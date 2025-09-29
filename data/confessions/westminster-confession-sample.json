@@ -1,0 +1,20 @@
+{
+  "title": "Westminster Confession of Faith (Sample Sections)",
+  "type": "confession",
+  "date": "1646",
+  "sections": [
+    {
+      "chapter": "1",
+      "title": "Of the Holy Scripture",
+      "content": "The Holy Scripture is the only sufficient, certain, and infallible rule of all saving knowledge, faith, and obedience.",
+      "topics": ["scripture", "authority", "salvation", "faith"]
+    },
+    {
+      "chapter": "2",
+      "title": "Of God and of the Holy Trinity",
+      "content": "There is but one only living and true God, who is infinite in being and perfection.",
+      "topics": ["god", "trinity"]
+    }
+  ],
+  "topics": ["scripture", "authority", "god", "trinity", "salvation", "faith"]
+}

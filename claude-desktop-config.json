@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "theologai": {
+      "command": "node",
+      "args": ["/Users/tyler/Projects/TheologAI/dist/index.js"],
+      "env": {
+        "ESV_API_KEY": "your_key_here"
+      }
+    }
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "title": "The Apostles' Creed",
+  "type": "creed",
+  "date": "c. 390 AD",
+  "sections": [
+    {
+      "title": "God the Father",
+      "content": "I believe in God, the Father almighty, creator of heaven and earth.",
+      "topics": ["trinity", "god the father", "creation"]
+    },
+    {
+      "title": "Jesus Christ",
+      "content": "I believe in Jesus Christ, his only Son, our Lord, who was conceived by the Holy Spirit, born of the Virgin Mary, suffered under Pontius Pilate, was crucified, died, and was buried; he descended to the dead. On the third day he rose again; he ascended into heaven, he is seated at the right hand of the Father, and he will come to judge the living and the dead.",
+      "topics": ["trinity", "jesus christ", "incarnation", "virgin birth", "holy spirit", "crucifixion", "resurrection", "ascension", "second coming"]
+    },
+    {
+      "title": "The Holy Spirit and the Church",
+      "content": "I believe in the Holy Spirit, the holy catholic Church, the communion of saints, the forgiveness of sins, the resurrection of the body, and the life everlasting. Amen.",
+      "topics": ["trinity", "holy spirit", "church", "communion of saints", "forgiveness", "resurrection", "eternal life"]
+    }
+  ],
+  "topics": [
+    "trinity", "god the father", "jesus christ", "holy spirit", "incarnation",
+    "virgin birth", "crucifixion", "resurrection", "ascension", "second coming",
+    "church", "communion of saints", "forgiveness", "eternal life"
+  ]
+}

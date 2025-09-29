@@ -1,0 +1,26 @@
+{
+  "name": "theologai",
+  "version": "1.0.0",
+  "description": "A Model Context Protocol server for Bible study and theological research",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "clean": "rm -rf dist",
+    "test": "echo \"Add tests in Phase 2\""
+  },
+  "keywords": ["bible", "theology", "mcp", "context-protocol"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.18.2",
+    "@types/node": "^24.5.2",
+    "typescript": "^5.9.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10",
+    "tsx": "^4.20.6"
+  }
+}
