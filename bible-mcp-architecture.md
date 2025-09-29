@@ -1,5 +1,12 @@
 # Bible Study MCP Server - Architecture Plan
 
+**Current Status: Phase 1 Complete (v1.0.0-phase1)**
+
+This document serves as the **architecture plan** for TheologAI MCP Server. Implementation status is annotated throughout:
+- ✅ = Implemented as planned
+- ⚠️ = Implemented differently than planned
+- 📋 = Planned but not yet implemented
+
 ## 1. System Architecture
 
 ### 1.1 Component Overview
@@ -7,92 +14,103 @@
 ┌─────────────────────┐
 │   Claude Desktop    │
 └──────────┬──────────┘
-           │ MCP Protocol
+           │ MCP Protocol (stdio)
 ┌──────────▼──────────┐
-│   MCP Server Core   │
+│   MCP Server Core   │  (src/index.ts, src/server.ts)
 ├─────────────────────┤
-│   Request Router    │
+│   Tool Handlers     │  (src/tools/)
+│  - bibleLookup      │  ✅ Implemented
+│  - historicalSearch │  ✅ Implemented (enhanced with topic tagging)
+│  - commentaryLookup │  ✅ Implemented (mock data)
 ├─────────────────────┤
-│   Tool Handlers     │
+│  Service Layer      │  (src/services/)
+│  - BibleService     │  ✅ Implemented
+│  - HistoricalService│  ✅ Implemented
+│  - CommentaryService│  ✅ Implemented (mock)
 ├─────────────────────┤
-│  Service Layer      │
-├─────────────────────┤
-│  Data Adapters      │
+│  Data Adapters      │  (src/adapters/)
+│  - ESVAdapter       │  ✅ Implemented with cache
+│  - LocalDataAdapter │  ✅ Implemented with section-level topics
 └──────────┬──────────┘
            │
-    ┌──────┴──────┬──────────┬─────────┐
-    │             │          │         │
-┌───▼───┐  ┌─────▼────┐ ┌───▼───┐ ┌───▼───┐
-│ESV API│  │NET Bible │ │ Local │ │ Cache │
-└───────┘  └──────────┘ └───────┘ └───────┘
+    ┌──────┴──────┬─────────┬─────────┐
+    │             │         │         │
+┌───▼───┐  ┌─────▼────┐ ┌──▼──┐ ┌───▼────┐
+│ESV API│  │Local JSON│ │Cache│ │NET Mock│
+│(5k/day)│  │  Data    │ │(TTL)│ │  Data  │
+└───────┘  └──────────┘ └─────┘ └────────┘
+           (creeds,                (4 verses)
+            confessions)
 ```
 
 ### 1.2 Core Components
 
-**MCP Server Core**
-- Entry point: `src/index.ts`
-- Handles MCP protocol handshake and message routing
-- Manages tool registration and lifecycle
+**MCP Server Core** ✅
+- Entry point: `src/index.ts` ✅
+- Handles MCP protocol handshake and message routing ✅
+- Manages tool registration and lifecycle ✅
 
-**Request Router**
-- Maps tool calls to appropriate handlers
-- Parses and validates parameters
-- Manages response formatting
+**Tool Handlers** ✅
+- Individual handler for each MCP tool ✅
+- Coordinates between service layer and response formatting ✅
+- Handles tool-specific error cases ✅
+- **Actual:** Three handlers implemented (bible_lookup, historical_search, commentary_lookup)
 
-**Tool Handlers**
-- Individual handler for each MCP tool
-- Coordinates between service layer and response formatting
-- Handles tool-specific error cases
+**Service Layer** ✅
+- Business logic for data retrieval and processing ✅
+- Combines data from multiple sources ✅
+- Implements caching strategies ✅
+- **Actual:** Three services: BibleService, HistoricalService, CommentaryService
 
-**Service Layer**
-- Business logic for data retrieval and processing
-- Combines data from multiple sources
-- Implements caching strategies
-
-**Data Adapters**
-- Abstraction layer for external APIs
-- Handles rate limiting and retries
-- Normalizes data formats
+**Data Adapters** ✅
+- Abstraction layer for external APIs ✅
+- Handles rate limiting via caching ✅
+- Normalizes data formats ✅
+- **Actual:** ESVAdapter (with cache), LocalDataAdapter (enhanced with section-level topics)
 
 ## 2. Project Structure
 
 ```
-bible-mcp-server/
+TheologAI/                      # ✅ Implemented
 ├── src/
-│   ├── index.ts              # MCP server entry point
-│   ├── server.ts             # MCP server class
-│   ├── tools/               
-│   │   ├── index.ts         # Tool registry
-│   │   ├── bibleLookup.ts   # Bible verse tool
-│   │   ├── commentary.ts    # Commentary tool
-│   │   ├── historical.ts    # Historical docs tool
-│   │   └── topical.ts       # Topical search tool
-│   ├── services/            
-│   │   ├── bibleService.ts  # Bible text logic
-│   │   ├── commentaryService.ts
-│   │   ├── historicalService.ts
-│   │   └── searchService.ts # Cross-resource search
-│   ├── adapters/            
-│   │   ├── esvApi.ts        # ESV API client
-│   │   ├── netBibleApi.ts   # NET Bible client
-│   │   └── localData.ts     # Local JSON handler
-│   ├── utils/               
-│   │   ├── parser.ts        # Reference parsing
-│   │   ├── formatter.ts     # Response formatting
-│   │   ├── cache.ts         # Simple cache
-│   │   └── errors.ts        # Error handling
-│   └── types/               
-│       ├── index.ts         # Type definitions
-│       └── mcp.ts           # MCP-specific types
-├── data/                    
-│   ├── confessions/         # JSON confession files
-│   ├── creeds/              # JSON creed files
-│   └── commentaries/        # Local commentary data
-├── config/                  
-│   └── default.json         # Configuration
-├── package.json            
-├── tsconfig.json           
-└── README.md               
+│   ├── index.ts              # ✅ MCP server entry point
+│   ├── server.ts             # ✅ MCP server class
+│   ├── tools/
+│   │   ├── index.ts         # ✅ Tool registry
+│   │   ├── bibleLookup.ts   # ✅ Bible verse tool
+│   │   ├── commentaryLookup.ts  # ✅ Commentary tool (was commentary.ts)
+│   │   ├── historicalSearch.ts  # ✅ Historical docs tool (was historical.ts)
+│   │   └── topical.ts       # 📋 Topical search tool (planned for Phase 3)
+│   ├── services/
+│   │   ├── bibleService.ts  # ✅ Bible text logic
+│   │   ├── commentaryService.ts  # ⚠️ Mock data (4 verses), real NET API in Phase 2
+│   │   ├── historicalService.ts  # ✅ (enhanced with section-level topics)
+│   │   └── searchService.ts # 📋 Cross-resource search (Phase 3)
+│   ├── adapters/
+│   │   ├── esvApi.ts        # ✅ ESV API client with cache
+│   │   ├── netBibleApi.ts   # 📋 NET Bible client (Phase 2)
+│   │   ├── localData.ts     # ✅ Local JSON handler with section topics
+│   │   └── index.ts         # ✅ Adapter exports
+│   ├── utils/
+│   │   ├── parser.ts        # 📋 Reference parsing (Phase 2)
+│   │   ├── formatter.ts     # ✅ Response formatting
+│   │   ├── cache.ts         # ✅ In-memory cache with TTL & LRU
+│   │   └── errors.ts        # ✅ Error handling
+│   └── types/
+│       └── index.ts         # ✅ Type definitions (consolidated)
+├── data/                    # ✅ Implemented
+│   ├── confessions/         # ✅ Westminster, Heidelberg (samples)
+│   ├── creeds/              # ✅ Apostles, Nicene (with section topics)
+│   └── commentaries/        # 📋 Local commentary data (Phase 2)
+├── config/                  # ⚠️ Not using config files, using .env instead
+├── package.json             # ✅
+├── tsconfig.json            # ✅
+├── .env                     # ✅ Environment variables
+├── .env.example             # ✅ Example env file
+├── README.md                # ✅ Complete documentation
+├── bible-mcp-prd.md         # ✅ Product requirements
+├── bible-mcp-architecture.md # ✅ This document
+└── bible-mcp-development-plan.md  # ✅ Development plan
 ```
 
 ## 3. Key TypeScript Patterns
@@ -230,30 +248,43 @@ class RateLimiter {
 
 ## 6. Caching Strategy
 
-### 6.1 Simple Memory Cache (Phase 1)
+### 6.1 Simple Memory Cache (Phase 1) ✅
 ```typescript
-// src/utils/cache.ts
-class SimpleCache {
-  private cache: Map<string, CacheEntry> = new Map();
-  private maxSize = 1000;
-  private ttl = 3600000; // 1 hour
-  
-  async get(key: string): Promise<any> {
-    const entry = this.cache.get(key);
-    if (!entry) return null;
-    if (Date.now() > entry.expires) {
-      this.cache.delete(key);
-      return null;
-    }
-    return entry.value;
+// src/utils/cache.ts - ✅ Implemented
+class Cache<T> {
+  private cache: Map<string, CacheEntry<T>> = new Map();
+  private maxSize = 100;           // ✅ Implemented (100 entries)
+  private ttlMs = 3600000;         // ✅ 1 hour TTL
+
+  get(key: string): T | undefined {
+    // ✅ Checks expiry, updates lastAccessed for LRU
   }
+
+  set(key: string, value: T): void {
+    // ✅ LRU eviction when cache full
+  }
+
+  // ✅ Additional methods: has(), clear(), size(), cleanup()
 }
 ```
 
-### 6.2 Cache Keys
+**Implementation Status:**
+- ✅ Generic type support for type safety
+- ✅ LRU eviction strategy implemented
+- ✅ TTL-based expiration
+- ✅ Integrated into ESVAdapter
+- **Performance:** Reduces API calls from ~160ms to <1ms
+
+### 6.2 Cache Keys ⚠️
+**Planned:**
 - Bible: `bible:${translation}:${reference}`
 - Commentary: `commentary:${source}:${reference}`
 - Historical: `historical:${document}:${query}`
+
+**Actual (Phase 1):**
+- Bible: `${reference}:${JSON.stringify(options)}` (in ESVAdapter)
+- Historical: No caching (local data, instant)
+- Commentary: No caching (mock data, instant)
 
 ## 7. Response Formatting
 

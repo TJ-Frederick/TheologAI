@@ -102,13 +102,28 @@ A Model Context Protocol (MCP) server that provides theological researchers and 
 
 ## 3. Data Sources Priority
 
-**Phase 1 (Week 1-2):**
-- ESV API (api.esv.org) - 5000 requests/day free
-- NET Bible API - Translation notes
-- Local JSON files - Confessions, creeds, basic commentaries
+**Phase 1 (Week 1-2) - ✅ COMPLETE:**
+- ✅ ESV API (api.esv.org) - 5000 requests/day, integrated with caching
+- ⚠️ NET Bible Notes - Mock data for 4 key verses (John 3:16, John 1:1, Genesis 1:1, Romans 8:28)
+  - *Note: Real NET Bible API integration planned for Phase 2*
+- ✅ Local JSON files - Apostles' Creed, Nicene Creed, Westminster Confession (sample), Heidelberg Catechism (sample)
+- ✅ Enhanced with section-level topic tagging for conceptual searches
 
 **Phase 2 (Week 3-4):**
-- Additional Bible translations via public APIs
+- **Public Domain Bible APIs (No Rate Limits):**
+  - **wldeh/bible-api** - 200+ versions via GitHub CDN, no auth required
+    - KJV, ASV, WEB, BBE, Darby, YLT, and 190+ more translations
+    - Endpoint: `https://cdn.jsdelivr.net/gh/wldeh/bible-api/bibles/[version]/books/[book]/chapters/[chapter].json`
+  - **bible-api.com** - Simple REST API
+    - WEB (default), KJV, and other public domain versions
+    - Rate limited but generous (15 requests per 30 seconds)
+  - **Rob Keplin's bible-go-api** - Self-hostable option
+    - KJV, ASV, WEB, NLT translations
+    - Can deploy own instance for unlimited access
+  - **Bolls.life API** - No usage limits
+    - Multiple public domain translations
+    - Updated regularly
+- Real NET Bible API integration for translation notes
 - Matthew Henry Commentary (processed from public domain sources)
 - Calvin's Commentaries (if freely available)
 
@@ -116,6 +131,21 @@ A Model Context Protocol (MCP) server that provides theological researchers and 
 - SWORD module integration
 - CCEL API integration
 - Archive.org theological texts
+- Greek/Hebrew lexicons and interlinears
+
+### 3.1 Public Domain Bible Translations (Recommended for Phase 2)
+
+**Priority Translations:**
+1. **KJV (King James Version)** - Most widely recognized, public domain
+2. **WEB (World English Bible)** - Modern public domain translation
+3. **ASV (American Standard Version)** - Scholarly public domain option
+4. **BBE (Bible in Basic English)** - Simple, accessible translation
+
+**Benefits:**
+- No rate limits or API keys required
+- Can be cached indefinitely (public domain)
+- Multiple versions for parallel translation display
+- Self-hostable options available
 
 *Note: See Architecture Plan document for technical implementation details*
 
@@ -228,31 +258,39 @@ All tools return structured data that gets formatted into natural language:
 
 ## 6. Development Phases
 
-### Phase 1: MVP (Week 1-2)
+### Phase 1: MVP (Week 1-2) - ✅ COMPLETE
 **Goal:** Basic working MCP server with essential Bible lookup
 
 **Deliverables:**
-1. Basic MCP server setup in TypeScript
-2. ESV API integration for verse lookup
-3. Simple commentary access (NET Bible notes)
-4. Local JSON storage for 2-3 confessions
-5. Basic error handling and response formatting
+1. ✅ Basic MCP server setup in TypeScript
+2. ✅ ESV API integration for verse lookup with intelligent caching
+3. ⚠️ Simple commentary access (NET Bible notes) - Mock data for 4 verses
+4. ✅ Local JSON storage for 4 historical documents (2 creeds, 2 confessions)
+5. ✅ Section-level topic tagging for conceptual searches (beyond MVP!)
+6. ✅ Comprehensive error handling and response formatting
 
 **Success Metrics:**
-- Successfully connects to Claude Desktop
-- Can retrieve any Bible verse from ESV
-- Returns formatted, readable responses
-- Handles basic errors gracefully
+- ✅ Successfully connects to Claude Desktop
+- ✅ Can retrieve any Bible verse from ESV
+- ✅ Returns formatted, readable responses with proper citations
+- ✅ Handles basic errors gracefully with helpful messages
+- ✅ Cache performance: 160ms → <1ms on repeated queries
+- ✅ 9/9 tests passing
 
 ### Phase 2: Enhancement (Week 3-4)
 **Goal:** Expand resource coverage and improve UX
 
 **Deliverables:**
-1. Additional Bible translation (KJV)
-2. Matthew Henry commentary integration
-3. Cross-reference support
-4. Improved natural language understanding
-5. Basic caching for common queries
+1. **Public Domain Bible APIs** - Priority over ESV-only approach
+   - Integrate wldeh/bible-api (200+ versions, no rate limits)
+   - Add KJV, WEB, ASV translations
+   - Implement translation selection parameter
+   - Support parallel translation display
+2. **Real NET Bible API integration** - Replace mock data
+3. Matthew Henry commentary integration
+4. Cross-reference support
+5. Improved natural language understanding
+6. Enhanced caching for multiple translations
 
 ### Phase 3: Optimization (Week 5+)
 **Goal:** Performance improvements and advanced features
