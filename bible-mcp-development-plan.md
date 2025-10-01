@@ -1,9 +1,10 @@
 # Bible Study MCP Server - Development Plan
 
-**Current Status: Phase 1 Complete ✅ (v1.0.0-phase1)**
+**Current Status: Phase 2 - CCEL Integration Complete ✅**
 - Repository: https://github.com/TJ-Frederick/TheologAI
-- All Phase 1 deliverables completed
-- 9/9 tests passing
+- Phase 1: Complete (ESV Bible, Historical Docs, Mock Commentary)
+- Phase 2: CCEL Integration Complete (Classic Christian Texts)
+- All integration tests passing
 
 ## Phase 1: MVP Foundation (Days 1-7) - ✅ COMPLETE
 
@@ -136,6 +137,63 @@ mkdir -p data/confessions data/creeds
    - Tag v1.0.0-phase1 release ✅
 
 ## Phase 2: Enhancement (Days 8-14)
+
+### CCEL Integration - ✅ COMPLETE
+
+**Goal:** Integrate Christian Classics Ethereal Library for access to classic theological texts
+
+**Accomplished:**
+1. **CCEL API Adapter** ✅
+   - Created `src/adapters/ccelApi.ts` with three endpoints:
+     - Scripture API (alternative Bible source, XML format)
+     - Work Section API (full sections of classic works, HTML format)
+     - Work Fragments API (quotations from works)
+   - HTML content extraction targeting book-content div
+   - Comprehensive error handling and validation
+
+2. **TOC Parser with Auto-Resolution** ✅
+   - Created `src/adapters/ccelToc.ts` for parsing work TOCs
+   - Automatic section ID resolution from natural language
+   - Support for complex hierarchies (Book/Chapter/Part/Question/Article)
+   - Part number inheritance for nested structures (e.g., Summa Theologica)
+   - 24-hour caching of parsed TOCs (LRU eviction)
+
+3. **Section Resolver Service** ✅
+   - Created `src/services/sectionResolver.ts`
+   - Natural language query → section ID mapping
+   - Confidence scoring (exact/high/medium/low)
+   - Alternative suggestions when confidence is low
+   - Structured query parsing ("Book 1 Chapter 1", "Part 1 Question 2")
+
+4. **CCEL Service Layer** ✅
+   - Created `src/services/ccelService.ts`
+   - Popular works catalog (Calvin, Aquinas, Augustine, Bunyan, Luther)
+   - Clean integration with adapter and resolver
+   - Proper title formatting and error messages
+
+5. **Classic Text Lookup Tool** ✅
+   - Created `src/tools/classicTextLookup.ts`
+   - Four modes: list works, browse sections, search works, retrieve content
+   - Automatic resolution - users never need section IDs
+   - Clean markdown formatting
+
+6. **Integration Tests** ✅
+   - CCEL adapter tests: 8/8 passing
+   - Section resolver tests: 4/4 passing
+   - End-to-end integration validated
+   - Tested with Calvin's Institutes and Aquinas' Summa
+
+**Key Features:**
+- No manual section IDs required - natural language only!
+- Supports Summa's Part/Question/Article hierarchy
+- Prioritizes structured search over fuzzy matching
+- Reverse pattern matching ("First Part" → part: 1)
+- Generic solution works across all CCEL works
+
+**Performance:**
+- TOC caching: 24-hour TTL reduces API calls
+- Fast section resolution (<100ms typical)
+- Clean text extraction from HTML
 
 ### Day 8-9: Public Domain Bible APIs Integration
 

@@ -46,3 +46,25 @@ export function formatToolResponse(content: string) {
     }]
   };
 }
+
+export interface MarkdownFormatOptions {
+  title: string;
+  content: string;
+  citation?: string;
+  footer?: string;
+}
+
+export function formatMarkdown(options: MarkdownFormatOptions): string {
+  let response = `**${options.title}**\n\n`;
+  response += `${options.content}\n\n`;
+
+  if (options.citation) {
+    response += `*Citation: ${options.citation}*\n`;
+  }
+
+  if (options.footer) {
+    response += `*${options.footer}*`;
+  }
+
+  return response.trim();
+}

@@ -2,3 +2,7 @@ export { ESVAdapter } from './esvApi.js';
 export type { ESVPassageResponse } from './esvApi.js';
 export { LocalDataAdapter } from './localData.js';
 export type { HistoricalDocument, DocumentSection } from './localData.js';
+export { CCELApiAdapter } from './ccelApi.js';
+export type { CCELScriptureOptions, CCELWorkFragment, CCELWorkSection, CCELScriptureResponse, CCELWorkResponse } from './ccelApi.js';
+export { CCELTocParser } from './ccelToc.js';
+export type { TocEntry, ParsedToc } from './ccelToc.js';

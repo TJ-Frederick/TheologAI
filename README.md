@@ -2,17 +2,18 @@
 
 A Model Context Protocol (MCP) server that provides theological researchers and Bible students with programmatic access to biblical texts, commentaries, and historical Christian documents through natural language queries via Claude Desktop.
 
-## Current Status: Phase 1 Complete - Full MVP Ready! 🎉
+## Current Status: Phase 2 In Progress - CCEL Integration Complete! 🎉
 
-TheologAI now provides comprehensive theological research tools with three main capabilities:
+TheologAI now provides comprehensive theological research tools with four main capabilities:
 
 ## Features
 
 - **📖 Full Bible Access**: Look up ANY Bible verse or passage using the ESV API
 - **🏛️ Historical Documents**: Search through creeds, confessions, and catechisms with section-level topic tagging
+- **📚 Classic Christian Texts**: Access thousands of classic works from CCEL with automatic section resolution
 - **📝 Commentary & Notes**: Get translation notes and commentary on Bible verses
 - **🔍 Smart Search**: Topic-based conceptual search across all historical documents
-- **⚡ Fast & Reliable**: In-memory caching with 1-hour TTL reduces API calls and improves performance
+- **⚡ Fast & Reliable**: In-memory caching with 24-hour TTL for TOCs and 1-hour for Bible verses
 - **✨ Clean Formatting**: Beautiful markdown output with proper citations
 
 ## MCP Tools Available
@@ -29,6 +30,14 @@ Search historical Christian documents
 - **Example**: "Search for 'salvation' in confessions"
 - **Parameters**: `query` (required), `document`, `docType`
 
+### 📚 `classic_text_lookup` ✨ NEW!
+Access classic Christian texts from CCEL with natural language queries
+- **Example**: "Look up Calvin's Institutes Book 1 Chapter 1"
+- **Example**: "Show me Aquinas Summa Part 1 Question 2"
+- **Example**: "Get Augustine's Confessions Book 4"
+- **Parameters**: `work` (e.g., "calvin/institutes"), `query` (natural language)
+- **No section IDs needed** - automatic resolution from natural language!
+
 ### 📝 `commentary_lookup`
 Get translation notes and commentary on verses
 - **Example**: "Get commentary on John 1:1"
@@ -44,6 +53,21 @@ Get translation notes and commentary on verses
 ### Confessions & Catechisms
 - **Westminster Confession of Faith** (1646) - Sample sections
 - **Heidelberg Catechism** (1563) - Sample questions
+
+### Classic Christian Texts (CCEL) ✨ NEW!
+Access thousands of works from the Christian Classics Ethereal Library:
+- **Calvin's Institutes of the Christian Religion**
+- **Aquinas' Summa Theologica** (with Part/Question/Article hierarchy support)
+- **Augustine's Confessions**
+- **Bunyan's Pilgrim's Progress**
+- **Luther's Works**
+- And hundreds more...
+
+**Features:**
+- Natural language section resolution (no manual section IDs!)
+- Automatic TOC parsing and caching
+- Support for complex hierarchies (Books, Chapters, Parts, Questions, Articles)
+- Clean text extraction from HTML
 
 ### Commentary
 - **NET Bible Notes** - Sample commentary available for common verses (John 3:16, John 1:1, Genesis 1:1, Romans 8:28)
@@ -93,6 +117,11 @@ Get translation notes and commentary on verses
    - "Show me the Apostles' Creed"
    - "Search for 'comfort' in the Heidelberg Catechism"
 
+   **Classic Texts:**
+   - "Look up Calvin's Institutes Book 1 Chapter 1"
+   - "Show me Aquinas Summa Part 1 Question 2"
+   - "Get Augustine's Confessions Book 4"
+
    **Commentary:**
    - "Get commentary on John 1:1"
    - "What do the notes say about Genesis 1:1?"
@@ -125,47 +154,71 @@ Look up Bible verses by reference.
 - `includeContext` (optional): Include surrounding verses
 - `includeCrossRefs` (optional): Include cross-references
 
-## Phase 1 Complete! ✅
+## Development Progress
 
-**Accomplished:**
+### Phase 1 Complete! ✅
 - ✅ Full ESV API integration with 5000 verses/day
-- ✅ Historical document search with section-level topic tagging for conceptual queries
-- ✅ Commentary and translation notes system (mock data for 4 key verses)
+- ✅ Historical document search with section-level topic tagging
+- ✅ Commentary and translation notes system (mock data)
 - ✅ Clean MCP tool interface with proper error handling
-- ✅ In-memory caching system (1-hour TTL, LRU eviction, 100-entry capacity)
-- ✅ Comprehensive test suite validated
+- ✅ In-memory caching (1-hour TTL, LRU eviction)
+- ✅ Comprehensive test suite
+
+### Phase 2: CCEL Integration ✅
+- ✅ CCEL API adapter with Scripture, Work Section, and Fragment endpoints
+- ✅ Automatic section resolution from natural language queries
+- ✅ TOC parsing with 24-hour caching
+- ✅ Support for complex hierarchies (Book/Chapter/Part/Question/Article)
+- ✅ Part number inheritance for nested structures (e.g., Summa Theologica)
+- ✅ Clean HTML content extraction
+- ✅ Integration tests for section resolver and adapter
 
 **Performance:**
-- Cache reduces Bible verse lookup from ~160ms to <1ms on repeated queries
+- Bible verse cache: ~160ms → <1ms on repeated queries
+- TOC caching: 24-hour TTL reduces API calls
 - ESV API rate limit protection through intelligent caching
-- Fast local historical document search
 
 ## Next Steps (Phase 2+)
 
-**Potential Enhancements:**
+**In Progress:**
+- [ ] NET Bible API integration (real commentary data)
+- [ ] Additional Bible translations (KJV, NASB via public domain APIs)
+
+**Future Enhancements:**
 - [ ] Expanded commentary collection (Matthew Henry, Calvin)
-- [ ] Additional Bible translations (KJV, NASB)
 - [ ] Cross-reference system integration
 - [ ] Greek/Hebrew word study tools
 - [ ] Advanced topical search across all resources
-- [ ] Caching and performance optimizations
 
 ## Architecture
 
 ```
 src/
-├── index.ts              # MCP server entry point
-├── server.ts             # Main server class
-├── tools/                # Tool handlers
-│   ├── index.ts         # Tool registry
-│   └── bibleLookup.ts   # Bible lookup tool
-├── services/            # Business logic
-│   └── bibleService.ts  # Bible service (currently mock)
-├── utils/               # Utilities
-│   ├── formatter.ts     # Response formatting
-│   └── errors.ts        # Error handling
-└── types/               # Type definitions
-    └── index.ts         # Common types
+├── index.ts                      # MCP server entry point
+├── server.ts                     # Main server class
+├── adapters/                     # External API adapters
+│   ├── index.ts                 # Adapter exports
+│   ├── esvApi.ts               # ESV Bible API
+│   ├── ccelApi.ts              # CCEL API (Scripture, Works, Fragments)
+│   └── ccelToc.ts              # CCEL TOC parser with auto-resolution
+├── services/                     # Business logic layer
+│   ├── bibleService.ts          # Bible verse service
+│   ├── historicalService.ts     # Historical documents
+│   ├── commentaryService.ts     # Commentary notes
+│   ├── ccelService.ts           # CCEL classic texts
+│   └── sectionResolver.ts       # Natural language → section ID
+├── tools/                        # MCP tool handlers
+│   ├── index.ts                 # Tool registry
+│   ├── bibleLookup.ts           # Bible verse lookup
+│   ├── historicalSearch.ts      # Historical document search
+│   ├── commentaryLookup.ts      # Commentary retrieval
+│   └── classicTextLookup.ts     # CCEL classic text lookup
+├── utils/                        # Utilities
+│   ├── cache.ts                 # In-memory caching (Bible & TOC)
+│   ├── formatter.ts             # Markdown formatting
+│   └── errors.ts                # Error handling
+└── types/                        # Type definitions
+    └── index.ts                 # Common types
 ```
 
 ## License
