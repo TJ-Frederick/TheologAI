@@ -7,7 +7,7 @@ const commentaryService = new CommentaryService();
 
 export const commentaryLookupHandler: ToolHandler = {
   name: 'commentary_lookup',
-  description: 'Get theological commentary and exposition on Bible verses from public domain sources. Returns Matthew Henry\'s complete commentary (default), providing verse-by-verse theological exposition and practical application. Also available: Matthew Henry Concise and Jamieson-Fausset-Brown. Use this when the user asks for commentary, study help, exposition, or theological insight on a verse.',
+  description: 'Get theological commentary and exposition on Bible verses from public domain sources via HelloAO Bible API. Returns verse-by-verse theological exposition and practical application from classic commentaries. Default: Matthew Henry (most comprehensive). Use this when the user asks for commentary, study help, exposition, or theological insight on a verse.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -17,8 +17,8 @@ export const commentaryLookupHandler: ToolHandler = {
       },
       commentator: {
         type: 'string',
-        description: 'Preferred commentator. Options: "Matthew Henry" (default - most comprehensive), "Matthew Henry Concise" (shorter), "Jamieson-Fausset-Brown" (JFB), "ESV" (textual variants only)',
-        enum: ['Matthew Henry', 'Matthew Henry Concise', 'Jamieson-Fausset-Brown', 'JFB', 'ESV']
+        description: 'Preferred commentator. Options: "Matthew Henry" (default, comprehensive), "Jamieson-Fausset-Brown" (JFB, concise), "Adam Clarke" (detailed), "John Gill" (Baptist perspective), "Keil-Delitzsch" (OT only, scholarly), "Tyndale" (modern notes)',
+        enum: ['Matthew Henry', 'Jamieson-Fausset-Brown', 'JFB', 'Adam Clarke', 'John Gill', 'Keil-Delitzsch', 'Tyndale', 'ESV']
       },
       maxLength: {
         type: 'number',

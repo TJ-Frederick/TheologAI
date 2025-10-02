@@ -41,7 +41,7 @@ export class CommentaryService {
   }
 
   /**
-   * Get public domain commentary from CCEL
+   * Get public domain commentary from HelloAO Bible API
    * Provides actual theological commentary (not just textual notes)
    */
   private async getPublicDomainCommentary(reference: string, commentator: string): Promise<CommentaryResult> {
@@ -56,7 +56,7 @@ export class CommentaryService {
       commentaryText += `---\n\n`;
       commentaryText += result.fullText;
       commentaryText += `\n\n---\n\n`;
-      commentaryText += `*Source: [CCEL - Christian Classics Ethereal Library](${result.url})*`;
+      commentaryText += `*Source: [HelloAO Bible API](${result.url}) (Public Domain)*`;
 
       return {
         reference,
@@ -73,8 +73,9 @@ export class CommentaryService {
       throw new APIError(
         404,
         `Commentary not available for ${reference} from ${commentator}. ` +
-        `This may be due to: (1) Invalid reference format, (2) Book not covered by this commentator, ` +
-        `or (3) CCEL structure mismatch. Try "Matthew Henry" for most comprehensive coverage.`
+        `This may be due to: (1) Invalid reference format, (2) Book not covered by this commentator ` +
+        `(e.g., Keil-Delitzsch is OT only), or (3) Unknown commentator name. ` +
+        `Available: Matthew Henry, Jamieson-Fausset-Brown, Adam Clarke, John Gill, Keil-Delitzsch, Tyndale.`
       );
     }
   }
@@ -180,7 +181,12 @@ export class CommentaryService {
            normalized.includes('jfb') ||
            normalized.includes('jamieson') ||
            normalized.includes('fausset') ||
-           normalized.includes('brown');
+           normalized.includes('brown') ||
+           normalized.includes('clarke') ||
+           normalized.includes('gill') ||
+           normalized.includes('keil') ||
+           normalized.includes('delitzsch') ||
+           normalized.includes('tyndale');
   }
 
   /**
@@ -189,9 +195,12 @@ export class CommentaryService {
   getAvailableCommentators(): string[] {
     return [
       'Matthew Henry',
-      'Matthew Henry Concise',
       'Jamieson-Fausset-Brown',
-      'ESV (translation notes only)'
+      'Adam Clarke',
+      'John Gill',
+      'Keil-Delitzsch (OT only)',
+      'Tyndale',
+      'ESV (translation notes only - legacy)'
     ];
   }
 

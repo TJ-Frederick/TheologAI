@@ -426,6 +426,130 @@ mkdir -p data/confessions data/creeds
 
 **Key Achievement:** Real theological commentary (not just textual notes) now available from public domain sources!
 
+---
+
+### Priority 1.5: HelloAO Bible API Integration - ✅ COMPLETE
+
+**Goal:** Replace CCEL HTML parsing with clean JSON API for commentary
+
+**Status: COMPLETED** - Full integration with bible.helloao.org API
+
+**Why HelloAO?**
+- 1000+ Bible translations (vs ESV/NET only)
+- 6 public domain commentaries in clean JSON format
+- Zero API keys, zero rate limits, zero cost
+- No HTML parsing needed (vs CCEL)
+- Verse-level commentary extraction built-in
+
+**Accomplishments:**
+
+1. **HelloAO API Adapter** (`src/adapters/helloaoApi.ts`) ✅
+   - Complete API client for bible.helloao.org
+   - Translation endpoint integration (1000+ versions)
+   - Commentary endpoint integration (6 commentaries)
+   - Dual format parsing:
+     - Format 1: `{ verseNumber, content: [{ type, content }] }` (Matthew Henry, Clarke, Gill)
+     - Format 2: `{ type: 'verse', number, content: [strings] }` (JFB, Tyndale)
+   - Book code mapping (3-letter codes: GEN, JHN, etc.)
+   - Static helper methods for verse extraction
+
+2. **Reference Mapping Utility** (`src/utils/helloaoMapper.ts`) ✅
+   - Maps Bible references to HelloAO format
+   - Dual book mappings:
+     - `HELLOAO_BOOK_CODES` - 3-letter codes for commentaries (GEN, JHN)
+     - `HELLOAO_BOOK_NAMES` - Full names for translations (Genesis, John)
+   - Commentary validation (e.g., Keil-Delitzsch OT only)
+   - OT/NT detection for commentator support
+   - Returns: `{ book, bookCode, chapter, verse, endVerse }`
+
+3. **Public Commentary Adapter Rewrite** (`src/adapters/publicCommentaryAdapter.ts`) ✅
+   - Complete rewrite from CCEL HTML to HelloAO JSON
+   - HelloAO exclusive (no CCEL fallback per user request)
+   - CCEL reserved for historical classic texts (Augustine, Calvin)
+   - 6 convenience methods:
+     - `getMatthewHenry()`
+     - `getJFB()`
+     - `getAdamClarke()`
+     - `getJohnGill()`
+     - `getKeilDelitzsch()` (OT only)
+     - `getTyndale()`
+
+4. **Commentary Service Update** (`src/services/commentaryService.ts`) ✅
+   - Routes all commentary through HelloAO
+   - Updated commentator list:
+     - Matthew Henry
+     - Jamieson-Fausset-Brown
+     - Adam Clarke
+     - John Gill
+     - Keil-Delitzsch (OT only)
+     - Tyndale
+     - ESV (legacy translation notes only)
+   - Clear error messages referencing HelloAO
+
+5. **Commentary Tool Enhancement** (`src/tools/commentaryLookup.ts`) ✅
+   - Updated description: "via HelloAO Bible API"
+   - Expanded enum with all 6 commentators
+   - Removed "Matthew Henry Concise" (HelloAO has complete only)
+
+**Available Commentaries:**
+1. **Matthew Henry** - Complete commentary, comprehensive exposition
+2. **Jamieson-Fausset-Brown (JFB)** - Concise, practical commentary
+3. **Adam Clarke** - Detailed scholarly commentary
+4. **John Gill** - Baptist perspective, thorough exposition
+5. **Keil-Delitzsch** - OT only, scholarly Hebrew analysis
+6. **Tyndale** - Modern open study notes
+
+**Test Coverage:**
+
+HelloAO API Tests (`test/adapters/helloao-api-test.ts`):
+- ✓ Available translations: 1253 found
+- ✓ Available commentaries: 6 found
+- ✓ BSB translation (John 3): 36 verses
+- ✓ Matthew Henry (John 3): 2 section entries
+- ✓ JFB (John 3): 31 verse entries, verse 16 extracted
+- ✓ Adam Clarke (Genesis 1): 19 verse entries
+
+Integration Tests (`test/integration/phase3-helloao-test.ts`):
+- ✓ 8/8 tests passing
+- ✓ All 6 commentators validated
+- ✓ Multi-verse ranges (Ephesians 2:8-9)
+- ✓ OT and NT coverage
+- ✓ Quality checks (word count, reference, commentator name)
+
+**Architecture Decision:**
+- HelloAO: All Bible commentary (JSON API)
+- CCEL: Historical classic texts only (Augustine, Calvin, etc.)
+- Clean separation of concerns for optimal performance
+
+**Critical Fixes:**
+1. **Book Code Mapping** - Commentary endpoints require 3-letter codes (JHN, GEN) not full names
+2. **Dual Format Parsing** - Different commentaries use different JSON structures
+3. **Verse-Specific Extraction** - Handles both verse numbers and section-level commentary
+
+**New Files Created:**
+- `src/adapters/helloaoApi.ts` (352 lines) - Complete HelloAO API client
+- `src/utils/helloaoMapper.ts` (440+ lines) - Reference mapping with dual book formats
+- `test/adapters/helloao-api-test.ts` - Comprehensive API adapter tests
+- `test/integration/phase3-helloao-test.ts` - Full integration test suite
+- `test/quick-jfb-test.ts` - Debugging helper
+- `test/quick-matthew-henry-john3.ts` - Commentary structure analysis
+
+**Performance:**
+- JSON parsing (vs HTML scraping)
+- In-memory cache with 1-hour TTL (existing Cache infrastructure)
+- Zero rate limits, unlimited requests
+- Typical response time: <200ms
+
+**Success Criteria Met:**
+- ✅ 6 public domain commentaries available
+- ✅ Clean JSON API (no HTML parsing)
+- ✅ Verse-level commentary extraction
+- ✅ Zero API keys or rate limits
+- ✅ All tests passing (14 tests total)
+- ✅ Build successful with no errors
+
+**Key Achievement:** Best-in-class public domain commentary access with zero infrastructure costs!
+
 ### Priority 2: Additional Public Domain Bible Translations (EASY WIN)
 
 **Goal:** Add KJV, WEB, ASV via wldeh/bible-api

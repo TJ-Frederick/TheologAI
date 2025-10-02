@@ -1,287 +1,204 @@
 /**
  * Public Domain Commentary Adapter
  *
- * Provides access to public domain Bible commentaries via CCEL:
+ * Provides access to public domain Bible commentaries via HelloAO Bible API:
  * - Matthew Henry's Complete Commentary
- * - Matthew Henry's Concise Commentary
  * - Jamieson-Fausset-Brown Commentary
- * - And others
+ * - Adam Clarke Commentary
+ * - John Gill Commentary
+ * - Keil-Delitzsch Commentary (OT only)
+ * - Tyndale Open Study Notes
  *
- * Leverages existing CCELApiAdapter for data retrieval.
+ * Uses HelloAO API (bible.helloao.org) for clean JSON data instead of HTML scraping.
+ *
+ * Previous implementation used CCEL HTML parsing - that has been replaced for commentary
+ * with this cleaner HelloAO JSON approach. CCEL is still used for classic texts (Augustine, Calvin, etc.)
  */
 
-import { CCELApiAdapter, type CCELWorkSection } from './ccelApi.js';
+import { HelloAOApiAdapter } from './helloaoApi.js';
 import {
-  mapToMatthewHenry,
-  mapToMatthewHenryConcise,
-  mapToJFB,
-  parseReference
-} from '../utils/commentaryMapper.js';
+  mapReferenceToHelloAO,
+  getHelloAOCommentaryId,
+  validateCommentatorSupportsBook,
+  getAvailableHelloAOCommentators,
+  type HelloAOReference
+} from '../utils/helloaoMapper.js';
 
 export interface CommentaryOptions {
   reference: string;
-  commentator?: 'Matthew Henry' | 'Matthew Henry Concise' | 'JFB' | 'Jamieson-Fausset-Brown';
+  commentator?: string; // Any HelloAO commentator name
 }
 
 export interface CommentaryResponse {
   reference: string;
   commentator: string;
-  chapterCommentary: string;
   verseCommentary?: string;
+  chapterCommentary: string;
   fullText: string;
-  work: string;
-  section: string;
   url: string;
 }
 
 /**
  * Public Domain Commentary Adapter
- * Fetches and parses commentary from CCEL
+ * Fetches and parses commentary from HelloAO Bible API
  */
 export class PublicCommentaryAdapter {
-  private ccel: CCELApiAdapter;
+  private helloao: HelloAOApiAdapter;
 
   constructor() {
-    this.ccel = new CCELApiAdapter();
+    this.helloao = new HelloAOApiAdapter();
   }
 
   /**
-   * Get Matthew Henry's Complete Commentary for a Bible reference
-   *
-   * @param reference - Bible reference (e.g., "John 3:16")
-   * @returns Commentary response with full chapter and verse-specific content
-   */
-  async getMatthewHenry(reference: string): Promise<CommentaryResponse> {
-    const mapping = mapToMatthewHenry(reference);
-    const parsed = parseReference(reference);
-
-    // Fetch the chapter commentary from CCEL
-    const result = await this.ccel.getWorkSection({
-      work: mapping.work,
-      section: mapping.section
-    });
-
-    // Extract verse-specific commentary if verse number provided
-    let verseCommentary: string | undefined;
-    if (mapping.verse) {
-      verseCommentary = this.extractVerseCommentary(result.content, mapping.verse);
-    }
-
-    return {
-      reference,
-      commentator: 'Matthew Henry',
-      chapterCommentary: result.content,
-      verseCommentary,
-      fullText: verseCommentary || result.content,
-      work: mapping.work,
-      section: mapping.section,
-      url: `https://ccel.org/ccel/${mapping.work}/${mapping.section}.html`
-    };
-  }
-
-  /**
-   * Get Matthew Henry's Concise Commentary for a Bible reference
-   *
-   * @param reference - Bible reference (e.g., "John 3:16")
-   * @returns Commentary response
-   */
-  async getMatthewHenryConcise(reference: string): Promise<CommentaryResponse> {
-    const mapping = mapToMatthewHenryConcise(reference);
-
-    const result = await this.ccel.getWorkSection({
-      work: mapping.work,
-      section: mapping.section
-    });
-
-    let verseCommentary: string | undefined;
-    if (mapping.verse) {
-      verseCommentary = this.extractVerseCommentary(result.content, mapping.verse);
-    }
-
-    return {
-      reference,
-      commentator: 'Matthew Henry (Concise)',
-      chapterCommentary: result.content,
-      verseCommentary,
-      fullText: verseCommentary || result.content,
-      work: mapping.work,
-      section: mapping.section,
-      url: `https://ccel.org/ccel/${mapping.work}/${mapping.section}.html`
-    };
-  }
-
-  /**
-   * Get Jamieson-Fausset-Brown Commentary for a Bible reference
-   * Note: This is experimental - JFB structure on CCEL may differ
-   *
-   * @param reference - Bible reference (e.g., "John 3:16")
-   * @returns Commentary response
-   */
-  async getJFB(reference: string): Promise<CommentaryResponse> {
-    const mapping = mapToJFB(reference);
-
-    try {
-      const result = await this.ccel.getWorkSection({
-        work: mapping.work,
-        section: mapping.section
-      });
-
-      let verseCommentary: string | undefined;
-      if (mapping.verse) {
-        verseCommentary = this.extractVerseCommentary(result.content, mapping.verse);
-      }
-
-      return {
-        reference,
-        commentator: 'Jamieson-Fausset-Brown',
-        chapterCommentary: result.content,
-        verseCommentary,
-        fullText: verseCommentary || result.content,
-        work: mapping.work,
-        section: mapping.section,
-        url: `https://ccel.org/ccel/${mapping.work}/${mapping.section}.html`
-      };
-    } catch (error) {
-      throw new Error(
-        `JFB Commentary not available for ${reference}. ` +
-        `JFB commentary may use a different CCEL structure. ` +
-        `Try Matthew Henry instead.`
-      );
-    }
-  }
-
-  /**
-   * Get commentary from any available commentator
+   * Get commentary for any Bible reference from any available commentator
    *
    * @param options - Commentary options with reference and optional commentator
-   * @returns Commentary response
+   * @returns Commentary response with verse-specific and chapter content
+   *
+   * @example
+   * ```typescript
+   * const adapter = new PublicCommentaryAdapter();
+   * const result = await adapter.getCommentary({
+   *   reference: 'John 3:16',
+   *   commentator: 'Matthew Henry'
+   * });
+   * ```
    */
   async getCommentary(options: CommentaryOptions): Promise<CommentaryResponse> {
     const { reference, commentator = 'Matthew Henry' } = options;
 
-    const normalized = commentator.toLowerCase();
+    // Map reference to HelloAO format
+    const helloaoRef = mapReferenceToHelloAO(reference);
 
-    if (normalized.includes('concise')) {
-      return this.getMatthewHenryConcise(reference);
+    // Get HelloAO commentary ID
+    const commentaryId = getHelloAOCommentaryId(commentator);
+
+    // Validate commentator supports this book (e.g., Keil-Delitzsch is OT only)
+    validateCommentatorSupportsBook(commentator, helloaoRef.book);
+
+    // Fetch chapter commentary from HelloAO (uses book code for commentaries)
+    const chapterResponse = await this.helloao.getCommentaryChapter(
+      commentaryId,
+      helloaoRef.bookCode,
+      helloaoRef.chapter
+    );
+
+    // Build URL for reference
+    const url = `https://bible.helloao.org/api/c/${commentaryId}/${helloaoRef.bookCode}/${helloaoRef.chapter}.json`;
+
+    // Extract verse-specific commentary if verse number provided
+    let verseCommentary: string | undefined;
+    if (helloaoRef.verse) {
+      verseCommentary = HelloAOApiAdapter.getCommentaryForVerse(
+        chapterResponse,
+        helloaoRef.verse
+      );
     }
 
-    if (normalized.includes('jfb') || normalized.includes('jamieson')) {
-      return this.getJFB(reference);
-    }
+    // Build full chapter commentary text
+    const chapterCommentary = this.buildChapterCommentary(chapterResponse);
 
-    // Default to Matthew Henry Complete
-    return this.getMatthewHenry(reference);
+    // Determine which text to use as primary
+    const fullText = verseCommentary || chapterCommentary;
+
+    return {
+      reference,
+      commentator: chapterResponse.commentary.name,
+      verseCommentary,
+      chapterCommentary,
+      fullText,
+      url
+    };
   }
 
   /**
-   * Extract verse-specific commentary from chapter commentary
-   *
-   * Matthew Henry's commentary often has verse-range headings like:
-   * - "Verses 1-5"
-   * - "Verses 16-21"
-   * - "Ver. 16"
-   *
-   * This method attempts to find and extract the relevant section.
-   *
-   * @param chapterText - Full chapter commentary text
-   * @param verseNumber - Target verse number
-   * @returns Extracted verse commentary or undefined if not found
+   * Get Matthew Henry's Commentary
    */
-  private extractVerseCommentary(chapterText: string, verseNumber: number): string | undefined {
-    // Split into paragraphs
-    const paragraphs = chapterText.split('\n\n');
+  async getMatthewHenry(reference: string): Promise<CommentaryResponse> {
+    return this.getCommentary({ reference, commentator: 'Matthew Henry' });
+  }
 
-    // Look for verse headings (various formats)
-    const versePatterns = [
-      // "Verses 16-21"
-      new RegExp(`Verses?\\s+(\\d+)-(\\d+)`, 'i'),
-      // "Ver. 16" or "V. 16"
-      new RegExp(`Ver?\\.?\\s+(\\d+)`, 'i'),
-      // "16-21."
-      new RegExp(`^(\\d+)-(\\d+)\\.?\\s*$`, 'i'),
-      // "16."
-      new RegExp(`^(\\d+)\\.?\\s*$`, 'i')
-    ];
+  /**
+   * Get Jamieson-Fausset-Brown Commentary
+   */
+  async getJFB(reference: string): Promise<CommentaryResponse> {
+    return this.getCommentary({ reference, commentator: 'Jamieson-Fausset-Brown' });
+  }
 
-    let currentSection: string[] = [];
-    let inTargetSection = false;
+  /**
+   * Get Adam Clarke Commentary
+   */
+  async getAdamClarke(reference: string): Promise<CommentaryResponse> {
+    return this.getCommentary({ reference, commentator: 'Adam Clarke' });
+  }
 
-    for (let i = 0; i < paragraphs.length; i++) {
-      const para = paragraphs[i].trim();
-      if (!para) continue;
+  /**
+   * Get John Gill Commentary
+   */
+  async getJohnGill(reference: string): Promise<CommentaryResponse> {
+    return this.getCommentary({ reference, commentator: 'John Gill' });
+  }
 
-      // Check if this paragraph is a verse heading
-      let isHeading = false;
-      let containsTargetVerse = false;
+  /**
+   * Get Keil-Delitzsch Commentary (Old Testament only)
+   */
+  async getKeilDelitzsch(reference: string): Promise<CommentaryResponse> {
+    return this.getCommentary({ reference, commentator: 'Keil-Delitzsch' });
+  }
 
-      for (const pattern of versePatterns) {
-        const match = para.match(pattern);
-        if (match) {
-          isHeading = true;
+  /**
+   * Get Tyndale Open Study Notes
+   */
+  async getTyndale(reference: string): Promise<CommentaryResponse> {
+    return this.getCommentary({ reference, commentator: 'Tyndale' });
+  }
 
-          // Extract verse range or single verse
-          const start = parseInt(match[1], 10);
-          const end = match[2] ? parseInt(match[2], 10) : start;
+  /**
+   * Build chapter commentary text from HelloAO response
+   * Combines all verse commentaries into readable chapter text
+   */
+  private buildChapterCommentary(response: any): string {
+    const parts: string[] = [];
 
-          // Check if target verse is in this range
-          if (verseNumber >= start && verseNumber <= end) {
-            containsTargetVerse = true;
-            break;
-          }
+    for (const verseContent of response.chapter.content) {
+      const verseNum = verseContent.verseNumber;
+      const annotations = verseContent.content;
+
+      // Build verse commentary
+      const verseParts: string[] = [];
+
+      for (const annotation of annotations) {
+        if (annotation.type === 'heading') {
+          verseParts.push(`**${annotation.content.join(' ')}**`);
+        } else if (annotation.type === 'text') {
+          verseParts.push(annotation.content.join(' '));
         }
       }
 
-      if (isHeading) {
-        // If we were in target section and hit a new heading, we're done
-        if (inTargetSection && !containsTargetVerse) {
-          break;
-        }
-
-        // Start new section if this is our target
-        if (containsTargetVerse) {
-          inTargetSection = true;
-          currentSection = [para];
-        } else {
-          inTargetSection = false;
-          currentSection = [];
-        }
-      } else if (inTargetSection) {
-        // Add paragraph to current section
-        currentSection.push(para);
+      if (verseParts.length > 0) {
+        parts.push(`**Verse ${verseNum}:**\n${verseParts.join('\n\n')}`);
       }
     }
 
-    // Return extracted section if found
-    if (currentSection.length > 0) {
-      return currentSection.join('\n\n');
-    }
-
-    // Fallback: return first ~500 characters with ellipsis
-    // This provides some context even if we can't find verse-specific section
-    const preview = chapterText.substring(0, 800).trim();
-    if (preview.length < chapterText.length) {
-      return preview + '\n\n[Commentary continues for entire chapter...]';
-    }
-
-    return undefined;
+    return parts.join('\n\n---\n\n');
   }
 
   /**
    * Get list of available commentators
    */
   getAvailableCommentators(): string[] {
-    return [
-      'Matthew Henry',
-      'Matthew Henry Concise',
-      'Jamieson-Fausset-Brown'
-    ];
+    return getAvailableHelloAOCommentators();
   }
 
   /**
    * Check if a commentator is available
    */
   isCommentatorAvailable(commentator: string): boolean {
-    const available = this.getAvailableCommentators();
-    return available.some(c => c.toLowerCase().includes(commentator.toLowerCase()));
+    try {
+      getHelloAOCommentaryId(commentator);
+      return true;
+    } catch {
+      return false;
+    }
   }
 }
