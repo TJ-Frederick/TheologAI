@@ -125,12 +125,21 @@ All commentaries accessible via HelloAO Bible API with zero rate limits!
    npm install
    ```
 
-2. **Build the Server**
+2. **Configure Environment**
    ```bash
-   npm run build
+   cp .env.example .env
+   # Edit .env and set PORT=3000 (or your preferred port)
    ```
 
-3. **Configure Claude Desktop**
+3. **Build and Start the Server**
+   ```bash
+   npm run build
+   npm start
+   ```
+   
+   The server will start on the port specified in your `.env` file (default: 3000).
+
+4. **Configure Claude Desktop**
 
    Add to your Claude Desktop configuration file (`claude_desktop_config.json`):
 
@@ -138,14 +147,17 @@ All commentaries accessible via HelloAO Bible API with zero rate limits!
    {
      "mcpServers": {
        "theologai": {
-         "command": "node",
-         "args": ["/path/to/TheologAI/dist/index.js"]
+         "transport": {
+           "type": "http",
+           "host": "localhost",
+           "port": 3000
+         }
        }
      }
    }
    ```
 
-   Replace `/path/to/TheologAI` with the full path to your project directory.
+   Make sure the port matches the one in your `.env` file.
 
 4. **Test the Connection**
 
@@ -173,18 +185,27 @@ All commentaries accessible via HelloAO Bible API with zero rate limits!
 ## Development
 
 ```bash
+# Set up environment file
+cp .env.example .env
+# Edit .env and set PORT=3000
+
 # Run in development mode with auto-reload
-npm run dev
+PORT=3000 npm run dev
 
 # Build for production
 npm run build
 
-# Start the server
+# Start the server (reads PORT from .env)
 npm start
 
 # Clean build artifacts
 npm run clean
 ```
+
+**Server Modes:**
+- **HTTP Mode**: Set `PORT` in `.env` file to run as HTTP server
+- **Default Port**: 3000 (configurable via `.env` file)
+- **CORS**: Enabled for web client compatibility
 
 ## MCP Tools
 
