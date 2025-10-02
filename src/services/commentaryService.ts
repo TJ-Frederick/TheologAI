@@ -1,45 +1,77 @@
 import { CommentaryLookupParams, CommentaryResult } from '../types/index.js';
-import { NETBibleAdapter } from '../adapters/netBibleApi.js';
+import { ESVAdapter } from '../adapters/esvApi.js';
 import { APIError } from '../utils/errors.js';
 
 export class CommentaryService {
-  private netBible: NETBibleAdapter;
+  private esv: ESVAdapter;
 
   constructor() {
-    this.netBible = new NETBibleAdapter();
+    this.esv = new ESVAdapter();
   }
 
   async lookup(params: CommentaryLookupParams): Promise<CommentaryResult> {
     try {
-      // Fetch passage with notes from NET Bible
-      const result = await this.netBible.getPassage(params.reference);
+      // Fetch passage with footnotes from ESV
+      const result = await this.esv.getPassageWithNotes(params.reference);
 
-      // Check if there are any note markers
-      if (!result.notes || result.notes.length === 0) {
+      // Extract plain text from HTML
+      const plainText = this.extractPlainText(result.html);
+
+      // Check if there are any footnotes
+      if (!result.footnotes || result.footnotes.length === 0) {
         throw new APIError(
           404,
-          `No translator notes available for "${params.reference}". The NET Bible includes extensive notes for most verses, but this particular verse may not have additional commentary.`
+          `No translation notes available for "${params.reference}". The ESV includes footnotes for textual variants and translation alternatives, but this particular verse may not have additional notes.`
         );
       }
 
-      // The NET Bible API only provides note markers, not the actual note content
-      // We'll provide information about where to find the notes
-      const noteCount = result.notes.length;
-      const formattedRef = params.reference.replace(/\s+/g, '+');
-      const netBibleUrl = `https://netbible.org/bible/${formattedRef}`;
-
-      let commentaryText = `**${params.reference}** (NET Bible)\n\n`;
-      commentaryText += `${result.text}\n\n`;
+      // Build commentary text with footnotes
+      let commentaryText = `**${params.reference}** (ESV)\n\n`;
+      commentaryText += `${plainText}\n\n`;
       commentaryText += `---\n\n`;
-      commentaryText += `**Translator Notes Available:**\n\n`;
-      commentaryText += `This verse has **${noteCount} translator note${noteCount > 1 ? 's' : ''}** in the NET Bible. `;
-      commentaryText += `The NET Bible's 60,000+ translator notes provide detailed explanations of translation decisions, `;
-      commentaryText += `textual variants, and interpretive insights.\n\n`;
-      commentaryText += `**View full notes at:** ${netBibleUrl}\n\n`;
-      commentaryText += `The NET Bible notes include:\n`;
-      commentaryText += `- Study notes (theological/interpretive insights)\n`;
-      commentaryText += `- Translator notes (explanation of translation choices)\n`;
-      commentaryText += `- Textual criticism (manuscript variants and textual issues)\n`;
+      commentaryText += `**Translation Notes:**\n\n`;
+
+      // Group footnotes by type
+      const variants = result.footnotes.filter(f => f.type === 'variant');
+      const translations = result.footnotes.filter(f => f.type === 'translation');
+      const others = result.footnotes.filter(f => f.type === 'other');
+
+      if (variants.length > 0) {
+        commentaryText += `**Textual Variants:**\n`;
+        variants.forEach(note => {
+          commentaryText += `• [${note.marker}] ${note.reference}: ${note.text}\n`;
+        });
+        commentaryText += `\n`;
+      }
+
+      if (translations.length > 0) {
+        commentaryText += `**Translation Alternatives:**\n`;
+        translations.forEach(note => {
+          commentaryText += `• [${note.marker}] ${note.reference}: ${note.text}\n`;
+        });
+        commentaryText += `\n`;
+      }
+
+      if (others.length > 0) {
+        commentaryText += `**Additional Notes:**\n`;
+        others.forEach(note => {
+          commentaryText += `• [${note.marker}] ${note.reference}: ${note.text}\n`;
+        });
+        commentaryText += `\n`;
+      }
+
+      // Add cross-references if available
+      if (result.crossReferences && result.crossReferences.length > 0) {
+        commentaryText += `**Cross-References:**\n`;
+        result.crossReferences.forEach(ref => {
+          if (ref.text) {
+            commentaryText += `• ${ref.verse}: ${ref.text}\n`;
+          } else {
+            commentaryText += `• ${ref.verse}\n`;
+          }
+        });
+        commentaryText += `\n`;
+      }
 
       // Apply max length if specified
       if (params.maxLength && commentaryText.length > params.maxLength) {
@@ -48,12 +80,12 @@ export class CommentaryService {
 
       return {
         reference: params.reference,
-        commentator: params.commentator || 'NET Bible Translators',
+        commentator: params.commentator || 'ESV Translation Committee',
         text: commentaryText,
         citation: {
-          source: 'NET Bible Translator Notes',
-          copyright: this.netBible.getCopyrightNotice(),
-          url: 'https://netbible.org'
+          source: 'ESV Translation Notes',
+          copyright: this.esv.getCopyrightNotice(),
+          url: 'https://www.esv.org'
         }
       };
     } catch (error) {
@@ -65,5 +97,33 @@ export class CommentaryService {
         `Failed to fetch commentary: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
     }
+  }
+
+  /**
+   * Extract plain text from ESV HTML, removing all tags
+   */
+  private extractPlainText(html: string): string {
+    // Remove footnote markers
+    let text = html.replace(/<sup[^>]*>.*?<\/sup>/g, '');
+
+    // Remove headings
+    text = text.replace(/<h\d[^>]*>.*?<\/h\d>/g, '');
+
+    // Remove all HTML tags
+    text = text.replace(/<[^>]+>/g, ' ');
+
+    // Decode HTML entities
+    text = text
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'");
+
+    // Normalize whitespace
+    text = text.replace(/\s+/g, ' ').trim();
+
+    return text;
   }
 }

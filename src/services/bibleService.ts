@@ -1,12 +1,14 @@
 import { BibleLookupParams, BibleResult } from '../types/index.js';
-import { ESVAdapter } from '../adapters/index.js';
+import { ESVAdapter, NETBibleAdapter } from '../adapters/index.js';
 import { APIError } from '../utils/errors.js';
 
 export class BibleService {
   private esvAdapter: ESVAdapter;
+  private netBibleAdapter: NETBibleAdapter;
 
   constructor() {
     this.esvAdapter = new ESVAdapter();
+    this.netBibleAdapter = new NETBibleAdapter();
   }
 
   private mockData: Record<string, { text: string; translation: string }> = {
@@ -57,18 +59,28 @@ export class BibleService {
   };
 
   async lookup(params: BibleLookupParams): Promise<BibleResult> {
-    // Try ESV API first if configured
-    if (this.esvAdapter.isConfigured()) {
-      try {
-        return await this.lookupFromESV(params);
-      } catch (error) {
-        console.warn('ESV API failed, falling back to mock data:', error instanceof Error ? error.message : 'Unknown error');
-        // Fall through to mock data
-      }
-    }
+    const translation = (params.translation || 'ESV').toUpperCase();
 
-    // Fallback to mock data
-    return await this.lookupFromMock(params);
+    // Route to appropriate adapter based on translation
+    switch (translation) {
+      case 'NET':
+        return await this.lookupFromNET(params);
+
+      case 'ESV':
+      default:
+        // Try ESV API if configured
+        if (this.esvAdapter.isConfigured()) {
+          try {
+            return await this.lookupFromESV(params);
+          } catch (error) {
+            console.warn('ESV API failed, falling back to mock data:', error instanceof Error ? error.message : 'Unknown error');
+            // Fall through to mock data
+          }
+        }
+
+        // Fallback to mock data
+        return await this.lookupFromMock(params);
+    }
   }
 
   private async lookupFromESV(params: BibleLookupParams): Promise<BibleResult> {
@@ -103,6 +115,32 @@ export class BibleService {
 
     // Note: Cross-references would need a separate API call to ESV
     // For now, we'll leave this empty when using real API
+    if (params.includeCrossRefs) {
+      result.crossReferences = [];
+    }
+
+    return result;
+  }
+
+  private async lookupFromNET(params: BibleLookupParams): Promise<BibleResult> {
+    const response = await this.netBibleAdapter.getPassage(params.reference);
+
+    if (!response.text || response.text.length === 0) {
+      throw new APIError(404, `No passages found for reference: ${params.reference}`);
+    }
+
+    const result: BibleResult = {
+      reference: params.reference,
+      translation: 'NET',
+      text: response.text,
+      citation: {
+        source: 'NET Bible®',
+        copyright: this.netBibleAdapter.getCopyrightNotice(),
+        url: 'https://netbible.org'
+      }
+    };
+
+    // NET Bible doesn't provide cross-references via API
     if (params.includeCrossRefs) {
       result.crossReferences = [];
     }

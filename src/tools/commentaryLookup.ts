@@ -7,17 +7,17 @@ const commentaryService = new CommentaryService();
 
 export const commentaryLookupHandler: ToolHandler = {
   name: 'commentary_lookup',
-  description: 'Get commentary and translation notes on Bible verses',
+  description: 'Get translation notes and textual commentary on Bible verses. Returns ESV textual variants, translation alternatives, and manuscript notes. Use this when the user asks for study help, notes, or commentary on a verse.',
   inputSchema: {
     type: 'object',
     properties: {
       reference: {
         type: 'string',
-        description: 'Bible verse reference (e.g., "John 3:16", "Genesis 1:1")'
+        description: 'Bible verse reference (e.g., "John 3:16", "Romans 8:28", "Matthew 17:21")'
       },
       commentator: {
         type: 'string',
-        description: 'Preferred commentator (optional, defaults to NET Bible Notes)'
+        description: 'Preferred commentator (optional, defaults to ESV Translation Committee)'
       },
       maxLength: {
         type: 'number',

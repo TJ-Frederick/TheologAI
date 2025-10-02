@@ -8,21 +8,22 @@ TheologAI now provides comprehensive theological research tools with four main c
 
 ## Features
 
-- **📖 Full Bible Access**: Look up ANY Bible verse or passage using the ESV API
-- **🏛️ Historical Documents**: Search through creeds, confessions, and catechisms with section-level topic tagging
-- **📚 Classic Christian Texts**: Access thousands of classic works from CCEL with automatic section resolution
-- **📝 Commentary & Notes**: Get translation notes and commentary on Bible verses
+- **📖 Multi-Translation Bible Access**: ESV and NET Bible translations
+- **📝 ESV Translation Notes**: Real textual variants and translation alternatives
+- **🏛️ Historical Documents**: Search through creeds, confessions, and catechisms
+- **📚 Classic Christian Texts**: Access thousands of classic works from CCEL
 - **🔍 Smart Search**: Topic-based conceptual search across all historical documents
-- **⚡ Fast & Reliable**: In-memory caching with 24-hour TTL for TOCs and 1-hour for Bible verses
+- **⚡ Fast & Reliable**: In-memory caching with 1-hour TTL for verses and footnotes
 - **✨ Clean Formatting**: Beautiful markdown output with proper citations
 
 ## MCP Tools Available
 
 ### 🔍 `bible_lookup`
-Look up any Bible verse or passage from the ESV
+Look up any Bible verse or passage - returns clean Scripture text
 - **Example**: "Look up John 3:16"
-- **Example**: "Show me Psalm 119:105"
-- **Parameters**: `reference` (required), `translation`, `includeCrossRefs`
+- **Example**: "Show me Romans 8:28-30 in NET"
+- **Translations**: ESV (default), NET
+- **Parameters**: `reference` (required), `translation` (optional), `includeCrossRefs` (optional)
 
 ### 🏛️ `historical_search`
 Search historical Christian documents
@@ -39,10 +40,11 @@ Access classic Christian texts from CCEL with natural language queries
 - **No section IDs needed** - automatic resolution from natural language!
 
 ### 📝 `commentary_lookup`
-Get translation notes and commentary on verses
-- **Example**: "Get commentary on John 1:1"
-- **Example**: "What do the notes say about Genesis 1:1?"
-- **Parameters**: `reference` (required), `commentator`, `maxLength`
+Get ESV translation notes and textual commentary
+- **Example**: "Get commentary on Romans 8:28"
+- **Example**: "What are the textual variants for Matthew 17:21?"
+- **Content**: Textual variants, translation alternatives, manuscript notes
+- **Parameters**: `reference` (required), `commentator` (optional), `maxLength` (optional)
 
 ## Available Documents
 
@@ -69,11 +71,18 @@ Access thousands of works from the Christian Classics Ethereal Library:
 - Support for complex hierarchies (Books, Chapters, Parts, Questions, Articles)
 - Clean text extraction from HTML
 
-### Commentary
-- **NET Bible Translator Notes** - Integration with NET Bible API to identify verses with translator notes
-- Provides verse text and indicates how many translator notes are available
-- Direct links to netbible.org for full access to 60,000+ detailed notes
-- Includes information about study notes, translator notes, and textual criticism
+### Bible Translations
+- **ESV (English Standard Version)** - Primary translation with full API access
+- **NET (New English Translation)** - Alternative literal translation
+- Both translations support verse lookup and passage retrieval
+- ESV includes textual footnotes and translation notes
+
+### Commentary & Translation Notes
+- **ESV Translation Notes** - Real footnote content from ESV
+- Textual variants (manuscript differences)
+- Translation alternatives (alternative renderings)
+- Available for verses where ESV provides footnotes
+- Accessed via `commentary_lookup` tool
 
 ## Installation & Setup
 
@@ -175,19 +184,24 @@ Look up Bible verses by reference.
 - ✅ Clean HTML content extraction
 - ✅ Integration tests for section resolver and adapter
 
+### Phase 2.5: ESV Footnotes & Multi-Translation ✅
+- ✅ ESV HTML endpoint integration with footnote extraction
+- ✅ Real textual variant and translation alternative notes
+- ✅ Multi-translation support (ESV, NET)
+- ✅ Separate tools for clean text vs. study notes
+- ✅ Comprehensive footnote parsing and categorization
+
 **Performance:**
 - Bible verse cache: ~160ms → <1ms on repeated queries
+- ESV footnotes cache: ~170ms → <1ms on repeated queries
 - TOC caching: 24-hour TTL reduces API calls
 - ESV API rate limit protection through intelligent caching
-- NET Bible commentary cache: ~150ms → <1ms on repeated queries
 
-## Next Steps (Phase 2+)
+## Next Steps (Phase 3+)
 
-**Recently Completed:**
-- ✅ NET Bible API integration (note detection with links to full translator notes)
-
-**In Progress:**
-- [ ] Additional Bible translations (KJV, NASB via public domain APIs)
+**Potential Enhancements:**
+- [ ] Additional public domain Bible translations (KJV, ASV via wldeh/bible-api)
+- [ ] Public domain commentary integration (Matthew Henry, JFB)
 
 **Future Enhancements:**
 - [ ] Expanded commentary collection (Matthew Henry, Calvin)
