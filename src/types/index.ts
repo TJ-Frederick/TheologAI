@@ -1,6 +1,6 @@
 export interface BibleLookupParams {
   reference: string;
-  translation?: string;
+  translation?: string | string[];  // Support single translation or array
   includeCrossRefs?: boolean;
   includeFootnotes?: boolean;
 }

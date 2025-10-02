@@ -25,6 +25,40 @@ export function formatBibleResponse(data: BibleResult): string {
   return response.trim();
 }
 
+/**
+ * Format multiple Bible translations for comparison
+ */
+export function formatMultiBibleResponse(results: BibleResult[]): string {
+  if (results.length === 0) {
+    return 'No results found.';
+  }
+
+  // Use the first result's reference as the main reference
+  const reference = results[0].reference;
+  let response = `**${reference}** (${results.length} translations)\n\n`;
+
+  // Add each translation
+  for (const result of results) {
+    response += `**${result.translation}:**\n`;
+    response += `${result.text}\n\n`;
+
+    // Add footnotes if present (inline for each translation)
+    if (result.footnotes && result.footnotes.length > 0) {
+      response += `*Footnotes:*\n`;
+      for (const footnote of result.footnotes) {
+        response += `  ${footnote.caller} (v${footnote.reference.verse}): ${footnote.text}\n`;
+      }
+      response += `\n`;
+    }
+  }
+
+  // Add sources (collect unique sources)
+  const sources = Array.from(new Set(results.map(r => r.citation.source)));
+  response += `\n*Sources: ${sources.join(', ')}*`;
+
+  return response.trim();
+}
+
 export function formatCommentaryResponse(data: CommentaryResult): string {
   let response = `**${data.commentator} Commentary on ${data.reference}**\n\n`;
   response += `${data.text}\n\n`;

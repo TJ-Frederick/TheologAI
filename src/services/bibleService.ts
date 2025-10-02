@@ -62,7 +62,11 @@ export class BibleService {
   };
 
   async lookup(params: BibleLookupParams): Promise<BibleResult> {
-    const translation = (params.translation || 'ESV').toUpperCase();
+    // Ensure translation is a single string (tool handler should split arrays)
+    const translationParam = Array.isArray(params.translation)
+      ? params.translation[0]
+      : params.translation;
+    const translation = (translationParam || 'ESV').toUpperCase();
 
     // Check if HelloAO supports this translation
     if (this.helloaoAdapter.isSupported(translation)) {
@@ -92,7 +96,11 @@ export class BibleService {
   }
 
   private async lookupFromHelloAO(params: BibleLookupParams): Promise<BibleResult> {
-    const translation = (params.translation || 'KJV').toUpperCase();
+    // Ensure translation is a single string
+    const translationParam = Array.isArray(params.translation)
+      ? params.translation[0]
+      : params.translation;
+    const translation = (translationParam || 'KJV').toUpperCase();
 
     return await this.helloaoAdapter.getPassage(
       params.reference,
@@ -120,9 +128,22 @@ export class BibleService {
     // Remove any leading/trailing quotation marks that might be artifacts
     text = text.replace(/^["'"']|["'"']$/g, '');
 
+    // Remove duplicate reference prefix and translation suffix
+    // ESV API returns: "John 1:1 In the beginning... (ESV)"
+    // We want just: "In the beginning..."
+    // Remove leading reference (e.g., "John 1:1 ")
+    text = text.replace(/^[\w\s]+\d+:\d+(-\d+)?\s+/, '');
+    // Remove trailing translation marker (e.g., " (ESV)")
+    text = text.replace(/\s*\([A-Z]+\)\s*$/, '');
+
+    // Ensure translation is a single string for result
+    const translationStr = Array.isArray(params.translation)
+      ? params.translation[0]
+      : params.translation;
+
     const result: BibleResult = {
       reference: response.canonical || params.reference,
-      translation: params.translation || 'ESV',
+      translation: translationStr || 'ESV',
       text: text,
       citation: {
         source: 'ESV® Bible',
@@ -178,9 +199,14 @@ export class BibleService {
       throw new Error(`Reference "${params.reference}" not available in mock data. Available verses: ${availableRefs.join(', ')}`);
     }
 
+    // Ensure translation is a single string for result
+    const translationStr = Array.isArray(params.translation)
+      ? params.translation[0]
+      : params.translation;
+
     const result: BibleResult = {
       reference: params.reference,
-      translation: params.translation || mockEntry.translation,
+      translation: translationStr || mockEntry.translation,
       text: mockEntry.text,
       citation: {
         source: 'ESV Bible (Mock Data)',
