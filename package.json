@@ -12,7 +12,9 @@
     "test": "echo \"Add tests in Phase 2\"",
     "test:ccel": "tsx test/adapters/ccel-test.ts",
     "test:netbible": "tsx test/adapters/netbible-test.ts",
-    "test:bibleapi": "tsx test/adapters/bibleapi-test.ts"
+    "test:bibleapi": "tsx test/adapters/bibleapi-test.ts",
+    "test:commentary": "tsx test/integration/public-commentary-test.ts",
+    "test:all-books": "tsx test/integration/all-books-mapping-test.ts"
   },
   "keywords": ["bible", "theology", "mcp", "context-protocol"],
   "author": "",
