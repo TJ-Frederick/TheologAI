@@ -1,10 +1,12 @@
 # Bible Study MCP Server - Development Plan
 
-**Current Status: Phase 2 - CCEL Integration Complete ✅**
+**Current Status: Phase 3 - Commentary Integration Complete ✅**
 - Repository: https://github.com/TJ-Frederick/TheologAI
 - Phase 1: Complete (ESV Bible, Historical Docs, Mock Commentary)
-- Phase 2: CCEL Integration Complete (Classic Christian Texts)
-- All integration tests passing
+- Phase 2: Complete (CCEL Classic Texts, ESV Footnotes, Multi-Translation)
+- Phase 3.1: Complete (Matthew Henry via CCEL)
+- Phase 3.2: Complete (HelloAO Bible API - 6 Commentaries)
+- All integration tests passing (14 HelloAO tests + 8 CCEL tests)
 
 ## Phase 1: MVP Foundation (Days 1-7) - ✅ COMPLETE
 
@@ -253,9 +255,12 @@ mkdir -p data/confessions data/creeds
 - Build successful with no errors
 
 **Commits:**
-- 2b861c3: feat: Add NET Bible API integration for translator notes detection
-- f9f2028: feat: Add ESV footnotes and multi-translation support
+- c138ccc: feat: Add HelloAO Bible API integration with 6 commentaries (Phase 3.2)
+- 0784434: feat: Add Matthew Henry's Commentary integration (Phase 3.1 Complete)
+- 2aa0feb: docs: Update development plan with Phase 2.5 completion
 - 9103a42: fix: Handle verses without footnotes gracefully
+- f9f2028: feat: Add ESV footnotes and multi-translation support
+- 2b861c3: feat: Add NET Bible API integration for translator notes detection
 
 ### Day 8-9: Additional Public Domain Bible Translations
 
@@ -550,39 +555,59 @@ Integration Tests (`test/integration/phase3-helloao-test.ts`):
 
 **Key Achievement:** Best-in-class public domain commentary access with zero infrastructure costs!
 
-### Priority 2: Additional Public Domain Bible Translations (EASY WIN)
+---
 
-**Goal:** Add KJV, WEB, ASV via wldeh/bible-api
+## Phase 3 Remaining Priorities
 
-**Why Priority 2:**
-- Easy to implement (GitHub CDN, no API keys)
-- Immediate user value
-- No ongoing maintenance
-- Expands multi-translation support
+### Priority 3: Additional Public Domain Bible Translations (EASY WIN)
 
-**Implementation:**
-- Create wldeh/bible-api adapter
-- Add KJV, WEB, ASV to translation routing
-- Update bible_lookup tool with new options
+**Status:** Pending
+
+**Goal:** Add KJV, WEB, ASV via wldeh/bible-api or HelloAO
+
+**Why Priority 3:**
+- HelloAO already provides 1000+ translations via API
+- Can leverage existing HelloAO adapter
+- Alternative: wldeh/bible-api for GitHub CDN (offline capability)
+- Immediate user value with minimal effort
+
+**Implementation Option A (Recommended):**
+- Extend HelloAO adapter to support translation retrieval
+- Add KJV, WEB, ASV to BibleService translation routing
+- Update bible_lookup tool with new translation options
 - Test parallel translation display
 
-### Priority 3: Cross-Reference System (MEDIUM COMPLEXITY)
+**Implementation Option B:**
+- Create wldeh/bible-api adapter for offline capability
+- Add KJV, WEB, ASV via GitHub CDN
+- Fallback to HelloAO for other translations
+- Provides resilience if HelloAO is unavailable
+
+### Priority 4: Cross-Reference System (MEDIUM COMPLEXITY)
+
+**Status:** Pending
 
 **Goal:** Add Treasury of Scripture Knowledge integration
 
-**Why Priority 3:**
+**Why Priority 4:**
 - Enhances Bible study capabilities
 - Links related verses automatically
 - Moderate complexity
 - Clear user value
 
 **Implementation:**
-- Integrate Treasury of Scripture Knowledge data
-- Create cross-reference service
-- Add to commentary_lookup output
+- Download/integrate Treasury of Scripture Knowledge dataset
+- Create cross-reference service with verse mapping
+- Add cross-references to bible_lookup or commentary_lookup output
 - Format cross-refs with verse previews
+- Consider caching cross-reference lookups
 
-### Priority 4: Advanced Features (OPTIONAL)
+**Data Sources:**
+- OpenBible.info Cross-References (CC BY 4.0)
+- Treasury of Scripture Knowledge (public domain)
+- JSON format for fast lookup
+
+### Priority 5: Advanced Features (OPTIONAL)
 
 1. **Topical Search Tool**
    - Build topic index across all resources
@@ -738,23 +763,30 @@ tail -f ~/Library/Logs/Claude/mcp-*.log  # macOS
 - [x] **BONUS:** Performance optimization (cache reduces 160ms → <1ms)
 - [x] **BONUS:** Conceptual search via topic tagging
 
-### Phase 2 Status: Partially Complete ⚠️
-**Completed:**
+### Phase 2 Complete ✅
 - [x] CCEL integration (classic Christian texts)
 - [x] ESV footnotes (textual variants, translation alternatives)
 - [x] Multi-translation support (ESV, NET)
 - [x] Performance optimized (caching system working)
 
-**Remaining for Phase 2 Completion:**
-- [ ] Additional public domain translations (KJV, WEB, ASV)
-- [ ] Cross-references functional
-- [ ] Public domain theological commentary (Matthew Henry, JFB)
+### Phase 3 Status: Commentary Complete ✅
+**Completed:**
+- [x] Phase 3.1: Matthew Henry commentary via CCEL (66/66 books)
+- [x] Phase 3.2: HelloAO Bible API integration (6 commentaries, 1000+ translations)
+- [x] All 6 public domain commentaries working (Matthew Henry, JFB, Adam Clarke, John Gill, Keil-Delitzsch, Tyndale)
+- [x] Dual format parsing for different commentary structures
+- [x] Zero infrastructure costs (no API keys, no rate limits)
 
-**Phase 3 Goals:**
-- [ ] Priority 1: Matthew Henry commentary integration
-- [ ] Priority 2: KJV, WEB, ASV translations
-- [ ] Priority 3: Cross-reference system
-- [ ] Priority 4: Advanced features (word studies, topical search)
+**Remaining Phase 3 Goals:**
+- [ ] Priority 3: Additional translations (KJV, WEB, ASV via wldeh/bible-api)
+- [ ] Priority 4: Cross-reference system (Treasury of Scripture Knowledge)
+- [ ] Priority 5: Advanced features (word studies, topical search)
+
+### Phase 4 Goals (Future):
+- [ ] Greek/Hebrew lexicon integration
+- [ ] Persistent SQLite cache
+- [ ] Additional classic texts (Calvin's Commentaries)
+- [ ] Interlinear Bible display
 
 ### Ready for Others ✅
 - [x] Documentation complete and clear
@@ -765,12 +797,90 @@ tail -f ~/Library/Logs/Claude/mcp-*.log  # macOS
 - [x] GitHub repository published
 - [x] v1.0.0-phase1 released
 
+## Summary of Completed Work
+
+### What TheologAI MCP Server Provides (Current State)
+
+**Bible Text:**
+- ESV Bible with footnotes (textual variants, translation alternatives)
+- NET Bible translation
+- 1000+ translations available via HelloAO API (ready to integrate)
+- Intelligent caching (1-hour TTL, LRU eviction)
+- Fast lookups (<1ms cached, ~160ms API)
+
+**Commentary:**
+- 6 public domain commentaries via HelloAO Bible API:
+  1. Matthew Henry - Complete comprehensive exposition
+  2. Jamieson-Fausset-Brown (JFB) - Concise practical commentary
+  3. Adam Clarke - Detailed scholarly commentary
+  4. John Gill - Baptist perspective, thorough exposition
+  5. Keil-Delitzsch - OT only, scholarly Hebrew analysis
+  6. Tyndale - Modern open study notes
+- Verse-level commentary extraction
+- Section-level commentary when verse-specific unavailable
+- Zero API keys, zero rate limits, zero cost
+
+**Historical Texts:**
+- Christian Classics Ethereal Library (CCEL) integration
+- Classic works: Calvin's Institutes, Aquinas' Summa Theologica, Augustine's Confessions, Bunyan's Pilgrim's Progress, Luther's works
+- Natural language section resolution (no manual IDs needed)
+- Local confessions and creeds (Westminster, Apostles' Creed, etc.)
+- Section-level topic tagging for conceptual searches
+
+**Architecture Highlights:**
+- Clean TypeScript with adapters/services pattern
+- In-memory cache with TTL and LRU eviction
+- Comprehensive error handling
+- Dual API strategy: HelloAO (commentary/translations), CCEL (classic texts)
+- 22+ integration tests passing
+
+**Performance:**
+- Cache hits: <1ms
+- API calls: ~160ms (ESV), ~200ms (HelloAO)
+- 1-hour TTL for Bible verses
+- 24-hour TTL for CCEL TOCs
+- LRU eviction prevents memory bloat
+
+### Commits History
+
+**Phase 3.2:**
+- c138ccc: feat: Add HelloAO Bible API integration with 6 commentaries
+
+**Phase 3.1:**
+- 0784434: feat: Add Matthew Henry's Commentary integration
+
+**Phase 2.5:**
+- 2aa0feb: docs: Update development plan with Phase 2.5 completion
+- 9103a42: fix: Handle verses without footnotes gracefully
+- f9f2028: feat: Add ESV footnotes and multi-translation support
+- 2b861c3: feat: Add NET Bible API integration for translator notes detection
+
+**Phase 2:**
+- CCEL integration (classic texts)
+- Section resolver with natural language parsing
+- TOC parsing with auto-resolution
+
+**Phase 1:**
+- ESV Bible API integration
+- Local historical documents
+- MCP server foundation
+- Intelligent caching system
+
+---
+
 ## Resources & References
 
 ### Essential Documentation
 - [MCP SDK Docs](https://modelcontextprotocol.io/docs)
 - [ESV API Docs](https://api.esv.org/docs/)
+- [HelloAO Bible API Docs](https://bible.helloao.org/docs/)
 - [TypeScript Handbook](https://www.typescriptlang.org/docs/)
+
+### Data Sources
+- [ESV Bible API](https://api.esv.org/) - Primary English translation
+- [HelloAO Bible API](https://bible.helloao.org/) - Commentaries + 1000+ translations
+- [NET Bible API](https://labs.bible.org/) - Alternative translation
+- [CCEL](https://ccel.org/) - Classic Christian texts
 
 ### Helpful Examples
 - [MCP Server Examples](https://github.com/modelcontextprotocol/servers)
