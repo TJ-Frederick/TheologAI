@@ -256,11 +256,11 @@ mkdir -p data/confessions data/creeds
 - Build successful with no errors
 
 **Recent Commits:**
+- cf7e430: fix: Use book codes for HelloAO translation API calls (fixes 1 John, 2 Samuel, etc.)
 - 146b980: feat: Add 6 Bible translations via HelloAO API with footnotes support (Phase 3.3)
 - c138ccc: feat: Add HelloAO Bible API integration with 6 commentaries (Phase 3.2)
 - 0784434: feat: Add Matthew Henry's Commentary integration (Phase 3.1 Complete)
 - 2aa0feb: docs: Update development plan with Phase 2.5 completion
-- 9103a42: fix: Handle verses without footnotes gracefully
 - 2b861c3: feat: Add NET Bible API integration for translator notes detection
 
 ### Day 8-9: Additional Public Domain Bible Translations
@@ -868,6 +868,7 @@ tail -f ~/Library/Logs/Claude/mcp-*.log  # macOS
 ### Commits History
 
 **Phase 3.3:**
+- cf7e430: fix: Use book codes for HelloAO translation API calls (fixes 1 John, 2 Samuel, etc.)
 - 146b980: feat: Add 6 Bible translations via HelloAO API with footnotes support
 
 **Phase 3.2:**

@@ -2,28 +2,35 @@
 
 A Model Context Protocol (MCP) server that provides theological researchers and Bible students with programmatic access to biblical texts, commentaries, and historical Christian documents through natural language queries via Claude Desktop.
 
-## Current Status: Phase 2 In Progress - CCEL Integration Complete! 🎉
+## Current Status: Phase 3.3 Complete - Bible Translations & Commentaries! 🎉
 
-TheologAI now provides comprehensive theological research tools with four main capabilities:
+TheologAI now provides comprehensive theological research tools with extensive Bible study capabilities:
 
 ## Features
 
-- **📖 Multi-Translation Bible Access**: ESV and NET Bible translations
-- **📝 ESV Translation Notes**: Real textual variants and translation alternatives
+- **📖 8 Bible Translations**: ESV, NET, KJV, WEB, BSB, ASV, YLT, DBY (all with verse lookup)
+- **📝 Footnotes Support**: Translation notes, textual variants, and alternative readings
+- **💬 6 Public Domain Commentaries**: Matthew Henry, JFB, Adam Clarke, John Gill, Keil-Delitzsch, Tyndale
 - **🏛️ Historical Documents**: Search through creeds, confessions, and catechisms
 - **📚 Classic Christian Texts**: Access thousands of classic works from CCEL
 - **🔍 Smart Search**: Topic-based conceptual search across all historical documents
 - **⚡ Fast & Reliable**: In-memory caching with 1-hour TTL for verses and footnotes
+- **💰 Zero Cost**: All HelloAO resources (6 translations + 6 commentaries) are free with no rate limits
 - **✨ Clean Formatting**: Beautiful markdown output with proper citations
 
 ## MCP Tools Available
 
 ### 🔍 `bible_lookup`
-Look up any Bible verse or passage - returns clean Scripture text
+Look up any Bible verse or passage with 8 translation options and footnotes
 - **Example**: "Look up John 3:16"
-- **Example**: "Show me Romans 8:28-30 in NET"
-- **Translations**: ESV (default), NET
-- **Parameters**: `reference` (required), `translation` (optional), `includeCrossRefs` (optional)
+- **Example**: "Show me Romans 8:28-30 in KJV"
+- **Example**: "Get 1 John 5:7 in BSB with footnotes"
+- **Translations**: ESV, NET, KJV, WEB, BSB, ASV, YLT, DBY
+- **Parameters**:
+  - `reference` (required): Bible verse reference
+  - `translation` (optional): Translation code (default: ESV)
+  - `includeFootnotes` (optional): Include translation notes and textual variants
+  - `includeCrossRefs` (optional): Include cross-references (not yet implemented)
 
 ### 🏛️ `historical_search`
 Search historical Christian documents
@@ -40,11 +47,15 @@ Access classic Christian texts from CCEL with natural language queries
 - **No section IDs needed** - automatic resolution from natural language!
 
 ### 📝 `commentary_lookup`
-Get ESV translation notes and textual commentary
+Access 6 public domain commentaries on any Bible verse
 - **Example**: "Get commentary on Romans 8:28"
-- **Example**: "What are the textual variants for Matthew 17:21?"
-- **Content**: Textual variants, translation alternatives, manuscript notes
-- **Parameters**: `reference` (required), `commentator` (optional), `maxLength` (optional)
+- **Example**: "What does Matthew Henry say about John 3:16?"
+- **Example**: "Get JFB commentary on Genesis 1:1"
+- **Commentaries**: Matthew Henry, Jamieson-Fausset-Brown (JFB), Adam Clarke, John Gill, Keil-Delitzsch (OT only), Tyndale
+- **Parameters**:
+  - `reference` (required): Bible verse reference
+  - `commentator` (optional): Commentator name (default: Matthew Henry)
+  - `maxLength` (optional): Maximum length in characters
 
 ## Available Documents
 
@@ -71,18 +82,40 @@ Access thousands of works from the Christian Classics Ethereal Library:
 - Support for complex hierarchies (Books, Chapters, Parts, Questions, Articles)
 - Clean text extraction from HTML
 
-### Bible Translations
-- **ESV (English Standard Version)** - Primary translation with full API access
-- **NET (New English Translation)** - Alternative literal translation
-- Both translations support verse lookup and passage retrieval
-- ESV includes textual footnotes and translation notes
+### Bible Translations (8 Total)
 
-### Commentary & Translation Notes
-- **ESV Translation Notes** - Real footnote content from ESV
-- Textual variants (manuscript differences)
-- Translation alternatives (alternative renderings)
-- Available for verses where ESV provides footnotes
-- Accessed via `commentary_lookup` tool
+**ESV & NET (via dedicated APIs):**
+- **ESV (English Standard Version)** - Modern formal equivalence
+- **NET (New English Translation)** - With extensive translator notes
+
+**HelloAO Translations (Public Domain, Zero Rate Limits):**
+- **KJV (King James Version 1611)** - Most recognized English translation
+- **WEB (World English Bible)** - Modern public domain translation
+- **BSB (Berean Standard Bible)** - Clean, modern text with footnotes
+- **ASV (American Standard Version 1901)** - Scholarly literal translation
+- **YLT (Young's Literal Translation)** - Extremely literal word-for-word
+- **DBY (Darby Translation)** - Alternative literal translation
+
+All translations support:
+- Single verse lookup (John 3:16)
+- Verse ranges (Romans 8:28-30)
+- All 66 books including numbered books (1 John, 2 Samuel, etc.)
+
+**Footnotes Feature:**
+- Available for most HelloAO translations (BSB, WEB, etc.)
+- Includes translation notes, alternative readings, textual variants
+- Displayed at bottom of verse text with verse references
+- Enable with `includeFootnotes: true` parameter
+
+### Public Domain Commentaries (6 Total via HelloAO)
+- **Matthew Henry's Complete Commentary** - Comprehensive devotional commentary on all 66 books
+- **Jamieson-Fausset-Brown (JFB)** - Concise scholarly commentary
+- **Adam Clarke's Commentary** - In-depth exegetical notes
+- **John Gill's Exposition** - Detailed theological exposition
+- **Keil-Delitzsch Commentary** - OT-only scholarly Hebrew analysis
+- **Tyndale Open Study Notes** - Modern accessible study notes
+
+All commentaries accessible via HelloAO Bible API with zero rate limits!
 
 ## Installation & Setup
 
@@ -191,23 +224,38 @@ Look up Bible verses by reference.
 - ✅ Separate tools for clean text vs. study notes
 - ✅ Comprehensive footnote parsing and categorization
 
+### Phase 3: Commentary & Translation Integration ✅
+
+**Phase 3.1: Matthew Henry via CCEL**
+- ✅ Matthew Henry's Complete Commentary (66 books)
+- ✅ CCEL HTML parsing and text extraction
+- ✅ Integration with commentary_lookup tool
+
+**Phase 3.2: HelloAO Bible API Integration**
+- ✅ 6 public domain commentaries (Matthew Henry, JFB, Adam Clarke, John Gill, Keil-Delitzsch, Tyndale)
+- ✅ 1000+ Bible translations via HelloAO API
+- ✅ Zero rate limits, zero API keys
+
+**Phase 3.3: HelloAO Bible Translations**
+- ✅ 6 additional translations (KJV, WEB, BSB, ASV, YLT, DBY)
+- ✅ Footnotes support with translation notes
+- ✅ All numbered books working (1 John, 2 Samuel, etc.)
+- ✅ 8 total Bible translations available
+
 **Performance:**
 - Bible verse cache: ~160ms → <1ms on repeated queries
-- ESV footnotes cache: ~170ms → <1ms on repeated queries
+- HelloAO API calls: ~200ms (no rate limits!)
 - TOC caching: 24-hour TTL reduces API calls
 - ESV API rate limit protection through intelligent caching
 
-## Next Steps (Phase 3+)
+## Next Steps (Phase 4+)
 
 **Potential Enhancements:**
-- [ ] Additional public domain Bible translations (KJV, ASV via wldeh/bible-api)
-- [ ] Public domain commentary integration (Matthew Henry, JFB)
-
-**Future Enhancements:**
-- [ ] Expanded commentary collection (Matthew Henry, Calvin)
-- [ ] Cross-reference system integration
-- [ ] Greek/Hebrew word study tools
+- [ ] Cross-reference system (Treasury of Scripture Knowledge)
+- [ ] Additional HelloAO translations (1000+ available)
+- [ ] Greek/Hebrew word study tools (Strong's concordance)
 - [ ] Advanced topical search across all resources
+- [ ] More historical texts and confessions
 
 ## Architecture
 
@@ -219,26 +267,31 @@ src/
 │   ├── index.ts                 # Adapter exports
 │   ├── esvApi.ts               # ESV Bible API
 │   ├── netBibleApi.ts          # NET Bible API (translator notes)
+│   ├── helloaoApi.ts           # HelloAO Bible API (commentaries & translations)
+│   ├── helloaoBibleAdapter.ts  # HelloAO translation adapter (KJV, WEB, BSB, ASV, YLT, DBY)
+│   ├── publicCommentaryAdapter.ts # HelloAO commentary adapter
 │   ├── ccelApi.ts              # CCEL API (Scripture, Works, Fragments)
 │   └── ccelToc.ts              # CCEL TOC parser with auto-resolution
 ├── services/                     # Business logic layer
-│   ├── bibleService.ts          # Bible verse service
+│   ├── bibleService.ts          # Bible verse service (8 translations)
 │   ├── historicalService.ts     # Historical documents
-│   ├── commentaryService.ts     # Commentary notes
+│   ├── commentaryService.ts     # Commentary notes (6 commentaries)
 │   ├── ccelService.ts           # CCEL classic texts
 │   └── sectionResolver.ts       # Natural language → section ID
 ├── tools/                        # MCP tool handlers
 │   ├── index.ts                 # Tool registry
-│   ├── bibleLookup.ts           # Bible verse lookup
+│   ├── bibleLookup.ts           # Bible verse lookup (8 translations + footnotes)
 │   ├── historicalSearch.ts      # Historical document search
-│   ├── commentaryLookup.ts      # Commentary retrieval
+│   ├── commentaryLookup.ts      # Commentary retrieval (6 commentaries)
 │   └── classicTextLookup.ts     # CCEL classic text lookup
 ├── utils/                        # Utilities
 │   ├── cache.ts                 # In-memory caching (Bible & TOC)
-│   ├── formatter.ts             # Markdown formatting
+│   ├── formatter.ts             # Markdown formatting (with footnotes)
+│   ├── helloaoMapper.ts         # Book name/code mapping for HelloAO
+│   ├── commentaryMapper.ts      # Commentary reference mapping
 │   └── errors.ts                # Error handling
 └── types/                        # Type definitions
-    └── index.ts                 # Common types
+    └── index.ts                 # Common types (includes Footnote interface)
 ```
 
 ## License
