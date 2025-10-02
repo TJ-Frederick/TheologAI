@@ -7,7 +7,7 @@ const bibleService = new BibleService();
 
 export const bibleLookupHandler: ToolHandler = {
   name: 'bible_lookup',
-  description: 'Look up Bible verses by reference. Supports single or multiple translations (ESV, NET, KJV, WEB, BSB, ASV, YLT, DBY). Pass a single translation string or an array of translations to compare multiple versions. Can optionally include footnotes with translation notes and textual variants.',
+  description: 'Look up Bible verses by reference. Supports single or multiple translations (ESV, NET, KJV, WEB, BSB, ASV, YLT, DBY). Pass a single translation string or an array of translations to compare multiple versions. Can optionally include footnotes with translation notes and textual variants. IMPORTANT: When multiple translations are requested, ALWAYS display the full returned text verbatim first so the user can see each translation. After showing the translations, you may optionally provide analysis or highlight differences if helpful.',
   inputSchema: {
     type: 'object',
     properties: {
