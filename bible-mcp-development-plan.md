@@ -1,12 +1,13 @@
 # Bible Study MCP Server - Development Plan
 
-**Current Status: Phase 3 - Commentary Integration Complete ✅**
+**Current Status: Phase 3.3 - Bible Translations Complete ✅**
 - Repository: https://github.com/TJ-Frederick/TheologAI
 - Phase 1: Complete (ESV Bible, Historical Docs, Mock Commentary)
 - Phase 2: Complete (CCEL Classic Texts, ESV Footnotes, Multi-Translation)
 - Phase 3.1: Complete (Matthew Henry via CCEL)
 - Phase 3.2: Complete (HelloAO Bible API - 6 Commentaries)
-- All integration tests passing (14 HelloAO tests + 8 CCEL tests)
+- Phase 3.3: Complete (HelloAO Bible Translations - 6 translations + footnotes)
+- All integration tests passing (17 HelloAO tests + 7 MCP integration tests)
 
 ## Phase 1: MVP Foundation (Days 1-7) - ✅ COMPLETE
 
@@ -254,12 +255,12 @@ mkdir -p data/confessions data/creeds
 - Commentary service integration validated
 - Build successful with no errors
 
-**Commits:**
+**Recent Commits:**
+- 146b980: feat: Add 6 Bible translations via HelloAO API with footnotes support (Phase 3.3)
 - c138ccc: feat: Add HelloAO Bible API integration with 6 commentaries (Phase 3.2)
 - 0784434: feat: Add Matthew Henry's Commentary integration (Phase 3.1 Complete)
 - 2aa0feb: docs: Update development plan with Phase 2.5 completion
 - 9103a42: fix: Handle verses without footnotes gracefully
-- f9f2028: feat: Add ESV footnotes and multi-translation support
 - 2b861c3: feat: Add NET Bible API integration for translator notes detection
 
 ### Day 8-9: Additional Public Domain Bible Translations
@@ -559,29 +560,48 @@ Integration Tests (`test/integration/phase3-helloao-test.ts`):
 
 ## Phase 3 Remaining Priorities
 
-### Priority 3: Additional Public Domain Bible Translations (EASY WIN)
+### Priority 3: Additional Public Domain Bible Translations - ✅ COMPLETE
 
-**Status:** Pending
+**Status:** COMPLETED (Phase 3.3) - 6 translations + footnotes via HelloAO
 
-**Goal:** Add KJV, WEB, ASV via wldeh/bible-api or HelloAO
+**Implementation Summary:**
+- Created HelloAOBibleAdapter for translation retrieval
+- Added 6 public domain translations: KJV, WEB, BSB, ASV, YLT, DBY
+- Implemented footnotes support (translation notes, textual variants)
+- Updated bible_lookup tool with 8 total translation options
+- Enhanced formatter to display footnotes at bottom of verses
+- All translations accessible through MCP tool with zero rate limits
 
-**Why Priority 3:**
-- HelloAO already provides 1000+ translations via API
-- Can leverage existing HelloAO adapter
-- Alternative: wldeh/bible-api for GitHub CDN (offline capability)
-- Immediate user value with minimal effort
+**Files Implemented:**
+- `src/adapters/helloaoBibleAdapter.ts` - Translation adapter (273 lines)
+- `test/adapters/helloao-bible-test.ts` - 10 comprehensive tests
+- `test/integration/bible-translations-test.ts` - MCP tool integration tests
+- Updated: BibleService, bibleLookup tool, formatter, types
 
-**Implementation Option A (Recommended):**
-- Extend HelloAO adapter to support translation retrieval
-- Add KJV, WEB, ASV to BibleService translation routing
-- Update bible_lookup tool with new translation options
-- Test parallel translation display
+**Test Results:**
+- ✅ All 10 adapter tests passing (all 6 translations validated)
+- ✅ All 7 integration tests passing (MCP tool verified)
+- ✅ Footnotes extraction and formatting working
+- ✅ Verse ranges functional
+- ✅ ESV backward compatibility maintained
 
-**Implementation Option B:**
-- Create wldeh/bible-api adapter for offline capability
-- Add KJV, WEB, ASV via GitHub CDN
-- Fallback to HelloAO for other translations
-- Provides resilience if HelloAO is unavailable
+**Available Translations:**
+1. ESV (English Standard Version) - via ESV API
+2. NET (New English Translation) - via NET Bible API
+3. KJV (King James Version) - via HelloAO
+4. WEB (World English Bible) - via HelloAO
+5. BSB (Berean Standard Bible) - via HelloAO
+6. ASV (American Standard Version) - via HelloAO
+7. YLT (Young's Literal Translation) - via HelloAO
+8. DBY (Darby Translation) - via HelloAO
+
+**Footnotes Feature:**
+- Available for most HelloAO translations (BSB, WEB, etc.)
+- Includes translation notes, alternative readings, textual variants
+- Formatted at bottom with verse references
+- Enabled via `includeFootnotes: true` parameter
+
+**Commit:** 146b980 - feat: Add 6 Bible translations via HelloAO API with footnotes support
 
 ### Priority 4: Cross-Reference System (MEDIUM COMPLEXITY)
 
@@ -769,18 +789,21 @@ tail -f ~/Library/Logs/Claude/mcp-*.log  # macOS
 - [x] Multi-translation support (ESV, NET)
 - [x] Performance optimized (caching system working)
 
-### Phase 3 Status: Commentary Complete ✅
+### Phase 3 Status: Commentary & Translations Complete ✅
 **Completed:**
 - [x] Phase 3.1: Matthew Henry commentary via CCEL (66/66 books)
 - [x] Phase 3.2: HelloAO Bible API integration (6 commentaries, 1000+ translations)
+- [x] Phase 3.3: HelloAO Bible translations (KJV, WEB, BSB, ASV, YLT, DBY + footnotes)
 - [x] All 6 public domain commentaries working (Matthew Henry, JFB, Adam Clarke, John Gill, Keil-Delitzsch, Tyndale)
+- [x] 8 Bible translations available (ESV, NET, KJV, WEB, BSB, ASV, YLT, DBY)
+- [x] Footnotes support with translation notes and textual variants
 - [x] Dual format parsing for different commentary structures
-- [x] Zero infrastructure costs (no API keys, no rate limits)
+- [x] Zero infrastructure costs (no API keys, no rate limits for HelloAO)
 
 **Remaining Phase 3 Goals:**
-- [ ] Priority 3: Additional translations (KJV, WEB, ASV via wldeh/bible-api)
 - [ ] Priority 4: Cross-reference system (Treasury of Scripture Knowledge)
 - [ ] Priority 5: Advanced features (word studies, topical search)
+- [ ] Priority 6: Additional translations from HelloAO's 1000+ library
 
 ### Phase 4 Goals (Future):
 - [ ] Greek/Hebrew lexicon integration
@@ -804,7 +827,8 @@ tail -f ~/Library/Logs/Claude/mcp-*.log  # macOS
 **Bible Text:**
 - ESV Bible with footnotes (textual variants, translation alternatives)
 - NET Bible translation
-- 1000+ translations available via HelloAO API (ready to integrate)
+- 8 translations available: ESV, NET, KJV, WEB, BSB, ASV, YLT, DBY
+- 1000+ more translations available via HelloAO API (easy to add)
 - Intelligent caching (1-hour TTL, LRU eviction)
 - Fast lookups (<1ms cached, ~160ms API)
 
@@ -842,6 +866,9 @@ tail -f ~/Library/Logs/Claude/mcp-*.log  # macOS
 - LRU eviction prevents memory bloat
 
 ### Commits History
+
+**Phase 3.3:**
+- 146b980: feat: Add 6 Bible translations via HelloAO API with footnotes support
 
 **Phase 3.2:**
 - c138ccc: feat: Add HelloAO Bible API integration with 6 commentaries
