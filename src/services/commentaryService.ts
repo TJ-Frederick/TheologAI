@@ -19,10 +19,17 @@ export class CommentaryService {
 
       // Check if there are any footnotes
       if (!result.footnotes || result.footnotes.length === 0) {
-        throw new APIError(
-          404,
-          `No translation notes available for "${params.reference}". The ESV includes footnotes for textual variants and translation alternatives, but this particular verse may not have additional notes.`
-        );
+        // Return verse text with helpful message instead of throwing error
+        return {
+          reference: params.reference,
+          commentator: 'ESV Translation Committee',
+          text: `**${params.reference}** (ESV)\n\n${plainText}\n\n---\n\nThis verse has no textual variants or translation notes in the ESV.`,
+          citation: {
+            source: 'ESV Bible',
+            copyright: this.esv.getCopyrightNotice(),
+            url: 'https://www.esv.org'
+          }
+        };
       }
 
       // Build commentary text with footnotes
