@@ -47,10 +47,30 @@ export const bibleLookupHandler: ToolHandler = {
   },
   handler: async (params: BibleLookupParams) => {
     try {
-      // Handle both single translation and array of translations
-      const translations = Array.isArray(params.translation)
-        ? params.translation
-        : [params.translation || 'ESV'];
+      // Robust translation parameter handling
+      // Claude AI sometimes sends arrays as JSON-stringified strings: "[\"ESV\", \"KJV\"]"
+      // We need to handle: actual arrays, stringified arrays, and single strings
+      let translations: string[];
+
+      if (typeof params.translation === 'string') {
+        const translationStr = params.translation.trim();
+        // Check if it's a JSON-stringified array
+        if (translationStr.startsWith('[') && translationStr.endsWith(']')) {
+          try {
+            const parsed = JSON.parse(translationStr);
+            translations = Array.isArray(parsed) ? parsed : [translationStr];
+          } catch (e) {
+            // If parsing fails, treat as single translation
+            translations = [translationStr];
+          }
+        } else {
+          translations = [translationStr];
+        }
+      } else if (Array.isArray(params.translation)) {
+        translations = params.translation;
+      } else {
+        translations = ['ESV'];
+      }
 
       // Fetch all translations in parallel
       const results = await Promise.all(
