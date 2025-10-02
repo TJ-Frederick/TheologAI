@@ -1,14 +1,17 @@
 import { BibleLookupParams, BibleResult } from '../types/index.js';
 import { ESVAdapter, NETBibleAdapter } from '../adapters/index.js';
+import { HelloAOBibleAdapter } from '../adapters/helloaoBibleAdapter.js';
 import { APIError } from '../utils/errors.js';
 
 export class BibleService {
   private esvAdapter: ESVAdapter;
   private netBibleAdapter: NETBibleAdapter;
+  private helloaoAdapter: HelloAOBibleAdapter;
 
   constructor() {
     this.esvAdapter = new ESVAdapter();
     this.netBibleAdapter = new NETBibleAdapter();
+    this.helloaoAdapter = new HelloAOBibleAdapter();
   }
 
   private mockData: Record<string, { text: string; translation: string }> = {
@@ -61,6 +64,11 @@ export class BibleService {
   async lookup(params: BibleLookupParams): Promise<BibleResult> {
     const translation = (params.translation || 'ESV').toUpperCase();
 
+    // Check if HelloAO supports this translation
+    if (this.helloaoAdapter.isSupported(translation)) {
+      return await this.lookupFromHelloAO(params);
+    }
+
     // Route to appropriate adapter based on translation
     switch (translation) {
       case 'NET':
@@ -81,6 +89,16 @@ export class BibleService {
         // Fallback to mock data
         return await this.lookupFromMock(params);
     }
+  }
+
+  private async lookupFromHelloAO(params: BibleLookupParams): Promise<BibleResult> {
+    const translation = (params.translation || 'KJV').toUpperCase();
+
+    return await this.helloaoAdapter.getPassage(
+      params.reference,
+      translation,
+      params.includeFootnotes || false
+    );
   }
 
   private async lookupFromESV(params: BibleLookupParams): Promise<BibleResult> {

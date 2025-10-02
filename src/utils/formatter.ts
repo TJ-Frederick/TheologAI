@@ -2,13 +2,22 @@ import { BibleResult, CommentaryResult, HistoricalResult, Reference, Citation } 
 
 export function formatBibleResponse(data: BibleResult): string {
   let response = `**${data.reference} (${data.translation})**\n\n`;
-  response += `${data.text}\n\n`;
+  response += `${data.text}\n`;
 
-  if (data.crossReferences && data.crossReferences.length > 0) {
-    response += `*Cross References:* ${data.crossReferences.map(ref => ref.reference).join(', ')}\n\n`;
+  // Format footnotes if present
+  if (data.footnotes && data.footnotes.length > 0) {
+    response += `\n**Footnotes:**\n`;
+    for (const footnote of data.footnotes) {
+      response += `${footnote.caller} (v${footnote.reference.verse}): ${footnote.text}\n`;
+    }
   }
 
-  response += `*Source: ${data.citation.source}*`;
+  // Format cross-references if present
+  if (data.crossReferences && data.crossReferences.length > 0) {
+    response += `\n*Cross References:* ${data.crossReferences.map(ref => ref.reference).join(', ')}\n`;
+  }
+
+  response += `\n*Source: ${data.citation.source}*`;
   if (data.citation.copyright) {
     response += ` - ${data.citation.copyright}`;
   }

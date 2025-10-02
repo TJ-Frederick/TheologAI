@@ -64,7 +64,11 @@ export interface HelloAOBook {
 /**
  * Verse content element (text or formatting)
  */
-export type VerseContent = string | { lineBreak: true } | { noteId: number };
+export type VerseContent =
+  | string
+  | { lineBreak: true }
+  | { noteId: number }
+  | { text: string; wordsOfJesus?: boolean };
 
 /**
  * Verse data structure
@@ -258,7 +262,7 @@ export class HelloAOApiAdapter {
 
   /**
    * Extract verse text from verse content array
-   * Handles mixed content (text strings, line breaks, footnote markers)
+   * Handles mixed content (text strings, line breaks, footnote markers, wordsOfJesus objects)
    */
   static extractVerseText(content: VerseContent[]): string {
     const textParts: string[] = [];
@@ -268,6 +272,9 @@ export class HelloAOApiAdapter {
         textParts.push(item);
       } else if ('lineBreak' in item) {
         textParts.push('\n');
+      } else if ('text' in item) {
+        // Handle { text: string, wordsOfJesus?: boolean } format
+        textParts.push(item.text);
       }
       // Skip footnote markers ({ noteId: number })
     }

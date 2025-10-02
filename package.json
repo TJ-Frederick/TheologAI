@@ -9,12 +9,13 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "clean": "rm -rf dist",
-    "test": "echo \"Add tests in Phase 2\"",
+    "test": "npm run build && npm run test:helloao-bible",
     "test:ccel": "tsx test/adapters/ccel-test.ts",
     "test:netbible": "tsx test/adapters/netbible-test.ts",
     "test:bibleapi": "tsx test/adapters/bibleapi-test.ts",
     "test:commentary": "tsx test/integration/public-commentary-test.ts",
-    "test:all-books": "tsx test/integration/all-books-mapping-test.ts"
+    "test:all-books": "tsx test/integration/all-books-mapping-test.ts",
+    "test:helloao-bible": "tsx test/adapters/helloao-bible-test.ts"
   },
   "keywords": ["bible", "theology", "mcp", "context-protocol"],
   "author": "",

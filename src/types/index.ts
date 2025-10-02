@@ -2,6 +2,7 @@ export interface BibleLookupParams {
   reference: string;
   translation?: string;
   includeCrossRefs?: boolean;
+  includeFootnotes?: boolean;
 }
 
 export interface CommentaryLookupParams {
@@ -33,11 +34,22 @@ export interface Reference {
   text?: string;
 }
 
+export interface Footnote {
+  id: number;
+  caller: string;
+  text: string;
+  reference: {
+    chapter: number;
+    verse: number;
+  };
+}
+
 export interface BibleResult {
   reference: string;
   translation: string;
   text: string;
   crossReferences?: Reference[];
+  footnotes?: Footnote[];
   citation: Citation;
 }
 
