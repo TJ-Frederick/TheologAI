@@ -6,3 +6,5 @@ export { CCELApiAdapter } from './ccelApi.js';
 export type { CCELScriptureOptions, CCELWorkFragment, CCELWorkSection, CCELScriptureResponse, CCELWorkResponse } from './ccelApi.js';
 export { CCELTocParser } from './ccelToc.js';
 export type { TocEntry, ParsedToc } from './ccelToc.js';
+export { NETBibleAdapter } from './netBibleApi.js';
+export type { NETBibleNote, NETBibleResponse } from './netBibleApi.js';

@@ -70,8 +70,10 @@ Access thousands of works from the Christian Classics Ethereal Library:
 - Clean text extraction from HTML
 
 ### Commentary
-- **NET Bible Notes** - Sample commentary available for common verses (John 3:16, John 1:1, Genesis 1:1, Romans 8:28)
-- *Note: Phase 1 includes limited mock commentary. Phase 2 will expand with real NET Bible API integration and additional commentators.*
+- **NET Bible Translator Notes** - Integration with NET Bible API to identify verses with translator notes
+- Provides verse text and indicates how many translator notes are available
+- Direct links to netbible.org for full access to 60,000+ detailed notes
+- Includes information about study notes, translator notes, and textual criticism
 
 ## Installation & Setup
 
@@ -177,11 +179,14 @@ Look up Bible verses by reference.
 - Bible verse cache: ~160ms → <1ms on repeated queries
 - TOC caching: 24-hour TTL reduces API calls
 - ESV API rate limit protection through intelligent caching
+- NET Bible commentary cache: ~150ms → <1ms on repeated queries
 
 ## Next Steps (Phase 2+)
 
+**Recently Completed:**
+- ✅ NET Bible API integration (note detection with links to full translator notes)
+
 **In Progress:**
-- [ ] NET Bible API integration (real commentary data)
 - [ ] Additional Bible translations (KJV, NASB via public domain APIs)
 
 **Future Enhancements:**
@@ -199,6 +204,7 @@ src/
 ├── adapters/                     # External API adapters
 │   ├── index.ts                 # Adapter exports
 │   ├── esvApi.ts               # ESV Bible API
+│   ├── netBibleApi.ts          # NET Bible API (translator notes)
 │   ├── ccelApi.ts              # CCEL API (Scripture, Works, Fragments)
 │   └── ccelToc.ts              # CCEL TOC parser with auto-resolution
 ├── services/                     # Business logic layer
