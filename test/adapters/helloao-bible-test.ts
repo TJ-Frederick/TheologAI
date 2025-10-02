@@ -181,6 +181,21 @@ try {
   console.log();
 }
 
+// Test 11: Test numbered books (1 John, 2 Samuel, etc.)
+console.log('TEST 11: Test Numbered Books (1 John 5:7, 2 Samuel 22:2)');
+console.log('-'.repeat(80));
+try {
+  const result1 = await adapter.getPassage('1 John 5:7', 'KJV', false);
+  const result2 = await adapter.getPassage('2 Samuel 22:2', 'KJV', false);
+  console.log(`✓ Successfully fetched numbered book references`);
+  console.log(`  1 John 5:7 (KJV): "${result1.text.substring(0, 60)}..."`);
+  console.log(`  2 Samuel 22:2 (KJV): "${result2.text}"`);
+  console.log();
+} catch (error) {
+  console.log(`✗ FAILED: ${error instanceof Error ? error.message : error}`);
+  console.log();
+}
+
 // Summary
 console.log('='.repeat(80));
 console.log('HELLOAO BIBLE ADAPTER TESTS COMPLETE');

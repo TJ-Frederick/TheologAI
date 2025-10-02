@@ -146,8 +146,9 @@ const HELLOAO_BOOK_CODES: Record<string, string> = {
 };
 
 /**
- * HelloAO book name mappings (for translation endpoints)
- * HelloAO translations use full book names
+ * HelloAO book name mappings (for canonical reference display)
+ * Used for formatting user-friendly references, not API calls
+ * API calls should use HELLOAO_BOOK_CODES instead
  */
 const HELLOAO_BOOK_NAMES: Record<string, string> = {
   // Old Testament
@@ -341,10 +342,11 @@ export function mapReferenceToHelloAO(reference: string): HelloAOReference {
 }
 
 /**
- * Map a book name to HelloAO full name format (for translations)
+ * Map a book name to HelloAO full name format (for display purposes)
+ * Note: For API calls, use mapBookNameToHelloAOCode instead
  *
  * @param bookName - Book name in any common format
- * @returns HelloAO book name
+ * @returns HelloAO book name for display
  *
  * @example
  * ```typescript
@@ -364,7 +366,8 @@ export function mapBookNameToHelloAO(bookName: string): string {
 }
 
 /**
- * Map a book name to HelloAO code format (for commentaries)
+ * Map a book name to HelloAO code format (for API calls)
+ * Used for both translation and commentary API endpoints
  *
  * @param bookName - Book name in any common format
  * @returns HelloAO book code (3 letters)
@@ -373,6 +376,7 @@ export function mapBookNameToHelloAO(bookName: string): string {
  * ```typescript
  * mapBookNameToHelloAOCode("John")    // Returns: "JHN"
  * mapBookNameToHelloAOCode("Genesis") // Returns: "GEN"
+ * mapBookNameToHelloAOCode("1 John")  // Returns: "1JN"
  * ```
  */
 export function mapBookNameToHelloAOCode(bookName: string): string {

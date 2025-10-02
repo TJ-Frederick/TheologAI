@@ -119,9 +119,10 @@ export class HelloAOBibleAdapter {
     const parsed = mapReferenceToHelloAO(reference);
 
     // Fetch chapter from HelloAO API
+    // Note: Translations use book codes (e.g., "1JN") not full names (e.g., "1 John")
     const chapterResponse = await this.api.getTranslationChapter(
       metadata.id,
-      parsed.book,
+      parsed.bookCode,
       parsed.chapter
     );
 
