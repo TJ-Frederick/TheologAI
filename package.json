@@ -17,12 +17,18 @@
     "test:all-books": "tsx test/integration/all-books-mapping-test.ts",
     "test:helloao-bible": "tsx test/adapters/helloao-bible-test.ts"
   },
-  "keywords": ["bible", "theology", "mcp", "context-protocol"],
+  "keywords": [
+    "bible",
+    "theology",
+    "mcp",
+    "context-protocol"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.18.2",
     "@types/node": "^24.5.2",
+    "dotenv": "^17.2.3",
     "typescript": "^5.9.2"
   },
   "devDependencies": {
