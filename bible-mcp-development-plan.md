@@ -195,41 +195,91 @@ mkdir -p data/confessions data/creeds
 - Fast section resolution (<100ms typical)
 - Clean text extraction from HTML
 
-### Day 8-9: Public Domain Bible APIs Integration
+### Phase 2.5: ESV Footnotes & Multi-Translation - ✅ COMPLETE
 
-**Goal:** Add multiple translations via rate-limit-free APIs
+**Goal:** Real footnote content from ESV and multi-translation support
 
-**Priority:** Use public domain APIs instead of rate-limited options
+**Accomplished:**
+1. **ESV HTML Endpoint Integration** ✅
+   - Created `getPassageWithNotes()` method using HTML endpoint
+   - Parses footnotes from `<div class="footnotes">` section
+   - Categorizes notes by type: variant, translation, other
+   - 1-hour caching for footnote responses
+   - Separate cache for HTML responses
 
-**Steps:**
+2. **Real Footnote Content** ✅
+   - Textual variants (e.g., "Some manuscripts God works all things...")
+   - Translation alternatives (e.g., "Or For this is how God loved...")
+   - Graceful handling when no footnotes exist
+   - Returns verse + helpful message instead of error
+
+3. **Multi-Translation Support** ✅
+   - ESV (primary translation with footnotes)
+   - NET Bible (alternative literal translation)
+   - Translation routing in BibleService
+   - Clean separation: bible_lookup vs commentary_lookup
+
+4. **Tool Architecture** ✅
+   - `bible_lookup`: Clean Scripture text only (no footnotes by default)
+   - `commentary_lookup`: ESV text + footnotes when available
+   - No errors for verses without footnotes (e.g., John 1:1, 1 John 5:7)
+   - Clear tool descriptions guide users to correct tool
+
+**Research Findings:**
+- **NO Bible API provides full theological commentary** (all proprietary/copyright)
+- Study Bible notes (ESV Study Bible, NIV Study Bible) not API-accessible
+- ESV footnotes focus on textual/translation variants, NOT theological commentary
+- NET Bible API only provides note markers (`<n id="X" />`), not actual content
+- labs.bible.org API has note markers but no content retrieval endpoint
+- API.Bible, Biblia API, Bolls.life - none have comprehensive study notes
+
+**What Users Get:**
+- Real textual variant notes from ESV
+- Translation alternatives for clarity
+- Manuscript differences and textual criticism
+- Multi-translation Bible text (ESV, NET)
+
+**What Users Don't Get:**
+- Theological commentary (e.g., "This teaches about God's sovereignty...")
+- Cultural/historical context
+- Word studies or deeper exposition
+- Study Bible notes (require separate public domain commentary integration)
+
+**Test Coverage:**
+- 6 ESV footnote tests passing
+- 10 NET Bible tests passing
+- 8 CCEL tests passing
+- Commentary service integration validated
+- Build successful with no errors
+
+**Commits:**
+- 2b861c3: feat: Add NET Bible API integration for translator notes detection
+- f9f2028: feat: Add ESV footnotes and multi-translation support
+- 9103a42: fix: Handle verses without footnotes gracefully
+
+### Day 8-9: Additional Public Domain Bible Translations
+
+**Status:** Pending (moved to Phase 3)
+
+**Goal:** Add more translations via rate-limit-free APIs
+
+**Priority:** Use public domain APIs for KJV, WEB, ASV
+
+**Recommended Approach:**
 1. **Integrate wldeh/bible-api** (GitHub CDN)
    - No API keys required
    - 200+ versions available (KJV, WEB, ASV, BBE, Darby, YLT, etc.)
    - Create adapter for GitHub CDN endpoints
-   - Implement version selection parameter
+   - Add to BibleService translation routing
 
 2. **Add Priority Translations**
    - KJV (King James Version) - Most recognized
    - WEB (World English Bible) - Modern public domain
    - ASV (American Standard Version) - Scholarly option
-   - Allow translation selection in queries
 
 3. **Parallel Translation Display**
    - Modify formatter for side-by-side display
-   - Handle multiple translation requests
-   - Test formatting in Claude
-
-**Alternative APIs (if needed):**
-- bible-api.com (WEB, KJV) - Rate limited but generous
-- Rob Keplin's bible-go-api - Self-hostable
-- Bolls.life API - No usage limits
-
-**Test Queries:**
-```
-"Show me John 3:16 in ESV and KJV"
-"Compare Genesis 1:1 across translations"
-"Look up Romans 8:28 in WEB"
-```
+   - Handle multiple translation requests in single query
 
 ### Day 10-11: Cross-References
 
@@ -248,21 +298,37 @@ mkdir -p data/confessions data/creeds
 
 ### Day 12-13: Real Commentary Integration
 
-**Goal:** Replace mock data with real commentary resources
+**Status:** Partially Complete (ESV footnotes only)
 
-**Steps:**
-1. **NET Bible API Integration**
-   - Replace mock commentary with real NET Bible API
-   - Implement translation notes retrieval
-   - Cache commentary responses
+**Completed:**
+- ✅ ESV translation notes (textual variants, translation alternatives)
+- ✅ NET Bible integrated as translation option (not for commentary)
 
-2. **Matthew Henry Commentary** (if time permits)
-   - Find public domain Matthew Henry text
+**Remaining:** Public Domain Theological Commentary
+
+**Goal:** Add real theological commentary from public domain sources
+
+**Priority for Phase 3:**
+1. **Matthew Henry's Commentary** (Complete, Public Domain)
+   - Find public domain Matthew Henry text (Project Gutenberg or similar)
    - Convert to searchable JSON format
    - Index by verse reference
    - Link commentary to verses
    - Handle verse ranges
    - Format for readability
+   - Integrate into commentary_lookup tool
+
+2. **Additional Public Domain Commentaries:**
+   - Jamieson-Fausset-Brown (JFB) Commentary
+   - Barnes' Notes on the Bible
+   - Adam Clarke's Commentary
+   - Consider priority based on availability and quality
+
+**Why This Matters:**
+- ESV footnotes only provide textual/translation notes
+- Users need actual theological commentary for deeper study
+- Public domain = no API restrictions, full content access
+- Can provide rich exposition and application
 
 ### Day 14: Polish & Optimization
 
@@ -281,29 +347,98 @@ mkdir -p data/confessions data/creeds
 
 ## Phase 3: Advanced Features (Days 15+)
 
-### Optional Enhancements
+### Current Status: Ready to Begin
+
+**Recommended Priority Order:**
+
+### Priority 1: Public Domain Commentary Integration (HIGH VALUE)
+
+**Goal:** Add real theological commentary from public domain sources
+
+**Why Priority 1:**
+- Fills the biggest gap (theological commentary vs textual notes)
+- Public domain = no API/copyright restrictions
+- High user value for Bible study
+- Relatively straightforward implementation
+
+**Implementation Steps:**
+1. Research available sources:
+   - Matthew Henry's Commentary (most comprehensive)
+   - Jamieson-Fausset-Brown (concise, scholarly)
+   - Barnes' Notes (detailed, accessible)
+   - Adam Clarke's Commentary (extensive)
+
+2. Data acquisition & conversion:
+   - Find structured text sources (Project Gutenberg, Christian Classics)
+   - Convert to JSON format with verse indexing
+   - Handle verse ranges and cross-references
+   - Clean formatting for readability
+
+3. Integration:
+   - Create commentary adapter/service
+   - Add to commentary_lookup tool
+   - Support multiple commentators
+   - Cache commentary responses
+
+**Success Criteria:**
+- Users can request commentary by verse
+- Multiple commentators available
+- Clean, readable formatting
+- Fast response times with caching
+
+### Priority 2: Additional Public Domain Bible Translations (EASY WIN)
+
+**Goal:** Add KJV, WEB, ASV via wldeh/bible-api
+
+**Why Priority 2:**
+- Easy to implement (GitHub CDN, no API keys)
+- Immediate user value
+- No ongoing maintenance
+- Expands multi-translation support
+
+**Implementation:**
+- Create wldeh/bible-api adapter
+- Add KJV, WEB, ASV to translation routing
+- Update bible_lookup tool with new options
+- Test parallel translation display
+
+### Priority 3: Cross-Reference System (MEDIUM COMPLEXITY)
+
+**Goal:** Add Treasury of Scripture Knowledge integration
+
+**Why Priority 3:**
+- Enhances Bible study capabilities
+- Links related verses automatically
+- Moderate complexity
+- Clear user value
+
+**Implementation:**
+- Integrate Treasury of Scripture Knowledge data
+- Create cross-reference service
+- Add to commentary_lookup output
+- Format cross-refs with verse previews
+
+### Priority 4: Advanced Features (OPTIONAL)
 
 1. **Topical Search Tool**
    - Build topic index across all resources
    - Implement relevance scoring
    - Cross-resource search results
-   - Implement the planned `topical_search` tool
 
-2. **Persistent Cache**
+2. **Greek/Hebrew Word Studies**
+   - Strong's concordance integration
+   - Lexicon data (public domain)
+   - Original language display
+
+3. **Persistent Cache**
    - Migrate to SQLite for cache
    - Pre-warm common passages
    - Cache statistics tracking
 
-3. **Additional Resources**
-   - Calvin's Commentaries
+4. **Additional Resources**
    - More confessions/catechisms (full versions)
-   - Greek/Hebrew word studies
-   - Lexicons and interlinears
-
-4. **Advanced Translation Features**
-   - Original language support (Greek/Hebrew)
+   - Calvin's Commentaries
    - Interlinear Bible display
-   - Strong's concordance integration
 
 ## Testing Checklist
 
@@ -328,10 +463,11 @@ mkdir -p data/confessions data/creeds
 - [x] Performance under 3 seconds (cache: <1ms, API: ~160ms)
 
 **Phase 2 Testing Goals:**
-- [ ] Multiple translation support working
-- [ ] Parallel translation display formatted correctly
-- [ ] Real NET Bible commentary integration
-- [ ] Cross-references linked properly
+- [x] Multiple translation support working (ESV, NET)
+- [ ] Parallel translation display formatted correctly (pending KJV, WEB, ASV)
+- [x] ESV footnotes integration (textual variants, translation alternatives)
+- [ ] Theological commentary integration (pending Matthew Henry, etc.)
+- [ ] Cross-references linked properly (pending)
 
 ## Common Issues & Solutions
 
@@ -438,12 +574,23 @@ tail -f ~/Library/Logs/Claude/mcp-*.log  # macOS
 - [x] **BONUS:** Performance optimization (cache reduces 160ms → <1ms)
 - [x] **BONUS:** Conceptual search via topic tagging
 
-### Phase 2 Complete When:
-- [ ] Multiple public domain Bible translations available (KJV, WEB, ASV)
+### Phase 2 Status: Partially Complete ⚠️
+**Completed:**
+- [x] CCEL integration (classic Christian texts)
+- [x] ESV footnotes (textual variants, translation alternatives)
+- [x] Multi-translation support (ESV, NET)
+- [x] Performance optimized (caching system working)
+
+**Remaining for Phase 2 Completion:**
+- [ ] Additional public domain translations (KJV, WEB, ASV)
 - [ ] Cross-references functional
-- [ ] Real NET Bible commentary integrated (replacing mock)
-- [ ] Matthew Henry commentary integrated
-- [ ] Performance under 3 seconds consistently
+- [ ] Public domain theological commentary (Matthew Henry, JFB)
+
+**Phase 3 Goals:**
+- [ ] Priority 1: Matthew Henry commentary integration
+- [ ] Priority 2: KJV, WEB, ASV translations
+- [ ] Priority 3: Cross-reference system
+- [ ] Priority 4: Advanced features (word studies, topical search)
 
 ### Ready for Others ✅
 - [x] Documentation complete and clear
