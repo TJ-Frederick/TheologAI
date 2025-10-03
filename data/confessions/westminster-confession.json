@@ -1,0 +1,206 @@
+{
+  "title": "Westminster Confession of Faith",
+  "type": "confession",
+  "date": "1646",
+  "sections": [
+    {
+      "chapter": "1",
+      "title": "Of the Holy Scripture",
+      "content": "Although natural revelation shows God's attributes, it is not sufficient to give that knowledge of God, and of his will, which is necessary unto salvation. God chose to reveal Himself through Scripture to preserve truth and comfort the Church. The Holy Scripture contains all books of the Old and New Testaments, which are given by inspiration of God to be the rule of faith and life. The Apocryphal books are no part of the canon of the Scripture, and therefore are of no authority in the Church of God. Scripture's authority comes wholly upon God (who is truth itself) the author thereof: and therefore it is to be received, because it is the Word of God.",
+      "topics": ["scripture", "revelation", "canon", "authority", "inspiration"]
+    },
+    {
+      "chapter": "2", 
+      "title": "Of God, and of the Holy Trinity",
+      "content": "There is but one only living and true God, who is infinite in being and perfection, a most pure spirit, invisible, without body, parts, or passions, immutable, immense, eternal, incomprehensible, almighty, most wise, most holy, most free, most absolute, working all things according to the counsel of His own immutable and most righteous will. In the unity of the Godhead there be three persons, of one substance, power, and eternity: God the Father, God the Son, and God the Holy Ghost.",
+      "topics": ["god", "trinity", "attributes", "persons", "substance"]
+    },
+    {
+      "chapter": "3",
+      "title": "Of God's Eternal Decree", 
+      "content": "God from all eternity did, by the most wise and holy counsel of His own will, freely, and unchangeably ordain whatsoever comes to pass; yet so, as thereby neither is God the author of sin, nor is violence offered to the will of the creatures, nor is the liberty or contingency of second causes taken away, but rather established.",
+      "topics": ["predestination", "decree", "sovereignty", "election", "providence"]
+    },
+    {
+      "chapter": "4",
+      "title": "Of Creation",
+      "content": "It pleased God the Father, Son, and Holy Ghost, for the manifestation of the glory of His eternal power, wisdom, and goodness, in the beginning, to create or make of nothing the world, and all things therein, whether visible or invisible, in the space of six days, and all very good. After God had made all other creatures, He created man, male and female, with reasonable and immortal souls, endued with knowledge, righteousness, and true holiness, after His own image.",
+      "topics": ["creation", "trinity", "humanity", "image of god", "six days"]
+    },
+    {
+      "chapter": "5",
+      "title": "Of Providence",
+      "content": "God, the great Creator of all things, does uphold, direct, dispose, and govern all creatures, actions, and things, from the greatest even to the least, by His most wise and holy providence, according to His infallible foreknowledge and the free and immutable counsel of His own will, to the praise of the glory of His wisdom, power, justice, goodness, and mercy.",
+      "topics": ["providence", "sovereignty", "governance", "foreknowledge", "wisdom"]
+    },
+    {
+      "chapter": "6",
+      "title": "Of the Fall of Man, of Sin, and the Punishment thereof",
+      "content": "Our first parents, being seduced by the subtlety and temptation of Satan, sinned in eating the forbidden fruit. This their sin God was pleased, according to His wise and holy counsel, to permit, having purposed to order it to His own glory. By this sin they fell from their original righteousness and communion with God, and so became dead in sin, and wholly defiled in all the faculties and parts of soul and body.",
+      "topics": ["fall", "sin", "adam", "corruption", "death"]
+    },
+    {
+      "chapter": "7",
+      "title": "Of God's Covenant with Man",
+      "content": "The distance between God and the creature is so great, that although reasonable creatures do owe obedience unto Him as their Creator, yet they could never have any fruition of Him, as their blessedness and reward, but by some voluntary condescension on God's part, which He has been pleased to express by way of covenant.",
+      "topics": ["covenant", "grace", "works", "condescension", "obedience"]
+    },
+    {
+      "chapter": "8",
+      "title": "Of Christ the Mediator",
+      "content": "It pleased God, in His eternal purpose, to choose and ordain the Lord Jesus, His only begotten Son, to be the Mediator between God and man, the Prophet, Priest, and King; the Head and Savior of His Church, the Heir of all things, and Judge of the world; unto whom He did, from all eternity, give a people to be His seed, and to be by Him in time redeemed, called, justified, sanctified, and glorified.",
+      "topics": ["christ", "mediator", "incarnation", "offices", "salvation"]
+    },
+    {
+      "chapter": "9",
+      "title": "Of Free Will",
+      "content": "God has endued the will of man with that natural liberty, that is neither forced nor by any absolute necessity of nature determined to good or evil. Man, in his state of innocency, had freedom and power to will and to do that which is good and well-pleasing to God; but yet mutably, so that he might fall from it. Man, by his fall into a state of sin, has wholly lost all ability of will to any spiritual good accompanying salvation.",
+      "topics": ["free will", "liberty", "innocency", "fall", "ability"]
+    },
+    {
+      "chapter": "10",
+      "title": "Of Effectual Calling",
+      "content": "All those whom God has predestinated unto life, and those only, He is pleased, in His appointed and accepted time, effectually to call, by His Word and Spirit, out of that state of sin and death in which they are by nature, to grace and salvation by Jesus Christ; enlightening their minds spiritually and savingly to understand the things of God, taking away their heart of stone, and giving unto them an heart of flesh.",
+      "topics": ["calling", "election", "regeneration", "spirit", "salvation"]
+    },
+    {
+      "chapter": "11",
+      "title": "Of Justification",
+      "content": "Those whom God effectually calls He also freely justifies; not by infusing righteousness into them, but by pardoning their sins, and by accounting and accepting their persons as righteous; not for any thing wrought in them, or done by them, but for Christ's sake alone; not by imputing faith itself, the act of believing, or any other evangelical obedience to them, as their righteousness; but by imputing the obedience and satisfaction of Christ unto them.",
+      "topics": ["justification", "righteousness", "imputation", "faith", "christ"]
+    },
+    {
+      "chapter": "12",
+      "title": "Of Adoption",
+      "content": "All those that are justified God vouchsafes, in and for His only Son Jesus Christ, to make partakers of the grace of adoption; by which they are taken into the number, and enjoy the liberties and privileges of the children of God; have His name put upon them; receive the Spirit of adoption; have access to the throne of grace with boldness; are enabled to cry, Abba, Father; are pitied, protected, provided for, and chastened by Him as by a Father.",
+      "topics": ["adoption", "children", "privileges", "spirit", "father"]
+    },
+    {
+      "chapter": "13",
+      "title": "Of Sanctification",
+      "content": "They who are effectually called and regenerated, having a new heart and a new spirit created in them, are further sanctified, really and personally, through the virtue of Christ's death and resurrection, by His Word and Spirit dwelling in them; the dominion of the whole body of sin is destroyed, and the several lusts thereof are more and more weakened and mortified, and they more and more quickened and strengthened in all saving graces.",
+      "topics": ["sanctification", "holiness", "mortification", "grace", "spirit"]
+    },
+    {
+      "chapter": "14",
+      "title": "Of Saving Faith",
+      "content": "The grace of faith, whereby the elect are enabled to believe to the saving of their souls, is the work of the Spirit of Christ in their hearts, and is ordinarily wrought by the ministry of the Word; by which also, and by the administration of the sacraments and prayer, it is increased and strengthened.",
+      "topics": ["faith", "belief", "spirit", "word", "sacraments"]
+    },
+    {
+      "chapter": "15",
+      "title": "Of Repentance unto Life",
+      "content": "Repentance unto life is an evangelical grace, the doctrine whereof is to be preached by every minister of the gospel, as well as that of faith in Christ. By it a sinner, out of the sight and sense not only of the danger, but also of the filthiness and odiousness of his sins, as contrary to the holy nature and righteous law of God, and upon the apprehension of His mercy in Christ to such as are penitent, so grieves for and hates his sins as to turn from them all unto God.",
+      "topics": ["repentance", "grace", "sorrow", "conversion", "mercy"]
+    },
+    {
+      "chapter": "16",
+      "title": "Of Good Works",
+      "content": "Good works are only such as God has commanded in His holy Word, and not such as, without the warrant thereof, are devised by men out of blind zeal or upon any pretense of good intention. These good works, done in obedience to God's commandments, are the fruits and evidences of a true and lively faith; and by them believers manifest their thankfulness, strengthen their assurance, edify their brethren, adorn the profession of the gospel, stop the mouths of the adversaries, and glorify God.",
+      "topics": ["good works", "obedience", "fruits", "evidence", "faith"]
+    },
+    {
+      "chapter": "17",
+      "title": "Of the Perseverance Of the Saints",
+      "content": "They whom God has accepted in His Beloved, effectually called and sanctified by His Spirit, can neither totally nor finally fall away from the state of grace; but shall certainly persevere therein to the end, and be eternally saved. This perseverance of the saints depends, not upon their own free will, but upon the immutability of the decree of election, flowing from the free and unchangeable love of God the Father.",
+      "topics": ["perseverance", "saints", "election", "security", "grace"]
+    },
+    {
+      "chapter": "18",
+      "title": "Of Assurance Of Grace and Salvation",
+      "content": "Although hypocrites, and other unregenerate men, may vainly deceive themselves with false hopes and carnal presumptions of being in the favor of God and estate of salvation, which hope of theirs shall perish; yet such as truly believe in the Lord Jesus, and love Him in sincerity, endeavoring to walk in all good conscience before Him, may in this life be certainly assured that they are in the state of grace, and may rejoice in the hope of the glory of God.",
+      "topics": ["assurance", "certainty", "hope", "conscience", "glory"]
+    },
+    {
+      "chapter": "19",
+      "title": "Of the Law Of God",
+      "content": "God gave to Adam a law, as a covenant of works, by which He bound him and all his posterity to personal, entire, exact, and perpetual obedience; promised life upon the fulfilling, and threatened death upon the breach of it; and endued him with power and ability to keep it. This law, after his fall, continues to be a perfect rule of righteousness; and, as such, was delivered by God upon Mount Sinai in ten commandments.",
+      "topics": ["law", "commandments", "covenant", "righteousness", "obedience"]
+    },
+    {
+      "chapter": "20",
+      "title": "Of Christian Liberty, and Liberty Of Conscience",
+      "content": "The liberty which Christ has purchased for believers under the gospel consists in their freedom from the guilt of sin, the condemning wrath of God, the curse of the moral law; and in their being delivered from this present evil world, bondage to Satan, and dominion of sin, from the evil of afflictions, the sting of death, the victory of the grave, and everlasting damnation.",
+      "topics": ["liberty", "freedom", "conscience", "guilt", "bondage"]
+    },
+    {
+      "chapter": "21",
+      "title": "Of Religious Worship, and the Sabbath Day",
+      "content": "The light of nature shows that there is a God, who has lordship and sovereignty over all; is good, and does good unto all; and is therefore to be feared, loved, praised, called upon, trusted in, and served with all the heart, and with all the soul, and with all the might. But the acceptable way of worshipping the true God is instituted by Himself, and so limited by His own revealed will, that He may not be worshipped according to the imaginations and devices of men.",
+      "topics": ["worship", "sabbath", "reverence", "service", "ordinances"]
+    },
+    {
+      "chapter": "22",
+      "title": "Of Lawful Oaths and Vows",
+      "content": "A lawful oath is a part of religious worship, wherein upon just occasion the person swearing solemnly calls God to witness what he asserts or promises; and to judge him according to the truth or falsehood of what he swears. The name of God only is that by which men ought to swear, and therein it is to be used with all holy fear and reverence; therefore to swear vainly or rashly by that glorious and dreadful name, or to swear at all by any other thing, is sinful, and to be abhorred.",
+      "topics": ["oaths", "vows", "worship", "reverence", "promises"]
+    },
+    {
+      "chapter": "23",
+      "title": "Of the Civil Magistrate",
+      "content": "God, the supreme Lord and King of all the world, has ordained civil magistrates to be under Him over the people, for His own glory and the public good; and to this end has armed them with the power of the sword, for the defense and encouragement of them that are good, and for the punishment of evil-doers.",
+      "topics": ["government", "magistrate", "authority", "justice", "order"]
+    },
+    {
+      "chapter": "24",
+      "title": "Of Marriage and Divorce",
+      "content": "Marriage is to be between one man and one woman; neither is it lawful for any man to have more than one wife, nor for any woman to have more than one husband at the same time. Marriage was ordained for the mutual help of husband and wife; for the increase of mankind with legitimate issue, and of the Church with an holy seed; and for preventing of uncleanness.",
+      "topics": ["marriage", "divorce", "covenant", "family", "purity"]
+    },
+    {
+      "chapter": "25",
+      "title": "Of the Church",
+      "content": "The catholic or universal Church, which is invisible, consists of the whole number of the elect, that have been, are, or shall be gathered into one, under Christ the head thereof; and is the spouse, the body, the fullness of Him that fills all in all. The visible Church, which is also catholic or universal under the gospel, consists of all those, throughout the world, that profess the true religion, together with their children.",
+      "topics": ["church", "universal", "visible", "invisible", "elect"]
+    },
+    {
+      "chapter": "26",
+      "title": "Of the Communion Of Saints",
+      "content": "All saints that are united to Jesus Christ their head, by His Spirit and by faith, have fellowship with Him in His graces, sufferings, death, resurrection, and glory; and being united to one another in love, they have communion in each other's gifts and graces, and are obliged to the performance of such duties, public and private, as do conduce to their mutual good, both in the inward and outward man.",
+      "topics": ["communion", "saints", "fellowship", "unity", "love"]
+    },
+    {
+      "chapter": "27",
+      "title": "Of the Sacraments",
+      "content": "Sacraments are holy signs and seals of the covenant of grace, immediately instituted by God, to represent Christ and His benefits, and to confirm our interest in Him; as also to put a visible difference between those that belong unto the Church and the rest of the world, and solemnly to engage them to the service of God in Christ, according to His Word.",
+      "topics": ["sacraments", "signs", "seals", "covenant", "grace"]
+    },
+    {
+      "chapter": "28",
+      "title": "Of Baptism",
+      "content": "Baptism is a sacrament of the New Testament, ordained by Jesus Christ, not only for the solemn admission of the party baptized into the visible Church, but also to be unto him a sign and seal of the covenant of grace, of his ingrafting into Christ, of regeneration, of remission of sins, and of his giving up unto God, through Jesus Christ, to walk in newness of life.",
+      "topics": ["baptism", "sacrament", "covenant", "regeneration", "admission"]
+    },
+    {
+      "chapter": "29",
+      "title": "Of the Lord's Supper",
+      "content": "Our Lord Jesus, in the night wherein He was betrayed, instituted the sacrament of His body and blood, called the Lord's Supper, to be observed in His Church unto the end of the world; for the perpetual remembrance of the sacrifice of Himself in His death, the sealing of all benefits thereof unto true believers, their spiritual nourishment and growth in Him, their further engagement in and to all duties which they owe unto Him.",
+      "topics": ["lord's supper", "communion", "sacrifice", "remembrance", "nourishment"]
+    },
+    {
+      "chapter": "30",
+      "title": "Of Church Censures",
+      "content": "The Lord Jesus, as king and head of His Church, has therein appointed a government in the hand of Church officers, distinct from the civil magistrate. To these officers the keys of the Kingdom of Heaven are committed, by virtue whereof they have power respectively to retain and remit sins, to shut that kingdom against the impenitent, both by the Word and censures, and to open it unto penitent sinners, by the ministry of the gospel, and by absolution from censures, as occasion shall require.",
+      "topics": ["discipline", "censures", "keys", "officers", "government"]
+    },
+    {
+      "chapter": "31",
+      "title": "Of Synods and Councils",
+      "content": "For the better government and further edification of the Church, there ought to be such assemblies as are commonly called synods or councils; and it belongs unto the overseers and other rulers of the particular churches, by virtue of their office, and the power which Christ has given them for edification, and not for destruction, to appoint such assemblies, and to convene together in them, as often as they shall judge it expedient for the good of the Church.",
+      "topics": ["synods", "councils", "government", "edification", "assemblies"]
+    },
+    {
+      "chapter": "32",
+      "title": "Of the State Of Men after Death, and Of the Resurrection Of the Dead",
+      "content": "The bodies of men, after death, return to dust, and see corruption; but their souls (which neither die nor sleep) having an immortal subsistence, immediately return to God who gave them. The souls of the righteous, being then made perfect in holiness, are received into the highest heavens, where they behold the face of God in light and glory, waiting for the full redemption of their bodies.",
+      "topics": ["death", "resurrection", "soul", "body", "heaven"]
+    },
+    {
+      "chapter": "33",
+      "title": "Of the Last Judgment",
+      "content": "God has appointed a day wherein He will judge the world in righteousness by Jesus Christ, to whom all power and judgment is given of the Father. In which day, not only the apostate angels shall be judged, but likewise all persons, that have lived upon earth, shall appear before the tribunal of Christ, to give an account of their thoughts, words, and deeds, and to receive according to what they have done in the body, whether good or evil.",
+      "topics": ["judgment", "christ", "righteousness", "tribunal", "eternal"]
+    }
+  ],
+  "topics": ["scripture", "god", "trinity", "predestination", "creation", "providence", "sin", "covenant", "christ", "salvation", "faith", "justification", "sanctification", "church", "sacraments", "judgment"]
+}
