@@ -4,7 +4,8 @@
  * Resolves natural language queries to CCEL section identifiers
  */
 
-import { CCELTocParser, type ParsedToc, type TocEntry } from '../adapters/ccelToc.js';
+import { CCELTocParser, type ParsedToc, type TocEntry, type VerseRange } from '../adapters/ccelToc.js';
+import { parseReference } from '../utils/commentaryMapper.js';
 import { Cache } from '../utils/cache.js';
 
 export interface SectionResolution {
@@ -45,7 +46,19 @@ export class SectionResolver {
       throw new Error(`No TOC entries found for ${work}`);
     }
 
-    // Try to find best match
+    // Priority 1: Try Bible verse matching (for commentaries)
+    if (this.isBibleVerseQuery(query)) {
+      const verseMatch = this.findSectionByBibleVerse(toc.entries, query);
+      if (verseMatch) {
+        return {
+          sectionId: verseMatch.sectionId,
+          title: verseMatch.title,
+          confidence: 'exact'
+        };
+      }
+    }
+
+    // Priority 2: Try structured/title/keyword matching (existing logic)
     const match = this.tocParser.searchToc(toc.entries, query);
 
     if (!match) {
@@ -181,6 +194,81 @@ export class SectionResolver {
   }
 
   /**
+   * Check if query looks like a Bible verse reference
+   * Examples: "John 3:16", "1 Timothy 2:14", "Genesis 1:1-3"
+   */
+  private isBibleVerseQuery(query: string): boolean {
+    // Pattern: Optional number + Book name + Chapter:Verse
+    // Matches: "John 3:16", "1 Timothy 2:14", "2 Corinthians 5:17"
+    const bibleVersePattern = /^([1-3]?\s*[A-Za-z]+(?:\s+[A-Za-z]+)?)\s+(\d+):(\d+)(?:-(\d+))?$/;
+    return bibleVersePattern.test(query.trim());
+  }
+
+  /**
+   * Find TOC section by Bible verse reference
+   * Matches single verse to section with verse range
+   * Example: "1 Timothy 2:14" matches section titled "1 Timothy 2:11-15"
+   *
+   * @param entries - TOC entries to search
+   * @param query - Bible verse query (e.g., "1 Timothy 2:14")
+   * @returns Matching TOC entry or undefined
+   */
+  private findSectionByBibleVerse(entries: TocEntry[], query: string): TocEntry | undefined {
+    try {
+      // Parse the query verse using existing utility
+      const queryVerse = parseReference(query);
+
+      // Normalize book name for comparison (lowercase, trim)
+      const normalizeBook = (book: string) => book.toLowerCase().trim();
+      const queryBookNorm = normalizeBook(queryVerse.book);
+
+      // Search through TOC entries
+      for (const entry of entries) {
+        // Parse verse range from entry title
+        const entryRange = this.tocParser.parseVerseRangeFromTitle(entry.title);
+
+        if (!entryRange) {
+          continue; // Not a Bible verse entry
+        }
+
+        const entryBookNorm = normalizeBook(entryRange.book);
+
+        // Check if book and chapter match
+        if (entryBookNorm !== queryBookNorm || entryRange.chapter !== queryVerse.chapter) {
+          continue;
+        }
+
+        // If query has no verse specified, match chapter only
+        if (queryVerse.verse === undefined) {
+          return entry;
+        }
+
+        // Check if query verse falls within entry's verse range
+        if (queryVerse.verse >= entryRange.startVerse && queryVerse.verse <= entryRange.endVerse) {
+          return entry;
+        }
+
+        // If query has a verse range (e.g., "1 Timothy 2:11-15"), check for overlap
+        if (queryVerse.endVerse !== undefined) {
+          const queryOverlaps =
+            (queryVerse.verse >= entryRange.startVerse && queryVerse.verse <= entryRange.endVerse) ||
+            (queryVerse.endVerse >= entryRange.startVerse && queryVerse.endVerse <= entryRange.endVerse) ||
+            (queryVerse.verse <= entryRange.startVerse && queryVerse.endVerse >= entryRange.endVerse);
+
+          if (queryOverlaps) {
+            return entry;
+          }
+        }
+      }
+
+      return undefined;
+    } catch (error) {
+      // If parsing fails, return undefined (not a valid Bible reference)
+      return undefined;
+    }
+  }
+
+  /**
    * Convert number word/roman numeral to number
    */
   private parseNumber(str: string): number {
@@ -212,6 +300,85 @@ export class SectionResolver {
   async listSections(work: string): Promise<TocEntry[]> {
     const toc = await this.getToc(work);
     return toc.entries;
+  }
+
+  /**
+   * Search sections by topic/keyword within a work
+   * Searches TOC entry titles for keyword matches
+   *
+   * @param work - Work identifier (e.g., "calvin/institutes")
+   * @param topic - Topic or keyword to search for (e.g., "predestination", "trinity")
+   * @returns Array of matching TOC entries, ranked by relevance
+   *
+   * @example
+   * ```typescript
+   * const results = await resolver.searchSectionsByTopic('calvin/institutes', 'predestination');
+   * // Returns sections with "predestination" in the title
+   * ```
+   */
+  async searchSectionsByTopic(work: string, topic: string): Promise<TocEntry[]> {
+    const toc = await this.getToc(work);
+    const topicLower = topic.toLowerCase();
+
+    // Find all sections that match the topic
+    const matches: Array<{ entry: TocEntry; score: number }> = [];
+
+    for (const entry of toc.entries) {
+      const titleLower = entry.title.toLowerCase();
+
+      // Calculate relevance score
+      let score = 0;
+
+      // Exact match in title (highest score)
+      if (titleLower === topicLower) {
+        score = 100;
+      }
+      // Topic appears as a word in title (high score)
+      else if (titleLower.includes(` ${topicLower} `) ||
+               titleLower.startsWith(`${topicLower} `) ||
+               titleLower.endsWith(` ${topicLower}`)) {
+        score = 80;
+      }
+      // Topic appears anywhere in title (medium score)
+      else if (titleLower.includes(topicLower)) {
+        score = 60;
+      }
+      // Check for partial word matches (lower score)
+      else {
+        const topicWords = topicLower.split(/\s+/);
+        const titleWords = titleLower.split(/\s+/);
+
+        let matchingWords = 0;
+        for (const topicWord of topicWords) {
+          if (topicWord.length > 3) { // Only check words longer than 3 chars
+            // Only match if title word contains topic word (not vice versa)
+            // This prevents nonsense long strings from matching short title words
+            if (titleWords.some(tw => tw.length >= topicWord.length && tw.includes(topicWord))) {
+              matchingWords++;
+            }
+          }
+        }
+
+        if (matchingWords > 0) {
+          score = Math.min(50, matchingWords * 20);
+        }
+      }
+
+      if (score > 0) {
+        matches.push({ entry, score });
+      }
+    }
+
+    // Sort by score (highest first), then by order in TOC
+    matches.sort((a, b) => {
+      if (a.score !== b.score) {
+        return b.score - a.score;
+      }
+      // Maintain original TOC order for same scores
+      return toc.entries.indexOf(a.entry) - toc.entries.indexOf(b.entry);
+    });
+
+    return matches.map(m => m.entry);
   }
 
   /**

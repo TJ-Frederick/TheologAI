@@ -15,6 +15,17 @@ export interface TocEntry {
   level: number;        // Nesting level (1 = book, 2 = chapter, etc.)
 }
 
+/**
+ * Bible verse range parsed from TOC entry title
+ * Used for Bible commentary sections
+ */
+export interface VerseRange {
+  book: string;         // e.g., "1 Timothy", "John"
+  chapter: number;      // Chapter number
+  startVerse: number;   // Starting verse
+  endVerse: number;     // Ending verse (same as startVerse for single verse)
+}
+
 export interface ParsedToc {
   work: string;
   entries: TocEntry[];
@@ -81,9 +92,10 @@ export class CCELTocParser {
       const sectionId = href.replace(/\.html$/, '');
 
       // Skip if it's just the toc itself, index pages, or prefatory material
+      // Note: Use word boundaries to avoid filtering nested sections like "calcom43.iv.ii.iii"
       if (sectionId.endsWith('.toc') ||
           sectionId.includes('index') ||
-          sectionId.includes('.ii.') || // Prefatory material for most works
+          /^[^.]+\.ii($|\.)/.test(sectionId) || // Prefatory material at second level only (e.g., "work.ii" or "work.ii.x")
           title.toLowerCase().includes('table of') ||
           title.toLowerCase().includes('index of')) {
         continue;
@@ -379,5 +391,35 @@ export class CCELTocParser {
     }
 
     return matches;
+  }
+
+  /**
+   * Parse Bible verse range from TOC entry title
+   * Examples:
+   * - "1 Timothy 2:11-15" -> { book: "1 Timothy", chapter: 2, startVerse: 11, endVerse: 15 }
+   * - "John 3:16" -> { book: "John", chapter: 3, startVerse: 16, endVerse: 16 }
+   * - "Introduction" -> null
+   *
+   * @param title - TOC entry title
+   * @returns Parsed verse range or null if not a Bible verse reference
+   */
+  parseVerseRangeFromTitle(title: string): VerseRange | null {
+    // Pattern: [Number] Book Chapter:Verse[-EndVerse]
+    // Matches: "1 Timothy 2:11-15", "John 3:16", "2 Corinthians 5:17-21"
+    const versePattern = /^([1-3]?\s*[A-Za-z]+(?:\s+[A-Za-z]+)?)\s+(\d+):(\d+)(?:-(\d+))?/;
+    const match = title.match(versePattern);
+
+    if (!match) {
+      return null;
+    }
+
+    const [, book, chapter, startVerse, endVerse] = match;
+
+    return {
+      book: book.trim(),
+      chapter: parseInt(chapter, 10),
+      startVerse: parseInt(startVerse, 10),
+      endVerse: endVerse ? parseInt(endVerse, 10) : parseInt(startVerse, 10)
+    };
   }
 }

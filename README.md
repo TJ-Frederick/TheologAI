@@ -2,7 +2,7 @@
 
 A Model Context Protocol (MCP) server that provides theological researchers and Bible students with programmatic access to biblical texts, commentaries, and historical Christian documents through natural language queries via Claude Desktop.
 
-## Current Status: Phase 3.3 Complete - Bible Translations & Commentaries! 🎉
+## Current Status: Phase 3.4 Complete - Enhanced Discovery & Commentary Navigation! 🎉
 
 TheologAI now provides comprehensive theological research tools with extensive Bible study capabilities:
 
@@ -12,8 +12,10 @@ TheologAI now provides comprehensive theological research tools with extensive B
 - **📝 Footnotes Support**: Translation notes, textual variants, and alternative readings
 - **💬 6 Public Domain Commentaries**: Matthew Henry, JFB, Adam Clarke, John Gill, Keil-Delitzsch, Tyndale
 - **🏛️ Historical Documents**: Search through creeds, confessions, and catechisms
-- **📚 Classic Christian Texts**: Access thousands of classic works from CCEL
-- **🔍 Smart Search**: Topic-based conceptual search across all historical documents
+- **📚 Classic Christian Texts**: Access 1000+ works from CCEL with dynamic catalog discovery
+- **🔍 Smart Search**: Topic-based search across documents AND within specific works
+- **📖 Bible Verse → Commentary**: Direct verse lookup in Calvin's commentaries (auto-routing to correct volume)
+- **🗂️ Work Discovery**: Browse 40+ curated works or search entire CCEL catalog dynamically
 - **⚡ Fast & Reliable**: In-memory caching with 1-hour TTL for verses and footnotes
 - **💰 Zero Cost**: All HelloAO resources (6 translations + 6 commentaries) are free with no rate limits
 - **✨ Clean Formatting**: Beautiful markdown output with proper citations
@@ -38,24 +40,37 @@ Search historical Christian documents
 - **Example**: "Search for 'salvation' in confessions"
 - **Parameters**: `query` (required), `document`, `docType`
 
-### 📚 `classic_text_lookup` ✨ NEW!
-Access classic Christian texts from CCEL with natural language queries
+### 📚 `classic_text_lookup` ✨ ENHANCED!
+Access classic Christian texts from CCEL with natural language queries and powerful discovery
 - **Example**: "Look up Calvin's Institutes Book 1 Chapter 1"
 - **Example**: "Show me Aquinas Summa Part 1 Question 2"
 - **Example**: "Get Augustine's Confessions Book 4"
-- **Parameters**: `work` (e.g., "calvin/institutes"), `query` (natural language)
+- **NEW**: "Find sections about 'election' in Calvin's Institutes"
+- **NEW**: "What other works by Calvin are available?"
+- **NEW**: "Show me works about justification"
+- **Parameters**:
+  - `work` (e.g., "calvin/institutes"): Work identifier
+  - `query` (natural language): Section to retrieve OR search term for works
+  - `topic` (NEW): Search for sections within a work by keyword
+  - `listWorks`: Browse 40+ curated works organized by era
 - **No section IDs needed** - automatic resolution from natural language!
+- **Dynamic catalog access** - Search 1000+ works on CCEL, not just curated list
 
 ### 📝 `commentary_lookup`
 Access 6 public domain commentaries on any Bible verse
 - **Example**: "Get commentary on Romans 8:28"
 - **Example**: "What does Matthew Henry say about John 3:16?"
 - **Example**: "Get JFB commentary on Genesis 1:1"
+- **NEW**: Works seamlessly with Calvin's commentaries via `classic_text_lookup`
 - **Commentaries**: Matthew Henry, Jamieson-Fausset-Brown (JFB), Adam Clarke, John Gill, Keil-Delitzsch (OT only), Tyndale
 - **Parameters**:
   - `reference` (required): Bible verse reference
   - `commentator` (optional): Commentator name (default: Matthew Henry)
   - `maxLength` (optional): Maximum length in characters
+
+**Pro Tip:** For Calvin's detailed commentaries, use `classic_text_lookup` with:
+- `work: "calvin/calcom43"` and `query: "1 Timothy 2:14"` - Direct verse lookup!
+- Auto-routing handles meta-works (no need to know volume numbers)
 
 ## Available Documents
 
@@ -67,20 +82,25 @@ Access 6 public domain commentaries on any Bible verse
 - **Westminster Confession of Faith** (1646) - Sample sections
 - **Heidelberg Catechism** (1563) - Sample questions
 
-### Classic Christian Texts (CCEL) ✨ NEW!
-Access thousands of works from the Christian Classics Ethereal Library:
+### Classic Christian Texts (CCEL) ✨ ENHANCED!
+Access 1000+ works from the Christian Classics Ethereal Library with dynamic discovery:
 - **Calvin's Institutes of the Christian Religion**
+- **Calvin's Commentaries** (45 volumes covering all books he commented on)
 - **Aquinas' Summa Theologica** (with Part/Question/Article hierarchy support)
-- **Augustine's Confessions**
-- **Bunyan's Pilgrim's Progress**
-- **Luther's Works**
-- And hundreds more...
+- **Augustine's Confessions & City of God**
+- **Bunyan's Pilgrim's Progress & Grace Abounding**
+- **Luther's Works** (16+ volumes)
+- **Edwards, Wesley, Spurgeon, Owen, and many more...**
 
 **Features:**
+- **NEW: Dynamic Catalog Discovery** - Search entire CCEL catalog (1000+ works), not just curated list
+- **NEW: Bible Verse → Commentary** - "1 Timothy 2:14" auto-matches commentary sections
+- **NEW: Topic Search Within Works** - Find sections about "grace" in Calvin's Institutes
+- **NEW: Calvin Commentary Auto-Routing** - Automatically routes to correct volume (calcom01-calcom45)
 - Natural language section resolution (no manual section IDs!)
-- Automatic TOC parsing and caching
+- Automatic TOC parsing and caching (24-hour TTL)
 - Support for complex hierarchies (Books, Chapters, Parts, Questions, Articles)
-- Clean text extraction from HTML
+- Clean text extraction from HTML with proper nested div handling
 
 ### Bible Translations (8 Total)
 
@@ -263,10 +283,21 @@ Look up Bible verses by reference.
 - ✅ All numbered books working (1 John, 2 Samuel, etc.)
 - ✅ 8 total Bible translations available
 
+**Phase 3.4: Enhanced Discovery & Commentary Navigation** ✅
+- ✅ Dynamic CCEL catalog scraping (1000+ works discoverable)
+- ✅ Bible verse → commentary section matching (e.g., "1 Timothy 2:14" → exact section)
+- ✅ Calvin commentary auto-routing (meta-works → specific volumes)
+- ✅ Topic search within works (find sections by keyword)
+- ✅ Expanded popular works list (40+ works organized by era/tradition)
+- ✅ Improved HTML parsing (proper nested div handling)
+- ✅ Comprehensive test suite (95.6% success rate, 43/45 tests passing)
+
 **Performance:**
 - Bible verse cache: ~160ms → <1ms on repeated queries
 - HelloAO API calls: ~200ms (no rate limits!)
 - TOC caching: 24-hour TTL reduces API calls
+- Catalog scraping: ~2-3s per letter, 5-minute cache
+- Cache hit time: < 10ms across all resources
 - ESV API rate limit protection through intelligent caching
 
 ## Next Steps (Phase 4+)
@@ -277,6 +308,8 @@ Look up Bible verses by reference.
 - [ ] Greek/Hebrew word study tools (Strong's concordance)
 - [ ] Advanced topical search across all resources
 - [ ] More historical texts and confessions
+- [ ] Search history and bookmarking
+- [ ] Export/citation tools for research
 
 ## Architecture
 
@@ -292,7 +325,8 @@ src/
 │   ├── helloaoBibleAdapter.ts  # HelloAO translation adapter (KJV, WEB, BSB, ASV, YLT, DBY)
 │   ├── publicCommentaryAdapter.ts # HelloAO commentary adapter
 │   ├── ccelApi.ts              # CCEL API (Scripture, Works, Fragments)
-│   └── ccelToc.ts              # CCEL TOC parser with auto-resolution
+│   ├── ccelToc.ts              # CCEL TOC parser with auto-resolution
+│   └── ccelCatalogScraper.ts   # NEW: CCEL catalog scraper (1000+ works)
 ├── services/                     # Business logic layer
 │   ├── bibleService.ts          # Bible verse service (8 translations)
 │   ├── historicalService.ts     # Historical documents
@@ -310,6 +344,7 @@ src/
 │   ├── formatter.ts             # Markdown formatting (with footnotes)
 │   ├── helloaoMapper.ts         # Book name/code mapping for HelloAO
 │   ├── commentaryMapper.ts      # Commentary reference mapping
+│   ├── ccelCommentaryMapper.ts  # NEW: Calvin commentary volume mapper
 │   └── errors.ts                # Error handling
 └── types/                        # Type definitions
     └── index.ts                 # Common types (includes Footnote interface)

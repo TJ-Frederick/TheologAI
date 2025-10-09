@@ -237,18 +237,44 @@ export class CCELApiAdapter {
       throw new Error('CCEL returned an error page. The section identifier may be incorrect. Visit https://ccel.org to find the correct section ID.');
     }
 
-    // Extract only the book-content div
-    const bookContentMatch = html.match(/<div[^>]*class="book-content"[^>]*>([\s\S]*?)<\/div>/i);
+    // Extract only the book-content div using proper div matching
+    // Find the book-content div start position
+    const bookContentStart = html.search(/<div[^>]*class="book-content"[^>]*>/i);
 
-    if (!bookContentMatch) {
-      // Fallback: try xmlns version
-      const xhtmlMatch = html.match(/<div xmlns="http:\/\/www\.w3\.org\/1999\/xhtml" class="book-content">([\s\S]*?)<\/div>/i);
-      if (!xhtmlMatch) {
-        throw new Error('Could not find book content in CCEL response. The section identifier may be incorrect.');
+    if (bookContentStart === -1) {
+      throw new Error('Could not find book content in CCEL response. The section identifier may be incorrect.');
+    }
+
+    // Find the matching closing tag by counting nested divs
+    const startTag = html.slice(bookContentStart).match(/<div[^>]*class="book-content"[^>]*>/i)?.[0];
+    if (!startTag) {
+      throw new Error('Could not parse book content div.');
+    }
+
+    let depth = 0;
+    let pos = bookContentStart + startTag.length;
+    let contentStart = pos;
+
+    while (pos < html.length) {
+      const nextOpen = html.indexOf('<div', pos);
+      const nextClose = html.indexOf('</div>', pos);
+
+      if (nextClose === -1) {
+        throw new Error('Could not find closing tag for book-content div.');
       }
-      html = xhtmlMatch[1];
-    } else {
-      html = bookContentMatch[1];
+
+      if (nextOpen !== -1 && nextOpen < nextClose) {
+        depth++;
+        pos = nextOpen + 4; // Move past '<div'
+      } else {
+        if (depth === 0) {
+          // Found the matching closing tag
+          html = html.slice(contentStart, nextClose);
+          break;
+        }
+        depth--;
+        pos = nextClose + 6; // Move past '</div>'
+      }
     }
 
     // Remove script and style tags entirely

@@ -8,6 +8,8 @@
  */
 
 import { CCELApiAdapter, type CCELScriptureOptions, type CCELWorkSection } from '../adapters/ccelApi.js';
+import { CCELCatalogScraper, type CatalogEntry } from '../adapters/ccelCatalogScraper.js';
+import { findCalvinCommentaryVolume, isCalvinMetaCommentary } from '../utils/ccelCommentaryMapper.js';
 import { Cache } from '../utils/cache.js';
 
 export interface ClassicTextRequest {
@@ -34,10 +36,12 @@ export interface ScriptureResponse {
 
 export class CCELService {
   private adapter: CCELApiAdapter;
+  private catalogScraper: CCELCatalogScraper;
   private cache: Cache<any>;
 
   constructor() {
     this.adapter = new CCELApiAdapter();
+    this.catalogScraper = new CCELCatalogScraper();
     this.cache = new Cache();
   }
 
@@ -86,7 +90,27 @@ export class CCELService {
    * @returns Classic text response with content
    */
   async getClassicText(request: ClassicTextRequest): Promise<ClassicTextResponse> {
-    const { work, section } = request;
+    let { work, section, query } = request;
+
+    // Intelligent routing: Detect Calvin meta-commentary and suggest correct volume
+    if (isCalvinMetaCommentary(work) && query) {
+      const volume = findCalvinCommentaryVolume(query);
+      if (volume) {
+        // Auto-route to the correct volume
+        console.log(`Routing ${work} + "${query}" → ${volume.workId}`);
+        work = volume.workId;
+      } else {
+        throw new Error(
+          `"${work}" is an index page, not a retrievable work.\n\n` +
+          `To access Calvin's commentaries, use specific volumes like:\n` +
+          `- calvin/calcom43 (Timothy, Titus, Philemon)\n` +
+          `- calvin/calcom38 (Romans)\n` +
+          `- calvin/calcom08 (Psalms 1-35)\n\n` +
+          `Your query: "${query}"\n` +
+          `Couldn't determine the specific volume. Please try browsing Calvin's works with: { query: "calvin" }`
+        );
+      }
+    }
 
     if (!section) {
       throw new Error('Section identifier is required. Example: augustine/confessions -> confessions.ii');
@@ -140,50 +164,304 @@ export class CCELService {
 
   /**
    * Get information about popular classic works available on CCEL
+   * Organized by era and tradition for easier discovery
    */
-  getPopularWorks(): Array<{ work: string; author: string; title: string; sampleSection: string; description: string }> {
+  getPopularWorks(): Array<{ work: string; author: string; title: string; sampleSection: string; description: string; category: string }> {
     return [
+      // Church Fathers (100-600 AD)
       {
         work: 'augustine/confessions',
         author: 'Augustine of Hippo',
         title: 'Confessions',
         sampleSection: 'confessions.iv',
-        description: 'Book 1 - Augustine\'s early years and conversion'
+        description: 'Autobiographical work on grace, conversion, and the soul\'s search for God',
+        category: 'Church Fathers'
       },
       {
         work: 'augustine/city_of_god',
         author: 'Augustine of Hippo',
         title: 'City of God',
         sampleSection: 'cityofgod.ii.i',
-        description: 'Book 1, Chapter 1 - Against the pagans'
+        description: 'Defense of Christianity and two cities: the City of God and the City of Man',
+        category: 'Church Fathers'
       },
+      {
+        work: 'athanasius/incarnation',
+        author: 'Athanasius',
+        title: 'On the Incarnation',
+        sampleSection: 'incarnation.iii',
+        description: 'Classic treatise on the incarnation of Christ',
+        category: 'Church Fathers'
+      },
+      {
+        work: 'chrysostom/homilies',
+        author: 'John Chrysostom',
+        title: 'Homilies',
+        sampleSection: 'homilies.iii',
+        description: 'Expository sermons on Scripture by the "Golden Mouth"',
+        category: 'Church Fathers'
+      },
+
+      // Medieval (600-1500)
+      {
+        work: 'aquinas/summa',
+        author: 'Thomas Aquinas',
+        title: 'Summa Theologica',
+        sampleSection: 'summa.fp.q1.a1',
+        description: 'Comprehensive systematic theology in question-and-answer format',
+        category: 'Medieval'
+      },
+      {
+        work: 'anselm/cur_deus_homo',
+        author: 'Anselm of Canterbury',
+        title: 'Cur Deus Homo (Why God Became Man)',
+        sampleSection: 'cur_deus_homo.iii',
+        description: 'Classic work on the satisfaction theory of atonement',
+        category: 'Medieval'
+      },
+      {
+        work: 'bernard/loving_god',
+        author: 'Bernard of Clairvaux',
+        title: 'On Loving God',
+        sampleSection: 'loving_god.iii',
+        description: 'Mystical work on the degrees of loving God',
+        category: 'Medieval'
+      },
+      {
+        work: 'kempis/imitation',
+        author: 'Thomas à Kempis',
+        title: 'The Imitation of Christ',
+        sampleSection: 'imitation.iii',
+        description: 'Devotional classic on following Christ',
+        category: 'Medieval'
+      },
+
+      // Reformers (1500-1650)
       {
         work: 'calvin/institutes',
         author: 'John Calvin',
         title: 'Institutes of the Christian Religion',
         sampleSection: 'institutes.iii.ii',
-        description: 'Book 1, Chapter 1 - Knowledge of God and ourselves'
+        description: 'Comprehensive systematic theology of Reformed Christianity',
+        category: 'Reformers'
       },
       {
         work: 'luther/bondage',
         author: 'Martin Luther',
         title: 'The Bondage of the Will',
         sampleSection: 'bondage.iii',
-        description: 'Part 1 - Luther\'s response to Erasmus'
+        description: 'Luther\'s treatise on human will and divine sovereignty',
+        category: 'Reformers'
       },
       {
-        work: 'aquinas/summa',
-        author: 'Thomas Aquinas',
-        title: 'Summa Theologica',
-        sampleSection: 'summa.fp.q1.a1',
-        description: 'First Part, Question 1, Article 1'
+        work: 'luther/galatians',
+        author: 'Martin Luther',
+        title: 'Commentary on Galatians',
+        sampleSection: 'galatians.iii',
+        description: 'Luther\'s powerful exposition on justification by faith',
+        category: 'Reformers'
       },
+      {
+        work: 'luther/freedom',
+        author: 'Martin Luther',
+        title: 'The Freedom of a Christian',
+        sampleSection: 'freedom.iii',
+        description: 'Luther\'s treatise on Christian liberty',
+        category: 'Reformers'
+      },
+      {
+        work: 'knox/history',
+        author: 'John Knox',
+        title: 'History of the Reformation in Scotland',
+        sampleSection: 'history.iii',
+        description: 'First-hand account of the Scottish Reformation',
+        category: 'Reformers'
+      },
+
+      // Puritans (1600-1700)
       {
         work: 'bunyan/pilgrim',
         author: 'John Bunyan',
         title: "Pilgrim's Progress",
         sampleSection: 'pilgrim.iii',
-        description: 'Part 1 - Christian\'s journey begins'
+        description: 'Allegorical novel of Christian\'s journey to the Celestial City',
+        category: 'Puritans'
+      },
+      {
+        work: 'bunyan/grace_abounding',
+        author: 'John Bunyan',
+        title: 'Grace Abounding to the Chief of Sinners',
+        sampleSection: 'grace_abounding.iii',
+        description: 'Bunyan\'s spiritual autobiography',
+        category: 'Puritans'
+      },
+      {
+        work: 'owen/holy_spirit',
+        author: 'John Owen',
+        title: 'The Holy Spirit',
+        sampleSection: 'holy_spirit.iii',
+        description: 'Comprehensive Puritan pneumatology',
+        category: 'Puritans'
+      },
+      {
+        work: 'owen/mortification',
+        author: 'John Owen',
+        title: 'The Mortification of Sin',
+        sampleSection: 'mortification.iii',
+        description: 'Classic Puritan work on battling sin',
+        category: 'Puritans'
+      },
+      {
+        work: 'baxter/saints_rest',
+        author: 'Richard Baxter',
+        title: "The Saints' Everlasting Rest",
+        sampleSection: 'saints_rest.iii',
+        description: 'Meditation on the eternal rest of believers',
+        category: 'Puritans'
+      },
+      {
+        work: 'brooks/precious_remedies',
+        author: 'Thomas Brooks',
+        title: 'Precious Remedies Against Satan\'s Devices',
+        sampleSection: 'precious_remedies.iii',
+        description: 'Puritan spiritual warfare manual',
+        category: 'Puritans'
+      },
+
+      // Post-Reformation (1700-1900)
+      {
+        work: 'edwards/religious_affections',
+        author: 'Jonathan Edwards',
+        title: 'Religious Affections',
+        sampleSection: 'religious_affections.iii',
+        description: 'Examination of true religious experience',
+        category: 'Post-Reformation'
+      },
+      {
+        work: 'edwards/freedom_of_will',
+        author: 'Jonathan Edwards',
+        title: 'Freedom of the Will',
+        sampleSection: 'freedom_of_will.iii',
+        description: 'Philosophical defense of divine sovereignty',
+        category: 'Post-Reformation'
+      },
+      {
+        work: 'wesley/plain_account',
+        author: 'John Wesley',
+        title: 'A Plain Account of Christian Perfection',
+        sampleSection: 'plain_account.iii',
+        description: 'Wesley\'s teaching on entire sanctification',
+        category: 'Post-Reformation'
+      },
+      {
+        work: 'wesley/sermons',
+        author: 'John Wesley',
+        title: 'Sermons on Several Occasions',
+        sampleSection: 'sermons.iii',
+        description: 'Collection of Wesley\'s most important sermons',
+        category: 'Post-Reformation'
+      },
+      {
+        work: 'whitefield/sermons',
+        author: 'George Whitefield',
+        title: 'Sermons',
+        sampleSection: 'sermons.iii',
+        description: 'Evangelistic sermons from the Great Awakening',
+        category: 'Post-Reformation'
+      },
+      {
+        work: 'spurgeon/treasury',
+        author: 'Charles Spurgeon',
+        title: 'Treasury of David (Psalms Commentary)',
+        sampleSection: 'treasury.iii',
+        description: 'Devotional commentary on the Psalms',
+        category: 'Post-Reformation'
+      },
+      {
+        work: 'spurgeon/sermons',
+        author: 'Charles Spurgeon',
+        title: 'Sermons',
+        sampleSection: 'sermons.iii',
+        description: 'The "Prince of Preachers" expository sermons',
+        category: 'Post-Reformation'
+      },
+
+      // Devotional Classics
+      {
+        work: 'law/serious_call',
+        author: 'William Law',
+        title: 'A Serious Call to a Devout and Holy Life',
+        sampleSection: 'serious_call.iii',
+        description: 'Challenge to wholehearted Christian devotion',
+        category: 'Devotional'
+      },
+      {
+        work: 'taylor/holy_living',
+        author: 'Jeremy Taylor',
+        title: 'Holy Living',
+        sampleSection: 'holy_living.iii',
+        description: 'Guide to Christian life and conduct',
+        category: 'Devotional'
+      },
+      {
+        work: 'fenelon/christian_perfection',
+        author: 'François Fénelon',
+        title: 'Christian Perfection',
+        sampleSection: 'christian_perfection.iii',
+        description: 'Letters on spiritual growth and maturity',
+        category: 'Devotional'
+      },
+
+      // Apologetics & Philosophy
+      {
+        work: 'chesterton/orthodoxy',
+        author: 'G.K. Chesterton',
+        title: 'Orthodoxy',
+        sampleSection: 'orthodoxy.iii',
+        description: 'Defense and explanation of Christian faith',
+        category: 'Apologetics'
+      },
+      {
+        work: 'chesterton/everlasting_man',
+        author: 'G.K. Chesterton',
+        title: 'The Everlasting Man',
+        sampleSection: 'everlasting_man.iii',
+        description: 'Christian philosophy of history',
+        category: 'Apologetics'
+      },
+      {
+        work: 'paley/evidences',
+        author: 'William Paley',
+        title: 'Evidences of Christianity',
+        sampleSection: 'evidences.iii',
+        description: 'Classic work of Christian apologetics',
+        category: 'Apologetics'
+      },
+
+      // Church History
+      {
+        work: 'eusebius/church_history',
+        author: 'Eusebius',
+        title: 'Church History',
+        sampleSection: 'church_history.iii',
+        description: 'First comprehensive history of early Christianity',
+        category: 'History'
+      },
+      {
+        work: 'foxe/martyrs',
+        author: 'John Foxe',
+        title: 'Foxe\'s Book of Martyrs',
+        sampleSection: 'martyrs.iii',
+        description: 'Account of Christian martyrs throughout history',
+        category: 'History'
+      },
+      {
+        work: 'schaff/church_history',
+        author: 'Philip Schaff',
+        title: 'History of the Christian Church',
+        sampleSection: 'church_history.iii',
+        description: 'Comprehensive multi-volume church history',
+        category: 'History'
       }
     ];
   }
@@ -210,50 +488,234 @@ export class CCELService {
   }
 
   /**
+   * Search for works across the entire CCEL catalog (unlimited discovery)
+   *
+   * Uses on-demand HTML scraping to search ALL works on CCEL, not just the curated list.
+   * Falls back to suggestWorks() if scraping fails.
+   *
+   * @param query - Search query (author name, work title, or keyword)
+   * @returns Array of matching works from full CCEL catalog
+   *
+   * @example
+   * ```typescript
+   * const results = await service.searchAllWorks('calvin');
+   * // Returns all Calvin works available on CCEL
+   *
+   * const results = await service.searchAllWorks('institutes');
+   * // Returns works with "institutes" in title
+   * ```
+   */
+  async searchAllWorks(query: string): Promise<Array<{ work: string; author: string; title: string; description: string }>> {
+    try {
+      // Search the full CCEL catalog via scraping
+      const catalogEntries = await this.catalogScraper.searchCatalog(query);
+
+      if (catalogEntries.length === 0) {
+        // No results from scraping - return empty to trigger fallback
+        return [];
+      }
+
+      // Convert catalog entries to work format
+      // Limit to 66 (one per Bible book) to cover complete commentary sets
+      return catalogEntries.slice(0, 66).map(entry => ({
+        work: entry.workId,
+        author: entry.author,
+        title: entry.title,
+        description: entry.lifespan
+          ? `By ${entry.author} (${entry.lifespan})`
+          : `By ${entry.author}`
+      }));
+
+    } catch (error) {
+      console.error('Error searching CCEL catalog:', error);
+      // Return empty array to trigger fallback to curated list
+      return [];
+    }
+  }
+
+  /**
    * Search for works by topic or keyword
-   * (This is a helper method - actual search would require CCEL's search API)
+   * Enhanced keyword matching for theological topics and themes
    */
   suggestWorks(topic: string): Array<{ work: string; author: string; title: string; reason: string }> {
     const topicLower = topic.toLowerCase();
     const suggestions: Array<{ work: string; author: string; title: string; reason: string }> = [];
 
-    // Simple keyword matching - could be enhanced with actual CCEL search
-    if (topicLower.includes('grace') || topicLower.includes('salvation')) {
-      suggestions.push({
-        work: 'augustine/confessions',
-        author: 'Augustine',
-        title: 'Confessions',
-        reason: 'Classic work on God\'s grace and conversion'
-      });
+    // Map of topics to relevant works
+    const topicMap: Record<string, Array<{ work: string; author: string; title: string; reason: string }>> = {
+      // Theological Topics
+      'grace': [
+        { work: 'augustine/confessions', author: 'Augustine', title: 'Confessions', reason: 'Classic work on God\'s grace and conversion' },
+        { work: 'owen/holy_spirit', author: 'John Owen', title: 'The Holy Spirit', reason: 'Puritan treatment of grace and the Spirit\'s work' }
+      ],
+      'salvation': [
+        { work: 'augustine/confessions', author: 'Augustine', title: 'Confessions', reason: 'Personal testimony of salvation' },
+        { work: 'bunyan/pilgrim', author: 'John Bunyan', title: 'Pilgrim\'s Progress', reason: 'Allegory of the Christian journey to salvation' }
+      ],
+      'justification': [
+        { work: 'luther/galatians', author: 'Martin Luther', title: 'Commentary on Galatians', reason: 'Luther\'s powerful exposition on justification by faith' },
+        { work: 'calvin/institutes', author: 'John Calvin', title: 'Institutes', reason: 'Book 3 covers justification comprehensively' }
+      ],
+      'sanctification': [
+        { work: 'owen/mortification', author: 'John Owen', title: 'The Mortification of Sin', reason: 'Classic on progressive sanctification' },
+        { work: 'wesley/plain_account', author: 'John Wesley', title: 'Christian Perfection', reason: 'Wesley\'s teaching on entire sanctification' }
+      ],
+      'predestination': [
+        { work: 'calvin/institutes', author: 'John Calvin', title: 'Institutes', reason: 'Book 3, Chapters 21-24 on predestination and election' },
+        { work: 'augustine/city_of_god', author: 'Augustine', title: 'City of God', reason: 'Early development of predestination doctrine' }
+      ],
+      'election': [
+        { work: 'calvin/institutes', author: 'John Calvin', title: 'Institutes', reason: 'Comprehensive treatment of election' },
+        { work: 'edwards/freedom_of_will', author: 'Jonathan Edwards', title: 'Freedom of the Will', reason: 'Defense of divine sovereignty in election' }
+      ],
+      'sovereignty': [
+        { work: 'calvin/institutes', author: 'John Calvin', title: 'Institutes', reason: 'Comprehensive systematic theology emphasizing God\'s sovereignty' },
+        { work: 'luther/bondage', author: 'Martin Luther', title: 'The Bondage of the Will', reason: 'Luther on divine sovereignty vs. human free will' }
+      ],
+      'providence': [
+        { work: 'calvin/institutes', author: 'John Calvin', title: 'Institutes', reason: 'Book 1 on God\'s providence' },
+        { work: 'aquinas/summa', author: 'Thomas Aquinas', title: 'Summa Theologica', reason: 'Scholastic treatment of divine providence' }
+      ],
+      'free will': [
+        { work: 'luther/bondage', author: 'Martin Luther', title: 'The Bondage of the Will', reason: 'Luther\'s response to Erasmus on free will' },
+        { work: 'edwards/freedom_of_will', author: 'Jonathan Edwards', title: 'Freedom of the Will', reason: 'Philosophical defense of compatibilism' }
+      ],
+
+      // Christology & Trinity
+      'incarnation': [
+        { work: 'athanasius/incarnation', author: 'Athanasius', title: 'On the Incarnation', reason: 'Classic patristic work on Christ becoming man' },
+        { work: 'anselm/cur_deus_homo', author: 'Anselm', title: 'Why God Became Man', reason: 'Medieval treatment of the incarnation\'s necessity' }
+      ],
+      'atonement': [
+        { work: 'anselm/cur_deus_homo', author: 'Anselm', title: 'Why God Became Man', reason: 'Satisfaction theory of atonement' },
+        { work: 'calvin/institutes', author: 'John Calvin', title: 'Institutes', reason: 'Book 2 on Christ\'s work of redemption' }
+      ],
+      'trinity': [
+        { work: 'augustine/city_of_god', author: 'Augustine', title: 'City of God', reason: 'Augustine\'s trinitarian theology' },
+        { work: 'aquinas/summa', author: 'Thomas Aquinas', title: 'Summa Theologica', reason: 'Scholastic treatment of the Trinity' }
+      ],
+
+      // Spiritual Life & Devotion
+      'prayer': [
+        { work: 'law/serious_call', author: 'William Law', title: 'A Serious Call', reason: 'Challenge to devotional life and prayer' },
+        { work: 'bunyan/pilgrim', author: 'John Bunyan', title: 'Pilgrim\'s Progress', reason: 'Includes powerful scenes of prayer and dependence' }
+      ],
+      'worship': [
+        { work: 'taylor/holy_living', author: 'Jeremy Taylor', title: 'Holy Living', reason: 'Guide to Christian worship and conduct' },
+        { work: 'law/serious_call', author: 'William Law', title: 'A Serious Call', reason: 'Call to wholehearted devotion' }
+      ],
+      'devotion': [
+        { work: 'kempis/imitation', author: 'Thomas à Kempis', title: 'The Imitation of Christ', reason: 'Classic devotional on following Christ' },
+        { work: 'fenelon/christian_perfection', author: 'François Fénelon', title: 'Christian Perfection', reason: 'Letters on spiritual growth' }
+      ],
+      'suffering': [
+        { work: 'baxter/saints_rest', author: 'Richard Baxter', title: 'The Saints\' Everlasting Rest', reason: 'Comfort for suffering through hope of heaven' },
+        { work: 'bunyan/pilgrim', author: 'John Bunyan', title: 'Pilgrim\'s Progress', reason: 'Christian\'s journey through trials' }
+      ],
+
+      // Church & Kingdom
+      'church': [
+        { work: 'augustine/city_of_god', author: 'Augustine', title: 'City of God', reason: 'The church as God\'s city vs. the earthly city' },
+        { work: 'calvin/institutes', author: 'John Calvin', title: 'Institutes', reason: 'Book 4 on the church and sacraments' }
+      ],
+      'kingdom': [
+        { work: 'augustine/city_of_god', author: 'Augustine', title: 'City of God', reason: 'Two kingdoms: City of God and City of Man' },
+        { work: 'bunyan/pilgrim', author: 'John Bunyan', title: 'Pilgrim\'s Progress', reason: 'Journey to the Celestial City (Kingdom)' }
+      ],
+      'city': [
+        { work: 'augustine/city_of_god', author: 'Augustine', title: 'City of God', reason: 'Two cities: God\'s kingdom vs. earthly kingdom' }
+      ],
+
+      // Sin & Holiness
+      'sin': [
+        { work: 'owen/mortification', author: 'John Owen', title: 'The Mortification of Sin', reason: 'Puritan classic on battling sin' },
+        { work: 'brooks/precious_remedies', author: 'Thomas Brooks', title: 'Precious Remedies', reason: 'Defense against Satan\'s temptations' }
+      ],
+      'holiness': [
+        { work: 'taylor/holy_living', author: 'Jeremy Taylor', title: 'Holy Living', reason: 'Practical guide to holy living' },
+        { work: 'wesley/plain_account', author: 'John Wesley', title: 'Christian Perfection', reason: 'Wesley on entire sanctification and holiness' }
+      ],
+      'temptation': [
+        { work: 'brooks/precious_remedies', author: 'Thomas Brooks', title: 'Precious Remedies', reason: 'Puritan guide to resisting temptation' },
+        { work: 'bunyan/pilgrim', author: 'John Bunyan', title: 'Pilgrim\'s Progress', reason: 'Christian\'s battles with temptation' }
+      ],
+
+      // Faith & Doctrine
+      'faith': [
+        { work: 'luther/galatians', author: 'Martin Luther', title: 'Commentary on Galatians', reason: 'Justification by faith alone' },
+        { work: 'chesterton/orthodoxy', author: 'G.K. Chesterton', title: 'Orthodoxy', reason: 'Defense of Christian faith' }
+      ],
+      'doctrine': [
+        { work: 'calvin/institutes', author: 'John Calvin', title: 'Institutes', reason: 'Comprehensive systematic theology' },
+        { work: 'aquinas/summa', author: 'Thomas Aquinas', title: 'Summa Theologica', reason: 'Scholastic systematic theology' }
+      ],
+      'theology': [
+        { work: 'calvin/institutes', author: 'John Calvin', title: 'Institutes', reason: 'Reformed systematic theology' },
+        { work: 'aquinas/summa', author: 'Thomas Aquinas', title: 'Summa Theologica', reason: 'Medieval systematic theology' }
+      ],
+
+      // Christian Life
+      'conversion': [
+        { work: 'augustine/confessions', author: 'Augustine', title: 'Confessions', reason: 'Augustine\'s dramatic conversion story' },
+        { work: 'bunyan/grace_abounding', author: 'John Bunyan', title: 'Grace Abounding', reason: 'Bunyan\'s spiritual autobiography' }
+      ],
+      'spiritual growth': [
+        { work: 'fenelon/christian_perfection', author: 'François Fénelon', title: 'Christian Perfection', reason: 'Letters on spiritual maturity' },
+        { work: 'edwards/religious_affections', author: 'Jonathan Edwards', title: 'Religious Affections', reason: 'True vs. false religious experience' }
+      ],
+      'christian liberty': [
+        { work: 'luther/freedom', author: 'Martin Luther', title: 'The Freedom of a Christian', reason: 'Luther on Christian freedom' }
+      ],
+
+      // Apologetics & Philosophy
+      'apologetics': [
+        { work: 'chesterton/orthodoxy', author: 'G.K. Chesterton', title: 'Orthodoxy', reason: 'Brilliant defense of Christianity' },
+        { work: 'paley/evidences', author: 'William Paley', title: 'Evidences of Christianity', reason: 'Classic Christian apologetics' }
+      ],
+      'philosophy': [
+        { work: 'chesterton/everlasting_man', author: 'G.K. Chesterton', title: 'The Everlasting Man', reason: 'Christian philosophy of history' },
+        { work: 'aquinas/summa', author: 'Thomas Aquinas', title: 'Summa Theologica', reason: 'Scholastic philosophy and theology' }
+      ],
+
+      // History & Martyrdom
+      'history': [
+        { work: 'eusebius/church_history', author: 'Eusebius', title: 'Church History', reason: 'First history of early Christianity' },
+        { work: 'schaff/church_history', author: 'Philip Schaff', title: 'Church History', reason: 'Comprehensive multi-volume history' }
+      ],
+      'reformation': [
+        { work: 'luther/bondage', author: 'Martin Luther', title: 'The Bondage of the Will', reason: 'Key Reformation work' },
+        { work: 'knox/history', author: 'John Knox', title: 'History of the Reformation', reason: 'First-hand account of Scottish Reformation' }
+      ],
+      'martyrs': [
+        { work: 'foxe/martyrs', author: 'John Foxe', title: 'Book of Martyrs', reason: 'Account of Christian martyrs' }
+      ],
+
+      // Eschatology
+      'heaven': [
+        { work: 'baxter/saints_rest', author: 'Richard Baxter', title: 'The Saints\' Everlasting Rest', reason: 'Meditation on eternal rest in heaven' }
+      ],
+      'eternity': [
+        { work: 'baxter/saints_rest', author: 'Richard Baxter', title: 'The Saints\' Everlasting Rest', reason: 'Focus on eternal life with God' }
+      ]
+    };
+
+    // Search for matching topics
+    for (const [key, works] of Object.entries(topicMap)) {
+      if (topicLower.includes(key)) {
+        suggestions.push(...works);
+      }
     }
 
-    if (topicLower.includes('sovereignty') || topicLower.includes('providence')) {
-      suggestions.push({
-        work: 'calvin/institutes',
-        author: 'Calvin',
-        title: 'Institutes of the Christian Religion',
-        reason: 'Comprehensive systematic theology'
-      });
-    }
+    // Remove duplicates (keeping first occurrence)
+    const seen = new Set<string>();
+    const uniqueSuggestions = suggestions.filter(s => {
+      if (seen.has(s.work)) {
+        return false;
+      }
+      seen.add(s.work);
+      return true;
+    });
 
-    if (topicLower.includes('will') || topicLower.includes('free will')) {
-      suggestions.push({
-        work: 'luther/bondage',
-        author: 'Luther',
-        title: 'The Bondage of the Will',
-        reason: 'Luther\'s treatise on human will and divine sovereignty'
-      });
-    }
-
-    if (topicLower.includes('city') || topicLower.includes('kingdom')) {
-      suggestions.push({
-        work: 'augustine/city_of_god',
-        author: 'Augustine',
-        title: 'City of God',
-        reason: 'The church and the world, God\'s kingdom'
-      });
-    }
-
-    return suggestions;
+    return uniqueSuggestions;
   }
 }
