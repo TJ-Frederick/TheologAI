@@ -1,7 +1,11 @@
 import { readFileSync, readdirSync } from 'fs';
-import { join } from 'path';
-import { resolve } from 'path';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { HistoricalResult } from '../types/index.js';
+
+// Get the directory of the current module
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 export interface DocumentSection {
   title?: string;
@@ -29,8 +33,9 @@ export class LocalDataAdapter {
     if (dataPath) {
       this.dataPath = dataPath;
     } else {
-      // Use absolute path since process.cwd() isn't reliable in Claude Desktop
-      this.dataPath = '/Users/tyler/Projects/TheologAI/data';
+      // Use path relative to this file: src/adapters/../.. = project root
+      // This works regardless of where the server is run from
+      this.dataPath = join(__dirname, '..', '..', 'data');
     }
     this.loadDocuments();
   }
