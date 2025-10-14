@@ -42,30 +42,17 @@ export class LocalDataAdapter {
 
   private loadDocuments(): void {
     try {
-      // Load creeds
-      const creedsPath = join(this.dataPath, 'creeds');
+      // Load all historical documents (creeds, confessions, catechisms)
+      const historicalDocsPath = join(this.dataPath, 'historical-documents');
       try {
-        const creedFiles = readdirSync(creedsPath).filter(f => f.endsWith('.json'));
-        for (const file of creedFiles) {
-          const content = readFileSync(join(creedsPath, file), 'utf-8');
+        const files = readdirSync(historicalDocsPath).filter(f => f.endsWith('.json'));
+        for (const file of files) {
+          const content = readFileSync(join(historicalDocsPath, file), 'utf-8');
           const doc: HistoricalDocument = JSON.parse(content);
           this.documentsCache.set(file.replace('.json', ''), doc);
         }
       } catch (err) {
-        console.error(`Error loading creeds: ${err}`);
-      }
-
-      // Load confessions
-      const confessionsPath = join(this.dataPath, 'confessions');
-      try {
-        const confessionFiles = readdirSync(confessionsPath).filter(f => f.endsWith('.json'));
-        for (const file of confessionFiles) {
-          const content = readFileSync(join(confessionsPath, file), 'utf-8');
-          const doc: HistoricalDocument = JSON.parse(content);
-          this.documentsCache.set(file.replace('.json', ''), doc);
-        }
-      } catch (err) {
-        console.error(`Error loading confessions: ${err}`);
+        console.error(`Error loading historical documents: ${err}`);
       }
 
       console.error(`Loaded ${this.documentsCache.size} historical documents from path: ${this.dataPath}`);

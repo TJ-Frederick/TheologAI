@@ -1,0 +1,28 @@
+{
+  "title": "Athanasian Creed",
+  "type": "creed",
+  "date": "5th-6th century AD",
+  "topics": ["trinity", "christology", "incarnation", "hypostatic union"],
+  "sections": [
+    {
+      "title": "Opening",
+      "content": "Whosoever will be saved, before all things it is necessary that he hold the Catholic Faith. Which Faith except everyone do keep whole and undefiled, without doubt he shall perish everlastingly.",
+      "topics": ["salvation", "orthodox faith"]
+    },
+    {
+      "title": "The Doctrine of the Trinity",
+      "content": "And the Catholic Faith is this: That we worship one God in Trinity, and Trinity in Unity; Neither confounding the Persons, nor dividing the Substance. For there is one Person of the Father, another of the Son, and another of the Holy Ghost. But the Godhead of the Father, of the Son and of the Holy Ghost is all One, the Glory Equal, the Majesty Co-Eternal. Such as the Father is, such is the Son, and such is the Holy Ghost. The Father Uncreate, the Son Uncreate, and the Holy Ghost Uncreate. The Father Incomprehensible, the Son Incomprehensible, and the Holy Ghost Incomprehensible. The Father Eternal, the Son Eternal, and the Holy Ghost Eternal and yet they are not Three Eternals but One Eternal. As also there are not Three Uncreated, nor Three Incomprehensibles, but One Uncreated, and One Incomprehensible. So likewise the Father is Almighty, the Son Almighty, and the Holy Ghost Almighty. And yet they are not Three Almighties but One Almighty. So the Father is God, the Son is God, and the Holy Ghost is God. And yet they are not Three Gods, but One God. So likewise the Father is Lord, the Son Lord, and the Holy Ghost Lord. And yet not Three Lords but One Lord. For, like as we are compelled by the Christian verity to acknowledge every Person by Himself to be God and Lord, so are we forbidden by the Catholic Religion to say, there be Three Gods or Three Lords. The Father is made of none, neither created, nor begotten. The Son is of the Father alone; not made, nor created, but begotten. The Holy Ghost is of the Father, and of the Son neither made, nor created, nor begotten, but proceeding. So there is One Father, not Three Fathers; one Son, not Three Sons; One Holy Ghost, not Three Holy Ghosts. And in this Trinity none is afore or after another; None is greater or less than another, but the whole Three Persons are Co-eternal together, and Co-equal. So that in all things, as is aforesaid, the Unity in Trinity, and the Trinity in Unity, is to be worshipped. He therefore that will be saved, must thus think of the Trinity.",
+      "topics": ["trinity", "god the father", "god the son", "holy spirit", "persons of the trinity"]
+    },
+    {
+      "title": "The Incarnation of Christ",
+      "content": "Furthermore, it is necessary to everlasting salvation that he also believe rightly the Incarnation of our Lord Jesus Christ. For the right Faith is, that we believe and confess that our Lord Jesus Christ, the Son of God, is God and Man. God, of the Substance of the Father, begotten before the worlds; and Man, of the Substance of His Mother, born in the world. Perfect God, and perfect Man, of a reasonable soul and human flesh subsisting. Equal to the Father, as touching His Godhead, and inferior to the Father, as touching His Manhood. Who, although He be God and Man, yet He is not two, but one Christ. One, not by conversion of the Godhead into flesh, but by taking of the Manhood into God. One altogether, not by confusion of Substance, but by unity of Person. For as the reasonable soul and flesh is one man, so God and Man is one Christ; Who suffered for our salvation, descended into hell, rose again the third day from the dead. He ascended into heaven, He sitteth on the right hand of the Father, God Almighty, from whence He shall come to judge the quick and the dead. At whose coming all men shall rise again with their bodies and shall give account for their own works. And they that have done good shall go into life everlasting, and they that have done evil into everlasting fire.",
+      "topics": ["christology", "incarnation", "jesus christ", "two natures", "resurrection", "judgment"]
+    },
+    {
+      "title": "Conclusion",
+      "content": "This is the Catholic Faith, which except a man believe faithfully, he cannot be saved.",
+      "topics": ["salvation", "orthodox faith"]
+    }
+  ]
+}

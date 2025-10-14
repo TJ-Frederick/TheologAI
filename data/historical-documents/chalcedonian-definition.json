@@ -1,0 +1,23 @@
+{
+  "title": "Chalcedonian Definition",
+  "type": "creed",
+  "date": "451 AD",
+  "topics": ["christology", "trinity", "incarnation", "two natures", "hypostatic union"],
+  "sections": [
+    {
+      "title": "Introduction",
+      "content": "The holy, great, and ecumenical synod, assembled by the grace of God and the command of our most religious and Christian Emperors, Marcian and Valentinian, Augusti, at Chalcedon, the metropolis of the Bithynian Province, in the martyry of the holy and victorious martyr Euphemia, has decreed as follows: Our Lord and Saviour Jesus Christ, when strengthening the knowledge of the Faith in his disciples, to the end that no one might disagree with his neighbour concerning the doctrines of religion, and that the proclamation of the truth might be set forth equally to all men, said, 'My peace I leave with you, my peace I give unto you.'",
+      "topics": ["council of chalcedon", "christology"]
+    },
+    {
+      "title": "The Definition",
+      "content": "Following the holy Fathers we teach with one voice that the Son of God and our Lord Jesus Christ is to be confessed as one and the same Person, that he is perfect in Godhead and perfect in manhood, very God and very man, of a reasonable soul and human body; consubstantial with the Father as touching his Godhead, and consubstantial with us as touching his manhood; made in all things like us, sin only excepted; begotten of his Father before the worlds according to his Godhead; in these last days born of the Virgin Mary, the Mother of God, according to his manhood. This one and the same Jesus Christ, the only-begotten Son of God, must be confessed to be in two natures, unconfusedly, immutably, indivisibly, inseparably united, and that without the distinction of natures being taken away by such union, but rather the peculiar property of each nature being preserved and being united in one Person and subsistence, not separated or divided into two persons, but one and the same Son and only-begotten, God the Word, our Lord Jesus Christ; even as the Prophets from the beginning spoke concerning him, and as the Lord Jesus Christ instructed us, and as the Creed of the Fathers has delivered to us.",
+      "topics": ["christology", "two natures", "hypostatic union", "incarnation", "jesus christ"]
+    },
+    {
+      "title": "Prohibitions",
+      "content": "These things, therefore, having been expressed by us with the greatest accuracy and attention, the holy Ecumenical Synod defines that no one shall be permitted to bring forward a different faith, nor to write, nor to put together, nor to excogitate, nor to teach it to others. But such as dare either to put together another faith, or to bring forward or to teach or to deliver a different Creed to such as wish to be converted to the knowledge of the truth from the Gentiles, or Jews or any heresy whatever, if they be Bishops or clerics let them be deposed, the Bishops from the Episcopate, and the clerics from the clergy; but if they be monks or laics, let them be anathematized.",
+      "topics": ["heresy", "orthodoxy"]
+    }
+  ]
+}
