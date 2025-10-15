@@ -2,7 +2,7 @@
 
 A Model Context Protocol (MCP) server that provides theological researchers and Bible students with programmatic access to biblical texts, commentaries, and historical Christian documents through natural language queries via Claude Desktop.
 
-## Current Status: Phase 3.4 Complete - Enhanced Discovery & Commentary Navigation! 🎉
+## Current Status: Phase 3.5 Complete - Unified Historical Documents & Cross-References! 🎉
 
 TheologAI now provides comprehensive theological research tools with extensive Bible study capabilities:
 
@@ -10,10 +10,11 @@ TheologAI now provides comprehensive theological research tools with extensive B
 
 - **📖 8 Bible Translations**: ESV, NET, KJV, WEB, BSB, ASV, YLT, DBY (all with verse lookup)
 - **📝 Footnotes Support**: Translation notes, textual variants, and alternative readings
+- **🔗 Cross-References**: Treasury of Scripture Knowledge integration for verse connections
 - **💬 6 Public Domain Commentaries**: Matthew Henry, JFB, Adam Clarke, John Gill, Keil-Delitzsch, Tyndale
-- **🏛️ Historical Documents**: Search through creeds, confessions, and catechisms
-- **📚 Classic Christian Texts**: Access 1000+ works from CCEL with dynamic catalog discovery
-- **🔍 Smart Search**: Topic-based search across documents AND within specific works
+- **🏛️ 18 Historical Documents**: Major creeds, confessions, and catechisms (Nicene, Westminster, Heidelberg, 39 Articles, and more)
+- **📚 1000+ Classic Christian Texts**: Complete CCEL catalog access with unified search
+- **🔍 Unified Search**: Single tool searches local documents first, then entire CCEL catalog
 - **📖 Bible Verse → Commentary**: Direct verse lookup in Calvin's commentaries (auto-routing to correct volume)
 - **🗂️ Work Discovery**: Browse 40+ curated works or search entire CCEL catalog dynamically
 - **⚡ Fast & Reliable**: In-memory caching with 1-hour TTL for verses and footnotes
@@ -32,29 +33,32 @@ Look up any Bible verse or passage with 8 translation options and footnotes
   - `reference` (required): Bible verse reference
   - `translation` (optional): Translation code (default: ESV)
   - `includeFootnotes` (optional): Include translation notes and textual variants
-  - `includeCrossRefs` (optional): Include cross-references (not yet implemented)
 
-### 🏛️ `historical_search`
-Search historical Christian documents
-- **Example**: "What do the creeds say about the Trinity?"
-- **Example**: "Search for 'salvation' in confessions"
-- **Parameters**: `query` (required), `document`, `docType`
+### 🔗 `bible_cross_references`
+Get cross-references for Bible verses using Treasury of Scripture Knowledge
+- **Example**: "Get cross-references for John 3:16"
+- **Example**: "Show related verses for Romans 8:28"
+- **Parameters**: `reference` (required)
 
-### 📚 `classic_text_lookup` ✨ ENHANCED!
-Access classic Christian texts from CCEL with natural language queries and powerful discovery
-- **Example**: "Look up Calvin's Institutes Book 1 Chapter 1"
-- **Example**: "Show me Aquinas Summa Part 1 Question 2"
-- **Example**: "Get Augustine's Confessions Book 4"
-- **NEW**: "Find sections about 'election' in Calvin's Institutes"
-- **NEW**: "What other works by Calvin are available?"
-- **NEW**: "Show me works about justification"
-- **Parameters**:
-  - `work` (e.g., "calvin/institutes"): Work identifier
-  - `query` (natural language): Section to retrieve OR search term for works
-  - `topic` (NEW): Search for sections within a work by keyword
-  - `listWorks`: Browse 40+ curated works organized by era
-- **No section IDs needed** - automatic resolution from natural language!
-- **Dynamic catalog access** - Search 1000+ works on CCEL, not just curated list
+### 📚 `classic_text_lookup` ✨ UNIFIED TOOL!
+**Primary tool for ALL historical Christian documents** - searches local documents first, then CCEL
+- **Local Documents (18)**: Creeds (Apostles, Nicene, Chalcedonian, Athanasian), Confessions (Westminster, Augsburg, Belgic, Dort, 39 Articles, London Baptist 1689, Dositheus, Trent), Catechisms (Westminster Larger/Shorter, Heidelberg, Philaret, Baltimore)
+- **CCEL (1000+)**: Church Fathers, Medieval theologians, Reformers, Puritans, and more
+
+**Examples:**
+- **Search all documents**: `{ query: "trinity" }` → searches local + CCEL
+- **Local document**: `{ work: "nicene-creed" }` → full Nicene Creed
+- **Search in local doc**: `{ work: "westminster-confession", query: "scripture" }`
+- **CCEL work**: `{ work: "calvin/institutes", query: "Book 3 Chapter 21" }`
+- **Browse sections**: `{ work: "philaret-catechism", browseSections: true }`
+- **Discover works**: `{ listWorks: true }` → 40+ CCEL works by era
+
+**Parameters**:
+  - `work` (optional): Work identifier (e.g., "calvin/institutes", "nicene-creed")
+  - `query` (optional): Natural language section reference or search term
+  - `topic` (optional): Search sections within a work by keyword
+  - `listWorks` (optional): Browse available CCEL works
+  - `browseSections` (optional): List all sections in a work
 
 ### 📝 `commentary_lookup`
 Access 6 public domain commentaries on any Bible verse
@@ -74,13 +78,30 @@ Access 6 public domain commentaries on any Bible verse
 
 ## Available Documents
 
-### Creeds
+### Local Historical Documents (18 Total)
+
+**Creeds (4):**
 - **Apostles' Creed** (c. 390 AD)
 - **Nicene Creed** (325/381 AD)
+- **Chalcedonian Definition** (451 AD)
+- **Athanasian Creed** (c. 500 AD)
 
-### Confessions & Catechisms
-- **Westminster Confession of Faith** (1646) - Sample sections
-- **Heidelberg Catechism** (1563) - Sample questions
+**Confessions (8):**
+- **Westminster Confession of Faith** (1646) - Complete
+- **Augsburg Confession** (1530) - Lutheran
+- **Belgic Confession** (1561) - Reformed
+- **Canons of Dort** (1619) - Reformed
+- **Thirty-Nine Articles** (1571) - Anglican
+- **London Baptist Confession** (1689) - Baptist
+- **Confession of Dositheus** (1672) - Eastern Orthodox
+- **Council of Trent** (1545-1563) - Roman Catholic
+
+**Catechisms (6):**
+- **Westminster Shorter Catechism** (1647) - Complete
+- **Westminster Larger Catechism** (1648) - Complete
+- **Heidelberg Catechism** (1563) - Complete
+- **Philaret's Catechism** (1823) - Eastern Orthodox
+- **Baltimore Catechism** (1885) - Roman Catholic
 
 ### Classic Christian Texts (CCEL) ✨ ENHANCED!
 Access 1000+ works from the Christian Classics Ethereal Library with dynamic discovery:
@@ -190,8 +211,9 @@ All commentaries accessible via HelloAO Bible API with zero rate limits!
 
    **Historical Documents:**
    - "What do the creeds say about the Trinity?"
-   - "Show me the Apostles' Creed"
-   - "Search for 'comfort' in the Heidelberg Catechism"
+   - "Show me the Nicene Creed"
+   - "Search for 'justification' in the Westminster Confession"
+   - "What does the Heidelberg Catechism say about comfort?"
 
    **Classic Texts:**
    - "Look up Calvin's Institutes Book 1 Chapter 1"
@@ -200,7 +222,11 @@ All commentaries accessible via HelloAO Bible API with zero rate limits!
 
    **Commentary:**
    - "Get commentary on John 1:1"
-   - "What do the notes say about Genesis 1:1?"
+   - "What does Matthew Henry say about Romans 8:28?"
+
+   **Cross-References:**
+   - "Get cross-references for John 3:16"
+   - "Show related verses for Psalm 23:1"
 
 ## Development
 
@@ -227,17 +253,14 @@ npm run clean
 - **Default Port**: 3000 (configurable via `.env` file)
 - **CORS**: Enabled for web client compatibility
 
-## MCP Tools
+## MCP Tools Summary
 
-### `bible_lookup`
+TheologAI provides 4 primary tools:
 
-Look up Bible verses by reference.
-
-**Parameters:**
-- `reference` (required): Bible verse reference (e.g., "John 3:16")
-- `translation` (optional): Bible translation (default: "ESV")
-- `includeContext` (optional): Include surrounding verses
-- `includeCrossRefs` (optional): Include cross-references
+1. **`bible_lookup`** - Look up verses in 8 translations with footnotes
+2. **`bible_cross_references`** - Get related verses via Treasury of Scripture Knowledge
+3. **`commentary_lookup`** - Access 6 public domain commentaries
+4. **`classic_text_lookup`** - Search 18 local historical documents + 1000+ CCEL works (unified tool)
 
 ## Development Progress
 
@@ -292,6 +315,17 @@ Look up Bible verses by reference.
 - ✅ Improved HTML parsing (proper nested div handling)
 - ✅ Comprehensive test suite (95.6% success rate, 43/45 tests passing)
 
+**Phase 3.5: Unified Historical Documents & Cross-References** ✅
+- ✅ Added 11 major historical documents (18 total local documents)
+- ✅ Complete Westminster Confession, Larger/Shorter Catechisms
+- ✅ Major confessions: Augsburg, Belgic, Dort, 39 Articles, London Baptist 1689, Dositheus, Trent
+- ✅ Additional creeds: Chalcedonian, Athanasian
+- ✅ Catechisms: Heidelberg (complete), Philaret (Orthodox), Baltimore (Catholic)
+- ✅ Unified `classic_text_lookup` tool (replaces deprecated `historical_search`)
+- ✅ Priority search: local documents first, then CCEL
+- ✅ Cross-reference system via `bible_cross_references` tool
+- ✅ Treasury of Scripture Knowledge integration
+
 **Performance:**
 - Bible verse cache: ~160ms → <1ms on repeated queries
 - HelloAO API calls: ~200ms (no rate limits!)
@@ -303,13 +337,14 @@ Look up Bible verses by reference.
 ## Next Steps (Phase 4+)
 
 **Potential Enhancements:**
-- [ ] Cross-reference system (Treasury of Scripture Knowledge)
 - [ ] Additional HelloAO translations (1000+ available)
 - [ ] Greek/Hebrew word study tools (Strong's concordance)
 - [ ] Advanced topical search across all resources
-- [ ] More historical texts and confessions
+- [ ] More historical texts and catechisms
 - [ ] Search history and bookmarking
 - [ ] Export/citation tools for research
+- [ ] Parallel passage viewing
+- [ ] Theological topic indexing
 
 ## Architecture
 
@@ -321,30 +356,32 @@ src/
 │   ├── index.ts                 # Adapter exports
 │   ├── esvApi.ts               # ESV Bible API
 │   ├── netBibleApi.ts          # NET Bible API (translator notes)
-│   ├── helloaoApi.ts           # HelloAO Bible API (commentaries & translations)
+│   ├── helloaoApi.ts           # HelloAO Bible API (commentaries, translations, cross-refs)
 │   ├── helloaoBibleAdapter.ts  # HelloAO translation adapter (KJV, WEB, BSB, ASV, YLT, DBY)
 │   ├── publicCommentaryAdapter.ts # HelloAO commentary adapter
+│   ├── localData.ts            # Local historical documents adapter (18 documents)
 │   ├── ccelApi.ts              # CCEL API (Scripture, Works, Fragments)
 │   ├── ccelToc.ts              # CCEL TOC parser with auto-resolution
-│   └── ccelCatalogScraper.ts   # NEW: CCEL catalog scraper (1000+ works)
+│   └── ccelCatalogScraper.ts   # CCEL catalog scraper (1000+ works)
 ├── services/                     # Business logic layer
 │   ├── bibleService.ts          # Bible verse service (8 translations)
-│   ├── historicalService.ts     # Historical documents
+│   ├── historicalService.ts     # Historical documents service
 │   ├── commentaryService.ts     # Commentary notes (6 commentaries)
+│   ├── crossReferenceService.ts # Cross-reference service (Treasury of Scripture Knowledge)
 │   ├── ccelService.ts           # CCEL classic texts
 │   └── sectionResolver.ts       # Natural language → section ID
 ├── tools/                        # MCP tool handlers
 │   ├── index.ts                 # Tool registry
 │   ├── bibleLookup.ts           # Bible verse lookup (8 translations + footnotes)
-│   ├── historicalSearch.ts      # Historical document search
+│   ├── bibleCrossReferences.ts  # Cross-reference lookup
 │   ├── commentaryLookup.ts      # Commentary retrieval (6 commentaries)
-│   └── classicTextLookup.ts     # CCEL classic text lookup
+│   └── classicTextLookup.ts     # Unified historical documents + CCEL (replaces historicalSearch)
 ├── utils/                        # Utilities
 │   ├── cache.ts                 # In-memory caching (Bible & TOC)
 │   ├── formatter.ts             # Markdown formatting (with footnotes)
 │   ├── helloaoMapper.ts         # Book name/code mapping for HelloAO
 │   ├── commentaryMapper.ts      # Commentary reference mapping
-│   ├── ccelCommentaryMapper.ts  # NEW: Calvin commentary volume mapper
+│   ├── ccelCommentaryMapper.ts  # Calvin commentary volume mapper
 │   └── errors.ts                # Error handling
 └── types/                        # Type definitions
     └── index.ts                 # Common types (includes Footnote interface)
