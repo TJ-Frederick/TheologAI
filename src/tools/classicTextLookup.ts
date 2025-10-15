@@ -6,7 +6,8 @@
 
 import { CCELService } from '../services/ccelService.js';
 import { SectionResolver } from '../services/sectionResolver.js';
-import { formatMarkdown } from '../utils/formatter.js';
+import { LocalDataAdapter } from '../adapters/localData.js';
+import { formatMarkdown, formatHistoricalResponse } from '../utils/formatter.js';
 import { ToolHandler } from '../types/index.js';
 
 export interface ClassicTextInput {
@@ -19,32 +20,44 @@ export interface ClassicTextInput {
 
 const service = new CCELService();
 const resolver = new SectionResolver();
+const localData = new LocalDataAdapter();
 
 export const classicTextLookupHandler: ToolHandler = {
   name: 'classic_text_lookup',
-  description: `Look up classic Christian texts from the Christian Classics Ethereal Library (CCEL).
+  description: `Look up ALL classic Christian texts: local historical documents (creeds, confessions, catechisms) AND the Christian Classics Ethereal Library (CCEL).
 
-**Discover and access ALL works from CCEL's complete catalog spanning 2000 years of church history:**
-- Church Fathers: Augustine, Athanasius, Chrysostom
-- Medieval: Aquinas, Anselm, Bernard, Thomas à Kempis
-- Reformers: Calvin, Luther, Knox
-- Puritans: Bunyan, Owen, Baxter, Brooks
-- Post-Reformation: Edwards, Wesley, Spurgeon, Chesterton
-- Plus devotional classics, apologetics, and church history
+**This is the PRIMARY tool for ALL historical Christian document searches.**
+
+**PRIORITY: Checks local historical documents FIRST, then CCEL**
+
+**Local Historical Documents (18 curated documents):**
+- **Creeds:** Apostles, Nicene, Chalcedonian, Athanasian
+- **Confessions:** Westminster, Augsburg, Belgic, Dort, 39 Articles, London Baptist 1689, Dositheus, Trent
+- **Catechisms:** Westminster Larger/Shorter, Heidelberg, Philaret, Baltimore
+
+**CCEL Complete Catalog (1000s of works spanning 2000 years):**
+- **Church Fathers:** Augustine, Athanasius, Chrysostom, Irenaeus, Origen
+- **Medieval:** Aquinas, Anselm, Bernard of Clairvaux, Thomas à Kempis
+- **Reformers:** Calvin, Luther, Knox, Zwingli
+- **Puritans:** Bunyan, Owen, Baxter, Brooks, Goodwin
+- **Post-Reformation:** Edwards, Wesley, Spurgeon, Whitefield, Chesterton
+- **Plus:** Devotional classics, apologetics, church history, commentaries
 
 **How to use:**
-1. **Discover works:** Use listWorks or search by topic/keyword
-2. **Find sections within a work:** Provide work + topic to search section titles
-3. **Retrieve content:** Provide work + natural language query (e.g., "Book 1 Chapter 1")
+1. **Search any topic across all documents:** { query: "justification" } → searches local docs + CCEL
+2. **Lookup specific document:** { work: "westminster-confession", query: "scripture" } → returns matching sections
+3. **Browse document structure:** { work: "philaret-catechism", browseSections: true } → lists all sections
+4. **Discover available works:** { listWorks: true } → shows CCEL catalog organized by era
+5. **Search within CCEL work:** { work: "calvin/institutes", query: "Book 3 Chapter 21" } → retrieves specific content
 
 **NO section IDs needed - just use natural language!**
 
 **Example queries:**
-- listWorks: true → See 40+ curated works organized by era
-- query: "justification" → Find works about justification
-- work: "calvin/institutes", topic: "predestination" → Find relevant sections
-- work: "calvin/institutes", query: "Book 3 Chapter 21" → Retrieve specific section
-- work: "augustine/city_of_god", query: "Book 1" → Retrieve Book 1`,
+- query: "trinity" → Search ALL documents (local + CCEL)
+- work: "nicene-creed" → Get full Nicene Creed from local storage
+- work: "augsburg-confession", query: "justification" → Search Augsburg Confession
+- work: "calvin/institutes", query: "Book 3 Chapter 21" → Retrieve from CCEL
+- listWorks: true → See 40+ CCEL works organized by era`,
 
   inputSchema: {
     type: 'object',
@@ -75,6 +88,74 @@ export const classicTextLookupHandler: ToolHandler = {
 
   handler: async (input: ClassicTextInput) => {
     try {
+      // Priority 0: Check local historical documents first for specific work queries
+      if (input.work && !input.listWorks && !input.browseSections) {
+        // Normalize work ID to match local filenames
+        const localWorkId = input.work
+          .replace(/^(westminster)\/(.*)$/, 'westminster-$2')  // westminster/confession → westminster-confession
+          .replace(/^(.*)\/(.*)$/, '$1-$2')  // other/work → other-work
+          .replace(/_/g, '-');  // underscores to dashes
+
+        const localDoc = localData.getDocument(localWorkId);
+
+        if (localDoc) {
+          const searchQuery = input.query || input.topic || '';
+
+          // If no query provided, return full document
+          if (!searchQuery) {
+            const results = localData.searchDocuments('', localWorkId);
+            const formattedResults = results
+              .slice(0, 10) // Show more for full document view
+              .map(result => formatHistoricalResponse(result))
+              .join('\n\n---\n\n');
+
+            const summary = results.length > 10
+              ? `\n\n*Showing first 10 of ${results.length} sections*`
+              : `\n\n*Complete document (${results.length} section${results.length === 1 ? '' : 's'})*`;
+
+            return {
+              content: [{
+                type: 'text',
+                text: formattedResults + summary
+              }]
+            };
+          }
+
+          // Search within document
+          const results = localData.searchDocuments(searchQuery, localWorkId);
+
+          if (results.length > 0) {
+            const formattedResults = results
+              .slice(0, 5)
+              .map(result => formatHistoricalResponse(result))
+              .join('\n\n---\n\n');
+
+            const summary = results.length > 5
+              ? `\n\n*Showing first 5 of ${results.length} results*`
+              : `\n\n*Found ${results.length} result(s)*`;
+
+            return {
+              content: [{
+                type: 'text',
+                text: formattedResults + summary
+              }]
+            };
+          } else {
+            // Document found but no matches for query
+            return {
+              content: [{
+                type: 'text',
+                text: formatMarkdown({
+                  title: `No Matches in ${localDoc.title}`,
+                  content: `The document "${localDoc.title}" is available locally, but no sections match "${searchQuery}".\n\nTry different search terms, or omit the query parameter to see the full document.`,
+                  footer: `Local Historical Document (${localDoc.date})`
+                })
+              }]
+            };
+          }
+        }
+      }
+
       // Mode 1: List all available works
       if (input.listWorks) {
         const works = service.getPopularWorks();
@@ -112,6 +193,39 @@ export const classicTextLookupHandler: ToolHandler = {
 
       // Mode 2: Browse sections of a specific work
       if (input.browseSections && input.work) {
+        // Check if this is a local document first
+        const localWorkId = input.work
+          .replace(/^(westminster)\/(.*)$/, 'westminster-$2')
+          .replace(/^(.*)\/(.*)$/, '$1-$2')
+          .replace(/_/g, '-');
+
+        const localDoc = localData.getDocument(localWorkId);
+
+        if (localDoc) {
+          // Browse local document sections
+          const formatted = localDoc.sections.slice(0, 20).map(s => {
+            if (s.question_number) {
+              const preview = s.question ? ` ${s.question.substring(0, 50)}...` : '';
+              return `${s.question_number}.${preview}`;
+            }
+            if (s.chapter) return `Chapter ${s.chapter}`;
+            if (s.title) return s.title;
+            return 'Section';
+          }).join('\n');
+
+          return {
+            content: [{
+              type: 'text',
+              text: formatMarkdown({
+                title: `Sections in ${localDoc.title}`,
+                content: `${localDoc.title} has ${localDoc.sections.length} sections. Showing first 20:\n\n${formatted}\n\n*This is a local historical document. Use { work: "${localWorkId}", query: "search term" } to search within it.*`,
+                footer: `Local Historical Document (${localDoc.date})`
+              })
+            }]
+          };
+        }
+
+        // Not local, try CCEL
         const sections = await resolver.listSections(input.work);
         const formatted = sections.slice(0, 20).map(s => {
           const bookInfo = s.book ? `Book ${s.book}` : '';
@@ -182,7 +296,49 @@ export const classicTextLookupHandler: ToolHandler = {
 
       // Mode 3: Search for works by topic/author (unlimited catalog search)
       if (input.query && !input.work) {
-        // First, try searching the full CCEL catalog via scraping
+        // Priority 1: Search local historical documents first
+        const localResults = localData.searchDocuments(input.query);
+
+        if (localResults.length > 0) {
+          const formattedLocal = localResults
+            .slice(0, 5)
+            .map(result => formatHistoricalResponse(result))
+            .join('\n\n---\n\n');
+
+          const localSummary = localResults.length > 5
+            ? `\n\n*Showing first 5 of ${localResults.length} results from local historical documents*`
+            : '';
+
+          // Also search CCEL for additional results
+          const catalogResults = await service.searchAllWorks(input.query);
+
+          if (catalogResults.length > 0) {
+            const formattedCCEL = catalogResults.slice(0, 3).map(s =>
+              `**${s.author}** - *${s.title}*\n  Work ID: \`${s.work}\`\n  ${s.description}`
+            ).join('\n\n');
+
+            return {
+              content: [{
+                type: 'text',
+                text: formatMarkdown({
+                  title: `Results for "${input.query}"`,
+                  content: `### Local Historical Documents\n\n${formattedLocal}${localSummary}\n\n### CCEL Catalog (showing 3 of ${catalogResults.length})\n\n${formattedCCEL}`,
+                  footer: 'Local documents searched first, then CCEL catalog'
+                })
+              }]
+            };
+          }
+
+          // Only local results found
+          return {
+            content: [{
+              type: 'text',
+              text: formattedLocal + localSummary
+            }]
+          };
+        }
+
+        // Priority 2: Search the full CCEL catalog via scraping
         const catalogResults = await service.searchAllWorks(input.query);
 
         if (catalogResults.length > 0) {

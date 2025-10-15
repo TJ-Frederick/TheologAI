@@ -10,10 +10,14 @@ const __dirname = dirname(__filename);
 export interface DocumentSection {
   title?: string;
   chapter?: string;
-  question?: string;
-  q?: string;
-  a?: string;
-  content?: string;
+  question?: string;        // Question text (used in Philaret, Baltimore)
+  question_number?: string; // Question number: "1", "2", "100"
+  q?: string;               // Short form question
+  a?: string;               // Short form answer
+  answer?: string;          // Full answer text (used in Philaret, Baltimore)
+  content?: string;         // Full content (used in confessions/creeds)
+  part?: string;            // Section grouping: "Introduction", "Part I"
+  scripture?: string[];     // Bible references
   topics?: string[];
 }
 
@@ -77,6 +81,62 @@ export class LocalDataAdapter {
       // Filter by document type if specified
       if (docType && doc.type !== docType.toLowerCase()) {
         continue;
+      }
+
+      // PRIORITY 1: Question number search (e.g., "100", "Question 100", "Q100")
+      const numberMatch = searchTerm.match(/\b(\d+)\b/);
+      if (numberMatch) {
+        const targetNumber = numberMatch[1];
+        for (const section of doc.sections) {
+          if (section.question_number === targetNumber) {
+            results.push({
+              document: doc.title,
+              section: this.getSectionTitle(section),
+              text: this.getSectionText(section),
+              citation: {
+                source: `${doc.title} (${doc.date})`,
+                url: `local:${key}`
+              }
+            });
+          }
+        }
+      }
+
+      // PRIORITY 2: Ordinal search (e.g., "first question", "second", "tenth")
+      const ordinalMap: Record<string, string> = {
+        'first': '1',
+        'second': '2',
+        'third': '3',
+        'fourth': '4',
+        'fifth': '5',
+        'sixth': '6',
+        'seventh': '7',
+        'eighth': '8',
+        'ninth': '9',
+        'tenth': '10',
+        'eleventh': '11',
+        'twelfth': '12',
+        'twentieth': '20',
+        'thirtieth': '30',
+        'hundredth': '100'
+      };
+
+      for (const [ordinal, number] of Object.entries(ordinalMap)) {
+        if (searchTerm.includes(ordinal)) {
+          for (const section of doc.sections) {
+            if (section.question_number === number) {
+              results.push({
+                document: doc.title,
+                section: this.getSectionTitle(section),
+                text: this.getSectionText(section),
+                citation: {
+                  source: `${doc.title} (${doc.date})`,
+                  url: `local:${key}`
+                }
+              });
+            }
+          }
+        }
       }
 
       // Search in title (more flexible matching)
@@ -190,15 +250,47 @@ export class LocalDataAdapter {
   }
 
   private getSectionText(section: DocumentSection): string {
+    // Priority 1: content field (confessions, creeds)
     if (section.content) return section.content;
-    if (section.q && section.a) return `Q: ${section.q} A: ${section.a}`;
+
+    // Priority 2: question + answer (Philaret, Baltimore catechisms)
+    if (section.question && section.answer) {
+      return `Q: ${section.question}\n\nA: ${section.answer}`;
+    }
+
+    // Priority 3: q + a abbreviations (backward compatibility)
+    if (section.q && section.a) {
+      return `Q: ${section.q}\n\nA: ${section.a}`;
+    }
+
+    // Priority 4: answer only (fallback)
+    if (section.answer) return section.answer;
+    if (section.a) return section.a;
+
     return '';
   }
 
   private getSectionTitle(section: DocumentSection): string {
-    if (section.title) return section.title;
-    if (section.chapter) return `Chapter ${section.chapter}`;
-    if (section.question) return `Question ${section.question}`;
+    // Catechisms with question numbers
+    if (section.question_number) {
+      return `Question ${section.question_number}`;
+    }
+
+    // Confessions with chapter numbers
+    if (section.chapter) {
+      return `Chapter ${section.chapter}`;
+    }
+
+    // Explicit section title
+    if (section.title) {
+      return section.title;
+    }
+
+    // Fallback: truncated question text
+    if (section.question) {
+      return section.question.substring(0, 60) + (section.question.length > 60 ? '...' : '');
+    }
+
     return 'Section';
   }
 }
