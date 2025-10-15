@@ -65,6 +65,9 @@ export class LocalDataAdapter {
     const results: HistoricalResult[] = [];
     const searchTerm = query.toLowerCase();
 
+    // Tokenize the search query for multi-word searches
+    const searchTokens = searchTerm.split(/\s+/).filter(token => token.length > 0);
+
     for (const [key, doc] of this.documentsCache) {
       // Filter by document if specified
       if (documentFilter && !key.includes(documentFilter.toLowerCase())) {
@@ -93,10 +96,17 @@ export class LocalDataAdapter {
       }
 
       // Search in document-level and section-level topics
-      if (doc.topics.some(topic => topic.toLowerCase().includes(searchTerm))) {
+      // Check if any search token matches any topic (OR logic)
+      const topicMatches = doc.topics && searchTokens.some(token =>
+        doc.topics.some(topic => topic.toLowerCase().includes(token))
+      );
+
+      if (topicMatches) {
         // Find sections with matching section-level topics, or all sections if none have topics
         const matchingSections = doc.sections.filter(section =>
-          section.topics && section.topics.some(topic => topic.toLowerCase().includes(searchTerm))
+          section.topics && searchTokens.some(token =>
+            section.topics.some(topic => topic.toLowerCase().includes(token))
+          )
         );
 
         // If we found sections with matching topics, return those
@@ -132,12 +142,15 @@ export class LocalDataAdapter {
         }
       }
 
-      // Search in sections
+      // Search in sections - check if all tokens appear in text (AND logic for content search)
+      // OR if any token appears for better recall
       for (const section of doc.sections) {
         const sectionText = this.getSectionText(section);
+        const sectionTextLower = sectionText.toLowerCase();
         const sectionTitle = this.getSectionTitle(section);
 
-        if (sectionText.toLowerCase().includes(searchTerm)) {
+        // First try exact phrase match
+        if (sectionTextLower.includes(searchTerm)) {
           results.push({
             document: doc.title,
             section: sectionTitle,
@@ -147,6 +160,20 @@ export class LocalDataAdapter {
               url: `local:${key}`
             }
           });
+        } else if (searchTokens.length > 1) {
+          // For multi-word queries, check if ALL tokens appear (more precise)
+          const allTokensPresent = searchTokens.every(token => sectionTextLower.includes(token));
+          if (allTokensPresent) {
+            results.push({
+              document: doc.title,
+              section: sectionTitle,
+              text: sectionText,
+              citation: {
+                source: `${doc.title} (${doc.date})`,
+                url: `local:${key}`
+              }
+            });
+          }
         }
       }
     }

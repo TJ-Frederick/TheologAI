@@ -1,13 +1,14 @@
 # Bible Study MCP Server - Development Plan
 
-**Current Status: Phase 3.3 - Bible Translations Complete ✅**
+**Current Status: Phase 3.4 - Cross-References Complete ✅**
 - Repository: https://github.com/TJ-Frederick/TheologAI
 - Phase 1: Complete (ESV Bible, Historical Docs, Mock Commentary)
 - Phase 2: Complete (CCEL Classic Texts, ESV Footnotes, Multi-Translation)
 - Phase 3.1: Complete (Matthew Henry via CCEL)
 - Phase 3.2: Complete (HelloAO Bible API - 6 Commentaries)
 - Phase 3.3: Complete (HelloAO Bible Translations - 6 translations + footnotes)
-- All integration tests passing (17 HelloAO tests + 7 MCP integration tests)
+- Phase 3.4: Complete (Cross-Reference System - 344K+ references via OpenBible.info)
+- All tests passing (Service: 8, Tool: 7, Integration: 5)
 
 ## Phase 1: MVP Foundation (Days 1-7) - ✅ COMPLETE
 
@@ -603,29 +604,96 @@ Integration Tests (`test/integration/phase3-helloao-test.ts`):
 
 **Commit:** 146b980 - feat: Add 6 Bible translations via HelloAO API with footnotes support
 
-### Priority 4: Cross-Reference System (MEDIUM COMPLEXITY)
+### Priority 4: Cross-Reference System - ✅ COMPLETE
 
-**Status:** Pending
+**Status:** COMPLETED (Phase 3.4)
 
-**Goal:** Add Treasury of Scripture Knowledge integration
+**Goal:** Add cross-reference system to help users discover related passages
 
-**Why Priority 4:**
-- Enhances Bible study capabilities
-- Links related verses automatically
-- Moderate complexity
-- Clear user value
+**Accomplishments:**
 
-**Implementation:**
-- Download/integrate Treasury of Scripture Knowledge dataset
-- Create cross-reference service with verse mapping
-- Add cross-references to bible_lookup or commentary_lookup output
-- Format cross-refs with verse previews
-- Consider caching cross-reference lookups
+1. **OpenBible.info Data Integration** ✅
+   - Downloaded 344,799 cross-references covering 29,364 verses
+   - Data source: OpenBible.info (built on Treasury of Scripture Knowledge)
+   - License: CC-BY (requires attribution)
+   - Storage: 7.9MB uncompressed (negligible for local + hosted deployment)
 
-**Data Sources:**
-- OpenBible.info Cross-References (CC BY 4.0)
-- Treasury of Scripture Knowledge (public domain)
-- JSON format for fast lookup
+2. **Cross-Reference Service** (`src/services/crossReferenceService.ts`) ✅
+   - Parses TSV data into in-memory map for fast lookups
+   - Normalizes verse references (e.g., "Gen.1.1" → "Genesis 1:1")
+   - Sorts cross-references by vote count (community rankings)
+   - Filtering: `maxResults` (default: 5), `minVotes` (default: 0)
+   - Complete book abbreviation mapping (66 books)
+
+3. **New MCP Tool: `bible_cross_references`** ✅
+   - Separate tool from `bible_lookup` (enables flexible composition)
+   - Returns top 5 most relevant cross-refs by default
+   - Vote counts used internally for ranking (hidden from user output)
+   - Optional verse text inclusion via `includeVerseText` parameter
+   - Supports all 8 Bible translations (ESV, NET, KJV, WEB, BSB, ASV, YLT, DBY)
+
+4. **Tool Parameters:**
+   ```typescript
+   {
+     reference: string,              // Required: "John 3:16"
+     maxResults?: number,            // Optional: default 5
+     minVotes?: number,              // Optional: default 0 (filter low-quality refs)
+     includeVerseText?: boolean,     // Optional: default false
+     translation?: string            // Optional: default ESV (when includeVerseText=true)
+   }
+   ```
+
+5. **Example Output:**
+   ```
+   Cross-References for John 3:16 (showing top 5 of 23):
+
+   1. Romans 5:8
+   2. 1 John 4:9-1 John 4:10
+   3. John 3:15
+   4. Romans 8:32
+   5. John 11:25-John 11:26
+
+   [18 additional cross-references available. Use maxResults parameter to see more]
+
+   Data source: OpenBible.info (CC-BY)
+   ```
+
+6. **Comprehensive Testing** ✅
+   - Service tests: Parsing, lookup, sorting, filtering (8 tests)
+   - Tool tests: Default behavior, custom params, verse text inclusion (7 tests)
+   - Integration tests: Tool registration, execution via MCP server (5 tests)
+   - All tests passing ✓
+
+**Performance:**
+- In-memory lookups: Microseconds
+- No API calls required (local data)
+- No rate limits
+- Works offline
+
+**Use Cases Enabled:**
+- "What other passages help clarify John 3:16?"
+- "Show me related verses for Genesis 1:1"
+- "What passages relate to Romans 8:28?"
+
+**Key Design Decision:** Separate tool (not embedded in `bible_lookup`) allows users/LLMs to compose tools flexibly:
+```
+bible_lookup + bible_cross_references + commentary_lookup = comprehensive study
+```
+
+**Files Created:**
+- `src/services/crossReferenceService.ts` - Cross-reference service
+- `src/tools/bibleCrossReferences.ts` - MCP tool handler
+- `test/services/crossReferenceService-test.ts` - Service tests
+- `test/tools/bibleCrossReferences-test.ts` - Tool tests
+- `test/integration/simple-crossref-e2e-test.ts` - E2E tests
+- `data/cross-references/cross_references.txt` - OpenBible.info data (7.9MB)
+
+**Success Criteria Met:**
+- ✅ Users can discover related passages for any verse
+- ✅ Most relevant cross-references shown first (vote-based ranking)
+- ✅ Works with all 8 Bible translations
+- ✅ Fast, offline, no API dependencies
+- ✅ Proper attribution to OpenBible.info (CC-BY)
 
 ### Priority 5: Advanced Features (OPTIONAL)
 
@@ -789,19 +857,20 @@ tail -f ~/Library/Logs/Claude/mcp-*.log  # macOS
 - [x] Multi-translation support (ESV, NET)
 - [x] Performance optimized (caching system working)
 
-### Phase 3 Status: Commentary & Translations Complete ✅
+### Phase 3 Status: Commentary, Translations & Cross-References Complete ✅
 **Completed:**
 - [x] Phase 3.1: Matthew Henry commentary via CCEL (66/66 books)
 - [x] Phase 3.2: HelloAO Bible API integration (6 commentaries, 1000+ translations)
 - [x] Phase 3.3: HelloAO Bible translations (KJV, WEB, BSB, ASV, YLT, DBY + footnotes)
+- [x] Phase 3.4: Cross-reference system (344K+ references via OpenBible.info)
 - [x] All 6 public domain commentaries working (Matthew Henry, JFB, Adam Clarke, John Gill, Keil-Delitzsch, Tyndale)
 - [x] 8 Bible translations available (ESV, NET, KJV, WEB, BSB, ASV, YLT, DBY)
 - [x] Footnotes support with translation notes and textual variants
+- [x] Cross-references with vote-based relevance ranking
 - [x] Dual format parsing for different commentary structures
-- [x] Zero infrastructure costs (no API keys, no rate limits for HelloAO)
+- [x] Zero infrastructure costs (no API keys, no rate limits)
 
 **Remaining Phase 3 Goals:**
-- [ ] Priority 4: Cross-reference system (Treasury of Scripture Knowledge)
 - [ ] Priority 5: Advanced features (word studies, topical search)
 - [ ] Priority 6: Additional translations from HelloAO's 1000+ library
 

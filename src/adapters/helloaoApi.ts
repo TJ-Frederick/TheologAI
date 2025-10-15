@@ -297,23 +297,47 @@ export class HelloAOApiAdapter {
 
   /**
    * Extract commentary for a specific verse
-   * Handles different commentary formats (Matthew Henry uses verseNumber, JFB uses type/number)
+   * Handles different commentary formats:
+   * - Format 1: { verseNumber, content: [{ type, content }] } - annotation objects
+   * - Format 2: { type: 'verse', number, content: [strings] } - string arrays
+   *
+   * Falls back to sectional commentary when exact verse not found
+   * (e.g., Matthew Henry often groups multiple verses together)
    */
   static getCommentaryForVerse(
     commentaryResponse: any,
     verseNumber: number
   ): string | undefined {
-    const verseEntry = commentaryResponse.chapter.content.find((item: any) => {
-      // Format 1: { verseNumber, content: [{ type, content }] } - Matthew Henry, Clarke, Gill
+    // Try exact match first
+    let verseEntry = commentaryResponse.chapter.content.find((item: any) => {
+      // Format 1: { verseNumber, content: [{ type, content }] }
       if ('verseNumber' in item) {
         return item.verseNumber === verseNumber;
       }
-      // Format 2: { type: 'verse', number, content: [strings] } - JFB, Tyndale
+      // Format 2: { type: 'verse', number, content: [strings] }
       if (item.type === 'verse' && 'number' in item) {
         return item.number === verseNumber;
       }
       return false;
     });
+
+    // If no exact match, find the section that likely contains this verse
+    // (Find the verse entry with the highest number ≤ requested verse)
+    if (!verseEntry) {
+      const candidates = commentaryResponse.chapter.content.filter((item: any) => {
+        const itemVerseNum = 'verseNumber' in item ? item.verseNumber : item.number;
+        return itemVerseNum && itemVerseNum <= verseNumber;
+      });
+
+      if (candidates.length > 0) {
+        // Sort by verse number descending, take the closest one
+        verseEntry = candidates.sort((a: any, b: any) => {
+          const aNum = 'verseNumber' in a ? a.verseNumber : a.number;
+          const bNum = 'verseNumber' in b ? b.verseNumber : b.number;
+          return bNum - aNum;
+        })[0];
+      }
+    }
 
     if (!verseEntry) {
       return undefined;
@@ -335,7 +359,7 @@ export class HelloAOApiAdapter {
           }
         }
       }
-      // Format 2: content is array of strings (JFB, Tyndale)
+      // Format 2: content is array of strings
       else {
         for (const item of verseEntry.content) {
           if (typeof item === 'string') {

@@ -3,9 +3,11 @@ import { bibleLookupHandler } from './bibleLookup.js';
 import { historicalSearchHandler } from './historicalSearch.js';
 import { commentaryLookupHandler } from './commentaryLookup.js';
 import { classicTextLookupHandler } from './classicTextLookup.js';
+import { bibleCrossReferencesHandler } from './bibleCrossReferences.js';
 
 export const tools: ToolHandler[] = [
   bibleLookupHandler,
+  bibleCrossReferencesHandler,
   historicalSearchHandler,
   commentaryLookupHandler,
   classicTextLookupHandler
