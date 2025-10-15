@@ -105,7 +105,7 @@ export class LocalDataAdapter {
         // Find sections with matching section-level topics, or all sections if none have topics
         const matchingSections = doc.sections.filter(section =>
           section.topics && searchTokens.some(token =>
-            section.topics.some(topic => topic.toLowerCase().includes(token))
+            section.topics!.some(topic => topic.toLowerCase().includes(token))
           )
         );
 
