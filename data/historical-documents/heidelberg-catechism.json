@@ -111,187 +111,336 @@
     {
       "question": "22",
       "q": "What, then, must a Christian believe?",
-      "a": "All that is promised us in the gospel, which the articles of our catholic and undoubted Christian faith teach us in a summary."
+      "a": "All that is promised us in the gospel, which the articles of our catholic and undoubted Christian faith teach us in a summary.",
+      "topics": [
+        "Apostles' Creed",
+        "Creed",
+        "faith"
+      ]
     },
     {
       "question": "23",
       "q": "What are these articles?",
-      "a": "I believe in God the Father almighty, Creator of heaven and earth. I believe in Jesus Christ, His only begotten Son, our Lord; He was conceived by the Holy Spirit, born of the virgin Mary; suffered under Pontius Pilate, was crucified, dead, and buried; He descended into hell; On the third day He arose from the dead; He ascended into heaven, and sits at the right hand of God the Father almighty; from there He will come to judge the living and the dead. I believe in the Holy Spirit; I believe a holy catholic Christian church, the communion of saints; the forgiveness of sins; the resurrection of the body; and the life everlasting."
+      "a": "I believe in God the Father almighty, Creator of heaven and earth. I believe in Jesus Christ, His only begotten Son, our Lord; He was conceived by the Holy Spirit, born of the virgin Mary; suffered under Pontius Pilate, was crucified, dead, and buried; He descended into hell; On the third day He arose from the dead; He ascended into heaven, and sits at the right hand of God the Father almighty; from there He will come to judge the living and the dead. I believe in the Holy Spirit; I believe a holy catholic Christian church, the communion of saints; the forgiveness of sins; the resurrection of the body; and the life everlasting.",
+      "topics": [
+        "Apostles' Creed",
+        "Creed"
+      ]
     },
     {
       "question": "24",
       "q": "How are these articles divided?",
-      "a": "Into three parts: the first is about God the Father and our creation; the second about God the Son and our redemption; the third about God the Holy Spirit and our sanctification."
+      "a": "Into three parts: the first is about God the Father and our creation; the second about God the Son and our redemption; the third about God the Holy Spirit and our sanctification.",
+      "topics": [
+        "Apostles' Creed",
+        "Creed"
+      ]
     },
     {
       "question": "25",
       "q": "Since there is only one God, why do you speak of three persons, Father, Son, and Holy Spirit?",
-      "a": "Because God has so revealed Himself in His Word that these three distinct persons are the one, true, eternal God."
+      "a": "Because God has so revealed Himself in His Word that these three distinct persons are the one, true, eternal God.",
+      "topics": [
+        "Apostles' Creed",
+        "Creed"
+      ]
     },
     {
       "question": "26",
       "q": "What do you believe when you say: I believe in God the Father almighty, Creator of heaven and earth?",
-      "a": "That the eternal Father of our Lord Jesus Christ, who out of nothing created heaven and earth and all that is in them, and who still upholds and governs them by His eternal counsel and providence, is, for the sake of Christ His Son, my God and my Father. In Him I trust so completely as to have no doubt that He will provide me with all things necessary for body and soul, and will also turn to my good whatever adversity He sends me in this life of sorrow. He is able to do so as almighty God, and willing also as a faithful Father."
+      "a": "That the eternal Father of our Lord Jesus Christ, who out of nothing created heaven and earth and all that is in them, and who still upholds and governs them by His eternal counsel and providence, is, for the sake of Christ His Son, my God and my Father. In Him I trust so completely as to have no doubt that He will provide me with all things necessary for body and soul, and will also turn to my good whatever adversity He sends me in this life of sorrow. He is able to do so as almighty God, and willing also as a faithful Father.",
+      "topics": [
+        "Apostles' Creed",
+        "Creed"
+      ]
     },
     {
       "question": "27",
       "q": "What do you understand by the providence of God?",
-      "a": "God's providence is His almighty and ever present power, whereby, as with His hand, He still upholds heaven and earth and all creatures, and so governs them that leaf and blade, rain and drought, fruitful and barren years, food and drink, health and sickness, riches and poverty, indeed, all things, come not by chance but by His fatherly hand."
+      "a": "God's providence is His almighty and ever present power, whereby, as with His hand, He still upholds heaven and earth and all creatures, and so governs them that leaf and blade, rain and drought, fruitful and barren years, food and drink, health and sickness, riches and poverty, indeed, all things, come not by chance but by His fatherly hand.",
+      "topics": [
+        "Apostles' Creed",
+        "Creed"
+      ]
     },
     {
       "question": "28",
       "q": "What does it benefit us to know that God has created all things and still upholds them by His providence?",
-      "a": "We can be patient in adversity, thankful in prosperity, and with a view to the future we can have a firm confidence in our faithful God and Father that no creature shall separate us from His love; for all creatures are so completely in His hand that without His will they cannot so much as move."
+      "a": "We can be patient in adversity, thankful in prosperity, and with a view to the future we can have a firm confidence in our faithful God and Father that no creature shall separate us from His love; for all creatures are so completely in His hand that without His will they cannot so much as move.",
+      "topics": [
+        "Apostles' Creed",
+        "Creed"
+      ]
     },
     {
       "question": "29",
       "q": "Why is the Son of God called Jesus, that is, Saviour?",
-      "a": "Because He saves us from all our sins, and because salvation is not to be sought or found in anyone else."
+      "a": "Because He saves us from all our sins, and because salvation is not to be sought or found in anyone else.",
+      "topics": [
+        "Apostles' Creed",
+        "Creed"
+      ]
     },
     {
       "question": "30",
       "q": "Do those believe in the only Saviour Jesus who seek their salvation and well-being from saints, in themselves, or anywhere else?",
-      "a": "No. Though they boast of Him in words, they in fact deny the only Saviour Jesus. For one of two things must be true: either Jesus is not a complete Saviour, or those who by true faith accept this Saviour must find in Him all that is necessary for their salvation."
+      "a": "No. Though they boast of Him in words, they in fact deny the only Saviour Jesus. For one of two things must be true: either Jesus is not a complete Saviour, or those who by true faith accept this Saviour must find in Him all that is necessary for their salvation.",
+      "topics": [
+        "Apostles' Creed",
+        "Creed"
+      ]
     },
     {
       "question": "31",
       "q": "Why is He called Christ, that is, Anointed?",
-      "a": "Because He has been ordained by God the Father, and anointed with the Holy Spirit, to be our chief Prophet and Teacher, who has fully revealed to us the secret counsel and will of God concerning our redemption; our only High Priest, who by the one sacrifice of His body has redeemed us, and who continually intercedes for us before the Father; and our eternal King, who governs us by His Word and Spirit, and who defends and preserves us in the redemption obtained for us."
+      "a": "Because He has been ordained by God the Father, and anointed with the Holy Spirit, to be our chief Prophet and Teacher, who has fully revealed to us the secret counsel and will of God concerning our redemption; our only High Priest, who by the one sacrifice of His body has redeemed us, and who continually intercedes for us before the Father; and our eternal King, who governs us by His Word and Spirit, and who defends and preserves us in the redemption obtained for us.",
+      "topics": [
+        "Apostles' Creed",
+        "Creed"
+      ]
     },
     {
       "question": "32",
       "q": "Why are you called a Christian?",
-      "a": "Because I am a member of Christ by faith and thus share in His anointing, so that I may as prophet confess His Name, as priest present myself a living sacrifice of thankfulness to Him, and as king fight with a free and good conscience against sin and the devil in this life, and hereafter reign with Him eternally over all creatures."
+      "a": "Because I am a member of Christ by faith and thus share in His anointing, so that I may as prophet confess His Name, as priest present myself a living sacrifice of thankfulness to Him, and as king fight with a free and good conscience against sin and the devil in this life, and hereafter reign with Him eternally over all creatures.",
+      "topics": [
+        "Apostles' Creed",
+        "Creed"
+      ]
     },
     {
       "question": "33",
       "q": "Why is He called God's only begotten Son, since we also are children of God?",
-      "a": "Because Christ alone is the eternal, natural Son of God. We, however, are children of God by adoption, through grace, for Christ's sake."
+      "a": "Because Christ alone is the eternal, natural Son of God. We, however, are children of God by adoption, through grace, for Christ's sake.",
+      "topics": [
+        "Apostles' Creed",
+        "Creed"
+      ]
     },
     {
       "question": "34",
       "q": "Why do you call Him our Lord?",
-      "a": "Because He has ransomed us, body and soul, from all our sins, not with silver or gold but with His precious blood, and has freed us from all the power of the devil to make us His own possession."
+      "a": "Because He has ransomed us, body and soul, from all our sins, not with silver or gold but with His precious blood, and has freed us from all the power of the devil to make us His own possession.",
+      "topics": [
+        "Apostles' Creed",
+        "Creed"
+      ]
     },
     {
       "question": "35",
       "q": "What do you confess when you say: He was conceived by the Holy Spirit, born of the virgin Mary?",
-      "a": "The eternal Son of God, who is and remains true and eternal God, took upon Himself true human nature from the flesh and blood of the virgin Mary, through the working of the Holy Spirit. Thus He is also the true seed of David, and like His brothers in every respect, yet without sin."
+      "a": "The eternal Son of God, who is and remains true and eternal God, took upon Himself true human nature from the flesh and blood of the virgin Mary, through the working of the Holy Spirit. Thus He is also the true seed of David, and like His brothers in every respect, yet without sin.",
+      "topics": [
+        "Apostles' Creed",
+        "Creed"
+      ]
     },
     {
       "question": "36",
       "q": "What benefit do you receive from the holy conception and birth of Christ?",
-      "a": "He is our Mediator, and with His innocence and perfect holiness covers, in the sight of God, my sin, in which I was conceived and born."
+      "a": "He is our Mediator, and with His innocence and perfect holiness covers, in the sight of God, my sin, in which I was conceived and born.",
+      "topics": [
+        "Apostles' Creed",
+        "Creed"
+      ]
     },
     {
       "question": "37",
       "q": "What do you confess when you say that He suffered?",
-      "a": "During all the time He lived on earth, but especially at the end, Christ bore in body and soul the wrath of God against the sin of the whole human race. Thus, by His suffering, as the only atoning sacrifice, He has redeemed our body and soul from everlasting damnation, and obtained for us the grace of God, righteousness, and eternal life."
+      "a": "During all the time He lived on earth, but especially at the end, Christ bore in body and soul the wrath of God against the sin of the whole human race. Thus, by His suffering, as the only atoning sacrifice, He has redeemed our body and soul from everlasting damnation, and obtained for us the grace of God, righteousness, and eternal life.",
+      "topics": [
+        "Apostles' Creed",
+        "Creed"
+      ]
     },
     {
       "question": "38",
       "q": "Why did He suffer under Pontius Pilate as judge?",
-      "a": "Though innocent, Christ was condemned by an earthly judge, and so He freed us from the severe judgment of God that was to fall on us."
+      "a": "Though innocent, Christ was condemned by an earthly judge, and so He freed us from the severe judgment of God that was to fall on us.",
+      "topics": [
+        "Apostles' Creed",
+        "Creed"
+      ]
     },
     {
       "question": "39",
       "q": "Does it have a special meaning that Christ was crucified and did not die in a different way?",
-      "a": "Yes. Thereby I am assured that He took upon Himself the curse which lay on me, for a crucified one was cursed by God."
+      "a": "Yes. Thereby I am assured that He took upon Himself the curse which lay on me, for a crucified one was cursed by God.",
+      "topics": [
+        "Apostles' Creed",
+        "Creed"
+      ]
     },
     {
       "question": "40",
       "q": "Why was it necessary for Christ to humble Himself even unto death?",
-      "a": "Because of the justice and truth of God satisfaction for our sins could be made in no other way than by the death of the Son of God."
+      "a": "Because of the justice and truth of God satisfaction for our sins could be made in no other way than by the death of the Son of God.",
+      "topics": [
+        "Apostles' Creed",
+        "Creed"
+      ]
     },
     {
       "question": "41",
       "q": "Why was he buried?",
-      "a": "His burial testified that He had really died."
+      "a": "His burial testified that He had really died.",
+      "topics": [
+        "Apostles' Creed",
+        "Creed"
+      ]
     },
     {
       "question": "42",
       "q": "Since Christ has died for us, why do we still have to die?",
-      "a": "Our death is not a payment for our sins, but it puts an end to sin and is an entrance into eternal life."
+      "a": "Our death is not a payment for our sins, but it puts an end to sin and is an entrance into eternal life.",
+      "topics": [
+        "Apostles' Creed",
+        "Creed"
+      ]
     },
     {
       "question": "43",
       "q": "What further benefit do we receive from Christ's sacrifice and death on the cross?",
-      "a": "Through Christ's death our old nature is crucified, put to death, and buried with Him, so that the evil desires of the flesh may no longer reign in us, but that we may offer ourselves to Him as a sacrifice of thankfulness."
+      "a": "Through Christ's death our old nature is crucified, put to death, and buried with Him, so that the evil desires of the flesh may no longer reign in us, but that we may offer ourselves to Him as a sacrifice of thankfulness.",
+      "topics": [
+        "Apostles' Creed",
+        "Creed"
+      ]
     },
     {
       "question": "44",
       "q": "Why is there added: He descended into hell?",
-      "a": "In my greatest sorrows and temptations I may be assured and comforted that my Lord Jesus Christ, by His unspeakable anguish, pain, terror, and agony, which He endured throughout all His sufferings but especially on the cross, has delivered me from the anguish and torment of hell."
+      "a": "In my greatest sorrows and temptations I may be assured and comforted that my Lord Jesus Christ, by His unspeakable anguish, pain, terror, and agony, which He endured throughout all His sufferings but especially on the cross, has delivered me from the anguish and torment of hell.",
+      "topics": [
+        "Apostles' Creed",
+        "Creed"
+      ]
     },
     {
       "question": "45",
       "q": "How does Christ's resurrection benefit us?",
-      "a": "First, by His resurrection He has overcome death, so that He could make us share in the righteousness which He had obtained for us by His death. Second, by His power we too are raised up to a new life. Third, Christ's resurrection is to us a sure pledge of our glorious resurrection."
+      "a": "First, by His resurrection He has overcome death, so that He could make us share in the righteousness which He had obtained for us by His death. Second, by His power we too are raised up to a new life. Third, Christ's resurrection is to us a sure pledge of our glorious resurrection.",
+      "topics": [
+        "Apostles' Creed",
+        "Creed"
+      ]
     },
     {
       "question": "46",
       "q": "What do you confess when you say, He ascended into heaven?",
-      "a": "That Christ, before the eyes of His disciples, was taken up from the earth into heaven, and that He is there for our benefit until He comes again to judge the living and the dead."
+      "a": "That Christ, before the eyes of His disciples, was taken up from the earth into heaven, and that He is there for our benefit until He comes again to judge the living and the dead.",
+      "topics": [
+        "Apostles' Creed",
+        "Creed"
+      ]
     },
     {
       "question": "47",
       "q": "Is Christ, then, not with us until the end of the world, as He has promised us?",
-      "a": "Christ is true man and true God. With respect to His human nature He is no longer on earth, but with respect to His divinity, majesty, grace, and Spirit He is never absent from us."
+      "a": "Christ is true man and true God. With respect to His human nature He is no longer on earth, but with respect to His divinity, majesty, grace, and Spirit He is never absent from us.",
+      "topics": [
+        "Apostles' Creed",
+        "Creed"
+      ]
     },
     {
       "question": "48",
       "q": "But are the two natures in Christ not separated from each other if His human nature is not present wherever His divinity is?",
-      "a": "Not at all, for His divinity has no limits and is present everywhere. So it must follow that His divinity is indeed beyond the human nature which He has taken on and nevertheless is within this human nature and remains personally united with it."
+      "a": "Not at all, for His divinity has no limits and is present everywhere. So it must follow that His divinity is indeed beyond the human nature which He has taken on and nevertheless is within this human nature and remains personally united with it.",
+      "topics": [
+        "Apostles' Creed",
+        "Creed"
+      ]
     },
     {
       "question": "49",
       "q": "How does Christ's ascension into heaven benefit us?",
-      "a": "First, He is our Advocate in heaven before His Father. Second, we have our flesh in heaven as a sure pledge that He, our Head, will also take us, His members, up to Himself. Third, He sends us His Spirit as a counter-pledge, by whose power we seek the things that are above, where Christ is, seated at the right hand of God, and not the things that are on earth."
+      "a": "First, He is our Advocate in heaven before His Father. Second, we have our flesh in heaven as a sure pledge that He, our Head, will also take us, His members, up to Himself. Third, He sends us His Spirit as a counter-pledge, by whose power we seek the things that are above, where Christ is, seated at the right hand of God, and not the things that are on earth.",
+      "topics": [
+        "Apostles' Creed",
+        "Creed"
+      ]
     },
     {
       "question": "50",
       "q": "Why is it added, And sits at the right hand of God?",
-      "a": "Christ ascended into heaven to manifest Himself there as Head of His Church, through whom the Father governs all things."
+      "a": "Christ ascended into heaven to manifest Himself there as Head of His Church, through whom the Father governs all things.",
+      "topics": [
+        "Apostles' Creed",
+        "Creed"
+      ]
     },
     {
       "question": "51",
       "q": "How does the glory of Christ, our Head, benefit us?",
-      "a": "First, by His Holy Spirit He pours out heavenly gifts upon us, His members. Second, by His power He defends and preserves us against all enemies."
+      "a": "First, by His Holy Spirit He pours out heavenly gifts upon us, His members. Second, by His power He defends and preserves us against all enemies.",
+      "topics": [
+        "Apostles' Creed",
+        "Creed"
+      ]
     },
     {
       "question": "52",
       "q": "What comfort is it to you that Christ will come to judge the living and the dead?",
-      "a": "In all my sorrow and persecution I lift up my head and eagerly await as judge from heaven the very same person who before has submitted Himself to the judgment of God for my sake, and has removed all the curse from me. He will cast all His and my enemies into everlasting condemnation, but He will take me and all His chosen ones to Himself into heavenly joy and glory."
+      "a": "In all my sorrow and persecution I lift up my head and eagerly await as judge from heaven the very same person who before has submitted Himself to the judgment of God for my sake, and has removed all the curse from me. He will cast all His and my enemies into everlasting condemnation, but He will take me and all His chosen ones to Himself into heavenly joy and glory.",
+      "topics": [
+        "Apostles' Creed",
+        "Creed"
+      ]
     },
     {
       "question": "53",
       "q": "What do you believe concerning the Holy Spirit?",
-      "a": "First, He is, together with the Father and the Son, true and eternal God. Second, He is also given to me, to make me by true faith share in Christ and all His benefits, to comfort me, and to remain with me forever."
+      "a": "First, He is, together with the Father and the Son, true and eternal God. Second, He is also given to me, to make me by true faith share in Christ and all His benefits, to comfort me, and to remain with me forever.",
+      "topics": [
+        "Apostles' Creed",
+        "Creed"
+      ]
     },
     {
       "question": "54",
       "q": "What do you believe concerning the holy catholic Christian church?",
-      "a": "I believe that the Son of God, out of the whole human race, from the beginning of the world to its end, gathers, defends, and preserves for Himself, by His Spirit and Word, in the unity of the true faith, a church chosen to everlasting life. And I believe that I am and forever shall remain a living member of it."
+      "a": "I believe that the Son of God, out of the whole human race, from the beginning of the world to its end, gathers, defends, and preserves for Himself, by His Spirit and Word, in the unity of the true faith, a church chosen to everlasting life. And I believe that I am and forever shall remain a living member of it.",
+      "topics": [
+        "Apostles' Creed",
+        "Creed"
+      ]
     },
     {
       "question": "55",
       "q": "What do you understand by the communion of saints?",
-      "a": "First, that believers, all and everyone, as members of Christ have communion with Him and share in all His treasures and gifts. Second, that everyone is duty-bound to use his gifts readily and cheerfully for the benefit and well-being of the other members."
+      "a": "First, that believers, all and everyone, as members of Christ have communion with Him and share in all His treasures and gifts. Second, that everyone is duty-bound to use his gifts readily and cheerfully for the benefit and well-being of the other members.",
+      "topics": [
+        "Apostles' Creed",
+        "Creed"
+      ]
     },
     {
       "question": "56",
       "q": "What do you believe concerning the forgiveness of sins?",
-      "a": "I believe that God, because of Christ's satisfaction, will no more remember my sins, nor my sinful nature, against which I have to struggle all my life, but He will graciously grant me the righteousness of Christ, that I may never come into condemnation."
+      "a": "I believe that God, because of Christ's satisfaction, will no more remember my sins, nor my sinful nature, against which I have to struggle all my life, but He will graciously grant me the righteousness of Christ, that I may never come into condemnation.",
+      "topics": [
+        "Apostles' Creed",
+        "Creed"
+      ]
     },
     {
       "question": "57",
       "q": "What comfort does the resurrection of the body offer you?",
-      "a": "Not only shall my soul after this life immediately be taken up to Christ, my Head, but also this my flesh, raised by the power of Christ, shall be reunited with my soul and made like Christ's glorious body."
+      "a": "Not only shall my soul after this life immediately be taken up to Christ, my Head, but also this my flesh, raised by the power of Christ, shall be reunited with my soul and made like Christ's glorious body.",
+      "topics": [
+        "Apostles' Creed",
+        "Creed"
+      ]
     },
     {
       "question": "58",
       "q": "What comfort do you receive from the article about the life everlasting?",
-      "a": "Since I now already feel in my heart the beginning of eternal joy, I shall after this life possess perfect blessedness, such as no eye has seen, nor ear heard, nor the heart of man conceived– a blessedness in which to praise God forever."
+      "a": "Since I now already feel in my heart the beginning of eternal joy, I shall after this life possess perfect blessedness, such as no eye has seen, nor ear heard, nor the heart of man conceived– a blessedness in which to praise God forever.",
+      "topics": [
+        "Apostles' Creed",
+        "Creed"
+      ]
     },
     {
       "question": "59",
@@ -649,5 +798,31 @@
       "a": "Amen means: It is true and certain. For God has much more certainly heard my prayer than I feel in my heart that I desire this of Him."
     }
   ],
-  "topics": ["comfort", "salvation", "sin", "misery", "deliverance", "gratitude", "Christ", "faith", "law", "commandments", "creation", "fall", "redemption", "Trinity", "Holy Spirit", "church", "sacraments", "baptism", "Lord's Supper", "repentance", "good works", "prayer", "God's providence", "justification", "sanctification"]
+  "topics": [
+    "comfort",
+    "salvation",
+    "sin",
+    "misery",
+    "deliverance",
+    "gratitude",
+    "Christ",
+    "faith",
+    "law",
+    "commandments",
+    "creation",
+    "fall",
+    "redemption",
+    "Trinity",
+    "Holy Spirit",
+    "church",
+    "sacraments",
+    "baptism",
+    "Lord's Supper",
+    "repentance",
+    "good works",
+    "prayer",
+    "God's providence",
+    "justification",
+    "sanctification"
+  ]
 }

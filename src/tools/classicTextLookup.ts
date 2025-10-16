@@ -43,12 +43,21 @@ export const classicTextLookupHandler: ToolHandler = {
 - **Post-Reformation:** Edwards, Wesley, Spurgeon, Whitefield, Chesterton
 - **Plus:** Devotional classics, apologetics, church history, commentaries
 
+**COMMENTARIES - Auto-Routing System:**
+When user asks for "[Author]'s commentary on [passage]", use the generic author identifier + query parameter to enable auto-routing to the correct volume:
+- Calvin's commentaries: { work: "calvin/commentaries", query: "Isaiah 53" } → auto-routes to correct Isaiah volume
+- MacLaren's expositions: { work: "maclaren/expositions", query: "Psalm 23" } → auto-routes to Psalms volume
+- Barnes' Notes (NT): { work: "barnes/notes", query: "John 3:16" } → verse-by-verse commentary (complete NT)
+- Spurgeon on Psalms: { work: "spurgeon/treasury", query: "Psalm 23" } → Treasury of David (image-only, provides CCEL link)
+This works for any passage - the system automatically finds the right commentary volume internally.
+
 **How to use:**
 1. **Search any topic across all documents:** { query: "justification" } → searches local docs + CCEL
 2. **Lookup specific document:** { work: "westminster-confession", query: "scripture" } → returns matching sections
 3. **Browse document structure:** { work: "philaret-catechism", browseSections: true } → lists all sections
 4. **Discover available works:** { listWorks: true } → shows CCEL catalog organized by era
 5. **Search within CCEL work:** { work: "calvin/institutes", query: "Book 3 Chapter 21" } → retrieves specific content
+6. **Commentary lookup:** { work: "calvin/commentaries", query: "Romans 8:28" } → auto-routes to correct volume
 
 **NO section IDs needed - just use natural language!**
 
@@ -57,6 +66,9 @@ export const classicTextLookupHandler: ToolHandler = {
 - work: "nicene-creed" → Get full Nicene Creed from local storage
 - work: "augsburg-confession", query: "justification" → Search Augsburg Confession
 - work: "calvin/institutes", query: "Book 3 Chapter 21" → Retrieve from CCEL
+- work: "calvin/commentaries", query: "Isaiah 53" → Auto-route to Calvin's Isaiah commentary
+- work: "barnes/notes", query: "John 3:16" → Barnes' Notes on John 3:16 (verse-by-verse)
+- work: "spurgeon/treasury", query: "Psalm 23" → Spurgeon's Treasury (image-only, returns CCEL link)
 - listWorks: true → See 40+ CCEL works organized by era`,
 
   inputSchema: {
@@ -416,9 +428,49 @@ export const classicTextLookupHandler: ToolHandler = {
         };
       }
 
+      // Import commentary routing utilities
+      const { findCommentaryVolume, isMetaCommentary } = await import('../utils/ccelCommentaryMapper.js');
+
+      // Check if this is a meta-commentary and route to correct volume
+      let actualWork = input.work;
+      let routedVolume = null;
+
+      if (isMetaCommentary(input.work)) {
+        if (input.query) {
+          const volume = findCommentaryVolume(input.work, input.query);
+          if (volume) {
+            console.error(`[Tool] Auto-routing: ${input.work} → ${volume.workId}`);
+            actualWork = volume.workId;
+            routedVolume = volume;
+
+            // Check if this is an image-only work
+            if (volume.imageOnly) {
+              const resolution = await resolver.resolve(actualWork, input.query);
+              const ccelUrl = `https://ccel.org/ccel/${actualWork}/${resolution.sectionId}`;
+
+              return {
+                content: [{
+                  type: 'text',
+                  text: formatMarkdown({
+                    title: `${volume.title}`,
+                    content: `**${input.query}**\n\nThis commentary is available on CCEL as scanned page images only.\n\n**View on CCEL:** ${ccelUrl}\n\nNote: Text extraction is not available for this work. You can read the scanned pages directly on CCEL's website.`,
+                    footer: 'Spurgeon\'s Treasury of David is preserved as historical scanned images.'
+                  })
+                }],
+                isError: false
+              };
+            }
+          }
+        } else {
+          // For meta-commentary without query, we can't route to a specific volume
+          // Just use the meta-work ID (which will likely fail, but that's expected)
+          actualWork = input.work;
+        }
+      }
+
       // If no query provided, show available sections for this work
       if (!input.query) {
-        const sections = await resolver.listSections(input.work);
+        const sections = await resolver.listSections(actualWork);
         const formatted = sections.slice(0, 15).map(s => {
           const bookInfo = s.book ? `Book ${s.book}` : '';
           const chapterInfo = s.chapter ? `Chapter ${s.chapter}` : '';
@@ -431,21 +483,21 @@ export const classicTextLookupHandler: ToolHandler = {
             {
               type: 'text',
               text: formatMarkdown({
-                title: `Available Sections in ${input.work}`,
+                title: `Available Sections in ${actualWork}`,
                 content: `Please provide a \`query\` to specify which section you want.\n\nFirst 15 sections:\n\n${formatted}`,
-                footer: 'Example: { work: "' + input.work + '", query: "Book 1 Chapter 1" }'
+                footer: 'Example: { work: "' + actualWork + '", query: "Book 1 Chapter 1" }'
               })
             }
           ]
         };
       }
 
-      // Resolve query to section ID
-      const resolution = await resolver.resolve(input.work, input.query);
+      // Resolve query to section ID (using the routed work ID)
+      const resolution = await resolver.resolve(actualWork, input.query);
 
       // Fetch the content
       const result = await service.getClassicText({
-        work: input.work,
+        work: actualWork,
         section: resolution.sectionId,
         query: input.query
       });

@@ -9,7 +9,7 @@
 
 import { CCELApiAdapter, type CCELScriptureOptions, type CCELWorkSection } from '../adapters/ccelApi.js';
 import { CCELCatalogScraper, type CatalogEntry } from '../adapters/ccelCatalogScraper.js';
-import { findCalvinCommentaryVolume, isCalvinMetaCommentary } from '../utils/ccelCommentaryMapper.js';
+import { findCommentaryVolume, isMetaCommentary, findCalvinCommentaryVolume, isCalvinMetaCommentary } from '../utils/ccelCommentaryMapper.js';
 import { Cache } from '../utils/cache.js';
 
 export interface ClassicTextRequest {
@@ -92,28 +92,32 @@ export class CCELService {
   async getClassicText(request: ClassicTextRequest): Promise<ClassicTextResponse> {
     let { work, section, query } = request;
 
-    // Intelligent routing: Detect Calvin meta-commentary and suggest correct volume
-    if (isCalvinMetaCommentary(work) && query) {
-      const volume = findCalvinCommentaryVolume(query);
+    // Intelligent routing: Detect meta-commentary and auto-route to correct volume
+    if (isMetaCommentary(work) && query) {
+      const volume = findCommentaryVolume(work, query);
       if (volume) {
         // Auto-route to the correct volume
-        console.log(`Routing ${work} + "${query}" → ${volume.workId}`);
+        console.error(`Routing ${work} + "${query}" → ${volume.workId}`);
         work = volume.workId;
+        // Don't return here - continue to section resolution below
       } else {
+        // Couldn't find volume - provide helpful error
         throw new Error(
           `"${work}" is an index page, not a retrievable work.\n\n` +
-          `To access Calvin's commentaries, use specific volumes like:\n` +
-          `- calvin/calcom43 (Timothy, Titus, Philemon)\n` +
-          `- calvin/calcom38 (Romans)\n` +
-          `- calvin/calcom08 (Psalms 1-35)\n\n` +
+          `To access commentaries, use specific volumes or try:\n` +
+          `- { work: "calvin", query: "Isaiah 53" }\n` +
+          `- { work: "maclaren", query: "Isaiah 53" }\n` +
+          `- { work: "expositors-bible", query: "Isaiah 53" }\n\n` +
           `Your query: "${query}"\n` +
-          `Couldn't determine the specific volume. Please try browsing Calvin's works with: { query: "calvin" }`
+          `Couldn't determine the specific volume. Try browsing with: { listWorks: true }`
         );
       }
     }
 
+    // If no section provided but query exists, throw an error
+    // (Section resolution should happen in the tool layer before calling this service)
     if (!section) {
-      throw new Error('Section identifier is required. Example: augustine/confessions -> confessions.ii');
+      throw new Error('Section identifier is required. The tool layer should resolve queries to section IDs before calling this service.');
     }
 
     const cacheKey = `ccel:work:${work}:${section}`;

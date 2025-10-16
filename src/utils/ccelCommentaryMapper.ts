@@ -1,19 +1,34 @@
 /**
  * CCEL Commentary Volume Mapper
  *
- * Maps Bible books to specific Calvin commentary volumes (calcom##).
- * Calvin's "Commentaries—Complete" (calvin/commentaries) is just an index.
- * The actual commentaries are in individual volumes (calcom01-calcom45).
+ * Generic mapper for all CCEL commentary sets (Calvin, MacLaren, Expositor's Bible, etc.)
+ * Handles automatic volume routing based on Bible book queries.
+ *
+ * This mapper uses the commentary registry to support:
+ * - Single-author sets (Calvin, MacLaren)
+ * - Multi-author sets (Expositor's Bible)
+ * - Meta-work detection and routing
  */
+
+import {
+  CommentaryVolume,
+  CommentarySeries,
+  ALL_COMMENTARY_SERIES,
+  getAllMetaWorkIds,
+  findSeries
+} from './commentaryRegistry.js';
 
 export interface CommentaryVolumeMapping {
   workId: string;
   title: string;
   books: string[];  // Bible books covered
+  author?: string;  // Author name (for multi-author sets)
+  imageOnly?: boolean;  // Flag for scanned/image-only works
 }
 
 /**
- * Calvin's commentary volumes mapping
+ * @deprecated Use commentaryRegistry.ts instead
+ * Kept for backward compatibility
  */
 export const CALVIN_COMMENTARY_VOLUMES: CommentaryVolumeMapping[] = [
   { workId: 'calvin/calcom01', title: 'Commentary on Genesis - Volume 1', books: ['Genesis 1-23'] },
@@ -64,32 +79,74 @@ export const CALVIN_COMMENTARY_VOLUMES: CommentaryVolumeMapping[] = [
 ];
 
 /**
- * Find the correct Calvin commentary volume for a Bible book or reference
+ * Find the correct commentary volume for a Bible book or reference
  *
- * @param query - Bible book name or reference (e.g., "1 Timothy", "Genesis 1:1", "Romans")
+ * Generic function supporting all CCEL commentary sets:
+ * - Single-author: Calvin, MacLaren
+ * - Multi-author: Expositor's Bible
+ *
+ * @param authorOrSeries - Author name, series name, or meta-work ID (e.g., "calvin", "maclaren", "expositors-bible")
+ * @param query - Bible book name or reference (e.g., "1 Timothy 2:14", "Isaiah 53", "Psalms 23")
  * @returns Matching commentary volume or null
  *
  * @example
  * ```typescript
- * findCalvinCommentaryVolume("1 Timothy 2:14") // Returns calvin/calcom43
- * findCalvinCommentaryVolume("Genesis")        // Returns calvin/calcom01
- * findCalvinCommentaryVolume("Psalms 23")      // Returns calvin/calcom08
+ * findCommentaryVolume("calvin", "Isaiah 53")          // Returns calvin/calcom16
+ * findCommentaryVolume("maclaren", "Isaiah 53")        // Returns maclaren/isa_jer
+ * findCommentaryVolume("expositors-bible", "Isaiah 53") // Returns smith.g/expositorsisaiah2
+ * findCommentaryVolume("calvin/commentaries", "Romans") // Returns calvin/calcom38
  * ```
  */
-export function findCalvinCommentaryVolume(query: string): CommentaryVolumeMapping | null {
+export function findCommentaryVolume(authorOrSeries: string, query: string): CommentaryVolumeMapping | null {
   const queryLower = query.toLowerCase().trim();
 
-  // Try to extract Bible book from the query
+  // Try to extract Bible book and chapter from the query
   const book = extractBibleBook(queryLower);
   if (!book) {
     return null;
   }
 
-  // Find matching volume
+  // Extract chapter number if present (e.g., "Isaiah 53" → 53)
+  const chapterMatch = queryLower.match(/(\d+):?\d*/);
+  const chapter = chapterMatch ? parseInt(chapterMatch[1]) : null;
+
+  // Find the commentary series
+  const series = findSeries(authorOrSeries);
+  if (!series) {
+    return null;
+  }
+
+  // Search through volumes in this series
   const bookLower = book.toLowerCase();
 
-  for (const volume of CALVIN_COMMENTARY_VOLUMES) {
-    // Check if any book in this volume matches
+  // First pass: Try to find exact chapter range match (highest priority)
+  if (chapter !== null) {
+    for (const volume of series.volumes) {
+      for (const b of volume.books) {
+        const volumeBook = b.toLowerCase();
+        const rangeMatch = volumeBook.match(/(\w+)\s+(\d+)-(\d+)/);
+
+        if (rangeMatch) {
+          const rangeBook = rangeMatch[1];
+          const startChapter = parseInt(rangeMatch[2]);
+          const endChapter = parseInt(rangeMatch[3]);
+
+          // Check if book matches and chapter is in range
+          if (bookLower === rangeBook && chapter >= startChapter && chapter <= endChapter) {
+            return {
+              workId: volume.workId,
+              title: volume.title,
+              books: volume.books,
+              author: volume.author
+            };
+          }
+        }
+      }
+    }
+  }
+
+  // Second pass: Try other matching strategies
+  for (const volume of series.volumes) {
     const matches = volume.books.some(b => {
       const volumeBook = b.toLowerCase();
 
@@ -113,11 +170,25 @@ export function findCalvinCommentaryVolume(query: string): CommentaryVolumeMappi
     });
 
     if (matches) {
-      return volume;
+      return {
+        workId: volume.workId,
+        title: volume.title,
+        books: volume.books,
+        author: volume.author,
+        imageOnly: volume.imageOnly
+      };
     }
   }
 
   return null;
+}
+
+/**
+ * @deprecated Use findCommentaryVolume() instead
+ * Kept for backward compatibility
+ */
+export function findCalvinCommentaryVolume(query: string): CommentaryVolumeMapping | null {
+  return findCommentaryVolume('calvin', query);
 }
 
 /**
@@ -147,7 +218,25 @@ function extractBibleBook(query: string): string | null {
 
 /**
  * Check if a work ID is a meta-work that should be routed to a specific volume
+ *
+ * Meta-works are index pages or generic identifiers that don't point to actual content.
+ * Examples: "calvin/commentaries", "maclaren/expositions", "expositors-bible"
+ *
+ * @param workId - Work identifier to check
+ * @returns True if this is a meta-work requiring routing
+ */
+export function isMetaCommentary(workId: string): boolean {
+  const workIdLower = workId.toLowerCase();
+
+  // Check against all registered meta-work IDs
+  const allMetaIds = getAllMetaWorkIds();
+  return allMetaIds.some(metaId => metaId.toLowerCase() === workIdLower);
+}
+
+/**
+ * @deprecated Use isMetaCommentary() instead
+ * Kept for backward compatibility
  */
 export function isCalvinMetaCommentary(workId: string): boolean {
-  return workId === 'calvin/commentaries' || workId === 'calvin/calcom';
+  return isMetaCommentary(workId);
 }

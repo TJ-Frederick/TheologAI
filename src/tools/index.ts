@@ -5,10 +5,12 @@ import { bibleLookupHandler } from './bibleLookup.js';
 import { commentaryLookupHandler } from './commentaryLookup.js';
 import { classicTextLookupHandler } from './classicTextLookup.js';
 import { bibleCrossReferencesHandler } from './bibleCrossReferences.js';
+import { parallelPassagesHandler } from './parallelPassages.js';
 
 export const tools: ToolHandler[] = [
   bibleLookupHandler,
   bibleCrossReferencesHandler,
+  parallelPassagesHandler,
   // historicalSearchHandler,  // DEPRECATED: Use classicTextLookupHandler instead (searches local docs first, then CCEL)
   commentaryLookupHandler,
   classicTextLookupHandler

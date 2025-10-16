@@ -17,7 +17,7 @@ export interface CrossReferenceLookupParams {
 
 export const bibleCrossReferencesHandler: ToolHandler = {
   name: 'bible_cross_references',
-  description: 'Find related Bible passages and cross-references for a given verse or passage. Returns the most relevant cross-references based on community rankings (vote counts are used internally but not displayed). Use this tool to help users understand passages by showing related Scripture that provides context, clarification, or parallel teachings. Default: returns top 5 most relevant cross-references. Data from OpenBible.info (CC-BY).',
+  description: 'Find RELATED verses and THEMATIC connections for deeper biblical context. Shows verses that share themes, concepts, or provide background understanding. USE CASES: Finding verses on similar themes (e.g., "verses about faith like Hebrews 11"), discovering contextual background for better understanding, exploring how a concept appears throughout Scripture. IMPORTANT: For finding DIRECT QUOTATIONS or CITATIONS (e.g., "NT quotations of Psalm 22"), use parallel_passages tool instead - it\'s specifically designed for that purpose and provides more accurate results. Requires specific verse reference (e.g., "John 3:16", not "John 3"). Data from OpenBible.info (CC-BY).',
   inputSchema: {
     type: 'object',
     properties: {
@@ -59,6 +59,9 @@ export const bibleCrossReferencesHandler: ToolHandler = {
         translation = 'ESV'
       } = params;
 
+      // Check if reference is chapter-only (e.g., "Psalm 22" without verse)
+      const isChapterOnly = /\d+\s*$/.test(reference.trim());
+
       // Get cross-references
       const result = crossRefService.getCrossReferences(reference, {
         maxResults,
@@ -66,7 +69,14 @@ export const bibleCrossReferencesHandler: ToolHandler = {
       });
 
       if (result.total === 0) {
-        const message = `No cross-references found for ${reference}.`;
+        let message = `No cross-references found for ${reference}.`;
+
+        // Provide helpful guidance for chapter-only searches
+        if (isChapterOnly) {
+          message += `\n\nThe cross-reference database requires a specific verse number. Please specify a particular verse within the chapter (e.g., "${reference}:1").`;
+          message += `\n\nTip: Use the parallel_passages tool for broader searches, or try a specific verse with this tool.`;
+        }
+
         return formatToolResponse(message);
       }
 

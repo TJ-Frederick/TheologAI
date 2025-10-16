@@ -92,3 +92,43 @@ export interface ToolHandler {
   inputSchema: any;
   handler: (params: any) => Promise<any>;
 }
+
+// Parallel Passages Types
+export interface ParallelPassageLookupParams {
+  reference: string;
+  mode?: 'auto' | 'synoptic' | 'quotation' | 'thematic';
+  includeText?: boolean;
+  translation?: string;
+  showDifferences?: boolean;
+  useCrossReferences?: boolean;
+  maxParallels?: number;
+}
+
+export interface ParallelPassage {
+  reference: string;
+  text?: string;
+  translation?: string;
+  relationship: 'synoptic' | 'quotation' | 'allusion' | 'thematic';
+  confidence: number;
+  uniqueElements?: string[];
+  notes?: string;
+}
+
+export interface ParallelPassageAnalysis {
+  commonElements: string[];
+  variations: Record<string, string[]>;
+  chronology?: string[];
+}
+
+export interface ParallelPassageResult {
+  primary: {
+    reference: string;
+    text?: string;
+    translation?: string;
+    context?: string;
+  };
+  parallels: ParallelPassage[];
+  analysis?: ParallelPassageAnalysis;
+  citation: Citation;
+  suggestedWorkflow?: string;
+}

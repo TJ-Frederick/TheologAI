@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "tsc && mkdir -p dist/data && cp src/data/parallel-passages.json dist/data/",
     "start": "node dist/index.js",
     "clean": "rm -rf dist",
     "test": "npm run build && npm run test:helloao-bible",

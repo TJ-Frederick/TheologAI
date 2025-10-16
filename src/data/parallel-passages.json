@@ -1,0 +1,256 @@
+{
+  "description": "Curated database of parallel passages across Scripture. High-confidence parallels include synoptic Gospel accounts, direct OT quotations in NT, and well-established thematic parallels. Easily extensible as new parallels are identified.",
+  "version": "1.0",
+  "parallels": {
+    "matthew_1_18-25": {
+      "event": "Birth of Jesus - Annunciation to Joseph",
+      "relationship": "synoptic",
+      "confidence": 95,
+      "parallels": ["luke_1_26-38"],
+      "notes": "Matthew focuses on Joseph's perspective; Luke on Mary's perspective",
+      "uniqueDetails": {
+        "matthew": ["Joseph's dream", "Angel of the Lord", "Son of David genealogy", "Emmanuel prophecy (Isaiah 7:14)"],
+        "luke": ["Gabriel's announcement", "Mary's response", "Elizabeth connection", "Magnificat"]
+      }
+    },
+    "matthew_2_1-12": {
+      "event": "Visit of the Magi",
+      "relationship": "synoptic",
+      "confidence": 100,
+      "parallels": [],
+      "notes": "Unique to Matthew - no synoptic parallel",
+      "uniqueDetails": {
+        "matthew": ["Magi from the east", "Star of Bethlehem", "Herod's inquiry", "Gifts: gold, frankincense, myrrh"]
+      }
+    },
+    "matthew_3_13-17": {
+      "event": "Baptism of Jesus",
+      "relationship": "synoptic",
+      "confidence": 95,
+      "parallels": ["mark_1_9-11", "luke_3_21-22", "john_1_29-34"],
+      "notes": "All four Gospels attest Jesus' baptism with varying details",
+      "uniqueDetails": {
+        "matthew": ["Jesus came from Galilee", "John's initial reluctance"],
+        "mark": ["Most concise account", "Heavens torn open"],
+        "luke": ["Jesus was praying", "Holy Spirit descended in bodily form"],
+        "john": ["John's testimony focus", "Lamb of God declaration", "Spirit descending like a dove"]
+      }
+    },
+    "matthew_4_1-11": {
+      "event": "Temptation of Jesus",
+      "relationship": "synoptic",
+      "confidence": 95,
+      "parallels": ["mark_1_12-13", "luke_4_1-13"],
+      "notes": "Matthew and Luke provide detailed dialogue; Mark gives brief summary",
+      "uniqueDetails": {
+        "matthew": ["Three temptations detailed", "Order: stones, temple, kingdoms"],
+        "mark": ["Brief summary", "With wild animals", "Angels ministered"],
+        "luke": ["Three temptations detailed", "Order: stones, kingdoms, temple"]
+      }
+    },
+    "matthew_4_18-22": {
+      "event": "Calling of First Disciples",
+      "relationship": "synoptic",
+      "confidence": 90,
+      "parallels": ["mark_1_16-20", "luke_5_1-11", "john_1_35-42"],
+      "notes": "Synoptics show calling by Sea of Galilee; John shows earlier encounter in Judea",
+      "uniqueDetails": {
+        "matthew": ["Simple call narrative", "Follow me, fishers of men"],
+        "mark": ["Nearly identical to Matthew"],
+        "luke": ["Miraculous catch of fish", "Peter's confession of sinfulness"],
+        "john": ["Andrew and another disciple", "Lamb of God", "Earlier chronology"]
+      }
+    },
+    "matthew_5_1-12": {
+      "event": "Beatitudes (Sermon on the Mount/Plain)",
+      "relationship": "synoptic",
+      "confidence": 85,
+      "parallels": ["luke_6_20-26"],
+      "notes": "Matthew has nine beatitudes on mountain; Luke has four beatitudes and four woes on plain",
+      "uniqueDetails": {
+        "matthew": ["On a mountain", "Nine beatitudes", "Poor in spirit", "Theirs is the kingdom"],
+        "luke": ["On a level place", "Four beatitudes + four woes", "Simply 'poor'", "Direct address: 'Blessed are you'"]
+      }
+    },
+    "matthew_14_13-21": {
+      "event": "Feeding of the 5000",
+      "relationship": "synoptic",
+      "confidence": 95,
+      "parallels": ["mark_6_30-44", "luke_9_10-17", "john_6_1-15"],
+      "notes": "Only miracle recorded in all four Gospels. Each provides unique details.",
+      "uniqueDetails": {
+        "matthew": ["Withdrew by boat", "Compassion on crowds", "Evening mentioned"],
+        "mark": ["Green grass detail", "Groups of 50 and 100", "200 denarii mentioned"],
+        "luke": ["Near Bethsaida", "Kingdom of God teaching", "Twelve baskets"],
+        "john": ["Before Passover", "Philip tested", "Andrew identifies boy with loaves", "People wanted to make him king"]
+      }
+    },
+    "matthew_16_13-20": {
+      "event": "Peter's Confession at Caesarea Philippi",
+      "relationship": "synoptic",
+      "confidence": 95,
+      "parallels": ["mark_8_27-30", "luke_9_18-21"],
+      "notes": "Pivotal moment in Jesus' ministry. Matthew includes 'on this rock' statement.",
+      "uniqueDetails": {
+        "matthew": ["You are the Christ, Son of the living God", "Blessed are you Simon Bar-Jonah", "On this rock I will build my church", "Keys of the kingdom"],
+        "mark": ["You are the Christ", "Sternly charged them"],
+        "luke": ["The Christ of God", "While Jesus was praying alone"]
+      }
+    },
+    "matthew_17_1-13": {
+      "event": "Transfiguration",
+      "relationship": "synoptic",
+      "confidence": 95,
+      "parallels": ["mark_9_2-13", "luke_9_28-36"],
+      "notes": "Moses and Elijah appear with Jesus on mountain",
+      "uniqueDetails": {
+        "matthew": ["Face shone like the sun", "Peter offers to build three tents", "Cloud overshadowed them"],
+        "mark": ["After six days", "Clothes became radiant", "They were terrified"],
+        "luke": ["About eight days later", "Went up to pray", "Discussing his departure (exodus)", "Peter and companions were heavy with sleep"]
+      }
+    },
+    "matthew_21_1-11": {
+      "event": "Triumphal Entry into Jerusalem",
+      "relationship": "synoptic",
+      "confidence": 95,
+      "parallels": ["mark_11_1-11", "luke_19_28-44", "john_12_12-19"],
+      "notes": "Jesus enters Jerusalem on a donkey. All four Gospels record this event.",
+      "uniqueDetails": {
+        "matthew": ["Colt and donkey", "Zechariah 9:9 quoted", "Whole city stirred"],
+        "mark": ["Colt never ridden", "Looked around at everything"],
+        "luke": ["If these were silent, stones would cry out", "Jesus wept over Jerusalem"],
+        "john": ["Palm branches", "Disciples didn't understand at first", "Crowd came because of Lazarus"]
+      }
+    },
+    "matthew_26_26-29": {
+      "event": "Institution of the Lord's Supper",
+      "relationship": "synoptic",
+      "confidence": 95,
+      "parallels": ["mark_14_22-25", "luke_22_14-23", "1corinthians_11_23-26"],
+      "notes": "Last Supper narrative. Paul's account in 1 Corinthians is earliest written.",
+      "uniqueDetails": {
+        "matthew": ["This is my blood of the covenant", "For forgiveness of sins", "Until that day in my Father's kingdom"],
+        "mark": ["This is my blood of the covenant", "Poured out for many"],
+        "luke": ["This cup is the new covenant in my blood", "Do this in remembrance of me", "Extended farewell discourse"],
+        "1corinthians": ["Do this in remembrance of me", "Proclaim the Lord's death", "Earliest written account"]
+      }
+    },
+    "matthew_26_36-46": {
+      "event": "Gethsemane - Jesus Prays",
+      "relationship": "synoptic",
+      "confidence": 95,
+      "parallels": ["mark_14_32-42", "luke_22_39-46", "john_18_1"],
+      "notes": "Jesus' anguished prayer before arrest. John mentions the place but not the prayer.",
+      "uniqueDetails": {
+        "matthew": ["Sorrowful and troubled", "My soul is overwhelmed", "Three times Jesus prays"],
+        "mark": ["Deeply distressed and troubled", "Abba, Father", "Three times returns to disciples"],
+        "luke": ["Angel strengthened him", "Sweat like drops of blood", "Found them sleeping from sorrow"],
+        "john": ["Crossed the Kidron Valley", "Garden mentioned but no prayer details"]
+      }
+    },
+    "matthew_27_32-56": {
+      "event": "Crucifixion of Jesus",
+      "relationship": "synoptic",
+      "confidence": 95,
+      "parallels": ["mark_15_21-41", "luke_23_26-49", "john_19_16-37"],
+      "notes": "Central event of Christian faith. All four Gospels provide detailed accounts.",
+      "uniqueDetails": {
+        "matthew": ["Earthquake", "Tombs opened", "Curtain torn", "Eli, Eli, lema sabachthani"],
+        "mark": ["Wine mixed with myrrh offered", "Third, sixth, ninth hours", "Centurion's confession"],
+        "luke": ["Daughters of Jerusalem", "Father, forgive them", "Today you will be with me in paradise", "Father, into your hands"],
+        "john": ["Pilate's inscription controversy", "Seamless tunic", "Mother and beloved disciple", "I thirst", "It is finished", "Blood and water"]
+      }
+    },
+    "matthew_28_1-10": {
+      "event": "Resurrection - Empty Tomb",
+      "relationship": "synoptic",
+      "confidence": 95,
+      "parallels": ["mark_16_1-8", "luke_24_1-12", "john_20_1-10"],
+      "notes": "All four Gospels attest the empty tomb with varying details about witnesses and angelic appearances",
+      "uniqueDetails": {
+        "matthew": ["Great earthquake", "Angel rolled back the stone", "Guards terrified", "Jesus meets the women"],
+        "mark": ["Who will roll away the stone?", "Young man in white robe", "They said nothing to anyone (shorter ending)"],
+        "luke": ["Two men in dazzling apparel", "Remember how he told you in Galilee", "Peter runs to tomb"],
+        "john": ["Mary Magdalene alone at first", "Peter and beloved disciple race to tomb", "Strips of linen"]
+      }
+    },
+    "isaiah_53_5": {
+      "event": "Suffering Servant - OT Prophecy",
+      "relationship": "quotation",
+      "confidence": 90,
+      "parallels": ["matthew_8_17", "1peter_2_24", "acts_8_32-33", "romans_4_25"],
+      "notes": "Isaiah 53 is extensively quoted in NT as prophecy of Christ's suffering",
+      "uniqueDetails": {
+        "isaiah": ["He was pierced for our transgressions", "By his wounds we are healed"],
+        "matthew": ["Took our illnesses and bore our diseases", "Applied to healing ministry"],
+        "1peter": ["He himself bore our sins in his body", "By his wounds you have been healed"],
+        "acts": ["Like a sheep led to slaughter", "Ethiopian eunuch passage"],
+        "romans": ["Delivered over to death for our sins", "Raised for our justification"]
+      }
+    },
+    "psalm_110_1": {
+      "event": "The Lord says to my Lord - Messianic Psalm",
+      "relationship": "quotation",
+      "confidence": 95,
+      "parallels": ["matthew_22_44", "mark_12_36", "luke_20_42-43", "acts_2_34-35", "hebrews_1_13"],
+      "notes": "Most quoted OT verse in NT. Jesus uses it to challenge Pharisees about Messiah's identity.",
+      "uniqueDetails": {
+        "psalm": ["Sit at my right hand until I make your enemies your footstool"],
+        "matthew": ["How then does David in the Spirit call him Lord?"],
+        "mark": ["David himself calls him Lord"],
+        "luke": ["David calls him Lord"],
+        "acts": ["Peter's Pentecost sermon", "God has made him both Lord and Christ"],
+        "hebrews": ["To which of the angels did God ever say...?", "Superiority of Christ"]
+      }
+    },
+    "genesis_15_6": {
+      "event": "Abraham believed God - Faith and Righteousness",
+      "relationship": "quotation",
+      "confidence": 95,
+      "parallels": ["romans_4_3", "galatians_3_6", "james_2_23"],
+      "notes": "Central text for faith vs. works debate. Paul and James cite it differently.",
+      "uniqueDetails": {
+        "genesis": ["Abram believed the LORD", "He counted it to him as righteousness"],
+        "romans": ["Abraham believed God", "Faith was counted as righteousness", "Not by works"],
+        "galatians": ["Believed God and it was counted to him as righteousness", "Justification by faith"],
+        "james": ["Abraham believed God", "Faith was completed by works", "Justified by works"]
+      }
+    },
+    "psalm_22_1": {
+      "event": "My God, my God, why have you forsaken me?",
+      "relationship": "quotation",
+      "confidence": 95,
+      "parallels": ["matthew_27_46", "mark_15_34"],
+      "notes": "Jesus quotes Psalm 22 from the cross. Psalm prophetically describes crucifixion details.",
+      "uniqueDetails": {
+        "psalm": ["Why are you so far from saving me?", "All who see me mock me", "They divide my garments", "They cast lots for my clothing"],
+        "matthew": ["Eli, Eli, lema sabachthani?", "About the ninth hour Jesus cried out"],
+        "mark": ["Eloi, Eloi, lema sabachthani?", "At the ninth hour"]
+      }
+    },
+    "joel_2_28-32": {
+      "event": "I will pour out my Spirit - Prophecy of Pentecost",
+      "relationship": "quotation",
+      "confidence": 95,
+      "parallels": ["acts_2_17-21"],
+      "notes": "Peter quotes Joel at Pentecost to explain the outpouring of the Holy Spirit",
+      "uniqueDetails": {
+        "joel": ["Afterward I will pour out my Spirit", "Your sons and daughters will prophesy", "Wonders in the heavens and on the earth"],
+        "acts": ["In the last days, God says", "I will pour out my Spirit on all people", "Everyone who calls on the name of the Lord will be saved"]
+      }
+    },
+    "malachi_3_1": {
+      "event": "Messenger prepares the way",
+      "relationship": "quotation",
+      "confidence": 90,
+      "parallels": ["matthew_11_10", "mark_1_2", "luke_7_27"],
+      "notes": "Applied to John the Baptist as forerunner of Messiah",
+      "uniqueDetails": {
+        "malachi": ["I will send my messenger who will prepare the way before me"],
+        "matthew": ["I will send my messenger ahead of you", "Jesus speaking about John the Baptist"],
+        "mark": ["I will send my messenger ahead of you", "Combined with Isaiah 40:3"],
+        "luke": ["I will send my messenger ahead of you", "Jesus praising John"]
+      }
+    }
+  }
+}
