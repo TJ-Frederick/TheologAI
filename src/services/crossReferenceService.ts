@@ -108,7 +108,7 @@ export class CrossReferenceService {
       'Gen': 'Genesis', 'Exod': 'Exodus', 'Lev': 'Leviticus', 'Num': 'Numbers', 'Deut': 'Deuteronomy',
       'Josh': 'Joshua', 'Judg': 'Judges', 'Ruth': 'Ruth', '1Sam': '1 Samuel', '2Sam': '2 Samuel',
       '1Kgs': '1 Kings', '2Kgs': '2 Kings', '1Chr': '1 Chronicles', '2Chr': '2 Chronicles',
-      'Ezra': 'Ezra', 'Neh': 'Nehemiah', 'Esth': 'Esther', 'Job': 'Job', 'Ps': 'Psalms',
+      'Ezra': 'Ezra', 'Neh': 'Nehemiah', 'Esth': 'Esther', 'Job': 'Job', 'Ps': 'Psalms', 'Psalm': 'Psalms',
       'Prov': 'Proverbs', 'Eccl': 'Ecclesiastes', 'Song': 'Song of Solomon', 'Isa': 'Isaiah',
       'Jer': 'Jeremiah', 'Lam': 'Lamentations', 'Ezek': 'Ezekiel', 'Dan': 'Daniel',
       'Hos': 'Hosea', 'Joel': 'Joel', 'Amos': 'Amos', 'Obad': 'Obadiah', 'Jonah': 'Jonah',
@@ -122,10 +122,15 @@ export class CrossReferenceService {
       '1John': '1 John', '2John': '2 John', '3John': '3 John', 'Jude': 'Jude', 'Rev': 'Revelation'
     };
 
-    // Match book abbreviation at start
+    // Check if this needs book abbreviation expansion
+    // Try to match book abbreviations at the start of the string
+    let bookReplaced = false;
     for (const [abbr, full] of Object.entries(bookMap)) {
+      // Check if string starts with abbreviation followed by space and a number (chapter)
+      // This handles both "Gen 1 1" and ensures we don't match "1" when looking for "1Cor"
       if (normalized.startsWith(abbr + ' ')) {
         normalized = full + normalized.slice(abbr.length);
+        bookReplaced = true;
         break;
       }
     }
@@ -133,7 +138,7 @@ export class CrossReferenceService {
     // Ensure chapter:verse format (replace space before verse number with colon)
     // e.g., "Genesis 1 1" → "Genesis 1:1"
     const parts = normalized.split(' ');
-    if (parts.length >= 3) {
+    if (parts.length >= 3 && !normalized.includes(':')) {
       // Book name (may be multiple words) + chapter + verse
       const versePart = parts[parts.length - 1];
       const chapterPart = parts[parts.length - 2];
@@ -186,5 +191,50 @@ export class CrossReferenceService {
   hasReferences(reference: string): boolean {
     const normalized = this.normalizeReference(reference);
     return this.crossRefsMap.has(normalized);
+  }
+
+  /**
+   * Get chapter-level statistics for all verses in a chapter
+   * Returns verse numbers sorted by total cross-reference count
+   */
+  getChapterStatistics(bookChapter: string): {
+    totalVerses: number;
+    totalCrossRefs: number;
+    verseStats: Array<{ verse: number; refCount: number; topRef?: string }>;
+  } {
+    // Find all verses that match this chapter pattern
+    const verseStats: Array<{ verse: number; refCount: number; topRef?: string }> = [];
+    let totalCrossRefs = 0;
+
+    // Normalize the book/chapter reference (e.g., "Psalm 23" → "Psalms 23")
+    const normalized = this.normalizeReference(bookChapter);
+
+    // Search through all verses in the map
+    for (const [verseRef, refs] of this.crossRefsMap.entries()) {
+      // Check if this verse belongs to the requested chapter
+      // e.g., "Psalms 23:1" starts with "Psalms 23:"
+      if (verseRef.startsWith(normalized + ':')) {
+        const verseMatch = verseRef.match(/:(\d+)$/);
+        if (verseMatch) {
+          const verseNum = parseInt(verseMatch[1], 10);
+          const topRef = refs.length > 0 ? refs[0].reference : undefined;
+          verseStats.push({
+            verse: verseNum,
+            refCount: refs.length,
+            topRef
+          });
+          totalCrossRefs += refs.length;
+        }
+      }
+    }
+
+    // Sort by reference count (descending)
+    verseStats.sort((a, b) => b.refCount - a.refCount);
+
+    return {
+      totalVerses: verseStats.length,
+      totalCrossRefs,
+      verseStats
+    };
   }
 }

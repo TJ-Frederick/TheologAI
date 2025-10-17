@@ -2,15 +2,16 @@
 
 A Model Context Protocol (MCP) server that provides theological researchers and Bible students with programmatic access to biblical texts, commentaries, and historical Christian documents through natural language queries via Claude Desktop.
 
-## Current Status: Phase 3.5 Complete - Unified Historical Documents & Cross-References! 🎉
+## Current Status: Production Ready - Beta Launch Prepared! 🎉
 
-TheologAI now provides comprehensive theological research tools with extensive Bible study capabilities:
+TheologAI now provides comprehensive theological research tools with refined Greek & Hebrew word studies, fully tested and ready for 100+ beta users:
 
 ## Features
 
 - **📖 8 Bible Translations**: ESV, NET, KJV, WEB, BSB, ASV, YLT, DBY (all with verse lookup)
 - **📝 Footnotes Support**: Translation notes, textual variants, and alternative readings
 - **🔗 Cross-References**: Treasury of Scripture Knowledge integration for verse connections
+- **🔤 Greek & Hebrew Tools**: Enhanced Strong's Concordance (14,298 entries) + STEPBible morphology (142,096 Greek words)
 - **💬 6 Public Domain Commentaries**: Matthew Henry, JFB, Adam Clarke, John Gill, Keil-Delitzsch, Tyndale
 - **🏛️ 18 Historical Documents**: Major creeds, confessions, and catechisms (Nicene, Westminster, Heidelberg, 39 Articles, and more)
 - **📚 1000+ Classic Christian Texts**: Complete CCEL catalog access with unified search
@@ -39,6 +40,41 @@ Get cross-references for Bible verses using Treasury of Scripture Knowledge
 - **Example**: "Get cross-references for John 3:16"
 - **Example**: "Show related verses for Romans 8:28"
 - **Parameters**: `reference` (required)
+
+### 🔤 `original_language_lookup` ✨ REFINED!
+Look up biblical Greek and Hebrew words with tiered output: simple overviews or comprehensive analysis
+- **Simple mode** (default): Quick overview with key insights, pronunciation, occurrence stats, and semantic comparisons
+- **Detailed mode**: Comprehensive analysis with etymology, theological significance, full morphology, and study recommendations
+- **Example**: "Look up Strong's G25" → Quick overview of ἀγαπάω (agapaō - God's redemptive love)
+- **Example**: "What is Strong's H430 in detail?" → Full analysis of אֱלֹהִים (elohim - God)
+- **Example**: "Show me G2316 with detailed theology" → θεός with semantic field comparisons
+- **Data**: 14,298 entries (5,624 Greek + 8,674 Hebrew) from OpenScriptures (Public Domain)
+- **Enhanced data**: STEPBible TAGNT with 142,096 Greek words (CC BY 4.0)
+- **Parameters**:
+  - `strongs_number` (required): Strong's number (G#### for Greek, H#### for Hebrew, supports extended notation like G1722a)
+  - `detail_level` (optional): "simple" (default) or "detailed"
+  - `include_extended` (optional): Include STEPBible sense disambiguations
+  - `include_morphology` (optional): Show grammatical forms (noun cases, verb tenses, etc.)
+  - `include_occurrences` (optional): Count occurrences in loaded books
+  - Greek numbers: G1-G5624, Hebrew numbers: H1-H8674
+- **Returns**:
+  - **Simple**: Definition, pronunciation, key theological insight, occurrence count, most common form, semantic comparisons
+  - **Detailed**: All above + etymology, theological significance, full morphology breakdown with interpretation, study recommendations
+
+### 📖 `bible_verse_morphology` ✨ ENHANCED!
+Get word-by-word morphological analysis of **any Bible verse** - Hebrew (OT) or Greek (NT)
+- **Example**: "Analyze John 3:16 word by word" → Greek NT morphology
+- **Example**: "Show me the Hebrew for Genesis 1:1" → Hebrew OT morphology
+- **Example**: "Break down Psalm 23:1 with expanded morphology" → Hebrew with full grammar
+- **Example**: "Analyze Romans 8:28 in Greek" → Greek with detailed parsing
+- **Data**: STEPBible Tagged Hebrew Bible + TAGNT (CC BY 4.0)
+- **Coverage**: All 66 books (39 OT Hebrew + 27 NT Greek), 305,693 Hebrew words + 142,096 Greek words with morphological tagging
+- **Parameters**:
+  - `reference` (required): Bible verse reference (e.g., "John 3:16", "Genesis 1:1", common abbreviations supported)
+  - `expand_morphology` (optional): Expand codes to descriptions
+    - Greek: V-AAI-3S → "Verb, Aorist, Active, Indicative, 3rd person, Singular"
+    - Hebrew: HVqp3ms → "Hebrew, Verb, Qal, Perfect, 3rd person, masculine, singular"
+- **Returns**: Table with original Hebrew/Greek text, lemma, Strong's number, morphology code, and English gloss for each word
 
 ### 📚 `classic_text_lookup` ✨ UNIFIED TOOL!
 **Primary tool for ALL historical Christian documents** - searches local documents first, then CCEL
@@ -326,19 +362,32 @@ TheologAI provides 4 primary tools:
 - ✅ Cross-reference system via `bible_cross_references` tool
 - ✅ Treasury of Scripture Knowledge integration
 
+**Phase 3.6: Greek & Hebrew Language Tools** ✅
+- ✅ Strong's Concordance: 14,298 entries (5,624 Greek + 8,674 Hebrew)
+- ✅ `strongs_lookup` tool for word studies
+- ✅ Original language words with transliterations
+- ✅ Pronunciation guides for all entries
+- ✅ Comprehensive definitions and etymologies
+- ✅ Data from OpenScriptures (Public Domain)
+- ✅ Lightweight JSON-based architecture (~4MB total)
+- ✅ Fast in-memory lookups (<1ms per query)
+
 **Performance:**
 - Bible verse cache: ~160ms → <1ms on repeated queries
 - HelloAO API calls: ~200ms (no rate limits!)
 - TOC caching: 24-hour TTL reduces API calls
 - Catalog scraping: ~2-3s per letter, 5-minute cache
 - Cache hit time: < 10ms across all resources
+- Strong's lookups: < 1ms (in-memory JSON)
+- Strong's data loading: ~200ms on startup
 - ESV API rate limit protection through intelligent caching
 
 ## Next Steps (Phase 4+)
 
 **Potential Enhancements:**
 - [ ] Additional HelloAO translations (1000+ available)
-- [ ] Greek/Hebrew word study tools (Strong's concordance)
+- [ ] Morphological parsing (verb tenses, noun cases)
+- [ ] Word concordance (find all uses of a Greek/Hebrew word)
 - [ ] Advanced topical search across all resources
 - [ ] More historical texts and catechisms
 - [ ] Search history and bookmarking
@@ -387,6 +436,52 @@ src/
     └── index.ts                 # Common types (includes Footnote interface)
 ```
 
+## Data Sources & Attribution
+
+### Biblical Language Data
+
+**Strong's Concordance (14,298 entries)**
+- Source: [OpenScriptures Strong's Hebrew and Greek Dictionaries](https://github.com/openscriptures/strongs)
+- License: Public Domain
+- Attribution: Open Scriptures (openscriptures.org)
+- Coverage: 5,624 Greek entries (NT), 8,674 Hebrew entries (OT)
+- Includes: Original word, transliteration, pronunciation, definition, derivation/etymology
+
+**STEPBible TAGNT (142,096 words)**
+- Source: [STEPBible Data - Translators Amalgamated Greek NT](https://github.com/STEPBible/STEPBible-Data)
+- License: Creative Commons Attribution 4.0 (CC BY 4.0)
+- Attribution: STEP Bible (www.stepbible.org)
+- Coverage: All 27 NT books with morphological tagging
+- Includes: Greek text, lemma, extended Strong's numbers, grammatical parsing (Robinson codes), English glosses
+- Data created by www.STEPBible.org based on work at Tyndale House Cambridge
+
+### Bible Translations
+- HelloAO Bible API: ESV, NET, KJV, WEB, BSB (Free, no rate limits)
+- BibleAPI.co: ASV, YLT, DBY (Free, with caching)
+
+### Commentaries
+- HelloAO Bible API: Matthew Henry, JFB, Adam Clarke, John Gill, Keil-Delitzsch, Tyndale (Public Domain)
+
+### Historical Documents
+- Local Data: 18 creeds, confessions, and catechisms (Public Domain)
+- CCEL: 1000+ classic Christian texts via ccel.org API (Public Domain/Open Access)
+
 ## License
 
 ISC
+
+## Building STEPBible Data
+
+To rebuild the STEPBible morphological data:
+
+```bash
+npm run build:stepbible
+```
+
+This downloads the latest TAGNT data from STEPBible's GitHub repository, parses the TSV files, and generates:
+- 27 compressed JSON files (one per NT book) in `data/biblical-languages/stepbible/greek/`
+- Index file with book metadata
+- Morphology code expansion table
+- STEPBible metadata with version and attribution
+
+Total size: ~1.9MB compressed (~7MB uncompressed)
