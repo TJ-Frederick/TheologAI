@@ -88,10 +88,10 @@ db.exec(`
     extended_data JSON NOT NULL
   );
 
-  -- Historical documents (Tier 3)
-  DROP TABLE IF EXISTS documents;
-  DROP TABLE IF EXISTS document_sections;
+  -- Historical documents (Tier 3) — drop children before parents
   DROP TABLE IF EXISTS sections_fts;
+  DROP TABLE IF EXISTS document_sections;
+  DROP TABLE IF EXISTS documents;
 
   CREATE TABLE documents (
     id TEXT PRIMARY KEY,
