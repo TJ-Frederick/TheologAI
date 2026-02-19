@@ -1,9 +1,15 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { tools, getToolByName } from './tools/index.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf-8'));
 
 export class BibleMCPServer {
   private server: Server;
@@ -12,7 +18,7 @@ export class BibleMCPServer {
     this.server = new Server(
       {
         name: 'theologai-bible-server',
-        version: '1.0.0',
+        version: pkg.version,
       },
       {
         capabilities: {
