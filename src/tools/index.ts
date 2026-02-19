@@ -6,6 +6,7 @@ import { commentaryLookupHandler } from './commentaryLookup.js';
 import { classicTextLookupHandler } from './classicTextLookup.js';
 import { bibleCrossReferencesHandler } from './bibleCrossReferences.js';
 import { parallelPassagesHandler } from './parallelPassages.js';
+import { originalLanguageLookupHandler, bibleVerseMorphologyHandler } from './biblicalLanguages.js';
 
 export const tools: ToolHandler[] = [
   bibleLookupHandler,
@@ -13,7 +14,9 @@ export const tools: ToolHandler[] = [
   parallelPassagesHandler,
   // historicalSearchHandler,  // DEPRECATED: Use classicTextLookupHandler instead (searches local docs first, then CCEL)
   commentaryLookupHandler,
-  classicTextLookupHandler
+  classicTextLookupHandler,
+  originalLanguageLookupHandler,
+  bibleVerseMorphologyHandler
 ];
 
 export function getToolByName(name: string): ToolHandler | undefined {

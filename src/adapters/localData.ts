@@ -88,7 +88,8 @@ export class LocalDataAdapter {
       if (numberMatch) {
         const targetNumber = numberMatch[1];
         for (const section of doc.sections) {
-          if (section.question_number === targetNumber) {
+          // Check both question_number and question fields for backward compatibility
+          if (section.question_number === targetNumber || (section as any).question === targetNumber) {
             results.push({
               document: doc.title,
               section: this.getSectionTitle(section),
@@ -124,7 +125,8 @@ export class LocalDataAdapter {
       for (const [ordinal, number] of Object.entries(ordinalMap)) {
         if (searchTerm.includes(ordinal)) {
           for (const section of doc.sections) {
-            if (section.question_number === number) {
+            // Check both question_number and question fields for backward compatibility
+            if (section.question_number === number || (section as any).question === number) {
               results.push({
                 document: doc.title,
                 section: this.getSectionTitle(section),
@@ -276,6 +278,12 @@ export class LocalDataAdapter {
       return `Question ${section.question_number}`;
     }
 
+    // Check if 'question' field is a number (for Westminster Shorter Catechism)
+    const questionField = (section as any).question;
+    if (questionField && /^\d+$/.test(questionField)) {
+      return `Question ${questionField}`;
+    }
+
     // Confessions with chapter numbers
     if (section.chapter) {
       return `Chapter ${section.chapter}`;
@@ -287,7 +295,7 @@ export class LocalDataAdapter {
     }
 
     // Fallback: truncated question text
-    if (section.question) {
+    if (section.question && typeof section.question === 'string' && !/^\d+$/.test(section.question)) {
       return section.question.substring(0, 60) + (section.question.length > 60 ? '...' : '');
     }
 

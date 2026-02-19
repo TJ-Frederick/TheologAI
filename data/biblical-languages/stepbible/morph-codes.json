@@ -1,0 +1,22 @@
+{
+  "PREP": "Preposition",
+  "CONJ": "Conjunction",
+  "ADV": "Adverb",
+  "PRT": "Particle",
+  "INJ": "Interjection",
+  "ARAM": "Aramaic",
+  "HEB": "Hebrew",
+  "N-NSM": "Noun, Nominative, Singular, Masculine",
+  "N-GSM": "Noun, Genitive, Singular, Masculine",
+  "N-DSM": "Noun, Dative, Singular, Masculine",
+  "N-ASM": "Noun, Accusative, Singular, Masculine",
+  "N-VSM": "Noun, Vocative, Singular, Masculine",
+  "N-NSF": "Noun, Nominative, Singular, Feminine",
+  "N-GSF": "Noun, Genitive, Singular, Feminine",
+  "N-DSF": "Noun, Dative, Singular, Feminine",
+  "N-ASF": "Noun, Accusative, Singular, Feminine",
+  "N-NSN": "Noun, Nominative, Singular, Neuter",
+  "N-GSN": "Noun, Genitive, Singular, Neuter",
+  "N-DSN": "Noun, Dative, Singular, Neuter",
+  "N-ASN": "Noun, Accusative, Singular, Neuter"
+}

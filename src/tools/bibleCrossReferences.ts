@@ -60,24 +60,51 @@ export const bibleCrossReferencesHandler: ToolHandler = {
       } = params;
 
       // Check if reference is chapter-only (e.g., "Psalm 22" without verse)
-      const isChapterOnly = /\d+\s*$/.test(reference.trim());
+      // Must end with a number but NOT have a colon (which indicates verse number)
+      const isChapterOnly = /\d+\s*$/.test(reference.trim()) && !reference.includes(':');
 
-      // Get cross-references
+      // Handle chapter-only searches with helpful statistics
+      if (isChapterOnly) {
+        const chapterStats = crossRefService.getChapterStatistics(reference);
+
+        if (chapterStats.totalVerses === 0) {
+          let message = `No cross-references found for ${reference}.`;
+          message += `\n\nThe cross-reference database requires a specific verse number. Please specify a particular verse within the chapter (e.g., "${reference}:1").`;
+          return formatToolResponse(message);
+        }
+
+        // Build helpful chapter overview
+        let message = `## Cross-References for ${reference} (Chapter Overview)\n\n`;
+        message += `This chapter has **${chapterStats.totalCrossRefs} total cross-references** across **${chapterStats.totalVerses} verses**.\n\n`;
+        message += `### Most Referenced Verses:\n\n`;
+
+        // Show top 5 verses with most cross-references
+        const topVerses = chapterStats.verseStats.slice(0, 5);
+        topVerses.forEach((stat, index) => {
+          const verseRef = `${reference}:${stat.verse}`;
+          message += `${index + 1}. **${verseRef}** - ${stat.refCount} cross-reference${stat.refCount !== 1 ? 's' : ''}`;
+          if (stat.topRef) {
+            message += ` (top connection: ${stat.topRef})`;
+          }
+          message += `\n`;
+        });
+
+        message += `\n### 💡 Suggestion\n`;
+        message += `To see specific cross-references, try: \`${reference}:${topVerses[0].verse}\`\n`;
+        message += `Or explore other verses: ${topVerses.slice(1, 3).map(s => `${reference}:${s.verse}`).join(', ')}\n\n`;
+        message += `Data source: OpenBible.info (CC-BY)`;
+
+        return formatToolResponse(message);
+      }
+
+      // Get cross-references for specific verse
       const result = crossRefService.getCrossReferences(reference, {
         maxResults,
         minVotes
       });
 
       if (result.total === 0) {
-        let message = `No cross-references found for ${reference}.`;
-
-        // Provide helpful guidance for chapter-only searches
-        if (isChapterOnly) {
-          message += `\n\nThe cross-reference database requires a specific verse number. Please specify a particular verse within the chapter (e.g., "${reference}:1").`;
-          message += `\n\nTip: Use the parallel_passages tool for broader searches, or try a specific verse with this tool.`;
-        }
-
-        return formatToolResponse(message);
+        return formatToolResponse(`No cross-references found for ${reference}.`);
       }
 
       // Build response

@@ -1,0 +1,22 @@
+{
+  "version": "1.0.0",
+  "source": "STEPBible Data (Tyndale House, Cambridge)",
+  "source_url": "https://github.com/STEPBible/STEPBible-Data",
+  "license": "CC BY 4.0",
+  "attribution": "Tyndale House, Cambridge (www.stepbible.org)",
+  "build_date": "2025-10-17T15:40:25.908Z",
+  "lexicons": {
+    "greek": {
+      "name": "TBESG - Translators Brief Lexicon of Extended Strongs for Greek",
+      "source": "Abbott-Smith Manual Greek Lexicon (1922), corrected by Tyndale scholars",
+      "entries": 10847,
+      "file": "tbesg-greek.json"
+    },
+    "hebrew": {
+      "name": "TBESH - Translators Brief Lexicon of Extended Strongs for Hebrew",
+      "source": "Abridged Brown-Driver-Briggs Hebrew Lexicon (1906)",
+      "entries": 8723,
+      "file": "tbesh-hebrew.json"
+    }
+  }
+}
