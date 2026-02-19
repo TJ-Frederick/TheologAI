@@ -28,8 +28,8 @@ export class CcelService {
   private adapter: CcelAdapter;
   private cache: Cache<ClassicTextResponse>;
 
-  constructor(adapter?: CcelAdapter) {
-    this.adapter = adapter ?? new CcelAdapter();
+  constructor(adapter: CcelAdapter) {
+    this.adapter = adapter;
     this.cache = new Cache(200, 2 * 60 * 60 * 1000);
   }
 

@@ -106,11 +106,6 @@ export function createCompositionRoot(): CompositionRoot {
   };
 }
 
-/** @deprecated Use createCompositionRoot() */
-export function createTools(): ToolHandler[] {
-  return createCompositionRoot().tools;
-}
-
 /** Find a tool by name */
 export function getToolByName(tools: ToolHandler[], name: string): ToolHandler | undefined {
   return tools.find(t => t.name === name);

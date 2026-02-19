@@ -11,7 +11,6 @@ import type { CrossReferenceRepository } from '../../adapters/data/CrossReferenc
 import type { BibleAdapter } from '../../adapters/bible/BibleAdapter.js';
 import type { ParallelPassageLookupParams, ParallelPassageResult, ParallelPassage } from '../../kernel/types.js';
 import { parseReference, formatReference } from '../../kernel/reference.js';
-import { findBook } from '../../kernel/books.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
