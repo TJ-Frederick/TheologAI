@@ -1,0 +1,14 @@
+{
+  "version": "1.0.0",
+  "source": "STEPBible Data - Translators Amalgamated OT+NT",
+  "source_url": "https://github.com/STEPBible/STEPBible-Data",
+  "commit_sha": "master",
+  "license": "CC BY 4.0",
+  "attribution": "STEP Bible (www.stepbible.org)",
+  "build_date": "2025-10-17T14:27:33.512Z",
+  "books": {
+    "greek": 27,
+    "hebrew": 39,
+    "total": 66
+  }
+}

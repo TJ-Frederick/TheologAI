@@ -13,3 +13,19 @@ test-results/
 *.test.js.map
 coverage/
 .nyc_output/
+
+# Generated test reports and debug scripts
+*_TEST_REPORT.md
+*_TEST_RESULTS.md
+*_TEST_SUMMARY.txt
+*_TEST_INDEX.md
+TEST_PROMPTS.md
+TEST_RESULTS.md
+TEST_SUITE_PROGRESS.md
+COMPREHENSIVE_TEST_PROMPTS.md
+MULTI_TOOL_WORKFLOW_RESULTS.md
+test-results-*.txt
+debug-*.js
+test-*.js
+test-multi-tool-*.ts
+ORIGINAL_LANGUAGE_DETAILED_RESULTS.md

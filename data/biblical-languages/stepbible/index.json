@@ -1,0 +1,334 @@
+{
+  "books": {
+    "2Samuel": {
+      "file": "hebrew/10-2Samuel.json.gz",
+      "verses": 695,
+      "testament": "OT"
+    },
+    "1Kings": {
+      "file": "hebrew/11-1Kings.json.gz",
+      "verses": 816,
+      "testament": "OT"
+    },
+    "2Kings": {
+      "file": "hebrew/12-2Kings.json.gz",
+      "verses": 719,
+      "testament": "OT"
+    },
+    "1Chronicles": {
+      "file": "hebrew/13-1Chronicles.json.gz",
+      "verses": 942,
+      "testament": "OT"
+    },
+    "2Chronicles": {
+      "file": "hebrew/14-2Chronicles.json.gz",
+      "verses": 822,
+      "testament": "OT"
+    },
+    "Ezra": {
+      "file": "hebrew/15-Ezra.json.gz",
+      "verses": 280,
+      "testament": "OT"
+    },
+    "Nehemiah": {
+      "file": "hebrew/16-Nehemiah.json.gz",
+      "verses": 406,
+      "testament": "OT"
+    },
+    "Esther": {
+      "file": "hebrew/17-Esther.json.gz",
+      "verses": 167,
+      "testament": "OT"
+    },
+    "Job": {
+      "file": "hebrew/18-Job.json.gz",
+      "verses": 1070,
+      "testament": "OT"
+    },
+    "Psalms": {
+      "file": "hebrew/19-Psalms.json.gz",
+      "verses": 2577,
+      "testament": "OT"
+    },
+    "Proverbs": {
+      "file": "hebrew/20-Proverbs.json.gz",
+      "verses": 915,
+      "testament": "OT"
+    },
+    "Ecclesiastes": {
+      "file": "hebrew/21-Ecclesiastes.json.gz",
+      "verses": 222,
+      "testament": "OT"
+    },
+    "SongOfSolomon": {
+      "file": "hebrew/22-SongOfSolomon.json.gz",
+      "verses": 117,
+      "testament": "OT"
+    },
+    "Isaiah": {
+      "file": "hebrew/23-Isaiah.json.gz",
+      "verses": 1292,
+      "testament": "OT"
+    },
+    "Jeremiah": {
+      "file": "hebrew/24-Jeremiah.json.gz",
+      "verses": 1364,
+      "testament": "OT"
+    },
+    "Lamentations": {
+      "file": "hebrew/25-Lamentations.json.gz",
+      "verses": 154,
+      "testament": "OT"
+    },
+    "Ezekiel": {
+      "file": "hebrew/26-Ezekiel.json.gz",
+      "verses": 1273,
+      "testament": "OT"
+    },
+    "Daniel": {
+      "file": "hebrew/27-Daniel.json.gz",
+      "verses": 357,
+      "testament": "OT"
+    },
+    "Hosea": {
+      "file": "hebrew/28-Hosea.json.gz",
+      "verses": 197,
+      "testament": "OT"
+    },
+    "Joel": {
+      "file": "hebrew/29-Joel.json.gz",
+      "verses": 73,
+      "testament": "OT"
+    },
+    "Amos": {
+      "file": "hebrew/30-Amos.json.gz",
+      "verses": 146,
+      "testament": "OT"
+    },
+    "Obadiah": {
+      "file": "hebrew/31-Obadiah.json.gz",
+      "verses": 21,
+      "testament": "OT"
+    },
+    "Jonah": {
+      "file": "hebrew/32-Jonah.json.gz",
+      "verses": 48,
+      "testament": "OT"
+    },
+    "Micah": {
+      "file": "hebrew/33-Micah.json.gz",
+      "verses": 105,
+      "testament": "OT"
+    },
+    "Nahum": {
+      "file": "hebrew/34-Nahum.json.gz",
+      "verses": 47,
+      "testament": "OT"
+    },
+    "Habakkuk": {
+      "file": "hebrew/35-Habakkuk.json.gz",
+      "verses": 56,
+      "testament": "OT"
+    },
+    "Zephaniah": {
+      "file": "hebrew/36-Zephaniah.json.gz",
+      "verses": 53,
+      "testament": "OT"
+    },
+    "Haggai": {
+      "file": "hebrew/37-Haggai.json.gz",
+      "verses": 38,
+      "testament": "OT"
+    },
+    "Zechariah": {
+      "file": "hebrew/38-Zechariah.json.gz",
+      "verses": 211,
+      "testament": "OT"
+    },
+    "Malachi": {
+      "file": "hebrew/39-Malachi.json.gz",
+      "verses": 55,
+      "testament": "OT"
+    },
+    "Matthew": {
+      "file": "greek/40-Matthew.json.gz",
+      "verses": 1071,
+      "testament": "NT"
+    },
+    "Mark": {
+      "file": "greek/41-Mark.json.gz",
+      "verses": 678,
+      "testament": "NT"
+    },
+    "Luke": {
+      "file": "greek/42-Luke.json.gz",
+      "verses": 1151,
+      "testament": "NT"
+    },
+    "John": {
+      "file": "greek/43-John.json.gz",
+      "verses": 879,
+      "testament": "NT"
+    },
+    "Acts": {
+      "file": "greek/44-Acts.json.gz",
+      "verses": 1007,
+      "testament": "NT"
+    },
+    "Romans": {
+      "file": "greek/45-Romans.json.gz",
+      "verses": 433,
+      "testament": "NT"
+    },
+    "1Corinthians": {
+      "file": "greek/46-1Corinthians.json.gz",
+      "verses": 437,
+      "testament": "NT"
+    },
+    "2Corinthians": {
+      "file": "greek/47-2Corinthians.json.gz",
+      "verses": 256,
+      "testament": "NT"
+    },
+    "Galatians": {
+      "file": "greek/48-Galatians.json.gz",
+      "verses": 149,
+      "testament": "NT"
+    },
+    "Ephesians": {
+      "file": "greek/49-Ephesians.json.gz",
+      "verses": 155,
+      "testament": "NT"
+    },
+    "Philippians": {
+      "file": "greek/50-Philippians.json.gz",
+      "verses": 104,
+      "testament": "NT"
+    },
+    "Colossians": {
+      "file": "greek/51-Colossians.json.gz",
+      "verses": 95,
+      "testament": "NT"
+    },
+    "1Thessalonians": {
+      "file": "greek/52-1Thessalonians.json.gz",
+      "verses": 89,
+      "testament": "NT"
+    },
+    "2Thessalonians": {
+      "file": "greek/53-2Thessalonians.json.gz",
+      "verses": 47,
+      "testament": "NT"
+    },
+    "1Timothy": {
+      "file": "greek/54-1Timothy.json.gz",
+      "verses": 113,
+      "testament": "NT"
+    },
+    "2Timothy": {
+      "file": "greek/55-2Timothy.json.gz",
+      "verses": 83,
+      "testament": "NT"
+    },
+    "Titus": {
+      "file": "greek/56-Titus.json.gz",
+      "verses": 46,
+      "testament": "NT"
+    },
+    "Philemon": {
+      "file": "greek/57-Philemon.json.gz",
+      "verses": 25,
+      "testament": "NT"
+    },
+    "Hebrews": {
+      "file": "greek/58-Hebrews.json.gz",
+      "verses": 303,
+      "testament": "NT"
+    },
+    "James": {
+      "file": "greek/59-James.json.gz",
+      "verses": 108,
+      "testament": "NT"
+    },
+    "1Peter": {
+      "file": "greek/60-1Peter.json.gz",
+      "verses": 105,
+      "testament": "NT"
+    },
+    "2Peter": {
+      "file": "greek/61-2Peter.json.gz",
+      "verses": 61,
+      "testament": "NT"
+    },
+    "1John": {
+      "file": "greek/62-1John.json.gz",
+      "verses": 105,
+      "testament": "NT"
+    },
+    "2John": {
+      "file": "greek/63-2John.json.gz",
+      "verses": 13,
+      "testament": "NT"
+    },
+    "3John": {
+      "file": "greek/64-3John.json.gz",
+      "verses": 15,
+      "testament": "NT"
+    },
+    "Jude": {
+      "file": "greek/65-Jude.json.gz",
+      "verses": 25,
+      "testament": "NT"
+    },
+    "Revelation": {
+      "file": "greek/66-Revelation.json.gz",
+      "verses": 405,
+      "testament": "NT"
+    },
+    "Genesis": {
+      "file": "hebrew/01-Genesis.json.gz",
+      "verses": 1533,
+      "testament": "OT"
+    },
+    "Exodus": {
+      "file": "hebrew/02-Exodus.json.gz",
+      "verses": 1213,
+      "testament": "OT"
+    },
+    "Leviticus": {
+      "file": "hebrew/03-Leviticus.json.gz",
+      "verses": 859,
+      "testament": "OT"
+    },
+    "Numbers": {
+      "file": "hebrew/04-Numbers.json.gz",
+      "verses": 1288,
+      "testament": "OT"
+    },
+    "Deuteronomy": {
+      "file": "hebrew/05-Deuteronomy.json.gz",
+      "verses": 959,
+      "testament": "OT"
+    },
+    "Joshua": {
+      "file": "hebrew/06-Joshua.json.gz",
+      "verses": 658,
+      "testament": "OT"
+    },
+    "Judges": {
+      "file": "hebrew/07-Judges.json.gz",
+      "verses": 618,
+      "testament": "OT"
+    },
+    "Ruth": {
+      "file": "hebrew/08-Ruth.json.gz",
+      "verses": 85,
+      "testament": "OT"
+    },
+    "1Samuel": {
+      "file": "hebrew/09-1Samuel.json.gz",
+      "verses": 810,
+      "testament": "OT"
+    }
+  }
+}

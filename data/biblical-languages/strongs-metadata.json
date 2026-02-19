@@ -1,0 +1,13 @@
+{
+  "version": "1.0.0",
+  "source": "OpenScriptures Strong's Hebrew and Greek Dictionaries",
+  "source_url": "https://github.com/openscriptures/strongs",
+  "license": "Public Domain",
+  "attribution": "Open Scriptures (openscriptures.org)",
+  "build_date": "2025-10-16T19:10:48.637Z",
+  "entries": {
+    "greek": 5624,
+    "hebrew": 8674,
+    "total": 14298
+  }
+}

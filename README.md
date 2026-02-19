@@ -291,12 +291,15 @@ npm run clean
 
 ## MCP Tools Summary
 
-TheologAI provides 4 primary tools:
+TheologAI provides 7 tools:
 
 1. **`bible_lookup`** - Look up verses in 8 translations with footnotes
 2. **`bible_cross_references`** - Get related verses via Treasury of Scripture Knowledge
-3. **`commentary_lookup`** - Access 6 public domain commentaries
-4. **`classic_text_lookup`** - Search 18 local historical documents + 1000+ CCEL works (unified tool)
+3. **`parallel_passages`** - Find parallel/synoptic passages across the Bible
+4. **`commentary_lookup`** - Access 6 public domain commentaries
+5. **`classic_text_lookup`** - Search 18 local historical documents + 1000+ CCEL works (unified tool)
+6. **`original_language_lookup`** - Strong's Hebrew/Greek word studies with STEPBible data
+7. **`bible_verse_morphology`** - Word-by-word morphological analysis of any verse
 
 ## Development Progress
 
@@ -364,12 +367,13 @@ TheologAI provides 4 primary tools:
 
 **Phase 3.6: Greek & Hebrew Language Tools** ✅
 - ✅ Strong's Concordance: 14,298 entries (5,624 Greek + 8,674 Hebrew)
-- ✅ `strongs_lookup` tool for word studies
-- ✅ Original language words with transliterations
-- ✅ Pronunciation guides for all entries
-- ✅ Comprehensive definitions and etymologies
-- ✅ Data from OpenScriptures (Public Domain)
-- ✅ Lightweight JSON-based architecture (~4MB total)
+- ✅ `original_language_lookup` tool for word studies (simple/detailed modes)
+- ✅ `bible_verse_morphology` tool for word-by-word verse analysis (all 66 books)
+- ✅ STEPBible morphology data: 305,693 Hebrew + 142,096 Greek words
+- ✅ Original language words with transliterations and pronunciation
+- ✅ Comprehensive definitions, etymologies, and theological insights
+- ✅ Data from OpenScriptures (Public Domain) + STEPBible (CC BY 4.0)
+- ✅ Lightweight gzipped JSON architecture (~28MB total, ~7MB compressed morphology)
 - ✅ Fast in-memory lookups (<1ms per query)
 
 **Performance:**
@@ -386,14 +390,12 @@ TheologAI provides 4 primary tools:
 
 **Potential Enhancements:**
 - [ ] Additional HelloAO translations (1000+ available)
-- [ ] Morphological parsing (verb tenses, noun cases)
 - [ ] Word concordance (find all uses of a Greek/Hebrew word)
 - [ ] Advanced topical search across all resources
-- [ ] More historical texts and catechisms
 - [ ] Search history and bookmarking
 - [ ] Export/citation tools for research
-- [ ] Parallel passage viewing
 - [ ] Theological topic indexing
+- [ ] MCP skills integration (prompt-based workflows)
 
 ## Architecture
 
@@ -409,6 +411,7 @@ src/
 │   ├── helloaoBibleAdapter.ts  # HelloAO translation adapter (KJV, WEB, BSB, ASV, YLT, DBY)
 │   ├── publicCommentaryAdapter.ts # HelloAO commentary adapter
 │   ├── localData.ts            # Local historical documents adapter (18 documents)
+│   ├── biblicalLanguagesAdapter.ts # Strong's + STEPBible morphology data
 │   ├── ccelApi.ts              # CCEL API (Scripture, Works, Fragments)
 │   ├── ccelToc.ts              # CCEL TOC parser with auto-resolution
 │   └── ccelCatalogScraper.ts   # CCEL catalog scraper (1000+ works)
@@ -417,14 +420,17 @@ src/
 │   ├── historicalService.ts     # Historical documents service
 │   ├── commentaryService.ts     # Commentary notes (6 commentaries)
 │   ├── crossReferenceService.ts # Cross-reference service (Treasury of Scripture Knowledge)
+│   ├── parallelPassageService.ts # Parallel passage service
 │   ├── ccelService.ts           # CCEL classic texts
 │   └── sectionResolver.ts       # Natural language → section ID
 ├── tools/                        # MCP tool handlers
 │   ├── index.ts                 # Tool registry
 │   ├── bibleLookup.ts           # Bible verse lookup (8 translations + footnotes)
 │   ├── bibleCrossReferences.ts  # Cross-reference lookup
+│   ├── parallelPassages.ts      # Parallel/synoptic passage finder
 │   ├── commentaryLookup.ts      # Commentary retrieval (6 commentaries)
-│   └── classicTextLookup.ts     # Unified historical documents + CCEL (replaces historicalSearch)
+│   ├── classicTextLookup.ts     # Unified historical documents + CCEL (replaces historicalSearch)
+│   └── biblicalLanguages.ts     # Strong's lookup + verse morphology tools
 ├── utils/                        # Utilities
 │   ├── cache.ts                 # In-memory caching (Bible & TOC)
 │   ├── formatter.ts             # Markdown formatting (with footnotes)
@@ -447,12 +453,12 @@ src/
 - Coverage: 5,624 Greek entries (NT), 8,674 Hebrew entries (OT)
 - Includes: Original word, transliteration, pronunciation, definition, derivation/etymology
 
-**STEPBible TAGNT (142,096 words)**
-- Source: [STEPBible Data - Translators Amalgamated Greek NT](https://github.com/STEPBible/STEPBible-Data)
+**STEPBible Morphology (447,789 words)**
+- Source: [STEPBible Data - Translators Amalgamated OT+NT](https://github.com/STEPBible/STEPBible-Data)
 - License: Creative Commons Attribution 4.0 (CC BY 4.0)
 - Attribution: STEP Bible (www.stepbible.org)
-- Coverage: All 27 NT books with morphological tagging
-- Includes: Greek text, lemma, extended Strong's numbers, grammatical parsing (Robinson codes), English glosses
+- Coverage: All 66 books (39 OT Hebrew + 27 NT Greek) with morphological tagging
+- Includes: Original text, lemma, extended Strong's numbers, grammatical parsing, English glosses
 - Data created by www.STEPBible.org based on work at Tyndale House Cambridge
 
 ### Bible Translations
@@ -470,18 +476,31 @@ src/
 
 ISC
 
-## Building STEPBible Data
+## Building Biblical Language Data
 
-To rebuild the STEPBible morphological data:
+To rebuild the STEPBible morphological data (Hebrew OT + Greek NT):
 
 ```bash
 npm run build:stepbible
 ```
 
-This downloads the latest TAGNT data from STEPBible's GitHub repository, parses the TSV files, and generates:
+This downloads the latest data from STEPBible's GitHub repository, parses the TSV files, and generates:
+- 39 compressed JSON files (one per OT book) in `data/biblical-languages/stepbible/hebrew/`
 - 27 compressed JSON files (one per NT book) in `data/biblical-languages/stepbible/greek/`
 - Index file with book metadata
 - Morphology code expansion table
 - STEPBible metadata with version and attribution
 
-Total size: ~1.9MB compressed (~7MB uncompressed)
+To rebuild the Strong's concordance data:
+
+```bash
+npm run build:strongs
+```
+
+To rebuild the STEPBible lexicons (Abbott-Smith Greek, BDB Hebrew):
+
+```bash
+npm run build:stepbible:lexicons
+```
+
+Total biblical languages data size: ~28MB

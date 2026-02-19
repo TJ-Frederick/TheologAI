@@ -1,15 +1,24 @@
 {
   "name": "theologai",
-  "version": "3.4.0",
+  "version": "3.6.0",
   "description": "A Model Context Protocol server for Bible study and theological research",
   "main": "dist/index.js",
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc && mkdir -p dist/data && cp src/data/parallel-passages.json dist/data/",
+    "build:strongs": "tsx scripts/build-strongs-json.ts",
+    "build:stepbible": "tsx scripts/build-stepbible-json.ts",
+    "build:stepbible:lexicons": "tsx scripts/build-stepbible-lexicons.ts",
     "start": "node dist/index.js",
     "clean": "rm -rf dist",
-    "test": "npm run build && npm run test:helloao-bible",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:unit": "vitest run test/unit",
+    "test:integration": "vitest run test/integration",
+    "test:e2e": "vitest run test/e2e",
+    "test:coverage": "vitest run --coverage",
     "test:ccel": "tsx test/adapters/ccel-test.ts",
     "test:netbible": "tsx test/adapters/netbible-test.ts",
     "test:bibleapi": "tsx test/adapters/bibleapi-test.ts",
@@ -32,7 +41,13 @@
     "typescript": "^5.9.2"
   },
   "devDependencies": {
+    "@types/xml2js": "^0.4.14",
+    "@vitest/coverage-v8": "^3.2.4",
+    "@vitest/ui": "^3.2.4",
+    "happy-dom": "^20.0.4",
     "nodemon": "^3.1.10",
-    "tsx": "^4.20.6"
+    "tsx": "^4.20.6",
+    "vitest": "^3.2.4",
+    "xml2js": "^0.6.2"
   }
 }
