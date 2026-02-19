@@ -18,7 +18,7 @@ TheologAI now provides comprehensive theological research tools with refined Gre
 - **🔍 Unified Search**: Single tool searches local documents first, then entire CCEL catalog
 - **📖 Bible Verse → Commentary**: Direct verse lookup in Calvin's commentaries (auto-routing to correct volume)
 - **🗂️ Work Discovery**: Browse 40+ curated works or search entire CCEL catalog dynamically
-- **⚡ Fast & Reliable**: In-memory caching with 1-hour TTL for verses and footnotes
+- **⚡ Fast & Reliable**: SQLite for local data, LRU cache with 1-hour TTL for API responses
 - **💰 Zero Cost**: All HelloAO resources (6 translations + 6 commentaries) are free with no rate limits
 - **✨ Clean Formatting**: Beautiful markdown output with proper citations
 
@@ -289,17 +289,51 @@ npm run clean
 - **Default Port**: 3000 (configurable via `.env` file)
 - **CORS**: Enabled for web client compatibility
 
-## MCP Tools Summary
+## MCP Capabilities
 
-TheologAI provides 7 tools:
+TheologAI implements all 4 MCP protocol capabilities: **Tools**, **Resources**, **Prompts**, and **Logging**.
 
-1. **`bible_lookup`** - Look up verses in 8 translations with footnotes
-2. **`bible_cross_references`** - Get related verses via Treasury of Scripture Knowledge
-3. **`parallel_passages`** - Find parallel/synoptic passages across the Bible
-4. **`commentary_lookup`** - Access 6 public domain commentaries
-5. **`classic_text_lookup`** - Search 18 local historical documents + 1000+ CCEL works (unified tool)
-6. **`original_language_lookup`** - Strong's Hebrew/Greek word studies with STEPBible data
-7. **`bible_verse_morphology`** - Word-by-word morphological analysis of any verse
+### Tools (7)
+
+| Tool | Description |
+|------|-------------|
+| `bible_lookup` | Verse retrieval across 8 translations (ESV, NET, KJV, WEB, BSB, ASV, YLT, DBY) |
+| `bible_cross_references` | Thematic connections via OpenBible.info data |
+| `parallel_passages` | OT-NT quotations, synoptic parallels, thematic links |
+| `commentary_lookup` | 6 commentaries (Matthew Henry, JFB, Clarke, Gill, K-D, Tyndale) |
+| `classic_text_lookup` | 18 local docs + 1000+ CCEL works, unified search |
+| `original_language_lookup` | Strong's concordance (14,298 entries), Greek/Hebrew word studies |
+| `bible_verse_morphology` | Word-by-word grammatical analysis for all 66 books |
+
+All tools have annotations: `readOnlyHint: true`, `destructiveHint: false`, `idempotentHint: true`.
+
+### Resources
+
+| URI | Description |
+|-----|-------------|
+| `theologai://translations` | Available Bible translations |
+| `theologai://commentaries` | Available commentators with coverage info |
+| `theologai://documents/{slug}` | 18 historical documents (browseable) |
+| `theologai://strongs/{number}` | Strong's dictionary entries (G####, H####) |
+
+### Prompts
+
+| Prompt | Description |
+|--------|-------------|
+| `word-study` | Guided Greek/Hebrew word study workflow |
+| `passage-exegesis` | Systematic exegesis methodology |
+| `compare-translations` | Multi-translation comparison template |
+
+### Agent Skills
+
+Reusable workflow expertise in `skills/`:
+- **Word Study** — Greek/Hebrew word study methodology across tools
+- **Passage Exegesis** — Systematic exegetical analysis
+- **Confession Study** — Cross-tradition doctrinal comparison
+
+### Logging
+
+Structured logging via `server.sendLoggingMessage()` with levels: debug, info, warning, error.
 
 ## Development Progress
 
@@ -376,70 +410,74 @@ TheologAI provides 7 tools:
 - ✅ Lightweight gzipped JSON architecture (~28MB total, ~7MB compressed morphology)
 - ✅ Fast in-memory lookups (<1ms per query)
 
+**Phase 4: Comprehensive Architecture Rewrite** ✅
+- ✅ Canonical reference system (`src/kernel/`) — eliminates 5 duplicate book-name normalization schemes
+- ✅ SQLite data layer via `better-sqlite3` — cross-references, Strong's, morphology, historical documents
+- ✅ FTS5 full-text search for Strong's concordance and historical documents
+- ✅ Layered architecture: kernel → adapters → services → formatters → tools
+- ✅ Composition root with dependency injection (`src/tools/v2/index.ts`)
+- ✅ MCP Resources (4 URIs), Prompts (3 templates), Logging (structured levels)
+- ✅ Tool annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`)
+- ✅ Agent Skills for word study, passage exegesis, and confession comparison
+- ✅ Pure formatter functions for testable Markdown output
+- ✅ MCP SDK upgraded to v1.26.0
+
 **Performance:**
 - Bible verse cache: ~160ms → <1ms on repeated queries
 - HelloAO API calls: ~200ms (no rate limits!)
+- Strong's lookups: < 1ms (SQLite with prepared statements)
+- Morphology queries: < 1ms (SQLite indexed by book/chapter/verse)
+- Cross-reference lookups: < 1ms (SQLite indexed, ~1MB vs 30-50MB in-memory)
+- FTS5 search: < 5ms across all indexed data
 - TOC caching: 24-hour TTL reduces API calls
-- Catalog scraping: ~2-3s per letter, 5-minute cache
-- Cache hit time: < 10ms across all resources
-- Strong's lookups: < 1ms (in-memory JSON)
-- Strong's data loading: ~200ms on startup
 - ESV API rate limit protection through intelligent caching
 
-## Next Steps (Phase 4+)
+## Next Steps
 
 **Potential Enhancements:**
 - [ ] Additional HelloAO translations (1000+ available)
 - [ ] Word concordance (find all uses of a Greek/Hebrew word)
 - [ ] Advanced topical search across all resources
-- [ ] Search history and bookmarking
 - [ ] Export/citation tools for research
 - [ ] Theological topic indexing
-- [ ] MCP skills integration (prompt-based workflows)
 
 ## Architecture
 
 ```
 src/
-├── index.ts                      # MCP server entry point
-├── server.ts                     # Main server class
-├── adapters/                     # External API adapters
-│   ├── index.ts                 # Adapter exports
-│   ├── esvApi.ts               # ESV Bible API
-│   ├── netBibleApi.ts          # NET Bible API (translator notes)
-│   ├── helloaoApi.ts           # HelloAO Bible API (commentaries, translations, cross-refs)
-│   ├── helloaoBibleAdapter.ts  # HelloAO translation adapter (KJV, WEB, BSB, ASV, YLT, DBY)
-│   ├── publicCommentaryAdapter.ts # HelloAO commentary adapter
-│   ├── localData.ts            # Local historical documents adapter (18 documents)
-│   ├── biblicalLanguagesAdapter.ts # Strong's + STEPBible morphology data
-│   ├── ccelApi.ts              # CCEL API (Scripture, Works, Fragments)
-│   ├── ccelToc.ts              # CCEL TOC parser with auto-resolution
-│   └── ccelCatalogScraper.ts   # CCEL catalog scraper (1000+ works)
-├── services/                     # Business logic layer
-│   ├── bibleService.ts          # Bible verse service (8 translations)
-│   ├── historicalService.ts     # Historical documents service
-│   ├── commentaryService.ts     # Commentary notes (6 commentaries)
-│   ├── crossReferenceService.ts # Cross-reference service (Treasury of Scripture Knowledge)
-│   ├── parallelPassageService.ts # Parallel passage service
-│   ├── ccelService.ts           # CCEL classic texts
-│   └── sectionResolver.ts       # Natural language → section ID
-├── tools/                        # MCP tool handlers
-│   ├── index.ts                 # Tool registry
-│   ├── bibleLookup.ts           # Bible verse lookup (8 translations + footnotes)
-│   ├── bibleCrossReferences.ts  # Cross-reference lookup
-│   ├── parallelPassages.ts      # Parallel/synoptic passage finder
-│   ├── commentaryLookup.ts      # Commentary retrieval (6 commentaries)
-│   ├── classicTextLookup.ts     # Unified historical documents + CCEL (replaces historicalSearch)
-│   └── biblicalLanguages.ts     # Strong's lookup + verse morphology tools
-├── utils/                        # Utilities
-│   ├── cache.ts                 # In-memory caching (Bible & TOC)
-│   ├── formatter.ts             # Markdown formatting (with footnotes)
-│   ├── helloaoMapper.ts         # Book name/code mapping for HelloAO
-│   ├── commentaryMapper.ts      # Commentary reference mapping
-│   ├── ccelCommentaryMapper.ts  # Calvin commentary volume mapper
-│   └── errors.ts                # Error handling
-└── types/                        # Type definitions
-    └── index.ts                 # Common types (includes Footnote interface)
+├── index.ts              # Entry point (stdio or HTTP transport)
+├── server.ts             # MCP server — tools, resources, prompts, logging
+├── tools/v2/             # Tool handlers + composition root (DI wiring)
+│   └── index.ts          # createCompositionRoot() — single wiring point
+├── services/             # Business logic — orchestrates adapters
+│   ├── bible/            # BibleService, CrossReferenceService, ParallelPassageService
+│   ├── commentary/       # CommentaryService, CcelService
+│   ├── historical/       # HistoricalDocumentService
+│   └── languages/        # StrongsService, MorphologyService
+├── adapters/             # External API clients + data repositories
+│   ├── bible/            # EsvAdapter, NetBibleAdapter, HelloAoAdapter
+│   ├── commentary/       # HelloAoCommentaryAdapter, CcelAdapter
+│   ├── data/             # SQLite repositories (CrossRef, Strongs, Morphology, Historical)
+│   └── shared/           # Database.ts, HttpClient.ts, HtmlParser.ts
+├── formatters/           # Pure Markdown formatting functions
+├── kernel/               # Shared domain primitives
+│   ├── reference.ts      # THE canonical Bible reference parser
+│   ├── books.ts          # 66-book registry with all external format codes
+│   ├── types.ts          # Shared TypeScript interfaces
+│   ├── errors.ts         # Typed error hierarchy
+│   └── cache.ts          # Generic LRU cache with TTL
+└── data/                 # Compiled data (parallel-passages.json)
+
+data/                     # Source data files
+├── theologai.db          # SQLite database (built from source data)
+├── biblical-languages/   # Strong's concordance, STEPBible morphology/lexicons
+├── cross-references/     # OpenBible.info cross-reference TSV
+└── historical-documents/ # 18 creeds, confessions, catechisms (JSON)
+
+skills/                   # Agent skill workflows
+├── word-study/           # Greek/Hebrew word study methodology
+├── passage-exegesis/     # Systematic exegetical analysis
+└── confession-study/     # Cross-tradition doctrinal comparison
 ```
 
 ## Data Sources & Attribution
@@ -476,31 +514,24 @@ src/
 
 ISC
 
-## Building Biblical Language Data
+## Building Data
 
-To rebuild the STEPBible morphological data (Hebrew OT + Greek NT):
+### SQLite Database
+
+All local data (cross-references, Strong's concordance, morphology, historical documents) is compiled into a single SQLite database. The source files in `data/` are the source of truth; `data/theologai.db` is a derived artifact.
 
 ```bash
-npm run build:stepbible
+npm run build:db    # Rebuild SQLite database from all source data
 ```
 
-This downloads the latest data from STEPBible's GitHub repository, parses the TSV files, and generates:
-- 39 compressed JSON files (one per OT book) in `data/biblical-languages/stepbible/hebrew/`
-- 27 compressed JSON files (one per NT book) in `data/biblical-languages/stepbible/greek/`
-- Index file with book metadata
-- Morphology code expansion table
-- STEPBible metadata with version and attribution
+### Biblical Language Data
 
-To rebuild the Strong's concordance data:
+To rebuild the source data files:
 
 ```bash
-npm run build:strongs
-```
-
-To rebuild the STEPBible lexicons (Abbott-Smith Greek, BDB Hebrew):
-
-```bash
-npm run build:stepbible:lexicons
+npm run build:stepbible           # STEPBible morphology (Hebrew OT + Greek NT)
+npm run build:strongs             # Strong's concordance
+npm run build:stepbible:lexicons  # STEPBible lexicons (Abbott-Smith Greek, BDB Hebrew)
 ```
 
 Total biblical languages data size: ~28MB

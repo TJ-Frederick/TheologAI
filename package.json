@@ -10,6 +10,7 @@
     "build:strongs": "tsx scripts/build-strongs-json.ts",
     "build:stepbible": "tsx scripts/build-stepbible-json.ts",
     "build:stepbible:lexicons": "tsx scripts/build-stepbible-lexicons.ts",
+    "build:db": "tsx scripts/build-database.ts",
     "start": "node dist/index.js",
     "clean": "rm -rf dist",
     "test": "vitest run",
@@ -35,12 +36,14 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.18.2",
-    "@types/node": "^24.5.2",
+    "@modelcontextprotocol/sdk": "~1.26.0",
+    "better-sqlite3": "^12.6.2",
     "dotenv": "^17.2.3",
     "typescript": "^5.9.2"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^24.5.2",
     "@types/xml2js": "^0.4.14",
     "@vitest/coverage-v8": "^3.2.4",
     "@vitest/ui": "^3.2.4",

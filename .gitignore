@@ -6,6 +6,11 @@ dist/
 *.tsbuildinfo
 .aider*
 
+# SQLite derived artifacts (rebuild with: npm run build:db)
+data/theologai.db
+data/theologai.db-shm
+data/theologai.db-wal
+
 # Test outputs and temp files
 test-output/
 test-results/

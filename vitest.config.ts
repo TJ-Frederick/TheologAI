@@ -5,16 +5,10 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     setupFiles: ['./test/setup.ts'],
-    include: ['test/**/*.test.ts'],
+    include: ['test/unit/**/*.test.ts'],
     exclude: [
       'node_modules',
       'dist',
-      'test/adapters/**/*', // Exclude old test files
-      'test/integration/**/*',
-      'test/tools/**/*',
-      'test/quick-*.ts',
-      'test/readme-*.ts',
-      'test/scripts/**/*'
     ],
     coverage: {
       provider: 'v8',
@@ -27,7 +21,7 @@ export default defineConfig({
         '**/*.test.ts',
         '**/*.config.ts',
         'src/types/index.ts',
-        'src/index.ts'
+        'src/index.ts',
       ],
       lines: 80,
       functions: 75,
