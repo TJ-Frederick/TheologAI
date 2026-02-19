@@ -88,13 +88,17 @@ All tools have annotations: `readOnlyHint: true`, `destructiveHint: false`, `ide
 | `theologai://documents/{slug}` | 18 historical documents (browseable) |
 | `theologai://strongs/{number}` | Strong's dictionary entries (G####, H####) |
 
-### Prompts
+### Prompts (Guided Workflows)
 
-| Prompt | Description |
-|--------|-------------|
-| `word-study` | Guided Greek/Hebrew word study workflow |
-| `passage-exegesis` | Systematic exegesis methodology |
-| `compare-translations` | Multi-translation comparison template |
+These prompts provide structured research methodologies. **Auto-trigger**: when a user request matches one of these workflows, invoke the corresponding prompt before proceeding — do not wait for the user to type the slash command.
+
+| Prompt | Slash Command | Trigger When User Asks To... |
+|--------|---------------|------------------------------|
+| `word-study` | `/mcp__theologai__word-study` | Study a Greek/Hebrew word, explore a Strong's number, or understand a biblical term's meaning |
+| `passage-exegesis` | `/mcp__theologai__passage-exegesis` | Exegete a passage, do deep analysis of verses, or study a text systematically |
+| `compare-translations` | `/mcp__theologai__compare-translations` | Compare how different translations render a passage, or explore translation differences |
+
+When a user asks "what can you do?" or seems unsure how to proceed, mention these workflows as available research modes.
 
 ### Logging
 
