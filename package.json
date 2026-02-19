@@ -10,6 +10,7 @@
     "build:strongs": "tsx scripts/build-strongs-json.ts",
     "build:stepbible": "tsx scripts/build-stepbible-json.ts",
     "build:stepbible:lexicons": "tsx scripts/build-stepbible-lexicons.ts",
+    "build:db": "tsx scripts/build-database.ts",
     "start": "node dist/index.js",
     "clean": "rm -rf dist",
     "test": "vitest run",
