@@ -32,22 +32,22 @@ export function createClassicTextsHandler(
       try {
         // List works
         if (params.listWorks) {
-          const docs = historicalService.listDocuments();
+          const docs = await historicalService.listDocuments();
           return { content: [{ type: 'text', text: formatDocumentList(docs) }] };
         }
 
         // Browse a specific document
         if (params.work && params.browseSections) {
-          const doc = historicalService.getDocument(params.work as string);
-          const sections = historicalService.getSections(doc.id);
+          const doc = await historicalService.getDocument(params.work as string);
+          const sections = await historicalService.getSections(doc.id);
           return { content: [{ type: 'text', text: formatDocumentSections(doc, sections) }] };
         }
 
         // Look up a specific local document
         if (params.work && !params.query) {
-          const doc = historicalService.findDocument(params.work as string);
+          const doc = await historicalService.findDocument(params.work as string);
           if (doc) {
-            const sections = historicalService.getSections(doc.id);
+            const sections = await historicalService.getSections(doc.id);
             return { content: [{ type: 'text', text: formatDocumentSections(doc, sections) }] };
           }
 
@@ -59,7 +59,7 @@ export function createClassicTextsHandler(
         // Search by query
         if (params.query) {
           // Search local docs first
-          const localResults = historicalService.search(params.query as string);
+          const localResults = await historicalService.search(params.query as string);
           if (localResults.length > 0) {
             return { content: [{ type: 'text', text: formatSearchResults(params.query as string, localResults) }] };
           }

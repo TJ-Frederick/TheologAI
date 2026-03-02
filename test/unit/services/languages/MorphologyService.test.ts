@@ -27,30 +27,30 @@ function makeMockRepo() {
 
 describe('MorphologyService', () => {
   describe('getVerseMorphology', () => {
-    it('parses reference and calls repo with StepBible format', () => {
+    it('parses reference and calls repo with StepBible format', async () => {
       const repo = makeMockRepo();
       const service = new MorphologyService(repo as any);
-      service.getVerseMorphology('John 1:1');
+      await service.getVerseMorphology('John 1:1');
       expect(repo.getVerseMorphology).toHaveBeenCalledWith('John', 1, 1);
     });
 
-    it('throws NotFoundError for chapter-only reference', () => {
+    it('throws NotFoundError for chapter-only reference', async () => {
       const repo = makeMockRepo();
       const service = new MorphologyService(repo as any);
-      expect(() => service.getVerseMorphology('John 1')).toThrow(NotFoundError);
+      await expect(service.getVerseMorphology('John 1')).rejects.toThrow(NotFoundError);
     });
 
-    it('throws NotFoundError when repo returns empty array', () => {
+    it('throws NotFoundError when repo returns empty array', async () => {
       const repo = makeMockRepo();
       repo.getVerseMorphology.mockReturnValue([]);
       const service = new MorphologyService(repo as any);
-      expect(() => service.getVerseMorphology('John 1:1')).toThrow(NotFoundError);
+      await expect(service.getVerseMorphology('John 1:1')).rejects.toThrow(NotFoundError);
     });
 
-    it('maps MorphWord to VerseWord correctly', () => {
+    it('maps MorphWord to VerseWord correctly', async () => {
       const repo = makeMockRepo();
       const service = new MorphologyService(repo as any);
-      const result = service.getVerseMorphology('John 1:1');
+      const result = await service.getVerseMorphology('John 1:1');
       expect(result.words).toHaveLength(2);
       expect(result.words[0]).toMatchObject({
         position: 1,
@@ -62,37 +62,37 @@ describe('MorphologyService', () => {
       });
     });
 
-    it('sets morphExpanded when expandMorphology is true', () => {
+    it('sets morphExpanded when expandMorphology is true', async () => {
       const repo = makeMockRepo();
       const service = new MorphologyService(repo as any);
-      const result = service.getVerseMorphology('John 1:1', true);
+      const result = await service.getVerseMorphology('John 1:1', true);
       expect(result.words[0].morphExpanded).toBe('Preposition');
       expect(result.words[1].morphExpanded).toBe('Noun, Dative, Singular, Feminine');
     });
 
-    it('does not expand when expandMorphology is false', () => {
+    it('does not expand when expandMorphology is false', async () => {
       const repo = makeMockRepo();
       const service = new MorphologyService(repo as any);
-      const result = service.getVerseMorphology('John 1:1', false);
+      const result = await service.getVerseMorphology('John 1:1', false);
       expect(result.words[0].morphExpanded).toBeUndefined();
     });
 
-    it('handles null strongs_number and morph_code', () => {
+    it('handles null strongs_number and morph_code', async () => {
       const repo = makeMockRepo();
       repo.getVerseMorphology.mockReturnValue([
         { position: 1, word_text: 'word', lemma: 'lem', strongs_number: null, morph_code: null, gloss: null },
       ]);
       const service = new MorphologyService(repo as any);
-      const result = service.getVerseMorphology('John 1:1');
+      const result = await service.getVerseMorphology('John 1:1');
       expect(result.words[0].strong).toBe('');
       expect(result.words[0].morph).toBe('');
       expect(result.words[0].gloss).toBe('');
     });
 
-    it('returns correct metadata', () => {
+    it('returns correct metadata', async () => {
       const repo = makeMockRepo();
       const service = new MorphologyService(repo as any);
-      const result = service.getVerseMorphology('John 1:1');
+      const result = await service.getVerseMorphology('John 1:1');
       expect(result.reference).toBe('John 1:1');
       expect(result.testament).toBe('NT');
       expect(result.book).toBe('John');
@@ -103,10 +103,10 @@ describe('MorphologyService', () => {
   });
 
   describe('getAvailableBooks', () => {
-    it('delegates to repository', () => {
+    it('delegates to repository', async () => {
       const repo = makeMockRepo();
       const service = new MorphologyService(repo as any);
-      const books = service.getAvailableBooks();
+      const books = await service.getAvailableBooks();
       expect(repo.getAvailableBooks).toHaveBeenCalled();
       expect(books).toEqual(['Genesis', 'John', 'Romans']);
     });

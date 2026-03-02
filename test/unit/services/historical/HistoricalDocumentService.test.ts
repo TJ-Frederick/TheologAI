@@ -34,79 +34,79 @@ function makeMockRepo() {
 }
 
 describe('HistoricalDocumentService', () => {
-  it('delegates listDocuments to repository', () => {
+  it('delegates listDocuments to repository', async () => {
     const repo = makeMockRepo();
     const service = new HistoricalDocumentService(repo as any);
-    const docs = service.listDocuments();
+    const docs = await service.listDocuments();
     expect(repo.listDocuments).toHaveBeenCalled();
     expect(docs).toHaveLength(1);
   });
 
   describe('getDocument', () => {
-    it('returns document when found by ID', () => {
+    it('returns document when found by ID', async () => {
       const repo = makeMockRepo();
       const service = new HistoricalDocumentService(repo as any);
-      const doc = service.getDocument('nicene-creed');
+      const doc = await service.getDocument('nicene-creed');
       expect(repo.getDocument).toHaveBeenCalledWith('nicene-creed');
       expect(doc.id).toBe('nicene-creed');
     });
 
-    it('falls back to findDocumentByName when not found by ID', () => {
+    it('falls back to findDocumentByName when not found by ID', async () => {
       const repo = makeMockRepo();
       repo.getDocument.mockReturnValue(undefined);
       repo.findDocumentByName.mockReturnValue(mockDoc);
       const service = new HistoricalDocumentService(repo as any);
-      const doc = service.getDocument('Nicene Creed');
+      const doc = await service.getDocument('Nicene Creed');
       expect(repo.findDocumentByName).toHaveBeenCalledWith('Nicene Creed');
       expect(doc.id).toBe('nicene-creed');
     });
 
-    it('throws NotFoundError when neither lookup finds document', () => {
+    it('throws NotFoundError when neither lookup finds document', async () => {
       const repo = makeMockRepo();
       repo.getDocument.mockReturnValue(undefined);
       repo.findDocumentByName.mockReturnValue(undefined);
       const service = new HistoricalDocumentService(repo as any);
-      expect(() => service.getDocument('nonexistent')).toThrow(NotFoundError);
+      await expect(service.getDocument('nonexistent')).rejects.toThrow(NotFoundError);
     });
   });
 
-  it('delegates getSections to repository', () => {
+  it('delegates getSections to repository', async () => {
     const repo = makeMockRepo();
     const service = new HistoricalDocumentService(repo as any);
-    const sections = service.getSections('nicene-creed');
+    const sections = await service.getSections('nicene-creed');
     expect(repo.getSections).toHaveBeenCalledWith('nicene-creed');
     expect(sections).toHaveLength(1);
   });
 
   describe('getSection', () => {
-    it('returns section when found', () => {
+    it('returns section when found', async () => {
       const repo = makeMockRepo();
       const service = new HistoricalDocumentService(repo as any);
-      const section = service.getSection('nicene-creed', '1');
+      const section = await service.getSection('nicene-creed', '1');
       expect(repo.getSection).toHaveBeenCalledWith('nicene-creed', '1');
       expect(section.title).toBe('Article I');
     });
 
-    it('throws NotFoundError when section not found', () => {
+    it('throws NotFoundError when section not found', async () => {
       const repo = makeMockRepo();
       repo.getSection.mockReturnValue(undefined);
       const service = new HistoricalDocumentService(repo as any);
-      expect(() => service.getSection('nicene-creed', '99')).toThrow(NotFoundError);
+      await expect(service.getSection('nicene-creed', '99')).rejects.toThrow(NotFoundError);
     });
   });
 
-  it('delegates search to repository with query and limit', () => {
+  it('delegates search to repository with query and limit', async () => {
     const repo = makeMockRepo();
     const service = new HistoricalDocumentService(repo as any);
-    service.search('grace', 10);
+    await service.search('grace', 10);
     expect(repo.search).toHaveBeenCalledWith('grace', 10);
   });
 
-  it('delegates findDocument to repository', () => {
+  it('delegates findDocument to repository', async () => {
     const repo = makeMockRepo();
     repo.findDocumentByName.mockReturnValue(mockDoc);
     const service = new HistoricalDocumentService(repo as any);
-    const result = service.findDocument('nicene');
+    const result = await service.findDocument('nicene');
     expect(repo.findDocumentByName).toHaveBeenCalledWith('nicene');
     expect(result?.id).toBe('nicene-creed');
   });

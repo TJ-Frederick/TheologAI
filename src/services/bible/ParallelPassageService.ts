@@ -85,7 +85,7 @@ export class ParallelPassageService {
 
     // Augment with cross-references if requested
     if (params.useCrossReferences !== false) {
-      const xrefs = this.crossRefs.getCrossReferences(params.reference, { maxResults: params.maxParallels ?? 10 });
+      const xrefs = await this.crossRefs.getCrossReferences(params.reference, { maxResults: params.maxParallels ?? 10 });
       for (const xref of xrefs.references) {
         if (!parallels.some(p => p.reference === xref.reference)) {
           parallels.push({

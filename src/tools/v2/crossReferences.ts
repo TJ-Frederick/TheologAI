@@ -24,7 +24,7 @@ export function createCrossReferencesHandler(crossRefService: CrossReferenceServ
 
     handler: async (params) => {
       try {
-        const result = crossRefService.getCrossReferences(params.reference as string, {
+        const result = await crossRefService.getCrossReferences(params.reference as string, {
           maxResults: params.maxResults as number,
           minVotes: params.minVotes as number,
         });

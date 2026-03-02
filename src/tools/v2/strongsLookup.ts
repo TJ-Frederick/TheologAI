@@ -28,7 +28,7 @@ export function createStrongsLookupHandler(service: StrongsService): ToolHandler
 
     handler: async (params) => {
       try {
-        const result = service.lookup(
+        const result = await service.lookup(
           params.strongs_number as string,
           params.include_extended as boolean,
         );

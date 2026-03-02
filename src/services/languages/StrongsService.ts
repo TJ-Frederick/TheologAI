@@ -16,13 +16,13 @@ export class StrongsService {
   constructor(private repo: StrongsRepository) {}
 
   /** Look up a Strong's number */
-  lookup(strongsNumber: string, includeExtended?: boolean): EnhancedStrongsResult {
+  async lookup(strongsNumber: string, includeExtended?: boolean): Promise<EnhancedStrongsResult> {
     const normalized = strongsNumber.toUpperCase().trim();
     if (!/^[GH]\d+[a-z]?$/i.test(normalized)) {
       throw new ValidationError('strongs_number', `Invalid Strong's number format: ${strongsNumber}. Expected G#### or H####.`);
     }
 
-    const entry = this.repo.lookup(normalized);
+    const entry = await this.repo.lookup(normalized);
     if (!entry) {
       throw new NotFoundError('strongs', `Strong's number ${normalized} not found`);
     }
@@ -39,7 +39,7 @@ export class StrongsService {
     };
 
     if (includeExtended) {
-      const lexicon = this.repo.getLexiconEntry(normalized);
+      const lexicon = await this.repo.getLexiconEntry(normalized);
       if (lexicon) {
         result.extended = {
           strongsExtended: (lexicon.extended_data as any).extendedStrongs,
@@ -52,12 +52,12 @@ export class StrongsService {
   }
 
   /** Search by lemma or transliteration */
-  search(query: string, limit?: number): StrongsEntry[] {
-    return this.repo.search(query, limit);
+  async search(query: string, limit?: number): Promise<StrongsEntry[]> {
+    return await this.repo.search(query, limit);
   }
 
   /** Get database statistics */
-  getStats() {
-    return this.repo.getStats();
+  async getStats() {
+    return await this.repo.getStats();
   }
 }
