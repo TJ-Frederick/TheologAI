@@ -1,10 +1,16 @@
 # TheologAI - Bible Study MCP Server
 
-A Model Context Protocol (MCP) server that provides theological researchers and Bible students with programmatic access to biblical texts, commentaries, and historical Christian documents through natural language queries via Claude Desktop.
+A Model Context Protocol (MCP) server for theological research — 7 tools, 8 Bible translations, 6 commentaries, 18 historical documents, and Greek/Hebrew language tools. Runs locally via stdio or remotely on Cloudflare Workers.
 
-## Current Status: Production Ready - Beta Launch Prepared! 🎉
+## Use with Claude.ai (Remote)
 
-TheologAI now provides comprehensive theological research tools with refined Greek & Hebrew word studies, fully tested and ready for 100+ beta users:
+Add as a remote MCP server in Claude.ai settings:
+
+```
+https://theologai.tyler-tyfred.workers.dev/mcp
+```
+
+No authentication required. All 7 tools, 4 resources, and 4 prompts are available immediately.
 
 ## Features
 
@@ -196,6 +202,15 @@ All commentaries accessible via HelloAO Bible API with zero rate limits!
 
 ## Installation & Setup
 
+### Remote (Cloudflare Workers — no install needed)
+
+Use the hosted instance directly:
+
+- **Claude.ai**: Add `https://theologai.tyler-tyfred.workers.dev/mcp` as a remote MCP server in Settings > Integrations
+- **Claude Code**: `claude mcp add --transport http theologai https://theologai.tyler-tyfred.workers.dev/mcp`
+
+### Local (stdio)
+
 1. **Clone and Install**
    ```bash
    cd TheologAI
@@ -213,7 +228,7 @@ All commentaries accessible via HelloAO Bible API with zero rate limits!
    npm run build
    npm start
    ```
-   
+
    The server will start on the port specified in your `.env` file (default: 3000).
 
 4. **Configure Claude Desktop**
