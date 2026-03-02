@@ -8,16 +8,6 @@
 import type { IMorphologyRepository, MorphWord, WordOccurrence, BookDistribution } from '../../kernel/repositories.js';
 import { expandHebrewMorphCode } from '../shared/hebrewMorphExpander.js';
 
-// D1 binding type (subset used by this repo)
-interface D1Database {
-  prepare(sql: string): D1PreparedStatement;
-}
-interface D1PreparedStatement {
-  bind(...values: unknown[]): D1PreparedStatement;
-  first<T = Record<string, unknown>>(): Promise<T | null>;
-  all<T = Record<string, unknown>>(): Promise<{ results: T[] }>;
-}
-
 export class D1MorphologyRepository implements IMorphologyRepository {
   constructor(private db: D1Database) {}
 

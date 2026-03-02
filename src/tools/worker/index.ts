@@ -1,8 +1,10 @@
 /**
  * Workers composition root.
  *
- * Called per-request inside the fetch handler — D1 binding is only
- * available inside the fetch handler, not at module scope.
+ * HTTP adapters and services that don't depend on D1 are cached at
+ * module scope (once per isolate) so their LRU caches persist across
+ * requests. D1-dependent objects are created per-request since the
+ * D1 binding is only available inside the fetch handler.
  */
 
 import type { Env } from '../../worker-env.js';
@@ -58,26 +60,41 @@ export interface WorkerCompositionRoot {
   services: WorkerServices;
 }
 
+// ── Module-scope singletons (created once per isolate) ──
+
+const netAdapter = new NetBibleAdapter();
+const helloaoAdapter = new HelloAoAdapter();
+const helloaoCommentary = new HelloAoCommentaryAdapter();
+const ccelAdapter = new CcelAdapter();
+
+const commentaryService = new CommentaryService([helloaoCommentary]);
+const ccelService = new CcelService(ccelAdapter);
+
+// ESV adapter + BibleService are lazy-initialized on first request
+// because EsvAdapter needs env.ESV_API_KEY which isn't available at module scope.
+// Once created, they persist for the isolate's lifetime (secret changes require redeployment).
+let _bibleService: BibleService | null = null;
+
+function getBibleService(env: Env): BibleService {
+  if (!_bibleService) {
+    const esvAdapter = new EsvAdapter(env.ESV_API_KEY);
+    _bibleService = new BibleService([esvAdapter, netAdapter, helloaoAdapter]);
+  }
+  return _bibleService;
+}
+
+// ── Per-request creation (D1-dependent) ──
+
 export function createWorkerCompositionRoot(env: Env): WorkerCompositionRoot {
   const db = env.THEOLOGAI_DB;
 
-  // D1 repositories
+  // D1 repositories (per-request — binding is per-request)
   const crossRefRepo = new D1CrossReferenceRepository(db);
   const strongsRepo = new D1StrongsRepository(db);
   const morphRepo = new D1MorphologyRepository(db);
   const historicalRepo = new D1HistoricalDocumentRepository(db);
 
-  // Bible adapters
-  const esvAdapter = new EsvAdapter(env.ESV_API_KEY);
-  const netAdapter = new NetBibleAdapter();
-  const helloaoAdapter = new HelloAoAdapter();
-
-  // Commentary adapters
-  const helloaoCommentary = new HelloAoCommentaryAdapter();
-  const ccelAdapter = new CcelAdapter();
-
-  // Services
-  const bibleService = new BibleService([esvAdapter, netAdapter, helloaoAdapter]);
+  // D1-dependent services (per-request)
   const crossRefService = new CrossReferenceService(crossRefRepo);
   const parallelService = new ParallelPassageService(
     crossRefRepo,
@@ -85,13 +102,14 @@ export function createWorkerCompositionRoot(env: Env): WorkerCompositionRoot {
     undefined, // no databasePath in Workers
     parallelPassagesData as any, // preloaded from JSON module
   );
-  const commentaryService = new CommentaryService([helloaoCommentary]);
-  const ccelService = new CcelService(ccelAdapter);
   const historicalService = new HistoricalDocumentService(historicalRepo);
   const strongsService = new StrongsService(strongsRepo);
   const morphService = new MorphologyService(morphRepo);
 
-  // Tool handlers (reuse the same v2 handler factories)
+  // Module-scope services (cached across requests)
+  const bibleService = getBibleService(env);
+
+  // Tool handlers (per-request — hold D1-dependent services)
   const tools = [
     createBibleLookupHandler(bibleService),
     createCrossReferencesHandler(crossRefService),

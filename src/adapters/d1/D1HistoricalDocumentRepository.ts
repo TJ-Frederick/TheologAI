@@ -7,16 +7,6 @@
 
 import type { IHistoricalDocumentRepository, DocumentInfo, DocumentSection } from '../../kernel/repositories.js';
 
-// D1 binding type (subset used by this repo)
-interface D1Database {
-  prepare(sql: string): D1PreparedStatement;
-}
-interface D1PreparedStatement {
-  bind(...values: unknown[]): D1PreparedStatement;
-  first<T = Record<string, unknown>>(): Promise<T | null>;
-  all<T = Record<string, unknown>>(): Promise<{ results: T[] }>;
-}
-
 export class D1HistoricalDocumentRepository implements IHistoricalDocumentRepository {
   constructor(private db: D1Database) {}
 

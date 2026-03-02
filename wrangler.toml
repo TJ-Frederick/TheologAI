@@ -10,6 +10,8 @@ ai = "./src/shims/ai-stub.ts"
 [vars]
 THEOLOGAI_VERSION = "3.6.0"
 
+# D1 database. The database_id is not sensitive (scoped to Cloudflare account).
+# For multi-environment setups, use [env.staging] / [env.production] sections.
 [[d1_databases]]
 binding = "THEOLOGAI_DB"
 database_name = "theologai-db"

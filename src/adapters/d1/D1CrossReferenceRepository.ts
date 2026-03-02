@@ -8,16 +8,6 @@
 import type { ICrossReferenceRepository, CrossRefResult, CrossRefOptions } from '../../kernel/repositories.js';
 import { parseReference } from '../../kernel/reference.js';
 
-// D1 binding type (subset used by this repo)
-interface D1Database {
-  prepare(sql: string): D1PreparedStatement;
-}
-interface D1PreparedStatement {
-  bind(...values: unknown[]): D1PreparedStatement;
-  first<T = Record<string, unknown>>(): Promise<T | null>;
-  all<T = Record<string, unknown>>(): Promise<{ results: T[] }>;
-}
-
 export class D1CrossReferenceRepository implements ICrossReferenceRepository {
   constructor(private db: D1Database) {}
 
