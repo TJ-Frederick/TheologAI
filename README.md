@@ -338,6 +338,7 @@ All tools have annotations: `readOnlyHint: true`, `destructiveHint: false`, `ide
 | `word-study` | Guided Greek/Hebrew word study workflow |
 | `passage-exegesis` | Systematic exegesis methodology |
 | `compare-translations` | Multi-translation comparison template |
+| `confession-study` | Cross-tradition doctrinal comparison |
 
 ### Agent Skills
 
@@ -431,7 +432,7 @@ Structured logging via `server.sendLoggingMessage()` with levels: debug, info, w
 - ✅ FTS5 full-text search for Strong's concordance and historical documents
 - ✅ Layered architecture: kernel → adapters → services → formatters → tools
 - ✅ Composition root with dependency injection (`src/tools/v2/index.ts`)
-- ✅ MCP Resources (4 URIs), Prompts (3 templates), Logging (structured levels)
+- ✅ MCP Resources (4 URIs), Prompts (4 templates), Logging (structured levels)
 - ✅ Tool annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`)
 - ✅ Agent Skills for word study, passage exegesis, and confession comparison
 - ✅ Pure formatter functions for testable Markdown output
@@ -460,11 +461,15 @@ Structured logging via `server.sendLoggingMessage()` with levels: debug, info, w
 
 ```
 src/
-├── index.ts              # Entry point (stdio or HTTP transport)
-├── server.ts             # MCP server — tools, resources, prompts, logging
-├── tools/v2/             # Tool handlers + composition root (DI wiring)
-│   └── index.ts          # createCompositionRoot() — single wiring point
-├── services/             # Business logic — orchestrates adapters
+├── index.ts              # Entry point — stdio or HTTP transport (Node.js)
+├── worker.ts             # Entry point — Cloudflare Workers (Streamable HTTP)
+├── server.ts             # MCP server — tools, resources, prompts, logging (Node.js)
+├── worker-server.ts      # MCP server — same capabilities, wired for D1 (Workers)
+├── tools/v2/             # Tool handlers + Node.js composition root
+│   └── index.ts          # createCompositionRoot() — Node.js wiring (better-sqlite3)
+├── tools/worker/         # Workers composition root
+│   └── index.ts          # createWorkerCompositionRoot() — D1 wiring (per-request)
+├── services/             # Business logic — async, works with both SQLite and D1
 │   ├── bible/            # BibleService, CrossReferenceService, ParallelPassageService
 │   ├── commentary/       # CommentaryService, CcelService
 │   ├── historical/       # HistoricalDocumentService
@@ -472,12 +477,14 @@ src/
 ├── adapters/             # External API clients + data repositories
 │   ├── bible/            # EsvAdapter, NetBibleAdapter, HelloAoAdapter
 │   ├── commentary/       # HelloAoCommentaryAdapter, CcelAdapter
-│   ├── data/             # SQLite repositories (CrossRef, Strongs, Morphology, Historical)
+│   ├── data/             # SQLite repositories (Node.js — better-sqlite3)
+│   ├── d1/               # D1 repositories (Workers — Cloudflare D1)
 │   └── shared/           # Database.ts, HttpClient.ts, HtmlParser.ts
 ├── formatters/           # Pure Markdown formatting functions
 ├── kernel/               # Shared domain primitives
 │   ├── reference.ts      # THE canonical Bible reference parser
 │   ├── books.ts          # 66-book registry with all external format codes
+│   ├── repositories.ts   # Async repository interfaces (shared by SQLite + D1)
 │   ├── types.ts          # Shared TypeScript interfaces
 │   ├── errors.ts         # Typed error hierarchy
 │   └── cache.ts          # Generic LRU cache with TTL
