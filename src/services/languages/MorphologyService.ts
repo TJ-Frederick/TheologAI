@@ -17,20 +17,21 @@ export class MorphologyService {
   constructor(private repo: MorphologyRepository) {}
 
   /** Get word-by-word morphology for a verse */
-  getVerseMorphology(reference: string, expandMorphology?: boolean): VerseMorphologyResult {
+  async getVerseMorphology(reference: string, expandMorphology?: boolean): Promise<VerseMorphologyResult> {
     const ref = parseReference(reference);
     if (!ref.startVerse) {
       throw new NotFoundError('verse', `Please provide a specific verse, not just a chapter: "${reference}"`);
     }
 
     const sb = toStepBible(ref);
-    const words = this.repo.getVerseMorphology(sb.book, ref.chapter, ref.startVerse);
+    const words = await this.repo.getVerseMorphology(sb.book, ref.chapter, ref.startVerse);
 
     if (words.length === 0) {
       throw new NotFoundError('morphology', `No morphology data for ${formatReference(ref)}`);
     }
 
-    const verseWords: VerseWord[] = words.map(w => {
+    const verseWords: VerseWord[] = [];
+    for (const w of words) {
       const vw: VerseWord = {
         position: w.position,
         text: w.word_text,
@@ -41,11 +42,11 @@ export class MorphologyService {
       };
 
       if (expandMorphology && w.morph_code) {
-        vw.morphExpanded = this.repo.expandMorphCode(w.morph_code);
+        vw.morphExpanded = await this.repo.expandMorphCode(w.morph_code);
       }
 
-      return vw;
-    });
+      verseWords.push(vw);
+    }
 
     return {
       reference: formatReference(ref),
@@ -59,7 +60,7 @@ export class MorphologyService {
   }
 
   /** List available books with morphology data */
-  getAvailableBooks(): string[] {
-    return this.repo.getAvailableBooks();
+  async getAvailableBooks(): Promise<string[]> {
+    return await this.repo.getAvailableBooks();
   }
 }

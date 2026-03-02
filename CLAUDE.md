@@ -19,11 +19,16 @@ Set `PORT=3000` in `.env` for HTTP transport; omit for stdio.
 
 ```
 src/
-├── index.ts              # Entry point (stdio or HTTP transport)
-├── server.ts             # MCP server — tools, resources, prompts, logging
-├── tools/v2/             # Tool handlers + composition root (DI wiring)
-│   └── index.ts          # createCompositionRoot() — single wiring point
-├── services/             # Business logic — orchestrates adapters
+├── index.ts              # Entry point — stdio or HTTP transport (Node.js)
+├── worker.ts             # Entry point — Cloudflare Workers (Streamable HTTP)
+├── server.ts             # MCP server — tools, resources, prompts, logging (Node.js)
+├── worker-server.ts      # MCP server — same capabilities, wired for D1 (Workers)
+├── worker-env.ts         # Env type for Workers bindings (D1, secrets, vars)
+├── tools/v2/             # Tool handlers + Node.js composition root
+│   └── index.ts          # createCompositionRoot() — Node.js wiring (better-sqlite3)
+├── tools/worker/         # Workers composition root
+│   └── index.ts          # createWorkerCompositionRoot() — D1 wiring (per-request)
+├── services/             # Business logic — async, works with both SQLite and D1
 │   ├── bible/            # BibleService, CrossReferenceService, ParallelPassageService
 │   ├── commentary/       # CommentaryService, CcelService
 │   ├── historical/       # HistoricalDocumentService
@@ -31,12 +36,14 @@ src/
 ├── adapters/             # External API clients + data repositories
 │   ├── bible/            # EsvAdapter, NetBibleAdapter, HelloAoAdapter
 │   ├── commentary/       # HelloAoCommentaryAdapter, CcelAdapter
-│   ├── data/             # SQLite repositories (CrossRef, Strongs, Morphology, Historical)
+│   ├── data/             # SQLite repositories (Node.js — better-sqlite3)
+│   ├── d1/               # D1 repositories (Workers — Cloudflare D1)
 │   └── shared/           # Database.ts, HttpClient.ts, HtmlParser.ts
 ├── formatters/           # Pure Markdown formatting functions
 ├── kernel/               # Shared domain primitives
 │   ├── reference.ts      # THE canonical Bible reference parser
 │   ├── books.ts          # 66-book registry with all external format codes
+│   ├── repositories.ts   # Async repository interfaces (shared by SQLite + D1)
 │   ├── types.ts          # Shared TypeScript interfaces
 │   ├── errors.ts         # Typed error hierarchy
 │   └── cache.ts          # Generic LRU cache with TTL
@@ -54,11 +61,15 @@ skills/                   # Agent skill workflows
 └── confession-study/     # Cross-tradition doctrinal comparison
 
 test/
-├── unit/                 # Fast, mocked tests
+├── unit/                 # Fast, mocked tests (332 tests)
 │   ├── kernel/           # reference, books, cache, errors (94 tests)
 │   ├── formatters/       # bibleFormatter, commentary, historical, languages (75 tests)
-│   ├── services/         # bible/, commentary/, historical/, languages/ (56 tests)
-│   └── utils/            # Legacy utils tests (69 tests, kept until old code deleted)
+│   ├── services/         # bible/, commentary/, historical/, languages/, async-compat/ (64 tests)
+│   ├── adapters/d1/      # D1 repository tests (61 tests)
+│   ├── tools/worker/     # Worker composition root (11 tests)
+│   ├── worker-server/    # Worker MCP server registration (19 tests)
+│   └── worker/           # Worker entry point + CORS (8 tests)
+├── helpers/              # Reusable test utilities (mockD1.ts)
 ├── fixtures/             # Shared test data
 └── setup.ts              # Global test config
 ```
@@ -97,6 +108,7 @@ These prompts provide structured research methodologies. **Auto-trigger**: when 
 | `word-study` | `/mcp__theologai__word-study` | Study a Greek/Hebrew word, explore a Strong's number, or understand a biblical term's meaning |
 | `passage-exegesis` | `/mcp__theologai__passage-exegesis` | Exegete a passage, do deep analysis of verses, or study a text systematically |
 | `compare-translations` | `/mcp__theologai__compare-translations` | Compare how different translations render a passage, or explore translation differences |
+| `confession-study` | `/mcp__theologai__confession-study` | Compare doctrines across creeds, confessions, and catechisms from different traditions |
 
 When a user asks "what can you do?" or seems unsure how to proceed, mention these workflows as available research modes.
 
@@ -114,10 +126,11 @@ Structured logging via `server.sendLoggingMessage()` with levels: debug, info, w
 ## Conventions
 
 - **ESM throughout** — `"type": "module"` in package.json; use `.js` extensions in imports
-- **Composition root** — All DI wiring in `src/tools/v2/index.ts`; services receive adapters via constructor
+- **Dual deployment** — Node.js (stdio/HTTP via `src/index.ts`) and Cloudflare Workers (Streamable HTTP via `src/worker.ts`)
+- **Composition roots** — Node.js wiring in `src/tools/v2/index.ts` (better-sqlite3); Workers wiring in `src/tools/worker/index.ts` (D1, per-request)
 - **Error handling** — Typed errors from `src/kernel/errors.ts` (APIError, ValidationError, AdapterError, NotFoundError)
 - **Caching** — Generic LRU cache in `src/kernel/cache.ts` with 1-hour TTL for API responses
-- **Data storage** — SQLite via `better-sqlite3` for all local data (replaces in-memory Maps)
+- **Data storage** — SQLite via `better-sqlite3` (Node.js) or Cloudflare D1 (Workers); async repository interfaces in `src/kernel/repositories.ts`
 - **Testing** — Vitest with 30s timeout; coverage targets: 80% lines, 75% functions, 70% branches
 - **Formatting** — Tools return Markdown via pure functions in `src/formatters/`
 

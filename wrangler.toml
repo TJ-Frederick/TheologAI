@@ -1,0 +1,21 @@
+name = "theologai"
+main = "src/worker.ts"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Alias the Vercel AI SDK to an empty stub — only used by agents MCP client, not our server
+[alias]
+ai = "./src/shims/ai-stub.ts"
+
+[vars]
+THEOLOGAI_VERSION = "3.6.0"
+
+# D1 database. The database_id is not sensitive (scoped to Cloudflare account).
+# For multi-environment setups, use [env.staging] / [env.production] sections.
+[[d1_databases]]
+binding = "THEOLOGAI_DB"
+database_name = "theologai-db"
+database_id = "50de6fbe-852b-4a50-875f-729ef58d3fcb"
+
+# Secrets (set via `wrangler secret put`):
+#   ESV_API_KEY  — ESV API key (optional)

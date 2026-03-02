@@ -12,8 +12,6 @@ import type { BibleAdapter } from '../../adapters/bible/BibleAdapter.js';
 import type { ParallelPassageLookupParams, ParallelPassageResult, ParallelPassage } from '../../kernel/types.js';
 import { parseReference, formatReference } from '../../kernel/reference.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-
 interface ParallelEntry {
   event: string;
   relationship: 'synoptic' | 'quotation' | 'allusion' | 'thematic';
@@ -38,11 +36,19 @@ export class ParallelPassageService {
     crossRefs: CrossReferenceRepository,
     bibleAdapter?: BibleAdapter,
     databasePath?: string,
+    preloadedData?: ParallelDatabase,
   ) {
     this.crossRefs = crossRefs;
     this.bibleAdapter = bibleAdapter;
-    const dbPath = databasePath ?? join(__dirname, '..', '..', 'data', 'parallel-passages.json');
-    this.database = JSON.parse(readFileSync(dbPath, 'utf-8'));
+
+    if (preloadedData) {
+      this.database = preloadedData;
+    } else {
+      // Node.js path: read from disk (Workers always pass preloadedData)
+      const __dirname = dirname(fileURLToPath(import.meta.url));
+      const dbPath = databasePath ?? join(__dirname, '..', '..', 'data', 'parallel-passages.json');
+      this.database = JSON.parse(readFileSync(dbPath, 'utf-8'));
+    }
   }
 
   async lookup(params: ParallelPassageLookupParams): Promise<ParallelPassageResult> {
@@ -79,7 +85,7 @@ export class ParallelPassageService {
 
     // Augment with cross-references if requested
     if (params.useCrossReferences !== false) {
-      const xrefs = this.crossRefs.getCrossReferences(params.reference, { maxResults: params.maxParallels ?? 10 });
+      const xrefs = await this.crossRefs.getCrossReferences(params.reference, { maxResults: params.maxParallels ?? 10 });
       for (const xref of xrefs.references) {
         if (!parallels.some(p => p.reference === xref.reference)) {
           parallels.push({

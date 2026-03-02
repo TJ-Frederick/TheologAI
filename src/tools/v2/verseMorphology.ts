@@ -23,7 +23,7 @@ export function createVerseMorphologyHandler(service: MorphologyService): ToolHa
 
     handler: async (params) => {
       try {
-        const result = service.getVerseMorphology(
+        const result = await service.getVerseMorphology(
           params.reference as string,
           params.expand_morphology as boolean,
         );

@@ -9,13 +9,13 @@ export class HistoricalDocumentService {
   constructor(private repo: HistoricalDocumentRepository) {}
 
   /** List all available documents */
-  listDocuments(): DocumentInfo[] {
-    return this.repo.listDocuments();
+  async listDocuments(): Promise<DocumentInfo[]> {
+    return await this.repo.listDocuments();
   }
 
   /** Get a document by ID or name */
-  getDocument(idOrName: string): DocumentInfo {
-    const doc = this.repo.getDocument(idOrName) ?? this.repo.findDocumentByName(idOrName);
+  async getDocument(idOrName: string): Promise<DocumentInfo> {
+    const doc = await this.repo.getDocument(idOrName) ?? await this.repo.findDocumentByName(idOrName);
     if (!doc) {
       throw new NotFoundError('document', `Document not found: "${idOrName}"`);
     }
@@ -23,13 +23,13 @@ export class HistoricalDocumentService {
   }
 
   /** Get all sections of a document */
-  getSections(documentId: string): DocumentSection[] {
-    return this.repo.getSections(documentId);
+  async getSections(documentId: string): Promise<DocumentSection[]> {
+    return await this.repo.getSections(documentId);
   }
 
   /** Get a specific section by number */
-  getSection(documentId: string, sectionNumber: string): DocumentSection {
-    const section = this.repo.getSection(documentId, sectionNumber);
+  async getSection(documentId: string, sectionNumber: string): Promise<DocumentSection> {
+    const section = await this.repo.getSection(documentId, sectionNumber);
     if (!section) {
       throw new NotFoundError('section', `Section ${sectionNumber} not found in "${documentId}"`);
     }
@@ -37,12 +37,12 @@ export class HistoricalDocumentService {
   }
 
   /** Search across all documents */
-  search(query: string, limit?: number): DocumentSection[] {
-    return this.repo.search(query, limit);
+  async search(query: string, limit?: number): Promise<DocumentSection[]> {
+    return await this.repo.search(query, limit);
   }
 
   /** Find document by name with fuzzy matching */
-  findDocument(name: string): DocumentInfo | undefined {
-    return this.repo.findDocumentByName(name);
+  async findDocument(name: string): Promise<DocumentInfo | undefined> {
+    return await this.repo.findDocumentByName(name);
   }
 }

@@ -34,78 +34,78 @@ function makeMockRepo() {
 
 describe('StrongsService', () => {
   describe('lookup', () => {
-    it('normalizes input to uppercase', () => {
+    it('normalizes input to uppercase', async () => {
       const repo = makeMockRepo();
       const service = new StrongsService(repo as any);
-      service.lookup('g26');
+      await service.lookup('g26');
       expect(repo.lookup).toHaveBeenCalledWith('G26');
     });
 
-    it('trims whitespace from input', () => {
+    it('trims whitespace from input', async () => {
       const repo = makeMockRepo();
       const service = new StrongsService(repo as any);
-      service.lookup('  G26  ');
+      await service.lookup('  G26  ');
       expect(repo.lookup).toHaveBeenCalledWith('G26');
     });
 
-    it('throws ValidationError for invalid format', () => {
+    it('throws ValidationError for invalid format', async () => {
       const repo = makeMockRepo();
       const service = new StrongsService(repo as any);
-      expect(() => service.lookup('XYZ')).toThrow(ValidationError);
+      await expect(service.lookup('XYZ')).rejects.toThrow(ValidationError);
     });
 
-    it('throws ValidationError for empty string', () => {
+    it('throws ValidationError for empty string', async () => {
       const repo = makeMockRepo();
       const service = new StrongsService(repo as any);
-      expect(() => service.lookup('')).toThrow(ValidationError);
+      await expect(service.lookup('')).rejects.toThrow(ValidationError);
     });
 
-    it('throws NotFoundError when repo returns undefined', () => {
+    it('throws NotFoundError when repo returns undefined', async () => {
       const repo = makeMockRepo();
       repo.lookup.mockReturnValue(undefined);
       const service = new StrongsService(repo as any);
-      expect(() => service.lookup('G9999')).toThrow(NotFoundError);
+      await expect(service.lookup('G9999')).rejects.toThrow(NotFoundError);
     });
 
-    it('maps repo entry to EnhancedStrongsResult with citation', () => {
+    it('maps repo entry to EnhancedStrongsResult with citation', async () => {
       const repo = makeMockRepo();
       const service = new StrongsService(repo as any);
-      const result = service.lookup('G26');
+      const result = await service.lookup('G26');
       expect(result.strongs_number).toBe('G26');
       expect(result.testament).toBe('NT');
       expect(result.lemma).toBe('ἀγάπη');
       expect(result.citation.source).toBe("Strong's Concordance");
     });
 
-    it('does not include extended data when includeExtended is false', () => {
+    it('does not include extended data when includeExtended is false', async () => {
       const repo = makeMockRepo();
       const service = new StrongsService(repo as any);
-      const result = service.lookup('G26', false);
+      const result = await service.lookup('G26', false);
       expect(result.extended).toBeUndefined();
     });
 
-    it('includes extended data from lexicon when includeExtended is true', () => {
+    it('includes extended data from lexicon when includeExtended is true', async () => {
       const repo = makeMockRepo();
       const service = new StrongsService(repo as any);
-      const result = service.lookup('G26', true);
+      const result = await service.lookup('G26', true);
       expect(result.extended).toBeDefined();
       expect(result.extended!.strongsExtended).toBe('G0026');
       expect(repo.getLexiconEntry).toHaveBeenCalledWith('G26');
     });
 
-    it('handles missing lexicon entry gracefully', () => {
+    it('handles missing lexicon entry gracefully', async () => {
       const repo = makeMockRepo();
       repo.getLexiconEntry.mockReturnValue(undefined);
       const service = new StrongsService(repo as any);
-      const result = service.lookup('G26', true);
+      const result = await service.lookup('G26', true);
       expect(result.extended).toBeUndefined();
     });
 
-    it('converts null optional fields to undefined', () => {
+    it('converts null optional fields to undefined', async () => {
       const repo = makeMockRepo();
       repo.lookup.mockReturnValue({ ...mockEntry, transliteration: null, pronunciation: null, derivation: null });
       const service = new StrongsService(repo as any);
-      const result = service.lookup('G26');
+      const result = await service.lookup('G26');
       expect(result.transliteration).toBeUndefined();
       expect(result.pronunciation).toBeUndefined();
       expect(result.derivation).toBeUndefined();
@@ -113,20 +113,20 @@ describe('StrongsService', () => {
   });
 
   describe('search', () => {
-    it('delegates to repository', () => {
+    it('delegates to repository', async () => {
       const repo = makeMockRepo();
       const service = new StrongsService(repo as any);
-      const results = service.search('agape', 10);
+      const results = await service.search('agape', 10);
       expect(repo.search).toHaveBeenCalledWith('agape', 10);
       expect(results).toHaveLength(1);
     });
   });
 
   describe('getStats', () => {
-    it('delegates to repository', () => {
+    it('delegates to repository', async () => {
       const repo = makeMockRepo();
       const service = new StrongsService(repo as any);
-      const stats = service.getStats();
+      const stats = await service.getStats();
       expect(repo.getStats).toHaveBeenCalled();
       expect(stats).toEqual({ greek: 5624, hebrew: 8674 });
     });

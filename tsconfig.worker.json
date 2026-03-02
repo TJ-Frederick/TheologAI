@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "outDir": "./dist-worker",
+    "rootDir": "./src",
+    "strict": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "declaration": false,
+    "sourceMap": false,
+    "resolveJsonModule": true,
+    "types": ["@cloudflare/workers-types", "node"]
+  },
+  "include": ["src/**/*"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "dist-worker",
+    "src/index.ts",
+    "src/server.ts",
+    "src/adapters/data/*",
+    "src/adapters/shared/Database.ts",
+    "src/tools/v2/index.ts"
+  ]
+}

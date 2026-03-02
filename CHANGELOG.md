@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-03-02
+
+### Added — Cloudflare Workers Remote MCP Deployment
+
+#### Remote MCP Server
+- Cloudflare Workers entry point (`src/worker.ts`) serving MCP over Streamable HTTP via the Agents SDK
+- Worker MCP server (`src/worker-server.ts`) with all 7 tools, 4 resources, 4 prompts, and logging
+- Live at `https://theologai.tjfrederick.workers.dev/mcp` — no authentication required
+- CORS configured for Claude.ai browser connections (`Mcp-Session-Id` exposed)
+
+#### D1 Database Layer
+- 4 D1-backed repository adapters replacing better-sqlite3 for the worker runtime
+  - `D1CrossReferenceRepository`, `D1StrongsRepository`, `D1MorphologyRepository`, `D1HistoricalDocumentRepository`
+- Async repository interfaces (`src/kernel/repositories.ts`) shared by both SQLite and D1 adapters
+- Worker composition root (`src/tools/worker/index.ts`) with per-request D1 wiring and module-scope HTTP adapter caching
+- D1 export script (`scripts/export-for-d1.sh`) to migrate SQLite data
+
+#### Async Service Layer
+- All services (`CrossReferenceService`, `StrongsService`, `MorphologyService`, `HistoricalDocumentService`, `ParallelPassageService`) converted to async
+- Backward-compatible: `await syncValue` resolves immediately, so Node.js server is unaffected
+
+#### confession-study Prompt
+- New `confession-study` prompt for cross-tradition doctrinal comparison across creeds, confessions, and catechisms
+- Available in both Node.js and Workers servers (4 prompts total)
+
+### Fixed
+- Missing `await` in Node.js server resource handlers (broken by async migration)
+
+### Testing
+- 107 new tests for Workers/D1 layer (332 total)
+  - D1 repository unit tests (61 tests)
+  - Worker composition root, MCP server, and entry point tests (38 tests)
+  - Async/sync parity tests proving dual-target compatibility (8 tests)
+  - Reusable `mockD1` test helper
+
 ## [3.4.0] - 2025-10-09
 
 ### Added - Enhanced Discovery & Commentary Navigation
@@ -167,8 +202,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/yourusername/TheologAI/compare/v3.4.0...HEAD
-[3.4.0]: https://github.com/yourusername/TheologAI/compare/v3.3.0...v3.4.0
+[Unreleased]: https://github.com/TJ-Frederick/TheologAI/compare/v4.0.0...HEAD
+[4.0.0]: https://github.com/TJ-Frederick/TheologAI/compare/v3.4.0...v4.0.0
+[3.4.0]: https://github.com/TJ-Frederick/TheologAI/compare/v3.3.0...v3.4.0
 [3.3.0]: https://github.com/yourusername/TheologAI/compare/v3.2.0...v3.3.0
 [3.2.0]: https://github.com/yourusername/TheologAI/compare/v3.1.0...v3.2.0
 [3.1.0]: https://github.com/yourusername/TheologAI/compare/v2.5.0...v3.1.0
