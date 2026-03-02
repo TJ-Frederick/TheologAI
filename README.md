@@ -7,7 +7,7 @@ A Model Context Protocol (MCP) server for theological research — 7 tools, 8 Bi
 Add as a remote MCP server in Claude.ai settings:
 
 ```
-https://theologai.tyler-tyfred.workers.dev/mcp
+https://theologai.tjfrederick.workers.dev/mcp
 ```
 
 No authentication required. All 7 tools, 4 resources, and 4 prompts are available immediately.
@@ -206,8 +206,8 @@ All commentaries accessible via HelloAO Bible API with zero rate limits!
 
 Use the hosted instance directly:
 
-- **Claude.ai**: Add `https://theologai.tyler-tyfred.workers.dev/mcp` as a remote MCP server in Settings > Integrations
-- **Claude Code**: `claude mcp add --transport http theologai https://theologai.tyler-tyfred.workers.dev/mcp`
+- **Claude.ai**: Add `https://theologai.tjfrederick.workers.dev/mcp` as a remote MCP server in Settings > Integrations
+- **Claude Code**: `claude mcp add --transport http theologai https://theologai.tjfrederick.workers.dev/mcp`
 
 ### Local (stdio)
 
