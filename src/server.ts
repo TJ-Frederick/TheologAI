@@ -126,7 +126,7 @@ export class BibleMCPServer {
 
       // Individual historical documents
       try {
-        const docs = this.services.historicalService.listDocuments();
+        const docs = await this.services.historicalService.listDocuments();
         for (const doc of docs) {
           resources.push({
             uri: `theologai://documents/${doc.id}`,
@@ -197,8 +197,8 @@ export class BibleMCPServer {
       const docMatch = uri.match(/^theologai:\/\/documents\/(.+)$/);
       if (docMatch) {
         const slug = docMatch[1];
-        const doc = this.services.historicalService.getDocument(slug);
-        const sections = this.services.historicalService.getSections(doc.id);
+        const doc = await this.services.historicalService.getDocument(slug);
+        const sections = await this.services.historicalService.getSections(doc.id);
 
         const lines = [
           `# ${doc.title}\n`,
@@ -224,7 +224,7 @@ export class BibleMCPServer {
       const strongsMatch = uri.match(/^theologai:\/\/strongs\/([GHgh]\d+[a-z]?)$/);
       if (strongsMatch) {
         const number = strongsMatch[1].toUpperCase();
-        const entry = this.services.strongsService.lookup(number, true);
+        const entry = await this.services.strongsService.lookup(number, true);
 
         const lines = [
           `# ${entry.strongs_number} — ${entry.lemma}\n`,
@@ -285,6 +285,14 @@ export class BibleMCPServer {
               { name: 'translations', description: 'Comma-separated list of translations. Default: ESV,KJV,NET,BSB.', required: false },
             ],
           },
+          {
+            name: 'confession-study',
+            description: 'Cross-tradition doctrinal comparison across creeds, confessions, and catechisms',
+            arguments: [
+              { name: 'topic', description: 'The doctrine or topic to compare', required: true },
+              { name: 'traditions', description: 'Comma-separated traditions to focus on', required: false },
+            ],
+          },
         ],
       };
     });
@@ -302,6 +310,9 @@ export class BibleMCPServer {
 
         case 'compare-translations':
           return this.getCompareTranslationsPrompt(args?.reference ?? '', args?.translations);
+
+        case 'confession-study':
+          return this.getConfessionStudyPrompt(args?.topic ?? '', args?.traditions);
 
         default:
           throw new Error(`Unknown prompt: ${name}`);
@@ -426,6 +437,31 @@ Follow this methodology:
    - Create a comparison highlighting key differences
    - Note which renderings are more literal vs. dynamic
    - Identify any theologically significant translation choices`,
+          },
+        },
+      ],
+    };
+  }
+
+  private getConfessionStudyPrompt(topic: string, traditions?: string) {
+    const traditionsHint = traditions
+      ? ` Focus on: ${traditions.split(',').map(t => t.trim()).join(', ')}.`
+      : '';
+
+    return {
+      description: `Confession study on "${topic}"`,
+      messages: [
+        {
+          role: 'user' as const,
+          content: {
+            type: 'text' as const,
+            text: `Cross-tradition doctrinal comparison on "${topic}".${traditionsHint}
+
+1. **Identify documents** — \`classic_text_lookup\` with listWorks=true
+2. **Search** — \`classic_text_lookup\` with query="${topic}"
+3. **Read sections** — Browse specific documents
+4. **Biblical foundations** — \`bible_lookup\` + \`bible_cross_references\`
+5. **Comparison** — Agreement, divergence, Scripture, historical context`,
           },
         },
       ],

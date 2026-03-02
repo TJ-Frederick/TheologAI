@@ -116,7 +116,7 @@ export function createWorkerCompositionRoot(env: Env): WorkerCompositionRoot {
     createParallelPassagesHandler(parallelService),
     createCommentaryHandler(commentaryService),
     createClassicTextsHandler(historicalService, ccelService),
-    createStrongsLookupHandler(strongsService, morphService),
+    createStrongsLookupHandler(strongsService),
     createVerseMorphologyHandler(morphService),
   ];
 

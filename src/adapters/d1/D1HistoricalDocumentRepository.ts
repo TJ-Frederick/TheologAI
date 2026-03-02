@@ -101,7 +101,9 @@ export class D1HistoricalDocumentRepository implements IHistoricalDocumentReposi
         content: r.content,
         topics: r.topics ? JSON.parse(r.topics) : [],
       }));
-    } catch {
+    } catch (error) {
+      // FTS5 queries can fail on malformed input; log and return empty
+      console.warn('D1HistoricalDocumentRepository.search failed:', error);
       return [];
     }
   }

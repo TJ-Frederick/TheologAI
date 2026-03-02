@@ -14,7 +14,7 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     // Fresh composition root per request (D1 binding is per-request)
     const root = createWorkerCompositionRoot(env);
-    const mcpServer = createWorkerMcpServer(root, env.THEOLOGAI_VERSION);
+    const mcpServer = createWorkerMcpServer(root, env.THEOLOGAI_VERSION || '0.0.0');
 
     return createMcpHandler(mcpServer, {
       corsOptions: {
