@@ -36,15 +36,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - run: npm ci
+
       - name: Deploy to Cloudflare Workers (preview)
         uses: cloudflare/wrangler-action@v3
         with:
+          wranglerVersion: '4'
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy --env preview
           secrets: |
             ESV_API_KEY
             SBC_FACILITATOR_API_KEY
+          environment: preview
         env:
           ESV_API_KEY: ${{ secrets.ESV_API_KEY }}
           SBC_FACILITATOR_API_KEY: ${{ secrets.SBC_FACILITATOR_API_KEY }}
