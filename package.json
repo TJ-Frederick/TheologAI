@@ -37,6 +37,7 @@
   "license": "ISC",
   "dependencies": {
     "@modelcontextprotocol/sdk": "~1.26.0",
+    "agents": "^0.7.2",
     "better-sqlite3": "^12.6.2",
     "dotenv": "^17.2.3",
     "typescript": "^5.9.2"

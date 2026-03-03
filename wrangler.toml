@@ -17,5 +17,21 @@ binding = "THEOLOGAI_DB"
 database_name = "theologai-db"
 database_id = "50de6fbe-852b-4a50-875f-729ef58d3fcb"
 
+# ── Preview environment (deployed by CI on PRs) ──
+# Uses a separate D1 database. One-time setup:
+#   wrangler d1 create theologai-db-preview
+#   Then seed with: scripts/d1-migration/*.sql
+
+[env.preview]
+name = "theologai-preview"
+
+[env.preview.vars]
+THEOLOGAI_VERSION = "3.6.0-preview"
+
+[[env.preview.d1_databases]]
+binding = "THEOLOGAI_DB"
+database_name = "theologai-db-preview"
+database_id = "f9f415e1-219b-4d17-bcf5-33a8abad02fa"
+
 # Secrets (set via `wrangler secret put`):
 #   ESV_API_KEY  — ESV API key (optional)
