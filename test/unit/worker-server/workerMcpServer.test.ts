@@ -50,6 +50,8 @@ const TOOL_NAMES = [
   'classic_text_lookup',
   'original_language_lookup',
   'bible_verse_morphology',
+  'donation_config',
+  'verify_donation',
 ];
 
 function makeMockRoot(): WorkerCompositionRoot {
@@ -122,10 +124,10 @@ describe('createWorkerMcpServer', () => {
   });
 
   describe('ListTools handler', () => {
-    it('returns all 7 tools', async () => {
+    it('returns all 9 tools', async () => {
       const handler = capturedHandlers.get('tools/list')!;
       const result = await handler({});
-      expect(result.tools).toHaveLength(7);
+      expect(result.tools).toHaveLength(9);
     });
 
     it('each tool has name, description, inputSchema, annotations', async () => {

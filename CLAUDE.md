@@ -1,6 +1,6 @@
 # TheologAI — Development Guide
 
-Production MCP server for theological research. 7 tools, 4/4 MCP capabilities (Tools, Resources, Prompts, Logging), 8 Bible translations, 6 commentaries, 18 historical documents, Greek/Hebrew language tools.
+Production MCP server for theological research. 9 tools, 4/4 MCP capabilities (Tools, Resources, Prompts, Logging), 8 Bible translations, 6 commentaries, 18 historical documents, Greek/Hebrew language tools, x402 donation support.
 
 ## Quick Start
 
@@ -32,10 +32,12 @@ src/
 │   ├── bible/            # BibleService, CrossReferenceService, ParallelPassageService
 │   ├── commentary/       # CommentaryService, CcelService
 │   ├── historical/       # HistoricalDocumentService
-│   └── languages/        # StrongsService, MorphologyService
+│   ├── languages/        # StrongsService, MorphologyService
+│   └── donation/         # DonationService
 ├── adapters/             # External API clients + data repositories
 │   ├── bible/            # EsvAdapter, NetBibleAdapter, HelloAoAdapter
 │   ├── commentary/       # HelloAoCommentaryAdapter, CcelAdapter
+│   ├── donation/         # OnChainVerifier, FacilitatorClient
 │   ├── data/             # SQLite repositories (Node.js — better-sqlite3)
 │   ├── d1/               # D1 repositories (Workers — Cloudflare D1)
 │   └── shared/           # Database.ts, HttpClient.ts, HtmlParser.ts
@@ -76,7 +78,7 @@ test/
 
 ## MCP Capabilities
 
-### Tools (7)
+### Tools (9)
 
 | Tool | Description |
 |------|-------------|
@@ -87,6 +89,8 @@ test/
 | `classic_text_lookup` | 18 local docs + 1000+ CCEL works, unified search |
 | `original_language_lookup` | Strong's concordance (14,298 entries), Greek/Hebrew word studies |
 | `bible_verse_morphology` | Word-by-word grammatical analysis for all 66 books |
+| `donation_config` | Donation configuration: supported tokens, recipient, x402 endpoint |
+| `verify_donation` | On-chain donation verification across Ethereum, Base, and Radius |
 
 All tools have annotations: `readOnlyHint: true`, `destructiveHint: false`, `idempotentHint: true`.
 

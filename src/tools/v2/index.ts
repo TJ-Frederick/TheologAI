@@ -40,6 +40,12 @@ import { createCommentaryHandler } from './commentary.js';
 import { createClassicTextsHandler } from './classicTexts.js';
 import { createStrongsLookupHandler } from './strongsLookup.js';
 import { createVerseMorphologyHandler } from './verseMorphology.js';
+import { createDonationConfigHandler } from './donationConfig.js';
+import { createVerifyDonationHandler } from './verifyDonation.js';
+
+// Donation
+import { OnChainVerifier } from '../../adapters/donation/OnChainVerifier.js';
+import { DonationService } from '../../services/donation/DonationService.js';
 
 import { getDatabase } from '../../adapters/shared/Database.js';
 
@@ -89,6 +95,10 @@ export function createCompositionRoot(): CompositionRoot {
   const strongsService = new StrongsService(strongsRepo);
   const morphService = new MorphologyService(morphRepo);
 
+  // Donation (no DB dependency)
+  const onChainVerifier = new OnChainVerifier({});
+  const donationService = new DonationService(onChainVerifier, process.env.X402_BASE_URL ?? '');
+
   // Tool handlers
   const tools = [
     createBibleLookupHandler(bibleService),
@@ -98,6 +108,8 @@ export function createCompositionRoot(): CompositionRoot {
     createClassicTextsHandler(historicalService, ccelService),
     createStrongsLookupHandler(strongsService),
     createVerseMorphologyHandler(morphService),
+    createDonationConfigHandler(donationService),
+    createVerifyDonationHandler(donationService),
   ];
 
   return {

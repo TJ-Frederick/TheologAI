@@ -67,6 +67,17 @@ export class NotFoundError extends TheologAIError {
   }
 }
 
+/** Payment / donation verification failure */
+export class PaymentError extends TheologAIError {
+  constructor(
+    message: string,
+    public readonly txHash?: string,
+  ) {
+    super(message);
+    this.name = 'PaymentError';
+  }
+}
+
 /** User-friendly error message */
 export function getUserMessage(error: Error): string {
   if (error instanceof RateLimitError) {
@@ -77,6 +88,11 @@ export function getUserMessage(error: Error): string {
   }
   if (error instanceof NotFoundError) {
     return error.message;
+  }
+  if (error instanceof PaymentError) {
+    return error.txHash
+      ? `Payment verification failed for tx ${error.txHash}: ${error.message}`
+      : `Payment error: ${error.message}`;
   }
   if (error instanceof AdapterError) {
     return `Error from ${error.source}: ${error.message}`;

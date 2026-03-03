@@ -5,6 +5,7 @@ import {
   RateLimitError,
   AdapterError,
   NotFoundError,
+  PaymentError,
   TheologAIError,
   getUserMessage,
   handleToolError,
@@ -17,6 +18,7 @@ describe('Error hierarchy', () => {
     expect(new RateLimitError(60)).toBeInstanceOf(TheologAIError);
     expect(new AdapterError('ESV', 'fail')).toBeInstanceOf(TheologAIError);
     expect(new NotFoundError('verse', 'not found')).toBeInstanceOf(TheologAIError);
+    expect(new PaymentError('fail')).toBeInstanceOf(TheologAIError);
   });
 
   it('all errors extend Error', () => {
@@ -55,6 +57,17 @@ describe('Error hierarchy', () => {
     const err = new NotFoundError('verse', 'Gen 999:999 not found');
     expect(err.resource).toBe('verse');
   });
+
+  it('PaymentError stores optional txHash', () => {
+    const err = new PaymentError('fail', '0xabc');
+    expect(err.txHash).toBe('0xabc');
+    expect(err.name).toBe('PaymentError');
+  });
+
+  it('PaymentError works without txHash', () => {
+    const err = new PaymentError('fail');
+    expect(err.txHash).toBeUndefined();
+  });
 });
 
 describe('getUserMessage', () => {
@@ -68,6 +81,14 @@ describe('getUserMessage', () => {
 
   it('NotFoundError → returns message', () => {
     expect(getUserMessage(new NotFoundError('verse', 'verse not found'))).toBe('verse not found');
+  });
+
+  it('PaymentError with txHash → includes hash', () => {
+    expect(getUserMessage(new PaymentError('bad sig', '0xabc'))).toContain('0xabc');
+  });
+
+  it('PaymentError without txHash → payment error message', () => {
+    expect(getUserMessage(new PaymentError('bad sig'))).toContain('Payment error');
   });
 
   it('generic Error → fallback', () => {

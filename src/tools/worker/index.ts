@@ -42,6 +42,12 @@ import { createCommentaryHandler } from '../v2/commentary.js';
 import { createClassicTextsHandler } from '../v2/classicTexts.js';
 import { createStrongsLookupHandler } from '../v2/strongsLookup.js';
 import { createVerseMorphologyHandler } from '../v2/verseMorphology.js';
+import { createDonationConfigHandler } from '../v2/donationConfig.js';
+import { createVerifyDonationHandler } from '../v2/verifyDonation.js';
+
+// Donation
+import { OnChainVerifier } from '../../adapters/donation/OnChainVerifier.js';
+import { DonationService } from '../../services/donation/DonationService.js';
 
 // Static data (imported as JSON module in Workers bundle)
 import parallelPassagesData from '../../data/parallel-passages.json';
@@ -75,12 +81,30 @@ const ccelService = new CcelService(ccelAdapter);
 // Once created, they persist for the isolate's lifetime (secret changes require redeployment).
 let _bibleService: BibleService | null = null;
 
+// Donation service is HTTP-only (no D1 dependency), safe to cache at module scope.
+let _donationService: DonationService | null = null;
+
 function getBibleService(env: Env): BibleService {
   if (!_bibleService) {
     const esvAdapter = new EsvAdapter(env.ESV_API_KEY);
     _bibleService = new BibleService([esvAdapter, netAdapter, helloaoAdapter]);
   }
   return _bibleService;
+}
+
+export function getDonationService(env: Env): DonationService {
+  if (!_donationService) {
+    const verifier = new OnChainVerifier({
+      ethereum: env.ETH_RPC_URL,
+      base: env.BASE_RPC_URL,
+      radius: env.RADIUS_RPC_URL,
+    });
+    _donationService = new DonationService(
+      verifier,
+      'https://theologai.tjfrederick.workers.dev',
+    );
+  }
+  return _donationService;
 }
 
 // ── Per-request creation (D1-dependent) ──
@@ -108,6 +132,7 @@ export function createWorkerCompositionRoot(env: Env): WorkerCompositionRoot {
 
   // Module-scope services (cached across requests)
   const bibleService = getBibleService(env);
+  const donationService = getDonationService(env);
 
   // Tool handlers (per-request — hold D1-dependent services)
   const tools = [
@@ -118,6 +143,8 @@ export function createWorkerCompositionRoot(env: Env): WorkerCompositionRoot {
     createClassicTextsHandler(historicalService, ccelService),
     createStrongsLookupHandler(strongsService),
     createVerseMorphologyHandler(morphService),
+    createDonationConfigHandler(donationService),
+    createVerifyDonationHandler(donationService),
   ];
 
   return {

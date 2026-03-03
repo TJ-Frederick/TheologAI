@@ -56,6 +56,8 @@ const EXPECTED_TOOL_NAMES = [
   'classic_text_lookup',
   'original_language_lookup',
   'bible_verse_morphology',
+  'donation_config',
+  'verify_donation',
 ];
 
 function makeEnv(overrides: Partial<Env> = {}): Env {
@@ -77,9 +79,9 @@ describe('createWorkerCompositionRoot', () => {
   });
 
   describe('tool creation', () => {
-    it('creates exactly 7 tools', () => {
+    it('creates exactly 9 tools', () => {
       const root = createWorkerCompositionRoot(makeEnv());
-      expect(root.tools).toHaveLength(7);
+      expect(root.tools).toHaveLength(9);
     });
 
     it('creates tools with correct names', () => {
