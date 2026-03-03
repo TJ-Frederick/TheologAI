@@ -35,9 +35,3 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy
-          secrets: |
-            ESV_API_KEY
-            SBC_FACILITATOR_API_KEY
-        env:
-          ESV_API_KEY: ${{ secrets.ESV_API_KEY }}
-          SBC_FACILITATOR_API_KEY: ${{ secrets.SBC_FACILITATOR_API_KEY }}
