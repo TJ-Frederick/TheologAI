@@ -1,6 +1,6 @@
 # TheologAI — Development Guide
 
-Production MCP server for theological research. 7 tools, 4/4 MCP capabilities (Tools, Resources, Prompts, Logging), 8 Bible translations, 6 commentaries, 18 historical documents, Greek/Hebrew language tools.
+Production MCP server for theological research. 9 tools, 4/4 MCP capabilities (Tools, Resources, Prompts, Logging), 8 Bible translations, 6 commentaries, 18 historical documents, Greek/Hebrew language tools, on-chain donation support.
 
 ## Quick Start
 
@@ -32,10 +32,12 @@ src/
 │   ├── bible/            # BibleService, CrossReferenceService, ParallelPassageService
 │   ├── commentary/       # CommentaryService, CcelService
 │   ├── historical/       # HistoricalDocumentService
-│   └── languages/        # StrongsService, MorphologyService
+│   ├── languages/        # StrongsService, MorphologyService
+│   └── donation/         # DonationService
 ├── adapters/             # External API clients + data repositories
 │   ├── bible/            # EsvAdapter, NetBibleAdapter, HelloAoAdapter
 │   ├── commentary/       # HelloAoCommentaryAdapter, CcelAdapter
+│   ├── donation/         # OnChainVerifier
 │   ├── data/             # SQLite repositories (Node.js — better-sqlite3)
 │   ├── d1/               # D1 repositories (Workers — Cloudflare D1)
 │   └── shared/           # Database.ts, HttpClient.ts, HtmlParser.ts
@@ -76,7 +78,7 @@ test/
 
 ## MCP Capabilities
 
-### Tools (7)
+### Tools (9)
 
 | Tool | Description |
 |------|-------------|
@@ -87,6 +89,8 @@ test/
 | `classic_text_lookup` | 18 local docs + 1000+ CCEL works, unified search |
 | `original_language_lookup` | Strong's concordance (14,298 entries), Greek/Hebrew word studies |
 | `bible_verse_morphology` | Word-by-word grammatical analysis for all 66 books |
+| `donation_config` | Donation configuration: supported tokens, recipient address, chain details |
+| `verify_donation` | On-chain donation verification across Ethereum, Base, and Radius |
 
 All tools have annotations: `readOnlyHint: true`, `destructiveHint: false`, `idempotentHint: true`.
 
@@ -109,6 +113,7 @@ These prompts provide structured research methodologies. **Auto-trigger**: when 
 | `passage-exegesis` | `/mcp__theologai__passage-exegesis` | Exegete a passage, do deep analysis of verses, or study a text systematically |
 | `compare-translations` | `/mcp__theologai__compare-translations` | Compare how different translations render a passage, or explore translation differences |
 | `confession-study` | `/mcp__theologai__confession-study` | Compare doctrines across creeds, confessions, and catechisms from different traditions |
+| `donate` | `/mcp__theologai__donate` | Donate, support the project, contribute financially, or ask about donations |
 
 When a user asks "what can you do?" or seems unsure how to proceed, mention these workflows as available research modes.
 

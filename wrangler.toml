@@ -17,6 +17,11 @@ binding = "THEOLOGAI_DB"
 database_name = "theologai-db"
 database_id = "50de6fbe-852b-4a50-875f-729ef58d3fcb"
 
+# Optional: Custom RPC endpoints (defaults to public endpoints in code)
+# ETH_RPC_URL = "https://eth.llamarpc.com"
+# BASE_RPC_URL = "https://mainnet.base.org"
+# RADIUS_RPC_URL = "https://rpc.radiustech.xyz"
+
 # ── Preview environment (deployed by CI on PRs) ──
 # Uses a separate D1 database. One-time setup:
 #   wrangler d1 create theologai-db-preview
@@ -34,4 +39,4 @@ database_name = "theologai-db-preview"
 database_id = "f9f415e1-219b-4d17-bcf5-33a8abad02fa"
 
 # Secrets (set via `wrangler secret put`):
-#   ESV_API_KEY  — ESV API key (optional)
+#   ESV_API_KEY            — ESV API key (optional)

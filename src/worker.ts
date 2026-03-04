@@ -10,9 +10,10 @@ import type { Env } from './worker-env.js';
 import { createWorkerCompositionRoot } from './tools/worker/index.js';
 import { createWorkerMcpServer } from './worker-server.js';
 
+// ── Worker entry point ──
+
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    // Fresh composition root per request (D1 binding is per-request)
     const root = createWorkerCompositionRoot(env);
     const mcpServer = createWorkerMcpServer(root, env.THEOLOGAI_VERSION || '0.0.0');
 
