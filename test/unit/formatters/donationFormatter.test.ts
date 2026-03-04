@@ -80,7 +80,7 @@ describe('formatDonationConfigHuman', () => {
 
   it('lists transfer options in plain language', () => {
     const out = formatDonationConfigHuman(makeDonationConfig());
-    expect(out).toContain('USDC on Base');
+    expect(out).toContain('USDC or ETH on Base');
     expect(out).toContain('Ethereum');
     expect(out).toContain('Radius');
   });

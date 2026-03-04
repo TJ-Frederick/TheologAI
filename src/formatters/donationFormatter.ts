@@ -15,7 +15,7 @@ export function formatDonationConfigHuman(config: DonationConfig): string {
   s += '**Easiest option:** Donate via the web at [theologai.pages.dev](https://theologai.pages.dev/), which has a donation section with wallet connection support.\n\n';
 
   s += '**Manual transfer options:**\n';
-  s += '- USDC on Base (lowest fees, recommended)\n';
+  s += '- USDC or ETH on Base\n';
   s += '- USDC or ETH on Ethereum\n';
   s += '- SBC on Radius\n\n';
 

@@ -14,7 +14,7 @@ export function createDonationConfigHandler(donationService: DonationService): T
   return {
     name: 'donation_config',
     description:
-      'Get TheologAI donation configuration. Donations are voluntary and do not gate features. Use format="human" (default) for a user-friendly donation guide, or format="technical" for contract addresses, chain IDs, and details needed by agents with wallet tools.',
+      'Donate to support TheologAI development. All features are free regardless — donations are entirely voluntary. Returns how to donate: supported tokens, recipient address, and transfer options. Use format="human" (default) for a friendly guide, or format="technical" for contract addresses and chain IDs needed by agents with wallet tools.',
     inputSchema: {
       type: 'object' as const,
       properties: {

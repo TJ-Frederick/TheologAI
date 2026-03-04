@@ -251,7 +251,7 @@ describe('createWorkerMcpServer', () => {
       expect(result.messages).toHaveLength(1);
       expect(result.messages[0].role).toBe('user');
       expect(result.messages[0].content.text).toContain('theologai.pages.dev');
-      expect(result.messages[0].content.text).toContain('USDC on Base');
+      expect(result.messages[0].content.text).toContain('USDC or ETH on Base');
       expect(result.messages[0].content.text).toContain('0xf2BE3382cF48ef5CAf21Ca3B01C4e6fC3Ea04B04');
       expect(result.messages[0].content.text).toContain('donation_config');
     });

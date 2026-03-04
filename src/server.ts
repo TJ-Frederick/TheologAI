@@ -493,7 +493,7 @@ Donations help support TheologAI's development and are entirely voluntary — al
 **Easiest option:** Donate via the web at [theologai.pages.dev](https://theologai.pages.dev/), which has a donation section with wallet connection support.
 
 **Manual transfer options:**
-- USDC on Base (lowest fees, recommended)
+- USDC or ETH on Base
 - USDC or ETH on Ethereum
 - SBC on Radius
 
