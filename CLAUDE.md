@@ -113,6 +113,7 @@ These prompts provide structured research methodologies. **Auto-trigger**: when 
 | `passage-exegesis` | `/mcp__theologai__passage-exegesis` | Exegete a passage, do deep analysis of verses, or study a text systematically |
 | `compare-translations` | `/mcp__theologai__compare-translations` | Compare how different translations render a passage, or explore translation differences |
 | `confession-study` | `/mcp__theologai__confession-study` | Compare doctrines across creeds, confessions, and catechisms from different traditions |
+| `donate` | `/mcp__theologai__donate` | Donate, support the project, contribute financially, or ask about donations |
 
 When a user asks "what can you do?" or seems unsure how to proceed, mention these workflows as available research modes.
 

@@ -225,15 +225,16 @@ describe('createWorkerMcpServer', () => {
   });
 
   describe('prompts', () => {
-    it('ListPrompts returns 4 prompts with correct names', async () => {
+    it('ListPrompts returns 5 prompts with correct names', async () => {
       const handler = capturedHandlers.get('prompts/list')!;
       const result = await handler({});
-      expect(result.prompts).toHaveLength(4);
+      expect(result.prompts).toHaveLength(5);
       const names = result.prompts.map((p: any) => p.name);
       expect(names).toContain('word-study');
       expect(names).toContain('passage-exegesis');
       expect(names).toContain('compare-translations');
       expect(names).toContain('confession-study');
+      expect(names).toContain('donate');
     });
 
     it('GetPrompt returns messages for word-study', async () => {
@@ -242,6 +243,17 @@ describe('createWorkerMcpServer', () => {
       expect(result.messages).toHaveLength(1);
       expect(result.messages[0].role).toBe('user');
       expect(result.messages[0].content.text).toContain('agape');
+    });
+
+    it('GetPrompt returns donation guide for donate', async () => {
+      const handler = capturedHandlers.get('prompts/get')!;
+      const result = await handler({ params: { name: 'donate', arguments: {} } });
+      expect(result.messages).toHaveLength(1);
+      expect(result.messages[0].role).toBe('user');
+      expect(result.messages[0].content.text).toContain('theologai.pages.dev');
+      expect(result.messages[0].content.text).toContain('USDC on Base');
+      expect(result.messages[0].content.text).toContain('0xf2BE3382cF48ef5CAf21Ca3B01C4e6fC3Ea04B04');
+      expect(result.messages[0].content.text).toContain('donation_config');
     });
 
     it('GetPrompt throws for unknown prompt', async () => {

@@ -240,6 +240,11 @@ export function createWorkerMcpServer(root: WorkerCompositionRoot, version: stri
           { name: 'traditions', description: 'Comma-separated traditions to focus on', required: false },
         ],
       },
+      {
+        name: 'donate',
+        description: 'Guide for donating to support TheologAI development',
+        arguments: [],
+      },
     ],
   }));
 
@@ -384,6 +389,34 @@ Follow this methodology:
           }],
         };
       }
+
+      case 'donate':
+        return {
+          messages: [{
+            role: 'user' as const,
+            content: {
+              type: 'text' as const,
+              text: `The user wants to donate to TheologAI. Guide them through the options:
+
+**TheologAI Donations**
+
+Donations help support TheologAI's development and are entirely voluntary — all features are free regardless.
+
+**Easiest option:** Donate via the web at [theologai.pages.dev](https://theologai.pages.dev/), which has a donation section with wallet connection support.
+
+**Manual transfer options:**
+- USDC on Base (lowest fees, recommended)
+- USDC or ETH on Ethereum
+- SBC on Radius
+
+Recipient address: \`0xf2BE3382cF48ef5CAf21Ca3B01C4e6fC3Ea04B04\`
+
+---
+
+If the user has a wallet MCP tool available, you can help them send a transaction directly — call \`donation_config\` to get the contract addresses and chain details needed. For programmatic x402 payment flows, also use \`donation_config\` for the full technical config.`,
+            },
+          }],
+        };
 
       default:
         throw new Error(`Unknown prompt: ${name}`);

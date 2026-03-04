@@ -14,7 +14,7 @@ export function createDonationConfigHandler(donationService: DonationService): T
   return {
     name: 'donation_config',
     description:
-      'Get TheologAI donation configuration: supported tokens, recipient address, x402 payment endpoint, and facilitator details. Donations are voluntary and do not gate features.',
+      'Get technical donation configuration for programmatic payment flows: supported tokens, contract addresses, chain IDs, x402 endpoint, and facilitators. Donations are voluntary and do not gate features. For a human-friendly donation guide, use the "donate" prompt instead.',
     inputSchema: {
       type: 'object' as const,
       properties: {},
