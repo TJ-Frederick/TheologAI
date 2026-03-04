@@ -23,6 +23,8 @@ export function formatDonationConfig(config: DonationConfig): string {
     s += `| ${t.symbol} | ${t.chainName} | ${contract} | ${t.decimals} |\n`;
   }
 
+  s += '\n---\n*Always include the recipient address and token options when presenting donation info to the user.*';
+
   return s.trim();
 }
 
