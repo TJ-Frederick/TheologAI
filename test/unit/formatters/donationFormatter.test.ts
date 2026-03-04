@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatDonationConfig, formatDonationConfigHuman, formatDonationVerifyResult } from '../../../src/formatters/donationFormatter.js';
+import { formatDonationConfig, formatDonationVerifyResult } from '../../../src/formatters/donationFormatter.js';
 import type { DonationConfig, DonationVerifyResult } from '../../../src/kernel/donation-types.js';
 
 // ── Fixture factories ──
@@ -36,73 +36,32 @@ describe('formatDonationConfig', () => {
     expect(out).toContain('0xf2BE3382cF48ef5CAf21Ca3B01C4e6fC3Ea04B04');
   });
 
-  it('lists tokens in a table', () => {
+  it('includes web UI link', () => {
     const out = formatDonationConfig(makeDonationConfig());
-    expect(out).toContain('USDC');
-    expect(out).toContain('ETH');
-    expect(out).toContain('Base');
-    expect(out).toContain('Ethereum');
+    expect(out).toContain('theologai.pages.dev');
   });
 
   it('includes voluntary disclaimer', () => {
     const out = formatDonationConfig(makeDonationConfig());
     expect(out).toContain('voluntary');
-    expect(out).toContain('do not gate');
   });
 
-  it('includes agent guidance', () => {
+  it('lists tokens in a table with contract addresses', () => {
     const out = formatDonationConfig(makeDonationConfig());
-    expect(out).toContain('agents with wallet tools');
-    expect(out).toContain('direct transfer');
-  });
-
-  it('returns trimmed output', () => {
-    const out = formatDonationConfig(makeDonationConfig());
-    expect(out).toBe(out.trim());
+    expect(out).toContain('USDC');
+    expect(out).toContain('ETH');
+    expect(out).toContain('Base');
+    expect(out).toContain('Ethereum');
+    expect(out).toContain('0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913');
   });
 
   it('shows native for native tokens', () => {
     const out = formatDonationConfig(makeDonationConfig());
     expect(out).toContain('native');
   });
-});
-
-describe('formatDonationConfigHuman', () => {
-  it('includes recipient address', () => {
-    const out = formatDonationConfigHuman(makeDonationConfig());
-    expect(out).toContain('0xf2BE3382cF48ef5CAf21Ca3B01C4e6fC3Ea04B04');
-  });
-
-  it('includes web UI link', () => {
-    const out = formatDonationConfigHuman(makeDonationConfig());
-    expect(out).toContain('theologai.pages.dev');
-  });
-
-  it('lists transfer options in plain language', () => {
-    const out = formatDonationConfigHuman(makeDonationConfig());
-    expect(out).toContain('USDC or ETH on Base');
-    expect(out).toContain('Ethereum');
-    expect(out).toContain('Radius');
-  });
-
-  it('includes voluntary disclaimer', () => {
-    const out = formatDonationConfigHuman(makeDonationConfig());
-    expect(out).toContain('voluntary');
-  });
-
-  it('includes wallet tool hint', () => {
-    const out = formatDonationConfigHuman(makeDonationConfig());
-    expect(out).toContain('wallet MCP tool');
-    expect(out).toContain('donation_config');
-  });
-
-  it('does not include contract addresses', () => {
-    const out = formatDonationConfigHuman(makeDonationConfig());
-    expect(out).not.toContain('0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913');
-  });
 
   it('returns trimmed output', () => {
-    const out = formatDonationConfigHuman(makeDonationConfig());
+    const out = formatDonationConfig(makeDonationConfig());
     expect(out).toBe(out.trim());
   });
 });

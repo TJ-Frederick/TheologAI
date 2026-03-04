@@ -7,23 +7,17 @@
 
 import type { ToolHandler } from '../../kernel/types.js';
 import type { DonationService } from '../../services/donation/DonationService.js';
-import { formatDonationConfig, formatDonationConfigHuman } from '../../formatters/donationFormatter.js';
+import { formatDonationConfig } from '../../formatters/donationFormatter.js';
 import { handleToolError } from '../../kernel/errors.js';
 
 export function createDonationConfigHandler(donationService: DonationService): ToolHandler {
   return {
     name: 'donation_config',
     description:
-      'Donate to support TheologAI development. All features are free regardless — donations are entirely voluntary. Returns how to donate: supported tokens, recipient address, and transfer options. Use format="human" (default) for a friendly guide, or format="technical" for contract addresses and chain IDs needed by agents with wallet tools.',
+      'Donate to support TheologAI development. All features are free regardless — donations are entirely voluntary. Returns how to donate: web link, recipient address, supported tokens with contract addresses, and chain details.',
     inputSchema: {
       type: 'object' as const,
-      properties: {
-        format: {
-          type: 'string',
-          enum: ['human', 'technical'],
-          description: 'Response format: "human" for a friendly donation guide (default), "technical" for full contract addresses, chain IDs, and transfer details for agents with wallet tools.',
-        },
-      },
+      properties: {},
       required: [],
     },
     annotations: {
@@ -32,13 +26,10 @@ export function createDonationConfigHandler(donationService: DonationService): T
       idempotentHint: true,
     },
 
-    handler: async (params) => {
+    handler: async () => {
       try {
-        const format = (params.format as string) ?? 'human';
         const config = donationService.getConfig();
-        const text = format === 'technical'
-          ? formatDonationConfig(config)
-          : formatDonationConfigHuman(config);
+        const text = formatDonationConfig(config);
         return {
           content: [{ type: 'text' as const, text }],
         };
