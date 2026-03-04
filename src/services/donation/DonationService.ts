@@ -7,24 +7,18 @@ import { PaymentError } from '../../kernel/errors.js';
 import {
   RECIPIENT_ADDRESS,
   SUPPORTED_TOKENS,
-  FACILITATORS,
   EXPLORER_URLS,
   type DonationConfig,
   type DonationVerifyResult,
 } from '../../kernel/donation-types.js';
 
 export class DonationService {
-  constructor(
-    private verifier: OnChainVerifier,
-    private x402BaseUrl: string,
-  ) {}
+  constructor(private verifier: OnChainVerifier) {}
 
   getConfig(): DonationConfig {
     return {
       recipientAddress: RECIPIENT_ADDRESS,
       tokens: SUPPORTED_TOKENS,
-      facilitators: FACILITATORS,
-      x402PayEndpoint: this.x402BaseUrl ? `${this.x402BaseUrl}/x402/pay` : '',
     };
   }
 

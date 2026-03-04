@@ -99,10 +99,7 @@ export function getDonationService(env: Env): DonationService {
       base: env.BASE_RPC_URL,
       radius: env.RADIUS_RPC_URL,
     });
-    _donationService = new DonationService(
-      verifier,
-      'https://theologai.tjfrederick.workers.dev',
-    );
+    _donationService = new DonationService(verifier);
   }
   return _donationService;
 }

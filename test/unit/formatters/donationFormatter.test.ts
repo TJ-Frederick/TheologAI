@@ -8,13 +8,9 @@ function makeDonationConfig(overrides: Partial<DonationConfig> = {}): DonationCo
   return {
     recipientAddress: '0xf2BE3382cF48ef5CAf21Ca3B01C4e6fC3Ea04B04',
     tokens: [
-      { symbol: 'USDC', name: 'USD Coin', chainId: 8453, chainName: 'Base', network: 'eip155:8453', asset: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', decimals: 6, isNative: false, x402Supported: true },
-      { symbol: 'ETH', name: 'Ether', chainId: 1, chainName: 'Ethereum', network: 'eip155:1', asset: 'native', decimals: 18, isNative: true, x402Supported: false },
+      { symbol: 'USDC', name: 'USD Coin', chainId: 8453, chainName: 'Base', network: 'eip155:8453', asset: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', decimals: 6, isNative: false },
+      { symbol: 'ETH', name: 'Ether', chainId: 1, chainName: 'Ethereum', network: 'eip155:1', asset: 'native', decimals: 18, isNative: true },
     ],
-    facilitators: [
-      { name: 'Coinbase', url: 'https://x402.org/facilitator', networks: ['eip155:8453'], requiresApiKey: false },
-    ],
-    x402PayEndpoint: 'https://test.example.com/x402/pay',
     ...overrides,
   };
 }
@@ -48,27 +44,16 @@ describe('formatDonationConfig', () => {
     expect(out).toContain('Ethereum');
   });
 
-  it('marks x402-supported tokens', () => {
-    const out = formatDonationConfig(makeDonationConfig());
-    expect(out).toContain('Yes');
-    expect(out).toContain('No');
-  });
-
-  it('includes facilitator info', () => {
-    const out = formatDonationConfig(makeDonationConfig());
-    expect(out).toContain('Coinbase');
-    expect(out).toContain('eip155:8453');
-  });
-
-  it('includes x402 endpoint', () => {
-    const out = formatDonationConfig(makeDonationConfig());
-    expect(out).toContain('https://test.example.com/x402/pay');
-  });
-
   it('includes voluntary disclaimer', () => {
     const out = formatDonationConfig(makeDonationConfig());
     expect(out).toContain('voluntary');
     expect(out).toContain('do not gate');
+  });
+
+  it('includes agent guidance', () => {
+    const out = formatDonationConfig(makeDonationConfig());
+    expect(out).toContain('agents with wallet tools');
+    expect(out).toContain('direct transfer');
   });
 
   it('returns trimmed output', () => {
@@ -111,11 +96,9 @@ describe('formatDonationConfigHuman', () => {
     expect(out).toContain('donation_config');
   });
 
-  it('does not include contract addresses or facilitator details', () => {
+  it('does not include contract addresses', () => {
     const out = formatDonationConfigHuman(makeDonationConfig());
     expect(out).not.toContain('0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913');
-    expect(out).not.toContain('Coinbase');
-    expect(out).not.toContain('x402.org');
   });
 
   it('returns trimmed output', () => {

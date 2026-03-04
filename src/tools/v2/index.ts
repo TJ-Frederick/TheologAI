@@ -97,7 +97,7 @@ export function createCompositionRoot(): CompositionRoot {
 
   // Donation (no DB dependency)
   const onChainVerifier = new OnChainVerifier({});
-  const donationService = new DonationService(onChainVerifier, process.env.X402_BASE_URL ?? '');
+  const donationService = new DonationService(onChainVerifier);
 
   // Tool handlers
   const tools = [

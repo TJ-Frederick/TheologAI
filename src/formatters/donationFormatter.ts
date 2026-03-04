@@ -32,28 +32,15 @@ export function formatDonationConfig(config: DonationConfig): string {
 
   s += `**Recipient:** \`${config.recipientAddress}\`\n\n`;
 
-  s += '| Token | Chain | Contract | Decimals | x402 |\n';
-  s += '|-------|-------|----------|----------|------|\n';
+  s += '| Token | Chain | Contract | Decimals |\n';
+  s += '|-------|-------|----------|----------|\n';
   for (const t of config.tokens) {
     const contract = t.isNative ? 'native' : `\`${t.asset}\``;
-    const x402 = t.x402Supported ? 'Yes' : 'No';
-    s += `| ${t.symbol} | ${t.chainName} | ${contract} | ${t.decimals} | ${x402} |\n`;
+    s += `| ${t.symbol} | ${t.chainName} | ${contract} | ${t.decimals} |\n`;
   }
 
-  if (config.facilitators.length > 0) {
-    s += '\n**x402 Facilitators:**\n';
-    for (const f of config.facilitators) {
-      s += `- **${f.name}** — ${f.networks.join(', ')}`;
-      if (f.requiresApiKey) s += ' (API key required)';
-      s += '\n';
-    }
-  }
-
-  if (config.x402PayEndpoint) {
-    s += `\n**x402 Endpoint:** \`${config.x402PayEndpoint}\`\n`;
-  }
-
-  s += '\n*Donations are entirely voluntary and do not gate any features.*';
+  s += '\n*Donations are entirely voluntary and do not gate any features.*\n\n';
+  s += '*For agents with wallet tools: use the contract addresses and chain IDs above to construct a direct transfer to the recipient address.*';
 
   return s.trim();
 }

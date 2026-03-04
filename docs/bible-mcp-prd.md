@@ -374,7 +374,7 @@ All tools return structured data that gets formatted into natural language:
 - Mobile app integration
 
 ### 10.3 Monetization Options
-- Pay-per-query via x402 protocol
+- Direct crypto donations
 - Subscription tiers
 - Premium commentary access
 - Institutional licenses

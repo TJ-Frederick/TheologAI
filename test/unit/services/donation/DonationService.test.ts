@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { DonationService } from '../../../../src/services/donation/DonationService.js';
 import { PaymentError } from '../../../../src/kernel/errors.js';
-import { RECIPIENT_ADDRESS, SUPPORTED_TOKENS, FACILITATORS } from '../../../../src/kernel/donation-types.js';
+import { RECIPIENT_ADDRESS, SUPPORTED_TOKENS } from '../../../../src/kernel/donation-types.js';
 
 // ── Mock factory ──
 
@@ -29,7 +29,7 @@ describe('DonationService', () => {
 
   beforeEach(() => {
     mockVerifier = makeMockVerifier();
-    service = new DonationService(mockVerifier as any, 'https://test.example.com');
+    service = new DonationService(mockVerifier as any);
   });
 
   describe('getConfig', () => {
@@ -41,16 +41,6 @@ describe('DonationService', () => {
     it('returns all 5 supported tokens', () => {
       const config = service.getConfig();
       expect(config.tokens).toHaveLength(5);
-    });
-
-    it('returns facilitators', () => {
-      const config = service.getConfig();
-      expect(config.facilitators).toEqual(FACILITATORS);
-    });
-
-    it('returns x402 pay endpoint', () => {
-      const config = service.getConfig();
-      expect(config.x402PayEndpoint).toBe('https://test.example.com/x402/pay');
     });
   });
 
@@ -68,7 +58,7 @@ describe('DonationService', () => {
         symbol: 'ETH',
         tokenAddress: null,
       });
-      service = new DonationService(mockVerifier as any, 'https://test.example.com');
+      service = new DonationService(mockVerifier as any);
 
       const result = await service.verifyDonation('0x' + 'ab'.repeat(32));
       expect(result.amount).toBe('1');
@@ -77,7 +67,7 @@ describe('DonationService', () => {
 
     it('formats small USDC amounts', async () => {
       mockVerifier = makeMockVerifier({ amount: '100000' });
-      service = new DonationService(mockVerifier as any, 'https://test.example.com');
+      service = new DonationService(mockVerifier as any);
 
       const result = await service.verifyDonation('0x' + 'ab'.repeat(32));
       expect(result.amount).toBe('0.1');
@@ -85,7 +75,7 @@ describe('DonationService', () => {
 
     it('formats whole number amounts without trailing decimal', async () => {
       mockVerifier = makeMockVerifier({ amount: '5000000' });
-      service = new DonationService(mockVerifier as any, 'https://test.example.com');
+      service = new DonationService(mockVerifier as any);
 
       const result = await service.verifyDonation('0x' + 'ab'.repeat(32));
       expect(result.amount).toBe('5');
@@ -98,7 +88,7 @@ describe('DonationService', () => {
 
     it('sets isToRecipient false when to does not match', async () => {
       mockVerifier = makeMockVerifier({ to: '0x' + '99'.repeat(20) });
-      service = new DonationService(mockVerifier as any, 'https://test.example.com');
+      service = new DonationService(mockVerifier as any);
 
       const result = await service.verifyDonation('0x' + 'ab'.repeat(32));
       expect(result.isToRecipient).toBe(false);
@@ -106,7 +96,7 @@ describe('DonationService', () => {
 
     it('is case-insensitive for recipient check', async () => {
       mockVerifier = makeMockVerifier({ to: RECIPIENT_ADDRESS.toLowerCase() });
-      service = new DonationService(mockVerifier as any, 'https://test.example.com');
+      service = new DonationService(mockVerifier as any);
 
       const result = await service.verifyDonation('0x' + 'ab'.repeat(32));
       expect(result.isToRecipient).toBe(true);
@@ -119,7 +109,7 @@ describe('DonationService', () => {
 
     it('builds explorer URL for Ethereum', async () => {
       mockVerifier = makeMockVerifier({ chainId: 1, symbol: 'ETH', amount: '1000000000000000000', tokenAddress: null });
-      service = new DonationService(mockVerifier as any, 'https://test.example.com');
+      service = new DonationService(mockVerifier as any);
 
       const result = await service.verifyDonation('0x' + 'ab'.repeat(32));
       expect(result.explorerUrl).toContain('etherscan.io');

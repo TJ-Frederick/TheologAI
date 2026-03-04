@@ -501,7 +501,7 @@ Recipient address: \`0xf2BE3382cF48ef5CAf21Ca3B01C4e6fC3Ea04B04\`
 
 ---
 
-If the user has a wallet MCP tool available, you can help them send a transaction directly — call \`donation_config\` to get the contract addresses and chain details needed. For programmatic x402 payment flows, also use \`donation_config\` for the full technical config.`,
+If the user has a wallet MCP tool available, you can help them send a transaction directly — call \`donation_config\` with format="technical" to get the contract addresses and chain details needed.`,
           },
         },
       ],

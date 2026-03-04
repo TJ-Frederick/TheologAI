@@ -2,7 +2,7 @@
  * donation_config tool handler.
  *
  * Returns TheologAI donation configuration: supported tokens,
- * recipient address, x402 payment endpoint, and facilitator details.
+ * recipient address, and chain details.
  */
 
 import type { ToolHandler } from '../../kernel/types.js';
@@ -14,14 +14,14 @@ export function createDonationConfigHandler(donationService: DonationService): T
   return {
     name: 'donation_config',
     description:
-      'Get TheologAI donation configuration. Donations are voluntary and do not gate features. Use format="human" (default) for a user-friendly donation guide, or format="technical" for the full structured config needed for programmatic x402 payment flows.',
+      'Get TheologAI donation configuration. Donations are voluntary and do not gate features. Use format="human" (default) for a user-friendly donation guide, or format="technical" for contract addresses, chain IDs, and details needed by agents with wallet tools.',
     inputSchema: {
       type: 'object' as const,
       properties: {
         format: {
           type: 'string',
           enum: ['human', 'technical'],
-          description: 'Response format: "human" for a friendly donation guide (default), "technical" for full contract addresses, chain IDs, and x402 config.',
+          description: 'Response format: "human" for a friendly donation guide (default), "technical" for full contract addresses, chain IDs, and transfer details for agents with wallet tools.',
         },
       },
       required: [],

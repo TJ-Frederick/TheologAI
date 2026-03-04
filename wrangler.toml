@@ -40,4 +40,3 @@ database_id = "f9f415e1-219b-4d17-bcf5-33a8abad02fa"
 
 # Secrets (set via `wrangler secret put`):
 #   ESV_API_KEY            — ESV API key (optional)
-#   SBC_FACILITATOR_API_KEY — SBC facilitator API key for Radius x402 settlements
