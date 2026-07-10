@@ -23,9 +23,10 @@ export function normalizeTransliteration(value: string): string {
   for (const [from, to] of TRANSLITERATION_REPLACEMENTS) {
     normalized = normalized.replaceAll(from, to);
   }
-  // STEPBible writes Hebrew yod as `îy` in forms such as ʼĕlôhîym;
-  // common ASCII searches conventionally spell that sequence as `i`.
-  return normalized.replaceAll('iy', 'i');
+  // STEPBible writes the Hebrew plural ending as `îym` in forms such as
+  // ʼĕlôhîym. Restrict this compatibility spelling to the word ending;
+  // arbitrary `iy` sequences must not collapse to a one-character query.
+  return normalized.replace(/iym$/, 'im');
 }
 
 /**
@@ -48,7 +49,7 @@ const SQL_REPLACEMENTS: ReadonlyArray<readonly [string, string]> = [
   ['ÿ', 'y'], ['Ă', 'a'], ['ă', 'a'], ['Ē', 'e'], ['ē', 'e'], ['Ĕ', 'e'],
   ['ĕ', 'e'], ['Ō', 'o'], ['ō', 'o'], ['ŏ', 'o'], ['ŷ', 'y'], ['ḕ', 'e'],
   ['Ḗ', 'e'], ['ḗ', 'e'], ['ḯ', 'i'], ['ṑ', 'o'], ['ṓ', 'o'], ['Ṭ', 't'],
-  ['ṭ', 't'], ['iy', 'i'],
+  ['ṭ', 't'],
 ];
 
 function sqlString(value: string): string {
@@ -61,5 +62,7 @@ export function normalizedTransliterationSql(column = 's.transliteration'): stri
     (expression, [from, to]) => `replace(${expression}, ${sqlString(from)}, ${sqlString(to)})`,
     column,
   );
-  return `lower(${replaced})`;
+  const lowered = `lower(${replaced})`;
+  return `(CASE WHEN ${lowered} LIKE '%iym' ` +
+    `THEN substr(${lowered}, 1, length(${lowered}) - 3) || 'im' ELSE ${lowered} END)`;
 }

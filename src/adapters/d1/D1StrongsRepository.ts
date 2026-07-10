@@ -51,7 +51,7 @@ export class D1StrongsRepository implements IStrongsRepository {
     if (!isAsciiTransliterationQuery(query)) return results;
 
     const normalizedQuery = normalizeTransliteration(query);
-    if (!normalizedQuery) return results;
+    if (normalizedQuery.length < 2) return results;
 
     const normalized = await this.db.prepare(
       `SELECT strongs_number, testament, lemma, transliteration,

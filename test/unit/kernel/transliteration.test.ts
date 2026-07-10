@@ -11,6 +11,12 @@ describe('transliteration normalization', () => {
     expect(isAsciiTransliterationQuery('elohim')).toBe(true);
   });
 
+  it('does not collapse arbitrary iy sequences', () => {
+    expect(normalizeTransliteration('ziyoth')).toBe('ziyoth');
+    expect(normalizedTransliterationSql('s.transliteration')).toContain("'%iym'");
+    expect(normalizedTransliterationSql('s.transliteration')).not.toContain("'iy', 'i'");
+  });
+
   it('does not route Unicode queries through the ASCII fallback', () => {
     expect(isAsciiTransliterationQuery('אֱלֹהִים')).toBe(false);
     expect(isAsciiTransliterationQuery('agapē')).toBe(false);
@@ -18,6 +24,6 @@ describe('transliteration normalization', () => {
 
   it('provides a parameterized SQL expression for repository parity', () => {
     expect(normalizedTransliterationSql('s.transliteration')).toContain("replace(");
-    expect(normalizedTransliterationSql('s.transliteration')).toContain("'iy', 'i'");
+    expect(normalizedTransliterationSql('s.transliteration')).toContain("|| 'im'");
   });
 });

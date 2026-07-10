@@ -67,7 +67,7 @@ export class StrongsRepository implements IStrongsRepository {
     if (!isAsciiTransliterationQuery(query)) return results;
 
     const normalizedQuery = normalizeTransliteration(query);
-    if (!normalizedQuery) return results;
+    if (normalizedQuery.length < 2) return results;
 
     // The canonical FTS index stores diacritics and transliteration markers.
     // Match a normalized SQL expression as a fallback so ASCII `elohim` can

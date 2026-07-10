@@ -83,6 +83,7 @@ describe('SQLite and D1 repository parity with identical real data', () => {
 
       INSERT INTO strongs VALUES
         ('G0025', 'NT', 'ἀγαπάω', 'agapaō', 'ag-ap-ah-o', 'to love', 'perhaps from agan'),
+        ('G2424', 'NT', 'Ἰησοῦς', 'Iēsous', NULL, 'Jesus', NULL),
         ('H0430', 'OT', 'אֱלֹהִים', 'ʼĕlôhîym', NULL, 'God, gods', NULL);
       INSERT INTO strongs_fts
         SELECT strongs_number, lemma, transliteration, definition FROM strongs;
@@ -190,6 +191,12 @@ describe('SQLite and D1 repository parity with identical real data', () => {
     const sqliteResults = sqliteStrongs.search('elohim');
     await expect(d1Strongs.search('elohim')).resolves.toEqual(sqliteResults);
     expect(sqliteResults).toContainEqual(expect.objectContaining({ strongs_number: 'H0430' }));
+  });
+
+  it('does not broaden a short iy search into unrelated i transliterations', async () => {
+    const sqliteResults = sqliteStrongs.search('iy');
+    await expect(d1Strongs.search('iy')).resolves.toEqual(sqliteResults);
+    expect(sqliteResults).not.toContainEqual(expect.objectContaining({ strongs_number: 'G2424' }));
   });
 
   it('preserves Unicode lemma search alongside transliteration fallback', async () => {
