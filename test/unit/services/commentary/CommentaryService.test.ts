@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { CommentaryService } from '../../../../src/services/commentary/CommentaryService.js';
 import type { CommentaryAdapter } from '../../../../src/adapters/commentary/CommentaryAdapter.js';
 import type { CommentaryResult } from '../../../../src/kernel/types.js';
-import { NotFoundError } from '../../../../src/kernel/errors.js';
+import { APIError, NotFoundError } from '../../../../src/kernel/errors.js';
 
 // ── Mock adapter factory ──
 
@@ -47,15 +47,17 @@ describe('CommentaryService', () => {
     });
 
     it('truncates text at maxLength with ellipsis', async () => {
-      (henryAdapter.getCommentary as ReturnType<typeof vi.fn>).mockResolvedValue({
+      const providerResult: CommentaryResult = {
         reference: 'John 3:16',
         commentator: 'Matthew Henry',
         text: 'x'.repeat(500),
         citation: { source: 'Test' },
-      });
+      };
+      (henryAdapter.getCommentary as ReturnType<typeof vi.fn>).mockResolvedValue(providerResult);
       const result = await service.lookup({ reference: 'John 3:16', maxLength: 100 });
       expect(result.text).toHaveLength(103); // 100 + '...'
       expect(result.text.endsWith('...')).toBe(true);
+      expect(providerResult.text).toHaveLength(500);
     });
 
     it('does not truncate when text is shorter than maxLength', async () => {
@@ -67,6 +69,21 @@ describe('CommentaryService', () => {
       await expect(
         service.lookup({ reference: 'John 3:16', commentator: 'Unknown Author' })
       ).rejects.toThrow(NotFoundError);
+    });
+
+    it('rejects a provider result for a different reference without relabeling its text', async () => {
+      const providerResult: CommentaryResult = {
+        reference: 'John 3:17',
+        commentator: 'Matthew Henry',
+        text: 'Adjacent verse commentary',
+        citation: { source: 'Test' },
+      };
+      (henryAdapter.getCommentary as ReturnType<typeof vi.fn>).mockResolvedValue(providerResult);
+
+      await expect(service.lookup({ reference: 'John 3:16', commentator: 'Matthew Henry' }))
+        .rejects.toEqual(new APIError(502, 'Commentary provider returned commentary for a different reference.'));
+      expect(providerResult.reference).toBe('John 3:17');
+      expect(providerResult.text).toBe('Adjacent verse commentary');
     });
   });
 

@@ -94,50 +94,92 @@ export class HelloAoCommentaryAdapter implements CommentaryAdapter {
     return COMMENTATORS[name.toLowerCase().trim()];
   }
 
-  private extractCommentaryText(data: any, verseNumber?: number): string | undefined {
-    if (!data?.chapter?.content) return undefined;
+  private extractCommentaryText(data: unknown, verseNumber?: number): string | undefined {
+    const content = this.getChapterContent(data);
+    if (!content) return undefined;
 
     // If no specific verse, return all commentary for the chapter
-    if (!verseNumber) {
+    if (verseNumber == null) {
       const parts: string[] = [];
-      for (const entry of data.chapter.content) {
+      for (const entry of content) {
         const text = this.extractEntryText(entry);
         if (text) parts.push(text);
       }
       return parts.length > 0 ? parts.join('\n\n') : undefined;
     }
 
-    // Try exact verse match
-    let entry = data.chapter.content.find((item: any) => {
-      const num = item.verseNumber ?? item.number;
-      return num === verseNumber;
-    });
+    // Verse requests require an exact, trustworthy provider identity. A
+    // neighboring entry may be broader commentary or commentary for another
+    // verse, so never substitute it for the requested verse.
+    const exactEntries = content.filter(entry => this.getEntryVerseNumber(entry) === verseNumber);
+    if (exactEntries.length !== 1) return undefined;
 
-    // Fallback: closest preceding verse section
-    if (!entry) {
-      const candidates = data.chapter.content
-        .filter((item: any) => (item.verseNumber ?? item.number) <= verseNumber)
-        .sort((a: any, b: any) => (b.verseNumber ?? b.number) - (a.verseNumber ?? a.number));
-      entry = candidates[0];
-    }
-
-    return entry ? this.extractEntryText(entry) : undefined;
+    return this.extractEntryText(exactEntries[0]);
   }
 
-  private extractEntryText(entry: any): string | undefined {
-    if (!entry?.content || !Array.isArray(entry.content)) return undefined;
+  private getChapterContent(data: unknown): unknown[] | undefined {
+    if (!this.isRecord(data) || !this.isRecord(data.chapter) || !Array.isArray(data.chapter.content)) {
+      return undefined;
+    }
+    return data.chapter.content;
+  }
+
+  /** Return an entry's verse only when its metadata is unambiguous and numeric. */
+  private getEntryVerseNumber(entry: unknown): number | undefined {
+    if (!this.isRecord(entry)) return undefined;
+
+    const verseNumber = this.readVerseMetadata(entry.verseNumber);
+    const number = this.readVerseMetadata(entry.number);
+    const hasVerseNumber = entry.verseNumber !== undefined && entry.verseNumber !== null;
+    const hasNumber = entry.number !== undefined && entry.number !== null;
+
+    // If a provider supplies both fields, disagreement or malformed metadata
+    // makes the identity untrustworthy. Null/undefined are treated as absent.
+    if ((hasVerseNumber && verseNumber === undefined) || (hasNumber && number === undefined)) {
+      return undefined;
+    }
+    if (verseNumber !== undefined && number !== undefined && verseNumber !== number) {
+      return undefined;
+    }
+    return verseNumber ?? number;
+  }
+
+  private readVerseMetadata(value: unknown): number | undefined {
+    if (typeof value === 'number') {
+      return Number.isSafeInteger(value) && value >= 1 ? value : undefined;
+    }
+    if (typeof value === 'string' && /^\d+$/.test(value.trim())) {
+      const parsed = Number(value);
+      return Number.isSafeInteger(parsed) && parsed >= 1 ? parsed : undefined;
+    }
+    return undefined;
+  }
+
+  private extractEntryText(entry: unknown): string | undefined {
+    if (!this.isRecord(entry) || !Array.isArray(entry.content)) return undefined;
 
     const parts: string[] = [];
     for (const item of entry.content) {
-      if (typeof item === 'object' && item.type === 'heading') {
-        parts.push(`**${item.content.join(' ')}**`);
-      } else if (typeof item === 'object' && item.type === 'text') {
-        parts.push(item.content.join(' '));
+      if (this.isRecord(item) && item.type === 'heading') {
+        const heading = this.joinContent(item.content);
+        if (heading) parts.push(`**${heading}**`);
+      } else if (this.isRecord(item) && item.type === 'text') {
+        const text = this.joinContent(item.content);
+        if (text) parts.push(text);
       } else if (typeof item === 'string') {
         parts.push(item);
       }
     }
 
     return parts.length > 0 ? parts.join('\n\n') : undefined;
+  }
+
+  private joinContent(value: unknown): string | undefined {
+    if (!Array.isArray(value) || !value.every(item => typeof item === 'string')) return undefined;
+    return value.join(' ');
+  }
+
+  private isRecord(value: unknown): value is Record<string, any> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
   }
 }

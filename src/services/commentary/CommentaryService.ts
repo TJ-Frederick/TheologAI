@@ -6,8 +6,8 @@
 
 import type { CommentaryAdapter } from '../../adapters/commentary/CommentaryAdapter.js';
 import type { CommentaryResult, CommentaryLookupParams } from '../../kernel/types.js';
-import { parseReference, formatReference } from '../../kernel/reference.js';
-import { NotFoundError } from '../../kernel/errors.js';
+import { parseReference, referencesEqual } from '../../kernel/reference.js';
+import { APIError, NotFoundError } from '../../kernel/errors.js';
 
 export class CommentaryService {
   constructor(private adapters: CommentaryAdapter[]) {}
@@ -22,10 +22,14 @@ export class CommentaryService {
       );
       if (supported) {
         const result = await adapter.getCommentary(ref, commentator);
+        this.assertResultConsistency(ref, result);
 
         // Apply maxLength if specified
         if (params.maxLength && result.text.length > params.maxLength) {
-          result.text = result.text.substring(0, params.maxLength) + '...';
+          return {
+            ...result,
+            text: result.text.substring(0, params.maxLength) + '...',
+          };
         }
 
         return result;
@@ -36,6 +40,27 @@ export class CommentaryService {
       'commentator',
       `Unknown commentator: "${commentator}". Available: ${this.getAvailableCommentators().join(', ')}`
     );
+  }
+
+  /** Prevent a provider from returning adjacent or otherwise mislabeled commentary. */
+  private assertResultConsistency(ref: ReturnType<typeof parseReference>, result: CommentaryResult): void {
+    if (!result || typeof result.reference !== 'string' || typeof result.commentator !== 'string' || typeof result.text !== 'string') {
+      throw new APIError(502, 'Commentary provider returned an invalid result.');
+    }
+
+    let returnedRef: ReturnType<typeof parseReference>;
+    try {
+      returnedRef = parseReference(result.reference);
+    } catch {
+      throw new APIError(502, 'Commentary provider returned an invalid reference.');
+    }
+
+    if (!referencesEqual(ref, returnedRef)) {
+      throw new APIError(502, 'Commentary provider returned commentary for a different reference.');
+    }
+    if (!result.text.trim()) {
+      throw new APIError(502, 'Commentary provider returned empty commentary.');
+    }
   }
 
   getAvailableCommentators(): string[] {

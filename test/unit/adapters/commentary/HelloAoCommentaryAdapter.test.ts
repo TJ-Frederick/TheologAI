@@ -48,20 +48,45 @@ describe('HelloAoCommentaryAdapter', () => {
     expect(adapter.supportedCommentators).toContain('Tyndale');
   });
 
-  it('falls back to the closest preceding verse section using number fields', async () => {
+  it('extracts an exact verse using number metadata', async () => {
     vi.mocked(globalThis.fetch).mockResolvedValue(response({
       chapter: {
         content: [
           { number: 10, content: ['Earlier'] },
-          { number: 15, content: ['Closest'] },
+          { number: 16, content: ['Exact'] },
           { number: 20, content: ['Later'] },
         ],
       },
     }));
 
     const result = await new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3:16'), 'Clarke');
-    expect(result.text).toBe('Closest');
+    expect(result.text).toBe('Exact');
     expect(result.commentator).toBe('Adam Clarke');
+  });
+
+  it('rejects preceding and later entries when the exact verse is missing', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue(response({
+      chapter: {
+        content: [
+          { number: 15, content: ['Preceding verse'] },
+          { number: 17, content: ['Later verse'] },
+        ],
+      },
+    }));
+
+    await expect(new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3:16'), 'Clarke'))
+      .rejects.toEqual(new AdapterError('HelloAO', 'No commentary found for John 3:16 in Adam Clarke'));
+  });
+
+  it('never returns John 3:17 content for a John Gill 3:16 request', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue(response({
+      chapter: {
+        content: [{ number: 17, content: ['For God sent not his Son into the world'] }],
+      },
+    }));
+
+    await expect(new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3:16'), 'John Gill'))
+      .rejects.toEqual(new AdapterError('HelloAO', 'No commentary found for John 3:16 in John Gill'));
   });
 
   it('attributes Tyndale Open Study Notes under CC BY-SA 4.0', async () => {
@@ -128,14 +153,39 @@ describe('HelloAoCommentaryAdapter', () => {
 
   it.each([
     ['a malformed payload', {}],
+    ['a non-array chapter content payload', { chapter: { content: { number: 16 } } }],
     ['empty chapter content', { chapter: { content: [] } }],
     ['an exact entry without array content', { chapter: { content: [{ verseNumber: 16, content: 'bad' }] } }],
+    ['an entry with malformed verse metadata', { chapter: { content: [{ number: 'not-a-verse', content: ['unsafe'] }] } }],
+    ['an entry with conflicting verse metadata', { chapter: { content: [{ verseNumber: 16, number: 17, content: ['unsafe'] }] } }],
     ['no preceding section', { chapter: { content: [{ verseNumber: 17, content: ['later'] }] } }],
   ])('reports no commentary for %s', async (_label, payload) => {
     vi.mocked(globalThis.fetch).mockResolvedValue(response(payload));
 
     await expect(new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3:16'), 'tyndale'))
       .rejects.toEqual(new AdapterError('HelloAO', 'No commentary found for John 3:16 in Tyndale Open Study Notes'));
+  });
+
+  it.each([
+    ['Matthew Henry', 'Genesis 1:1', 'verseNumber', 'Genesis opening', 'Matthew Henry'],
+    ['Jamieson-Fausset-Brown', 'John 3:16', 'number', 'JFB exact', 'Jamieson-Fausset-Brown'],
+    ['Adam Clarke', 'Romans 8:28', 'verseNumber', 'Clarke exact', 'Adam Clarke'],
+    ['John Gill', 'Exodus 3:14', 'number', 'Gill exact', 'John Gill'],
+    ['Keil-Delitzsch', 'Genesis 1:1', 'number', 'Keil exact', 'Keil-Delitzsch'],
+    ['Tyndale', 'John 3:16', 'verseNumber', 'Tyndale exact', 'Tyndale Open Study Notes'],
+  ] as const)('preserves exact reference identity for %s (%s)', async (commentator, reference, metadata, text, displayName) => {
+    const parsed = parseReference(reference);
+    vi.mocked(globalThis.fetch).mockResolvedValue(response({
+      chapter: {
+        content: [{ [metadata]: parsed.startVerse, content: [text] }],
+      },
+    }));
+
+    const result = await new HelloAoCommentaryAdapter().getCommentary(parsed, commentator);
+
+    expect(result.reference).toBe(reference);
+    expect(result.text).toBe(text);
+    expect(result.commentator).toBe(displayName);
   });
 
   it('surfaces malformed upstream JSON', async () => {
