@@ -178,7 +178,6 @@ export class OnChainVerifier implements ITransactionEvidenceProvider {
 
 function isTransactionNotFoundError(error: unknown): boolean {
   const text = rpcErrorText(error).toLowerCase().replace(/[_-]+/g, ' ').trim();
-  if (text === 'not found') return true;
   return [
     'transaction not found',
     'transaction hash not found',

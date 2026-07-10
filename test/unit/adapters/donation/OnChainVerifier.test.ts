@@ -93,14 +93,27 @@ describe('OnChainVerifier evidence', () => {
   });
 
   it('normalizes explicit transaction-not-found RPC errors to absent', async () => {
-    mockByChain((url) => url === 'eth'
-      ? errorResponse({ code: -32000, data: { message: 'transaction not found' } })
-      : response(null));
+    mockByChain((url) => {
+      if (url === 'eth') return errorResponse({ code: -32000, data: { message: 'transaction not found' } });
+      if (url === 'base') return errorResponse({ code: -32000, message: 'receipt not found' });
+      return response(null);
+    });
     const provider = new OnChainVerifier({ ethereum: 'eth', base: 'base', radius: 'radius' });
 
     const evidence = await provider.getEvidence(TX_HASH);
 
     expect(evidence.map(item => item.state)).toEqual(['absent', 'absent', 'absent']);
+  });
+
+  it('does not treat a generic not-found RPC error as transaction absence', async () => {
+    mockByChain((url) => url === 'eth'
+      ? errorResponse({ code: -32000, message: 'not found' })
+      : response(null));
+    const provider = new OnChainVerifier({ ethereum: 'eth', base: 'base', radius: 'radius' });
+
+    const evidence = await provider.getEvidence(TX_HASH);
+
+    expect(evidence.map(item => item.state)).toEqual(['unavailable', 'absent', 'absent']);
   });
 
   it('preserves healthy absence alongside a partial RPC outage', async () => {
