@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import type { BibleService } from './BibleService.js';
 import type { ParallelPassageLookupParams, ParallelPassageResult, ParallelPassage } from '../../kernel/types.js';
 import type { ICrossReferenceRepository } from '../../kernel/repositories.js';
-import { parseReference, formatReference } from '../../kernel/reference.js';
+import { parseReference, formatReference, type BibleReference } from '../../kernel/reference.js';
 
 type Relationship = ParallelPassage['relationship'];
 interface RawParallelEntry {
@@ -26,12 +26,17 @@ interface CuratedGroup {
   relationship: Relationship;
   confidence: number;
   notes: string;
-  members: string[];
+  members: CuratedMember[];
+}
+interface CuratedMember {
+  reference: string;
+  parsed: BibleReference;
 }
 type TextService = Pick<BibleService, 'lookup'>;
 
 export class ParallelPassageService {
   private readonly groupsByReference = new Map<string, CuratedGroup[]>();
+  private readonly groupsByBookChapter = new Map<string, CuratedGroup[]>();
 
   constructor(
     private readonly crossRefs: ICrossReferenceRepository,
@@ -46,16 +51,20 @@ export class ParallelPassageService {
   async lookup(params: ParallelPassageLookupParams): Promise<ParallelPassageResult> {
     const primaryReference = normalizeReference(params.reference);
     const mode = params.mode ?? 'auto';
-    const maxParallels = params.maxParallels ?? 10;
+    const maxParallels = normalizeMaxParallels(params.maxParallels);
     const warnings: string[] = [];
     const candidates = new Map<string, ParallelPassage>();
+    const primaryParsed = parseReference(primaryReference);
 
-    for (const group of this.groupsByReference.get(primaryReference) ?? []) {
+    for (const group of this.findGroups(primaryReference, primaryParsed)) {
       if (!relationshipMatchesMode(group.relationship, mode)) continue;
       for (const member of group.members) {
-        if (member === primaryReference || candidates.has(member)) continue;
-        candidates.set(member, {
-          reference: member,
+        // A verse/range inside a curated member identifies that member; it is
+        // not a parallel to return. This also prevents overlapping queries
+        // from returning the canonical range they matched.
+        if (rangesOverlap(primaryParsed, member.parsed) || candidates.has(member.reference)) continue;
+        candidates.set(member.reference, {
+          reference: member.reference,
           relationship: group.relationship,
           confidence: group.confidence,
           notes: group.notes,
@@ -115,8 +124,8 @@ export class ParallelPassageService {
       if (!Array.isArray(entry.parallels) || !Number.isFinite(entry.confidence)) {
         throw new Error(`Invalid parallel entry for ${rawPrimary}`);
       }
-      const members = [rawPrimary, ...entry.parallels].map(normalizeReference);
-      const uniqueMembers = [...new Set(members)];
+      const uniqueMembers = [...new Set([rawPrimary, ...entry.parallels].map(normalizeReference))]
+        .map(reference => ({ reference, parsed: parseReference(reference) }));
       const confidence = entry.confidence > 1 ? entry.confidence / 100 : entry.confidence;
       if (confidence < 0 || confidence > 1) throw new Error(`Invalid parallel confidence for ${rawPrimary}`);
       const group: CuratedGroup = {
@@ -125,12 +134,27 @@ export class ParallelPassageService {
         notes: entry.notes,
         members: uniqueMembers,
       };
-      for (const member of uniqueMembers) {
-        const groups = this.groupsByReference.get(member) ?? [];
+      for (const member of group.members) {
+        const groups = this.groupsByReference.get(member.reference) ?? [];
         groups.push(group);
-        this.groupsByReference.set(member, groups);
+        this.groupsByReference.set(member.reference, groups);
+
+        const scope = referenceScopeKey(member.parsed);
+        const scopedGroups = this.groupsByBookChapter.get(scope) ?? [];
+        scopedGroups.push(group);
+        this.groupsByBookChapter.set(scope, scopedGroups);
       }
     }
+  }
+
+  private findGroups(primaryReference: string, primaryParsed: BibleReference): CuratedGroup[] {
+    const groups = new Set(this.groupsByReference.get(primaryReference) ?? []);
+    for (const group of this.groupsByBookChapter.get(referenceScopeKey(primaryParsed)) ?? []) {
+      if (group.members.some(member => rangesOverlap(primaryParsed, member.parsed))) {
+        groups.add(group);
+      }
+    }
+    return [...groups];
   }
 
   private async attachTexts(
@@ -168,6 +192,26 @@ function relationshipMatchesMode(relationship: Relationship, mode: NonNullable<P
   if (mode === 'auto') return true;
   if (mode === 'thematic') return relationship === 'thematic' || relationship === 'allusion';
   return relationship === mode;
+}
+
+function normalizeMaxParallels(value: number | undefined): number {
+  if (value === undefined || !Number.isFinite(value)) return 10;
+  return Math.min(Math.max(Math.trunc(value), 1), 50);
+}
+
+function referenceScopeKey(reference: BibleReference): string {
+  return `${reference.book.number}:${reference.chapter}`;
+}
+
+function rangesOverlap(left: BibleReference, right: BibleReference): boolean {
+  if (left.book.number !== right.book.number || left.chapter !== right.chapter) return false;
+
+  const leftStart = left.startVerse ?? 1;
+  const leftEnd = left.endVerse ?? left.startVerse ?? Number.POSITIVE_INFINITY;
+  const rightStart = right.startVerse ?? 1;
+  const rightEnd = right.endVerse ?? right.startVerse ?? Number.POSITIVE_INFINITY;
+
+  return leftStart <= rightEnd && rightStart <= leftEnd;
 }
 
 function normalizeReference(raw: string): string {

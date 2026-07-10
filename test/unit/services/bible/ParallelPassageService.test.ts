@@ -49,6 +49,57 @@ describe('ParallelPassageService', () => {
   });
 
   it.each([
+    ['Matthew 26:26', ['Mark 14:22-25', 'Luke 22:14-23', '1 Corinthians 11:23-26']],
+    ['Mark 14:22', ['Matthew 26:26-29', 'Luke 22:14-23', '1 Corinthians 11:23-26']],
+    ['Luke 22:19', ['Matthew 26:26-29', 'Mark 14:22-25', '1 Corinthians 11:23-26']],
+  ] as const)('discovers the Last Supper group from canonical verse %s', async (reference, expected) => {
+    const service = new ParallelPassageService(repository());
+    const result = await service.lookup({ reference, mode: 'synoptic', useCrossReferences: false });
+
+    expect(result.parallels.map(item => item.reference)).toEqual(expected);
+    expect(result.parallels.every(item => item.relationship === 'synoptic')).toBe(true);
+  });
+
+  it('discovers a curated group from overlapping ranges without returning the matched member', async () => {
+    const service = new ParallelPassageService(repository());
+    const result = await service.lookup({
+      reference: 'Matthew 26:27-30',
+      mode: 'synoptic',
+      useCrossReferences: false,
+    });
+
+    expect(result.parallels.map(item => item.reference)).toEqual([
+      'Mark 14:22-25',
+      'Luke 22:14-23',
+      '1 Corinthians 11:23-26',
+    ]);
+    expect(result.parallels.some(item => item.reference.startsWith('Matthew 26:'))).toBe(false);
+  });
+
+  it('supports reverse lookup from every canonical Last Supper member', async () => {
+    const service = new ParallelPassageService(repository());
+    for (const reference of ['Matthew 26:26-29', 'Mark 14:22-25', 'Luke 22:14-23', '1 Corinthians 11:23-26']) {
+      const result = await service.lookup({ reference, mode: 'synoptic', useCrossReferences: false });
+      expect(result.parallels).toHaveLength(3);
+      expect(result.parallels.some(item => item.reference === reference)).toBe(false);
+    }
+  });
+
+  it('keeps explicit synoptic mode curated, bounded, and isolated from cross-references', async () => {
+    const repo = repository([{ reference: 'Romans 1:20', votes: 100 }]);
+    const service = new ParallelPassageService(repo);
+    const result = await service.lookup({
+      reference: 'Matthew 26:26',
+      mode: 'synoptic',
+      maxParallels: 1,
+    });
+
+    expect(result.parallels).toHaveLength(1);
+    expect(result.parallels[0]).toMatchObject({ reference: 'Mark 14:22-25', relationship: 'synoptic' });
+    expect(repo.getCrossReferences).not.toHaveBeenCalled();
+  });
+
+  it.each([
     ['synoptic', 'Matthew 1:1', ['Luke 3:23-38', 'John 1:1']],
     ['quotation', 'Isaiah 53:5', ['1 Peter 2:24']],
     ['thematic', 'Genesis 1:1', ['John 1:1', 'Romans 1:20']],
@@ -58,6 +109,27 @@ describe('ParallelPassageService', () => {
     const result = await service.lookup({ reference, mode });
     expect(result.parallels.map(item => item.reference)).toEqual(expected);
     expect(repo.getCrossReferences).toHaveBeenCalledTimes(mode === 'thematic' ? 1 : 0);
+  });
+
+  it('discovers the Isaiah 7:14 quotation in both directions', async () => {
+    const repo = repository([{ reference: 'Romans 1:20', votes: 100 }]);
+    const service = new ParallelPassageService(repo);
+
+    const fromIsaiah = await service.lookup({ reference: 'Isaiah 7:14', mode: 'quotation', maxParallels: 1 });
+    expect(fromIsaiah.parallels).toEqual([expect.objectContaining({
+      reference: 'Matthew 1:23',
+      relationship: 'quotation',
+      confidence: 0.95,
+      notes: expect.stringContaining('Immanuel'),
+    })]);
+
+    const fromMatthew = await service.lookup({ reference: 'Matthew 1:23', mode: 'quotation', maxParallels: 1 });
+    expect(fromMatthew.parallels).toEqual([expect.objectContaining({
+      reference: 'Isaiah 7:14',
+      relationship: 'quotation',
+      confidence: 0.95,
+    })]);
+    expect(repo.getCrossReferences).not.toHaveBeenCalled();
   });
 
   it('auto mode merges canonicalized cross-references without duplicates', async () => {

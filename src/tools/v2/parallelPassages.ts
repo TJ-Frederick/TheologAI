@@ -10,7 +10,7 @@ import { handleToolError } from '../../kernel/errors.js';
 export function createParallelPassagesHandler(service: ParallelPassageService): ToolHandler {
   return {
     name: 'parallel_passages',
-    description: 'Find parallel passages: synoptic parallels, OT→NT quotations, and thematic connections.',
+    description: 'Find curated, non-exhaustive parallel passages: synoptic parallels, OT→NT quotations, and thematic connections.',
     inputSchema: {
       type: 'object',
       properties: {

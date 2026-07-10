@@ -211,6 +211,44 @@ describe('Worker MCP endpoint in workerd', () => {
     });
   });
 
+  it('serves the curated synoptic and quotation groups through the Worker endpoint', async () => {
+    const synoptic = await rpc('tools/call', {
+      name: 'parallel_passages',
+      arguments: {
+        reference: 'Matthew 26:26',
+        mode: 'synoptic',
+        maxParallels: 1,
+      },
+    }, 14);
+
+    expect(synoptic.response.status).toBe(200);
+    expect(synoptic.message.error).toBeUndefined();
+    expect(synoptic.message.result).toMatchObject({
+      content: [expect.objectContaining({
+        type: 'text',
+        text: expect.stringMatching(/Mark 14:22-25\*\* \[synoptic\]/),
+      })],
+    });
+
+    const quotation = await rpc('tools/call', {
+      name: 'parallel_passages',
+      arguments: {
+        reference: 'Matthew 1:23',
+        mode: 'quotation',
+        maxParallels: 1,
+      },
+    }, 15);
+
+    expect(quotation.response.status).toBe(200);
+    expect(quotation.message.error).toBeUndefined();
+    expect(quotation.message.result).toMatchObject({
+      content: [expect.objectContaining({
+        type: 'text',
+        text: expect.stringMatching(/Isaiah 7:14\*\* \[quotation\]/),
+      })],
+    });
+  });
+
   it('searches the historical-document FTS fixture through the MCP tool', async () => {
     const result = await rpc('tools/call', {
       name: 'classic_text_lookup',

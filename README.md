@@ -36,7 +36,7 @@ fresh server and transport.
 |---|---|
 | `bible_lookup` | Retrieve a passage in ESV, NET, KJV, WEB, BSB, ASV, YLT, or DBY; arrays compare translations. |
 | `bible_cross_references` | Query locally indexed OpenBible.info cross references. |
-| `parallel_passages` | Find curated synoptic, quotation, allusion, and thematic relationships, optionally augmented with cross references. |
+| `parallel_passages` | Find curated, non-exhaustive synoptic, quotation, allusion, and thematic relationships, optionally augmented with cross references. |
 | `commentary_lookup` | Retrieve Matthew Henry, JFB, Adam Clarke, John Gill, Keil-Delitzsch (OT), or Tyndale notes. |
 | `classic_text_lookup` | Search and browse the 17 local historical documents; retrieve a specifically named CCEL work section when available. |
 | `original_language_lookup` | Look up a Strong's entry or search for matching Greek/Hebrew entries. |
@@ -96,7 +96,7 @@ Calvin-volume routing. Those are possible future features, not current claims.
 - 447,748 indexed STEPBible morphology rows spanning all 66 books.
 - STEPBible lexicon extensions and morphology-code expansions.
 - OpenBible.info cross references.
-- A bundled curated parallel-passage corpus.
+- A bundled curated, non-exhaustive parallel-passage corpus.
 
 Source hashes and expected database counts live in
 `data/data-manifest.json`. The SQLite database is a derived, ignored artifact.
