@@ -43,7 +43,8 @@ describe('prompt-recommended tool-call contracts', () => {
       const tool = toolByName.get(call.tool);
       expect(tool, `unknown recommended tool ${call.tool}`).toBeDefined();
       const validate = validatorFor(tool!.inputSchema);
-      expect(validate(call.arguments), JSON.stringify(validate.errors)).toBe(true);
+      const result = validate(call.arguments);
+      expect(result.valid, result.errorMessage).toBe(true);
     }
   });
 });

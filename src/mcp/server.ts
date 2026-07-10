@@ -21,6 +21,7 @@ import type { StrongsService } from '../services/languages/StrongsService.js';
 import { internalError, resourceNotFound } from './errors.js';
 import { registerPromptHandlers } from './prompts.js';
 import { registerToolHandlers } from './tools.js';
+import { jsonSchemaValidator } from './validation.js';
 
 export interface McpServerServices {
   bibleService: Pick<BibleService, 'getSupportedTranslations'>;
@@ -56,6 +57,7 @@ export function createTheologAiMcpServer(
         prompts: {},
         ...(profile.logging ? { logging: {} } : {}),
       },
+      jsonSchemaValidator,
     },
   );
   const server = mcpServer.server;

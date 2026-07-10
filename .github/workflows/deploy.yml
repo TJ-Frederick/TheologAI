@@ -77,6 +77,9 @@ jobs:
       - name: Exercise Worker MCP endpoint with isolated D1
         run: npm run test:worker-runtime
 
+      - name: Exercise production-like Worker bundle without test-only globals
+        run: npm run test:worker-production-runtime
+
       - name: Build Node.js target
         run: npm run build
 

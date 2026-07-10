@@ -34,9 +34,10 @@
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:conformance": "tsx test/conformance/run-server-conformance.ts",
     "test:worker-runtime": "vitest run --config vitest.worker.config.ts",
+    "test:worker-production-runtime": "tsx scripts/test-worker-production-runtime.ts",
     "test:data": "tsx scripts/test-data-pipeline.ts",
     "docs:check": "vitest run test/unit/docs/publicContract.test.ts",
-    "test:all": "npm run test:coverage && npm run test:integration && npm run test:worker-runtime && npm run test:e2e && npm run test:conformance && npm run test:data && npm run d1:seed:verify-workerd",
+    "test:all": "npm run test:coverage && npm run test:integration && npm run test:worker-runtime && npm run test:worker-production-runtime && npm run test:e2e && npm run test:conformance && npm run test:data && npm run d1:seed:verify-workerd",
     "test:e2e": "npm run build && npm run test:e2e:compiled",
     "test:e2e:compiled": "tsx scripts/test-node-http-e2e.ts",
     "test:coverage": "vitest run --coverage",
@@ -64,9 +65,9 @@
     }
   },
   "dependencies": {
+    "@cfworker/json-schema": "4.1.1",
     "@modelcontextprotocol/sdk": "1.29.0",
     "agents": "0.17.3",
-    "ajv": "^8.20.0",
     "better-sqlite3": "^12.6.2",
     "dotenv": "^17.2.3",
     "typescript": "^5.9.2"
@@ -80,6 +81,7 @@
     "@vitest/coverage-v8": "4.1.10",
     "@vitest/ui": "4.1.10",
     "happy-dom": "^20.0.4",
+    "miniflare": "4.20260708.1",
     "nodemon": "^3.1.10",
     "tsx": "^4.20.6",
     "vite": "8.1.4",

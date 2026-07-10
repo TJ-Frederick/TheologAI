@@ -1,4 +1,3 @@
-import type { ValidateFunction } from 'ajv';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import {
   CallToolRequestSchema,
@@ -9,14 +8,14 @@ import {
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolHandler } from '../kernel/types.js';
 import { internalError } from './errors.js';
-import { formatValidationErrors, validatorFor } from './validation.js';
+import { formatValidationError, type SchemaValidator, validatorFor } from './validation.js';
 
 export function registerToolHandlers(
   server: Server,
   tools: ToolHandler[],
   logging: boolean,
 ): void {
-  const validators = new Map<string, ValidateFunction>(
+  const validators = new Map<string, SchemaValidator<Record<string, unknown>>>(
     tools.map(tool => [tool.name, validatorFor(tool.inputSchema)]),
   );
 
@@ -38,11 +37,12 @@ export function registerToolHandlers(
 
     const validate = validators.get(name);
     const toolArguments = args ?? {};
-    if (!validate || !validate(toolArguments)) {
+    const validation = validate?.(toolArguments);
+    if (!validation?.valid) {
       return {
         content: [{
           type: 'text',
-          text: `Invalid arguments for ${name}: ${formatValidationErrors(validate?.errors)}`,
+          text: `Invalid arguments for ${name}: ${formatValidationError(validation?.errorMessage)}`,
         }],
         isError: true,
       };

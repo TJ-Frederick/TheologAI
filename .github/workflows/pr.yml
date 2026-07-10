@@ -115,6 +115,9 @@ jobs:
       - name: Exercise Worker MCP endpoint with isolated D1
         run: npm run test:worker-runtime
 
+      - name: Exercise production-like Worker bundle without test-only globals
+        run: npm run test:worker-production-runtime
+
   node-http-e2e:
     name: Node HTTP E2E
     runs-on: ubuntu-latest
