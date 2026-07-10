@@ -16,6 +16,8 @@ describe('remote D1 readiness query', () => {
     expect(sql).toContain("pragma_table_info('morphology')");
     expect(sql).toContain('(SELECT COUNT(*) FROM "morphology") = 12');
     expect(sql).toContain('(SELECT COUNT(*) FROM "documents") = 17');
+    expect(sql).toContain("word_text FROM morphology WHERE book = 'John' AND chapter = 1 AND verse = 1 AND position = 11");
+    expect(sql).toContain(") = 'τὸ'");
     expect(sql).toContain("name IN ('idx_xref_from','idx_xref_votes','idx_morph_verse','idx_morph_strongs')");
     expect(sql).not.toMatch(/\b(?:INSERT|UPDATE|DELETE|DROP|ALTER)\b/);
   });

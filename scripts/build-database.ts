@@ -23,6 +23,7 @@ import { isAbsolute, join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { gunzipSync } from 'zlib';
 import { createHash } from 'crypto';
+import { assertJohnOneOneDatabase, assertJohnOneOneSource } from './data-integrity.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -181,6 +182,9 @@ const morphTx = db.transaction(() => {
       const compressed = readFileSync(join(dir, file));
       const json = JSON.parse(gunzipSync(compressed).toString('utf-8'));
       const bookName = json.book as string;
+      if (file === '43-John.json.gz') {
+        assertJohnOneOneSource(json, `data/biblical-languages/stepbible/${subdir}/${file}`);
+      }
 
       for (const [ch, verses] of Object.entries(json.chapters as Record<string, Record<string, any>>)) {
         for (const [v, verseData] of Object.entries(verses)) {
@@ -210,6 +214,7 @@ const morphTx = db.transaction(() => {
 
 const morphCount = morphTx();
 log(`  Inserted ${morphCount} morphology words`);
+assertJohnOneOneDatabase(db);
 
 // ── Tier 2: Morphology codes ──
 

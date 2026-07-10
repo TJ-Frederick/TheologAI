@@ -10,11 +10,11 @@ import { handleToolError } from '../../kernel/errors.js';
 export function createVerseMorphologyHandler(service: MorphologyService): ToolHandler {
   return {
     name: 'bible_verse_morphology',
-    description: 'Get word-by-word grammatical analysis (Greek/Hebrew) for any Bible verse. Shows text, lemma, Strong\'s number, morphology code, and English gloss.',
+    description: 'Get word-by-word grammatical analysis (Greek/Hebrew) for one Bible verse. Ranges are not supported. Shows text, lemma, Strong\'s number, morphology code, and English gloss.',
     inputSchema: {
       type: 'object',
       properties: {
-        reference: { type: 'string', minLength: 1, maxLength: 100, description: 'Bible verse reference (e.g., "John 1:1", "Genesis 1:1")' },
+        reference: { type: 'string', minLength: 1, maxLength: 100, description: 'One Bible verse reference (e.g., "John 1:1", "Genesis 1:1"); verse ranges are not supported' },
         expand_morphology: { type: 'boolean', default: false, description: 'Expand morphology codes to full descriptions' },
       },
       required: ['reference'],

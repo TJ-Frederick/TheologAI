@@ -308,6 +308,7 @@ describe('commentary_lookup handler', () => {
 
     expect(result.isError).toBe(true);
   });
+
 });
 
 describe('classic_text_lookup handler', () => {
@@ -615,6 +616,20 @@ describe('bible_verse_morphology handler', () => {
     const result = await handler.handler({ reference: 'John 1' });
 
     expect(result.isError).toBe(true);
+  });
+
+  it('returns an explicit validation error for unsupported morphology ranges', async () => {
+    const getVerseMorphology = vi.fn<MorphologyService['getVerseMorphology']>()
+      .mockRejectedValue(new ValidationError(
+        'reference',
+        'Morphology accepts one verse at a time; ranges are not supported',
+      ));
+    const handler = createVerseMorphologyHandler(serviceDouble({ getVerseMorphology }));
+
+    const result = await handler.handler({ reference: 'John 1:1-2' });
+
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toContain('Invalid input: Morphology accepts one verse at a time');
   });
 });
 

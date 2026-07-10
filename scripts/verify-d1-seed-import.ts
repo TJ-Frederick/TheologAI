@@ -8,6 +8,7 @@ import { tmpdir } from 'os';
 import { dirname, isAbsolute, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { sha256File } from './d1-seed-utils.js';
+import { assertJohnOneOneDatabase } from './data-integrity.js';
 
 interface SeedManifest {
   manifestVersion: number;
@@ -189,6 +190,8 @@ try {
   }
 
   assertDatabaseHealth(target, manifest.expectedCounts);
+  assertJohnOneOneDatabase(source, 'Source SQLite morphology');
+  assertJohnOneOneDatabase(target, 'Imported D1 morphology');
   assertRepresentativeFts(target);
 
   for (const table of Object.keys(manifest.expectedCounts)) {

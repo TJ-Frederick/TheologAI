@@ -6,6 +6,11 @@
  */
 
 import type { IStrongsRepository, StrongsEntry, LexiconEntry } from '../../kernel/repositories.js';
+import {
+  isAsciiTransliterationQuery,
+  normalizeTransliteration,
+  normalizedTransliterationSql,
+} from '../../kernel/transliteration.js';
 
 export class D1StrongsRepository implements IStrongsRepository {
   constructor(private db: D1Database) {}
@@ -43,7 +48,21 @@ export class D1StrongsRepository implements IStrongsRepository {
        ORDER BY rank, s.strongs_number
        LIMIT ?`
     ).bind(ftsQuery, limit).all<StrongsEntry>();
-    return results;
+    if (!isAsciiTransliterationQuery(query)) return results;
+
+    const normalizedQuery = normalizeTransliteration(query);
+    if (!normalizedQuery) return results;
+
+    const normalized = await this.db.prepare(
+      `SELECT strongs_number, testament, lemma, transliteration,
+              pronunciation, definition, derivation
+         FROM strongs s
+        WHERE ${normalizedTransliterationSql('s.transliteration')} LIKE ? || '%'
+        ORDER BY strongs_number
+        LIMIT ?`,
+    ).bind(normalizedQuery, limit).all<StrongsEntry>();
+
+    return mergeSearchResults(results, normalized.results, limit);
   }
 
   async getLexiconEntry(strongsNumber: string): Promise<LexiconEntry | undefined> {
@@ -72,4 +91,20 @@ export class D1StrongsRepository implements IStrongsRepository {
     const hebrew = hebrewRow?.c ?? 0;
     return { greek, hebrew, total: greek + hebrew };
   }
+}
+
+function mergeSearchResults(
+  primary: StrongsEntry[],
+  fallback: StrongsEntry[],
+  limit: number,
+): StrongsEntry[] {
+  const seen = new Set<string>();
+  const merged: StrongsEntry[] = [];
+  for (const entry of [...primary, ...fallback]) {
+    if (seen.has(entry.strongs_number)) continue;
+    seen.add(entry.strongs_number);
+    merged.push(entry);
+    if (merged.length >= limit) break;
+  }
+  return merged;
 }

@@ -7,6 +7,7 @@ import { dirname, isAbsolute, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { createHash } from 'crypto';
 import { buildD1ReadinessSql } from './check-remote-d1-readiness.js';
+import { assertJohnOneOneDatabase } from './data-integrity.js';
 
 interface DataManifest {
   schemaVersion: string;
@@ -96,6 +97,7 @@ try {
   if (readiness?.readiness !== 'ready') {
     throw new Error('Production D1 readiness SQL did not accept the complete derived database');
   }
+  assertJohnOneOneDatabase(db, 'Verified SQLite morphology');
 
   const representativeQueries = [
     ["SELECT 1 FROM cross_references WHERE from_verse = 'John.3.16' LIMIT 1", 'John 3:16 cross-references'],

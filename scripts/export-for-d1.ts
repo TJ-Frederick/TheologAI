@@ -24,6 +24,7 @@ import {
   splitGeneratedSql,
   statementBytes,
 } from './d1-seed-utils.js';
+import { johnOneOneReadinessPredicate } from './data-integrity.js';
 
 interface SourceManifest {
   manifestVersion: number;
@@ -133,6 +134,16 @@ function queryNumber(database: string, sql: string): number {
   const output = sqlite(database, sql).trim();
   if (!/^\d+$/.test(output)) throw new Error(`Expected an integer from SQLite, received: ${output}`);
   return Number(output);
+}
+
+function assertSemanticSource(database: string): void {
+  const result = sqlite(
+    database,
+    `SELECT CASE WHEN ${johnOneOneReadinessPredicate()} THEN 'ok' ELSE 'invalid' END;`,
+  ).trim();
+  if (result !== 'ok') {
+    throw new Error('Source database failed the John 1:1 Greek morphology integrity check');
+  }
 }
 
 function validateCanonicalSources(manifest: SourceManifest): void {
@@ -263,6 +274,7 @@ const { database, clean } = parseArguments(process.argv.slice(2));
 const sourceManifestBytes = readFileSync(SOURCE_MANIFEST_PATH);
 const sourceManifest = JSON.parse(sourceManifestBytes.toString('utf8')) as SourceManifest;
 validateCanonicalSources(sourceManifest);
+assertSemanticSource(database);
 
 const schemaPath = join(ROOT, 'migrations', `${sourceManifest.schemaVersion}.sql`);
 if (!existsSync(schemaPath) || !statSync(schemaPath).isFile()) {

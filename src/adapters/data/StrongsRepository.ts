@@ -8,6 +8,11 @@
 import type Database from 'better-sqlite3';
 import { getDatabase } from '../shared/Database.js';
 import type { IStrongsRepository, StrongsEntry, LexiconEntry } from '../../kernel/repositories.js';
+import {
+  isAsciiTransliterationQuery,
+  normalizeTransliteration,
+  normalizedTransliterationSql,
+} from '../../kernel/transliteration.js';
 
 export type { StrongsEntry, LexiconEntry } from '../../kernel/repositories.js';
 
@@ -58,7 +63,25 @@ export class StrongsRepository implements IStrongsRepository {
     // Escape special FTS5 characters and add prefix matching
     const escaped = query.replace(/['"*]/g, '');
     const ftsQuery = `"${escaped}"*`;
-    return this.stmtFtsSearch.all(ftsQuery, limit) as StrongsEntry[];
+    const results = this.stmtFtsSearch.all(ftsQuery, limit) as StrongsEntry[];
+    if (!isAsciiTransliterationQuery(query)) return results;
+
+    const normalizedQuery = normalizeTransliteration(query);
+    if (!normalizedQuery) return results;
+
+    // The canonical FTS index stores diacritics and transliteration markers.
+    // Match a normalized SQL expression as a fallback so ASCII `elohim` can
+    // find STEPBible's `ʼĕlôhîym` without changing the source or FTS schema.
+    const normalizedRows = this.db.prepare(
+      `SELECT strongs_number, testament, lemma, transliteration,
+              pronunciation, definition, derivation
+         FROM strongs s
+        WHERE ${normalizedTransliterationSql('s.transliteration')} LIKE ? || '%'
+        ORDER BY strongs_number
+        LIMIT ?`,
+    ).all(normalizedQuery, limit) as StrongsEntry[];
+
+    return mergeSearchResults(results, normalizedRows, limit);
   }
 
   /** Get STEPBible lexicon data for a Strong's number */
@@ -83,4 +106,20 @@ export class StrongsRepository implements IStrongsRepository {
     const hebrew = (this.db.prepare("SELECT COUNT(*) as c FROM strongs WHERE testament = 'OT'").get() as any).c;
     return { greek, hebrew, total: greek + hebrew };
   }
+}
+
+function mergeSearchResults(
+  primary: StrongsEntry[],
+  fallback: StrongsEntry[],
+  limit: number,
+): StrongsEntry[] {
+  const seen = new Set<string>();
+  const merged: StrongsEntry[] = [];
+  for (const entry of [...primary, ...fallback]) {
+    if (seen.has(entry.strongs_number)) continue;
+    seen.add(entry.strongs_number);
+    merged.push(entry);
+    if (merged.length >= limit) break;
+  }
+  return merged;
 }

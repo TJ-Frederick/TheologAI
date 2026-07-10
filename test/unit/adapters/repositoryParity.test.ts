@@ -83,7 +83,7 @@ describe('SQLite and D1 repository parity with identical real data', () => {
 
       INSERT INTO strongs VALUES
         ('G0025', 'NT', 'ἀγαπάω', 'agapaō', 'ag-ap-ah-o', 'to love', 'perhaps from agan'),
-        ('H0430', 'OT', 'אֱלֹהִים', 'elohim', NULL, 'God, gods', NULL);
+        ('H0430', 'OT', 'אֱלֹהִים', 'ʼĕlôhîym', NULL, 'God, gods', NULL);
       INSERT INTO strongs_fts
         SELECT strongs_number, lemma, transliteration, definition FROM strongs;
       INSERT INTO stepbible_lexicons VALUES
@@ -184,5 +184,25 @@ describe('SQLite and D1 repository parity with identical real data', () => {
     await expect(d1Strongs.getLexiconEntry('G25'))
       .resolves.toEqual(sqliteStrongs.getLexiconEntry('G25'));
     await expect(d1Strongs.getStats()).resolves.toEqual(sqliteStrongs.getStats());
+  });
+
+  it('normalizes ASCII transliteration search identically in SQLite and D1', async () => {
+    const sqliteResults = sqliteStrongs.search('elohim');
+    await expect(d1Strongs.search('elohim')).resolves.toEqual(sqliteResults);
+    expect(sqliteResults).toContainEqual(expect.objectContaining({ strongs_number: 'H0430' }));
+  });
+
+  it('preserves Unicode lemma search alongside transliteration fallback', async () => {
+    const sqliteResults = sqliteStrongs.search('אֱלֹהִים');
+    await expect(d1Strongs.search('אֱלֹהִים')).resolves.toEqual(sqliteResults);
+    expect(sqliteResults).toContainEqual(expect.objectContaining({ strongs_number: 'H0430' }));
+
+    const greekResults = sqliteStrongs.search('ἀγαπάω');
+    await expect(d1Strongs.search('ἀγαπάω')).resolves.toEqual(greekResults);
+    expect(greekResults).toContainEqual(expect.objectContaining({ strongs_number: 'G0025' }));
+
+    const diacriticResults = sqliteStrongs.search('agapaō');
+    await expect(d1Strongs.search('agapaō')).resolves.toEqual(diacriticResults);
+    expect(diacriticResults).toContainEqual(expect.objectContaining({ strongs_number: 'G0025' }));
   });
 });

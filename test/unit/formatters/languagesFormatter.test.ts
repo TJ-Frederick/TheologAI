@@ -182,6 +182,15 @@ describe('formatMorphologyResult', () => {
     expect(out).toContain('| 2 | ἀρχῇ | ἀρχή | G746 | N-DSF | beginning |');
   });
 
+  it('renders valid Greek Unicode without introducing replacement characters', () => {
+    const out = formatMorphologyResult(makeMorphResult({
+      words: [makeWord({ text: 'τὸ', lemma: 'ὁ', strong: 'G3588' })],
+    }));
+
+    expect(out).toContain('| 1 | τὸ | ὁ | G3588 | PREP | In |');
+    expect(out).not.toContain('�');
+  });
+
   it('uses morphExpanded when available', () => {
     const out = formatMorphologyResult(makeMorphResult({
       words: [makeWord({ morph: 'N-DSF', morphExpanded: 'Noun, Dative, Singular, Feminine' })],
