@@ -105,6 +105,38 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
         }),
       ]));
 
+      const classicSchema = listed.tools.find(tool => tool.name === 'classic_text_lookup')?.inputSchema;
+      const languageSchema = listed.tools.find(tool => tool.name === 'original_language_lookup')?.inputSchema;
+      expect(classicSchema).not.toHaveProperty('oneOf');
+      expect(classicSchema?.properties).toMatchObject({
+        work: expect.objectContaining({ type: 'string' }),
+        query: expect.objectContaining({ type: 'string' }),
+        listWorks: expect.objectContaining({ const: true }),
+      });
+      expect(languageSchema).not.toHaveProperty('oneOf');
+      expect(languageSchema?.properties).toMatchObject({
+        strongs_number: expect.objectContaining({ type: 'string' }),
+        query: expect.objectContaining({ type: 'string' }),
+      });
+
+      const invalidClassic = await client.callTool({
+        name: 'classic_text_lookup',
+        arguments: { work: 'nicene-creed', query: 'trinity' },
+      });
+      expect(invalidClassic).toMatchObject({
+        isError: true,
+        content: [expect.objectContaining({ text: expect.stringContaining('query is the local-search mode') })],
+      });
+
+      const invalidLanguage = await client.callTool({
+        name: 'original_language_lookup',
+        arguments: { strongs_number: 'G26', limit: 5 },
+      });
+      expect(invalidLanguage).toMatchObject({
+        isError: true,
+        content: [expect.objectContaining({ text: expect.stringContaining('limit is only valid with query search') })],
+      });
+
       const result = await client.callTool({
         name: 'bible_lookup',
         arguments: { reference: 'John 3:16', translation: 'ESV' },

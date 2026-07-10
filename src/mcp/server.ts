@@ -13,6 +13,7 @@ import {
   ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { NotFoundError } from '../kernel/errors.js';
+import { LOCAL_HISTORICAL_SOURCE } from '../formatters/historicalFormatter.js';
 import type { ToolHandler } from '../kernel/types.js';
 import type { BibleService } from '../services/bible/BibleService.js';
 import type { CommentaryService } from '../services/commentary/CommentaryService.js';
@@ -187,6 +188,7 @@ export function createTheologAiMcpServer(
           lines.push(section.content);
           lines.push('');
         }
+        lines.push(`*Source: ${LOCAL_HISTORICAL_SOURCE}*`);
 
         return {
           contents: [{ uri, mimeType: 'text/markdown', text: lines.filter(Boolean).join('\n') }],

@@ -47,6 +47,16 @@ describe('CcelService', () => {
     expect(getWorkSection).toHaveBeenCalledWith('calvin/institutes', 'institutes');
   });
 
+  it('does not leave an incomplete author-only heading', async () => {
+    const { adapter } = adapterReturning('calvin', 'calvin');
+    const service = new CcelService(adapter);
+
+    const result = await service.getWorkSection({ work: 'calvin' });
+
+    expect(result.title).toBe('Calvin');
+    expect(result.title).not.toContain('— ');
+  });
+
   it('rejects an empty work identifier before calling the adapter', async () => {
     const { adapter, getWorkSection } = adapterReturning('', '');
     const service = new CcelService(adapter);

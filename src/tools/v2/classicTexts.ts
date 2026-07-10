@@ -16,22 +16,17 @@ export function createClassicTextsHandler(
 ): ToolHandler {
   return {
     name: 'classic_text_lookup',
-    description: 'Search and browse the local creed, confession, and catechism collection. If a named work is not local, retrieve that specific CCEL work section when available; catalog-wide CCEL search is not supported.',
+    description: 'Search and browse local historical documents, or retrieve one explicitly named CCEL work section. Use exactly one mode: listWorks, query, work (optionally with section), or work with browseSections=true. Catalog-wide CCEL search is not supported.',
     inputSchema: {
       type: 'object',
+      description: 'Choose exactly one mode. The mode fields are intentionally shown together for clients that do not render conditional schemas; invalid combinations receive an actionable error from the handler.',
       properties: {
-        work: { type: 'string', minLength: 1, maxLength: 256, description: 'Document ID or CCEL work path (e.g., "nicene-creed", "calvin/institutes")' },
-        section: { type: 'string', minLength: 1, maxLength: 256, description: 'Exact CCEL section identifier for bounded named-section retrieval' },
-        query: { type: 'string', minLength: 1, maxLength: 500, description: 'Search query across all documents' },
-        listWorks: { type: 'boolean', description: 'Set true to list locally indexed historical documents' },
-        browseSections: { type: 'boolean', description: 'Set true with work to show all sections of a local document' },
+        work: { type: 'string', minLength: 1, maxLength: 256, description: 'Named local document or CCEL work path (e.g., "nicene-creed", "calvin/institutes"). Use alone for a work, or with section for a bounded CCEL section.' },
+        section: { type: 'string', minLength: 1, maxLength: 256, description: 'Exact CCEL section identifier; valid only with work (e.g., "book-one").' },
+        query: { type: 'string', minLength: 1, maxLength: 500, description: 'Search query across the local historical-document collection. Use alone.' },
+        listWorks: { type: 'boolean', const: true, description: 'List locally indexed historical documents. Use alone and set true.' },
+        browseSections: { type: 'boolean', const: true, description: 'List sections for a local work. Use with a work identifier and no section or query.' },
       },
-      oneOf: [
-        { required: ['listWorks'], properties: { listWorks: { const: true } }, not: { anyOf: [{ required: ['work'] }, { required: ['section'] }, { required: ['query'] }, { required: ['browseSections'] }] } },
-        { required: ['query'], not: { anyOf: [{ required: ['work'] }, { required: ['section'] }, { required: ['listWorks'] }, { required: ['browseSections'] }] } },
-        { required: ['work', 'browseSections'], properties: { browseSections: { const: true } }, not: { anyOf: [{ required: ['section'] }, { required: ['query'] }, { required: ['listWorks'] }] } },
-        { required: ['work'], not: { anyOf: [{ required: ['query'] }, { required: ['listWorks'] }, { required: ['browseSections'] }] } },
-      ],
       additionalProperties: false,
     },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
@@ -91,20 +86,46 @@ export function createClassicTextsHandler(
 
 function validateMode(params: Record<string, unknown>): void {
   const keys = Object.keys(params);
+  const allowed = new Set(['work', 'section', 'query', 'listWorks', 'browseSections']);
+  const unknown = keys.find(key => !allowed.has(key));
+  if (unknown) {
+    throw new ValidationError(unknown, `Unknown argument "${unknown}". Choose one of the advertised classic-text modes.`);
+  }
+
+  const has = (key: string): boolean => Object.prototype.hasOwnProperty.call(params, key);
   if (keys.length === 0) {
     throw new ValidationError('mode', 'Choose a classic-text lookup mode.');
   }
-  if (params.listWorks === true && keys.some(key => key !== 'listWorks')) {
-    throw new ValidationError('mode', 'listWorks cannot be combined with another mode.');
+
+  if (has('listWorks')) {
+    if (params.listWorks !== true || keys.length !== 1) {
+      throw new ValidationError('listWorks', 'listWorks must be true and cannot be combined with another mode.');
+    }
+    return;
   }
-  if (params.query !== undefined && keys.some(key => key !== 'query')) {
-    throw new ValidationError('mode', 'Local document search accepts only query; CCEL retrieval requires an explicit work and optional section.');
+
+  if (has('query')) {
+    if (typeof params.query !== 'string' || params.query.trim().length < 1 || params.query.length > 500) {
+      throw new ValidationError('query', 'query must be a non-empty string of no more than 500 characters.');
+    }
+    if (keys.length !== 1) {
+      throw new ValidationError('mode', 'query is the local-search mode and cannot be combined with work, section, listWorks, or browseSections.');
+    }
+    return;
   }
-  if (params.browseSections !== undefined && (params.browseSections !== true || typeof params.work !== 'string' || keys.some(key => !['work', 'browseSections'].includes(key)))) {
-    throw new ValidationError('browseSections', 'browseSections=true requires only a local work identifier.');
+
+  if (has('browseSections')) {
+    if (params.browseSections !== true || typeof params.work !== 'string' || params.work.trim().length < 1 || keys.length !== 2 || !has('work')) {
+      throw new ValidationError('browseSections', 'browseSections=true requires only a non-empty local work identifier.');
+    }
+    return;
   }
-  if (params.section !== undefined && typeof params.work !== 'string') {
-    throw new ValidationError('section', 'section requires a named CCEL work.');
+
+  if (!has('work') || typeof params.work !== 'string' || params.work.trim().length < 1 || params.work.length > 256) {
+    throw new ValidationError('work', 'work must be a non-empty named local document or CCEL work path.');
+  }
+  if (has('section') && (typeof params.section !== 'string' || params.section.trim().length < 1 || params.section.length > 256)) {
+    throw new ValidationError('section', 'section must be a non-empty CCEL section identifier no longer than 256 characters.');
   }
 }
 

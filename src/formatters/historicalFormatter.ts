@@ -4,6 +4,11 @@
 
 import type { DocumentInfo, DocumentSection } from '../adapters/data/HistoricalDocumentRepository.js';
 
+/** Provenance label for documents bundled with the server. No edition is implied. */
+export const LOCAL_HISTORICAL_SOURCE = 'TheologAI local historical-document collection';
+
+const localSource = `*Source: ${LOCAL_HISTORICAL_SOURCE}*`;
+
 /** Format a document listing */
 export function formatDocumentList(docs: DocumentInfo[]): string {
   let s = `**Available Historical Documents** (${docs.length})\n\n`;
@@ -11,7 +16,7 @@ export function formatDocumentList(docs: DocumentInfo[]): string {
     s += `- **${doc.title}** (${doc.type}, ${doc.date ?? 'n.d.'})\n`;
     s += `  ID: \`${doc.id}\`\n`;
   }
-  return s.trim();
+  return `${s.trim()}\n\n${localSource}`;
 }
 
 /** Format document sections */
@@ -23,7 +28,7 @@ export function formatDocumentSections(doc: DocumentInfo, sections: DocumentSect
     s += `${section.content}\n\n`;
   }
 
-  return s.trim();
+  return `${s.trim()}\n\n${localSource}`;
 }
 
 /** Format search results */
@@ -32,13 +37,17 @@ export function formatSearchResults(query: string, sections: DocumentSection[]):
     return `No results found for "${query}".`;
   }
 
-  let s = `**Search Results for "${query}"** (${sections.length} results)\n\n`;
+  const displayedSections = sections.slice(0, 10);
+  const count = sections.length > displayedSections.length
+    ? `(showing ${displayedSections.length} of ${sections.length} results)`
+    : `(${sections.length} results)`;
+  let s = `**Search Results for "${query}"** ${count}\n\n`;
 
-  for (const section of sections.slice(0, 10)) {
+  for (const section of displayedSections) {
     if (section.title) s += `**${section.title}**\n`;
     const preview = section.content.substring(0, 300);
     s += `${preview}${section.content.length > 300 ? '...' : ''}\n\n`;
   }
 
-  return s.trim();
+  return `${s.trim()}\n\n${localSource}`;
 }

@@ -87,6 +87,12 @@ export function getUserMessage(error: Error): string {
     return `Invalid input: ${error.message}`;
   }
   if (error instanceof NotFoundError) {
+    if (error.resource === 'adapter' || containsImplementationDetail(error.message)) {
+      return 'Unavailable: The requested source is not available in this runtime. Try another supported option.';
+    }
+    if (error.resource === 'commentator') {
+      return 'Unsupported coverage: This commentator is not supported for the requested lookup. Use one of the advertised commentators.';
+    }
     return error.message;
   }
   if (error instanceof PaymentError) {
@@ -95,12 +101,39 @@ export function getUserMessage(error: Error): string {
       : `Payment error: ${error.message}`;
   }
   if (error instanceof AdapterError) {
-    return `Error from ${error.source}: ${error.message}`;
+    return getAdapterUserMessage(error.message);
   }
   if (error instanceof APIError) {
-    return 'I encountered an issue connecting to the Bible service. Please try again.';
+    if (error.status === 404) return 'Not found: No matching content was found.';
+    if (error.status === 401 || error.status === 403) {
+      return 'Unavailable: The requested source is not available in this runtime. Try another supported option.';
+    }
+    return 'Unavailable: The requested source is temporarily unavailable. Please try again later.';
   }
   return 'I encountered an error retrieving that information. Please try again.';
+}
+
+/**
+ * Adapter messages retain provider and request details for diagnostics, but
+ * only a stable category is returned to clients.
+ */
+function getAdapterUserMessage(diagnosticMessage: string): string {
+  const detail = diagnosticMessage.replace(/^\[[^\]]+\]\s*/, '').toLowerCase();
+
+  if (/unsupported|not supported|only available|unknown commentator|outside .*coverage/.test(detail)) {
+    return 'Unsupported coverage: This request is outside the supported coverage.';
+  }
+  if (/http 404|not found|no (?:verses|passage|commentary)|could not find .*content|section not found|error page returned/.test(detail)) {
+    return 'Not found: No matching content was found.';
+  }
+  if (/http (?:401|403)|not configured/.test(detail)) {
+    return 'Unavailable: The requested source is not available in this runtime. Try another supported option.';
+  }
+  return 'Unavailable: The requested source is temporarily unavailable. Please try again later.';
+}
+
+function containsImplementationDetail(message: string): boolean {
+  return /\b(?:adapter|provider|database|sqlite|d1|ccel|helloao|esv|net bible)\b|https?:\/\//i.test(message);
 }
 
 /** Format an error as an MCP tool error response */

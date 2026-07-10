@@ -52,14 +52,19 @@ export class CcelService {
 
   private deriveTitle(work: string, section: string): string {
     // Extract a readable title from the work/section path
-    const parts = work.split('/');
-    const author = parts[0]?.replace(/-/g, ' ') ?? '';
-    const workName = parts[1]?.replace(/-/g, ' ') ?? '';
-    return `${this.capitalize(author)} — ${this.capitalize(workName)}`;
+    const parts = work.split('/').filter(Boolean);
+    const author = this.humanize(parts[0] ?? '');
+    const workName = this.humanize(parts.slice(1).join(' '));
+    if (author && workName) return `${author} — ${workName}`;
+    return author || this.humanize(section) || 'Classic text';
   }
 
-  private capitalize(s: string): string {
-    return s.replace(/\b\w/g, c => c.toUpperCase());
+  private humanize(s: string): string {
+    return s
+      .replace(/[-_]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/\b\w/g, c => c.toUpperCase());
   }
 }
 

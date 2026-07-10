@@ -68,6 +68,11 @@ describe('v2 tool handler schemas', () => {
     const commentary = createCommentaryHandler(
       serviceDouble<CommentaryService>({}),
     ).inputSchema;
+    const classicTexts = createClassicTextsHandler(
+      serviceDouble<HistoricalDocumentService>({}),
+      serviceDouble<CcelService>({}),
+    ).inputSchema;
+    const originalLanguage = createStrongsLookupHandler(serviceDouble<StrongsService>({})).inputSchema;
 
     expect(bible.properties?.reference).toMatchObject({ minLength: 1, maxLength: 100 });
     expect(bible.properties?.translation).toMatchObject({
@@ -77,6 +82,19 @@ describe('v2 tool handler schemas', () => {
     });
     expect(parallels.properties?.maxParallels).toMatchObject({ minimum: 1, maximum: 50 });
     expect(commentary.properties?.maxLength).toMatchObject({ minimum: 1, maximum: 100000 });
+    expect(classicTexts).not.toHaveProperty('oneOf');
+    expect(classicTexts.properties).toMatchObject({
+      work: { minLength: 1, maxLength: 256 },
+      query: { minLength: 1, maxLength: 500 },
+      listWorks: { const: true },
+      browseSections: { const: true },
+    });
+    expect(originalLanguage).not.toHaveProperty('oneOf');
+    expect(originalLanguage.properties).toMatchObject({
+      strongs_number: { minLength: 2, maxLength: 16 },
+      query: { minLength: 2, maxLength: 100 },
+      limit: { minimum: 1, maximum: 20 },
+    });
   });
 });
 
@@ -407,7 +425,18 @@ describe('classic_text_lookup handler', () => {
 
     expect(ccel.getWorkSection).not.toHaveBeenCalled();
     expect(result.isError).toBe(true);
-    expect(textOf(result)).toContain('CCEL retrieval requires an explicit work');
+    expect(textOf(result)).toContain('query is the local-search mode');
+  });
+
+  it('keeps mode validation strict after flattening the advertised schema', async () => {
+    const { handler, historical, ccel } = createServices();
+
+    const result = await handler.handler({ work: 'calvin/institutes', query: 'wisdom' });
+
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toContain('query is the local-search mode');
+    expect(historical.search).not.toHaveBeenCalled();
+    expect(ccel.getWorkSection).not.toHaveBeenCalled();
   });
 
   it('distinguishes an empty global search from a missing action', async () => {
@@ -478,16 +507,29 @@ describe('original_language_lookup handler', () => {
     expect(textOf(result)).toContain('**G26**');
   });
 
-  it('advertises mutually exclusive exact and search modes', () => {
+  it('advertises both exact and search fields without a client-hostile branch schema', () => {
     const handler = createStrongsLookupHandler(serviceDouble<StrongsService>({}));
     expect(handler.inputSchema).toMatchObject({
       additionalProperties: false,
-      oneOf: expect.any(Array),
       properties: {
         query: { minLength: 2, maxLength: 100 },
         limit: { minimum: 1, maximum: 20 },
       },
     });
+    expect(handler.inputSchema).not.toHaveProperty('oneOf');
+  });
+
+  it('keeps exact/search mode validation strict in the handler', async () => {
+    const search = vi.fn<StrongsService['search']>();
+    const lookup = vi.fn<StrongsService['lookup']>();
+    const handler = createStrongsLookupHandler(serviceDouble({ search, lookup }));
+
+    const result = await handler.handler({ strongs_number: 'G26', limit: 5 });
+
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toContain('limit is only valid with query search');
+    expect(search).not.toHaveBeenCalled();
+    expect(lookup).not.toHaveBeenCalled();
   });
 
   it('returns service validation failures as tool errors', async () => {
@@ -496,7 +538,7 @@ describe('original_language_lookup handler', () => {
     );
     const handler = createStrongsLookupHandler(serviceDouble({ lookup }));
 
-    const result = await handler.handler({ strongs_number: 'love' });
+    const result = await handler.handler({ strongs_number: 'G26' });
 
     expect(result.isError).toBe(true);
     expect(textOf(result)).toContain('Invalid input: Expected G#### or H####');
