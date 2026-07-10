@@ -63,13 +63,17 @@ that is open and non-draft with the `deploy-preview` label, and the GitHub
 `preview` environment. Configure that environment with required reviewers
 before using the label.
 
-Closing the pull request, converting it to a draft, or removing the
-`deploy-preview` label starts a revocation-only workflow run. Its shared PR
-concurrency group cancels any in-flight preview run; validation and deployment
-jobs do not run for that event. Removing an unrelated label does not cancel an
-authorized preview run. The deploy job also reads the live pull request
-immediately before it uses environment secrets and again immediately before
-deployment. It stops if the PR is closed, draft, no longer from the same
+Closing the pull request, converting it to a draft, removing the
+`deploy-preview` label, or retargeting it away from `main` starts the separate,
+non-secret Preview Revocation workflow. Its repository-wide PR concurrency
+group cancels any matching in-flight PR Checks run without emitting replacement
+skipped instances of the five required checks. Unrelated label removals and PR
+edits use a run-unique group and cannot cancel or displace an authorized preview
+run.
+
+The deploy job also reads the live pull request immediately before it uses
+environment secrets and again immediately before deployment. It stops if the
+PR is closed, draft, no longer targets `main`, no longer comes from the same
 repository, no longer carries `deploy-preview`, or has moved to a different
 head commit.
 

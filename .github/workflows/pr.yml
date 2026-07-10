@@ -3,13 +3,11 @@ name: PR Checks
 on:
   pull_request:
     branches: [main]
-    # Revocation events start a replacement run so the shared concurrency group
-    # cancels any in-flight preview deployment for this PR.
-    types: [opened, synchronize, reopened, labeled, unlabeled, closed, ready_for_review, converted_to_draft]
+    types: [opened, synchronize, reopened, labeled, ready_for_review]
 
 concurrency:
   group: pr-${{ github.event.pull_request.number }}
-  cancel-in-progress: ${{ github.event.action != 'unlabeled' || github.event.label.name == 'deploy-preview' }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -17,10 +15,6 @@ permissions:
 jobs:
   test-and-build:
     name: Test & Build
-    if: >-
-      github.event.action != 'closed' &&
-      github.event.action != 'unlabeled' &&
-      github.event.action != 'converted_to_draft'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -59,10 +53,6 @@ jobs:
 
   fresh-checkout-data:
     name: Fresh Checkout & Data
-    if: >-
-      github.event.action != 'closed' &&
-      github.event.action != 'unlabeled' &&
-      github.event.action != 'converted_to_draft'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -107,10 +97,6 @@ jobs:
 
   worker-runtime:
     name: Worker Runtime & D1
-    if: >-
-      github.event.action != 'closed' &&
-      github.event.action != 'unlabeled' &&
-      github.event.action != 'converted_to_draft'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -131,10 +117,6 @@ jobs:
 
   node-http-e2e:
     name: Node HTTP E2E
-    if: >-
-      github.event.action != 'closed' &&
-      github.event.action != 'unlabeled' &&
-      github.event.action != 'converted_to_draft'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -152,10 +134,6 @@ jobs:
 
   mcp-conformance:
     name: Applicable MCP Conformance
-    if: >-
-      github.event.action != 'closed' &&
-      github.event.action != 'unlabeled' &&
-      github.event.action != 'converted_to_draft'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -183,11 +161,9 @@ jobs:
     name: Deploy Preview
     needs: [test-and-build, fresh-checkout-data, worker-runtime, node-http-e2e, mcp-conformance]
     if: >-
-      github.event.action != 'closed' &&
-      github.event.action != 'unlabeled' &&
-      github.event.action != 'converted_to_draft' &&
       github.event.pull_request.state == 'open' &&
       github.event.pull_request.draft == false &&
+      github.event.pull_request.base.ref == 'main' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       contains(github.event.pull_request.labels.*.name, 'deploy-preview')
     runs-on: ubuntu-latest
@@ -210,6 +186,7 @@ jobs:
 
             if (pullRequest.state !== 'open') failures.push('the pull request is no longer open');
             if (pullRequest.draft) failures.push('the pull request is now a draft');
+            if (pullRequest.base.ref !== 'main') failures.push('the pull request no longer targets main');
             if (pullRequest.head.repo.full_name !== `${context.repo.owner}/${context.repo.repo}`) {
               failures.push('the pull request no longer has a same-repository head');
             }
@@ -251,6 +228,7 @@ jobs:
 
             if (pullRequest.state !== 'open') failures.push('the pull request is no longer open');
             if (pullRequest.draft) failures.push('the pull request is now a draft');
+            if (pullRequest.base.ref !== 'main') failures.push('the pull request no longer targets main');
             if (pullRequest.head.repo.full_name !== `${context.repo.owner}/${context.repo.repo}`) {
               failures.push('the pull request no longer has a same-repository head');
             }

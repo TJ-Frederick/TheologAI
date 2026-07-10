@@ -1,0 +1,57 @@
+name: Preview Revocation
+
+on:
+  # Do not add a base-branch filter: an edited event must still be observed
+  # after a pull request is retargeted away from main.
+  pull_request:
+    types: [closed, unlabeled, converted_to_draft, edited]
+
+permissions: {}
+
+# GitHub concurrency groups are repository-wide. Revocation events deliberately
+# join PR Checks' group; unrelated events use a run-unique group and cannot
+# cancel or displace a substantive PR Checks run.
+concurrency:
+  group: >-
+    ${{
+      (
+        github.event.action == 'closed' ||
+        (github.event.action == 'unlabeled' && github.event.label.name == 'deploy-preview') ||
+        github.event.action == 'converted_to_draft' ||
+        (
+          github.event.action == 'edited' &&
+          github.event.changes.base.ref.from == 'main' &&
+          github.event.pull_request.base.ref != 'main'
+        )
+      ) && format('pr-{0}', github.event.pull_request.number) ||
+      format('preview-revocation-noop-{0}', github.run_id)
+    }}
+  cancel-in-progress: >-
+    ${{
+      github.event.action == 'closed' ||
+      (github.event.action == 'unlabeled' && github.event.label.name == 'deploy-preview') ||
+      github.event.action == 'converted_to_draft' ||
+      (
+        github.event.action == 'edited' &&
+        github.event.changes.base.ref.from == 'main' &&
+        github.event.pull_request.base.ref != 'main'
+      )
+    }}
+
+jobs:
+  acknowledge-revocation:
+    name: Record Preview Revocation
+    if: >-
+      github.event.action == 'closed' ||
+      (github.event.action == 'unlabeled' && github.event.label.name == 'deploy-preview') ||
+      github.event.action == 'converted_to_draft' ||
+      (
+        github.event.action == 'edited' &&
+        github.event.changes.base.ref.from == 'main' &&
+        github.event.pull_request.base.ref != 'main'
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Confirm active preview cancellation
+        run: echo "Preview authorization was revoked; matching in-flight PR Checks runs were canceled."
