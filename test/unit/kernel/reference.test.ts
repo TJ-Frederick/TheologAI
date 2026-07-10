@@ -10,6 +10,7 @@ import {
   normalizeOpenBibleRef,
   toRomanNumeral,
 } from '../../../src/kernel/reference.js';
+import { BIBLE_BOOKS, getBibleBookBounds } from '../../../src/kernel/books.js';
 
 describe('parseReference', () => {
   it('parses "John 3:16"', () => {
@@ -96,6 +97,30 @@ describe('parseReference', () => {
 
   it('throws on unknown book', () => {
     expect(() => parseReference('Hezekiah 1:1')).toThrow('Unknown Bible book');
+  });
+
+  it('enforces canonical chapter and verse bounds for all 66 books', () => {
+    expect(BIBLE_BOOKS).toHaveLength(66);
+
+    for (const book of BIBLE_BOOKS) {
+      const maxVerses = getBibleBookBounds(book).maxVerseByChapter;
+      const lastChapter = maxVerses.length;
+      const lastVerse = maxVerses[lastChapter - 1];
+
+      expect(parseReference(`${book.name} ${lastChapter}:${lastVerse}`).book.number)
+        .toBe(book.number);
+      expect(() => parseReference(`${book.name} ${lastChapter + 1}:1`)).toThrow(/out of range/);
+    }
+  });
+
+  it.each([
+    ['John 999:999', /Chapter 999 is out of range for John/],
+    ['John 3:999', /Verse 999 is out of range for John 3/],
+    ['John 3:16-999', /Verse range 16-999 is out of range for John 3/],
+    ['John 3:17-16', /Verse range 17-16 is out of range for John 3/],
+    ['Genesis 0:1', /Chapter 0 is out of range for Genesis/],
+  ])('rejects impossible reference %s', (reference, message) => {
+    expect(() => parseReference(reference)).toThrow(message);
   });
 
   it('parses "Obad 1:3"', () => {

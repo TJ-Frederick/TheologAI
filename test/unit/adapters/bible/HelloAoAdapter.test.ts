@@ -89,6 +89,21 @@ describe('HelloAoAdapter', () => {
     expect(String(vi.mocked(globalThis.fetch).mock.calls[0][0])).toContain('/eng_kjv/GEN/1.json');
   });
 
+  it('joins adjacent word fragments without concatenating words or separating punctuation', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue(response({
+      chapter: {
+        content: [{
+          type: 'verse',
+          number: 1,
+          content: ['the only', { text: 'Son,' }, ' born', { text: 'Son,' }, ' For', { text: 'God' }],
+        }],
+      },
+    }));
+
+    const result = await new HelloAoAdapter().getPassage(parseReference('Genesis 1:1'), 'WEB');
+    expect(result.text).toBe('the only Son, born Son, For God');
+  });
+
   it('includes all chapter footnotes when requested without a verse', async () => {
     vi.mocked(globalThis.fetch).mockResolvedValue(response({
       chapter: {
@@ -114,6 +129,28 @@ describe('HelloAoAdapter', () => {
 
     await expect(new HelloAoAdapter().getPassage(parseReference('John 3:16'), 'DBY'))
       .rejects.toEqual(new AdapterError('HelloAO', 'No verses found for John 3:16'));
+  });
+
+  it('rejects response metadata for a different book', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue(response({
+      translation: { id: 'eng_dby' },
+      book: { id: 'MRK', number: 41 },
+      chapter: { number: 3, content: [{ type: 'verse', number: 16, content: ['Different passage'] }] },
+    }));
+
+    await expect(new HelloAoAdapter().getPassage(parseReference('John 3:16'), 'DBY'))
+      .rejects.toEqual(new AdapterError('HelloAO', 'Provider returned a different book.'));
+  });
+
+  it('rejects a partial provider response for a requested range', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue(response({
+      chapter: {
+        content: [{ type: 'verse', number: 16, content: ['Only verse 16'] }],
+      },
+    }));
+
+    await expect(new HelloAoAdapter().getPassage(parseReference('John 3:16-17'), 'DBY'))
+      .rejects.toEqual(new AdapterError('HelloAO', 'No verses found for John 3:16-17'));
   });
 
   it('normalizes an upstream HTTP error as an adapter error', async () => {

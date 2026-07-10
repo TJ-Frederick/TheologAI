@@ -2,7 +2,13 @@
  * Pure formatting functions for Bible-related tool responses.
  */
 
-import type { BibleResult, CrossReferenceResult, ParallelPassageResult, ParallelPassage } from '../kernel/types.js';
+import type {
+  BibleLookupMultipleResult,
+  BibleResult,
+  CrossReferenceResult,
+  ParallelPassageResult,
+  ParallelPassage,
+} from '../kernel/types.js';
 
 /** Format a single Bible result as Markdown */
 export function formatBibleResponse(data: BibleResult): string {
@@ -20,11 +26,19 @@ export function formatBibleResponse(data: BibleResult): string {
   return s.trim();
 }
 
-/** Format multiple translations for comparison */
-export function formatMultiBibleResponse(results: BibleResult[]): string {
-  if (results.length === 0) return 'No results found.';
+/** Format multiple translations for comparison, including explicit failures. */
+export function formatMultiBibleResponse(data: BibleLookupMultipleResult | BibleResult[]): string {
+  const response: BibleLookupMultipleResult = Array.isArray(data)
+    ? { reference: data[0]?.reference ?? '', results: data, failures: [] }
+    : data;
+  const { reference, results, failures } = response;
+  if (results.length === 0 && failures.length === 0) return 'No results found.';
 
-  let s = `**${results[0].reference}** (${results.length} translations)\n\n`;
+  const requestedCount = results.length + failures.length;
+  const header = failures.length > 0
+    ? `**${reference}** (${requestedCount} translations requested; ${results.length} available)`
+    : `**${reference || results[0].reference}** (${results.length} translations)`;
+  let s = `${header}\n\n`;
   for (const r of results) {
     s += `**${r.translation}:**\n${r.text}\n\n`;
     if (r.footnotes?.length) {
@@ -36,8 +50,18 @@ export function formatMultiBibleResponse(results: BibleResult[]): string {
     }
   }
 
-  const sources = [...new Set(results.map(r => r.citation.source))];
-  s += `*Sources: ${sources.join(', ')}*`;
+  if (failures.length > 0) {
+    s += '**Translation status:**\n';
+    for (const failure of failures) {
+      s += `- **${failure.translation}:** unavailable — ${failure.reason}\n`;
+    }
+    s += '\n';
+  }
+
+  if (results.length > 0) {
+    const sources = [...new Set(results.map(r => r.citation.source))];
+    s += `*Sources: ${sources.join(', ')}*`;
+  }
   return s.trim();
 }
 

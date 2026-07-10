@@ -99,6 +99,29 @@ describe('formatMultiBibleResponse', () => {
     expect(out).toContain('**KJV:**\nKJV text');
   });
 
+  it('shows every requested translation, including explicit failures', () => {
+    const out = formatMultiBibleResponse({
+      reference: 'John 3:16',
+      results: [makeBibleResult({ translation: 'NET', text: 'NET text' })],
+      failures: [{ translation: 'ESV', reason: 'Translation provider is not configured.' }],
+    });
+
+    expect(out).toContain('**John 3:16** (2 translations requested; 1 available)');
+    expect(out).toContain('**NET:**\nNET text');
+    expect(out).toContain('- **ESV:** unavailable — Translation provider is not configured.');
+  });
+
+  it('preserves failure status when every requested translation fails', () => {
+    const out = formatMultiBibleResponse({
+      reference: 'John 3:16',
+      results: [],
+      failures: [{ translation: 'ESV', reason: 'Translation provider is not configured.' }],
+    });
+
+    expect(out).toContain('**John 3:16** (1 translations requested; 0 available)');
+    expect(out).toContain('- **ESV:** unavailable');
+  });
+
   it('includes per-translation footnotes', () => {
     const out = formatMultiBibleResponse([
       makeBibleResult({

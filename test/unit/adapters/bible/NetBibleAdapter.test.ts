@@ -19,9 +19,8 @@ describe('NetBibleAdapter', () => {
 
   it('maps a range request and combines sanitized verse text', async () => {
     vi.mocked(globalThis.fetch).mockResolvedValue(response([
-      { text: '<b>In</b> the beginning&nbsp;' },
-      { text: '<span>was the Word.</span>' },
-      {},
+      { bookname: 'John', chapter: 1, verse: 1, text: '<b>In</b> the beginning&nbsp;' },
+      { bookname: 'John', chapter: 1, verse: 2, text: '<span>was the Word.</span>' },
     ]));
     const adapter = new NetBibleAdapter();
 
@@ -50,6 +49,15 @@ describe('NetBibleAdapter', () => {
 
     await expect(new NetBibleAdapter().getPassage(parseReference('Romans 8:1'), 'NET'))
       .rejects.toEqual(new APIError(404, 'No passage found for: Romans 8:1'));
+  });
+
+  it('rejects verse metadata for a different reference', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue(response([
+      { bookname: 'John', chapter: 1, verse: 1, text: 'Different passage' },
+    ]));
+
+    await expect(new NetBibleAdapter().getPassage(parseReference('John 1:2'), 'NET'))
+      .rejects.toEqual(new APIError(502, 'Bible provider returned a passage for a different reference.'));
   });
 
   it('surfaces malformed upstream JSON', async () => {

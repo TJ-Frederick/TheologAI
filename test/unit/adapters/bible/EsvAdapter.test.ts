@@ -73,6 +73,16 @@ describe('EsvAdapter', () => {
     expect(String(vi.mocked(globalThis.fetch).mock.calls[0][0])).toContain('include-footnotes=false');
   });
 
+  it('rejects a canonical response for a different reference', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue(jsonResponse({
+      canonical: 'John 1:1',
+      passages: ['Different passage'],
+    }));
+
+    await expect(new EsvAdapter('key').getPassage(parseReference('John 3:16'), 'ESV'))
+      .rejects.toEqual(new APIError(502, 'Bible provider returned a passage for a different reference.'));
+  });
+
   it.each([
     ['missing passages', {}],
     ['an empty passage list', { passages: [] }],

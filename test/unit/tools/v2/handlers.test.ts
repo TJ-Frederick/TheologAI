@@ -123,10 +123,14 @@ describe('bible_lookup handler', () => {
 
   it('dispatches an array to multi-translation lookup', async () => {
     const lookup = vi.fn<BibleService['lookup']>();
-    const lookupMultiple = vi.fn<BibleService['lookupMultiple']>().mockResolvedValue([
-      { reference: 'John 3:16', translation: 'ESV', text: 'ESV text', citation },
-      { reference: 'John 3:16', translation: 'KJV', text: 'KJV text', citation },
-    ]);
+    const lookupMultiple = vi.fn<BibleService['lookupMultiple']>().mockResolvedValue({
+      reference: 'John 3:16',
+      results: [
+        { reference: 'John 3:16', translation: 'ESV', text: 'ESV text', citation },
+        { reference: 'John 3:16', translation: 'KJV', text: 'KJV text', citation },
+      ],
+      failures: [],
+    });
     const handler = createBibleLookupHandler(serviceDouble({ lookup, lookupMultiple }));
 
     const result = await handler.handler({
@@ -141,9 +145,11 @@ describe('bible_lookup handler', () => {
   });
 
   it('accepts legacy JSON-encoded translation arrays and preserves partial results', async () => {
-    const lookupMultiple = vi.fn<BibleService['lookupMultiple']>().mockResolvedValue([
-      { reference: 'Psalm 23:1', translation: 'WEB', text: 'Yahweh is my shepherd.', citation },
-    ]);
+    const lookupMultiple = vi.fn<BibleService['lookupMultiple']>().mockResolvedValue({
+      reference: 'Psalms 23:1',
+      results: [{ reference: 'Psalms 23:1', translation: 'WEB', text: 'Yahweh is my shepherd.', citation }],
+      failures: [{ translation: 'DBY', reason: 'Translation could not be retrieved.' }],
+    });
     const handler = createBibleLookupHandler(serviceDouble<BibleService>({
       lookup: vi.fn<BibleService['lookup']>(),
       lookupMultiple,
@@ -155,8 +161,9 @@ describe('bible_lookup handler', () => {
     });
 
     expect(lookupMultiple).toHaveBeenCalledWith('Psalm 23:1', ['WEB', 'DBY']);
-    expect(textOf(result)).toContain('(1 translations)');
-    expect(textOf(result)).not.toContain('**DBY:**');
+    expect(textOf(result)).toContain('(2 translations requested; 1 available)');
+    expect(textOf(result)).toContain('**WEB:**');
+    expect(textOf(result)).toContain('**DBY:** unavailable');
   });
 
   it('treats a malformed legacy array string as a single translation value', async () => {

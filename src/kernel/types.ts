@@ -61,6 +61,17 @@ export interface BibleResult {
   citation: Citation;
 }
 
+export interface BibleTranslationFailure {
+  translation: string;
+  reason: string;
+}
+
+export interface BibleLookupMultipleResult {
+  reference: string;
+  results: BibleResult[];
+  failures: BibleTranslationFailure[];
+}
+
 // ── Commentary types ──
 
 export interface CommentaryLookupParams {

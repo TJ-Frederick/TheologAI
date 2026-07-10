@@ -135,6 +135,13 @@ describe('createWorkerCompositionRoot', () => {
       expect(root.services.bibleService).toBeDefined();
     });
 
+    it('keeps all eight translation routes, including ESV, in the Worker composition root', () => {
+      const root = createWorkerCompositionRoot(makeEnv());
+      expect(root.services.bibleService.getSupportedTranslations().sort()).toEqual([
+        'ASV', 'BSB', 'DBY', 'ESV', 'KJV', 'NET', 'WEB', 'YLT',
+      ]);
+    });
+
     it('exposes commentaryService on services', () => {
       const root = createWorkerCompositionRoot(makeEnv());
       expect(root.services.commentaryService).toBeDefined();

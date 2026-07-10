@@ -7,6 +7,7 @@
 // Books
 export {
   BIBLE_BOOKS,
+  BIBLE_BOOK_BOUNDS,
   findBook,
   findBookByHelloaoCode,
   findBookByAbbreviation,
@@ -14,7 +15,9 @@ export {
   findBookByNumber,
   getOTBooks,
   getNTBooks,
+  getBibleBookBounds,
   type BibleBook,
+  type BibleBookBounds,
 } from './books.js';
 
 // Reference parsing & formatting
@@ -29,6 +32,7 @@ export {
   toStepBible,
   normalizeOpenBibleRef,
   toRomanNumeral,
+  referencesEqual,
   type BibleReference,
 } from './reference.js';
 
@@ -56,6 +60,8 @@ export type {
   Reference,
   Footnote,
   BibleResult,
+  BibleTranslationFailure,
+  BibleLookupMultipleResult,
   CommentaryLookupParams,
   CommentaryResult,
   HistoricalSearchParams,

@@ -52,11 +52,21 @@ export class HelloAoAdapter implements BibleAdapter {
 
     const hao = toHelloAO(ref);
     const data = await this.client.getJSON<any>(`/${meta.id}/${hao.bookCode}/${hao.chapter}.json`);
+    this.assertResponseMatchesRequest(data, ref, hao.bookCode, meta.id);
 
     // Extract verses
     const verses = this.extractVerses(data.chapter.content, hao.verse, hao.endVerse);
     if (verses.length === 0) {
       throw new AdapterError('HelloAO', `No verses found for ${formatReference(ref)}`);
+    }
+    if (hao.verse != null) {
+      const endVerse = hao.endVerse ?? hao.verse;
+      const returnedVerses = new Set(verses.map(v => Number(v.number)));
+      for (let verse = hao.verse; verse <= endVerse; verse++) {
+        if (!returnedVerses.has(verse)) {
+          throw new AdapterError('HelloAO', `No verses found for ${formatReference(ref)}`);
+        }
+      }
     }
 
     const text = verses.map(v => this.extractVerseText(v.content)).join(' ');
@@ -88,6 +98,26 @@ export class HelloAoAdapter implements BibleAdapter {
     return this.client;
   }
 
+  private assertResponseMatchesRequest(
+    data: any,
+    ref: BibleReference,
+    bookCode: string,
+    translationId: string,
+  ): void {
+    if (data.translation?.id && data.translation.id !== translationId) {
+      throw new AdapterError('HelloAO', 'Provider returned a different translation.');
+    }
+    if (data.book?.id && data.book.id !== bookCode) {
+      throw new AdapterError('HelloAO', 'Provider returned a different book.');
+    }
+    if (data.book?.number != null && Number(data.book.number) !== ref.book.number) {
+      throw new AdapterError('HelloAO', 'Provider returned a different book.');
+    }
+    if (data.chapter?.number != null && Number(data.chapter.number) !== ref.chapter) {
+      throw new AdapterError('HelloAO', 'Provider returned a different chapter.');
+    }
+  }
+
   private extractVerses(content: any[], startVerse?: number, endVerse?: number): any[] {
     const allVerses = content.filter((item: any) => item.type === 'verse');
     if (!startVerse) return allVerses;
@@ -96,13 +126,32 @@ export class HelloAoAdapter implements BibleAdapter {
   }
 
   private extractVerseText(content: VerseContent[]): string {
-    const parts: string[] = [];
+    let text = '';
     for (const item of content) {
-      if (typeof item === 'string') parts.push(item);
-      else if ('lineBreak' in item) parts.push('\n');
-      else if ('text' in item) parts.push(item.text);
+      if (typeof item === 'string') {
+        text = this.appendFragment(text, item);
+      } else if ('lineBreak' in item) {
+        text = `${text.trimEnd()}\n`;
+      } else if ('text' in item) {
+        text = this.appendFragment(text, item.text);
+      }
     }
-    return parts.join('').trim();
+    return text.trim();
+  }
+
+  /** Join provider fragments as words while leaving punctuation attached. */
+  private appendFragment(current: string, fragment: string): string {
+    if (!fragment) return current;
+    if (!current || /\s$/.test(current) || /^\s/.test(fragment) || /\n$/.test(current)) {
+      return current + fragment;
+    }
+
+    const previous = current[current.length - 1];
+    const next = fragment[0];
+    if (/^[,.;:!?%…)\]}"'”’]/u.test(next) || /^[([{"'“‘]/u.test(previous) || previous === '-' || next === '-') {
+      return current + fragment;
+    }
+    return `${current} ${fragment}`;
   }
 
   private extractFootnotes(footnotes: any[], startVerse?: number, endVerse?: number): Footnote[] {
