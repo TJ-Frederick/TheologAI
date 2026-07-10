@@ -250,7 +250,12 @@ jobs:
           wranglerVersion: '4.107.0'
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          environment: preview
+          secrets: |
+            ESV_API_KEY
           command: deploy --env preview
+        env:
+          ESV_API_KEY: ${{ secrets.ESV_API_KEY }}
 
       - name: Comment preview URL on PR
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
