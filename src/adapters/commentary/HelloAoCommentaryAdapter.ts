@@ -18,21 +18,24 @@ interface CommentatorMeta {
   displayName: string;
   otOnly?: boolean;
   copyright: string;
+  verseIdentity: VerseIdentityPolicy;
 }
+
+type VerseIdentityPolicy = 'verseNumberOrNumber' | 'verseNumberOnly';
 
 const PUBLIC_DOMAIN = 'Public Domain';
 const TYNDALE_LICENSE = 'CC BY-SA 4.0 — Tyndale House, Cambridge (https://creativecommons.org/licenses/by-sa/4.0/)';
 
 const COMMENTATORS: Record<string, CommentatorMeta> = {
-  'matthew henry': { id: 'matthew-henry', displayName: 'Matthew Henry', copyright: PUBLIC_DOMAIN },
-  'jfb': { id: 'jamieson-fausset-brown', displayName: 'Jamieson-Fausset-Brown', copyright: PUBLIC_DOMAIN },
-  'jamieson-fausset-brown': { id: 'jamieson-fausset-brown', displayName: 'Jamieson-Fausset-Brown', copyright: PUBLIC_DOMAIN },
-  'adam clarke': { id: 'adam-clarke', displayName: 'Adam Clarke', copyright: PUBLIC_DOMAIN },
-  'clarke': { id: 'adam-clarke', displayName: 'Adam Clarke', copyright: PUBLIC_DOMAIN },
-  'john gill': { id: 'john-gill', displayName: 'John Gill', copyright: PUBLIC_DOMAIN },
-  'gill': { id: 'john-gill', displayName: 'John Gill', copyright: PUBLIC_DOMAIN },
-  'keil-delitzsch': { id: 'keil-delitzsch', displayName: 'Keil-Delitzsch', otOnly: true, copyright: PUBLIC_DOMAIN },
-  'tyndale': { id: 'tyndale', displayName: 'Tyndale Open Study Notes', copyright: TYNDALE_LICENSE },
+  'matthew henry': { id: 'matthew-henry', displayName: 'Matthew Henry', copyright: PUBLIC_DOMAIN, verseIdentity: 'verseNumberOrNumber' },
+  'jfb': { id: 'jamieson-fausset-brown', displayName: 'Jamieson-Fausset-Brown', copyright: PUBLIC_DOMAIN, verseIdentity: 'verseNumberOrNumber' },
+  'jamieson-fausset-brown': { id: 'jamieson-fausset-brown', displayName: 'Jamieson-Fausset-Brown', copyright: PUBLIC_DOMAIN, verseIdentity: 'verseNumberOrNumber' },
+  'adam clarke': { id: 'adam-clarke', displayName: 'Adam Clarke', copyright: PUBLIC_DOMAIN, verseIdentity: 'verseNumberOrNumber' },
+  'clarke': { id: 'adam-clarke', displayName: 'Adam Clarke', copyright: PUBLIC_DOMAIN, verseIdentity: 'verseNumberOrNumber' },
+  'john gill': { id: 'john-gill', displayName: 'John Gill', copyright: PUBLIC_DOMAIN, verseIdentity: 'verseNumberOnly' },
+  'gill': { id: 'john-gill', displayName: 'John Gill', copyright: PUBLIC_DOMAIN, verseIdentity: 'verseNumberOnly' },
+  'keil-delitzsch': { id: 'keil-delitzsch', displayName: 'Keil-Delitzsch', otOnly: true, copyright: PUBLIC_DOMAIN, verseIdentity: 'verseNumberOrNumber' },
+  'tyndale': { id: 'tyndale', displayName: 'Tyndale Open Study Notes', copyright: TYNDALE_LICENSE, verseIdentity: 'verseNumberOrNumber' },
 };
 
 export class HelloAoCommentaryAdapter implements CommentaryAdapter {
@@ -72,8 +75,11 @@ export class HelloAoCommentaryAdapter implements CommentaryAdapter {
     const hao = toHelloAO(ref);
     const data = await this.client.getJSON<any>(`/${meta.id}/${hao.bookCode}/${hao.chapter}.json`);
 
-    const text = this.extractCommentaryText(data, hao.verse);
+    const text = this.extractCommentaryText(data, hao.verse, meta.verseIdentity);
     if (!text) {
+      if (meta.verseIdentity === 'verseNumberOnly' && hao.verse != null) {
+        throw new AdapterError('HelloAO', `John Gill scalar verse lookup is outside supported coverage for ${formatReference(ref)}`);
+      }
       throw new AdapterError('HelloAO', `No commentary found for ${formatReference(ref)} in ${meta.displayName}`);
     }
 
@@ -101,7 +107,11 @@ export class HelloAoCommentaryAdapter implements CommentaryAdapter {
     return COMMENTATORS[name.toLowerCase().trim()];
   }
 
-  private extractCommentaryText(data: unknown, verseNumber?: number): string | undefined {
+  private extractCommentaryText(
+    data: unknown,
+    verseNumber: number | undefined,
+    verseIdentity: VerseIdentityPolicy,
+  ): string | undefined {
     const content = this.getChapterContent(data);
     if (!content) return undefined;
 
@@ -118,7 +128,7 @@ export class HelloAoCommentaryAdapter implements CommentaryAdapter {
     // Verse requests require an exact, trustworthy provider identity. A
     // neighboring entry may be broader commentary or commentary for another
     // verse, so never substitute it for the requested verse.
-    const exactEntries = content.filter(entry => this.getEntryVerseNumber(entry) === verseNumber);
+    const exactEntries = content.filter(entry => this.getEntryVerseNumber(entry, verseIdentity) === verseNumber);
     if (exactEntries.length !== 1) return undefined;
 
     return this.extractEntryText(exactEntries[0]);
@@ -132,12 +142,17 @@ export class HelloAoCommentaryAdapter implements CommentaryAdapter {
   }
 
   /** Return an entry's verse only when its metadata is unambiguous and numeric. */
-  private getEntryVerseNumber(entry: unknown): number | undefined {
+  private getEntryVerseNumber(entry: unknown, verseIdentity: VerseIdentityPolicy): number | undefined {
     if (!this.isRecord(entry)) return undefined;
 
     const verseNumber = this.readVerseMetadata(entry.verseNumber);
-    const number = this.readVerseMetadata(entry.number);
     const hasVerseNumber = entry.verseNumber !== undefined && entry.verseNumber !== null;
+
+    if (verseIdentity === 'verseNumberOnly') {
+      return hasVerseNumber && verseNumber === undefined ? undefined : verseNumber;
+    }
+
+    const number = this.readVerseMetadata(entry.number);
     const hasNumber = entry.number !== undefined && entry.number !== null;
 
     // If a provider supplies both fields, disagreement or malformed metadata

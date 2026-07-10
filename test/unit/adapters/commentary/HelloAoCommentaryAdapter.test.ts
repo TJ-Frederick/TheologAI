@@ -95,7 +95,33 @@ describe('HelloAoCommentaryAdapter', () => {
     }));
 
     await expect(new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3:16'), 'John Gill'))
-      .rejects.toEqual(new AdapterError('HelloAO', 'No commentary found for John 3:16 in John Gill'));
+      .rejects.toEqual(new AdapterError('HelloAO', 'John Gill scalar verse lookup is outside supported coverage for John 3:16'));
+  });
+
+  it.each(['John 3:15', 'John 3:16'])('does not use John Gill number metadata for %s', async (reference) => {
+    vi.mocked(globalThis.fetch).mockResolvedValue(response({
+      chapter: {
+        content: [
+          { number: 15, content: ['For God so loved the world'] },
+          { number: 16, content: ['For God sent not his Son into the world'] },
+        ],
+      },
+    }));
+
+    await expect(new HelloAoCommentaryAdapter().getCommentary(parseReference(reference), 'John Gill'))
+      .rejects.toEqual(new AdapterError('HelloAO', `John Gill scalar verse lookup is outside supported coverage for ${reference}`));
+  });
+
+  it('accepts John Gill scalar commentary only with a genuine verseNumber field', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue(response({
+      chapter: {
+        content: [{ verseNumber: 16, number: 15, content: ['Genuine verse 16 commentary'] }],
+      },
+    }));
+
+    const result = await new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3:16'), 'John Gill');
+
+    expect(result.text).toBe('Genuine verse 16 commentary');
   });
 
   it('attributes Tyndale Open Study Notes under CC BY-SA 4.0', async () => {
@@ -180,7 +206,7 @@ describe('HelloAoCommentaryAdapter', () => {
     ['Matthew Henry', 'Genesis 1:1', 'verseNumber', 'Genesis opening', 'Matthew Henry'],
     ['Jamieson-Fausset-Brown', 'John 3:16', 'number', 'JFB exact', 'Jamieson-Fausset-Brown'],
     ['Adam Clarke', 'Romans 8:28', 'verseNumber', 'Clarke exact', 'Adam Clarke'],
-    ['John Gill', 'Exodus 3:14', 'number', 'Gill exact', 'John Gill'],
+    ['John Gill', 'Exodus 3:14', 'verseNumber', 'Gill exact', 'John Gill'],
     ['Keil-Delitzsch', 'Genesis 1:1', 'number', 'Keil exact', 'Keil-Delitzsch'],
     ['Tyndale', 'John 3:16', 'verseNumber', 'Tyndale exact', 'Tyndale Open Study Notes'],
   ] as const)('preserves exact reference identity for %s (%s)', async (commentator, reference, metadata, text, displayName) => {

@@ -98,6 +98,7 @@ describe('v2 tool handler schemas', () => {
       limit: { minimum: 1, maximum: 20 },
     });
     expect(commentaryHandler.description).toContain('Verse ranges are not supported');
+    expect(commentaryHandler.description).toContain('John Gill scalar lookups require exact provider verseNumber metadata');
     expect(commentary.properties?.reference).toMatchObject({
       description: expect.stringContaining('verse ranges are not supported'),
     });

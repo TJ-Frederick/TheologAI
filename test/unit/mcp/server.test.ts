@@ -304,6 +304,14 @@ describe('shared MCP registration', () => {
       mimeType: 'text/markdown',
       text: expect.stringContaining('ESV'),
     }));
+
+    const commentaries = await client.readResource({ uri: 'theologai://commentaries' });
+    expect(commentaries.contents[0]).toEqual(expect.objectContaining({
+      text: expect.stringContaining('John Gill'),
+    }));
+    expect(commentaries.contents[0]).toEqual(expect.objectContaining({
+      text: expect.stringContaining('verseNumber metadata'),
+    }));
   });
 
   it.each(LOGGING_SERVER_VARIANTS)('$name warns when historical resources are unavailable and returns static resources', async ({ create }) => {
