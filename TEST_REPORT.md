@@ -1,4 +1,10 @@
 # TheologAI Testing Report
+
+> **Historical test report:** This file records an earlier intended feature
+> state and is not the current product contract. Full CCEL catalog discovery,
+> catalog-wide search, and Calvin auto-routing are not currently supported.
+> Bounded named-work/section retrieval remains available; see `README.md`.
+
 **Date:** October 9, 2025
 **Branch:** main (with uncommitted changes)
 **Test Scope:** General-purpose testing of recent CCEL enhancements

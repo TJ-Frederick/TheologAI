@@ -21,6 +21,7 @@
     "src/worker.ts",
     "src/worker-server.ts",
     "src/worker-env.ts",
+    "src/http/worker",
     "src/adapters/d1",
     "src/tools/worker",
     "src/shims"

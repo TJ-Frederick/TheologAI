@@ -14,10 +14,11 @@ export function createVerseMorphologyHandler(service: MorphologyService): ToolHa
     inputSchema: {
       type: 'object',
       properties: {
-        reference: { type: 'string', description: 'Bible verse reference (e.g., "John 1:1", "Genesis 1:1")' },
+        reference: { type: 'string', minLength: 1, maxLength: 100, description: 'Bible verse reference (e.g., "John 1:1", "Genesis 1:1")' },
         expand_morphology: { type: 'boolean', default: false, description: 'Expand morphology codes to full descriptions' },
       },
       required: ['reference'],
+      additionalProperties: false,
     },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
 

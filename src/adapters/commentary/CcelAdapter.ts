@@ -2,7 +2,7 @@
  * CCEL (Christian Classics Ethereal Library) adapter.
  *
  * Consolidates ccelApi.ts + ccelCatalogScraper.ts + ccelToc.ts into one adapter.
- * Provides access to 1000+ classic theological texts.
+ * Provides bounded access to explicitly named classic theological work sections.
  */
 
 import type { BibleReference } from '../../kernel/reference.js';
@@ -26,6 +26,8 @@ export class CcelAdapter {
       baseUrl: 'https://ccel.org',
       cacheTtlMs: 2 * 60 * 60 * 1000, // 2 hour cache
       cacheMaxSize: 200,
+      maxResponseBytes: 8 * 1024 * 1024,
+      maxCacheBytes: 16 * 1024 * 1024,
     });
   }
 

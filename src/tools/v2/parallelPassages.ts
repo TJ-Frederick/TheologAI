@@ -14,14 +14,15 @@ export function createParallelPassagesHandler(service: ParallelPassageService): 
     inputSchema: {
       type: 'object',
       properties: {
-        reference: { type: 'string', description: 'Bible reference (e.g., "Matthew 26:26-28")' },
+        reference: { type: 'string', minLength: 1, maxLength: 100, description: 'Bible reference (e.g., "Matthew 26:26-28")' },
         mode: { type: 'string', enum: ['auto', 'synoptic', 'quotation', 'thematic'], default: 'auto' },
-        includeText: { type: 'boolean', default: false, description: 'Include verse text for parallels' },
-        translation: { type: 'string', default: 'ESV' },
-        maxParallels: { type: 'number', default: 10 },
+        includeText: { type: 'boolean', default: false, description: 'Include a clearly labeled text excerpt of up to 200 characters for each parallel' },
+        translation: { type: 'string', enum: ['ESV', 'NET', 'KJV', 'WEB', 'BSB', 'ASV', 'YLT', 'DBY'], default: 'ESV' },
+        maxParallels: { type: 'integer', minimum: 1, maximum: 50, default: 10 },
         useCrossReferences: { type: 'boolean', default: true },
       },
       required: ['reference'],
+      additionalProperties: false,
     },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
 

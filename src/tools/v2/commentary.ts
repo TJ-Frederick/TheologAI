@@ -14,15 +14,16 @@ export function createCommentaryHandler(service: CommentaryService): ToolHandler
     inputSchema: {
       type: 'object',
       properties: {
-        reference: { type: 'string', description: 'Bible reference (e.g., "John 3:16")' },
+        reference: { type: 'string', minLength: 1, maxLength: 100, description: 'Bible reference (e.g., "John 3:16")' },
         commentator: {
           type: 'string',
           enum: ['Matthew Henry', 'Jamieson-Fausset-Brown', 'Adam Clarke', 'John Gill', 'Keil-Delitzsch', 'Tyndale'],
           default: 'Matthew Henry',
         },
-        maxLength: { type: 'number', description: 'Max response length in characters' },
+        maxLength: { type: 'integer', minimum: 1, maximum: 100000, description: 'Max response length in characters' },
       },
       required: ['reference'],
+      additionalProperties: false,
     },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
 

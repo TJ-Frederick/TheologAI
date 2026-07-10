@@ -6,25 +6,15 @@
 
 import type Database from 'better-sqlite3';
 import { getDatabase } from '../shared/Database.js';
+import type {
+  IHistoricalDocumentRepository,
+  DocumentInfo,
+  DocumentSection,
+} from '../../kernel/repositories.js';
 
-export interface DocumentInfo {
-  id: string;
-  title: string;
-  type: string;
-  date: string | null;
-  topics: string[];
-}
+export type { DocumentInfo, DocumentSection } from '../../kernel/repositories.js';
 
-export interface DocumentSection {
-  id: number;
-  document_id: string;
-  section_number: string;
-  title: string;
-  content: string;
-  topics: string[];
-}
-
-export class HistoricalDocumentRepository {
+export class HistoricalDocumentRepository implements IHistoricalDocumentRepository {
   private db: Database.Database;
   private stmtAllDocs: Database.Statement;
   private stmtDocById: Database.Statement;
@@ -35,7 +25,7 @@ export class HistoricalDocumentRepository {
   constructor(db?: Database.Database) {
     this.db = db ?? getDatabase();
 
-    this.stmtAllDocs = this.db.prepare('SELECT * FROM documents ORDER BY title');
+    this.stmtAllDocs = this.db.prepare('SELECT * FROM documents ORDER BY title, id');
     this.stmtDocById = this.db.prepare('SELECT * FROM documents WHERE id = ?');
     this.stmtSections = this.db.prepare(
       'SELECT * FROM document_sections WHERE document_id = ? ORDER BY id'
@@ -44,7 +34,12 @@ export class HistoricalDocumentRepository {
       'SELECT * FROM document_sections WHERE document_id = ? AND section_number = ?'
     );
     this.stmtFtsSearch = this.db.prepare(
-      'SELECT rowid, title, content, topics FROM sections_fts WHERE sections_fts MATCH ? ORDER BY rank LIMIT ?'
+      `SELECT ds.id, ds.document_id, ds.section_number, ds.title, ds.content, ds.topics
+       FROM sections_fts
+       JOIN document_sections ds ON ds.id = sections_fts.rowid
+       WHERE sections_fts MATCH ?
+       ORDER BY rank, ds.id
+       LIMIT ?`
     );
   }
 
@@ -121,14 +116,14 @@ export class HistoricalDocumentRepository {
 
     try {
       const rows = this.stmtFtsSearch.all(ftsQuery, limit) as Array<{
-        rowid: number; title: string; content: string; topics: string;
+        id: number; document_id: string; section_number: string | null;
+        title: string | null; content: string; topics: string | null;
       }>;
 
-      // FTS rowids correspond to document_sections rowids
       return rows.map(r => ({
-        id: r.rowid,
-        document_id: '', // FTS doesn't include this, caller can join if needed
-        section_number: '',
+        id: r.id,
+        document_id: r.document_id,
+        section_number: r.section_number || '',
         title: r.title || '',
         content: r.content,
         topics: r.topics ? JSON.parse(r.topics) : [],

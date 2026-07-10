@@ -1,4 +1,10 @@
 # Release Notes: Version 3.4.0
+
+> **Historical release note:** This file records the intended v3.4.0 scope and
+> is not the current product contract. Full CCEL catalog discovery/search is not
+> currently supported; bounded named-work/section retrieval remains available.
+> See the repository README for current capabilities.
+
 ## Enhanced Discovery & Commentary Navigation
 
 **Release Date:** October 9, 2025

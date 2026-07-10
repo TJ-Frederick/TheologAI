@@ -3,47 +3,57 @@ import { createSimpleD1 } from '../../../helpers/mockD1.js';
 
 // Mock all HTTP adapters and external services to avoid network calls
 vi.mock('../../../../src/adapters/bible/EsvAdapter.js', () => ({
-  EsvAdapter: vi.fn().mockImplementation(() => ({
-    supportedTranslations: ['ESV'],
-    getPassage: vi.fn(),
-    isConfigured: vi.fn().mockReturnValue(true),
-    getCopyright: vi.fn().mockReturnValue('ESV'),
-  })),
+  EsvAdapter: vi.fn().mockImplementation(function () {
+    return {
+      supportedTranslations: ['ESV'],
+      getPassage: vi.fn(),
+      isConfigured: vi.fn().mockReturnValue(true),
+      getCopyright: vi.fn().mockReturnValue('ESV'),
+    };
+  }),
 }));
 
 vi.mock('../../../../src/adapters/bible/NetBibleAdapter.js', () => ({
-  NetBibleAdapter: vi.fn().mockImplementation(() => ({
-    supportedTranslations: ['NET'],
-    getPassage: vi.fn(),
-    isConfigured: vi.fn().mockReturnValue(true),
-    getCopyright: vi.fn().mockReturnValue('NET'),
-  })),
+  NetBibleAdapter: vi.fn().mockImplementation(function () {
+    return {
+      supportedTranslations: ['NET'],
+      getPassage: vi.fn(),
+      isConfigured: vi.fn().mockReturnValue(true),
+      getCopyright: vi.fn().mockReturnValue('NET'),
+    };
+  }),
 }));
 
 vi.mock('../../../../src/adapters/bible/HelloAoAdapter.js', () => ({
-  HelloAoAdapter: vi.fn().mockImplementation(() => ({
-    supportedTranslations: ['KJV', 'WEB', 'BSB', 'ASV', 'YLT', 'DBY'],
-    getPassage: vi.fn(),
-    isConfigured: vi.fn().mockReturnValue(true),
-    getCopyright: vi.fn().mockReturnValue('Public Domain'),
-  })),
+  HelloAoAdapter: vi.fn().mockImplementation(function () {
+    return {
+      supportedTranslations: ['KJV', 'WEB', 'BSB', 'ASV', 'YLT', 'DBY'],
+      getPassage: vi.fn(),
+      isConfigured: vi.fn().mockReturnValue(true),
+      getCopyright: vi.fn().mockReturnValue('Public Domain'),
+    };
+  }),
 }));
 
 vi.mock('../../../../src/adapters/commentary/HelloAoCommentaryAdapter.js', () => ({
-  HelloAoCommentaryAdapter: vi.fn().mockImplementation(() => ({
-    getCommentary: vi.fn(),
-  })),
+  HelloAoCommentaryAdapter: vi.fn().mockImplementation(function () {
+    return {
+      getCommentary: vi.fn(),
+    };
+  }),
 }));
 
 vi.mock('../../../../src/adapters/commentary/CcelAdapter.js', () => ({
-  CcelAdapter: vi.fn().mockImplementation(() => ({
-    search: vi.fn(),
-  })),
+  CcelAdapter: vi.fn().mockImplementation(function () {
+    return {
+      search: vi.fn(),
+    };
+  }),
 }));
 
 // Mock the JSON import
 vi.mock('../../../../src/data/parallel-passages.json', () => ({
-  default: [],
+  default: { description: 'test fixture', version: '1', parallels: {} },
 }));
 
 import type { Env } from '../../../../src/worker-env.js';
@@ -97,6 +107,13 @@ describe('createWorkerCompositionRoot', () => {
         expect(tool.description).toBeDefined();
         expect(tool.inputSchema).toBeDefined();
         expect(tool.handler).toBeTypeOf('function');
+      }
+    });
+
+    it('every advertised tool schema rejects unknown arguments', () => {
+      const root = createWorkerCompositionRoot(makeEnv());
+      for (const tool of root.tools) {
+        expect(tool.inputSchema.additionalProperties, tool.name).toBe(false);
       }
     });
 

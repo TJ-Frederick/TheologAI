@@ -15,11 +15,11 @@ export function createBibleLookupHandler(bibleService: BibleService): ToolHandle
     inputSchema: {
       type: 'object',
       properties: {
-        reference: { type: 'string', description: 'Bible verse reference (e.g., "John 3:16", "Genesis 1:1-3")' },
+        reference: { type: 'string', minLength: 1, maxLength: 100, description: 'Bible verse reference (e.g., "John 3:16", "Genesis 1:1-3")' },
         translation: {
           oneOf: [
             { type: 'string', enum: ['ESV', 'NET', 'KJV', 'WEB', 'BSB', 'ASV', 'YLT', 'DBY'] },
-            { type: 'array', items: { type: 'string', enum: ['ESV', 'NET', 'KJV', 'WEB', 'BSB', 'ASV', 'YLT', 'DBY'] } },
+            { type: 'array', minItems: 1, maxItems: 8, uniqueItems: true, items: { type: 'string', enum: ['ESV', 'NET', 'KJV', 'WEB', 'BSB', 'ASV', 'YLT', 'DBY'] } },
           ],
           default: 'ESV',
           description: 'Translation(s). Single: "ESV". Compare: ["ESV","KJV","WEB"].',
@@ -27,6 +27,7 @@ export function createBibleLookupHandler(bibleService: BibleService): ToolHandle
         includeFootnotes: { type: 'boolean', default: false, description: 'Include footnotes and translation notes' },
       },
       required: ['reference'],
+      additionalProperties: false,
     },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
 

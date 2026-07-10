@@ -88,7 +88,7 @@ export function createCompositionRoot(): CompositionRoot {
   // Services
   const bibleService = new BibleService([esvAdapter, netAdapter, helloaoAdapter]);
   const crossRefService = new CrossReferenceService(crossRefRepo);
-  const parallelService = new ParallelPassageService(crossRefRepo, helloaoAdapter);
+  const parallelService = new ParallelPassageService(crossRefRepo, bibleService);
   const commentaryService = new CommentaryService([helloaoCommentary]);
   const ccelService = new CcelService(ccelAdapter);
   const historicalService = new HistoricalDocumentService(historicalRepo);

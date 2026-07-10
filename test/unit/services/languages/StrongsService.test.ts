@@ -90,7 +90,34 @@ describe('StrongsService', () => {
       const result = await service.lookup('G26', true);
       expect(result.extended).toBeDefined();
       expect(result.extended!.strongsExtended).toBe('G0026');
+      expect(result.extendedCitation).toMatchObject({
+        source: 'STEPBible lexicon data',
+        copyright: 'CC BY 4.0 (Tyndale House, Cambridge)',
+      });
       expect(repo.getLexiconEntry).toHaveBeenCalledWith('G26');
+    });
+
+    it('maps the real STEPBible lexicon shape', async () => {
+      const repo = makeMockRepo();
+      repo.getLexiconEntry.mockReturnValue({
+        strongs_number: 'G0026',
+        source: 'Abbott-Smith',
+        extended_data: {
+          extendedStrongs: 'G0026',
+          gloss: 'love',
+          definition: '<b>love, goodwill</b>',
+          morph: 'G:N-F',
+          source: 'Abbott-Smith',
+        },
+      });
+      const result = await new StrongsService(repo as any).lookup('G26', true);
+      expect(result.extended).toMatchObject({
+        strongsExtended: 'G0026',
+        gloss: 'love',
+        definition: '<b>love, goodwill</b>',
+        morphologyCode: 'G:N-F',
+        source: 'Abbott-Smith',
+      });
     });
 
     it('handles missing lexicon entry gracefully', async () => {
@@ -99,6 +126,7 @@ describe('StrongsService', () => {
       const service = new StrongsService(repo as any);
       const result = await service.lookup('G26', true);
       expect(result.extended).toBeUndefined();
+      expect(result.extendedCitation).toBeUndefined();
     });
 
     it('converts null optional fields to undefined', async () => {
@@ -119,6 +147,24 @@ describe('StrongsService', () => {
       const results = await service.search('agape', 10);
       expect(repo.search).toHaveBeenCalledWith('agape', 10);
       expect(results).toHaveLength(1);
+    });
+
+    it('trims the query and applies the bounded default', async () => {
+      const repo = makeMockRepo();
+      const service = new StrongsService(repo as any);
+      await service.search('  agape  ');
+      expect(repo.search).toHaveBeenCalledWith('agape', 10);
+    });
+
+    it.each([
+      ['', 10],
+      ['x', 10],
+      ['love', 0],
+      ['love', 21],
+      ['love', 1.5],
+    ])('rejects an invalid bounded search (%s, %s)', async (query, limit) => {
+      const service = new StrongsService(makeMockRepo() as any);
+      await expect(service.search(query, limit)).rejects.toThrow(ValidationError);
     });
   });
 

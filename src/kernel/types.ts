@@ -149,17 +149,26 @@ export interface ParallelPassageResult {
   analysis?: ParallelPassageAnalysis;
   citation: Citation;
   suggestedWorkflow?: string;
+  warnings?: string[];
 }
 
 // ── Biblical languages ──
 
-export interface StrongsLookupParams {
-  strongs_number: string;
-  detail_level?: 'simple' | 'detailed';
-  include_extended?: boolean;
-  include_morphology?: boolean;
-  include_occurrences?: boolean;
-}
+export type StrongsLookupParams =
+  | {
+    strongs_number: string;
+    query?: never;
+    limit?: never;
+    detail_level?: 'simple' | 'detailed';
+    include_extended?: boolean;
+  }
+  | {
+    query: string;
+    limit?: number;
+    strongs_number?: never;
+    detail_level?: never;
+    include_extended?: never;
+  };
 
 export interface StrongsResult {
   strongs_number: string;
@@ -179,8 +188,13 @@ export interface SenseInfo {
 }
 
 export interface EnhancedStrongsResult extends StrongsResult {
+  extendedCitation?: Citation;
   extended?: {
     strongsExtended?: string;
+    gloss?: string;
+    definition?: string;
+    morphologyCode?: string;
+    source?: string;
     occurrences?: number;
     senses?: Record<string, SenseInfo>;
     morphology?: Record<string, number>;

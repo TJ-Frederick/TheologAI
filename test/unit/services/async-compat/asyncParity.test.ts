@@ -13,6 +13,15 @@ import { CrossReferenceService } from '../../../../src/services/bible/CrossRefer
 import { StrongsService } from '../../../../src/services/languages/StrongsService.js';
 import { MorphologyService } from '../../../../src/services/languages/MorphologyService.js';
 import { HistoricalDocumentService } from '../../../../src/services/historical/HistoricalDocumentService.js';
+import type {
+  ICrossReferenceRepository,
+  IHistoricalDocumentRepository,
+  IMorphologyRepository,
+  IStrongsRepository,
+  DocumentInfo,
+  MorphWord,
+  StrongsEntry,
+} from '../../../../src/kernel/repositories.js';
 
 // ── Shared test data ──
 
@@ -23,7 +32,7 @@ const crossRefResult = {
   hasMore: false,
 };
 
-const strongsEntry = {
+const strongsEntry: StrongsEntry = {
   strongs_number: 'G0025',
   testament: 'NT',
   lemma: 'ἀγαπάω',
@@ -33,35 +42,35 @@ const strongsEntry = {
   derivation: null,
 };
 
-const morphWords = [
+const morphWords: MorphWord[] = [
   { position: 1, word_text: 'Ἐν', lemma: 'ἐν', strongs_number: 'G1722', morph_code: 'PREP', gloss: 'In' },
 ];
 
-const documents = [
+const documents: DocumentInfo[] = [
   { id: 'nicene-creed', title: 'Nicene Creed', type: 'creed', date: '325', topics: ['trinity'] },
 ];
 
 describe('Async/Sync Repository Parity', () => {
   describe('CrossReferenceService', () => {
     it('works with sync repo (mockReturnValue — better-sqlite3 pattern)', async () => {
-      const repo = {
+      const repo: ICrossReferenceRepository = {
         getCrossReferences: vi.fn().mockReturnValue(crossRefResult),
         hasReferences: vi.fn().mockReturnValue(true),
-        getChapterStatistics: vi.fn().mockReturnValue([]),
+        getChapterStatistics: vi.fn().mockReturnValue({ totalVerses: 0, totalCrossRefs: 0, verseStats: [] }),
       };
-      const service = new CrossReferenceService(repo as any);
+      const service = new CrossReferenceService(repo);
       const result = await service.getCrossReferences('John 3:16');
       expect(result.references).toHaveLength(1);
       expect(result.references[0].reference).toBe('Rom.5.8');
     });
 
     it('works with async repo (mockResolvedValue — D1 pattern)', async () => {
-      const repo = {
+      const repo: ICrossReferenceRepository = {
         getCrossReferences: vi.fn().mockResolvedValue(crossRefResult),
         hasReferences: vi.fn().mockResolvedValue(true),
-        getChapterStatistics: vi.fn().mockResolvedValue([]),
+        getChapterStatistics: vi.fn().mockResolvedValue({ totalVerses: 0, totalCrossRefs: 0, verseStats: [] }),
       };
-      const service = new CrossReferenceService(repo as any);
+      const service = new CrossReferenceService(repo);
       const result = await service.getCrossReferences('John 3:16');
       expect(result.references).toHaveLength(1);
       expect(result.references[0].reference).toBe('Rom.5.8');
@@ -70,25 +79,25 @@ describe('Async/Sync Repository Parity', () => {
 
   describe('StrongsService', () => {
     it('works with sync repo (mockReturnValue — better-sqlite3 pattern)', async () => {
-      const repo = {
+      const repo: IStrongsRepository = {
         lookup: vi.fn().mockReturnValue(strongsEntry),
         search: vi.fn().mockReturnValue([]),
         getLexiconEntry: vi.fn().mockReturnValue(undefined),
         getStats: vi.fn().mockReturnValue({ greek: 0, hebrew: 0, total: 0 }),
       };
-      const service = new StrongsService(repo as any);
+      const service = new StrongsService(repo);
       const result = await service.lookup('G25');
       expect(result.strongs_number).toBe('G0025');
     });
 
     it('works with async repo (mockResolvedValue — D1 pattern)', async () => {
-      const repo = {
+      const repo: IStrongsRepository = {
         lookup: vi.fn().mockResolvedValue(strongsEntry),
         search: vi.fn().mockResolvedValue([]),
         getLexiconEntry: vi.fn().mockResolvedValue(undefined),
         getStats: vi.fn().mockResolvedValue({ greek: 0, hebrew: 0, total: 0 }),
       };
-      const service = new StrongsService(repo as any);
+      const service = new StrongsService(repo);
       const result = await service.lookup('G25');
       expect(result.strongs_number).toBe('G0025');
     });
@@ -96,7 +105,7 @@ describe('Async/Sync Repository Parity', () => {
 
   describe('MorphologyService', () => {
     it('works with sync repo (mockReturnValue — better-sqlite3 pattern)', async () => {
-      const repo = {
+      const repo: IMorphologyRepository = {
         getVerseMorphology: vi.fn().mockReturnValue(morphWords),
         expandMorphCode: vi.fn().mockReturnValue('Preposition'),
         getAvailableBooks: vi.fn().mockReturnValue(['John']),
@@ -104,14 +113,14 @@ describe('Async/Sync Repository Parity', () => {
         getOccurrences: vi.fn().mockReturnValue([]),
         getDistribution: vi.fn().mockReturnValue([]),
       };
-      const service = new MorphologyService(repo as any);
+      const service = new MorphologyService(repo);
       const result = await service.getVerseMorphology('John 1:1');
       expect(result.words).toHaveLength(1);
       expect(result.words[0].text).toBe('Ἐν');
     });
 
     it('works with async repo (mockResolvedValue — D1 pattern)', async () => {
-      const repo = {
+      const repo: IMorphologyRepository = {
         getVerseMorphology: vi.fn().mockResolvedValue(morphWords),
         expandMorphCode: vi.fn().mockResolvedValue('Preposition'),
         getAvailableBooks: vi.fn().mockResolvedValue(['John']),
@@ -119,7 +128,7 @@ describe('Async/Sync Repository Parity', () => {
         getOccurrences: vi.fn().mockResolvedValue([]),
         getDistribution: vi.fn().mockResolvedValue([]),
       };
-      const service = new MorphologyService(repo as any);
+      const service = new MorphologyService(repo);
       const result = await service.getVerseMorphology('John 1:1');
       expect(result.words).toHaveLength(1);
       expect(result.words[0].text).toBe('Ἐν');
@@ -128,7 +137,7 @@ describe('Async/Sync Repository Parity', () => {
 
   describe('HistoricalDocumentService', () => {
     it('works with sync repo (mockReturnValue — better-sqlite3 pattern)', async () => {
-      const repo = {
+      const repo: IHistoricalDocumentRepository = {
         listDocuments: vi.fn().mockReturnValue(documents),
         getDocument: vi.fn().mockReturnValue(documents[0]),
         getSections: vi.fn().mockReturnValue([]),
@@ -136,14 +145,14 @@ describe('Async/Sync Repository Parity', () => {
         search: vi.fn().mockReturnValue([]),
         findDocumentByName: vi.fn().mockReturnValue(documents[0]),
       };
-      const service = new HistoricalDocumentService(repo as any);
+      const service = new HistoricalDocumentService(repo);
       const result = await service.listDocuments();
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe('nicene-creed');
     });
 
     it('works with async repo (mockResolvedValue — D1 pattern)', async () => {
-      const repo = {
+      const repo: IHistoricalDocumentRepository = {
         listDocuments: vi.fn().mockResolvedValue(documents),
         getDocument: vi.fn().mockResolvedValue(documents[0]),
         getSections: vi.fn().mockResolvedValue([]),
@@ -151,7 +160,7 @@ describe('Async/Sync Repository Parity', () => {
         search: vi.fn().mockResolvedValue([]),
         findDocumentByName: vi.fn().mockResolvedValue(documents[0]),
       };
-      const service = new HistoricalDocumentService(repo as any);
+      const service = new HistoricalDocumentService(repo);
       const result = await service.listDocuments();
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe('nicene-creed');

@@ -153,6 +153,7 @@ describe('formatCrossReferences', () => {
     const result: CrossReferenceResult = { references: [], total: 0, showing: 0, hasMore: false };
     const out = formatCrossReferences('John 3:16', result);
     expect(out).toContain('No cross-references found for this verse.');
+    expect(out).toContain('OpenBible.info cross references — CC BY');
   });
 
   it('lists references with votes', () => {
@@ -168,6 +169,7 @@ describe('formatCrossReferences', () => {
     const out = formatCrossReferences('John 3:16', result);
     expect(out).toContain('- **Romans 5:8** (42 votes)');
     expect(out).toContain('- **1 John 4:9** (30 votes)');
+    expect(out).toContain('OpenBible.info cross references — CC BY');
   });
 
   it('shows pagination when hasMore is true', () => {
@@ -242,7 +244,7 @@ describe('formatParallelPassages', () => {
         { reference: 'Luke 4:1-13', relationship: 'synoptic', confidence: 0.9, text: longText },
       ],
     }));
-    expect(out).toContain('x'.repeat(200) + '...');
+    expect(out).toContain('Text excerpt: ' + 'x'.repeat(200) + '…');
   });
 
   it('does not truncate text under 200 chars', () => {
@@ -253,7 +255,8 @@ describe('formatParallelPassages', () => {
       ],
     }));
     expect(out).toContain(shortText);
-    expect(out).not.toContain(shortText + '...');
+    expect(out).toContain('Text excerpt: ' + shortText);
+    expect(out).not.toContain(shortText + '…');
   });
 
   it('shows notes in italics', () => {
@@ -272,6 +275,17 @@ describe('formatParallelPassages', () => {
       ],
     }));
     expect(out).toContain('*TheologAI Parallel Passages Database*');
+  });
+
+  it('appends parallel-passage copyright attribution', () => {
+    const out = formatParallelPassages(makeResult({
+      parallels: [{ reference: 'Luke 4:1-13', relationship: 'synoptic', confidence: 0.9 }],
+      citation: {
+        source: 'TheologAI Parallel Passages + OpenBible.info',
+        copyright: 'Cross-references from OpenBible.info (CC-BY)',
+      },
+    }));
+    expect(out).toContain('Cross-references from OpenBible.info (CC-BY)');
   });
 
   it('returns trimmed output', () => {

@@ -46,6 +46,7 @@ export function formatCrossReferences(reference: string, result: CrossReferenceR
   let s = `**Cross-References for ${reference}**\n\n`;
   if (result.references.length === 0) {
     s += 'No cross-references found for this verse.\n';
+    s += '\n*Source: OpenBible.info cross references — CC BY*\n';
     return s.trim();
   }
 
@@ -56,6 +57,7 @@ export function formatCrossReferences(reference: string, result: CrossReferenceR
   if (result.hasMore) {
     s += `\n*Showing ${result.showing} of ${result.total} cross-references*\n`;
   }
+  s += '\n*Source: OpenBible.info cross references — CC BY*\n';
   return s.trim();
 }
 
@@ -65,16 +67,27 @@ export function formatParallelPassages(result: ParallelPassageResult): string {
 
   if (result.parallels.length === 0) {
     s += 'No parallel passages found.\n';
+    if (result.warnings?.length) {
+      s += `\n${result.warnings.map(warning => `*Warning: ${warning}*`).join('\n')}\n`;
+    }
     return s.trim();
   }
 
   for (const p of result.parallels) {
     const conf = Math.round(p.confidence * 100);
     s += `- **${p.reference}** [${p.relationship}] (${conf}% confidence)\n`;
-    if (p.text) s += `  > ${p.text.substring(0, 200)}${p.text.length > 200 ? '...' : ''}\n`;
+    if (p.text) {
+      const excerpt = `${p.text.substring(0, 200)}${p.text.length > 200 ? '…' : ''}`;
+      s += `  > Text excerpt${p.translation ? ` (${p.translation})` : ''}: ${excerpt}\n`;
+    }
     if (p.notes) s += `  *${p.notes}*\n`;
   }
 
+  if (result.warnings?.length) {
+    s += `\n${result.warnings.map(warning => `*Warning: ${warning}*`).join('\n')}\n`;
+  }
+
   s += `\n*${result.citation.source}*`;
+  if (result.citation.copyright) s += ` - ${result.citation.copyright}`;
   return s.trim();
 }

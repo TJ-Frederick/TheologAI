@@ -35,7 +35,13 @@ export class D1StrongsRepository implements IStrongsRepository {
     const escaped = query.replace(/['"*]/g, '');
     const ftsQuery = `"${escaped}"*`;
     const { results } = await this.db.prepare(
-      'SELECT strongs_number, lemma, transliteration, definition FROM strongs_fts WHERE strongs_fts MATCH ? ORDER BY rank LIMIT ?'
+      `SELECT s.strongs_number, s.testament, s.lemma, s.transliteration,
+              s.pronunciation, s.definition, s.derivation
+       FROM strongs_fts
+       JOIN strongs s ON s.strongs_number = strongs_fts.strongs_number
+       WHERE strongs_fts MATCH ?
+       ORDER BY rank, s.strongs_number
+       LIMIT ?`
     ).bind(ftsQuery, limit).all<StrongsEntry>();
     return results;
   }

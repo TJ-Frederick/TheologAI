@@ -1,30 +1,100 @@
-/**
- * Cloudflare Workers entry point for TheologAI MCP server.
- *
- * Serves the MCP protocol over Streamable HTTP via the Cloudflare
- * Agents SDK. Auth is handled at the Cloudflare edge (rate limiting).
- */
+/** Cloudflare Workers entry point for the anonymous Streamable HTTP MCP server. */
 
-import { createMcpHandler } from 'agents/mcp';
 import type { Env } from './worker-env.js';
 import { createWorkerCompositionRoot } from './tools/worker/index.js';
 import { createWorkerMcpServer } from './worker-server.js';
-
-// ── Worker entry point ──
+import {
+  createInternalMcpErrorResponse,
+  handleWorkerMcpRequest,
+} from './http/worker/mcpHandler.js';
+import { readBoundedWorkerRequest } from './http/worker/requestBody.js';
+import {
+  applyCors,
+  getDeclaredBodyLimitResponse,
+  getEarlyResponse,
+  getMaxRequestBytes,
+  responseWithCors,
+} from './http/worker/requestPolicy.js';
+import { getRateLimitResponse } from './http/worker/rateLimit.js';
+import {
+  getWorkerRequestMetadata,
+  logWorkerRuntimeError,
+  logWorkerRequestEvent,
+  safeErrorName,
+} from './http/worker/telemetry.js';
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    const root = createWorkerCompositionRoot(env);
-    const mcpServer = createWorkerMcpServer(root, env.THEOLOGAI_VERSION || '0.0.0');
+    void ctx;
+    const startedAt = Date.now();
+    const metadata = getWorkerRequestMetadata(request);
+    const origin = request.headers.get('Origin');
+    logWorkerRequestEvent(env, metadata, { event: 'theologai.worker.request.start' });
 
-    return createMcpHandler(mcpServer, {
-      corsOptions: {
-        origin: '*',
-        methods: 'GET, POST, DELETE, OPTIONS',
-        headers: 'Content-Type, Authorization, Mcp-Session-Id, Mcp-Protocol-Version',
-        exposeHeaders: 'Mcp-Session-Id',
-        maxAge: 86400,
-      },
-    })(request, env, ctx);
+    const complete = (
+      response: Response,
+      guarded: boolean,
+      guardReason?: string,
+    ): Response => {
+      logWorkerRequestEvent(env, metadata, {
+        event: 'theologai.worker.request.complete',
+        status: response.status,
+        guarded,
+        guardReason,
+        durationMs: Date.now() - startedAt,
+      });
+      return response;
+    };
+
+    try {
+      const earlyResponse = getEarlyResponse(env, request, metadata);
+      if (earlyResponse) {
+        return complete(earlyResponse.response, true, earlyResponse.reason);
+      }
+
+      const rateLimitResponse = await getRateLimitResponse(env, request, metadata, origin);
+      if (rateLimitResponse) {
+        return complete(rateLimitResponse.response, true, rateLimitResponse.reason);
+      }
+
+      const declaredBodyLimitResponse = getDeclaredBodyLimitResponse(env, request, origin);
+      if (declaredBodyLimitResponse) {
+        return complete(
+          declaredBodyLimitResponse.response,
+          true,
+          declaredBodyLimitResponse.reason,
+        );
+      }
+
+      if (metadata.path === '/') {
+        logWorkerRequestEvent(env, metadata, {
+          event: 'theologai.worker.route.deprecated',
+          canonicalPath: '/mcp',
+        });
+      }
+
+      const boundedRequest = await readBoundedWorkerRequest(request, getMaxRequestBytes(env));
+      if (!boundedRequest) {
+        return complete(responseWithCors(origin, 'Payload too large', {
+          status: 413,
+          headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+        }), true, 'payload_too_large');
+      }
+
+      const root = createWorkerCompositionRoot(env);
+      const mcpServer = createWorkerMcpServer(root, env.THEOLOGAI_VERSION || '0.0.0');
+      const result = await handleWorkerMcpRequest(mcpServer, boundedRequest);
+      const response = applyCors(result.response, origin);
+
+      if (result.errorName) {
+        logWorkerRuntimeError(metadata, result.errorName, Date.now() - startedAt);
+        return response;
+      }
+
+      return complete(response, false);
+    } catch (error) {
+      logWorkerRuntimeError(metadata, safeErrorName(error), Date.now() - startedAt);
+      return applyCors(createInternalMcpErrorResponse(), origin);
+    }
   },
 } satisfies ExportedHandler<Env>;

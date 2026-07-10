@@ -159,6 +159,7 @@ describe('D1HistoricalDocumentRepository', () => {
     });
 
     it('returns empty array on FTS error', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
       const db = {
         prepare: vi.fn().mockImplementation(() => ({
           bind: vi.fn().mockReturnValue({
@@ -171,6 +172,8 @@ describe('D1HistoricalDocumentRepository', () => {
       const repo = new D1HistoricalDocumentRepository(db as any);
       const result = await repo.search('invalid query!!!');
       expect(result).toEqual([]);
+      expect(warn).not.toHaveBeenCalled();
+      warn.mockRestore();
     });
 
     it('passes limit to .bind()', async () => {

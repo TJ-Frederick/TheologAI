@@ -1,135 +1,97 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { DonationService } from '../../../../src/services/donation/DonationService.js';
 import { PaymentError } from '../../../../src/kernel/errors.js';
-import { RECIPIENT_ADDRESS, SUPPORTED_TOKENS } from '../../../../src/kernel/donation-types.js';
+import { RECIPIENT_ADDRESS, type ChainTransactionEvidence, type ITransactionEvidenceProvider } from '../../../../src/kernel/donation-types.js';
 
-// ── Mock factory ──
+const HASH = `0x${'ab'.repeat(32)}`;
+const USDC = '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913';
+const OTHER = `0x${'99'.repeat(20)}`;
+const FROM = `0x${'11'.repeat(20)}`;
 
-function makeMockVerifier(overrides: Partial<Record<string, unknown>> = {}) {
+function evidence(overrides: Partial<ChainTransactionEvidence> = {}): ChainTransactionEvidence {
   return {
-    verify: vi.fn().mockResolvedValue({
-      txHash: '0x' + 'ab'.repeat(32),
-      chainId: 8453,
-      from: '0x' + '11'.repeat(20),
-      to: RECIPIENT_ADDRESS,
-      amount: '1500000',
-      symbol: 'USDC',
-      tokenAddress: '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913',
-      blockNumber: 12345,
-      confirmed: true,
-      ...overrides,
-    }),
-    dispose: vi.fn(),
+    txHash: HASH,
+    chainId: 8453,
+    chainName: 'Base',
+    state: 'mined',
+    minedSuccessfully: true,
+    blockNumber: 100,
+    transfers: [{ from: FROM, to: RECIPIENT_ADDRESS, amount: '1500000', tokenAddress: USDC }],
+    ...overrides,
   };
 }
+function service(items: ChainTransactionEvidence[]) {
+  const provider: ITransactionEvidenceProvider = { getEvidence: vi.fn().mockResolvedValue(items) };
+  return { donation: new DonationService(provider), provider };
+}
 
-describe('DonationService', () => {
-  let service: DonationService;
-  let mockVerifier: ReturnType<typeof makeMockVerifier>;
-
-  beforeEach(() => {
-    mockVerifier = makeMockVerifier();
-    service = new DonationService(mockVerifier as any);
+describe('DonationService classification', () => {
+  it('verifies every supported transfer sent to the recipient', async () => {
+    const { donation } = service([evidence({
+      transfers: [
+        { from: FROM, to: OTHER, amount: '999', tokenAddress: OTHER },
+        { from: FROM, to: RECIPIENT_ADDRESS, amount: '1500000', tokenAddress: USDC },
+        { from: FROM, to: RECIPIENT_ADDRESS.toLowerCase(), amount: '500000', tokenAddress: USDC },
+      ],
+    })]);
+    const result = await donation.verifyDonation(HASH);
+    expect(result.status).toBe('verified');
+    expect(result.transfers.map(item => item.amount)).toEqual(['1.5', '0.5']);
+    expect(result.transfers.every(item => item.symbol === 'USDC')).toBe(true);
   });
 
-  describe('getConfig', () => {
-    it('returns correct recipient address', () => {
-      const config = service.getConfig();
-      expect(config.recipientAddress).toBe(RECIPIENT_ADDRESS);
-    });
-
-    it('returns all 5 supported tokens', () => {
-      const config = service.getConfig();
-      expect(config.tokens).toHaveLength(5);
-    });
+  it('does not false-confirm a supported transfer sent elsewhere', async () => {
+    const { donation } = service([evidence({ transfers: [{ from: FROM, to: OTHER, amount: '1', tokenAddress: USDC }] })]);
+    const result = await donation.verifyDonation(HASH);
+    expect(result.status).toBe('wrong_recipient');
+    expect(result.minedSuccessfully).toBe(true);
   });
 
-  describe('verifyDonation', () => {
-    it('formats USDC amount correctly (6 decimals)', async () => {
-      const result = await service.verifyDonation('0x' + 'ab'.repeat(32));
-      expect(result.amount).toBe('1.5');
-      expect(result.symbol).toBe('USDC');
-    });
+  it('does not false-confirm an unsupported token sent to the recipient', async () => {
+    const { donation } = service([evidence({ transfers: [{ from: FROM, to: RECIPIENT_ADDRESS, amount: '7', tokenAddress: OTHER }] })]);
+    const result = await donation.verifyDonation(HASH);
+    expect(result.status).toBe('unsupported');
+    expect(result.transfers[0].symbol).toBe('Unsupported asset');
+  });
 
-    it('formats ETH amount correctly (18 decimals)', async () => {
-      mockVerifier = makeMockVerifier({
-        chainId: 1,
-        amount: '1000000000000000000',
-        symbol: 'ETH',
-        tokenAddress: null,
-      });
-      service = new DonationService(mockVerifier as any);
+  it('does not confirm zero or malformed transfer amounts from an evidence provider', async () => {
+    const { donation } = service([evidence({
+      transfers: [
+        { from: FROM, to: RECIPIENT_ADDRESS, amount: '0', tokenAddress: USDC },
+        { from: FROM, to: RECIPIENT_ADDRESS, amount: 'not-an-integer', tokenAddress: USDC },
+      ],
+    })]);
+    expect(await donation.verifyDonation(HASH)).toMatchObject({ status: 'unsupported', transfers: [] });
+  });
 
-      const result = await service.verifyDonation('0x' + 'ab'.repeat(32));
-      expect(result.amount).toBe('1');
-      expect(result.symbol).toBe('ETH');
-    });
+  it('recognizes supported native transfers', async () => {
+    const { donation } = service([evidence({ transfers: [{ from: FROM, to: RECIPIENT_ADDRESS, amount: '1000000000000000000', tokenAddress: null }] })]);
+    const result = await donation.verifyDonation(HASH);
+    expect(result).toMatchObject({ status: 'verified', transfers: [{ amount: '1', symbol: 'ETH' }] });
+  });
 
-    it('formats small USDC amounts', async () => {
-      mockVerifier = makeMockVerifier({ amount: '100000' });
-      service = new DonationService(mockVerifier as any);
+  it.each([
+    ['unavailable', evidence({ state: 'unavailable', minedSuccessfully: undefined, transfers: [] })],
+    ['absent', evidence({ state: 'absent', minedSuccessfully: undefined, transfers: [] })],
+    ['pending', evidence({ state: 'pending', minedSuccessfully: undefined, transfers: [] })],
+    ['failed', evidence({ state: 'mined', minedSuccessfully: false, transfers: [] })],
+    ['unsupported', evidence({ state: 'mined', minedSuccessfully: true, transfers: [] })],
+  ] as const)('returns %s without claiming a donation', async (status, item) => {
+    const { donation } = service([item]);
+    expect(await donation.verifyDonation(HASH)).toMatchObject({ status, transfers: [] });
+  });
 
-      const result = await service.verifyDonation('0x' + 'ab'.repeat(32));
-      expect(result.amount).toBe('0.1');
-    });
+  it('prefers unavailable over absent when one supported chain could not be checked', async () => {
+    const { donation } = service([
+      evidence({ state: 'absent', minedSuccessfully: undefined, transfers: [] }),
+      evidence({ chainId: 1, chainName: 'Ethereum', state: 'unavailable', minedSuccessfully: undefined, transfers: [] }),
+    ]);
+    expect((await donation.verifyDonation(HASH)).status).toBe('unavailable');
+  });
 
-    it('formats whole number amounts without trailing decimal', async () => {
-      mockVerifier = makeMockVerifier({ amount: '5000000' });
-      service = new DonationService(mockVerifier as any);
-
-      const result = await service.verifyDonation('0x' + 'ab'.repeat(32));
-      expect(result.amount).toBe('5');
-    });
-
-    it('sets isToRecipient true when to matches', async () => {
-      const result = await service.verifyDonation('0x' + 'ab'.repeat(32));
-      expect(result.isToRecipient).toBe(true);
-    });
-
-    it('sets isToRecipient false when to does not match', async () => {
-      mockVerifier = makeMockVerifier({ to: '0x' + '99'.repeat(20) });
-      service = new DonationService(mockVerifier as any);
-
-      const result = await service.verifyDonation('0x' + 'ab'.repeat(32));
-      expect(result.isToRecipient).toBe(false);
-    });
-
-    it('is case-insensitive for recipient check', async () => {
-      mockVerifier = makeMockVerifier({ to: RECIPIENT_ADDRESS.toLowerCase() });
-      service = new DonationService(mockVerifier as any);
-
-      const result = await service.verifyDonation('0x' + 'ab'.repeat(32));
-      expect(result.isToRecipient).toBe(true);
-    });
-
-    it('builds explorer URL for Base', async () => {
-      const result = await service.verifyDonation('0x' + 'ab'.repeat(32));
-      expect(result.explorerUrl).toContain('basescan.org');
-    });
-
-    it('builds explorer URL for Ethereum', async () => {
-      mockVerifier = makeMockVerifier({ chainId: 1, symbol: 'ETH', amount: '1000000000000000000', tokenAddress: null });
-      service = new DonationService(mockVerifier as any);
-
-      const result = await service.verifyDonation('0x' + 'ab'.repeat(32));
-      expect(result.explorerUrl).toContain('etherscan.io');
-    });
-
-    it('returns chainName from token config', async () => {
-      const result = await service.verifyDonation('0x' + 'ab'.repeat(32));
-      expect(result.chainName).toBe('Base');
-    });
-
-    it('throws PaymentError for invalid hash format', async () => {
-      await expect(service.verifyDonation('not-a-hash')).rejects.toThrow(PaymentError);
-      await expect(service.verifyDonation('')).rejects.toThrow(PaymentError);
-      await expect(service.verifyDonation('0xshort')).rejects.toThrow(PaymentError);
-    });
-
-    it('calls verifier.verify with the tx hash', async () => {
-      const hash = '0x' + 'ab'.repeat(32);
-      await service.verifyDonation(hash);
-      expect(mockVerifier.verify).toHaveBeenCalledWith(hash);
-    });
+  it('rejects malformed hashes before querying providers', async () => {
+    const { donation, provider } = service([]);
+    await expect(donation.verifyDonation('bad')).rejects.toThrow(PaymentError);
+    expect(provider.getEvidence).not.toHaveBeenCalled();
   });
 });

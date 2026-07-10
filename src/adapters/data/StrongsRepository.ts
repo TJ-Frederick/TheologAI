@@ -7,24 +7,11 @@
 
 import type Database from 'better-sqlite3';
 import { getDatabase } from '../shared/Database.js';
+import type { IStrongsRepository, StrongsEntry, LexiconEntry } from '../../kernel/repositories.js';
 
-export interface StrongsEntry {
-  strongs_number: string;
-  testament: 'OT' | 'NT';
-  lemma: string;
-  transliteration: string | null;
-  pronunciation: string | null;
-  definition: string;
-  derivation: string | null;
-}
+export type { StrongsEntry, LexiconEntry } from '../../kernel/repositories.js';
 
-export interface LexiconEntry {
-  strongs_number: string;
-  source: string;
-  extended_data: Record<string, unknown>;
-}
-
-export class StrongsRepository {
+export class StrongsRepository implements IStrongsRepository {
   private db: Database.Database;
   private stmtLookup: Database.Statement;
   private stmtFtsSearch: Database.Statement;
@@ -36,7 +23,13 @@ export class StrongsRepository {
       'SELECT * FROM strongs WHERE strongs_number = ?'
     );
     this.stmtFtsSearch = this.db.prepare(
-      "SELECT strongs_number, lemma, transliteration, definition FROM strongs_fts WHERE strongs_fts MATCH ? ORDER BY rank LIMIT ?"
+      `SELECT s.strongs_number, s.testament, s.lemma, s.transliteration,
+              s.pronunciation, s.definition, s.derivation
+       FROM strongs_fts
+       JOIN strongs s ON s.strongs_number = strongs_fts.strongs_number
+       WHERE strongs_fts MATCH ?
+       ORDER BY rank, s.strongs_number
+       LIMIT ?`
     );
     this.stmtLexicon = this.db.prepare(
       'SELECT * FROM stepbible_lexicons WHERE strongs_number = ?'

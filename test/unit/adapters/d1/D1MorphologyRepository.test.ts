@@ -60,8 +60,8 @@ describe('D1MorphologyRepository', () => {
   });
 
   describe('getAvailableBooks', () => {
-    it('unwraps { results } and maps to string[]', async () => {
-      const db = createSimpleD1([{ book: 'Genesis' }, { book: 'John' }]);
+    it('unwraps { results } and maps to canonical book order', async () => {
+      const db = createSimpleD1([{ book: 'John' }, { book: 'Genesis' }]);
       const repo = new D1MorphologyRepository(db as any);
       const result = await repo.getAvailableBooks();
       expect(result).toEqual(['Genesis', 'John']);
@@ -100,12 +100,17 @@ describe('D1MorphologyRepository', () => {
   });
 
   describe('getDistribution', () => {
-    it('unwraps { results } from .all()', async () => {
-      const dist = { book: 'John', verse_count: 15 };
-      const db = createSimpleD1([dist]);
+    it('unwraps { results } from .all() in canonical book order', async () => {
+      const db = createSimpleD1([
+        { book: 'Romans', verse_count: 3 },
+        { book: 'John', verse_count: 15 },
+      ]);
       const repo = new D1MorphologyRepository(db as any);
       const result = await repo.getDistribution('G25');
-      expect(result).toEqual([dist]);
+      expect(result).toEqual([
+        { book: 'John', verse_count: 15 },
+        { book: 'Romans', verse_count: 3 },
+      ]);
     });
 
     it('passes strongsNumber to .bind()', async () => {

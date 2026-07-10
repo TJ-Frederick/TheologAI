@@ -19,11 +19,14 @@ export function createVerifyDonationHandler(donationService: DonationService): T
       properties: {
         tx_hash: {
           type: 'string',
+          minLength: 66,
+          maxLength: 66,
           description: 'Transaction hash (0x-prefixed, 64 hex characters)',
           pattern: '^0x[0-9a-fA-F]{64}$',
         },
       },
       required: ['tx_hash'],
+      additionalProperties: false,
     },
     annotations: {
       readOnlyHint: true,

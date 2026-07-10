@@ -7,12 +7,11 @@
  */
 
 import { CcelAdapter } from '../../adapters/commentary/CcelAdapter.js';
-import { Cache } from '../../kernel/cache.js';
+import { ValidationError } from '../../kernel/errors.js';
 
 export interface ClassicTextRequest {
   work: string;
   section?: string;
-  query?: string;
 }
 
 export interface ClassicTextResponse {
@@ -26,19 +25,16 @@ export interface ClassicTextResponse {
 
 export class CcelService {
   private adapter: CcelAdapter;
-  private cache: Cache<ClassicTextResponse>;
 
   constructor(adapter: CcelAdapter) {
     this.adapter = adapter;
-    this.cache = new Cache(200, 2 * 60 * 60 * 1000);
   }
 
   /** Look up a classic work section */
   async getWorkSection(request: ClassicTextRequest): Promise<ClassicTextResponse> {
-    const cacheKey = `${request.work}:${request.section || ''}:${request.query || ''}`;
-    const cached = this.cache.get(cacheKey);
-    if (cached) return cached;
-
+    if (!CCEL_IDENTIFIER.test(request.work) || (request.section && !CCEL_IDENTIFIER.test(request.section))) {
+      throw new ValidationError('work', 'CCEL work and section identifiers may contain only letters, numbers, dots, underscores, hyphens, and slashes.');
+    }
     const section = request.section || request.work.split('/').pop() || '';
     const result = await this.adapter.getWorkSection(request.work, section);
 
@@ -51,7 +47,6 @@ export class CcelService {
       url: `https://ccel.org/ccel/${result.work}/${result.section}.html`,
     };
 
-    this.cache.set(cacheKey, response);
     return response;
   }
 
@@ -67,3 +62,5 @@ export class CcelService {
     return s.replace(/\b\w/g, c => c.toUpperCase());
   }
 }
+
+const CCEL_IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._-]*(?:\/[A-Za-z0-9][A-Za-z0-9._-]*)*$/;

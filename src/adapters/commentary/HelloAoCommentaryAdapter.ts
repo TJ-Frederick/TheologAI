@@ -1,7 +1,7 @@
 /**
  * HelloAO commentary adapter.
  *
- * Provides 6 public domain commentaries via bible.helloao.org:
+ * Provides 6 commentaries via bible.helloao.org. Licensing varies by work.
  * Matthew Henry, JFB, Adam Clarke, John Gill, Keil-Delitzsch, Tyndale.
  */
 
@@ -9,6 +9,7 @@ import type { CommentaryAdapter } from './CommentaryAdapter.js';
 import type { CommentaryResult } from '../../kernel/types.js';
 import type { BibleReference } from '../../kernel/reference.js';
 import { formatReference, toHelloAO } from '../../kernel/reference.js';
+import { findBook } from '../../kernel/books.js';
 import { HttpClient } from '../shared/HttpClient.js';
 import { AdapterError } from '../../kernel/errors.js';
 
@@ -16,18 +17,22 @@ interface CommentatorMeta {
   id: string;
   displayName: string;
   otOnly?: boolean;
+  copyright: string;
 }
 
+const PUBLIC_DOMAIN = 'Public Domain';
+const TYNDALE_LICENSE = 'CC BY-SA 4.0 — Tyndale House, Cambridge (https://creativecommons.org/licenses/by-sa/4.0/)';
+
 const COMMENTATORS: Record<string, CommentatorMeta> = {
-  'matthew henry': { id: 'matthew-henry', displayName: 'Matthew Henry' },
-  'jfb': { id: 'jamieson-fausset-brown', displayName: 'Jamieson-Fausset-Brown' },
-  'jamieson-fausset-brown': { id: 'jamieson-fausset-brown', displayName: 'Jamieson-Fausset-Brown' },
-  'adam clarke': { id: 'adam-clarke', displayName: 'Adam Clarke' },
-  'clarke': { id: 'adam-clarke', displayName: 'Adam Clarke' },
-  'john gill': { id: 'john-gill', displayName: 'John Gill' },
-  'gill': { id: 'john-gill', displayName: 'John Gill' },
-  'keil-delitzsch': { id: 'keil-delitzsch', displayName: 'Keil-Delitzsch', otOnly: true },
-  'tyndale': { id: 'tyndale', displayName: 'Tyndale Open Study Notes' },
+  'matthew henry': { id: 'matthew-henry', displayName: 'Matthew Henry', copyright: PUBLIC_DOMAIN },
+  'jfb': { id: 'jamieson-fausset-brown', displayName: 'Jamieson-Fausset-Brown', copyright: PUBLIC_DOMAIN },
+  'jamieson-fausset-brown': { id: 'jamieson-fausset-brown', displayName: 'Jamieson-Fausset-Brown', copyright: PUBLIC_DOMAIN },
+  'adam clarke': { id: 'adam-clarke', displayName: 'Adam Clarke', copyright: PUBLIC_DOMAIN },
+  'clarke': { id: 'adam-clarke', displayName: 'Adam Clarke', copyright: PUBLIC_DOMAIN },
+  'john gill': { id: 'john-gill', displayName: 'John Gill', copyright: PUBLIC_DOMAIN },
+  'gill': { id: 'john-gill', displayName: 'John Gill', copyright: PUBLIC_DOMAIN },
+  'keil-delitzsch': { id: 'keil-delitzsch', displayName: 'Keil-Delitzsch', otOnly: true, copyright: PUBLIC_DOMAIN },
+  'tyndale': { id: 'tyndale', displayName: 'Tyndale Open Study Notes', copyright: TYNDALE_LICENSE },
 };
 
 export class HelloAoCommentaryAdapter implements CommentaryAdapter {
@@ -71,15 +76,18 @@ export class HelloAoCommentaryAdapter implements CommentaryAdapter {
       text,
       citation: {
         source: `${meta.displayName} Commentary`,
-        copyright: 'Public Domain',
+        copyright: meta.copyright,
         url: 'https://bible.helloao.org',
       },
     };
   }
 
-  supportsBook(commentator: string, _bookName: string): boolean {
+  supportsBook(commentator: string, bookName: string): boolean {
     const meta = this.resolveCommentator(commentator);
-    return !!meta;
+    if (!meta) return false;
+    if (!meta.otOnly) return true;
+
+    return findBook(bookName)?.testament === 'OT';
   }
 
   private resolveCommentator(name: string): CommentatorMeta | undefined {

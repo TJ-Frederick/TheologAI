@@ -1,0 +1,27 @@
+name = "theologai-worker-runtime-test"
+main = "../../src/worker.ts"
+compatibility_date = "2026-07-09"
+compatibility_flags = ["nodejs_compat"]
+
+[alias]
+ai = "../../src/shims/ai-stub.ts"
+
+[vars]
+THEOLOGAI_VERSION = "3.6.0-test"
+THEOLOGAI_REQUEST_LOGS = "false"
+THEOLOGAI_ALLOWED_ORIGINS = "https://allowed.example"
+THEOLOGAI_MAX_REQUEST_BYTES = "1024"
+
+[[d1_databases]]
+binding = "THEOLOGAI_DB"
+database_name = "theologai-worker-runtime-test"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "../../migrations"
+
+[[ratelimits]]
+name = "THEOLOGAI_RATE_LIMITER"
+namespace_id = "361299"
+
+[ratelimits.simple]
+limit = 120
+period = 60

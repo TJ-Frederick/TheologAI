@@ -117,9 +117,10 @@ export function createWorkerCompositionRoot(env: Env): WorkerCompositionRoot {
 
   // D1-dependent services (per-request)
   const crossRefService = new CrossReferenceService(crossRefRepo);
+  const bibleService = getBibleService(env);
   const parallelService = new ParallelPassageService(
     crossRefRepo,
-    helloaoAdapter,
+    bibleService,
     undefined, // no databasePath in Workers
     parallelPassagesData as any, // preloaded from JSON module
   );
@@ -128,7 +129,6 @@ export function createWorkerCompositionRoot(env: Env): WorkerCompositionRoot {
   const morphService = new MorphologyService(morphRepo);
 
   // Module-scope services (cached across requests)
-  const bibleService = getBibleService(env);
   const donationService = getDonationService(env);
 
   // Tool handlers (per-request — hold D1-dependent services)

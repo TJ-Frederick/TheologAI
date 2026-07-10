@@ -3,56 +3,197 @@ name: PR Checks
 on:
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, labeled]
 
 concurrency:
   group: pr-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   test-and-build:
     name: Test & Build
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
 
       - run: npm ci
 
-      - run: npm test
+      - name: Verify generated Worker binding types
+        run: npm run types:worker:check
 
-      - run: npm run build
+      - name: Validate production and preview Worker configuration
+        run: npm run validate:worker-config
+
+      - name: Typecheck Node.js target
+        run: npm run typecheck:node
+
+      - name: Typecheck Workers target
+        run: npm run typecheck:worker
+
+      - name: Typecheck Worker runtime tests
+        run: npm run typecheck:worker-runtime
+
+      - name: Run unit tests with enforced coverage thresholds
+        run: npm run test:coverage
+
+      - name: Run current-architecture integration tests
+        run: npm run test:integration
+
+      - name: Build Node.js target
+        run: npm run build
+
+  fresh-checkout-data:
+    name: Fresh Checkout & Data
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Confirm derived database is absent
+        run: test ! -e data/theologai.db
+
+      - name: Verify canonical data sources
+        run: npm run data:verify-sources
+
+      - name: Build SQLite database from tracked sources
+        run: npm run build:db -- --output "$RUNNER_TEMP/theologai.db"
+
+      - name: Verify generated SQLite database
+        run: npm run data:verify-db -- --database "$RUNNER_TEMP/theologai.db"
+
+      - name: Export deterministic local D1 seed
+        run: npm run d1:seed:export -- --database "$RUNNER_TEMP/theologai.db" --clean
+
+      - name: Verify and reproduce deterministic local D1 seed
+        run: |
+          npm run d1:seed:verify
+          cp scripts/d1-seed/seed-manifest.json "$RUNNER_TEMP/d1-seed-manifest.json"
+          npm run d1:seed:export -- --database "$RUNNER_TEMP/theologai.db" --clean
+          cmp "$RUNNER_TEMP/d1-seed-manifest.json" scripts/d1-seed/seed-manifest.json
+          npm run d1:seed:verify
+          npm run d1:seed:verify-import -- --database "$RUNNER_TEMP/theologai.db"
+
+      - name: Import generated seed through local D1
+        run: npm run d1:seed:verify-workerd
+
+      - name: Build Node.js target
+        run: npm run build
+
+  worker-runtime:
+    name: Worker Runtime & D1
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Typecheck Worker runtime tests
+        run: npm run typecheck:worker-runtime
+
+      - name: Exercise Worker MCP endpoint with isolated D1
+        run: npm run test:worker-runtime
+
+  node-http-e2e:
+    name: Node HTTP E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Exercise compiled Node HTTP MCP server
+        run: npm run test:e2e
+
+  mcp-conformance:
+    name: Applicable MCP Conformance
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Run applicable official MCP server scenarios
+        run: npm run test:conformance
+
+      - name: Upload MCP conformance results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: mcp-conformance-results
+          path: test-output/mcp-conformance/
+          if-no-files-found: error
 
   preview-deploy:
     name: Deploy Preview
-    needs: test-and-build
+    needs: [test-and-build, fresh-checkout-data, worker-runtime, node-http-e2e, mcp-conformance]
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      contains(github.event.pull_request.labels.*.name, 'deploy-preview')
     runs-on: ubuntu-latest
+    environment: preview
     permissions:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
 
       - run: npm ci
 
+      - name: Verify preview D1 is compatible (read-only)
+        run: npm run d1:remote:check -- --database theologai-db-preview --env preview
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
       - name: Deploy to Cloudflare Workers (preview)
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd # v3
         with:
-          wranglerVersion: '4'
+          wranglerVersion: '4.107.0'
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy --env preview
 
       - name: Comment preview URL on PR
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
           script: |
             const sha = context.payload.pull_request.head.sha.substring(0, 7);

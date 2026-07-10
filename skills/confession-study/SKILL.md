@@ -13,7 +13,7 @@ Use this workflow when the user asks about:
 
 ## Available Documents
 
-TheologAI includes 18 historical documents spanning the major Christian traditions:
+TheologAI includes 17 historical documents spanning the major Christian traditions:
 
 **Ecumenical Creeds:**
 - Apostles' Creed, Nicene Creed, Athanasian Creed, Chalcedonian Definition
@@ -41,19 +41,21 @@ TheologAI includes 18 historical documents spanning the major Christian traditio
 
 ### Step 1: Identify Relevant Documents
 
-- Call `classic_text_lookup` with action "listWorks" to see all available documents
+- Call `classic_text_lookup` with `{ "listWorks": true }` to see all available documents
 - Based on the topic, select relevant documents from different traditions
 
 ### Step 2: Search Across Traditions
 
-- Call `classic_text_lookup` with action "query" and the doctrinal topic
+- Call `classic_text_lookup` with `{ "query": "the doctrinal topic" }`
 - This searches across all documents using full-text search
 - Review results to identify which documents address the topic
 
 ### Step 3: Read Specific Sections
 
-- For each relevant document, call `classic_text_lookup` with action "browseSections"
-- Then read the specific relevant sections with action "work"
+- For each relevant document, call `classic_text_lookup` with
+  `{ "work": "document-slug", "browseSections": true }` to inspect its sections
+- Call `classic_text_lookup` with `{ "work": "document-slug" }` to read the
+  locally indexed document
 - Quote the actual text rather than paraphrasing
 
 ### Step 4: Biblical Foundations

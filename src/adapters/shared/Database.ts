@@ -12,8 +12,17 @@ import { fileURLToPath } from 'url';
 import { existsSync } from 'fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const DEFAULT_DATABASE_PATH = join(__dirname, '..', '..', '..', 'data', 'theologai.db');
 
 let instance: Database.Database | null = null;
+
+/** Resolve the local SQLite database without hiding explicit test/runtime injection. */
+export function resolveDatabasePath(
+  dbPath?: string,
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): string {
+  return dbPath || env.THEOLOGAI_DATABASE_PATH || DEFAULT_DATABASE_PATH;
+}
 
 /**
  * Get the singleton database connection.
@@ -22,7 +31,7 @@ let instance: Database.Database | null = null;
 export function getDatabase(dbPath?: string): Database.Database {
   if (instance) return instance;
 
-  const resolvedPath = dbPath ?? join(__dirname, '..', '..', '..', 'data', 'theologai.db');
+  const resolvedPath = resolveDatabasePath(dbPath);
 
   if (!existsSync(resolvedPath)) {
     throw new Error(
@@ -31,7 +40,8 @@ export function getDatabase(dbPath?: string): Database.Database {
   }
 
   instance = new Database(resolvedPath, { readonly: true });
-  instance.pragma('journal_mode = WAL');
+  // Do not change journal_mode on a read-only connection. Fresh databases are
+  // built in DELETE mode and attempting to switch them to WAL requires a write.
   instance.pragma('cache_size = -64000'); // 64MB cache
   instance.pragma('mmap_size = 268435456'); // 256MB mmap
 

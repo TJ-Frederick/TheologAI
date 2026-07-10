@@ -2,11 +2,11 @@
  * Historical document service using SQLite repository.
  */
 
-import type { HistoricalDocumentRepository, DocumentInfo, DocumentSection } from '../../adapters/data/HistoricalDocumentRepository.js';
+import type { IHistoricalDocumentRepository, DocumentInfo, DocumentSection } from '../../kernel/repositories.js';
 import { NotFoundError } from '../../kernel/errors.js';
 
 export class HistoricalDocumentService {
-  constructor(private repo: HistoricalDocumentRepository) {}
+  constructor(private repo: IHistoricalDocumentRepository) {}
 
   /** List all available documents */
   async listDocuments(): Promise<DocumentInfo[]> {

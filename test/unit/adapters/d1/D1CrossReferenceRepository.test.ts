@@ -11,7 +11,7 @@ describe('D1CrossReferenceRepository', () => {
       ]);
       const repo = new D1CrossReferenceRepository(db as any);
       const result = await repo.getCrossReferences('Gen.1.1');
-      expect(result.references).toEqual([{ reference: 'Rom.5.8', votes: 42 }]);
+      expect(result.references).toEqual([{ reference: 'Romans 5:8', votes: 42 }]);
       expect(result.total).toBe(1);
       expect(result.showing).toBe(1);
     });

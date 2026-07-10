@@ -1,226 +1,97 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { OnChainVerifier } from '../../../../src/adapters/donation/OnChainVerifier.js';
-import { PaymentError } from '../../../../src/kernel/errors.js';
 
-// ── Helpers ──
-
-const TX_HASH = '0x' + 'ab'.repeat(32);
-const USDC_BASE_CONTRACT = '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913';
+const TX_HASH = `0x${'ab'.repeat(32)}`;
+const TOKEN = '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913';
+const FROM = `0x${'11'.repeat(20)}`;
+const TO = `0x${'22'.repeat(20)}`;
 const TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
 
-function makeReceiptResponse(overrides: Record<string, unknown> = {}) {
-  return {
-    jsonrpc: '2.0',
-    id: 1,
-    result: {
-      status: '0x1',
-      blockNumber: '0x100',
-      from: '0x' + '11'.repeat(20),
-      to: USDC_BASE_CONTRACT,
-      logs: [],
-      ...overrides,
-    },
-  };
+function word(address: string): string { return `0x${'0'.repeat(24)}${address.slice(2)}`; }
+function transfer(to = TO, address = TOKEN, amount = 1_500_000n) {
+  return { address, topics: [TRANSFER_TOPIC, word(FROM), word(to)], data: `0x${amount.toString(16).padStart(64, '0')}` };
 }
-
-function makeTxResponse(overrides: Record<string, unknown> = {}) {
-  return {
-    jsonrpc: '2.0',
-    id: 1,
-    result: {
-      from: '0x' + '11'.repeat(20),
-      to: '0x' + '22'.repeat(20),
-      value: '0x0',
-      blockNumber: '0x100',
-      ...overrides,
-    },
-  };
+function receipt(overrides: Record<string, unknown> = {}) {
+  return { status: '0x1', blockNumber: '0x100', logs: [], ...overrides };
 }
-
-function makeErc20Receipt(from: string, to: string, amount: string) {
-  const fromTopic = '0x' + '0'.repeat(24) + from.slice(2);
-  const toTopic = '0x' + '0'.repeat(24) + to.slice(2);
-  const data = '0x' + BigInt(amount).toString(16).padStart(64, '0');
-
-  return makeReceiptResponse({
-    logs: [{
-      address: USDC_BASE_CONTRACT,
-      topics: [TRANSFER_TOPIC, fromTopic, toTopic],
-      data,
-    }],
+function transaction(overrides: Record<string, unknown> = {}) {
+  return { from: FROM, to: TOKEN, value: '0x0', ...overrides };
+}
+function response(result: unknown) {
+  return new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
   });
 }
 
-function mockFetch(responses: Record<string, unknown>[]) {
-  let callIndex = 0;
-  return vi.fn().mockImplementation(() => {
-    const resp = responses[callIndex] ?? { jsonrpc: '2.0', id: 1, result: null };
-    callIndex++;
-    return Promise.resolve({
+function mockChains(firstReceipt: unknown, firstTransaction: unknown) {
+  const results = [firstReceipt, firstTransaction, null, null, null, null];
+  globalThis.fetch = vi.fn().mockImplementation(() => Promise.resolve(response(results.shift())));
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.useRealTimers();
+});
+
+describe('OnChainVerifier evidence', () => {
+  it('decodes every valid transfer log plus a native transfer', async () => {
+    mockChains(
+      receipt({ logs: [transfer(), transfer(TO, `0x${'33'.repeat(20)}`, 2n)] }),
+      transaction({ to: TO, value: '0xde0b6b3a7640000' }),
+    );
+    const provider = new OnChainVerifier({ ethereum: 'eth', base: 'base', radius: 'radius' });
+
+    const evidence = await provider.getEvidence(TX_HASH);
+
+    expect(evidence[0]).toMatchObject({ state: 'mined', minedSuccessfully: true, blockNumber: 256 });
+    expect(evidence[0].transfers).toHaveLength(3);
+    expect(evidence[0].transfers[0]).toMatchObject({ to: TO, amount: '1500000', tokenAddress: TOKEN });
+    expect(evidence[0].transfers[2]).toMatchObject({ amount: '1000000000000000000', tokenAddress: null });
+  });
+
+  it('ignores malformed transfer logs rather than treating them as donations', async () => {
+    mockChains(receipt({ logs: [null, transfer(TO, TOKEN, 0n), { ...transfer(), data: '0xnot-a-word' }] }), transaction());
+    const provider = new OnChainVerifier({ ethereum: 'eth', base: 'base', radius: 'radius' });
+
+    const evidence = await provider.getEvidence(TX_HASH);
+
+    expect(evidence[0].state).toBe('mined');
+    expect(evidence[0].transfers).toEqual([]);
+  });
+
+  it.each([
+    [null, null, 'absent'],
+    [null, transaction(), 'pending'],
+    [receipt({ status: '0x0' }), transaction(), 'mined'],
+  ])('distinguishes receipt/transaction state %#', async (receiptValue, txValue, state) => {
+    mockChains(receiptValue, txValue);
+    const provider = new OnChainVerifier({ ethereum: 'eth', base: 'base', radius: 'radius' });
+    const evidence = await provider.getEvidence(TX_HASH);
+    expect(evidence[0].state).toBe(state);
+    if (state === 'mined') expect(evidence[0].minedSuccessfully).toBe(false);
+  });
+
+  it('distinguishes provider failure from an absent transaction', async () => {
+    globalThis.fetch = vi.fn().mockRejectedValue(new Error('offline'));
+    const provider = new OnChainVerifier({ ethereum: 'eth', base: 'base', radius: 'radius' });
+    const evidence = await provider.getEvidence(TX_HASH);
+    expect(evidence.every(item => item.state === 'unavailable')).toBe(true);
+  });
+
+  it('aborts stalled response parsing and clears timers', async () => {
+    vi.useFakeTimers();
+    globalThis.fetch = vi.fn().mockImplementation((_url, init) => ({
       ok: true,
-      json: () => Promise.resolve(resp),
-    });
-  });
-}
-
-describe('OnChainVerifier', () => {
-  let originalFetch: typeof globalThis.fetch;
-
-  beforeEach(() => {
-    originalFetch = globalThis.fetch;
-  });
-
-  afterEach(() => {
-    globalThis.fetch = originalFetch;
-  });
-
-  describe('verify', () => {
-    it('detects ERC-20 Transfer and returns amount as string', async () => {
-      const sender = '0x' + '11'.repeat(20);
-      const recipient = '0x' + '22'.repeat(20);
-
-      // 6 responses: receipt+tx for each of 3 chains (all called in parallel)
-      // Chain 1 (Ethereum) returns the match
-      globalThis.fetch = mockFetch([
-        makeErc20Receipt(sender, recipient, '1500000'),
-        makeTxResponse({ from: sender, to: USDC_BASE_CONTRACT, value: '0x0' }),
-        // Chain 2 & 3 return null
-        { jsonrpc: '2.0', id: 1, result: null },
-        { jsonrpc: '2.0', id: 1, result: null },
-        { jsonrpc: '2.0', id: 1, result: null },
-        { jsonrpc: '2.0', id: 1, result: null },
-      ]);
-
-      const verifier = new OnChainVerifier({
-        ethereum: 'https://fake-eth.test',
-        base: 'https://fake-base.test',
-        radius: 'https://fake-radius.test',
-      });
-
-      const result = await verifier.verify(TX_HASH);
-
-      expect(result.amount).toBe('1500000');
-      expect(typeof result.amount).toBe('string');
-      expect(result.from).toContain('1111');
-      expect(result.to).toContain('2222');
-      expect(result.confirmed).toBe(true);
-
-      verifier.dispose();
-    });
-
-    it('detects native ETH transfer', async () => {
-      const sender = '0x' + '11'.repeat(20);
-      const recipient = '0x' + '22'.repeat(20);
-      const weiAmount = '0x' + BigInt('1000000000000000000').toString(16); // 1 ETH
-
-      // All chains return no ERC-20, but Ethereum has native value
-      globalThis.fetch = mockFetch([
-        makeReceiptResponse({ logs: [] }),
-        makeTxResponse({ from: sender, to: recipient, value: weiAmount }),
-        { jsonrpc: '2.0', id: 1, result: null },
-        { jsonrpc: '2.0', id: 1, result: null },
-        { jsonrpc: '2.0', id: 1, result: null },
-        { jsonrpc: '2.0', id: 1, result: null },
-      ]);
-
-      const verifier = new OnChainVerifier({
-        ethereum: 'https://fake-eth.test',
-        base: 'https://fake-base.test',
-        radius: 'https://fake-radius.test',
-      });
-
-      const result = await verifier.verify(TX_HASH);
-
-      expect(result.amount).toBe('1000000000000000000');
-      expect(result.symbol).toBe('ETH');
-      expect(result.tokenAddress).toBeNull();
-
-      verifier.dispose();
-    });
-
-    it('calls all RPCs in parallel (not sequential)', async () => {
-      const fetchMock = vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ jsonrpc: '2.0', id: 1, result: null }),
-      });
-      globalThis.fetch = fetchMock;
-
-      const verifier = new OnChainVerifier({
-        ethereum: 'https://fake-eth.test',
-        base: 'https://fake-base.test',
-        radius: 'https://fake-radius.test',
-      });
-
-      await expect(verifier.verify(TX_HASH)).rejects.toThrow(PaymentError);
-
-      // All 3 chains should have been tried (2 calls each = 6 total)
-      expect(fetchMock).toHaveBeenCalledTimes(6);
-
-      verifier.dispose();
-    });
-
-    it('throws PaymentError when tx not found on any chain', async () => {
-      globalThis.fetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ jsonrpc: '2.0', id: 1, result: null }),
-      });
-
-      const verifier = new OnChainVerifier({
-        ethereum: 'https://fake-eth.test',
-        base: 'https://fake-base.test',
-        radius: 'https://fake-radius.test',
-      });
-
-      await expect(verifier.verify(TX_HASH)).rejects.toThrow(PaymentError);
-      await expect(verifier.verify(TX_HASH)).rejects.toThrow('not found');
-
-      verifier.dispose();
-    });
-
-    it('returns cached result on repeat calls', async () => {
-      const sender = '0x' + '11'.repeat(20);
-      const recipient = '0x' + '22'.repeat(20);
-
-      const fetchMock = mockFetch([
-        makeErc20Receipt(sender, recipient, '1000000'),
-        makeTxResponse({ from: sender, to: USDC_BASE_CONTRACT, value: '0x0' }),
-        { jsonrpc: '2.0', id: 1, result: null },
-        { jsonrpc: '2.0', id: 1, result: null },
-        { jsonrpc: '2.0', id: 1, result: null },
-        { jsonrpc: '2.0', id: 1, result: null },
-      ]);
-      globalThis.fetch = fetchMock;
-
-      const verifier = new OnChainVerifier({
-        ethereum: 'https://fake-eth.test',
-        base: 'https://fake-base.test',
-        radius: 'https://fake-radius.test',
-      });
-
-      const result1 = await verifier.verify(TX_HASH);
-      const callCount = fetchMock.mock.calls.length;
-
-      const result2 = await verifier.verify(TX_HASH);
-
-      expect(result2).toEqual(result1);
-      // No additional fetch calls on second verify
-      expect(fetchMock.mock.calls.length).toBe(callCount);
-
-      verifier.dispose();
-    });
-
-    it('handles RPC errors gracefully', async () => {
-      globalThis.fetch = vi.fn().mockRejectedValue(new Error('network error'));
-
-      const verifier = new OnChainVerifier({
-        ethereum: 'https://fake-eth.test',
-        base: 'https://fake-base.test',
-        radius: 'https://fake-radius.test',
-      });
-
-      await expect(verifier.verify(TX_HASH)).rejects.toThrow(PaymentError);
-
-      verifier.dispose();
-    });
+      text: () => new Promise((_resolve, reject) => {
+        (init?.signal as AbortSignal).addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+      }),
+    }));
+    const provider = new OnChainVerifier({ ethereum: 'eth', base: 'base', radius: 'radius', rpcTimeoutMs: 25 });
+    const pending = provider.getEvidence(TX_HASH);
+    await vi.advanceTimersByTimeAsync(25);
+    const evidence = await pending;
+    expect(evidence.every(item => item.state === 'unavailable')).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
   });
 });

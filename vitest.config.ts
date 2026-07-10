@@ -13,6 +13,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
+      include: ['src/**/*.ts'],
       exclude: [
         'node_modules/',
         'test/',
@@ -23,10 +24,12 @@ export default defineConfig({
         'src/types/index.ts',
         'src/index.ts',
       ],
-      lines: 80,
-      functions: 75,
-      branches: 70,
-      statements: 80
+      thresholds: {
+        lines: 80,
+        functions: 75,
+        branches: 70,
+        statements: 80,
+      },
     },
     testTimeout: 30000,
     hookTimeout: 30000

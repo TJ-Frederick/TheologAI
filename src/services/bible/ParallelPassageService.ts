@@ -1,129 +1,198 @@
-/**
- * Parallel passage discovery service.
- *
- * Uses curated parallel-passages.json + cross-reference repository.
- */
+/** Curated and cross-reference-backed parallel passage discovery. */
 
-import { readFileSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
-import type { CrossReferenceRepository } from '../../adapters/data/CrossReferenceRepository.js';
-import type { BibleAdapter } from '../../adapters/bible/BibleAdapter.js';
+import { readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import type { BibleService } from './BibleService.js';
 import type { ParallelPassageLookupParams, ParallelPassageResult, ParallelPassage } from '../../kernel/types.js';
+import type { ICrossReferenceRepository } from '../../kernel/repositories.js';
 import { parseReference, formatReference } from '../../kernel/reference.js';
 
-interface ParallelEntry {
+type Relationship = ParallelPassage['relationship'];
+interface RawParallelEntry {
   event: string;
-  relationship: 'synoptic' | 'quotation' | 'allusion' | 'thematic';
+  relationship: Relationship;
   confidence: number;
   parallels: string[];
   notes: string;
   uniqueDetails: Record<string, string[]>;
 }
-
-interface ParallelDatabase {
+interface RawParallelDatabase {
   description: string;
   version: string;
-  parallels: Record<string, ParallelEntry>;
+  parallels: Record<string, RawParallelEntry>;
 }
+interface CuratedGroup {
+  relationship: Relationship;
+  confidence: number;
+  notes: string;
+  members: string[];
+}
+type TextService = Pick<BibleService, 'lookup'>;
 
 export class ParallelPassageService {
-  private database: ParallelDatabase;
-  private crossRefs: CrossReferenceRepository;
-  private bibleAdapter?: BibleAdapter;
+  private readonly groupsByReference = new Map<string, CuratedGroup[]>();
 
   constructor(
-    crossRefs: CrossReferenceRepository,
-    bibleAdapter?: BibleAdapter,
+    private readonly crossRefs: ICrossReferenceRepository,
+    private readonly bibleService?: TextService,
     databasePath?: string,
-    preloadedData?: ParallelDatabase,
+    preloadedData?: RawParallelDatabase,
   ) {
-    this.crossRefs = crossRefs;
-    this.bibleAdapter = bibleAdapter;
-
-    if (preloadedData) {
-      this.database = preloadedData;
-    } else {
-      // Node.js path: read from disk (Workers always pass preloadedData)
-      const __dirname = dirname(fileURLToPath(import.meta.url));
-      const dbPath = databasePath ?? join(__dirname, '..', '..', 'data', 'parallel-passages.json');
-      this.database = JSON.parse(readFileSync(dbPath, 'utf-8'));
-    }
+    const raw = preloadedData ?? this.loadDatabase(databasePath);
+    this.indexDatabase(raw);
   }
 
   async lookup(params: ParallelPassageLookupParams): Promise<ParallelPassageResult> {
-    const ref = parseReference(params.reference);
-    const refStr = formatReference(ref);
+    const primaryReference = normalizeReference(params.reference);
+    const mode = params.mode ?? 'auto';
+    const maxParallels = params.maxParallels ?? 10;
+    const warnings: string[] = [];
+    const candidates = new Map<string, ParallelPassage>();
 
-    // Find curated parallels
-    const entry = this.findEntry(refStr);
-    const parallels: ParallelPassage[] = [];
-
-    if (entry) {
-      for (const p of entry.parallels) {
-        const parallel: ParallelPassage = {
-          reference: p,
-          relationship: entry.relationship,
-          confidence: entry.confidence,
-          notes: entry.notes,
-        };
-
-        if (params.includeText && this.bibleAdapter) {
-          try {
-            const pRef = parseReference(p);
-            const result = await this.bibleAdapter.getPassage(pRef, params.translation || 'ESV');
-            parallel.text = result.text;
-            parallel.translation = result.translation;
-          } catch {
-            // Skip if text unavailable
-          }
-        }
-
-        parallels.push(parallel);
+    for (const group of this.groupsByReference.get(primaryReference) ?? []) {
+      if (!relationshipMatchesMode(group.relationship, mode)) continue;
+      for (const member of group.members) {
+        if (member === primaryReference || candidates.has(member)) continue;
+        candidates.set(member, {
+          reference: member,
+          relationship: group.relationship,
+          confidence: group.confidence,
+          notes: group.notes,
+        });
       }
     }
 
-    // Augment with cross-references if requested
-    if (params.useCrossReferences !== false) {
-      const xrefs = await this.crossRefs.getCrossReferences(params.reference, { maxResults: params.maxParallels ?? 10 });
+    let usedCrossReferences = false;
+    if ((mode === 'auto' || mode === 'thematic') && params.useCrossReferences !== false) {
+      const xrefs = await this.crossRefs.getCrossReferences(primaryReference, { maxResults: maxParallels });
+      usedCrossReferences = xrefs.references.length > 0;
       for (const xref of xrefs.references) {
-        if (!parallels.some(p => p.reference === xref.reference)) {
-          parallels.push({
-            reference: xref.reference,
-            relationship: 'thematic',
-            confidence: Math.min(xref.votes / 100, 1),
-          });
+        let reference: string;
+        try {
+          reference = normalizeReference(xref.reference);
+        } catch {
+          warnings.push('One malformed cross-reference was omitted.');
+          continue;
         }
+        if (reference === primaryReference || candidates.has(reference)) continue;
+        candidates.set(reference, {
+          reference,
+          relationship: 'thematic',
+          confidence: Math.min(Math.max(xref.votes / 100, 0), 1),
+        });
       }
     }
 
-    // Limit results
-    const maxP = params.maxParallels ?? 10;
-    const limited = parallels.slice(0, maxP);
+    const parallels = [...candidates.values()].slice(0, maxParallels);
+    const primary: ParallelPassageResult['primary'] = { reference: primaryReference };
+    if (params.includeText) {
+      await this.attachTexts(parallels, params.translation || 'ESV', warnings);
+    }
 
     return {
-      primary: { reference: refStr },
-      parallels: limited,
+      primary,
+      parallels,
       citation: {
-        source: 'TheologAI Parallel Passages',
-        copyright: 'Cross-references from OpenBible.info (CC-BY)',
+        source: usedCrossReferences ? 'TheologAI Parallel Passages + OpenBible.info' : 'TheologAI Parallel Passages',
+        copyright: usedCrossReferences ? 'Cross-references from OpenBible.info (CC-BY)' : undefined,
       },
+      warnings: warnings.length > 0 ? [...new Set(warnings)] : undefined,
     };
   }
 
-  private findEntry(reference: string): ParallelEntry | undefined {
-    // Direct lookup
-    if (this.database.parallels[reference]) {
-      return this.database.parallels[reference];
-    }
+  private loadDatabase(databasePath?: string): RawParallelDatabase {
+    const currentDirectory = dirname(fileURLToPath(import.meta.url));
+    const path = databasePath ?? join(currentDirectory, '..', '..', 'data', 'parallel-passages.json');
+    return JSON.parse(readFileSync(path, 'utf-8')) as RawParallelDatabase;
+  }
 
-    // Search through all entries for matching references
-    for (const [key, entry] of Object.entries(this.database.parallels)) {
-      if (entry.parallels.includes(reference) || key === reference) {
-        return entry;
+  private indexDatabase(database: RawParallelDatabase): void {
+    for (const [rawPrimary, entry] of Object.entries(database.parallels)) {
+      if (!['synoptic', 'quotation', 'allusion', 'thematic'].includes(entry.relationship)) {
+        throw new Error(`Invalid parallel relationship for ${rawPrimary}`);
+      }
+      if (!Array.isArray(entry.parallels) || !Number.isFinite(entry.confidence)) {
+        throw new Error(`Invalid parallel entry for ${rawPrimary}`);
+      }
+      const members = [rawPrimary, ...entry.parallels].map(normalizeReference);
+      const uniqueMembers = [...new Set(members)];
+      const confidence = entry.confidence > 1 ? entry.confidence / 100 : entry.confidence;
+      if (confidence < 0 || confidence > 1) throw new Error(`Invalid parallel confidence for ${rawPrimary}`);
+      const group: CuratedGroup = {
+        relationship: entry.relationship,
+        confidence,
+        notes: entry.notes,
+        members: uniqueMembers,
+      };
+      for (const member of uniqueMembers) {
+        const groups = this.groupsByReference.get(member) ?? [];
+        groups.push(group);
+        this.groupsByReference.set(member, groups);
       }
     }
-
-    return undefined;
   }
+
+  private async attachTexts(
+    parallels: ParallelPassage[],
+    translation: string,
+    warnings: string[],
+  ): Promise<void> {
+    if (!this.bibleService) {
+      warnings.push('Passage text is unavailable in this runtime.');
+      return;
+    }
+
+    const targets: Array<{ reference: string; apply: (text: string, resolvedTranslation: string) => void }> = [
+      ...parallels.map(parallel => ({
+        reference: parallel.reference,
+        apply: (text: string, resolvedTranslation: string) => {
+          parallel.text = text;
+          parallel.translation = resolvedTranslation;
+        },
+      })),
+    ];
+
+    await mapWithConcurrency(targets, 4, async target => {
+      try {
+        const result = await this.bibleService!.lookup({ reference: target.reference, translation });
+        target.apply(result.text, result.translation);
+      } catch {
+        warnings.push(`Text unavailable for ${target.reference}.`);
+      }
+    });
+  }
+}
+
+function relationshipMatchesMode(relationship: Relationship, mode: NonNullable<ParallelPassageLookupParams['mode']>): boolean {
+  if (mode === 'auto') return true;
+  if (mode === 'thematic') return relationship === 'thematic' || relationship === 'allusion';
+  return relationship === mode;
+}
+
+function normalizeReference(raw: string): string {
+  try {
+    return formatReference(parseReference(raw));
+  } catch (originalError) {
+    const slug = raw.trim().match(/^(.+)_(\d+)_(\d+)(?:-(\d+))?$/);
+    if (!slug) throw originalError;
+    const [, bookSlug, chapter, startVerse, endVerse] = slug;
+    const candidate = `${bookSlug.replaceAll('_', ' ')} ${chapter}:${startVerse}${endVerse ? `-${endVerse}` : ''}`;
+    return formatReference(parseReference(candidate));
+  }
+}
+
+async function mapWithConcurrency<T>(
+  values: T[],
+  concurrency: number,
+  mapper: (value: T) => Promise<void>,
+): Promise<void> {
+  let next = 0;
+  const workers = Array.from({ length: Math.min(concurrency, values.length) }, async () => {
+    while (next < values.length) {
+      const index = next++;
+      await mapper(values[index]);
+    }
+  });
+  await Promise.all(workers);
 }

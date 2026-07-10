@@ -7,6 +7,7 @@
 
 import type { IMorphologyRepository, MorphWord, WordOccurrence, BookDistribution } from '../../kernel/repositories.js';
 import { expandHebrewMorphCode } from '../shared/hebrewMorphExpander.js';
+import { CANONICAL_BOOK_ORDER_SQL, sortByCanonicalBook } from '../shared/repositoryUtils.js';
 
 export class D1MorphologyRepository implements IMorphologyRepository {
   constructor(private db: D1Database) {}
@@ -32,7 +33,7 @@ export class D1MorphologyRepository implements IMorphologyRepository {
     const { results } = await this.db.prepare(
       'SELECT DISTINCT book FROM morphology ORDER BY book'
     ).all<{ book: string }>();
-    return results.map(r => r.book);
+    return sortByCanonicalBook(results).map(r => r.book);
   }
 
   async hasVerse(book: string, chapter: number, verse: number): Promise<boolean> {
@@ -41,7 +42,10 @@ export class D1MorphologyRepository implements IMorphologyRepository {
 
   async getOccurrences(strongsNumber: string, limit: number = 100): Promise<WordOccurrence[]> {
     const { results } = await this.db.prepare(
-      'SELECT DISTINCT book, chapter, verse, word_text, gloss FROM morphology WHERE strongs_number = ? ORDER BY rowid LIMIT ?'
+      `SELECT DISTINCT book, chapter, verse, word_text, gloss
+       FROM morphology WHERE strongs_number = ?
+       ORDER BY ${CANONICAL_BOOK_ORDER_SQL}, chapter, verse, word_text, gloss
+       LIMIT ?`
     ).bind(strongsNumber, limit).all<WordOccurrence>();
     return results;
   }
@@ -49,8 +53,9 @@ export class D1MorphologyRepository implements IMorphologyRepository {
   async getDistribution(strongsNumber: string): Promise<BookDistribution[]> {
     const { results } = await this.db.prepare(
       `SELECT book, COUNT(DISTINCT chapter || ':' || verse) as verse_count
-       FROM morphology WHERE strongs_number = ? GROUP BY book ORDER BY rowid`
+       FROM morphology WHERE strongs_number = ? GROUP BY book
+       ORDER BY ${CANONICAL_BOOK_ORDER_SQL}, book`
     ).bind(strongsNumber).all<BookDistribution>();
-    return results;
+    return sortByCanonicalBook(results);
   }
 }
