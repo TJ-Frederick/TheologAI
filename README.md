@@ -44,6 +44,10 @@ fresh server and transport.
 | `donation_config` | Return voluntary-donation recipient, asset, and chain configuration. |
 | `verify_donation` | Classify a transaction and confirm only supported transfers to the configured recipient. |
 
+Explicit `synoptic` mode only returns edges between Matthew, Mark, and Luke.
+Cross-boundary event members such as John or Paul remain available as thematic
+connections in `thematic` and `auto` modes.
+
 All tools are annotated as read-only, non-destructive, and idempotent. Tool
 inputs use closed, bounded JSON Schema 2020-12 contracts.
 

@@ -31,6 +31,16 @@ async function parseMcpResponse(response: Response): Promise<JsonRpcResponse> {
   return JSON.parse(body) as JsonRpcResponse;
 }
 
+function textContent(message: JsonRpcResponse): string {
+  if (!Array.isArray(message.result?.content)) return '';
+  return message.result.content
+    .filter((block): block is { text: string } => (
+      typeof block === 'object' && block !== null && 'text' in block && typeof block.text === 'string'
+    ))
+    .map(block => block.text)
+    .join('\n');
+}
+
 async function rpc(
   method: string,
   params?: Record<string, unknown>,
@@ -247,6 +257,82 @@ describe('Worker MCP endpoint in workerd', () => {
         text: expect.stringMatching(/Isaiah 7:14\*\* \[quotation\]/),
       })],
     });
+  });
+
+  it('keeps Worker parallel relationships edge-aware across Gospel and Pauline sources', async () => {
+    const gospel = await rpc('tools/call', {
+      name: 'parallel_passages',
+      arguments: {
+        reference: 'Matthew 3:13-17',
+        mode: 'synoptic',
+        useCrossReferences: false,
+      },
+    }, 16);
+
+    expect(gospel.response.status).toBe(200);
+    expect(gospel.message.error).toBeUndefined();
+    const gospelText = textContent(gospel.message);
+    expect(gospelText).toContain('Mark 1:9-11** [synoptic]');
+    expect(gospelText).toContain('Luke 3:21-22** [synoptic]');
+    expect(gospelText).not.toContain('John 1:29-34');
+
+    const paulineSynoptic = await rpc('tools/call', {
+      name: 'parallel_passages',
+      arguments: {
+        reference: '1 Corinthians 11:23-26',
+        mode: 'synoptic',
+        useCrossReferences: false,
+      },
+    }, 17);
+
+    expect(paulineSynoptic.response.status).toBe(200);
+    expect(paulineSynoptic.message.error).toBeUndefined();
+    expect(textContent(paulineSynoptic.message)).toContain('No parallel passages found.');
+
+    const thematic = await rpc('tools/call', {
+      name: 'parallel_passages',
+      arguments: {
+        reference: 'Matthew 26:26',
+        mode: 'thematic',
+        useCrossReferences: false,
+      },
+    }, 18);
+
+    expect(thematic.response.status).toBe(200);
+    expect(thematic.message.error).toBeUndefined();
+    const thematicText = textContent(thematic.message);
+    expect(thematicText).toContain('1 Corinthians 11:23-26** [thematic]');
+    expect(thematicText).not.toContain('Mark 14:22-25** [synoptic]');
+
+    const auto = await rpc('tools/call', {
+      name: 'parallel_passages',
+      arguments: {
+        reference: 'Matthew 26:26',
+        mode: 'auto',
+        useCrossReferences: false,
+      },
+    }, 19);
+
+    expect(auto.response.status).toBe(200);
+    expect(auto.message.error).toBeUndefined();
+    const autoText = textContent(auto.message);
+    expect(autoText).toContain('Mark 14:22-25** [synoptic]');
+    expect(autoText).toContain('1 Corinthians 11:23-26** [thematic]');
+
+    const paulineAuto = await rpc('tools/call', {
+      name: 'parallel_passages',
+      arguments: {
+        reference: '1 Corinthians 11:23-26',
+        mode: 'auto',
+        useCrossReferences: false,
+      },
+    }, 20);
+
+    expect(paulineAuto.response.status).toBe(200);
+    expect(paulineAuto.message.error).toBeUndefined();
+    const paulineAutoText = textContent(paulineAuto.message);
+    expect(paulineAutoText).toContain('Matthew 26:26-29** [thematic]');
+    expect(paulineAutoText).not.toContain('[synoptic]');
   });
 
   it('searches the historical-document FTS fixture through the MCP tool', async () => {

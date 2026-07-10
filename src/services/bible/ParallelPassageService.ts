@@ -57,15 +57,16 @@ export class ParallelPassageService {
     const primaryParsed = parseReference(primaryReference);
 
     for (const group of this.findGroups(primaryReference, primaryParsed)) {
-      if (!relationshipMatchesMode(group.relationship, mode)) continue;
       for (const member of group.members) {
         // A verse/range inside a curated member identifies that member; it is
         // not a parallel to return. This also prevents overlapping queries
         // from returning the canonical range they matched.
         if (rangesOverlap(primaryParsed, member.parsed) || candidates.has(member.reference)) continue;
+        const relationship = relationshipForEdge(group.relationship, primaryParsed, member.parsed);
+        if (!relationshipMatchesMode(relationship, mode)) continue;
         candidates.set(member.reference, {
           reference: member.reference,
-          relationship: group.relationship,
+          relationship,
           confidence: group.confidence,
           notes: group.notes,
         });
@@ -192,6 +193,19 @@ function relationshipMatchesMode(relationship: Relationship, mode: NonNullable<P
   if (mode === 'auto') return true;
   if (mode === 'thematic') return relationship === 'thematic' || relationship === 'allusion';
   return relationship === mode;
+}
+
+function relationshipForEdge(
+  groupRelationship: Relationship,
+  primary: BibleReference,
+  member: BibleReference,
+): Relationship {
+  if (groupRelationship !== 'synoptic') return groupRelationship;
+  return isSynopticGospel(primary) && isSynopticGospel(member) ? 'synoptic' : 'thematic';
+}
+
+function isSynopticGospel(reference: BibleReference): boolean {
+  return reference.book.name === 'Matthew' || reference.book.name === 'Mark' || reference.book.name === 'Luke';
 }
 
 function normalizeMaxParallels(value: number | undefined): number {
