@@ -137,6 +137,42 @@ describe('parseReference', () => {
     const ref = parseReference('3 John 1:4');
     expect(ref.book.name).toBe('3 John');
   });
+
+  it.each([
+    ['Obadiah 4', 'Obadiah', 4],
+    ['Philemon 6', 'Philemon', 6],
+    ['2 John 4', '2 John', 4],
+    ['3 John 4', '3 John', 4],
+    ['Jude 3', 'Jude', 3],
+  ])('interprets the common single-chapter verse form %s', (input, book, verse) => {
+    const ref = parseReference(input);
+    expect(ref).toMatchObject({
+      book: expect.objectContaining({ name: book }),
+      chapter: 1,
+      startVerse: verse,
+    });
+    expect(formatReference(ref)).toBe(`${book} 1:${verse}`);
+  });
+
+  it.each([
+    ['Obadiah 1:4', 'Obadiah 1:4'],
+    ['Philemon 1:6', 'Philemon 1:6'],
+    ['2 John 1:4', '2 John 1:4'],
+    ['3 John 1:4', '3 John 1:4'],
+    ['Jude 1:3', 'Jude 1:3'],
+  ])('round-trips explicit single-chapter reference %s', (input, expected) => {
+    expect(formatReference(parseReference(input))).toBe(expected);
+  });
+
+  it.each([
+    ['Obadiah 22', 'Obadiah'],
+    ['Philemon 26', 'Philemon'],
+    ['2 John 14', '2 John'],
+    ['3 John 16', '3 John'],
+    ['Jude 26', 'Jude'],
+  ])('rejects out-of-range single-chapter verse %s', (input, book) => {
+    expect(() => parseReference(input)).toThrow(new RegExp(`Verse .* out of range for ${book} 1`));
+  });
 });
 
 describe('formatReference', () => {

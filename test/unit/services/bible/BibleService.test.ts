@@ -193,5 +193,21 @@ describe('BibleService', () => {
       await expect(service.lookup({ reference: 'John 3:16', translation: 'ESV' }))
         .rejects.toBeInstanceOf(APIError);
     });
+
+    it('accepts a common single-chapter input when the provider returns explicit chapter notation', async () => {
+      const adapter = makeAdapter({
+        supportedTranslations: ['ESV'],
+        getPassage: vi.fn().mockResolvedValue({
+          reference: 'Jude 1:3',
+          translation: 'ESV',
+          text: 'Beloved, ...',
+          citation: { source: 'ESV API' },
+        }),
+      });
+      const singleChapterService = new BibleService([adapter]);
+
+      await expect(singleChapterService.lookup({ reference: 'Jude 3', translation: 'ESV' }))
+        .resolves.toMatchObject({ reference: 'Jude 1:3', translation: 'ESV' });
+    });
   });
 });

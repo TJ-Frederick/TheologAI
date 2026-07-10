@@ -31,6 +31,7 @@ export interface BibleReference {
  *   - "Gen 1:1"
  *   - "genesis 1:1-5"
  *   - "Ps 23"           (chapter only)
+ *   - "Jude 3"           (verse in a single-chapter book)
  *   - "Song of Solomon 1:1"
  *   - "Gen.1.1"         (OpenBible TSV format)
  *   - "Jn 3.16"         (dot separator)
@@ -74,12 +75,16 @@ export function parseReference(input: string): BibleReference {
   const [, rawBook, rawChapter, rawStartVerse, rawEndVerse] = match;
   const book = resolveBook(rawBook.trim());
   const chapter = parseInt(rawChapter, 10);
+  const isSingleChapterVerse = !rawStartVerse && getBibleBookBounds(book).maxVerseByChapter.length === 1;
   const startVerse = rawStartVerse ? parseInt(rawStartVerse, 10) : undefined;
   const endVerse = rawEndVerse ? parseInt(rawEndVerse, 10) : undefined;
 
-  validateReferenceBounds({ book, chapter, startVerse, endVerse });
+  const ref = isSingleChapterVerse
+    ? { book, chapter: 1, startVerse: chapter }
+    : { book, chapter, startVerse, endVerse };
+  validateReferenceBounds(ref);
 
-  return { book, chapter, startVerse, endVerse };
+  return ref;
 }
 
 /**
