@@ -62,6 +62,22 @@ The seed SQL and generated seed manifest are intentionally ignored by Git. The
 tracked exporter, verifier, canonical source manifest, schema migrations, and
 this runbook are the reproducibility contract.
 
+### Corpus revisions and deployed metadata
+
+When a canonical source changes, update its checksum in `data/data-manifest.json`
+and verify the complete source manifest before building a replacement database.
+The manifest file is itself recorded in `theologai_metadata` as
+`corpus_manifest_sha256`; an existing D1 database therefore retains the previous
+corpus identity until it is replaced and cut over through the authorized remote
+workflow. Updating source files or the manifest does not mutate preview or
+production D1.
+
+For preview, a later deployment built from the revised manifest will remain
+blocked by the read-only readiness gate until a separately authorized preview
+replacement is seeded and bound. Production remains on its existing database and
+deployment until its own approved replacement/cutover; no production change is
+implied by a local corpus revision.
+
 The two import verifiers are complementary: `verify-import` reconstructs every
 row and compares deterministic table hashes with the source SQLite database;
 `verify-workerd` applies complete metadata/document/FTS chunks plus a generated
