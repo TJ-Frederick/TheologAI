@@ -7,7 +7,7 @@
 import type { CommentaryAdapter } from '../../adapters/commentary/CommentaryAdapter.js';
 import type { CommentaryResult, CommentaryLookupParams } from '../../kernel/types.js';
 import { parseReference, referencesEqual } from '../../kernel/reference.js';
-import { APIError, NotFoundError } from '../../kernel/errors.js';
+import { APIError, NotFoundError, ValidationError } from '../../kernel/errors.js';
 
 export class CommentaryService {
   constructor(private adapters: CommentaryAdapter[]) {}
@@ -15,6 +15,12 @@ export class CommentaryService {
   async lookup(params: CommentaryLookupParams): Promise<CommentaryResult> {
     const commentator = params.commentator || 'Matthew Henry';
     const ref = parseReference(params.reference);
+    if (ref.endVerse != null) {
+      throw new ValidationError(
+        'reference',
+        'Commentary verse ranges are not supported; request one verse or a full chapter.',
+      );
+    }
 
     for (const adapter of this.adapters) {
       const supported = adapter.supportedCommentators.some(

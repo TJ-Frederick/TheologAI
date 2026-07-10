@@ -10,6 +10,7 @@ import { createStrongsLookupHandler } from '../../../../src/tools/v2/strongsLook
 import { createVerifyDonationHandler } from '../../../../src/tools/v2/verifyDonation.js';
 import { createVerseMorphologyHandler } from '../../../../src/tools/v2/verseMorphology.js';
 import { ValidationError } from '../../../../src/kernel/errors.js';
+import { CommentaryService as CommentaryServiceClass } from '../../../../src/services/commentary/CommentaryService.js';
 import type { BibleService } from '../../../../src/services/bible/BibleService.js';
 import type { CrossReferenceService } from '../../../../src/services/bible/CrossReferenceService.js';
 import type { ParallelPassageService } from '../../../../src/services/bible/ParallelPassageService.js';
@@ -65,9 +66,10 @@ describe('v2 tool handler schemas', () => {
     const parallels = createParallelPassagesHandler(
       serviceDouble<ParallelPassageService>({}),
     ).inputSchema;
-    const commentary = createCommentaryHandler(
+    const commentaryHandler = createCommentaryHandler(
       serviceDouble<CommentaryService>({}),
-    ).inputSchema;
+    );
+    const commentary = commentaryHandler.inputSchema;
     const classicTexts = createClassicTextsHandler(
       serviceDouble<HistoricalDocumentService>({}),
       serviceDouble<CcelService>({}),
@@ -94,6 +96,10 @@ describe('v2 tool handler schemas', () => {
       strongs_number: { minLength: 2, maxLength: 16 },
       query: { minLength: 2, maxLength: 100 },
       limit: { minimum: 1, maximum: 20 },
+    });
+    expect(commentaryHandler.description).toContain('Verse ranges are not supported');
+    expect(commentary.properties?.reference).toMatchObject({
+      description: expect.stringContaining('verse ranges are not supported'),
     });
   });
 });
@@ -314,6 +320,24 @@ describe('commentary_lookup handler', () => {
     const result = await handler.handler({ reference: 'John 1:1' });
 
     expect(result.isError).toBe(true);
+  });
+
+  it('rejects verse ranges before calling the commentary provider', async () => {
+    const getCommentary = vi.fn();
+    const service = new CommentaryServiceClass([{
+      supportedCommentators: ['John Gill'],
+      getCommentary,
+      supportsBook: vi.fn().mockReturnValue(true),
+    }]);
+    const handler = createCommentaryHandler(service);
+
+    const result = await handler.handler({ reference: 'John 3:16-17', commentator: 'John Gill' });
+
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toBe(
+      'Invalid input: Commentary verse ranges are not supported; request one verse or a full chapter.',
+    );
+    expect(getCommentary).not.toHaveBeenCalled();
   });
 
 });

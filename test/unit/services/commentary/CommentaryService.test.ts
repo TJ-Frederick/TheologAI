@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { CommentaryService } from '../../../../src/services/commentary/CommentaryService.js';
 import type { CommentaryAdapter } from '../../../../src/adapters/commentary/CommentaryAdapter.js';
 import type { CommentaryResult } from '../../../../src/kernel/types.js';
-import { APIError, NotFoundError } from '../../../../src/kernel/errors.js';
+import { APIError, NotFoundError, ValidationError } from '../../../../src/kernel/errors.js';
 
 // ── Mock adapter factory ──
 
@@ -44,6 +44,15 @@ describe('CommentaryService', () => {
     it('defaults to "Matthew Henry" when commentator not specified', async () => {
       await service.lookup({ reference: 'John 3:16' });
       expect(henryAdapter.getCommentary).toHaveBeenCalled();
+    });
+
+    it('rejects verse ranges before calling an adapter', async () => {
+      await expect(service.lookup({ reference: 'John 3:16-17', commentator: 'Matthew Henry' }))
+        .rejects.toEqual(new ValidationError(
+          'reference',
+          'Commentary verse ranges are not supported; request one verse or a full chapter.',
+        ));
+      expect(henryAdapter.getCommentary).not.toHaveBeenCalled();
     });
 
     it('truncates text at maxLength with ellipsis', async () => {

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HelloAoCommentaryAdapter } from '../../../../src/adapters/commentary/HelloAoCommentaryAdapter.js';
-import { AdapterError } from '../../../../src/kernel/errors.js';
+import { AdapterError, ValidationError } from '../../../../src/kernel/errors.js';
 import { parseReference } from '../../../../src/kernel/reference.js';
 
 const response = (body: unknown): Response => new Response(JSON.stringify(body), { status: 200 });
@@ -62,6 +62,15 @@ describe('HelloAoCommentaryAdapter', () => {
     const result = await new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3:16'), 'Clarke');
     expect(result.text).toBe('Exact');
     expect(result.commentator).toBe('Adam Clarke');
+  });
+
+  it('rejects verse ranges before making a provider request', async () => {
+    await expect(new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3:16-17'), 'John Gill'))
+      .rejects.toEqual(new ValidationError(
+        'reference',
+        'Commentary verse ranges are not supported; request one verse or a full chapter.',
+      ));
+    expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
   it('rejects preceding and later entries when the exact verse is missing', async () => {
@@ -158,6 +167,7 @@ describe('HelloAoCommentaryAdapter', () => {
     ['an exact entry without array content', { chapter: { content: [{ verseNumber: 16, content: 'bad' }] } }],
     ['an entry with malformed verse metadata', { chapter: { content: [{ number: 'not-a-verse', content: ['unsafe'] }] } }],
     ['an entry with conflicting verse metadata', { chapter: { content: [{ verseNumber: 16, number: 17, content: ['unsafe'] }] } }],
+    ['duplicate exact verse entries', { chapter: { content: [{ number: 16, content: ['first'] }, { number: 16, content: ['second'] }] } }],
     ['no preceding section', { chapter: { content: [{ verseNumber: 17, content: ['later'] }] } }],
   ])('reports no commentary for %s', async (_label, payload) => {
     vi.mocked(globalThis.fetch).mockResolvedValue(response(payload));

@@ -11,7 +11,7 @@ import type { BibleReference } from '../../kernel/reference.js';
 import { formatReference, toHelloAO } from '../../kernel/reference.js';
 import { findBook } from '../../kernel/books.js';
 import { HttpClient } from '../shared/HttpClient.js';
-import { AdapterError } from '../../kernel/errors.js';
+import { AdapterError, ValidationError } from '../../kernel/errors.js';
 
 interface CommentatorMeta {
   id: string;
@@ -53,6 +53,13 @@ export class HelloAoCommentaryAdapter implements CommentaryAdapter {
   }
 
   async getCommentary(ref: BibleReference, commentator: string): Promise<CommentaryResult> {
+    if (ref.endVerse != null) {
+      throw new ValidationError(
+        'reference',
+        'Commentary verse ranges are not supported; request one verse or a full chapter.',
+      );
+    }
+
     const meta = this.resolveCommentator(commentator);
     if (!meta) {
       throw new AdapterError('HelloAO', `Unknown commentator: "${commentator}". Available: ${this.supportedCommentators.join(', ')}`);
