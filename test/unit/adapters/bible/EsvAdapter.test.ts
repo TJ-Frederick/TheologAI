@@ -83,6 +83,16 @@ describe('EsvAdapter', () => {
       .resolves.toMatchObject({ reference: 'Jude 3', translation: 'ESV' });
   });
 
+  it('accepts a chapterless en-dash range in the provider canonical form', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue(jsonResponse({
+      canonical: 'Jude 3–5',
+      passages: ['[3] ... [5] ...'],
+    }));
+
+    await expect(new EsvAdapter('key').getPassage(parseReference('Jude 1:3-5'), 'ESV'))
+      .resolves.toMatchObject({ reference: 'Jude 3–5', translation: 'ESV' });
+  });
+
   it('rejects a canonical response for a different reference', async () => {
     vi.mocked(globalThis.fetch).mockResolvedValue(jsonResponse({
       canonical: 'John 1:1',

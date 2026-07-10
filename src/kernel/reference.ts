@@ -32,6 +32,7 @@ export interface BibleReference {
  *   - "genesis 1:1-5"
  *   - "Ps 23"           (chapter only)
  *   - "Jude 3"           (verse in a single-chapter book)
+ *   - "Jude 3-5"         (verse range in a single-chapter book)
  *   - "Song of Solomon 1:1"
  *   - "Gen.1.1"         (OpenBible TSV format)
  *   - "Jn 3.16"         (dot separator)
@@ -50,6 +51,24 @@ export function parseReference(input: string): BibleReference {
 
   // Try to split the reference into book name and chapter:verse parts.
   // Strategy: scan from the end to find the numeric portion, rest is book.
+  const singleChapterRangeMatch = normalized.match(
+    /^([1-3]?\s*[A-Za-z][A-Za-z\s.]*?)[\s.]+(\d+)\s*-\s*(\d+)$/
+  );
+  if (singleChapterRangeMatch) {
+    const [, rawBook, rawStartVerse, rawEndVerse] = singleChapterRangeMatch;
+    const book = resolveBook(rawBook.trim());
+    if (getBibleBookBounds(book).maxVerseByChapter.length === 1) {
+      const ref = {
+        book,
+        chapter: 1,
+        startVerse: parseInt(rawStartVerse, 10),
+        endVerse: parseInt(rawEndVerse, 10),
+      };
+      validateReferenceBounds(ref);
+      return ref;
+    }
+  }
+
   const match = normalized.match(
     /^([1-3]?\s*[A-Za-z][A-Za-z\s.]*?)[\s.]+(\d+)(?:[:.]+(\d+)(?:\s*-\s*(\d+))?)?$/
   );

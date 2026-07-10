@@ -155,6 +155,27 @@ describe('parseReference', () => {
   });
 
   it.each([
+    ['Obadiah 4-5', 'Obadiah', 4, 5],
+    ['Philemon 5-6', 'Philemon', 5, 6],
+    ['2 John 3-4', '2 John', 3, 4],
+    ['3 John 3-4', '3 John', 3, 4],
+    ['Jude 3-5', 'Jude', 3, 5],
+  ])('parses and formats chapterless single-chapter range %s', (input, book, startVerse, endVerse) => {
+    const ref = parseReference(input);
+    expect(ref).toMatchObject({
+      book: expect.objectContaining({ name: book }),
+      chapter: 1,
+      startVerse,
+      endVerse,
+    });
+    expect(formatReference(ref)).toBe(`${book} 1:${startVerse}-${endVerse}`);
+  });
+
+  it('normalizes an en-dash chapterless range', () => {
+    expect(formatReference(parseReference('Jude 3–5'))).toBe('Jude 1:3-5');
+  });
+
+  it.each([
     ['Obadiah 1:4', 'Obadiah 1:4'],
     ['Philemon 1:6', 'Philemon 1:6'],
     ['2 John 1:4', '2 John 1:4'],
@@ -172,6 +193,20 @@ describe('parseReference', () => {
     ['Jude 26', 'Jude'],
   ])('rejects out-of-range single-chapter verse %s', (input, book) => {
     expect(() => parseReference(input)).toThrow(new RegExp(`Verse .* out of range for ${book} 1`));
+  });
+
+  it.each([
+    ['Obadiah 4-22', 'Obadiah'],
+    ['Philemon 6-5', 'Philemon'],
+    ['2 John 3-14', '2 John'],
+    ['3 John 3-2', '3 John'],
+    ['Jude 3-26', 'Jude'],
+  ])('rejects invalid chapterless single-chapter range %s', (input, book) => {
+    expect(() => parseReference(input)).toThrow(new RegExp(`Verse range .* out of range for ${book} 1`));
+  });
+
+  it('does not reinterpret a multi-chapter book range as verses', () => {
+    expect(() => parseReference('Genesis 1-3')).toThrow(/Invalid Bible reference/);
   });
 });
 
