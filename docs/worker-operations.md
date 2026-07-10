@@ -61,7 +61,8 @@ Opening or updating a pull request runs validation but does not deploy a
 preview. Preview deployment requires all checks to pass, a same-repository PR
 that is open and non-draft with the `deploy-preview` label, and the GitHub
 `preview` environment. Configure that environment with required reviewers
-before using the label.
+before using the label, disable administrator bypass, and restrict deployment
+branches to the `refs/pull/*/merge` pattern.
 
 Closing the pull request, converting it to a draft, removing the
 `deploy-preview` label, or retargeting it away from `main` starts the separate,
