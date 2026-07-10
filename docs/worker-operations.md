@@ -59,8 +59,19 @@ errors remain structured security events independent of that lifecycle switch.
 
 Opening or updating a pull request runs validation but does not deploy a
 preview. Preview deployment requires all checks to pass, a same-repository PR
-with the `deploy-preview` label, and the GitHub `preview` environment. Configure
-that environment with required reviewers before using the label.
+that is open and non-draft with the `deploy-preview` label, and the GitHub
+`preview` environment. Configure that environment with required reviewers
+before using the label.
+
+Closing the pull request, converting it to a draft, or removing the
+`deploy-preview` label starts a revocation-only workflow run. Its shared PR
+concurrency group cancels any in-flight preview run; validation and deployment
+jobs do not run for that event. Removing an unrelated label does not cancel an
+authorized preview run. The deploy job also reads the live pull request
+immediately before it uses environment secrets and again immediately before
+deployment. It stops if the PR is closed, draft, no longer from the same
+repository, no longer carries `deploy-preview`, or has moved to a different
+head commit.
 
 Production deployment is assigned to the GitHub `production` environment.
 Configure required reviewers there as a release gate. Both workflows pin the
