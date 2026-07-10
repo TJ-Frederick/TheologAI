@@ -51,6 +51,45 @@ not enable it.
 API keys and provider-bearing RPC URLs remain optional Worker secrets. No raw
 client denylist is stored in source or generated binding types.
 
+## Donation verification preview smoke test
+
+Preview verification should use a read-only, already-mined public transaction
+selected at test time. Do not send funds from a test wallet and do not commit a
+transaction hash as a golden fixture.
+
+1. Select a finalized transaction visible in the relevant chain explorer that
+   already transfers a supported asset to the configured donation recipient.
+2. Cross-check the hash, successful receipt, positive transfer value, exact
+   token contract (or native asset), and recipient against the chain RPC before
+   calling the preview tool. A second explorer or RPC view is useful when the
+   transaction is used as release evidence.
+3. Call `verify_donation` on the preview endpoint with that hash and expect
+   `verified`, then record the returned chain and explorer link. For a negative
+   smoke check, use a separately selected public transaction and assert the
+   expected non-verifying status; never infer a fixture's status from its hash
+   alone.
+
+The hash may be supplied as an operator-only environment value or manual test
+input after the preflight above, but it must not be embedded in source or
+tests. This keeps the check deterministic at execution time without making an
+unverified historical transaction part of the release contract.
+
+## Donation RPC defaults and failure semantics
+
+The zero-configuration defaults are public, unauthenticated endpoints:
+Ethereum uses LlamaRPC, Base uses Base's documented standard mainnet endpoint,
+and Radius uses its documented mainnet endpoint. They are suitable for light
+preview smoke checks, not an availability commitment. Public endpoints can be
+rate-limited or unavailable, so operators can provide chain-specific RPC URL
+secrets when a higher operational budget is approved; no paid provider or
+secret is required by the code.
+
+The verifier treats an explicit transaction/receipt-not-found JSON-RPC error as
+the same evidence as a JSON-RPC `result: null`, while timeouts, HTTP failures,
+rate limits, malformed responses, and other RPC errors remain `unavailable`.
+Verification results include per-chain states so a healthy chain's evidence is
+not hidden when another provider is down.
+
 Production request-lifecycle logs are disabled. Preview keeps them enabled for
 diagnostics. Rate-limit failures/rejections and sanitized unexpected runtime
 errors remain structured security events independent of that lifecycle switch.

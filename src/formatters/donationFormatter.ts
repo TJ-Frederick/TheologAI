@@ -45,6 +45,27 @@ export function formatDonationVerifyResult(result: DonationVerifyResult): string
     unavailable: 'One or more chain providers could not complete verification. Try again later.',
   };
   output += `\n${explanations[result.status]}\n`;
+
+  const chainStatuses = result.chainStatuses ?? [];
+  const unavailableChains = chainStatuses.filter(chain => chain.state === 'unavailable');
+  if (unavailableChains.length > 0) {
+    const perChain = chainStatuses
+      .map(chain => `${chain.chainName}: ${formatChainState(chain.state)}`)
+      .join('; ');
+    output += `\n**Per-chain verification:** ${perChain}.\n`;
+    if (unavailableChains.length === chainStatuses.length) {
+      output += 'All supported chain providers were unavailable for this check.\n';
+    } else {
+      output += `Could not check ${unavailableChains.map(chain => chain.chainName).join(', ')}; the other chain results above are still reported.\n`;
+    }
+  }
+
   if (result.explorerUrl) output += `\n[View on Explorer](${result.explorerUrl})\n`;
   return output.trim();
+}
+
+function formatChainState(state: NonNullable<DonationVerifyResult['chainStatuses']>[number]['state']): string {
+  if (state === 'absent') return 'not found';
+  if (state === 'mined') return 'mined';
+  return state;
 }

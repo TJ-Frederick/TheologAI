@@ -23,6 +23,19 @@ function response(result: unknown) {
     headers: { 'Content-Type': 'application/json' },
   });
 }
+function errorResponse(error: unknown) {
+  return new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, error }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+function mockByChain(handler: (url: string, method: string) => Response | Promise<Response>) {
+  globalThis.fetch = vi.fn().mockImplementation((url, init) => {
+    const request = JSON.parse(String(init?.body)) as { method: string };
+    return handler(String(url), request.method);
+  });
+}
 
 function mockChains(firstReceipt: unknown, firstTransaction: unknown) {
   const results = [firstReceipt, firstTransaction, null, null, null, null];
@@ -77,6 +90,37 @@ describe('OnChainVerifier evidence', () => {
     const provider = new OnChainVerifier({ ethereum: 'eth', base: 'base', radius: 'radius' });
     const evidence = await provider.getEvidence(TX_HASH);
     expect(evidence.every(item => item.state === 'unavailable')).toBe(true);
+  });
+
+  it('normalizes explicit transaction-not-found RPC errors to absent', async () => {
+    mockByChain((url) => url === 'eth'
+      ? errorResponse({ code: -32000, data: { message: 'transaction not found' } })
+      : response(null));
+    const provider = new OnChainVerifier({ ethereum: 'eth', base: 'base', radius: 'radius' });
+
+    const evidence = await provider.getEvidence(TX_HASH);
+
+    expect(evidence.map(item => item.state)).toEqual(['absent', 'absent', 'absent']);
+  });
+
+  it('preserves healthy absence alongside a partial RPC outage', async () => {
+    mockByChain((url) => url === 'eth'
+      ? Promise.reject(new Error('offline'))
+      : response(null));
+    const provider = new OnChainVerifier({ ethereum: 'eth', base: 'base', radius: 'radius' });
+
+    const evidence = await provider.getEvidence(TX_HASH);
+
+    expect(evidence.map(item => item.state)).toEqual(['unavailable', 'absent', 'absent']);
+  });
+
+  it('reports total RPC outage as unavailable on every chain', async () => {
+    mockByChain(() => Promise.reject(new Error('offline')));
+    const provider = new OnChainVerifier({ ethereum: 'eth', base: 'base', radius: 'radius' });
+
+    const evidence = await provider.getEvidence(TX_HASH);
+
+    expect(evidence.map(item => item.state)).toEqual(['unavailable', 'unavailable', 'unavailable']);
   });
 
   it('aborts stalled response parsing and clears timers', async () => {

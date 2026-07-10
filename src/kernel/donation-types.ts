@@ -58,6 +58,13 @@ export interface ChainTransactionEvidence {
   transfers: ChainTransferEvidence[];
 }
 
+/** Public summary of what each chain provider could establish. */
+export interface DonationChainStatus {
+  chainId: number;
+  chainName: string;
+  state: ChainEvidenceState;
+}
+
 export interface ITransactionEvidenceProvider {
   getEvidence(txHash: string): Promise<ChainTransactionEvidence[]>;
 }
@@ -87,4 +94,6 @@ export interface DonationVerifyResult {
   minedSuccessfully: boolean;
   transfers: DonationTransferResult[];
   explorerUrl: string;
+  /** Populated by the service; optional for compatibility with older callers. */
+  chainStatuses?: DonationChainStatus[];
 }

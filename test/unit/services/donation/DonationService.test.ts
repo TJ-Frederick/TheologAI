@@ -81,12 +81,45 @@ describe('DonationService classification', () => {
     expect(await donation.verifyDonation(HASH)).toMatchObject({ status, transfers: [] });
   });
 
-  it('prefers unavailable over absent when one supported chain could not be checked', async () => {
+  it('keeps partial outages honest while exposing healthy per-chain evidence', async () => {
     const { donation } = service([
       evidence({ state: 'absent', minedSuccessfully: undefined, transfers: [] }),
       evidence({ chainId: 1, chainName: 'Ethereum', state: 'unavailable', minedSuccessfully: undefined, transfers: [] }),
     ]);
-    expect((await donation.verifyDonation(HASH)).status).toBe('unavailable');
+    const result = await donation.verifyDonation(HASH);
+    expect(result.status).toBe('unavailable');
+    expect(result.chainStatuses).toEqual([
+      { chainId: 8453, chainName: 'Base', state: 'absent' },
+      { chainId: 1, chainName: 'Ethereum', state: 'unavailable' },
+    ]);
+  });
+
+  it('does not let a partial outage hide a verified healthy-chain transfer', async () => {
+    const { donation } = service([
+      evidence(),
+      evidence({ chainId: 1, chainName: 'Ethereum', state: 'unavailable', minedSuccessfully: undefined, transfers: [] }),
+    ]);
+
+    const result = await donation.verifyDonation(HASH);
+
+    expect(result.status).toBe('verified');
+    expect(result.chainStatuses).toEqual([
+      { chainId: 8453, chainName: 'Base', state: 'mined' },
+      { chainId: 1, chainName: 'Ethereum', state: 'unavailable' },
+    ]);
+  });
+
+  it('reports total outage without claiming absence', async () => {
+    const { donation } = service([
+      evidence({ state: 'unavailable', minedSuccessfully: undefined, transfers: [] }),
+      evidence({ chainId: 1, chainName: 'Ethereum', state: 'unavailable', minedSuccessfully: undefined, transfers: [] }),
+      evidence({ chainId: 723, chainName: 'Radius', state: 'unavailable', minedSuccessfully: undefined, transfers: [] }),
+    ]);
+
+    const result = await donation.verifyDonation(HASH);
+
+    expect(result).toMatchObject({ status: 'unavailable', transfers: [] });
+    expect(result.chainStatuses?.every(item => item.state === 'unavailable')).toBe(true);
   });
 
   it('rejects malformed hashes before querying providers', async () => {

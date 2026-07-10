@@ -154,7 +154,17 @@ export class OnChainVerifier implements ITransactionEvidenceProvider {
       const json = JSON.parse(
         await readBoundedResponseText(response, MAX_RPC_RESPONSE_BYTES, 'Donation RPC'),
       ) as { result?: T | null; error?: unknown };
-      if (json.error || !Object.hasOwn(json, 'result')) return { available: false };
+      // Nodes are allowed to return null for an unknown hash, but some public
+      // endpoints use a JSON-RPC "not found" error instead. That is conclusive
+      // absence, not an outage. Keep all other RPC errors unavailable so a
+      // rate limit, malformed response, or provider failure cannot become a
+      // false negative.
+      if (json.error) {
+        return isTransactionNotFoundError(json.error)
+          ? { available: true, result: null }
+          : { available: false };
+      }
+      if (!Object.hasOwn(json, 'result')) return { available: false };
       return { available: true, result: json.result ?? null };
     } catch {
       return { available: false };
@@ -164,4 +174,29 @@ export class OnChainVerifier implements ITransactionEvidenceProvider {
   }
 
   dispose(): void { this.cache.dispose(); }
+}
+
+function isTransactionNotFoundError(error: unknown): boolean {
+  const text = rpcErrorText(error).toLowerCase().replace(/[_-]+/g, ' ').trim();
+  if (text === 'not found') return true;
+  return [
+    'transaction not found',
+    'transaction hash not found',
+    'unknown transaction',
+    'receipt not found',
+    'unknown receipt',
+    'tx not found',
+    'tx hash not found',
+  ].some(phrase => text.includes(phrase));
+}
+
+function rpcErrorText(error: unknown): string {
+  if (typeof error === 'string') return error;
+  if (!error || typeof error !== 'object') return '';
+  const candidate = error as { message?: unknown; data?: unknown };
+  const messages = [
+    candidate.message,
+    typeof candidate.data === 'string' ? candidate.data : rpcErrorText(candidate.data),
+  ].filter((value): value is string => typeof value === 'string' && value.length > 0);
+  return messages.join(' ');
 }

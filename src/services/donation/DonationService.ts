@@ -8,6 +8,7 @@ import {
   type ChainTransactionEvidence,
   type ChainTransferEvidence,
   type DonationConfig,
+  type DonationChainStatus,
   type DonationTransferResult,
   type DonationVerificationStatus,
   type DonationVerifyResult,
@@ -35,20 +36,22 @@ export class DonationService {
     const mined = evidence.filter(item => item.state === 'mined');
     const successful = mined.filter(item => item.minedSuccessfully);
     const verified = this.collectTransfers(successful, transfer => transfer.supported && transfer.toRecipient);
-    if (verified.length > 0) return this.result(txHash, 'verified', verified, true);
+    if (verified.length > 0) return this.result(txHash, 'verified', verified, true, evidence);
 
     const wrongRecipient = this.collectTransfers(successful, transfer => transfer.supported && !transfer.toRecipient);
-    if (wrongRecipient.length > 0) return this.result(txHash, 'wrong_recipient', wrongRecipient, true);
+    if (wrongRecipient.length > 0) return this.result(txHash, 'wrong_recipient', wrongRecipient, true, evidence);
 
     const unsupported = this.collectTransfers(successful, transfer => !transfer.supported);
     if (unsupported.length > 0 || successful.length > 0) {
-      return this.result(txHash, 'unsupported', unsupported, true, successful[0]);
+      return this.result(txHash, 'unsupported', unsupported, true, evidence, successful[0]);
     }
 
-    if (mined.length > 0) return this.result(txHash, 'failed', [], false, mined[0]);
-    if (evidence.some(item => item.state === 'pending')) return this.result(txHash, 'pending', [], false);
-    if (evidence.length > 0 && evidence.every(item => item.state === 'absent')) return this.result(txHash, 'absent', [], false);
-    return this.result(txHash, 'unavailable', [], false);
+    if (mined.length > 0) return this.result(txHash, 'failed', [], false, evidence, mined[0]);
+    if (evidence.some(item => item.state === 'pending')) return this.result(txHash, 'pending', [], false, evidence);
+    if (evidence.length > 0 && evidence.every(item => item.state === 'absent')) {
+      return this.result(txHash, 'absent', [], false, evidence);
+    }
+    return this.result(txHash, 'unavailable', [], false, evidence);
   }
 
   private collectTransfers(
@@ -101,15 +104,22 @@ export class DonationService {
     status: DonationVerificationStatus,
     transfers: DonationTransferResult[],
     minedSuccessfully: boolean,
+    chainEvidence: ChainTransactionEvidence[],
     evidence?: ChainTransactionEvidence,
   ): DonationVerifyResult {
     const chainId = transfers[0]?.chainId ?? evidence?.chainId;
+    const chainStatuses: DonationChainStatus[] = chainEvidence.map(item => ({
+      chainId: item.chainId,
+      chainName: item.chainName,
+      state: item.state,
+    }));
     return {
       txHash,
       status,
       minedSuccessfully,
       transfers,
       explorerUrl: chainId && EXPLORER_URLS[chainId] ? `${EXPLORER_URLS[chainId]}${txHash}` : '',
+      chainStatuses,
     };
   }
 }

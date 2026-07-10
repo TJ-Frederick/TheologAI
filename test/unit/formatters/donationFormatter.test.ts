@@ -106,6 +106,18 @@ describe('formatDonationVerifyResult', () => {
     expect(out).not.toContain('Thank you');
   });
 
+  it('shows per-chain evidence when a provider is unavailable', () => {
+    const out = formatDonationVerifyResult(makeDonationVerifyResult({
+      chainStatuses: [
+        { chainId: 8453, chainName: 'Base', state: 'absent' },
+        { chainId: 1, chainName: 'Ethereum', state: 'unavailable' },
+      ],
+    }));
+    expect(out).toContain('Base: not found');
+    expect(out).toContain('Ethereum: unavailable');
+    expect(out).toContain('Could not check Ethereum');
+  });
+
   it('returns trimmed output', () => {
     const out = formatDonationVerifyResult(makeDonationVerifyResult());
     expect(out).toBe(out.trim());
