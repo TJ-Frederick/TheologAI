@@ -511,12 +511,46 @@ describe('original_language_lookup handler', () => {
     const handler = createStrongsLookupHandler(serviceDouble<StrongsService>({}));
     expect(handler.inputSchema).toMatchObject({
       additionalProperties: false,
+      minProperties: 1,
       properties: {
         query: { minLength: 2, maxLength: 100 },
         limit: { minimum: 1, maximum: 20 },
       },
     });
     expect(handler.inputSchema).not.toHaveProperty('oneOf');
+    expect(handler.inputSchema.properties?.detail_level).not.toHaveProperty('default');
+    expect(handler.inputSchema.properties?.include_extended).not.toHaveProperty('default');
+    expect(handler.inputSchema.properties?.limit).not.toHaveProperty('default');
+  });
+
+  it('accepts valid calls after mode-appropriate client default materialization', async () => {
+    const search = vi.fn<StrongsService['search']>().mockResolvedValue([]);
+    const lookup = vi.fn<StrongsService['lookup']>().mockResolvedValue({
+      strongs_number: 'G26',
+      testament: 'NT',
+      lemma: 'ἀγάπη',
+      definition: 'love',
+      citation,
+    });
+    const handler = createStrongsLookupHandler(serviceDouble({ search, lookup }));
+
+    const queryResult = await handler.handler({ query: 'love', limit: 10 });
+    const exactResult = await handler.handler({
+      strongs_number: 'G26',
+      detail_level: 'simple',
+      include_extended: false,
+    });
+    const queryDefaultResult = await handler.handler({ query: 'love' });
+    const exactDefaultResult = await handler.handler({ strongs_number: 'G26' });
+
+    expect(queryResult.isError).not.toBe(true);
+    expect(queryDefaultResult.isError).not.toBe(true);
+    expect(search).toHaveBeenNthCalledWith(1, 'love', 10);
+    expect(search).toHaveBeenNthCalledWith(2, 'love', 10);
+    expect(exactResult.isError).not.toBe(true);
+    expect(exactDefaultResult.isError).not.toBe(true);
+    expect(lookup).toHaveBeenNthCalledWith(1, 'G26', false);
+    expect(lookup).toHaveBeenNthCalledWith(2, 'G26', false);
   });
 
   it('keeps exact/search mode validation strict in the handler', async () => {

@@ -13,7 +13,8 @@ export function createStrongsLookupHandler(service: StrongsService): ToolHandler
     description: "Look up an exact Strong's number or search Greek/Hebrew lemmas, transliterations, and definitions. Use exactly one mode: strongs_number for an exact lookup, or query for a search. Exact lookup can include extended STEPBible lexicon data.",
     inputSchema: {
       type: 'object',
-      description: 'Choose exactly one mode. The exact-lookup and search fields are intentionally shown together for clients that do not render conditional schemas; invalid combinations receive an actionable error from the handler.',
+      description: 'Flat mode fields are intentionally shown together for client discoverability; choose exactly one mode, with cross-field validity enforced strictly by the handler.',
+      minProperties: 1,
       properties: {
         strongs_number: {
           type: 'string',
@@ -22,8 +23,8 @@ export function createStrongsLookupHandler(service: StrongsService): ToolHandler
           description: "Strong's number (e.g., G25 for Greek agapaō, H430 for Hebrew Elohim)",
           pattern: '^[GHgh]\\d+[a-z]?$',
         },
-        detail_level: { type: 'string', enum: ['simple', 'detailed'], default: 'simple', description: 'Exact strongs_number lookups only; choose the amount of entry detail.' },
-        include_extended: { type: 'boolean', default: false, description: 'Exact strongs_number lookups only; include STEPBible extended data.' },
+        detail_level: { type: 'string', enum: ['simple', 'detailed'], description: 'Exact strongs_number lookups only; choose the amount of entry detail. Defaults to simple when omitted.' },
+        include_extended: { type: 'boolean', description: 'Exact strongs_number lookups only; include STEPBible extended data. Defaults to false when omitted.' },
         query: {
           type: 'string',
           minLength: 2,
@@ -34,8 +35,7 @@ export function createStrongsLookupHandler(service: StrongsService): ToolHandler
           type: 'integer',
           minimum: 1,
           maximum: 20,
-          default: 10,
-          description: 'Search query only; maximum number of matching entries to return.',
+          description: 'Search query only; maximum number of matching entries to return. Defaults to 10 when omitted.',
         },
       },
       additionalProperties: false,

@@ -108,16 +108,21 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
       const classicSchema = listed.tools.find(tool => tool.name === 'classic_text_lookup')?.inputSchema;
       const languageSchema = listed.tools.find(tool => tool.name === 'original_language_lookup')?.inputSchema;
       expect(classicSchema).not.toHaveProperty('oneOf');
+      expect(classicSchema).toMatchObject({ minProperties: 1 });
       expect(classicSchema?.properties).toMatchObject({
         work: expect.objectContaining({ type: 'string' }),
         query: expect.objectContaining({ type: 'string' }),
         listWorks: expect.objectContaining({ const: true }),
       });
       expect(languageSchema).not.toHaveProperty('oneOf');
+      expect(languageSchema).toMatchObject({ minProperties: 1 });
       expect(languageSchema?.properties).toMatchObject({
         strongs_number: expect.objectContaining({ type: 'string' }),
         query: expect.objectContaining({ type: 'string' }),
       });
+      expect(languageSchema?.properties?.detail_level).not.toHaveProperty('default');
+      expect(languageSchema?.properties?.include_extended).not.toHaveProperty('default');
+      expect(languageSchema?.properties?.limit).not.toHaveProperty('default');
 
       const invalidClassic = await client.callTool({
         name: 'classic_text_lookup',
@@ -136,6 +141,12 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
         isError: true,
         content: [expect.objectContaining({ text: expect.stringContaining('limit is only valid with query search') })],
       });
+
+      const materializedSearch = await client.callTool({
+        name: 'original_language_lookup',
+        arguments: { query: 'love', limit: 10 },
+      });
+      expect(materializedSearch.isError).not.toBe(true);
 
       const result = await client.callTool({
         name: 'bible_lookup',

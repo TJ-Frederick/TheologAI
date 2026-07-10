@@ -19,7 +19,8 @@ export function createClassicTextsHandler(
     description: 'Search and browse local historical documents, or retrieve one explicitly named CCEL work section. Use exactly one mode: listWorks, query, work (optionally with section), or work with browseSections=true. Catalog-wide CCEL search is not supported.',
     inputSchema: {
       type: 'object',
-      description: 'Choose exactly one mode. The mode fields are intentionally shown together for clients that do not render conditional schemas; invalid combinations receive an actionable error from the handler.',
+      description: 'Flat mode fields are intentionally shown together for client discoverability; choose exactly one mode, with cross-field validity enforced strictly by the handler.',
+      minProperties: 1,
       properties: {
         work: { type: 'string', minLength: 1, maxLength: 256, description: 'Named local document or CCEL work path (e.g., "nicene-creed", "calvin/institutes"). Use alone for a work, or with section for a bounded CCEL section.' },
         section: { type: 'string', minLength: 1, maxLength: 256, description: 'Exact CCEL section identifier; valid only with work (e.g., "book-one").' },

@@ -55,6 +55,12 @@ export function formatValidationError(errorMessage: string | undefined): string 
     return 'arguments do not match exactly one advertised schema option';
   }
 
+  const minProperties = errorMessage.match(/Instance does not have at least (\d+) properties\./);
+  if (minProperties) {
+    const count = Number(minProperties[1]);
+    return `provide at least ${count === 1 ? 'one' : count} argument${count === 1 ? '' : 's'}`;
+  }
+
   const missing = errorMessage.match(/does not have required property "([^"]+)"/);
   if (missing) return `missing required argument "${missing[1]}"`;
 

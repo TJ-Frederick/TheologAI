@@ -114,6 +114,15 @@ describe('getUserMessage', () => {
       .toBe('Not found: No matching content was found.');
   });
 
+  it('treats CCEL parser and upstream-shape failures as unavailable', () => {
+    expect(getUserMessage(new AdapterError('CCEL', 'Could not find book content in response')))
+      .toBe('Unavailable: The requested source is temporarily unavailable. Please try again later.');
+    expect(getUserMessage(new AdapterError('CCEL', 'Section not found or error page returned')))
+      .toBe('Unavailable: The requested source is temporarily unavailable. Please try again later.');
+    expect(getUserMessage(new AdapterError('CCEL', 'Section not found')))
+      .toBe('Not found: No matching content was found.');
+  });
+
   it('sanitizes unavailable configuration errors', () => {
     expect(getUserMessage(new NotFoundError('adapter', 'ESV adapter is not configured')))
       .toContain('Unavailable');

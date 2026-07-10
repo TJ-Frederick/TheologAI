@@ -66,6 +66,7 @@ describe('Worker-safe JSON Schema validation', () => {
     ['#: Property "reference" does not match schema.; #/reference: Instance type "number" is invalid. Expected "string".', 'argument "reference" must be string'],
     ['#: Instance has "primary" but does not have "secondary".', 'must have property secondary'],
     ['#: Instance does not match exactly one subschema (0 matches).; #: Instance does not have required property "otherMode".', 'arguments do not match exactly one advertised schema option'],
+    ['#: Instance does not have at least 1 properties.', 'provide at least one argument'],
   ])('normalizes validator errors into actionable tool feedback', (message, expected) => {
     expect(formatValidationError(message)).toBe(expected);
   });
@@ -94,5 +95,12 @@ describe('Worker-safe JSON Schema validation', () => {
     const result = await tool.handler(arguments_);
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain(expected);
+  });
+
+  it.each([
+    ['classic-text empty input', createClassicTextsHandler(unused, unused)],
+    ['original-language empty input', createStrongsLookupHandler(unused)],
+  ])('advertised flat schema rejects %s', (_name, tool) => {
+    expect(validatorFor(tool.inputSchema)({}).valid).toBe(false);
   });
 });

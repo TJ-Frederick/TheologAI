@@ -123,7 +123,10 @@ function getAdapterUserMessage(diagnosticMessage: string): string {
   if (/unsupported|not supported|only available|unknown commentator|outside .*coverage/.test(detail)) {
     return 'Unsupported coverage: This request is outside the supported coverage.';
   }
-  if (/http 404|not found|no (?:verses|passage|commentary)|could not find .*content|section not found|error page returned/.test(detail)) {
+  if (/error page returned|could not (?:find|parse|extract)/.test(detail)) {
+    return 'Unavailable: The requested source is temporarily unavailable. Please try again later.';
+  }
+  if (/http 404|section not found|no (?:verses|passage|commentary)/.test(detail)) {
     return 'Not found: No matching content was found.';
   }
   if (/http (?:401|403)|not configured/.test(detail)) {
