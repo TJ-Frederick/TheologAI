@@ -49,10 +49,9 @@ period = 60
 # RADIUS_RPC_URL = "https://rpc.radiustech.xyz"
 
 # ── Preview environment (deployed by CI on PRs) ──
-# Uses a separate D1 database. One-time setup:
-#   wrangler d1 create theologai-db-preview
-#   Then apply migrations and the explicitly reviewed generated seed according
-#   to docs/D1-DATA-WORKFLOW.md. Worker deployment does not seed D1.
+# Uses a separate, pre-seeded D1 database. Prepare and validate replacements
+# according to docs/D1-DATA-WORKFLOW.md before changing this binding. Worker
+# deployment does not migrate or seed D1.
 
 [env.preview]
 name = "theologai-preview"
@@ -65,8 +64,8 @@ THEOLOGAI_REQUEST_LOGS = "true"
 
 [[env.preview.d1_databases]]
 binding = "THEOLOGAI_DB"
-database_name = "theologai-db-preview"
-database_id = "f9f415e1-219b-4d17-bcf5-33a8abad02fa"
+database_name = "theologai-preview-20260710-a"
+database_id = "3d010946-b530-4c7e-9e21-a900ff3c21a2"
 migrations_dir = "migrations"
 
 # Preview uses a distinct namespace so load tests and PR validation cannot

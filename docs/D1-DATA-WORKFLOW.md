@@ -113,11 +113,36 @@ Before a full remote seed:
 6. Compare remote table counts with the manifest before deploying application
    code that depends on the corpus.
 
+### Fresh-database replacement and cutover
+
+Create each replacement under a unique name and match the current database's
+location or jurisdiction. Do not use `--update-config`: leave the deployed
+Worker bound to the known-good database while the replacement is prepared.
+After recording the old binding for rollback, edit only the local environment's
+`database_name` and `database_id` in `wrangler.toml`. This local edit does not
+change the deployed Worker. Apply migrations and execute every seed file, in
+manifest order, through that environment binding, then validate the same
+binding before committing or deploying it:
+
+```bash
+npx wrangler d1 migrations apply THEOLOGAI_DB --remote --env preview
+# Execute every manifest-listed seed file with --remote --env preview.
+npm run d1:remote:check -- --database THEOLOGAI_DB --env preview
+```
+
+If any migration or seed import fails or is interrupted, do not resume against
+that partial database. Give the next empty replacement a new name and restart
+from migration application. Preserve the previously bound database through the
+cutover and initial verification window; rollback is restoring its name and ID
+in `wrangler.toml` and redeploying through the normal approval gate. Database
+creation, binding edits, rollback deployments, and eventual deletion remain
+separately authorized operations.
+
 Approved deploy jobs perform the last compatibility check read-only:
 
 ```bash
 npm run d1:remote:check -- --database theologai-db
-npm run d1:remote:check -- --database theologai-db-preview --env preview
+npm run d1:remote:check -- --database THEOLOGAI_DB --env preview
 ```
 
 The check requires normal Wrangler Cloudflare credentials and verifies database
