@@ -78,16 +78,19 @@ const ccelService = new CcelService(ccelAdapter);
 
 // ESV adapter + BibleService are lazy-initialized on first request
 // because EsvAdapter needs env.ESV_API_KEY which isn't available at module scope.
-// Once created, they persist for the isolate's lifetime (secret changes require redeployment).
+// The cache is rebuilt if the request's non-secret ESV configuration state changes.
 let _bibleService: BibleService | null = null;
+let _bibleServiceEsvConfigured: boolean | null = null;
 
 // Donation service is HTTP-only (no D1 dependency), safe to cache at module scope.
 let _donationService: DonationService | null = null;
 
 function getBibleService(env: Env): BibleService {
-  if (!_bibleService) {
+  const esvConfigured = Boolean(env.ESV_API_KEY);
+  if (!_bibleService || _bibleServiceEsvConfigured !== esvConfigured) {
     const esvAdapter = new EsvAdapter(env.ESV_API_KEY);
     _bibleService = new BibleService([esvAdapter, netAdapter, helloaoAdapter]);
+    _bibleServiceEsvConfigured = esvConfigured;
   }
   return _bibleService;
 }

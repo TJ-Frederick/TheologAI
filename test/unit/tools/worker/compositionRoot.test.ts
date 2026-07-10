@@ -3,11 +3,16 @@ import { createSimpleD1 } from '../../../helpers/mockD1.js';
 
 // Mock all HTTP adapters and external services to avoid network calls
 vi.mock('../../../../src/adapters/bible/EsvAdapter.js', () => ({
-  EsvAdapter: vi.fn().mockImplementation(function () {
+  EsvAdapter: vi.fn().mockImplementation(function (apiKey?: string) {
     return {
       supportedTranslations: ['ESV'],
-      getPassage: vi.fn(),
-      isConfigured: vi.fn().mockReturnValue(true),
+      getPassage: vi.fn().mockResolvedValue({
+        reference: 'John 3:16',
+        translation: 'ESV',
+        text: 'For God so loved the world.',
+        citation: { source: 'ESV test adapter' },
+      }),
+      isConfigured: vi.fn().mockReturnValue(Boolean(apiKey)),
       getCopyright: vi.fn().mockReturnValue('ESV'),
     };
   }),
@@ -171,6 +176,36 @@ describe('createWorkerCompositionRoot', () => {
       const root1 = createWorkerCompositionRoot(env);
       const root2 = createWorkerCompositionRoot(env);
       expect(root1.services.bibleService).toBe(root2.services.bibleService);
+    });
+
+    it('rebuilds BibleService when ESV changes from unconfigured to configured', async () => {
+      const secretlessRoot = createWorkerCompositionRoot(makeEnv({ ESV_API_KEY: undefined }));
+      await expect(secretlessRoot.services.bibleService.lookup({
+        reference: 'John 3:16',
+        translation: 'ESV',
+      })).rejects.toThrow('ESV adapter is not configured');
+
+      const configuredRoot = createWorkerCompositionRoot(makeEnv({ ESV_API_KEY: 'test-key' }));
+      await expect(configuredRoot.services.bibleService.lookup({
+        reference: 'John 3:16',
+        translation: 'ESV',
+      })).resolves.toMatchObject({ translation: 'ESV', reference: 'John 3:16' });
+      expect(configuredRoot.services.bibleService).not.toBe(secretlessRoot.services.bibleService);
+    });
+
+    it('rebuilds BibleService when ESV changes from configured to unconfigured', async () => {
+      const configuredRoot = createWorkerCompositionRoot(makeEnv({ ESV_API_KEY: 'test-key' }));
+      await expect(configuredRoot.services.bibleService.lookup({
+        reference: 'John 3:16',
+        translation: 'ESV',
+      })).resolves.toMatchObject({ translation: 'ESV' });
+
+      const secretlessRoot = createWorkerCompositionRoot(makeEnv({ ESV_API_KEY: undefined }));
+      await expect(secretlessRoot.services.bibleService.lookup({
+        reference: 'John 3:16',
+        translation: 'ESV',
+      })).rejects.toThrow('ESV adapter is not configured');
+      expect(secretlessRoot.services.bibleService).not.toBe(configuredRoot.services.bibleService);
     });
 
     it('caches commentaryService at module scope (singleton)', () => {
