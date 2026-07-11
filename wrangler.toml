@@ -28,8 +28,8 @@ THEOLOGAI_REQUEST_LOGS = "false"
 # For multi-environment setups, use [env.staging] / [env.production] sections.
 [[d1_databases]]
 binding = "THEOLOGAI_DB"
-database_name = "theologai-db"
-database_id = "50de6fbe-852b-4a50-875f-729ef58d3fcb"
+database_name = "theologai-production-20260711-a"
+database_id = "324103e8-16b0-457b-8a2c-45f63a4d8735"
 migrations_dir = "migrations"
 
 # Anonymous abuse control. Counters are intentionally local to each Cloudflare

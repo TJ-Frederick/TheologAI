@@ -93,7 +93,7 @@ jobs:
         run: npm audit --omit=dev
 
       - name: Verify production D1 is compatible (read-only)
-        run: npm run d1:remote:check -- --database theologai-db
+        run: npm run d1:remote:check -- --database THEOLOGAI_DB
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -104,4 +104,8 @@ jobs:
           wranglerVersion: '4.107.0'
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          secrets: |
+            ESV_API_KEY
           command: deploy
+        env:
+          ESV_API_KEY: ${{ secrets.ESV_API_KEY }}

@@ -157,7 +157,7 @@ separately authorized operations.
 Approved deploy jobs perform the last compatibility check read-only:
 
 ```bash
-npm run d1:remote:check -- --database theologai-db
+npm run d1:remote:check -- --database THEOLOGAI_DB
 npm run d1:remote:check -- --database THEOLOGAI_DB --env preview
 ```
 
