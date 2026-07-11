@@ -1,9 +1,9 @@
 # Bible Study MCP Server - Architecture Plan
 
 > **Historical architecture plan:** This document describes an earlier
-> mock-era design and is not the current architecture or product contract. See
-> `README.md`, `CLAUDE.md`, and `docs/worker-operations.md` for the implemented
-> Node/Cloudflare architecture and current capabilities.
+> mock-era design. It is not the current product contract or implementation
+> status. See [README.md](../README.md) and [docs/ROADMAP.md](ROADMAP.md) for
+> the current capabilities and sequence.
 
 
 **Current Status: Production Ready - Beta Launch (v3.4.1)**

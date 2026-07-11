@@ -84,6 +84,10 @@ Matthew Henry, Jamieson-Fausset-Brown, Adam Clarke, John Gill, and
 Keil-Delitzsch are treated as public-domain source texts. Tyndale Open Study
 Notes are CC BY-SA 4.0 and responses include attribution. See [NOTICE.md](NOTICE.md).
 
+Scalar commentary is returned only when the provider exposes an exact,
+trustworthy verse identity. For section-level commentary, use chapter lookup
+as the truthful fallback rather than treating a section anchor as a verse span.
+
 ### Historical documents and CCEL
 
 The local database contains 17 tracked creeds, confessions, and
@@ -236,6 +240,8 @@ per-request D1 repositories. Both targets share one MCP registry.
 
 ## Known boundaries and roadmap
 
+- The current tracked roadmap is [docs/ROADMAP.md](docs/ROADMAP.md), beginning
+  after the PR #10 production baseline.
 - Full CCEL discovery and search are future work.
 - The local historical collection needs document-level edition, source, and
   license metadata before redistribution claims can be made.
@@ -245,5 +251,5 @@ per-request D1 repositories. Both targets share one MCP registry.
 - Remote D1 compatibility must be checked before any deployment; migration or
   corpus replacement requires separate review and approval.
 
-The local implementation assessment and roadmap are kept under ignored
-`test-output/` so planning notes do not enter Git accidentally.
+The dated architecture assessment remains under ignored `test-output/` as
+historical source context; it is not the current roadmap or product contract.

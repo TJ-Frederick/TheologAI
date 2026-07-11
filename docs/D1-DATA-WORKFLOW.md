@@ -86,6 +86,32 @@ keeps the D1 syntax/runtime check practical while the full semantic verifier
 continues to cover all 846,860 rows. The exact production readiness query is
 separately exercised against the complete derived SQLite database.
 
+### Readiness compatibility and rollback
+
+The deploy readiness query requires the current schema and corpus identity
+markers, including `theologai_metadata`, in addition to integrity, foreign-key,
+index, column-signature, and exact manifest-count checks. A predecessor D1
+database that predates those markers cannot pass the current readiness gate,
+even if its older application revision previously used it successfully.
+
+Rollback therefore has three distinct forms:
+
+- **Code-only:** restore a known-good Worker revision while retaining the
+  active compatible D1 binding, then run that revision's normal readiness check.
+- **Data-binding:** bind a retained, independently verified compatible D1
+  database while keeping application code constant; readiness must pass before
+  deployment.
+- **Combined:** when a predecessor database lacks the current schema or
+  identity markers, restore the matched earlier application/config/workflow
+  revision and database, or prepare a new compatible replacement. Do not weaken
+  the readiness query for rollback convenience.
+
+Before claiming a rollback target is available, confirm its Cloudflare
+retention, exact Worker revision, and readiness compatibility through a
+read-only inventory/check. If retention or compatibility has not been verified,
+document the target as candidate/unverified. Database deletion remains a later,
+separately authorized operation after the retention window and rollback review.
+
 ## Optional local D1 rehearsal
 
 Wrangler defaults D1 commands to local state, but specify `--local` explicitly

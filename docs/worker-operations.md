@@ -1,5 +1,50 @@
 # Worker operations
 
+## Deployment baseline and rollback posture (2026-07-11)
+
+PR #10 (`71a3f0d`) is the current production application baseline. Production
+deployed successfully after a read-only D1 readiness result of `ready`.
+Preview contains the hardened PR #10 application code from `ccdfb8c`; its later
+production-only changes are not part of the preview baseline.
+
+The active logical D1 bindings are recorded in `wrangler.toml`:
+
+| Environment | Active logical database | Current posture | Rollback posture |
+|---|---|---|---|
+| Production | `theologai-production-20260711-a` | PR #10 merge deployed after the read-only readiness gate passed. | Former `theologai-db` is a candidate only. Retention and compatibility are not verified here; if it predates current identity markers, a current-main redeploy may reject it. |
+| Preview | `theologai-preview-20260710-c` | Hardened PR #10 application code deployed from `ccdfb8c`. | Earlier preview databases are candidates only. Confirm retention, readiness compatibility, and the exact Worker revision before use. |
+
+No rollback asset is claimed as known-good without a read-only inventory and
+compatibility check. Do not copy database IDs, credentials, API tokens, or
+provider-bearing secret RPC URLs into this runbook; `wrangler.toml` and the
+approved workflow are the configuration sources of truth.
+
+Choose rollback as a matched operational decision:
+
+1. **Code-only rollback:** restore a known-good Worker revision while retaining
+   the active compatible D1 binding, then run the approval gate and the
+   readiness check for that revision.
+2. **Data-binding rollback:** bind a retained, independently verified
+   compatible D1 database while keeping application code constant. Readiness
+   must pass before deployment.
+3. **Combined rollback:** if the predecessor D1 lacks current metadata/schema,
+   restore the matched earlier Worker/config/workflow revision and database, or
+   prepare a compatible replacement. Never weaken the current readiness query.
+4. **Retention check:** before approving a rollback, use a read-only Cloudflare
+   inventory to confirm which predecessor databases and Worker revisions still
+   exist. If that cannot be verified, describe them as candidate/unverified.
+5. **No destructive cleanup:** do not delete predecessor databases until a
+   separately authorized retention window and rollback review are complete.
+
+The production Wrangler workflow targets the top-level configuration explicitly
+with `npx --no-install wrangler secret put ESV_API_KEY --env=` for secret upload
+and `command: deploy --env=` for deploy. The secret value is supplied through
+stdin from the masked job environment and is not part of the command text.
+This is intentional: the top-level configuration is production, while
+`preview` is the only named environment. The action's named
+`environment: production` input is not used because no `env.production` block
+exists and creating one would change the Worker/configuration model.
+
 ## Anonymous MCP request limit
 
 The public Worker remains anonymous. It uses Cloudflare's Rate Limiting binding
@@ -87,6 +132,14 @@ secret is required by the code.
 The verifier treats an explicit transaction/receipt-not-found JSON-RPC error as
 the same evidence as a JSON-RPC `result: null`, while timeouts, HTTP failures,
 rate limits, malformed responses, and other RPC errors remain `unavailable`.
+An arbitrary syntactically valid fake Ethereum transaction hash is therefore
+only an error-taxonomy exercise, not a deterministic health probe. An
+Ethereum `unavailable` result during such a check is a non-blocking
+provider-availability observation, not evidence of absence or verification.
+Release smoke tests must use an operator-selected, already-mined public
+transaction checked at execution time, never a committed golden hash or a
+newly sent transaction. Keep `unavailable` fail-closed and distinct from
+`absent`.
 Verification results include per-chain states so a healthy chain's evidence is
 not hidden when another provider is down.
 

@@ -27,6 +27,34 @@ afterAll(async () => {
 });
 
 describe('published project contract', () => {
+  it('links the current roadmap and quarantines known historical artifacts', async () => {
+    const historicalArtifacts = [
+      'TEST_REPORT.md',
+      'docs/bible-mcp-prd.md',
+      'docs/parallel-passages-tool-spec.md',
+      'docs/bible-mcp-architecture.md',
+      'docs/bible-mcp-development-plan.md',
+      'docs/RELEASE_NOTES_v3.4.0.md',
+    ];
+    const [readme, roadmap, ...artifacts] = await Promise.all([
+      readProjectFile('README.md'),
+      readProjectFile('docs/ROADMAP.md'),
+      ...historicalArtifacts.map(readProjectFile),
+    ]);
+
+    expect(readme).toContain('[docs/ROADMAP.md](docs/ROADMAP.md)');
+    expect(roadmap).toContain('# TheologAI roadmap');
+    expect(roadmap).toContain('71a3f0d120ffd31c09424ba2a7caef88961d21e3');
+    expect(roadmap).toContain('### PR 1 — production cleanup and roadmap baseline');
+    for (const artifact of artifacts) {
+      const banner = artifact.slice(0, 700).replace(/^>\s?/gm, '').replace(/\s+/g, ' ');
+      expect(banner).toMatch(/Historical/i);
+      expect(banner).toMatch(/not\s+the\s+current/i);
+      expect(banner).toMatch(/product\s+contract/i);
+      expect(banner).toContain('docs/ROADMAP.md');
+    }
+  });
+
   it('keeps the README tool and prompt registries aligned with the MCP server', async () => {
     const readme = await readProjectFile('README.md');
     const { root } = createDeterministicMcpFixture();

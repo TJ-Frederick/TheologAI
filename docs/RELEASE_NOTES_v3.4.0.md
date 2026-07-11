@@ -1,9 +1,10 @@
 # Release Notes: Version 3.4.0
 
-> **Historical release note:** This file records the intended v3.4.0 scope and
-> is not the current product contract. Full CCEL catalog discovery/search is not
-> currently supported; bounded named-work/section retrieval remains available.
-> See the repository README for current capabilities.
+> **Historical release note:** This file records the intended v3.4.0 scope. It
+> is not the current product contract or implementation status. Full CCEL
+> catalog discovery/search is not currently supported; bounded named-work/section
+> retrieval remains available. See [README.md](../README.md) and
+> [docs/ROADMAP.md](ROADMAP.md) for current capabilities and sequencing.
 
 ## Enhanced Discovery & Commentary Navigation
 

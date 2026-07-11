@@ -1,5 +1,10 @@
 # Parallel Passages Tool - Implementation Specification
 
+> **Historical implementation specification:** The `parallel_passages` tool is
+> already implemented, and this document's four-tool list and instructions are
+> not the current product contract or implementation status. See [README.md](../README.md)
+> and [docs/ROADMAP.md](ROADMAP.md).
+
 ## Project Context
 
 This is a **Model Context Protocol (MCP) server** for Bible study and theological research. The server currently has 4 tools:
