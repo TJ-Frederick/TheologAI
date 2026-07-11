@@ -3,122 +3,93 @@
  * Build script: Populate SQLite database from source data files.
  *
  * Reads existing data files (TSV, JSON, gzip) and creates data/theologai.db.
- * Idempotent: drops and recreates all tables on each run.
- * Source data files remain the source of truth; SQLite is a derived artifact.
+ * Builds into a temporary database, validates it, then atomically replaces the
+ * requested output. Source data files remain the source of truth.
  *
- * Usage: npm run build:db
+ * Usage: npm run build:db [-- --output /path/to/theologai.db]
  */
 
 import Database from 'better-sqlite3';
-import { readFileSync, readdirSync, existsSync } from 'fs';
-import { join, dirname } from 'path';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  renameSync,
+  statSync,
+  unlinkSync,
+} from 'fs';
+import { isAbsolute, join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { gunzipSync } from 'zlib';
+import { createHash } from 'crypto';
+import { assertJohnOneOneDatabase, assertJohnOneOneSource } from './data-integrity.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 const DATA = join(ROOT, 'data');
-const DB_PATH = join(DATA, 'theologai.db');
+const MANIFEST_PATH = join(DATA, 'data-manifest.json');
+const manifestBytes = readFileSync(MANIFEST_PATH);
+const manifest = JSON.parse(manifestBytes.toString('utf-8')) as {
+  schemaVersion: string;
+  expectedCounts: Record<string, number>;
+};
+const SCHEMA_PATH = join(ROOT, 'migrations', `${manifest.schemaVersion}.sql`);
+
+function getOutputPath(argv: string[]): string {
+  const equalsArg = argv.find(arg => arg.startsWith('--output='));
+  if (equalsArg) {
+    const value = equalsArg.slice('--output='.length);
+    if (!value) throw new Error('--output requires a path');
+    return isAbsolute(value) ? value : resolve(ROOT, value);
+  }
+
+  const outputIndex = argv.indexOf('--output');
+  if (outputIndex >= 0) {
+    const value = argv[outputIndex + 1];
+    if (!value || value.startsWith('--')) throw new Error('--output requires a path');
+    return isAbsolute(value) ? value : resolve(ROOT, value);
+  }
+
+  return join(DATA, 'theologai.db');
+}
+
+const DB_PATH = getOutputPath(process.argv.slice(2));
+const TEMP_DB_PATH = `${DB_PATH}.tmp-${process.pid}`;
+
+function removeIfPresent(path: string): void {
+  if (existsSync(path)) unlinkSync(path);
+}
+
+function cleanupTemporaryDatabase(): void {
+  removeIfPresent(TEMP_DB_PATH);
+  removeIfPresent(`${TEMP_DB_PATH}-shm`);
+  removeIfPresent(`${TEMP_DB_PATH}-wal`);
+}
 
 function log(msg: string) {
   console.error(`[build-db] ${msg}`);
 }
 
-// ── Create database ──
+// ── Create temporary database ──
 
-log(`Creating database at ${DB_PATH}`);
-const db = new Database(DB_PATH);
-db.pragma('journal_mode = WAL');
+mkdirSync(dirname(DB_PATH), { recursive: true });
+cleanupTemporaryDatabase();
+log(`Building temporary database for ${DB_PATH}`);
+let db: Database.Database | undefined;
+
+try {
+db = new Database(TEMP_DB_PATH);
+db.pragma('journal_mode = DELETE');
 db.pragma('synchronous = NORMAL');
+db.pragma('foreign_keys = ON');
 
 // ── Schema ──
 
-db.exec(`
-  -- Cross-references (Tier 1)
-  DROP TABLE IF EXISTS cross_references;
-  CREATE TABLE cross_references (
-    from_verse TEXT NOT NULL,
-    to_verse TEXT NOT NULL,
-    votes INTEGER NOT NULL,
-    PRIMARY KEY (from_verse, to_verse)
-  );
-  CREATE INDEX idx_xref_from ON cross_references(from_verse);
-  CREATE INDEX idx_xref_votes ON cross_references(votes DESC);
-
-  -- Strong's concordance (Tier 1)
-  DROP TABLE IF EXISTS strongs;
-  CREATE TABLE strongs (
-    strongs_number TEXT PRIMARY KEY,
-    testament TEXT NOT NULL,
-    lemma TEXT NOT NULL,
-    transliteration TEXT,
-    pronunciation TEXT,
-    definition TEXT NOT NULL,
-    derivation TEXT
-  );
-
-  -- Strong's FTS index
-  DROP TABLE IF EXISTS strongs_fts;
-  CREATE VIRTUAL TABLE strongs_fts USING fts5(
-    strongs_number UNINDEXED, lemma, transliteration, definition
-  );
-
-  -- STEPBible morphology (Tier 2)
-  DROP TABLE IF EXISTS morphology;
-  CREATE TABLE morphology (
-    book TEXT NOT NULL,
-    chapter INTEGER NOT NULL,
-    verse INTEGER NOT NULL,
-    position INTEGER NOT NULL,
-    word_text TEXT NOT NULL,
-    lemma TEXT NOT NULL,
-    strongs_number TEXT,
-    morph_code TEXT,
-    gloss TEXT,
-    PRIMARY KEY (book, chapter, verse, position)
-  );
-  CREATE INDEX idx_morph_verse ON morphology(book, chapter, verse);
-  CREATE INDEX idx_morph_strongs ON morphology(strongs_number);
-
-  -- STEPBible lexicons (Tier 2)
-  DROP TABLE IF EXISTS stepbible_lexicons;
-  CREATE TABLE stepbible_lexicons (
-    strongs_number TEXT PRIMARY KEY,
-    source TEXT NOT NULL,
-    extended_data JSON NOT NULL
-  );
-
-  -- Historical documents (Tier 3) — drop children before parents
-  DROP TABLE IF EXISTS sections_fts;
-  DROP TABLE IF EXISTS document_sections;
-  DROP TABLE IF EXISTS documents;
-
-  CREATE TABLE documents (
-    id TEXT PRIMARY KEY,
-    title TEXT NOT NULL,
-    type TEXT NOT NULL,
-    date TEXT,
-    metadata JSON
-  );
-
-  CREATE TABLE document_sections (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    document_id TEXT NOT NULL REFERENCES documents(id),
-    section_number TEXT,
-    title TEXT,
-    content TEXT NOT NULL,
-    topics JSON
-  );
-
-  CREATE VIRTUAL TABLE sections_fts USING fts5(title, content, topics);
-
-  -- Morphology codes
-  DROP TABLE IF EXISTS morph_codes;
-  CREATE TABLE morph_codes (
-    code TEXT PRIMARY KEY,
-    expansion TEXT NOT NULL
-  );
-`);
+db.exec(readFileSync(SCHEMA_PATH, 'utf-8'));
+const insertMetadata = db.prepare('INSERT INTO theologai_metadata (key, value) VALUES (?, ?)');
+insertMetadata.run('schema_version', manifest.schemaVersion);
+insertMetadata.run('corpus_manifest_sha256', createHash('sha256').update(manifestBytes).digest('hex'));
 
 // ── Tier 1: Cross-references ──
 
@@ -206,11 +177,14 @@ const morphTx = db.transaction(() => {
       continue;
     }
 
-    const files = readdirSync(dir).filter(f => f.endsWith('.json.gz'));
+    const files = readdirSync(dir).filter(f => f.endsWith('.json.gz')).sort();
     for (const file of files) {
       const compressed = readFileSync(join(dir, file));
       const json = JSON.parse(gunzipSync(compressed).toString('utf-8'));
       const bookName = json.book as string;
+      if (file === '43-John.json.gz') {
+        assertJohnOneOneSource(json, `data/biblical-languages/stepbible/${subdir}/${file}`);
+      }
 
       for (const [ch, verses] of Object.entries(json.chapters as Record<string, Record<string, any>>)) {
         for (const [v, verseData] of Object.entries(verses)) {
@@ -240,6 +214,7 @@ const morphTx = db.transaction(() => {
 
 const morphCount = morphTx();
 log(`  Inserted ${morphCount} morphology words`);
+assertJohnOneOneDatabase(db);
 
 // ── Tier 2: Morphology codes ──
 
@@ -312,7 +287,7 @@ const histTx = db.transaction(() => {
   let docCount = 0;
   let sectionCount = 0;
 
-  const files = readdirSync(histDir).filter(f => f.endsWith('.json'));
+  const files = readdirSync(histDir).filter(f => f.endsWith('.json')).sort();
   for (const file of files) {
     const id = file.replace('.json', '');
     const doc = JSON.parse(readFileSync(join(histDir, file), 'utf-8'));
@@ -347,9 +322,44 @@ const histTx = db.transaction(() => {
 const { docCount, sectionCount } = histTx();
 log(`  Inserted ${docCount} documents with ${sectionCount} sections`);
 
-// ── Finalize ──
+// ── Validate and finalize ──
 
 db.exec('ANALYZE');
-db.close();
 
-log('Database build complete!');
+const integrityRows = db.pragma('integrity_check') as Array<Record<string, string>>;
+if (integrityRows.length !== 1 || Object.values(integrityRows[0])[0] !== 'ok') {
+  throw new Error(`SQLite integrity check failed: ${JSON.stringify(integrityRows)}`);
+}
+
+const foreignKeyViolations = db.pragma('foreign_key_check') as unknown[];
+if (foreignKeyViolations.length > 0) {
+  throw new Error(`Foreign-key check failed: ${JSON.stringify(foreignKeyViolations)}`);
+}
+
+for (const [table, expected] of Object.entries(manifest.expectedCounts)) {
+  if (!/^[a-z_]+$/.test(table)) throw new Error(`Invalid table name in manifest: ${table}`);
+  const row = db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get() as { count: number };
+  if (row.count !== expected) {
+    throw new Error(`Unexpected ${table} count: expected ${expected}, received ${row.count}`);
+  }
+}
+
+db.close();
+db = undefined;
+
+const destinationWal = `${DB_PATH}-wal`;
+if (existsSync(destinationWal) && statSync(destinationWal).size > 0) {
+  throw new Error(
+    `Refusing to replace ${DB_PATH} while a non-empty WAL exists. Stop processes using the database and checkpoint it first.`
+  );
+}
+removeIfPresent(destinationWal);
+removeIfPresent(`${DB_PATH}-shm`);
+renameSync(TEMP_DB_PATH, DB_PATH);
+
+log(`Database build complete at ${DB_PATH}`);
+} catch (error) {
+  if (db?.open) db.close();
+  cleanupTemporaryDatabase();
+  throw error;
+}

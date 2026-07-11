@@ -3,47 +3,62 @@ import { createSimpleD1 } from '../../../helpers/mockD1.js';
 
 // Mock all HTTP adapters and external services to avoid network calls
 vi.mock('../../../../src/adapters/bible/EsvAdapter.js', () => ({
-  EsvAdapter: vi.fn().mockImplementation(() => ({
-    supportedTranslations: ['ESV'],
-    getPassage: vi.fn(),
-    isConfigured: vi.fn().mockReturnValue(true),
-    getCopyright: vi.fn().mockReturnValue('ESV'),
-  })),
+  EsvAdapter: vi.fn().mockImplementation(function (apiKey?: string) {
+    return {
+      supportedTranslations: ['ESV'],
+      getPassage: vi.fn().mockResolvedValue({
+        reference: 'John 3:16',
+        translation: 'ESV',
+        text: 'For God so loved the world.',
+        citation: { source: 'ESV test adapter' },
+      }),
+      isConfigured: vi.fn().mockReturnValue(Boolean(apiKey)),
+      getCopyright: vi.fn().mockReturnValue('ESV'),
+    };
+  }),
 }));
 
 vi.mock('../../../../src/adapters/bible/NetBibleAdapter.js', () => ({
-  NetBibleAdapter: vi.fn().mockImplementation(() => ({
-    supportedTranslations: ['NET'],
-    getPassage: vi.fn(),
-    isConfigured: vi.fn().mockReturnValue(true),
-    getCopyright: vi.fn().mockReturnValue('NET'),
-  })),
+  NetBibleAdapter: vi.fn().mockImplementation(function () {
+    return {
+      supportedTranslations: ['NET'],
+      getPassage: vi.fn(),
+      isConfigured: vi.fn().mockReturnValue(true),
+      getCopyright: vi.fn().mockReturnValue('NET'),
+    };
+  }),
 }));
 
 vi.mock('../../../../src/adapters/bible/HelloAoAdapter.js', () => ({
-  HelloAoAdapter: vi.fn().mockImplementation(() => ({
-    supportedTranslations: ['KJV', 'WEB', 'BSB', 'ASV', 'YLT', 'DBY'],
-    getPassage: vi.fn(),
-    isConfigured: vi.fn().mockReturnValue(true),
-    getCopyright: vi.fn().mockReturnValue('Public Domain'),
-  })),
+  HelloAoAdapter: vi.fn().mockImplementation(function () {
+    return {
+      supportedTranslations: ['KJV', 'WEB', 'BSB', 'ASV', 'YLT', 'DBY'],
+      getPassage: vi.fn(),
+      isConfigured: vi.fn().mockReturnValue(true),
+      getCopyright: vi.fn().mockReturnValue('Public Domain'),
+    };
+  }),
 }));
 
 vi.mock('../../../../src/adapters/commentary/HelloAoCommentaryAdapter.js', () => ({
-  HelloAoCommentaryAdapter: vi.fn().mockImplementation(() => ({
-    getCommentary: vi.fn(),
-  })),
+  HelloAoCommentaryAdapter: vi.fn().mockImplementation(function () {
+    return {
+      getCommentary: vi.fn(),
+    };
+  }),
 }));
 
 vi.mock('../../../../src/adapters/commentary/CcelAdapter.js', () => ({
-  CcelAdapter: vi.fn().mockImplementation(() => ({
-    search: vi.fn(),
-  })),
+  CcelAdapter: vi.fn().mockImplementation(function () {
+    return {
+      search: vi.fn(),
+    };
+  }),
 }));
 
 // Mock the JSON import
 vi.mock('../../../../src/data/parallel-passages.json', () => ({
-  default: [],
+  default: { description: 'test fixture', version: '1', parallels: {} },
 }));
 
 import type { Env } from '../../../../src/worker-env.js';
@@ -100,6 +115,13 @@ describe('createWorkerCompositionRoot', () => {
       }
     });
 
+    it('every advertised tool schema rejects unknown arguments', () => {
+      const root = createWorkerCompositionRoot(makeEnv());
+      for (const tool of root.tools) {
+        expect(tool.inputSchema.additionalProperties, tool.name).toBe(false);
+      }
+    });
+
     it('every tool has readOnlyHint annotation', () => {
       const root = createWorkerCompositionRoot(makeEnv());
       for (const tool of root.tools) {
@@ -116,6 +138,13 @@ describe('createWorkerCompositionRoot', () => {
     it('exposes bibleService on services', () => {
       const root = createWorkerCompositionRoot(makeEnv());
       expect(root.services.bibleService).toBeDefined();
+    });
+
+    it('keeps all eight translation routes, including ESV, in the Worker composition root', () => {
+      const root = createWorkerCompositionRoot(makeEnv());
+      expect(root.services.bibleService.getSupportedTranslations().sort()).toEqual([
+        'ASV', 'BSB', 'DBY', 'ESV', 'KJV', 'NET', 'WEB', 'YLT',
+      ]);
     });
 
     it('exposes commentaryService on services', () => {
@@ -147,6 +176,36 @@ describe('createWorkerCompositionRoot', () => {
       const root1 = createWorkerCompositionRoot(env);
       const root2 = createWorkerCompositionRoot(env);
       expect(root1.services.bibleService).toBe(root2.services.bibleService);
+    });
+
+    it('rebuilds BibleService when ESV changes from unconfigured to configured', async () => {
+      const secretlessRoot = createWorkerCompositionRoot(makeEnv({ ESV_API_KEY: undefined }));
+      await expect(secretlessRoot.services.bibleService.lookup({
+        reference: 'John 3:16',
+        translation: 'ESV',
+      })).rejects.toThrow('ESV adapter is not configured');
+
+      const configuredRoot = createWorkerCompositionRoot(makeEnv({ ESV_API_KEY: 'test-key' }));
+      await expect(configuredRoot.services.bibleService.lookup({
+        reference: 'John 3:16',
+        translation: 'ESV',
+      })).resolves.toMatchObject({ translation: 'ESV', reference: 'John 3:16' });
+      expect(configuredRoot.services.bibleService).not.toBe(secretlessRoot.services.bibleService);
+    });
+
+    it('rebuilds BibleService when ESV changes from configured to unconfigured', async () => {
+      const configuredRoot = createWorkerCompositionRoot(makeEnv({ ESV_API_KEY: 'test-key' }));
+      await expect(configuredRoot.services.bibleService.lookup({
+        reference: 'John 3:16',
+        translation: 'ESV',
+      })).resolves.toMatchObject({ translation: 'ESV' });
+
+      const secretlessRoot = createWorkerCompositionRoot(makeEnv({ ESV_API_KEY: undefined }));
+      await expect(secretlessRoot.services.bibleService.lookup({
+        reference: 'John 3:16',
+        translation: 'ESV',
+      })).rejects.toThrow('ESV adapter is not configured');
+      expect(secretlessRoot.services.bibleService).not.toBe(configuredRoot.services.bibleService);
     });
 
     it('caches commentaryService at module scope (singleton)', () => {

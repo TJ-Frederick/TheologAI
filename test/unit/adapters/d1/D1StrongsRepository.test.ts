@@ -72,13 +72,15 @@ describe('D1StrongsRepository', () => {
 
     it('unwraps { results } from .all()', async () => {
       const db = createSimpleD1([
-        { strongs_number: 'G0025', lemma: 'ἀγαπάω', transliteration: 'agapaō', definition: 'to love' },
-        { strongs_number: 'G0026', lemma: 'ἀγάπη', transliteration: 'agapē', definition: 'love' },
+        sampleEntry,
+        { ...sampleEntry, strongs_number: 'G0026', lemma: 'ἀγάπη', transliteration: 'agapē', definition: 'love' },
       ]);
       const repo = new D1StrongsRepository(db as any);
       const results = await repo.search('agape');
       expect(results).toHaveLength(2);
       expect(results[0].strongs_number).toBe('G0025');
+      expect(results[0]).toHaveProperty('testament', 'NT');
+      expect(results[0]).toHaveProperty('pronunciation');
     });
 
     it('passes limit parameter to bind', async () => {

@@ -78,16 +78,19 @@ const ccelService = new CcelService(ccelAdapter);
 
 // ESV adapter + BibleService are lazy-initialized on first request
 // because EsvAdapter needs env.ESV_API_KEY which isn't available at module scope.
-// Once created, they persist for the isolate's lifetime (secret changes require redeployment).
+// The cache is rebuilt if the request's non-secret ESV configuration state changes.
 let _bibleService: BibleService | null = null;
+let _bibleServiceEsvConfigured: boolean | null = null;
 
 // Donation service is HTTP-only (no D1 dependency), safe to cache at module scope.
 let _donationService: DonationService | null = null;
 
 function getBibleService(env: Env): BibleService {
-  if (!_bibleService) {
+  const esvConfigured = Boolean(env.ESV_API_KEY);
+  if (!_bibleService || _bibleServiceEsvConfigured !== esvConfigured) {
     const esvAdapter = new EsvAdapter(env.ESV_API_KEY);
     _bibleService = new BibleService([esvAdapter, netAdapter, helloaoAdapter]);
+    _bibleServiceEsvConfigured = esvConfigured;
   }
   return _bibleService;
 }
@@ -117,9 +120,10 @@ export function createWorkerCompositionRoot(env: Env): WorkerCompositionRoot {
 
   // D1-dependent services (per-request)
   const crossRefService = new CrossReferenceService(crossRefRepo);
+  const bibleService = getBibleService(env);
   const parallelService = new ParallelPassageService(
     crossRefRepo,
-    helloaoAdapter,
+    bibleService,
     undefined, // no databasePath in Workers
     parallelPassagesData as any, // preloaded from JSON module
   );
@@ -128,7 +132,6 @@ export function createWorkerCompositionRoot(env: Env): WorkerCompositionRoot {
   const morphService = new MorphologyService(morphRepo);
 
   // Module-scope services (cached across requests)
-  const bibleService = getBibleService(env);
   const donationService = getDonationService(env);
 
   // Tool handlers (per-request — hold D1-dependent services)

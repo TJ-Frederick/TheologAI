@@ -7,7 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [4.0.0] - 2026-03-02
+### Corrected
+
+- Reconciled the current public contract at version 3.6.0: nine tools, five
+  prompts, 17 local historical documents, and transport-specific Logging.
+- Preserved bounded named-work/section CCEL retrieval while moving full catalog
+  discovery and search to the future roadmap.
+- Corrected Tyndale Open Study Notes licensing to CC BY-SA 4.0.
+
+## [4.0.0-draft] - Not released
+
+> This section was written as a future release draft. It is retained as design
+> history, but its feature counts and CCEL scope are not the current product
+> contract. See the README and the Unreleased corrections above.
 
 ### Added — Cloudflare Workers Remote MCP Deployment
 
@@ -202,8 +214,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/TJ-Frederick/TheologAI/compare/v4.0.0...HEAD
-[4.0.0]: https://github.com/TJ-Frederick/TheologAI/compare/v3.4.0...v4.0.0
+[Unreleased]: https://github.com/TJ-Frederick/TheologAI/compare/v3.4.0...HEAD
 [3.4.0]: https://github.com/TJ-Frederick/TheologAI/compare/v3.3.0...v3.4.0
 [3.3.0]: https://github.com/yourusername/TheologAI/compare/v3.2.0...v3.3.0
 [3.2.0]: https://github.com/yourusername/TheologAI/compare/v3.1.0...v3.2.0

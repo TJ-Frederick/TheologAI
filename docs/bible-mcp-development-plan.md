@@ -1,5 +1,11 @@
 # Bible Study MCP Server - Development Plan
 
+> **Historical development plan:** This document preserves earlier milestones,
+> test totals, and intended provider scope. It is not the current implementation
+> status or product contract. In particular, full CCEL catalog search is not
+> supported and commentary rights vary by work. See `README.md` and `NOTICE.md`.
+
+
 **Current Status: Phase 3.4 - Production Ready for Beta Launch ✅**
 - Repository: https://github.com/TJ-Frederick/TheologAI
 - Phase 1: Complete (ESV Bible, Historical Docs, Mock Commentary)

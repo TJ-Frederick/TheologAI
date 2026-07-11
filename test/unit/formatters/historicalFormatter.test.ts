@@ -134,6 +134,20 @@ describe('formatSearchResults', () => {
     expect(out).not.toContain('Section 10');
   });
 
+  it('states how many results are shown when the result list is truncated', () => {
+    const sections = Array.from({ length: 15 }, (_, i) => makeSection({ id: i }));
+    const out = formatSearchResults('test', sections);
+
+    expect(out).toContain('(showing 10 of 15 results)');
+  });
+
+  it('labels local historical output without inventing edition metadata', () => {
+    const out = formatSearchResults('grace', [makeSection()]);
+
+    expect(out).toContain('*Source: TheologAI local historical-document collection*');
+    expect(out).not.toMatch(/edition|version \d/i);
+  });
+
   it('returns trimmed output', () => {
     const out = formatSearchResults('grace', [makeSection()]);
     expect(out).toBe(out.trim());

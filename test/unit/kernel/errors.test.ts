@@ -94,6 +94,43 @@ describe('getUserMessage', () => {
   it('generic Error → fallback', () => {
     expect(getUserMessage(new Error('oops'))).toContain('error');
   });
+
+  it('sanitizes provider names and URLs from ordinary adapter failures', () => {
+    const message = getUserMessage(new AdapterError(
+      'CCEL',
+      'HTTP 503: Service Unavailable for https://ccel.example.test/private?token=secret',
+    ));
+
+    expect(message).toContain('Unavailable');
+    expect(message).not.toContain('CCEL');
+    expect(message).not.toContain('https://');
+    expect(message).not.toContain('token=secret');
+  });
+
+  it('preserves unsupported-coverage and not-found distinctions without provider details', () => {
+    expect(getUserMessage(new AdapterError('HelloAO', 'Unsupported translation: NIV')))
+      .toBe('Unsupported coverage: This request is outside the supported coverage.');
+    expect(getUserMessage(new AdapterError('CCEL', 'HTTP 404: Not Found for https://ccel.example.test/missing')))
+      .toBe('Not found: No matching content was found.');
+  });
+
+  it('treats CCEL parser and upstream-shape failures as unavailable', () => {
+    expect(getUserMessage(new AdapterError('CCEL', 'Could not find book content in response')))
+      .toBe('Unavailable: The requested source is temporarily unavailable. Please try again later.');
+    expect(getUserMessage(new AdapterError('CCEL', 'Section not found or error page returned')))
+      .toBe('Unavailable: The requested source is temporarily unavailable. Please try again later.');
+    expect(getUserMessage(new AdapterError('CCEL', 'Section not found')))
+      .toBe('Not found: No matching content was found.');
+  });
+
+  it('sanitizes unavailable configuration errors', () => {
+    expect(getUserMessage(new NotFoundError('adapter', 'ESV adapter is not configured')))
+      .toContain('Unavailable');
+    expect(getUserMessage(new NotFoundError('verse', 'CCEL passage was not found')))
+      .not.toContain('CCEL');
+    expect(getUserMessage(new APIError(503, 'request failed at https://provider.example.test')))
+      .not.toContain('provider.example.test');
+  });
 });
 
 describe('handleToolError', () => {

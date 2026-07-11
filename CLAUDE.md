@@ -1,6 +1,6 @@
 # TheologAI — Development Guide
 
-Production MCP server for theological research. 9 tools, 4/4 MCP capabilities (Tools, Resources, Prompts, Logging), 8 Bible translations, 6 commentaries, 18 historical documents, Greek/Hebrew language tools, on-chain donation support.
+Production MCP server for theological research. Nine tools, five prompts, eight Bible translations, six commentaries, 17 historical documents, Greek/Hebrew language tools, and on-chain donation support. Tools, resources, and prompts are available on every transport; MCP Logging is stdio-only because HTTP is stateless.
 
 ## Quick Start
 
@@ -21,8 +21,10 @@ Set `PORT=3000` in `.env` for HTTP transport; omit for stdio.
 src/
 ├── index.ts              # Entry point — stdio or HTTP transport (Node.js)
 ├── worker.ts             # Entry point — Cloudflare Workers (Streamable HTTP)
-├── server.ts             # MCP server — tools, resources, prompts, logging (Node.js)
-├── worker-server.ts      # MCP server — same capabilities, wired for D1 (Workers)
+├── server.ts             # Node wrapper around the shared MCP registrar
+├── worker-server.ts      # Worker wrapper around the shared MCP registrar
+├── mcp/                  # Shared tools/resources/prompts, schemas, and errors
+├── http/                 # Node and Worker transport policies
 ├── worker-env.ts         # Env type for Workers bindings (D1, secrets, vars)
 ├── tools/v2/             # Tool handlers + Node.js composition root
 │   └── index.ts          # createCompositionRoot() — Node.js wiring (better-sqlite3)
@@ -55,7 +57,7 @@ data/                     # Source data files
 ├── theologai.db          # SQLite database (built from source data)
 ├── biblical-languages/   # Strong's concordance, STEPBible morphology/lexicons
 ├── cross-references/     # OpenBible.info cross-reference TSV
-└── historical-documents/ # 18 creeds, confessions, catechisms (JSON)
+└── historical-documents/ # 17 creeds, confessions, catechisms (JSON)
 
 skills/                   # Agent skill workflows
 ├── word-study/           # Greek/Hebrew word study methodology
@@ -63,14 +65,15 @@ skills/                   # Agent skill workflows
 └── confession-study/     # Cross-tradition doctrinal comparison
 
 test/
-├── unit/                 # Fast, mocked tests (332 tests)
+├── unit/                 # Fast unit, contract, parity, and boundary tests
 │   ├── kernel/           # reference, books, cache, errors (94 tests)
 │   ├── formatters/       # bibleFormatter, commentary, historical, languages (75 tests)
 │   ├── services/         # bible/, commentary/, historical/, languages/, async-compat/ (64 tests)
 │   ├── adapters/d1/      # D1 repository tests (61 tests)
 │   ├── tools/worker/     # Worker composition root (11 tests)
-│   ├── worker-server/    # Worker MCP server registration (19 tests)
-│   └── worker/           # Worker entry point + CORS (8 tests)
+│   └── worker/           # Worker entry point and policy tests
+├── integration/current/  # Shared Node/Worker MCP contract tests
+├── worker-runtime/       # Real Workerd endpoint with isolated D1
 ├── helpers/              # Reusable test utilities (mockD1.ts)
 ├── fixtures/             # Shared test data
 └── setup.ts              # Global test config
@@ -86,7 +89,7 @@ test/
 | `bible_cross_references` | Thematic connections via OpenBible.info data |
 | `parallel_passages` | OT→NT quotations, synoptic parallels, thematic links |
 | `commentary_lookup` | 6 commentaries (Matthew Henry, JFB, Clarke, Gill, K-D, Tyndale) |
-| `classic_text_lookup` | 18 local docs + 1000+ CCEL works, unified search |
+| `classic_text_lookup` | Search/browse 17 local docs; retrieve a specifically named CCEL work section when available |
 | `original_language_lookup` | Strong's concordance (14,298 entries), Greek/Hebrew word studies |
 | `bible_verse_morphology` | Word-by-word grammatical analysis for all 66 books |
 | `donation_config` | Donation configuration: supported tokens, recipient address, chain details |
@@ -100,7 +103,7 @@ All tools have annotations: `readOnlyHint: true`, `destructiveHint: false`, `ide
 |-----|-------------|
 | `theologai://translations` | Available Bible translations |
 | `theologai://commentaries` | Available commentators with coverage info |
-| `theologai://documents/{slug}` | 18 historical documents (browseable) |
+| `theologai://documents/{slug}` | 17 historical documents (browseable) |
 | `theologai://strongs/{number}` | Strong's dictionary entries (G####, H####) |
 
 ### Prompts (Guided Workflows)
@@ -119,14 +122,16 @@ When a user asks "what can you do?" or seems unsure how to proceed, mention thes
 
 ### Logging
 
-Structured logging via `server.sendLoggingMessage()` with levels: debug, info, warning, error.
+Structured MCP logging via `server.sendLoggingMessage()` is advertised only on
+stateful stdio. Stateless Node and Worker HTTP intentionally omit the Logging
+capability.
 
 ## External APIs
 
 - **HelloAO** (`bible.helloao.org`) — Free, no auth, 1000+ translations + 6 commentaries
 - **ESV API** — Requires `ESV_API_KEY` env var, 100k/day limit
 - **NET Bible API** — Free, no auth, includes 60k translator notes
-- **CCEL** (`ccel.org`) — Classic theological texts, free
+- **CCEL** (`ccel.org`) — Classic theological texts with work-specific rights; see `NOTICE.md`
 
 ## Conventions
 

@@ -6,6 +6,9 @@
  * import from concrete adapter implementations.
  */
 
+/** Repository operations may be synchronous locally or asynchronous on Workers. */
+export type RepositoryResult<T> = T | Promise<T>;
+
 // ── Cross-reference types & interface ──
 
 export interface CrossRefRow {
@@ -26,9 +29,9 @@ export interface CrossRefOptions {
 }
 
 export interface ICrossReferenceRepository {
-  getCrossReferences(reference: string, options?: CrossRefOptions): Promise<CrossRefResult>;
-  hasReferences(reference: string): Promise<boolean>;
-  getChapterStatistics(bookChapter: string): Promise<{
+  getCrossReferences(reference: string, options?: CrossRefOptions): RepositoryResult<CrossRefResult>;
+  hasReferences(reference: string): RepositoryResult<boolean>;
+  getChapterStatistics(bookChapter: string): RepositoryResult<{
     totalVerses: number;
     totalCrossRefs: number;
     verseStats: Array<{ verse: number; refCount: number }>;
@@ -54,10 +57,10 @@ export interface LexiconEntry {
 }
 
 export interface IStrongsRepository {
-  lookup(strongsNumber: string): Promise<StrongsEntry | undefined>;
-  search(query: string, limit?: number): Promise<StrongsEntry[]>;
-  getLexiconEntry(strongsNumber: string): Promise<LexiconEntry | undefined>;
-  getStats(): Promise<{ greek: number; hebrew: number; total: number }>;
+  lookup(strongsNumber: string): RepositoryResult<StrongsEntry | undefined>;
+  search(query: string, limit?: number): RepositoryResult<StrongsEntry[]>;
+  getLexiconEntry(strongsNumber: string): RepositoryResult<LexiconEntry | undefined>;
+  getStats(): RepositoryResult<{ greek: number; hebrew: number; total: number }>;
 }
 
 // ── Morphology types & interface ──
@@ -85,12 +88,12 @@ export interface BookDistribution {
 }
 
 export interface IMorphologyRepository {
-  getVerseMorphology(book: string, chapter: number, verse: number): Promise<MorphWord[]>;
-  expandMorphCode(code: string): Promise<string | undefined>;
-  getAvailableBooks(): Promise<string[]>;
-  hasVerse(book: string, chapter: number, verse: number): Promise<boolean>;
-  getOccurrences(strongsNumber: string, limit?: number): Promise<WordOccurrence[]>;
-  getDistribution(strongsNumber: string): Promise<BookDistribution[]>;
+  getVerseMorphology(book: string, chapter: number, verse: number): RepositoryResult<MorphWord[]>;
+  expandMorphCode(code: string): RepositoryResult<string | undefined>;
+  getAvailableBooks(): RepositoryResult<string[]>;
+  hasVerse(book: string, chapter: number, verse: number): RepositoryResult<boolean>;
+  getOccurrences(strongsNumber: string, limit?: number): RepositoryResult<WordOccurrence[]>;
+  getDistribution(strongsNumber: string): RepositoryResult<BookDistribution[]>;
 }
 
 // ── Historical document types & interface ──
@@ -113,10 +116,10 @@ export interface DocumentSection {
 }
 
 export interface IHistoricalDocumentRepository {
-  listDocuments(): Promise<DocumentInfo[]>;
-  getDocument(id: string): Promise<DocumentInfo | undefined>;
-  getSections(documentId: string): Promise<DocumentSection[]>;
-  getSection(documentId: string, sectionNumber: string): Promise<DocumentSection | undefined>;
-  search(query: string, limit?: number): Promise<DocumentSection[]>;
-  findDocumentByName(name: string): Promise<DocumentInfo | undefined>;
+  listDocuments(): RepositoryResult<DocumentInfo[]>;
+  getDocument(id: string): RepositoryResult<DocumentInfo | undefined>;
+  getSections(documentId: string): RepositoryResult<DocumentSection[]>;
+  getSection(documentId: string, sectionNumber: string): RepositoryResult<DocumentSection | undefined>;
+  search(query: string, limit?: number): RepositoryResult<DocumentSection[]>;
+  findDocumentByName(name: string): RepositoryResult<DocumentInfo | undefined>;
 }

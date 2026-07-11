@@ -8,26 +8,17 @@
 
 import type Database from 'better-sqlite3';
 import { getDatabase } from '../shared/Database.js';
-import { normalizeOpenBibleRef, parseReference, formatReference } from '../../kernel/reference.js';
+import { fromOpenBibleKey, toOpenBibleKey } from '../shared/repositoryUtils.js';
+import type {
+  ICrossReferenceRepository,
+  CrossRefRow,
+  CrossRefResult,
+  CrossRefOptions,
+} from '../../kernel/repositories.js';
 
-export interface CrossRefRow {
-  reference: string;
-  votes: number;
-}
+export type { CrossRefRow, CrossRefResult, CrossRefOptions } from '../../kernel/repositories.js';
 
-export interface CrossRefResult {
-  references: CrossRefRow[];
-  total: number;
-  showing: number;
-  hasMore: boolean;
-}
-
-export interface CrossRefOptions {
-  maxResults?: number;
-  minVotes?: number;
-}
-
-export class CrossReferenceRepository {
+export class CrossReferenceRepository implements ICrossReferenceRepository {
   private db: Database.Database;
   private stmtByFrom: Database.Statement;
   private stmtCountByFrom: Database.Statement;
@@ -36,13 +27,13 @@ export class CrossReferenceRepository {
   constructor(db?: Database.Database) {
     this.db = db ?? getDatabase();
     this.stmtByFrom = this.db.prepare(
-      'SELECT to_verse, votes FROM cross_references WHERE from_verse = ? AND votes >= ? ORDER BY votes DESC LIMIT ?'
+      'SELECT to_verse, votes FROM cross_references WHERE from_verse = ? AND votes >= ? ORDER BY votes DESC, to_verse ASC LIMIT ?'
     );
     this.stmtCountByFrom = this.db.prepare(
       'SELECT COUNT(*) as count FROM cross_references WHERE from_verse = ? AND votes >= ?'
     );
     this.stmtChapter = this.db.prepare(
-      "SELECT from_verse, COUNT(*) as ref_count FROM cross_references WHERE from_verse LIKE ? || '%' GROUP BY from_verse ORDER BY ref_count DESC"
+      "SELECT from_verse, COUNT(*) as ref_count FROM cross_references WHERE from_verse LIKE ? || '.%' GROUP BY from_verse ORDER BY ref_count DESC, from_verse ASC"
     );
   }
 
@@ -52,13 +43,13 @@ export class CrossReferenceRepository {
    */
   getCrossReferences(reference: string, options: CrossRefOptions = {}): CrossRefResult {
     const { maxResults = 5, minVotes = 0 } = options;
-    const key = this.normalizeKey(reference);
+    const key = toOpenBibleKey(reference);
 
     const rows = this.stmtByFrom.all(key, minVotes, maxResults) as Array<{ to_verse: string; votes: number }>;
     const totalRow = this.stmtCountByFrom.get(key, minVotes) as { count: number };
 
     const references = rows.map(r => ({
-      reference: this.tryNormalize(r.to_verse),
+      reference: fromOpenBibleKey(r.to_verse),
       votes: r.votes,
     }));
 
@@ -71,7 +62,7 @@ export class CrossReferenceRepository {
   }
 
   hasReferences(reference: string): boolean {
-    const key = this.normalizeKey(reference);
+    const key = toOpenBibleKey(reference);
     const row = this.stmtCountByFrom.get(key, 0) as { count: number };
     return row.count > 0;
   }
@@ -81,7 +72,7 @@ export class CrossReferenceRepository {
     totalCrossRefs: number;
     verseStats: Array<{ verse: number; refCount: number }>;
   } {
-    const normalized = this.normalizeKey(bookChapter);
+    const normalized = toOpenBibleKey(bookChapter);
     const rows = this.stmtChapter.all(normalized) as Array<{ from_verse: string; ref_count: number }>;
 
     const verseStats = rows.map(r => {
@@ -99,32 +90,4 @@ export class CrossReferenceRepository {
     };
   }
 
-  /**
-   * Normalize a user-provided reference to the OpenBible TSV format
-   * stored in the database (e.g. "Gen.1.1").
-   */
-  private normalizeKey(ref: string): string {
-    // The DB stores raw OpenBible format: "Gen.1.1"
-    // If the input already looks like OpenBible format, pass through
-    if (/^[A-Za-z0-9]+\.\d+\.\d+$/.test(ref.trim())) {
-      return ref.trim();
-    }
-
-    // Otherwise, parse and convert to OpenBible format
-    try {
-      const parsed = parseReference(ref);
-      return `${parsed.book.abbreviation}.${parsed.chapter}.${parsed.startVerse ?? ''}`.replace(/\.$/, '');
-    } catch {
-      // Last resort: pass through as-is
-      return ref.trim();
-    }
-  }
-
-  private tryNormalize(openBibleRef: string): string {
-    try {
-      return normalizeOpenBibleRef(openBibleRef);
-    } catch {
-      return openBibleRef;
-    }
-  }
 }

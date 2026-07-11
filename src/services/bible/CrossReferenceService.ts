@@ -5,11 +5,10 @@
  * async (D1) repositories — `await syncValue` resolves immediately.
  */
 
-import type { CrossReferenceRepository, CrossRefResult, CrossRefOptions } from '../../adapters/data/CrossReferenceRepository.js';
-import { parseReference, formatReference } from '../../kernel/reference.js';
+import type { ICrossReferenceRepository, CrossRefResult, CrossRefOptions } from '../../kernel/repositories.js';
 
 export class CrossReferenceService {
-  constructor(private repo: CrossReferenceRepository) {}
+  constructor(private repo: ICrossReferenceRepository) {}
 
   async getCrossReferences(reference: string, options?: CrossRefOptions): Promise<CrossRefResult> {
     return await this.repo.getCrossReferences(reference, options);

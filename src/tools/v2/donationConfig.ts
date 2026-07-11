@@ -19,6 +19,7 @@ export function createDonationConfigHandler(donationService: DonationService): T
       type: 'object' as const,
       properties: {},
       required: [],
+      additionalProperties: false,
     },
     annotations: {
       readOnlyHint: true,

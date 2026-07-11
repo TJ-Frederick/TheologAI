@@ -6,18 +6,18 @@
  */
 
 import type { ICrossReferenceRepository, CrossRefResult, CrossRefOptions } from '../../kernel/repositories.js';
-import { parseReference } from '../../kernel/reference.js';
+import { fromOpenBibleKey, toOpenBibleKey } from '../shared/repositoryUtils.js';
 
 export class D1CrossReferenceRepository implements ICrossReferenceRepository {
   constructor(private db: D1Database) {}
 
   async getCrossReferences(reference: string, options: CrossRefOptions = {}): Promise<CrossRefResult> {
     const { maxResults = 5, minVotes = 0 } = options;
-    const key = this.normalizeKey(reference);
+    const key = toOpenBibleKey(reference);
 
     const [rows, totalRow] = await Promise.all([
       this.db.prepare(
-        'SELECT to_verse, votes FROM cross_references WHERE from_verse = ? AND votes >= ? ORDER BY votes DESC LIMIT ?'
+        'SELECT to_verse, votes FROM cross_references WHERE from_verse = ? AND votes >= ? ORDER BY votes DESC, to_verse ASC LIMIT ?'
       ).bind(key, minVotes, maxResults).all<{ to_verse: string; votes: number }>(),
       this.db.prepare(
         'SELECT COUNT(*) as count FROM cross_references WHERE from_verse = ? AND votes >= ?'
@@ -25,7 +25,7 @@ export class D1CrossReferenceRepository implements ICrossReferenceRepository {
     ]);
 
     const references = rows.results.map(r => ({
-      reference: r.to_verse,
+      reference: fromOpenBibleKey(r.to_verse),
       votes: r.votes,
     }));
 
@@ -38,7 +38,7 @@ export class D1CrossReferenceRepository implements ICrossReferenceRepository {
   }
 
   async hasReferences(reference: string): Promise<boolean> {
-    const key = this.normalizeKey(reference);
+    const key = toOpenBibleKey(reference);
     const row = await this.db.prepare(
       'SELECT COUNT(*) as count FROM cross_references WHERE from_verse = ? AND votes >= 0'
     ).bind(key).first<{ count: number }>();
@@ -50,9 +50,9 @@ export class D1CrossReferenceRepository implements ICrossReferenceRepository {
     totalCrossRefs: number;
     verseStats: Array<{ verse: number; refCount: number }>;
   }> {
-    const normalized = this.normalizeKey(bookChapter);
+    const normalized = toOpenBibleKey(bookChapter);
     const { results: rows } = await this.db.prepare(
-      "SELECT from_verse, COUNT(*) as ref_count FROM cross_references WHERE from_verse LIKE ? || '%' GROUP BY from_verse ORDER BY ref_count DESC"
+      "SELECT from_verse, COUNT(*) as ref_count FROM cross_references WHERE from_verse LIKE ? || '.%' GROUP BY from_verse ORDER BY ref_count DESC, from_verse ASC"
     ).bind(normalized).all<{ from_verse: string; ref_count: number }>();
 
     const verseStats = rows.map(r => {
@@ -68,17 +68,5 @@ export class D1CrossReferenceRepository implements ICrossReferenceRepository {
       totalCrossRefs: verseStats.reduce((sum, v) => sum + v.refCount, 0),
       verseStats,
     };
-  }
-
-  private normalizeKey(ref: string): string {
-    if (/^[A-Za-z0-9]+\.\d+\.\d+$/.test(ref.trim())) {
-      return ref.trim();
-    }
-    try {
-      const parsed = parseReference(ref);
-      return `${parsed.book.abbreviation}.${parsed.chapter}.${parsed.startVerse ?? ''}`.replace(/\.$/, '');
-    } catch {
-      return ref.trim();
-    }
   }
 }

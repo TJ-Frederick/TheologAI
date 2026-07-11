@@ -1,5 +1,5 @@
 {
-  "description": "Curated database of parallel passages across Scripture. High-confidence parallels include synoptic Gospel accounts, direct OT quotations in NT, and well-established thematic parallels. Easily extensible as new parallels are identified.",
+  "description": "Curated, non-exhaustive database of parallel passages across Scripture. High-confidence parallels include synoptic Gospel accounts, direct OT quotations in NT, and well-established thematic parallels. Easily extensible as new parallels are identified.",
   "version": "1.0",
   "parallels": {
     "matthew_1_18-25": {
@@ -186,6 +186,17 @@
         "1peter": ["He himself bore our sins in his body", "By his wounds you have been healed"],
         "acts": ["Like a sheep led to slaughter", "Ethiopian eunuch passage"],
         "romans": ["Delivered over to death for our sins", "Raised for our justification"]
+      }
+    },
+    "isaiah_7_14": {
+      "event": "Immanuel prophecy",
+      "relationship": "quotation",
+      "confidence": 95,
+      "parallels": ["matthew_1_23"],
+      "notes": "Matthew explicitly identifies Isaiah's Immanuel prophecy as fulfilled in Jesus' birth.",
+      "uniqueDetails": {
+        "isaiah": ["The virgin will conceive and bear a son", "His name will be called Immanuel"],
+        "matthew": ["Immanuel is interpreted as God with us", "The prophecy is applied to Jesus' birth"]
       }
     },
     "psalm_110_1": {

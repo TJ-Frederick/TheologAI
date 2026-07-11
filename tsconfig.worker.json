@@ -12,10 +12,9 @@
     "forceConsistentCasingInFileNames": true,
     "declaration": false,
     "sourceMap": false,
-    "resolveJsonModule": true,
-    "types": ["@cloudflare/workers-types", "node"]
+    "resolveJsonModule": true
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "worker-configuration.d.ts"],
   "exclude": [
     "node_modules",
     "dist",

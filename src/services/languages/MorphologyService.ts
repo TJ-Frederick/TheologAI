@@ -2,10 +2,10 @@
  * Verse morphology service using SQLite repository.
  */
 
-import type { MorphologyRepository, MorphWord } from '../../adapters/data/MorphologyRepository.js';
+import type { IMorphologyRepository } from '../../kernel/repositories.js';
 import type { VerseMorphologyResult, VerseWord, Citation } from '../../kernel/types.js';
 import { parseReference, toStepBible, formatReference } from '../../kernel/reference.js';
-import { NotFoundError } from '../../kernel/errors.js';
+import { NotFoundError, ValidationError } from '../../kernel/errors.js';
 
 const CITATION: Citation = {
   source: 'STEPBible TAGNT/TAHOT',
@@ -14,12 +14,18 @@ const CITATION: Citation = {
 };
 
 export class MorphologyService {
-  constructor(private repo: MorphologyRepository) {}
+  constructor(private repo: IMorphologyRepository) {}
 
   /** Get word-by-word morphology for a verse */
   async getVerseMorphology(reference: string, expandMorphology?: boolean): Promise<VerseMorphologyResult> {
     const ref = parseReference(reference);
-    if (!ref.startVerse) {
+    if (ref.endVerse != null) {
+      throw new ValidationError(
+        'reference',
+        `Morphology accepts one verse at a time; ranges are not supported: "${reference}"`,
+      );
+    }
+    if (ref.startVerse == null) {
       throw new NotFoundError('verse', `Please provide a specific verse, not just a chapter: "${reference}"`);
     }
 

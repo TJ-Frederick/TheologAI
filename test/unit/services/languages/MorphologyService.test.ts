@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { MorphologyService } from '../../../../src/services/languages/MorphologyService.js';
-import { NotFoundError } from '../../../../src/kernel/errors.js';
+import { NotFoundError, ValidationError } from '../../../../src/kernel/errors.js';
 import type { MorphWord } from '../../../../src/adapters/data/MorphologyRepository.js';
 
 // ── Mock repository ──
@@ -38,6 +38,14 @@ describe('MorphologyService', () => {
       const repo = makeMockRepo();
       const service = new MorphologyService(repo as any);
       await expect(service.getVerseMorphology('John 1')).rejects.toThrow(NotFoundError);
+    });
+
+    it('rejects verse ranges because the service returns one verse', async () => {
+      const repo = makeMockRepo();
+      const service = new MorphologyService(repo as any);
+
+      await expect(service.getVerseMorphology('John 1:1-2')).rejects.toThrow(ValidationError);
+      expect(repo.getVerseMorphology).not.toHaveBeenCalled();
     });
 
     it('throws NotFoundError when repo returns empty array', async () => {

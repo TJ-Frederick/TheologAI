@@ -12,7 +12,7 @@ export class D1HistoricalDocumentRepository implements IHistoricalDocumentReposi
 
   async listDocuments(): Promise<DocumentInfo[]> {
     const { results: rows } = await this.db.prepare(
-      'SELECT * FROM documents ORDER BY title'
+      'SELECT * FROM documents ORDER BY title, id'
     ).all<{ id: string; title: string; type: string; date: string | null; metadata: string }>();
 
     return rows.map(r => ({
@@ -83,10 +83,10 @@ export class D1HistoricalDocumentRepository implements IHistoricalDocumentReposi
     try {
       const { results: rows } = await this.db.prepare(
         `SELECT ds.id, ds.document_id, ds.section_number, ds.title, ds.content, ds.topics
-         FROM sections_fts fts
-         JOIN document_sections ds ON ds.id = fts.rowid
+         FROM sections_fts
+         JOIN document_sections ds ON ds.id = sections_fts.rowid
          WHERE sections_fts MATCH ?
-         ORDER BY fts.rank
+         ORDER BY rank, ds.id
          LIMIT ?`
       ).bind(ftsQuery, limit).all<{
         id: number; document_id: string; section_number: string;
@@ -101,9 +101,9 @@ export class D1HistoricalDocumentRepository implements IHistoricalDocumentReposi
         content: r.content,
         topics: r.topics ? JSON.parse(r.topics) : [],
       }));
-    } catch (error) {
-      // FTS5 queries can fail on malformed input; log and return empty
-      console.warn('D1HistoricalDocumentRepository.search failed:', error);
+    } catch {
+      // FTS5 queries can fail on malformed input. The repository contract uses
+      // an empty result for invalid search syntax and never logs raw errors.
       return [];
     }
   }

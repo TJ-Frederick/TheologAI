@@ -10,6 +10,7 @@ import {
   normalizeOpenBibleRef,
   toRomanNumeral,
 } from '../../../src/kernel/reference.js';
+import { BIBLE_BOOKS, getBibleBookBounds } from '../../../src/kernel/books.js';
 
 describe('parseReference', () => {
   it('parses "John 3:16"', () => {
@@ -98,6 +99,30 @@ describe('parseReference', () => {
     expect(() => parseReference('Hezekiah 1:1')).toThrow('Unknown Bible book');
   });
 
+  it('enforces canonical chapter and verse bounds for all 66 books', () => {
+    expect(BIBLE_BOOKS).toHaveLength(66);
+
+    for (const book of BIBLE_BOOKS) {
+      const maxVerses = getBibleBookBounds(book).maxVerseByChapter;
+      const lastChapter = maxVerses.length;
+      const lastVerse = maxVerses[lastChapter - 1];
+
+      expect(parseReference(`${book.name} ${lastChapter}:${lastVerse}`).book.number)
+        .toBe(book.number);
+      expect(() => parseReference(`${book.name} ${lastChapter + 1}:1`)).toThrow(/out of range/);
+    }
+  });
+
+  it.each([
+    ['John 999:999', /Chapter 999 is out of range for John/],
+    ['John 3:999', /Verse 999 is out of range for John 3/],
+    ['John 3:16-999', /Verse range 16-999 is out of range for John 3/],
+    ['John 3:17-16', /Verse range 17-16 is out of range for John 3/],
+    ['Genesis 0:1', /Chapter 0 is out of range for Genesis/],
+  ])('rejects impossible reference %s', (reference, message) => {
+    expect(() => parseReference(reference)).toThrow(message);
+  });
+
   it('parses "Obad 1:3"', () => {
     const ref = parseReference('Obad 1:3');
     expect(ref.book.name).toBe('Obadiah');
@@ -111,6 +136,77 @@ describe('parseReference', () => {
   it('parses "3 John 1:4"', () => {
     const ref = parseReference('3 John 1:4');
     expect(ref.book.name).toBe('3 John');
+  });
+
+  it.each([
+    ['Obadiah 4', 'Obadiah', 4],
+    ['Philemon 6', 'Philemon', 6],
+    ['2 John 4', '2 John', 4],
+    ['3 John 4', '3 John', 4],
+    ['Jude 3', 'Jude', 3],
+  ])('interprets the common single-chapter verse form %s', (input, book, verse) => {
+    const ref = parseReference(input);
+    expect(ref).toMatchObject({
+      book: expect.objectContaining({ name: book }),
+      chapter: 1,
+      startVerse: verse,
+    });
+    expect(formatReference(ref)).toBe(`${book} 1:${verse}`);
+  });
+
+  it.each([
+    ['Obadiah 4-5', 'Obadiah', 4, 5],
+    ['Philemon 5-6', 'Philemon', 5, 6],
+    ['2 John 3-4', '2 John', 3, 4],
+    ['3 John 3-4', '3 John', 3, 4],
+    ['Jude 3-5', 'Jude', 3, 5],
+  ])('parses and formats chapterless single-chapter range %s', (input, book, startVerse, endVerse) => {
+    const ref = parseReference(input);
+    expect(ref).toMatchObject({
+      book: expect.objectContaining({ name: book }),
+      chapter: 1,
+      startVerse,
+      endVerse,
+    });
+    expect(formatReference(ref)).toBe(`${book} 1:${startVerse}-${endVerse}`);
+  });
+
+  it('normalizes an en-dash chapterless range', () => {
+    expect(formatReference(parseReference('Jude 3–5'))).toBe('Jude 1:3-5');
+  });
+
+  it.each([
+    ['Obadiah 1:4', 'Obadiah 1:4'],
+    ['Philemon 1:6', 'Philemon 1:6'],
+    ['2 John 1:4', '2 John 1:4'],
+    ['3 John 1:4', '3 John 1:4'],
+    ['Jude 1:3', 'Jude 1:3'],
+  ])('round-trips explicit single-chapter reference %s', (input, expected) => {
+    expect(formatReference(parseReference(input))).toBe(expected);
+  });
+
+  it.each([
+    ['Obadiah 22', 'Obadiah'],
+    ['Philemon 26', 'Philemon'],
+    ['2 John 14', '2 John'],
+    ['3 John 16', '3 John'],
+    ['Jude 26', 'Jude'],
+  ])('rejects out-of-range single-chapter verse %s', (input, book) => {
+    expect(() => parseReference(input)).toThrow(new RegExp(`Verse .* out of range for ${book} 1`));
+  });
+
+  it.each([
+    ['Obadiah 4-22', 'Obadiah'],
+    ['Philemon 6-5', 'Philemon'],
+    ['2 John 3-14', '2 John'],
+    ['3 John 3-2', '3 John'],
+    ['Jude 3-26', 'Jude'],
+  ])('rejects invalid chapterless single-chapter range %s', (input, book) => {
+    expect(() => parseReference(input)).toThrow(new RegExp(`Verse range .* out of range for ${book} 1`));
+  });
+
+  it('does not reinterpret a multi-chapter book range as verses', () => {
+    expect(() => parseReference('Genesis 1-3')).toThrow(/Invalid Bible reference/);
   });
 });
 

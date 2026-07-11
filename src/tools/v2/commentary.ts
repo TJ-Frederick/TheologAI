@@ -10,19 +10,20 @@ import { handleToolError } from '../../kernel/errors.js';
 export function createCommentaryHandler(service: CommentaryService): ToolHandler {
   return {
     name: 'commentary_lookup',
-    description: 'Look up Bible commentary. 6 commentators: Matthew Henry, JFB, Adam Clarke, John Gill, Keil-Delitzsch (OT only), Tyndale.',
+    description: 'Look up Bible commentary for one verse or a full chapter. Verse ranges are not supported. John Gill scalar lookups require exact provider verseNumber metadata; chapter lookup remains available. 6 commentators: Matthew Henry, JFB, Adam Clarke, John Gill, Keil-Delitzsch (OT only), Tyndale.',
     inputSchema: {
       type: 'object',
       properties: {
-        reference: { type: 'string', description: 'Bible reference (e.g., "John 3:16")' },
+        reference: { type: 'string', minLength: 1, maxLength: 100, description: 'One Bible verse or full chapter (e.g., "John 3:16" or "John 3"); verse ranges are not supported.' },
         commentator: {
           type: 'string',
           enum: ['Matthew Henry', 'Jamieson-Fausset-Brown', 'Adam Clarke', 'John Gill', 'Keil-Delitzsch', 'Tyndale'],
           default: 'Matthew Henry',
         },
-        maxLength: { type: 'number', description: 'Max response length in characters' },
+        maxLength: { type: 'integer', minimum: 1, maximum: 100000, description: 'Max response length in characters' },
       },
       required: ['reference'],
+      additionalProperties: false,
     },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
 

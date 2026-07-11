@@ -5,7 +5,7 @@
 import type { BibleAdapter } from './BibleAdapter.js';
 import type { BibleResult } from '../../kernel/types.js';
 import type { BibleReference } from '../../kernel/reference.js';
-import { formatReference } from '../../kernel/reference.js';
+import { formatReference, parseReference, referencesEqual } from '../../kernel/reference.js';
 import { HttpClient } from '../shared/HttpClient.js';
 import { APIError } from '../../kernel/errors.js';
 
@@ -44,6 +44,18 @@ export class EsvAdapter implements BibleAdapter {
 
     if (!data.passages || data.passages.length === 0) {
       throw new APIError(404, `No passages found for: ${refStr}`);
+    }
+
+    if (typeof data.canonical === 'string') {
+      let canonicalRef: BibleReference;
+      try {
+        canonicalRef = parseReference(data.canonical);
+      } catch {
+        throw new APIError(502, 'Bible provider returned an invalid canonical reference.');
+      }
+      if (!referencesEqual(ref, canonicalRef)) {
+        throw new APIError(502, 'Bible provider returned a passage for a different reference.');
+      }
     }
 
     return {

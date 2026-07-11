@@ -1,0 +1,379 @@
+{
+  "manifestVersion": 1,
+  "schemaVersion": "0001_initial_schema",
+  "algorithm": "sha256",
+  "files": [
+    {
+      "path": "data/biblical-languages/stepbible-lexicons/tbesg-greek.json",
+      "sha256": "67f818251764715a6ce9c85520cef6dfcb7ef870a77dccec8cf0e32ba0d46fae"
+    },
+    {
+      "path": "data/biblical-languages/stepbible-lexicons/tbesh-hebrew.json",
+      "sha256": "b8723804c0a6a710c83239197d23b30239d63d5b024a4842f71106021624f469"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/greek/40-Matthew.json.gz",
+      "sha256": "0ca41573eb90ad3816ee471fb0bc336fb335792d6897f6484dc20359586f0359"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/greek/41-Mark.json.gz",
+      "sha256": "9f5f8e657027fb674201f3b1dfc63d6e048a934d34f8899d76c5d59a82eb1a23"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/greek/42-Luke.json.gz",
+      "sha256": "8e247b4481ee92fc3810d69fe28fd2e751967ed0678c04d708d32bc6a72b4357"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/greek/43-John.json.gz",
+      "sha256": "5a737ffd74aee023a221ab9b9ac5501842a954c0265805294710f2e16b88cd85"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/greek/44-Acts.json.gz",
+      "sha256": "cd3ba206a66bdca7d01b76d442a0a8d0e5d304f7c01476fb5dbcc995472d7c25"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/greek/45-Romans.json.gz",
+      "sha256": "2893025df2cc2dd8411b6c59cb6bcc815246262b64769f8acfd1d800b40cc0f2"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/greek/46-1Corinthians.json.gz",
+      "sha256": "797500a0581184ca74b277abd54a8230698bf065fa23cb649b5b2171373e93ee"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/greek/47-2Corinthians.json.gz",
+      "sha256": "1e116f6dfdc9adf0b22e4a6697efd2645b223f67cd37516b4bdb3f4ec09a0be1"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/greek/48-Galatians.json.gz",
+      "sha256": "b202e63ea157f47c5512302b48cdc7d8fb2cf0d3aa21044bcd1c15713a8de2e2"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/greek/49-Ephesians.json.gz",
+      "sha256": "95566eba1dfa98131127d23e3c424c673727f9df4b565784a97d5244abf3ab1e"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/greek/50-Philippians.json.gz",
+      "sha256": "ca0358d50ee4afeb7a751b48803b6cd4914fe7caf3ad42e95ea3982364dd3ec3"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/greek/51-Colossians.json.gz",
+      "sha256": "b5336b82ff1b16a1be84d190c78e8d7bbb9a2bf8fddd7d20a32d0aec8e0758bf"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/greek/52-1Thessalonians.json.gz",
+      "sha256": "e9972b7aace255f71a9b601a3f946998d9988ca0639c299de1869878acce711a"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/greek/53-2Thessalonians.json.gz",
+      "sha256": "ea46ec507048750359af194356730ca083c2762c66dcf21064a469a3171f5186"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/greek/54-1Timothy.json.gz",
+      "sha256": "1b3208bbfb030611bad4a654f2aa5074731d77fb0632e86dc0215618ffc0d073"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/greek/55-2Timothy.json.gz",
+      "sha256": "acc9f06e74c3110abe06fe139052dc6f0b27d60eaa47b564160c42b6d8fb8fde"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/greek/56-Titus.json.gz",
+      "sha256": "2b372c3d1ef8ec0f65a668f76ac2bccdee1045c7fb97f94b114e3ba9287cf73c"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/greek/57-Philemon.json.gz",
+      "sha256": "442d9b44c4148162efa33ca396b5ae17e9552d0bdc22395ab3ae0de8bc22b741"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/greek/58-Hebrews.json.gz",
+      "sha256": "6e925a6bd7605330eed0a58c284fda38f08776b6fe0aa2f12594b3d49f7add01"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/greek/59-James.json.gz",
+      "sha256": "e920f733b1c3eb01e5f3166329aecb5b9e4b519c07c74e788ee3df94d1313e72"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/greek/60-1Peter.json.gz",
+      "sha256": "f3c0e8a0d4100a9720dd7ee730c52a24bd5a43243bb59891c643e63977c60e65"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/greek/61-2Peter.json.gz",
+      "sha256": "3e18c2a281d7ede3cacfb2af07296e67e018622ab66145ef56719019d9b3f771"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/greek/62-1John.json.gz",
+      "sha256": "89b078a29c8219aa767f8bc18a97e8fff59134f0d41f696b72453a1f850d708d"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/greek/63-2John.json.gz",
+      "sha256": "b3292034b1ff81402395f4c2c7553c42e5d2904b6d1a934abc20aab189b01dbd"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/greek/64-3John.json.gz",
+      "sha256": "b3059d6fd77299e946e7d1a4f3871e986274752900c7b84ccffd55edcbe63eaf"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/greek/65-Jude.json.gz",
+      "sha256": "e389247a29fb005f73db3eed1fa7571e0816ec0af191d24af795f4a9d50c0c4b"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/greek/66-Revelation.json.gz",
+      "sha256": "8bd8fc3d50ab19963b30767fd8e1f359f6efed0a0904ff348e75bde28afc7ee6"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/hebrew/01-Genesis.json.gz",
+      "sha256": "4b1192a9d9583c0883cb418eac908d0d444b95e630f7ffe837b8b85af5763105"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/hebrew/02-Exodus.json.gz",
+      "sha256": "659dea46a6e39bafbeb49683e054eabac177f555afb958aaf70022cc0a01b974"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/hebrew/03-Leviticus.json.gz",
+      "sha256": "767ff8579f67e4b584a8e32d1593d3fa5bab5225bd0cb0e1d80351a63c1614df"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/hebrew/04-Numbers.json.gz",
+      "sha256": "3847402bf83064cf2b7f6965702fafd7a3224fc8044373b79b00f2c77d42fefe"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/hebrew/05-Deuteronomy.json.gz",
+      "sha256": "48878300f0a6863fa4a49cf917f3fc41775f6997a295a95ed8d3ce5a137d8f07"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/hebrew/06-Joshua.json.gz",
+      "sha256": "d4a551f9a1b6625a2e6e31cc80ce473743c5cfc314b69ddd0c7ca38d3b5347ac"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/hebrew/07-Judges.json.gz",
+      "sha256": "37e0db12a0e4a6caf86c016f8b44bc391cc9f23f7abce11e506ee38dd0a15c57"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/hebrew/08-Ruth.json.gz",
+      "sha256": "1c7250f9c0c5027a858079360a55168252793cf72ab411a3c907394b924a02d4"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/hebrew/09-1Samuel.json.gz",
+      "sha256": "c6d4478e7bfb52a64f6b3bed29ee15737793cd8adffd33a157e54569b64b65b5"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/hebrew/10-2Samuel.json.gz",
+      "sha256": "37a36c6440e02e62d588cc67d5acd708ba67bd70c23adaa6c27c4caa118d7a23"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/hebrew/11-1Kings.json.gz",
+      "sha256": "0ade7635af8d40ce6dacc0240bb2b60c5600daa5478809ab485e7f64c111a75e"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/hebrew/12-2Kings.json.gz",
+      "sha256": "51da320c69772f01e0ed17cce3034bd545ed4e4455a3721e83566f9d2b1c93e5"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/hebrew/13-1Chronicles.json.gz",
+      "sha256": "7982338df4f7da1f03e191c1ca3df0f35a4d5b26540503d2ad28a9d1bccf0aaa"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/hebrew/14-2Chronicles.json.gz",
+      "sha256": "e6d2c3d4f187ae5d117f416fe1885d98ff9a1334228d21aeb57486b67f4ed557"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/hebrew/15-Ezra.json.gz",
+      "sha256": "dd8f0ec16b937ab8b89484166c2b27e7ea226ad5970f0cdbe5164dbf1746d96e"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/hebrew/16-Nehemiah.json.gz",
+      "sha256": "f93b490905a497d7e91050df028ef72c8c5f43fa07258ac91c3ccf65121ba227"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/hebrew/17-Esther.json.gz",
+      "sha256": "62eadff58c7ec0ef7a4936920ff99baa0c83aab81fca5486895e5da18c505f11"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/hebrew/18-Job.json.gz",
+      "sha256": "e3ace98a9e57f02744286584183576159e8c8ee7dac7bd5e00f5ab1dd70d4cd0"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/hebrew/19-Psalms.json.gz",
+      "sha256": "8c159a3059d160b0cdbee62088be2d3780025bb347dcd3204c4a989a5b87f2c5"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/hebrew/20-Proverbs.json.gz",
+      "sha256": "83ce52466f3d75672b8657b77f1a4b17abe50b8cdf09ef025317a5af7b6e2c48"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/hebrew/21-Ecclesiastes.json.gz",
+      "sha256": "4e782aea6d3cf10729efe1c09a7373041cdd316b05d8b9947ccd7488081a74f1"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/hebrew/22-SongOfSolomon.json.gz",
+      "sha256": "4fbad23ba8ff7471c204a7c671c219203aaa075cfd8f1caebea6651061f97bd8"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/hebrew/23-Isaiah.json.gz",
+      "sha256": "f738165ee4e54604341784257910c249476ab7fd83d2608dedf6c32e822c54cc"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/hebrew/24-Jeremiah.json.gz",
+      "sha256": "6ca81718a6b0dcdc94817f4e727ac3bed22b8060b6b5457e47cb782b7bba67be"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/hebrew/25-Lamentations.json.gz",
+      "sha256": "3f2c48f22738ab045d1be1081d07d498b030e76b6f5e20dbbd8c0df1edff6f92"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/hebrew/26-Ezekiel.json.gz",
+      "sha256": "5a6fb00bc5ab2fe111975a5475f8325b5644443453b2a05e4bb6386d1df1259d"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/hebrew/27-Daniel.json.gz",
+      "sha256": "71ab850ed19c4b3ca6c0c6f81e920951d3125e561460a5be09db2c8d65dea266"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/hebrew/28-Hosea.json.gz",
+      "sha256": "9786d0ee12f95e618b1ac0cda7d8f4d416802b2ac8d33bceb85b172197a9e3f6"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/hebrew/29-Joel.json.gz",
+      "sha256": "e48e196120db22556b5326f69b7327fa441e790d7891a995f8b7f82069db9b89"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/hebrew/30-Amos.json.gz",
+      "sha256": "0a0ba9946d7bb65a6b31ee73277d691a94517281e08e026e212192f8905ec838"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/hebrew/31-Obadiah.json.gz",
+      "sha256": "0edf04a02244b925441d3ef24b109189db93e4699d5bf6be68a782e76100ddd4"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/hebrew/32-Jonah.json.gz",
+      "sha256": "5d0787b300c9eb5c14ab6ba30fd6c060b5155a710daa6ce14e0b26da1bd9ed47"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/hebrew/33-Micah.json.gz",
+      "sha256": "477a4356ec61bfeef680b36ed5a3c5fcff24a3f473803505be3814c4692b5def"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/hebrew/34-Nahum.json.gz",
+      "sha256": "25d2e9b1e147771fe9d3c27ed3382c433235f24092d44f83d8d778518b787ab2"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/hebrew/35-Habakkuk.json.gz",
+      "sha256": "44c2bb73c6f57cd6c5ee23a8237bf772e353cb8a83c6e6ad17ee1a6dba16547a"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/hebrew/36-Zephaniah.json.gz",
+      "sha256": "471ed7147b446b283af30bcd927d69326da9e542d407eef4768305990e185b50"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/hebrew/37-Haggai.json.gz",
+      "sha256": "9b1c42b4b5707c584e23bcea8f26fdcb1e67f1ae57b8ecfaa95c5d15ab36ee33"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/hebrew/38-Zechariah.json.gz",
+      "sha256": "db141e4b1a6a14a31a978f9793cad2a813c38bf023cbb6febac206b2b8aa0b78"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/hebrew/39-Malachi.json.gz",
+      "sha256": "1988375c3d8db60b3077a9d5d3d81c178cb3e427f922b1ee9823512daef15fff"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/morph-codes.json",
+      "sha256": "e98d08c943e0dce8a8707bc9c7e26ed85a6b1101c0c8091df9d1ed9b739c53cd"
+    },
+    {
+      "path": "data/biblical-languages/strongs-greek.json",
+      "sha256": "3e9ae9e02539c1792c36fd1e685fad80a694d84d952af5d4edc0dd87e8fdd5dd"
+    },
+    {
+      "path": "data/biblical-languages/strongs-hebrew.json",
+      "sha256": "e40ea10268bed5e9778c91268007d8c1d42d3cf2c839215c807ecc38ff5eeceb"
+    },
+    {
+      "path": "data/cross-references/cross_references.txt",
+      "sha256": "bb5a4f5cfb7f0faa07b171ee9b361285d6179bee705de16ead0690da16568191"
+    },
+    {
+      "path": "data/historical-documents/39-articles.json",
+      "sha256": "d7ebc9acc6221a1eeb9c1885ce8cf9ce4399fafe300dfa068e325bb48d95c99d"
+    },
+    {
+      "path": "data/historical-documents/apostles-creed.json",
+      "sha256": "1acca68fb2ad990870a1e58dbfb8c0bcaf521cb2423f6f8537976aa721897cfd"
+    },
+    {
+      "path": "data/historical-documents/athanasian-creed.json",
+      "sha256": "96455a19f1b3df5688f1ddf1bd593bf366af646580aee5850fd273c51bc585d2"
+    },
+    {
+      "path": "data/historical-documents/augsburg-confession.json",
+      "sha256": "40e11ca6284d90660763947c8a100908558899d67fe875e7bd8cb7a99b69a83b"
+    },
+    {
+      "path": "data/historical-documents/baltimore-catechism.json",
+      "sha256": "bd20b6ca9b6b37dcfa5496378efb4196169ca80eaa161770ca766f480d32f799"
+    },
+    {
+      "path": "data/historical-documents/belgic-confession.json",
+      "sha256": "c8f331118592aa78638b7f4d1e8ff1473106f0565ed85a68e4ccaf5783ced3a2"
+    },
+    {
+      "path": "data/historical-documents/canons-of-dort.json",
+      "sha256": "3aba2918d00f2c7c1f066303f8f6f94f3feb571694540ae8bf319e90d9393d76"
+    },
+    {
+      "path": "data/historical-documents/chalcedonian-definition.json",
+      "sha256": "0092b82c44ba276fdf812e67a313340b009cd9ffbbb042e99bd726b66e9f7be2"
+    },
+    {
+      "path": "data/historical-documents/confession-of-dositheus.json",
+      "sha256": "eb4a44394c874e61d9902ecf6b73cb1530384cbdb3796ec7054b9d1666545a87"
+    },
+    {
+      "path": "data/historical-documents/council-of-trent.json",
+      "sha256": "b04aa37b10c743a78f687c7f1326b20846ea3e980bed836da6dd9584fff509bc"
+    },
+    {
+      "path": "data/historical-documents/heidelberg-catechism.json",
+      "sha256": "5e86b47d797721003747492c44ab5b7e30053ecc6833e1bdc6a38e72f62cba2c"
+    },
+    {
+      "path": "data/historical-documents/london-baptist-1689.json",
+      "sha256": "141cb44f76a2f9d198b55d068f052e09f8c74662b970a6356a566595b4b26b29"
+    },
+    {
+      "path": "data/historical-documents/nicene-creed.json",
+      "sha256": "aa21b6641afcb8b91e878718d27c42c879c18f5440f2a4d69fbc7dc2e3fd7efd"
+    },
+    {
+      "path": "data/historical-documents/philaret-catechism.json",
+      "sha256": "bc3c4f9a1df75063e1a77f3e718ba0b32d0132291227f073e275a6383b81bfcc"
+    },
+    {
+      "path": "data/historical-documents/westminster-confession.json",
+      "sha256": "7ee93157f95c3a69e9cc9ef448b5761822f90ac801a75aa12c7df948cf55be06"
+    },
+    {
+      "path": "data/historical-documents/westminster-larger-catechism.json",
+      "sha256": "343b5303872a3360b6906dd26c6c9b8258c2b28c2c58e0be15ea16b817e1adfd"
+    },
+    {
+      "path": "data/historical-documents/westminster-shorter-catechism.json",
+      "sha256": "581bdbd02fe99b97a6e236b893bce459d8b8b477789df9e16c5ef8dbcf612b85"
+    },
+    {
+      "path": "src/data/parallel-passages.json",
+      "sha256": "17b8310977868b9638f9fadb8bb7912488777a4f9b5fc1669112e021c4ddc66b"
+    }
+  ],
+  "expectedCounts": {
+    "theologai_metadata": 2,
+    "cross_references": 344799,
+    "strongs": 14298,
+    "strongs_fts": 14298,
+    "morphology": 447748,
+    "stepbible_lexicons": 19570,
+    "documents": 17,
+    "document_sections": 3054,
+    "sections_fts": 3054,
+    "morph_codes": 20
+  }
+}

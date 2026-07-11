@@ -1,5 +1,11 @@
 # Bible Study MCP Server - Architecture Plan
 
+> **Historical architecture plan:** This document describes an earlier
+> mock-era design and is not the current architecture or product contract. See
+> `README.md`, `CLAUDE.md`, and `docs/worker-operations.md` for the implemented
+> Node/Cloudflare architecture and current capabilities.
+
+
 **Current Status: Production Ready - Beta Launch (v3.4.1)**
 
 This document serves as the **architecture plan** for TheologAI MCP Server. Implementation status is annotated throughout:

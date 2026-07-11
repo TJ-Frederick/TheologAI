@@ -18,13 +18,17 @@ function makeDonationConfig(overrides: Partial<DonationConfig> = {}): DonationCo
 function makeDonationVerifyResult(overrides: Partial<DonationVerifyResult> = {}): DonationVerifyResult {
   return {
     txHash: '0x' + 'ab'.repeat(32),
-    chainId: 8453,
-    chainName: 'Base',
-    from: '0x' + '11'.repeat(20),
-    amount: '1.5',
-    symbol: 'USDC',
-    confirmed: true,
-    isToRecipient: true,
+    status: 'verified',
+    minedSuccessfully: true,
+    transfers: [{
+      chainId: 8453,
+      chainName: 'Base',
+      from: '0x' + '11'.repeat(20),
+      to: '0x' + '22'.repeat(20),
+      amount: '1.5',
+      symbol: 'USDC',
+      tokenAddress: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+    }],
     explorerUrl: 'https://basescan.org/tx/0x' + 'ab'.repeat(32),
     ...overrides,
   };
@@ -73,14 +77,16 @@ describe('formatDonationVerifyResult', () => {
     expect(out).toContain('USDC');
   });
 
-  it('shows Confirmed status', () => {
-    const out = formatDonationVerifyResult(makeDonationVerifyResult({ confirmed: true }));
-    expect(out).toContain('Confirmed');
+  it('shows verified status only for verified donations', () => {
+    const out = formatDonationVerifyResult(makeDonationVerifyResult());
+    expect(out).toContain('Donation Verified');
+    expect(out).toContain('Thank you');
   });
 
   it('shows Pending status', () => {
-    const out = formatDonationVerifyResult(makeDonationVerifyResult({ confirmed: false }));
+    const out = formatDonationVerifyResult(makeDonationVerifyResult({ status: 'pending', minedSuccessfully: false, transfers: [] }));
     expect(out).toContain('Pending');
+    expect(out).not.toContain('Thank you');
   });
 
   it('includes chain name', () => {
@@ -94,15 +100,22 @@ describe('formatDonationVerifyResult', () => {
     expect(out).toContain('View on Explorer');
   });
 
-  it('shows thank-you when isToRecipient', () => {
-    const out = formatDonationVerifyResult(makeDonationVerifyResult({ isToRecipient: true }));
-    expect(out).toContain('Thank you');
+  it('does not thank users for wrong-recipient transactions', () => {
+    const out = formatDonationVerifyResult(makeDonationVerifyResult({ status: 'wrong_recipient' }));
+    expect(out).toContain('Not a TheologAI Donation');
+    expect(out).not.toContain('Thank you');
   });
 
-  it('shows warning when not sent to recipient', () => {
-    const out = formatDonationVerifyResult(makeDonationVerifyResult({ isToRecipient: false }));
-    expect(out).toContain('Warning');
-    expect(out).not.toContain('Thank you');
+  it('shows per-chain evidence when a provider is unavailable', () => {
+    const out = formatDonationVerifyResult(makeDonationVerifyResult({
+      chainStatuses: [
+        { chainId: 8453, chainName: 'Base', state: 'absent' },
+        { chainId: 1, chainName: 'Ethereum', state: 'unavailable' },
+      ],
+    }));
+    expect(out).toContain('Base: not found');
+    expect(out).toContain('Ethereum: unavailable');
+    expect(out).toContain('Could not check Ethereum');
   });
 
   it('returns trimmed output', () => {

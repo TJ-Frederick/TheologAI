@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BibleService } from '../../../../src/services/bible/BibleService.js';
 import type { BibleAdapter } from '../../../../src/adapters/bible/BibleAdapter.js';
 import type { BibleResult } from '../../../../src/kernel/types.js';
-import { ValidationError, NotFoundError } from '../../../../src/kernel/errors.js';
+import { APIError, ValidationError, NotFoundError } from '../../../../src/kernel/errors.js';
 
 // ── Mock adapter factory ──
 
@@ -130,35 +130,84 @@ describe('BibleService', () => {
     });
 
     it('calls each adapter with correct translation', async () => {
-      const results = await service.lookupMultiple('John 3:16', ['ESV', 'KJV']);
-      expect(results).toHaveLength(2);
+      const response = await service.lookupMultiple('John 3:16', ['ESV', 'KJV']);
+      expect(response.results).toHaveLength(2);
+      expect(response.failures).toEqual([]);
+      expect(response.reference).toBe('John 3:16');
       expect(esvAdapter.getPassage).toHaveBeenCalled();
       expect(kjvAdapter.getPassage).toHaveBeenCalled();
     });
 
-    it('skips unconfigured adapters without throwing', async () => {
+    it('reports unconfigured adapters without discarding successful translations', async () => {
       (kjvAdapter.isConfigured as ReturnType<typeof vi.fn>).mockReturnValue(false);
-      const results = await service.lookupMultiple('John 3:16', ['ESV', 'KJV']);
-      expect(results).toHaveLength(1);
-      expect(results[0].translation).toBe('ESV');
+      const response = await service.lookupMultiple('John 3:16', ['ESV', 'KJV']);
+      expect(response.results).toHaveLength(1);
+      expect(response.results[0].translation).toBe('ESV');
+      expect(response.failures).toEqual([{
+        translation: 'KJV',
+        reason: 'Translation provider is not configured.',
+      }]);
     });
 
-    it('skips failed translations silently', async () => {
+    it('reports failed translations explicitly', async () => {
       (esvAdapter.getPassage as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('API error'));
-      const results = await service.lookupMultiple('John 3:16', ['ESV', 'KJV']);
-      expect(results).toHaveLength(1);
-      expect(results[0].translation).toBe('KJV');
+      const response = await service.lookupMultiple('John 3:16', ['ESV', 'KJV']);
+      expect(response.results).toHaveLength(1);
+      expect(response.results[0].translation).toBe('KJV');
+      expect(response.failures).toEqual([{
+        translation: 'ESV',
+        reason: 'Translation could not be retrieved.',
+      }]);
     });
 
     it('returns results in order', async () => {
-      const results = await service.lookupMultiple('John 3:16', ['ESV', 'KJV']);
-      expect(results[0].translation).toBe('ESV');
-      expect(results[1].translation).toBe('KJV');
+      const response = await service.lookupMultiple('John 3:16', ['ESV', 'KJV']);
+      expect(response.results[0].translation).toBe('ESV');
+      expect(response.results[1].translation).toBe('KJV');
     });
 
-    it('skips unknown translations', async () => {
-      const results = await service.lookupMultiple('John 3:16', ['NIV']);
-      expect(results).toHaveLength(0);
+    it('reports unknown translations instead of omitting them', async () => {
+      const response = await service.lookupMultiple('John 3:16', ['NIV']);
+      expect(response.results).toHaveLength(0);
+      expect(response.failures).toEqual([{
+        translation: 'NIV',
+        reason: 'Translation is not supported by this server.',
+      }]);
+    });
+
+    it('rejects impossible references before any adapter call', async () => {
+      await expect(service.lookupMultiple('John 999:999', ['ESV', 'KJV']))
+        .rejects.toThrow('Chapter 999 is out of range for John');
+      expect(esvAdapter.getPassage).not.toHaveBeenCalled();
+      expect(kjvAdapter.getPassage).not.toHaveBeenCalled();
+    });
+
+    it('rejects a provider result for a different reference', async () => {
+      (esvAdapter.getPassage as ReturnType<typeof vi.fn>).mockResolvedValue({
+        reference: 'John 1:1',
+        translation: 'ESV',
+        text: 'Different passage',
+        citation: { source: 'ESV API' },
+      });
+
+      await expect(service.lookup({ reference: 'John 3:16', translation: 'ESV' }))
+        .rejects.toBeInstanceOf(APIError);
+    });
+
+    it('accepts a common single-chapter input when the provider returns explicit chapter notation', async () => {
+      const adapter = makeAdapter({
+        supportedTranslations: ['ESV'],
+        getPassage: vi.fn().mockResolvedValue({
+          reference: 'Jude 1:3',
+          translation: 'ESV',
+          text: 'Beloved, ...',
+          citation: { source: 'ESV API' },
+        }),
+      });
+      const singleChapterService = new BibleService([adapter]);
+
+      await expect(singleChapterService.lookup({ reference: 'Jude 3', translation: 'ESV' }))
+        .resolves.toMatchObject({ reference: 'Jude 1:3', translation: 'ESV' });
     });
   });
 });

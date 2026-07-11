@@ -7,24 +7,16 @@
 
 import type Database from 'better-sqlite3';
 import { getDatabase } from '../shared/Database.js';
+import type { IStrongsRepository, StrongsEntry, LexiconEntry } from '../../kernel/repositories.js';
+import {
+  isAsciiTransliterationQuery,
+  normalizeTransliteration,
+  normalizedTransliterationSql,
+} from '../../kernel/transliteration.js';
 
-export interface StrongsEntry {
-  strongs_number: string;
-  testament: 'OT' | 'NT';
-  lemma: string;
-  transliteration: string | null;
-  pronunciation: string | null;
-  definition: string;
-  derivation: string | null;
-}
+export type { StrongsEntry, LexiconEntry } from '../../kernel/repositories.js';
 
-export interface LexiconEntry {
-  strongs_number: string;
-  source: string;
-  extended_data: Record<string, unknown>;
-}
-
-export class StrongsRepository {
+export class StrongsRepository implements IStrongsRepository {
   private db: Database.Database;
   private stmtLookup: Database.Statement;
   private stmtFtsSearch: Database.Statement;
@@ -36,7 +28,13 @@ export class StrongsRepository {
       'SELECT * FROM strongs WHERE strongs_number = ?'
     );
     this.stmtFtsSearch = this.db.prepare(
-      "SELECT strongs_number, lemma, transliteration, definition FROM strongs_fts WHERE strongs_fts MATCH ? ORDER BY rank LIMIT ?"
+      `SELECT s.strongs_number, s.testament, s.lemma, s.transliteration,
+              s.pronunciation, s.definition, s.derivation
+       FROM strongs_fts
+       JOIN strongs s ON s.strongs_number = strongs_fts.strongs_number
+       WHERE strongs_fts MATCH ?
+       ORDER BY rank, s.strongs_number
+       LIMIT ?`
     );
     this.stmtLexicon = this.db.prepare(
       'SELECT * FROM stepbible_lexicons WHERE strongs_number = ?'
@@ -65,7 +63,25 @@ export class StrongsRepository {
     // Escape special FTS5 characters and add prefix matching
     const escaped = query.replace(/['"*]/g, '');
     const ftsQuery = `"${escaped}"*`;
-    return this.stmtFtsSearch.all(ftsQuery, limit) as StrongsEntry[];
+    const results = this.stmtFtsSearch.all(ftsQuery, limit) as StrongsEntry[];
+    if (!isAsciiTransliterationQuery(query)) return results;
+
+    const normalizedQuery = normalizeTransliteration(query);
+    if (normalizedQuery.length < 2) return results;
+
+    // The canonical FTS index stores diacritics and transliteration markers.
+    // Match a normalized SQL expression as a fallback so ASCII `elohim` can
+    // find STEPBible's `ʼĕlôhîym` without changing the source or FTS schema.
+    const normalizedRows = this.db.prepare(
+      `SELECT strongs_number, testament, lemma, transliteration,
+              pronunciation, definition, derivation
+         FROM strongs s
+        WHERE ${normalizedTransliterationSql('s.transliteration')} LIKE ? || '%'
+        ORDER BY strongs_number
+        LIMIT ?`,
+    ).all(normalizedQuery, limit) as StrongsEntry[];
+
+    return mergeSearchResults(results, normalizedRows, limit);
   }
 
   /** Get STEPBible lexicon data for a Strong's number */
@@ -90,4 +106,20 @@ export class StrongsRepository {
     const hebrew = (this.db.prepare("SELECT COUNT(*) as c FROM strongs WHERE testament = 'OT'").get() as any).c;
     return { greek, hebrew, total: greek + hebrew };
   }
+}
+
+function mergeSearchResults(
+  primary: StrongsEntry[],
+  fallback: StrongsEntry[],
+  limit: number,
+): StrongsEntry[] {
+  const seen = new Set<string>();
+  const merged: StrongsEntry[] = [];
+  for (const entry of [...primary, ...fallback]) {
+    if (seen.has(entry.strongs_number)) continue;
+    seen.add(entry.strongs_number);
+    merged.push(entry);
+    if (merged.length >= limit) break;
+  }
+  return merged;
 }

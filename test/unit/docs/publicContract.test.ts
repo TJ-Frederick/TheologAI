@@ -1,0 +1,90 @@
+import { readFile } from 'node:fs/promises';
+import { afterAll, describe, expect, it } from 'vitest';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { createTheologAiMcpServer } from '../../../src/mcp/server.js';
+import { createDeterministicMcpFixture } from '../../fixtures/mcpCompositionRoot.js';
+
+interface DataManifest {
+  expectedCounts: {
+    documents: number;
+    morphology: number;
+    strongs: number;
+  };
+}
+
+const openConnections: Array<{ client: Client; server: Server }> = [];
+
+async function readProjectFile(path: string): Promise<string> {
+  return readFile(new URL(`../../../${path}`, import.meta.url), 'utf8');
+}
+
+afterAll(async () => {
+  await Promise.allSettled(
+    openConnections.flatMap(({ client, server }) => [client.close(), server.close()]),
+  );
+});
+
+describe('published project contract', () => {
+  it('keeps the README tool and prompt registries aligned with the MCP server', async () => {
+    const readme = await readProjectFile('README.md');
+    const { root } = createDeterministicMcpFixture();
+    const server = createTheologAiMcpServer(root, 'contract-test').server;
+    const client = new Client(
+      { name: 'public-contract-test', version: '1.0.0' },
+      { capabilities: {} },
+    );
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+    openConnections.push({ client, server });
+
+    const [{ tools }, { prompts }] = await Promise.all([
+      client.listTools(),
+      client.listPrompts(),
+    ]);
+
+    expect(tools).toHaveLength(9);
+    expect(prompts).toHaveLength(5);
+    for (const { name } of [...tools, ...prompts]) {
+      expect(readme).toContain(`| \`${name}\` |`);
+    }
+  });
+
+  it('keeps advertised corpus counts sourced from the data manifest', async () => {
+    const [readme, developerGuide, confessionSkill, rawManifest] = await Promise.all([
+      readProjectFile('README.md'),
+      readProjectFile('CLAUDE.md'),
+      readProjectFile('skills/confession-study/SKILL.md'),
+      readProjectFile('data/data-manifest.json'),
+    ]);
+    const manifest = JSON.parse(rawManifest) as DataManifest;
+    const { documents, morphology, strongs } = manifest.expectedCounts;
+
+    expect(readme).toContain(`${documents} locally indexed`);
+    expect(readme).toContain(`${morphology.toLocaleString('en-US')} indexed STEPBible morphology rows`);
+    expect(readme).toContain(`${strongs.toLocaleString('en-US')} Strong's entries`);
+    expect(developerGuide).toContain(`${documents} historical documents`);
+    expect(confessionSkill).toContain(`includes ${documents} historical documents`);
+    expect(`${developerGuide}\n${confessionSkill}`).not.toMatch(/18 historical documents/i);
+  });
+
+  it('does not reintroduce retired scope claims', async () => {
+    const [readme, historicalTestReport, historicalArchitecture, historicalDevelopment] = await Promise.all([
+      readProjectFile('README.md'),
+      readProjectFile('TEST_REPORT.md'),
+      readProjectFile('docs/bible-mcp-architecture.md'),
+      readProjectFile('docs/bible-mcp-development-plan.md'),
+    ]);
+
+    expect(readme).not.toMatch(/1,000\+.*CCEL/i);
+    expect(readme).not.toMatch(/eighteen locally indexed|18 locally indexed/i);
+    expect(readme).not.toMatch(/six public-domain commentar/i);
+    expect(readme).toContain('does **not** currently\nprovide complete CCEL catalog discovery');
+    expect(historicalTestReport.slice(0, 500)).toContain('Historical test report');
+    expect(historicalTestReport.slice(0, 500)).toContain('not the current product contract');
+    expect(historicalArchitecture.slice(0, 700)).toContain('Historical architecture plan');
+    expect(historicalDevelopment.slice(0, 700)).toContain('Historical development plan');
+  });
+});

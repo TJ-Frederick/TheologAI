@@ -103,6 +103,29 @@ describe('formatStrongsResult', () => {
     expect(out).toContain('Occurrences: 116');
   });
 
+  it('renders requested real-shape extended data and its CC BY attribution in simple mode', () => {
+    const out = formatStrongsResult(makeStrongsResult({
+      extended: {
+        strongsExtended: 'G0026',
+        gloss: 'love',
+        definition: '<b>love, goodwill</b><BR />divine love',
+        morphologyCode: 'G:N-F',
+        source: 'Abbott-Smith',
+      },
+      extendedCitation: {
+        source: 'STEPBible lexicon data',
+        copyright: 'CC BY 4.0 (Tyndale House, Cambridge)',
+      },
+    }));
+    expect(out).toContain("Extended Strong's: G0026");
+    expect(out).toContain('Gloss: love');
+    expect(out).toContain('Morphology: G:N-F');
+    expect(out).toContain('Lexicon: Abbott-Smith');
+    expect(out).toContain('Definition: love, goodwill\ndivine love');
+    expect(out).toContain('*Extended source: STEPBible lexicon data* - CC BY 4.0');
+    expect(out).not.toContain('<b>');
+  });
+
   it('in detailed mode, formats senses list', () => {
     const out = formatStrongsResult(makeStrongsResult({
       extended: {
@@ -157,6 +180,15 @@ describe('formatMorphologyResult', () => {
     }));
     expect(out).toContain('| 1 | Ἐν | ἐν | G1722 | PREP | In |');
     expect(out).toContain('| 2 | ἀρχῇ | ἀρχή | G746 | N-DSF | beginning |');
+  });
+
+  it('renders valid Greek Unicode without introducing replacement characters', () => {
+    const out = formatMorphologyResult(makeMorphResult({
+      words: [makeWord({ text: 'τὸ', lemma: 'ὁ', strong: 'G3588' })],
+    }));
+
+    expect(out).toContain('| 1 | τὸ | ὁ | G3588 | PREP | In |');
+    expect(out).not.toContain('�');
   });
 
   it('uses morphExpanded when available', () => {

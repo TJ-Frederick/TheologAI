@@ -1,0 +1,116 @@
+#!/usr/bin/env tsx
+/** Verify a generated TheologAI SQLite database without modifying it. */
+
+import Database from 'better-sqlite3';
+import { existsSync, readFileSync } from 'fs';
+import { dirname, isAbsolute, join, resolve } from 'path';
+import { fileURLToPath } from 'url';
+import { createHash } from 'crypto';
+import { buildD1ReadinessSql } from './check-remote-d1-readiness.js';
+import { assertJohnOneOneDatabase } from './data-integrity.js';
+
+interface DataManifest {
+  schemaVersion: string;
+  expectedCounts: Record<string, number>;
+}
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const ROOT = join(__dirname, '..');
+const MANIFEST_PATH = join(ROOT, 'data', 'data-manifest.json');
+
+function getDatabasePath(argv: string[]): string {
+  const equalsArg = argv.find(arg => arg.startsWith('--database='));
+  if (equalsArg) {
+    const value = equalsArg.slice('--database='.length);
+    if (!value) throw new Error('--database requires a path');
+    return isAbsolute(value) ? value : resolve(ROOT, value);
+  }
+
+  const databaseIndex = argv.indexOf('--database');
+  if (databaseIndex >= 0) {
+    const value = argv[databaseIndex + 1];
+    if (!value || value.startsWith('--')) throw new Error('--database requires a path');
+    return isAbsolute(value) ? value : resolve(ROOT, value);
+  }
+
+  return join(ROOT, 'data', 'theologai.db');
+}
+
+const databasePath = getDatabasePath(process.argv.slice(2));
+if (!existsSync(databasePath)) throw new Error(`Database not found: ${databasePath}`);
+
+const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf-8')) as DataManifest;
+const expectedTables = Object.keys(manifest.expectedCounts).sort();
+const expectedIndexes = ['idx_morph_strongs', 'idx_morph_verse', 'idx_xref_from', 'idx_xref_votes'];
+const db = new Database(databasePath, { readonly: true, fileMustExist: true });
+
+try {
+  const integrityRows = db.pragma('integrity_check') as Array<Record<string, string>>;
+  if (integrityRows.length !== 1 || Object.values(integrityRows[0])[0] !== 'ok') {
+    throw new Error(`SQLite integrity check failed: ${JSON.stringify(integrityRows)}`);
+  }
+
+  const foreignKeyViolations = db.pragma('foreign_key_check') as unknown[];
+  if (foreignKeyViolations.length > 0) {
+    throw new Error(`Foreign-key check failed: ${JSON.stringify(foreignKeyViolations)}`);
+  }
+
+  const tables = (db.prepare(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"
+  ).all() as Array<{ name: string }>)
+    .map(row => row.name)
+    .filter(name => !/_((data)|(idx)|(content)|(docsize)|(config))$/.test(name))
+    .sort();
+  if (JSON.stringify(tables) !== JSON.stringify(expectedTables)) {
+    throw new Error(`Unexpected table set: expected ${expectedTables.join(', ')}, received ${tables.join(', ')}`);
+  }
+
+  const indexes = (db.prepare(
+    "SELECT name FROM sqlite_master WHERE type = 'index' AND name NOT LIKE 'sqlite_%'"
+  ).all() as Array<{ name: string }>).map(row => row.name).sort();
+  for (const expectedIndex of expectedIndexes) {
+    if (!indexes.includes(expectedIndex)) throw new Error(`Required index is missing: ${expectedIndex}`);
+  }
+
+  for (const [table, expected] of Object.entries(manifest.expectedCounts)) {
+    if (!/^[a-z_]+$/.test(table)) throw new Error(`Invalid table name in manifest: ${table}`);
+    const row = db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get() as { count: number };
+    if (row.count !== expected) {
+      throw new Error(`Unexpected ${table} count: expected ${expected}, received ${row.count}`);
+    }
+  }
+
+  const metadata = Object.fromEntries(
+    (db.prepare('SELECT key, value FROM theologai_metadata').all() as Array<{ key: string; value: string }>)
+      .map(row => [row.key, row.value]),
+  );
+  if (metadata.schema_version !== manifest.schemaVersion) {
+    throw new Error(`Schema version marker mismatch: ${metadata.schema_version ?? 'missing'}`);
+  }
+  const manifestHash = createHash('sha256').update(readFileSync(MANIFEST_PATH)).digest('hex');
+  if (metadata.corpus_manifest_sha256 !== manifestHash) {
+    throw new Error('Corpus manifest hash marker mismatch');
+  }
+  const readiness = db.prepare(
+    buildD1ReadinessSql(manifest.expectedCounts, manifest.schemaVersion, manifestHash),
+  ).get() as { readiness?: string } | undefined;
+  if (readiness?.readiness !== 'ready') {
+    throw new Error('Production D1 readiness SQL did not accept the complete derived database');
+  }
+  assertJohnOneOneDatabase(db, 'Verified SQLite morphology');
+
+  const representativeQueries = [
+    ["SELECT 1 FROM cross_references WHERE from_verse = 'John.3.16' LIMIT 1", 'John 3:16 cross-references'],
+    ["SELECT 1 FROM strongs WHERE strongs_number = 'G25' LIMIT 1", "Strong's G25"],
+    ["SELECT 1 FROM morphology WHERE book = 'Genesis' AND chapter = 1 AND verse = 1 LIMIT 1", 'Genesis 1:1 morphology'],
+    ["SELECT 1 FROM documents WHERE id = 'nicene-creed' LIMIT 1", 'Nicene Creed'],
+    ['SELECT 1 FROM morph_codes LIMIT 1', 'morphology-code data'],
+  ] as const;
+  for (const [query, label] of representativeQueries) {
+    if (!db.prepare(query).get()) throw new Error(`Representative record is missing: ${label}`);
+  }
+} finally {
+  db.close();
+}
+
+console.error(`[verify-database] Verified ${databasePath}.`);

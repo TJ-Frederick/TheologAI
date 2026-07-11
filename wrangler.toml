@@ -1,7 +1,18 @@
 name = "theologai"
 main = "src/worker.ts"
-compatibility_date = "2024-12-01"
+compatibility_date = "2026-07-09"
 compatibility_flags = ["nodejs_compat"]
+
+[observability.logs]
+enabled = true
+# Temporary diagnostic sampling for invocation attribution.
+# Raise toward 1 briefly if you need every request, then disable after triage.
+head_sampling_rate = 0.25
+
+[observability.traces]
+enabled = true
+# Low trace sampling keeps span volume down while surfacing request flow shape.
+head_sampling_rate = 0.05
 
 # Alias the Vercel AI SDK to an empty stub — only used by agents MCP client, not our server
 [alias]
@@ -9,13 +20,28 @@ ai = "./src/shims/ai-stub.ts"
 
 [vars]
 THEOLOGAI_VERSION = "3.6.0"
+THEOLOGAI_ALLOWED_ORIGINS = "https://theologai.pages.dev"
+THEOLOGAI_MAX_REQUEST_BYTES = "1048576"
+THEOLOGAI_REQUEST_LOGS = "false"
 
 # D1 database. The database_id is not sensitive (scoped to Cloudflare account).
 # For multi-environment setups, use [env.staging] / [env.production] sections.
 [[d1_databases]]
 binding = "THEOLOGAI_DB"
-database_name = "theologai-db"
-database_id = "50de6fbe-852b-4a50-875f-729ef58d3fcb"
+database_name = "theologai-production-20260711-a"
+database_id = "324103e8-16b0-457b-8a2c-45f63a4d8735"
+migrations_dir = "migrations"
+
+# Anonymous abuse control. Counters are intentionally local to each Cloudflare
+# location. Namespace 361201 is reserved for production and must not be reused
+# by preview, otherwise the environments would share counters for equal keys.
+[[ratelimits]]
+name = "THEOLOGAI_RATE_LIMITER"
+namespace_id = "361201"
+
+[ratelimits.simple]
+limit = 120
+period = 60
 
 # Optional: Custom RPC endpoints (defaults to public endpoints in code)
 # ETH_RPC_URL = "https://eth.llamarpc.com"
@@ -23,20 +49,34 @@ database_id = "50de6fbe-852b-4a50-875f-729ef58d3fcb"
 # RADIUS_RPC_URL = "https://rpc.radiustech.xyz"
 
 # ── Preview environment (deployed by CI on PRs) ──
-# Uses a separate D1 database. One-time setup:
-#   wrangler d1 create theologai-db-preview
-#   Then seed with: scripts/d1-migration/*.sql
+# Uses a separate, pre-seeded D1 database. Prepare and validate replacements
+# according to docs/D1-DATA-WORKFLOW.md before changing this binding. Worker
+# deployment does not migrate or seed D1.
 
 [env.preview]
 name = "theologai-preview"
 
 [env.preview.vars]
 THEOLOGAI_VERSION = "3.6.0-preview"
+THEOLOGAI_ALLOWED_ORIGINS = "https://theologai.pages.dev"
+THEOLOGAI_MAX_REQUEST_BYTES = "1048576"
+THEOLOGAI_REQUEST_LOGS = "true"
 
 [[env.preview.d1_databases]]
 binding = "THEOLOGAI_DB"
-database_name = "theologai-db-preview"
-database_id = "f9f415e1-219b-4d17-bcf5-33a8abad02fa"
+database_name = "theologai-preview-20260710-c"
+database_id = "7cd1b99e-49ed-4d7b-b056-e746b902c89f"
+migrations_dir = "migrations"
+
+# Preview uses a distinct namespace so load tests and PR validation cannot
+# consume the production request budget.
+[[env.preview.ratelimits]]
+name = "THEOLOGAI_RATE_LIMITER"
+namespace_id = "361202"
+
+[env.preview.ratelimits.simple]
+limit = 120
+period = 60
 
 # Secrets (set via `wrangler secret put`):
 #   ESV_API_KEY            — ESV API key (optional)
