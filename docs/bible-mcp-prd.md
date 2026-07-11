@@ -1,5 +1,10 @@
 # Bible Study MCP Server - Product Requirements Document
 
+> **Historical product requirements document:** This document preserves an
+> earlier scope, names, performance targets, and provider claims. It is not the
+> current product contract or implementation status. See [README.md](../README.md)
+> and [docs/ROADMAP.md](ROADMAP.md).
+
 ## 1. Executive Summary
 
 ### 1.1 Product Vision

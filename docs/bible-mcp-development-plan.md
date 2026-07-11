@@ -1,9 +1,10 @@
 # Bible Study MCP Server - Development Plan
 
 > **Historical development plan:** This document preserves earlier milestones,
-> test totals, and intended provider scope. It is not the current implementation
-> status or product contract. In particular, full CCEL catalog search is not
-> supported and commentary rights vary by work. See `README.md` and `NOTICE.md`.
+> test totals, and intended provider scope. It is not the current product
+> contract or implementation status. In particular, full CCEL catalog search is not
+> supported and commentary rights vary by work. See [README.md](../README.md),
+> [docs/ROADMAP.md](ROADMAP.md), and [NOTICE.md](../NOTICE.md).
 
 
 **Current Status: Phase 3.4 - Production Ready for Beta Launch ✅**
