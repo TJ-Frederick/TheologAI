@@ -68,10 +68,19 @@ describe('UbsParallelPassageRepository', () => {
       mutate(value => { value.unknown = true; }),
       mutate(value => { value.schemaVersion = 'v2'; }),
       mutate(value => { value.provenance.sourceId = 'other'; }),
+      mutate(value => {
+        value.provenance.sourceCommit = 'd'.repeat(40);
+        value.provenance.sourceUrl = 'https://evil.example/fabricated';
+        for (const group of value.groups) {
+          group.provenance.sourceCommit = 'd'.repeat(40);
+          group.provenance.sourceUrl = 'https://evil.example/fabricated';
+        }
+      }),
       mutate(value => { value.groups[0].provenance.sourceSha256 = 'd'.repeat(64); }),
       mutate(value => { value.groups[0].sourceOrdinal = 2; }),
       mutate(value => { value.groups[0].members[0].sourceOrder = 2; }),
       mutate(value => { value.groups[0].members[0].alignmentRaw = '9'; }),
+      mutate(value => { value.groups[0].members[0].alignmentRaw = '112345678'; }),
       mutate(value => { value.groups[0].members[0].alignmentBasis = 'BHS'; }),
       mutate(value => { value.groups[0].members[0].normalizedReference = 'Luke 6:27-35'; }),
       mutate(value => { value.groups[0].members[0].sourceReference = 'LUK 6:27-35'; }),
@@ -79,6 +88,14 @@ describe('UbsParallelPassageRepository', () => {
       mutate(value => { value.groups[0].members[0].segments[0].bookNumber = 67; }),
       mutate(value => { value.groups[0].members[0].segments[0].chapter = 99; }),
       mutate(value => { value.referenceIndex['42:6'][0].startVerse = 26; }),
+      mutate(value => {
+        const replacement = `ubs-pp-${'d'.repeat(64)}`;
+        const original = value.groups[0].groupId;
+        value.groups[0].groupId = replacement;
+        for (const entries of Object.values(value.referenceIndex) as any[][]) {
+          for (const entry of entries) if (entry.groupId === original) entry.groupId = replacement;
+        }
+      }),
       mutate(value => { delete value.referenceIndex['40:5']; }),
       mutate(value => { value.groups.push(structuredClone(value.groups[0])); }),
     ];

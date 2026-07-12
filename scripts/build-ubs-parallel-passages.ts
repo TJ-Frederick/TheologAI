@@ -19,6 +19,7 @@ import type {
   SourceParallelMember as KernelSourceParallelMember,
   SourceParallelReferenceSegment,
 } from '../src/kernel/sourceAttestedParallels.js';
+import { deriveUbsParallelGroupId, UBS_PARALLEL_PASSAGE_PROVENANCE } from '../src/kernel/ubsParallelSource.js';
 
 export const TRANSFORM_VERSION = 1;
 export const LABEL = 'source_attested_parallel' as const;
@@ -124,8 +125,7 @@ export const DEFAULT_SOURCE_PATH = join(ROOT, 'data/parallel-passages/ubs-parate
 export const DEFAULT_METADATA_PATH = join(ROOT, 'data/parallel-passages/ubs-paratext/SOURCE.json');
 export const DEFAULT_OUTPUT_PATH = join(ROOT, 'src/data/ubs-parallel-passages.generated.json');
 
-const MODIFICATION_NOTE =
-  'References and alignment metadata normalized for local lookup; UBS group membership and member order preserved.';
+const MODIFICATION_NOTE = UBS_PARALLEL_PASSAGE_PROVENANCE.modificationNote;
 
 function fail(message: string): never {
   throw new Error(`[ubs-compiler] ${message}`);
@@ -431,7 +431,11 @@ export function compileUbsParallelPassages(xml: string | Buffer, metadata: Sourc
     const mixed = markers.size === 2;
     const canonicalMembers = passage.verses.map(verse => [verse.marker, verse.sourceReference, verse.alignmentRaw]);
     const canonical = JSON.stringify(canonicalMembers);
-    const groupId = `ubs-pp-${sha256(Buffer.from(canonical, 'utf8'))}`;
+    const groupId = deriveUbsParallelGroupId(passage.verses.map(verse => ({
+      languageMarker: verse.marker,
+      sourceReference: verse.sourceReference,
+      alignmentRaw: verse.alignmentRaw,
+    })));
     if (seenGroups.has(canonical) || seenGroups.has(groupId)) fail(`duplicate UBS group at source ordinal ${passageIndex + 1}`);
     seenGroups.add(canonical);
     seenGroups.add(groupId);
