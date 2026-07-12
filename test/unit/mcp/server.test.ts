@@ -370,6 +370,21 @@ describe('shared MCP registration', () => {
     });
   });
 
+  it('canonicalizes Strong\'s resource identities and rejects invalid corpus numbers', async () => {
+    const root = makeMockRoot();
+    const lookup = vi.fn(root.services.strongsService.lookup);
+    root.services.strongsService.lookup = lookup;
+    const client = await connect(createTheologAiMcpServer(root, '1.0.0-test').server);
+
+    await client.readResource({ uri: 'theologai://strongs/g02385i' });
+    expect(lookup).toHaveBeenCalledWith('G2385I', true);
+
+    for (const uri of ['theologai://strongs/G0', 'theologai://strongs/G5625', 'theologai://strongs/H8675']) {
+      await expect(client.readResource({ uri })).rejects.toMatchObject({ code: -32002, data: { uri } });
+    }
+    expect(lookup).toHaveBeenCalledTimes(1);
+  });
+
   it.each([
     ['document', 'theologai://documents/nicene-creed'],
     ['strongs', 'theologai://strongs/G26'],

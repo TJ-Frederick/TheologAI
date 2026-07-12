@@ -40,35 +40,31 @@ describe('original_language_lookup - Enhanced Features (STEPBible)', () => {
   });
 
   describe('extended Strong\'s numbers', () => {
-    it('should accept extended Strong\'s format (G1722a)', async () => {
+    it('should preserve an extended Strong\'s identity without joining it to the base', async () => {
       const result = await originalLanguageLookupHandler.handler({
         strongs_number: 'G1722a',
         include_extended: true
       });
 
-      expect(result.isError).toBeUndefined();
-      const text = result.content[0].text;
-      expect(text).toContain('1722');
+      expect(result.isError).toBe(true);
     });
 
-    it('should fall back to base number when extended variant not found', async () => {
+    it('should not fall back to a base number when an extended variant is absent', async () => {
       const result = await originalLanguageLookupHandler.handler({
         strongs_number: 'G25z',
         include_extended: true
       });
 
-      expect(result.isError).toBeUndefined();
-      const text = result.content[0].text;
-      expect(text).toContain('G25');
+      expect(result.isError).toBe(true);
     });
 
-    it('should normalize input (lowercase, whitespace)', async () => {
+    it('should reject surrounding whitespace at the exact handler boundary', async () => {
       const result = await originalLanguageLookupHandler.handler({
         strongs_number: '  g25a  ',
         include_extended: true
       });
 
-      expect(result.isError).toBeUndefined();
+      expect(result.isError).toBe(true);
     });
   });
 

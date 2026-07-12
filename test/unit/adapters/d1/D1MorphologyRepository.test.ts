@@ -95,7 +95,11 @@ describe('D1MorphologyRepository', () => {
       const db = createSimpleD1([]);
       const repo = new D1MorphologyRepository(db as any);
       await repo.getOccurrences('G25', 50);
-      expect(db.prepare.mock.results[0].value.bind).toHaveBeenCalledWith('G25', 50);
+      expect(db.prepare.mock.results[0].value.bind).toHaveBeenCalledWith('G0025', 50);
+
+      await repo.getOccurrences('g25i');
+      expect(db.prepare.mock.results[1].value.bind).toHaveBeenCalledWith('G0025I', 100);
+      expect(await repo.getOccurrences('G0')).toEqual([]);
     });
   });
 
@@ -117,7 +121,7 @@ describe('D1MorphologyRepository', () => {
       const db = createSimpleD1([]);
       const repo = new D1MorphologyRepository(db as any);
       await repo.getDistribution('G25');
-      expect(db.prepare.mock.results[0].value.bind).toHaveBeenCalledWith('G25');
+      expect(db.prepare.mock.results[0].value.bind).toHaveBeenCalledWith('G0025');
     });
   });
 });

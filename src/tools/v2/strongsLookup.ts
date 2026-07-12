@@ -25,9 +25,9 @@ export function createStrongsLookupHandler(service: StrongsService): ToolHandler
         strongs_number: {
           type: 'string',
           minLength: 2,
-          maxLength: 16,
+          maxLength: 6,
           description: "Strong's number (e.g., G25 for Greek agapaō, H430 for Hebrew Elohim)",
-          pattern: '^[GHgh]\\d+[a-z]?$',
+          pattern: '^[GHgh]0*[1-9]\\d*[A-Za-z]?$',
         },
         detail_level: { type: 'string', enum: ['simple', 'detailed'], description: 'Exact strongs_number lookups only; choose the amount of entry detail. Defaults to simple when omitted.' },
         include_extended: { type: 'boolean', description: 'Exact strongs_number lookups only; include STEPBible extended data. Defaults to false when omitted.' },
@@ -113,7 +113,7 @@ function validateLookupMode(params: Record<string, unknown>): void {
 
   if (typeof params.strongs_number !== 'string'
     || params.strongs_number.length < 2
-    || params.strongs_number.length > 16
+    || params.strongs_number.length > 6
     || params.strongs_number !== params.strongs_number.trim()
     || !parseStrongsIdentity(params.strongs_number)) {
     throw new ValidationError('strongs_number', "strongs_number must match a Strong's number such as G25 or H430.");

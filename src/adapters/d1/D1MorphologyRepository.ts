@@ -8,6 +8,7 @@
 import type { IMorphologyRepository, MorphWord, WordOccurrence, BookDistribution } from '../../kernel/repositories.js';
 import { expandHebrewMorphCode } from '../shared/hebrewMorphExpander.js';
 import { CANONICAL_BOOK_ORDER_SQL, sortByCanonicalBook } from '../shared/repositoryUtils.js';
+import { parseStrongsIdentity } from '../../kernel/strongs.js';
 
 export class D1MorphologyRepository implements IMorphologyRepository {
   constructor(private db: D1Database) {}
@@ -41,21 +42,25 @@ export class D1MorphologyRepository implements IMorphologyRepository {
   }
 
   async getOccurrences(strongsNumber: string, limit: number = 100): Promise<WordOccurrence[]> {
+    const identity = parseStrongsIdentity(strongsNumber);
+    if (!identity) return [];
     const { results } = await this.db.prepare(
       `SELECT DISTINCT book, chapter, verse, word_text, gloss
        FROM morphology WHERE strongs_number = ?
        ORDER BY ${CANONICAL_BOOK_ORDER_SQL}, chapter, verse, word_text, gloss
        LIMIT ?`
-    ).bind(strongsNumber, limit).all<WordOccurrence>();
+    ).bind(identity.morphologyKey, limit).all<WordOccurrence>();
     return results;
   }
 
   async getDistribution(strongsNumber: string): Promise<BookDistribution[]> {
+    const identity = parseStrongsIdentity(strongsNumber);
+    if (!identity) return [];
     const { results } = await this.db.prepare(
       `SELECT book, COUNT(DISTINCT chapter || ':' || verse) as verse_count
        FROM morphology WHERE strongs_number = ? GROUP BY book
        ORDER BY ${CANONICAL_BOOK_ORDER_SQL}, book`
-    ).bind(strongsNumber).all<BookDistribution>();
+    ).bind(identity.morphologyKey).all<BookDistribution>();
     return sortByCanonicalBook(results);
   }
 }

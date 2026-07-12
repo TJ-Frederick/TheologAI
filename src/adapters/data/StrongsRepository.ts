@@ -13,7 +13,7 @@ import {
   normalizeTransliteration,
   normalizedTransliterationSql,
 } from '../../kernel/transliteration.js';
-import { baseStrongsId, parseStrongsIdentity } from '../../kernel/strongs.js';
+import { parseStrongsIdentity } from '../../kernel/strongs.js';
 
 export type { StrongsEntry, LexiconEntry } from '../../kernel/repositories.js';
 
@@ -47,21 +47,13 @@ export class StrongsRepository implements IStrongsRepository {
     const identity = parseStrongsIdentity(strongsNumber);
     if (!identity) return undefined;
 
-    // Preserve sense suffixes for data sets that contain them, then fall back
-    // to the base concordance entry when the source only provides that entry.
+    // A suffixed identity is exact: never silently substitute the base entry.
     let row = this.stmtLookup.get(identity.publicId) as StrongsEntry | undefined;
     if (row) return row;
 
-    const basePublicId = baseStrongsId(identity.publicId);
-    if (basePublicId !== identity.publicId) {
-      row = this.stmtLookup.get(basePublicId) as StrongsEntry | undefined;
-      if (row) return row;
-    }
-
     // Compatibility with databases that stored concordance keys padded.
-    const baseMorphologyKey = baseStrongsId(identity.morphologyKey);
-    if (baseMorphologyKey !== identity.publicId && baseMorphologyKey !== basePublicId) {
-      row = this.stmtLookup.get(baseMorphologyKey) as StrongsEntry | undefined;
+    if (identity.morphologyKey !== identity.publicId) {
+      row = this.stmtLookup.get(identity.morphologyKey) as StrongsEntry | undefined;
     }
     return row;
   }
@@ -96,10 +88,7 @@ export class StrongsRepository implements IStrongsRepository {
   getLexiconEntry(strongsNumber: string): LexiconEntry | undefined {
     const identity = parseStrongsIdentity(strongsNumber);
     if (!identity) return undefined;
-    let row = this.stmtLexicon.get(identity.morphologyKey) as { strongs_number: string; source: string; extended_data: string } | undefined;
-    if (!row && /[a-z]$/.test(identity.morphologyKey)) {
-      row = this.stmtLexicon.get(baseStrongsId(identity.morphologyKey)) as typeof row;
-    }
+    const row = this.stmtLexicon.get(identity.morphologyKey) as { strongs_number: string; source: string; extended_data: string } | undefined;
     if (!row) return undefined;
 
     return {

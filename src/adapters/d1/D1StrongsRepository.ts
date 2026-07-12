@@ -11,7 +11,7 @@ import {
   normalizeTransliteration,
   normalizedTransliterationSql,
 } from '../../kernel/transliteration.js';
-import { baseStrongsId, parseStrongsIdentity } from '../../kernel/strongs.js';
+import { parseStrongsIdentity } from '../../kernel/strongs.js';
 
 export class D1StrongsRepository implements IStrongsRepository {
   constructor(private db: D1Database) {}
@@ -26,19 +26,10 @@ export class D1StrongsRepository implements IStrongsRepository {
     ).bind(identity.publicId).first<StrongsEntry>();
     if (row) return row;
 
-    const basePublicId = baseStrongsId(identity.publicId);
-    if (basePublicId !== identity.publicId) {
+    if (identity.morphologyKey !== identity.publicId) {
       row = await this.db.prepare(
         'SELECT * FROM strongs WHERE strongs_number = ?'
-      ).bind(basePublicId).first<StrongsEntry>();
-      if (row) return row;
-    }
-
-    const baseMorphologyKey = baseStrongsId(identity.morphologyKey);
-    if (baseMorphologyKey !== identity.publicId && baseMorphologyKey !== basePublicId) {
-      row = await this.db.prepare(
-        'SELECT * FROM strongs WHERE strongs_number = ?'
-      ).bind(baseMorphologyKey).first<StrongsEntry>();
+      ).bind(identity.morphologyKey).first<StrongsEntry>();
     }
     return row ?? undefined;
   }
@@ -75,14 +66,9 @@ export class D1StrongsRepository implements IStrongsRepository {
   async getLexiconEntry(strongsNumber: string): Promise<LexiconEntry | undefined> {
     const identity = parseStrongsIdentity(strongsNumber);
     if (!identity) return undefined;
-    let row = await this.db.prepare(
+    const row = await this.db.prepare(
       'SELECT * FROM stepbible_lexicons WHERE strongs_number = ?'
     ).bind(identity.morphologyKey).first<{ strongs_number: string; source: string; extended_data: string }>();
-    if (!row && /[a-z]$/.test(identity.morphologyKey)) {
-      row = await this.db.prepare(
-        'SELECT * FROM stepbible_lexicons WHERE strongs_number = ?'
-      ).bind(baseStrongsId(identity.morphologyKey)).first<{ strongs_number: string; source: string; extended_data: string }>();
-    }
     if (!row) return undefined;
 
     return {

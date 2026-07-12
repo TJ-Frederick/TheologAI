@@ -39,14 +39,15 @@ describe('StrongsRepository', () => {
     expect(repo.lookup('invalid')).toBeUndefined();
   });
 
-  it('preserves a suffix before falling back to the base public identity', () => {
+  it('treats a suffixed public identity as exact', () => {
+    const suffixedEntry = { ...entry, strongs_number: 'G2385I' };
     const db = new FakeSqliteDatabase([{
       match: 'strongs WHERE strongs_number',
-      get: (number: unknown) => number === 'G1722' ? entry : undefined,
+      get: (number: unknown) => number === 'G2385I' ? suffixedEntry : undefined,
     }]);
     const repo = new StrongsRepository(db.asDatabase());
-    expect(repo.lookup('g01722A')).toEqual(entry);
-    expect(db.statement('strongs WHERE strongs_number').get.mock.calls).toEqual([['G1722a'], ['G1722']]);
+    expect(repo.lookup('g02385i')).toEqual(suffixedEntry);
+    expect(db.statement('strongs WHERE strongs_number').get.mock.calls).toEqual([['G2385I']]);
   });
 
   it('sanitizes FTS input and applies default and explicit limits', () => {
@@ -73,14 +74,14 @@ describe('StrongsRepository', () => {
     expect(db.statement('stepbible_lexicons').get).toHaveBeenCalledWith('H0430');
   });
 
-  it('tries a suffix-preserving morphology key before its base key', () => {
-    const row = { strongs_number: 'H0430', source: 'STEPBible', extended_data: '{}' };
+  it('uses the source-grounded uppercase suffixed morphology key exactly', () => {
+    const row = { strongs_number: 'G2385I', source: 'STEPBible', extended_data: '{}' };
     const db = new FakeSqliteDatabase([{
       match: 'stepbible_lexicons',
-      get: (number: unknown) => number === 'H0430' ? row : undefined,
+      get: (number: unknown) => number === 'G2385I' ? row : undefined,
     }]);
-    expect(new StrongsRepository(db.asDatabase()).getLexiconEntry('h430A')).toMatchObject({ strongs_number: 'H0430' });
-    expect(db.statement('stepbible_lexicons').get.mock.calls).toEqual([['H0430a'], ['H0430']]);
+    expect(new StrongsRepository(db.asDatabase()).getLexiconEntry('g2385i')).toMatchObject({ strongs_number: 'G2385I' });
+    expect(db.statement('stepbible_lexicons').get.mock.calls).toEqual([['G2385I']]);
   });
 
   it('returns undefined for a missing lexicon row', () => {
