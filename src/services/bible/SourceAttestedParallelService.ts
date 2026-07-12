@@ -2,6 +2,7 @@
 
 import type {
   ISourceAttestedParallelRepository,
+  ParallelSourceProvenance,
   SourceAttestedParallelLookup,
 } from '../../kernel/sourceAttestedParallels.js';
 import { parseSourceAttestedLookupReference } from '../../kernel/sourceAttestedReference.js';
@@ -34,5 +35,9 @@ export class SourceAttestedParallelService {
       throw new ValidationError('maxGroups', 'maxGroups must be an integer from 1 to 10.');
     }
     return { reference, groups: await this.repository.findGroups(reference, maxGroups) };
+  }
+
+  async getProvenance(): Promise<Readonly<ParallelSourceProvenance>> {
+    return this.repository.getProvenance();
   }
 }

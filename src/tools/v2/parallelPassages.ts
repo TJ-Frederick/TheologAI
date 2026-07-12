@@ -36,7 +36,13 @@ export function createParallelPassagesHandler(service: ParallelPassageService): 
           maxParallels: params.maxParallels as number,
           useCrossReferences: params.useCrossReferences as boolean,
         });
-        return { content: [{ type: 'text', text: formatParallelPassages(result) }] };
+        // Commit D replaces this legacy Markdown bridge with the versioned UBS presenter.
+        return { content: [{ type: 'text', text: formatParallelPassages({
+          primary: { reference: result.requestedReference },
+          parallels: result.legacyParallels,
+          citation: { source: 'TheologAI Parallel Passages' },
+          warnings: result.warnings,
+        }) }] };
       } catch (error) {
         return handleToolError(error as Error);
       }

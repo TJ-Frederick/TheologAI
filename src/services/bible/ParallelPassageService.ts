@@ -4,9 +4,25 @@ import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { BibleService } from './BibleService.js';
-import type { ParallelPassageLookupParams, ParallelPassageResult, ParallelPassage } from '../../kernel/types.js';
+import type {
+  ParallelPassageCorpus,
+  ParallelPassageLookupParams,
+  ParallelPassageResearchResult,
+  ParallelPassage,
+  SourceAttestedParallelGroupResult,
+} from '../../kernel/types.js';
 import type { ICrossReferenceRepository } from '../../kernel/repositories.js';
 import { parseReference, formatReference, type BibleReference } from '../../kernel/reference.js';
+import { parseSourceAttestedLookupReference } from '../../kernel/sourceAttestedReference.js';
+import type { SourceAttestedParallelService } from './SourceAttestedParallelService.js';
+import { ValidationError } from '../../kernel/errors.js';
+import {
+  LEGACY_PARALLEL_PROVENANCE,
+  LEGACY_PARALLEL_PROVENANCE_ID,
+  OPENBIBLE_CROSS_REFERENCE_PROVENANCE,
+  UBS_PARALLEL_PROVENANCE_ID,
+  ubsParallelProvenanceRecord,
+} from '../../kernel/parallelPassageProvenance.js';
 
 type Relationship = ParallelPassage['relationship'];
 interface RawParallelEntry {
@@ -43,72 +59,103 @@ export class ParallelPassageService {
     private readonly bibleService?: TextService,
     databasePath?: string,
     preloadedData?: RawParallelDatabase,
+    private readonly sourceAttestedService?: Pick<SourceAttestedParallelService, 'lookup' | 'getProvenance'>,
   ) {
     const raw = preloadedData ?? this.loadDatabase(databasePath);
     this.indexDatabase(raw);
   }
 
-  async lookup(params: ParallelPassageLookupParams): Promise<ParallelPassageResult> {
-    const primaryReference = normalizeReference(params.reference);
+  async lookup(params: ParallelPassageLookupParams): Promise<ParallelPassageResearchResult> {
+    const corpora = normalizeCorpora(params);
+    const primaryReference = normalizeResearchReference(params.reference);
+    const warnings: string[] = [];
+    const sourceAttestedGroups = corpora.includes('ubs_source_attested')
+      ? await this.lookupSourceAttested(primaryReference, params, warnings)
+      : [];
+    const legacyParallels = corpora.includes('theologai_legacy')
+      ? this.lookupLegacy(primaryReference, params)
+      : [];
+    const includeOpenBible = resolveOpenBibleSelection(params);
+    const openBibleCrossReferences = includeOpenBible
+      ? await this.lookupOpenBible(primaryReference, normalizeMaxParallels(params.maxParallels), warnings)
+      : [];
+
+    if (params.includeText) {
+      await this.attachTexts(sourceAttestedGroups, legacyParallels, params.translation || 'ESV', warnings);
+    }
+    const provenance = [];
+    if (corpora.includes('ubs_source_attested')) {
+      if (!this.sourceAttestedService) throw new Error('UBS source-attested parallels are unavailable in this runtime');
+      provenance.push(ubsParallelProvenanceRecord(await this.sourceAttestedService.getProvenance()));
+    }
+    if (corpora.includes('theologai_legacy')) provenance.push({ ...LEGACY_PARALLEL_PROVENANCE });
+    if (includeOpenBible) provenance.push({ ...OPENBIBLE_CROSS_REFERENCE_PROVENANCE });
+    return {
+      requestedReference: primaryReference,
+      corpora,
+      sourceAttestedGroups,
+      legacyParallels,
+      openBibleCrossReferences,
+      provenance,
+      warnings: warnings.length > 0 ? [...new Set(warnings)] : undefined,
+    };
+  }
+
+  private async lookupSourceAttested(
+    reference: string,
+    params: ParallelPassageLookupParams,
+    warnings: string[],
+  ): Promise<SourceAttestedParallelGroupResult[]> {
+    if (!this.sourceAttestedService) throw new Error('UBS source-attested parallels are unavailable in this runtime');
+    const lookup = await this.sourceAttestedService.lookup({ reference, maxGroups: params.maxGroups });
+    const requested = parseSourceAttestedLookupReference(lookup.reference).segments;
+    return lookup.groups.map(group => ({
+      groupId: group.groupId,
+      sourceOrdinal: group.sourceOrdinal,
+      label: group.label,
+      directionality: group.directionality,
+      members: group.members.map(member => ({
+        sourceOrder: member.sourceOrder,
+        sourceReference: member.sourceReference,
+        normalizedReference: member.normalizedReference,
+        segments: member.segments.map(segment => ({ ...segment })),
+        languageMarker: member.languageMarker,
+        matched: member.segments.some(segment => requested.some(query => sourceSegmentsOverlap(segment, query))),
+        ...(params.includeAlignment ? { alignmentBasis: member.alignmentBasis, alignmentRaw: member.alignmentRaw } : {}),
+      })),
+      provenanceIds: [UBS_PARALLEL_PROVENANCE_ID],
+    }));
+  }
+
+  private lookupLegacy(primaryReference: string, params: ParallelPassageLookupParams): ParallelPassage[] {
     const mode = params.mode ?? 'auto';
     const maxParallels = normalizeMaxParallels(params.maxParallels);
-    const warnings: string[] = [];
     const candidates = new Map<string, ParallelPassage>();
     const primaryParsed = parseReference(primaryReference);
-
     for (const group of this.findGroups(primaryReference, primaryParsed)) {
       for (const member of group.members) {
-        // A verse/range inside a curated member identifies that member; it is
-        // not a parallel to return. This also prevents overlapping queries
-        // from returning the canonical range they matched.
         if (rangesOverlap(primaryParsed, member.parsed) || candidates.has(member.reference)) continue;
         const relationship = relationshipForEdge(group.relationship, primaryParsed, member.parsed);
         if (!relationshipMatchesMode(relationship, mode)) continue;
         candidates.set(member.reference, {
-          reference: member.reference,
-          relationship,
-          confidence: group.confidence,
-          notes: group.notes,
+          reference: member.reference, relationship, confidence: group.confidence, notes: group.notes,
         });
       }
     }
+    return [...candidates.values()].slice(0, maxParallels);
+  }
 
-    let usedCrossReferences = false;
-    if ((mode === 'auto' || mode === 'thematic') && params.useCrossReferences !== false) {
-      const xrefs = await this.crossRefs.getCrossReferences(primaryReference, { maxResults: maxParallels });
-      usedCrossReferences = xrefs.references.length > 0;
-      for (const xref of xrefs.references) {
-        let reference: string;
-        try {
-          reference = normalizeReference(xref.reference);
-        } catch {
-          warnings.push('One malformed cross-reference was omitted.');
-          continue;
-        }
-        if (reference === primaryReference || candidates.has(reference)) continue;
-        candidates.set(reference, {
-          reference,
-          relationship: 'thematic',
-          confidence: Math.min(Math.max(xref.votes / 100, 0), 1),
-        });
+  private async lookupOpenBible(reference: string, maxResults: number, warnings: string[]) {
+    const result = await this.crossRefs.getCrossReferences(reference, { maxResults });
+    return result.references.flatMap(xref => {
+      try {
+        const normalized = normalizeReference(xref.reference);
+        return normalized === reference ? [] : [{ reference: normalized, votes: xref.votes }];
+      } catch {
+        warnings.push('One malformed OpenBible.info cross-reference was omitted.');
+        return [];
       }
-    }
-
-    const parallels = [...candidates.values()].slice(0, maxParallels);
-    const primary: ParallelPassageResult['primary'] = { reference: primaryReference };
-    if (params.includeText) {
-      await this.attachTexts(parallels, params.translation || 'ESV', warnings);
-    }
-
-    return {
-      primary,
-      parallels,
-      citation: {
-        source: usedCrossReferences ? 'TheologAI Parallel Passages + OpenBible.info' : 'TheologAI Parallel Passages',
-        copyright: usedCrossReferences ? 'Cross-references from OpenBible.info (CC-BY)' : undefined,
-      },
-      warnings: warnings.length > 0 ? [...new Set(warnings)] : undefined,
-    };
+    });
   }
 
   private loadDatabase(databasePath?: string): RawParallelDatabase {
@@ -159,7 +206,8 @@ export class ParallelPassageService {
   }
 
   private async attachTexts(
-    parallels: ParallelPassage[],
+    sourceGroups: SourceAttestedParallelGroupResult[],
+    legacyParallels: ParallelPassage[],
     translation: string,
     warnings: string[],
   ): Promise<void> {
@@ -169,7 +217,14 @@ export class ParallelPassageService {
     }
 
     const targets: Array<{ reference: string; apply: (text: string, resolvedTranslation: string) => void }> = [
-      ...parallels.map(parallel => ({
+      ...sourceGroups.flatMap(group => group.members.map(member => ({
+        reference: member.normalizedReference,
+        apply: (text: string, resolvedTranslation: string) => {
+          member.text = text;
+          member.translation = resolvedTranslation;
+        },
+      }))),
+      ...legacyParallels.map(parallel => ({
         reference: parallel.reference,
         apply: (text: string, resolvedTranslation: string) => {
           parallel.text = text;
@@ -187,6 +242,38 @@ export class ParallelPassageService {
       }
     });
   }
+}
+
+function normalizeCorpora(params: ParallelPassageLookupParams): ParallelPassageCorpus[] {
+  const corpora = params.corpora ?? ['ubs_source_attested'];
+  if (!Array.isArray(corpora) || corpora.length < 1 || corpora.length > 2
+    || new Set(corpora).size !== corpora.length
+    || corpora.some(corpus => corpus !== 'ubs_source_attested' && corpus !== 'theologai_legacy')) {
+    throw new ValidationError('corpora', 'corpora must contain one or both unique supported corpus identifiers.');
+  }
+  if (!corpora.includes('theologai_legacy') && (params.mode !== undefined || params.maxParallels !== undefined)) {
+    throw new ValidationError('corpora', "mode and maxParallels require corpora: ['theologai_legacy'].");
+  }
+  if (!corpora.includes('ubs_source_attested') && params.includeAlignment !== undefined) {
+    throw new ValidationError('includeAlignment', 'includeAlignment requires the ubs_source_attested corpus.');
+  }
+  return [...corpora];
+}
+
+function resolveOpenBibleSelection(params: ParallelPassageLookupParams): boolean {
+  if (params.includeOpenBibleCrossReferences !== undefined && params.useCrossReferences !== undefined
+    && params.includeOpenBibleCrossReferences !== params.useCrossReferences) {
+    throw new ValidationError('includeOpenBibleCrossReferences', 'includeOpenBibleCrossReferences conflicts with deprecated useCrossReferences.');
+  }
+  return params.includeOpenBibleCrossReferences ?? params.useCrossReferences ?? false;
+}
+
+function sourceSegmentsOverlap(
+  left: { bookNumber: number; chapter: number; startVerse: number; endVerse: number },
+  right: { bookNumber: number; chapter: number; startVerse: number; endVerse: number },
+): boolean {
+  return left.bookNumber === right.bookNumber && left.chapter === right.chapter
+    && left.startVerse <= right.endVerse && right.startVerse <= left.endVerse;
 }
 
 function relationshipMatchesMode(relationship: Relationship, mode: NonNullable<ParallelPassageLookupParams['mode']>): boolean {
@@ -237,6 +324,14 @@ function normalizeReference(raw: string): string {
     const [, bookSlug, chapter, startVerse, endVerse] = slug;
     const candidate = `${bookSlug.replaceAll('_', ' ')} ${chapter}:${startVerse}${endVerse ? `-${endVerse}` : ''}`;
     return formatReference(parseReference(candidate));
+  }
+}
+
+function normalizeResearchReference(raw: string): string {
+  try {
+    return parseSourceAttestedLookupReference(raw).normalizedReference;
+  } catch {
+    return normalizeReference(raw);
   }
 }
 
