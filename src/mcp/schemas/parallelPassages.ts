@@ -34,6 +34,7 @@ export const parallelPassagesOutputSchema = {
                 normalizedReference: { type: 'string' }, languageMarker: { type: 'string', enum: ['HEB', 'GRK'] },
                 matched: { type: 'boolean' }, alignmentBasis: { type: 'string', enum: ['BHS', 'LXX', 'UBSGNT5'] },
                 alignmentRaw: { type: 'string' }, ...textFields,
+                provenanceIds: { type: 'array', minItems: 1, uniqueItems: true, items: { type: 'string' } },
                 segments: {
                   type: 'array', minItems: 1, items: {
                     type: 'object',
@@ -45,7 +46,7 @@ export const parallelPassagesOutputSchema = {
                   },
                 },
               },
-              required: ['sourceOrder', 'sourceReference', 'normalizedReference', 'segments', 'languageMarker', 'matched'],
+              required: ['sourceOrder', 'sourceReference', 'normalizedReference', 'segments', 'languageMarker', 'matched', 'provenanceIds'],
               additionalProperties: false,
             },
           },

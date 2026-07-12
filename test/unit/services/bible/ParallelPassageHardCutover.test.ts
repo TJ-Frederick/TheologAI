@@ -47,6 +47,7 @@ describe('ParallelPassageService hard-cutover contract', () => {
     expect(result.sourceAttestedGroups).toEqual([]);
     expect(result.legacyParallels).toEqual([{
       reference: 'Matthew 5:44', relationship: 'thematic', confidence: 0.8, notes: 'legacy note',
+      provenanceIds: ['theologai-legacy-parallels'],
     }]);
   });
 
@@ -64,6 +65,49 @@ describe('ParallelPassageService hard-cutover contract', () => {
     const result = await service.lookup({ reference: 'Luke 6:35', includeText: true, translation: 'WEB', includeAlignment: true });
     expect(result.sourceAttestedGroups[0].members.every(member => member.text?.startsWith('Text '))).toBe(true);
     expect(result.sourceAttestedGroups[0].members[0]).toMatchObject({ matched: true, alignmentBasis: 'UBSGNT5', alignmentRaw: '012345678' });
+  });
+
+  it('deduplicates text fetches across corpora and links distinct provider provenance', async () => {
+    const lookup = vi.fn().mockImplementation(async ({ reference }) => ({
+      reference,
+      translation: 'WEB',
+      text: `Text ${reference}`,
+      citation: reference.startsWith('Matthew')
+        ? { source: 'Provider B', copyright: 'Public Domain' }
+        : { source: 'Provider A', copyright: 'Licensed text' },
+    }));
+    const service = new ParallelPassageService(crossReferences(), { lookup } as any, undefined, legacyFixture(), sourceService() as any);
+    const result = await service.lookup({
+      reference: 'Luke 6:35', corpora: ['ubs_source_attested', 'theologai_legacy'], includeText: true,
+    });
+
+    expect(lookup).toHaveBeenCalledTimes(2);
+    expect(lookup.mock.calls.map(([params]) => params.reference).sort()).toEqual(['Luke 6:27-28,35', 'Matthew 5:44']);
+    expect(result.provenance.filter(record => record.kind === 'translation').map(record => record.label).sort())
+      .toEqual(['Provider A', 'Provider B']);
+    const sharedReference = result.sourceAttestedGroups[0].members.find(member => member.normalizedReference === 'Matthew 5:44')!;
+    expect(sharedReference.provenanceIds).toHaveLength(2);
+    expect(result.legacyParallels[0].provenanceIds).toEqual(sharedReference.provenanceIds.map(id =>
+      id === 'ubs-source-attested-parallels' ? 'theologai-legacy-parallels' : id));
+  });
+
+  it('keeps successful provider attribution when another unique text fetch fails', async () => {
+    const lookup = vi.fn().mockImplementation(async ({ reference }) => {
+      if (reference.startsWith('Luke')) throw new Error('unavailable');
+      return { reference, translation: 'WEB', text: 'Available', citation: { source: 'Provider B', copyright: 'Public Domain' } };
+    });
+    const service = new ParallelPassageService(crossReferences(), { lookup } as any, undefined, legacyFixture(), sourceService() as any);
+    const result = await service.lookup({ reference: 'Luke 6:35', includeText: true });
+    expect(result.warnings).toEqual(['Text unavailable for Luke 6:27-28,35.']);
+    expect(result.sourceAttestedGroups[0].members[1].text).toBe('Available');
+    expect(result.provenance).toEqual(expect.arrayContaining([expect.objectContaining({ label: 'Provider B', kind: 'translation' })]));
+  });
+
+  it('allows a materialized false alignment default with legacy-only selection', async () => {
+    const service = new ParallelPassageService(crossReferences(), undefined, undefined, legacyFixture(), sourceService() as any);
+    await expect(service.lookup({
+      reference: 'Luke 6:35', corpora: ['theologai_legacy'], includeAlignment: false,
+    })).resolves.toMatchObject({ corpora: ['theologai_legacy'] });
   });
 
   it.each([
