@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "1",
+  "tool": "parallel_passages",
+  "cases": [
+    {
+      "name": "hard default is UBS only",
+      "arguments": { "reference": "Luke 6:35" },
+      "assert": ["corpora=ubs_source_attested", "sourceAttestedGroups>=1", "legacyParallels=0", "openBibleCrossReferences=0", "alignmentAbsent"]
+    },
+    {
+      "name": "alignment is explicit",
+      "arguments": { "reference": "Luke 6:35", "includeAlignment": true, "maxGroups": 1 },
+      "assert": ["sourceAttestedGroups=1", "allMembersHaveAlignment"]
+    },
+    {
+      "name": "all group members receive text",
+      "arguments": { "reference": "Luke 6:35", "includeText": true, "translation": "WEB", "maxGroups": 1 },
+      "assert": ["allMembersPresent", "allAvailableMembersHaveText", "matchedMemberPresent", "markdownMatchedMemberDeemphasized"]
+    },
+    {
+      "name": "legacy remains explicit and unchanged",
+      "arguments": { "reference": "Matthew 26:26", "corpora": ["theologai_legacy"], "mode": "synoptic", "maxParallels": 2 },
+      "assert": ["sourceAttestedGroups=0", "legacyRelationship=synoptic", "legacyConfidencePresent"]
+    },
+    {
+      "name": "both corpora remain separated",
+      "arguments": { "reference": "Matthew 26:26", "corpora": ["ubs_source_attested", "theologai_legacy"], "mode": "auto", "maxGroups": 2 },
+      "assert": ["sourceAttestedGroupsSeparate", "legacyParallelsSeparate"]
+    },
+    {
+      "name": "OpenBible is separate and opt in",
+      "arguments": { "reference": "John 3:16", "includeOpenBibleCrossReferences": true },
+      "assert": ["openBibleCrossReferencesSeparate", "openBibleProvenancePresent", "noLegacyFallback"]
+    },
+    {
+      "name": "deprecated alias conflict is rejected",
+      "arguments": { "reference": "John 3:16", "includeOpenBibleCrossReferences": true, "useCrossReferences": false },
+      "assert": ["toolError", "conflictMessage"]
+    },
+    {
+      "name": "legacy controls do not infer legacy",
+      "arguments": { "reference": "Matthew 26:26", "mode": "synoptic" },
+      "assert": ["toolError", "explicitLegacyInstruction"]
+    }
+  ]
+}

@@ -36,7 +36,7 @@ fresh server and transport.
 |---|---|
 | `bible_lookup` | Retrieve a passage in ESV, NET, KJV, WEB, BSB, ASV, YLT, or DBY; arrays compare translations. |
 | `bible_cross_references` | Query locally indexed OpenBible.info cross references. |
-| `parallel_passages` | Find curated, non-exhaustive synoptic, quotation, allusion, and thematic relationships, optionally augmented with cross references. |
+| `parallel_passages` | Return complete UBS source-attested parallel groups by default; legacy curated edges and OpenBible.info cross references require explicit selectors and remain separate. |
 | `commentary_lookup` | Retrieve Matthew Henry, JFB, Adam Clarke, John Gill, Keil-Delitzsch (OT), or Tyndale notes. |
 | `classic_text_lookup` | Search and browse the 17 local historical documents; retrieve a specifically named CCEL work section when available. |
 | `primary_source_search` | Execute a bounded, explicit query plan against the local historical index; optional live CCEL discovery is separately gated off by default. Returns snippets and exact locators, not document bodies. |
@@ -46,13 +46,20 @@ fresh server and transport.
 | `donation_config` | Return voluntary-donation recipient, asset, and chain configuration. |
 | `verify_donation` | Classify a transaction and confirm only supported transfers to the configured recipient. |
 
-Explicit `synoptic` mode only returns edges between Matthew, Mark, and Luke.
-Cross-boundary event members such as John or Paul remain available as thematic
-connections in `thematic` and `auto` modes.
+`parallel_passages` defaults unconditionally to `corpora:
+["ubs_source_attested"]`, with at most five complete groups. It does not fall
+back to the legacy corpus when UBS has no match. Raw UBS alignment metadata is
+opt-in. The older curated edge behavior remains available through
+`corpora: ["theologai_legacy"]`; its `mode` and `maxParallels` controls retain
+their prior item semantics. OpenBible.info rows are off by default and, when
+requested with `includeOpenBibleCrossReferences`, are returned in a separate
+collection. The deprecated `useCrossReferences` alias now also defaults false,
+and conflicting old/new values are rejected.
 
 All tools are annotated as read-only, non-destructive, and idempotent. Tool
 inputs use closed, bounded JSON Schema 2020-12 contracts. `bible_lookup`,
-`original_language_lookup`, and `original_language_study` also advertise versioned object-root `outputSchema`
+`parallel_passages`, `original_language_lookup`, and `original_language_study`
+also advertise versioned object-root `outputSchema`
 contracts and return matching `structuredContent` beside the existing Markdown
 content. Their structured results include bounded, result-local provenance
 records; all other tools retain their current Markdown-only result contract.
@@ -110,7 +117,10 @@ Calvin-volume routing. Those are possible future features, not current claims.
 - 447,748 indexed STEPBible morphology rows spanning all 66 books.
 - STEPBible lexicon extensions and morphology-code expansions.
 - OpenBible.info cross references.
-- A bundled curated, non-exhaustive parallel-passage corpus.
+- 2,193 UBS source-attested parallel groups (CC BY-SA 4.0), normalized into
+  SQLite/D1 with pinned source provenance and artifact identity.
+- A small bundled legacy curated parallel-passage corpus, available only by
+  explicit selector.
 
 Source hashes and expected database counts live in
 `data/data-manifest.json`. The SQLite database is a derived, ignored artifact.

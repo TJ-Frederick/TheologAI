@@ -53,7 +53,12 @@ describe('MCP structured output validation', () => {
     const listed = await client.listTools();
 
     const withOutput = listed.tools.filter(tool => tool.outputSchema).map(tool => tool.name);
-    expect(withOutput).toEqual(['bible_lookup', 'original_language_lookup', 'original_language_study']);
+    expect(withOutput).toEqual([
+      'bible_lookup',
+      'parallel_passages',
+      'original_language_lookup',
+      'original_language_study',
+    ]);
     for (const toolName of withOutput) {
       const schema = listed.tools.find(tool => tool.name === toolName)?.outputSchema;
       expect(schema).toMatchObject({ type: 'object', additionalProperties: false });
