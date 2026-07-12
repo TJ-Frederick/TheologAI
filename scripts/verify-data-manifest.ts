@@ -5,6 +5,7 @@ import { createHash } from 'crypto';
 import { existsSync, readFileSync, readdirSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import { assertProvenanceMatches, type SourceMetadata } from './build-ubs-parallel-passages.js';
 
 interface ManifestFile {
   path: string;
@@ -17,6 +18,7 @@ interface DataManifest {
   algorithm: 'sha256';
   files: ManifestFile[];
   expectedCounts: Record<string, number>;
+  sources?: Record<string, SourceMetadata>;
 }
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -41,12 +43,24 @@ function discoverCanonicalFiles(): string[] {
     ...relativeDataFiles('data/biblical-languages/stepbible/greek', '.json.gz'),
     ...relativeDataFiles('data/biblical-languages/stepbible/hebrew', '.json.gz'),
     ...relativeDataFiles('data/historical-documents', '.json'),
+    'data/parallel-passages/ubs-paratext/LICENSE.md',
+    'data/parallel-passages/ubs-paratext/ParallelPassages.xml',
+    'data/parallel-passages/ubs-paratext/README.md',
+    'data/parallel-passages/ubs-paratext/SOURCE.json',
     'src/data/parallel-passages.json',
+    'src/data/ubs-parallel-passages.generated.json',
   ].sort();
 }
 
 function checksum(path: string): string {
   return createHash('sha256').update(readFileSync(path)).digest('hex');
+}
+
+function gitBlobChecksum(bytes: Buffer): string {
+  return createHash('sha1').update(Buffer.concat([
+    Buffer.from(`blob ${bytes.length}\0`, 'utf8'),
+    bytes,
+  ])).digest('hex');
 }
 
 const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf-8')) as DataManifest;
@@ -57,6 +71,27 @@ if (manifest.manifestVersion !== 1 || manifest.algorithm !== 'sha256') {
 const schemaPath = join(ROOT, 'migrations', `${manifest.schemaVersion}.sql`);
 if (!existsSync(schemaPath)) {
   throw new Error(`Manifest schema migration does not exist: ${schemaPath}`);
+}
+
+const ubsSource = manifest.sources?.ubs_paratext_parallel_passages;
+if (!ubsSource) throw new Error('Manifest is missing UBS/Paratext source provenance');
+const ubsMetadata = JSON.parse(readFileSync(
+  join(ROOT, 'data/parallel-passages/ubs-paratext/SOURCE.json'),
+  'utf-8',
+)) as SourceMetadata;
+assertProvenanceMatches(ubsMetadata, ubsSource);
+const ubsXml = readFileSync(join(ROOT, 'data/parallel-passages/ubs-paratext/ParallelPassages.xml'));
+if (ubsXml.length !== ubsSource.sourceBytes) {
+  throw new Error(`UBS source byte size mismatch: expected ${ubsSource.sourceBytes}, received ${ubsXml.length}`);
+}
+if (checksum(join(ROOT, 'data/parallel-passages/ubs-paratext/ParallelPassages.xml')) !== ubsSource.sourceSha256) {
+  throw new Error('UBS source SHA-256 does not match manifest provenance');
+}
+if (gitBlobChecksum(ubsXml) !== ubsSource.sourceBlob) {
+  throw new Error('UBS source Git blob does not match manifest provenance');
+}
+if (!/^[0-9a-f]{40}$/.test(ubsSource.sourceCommit)) {
+  throw new Error('UBS source commit provenance is not a Git SHA-1');
 }
 
 const discovered = discoverCanonicalFiles();

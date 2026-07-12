@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc && mkdir -p dist/data && cp src/data/parallel-passages.json dist/data/",
+    "build": "tsc && mkdir -p dist/data && cp src/data/parallel-passages.json src/data/ubs-parallel-passages.generated.json dist/data/",
+    "build:ubs-parallel-passages": "tsx scripts/build-ubs-parallel-passages.ts",
     "build:strongs": "tsx scripts/build-strongs-json.ts",
     "build:stepbible": "tsx scripts/build-stepbible-json.ts",
     "build:stepbible:lexicons": "tsx scripts/build-stepbible-lexicons.ts",
