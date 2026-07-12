@@ -13,6 +13,7 @@ import {
   normalizeTransliteration,
   normalizedTransliterationSql,
 } from '../../kernel/transliteration.js';
+import { baseStrongsId, parseStrongsIdentity } from '../../kernel/strongs.js';
 
 export type { StrongsEntry, LexiconEntry } from '../../kernel/repositories.js';
 
@@ -43,17 +44,24 @@ export class StrongsRepository implements IStrongsRepository {
 
   /** Look up a Strong's number (e.g. "G25", "H430") */
   lookup(strongsNumber: string): StrongsEntry | undefined {
-    const normalized = strongsNumber.toUpperCase().trim();
-    // Try exact match first
-    let row = this.stmtLookup.get(normalized) as StrongsEntry | undefined;
+    const identity = parseStrongsIdentity(strongsNumber);
+    if (!identity) return undefined;
+
+    // Preserve sense suffixes for data sets that contain them, then fall back
+    // to the base concordance entry when the source only provides that entry.
+    let row = this.stmtLookup.get(identity.publicId) as StrongsEntry | undefined;
     if (row) return row;
 
-    // Try padded: G25 → G0025 (for lexicon lookup)
-    const padded = normalized.replace(/^([GH])(\d+)$/, (_, prefix, num) =>
-      prefix + num.padStart(4, '0')
-    );
-    if (padded !== normalized) {
-      row = this.stmtLookup.get(padded) as StrongsEntry | undefined;
+    const basePublicId = baseStrongsId(identity.publicId);
+    if (basePublicId !== identity.publicId) {
+      row = this.stmtLookup.get(basePublicId) as StrongsEntry | undefined;
+      if (row) return row;
+    }
+
+    // Compatibility with databases that stored concordance keys padded.
+    const baseMorphologyKey = baseStrongsId(identity.morphologyKey);
+    if (baseMorphologyKey !== identity.publicId && baseMorphologyKey !== basePublicId) {
+      row = this.stmtLookup.get(baseMorphologyKey) as StrongsEntry | undefined;
     }
     return row;
   }
@@ -86,11 +94,12 @@ export class StrongsRepository implements IStrongsRepository {
 
   /** Get STEPBible lexicon data for a Strong's number */
   getLexiconEntry(strongsNumber: string): LexiconEntry | undefined {
-    const padded = strongsNumber.toUpperCase().trim().replace(
-      /^([GH])(\d+)$/,
-      (_, prefix, num) => prefix + num.padStart(4, '0')
-    );
-    const row = this.stmtLexicon.get(padded) as { strongs_number: string; source: string; extended_data: string } | undefined;
+    const identity = parseStrongsIdentity(strongsNumber);
+    if (!identity) return undefined;
+    let row = this.stmtLexicon.get(identity.morphologyKey) as { strongs_number: string; source: string; extended_data: string } | undefined;
+    if (!row && /[a-z]$/.test(identity.morphologyKey)) {
+      row = this.stmtLexicon.get(baseStrongsId(identity.morphologyKey)) as typeof row;
+    }
     if (!row) return undefined;
 
     return {

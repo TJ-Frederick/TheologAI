@@ -20,12 +20,12 @@ describe('StrongsRepository', () => {
     expect(db.statement('strongs_fts MATCH').sql).toMatch(/ORDER BY rank, s\.strongs_number\s+LIMIT \?/);
   });
 
-  it('normalizes exact lookups and does not perform an unnecessary padded lookup', () => {
+  it('canonicalizes padded input to the public identity', () => {
     const db = new FakeSqliteDatabase([{ match: 'strongs WHERE strongs_number', get: entry }]);
     const repo = new StrongsRepository(db.asDatabase());
     expect(repo.lookup(' g0025 ')).toEqual(entry);
     expect(db.statement('strongs WHERE strongs_number').get).toHaveBeenCalledOnce();
-    expect(db.statement('strongs WHERE strongs_number').get).toHaveBeenCalledWith('G0025');
+    expect(db.statement('strongs WHERE strongs_number').get).toHaveBeenCalledWith('G25');
   });
 
   it('falls back to a four-digit padded Strong number', () => {
@@ -37,6 +37,16 @@ describe('StrongsRepository', () => {
     expect(repo.lookup('g25')).toEqual(entry);
     expect(db.statement('strongs WHERE strongs_number').get.mock.calls).toEqual([['G25'], ['G0025']]);
     expect(repo.lookup('invalid')).toBeUndefined();
+  });
+
+  it('preserves a suffix before falling back to the base public identity', () => {
+    const db = new FakeSqliteDatabase([{
+      match: 'strongs WHERE strongs_number',
+      get: (number: unknown) => number === 'G1722' ? entry : undefined,
+    }]);
+    const repo = new StrongsRepository(db.asDatabase());
+    expect(repo.lookup('g01722A')).toEqual(entry);
+    expect(db.statement('strongs WHERE strongs_number').get.mock.calls).toEqual([['G1722a'], ['G1722']]);
   });
 
   it('sanitizes FTS input and applies default and explicit limits', () => {
@@ -61,6 +71,16 @@ describe('StrongsRepository', () => {
       extended_data: { definition: 'God' },
     });
     expect(db.statement('stepbible_lexicons').get).toHaveBeenCalledWith('H0430');
+  });
+
+  it('tries a suffix-preserving morphology key before its base key', () => {
+    const row = { strongs_number: 'H0430', source: 'STEPBible', extended_data: '{}' };
+    const db = new FakeSqliteDatabase([{
+      match: 'stepbible_lexicons',
+      get: (number: unknown) => number === 'H0430' ? row : undefined,
+    }]);
+    expect(new StrongsRepository(db.asDatabase()).getLexiconEntry('h430A')).toMatchObject({ strongs_number: 'H0430' });
+    expect(db.statement('stepbible_lexicons').get.mock.calls).toEqual([['H0430a'], ['H0430']]);
   });
 
   it('returns undefined for a missing lexicon row', () => {
