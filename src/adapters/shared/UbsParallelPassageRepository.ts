@@ -145,6 +145,7 @@ function validateMember(input: unknown, expectedOrder: number, groupOrdinal: num
   integer(member.sourceOrder, `${path}.sourceOrder`, 1);
   equal(member.sourceOrder, expectedOrder, `${path}.sourceOrder`);
   const sourceReference = string(member.sourceReference, `${path}.sourceReference`);
+  if (sourceReference !== sourceReference.trim()) fail(`${path}.sourceReference must preserve a canonical source locator without outer whitespace`);
   const normalizedReference = string(member.normalizedReference, `${path}.normalizedReference`);
   if (!Array.isArray(member.segments) || member.segments.length === 0) fail(`${path}.segments must be non-empty`);
   const segments = member.segments.map((segment, index) => validateSegment(segment, `${path}.segment ${index + 1}`));
