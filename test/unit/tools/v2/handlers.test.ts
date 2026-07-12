@@ -58,7 +58,7 @@ describe('v2 tool handler schemas', () => {
       createVerifyDonationHandler(serviceDouble<DonationService>({})),
     ];
 
-    expect(handlers.map(handler => handler.name)).toHaveLength(10);
+    expect(handlers.map(handler => handler.name)).toHaveLength(11);
     for (const handler of handlers) {
       expect(handler.inputSchema.additionalProperties).toBe(false);
       expect(handler.annotations).toMatchObject({

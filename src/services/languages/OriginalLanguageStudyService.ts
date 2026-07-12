@@ -162,8 +162,12 @@ export class OriginalLanguageStudyService {
       const parsed = parseStrongsIdentity(word.strongs_number);
       if (!parsed) continue;
       if (!cache.has(parsed.publicId)) {
-        try { cache.set(parsed.publicId, await this.strongs.lookup(parsed.publicId)); }
-        catch { cache.set(parsed.publicId, null); }
+        try {
+          cache.set(parsed.publicId, await this.strongs.lookup(parsed.publicId));
+        } catch (error) {
+          if (!(error instanceof NotFoundError)) throw error;
+          cache.set(parsed.publicId, null);
+        }
       }
       const entry = cache.get(parsed.publicId);
       if (entry?.transliteration && normalize(entry.transliteration) === normalized) matches.push(word);
@@ -184,5 +188,8 @@ function toStudyToken(word: MorphWord): StudyToken {
 }
 
 function normalize(value: string): string {
-  return value.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').trim().toLocaleLowerCase('en-US');
+  // Canonical decomposition followed by Unicode Mark removal makes exact
+  // script comparison insensitive to Greek accents/breathings and Hebrew
+  // niqqud/cantillation while preserving every base letter and its order.
+  return value.normalize('NFKD').replace(/\p{M}/gu, '').trim().toLocaleLowerCase('en-US');
 }

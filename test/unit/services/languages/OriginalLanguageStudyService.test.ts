@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { OriginalLanguageStudyService } from '../../../../src/services/languages/OriginalLanguageStudyService.js';
 import type { IMorphologyRepository, IStrongsRepository, MorphWord } from '../../../../src/kernel/repositories.js';
+import { AdapterError, NotFoundError } from '../../../../src/kernel/errors.js';
 
 const loved: MorphWord = { position: 3, word_text: 'ἠγάπησεν', lemma: 'ἀγαπάω', strongs_number: 'G0025', morph_code: 'V-AAI-3S', gloss: 'loved' };
 
@@ -52,6 +53,33 @@ describe('OriginalLanguageStudyService', () => {
     const { morphology, strongs } = repos([loved]);
     const result = await new OriginalLanguageStudyService(morphology, strongs).study({ reference: 'John 3:16', target: 'agapao' });
     expect(result.selectedToken?.position).toBe(3);
+  });
+
+  it('matches pointed and unpointed Hebrew exactly without changing consonants', async () => {
+    const hebrew = { ...loved, word_text: 'אֱלֹהִים֙', lemma: 'אֱלֹהִים', strongs_number: 'H0430', gloss: 'God' };
+    const { morphology, strongs } = repos([hebrew]);
+    const service = new OriginalLanguageStudyService(morphology, strongs);
+    await expect(service.study({ reference: 'Genesis 1:1', target: 'אלהים' })).resolves.toMatchObject({ selectedToken: { position: 3 } });
+    await expect(service.study({ reference: 'Genesis 1:1', target: 'אלחים' })).rejects.toThrow('No token');
+  });
+
+  it('matches accented and unaccented Greek exactly without changing letters', async () => {
+    const { morphology, strongs } = repos([{ ...loved, word_text: 'ἠγάπησεν' }]);
+    const service = new OriginalLanguageStudyService(morphology, strongs);
+    await expect(service.study({ reference: 'John 3:16', target: 'ηγαπησεν' })).resolves.toMatchObject({ selectedToken: { position: 3 } });
+    await expect(service.study({ reference: 'John 3:16', target: 'ηγαπησαν' })).rejects.toThrow('No token');
+  });
+
+  it('continues past typed lexical not-found during transliteration resolution', async () => {
+    const { morphology, strongs } = repos([loved]);
+    strongs.lookup = () => { throw new NotFoundError('strongs', 'missing'); };
+    await expect(new OriginalLanguageStudyService(morphology, strongs).study({ reference: 'John 3:16', target: 'agapao' })).rejects.toThrow('No token');
+  });
+
+  it('propagates operational repository failures during transliteration resolution', async () => {
+    const { morphology, strongs } = repos([loved]);
+    strongs.lookup = () => { throw new AdapterError('Strong\'s repository', 'unavailable'); };
+    await expect(new OriginalLanguageStudyService(morphology, strongs).study({ reference: 'John 3:16', target: 'agapao' })).rejects.toThrow(AdapterError);
   });
 
   it('classifies OT source material as Hebrew without inferring Aramaic', async () => {

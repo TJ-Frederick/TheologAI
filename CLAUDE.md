@@ -81,7 +81,7 @@ test/
 
 ## MCP Capabilities
 
-### Tools (10)
+### Tools (11)
 
 | Tool | Description |
 |------|-------------|
@@ -90,6 +90,7 @@ test/
 | `parallel_passages` | OT→NT quotations, synoptic parallels, thematic links |
 | `commentary_lookup` | 6 commentaries (Matthew Henry, JFB, Clarke, Gill, K-D, Tyndale) |
 | `classic_text_lookup` | Search/browse 17 local docs; retrieve a specifically named CCEL work section when available |
+| `primary_source_search` | Run bounded local-first primary-source query plans with optional separately gated CCEL discovery |
 | `original_language_lookup` | Strong's concordance (14,298 entries), Greek/Hebrew word studies |
 | `bible_verse_morphology` | Word-by-word grammatical analysis for all 66 books |
 | `original_language_study` | Context-first study of one Greek or Hebrew token in one verse, with structured evidence and interpretive limits |

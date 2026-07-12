@@ -3,7 +3,7 @@
 TheologAI is an MCP server for Bible study and theological research. It runs
 locally over stdio or Streamable HTTP and on Cloudflare Workers with D1.
 
-The current registry contains ten tools, five guided prompts, eight English
+The current registry contains eleven tools, five guided prompts, eight English
 Bible translations, six commentary sources, 17 locally indexed
 historical documents, Strong's dictionaries, and Greek/Hebrew morphology.
 
@@ -51,8 +51,8 @@ Cross-boundary event members such as John or Paul remain available as thematic
 connections in `thematic` and `auto` modes.
 
 All tools are annotated as read-only, non-destructive, and idempotent. Tool
-inputs use closed, bounded JSON Schema 2020-12 contracts. `bible_lookup` and
-`original_language_lookup` and `original_language_study` also advertise versioned object-root `outputSchema`
+inputs use closed, bounded JSON Schema 2020-12 contracts. `bible_lookup`,
+`original_language_lookup`, and `original_language_study` also advertise versioned object-root `outputSchema`
 contracts and return matching `structuredContent` beside the existing Markdown
 content. Their structured results include bounded, result-local provenance
 records; all other tools retain their current Markdown-only result contract.

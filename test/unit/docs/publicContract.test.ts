@@ -73,7 +73,7 @@ describe('published project contract', () => {
       client.listPrompts(),
     ]);
 
-    expect(tools).toHaveLength(10);
+    expect(tools).toHaveLength(11);
     expect(prompts).toHaveLength(5);
     for (const { name } of [...tools, ...prompts]) {
       expect(readme).toContain(`| \`${name}\` |`);

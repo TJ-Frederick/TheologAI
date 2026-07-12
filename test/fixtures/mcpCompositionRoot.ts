@@ -53,7 +53,7 @@ export interface DeterministicMcpFixture {
  *
  * This fixture intentionally opens no database and performs no network calls.
  * It is shared by protocol integration tests and the official HTTP conformance
- * harness so both exercise the same ten real tool definitions.
+ * harness so both exercise the same eleven real tool definitions.
  */
 export function createDeterministicMcpFixture(): DeterministicMcpFixture {
   const biblePassageCalls: BiblePassageCall[] = [];

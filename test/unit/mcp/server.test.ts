@@ -21,6 +21,7 @@ const TOOL_NAMES = [
   'primary_source_search',
   'original_language_lookup',
   'bible_verse_morphology',
+  'original_language_study',
   'donation_config',
   'verify_donation',
 ];
@@ -164,7 +165,7 @@ describe('shared MCP registration', () => {
     });
   });
 
-  it('lists all 10 tools and dispatches calls through the shared registry', async () => {
+  it('lists all 11 tools and dispatches calls through the shared registry', async () => {
     const root = makeMockRoot();
     const client = await connect(createTheologAiMcpServer(root, '1.0.0-test').server);
     const listed = await client.listTools();

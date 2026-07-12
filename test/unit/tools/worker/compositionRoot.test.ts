@@ -110,9 +110,9 @@ describe('createWorkerCompositionRoot', () => {
   });
 
   describe('tool creation', () => {
-    it('creates exactly 10 tools', () => {
+    it('creates exactly 11 tools', () => {
       const root = createWorkerCompositionRoot(makeEnv());
-      expect(root.tools).toHaveLength(10);
+      expect(root.tools).toHaveLength(11);
     });
 
     it('creates tools with correct names', () => {
