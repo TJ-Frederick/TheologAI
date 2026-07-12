@@ -7,12 +7,35 @@ deployed successfully after a read-only D1 readiness result of `ready`.
 Preview contains the hardened PR #10 application code from `ccdfb8c`; its later
 production-only changes are not part of the preview baseline.
 
-The active logical D1 bindings are recorded in `wrangler.toml`:
+The deployed logical D1 bindings and retained rollback posture are recorded
+below. A reviewable `wrangler.toml` change may point at a prepared candidate
+before any Worker deployment; in that state the configuration is not evidence
+of the deployed binding.
 
 | Environment | Active logical database | Current posture | Rollback posture |
 |---|---|---|---|
 | Production | `theologai-production-20260711-a` | PR #10 merge deployed after the read-only readiness gate passed. | Former `theologai-db` is a candidate only. Retention and compatibility are not verified here; if it predates current identity markers, a current-main redeploy may reject it. |
 | Preview | `theologai-preview-20260710-c` | Hardened PR #10 application code deployed from `ccdfb8c`. | Earlier preview databases are candidates only. Confirm retention, readiness compatibility, and the exact Worker revision before use. |
+
+### Prepared preview candidate (not deployed)
+
+On 2026-07-12, `theologai-preview-20260712-a` was created in Eastern North
+America (`ENAM`) with no jurisdiction restriction, migrated through
+`0002_ubs_parallel_passages`, and populated from all 29 files in the generated
+seed manifest, beginning with the empty-target guard. Its database ID is kept
+in the reviewable preview binding in `wrangler.toml`; the prior ID remains in
+Git history and the operational handoff rather than being duplicated here.
+
+The strict remote readiness gate returned `ready`. Independent read-only checks
+also confirmed 859,596 exact manifest rows, both required UBS indexes, artifact
+identity `a5fd0d4646cb69f426f592c6e334866191201fbe64691cd55c7f7ecd0ca9d4cc`,
+source SHA-256 `d43e7554556c1a1c5e2464e6b5ad8a4ab9118ada11060bf6b200abf3d0d0a394`,
+transform version 2, `quick_check = ok`, and zero foreign-key violations.
+
+This is preparation evidence only. The preview Worker remains deployed against
+`theologai-preview-20260710-c` until the normal PR label, environment approval,
+live-authorization rechecks, and deployment complete. Retain that database for
+rollback; do not delete either database during the verification window.
 
 No rollback asset is claimed as known-good without a read-only inventory and
 compatibility check. Do not copy database IDs, credentials, API tokens, or

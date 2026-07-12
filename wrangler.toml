@@ -66,8 +66,8 @@ THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH = "false"
 
 [[env.preview.d1_databases]]
 binding = "THEOLOGAI_DB"
-database_name = "theologai-preview-20260710-c"
-database_id = "7cd1b99e-49ed-4d7b-b056-e746b902c89f"
+database_name = "theologai-preview-20260712-a"
+database_id = "9e0b6f3d-7bdc-45d0-8999-9f29f964ef0e"
 migrations_dir = "migrations"
 
 # Preview uses a distinct namespace so load tests and PR validation cannot
