@@ -7,21 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+<!-- theologai-public-contract tools=11 structured=bible_lookup,original_language_lookup,original_language_study,parallel_passages -->
+
 ### Added
 
 - Added stable MCP 2025-11-25 structured output and server-side schema
-  validation for `bible_lookup` and `original_language_lookup`, while keeping
-  their existing Markdown content available for legacy clients.
+  validation for `bible_lookup`, `parallel_passages`,
+  `original_language_lookup`, and `original_language_study`, while keeping
+  their Markdown content available for legacy clients.
 - Added bounded, result-local provenance records and structured-first guidance
   to the word-study, passage-exegesis, and compare-translations prompts.
 - Added versioned grouped output and provenance for `parallel_passages`, with a
   hard default to complete UBS source-attested groups. Legacy curated edges and
   OpenBible.info rows remain available only through explicit, separate selectors.
+- Added `primary_source_search`, an explicit, bounded, local-first research-plan
+  tool. Optional live CCEL discovery remains independently gated off by default;
+  results are snippets and resolvable locators rather than mirrored documents.
+- Added `original_language_study`, a context-first study of one verse token that
+  combines morphology and source-separated lexical evidence while stating its
+  interpretive limits.
+- Added exact Strong's identity preservation, including extended STEPBible
+  identities such as `G21502` and `H9001`, across SQLite, D1, resources, lookup,
+  morphology, and structured output.
+- Added the pinned CC BY-SA 4.0 UBS/Paratext source compiler, strict source and
+  generated-artifact verification, D1 materialization, and a hard default to
+  source-attested UBS parallel groups. Raw alignment remains opt-in, and legacy
+  and OpenBible.info evidence remain explicitly separate.
 
 ### Corrected
 
-- Reconciled the current public contract at version 3.6.0: nine tools, five
+- Reconciled the pending public contract at version 3.6.0: eleven tools, five
   prompts, 17 local historical documents, and transport-specific Logging.
+- Scoped D1 readiness to both schema and materialization identity. Remote D1
+  marker transitions, preview deployment, and production deployment remain
+  separate operational gates and are not performed by these code changes.
 - Preserved bounded named-work/section CCEL retrieval while moving full catalog
   discovery and search to the future roadmap.
 - Corrected Tyndale Open Study Notes licensing to CC BY-SA 4.0.

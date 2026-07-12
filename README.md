@@ -7,6 +7,8 @@ The current registry contains eleven tools, five guided prompts, eight English
 Bible translations, six commentary sources, 17 locally indexed
 historical documents, Strong's dictionaries, and Greek/Hebrew morphology.
 
+<!-- theologai-public-contract tools=11 structured=bible_lookup,original_language_lookup,original_language_study,parallel_passages -->
+
 ## Remote endpoint
 
 The hosted anonymous endpoint is:

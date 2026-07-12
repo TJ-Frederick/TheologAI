@@ -4,7 +4,10 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { createTheologAiMcpServer } from '../../../src/mcp/server.js';
+import { createWorkerCompositionRoot } from '../../../src/tools/worker/index.js';
 import { createDeterministicMcpFixture } from '../../fixtures/mcpCompositionRoot.js';
+import { createSimpleD1 } from '../../helpers/mockD1.js';
+import type { Env } from '../../../src/worker-env.js';
 
 interface DataManifest {
   expectedCounts: {
@@ -15,6 +18,16 @@ interface DataManifest {
 }
 
 const openConnections: Array<{ client: Client; server: Server }> = [];
+const PUBLIC_CONTRACT_MARKER = /<!-- theologai-public-contract tools=(\d+) structured=([a-z_,]+) -->/;
+
+function parsePublicContractMarker(document: string, path: string) {
+  const matches = [...document.matchAll(new RegExp(PUBLIC_CONTRACT_MARKER, 'g'))];
+  expect(matches, `${path} must contain exactly one public-contract marker`).toHaveLength(1);
+  return {
+    toolCount: Number(matches[0][1]),
+    structuredTools: matches[0][2].split(',').sort(),
+  };
+}
 
 async function readProjectFile(path: string): Promise<string> {
   return readFile(new URL(`../../../${path}`, import.meta.url), 'utf8');
@@ -45,7 +58,7 @@ describe('published project contract', () => {
     expect(readme).toContain('[docs/ROADMAP.md](docs/ROADMAP.md)');
     expect(roadmap).toContain('# TheologAI roadmap');
     expect(roadmap).toContain('71a3f0d120ffd31c09424ba2a7caef88961d21e3');
-    expect(roadmap).toContain('### PR 1 — production cleanup and roadmap baseline');
+    expect(roadmap).toContain('Phase 3 cleanup / PR #11');
     for (const artifact of artifacts) {
       const banner = artifact.slice(0, 700).replace(/^>\s?/gm, '').replace(/\s+/g, ' ');
       expect(banner).toMatch(/Historical/i);
@@ -77,6 +90,37 @@ describe('published project contract', () => {
     expect(prompts).toHaveLength(5);
     for (const { name } of [...tools, ...prompts]) {
       expect(readme).toContain(`| \`${name}\` |`);
+    }
+  });
+
+  it('ties every advertised tool count and structured-output list to both runtime registries', async () => {
+    const documentPaths = ['README.md', 'CLAUDE.md', 'CHANGELOG.md'];
+    const documents = await Promise.all(documentPaths.map(readProjectFile));
+    const nodeTools = createDeterministicMcpFixture().root.tools;
+    const workerTools = createWorkerCompositionRoot({
+      THEOLOGAI_DB: createSimpleD1(),
+      THEOLOGAI_VERSION: 'public-contract-test',
+    } as unknown as Env).tools;
+
+    const describeRegistry = (tools: typeof nodeTools) => ({
+      toolCount: tools.length,
+      structuredTools: tools.filter(tool => tool.outputSchema !== undefined).map(tool => tool.name).sort(),
+    });
+    const nodeContract = describeRegistry(nodeTools);
+    const workerContract = describeRegistry(workerTools);
+
+    expect(workerContract).toEqual(nodeContract);
+    expect(nodeContract).toEqual({
+      toolCount: 11,
+      structuredTools: [
+        'bible_lookup',
+        'original_language_lookup',
+        'original_language_study',
+        'parallel_passages',
+      ],
+    });
+    for (const [index, document] of documents.entries()) {
+      expect(parsePublicContractMarker(document, documentPaths[index])).toEqual(nodeContract);
     }
   });
 

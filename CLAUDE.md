@@ -1,6 +1,8 @@
 # TheologAI — Development Guide
 
-Production MCP server for theological research. Nine tools, five prompts, eight Bible translations, six commentaries, 17 historical documents, Greek/Hebrew language tools, and on-chain donation support. Tools, resources, and prompts are available on every transport; MCP Logging is stdio-only because HTTP is stateless.
+Production MCP server for theological research. Eleven tools, five prompts, eight Bible translations, six commentaries, 17 historical documents, Greek/Hebrew language tools, and on-chain donation support. Tools, resources, and prompts are available on every transport; MCP Logging is stdio-only because HTTP is stateless.
+
+<!-- theologai-public-contract tools=11 structured=bible_lookup,original_language_lookup,original_language_study,parallel_passages -->
 
 ## Quick Start
 
