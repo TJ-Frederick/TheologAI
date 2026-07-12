@@ -73,6 +73,14 @@ function makeMockRoot(): McpCompositionRoot {
           content: 'We believe...',
           topics: [],
         }],
+        getSection: vi.fn(async (_documentId: string, sectionNumber: string) => ({
+          id: 1,
+          document_id: 'nicene-creed',
+          section_number: sectionNumber,
+          title: 'Article I',
+          content: 'We believe...',
+          topics: [],
+        })),
       },
       strongsService: {
         lookup: async () => ({
@@ -369,6 +377,29 @@ describe('shared MCP registration', () => {
       message: expect.stringContaining('Resource not found'),
       data: { uri },
     });
+  });
+
+  it('resolves an exact document section without changing whole-document resources', async () => {
+    const root = makeMockRoot();
+    const client = await connect(createTheologAiMcpServer(root, '1.0.0-test').server);
+    const whole = await client.readResource({ uri: 'theologai://documents/nicene-creed' });
+    expect(String(whole.contents[0].text)).toContain('We believe...');
+
+    const exactUri = 'theologai://documents/nicene-creed#section-1';
+    const exact = await client.readResource({ uri: exactUri });
+    expect(exact.contents[0]).toMatchObject({ uri: exactUri, mimeType: 'text/markdown' });
+    expect(String(exact.contents[0].text)).toMatch(/Nicene Creed[\s\S]*Article I[\s\S]*We believe/);
+    expect(root.services.historicalService.getSection).toHaveBeenCalledWith('nicene-creed', '1');
+  });
+
+  it.each([
+    'theologai://documents/nicene-creed#section-',
+    'theologai://documents/nicene-creed#section-..',
+    'theologai://documents/nicene-creed?section=1',
+    'theologai://documents/Nicene-Creed#section-1',
+  ])('rejects malformed exact-section resource %s', async uri => {
+    const client = await connect(createTheologAiMcpServer(makeMockRoot(), '1.0.0-test').server);
+    await expect(client.readResource({ uri })).rejects.toMatchObject({ code: -32002, data: { uri } });
   });
 
   it.each([

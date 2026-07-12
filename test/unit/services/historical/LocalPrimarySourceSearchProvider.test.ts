@@ -41,4 +41,23 @@ describe('LocalPrimarySourceSearchProvider', () => {
     await expect(provider.search({ text: 'grace', work: 'Institute' })).resolves.toMatchObject({ status: 'no_results', searched: true, hits: [] });
     expect(repo.searchPrimarySources).not.toHaveBeenCalled();
   });
+
+  it('returns a bounded Unicode-safe excerpt around a practical phrase match', async () => {
+    const content = `${'α'.repeat(700)} 😀Covenant of Grace😀 ${'ω'.repeat(700)}`;
+    const repo = repository({
+      searchPrimarySources: vi.fn().mockReturnValue([{
+        document: { id: 'institutes', title: 'Institutes', type: 'treatise', date: '1559', topics: [] },
+        section: { id: 1, document_id: 'institutes', section_number: '3.1', title: 'Union', content, topics: [] },
+      }]),
+    });
+    const result = await new LocalPrimarySourceSearchProvider(repo).search({
+      text: 'covenant of grace', match: 'phrase', limit: 1,
+    });
+    const snippet = result.hits[0].snippet;
+    expect(snippet).toContain('😀Covenant of Grace😀');
+    expect(snippet.startsWith('…')).toBe(true);
+    expect(snippet.endsWith('…')).toBe(true);
+    expect(Array.from(snippet)).toHaveLength(500);
+    expect(snippet).not.toContain('\uFFFD');
+  });
 });

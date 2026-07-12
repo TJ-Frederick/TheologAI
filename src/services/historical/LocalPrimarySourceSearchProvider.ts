@@ -1,4 +1,5 @@
 import type { IHistoricalDocumentRepository } from '../../kernel/repositories.js';
+import { buildLocalDocumentResourceUri } from '../../kernel/documentResource.js';
 import {
   LOCAL_PRIMARY_SOURCE_ATTRIBUTION,
   type PrimarySourceProviderResult,
@@ -42,12 +43,12 @@ export class LocalPrimarySourceSearchProvider {
       provider: 'local' as const,
       title: row.document.title,
       ...(row.section.title ? { sectionLabel: row.section.title } : {}),
-      snippet: boundedPlainText(row.section.content, 500),
+      snippet: boundedMatchContext(row.section.content, input.text, input.match ?? 'all_terms', 500),
       locator: {
         kind: 'local_section' as const,
         documentId: row.document.id,
         sectionId: row.section.section_number,
-        url: `theologai://documents/${encodeURIComponent(row.document.id)}#section-${encodeURIComponent(row.section.section_number)}`,
+        url: buildLocalDocumentResourceUri(row.document.id, row.section.section_number)!,
       },
       rankWithinProvider: index + 1,
       page,
@@ -72,10 +73,47 @@ function normalizeForExactComparison(value: string): string {
   return value.normalize('NFC').trim().replace(/\s+/gu, ' ').toLocaleLowerCase('en-US');
 }
 
-function boundedPlainText(value: string, maximum: number): string {
+export function boundedMatchContext(value: string, query: string, matchMode: 'all_terms' | 'phrase', maximum: number): string {
   const normalized = value.normalize('NFC')
     .replace(/[\u0000-\u001F\u007F-\u009F]/g, ' ')
     .replace(/\s+/gu, ' ')
     .trim();
-  return Array.from(normalized).slice(0, maximum).join('');
+  const characters = Array.from(normalized);
+  if (characters.length <= maximum) return normalized;
+
+  const normalizedQuery = query.normalize('NFC').replace(/\s+/gu, ' ').trim();
+  const terms = matchMode === 'phrase' ? [normalizedQuery] : normalizedQuery.split(' ').filter(Boolean);
+  let match: { start: number; length: number } | undefined;
+  for (const term of terms) {
+    const found = findCaseInsensitive(characters, Array.from(term));
+    if (found && (!match || found.start < match.start)) match = found;
+  }
+  if (!match) return characters.slice(0, maximum - 1).join('') + '…';
+
+  const interiorBudget = maximum - 2;
+  const before = Math.max(0, Math.floor((interiorBudget - Math.min(match.length, interiorBudget)) / 2));
+  let start = Math.max(0, match.start - before);
+  let end = Math.min(characters.length, start + interiorBudget);
+  if (end - start < interiorBudget) start = Math.max(0, end - interiorBudget);
+  const prefix = start > 0 ? '…' : '';
+  const suffix = end < characters.length ? '…' : '';
+  const available = maximum - Array.from(prefix + suffix).length;
+  end = Math.min(characters.length, start + available);
+  return `${prefix}${characters.slice(start, end).join('')}${end < characters.length ? '…' : ''}`;
+}
+
+function findCaseInsensitive(haystack: string[], needle: string[]): { start: number; length: number } | undefined {
+  if (needle.length === 0) return undefined;
+  const foldedNeedle = needle.map(character => character.toLocaleLowerCase('en-US'));
+  for (let start = 0; start <= haystack.length - needle.length; start++) {
+    let matches = true;
+    for (let offset = 0; offset < needle.length; offset++) {
+      if (haystack[start + offset].toLocaleLowerCase('en-US') !== foldedNeedle[offset]) {
+        matches = false;
+        break;
+      }
+    }
+    if (matches) return { start, length: needle.length };
+  }
+  return undefined;
 }

@@ -217,6 +217,18 @@ describe('Worker MCP endpoint in workerd', () => {
         text: expect.stringMatching(/Apostles' Creed[\s\S]*The First Article[\s\S]*maker of heaven and earth/),
       }),
     ]);
+
+    const exactUri = 'theologai://documents/apostles-creed#section-1';
+    const exact = await rpc('resources/read', { uri: exactUri }, 41);
+    expect(exact.response.status).toBe(200);
+    expect(exact.message.error).toBeUndefined();
+    expect(exact.message.result?.contents).toEqual([
+      expect.objectContaining({
+        uri: exactUri,
+        mimeType: 'text/markdown',
+        text: expect.stringMatching(/Apostles' Creed[\s\S]*The First Article[\s\S]*maker of heaven and earth/),
+      }),
+    ]);
   });
 
   it('executes cross-reference and expanded morphology tools against D1', async () => {
