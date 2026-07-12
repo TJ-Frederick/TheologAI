@@ -77,6 +77,8 @@ export {
 } from './sourceAttestedReference.js';
 export {
   UBS_PARALLEL_PASSAGE_PROVENANCE,
+  UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY,
+  computeUbsParallelArtifactIdentity,
   deriveUbsParallelGroupId,
 } from './ubsParallelSource.js';
 

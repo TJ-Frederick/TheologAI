@@ -5,8 +5,12 @@ import { SourceAttestedParallelService } from '../../../../src/services/bible/So
 import { ubsFixture } from '../../../fixtures/ubsParallelCorpus.js';
 
 describe('SourceAttestedParallelService', () => {
+  const fixtureRepository = (): UbsParallelPassageRepository => {
+    const artifact = ubsFixture();
+    return new UbsParallelPassageRepository(artifact, (artifact as { artifactIdentity: string }).artifactIdentity);
+  };
   it('normalizes a reference and applies the bounded group default', () => {
-    const repository = new UbsParallelPassageRepository(ubsFixture());
+    const repository = fixtureRepository();
     const findGroups = vi.spyOn(repository, 'findGroups');
     const result = new SourceAttestedParallelService(repository).lookup({ reference: 'lk 6:35' });
     expect(result.reference).toBe('Luke 6:35');
@@ -15,7 +19,7 @@ describe('SourceAttestedParallelService', () => {
   });
 
   it('passes an explicit limit without flattening or changing source evidence', () => {
-    const repository = new UbsParallelPassageRepository(ubsFixture());
+    const repository = fixtureRepository();
     const result = new SourceAttestedParallelService(repository).lookup({ reference: 'Luke 6:35', maxGroups: 1 });
     expect(result.groups).toHaveLength(1);
     expect(result.groups[0]).toMatchObject({ label: 'source_attested_parallel', directionality: 'unspecified' });

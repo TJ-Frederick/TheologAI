@@ -1,5 +1,9 @@
 import type { SourceAttestedParallelGroup } from '../../src/kernel/sourceAttestedParallels.js';
-import { deriveUbsParallelGroupId, UBS_PARALLEL_PASSAGE_PROVENANCE } from '../../src/kernel/ubsParallelSource.js';
+import {
+  computeUbsParallelArtifactIdentity,
+  deriveUbsParallelGroupId,
+  UBS_PARALLEL_PASSAGE_PROVENANCE,
+} from '../../src/kernel/ubsParallelSource.js';
 
 export const fixtureProvenance = UBS_PARALLEL_PASSAGE_PROVENANCE;
 
@@ -65,9 +69,9 @@ export function ubsFixture(): Record<string, unknown> {
   ];
   for (const group of groups) group.groupId = deriveUbsParallelGroupId(group.members);
   const [firstId, secondId] = groups.map(group => group.groupId);
-  return {
-    schemaVersion: 'ubs-parallel-passages.v1',
-    transformVersion: 1,
+  const projection = {
+    schemaVersion: 'ubs-parallel-passages.v2',
+    transformVersion: 2,
     label: 'source_attested_parallel',
     directionality: 'unspecified',
     license: { name: 'CC BY-SA 4.0', url: 'https://creativecommons.org/licenses/by-sa/4.0/' },
@@ -82,5 +86,16 @@ export function ubsFixture(): Record<string, unknown> {
         { groupId: secondId, memberOrder: 1, segmentOrder: 1, startVerse: 35, endVerse: 36 },
       ],
     },
+  };
+  return {
+    schemaVersion: projection.schemaVersion,
+    transformVersion: projection.transformVersion,
+    artifactIdentity: computeUbsParallelArtifactIdentity(projection),
+    label: projection.label,
+    directionality: projection.directionality,
+    license: projection.license,
+    provenance: projection.provenance,
+    groups: projection.groups,
+    referenceIndex: projection.referenceIndex,
   };
 }

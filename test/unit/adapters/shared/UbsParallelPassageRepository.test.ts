@@ -3,8 +3,17 @@ import generatedCorpus from '../../../../src/data/ubs-parallel-passages.generate
 import { UbsParallelPassageRepository } from '../../../../src/adapters/shared/UbsParallelPassageRepository.js';
 import { loadUbsParallelPassageRepository } from '../../../../src/adapters/data/loadUbsParallelPassages.js';
 import { ubsFixture } from '../../../fixtures/ubsParallelCorpus.js';
+import {
+  computeUbsParallelArtifactIdentity,
+  deriveUbsParallelGroupId,
+  UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY,
+} from '../../../../src/kernel/ubsParallelSource.js';
 
 describe('UbsParallelPassageRepository', () => {
+  const fixtureIdentity = (ubsFixture() as { artifactIdentity: string }).artifactIdentity;
+  const fixtureRepository = (artifact = ubsFixture()): UbsParallelPassageRepository =>
+    new UbsParallelPassageRepository(artifact, fixtureIdentity);
+
   it('validates and indexes the complete pinned artifact', () => {
     const repository = new UbsParallelPassageRepository(generatedCorpus);
     expect(repository.getProvenance()).toMatchObject({
@@ -12,6 +21,7 @@ describe('UbsParallelPassageRepository', () => {
       sourceCommit: 'fd7bcf88b20a1522d3916f437f012c561466fe7b',
       license: 'CC BY-SA 4.0',
     });
+    expect(generatedCorpus.artifactIdentity).toBe(UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY);
     expect(repository.findGroups('Matthew 3:16-17', 1)[0].members.map(member => member.normalizedReference)).toEqual([
       'Matthew 3:16-17', 'Mark 1:10-11', 'Luke 3:21-22', 'John 1:32',
     ]);
@@ -36,8 +46,37 @@ describe('UbsParallelPassageRepository', () => {
     expect(repository.findGroups('Luke 6:35').some(group => group.members.some(member => member.sourceReference.includes(',')))).toBe(true);
   });
 
+  it('rejects a fully coordinated but unreviewed artifact rewrite at the pinned root', () => {
+    const artifact = ubsFixture() as any;
+    const member = artifact.groups[0].members[0];
+    member.sourceReference = 'LUK 6:29';
+    member.normalizedReference = 'Luke 6:29';
+    member.segments = [{ bookNumber: 42, chapter: 6, startVerse: 29, endVerse: 29 }];
+    artifact.groups[0].groupId = deriveUbsParallelGroupId(artifact.groups[0].members);
+    artifact.referenceIndex = {};
+    for (const group of artifact.groups) {
+      for (const groupMember of group.members) {
+        groupMember.segments.forEach((segment: any, index: number) => {
+          const key = `${segment.bookNumber}:${segment.chapter}`;
+          (artifact.referenceIndex[key] ??= []).push({
+            groupId: group.groupId,
+            memberOrder: groupMember.sourceOrder,
+            segmentOrder: index + 1,
+            startVerse: segment.startVerse,
+            endVerse: segment.endVerse,
+          });
+        });
+      }
+    }
+    artifact.referenceIndex = Object.fromEntries(Object.entries(artifact.referenceIndex).sort(([a], [b]) => a.localeCompare(b)));
+    const { artifactIdentity: _old, ...projection } = artifact;
+    artifact.artifactIdentity = computeUbsParallelArtifactIdentity(projection);
+    expect(artifact.artifactIdentity).not.toBe(fixtureIdentity);
+    expect(() => fixtureRepository(artifact)).toThrow('artifactIdentity pin');
+  });
+
   it('supports exact, overlap, reverse, discontinuous, deduplicated, source-ordered lookup', () => {
-    const repository = new UbsParallelPassageRepository(ubsFixture());
+    const repository = fixtureRepository();
     const exact = repository.findGroups('Luke 6:35');
     expect(exact.map(group => group.sourceOrdinal)).toEqual([1, 2]);
     expect(exact[0].members).toHaveLength(2);
@@ -50,7 +89,7 @@ describe('UbsParallelPassageRepository', () => {
   });
 
   it('returns immutable complete groups and provenance', () => {
-    const repository = new UbsParallelPassageRepository(ubsFixture());
+    const repository = fixtureRepository();
     const group = repository.findGroups('Luke 6:35')[0];
     expect(Object.isFrozen(group)).toBe(true);
     expect(Object.isFrozen(group.members)).toBe(true);
@@ -99,7 +138,7 @@ describe('UbsParallelPassageRepository', () => {
       mutate(value => { delete value.referenceIndex['40:5']; }),
       mutate(value => { value.groups.push(structuredClone(value.groups[0])); }),
     ];
-    for (const artifact of cases) expect(() => new UbsParallelPassageRepository(artifact)).toThrow('[ubs-repository]');
+    for (const artifact of cases) expect(() => fixtureRepository(artifact as Record<string, unknown>)).toThrow('[ubs-repository]');
   });
 
   it('loads identical bytes through Node and Worker-safe injected paths', () => {

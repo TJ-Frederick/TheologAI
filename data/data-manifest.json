@@ -118,7 +118,7 @@
       "sourceBlob": "b30af22e9ee4740f6c339eb267a59b8fdb9f83f7",
       "sourceBytes": 336250,
       "sourceSha256": "d43e7554556c1a1c5e2464e6b5ad8a4ab9118ada11060bf6b200abf3d0d0a394",
-      "transformVersion": 1
+      "transformVersion": 2
     }
   },
   "files": [
@@ -492,7 +492,7 @@
     },
     {
       "path": "data/parallel-passages/ubs-paratext/SOURCE.json",
-      "sha256": "ba0bbf93da809494a9e033e7047fd47bf04d905499a8b695f41e263b1c4239d9"
+      "sha256": "27f42912a62ac0af99eb56ef748f144171b17f294dbd7b1391f7b87f84ba37c8"
     },
     {
       "path": "src/data/parallel-passages.json",
@@ -500,7 +500,7 @@
     },
     {
       "path": "src/data/ubs-parallel-passages.generated.json",
-      "sha256": "164c1ab52366e1421b550ede91b3ac3d79f05eaf7bef054d065fb37d27006b4d"
+      "sha256": "948f324091974aee29b1f03f735c12555838ad49870ac4f0fecc11839c757aa4"
     }
   ],
   "expectedCounts": {

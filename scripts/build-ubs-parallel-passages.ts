@@ -19,9 +19,13 @@ import type {
   SourceParallelMember as KernelSourceParallelMember,
   SourceParallelReferenceSegment,
 } from '../src/kernel/sourceAttestedParallels.js';
-import { deriveUbsParallelGroupId, UBS_PARALLEL_PASSAGE_PROVENANCE } from '../src/kernel/ubsParallelSource.js';
+import {
+  computeUbsParallelArtifactIdentity,
+  deriveUbsParallelGroupId,
+  UBS_PARALLEL_PASSAGE_PROVENANCE,
+} from '../src/kernel/ubsParallelSource.js';
 
-export const TRANSFORM_VERSION = 1;
+export const TRANSFORM_VERSION = 2;
 export const LABEL = 'source_attested_parallel' as const;
 export const DIRECTIONALITY = 'unspecified' as const;
 
@@ -89,8 +93,9 @@ export interface ReferenceIndexEntry {
 }
 
 export interface GeneratedUbsCorpus {
-  schemaVersion: 'ubs-parallel-passages.v1';
+  schemaVersion: 'ubs-parallel-passages.v2';
   transformVersion: typeof TRANSFORM_VERSION;
+  artifactIdentity: string;
   label: typeof LABEL;
   directionality: typeof DIRECTIONALITY;
   license: {
@@ -481,8 +486,8 @@ export function compileUbsParallelPassages(xml: string | Buffer, metadata: Sourc
   const referenceIndex: Record<string, ReferenceIndexEntry[]> = {};
   for (const key of [...index.keys()].sort()) referenceIndex[key] = index.get(key)!;
 
-  const output: GeneratedUbsCorpus = {
-    schemaVersion: 'ubs-parallel-passages.v1',
+  const identityProjection = {
+    schemaVersion: 'ubs-parallel-passages.v2' as const,
     transformVersion: TRANSFORM_VERSION,
     label: LABEL,
     directionality: DIRECTIONALITY,
@@ -490,6 +495,17 @@ export function compileUbsParallelPassages(xml: string | Buffer, metadata: Sourc
     provenance: sourceProvenance,
     groups,
     referenceIndex,
+  };
+  const output: GeneratedUbsCorpus = {
+    schemaVersion: identityProjection.schemaVersion,
+    transformVersion: identityProjection.transformVersion,
+    artifactIdentity: computeUbsParallelArtifactIdentity(identityProjection),
+    label: identityProjection.label,
+    directionality: identityProjection.directionality,
+    license: identityProjection.license,
+    provenance: identityProjection.provenance,
+    groups: identityProjection.groups,
+    referenceIndex: identityProjection.referenceIndex,
   };
   // Object insertion order is fixed above; compact output keeps the shared
   // Node/Worker artifact practical without changing its deterministic bytes.
