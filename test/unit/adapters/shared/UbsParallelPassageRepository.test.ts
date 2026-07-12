@@ -75,6 +75,7 @@ describe('UbsParallelPassageRepository', () => {
       mutate(value => { value.groups[0].members[0].alignmentBasis = 'BHS'; }),
       mutate(value => { value.groups[0].members[0].normalizedReference = 'Luke 6:27-35'; }),
       mutate(value => { value.groups[0].members[0].sourceReference = 'LUK 6:27-35'; }),
+      mutate(value => { value.groups[0].members[0].sourceReference += ' '; }),
       mutate(value => { value.groups[0].members[0].segments[0].bookNumber = 67; }),
       mutate(value => { value.groups[0].members[0].segments[0].chapter = 99; }),
       mutate(value => { value.referenceIndex['42:6'][0].startVerse = 26; }),
