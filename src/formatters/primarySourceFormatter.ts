@@ -1,4 +1,6 @@
 import type { PrimarySourceSearchPlanResult } from '../services/historical/primarySourceTypes.js';
+import { buildLocalDocumentResourceUri } from '../kernel/documentResource.js';
+import { normalizeCcelSectionLocator } from '../adapters/commentary/CcelSearchAdapter.js';
 
 export function formatPrimarySourceSearch(result: PrimarySourceSearchPlanResult): string {
   const lines = [
@@ -18,7 +20,7 @@ export function formatPrimarySourceSearch(result: PrimarySourceSearchPlanResult)
         if (hit.author) lines.push(`Author: ${safe(hit.author)}`);
         if (hit.sectionLabel) lines.push(`Section: ${safe(hit.sectionLabel)}`);
         lines.push('', `> ${safe(hit.snippet) || '_Empty snippet_'}`, '');
-        lines.push(`- Locator: [exact section](${safeUrl(hit.locator.url)})`);
+        lines.push(`- Locator: ${formatLocator(hit.locator)}`);
         lines.push(`- Attribution: ${safe(hit.attribution)}`);
         lines.push('- **Snippet only—fetch the selected exact section before quoting or drawing substantive conclusions.**', '');
       }
@@ -43,6 +45,15 @@ function safe(value: string): string {
     .replace(/[\\`*_{}\[\]()<>#+.!|>-]/g, character => `\\${character}`);
 }
 
-function safeUrl(value: string): string {
-  return value.replaceAll('(', '%28').replaceAll(')', '%29').replaceAll(' ', '%20');
+function formatLocator(locator: PrimarySourceSearchPlanResult['queries'][number]['providers'][number]['hits'][number]['locator']): string {
+  if (locator.kind === 'local_section') {
+    const canonical = buildLocalDocumentResourceUri(locator.documentId, locator.sectionId);
+    if (canonical && locator.url === canonical) return `[exact section](${canonical})`;
+  } else {
+    const normalized = normalizeCcelSectionLocator(locator.url);
+    if (normalized && normalized.work === locator.work && normalized.section === locator.section) {
+      return `[exact section](${normalized.url})`;
+    }
+  }
+  return safe(locator.url);
 }

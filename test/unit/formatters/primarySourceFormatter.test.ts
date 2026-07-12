@@ -28,4 +28,32 @@ describe('formatPrimarySourceSearch', () => {
     expect(output).toContain('Snippet only—fetch the selected exact section before quoting');
     expect(output).toContain('not an exhaustive catalog');
   });
+
+  it('links only canonical locator shapes and degrades hostile values to non-link text', () => {
+    const hit = (locator: PrimarySourceSearchPlanResult['queries'][number]['providers'][number]['hits'][number]['locator']) => ({
+      provider: locator.kind === 'local_section' ? 'local' as const : 'ccel_live' as const,
+      queryId: 'q', title: 'Title', snippet: 'Snippet', locator,
+      rankWithinProvider: 1, page: 1, snippetOnly: true as const, attribution: 'Source',
+    });
+    const result: PrimarySourceSearchPlanResult = {
+      planStatus: 'complete',
+      queries: [{ id: 'q', normalizedMode: 'all_terms', providers: [{
+        provider: 'local', status: 'ok', searched: true, page: 1, hitCount: 4, notices: [],
+        hits: [
+          hit({ kind: 'local_section', documentId: 'doc', sectionId: '1', url: 'theologai://documents/doc#section-1' }),
+          hit({ kind: 'local_section', documentId: 'doc', sectionId: '1', url: 'javascript:alert(1)' }),
+          hit({ kind: 'ccel_section', work: 'calvin/institutes', section: 'iv.xvii', url: 'https://www.ccel.org/ccel/calvin/institutes/iv.xvii.html' }),
+          hit({ kind: 'ccel_section', work: 'calvin/institutes', section: 'iv.xvii', url: 'https://evil.test/ccel/calvin/institutes/iv.xvii.html' }),
+        ],
+      }] }],
+      coverage: { localAttempted: true, localStatus: 'ok', localHitCount: 4, ccelAttempted: false, ccelHitCount: 0, notices: [] },
+    };
+    const output = formatPrimarySourceSearch(result);
+    expect(output).toContain('[exact section](theologai://documents/doc#section-1)');
+    expect(output).toContain('[exact section](https://ccel.org/ccel/calvin/institutes/iv.xvii.html)');
+    expect(output).toContain('javascript:alert\\(1\\)');
+    expect(output).toContain('https://evil\\.test/ccel/calvin/institutes/iv\\.xvii\\.html');
+    expect(output).not.toContain('](javascript:');
+    expect(output).not.toContain('](https://evil.test');
+  });
 });
