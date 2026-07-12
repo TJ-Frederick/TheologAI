@@ -22,19 +22,23 @@ import {
 import { isAbsolute, join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { gunzipSync } from 'zlib';
-import { createHash } from 'crypto';
 import { assertJohnOneOneDatabase, assertJohnOneOneSource } from './data-integrity.js';
+import {
+  computeD1CorpusIdentity,
+  D1SourceConsumptionRegistry,
+  parseDataManifest,
+  verifyD1Schema,
+} from './d1-corpus-identity.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 const DATA = join(ROOT, 'data');
 const MANIFEST_PATH = join(DATA, 'data-manifest.json');
 const manifestBytes = readFileSync(MANIFEST_PATH);
-const manifest = JSON.parse(manifestBytes.toString('utf-8')) as {
-  schemaVersion: string;
-  expectedCounts: Record<string, number>;
-};
-const SCHEMA_PATH = join(ROOT, 'migrations', `${manifest.schemaVersion}.sql`);
+const manifest = parseDataManifest(manifestBytes);
+const d1CorpusIdentity = computeD1CorpusIdentity(manifest);
+const sourceRegistry = new D1SourceConsumptionRegistry(ROOT, manifest);
+const schemaBytes = verifyD1Schema(ROOT, manifest);
 
 function getOutputPath(argv: string[]): string {
   const equalsArg = argv.find(arg => arg.startsWith('--output='));
@@ -86,16 +90,15 @@ db.pragma('foreign_keys = ON');
 
 // ── Schema ──
 
-db.exec(readFileSync(SCHEMA_PATH, 'utf-8'));
+db.exec(schemaBytes.toString('utf-8'));
 const insertMetadata = db.prepare('INSERT INTO theologai_metadata (key, value) VALUES (?, ?)');
 insertMetadata.run('schema_version', manifest.schemaVersion);
-insertMetadata.run('corpus_manifest_sha256', createHash('sha256').update(manifestBytes).digest('hex'));
+insertMetadata.run('corpus_manifest_sha256', d1CorpusIdentity);
 
 // ── Tier 1: Cross-references ──
 
 log('Loading cross-references...');
-const xrefPath = join(DATA, 'cross-references', 'cross_references.txt');
-const xrefContent = readFileSync(xrefPath, 'utf-8');
+const xrefContent = sourceRegistry.read('data/cross-references/cross_references.txt', 'utf-8');
 const xrefLines = xrefContent.split('\n');
 
 const insertXref = db.prepare(
@@ -135,13 +138,14 @@ const strongsTx = db.transaction(() => {
     ['NT', 'G', 'strongs-greek.json'],
     ['OT', 'H', 'strongs-hebrew.json'],
   ] as const) {
-    const filePath = join(DATA, 'biblical-languages', filename);
+    const relativePath = `data/biblical-languages/${filename}`;
+    const filePath = join(ROOT, relativePath);
     if (!existsSync(filePath)) {
       log(`  Warning: ${filename} not found, skipping`);
       continue;
     }
 
-    const data = JSON.parse(readFileSync(filePath, 'utf-8'));
+    const data = JSON.parse(sourceRegistry.read(relativePath, 'utf-8'));
     for (const [key, entry] of Object.entries(data) as [string, any][]) {
       const def = typeof entry.def === 'string' ? entry.def : JSON.stringify(entry.def);
       const derivation = typeof entry.derivation === 'string'
@@ -179,7 +183,8 @@ const morphTx = db.transaction(() => {
 
     const files = readdirSync(dir).filter(f => f.endsWith('.json.gz')).sort();
     for (const file of files) {
-      const compressed = readFileSync(join(dir, file));
+      const relativePath = `data/biblical-languages/stepbible/${subdir}/${file}`;
+      const compressed = sourceRegistry.read(relativePath);
       const json = JSON.parse(gunzipSync(compressed).toString('utf-8'));
       const bookName = json.book as string;
       if (file === '43-John.json.gz') {
@@ -221,7 +226,7 @@ assertJohnOneOneDatabase(db);
 log('Loading morphology codes...');
 const morphCodesPath = join(stepbibleDir, 'morph-codes.json');
 if (existsSync(morphCodesPath)) {
-  const morphCodes = JSON.parse(readFileSync(morphCodesPath, 'utf-8'));
+  const morphCodes = JSON.parse(sourceRegistry.read('data/biblical-languages/stepbible/morph-codes.json', 'utf-8'));
   const insertMorphCode = db.prepare('INSERT OR IGNORE INTO morph_codes (code, expansion) VALUES (?, ?)');
   const morphCodeTx = db.transaction(() => {
     let count = 0;
@@ -250,13 +255,14 @@ const lexiconTx = db.transaction(() => {
     ['tbesg-greek.json', 'Abbott-Smith'],
     ['tbesh-hebrew.json', 'BDB'],
   ] as const) {
-    const filePath = join(lexiconDir, filename);
+    const relativePath = `data/biblical-languages/stepbible-lexicons/${filename}`;
+    const filePath = join(ROOT, relativePath);
     if (!existsSync(filePath)) {
       log(`  Warning: ${filename} not found, skipping`);
       continue;
     }
 
-    const data = JSON.parse(readFileSync(filePath, 'utf-8'));
+    const data = JSON.parse(sourceRegistry.read(relativePath, 'utf-8'));
     for (const [key, entry] of Object.entries(data) as [string, any][]) {
       insertLexicon.run(key, entry.source || defaultSource, JSON.stringify(entry));
       count++;
@@ -290,7 +296,7 @@ const histTx = db.transaction(() => {
   const files = readdirSync(histDir).filter(f => f.endsWith('.json')).sort();
   for (const file of files) {
     const id = file.replace('.json', '');
-    const doc = JSON.parse(readFileSync(join(histDir, file), 'utf-8'));
+    const doc = JSON.parse(sourceRegistry.read(`data/historical-documents/${file}`, 'utf-8'));
 
     insertDoc.run(
       id,
@@ -321,6 +327,7 @@ const histTx = db.transaction(() => {
 
 const { docCount, sectionCount } = histTx();
 log(`  Inserted ${docCount} documents with ${sectionCount} sections`);
+sourceRegistry.assertAllConsumed();
 
 // ── Validate and finalize ──
 

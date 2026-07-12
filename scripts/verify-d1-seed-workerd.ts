@@ -4,19 +4,16 @@
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-
-interface SeedManifest {
-  expectedCounts: Record<string, number>;
-  files: Array<{ path: string; table: string }>;
-}
+import { loadAndVerifyD1SeedManifest } from './d1-seed-manifest.js';
+import { parseDataManifest } from './d1-corpus-identity.js';
+import { REQUIRED_COLUMNS } from './check-remote-d1-readiness.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SEED_ROOT = join(ROOT, 'scripts', 'd1-seed');
-const manifest = JSON.parse(
-  readFileSync(join(SEED_ROOT, 'seed-manifest.json'), 'utf8'),
-) as SeedManifest;
+const manifest = loadAndVerifyD1SeedManifest(ROOT, SEED_ROOT);
+const sourceManifest = parseDataManifest(readFileSync(join(ROOT, 'data', 'data-manifest.json')));
 const state = mkdtempSync(join(tmpdir(), 'theologai-wrangler-d1-'));
 const wrangler = join(ROOT, 'node_modules', 'wrangler', 'bin', 'wrangler.js');
 
@@ -41,6 +38,24 @@ function run(args: string[]): string {
 try {
   const common = ['THEOLOGAI_DB', '--local', '--persist-to', state, '--config', 'wrangler.toml'];
   run(['d1', 'migrations', 'apply', ...common]);
+  const migrationName = basename(sourceManifest.materializations.d1.schema.path);
+  const columnChecks = Object.entries(REQUIRED_COLUMNS).map(([table, columns]) =>
+    `(SELECT group_concat(name, ',') FROM (SELECT name FROM pragma_table_info('${table}') ORDER BY cid)) = '${columns.join(',')}'`
+  );
+  const schemaState = run([
+    'd1',
+    'execute',
+    ...common,
+    '--command',
+    `SELECT CASE WHEN
+      (SELECT COUNT(*) FROM d1_migrations) = 1
+      AND (SELECT name FROM d1_migrations LIMIT 1) = '${migrationName}'
+      AND (SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name IN ('idx_xref_from','idx_xref_votes','idx_morph_verse','idx_morph_strongs')) = 4
+      AND ${columnChecks.join('\n      AND ')}
+      THEN 'schema-ready' ELSE json_extract('Wrangler-applied migration state mismatch', '$') END AS schema_state;`,
+    '--json',
+  ]);
+  if (!schemaState.includes('schema-ready')) throw new Error('Wrangler-applied migration state was not verified');
 
   const completeTables = new Set([
     'empty-target-check',

@@ -12,11 +12,13 @@ import {
   splitGeneratedSql,
   statementBytes,
 } from './d1-seed-utils.js';
+import { computeD1CorpusIdentity, parseDataManifest, verifyD1Schema } from './d1-corpus-identity.js';
 
 interface SeedManifest {
   manifestVersion: number;
   algorithm: 'sha256';
   sourceManifest: { path: string; sha256: string };
+  d1Materialization: { identityVersion: number; transformVersion: number; sha256: string };
   schema: { version: string; path: string; sha256: string };
   limits: { maximumStatementBytes: number; targetFileBytes: number };
   tableOrder: string[];
@@ -39,7 +41,7 @@ const MANIFEST_PATH = join(OUTPUT, 'seed-manifest.json');
 if (!existsSync(MANIFEST_PATH)) throw new Error('D1 seed is absent; run npm run d1:seed:export first');
 
 const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf8')) as SeedManifest;
-if (manifest.manifestVersion !== 1 || manifest.algorithm !== 'sha256') {
+if (manifest.manifestVersion !== 2 || manifest.algorithm !== 'sha256') {
   throw new Error('Unsupported D1 seed manifest');
 }
 if (manifest.limits.maximumStatementBytes !== D1_MAX_STATEMENT_BYTES) {
@@ -54,6 +56,17 @@ for (const tracked of [manifest.sourceManifest, manifest.schema]) {
   if (!existsSync(path) || !statSync(path).isFile() || sha256File(path) !== tracked.sha256) {
     throw new Error(`Tracked input changed after seed generation: ${tracked.path}`);
   }
+}
+const sourceManifest = parseDataManifest(readFileSync(join(ROOT, manifest.sourceManifest.path)));
+verifyD1Schema(ROOT, sourceManifest);
+if (manifest.d1Materialization.identityVersion !== sourceManifest.materializations.d1.identityVersion
+  || manifest.d1Materialization.transformVersion !== sourceManifest.materializations.d1.transformVersion
+  || manifest.d1Materialization.sha256 !== computeD1CorpusIdentity(sourceManifest)) {
+  throw new Error('Seed manifest D1 materialization identity is stale');
+}
+if (manifest.schema.path !== sourceManifest.materializations.d1.schema.path
+  || manifest.schema.sha256 !== sourceManifest.materializations.d1.schema.sha256) {
+  throw new Error('Seed manifest schema identity differs from D1 materialization identity');
 }
 
 const listedFiles = manifest.files.map(file => file.path);

@@ -9,23 +9,10 @@ import { dirname, isAbsolute, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { sha256File } from './d1-seed-utils.js';
 import { assertJohnOneOneDatabase } from './data-integrity.js';
-
-interface SeedManifest {
-  manifestVersion: number;
-  algorithm: 'sha256';
-  schema: { version: string; path: string; sha256: string };
-  expectedCounts: Record<string, number>;
-  files: Array<{
-    path: string;
-    table: string;
-    sha256: string;
-    byteSize: number;
-  }>;
-}
+import { loadAndVerifyD1SeedManifest } from './d1-seed-manifest.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SEED_DIRECTORY = join(ROOT, 'scripts', 'd1-seed');
-const SEED_MANIFEST_PATH = join(SEED_DIRECTORY, 'seed-manifest.json');
 
 function databaseArgument(argv: string[]): string {
   let value: string | undefined;
@@ -147,13 +134,7 @@ function assertRepresentativeFts(db: Database.Database): void {
 }
 
 const sourcePath = databaseArgument(process.argv.slice(2));
-if (!existsSync(SEED_MANIFEST_PATH)) {
-  throw new Error('D1 seed is absent; run npm run d1:seed:export first');
-}
-const manifest = JSON.parse(readFileSync(SEED_MANIFEST_PATH, 'utf8')) as SeedManifest;
-if (manifest.manifestVersion !== 1 || manifest.algorithm !== 'sha256') {
-  throw new Error('Unsupported D1 seed manifest');
-}
+const manifest = loadAndVerifyD1SeedManifest(ROOT, SEED_DIRECTORY);
 
 const schemaPath = join(ROOT, manifest.schema.path);
 if (!existsSync(schemaPath) || sha256File(schemaPath) !== manifest.schema.sha256) {
