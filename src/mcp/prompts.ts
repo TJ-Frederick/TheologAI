@@ -25,16 +25,25 @@ export function recommendedToolCallsForPrompt(
   switch (name) {
     case 'word-study': {
       const word = args?.word?.trim() ?? '';
-      return /^[GH]\d+[a-z]?$/i.test(word)
+      const reference = args?.reference?.trim();
+      const lexical = /^[GH]\d+[a-z]?$/i.test(word)
         ? [{ tool: 'original_language_lookup', arguments: { strongs_number: word.toUpperCase(), include_extended: true, detail_level: 'detailed' } }]
         : [{ tool: 'original_language_lookup', arguments: { query: word, limit: 10 } }];
+      return reference
+        ? [
+          { tool: 'bible_lookup', arguments: { reference, translation: 'ESV', includeFootnotes: true } },
+          { tool: 'bible_lookup', arguments: { reference, translation: 'KJV' } },
+          { tool: 'bible_verse_morphology', arguments: { reference, expand_morphology: true } },
+          ...lexical,
+        ]
+        : lexical;
     }
     case 'passage-exegesis': {
       const reference = args?.reference ?? '';
       return [
         { tool: 'bible_lookup', arguments: { reference, translation: translation(args?.translation), includeFootnotes: true } },
         { tool: 'bible_lookup', arguments: { reference, translation: 'KJV' } },
-        { tool: 'bible_verse_morphology', arguments: { reference, expand_morphology: true } },
+        ...(!/[-–—]/.test(reference) ? [{ tool: 'bible_verse_morphology', arguments: { reference, expand_morphology: true } }] : []),
         { tool: 'bible_cross_references', arguments: { reference } },
         { tool: 'parallel_passages', arguments: { reference } },
         { tool: 'commentary_lookup', arguments: { reference, commentator: 'Matthew Henry' } },
@@ -82,6 +91,7 @@ export function registerPromptHandlers(server: Server): void {
         arguments: [
           { name: 'word', description: 'The English word, Greek/Hebrew term, or Strong\'s number (e.g. "love", "agape", "G26")', required: true },
           { name: 'testament', description: 'Focus on OT (Hebrew) or NT (Greek). Default: auto-detect.', required: false },
+          { name: 'reference', description: 'One verse providing context for the word. Without it, the workflow is a lexical overview, not a claim about meaning in a verse.', required: false },
         ],
       },
       {
@@ -121,29 +131,37 @@ export function registerPromptHandlers(server: Server): void {
     switch (name) {
       case 'word-study': {
         const word = args?.word ?? '';
+        const reference = args?.reference?.trim();
         const testament = args?.testament;
         const testamentHint = testament
           ? ` Focus on the ${testament.toUpperCase() === 'OT' ? 'Hebrew (Old Testament)' : 'Greek (New Testament)'}.`
           : '';
-        text = `Conduct a thorough word study on "${word}".${testamentHint}
+        text = reference
+          ? `Conduct a context-first word study on "${word}" in ${reference}.${testamentHint}
 
-1. **Identify the original term** — ${callText(calls[0])}. Prefer structured \`mode\`, \`entries\`, \`detailLevel\`, and \`provenanceIds\` when present, with Markdown as fallback. For a search, first use its summary entries and only make a detailed extended lookup for a clearly selected Strong's entry. Do not treat one English gloss as exhausting the term's semantic range.
-2. **Examine morphological usage** — Find a key verse and use \`bible_verse_morphology\` to study its grammatical form.
-3. **Study contextual meaning** — Read 2–3 significant passages with \`bible_lookup\` and compare translations.
-4. **Explore cross-references** — Use \`bible_cross_references\` on a key verse.
-5. **Synthesize** — Summarize semantic range, theological significance, and English-rendering nuances.`;
+1. **Read the context** — ${callText(calls[0])}; compare ${callText(calls[1])}.
+2. **Resolve the verse token** — ${callText(calls[2])}. Identify the source form, lemma, Strong's identifier, or exact local gloss corresponding to the user's term. Then call \`original_language_study\` with ${reference} and that verse-local target. If it returns \`needs_disambiguation\`, select a candidate only from sentence context and call it again with that source position; do not guess.
+3. **Consult lexical evidence** — ${callText(calls[3])}. Keep OpenScriptures and STEPBible claims source-separated.
+4. **Synthesize in this order** — Begin with **Meaning here, in plain English**, then explain why it fits the verse, the word identity, and grammar. Put broader lexical evidence after the contextual explanation.
+5. **Apply safeguards** — Context controls sense. A gloss is not a definition; a Strong's number is an identifier; morphology constrains but does not settle meaning; roots and etymology do not prove present meaning; never import every possible sense into one occurrence. Do not infer Aramaic from an H identifier.`
+          : `Provide a lexical overview of "${word}".${testamentHint}
+
+1. **Identify candidate terms** — ${callText(calls[0])}. Prefer structured \`mode\`, \`entries\`, \`detailLevel\`, and \`provenanceIds\`, with Markdown as fallback.
+2. **Label the scope honestly** — There is no verse context, so do not claim a contextual meaning. Invite a passage-specific study.
+3. **Apply safeguards** — Do not treat one English gloss as exhausting the term's semantic range. Keep source claims separate; a gloss, Strong's number, morphology, root, or etymology does not establish meaning in a verse, and do not import every possible sense into every occurrence.`;
         break;
       }
       case 'passage-exegesis': {
         const reference = args?.reference ?? '';
+        const morphologyCall = calls.find(call => call.tool === 'bible_verse_morphology');
         text = `Perform a systematic exegesis of ${reference}.
 
 1. **Read the text** — ${callText(calls[0])}; compare with ${callText(calls[1])}. Prefer structured \`passages[]\` and retain each translation's \`provenanceIds\`; distinguish an unavailable translation in \`failures[]\` from a translation whose text is absent.
-2. **Examine the original language** — ${callText(calls[2])}, then make exact \`original_language_lookup\` calls for significant Strong's numbers.
-3. **Explore connections** — ${callText(calls[3])} and ${callText(calls[4])}.
-4. **Consult commentaries** — ${callText(calls[5])} and ${callText(calls[6])}; note agreement and divergence.
-5. **Check historical theology** — ${callText(calls[7])}.
-6. **Synthesize** — Explain original context, interpretive decisions, implications, and application.`;
+2. **Trace the passage before selecting terms** — Explain literary and discourse flow first. ${morphologyCall ? `For this single verse, ${callText(morphologyCall)}.` : 'This is a range: select at most three key individual verses and call `bible_verse_morphology` separately for each; never pass the range to a single-verse tool.'}
+3. **Study only consequential terms** — For a term affecting a real translation or interpretive question, call \`original_language_study\` with one exact verse and the verse-local target. Resolve ambiguity by source position rather than guessing.
+4. **Explore connections** — Use \`bible_cross_references\` and \`parallel_passages\` for ${reference}.
+5. **Consult commentaries and historical theology** — Use \`commentary_lookup\` and \`classic_text_lookup\`; note agreement and divergence.
+6. **Synthesize distinctly** — Separate observation, lexical evidence, interpretation, theological synthesis, and application. Context controls sense; never derive contextual meaning from a gloss, Strong's identifier, morphology, root, etymology, frequency, or every possible lexicon sense.`;
         break;
       }
       case 'compare-translations': {

@@ -21,6 +21,7 @@ import { LocalPrimarySourceSearchProvider } from '../../src/services/historical/
 import { PrimarySourceSearchService } from '../../src/services/historical/PrimarySourceSearchService.js';
 import { MorphologyService } from '../../src/services/languages/MorphologyService.js';
 import { StrongsService } from '../../src/services/languages/StrongsService.js';
+import { OriginalLanguageStudyService } from '../../src/services/languages/OriginalLanguageStudyService.js';
 import { createBibleLookupHandler } from '../../src/tools/v2/bibleLookup.js';
 import { createClassicTextsHandler } from '../../src/tools/v2/classicTexts.js';
 import { createCommentaryHandler } from '../../src/tools/v2/commentary.js';
@@ -31,6 +32,7 @@ import { createPrimarySourceSearchHandler } from '../../src/tools/v2/primarySour
 import { createStrongsLookupHandler } from '../../src/tools/v2/strongsLookup.js';
 import { createVerifyDonationHandler } from '../../src/tools/v2/verifyDonation.js';
 import { createVerseMorphologyHandler } from '../../src/tools/v2/verseMorphology.js';
+import { createOriginalLanguageStudyHandler } from '../../src/tools/v2/originalLanguageStudy.js';
 import type { WorkerCompositionRoot } from '../../src/tools/worker/index.js';
 
 export type DeterministicMcpRoot = McpCompositionRoot & WorkerCompositionRoot;
@@ -146,6 +148,7 @@ export function createDeterministicMcpFixture(): DeterministicMcpFixture {
   );
   const strongsService = new StrongsService(strongsRepository);
   const morphologyService = new MorphologyService(morphologyRepository);
+  const originalLanguageStudyService = new OriginalLanguageStudyService(morphologyRepository, strongsRepository);
   const ccelService = new CcelService(ccelAdapter);
   const donationService = new DonationService(onChainVerifier);
 
@@ -159,6 +162,7 @@ export function createDeterministicMcpFixture(): DeterministicMcpFixture {
       createPrimarySourceSearchHandler(primarySourceSearchService),
       createStrongsLookupHandler(strongsService),
       createVerseMorphologyHandler(morphologyService),
+      createOriginalLanguageStudyHandler(originalLanguageStudyService),
       createDonationConfigHandler(donationService),
       createVerifyDonationHandler(donationService),
     ],

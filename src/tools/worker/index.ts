@@ -36,6 +36,7 @@ import { LocalPrimarySourceSearchProvider } from '../../services/historical/Loca
 import { PrimarySourceSearchService } from '../../services/historical/PrimarySourceSearchService.js';
 import { StrongsService } from '../../services/languages/StrongsService.js';
 import { MorphologyService } from '../../services/languages/MorphologyService.js';
+import { OriginalLanguageStudyService } from '../../services/languages/OriginalLanguageStudyService.js';
 
 // Tool handlers
 import { createBibleLookupHandler } from '../v2/bibleLookup.js';
@@ -46,6 +47,7 @@ import { createClassicTextsHandler } from '../v2/classicTexts.js';
 import { createPrimarySourceSearchHandler } from '../v2/primarySourceSearch.js';
 import { createStrongsLookupHandler } from '../v2/strongsLookup.js';
 import { createVerseMorphologyHandler } from '../v2/verseMorphology.js';
+import { createOriginalLanguageStudyHandler } from '../v2/originalLanguageStudy.js';
 import { createDonationConfigHandler } from '../v2/donationConfig.js';
 import { createVerifyDonationHandler } from '../v2/verifyDonation.js';
 
@@ -143,6 +145,7 @@ export function createWorkerCompositionRoot(env: Env): WorkerCompositionRoot {
   );
   const strongsService = new StrongsService(strongsRepo);
   const morphService = new MorphologyService(morphRepo);
+  const originalLanguageStudyService = new OriginalLanguageStudyService(morphRepo, strongsRepo);
 
   // Module-scope services (cached across requests)
   const donationService = getDonationService(env);
@@ -157,6 +160,7 @@ export function createWorkerCompositionRoot(env: Env): WorkerCompositionRoot {
     createPrimarySourceSearchHandler(primarySourceSearchService),
     createStrongsLookupHandler(strongsService),
     createVerseMorphologyHandler(morphService),
+    createOriginalLanguageStudyHandler(originalLanguageStudyService),
     createDonationConfigHandler(donationService),
     createVerifyDonationHandler(donationService),
   ];

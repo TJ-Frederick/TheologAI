@@ -81,7 +81,7 @@ test/
 
 ## MCP Capabilities
 
-### Tools (9)
+### Tools (10)
 
 | Tool | Description |
 |------|-------------|
@@ -92,6 +92,7 @@ test/
 | `classic_text_lookup` | Search/browse 17 local docs; retrieve a specifically named CCEL work section when available |
 | `original_language_lookup` | Strong's concordance (14,298 entries), Greek/Hebrew word studies |
 | `bible_verse_morphology` | Word-by-word grammatical analysis for all 66 books |
+| `original_language_study` | Context-first study of one Greek or Hebrew token in one verse, with structured evidence and interpretive limits |
 | `donation_config` | Donation configuration: supported tokens, recipient address, chain details |
 | `verify_donation` | On-chain donation verification across Ethereum, Base, and Radius |
 

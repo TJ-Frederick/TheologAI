@@ -10,6 +10,7 @@ import { createDonationConfigHandler } from '../../../src/tools/v2/donationConfi
 import { createParallelPassagesHandler } from '../../../src/tools/v2/parallelPassages.js';
 import { createStrongsLookupHandler } from '../../../src/tools/v2/strongsLookup.js';
 import { createVerseMorphologyHandler } from '../../../src/tools/v2/verseMorphology.js';
+import { createOriginalLanguageStudyHandler } from '../../../src/tools/v2/originalLanguageStudy.js';
 
 const unused = {} as never;
 const tools: ToolHandler[] = [
@@ -20,6 +21,7 @@ const tools: ToolHandler[] = [
   createClassicTextsHandler(unused, unused),
   createStrongsLookupHandler(unused),
   createVerseMorphologyHandler(unused),
+  createOriginalLanguageStudyHandler(unused),
   createDonationConfigHandler(unused),
 ];
 
@@ -29,8 +31,10 @@ describe('prompt-recommended tool-call contracts', () => {
   it.each([
     ['word-study', { word: 'G26' }],
     ['word-study', { word: 'love', testament: 'NT' }],
+    ['word-study', { word: 'love', reference: 'John 3:16' }],
     ['passage-exegesis', { reference: 'John 3:16', translation: 'NET' }],
     ['passage-exegesis', { reference: 'John 3:16', translation: 'unsupported' }],
+    ['passage-exegesis', { reference: 'Romans 8:28-30', translation: 'ESV' }],
     ['compare-translations', { reference: 'Philippians 2:6-8', translations: 'ESV,KJV,NET,BSB' }],
     ['compare-translations', { reference: 'John 1:1', translations: 'unknown' }],
     ['confession-study', { topic: 'justification', traditions: 'Reformed, Lutheran' }],
@@ -46,5 +50,16 @@ describe('prompt-recommended tool-call contracts', () => {
       const result = validate(call.arguments);
       expect(result.valid, result.errorMessage).toBe(true);
     }
+  });
+
+  it('never recommends a range to the single-verse morphology tool', () => {
+    const calls = recommendedToolCallsForPrompt('passage-exegesis', { reference: 'Romans 8:28-30' });
+    expect(calls.some(call => call.tool === 'bible_verse_morphology')).toBe(false);
+  });
+
+  it('uses morphology to resolve a contextual word before a dynamic study call', () => {
+    const calls = recommendedToolCallsForPrompt('word-study', { word: 'love', reference: 'John 3:16' });
+    expect(calls.map(call => call.tool)).toContain('bible_verse_morphology');
+    expect(calls.map(call => call.tool)).not.toContain('original_language_study');
   });
 });

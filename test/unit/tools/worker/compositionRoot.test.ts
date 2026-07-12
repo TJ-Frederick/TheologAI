@@ -85,6 +85,7 @@ const EXPECTED_TOOL_NAMES = [
   'primary_source_search',
   'original_language_lookup',
   'bible_verse_morphology',
+  'original_language_study',
   'donation_config',
   'verify_donation',
 ];

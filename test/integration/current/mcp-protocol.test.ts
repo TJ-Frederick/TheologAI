@@ -91,12 +91,14 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
         'primary_source_search',
         'original_language_lookup',
         'bible_verse_morphology',
+        'original_language_study',
         'donation_config',
         'verify_donation',
       ]);
       expect(listed.tools.filter(tool => tool.outputSchema).map(tool => tool.name)).toEqual([
         'bible_lookup',
         'original_language_lookup',
+        'original_language_study',
       ]);
       expect(listed.tools.find(tool => tool.name === 'bible_lookup')?.outputSchema).toMatchObject({
         type: 'object',

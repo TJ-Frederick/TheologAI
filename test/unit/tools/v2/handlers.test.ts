@@ -10,6 +10,7 @@ import { createPrimarySourceSearchHandler } from '../../../../src/tools/v2/prima
 import { createStrongsLookupHandler } from '../../../../src/tools/v2/strongsLookup.js';
 import { createVerifyDonationHandler } from '../../../../src/tools/v2/verifyDonation.js';
 import { createVerseMorphologyHandler } from '../../../../src/tools/v2/verseMorphology.js';
+import { createOriginalLanguageStudyHandler } from '../../../../src/tools/v2/originalLanguageStudy.js';
 import { ValidationError } from '../../../../src/kernel/errors.js';
 import { CommentaryService as CommentaryServiceClass } from '../../../../src/services/commentary/CommentaryService.js';
 import type { BibleService } from '../../../../src/services/bible/BibleService.js';
@@ -22,6 +23,7 @@ import type { HistoricalDocumentService } from '../../../../src/services/histori
 import type { PrimarySourceSearchService } from '../../../../src/services/historical/PrimarySourceSearchService.js';
 import type { MorphologyService } from '../../../../src/services/languages/MorphologyService.js';
 import type { StrongsService } from '../../../../src/services/languages/StrongsService.js';
+import type { OriginalLanguageStudyService } from '../../../../src/services/languages/OriginalLanguageStudyService.js';
 import { StrongsService as StrongsServiceClass } from '../../../../src/services/languages/StrongsService.js';
 import { readFileSync } from 'node:fs';
 import type { ToolHandler, ToolResult } from '../../../../src/kernel/types.js';
@@ -51,6 +53,7 @@ describe('v2 tool handler schemas', () => {
       createPrimarySourceSearchHandler(serviceDouble<PrimarySourceSearchService>({})),
       createStrongsLookupHandler(serviceDouble<StrongsService>({})),
       createVerseMorphologyHandler(serviceDouble<MorphologyService>({})),
+      createOriginalLanguageStudyHandler(serviceDouble<OriginalLanguageStudyService>({})),
       createDonationConfigHandler(serviceDouble<DonationService>({})),
       createVerifyDonationHandler(serviceDouble<DonationService>({})),
     ];

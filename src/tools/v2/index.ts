@@ -34,6 +34,7 @@ import { LocalPrimarySourceSearchProvider } from '../../services/historical/Loca
 import { PrimarySourceSearchService } from '../../services/historical/PrimarySourceSearchService.js';
 import { StrongsService } from '../../services/languages/StrongsService.js';
 import { MorphologyService } from '../../services/languages/MorphologyService.js';
+import { OriginalLanguageStudyService } from '../../services/languages/OriginalLanguageStudyService.js';
 
 // Tool handlers
 import { createBibleLookupHandler } from './bibleLookup.js';
@@ -44,6 +45,7 @@ import { createClassicTextsHandler } from './classicTexts.js';
 import { createPrimarySourceSearchHandler } from './primarySourceSearch.js';
 import { createStrongsLookupHandler } from './strongsLookup.js';
 import { createVerseMorphologyHandler } from './verseMorphology.js';
+import { createOriginalLanguageStudyHandler } from './originalLanguageStudy.js';
 import { createDonationConfigHandler } from './donationConfig.js';
 import { createVerifyDonationHandler } from './verifyDonation.js';
 
@@ -107,6 +109,7 @@ export function createCompositionRoot(): CompositionRoot {
   );
   const strongsService = new StrongsService(strongsRepo);
   const morphService = new MorphologyService(morphRepo);
+  const originalLanguageStudyService = new OriginalLanguageStudyService(morphRepo, strongsRepo);
 
   // Donation (no DB dependency)
   const onChainVerifier = new OnChainVerifier({});
@@ -122,6 +125,7 @@ export function createCompositionRoot(): CompositionRoot {
     createPrimarySourceSearchHandler(primarySourceSearchService),
     createStrongsLookupHandler(strongsService),
     createVerseMorphologyHandler(morphService),
+    createOriginalLanguageStudyHandler(originalLanguageStudyService),
     createDonationConfigHandler(donationService),
     createVerifyDonationHandler(donationService),
   ];

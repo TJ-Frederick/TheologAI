@@ -42,6 +42,7 @@ fresh server and transport.
 | `primary_source_search` | Execute a bounded, explicit query plan against the local historical index; optional live CCEL discovery is separately gated off by default. Returns snippets and exact locators, not document bodies. |
 | `original_language_lookup` | Look up a Strong's entry or search for matching Greek/Hebrew entries. |
 | `bible_verse_morphology` | Return word-by-word morphology for a specific verse. |
+| `original_language_study` | Resolve and study one Greek or Hebrew token in one verse with contextual morphology, source-separated lexical evidence, and explicit interpretive limits. |
 | `donation_config` | Return voluntary-donation recipient, asset, and chain configuration. |
 | `verify_donation` | Classify a transaction and confirm only supported transfers to the configured recipient. |
 
@@ -51,7 +52,7 @@ connections in `thematic` and `auto` modes.
 
 All tools are annotated as read-only, non-destructive, and idempotent. Tool
 inputs use closed, bounded JSON Schema 2020-12 contracts. `bible_lookup` and
-`original_language_lookup` also advertise versioned object-root `outputSchema`
+`original_language_lookup` and `original_language_study` also advertise versioned object-root `outputSchema`
 contracts and return matching `structuredContent` beside the existing Markdown
 content. Their structured results include bounded, result-local provenance
 records; all other tools retain their current Markdown-only result contract.

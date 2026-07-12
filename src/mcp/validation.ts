@@ -105,7 +105,7 @@ function normalizeValidationMessage(message: string): string {
 }
 
 const PROMPT_ARGUMENTS = {
-  'word-study': { required: ['word'], allowed: ['word', 'testament'] },
+  'word-study': { required: ['word'], allowed: ['word', 'testament', 'reference'] },
   'passage-exegesis': { required: ['reference'], allowed: ['reference', 'translation'] },
   'compare-translations': { required: ['reference'], allowed: ['reference', 'translations'] },
   'confession-study': { required: ['topic'], allowed: ['topic', 'traditions'] },
@@ -141,6 +141,9 @@ export function validatePromptArguments(name: string, args: Record<string, strin
     }
     if (values.testament && !['OT', 'NT'].includes(values.testament.toUpperCase())) {
       throw new McpError(ErrorCode.InvalidParams, 'Argument "testament" for prompt "word-study" must be OT or NT');
+    }
+    if ((values.reference?.length ?? 0) > 100) {
+      throw new McpError(ErrorCode.InvalidParams, 'Argument "reference" for prompt "word-study" exceeds 100 characters');
     }
   }
 

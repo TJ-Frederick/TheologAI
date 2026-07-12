@@ -22,10 +22,11 @@ Use this workflow when the user asks for:
 
 ### Step 2: Original Language Analysis
 
-- Call `bible_verse_morphology` on the key verse(s) with `expand_morphology: true`
-- Identify theologically significant words (look for key verbs, important nouns)
-- Call `original_language_lookup` on 2-3 key terms with `include_extended: true`
-- Note verb tenses, imperative/indicative distinctions, key prepositions
+- Trace the passage's literary and discourse flow before selecting terms.
+- For a range, select at most three key individual verses. Never pass a range to `bible_verse_morphology` or `original_language_study`.
+- Study only terms affecting an actual translation or interpretive question.
+- Call `original_language_study` with one verse and the verse-local target. Resolve returned ambiguity by source position, not guesswork.
+- Treat morphology as constraining evidence, not a self-sufficient interpretation.
 
 ### Step 3: Literary Context
 
@@ -65,3 +66,6 @@ Present findings as:
 - Let the original language inform interpretation, not the other way around
 - Present multiple views fairly when interpretation is debated
 - Distinguish between what the text says, what it means, and how it applies
+- Separate observation, lexical evidence, interpretation, theological synthesis, and application.
+- Never derive contextual meaning from a gloss, Strong's identifier, morphology, root, etymology, frequency, or the sum of every lexicon sense.
+- Keep source claims and provenance attached to their evidence.
