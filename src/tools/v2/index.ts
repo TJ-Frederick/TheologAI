@@ -5,6 +5,7 @@
  * This is the single wiring point for dependency injection.
  */
 
+import type Database from 'better-sqlite3';
 import type { ToolHandler } from '../../kernel/types.js';
 
 // Adapters — Bible
@@ -62,12 +63,17 @@ export interface CompositionRoot {
   services: ServerServices;
 }
 
+export interface CompositionRootOptions {
+  /** Explicit database injection for isolated runtimes and clean-checkout tests. */
+  database?: Database.Database;
+}
+
 /**
  * Create all tool handlers and services with fully-wired dependency graph.
  */
-export function createCompositionRoot(): CompositionRoot {
+export function createCompositionRoot(options: CompositionRootOptions = {}): CompositionRoot {
   // Database
-  const db = getDatabase();
+  const db = options.database ?? getDatabase();
 
   // Repositories
   const crossRefRepo = new CrossReferenceRepository(db);

@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import Database from 'better-sqlite3';
 import { afterAll, describe, expect, it } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
@@ -100,7 +101,10 @@ describe('published project contract', () => {
     // Use the real Node composition root here. The deterministic fixture is
     // valuable for protocol calls, but it must not be able to mask Node-only
     // registry drift in the published contract.
-    const nodeTools = createCompositionRoot().tools;
+    const nodeDatabase = new Database(':memory:');
+    nodeDatabase.exec(await readProjectFile('migrations/0001_initial_schema.sql'));
+    const nodeTools = createCompositionRoot({ database: nodeDatabase }).tools;
+    nodeDatabase.close();
     const workerTools = createWorkerCompositionRoot({
       THEOLOGAI_DB: createSimpleD1(),
       THEOLOGAI_VERSION: 'public-contract-test',
