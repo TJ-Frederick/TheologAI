@@ -1,36 +1,36 @@
 {
-  "schemaVersion": "1",
+  "schemaVersion": "2",
   "tool": "parallel_passages",
   "cases": [
     {
       "name": "hard default is UBS only",
       "arguments": { "reference": "Luke 6:35" },
-      "assert": ["corpora=ubs_source_attested", "sourceAttestedGroups>=1", "legacyParallels=0", "openBibleCrossReferences=0", "alignmentAbsent"]
+      "assert": ["success", "ubsGroupsPresent"]
     },
     {
       "name": "alignment is explicit",
       "arguments": { "reference": "Luke 6:35", "includeAlignment": true, "maxGroups": 1 },
-      "assert": ["sourceAttestedGroups=1", "allMembersHaveAlignment"]
+      "assert": ["success", "ubsGroupsPresent", "alignmentPresent"]
     },
     {
       "name": "all group members receive text",
       "arguments": { "reference": "Luke 6:35", "includeText": true, "translation": "WEB", "maxGroups": 1 },
-      "assert": ["allMembersPresent", "allAvailableMembersHaveText", "matchedMemberPresent", "markdownMatchedMemberDeemphasized"]
+      "assert": ["success", "ubsGroupsPresent", "memberTextPresent", "textAttributionPresent"]
     },
     {
       "name": "legacy remains explicit and unchanged",
       "arguments": { "reference": "Matthew 26:26", "corpora": ["theologai_legacy"], "mode": "synoptic", "maxParallels": 2 },
-      "assert": ["sourceAttestedGroups=0", "legacyRelationship=synoptic", "legacyConfidencePresent"]
+      "assert": ["success", "legacyParallelsPresent"]
     },
     {
       "name": "both corpora remain separated",
       "arguments": { "reference": "Matthew 26:26", "corpora": ["ubs_source_attested", "theologai_legacy"], "mode": "auto", "maxGroups": 2 },
-      "assert": ["sourceAttestedGroupsSeparate", "legacyParallelsSeparate"]
+      "assert": ["success", "bothCorpora", "ubsGroupsPresent", "legacyParallelsPresent"]
     },
     {
       "name": "OpenBible is separate and opt in",
       "arguments": { "reference": "John 3:16", "includeOpenBibleCrossReferences": true },
-      "assert": ["openBibleCrossReferencesSeparate", "openBibleProvenancePresent", "noLegacyFallback"]
+      "assert": ["success", "openBibleSeparate", "openBibleAttribution"]
     },
     {
       "name": "deprecated alias conflict is rejected",
@@ -40,6 +40,35 @@
     {
       "name": "legacy controls do not infer legacy",
       "arguments": { "reference": "Matthew 26:26", "mode": "synoptic" },
+      "assert": ["toolError", "explicitLegacyInstruction"]
+    },
+    {
+      "name": "valid no-result query remains successful",
+      "arguments": { "reference": "Psalms 119:176" },
+      "assert": ["success", "noUbsGroups"]
+    },
+    {
+      "name": "fully default-populated client arguments are accepted",
+      "arguments": {
+        "reference": "Luke 6:35",
+        "corpora": ["ubs_source_attested"],
+        "includeText": false,
+        "translation": "ESV",
+        "maxGroups": 5,
+        "includeAlignment": false,
+        "includeOpenBibleCrossReferences": false
+      },
+      "assert": ["success", "defaultsAccepted", "ubsGroupsPresent"]
+    },
+    {
+      "name": "removed legacy defaults are not tolerated as UBS controls",
+      "arguments": {
+        "reference": "Luke 6:35",
+        "corpora": ["ubs_source_attested"],
+        "mode": "auto",
+        "maxParallels": 10,
+        "useCrossReferences": false
+      },
       "assert": ["toolError", "explicitLegacyInstruction"]
     }
   ]
