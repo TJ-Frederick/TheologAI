@@ -51,6 +51,22 @@ export {
 // Cache
 export { Cache } from './cache.js';
 
+// Source-attested parallel passage groups
+export type {
+  SourceParallelLanguageMarker,
+  SourceParallelAlignmentBasis,
+  SourceParallelReferenceSegment,
+  SourceParallelMember,
+  ParallelSourceProvenance,
+  SourceAttestedParallelGroup,
+  SourceAttestedParallelLookup,
+  ISourceAttestedParallelRepository,
+} from './sourceAttestedParallels.js';
+export {
+  parseSourceAttestedLookupReference,
+  type SourceAttestedLookupReference,
+} from './sourceAttestedReference.js';
+
 // Provenance
 export {
   provenanceFromCitation,

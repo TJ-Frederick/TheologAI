@@ -11,6 +11,14 @@ import {
   getBibleBookBounds,
   type BibleBook,
 } from '../src/kernel/books.js';
+import type {
+  ParallelSourceProvenance as KernelParallelSourceProvenance,
+  SourceAttestedParallelGroup as KernelSourceAttestedParallelGroup,
+  SourceParallelAlignmentBasis,
+  SourceParallelLanguageMarker,
+  SourceParallelMember as KernelSourceParallelMember,
+  SourceParallelReferenceSegment,
+} from '../src/kernel/sourceAttestedParallels.js';
 
 export const TRANSFORM_VERSION = 1;
 export const LABEL = 'source_attested_parallel' as const;
@@ -64,38 +72,12 @@ export function assertProvenanceMatches(left: SourceMetadata, right: SourceMetad
   }
 }
 
-export interface ReferenceSegment {
-  bookNumber: number;
-  chapter: number;
-  startVerse: number;
-  endVerse: number;
-}
-
-export type LanguageMarker = 'HEB' | 'GRK';
-export type AlignmentBasis = 'BHS' | 'LXX' | 'UBSGNT5';
-export interface SourceParallelMember {
-  sourceOrder: number;
-  sourceReference: string;
-  normalizedReference: string;
-  segments: ReferenceSegment[];
-  languageMarker: LanguageMarker;
-  alignmentBasis: AlignmentBasis;
-  alignmentRaw: string;
-}
-
-export interface ParallelSourceProvenance extends SourceMetadata {
-  modified: true;
-  modificationNote: string;
-}
-
-export interface SourceAttestedParallelGroup {
-  groupId: string;
-  sourceOrdinal: number;
-  label: typeof LABEL;
-  directionality: typeof DIRECTIONALITY;
-  members: SourceParallelMember[];
-  provenance: ParallelSourceProvenance;
-}
+export type ReferenceSegment = SourceParallelReferenceSegment;
+export type LanguageMarker = SourceParallelLanguageMarker;
+export type AlignmentBasis = SourceParallelAlignmentBasis;
+export type SourceParallelMember = KernelSourceParallelMember;
+export type ParallelSourceProvenance = KernelParallelSourceProvenance;
+export type SourceAttestedParallelGroup = KernelSourceAttestedParallelGroup;
 
 export interface ReferenceIndexEntry {
   groupId: string;
