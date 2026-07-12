@@ -379,7 +379,7 @@
     },
     {
       "path": "data/parallel-passages/ubs-paratext/LICENSE.md",
-      "sha256": "c6ededb4b82093ea27e8fc2f5b12c156b1d85fdad9e6579e96c7beffd53689a1"
+      "sha256": "924513d06ecd19f5abb3d5a41973452983bf2b471347253d07d7cc529a466c8c"
     },
     {
       "path": "data/parallel-passages/ubs-paratext/ParallelPassages.xml",
@@ -387,7 +387,7 @@
     },
     {
       "path": "data/parallel-passages/ubs-paratext/README.md",
-      "sha256": "26ce6d4df0d2661357a903a390b3b9ca731d4c078ee5802c34fdaaa6bcbfa46b"
+      "sha256": "252675adaa4296c1eb2b9b0cfab75cdc1d765cc2ef2425685c0e26f5525731f9"
     },
     {
       "path": "data/parallel-passages/ubs-paratext/SOURCE.json",
