@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   their existing Markdown content available for legacy clients.
 - Added bounded, result-local provenance records and structured-first guidance
   to the word-study, passage-exegesis, and compare-translations prompts.
+- Added versioned grouped output and provenance for `parallel_passages`, with a
+  hard default to complete UBS source-attested groups. Legacy curated edges and
+  OpenBible.info rows remain available only through explicit, separate selectors.
 
 ### Corrected
 

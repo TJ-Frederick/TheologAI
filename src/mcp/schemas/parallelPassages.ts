@@ -10,8 +10,8 @@ const textFields = {
 export const parallelPassagesOutputSchema = {
   type: 'object',
   properties: {
-    schemaVersion: { type: 'string', enum: ['1'] },
-    kind: { type: 'string', enum: ['parallel_passages'] },
+    schemaVersion: { type: 'string', const: '1' },
+    kind: { type: 'string', const: 'parallel_passages' },
     requestedReference: { type: 'string' },
     corpora: {
       type: 'array', minItems: 1, maxItems: 2, uniqueItems: true,

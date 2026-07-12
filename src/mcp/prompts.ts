@@ -36,7 +36,7 @@ export function recommendedToolCallsForPrompt(
         { tool: 'bible_lookup', arguments: { reference, translation: 'KJV' } },
         { tool: 'bible_verse_morphology', arguments: { reference, expand_morphology: true } },
         { tool: 'bible_cross_references', arguments: { reference } },
-        { tool: 'parallel_passages', arguments: { reference } },
+        { tool: 'parallel_passages', arguments: { reference, corpora: ['ubs_source_attested'], maxGroups: 5 } },
         { tool: 'commentary_lookup', arguments: { reference, commentator: 'Matthew Henry' } },
         { tool: 'commentary_lookup', arguments: { reference, commentator: 'John Gill' } },
         { tool: 'classic_text_lookup', arguments: { query: `themes in ${reference}` } },

@@ -29,8 +29,10 @@ Use this workflow when the user asks for:
 
 ### Step 3: Literary Context
 
-- Call `parallel_passages` to find synoptic parallels (Gospels) or OT quotations
-- If parallels exist, compare the accounts to note unique contributions
+- Call `parallel_passages` with `corpora: ["ubs_source_attested"]` to retrieve complete, source-attested groups. Do not flatten group membership into inferred pairwise relationships.
+- Compare every member in a returned group, including the passage that matched the query. Use `includeText: true` when the workflow needs all member texts, and request `includeAlignment: true` only when raw UBS alignment evidence is useful.
+- Use `corpora: ["theologai_legacy"]` only when the user specifically wants the older curated relationship labels (`synoptic`, `quotation`, `allusion`, or `thematic`).
+- Request `includeOpenBibleCrossReferences: true` only for a separate, broader cross-reference list; do not present those rows as UBS-attested group members.
 - Call `bible_cross_references` to identify related themes across Scripture
 - Follow the strongest cross-references to build a biblical-theological framework
 

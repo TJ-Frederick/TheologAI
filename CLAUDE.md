@@ -87,7 +87,7 @@ test/
 |------|-------------|
 | `bible_lookup` | Verse retrieval across 8 translations (ESV, NET, KJV, WEB, BSB, ASV, YLT, DBY) |
 | `bible_cross_references` | Thematic connections via OpenBible.info data |
-| `parallel_passages` | OT→NT quotations, synoptic parallels, thematic links |
+| `parallel_passages` | Complete UBS source-attested groups by default; explicit legacy curated edges and separate OpenBible.info rows |
 | `commentary_lookup` | 6 commentaries (Matthew Henry, JFB, Clarke, Gill, K-D, Tyndale) |
 | `classic_text_lookup` | Search/browse 17 local docs; retrieve a specifically named CCEL work section when available |
 | `original_language_lookup` | Strong's concordance (14,298 entries), Greek/Hebrew word studies |

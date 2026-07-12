@@ -95,6 +95,7 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
       ]);
       expect(listed.tools.filter(tool => tool.outputSchema).map(tool => tool.name)).toEqual([
         'bible_lookup',
+        'parallel_passages',
         'original_language_lookup',
       ]);
       expect(listed.tools.find(tool => tool.name === 'bible_lookup')?.outputSchema).toMatchObject({
