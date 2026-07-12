@@ -10,4 +10,6 @@ export type Env = Cloudflare.Env & {
   ETH_RPC_URL?: string;
   BASE_RPC_URL?: string;
   RADIUS_RPC_URL?: string;
+  /** Staged primary-source switches; absent values remain disabled. */
+  THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH?: string;
 };
