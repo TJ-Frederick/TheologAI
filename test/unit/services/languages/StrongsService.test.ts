@@ -48,6 +48,14 @@ describe('StrongsService', () => {
       expect(repo.lookup).toHaveBeenCalledWith('G26');
     });
 
+    it('canonicalizes padding while preserving a sense suffix', async () => {
+      const repo = makeMockRepo();
+      const service = new StrongsService(repo as any);
+      await service.lookup(' g01722A ', true);
+      expect(repo.lookup).toHaveBeenCalledWith('G1722a');
+      expect(repo.getLexiconEntry).toHaveBeenCalledWith('G1722a');
+    });
+
     it('throws ValidationError for invalid format', async () => {
       const repo = makeMockRepo();
       const service = new StrongsService(repo as any);

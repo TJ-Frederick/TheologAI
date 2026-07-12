@@ -645,6 +645,25 @@ describe('original_language_lookup handler', () => {
     expect(lookup).not.toHaveBeenCalled();
   });
 
+  it('accepts a suffixed exact identity but rejects surrounding whitespace', async () => {
+    const lookup = vi.fn<StrongsService['lookup']>().mockResolvedValue({
+      strongs_number: 'G1722',
+      testament: 'NT',
+      lemma: 'ἐν',
+      definition: 'in',
+      citation,
+    });
+    const handler = createStrongsLookupHandler(serviceDouble({ lookup }));
+
+    const suffixed = await handler.handler({ strongs_number: 'g01722A' });
+    const spaced = await handler.handler({ strongs_number: ' G1722a ' });
+
+    expect(suffixed.isError).not.toBe(true);
+    expect(lookup).toHaveBeenCalledWith('g01722A', false);
+    expect(spaced.isError).toBe(true);
+    expect(lookup).toHaveBeenCalledTimes(1);
+  });
+
   it('returns service validation failures as tool errors', async () => {
     const lookup = vi.fn<StrongsService['lookup']>().mockRejectedValue(
       new ValidationError('strongs_number', 'Expected G#### or H####'),

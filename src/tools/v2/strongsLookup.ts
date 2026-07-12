@@ -11,6 +11,7 @@ import {
   presentOriginalLanguageEntry,
   presentOriginalLanguageSearch,
 } from '../../presenters/originalLanguageStructured.js';
+import { parseStrongsIdentity } from '../../kernel/strongs.js';
 
 export function createStrongsLookupHandler(service: StrongsService): ToolHandler {
   return {
@@ -110,7 +111,11 @@ function validateLookupMode(params: Record<string, unknown>): void {
     return;
   }
 
-  if (typeof params.strongs_number !== 'string' || params.strongs_number.length < 2 || params.strongs_number.length > 16 || !/^[GHgh]\d+[a-z]?$/.test(params.strongs_number)) {
+  if (typeof params.strongs_number !== 'string'
+    || params.strongs_number.length < 2
+    || params.strongs_number.length > 16
+    || params.strongs_number !== params.strongs_number.trim()
+    || !parseStrongsIdentity(params.strongs_number)) {
     throw new ValidationError('strongs_number', "strongs_number must match a Strong's number such as G25 or H430.");
   }
   if (has('limit')) {

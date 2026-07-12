@@ -45,6 +45,20 @@ describe('D1StrongsRepository', () => {
       expect(db.prepare).toHaveBeenCalledTimes(2);
     });
 
+    it('preserves suffix identity before falling back to the base entry', async () => {
+      const binds: unknown[] = [];
+      const db = {
+        prepare: vi.fn().mockImplementation(() => ({
+          bind: vi.fn().mockImplementation((value: unknown) => {
+            binds.push(value);
+            return { first: vi.fn().mockResolvedValue(value === 'G1722' ? sampleEntry : null) };
+          }),
+        })),
+      };
+      expect(await new D1StrongsRepository(db as any).lookup('g01722A')).toEqual(sampleEntry);
+      expect(binds).toEqual(['G1722a', 'G1722']);
+    });
+
     it('returns undefined when both exact and padded fail', async () => {
       const db = createSimpleD1([], null);
       const repo = new D1StrongsRepository(db as any);
@@ -52,12 +66,13 @@ describe('D1StrongsRepository', () => {
       expect(result).toBeUndefined();
     });
 
-    it('skips padding when padded equals normalized', async () => {
+    it('canonicalizes padded input and retains padded-database compatibility', async () => {
       const db = createSimpleD1([], null);
       const repo = new D1StrongsRepository(db as any);
       await repo.lookup('G0025');
-      // G0025 padded is still G0025, so only 1 query
-      expect(db.prepare).toHaveBeenCalledTimes(1);
+      expect(db.prepare).toHaveBeenCalledTimes(2);
+      expect(db.prepare.mock.results[0].value.bind).toHaveBeenCalledWith('G25');
+      expect(db.prepare.mock.results[1].value.bind).toHaveBeenCalledWith('G0025');
     });
   });
 
@@ -119,6 +134,21 @@ describe('D1StrongsRepository', () => {
       expect(result).toBeDefined();
       expect(result!.extended_data).toEqual({ senses: { '1': { gloss: 'love', count: 100 } } });
       expect(typeof result!.extended_data).toBe('object');
+    });
+
+    it('preserves suffix identity before falling back to the base morphology key', async () => {
+      const binds: unknown[] = [];
+      const row = { strongs_number: 'H0430', source: 'BDB', extended_data: '{}' };
+      const db = {
+        prepare: vi.fn().mockImplementation(() => ({
+          bind: vi.fn().mockImplementation((value: unknown) => {
+            binds.push(value);
+            return { first: vi.fn().mockResolvedValue(value === 'H0430' ? row : null) };
+          }),
+        })),
+      };
+      expect(await new D1StrongsRepository(db as any).getLexiconEntry('h430A')).toMatchObject({ strongs_number: 'H0430' });
+      expect(binds).toEqual(['H0430a', 'H0430']);
     });
 
     it('returns undefined when row is null', async () => {

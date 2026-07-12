@@ -11,27 +11,34 @@ import {
   normalizeTransliteration,
   normalizedTransliterationSql,
 } from '../../kernel/transliteration.js';
+import { baseStrongsId, parseStrongsIdentity } from '../../kernel/strongs.js';
 
 export class D1StrongsRepository implements IStrongsRepository {
   constructor(private db: D1Database) {}
 
   async lookup(strongsNumber: string): Promise<StrongsEntry | undefined> {
-    const normalized = strongsNumber.toUpperCase().trim();
+    const identity = parseStrongsIdentity(strongsNumber);
+    if (!identity) return undefined;
 
-    // Try exact match first
+    // Try the suffix-preserving public identity first.
     let row = await this.db.prepare(
       'SELECT * FROM strongs WHERE strongs_number = ?'
-    ).bind(normalized).first<StrongsEntry>();
+    ).bind(identity.publicId).first<StrongsEntry>();
     if (row) return row;
 
-    // Try padded: G25 → G0025
-    const padded = normalized.replace(/^([GH])(\d+)$/, (_, prefix, num) =>
-      prefix + num.padStart(4, '0')
-    );
-    if (padded !== normalized) {
+    const basePublicId = baseStrongsId(identity.publicId);
+    if (basePublicId !== identity.publicId) {
       row = await this.db.prepare(
         'SELECT * FROM strongs WHERE strongs_number = ?'
-      ).bind(padded).first<StrongsEntry>();
+      ).bind(basePublicId).first<StrongsEntry>();
+      if (row) return row;
+    }
+
+    const baseMorphologyKey = baseStrongsId(identity.morphologyKey);
+    if (baseMorphologyKey !== identity.publicId && baseMorphologyKey !== basePublicId) {
+      row = await this.db.prepare(
+        'SELECT * FROM strongs WHERE strongs_number = ?'
+      ).bind(baseMorphologyKey).first<StrongsEntry>();
     }
     return row ?? undefined;
   }
@@ -66,13 +73,16 @@ export class D1StrongsRepository implements IStrongsRepository {
   }
 
   async getLexiconEntry(strongsNumber: string): Promise<LexiconEntry | undefined> {
-    const padded = strongsNumber.toUpperCase().trim().replace(
-      /^([GH])(\d+)$/,
-      (_, prefix, num) => prefix + num.padStart(4, '0')
-    );
-    const row = await this.db.prepare(
+    const identity = parseStrongsIdentity(strongsNumber);
+    if (!identity) return undefined;
+    let row = await this.db.prepare(
       'SELECT * FROM stepbible_lexicons WHERE strongs_number = ?'
-    ).bind(padded).first<{ strongs_number: string; source: string; extended_data: string }>();
+    ).bind(identity.morphologyKey).first<{ strongs_number: string; source: string; extended_data: string }>();
+    if (!row && /[a-z]$/.test(identity.morphologyKey)) {
+      row = await this.db.prepare(
+        'SELECT * FROM stepbible_lexicons WHERE strongs_number = ?'
+      ).bind(baseStrongsId(identity.morphologyKey)).first<{ strongs_number: string; source: string; extended_data: string }>();
+    }
     if (!row) return undefined;
 
     return {

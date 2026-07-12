@@ -5,6 +5,7 @@
 import type { IStrongsRepository, StrongsEntry } from '../../kernel/repositories.js';
 import type { StrongsResult, EnhancedStrongsResult, Citation } from '../../kernel/types.js';
 import { ValidationError, NotFoundError } from '../../kernel/errors.js';
+import { parseStrongsIdentity } from '../../kernel/strongs.js';
 
 const CITATION: Citation = {
   source: "Strong's Concordance",
@@ -32,14 +33,14 @@ export class StrongsService {
 
   /** Look up a Strong's number */
   async lookup(strongsNumber: string, includeExtended?: boolean): Promise<EnhancedStrongsResult> {
-    const normalized = strongsNumber.toUpperCase().trim();
-    if (!/^[GH]\d+[a-z]?$/i.test(normalized)) {
+    const identity = parseStrongsIdentity(strongsNumber);
+    if (!identity) {
       throw new ValidationError('strongs_number', `Invalid Strong's number format: ${strongsNumber}. Expected G#### or H####.`);
     }
 
-    const entry = await this.repo.lookup(normalized);
+    const entry = await this.repo.lookup(identity.publicId);
     if (!entry) {
-      throw new NotFoundError('strongs', `Strong's number ${normalized} not found`);
+      throw new NotFoundError('strongs', `Strong's number ${identity.publicId} not found`);
     }
 
     const result: EnhancedStrongsResult = {
@@ -54,7 +55,7 @@ export class StrongsService {
     };
 
     if (includeExtended) {
-      const lexicon = await this.repo.getLexiconEntry(normalized);
+      const lexicon = await this.repo.getLexiconEntry(identity.publicId);
       if (lexicon) {
         const data = lexicon.extended_data as StepBibleLexiconData;
         result.extended = {
