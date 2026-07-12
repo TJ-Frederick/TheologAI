@@ -9,6 +9,8 @@ import { createTheologAiMcpServer, STATELESS_HTTP_CAPABILITIES } from '../../../
 import { BibleMCPServer } from '../../../src/server.js';
 import { createWorkerMcpServer } from '../../../src/worker-server.js';
 import type { WorkerCompositionRoot } from '../../../src/tools/worker/index.js';
+import { StrongsService } from '../../../src/services/languages/StrongsService.js';
+import { readFileSync } from 'node:fs';
 
 const TOOL_NAMES = [
   'bible_lookup',
@@ -388,6 +390,24 @@ describe('shared MCP registration', () => {
       await expect(client.readResource({ uri })).rejects.toMatchObject({ code: -32002, data: { uri } });
     }
     expect(lookup).toHaveBeenCalledTimes(5);
+  });
+
+  it('serves a source-grounded lexicon-only STEPBible resource', async () => {
+    const source = JSON.parse(readFileSync(new URL('../../../data/biblical-languages/stepbible-lexicons/tbesh-hebrew.json', import.meta.url), 'utf8')) as Record<string, Record<string, unknown>>;
+    const root = makeMockRoot();
+    root.services.strongsService = new StrongsService({
+      lookup: async () => undefined,
+      getLexiconEntry: async identity => ({ strongs_number: identity, source: 'STEPBible', extended_data: source[identity] }),
+      search: async () => [],
+      getStats: async () => ({ greek: 0, hebrew: 0, total: 0 }),
+    });
+    const client = await connect(createTheologAiMcpServer(root, '1.0.0-test').server);
+    const result = await client.readResource({ uri: 'theologai://strongs/H9001' });
+    expect(result.contents[0]).toMatchObject({
+      uri: 'theologai://strongs/H9001',
+      text: expect.stringContaining('# H9001 — /וַ'),
+    });
+    expect(String(result.contents[0].text)).toContain('Verbal vav');
   });
 
   it.each([

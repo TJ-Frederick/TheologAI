@@ -11,7 +11,7 @@ import {
   presentOriginalLanguageEntry,
   presentOriginalLanguageSearch,
 } from '../../presenters/originalLanguageStructured.js';
-import { parseStrongsIdentity } from '../../kernel/strongs.js';
+import { parseStrongsIdentity, STRONGS_IDENTITY_PATTERN } from '../../kernel/strongs.js';
 import type { CanonicalStrongsIdentity } from '../../kernel/strongs.js';
 
 export function createStrongsLookupHandler(service: StrongsService): ToolHandler {
@@ -28,7 +28,7 @@ export function createStrongsLookupHandler(service: StrongsService): ToolHandler
           minLength: 2,
           maxLength: 7,
           description: "Strong's number (e.g., G25 for Greek agapaō, H430 for Hebrew Elohim)",
-          pattern: '^[GHgh]0*[1-9]\\d*[A-Za-z]?$',
+          pattern: STRONGS_IDENTITY_PATTERN,
         },
         detail_level: { type: 'string', enum: ['simple', 'detailed'], description: 'Exact strongs_number lookups only; choose the amount of entry detail. Defaults to simple when omitted.' },
         include_extended: { type: 'boolean', description: 'Exact strongs_number lookups only; include STEPBible extended data. Defaults to false when omitted.' },

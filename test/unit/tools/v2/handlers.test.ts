@@ -20,6 +20,8 @@ import type { DonationService } from '../../../../src/services/donation/Donation
 import type { HistoricalDocumentService } from '../../../../src/services/historical/HistoricalDocumentService.js';
 import type { MorphologyService } from '../../../../src/services/languages/MorphologyService.js';
 import type { StrongsService } from '../../../../src/services/languages/StrongsService.js';
+import { StrongsService as StrongsServiceClass } from '../../../../src/services/languages/StrongsService.js';
+import { readFileSync } from 'node:fs';
 import type { ToolHandler, ToolResult } from '../../../../src/kernel/types.js';
 import type { DocumentInfo, DocumentSection } from '../../../../src/kernel/repositories.js';
 
@@ -600,6 +602,11 @@ describe('original_language_lookup handler', () => {
     expect(handler.inputSchema.properties?.detail_level).not.toHaveProperty('default');
     expect(handler.inputSchema.properties?.include_extended).not.toHaveProperty('default');
     expect(handler.inputSchema.properties?.limit).not.toHaveProperty('default');
+    const exact = handler.inputSchema.properties?.strongs_number as { pattern: string; maxLength: number };
+    expect(exact.maxLength).toBe(7);
+    expect(new RegExp(exact.pattern).test('G21502')).toBe(true);
+    expect(new RegExp(exact.pattern).test('G000001')).toBe(false);
+    expect(new RegExp(exact.pattern).test('G100000')).toBe(false);
   });
 
   it('accepts valid calls after mode-appropriate client default materialization', async () => {
@@ -675,6 +682,24 @@ describe('original_language_lookup handler', () => {
     const result = await createStrongsLookupHandler(serviceDouble({ lookup })).handler({ strongs_number: identity });
     expect(result.isError).not.toBe(true);
     expect(lookup).toHaveBeenCalledWith(identity, false);
+  });
+
+  it('presents a real lexicon-only STEPBible identity with CC BY provenance', async () => {
+    const source = JSON.parse(readFileSync(new URL('../../../../data/biblical-languages/stepbible-lexicons/tbesg-greek.json', import.meta.url), 'utf8')) as Record<string, Record<string, unknown>>;
+    const service = new StrongsServiceClass({
+      lookup: async () => undefined,
+      getLexiconEntry: async () => ({ strongs_number: 'G21502', source: 'STEPBible', extended_data: source.G21502 }),
+      search: async () => [],
+      getStats: async () => ({ greek: 0, hebrew: 0, total: 0 }),
+    });
+    const result = await createStrongsLookupHandler(service).handler({ strongs_number: 'g21502', include_extended: true });
+    expect(result.isError).not.toBe(true);
+    expect(textOf(result)).toContain('**G21502**');
+    expect(textOf(result)).toContain('*Source: STEPBible lexicon data* - CC BY 4.0');
+    expect(result.structuredContent).toMatchObject({
+      entries: [{ strongsNumber: 'G21502', lemma: 'Ηνια', provenanceIds: ['src-1'] }],
+      provenance: [{ id: 'src-1', label: 'STEPBible lexicon data', license: { label: 'CC BY 4.0' } }],
+    });
   });
 
   it('returns service validation failures as tool errors', async () => {

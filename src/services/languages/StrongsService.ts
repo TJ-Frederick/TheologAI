@@ -6,6 +6,7 @@ import type { IStrongsRepository, StrongsEntry } from '../../kernel/repositories
 import type { StrongsResult, EnhancedStrongsResult, Citation } from '../../kernel/types.js';
 import { ValidationError, NotFoundError } from '../../kernel/errors.js';
 import { parseStrongsIdentity } from '../../kernel/strongs.js';
+import { normalizeLexiconText } from '../../kernel/lexiconText.js';
 
 const CITATION: Citation = {
   source: "Strong's Concordance",
@@ -26,6 +27,8 @@ interface StepBibleLexiconData {
   morph?: unknown;
   source?: unknown;
   senses?: unknown;
+  lemma?: unknown;
+  translit?: unknown;
 }
 
 export class StrongsService {
@@ -39,9 +42,12 @@ export class StrongsService {
     }
 
     const entry = await this.repo.lookup(identity.publicId);
-    if (!entry) {
-      throw new NotFoundError('strongs', `Strong's number ${identity.publicId} not found`);
-    }
+    const lexicon = !entry || includeExtended
+      ? await this.repo.getLexiconEntry(identity.publicId)
+      : undefined;
+    if (!entry && !lexicon) throw new NotFoundError('strongs', `Strong's number ${identity.publicId} not found`);
+
+    if (!entry) return resultFromStepBible(identity.publicId, identity.prefix, lexicon!, includeExtended === true);
 
     const result: EnhancedStrongsResult = {
       strongs_number: entry.strongs_number,
@@ -55,17 +61,9 @@ export class StrongsService {
     };
 
     if (includeExtended) {
-      const lexicon = await this.repo.getLexiconEntry(identity.publicId);
       if (lexicon) {
         const data = lexicon.extended_data as StepBibleLexiconData;
-        result.extended = {
-          strongsExtended: stringValue(data.extendedStrongs),
-          gloss: stringValue(data.gloss),
-          definition: stringValue(data.definition),
-          morphologyCode: stringValue(data.morph),
-          source: stringValue(data.source) ?? lexicon.source,
-          senses: isSenseRecord(data.senses) ? data.senses : undefined,
-        };
+        result.extended = extendedFromLexicon(data, lexicon.source);
         result.extendedCitation = STEP_BIBLE_CITATION;
       }
     }
@@ -89,6 +87,43 @@ export class StrongsService {
   async getStats() {
     return await this.repo.getStats();
   }
+}
+
+function resultFromStepBible(
+  publicId: string,
+  prefix: 'G' | 'H',
+  lexicon: NonNullable<Awaited<ReturnType<IStrongsRepository['getLexiconEntry']>>>,
+  includeExtended: boolean,
+): EnhancedStrongsResult {
+  const data = lexicon.extended_data as StepBibleLexiconData;
+  const lemma = stringValue(data.lemma);
+  const rawDefinition = stringValue(data.definition) ?? stringValue(data.gloss);
+  if (!lemma || !rawDefinition) {
+    throw new NotFoundError('strongs', `Strong's number ${publicId} has no complete lexicon entry`);
+  }
+  const definition = normalizeLexiconText(rawDefinition);
+  const result: EnhancedStrongsResult = {
+    strongs_number: publicId,
+    testament: prefix === 'G' ? 'NT' : 'OT',
+    lemma,
+    transliteration: stringValue(data.translit),
+    definition,
+    citation: STEP_BIBLE_CITATION,
+    sourceKind: 'stepbible_lexicon',
+  };
+  if (includeExtended) result.extended = extendedFromLexicon(data, lexicon.source);
+  return result;
+}
+
+function extendedFromLexicon(data: StepBibleLexiconData, fallbackSource: string): NonNullable<EnhancedStrongsResult['extended']> {
+  return {
+    strongsExtended: stringValue(data.extendedStrongs),
+    gloss: stringValue(data.gloss),
+    definition: stringValue(data.definition),
+    morphologyCode: stringValue(data.morph),
+    source: stringValue(data.source) ?? fallbackSource,
+    senses: isSenseRecord(data.senses) ? data.senses : undefined,
+  };
 }
 
 function stringValue(value: unknown): string | undefined {

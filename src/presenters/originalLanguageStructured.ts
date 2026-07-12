@@ -9,7 +9,8 @@ import type {
   OriginalLanguageExtendedV1,
   OriginalLanguageOutputV1,
 } from '../mcp/schemas/originalLanguage.js';
-import { normalizeLexiconText, summarizeDefinition } from '../formatters/languagesFormatter.js';
+import { summarizeDefinition } from '../formatters/languagesFormatter.js';
+import { normalizeLexiconText } from '../kernel/lexiconText.js';
 
 const STRONGS_CITATION = {
   source: "Strong's Concordance",
@@ -60,12 +61,16 @@ export function presentOriginalLanguageEntry(
   result: EnhancedStrongsResult,
   detailLevel: 'simple' | 'detailed',
 ): OriginalLanguageOutputV1 {
+  const stepBibleBase = result.sourceKind === 'stepbible_lexicon';
   const base = provenanceFromCitation(result.citation, {
     id: 'src-1',
     kind: 'lexicon',
     status: 'verified_source',
-    license: { label: 'Public Domain' },
-    attribution: 'OpenScriptures',
+    license: stepBibleBase ? {
+      label: 'CC BY 4.0',
+      url: 'https://creativecommons.org/licenses/by/4.0/',
+    } : { label: 'Public Domain' },
+    attribution: stepBibleBase ? 'Tyndale House, Cambridge' : 'OpenScriptures',
   });
   const provenance: ProvenanceRecord[] = [base];
   const provenanceIds = [base.id];

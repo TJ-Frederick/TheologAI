@@ -201,6 +201,8 @@ export interface SenseInfo {
 }
 
 export interface EnhancedStrongsResult extends StrongsResult {
+  /** Identifies the source of the base fields without changing public output. */
+  sourceKind?: 'strongs_concordance' | 'stepbible_lexicon';
   extendedCitation?: Citation;
   extended?: {
     strongsExtended?: string;
