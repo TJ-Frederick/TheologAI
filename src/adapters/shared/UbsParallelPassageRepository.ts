@@ -8,7 +8,12 @@
 
 import { findBookByHelloaoCode, findBookByNumber, getBibleBookBounds } from '../../kernel/books.js';
 import { parseSourceAttestedLookupReference } from '../../kernel/sourceAttestedReference.js';
-import { deriveUbsParallelGroupId, UBS_PARALLEL_PASSAGE_PROVENANCE } from '../../kernel/ubsParallelSource.js';
+import {
+  computeUbsParallelArtifactIdentity,
+  deriveUbsParallelGroupId,
+  UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY,
+  UBS_PARALLEL_PASSAGE_PROVENANCE,
+} from '../../kernel/ubsParallelSource.js';
 import type {
   ISourceAttestedParallelRepository,
   ParallelSourceProvenance,
@@ -32,7 +37,7 @@ interface ValidatedUbsCorpus {
 }
 
 const TOP_LEVEL_KEYS = [
-  'schemaVersion', 'transformVersion', 'label', 'directionality',
+  'schemaVersion', 'transformVersion', 'artifactIdentity', 'label', 'directionality',
   'license', 'provenance', 'groups', 'referenceIndex',
 ] as const;
 const PROVENANCE_KEYS = [
@@ -53,8 +58,8 @@ export class UbsParallelPassageRepository implements ISourceAttestedParallelRepo
   private readonly groupsById = new Map<string, SourceAttestedParallelGroup>();
   private readonly referenceIndex: Readonly<Record<string, readonly ReferenceIndexEntry[]>>;
 
-  constructor(artifact: unknown) {
-    const corpus = validateCorpus(artifact);
+  constructor(artifact: unknown, expectedArtifactIdentity = UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY) {
+    const corpus = validateCorpus(artifact, expectedArtifactIdentity);
     this.provenance = Object.freeze({ ...corpus.provenance });
     for (const group of corpus.groups) this.groupsById.set(group.groupId, deepFreezeGroup(group));
     this.referenceIndex = corpus.referenceIndex;
@@ -82,11 +87,16 @@ export class UbsParallelPassageRepository implements ISourceAttestedParallelRepo
   }
 }
 
-function validateCorpus(input: unknown): ValidatedUbsCorpus {
+function validateCorpus(input: unknown, expectedArtifactIdentity: string): ValidatedUbsCorpus {
   const corpus = record(input, 'artifact');
   exactKeys(corpus, TOP_LEVEL_KEYS, 'artifact');
-  equal(corpus.schemaVersion, 'ubs-parallel-passages.v1', 'artifact.schemaVersion');
-  equal(corpus.transformVersion, 1, 'artifact.transformVersion');
+  equal(corpus.schemaVersion, 'ubs-parallel-passages.v2', 'artifact.schemaVersion');
+  equal(corpus.transformVersion, 2, 'artifact.transformVersion');
+  const artifactIdentity = string(corpus.artifactIdentity, 'artifact.artifactIdentity');
+  if (!/^[0-9a-f]{64}$/.test(expectedArtifactIdentity)) fail('expected artifact identity is invalid');
+  equal(artifactIdentity, expectedArtifactIdentity, 'artifact.artifactIdentity pin');
+  const { artifactIdentity: _excludedIdentity, ...identityProjection } = corpus;
+  equal(artifactIdentity, computeUbsParallelArtifactIdentity(identityProjection), 'artifact.artifactIdentity derivation');
   equal(corpus.label, 'source_attested_parallel', 'artifact.label');
   equal(corpus.directionality, 'unspecified', 'artifact.directionality');
   const license = record(corpus.license, 'artifact.license');

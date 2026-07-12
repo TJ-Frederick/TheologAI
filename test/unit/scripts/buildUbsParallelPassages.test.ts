@@ -7,6 +7,10 @@ import {
   type GeneratedUbsCorpus,
   type SourceMetadata,
 } from '../../../scripts/build-ubs-parallel-passages.js';
+import {
+  computeUbsParallelArtifactIdentity,
+  UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY,
+} from '../../../src/kernel/ubsParallelSource.js';
 
 const sourceDir = new URL('../../../data/parallel-passages/ubs-paratext/', import.meta.url);
 const sourcePath = new URL('ParallelPassages.xml', sourceDir);
@@ -89,6 +93,9 @@ describe('UBS/Paratext deterministic compiler', () => {
     expect(generated.provenance.license).toBe('CC BY-SA 4.0');
     expect(generated.provenance.modified).toBe(true);
     expect(generated.provenance.sourceSha256).toBe(metadata.sourceSha256);
+    expect(generated.artifactIdentity).toBe(UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY);
+    const { artifactIdentity, ...identityProjection } = generated;
+    expect(computeUbsParallelArtifactIdentity(identityProjection)).toBe(artifactIdentity);
   });
 
   it('is byte-identical when compiled twice and matches the checked-in artifact', () => {
