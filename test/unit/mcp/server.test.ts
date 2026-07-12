@@ -434,6 +434,45 @@ describe('shared MCP registration', () => {
     expect(root.services.historicalService.getSection).toHaveBeenCalledWith('nicene-creed', '1');
   });
 
+  it('canonicalizes classical and extended Strong\'s resources and rejects invalid domain numbers', async () => {
+    const root = makeMockRoot();
+    const lookup = vi.fn(root.services.strongsService.lookup);
+    root.services.strongsService.lookup = lookup;
+    const client = await connect(createTheologAiMcpServer(root, '1.0.0-test').server);
+
+    await client.readResource({ uri: 'theologai://strongs/g02385i' });
+    expect(lookup).toHaveBeenCalledWith('G2385I', true);
+
+    for (const identity of ['G6000', 'H9001', 'H9049', 'G21502']) {
+      await client.readResource({ uri: `theologai://strongs/${identity}` });
+      expect(lookup).toHaveBeenCalledWith(identity, true);
+    }
+
+    for (const uri of ['theologai://strongs/G0', 'theologai://strongs/G100000', 'theologai://strongs/H999999']) {
+      await expect(client.readResource({ uri })).rejects.toMatchObject({ code: -32002, data: { uri } });
+    }
+    expect(lookup).toHaveBeenCalledTimes(5);
+  });
+
+  it('serves a source-grounded lexicon-only STEPBible resource with nullable testament', async () => {
+    const source = JSON.parse(readFileSync(new URL('../../../data/biblical-languages/stepbible-lexicons/tbesh-hebrew.json', import.meta.url), 'utf8')) as Record<string, Record<string, unknown>>;
+    const root = makeMockRoot();
+    root.services.strongsService = new StrongsService({
+      lookup: async () => undefined,
+      getLexiconEntry: async identity => ({ strongs_number: identity, source: 'STEPBible', extended_data: source[identity] }),
+      search: async () => [],
+      getStats: async () => ({ greek: 0, hebrew: 0, total: 0 }),
+    });
+    const client = await connect(createTheologAiMcpServer(root, '1.0.0-test').server);
+    const result = await client.readResource({ uri: 'theologai://strongs/H9001' });
+    expect(result.contents[0]).toMatchObject({
+      uri: 'theologai://strongs/H9001',
+      text: expect.stringContaining('# H9001 — /וַ'),
+    });
+    expect(String(result.contents[0].text)).toContain('Verbal vav');
+    expect(String(result.contents[0].text)).toContain('Not classified (source-language lexicon identity)');
+  });
+
   it.each([
     'theologai://documents/nicene-creed#section-',
     'theologai://documents/nicene-creed#section-..',
