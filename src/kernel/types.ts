@@ -127,13 +127,21 @@ export interface CrossReferenceOptions {
 
 export interface ParallelPassageLookupParams {
   reference: string;
+  /** Corpus selection; omission is a hard default to UBS source-attested groups. */
+  corpora?: ParallelPassageCorpus[];
   mode?: 'auto' | 'synoptic' | 'quotation' | 'thematic';
   includeText?: boolean;
   translation?: string;
   showDifferences?: boolean;
+  maxGroups?: number;
+  includeAlignment?: boolean;
+  includeOpenBibleCrossReferences?: boolean;
+  /** @deprecated Use includeOpenBibleCrossReferences. */
   useCrossReferences?: boolean;
   maxParallels?: number;
 }
+
+export type ParallelPassageCorpus = 'ubs_source_attested' | 'theologai_legacy';
 
 export interface ParallelPassage {
   reference: string;
@@ -162,6 +170,39 @@ export interface ParallelPassageResult {
   analysis?: ParallelPassageAnalysis;
   citation: Citation;
   suggestedWorkflow?: string;
+  warnings?: string[];
+}
+
+export interface SourceAttestedParallelMemberResult {
+  sourceOrder: number;
+  sourceReference: string;
+  normalizedReference: string;
+  segments: Array<{ bookNumber: number; chapter: number; startVerse: number; endVerse: number }>;
+  languageMarker: 'HEB' | 'GRK';
+  matched: boolean;
+  alignmentBasis?: 'BHS' | 'LXX' | 'UBSGNT5';
+  alignmentRaw?: string;
+  text?: string;
+  translation?: string;
+}
+
+export interface SourceAttestedParallelGroupResult {
+  groupId: string;
+  sourceOrdinal: number;
+  label: 'source_attested_parallel';
+  directionality: 'unspecified';
+  members: SourceAttestedParallelMemberResult[];
+  provenanceIds: string[];
+}
+
+/** Versioned public service result before MCP presentation. */
+export interface ParallelPassageResearchResult {
+  requestedReference: string;
+  corpora: ParallelPassageCorpus[];
+  sourceAttestedGroups: SourceAttestedParallelGroupResult[];
+  legacyParallels: ParallelPassage[];
+  openBibleCrossReferences: CrossReference[];
+  provenance: import('./provenance.js').ProvenanceRecord[];
   warnings?: string[];
 }
 
