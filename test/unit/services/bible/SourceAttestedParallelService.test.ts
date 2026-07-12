@@ -32,4 +32,13 @@ describe('SourceAttestedParallelService', () => {
     expect(() => new SourceAttestedParallelService(repository).lookup({ reference: 'John 1:1', maxGroups })).toThrow('1 to 10');
     expect(repository.findGroups).not.toHaveBeenCalled();
   });
+
+  it('returns a typed validation error for an invalid reference', () => {
+    const repository: ISourceAttestedParallelRepository = {
+      findGroups: vi.fn(),
+      getProvenance: vi.fn(),
+    };
+    expect(() => new SourceAttestedParallelService(repository).lookup({ reference: 'not a passage' })).toThrow('reference must identify');
+    expect(repository.findGroups).not.toHaveBeenCalled();
+  });
 });
