@@ -13,6 +13,7 @@ import type { McpCompositionRoot } from '../../src/mcp/server.js';
 import { BibleService } from '../../src/services/bible/BibleService.js';
 import { CrossReferenceService } from '../../src/services/bible/CrossReferenceService.js';
 import { ParallelPassageService } from '../../src/services/bible/ParallelPassageService.js';
+import { SourceAttestedParallelService } from '../../src/services/bible/SourceAttestedParallelService.js';
 import { CcelService } from '../../src/services/commentary/CcelService.js';
 import { CommentaryService } from '../../src/services/commentary/CommentaryService.js';
 import { DonationService } from '../../src/services/donation/DonationService.js';
@@ -139,6 +140,15 @@ export function createDeterministicMcpFixture(): DeterministicMcpFixture {
     undefined,
     { description: 'Deterministic test fixture', version: '1', parallels: {} },
   );
+  const sourceAttestedParallelService = new SourceAttestedParallelService({
+    findGroups: () => [],
+    getProvenance: () => ({
+      sourceId: 'fixture', title: 'Fixture', publisher: 'Fixture', copyright: 'Fixture', license: 'Fixture',
+      licenseUrl: 'https://example.test/license', sourceUrl: 'https://example.test/source', sourcePath: 'fixture',
+      sourceCommit: '0'.repeat(40), sourceCommitDate: '2026-01-01', sourceBlob: '0'.repeat(40), sourceBytes: 1,
+      sourceSha256: '0'.repeat(64), transformVersion: 1, modified: true, modificationNote: 'Fixture',
+    }),
+  });
   const commentaryService = new CommentaryService([commentaryAdapter]);
   const historicalService = new HistoricalDocumentService(historicalRepository);
   const primarySourceSearchService = new PrimarySourceSearchService(
@@ -166,7 +176,7 @@ export function createDeterministicMcpFixture(): DeterministicMcpFixture {
       createDonationConfigHandler(donationService),
       createVerifyDonationHandler(donationService),
     ],
-    services: { bibleService, commentaryService, historicalService, strongsService },
+    services: { bibleService, commentaryService, historicalService, strongsService, sourceAttestedParallelService },
   } satisfies DeterministicMcpRoot;
 
   return { root, biblePassageCalls };

@@ -22,6 +22,7 @@ import { CrossReferenceRepository } from '../../adapters/data/CrossReferenceRepo
 import { StrongsRepository } from '../../adapters/data/StrongsRepository.js';
 import { MorphologyRepository } from '../../adapters/data/MorphologyRepository.js';
 import { HistoricalDocumentRepository } from '../../adapters/data/HistoricalDocumentRepository.js';
+import { loadUbsParallelPassageRepository } from '../../adapters/data/loadUbsParallelPassages.js';
 
 // Services
 import { BibleService } from '../../services/bible/BibleService.js';
@@ -35,6 +36,7 @@ import { PrimarySourceSearchService } from '../../services/historical/PrimarySou
 import { StrongsService } from '../../services/languages/StrongsService.js';
 import { MorphologyService } from '../../services/languages/MorphologyService.js';
 import { OriginalLanguageStudyService } from '../../services/languages/OriginalLanguageStudyService.js';
+import { SourceAttestedParallelService } from '../../services/bible/SourceAttestedParallelService.js';
 
 // Tool handlers
 import { createBibleLookupHandler } from './bibleLookup.js';
@@ -62,6 +64,7 @@ export interface ServerServices {
   commentaryService: CommentaryService;
   historicalService: HistoricalDocumentService;
   strongsService: StrongsService;
+  sourceAttestedParallelService: SourceAttestedParallelService;
 }
 
 /** Result of the composition root wiring */
@@ -82,6 +85,7 @@ export function createCompositionRoot(): CompositionRoot {
   const strongsRepo = new StrongsRepository(db);
   const morphRepo = new MorphologyRepository(db);
   const historicalRepo = new HistoricalDocumentRepository(db);
+  const sourceAttestedParallelRepo = loadUbsParallelPassageRepository();
 
   // Bible adapters
   const esvAdapter = new EsvAdapter();
@@ -110,6 +114,7 @@ export function createCompositionRoot(): CompositionRoot {
   const strongsService = new StrongsService(strongsRepo);
   const morphService = new MorphologyService(morphRepo);
   const originalLanguageStudyService = new OriginalLanguageStudyService(morphRepo, strongsRepo);
+  const sourceAttestedParallelService = new SourceAttestedParallelService(sourceAttestedParallelRepo);
 
   // Donation (no DB dependency)
   const onChainVerifier = new OnChainVerifier({});
@@ -132,7 +137,7 @@ export function createCompositionRoot(): CompositionRoot {
 
   return {
     tools,
-    services: { bibleService, commentaryService, historicalService, strongsService },
+    services: { bibleService, commentaryService, historicalService, strongsService, sourceAttestedParallelService },
   };
 }
 

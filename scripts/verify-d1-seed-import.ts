@@ -40,7 +40,7 @@ function databaseArgument(argv: string[]): string {
 }
 
 function quoteIdentifier(identifier: string): string {
-  if (!/^[a-z_]+$/.test(identifier)) throw new Error(`Unsafe SQLite identifier: ${identifier}`);
+  if (!/^[a-z_][a-z0-9_]*$/.test(identifier)) throw new Error(`Unsafe SQLite identifier: ${identifier}`);
   return `"${identifier}"`;
 }
 
@@ -133,12 +133,30 @@ function assertRepresentativeFts(db: Database.Database): void {
   if (!sections) throw new Error("Imported historical FTS has no representative 'almighty' result");
 }
 
+function assertUbsReconstruction(db: Database.Database, expectedCounts: Record<string, number>): void {
+  const incompleteGroups = db.prepare(`SELECT COUNT(*) AS count FROM ubs_parallel_groups g
+    WHERE (SELECT COUNT(*) FROM ubs_parallel_members m WHERE m.group_id = g.group_id) < 2`).get() as { count: number };
+  const incompleteMembers = db.prepare(`SELECT COUNT(*) AS count FROM ubs_parallel_members m
+    WHERE NOT EXISTS (SELECT 1 FROM ubs_parallel_segments s WHERE s.group_id = m.group_id AND s.member_order = m.source_order)`).get() as { count: number };
+  const source = db.prepare('SELECT artifact_identity, transform_version FROM ubs_parallel_sources').get() as { artifact_identity?: string; transform_version?: number } | undefined;
+  if (incompleteGroups.count !== 0 || incompleteMembers.count !== 0
+    || source?.artifact_identity !== 'a5fd0d4646cb69f426f592c6e334866191201fbe64691cd55c7f7ecd0ca9d4cc'
+    || source?.transform_version !== 2) {
+    throw new Error('Normalized UBS reconstruction is incomplete or has a stale artifact identity');
+  }
+  const ubsDelta = ['ubs_parallel_sources', 'ubs_parallel_groups', 'ubs_parallel_members', 'ubs_parallel_segments']
+    .reduce((sum, table) => sum + expectedCounts[table], 0);
+  if (ubsDelta !== 12_736) throw new Error(`Unexpected normalized UBS row delta: ${ubsDelta}`);
+}
+
 const sourcePath = databaseArgument(process.argv.slice(2));
 const manifest = loadAndVerifyD1SeedManifest(ROOT, SEED_DIRECTORY);
 
-const schemaPath = join(ROOT, manifest.schema.path);
-if (!existsSync(schemaPath) || sha256File(schemaPath) !== manifest.schema.sha256) {
-  throw new Error('Tracked schema does not match the D1 seed manifest');
+for (const migration of manifest.migrations) {
+  const migrationPath = join(ROOT, migration.path);
+  if (!existsSync(migrationPath) || sha256File(migrationPath) !== migration.sha256) {
+    throw new Error(`Tracked migration does not match the D1 seed manifest: ${migration.path}`);
+  }
 }
 for (const file of manifest.files) {
   const path = join(SEED_DIRECTORY, file.path);
@@ -156,7 +174,7 @@ try {
   target.pragma('journal_mode = OFF');
   target.pragma('synchronous = OFF');
   target.pragma('foreign_keys = ON');
-  target.exec(readFileSync(schemaPath, 'utf8'));
+  for (const migration of manifest.migrations) target.exec(readFileSync(join(ROOT, migration.path), 'utf8'));
 
   for (const file of manifest.files) {
     const sql = readFileSync(join(SEED_DIRECTORY, file.path), 'utf8');
@@ -174,6 +192,8 @@ try {
   assertJohnOneOneDatabase(source, 'Source SQLite morphology');
   assertJohnOneOneDatabase(target, 'Imported D1 morphology');
   assertRepresentativeFts(target);
+  assertUbsReconstruction(source, manifest.expectedCounts);
+  assertUbsReconstruction(target, manifest.expectedCounts);
 
   for (const table of Object.keys(manifest.expectedCounts)) {
     const sourceDigest = tableDigest(source, table);

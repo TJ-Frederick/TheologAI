@@ -8,7 +8,7 @@ import {
   buildD1CorpusIdentityProjection,
   computeD1CorpusIdentity,
   parseDataManifest,
-  verifyD1Schema,
+  verifyD1Migrations,
   type DataManifest,
 } from '../../../scripts/d1-corpus-identity.js';
 
@@ -28,7 +28,7 @@ function manifest(): DataManifest {
       d1: {
         identityVersion: 1,
         transformVersion: 1,
-        schema: { path: 'migrations/0001_initial_schema.sql', sha256: 'f'.repeat(64) },
+        migrations: [{ path: 'migrations/0001_initial_schema.sql', sha256: 'f'.repeat(64) }],
         inputs: ['data/a.json'],
       },
     },
@@ -37,15 +37,17 @@ function manifest(): DataManifest {
 }
 
 describe('D1 corpus identity', () => {
-  it('pins the reviewed production transition and ignores the real UBS inventory slice', () => {
+  it('pins the normalized UBS D1 identity and includes the generated artifact', () => {
     const current = parseDataManifest(readFileSync('data/data-manifest.json'));
     expect(computeD1CorpusIdentity(current))
-      .toBe('118844cc76b2c091ca60f88d890c3253bbcefd15cad416d03bce3d0af0f4e0ad');
+      .toBe('961615b1da2ea26609e289d30d3bf000de5b2ea0f3542ffd01cb7ffe852d38ee');
     const changedUbs = structuredClone(current);
     const ubs = changedUbs.files.find(file => file.path === 'src/data/ubs-parallel-passages.generated.json');
     expect(ubs).toBeDefined();
     ubs!.sha256 = '0'.repeat(64);
-    expect(computeD1CorpusIdentity(changedUbs)).toBe(computeD1CorpusIdentity(current));
+    expect(computeD1CorpusIdentity(changedUbs)).not.toBe(computeD1CorpusIdentity(current));
+    expect(current.materializations.d1.inputs).toContain('src/data/ubs-parallel-passages.generated.json');
+    expect(current.materializations.d1.inputs).not.toContain('data/parallel-passages/ubs-paratext/ParallelPassages.xml');
   });
 
   it('is stable across non-D1 inventory/provenance and serialization changes', () => {
@@ -69,9 +71,9 @@ describe('D1 corpus identity', () => {
     ['D1 checksum', (value: DataManifest) => { value.files[0].sha256 = 'e'.repeat(64); }],
     ['schema version', (value: DataManifest) => {
       value.schemaVersion = '0002_changed';
-      value.materializations.d1.schema.path = 'migrations/0002_changed.sql';
+      value.materializations.d1.migrations.push({ path: 'migrations/0002_changed.sql', sha256: '1'.repeat(64) });
     }],
-    ['schema bytes', (value: DataManifest) => { value.materializations.d1.schema.sha256 = '1'.repeat(64); }],
+    ['migration bytes', (value: DataManifest) => { value.materializations.d1.migrations[0].sha256 = '1'.repeat(64); }],
     ['transform', (value: DataManifest) => { value.materializations.d1.transformVersion++; }],
     ['count', (value: DataManifest) => { value.expectedCounts.strongs++; }],
   ] as const)('changes when %s changes', (_label, mutate) => {
@@ -136,10 +138,10 @@ describe('D1 corpus identity', () => {
       const schemaPath = join(root, 'migrations', '0001_initial_schema.sql');
       writeFileSync(schemaPath, 'CREATE TABLE stable(id INTEGER);\n');
       const value = manifest();
-      value.materializations.d1.schema.sha256 = '0891337a0d5cf35550ecd9272a630fe7c8d96586c9eafbf7c4e84644d1f46340';
-      expect(() => verifyD1Schema(root, value)).not.toThrow();
+      value.materializations.d1.migrations[0].sha256 = '0891337a0d5cf35550ecd9272a630fe7c8d96586c9eafbf7c4e84644d1f46340';
+      expect(() => verifyD1Migrations(root, value)).not.toThrow();
       writeFileSync(schemaPath, 'CREATE TABLE drifted(id INTEGER);\n');
-      expect(() => verifyD1Schema(root, value)).toThrow('D1 schema checksum mismatch');
+      expect(() => verifyD1Migrations(root, value)).toThrow('D1 migration checksum mismatch');
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

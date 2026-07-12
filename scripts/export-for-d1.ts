@@ -29,7 +29,7 @@ import {
   computeD1CorpusIdentity,
   computeSourceInventoryIdentity,
   parseDataManifest,
-  verifyD1Schema,
+  verifyD1Migrations,
   type DataManifest,
 } from './d1-corpus-identity.js';
 
@@ -60,6 +60,10 @@ const BASE_TABLES = [
   'stepbible_lexicons',
   'cross_references',
   'morphology',
+  'ubs_parallel_sources',
+  'ubs_parallel_groups',
+  'ubs_parallel_members',
+  'ubs_parallel_segments',
 ] as const;
 const EXPORT_ORDER = [...BASE_TABLES, 'fts'] as const;
 const CONTENT_CHARS_PER_STATEMENT = 10_000;
@@ -125,7 +129,7 @@ function sqlite(database: string, sql: string, json = false): string {
 }
 
 function sqlIdentifier(identifier: string): string {
-  if (!/^[a-z_]+$/.test(identifier)) throw new Error(`Unsafe SQLite identifier: ${identifier}`);
+  if (!/^[a-z_][a-z0-9_]*$/.test(identifier)) throw new Error(`Unsafe SQLite identifier: ${identifier}`);
   return `"${identifier}"`;
 }
 
@@ -270,14 +274,9 @@ const { database, clean } = parseArguments(process.argv.slice(2));
 const sourceManifestBytes = readFileSync(SOURCE_MANIFEST_PATH);
 const sourceManifest = parseDataManifest(sourceManifestBytes);
 const d1CorpusIdentity = computeD1CorpusIdentity(sourceManifest);
-const schemaBytes = verifyD1Schema(ROOT, sourceManifest);
+verifyD1Migrations(ROOT, sourceManifest);
 validateCanonicalSources(sourceManifest);
 assertSemanticSource(database);
-
-const schemaPath = join(ROOT, sourceManifest.materializations.d1.schema.path);
-if (!existsSync(schemaPath) || !statSync(schemaPath).isFile()) {
-  throw new Error(`Tracked schema migration is missing: ${schemaPath}`);
-}
 
 for (const table of [...BASE_TABLES, 'strongs_fts', 'sections_fts']) {
   const expected = sourceManifest.expectedCounts[table];
@@ -344,11 +343,7 @@ const seedManifest = {
     transformVersion: sourceManifest.materializations.d1.transformVersion,
     sha256: d1CorpusIdentity,
   },
-  schema: {
-    version: sourceManifest.schemaVersion,
-    path: relative(ROOT, schemaPath),
-    sha256: sha256Buffer(schemaBytes),
-  },
+  migrations: sourceManifest.materializations.d1.migrations.map(migration => ({ ...migration })),
   limits: {
     maximumStatementBytes: D1_MAX_STATEMENT_BYTES,
     targetFileBytes: D1_SEED_FILE_BYTES,

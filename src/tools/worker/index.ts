@@ -14,6 +14,7 @@ import { D1CrossReferenceRepository } from '../../adapters/d1/D1CrossReferenceRe
 import { D1StrongsRepository } from '../../adapters/d1/D1StrongsRepository.js';
 import { D1MorphologyRepository } from '../../adapters/d1/D1MorphologyRepository.js';
 import { D1HistoricalDocumentRepository } from '../../adapters/d1/D1HistoricalDocumentRepository.js';
+import { D1UbsParallelPassageRepository } from '../../adapters/d1/D1UbsParallelPassageRepository.js';
 
 // Bible adapters (HTTP-based, Workers-compatible)
 import { EsvAdapter } from '../../adapters/bible/EsvAdapter.js';
@@ -37,6 +38,7 @@ import { PrimarySourceSearchService } from '../../services/historical/PrimarySou
 import { StrongsService } from '../../services/languages/StrongsService.js';
 import { MorphologyService } from '../../services/languages/MorphologyService.js';
 import { OriginalLanguageStudyService } from '../../services/languages/OriginalLanguageStudyService.js';
+import { SourceAttestedParallelService } from '../../services/bible/SourceAttestedParallelService.js';
 
 // Tool handlers
 import { createBibleLookupHandler } from '../v2/bibleLookup.js';
@@ -66,6 +68,7 @@ export interface WorkerServices {
   commentaryService: CommentaryService;
   historicalService: HistoricalDocumentService;
   strongsService: StrongsService;
+  sourceAttestedParallelService: SourceAttestedParallelService;
 }
 
 export interface WorkerCompositionRoot {
@@ -127,6 +130,7 @@ export function createWorkerCompositionRoot(env: Env): WorkerCompositionRoot {
   const strongsRepo = new D1StrongsRepository(db);
   const morphRepo = new D1MorphologyRepository(db);
   const historicalRepo = new D1HistoricalDocumentRepository(db);
+  const sourceAttestedParallelRepo = new D1UbsParallelPassageRepository(db);
 
   // D1-dependent services (per-request)
   const crossRefService = new CrossReferenceService(crossRefRepo);
@@ -146,6 +150,7 @@ export function createWorkerCompositionRoot(env: Env): WorkerCompositionRoot {
   const strongsService = new StrongsService(strongsRepo);
   const morphService = new MorphologyService(morphRepo);
   const originalLanguageStudyService = new OriginalLanguageStudyService(morphRepo, strongsRepo);
+  const sourceAttestedParallelService = new SourceAttestedParallelService(sourceAttestedParallelRepo);
 
   // Module-scope services (cached across requests)
   const donationService = getDonationService(env);
@@ -167,6 +172,6 @@ export function createWorkerCompositionRoot(env: Env): WorkerCompositionRoot {
 
   return {
     tools,
-    services: { bibleService, commentaryService, historicalService, strongsService },
+    services: { bibleService, commentaryService, historicalService, strongsService, sourceAttestedParallelService },
   };
 }

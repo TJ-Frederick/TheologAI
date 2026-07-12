@@ -23,11 +23,12 @@ import { isAbsolute, join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { gunzipSync } from 'zlib';
 import { assertJohnOneOneDatabase, assertJohnOneOneSource } from './data-integrity.js';
+import { validateUbsParallelArtifact } from '../src/adapters/shared/UbsParallelPassageRepository.js';
 import {
   computeD1CorpusIdentity,
   D1SourceConsumptionRegistry,
   parseDataManifest,
-  verifyD1Schema,
+  verifyD1Migrations,
 } from './d1-corpus-identity.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -38,7 +39,7 @@ const manifestBytes = readFileSync(MANIFEST_PATH);
 const manifest = parseDataManifest(manifestBytes);
 const d1CorpusIdentity = computeD1CorpusIdentity(manifest);
 const sourceRegistry = new D1SourceConsumptionRegistry(ROOT, manifest);
-const schemaBytes = verifyD1Schema(ROOT, manifest);
+const migrationBytes = verifyD1Migrations(ROOT, manifest);
 
 function getOutputPath(argv: string[]): string {
   const equalsArg = argv.find(arg => arg.startsWith('--output='));
@@ -90,7 +91,7 @@ db.pragma('foreign_keys = ON');
 
 // ── Schema ──
 
-db.exec(schemaBytes.toString('utf-8'));
+for (const bytes of migrationBytes) db.exec(bytes.toString('utf-8'));
 const insertMetadata = db.prepare('INSERT INTO theologai_metadata (key, value) VALUES (?, ?)');
 insertMetadata.run('schema_version', manifest.schemaVersion);
 insertMetadata.run('corpus_manifest_sha256', d1CorpusIdentity);
@@ -327,6 +328,57 @@ const histTx = db.transaction(() => {
 
 const { docCount, sectionCount } = histTx();
 log(`  Inserted ${docCount} documents with ${sectionCount} sections`);
+
+// ── Tier 3: UBS source-attested parallel passages ──
+
+log('Loading UBS parallel passages...');
+const ubsArtifact = validateUbsParallelArtifact(JSON.parse(
+  sourceRegistry.read('src/data/ubs-parallel-passages.generated.json', 'utf8'),
+));
+const insertUbsSource = db.prepare(`INSERT INTO ubs_parallel_sources (
+  source_id, schema_version, transform_version, artifact_identity, title, publisher, copyright,
+  license, license_url, source_url, source_path, source_commit, source_commit_date, source_blob,
+  source_bytes, source_sha256, modified, modification_note, label, directionality
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+const insertUbsGroup = db.prepare(`INSERT INTO ubs_parallel_groups
+  (group_id, source_id, source_ordinal, label, directionality) VALUES (?, ?, ?, ?, ?)`);
+const insertUbsMember = db.prepare(`INSERT INTO ubs_parallel_members
+  (group_id, source_order, source_reference, normalized_reference, language_marker, alignment_basis, alignment_raw)
+  VALUES (?, ?, ?, ?, ?, ?, ?)`);
+const insertUbsSegment = db.prepare(`INSERT INTO ubs_parallel_segments
+  (group_id, member_order, segment_order, book_number, chapter, start_verse, end_verse)
+  VALUES (?, ?, ?, ?, ?, ?, ?)`);
+const ubsTx = db.transaction(() => {
+  const p = ubsArtifact.provenance;
+  insertUbsSource.run(
+    p.sourceId, ubsArtifact.schemaVersion, ubsArtifact.transformVersion, ubsArtifact.artifactIdentity,
+    p.title, p.publisher, p.copyright, p.license, p.licenseUrl, p.sourceUrl, p.sourcePath,
+    p.sourceCommit, p.sourceCommitDate, p.sourceBlob, p.sourceBytes, p.sourceSha256,
+    p.modified ? 1 : 0, p.modificationNote, ubsArtifact.label, ubsArtifact.directionality,
+  );
+  let members = 0;
+  let segments = 0;
+  for (const group of ubsArtifact.groups) {
+    insertUbsGroup.run(group.groupId, p.sourceId, group.sourceOrdinal, group.label, group.directionality);
+    for (const member of group.members) {
+      insertUbsMember.run(
+        group.groupId, member.sourceOrder, member.sourceReference, member.normalizedReference,
+        member.languageMarker, member.alignmentBasis, member.alignmentRaw,
+      );
+      members++;
+      member.segments.forEach((segment, index) => {
+        insertUbsSegment.run(
+          group.groupId, member.sourceOrder, index + 1, segment.bookNumber, segment.chapter,
+          segment.startVerse, segment.endVerse,
+        );
+        segments++;
+      });
+    }
+  }
+  return { groups: ubsArtifact.groups.length, members, segments };
+});
+const ubsCounts = ubsTx();
+log(`  Inserted ${ubsCounts.groups} UBS groups, ${ubsCounts.members} members, and ${ubsCounts.segments} segments`);
 sourceRegistry.assertAllConsumed();
 
 // ── Validate and finalize ──
