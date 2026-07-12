@@ -1,0 +1,18 @@
+<!-- Adversarial-only fixture: synthetic hostile markup for parser/security tests.
+     This is not an upstream capture and must not be used as provenance. -->
+<!doctype html>
+<html><body>
+  <main id="search-results">
+    <h2>CCEL Search results</h2>
+    <article class="ccel-search-result">
+      <h5 class="ccel-result-title"><a href="/ccel/calvin/institutes/iv.xvii.html">Institutes of the Christian Religion</a></h5>
+      <div class="ccel-result-author">Calvin, John</div>
+      <div class="ccel-result-section">Book IV, Chapter XVII</div>
+      <p class="ccel-result-snippet" onclick="alert('removed')">The Lord's Supper &amp; the church. &lt;script&gt;alert('encoded')&lt;/script&gt;</p>
+      <div hidden>Hidden non-result content</div>
+    </article>
+    <script>window.session = 'secret';</script>
+    <style>.secret { display: block }</style>
+    <form><input type="hidden" name="csrf" value="secret"></form>
+  </main>
+</body></html>

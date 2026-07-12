@@ -61,6 +61,14 @@ export {
   type ProvenanceContext,
 } from './provenance.js';
 
+// Staged primary-source rollout flags
+export {
+  DEFAULT_PRIMARY_SOURCE_FEATURE_FLAGS,
+  readPrimarySourceFeatureFlags,
+  type PrimarySourceFeatureFlags,
+  type PrimarySourceFlagEnvironment,
+} from './featureFlags.js';
+
 // Types
 export type {
   ToolHandler,
