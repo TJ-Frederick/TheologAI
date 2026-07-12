@@ -179,6 +179,14 @@ readiness query that checks integrity, exact manifest row counts, and required
 indexes, column signatures, foreign keys, and schema/corpus identity markers. A
 missing, stale, partial, or incompatible corpus stops deployment.
 
+The corpus marker is the scoped D1 materialization identity derived from
+`data/data-manifest.json` `materializations.d1`, not the hash of the complete
+source inventory. Worker-bundled corpora may change without requiring a D1
+replacement; any D1 input, transform version, schema version, or expected-count
+drift still changes the marker and stops deployment. Legacy-marker transitions
+are conditional, separately authorized metadata writes documented in
+`docs/D1-DATA-WORKFLOW.md`; deploy workflows remain read-only with respect to D1.
+
 The identity markers were introduced with the reproducible corpus pipeline. An
 older remote database without `theologai_metadata` will intentionally fail the
 gate; do not weaken the query. Prepare and verify a new seeded database, then
