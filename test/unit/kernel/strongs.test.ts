@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { parseStrongsIdentity } from '../../../src/kernel/strongs.js';
+import { parseStrongsIdentity, STRONGS_IDENTITY_PATTERN } from '../../../src/kernel/strongs.js';
 
 describe('parseStrongsIdentity', () => {
   it.each([
@@ -34,5 +34,17 @@ describe('parseStrongsIdentity', () => {
       expect(parseStrongsIdentity(item.id)?.morphologyKey).toBe(item.id);
       expect((item.id.startsWith('G') ? greek : hebrew)[item.id]?.lemma.normalize('NFC')).toBe(item.lemma.normalize('NFC'));
     }
+  });
+});
+
+describe('STRONGS_IDENTITY_PATTERN', () => {
+  const schemaPattern = new RegExp(STRONGS_IDENTITY_PATTERN);
+
+  it.each(['G1', 'G0025', 'H9001', 'G21502', 'g2385i', 'G99999Z'])('accepts schema identity %s', identity => {
+    expect(schemaPattern.test(identity)).toBe(true);
+  });
+
+  it.each(['G0', 'G00000', 'G000001', 'G100000', 'H999999A', 'G25AA'])('rejects schema identity %s', identity => {
+    expect(schemaPattern.test(identity)).toBe(false);
   });
 });

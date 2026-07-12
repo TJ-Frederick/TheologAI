@@ -19,6 +19,7 @@ const STRONGS_ID = /^([GH])(\d+)([A-Z]?)$/i;
  */
 export const STRONGS_IDENTITY_MAX_DIGITS = 5;
 export const STRONGS_IDENTITY_MAX_NUMBER = 99_999;
+export const STRONGS_IDENTITY_PATTERN = '^[GHgh](?:[1-9]\\d{0,4}|0[1-9]\\d{0,3}|00[1-9]\\d{0,2}|000[1-9]\\d?|0000[1-9])[A-Za-z]?$';
 
 /**
  * Parse a Strong's identifier once at the kernel boundary.

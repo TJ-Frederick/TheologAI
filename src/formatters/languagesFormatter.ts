@@ -4,6 +4,8 @@
 
 import type { EnhancedStrongsResult, VerseMorphologyResult, VerseWord } from '../kernel/types.js';
 import type { StrongsEntry } from '../kernel/repositories.js';
+import { normalizeLexiconText } from '../kernel/lexiconText.js';
+export { normalizeLexiconText } from '../kernel/lexiconText.js';
 
 /** Format a Strong's lookup result */
 export function formatStrongsResult(result: EnhancedStrongsResult, detailLevel: string = 'simple'): string {
@@ -49,35 +51,6 @@ export function formatStrongsResult(result: EnhancedStrongsResult, detailLevel: 
 }
 
 /** Normalize STEPBible markup before exposing it in either result view. */
-export function normalizeLexiconText(value: string): string {
-  return decodeLexiconEntities(value)
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<ref=['"][^'"]*['"]>/gi, '')
-    .replace(/<\/ref>/gi, '')
-    .replace(/<[^>]+>/g, '')
-    .replace(/[ \t]+/g, ' ')
-    .replace(/\n\s+/g, '\n')
-    .trim();
-}
-
-function decodeLexiconEntities(value: string): string {
-  return value.replace(/&(#x[\da-f]+|#\d+|nbsp|amp|lt|gt|quot|apos);/gi, (_match, entity: string) => {
-    const normalized = entity.toLowerCase();
-    if (normalized === 'nbsp') return ' ';
-    if (normalized === 'amp') return '&';
-    if (normalized === 'lt') return '<';
-    if (normalized === 'gt') return '>';
-    if (normalized === 'quot') return '"';
-    if (normalized === 'apos') return "'";
-    const code = normalized.startsWith('#x')
-      ? Number.parseInt(normalized.slice(2), 16)
-      : Number.parseInt(normalized.slice(1), 10);
-    return !Number.isInteger(code) || code < 0 || code > 0x10FFFF
-      ? _match
-      : String.fromCodePoint(code);
-  });
-}
-
 /** Produce the bounded discovery summary used by Markdown and structured search. */
 export function summarizeDefinition(value: string, maxLength = 240): string {
   const definition = normalizeLexiconText(value).replace(/\s+/g, ' ').trim();

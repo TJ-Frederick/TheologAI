@@ -56,6 +56,7 @@ export {
   parseStrongsIdentity,
   STRONGS_IDENTITY_MAX_DIGITS,
   STRONGS_IDENTITY_MAX_NUMBER,
+  STRONGS_IDENTITY_PATTERN,
   type CanonicalStrongsIdentity,
 } from './strongs.js';
 
