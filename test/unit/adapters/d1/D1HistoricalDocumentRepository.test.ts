@@ -220,4 +220,25 @@ describe('D1HistoricalDocumentRepository', () => {
       expect(result).toBeUndefined();
     });
   });
+
+  describe('searchPrimarySources', () => {
+    it('uses the shared controlled FTS query and maps document metadata', async () => {
+      const row = {
+        ...sampleSectionRow,
+        document_title: sampleDocRow.title,
+        document_type: sampleDocRow.type,
+        document_date: sampleDocRow.date,
+        document_metadata: sampleDocRow.metadata,
+      };
+      const db = createSimpleD1([row]);
+      const result = await new D1HistoricalDocumentRepository(db as any).searchPrimarySources({
+        text: 'grace OR faith', match: 'all_terms', documentId: 'nicene-creed', limit: 8,
+      });
+      expect(db.prepare.mock.results[0].value.bind).toHaveBeenCalledWith('"grace" AND "OR" AND "faith"', 'nicene-creed', 8);
+      expect(result[0]).toMatchObject({
+        document: { id: 'nicene-creed', title: 'Nicene Creed', topics: ['trinity', 'christology'] },
+        section: { section_number: '1', content: 'We believe in one God...' },
+      });
+    });
+  });
 });

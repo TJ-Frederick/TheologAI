@@ -17,6 +17,8 @@ import { CcelService } from '../../src/services/commentary/CcelService.js';
 import { CommentaryService } from '../../src/services/commentary/CommentaryService.js';
 import { DonationService } from '../../src/services/donation/DonationService.js';
 import { HistoricalDocumentService } from '../../src/services/historical/HistoricalDocumentService.js';
+import { LocalPrimarySourceSearchProvider } from '../../src/services/historical/LocalPrimarySourceSearchProvider.js';
+import { PrimarySourceSearchService } from '../../src/services/historical/PrimarySourceSearchService.js';
 import { MorphologyService } from '../../src/services/languages/MorphologyService.js';
 import { StrongsService } from '../../src/services/languages/StrongsService.js';
 import { createBibleLookupHandler } from '../../src/tools/v2/bibleLookup.js';
@@ -25,6 +27,7 @@ import { createCommentaryHandler } from '../../src/tools/v2/commentary.js';
 import { createCrossReferencesHandler } from '../../src/tools/v2/crossReferences.js';
 import { createDonationConfigHandler } from '../../src/tools/v2/donationConfig.js';
 import { createParallelPassagesHandler } from '../../src/tools/v2/parallelPassages.js';
+import { createPrimarySourceSearchHandler } from '../../src/tools/v2/primarySourceSearch.js';
 import { createStrongsLookupHandler } from '../../src/tools/v2/strongsLookup.js';
 import { createVerifyDonationHandler } from '../../src/tools/v2/verifyDonation.js';
 import { createVerseMorphologyHandler } from '../../src/tools/v2/verseMorphology.js';
@@ -48,7 +51,7 @@ export interface DeterministicMcpFixture {
  *
  * This fixture intentionally opens no database and performs no network calls.
  * It is shared by protocol integration tests and the official HTTP conformance
- * harness so both exercise the same nine real tool definitions.
+ * harness so both exercise the same ten real tool definitions.
  */
 export function createDeterministicMcpFixture(): DeterministicMcpFixture {
   const biblePassageCalls: BiblePassageCall[] = [];
@@ -92,6 +95,7 @@ export function createDeterministicMcpFixture(): DeterministicMcpFixture {
     getSections: () => [],
     getSection: () => undefined,
     search: () => [],
+    searchPrimarySources: () => [],
     findDocumentByName: () => undefined,
   };
 
@@ -135,6 +139,11 @@ export function createDeterministicMcpFixture(): DeterministicMcpFixture {
   );
   const commentaryService = new CommentaryService([commentaryAdapter]);
   const historicalService = new HistoricalDocumentService(historicalRepository);
+  const primarySourceSearchService = new PrimarySourceSearchService(
+    new LocalPrimarySourceSearchProvider(historicalRepository),
+    { search: async () => ({ provider: 'ccel_live', status: 'disabled', searched: false, page: 1, hitCount: 0, hits: [], notices: [] }) },
+    { ccelLiveSearch: false },
+  );
   const strongsService = new StrongsService(strongsRepository);
   const morphologyService = new MorphologyService(morphologyRepository);
   const ccelService = new CcelService(ccelAdapter);
@@ -147,6 +156,7 @@ export function createDeterministicMcpFixture(): DeterministicMcpFixture {
       createParallelPassagesHandler(parallelPassageService),
       createCommentaryHandler(commentaryService),
       createClassicTextsHandler(historicalService, ccelService),
+      createPrimarySourceSearchHandler(primarySourceSearchService),
       createStrongsLookupHandler(strongsService),
       createVerseMorphologyHandler(morphologyService),
       createDonationConfigHandler(donationService),

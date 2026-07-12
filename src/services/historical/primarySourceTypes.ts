@@ -7,6 +7,8 @@
 
 export type PrimarySourceSearchMatch = 'all_terms' | 'phrase';
 
+export type PrimarySourceRequestedProvider = 'local' | 'ccel';
+
 export type PrimarySourceProvider = 'local' | 'ccel_live';
 
 export type PrimarySourceProviderStatus =
@@ -56,6 +58,43 @@ export interface PrimarySourceSearchHit {
   snippetOnly: true;
   attribution: string;
 }
+
+export interface PrimarySourceSearchPlanQuery extends PrimarySourceSearchQuery {
+  id: string;
+  providers: PrimarySourceRequestedProvider[];
+}
+
+export interface PrimarySourcePlanHit extends PrimarySourceSearchHit {
+  queryId: string;
+}
+
+export interface PrimarySourcePlanProviderResult extends Omit<PrimarySourceProviderResult, 'hits'> {
+  hits: PrimarySourcePlanHit[];
+}
+
+export interface PrimarySourcePlanQueryResult {
+  id: string;
+  normalizedMode: PrimarySourceSearchMatch;
+  providers: PrimarySourcePlanProviderResult[];
+}
+
+export interface PrimarySourceSearchCoverage {
+  localAttempted: boolean;
+  localStatus?: PrimarySourceProviderStatus;
+  localHitCount: number;
+  ccelAttempted: boolean;
+  ccelStatus?: PrimarySourceProviderStatus;
+  ccelHitCount: number;
+  notices: string[];
+}
+
+export interface PrimarySourceSearchPlanResult {
+  planStatus: 'complete' | 'partial' | 'unavailable';
+  queries: PrimarySourcePlanQueryResult[];
+  coverage: PrimarySourceSearchCoverage;
+}
+
+export const LOCAL_PRIMARY_SOURCE_ATTRIBUTION = 'TheologAI local historical-document collection';
 
 export interface PrimarySourceProviderResult {
   provider: PrimarySourceProvider;

@@ -205,7 +205,7 @@ export function composeCcelSearchRequest(input: PrimarySourceSearchQuery): Compo
   }
 
   const textTerms = normalizedText.split(' ');
-  if (textTerms.length > CCEL_SEARCH_LIMITS.maxTerms) {
+  if (normalizedMatch === 'all_terms' && textTerms.length > CCEL_SEARCH_LIMITS.maxTerms) {
     throw new ValidationError('text', `text may contain at most ${CCEL_SEARCH_LIMITS.maxTerms} terms.`);
   }
   const luceneText = normalizedMatch === 'phrase'

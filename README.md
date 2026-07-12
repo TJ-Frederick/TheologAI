@@ -3,7 +3,7 @@
 TheologAI is an MCP server for Bible study and theological research. It runs
 locally over stdio or Streamable HTTP and on Cloudflare Workers with D1.
 
-The current registry contains nine tools, five guided prompts, eight English
+The current registry contains ten tools, five guided prompts, eight English
 Bible translations, six commentary sources, 17 locally indexed
 historical documents, Strong's dictionaries, and Greek/Hebrew morphology.
 
@@ -39,6 +39,7 @@ fresh server and transport.
 | `parallel_passages` | Find curated, non-exhaustive synoptic, quotation, allusion, and thematic relationships, optionally augmented with cross references. |
 | `commentary_lookup` | Retrieve Matthew Henry, JFB, Adam Clarke, John Gill, Keil-Delitzsch (OT), or Tyndale notes. |
 | `classic_text_lookup` | Search and browse the 17 local historical documents; retrieve a specifically named CCEL work section when available. |
+| `primary_source_search` | Execute a bounded, explicit query plan against the local historical index; optional live CCEL discovery is separately gated off by default. Returns snippets and exact locators, not document bodies. |
 | `original_language_lookup` | Look up a Strong's entry or search for matching Greek/Hebrew entries. |
 | `bible_verse_morphology` | Return word-by-word morphology for a specific verse. |
 | `donation_config` | Return voluntary-donation recipient, asset, and chain configuration. |

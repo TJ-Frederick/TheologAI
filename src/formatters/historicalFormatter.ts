@@ -3,9 +3,10 @@
  */
 
 import type { DocumentInfo, DocumentSection } from '../adapters/data/HistoricalDocumentRepository.js';
+import { LOCAL_PRIMARY_SOURCE_ATTRIBUTION } from '../services/historical/primarySourceTypes.js';
 
 /** Provenance label for documents bundled with the server. No edition is implied. */
-export const LOCAL_HISTORICAL_SOURCE = 'TheologAI local historical-document collection';
+export const LOCAL_HISTORICAL_SOURCE = LOCAL_PRIMARY_SOURCE_ATTRIBUTION;
 
 const localSource = `*Source: ${LOCAL_HISTORICAL_SOURCE}*`;
 

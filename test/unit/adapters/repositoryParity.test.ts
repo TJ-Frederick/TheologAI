@@ -161,6 +161,13 @@ describe('SQLite and D1 repository parity with identical real data', () => {
     });
     await expect(d1Historical.findDocumentByName('Nicene'))
       .resolves.toEqual(sqliteHistorical.findDocumentByName('Nicene'));
+    const primaryOptions = { text: 'one almighty', match: 'all_terms' as const, documentId: 'nicene-creed', limit: 8 };
+    await expect(d1Historical.searchPrimarySources(primaryOptions))
+      .resolves.toEqual(sqliteHistorical.searchPrimarySources(primaryOptions));
+    expect(sqliteHistorical.searchPrimarySources(primaryOptions)[0]).toMatchObject({
+      document: { id: 'nicene-creed', title: 'Nicene Creed' },
+      section: { section_number: '1' },
+    });
   });
 
   it('returns identical morphology with shared fallback and canonical book ordering', async () => {
