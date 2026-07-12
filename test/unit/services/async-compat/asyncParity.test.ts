@@ -82,6 +82,7 @@ describe('Async/Sync Repository Parity', () => {
       const repo: IStrongsRepository = {
         lookup: vi.fn().mockReturnValue(strongsEntry),
         search: vi.fn().mockReturnValue([]),
+        searchPrimarySources: vi.fn().mockReturnValue([]),
         getLexiconEntry: vi.fn().mockReturnValue(undefined),
         getStats: vi.fn().mockReturnValue({ greek: 0, hebrew: 0, total: 0 }),
       };
@@ -94,6 +95,7 @@ describe('Async/Sync Repository Parity', () => {
       const repo: IStrongsRepository = {
         lookup: vi.fn().mockResolvedValue(strongsEntry),
         search: vi.fn().mockResolvedValue([]),
+        searchPrimarySources: vi.fn().mockResolvedValue([]),
         getLexiconEntry: vi.fn().mockResolvedValue(undefined),
         getStats: vi.fn().mockResolvedValue({ greek: 0, hebrew: 0, total: 0 }),
       };

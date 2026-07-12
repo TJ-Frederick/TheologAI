@@ -15,6 +15,7 @@ import { HelloAoAdapter } from '../../adapters/bible/HelloAoAdapter.js';
 // Adapters — Commentary
 import { HelloAoCommentaryAdapter } from '../../adapters/commentary/HelloAoCommentaryAdapter.js';
 import { CcelAdapter } from '../../adapters/commentary/CcelAdapter.js';
+import { CcelSearchAdapter } from '../../adapters/commentary/CcelSearchAdapter.js';
 
 // Repositories (SQLite-backed)
 import { CrossReferenceRepository } from '../../adapters/data/CrossReferenceRepository.js';
@@ -29,6 +30,8 @@ import { ParallelPassageService } from '../../services/bible/ParallelPassageServ
 import { CommentaryService } from '../../services/commentary/CommentaryService.js';
 import { CcelService } from '../../services/commentary/CcelService.js';
 import { HistoricalDocumentService } from '../../services/historical/HistoricalDocumentService.js';
+import { LocalPrimarySourceSearchProvider } from '../../services/historical/LocalPrimarySourceSearchProvider.js';
+import { PrimarySourceSearchService } from '../../services/historical/PrimarySourceSearchService.js';
 import { StrongsService } from '../../services/languages/StrongsService.js';
 import { MorphologyService } from '../../services/languages/MorphologyService.js';
 
@@ -38,6 +41,7 @@ import { createCrossReferencesHandler } from './crossReferences.js';
 import { createParallelPassagesHandler } from './parallelPassages.js';
 import { createCommentaryHandler } from './commentary.js';
 import { createClassicTextsHandler } from './classicTexts.js';
+import { createPrimarySourceSearchHandler } from './primarySourceSearch.js';
 import { createStrongsLookupHandler } from './strongsLookup.js';
 import { createVerseMorphologyHandler } from './verseMorphology.js';
 import { createDonationConfigHandler } from './donationConfig.js';
@@ -48,6 +52,7 @@ import { OnChainVerifier } from '../../adapters/donation/OnChainVerifier.js';
 import { DonationService } from '../../services/donation/DonationService.js';
 
 import { getDatabase } from '../../adapters/shared/Database.js';
+import { readPrimarySourceFeatureFlags } from '../../kernel/featureFlags.js';
 
 /** Services exposed for MCP Resources / Prompts (Phase 5+) */
 export interface ServerServices {
@@ -84,6 +89,7 @@ export function createCompositionRoot(): CompositionRoot {
   // Commentary adapters
   const helloaoCommentary = new HelloAoCommentaryAdapter();
   const ccelAdapter = new CcelAdapter();
+  const ccelSearchAdapter = new CcelSearchAdapter({ enabled: true });
 
   // Services
   const bibleService = new BibleService([esvAdapter, netAdapter, helloaoAdapter]);
@@ -92,6 +98,13 @@ export function createCompositionRoot(): CompositionRoot {
   const commentaryService = new CommentaryService([helloaoCommentary]);
   const ccelService = new CcelService(ccelAdapter);
   const historicalService = new HistoricalDocumentService(historicalRepo);
+  const primarySourceSearchService = new PrimarySourceSearchService(
+    new LocalPrimarySourceSearchProvider(historicalRepo),
+    ccelSearchAdapter,
+    readPrimarySourceFeatureFlags({
+      THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH: process.env.THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH,
+    }),
+  );
   const strongsService = new StrongsService(strongsRepo);
   const morphService = new MorphologyService(morphRepo);
 
@@ -106,6 +119,7 @@ export function createCompositionRoot(): CompositionRoot {
     createParallelPassagesHandler(parallelService),
     createCommentaryHandler(commentaryService),
     createClassicTextsHandler(historicalService, ccelService),
+    createPrimarySourceSearchHandler(primarySourceSearchService),
     createStrongsLookupHandler(strongsService),
     createVerseMorphologyHandler(morphService),
     createDonationConfigHandler(donationService),

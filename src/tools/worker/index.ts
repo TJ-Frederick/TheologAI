@@ -23,6 +23,7 @@ import { HelloAoAdapter } from '../../adapters/bible/HelloAoAdapter.js';
 // Commentary adapters
 import { HelloAoCommentaryAdapter } from '../../adapters/commentary/HelloAoCommentaryAdapter.js';
 import { CcelAdapter } from '../../adapters/commentary/CcelAdapter.js';
+import { CcelSearchAdapter } from '../../adapters/commentary/CcelSearchAdapter.js';
 
 // Services
 import { BibleService } from '../../services/bible/BibleService.js';
@@ -31,6 +32,8 @@ import { ParallelPassageService } from '../../services/bible/ParallelPassageServ
 import { CommentaryService } from '../../services/commentary/CommentaryService.js';
 import { CcelService } from '../../services/commentary/CcelService.js';
 import { HistoricalDocumentService } from '../../services/historical/HistoricalDocumentService.js';
+import { LocalPrimarySourceSearchProvider } from '../../services/historical/LocalPrimarySourceSearchProvider.js';
+import { PrimarySourceSearchService } from '../../services/historical/PrimarySourceSearchService.js';
 import { StrongsService } from '../../services/languages/StrongsService.js';
 import { MorphologyService } from '../../services/languages/MorphologyService.js';
 
@@ -40,6 +43,7 @@ import { createCrossReferencesHandler } from '../v2/crossReferences.js';
 import { createParallelPassagesHandler } from '../v2/parallelPassages.js';
 import { createCommentaryHandler } from '../v2/commentary.js';
 import { createClassicTextsHandler } from '../v2/classicTexts.js';
+import { createPrimarySourceSearchHandler } from '../v2/primarySourceSearch.js';
 import { createStrongsLookupHandler } from '../v2/strongsLookup.js';
 import { createVerseMorphologyHandler } from '../v2/verseMorphology.js';
 import { createDonationConfigHandler } from '../v2/donationConfig.js';
@@ -53,6 +57,7 @@ import { DonationService } from '../../services/donation/DonationService.js';
 import parallelPassagesData from '../../data/parallel-passages.json';
 
 import type { ToolHandler } from '../../kernel/types.js';
+import { readPrimarySourceFeatureFlags } from '../../kernel/featureFlags.js';
 
 export interface WorkerServices {
   bibleService: BibleService;
@@ -72,6 +77,9 @@ const netAdapter = new NetBibleAdapter();
 const helloaoAdapter = new HelloAoAdapter();
 const helloaoCommentary = new HelloAoCommentaryAdapter();
 const ccelAdapter = new CcelAdapter();
+// Cache/circuit state is isolate-scoped; the service gate prevents any call
+// while the non-secret rollout flag is false.
+const ccelSearchAdapter = new CcelSearchAdapter({ enabled: true });
 
 const commentaryService = new CommentaryService([helloaoCommentary]);
 const ccelService = new CcelService(ccelAdapter);
@@ -128,6 +136,11 @@ export function createWorkerCompositionRoot(env: Env): WorkerCompositionRoot {
     parallelPassagesData as any, // preloaded from JSON module
   );
   const historicalService = new HistoricalDocumentService(historicalRepo);
+  const primarySourceSearchService = new PrimarySourceSearchService(
+    new LocalPrimarySourceSearchProvider(historicalRepo),
+    ccelSearchAdapter,
+    readPrimarySourceFeatureFlags(env),
+  );
   const strongsService = new StrongsService(strongsRepo);
   const morphService = new MorphologyService(morphRepo);
 
@@ -141,6 +154,7 @@ export function createWorkerCompositionRoot(env: Env): WorkerCompositionRoot {
     createParallelPassagesHandler(parallelService),
     createCommentaryHandler(commentaryService),
     createClassicTextsHandler(historicalService, ccelService),
+    createPrimarySourceSearchHandler(primarySourceSearchService),
     createStrongsLookupHandler(strongsService),
     createVerseMorphologyHandler(morphService),
     createDonationConfigHandler(donationService),

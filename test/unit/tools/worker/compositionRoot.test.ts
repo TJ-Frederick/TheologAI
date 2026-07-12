@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createSimpleD1 } from '../../../helpers/mockD1.js';
 
+const primarySourceMocks = vi.hoisted(() => ({
+  search: vi.fn().mockResolvedValue({
+    provider: 'ccel_live', status: 'no_results', searched: true, page: 1,
+    hitCount: 0, hits: [], notices: [],
+  }),
+}));
+
 // Mock all HTTP adapters and external services to avoid network calls
 vi.mock('../../../../src/adapters/bible/EsvAdapter.js', () => ({
   EsvAdapter: vi.fn().mockImplementation(function (apiKey?: string) {
@@ -56,6 +63,12 @@ vi.mock('../../../../src/adapters/commentary/CcelAdapter.js', () => ({
   }),
 }));
 
+vi.mock('../../../../src/adapters/commentary/CcelSearchAdapter.js', () => ({
+  CcelSearchAdapter: vi.fn().mockImplementation(function () {
+    return { search: primarySourceMocks.search };
+  }),
+}));
+
 // Mock the JSON import
 vi.mock('../../../../src/data/parallel-passages.json', () => ({
   default: { description: 'test fixture', version: '1', parallels: {} },
@@ -69,6 +82,7 @@ const EXPECTED_TOOL_NAMES = [
   'parallel_passages',
   'commentary_lookup',
   'classic_text_lookup',
+  'primary_source_search',
   'original_language_lookup',
   'bible_verse_morphology',
   'donation_config',
@@ -88,15 +102,16 @@ describe('createWorkerCompositionRoot', () => {
   let createWorkerCompositionRoot: typeof import('../../../../src/tools/worker/index.js').createWorkerCompositionRoot;
 
   beforeEach(async () => {
+    vi.clearAllMocks();
     vi.resetModules();
     const mod = await import('../../../../src/tools/worker/index.js');
     createWorkerCompositionRoot = mod.createWorkerCompositionRoot;
   });
 
   describe('tool creation', () => {
-    it('creates exactly 9 tools', () => {
+    it('creates exactly 10 tools', () => {
       const root = createWorkerCompositionRoot(makeEnv());
-      expect(root.tools).toHaveLength(9);
+      expect(root.tools).toHaveLength(10);
     });
 
     it('creates tools with correct names', () => {
@@ -131,6 +146,24 @@ describe('createWorkerCompositionRoot', () => {
           idempotentHint: true,
         });
       }
+    });
+  });
+
+  describe('primary-source rollout gate', () => {
+    it('keeps CCEL disabled and makes zero adapter calls when the flag is absent', async () => {
+      const root = createWorkerCompositionRoot(makeEnv());
+      const tool = root.tools.find(candidate => candidate.name === 'primary_source_search')!;
+      const result = await tool.handler({ queries: [{ id: 'remote', text: 'grace', providers: ['ccel'] }] });
+      expect(result).toMatchObject({ isError: true });
+      expect(result.content[0].text).toContain('Live CCEL search is disabled');
+      expect(primarySourceMocks.search).not.toHaveBeenCalled();
+    });
+
+    it('calls the live adapter only when the explicit flag is true', async () => {
+      const root = createWorkerCompositionRoot(makeEnv({ THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH: 'true' }));
+      const tool = root.tools.find(candidate => candidate.name === 'primary_source_search')!;
+      await tool.handler({ queries: [{ id: 'remote', text: 'grace', providers: ['ccel'] }] });
+      expect(primarySourceMocks.search).toHaveBeenCalledOnce();
     });
   });
 

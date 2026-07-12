@@ -23,6 +23,7 @@ THEOLOGAI_VERSION = "3.6.0"
 THEOLOGAI_ALLOWED_ORIGINS = "https://theologai.pages.dev"
 THEOLOGAI_MAX_REQUEST_BYTES = "1048576"
 THEOLOGAI_REQUEST_LOGS = "false"
+THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH = "false"
 
 # D1 database. The database_id is not sensitive (scoped to Cloudflare account).
 # For multi-environment setups, use [env.staging] / [env.production] sections.
@@ -61,6 +62,7 @@ THEOLOGAI_VERSION = "3.6.0-preview"
 THEOLOGAI_ALLOWED_ORIGINS = "https://theologai.pages.dev"
 THEOLOGAI_MAX_REQUEST_BYTES = "1048576"
 THEOLOGAI_REQUEST_LOGS = "true"
+THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH = "false"
 
 [[env.preview.d1_databases]]
 binding = "THEOLOGAI_DB"

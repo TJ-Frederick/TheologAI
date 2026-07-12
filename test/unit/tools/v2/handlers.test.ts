@@ -6,6 +6,7 @@ import { createCommentaryHandler } from '../../../../src/tools/v2/commentary.js'
 import { createCrossReferencesHandler } from '../../../../src/tools/v2/crossReferences.js';
 import { createDonationConfigHandler } from '../../../../src/tools/v2/donationConfig.js';
 import { createParallelPassagesHandler } from '../../../../src/tools/v2/parallelPassages.js';
+import { createPrimarySourceSearchHandler } from '../../../../src/tools/v2/primarySourceSearch.js';
 import { createStrongsLookupHandler } from '../../../../src/tools/v2/strongsLookup.js';
 import { createVerifyDonationHandler } from '../../../../src/tools/v2/verifyDonation.js';
 import { createVerseMorphologyHandler } from '../../../../src/tools/v2/verseMorphology.js';
@@ -18,6 +19,7 @@ import type { CommentaryService } from '../../../../src/services/commentary/Comm
 import type { CcelService } from '../../../../src/services/commentary/CcelService.js';
 import type { DonationService } from '../../../../src/services/donation/DonationService.js';
 import type { HistoricalDocumentService } from '../../../../src/services/historical/HistoricalDocumentService.js';
+import type { PrimarySourceSearchService } from '../../../../src/services/historical/PrimarySourceSearchService.js';
 import type { MorphologyService } from '../../../../src/services/languages/MorphologyService.js';
 import type { StrongsService } from '../../../../src/services/languages/StrongsService.js';
 import type { ToolHandler, ToolResult } from '../../../../src/kernel/types.js';
@@ -44,13 +46,14 @@ describe('v2 tool handler schemas', () => {
         serviceDouble<HistoricalDocumentService>({}),
         serviceDouble<CcelService>({}),
       ),
+      createPrimarySourceSearchHandler(serviceDouble<PrimarySourceSearchService>({})),
       createStrongsLookupHandler(serviceDouble<StrongsService>({})),
       createVerseMorphologyHandler(serviceDouble<MorphologyService>({})),
       createDonationConfigHandler(serviceDouble<DonationService>({})),
       createVerifyDonationHandler(serviceDouble<DonationService>({})),
     ];
 
-    expect(handlers.map(handler => handler.name)).toHaveLength(9);
+    expect(handlers.map(handler => handler.name)).toHaveLength(10);
     for (const handler of handlers) {
       expect(handler.inputSchema.additionalProperties).toBe(false);
       expect(handler.annotations).toMatchObject({

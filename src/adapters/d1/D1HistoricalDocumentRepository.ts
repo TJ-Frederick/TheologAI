@@ -5,7 +5,18 @@
  * the D1 async binding API.
  */
 
-import type { IHistoricalDocumentRepository, DocumentInfo, DocumentSection } from '../../kernel/repositories.js';
+import type {
+  IHistoricalDocumentRepository,
+  DocumentInfo,
+  DocumentSection,
+  PrimarySourceLocalSearchOptions,
+  PrimarySourceLocalSearchRow,
+} from '../../kernel/repositories.js';
+import {
+  composeLocalPrimarySourceFtsQuery,
+  LOCAL_PRIMARY_SOURCE_SEARCH_SQL,
+  LOCAL_PRIMARY_SOURCE_WORK_SEARCH_SQL,
+} from '../shared/primarySourceSearchSql.js';
 
 export class D1HistoricalDocumentRepository implements IHistoricalDocumentRepository {
   constructor(private db: D1Database) {}
@@ -108,6 +119,17 @@ export class D1HistoricalDocumentRepository implements IHistoricalDocumentReposi
     }
   }
 
+  async searchPrimarySources(options: PrimarySourceLocalSearchOptions): Promise<PrimarySourceLocalSearchRow[]> {
+    validatePrimarySourceOptions(options);
+    const ftsQuery = composeLocalPrimarySourceFtsQuery(options.text, options.match);
+    const statement = this.db.prepare(options.documentId ? LOCAL_PRIMARY_SOURCE_WORK_SEARCH_SQL : LOCAL_PRIMARY_SOURCE_SEARCH_SQL);
+    const bound = options.documentId
+      ? statement.bind(ftsQuery, options.documentId, options.limit)
+      : statement.bind(ftsQuery, options.limit);
+    const { results } = await bound.all<PrimarySourceSearchDatabaseRow>();
+    return results.map(mapPrimarySourceRow);
+  }
+
   async findDocumentByName(name: string): Promise<DocumentInfo | undefined> {
     const normalized = name.toLowerCase().trim();
     const docs = await this.listDocuments();
@@ -120,4 +142,44 @@ export class D1HistoricalDocumentRepository implements IHistoricalDocumentReposi
 
     return docs.find(d => d.id.includes(normalized));
   }
+}
+
+interface PrimarySourceSearchDatabaseRow {
+  id: number;
+  document_id: string;
+  section_number: string | null;
+  title: string | null;
+  content: string;
+  topics: string | null;
+  document_title: string;
+  document_type: string;
+  document_date: string | null;
+  document_metadata: string | null;
+}
+
+function mapPrimarySourceRow(row: PrimarySourceSearchDatabaseRow): PrimarySourceLocalSearchRow {
+  return {
+    document: {
+      id: row.document_id,
+      title: row.document_title,
+      type: row.document_type,
+      date: row.document_date,
+      topics: row.document_metadata ? (JSON.parse(row.document_metadata).topics || []) : [],
+    },
+    section: {
+      id: row.id,
+      document_id: row.document_id,
+      section_number: row.section_number || '',
+      title: row.title || '',
+      content: row.content,
+      topics: row.topics ? JSON.parse(row.topics) : [],
+    },
+  };
+}
+
+function validatePrimarySourceOptions(options: PrimarySourceLocalSearchOptions): void {
+  if (!options || typeof options.text !== 'string' || options.text.length < 1) throw new Error('Primary-source search text is required');
+  if (options.match !== 'all_terms' && options.match !== 'phrase') throw new Error('Primary-source match mode is invalid');
+  if (!Number.isSafeInteger(options.limit) || options.limit < 1 || options.limit > 8) throw new Error('Primary-source limit must be 1..8');
+  if (options.documentId !== undefined && (typeof options.documentId !== 'string' || options.documentId.length < 1)) throw new Error('Primary-source document ID is invalid');
 }

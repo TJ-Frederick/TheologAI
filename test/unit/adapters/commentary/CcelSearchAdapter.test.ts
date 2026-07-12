@@ -86,6 +86,10 @@ describe('composeCcelSearchRequest', () => {
     expect(composeCcelSearchRequest({ text: 'e\u0301\n  grace\ttruth' }).normalizedText).toBe('é grace truth');
     expect(() => composeCcelSearchRequest({ text: '\u0000bad' })).toThrow('NUL');
     expect(() => composeCcelSearchRequest({ text: 'one two three four five six seven eight nine ten eleven twelve thirteen' })).toThrow('12 terms');
+    expect(composeCcelSearchRequest({
+      text: 'one two three four five six seven eight nine ten eleven twelve thirteen',
+      match: 'phrase',
+    }).luceneQuery).toBe('"one two three four five six seven eight nine ten eleven twelve thirteen"');
     expect(() => composeCcelSearchRequest({ text: 'x'.repeat(201) })).toThrow('safe length');
     expect(() => composeCcelSearchRequest({ text: 'x', page: 4 })).toThrow('page');
     expect(() => composeCcelSearchRequest({ text: 'x', limit: 9 })).toThrow('limit');
