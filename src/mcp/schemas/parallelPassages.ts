@@ -1,4 +1,5 @@
-import type { Schema } from '@cfworker/json-schema';
+import type { Tool } from '@modelcontextprotocol/sdk/types.js';
+import type { ProvenanceRecord } from '../../kernel/provenance.js';
 import { createProvenanceRecordSchema } from './provenance.js';
 
 const textFields = {
@@ -6,7 +7,7 @@ const textFields = {
   translation: { type: 'string' },
 } as const;
 
-export const parallelPassagesOutputSchema: Schema = {
+export const parallelPassagesOutputSchema = {
   type: 'object',
   properties: {
     schemaVersion: { type: 'string', enum: ['1'] },
@@ -80,9 +81,10 @@ export const parallelPassagesOutputSchema: Schema = {
   },
   required: ['schemaVersion', 'kind', 'requestedReference', 'corpora', 'sourceAttestedGroups', 'legacyParallels', 'openBibleCrossReferences', 'provenance'],
   additionalProperties: false,
-};
+} as NonNullable<Tool['outputSchema']>;
 
 export interface ParallelPassagesOutputV1 {
+  [key: string]: unknown;
   schemaVersion: '1';
   kind: 'parallel_passages';
   requestedReference: string;
@@ -90,6 +92,6 @@ export interface ParallelPassagesOutputV1 {
   sourceAttestedGroups: Array<Record<string, unknown>>;
   legacyParallels: Array<Record<string, unknown>>;
   openBibleCrossReferences: Array<Record<string, unknown>>;
-  provenance: Array<Record<string, unknown>>;
+  provenance: ProvenanceRecord[];
   warnings?: string[];
 }

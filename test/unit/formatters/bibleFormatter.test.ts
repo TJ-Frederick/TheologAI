@@ -4,8 +4,9 @@ import {
   formatMultiBibleResponse,
   formatCrossReferences,
   formatParallelPassages,
+  formatParallelPassageResearch,
 } from '../../../src/formatters/bibleFormatter.js';
-import type { BibleResult, CrossReferenceResult, ParallelPassageResult } from '../../../src/kernel/types.js';
+import type { BibleResult, CrossReferenceResult, ParallelPassageResult, ParallelPassageResearchResult } from '../../../src/kernel/types.js';
 
 // ── Fixtures ──
 
@@ -72,6 +73,27 @@ describe('formatBibleResponse', () => {
   it('returns trimmed output', () => {
     const out = formatBibleResponse(makeBibleResult());
     expect(out).toBe(out.trim());
+  });
+});
+
+describe('formatParallelPassageResearch', () => {
+  it('preserves complete groups while visually de-emphasizing the matched member', () => {
+    const result: ParallelPassageResearchResult = {
+      requestedReference: 'Luke 6:35', corpora: ['ubs_source_attested'], legacyParallels: [],
+      openBibleCrossReferences: [], provenance: [],
+      sourceAttestedGroups: [{
+        groupId: 'ubs-pp-test', sourceOrdinal: 1, label: 'source_attested_parallel', directionality: 'unspecified',
+        provenanceIds: ['ubs'], members: [
+          { sourceOrder: 1, sourceReference: 'LUK 6:35', normalizedReference: 'Luke 6:35', segments: [{ bookNumber: 42, chapter: 6, startVerse: 35, endVerse: 35 }], languageMarker: 'GRK', matched: true, text: 'Matched full text', translation: 'WEB' },
+          { sourceOrder: 2, sourceReference: 'MAT 5:44', normalizedReference: 'Matthew 5:44', segments: [{ bookNumber: 40, chapter: 5, startVerse: 44, endVerse: 44 }], languageMarker: 'GRK', matched: false, text: 'Parallel full text', translation: 'WEB' },
+        ],
+      }],
+    };
+    const output = formatParallelPassageResearch(result);
+    expect(output).toContain('_Matched passage: Luke 6:35_');
+    expect(output).toContain('**Matthew 5:44**');
+    expect(output).toContain('Matched full text');
+    expect(output).toContain('Parallel full text');
   });
 });
 

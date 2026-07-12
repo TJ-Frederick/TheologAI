@@ -8,6 +8,7 @@ import type {
   CrossReferenceResult,
   ParallelPassageResult,
   ParallelPassage,
+  ParallelPassageResearchResult,
 } from '../kernel/types.js';
 
 /** Format a single Bible result as Markdown */
@@ -114,4 +115,58 @@ export function formatParallelPassages(result: ParallelPassageResult): string {
   s += `\n*${result.citation.source}*`;
   if (result.citation.copyright) s += ` - ${result.citation.copyright}`;
   return s.trim();
+}
+
+/** Format the group-preserving UBS hard-cutover result. */
+export function formatParallelPassageResearch(result: ParallelPassageResearchResult): string {
+  let s = `**Parallel Passages for ${result.requestedReference}**\n`;
+
+  if (result.sourceAttestedGroups.length > 0) {
+    s += '\n### UBS source-attested groups\n';
+    for (const group of result.sourceAttestedGroups) {
+      s += `\n**Group ${group.sourceOrdinal}**\n`;
+      for (const member of group.members) {
+        const label = member.matched
+          ? `_Matched passage: ${member.normalizedReference}_`
+          : `**${member.normalizedReference}**`;
+        s += `- ${label} (${member.languageMarker}; source order ${member.sourceOrder})\n`;
+        if (member.alignmentBasis && member.alignmentRaw) {
+          s += `  - Alignment: ${member.alignmentBasis}; raw UBS codes \`${member.alignmentRaw}\`\n`;
+        }
+        if (member.text) s += `  > ${textExcerpt(member.text)}${member.translation ? ` (${member.translation})` : ''}\n`;
+      }
+    }
+  } else if (result.corpora.includes('ubs_source_attested')) {
+    s += '\nNo UBS source-attested parallel groups found.\n';
+  }
+
+  if (result.legacyParallels.length > 0) {
+    s += '\n### TheologAI legacy curated edges\n';
+    for (const parallel of result.legacyParallels) {
+      const confidence = Math.round(parallel.confidence * 100);
+      s += `- **${parallel.reference}** [${parallel.relationship}] (${confidence}% confidence)\n`;
+      if (parallel.text) s += `  > Text excerpt${parallel.translation ? ` (${parallel.translation})` : ''}: ${textExcerpt(parallel.text)}\n`;
+      if (parallel.notes) s += `  *${parallel.notes}*\n`;
+    }
+  } else if (result.corpora.includes('theologai_legacy')) {
+    s += '\nNo TheologAI legacy curated parallels found.\n';
+  }
+
+  if (result.openBibleCrossReferences.length > 0) {
+    s += '\n### OpenBible.info cross references\n';
+    for (const reference of result.openBibleCrossReferences) {
+      s += `- **${reference.reference}** (${reference.votes} votes)\n`;
+    }
+  }
+  if (result.warnings?.length) {
+    s += `\n${result.warnings.map(warning => `*Warning: ${warning}*`).join('\n')}\n`;
+  }
+  if (result.provenance.length > 0) {
+    s += `\n*Sources: ${result.provenance.map(record => `${record.label}${record.license ? ` (${record.license.label})` : ''}`).join('; ')}*`;
+  }
+  return s.trim();
+}
+
+function textExcerpt(text: string): string {
+  return `${text.substring(0, 200)}${text.length > 200 ? '…' : ''}`;
 }
