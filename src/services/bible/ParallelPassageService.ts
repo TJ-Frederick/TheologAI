@@ -23,6 +23,8 @@ import {
   UBS_PARALLEL_PROVENANCE_ID,
   ubsParallelProvenanceRecord,
 } from '../../kernel/parallelPassageProvenance.js';
+import { provenanceFromCitation, type ProvenanceRecord } from '../../kernel/provenance.js';
+import type { BibleResult } from '../../kernel/types.js';
 
 type Relationship = ParallelPassage['relationship'];
 interface RawParallelEntry {
@@ -80,16 +82,16 @@ export class ParallelPassageService {
       ? await this.lookupOpenBible(primaryReference, normalizeMaxParallels(params.maxParallels), warnings)
       : [];
 
-    if (params.includeText) {
-      await this.attachTexts(sourceAttestedGroups, legacyParallels, params.translation || 'ESV', warnings);
-    }
-    const provenance = [];
+    const provenance: ProvenanceRecord[] = [];
     if (corpora.includes('ubs_source_attested')) {
       if (!this.sourceAttestedService) throw new Error('UBS source-attested parallels are unavailable in this runtime');
       provenance.push(ubsParallelProvenanceRecord(await this.sourceAttestedService.getProvenance()));
     }
     if (corpora.includes('theologai_legacy')) provenance.push({ ...LEGACY_PARALLEL_PROVENANCE });
     if (includeOpenBible) provenance.push({ ...OPENBIBLE_CROSS_REFERENCE_PROVENANCE });
+    if (params.includeText) {
+      await this.attachTexts(sourceAttestedGroups, legacyParallels, params.translation || 'ESV', warnings, provenance);
+    }
     return {
       requestedReference: primaryReference,
       corpora,
@@ -121,6 +123,7 @@ export class ParallelPassageService {
         segments: member.segments.map(segment => ({ ...segment })),
         languageMarker: member.languageMarker,
         matched: member.segments.some(segment => requested.some(query => sourceSegmentsOverlap(segment, query))),
+        provenanceIds: [UBS_PARALLEL_PROVENANCE_ID],
         ...(params.includeAlignment ? { alignmentBasis: member.alignmentBasis, alignmentRaw: member.alignmentRaw } : {}),
       })),
       provenanceIds: [UBS_PARALLEL_PROVENANCE_ID],
@@ -139,6 +142,7 @@ export class ParallelPassageService {
         if (!relationshipMatchesMode(relationship, mode)) continue;
         candidates.set(member.reference, {
           reference: member.reference, relationship, confidence: group.confidence, notes: group.notes,
+          provenanceIds: [LEGACY_PARALLEL_PROVENANCE_ID],
         });
       }
     }
@@ -210,35 +214,43 @@ export class ParallelPassageService {
     legacyParallels: ParallelPassage[],
     translation: string,
     warnings: string[],
+    provenance: ProvenanceRecord[],
   ): Promise<void> {
     if (!this.bibleService) {
       warnings.push('Passage text is unavailable in this runtime.');
       return;
     }
 
-    const targets: Array<{ reference: string; apply: (text: string, resolvedTranslation: string) => void }> = [
+    const targets: Array<{ reference: string; apply: (result: BibleResult, provenanceId: string) => void }> = [
       ...sourceGroups.flatMap(group => group.members.map(member => ({
         reference: member.normalizedReference,
-        apply: (text: string, resolvedTranslation: string) => {
-          member.text = text;
-          member.translation = resolvedTranslation;
+        apply: (result: BibleResult, provenanceId: string) => {
+          member.text = result.text;
+          member.translation = result.translation;
+          member.provenanceIds.push(provenanceId);
         },
       }))),
       ...legacyParallels.map(parallel => ({
         reference: parallel.reference,
-        apply: (text: string, resolvedTranslation: string) => {
-          parallel.text = text;
-          parallel.translation = resolvedTranslation;
+        apply: (result: BibleResult, provenanceId: string) => {
+          parallel.text = result.text;
+          parallel.translation = result.translation;
+          parallel.provenanceIds = [...(parallel.provenanceIds ?? [LEGACY_PARALLEL_PROVENANCE_ID]), provenanceId];
         },
       })),
     ];
-
-    await mapWithConcurrency(targets, 4, async target => {
+    const consumersByReference = new Map<string, typeof targets>();
+    for (const target of targets) {
+      consumersByReference.set(target.reference, [...(consumersByReference.get(target.reference) ?? []), target]);
+    }
+    const provenanceBySource = new Map<string, string>();
+    await mapWithConcurrency([...consumersByReference.entries()], 4, async ([reference, consumers]) => {
       try {
-        const result = await this.bibleService!.lookup({ reference: target.reference, translation });
-        target.apply(result.text, result.translation);
+        const result = await this.bibleService!.lookup({ reference, translation });
+        const provenanceId = translationProvenanceId(result, provenance, provenanceBySource);
+        for (const consumer of consumers) consumer.apply(result, provenanceId);
       } catch {
-        warnings.push(`Text unavailable for ${target.reference}.`);
+        warnings.push(`Text unavailable for ${reference}.`);
       }
     });
   }
@@ -254,10 +266,36 @@ function normalizeCorpora(params: ParallelPassageLookupParams): ParallelPassageC
   if (!corpora.includes('theologai_legacy') && (params.mode !== undefined || params.maxParallels !== undefined)) {
     throw new ValidationError('corpora', "mode and maxParallels require corpora: ['theologai_legacy'].");
   }
-  if (!corpora.includes('ubs_source_attested') && params.includeAlignment !== undefined) {
+  if (!corpora.includes('ubs_source_attested') && params.includeAlignment === true) {
     throw new ValidationError('includeAlignment', 'includeAlignment requires the ubs_source_attested corpus.');
   }
   return [...corpora];
+}
+
+function translationProvenanceId(
+  result: BibleResult,
+  provenance: ProvenanceRecord[],
+  provenanceBySource: Map<string, string>,
+): string {
+  const candidate = provenanceFromCitation(result.citation, {
+    id: `translation-${provenance.length + 1}`,
+    kind: 'translation',
+    status: 'provider_attributed',
+    version: result.translation,
+    ...(recognizedLicense(result.citation.copyright) ? { license: recognizedLicense(result.citation.copyright) } : {}),
+  });
+  const key = JSON.stringify({ ...candidate, id: undefined });
+  const existing = provenanceBySource.get(key);
+  if (existing) return existing;
+  provenance.push(candidate);
+  provenanceBySource.set(key, candidate.id);
+  return candidate.id;
+}
+
+function recognizedLicense(copyright: string | undefined): { label: string } | undefined {
+  return /^public domain(?:\s+\([^)]*\))?$/i.test(copyright?.trim() ?? '')
+    ? { label: 'Public Domain' }
+    : undefined;
 }
 
 function resolveOpenBibleSelection(params: ParallelPassageLookupParams): boolean {

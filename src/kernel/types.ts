@@ -151,6 +151,7 @@ export interface ParallelPassage {
   confidence: number;
   uniqueElements?: string[];
   notes?: string;
+  provenanceIds?: string[];
 }
 
 export interface ParallelPassageAnalysis {
@@ -184,6 +185,7 @@ export interface SourceAttestedParallelMemberResult {
   alignmentRaw?: string;
   text?: string;
   translation?: string;
+  provenanceIds: string[];
 }
 
 export interface SourceAttestedParallelGroupResult {

@@ -123,6 +123,7 @@ export function formatParallelPassageResearch(result: ParallelPassageResearchRes
 
   if (result.sourceAttestedGroups.length > 0) {
     s += '\n### UBS source-attested groups\n';
+    s += '\n_These groups attest membership and source order only. They do not assert direction, relationship type, quotation status, or confidence._\n';
     for (const group of result.sourceAttestedGroups) {
       s += `\n**Group ${group.sourceOrdinal}**\n`;
       for (const member of group.members) {
@@ -130,10 +131,13 @@ export function formatParallelPassageResearch(result: ParallelPassageResearchRes
           ? `_Matched passage: ${member.normalizedReference}_`
           : `**${member.normalizedReference}**`;
         s += `- ${label} (${member.languageMarker}; source order ${member.sourceOrder})\n`;
+        if (member.sourceReference !== member.normalizedReference) {
+          s += `  - UBS source locator: \`${member.sourceReference}\` (normalized lookup: ${member.normalizedReference})\n`;
+        }
         if (member.alignmentBasis && member.alignmentRaw) {
           s += `  - Alignment: ${member.alignmentBasis}; raw UBS codes \`${member.alignmentRaw}\`\n`;
         }
-        if (member.text) s += `  > ${textExcerpt(member.text)}${member.translation ? ` (${member.translation})` : ''}\n`;
+        if (member.text) s += `  > ${textExcerpt(member.text)}${textAttribution(member.translation, member.provenanceIds ?? [], result)}\n`;
       }
     }
   } else if (result.corpora.includes('ubs_source_attested')) {
@@ -145,7 +149,7 @@ export function formatParallelPassageResearch(result: ParallelPassageResearchRes
     for (const parallel of result.legacyParallels) {
       const confidence = Math.round(parallel.confidence * 100);
       s += `- **${parallel.reference}** [${parallel.relationship}] (${confidence}% confidence)\n`;
-      if (parallel.text) s += `  > Text excerpt${parallel.translation ? ` (${parallel.translation})` : ''}: ${textExcerpt(parallel.text)}\n`;
+      if (parallel.text) s += `  > Text excerpt${textAttribution(parallel.translation, parallel.provenanceIds ?? [], result)}: ${textExcerpt(parallel.text)}\n`;
       if (parallel.notes) s += `  *${parallel.notes}*\n`;
     }
   } else if (result.corpora.includes('theologai_legacy')) {
@@ -169,4 +173,16 @@ export function formatParallelPassageResearch(result: ParallelPassageResearchRes
 
 function textExcerpt(text: string): string {
   return `${text.substring(0, 200)}${text.length > 200 ? '…' : ''}`;
+}
+
+function textAttribution(
+  translation: string | undefined,
+  provenanceIds: string[],
+  result: ParallelPassageResearchResult,
+): string {
+  const translationSource = provenanceIds
+    .map(id => result.provenance.find(record => record.id === id))
+    .find(record => record?.kind === 'translation');
+  const details = [translation, translationSource?.label, translationSource?.rightsNotice].filter(Boolean);
+  return details.length > 0 ? ` (${details.join('; ')})` : '';
 }

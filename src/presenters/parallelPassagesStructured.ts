@@ -1,6 +1,5 @@
 import type { ParallelPassageResearchResult } from '../kernel/types.js';
 import {
-  LEGACY_PARALLEL_PROVENANCE_ID,
   OPENBIBLE_PROVENANCE_ID,
 } from '../kernel/parallelPassageProvenance.js';
 import type { ParallelPassagesOutputV1 } from '../mcp/schemas/parallelPassages.js';
@@ -22,7 +21,7 @@ export function presentParallelPassagesStructured(result: ParallelPassageResearc
     })),
     legacyParallels: result.legacyParallels.map(parallel => ({
       ...parallel,
-      provenanceIds: [LEGACY_PARALLEL_PROVENANCE_ID],
+      provenanceIds: [...(parallel.provenanceIds ?? [])],
     })),
     openBibleCrossReferences: result.openBibleCrossReferences.map(reference => ({
       ...reference,

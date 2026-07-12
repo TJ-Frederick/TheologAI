@@ -277,6 +277,32 @@ describe('bible_cross_references handler', () => {
 });
 
 describe('parallel_passages handler', () => {
+  it('does not advertise defaults for source-specific legacy compatibility fields', () => {
+    const handler = createParallelPassagesHandler(serviceDouble({ lookup: vi.fn() }));
+    const properties = handler.inputSchema.properties as Record<string, Record<string, unknown>>;
+    expect(properties.mode).not.toHaveProperty('default');
+    expect(properties.maxParallels).not.toHaveProperty('default');
+    expect(properties.useCrossReferences).not.toHaveProperty('default');
+  });
+
+  it('accepts fully materialized advertised defaults without inferring legacy controls', async () => {
+    const lookup = vi.fn<ParallelPassageService['lookup']>().mockResolvedValue({
+      requestedReference: 'John 3:16', corpora: ['ubs_source_attested'], sourceAttestedGroups: [],
+      legacyParallels: [], openBibleCrossReferences: [], provenance: [],
+    });
+    const handler = createParallelPassagesHandler(serviceDouble({ lookup }));
+    const properties = handler.inputSchema.properties as Record<string, Record<string, unknown>>;
+    const materialized = Object.fromEntries(Object.entries(properties)
+      .filter(([, schema]) => 'default' in schema)
+      .map(([name, schema]) => [name, schema.default]));
+    const result = await handler.handler({ reference: 'John 3:16', ...materialized });
+
+    expect(result.isError).not.toBe(true);
+    expect(lookup).toHaveBeenCalledWith(expect.objectContaining({
+      corpora: ['ubs_source_attested'], maxGroups: 5, includeAlignment: false,
+      includeOpenBibleCrossReferences: false, mode: undefined, maxParallels: undefined, useCrossReferences: undefined,
+    }));
+  });
   it('forwards all lookup controls and formats text-bearing parallels', async () => {
     const lookup = vi.fn<ParallelPassageService['lookup']>().mockResolvedValue({
       requestedReference: 'Matthew 26:26-28',
