@@ -14,12 +14,14 @@ export interface ToolHandler {
   name: string;
   description: string;
   inputSchema: Tool['inputSchema'];
+  outputSchema?: Tool['outputSchema'];
   annotations?: Tool['annotations'];
   handler: (params: Record<string, unknown>) => Promise<ToolResult>;
 }
 
 export interface ToolResult {
   content: Array<{ type: 'text'; text: string }>;
+  structuredContent?: Record<string, unknown>;
   isError?: boolean;
 }
 

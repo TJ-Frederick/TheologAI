@@ -126,6 +126,12 @@ describe('bible_lookup handler', () => {
     expect(lookupMultiple).not.toHaveBeenCalled();
     expect(textOf(result)).toContain('John 3:16 (ESV)');
     expect(textOf(result)).toContain('For God so loved the world.');
+    expect(result.structuredContent).toMatchObject({
+      kind: 'bible_lookup',
+      requestedTranslations: ['ESV'],
+      passages: [{ translation: 'ESV', text: 'For God so loved the world.' }],
+      failures: [],
+    });
   });
 
   it('dispatches an array to multi-translation lookup', async () => {
@@ -171,6 +177,33 @@ describe('bible_lookup handler', () => {
     expect(textOf(result)).toContain('(2 translations requested; 1 available)');
     expect(textOf(result)).toContain('**WEB:**');
     expect(textOf(result)).toContain('**DBY:** unavailable');
+    expect(result.structuredContent).toMatchObject({
+      passages: [{ translation: 'WEB', text: 'Yahweh is my shepherd.' }],
+      failures: [{ translation: 'DBY', reason: 'Translation could not be retrieved.' }],
+    });
+  });
+
+  it('returns a valid empty-provenance structure when every requested translation fails', async () => {
+    const lookupMultiple = vi.fn<BibleService['lookupMultiple']>().mockResolvedValue({
+      reference: 'John 3:16',
+      results: [],
+      failures: [
+        { translation: 'ESV', reason: 'Translation could not be retrieved.' },
+        { translation: 'KJV', reason: 'Translation could not be retrieved.' },
+      ],
+    });
+    const handler = createBibleLookupHandler(serviceDouble<BibleService>({
+      lookup: vi.fn<BibleService['lookup']>(),
+      lookupMultiple,
+    }));
+
+    const result = await handler.handler({
+      reference: 'John 3:16',
+      translation: ['ESV', 'KJV'],
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({ passages: [], failures: expect.any(Array), provenance: [] });
   });
 
   it('treats a malformed legacy array string as a single translation value', async () => {
@@ -203,6 +236,7 @@ describe('bible_lookup handler', () => {
 
     expect(result.isError).toBe(true);
     expect(textOf(result)).toContain('Invalid input: A verse reference is required');
+    expect(result.structuredContent).toBeUndefined();
   });
 });
 
@@ -517,6 +551,12 @@ describe('original_language_lookup handler', () => {
     expect(lookup).toHaveBeenCalledWith('G25', true);
     expect(textOf(result)).toContain('**Derivation:** perhaps from agan');
     expect(textOf(result)).toContain('Occurrences: 143');
+    expect(result.structuredContent).toMatchObject({
+      kind: 'original_language_lookup',
+      mode: 'entry',
+      detailLevel: 'detailed',
+      entries: [{ strongsNumber: 'G25', derivation: 'perhaps from agan', extended: { occurrences: 143 } }],
+    });
   });
 
   it('performs a bounded search without requesting an exact lookup', async () => {
@@ -538,6 +578,12 @@ describe('original_language_lookup handler', () => {
     expect(lookup).not.toHaveBeenCalled();
     expect(textOf(result)).toContain("Strong's search results");
     expect(textOf(result)).toContain('**G26**');
+    expect(result.structuredContent).toMatchObject({
+      mode: 'search',
+      query: 'love',
+      detailLevel: 'summary',
+      entries: [{ strongsNumber: 'G26', language: 'Greek' }],
+    });
   });
 
   it('advertises both exact and search fields without a client-hostile branch schema', () => {

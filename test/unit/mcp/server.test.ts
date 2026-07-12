@@ -409,6 +409,31 @@ describe('shared MCP registration', () => {
       type: 'text',
       text: expect.stringContaining('G26'),
     }));
+    expect(wordStudy.messages[0].content).toEqual(expect.objectContaining({
+      text: expect.stringContaining('mode`, `entries`, `detailLevel`, and `provenanceIds`'),
+    }));
+    expect(wordStudy.messages[0].content).toEqual(expect.objectContaining({
+      text: expect.stringContaining('Do not treat one English gloss as exhausting'),
+    }));
+
+    const passageExegesis = await client.getPrompt({
+      name: 'passage-exegesis',
+      arguments: { reference: 'John 3:16' },
+    });
+    expect(passageExegesis.messages[0].content).toEqual(expect.objectContaining({
+      text: expect.stringContaining('`passages[]` and retain each translation'),
+    }));
+    expect(passageExegesis.messages[0].content).toEqual(expect.objectContaining({
+      text: expect.stringContaining('distinguish an unavailable translation'),
+    }));
+
+    const compareTranslations = await client.getPrompt({
+      name: 'compare-translations',
+      arguments: { reference: 'John 3:16' },
+    });
+    expect(compareTranslations.messages[0].content).toEqual(expect.objectContaining({
+      text: expect.stringContaining('compare by its `translation`, report every `failures[]` item'),
+    }));
 
     const searchedWord = await client.getPrompt({ name: 'word-study', arguments: { word: 'love' } });
     expect(searchedWord.messages[0].content).toEqual(expect.objectContaining({

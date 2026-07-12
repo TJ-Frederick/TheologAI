@@ -26,7 +26,7 @@ export function formatStrongsResult(result: EnhancedStrongsResult, detailLevel: 
     if (result.extended.morphologyCode) s += `Morphology: ${result.extended.morphologyCode}\n`;
     if (result.extended.source) s += `Lexicon: ${result.extended.source}\n`;
     if (result.extended.definition) {
-      s += `Definition: ${cleanLexiconText(result.extended.definition)}\n`;
+      s += `Definition: ${normalizeLexiconText(result.extended.definition)}\n`;
     }
     if (result.extended.occurrences) {
       s += `Occurrences: ${result.extended.occurrences}\n`;
@@ -48,17 +48,42 @@ export function formatStrongsResult(result: EnhancedStrongsResult, detailLevel: 
   return s.trim();
 }
 
-function cleanLexiconText(value: string): string {
-  return value
+/** Normalize STEPBible markup before exposing it in either result view. */
+export function normalizeLexiconText(value: string): string {
+  return decodeLexiconEntities(value)
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<ref=['"][^'"]*['"]>/gi, '')
     .replace(/<\/ref>/gi, '')
     .replace(/<[^>]+>/g, '')
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&amp;/gi, '&')
     .replace(/[ \t]+/g, ' ')
     .replace(/\n\s+/g, '\n')
     .trim();
+}
+
+function decodeLexiconEntities(value: string): string {
+  return value.replace(/&(#x[\da-f]+|#\d+|nbsp|amp|lt|gt|quot|apos);/gi, (_match, entity: string) => {
+    const normalized = entity.toLowerCase();
+    if (normalized === 'nbsp') return ' ';
+    if (normalized === 'amp') return '&';
+    if (normalized === 'lt') return '<';
+    if (normalized === 'gt') return '>';
+    if (normalized === 'quot') return '"';
+    if (normalized === 'apos') return "'";
+    const code = normalized.startsWith('#x')
+      ? Number.parseInt(normalized.slice(2), 16)
+      : Number.parseInt(normalized.slice(1), 10);
+    return !Number.isInteger(code) || code < 0 || code > 0x10FFFF
+      ? _match
+      : String.fromCodePoint(code);
+  });
+}
+
+/** Produce the bounded discovery summary used by Markdown and structured search. */
+export function summarizeDefinition(value: string, maxLength = 240): string {
+  const definition = normalizeLexiconText(value).replace(/\s+/g, ' ').trim();
+  return definition.length > maxLength
+    ? `${definition.slice(0, maxLength - 3)}…`
+    : definition;
 }
 
 /** Format lightweight search hits before the caller chooses an exact entry. */
@@ -73,8 +98,7 @@ export function formatStrongsSearchResults(query: string, results: StrongsEntry[
     ...results.map(entry => {
       const language = entry.testament === 'NT' ? 'Greek' : 'Hebrew';
       const transliteration = entry.transliteration ? ` — ${entry.transliteration}` : '';
-      const definition = entry.definition.replace(/\s+/g, ' ').trim();
-      const summary = definition.length > 240 ? `${definition.slice(0, 237)}…` : definition;
+      const summary = summarizeDefinition(entry.definition);
       return `- **${entry.strongs_number}** (${language}): ${entry.lemma}${transliteration} — ${summary}`;
     }),
     '',

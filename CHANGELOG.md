@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added stable MCP 2025-11-25 structured output and server-side schema
+  validation for `bible_lookup` and `original_language_lookup`, while keeping
+  their existing Markdown content available for legacy clients.
+- Added bounded, result-local provenance records and structured-first guidance
+  to the word-study, passage-exegesis, and compare-translations prompts.
+
 ### Corrected
 
 - Reconciled the current public contract at version 3.6.0: nine tools, five

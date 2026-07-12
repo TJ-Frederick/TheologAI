@@ -127,7 +127,7 @@ export function registerPromptHandlers(server: Server): void {
           : '';
         text = `Conduct a thorough word study on "${word}".${testamentHint}
 
-1. **Identify the original term** — ${callText(calls[0])}. If this is a search, choose the best matching Strong's number and make an exact detailed lookup.
+1. **Identify the original term** — ${callText(calls[0])}. Prefer structured \`mode\`, \`entries\`, \`detailLevel\`, and \`provenanceIds\` when present, with Markdown as fallback. For a search, first use its summary entries and only make a detailed extended lookup for a clearly selected Strong's entry. Do not treat one English gloss as exhausting the term's semantic range.
 2. **Examine morphological usage** — Find a key verse and use \`bible_verse_morphology\` to study its grammatical form.
 3. **Study contextual meaning** — Read 2–3 significant passages with \`bible_lookup\` and compare translations.
 4. **Explore cross-references** — Use \`bible_cross_references\` on a key verse.
@@ -138,7 +138,7 @@ export function registerPromptHandlers(server: Server): void {
         const reference = args?.reference ?? '';
         text = `Perform a systematic exegesis of ${reference}.
 
-1. **Read the text** — ${callText(calls[0])}; compare with ${callText(calls[1])}.
+1. **Read the text** — ${callText(calls[0])}; compare with ${callText(calls[1])}. Prefer structured \`passages[]\` and retain each translation's \`provenanceIds\`; distinguish an unavailable translation in \`failures[]\` from a translation whose text is absent.
 2. **Examine the original language** — ${callText(calls[2])}, then make exact \`original_language_lookup\` calls for significant Strong's numbers.
 3. **Explore connections** — ${callText(calls[3])} and ${callText(calls[4])}.
 4. **Consult commentaries** — ${callText(calls[5])} and ${callText(calls[6])}; note agreement and divergence.
@@ -153,6 +153,7 @@ export function registerPromptHandlers(server: Server): void {
 
 1. **Retrieve each translation**
 ${lookupCalls}
+Use structured \`passages[]\` when available, compare by its \`translation\`, report every \`failures[]\` item, and keep each citation/provenance link attached to the relevant translation. Fall back to the Markdown text when structured fields are unavailable.
 2. **Examine the original language** — ${callText(calls.at(-1)!)}.
 3. **Investigate divergences** — Make exact \`original_language_lookup\` calls for the relevant Strong's numbers.
 4. **Summarize** — Compare literal/dynamic choices and any theologically significant differences.`;

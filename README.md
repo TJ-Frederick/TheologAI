@@ -49,7 +49,11 @@ Cross-boundary event members such as John or Paul remain available as thematic
 connections in `thematic` and `auto` modes.
 
 All tools are annotated as read-only, non-destructive, and idempotent. Tool
-inputs use closed, bounded JSON Schema 2020-12 contracts.
+inputs use closed, bounded JSON Schema 2020-12 contracts. `bible_lookup` and
+`original_language_lookup` also advertise versioned object-root `outputSchema`
+contracts and return matching `structuredContent` beside the existing Markdown
+content. Their structured results include bounded, result-local provenance
+records; all other tools retain their current Markdown-only result contract.
 
 ### Resources
 
@@ -246,8 +250,10 @@ per-request D1 repositories. Both targets share one MCP registry.
 - The local historical collection needs document-level edition, source, and
   license metadata before redistribution claims can be made.
 - Hosted MCP Logging would require a deliberate stateful-session design.
-- Authentication, saved workspaces, structured tool output, completions, and
-  MCP tasks should be added only when a concrete workflow requires them.
+- Authentication, saved workspaces, completions, and MCP tasks should be added
+  only when a concrete workflow requires them. Structured output is currently
+  limited to the two representative lookup tools above; further conversions
+  require separate compatibility review.
 - Remote D1 compatibility must be checked before any deployment; migration or
   corpus replacement requires separate review and approval.
 
