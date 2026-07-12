@@ -135,11 +135,13 @@ export function createWorkerCompositionRoot(env: Env): WorkerCompositionRoot {
   // D1-dependent services (per-request)
   const crossRefService = new CrossReferenceService(crossRefRepo);
   const bibleService = getBibleService(env);
+  const sourceAttestedParallelService = new SourceAttestedParallelService(sourceAttestedParallelRepo);
   const parallelService = new ParallelPassageService(
     crossRefRepo,
     bibleService,
     undefined, // no databasePath in Workers
     parallelPassagesData as any, // preloaded from JSON module
+    sourceAttestedParallelService,
   );
   const historicalService = new HistoricalDocumentService(historicalRepo);
   const primarySourceSearchService = new PrimarySourceSearchService(
@@ -150,7 +152,6 @@ export function createWorkerCompositionRoot(env: Env): WorkerCompositionRoot {
   const strongsService = new StrongsService(strongsRepo);
   const morphService = new MorphologyService(morphRepo);
   const originalLanguageStudyService = new OriginalLanguageStudyService(morphRepo, strongsRepo);
-  const sourceAttestedParallelService = new SourceAttestedParallelService(sourceAttestedParallelRepo);
 
   // Module-scope services (cached across requests)
   const donationService = getDonationService(env);

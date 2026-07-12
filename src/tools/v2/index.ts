@@ -100,7 +100,10 @@ export function createCompositionRoot(): CompositionRoot {
   // Services
   const bibleService = new BibleService([esvAdapter, netAdapter, helloaoAdapter]);
   const crossRefService = new CrossReferenceService(crossRefRepo);
-  const parallelService = new ParallelPassageService(crossRefRepo, bibleService);
+  const sourceAttestedParallelService = new SourceAttestedParallelService(sourceAttestedParallelRepo);
+  const parallelService = new ParallelPassageService(
+    crossRefRepo, bibleService, undefined, undefined, sourceAttestedParallelService,
+  );
   const commentaryService = new CommentaryService([helloaoCommentary]);
   const ccelService = new CcelService(ccelAdapter);
   const historicalService = new HistoricalDocumentService(historicalRepo);
@@ -114,7 +117,6 @@ export function createCompositionRoot(): CompositionRoot {
   const strongsService = new StrongsService(strongsRepo);
   const morphService = new MorphologyService(morphRepo);
   const originalLanguageStudyService = new OriginalLanguageStudyService(morphRepo, strongsRepo);
-  const sourceAttestedParallelService = new SourceAttestedParallelService(sourceAttestedParallelRepo);
 
   // Donation (no DB dependency)
   const onChainVerifier = new OnChainVerifier({});

@@ -134,12 +134,6 @@ export function createDeterministicMcpFixture(): DeterministicMcpFixture {
 
   const bibleService = new BibleService([bibleAdapter]);
   const crossReferenceService = new CrossReferenceService(crossReferenceRepository);
-  const parallelPassageService = new ParallelPassageService(
-    crossReferenceRepository,
-    bibleService,
-    undefined,
-    { description: 'Deterministic test fixture', version: '1', parallels: {} },
-  );
   const sourceAttestedParallelService = new SourceAttestedParallelService({
     findGroups: () => [],
     getProvenance: () => ({
@@ -149,6 +143,13 @@ export function createDeterministicMcpFixture(): DeterministicMcpFixture {
       sourceSha256: '0'.repeat(64), transformVersion: 1, modified: true, modificationNote: 'Fixture',
     }),
   });
+  const parallelPassageService = new ParallelPassageService(
+    crossReferenceRepository,
+    bibleService,
+    undefined,
+    { description: 'Deterministic test fixture', version: '1', parallels: {} },
+    sourceAttestedParallelService,
+  );
   const commentaryService = new CommentaryService([commentaryAdapter]);
   const historicalService = new HistoricalDocumentService(historicalRepository);
   const primarySourceSearchService = new PrimarySourceSearchService(
