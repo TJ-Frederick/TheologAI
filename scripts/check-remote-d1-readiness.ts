@@ -2,21 +2,19 @@
 /** Read-only remote D1 compatibility gate used only inside approved deploy jobs. */
 
 import { execFileSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { johnOneOneReadinessPredicate } from './data-integrity.js';
+import { computeD1CorpusIdentity, parseDataManifest, verifyD1Schema } from './d1-corpus-identity.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const manifestBytes = readFileSync(join(ROOT, 'data', 'data-manifest.json'));
-const MANIFEST = JSON.parse(manifestBytes.toString('utf8')) as {
-  schemaVersion: string;
-  expectedCounts: Record<string, number>;
-};
-const MANIFEST_SHA256 = createHash('sha256').update(manifestBytes).digest('hex');
+const MANIFEST = parseDataManifest(manifestBytes);
+verifyD1Schema(ROOT, MANIFEST);
+const D1_CORPUS_IDENTITY = computeD1CorpusIdentity(MANIFEST);
 
-const REQUIRED_COLUMNS: Record<string, string[]> = {
+export const REQUIRED_COLUMNS: Readonly<Record<string, readonly string[]>> = {
   theologai_metadata: ['key', 'value'],
   cross_references: ['from_verse', 'to_verse', 'votes'],
   strongs: ['strongs_number', 'testament', 'lemma', 'transliteration', 'pronunciation', 'definition', 'derivation'],
@@ -32,7 +30,7 @@ const REQUIRED_COLUMNS: Record<string, string[]> = {
 export function buildD1ReadinessSql(
   expectedCounts: Record<string, number>,
   schemaVersion = MANIFEST.schemaVersion,
-  manifestSha256 = MANIFEST_SHA256,
+  d1CorpusIdentity = D1_CORPUS_IDENTITY,
 ): string {
   const countChecks = Object.entries(expectedCounts).map(([table, count]) => {
     if (!/^[a-z_]+$/.test(table) || !Number.isSafeInteger(count) || count < 0) {
@@ -50,12 +48,12 @@ export function buildD1ReadinessSql(
   const indexCheck = `(SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name IN (${quotedIndexes})) = ${requiredIndexes.length}`;
   const integrityCheck = `(SELECT quick_check FROM pragma_quick_check LIMIT 1) = 'ok'`;
   const foreignKeyCheck = `(SELECT COUNT(*) FROM pragma_foreign_key_check) = 0`;
-  if (!/^[a-z0-9_]+$/.test(schemaVersion) || !/^[a-f0-9]{64}$/.test(manifestSha256)) {
-    throw new Error('Invalid schema or manifest identity');
+  if (!/^[a-z0-9_]+$/.test(schemaVersion) || !/^[a-f0-9]{64}$/.test(d1CorpusIdentity)) {
+    throw new Error('Invalid schema or D1 corpus identity');
   }
   const identityChecks = [
     `(SELECT value FROM theologai_metadata WHERE key = 'schema_version') = '${schemaVersion}'`,
-    `(SELECT value FROM theologai_metadata WHERE key = 'corpus_manifest_sha256') = '${manifestSha256}'`,
+    `(SELECT value FROM theologai_metadata WHERE key = 'corpus_manifest_sha256') = '${d1CorpusIdentity}'`,
   ];
   const columnChecks = Object.entries(REQUIRED_COLUMNS).map(([table, columns]) =>
     `(SELECT group_concat(name, ',') FROM (SELECT name FROM pragma_table_info('${table}') ORDER BY cid)) = '${columns.join(',')}'`

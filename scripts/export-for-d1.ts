@@ -25,14 +25,13 @@ import {
   statementBytes,
 } from './d1-seed-utils.js';
 import { johnOneOneReadinessPredicate } from './data-integrity.js';
-
-interface SourceManifest {
-  manifestVersion: number;
-  schemaVersion: string;
-  algorithm: 'sha256';
-  files: Array<{ path: string; sha256: string }>;
-  expectedCounts: Record<string, number>;
-}
+import {
+  computeD1CorpusIdentity,
+  computeSourceInventoryIdentity,
+  parseDataManifest,
+  verifyD1Schema,
+  type DataManifest,
+} from './d1-corpus-identity.js';
 
 interface SeedStatement {
   sql: string;
@@ -146,10 +145,7 @@ function assertSemanticSource(database: string): void {
   }
 }
 
-function validateCanonicalSources(manifest: SourceManifest): void {
-  if (manifest.manifestVersion !== 1 || manifest.algorithm !== 'sha256') {
-    throw new Error('Unsupported canonical source manifest');
-  }
+function validateCanonicalSources(manifest: DataManifest): void {
   const paths = manifest.files.map(file => file.path);
   if (new Set(paths).size !== paths.length) throw new Error('Canonical source manifest has duplicate paths');
   if (JSON.stringify(paths) !== JSON.stringify([...paths].sort())) {
@@ -272,11 +268,13 @@ function writeChunks(table: string, ordinal: number, statements: SeedStatement[]
 
 const { database, clean } = parseArguments(process.argv.slice(2));
 const sourceManifestBytes = readFileSync(SOURCE_MANIFEST_PATH);
-const sourceManifest = JSON.parse(sourceManifestBytes.toString('utf8')) as SourceManifest;
+const sourceManifest = parseDataManifest(sourceManifestBytes);
+const d1CorpusIdentity = computeD1CorpusIdentity(sourceManifest);
+const schemaBytes = verifyD1Schema(ROOT, sourceManifest);
 validateCanonicalSources(sourceManifest);
 assertSemanticSource(database);
 
-const schemaPath = join(ROOT, 'migrations', `${sourceManifest.schemaVersion}.sql`);
+const schemaPath = join(ROOT, sourceManifest.materializations.d1.schema.path);
 if (!existsSync(schemaPath) || !statSync(schemaPath).isFile()) {
   throw new Error(`Tracked schema migration is missing: ${schemaPath}`);
 }
@@ -335,16 +333,21 @@ for (const file of files) {
 }
 
 const seedManifest = {
-  manifestVersion: 1,
+  manifestVersion: 2,
   algorithm: 'sha256',
   sourceManifest: {
     path: relative(ROOT, SOURCE_MANIFEST_PATH),
-    sha256: sha256Buffer(sourceManifestBytes),
+    sha256: computeSourceInventoryIdentity(sourceManifestBytes),
+  },
+  d1Materialization: {
+    identityVersion: sourceManifest.materializations.d1.identityVersion,
+    transformVersion: sourceManifest.materializations.d1.transformVersion,
+    sha256: d1CorpusIdentity,
   },
   schema: {
     version: sourceManifest.schemaVersion,
     path: relative(ROOT, schemaPath),
-    sha256: sha256File(schemaPath),
+    sha256: sha256Buffer(schemaBytes),
   },
   limits: {
     maximumStatementBytes: D1_MAX_STATEMENT_BYTES,
