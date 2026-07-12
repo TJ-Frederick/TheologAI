@@ -95,12 +95,23 @@ describe('StrongsService', () => {
       expect(repo.getLexiconEntry).toHaveBeenCalledWith(input);
       expect(result).toMatchObject({
         strongs_number: input,
+        testament: null,
+        language: input.startsWith('G') ? 'Greek' : 'Hebrew',
         sourceKind: 'stepbible_lexicon',
         citation: { source: 'STEPBible lexicon data' },
         lemma: sourceLexicon(input).extended_data.lemma,
         extended: { strongsExtended: input },
       });
       expect(result.definition).not.toMatch(/<[^>]+>/);
+    });
+
+    it('does not infer New Testament classification for the LXX-only G21502 identity', async () => {
+      const repo = makeMockRepo();
+      repo.lookup.mockReturnValue(undefined);
+      repo.getLexiconEntry.mockReturnValue(sourceLexicon('G21502'));
+      const result = await new StrongsService(repo as any).lookup('G21502');
+      expect(result).toMatchObject({ strongs_number: 'G21502', language: 'Greek', testament: null });
+      expect(result.definition).toContain('LXX');
     });
 
     it('keeps lexicon-only summary source-backed without forcing extended detail', async () => {

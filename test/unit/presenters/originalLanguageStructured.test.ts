@@ -38,7 +38,6 @@ describe('original-language structured presenter', () => {
   it('maps detailed and extended exact fields to linked provenance', () => {
     const result = presentOriginalLanguageEntry({
       strongs_number: 'G25',
-      testament: 'NT',
       lemma: 'ἀγαπάω',
       transliteration: 'agapaō',
       pronunciation: 'ag-ap-ah-o',
@@ -98,9 +97,11 @@ describe('original-language structured presenter', () => {
         url: 'https://github.com/STEPBible/STEPBible-Data',
       },
       sourceKind: 'stepbible_lexicon',
+      language: 'Greek',
+      testament: null,
     }, 'simple');
 
-    expect(result.entries[0]).toMatchObject({ strongsNumber: 'G21502', provenanceIds: ['src-1'] });
+    expect(result.entries[0]).toMatchObject({ strongsNumber: 'G21502', language: 'Greek', testament: null, provenanceIds: ['src-1'] });
     expect(result.provenance).toEqual([expect.objectContaining({
       id: 'src-1',
       label: 'STEPBible lexicon data',

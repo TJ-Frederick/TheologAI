@@ -83,6 +83,20 @@ describe('formatStrongsResult', () => {
     expect(out).toContain('**H430** (Hebrew)');
   });
 
+  it('renders a lexicon-only Greek identity without assigning a testament', () => {
+    const out = formatStrongsResult(makeStrongsResult({
+      strongs_number: 'G21502',
+      testament: null,
+      language: 'Greek',
+      sourceKind: 'stepbible_lexicon',
+      lemma: 'Ηνια',
+      definition: 'Heneia, man occurring at LXX in 1Ch.25.9',
+      citation: { source: 'STEPBible lexicon data', copyright: 'CC BY 4.0 (Tyndale House, Cambridge)' },
+    }));
+    expect(out).toContain('**G21502** (Greek)');
+    expect(out).not.toContain('New Testament');
+  });
+
   it('shows lemma, transliteration, pronunciation, definition', () => {
     const out = formatStrongsResult(makeStrongsResult());
     expect(out).toContain('**Lemma:** ἀγάπη');
