@@ -16,6 +16,10 @@ export function presentParallelPassagesStructured(result: ParallelPassageResearc
       members: group.members.map(member => ({
         ...member,
         segments: member.segments.map(segment => ({ ...segment })),
+        ...(member.excerpts ? { excerpts: member.excerpts.map(excerpt => ({
+          ...excerpt, provenanceIds: [...excerpt.provenanceIds],
+        })) } : {}),
+        provenanceIds: [...member.provenanceIds],
       })),
       provenanceIds: [...group.provenanceIds],
     })),

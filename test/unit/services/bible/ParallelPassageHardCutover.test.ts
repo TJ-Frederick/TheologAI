@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import type { ICrossReferenceRepository } from '../../../../src/kernel/repositories.js';
 import { UBS_PARALLEL_PASSAGE_PROVENANCE } from '../../../../src/kernel/ubsParallelSource.js';
 import { ParallelPassageService } from '../../../../src/services/bible/ParallelPassageService.js';
+import { BibleService } from '../../../../src/services/bible/BibleService.js';
+import { formatReference } from '../../../../src/kernel/reference.js';
 import { ubsFixture } from '../../../fixtures/ubsParallelCorpus.js';
 
 function crossReferences(references: Array<{ reference: string; votes: number }> = []): ICrossReferenceRepository {
@@ -63,7 +65,10 @@ describe('ParallelPassageService hard-cutover contract', () => {
     const lookup = vi.fn().mockImplementation(async ({ reference }) => ({ reference, translation: 'WEB', text: `Text ${reference}`, citation: { source: 'fixture' } }));
     const service = new ParallelPassageService(crossReferences(), { lookup } as any, undefined, legacyFixture(), sourceService() as any);
     const result = await service.lookup({ reference: 'Luke 6:35', includeText: true, translation: 'WEB', includeAlignment: true });
-    expect(result.sourceAttestedGroups[0].members.every(member => member.text?.startsWith('Text '))).toBe(true);
+    expect(result.sourceAttestedGroups[0].members[0].excerpts?.map(excerpt => excerpt.reference)).toEqual([
+      'Luke 6:27-28', 'Luke 6:35',
+    ]);
+    expect(result.sourceAttestedGroups[0].members.every(member => member.excerpts?.length)).toBeTruthy();
     expect(result.sourceAttestedGroups[0].members[0]).toMatchObject({ matched: true, alignmentBasis: 'UBSGNT5', alignmentRaw: '012345678' });
   });
 
@@ -74,17 +79,22 @@ describe('ParallelPassageService hard-cutover contract', () => {
       text: `Text ${reference}`,
       citation: reference.startsWith('Matthew')
         ? { source: 'Provider B', copyright: 'Public Domain' }
-        : { source: 'Provider A', copyright: 'Licensed text' },
+        : reference === 'Luke 6:35'
+          ? { source: 'Provider C', copyright: 'Licensed text C' }
+          : { source: 'Provider A', copyright: 'Licensed text A' },
     }));
     const service = new ParallelPassageService(crossReferences(), { lookup } as any, undefined, legacyFixture(), sourceService() as any);
     const result = await service.lookup({
       reference: 'Luke 6:35', corpora: ['ubs_source_attested', 'theologai_legacy'], includeText: true,
     });
 
-    expect(lookup).toHaveBeenCalledTimes(2);
-    expect(lookup.mock.calls.map(([params]) => params.reference).sort()).toEqual(['Luke 6:27-28,35', 'Matthew 5:44']);
+    expect(lookup).toHaveBeenCalledTimes(3);
+    expect(lookup.mock.calls.map(([params]) => params.reference).sort()).toEqual([
+      'Luke 6:27-28', 'Luke 6:35', 'Matthew 5:44',
+    ]);
     expect(result.provenance.filter(record => record.kind === 'translation').map(record => record.label).sort())
-      .toEqual(['Provider A', 'Provider B']);
+      .toEqual(['Provider A', 'Provider B', 'Provider C']);
+    expect(result.sourceAttestedGroups[0].members[0].provenanceIds).toHaveLength(3);
     const sharedReference = result.sourceAttestedGroups[0].members.find(member => member.normalizedReference === 'Matthew 5:44')!;
     expect(sharedReference.provenanceIds).toHaveLength(2);
     expect(result.legacyParallels[0].provenanceIds).toEqual(sharedReference.provenanceIds.map(id =>
@@ -98,9 +108,55 @@ describe('ParallelPassageService hard-cutover contract', () => {
     });
     const service = new ParallelPassageService(crossReferences(), { lookup } as any, undefined, legacyFixture(), sourceService() as any);
     const result = await service.lookup({ reference: 'Luke 6:35', includeText: true });
-    expect(result.warnings).toEqual(['Text unavailable for Luke 6:27-28,35.']);
-    expect(result.sourceAttestedGroups[0].members[1].text).toBe('Available');
+    expect(result.warnings).toEqual([
+      'Text unavailable for Luke 6:27-28.',
+      'Text unavailable for Luke 6:35.',
+    ]);
+    expect(result.sourceAttestedGroups[0].members[1].text).toBe('Matthew 5:44: Available');
+    expect(result.sourceAttestedGroups[0].members[1].excerpts).toEqual([
+      expect.objectContaining({ segmentOrder: 1, reference: 'Matthew 5:44', text: 'Available' }),
+    ]);
     expect(result.provenance).toEqual(expect.arrayContaining([expect.objectContaining({ label: 'Provider B', kind: 'translation' })]));
+  });
+
+  it('uses the real BibleService canonical parser for every discontinuous member segment', async () => {
+    const requested: string[] = [];
+    const bible = new BibleService([{
+      supportedTranslations: ['WEB'],
+      isConfigured: () => true,
+      getCopyright: () => 'Public Domain',
+      getPassage: async (reference, translation) => {
+        const formatted = formatReference(reference);
+        requested.push(formatted);
+        return { reference: formatted, translation, text: `Canonical ${formatted}`, citation: { source: 'Fixture WEB', copyright: 'Public Domain' } };
+      },
+    }]);
+    const service = new ParallelPassageService(crossReferences(), bible, undefined, legacyFixture(), sourceService() as any);
+    const result = await service.lookup({ reference: 'Luke 6:35', includeText: true, translation: 'WEB' });
+
+    expect(requested).toEqual(['Luke 6:27-28', 'Luke 6:35', 'Matthew 5:44']);
+    expect(requested).not.toContain('Luke 6:27-28,35');
+    expect(result.sourceAttestedGroups[0].members[0].excerpts).toEqual([
+      expect.objectContaining({ segmentOrder: 1, reference: 'Luke 6:27-28', text: 'Canonical Luke 6:27-28' }),
+      expect.objectContaining({ segmentOrder: 2, reference: 'Luke 6:35', text: 'Canonical Luke 6:35' }),
+    ]);
+  });
+
+  it('bounds all structured excerpts and member aggregates to 200 Unicode code points', async () => {
+    const lookup = vi.fn().mockImplementation(async ({ reference }) => ({
+      reference, translation: 'WEB', text: `😀${'x'.repeat(250)}`, citation: { source: 'Fixture' },
+    }));
+    const service = new ParallelPassageService(crossReferences(), { lookup } as any, undefined, legacyFixture(), sourceService() as any);
+    const result = await service.lookup({
+      reference: 'Luke 6:35', corpora: ['ubs_source_attested', 'theologai_legacy'], includeText: true,
+    });
+    for (const member of result.sourceAttestedGroups[0].members) {
+      expect(Array.from(member.text ?? '')).toHaveLength(200);
+      expect(member.text?.endsWith('…')).toBe(true);
+      for (const excerpt of member.excerpts ?? []) expect(Array.from(excerpt.text)).toHaveLength(200);
+    }
+    expect(Array.from(result.legacyParallels[0].text ?? '')).toHaveLength(200);
+    expect(result.legacyParallels[0].text?.endsWith('…')).toBe(true);
   });
 
   it('allows a materialized false alignment default with legacy-only selection', async () => {

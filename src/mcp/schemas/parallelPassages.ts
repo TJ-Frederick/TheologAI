@@ -3,7 +3,7 @@ import type { ProvenanceRecord } from '../../kernel/provenance.js';
 import { createProvenanceRecordSchema } from './provenance.js';
 
 const textFields = {
-  text: { type: 'string' },
+  text: { type: 'string', maxLength: 200 },
   translation: { type: 'string' },
 } as const;
 
@@ -34,6 +34,21 @@ export const parallelPassagesOutputSchema = {
                 normalizedReference: { type: 'string' }, languageMarker: { type: 'string', enum: ['HEB', 'GRK'] },
                 matched: { type: 'boolean' }, alignmentBasis: { type: 'string', enum: ['BHS', 'LXX', 'UBSGNT5'] },
                 alignmentRaw: { type: 'string' }, ...textFields,
+                excerpts: {
+                  type: 'array', minItems: 1,
+                  items: {
+                    type: 'object',
+                    properties: {
+                      segmentOrder: { type: 'integer', minimum: 1 },
+                      reference: { type: 'string' },
+                      text: { type: 'string', maxLength: 200 },
+                      translation: { type: 'string' },
+                      provenanceIds: { type: 'array', minItems: 1, uniqueItems: true, items: { type: 'string' } },
+                    },
+                    required: ['segmentOrder', 'reference', 'text', 'translation', 'provenanceIds'],
+                    additionalProperties: false,
+                  },
+                },
                 provenanceIds: { type: 'array', minItems: 1, uniqueItems: true, items: { type: 'string' } },
                 segments: {
                   type: 'array', minItems: 1, items: {
