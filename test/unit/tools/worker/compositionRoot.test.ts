@@ -196,10 +196,10 @@ describe('createWorkerCompositionRoot', () => {
       expect(root.services.strongsService).toBeDefined();
     });
 
-    it('exposes the internal D1-backed source-attested parallel service without adding a public tool', () => {
+    it('exposes the internal D1-backed source-attested parallel service with the eleven-tool registry', () => {
       const root = createWorkerCompositionRoot(makeEnv());
       expect(root.services.sourceAttestedParallelService).toBeDefined();
-      expect(root.tools).toHaveLength(9);
+      expect(root.tools).toHaveLength(11);
     });
   });
 

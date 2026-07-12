@@ -15,7 +15,6 @@ import {
 import { NotFoundError } from '../kernel/errors.js';
 import { parseStrongsIdentity } from '../kernel/strongs.js';
 import { parseLocalDocumentResourceUri } from '../kernel/documentResource.js';
-import { parseStrongsIdentity } from '../kernel/strongs.js';
 import { LOCAL_HISTORICAL_SOURCE } from '../formatters/historicalFormatter.js';
 import type { ToolHandler } from '../kernel/types.js';
 import type { BibleService } from '../services/bible/BibleService.js';
