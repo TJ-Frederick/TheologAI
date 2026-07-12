@@ -279,32 +279,47 @@ describe('bible_cross_references handler', () => {
 describe('parallel_passages handler', () => {
   it('forwards all lookup controls and formats text-bearing parallels', async () => {
     const lookup = vi.fn<ParallelPassageService['lookup']>().mockResolvedValue({
-      primary: { reference: 'Matthew 26:26-28' },
-      parallels: [{
+      requestedReference: 'Matthew 26:26-28',
+      corpora: ['theologai_legacy'],
+      sourceAttestedGroups: [],
+      legacyParallels: [{
         reference: 'Mark 14:22-24',
         relationship: 'synoptic',
         confidence: 0.95,
         text: 'And as they were eating...',
       }],
-      citation,
+      openBibleCrossReferences: [],
+      provenance: [],
     });
     const handler = createParallelPassagesHandler(serviceDouble({ lookup }));
 
     const result = await handler.handler({
       reference: 'Matthew 26:26-28',
+      corpora: ['theologai_legacy'],
       mode: 'synoptic',
       includeText: true,
       translation: 'KJV',
       maxParallels: 4,
+      maxGroups: undefined,
+      includeAlignment: undefined,
+      includeOpenBibleCrossReferences: undefined,
       useCrossReferences: false,
+    });
+    expect(result.structuredContent).toMatchObject({
+      schemaVersion: '1', kind: 'parallel_passages', corpora: ['theologai_legacy'],
+      sourceAttestedGroups: [], openBibleCrossReferences: [],
     });
 
     expect(lookup).toHaveBeenCalledWith({
       reference: 'Matthew 26:26-28',
+      corpora: ['theologai_legacy'],
       mode: 'synoptic',
       includeText: true,
       translation: 'KJV',
       maxParallels: 4,
+      maxGroups: undefined,
+      includeAlignment: undefined,
+      includeOpenBibleCrossReferences: undefined,
       useCrossReferences: false,
     });
     expect(textOf(result)).toContain('[synoptic] (95% confidence)');
