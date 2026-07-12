@@ -38,6 +38,19 @@ const assertions: Record<string, (result: ToolEvidence) => boolean> = {
     && members(result).every(m => Array.isArray(m.provenanceIds) && m.provenanceIds.length > 0)
     && (structured(result).provenance?.some(p => p.kind === 'translation') ?? false)
     && /\(WEB(?:;|\))/.test(text(result)),
+  excerptsBounded: result => {
+    const ubsTexts = members(result).flatMap(member => [
+      ...(typeof member.text === 'string' ? [member.text] : []),
+      ...(Array.isArray(member.excerpts)
+        ? member.excerpts.flatMap(excerpt => typeof excerpt === 'object' && excerpt !== null
+          && 'text' in excerpt && typeof excerpt.text === 'string' ? [excerpt.text] : [])
+        : []),
+    ]);
+    const legacyTexts = (structured(result).legacyParallels ?? [])
+      .flatMap(item => typeof item.text === 'string' ? [item.text] : []);
+    const storedTexts = [...ubsTexts, ...legacyTexts];
+    return storedTexts.length > 0 && storedTexts.every(value => Array.from(value).length <= 200);
+  },
   openBibleSeparate: result => (structured(result).openBibleCrossReferences?.length ?? 0) > 0
     && /OpenBible\.info cross references/.test(text(result)),
   openBibleAttribution: result => /OpenBible\.info.*CC BY/i.test(text(result)),
@@ -83,7 +96,13 @@ export async function runAudit(url: URL, cases: AuditCase[], timeoutMs = 30_000)
           arguments: testCase.arguments,
         }), timeoutMs, testCase.name) as ToolEvidence;
         const checks = evaluateCase(testCase, response);
-        records.push({ ...testCase, durationMs: Date.now() - started, passed: checks.every(c => c.passed), checks, response });
+        records.push({
+          ...testCase,
+          durationMs: Date.now() - started,
+          passed: checks.every(c => c.passed),
+          checks,
+          response: sanitizeEvidence(response),
+        });
       } catch (error) {
         records.push({ ...testCase, durationMs: Date.now() - started, passed: false, checks: [], transportError: String(error) });
       }
@@ -95,6 +114,23 @@ export async function runAudit(url: URL, cases: AuditCase[], timeoutMs = 30_000)
     schemaVersion: '1', audit: 'parallel-passages-preview', endpoint: url.toString(), startedAt,
     finishedAt: new Date().toISOString(), passed: records.every(record => record.passed), records,
   };
+}
+
+/** Never persist an unbounded provider or Markdown text field in audit evidence. */
+export function sanitizeEvidence<T>(value: T): T {
+  if (Array.isArray(value)) return value.map(item => sanitizeEvidence(item)) as T;
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [
+      key,
+      key === 'text' && typeof item === 'string' ? boundEvidenceText(item) : sanitizeEvidence(item),
+    ])) as T;
+  }
+  return value;
+}
+
+function boundEvidenceText(value: string): string {
+  const codePoints = Array.from(value);
+  return codePoints.length <= 200 ? value : `${codePoints.slice(0, 199).join('')}…`;
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
