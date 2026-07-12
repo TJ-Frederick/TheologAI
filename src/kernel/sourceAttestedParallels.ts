@@ -1,4 +1,5 @@
 /** Source-neutral domain contracts for externally attested parallel-passage groups. */
+import type { RepositoryResult } from './repositories.js';
 
 export type SourceParallelLanguageMarker = 'HEB' | 'GRK';
 export type SourceParallelAlignmentBasis = 'BHS' | 'LXX' | 'UBSGNT5';
@@ -54,6 +55,6 @@ export interface SourceAttestedParallelLookup {
 }
 
 export interface ISourceAttestedParallelRepository {
-  findGroups(reference: string, maxGroups?: number): readonly SourceAttestedParallelGroup[];
-  getProvenance(): Readonly<ParallelSourceProvenance>;
+  findGroups(reference: string, maxGroups?: number): RepositoryResult<readonly SourceAttestedParallelGroup[]>;
+  getProvenance(): RepositoryResult<Readonly<ParallelSourceProvenance>>;
 }

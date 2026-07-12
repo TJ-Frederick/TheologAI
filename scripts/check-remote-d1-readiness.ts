@@ -6,12 +6,13 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { johnOneOneReadinessPredicate } from './data-integrity.js';
-import { computeD1CorpusIdentity, parseDataManifest, verifyD1Schema } from './d1-corpus-identity.js';
+import { computeD1CorpusIdentity, parseDataManifest, verifyD1Migrations } from './d1-corpus-identity.js';
+import { UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY, UBS_PARALLEL_PASSAGE_PROVENANCE } from '../src/kernel/ubsParallelSource.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const manifestBytes = readFileSync(join(ROOT, 'data', 'data-manifest.json'));
 const MANIFEST = parseDataManifest(manifestBytes);
-verifyD1Schema(ROOT, MANIFEST);
+verifyD1Migrations(ROOT, MANIFEST);
 const D1_CORPUS_IDENTITY = computeD1CorpusIdentity(MANIFEST);
 
 export const REQUIRED_COLUMNS: Readonly<Record<string, readonly string[]>> = {
@@ -25,6 +26,10 @@ export const REQUIRED_COLUMNS: Readonly<Record<string, readonly string[]>> = {
   document_sections: ['id', 'document_id', 'section_number', 'title', 'content', 'topics'],
   sections_fts: ['title', 'content', 'topics'],
   morph_codes: ['code', 'expansion'],
+  ubs_parallel_sources: ['source_id', 'schema_version', 'transform_version', 'artifact_identity', 'title', 'publisher', 'copyright', 'license', 'license_url', 'source_url', 'source_path', 'source_commit', 'source_commit_date', 'source_blob', 'source_bytes', 'source_sha256', 'modified', 'modification_note', 'label', 'directionality'],
+  ubs_parallel_groups: ['group_id', 'source_id', 'source_ordinal', 'label', 'directionality'],
+  ubs_parallel_members: ['group_id', 'source_order', 'source_reference', 'normalized_reference', 'language_marker', 'alignment_basis', 'alignment_raw'],
+  ubs_parallel_segments: ['group_id', 'member_order', 'segment_order', 'book_number', 'chapter', 'start_verse', 'end_verse'],
 };
 
 export function buildD1ReadinessSql(
@@ -43,6 +48,8 @@ export function buildD1ReadinessSql(
     'idx_xref_votes',
     'idx_morph_verse',
     'idx_morph_strongs',
+    'idx_ubs_groups_source_order',
+    'idx_ubs_segments_lookup',
   ];
   const quotedIndexes = requiredIndexes.map(name => `'${name}'`).join(',');
   const indexCheck = `(SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name IN (${quotedIndexes})) = ${requiredIndexes.length}`;
@@ -54,6 +61,9 @@ export function buildD1ReadinessSql(
   const identityChecks = [
     `(SELECT value FROM theologai_metadata WHERE key = 'schema_version') = '${schemaVersion}'`,
     `(SELECT value FROM theologai_metadata WHERE key = 'corpus_manifest_sha256') = '${d1CorpusIdentity}'`,
+    `(SELECT artifact_identity FROM ubs_parallel_sources WHERE source_id = 'ubs_paratext_parallel_passages') = '${UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY}'`,
+    `(SELECT source_sha256 FROM ubs_parallel_sources WHERE source_id = 'ubs_paratext_parallel_passages') = '${UBS_PARALLEL_PASSAGE_PROVENANCE.sourceSha256}'`,
+    `(SELECT transform_version FROM ubs_parallel_sources WHERE source_id = 'ubs_paratext_parallel_passages') = ${UBS_PARALLEL_PASSAGE_PROVENANCE.transformVersion}`,
   ];
   const columnChecks = Object.entries(REQUIRED_COLUMNS).map(([table, columns]) =>
     `(SELECT group_concat(name, ',') FROM (SELECT name FROM pragma_table_info('${table}') ORDER BY cid)) = '${columns.join(',')}'`

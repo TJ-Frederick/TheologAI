@@ -20,6 +20,8 @@
     "d1:seed:verify-workerd": "tsx scripts/verify-d1-seed-workerd.ts",
     "d1:corpus:compare": "tsx scripts/compare-d1-corpora.ts",
     "d1:remote:check": "tsx scripts/check-remote-d1-readiness.ts",
+    "benchmark:ubs-runtime": "tsx scripts/benchmark-ubs-runtime.ts",
+    "test:worker-bundle-ubs": "tsx scripts/check-worker-bundle-excludes-ubs.ts",
     "start": "node dist/index.js",
     "clean": "rm -rf dist",
     "typecheck": "npm run typecheck:node && npm run typecheck:worker",

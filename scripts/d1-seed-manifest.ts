@@ -12,7 +12,7 @@ import {
   computeD1CorpusIdentity,
   computeSourceInventoryIdentity,
   parseDataManifest,
-  verifyD1Schema,
+  verifyD1Migrations,
   type DataManifest,
 } from './d1-corpus-identity.js';
 
@@ -31,7 +31,7 @@ export interface SeedManifest {
   algorithm: 'sha256';
   sourceManifest: { path: string; sha256: string };
   d1Materialization: { identityVersion: number; transformVersion: number; sha256: string };
-  schema: { version: string; path: string; sha256: string };
+  migrations: Array<{ path: string; sha256: string }>;
   limits: { maximumStatementBytes: number; targetFileBytes: number };
   tableOrder: string[];
   expectedCounts: Record<string, number>;
@@ -55,10 +55,8 @@ export function assertSeedManifestBinding(
     || seed.d1Materialization.sha256 !== computeD1CorpusIdentity(source)) {
     throw new Error('D1 seed materialization identity is stale');
   }
-  if (seed.schema.version !== source.schemaVersion
-    || seed.schema.path !== d1.schema.path
-    || seed.schema.sha256 !== d1.schema.sha256) {
-    throw new Error('D1 seed schema identity is stale');
+  if (JSON.stringify(seed.migrations) !== JSON.stringify(d1.migrations)) {
+    throw new Error('D1 seed migration identity is stale');
   }
   const canonicalCounts = (value: Record<string, number>) => JSON.stringify(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)));
   if (canonicalCounts(seed.expectedCounts) !== canonicalCounts(source.expectedCounts)) {
@@ -70,7 +68,7 @@ export function loadAndVerifyD1SeedManifest(root: string, seedRoot: string): See
   const sourcePath = join(root, 'data', 'data-manifest.json');
   const sourceBytes = readFileSync(sourcePath);
   const source = parseDataManifest(sourceBytes);
-  verifyD1Schema(root, source);
+  verifyD1Migrations(root, source);
   const manifestPath = join(seedRoot, 'seed-manifest.json');
   if (!existsSync(manifestPath)) throw new Error('D1 seed is absent; run npm run d1:seed:export first');
   const seed = JSON.parse(readFileSync(manifestPath, 'utf8')) as SeedManifest;

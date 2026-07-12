@@ -7,7 +7,7 @@ import { dirname, isAbsolute, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { buildD1ReadinessSql } from './check-remote-d1-readiness.js';
 import { assertJohnOneOneDatabase } from './data-integrity.js';
-import { computeD1CorpusIdentity, parseDataManifest, verifyD1Schema } from './d1-corpus-identity.js';
+import { computeD1CorpusIdentity, parseDataManifest, verifyD1Migrations } from './d1-corpus-identity.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -35,9 +35,9 @@ const databasePath = getDatabasePath(process.argv.slice(2));
 if (!existsSync(databasePath)) throw new Error(`Database not found: ${databasePath}`);
 
 const manifest = parseDataManifest(readFileSync(MANIFEST_PATH));
-verifyD1Schema(ROOT, manifest);
+verifyD1Migrations(ROOT, manifest);
 const expectedTables = Object.keys(manifest.expectedCounts).sort();
-const expectedIndexes = ['idx_morph_strongs', 'idx_morph_verse', 'idx_xref_from', 'idx_xref_votes'];
+  const expectedIndexes = ['idx_morph_strongs', 'idx_morph_verse', 'idx_ubs_groups_source_order', 'idx_ubs_segments_lookup', 'idx_xref_from', 'idx_xref_votes'];
 const db = new Database(databasePath, { readonly: true, fileMustExist: true });
 
 try {

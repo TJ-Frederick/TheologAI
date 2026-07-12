@@ -10,7 +10,7 @@ export interface DataManifestFile {
 export interface D1MaterializationManifest {
   identityVersion: number;
   transformVersion: number;
-  schema: DataManifestFile;
+  migrations: DataManifestFile[];
   inputs: string[];
 }
 
@@ -29,7 +29,7 @@ export interface D1CorpusIdentityProjection {
   identityVersion: number;
   transformVersion: number;
   schemaVersion: string;
-  schema: DataManifestFile;
+  migrations: DataManifestFile[];
   inputs: DataManifestFile[];
   expectedCounts: Array<{ table: string; count: number }>;
 }
@@ -50,6 +50,10 @@ export const D1_EXPECTED_TABLES = Object.freeze([
   'strongs',
   'strongs_fts',
   'theologai_metadata',
+  'ubs_parallel_groups',
+  'ubs_parallel_members',
+  'ubs_parallel_segments',
+  'ubs_parallel_sources',
 ] as const);
 
 export function parseDataManifest(bytes: Buffer | string): DataManifest {
@@ -78,9 +82,18 @@ export function validateDataManifest(manifest: DataManifest): void {
     throw new Error('Invalid D1 materialization version');
   }
   const expectedSchemaPath = `migrations/${manifest.schemaVersion}.sql`;
-  if (!d1.schema || d1.schema.path !== expectedSchemaPath
-    || !SAFE_SCHEMA_PATH.test(d1.schema.path) || !SHA256.test(d1.schema.sha256)) {
-    throw new Error(`Invalid D1 materialization schema: expected ${expectedSchemaPath}`);
+  if (!Array.isArray(d1.migrations) || d1.migrations.length === 0
+    || d1.migrations.at(-1)?.path !== expectedSchemaPath) {
+    throw new Error(`Invalid D1 migration set: expected latest ${expectedSchemaPath}`);
+  }
+  const migrationPaths = new Set<string>();
+  for (const [index, migration] of d1.migrations.entries()) {
+    if (!SAFE_SCHEMA_PATH.test(migration.path) || !SHA256.test(migration.sha256)
+      || migrationPaths.has(migration.path)
+      || !migration.path.startsWith(`migrations/${String(index + 1).padStart(4, '0')}_`)) {
+      throw new Error(`Invalid ordered D1 migration at position ${index + 1}`);
+    }
+    migrationPaths.add(migration.path);
   }
   const inputs = new Set<string>();
   for (const path of d1.inputs) {
@@ -110,7 +123,7 @@ export function buildD1CorpusIdentityProjection(manifest: DataManifest): D1Corpu
     identityVersion: manifest.materializations.d1.identityVersion,
     transformVersion: manifest.materializations.d1.transformVersion,
     schemaVersion: manifest.schemaVersion,
-    schema: { ...manifest.materializations.d1.schema },
+    migrations: manifest.materializations.d1.migrations.map(migration => ({ ...migration })),
     inputs: [...manifest.materializations.d1.inputs]
       .sort()
       .map(path => ({ path, sha256: files.get(path)!.sha256 })),
@@ -130,15 +143,16 @@ export function computeSourceInventoryIdentity(bytes: Buffer | string): string {
   return createHash('sha256').update(bytes).digest('hex');
 }
 
-export function verifyD1Schema(root: string, manifest: DataManifest): Buffer {
+export function verifyD1Migrations(root: string, manifest: DataManifest): Buffer[] {
   validateDataManifest(manifest);
-  const schema = manifest.materializations.d1.schema;
-  const bytes = readFileSync(join(root, schema.path));
-  const actualSha256 = createHash('sha256').update(bytes).digest('hex');
-  if (actualSha256 !== schema.sha256) {
-    throw new Error(`D1 schema checksum mismatch for ${schema.path}: expected ${schema.sha256}, received ${actualSha256}`);
-  }
-  return bytes;
+  return manifest.materializations.d1.migrations.map(migration => {
+    const bytes = readFileSync(join(root, migration.path));
+    const actualSha256 = createHash('sha256').update(bytes).digest('hex');
+    if (actualSha256 !== migration.sha256) {
+      throw new Error(`D1 migration checksum mismatch for ${migration.path}: expected ${migration.sha256}, received ${actualSha256}`);
+    }
+    return bytes;
+  });
 }
 
 export class D1SourceConsumptionRegistry {

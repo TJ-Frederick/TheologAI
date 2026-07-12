@@ -6,7 +6,7 @@ import { existsSync, readFileSync, readdirSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { assertProvenanceMatches, type SourceMetadata } from './build-ubs-parallel-passages.js';
-import { parseDataManifest, verifyD1Schema, type DataManifest } from './d1-corpus-identity.js';
+import { parseDataManifest, verifyD1Migrations, type DataManifest } from './d1-corpus-identity.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -53,7 +53,7 @@ function gitBlobChecksum(bytes: Buffer): string {
 const manifest = parseDataManifest(readFileSync(MANIFEST_PATH)) as DataManifest & {
   sources?: Record<string, SourceMetadata>;
 };
-verifyD1Schema(ROOT, manifest);
+verifyD1Migrations(ROOT, manifest);
 
 const schemaPath = join(ROOT, 'migrations', `${manifest.schemaVersion}.sql`);
 if (!existsSync(schemaPath)) {

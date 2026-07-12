@@ -38,7 +38,7 @@ function run(args: string[]): string {
 try {
   const common = ['THEOLOGAI_DB', '--local', '--persist-to', state, '--config', 'wrangler.toml'];
   run(['d1', 'migrations', 'apply', ...common]);
-  const migrationName = basename(sourceManifest.materializations.d1.schema.path);
+  const migrationNames = sourceManifest.materializations.d1.migrations.map(migration => basename(migration.path));
   const columnChecks = Object.entries(REQUIRED_COLUMNS).map(([table, columns]) =>
     `(SELECT group_concat(name, ',') FROM (SELECT name FROM pragma_table_info('${table}') ORDER BY cid)) = '${columns.join(',')}'`
   );
@@ -48,9 +48,9 @@ try {
     ...common,
     '--command',
     `SELECT CASE WHEN
-      (SELECT COUNT(*) FROM d1_migrations) = 1
-      AND (SELECT name FROM d1_migrations LIMIT 1) = '${migrationName}'
-      AND (SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name IN ('idx_xref_from','idx_xref_votes','idx_morph_verse','idx_morph_strongs')) = 4
+      (SELECT COUNT(*) FROM d1_migrations) = ${migrationNames.length}
+      AND (SELECT group_concat(name, ',') FROM (SELECT name FROM d1_migrations ORDER BY id)) = '${migrationNames.join(',')}'
+      AND (SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name IN ('idx_xref_from','idx_xref_votes','idx_morph_verse','idx_morph_strongs','idx_ubs_groups_source_order','idx_ubs_segments_lookup')) = 6
       AND ${columnChecks.join('\n      AND ')}
       THEN 'schema-ready' ELSE json_extract('Wrangler-applied migration state mismatch', '$') END AS schema_state;`,
     '--json',
@@ -64,6 +64,10 @@ try {
     'documents',
     'document_sections',
     'fts',
+    'ubs_parallel_sources',
+    'ubs_parallel_groups',
+    'ubs_parallel_members',
+    'ubs_parallel_segments',
   ]);
   const firstChunkTables = new Set(['strongs', 'stepbible_lexicons', 'cross_references', 'morphology']);
   const seen = new Set<string>();
@@ -98,6 +102,11 @@ try {
       AND (SELECT COUNT(*) FROM document_sections) = ${manifest.expectedCounts.document_sections}
       AND (SELECT COUNT(*) FROM strongs_fts) > 0
       AND (SELECT COUNT(*) FROM sections_fts) = ${manifest.expectedCounts.sections_fts}
+      AND (SELECT COUNT(*) FROM ubs_parallel_sources) = ${manifest.expectedCounts.ubs_parallel_sources}
+      AND (SELECT COUNT(*) FROM ubs_parallel_groups) = ${manifest.expectedCounts.ubs_parallel_groups}
+      AND (SELECT COUNT(*) FROM ubs_parallel_members) = ${manifest.expectedCounts.ubs_parallel_members}
+      AND (SELECT COUNT(*) FROM ubs_parallel_segments) = ${manifest.expectedCounts.ubs_parallel_segments}
+      AND (SELECT artifact_identity FROM ubs_parallel_sources LIMIT 1) = 'a5fd0d4646cb69f426f592c6e334866191201fbe64691cd55c7f7ecd0ca9d4cc'
       THEN 'ready' ELSE json_extract('Local D1 representative import failed', '$') END AS readiness;`,
     '--json',
   ]);

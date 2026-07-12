@@ -1,15 +1,21 @@
 {
   "manifestVersion": 2,
-  "schemaVersion": "0001_initial_schema",
+  "schemaVersion": "0002_ubs_parallel_passages",
   "algorithm": "sha256",
   "materializations": {
     "d1": {
       "identityVersion": 1,
-      "transformVersion": 1,
-      "schema": {
-        "path": "migrations/0001_initial_schema.sql",
-        "sha256": "9d215bf550538e17198dba3012e1db053a1340c9c5331618f6d0b8bb79e6d3b9"
-      },
+      "transformVersion": 2,
+      "migrations": [
+        {
+          "path": "migrations/0001_initial_schema.sql",
+          "sha256": "9d215bf550538e17198dba3012e1db053a1340c9c5331618f6d0b8bb79e6d3b9"
+        },
+        {
+          "path": "migrations/0002_ubs_parallel_passages.sql",
+          "sha256": "2db4e445009cd8b5242fb7939517e9ac7c413da0cfa8824dca3def016681dd6f"
+        }
+      ],
       "inputs": [
         "data/biblical-languages/stepbible-lexicons/tbesg-greek.json",
         "data/biblical-languages/stepbible-lexicons/tbesh-hebrew.json",
@@ -99,7 +105,8 @@
         "data/historical-documents/philaret-catechism.json",
         "data/historical-documents/westminster-confession.json",
         "data/historical-documents/westminster-larger-catechism.json",
-        "data/historical-documents/westminster-shorter-catechism.json"
+        "data/historical-documents/westminster-shorter-catechism.json",
+        "src/data/ubs-parallel-passages.generated.json"
       ]
     }
   },
@@ -513,6 +520,10 @@
     "documents": 17,
     "document_sections": 3054,
     "sections_fts": 3054,
-    "morph_codes": 20
+    "morph_codes": 20,
+    "ubs_parallel_sources": 1,
+    "ubs_parallel_groups": 2193,
+    "ubs_parallel_members": 5266,
+    "ubs_parallel_segments": 5276
   }
 }

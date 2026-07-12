@@ -27,7 +27,7 @@ function source(): DataManifest {
       d1: {
         identityVersion: 1,
         transformVersion: 1,
-        schema: { path: 'migrations/0001_initial_schema.sql', sha256: schemaSha },
+        migrations: [{ path: 'migrations/0001_initial_schema.sql', sha256: schemaSha }],
         inputs: ['data/source.json'],
       },
     },
@@ -50,7 +50,7 @@ function fixture(): { source: DataManifest; bytes: Buffer; seed: SeedManifest } 
         transformVersion: 1,
         sha256: computeD1CorpusIdentity(canonical),
       },
-      schema: { version: canonical.schemaVersion, ...canonical.materializations.d1.schema },
+      migrations: canonical.materializations.d1.migrations.map(migration => ({ ...migration })),
       limits: { maximumStatementBytes: 100_000, targetFileBytes: 8_388_608 },
       tableOrder: [],
       expectedCounts: { ...canonical.expectedCounts },
@@ -69,8 +69,8 @@ describe('standalone D1 seed manifest binding', () => {
   it.each([
     ['source inventory', (seed: SeedManifest) => { seed.sourceManifest.sha256 = createHash('sha256').update('stale').digest('hex'); }],
     ['D1 identity', (seed: SeedManifest) => { seed.d1Materialization.sha256 = 'c'.repeat(64); }],
-    ['schema path', (seed: SeedManifest) => { seed.schema.path = 'migrations/other.sql'; }],
-    ['schema hash', (seed: SeedManifest) => { seed.schema.sha256 = 'd'.repeat(64); }],
+    ['migration path', (seed: SeedManifest) => { seed.migrations[0].path = 'migrations/other.sql'; }],
+    ['migration hash', (seed: SeedManifest) => { seed.migrations[0].sha256 = 'd'.repeat(64); }],
     ['expected counts', (seed: SeedManifest) => { seed.expectedCounts.strongs = 1; }],
   ] as const)('rejects stale standalone %s state', (_label, mutate) => {
     const value = fixture();
@@ -83,11 +83,11 @@ describe('standalone D1 seed manifest binding', () => {
     try {
       const value = fixture();
       const schema = 'CREATE TABLE stable(id INTEGER);\n';
-      value.source.materializations.d1.schema.sha256 = createHash('sha256').update(schema).digest('hex');
+      value.source.materializations.d1.migrations[0].sha256 = createHash('sha256').update(schema).digest('hex');
       value.bytes = Buffer.from(JSON.stringify(value.source));
       value.seed.sourceManifest.sha256 = computeSourceInventoryIdentity(value.bytes);
       value.seed.d1Materialization.sha256 = computeD1CorpusIdentity(value.source);
-      value.seed.schema.sha256 = value.source.materializations.d1.schema.sha256;
+      value.seed.migrations[0].sha256 = value.source.materializations.d1.migrations[0].sha256;
       const sql = 'SELECT 1;\n';
       const file = {
         path: '00-empty-target-check-000.sql',
@@ -105,7 +105,7 @@ describe('standalone D1 seed manifest binding', () => {
       const seedRoot = join(root, 'scripts', 'd1-seed');
       mkdirSync(seedRoot, { recursive: true });
       writeFileSync(join(root, 'data', 'data-manifest.json'), value.bytes);
-      writeFileSync(join(root, value.source.materializations.d1.schema.path), schema);
+      writeFileSync(join(root, value.source.materializations.d1.migrations[0].path), schema);
       writeFileSync(join(seedRoot, 'seed-manifest.json'), `${JSON.stringify(value.seed)}\n`);
       writeFileSync(join(seedRoot, file.path), sql);
       expect(() => loadAndVerifyD1SeedManifest(root, seedRoot)).not.toThrow();

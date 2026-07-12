@@ -40,15 +40,15 @@ npm run d1:seed:export -- --database /absolute/path/to/corpus.db --clean
 
 The exporter is read-only with respect to its source database. It verifies the
 canonical source checksums and database row counts, derives columns and primary
-key ordering from that database, and uses the schema version named by the source
-manifest. It never copies schema SQL into the seed.
+key ordering from that database, and uses the ordered migration set named by the
+source manifest. It never copies migration SQL into the seed.
 
 Each SQL file is generated in an explicit table and primary-key order. Files
 target 8 MiB, and every individual statement is checked against D1's current
 100,000-byte maximum. Long historical sections are assembled from smaller,
 byte-validated statements. `seed-manifest.json` records, in application order:
 
-- the full source-inventory hash, scoped D1 materialization identity, and schema hash;
+- the full source-inventory hash, scoped D1 materialization identity, and ordered migration hashes;
 - every seed file's SHA-256 and byte size;
 - statement and inserted-row counts;
 - the D1 statement and target-file limits used by the exporter; and
@@ -72,10 +72,11 @@ if it reads an undeclared source or leaves a declared D1 input unused.
 
 `theologai_metadata.corpus_manifest_sha256` stores a canonical D1 materialization
 identity, despite the legacy column name. The identity covers the D1 identity and
-transform versions, schema version plus the exact migration path/checksum,
+transform versions, schema version plus every ordered migration path/checksum,
 sorted D1 input paths/checksums, and sorted
-expected table counts. It deliberately does not cover Worker-bundled sources such
-as either parallel-passage corpus. The seed manifest records the full inventory
+expected table counts. The generated UBS parallel-passage artifact is now a D1
+input; the smaller curated legacy parallel corpus remains Worker-bundled and is
+not a D1 input. The seed manifest records the full inventory
 hash separately for provenance. Changing a non-D1 source therefore does not
 claim that D1 changed; changing any D1 input or materialization contract still
 blocks deployment until the corresponding database is prepared.
@@ -91,7 +92,8 @@ row and compares deterministic table hashes with the source SQLite database;
 `verify-workerd` applies complete metadata/document/FTS chunks plus a generated
 chunk of every large table through Wrangler's isolated local D1 runtime. This
 keeps the D1 syntax/runtime check practical while the full semantic verifier
-continues to cover all 846,860 rows. The exact production readiness query is
+continues to cover all 859,596 rows, including the exact 12,736-row normalized
+UBS delta. The exact production readiness query is
 separately exercised against the complete derived SQLite database.
 
 ### Readiness compatibility and rollback

@@ -30,7 +30,13 @@ interface ReferenceIndexEntry {
   endVerse: number;
 }
 
-interface ValidatedUbsCorpus {
+export interface ValidatedUbsCorpus {
+  schemaVersion: 'ubs-parallel-passages.v2';
+  transformVersion: 2;
+  artifactIdentity: string;
+  label: 'source_attested_parallel';
+  directionality: 'unspecified';
+  license: { name: string; url: string };
   provenance: ParallelSourceProvenance;
   groups: SourceAttestedParallelGroup[];
   referenceIndex: Record<string, ReferenceIndexEntry[]>;
@@ -59,7 +65,7 @@ export class UbsParallelPassageRepository implements ISourceAttestedParallelRepo
   private readonly referenceIndex: Readonly<Record<string, readonly ReferenceIndexEntry[]>>;
 
   constructor(artifact: unknown, expectedArtifactIdentity = UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY) {
-    const corpus = validateCorpus(artifact, expectedArtifactIdentity);
+    const corpus = validateUbsParallelArtifact(artifact, expectedArtifactIdentity);
     this.provenance = Object.freeze({ ...corpus.provenance });
     for (const group of corpus.groups) this.groupsById.set(group.groupId, deepFreezeGroup(group));
     this.referenceIndex = corpus.referenceIndex;
@@ -69,8 +75,10 @@ export class UbsParallelPassageRepository implements ISourceAttestedParallelRepo
     if (maxGroups !== Number.POSITIVE_INFINITY && (!Number.isSafeInteger(maxGroups) || maxGroups < 1)) {
       throw new Error('maxGroups must be a positive safe integer');
     }
+    const parsed = parseSourceAttestedLookupReference(reference);
+    if (parsed.segments.length > 8) throw new Error('reference exceeds the reviewed 8-segment query bound');
     const groupIds = new Set<string>();
-    for (const segment of parseSourceAttestedLookupReference(reference).segments) {
+    for (const segment of parsed.segments) {
       const entries = this.referenceIndex[`${segment.bookNumber}:${segment.chapter}`] ?? [];
       for (const entry of entries) {
         if (entry.startVerse <= segment.endVerse && segment.startVerse <= entry.endVerse) groupIds.add(entry.groupId);
@@ -87,7 +95,7 @@ export class UbsParallelPassageRepository implements ISourceAttestedParallelRepo
   }
 }
 
-function validateCorpus(input: unknown, expectedArtifactIdentity: string): ValidatedUbsCorpus {
+export function validateUbsParallelArtifact(input: unknown, expectedArtifactIdentity = UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY): ValidatedUbsCorpus {
   const corpus = record(input, 'artifact');
   exactKeys(corpus, TOP_LEVEL_KEYS, 'artifact');
   equal(corpus.schemaVersion, 'ubs-parallel-passages.v2', 'artifact.schemaVersion');
@@ -120,7 +128,12 @@ function validateCorpus(input: unknown, expectedArtifactIdentity: string): Valid
   }
 
   const referenceIndex = validateIndex(corpus.referenceIndex, groups);
-  return { provenance, groups, referenceIndex };
+  return {
+    schemaVersion: 'ubs-parallel-passages.v2', transformVersion: 2, artifactIdentity,
+    label: 'source_attested_parallel', directionality: 'unspecified',
+    license: { name: license.name as string, url: license.url as string },
+    provenance, groups, referenceIndex,
+  };
 }
 
 function validateGroup(input: unknown, expectedOrdinal: number, provenance: ParallelSourceProvenance): SourceAttestedParallelGroup {
