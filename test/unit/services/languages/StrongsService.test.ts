@@ -51,9 +51,9 @@ describe('StrongsService', () => {
     it('canonicalizes padding while preserving a sense suffix', async () => {
       const repo = makeMockRepo();
       const service = new StrongsService(repo as any);
-      await service.lookup(' g01722A ', true);
-      expect(repo.lookup).toHaveBeenCalledWith('G1722a');
-      expect(repo.getLexiconEntry).toHaveBeenCalledWith('G1722a');
+      await service.lookup(' g02385i ', true);
+      expect(repo.lookup).toHaveBeenCalledWith('G2385I');
+      expect(repo.getLexiconEntry).toHaveBeenCalledWith('G2385I');
     });
 
     it('throws ValidationError for invalid format', async () => {
@@ -68,11 +68,17 @@ describe('StrongsService', () => {
       await expect(service.lookup('')).rejects.toThrow(ValidationError);
     });
 
+    it.each(['G0', 'G5625', 'H8675', 'G9007199254740993'])('rejects unsafe or out-of-corpus identity %s', async input => {
+      const repo = makeMockRepo();
+      await expect(new StrongsService(repo as any).lookup(input)).rejects.toThrow(ValidationError);
+      expect(repo.lookup).not.toHaveBeenCalled();
+    });
+
     it('throws NotFoundError when repo returns undefined', async () => {
       const repo = makeMockRepo();
       repo.lookup.mockReturnValue(undefined);
       const service = new StrongsService(repo as any);
-      await expect(service.lookup('G9999')).rejects.toThrow(NotFoundError);
+      await expect(service.lookup('G5624')).rejects.toThrow(NotFoundError);
     });
 
     it('maps repo entry to EnhancedStrongsResult with citation', async () => {

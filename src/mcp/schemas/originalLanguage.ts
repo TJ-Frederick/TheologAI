@@ -52,7 +52,7 @@ export interface OriginalLanguageOutputV1 {
 const entrySchema: Schema = {
   type: 'object',
   properties: {
-    strongsNumber: { type: 'string', minLength: 2, maxLength: 16, pattern: '^[GHgh]\\d+[a-z]?$' },
+    strongsNumber: { type: 'string', minLength: 2, maxLength: 6, pattern: '^[GHgh]0*[1-9]\\d*[A-Za-z]?$' },
     language: { type: 'string', enum: ['Greek', 'Hebrew'] },
     testament: { type: 'string', enum: ['NT', 'OT'] },
     lemma: { type: ['string', 'null'], minLength: 1, maxLength: 500 },
@@ -110,7 +110,7 @@ export const originalLanguageOutputSchema = {
         arguments: {
           type: 'object',
           properties: {
-            strongs_number: { type: 'string', minLength: 2, maxLength: 16, pattern: '^[GHgh]\\d+[a-z]?$' },
+            strongs_number: { type: 'string', minLength: 2, maxLength: 6, pattern: '^[GHgh]0*[1-9]\\d*[A-Za-z]?$' },
             detail_level: { const: 'detailed' },
             include_extended: { const: true },
           },

@@ -45,18 +45,18 @@ describe('D1StrongsRepository', () => {
       expect(db.prepare).toHaveBeenCalledTimes(2);
     });
 
-    it('preserves suffix identity before falling back to the base entry', async () => {
+    it('treats a suffixed public identity as exact', async () => {
       const binds: unknown[] = [];
       const db = {
         prepare: vi.fn().mockImplementation(() => ({
           bind: vi.fn().mockImplementation((value: unknown) => {
             binds.push(value);
-            return { first: vi.fn().mockResolvedValue(value === 'G1722' ? sampleEntry : null) };
+            return { first: vi.fn().mockResolvedValue(value === 'G2385I' ? sampleEntry : null) };
           }),
         })),
       };
-      expect(await new D1StrongsRepository(db as any).lookup('g01722A')).toEqual(sampleEntry);
-      expect(binds).toEqual(['G1722a', 'G1722']);
+      expect(await new D1StrongsRepository(db as any).lookup('g02385i')).toEqual(sampleEntry);
+      expect(binds).toEqual(['G2385I']);
     });
 
     it('returns undefined when both exact and padded fail', async () => {
@@ -136,19 +136,19 @@ describe('D1StrongsRepository', () => {
       expect(typeof result!.extended_data).toBe('object');
     });
 
-    it('preserves suffix identity before falling back to the base morphology key', async () => {
+    it('uses the source-grounded uppercase suffixed morphology key exactly', async () => {
       const binds: unknown[] = [];
-      const row = { strongs_number: 'H0430', source: 'BDB', extended_data: '{}' };
+      const row = { strongs_number: 'G2385I', source: 'STEPBible', extended_data: '{}' };
       const db = {
         prepare: vi.fn().mockImplementation(() => ({
           bind: vi.fn().mockImplementation((value: unknown) => {
             binds.push(value);
-            return { first: vi.fn().mockResolvedValue(value === 'H0430' ? row : null) };
+            return { first: vi.fn().mockResolvedValue(value === 'G2385I' ? row : null) };
           }),
         })),
       };
-      expect(await new D1StrongsRepository(db as any).getLexiconEntry('h430A')).toMatchObject({ strongs_number: 'H0430' });
-      expect(binds).toEqual(['H0430a', 'H0430']);
+      expect(await new D1StrongsRepository(db as any).getLexiconEntry('g2385i')).toMatchObject({ strongs_number: 'G2385I' });
+      expect(binds).toEqual(['G2385I']);
     });
 
     it('returns undefined when row is null', async () => {

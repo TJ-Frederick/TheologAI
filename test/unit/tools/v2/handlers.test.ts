@@ -93,7 +93,7 @@ describe('v2 tool handler schemas', () => {
     });
     expect(originalLanguage).not.toHaveProperty('oneOf');
     expect(originalLanguage.properties).toMatchObject({
-      strongs_number: { minLength: 2, maxLength: 16 },
+      strongs_number: { minLength: 2, maxLength: 6 },
       query: { minLength: 2, maxLength: 100 },
       limit: { minimum: 1, maximum: 20 },
     });
@@ -655,11 +655,11 @@ describe('original_language_lookup handler', () => {
     });
     const handler = createStrongsLookupHandler(serviceDouble({ lookup }));
 
-    const suffixed = await handler.handler({ strongs_number: 'g01722A' });
-    const spaced = await handler.handler({ strongs_number: ' G1722a ' });
+    const suffixed = await handler.handler({ strongs_number: 'g2385i' });
+    const spaced = await handler.handler({ strongs_number: ' G2385I ' });
 
     expect(suffixed.isError).not.toBe(true);
-    expect(lookup).toHaveBeenCalledWith('g01722A', false);
+    expect(lookup).toHaveBeenCalledWith('g2385i', false);
     expect(spaced.isError).toBe(true);
     expect(lookup).toHaveBeenCalledTimes(1);
   });

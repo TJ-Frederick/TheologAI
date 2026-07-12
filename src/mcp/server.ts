@@ -13,6 +13,7 @@ import {
   ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { NotFoundError } from '../kernel/errors.js';
+import { parseStrongsIdentity } from '../kernel/strongs.js';
 import { LOCAL_HISTORICAL_SOURCE } from '../formatters/historicalFormatter.js';
 import type { ToolHandler } from '../kernel/types.js';
 import type { BibleService } from '../services/bible/BibleService.js';
@@ -202,11 +203,11 @@ export function createTheologAiMcpServer(
     }
 
     // theologai://strongs/{number}
-    const strongsMatch = uri.match(/^theologai:\/\/strongs\/([GHgh]\d+[a-z]?)$/);
-    if (strongsMatch) {
+    const strongsMatch = uri.match(/^theologai:\/\/strongs\/([^/]+)$/);
+    const strongsIdentity = strongsMatch ? parseStrongsIdentity(strongsMatch[1]) : undefined;
+    if (strongsIdentity) {
       try {
-        const number = strongsMatch[1].toUpperCase();
-        const entry = await services.strongsService.lookup(number, true);
+        const entry = await services.strongsService.lookup(strongsIdentity.publicId, true);
 
         const lines = [
           `# ${entry.strongs_number} — ${entry.lemma}\n`,

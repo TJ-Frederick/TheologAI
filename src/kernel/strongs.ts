@@ -1,12 +1,16 @@
 /** Canonical identities used by the public Strong's API and STEPBible data. */
 export interface CanonicalStrongsIdentity {
-  /** Unpadded public identifier, preserving an optional lowercase sense suffix. */
+  prefix: 'G' | 'H';
+  number: number;
+  suffix?: string;
+  /** Unpadded public identifier, preserving an optional uppercase STEPBible suffix. */
   publicId: string;
   /** Four-digit STEPBible/morphology identifier, preserving the same suffix. */
   morphologyKey: string;
 }
 
-const STRONGS_ID = /^([GH])(\d+)([a-z]?)$/i;
+const STRONGS_ID = /^([GH])(\d+)([A-Z]?)$/i;
+const MAX_NUMBER = { G: 5624, H: 8674 } as const;
 
 /**
  * Parse a Strong's identifier once at the kernel boundary.
@@ -19,17 +23,17 @@ export function parseStrongsIdentity(input: string): CanonicalStrongsIdentity | 
   const match = STRONGS_ID.exec(input.trim());
   if (!match) return undefined;
 
-  const prefix = match[1].toUpperCase();
-  const digits = match[2].replace(/^0+(?=\d)/, '');
-  const suffix = match[3].toLowerCase();
+  const prefix = match[1].toUpperCase() as 'G' | 'H';
+  const number = Number(match[2]);
+  if (!Number.isSafeInteger(number) || number < 1 || number > MAX_NUMBER[prefix]) return undefined;
+  const digits = String(number);
+  const suffix = match[3].toUpperCase() || undefined;
 
   return {
-    publicId: `${prefix}${digits}${suffix}`,
-    morphologyKey: `${prefix}${digits.padStart(4, '0')}${suffix}`,
+    prefix,
+    number,
+    suffix,
+    publicId: `${prefix}${digits}${suffix ?? ''}`,
+    morphologyKey: `${prefix}${digits.padStart(4, '0')}${suffix ?? ''}`,
   };
-}
-
-/** Remove an optional sense suffix while retaining the chosen key format. */
-export function baseStrongsId(id: string): string {
-  return id.replace(/[a-z]$/, '');
 }
