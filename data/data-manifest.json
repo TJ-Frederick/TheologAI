@@ -2,6 +2,24 @@
   "manifestVersion": 1,
   "schemaVersion": "0001_initial_schema",
   "algorithm": "sha256",
+  "sources": {
+    "ubs_paratext_parallel_passages": {
+      "sourceId": "ubs_paratext_parallel_passages",
+      "title": "UBS Parallel Passage Database",
+      "publisher": "United Bible Societies",
+      "copyright": "© 2023 United Bible Societies",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "sourceUrl": "https://github.com/ubsicap/ubs-open-license/tree/fd7bcf88b20a1522d3916f437f012c561466fe7b/parallel%20passages",
+      "sourcePath": "parallel passages/ParallelPassages.xml",
+      "sourceCommit": "fd7bcf88b20a1522d3916f437f012c561466fe7b",
+      "sourceCommitDate": "2023-07-10",
+      "sourceBlob": "b30af22e9ee4740f6c339eb267a59b8fdb9f83f7",
+      "sourceBytes": 336250,
+      "sourceSha256": "d43e7554556c1a1c5e2464e6b5ad8a4ab9118ada11060bf6b200abf3d0d0a394",
+      "transformVersion": 1
+    }
+  },
   "files": [
     {
       "path": "data/biblical-languages/stepbible-lexicons/tbesg-greek.json",
@@ -360,8 +378,28 @@
       "sha256": "581bdbd02fe99b97a6e236b893bce459d8b8b477789df9e16c5ef8dbcf612b85"
     },
     {
+      "path": "data/parallel-passages/ubs-paratext/LICENSE.md",
+      "sha256": "924513d06ecd19f5abb3d5a41973452983bf2b471347253d07d7cc529a466c8c"
+    },
+    {
+      "path": "data/parallel-passages/ubs-paratext/ParallelPassages.xml",
+      "sha256": "d43e7554556c1a1c5e2464e6b5ad8a4ab9118ada11060bf6b200abf3d0d0a394"
+    },
+    {
+      "path": "data/parallel-passages/ubs-paratext/README.md",
+      "sha256": "252675adaa4296c1eb2b9b0cfab75cdc1d765cc2ef2425685c0e26f5525731f9"
+    },
+    {
+      "path": "data/parallel-passages/ubs-paratext/SOURCE.json",
+      "sha256": "ba0bbf93da809494a9e033e7047fd47bf04d905499a8b695f41e263b1c4239d9"
+    },
+    {
       "path": "src/data/parallel-passages.json",
       "sha256": "17b8310977868b9638f9fadb8bb7912488777a4f9b5fc1669112e021c4ddc66b"
+    },
+    {
+      "path": "src/data/ubs-parallel-passages.generated.json",
+      "sha256": "164c1ab52366e1421b550ede91b3ac3d79f05eaf7bef054d065fb37d27006b4d"
     }
   ],
   "expectedCounts": {
