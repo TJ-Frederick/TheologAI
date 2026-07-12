@@ -75,6 +75,10 @@ export {
   parseSourceAttestedLookupReference,
   type SourceAttestedLookupReference,
 } from './sourceAttestedReference.js';
+export {
+  UBS_PARALLEL_PASSAGE_PROVENANCE,
+  deriveUbsParallelGroupId,
+} from './ubsParallelSource.js';
 
 // Provenance
 export {

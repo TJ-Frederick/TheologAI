@@ -8,6 +8,7 @@
 
 import { findBookByHelloaoCode, findBookByNumber, getBibleBookBounds } from '../../kernel/books.js';
 import { parseSourceAttestedLookupReference } from '../../kernel/sourceAttestedReference.js';
+import { deriveUbsParallelGroupId, UBS_PARALLEL_PASSAGE_PROVENANCE } from '../../kernel/ubsParallelSource.js';
 import type {
   ISourceAttestedParallelRepository,
   ParallelSourceProvenance,
@@ -93,7 +94,9 @@ function validateCorpus(input: unknown): ValidatedUbsCorpus {
   equal(license.name, 'CC BY-SA 4.0', 'artifact.license.name');
   equal(license.url, 'https://creativecommons.org/licenses/by-sa/4.0/', 'artifact.license.url');
   const provenance = validateProvenance(corpus.provenance, 'artifact.provenance');
-  equal(provenance.sourceId, 'ubs_paratext_parallel_passages', 'artifact.provenance.sourceId');
+  if (canonicalJson(provenance) !== canonicalJson(UBS_PARALLEL_PASSAGE_PROVENANCE)) {
+    fail('artifact.provenance differs from the reviewed UBS source descriptor');
+  }
   equal(provenance.license, license.name, 'artifact provenance/license');
   equal(provenance.licenseUrl, license.url, 'artifact provenance/licenseUrl');
   equal(provenance.transformVersion, corpus.transformVersion, 'artifact provenance/transformVersion');
@@ -123,6 +126,7 @@ function validateGroup(input: unknown, expectedOrdinal: number, provenance: Para
   if (canonicalJson(groupProvenance) !== canonicalJson(provenance)) fail(`group ${expectedOrdinal} provenance differs from corpus provenance`);
   if (!Array.isArray(group.members) || group.members.length < 2) fail(`group ${expectedOrdinal}.members must contain at least two members`);
   const members = group.members.map((member, index) => validateMember(member, index + 1, expectedOrdinal));
+  equal(groupId, deriveUbsParallelGroupId(members), `group ${expectedOrdinal}.groupId derivation`);
   const mixed = new Set(members.map(member => member.languageMarker)).size === 2;
   for (const member of members) {
     const expectedBasis = member.languageMarker === 'GRK' ? 'UBSGNT5' : mixed ? 'LXX' : 'BHS';

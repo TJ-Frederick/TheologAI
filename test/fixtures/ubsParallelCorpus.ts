@@ -1,31 +1,12 @@
 import type { SourceAttestedParallelGroup } from '../../src/kernel/sourceAttestedParallels.js';
+import { deriveUbsParallelGroupId, UBS_PARALLEL_PASSAGE_PROVENANCE } from '../../src/kernel/ubsParallelSource.js';
 
-export const fixtureProvenance = {
-  sourceId: 'ubs_paratext_parallel_passages',
-  title: 'UBS Parallel Passage Database',
-  publisher: 'United Bible Societies',
-  copyright: '© 2023 United Bible Societies',
-  license: 'CC BY-SA 4.0',
-  licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/',
-  sourceUrl: 'https://example.test/ubs',
-  sourcePath: 'parallel passages/ParallelPassages.xml',
-  sourceCommit: 'a'.repeat(40),
-  sourceCommitDate: '2023-07-10',
-  sourceBlob: 'b'.repeat(40),
-  sourceBytes: 100,
-  sourceSha256: 'c'.repeat(64),
-  transformVersion: 1,
-  modified: true,
-  modificationNote: 'References and alignment metadata normalized for local lookup.',
-} as const;
-
-const firstId = `ubs-pp-${'1'.repeat(64)}`;
-const secondId = `ubs-pp-${'2'.repeat(64)}`;
+export const fixtureProvenance = UBS_PARALLEL_PASSAGE_PROVENANCE;
 
 export function ubsFixture(): Record<string, unknown> {
   const groups: SourceAttestedParallelGroup[] = [
     {
-      groupId: firstId,
+      groupId: '',
       sourceOrdinal: 1,
       label: 'source_attested_parallel',
       directionality: 'unspecified',
@@ -55,7 +36,7 @@ export function ubsFixture(): Record<string, unknown> {
       provenance: { ...fixtureProvenance },
     },
     {
-      groupId: secondId,
+      groupId: '',
       sourceOrdinal: 2,
       label: 'source_attested_parallel',
       directionality: 'unspecified',
@@ -82,6 +63,8 @@ export function ubsFixture(): Record<string, unknown> {
       provenance: { ...fixtureProvenance },
     },
   ];
+  for (const group of groups) group.groupId = deriveUbsParallelGroupId(group.members);
+  const [firstId, secondId] = groups.map(group => group.groupId);
   return {
     schemaVersion: 'ubs-parallel-passages.v1',
     transformVersion: 1,
