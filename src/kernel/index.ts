@@ -54,6 +54,8 @@ export { Cache } from './cache.js';
 // Strong's identity
 export {
   parseStrongsIdentity,
+  STRONGS_IDENTITY_MAX_DIGITS,
+  STRONGS_IDENTITY_MAX_NUMBER,
   type CanonicalStrongsIdentity,
 } from './strongs.js';
 

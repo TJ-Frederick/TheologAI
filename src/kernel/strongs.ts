@@ -10,7 +10,15 @@ export interface CanonicalStrongsIdentity {
 }
 
 const STRONGS_ID = /^([GH])(\d+)([A-Z]?)$/i;
-const MAX_NUMBER = { G: 5624, H: 8674 } as const;
+
+/**
+ * STEPBible extends classical dictionary numbering with morphology particles,
+ * proper names, and other source identities (for example H9001 and G21502).
+ * Five decimal digits is the reviewed, storage-safe interchange domain. It is
+ * identity grammar, not a claim that every number exists in every repository.
+ */
+export const STRONGS_IDENTITY_MAX_DIGITS = 5;
+export const STRONGS_IDENTITY_MAX_NUMBER = 99_999;
 
 /**
  * Parse a Strong's identifier once at the kernel boundary.
@@ -24,8 +32,9 @@ export function parseStrongsIdentity(input: string): CanonicalStrongsIdentity | 
   if (!match) return undefined;
 
   const prefix = match[1].toUpperCase() as 'G' | 'H';
+  if (match[2].length > STRONGS_IDENTITY_MAX_DIGITS) return undefined;
   const number = Number(match[2]);
-  if (!Number.isSafeInteger(number) || number < 1 || number > MAX_NUMBER[prefix]) return undefined;
+  if (!Number.isSafeInteger(number) || number < 1 || number > STRONGS_IDENTITY_MAX_NUMBER) return undefined;
   const digits = String(number);
   const suffix = match[3].toUpperCase() || undefined;
 

@@ -88,14 +88,22 @@ describe('SQLite and D1 repository parity with identical real data', () => {
       INSERT INTO strongs_fts
         SELECT strongs_number, lemma, transliteration, definition FROM strongs;
       INSERT INTO stepbible_lexicons VALUES
-        ('G0025', 'STEPBible', '{"gloss":"love"}');
+        ('G0025', 'STEPBible', '{"gloss":"love"}'),
+        ('G6000', 'STEPBible', '{"gloss":"to report"}'),
+        ('G21502', 'STEPBible', '{"gloss":"Heneia"}'),
+        ('H9001', 'STEPBible', '{"gloss":"&"}'),
+        ('H9049', 'STEPBible', '{"gloss":"they"}');
 
       INSERT INTO morphology VALUES
         ('Romans', 8, 28, 1, 'οἴδαμεν', 'οἶδα', 'G1492', 'V-RAI-1P', 'we know'),
         ('John', 3, 16, 1, 'ἠγάπησεν', 'ἀγαπάω', 'G0025', 'V-AAI-3S', 'loved'),
         ('Genesis', 1, 1, 1, 'בְּרֵאשִׁית', 'רֵאשִׁית', 'H7225', 'HNcfsa', 'in beginning'),
         ('Romans', 5, 8, 1, 'συνίστησιν', 'συνίστημι', 'G4921', 'V-PAI-3S', 'demonstrates'),
-        ('Romans', 8, 35, 1, 'ἀγάπης', 'ἀγάπη', 'G0025', 'N-GSF', 'love');
+        ('Romans', 8, 35, 1, 'ἀγάπης', 'ἀγάπη', 'G0025', 'N-GSF', 'love'),
+        ('John', 1, 1, 1, 'fixture-g6000', 'fixture', 'G6000', 'G:V', 'report'),
+        ('John', 1, 1, 2, 'fixture-g21502', 'fixture', 'G21502', 'G:N-PRI', 'Heneia'),
+        ('John', 1, 1, 3, 'fixture-h9001', 'fixture', 'H9001', 'H:Conj', '&'),
+        ('John', 1, 1, 4, 'fixture-h9049', 'fixture', 'H9049', 'Sp3f', 'they');
       INSERT INTO morph_codes VALUES ('V-AAI-3S', 'Verb Aorist Active Indicative 3rd Singular');
 
       INSERT INTO documents VALUES
@@ -185,6 +193,14 @@ describe('SQLite and D1 repository parity with identical real data', () => {
     await expect(d1Strongs.getLexiconEntry('G25'))
       .resolves.toEqual(sqliteStrongs.getLexiconEntry('G25'));
     await expect(d1Strongs.getStats()).resolves.toEqual(sqliteStrongs.getStats());
+  });
+
+  it.each(['G6000', 'H9001', 'H9049', 'G21502'])('preserves extended identity %s across SQLite and D1 lexicon/morphology repositories', async identity => {
+    await expect(d1Strongs.getLexiconEntry(identity)).resolves.toEqual(sqliteStrongs.getLexiconEntry(identity));
+    await expect(d1Morphology.getOccurrences(identity)).resolves.toEqual(sqliteMorphology.getOccurrences(identity));
+    await expect(d1Morphology.getDistribution(identity)).resolves.toEqual(sqliteMorphology.getDistribution(identity));
+    expect(sqliteStrongs.getLexiconEntry(identity)?.strongs_number).toBe(identity);
+    expect(sqliteMorphology.getOccurrences(identity)).toHaveLength(1);
   });
 
   it('normalizes ASCII transliteration search identically in SQLite and D1', async () => {

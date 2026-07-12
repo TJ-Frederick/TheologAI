@@ -68,10 +68,17 @@ describe('StrongsService', () => {
       await expect(service.lookup('')).rejects.toThrow(ValidationError);
     });
 
-    it.each(['G0', 'G5625', 'H8675', 'G9007199254740993'])('rejects unsafe or out-of-corpus identity %s', async input => {
+    it.each(['G0', 'G100000', 'H999999', 'G9007199254740993'])('rejects zero or out-of-domain identity %s', async input => {
       const repo = makeMockRepo();
       await expect(new StrongsService(repo as any).lookup(input)).rejects.toThrow(ValidationError);
       expect(repo.lookup).not.toHaveBeenCalled();
+    });
+
+    it.each(['G6000', 'H9001', 'H9049', 'G21502'])('delegates representable extended identity %s to repository presence', async input => {
+      const repo = makeMockRepo();
+      await new StrongsService(repo as any).lookup(input, true);
+      expect(repo.lookup).toHaveBeenCalledWith(input);
+      expect(repo.getLexiconEntry).toHaveBeenCalledWith(input);
     });
 
     it('throws NotFoundError when repo returns undefined', async () => {

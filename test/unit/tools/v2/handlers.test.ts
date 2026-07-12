@@ -93,7 +93,7 @@ describe('v2 tool handler schemas', () => {
     });
     expect(originalLanguage).not.toHaveProperty('oneOf');
     expect(originalLanguage.properties).toMatchObject({
-      strongs_number: { minLength: 2, maxLength: 6 },
+      strongs_number: { minLength: 2, maxLength: 7 },
       query: { minLength: 2, maxLength: 100 },
       limit: { minimum: 1, maximum: 20 },
     });
@@ -659,9 +659,22 @@ describe('original_language_lookup handler', () => {
     const spaced = await handler.handler({ strongs_number: ' G2385I ' });
 
     expect(suffixed.isError).not.toBe(true);
-    expect(lookup).toHaveBeenCalledWith('g2385i', false);
+    expect(lookup).toHaveBeenCalledWith('G2385I', false);
     expect(spaced.isError).toBe(true);
     expect(lookup).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['G6000', 'H9001', 'H9049', 'G21502'])('accepts extended exact identity %s at the MCP boundary', async identity => {
+    const lookup = vi.fn<StrongsService['lookup']>().mockResolvedValue({
+      strongs_number: identity,
+      testament: identity.startsWith('G') ? 'NT' : 'OT',
+      lemma: 'fixture',
+      definition: 'fixture',
+      citation,
+    });
+    const result = await createStrongsLookupHandler(serviceDouble({ lookup })).handler({ strongs_number: identity });
+    expect(result.isError).not.toBe(true);
+    expect(lookup).toHaveBeenCalledWith(identity, false);
   });
 
   it('returns service validation failures as tool errors', async () => {

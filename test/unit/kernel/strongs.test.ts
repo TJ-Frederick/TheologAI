@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { parseStrongsIdentity } from '../../../src/kernel/strongs.js';
 
 describe('parseStrongsIdentity', () => {
@@ -15,11 +16,23 @@ describe('parseStrongsIdentity', () => {
 
   it.each([
     '', '25', 'X25', 'G', 'G 25', 'G25aa', 'G-25',
-    'G0', 'H0000', 'G5625', 'H8675', 'G9007199254740993',
+    'G0', 'H0000', 'G100000', 'H999999', 'G9007199254740993',
   ])('rejects %s', input => {
     expect(parseStrongsIdentity(input)).toBeUndefined();
   });
-  it.each(['G5624', 'H8674'])('accepts the reviewed corpus boundary %s', input => {
+  it.each(['G5624', 'H8674', 'G6000', 'H9001', 'H9049', 'G21502', 'G99999'])('accepts bounded classical and extended identity %s', input => {
     expect(parseStrongsIdentity(input)?.publicId).toBe(input);
+  });
+
+  it('keeps the reviewed fixture grounded in checked-in STEPBible lexicons', () => {
+    const fixture = JSON.parse(readFileSync(new URL('../../fixtures/stepbible-extended-strongs.json', import.meta.url), 'utf8')) as {
+      identities: Array<{ id: string; lemma: string }>;
+    };
+    const greek = JSON.parse(readFileSync(new URL('../../../data/biblical-languages/stepbible-lexicons/tbesg-greek.json', import.meta.url), 'utf8')) as Record<string, { lemma: string }>;
+    const hebrew = JSON.parse(readFileSync(new URL('../../../data/biblical-languages/stepbible-lexicons/tbesh-hebrew.json', import.meta.url), 'utf8')) as Record<string, { lemma: string }>;
+    for (const item of fixture.identities) {
+      expect(parseStrongsIdentity(item.id)?.morphologyKey).toBe(item.id);
+      expect((item.id.startsWith('G') ? greek : hebrew)[item.id]?.lemma.normalize('NFC')).toBe(item.lemma.normalize('NFC'));
+    }
   });
 });

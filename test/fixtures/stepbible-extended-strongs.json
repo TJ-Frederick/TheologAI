@@ -1,0 +1,13 @@
+{
+  "source": "STEPBible-Data TBESG/TBESH checked-in source extracts",
+  "sourceFiles": [
+    "data/biblical-languages/stepbible-lexicons/tbesg-greek.json",
+    "data/biblical-languages/stepbible-lexicons/tbesh-hebrew.json"
+  ],
+  "identities": [
+    { "id": "G6000", "lemma": "ἀγγέλλω", "kind": "extended_greek_lexicon" },
+    { "id": "G21502", "lemma": "Ηνια", "kind": "five_digit_lxx_proper_name" },
+    { "id": "H9001", "lemma": "/וַ", "kind": "hebrew_morphology_particle" },
+    { "id": "H9049", "lemma": "ינה", "kind": "hebrew_morphology_suffix" }
+  ]
+}
