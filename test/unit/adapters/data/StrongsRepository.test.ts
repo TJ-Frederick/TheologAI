@@ -84,6 +84,13 @@ describe('StrongsRepository', () => {
     expect(db.statement('stepbible_lexicons').get.mock.calls).toEqual([['G2385I']]);
   });
 
+  it.each(['G6000', 'H9001', 'H9049', 'G21502'])('queries extended STEPBible lexicon identity %s exactly', identity => {
+    const row = { strongs_number: identity, source: 'STEPBible', extended_data: '{}' };
+    const db = new FakeSqliteDatabase([{ match: 'stepbible_lexicons', get: row }]);
+    expect(new StrongsRepository(db.asDatabase()).getLexiconEntry(identity)).toMatchObject({ strongs_number: identity });
+    expect(db.statement('stepbible_lexicons').get).toHaveBeenCalledWith(identity);
+  });
+
   it('returns undefined for a missing lexicon row', () => {
     const db = new FakeSqliteDatabase([{ match: 'stepbible_lexicons', get: undefined }]);
     expect(new StrongsRepository(db.asDatabase()).getLexiconEntry('G25')).toBeUndefined();

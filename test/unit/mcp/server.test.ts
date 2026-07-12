@@ -370,7 +370,7 @@ describe('shared MCP registration', () => {
     });
   });
 
-  it('canonicalizes Strong\'s resource identities and rejects invalid corpus numbers', async () => {
+  it('canonicalizes classical and extended Strong\'s resources and rejects invalid domain numbers', async () => {
     const root = makeMockRoot();
     const lookup = vi.fn(root.services.strongsService.lookup);
     root.services.strongsService.lookup = lookup;
@@ -379,10 +379,15 @@ describe('shared MCP registration', () => {
     await client.readResource({ uri: 'theologai://strongs/g02385i' });
     expect(lookup).toHaveBeenCalledWith('G2385I', true);
 
-    for (const uri of ['theologai://strongs/G0', 'theologai://strongs/G5625', 'theologai://strongs/H8675']) {
+    for (const identity of ['G6000', 'H9001', 'H9049', 'G21502']) {
+      await client.readResource({ uri: `theologai://strongs/${identity}` });
+      expect(lookup).toHaveBeenCalledWith(identity, true);
+    }
+
+    for (const uri of ['theologai://strongs/G0', 'theologai://strongs/G100000', 'theologai://strongs/H999999']) {
       await expect(client.readResource({ uri })).rejects.toMatchObject({ code: -32002, data: { uri } });
     }
-    expect(lookup).toHaveBeenCalledTimes(1);
+    expect(lookup).toHaveBeenCalledTimes(5);
   });
 
   it.each([

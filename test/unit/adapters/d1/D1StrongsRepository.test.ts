@@ -151,6 +151,13 @@ describe('D1StrongsRepository', () => {
       expect(binds).toEqual(['G2385I']);
     });
 
+    it.each(['G6000', 'H9001', 'H9049', 'G21502'])('queries extended STEPBible lexicon identity %s exactly', async identity => {
+      const row = { strongs_number: identity, source: 'STEPBible', extended_data: '{}' };
+      const db = createSimpleD1([], row);
+      await expect(new D1StrongsRepository(db as any).getLexiconEntry(identity)).resolves.toMatchObject({ strongs_number: identity });
+      expect(db.prepare.mock.results[0].value.bind).toHaveBeenCalledWith(identity);
+    });
+
     it('returns undefined when row is null', async () => {
       const db = createSimpleD1([], null);
       const repo = new D1StrongsRepository(db as any);

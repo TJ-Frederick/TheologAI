@@ -62,6 +62,13 @@ describe('MorphologyRepository', () => {
     expect(repo.getOccurrences('G0')).toEqual([]);
   });
 
+  it.each(['G6000', 'H9001', 'H9049', 'G21502'])('uses extended morphology identity %s unchanged', identity => {
+    const db = new FakeSqliteDatabase([{ match: 'SELECT DISTINCT book, chapter, verse', all: [] }]);
+    const repo = new MorphologyRepository(db.asDatabase());
+    expect(repo.getOccurrences(identity)).toEqual([]);
+    expect(db.statement('SELECT DISTINCT book, chapter, verse').all).toHaveBeenCalledWith(identity, 100);
+  });
+
   it('returns per-book verse distribution rows unchanged', () => {
     const distribution = [{ book: 'Romans', verse_count: 4 }, { book: 'John', verse_count: 9 }];
     const db = new FakeSqliteDatabase([{ match: 'COUNT(DISTINCT', all: distribution }]);
