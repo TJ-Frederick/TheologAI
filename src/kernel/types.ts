@@ -185,7 +185,7 @@ export type StrongsLookupParams =
 
 export interface StrongsResult {
   strongs_number: string;
-  testament: 'OT' | 'NT';
+  testament: 'OT' | 'NT' | null;
   lemma: string;
   transliteration?: string;
   pronunciation?: string;
@@ -203,6 +203,8 @@ export interface SenseInfo {
 export interface EnhancedStrongsResult extends StrongsResult {
   /** Identifies the source of the base fields without changing public output. */
   sourceKind?: 'strongs_concordance' | 'stepbible_lexicon';
+  /** Known source language does not imply a biblical testament classification. */
+  language?: 'Greek' | 'Hebrew';
   extendedCitation?: Citation;
   extended?: {
     strongsExtended?: string;

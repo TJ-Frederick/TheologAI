@@ -22,7 +22,7 @@ export interface OriginalLanguageExtendedV1 {
 export interface OriginalLanguageEntryV1 {
   strongsNumber: string;
   language: 'Greek' | 'Hebrew';
-  testament: 'NT' | 'OT';
+  testament: 'NT' | 'OT' | null;
   lemma: string | null;
   transliteration?: string;
   pronunciation?: string;
@@ -55,7 +55,7 @@ const entrySchema: Schema = {
   properties: {
     strongsNumber: { type: 'string', minLength: 2, maxLength: 7, pattern: STRONGS_IDENTITY_PATTERN },
     language: { type: 'string', enum: ['Greek', 'Hebrew'] },
-    testament: { type: 'string', enum: ['NT', 'OT'] },
+    testament: { type: ['string', 'null'], enum: ['NT', 'OT', null] },
     lemma: { type: ['string', 'null'], minLength: 1, maxLength: 500 },
     transliteration: { type: 'string', minLength: 1, maxLength: 500 },
     pronunciation: { type: 'string', minLength: 1, maxLength: 500 },

@@ -213,7 +213,11 @@ export function createTheologAiMcpServer(
           `# ${entry.strongs_number} — ${entry.lemma}\n`,
           entry.transliteration ? `**Transliteration:** ${entry.transliteration}` : '',
           entry.pronunciation ? `**Pronunciation:** ${entry.pronunciation}` : '',
-          `**Testament:** ${entry.testament === 'OT' ? 'Old Testament (Hebrew)' : 'New Testament (Greek)'}`,
+          `**Testament:** ${entry.testament === 'OT'
+            ? 'Old Testament (Hebrew)'
+            : entry.testament === 'NT'
+              ? 'New Testament (Greek)'
+              : 'Not classified (source-language lexicon identity)'}`,
           `\n## Definition\n`,
           entry.definition,
         ];

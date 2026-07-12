@@ -408,6 +408,7 @@ describe('shared MCP registration', () => {
       text: expect.stringContaining('# H9001 — /וַ'),
     });
     expect(String(result.contents[0].text)).toContain('Verbal vav');
+    expect(String(result.contents[0].text)).toContain('Not classified (source-language lexicon identity)');
   });
 
   it.each([

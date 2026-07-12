@@ -93,7 +93,7 @@ export function presentOriginalLanguageEntry(
   const extended = result.extended;
   const entry: OriginalLanguageEntryV1 = {
     strongsNumber: result.strongs_number,
-    language: languageFor(result.testament),
+    language: result.language ?? languageFor(result.testament, result.strongs_number),
     testament: result.testament,
     lemma: nullableText(result.lemma),
     ...(result.transliteration ? { transliteration: result.transliteration } : {}),
@@ -146,8 +146,10 @@ function strongsProvenance(): ProvenanceRecord {
   });
 }
 
-function languageFor(testament: 'OT' | 'NT'): 'Greek' | 'Hebrew' {
-  return testament === 'NT' ? 'Greek' : 'Hebrew';
+function languageFor(testament: 'OT' | 'NT' | null, strongsNumber?: string): 'Greek' | 'Hebrew' {
+  if (testament === 'NT') return 'Greek';
+  if (testament === 'OT') return 'Hebrew';
+  return strongsNumber?.startsWith('H') ? 'Hebrew' : 'Greek';
 }
 
 function nullableText(value: string | null | undefined): string | null {

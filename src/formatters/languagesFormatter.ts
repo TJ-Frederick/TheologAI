@@ -9,7 +9,8 @@ export { normalizeLexiconText } from '../kernel/lexiconText.js';
 
 /** Format a Strong's lookup result */
 export function formatStrongsResult(result: EnhancedStrongsResult, detailLevel: string = 'simple'): string {
-  const testament = result.testament === 'NT' ? 'Greek' : 'Hebrew';
+  const testament = result.language
+    ?? (result.testament === 'NT' ? 'Greek' : result.testament === 'OT' ? 'Hebrew' : 'Source language');
 
   let s = `**${result.strongs_number}** (${testament})\n\n`;
   s += `**Lemma:** ${result.lemma}\n`;

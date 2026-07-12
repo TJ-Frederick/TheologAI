@@ -104,7 +104,8 @@ function resultFromStepBible(
   const definition = normalizeLexiconText(rawDefinition);
   const result: EnhancedStrongsResult = {
     strongs_number: publicId,
-    testament: prefix === 'G' ? 'NT' : 'OT',
+    testament: null,
+    language: prefix === 'G' ? 'Greek' : 'Hebrew',
     lemma,
     transliteration: stringValue(data.translit),
     definition,

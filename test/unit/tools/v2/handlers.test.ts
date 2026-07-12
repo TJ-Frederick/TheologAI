@@ -697,9 +697,10 @@ describe('original_language_lookup handler', () => {
     expect(textOf(result)).toContain('**G21502**');
     expect(textOf(result)).toContain('*Source: STEPBible lexicon data* - CC BY 4.0');
     expect(result.structuredContent).toMatchObject({
-      entries: [{ strongsNumber: 'G21502', lemma: 'Ηνια', provenanceIds: ['src-1'] }],
+      entries: [{ strongsNumber: 'G21502', language: 'Greek', testament: null, lemma: 'Ηνια', provenanceIds: ['src-1'] }],
       provenance: [{ id: 'src-1', label: 'STEPBible lexicon data', license: { label: 'CC BY 4.0' } }],
     });
+    expect(textOf(result)).not.toContain('New Testament');
   });
 
   it('returns service validation failures as tool errors', async () => {
