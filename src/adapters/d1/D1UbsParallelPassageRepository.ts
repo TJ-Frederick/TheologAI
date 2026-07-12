@@ -1,5 +1,6 @@
 import { parseSourceAttestedLookupReference } from '../../kernel/sourceAttestedReference.js';
-import { UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY, UBS_PARALLEL_PASSAGE_PROVENANCE, deriveUbsParallelGroupId } from '../../kernel/ubsParallelSource.js';
+import { UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY, UBS_PARALLEL_PASSAGE_PROVENANCE } from '../../kernel/ubsParallelSource.js';
+import { validateUbsParallelGroup } from '../shared/UbsParallelPassageRepository.js';
 import type {
   ISourceAttestedParallelRepository,
   ParallelSourceProvenance,
@@ -80,27 +81,47 @@ export class D1UbsParallelPassageRepository implements ISourceAttestedParallelRe
       segments.push(row);
       segmentsByMember.set(key, segments);
     }
-    const groups = groupsResult.results.map(row => freezeGroup({
-      groupId: row.group_id,
-      sourceOrdinal: row.source_ordinal,
-      label: row.label,
-      directionality: row.directionality,
-      members: (membersByGroup.get(row.group_id) ?? []).map(member => ({
-        sourceOrder: member.source_order,
-        sourceReference: member.source_reference,
-        normalizedReference: member.normalized_reference,
-        languageMarker: member.language_marker,
-        alignmentBasis: member.alignment_basis,
-        alignmentRaw: member.alignment_raw,
-        segments: (segmentsByMember.get(`${row.group_id}\0${member.source_order}`) ?? []).map(mapSegment),
-      })),
-      provenance: { ...source },
-    }));
-    const complete = groups.every(group => group.members.length >= 2 && group.members.every((member, index) =>
-      member.sourceOrder === index + 1 && member.segments.length >= 1
-    ) && deriveUbsParallelGroupId(group.members) === group.groupId);
-    if (!complete || groups.length !== ids.length || membersResult.results.length >= MAX_MEMBERS || segmentsResult.results.length >= MAX_SEGMENTS) {
+    const selectedIds = new Set(ids.map(row => row.group_id));
+    const selectedOrdinals = new Map(ids.map(row => [row.group_id, row.source_ordinal]));
+    const rowsAreScoped = groupsResult.results.every(row => selectedIds.has(row.group_id))
+      && membersResult.results.every(row => selectedIds.has(row.group_id))
+      && segmentsResult.results.every(row => selectedIds.has(row.group_id));
+    if (!rowsAreScoped || groupsResult.results.length !== ids.length
+      || new Set(groupsResult.results.map(row => row.group_id)).size !== ids.length
+      || groupsResult.results.some(row => selectedOrdinals.get(row.group_id) !== row.source_ordinal)
+      || membersResult.results.length >= MAX_MEMBERS || segmentsResult.results.length >= MAX_SEGMENTS) {
       throw new Error('UBS complete-group query exceeded its reviewed bounds or returned incomplete data');
+    }
+    let consumedSegments = 0;
+    const groups = groupsResult.results.map(row => {
+      const members = (membersByGroup.get(row.group_id) ?? []).map((member, memberIndex) => {
+        if (member.source_order !== memberIndex + 1) throw new Error('UBS member ordinals are not contiguous');
+        const segmentRows = segmentsByMember.get(`${row.group_id}\0${member.source_order}`) ?? [];
+        if (segmentRows.some((segment, segmentIndex) => segment.segment_order !== segmentIndex + 1)) {
+          throw new Error('UBS segment ordinals are not contiguous');
+        }
+        consumedSegments += segmentRows.length;
+        return {
+          sourceOrder: member.source_order,
+          sourceReference: member.source_reference,
+          normalizedReference: member.normalized_reference,
+          languageMarker: member.language_marker,
+          alignmentBasis: member.alignment_basis,
+          alignmentRaw: member.alignment_raw,
+          segments: segmentRows.map(mapSegment),
+        };
+      });
+      return freezeGroup(validateUbsParallelGroup({
+        groupId: row.group_id,
+        sourceOrdinal: row.source_ordinal,
+        label: row.label,
+        directionality: row.directionality,
+        members,
+        provenance: { ...source },
+      }, row.source_ordinal, source));
+    });
+    if (consumedSegments !== segmentsResult.results.length) {
+      throw new Error('UBS segment rows do not belong to reconstructed members');
     }
     return Object.freeze(groups);
   }
