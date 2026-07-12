@@ -7,6 +7,8 @@ import type { ToolHandler } from '../../kernel/types.js';
 import type { BibleService } from '../../services/bible/BibleService.js';
 import { formatBibleResponse, formatMultiBibleResponse } from '../../formatters/bibleFormatter.js';
 import { handleToolError } from '../../kernel/errors.js';
+import { bibleLookupOutputSchema } from '../../mcp/schemas/bibleLookup.js';
+import { presentBibleLookupStructured } from '../../presenters/bibleStructured.js';
 
 export function createBibleLookupHandler(bibleService: BibleService): ToolHandler {
   return {
@@ -29,6 +31,7 @@ export function createBibleLookupHandler(bibleService: BibleService): ToolHandle
       required: ['reference'],
       additionalProperties: false,
     },
+    outputSchema: bibleLookupOutputSchema,
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
 
     handler: async (params) => {
@@ -41,11 +44,25 @@ export function createBibleLookupHandler(bibleService: BibleService): ToolHandle
             translation: translations[0],
             includeFootnotes: params.includeFootnotes as boolean,
           });
-          return { content: [{ type: 'text', text: formatBibleResponse(result) }] };
+          return {
+            content: [{ type: 'text', text: formatBibleResponse(result) }],
+            structuredContent: presentBibleLookupStructured(
+              result,
+              params.reference as string,
+              translations,
+            ),
+          };
         }
 
         const results = await bibleService.lookupMultiple(params.reference as string, translations);
-        return { content: [{ type: 'text', text: formatMultiBibleResponse(results) }] };
+        return {
+          content: [{ type: 'text', text: formatMultiBibleResponse(results) }],
+          structuredContent: presentBibleLookupStructured(
+            results,
+            params.reference as string,
+            translations,
+          ),
+        };
       } catch (error) {
         return handleToolError(error as Error);
       }

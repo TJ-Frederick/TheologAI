@@ -120,8 +120,34 @@ describe('Worker MCP endpoint in workerd', () => {
     expect(listed.message.error).toBeUndefined();
     expect(listed.message.result).toMatchObject({
       tools: expect.arrayContaining([
-        expect.objectContaining({ name: 'original_language_lookup' }),
+        expect.objectContaining({
+          name: 'bible_lookup',
+          outputSchema: expect.objectContaining({ type: 'object', additionalProperties: false }),
+        }),
+        expect.objectContaining({
+          name: 'original_language_lookup',
+          outputSchema: expect.objectContaining({ type: 'object', additionalProperties: false }),
+        }),
       ]),
+    });
+  });
+
+  it('returns structured Bible content alongside the legacy Markdown result', async () => {
+    const toolResult = await rpc('tools/call', {
+      name: 'bible_lookup',
+      arguments: { reference: 'John 3:16', translation: 'KJV' },
+    }, 21);
+
+    expect(toolResult.response.status).toBe(200);
+    expect(toolResult.message.error).toBeUndefined();
+    expect(toolResult.message.result).toMatchObject({
+      content: [expect.objectContaining({ type: 'text', text: expect.stringContaining('John 3:16 (KJV)') })],
+      structuredContent: {
+        schemaVersion: '1',
+        kind: 'bible_lookup',
+        passages: [expect.objectContaining({ translation: 'KJV', provenanceIds: expect.any(Array) })],
+        failures: [],
+      },
     });
   });
 
@@ -156,6 +182,12 @@ describe('Worker MCP endpoint in workerd', () => {
           text: expect.stringContaining('love, goodwill, benevolence'),
         }),
       ],
+      structuredContent: {
+        schemaVersion: '1',
+        kind: 'original_language_lookup',
+        mode: 'entry',
+        entries: [expect.objectContaining({ strongsNumber: 'G0026', language: 'Greek' })],
+      },
     });
   });
 

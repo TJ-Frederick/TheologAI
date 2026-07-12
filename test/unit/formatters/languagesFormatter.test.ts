@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   formatStrongsResult,
   formatMorphologyResult,
+  normalizeLexiconText,
+  summarizeDefinition,
 } from '../../../src/formatters/languagesFormatter.js';
 import type { EnhancedStrongsResult, VerseMorphologyResult, VerseWord } from '../../../src/kernel/types.js';
 
@@ -49,6 +51,28 @@ function makeMorphResult(overrides: Partial<VerseMorphologyResult> = {}): VerseM
 // ── formatStrongsResult ──
 
 describe('formatStrongsResult', () => {
+  it('normalizes markup and common entities through the shared pure helper', () => {
+    expect(normalizeLexiconText('<b>love</b><BR/>A &amp; B &lt; 3 &#39;D&#39;')).toBe(
+      "love\nA & B < 3 'D'",
+    );
+  });
+
+  it('strips encoded markup tags from Markdown extended definitions', () => {
+    const out = formatStrongsResult(makeStrongsResult({
+      extended: { definition: '&lt;b&gt;love&lt;/b&gt;&lt;br/&gt;divine love &amp; charity' },
+    }));
+
+    expect(out).toContain('Definition: love\ndivine love & charity');
+    expect(out).not.toContain('&lt;b&gt;');
+    expect(out).not.toContain('<b>');
+  });
+
+  it('bounds search definitions with the shared summary helper', () => {
+    const value = 'a'.repeat(240) + ' trailing detail';
+    expect(summarizeDefinition(value).length).toBeLessThanOrEqual(240);
+    expect(summarizeDefinition(value)).toMatch(/…$/);
+  });
+
   it('shows Strong\'s number and testament language', () => {
     const out = formatStrongsResult(makeStrongsResult());
     expect(out).toContain('**G26** (Greek)');

@@ -6,6 +6,11 @@ import type { ToolHandler } from '../../kernel/types.js';
 import type { StrongsService } from '../../services/languages/StrongsService.js';
 import { formatStrongsResult, formatStrongsSearchResults } from '../../formatters/languagesFormatter.js';
 import { handleToolError, ValidationError } from '../../kernel/errors.js';
+import { originalLanguageOutputSchema } from '../../mcp/schemas/originalLanguage.js';
+import {
+  presentOriginalLanguageEntry,
+  presentOriginalLanguageSearch,
+} from '../../presenters/originalLanguageStructured.js';
 
 export function createStrongsLookupHandler(service: StrongsService): ToolHandler {
   return {
@@ -40,6 +45,7 @@ export function createStrongsLookupHandler(service: StrongsService): ToolHandler
       },
       additionalProperties: false,
     },
+    outputSchema: originalLanguageOutputSchema,
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
 
     handler: async (params) => {
@@ -50,7 +56,10 @@ export function createStrongsLookupHandler(service: StrongsService): ToolHandler
           const limit = typeof params.limit === 'number' ? params.limit : 10;
           const query = params.query as string;
           const results = await service.search(query, limit);
-          return { content: [{ type: 'text', text: formatStrongsSearchResults(query, results) }] };
+          return {
+            content: [{ type: 'text', text: formatStrongsSearchResults(query, results) }],
+            structuredContent: presentOriginalLanguageSearch(query, results),
+          };
         }
 
         const result = await service.lookup(
@@ -58,7 +67,13 @@ export function createStrongsLookupHandler(service: StrongsService): ToolHandler
           params.include_extended === true,
         );
         const text = formatStrongsResult(result, params.detail_level as string);
-        return { content: [{ type: 'text', text }] };
+        return {
+          content: [{ type: 'text', text }],
+          structuredContent: presentOriginalLanguageEntry(
+            result,
+            params.detail_level === 'detailed' ? 'detailed' : 'simple',
+          ),
+        };
       } catch (error) {
         return handleToolError(error as Error);
       }

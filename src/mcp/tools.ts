@@ -18,12 +18,18 @@ export function registerToolHandlers(
   const validators = new Map<string, SchemaValidator<Record<string, unknown>>>(
     tools.map(tool => [tool.name, validatorFor(tool.inputSchema)]),
   );
+  const outputValidators = new Map<string, SchemaValidator<Record<string, unknown>>>(
+    tools
+      .filter(tool => tool.outputSchema)
+      .map(tool => [tool.name, validatorFor(tool.outputSchema!)]),
+  );
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
     tools: tools.map(tool => ({
       name: tool.name,
       description: tool.description,
       inputSchema: tool.inputSchema,
+      ...(tool.outputSchema ? { outputSchema: tool.outputSchema } : {}),
       annotations: tool.annotations,
     })),
   }));
@@ -58,10 +64,42 @@ export function registerToolHandlers(
       });
     }
 
+    let result;
     try {
-      return await tool.handler(toolArguments) as CallToolResult;
+      result = await tool.handler(toolArguments);
     } catch {
       throw internalError();
     }
+
+    if (result.isError) return result as CallToolResult;
+
+    if (tool.outputSchema) {
+      if (result.structuredContent === undefined) {
+        await reportOutputValidationFailure(server, logging, name);
+        throw internalError();
+      }
+      const validation = outputValidators.get(name)?.(result.structuredContent);
+      if (!validation?.valid) {
+        await reportOutputValidationFailure(server, logging, name);
+        throw internalError();
+      }
+    }
+
+    return result as CallToolResult;
+  });
+}
+
+async function reportOutputValidationFailure(
+  server: Server,
+  logging: boolean,
+  tool: string,
+): Promise<void> {
+  if (!logging) return;
+  await server.sendLoggingMessage({
+    level: 'error',
+    logger: 'theologai.tools',
+    data: { event: 'tool_output_validation_failed', tool },
+  }).catch(() => {
+    // Logging is observational and must not alter the sanitized protocol error.
   });
 }

@@ -51,6 +51,16 @@ export {
 // Cache
 export { Cache } from './cache.js';
 
+// Provenance
+export {
+  provenanceFromCitation,
+  type ProvenanceKind,
+  type ProvenanceStatus,
+  type ProvenanceRecord,
+  type ProvenanceLink,
+  type ProvenanceContext,
+} from './provenance.js';
+
 // Types
 export type {
   ToolHandler,

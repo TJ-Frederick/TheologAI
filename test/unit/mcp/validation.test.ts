@@ -9,10 +9,44 @@ import { createParallelPassagesHandler } from '../../../src/tools/v2/parallelPas
 import { createStrongsLookupHandler } from '../../../src/tools/v2/strongsLookup.js';
 import { createVerifyDonationHandler } from '../../../src/tools/v2/verifyDonation.js';
 import { createVerseMorphologyHandler } from '../../../src/tools/v2/verseMorphology.js';
+import { bibleLookupOutputSchema } from '../../../src/mcp/schemas/bibleLookup.js';
+import { originalLanguageOutputSchema } from '../../../src/mcp/schemas/originalLanguage.js';
 
 const unused = {} as never;
 
 describe('Worker-safe JSON Schema validation', () => {
+  it('validates the two advertised output schemas with the same Worker-safe validator', () => {
+    const bible = validatorFor(bibleLookupOutputSchema);
+    const language = validatorFor(originalLanguageOutputSchema);
+
+    expect(bible({
+      schemaVersion: '1',
+      kind: 'bible_lookup',
+      requestedReference: 'John 3:16',
+      requestedTranslations: ['ESV'],
+      passages: [],
+      failures: [{ translation: 'ESV', reason: 'Unavailable' }],
+      provenance: [],
+    }).valid).toBe(true);
+    expect(language({
+      schemaVersion: '1',
+      kind: 'original_language_lookup',
+      mode: 'search',
+      query: 'love',
+      detailLevel: 'summary',
+      entries: [],
+      provenance: [{ id: 'src-1', kind: 'lexicon', label: "Strong's Concordance", status: 'verified_source' }],
+    }).valid).toBe(true);
+    expect(language({
+      schemaVersion: '1',
+      kind: 'original_language_lookup',
+      mode: 'entry',
+      detailLevel: 'summary',
+      entries: [{ strongsNumber: 'G26', language: 'Greek', testament: 'NT', lemma: 'ἀγάπη', definition: 'love', provenanceIds: ['src-1'], extra: true }],
+      provenance: [{ id: 'src-1', kind: 'lexicon', label: "Strong's Concordance", status: 'verified_source' }],
+    }).valid).toBe(false);
+  });
+
   it('validates draft 2020-12 dependencies without dynamic code evaluation', () => {
     const originalFunction = globalThis.Function;
     Object.defineProperty(globalThis, 'Function', {

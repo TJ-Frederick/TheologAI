@@ -1,6 +1,6 @@
 import { Validator, type Schema } from '@cfworker/json-schema';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
-import type { ToolHandler } from '../kernel/types.js';
+import type { JsonSchemaType } from '@modelcontextprotocol/sdk/validation/types.js';
 
 export type SchemaValidationResult<T> = {
   valid: true;
@@ -15,7 +15,7 @@ export type SchemaValidationResult<T> = {
 export type SchemaValidator<T> = (input: unknown) => SchemaValidationResult<T>;
 
 export const jsonSchemaValidator = {
-  getValidator<T>(schema: ToolHandler['inputSchema']): SchemaValidator<T> {
+  getValidator<T>(schema: JsonSchemaType): SchemaValidator<T> {
     const validator = new Validator(schema as Schema, '2020-12', true);
     return (input: unknown): SchemaValidationResult<T> => {
       const result = validator.validate(input);
@@ -35,14 +35,14 @@ export const jsonSchemaValidator = {
 const validatorCache = new Map<string, SchemaValidator<Record<string, unknown>>>();
 
 export function validatorFor(
-  schema: ToolHandler['inputSchema'],
+  schema: JsonSchemaType,
 ): SchemaValidator<Record<string, unknown>> {
   const serializedSchema = JSON.stringify(schema);
   const cached = validatorCache.get(serializedSchema);
   if (cached) return cached;
 
   const validator = jsonSchemaValidator.getValidator<Record<string, unknown>>(
-    JSON.parse(serializedSchema),
+    JSON.parse(serializedSchema) as JsonSchemaType,
   );
   validatorCache.set(serializedSchema, validator);
   return validator;

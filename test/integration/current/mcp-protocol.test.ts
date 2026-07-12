@@ -93,6 +93,20 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
         'donation_config',
         'verify_donation',
       ]);
+      expect(listed.tools.filter(tool => tool.outputSchema).map(tool => tool.name)).toEqual([
+        'bible_lookup',
+        'original_language_lookup',
+      ]);
+      expect(listed.tools.find(tool => tool.name === 'bible_lookup')?.outputSchema).toMatchObject({
+        type: 'object',
+        additionalProperties: false,
+        properties: { schemaVersion: { const: '1' }, kind: { const: 'bible_lookup' } },
+      });
+      expect(listed.tools.find(tool => tool.name === 'original_language_lookup')?.outputSchema).toMatchObject({
+        type: 'object',
+        additionalProperties: false,
+        properties: { schemaVersion: { const: '1' }, kind: { const: 'original_language_lookup' } },
+      });
       expect(listed.tools).toEqual(expect.arrayContaining([
         expect.objectContaining({
           name: 'bible_lookup',
@@ -170,6 +184,12 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
           text: '**John 3:16 (ESV)**\n\nFor God so loved the world.\n\n*Source: Deterministic test fixture*',
         },
       ]);
+      expect(result.structuredContent).toMatchObject({
+        schemaVersion: '1',
+        kind: 'bible_lookup',
+        passages: [{ translation: 'ESV', text: 'For God so loved the world.', provenanceIds: ['src-1'] }],
+        failures: [],
+      });
     } finally {
       await Promise.allSettled([client.close(), harness.server.close()]);
     }
