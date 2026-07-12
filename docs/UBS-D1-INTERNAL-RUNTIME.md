@@ -24,10 +24,24 @@ The expected delta over the PR15 corpus is exactly:
 - total: 12,736 rows (859,596 total seeded rows)
 
 Seed export is parent-first and primary-key ordered. Full import verification
-reconstructs and hashes all 14 tables, verifies the artifact root, and rejects
-memberless groups or segmentless members. Runtime lookup accepts at most eight
-reference segments and ten complete groups, then caps reconstruction at 400
-members and 800 segments.
+reconstructs and hashes all 14 tables, then runs the shared strict UBS validator
+over every normalized group in both the source and imported database. It attests
+source/normalized-reference equivalence, parsed segments, canonical book and
+chapter bounds, contiguous ordinals, language/alignment semantics, raw alignment
+codes, derived group IDs, provenance, and the artifact root. Runtime lookup
+accepts at most eight reference segments and ten complete groups, then caps
+reconstruction at 400 members and 800 segments.
+
+Remote readiness is deliberately read-only SQL. It proves exact counts, schema,
+indexes, integrity, foreign keys, corpus/source identities, contiguous ordinals,
+non-empty relationships, locator shape, numeric segment bounds, and
+language/alignment marker consistency. SQLite D1 cannot practically recompute
+the SHA-256-derived group IDs or fully parse source-owned references in that
+single gate. Those stronger guarantees come from deterministic seed digests and
+whole-corpus strict import validation before upload, plus the shared strict
+validator on every group reconstructed at runtime. Thus count/marker-only
+corruption cannot pass the local release pipeline, and a malformed group that
+somehow appears remotely is rejected rather than returned.
 
 ## Runtime acceptance
 
@@ -46,11 +60,15 @@ D1 repository and the Worker dependency graph must not contain
 Record final measured Node construction and Worker raw/gzip bundle sizes in the
 implementation handoff; measurements are evidence, not public performance SLOs.
 
-Local Node 22.23.1 runs on 2026-07-11 measured 154–163 ms for file read, parse,
-whole-artifact validation, and repository construction (the identical approved
-repository measured 171 ms in a control worktree during the same run). Heap/RSS
-deltas are allocator-sensitive and ranged around 28/63 MiB in the implementation
-worktree. The preview dry bundle contained 404 inputs, measured 2,307,852 raw
+Local Node 22.23.1 runs on 2026-07-11 measured 154–171 ms for file read, parse,
+whole-artifact validation, and repository construction. The original 25 MiB
+immediate heap-delta budget was not a stable acceptance measure: it included
+uncollected parsed input and varied with allocator state. The benchmark now runs
+with explicit pre/post GC and reports the retained repository heap separately;
+five Node 22.23.1 processes measured 153.71–162.23 ms and 9.38–9.41 MiB
+retained heap. Initialization time remains an evidence threshold of 175 ms on
+the review machine, not a public SLO.
+The preview dry bundle contained 404 inputs, measured 2,307,852 raw
 bytes / 427,709 gzip bytes, and its esbuild metadata contained no UBS generated
 JSON input.
 

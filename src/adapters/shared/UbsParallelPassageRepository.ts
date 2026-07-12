@@ -120,7 +120,7 @@ export function validateUbsParallelArtifact(input: unknown, expectedArtifactIden
   equal(provenance.transformVersion, corpus.transformVersion, 'artifact provenance/transformVersion');
 
   if (!Array.isArray(corpus.groups) || corpus.groups.length === 0) fail('artifact.groups must be a non-empty array');
-  const groups = corpus.groups.map((group, index) => validateGroup(group, index + 1, provenance));
+  const groups = corpus.groups.map((group, index) => validateUbsParallelGroup(group, index + 1, provenance));
   const groupIds = new Set<string>();
   for (const group of groups) {
     if (groupIds.has(group.groupId)) fail(`duplicate group ID ${group.groupId}`);
@@ -136,7 +136,17 @@ export function validateUbsParallelArtifact(input: unknown, expectedArtifactIden
   };
 }
 
-function validateGroup(input: unknown, expectedOrdinal: number, provenance: ParallelSourceProvenance): SourceAttestedParallelGroup {
+/**
+ * Strictly attest one reconstructed UBS group against the same invariants used
+ * for the reviewed generated artifact. This is intentionally runtime-neutral
+ * so storage adapters cannot return merely well-shaped but semantically
+ * corrupted rows.
+ */
+export function validateUbsParallelGroup(
+  input: unknown,
+  expectedOrdinal: number,
+  provenance: ParallelSourceProvenance,
+): SourceAttestedParallelGroup {
   const group = record(input, `group ${expectedOrdinal}`);
   exactKeys(group, GROUP_KEYS, `group ${expectedOrdinal}`);
   const groupId = string(group.groupId, `group ${expectedOrdinal}.groupId`);

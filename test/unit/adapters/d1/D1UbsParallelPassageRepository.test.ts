@@ -4,10 +4,29 @@ import { UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY, UBS_PARALLEL_PASSAGE_PROVENANCE
 import { ubsFixture } from '../../../fixtures/ubsParallelCorpus.js';
 import { createMockD1 } from '../../../helpers/mockD1.js';
 
-function fixtureDb() {
+interface FixtureRows {
+  groups: any[];
+  members: any[];
+  segments: any[];
+}
+
+function fixtureDb(mutate?: (rows: FixtureRows) => void) {
   const artifact = ubsFixture() as any;
   const group = artifact.groups[0];
   const p = UBS_PARALLEL_PASSAGE_PROVENANCE;
+  const rows: FixtureRows = {
+    groups: [{ group_id: group.groupId, source_ordinal: group.sourceOrdinal, label: group.label, directionality: group.directionality }],
+    members: group.members.map((member: any) => ({
+      group_id: group.groupId, source_order: member.sourceOrder, source_reference: member.sourceReference,
+      normalized_reference: member.normalizedReference, language_marker: member.languageMarker,
+      alignment_basis: member.alignmentBasis, alignment_raw: member.alignmentRaw,
+    })),
+    segments: group.members.flatMap((member: any) => member.segments.map((segment: any, index: number) => ({
+      group_id: group.groupId, member_order: member.sourceOrder, segment_order: index + 1,
+      book_number: segment.bookNumber, chapter: segment.chapter, start_verse: segment.startVerse, end_verse: segment.endVerse,
+    }))),
+  };
+  mutate?.(rows);
   return {
     group,
     db: createMockD1([
@@ -20,19 +39,9 @@ function fixtureDb() {
         source_blob: p.sourceBlob, source_bytes: p.sourceBytes, source_sha256: p.sourceSha256,
         modified: 1, modification_note: p.modificationNote, label: 'source_attested_parallel', directionality: 'unspecified',
       } },
-      { sql: 'SELECT group_id, source_ordinal', all: { results: [{
-        group_id: group.groupId, source_ordinal: group.sourceOrdinal, label: group.label, directionality: group.directionality,
-      }] } },
-      { sql: 'SELECT group_id, source_order', all: { results: group.members.map((member: any) => ({
-        group_id: group.groupId, source_order: member.sourceOrder, source_reference: member.sourceReference,
-        normalized_reference: member.normalizedReference, language_marker: member.languageMarker,
-        alignment_basis: member.alignmentBasis, alignment_raw: member.alignmentRaw,
-      })) } },
-      { sql: 'SELECT group_id, member_order', all: { results: group.members.flatMap((member: any) =>
-        member.segments.map((segment: any, index: number) => ({
-          group_id: group.groupId, member_order: member.sourceOrder, segment_order: index + 1,
-          book_number: segment.bookNumber, chapter: segment.chapter, start_verse: segment.startVerse, end_verse: segment.endVerse,
-        }))) } },
+      { sql: 'SELECT group_id, source_ordinal', all: { results: rows.groups } },
+      { sql: 'SELECT group_id, source_order', all: { results: rows.members } },
+      { sql: 'SELECT group_id, member_order', all: { results: rows.segments } },
     ]),
   };
 }
@@ -61,5 +70,22 @@ describe('D1UbsParallelPassageRepository', () => {
     const db = createMockD1([{ sql: 'SELECT DISTINCT g.group_id', all: { results: [] } }]);
     await expect(new D1UbsParallelPassageRepository(db as any).findGroups('John 1:1', 5)).resolves.toEqual([]);
     expect(db.prepare).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['group source ordinal', (rows: FixtureRows) => { rows.groups[0].source_ordinal = 2; }],
+    ['normalized reference', (rows: FixtureRows) => { rows.members[0].normalized_reference = 'Luke 6:27-35'; }],
+    ['source reference', (rows: FixtureRows) => { rows.members[0].source_reference = 'LUK 6:27-35'; }],
+    ['parsed segment', (rows: FixtureRows) => { rows.segments[0].start_verse = 26; }],
+    ['canonical book bounds', (rows: FixtureRows) => { rows.segments[0].book_number = 67; }],
+    ['canonical chapter bounds', (rows: FixtureRows) => { rows.segments[0].chapter = 99; }],
+    ['language marker', (rows: FixtureRows) => { rows.members[0].language_marker = 'HEB'; }],
+    ['alignment basis', (rows: FixtureRows) => { rows.members[0].alignment_basis = 'BHS'; }],
+    ['alignment raw', (rows: FixtureRows) => { rows.members[0].alignment_raw = '9'; }],
+    ['member order', (rows: FixtureRows) => { rows.members[0].source_order = 2; }],
+    ['segment order', (rows: FixtureRows) => { rows.segments[0].segment_order = 2; }],
+  ])('rejects corrupted %s rows', async (_name, mutate) => {
+    const { db } = fixtureDb(mutate);
+    await expect(new D1UbsParallelPassageRepository(db as any).findGroups('Luke 6:35', 1)).rejects.toThrow();
   });
 });

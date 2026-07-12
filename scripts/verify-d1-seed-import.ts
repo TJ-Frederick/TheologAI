@@ -10,6 +10,9 @@ import { fileURLToPath } from 'url';
 import { sha256File } from './d1-seed-utils.js';
 import { assertJohnOneOneDatabase } from './data-integrity.js';
 import { loadAndVerifyD1SeedManifest } from './d1-seed-manifest.js';
+import { validateUbsParallelGroup } from '../src/adapters/shared/UbsParallelPassageRepository.js';
+import type { ParallelSourceProvenance } from '../src/kernel/sourceAttestedParallels.js';
+import { UBS_PARALLEL_PASSAGE_PROVENANCE } from '../src/kernel/ubsParallelSource.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SEED_DIRECTORY = join(ROOT, 'scripts', 'd1-seed');
@@ -147,6 +150,55 @@ function assertUbsReconstruction(db: Database.Database, expectedCounts: Record<s
   const ubsDelta = ['ubs_parallel_sources', 'ubs_parallel_groups', 'ubs_parallel_members', 'ubs_parallel_segments']
     .reduce((sum, table) => sum + expectedCounts[table], 0);
   if (ubsDelta !== 12_736) throw new Error(`Unexpected normalized UBS row delta: ${ubsDelta}`);
+
+  const sourceRow = db.prepare(`SELECT * FROM ubs_parallel_sources WHERE source_id = 'ubs_paratext_parallel_passages'`).get() as Record<string, any>;
+  const provenance: ParallelSourceProvenance = {
+    sourceId: sourceRow.source_id, title: sourceRow.title, publisher: sourceRow.publisher,
+    copyright: sourceRow.copyright, license: sourceRow.license, licenseUrl: sourceRow.license_url,
+    sourceUrl: sourceRow.source_url, sourcePath: sourceRow.source_path, sourceCommit: sourceRow.source_commit,
+    sourceCommitDate: sourceRow.source_commit_date, sourceBlob: sourceRow.source_blob,
+    sourceBytes: sourceRow.source_bytes, sourceSha256: sourceRow.source_sha256,
+    transformVersion: sourceRow.transform_version, modified: sourceRow.modified === 1,
+    modificationNote: sourceRow.modification_note,
+  };
+  if (JSON.stringify(provenance) !== JSON.stringify(UBS_PARALLEL_PASSAGE_PROVENANCE)
+    || sourceRow.schema_version !== 'ubs-parallel-passages.v2'
+    || sourceRow.label !== 'source_attested_parallel'
+    || sourceRow.directionality !== 'unspecified') {
+    throw new Error('Normalized UBS source provenance differs from the reviewed descriptor');
+  }
+  const groups = db.prepare('SELECT * FROM ubs_parallel_groups ORDER BY source_ordinal').all() as Record<string, any>[];
+  const members = db.prepare('SELECT * FROM ubs_parallel_members ORDER BY group_id, source_order').all() as Record<string, any>[];
+  const segments = db.prepare('SELECT * FROM ubs_parallel_segments ORDER BY group_id, member_order, segment_order').all() as Record<string, any>[];
+  const membersByGroup = new Map<string, Record<string, any>[]>();
+  for (const member of members) membersByGroup.set(member.group_id, [...(membersByGroup.get(member.group_id) ?? []), member]);
+  const segmentsByMember = new Map<string, Record<string, any>[]>();
+  for (const segment of segments) {
+    const key = `${segment.group_id}\0${segment.member_order}`;
+    segmentsByMember.set(key, [...(segmentsByMember.get(key) ?? []), segment]);
+  }
+  groups.forEach((group, groupIndex) => validateUbsParallelGroup({
+    groupId: group.group_id,
+    sourceOrdinal: group.source_ordinal,
+    label: group.label,
+    directionality: group.directionality,
+    provenance,
+    members: (membersByGroup.get(group.group_id) ?? []).map((member, memberIndex) => {
+      if (member.source_order !== memberIndex + 1) throw new Error('Normalized UBS member ordinals are not contiguous');
+      return {
+        sourceOrder: member.source_order,
+        sourceReference: member.source_reference,
+        normalizedReference: member.normalized_reference,
+        languageMarker: member.language_marker,
+        alignmentBasis: member.alignment_basis,
+        alignmentRaw: member.alignment_raw,
+        segments: (segmentsByMember.get(`${group.group_id}\0${member.source_order}`) ?? []).map((segment, segmentIndex) => {
+          if (segment.segment_order !== segmentIndex + 1) throw new Error('Normalized UBS segment ordinals are not contiguous');
+          return { bookNumber: segment.book_number, chapter: segment.chapter, startVerse: segment.start_verse, endVerse: segment.end_verse };
+        }),
+      };
+    }),
+  }, groupIndex + 1, provenance));
 }
 
 const sourcePath = databaseArgument(process.argv.slice(2));

@@ -20,6 +20,11 @@ describe('remote D1 readiness query', () => {
     expect(sql).toContain(") = 'τὸ'");
     expect(sql).toContain("'idx_ubs_groups_source_order','idx_ubs_segments_lookup'");
     expect(sql).toContain('a5fd0d4646cb69f426f592c6e334866191201fbe64691cd55c7f7ecd0ca9d4cc');
+    expect(sql).toContain('MAX(source_ordinal) = COUNT(*)');
+    expect(sql).toContain('MAX(source_order)');
+    expect(sql).toContain('MAX(segment_order)');
+    expect(sql).toContain("alignment_raw GLOB '*[^0-8]*'");
+    expect(sql).toContain("language_marker = 'GRK' AND alignment_basis != 'UBSGNT5'");
     expect(sql).not.toMatch(/\b(?:INSERT|UPDATE|DELETE|DROP|ALTER)\b/);
   });
 
