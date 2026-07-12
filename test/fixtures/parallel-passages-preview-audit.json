@@ -15,7 +15,7 @@
     {
       "name": "all group members receive text",
       "arguments": { "reference": "Luke 6:35", "includeText": true, "translation": "WEB", "maxGroups": 1 },
-      "assert": ["success", "ubsGroupsPresent", "memberTextPresent", "textAttributionPresent"]
+      "assert": ["success", "ubsGroupsPresent", "memberTextPresent", "textAttributionPresent", "excerptsBounded"]
     },
     {
       "name": "legacy remains explicit and unchanged",
