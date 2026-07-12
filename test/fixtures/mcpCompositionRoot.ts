@@ -23,17 +23,7 @@ import { PrimarySourceSearchService } from '../../src/services/historical/Primar
 import { MorphologyService } from '../../src/services/languages/MorphologyService.js';
 import { StrongsService } from '../../src/services/languages/StrongsService.js';
 import { OriginalLanguageStudyService } from '../../src/services/languages/OriginalLanguageStudyService.js';
-import { createBibleLookupHandler } from '../../src/tools/v2/bibleLookup.js';
-import { createClassicTextsHandler } from '../../src/tools/v2/classicTexts.js';
-import { createCommentaryHandler } from '../../src/tools/v2/commentary.js';
-import { createCrossReferencesHandler } from '../../src/tools/v2/crossReferences.js';
-import { createDonationConfigHandler } from '../../src/tools/v2/donationConfig.js';
-import { createParallelPassagesHandler } from '../../src/tools/v2/parallelPassages.js';
-import { createPrimarySourceSearchHandler } from '../../src/tools/v2/primarySourceSearch.js';
-import { createStrongsLookupHandler } from '../../src/tools/v2/strongsLookup.js';
-import { createVerifyDonationHandler } from '../../src/tools/v2/verifyDonation.js';
-import { createVerseMorphologyHandler } from '../../src/tools/v2/verseMorphology.js';
-import { createOriginalLanguageStudyHandler } from '../../src/tools/v2/originalLanguageStudy.js';
+import { createToolRegistry } from '../../src/tools/toolRegistry.js';
 import type { WorkerCompositionRoot } from '../../src/tools/worker/index.js';
 
 export type DeterministicMcpRoot = McpCompositionRoot & WorkerCompositionRoot;
@@ -164,19 +154,19 @@ export function createDeterministicMcpFixture(): DeterministicMcpFixture {
   const donationService = new DonationService(onChainVerifier);
 
   const root = {
-    tools: [
-      createBibleLookupHandler(bibleService),
-      createCrossReferencesHandler(crossReferenceService),
-      createParallelPassagesHandler(parallelPassageService),
-      createCommentaryHandler(commentaryService),
-      createClassicTextsHandler(historicalService, ccelService),
-      createPrimarySourceSearchHandler(primarySourceSearchService),
-      createStrongsLookupHandler(strongsService),
-      createVerseMorphologyHandler(morphologyService),
-      createOriginalLanguageStudyHandler(originalLanguageStudyService),
-      createDonationConfigHandler(donationService),
-      createVerifyDonationHandler(donationService),
-    ],
+    tools: createToolRegistry({
+      bibleService,
+      crossReferenceService,
+      parallelPassageService,
+      commentaryService,
+      historicalService,
+      ccelService,
+      primarySourceSearchService,
+      strongsService,
+      morphologyService,
+      originalLanguageStudyService,
+      donationService,
+    }),
     services: { bibleService, commentaryService, historicalService, strongsService, sourceAttestedParallelService },
   } satisfies DeterministicMcpRoot;
 

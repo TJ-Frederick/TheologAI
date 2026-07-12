@@ -40,18 +40,7 @@ import { MorphologyService } from '../../services/languages/MorphologyService.js
 import { OriginalLanguageStudyService } from '../../services/languages/OriginalLanguageStudyService.js';
 import { SourceAttestedParallelService } from '../../services/bible/SourceAttestedParallelService.js';
 
-// Tool handlers
-import { createBibleLookupHandler } from '../v2/bibleLookup.js';
-import { createCrossReferencesHandler } from '../v2/crossReferences.js';
-import { createParallelPassagesHandler } from '../v2/parallelPassages.js';
-import { createCommentaryHandler } from '../v2/commentary.js';
-import { createClassicTextsHandler } from '../v2/classicTexts.js';
-import { createPrimarySourceSearchHandler } from '../v2/primarySourceSearch.js';
-import { createStrongsLookupHandler } from '../v2/strongsLookup.js';
-import { createVerseMorphologyHandler } from '../v2/verseMorphology.js';
-import { createOriginalLanguageStudyHandler } from '../v2/originalLanguageStudy.js';
-import { createDonationConfigHandler } from '../v2/donationConfig.js';
-import { createVerifyDonationHandler } from '../v2/verifyDonation.js';
+import { createToolRegistry } from '../toolRegistry.js';
 
 // Donation
 import { OnChainVerifier } from '../../adapters/donation/OnChainVerifier.js';
@@ -157,19 +146,19 @@ export function createWorkerCompositionRoot(env: Env): WorkerCompositionRoot {
   const donationService = getDonationService(env);
 
   // Tool handlers (per-request — hold D1-dependent services)
-  const tools = [
-    createBibleLookupHandler(bibleService),
-    createCrossReferencesHandler(crossRefService),
-    createParallelPassagesHandler(parallelService),
-    createCommentaryHandler(commentaryService),
-    createClassicTextsHandler(historicalService, ccelService),
-    createPrimarySourceSearchHandler(primarySourceSearchService),
-    createStrongsLookupHandler(strongsService),
-    createVerseMorphologyHandler(morphService),
-    createOriginalLanguageStudyHandler(originalLanguageStudyService),
-    createDonationConfigHandler(donationService),
-    createVerifyDonationHandler(donationService),
-  ];
+  const tools = createToolRegistry({
+    bibleService,
+    crossReferenceService: crossRefService,
+    parallelPassageService: parallelService,
+    commentaryService,
+    historicalService,
+    ccelService,
+    primarySourceSearchService,
+    strongsService,
+    morphologyService: morphService,
+    originalLanguageStudyService,
+    donationService,
+  });
 
   return {
     tools,

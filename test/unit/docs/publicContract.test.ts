@@ -5,6 +5,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { createTheologAiMcpServer } from '../../../src/mcp/server.js';
 import { createWorkerCompositionRoot } from '../../../src/tools/worker/index.js';
+import { createCompositionRoot } from '../../../src/tools/v2/index.js';
 import { createDeterministicMcpFixture } from '../../fixtures/mcpCompositionRoot.js';
 import { createSimpleD1 } from '../../helpers/mockD1.js';
 import type { Env } from '../../../src/worker-env.js';
@@ -96,7 +97,10 @@ describe('published project contract', () => {
   it('ties every advertised tool count and structured-output list to both runtime registries', async () => {
     const documentPaths = ['README.md', 'CLAUDE.md', 'CHANGELOG.md'];
     const documents = await Promise.all(documentPaths.map(readProjectFile));
-    const nodeTools = createDeterministicMcpFixture().root.tools;
+    // Use the real Node composition root here. The deterministic fixture is
+    // valuable for protocol calls, but it must not be able to mask Node-only
+    // registry drift in the published contract.
+    const nodeTools = createCompositionRoot().tools;
     const workerTools = createWorkerCompositionRoot({
       THEOLOGAI_DB: createSimpleD1(),
       THEOLOGAI_VERSION: 'public-contract-test',

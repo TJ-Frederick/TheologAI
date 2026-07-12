@@ -38,18 +38,7 @@ import { MorphologyService } from '../../services/languages/MorphologyService.js
 import { OriginalLanguageStudyService } from '../../services/languages/OriginalLanguageStudyService.js';
 import { SourceAttestedParallelService } from '../../services/bible/SourceAttestedParallelService.js';
 
-// Tool handlers
-import { createBibleLookupHandler } from './bibleLookup.js';
-import { createCrossReferencesHandler } from './crossReferences.js';
-import { createParallelPassagesHandler } from './parallelPassages.js';
-import { createCommentaryHandler } from './commentary.js';
-import { createClassicTextsHandler } from './classicTexts.js';
-import { createPrimarySourceSearchHandler } from './primarySourceSearch.js';
-import { createStrongsLookupHandler } from './strongsLookup.js';
-import { createVerseMorphologyHandler } from './verseMorphology.js';
-import { createOriginalLanguageStudyHandler } from './originalLanguageStudy.js';
-import { createDonationConfigHandler } from './donationConfig.js';
-import { createVerifyDonationHandler } from './verifyDonation.js';
+import { createToolRegistry } from '../toolRegistry.js';
 
 // Donation
 import { OnChainVerifier } from '../../adapters/donation/OnChainVerifier.js';
@@ -123,19 +112,19 @@ export function createCompositionRoot(): CompositionRoot {
   const donationService = new DonationService(onChainVerifier);
 
   // Tool handlers
-  const tools = [
-    createBibleLookupHandler(bibleService),
-    createCrossReferencesHandler(crossRefService),
-    createParallelPassagesHandler(parallelService),
-    createCommentaryHandler(commentaryService),
-    createClassicTextsHandler(historicalService, ccelService),
-    createPrimarySourceSearchHandler(primarySourceSearchService),
-    createStrongsLookupHandler(strongsService),
-    createVerseMorphologyHandler(morphService),
-    createOriginalLanguageStudyHandler(originalLanguageStudyService),
-    createDonationConfigHandler(donationService),
-    createVerifyDonationHandler(donationService),
-  ];
+  const tools = createToolRegistry({
+    bibleService,
+    crossReferenceService: crossRefService,
+    parallelPassageService: parallelService,
+    commentaryService,
+    historicalService,
+    ccelService,
+    primarySourceSearchService,
+    strongsService,
+    morphologyService: morphService,
+    originalLanguageStudyService,
+    donationService,
+  });
 
   return {
     tools,
