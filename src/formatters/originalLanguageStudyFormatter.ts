@@ -21,4 +21,3 @@ export function formatOriginalLanguageStudy(result: OriginalLanguageStudyDomainR
   if (result.warnings.length) sections.push(`## Data limitations\n\n${result.warnings.map(w => `- ${w}`).join('\n')}`);
   return sections.join('\n\n');
 }
-
