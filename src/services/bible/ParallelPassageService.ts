@@ -254,16 +254,30 @@ export class ParallelPassageService {
     for (const target of targets) {
       consumersByReference.set(target.reference, [...(consumersByReference.get(target.reference) ?? []), target]);
     }
-    const provenanceBySource = new Map<string, string>();
-    await mapWithConcurrency([...consumersByReference.entries()], 4, async ([reference, consumers]) => {
+    const plans = [...consumersByReference.entries()].map(([reference, consumers]) => ({ reference, consumers }));
+    const outcomes: Array<{ ok: true; result: BibleResult } | { ok: false }> = new Array(plans.length);
+    await mapWithConcurrency(plans.map((plan, index) => ({ index, reference: plan.reference })), 4, async plan => {
       try {
-        const result = await this.bibleService!.lookup({ reference, translation });
-        const provenanceId = translationProvenanceId(result, provenance, provenanceBySource);
-        for (const consumer of consumers) consumer.apply(result, provenanceId);
+        outcomes[plan.index] = {
+          ok: true,
+          result: await this.bibleService!.lookup({ reference: plan.reference, translation }),
+        };
       } catch {
-        warnings.push(`Text unavailable for ${reference}.`);
+        outcomes[plan.index] = { ok: false };
       }
     });
+
+    const provenanceBySource = new Map<string, string>();
+    for (let index = 0; index < plans.length; index++) {
+      const plan = plans[index];
+      const outcome = outcomes[index];
+      if (!outcome?.ok) {
+        warnings.push(`Text unavailable for ${plan.reference}.`);
+        continue;
+      }
+      const provenanceId = translationProvenanceId(outcome.result, provenance, provenanceBySource);
+      for (const consumer of plan.consumers) consumer.apply(outcome.result, provenanceId);
+    }
   }
 }
 

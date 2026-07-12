@@ -4,6 +4,7 @@ import { UBS_PARALLEL_PASSAGE_PROVENANCE } from '../../../../src/kernel/ubsParal
 import { ParallelPassageService } from '../../../../src/services/bible/ParallelPassageService.js';
 import { BibleService } from '../../../../src/services/bible/BibleService.js';
 import { formatReference } from '../../../../src/kernel/reference.js';
+import { presentParallelPassagesStructured } from '../../../../src/presenters/parallelPassagesStructured.js';
 import { ubsFixture } from '../../../fixtures/ubsParallelCorpus.js';
 
 function crossReferences(references: Array<{ reference: string; votes: number }> = []): ICrossReferenceRepository {
@@ -157,6 +158,65 @@ describe('ParallelPassageService hard-cutover contract', () => {
     }
     expect(Array.from(result.legacyParallels[0].text ?? '')).toHaveLength(200);
     expect(result.legacyParallels[0].text?.endsWith('…')).toBe(true);
+  });
+
+  it('is byte-deterministic across inverted asynchronous provider completion and citation collisions', async () => {
+    const run = async (delays: Record<string, number>) => {
+      const lookup = vi.fn().mockImplementation(async ({ reference }) => {
+        await new Promise(resolve => setTimeout(resolve, delays[reference] ?? 0));
+        const shared = reference !== 'Luke 6:35';
+        return {
+          reference, translation: 'WEB', text: `Text ${reference}`,
+          citation: shared
+            ? { source: 'Shared Provider', copyright: 'Public Domain' }
+            : { source: 'Second Provider', copyright: 'Licensed' },
+        };
+      });
+      const service = new ParallelPassageService(crossReferences(), { lookup } as any, undefined, legacyFixture(), sourceService() as any);
+      return presentParallelPassagesStructured(await service.lookup({
+        reference: 'Luke 6:35', corpora: ['ubs_source_attested', 'theologai_legacy'], includeText: true,
+      }));
+    };
+    const slowFirst = await run({ 'Luke 6:27-28': 25, 'Luke 6:35': 1, 'Matthew 5:44': 10 });
+    const slowLast = await run({ 'Luke 6:27-28': 1, 'Luke 6:35': 20, 'Matthew 5:44': 30 });
+    const immediateAsyncShape = await run({});
+
+    expect(slowLast).toEqual(slowFirst);
+    expect(JSON.stringify(slowLast)).toBe(JSON.stringify(slowFirst));
+    expect(JSON.stringify(immediateAsyncShape)).toBe(JSON.stringify(slowFirst));
+    expect(slowFirst.provenance.map(record => [record.id, record.label])).toEqual([
+      ['ubs-source-attested-parallels', 'UBS Parallel Passage Database'],
+      ['theologai-legacy-parallels', 'TheologAI legacy curated parallel passages'],
+      ['translation-3', 'Shared Provider'],
+      ['translation-4', 'Second Provider'],
+    ]);
+    expect((slowFirst.sourceAttestedGroups[0] as any).members[0].excerpts.map((excerpt: any) => excerpt.provenanceIds)).toEqual([
+      ['translation-3'], ['translation-4'],
+    ]);
+    expect((slowFirst.legacyParallels[0] as any).provenanceIds).toEqual([
+      'theologai-legacy-parallels', 'translation-3',
+    ]);
+  });
+
+  it('orders partial warnings canonically rather than by inverted failure completion', async () => {
+    const run = async (delays: Record<string, number>) => {
+      const lookup = vi.fn().mockImplementation(async ({ reference }) => {
+        await new Promise(resolve => setTimeout(resolve, delays[reference] ?? 0));
+        if (reference !== 'Luke 6:27-28') throw new Error('unavailable');
+        return { reference, translation: 'WEB', text: 'Available', citation: { source: 'Provider' } };
+      });
+      const service = new ParallelPassageService(crossReferences(), { lookup } as any, undefined, legacyFixture(), sourceService() as any);
+      return presentParallelPassagesStructured(await service.lookup({
+        reference: 'Luke 6:35', corpora: ['ubs_source_attested', 'theologai_legacy'], includeText: true,
+      }));
+    };
+    const first = await run({ 'Luke 6:27-28': 20, 'Luke 6:35': 15, 'Matthew 5:44': 1 });
+    const second = await run({ 'Luke 6:27-28': 1, 'Luke 6:35': 2, 'Matthew 5:44': 20 });
+    expect(JSON.stringify(second)).toBe(JSON.stringify(first));
+    expect(first.warnings).toEqual([
+      'Text unavailable for Luke 6:35.',
+      'Text unavailable for Matthew 5:44.',
+    ]);
   });
 
   it('allows a materialized false alignment default with legacy-only selection', async () => {
