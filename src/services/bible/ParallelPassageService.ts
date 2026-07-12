@@ -25,6 +25,7 @@ import {
 } from '../../kernel/parallelPassageProvenance.js';
 import { provenanceFromCitation, type ProvenanceRecord } from '../../kernel/provenance.js';
 import type { BibleResult } from '../../kernel/types.js';
+import { findBookByNumber } from '../../kernel/books.js';
 
 type Relationship = ParallelPassage['relationship'];
 interface RawParallelEntry {
@@ -222,18 +223,28 @@ export class ParallelPassageService {
     }
 
     const targets: Array<{ reference: string; apply: (result: BibleResult, provenanceId: string) => void }> = [
-      ...sourceGroups.flatMap(group => group.members.map(member => ({
-        reference: member.normalizedReference,
+      ...sourceGroups.flatMap(group => group.members.flatMap(member => member.segments.map((segment, segmentIndex) => ({
+        reference: canonicalSegmentReference(segment),
         apply: (result: BibleResult, provenanceId: string) => {
-          member.text = result.text;
-          member.translation = result.translation;
-          member.provenanceIds.push(provenanceId);
+          const excerpt = {
+            segmentOrder: segmentIndex + 1,
+            reference: canonicalSegmentReference(segment),
+            text: boundExcerpt(result.text),
+            translation: result.translation,
+            provenanceIds: [provenanceId],
+          };
+          member.excerpts = [...(member.excerpts ?? []), excerpt]
+            .sort((left, right) => left.segmentOrder - right.segmentOrder);
+          member.provenanceIds = [...new Set([...member.provenanceIds, provenanceId])];
+          member.text = boundExcerpt(member.excerpts.map(item => `${item.reference}: ${item.text}`).join('\n'));
+          const translations = new Set(member.excerpts.map(item => item.translation));
+          member.translation = translations.size === 1 ? member.excerpts[0].translation : undefined;
         },
-      }))),
+      })))),
       ...legacyParallels.map(parallel => ({
         reference: parallel.reference,
         apply: (result: BibleResult, provenanceId: string) => {
-          parallel.text = result.text;
+          parallel.text = boundExcerpt(result.text);
           parallel.translation = result.translation;
           parallel.provenanceIds = [...(parallel.provenanceIds ?? [LEGACY_PARALLEL_PROVENANCE_ID]), provenanceId];
         },
@@ -254,6 +265,22 @@ export class ParallelPassageService {
       }
     });
   }
+}
+
+function canonicalSegmentReference(segment: { bookNumber: number; chapter: number; startVerse: number; endVerse: number }): string {
+  const book = findBookByNumber(segment.bookNumber);
+  if (!book) throw new Error(`Unknown canonical book number ${segment.bookNumber}`);
+  const verses = segment.startVerse === segment.endVerse
+    ? `${segment.startVerse}`
+    : `${segment.startVerse}-${segment.endVerse}`;
+  return `${book.name} ${segment.chapter}:${verses}`;
+}
+
+/** Bound public excerpts by Unicode code points, including the ellipsis. */
+export function boundExcerpt(text: string, maxCodePoints = 200): string {
+  const codePoints = Array.from(text);
+  if (codePoints.length <= maxCodePoints) return text;
+  return `${codePoints.slice(0, Math.max(0, maxCodePoints - 1)).join('')}…`;
 }
 
 function normalizeCorpora(params: ParallelPassageLookupParams): ParallelPassageCorpus[] {

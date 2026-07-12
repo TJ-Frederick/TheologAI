@@ -185,6 +185,15 @@ export interface SourceAttestedParallelMemberResult {
   alignmentRaw?: string;
   text?: string;
   translation?: string;
+  excerpts?: SourceAttestedSegmentExcerpt[];
+  provenanceIds: string[];
+}
+
+export interface SourceAttestedSegmentExcerpt {
+  segmentOrder: number;
+  reference: string;
+  text: string;
+  translation: string;
   provenanceIds: string[];
 }
 

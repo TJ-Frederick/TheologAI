@@ -137,7 +137,13 @@ export function formatParallelPassageResearch(result: ParallelPassageResearchRes
         if (member.alignmentBasis && member.alignmentRaw) {
           s += `  - Alignment: ${member.alignmentBasis}; raw UBS codes \`${member.alignmentRaw}\`\n`;
         }
-        if (member.text) s += `  > ${textExcerpt(member.text)}${textAttribution(member.translation, member.provenanceIds ?? [], result)}\n`;
+        if (member.excerpts?.length) {
+          for (const excerpt of member.excerpts) {
+            s += `  > Segment ${excerpt.segmentOrder} — ${excerpt.reference}: ${excerpt.text}${textAttribution(excerpt.translation, excerpt.provenanceIds, result)}\n`;
+          }
+        } else if (member.text) {
+          s += `  > ${member.text}${textAttribution(member.translation, member.provenanceIds ?? [], result)}\n`;
+        }
       }
     }
   } else if (result.corpora.includes('ubs_source_attested')) {
@@ -149,7 +155,7 @@ export function formatParallelPassageResearch(result: ParallelPassageResearchRes
     for (const parallel of result.legacyParallels) {
       const confidence = Math.round(parallel.confidence * 100);
       s += `- **${parallel.reference}** [${parallel.relationship}] (${confidence}% confidence)\n`;
-      if (parallel.text) s += `  > Text excerpt${textAttribution(parallel.translation, parallel.provenanceIds ?? [], result)}: ${textExcerpt(parallel.text)}\n`;
+      if (parallel.text) s += `  > Text excerpt${textAttribution(parallel.translation, parallel.provenanceIds ?? [], result)}: ${parallel.text}\n`;
       if (parallel.notes) s += `  *${parallel.notes}*\n`;
     }
   } else if (result.corpora.includes('theologai_legacy')) {
@@ -169,10 +175,6 @@ export function formatParallelPassageResearch(result: ParallelPassageResearchRes
     s += `\n*Sources: ${result.provenance.map(record => `${record.label}${record.license ? ` (${record.license.label})` : ''}`).join('; ')}*`;
   }
   return s.trim();
-}
-
-function textExcerpt(text: string): string {
-  return `${text.substring(0, 200)}${text.length > 200 ? '…' : ''}`;
 }
 
 function textAttribution(

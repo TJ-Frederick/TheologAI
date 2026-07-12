@@ -285,6 +285,15 @@ describe('parallel_passages handler', () => {
     expect(properties.useCrossReferences).not.toHaveProperty('default');
   });
 
+  it('advertises the same 200-code-point bound used for structured excerpts', () => {
+    const handler = createParallelPassagesHandler(serviceDouble({ lookup: vi.fn() }));
+    const output = handler.outputSchema as any;
+    const member = output.properties.sourceAttestedGroups.items.properties.members.items.properties;
+    expect(member.text.maxLength).toBe(200);
+    expect(member.excerpts.items.properties.text.maxLength).toBe(200);
+    expect(output.properties.legacyParallels.items.properties.text.maxLength).toBe(200);
+  });
+
   it('accepts fully materialized advertised defaults without inferring legacy controls', async () => {
     const lookup = vi.fn<ParallelPassageService['lookup']>().mockResolvedValue({
       requestedReference: 'John 3:16', corpora: ['ubs_source_attested'], sourceAttestedGroups: [],
