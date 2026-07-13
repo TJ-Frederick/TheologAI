@@ -19,7 +19,7 @@ describe('STEPBible semantic integrity fixtures', () => {
     expect(() => assertJohnOneOneSource(source)).not.toThrow();
     expect(source.chapters['1']['1'].words[10]).toMatchObject({
       position: 11,
-      text: 'τὸ',
+      text: 'τὸν',
       lemma: 'ὁ',
       strong: 'G3588',
     });
@@ -28,10 +28,10 @@ describe('STEPBible semantic integrity fixtures', () => {
   it('rejects replacement-character corruption even when the row shape is valid', () => {
     const source = {
       book: 'John',
-      chapters: { '1': { '1': { words: [{ position: 11, text: 'τὸ��', lemma: 'ὁ', strong: 'G3588' }] } } },
+      chapters: { '1': { '1': { words: [{ position: 11, text: 'τὸν��', lemma: 'ὁ', strong: 'G3588' }] } } },
     };
 
-    expect(() => assertJohnOneOneSource(source)).toThrow(/expected "τὸ"/);
+    expect(() => assertJohnOneOneSource(source)).toThrow(/expected "τὸν"/);
   });
 
   it('verifies Greek source lemmas and lexicon-backed Hebrew lemmas independently', () => {
@@ -39,7 +39,7 @@ describe('STEPBible semantic integrity fixtures', () => {
     db.exec(`
       CREATE TABLE morphology (book TEXT, chapter INTEGER, verse INTEGER, position INTEGER, word_text TEXT, lemma TEXT, strongs_number TEXT);
       CREATE TABLE stepbible_lexicons (strongs_number TEXT, extended_data TEXT);
-      INSERT INTO morphology VALUES ('John', 1, 1, 11, 'τὸ', 'ὁ', 'G3588');
+      INSERT INTO morphology VALUES ('John', 1, 1, 11, 'τὸν', 'ὁ', 'G3588');
       INSERT INTO morphology VALUES ('Genesis', 1, 1, 3, 'אֱלֹהִ֑ים', 'אֱלֹהִים', 'H0430');
       INSERT INTO stepbible_lexicons VALUES ('H0430', '{"lemma":"אֱלֹהִים"}');
     `);

@@ -16,6 +16,8 @@
     "data:verify-language-sources": "tsx scripts/verify-biblical-language-sources.ts",
     "data:reproduce-language-sources": "tsx scripts/reproduce-biblical-language-sources.ts",
     "data:verify-language-reproduction-report": "tsx scripts/verify-biblical-language-reproduction-report.ts",
+    "data:write-language-source-lock": "tsx scripts/write-biblical-language-source-lock.ts",
+    "data:finalize-language-unicode-manifest": "tsx scripts/finalize-biblical-language-unicode-manifest.ts",
     "data:verify-db": "tsx scripts/verify-database.ts",
     "d1:seed:export": "tsx scripts/export-for-d1.ts",
     "d1:seed:verify": "tsx scripts/verify-d1-seed.ts",

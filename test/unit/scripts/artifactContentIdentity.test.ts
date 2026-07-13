@@ -1,4 +1,5 @@
 import { gzipSync } from 'node:zlib';
+import { describe, expect, it } from 'vitest';
 import { artifactContentIdentity } from '../../../scripts/artifact-content-identity.js';
 
 describe('artifactContentIdentity', () => {
@@ -7,22 +8,17 @@ describe('artifactContentIdentity', () => {
     const payload = Buffer.from(JSON.stringify(value));
     const fast = gzipSync(payload, { level: 1 });
     const dense = gzipSync(payload, { level: 9 });
-    const reorderedAndIndented = gzipSync(
-      JSON.stringify({ nested: { a: 1, b: 2 }, z: value.z }, null, 2),
-      { level: 9 },
-    );
-
+    const reordered = gzipSync(JSON.stringify({ nested: { a: 1, b: 2 }, z: value.z }, null, 2), { level: 9 });
     expect(fast).not.toEqual(dense);
     expect(artifactContentIdentity('book.json.gz', fast).sha256)
       .toBe(artifactContentIdentity('book.json.gz', dense).sha256);
     expect(artifactContentIdentity('book.json.gz', fast).sha256)
-      .toBe(artifactContentIdentity('book.json.gz', reorderedAndIndented).sha256);
+      .toBe(artifactContentIdentity('book.json.gz', reordered).sha256);
   });
 
   it('detects a canonical JSON payload change', () => {
     const first = gzipSync(JSON.stringify({ words: ['one', 'two'] }), { level: 1 });
     const changed = gzipSync(JSON.stringify({ words: ['one', 'three'] }), { level: 9 });
-
     expect(artifactContentIdentity('book.json.gz', first).sha256)
       .not.toBe(artifactContentIdentity('book.json.gz', changed).sha256);
   });

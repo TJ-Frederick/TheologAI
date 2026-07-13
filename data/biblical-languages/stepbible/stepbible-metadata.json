@@ -55,19 +55,19 @@
       "git_blob_sha1": "1cfe6718a1dae0d5d45a57a942d3f7f716ac6342"
     }
   ],
-  "provenance_status": "forensic_attestation_of_tracked_inventory",
+  "provenance_status": "content_reproducible_build_from_exact_verified_pins",
   "source_attestation": {
-    "kind": "forensic_source_attestation_added_after_artifact_creation",
+    "kind": "build_time_byte_verification",
     "source_lock": "data/biblical-languages/SOURCE.json",
     "raw_inputs_byte_verified": true
   },
-  "tracked_artifact": {
-    "lineage": "historical_tracked_artifact_with_provenance_attested_after_creation",
-    "classification": "accepted_legacy_non_reproducible",
+  "derived_artifact": {
+    "classification": "content_reproducible_from_exact_verified_pins",
+    "identity_kind": "canonical_json_payload_sha256_v1",
     "byte_reproducible_from_pinned_inputs": false,
-    "affected_runtime_artifacts": 43,
-    "source_lock": "data/biblical-languages/SOURCE.json#derived_artifacts",
-    "clean_reproduction_compiler": {
+    "gzip_container_bytes_reproducible_across_zlib_versions": false,
+    "source_lock": "data/biblical-languages/SOURCE.json#sources",
+    "compiler": {
       "id": "theologai-stepbible-morphology-json",
       "version": 1,
       "source_revision": "0f60797c170f11a1f8dc75c5f7617973e2e66b0d"

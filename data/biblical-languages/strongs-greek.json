@@ -5628,7 +5628,7 @@
     "derivation": "{\"_\":\"from  (as a negative particle) and sphallo (to \\\"fail\\\");\",\"strongsref\":[{\"$\":{\"language\":\"GREEK\",\"strongs\":\"1\"}}]}"
   },
   "G805": {
-    "lemma": "ἀσφαλί��ω",
+    "lemma": "ἀσφαλίζω",
     "translit": "asphalízō",
     "pronunciation": "as-fal-id'-zo",
     "def": "to render secure",
@@ -9807,7 +9807,7 @@
   },
   "G1402": {
     "lemma": "δουλόω",
-    "translit": "doul��ō",
+    "translit": "doulóō",
     "pronunciation": "doo-lo'-o",
     "def": "to enslave (literally or figuratively)",
     "derivation": "{\"_\":\"from ;\",\"strongsref\":[{\"$\":{\"language\":\"GREEK\",\"strongs\":\"1401\"}}]}"
@@ -26911,7 +26911,7 @@
     "derivation": "{\"_\":\"from ;\",\"strongsref\":[{\"$\":{\"language\":\"GREEK\",\"strongs\":\"3888\"}}]}"
   },
   "G3890": {
-    "lemma": "πα��αμύθιον",
+    "lemma": "παραμύθιον",
     "translit": "paramýthion",
     "pronunciation": "par-am-oo'-thee-on",
     "def": "consolation (properly, concretely)",
@@ -31271,7 +31271,7 @@
     "derivation": "{\"_\":\"from ;\",\"strongsref\":[{\"$\":{\"language\":\"GREEK\",\"strongs\":\"4506\"}}]}"
   },
   "G4513": {
-    "lemma": "Ῥωμαϊκό��",
+    "lemma": "Ῥωμαϊκός",
     "translit": "Rhōmaïkós",
     "pronunciation": "rho-mah-ee-kos'",
     "def": "Romaic, i.e. Latin",

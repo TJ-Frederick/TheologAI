@@ -1,29 +1,32 @@
 {
   "schema_version": 2,
   "derived_artifacts": {
-    "status": "accepted_legacy_non_reproducible",
+    "status": "content_reproducible_from_exact_verified_pins",
     "tracked_manifest": "data/data-manifest.json",
-    "d1_materialization_identity": "91afa5bcf8155ac9f8c5fd14d1d661657c83be9a8e5cd90a5783bfa38ae7dfa5",
+    "d1_materialization_identity": "652245709aaed181345b0cf17f0091471ac3a3e323f6ae84cfd73a5d8b409c51",
     "compared_artifacts": 72,
     "comparison_identity_policy": "canonical_decompressed_json_v1_sha256_for_json_gz_else_raw_sha256",
-    "changed_content_artifacts": 45,
-    "tracked_content_inventory_sha256": "3661deb0e2c912bd3ca4ac1a815a118f0397a186d816c0bfe17e25d276f9fa4d",
+    "changed_content_artifacts": 0,
+    "tracked_content_inventory_sha256": "caf58814f24cc72837586c901c42f3556b59e45ec81bb0af7f5cfb9fa1629dcd",
     "clean_reproduction_content_inventory_sha256": "caf58814f24cc72837586c901c42f3556b59e45ec81bb0af7f5cfb9fa1629dcd",
-    "tracked_raw_inventory_sha256": "433902e19fa60f1e98dd856b0a073b72e71b1b4e2edd04abca552bf0e96bbf44",
-    "semantic_drift_inventory_sha256": "a0ca99fa6a876b22f2c55a2415f1bf524c17026f290773f59f98676d903c7f36",
-    "explanation": "45 of 72 tracked runtime artifacts differ from a pinned rebuild by portable content identity because historical per-network-chunk UTF-8 decoding corrupted text. Gzip-packaged JSON is identified by its canonical decompressed payload; gzip container bytes are not a cross-zlib reproducibility claim. The uncompressed STEPBible lexicon pair is byte-reproducible and is not part of this exception.",
+    "tracked_raw_inventory_sha256": "35649745857b65dbe87d024d13288036710272a193179349088f7a4af138268a",
     "raw_container_policy": "Tracked raw hashes are retained as forensic evidence. Reproduced gzip container hashes are diagnostic only because headers and DEFLATE streams vary across operating systems and zlib versions.",
-    "clean_reproduction_delta": {
-      "strongs_entries": 9,
-      "strongs_fields": 9,
-      "strongs_replacement_characters": 18,
-      "morphology_files": 43,
-      "morphology_tokens": 237,
-      "morphology_fields": 237,
-      "morphology_replacement_characters": 496,
-      "additional_attested_delta": "John 1:1 position 11 is tracked as τὸ while the pinned TAGNT input rebuilds as τὸν."
+    "unicode_correction": {
+      "ledger": "data/biblical-languages/UNICODE-CORRECTION.json",
+      "legacy_d1_materialization_identity": "91afa5bcf8155ac9f8c5fd14d1d661657c83be9a8e5cd90a5783bfa38ae7dfa5",
+      "legacy_content_inventory_sha256": "3661deb0e2c912bd3ca4ac1a815a118f0397a186d816c0bfe17e25d276f9fa4d",
+      "corrected_content_inventory_sha256": "caf58814f24cc72837586c901c42f3556b59e45ec81bb0af7f5cfb9fa1629dcd",
+      "corrected_content_artifacts": 45,
+      "unchanged_runtime_artifacts": 27,
+      "source_cells": 246,
+      "d1_cells": 255,
+      "strongs_cells": 9,
+      "strongs_fts_cells": 9,
+      "morphology_cells": 237,
+      "attested_restoration": "John 1:1 position 11 text τὸ → τὸν (lemma ὁ; Strong G3588; morph T-ASM)."
     },
-    "policy": "Do not replace tracked runtime artifacts in the provenance-pin slice; repair and cut over as a separately reviewed data migration."
+    "explanation": "The 45 historically corrupted runtime artifacts were replaced by content-reproducible builds from exact byte-verified source pins. The committed ledger preserves every source-cell correction and proves the legacy semantic state by reverse projection. Gzip JSON is identified by its canonical decompressed payload, not platform-dependent container bytes.",
+    "policy": "Reproduction must remain clean by portable content identity; any source, compiler, semantic, content-artifact, or correction-ledger drift requires explicit review."
   },
   "sources": [
     {

@@ -209,6 +209,44 @@ upsert or repair mechanism. Future corpus revisions need either a new empty D1
 database followed by a binding cutover, or a separately designed and reviewed
 incremental data migration.
 
+### Biblical-language Unicode correction (transform 4)
+
+The transform-4 corpus repairs a bounded historical UTF-8 decoding failure in
+the pinned biblical-language artifacts. The machine-readable correction ledger
+is `data/biblical-languages/UNICODE-CORRECTION.json`. It records exactly 246
+source cells: 9 Strong's fields and 237 morphology fields. D1 materializes 255
+changed cells because the 9 Strong's corrections are also copied into the
+external-content `strongs_fts` table; morphology contributes the same 237
+cells. The only correction that is not a U+FFFD replacement repair is the
+source-attested John 1:1 position 11 restoration from `τὸ` to `τὸν` (lemma
+`ὁ`, Strong's `G3588`, morphology `T-ASM`).
+
+The verifier requires all of the following before a seed can be accepted:
+
+- exact 9 + 237 ledger membership and the 45-artifact change boundary;
+- portable content-identity reproduction of the corrected 72-artifact language
+  inventory from the exact OpenScriptures and STEPBible pins (canonical
+  decompressed JSON for gzip artifacts; raw SHA-256 for uncompressed files);
+- reverse projection of every ledger cell to all 45 predecessor artifact
+  content identities and the predecessor content-inventory identity; raw gzip
+  hashes remain diagnostic because zlib containers vary across platforms;
+- no U+FFFD in the Strong's or morphology textual fields;
+- unchanged row counts, schema `0002_ubs_parallel_passages`, and D1 identity
+  version 1; and
+- transform version 4 with scoped D1 identity
+  `652245709aaed181345b0cf17f0091471ac3a3e323f6ae84cfd73a5d8b409c51`.
+
+This is a data-changing transition, not a metadata-only transition. Prepare a
+fresh empty D1, apply the existing two migrations, import the complete seed,
+and pass the full readiness gate before any binding or deployment change. The
+matched rollback is the predecessor Worker/config revision together with its
+transform-3 database identity
+`91afa5bcf8155ac9f8c5fd14d1d661657c83be9a8e5cd90a5783bfa38ae7dfa5`.
+Do not pair transform-4 code with that database, marker-update it in place, or
+claim a retained remote database as a rollback target without a fresh read-only
+inventory. Local preparation does not authorize creating a remote D1, changing
+Wrangler bindings, or deploying either environment.
+
 ### One-time legacy identity transition
 
 Databases seeded before scoped D1 identities contain the full source-manifest

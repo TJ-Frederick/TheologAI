@@ -9,6 +9,7 @@ on:
       - 'data/data-manifest.json'
       - 'scripts/biblical-language-sources.ts'
       - 'scripts/biblical-language-semantic-drift.ts'
+      - 'scripts/biblical-language-unicode-correction.ts'
       - 'scripts/artifact-content-identity.ts'
       - 'scripts/d1-corpus-identity.ts'
       - 'scripts/download-pinned-source.ts'
@@ -17,6 +18,9 @@ on:
       - 'scripts/build-stepbible-json.ts'
       - 'scripts/build-stepbible-lexicons.ts'
       - 'scripts/reproduce-biblical-language-sources.ts'
+      - 'scripts/write-biblical-language-source-lock.ts'
+      - 'scripts/finalize-biblical-language-unicode-manifest.ts'
+      - 'scripts/verify-biblical-language-unicode-d1.ts'
       - 'scripts/verify-biblical-language-sources.ts'
       - 'scripts/verify-biblical-language-reproduction-report.ts'
       - 'scripts/verify-data-manifest.ts'
@@ -37,7 +41,7 @@ concurrency:
 
 jobs:
   reproduce:
-    name: Verify Pins & Classify Legacy Drift
+    name: Verify Pins & Zero Reproduction Drift
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -54,16 +58,16 @@ jobs:
         run: npm run data:verify-sources
 
       - name: Rebuild pinned sources without modifying tracked artifacts
-        id: reproduce
-        continue-on-error: true
         run: npm run data:reproduce-language-sources
 
-      - name: Require the exact reviewed legacy-drift fingerprint
-        env:
-          REPRODUCTION_OUTCOME: ${{ steps.reproduce.outcome }}
+      - name: Require zero source, semantic, artifact, and reverse-projection drift
+        run: npm run data:verify-language-reproduction-report
+
+      - name: Require deterministic source-lock and manifest finalization
         run: |
-          test "$REPRODUCTION_OUTCOME" = failure
-          npm run data:verify-language-reproduction-report
+          npm run data:write-language-source-lock
+          npm run data:finalize-language-unicode-manifest
+          git diff --exit-code -- data/biblical-languages/SOURCE.json data/data-manifest.json
 
       - name: Upload reproduction evidence
         if: always()

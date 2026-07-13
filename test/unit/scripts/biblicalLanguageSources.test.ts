@@ -15,9 +15,31 @@ import {
 import { computeD1CorpusIdentity, parseDataManifest } from '../../../scripts/d1-corpus-identity.js';
 import { verifyBiblicalLanguageSources } from '../../../scripts/verify-biblical-language-sources.js';
 import {
-  verifyExpectedLegacyReproductionReport,
+  verifyCorrectedReproductionReport,
   verifyReproductionArtifactInventory,
 } from '../../../scripts/verify-biblical-language-reproduction-report.js';
+import {
+  verifyBiblicalLanguageUnicodeCorrection,
+  type BiblicalLanguageUnicodeCorrectionLedger,
+} from '../../../scripts/biblical-language-unicode-correction.js';
+
+function unicodeCorrectionFixture(): {
+  ledger: BiblicalLanguageUnicodeCorrectionLedger;
+  comparedPaths: string[];
+} {
+  const manifest = parseDataManifest(readFileSync('data/data-manifest.json'));
+  const ledger = JSON.parse(readFileSync(
+    'data/biblical-languages/UNICODE-CORRECTION.json',
+    'utf8',
+  )) as BiblicalLanguageUnicodeCorrectionLedger;
+  return {
+    ledger,
+    comparedPaths: [
+      ...manifest.materializations.d1.inputs.filter(path => path.startsWith('data/biblical-languages/')),
+      'data/biblical-languages/stepbible/index.json',
+    ].sort(),
+  };
+}
 
 describe('biblical-language source revisions', () => {
   it('pins the reviewed OpenScriptures and STEPBible commits in every raw URL', () => {
@@ -40,9 +62,10 @@ describe('biblical-language source revisions', () => {
     const lock = sourceLockProjection();
     expect(lock.sources.flatMap(source => source.inputs)).toHaveLength(10);
     expect(lock.derived_artifacts).toMatchObject({
-      status: 'accepted_legacy_non_reproducible',
+      status: 'content_reproducible_from_exact_verified_pins',
       compared_artifacts: 72,
-      changed_content_artifacts: 45,
+      changed_content_artifacts: 0,
+      unicode_correction: { source_cells: 246, d1_cells: 255 },
     });
   });
 
@@ -185,12 +208,14 @@ describe('biblical-language source revisions', () => {
     expect(() => assertPinnedSourceBytes(file, changed)).toThrow('Pinned source drift');
   });
 
-  it('does not change the byte-derived D1 materialization identity', () => {
+  it('pins the transform-4 byte-derived D1 materialization identity', () => {
     const manifest = parseDataManifest(readFileSync('data/data-manifest.json'));
     expect(computeD1CorpusIdentity(manifest))
-      .toBe('91afa5bcf8155ac9f8c5fd14d1d661657c83be9a8e5cd90a5783bfa38ae7dfa5');
+      .toBe('652245709aaed181345b0cf17f0091471ac3a3e323f6ae84cfd73a5d8b409c51');
+    expect(manifest.materializations.d1.transformVersion).toBe(4);
     for (const provenanceOnly of [
       'data/biblical-languages/SOURCE.json',
+      'data/biblical-languages/UNICODE-CORRECTION.json',
       'data/biblical-languages/strongs-metadata.json',
       'data/biblical-languages/stepbible/index.json',
       'data/biblical-languages/stepbible/stepbible-metadata.json',
@@ -203,52 +228,83 @@ describe('biblical-language source revisions', () => {
     }
   });
 
-  it('fails closed when a reproduction report omits the exact semantic drift evidence', () => {
+  it('fails closed when a corrected reproduction report contains any residual drift', () => {
     const expected = sourceLockProjection().derived_artifacts;
     const report = {
-      status: 'legacy-derived-content-drift',
+      status: 'content-reproducible',
       sourcePins: {
         openscriptures: OPENSCRIPTURES_COMMIT,
         stepbible: STEPBIBLE_COMMIT,
       },
       d1MaterializationIdentity: expected.d1_materialization_identity,
       comparedArtifacts: expected.compared_artifacts,
-      changedArtifacts: expected.changed_content_artifacts,
+      changedArtifacts: 0,
       comparisonIdentityPolicy: expected.comparison_identity_policy,
       trackedContentInventorySha256: expected.tracked_content_inventory_sha256,
       reproducedContentInventorySha256: expected.clean_reproduction_content_inventory_sha256,
       trackedRawInventorySha256: expected.tracked_raw_inventory_sha256,
-      reproducedRawInventorySha256: '1'.repeat(64),
-      rawByteDifferenceCount: expected.changed_content_artifacts,
-      rawByteDifferences: Array.from({ length: 45 }, (_, index) => {
-        const gzip = index < 43;
-        return {
-          path: gzip ? `data/biblical-languages/stepbible/greek/${index}.json.gz` : `data/strongs-${index}.json`,
-          trackedRawSha256: '4'.repeat(64),
-          reproducedRawSha256: '5'.repeat(64),
-        };
-      }),
+      reproducedRawInventorySha256: expected.tracked_raw_inventory_sha256,
+      rawByteDifferenceCount: 0,
+      rawByteDifferences: [],
+      changed: [],
       missingArtifacts: [],
-      changed: Array.from({ length: 45 }, (_, index) => {
-        const gzip = index < 43;
-        return {
-          path: gzip ? `data/biblical-languages/stepbible/greek/${index}.json.gz` : `data/strongs-${index}.json`,
-          identityKind: gzip ? 'canonical_json_payload_sha256_v1' : 'raw_sha256',
-          trackedIdentitySha256: '2'.repeat(64),
-          reproducedIdentitySha256: '3'.repeat(64),
-          trackedRawSha256: '4'.repeat(64),
-          reproducedRawSha256: '5'.repeat(64),
-        };
-      }),
     };
-    expect(() => verifyExpectedLegacyReproductionReport(report as any))
-      .toThrow('semantic drift');
-    expect(() => verifyExpectedLegacyReproductionReport({ ...report, changedArtifacts: 46 } as any))
+    expect(() => verifyCorrectedReproductionReport(report as any))
+      .toThrow('semantic structural issue count');
+    expect(() => verifyCorrectedReproductionReport({ ...report, changedArtifacts: 1 } as any))
       .toThrow('changed content artifact count');
-    expect(() => verifyExpectedLegacyReproductionReport({
+    expect(() => verifyCorrectedReproductionReport({
       ...report,
       sourcePins: { ...report.sourcePins, stepbible: '0'.repeat(40) },
     } as any)).toThrow('STEPBible source pin');
+  });
+
+  it('verifies all 246 corrections and reverse-projects the exact legacy artifacts', () => {
+    const { ledger, comparedPaths } = unicodeCorrectionFixture();
+    expect(() => verifyBiblicalLanguageUnicodeCorrection(process.cwd(), ledger, comparedPaths)).not.toThrow();
+    expect(ledger.strongs).toHaveLength(9);
+    expect(ledger.morphology).toHaveLength(237);
+    expect(ledger.artifacts).toHaveLength(45);
+  });
+
+  it('rejects unsafe Unicode correction artifact paths', () => {
+    const { ledger, comparedPaths } = unicodeCorrectionFixture();
+    const unsafe = structuredClone(ledger);
+    unsafe.artifacts[0].path = 'data/biblical-languages/stepbible/greek/../outside.json.gz';
+    expect(() => verifyBiblicalLanguageUnicodeCorrection(process.cwd(), unsafe, comparedPaths))
+      .toThrow('Invalid Unicode artifact identity record');
+  });
+
+  it('binds corrected artifact records to current committed raw bytes', () => {
+    const { ledger, comparedPaths } = unicodeCorrectionFixture();
+    const correctedRawMutation = structuredClone(ledger);
+    correctedRawMutation.artifacts[0].preparedCorrectedRawSha256 = '0'.repeat(64);
+    expect(() => verifyBiblicalLanguageUnicodeCorrection(process.cwd(), correctedRawMutation, comparedPaths))
+      .toThrow('Corrected artifact raw-byte identity drift');
+  });
+
+  it('binds legacy gzip forensics to the Phase A raw inventory', () => {
+    const { ledger, comparedPaths } = unicodeCorrectionFixture();
+    const legacyRawMutation = structuredClone(ledger);
+    legacyRawMutation.artifacts[0].legacyRawSha256 = '0'.repeat(64);
+    expect(() => verifyBiblicalLanguageUnicodeCorrection(process.cwd(), legacyRawMutation, comparedPaths))
+      .toThrow('Reverse-projected biblical-language raw inventory identity drift');
+  });
+
+  it("reverse-verifies uncompressed Strong's legacy bytes", () => {
+    const { ledger, comparedPaths } = unicodeCorrectionFixture();
+    const strongsLegacyRawMutation = structuredClone(ledger);
+    strongsLegacyRawMutation.artifacts.find(artifact => !artifact.path.endsWith('.json.gz'))!.legacyRawSha256 = '0'.repeat(64);
+    expect(() => verifyBiblicalLanguageUnicodeCorrection(process.cwd(), strongsLegacyRawMutation, comparedPaths))
+      .toThrow('Reverse projection did not reconstruct legacy artifact bytes');
+  });
+
+  it('pins the Phase A legacy raw inventory contract', () => {
+    const { ledger, comparedPaths } = unicodeCorrectionFixture();
+    const rawInventoryMutation = structuredClone(ledger);
+    rawInventoryMutation.contract.legacyRawInventorySha256 = '0'.repeat(64);
+    expect(() => verifyBiblicalLanguageUnicodeCorrection(process.cwd(), rawInventoryMutation, comparedPaths))
+      .toThrow('Unicode correction identity contract drift');
   });
 
   it('routes every language acquisition builder through the pin registry', () => {

@@ -5,7 +5,7 @@ export const JOHN_1_1_POSITION_11 = {
   chapter: 1,
   verse: 1,
   position: 11,
-  wordText: 'τὸ',
+  wordText: 'τὸν',
   lemma: 'ὁ',
   strongsNumber: 'G3588',
 } as const;
@@ -115,7 +115,7 @@ export function assertHebrewLemmaCoverageDatabase(db: {
 
 /** SQL predicate used by D1 readiness checks for the semantic sentinel. */
 export function johnOneOneReadinessPredicate(): string {
-  return `(SELECT word_text FROM morphology WHERE book = 'John' AND chapter = 1 AND verse = 1 AND position = 11) = 'τὸ'`;
+  return `(SELECT word_text FROM morphology WHERE book = 'John' AND chapter = 1 AND verse = 1 AND position = 11) = 'τὸν'`;
 }
 
 /** SQL predicate proving the prepared D1 includes lexicon-backed Hebrew lemmas. */
