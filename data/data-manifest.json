@@ -1,11 +1,11 @@
 {
   "manifestVersion": 2,
-  "schemaVersion": "0002_ubs_parallel_passages",
+  "schemaVersion": "0003_original_language_usage",
   "algorithm": "sha256",
   "materializations": {
     "d1": {
       "identityVersion": 1,
-      "transformVersion": 4,
+      "transformVersion": 5,
       "migrations": [
         {
           "path": "migrations/0001_initial_schema.sql",
@@ -14,6 +14,10 @@
         {
           "path": "migrations/0002_ubs_parallel_passages.sql",
           "sha256": "2db4e445009cd8b5242fb7939517e9ac7c413da0cfa8824dca3def016681dd6f"
+        },
+        {
+          "path": "migrations/0003_original_language_usage.sql",
+          "sha256": "d171aec055e26e25e7432f16be01d36fb413b5e285737a898dfa6105ec977708"
         }
       ],
       "inputs": [
@@ -131,7 +135,7 @@
   "files": [
     {
       "path": "data/biblical-languages/SOURCE.json",
-      "sha256": "c917f7ceeb624ea42d2a3645c3b66a4d570c5a633136121c04232fb54f9dba28"
+      "sha256": "5a1c620def8017895f6d3e795972f713aa4506ba15c0739f06aeeeea21ac293f"
     },
     {
       "path": "data/biblical-languages/UNICODE-CORRECTION.json",
@@ -546,7 +550,10 @@
     "theologai_metadata": 2,
     "cross_references": 344799,
     "strongs": 14298,
+    "strongs_book_stats": 57781,
+    "strongs_form_stats": 138293,
     "strongs_fts": 14298,
+    "strongs_usage_stats": 13836,
     "morphology": 447748,
     "stepbible_lexicons": 19570,
     "documents": 17,

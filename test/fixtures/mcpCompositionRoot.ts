@@ -104,6 +104,10 @@ export function createDeterministicMcpFixture(): DeterministicMcpFixture {
     hasVerse: () => false,
     getOccurrences: () => [],
     getDistribution: () => [],
+    getUsageStats: () => undefined,
+    getBookUsage: () => [],
+    getFormUsage: () => [],
+    getTokenOccurrences: () => ({ occurrences: [] }),
   };
 
   const onChainVerifier = {

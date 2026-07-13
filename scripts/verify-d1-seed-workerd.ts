@@ -50,7 +50,7 @@ try {
     `SELECT CASE WHEN
       (SELECT COUNT(*) FROM d1_migrations) = ${migrationNames.length}
       AND (SELECT group_concat(name, ',') FROM (SELECT name FROM d1_migrations ORDER BY id)) = '${migrationNames.join(',')}'
-      AND (SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name IN ('idx_xref_from','idx_xref_votes','idx_morph_verse','idx_morph_strongs','idx_ubs_groups_source_order','idx_ubs_segments_lookup')) = 6
+      AND (SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name IN ('idx_xref_from','idx_xref_votes','idx_morph_verse','idx_morph_strongs','idx_morph_strongs_canonical','idx_strongs_book_stats_order','idx_strongs_form_stats_rank','idx_ubs_groups_source_order','idx_ubs_segments_lookup')) = 9
       AND ${columnChecks.join('\n      AND ')}
       THEN 'schema-ready' ELSE json_extract('Wrangler-applied migration state mismatch', '$') END AS schema_state;`,
     '--json',
@@ -61,6 +61,9 @@ try {
     'empty-target-check',
     'theologai_metadata',
     'morph_codes',
+    'strongs_usage_stats',
+    'strongs_book_stats',
+    'strongs_form_stats',
     'documents',
     'document_sections',
     'fts',

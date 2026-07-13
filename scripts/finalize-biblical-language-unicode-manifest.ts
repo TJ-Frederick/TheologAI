@@ -11,7 +11,7 @@ import type { BiblicalLanguageUnicodeCorrectionLedger } from './biblical-languag
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const MANIFEST_PATH = join(ROOT, 'data/data-manifest.json');
 const LEDGER_PATH = 'data/biblical-languages/UNICODE-CORRECTION.json';
-const EXPECTED_IDENTITY = '652245709aaed181345b0cf17f0091471ac3a3e323f6ae84cfd73a5d8b409c51';
+const EXPECTED_IDENTITY = '93ae4ca3c09493cf02a6b48154c991c133fd6ce235119fc4b8cba0256a36f881';
 
 function sha256(path: string): string {
   return createHash('sha256').update(readFileSync(join(ROOT, path))).digest('hex');
@@ -23,13 +23,14 @@ function assert(condition: unknown, message: string): asserts condition {
 
 const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf8')) as DataManifest;
 const ledger = JSON.parse(readFileSync(join(ROOT, LEDGER_PATH), 'utf8')) as BiblicalLanguageUnicodeCorrectionLedger;
-assert(manifest.schemaVersion === '0002_ubs_parallel_passages', 'Unicode correction must retain schema 0002');
+assert(manifest.schemaVersion === '0003_original_language_usage', 'Unicode correction must retain schema 0003');
 assert(manifest.materializations.d1.identityVersion === 1, 'Unicode correction must retain identity version 1');
-assert([3, 4].includes(manifest.materializations.d1.transformVersion), 'Unexpected pre-correction D1 transform version');
-assert(manifest.materializations.d1.migrations.length === 2
+assert([3, 4, 5].includes(manifest.materializations.d1.transformVersion), 'Unexpected pre-correction D1 transform version');
+assert(manifest.materializations.d1.migrations.length === 3
   && manifest.materializations.d1.migrations[0].path === 'migrations/0001_initial_schema.sql'
-  && manifest.materializations.d1.migrations[1].path === 'migrations/0002_ubs_parallel_passages.sql',
-'Unicode correction must not alter migrations');
+  && manifest.materializations.d1.migrations[1].path === 'migrations/0002_ubs_parallel_passages.sql'
+  && manifest.materializations.d1.migrations[2].path === 'migrations/0003_original_language_usage.sql',
+'Unicode correction must retain the reviewed migration set');
 
 const ledgerWasAdded = !manifest.files.some(file => file.path === LEDGER_PATH);
 if (ledgerWasAdded) {
@@ -62,8 +63,8 @@ if (manifest.materializations.d1.transformVersion === 3) {
     && changed.has('data/biblical-languages/stepbible/stepbible-metadata.json'),
   'Unicode provenance artifacts were not all refreshed');
 }
-manifest.materializations.d1.transformVersion = 4;
+manifest.materializations.d1.transformVersion = 5;
 const identity = computeD1CorpusIdentity(manifest);
 assert(identity === EXPECTED_IDENTITY, `Unexpected corrected D1 identity: ${identity}`);
 writeFileAtomically(MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`);
-console.error(`[finalize-biblical-language-unicode-manifest] D1 transform 4 identity ${identity}`);
+console.error(`[finalize-biblical-language-unicode-manifest] D1 transform 5 identity ${identity}`);

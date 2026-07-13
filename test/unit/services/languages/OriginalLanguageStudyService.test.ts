@@ -9,6 +9,8 @@ function repos(words: MorphWord[] = [loved], options: { dictionary?: boolean; le
   const morphology: IMorphologyRepository = {
     getVerseMorphology: () => words, expandMorphCode: () => options.expansion,
     getAvailableBooks: () => [], hasVerse: () => true, getOccurrences: () => [], getDistribution: () => [],
+    getUsageStats: () => undefined, getBookUsage: () => [], getFormUsage: () => [],
+    getTokenOccurrences: () => ({ occurrences: [] }),
   };
   const strongs: IStrongsRepository = {
     lookup: id => options.dictionary === false ? undefined : ({ strongs_number: id, testament: 'NT', lemma: 'ἀγαπάω', transliteration: 'agapaō', pronunciation: null, definition: 'to love', derivation: null }),
@@ -96,6 +98,8 @@ describe('OriginalLanguageStudyService', () => {
       expandMorphCode: async code => await morphology.expandMorphCode(code),
       getAvailableBooks: async () => [], hasVerse: async () => true,
       getOccurrences: async () => [], getDistribution: async () => [],
+      getUsageStats: async () => undefined, getBookUsage: async () => [], getFormUsage: async () => [],
+      getTokenOccurrences: async () => ({ occurrences: [] }),
     };
     const asyncStrongs: IStrongsRepository = {
       lookup: async id => await strongs.lookup(id), search: async query => await strongs.search(query),

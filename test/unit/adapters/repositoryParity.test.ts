@@ -68,8 +68,21 @@ describe('SQLite and D1 repository parity with identical real data', () => {
       CREATE TABLE morphology (
         book TEXT NOT NULL, chapter INTEGER NOT NULL, verse INTEGER NOT NULL,
         position INTEGER NOT NULL, word_text TEXT NOT NULL, lemma TEXT NOT NULL,
-        strongs_number TEXT, morph_code TEXT, gloss TEXT,
+        strongs_number TEXT, morph_code TEXT, gloss TEXT, book_order INTEGER NOT NULL,
         PRIMARY KEY (book, chapter, verse, position)
+      );
+      CREATE INDEX idx_morph_strongs_canonical ON morphology(strongs_number, book_order, chapter, verse, position);
+      CREATE TABLE strongs_usage_stats (
+        strongs_key TEXT PRIMARY KEY, token_count INTEGER, verse_count INTEGER, book_count INTEGER, form_count INTEGER
+      );
+      CREATE TABLE strongs_book_stats (
+        strongs_key TEXT, book TEXT, book_order INTEGER, token_count INTEGER, verse_count INTEGER,
+        PRIMARY KEY (strongs_key, book)
+      );
+      CREATE TABLE strongs_form_stats (
+        strongs_key TEXT, form_text TEXT, token_count INTEGER, verse_count INTEGER,
+        first_book TEXT, first_book_order INTEGER, first_chapter INTEGER, first_verse INTEGER, first_position INTEGER,
+        PRIMARY KEY (strongs_key, form_text)
       );
       CREATE TABLE morph_codes (code TEXT PRIMARY KEY, expansion TEXT NOT NULL);
       CREATE TABLE documents (
@@ -105,15 +118,24 @@ describe('SQLite and D1 repository parity with identical real data', () => {
         ('H9049', 'STEPBible', '{"gloss":"they"}');
 
       INSERT INTO morphology VALUES
-        ('Romans', 8, 28, 1, 'οἴδαμεν', 'οἶδα', 'G1492', 'V-RAI-1P', 'we know'),
-        ('John', 3, 16, 1, 'ἠγάπησεν', 'ἀγαπάω', 'G0025', 'V-AAI-3S', 'loved'),
-        ('Genesis', 1, 1, 1, 'בְּרֵאשִׁית', 'רֵאשִׁית', 'H7225', 'HNcfsa', 'in beginning'),
-        ('Romans', 5, 8, 1, 'συνίστησιν', 'συνίστημι', 'G4921', 'V-PAI-3S', 'demonstrates'),
-        ('Romans', 8, 35, 1, 'ἀγάπης', 'ἀγάπη', 'G0025', 'N-GSF', 'love'),
-        ('John', 1, 1, 1, 'fixture-g6000', 'fixture', 'G6000', 'G:V', 'report'),
-        ('John', 1, 1, 2, 'fixture-g21502', 'fixture', 'G21502', 'G:N-PRI', 'Heneia'),
-        ('John', 1, 1, 3, 'fixture-h9001', 'fixture', 'H9001', 'H:Conj', '&'),
-        ('John', 1, 1, 4, 'fixture-h9049', 'fixture', 'H9049', 'Sp3f', 'they');
+        ('Romans', 8, 28, 1, 'οἴδαμεν', 'οἶδα', 'G1492', 'V-RAI-1P', 'we know', 45),
+        ('John', 3, 16, 1, 'ἠγάπησεν', 'ἀγαπάω', 'G0025', 'V-AAI-3S', 'loved', 43),
+        ('Genesis', 1, 1, 1, 'בְּרֵאשִׁית', 'רֵאשִׁית', 'H7225', 'HNcfsa', 'in beginning', 1),
+        ('Romans', 5, 8, 1, 'συνίστησιν', 'συνίστημι', 'G4921', 'V-PAI-3S', 'demonstrates', 45),
+        ('Romans', 8, 35, 1, 'ἀγάπης', 'ἀγάπη', 'G0025', 'N-GSF', 'love', 45),
+        ('John', 1, 1, 1, 'fixture-g6000', 'fixture', 'G6000', 'G:V', 'report', 43),
+        ('John', 1, 1, 2, 'fixture-g21502', 'fixture', 'G21502', 'G:N-PRI', 'Heneia', 43),
+        ('John', 1, 1, 3, 'fixture-h9001', 'fixture', 'H9001', 'H:Conj', '&', 43),
+        ('John', 1, 1, 4, 'fixture-h9049', 'fixture', 'H9049', 'Sp3f', 'they', 43),
+        ('Psalms', 3, 0, 1, 'מִזְמוֹר', 'מִזְמוֹר', 'H9998', 'HNcmsa', 'psalm', 19),
+        ('Psalms', 3, 0, 2, 'לְדָוִד', 'דָּוִד', 'H9998', 'HNp', 'of David', 19),
+        ('Psalms', 3, 1, 1, 'יְהוָה', 'יְהוָה', 'H9998', 'HNp', 'Lord', 19);
+      INSERT INTO strongs_usage_stats VALUES ('G0025', 2, 2, 2, 2);
+      INSERT INTO strongs_book_stats VALUES
+        ('G0025', 'John', 43, 1, 1), ('G0025', 'Romans', 45, 1, 1);
+      INSERT INTO strongs_form_stats VALUES
+        ('G0025', 'ἠγάπησεν', 1, 1, 'John', 43, 3, 16, 1),
+        ('G0025', 'ἀγάπης', 1, 1, 'Romans', 45, 8, 35, 1);
       INSERT INTO morph_codes VALUES ('V-AAI-3S', 'Verb Aorist Active Indicative 3rd Singular');
 
       INSERT INTO documents VALUES
@@ -213,8 +235,30 @@ describe('SQLite and D1 repository parity with identical real data', () => {
       .resolves.toEqual(sqliteMorphology.getOccurrences('G0025'));
     await expect(d1Morphology.getDistribution('G0025'))
       .resolves.toEqual(sqliteMorphology.getDistribution('G0025'));
-    expect(sqliteMorphology.getAvailableBooks()).toEqual(['Genesis', 'John', 'Romans']);
+    await expect(d1Morphology.getUsageStats('G0025'))
+      .resolves.toEqual(sqliteMorphology.getUsageStats('G0025'));
+    await expect(d1Morphology.getBookUsage('G0025'))
+      .resolves.toEqual(sqliteMorphology.getBookUsage('G0025'));
+    await expect(d1Morphology.getFormUsage('G0025'))
+      .resolves.toEqual(sqliteMorphology.getFormUsage('G0025'));
+    await expect(d1Morphology.getTokenOccurrences('G0025'))
+      .resolves.toEqual(sqliteMorphology.getTokenOccurrences('G0025'));
+    expect(sqliteMorphology.getAvailableBooks()).toEqual(['Genesis', 'Psalms', 'John', 'Romans']);
     expect(sqliteMorphology.getDistribution('G0025').map(row => row.book)).toEqual(['John', 'Romans']);
+  });
+
+  it('round-trips a verse-zero Psalm superscription keyset cursor identically', async () => {
+    const sqliteFirst = sqliteMorphology.getTokenOccurrences('H9998', undefined, 2);
+    const d1First = await d1Morphology.getTokenOccurrences('H9998', undefined, 2);
+    expect(d1First).toEqual(sqliteFirst);
+    expect(sqliteFirst.next_after).toEqual({ book_order: 19, chapter: 3, verse: 0, position: 2 });
+
+    const sqliteSecond = sqliteMorphology.getTokenOccurrences('H9998', sqliteFirst.next_after, 2);
+    const d1Second = await d1Morphology.getTokenOccurrences('H9998', d1First.next_after, 2);
+    expect(d1Second).toEqual(sqliteSecond);
+    expect(sqliteSecond.occurrences).toHaveLength(1);
+    expect(sqliteSecond.occurrences[0]).toMatchObject({ verse: 1, position: 1 });
+    expect(sqliteSecond.next_after).toBeUndefined();
   });
 
   it('returns complete and identical Strong entries for lookup and search', async () => {
