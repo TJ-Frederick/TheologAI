@@ -38,7 +38,7 @@ describe('biblical-language source revisions', () => {
     expect(lock.derived_artifacts).toMatchObject({
       status: 'accepted_legacy_non_reproducible',
       compared_artifacts: 72,
-      changed_artifacts: 45,
+      changed_content_artifacts: 45,
     });
   });
 
@@ -47,9 +47,18 @@ describe('biblical-language source revisions', () => {
     const compiler = { id: 'theologai-stepbible-lexicon-json', version: 1 };
     expect(deterministicBuildProvenance(STEPBIBLE_DATA, files, compiler).derived_artifact)
       .toMatchObject({
-        classification: 'reproducible_from_exact_verified_pins',
+        classification: 'content_reproducible_from_exact_verified_pins',
+        identity_kind: 'raw_sha256',
         byte_reproducible_from_pinned_inputs: true,
       });
+    expect(deterministicBuildProvenance(
+      STEPBIBLE_DATA, files, compiler, 'canonical_json_payload_sha256_v1',
+    ).derived_artifact).toMatchObject({
+      classification: 'content_reproducible_from_exact_verified_pins',
+      identity_kind: 'canonical_json_payload_sha256_v1',
+      byte_reproducible_from_pinned_inputs: false,
+      gzip_container_bytes_reproducible_across_zlib_versions: false,
+    });
     expect(trackedArtifactAttestation(STEPBIBLE_DATA, files, compiler, {
       status: 'byte_reproducible_from_exact_verified_pins',
       affectedArtifacts: 0,
@@ -90,22 +99,45 @@ describe('biblical-language source revisions', () => {
   it('fails closed when a reproduction report omits the exact semantic drift evidence', () => {
     const expected = sourceLockProjection().derived_artifacts;
     const report = {
-      status: 'legacy-derived-artifact-drift',
+      status: 'legacy-derived-content-drift',
       sourcePins: {
         openscriptures: OPENSCRIPTURES_COMMIT,
         stepbible: STEPBIBLE_COMMIT,
       },
       d1MaterializationIdentity: expected.d1_materialization_identity,
       comparedArtifacts: expected.compared_artifacts,
-      changedArtifacts: expected.changed_artifacts,
-      trackedInventorySha256: expected.tracked_inventory_sha256,
-      reproducedInventorySha256: expected.clean_reproduction_inventory_sha256,
+      changedArtifacts: expected.changed_content_artifacts,
+      comparisonIdentityPolicy: expected.comparison_identity_policy,
+      trackedContentInventorySha256: expected.tracked_content_inventory_sha256,
+      reproducedContentInventorySha256: expected.clean_reproduction_content_inventory_sha256,
+      trackedRawInventorySha256: expected.tracked_raw_inventory_sha256,
+      reproducedRawInventorySha256: '1'.repeat(64),
+      rawByteDifferenceCount: expected.changed_content_artifacts,
+      rawByteDifferences: Array.from({ length: 45 }, (_, index) => {
+        const gzip = index < 43;
+        return {
+          path: gzip ? `data/biblical-languages/stepbible/greek/${index}.json.gz` : `data/strongs-${index}.json`,
+          trackedRawSha256: '4'.repeat(64),
+          reproducedRawSha256: '5'.repeat(64),
+        };
+      }),
       missingArtifacts: [],
+      changed: Array.from({ length: 45 }, (_, index) => {
+        const gzip = index < 43;
+        return {
+          path: gzip ? `data/biblical-languages/stepbible/greek/${index}.json.gz` : `data/strongs-${index}.json`,
+          identityKind: gzip ? 'canonical_json_payload_sha256_v1' : 'raw_sha256',
+          trackedIdentitySha256: '2'.repeat(64),
+          reproducedIdentitySha256: '3'.repeat(64),
+          trackedRawSha256: '4'.repeat(64),
+          reproducedRawSha256: '5'.repeat(64),
+        };
+      }),
     };
     expect(() => verifyExpectedLegacyReproductionReport(report as any))
       .toThrow('semantic drift');
     expect(() => verifyExpectedLegacyReproductionReport({ ...report, changedArtifacts: 46 } as any))
-      .toThrow('changed artifact count');
+      .toThrow('changed content artifact count');
     expect(() => verifyExpectedLegacyReproductionReport({
       ...report,
       sourcePins: { ...report.sourcePins, stepbible: '0'.repeat(40) },

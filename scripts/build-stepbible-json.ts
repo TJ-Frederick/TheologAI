@@ -31,7 +31,6 @@ import {
 } from './biblical-language-sources.js';
 import { downloadPinnedSource } from './download-pinned-source.js';
 import { publishDirectoryAtomically } from './atomic-publication.js';
-import { deterministicGzipSync } from './deterministic-gzip.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -408,7 +407,7 @@ function saveBook(bookName: string, bookNum: string, bookData: BookData): void {
   const filepath = path.join(dir, filename);
 
   const json = JSON.stringify(bookData, null, 0); // No whitespace for compression
-  const compressed = deterministicGzipSync(json);
+  const compressed = zlib.gzipSync(json, { level: 9 });
 
   fs.writeFileSync(filepath, compressed);
 
@@ -455,6 +454,7 @@ function generateMetadata(greekBooks: Map<string, BookData>, hebrewBooks: Map<st
       STEPBIBLE_DATA,
       [...TAGNT_SOURCES, ...TAHOT_SOURCES],
       { id: 'theologai-stepbible-morphology-json', version: 1 },
+      'canonical_json_payload_sha256_v1',
     ),
     license: 'CC BY 4.0',
     attribution: 'STEP Bible (www.stepbible.org)',

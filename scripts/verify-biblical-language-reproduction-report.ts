@@ -24,9 +24,26 @@ export interface ReproductionReport {
   d1MaterializationIdentity: string;
   comparedArtifacts: number;
   changedArtifacts: number;
-  trackedInventorySha256: string;
-  reproducedInventorySha256: string;
+  comparisonIdentityPolicy: string;
+  trackedContentInventorySha256: string;
+  reproducedContentInventorySha256: string;
+  trackedRawInventorySha256: string;
+  reproducedRawInventorySha256: string;
+  rawByteDifferenceCount: number;
+  rawByteDifferences: Array<{
+    path: string;
+    trackedRawSha256: string;
+    reproducedRawSha256: string;
+  }>;
   missingArtifacts: string[];
+  changed: Array<{
+    path: string;
+    identityKind: 'raw_sha256' | 'canonical_json_payload_sha256_v1';
+    trackedIdentitySha256: string;
+    reproducedIdentitySha256: string;
+    trackedRawSha256: string;
+    reproducedRawSha256: string;
+  }>;
   semanticDrift: SemanticDriftReport;
 }
 
@@ -130,19 +147,66 @@ function verifyMorphology(records: MorphologyDriftRecord[], report: SemanticDrif
 export function verifyExpectedLegacyReproductionReport(report: ReproductionReport): void {
   const expected = sourceLockProjection().derived_artifacts;
   const checks: Array<[string, unknown, unknown]> = [
-    ['status', report.status, 'legacy-derived-artifact-drift'],
+    ['status', report.status, 'legacy-derived-content-drift'],
     ['OpenScriptures source pin', report.sourcePins?.openscriptures, OPENSCRIPTURES_STRONGS.commit],
     ['STEPBible source pin', report.sourcePins?.stepbible, STEPBIBLE_DATA.commit],
     ['D1 materialization identity', report.d1MaterializationIdentity, expected.d1_materialization_identity],
     ['compared artifact count', report.comparedArtifacts, expected.compared_artifacts],
-    ['changed artifact count', report.changedArtifacts, expected.changed_artifacts],
-    ['tracked inventory', report.trackedInventorySha256, expected.tracked_inventory_sha256],
-    ['clean reproduction inventory', report.reproducedInventorySha256, expected.clean_reproduction_inventory_sha256],
+    ['comparison identity policy', report.comparisonIdentityPolicy, expected.comparison_identity_policy],
+    ['changed content artifact count', report.changedArtifacts, expected.changed_content_artifacts],
+    ['tracked content inventory', report.trackedContentInventorySha256, expected.tracked_content_inventory_sha256],
+    ['clean reproduction content inventory', report.reproducedContentInventorySha256, expected.clean_reproduction_content_inventory_sha256],
+    ['tracked raw inventory', report.trackedRawInventorySha256, expected.tracked_raw_inventory_sha256],
     ['missing artifact count', report.missingArtifacts.length, 0],
   ];
   for (const [label, actual, value] of checks) {
     assertValue(label, actual, value);
   }
+  if (!/^[0-9a-f]{64}$/.test(report.reproducedRawInventorySha256)) {
+    fail('diagnostic reproduced raw inventory', report.reproducedRawInventorySha256);
+  }
+  if (!Number.isSafeInteger(report.rawByteDifferenceCount)
+    || report.rawByteDifferenceCount < report.changedArtifacts
+    || report.rawByteDifferenceCount > report.comparedArtifacts
+    || !Array.isArray(report.rawByteDifferences)
+    || report.rawByteDifferences.length !== report.rawByteDifferenceCount) {
+    fail('diagnostic raw-byte difference count', report.rawByteDifferenceCount);
+  }
+  const rawPaths = new Set<string>();
+  for (const record of report.rawByteDifferences) {
+    if (rawPaths.has(record.path)) fail('duplicate raw-byte difference path', record.path);
+    rawPaths.add(record.path);
+    if (!/^[0-9a-f]{64}$/.test(record.trackedRawSha256)
+      || !/^[0-9a-f]{64}$/.test(record.reproducedRawSha256)
+      || record.trackedRawSha256 === record.reproducedRawSha256) {
+      fail('invalid raw-byte difference', record.path);
+    }
+  }
+  if (!Array.isArray(report.changed) || report.changed.length !== report.changedArtifacts) {
+    fail('changed content records', report.changed?.length);
+  }
+  const changedPaths = new Set<string>();
+  for (const record of report.changed) {
+    if (changedPaths.has(record.path)) fail('duplicate changed content path', record.path);
+    changedPaths.add(record.path);
+    const gzip = record.path.endsWith('.json.gz');
+    assertValue(`${record.path} identity kind`, record.identityKind,
+      gzip ? 'canonical_json_payload_sha256_v1' : 'raw_sha256');
+    for (const [label, digest] of Object.entries(record).filter(([key]) => key.endsWith('Sha256'))) {
+      if (typeof digest !== 'string' || !/^[0-9a-f]{64}$/.test(digest)) fail(`${record.path} ${label}`, digest);
+    }
+    if (record.trackedIdentitySha256 === record.reproducedIdentitySha256) {
+      fail('unchanged content record', record.path);
+    }
+    const rawRecord = report.rawByteDifferences.find(candidate => candidate.path === record.path);
+    if (!rawRecord
+      || rawRecord.trackedRawSha256 !== record.trackedRawSha256
+      || rawRecord.reproducedRawSha256 !== record.reproducedRawSha256) {
+      fail('changed content raw-hash evidence', record.path);
+    }
+  }
+  assertValue('changed gzip content artifacts', report.changed.filter(record => record.path.endsWith('.json.gz')).length, 43);
+  assertValue('changed raw content artifacts', report.changed.filter(record => !record.path.endsWith('.json.gz')).length, 2);
   if (!report.semanticDrift || typeof report.semanticDrift !== 'object') {
     fail('semantic drift evidence', 'missing');
   }
