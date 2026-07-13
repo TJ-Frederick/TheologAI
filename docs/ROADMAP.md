@@ -65,6 +65,25 @@ the exact-corpus readiness gate passed. The post-deployment production audit
 passed all 84 checks. Live CCEL discovery remains intentionally disabled and is
 not part of the public MCP contract.
 
+## Current follow-up integration candidate
+
+Two independently reviewed follow-up slices are staged after the shipped PR #21
+baseline and are not yet merged or deployed:
+
+1. **Pinned biblical-language source revisions.** Records immutable upstream
+   source identities, verifies source and generated-artifact integrity, and adds
+   a reproducible, atomic regeneration workflow with semantic-drift reporting.
+2. **Primary-source evidence handoff.** Gives `primary_source_search` a stable,
+   bounded structured-output contract plus the local-only
+   `primary-source-research` prompt and exact native resource links for selected
+   canonical sections. It does not enable or advertise live CCEL discovery.
+
+The follow-up integration candidate still advertises eleven tools, but expands
+structured output to `bible_lookup`, `parallel_passages`,
+`primary_source_search`, `original_language_lookup`, and
+`original_language_study`, and expands the guided prompt set from five to six.
+These candidate counts do not describe the currently deployed PR #21 server.
+
 ## Release gates
 
 Code readiness and operational readiness are deliberately separate:
@@ -79,10 +98,10 @@ Code readiness and operational readiness are deliberately separate:
 4. Preview deployment requires the repository's authorization label and
    protected environment approval. The live PR must still be open, non-draft,
    and authorized immediately before deployment.
-5. Preview smoke and a functional audit must cover all eleven tools, the four
+5. Preview smoke and a functional audit must cover all eleven tools, the five
    structured-output contracts, UBS default and explicit-source behavior,
    Strong's extended identities, local primary-source search, language study,
-   resources, prompts, and failure/privacy boundaries.
+   resources, all six prompts, and failure/privacy boundaries.
 6. Production D1 corpus changes require explicit owner authorization and a
    compatible replacement or reviewed incremental migration. A metadata-only
    transition is valid only when materialized rows are unchanged; it must use a
@@ -94,14 +113,19 @@ Code readiness and operational readiness are deliberately separate:
 
 ## Next work
 
+- Correct known Greek/Hebrew Unicode normalization and display defects against
+  pinned-source evidence before expanding language-study interpretation.
+- After Unicode correctness is established, add the planned advanced-usage
+  schema for occurrence counts, book distribution, attested forms, and keyset
+  cursor pagination.
+- Broaden advanced original-language study only after those foundations, using
+  carefully sourced semantic-domain and discourse evidence useful to both
+  beginners and readers of Greek or Hebrew.
 - Expand primary-source discovery beyond the initial local collection through
   rights-reviewed, freely redistributable editions and provider adapters. Do
   not mirror or republish CCEL transcriptions without edition-specific rights.
 - Improve primary-source research bundles for topic surveys, within-work
   location, and author comparison while leaving synthesis to the host model.
-- Extend original-language study with carefully sourced semantic-domain,
-  occurrence-distribution, and discourse evidence useful to both beginners and
-  readers of Greek or Hebrew.
 - Evaluate section-span commentary only where provider coverage can be stated
   honestly; never relabel a section anchor as an exact verse range.
 - Continue modern MCP output improvements tool by tool when a stable structured

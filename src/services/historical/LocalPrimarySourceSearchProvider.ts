@@ -5,6 +5,7 @@ import {
   type PrimarySourceProviderResult,
   type PrimarySourceSearchQuery,
 } from './primarySourceTypes.js';
+import { formatLocalDocumentSectionResource } from '../../formatters/historicalFormatter.js';
 
 export class LocalPrimarySourceSearchProvider {
   constructor(private readonly repository: IHistoricalDocumentRepository) {}
@@ -54,6 +55,11 @@ export class LocalPrimarySourceSearchProvider {
       page,
       snippetOnly: true as const,
       attribution: LOCAL_PRIMARY_SOURCE_ATTRIBUTION,
+      documentType: row.document.type,
+      ...(row.document.date ? { documentDate: row.document.date } : {}),
+      resourceSizeBytes: new TextEncoder().encode(
+        formatLocalDocumentSectionResource(row.document, row.section),
+      ).byteLength,
     }));
     return result(hits.length > 0 ? 'ok' : 'no_results', page, true, hits);
   }

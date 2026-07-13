@@ -140,7 +140,7 @@ function containsImplementationDetail(message: string): boolean {
 }
 
 /** Format an error as an MCP tool error response */
-export function handleToolError(error: Error) {
+export function handleToolError(error: Error): import('./types.js').ToolResult {
   return {
     content: [{ type: 'text' as const, text: getUserMessage(error) }],
     isError: true,

@@ -128,6 +128,10 @@ describe('Worker MCP endpoint in workerd', () => {
           name: 'original_language_lookup',
           outputSchema: expect.objectContaining({ type: 'object', additionalProperties: false }),
         }),
+        expect.objectContaining({
+          name: 'primary_source_search',
+          outputSchema: expect.objectContaining({ type: 'object', additionalProperties: false }),
+        }),
       ]),
     });
   });
@@ -447,6 +451,46 @@ describe('Worker MCP endpoint in workerd', () => {
     });
   });
 
+  it('returns structured primary-source evidence and an exact readable D1 resource link', async () => {
+    const result = await rpc('tools/call', {
+      name: 'primary_source_search',
+      arguments: { queries: [{ id: 'creed', text: 'almighty', providers: ['local'], limit: 1 }] },
+    }, 42);
+
+    expect(result.response.status).toBe(200);
+    expect(result.message.error).toBeUndefined();
+    expect(result.message.result).toMatchObject({
+      content: [
+        expect.objectContaining({ type: 'text', text: expect.stringContaining('Plan status: **complete**') }),
+        expect.objectContaining({
+          type: 'resource_link',
+          uri: 'theologai://documents/apostles-creed#section-1',
+          mimeType: 'text/markdown', size: expect.any(Number),
+          annotations: { audience: ['assistant'] },
+        }),
+      ],
+      structuredContent: {
+        schemaVersion: '1', kind: 'primary_source_search', planStatus: 'complete',
+        queries: [expect.objectContaining({
+          providers: [expect.objectContaining({
+            provider: 'local', hitCount: 1,
+            hits: [expect.objectContaining({ documentType: 'Creed', documentDate: 'c. 390' })],
+          })],
+        })],
+        coverage: expect.any(Object),
+        evidencePolicy: {
+          snippetUse: 'discovery_only', selectedSectionAccess: 'mcp_resource_read',
+          coverageScope: 'bounded_non_exhaustive', editionProvenance: 'incomplete',
+        },
+      },
+    });
+    const blocks = result.message.result?.content as Array<Record<string, unknown>>;
+    const link = blocks.find(block => block.type === 'resource_link')!;
+    const read = await rpc('resources/read', { uri: link.uri }, 43);
+    const contents = read.message.result?.contents as Array<Record<string, unknown>>;
+    expect(new TextEncoder().encode(String(contents[0].text)).byteLength).toBe(link.size);
+  });
+
   it('lists prompts and renders a validated prompt through the Worker endpoint', async () => {
     const listed = await rpc('prompts/list', undefined, 8);
 
@@ -455,6 +499,7 @@ describe('Worker MCP endpoint in workerd', () => {
     expect(listed.message.result?.prompts).toEqual(expect.arrayContaining([
       expect.objectContaining({ name: 'passage-exegesis' }),
       expect.objectContaining({ name: 'word-study' }),
+      expect.objectContaining({ name: 'primary-source-research' }),
     ]));
 
     const rendered = await rpc('prompts/get', {

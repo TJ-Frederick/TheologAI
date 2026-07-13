@@ -89,7 +89,7 @@ describe('published project contract', () => {
     ]);
 
     expect(tools).toHaveLength(11);
-    expect(prompts).toHaveLength(5);
+    expect(prompts).toHaveLength(6);
     for (const { name } of [...tools, ...prompts]) {
       expect(readme).toContain(`| \`${name}\` |`);
     }
@@ -125,6 +125,7 @@ describe('published project contract', () => {
         'original_language_lookup',
         'original_language_study',
         'parallel_passages',
+        'primary_source_search',
       ],
     });
     for (const [index, document] of documents.entries()) {

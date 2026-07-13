@@ -98,6 +98,7 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
       expect(listed.tools.filter(tool => tool.outputSchema).map(tool => tool.name)).toEqual([
         'bible_lookup',
         'parallel_passages',
+        'primary_source_search',
         'original_language_lookup',
         'original_language_study',
       ]);
@@ -176,6 +177,19 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
         content: [expect.objectContaining({
           text: expect.stringContaining('Plan status: **complete**'),
         })],
+        structuredContent: {
+          schemaVersion: '1',
+          kind: 'primary_source_search',
+          planStatus: 'complete',
+          queries: [expect.anything()],
+          coverage: expect.any(Object),
+          evidencePolicy: {
+            snippetUse: 'discovery_only',
+            selectedSectionAccess: 'mcp_resource_read',
+            coverageScope: 'bounded_non_exhaustive',
+            editionProvenance: 'incomplete',
+          },
+        },
       });
       expect(primarySourceSearch.isError).not.toBe(true);
 

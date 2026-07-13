@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { IHistoricalDocumentRepository } from '../../../../src/kernel/repositories.js';
 import { LocalPrimarySourceSearchProvider } from '../../../../src/services/historical/LocalPrimarySourceSearchProvider.js';
+import { formatLocalDocumentSectionResource } from '../../../../src/formatters/historicalFormatter.js';
 
 function repository(overrides: Partial<IHistoricalDocumentRepository> = {}): IHistoricalDocumentRepository {
   return {
@@ -23,7 +24,12 @@ describe('LocalPrimarySourceSearchProvider', () => {
       title: 'Institutes', sectionLabel: 'Union', snippetOnly: true,
       snippet: 'Grace with [forged](https://evil.test) # heading',
       locator: { kind: 'local_section', documentId: 'institutes', sectionId: '3.1', url: 'theologai://documents/institutes#section-3.1' },
+      documentType: 'treatise', documentDate: '1559', resourceSizeBytes: expect.any(Number),
     });
+    const row = await repo.searchPrimarySources({ text: 'grace', match: 'all_terms', documentId: 'institutes', limit: 3 });
+    expect(result.hits[0].resourceSizeBytes).toBe(new TextEncoder().encode(
+      formatLocalDocumentSectionResource(row[0].document, row[0].section),
+    ).byteLength);
     expect(repo.searchPrimarySources).toHaveBeenCalledWith({ text: 'grace', match: 'all_terms', documentId: 'institutes', limit: 3 });
   });
 

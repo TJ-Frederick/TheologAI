@@ -6,7 +6,7 @@
  *   - Removed unimplemented params (includeCrossRefs, include_cross_references)
  */
 
-import type { Tool } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult, ContentBlock, TextContent, Tool } from '@modelcontextprotocol/sdk/types.js';
 
 // ── Tool infrastructure ──
 
@@ -19,11 +19,10 @@ export interface ToolHandler {
   handler: (params: Record<string, unknown>) => Promise<ToolResult>;
 }
 
-export interface ToolResult {
-  content: Array<{ type: 'text'; text: string }>;
-  structuredContent?: Record<string, unknown>;
-  isError?: boolean;
-}
+export type ToolResult = Omit<CallToolResult, 'content'> & {
+  /** Legacy Markdown is always first; later blocks may use the native MCP union. */
+  content: [TextContent, ...ContentBlock[]];
+};
 
 // ── Bible types ──
 

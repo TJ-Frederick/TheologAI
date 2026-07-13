@@ -7,13 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-<!-- theologai-public-contract tools=11 structured=bible_lookup,original_language_lookup,original_language_study,parallel_passages -->
+<!-- theologai-public-contract tools=11 structured=bible_lookup,original_language_lookup,original_language_study,parallel_passages,primary_source_search -->
 
 ### Added
 
 - Added stable MCP 2025-11-25 structured output and server-side schema
   validation for `bible_lookup`, `parallel_passages`,
-  `original_language_lookup`, and `original_language_study`, while keeping
+  `primary_source_search`, `original_language_lookup`, and
+  `original_language_study`, while keeping
   their Markdown content available for legacy clients.
 - Added bounded, result-local provenance records and structured-first guidance
   to the word-study, passage-exegesis, and compare-translations prompts.
@@ -21,8 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hard default to complete UBS source-attested groups. Legacy curated edges and
   OpenBible.info rows remain available only through explicit, separate selectors.
 - Added `primary_source_search`, an explicit, bounded local research-plan tool.
-  The public schema returns snippets and resolvable local section locators and
-  does not advertise or invoke inactive CCEL provider adapters.
+  Its versioned structured output keeps query/provider grouping and evidence
+  policy, while native resource links resolve selected canonical local sections
+  with exact byte sizes. It does not advertise or invoke inactive CCEL adapters.
+- Added the local-only `primary-source-research` prompt for bounded topic surveys
+  or exact-work searches followed by explicit MCP section reads.
 - Added `original_language_study`, a context-first study of one verse token that
   combines morphology and source-separated lexical evidence while stating its
   interpretive limits.
@@ -36,7 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Corrected
 
-- Reconciled the public contract at version 3.6.0: eleven tools, five
+- Reconciled the pending public contract at version 3.6.0: eleven tools, six
   prompts, 17 local historical documents, and transport-specific Logging.
 - Scoped D1 readiness to both schema and materialization identity. Remote D1
   preparation and preview/production deployment remained separate operational
