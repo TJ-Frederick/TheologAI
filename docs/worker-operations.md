@@ -19,35 +19,34 @@ of the deployed binding.
 
 ### Prepared preview candidate (not deployed)
 
-On 2026-07-12, `theologai-preview-20260712-a` was created in Eastern North
+On 2026-07-12, `theologai-preview-20260712-b` was created in Eastern North
 America (`ENAM`) with no jurisdiction restriction, migrated through
-`0002_ubs_parallel_passages`, and populated from all 29 files in the generated
-seed manifest, beginning with the empty-target guard. Its database ID is kept
-in the reviewable preview binding in `wrangler.toml`; the prior ID remains in
-Git history and the operational handoff rather than being duplicated here.
+`0002_ubs_parallel_passages`, and populated from all 29 generated data files,
+after beginning with the empty-target guard. The manifest contains 30 files
+total including that guard. Its database ID is kept in the
+reviewable preview binding in `wrangler.toml`; prior candidates remain available
+for rollback investigation and are not modified by this preparation.
 
 The strict remote readiness gate returned `ready`. Independent read-only checks
-also confirmed 859,596 exact manifest rows, both required UBS indexes, artifact
-identity `a5fd0d4646cb69f426f592c6e334866191201fbe64691cd55c7f7ecd0ca9d4cc`,
-source SHA-256 `d43e7554556c1a1c5e2464e6b5ad8a4ab9118ada11060bf6b200abf3d0d0a394`,
-transform version 2, `quick_check = ok`, and zero foreign-key violations.
+also confirmed 859,596 exact manifest rows, both required UBS indexes, scoped
+materialization identity
+`91afa5bcf8155ac9f8c5fd14d1d661657c83be9a8e5cd90a5783bfa38ae7dfa5`,
+Hebrew morphology transform version 3, the Genesis 1:1 Hebrew lemma sentinel,
+`quick_check = ok`, and zero foreign-key violations.
 
 This is preparation evidence only. The preview Worker remains deployed against
 `theologai-preview-20260710-c` until the normal PR label, environment approval,
 live-authorization rechecks, and deployment complete. Retain that database for
 rollback; do not delete either database during the verification window.
 
-### Hebrew-lemma materialization follow-up (not prepared or deployed)
+### Hebrew-lemma materialization follow-up
 
-The transform-version-2 preview candidate above predates deterministic Hebrew
-lemma population. Application revisions expecting D1 materialization transform
-version 3 require a fresh database seeded from all 30 generated files, with
-scoped identity
-`91afa5bcf8155ac9f8c5fd14d1d661657c83be9a8e5cd90a5783bfa38ae7dfa5`
-and the Genesis 1:1 Hebrew lemma readiness sentinel. This changes morphology
-rows and therefore cannot use the earlier marker-only transition. The UBS
-parallel-passage source transform remains version 2; these are separate
-version domains.
+The prepared `theologai-preview-20260712-b` candidate includes deterministic
+Hebrew lemma population and passed the transform-version-3 readiness gate. The
+earlier `theologai-preview-20260712-a` candidate predates those materialized row
+changes and must not be marker-updated or rebound to an application revision
+expecting transform version 3. The UBS parallel-passage source transform remains
+version 2; these are separate version domains.
 
 No rollback asset is claimed as known-good without a read-only inventory and
 compatibility check. Do not copy database IDs, credentials, API tokens, or
