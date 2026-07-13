@@ -22,6 +22,9 @@ is local source context only and does not define the current product contract.
   primary-source research, normalized UBS runtime and public cutover, and
   contextual original-language study, merged as
   `639d0a02c1c666340f0e2ee3bcb4b4d5a336d9fb`.
+- **Phase 3 evidence follow-up / PR #26:** pinned biblical-language source
+  reproduction plus structured primary-source evidence handoff, merged as
+  `65db03e8cd02098064a748f96cca8da22c974381`.
 
 These entries describe merged repository state. Deployment state is established
 only by the relevant protected workflow and post-deployment smoke evidence; a
@@ -56,33 +59,29 @@ PR #21. Their stacked PRs #14–#20 are closed as superseded review vehicles:
    context-first workflow for one token in one verse, with morphology,
    source-separated lexical evidence, provenance, and interpretive limits.
 
-The released server advertises eleven tools and structured output for
-`bible_lookup`, `parallel_passages`, `original_language_lookup`, and
-`original_language_study`. Markdown remains available for compatibility.
+The released server advertises eleven tools, six guided prompts, and structured
+output for `bible_lookup`, `parallel_passages`, `primary_source_search`,
+`original_language_lookup`, and `original_language_study`. Markdown remains
+available for compatibility.
 
-Protected production workflow run `29257538930` deployed the PR #21 merge after
-the exact-corpus readiness gate passed. The post-deployment production audit
-passed all 84 checks. Live CCEL discovery remains intentionally disabled and is
-not part of the public MCP contract.
+Protected production workflow run `29267651916` deployed the PR #26 merge after
+the exact-corpus readiness gate passed. Live CCEL discovery remains intentionally
+disabled and is not part of the public MCP contract.
 
-## Current follow-up integration candidate
+## Current Unicode correction release candidate
 
-Two independently reviewed follow-up slices are staged after the shipped PR #21
-baseline and are not yet merged or deployed:
+PR #27 corrects pinned-source Unicode artifacts in the biblical-language corpus
+without broadening the interpretation contract. Its exact source and generated
+artifact reproduction checks are green. A fresh transform-version-4 D1 database
+has passed the complete readiness contract and is prepared for protected
+production deployment; the current production Worker and database remain
+unchanged until that workflow succeeds.
 
-1. **Pinned biblical-language source revisions.** Records immutable upstream
-   source identities, verifies source and generated-artifact integrity, and adds
-   a reproducible, atomic regeneration workflow with semantic-drift reporting.
-2. **Primary-source evidence handoff.** Gives `primary_source_search` a stable,
-   bounded structured-output contract plus the local-only
-   `primary-source-research` prompt and exact native resource links for selected
-   canonical sections. It does not enable or advertise live CCEL discovery.
-
-The follow-up integration candidate still advertises eleven tools, but expands
-structured output to `bible_lookup`, `parallel_passages`,
-`primary_source_search`, `original_language_lookup`, and
-`original_language_study`, and expands the guided prompt set from five to six.
-These candidate counts do not describe the currently deployed PR #21 server.
+The candidate preserves eleven advertised tools, six guided prompts, local-only
+primary-source evidence, disabled CCEL discovery, and the existing public MCP
+contracts. Preview has passed the targeted Unicode audit across all nine
+corrected Strong's entries, 237 corrected morphology cells, and 11 affected
+parallel-passage cases, plus sampled checks of the remaining MCP surface.
 
 ## Release gates
 
@@ -113,8 +112,6 @@ Code readiness and operational readiness are deliberately separate:
 
 ## Next work
 
-- Correct known Greek/Hebrew Unicode normalization and display defects against
-  pinned-source evidence before expanding language-study interpretation.
 - After Unicode correctness is established, add the planned advanced-usage
   schema for occurrence counts, book distribution, attested forms, and keyset
   cursor pagination.
