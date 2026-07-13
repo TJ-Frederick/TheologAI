@@ -28,4 +28,3 @@ describe('artifactContentIdentity', () => {
     expect(identity).toMatchObject({ kind: 'raw_sha256', sha256: identity.rawSha256 });
   });
 });
-

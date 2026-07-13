@@ -6,7 +6,6 @@ import type { BiblicalLanguageUnicodeCorrectionLedger } from './biblical-languag
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
-
 export function verifyBiblicalLanguageUnicodeD1(
   root: string,
   db: Database.Database,
@@ -64,4 +63,3 @@ export function verifyBiblicalLanguageUnicodeD1(
   assert(rows === 859_596, `Unicode D1 total row-count drift: ${rows}`);
   return { sourceCells: ledger.contract.sourceCells, d1Cells, rows };
 }
-

@@ -8,7 +8,6 @@ export interface ArtifactContentIdentity {
   sha256: string;
   rawSha256: string;
 }
-
 function sha256(bytes: Buffer | string): string {
   return createHash('sha256').update(bytes).digest('hex');
 }
@@ -42,4 +41,3 @@ export function artifactContentIdentity(path: string, bytes: Buffer): ArtifactCo
     rawSha256,
   };
 }
-

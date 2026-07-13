@@ -11,4 +11,3 @@ writeFileAtomically(
   `${JSON.stringify(sourceLockProjection(), null, 2)}\n`,
 );
 console.error('[write-biblical-language-source-lock] Wrote the deterministic biblical-language source lock.');
-
