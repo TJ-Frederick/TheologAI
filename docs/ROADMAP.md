@@ -90,10 +90,35 @@ pinned OpenScriptures and STEPBible evidence, records the exact correction
 ledger, and advances the D1 materialization identity without changing corpus
 row counts or the public MCP tool inventory.
 
-PR #27 is not merged or deployed. Its next operational gate is a freshly
-migrated and fully seeded preview D1 replacement, followed by the protected
-preview deployment and complete preview audit. The currently bound preview and
-production databases must not be mutated in place to make the candidate pass.
+PR #27 remains open and unmerged, but its preview release gate is complete. A
+fresh replacement database, `theologai-preview-20260713-c`, was migrated and
+fully seeded without mutating its predecessor. Protected workflow run
+`29277315492` created GitHub deployment `5429947573` and deployed Worker version
+`734aec3b-d6c3-456b-a203-c7f940a2d081`. The combined preview audit passed all
+nine Strong's corrections, all 237 morphology corrections, all 11
+parallel-passage cases, and sampled the remaining MCP surface; positive donation
+verification remains manual. The preview authorization label was then removed
+and the revocation workflow completed successfully.
+
+This is preview evidence only. Production remains on the PR #26 release and was
+not changed, queried, or deployed as part of PR #27's preview preparation. PR
+#27 still requires its merge and separately authorized production-data and
+deployment gates before it can be called shipped.
+
+## Dependent work in flight
+
+- **Draft PR #29 — original-language usage foundation.** This migration and
+  repository foundation is stacked on PR #27 and is published as a draft PR,
+  but remains unmerged, undeployed, and unreleased. It does not yet change the
+  public MCP behavior. It must be rebased or retargeted after PR #27 lands, then
+  receive fresh CI and review.
+- **Original-language usage output.** The public occurrence-count, attested-form,
+  book-distribution, and keyset-pagination slice exists only as a local commit.
+  It has not been pushed, opened as a PR, deployed, or released.
+- **Primary-source catalog and scope.** Catalog-aware discovery work is local
+  and uncommitted while its authoritative metadata provenance is being
+  completed and reviewed. It has not been pushed, deployed, or released, and it
+  does not enable CCEL or publish external document bodies.
 
 ## Release gates
 
@@ -124,11 +149,20 @@ Code readiness and operational readiness are deliberately separate:
 
 ## Next work
 
-- Complete PR #27 through a fresh preview D1 replacement, protected preview
-  deployment, and functional audit before any merge or production cutover.
-- After the Unicode correction is merged and safely released, add the planned
-  advanced-usage schema for occurrence counts, book distribution, attested
-  forms, and keyset cursor pagination.
+- Merge PR #27 only after its completed preview evidence and release review are
+  accepted; prepare and promote production data only with explicit owner
+  authorization.
+- After PR #27 lands, rebase or retarget draft PR #29 to `main`, rerun CI and
+  review, and land the invisible original-language usage foundation before its
+  public output slice.
+- Rebase the local original-language usage output onto the landed foundation,
+  then use a fresh preview D1 replacement to verify occurrence counts, book
+  distribution, attested forms, keyset pagination, legacy behavior, and stale
+  cursor rejection before release.
+- Integrate the local primary-source catalog and scope slice after the usage
+  output, preserving its authoritative per-claim provenance and advancing the
+  materialization identity deliberately; rehearse it against another fresh
+  preview database before release.
 - Broaden advanced original-language study only after those foundations, using
   carefully sourced semantic-domain and discourse evidence useful to both
   beginners and readers of Greek or Hebrew.
