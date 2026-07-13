@@ -39,6 +39,9 @@ The reviewed corpus contract is:
 - materialization transform version `5`;
 - D1 identity
   `93ae4ca3c09493cf02a6b48154c991c133fd6ce235119fc4b8cba0256a36f881`;
+- scoped morphology-usage identity version `1`, transform version `1`, and
+  identity
+  `c3600bb55da75aa600f8c97885efa7d58a3e8c29c3fcc6445a553091011beabd`;
 - 13,836 usage rows, 57,781 book rows, and 138,293 exact surface-form rows;
 - 1,069,506 total seeded rows across 17 manifest tables; and
 - 36 ordered seed files.
@@ -50,13 +53,21 @@ contract. Local verification additionally asserts that occurrence, book, and
 form queries use their intended covering/ranking indexes without a temporary
 sort.
 
-The public usage cursor and provenance are deliberately bound to this exact D1
-identity. Any integration that changes `data/data-manifest.json`—including a
-catalog/data branch—must update `MORPHOLOGY_CORPUS_IDENTITY` in
-`src/kernel/morphologyUsageCursor.ts`. The mandatory cursor identity-drift test
-computes the canonical identity from the manifest and fails until that runtime
-binding is updated; cursors from the preceding corpus must then be rejected as
-stale.
+The public usage cursor, structured schema, and provenance are bound to the
+scoped morphology-usage identity, not to the whole D1 materialization. Its
+canonical projection is defined by `scripts/morphology-usage-identity.ts` and
+includes all 66 ordered morphology artifacts, the Hebrew lemma source, the
+canonical `{number, stepbibleId}` map, and versioned occurrence-row, aggregate,
+and keyset semantics. It deliberately excludes migrations, global D1 transform
+and schema versions, unrelated table counts, historical documents,
+cross-references, UBS parallels, and other sources that cannot change a
+morphology-usage result.
+
+The mandatory identity-drift tests recompute that projection from the manifest
+and fail until the pinned `MORPHOLOGY_USAGE_IDENTITY` in
+`src/kernel/morphologyUsageCursor.ts` is updated for a relevant change. A
+relevant source or semantics change therefore stales old cursors, while an
+unrelated catalog or database change does not.
 
 ## Storage impact and later product work
 

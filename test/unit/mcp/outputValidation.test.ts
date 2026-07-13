@@ -195,7 +195,7 @@ describe('MCP structured output validation', () => {
         } : {}),
       }),
       getCorpusUsage: async () => ({
-        level: 'technical' as const, exactMorphologyKey: 'G0026', corpusIdentity: '93ae4ca3c09493cf02a6b48154c991c133fd6ce235119fc4b8cba0256a36f881',
+        level: 'technical' as const, exactMorphologyKey: 'G0026', corpusIdentity: 'c3600bb55da75aa600f8c97885efa7d58a3e8c29c3fcc6445a553091011beabd',
         attested: true, totals: { tokenCount: 3, verseCount: 3, bookCount: 2, sourceSurfaceVariantCount: 2 },
         bookDistribution: [{ book: 'John', canonicalOrder: 43, tokenCount: 2, verseCount: 2 }],
         sourceSurfaceVariants: [{

@@ -611,7 +611,7 @@ describe('original_language_lookup handler', () => {
       extended: { occurrences: 143 }, citation,
     });
     const getCorpusUsage = vi.fn<StrongsService['getCorpusUsage']>().mockResolvedValue({
-      level: 'study', exactMorphologyKey: 'G0025', corpusIdentity: '93ae4ca3c09493cf02a6b48154c991c133fd6ce235119fc4b8cba0256a36f881',
+      level: 'study', exactMorphologyKey: 'G0025', corpusIdentity: 'c3600bb55da75aa600f8c97885efa7d58a3e8c29c3fcc6445a553091011beabd',
       attested: true, totals: { tokenCount: 17, verseCount: 15, bookCount: 4, sourceSurfaceVariantCount: 6 },
       bookDistribution: [], sourceSurfaceVariants: [], occurrences: [], cautions: ['one', 'two', 'three'],
     });

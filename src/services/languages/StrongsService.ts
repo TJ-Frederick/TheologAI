@@ -10,7 +10,7 @@ import { normalizeLexiconText } from '../../kernel/lexiconText.js';
 import {
   decodeMorphologyUsageCursor,
   encodeMorphologyUsageCursor,
-  MORPHOLOGY_CORPUS_IDENTITY,
+  MORPHOLOGY_USAGE_IDENTITY,
 } from '../../kernel/morphologyUsageCursor.js';
 
 const CITATION: Citation = {
@@ -147,7 +147,7 @@ export class StrongsService {
     return {
       level,
       exactMorphologyKey: identity.morphologyKey,
-      corpusIdentity: MORPHOLOGY_CORPUS_IDENTITY,
+      corpusIdentity: MORPHOLOGY_USAGE_IDENTITY,
       attested: stats !== undefined,
       totals: {
         tokenCount: stats?.token_count ?? 0,

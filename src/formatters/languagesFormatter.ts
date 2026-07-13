@@ -61,7 +61,7 @@ function formatCorpusUsage(usage: CorpusUsageResult): string {
     `## Corrected morphology-corpus usage (${usage.level})`,
     '',
     `**Exact morphology identity:** ${usage.exactMorphologyKey}`,
-    `**Corpus identity:** ${usage.corpusIdentity}`,
+    `**Morphology usage identity:** ${usage.corpusIdentity}`,
   ];
   if (!usage.attested) {
     lines.push('', '*This exact identity is not attested in the counted morphology corpus.*');

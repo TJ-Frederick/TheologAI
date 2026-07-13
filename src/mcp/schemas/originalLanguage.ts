@@ -4,7 +4,7 @@ import type { ProvenanceRecord } from '../../kernel/provenance.js';
 import { createProvenanceRecordSchema } from './provenance.js';
 import { STRONGS_IDENTITY_PATTERN } from '../../kernel/strongs.js';
 import type { CorpusUsageResult } from '../../kernel/types.js';
-import { MORPHOLOGY_CORPUS_IDENTITY } from '../../kernel/morphologyUsageCursor.js';
+import { MORPHOLOGY_USAGE_IDENTITY } from '../../kernel/morphologyUsageCursor.js';
 
 export interface OriginalLanguageSenseV1 {
   gloss: string;
@@ -73,7 +73,7 @@ const corpusUsageSchema: Schema = {
   properties: {
     level: { type: 'string', enum: ['overview', 'study', 'technical'] },
     exactMorphologyKey: { type: 'string', minLength: 2, maxLength: 7, pattern: '^[GH](?:\\d{4,5})[A-Z]?$' },
-    corpusIdentity: { const: MORPHOLOGY_CORPUS_IDENTITY },
+    corpusIdentity: { const: MORPHOLOGY_USAGE_IDENTITY },
     attested: { type: 'boolean' },
     totals: {
       type: 'object',

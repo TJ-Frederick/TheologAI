@@ -197,7 +197,7 @@ describe('formatStrongsResult', () => {
 
   it('labels counted tokens, exact surface variants, verse zero, and pagination distinctly', () => {
     const out = formatStrongsResult(makeStrongsResult({ extended: { occurrences: 999 } }), 'simple', {
-      level: 'study', exactMorphologyKey: 'H9998', corpusIdentity: '93ae4ca3c09493cf02a6b48154c991c133fd6ce235119fc4b8cba0256a36f881',
+      level: 'study', exactMorphologyKey: 'H9998', corpusIdentity: 'c3600bb55da75aa600f8c97885efa7d58a3e8c29c3fcc6445a553091011beabd',
       attested: true,
       totals: { tokenCount: 3, verseCount: 2, bookCount: 1, sourceSurfaceVariantCount: 2 },
       bookDistribution: [{ book: 'Psalms', canonicalOrder: 19, tokenCount: 3, verseCount: 2 }],
@@ -213,6 +213,7 @@ describe('formatStrongsResult', () => {
     });
     expect(out).toContain('Occurrences: 999');
     expect(out).toContain('**Totals:** 3 raw tokens');
+    expect(out).toContain('**Morphology usage identity:** c3600bb5');
     expect(out).toContain('Psalms 3:0');
     expect(out).toContain('מִזְמוֹר֙');
     expect(out).toContain('`opaque_cursor`');

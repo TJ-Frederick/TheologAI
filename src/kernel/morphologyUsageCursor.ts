@@ -1,6 +1,7 @@
 import type { CanonicalOccurrencePosition } from './repositories.js';
 
-export const MORPHOLOGY_CORPUS_IDENTITY = '93ae4ca3c09493cf02a6b48154c991c133fd6ce235119fc4b8cba0256a36f881';
+/** Pinned SHA-256 of the scoped morphology-usage sources and result semantics. */
+export const MORPHOLOGY_USAGE_IDENTITY = 'c3600bb55da75aa600f8c97885efa7d58a3e8c29c3fcc6445a553091011beabd';
 export const MORPHOLOGY_USAGE_CURSOR_MAX_LENGTH = 512;
 
 interface MorphologyUsageCursorV1 {
@@ -17,7 +18,7 @@ export function encodeMorphologyUsageCursor(
   assertOccurrencePosition(after);
   return encodeBase64Url(JSON.stringify({
     v: 1,
-    corpus: MORPHOLOGY_CORPUS_IDENTITY,
+    corpus: MORPHOLOGY_USAGE_IDENTITY,
     key: morphologyKey,
     after,
   } satisfies MorphologyUsageCursorV1));
@@ -37,7 +38,7 @@ export function decodeMorphologyUsageCursor(
     throw new RangeError('occurrence_cursor is malformed');
   }
   if (!isRecord(value) || Object.keys(value).sort().join(',') !== 'after,corpus,key,v'
-    || value.v !== 1 || value.corpus !== MORPHOLOGY_CORPUS_IDENTITY) {
+    || value.v !== 1 || value.corpus !== MORPHOLOGY_USAGE_IDENTITY) {
     throw new RangeError('occurrence_cursor is stale or uses an unsupported version');
   }
   if (value.key !== expectedMorphologyKey) {

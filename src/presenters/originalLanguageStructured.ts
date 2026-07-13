@@ -12,7 +12,7 @@ import type {
 } from '../mcp/schemas/originalLanguage.js';
 import { summarizeDefinition } from '../formatters/languagesFormatter.js';
 import { normalizeLexiconText } from '../kernel/lexiconText.js';
-import { MORPHOLOGY_CORPUS_IDENTITY } from '../kernel/morphologyUsageCursor.js';
+import { MORPHOLOGY_USAGE_IDENTITY } from '../kernel/morphologyUsageCursor.js';
 
 const STRONGS_CITATION = {
   source: "Strong's Concordance",
@@ -130,7 +130,7 @@ function morphologyUsageProvenance(): ProvenanceRecord {
     license: { label: 'CC BY 4.0', url: 'https://creativecommons.org/licenses/by/4.0/' },
     rightsNotice: 'CC BY 4.0 (Tyndale House, Cambridge)',
     attribution: 'Tyndale House, Cambridge',
-    version: MORPHOLOGY_CORPUS_IDENTITY,
+    version: MORPHOLOGY_USAGE_IDENTITY,
     status: 'verified_source',
     note: 'Counts are derived from exact corrected morphology tokens and are distinct from lexicon occurrence metadata.',
   };

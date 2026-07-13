@@ -116,7 +116,7 @@ describe('original-language structured presenter', () => {
       strongs_number: 'H430', testament: 'OT', lemma: 'אֱלֹהִים', definition: 'God, gods',
       citation: { source: "Strong's Concordance", copyright: 'Public Domain' },
     }, 'simple', {
-      level: 'study', exactMorphologyKey: 'H0430', corpusIdentity: '93ae4ca3c09493cf02a6b48154c991c133fd6ce235119fc4b8cba0256a36f881',
+      level: 'study', exactMorphologyKey: 'H0430', corpusIdentity: 'c3600bb55da75aa600f8c97885efa7d58a3e8c29c3fcc6445a553091011beabd',
       attested: true, totals: { tokenCount: 2, verseCount: 2, bookCount: 1, sourceSurfaceVariantCount: 2 },
       bookDistribution: [{ book: 'Genesis', canonicalOrder: 1, tokenCount: 2, verseCount: 2 }],
       sourceSurfaceVariants: [{
@@ -137,7 +137,7 @@ describe('original-language structured presenter', () => {
       strongs_number: 'H430A', testament: null, language: 'Hebrew', lemma: 'fixture', definition: 'fixture',
       sourceKind: 'stepbible_lexicon', citation: { source: 'STEPBible lexicon data', copyright: 'CC BY 4.0' },
     }, 'simple', {
-      level: 'overview', exactMorphologyKey: 'H0430A', corpusIdentity: '93ae4ca3c09493cf02a6b48154c991c133fd6ce235119fc4b8cba0256a36f881',
+      level: 'overview', exactMorphologyKey: 'H0430A', corpusIdentity: 'c3600bb55da75aa600f8c97885efa7d58a3e8c29c3fcc6445a553091011beabd',
       attested: false, totals: { tokenCount: 0, verseCount: 0, bookCount: 0, sourceSurfaceVariantCount: 0 },
       bookDistribution: [], sourceSurfaceVariants: [], cautions: ['one', 'two', 'three'],
     });
