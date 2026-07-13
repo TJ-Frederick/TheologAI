@@ -1,0 +1,72 @@
+name: Biblical Language Source Reproduction
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/language-source-reproduction.yml'
+      - 'data/biblical-languages/**'
+      - 'data/data-manifest.json'
+      - 'scripts/biblical-language-sources.ts'
+      - 'scripts/biblical-language-semantic-drift.ts'
+      - 'scripts/download-pinned-source.ts'
+      - 'scripts/atomic-publication.ts'
+      - 'scripts/build-strongs-json.ts'
+      - 'scripts/build-stepbible-json.ts'
+      - 'scripts/build-stepbible-lexicons.ts'
+      - 'scripts/reproduce-biblical-language-sources.ts'
+      - 'scripts/verify-biblical-language-sources.ts'
+      - 'scripts/verify-biblical-language-reproduction-report.ts'
+      - 'scripts/verify-data-manifest.ts'
+      - 'test/unit/scripts/biblicalLanguageSources.test.ts'
+      - 'test/unit/scripts/languageBuildInfrastructure.test.ts'
+      - 'package-lock.json'
+      - 'package.json'
+  schedule:
+    - cron: '17 9 1 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: biblical-language-reproduction-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reproduce:
+    name: Verify Pins & Classify Legacy Drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Verify immutable source lock and canonical inventory offline
+        run: npm run data:verify-sources
+
+      - name: Rebuild pinned sources without modifying tracked artifacts
+        id: reproduce
+        continue-on-error: true
+        run: npm run data:reproduce-language-sources
+
+      - name: Require the exact reviewed legacy-drift fingerprint
+        env:
+          REPRODUCTION_OUTCOME: ${{ steps.reproduce.outcome }}
+        run: |
+          test "$REPRODUCTION_OUTCOME" = failure
+          npm run data:verify-language-reproduction-report
+
+      - name: Upload reproduction evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: biblical-language-reproduction
+          path: test-output/biblical-language-reproduction.json
+          if-no-files-found: error

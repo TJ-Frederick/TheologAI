@@ -20,30 +20,39 @@
  *   data/biblical-languages/stepbible/greek/*.json.gz (27 files, ~400KB total)
  */
 
-import * as https from 'https';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as zlib from 'zlib';
 import { fileURLToPath } from 'url';
+import {
+  STEPBIBLE_DATA,
+  deterministicBuildProvenance,
+  sourceFile,
+} from './biblical-language-sources.js';
+import { downloadPinnedSource } from './download-pinned-source.js';
+import { publishDirectoryAtomically } from './atomic-publication.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const DATA_DIR = path.join(__dirname, '../data/biblical-languages/stepbible');
-const GREEK_DIR = path.join(DATA_DIR, 'greek');
-const HEBREW_DIR = path.join(DATA_DIR, 'hebrew');
+const TARGET_DATA_DIR = process.env.THEOLOGAI_LANGUAGE_OUTPUT_ROOT
+  ? path.join(path.resolve(process.env.THEOLOGAI_LANGUAGE_OUTPUT_ROOT), 'biblical-languages/stepbible')
+  : path.join(__dirname, '../data/biblical-languages/stepbible');
+let DATA_DIR = TARGET_DATA_DIR;
+let GREEK_DIR = path.join(DATA_DIR, 'greek');
+let HEBREW_DIR = path.join(DATA_DIR, 'hebrew');
 
 // STEPBible TAGNT data URLs (Greek NT - split into two files)
-const TAGNT_URLS = [
-  'https://raw.githubusercontent.com/STEPBible/STEPBible-Data/master/Translators%20Amalgamated%20OT%2BNT/TAGNT%20Mat-Jhn%20-%20Translators%20Amalgamated%20Greek%20NT%20-%20STEPBible.org%20CC-BY.txt',
-  'https://raw.githubusercontent.com/STEPBible/STEPBible-Data/master/Translators%20Amalgamated%20OT%2BNT/TAGNT%20Act-Rev%20-%20Translators%20Amalgamated%20Greek%20NT%20-%20STEPBible.org%20CC-BY.txt'
+const TAGNT_SOURCES = [
+  sourceFile(STEPBIBLE_DATA, 'tagnt-mat-jhn'),
+  sourceFile(STEPBIBLE_DATA, 'tagnt-act-rev'),
 ];
 
 // STEPBible TAHOT data URLs (Hebrew OT - split into four files)
-const TAHOT_URLS = [
-  'https://raw.githubusercontent.com/STEPBible/STEPBible-Data/master/Translators%20Amalgamated%20OT%2BNT/TAHOT%20Gen-Deu%20-%20Translators%20Amalgamated%20Hebrew%20OT%20-%20STEPBible.org%20CC%20BY.txt',
-  'https://raw.githubusercontent.com/STEPBible/STEPBible-Data/master/Translators%20Amalgamated%20OT%2BNT/TAHOT%20Jos-Est%20-%20Translators%20Amalgamated%20Hebrew%20OT%20-%20STEPBible.org%20CC%20BY.txt',
-  'https://raw.githubusercontent.com/STEPBible/STEPBible-Data/master/Translators%20Amalgamated%20OT%2BNT/TAHOT%20Job-Sng%20-%20Translators%20Amalgamated%20Hebrew%20OT%20-%20STEPBible.org%20CC%20BY.txt',
-  'https://raw.githubusercontent.com/STEPBible/STEPBible-Data/master/Translators%20Amalgamated%20OT%2BNT/TAHOT%20Isa-Mal%20-%20Translators%20Amalgamated%20Hebrew%20OT%20-%20STEPBible.org%20CC%20BY.txt'
+const TAHOT_SOURCES = [
+  sourceFile(STEPBIBLE_DATA, 'tahot-gen-deu'),
+  sourceFile(STEPBIBLE_DATA, 'tahot-jos-est'),
+  sourceFile(STEPBIBLE_DATA, 'tahot-job-sng'),
+  sourceFile(STEPBIBLE_DATA, 'tahot-isa-mal'),
 ];
 
 // Book name mappings (book number -> name)
@@ -131,38 +140,6 @@ function ensureDirectories(): void {
     fs.mkdirSync(HEBREW_DIR, { recursive: true });
     console.log(`✓ Created directory: ${HEBREW_DIR}`);
   }
-}
-
-// Download file from URL
-function downloadFile(url: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    console.log(`Downloading: ${url}`);
-    https.get(url, (response) => {
-      if (response.statusCode === 302 || response.statusCode === 301) {
-        // Handle redirect
-        const redirectUrl = response.headers.location;
-        if (redirectUrl) {
-          console.log(`Following redirect to: ${redirectUrl}`);
-          return downloadFile(redirectUrl).then(resolve).catch(reject);
-        }
-      }
-
-      if (response.statusCode !== 200) {
-        reject(new Error(`Failed to download: ${response.statusCode}`));
-        return;
-      }
-
-      let data = '';
-      response.on('data', (chunk) => {
-        data += chunk;
-      });
-
-      response.on('end', () => {
-        console.log(`✓ Downloaded ${(data.length / 1024).toFixed(2)} KB`);
-        resolve(data);
-      });
-    }).on('error', reject);
-  });
 }
 
 // Parse TSV data (works for both TAGNT and TAHOT)
@@ -473,11 +450,13 @@ function generateMetadata(greekBooks: Map<string, BookData>, hebrewBooks: Map<st
   const metadata = {
     version: '1.0.0',
     source: 'STEPBible Data - Translators Amalgamated OT+NT',
-    source_url: 'https://github.com/STEPBible/STEPBible-Data',
-    commit_sha: 'master', // Will be updated when we pin a specific commit
+    ...deterministicBuildProvenance(
+      STEPBIBLE_DATA,
+      [...TAGNT_SOURCES, ...TAHOT_SOURCES],
+      { id: 'theologai-stepbible-morphology-json', version: 1 },
+    ),
     license: 'CC BY 4.0',
     attribution: 'STEP Bible (www.stepbible.org)',
-    build_date: new Date().toISOString(),
     books: {
       greek: greekBooks.size,
       hebrew: hebrewBooks.size,
@@ -522,18 +501,26 @@ async function main() {
   console.log('=====================\n');
   console.log('Data Source: STEPBible TAGNT (Greek NT) + TAHOT (Hebrew OT)');
   console.log('License: Creative Commons BY 4.0');
-  console.log('URL: https://github.com/STEPBible/STEPBible-Data\n');
+  console.log(`Pinned source: ${STEPBIBLE_DATA.commitUrl}\n`);
+
+  fs.mkdirSync(path.dirname(TARGET_DATA_DIR), { recursive: true });
+  const stagingDirectory = fs.mkdtempSync(path.join(path.dirname(TARGET_DATA_DIR), '.stepbible-stage-'));
+  DATA_DIR = stagingDirectory;
+  GREEK_DIR = path.join(DATA_DIR, 'greek');
+  HEBREW_DIR = path.join(DATA_DIR, 'hebrew');
 
   try {
     ensureDirectories();
 
     // Download and process Greek NT (TAGNT)
     console.log('=== Processing Greek NT (TAGNT) ===\n');
-    console.log(`Downloading TAGNT data (${TAGNT_URLS.length} files)...`);
+    console.log(`Downloading TAGNT data (${TAGNT_SOURCES.length} files)...`);
     const tagntParts: string[] = [];
-    for (let i = 0; i < TAGNT_URLS.length; i++) {
-      console.log(`  File ${i + 1}/${TAGNT_URLS.length}...`);
-      const content = await downloadFile(TAGNT_URLS[i]);
+    for (let i = 0; i < TAGNT_SOURCES.length; i++) {
+      console.log(`  File ${i + 1}/${TAGNT_SOURCES.length}...`);
+      const bytes = await downloadPinnedSource(TAGNT_SOURCES[i]);
+      console.log(`✓ Downloaded and verified ${(bytes.length / 1024).toFixed(2)} KB`);
+      const content = bytes.toString('utf8');
       tagntParts.push(content);
     }
 
@@ -546,11 +533,13 @@ async function main() {
 
     // Download and process Hebrew OT (TAHOT)
     console.log('\n=== Processing Hebrew OT (TAHOT) ===\n');
-    console.log(`Downloading TAHOT data (${TAHOT_URLS.length} files)...`);
+    console.log(`Downloading TAHOT data (${TAHOT_SOURCES.length} files)...`);
     const tahotParts: string[] = [];
-    for (let i = 0; i < TAHOT_URLS.length; i++) {
-      console.log(`  File ${i + 1}/${TAHOT_URLS.length}...`);
-      const content = await downloadFile(TAHOT_URLS[i]);
+    for (let i = 0; i < TAHOT_SOURCES.length; i++) {
+      console.log(`  File ${i + 1}/${TAHOT_SOURCES.length}...`);
+      const bytes = await downloadPinnedSource(TAHOT_SOURCES[i]);
+      console.log(`✓ Downloaded and verified ${(bytes.length / 1024).toFixed(2)} KB`);
+      const content = bytes.toString('utf8');
       tahotParts.push(content);
     }
 
@@ -588,9 +577,48 @@ async function main() {
     console.log('Generating metadata...');
     generateMetadata(greekBooks, hebrewBooks);
 
+    if (greekBooks.size !== 27 || hebrewBooks.size !== 39 || allBooks.size !== 66) {
+      throw new Error(`Unexpected STEPBible book counts: Greek ${greekBooks.size}, Hebrew ${hebrewBooks.size}`);
+    }
+    const wordCount = [...allBooks.values()].reduce((total, book) => total + Object.values(book.chapters)
+      .reduce((bookTotal, chapter) => bookTotal + Object.values(chapter)
+        .reduce((chapterTotal, verse) => chapterTotal + verse.words.length, 0), 0), 0);
+    if (wordCount !== 447748) throw new Error(`Unexpected STEPBible word count: ${wordCount}`);
+    for (const book of allBooks.values()) {
+      for (const chapter of Object.values(book.chapters)) {
+        for (const verse of Object.values(chapter)) {
+          for (const word of verse.words) {
+            if (!Number.isSafeInteger(word.position) || word.position < 1
+              || typeof word.text !== 'string'
+              || typeof word.lemma !== 'string'
+              || typeof word.strong !== 'string'
+              || typeof word.morph !== 'string'
+              || typeof word.gloss !== 'string'
+              || [word.text, word.lemma].some(value => value.includes('\uFFFD'))) {
+              throw new Error(`Invalid staged STEPBible word in ${book.book}: ${JSON.stringify(word)}`);
+            }
+          }
+        }
+      }
+    }
+    const index = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'index.json'), 'utf8')) as StepBibleIndex;
+    if (Object.keys(index.books).length !== 66) throw new Error('Staged STEPBible index does not contain 66 books');
+    if (fs.readdirSync(GREEK_DIR).filter(file => file.endsWith('.json.gz')).length !== 27
+      || fs.readdirSync(HEBREW_DIR).filter(file => file.endsWith('.json.gz')).length !== 39) {
+      throw new Error('Staged STEPBible book-file inventory is incomplete');
+    }
+    const john = JSON.parse(zlib.gunzipSync(
+      fs.readFileSync(path.join(GREEK_DIR, '43-John.json.gz')),
+    ).toString('utf8')) as BookData;
+    const johnToken = john.chapters['1']?.['1']?.words.find(word => word.position === 11);
+    if (johnToken?.text !== 'τὸν' || johnToken.morph !== 'T-ASM') {
+      throw new Error(`Pinned TAGNT John 1:1 position 11 is not source-attested: ${JSON.stringify(johnToken)}`);
+    }
+    publishDirectoryAtomically(stagingDirectory, TARGET_DATA_DIR);
+
     // Calculate total size
     let totalSize = 0;
-    for (const dir of [GREEK_DIR, HEBREW_DIR]) {
+    for (const dir of [path.join(TARGET_DATA_DIR, 'greek'), path.join(TARGET_DATA_DIR, 'hebrew')]) {
       if (fs.existsSync(dir)) {
         const files = fs.readdirSync(dir);
         for (const file of files) {
@@ -604,13 +632,15 @@ async function main() {
     console.log(`Hebrew OT Books: ${hebrewBooks.size}`);
     console.log(`Total Books: ${allBooks.size}`);
     console.log(`Total compressed size: ${(totalSize / 1024).toFixed(2)} KB`);
-    console.log(`Files created in: ${DATA_DIR}`);
+    console.log(`Files created in: ${TARGET_DATA_DIR}`);
     console.log('\nAttribution: STEP Bible (www.stepbible.org)');
     console.log('License: Creative Commons BY 4.0');
 
   } catch (error) {
     console.error('\n✗ Error:', error);
-    process.exit(1);
+    process.exitCode = 1;
+  } finally {
+    fs.rmSync(stagingDirectory, { recursive: true, force: true });
   }
 }
 

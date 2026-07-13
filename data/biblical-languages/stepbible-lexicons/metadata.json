@@ -1,10 +1,48 @@
 {
   "version": "1.0.0",
   "source": "STEPBible Data (Tyndale House, Cambridge)",
-  "source_url": "https://github.com/STEPBible/STEPBible-Data",
+  "repository_url": "https://github.com/STEPBible/STEPBible-Data",
+  "source_url": "https://github.com/STEPBible/STEPBible-Data/tree/0f60797c170f11a1f8dc75c5f7617973e2e66b0d",
+  "commit_sha": "0f60797c170f11a1f8dc75c5f7617973e2e66b0d",
+  "commit_date": "2025-09-02T09:50:51Z",
+  "inputs": [
+    {
+      "id": "tbesg-greek",
+      "repository_path": "Lexicons/TBESG - Translators Brief lexicon of Extended Strongs for Greek - STEPBible.org CC BY.txt",
+      "raw_url": "https://raw.githubusercontent.com/STEPBible/STEPBible-Data/0f60797c170f11a1f8dc75c5f7617973e2e66b0d/Lexicons/TBESG%20-%20Translators%20Brief%20lexicon%20of%20Extended%20Strongs%20for%20Greek%20-%20STEPBible.org%20CC%20BY.txt",
+      "bytes": 4736912,
+      "sha256": "312f723d7b8ef263bbdfb0451c9b8057125804dfff390b6f8544cff2a84b57f4",
+      "git_blob_sha1": "efe271a1dbb73fa01f8fa6e0f164c6687757a9ae"
+    },
+    {
+      "id": "tbesh-hebrew",
+      "repository_path": "Lexicons/TBESH - Translators Brief lexicon of Extended Strongs for Hebrew - STEPBible.org CC BY.txt",
+      "raw_url": "https://raw.githubusercontent.com/STEPBible/STEPBible-Data/0f60797c170f11a1f8dc75c5f7617973e2e66b0d/Lexicons/TBESH%20-%20Translators%20Brief%20lexicon%20of%20Extended%20Strongs%20for%20Hebrew%20-%20STEPBible.org%20CC%20BY.txt",
+      "bytes": 3288043,
+      "sha256": "bdfdd17c1377aa5400618930fd0ea6f9a6f8d77ffdbbcd575b35d2d81c89401f",
+      "git_blob_sha1": "c1638080d61083d7f439bdae872f6d5719ec6ae8"
+    }
+  ],
+  "provenance_status": "forensic_attestation_of_tracked_inventory",
+  "source_attestation": {
+    "kind": "forensic_source_attestation_added_after_artifact_creation",
+    "source_lock": "data/biblical-languages/SOURCE.json",
+    "raw_inputs_byte_verified": true
+  },
+  "tracked_artifact": {
+    "lineage": "historical_tracked_artifact_with_provenance_attested_after_creation",
+    "classification": "byte_reproducible_from_exact_verified_pins",
+    "byte_reproducible_from_pinned_inputs": true,
+    "affected_runtime_artifacts": 0,
+    "source_lock": "data/biblical-languages/SOURCE.json#sources",
+    "clean_reproduction_compiler": {
+      "id": "theologai-stepbible-lexicon-json",
+      "version": 1,
+      "source_revision": "0f60797c170f11a1f8dc75c5f7617973e2e66b0d"
+    }
+  },
   "license": "CC BY 4.0",
   "attribution": "Tyndale House, Cambridge (www.stepbible.org)",
-  "build_date": "2025-10-17T15:40:25.908Z",
   "lexicons": {
     "greek": {
       "name": "TBESG - Translators Brief Lexicon of Extended Strongs for Greek",

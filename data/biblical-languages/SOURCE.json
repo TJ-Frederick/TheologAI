@@ -1,0 +1,161 @@
+{
+  "schema_version": 1,
+  "derived_artifacts": {
+    "status": "accepted_legacy_non_reproducible",
+    "tracked_manifest": "data/data-manifest.json",
+    "d1_materialization_identity": "91afa5bcf8155ac9f8c5fd14d1d661657c83be9a8e5cd90a5783bfa38ae7dfa5",
+    "compared_artifacts": 72,
+    "changed_artifacts": 45,
+    "tracked_inventory_sha256": "433902e19fa60f1e98dd856b0a073b72e71b1b4e2edd04abca552bf0e96bbf44",
+    "clean_reproduction_inventory_sha256": "35649745857b65dbe87d024d13288036710272a193179349088f7a4af138268a",
+    "semantic_drift_inventory_sha256": "a0ca99fa6a876b22f2c55a2415f1bf524c17026f290773f59f98676d903c7f36",
+    "explanation": "45 of 72 tracked runtime artifacts remain byte-locked but differ from a deterministic rebuild because historical per-network-chunk UTF-8 decoding corrupted text. The STEPBible lexicon pair is byte-reproducible and is not part of this exception.",
+    "clean_reproduction_delta": {
+      "strongs_entries": 9,
+      "strongs_fields": 9,
+      "strongs_replacement_characters": 18,
+      "morphology_files": 43,
+      "morphology_tokens": 237,
+      "morphology_fields": 237,
+      "morphology_replacement_characters": 496,
+      "additional_attested_delta": "John 1:1 position 11 is tracked as τὸ while the pinned TAGNT input rebuilds as τὸν."
+    },
+    "policy": "Do not replace tracked runtime artifacts in the provenance-pin slice; repair and cut over as a separately reviewed data migration."
+  },
+  "sources": [
+    {
+      "id": "openscriptures_strongs",
+      "repository_url": "https://github.com/openscriptures/strongs",
+      "commit_sha": "0acd2f251c2d35ff8db2dece4e0593979d3ac223",
+      "commit_date": "2021-07-15T14:50:54Z",
+      "commit_url": "https://github.com/openscriptures/strongs/tree/0acd2f251c2d35ff8db2dece4e0593979d3ac223",
+      "license": "Public Domain",
+      "license_url": null,
+      "attribution": "Open Scriptures (openscriptures.org)",
+      "inputs": [
+        {
+          "id": "strongs-greek-xml",
+          "repository_path": "greek/StrongsGreekDictionaryXML_1.4/strongsgreek.xml",
+          "raw_url": "https://raw.githubusercontent.com/openscriptures/strongs/0acd2f251c2d35ff8db2dece4e0593979d3ac223/greek/StrongsGreekDictionaryXML_1.4/strongsgreek.xml",
+          "git_blob_sha1": "4d7da5124a065cde874c53d08cce647df954d81f",
+          "bytes": 2636209,
+          "sha256": "df928f01b37632f8af9f16289ce58d10b958014cb5dbd1e1ea715a8d311a0625",
+          "license": "Public Domain",
+          "license_url": null,
+          "attribution": "Open Scriptures (openscriptures.org)"
+        },
+        {
+          "id": "strongs-hebrew-xml",
+          "repository_path": "hebrew/StrongHebrewG.xml",
+          "raw_url": "https://raw.githubusercontent.com/openscriptures/strongs/0acd2f251c2d35ff8db2dece4e0593979d3ac223/hebrew/StrongHebrewG.xml",
+          "git_blob_sha1": "9c16d031f99d5de30a0219cb66d54d6e6401a664",
+          "bytes": 6436400,
+          "sha256": "1f9659ea208f4c498843a0280dacb1448627c33ca77712642d8705793ab66061",
+          "license": "Public Domain",
+          "license_url": null,
+          "attribution": "Open Scriptures (openscriptures.org)"
+        }
+      ]
+    },
+    {
+      "id": "stepbible_data",
+      "repository_url": "https://github.com/STEPBible/STEPBible-Data",
+      "commit_sha": "0f60797c170f11a1f8dc75c5f7617973e2e66b0d",
+      "commit_date": "2025-09-02T09:50:51Z",
+      "commit_url": "https://github.com/STEPBible/STEPBible-Data/tree/0f60797c170f11a1f8dc75c5f7617973e2e66b0d",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "Tyndale House, Cambridge / STEP Bible (www.stepbible.org)",
+      "inputs": [
+        {
+          "id": "tagnt-mat-jhn",
+          "repository_path": "Translators Amalgamated OT+NT/TAGNT Mat-Jhn - Translators Amalgamated Greek NT - STEPBible.org CC-BY.txt",
+          "raw_url": "https://raw.githubusercontent.com/STEPBible/STEPBible-Data/0f60797c170f11a1f8dc75c5f7617973e2e66b0d/Translators%20Amalgamated%20OT%2BNT/TAGNT%20Mat-Jhn%20-%20Translators%20Amalgamated%20Greek%20NT%20-%20STEPBible.org%20CC-BY.txt",
+          "git_blob_sha1": "705c1bc1cf752e013efcef99b8d9a3b7853bf843",
+          "bytes": 14189032,
+          "sha256": "ab8eaaeb68e17a1dcfa34e1e9350358f22f03bc2a97244d848750ad81044bc8e",
+          "license": "CC BY 4.0",
+          "license_url": "https://creativecommons.org/licenses/by/4.0/",
+          "attribution": "Tyndale House, Cambridge / STEP Bible (www.stepbible.org)"
+        },
+        {
+          "id": "tagnt-act-rev",
+          "repository_path": "Translators Amalgamated OT+NT/TAGNT Act-Rev - Translators Amalgamated Greek NT - STEPBible.org CC-BY.txt",
+          "raw_url": "https://raw.githubusercontent.com/STEPBible/STEPBible-Data/0f60797c170f11a1f8dc75c5f7617973e2e66b0d/Translators%20Amalgamated%20OT%2BNT/TAGNT%20Act-Rev%20-%20Translators%20Amalgamated%20Greek%20NT%20-%20STEPBible.org%20CC-BY.txt",
+          "git_blob_sha1": "4bbea2c14681b01eb889d5a2d1dc0856858a32de",
+          "bytes": 15939932,
+          "sha256": "524e32375361e6d3fa2f7ef00b87605fdc4317a762f395651a05fdc31ad031b7",
+          "license": "CC BY 4.0",
+          "license_url": "https://creativecommons.org/licenses/by/4.0/",
+          "attribution": "Tyndale House, Cambridge / STEP Bible (www.stepbible.org)"
+        },
+        {
+          "id": "tahot-gen-deu",
+          "repository_path": "Translators Amalgamated OT+NT/TAHOT Gen-Deu - Translators Amalgamated Hebrew OT - STEPBible.org CC BY.txt",
+          "raw_url": "https://raw.githubusercontent.com/STEPBible/STEPBible-Data/0f60797c170f11a1f8dc75c5f7617973e2e66b0d/Translators%20Amalgamated%20OT%2BNT/TAHOT%20Gen-Deu%20-%20Translators%20Amalgamated%20Hebrew%20OT%20-%20STEPBible.org%20CC%20BY.txt",
+          "git_blob_sha1": "eb051292f8cee648c4f3eaf1b48cd0f1f30dc1d5",
+          "bytes": 18190455,
+          "sha256": "e9b8546ee48fe0bfc57c3b70f5f40e98d96580e803526d19026224e31753368b",
+          "license": "CC BY 4.0",
+          "license_url": "https://creativecommons.org/licenses/by/4.0/",
+          "attribution": "Tyndale House, Cambridge / STEP Bible (www.stepbible.org)"
+        },
+        {
+          "id": "tahot-jos-est",
+          "repository_path": "Translators Amalgamated OT+NT/TAHOT Jos-Est - Translators Amalgamated Hebrew OT - STEPBible.org CC BY.txt",
+          "raw_url": "https://raw.githubusercontent.com/STEPBible/STEPBible-Data/0f60797c170f11a1f8dc75c5f7617973e2e66b0d/Translators%20Amalgamated%20OT%2BNT/TAHOT%20Jos-Est%20-%20Translators%20Amalgamated%20Hebrew%20OT%20-%20STEPBible.org%20CC%20BY.txt",
+          "git_blob_sha1": "e3824344f6dea1a3f51932d1b0a53537c3c2023e",
+          "bytes": 24500317,
+          "sha256": "195fee1dc3653bab33701f170734eb894ed647c10cd08cc61749375fe8b73775",
+          "license": "CC BY 4.0",
+          "license_url": "https://creativecommons.org/licenses/by/4.0/",
+          "attribution": "Tyndale House, Cambridge / STEP Bible (www.stepbible.org)"
+        },
+        {
+          "id": "tahot-job-sng",
+          "repository_path": "Translators Amalgamated OT+NT/TAHOT Job-Sng - Translators Amalgamated Hebrew OT - STEPBible.org CC BY.txt",
+          "raw_url": "https://raw.githubusercontent.com/STEPBible/STEPBible-Data/0f60797c170f11a1f8dc75c5f7617973e2e66b0d/Translators%20Amalgamated%20OT%2BNT/TAHOT%20Job-Sng%20-%20Translators%20Amalgamated%20Hebrew%20OT%20-%20STEPBible.org%20CC%20BY.txt",
+          "git_blob_sha1": "3d7af689417b54ebc468700b2bd86a8ba5377530",
+          "bytes": 9540133,
+          "sha256": "84e118a97e5725e3847cdfdd593873513021c790c63cc91a0d41fca2b5db2ed5",
+          "license": "CC BY 4.0",
+          "license_url": "https://creativecommons.org/licenses/by/4.0/",
+          "attribution": "Tyndale House, Cambridge / STEP Bible (www.stepbible.org)"
+        },
+        {
+          "id": "tahot-isa-mal",
+          "repository_path": "Translators Amalgamated OT+NT/TAHOT Isa-Mal - Translators Amalgamated Hebrew OT - STEPBible.org CC BY.txt",
+          "raw_url": "https://raw.githubusercontent.com/STEPBible/STEPBible-Data/0f60797c170f11a1f8dc75c5f7617973e2e66b0d/Translators%20Amalgamated%20OT%2BNT/TAHOT%20Isa-Mal%20-%20Translators%20Amalgamated%20Hebrew%20OT%20-%20STEPBible.org%20CC%20BY.txt",
+          "git_blob_sha1": "1cfe6718a1dae0d5d45a57a942d3f7f716ac6342",
+          "bytes": 17977518,
+          "sha256": "f3ded203d2a74d6368932c97ae550d1d0754b271af491dc0dedf36fe3ba0bcc5",
+          "license": "CC BY 4.0",
+          "license_url": "https://creativecommons.org/licenses/by/4.0/",
+          "attribution": "Tyndale House, Cambridge / STEP Bible (www.stepbible.org)"
+        },
+        {
+          "id": "tbesg-greek",
+          "repository_path": "Lexicons/TBESG - Translators Brief lexicon of Extended Strongs for Greek - STEPBible.org CC BY.txt",
+          "raw_url": "https://raw.githubusercontent.com/STEPBible/STEPBible-Data/0f60797c170f11a1f8dc75c5f7617973e2e66b0d/Lexicons/TBESG%20-%20Translators%20Brief%20lexicon%20of%20Extended%20Strongs%20for%20Greek%20-%20STEPBible.org%20CC%20BY.txt",
+          "git_blob_sha1": "efe271a1dbb73fa01f8fa6e0f164c6687757a9ae",
+          "bytes": 4736912,
+          "sha256": "312f723d7b8ef263bbdfb0451c9b8057125804dfff390b6f8544cff2a84b57f4",
+          "license": "CC BY 4.0",
+          "license_url": "https://creativecommons.org/licenses/by/4.0/",
+          "attribution": "Tyndale House, Cambridge / STEP Bible (www.stepbible.org)"
+        },
+        {
+          "id": "tbesh-hebrew",
+          "repository_path": "Lexicons/TBESH - Translators Brief lexicon of Extended Strongs for Hebrew - STEPBible.org CC BY.txt",
+          "raw_url": "https://raw.githubusercontent.com/STEPBible/STEPBible-Data/0f60797c170f11a1f8dc75c5f7617973e2e66b0d/Lexicons/TBESH%20-%20Translators%20Brief%20lexicon%20of%20Extended%20Strongs%20for%20Hebrew%20-%20STEPBible.org%20CC%20BY.txt",
+          "git_blob_sha1": "c1638080d61083d7f439bdae872f6d5719ec6ae8",
+          "bytes": 3288043,
+          "sha256": "bdfdd17c1377aa5400618930fd0ea6f9a6f8d77ffdbbcd575b35d2d81c89401f",
+          "license": "CC BY 4.0",
+          "license_url": "https://creativecommons.org/licenses/by/4.0/",
+          "attribution": "Tyndale House, Cambridge / STEP Bible (www.stepbible.org)"
+        }
+      ]
+    }
+  ]
+}
