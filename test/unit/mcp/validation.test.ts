@@ -134,7 +134,7 @@ describe('Worker-safe JSON Schema validation', () => {
     ['cross references', createCrossReferencesHandler(unused), { reference: 'John 3:16', maxResults: 5 }, { reference: 'John 3:16', maxResults: 1.5 }],
     ['parallel passages', createParallelPassagesHandler(unused), { reference: 'Matthew 1:1', mode: 'synoptic' }, { reference: 'Matthew 1:1', mode: 'invalid' }],
     ['commentary', createCommentaryHandler(unused), { reference: 'John 3:16', commentator: 'John Gill' }, { reference: 'John 3:16', commentator: 'Unknown' }],
-    ['classic texts', createClassicTextsHandler(unused, unused), { listWorks: true }, { listWorks: false }],
+    ['classic texts', createClassicTextsHandler(unused), { listWorks: true }, { listWorks: false }],
     ['original language', createStrongsLookupHandler(unused), { query: 'love', limit: 10 }, { query: 'love', limit: 21 }],
     ['morphology', createVerseMorphologyHandler(unused), { reference: 'John 3:16', expand_morphology: true }, { reference: 'John 3:16', expand_morphology: 'yes' }],
     ['donation config', createDonationConfigHandler(unused), {}, { extra: true }],
@@ -146,8 +146,8 @@ describe('Worker-safe JSON Schema validation', () => {
   });
 
   it.each([
-    ['classic-text conflicting modes', createClassicTextsHandler(unused, unused), { work: 'nicene-creed', query: 'trinity' }, 'query is the local-search mode'],
-    ['classic-text false mode selector', createClassicTextsHandler(unused, unused), { listWorks: false }, 'listWorks must be true'],
+    ['classic-text conflicting modes', createClassicTextsHandler(unused), { work: 'nicene-creed', query: 'trinity' }, 'query is the local-search mode'],
+    ['classic-text false mode selector', createClassicTextsHandler(unused), { listWorks: false }, 'listWorks must be true'],
     ['original-language conflicting modes', createStrongsLookupHandler(unused), { strongs_number: 'G26', limit: 5 }, 'limit is only valid with query search'],
   ])('keeps strict handler validation actionable for %s', async (_name, tool, arguments_, expected) => {
     const result = await tool.handler(arguments_);
@@ -156,7 +156,7 @@ describe('Worker-safe JSON Schema validation', () => {
   });
 
   it.each([
-    ['classic-text empty input', createClassicTextsHandler(unused, unused)],
+    ['classic-text empty input', createClassicTextsHandler(unused)],
     ['original-language empty input', createStrongsLookupHandler(unused)],
   ])('advertised flat schema rejects %s', (_name, tool) => {
     expect(validatorFor(tool.inputSchema)({}).valid).toBe(false);

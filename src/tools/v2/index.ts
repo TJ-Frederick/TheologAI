@@ -15,7 +15,6 @@ import { HelloAoAdapter } from '../../adapters/bible/HelloAoAdapter.js';
 
 // Adapters — Commentary
 import { HelloAoCommentaryAdapter } from '../../adapters/commentary/HelloAoCommentaryAdapter.js';
-import { CcelAdapter } from '../../adapters/commentary/CcelAdapter.js';
 import { CcelSearchAdapter } from '../../adapters/commentary/CcelSearchAdapter.js';
 
 // Repositories (SQLite-backed)
@@ -30,7 +29,6 @@ import { BibleService } from '../../services/bible/BibleService.js';
 import { CrossReferenceService } from '../../services/bible/CrossReferenceService.js';
 import { ParallelPassageService } from '../../services/bible/ParallelPassageService.js';
 import { CommentaryService } from '../../services/commentary/CommentaryService.js';
-import { CcelService } from '../../services/commentary/CcelService.js';
 import { HistoricalDocumentService } from '../../services/historical/HistoricalDocumentService.js';
 import { LocalPrimarySourceSearchProvider } from '../../services/historical/LocalPrimarySourceSearchProvider.js';
 import { PrimarySourceSearchService } from '../../services/historical/PrimarySourceSearchService.js';
@@ -89,7 +87,6 @@ export function createCompositionRoot(options: CompositionRootOptions = {}): Com
 
   // Commentary adapters
   const helloaoCommentary = new HelloAoCommentaryAdapter();
-  const ccelAdapter = new CcelAdapter();
   const ccelSearchAdapter = new CcelSearchAdapter({ enabled: true });
 
   // Services
@@ -100,7 +97,6 @@ export function createCompositionRoot(options: CompositionRootOptions = {}): Com
     crossRefRepo, bibleService, undefined, undefined, sourceAttestedParallelService,
   );
   const commentaryService = new CommentaryService([helloaoCommentary]);
-  const ccelService = new CcelService(ccelAdapter);
   const historicalService = new HistoricalDocumentService(historicalRepo);
   const primarySourceSearchService = new PrimarySourceSearchService(
     new LocalPrimarySourceSearchProvider(historicalRepo),
@@ -124,7 +120,6 @@ export function createCompositionRoot(options: CompositionRootOptions = {}): Com
     parallelPassageService: parallelService,
     commentaryService,
     historicalService,
-    ccelService,
     primarySourceSearchService,
     strongsService,
     morphologyService: morphService,

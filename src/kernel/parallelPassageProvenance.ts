@@ -25,8 +25,17 @@ export const LEGACY_PARALLEL_PROVENANCE: Readonly<ProvenanceRecord> = Object.fre
   id: LEGACY_PARALLEL_PROVENANCE_ID,
   kind: 'curated_dataset',
   label: 'TheologAI legacy curated parallel passages',
-  status: 'provider_attributed',
-  note: 'Small non-exhaustive repository-curated relationship dataset retained for explicit compatibility queries.',
+  url: 'https://github.com/TJ-Frederick/TheologAI/blob/db8d323ebca458ae3b8aaed4a747f925b0273770/src/data/parallel-passages.json',
+  license: {
+    label: 'ISC',
+    url: 'https://github.com/TJ-Frederick/TheologAI/blob/db8d323ebca458ae3b8aaed4a747f925b0273770/LICENSE',
+  },
+  rightsNotice: 'Copyright (c) 2026 TheologAI contributors',
+  attribution: 'TheologAI contributors',
+  version: 'db8d323ebca458ae3b8aaed4a747f925b0273770',
+  locator: 'src/data/parallel-passages.json',
+  status: 'verified_source',
+  note: 'Small non-exhaustive repository-curated relationship dataset retained for explicit compatibility queries; repository contents are distributed under the root ISC license unless a source-specific notice says otherwise.',
 });
 
 export const OPENBIBLE_CROSS_REFERENCE_PROVENANCE: Readonly<ProvenanceRecord> = Object.freeze({

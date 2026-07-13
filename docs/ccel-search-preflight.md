@@ -1,5 +1,10 @@
 # CCEL live-search preflight record
 
+> **Current status:** architecture record only. The public MCP schemas do not
+> advertise CCEL, no public tool can invoke this adapter, and TheologAI does not
+> retrieve or republish CCEL document bodies. A future discovery-only rollout
+> requires a new preflight and explicit release review.
+
 Recorded 2026-07-11 for PR 1. This is an operational review record, not an
 enablement approval. The live-search flag remains off by default.
 

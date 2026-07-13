@@ -150,21 +150,21 @@ describe('createWorkerCompositionRoot', () => {
     });
   });
 
-  describe('primary-source rollout gate', () => {
-    it('keeps CCEL disabled and makes zero adapter calls when the flag is absent', async () => {
+  describe('primary-source public provider contract', () => {
+    it('does not advertise CCEL provider controls', () => {
       const root = createWorkerCompositionRoot(makeEnv());
       const tool = root.tools.find(candidate => candidate.name === 'primary_source_search')!;
-      const result = await tool.handler({ queries: [{ id: 'remote', text: 'grace', providers: ['ccel'] }] });
-      expect(result).toMatchObject({ isError: true });
-      expect(result.content[0].text).toContain('Live CCEL search is disabled');
-      expect(primarySourceMocks.search).not.toHaveBeenCalled();
+      const item = (tool.inputSchema.properties?.queries as any).items;
+      expect(item.properties.providers).toMatchObject({ maxItems: 1, items: { enum: ['local'] } });
+      expect(item.properties.author.description).toContain('unsupported_filter');
+      expect(item.properties.page.description).toContain('only page 1');
     });
 
-    it('calls the live adapter only when the explicit flag is true', async () => {
+    it('does not expose the live adapter even when its future rollout flag is true', async () => {
       const root = createWorkerCompositionRoot(makeEnv({ THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH: 'true' }));
       const tool = root.tools.find(candidate => candidate.name === 'primary_source_search')!;
-      await tool.handler({ queries: [{ id: 'remote', text: 'grace', providers: ['ccel'] }] });
-      expect(primarySourceMocks.search).toHaveBeenCalledOnce();
+      await tool.handler({ queries: [{ id: 'local', text: 'grace', providers: ['local'] }] });
+      expect(primarySourceMocks.search).not.toHaveBeenCalled();
     });
   });
 

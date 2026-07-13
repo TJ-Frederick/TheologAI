@@ -40,9 +40,50 @@ describe('Bible structured presenter', () => {
       kind: 'translation',
       label: 'English Standard Version',
       rightsNotice: 'ESV license',
+      attribution: 'Crossway',
+      note: expect.stringContaining('No open-content license is asserted'),
       status: 'provider_attributed',
     })]);
     expect(result.provenance[0]).not.toHaveProperty('license');
+  });
+
+  it('adds authoritative ESV and NET source metadata without inventing licenses', () => {
+    const result = presentBibleLookupStructured({
+      reference: 'John 1:1',
+      results: [
+        {
+          reference: 'John 1:1', translation: 'ESV', text: 'ESV text',
+          citation: {
+            source: 'English Standard Version',
+            copyright: 'ESV® Bible (English Standard Version®), copyright © 2001 by Crossway',
+            url: 'https://www.esv.org/',
+          },
+        },
+        {
+          reference: 'John 1:1', translation: 'NET', text: 'NET text',
+          citation: {
+            source: 'New English Translation',
+            copyright: 'NET Bible® copyright ©1996, 2019 by Biblical Studies Press, L.L.C.',
+            url: 'https://netbible.org',
+          },
+        },
+      ],
+      failures: [],
+    }, 'John 1:1', ['ESV', 'NET']);
+
+    expect(result.provenance).toEqual([
+      expect.objectContaining({
+        label: 'English Standard Version', url: 'https://www.esv.org/',
+        attribution: 'Crossway', rightsNotice: expect.stringContaining('copyright © 2001'),
+        note: expect.stringContaining('No open-content license is asserted'),
+      }),
+      expect.objectContaining({
+        label: 'New English Translation', url: 'https://netbible.org',
+        attribution: 'Biblical Studies Press, L.L.C.', rightsNotice: expect.stringContaining('copyright ©1996, 2019'),
+        note: expect.stringContaining('No open-content license is asserted'),
+      }),
+    ]);
+    for (const record of result.provenance) expect(record).not.toHaveProperty('license');
   });
 
   it('recognizes explicit public-domain notices without treating other notices as licenses', () => {
@@ -63,11 +104,11 @@ describe('Bible structured presenter', () => {
     const result = presentBibleLookupStructured({
       reference: 'John 3:16',
       results: [
-        { reference: 'John 3:16', translation: 'ESV', text: 'ESV text', citation: { source: 'Same source' } },
+        { reference: 'John 3:16', translation: 'WEB', text: 'WEB text', citation: { source: 'Same source' } },
         { reference: 'John 3:16', translation: 'KJV', text: 'KJV text', citation: { source: 'Same source' } },
       ],
       failures: [{ translation: 'NET', reason: 'Translation could not be retrieved.' }],
-    }, 'John 3:16', ['ESV', 'KJV', 'NET']);
+    }, 'John 3:16', ['WEB', 'KJV', 'NET']);
 
     expect(result.failures).toEqual([{ translation: 'NET', reason: 'Translation could not be retrieved.' }]);
     expect(result.passages.map(passage => passage.provenanceIds)).toEqual([['src-1'], ['src-1']]);

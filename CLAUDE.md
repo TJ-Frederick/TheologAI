@@ -91,8 +91,8 @@ test/
 | `bible_cross_references` | Thematic connections via OpenBible.info data |
 | `parallel_passages` | Complete UBS source-attested groups by default; explicit legacy curated edges and separate OpenBible.info rows |
 | `commentary_lookup` | 6 commentaries (Matthew Henry, JFB, Clarke, Gill, K-D, Tyndale) |
-| `classic_text_lookup` | Search/browse 17 local docs; retrieve a specifically named CCEL work section when available |
-| `primary_source_search` | Run bounded local-first primary-source query plans with optional separately gated CCEL discovery |
+| `classic_text_lookup` | Search and browse 17 locally indexed historical documents; no remote CCEL body retrieval |
+| `primary_source_search` | Run bounded local-only primary-source query plans with exact local section locators |
 | `original_language_lookup` | Strong's concordance (14,298 entries), Greek/Hebrew word studies |
 | `bible_verse_morphology` | Word-by-word grammatical analysis for all 66 books |
 | `original_language_study` | Context-first study of one Greek or Hebrew token in one verse, with structured evidence and interpretive limits |
@@ -135,7 +135,7 @@ capability.
 - **HelloAO** (`bible.helloao.org`) — Free, no auth, 1000+ translations + 6 commentaries
 - **ESV API** — Requires `ESV_API_KEY` env var, 100k/day limit
 - **NET Bible API** — Free, no auth, includes 60k translator notes
-- **CCEL** (`ccel.org`) — Classic theological texts with work-specific rights; see `NOTICE.md`
+- **CCEL future adapter** (`ccel.org`) — defensive discovery architecture retained but not exposed by current public schemas; see `NOTICE.md`
 
 ## Conventions
 

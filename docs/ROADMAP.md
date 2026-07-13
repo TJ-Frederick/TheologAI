@@ -28,16 +28,17 @@ The following slices are implemented in the integration candidate and remain
 subject to their stacked PR reviews, CI, operational gates, and merge order:
 
 1. **PR #14 — bounded CCEL search adapter.** Defensive live-search transport,
-   rights notices, budgets, caching, circuit behavior, and feature gates. Live
-   CCEL search stays disabled unless its independent runtime flag is enabled.
+   rights notices, budgets, caching, circuit behavior, and feature gates. The
+   adapter is retained as inactive future-provider architecture and is not
+   advertised or reachable through the current public MCP schemas.
 2. **PR #15 — D1 materialization identity.** Distinguishes schema compatibility
    from the exact materialized corpus. A production marker transition is a
    separately authorized data operation, not a side effect of merge or deploy.
 3. **PR #16 — exact Strong's identities.** Preserves canonical and extended
    OpenScriptures/STEPBible identifiers without lossy four-digit coercion.
-4. **PR #17 — local-first primary-source research.** Adds the bounded
-   `primary_source_search` query-plan workflow, resolvable result locators, and
-   optional separately gated CCEL discovery.
+4. **PR #17 — local primary-source research.** Adds the bounded
+   `primary_source_search` query-plan workflow and resolvable local result
+   locators. External discovery remains future work.
 5. **PR #18 — UBS runtime foundation.** Adds strict repositories, provenance,
    source integrity, and source-attested parallel-group domain contracts.
 6. **PR #19 — UBS D1 materialization.** Adds deterministic relational export,
@@ -81,7 +82,7 @@ Code readiness and operational readiness are deliberately separate:
    approval. Production then receives the same bounded smoke audit.
 
 No current roadmap statement claims that the pending D1 transition, preview
-deployment, production deployment, or live CCEL enablement has happened.
+deployment, production deployment, or any live CCEL enablement has happened.
 
 ## Next work after this train
 
@@ -111,7 +112,8 @@ deployment, production deployment, or live CCEL enablement has happened.
 - Historical public-domain text may be published when transcription provenance
   is uncertain, but that uncertainty must be disclosed; a third party's
   particular transcription is not assumed redistributable.
-- CCEL access remains bounded and user-initiated. Live discovery is disabled by
-  default and must not become crawling, catalog mirroring, or permanent storage.
+- CCEL adapters remain inactive and outside the public MCP contract. A future
+  discovery-only rollout requires separate review and must not become crawling,
+  catalog mirroring, body republication, or permanent storage.
 - Public Ethereum RPC endpoints are light-use defaults, not an uptime SLO.
   Donation verification remains fail-closed.

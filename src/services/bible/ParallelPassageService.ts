@@ -24,6 +24,7 @@ import {
   ubsParallelProvenanceRecord,
 } from '../../kernel/parallelPassageProvenance.js';
 import { provenanceFromCitation, type ProvenanceRecord } from '../../kernel/provenance.js';
+import { translationProvenanceContext } from '../../kernel/translationProvenance.js';
 import type { BibleResult } from '../../kernel/types.js';
 import { findBookByNumber } from '../../kernel/books.js';
 
@@ -318,12 +319,14 @@ function translationProvenanceId(
   provenance: ProvenanceRecord[],
   provenanceBySource: Map<string, string>,
 ): string {
+  const context = translationProvenanceContext(result);
   const candidate = provenanceFromCitation(result.citation, {
     id: `translation-${provenance.length + 1}`,
     kind: 'translation',
     status: 'provider_attributed',
     version: result.translation,
     ...(recognizedLicense(result.citation.copyright) ? { license: recognizedLicense(result.citation.copyright) } : {}),
+    ...(context ?? {}),
   });
   const key = JSON.stringify({ ...candidate, id: undefined });
   const existing = provenanceBySource.get(key);

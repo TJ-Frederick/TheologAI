@@ -20,9 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added versioned grouped output and provenance for `parallel_passages`, with a
   hard default to complete UBS source-attested groups. Legacy curated edges and
   OpenBible.info rows remain available only through explicit, separate selectors.
-- Added `primary_source_search`, an explicit, bounded, local-first research-plan
-  tool. Optional live CCEL discovery remains independently gated off by default;
-  results are snippets and resolvable locators rather than mirrored documents.
+- Added `primary_source_search`, an explicit, bounded local research-plan tool.
+  The public schema returns snippets and resolvable local section locators and
+  does not advertise or invoke inactive CCEL provider adapters.
 - Added `original_language_study`, a context-first study of one verse token that
   combines morphology and source-separated lexical evidence while stating its
   interpretive limits.
@@ -41,8 +41,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Scoped D1 readiness to both schema and materialization identity. Remote D1
   marker transitions, preview deployment, and production deployment remain
   separate operational gates and are not performed by these code changes.
-- Preserved bounded named-work/section CCEL retrieval while moving full catalog
-  discovery and search to the future roadmap.
+- Removed public CCEL document-body retrieval and reconciled both historical
+  tools with the currently local-only provider contract. Defensive external
+  discovery architecture remains inactive for a separately reviewed future rollout.
+- Completed structured source metadata for ESV, NET, and the bundled legacy
+  parallel corpus without asserting an open license for copyrighted translations.
 - Corrected Tyndale Open Study Notes licensing to CC BY-SA 4.0.
 
 ## [4.0.0-draft] - Not released

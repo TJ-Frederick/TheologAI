@@ -18,7 +18,7 @@ const tools: ToolHandler[] = [
   createCrossReferencesHandler(unused),
   createParallelPassagesHandler(unused),
   createCommentaryHandler(unused),
-  createClassicTextsHandler(unused, unused),
+  createClassicTextsHandler(unused),
   createStrongsLookupHandler(unused),
   createVerseMorphologyHandler(unused),
   createOriginalLanguageStudyHandler(unused),

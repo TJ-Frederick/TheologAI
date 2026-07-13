@@ -17,7 +17,6 @@ import type { BibleService } from '../../../../src/services/bible/BibleService.j
 import type { CrossReferenceService } from '../../../../src/services/bible/CrossReferenceService.js';
 import type { ParallelPassageService } from '../../../../src/services/bible/ParallelPassageService.js';
 import type { CommentaryService } from '../../../../src/services/commentary/CommentaryService.js';
-import type { CcelService } from '../../../../src/services/commentary/CcelService.js';
 import type { DonationService } from '../../../../src/services/donation/DonationService.js';
 import type { HistoricalDocumentService } from '../../../../src/services/historical/HistoricalDocumentService.js';
 import type { PrimarySourceSearchService } from '../../../../src/services/historical/PrimarySourceSearchService.js';
@@ -46,10 +45,7 @@ describe('v2 tool handler schemas', () => {
       createCrossReferencesHandler(serviceDouble<CrossReferenceService>({})),
       createParallelPassagesHandler(serviceDouble<ParallelPassageService>({})),
       createCommentaryHandler(serviceDouble<CommentaryService>({})),
-      createClassicTextsHandler(
-        serviceDouble<HistoricalDocumentService>({}),
-        serviceDouble<CcelService>({}),
-      ),
+      createClassicTextsHandler(serviceDouble<HistoricalDocumentService>({})),
       createPrimarySourceSearchHandler(serviceDouble<PrimarySourceSearchService>({})),
       createStrongsLookupHandler(serviceDouble<StrongsService>({})),
       createVerseMorphologyHandler(serviceDouble<MorphologyService>({})),
@@ -80,7 +76,6 @@ describe('v2 tool handler schemas', () => {
     const commentary = commentaryHandler.inputSchema;
     const classicTexts = createClassicTextsHandler(
       serviceDouble<HistoricalDocumentService>({}),
-      serviceDouble<CcelService>({}),
     ).inputSchema;
     const originalLanguage = createStrongsLookupHandler(serviceDouble<StrongsService>({})).inputSchema;
 
@@ -475,20 +470,9 @@ describe('classic_text_lookup handler', () => {
       findDocument: vi.fn<HistoricalDocumentService['findDocument']>().mockResolvedValue(undefined),
       search: vi.fn<HistoricalDocumentService['search']>().mockResolvedValue([]),
     };
-    const ccel = {
-      getWorkSection: vi.fn<CcelService['getWorkSection']>().mockResolvedValue({
-        work: 'calvin/institutes',
-        section: 'institutes',
-        title: 'Calvin — Institutes',
-        content: 'Nearly all wisdom consists in two parts.',
-        source: 'CCEL',
-        url: 'https://example.test/calvin',
-      }),
-    };
     return {
       historical,
-      ccel,
-      handler: createClassicTextsHandler(serviceDouble(historical), serviceDouble(ccel)),
+      handler: createClassicTextsHandler(serviceDouble(historical)),
     };
   }
 
@@ -512,71 +496,57 @@ describe('classic_text_lookup handler', () => {
     expect(textOf(result)).toContain('We believe in one God.');
   });
 
-  it('returns a matching local work without consulting CCEL', async () => {
-    const { handler, historical, ccel } = createServices();
+  it('returns a matching local work', async () => {
+    const { handler, historical } = createServices();
     historical.findDocument.mockResolvedValue(document);
 
     const result = await handler.handler({ work: 'nicene-creed' });
 
     expect(historical.getSections).toHaveBeenCalledWith('nicene-creed');
-    expect(ccel.getWorkSection).not.toHaveBeenCalled();
     expect(textOf(result)).toContain('Nicene Creed');
   });
 
-  it('falls back to CCEL when a work is not local', async () => {
-    const { handler, ccel } = createServices();
+  it('does not retrieve a remote body when a work is not local', async () => {
+    const { handler } = createServices();
 
     const result = await handler.handler({ work: 'calvin/institutes' });
 
-    expect(ccel.getWorkSection).toHaveBeenCalledWith({ work: 'calvin/institutes' });
-    expect(textOf(result)).toContain('Calvin — Institutes');
-    expect(textOf(result)).toContain('Source: [CCEL]');
-    expect(textOf(result)).toContain('(https://example.test/calvin)');
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toContain('No locally indexed historical document matches');
   });
 
-  it('preserves bounded CCEL retrieval with an explicit section identifier', async () => {
-    const { handler, historical, ccel } = createServices();
-    historical.findDocument.mockResolvedValue(document);
-
-    await handler.handler({ work: 'augustine/confessions', section: 'book-one' });
-
-    expect(historical.findDocument).not.toHaveBeenCalled();
-    expect(ccel.getWorkSection).toHaveBeenCalledWith({
-      work: 'augustine/confessions',
-      section: 'book-one',
-    });
+  it('does not advertise or accept the former CCEL section argument', () => {
+    const handler = createServices().handler;
+    expect(handler.inputSchema.properties).not.toHaveProperty('section');
   });
 
-  it('returns local search results without consulting CCEL', async () => {
-    const { handler, historical, ccel } = createServices();
+  it('returns local search results', async () => {
+    const { handler, historical } = createServices();
     historical.search.mockResolvedValue([section]);
 
     const result = await handler.handler({ query: 'wisdom' });
 
     expect(historical.search).toHaveBeenCalledWith('wisdom');
-    expect(ccel.getWorkSection).not.toHaveBeenCalled();
     expect(textOf(result)).toContain('Search Results for "wisdom"');
   });
 
-  it('rejects a scoped CCEL query instead of silently ignoring it', async () => {
-    const { handler, ccel } = createServices();
+  it('rejects a scoped work query instead of silently ignoring it', async () => {
+    const { handler } = createServices();
 
     const result = await handler.handler({ work: 'calvin/institutes', query: 'wisdom' });
 
-    expect(ccel.getWorkSection).not.toHaveBeenCalled();
     expect(result.isError).toBe(true);
     expect(textOf(result)).toContain('query is the local-search mode');
   });
 
   it('keeps mode validation strict after flattening the advertised schema', async () => {
-    const { handler, historical, ccel } = createServices();
+    const { handler, historical } = createServices();
 
     const result = await handler.handler({ work: 'calvin/institutes', query: 'wisdom' });
 
     expect(result.isError).toBe(true);
     expect(textOf(result)).toContain('query is the local-search mode');
     expect(historical.search).not.toHaveBeenCalled();
-    expect(ccel.getWorkSection).not.toHaveBeenCalled();
   });
 
   it('distinguishes an empty global search from a missing action', async () => {

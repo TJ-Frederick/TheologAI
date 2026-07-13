@@ -23,7 +23,6 @@ import { HelloAoAdapter } from '../../adapters/bible/HelloAoAdapter.js';
 
 // Commentary adapters
 import { HelloAoCommentaryAdapter } from '../../adapters/commentary/HelloAoCommentaryAdapter.js';
-import { CcelAdapter } from '../../adapters/commentary/CcelAdapter.js';
 import { CcelSearchAdapter } from '../../adapters/commentary/CcelSearchAdapter.js';
 
 // Services
@@ -31,7 +30,6 @@ import { BibleService } from '../../services/bible/BibleService.js';
 import { CrossReferenceService } from '../../services/bible/CrossReferenceService.js';
 import { ParallelPassageService } from '../../services/bible/ParallelPassageService.js';
 import { CommentaryService } from '../../services/commentary/CommentaryService.js';
-import { CcelService } from '../../services/commentary/CcelService.js';
 import { HistoricalDocumentService } from '../../services/historical/HistoricalDocumentService.js';
 import { LocalPrimarySourceSearchProvider } from '../../services/historical/LocalPrimarySourceSearchProvider.js';
 import { PrimarySourceSearchService } from '../../services/historical/PrimarySourceSearchService.js';
@@ -70,13 +68,11 @@ export interface WorkerCompositionRoot {
 const netAdapter = new NetBibleAdapter();
 const helloaoAdapter = new HelloAoAdapter();
 const helloaoCommentary = new HelloAoCommentaryAdapter();
-const ccelAdapter = new CcelAdapter();
 // Cache/circuit state is isolate-scoped; the service gate prevents any call
 // while the non-secret rollout flag is false.
 const ccelSearchAdapter = new CcelSearchAdapter({ enabled: true });
 
 const commentaryService = new CommentaryService([helloaoCommentary]);
-const ccelService = new CcelService(ccelAdapter);
 
 // ESV adapter + BibleService are lazy-initialized on first request
 // because EsvAdapter needs env.ESV_API_KEY which isn't available at module scope.
@@ -152,7 +148,6 @@ export function createWorkerCompositionRoot(env: Env): WorkerCompositionRoot {
     parallelPassageService: parallelService,
     commentaryService,
     historicalService,
-    ccelService,
     primarySourceSearchService,
     strongsService,
     morphologyService: morphService,

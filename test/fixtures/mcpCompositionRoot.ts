@@ -1,5 +1,4 @@
 import type { BibleAdapter } from '../../src/adapters/bible/BibleAdapter.js';
-import type { CcelAdapter } from '../../src/adapters/commentary/CcelAdapter.js';
 import type { CommentaryAdapter } from '../../src/adapters/commentary/CommentaryAdapter.js';
 import type { OnChainVerifier } from '../../src/adapters/donation/OnChainVerifier.js';
 import type {
@@ -14,7 +13,6 @@ import { BibleService } from '../../src/services/bible/BibleService.js';
 import { CrossReferenceService } from '../../src/services/bible/CrossReferenceService.js';
 import { ParallelPassageService } from '../../src/services/bible/ParallelPassageService.js';
 import { SourceAttestedParallelService } from '../../src/services/bible/SourceAttestedParallelService.js';
-import { CcelService } from '../../src/services/commentary/CcelService.js';
 import { CommentaryService } from '../../src/services/commentary/CommentaryService.js';
 import { DonationService } from '../../src/services/donation/DonationService.js';
 import { HistoricalDocumentService } from '../../src/services/historical/HistoricalDocumentService.js';
@@ -108,14 +106,6 @@ export function createDeterministicMcpFixture(): DeterministicMcpFixture {
     getDistribution: () => [],
   };
 
-  const ccelAdapter = {
-    getWorkSection: async (work: string, section: string) => ({
-      work,
-      section,
-      content: 'Deterministic classic text.',
-    }),
-  } as unknown as CcelAdapter;
-
   const onChainVerifier = {
     getEvidence: async () => {
       throw new Error('The deterministic verifier must not be called by conformance tests.');
@@ -150,7 +140,6 @@ export function createDeterministicMcpFixture(): DeterministicMcpFixture {
   const strongsService = new StrongsService(strongsRepository);
   const morphologyService = new MorphologyService(morphologyRepository);
   const originalLanguageStudyService = new OriginalLanguageStudyService(morphologyRepository, strongsRepository);
-  const ccelService = new CcelService(ccelAdapter);
   const donationService = new DonationService(onChainVerifier);
 
   const root = {
@@ -160,7 +149,6 @@ export function createDeterministicMcpFixture(): DeterministicMcpFixture {
       parallelPassageService,
       commentaryService,
       historicalService,
-      ccelService,
       primarySourceSearchService,
       strongsService,
       morphologyService,

@@ -196,6 +196,14 @@ describe('ParallelPassageService hard-cutover contract', () => {
     expect((slowFirst.legacyParallels[0] as any).provenanceIds).toEqual([
       'theologai-legacy-parallels', 'translation-3',
     ]);
+    expect(slowFirst.provenance[1]).toMatchObject({
+      status: 'verified_source',
+      attribution: 'TheologAI contributors',
+      version: 'db8d323ebca458ae3b8aaed4a747f925b0273770',
+      locator: 'src/data/parallel-passages.json',
+      license: { label: 'ISC', url: expect.stringContaining('/LICENSE') },
+      rightsNotice: 'Copyright (c) 2026 TheologAI contributors',
+    });
   });
 
   it('orders partial warnings canonically rather than by inverted failure completion', async () => {

@@ -34,10 +34,12 @@ redistribution rights. Completing that audit is a release-roadmap item.
 ## CCEL
 
 The Christian Classics Ethereal Library hosts works with heterogeneous source
-and edition rights. TheologAI's bounded CCEL integration retrieves a specifically
-named work section when available; it does not imply that every CCEL-hosted work
-is public domain or redistributable under one blanket license. Consult the
-source work's notice before redistribution.
+and edition rights. The current public MCP tools do not retrieve or republish
+CCEL document bodies, and they do not advertise live CCEL discovery. Defensive
+discovery adapters remain as inactive future-provider architecture. Any later
+rollout requires a fresh provider-policy review and edition-specific rights
+handling; CCEL hosting never implies a blanket public-domain or redistribution
+license.
 
 Provider URLs and more detailed citations are included in tool output where the
 underlying source supplies them.

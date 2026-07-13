@@ -25,7 +25,6 @@ export interface ToolRegistryDependencies {
   parallelPassageService: Parameters<typeof createParallelPassagesHandler>[0];
   commentaryService: Parameters<typeof createCommentaryHandler>[0];
   historicalService: Parameters<typeof createClassicTextsHandler>[0];
-  ccelService: Parameters<typeof createClassicTextsHandler>[1];
   primarySourceSearchService: Parameters<typeof createPrimarySourceSearchHandler>[0];
   strongsService: Parameters<typeof createStrongsLookupHandler>[0];
   morphologyService: Parameters<typeof createVerseMorphologyHandler>[0];
@@ -39,7 +38,7 @@ export function createToolRegistry(dependencies: ToolRegistryDependencies): Tool
     createCrossReferencesHandler(dependencies.crossReferenceService),
     createParallelPassagesHandler(dependencies.parallelPassageService),
     createCommentaryHandler(dependencies.commentaryService),
-    createClassicTextsHandler(dependencies.historicalService, dependencies.ccelService),
+    createClassicTextsHandler(dependencies.historicalService),
     createPrimarySourceSearchHandler(dependencies.primarySourceSearchService),
     createStrongsLookupHandler(dependencies.strongsService),
     createVerseMorphologyHandler(dependencies.morphologyService),

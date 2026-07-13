@@ -40,8 +40,8 @@ fresh server and transport.
 | `bible_cross_references` | Query locally indexed OpenBible.info cross references. |
 | `parallel_passages` | Return complete UBS source-attested parallel groups by default; legacy curated edges and OpenBible.info cross references require explicit selectors and remain separate. |
 | `commentary_lookup` | Retrieve Matthew Henry, JFB, Adam Clarke, John Gill, Keil-Delitzsch (OT), or Tyndale notes. |
-| `classic_text_lookup` | Search and browse the 17 local historical documents; retrieve a specifically named CCEL work section when available. |
-| `primary_source_search` | Execute a bounded, explicit query plan against the local historical index; optional live CCEL discovery is separately gated off by default. Returns snippets and exact locators, not document bodies. |
+| `classic_text_lookup` | Search and browse the 17 locally indexed historical documents. Remote CCEL document bodies are not retrieved or republished. |
+| `primary_source_search` | Execute a bounded, explicit query plan against the local historical index. Returns snippets and exact local section locators, not document bodies. |
 | `original_language_lookup` | Look up a Strong's entry or search for matching Greek/Hebrew entries. |
 | `bible_verse_morphology` | Return word-by-word morphology for a specific verse. |
 | `original_language_study` | Resolve and study one Greek or Hebrew token in one verse with contextual morphology, source-separated lexical evidence, and explicit interpretive limits. |
@@ -103,15 +103,17 @@ Scalar commentary is returned only when the provider exposes an exact,
 trustworthy verse identity. For section-level commentary, use chapter lookup
 as the truthful fallback rather than treating a section anchor as a verse span.
 
-### Historical documents and CCEL
+### Historical documents and external discovery
 
 The local database contains 17 tracked creeds, confessions, and
 catechisms. The exact count is enforced by `data/data-manifest.json`.
 
-CCEL support is deliberately bounded: callers can request a named work and
-exact section when its CCEL path is known. The server does **not** currently
-provide complete CCEL catalog discovery, catalog-wide search, or automatic
-Calvin-volume routing. Those are possible future features, not current claims.
+The public tools search and retrieve only the locally indexed collection. They
+do **not** currently fetch CCEL search results or document bodies. Defensive
+CCEL discovery adapters remain in the codebase as future provider architecture,
+but they are not advertised by the MCP schemas or reachable through the public
+tool registry. Any future external provider rollout must remain discovery-only
+until edition-specific rights and provider-policy gates are satisfied.
 
 ### Language and reference data
 

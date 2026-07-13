@@ -1,9 +1,9 @@
 /**
  * Non-secret rollout switches for the staged primary-source workstream.
  *
- * Live CCEL search is intentionally disabled when configuration is absent or
- * malformed. Existing exact CCEL retrieval is not gated here and remains
- * available under its established product contract.
+ * This switch is retained for future discovery-provider integration tests.
+ * The current public MCP schemas expose only the local provider, so setting the
+ * flag alone cannot enable CCEL or make a remote adapter publicly reachable.
  */
 
 export interface PrimarySourceFeatureFlags {

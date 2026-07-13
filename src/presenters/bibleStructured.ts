@@ -8,6 +8,7 @@ import {
   type ProvenanceRecord,
 } from '../kernel/provenance.js';
 import type { BibleLookupOutputV1 } from '../mcp/schemas/bibleLookup.js';
+import { translationProvenanceContext } from '../kernel/translationProvenance.js';
 
 type BibleLookupData = BibleLookupMultipleResult | BibleResult;
 
@@ -54,12 +55,14 @@ function getProvenanceId(
   provenance: ProvenanceRecord[],
   provenanceByKey: Map<string, string>,
 ): string {
+  const context = translationProvenanceContext(result);
   const candidate = provenanceFromCitation(result.citation, {
     id: `src-${provenance.length + 1}`,
     kind: 'translation',
     status: 'provider_attributed',
     license: recognizedLicense(result.citation),
     locator: result.reference,
+    ...(context ?? {}),
   });
   const key = JSON.stringify({ ...candidate, id: undefined });
   const existing = provenanceByKey.get(key);
