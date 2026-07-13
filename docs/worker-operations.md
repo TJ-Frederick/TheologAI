@@ -16,8 +16,25 @@ binding.
 
 | Environment | Active logical database | Current posture | Rollback posture |
 |---|---|---|---|
-| Production | `theologai-production-20260711-a` | PR #10 merge deployed after the read-only readiness gate passed. | Former `theologai-db` is a candidate only. Retention and compatibility are not verified here; if it predates current identity markers, a current-main redeploy may reject it. |
-| Preview | `theologai-preview-20260712-b` | Phase 3 PR #21 head `446a9eb` deployed successfully by GitHub Actions run `29220658995` after the read-only readiness gate passed. | `theologai-preview-20260712-a` and `theologai-preview-20260710-c` are retained candidates only. Candidate `-a` predates transform version 3; candidate `-c` belongs to the earlier PR #10 deployment. Verify the retained Worker/config pair and run its exact readiness contract before either is used. |
+| Production | `theologai-production-20260711-a` | PR #10 merge remains deployed while the Phase 3 production candidate below is reviewed. | The deployed Worker and this database are the retained matched rollback pair. Do not mix this database with Phase 3 code or delete it during the release window. |
+| Preview | `theologai-preview-20260712-b` | Phase 3 PR #21 head `173a6a4` deployed successfully by GitHub Actions run `29221227777` after the read-only readiness gate passed. | `theologai-preview-20260712-a` and `theologai-preview-20260710-c` are retained candidates only. Candidate `-a` predates transform version 3; candidate `-c` belongs to the earlier PR #10 deployment. Verify the retained Worker/config pair and run its exact readiness contract before either is used. |
+
+### Prepared Phase 3 production candidate (not deployed)
+
+On 2026-07-13, `theologai-production-20260713-a` was created in Eastern North
+America (`ENAM`) with no jurisdiction restriction, migrated through
+`0002_ubs_parallel_passages`, and populated from all 29 generated data files
+after the empty-target guard. The 30-file manifest contains 859,596 rows and
+scoped materialization identity
+`91afa5bcf8155ac9f8c5fd14d1d661657c83be9a8e5cd90a5783bfa38ae7dfa5`.
+Its database ID is recorded only in the reviewable top-level binding in
+`wrangler.toml`.
+
+The strict remote readiness gate returned `ready` against the candidate before
+this binding change was committed. Updating `wrangler.toml` prepares the matched
+Phase 3 code/config release; it does not change the deployed production Worker. The
+existing PR #10 Worker and `theologai-production-20260711-a` remain active and
+must be retained together until the protected main-branch deployment succeeds.
 
 ### Active Phase 3 preview database
 
