@@ -208,18 +208,24 @@ export function deterministicBuildProvenance(
   source: PinnedSource,
   files: readonly PinnedSourceFile[],
   compiler: { id: string; version: number },
+  identityKind: 'raw_sha256' | 'canonical_json_payload_sha256_v1' = 'raw_sha256',
 ) {
+  const byteReproducible = identityKind === 'raw_sha256';
   return {
     ...provenance(source, files),
-    provenance_status: 'reproducible_build_from_exact_verified_pins',
+    provenance_status: 'content_reproducible_build_from_exact_verified_pins',
     source_attestation: {
       kind: 'build_time_byte_verification',
       source_lock: 'data/biblical-languages/SOURCE.json',
       raw_inputs_byte_verified: true,
     },
     derived_artifact: {
-      classification: 'reproducible_from_exact_verified_pins',
-      byte_reproducible_from_pinned_inputs: true,
+      classification: 'content_reproducible_from_exact_verified_pins',
+      identity_kind: identityKind,
+      byte_reproducible_from_pinned_inputs: byteReproducible,
+      ...(identityKind === 'canonical_json_payload_sha256_v1'
+        ? { gzip_container_bytes_reproducible_across_zlib_versions: false }
+        : {}),
       source_lock: 'data/biblical-languages/SOURCE.json#sources',
       compiler: {
         id: compiler.id,
@@ -266,17 +272,20 @@ export function trackedArtifactAttestation(
 
 export function sourceLockProjection() {
   return {
-    schema_version: 1,
+    schema_version: 2,
     derived_artifacts: {
       status: 'accepted_legacy_non_reproducible',
       tracked_manifest: 'data/data-manifest.json',
       d1_materialization_identity: '91afa5bcf8155ac9f8c5fd14d1d661657c83be9a8e5cd90a5783bfa38ae7dfa5',
       compared_artifacts: 72,
-      changed_artifacts: 45,
-      tracked_inventory_sha256: '433902e19fa60f1e98dd856b0a073b72e71b1b4e2edd04abca552bf0e96bbf44',
-      clean_reproduction_inventory_sha256: '35649745857b65dbe87d024d13288036710272a193179349088f7a4af138268a',
+      comparison_identity_policy: 'canonical_decompressed_json_v1_sha256_for_json_gz_else_raw_sha256',
+      changed_content_artifacts: 45,
+      tracked_content_inventory_sha256: '3661deb0e2c912bd3ca4ac1a815a118f0397a186d816c0bfe17e25d276f9fa4d',
+      clean_reproduction_content_inventory_sha256: 'caf58814f24cc72837586c901c42f3556b59e45ec81bb0af7f5cfb9fa1629dcd',
+      tracked_raw_inventory_sha256: '433902e19fa60f1e98dd856b0a073b72e71b1b4e2edd04abca552bf0e96bbf44',
       semantic_drift_inventory_sha256: 'a0ca99fa6a876b22f2c55a2415f1bf524c17026f290773f59f98676d903c7f36',
-      explanation: '45 of 72 tracked runtime artifacts remain byte-locked but differ from a deterministic rebuild because historical per-network-chunk UTF-8 decoding corrupted text. The STEPBible lexicon pair is byte-reproducible and is not part of this exception.',
+      explanation: '45 of 72 tracked runtime artifacts differ from a pinned rebuild by portable content identity because historical per-network-chunk UTF-8 decoding corrupted text. Gzip-packaged JSON is identified by its canonical decompressed payload; gzip container bytes are not a cross-zlib reproducibility claim. The uncompressed STEPBible lexicon pair is byte-reproducible and is not part of this exception.',
+      raw_container_policy: 'Tracked raw hashes are retained as forensic evidence. Reproduced gzip container hashes are diagnostic only because headers and DEFLATE streams vary across operating systems and zlib versions.',
       clean_reproduction_delta: {
         strongs_entries: 9,
         strongs_fields: 9,
