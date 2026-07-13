@@ -45,7 +45,8 @@ function assertRegistrySource(source: PinnedSource): void {
       throw new Error(`Unsafe repository path for ${source.id}/${file.id}`);
     }
     assertExactPinnedRawUrl(file);
-    if (file.trackedPath && !/^data\/biblical-languages\/[A-Za-z0-9._/-]+$/.test(file.trackedPath)) {
+    if (file.trackedPath && (!/^data\/biblical-languages\/[A-Za-z0-9._/-]+$/.test(file.trackedPath)
+      || file.trackedPath.split('/').some(segment => segment === '' || segment === '.' || segment === '..'))) {
       throw new Error(`Unsafe tracked path for ${source.id}/${file.id}`);
     }
     if (!Number.isSafeInteger(file.bytes) || file.bytes < 1

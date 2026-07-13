@@ -14,6 +14,8 @@ import type {
   SemanticDriftReport,
   StrongsDriftRecord,
 } from './biblical-language-semantic-drift.js';
+import { artifactContentIdentity, type ArtifactIdentityKind } from './artifact-content-identity.js';
+import { parseDataManifest } from './d1-corpus-identity.js';
 
 export interface ReproductionReport {
   status: string;
@@ -47,6 +49,13 @@ export interface ReproductionReport {
   semanticDrift: SemanticDriftReport;
 }
 
+export interface TrackedArtifactIdentity {
+  path: string;
+  identityKind: ArtifactIdentityKind;
+  identitySha256: string;
+  rawSha256: string;
+}
+
 function countReplacements(value: unknown): number {
   return typeof value === 'string' ? [...value].filter(character => character === '\uFFFD').length : 0;
 }
@@ -57,6 +66,111 @@ function fail(label: string, actual: unknown): never {
 
 function assertValue(label: string, actual: unknown, expected: unknown): void {
   if (actual !== expected) fail(label, actual);
+}
+
+function inventorySha256(value: unknown): string {
+  return createHash('sha256').update(JSON.stringify(value)).digest('hex');
+}
+
+/**
+ * Bind every path and digest in the report to the exact artifact inventory that
+ * was compared. Reproduced gzip bytes remain diagnostic: their inventory is
+ * self-consistent, but deliberately has no cross-platform lock.
+ */
+export function verifyReproductionArtifactInventory(
+  report: ReproductionReport,
+  trackedArtifacts: readonly TrackedArtifactIdentity[],
+): void {
+  const expectedPaths = trackedArtifacts.map(artifact => artifact.path);
+  if (new Set(expectedPaths).size !== expectedPaths.length) fail('duplicate compared artifact path', 'tracked inventory');
+  assertValue('compared artifact count from inventory', report.comparedArtifacts, trackedArtifacts.length);
+
+  if (!Array.isArray(report.changed) || report.changed.length !== report.changedArtifacts) {
+    fail('changed content records', report.changed?.length);
+  }
+  if (!Array.isArray(report.rawByteDifferences)
+    || report.rawByteDifferences.length !== report.rawByteDifferenceCount) {
+    fail('diagnostic raw-byte difference records', report.rawByteDifferences?.length);
+  }
+
+  const expectedByPath = new Map(trackedArtifacts.map(artifact => [artifact.path, artifact]));
+  const changedByPath = new Map<string, ReproductionReport['changed'][number]>();
+  for (const record of report.changed) {
+    if (!expectedByPath.has(record.path)) fail('unexpected changed content path', record.path);
+    if (changedByPath.has(record.path)) fail('duplicate changed content path', record.path);
+    changedByPath.set(record.path, record);
+  }
+  const rawByPath = new Map<string, ReproductionReport['rawByteDifferences'][number]>();
+  for (const record of report.rawByteDifferences) {
+    if (!expectedByPath.has(record.path)) fail('unexpected raw-byte difference path', record.path);
+    if (rawByPath.has(record.path)) fail('duplicate raw-byte difference path', record.path);
+    rawByPath.set(record.path, record);
+  }
+
+  const trackedContentInventory: Array<{ path: string; identityKind: ArtifactIdentityKind; sha256: string }> = [];
+  const reproducedContentInventory: Array<{ path: string; identityKind: ArtifactIdentityKind; sha256: string }> = [];
+  const trackedRawInventory: Array<{ path: string; sha256: string }> = [];
+  const reproducedRawInventory: Array<{ path: string; sha256: string }> = [];
+  for (const artifact of trackedArtifacts) {
+    const changed = changedByPath.get(artifact.path);
+    const rawDifference = rawByPath.get(artifact.path);
+    if (changed) {
+      assertValue(`${artifact.path} tracked identity kind`, changed.identityKind, artifact.identityKind);
+      assertValue(`${artifact.path} tracked content digest`, changed.trackedIdentitySha256, artifact.identitySha256);
+      assertValue(`${artifact.path} tracked raw digest in content record`, changed.trackedRawSha256, artifact.rawSha256);
+      if (changed.reproducedIdentitySha256 === artifact.identitySha256) fail('unchanged content record', artifact.path);
+      if (!rawDifference
+        || changed.reproducedRawSha256 !== rawDifference.reproducedRawSha256
+        || changed.trackedRawSha256 !== rawDifference.trackedRawSha256) {
+        fail('changed content raw-hash evidence', artifact.path);
+      }
+    }
+    if (rawDifference) {
+      assertValue(`${artifact.path} tracked raw digest`, rawDifference.trackedRawSha256, artifact.rawSha256);
+      if (rawDifference.reproducedRawSha256 === artifact.rawSha256) fail('unchanged raw-byte difference', artifact.path);
+    }
+    trackedContentInventory.push({
+      path: artifact.path,
+      identityKind: artifact.identityKind,
+      sha256: artifact.identitySha256,
+    });
+    reproducedContentInventory.push({
+      path: artifact.path,
+      identityKind: artifact.identityKind,
+      sha256: changed?.reproducedIdentitySha256 ?? artifact.identitySha256,
+    });
+    trackedRawInventory.push({ path: artifact.path, sha256: artifact.rawSha256 });
+    reproducedRawInventory.push({
+      path: artifact.path,
+      sha256: rawDifference?.reproducedRawSha256 ?? artifact.rawSha256,
+    });
+  }
+
+  assertValue('tracked content inventory from artifacts', report.trackedContentInventorySha256,
+    inventorySha256(trackedContentInventory));
+  assertValue('reproduced content inventory from records', report.reproducedContentInventorySha256,
+    inventorySha256(reproducedContentInventory));
+  assertValue('tracked raw inventory from artifacts', report.trackedRawInventorySha256,
+    inventorySha256(trackedRawInventory));
+  assertValue('diagnostic reproduced raw inventory from records', report.reproducedRawInventorySha256,
+    inventorySha256(reproducedRawInventory));
+}
+
+function trackedRuntimeArtifacts(root: string): TrackedArtifactIdentity[] {
+  const manifest = parseDataManifest(readFileSync(join(root, 'data/data-manifest.json')));
+  const paths = [
+    ...manifest.materializations.d1.inputs.filter(path => path.startsWith('data/biblical-languages/')),
+    'data/biblical-languages/stepbible/index.json',
+  ].sort();
+  return paths.map(path => {
+    const identity = artifactContentIdentity(path, readFileSync(join(root, path)));
+    return {
+      path,
+      identityKind: identity.kind,
+      identitySha256: identity.sha256,
+      rawSha256: identity.rawSha256,
+    };
+  });
 }
 
 function verifyStrongs(records: StrongsDriftRecord[], report: SemanticDriftReport['strongs']): void {
@@ -162,6 +276,16 @@ export function verifyExpectedLegacyReproductionReport(report: ReproductionRepor
   for (const [label, actual, value] of checks) {
     assertValue(label, actual, value);
   }
+  if (!report.semanticDrift || typeof report.semanticDrift !== 'object') {
+    fail('semantic drift evidence', 'missing');
+  }
+  if (!Array.isArray(report.semanticDrift.structuralIssues) || report.semanticDrift.structuralIssues.length !== 0) {
+    fail('semantic structural issues', JSON.stringify(report.semanticDrift.structuralIssues));
+  }
+  if (!Array.isArray(report.semanticDrift.strongs.records) || !Array.isArray(report.semanticDrift.morphology.records)) {
+    fail('semantic drift records', 'missing');
+  }
+  verifyReproductionArtifactInventory(report, trackedRuntimeArtifacts(ROOT));
   if (!/^[0-9a-f]{64}$/.test(report.reproducedRawInventorySha256)) {
     fail('diagnostic reproduced raw inventory', report.reproducedRawInventorySha256);
   }
@@ -172,23 +296,14 @@ export function verifyExpectedLegacyReproductionReport(report: ReproductionRepor
     || report.rawByteDifferences.length !== report.rawByteDifferenceCount) {
     fail('diagnostic raw-byte difference count', report.rawByteDifferenceCount);
   }
-  const rawPaths = new Set<string>();
   for (const record of report.rawByteDifferences) {
-    if (rawPaths.has(record.path)) fail('duplicate raw-byte difference path', record.path);
-    rawPaths.add(record.path);
     if (!/^[0-9a-f]{64}$/.test(record.trackedRawSha256)
       || !/^[0-9a-f]{64}$/.test(record.reproducedRawSha256)
       || record.trackedRawSha256 === record.reproducedRawSha256) {
       fail('invalid raw-byte difference', record.path);
     }
   }
-  if (!Array.isArray(report.changed) || report.changed.length !== report.changedArtifacts) {
-    fail('changed content records', report.changed?.length);
-  }
-  const changedPaths = new Set<string>();
   for (const record of report.changed) {
-    if (changedPaths.has(record.path)) fail('duplicate changed content path', record.path);
-    changedPaths.add(record.path);
     const gzip = record.path.endsWith('.json.gz');
     assertValue(`${record.path} identity kind`, record.identityKind,
       gzip ? 'canonical_json_payload_sha256_v1' : 'raw_sha256');
@@ -198,24 +313,9 @@ export function verifyExpectedLegacyReproductionReport(report: ReproductionRepor
     if (record.trackedIdentitySha256 === record.reproducedIdentitySha256) {
       fail('unchanged content record', record.path);
     }
-    const rawRecord = report.rawByteDifferences.find(candidate => candidate.path === record.path);
-    if (!rawRecord
-      || rawRecord.trackedRawSha256 !== record.trackedRawSha256
-      || rawRecord.reproducedRawSha256 !== record.reproducedRawSha256) {
-      fail('changed content raw-hash evidence', record.path);
-    }
   }
   assertValue('changed gzip content artifacts', report.changed.filter(record => record.path.endsWith('.json.gz')).length, 43);
   assertValue('changed raw content artifacts', report.changed.filter(record => !record.path.endsWith('.json.gz')).length, 2);
-  if (!report.semanticDrift || typeof report.semanticDrift !== 'object') {
-    fail('semantic drift evidence', 'missing');
-  }
-  if (!Array.isArray(report.semanticDrift.structuralIssues) || report.semanticDrift.structuralIssues.length !== 0) {
-    fail('semantic structural issues', JSON.stringify(report.semanticDrift.structuralIssues));
-  }
-  if (!Array.isArray(report.semanticDrift.strongs.records) || !Array.isArray(report.semanticDrift.morphology.records)) {
-    fail('semantic drift records', 'missing');
-  }
   verifyStrongs(report.semanticDrift.strongs.records, report.semanticDrift.strongs);
   verifyMorphology(report.semanticDrift.morphology.records, report.semanticDrift.morphology);
   const inventorySha256 = createHash('sha256').update(JSON.stringify({

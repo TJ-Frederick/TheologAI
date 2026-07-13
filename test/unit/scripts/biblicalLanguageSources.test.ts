@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
@@ -13,7 +14,10 @@ import {
 } from '../../../scripts/biblical-language-sources.js';
 import { computeD1CorpusIdentity, parseDataManifest } from '../../../scripts/d1-corpus-identity.js';
 import { verifyBiblicalLanguageSources } from '../../../scripts/verify-biblical-language-sources.js';
-import { verifyExpectedLegacyReproductionReport } from '../../../scripts/verify-biblical-language-reproduction-report.js';
+import {
+  verifyExpectedLegacyReproductionReport,
+  verifyReproductionArtifactInventory,
+} from '../../../scripts/verify-biblical-language-reproduction-report.js';
 
 describe('biblical-language source revisions', () => {
   it('pins the reviewed OpenScriptures and STEPBible commits in every raw URL', () => {
@@ -40,6 +44,109 @@ describe('biblical-language source revisions', () => {
       compared_artifacts: 72,
       changed_content_artifacts: 45,
     });
+  });
+
+  it('rejects traversal segments in tracked source paths', () => {
+    const file = STEPBIBLE_DATA.files.find(candidate => candidate.trackedPath)! as { trackedPath: string };
+    const original = file.trackedPath;
+    try {
+      file.trackedPath = 'data/biblical-languages/../outside.txt';
+      expect(() => verifyBiblicalLanguageSources(process.cwd())).toThrow('Unsafe tracked path');
+    } finally {
+      file.trackedPath = original;
+    }
+  });
+
+  it('binds reproduction drift records to the exact compared paths and digests', () => {
+    const digest = (value: string) => createHash('sha256').update(value).digest('hex');
+    const artifacts = [
+      {
+        path: 'data/biblical-languages/strongs-greek.json',
+        identityKind: 'raw_sha256' as const,
+        identitySha256: digest('tracked-content-a'),
+        rawSha256: digest('tracked-raw-a'),
+      },
+      {
+        path: 'data/biblical-languages/stepbible/greek/40-Matthew.json.gz',
+        identityKind: 'canonical_json_payload_sha256_v1' as const,
+        identitySha256: digest('tracked-content-b'),
+        rawSha256: digest('tracked-raw-b'),
+      },
+    ];
+    const reproducedContentA = digest('reproduced-content-a');
+    const reproducedRawA = digest('reproduced-raw-a');
+    const reproducedRawB = digest('platform-specific-gzip-b');
+    const inventoryHash = (value: unknown) => digest(JSON.stringify(value));
+    const report = {
+      comparedArtifacts: 2,
+      changedArtifacts: 1,
+      rawByteDifferenceCount: 2,
+      changed: [{
+        path: artifacts[0].path,
+        identityKind: artifacts[0].identityKind,
+        trackedIdentitySha256: artifacts[0].identitySha256,
+        reproducedIdentitySha256: reproducedContentA,
+        trackedRawSha256: artifacts[0].rawSha256,
+        reproducedRawSha256: reproducedRawA,
+      }],
+      rawByteDifferences: [
+        {
+          path: artifacts[0].path,
+          trackedRawSha256: artifacts[0].rawSha256,
+          reproducedRawSha256: reproducedRawA,
+        },
+        {
+          path: artifacts[1].path,
+          trackedRawSha256: artifacts[1].rawSha256,
+          reproducedRawSha256: reproducedRawB,
+        },
+      ],
+      trackedContentInventorySha256: inventoryHash(artifacts.map(artifact => ({
+        path: artifact.path,
+        identityKind: artifact.identityKind,
+        sha256: artifact.identitySha256,
+      }))),
+      reproducedContentInventorySha256: inventoryHash([
+        { path: artifacts[0].path, identityKind: artifacts[0].identityKind, sha256: reproducedContentA },
+        { path: artifacts[1].path, identityKind: artifacts[1].identityKind, sha256: artifacts[1].identitySha256 },
+      ]),
+      trackedRawInventorySha256: inventoryHash(artifacts.map(artifact => ({
+        path: artifact.path,
+        sha256: artifact.rawSha256,
+      }))),
+      reproducedRawInventorySha256: inventoryHash([
+        { path: artifacts[0].path, sha256: reproducedRawA },
+        { path: artifacts[1].path, sha256: reproducedRawB },
+      ]),
+    };
+
+    expect(() => verifyReproductionArtifactInventory(report as any, artifacts)).not.toThrow();
+    expect(() => verifyReproductionArtifactInventory({
+      ...report,
+      changed: [{ ...report.changed[0], path: 'data/biblical-languages/substituted.json' }],
+    } as any, artifacts)).toThrow('unexpected changed content path');
+    expect(() => verifyReproductionArtifactInventory({
+      ...report,
+      changed: [{ ...report.changed[0], trackedIdentitySha256: digest('substituted-digest') }],
+    } as any, artifacts)).toThrow('tracked content digest');
+    expect(() => verifyReproductionArtifactInventory({
+      ...report,
+      changed: [{ ...report.changed[0], reproducedIdentitySha256: digest('substituted-reproduction') }],
+    } as any, artifacts)).toThrow('reproduced content inventory from records');
+    expect(() => verifyReproductionArtifactInventory({
+      ...report,
+      rawByteDifferences: [
+        { ...report.rawByteDifferences[0], path: 'data/biblical-languages/substituted.json' },
+        report.rawByteDifferences[1],
+      ],
+    } as any, artifacts)).toThrow('unexpected raw-byte difference path');
+    expect(() => verifyReproductionArtifactInventory({
+      ...report,
+      rawByteDifferences: [
+        report.rawByteDifferences[0],
+        { ...report.rawByteDifferences[1], reproducedRawSha256: digest('substituted-raw') },
+      ],
+    } as any, artifacts)).toThrow('diagnostic reproduced raw inventory from records');
   });
 
   it('distinguishes reproducible clean builds from scoped tracked legacy attestations', () => {
