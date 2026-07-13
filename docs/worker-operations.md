@@ -4,8 +4,8 @@
 
 PR #21 (`639d0a0`) is the current production application baseline. Protected
 workflow run `29257538930` deployed it after a read-only D1 readiness result of
-`ready`. Preview runs the final PR #21 head `247b280` against the schema-0002,
-transform-version-3 database described below.
+`ready`. Preview runs PR #27 head `97644f0` against the schema-0002,
+transform-version-4 database described below.
 
 The deployed logical D1 bindings and retained rollback posture are recorded
 below as point-in-time evidence. Cloudflare deployment history and the approved
@@ -17,7 +17,7 @@ binding.
 | Environment | Active logical database | Current posture | Rollback posture |
 |---|---|---|---|
 | Production | `theologai-production-20260713-a` | PR #21 merge `639d0a0` deployed successfully by GitHub Actions run `29257538930`; deployment `2a9dbaf4-3fa9-431a-b8ba-265f0809e2c2` serves Worker version `2e55ef40-d450-4978-adf6-9fc28c349e61`. | Retain Worker version `c291ca9f-bb1b-4e6e-abd5-d6a3ea4f0704` with `theologai-production-20260711-a` as the predecessor matched pair. Do not mix that database with Phase 3 code or delete it during the observation window. |
-| Preview | `theologai-preview-20260712-b` | Final PR #21 head `247b280` deployed successfully by GitHub Actions run `29256660848`; deployment `d28d1d73` serves Worker version `3c8ad7ef-50ed-42a7-9c71-2ac8c2dd6d7f`. | `theologai-preview-20260712-a` and `theologai-preview-20260710-c` are retained candidates only. Candidate `-a` predates transform version 3; candidate `-c` belongs to the earlier PR #10 deployment. Verify the retained Worker/config pair and run its exact readiness contract before either is used. |
+| Preview | `theologai-preview-20260713-c` | PR #27 head `97644f0` deployed successfully by protected GitHub Actions run `29277315492`; GitHub deployment `5429947573` serves Worker version `734aec3b-d6c3-456b-a203-c7f940a2d081`. The combined post-deployment audit verified all nine Strong's corrections, all 237 morphology corrections, and all 11 parallel-passage cases, with sampled checks across the remaining MCP surface. Positive donation verification remains manual. | Retain `theologai-preview-20260712-b` with predecessor Worker version `3c8ad7ef-50ed-42a7-9c71-2ac8c2dd6d7f` as the most recent matched rollback pair. Older `theologai-preview-20260712-a` and `theologai-preview-20260710-c` candidates remain unverified for this head. Do not delete any retained database during the observation window. |
 
 ### Active Phase 3 production database
 
@@ -36,15 +36,15 @@ workflow deployed the matched PR #21 code and configuration. The independent
 post-deployment audit passed all 84 checks. Retain the predecessor PR #10 Worker
 and `theologai-production-20260711-a` together during the observation window.
 
-### Active Phase 3 preview database
+### Retained Phase 3 preview rollback database
 
 On 2026-07-12, `theologai-preview-20260712-b` was created in Eastern North
 America (`ENAM`) with no jurisdiction restriction, migrated through
 `0002_ubs_parallel_passages`, and populated from all 29 generated data files,
 after beginning with the empty-target guard. The manifest contains 30 files
-total including that guard. Its database ID is kept in the
-reviewable preview binding in `wrangler.toml`; prior candidates remain available
-for rollback investigation and are not modified by this preparation.
+total including that guard. Its database ID remains in Git history and the
+matched predecessor configuration; prior candidates remain available for
+rollback investigation and were not modified by the PR #27 preparation.
 
 The strict remote readiness gate returned `ready`. Independent read-only checks
 also confirmed 859,596 exact manifest rows, both required UBS indexes, scoped
@@ -59,12 +59,12 @@ bound to preview. Retain both earlier candidates during the verification window,
 but do not describe either as ready for this head without its own matched
 compatibility proof. Do not delete any retained database as part of deployment.
 
-### Prepared PR #27 preview replacement
+### Deployed PR #27 preview replacement
 
 On 2026-07-13, `theologai-preview-20260713-c` was created as a fresh,
 unrestricted `ENAM` database for PR #27. The previously deployed
-`theologai-preview-20260712-b` database was not modified and remains the rollback
-database until the protected preview deployment and audit are complete.
+`theologai-preview-20260712-b` database was not modified and remains the matched
+rollback database through the observation window.
 
 The replacement was migrated through `0002_ubs_parallel_passages` and populated
 from all 30 files in `seed-manifest.json` order, beginning with the empty-target
@@ -76,15 +76,22 @@ all 255 reviewed D1 Unicode correction cells, no Unicode replacement characters,
 the required UBS provenance and indexes, `quick_check = ok`, and zero foreign-key
 violations.
 
-The reviewable preview binding now selects this prepared replacement. That
-configuration change is not evidence of a deployed binding: the protected
-GitHub preview workflow must re-read PR authorization, rerun the readiness gate,
-and deploy the exact approved commit before the table above can be updated.
-Production configuration and data are unchanged.
+Protected GitHub Actions run `29277315492` re-read the live PR state and label,
+reran the remote readiness gate with result `ready`, and deployed exact head
+`97644f0`. Wrangler recorded Worker version
+`734aec3b-d6c3-456b-a203-c7f940a2d081` with the expected replacement binding.
+The combined black-box release audit then verified all nine corrected Strong's
+entries, all 237 corrected morphology cells, all 11 parallel-passage cases, and
+sampled every remaining tool plus the resources, prompts, registry, and transport
+surfaces without a 429 or unexpected session. Positive donation verification
+remains an intentionally manual operator check requiring an already-mined
+transaction; its validation path passed. The deployment authorization label was
+removed after the audit.
+Production configuration, data, and Worker are unchanged.
 
 ### Hebrew-lemma materialization follow-up
 
-The active `theologai-preview-20260712-b` database includes deterministic
+The retained `theologai-preview-20260712-b` rollback database includes deterministic
 Hebrew lemma population and passed the transform-version-3 readiness gate. The
 earlier `theologai-preview-20260712-a` candidate predates those materialized row
 changes and must not be marker-updated or rebound to an application revision
