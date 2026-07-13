@@ -23,6 +23,24 @@ import {
   type BiblicalLanguageUnicodeCorrectionLedger,
 } from '../../../scripts/biblical-language-unicode-correction.js';
 
+function unicodeCorrectionFixture(): {
+  ledger: BiblicalLanguageUnicodeCorrectionLedger;
+  comparedPaths: string[];
+} {
+  const manifest = parseDataManifest(readFileSync('data/data-manifest.json'));
+  const ledger = JSON.parse(readFileSync(
+    'data/biblical-languages/UNICODE-CORRECTION.json',
+    'utf8',
+  )) as BiblicalLanguageUnicodeCorrectionLedger;
+  return {
+    ledger,
+    comparedPaths: [
+      ...manifest.materializations.d1.inputs.filter(path => path.startsWith('data/biblical-languages/')),
+      'data/biblical-languages/stepbible/index.json',
+    ].sort(),
+  };
+}
+
 describe('biblical-language source revisions', () => {
   it('pins the reviewed OpenScriptures and STEPBible commits in every raw URL', () => {
     expect(OPENSCRIPTURES_COMMIT).toBe('0acd2f251c2d35ff8db2dece4e0593979d3ac223');
@@ -235,40 +253,47 @@ describe('biblical-language source revisions', () => {
   });
 
   it('verifies all 246 corrections and reverse-projects the exact legacy artifacts', () => {
-    const manifest = parseDataManifest(readFileSync('data/data-manifest.json'));
-    const ledger = JSON.parse(readFileSync(
-      'data/biblical-languages/UNICODE-CORRECTION.json',
-      'utf8',
-    )) as BiblicalLanguageUnicodeCorrectionLedger;
-    const comparedPaths = [
-      ...manifest.materializations.d1.inputs.filter(path => path.startsWith('data/biblical-languages/')),
-      'data/biblical-languages/stepbible/index.json',
-    ].sort();
+    const { ledger, comparedPaths } = unicodeCorrectionFixture();
     expect(() => verifyBiblicalLanguageUnicodeCorrection(process.cwd(), ledger, comparedPaths)).not.toThrow();
     expect(ledger.strongs).toHaveLength(9);
     expect(ledger.morphology).toHaveLength(237);
     expect(ledger.artifacts).toHaveLength(45);
+  });
 
+  it('rejects unsafe Unicode correction artifact paths', () => {
+    const { ledger, comparedPaths } = unicodeCorrectionFixture();
     const unsafe = structuredClone(ledger);
     unsafe.artifacts[0].path = 'data/biblical-languages/stepbible/greek/../outside.json.gz';
     expect(() => verifyBiblicalLanguageUnicodeCorrection(process.cwd(), unsafe, comparedPaths))
       .toThrow('Invalid Unicode artifact identity record');
+  });
 
+  it('binds corrected artifact records to current committed raw bytes', () => {
+    const { ledger, comparedPaths } = unicodeCorrectionFixture();
     const correctedRawMutation = structuredClone(ledger);
     correctedRawMutation.artifacts[0].preparedCorrectedRawSha256 = '0'.repeat(64);
     expect(() => verifyBiblicalLanguageUnicodeCorrection(process.cwd(), correctedRawMutation, comparedPaths))
       .toThrow('Corrected artifact raw-byte identity drift');
+  });
 
+  it('binds legacy gzip forensics to the Phase A raw inventory', () => {
+    const { ledger, comparedPaths } = unicodeCorrectionFixture();
     const legacyRawMutation = structuredClone(ledger);
     legacyRawMutation.artifacts[0].legacyRawSha256 = '0'.repeat(64);
     expect(() => verifyBiblicalLanguageUnicodeCorrection(process.cwd(), legacyRawMutation, comparedPaths))
       .toThrow('Reverse-projected biblical-language raw inventory identity drift');
+  });
 
+  it("reverse-verifies uncompressed Strong's legacy bytes", () => {
+    const { ledger, comparedPaths } = unicodeCorrectionFixture();
     const strongsLegacyRawMutation = structuredClone(ledger);
     strongsLegacyRawMutation.artifacts.find(artifact => !artifact.path.endsWith('.json.gz'))!.legacyRawSha256 = '0'.repeat(64);
     expect(() => verifyBiblicalLanguageUnicodeCorrection(process.cwd(), strongsLegacyRawMutation, comparedPaths))
       .toThrow('Reverse projection did not reconstruct legacy artifact bytes');
+  });
 
+  it('pins the Phase A legacy raw inventory contract', () => {
+    const { ledger, comparedPaths } = unicodeCorrectionFixture();
     const rawInventoryMutation = structuredClone(ledger);
     rawInventoryMutation.contract.legacyRawInventorySha256 = '0'.repeat(64);
     expect(() => verifyBiblicalLanguageUnicodeCorrection(process.cwd(), rawInventoryMutation, comparedPaths))
