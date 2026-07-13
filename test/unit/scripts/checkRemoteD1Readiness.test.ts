@@ -17,6 +17,7 @@ describe('remote D1 readiness query', () => {
     expect(sql).toContain('(SELECT COUNT(*) FROM "morphology") = 12');
     expect(sql).toContain('(SELECT COUNT(*) FROM "documents") = 17');
     expect(sql).toContain("word_text FROM morphology WHERE book = 'John' AND chapter = 1 AND verse = 1 AND position = 11");
+    expect(sql).toContain("lemma FROM morphology WHERE book = 'Genesis' AND chapter = 1 AND verse = 1 AND position = 3");
     expect(sql).toContain(") = 'τὸ'");
     expect(sql).toContain("'idx_ubs_groups_source_order','idx_ubs_segments_lookup'");
     expect(sql).toContain('a5fd0d4646cb69f426f592c6e334866191201fbe64691cd55c7f7ecd0ca9d4cc');

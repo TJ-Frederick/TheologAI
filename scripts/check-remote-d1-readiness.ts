@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { johnOneOneReadinessPredicate } from './data-integrity.js';
+import { genesisOneOneLemmaReadinessPredicate, johnOneOneReadinessPredicate } from './data-integrity.js';
 import { computeD1CorpusIdentity, parseDataManifest, verifyD1Migrations } from './d1-corpus-identity.js';
 import { UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY, UBS_PARALLEL_PASSAGE_PROVENANCE } from '../src/kernel/ubsParallelSource.js';
 
@@ -78,7 +78,7 @@ export function buildD1ReadinessSql(
   ];
 
   return [
-    `SELECT CASE WHEN ${[integrityCheck, foreignKeyCheck, ...identityChecks, ...columnChecks, ...countChecks, indexCheck, ...ubsSemanticChecks, johnOneOneReadinessPredicate()].join(' AND ')}`,
+    `SELECT CASE WHEN ${[integrityCheck, foreignKeyCheck, ...identityChecks, ...columnChecks, ...countChecks, indexCheck, ...ubsSemanticChecks, johnOneOneReadinessPredicate(), genesisOneOneLemmaReadinessPredicate()].join(' AND ')}`,
     `THEN 'ready' ELSE json_extract('D1 readiness check failed', '$') END AS readiness;`,
   ].join('\n');
 }

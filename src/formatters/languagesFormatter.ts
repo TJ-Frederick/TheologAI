@@ -96,5 +96,9 @@ export function formatMorphologyResult(result: VerseMorphologyResult): string {
 
   s += `\n*Source: ${result.citation.source}*`;
   if (result.citation.copyright) s += ` - ${result.citation.copyright}`;
+  if (result.lemmaCitation) {
+    s += `\n*Hebrew lemma source: ${result.lemmaCitation.source}*`;
+    if (result.lemmaCitation.copyright) s += ` - ${result.lemmaCitation.copyright}`;
+  }
   return s.trim();
 }

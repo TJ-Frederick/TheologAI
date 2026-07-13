@@ -37,6 +37,18 @@ This is preparation evidence only. The preview Worker remains deployed against
 live-authorization rechecks, and deployment complete. Retain that database for
 rollback; do not delete either database during the verification window.
 
+### Hebrew-lemma materialization follow-up (not prepared or deployed)
+
+The transform-version-2 preview candidate above predates deterministic Hebrew
+lemma population. Application revisions expecting D1 materialization transform
+version 3 require a fresh database seeded from all 30 generated files, with
+scoped identity
+`91afa5bcf8155ac9f8c5fd14d1d661657c83be9a8e5cd90a5783bfa38ae7dfa5`
+and the Genesis 1:1 Hebrew lemma readiness sentinel. This changes morphology
+rows and therefore cannot use the earlier marker-only transition. The UBS
+parallel-passage source transform remains version 2; these are separate
+version domains.
+
 No rollback asset is claimed as known-good without a read-only inventory and
 compatibility check. Do not copy database IDs, credentials, API tokens, or
 provider-bearing secret RPC URLs into this runbook; `wrangler.toml` and the

@@ -70,9 +70,13 @@ try {
     'ubs_parallel_segments',
   ]);
   const firstChunkTables = new Set(['strongs', 'stepbible_lexicons', 'cross_references', 'morphology']);
+  const hebrewSentinelChunk = manifest.files.find(file => file.table === 'morphology'
+    && readFileSync(join(SEED_ROOT, file.path), 'utf8').includes("VALUES('Genesis',1,1,3,'אֱלֹהִ֑ים','אֱלֹהִים','H0430'"));
+  if (!hebrewSentinelChunk) throw new Error('Generated D1 seed has no Genesis 1:1 Hebrew lemma sentinel');
   const seen = new Set<string>();
   const representativeFiles = manifest.files.filter(file => {
     if (completeTables.has(file.table)) return true;
+    if (file.path === hebrewSentinelChunk.path) return true;
     if (!firstChunkTables.has(file.table) || seen.has(file.table)) return false;
     seen.add(file.table);
     return true;
@@ -99,6 +103,7 @@ try {
       AND (SELECT COUNT(*) FROM stepbible_lexicons) > 0
       AND (SELECT COUNT(*) FROM cross_references) > 0
       AND (SELECT COUNT(*) FROM morphology) > 0
+      AND (SELECT lemma FROM morphology WHERE book = 'Genesis' AND chapter = 1 AND verse = 1 AND position = 3) = 'אֱלֹהִים'
       AND (SELECT COUNT(*) FROM document_sections) = ${manifest.expectedCounts.document_sections}
       AND (SELECT COUNT(*) FROM strongs_fts) > 0
       AND (SELECT COUNT(*) FROM sections_fts) = ${manifest.expectedCounts.sections_fts}

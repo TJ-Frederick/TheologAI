@@ -246,6 +246,18 @@ to `118844cc76b2c091ca60f88d890c3253bbcefd15cad416d03bce3d0af0f4e0ad`.
 Do not copy either value to another database without independently proving its
 current marker and corpus equivalence.
 
+The subsequent Hebrew-lemma materialization is intentionally **not** a
+metadata-only transition. D1 materialization transform version 3 joins blank
+TAHOT Hebrew token lemmas to exact, tracked TBESH Strong's identities and has
+scoped identity
+`91afa5bcf8155ac9f8c5fd14d1d661657c83be9a8e5cd90a5783bfa38ae7dfa5`.
+Its immediate transform-version-2 predecessor is
+`961615b1da2ea26609e289d30d3bf000de5b2ea0f3542ffd01cb7ffe852d38ee`.
+Because morphology rows change between those identities, prepare a freshly
+migrated and fully seeded database and run the complete readiness gate; never
+advance an older database to the new identity by updating only
+`theologai_metadata`.
+
 Cloudflare's import guidance and tracked migration behavior are documented at:
 
 - <https://developers.cloudflare.com/d1/best-practices/import-export-data/>

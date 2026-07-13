@@ -250,6 +250,17 @@ describe('formatMorphologyResult', () => {
     expect(out).toContain('CC BY 4.0 (Tyndale House, Cambridge)');
   });
 
+  it('separately attributes lexicon-backed Hebrew lemmas', () => {
+    const out = formatMorphologyResult(makeMorphResult({
+      testament: 'OT',
+      lemmaCitation: {
+        source: 'STEPBible TBESH Hebrew lexicon',
+        copyright: 'CC BY 4.0 (Tyndale House, Cambridge)',
+      },
+    }));
+    expect(out).toContain('*Hebrew lemma source: STEPBible TBESH Hebrew lexicon*');
+  });
+
   it('returns trimmed output', () => {
     const out = formatMorphologyResult(makeMorphResult());
     expect(out).toBe(out.trim());

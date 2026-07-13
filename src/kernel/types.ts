@@ -300,6 +300,8 @@ export interface VerseMorphologyResult {
   verse: number;
   words: VerseWord[];
   citation: Citation;
+  /** Present when Hebrew lemmas were joined from the tracked TBESH lexicon. */
+  lemmaCitation?: Citation;
 }
 
 // ── STEPBible data structures ──

@@ -24,7 +24,7 @@ import {
   splitGeneratedSql,
   statementBytes,
 } from './d1-seed-utils.js';
-import { johnOneOneReadinessPredicate } from './data-integrity.js';
+import { genesisOneOneLemmaReadinessPredicate, johnOneOneReadinessPredicate } from './data-integrity.js';
 import {
   computeD1CorpusIdentity,
   computeSourceInventoryIdentity,
@@ -142,10 +142,10 @@ function queryNumber(database: string, sql: string): number {
 function assertSemanticSource(database: string): void {
   const result = sqlite(
     database,
-    `SELECT CASE WHEN ${johnOneOneReadinessPredicate()} THEN 'ok' ELSE 'invalid' END;`,
+    `SELECT CASE WHEN ${johnOneOneReadinessPredicate()} AND ${genesisOneOneLemmaReadinessPredicate()} THEN 'ok' ELSE 'invalid' END;`,
   ).trim();
   if (result !== 'ok') {
-    throw new Error('Source database failed the John 1:1 Greek morphology integrity check');
+    throw new Error('Source database failed the Greek/Hebrew morphology integrity checks');
   }
 }
 

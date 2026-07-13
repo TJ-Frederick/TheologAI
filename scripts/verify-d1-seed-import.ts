@@ -8,7 +8,11 @@ import { tmpdir } from 'os';
 import { dirname, isAbsolute, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { sha256File } from './d1-seed-utils.js';
-import { assertJohnOneOneDatabase } from './data-integrity.js';
+import {
+  assertGenesisOneOneDatabase,
+  assertHebrewLemmaCoverageDatabase,
+  assertJohnOneOneDatabase,
+} from './data-integrity.js';
 import { loadAndVerifyD1SeedManifest } from './d1-seed-manifest.js';
 import { validateUbsParallelGroup } from '../src/adapters/shared/UbsParallelPassageRepository.js';
 import type { ParallelSourceProvenance } from '../src/kernel/sourceAttestedParallels.js';
@@ -243,6 +247,10 @@ try {
   assertDatabaseHealth(target, manifest.expectedCounts);
   assertJohnOneOneDatabase(source, 'Source SQLite morphology');
   assertJohnOneOneDatabase(target, 'Imported D1 morphology');
+  assertGenesisOneOneDatabase(source, 'Source SQLite morphology');
+  assertGenesisOneOneDatabase(target, 'Imported D1 morphology');
+  assertHebrewLemmaCoverageDatabase(source, 'Source SQLite morphology');
+  assertHebrewLemmaCoverageDatabase(target, 'Imported D1 morphology');
   assertRepresentativeFts(target);
   assertUbsReconstruction(source, manifest.expectedCounts);
   assertUbsReconstruction(target, manifest.expectedCounts);

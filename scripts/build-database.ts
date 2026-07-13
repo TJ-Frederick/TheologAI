@@ -22,7 +22,13 @@ import {
 import { isAbsolute, join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { gunzipSync } from 'zlib';
-import { assertJohnOneOneDatabase, assertJohnOneOneSource } from './data-integrity.js';
+import {
+  assertGenesisOneOneDatabase,
+  assertHebrewLemmaCoverageDatabase,
+  assertJohnOneOneDatabase,
+  assertJohnOneOneSource,
+} from './data-integrity.js';
+import { resolveMorphologyLemma } from './morphology-lemma.js';
 import { validateUbsParallelArtifact } from '../src/adapters/shared/UbsParallelPassageRepository.js';
 import {
   computeD1CorpusIdentity,
@@ -168,6 +174,10 @@ log(`  Inserted ${strongsCount} Strong's entries`);
 
 log('Loading STEPBible morphology...');
 const stepbibleDir = join(DATA, 'biblical-languages', 'stepbible');
+const hebrewLexicon = JSON.parse(sourceRegistry.read(
+  'data/biblical-languages/stepbible-lexicons/tbesh-hebrew.json',
+  'utf-8',
+)) as Record<string, { lemma?: unknown }>;
 const insertMorph = db.prepare(
   'INSERT OR IGNORE INTO morphology (book, chapter, verse, position, word_text, lemma, strongs_number, morph_code, gloss) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
 );
@@ -203,7 +213,7 @@ const morphTx = db.transaction(() => {
               parseInt(v, 10),
               w.position,
               w.text,
-              w.lemma || '',
+              resolveMorphologyLemma(w.lemma, w.strong, json.testament, hebrewLexicon),
               w.strong || null,
               w.morph || null,
               w.gloss || null,
@@ -221,6 +231,7 @@ const morphTx = db.transaction(() => {
 const morphCount = morphTx();
 log(`  Inserted ${morphCount} morphology words`);
 assertJohnOneOneDatabase(db);
+assertGenesisOneOneDatabase(db);
 
 // ── Tier 2: Morphology codes ──
 
@@ -275,6 +286,7 @@ const lexiconTx = db.transaction(() => {
 
 const lexiconCount = lexiconTx();
 log(`  Inserted ${lexiconCount} lexicon entries`);
+assertHebrewLemmaCoverageDatabase(db);
 
 // ── Tier 3: Historical documents ──
 
