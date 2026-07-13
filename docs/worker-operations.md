@@ -59,6 +59,29 @@ bound to preview. Retain both earlier candidates during the verification window,
 but do not describe either as ready for this head without its own matched
 compatibility proof. Do not delete any retained database as part of deployment.
 
+### Prepared PR #27 preview replacement
+
+On 2026-07-13, `theologai-preview-20260713-c` was created as a fresh,
+unrestricted `ENAM` database for PR #27. The previously deployed
+`theologai-preview-20260712-b` database was not modified and remains the rollback
+database until the protected preview deployment and audit are complete.
+
+The replacement was migrated through `0002_ubs_parallel_passages` and populated
+from all 30 files in `seed-manifest.json` order, beginning with the empty-target
+guard. Wrangler reports no pending migrations. The strict read-only remote gate
+returned `ready` with 859,596 exact manifest rows, scoped D1 materialization
+identity
+`652245709aaed181345b0cf17f0091471ac3a3e323f6ae84cfd73a5d8b409c51`,
+all 255 reviewed D1 Unicode correction cells, no Unicode replacement characters,
+the required UBS provenance and indexes, `quick_check = ok`, and zero foreign-key
+violations.
+
+The reviewable preview binding now selects this prepared replacement. That
+configuration change is not evidence of a deployed binding: the protected
+GitHub preview workflow must re-read PR authorization, rerun the readiness gate,
+and deploy the exact approved commit before the table above can be updated.
+Production configuration and data are unchanged.
+
 ### Hebrew-lemma materialization follow-up
 
 The active `theologai-preview-20260712-b` database includes deterministic
