@@ -296,6 +296,21 @@ migrated and fully seeded database and run the complete readiness gate; never
 advance an older database to the new identity by updating only
 `theologai_metadata`.
 
+### Original-language usage foundation (transform 5)
+
+Migration `0003_original_language_usage.sql` adds the canonical occurrence
+order and deterministic Strong's usage, book, and exact surface-token variant
+aggregates. This is another full data materialization: prepare a fresh database
+rather than applying the migration to a populated transform-4 database. The
+schema, semantics, exact counts and identity, keyset behavior, verification
+contract, and measured storage/import impact are recorded in
+[`ORIGINAL-LANGUAGE-USAGE-FOUNDATION.md`](ORIGINAL-LANGUAGE-USAGE-FOUNDATION.md).
+
+The aggregate “form” dimension is exact source `word_text`; it deliberately
+does not remove punctuation, accents, breathing marks, or cantillation. Public
+output must preserve that caveat or introduce a separately reviewed linguistic
+normalization layer.
+
 Cloudflare's import guidance and tracked migration behavior are documented at:
 
 - <https://developers.cloudflare.com/d1/best-practices/import-export-data/>

@@ -8,6 +8,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { genesisOneOneLemmaReadinessPredicate, johnOneOneReadinessPredicate } from './data-integrity.js';
 import { computeD1CorpusIdentity, parseDataManifest, verifyD1Migrations } from './d1-corpus-identity.js';
 import { UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY, UBS_PARALLEL_PASSAGE_PROVENANCE } from '../src/kernel/ubsParallelSource.js';
+import { CANONICAL_BOOK_ORDER_SQL } from '../src/adapters/shared/repositoryUtils.js';
 import type {
   BiblicalLanguageUnicodeCorrectionLedger,
   MorphologyUnicodeCorrection,
@@ -28,7 +29,10 @@ export const REQUIRED_COLUMNS: Readonly<Record<string, readonly string[]>> = {
   cross_references: ['from_verse', 'to_verse', 'votes'],
   strongs: ['strongs_number', 'testament', 'lemma', 'transliteration', 'pronunciation', 'definition', 'derivation'],
   strongs_fts: ['strongs_number', 'lemma', 'transliteration', 'definition'],
-  morphology: ['book', 'chapter', 'verse', 'position', 'word_text', 'lemma', 'strongs_number', 'morph_code', 'gloss'],
+  morphology: ['book', 'chapter', 'verse', 'position', 'word_text', 'lemma', 'strongs_number', 'morph_code', 'gloss', 'book_order'],
+  strongs_usage_stats: ['strongs_key', 'token_count', 'verse_count', 'book_count', 'form_count'],
+  strongs_book_stats: ['strongs_key', 'book', 'book_order', 'token_count', 'verse_count'],
+  strongs_form_stats: ['strongs_key', 'form_text', 'token_count', 'verse_count', 'first_book', 'first_book_order', 'first_chapter', 'first_verse', 'first_position'],
   stepbible_lexicons: ['strongs_number', 'source', 'extended_data'],
   documents: ['id', 'title', 'type', 'date', 'metadata'],
   document_sections: ['id', 'document_id', 'section_number', 'title', 'content', 'topics'],
@@ -107,6 +111,9 @@ export function buildD1ReadinessSql(
     'idx_xref_votes',
     'idx_morph_verse',
     'idx_morph_strongs',
+    'idx_morph_strongs_canonical',
+    'idx_strongs_book_stats_order',
+    'idx_strongs_form_stats_rank',
     'idx_ubs_groups_source_order',
     'idx_ubs_segments_lookup',
   ];
@@ -152,6 +159,30 @@ export function buildD1ReadinessSql(
     ];
   });
   const morphologyUnicodeContract = buildMorphologyUnicodeReadinessContract(UNICODE_CORRECTION.morphology);
+  const usageFoundationCtes = `usage_expected(strongs_key,token_count,verse_count,book_count) AS (
+    SELECT strongs_number, COUNT(*), COUNT(DISTINCT printf('%d:%d:%d', book_order, chapter, verse)), COUNT(DISTINCT book_order)
+    FROM morphology WHERE strongs_number IS NOT NULL AND strongs_number != '' GROUP BY strongs_number
+  ), book_usage_expected(strongs_key,book,book_order,token_count,verse_count) AS (
+    SELECT strongs_number, book, book_order, COUNT(*), COUNT(DISTINCT printf('%d:%d:%d', book_order, chapter, verse))
+    FROM morphology WHERE strongs_number IS NOT NULL AND strongs_number != '' GROUP BY strongs_number, book, book_order
+  ), form_usage_expected(strongs_key,form_text,token_count,verse_count,first_key) AS (
+    SELECT strongs_number, word_text, COUNT(*), COUNT(DISTINCT printf('%d:%d:%d', book_order, chapter, verse)),
+           MIN(printf('%02d:%05d:%05d:%05d', book_order, chapter, verse, position))
+    FROM morphology WHERE strongs_number IS NOT NULL AND strongs_number != '' GROUP BY strongs_number, word_text
+  ), form_counts_expected(strongs_key,form_count) AS (
+    SELECT strongs_key, COUNT(*) FROM form_usage_expected GROUP BY strongs_key
+  )`;
+  const usageFoundationChecks = [
+    `(SELECT COUNT(*) FROM morphology WHERE book_order NOT BETWEEN 1 AND 66) = 0`,
+    `(SELECT COUNT(*) FROM morphology WHERE book_order != ${CANONICAL_BOOK_ORDER_SQL}) = 0`,
+    `(SELECT COUNT(*) FROM (SELECT expected.strongs_key, expected.token_count, expected.verse_count, expected.book_count, forms.form_count FROM usage_expected expected JOIN form_counts_expected forms USING (strongs_key) EXCEPT SELECT strongs_key, token_count, verse_count, book_count, form_count FROM strongs_usage_stats)) = 0`,
+    `(SELECT COUNT(*) FROM (SELECT strongs_key, token_count, verse_count, book_count, form_count FROM strongs_usage_stats EXCEPT SELECT expected.strongs_key, expected.token_count, expected.verse_count, expected.book_count, forms.form_count FROM usage_expected expected JOIN form_counts_expected forms USING (strongs_key))) = 0`,
+    `(SELECT COUNT(*) FROM (SELECT * FROM book_usage_expected EXCEPT SELECT strongs_key, book, book_order, token_count, verse_count FROM strongs_book_stats)) = 0`,
+    `(SELECT COUNT(*) FROM (SELECT strongs_key, book, book_order, token_count, verse_count FROM strongs_book_stats EXCEPT SELECT * FROM book_usage_expected)) = 0`,
+    `(SELECT COUNT(*) FROM (SELECT strongs_key, form_text, token_count, verse_count, first_key FROM form_usage_expected EXCEPT SELECT strongs_key, form_text, token_count, verse_count, printf('%02d:%05d:%05d:%05d', first_book_order, first_chapter, first_verse, first_position) FROM strongs_form_stats)) = 0`,
+    `(SELECT COUNT(*) FROM (SELECT strongs_key, form_text, token_count, verse_count, printf('%02d:%05d:%05d:%05d', first_book_order, first_chapter, first_verse, first_position) FROM strongs_form_stats EXCEPT SELECT strongs_key, form_text, token_count, verse_count, first_key FROM form_usage_expected)) = 0`,
+    `(SELECT COUNT(*) FROM strongs_form_stats form WHERE NOT EXISTS (SELECT 1 FROM morphology token WHERE token.strongs_number = form.strongs_key AND token.word_text = form.form_text AND token.book = form.first_book AND token.book_order = form.first_book_order AND token.chapter = form.first_chapter AND token.verse = form.first_verse AND token.position = form.first_position)) = 0`,
+  ];
   const unicodeAbsenceChecks = [
     ['strongs', ['strongs_number', 'testament', 'lemma', 'transliteration', 'pronunciation', 'definition', 'derivation']],
     ['strongs_fts', ['strongs_number', 'lemma', 'transliteration', 'definition']],
@@ -162,8 +193,8 @@ export function buildD1ReadinessSql(
   });
 
   return [
-    `WITH ${morphologyUnicodeContract.cte}`,
-    `SELECT CASE WHEN ${[integrityCheck, foreignKeyCheck, ...identityChecks, ...columnChecks, ...countChecks, indexCheck, ...ubsSemanticChecks, ...strongsSemanticChecks, ...morphologyUnicodeContract.checks, ...unicodeAbsenceChecks, johnOneOneReadinessPredicate(), genesisOneOneLemmaReadinessPredicate()].join(' AND ')}`,
+    `WITH ${morphologyUnicodeContract.cte},\n${usageFoundationCtes}`,
+    `SELECT CASE WHEN ${[integrityCheck, foreignKeyCheck, ...identityChecks, ...columnChecks, ...countChecks, indexCheck, ...ubsSemanticChecks, ...strongsSemanticChecks, ...morphologyUnicodeContract.checks, ...usageFoundationChecks, ...unicodeAbsenceChecks, johnOneOneReadinessPredicate(), genesisOneOneLemmaReadinessPredicate()].join(' AND ')}`,
     `THEN 'ready' ELSE json_extract('D1 readiness check failed', '$') END AS readiness;`,
   ].join('\n');
 }

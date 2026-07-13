@@ -42,7 +42,7 @@ if (!existsSync(databasePath)) throw new Error(`Database not found: ${databasePa
 const manifest = parseDataManifest(readFileSync(MANIFEST_PATH));
 verifyD1Migrations(ROOT, manifest);
 const expectedTables = Object.keys(manifest.expectedCounts).sort();
-  const expectedIndexes = ['idx_morph_strongs', 'idx_morph_verse', 'idx_ubs_groups_source_order', 'idx_ubs_segments_lookup', 'idx_xref_from', 'idx_xref_votes'];
+  const expectedIndexes = ['idx_morph_strongs', 'idx_morph_strongs_canonical', 'idx_morph_verse', 'idx_strongs_book_stats_order', 'idx_strongs_form_stats_rank', 'idx_ubs_groups_source_order', 'idx_ubs_segments_lookup', 'idx_xref_from', 'idx_xref_votes'];
 const db = new Database(databasePath, { readonly: true, fileMustExist: true });
 
 try {
@@ -112,6 +112,36 @@ try {
   ] as const;
   for (const [query, label] of representativeQueries) {
     if (!db.prepare(query).get()) throw new Error(`Representative record is missing: ${label}`);
+  }
+
+  const queryPlans = [
+    {
+      label: 'canonical token occurrence page',
+      sql: `SELECT book, book_order, chapter, verse, position FROM morphology
+            WHERE strongs_number = 'G0025'
+            ORDER BY book_order, chapter, verse, position LIMIT 101`,
+      index: 'idx_morph_strongs_canonical',
+    },
+    {
+      label: 'canonical per-book usage',
+      sql: `SELECT book, book_order, token_count, verse_count FROM strongs_book_stats
+            WHERE strongs_key = 'G0025' ORDER BY book_order`,
+      index: 'idx_strongs_book_stats_order',
+    },
+    {
+      label: 'ranked attested forms',
+      sql: `SELECT form_text, token_count, verse_count FROM strongs_form_stats
+            WHERE strongs_key = 'G0025'
+            ORDER BY token_count DESC, verse_count DESC, form_text LIMIT 100`,
+      index: 'idx_strongs_form_stats_rank',
+    },
+  ] as const;
+  for (const plan of queryPlans) {
+    const details = (db.prepare(`EXPLAIN QUERY PLAN ${plan.sql}`).all() as Array<{ detail: string }>)
+      .map(row => row.detail).join('\n');
+    if (!details.includes(plan.index) || details.includes('USE TEMP B-TREE')) {
+      throw new Error(`${plan.label} does not use ${plan.index} without a temporary sort: ${details}`);
+    }
   }
 } finally {
   db.close();

@@ -1,4 +1,6 @@
-import { readFileSync } from 'node:fs';
+import { copyFileSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
 import {
@@ -38,6 +40,14 @@ describe('remote D1 readiness query', () => {
     expect(sql).toContain('MAX(segment_order)');
     expect(sql).toContain("alignment_raw GLOB '*[^0-8]*'");
     expect(sql).toContain("language_marker = 'GRK' AND alignment_basis != 'UBSGNT5'");
+    expect(sql).toContain('usage_expected(strongs_key,token_count,verse_count,book_count) AS');
+    expect(sql).toContain('book_usage_expected(strongs_key,book,book_order,token_count,verse_count) AS');
+    expect(sql).toContain('form_usage_expected(strongs_key,form_text,token_count,verse_count,first_key) AS');
+    expect(sql).toContain('FROM usage_expected expected JOIN form_counts_expected forms');
+    expect(sql).toContain('FROM book_usage_expected EXCEPT SELECT strongs_key');
+    expect(sql).toContain('FROM form_usage_expected EXCEPT SELECT strongs_key');
+    expect(sql).not.toContain('FROM strongs_usage_stats usage WHERE usage.token_count != (SELECT COUNT(*) FROM morphology');
+    expect(sql).not.toContain('FROM strongs_form_stats form WHERE form.token_count != (SELECT COUNT(*) FROM morphology');
     expect(sql).not.toMatch(/\b(?:INSERT|UPDATE|DELETE|DROP|ALTER)\b/);
   });
 
@@ -45,6 +55,39 @@ describe('remote D1 readiness query', () => {
     expect(() => buildD1ReadinessSql({ 'documents; DROP TABLE documents': 17 }))
       .toThrow('Invalid expected D1 count');
   });
+
+  it('fails when set-based usage totals or first-occurrence evidence drift', () => {
+    const root = mkdtempSync(join(tmpdir(), 'theologai-readiness-mutation-'));
+    const databasePath = join(root, 'theologai.db');
+    copyFileSync('data/theologai.db', databasePath);
+    const manifest = JSON.parse(readFileSync('data/data-manifest.json', 'utf8')) as {
+      expectedCounts: Record<string, number>;
+    };
+    const sql = buildD1ReadinessSql(manifest.expectedCounts);
+    const db = new Database(databasePath);
+    const assertReady = () => expect(db.prepare(sql).get()).toEqual({ readiness: 'ready' });
+    const assertRejected = () => expect(() => db.prepare(sql).get()).toThrow();
+    try {
+      assertReady();
+      const usage = db.prepare('SELECT strongs_key, token_count FROM strongs_usage_stats ORDER BY strongs_key LIMIT 1')
+        .get() as { strongs_key: string; token_count: number };
+      db.prepare('UPDATE strongs_usage_stats SET token_count = ? WHERE strongs_key = ?')
+        .run(usage.token_count + 1, usage.strongs_key);
+      assertRejected();
+      db.prepare('UPDATE strongs_usage_stats SET token_count = ? WHERE strongs_key = ?')
+        .run(usage.token_count, usage.strongs_key);
+      assertReady();
+
+      const form = db.prepare('SELECT strongs_key, form_text, first_book FROM strongs_form_stats ORDER BY strongs_key, form_text LIMIT 1')
+        .get() as { strongs_key: string; form_text: string; first_book: string };
+      db.prepare('UPDATE strongs_form_stats SET first_book = ? WHERE strongs_key = ? AND form_text = ?')
+        .run(form.first_book === 'Genesis' ? 'Exodus' : 'Genesis', form.strongs_key, form.form_text);
+      assertRejected();
+    } finally {
+      db.close();
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 30_000);
 
   it('requires every one of the 237 reviewed morphology values by exact locator', () => {
     const ledger = JSON.parse(readFileSync(

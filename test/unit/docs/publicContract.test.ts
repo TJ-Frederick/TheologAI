@@ -103,6 +103,8 @@ describe('published project contract', () => {
     // registry drift in the published contract.
     const nodeDatabase = new Database(':memory:');
     nodeDatabase.exec(await readProjectFile('migrations/0001_initial_schema.sql'));
+    nodeDatabase.exec(await readProjectFile('migrations/0002_ubs_parallel_passages.sql'));
+    nodeDatabase.exec(await readProjectFile('migrations/0003_original_language_usage.sql'));
     const nodeTools = createCompositionRoot({ database: nodeDatabase }).tools;
     nodeDatabase.close();
     const workerTools = createWorkerCompositionRoot({
