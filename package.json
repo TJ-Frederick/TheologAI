@@ -75,7 +75,8 @@
     "agents": "0.17.3",
     "better-sqlite3": "^12.6.2",
     "dotenv": "^17.2.3",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "zod": "4.3.6"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.18.4",

@@ -64,9 +64,14 @@ describe('CommentaryService', () => {
       };
       (henryAdapter.getCommentary as ReturnType<typeof vi.fn>).mockResolvedValue(providerResult);
       const result = await service.lookup({ reference: 'John 3:16', maxLength: 100 });
-      expect(result.text).toHaveLength(103); // 100 + '...'
-      expect(result.text.endsWith('...')).toBe(true);
+      expect(Array.from(result.text)).toHaveLength(100);
+      expect(result.text.endsWith('…')).toBe(true);
       expect(providerResult.text).toHaveLength(500);
+    });
+
+    it('keeps a one-character content budget truthful', async () => {
+      const result = await service.lookup({ reference: 'John 3:16', maxLength: 1 });
+      expect(result.text).toBe('…');
     });
 
     it('does not truncate when text is shorter than maxLength', async () => {

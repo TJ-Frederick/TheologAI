@@ -1,5 +1,7 @@
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { GetPromptRequestSchema, ListPromptsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import { z } from 'zod/v4';
+import { parseReference } from '../kernel/reference.js';
 import { validatePromptArguments } from './validation.js';
 
 export interface RecommendedToolCall {
@@ -9,9 +11,30 @@ export interface RecommendedToolCall {
 
 const TRANSLATIONS = new Set(['ESV', 'NET', 'KJV', 'WEB', 'BSB', 'ASV', 'YLT', 'DBY']);
 
+/**
+ * The upstream SDK's strict string record throws an unclassified ZodError before
+ * our handler can return MCP InvalidParams. Accept unknown values at the wire
+ * boundary, then classify them explicitly with validatePromptArguments.
+ */
+const ClassifiedGetPromptRequestSchema = GetPromptRequestSchema.extend({
+  params: GetPromptRequestSchema.shape.params.extend({
+    name: z.unknown(),
+    arguments: z.unknown().optional(),
+  }),
+});
+
 function translation(value: string | undefined): string {
   const normalized = value?.trim().toUpperCase();
   return normalized && TRANSLATIONS.has(normalized) ? normalized : 'ESV';
+}
+
+function isSingleVerseReference(value: string): boolean {
+  try {
+    const reference = parseReference(value);
+    return reference.startVerse != null && reference.endVerse == null;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -40,11 +63,12 @@ export function recommendedToolCallsForPrompt(
     }
     case 'passage-exegesis': {
       const reference = args?.reference ?? '';
+      const singleVerse = isSingleVerseReference(reference);
       return [
         { tool: 'bible_lookup', arguments: { reference, translation: translation(args?.translation), includeFootnotes: true } },
         { tool: 'bible_lookup', arguments: { reference, translation: 'KJV' } },
-        ...(!/[-–—]/.test(reference) ? [{ tool: 'bible_verse_morphology', arguments: { reference, expand_morphology: true } }] : []),
-        { tool: 'bible_cross_references', arguments: { reference } },
+        ...(singleVerse ? [{ tool: 'bible_verse_morphology', arguments: { reference, expand_morphology: true } }] : []),
+        ...(singleVerse ? [{ tool: 'bible_cross_references', arguments: { reference } }] : []),
         { tool: 'parallel_passages', arguments: { reference, corpora: ['ubs_source_attested'], maxGroups: 5 } },
         { tool: 'commentary_lookup', arguments: { reference, commentator: 'Matthew Henry' } },
         { tool: 'commentary_lookup', arguments: { reference, commentator: 'John Gill' } },
@@ -122,9 +146,11 @@ export function registerPromptHandlers(server: Server): void {
     ],
   }));
 
-  server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+  server.setRequestHandler(ClassifiedGetPromptRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
     validatePromptArguments(name, args);
+    // validatePromptArguments narrows both values after the permissive wire boundary.
+    if (typeof name !== 'string') throw new Error('Unreachable prompt-name validation state');
     const calls = recommendedToolCallsForPrompt(name, args);
 
     let text: string;
@@ -154,12 +180,13 @@ export function registerPromptHandlers(server: Server): void {
       case 'passage-exegesis': {
         const reference = args?.reference ?? '';
         const morphologyCall = calls.find(call => call.tool === 'bible_verse_morphology');
+        const crossReferenceCall = calls.find(call => call.tool === 'bible_cross_references');
         text = `Perform a systematic exegesis of ${reference}.
 
 1. **Read the text** — ${callText(calls[0])}; compare with ${callText(calls[1])}. Prefer structured \`passages[]\` and retain each translation's \`provenanceIds\`; distinguish an unavailable translation in \`failures[]\` from a translation whose text is absent.
 2. **Trace the passage before selecting terms** — Explain literary and discourse flow first. ${morphologyCall ? `For this single verse, ${callText(morphologyCall)}.` : 'This is a range: select at most three key individual verses and call `bible_verse_morphology` separately for each; never pass the range to a single-verse tool.'}
 3. **Study only consequential terms** — For a term affecting a real translation or interpretive question, call \`original_language_study\` with one exact verse and the verse-local target. Resolve ambiguity by source position rather than guessing.
-4. **Explore connections** — Use \`bible_cross_references\` and \`parallel_passages\` for ${reference}.
+4. **Explore connections without conflating sources** — Use \`parallel_passages\` with \`corpora: ["ubs_source_attested"]\` for complete UBS source-attested groups. Preserve group membership and source order; because the source labels directionality unspecified, do not infer quotation, dependence, synoptic direction, or a thematic relationship. ${crossReferenceCall ? `${callText(crossReferenceCall)} separately for broader OpenBible.info discovery.` : 'This is not one exact verse: select at most three consequential individual verses and call `bible_cross_references` separately for each; never pass a chapter or range.'} Treat those community-ranked links as thematic leads, not UBS-attested parallels or evidence that one passage quotes another, and retain their separate attribution.
 5. **Consult commentaries and historical theology** — Use \`commentary_lookup\` and \`classic_text_lookup\`; note agreement and divergence.
 6. **Synthesize distinctly** — Separate observation, lexical evidence, interpretation, theological synthesis, and application. Context controls sense; never derive contextual meaning from a gloss, Strong's identifier, morphology, root, etymology, frequency, or every possible lexicon sense.`;
         break;

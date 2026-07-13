@@ -42,6 +42,29 @@ describe('CrossReferenceService', () => {
     expect(result).toBe(true);
   });
 
+  it.each([
+    ['unknown book', 'NotABook 1:1', 'Unknown Bible book'],
+    ['out-of-range chapter', 'John 99:1', 'Chapter 99 is out of range'],
+    ['out-of-range verse', 'John 3:99', 'Verse 99 is out of range'],
+    ['chapter', 'John 3', 'requires exactly one Bible verse'],
+    ['range', 'John 3:16-17', 'requires exactly one Bible verse'],
+  ])('rejects %s input before querying the repository', async (_case, reference, message) => {
+    const repo = makeMockRepo();
+    const service = new CrossReferenceService(repo as any);
+
+    await expect(service.getCrossReferences(reference)).rejects.toThrow(message);
+    expect(repo.getCrossReferences).not.toHaveBeenCalled();
+  });
+
+  it('canonicalizes accepted aliases before repository lookup', async () => {
+    const repo = makeMockRepo();
+    const service = new CrossReferenceService(repo as any);
+
+    await service.getCrossReferences('Jn 3.16');
+
+    expect(repo.getCrossReferences).toHaveBeenCalledWith('John 3:16', undefined);
+  });
+
   it('delegates getChapterStatistics to repository', async () => {
     const repo = makeMockRepo();
     const service = new CrossReferenceService(repo as any);

@@ -55,6 +55,27 @@ describe('prompt-recommended tool-call contracts', () => {
   it('never recommends a range to the single-verse morphology tool', () => {
     const calls = recommendedToolCallsForPrompt('passage-exegesis', { reference: 'Romans 8:28-30' });
     expect(calls.some(call => call.tool === 'bible_verse_morphology')).toBe(false);
+    expect(calls.some(call => call.tool === 'bible_cross_references')).toBe(false);
+  });
+
+  it('never recommends a chapter to verse-only morphology or cross-reference tools', () => {
+    const calls = recommendedToolCallsForPrompt('passage-exegesis', { reference: 'John 3' });
+    expect(calls.some(call => call.tool === 'bible_verse_morphology')).toBe(false);
+    expect(calls.some(call => call.tool === 'bible_cross_references')).toBe(false);
+  });
+
+  it('keeps UBS groups and OpenBible discovery in separate passage-exegesis calls', () => {
+    const calls = recommendedToolCallsForPrompt('passage-exegesis', { reference: 'John 3:16' });
+    expect(calls).toContainEqual({
+      tool: 'parallel_passages',
+      arguments: { reference: 'John 3:16', corpora: ['ubs_source_attested'], maxGroups: 5 },
+    });
+    expect(calls).toContainEqual({
+      tool: 'bible_cross_references',
+      arguments: { reference: 'John 3:16' },
+    });
+    expect(calls.find(call => call.tool === 'parallel_passages')?.arguments)
+      .not.toHaveProperty('includeOpenBibleCrossReferences');
   });
 
   it('uses morphology to resolve a contextual word before a dynamic study call', () => {

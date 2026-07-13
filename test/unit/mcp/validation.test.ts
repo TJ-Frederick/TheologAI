@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatValidationError, validatorFor } from '../../../src/mcp/validation.js';
+import { formatValidationError, validatePromptArguments, validatorFor } from '../../../src/mcp/validation.js';
 import { createBibleLookupHandler } from '../../../src/tools/v2/bibleLookup.js';
 import { createClassicTextsHandler } from '../../../src/tools/v2/classicTexts.js';
 import { createCommentaryHandler } from '../../../src/tools/v2/commentary.js';
@@ -15,6 +15,30 @@ import { originalLanguageOutputSchema } from '../../../src/mcp/schemas/originalL
 const unused = {} as never;
 
 describe('Worker-safe JSON Schema validation', () => {
+  it.each([
+    ['reference', 316],
+    ['translation', ['NET']],
+    ['word', { value: 'love' }],
+  ])('classifies a non-string prompt %s as InvalidParams', (argument, value) => {
+    expect(() => validatePromptArguments(
+      argument === 'word' ? 'word-study' : 'passage-exegesis',
+      { [argument]: value, ...(argument === 'translation' ? { reference: 'John 3:16' } : {}) },
+    )).toThrow(expect.objectContaining({
+      code: -32602,
+      message: expect.stringContaining(`Argument "${argument}"`),
+    }));
+  });
+
+  it.each([
+    [316, undefined, 'Prompt name must be a string'],
+    ['passage-exegesis', [], 'must be an object'],
+    ['passage-exegesis', null, 'must be an object'],
+  ])('classifies an invalid prompt request boundary as InvalidParams', (name, args, message) => {
+    expect(() => validatePromptArguments(name, args)).toThrow(expect.objectContaining({
+      code: -32602,
+      message: expect.stringContaining(message),
+    }));
+  });
   it('validates the two advertised output schemas with the same Worker-safe validator', () => {
     const bible = validatorFor(bibleLookupOutputSchema);
     const language = validatorFor(originalLanguageOutputSchema);

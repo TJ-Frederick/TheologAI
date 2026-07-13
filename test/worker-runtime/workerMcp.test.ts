@@ -265,6 +265,23 @@ describe('Worker MCP endpoint in workerd', () => {
     });
   });
 
+  it('rejects invalid and non-verse cross-reference inputs before D1 lookup', async () => {
+    for (const [id, reference, expected] of [
+      [501, 'John 99:1', 'Chapter 99 is out of range'],
+      [502, 'John 3', 'requires exactly one Bible verse'],
+      [503, 'John 3:16-17', 'requires exactly one Bible verse'],
+    ] as const) {
+      const result = await rpc('tools/call', {
+        name: 'bible_cross_references',
+        arguments: { reference },
+      }, id);
+      expect(result.response.status).toBe(200);
+      expect(result.message.error).toBeUndefined();
+      expect(result.message.result).toMatchObject({ isError: true });
+      expect(textContent(result.message)).toContain(expected);
+    }
+  });
+
   it('serves the curated synoptic and quotation groups through the Worker endpoint', async () => {
     const synoptic = await rpc('tools/call', {
       name: 'parallel_passages',
@@ -456,6 +473,29 @@ describe('Worker MCP endpoint in workerd', () => {
         }),
       }),
     ]);
+    expect(JSON.stringify(rendered.message.result?.messages)).toContain(
+      'do not infer quotation, dependence, synoptic direction, or a thematic relationship',
+    );
+
+    const wrongType = await rpc('prompts/get', {
+      name: 'passage-exegesis',
+      arguments: { reference: 316 },
+    }, 504);
+    expect(wrongType.response.status).toBe(200);
+    expect(wrongType.message.result).toBeUndefined();
+    expect(wrongType.message.error).toMatchObject({
+      code: -32602,
+      message: expect.stringContaining('Argument "reference" for prompt "passage-exegesis" must be a string'),
+    });
+
+    const wrongArgumentsContainer = await rpc('prompts/get', {
+      name: 'passage-exegesis',
+      arguments: [],
+    }, 505);
+    expect(wrongArgumentsContainer.message.error).toMatchObject({
+      code: -32602,
+      message: expect.stringContaining('Arguments for prompt "passage-exegesis" must be an object'),
+    });
   });
 
   it('returns tool execution errors for arguments that violate the advertised schema', async () => {

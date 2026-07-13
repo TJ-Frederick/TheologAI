@@ -406,6 +406,21 @@ describe('commentary_lookup handler', () => {
     expect(textOf(result)).toContain('Commentary body');
   });
 
+  it('applies maxLength to the complete formatted Markdown response', async () => {
+    const lookup = vi.fn<CommentaryService['lookup']>().mockResolvedValue({
+      reference: 'John 1:1',
+      commentator: 'John Gill',
+      text: '𐐷'.repeat(500),
+      citation,
+    });
+    const handler = createCommentaryHandler(serviceDouble({ lookup }));
+
+    const result = await handler.handler({ reference: 'John 1:1', maxLength: 64 });
+
+    expect(Array.from(textOf(result))).toHaveLength(64);
+    expect(textOf(result).endsWith('…')).toBe(true);
+  });
+
   it('returns service failures as tool errors', async () => {
     const lookup = vi.fn<CommentaryService['lookup']>().mockRejectedValue(new Error('failure'));
     const handler = createCommentaryHandler(serviceDouble({ lookup }));

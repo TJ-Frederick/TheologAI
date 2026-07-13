@@ -20,7 +20,7 @@ export function createCommentaryHandler(service: CommentaryService): ToolHandler
           enum: ['Matthew Henry', 'Jamieson-Fausset-Brown', 'Adam Clarke', 'John Gill', 'Keil-Delitzsch', 'Tyndale'],
           default: 'Matthew Henry',
         },
-        maxLength: { type: 'integer', minimum: 1, maximum: 100000, description: 'Max response length in characters' },
+        maxLength: { type: 'integer', minimum: 1, maximum: 100000, description: 'Maximum total formatted Markdown response length in Unicode characters. Very small limits can omit citation text.' },
       },
       required: ['reference'],
       additionalProperties: false,
@@ -34,7 +34,12 @@ export function createCommentaryHandler(service: CommentaryService): ToolHandler
           commentator: params.commentator as string,
           maxLength: params.maxLength as number,
         });
-        return { content: [{ type: 'text', text: formatCommentaryResponse(result) }] };
+        return {
+          content: [{
+            type: 'text',
+            text: formatCommentaryResponse(result, params.maxLength as number | undefined),
+          }],
+        };
       } catch (error) {
         return handleToolError(error as Error);
       }

@@ -44,4 +44,10 @@ describe('formatCommentaryResponse', () => {
     const out = formatCommentaryResponse(makeResult());
     expect(out).toBe(out.trim());
   });
+
+  it.each([1, 10, 100])('bounds the complete formatted response to %i Unicode characters', maxLength => {
+    const out = formatCommentaryResponse(makeResult({ text: '𐐷'.repeat(500) }), maxLength);
+    expect(Array.from(out).length).toBeLessThanOrEqual(maxLength);
+    expect(out.endsWith('…')).toBe(true);
+  });
 });

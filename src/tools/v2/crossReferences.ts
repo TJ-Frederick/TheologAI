@@ -14,7 +14,7 @@ export function createCrossReferencesHandler(crossRefService: CrossReferenceServ
     inputSchema: {
       type: 'object',
       properties: {
-        reference: { type: 'string', minLength: 1, maxLength: 100, description: 'Bible verse reference (e.g., "John 3:16")' },
+        reference: { type: 'string', minLength: 1, maxLength: 100, description: 'Exactly one Bible verse (e.g., "John 3:16"); chapters and verse ranges are not supported.' },
         maxResults: { type: 'integer', minimum: 1, maximum: 100, default: 5, description: 'Max cross-references to return (default 5)' },
         minVotes: { type: 'integer', minimum: 0, maximum: 1000000, default: 0, description: 'Minimum community votes threshold' },
       },

@@ -539,6 +539,23 @@ describe('shared MCP registration', () => {
     expect(passageExegesis.messages[0].content).toEqual(expect.objectContaining({
       text: expect.stringContaining('distinguish an unavailable translation'),
     }));
+    expect(passageExegesis.messages[0].content).toEqual(expect.objectContaining({
+      text: expect.stringContaining('do not infer quotation, dependence, synoptic direction, or a thematic relationship'),
+    }));
+    expect(passageExegesis.messages[0].content).toEqual(expect.objectContaining({
+      text: expect.stringContaining('community-ranked links as thematic leads, not UBS-attested parallels'),
+    }));
+
+    const rangeExegesis = await client.getPrompt({
+      name: 'passage-exegesis',
+      arguments: { reference: 'Romans 8:28-30' },
+    });
+    expect(rangeExegesis.messages[0].content).toEqual(expect.objectContaining({
+      text: expect.stringContaining('never pass a chapter or range'),
+    }));
+    expect(String(rangeExegesis.messages[0].content)).not.toContain(
+      '`bible_cross_references` with `{"reference":"Romans 8:28-30"}`',
+    );
 
     const compareTranslations = await client.getPrompt({
       name: 'compare-translations',
@@ -575,6 +592,20 @@ describe('shared MCP registration', () => {
     await expect(client.getPrompt({ name: 'word-study', arguments: { word: 'a' } })).rejects.toMatchObject({
       code: -32602,
       message: expect.stringContaining('between 2 and 100 characters'),
+    });
+    await expect(client.getPrompt({
+      name: 'passage-exegesis',
+      arguments: { reference: 316 } as never,
+    })).rejects.toMatchObject({
+      code: -32602,
+      message: expect.stringContaining('Argument "reference" for prompt "passage-exegesis" must be a string'),
+    });
+    await expect(client.getPrompt({
+      name: 'passage-exegesis',
+      arguments: [] as never,
+    })).rejects.toMatchObject({
+      code: -32602,
+      message: expect.stringContaining('Arguments for prompt "passage-exegesis" must be an object'),
     });
   });
 
