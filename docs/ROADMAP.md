@@ -111,7 +111,10 @@ deployment gates before it can be called shipped.
   repository foundation is stacked on PR #27 and is published as a draft PR,
   but remains unmerged, undeployed, and unreleased. It does not yet change the
   public MCP behavior. It must be rebased or retargeted after PR #27 lands, then
-  receive fresh CI and review.
+  receive fresh CI and review. It should remain a reviewed foundation rather
+  than merge independently: every `main` push starts the production workflow,
+  and the current production D1 intentionally cannot satisfy its transform-5
+  readiness contract.
 - **Original-language usage output.** The public occurrence-count, attested-form,
   book-distribution, and keyset-pagination slice exists only as a local commit.
   It has not been pushed, opened as a PR, deployed, or released.
@@ -153,16 +156,18 @@ Code readiness and operational readiness are deliberately separate:
   accepted; prepare and promote production data only with explicit owner
   authorization.
 - After PR #27 lands, rebase or retarget draft PR #29 to `main`, rerun CI and
-  review, and land the invisible original-language usage foundation before its
-  public output slice.
-- Rebase the local original-language usage output onto the landed foundation,
-  then use a fresh preview D1 replacement to verify occurrence counts, book
-  distribution, attested forms, keyset pagination, legacy behavior, and stale
-  cursor rejection before release.
-- Integrate the local primary-source catalog and scope slice after the usage
-  output, preserving its authoritative per-claim provenance and advancing the
-  materialization identity deliberately; rehearse it against another fresh
-  preview database before release.
+  review, but keep the invisible foundation unmerged while its public slices
+  remain in flight.
+- Rebase the local original-language usage output onto the reviewed foundation,
+  then use a fresh transform-5 preview D1 replacement to verify occurrence
+  counts, book distribution, attested forms, keyset pagination, legacy
+  behavior, and stale cursor rejection.
+- Integrate the provenance-complete primary-source catalog and scope slice after
+  that usage rehearsal, preserving the reviewed metadata claims and advancing
+  the materialization identity deliberately. Rehearse the combined transform-6
+  candidate against another fresh preview database, then merge and promote the
+  integrated release only through its separately authorized production-data
+  and deployment gates.
 - Broaden advanced original-language study only after those foundations, using
   carefully sourced semantic-domain and discourse evidence useful to both
   beginners and readers of Greek or Hebrew.
