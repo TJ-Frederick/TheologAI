@@ -109,6 +109,7 @@ const PROMPT_ARGUMENTS = {
   'passage-exegesis': { required: ['reference'], allowed: ['reference', 'translation'] },
   'compare-translations': { required: ['reference'], allowed: ['reference', 'translations'] },
   'confession-study': { required: ['topic'], allowed: ['topic', 'traditions'] },
+  'primary-source-research': { required: ['topic'], allowed: ['topic', 'work', 'maxSections'] },
   donate: { required: [], allowed: [] },
 } as const;
 
@@ -168,5 +169,21 @@ export function validatePromptArguments(
 
   if (['passage-exegesis', 'compare-translations'].includes(name) && (stringValues.reference?.length ?? 0) > 100) {
     throw new McpError(ErrorCode.InvalidParams, `Argument "reference" for prompt "${name}" exceeds 100 characters`);
+  }
+
+  if (name === 'primary-source-research') {
+    const topicLength = Array.from(stringValues.topic.trim()).length;
+    if (topicLength < 1 || topicLength > 200) {
+      throw new McpError(ErrorCode.InvalidParams, 'Argument "topic" for prompt "primary-source-research" must be between 1 and 200 characters');
+    }
+    if (stringValues.work !== undefined) {
+      const workLength = Array.from(stringValues.work.trim()).length;
+      if (workLength < 1 || workLength > 160) {
+        throw new McpError(ErrorCode.InvalidParams, 'Argument "work" for prompt "primary-source-research" must be between 1 and 160 characters');
+      }
+    }
+    if (stringValues.maxSections !== undefined && !/^[1-5]$/.test(stringValues.maxSections.trim())) {
+      throw new McpError(ErrorCode.InvalidParams, 'Argument "maxSections" for prompt "primary-source-research" must be a string integer from 1 to 5');
+    }
   }
 }

@@ -1,10 +1,13 @@
 # UBS normalized D1 internal runtime
 
-This slice materializes the reviewed UBS/Paratext v2 generated artifact into D1
-for Worker runtime use. It is internal plumbing only: it does not change the
-`parallel_passages` tool, MCP resources, prompts, schemas, structured output,
-Markdown, defaults, or guided workflows. A later public hard-cutover requires a
-separate product contract and release review.
+> **Historical slice record.** This document describes the internal PR #19
+> foundation and its point-in-time rollout evidence. The later public hard
+> cutover shipped through PR #21 and is now the production default.
+
+This slice materialized the reviewed UBS/Paratext v2 generated artifact into D1
+for Worker runtime use. In isolation it did not change the `parallel_passages`
+public contract; PR #21 subsequently supplied and released that separately
+reviewed contract.
 
 ## Storage and identity
 
@@ -72,10 +75,13 @@ The preview dry bundle contained 404 inputs, measured 2,307,852 raw
 bytes / 427,709 gzip bytes, and its esbuild metadata contained no UBS generated
 JSON input.
 
-## Preview replacement runbook and prepared candidate
+## Historical preview replacement runbook and preparation evidence
 
-The currently deployed preview database lacks migration 0002 and the normalized
-rows, so a metadata-only marker update is invalid. When separately authorized:
+At the start of this slice, the deployed preview database lacked migration 0002
+and the normalized rows, so a metadata-only marker update was invalid. The
+authorized candidate preparation followed steps 1–5. Steps 6–7 recorded the
+intended deployment and rollback sequence but were not performed for candidate
+`theologai-preview-20260712-a`:
 
 1. Inventory the currently bound preview database and retain it for rollback.
 2. Create a uniquely named empty preview replacement in the same jurisdiction;
@@ -92,15 +98,13 @@ rows, so a metadata-only marker update is invalid. When separately authorized:
    revision. Do not weaken the readiness gate or delete either database during
    the verification window.
 
-No command in this document authorizes remote creation, migration, import,
-binding change, deployment, or deletion. Production requires its own later
-authorization and replacement plan.
+No command in this historical record independently authorizes a future remote
+creation, migration, import, binding change, deployment, or deletion.
 
 The separately authorized preparation was completed on 2026-07-12 for
 `theologai-preview-20260712-a` in the same `ENAM` location and unrestricted
 jurisdiction as the retained rollback database
 `theologai-preview-20260710-c`. Both migrations and all 29 ordered seed files
-completed, and the strict remote readiness gate returned `ready`. The local
-preview binding now names the prepared candidate for review, but no Worker was
-deployed by this preparation step. The old database remains the deployed
-preview binding and rollback target until an approved preview deployment.
+completed, and the strict remote readiness gate returned `ready`. That candidate
+was later superseded by the transform-version-3 preview database documented in
+`docs/worker-operations.md`; this paragraph is not current binding evidence.

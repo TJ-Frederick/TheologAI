@@ -163,6 +163,13 @@ describe('biblical-language source revisions', () => {
         report.rawByteDifferences[1],
       ],
     } as any, artifacts)).toThrow('unexpected raw-byte difference path');
+    expect(() => verifyReproductionArtifactInventory({
+      ...report,
+      rawByteDifferences: [
+        report.rawByteDifferences[0],
+        { ...report.rawByteDifferences[1], reproducedRawSha256: digest('substituted-raw') },
+      ],
+    } as any, artifacts)).toThrow('diagnostic reproduced raw inventory from records');
   });
 
   it('distinguishes reproducible clean builds from scoped tracked legacy attestations', () => {

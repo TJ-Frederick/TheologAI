@@ -15,7 +15,7 @@ import {
 import { NotFoundError } from '../kernel/errors.js';
 import { parseStrongsIdentity } from '../kernel/strongs.js';
 import { parseLocalDocumentResourceUri } from '../kernel/documentResource.js';
-import { LOCAL_HISTORICAL_SOURCE } from '../formatters/historicalFormatter.js';
+import { formatLocalDocumentSectionResource, LOCAL_HISTORICAL_SOURCE } from '../formatters/historicalFormatter.js';
 import type { ToolHandler } from '../kernel/types.js';
 import type { BibleService } from '../services/bible/BibleService.js';
 import type { CommentaryService } from '../services/commentary/CommentaryService.js';
@@ -179,22 +179,12 @@ export function createTheologAiMcpServer(
         if (documentResource.sectionId !== undefined) {
           if (doc.id !== documentResource.documentId) throw new NotFoundError('document', 'Exact document resource identity did not match.');
           const section = await services.historicalService.getSection(doc.id, documentResource.sectionId);
-          const heading = section.title
-            ? `## ${section.section_number ? `${section.section_number}. ` : ''}${section.title}`
-            : section.section_number ? `## Section ${section.section_number}` : '## Selected section';
-          const lines = [
-            `# ${doc.title}\n`,
-            `**Type:** ${doc.type}`,
-            doc.date ? `**Date:** ${doc.date}` : '',
-            '',
-            heading,
-            '',
-            section.content,
-            '',
-            `*Source: ${LOCAL_HISTORICAL_SOURCE}*`,
-          ];
           return {
-            contents: [{ uri, mimeType: 'text/markdown', text: lines.filter(Boolean).join('\n') }],
+            contents: [{
+              uri,
+              mimeType: 'text/markdown',
+              text: formatLocalDocumentSectionResource(doc, section),
+            }],
           };
         }
 

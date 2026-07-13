@@ -2,6 +2,13 @@ import type { ToolHandler } from '../../kernel/types.js';
 import { handleToolError } from '../../kernel/errors.js';
 import type { PrimarySourceSearchService } from '../../services/historical/PrimarySourceSearchService.js';
 import { formatPrimarySourceSearch } from '../../formatters/primarySourceFormatter.js';
+import { primarySourceSearchOutputSchema } from '../../mcp/schemas/primarySourceSearch.js';
+import {
+  presentPrimarySourceSearch,
+  type PresentedPrimarySourceSearch,
+} from '../../presenters/primarySourceSearchStructured.js';
+import { buildLocalDocumentResourceUri } from '../../kernel/documentResource.js';
+import type { ResourceLink } from '@modelcontextprotocol/sdk/types.js';
 
 export function createPrimarySourceSearchHandler(service: Pick<PrimarySourceSearchService, 'search'>): ToolHandler {
   return {
@@ -36,6 +43,7 @@ export function createPrimarySourceSearchHandler(service: Pick<PrimarySourceSear
       required: ['queries'],
       additionalProperties: false,
     },
+    outputSchema: primarySourceSearchOutputSchema,
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     handler: async params => {
       try {
@@ -46,13 +54,49 @@ export function createPrimarySourceSearchHandler(service: Pick<PrimarySourceSear
             }))
           : params.queries;
         const result = await service.search({ ...params, queries });
+        const presented = presentPrimarySourceSearch(result);
         return {
-          content: [{ type: 'text', text: formatPrimarySourceSearch(result) }],
-          ...(result.planStatus === 'unavailable' ? { isError: true } : {}),
+          content: [
+            { type: 'text', text: formatPrimarySourceSearch(presented) },
+            ...localSectionResourceLinks(presented),
+          ],
+          structuredContent: presented,
+          ...(presented.planStatus === 'unavailable' ? { isError: true } : {}),
         };
       } catch (error) {
         return handleToolError(error as Error);
       }
     },
   };
+}
+
+/** Build links only from validated presentation data, never directly from provider locators. */
+function localSectionResourceLinks(presented: PresentedPrimarySourceSearch): ResourceLink[] {
+  const links: ResourceLink[] = [];
+  const seen = new Set<string>();
+  for (const query of presented.queries) {
+    for (const provider of query.providers) {
+      for (const candidate of provider.hits) {
+        if (candidate.provider !== 'local') continue;
+        const { locator } = candidate;
+        const canonical = buildLocalDocumentResourceUri(locator.documentId, locator.sectionId);
+        if (!canonical || canonical !== locator.url || seen.has(canonical)) continue;
+        seen.add(canonical);
+        const section = candidate.sectionLabel ? ` — ${candidate.sectionLabel}` : '';
+        const metadata = [candidate.documentType, candidate.documentDate].filter(Boolean).join(', ');
+        links.push({
+          type: 'resource_link',
+          uri: canonical,
+          name: `local-primary-source/${locator.documentId}/${locator.sectionId}`,
+          title: `${candidate.title}${section}`,
+          description: `${metadata ? `${metadata}. ` : ''}Exact local section selected by primary-source discovery.`,
+          mimeType: 'text/markdown',
+          size: candidate.resourceSizeBytes,
+          annotations: { audience: ['assistant'] },
+        });
+        if (links.length === 32) return links;
+      }
+    }
+  }
+  return links;
 }

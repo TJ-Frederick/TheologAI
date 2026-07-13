@@ -305,7 +305,16 @@ function countCharacters(value: string): number {
 }
 
 function cloneResult(result: PrimarySourceProviderResult): PrimarySourceProviderResult {
-  return { ...result, hits: result.hits.map(hit => ({ ...hit, locator: { ...hit.locator } })), notices: [...result.notices] };
+  return {
+    ...result,
+    hits: result.hits.map(cloneHit),
+    notices: [...result.notices],
+  };
+}
+
+function cloneHit(hit: PrimarySourceSearchHit): PrimarySourceSearchHit {
+  if (hit.provider === 'local') return { ...hit, locator: { ...hit.locator } };
+  return { ...hit, locator: { ...hit.locator } };
 }
 
 function resultFor(
