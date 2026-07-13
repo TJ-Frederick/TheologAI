@@ -31,6 +31,7 @@ import {
 } from './biblical-language-sources.js';
 import { downloadPinnedSource } from './download-pinned-source.js';
 import { publishDirectoryAtomically } from './atomic-publication.js';
+import { deterministicGzipSync } from './deterministic-gzip.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -407,7 +408,7 @@ function saveBook(bookName: string, bookNum: string, bookData: BookData): void {
   const filepath = path.join(dir, filename);
 
   const json = JSON.stringify(bookData, null, 0); // No whitespace for compression
-  const compressed = zlib.gzipSync(json, { level: 9 });
+  const compressed = deterministicGzipSync(json);
 
   fs.writeFileSync(filepath, compressed);
 
