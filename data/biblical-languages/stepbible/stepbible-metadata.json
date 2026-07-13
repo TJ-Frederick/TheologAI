@@ -1,11 +1,80 @@
 {
   "version": "1.0.0",
   "source": "STEPBible Data - Translators Amalgamated OT+NT",
-  "source_url": "https://github.com/STEPBible/STEPBible-Data",
-  "commit_sha": "master",
+  "repository_url": "https://github.com/STEPBible/STEPBible-Data",
+  "source_url": "https://github.com/STEPBible/STEPBible-Data/tree/0f60797c170f11a1f8dc75c5f7617973e2e66b0d",
+  "commit_sha": "0f60797c170f11a1f8dc75c5f7617973e2e66b0d",
+  "commit_date": "2025-09-02T09:50:51Z",
+  "inputs": [
+    {
+      "id": "tagnt-mat-jhn",
+      "repository_path": "Translators Amalgamated OT+NT/TAGNT Mat-Jhn - Translators Amalgamated Greek NT - STEPBible.org CC-BY.txt",
+      "raw_url": "https://raw.githubusercontent.com/STEPBible/STEPBible-Data/0f60797c170f11a1f8dc75c5f7617973e2e66b0d/Translators%20Amalgamated%20OT%2BNT/TAGNT%20Mat-Jhn%20-%20Translators%20Amalgamated%20Greek%20NT%20-%20STEPBible.org%20CC-BY.txt",
+      "bytes": 14189032,
+      "sha256": "ab8eaaeb68e17a1dcfa34e1e9350358f22f03bc2a97244d848750ad81044bc8e",
+      "git_blob_sha1": "705c1bc1cf752e013efcef99b8d9a3b7853bf843"
+    },
+    {
+      "id": "tagnt-act-rev",
+      "repository_path": "Translators Amalgamated OT+NT/TAGNT Act-Rev - Translators Amalgamated Greek NT - STEPBible.org CC-BY.txt",
+      "raw_url": "https://raw.githubusercontent.com/STEPBible/STEPBible-Data/0f60797c170f11a1f8dc75c5f7617973e2e66b0d/Translators%20Amalgamated%20OT%2BNT/TAGNT%20Act-Rev%20-%20Translators%20Amalgamated%20Greek%20NT%20-%20STEPBible.org%20CC-BY.txt",
+      "bytes": 15939932,
+      "sha256": "524e32375361e6d3fa2f7ef00b87605fdc4317a762f395651a05fdc31ad031b7",
+      "git_blob_sha1": "4bbea2c14681b01eb889d5a2d1dc0856858a32de"
+    },
+    {
+      "id": "tahot-gen-deu",
+      "repository_path": "Translators Amalgamated OT+NT/TAHOT Gen-Deu - Translators Amalgamated Hebrew OT - STEPBible.org CC BY.txt",
+      "raw_url": "https://raw.githubusercontent.com/STEPBible/STEPBible-Data/0f60797c170f11a1f8dc75c5f7617973e2e66b0d/Translators%20Amalgamated%20OT%2BNT/TAHOT%20Gen-Deu%20-%20Translators%20Amalgamated%20Hebrew%20OT%20-%20STEPBible.org%20CC%20BY.txt",
+      "bytes": 18190455,
+      "sha256": "e9b8546ee48fe0bfc57c3b70f5f40e98d96580e803526d19026224e31753368b",
+      "git_blob_sha1": "eb051292f8cee648c4f3eaf1b48cd0f1f30dc1d5"
+    },
+    {
+      "id": "tahot-jos-est",
+      "repository_path": "Translators Amalgamated OT+NT/TAHOT Jos-Est - Translators Amalgamated Hebrew OT - STEPBible.org CC BY.txt",
+      "raw_url": "https://raw.githubusercontent.com/STEPBible/STEPBible-Data/0f60797c170f11a1f8dc75c5f7617973e2e66b0d/Translators%20Amalgamated%20OT%2BNT/TAHOT%20Jos-Est%20-%20Translators%20Amalgamated%20Hebrew%20OT%20-%20STEPBible.org%20CC%20BY.txt",
+      "bytes": 24500317,
+      "sha256": "195fee1dc3653bab33701f170734eb894ed647c10cd08cc61749375fe8b73775",
+      "git_blob_sha1": "e3824344f6dea1a3f51932d1b0a53537c3c2023e"
+    },
+    {
+      "id": "tahot-job-sng",
+      "repository_path": "Translators Amalgamated OT+NT/TAHOT Job-Sng - Translators Amalgamated Hebrew OT - STEPBible.org CC BY.txt",
+      "raw_url": "https://raw.githubusercontent.com/STEPBible/STEPBible-Data/0f60797c170f11a1f8dc75c5f7617973e2e66b0d/Translators%20Amalgamated%20OT%2BNT/TAHOT%20Job-Sng%20-%20Translators%20Amalgamated%20Hebrew%20OT%20-%20STEPBible.org%20CC%20BY.txt",
+      "bytes": 9540133,
+      "sha256": "84e118a97e5725e3847cdfdd593873513021c790c63cc91a0d41fca2b5db2ed5",
+      "git_blob_sha1": "3d7af689417b54ebc468700b2bd86a8ba5377530"
+    },
+    {
+      "id": "tahot-isa-mal",
+      "repository_path": "Translators Amalgamated OT+NT/TAHOT Isa-Mal - Translators Amalgamated Hebrew OT - STEPBible.org CC BY.txt",
+      "raw_url": "https://raw.githubusercontent.com/STEPBible/STEPBible-Data/0f60797c170f11a1f8dc75c5f7617973e2e66b0d/Translators%20Amalgamated%20OT%2BNT/TAHOT%20Isa-Mal%20-%20Translators%20Amalgamated%20Hebrew%20OT%20-%20STEPBible.org%20CC%20BY.txt",
+      "bytes": 17977518,
+      "sha256": "f3ded203d2a74d6368932c97ae550d1d0754b271af491dc0dedf36fe3ba0bcc5",
+      "git_blob_sha1": "1cfe6718a1dae0d5d45a57a942d3f7f716ac6342"
+    }
+  ],
+  "provenance_status": "forensic_attestation_of_tracked_inventory",
+  "source_attestation": {
+    "kind": "forensic_source_attestation_added_after_artifact_creation",
+    "source_lock": "data/biblical-languages/SOURCE.json",
+    "raw_inputs_byte_verified": true
+  },
+  "tracked_artifact": {
+    "lineage": "historical_tracked_artifact_with_provenance_attested_after_creation",
+    "classification": "accepted_legacy_non_reproducible",
+    "byte_reproducible_from_pinned_inputs": false,
+    "affected_runtime_artifacts": 43,
+    "source_lock": "data/biblical-languages/SOURCE.json#derived_artifacts",
+    "clean_reproduction_compiler": {
+      "id": "theologai-stepbible-morphology-json",
+      "version": 1,
+      "source_revision": "0f60797c170f11a1f8dc75c5f7617973e2e66b0d"
+    }
+  },
   "license": "CC BY 4.0",
   "attribution": "STEP Bible (www.stepbible.org)",
-  "build_date": "2025-10-17T14:27:33.512Z",
   "books": {
     "greek": 27,
     "hebrew": 39,

@@ -25,10 +25,22 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
+import {
+  STEPBIBLE_DATA,
+  assertPinnedSourceBytes,
+  deterministicBuildProvenance,
+  sourceFile,
+} from './biblical-language-sources.js';
+import { publishFilesAtomically } from './atomic-publication.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const LEXICON_DIR = path.join(__dirname, '../data/biblical-languages/stepbible-lexicons');
+const SOURCE_LEXICON_DIR = path.join(__dirname, '../data/biblical-languages/stepbible-lexicons');
+const TARGET_LEXICON_DIR = process.env.THEOLOGAI_LANGUAGE_OUTPUT_ROOT
+  ? path.join(path.resolve(process.env.THEOLOGAI_LANGUAGE_OUTPUT_ROOT), 'biblical-languages/stepbible-lexicons')
+  : SOURCE_LEXICON_DIR;
+const GREEK_SOURCE = sourceFile(STEPBIBLE_DATA, 'tbesg-greek');
+const HEBREW_SOURCE = sourceFile(STEPBIBLE_DATA, 'tbesh-hebrew');
 
 interface LexiconEntry {
   strongsId: string;          // e.g., "G0025" or "H0430"
@@ -44,10 +56,13 @@ interface LexiconEntry {
 /**
  * Parse STEPBible TSV lexicon file
  */
-function parseLexicon(filePath: string, testament: 'Greek' | 'Hebrew'): Record<string, LexiconEntry> {
+function parseLexicon(filePath: string, testament: 'Greek' | 'Hebrew', source = testament === 'Greek' ? GREEK_SOURCE : HEBREW_SOURCE): Record<string, LexiconEntry> {
   console.log(`\nParsing ${testament} lexicon: ${path.basename(filePath)}`);
 
-  const content = fs.readFileSync(filePath, 'utf-8');
+  const bytes = fs.readFileSync(filePath);
+  assertPinnedSourceBytes(source, bytes);
+  console.log(`✓ Verified pinned ${source.id} input`);
+  const content = bytes.toString('utf-8');
   const lines = content.split('\n');
 
   const entries: Record<string, LexiconEntry> = {};
@@ -144,46 +159,45 @@ function main() {
   console.log('Building STEPBible lexicon JSON files...\n');
 
   // Ensure output directory exists
-  if (!fs.existsSync(LEXICON_DIR)) {
-    fs.mkdirSync(LEXICON_DIR, { recursive: true });
+  if (!fs.existsSync(TARGET_LEXICON_DIR)) {
+    fs.mkdirSync(TARGET_LEXICON_DIR, { recursive: true });
   }
+  const stagingDirectory = fs.mkdtempSync(path.join(path.dirname(TARGET_LEXICON_DIR), '.stepbible-lexicons-stage-'));
 
-  // Parse Greek lexicon (TBESG)
-  const greekFile = path.join(LEXICON_DIR, 'tbesg-greek.txt');
-  if (!fs.existsSync(greekFile)) {
-    console.error(`ERROR: Greek lexicon file not found: ${greekFile}`);
-    console.error('Please download it first from:');
-    console.error('https://github.com/STEPBible/STEPBible-Data/tree/master/Lexicons');
-    process.exit(1);
-  }
+  try {
+    // Parse Greek lexicon (TBESG)
+    const greekFile = path.join(SOURCE_LEXICON_DIR, 'tbesg-greek.txt');
+    if (!fs.existsSync(greekFile)) {
+      throw new Error(`Greek lexicon file not found: ${greekFile}; pinned source: ${GREEK_SOURCE.rawUrl}`);
+    }
 
-  const greekEntries = parseLexicon(greekFile, 'Greek');
-  const greekOutput = path.join(LEXICON_DIR, 'tbesg-greek.json');
-  fs.writeFileSync(greekOutput, JSON.stringify(greekEntries, null, 2));
-  console.log(`✓ Wrote ${greekOutput}`);
+    const greekEntries = parseLexicon(greekFile, 'Greek');
+    const greekOutput = path.join(stagingDirectory, 'tbesg-greek.json');
+    fs.writeFileSync(greekOutput, JSON.stringify(greekEntries, null, 2));
+    console.log(`✓ Staged ${greekOutput}`);
 
   // Parse Hebrew lexicon (TBESH)
-  const hebrewFile = path.join(LEXICON_DIR, 'tbesh-hebrew.txt');
-  if (!fs.existsSync(hebrewFile)) {
-    console.error(`ERROR: Hebrew lexicon file not found: ${hebrewFile}`);
-    console.error('Please download it first from:');
-    console.error('https://github.com/STEPBible/STEPBible-Data/tree/master/Lexicons');
-    process.exit(1);
-  }
+    const hebrewFile = path.join(SOURCE_LEXICON_DIR, 'tbesh-hebrew.txt');
+    if (!fs.existsSync(hebrewFile)) {
+      throw new Error(`Hebrew lexicon file not found: ${hebrewFile}; pinned source: ${HEBREW_SOURCE.rawUrl}`);
+    }
 
-  const hebrewEntries = parseLexicon(hebrewFile, 'Hebrew');
-  const hebrewOutput = path.join(LEXICON_DIR, 'tbesh-hebrew.json');
-  fs.writeFileSync(hebrewOutput, JSON.stringify(hebrewEntries, null, 2));
-  console.log(`✓ Wrote ${hebrewOutput}`);
+    const hebrewEntries = parseLexicon(hebrewFile, 'Hebrew');
+    const hebrewOutput = path.join(stagingDirectory, 'tbesh-hebrew.json');
+    fs.writeFileSync(hebrewOutput, JSON.stringify(hebrewEntries, null, 2));
+    console.log(`✓ Staged ${hebrewOutput}`);
 
   // Write metadata
-  const metadata = {
+    const metadata = {
     version: '1.0.0',
     source: 'STEPBible Data (Tyndale House, Cambridge)',
-    source_url: 'https://github.com/STEPBible/STEPBible-Data',
+    ...deterministicBuildProvenance(
+      STEPBIBLE_DATA,
+      [GREEK_SOURCE, HEBREW_SOURCE],
+      { id: 'theologai-stepbible-lexicon-json', version: 1 },
+    ),
     license: 'CC BY 4.0',
     attribution: 'Tyndale House, Cambridge (www.stepbible.org)',
-    build_date: new Date().toISOString(),
     lexicons: {
       greek: {
         name: 'TBESG - Translators Brief Lexicon of Extended Strongs for Greek',
@@ -198,16 +212,34 @@ function main() {
         file: 'tbesh-hebrew.json'
       }
     }
-  };
+    };
 
-  const metadataOutput = path.join(LEXICON_DIR, 'metadata.json');
-  fs.writeFileSync(metadataOutput, JSON.stringify(metadata, null, 2));
-  console.log(`✓ Wrote ${metadataOutput}`);
+    const metadataOutput = path.join(stagingDirectory, 'metadata.json');
+    fs.writeFileSync(metadataOutput, JSON.stringify(metadata, null, 2));
+    console.log(`✓ Staged ${metadataOutput}`);
 
-  console.log('\n✓ STEPBible lexicon build complete!');
-  console.log(`  Greek entries: ${metadata.lexicons.greek.entries}`);
-  console.log(`  Hebrew entries: ${metadata.lexicons.hebrew.entries}`);
-  console.log(`  Total: ${metadata.lexicons.greek.entries + metadata.lexicons.hebrew.entries}`);
+    if (metadata.lexicons.greek.entries !== 10847 || metadata.lexicons.hebrew.entries !== 8723) {
+      throw new Error(`Unexpected STEPBible lexicon counts: ${JSON.stringify(metadata.lexicons)}`);
+    }
+    if (JSON.stringify([greekEntries, hebrewEntries]).includes('\uFFFD')) {
+      throw new Error('Staged STEPBible lexicons contain a Unicode replacement character');
+    }
+    for (const filename of ['tbesg-greek.json', 'tbesh-hebrew.json', 'metadata.json']) {
+      JSON.parse(fs.readFileSync(path.join(stagingDirectory, filename), 'utf8'));
+    }
+    publishFilesAtomically(
+      stagingDirectory,
+      TARGET_LEXICON_DIR,
+      ['tbesg-greek.json', 'tbesh-hebrew.json', 'metadata.json'],
+    );
+
+    console.log('\n✓ STEPBible lexicon build complete!');
+    console.log(`  Greek entries: ${metadata.lexicons.greek.entries}`);
+    console.log(`  Hebrew entries: ${metadata.lexicons.hebrew.entries}`);
+    console.log(`  Total: ${metadata.lexicons.greek.entries + metadata.lexicons.hebrew.entries}`);
+  } finally {
+    fs.rmSync(stagingDirectory, { recursive: true, force: true });
+  }
 }
 
 main();

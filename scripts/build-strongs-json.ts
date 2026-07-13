@@ -18,11 +18,17 @@
  *   data/biblical-languages/strongs-hebrew.json (~3MB)
  */
 
-import * as https from 'https';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import * as xml2js from 'xml2js';
+import {
+  OPENSCRIPTURES_STRONGS,
+  deterministicBuildProvenance,
+  sourceFile,
+} from './biblical-language-sources.js';
+import { downloadPinnedSource } from './download-pinned-source.js';
+import { publishFilesAtomically } from './atomic-publication.js';
 
 interface StrongsEntry {
   lemma: string;
@@ -38,9 +44,11 @@ interface StrongsDatabase {
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const DATA_DIR = path.join(__dirname, '../data/biblical-languages');
-const GREEK_URL = 'https://raw.githubusercontent.com/openscriptures/strongs/master/greek/StrongsGreekDictionaryXML_1.4/strongsgreek.xml';
-const HEBREW_URL = 'https://raw.githubusercontent.com/openscriptures/strongs/master/hebrew/StrongHebrewG.xml';
+const DATA_DIR = process.env.THEOLOGAI_LANGUAGE_OUTPUT_ROOT
+  ? path.join(path.resolve(process.env.THEOLOGAI_LANGUAGE_OUTPUT_ROOT), 'biblical-languages')
+  : path.join(__dirname, '../data/biblical-languages');
+const GREEK_SOURCE = sourceFile(OPENSCRIPTURES_STRONGS, 'strongs-greek-xml');
+const HEBREW_SOURCE = sourceFile(OPENSCRIPTURES_STRONGS, 'strongs-hebrew-xml');
 
 // Ensure data directory exists
 function ensureDataDirectory(): void {
@@ -48,29 +56,6 @@ function ensureDataDirectory(): void {
     fs.mkdirSync(DATA_DIR, { recursive: true });
     console.log(`✓ Created directory: ${DATA_DIR}`);
   }
-}
-
-// Download file from URL
-function downloadFile(url: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    console.log(`Downloading: ${url}`);
-    https.get(url, (response) => {
-      if (response.statusCode !== 200) {
-        reject(new Error(`Failed to download: ${response.statusCode}`));
-        return;
-      }
-
-      let data = '';
-      response.on('data', (chunk) => {
-        data += chunk;
-      });
-
-      response.on('end', () => {
-        console.log(`✓ Downloaded ${(data.length / 1024).toFixed(2)} KB`);
-        resolve(data);
-      });
-    }).on('error', reject);
-  });
 }
 
 // Parse XML to JSON
@@ -82,7 +67,9 @@ async function parseXML(xmlContent: string): Promise<any> {
 // Process Greek Strong's dictionary
 async function processGreekDictionary(): Promise<StrongsDatabase> {
   console.log('\n=== Processing Greek Dictionary ===');
-  const xmlContent = await downloadFile(GREEK_URL);
+  const bytes = await downloadPinnedSource(GREEK_SOURCE);
+  console.log(`✓ Downloaded and verified ${(bytes.length / 1024).toFixed(2)} KB`);
+  const xmlContent = bytes.toString('utf8');
   const parsed = await parseXML(xmlContent);
 
   const database: StrongsDatabase = {};
@@ -134,7 +121,9 @@ async function processGreekDictionary(): Promise<StrongsDatabase> {
 // Process Hebrew Strong's dictionary (OSIS format)
 async function processHebrewDictionary(): Promise<StrongsDatabase> {
   console.log('\n=== Processing Hebrew Dictionary ===');
-  const xmlContent = await downloadFile(HEBREW_URL);
+  const bytes = await downloadPinnedSource(HEBREW_SOURCE);
+  console.log(`✓ Downloaded and verified ${(bytes.length / 1024).toFixed(2)} KB`);
+  const xmlContent = bytes.toString('utf8');
   const parsed = await parseXML(xmlContent);
 
   const database: StrongsDatabase = {};
@@ -184,8 +173,8 @@ async function processHebrewDictionary(): Promise<StrongsDatabase> {
 }
 
 // Save JSON file
-function saveJSON(filename: string, data: any): void {
-  const filePath = path.join(DATA_DIR, filename);
+function saveJSON(outputDirectory: string, filename: string, data: unknown): void {
+  const filePath = path.join(outputDirectory, filename);
   const jsonContent = JSON.stringify(data, null, 2);
   fs.writeFileSync(filePath, jsonContent, 'utf8');
 
@@ -200,27 +189,32 @@ async function main() {
   console.log('===================================\n');
   console.log('Data Source: OpenScriptures Strong\'s Dictionaries');
   console.log('License: Public Domain');
-  console.log('URL: https://github.com/openscriptures/strongs\n');
+  console.log(`Pinned source: ${OPENSCRIPTURES_STRONGS.commitUrl}\n`);
 
+  let stagingDirectory: string | undefined;
   try {
     ensureDataDirectory();
+    stagingDirectory = fs.mkdtempSync(path.join(path.dirname(DATA_DIR), '.strongs-stage-'));
 
     // Process Greek dictionary
     const greekDatabase = await processGreekDictionary();
-    saveJSON('strongs-greek.json', greekDatabase);
+    saveJSON(stagingDirectory, 'strongs-greek.json', greekDatabase);
 
     // Process Hebrew dictionary
     const hebrewDatabase = await processHebrewDictionary();
-    saveJSON('strongs-hebrew.json', hebrewDatabase);
+    saveJSON(stagingDirectory, 'strongs-hebrew.json', hebrewDatabase);
 
     // Save metadata
     const metadata = {
       version: '1.0.0',
       source: 'OpenScriptures Strong\'s Hebrew and Greek Dictionaries',
-      source_url: 'https://github.com/openscriptures/strongs',
+      ...deterministicBuildProvenance(
+        OPENSCRIPTURES_STRONGS,
+        [GREEK_SOURCE, HEBREW_SOURCE],
+        { id: 'theologai-strongs-json', version: 1 },
+      ),
       license: 'Public Domain',
       attribution: 'Open Scriptures (openscriptures.org)',
-      build_date: new Date().toISOString(),
       entries: {
         greek: Object.keys(greekDatabase).length,
         hebrew: Object.keys(hebrewDatabase).length,
@@ -228,7 +222,22 @@ async function main() {
       }
     };
 
-    saveJSON('strongs-metadata.json', metadata);
+    saveJSON(stagingDirectory, 'strongs-metadata.json', metadata);
+
+    if (metadata.entries.greek !== 5624 || metadata.entries.hebrew !== 8674 || metadata.entries.total !== 14298) {
+      throw new Error(`Unexpected Strong's output counts: ${JSON.stringify(metadata.entries)}`);
+    }
+    if (JSON.stringify([greekDatabase, hebrewDatabase]).includes('\uFFFD')) {
+      throw new Error("Staged Strong's output contains a Unicode replacement character");
+    }
+    for (const filename of ['strongs-greek.json', 'strongs-hebrew.json', 'strongs-metadata.json']) {
+      JSON.parse(fs.readFileSync(path.join(stagingDirectory, filename), 'utf8'));
+    }
+    publishFilesAtomically(
+      stagingDirectory,
+      DATA_DIR,
+      ['strongs-greek.json', 'strongs-hebrew.json', 'strongs-metadata.json'],
+    );
 
     console.log('\n=== Build Complete! ===');
     console.log(`Total entries: ${metadata.entries.total}`);
@@ -238,7 +247,9 @@ async function main() {
 
   } catch (error) {
     console.error('\n✗ Error:', error);
-    process.exit(1);
+    process.exitCode = 1;
+  } finally {
+    if (stagingDirectory) fs.rmSync(stagingDirectory, { recursive: true, force: true });
   }
 }
 

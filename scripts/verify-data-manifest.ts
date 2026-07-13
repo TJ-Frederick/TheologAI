@@ -7,6 +7,7 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { assertProvenanceMatches, type SourceMetadata } from './build-ubs-parallel-passages.js';
 import { parseDataManifest, verifyD1Migrations, type DataManifest } from './d1-corpus-identity.js';
+import { verifyBiblicalLanguageSources } from './verify-biblical-language-sources.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -22,10 +23,17 @@ function relativeDataFiles(directory: string, suffix: string): string[] {
 function discoverCanonicalFiles(): string[] {
   return [
     'data/cross-references/cross_references.txt',
+    'data/biblical-languages/SOURCE.json',
     'data/biblical-languages/strongs-greek.json',
     'data/biblical-languages/strongs-hebrew.json',
+    'data/biblical-languages/strongs-metadata.json',
+    'data/biblical-languages/stepbible/index.json',
+    'data/biblical-languages/stepbible/stepbible-metadata.json',
     'data/biblical-languages/stepbible/morph-codes.json',
+    'data/biblical-languages/stepbible-lexicons/metadata.json',
+    'data/biblical-languages/stepbible-lexicons/tbesg-greek.txt',
     'data/biblical-languages/stepbible-lexicons/tbesg-greek.json',
+    'data/biblical-languages/stepbible-lexicons/tbesh-hebrew.txt',
     'data/biblical-languages/stepbible-lexicons/tbesh-hebrew.json',
     ...relativeDataFiles('data/biblical-languages/stepbible/greek', '.json.gz'),
     ...relativeDataFiles('data/biblical-languages/stepbible/hebrew', '.json.gz'),
@@ -54,6 +62,7 @@ const manifest = parseDataManifest(readFileSync(MANIFEST_PATH)) as DataManifest 
   sources?: Record<string, SourceMetadata>;
 };
 verifyD1Migrations(ROOT, manifest);
+verifyBiblicalLanguageSources(ROOT);
 
 const schemaPath = join(ROOT, 'migrations', `${manifest.schemaVersion}.sql`);
 if (!existsSync(schemaPath)) {
