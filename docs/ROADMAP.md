@@ -17,23 +17,28 @@ is local source context only and does not define the current product contract.
 - **UBS compiler / PR #13:** pinned UBS/Paratext source, license and provenance,
   deterministic compiler, generated-artifact verifier, and regression tests,
   merged as `4e02564531351f4a2de61d95dcebfd0dfd06d404`.
+- **Phase 3 research foundations / PR #21:** bounded inactive CCEL provider
+  architecture, D1 materialization identity, exact Strong's identities, local
+  primary-source research, normalized UBS runtime and public cutover, and
+  contextual original-language study, merged as
+  `639d0a02c1c666340f0e2ee3bcb4b4d5a336d9fb`.
 
 These entries describe merged repository state. Deployment state is established
 only by the relevant protected workflow and post-deployment smoke evidence; a
 merge or this roadmap is not evidence that preview or production was deployed.
 
-## Current Phase 3 release train
+## Shipped Phase 3 release train
 
-The following slices are implemented in the integration candidate and remain
-subject to their stacked PR reviews, CI, operational gates, and merge order:
+The following component slices were integrated, reviewed, and shipped through
+PR #21. Their stacked PRs #14–#20 are closed as superseded review vehicles:
 
 1. **PR #14 — bounded CCEL search adapter.** Defensive live-search transport,
    rights notices, budgets, caching, circuit behavior, and feature gates. The
    adapter is retained as inactive future-provider architecture and is not
    advertised or reachable through the current public MCP schemas.
 2. **PR #15 — D1 materialization identity.** Distinguishes schema compatibility
-   from the exact materialized corpus. A production marker transition is a
-   separately authorized data operation, not a side effect of merge or deploy.
+   from the exact materialized corpus. Production was cut over to a freshly
+   materialized replacement rather than mutating the predecessor database.
 3. **PR #16 — exact Strong's identities.** Preserves canonical and extended
    OpenScriptures/STEPBible identifiers without lossy four-digit coercion.
 4. **PR #17 — local primary-source research.** Adds the bounded
@@ -47,14 +52,18 @@ subject to their stacked PR reviews, CI, operational gates, and merge order:
    unconditional default, with bounded structured output. Legacy curated edges
    and OpenBible.info evidence remain available only through explicit separate
    selectors; raw UBS alignment is opt-in.
-8. **Integrated language-study slice.** Adds `original_language_study`, a
+8. **Integrated language-study slice.** Added `original_language_study`, a
    context-first workflow for one token in one verse, with morphology,
-   source-separated lexical evidence, provenance, and interpretive limits. It
-   must receive its own reviewable publication path before release.
+   source-separated lexical evidence, provenance, and interpretive limits.
 
-The integration candidate advertises eleven tools and structured output for
+The released server advertises eleven tools and structured output for
 `bible_lookup`, `parallel_passages`, `original_language_lookup`, and
 `original_language_study`. Markdown remains available for compatibility.
+
+Protected production workflow run `29257538930` deployed the PR #21 merge after
+the exact-corpus readiness gate passed. The post-deployment production audit
+passed all 84 checks. Live CCEL discovery remains intentionally disabled and is
+not part of the public MCP contract.
 
 ## Release gates
 
@@ -74,17 +83,16 @@ Code readiness and operational readiness are deliberately separate:
    structured-output contracts, UBS default and explicit-source behavior,
    Strong's extended identities, local primary-source search, language study,
    resources, prompts, and failure/privacy boundaries.
-6. Production D1 marker changes require explicit owner authorization, a
+6. Production D1 corpus changes require explicit owner authorization and a
+   compatible replacement or reviewed incremental migration. A metadata-only
+   transition is valid only when materialized rows are unchanged; it must use a
    conditional one-row update, immediate read-only readiness verification, and
    a prepared conditional rollback.
 7. Production merge/deployment occurs only after the integrated Sol review,
    green required checks, successful preview audit, and protected production
    approval. Production then receives the same bounded smoke audit.
 
-No current roadmap statement claims that the pending D1 transition, preview
-deployment, production deployment, or any live CCEL enablement has happened.
-
-## Next work after this train
+## Next work
 
 - Expand primary-source discovery beyond the initial local collection through
   rights-reviewed, freely redistributable editions and provider adapters. Do
