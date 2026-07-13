@@ -77,56 +77,87 @@ export interface PresentedPrimarySourceSearch extends Record<string, unknown> {
 
 /** Canonical public result used by Markdown, structured output, and native links. */
 export function presentPrimarySourceSearch(result: PrimarySourceSearchPlanResult): PresentedPrimarySourceSearch {
-  const queries = result.queries.slice(0, 4).map(query => ({
-    id: boundedText(query.id, 40),
-    normalizedMode: query.normalizedMode,
-    providers: query.providers.slice(0, 2).map(provider => {
-      const hits = provider.hits.slice(0, 8).flatMap(hit => {
-        const presented = presentHit(hit, query.id, provider.provider);
-        return presented ? [presented] : [];
-      });
-      const omitted = provider.hits.length - hits.length;
-      const countMismatch = provider.hitCount !== provider.hits.length;
-      const downgraded = omitted > 0 || countMismatch;
-      const notices = [...provider.notices];
-      if (omitted > 0) {
-        notices.push(`${omitted} ${provider.provider} hit${omitted === 1 ? '' : 's'} omitted because the locator, group attribution, or bounded metadata was invalid.`);
-      }
-      if (countMismatch) notices.push('Provider-reported hit count did not match its returned hit array.');
-      return {
-        provider: provider.provider,
-        status: downgraded ? 'interface_changed' as const : provider.status,
-        searched: provider.searched,
-        page: provider.page,
-        hitCount: hits.length,
-        hits,
-        notices: uniqueBounded(notices, 16, 500),
-      };
+  const boundedQueries = result.queries.slice(0, 4);
+  const omittedQueries = result.queries.slice(4);
+  const omittedProviderGroups = [
+    ...omittedQueries.flatMap(query => query.providers),
+    ...boundedQueries.flatMap(query => query.providers.slice(2)),
+  ];
+  const envelopeNotices = [
+    ...(omittedQueries.length > 0
+      ? [`${omittedQueries.length} query group${omittedQueries.length === 1 ? ' was' : 's were'} omitted because the result exceeded the public limit of 4.`]
+      : []),
+    ...boundedQueries.flatMap(query => {
+      const omitted = query.providers.length - 2;
+      return omitted > 0
+        ? [`${omitted} provider group${omitted === 1 ? ' was' : 's were'} omitted from query ${boundedText(query.id, 40)} because the result exceeded the public limit of 2 providers per query.`]
+        : [];
     }),
-  }));
+  ];
+  const envelopeChanged = envelopeNotices.length > 0;
+  const queries = boundedQueries.map(query => {
+    const providerGroupsOmitted = query.providers.length > 2;
+    return {
+      id: boundedText(query.id, 40),
+      normalizedMode: query.normalizedMode,
+      providers: query.providers.slice(0, 2).map(provider => {
+        const hits = provider.hits.slice(0, 8).flatMap(hit => {
+          const presented = presentHit(hit, query.id, provider.provider);
+          return presented ? [presented] : [];
+        });
+        const omitted = provider.hits.length - hits.length;
+        const countMismatch = provider.hitCount !== provider.hits.length;
+        const downgraded = omitted > 0 || countMismatch || providerGroupsOmitted;
+        const notices = [...provider.notices];
+        if (omitted > 0) {
+          notices.push(`${omitted} ${provider.provider} hit${omitted === 1 ? '' : 's'} omitted because the locator, group attribution, or bounded metadata was invalid.`);
+        }
+        if (countMismatch) notices.push('Provider-reported hit count did not match its returned hit array.');
+        if (providerGroupsOmitted) notices.push('One or more provider groups were omitted because the query exceeded the public provider-group limit.');
+        return {
+          provider: provider.provider,
+          status: downgraded ? 'interface_changed' as const : provider.status,
+          searched: provider.searched,
+          page: provider.page,
+          hitCount: hits.length,
+          hits,
+          notices: uniqueBounded(notices, 16, 500),
+        };
+      }),
+    };
+  });
   const providers = queries.flatMap(query => query.providers);
   const local = providers.filter(provider => provider.provider === 'local');
   const ccel = providers.filter(provider => provider.provider === 'ccel_live');
+  const omittedLocal = omittedProviderGroups.filter(provider => provider.provider === 'local');
+  const omittedCcel = omittedProviderGroups.filter(provider => provider.provider === 'ccel_live');
   const statuses = providers.map(provider => provider.status);
   const hasUsableResult = providers.some(provider => provider.hits.length > 0 || COMPLETE_STATUSES.has(provider.status));
-  const planStatus = statuses.every(status => COMPLETE_STATUSES.has(status))
-    ? 'complete'
-    : !hasUsableResult && statuses.every(status => UNAVAILABLE_STATUSES.has(status))
-      ? 'unavailable'
-      : 'partial';
+  const planStatus = envelopeChanged
+    ? 'partial'
+    : statuses.every(status => COMPLETE_STATUSES.has(status))
+      ? 'complete'
+      : !hasUsableResult && statuses.every(status => UNAVAILABLE_STATUSES.has(status))
+        ? 'unavailable'
+        : 'partial';
   return {
     schemaVersion: '1',
     kind: 'primary_source_search',
     planStatus,
     queries,
     coverage: {
-      localAttempted: local.some(provider => provider.searched),
-      ...(local.length ? { localStatus: aggregateStatus(local) } : {}),
+      localAttempted: [...local, ...omittedLocal].some(provider => provider.searched),
+      ...(omittedLocal.length
+        ? { localStatus: 'interface_changed' as const }
+        : local.length ? { localStatus: aggregateStatus(local) } : {}),
       localHitCount: countHits(local),
-      ccelAttempted: ccel.some(provider => provider.searched),
-      ...(ccel.length ? { ccelStatus: aggregateStatus(ccel) } : {}),
+      ccelAttempted: [...ccel, ...omittedCcel].some(provider => provider.searched),
+      ...(omittedCcel.length
+        ? { ccelStatus: 'interface_changed' as const }
+        : ccel.length ? { ccelStatus: aggregateStatus(ccel) } : {}),
       ccelHitCount: countHits(ccel),
       notices: uniqueBounded([
+        ...envelopeNotices,
         ...result.coverage.notices,
         ...providers.flatMap(provider => provider.notices),
       ], 32, 500),

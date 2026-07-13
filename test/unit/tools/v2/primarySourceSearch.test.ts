@@ -191,4 +191,85 @@ describe('primary_source_search handler', () => {
     schemaInvalidCrossProviderGroup.queries[0].providers[0].hitCount = 1;
     expect(validatorFor(handler.outputSchema!)(schemaInvalidCrossProviderGroup).valid).toBe(false);
   });
+
+  it('fails closed when a service returns excess query groups', async () => {
+    const emptyLocalProvider = {
+      provider: 'local', status: 'no_results', searched: true, page: 1, hitCount: 0, hits: [], notices: [],
+    } as const;
+    const omittedHit = {
+      queryId: 'q5', provider: 'local', title: 'Omitted fifth-query evidence', snippet: 'Must not leak.',
+      locator: {
+        kind: 'local_section', documentId: 'secret', sectionId: '5',
+        url: 'theologai://documents/secret#section-5',
+      },
+      rankWithinProvider: 1, page: 1, snippetOnly: true, attribution: 'Local', resourceSizeBytes: 25,
+    } as const;
+    const queries = [1, 2, 3, 4].map(number => ({
+      id: `q${number}`, normalizedMode: 'all_terms', providers: [emptyLocalProvider],
+    }));
+    queries.push({
+      id: 'q5', normalizedMode: 'all_terms',
+      providers: [{ ...emptyLocalProvider, status: 'ok', hitCount: 1, hits: [omittedHit] }],
+    } as any);
+    const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue({
+      planStatus: 'complete', queries,
+      coverage: { localAttempted: true, localStatus: 'ok', localHitCount: 1, ccelAttempted: false, ccelHitCount: 0, notices: [] },
+    }) } as any);
+
+    const result = await handler.handler({ queries: [{ id: 'q1', text: 'faith', providers: ['local'] }] });
+
+    expect(result.structuredContent).toMatchObject({
+      planStatus: 'partial',
+      queries: [{ id: 'q1' }, { id: 'q2' }, { id: 'q3' }, { id: 'q4' }],
+      coverage: {
+        localAttempted: true, localStatus: 'interface_changed', localHitCount: 0,
+        notices: expect.arrayContaining([expect.stringContaining('1 query group was omitted')]),
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain('q5');
+    expect(JSON.stringify(result)).not.toContain('Omitted fifth-query evidence');
+    expect(result.content).toHaveLength(1);
+    expect(validatorFor(handler.outputSchema!)(result.structuredContent).valid).toBe(true);
+  });
+
+  it('fails closed when a query returns excess provider groups', async () => {
+    const emptyLocalProvider = {
+      provider: 'local', status: 'no_results', searched: true, page: 1, hitCount: 0, hits: [], notices: [],
+    } as const;
+    const omittedHit = {
+      queryId: 'q1', provider: 'local', title: 'Omitted third-provider evidence', snippet: 'Must not leak.',
+      locator: {
+        kind: 'local_section', documentId: 'secret', sectionId: '3',
+        url: 'theologai://documents/secret#section-3',
+      },
+      rankWithinProvider: 1, page: 1, snippetOnly: true, attribution: 'Local', resourceSizeBytes: 25,
+    } as const;
+    const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue({
+      planStatus: 'complete',
+      queries: [{ id: 'q1', normalizedMode: 'all_terms', providers: [
+        emptyLocalProvider,
+        emptyLocalProvider,
+        { ...emptyLocalProvider, status: 'ok', hitCount: 1, hits: [omittedHit] },
+      ] }],
+      coverage: { localAttempted: true, localStatus: 'ok', localHitCount: 1, ccelAttempted: false, ccelHitCount: 0, notices: [] },
+    }) } as any);
+
+    const result = await handler.handler({ queries: [{ id: 'q1', text: 'faith', providers: ['local'] }] });
+
+    expect(result.structuredContent).toMatchObject({
+      planStatus: 'partial',
+      queries: [{ providers: [
+        { status: 'interface_changed', hitCount: 0 },
+        { status: 'interface_changed', hitCount: 0 },
+      ] }],
+      coverage: {
+        localAttempted: true, localStatus: 'interface_changed', localHitCount: 0,
+        notices: expect.arrayContaining([expect.stringContaining('1 provider group was omitted from query q1')]),
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain('Omitted third-provider evidence');
+    expect(JSON.stringify(result)).not.toContain('theologai://documents/secret');
+    expect(result.content).toHaveLength(1);
+    expect(validatorFor(handler.outputSchema!)(result.structuredContent).valid).toBe(true);
+  });
 });
