@@ -36,11 +36,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Corrected
 
-- Reconciled the pending public contract at version 3.6.0: eleven tools, five
+- Reconciled the public contract at version 3.6.0: eleven tools, five
   prompts, 17 local historical documents, and transport-specific Logging.
 - Scoped D1 readiness to both schema and materialization identity. Remote D1
-  marker transitions, preview deployment, and production deployment remain
-  separate operational gates and are not performed by these code changes.
+  preparation and preview/production deployment remained separate operational
+  gates and were performed only through their authorized release workflows.
 - Removed public CCEL document-body retrieval and reconciled both historical
   tools with the currently local-only provider contract. Defensive external
   discovery architecture remains inactive for a separately reviewed future rollout.
