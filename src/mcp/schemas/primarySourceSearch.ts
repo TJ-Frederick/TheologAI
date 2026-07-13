@@ -47,45 +47,57 @@ const commonHitRequired = [
   'queryId', 'title', 'snippet', 'rankWithinProvider', 'page', 'snippetOnly', 'attribution',
 ] as const;
 
-const hit = {
-  oneOf: [
-    {
-      type: 'object',
-      properties: {
-        ...commonHitProperties,
-        provider: { const: 'local' },
-        locator: localLocator,
-        resourceSizeBytes: { type: 'integer', minimum: 0, maximum: Number.MAX_SAFE_INTEGER },
-      },
-      required: [...commonHitRequired, 'provider', 'locator', 'resourceSizeBytes'],
-      additionalProperties: false,
-    },
-    {
-      type: 'object',
-      properties: {
-        ...commonHitProperties,
-        provider: { const: 'ccel_live' },
-        locator: ccelLocator,
-      },
-      required: [...commonHitRequired, 'provider', 'locator'],
-      additionalProperties: false,
-    },
-  ],
+const localHit = {
+  type: 'object',
+  properties: {
+    ...commonHitProperties,
+    provider: { const: 'local' },
+    locator: localLocator,
+    resourceSizeBytes: { type: 'integer', minimum: 0, maximum: Number.MAX_SAFE_INTEGER },
+  },
+  required: [...commonHitRequired, 'provider', 'locator', 'resourceSizeBytes'],
+  additionalProperties: false,
+} as const;
+
+const ccelHit = {
+  type: 'object',
+  properties: {
+    ...commonHitProperties,
+    provider: { const: 'ccel_live' },
+    locator: ccelLocator,
+  },
+  required: [...commonHitRequired, 'provider', 'locator'],
+  additionalProperties: false,
+} as const;
+
+const providerProperties = {
+  status,
+  searched: { type: 'boolean' },
+  page: { type: 'integer', minimum: 1, maximum: 3 },
+  hitCount: { type: 'integer', minimum: 0, maximum: 8 },
+  notices: { type: 'array', maxItems: 16, items: { type: 'string', maxLength: 500 } },
 } as const;
 
 const provider = {
-  type: 'object',
-  properties: {
-    provider: { type: 'string', enum: ['local', 'ccel_live'] },
-    status,
-    searched: { type: 'boolean' },
-    page: { type: 'integer', minimum: 1, maximum: 3 },
-    hitCount: { type: 'integer', minimum: 0, maximum: 8 },
-    hits: { type: 'array', maxItems: 8, items: hit },
-    notices: { type: 'array', maxItems: 16, items: { type: 'string', maxLength: 500 } },
-  },
-  required: ['provider', 'status', 'searched', 'page', 'hitCount', 'hits', 'notices'],
-  additionalProperties: false,
+  oneOf: [{
+    type: 'object',
+    properties: {
+      ...providerProperties,
+      provider: { const: 'local' },
+      hits: { type: 'array', maxItems: 8, items: localHit },
+    },
+    required: ['provider', 'status', 'searched', 'page', 'hitCount', 'hits', 'notices'],
+    additionalProperties: false,
+  }, {
+    type: 'object',
+    properties: {
+      ...providerProperties,
+      provider: { const: 'ccel_live' },
+      hits: { type: 'array', maxItems: 8, items: ccelHit },
+    },
+    required: ['provider', 'status', 'searched', 'page', 'hitCount', 'hits', 'notices'],
+    additionalProperties: false,
+  }],
 } as const;
 
 export const primarySourceSearchOutputSchema = {
