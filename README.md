@@ -42,7 +42,7 @@ fresh server and transport.
 | `commentary_lookup` | Retrieve Matthew Henry, JFB, Adam Clarke, John Gill, Keil-Delitzsch (OT), or Tyndale notes. |
 | `classic_text_lookup` | Search and browse the 17 locally indexed historical documents. Remote CCEL document bodies are not retrieved or republished. |
 | `primary_source_search` | Execute a bounded local query plan with versioned structured results and native links to exact section resources. Snippets remain discovery-only. |
-| `original_language_lookup` | Look up a Strong's entry or search for matching Greek/Hebrew entries. |
+| `original_language_lookup` | Look up or search Strong's entries, with opt-in exact corrected-corpus usage and bounded occurrence pages for exact identities. |
 | `bible_verse_morphology` | Return word-by-word morphology for a specific verse. |
 | `original_language_study` | Resolve and study one Greek or Hebrew token in one verse with contextual morphology, source-separated lexical evidence, and explicit interpretive limits. |
 | `donation_config` | Return voluntary-donation recipient, asset, and chain configuration. |
@@ -57,6 +57,13 @@ their prior item semantics. OpenBible.info rows are off by default and, when
 requested with `includeOpenBibleCrossReferences`, are returned in a separate
 collection. The deprecated `useCrossReferences` alias now also defaults false,
 and conflicting old/new values are rejected.
+
+For exact `original_language_lookup` calls, corpus usage is opt-in. `overview`
+returns totals plus the complete canonical-book distribution only. `study`
+adds the top 10 exact source variants and defaults to 8 raw occurrences (maximum
+12). `technical` adds the top 25 variants and defaults to 20 raw occurrences
+(maximum 25). Search mode and calls that omit `usage_level` retain their prior
+responses.
 
 All tools are annotated as read-only, non-destructive, and idempotent. Tool
 inputs use closed, bounded JSON Schema 2020-12 contracts. `bible_lookup`,

@@ -3,6 +3,8 @@ import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 import type { ProvenanceRecord } from '../../kernel/provenance.js';
 import { createProvenanceRecordSchema } from './provenance.js';
 import { STRONGS_IDENTITY_PATTERN } from '../../kernel/strongs.js';
+import type { CorpusUsageResult } from '../../kernel/types.js';
+import { MORPHOLOGY_CORPUS_IDENTITY } from '../../kernel/morphologyUsageCursor.js';
 
 export interface OriginalLanguageSenseV1 {
   gloss: string;
@@ -47,8 +49,94 @@ export interface OriginalLanguageOutputV1 {
   detailLevel: 'summary' | 'detailed';
   entries: OriginalLanguageEntryV1[];
   nextStep?: OriginalLanguageNextStepV1;
+  corpusUsage?: CorpusUsageResult & { provenanceIds: string[] };
   provenance: ProvenanceRecord[];
 }
+
+const positiveCount = { type: 'integer', minimum: 0, maximum: 1_000_000 } as const;
+const canonicalOrder = { type: 'integer', minimum: 1, maximum: 66 } as const;
+const occurrencePositionSchema: Schema = {
+  type: 'object',
+  properties: {
+    book: { type: 'string', minLength: 2, maxLength: 32 },
+    canonicalOrder,
+    chapter: { type: 'integer', minimum: 1, maximum: 200 },
+    verse: { type: 'integer', minimum: 0, maximum: 200 },
+    position: { type: 'integer', minimum: 1, maximum: 500 },
+  },
+  required: ['book', 'canonicalOrder', 'chapter', 'verse', 'position'],
+  additionalProperties: false,
+};
+
+const corpusUsageSchema: Schema = {
+  type: 'object',
+  properties: {
+    level: { type: 'string', enum: ['overview', 'study', 'technical'] },
+    exactMorphologyKey: { type: 'string', minLength: 2, maxLength: 7, pattern: '^[GH](?:\\d{4,5})[A-Z]?$' },
+    corpusIdentity: { const: MORPHOLOGY_CORPUS_IDENTITY },
+    attested: { type: 'boolean' },
+    totals: {
+      type: 'object',
+      properties: {
+        tokenCount: positiveCount,
+        verseCount: positiveCount,
+        bookCount: { type: 'integer', minimum: 0, maximum: 66 },
+        sourceSurfaceVariantCount: positiveCount,
+      },
+      required: ['tokenCount', 'verseCount', 'bookCount', 'sourceSurfaceVariantCount'],
+      additionalProperties: false,
+    },
+    bookDistribution: {
+      type: 'array', maxItems: 66,
+      items: {
+        type: 'object',
+        properties: {
+          book: { type: 'string', minLength: 2, maxLength: 32 },
+          canonicalOrder,
+          tokenCount: positiveCount,
+          verseCount: positiveCount,
+        },
+        required: ['book', 'canonicalOrder', 'tokenCount', 'verseCount'],
+        additionalProperties: false,
+      },
+    },
+    sourceSurfaceVariants: {
+      type: 'array', maxItems: 25,
+      items: {
+        type: 'object',
+        properties: {
+          sourceForm: { type: 'string', minLength: 1, maxLength: 500 },
+          tokenCount: positiveCount,
+          verseCount: positiveCount,
+          firstOccurrence: occurrencePositionSchema,
+        },
+        required: ['sourceForm', 'tokenCount', 'verseCount', 'firstOccurrence'],
+        additionalProperties: false,
+      },
+    },
+    occurrences: {
+      type: 'array', maxItems: 25,
+      items: {
+        type: 'object',
+        properties: {
+          ...occurrencePositionSchema.properties,
+          sourceForm: { type: 'string', minLength: 1, maxLength: 500 },
+          lemma: { type: 'string', minLength: 1, maxLength: 500 },
+          exactMorphologyKey: { type: 'string', minLength: 2, maxLength: 7, pattern: '^[GH](?:\\d{4,5})[A-Z]?$' },
+          morphologyCode: { type: ['string', 'null'], maxLength: 500 },
+          gloss: { type: ['string', 'null'], maxLength: 2000 },
+        },
+        required: ['book', 'canonicalOrder', 'chapter', 'verse', 'position', 'sourceForm', 'lemma', 'exactMorphologyKey', 'morphologyCode', 'gloss'],
+        additionalProperties: false,
+      },
+    },
+    nextOccurrenceCursor: { type: 'string', minLength: 1, maxLength: 512, pattern: '^[A-Za-z0-9_-]+$' },
+    cautions: { type: 'array', minItems: 3, maxItems: 8, items: { type: 'string', minLength: 1, maxLength: 500 } },
+    provenanceIds: { type: 'array', minItems: 1, maxItems: 2, uniqueItems: true, items: { type: 'string', minLength: 1, maxLength: 64 } },
+  },
+  required: ['level', 'exactMorphologyKey', 'corpusIdentity', 'attested', 'totals', 'bookDistribution', 'sourceSurfaceVariants', 'cautions', 'provenanceIds'],
+  additionalProperties: false,
+};
 
 const entrySchema: Schema = {
   type: 'object',
@@ -122,6 +210,7 @@ export const originalLanguageOutputSchema = {
       required: ['tool', 'arguments'],
       additionalProperties: false,
     },
+    corpusUsage: corpusUsageSchema,
     provenance: {
       type: 'array', minItems: 1, maxItems: 8,
       items: createProvenanceRecordSchema(),

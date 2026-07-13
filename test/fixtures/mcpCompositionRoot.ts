@@ -141,7 +141,7 @@ export function createDeterministicMcpFixture(): DeterministicMcpFixture {
     { search: async () => ({ provider: 'ccel_live', status: 'disabled', searched: false, page: 1, hitCount: 0, hits: [], notices: [] }) },
     { ccelLiveSearch: false },
   );
-  const strongsService = new StrongsService(strongsRepository);
+  const strongsService = new StrongsService(strongsRepository, morphologyRepository);
   const morphologyService = new MorphologyService(morphologyRepository);
   const originalLanguageStudyService = new OriginalLanguageStudyService(morphologyRepository, strongsRepository);
   const donationService = new DonationService(onChainVerifier);

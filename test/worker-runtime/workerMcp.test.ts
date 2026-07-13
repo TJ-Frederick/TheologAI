@@ -153,6 +153,25 @@ describe('Worker MCP endpoint in workerd', () => {
         failures: [],
       },
     });
+
+    const usage = await rpc('tools/call', {
+      name: 'original_language_lookup',
+      arguments: { strongs_number: 'G26', usage_level: 'technical', occurrence_limit: 1 },
+    }, 31);
+    expect(usage.response.status).toBe(200);
+    expect(usage.message.error).toBeUndefined();
+    expect(usage.message.result).toMatchObject({
+      content: [expect.objectContaining({ text: expect.stringContaining('1 raw tokens') })],
+      structuredContent: {
+        schemaVersion: '1', kind: 'original_language_lookup',
+        corpusUsage: {
+          exactMorphologyKey: 'G0026', attested: true,
+          totals: { tokenCount: 1, verseCount: 1, bookCount: 1, sourceSurfaceVariantCount: 1 },
+          sourceSurfaceVariants: [expect.objectContaining({ sourceForm: 'ἀγάπη·' })],
+          occurrences: [expect.objectContaining({ sourceForm: 'ἀγάπη·', exactMorphologyKey: 'G0026' })],
+        },
+      },
+    });
   });
 
   it('serves Strong\'s tool and resource results from the isolated D1 fixture', async () => {

@@ -605,6 +605,29 @@ describe('original_language_lookup handler', () => {
     });
   });
 
+  it('adds opt-in corpus usage without conflating lexicon occurrences', async () => {
+    const lookup = vi.fn<StrongsService['lookup']>().mockResolvedValue({
+      strongs_number: 'G25', testament: 'NT', lemma: 'ἀγαπάω', definition: 'to love',
+      extended: { occurrences: 143 }, citation,
+    });
+    const getCorpusUsage = vi.fn<StrongsService['getCorpusUsage']>().mockResolvedValue({
+      level: 'study', exactMorphologyKey: 'G0025', corpusIdentity: '93ae4ca3c09493cf02a6b48154c991c133fd6ce235119fc4b8cba0256a36f881',
+      attested: true, totals: { tokenCount: 17, verseCount: 15, bookCount: 4, sourceSurfaceVariantCount: 6 },
+      bookDistribution: [], sourceSurfaceVariants: [], occurrences: [], cautions: ['one', 'two', 'three'],
+    });
+    const result = await createStrongsLookupHandler(serviceDouble({ lookup, getCorpusUsage })).handler({
+      strongs_number: 'g0025', include_extended: true, usage_level: 'study', occurrence_limit: 7,
+    });
+    expect(lookup).toHaveBeenCalledWith('G25', true);
+    expect(getCorpusUsage).toHaveBeenCalledWith('G25', 'study', 7, undefined);
+    expect(textOf(result)).toContain('Occurrences: 143');
+    expect(textOf(result)).toContain('**Totals:** 17 raw tokens');
+    expect(result.structuredContent).toMatchObject({
+      corpusUsage: { exactMorphologyKey: 'G0025', totals: { tokenCount: 17 }, provenanceIds: ['src-usage'] },
+      provenance: expect.arrayContaining([expect.objectContaining({ id: 'src-usage', kind: 'morphology_dataset' })]),
+    });
+  });
+
   it('performs a bounded search without requesting an exact lookup', async () => {
     const search = vi.fn<StrongsService['search']>().mockResolvedValue([{
       strongs_number: 'G26',
@@ -645,12 +668,20 @@ describe('original_language_lookup handler', () => {
     expect(handler.inputSchema).not.toHaveProperty('oneOf');
     expect(handler.inputSchema.properties?.detail_level).not.toHaveProperty('default');
     expect(handler.inputSchema.properties?.include_extended).not.toHaveProperty('default');
+    expect(handler.inputSchema.properties?.usage_level).not.toHaveProperty('default');
+    expect(handler.inputSchema.properties?.occurrence_limit).not.toHaveProperty('default');
+    expect(handler.inputSchema.properties?.occurrence_limit).toMatchObject({ minimum: 1, maximum: 25 });
     expect(handler.inputSchema.properties?.limit).not.toHaveProperty('default');
     const exact = handler.inputSchema.properties?.strongs_number as { pattern: string; maxLength: number };
     expect(exact.maxLength).toBe(7);
     expect(new RegExp(exact.pattern).test('G21502')).toBe(true);
     expect(new RegExp(exact.pattern).test('G000001')).toBe(false);
     expect(new RegExp(exact.pattern).test('G100000')).toBe(false);
+    const corpusUsage = handler.outputSchema?.properties?.corpusUsage as {
+      properties: { sourceSurfaceVariants: { maxItems: number }; occurrences: { maxItems: number } };
+    };
+    expect(corpusUsage.properties.sourceSurfaceVariants.maxItems).toBe(25);
+    expect(corpusUsage.properties.occurrences.maxItems).toBe(25);
   });
 
   it('accepts valid calls after mode-appropriate client default materialization', async () => {
@@ -694,6 +725,19 @@ describe('original_language_lookup handler', () => {
     expect(textOf(result)).toContain('limit is only valid with query search');
     expect(search).not.toHaveBeenCalled();
     expect(lookup).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [{ query: 'love', usage_level: 'overview' }, 'apply only to exact'],
+    [{ strongs_number: 'G25', occurrence_limit: 5 }, 'require usage_level study or technical'],
+    [{ strongs_number: 'G25', usage_level: 'overview', occurrence_cursor: 'abc' }, 'require usage_level study or technical'],
+    [{ strongs_number: 'G25', usage_level: 'study', occurrence_limit: 13 }, 'between 1 and 12'],
+    [{ strongs_number: 'G25', usage_level: 'technical', occurrence_limit: 26 }, 'between 1 and 25'],
+    [{ strongs_number: 'G25', usage_level: 'technical', occurrence_cursor: 'bad cursor' }, 'malformed'],
+  ])('rejects invalid corpus usage call %j', async (params, message) => {
+    const result = await createStrongsLookupHandler(serviceDouble<StrongsService>({})).handler(params);
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toContain(message);
   });
 
   it('accepts a suffixed exact identity but rejects surrounding whitespace', async () => {

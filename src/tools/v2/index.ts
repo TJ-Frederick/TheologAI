@@ -105,7 +105,7 @@ export function createCompositionRoot(options: CompositionRootOptions = {}): Com
       THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH: process.env.THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH,
     }),
   );
-  const strongsService = new StrongsService(strongsRepo);
+  const strongsService = new StrongsService(strongsRepo, morphRepo);
   const morphService = new MorphologyService(morphRepo);
   const originalLanguageStudyService = new OriginalLanguageStudyService(morphRepo, strongsRepo);
 

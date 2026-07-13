@@ -13,11 +13,13 @@ import {
 } from '../../presenters/originalLanguageStructured.js';
 import { parseStrongsIdentity, STRONGS_IDENTITY_PATTERN } from '../../kernel/strongs.js';
 import type { CanonicalStrongsIdentity } from '../../kernel/strongs.js';
+import type { CorpusUsageLevel } from '../../kernel/types.js';
+import { MORPHOLOGY_USAGE_CURSOR_MAX_LENGTH } from '../../kernel/morphologyUsageCursor.js';
 
 export function createStrongsLookupHandler(service: StrongsService): ToolHandler {
   return {
     name: 'original_language_lookup',
-    description: "Look up an exact Strong's number or search Greek/Hebrew lemmas, transliterations, and definitions. Use exactly one mode: strongs_number for an exact lookup, or query for a search. Exact lookup can include extended STEPBible lexicon data.",
+    description: "Look up an exact Strong's number or search Greek/Hebrew lemmas, transliterations, and definitions. Use exactly one mode: strongs_number for an exact lookup, or query for a search. Exact lookup can opt into extended STEPBible lexicon data or exact corrected-corpus usage evidence.",
     inputSchema: {
       type: 'object',
       description: 'Flat mode fields are intentionally shown together for client discoverability; choose exactly one mode, with cross-field validity enforced strictly by the handler.',
@@ -32,6 +34,9 @@ export function createStrongsLookupHandler(service: StrongsService): ToolHandler
         },
         detail_level: { type: 'string', enum: ['simple', 'detailed'], description: 'Exact strongs_number lookups only; choose the amount of entry detail. Defaults to simple when omitted.' },
         include_extended: { type: 'boolean', description: 'Exact strongs_number lookups only; include STEPBible extended data. Defaults to false when omitted.' },
+        usage_level: { type: 'string', enum: ['overview', 'study', 'technical'], description: 'Exact strongs_number lookups only; opt into counted morphology-corpus usage. overview returns totals and complete canonical-book distribution only; study adds the top 10 exact source variants and a default 8-token page; technical adds the top 25 variants and a default 20-token page. Omit to preserve the legacy response.' },
+        occurrence_limit: { type: 'integer', minimum: 1, maximum: 25, description: 'Study/technical usage only; bounded raw-token page size. Maximum 12 for study or 25 for technical.' },
+        occurrence_cursor: { type: 'string', minLength: 1, maxLength: MORPHOLOGY_USAGE_CURSOR_MAX_LENGTH, pattern: '^[A-Za-z0-9_-]+$', description: 'Study/technical usage only; opaque cursor returned by the preceding page for this exact identity and corpus.' },
         query: {
           type: 'string',
           minLength: 2,
@@ -64,16 +69,25 @@ export function createStrongsLookupHandler(service: StrongsService): ToolHandler
           };
         }
 
-        const result = await service.lookup(
-          exactIdentity!.publicId,
-          params.include_extended === true,
-        );
-        const text = formatStrongsResult(result, params.detail_level as string);
+        const usageLevel = params.usage_level as CorpusUsageLevel | undefined;
+        const [result, corpusUsage] = await Promise.all([
+          service.lookup(exactIdentity!.publicId, params.include_extended === true),
+          usageLevel
+            ? service.getCorpusUsage(
+              exactIdentity!.publicId,
+              usageLevel,
+              params.occurrence_limit as number | undefined,
+              params.occurrence_cursor as string | undefined,
+            )
+            : undefined,
+        ]);
+        const text = formatStrongsResult(result, params.detail_level as string, corpusUsage);
         return {
           content: [{ type: 'text', text }],
           structuredContent: presentOriginalLanguageEntry(
             result,
             params.detail_level === 'detailed' ? 'detailed' : 'simple',
+            corpusUsage,
           ),
         };
       } catch (error) {
@@ -85,7 +99,10 @@ export function createStrongsLookupHandler(service: StrongsService): ToolHandler
 
 function validateLookupMode(params: Record<string, unknown>): CanonicalStrongsIdentity | undefined {
   const keys = Object.keys(params);
-  const allowed = new Set(['strongs_number', 'detail_level', 'include_extended', 'query', 'limit']);
+  const allowed = new Set([
+    'strongs_number', 'detail_level', 'include_extended', 'usage_level', 'occurrence_limit',
+    'occurrence_cursor', 'query', 'limit',
+  ]);
   const unknown = keys.find(key => !allowed.has(key));
   if (unknown) {
     throw new ValidationError(unknown, `Unknown argument "${unknown}". Use strongs_number for an exact lookup or query for a search.`);
@@ -103,8 +120,8 @@ function validateLookupMode(params: Record<string, unknown>): CanonicalStrongsId
     if (typeof params.query !== 'string' || params.query.trim().length < 2 || params.query.length > 100) {
       throw new ValidationError('query', 'query must be between 2 and 100 characters.');
     }
-    if (has('detail_level') || has('include_extended')) {
-      throw new ValidationError('mode', 'detail_level and include_extended apply only to exact strongs_number lookups; remove them when searching.');
+    if (has('detail_level') || has('include_extended') || has('usage_level') || has('occurrence_limit') || has('occurrence_cursor')) {
+      throw new ValidationError('mode', 'detail_level, include_extended, and corpus usage arguments apply only to exact strongs_number lookups; remove them when searching.');
     }
     if (has('limit') && (!Number.isInteger(params.limit) || (params.limit as number) < 1 || (params.limit as number) > 20)) {
       throw new ValidationError('limit', 'limit must be an integer between 1 and 20.');
@@ -130,6 +147,24 @@ function validateLookupMode(params: Record<string, unknown>): CanonicalStrongsId
   }
   if (has('include_extended') && typeof params.include_extended !== 'boolean') {
     throw new ValidationError('include_extended', 'include_extended must be true or false.');
+  }
+  if (has('usage_level') && !['overview', 'study', 'technical'].includes(params.usage_level as string)) {
+    throw new ValidationError('usage_level', 'usage_level must be overview, study, or technical.');
+  }
+  const hasOccurrenceArguments = has('occurrence_limit') || has('occurrence_cursor');
+  if (hasOccurrenceArguments && params.usage_level !== 'study' && params.usage_level !== 'technical') {
+    throw new ValidationError('usage_level', 'occurrence_limit and occurrence_cursor require usage_level study or technical.');
+  }
+  const occurrenceMaximum = params.usage_level === 'study' ? 12 : 25;
+  if (has('occurrence_limit') && (!Number.isInteger(params.occurrence_limit)
+    || (params.occurrence_limit as number) < 1 || (params.occurrence_limit as number) > occurrenceMaximum)) {
+    throw new ValidationError('occurrence_limit', `occurrence_limit must be an integer between 1 and ${occurrenceMaximum} for ${String(params.usage_level)} usage.`);
+  }
+  if (has('occurrence_cursor') && (typeof params.occurrence_cursor !== 'string'
+    || params.occurrence_cursor.length < 1
+    || params.occurrence_cursor.length > MORPHOLOGY_USAGE_CURSOR_MAX_LENGTH
+    || !/^[A-Za-z0-9_-]+$/.test(params.occurrence_cursor))) {
+    throw new ValidationError('occurrence_cursor', 'occurrence_cursor is malformed or oversized.');
   }
   return identity;
 }

@@ -50,6 +50,14 @@ contract. Local verification additionally asserts that occurrence, book, and
 form queries use their intended covering/ranking indexes without a temporary
 sort.
 
+The public usage cursor and provenance are deliberately bound to this exact D1
+identity. Any integration that changes `data/data-manifest.json`—including a
+catalog/data branch—must update `MORPHOLOGY_CORPUS_IDENTITY` in
+`src/kernel/morphologyUsageCursor.ts`. The mandatory cursor identity-drift test
+computes the canonical identity from the manifest and fails until that runtime
+binding is updated; cursors from the preceding corpus must then be rejected as
+stale.
+
 ## Storage impact and later product work
 
 Against PR #27 transform 4, the reproducible SQLite database grows from

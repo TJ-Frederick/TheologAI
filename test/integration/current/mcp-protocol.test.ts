@@ -138,9 +138,15 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
       expect(languageSchema?.properties).toMatchObject({
         strongs_number: expect.objectContaining({ type: 'string' }),
         query: expect.objectContaining({ type: 'string' }),
+        usage_level: expect.objectContaining({ enum: ['overview', 'study', 'technical'] }),
+        occurrence_limit: expect.objectContaining({ minimum: 1, maximum: 25 }),
+        occurrence_cursor: expect.objectContaining({ maxLength: 512 }),
       });
       expect(languageSchema?.properties?.detail_level).not.toHaveProperty('default');
       expect(languageSchema?.properties?.include_extended).not.toHaveProperty('default');
+      expect(languageSchema?.properties?.usage_level).not.toHaveProperty('default');
+      expect(languageSchema?.properties?.occurrence_limit).not.toHaveProperty('default');
+      expect(languageSchema?.properties?.occurrence_cursor).not.toHaveProperty('default');
       expect(languageSchema?.properties?.limit).not.toHaveProperty('default');
 
       const invalidClassic = await client.callTool({

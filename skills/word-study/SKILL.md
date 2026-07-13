@@ -26,7 +26,12 @@ Use this workflow when the user asks about:
 ### Step 3: Consult Lexical Evidence
 
 If the user provides a Strong's number (G####, H####):
-- Call `original_language_lookup` with the number and `include_extended: true`
+- Call `original_language_lookup` with the number, `include_extended: true`, and
+  `usage_level: "overview"`. Treat `corpusUsage` as global distribution evidence
+  that follows the verse-local analysis, never as a way to select a contextual
+  sense. Overview contains totals and the complete canonical-book distribution
+  only; request `study` or `technical` only when bounded forms or raw tokens are
+  genuinely needed.
 
 If the user provides an English word without verse context:
 - Call `original_language_lookup` to search for the term
@@ -58,4 +63,8 @@ Present contextual findings in this order:
 - Roots and etymology do not prove present contextual meaning.
 - Never import every possible sense into one occurrence.
 - Keep OpenScriptures and STEPBible evidence separately attributed.
+- Keep lexicon `extended.occurrences` distinct from counted morphology
+  `corpusUsage.totals.tokenCount`; they are different source claims.
+- Exact source surface variants preserve punctuation, accents, breathing marks,
+  and cantillation and are not normalized linguistic forms.
 - Do not infer Aramaic from an H identifier; current source classification is Greek or Hebrew.

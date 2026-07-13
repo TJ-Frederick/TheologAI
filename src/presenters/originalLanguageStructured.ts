@@ -4,6 +4,7 @@ import {
 } from '../kernel/provenance.js';
 import type { StrongsEntry } from '../kernel/repositories.js';
 import type { EnhancedStrongsResult } from '../kernel/types.js';
+import type { CorpusUsageResult } from '../kernel/types.js';
 import type {
   OriginalLanguageEntryV1,
   OriginalLanguageExtendedV1,
@@ -11,6 +12,7 @@ import type {
 } from '../mcp/schemas/originalLanguage.js';
 import { summarizeDefinition } from '../formatters/languagesFormatter.js';
 import { normalizeLexiconText } from '../kernel/lexiconText.js';
+import { MORPHOLOGY_CORPUS_IDENTITY } from '../kernel/morphologyUsageCursor.js';
 
 const STRONGS_CITATION = {
   source: "Strong's Concordance",
@@ -60,6 +62,7 @@ export function presentOriginalLanguageSearch(
 export function presentOriginalLanguageEntry(
   result: EnhancedStrongsResult,
   detailLevel: 'simple' | 'detailed',
+  corpusUsage?: CorpusUsageResult,
 ): OriginalLanguageOutputV1 {
   const stepBibleBase = result.sourceKind === 'stepbible_lexicon';
   const base = provenanceFromCitation(result.citation, {
@@ -90,6 +93,8 @@ export function presentOriginalLanguageEntry(
     provenanceIds.push(extended.id);
   }
 
+  if (corpusUsage) provenance.push(morphologyUsageProvenance());
+
   const extended = result.extended;
   const entry: OriginalLanguageEntryV1 = {
     strongsNumber: result.strongs_number,
@@ -111,7 +116,23 @@ export function presentOriginalLanguageEntry(
     mode: 'entry',
     detailLevel: detailLevel === 'detailed' ? 'detailed' : 'summary',
     entries: [entry],
+    ...(corpusUsage ? { corpusUsage: { ...corpusUsage, provenanceIds: ['src-usage'] } } : {}),
     provenance,
+  };
+}
+
+function morphologyUsageProvenance(): ProvenanceRecord {
+  return {
+    id: 'src-usage',
+    kind: 'morphology_dataset',
+    label: 'Corrected STEPBible morphology corpus',
+    url: 'https://github.com/STEPBible/STEPBible-Data',
+    license: { label: 'CC BY 4.0', url: 'https://creativecommons.org/licenses/by/4.0/' },
+    rightsNotice: 'CC BY 4.0 (Tyndale House, Cambridge)',
+    attribution: 'Tyndale House, Cambridge',
+    version: MORPHOLOGY_CORPUS_IDENTITY,
+    status: 'verified_source',
+    note: 'Counts are derived from exact corrected morphology tokens and are distinct from lexicon occurrence metadata.',
   };
 }
 

@@ -17,6 +17,8 @@ describe('original_language_study handler', () => {
     expect(result.content[0].text).toContain('Contextual evidence (for a plain-English explanation)');
     expect(result.content[0].text).not.toContain('Meaning here, in plain English');
     expect(result.structuredContent).toMatchObject({ kind: 'original_language_study', status: 'partial', context: { language: 'Greek' } });
+    expect(result.structuredContent).not.toHaveProperty('corpusUsage');
+    expect(handler.outputSchema?.properties).not.toHaveProperty('corpusUsage');
     expect(validatorFor(handler.outputSchema!)(result.structuredContent).valid).toBe(true);
     expect((result.structuredContent?.interpretiveLimits as Array<{ code: string }>).map(x => x.code)).toContain('corpus_scope_limit');
   });

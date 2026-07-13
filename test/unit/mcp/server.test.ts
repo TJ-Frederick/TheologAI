@@ -571,10 +571,13 @@ describe('shared MCP registration', () => {
       text: expect.stringContaining('G26'),
     }));
     expect(wordStudy.messages[0].content).toEqual(expect.objectContaining({
-      text: expect.stringContaining('mode`, `entries`, `detailLevel`, and `provenanceIds`'),
+      text: expect.stringContaining('optional `corpusUsage`, and `provenanceIds`'),
     }));
     expect(wordStudy.messages[0].content).toEqual(expect.objectContaining({
       text: expect.stringContaining('Do not treat one English gloss as exhausting'),
+    }));
+    expect(wordStudy.messages[0].content).toEqual(expect.objectContaining({
+      text: expect.stringContaining('Counted morphology tokens are distinct from lexicon occurrence metadata'),
     }));
 
     const passageExegesis = await client.getPrompt({

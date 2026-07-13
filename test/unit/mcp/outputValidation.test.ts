@@ -194,6 +194,19 @@ describe('MCP structured output validation', () => {
           },
         } : {}),
       }),
+      getCorpusUsage: async () => ({
+        level: 'technical' as const, exactMorphologyKey: 'G0026', corpusIdentity: '93ae4ca3c09493cf02a6b48154c991c133fd6ce235119fc4b8cba0256a36f881',
+        attested: true, totals: { tokenCount: 3, verseCount: 3, bookCount: 2, sourceSurfaceVariantCount: 2 },
+        bookDistribution: [{ book: 'John', canonicalOrder: 43, tokenCount: 2, verseCount: 2 }],
+        sourceSurfaceVariants: [{
+          sourceForm: 'ἀγάπη·', tokenCount: 1, verseCount: 1,
+          firstOccurrence: { book: 'John', canonicalOrder: 43, chapter: 3, verse: 16, position: 8 },
+        }],
+        occurrences: [{
+          book: 'John', canonicalOrder: 43, chapter: 3, verse: 16, position: 8,
+          sourceForm: 'ἀγάπη·', lemma: 'ἀγάπη', exactMorphologyKey: 'G0026', morphologyCode: 'N-NSF', gloss: 'love',
+        }], nextOccurrenceCursor: 'opaque_cursor', cautions: ['one', 'two', 'three'],
+      }),
     } as unknown as StrongsService;
     const client = await connect([
       createBibleLookupHandler(bibleService),
@@ -207,8 +220,9 @@ describe('MCP structured output validation', () => {
     const simple = await client.callTool({ name: 'original_language_lookup', arguments: { strongs_number: 'G26' } });
     const detailed = await client.callTool({ name: 'original_language_lookup', arguments: { strongs_number: 'G26', detail_level: 'detailed' } });
     const extended = await client.callTool({ name: 'original_language_lookup', arguments: { strongs_number: 'G26', include_extended: true, detail_level: 'detailed' } });
+    const usage = await client.callTool({ name: 'original_language_lookup', arguments: { strongs_number: 'G26', usage_level: 'technical', occurrence_limit: 1 } });
 
-    for (const result of [bibleSingle, biblePartial, search, simple, detailed, extended]) {
+    for (const result of [bibleSingle, biblePartial, search, simple, detailed, extended, usage]) {
       expect(result.isError).not.toBe(true);
       expect(result.content[0]).toMatchObject({ type: 'text', text: expect.any(String) });
       expect(result.structuredContent).toMatchObject({ schemaVersion: '1' });
@@ -223,6 +237,9 @@ describe('MCP structured output validation', () => {
     expect(extended.structuredContent).toMatchObject({
       mode: 'entry',
       entries: [{ extended: { definition: 'love\ndivine love & charity' } }],
+    });
+    expect(usage.structuredContent).toMatchObject({
+      corpusUsage: { exactMorphologyKey: 'G0026', occurrences: [{ sourceForm: 'ἀγάπη·' }] },
     });
   });
 

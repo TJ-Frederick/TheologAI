@@ -26,6 +26,10 @@ Use this workflow when the user asks for:
 - For a range, select at most three key individual verses. Never pass a range to `bible_verse_morphology` or `original_language_study`.
 - Study only terms affecting an actual translation or interpretive question.
 - Call `original_language_study` with one verse and the verse-local target. Resolve returned ambiguity by source position, not guesswork.
+- Request `usage_level: "overview"` from an exact `original_language_lookup`
+  only after the verse-local analysis and only when global distribution is
+  consequential. Overview is totals plus complete books only. Do not request
+  global usage from `original_language_study`.
 - Treat morphology as constraining evidence, not a self-sufficient interpretation.
 
 ### Step 3: Literary Context

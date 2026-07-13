@@ -50,7 +50,7 @@ export function recommendedToolCallsForPrompt(
       const word = args?.word?.trim() ?? '';
       const reference = args?.reference?.trim();
       const lexical = /^[GH]\d+[a-z]?$/i.test(word)
-        ? [{ tool: 'original_language_lookup', arguments: { strongs_number: word.toUpperCase(), include_extended: true, detail_level: 'detailed' } }]
+        ? [{ tool: 'original_language_lookup', arguments: { strongs_number: word.toUpperCase(), include_extended: true, detail_level: 'detailed', usage_level: 'overview' } }]
         : [{ tool: 'original_language_lookup', arguments: { query: word, limit: 10 } }];
       return reference
         ? [
@@ -197,14 +197,14 @@ export function registerPromptHandlers(server: Server): void {
 
 1. **Read the context** — ${callText(calls[0])}; compare ${callText(calls[1])}.
 2. **Resolve the verse token** — ${callText(calls[2])}. Identify the source form, lemma, Strong's identifier, or exact local gloss corresponding to the user's term. Then call \`original_language_study\` with ${reference} and that verse-local target. If it returns \`needs_disambiguation\`, select a candidate only from sentence context and call it again with that source position; do not guess.
-3. **Consult lexical evidence** — ${callText(calls[3])}. Keep OpenScriptures and STEPBible claims source-separated.
+3. **Consult lexical and corpus evidence** — ${callText(calls[3])}. Keep OpenScriptures lexicon claims, STEPBible lexicon metadata, and counted \`corpusUsage\` source-separated. Present corpus frequency only after the verse-local meaning and never use it to select the sense.
 4. **Synthesize in this order** — Begin with **Meaning here, in plain English**, then explain why it fits the verse, the word identity, and grammar. Put broader lexical evidence after the contextual explanation.
 5. **Apply safeguards** — Context controls sense. A gloss is not a definition; a Strong's number is an identifier; morphology constrains but does not settle meaning; roots and etymology do not prove present meaning; never import every possible sense into one occurrence. Do not infer Aramaic from an H identifier.`
           : `Provide a lexical overview of "${word}".${testamentHint}
 
-1. **Identify candidate terms** — ${callText(calls[0])}. Prefer structured \`mode\`, \`entries\`, \`detailLevel\`, and \`provenanceIds\`, with Markdown as fallback.
+1. **Identify candidate terms** — ${callText(calls[0])}. Prefer structured \`mode\`, \`entries\`, \`detailLevel\`, optional \`corpusUsage\`, and \`provenanceIds\`, with Markdown as fallback.
 2. **Label the scope honestly** — There is no verse context, so do not claim a contextual meaning. Invite a passage-specific study.
-3. **Apply safeguards** — Do not treat one English gloss as exhausting the term's semantic range. Keep source claims separate; a gloss, Strong's number, morphology, root, or etymology does not establish meaning in a verse, and do not import every possible sense into every occurrence.`;
+3. **Apply safeguards** — Do not treat one English gloss as exhausting the term's semantic range. Counted morphology tokens are distinct from lexicon occurrence metadata. Frequency, a gloss, Strong's number, morphology, root, or etymology does not establish meaning in a verse, and do not import every possible sense into every occurrence.`;
         break;
       }
       case 'passage-exegesis': {
@@ -230,7 +230,7 @@ export function registerPromptHandlers(server: Server): void {
 ${lookupCalls}
 Use structured \`passages[]\` when available, compare by its \`translation\`, report every \`failures[]\` item, and keep each citation/provenance link attached to the relevant translation. Fall back to the Markdown text when structured fields are unavailable.
 2. **Examine the original language** — ${callText(calls.at(-1)!)}.
-3. **Investigate divergences** — Make exact \`original_language_lookup\` calls for the relevant Strong's numbers.
+3. **Investigate divergences** — Make exact \`original_language_lookup\` calls for the relevant Strong's numbers. Request \`usage_level: "overview"\` only when distribution materially helps, keep it after verse-local analysis, and never infer contextual meaning from frequency.
 4. **Summarize** — Compare literal/dynamic choices and any theologically significant differences.`;
         break;
       }

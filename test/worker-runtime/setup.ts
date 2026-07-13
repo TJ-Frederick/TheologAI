@@ -63,9 +63,32 @@ beforeAll(async () => {
         lemma,
         strongs_number,
         morph_code,
-        gloss
+        gloss,
+        book_order
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind('John', 3, 16, 1, 'Οὕτως', 'οὕτως', 'G3779', 'ADV', 'thus', 43),
+    env.THEOLOGAI_DB.prepare(`
+      INSERT INTO morphology (
+        book, chapter, verse, position, word_text, lemma,
+        strongs_number, morph_code, gloss, book_order
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind('John', 3, 16, 2, 'ἀγάπη·', 'ἀγάπη', 'G0026', 'N-NSF', 'love', 43),
+    env.THEOLOGAI_DB.prepare(`
+      INSERT INTO strongs_usage_stats
+        (strongs_key, token_count, verse_count, book_count, form_count)
+      VALUES (?, ?, ?, ?, ?)
+    `).bind('G0026', 1, 1, 1, 1),
+    env.THEOLOGAI_DB.prepare(`
+      INSERT INTO strongs_book_stats
+        (strongs_key, book, book_order, token_count, verse_count)
+      VALUES (?, ?, ?, ?, ?)
+    `).bind('G0026', 'John', 43, 1, 1),
+    env.THEOLOGAI_DB.prepare(`
+      INSERT INTO strongs_form_stats (
+        strongs_key, form_text, token_count, verse_count,
+        first_book, first_book_order, first_chapter, first_verse, first_position
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind('John', 3, 16, 1, 'Οὕτως', 'οὕτως', 'G3779', 'ADV', 'thus'),
+    `).bind('G0026', 'ἀγάπη·', 1, 1, 'John', 43, 3, 16, 2),
     env.THEOLOGAI_DB.prepare(`
       INSERT INTO morph_codes (code, expansion)
       VALUES (?, ?)

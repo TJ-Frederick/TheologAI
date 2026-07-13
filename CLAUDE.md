@@ -93,13 +93,19 @@ test/
 | `commentary_lookup` | 6 commentaries (Matthew Henry, JFB, Clarke, Gill, K-D, Tyndale) |
 | `classic_text_lookup` | Search and browse 17 locally indexed historical documents; no remote CCEL body retrieval |
 | `primary_source_search` | Run bounded local-only primary-source query plans with exact local section locators |
-| `original_language_lookup` | Strong's concordance (14,298 entries), Greek/Hebrew word studies |
+| `original_language_lookup` | Strong's concordance plus opt-in exact corrected-corpus usage and bounded occurrence pages |
 | `bible_verse_morphology` | Word-by-word grammatical analysis for all 66 books |
 | `original_language_study` | Context-first study of one Greek or Hebrew token in one verse, with structured evidence and interpretive limits |
 | `donation_config` | Donation configuration: supported tokens, recipient address, chain details |
 | `verify_donation` | On-chain donation verification across Ethereum, Base, and Radius |
 
 All tools have annotations: `readOnlyHint: true`, `destructiveHint: false`, `idempotentHint: true`.
+
+Exact `original_language_lookup` corpus-usage budgets are fixed: `overview`
+returns totals and complete books only; `study` returns the top 10 exact source
+variants plus 8 occurrences by default (12 maximum); `technical` returns the
+top 25 variants plus 20 occurrences by default (25 maximum). Omission preserves
+the legacy response.
 
 ### Resources
 

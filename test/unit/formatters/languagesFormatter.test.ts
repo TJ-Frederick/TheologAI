@@ -184,6 +184,40 @@ describe('formatStrongsResult', () => {
     expect(out).toContain('Public Domain (OpenScriptures)');
   });
 
+  it('keeps omitted usage byte-compatible with the legacy Markdown shape', () => {
+    expect(formatStrongsResult(makeStrongsResult())).toBe(`**G26** (Greek)
+
+**Lemma:** ἀγάπη
+**Transliteration:** agapē
+**Pronunciation:** ag-ah-pay
+**Definition:** love, goodwill
+
+*Source: Strong's Concordance* - Public Domain (OpenScriptures)`);
+  });
+
+  it('labels counted tokens, exact surface variants, verse zero, and pagination distinctly', () => {
+    const out = formatStrongsResult(makeStrongsResult({ extended: { occurrences: 999 } }), 'simple', {
+      level: 'study', exactMorphologyKey: 'H9998', corpusIdentity: '93ae4ca3c09493cf02a6b48154c991c133fd6ce235119fc4b8cba0256a36f881',
+      attested: true,
+      totals: { tokenCount: 3, verseCount: 2, bookCount: 1, sourceSurfaceVariantCount: 2 },
+      bookDistribution: [{ book: 'Psalms', canonicalOrder: 19, tokenCount: 3, verseCount: 2 }],
+      sourceSurfaceVariants: [{
+        sourceForm: 'מִזְמוֹר֙', tokenCount: 1, verseCount: 1,
+        firstOccurrence: { book: 'Psalms', canonicalOrder: 19, chapter: 3, verse: 0, position: 1 },
+      }],
+      occurrences: [{
+        book: 'Psalms', canonicalOrder: 19, chapter: 3, verse: 0, position: 1,
+        sourceForm: 'מִזְמוֹר֙', lemma: 'מִזְמוֹר', exactMorphologyKey: 'H9998', morphologyCode: 'HNcmsa', gloss: 'psalm',
+      }],
+      nextOccurrenceCursor: 'opaque_cursor', cautions: ['one', 'two', 'three'],
+    });
+    expect(out).toContain('Occurrences: 999');
+    expect(out).toContain('**Totals:** 3 raw tokens');
+    expect(out).toContain('Psalms 3:0');
+    expect(out).toContain('מִזְמוֹר֙');
+    expect(out).toContain('`opaque_cursor`');
+  });
+
   it('returns trimmed output', () => {
     const out = formatStrongsResult(makeStrongsResult());
     expect(out).toBe(out.trim());

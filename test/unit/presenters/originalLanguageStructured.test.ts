@@ -110,4 +110,37 @@ describe('original-language structured presenter', () => {
       attribution: 'Tyndale House, Cambridge',
     })]);
   });
+
+  it('presents exact corrected-corpus usage with separate morphology provenance', () => {
+    const result = presentOriginalLanguageEntry({
+      strongs_number: 'H430', testament: 'OT', lemma: 'אֱלֹהִים', definition: 'God, gods',
+      citation: { source: "Strong's Concordance", copyright: 'Public Domain' },
+    }, 'simple', {
+      level: 'study', exactMorphologyKey: 'H0430', corpusIdentity: '93ae4ca3c09493cf02a6b48154c991c133fd6ce235119fc4b8cba0256a36f881',
+      attested: true, totals: { tokenCount: 2, verseCount: 2, bookCount: 1, sourceSurfaceVariantCount: 2 },
+      bookDistribution: [{ book: 'Genesis', canonicalOrder: 1, tokenCount: 2, verseCount: 2 }],
+      sourceSurfaceVariants: [{
+        sourceForm: 'אֱלֹהִ֑ים', tokenCount: 1, verseCount: 1,
+        firstOccurrence: { book: 'Genesis', canonicalOrder: 1, chapter: 1, verse: 1, position: 3 },
+      }], cautions: ['one', 'two', 'three'],
+    });
+    expect(result.corpusUsage).toMatchObject({
+      exactMorphologyKey: 'H0430', sourceSurfaceVariants: [{ sourceForm: 'אֱלֹהִ֑ים' }], provenanceIds: ['src-usage'],
+    });
+    expect(result.provenance).toContainEqual(expect.objectContaining({
+      id: 'src-usage', kind: 'morphology_dataset', license: { label: 'CC BY 4.0', url: expect.any(String) },
+    }));
+  });
+
+  it('represents an exact extended identity as not attested without base-key inheritance', () => {
+    const result = presentOriginalLanguageEntry({
+      strongs_number: 'H430A', testament: null, language: 'Hebrew', lemma: 'fixture', definition: 'fixture',
+      sourceKind: 'stepbible_lexicon', citation: { source: 'STEPBible lexicon data', copyright: 'CC BY 4.0' },
+    }, 'simple', {
+      level: 'overview', exactMorphologyKey: 'H0430A', corpusIdentity: '93ae4ca3c09493cf02a6b48154c991c133fd6ce235119fc4b8cba0256a36f881',
+      attested: false, totals: { tokenCount: 0, verseCount: 0, bookCount: 0, sourceSurfaceVariantCount: 0 },
+      bookDistribution: [], sourceSurfaceVariants: [], cautions: ['one', 'two', 'three'],
+    });
+    expect(result.corpusUsage).toMatchObject({ exactMorphologyKey: 'H0430A', attested: false, totals: { tokenCount: 0 } });
+  });
 });

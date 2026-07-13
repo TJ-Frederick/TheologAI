@@ -87,6 +87,17 @@ describe('prompt-recommended tool-call contracts', () => {
     expect(calls.map(call => call.tool)).not.toContain('original_language_study');
   });
 
+  it('keeps global usage opt-in, overview-only, and after context in guided word study', () => {
+    const lexical = recommendedToolCallsForPrompt('word-study', { word: 'G26' });
+    expect(lexical).toEqual([{
+      tool: 'original_language_lookup',
+      arguments: { strongs_number: 'G26', include_extended: true, detail_level: 'detailed', usage_level: 'overview' },
+    }]);
+    const contextual = recommendedToolCallsForPrompt('word-study', { word: 'G26', reference: 'John 3:16' });
+    expect(contextual.at(-1)).toEqual(lexical[0]);
+    expect(contextual.find(call => call.tool === 'original_language_study')).toBeUndefined();
+  });
+
   it('keeps primary-source research local, bounded, and exact-work aware', () => {
     expect(recommendedToolCallsForPrompt('primary-source-research', { topic: 'eucharist' })).toEqual([{
       tool: 'primary_source_search',

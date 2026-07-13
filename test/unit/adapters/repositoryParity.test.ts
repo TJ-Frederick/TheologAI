@@ -12,6 +12,7 @@ import { D1UbsParallelPassageRepository } from '../../../src/adapters/d1/D1UbsPa
 import { UbsParallelPassageRepository } from '../../../src/adapters/shared/UbsParallelPassageRepository.js';
 import { UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY, UBS_PARALLEL_PASSAGE_PROVENANCE } from '../../../src/kernel/ubsParallelSource.js';
 import { ubsFixture } from '../../fixtures/ubsParallelCorpus.js';
+import { StrongsService } from '../../../src/services/languages/StrongsService.js';
 
 function sqliteAsD1(db: Database.Database): D1Database {
   return {
@@ -245,6 +246,24 @@ describe('SQLite and D1 repository parity with identical real data', () => {
       .resolves.toEqual(sqliteMorphology.getTokenOccurrences('G0025'));
     expect(sqliteMorphology.getAvailableBooks()).toEqual(['Genesis', 'Psalms', 'John', 'Romans']);
     expect(sqliteMorphology.getDistribution('G0025').map(row => row.book)).toEqual(['John', 'Romans']);
+  });
+
+  it('produces identical Node and D1 public usage pages and opaque cursors', async () => {
+    const node = new StrongsService(sqliteStrongs, sqliteMorphology);
+    const worker = new StrongsService(d1Strongs, d1Morphology);
+    await expect(worker.getCorpusUsage('G25', 'overview'))
+      .resolves.toEqual(await node.getCorpusUsage('G0025', 'overview'));
+
+    const nodeFirst = await node.getCorpusUsage('G25', 'technical', 1);
+    const workerFirst = await worker.getCorpusUsage('g0025', 'technical', 1);
+    expect(workerFirst).toEqual(nodeFirst);
+    expect(nodeFirst.occurrences).toHaveLength(1);
+    expect(nodeFirst.nextOccurrenceCursor).toMatch(/^[A-Za-z0-9_-]+$/);
+
+    const nodeSecond = await node.getCorpusUsage('G25', 'technical', 1, nodeFirst.nextOccurrenceCursor);
+    const workerSecond = await worker.getCorpusUsage('G25', 'technical', 1, workerFirst.nextOccurrenceCursor);
+    expect(workerSecond).toEqual(nodeSecond);
+    expect(nodeSecond.occurrences?.[0]).toMatchObject({ book: 'Romans', chapter: 8, verse: 35 });
   });
 
   it('round-trips a verse-zero Psalm superscription keyset cursor identically', async () => {
