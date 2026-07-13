@@ -1,8 +1,6 @@
-import type { PrimarySourceSearchPlanResult } from '../services/historical/primarySourceTypes.js';
-import { buildLocalDocumentResourceUri } from '../kernel/documentResource.js';
-import { normalizeCcelSectionLocator } from '../adapters/commentary/CcelSearchAdapter.js';
+import type { PresentedPrimarySourceSearch } from '../presenters/primarySourceSearchStructured.js';
 
-export function formatPrimarySourceSearch(result: PrimarySourceSearchPlanResult): string {
+export function formatPrimarySourceSearch(result: PresentedPrimarySourceSearch): string {
   const lines = [
     '# Primary-source discovery',
     '',
@@ -32,7 +30,12 @@ export function formatPrimarySourceSearch(result: PrimarySourceSearchPlanResult)
   lines.push(`- Local: ${result.coverage.localStatus ?? 'not requested'}; ${result.coverage.localHitCount} returned hits`);
   lines.push(`- CCEL: ${result.coverage.ccelStatus ?? 'not requested'}; ${result.coverage.ccelHitCount} returned hits`);
   for (const notice of result.coverage.notices) lines.push(`- ${safe(notice)}`);
-  lines.push('', '_Results are bounded discovery evidence, not an exhaustive catalog. Missing hits do not establish historical silence._');
+  lines.push(
+    '',
+    '_Evidence policy: snippets are discovery aids only. Read a selected exact MCP section resource before quotation or substantive conclusions._',
+    '_Results are bounded discovery evidence, not an exhaustive catalog; missing hits do not establish historical silence._',
+    '_Edition provenance is incomplete. Catalog type/date describe the work; this server does not claim a reviewed author, edition, transcription provenance, or rights status where none is supplied._',
+  );
   return lines.join('\n').trim();
 }
 
@@ -45,15 +48,6 @@ function safe(value: string): string {
     .replace(/[\\`*_{}\[\]()<>#+.!|>-]/g, character => `\\${character}`);
 }
 
-function formatLocator(locator: PrimarySourceSearchPlanResult['queries'][number]['providers'][number]['hits'][number]['locator']): string {
-  if (locator.kind === 'local_section') {
-    const canonical = buildLocalDocumentResourceUri(locator.documentId, locator.sectionId);
-    if (canonical && locator.url === canonical) return `[exact section](${canonical})`;
-  } else {
-    const normalized = normalizeCcelSectionLocator(locator.url);
-    if (normalized && normalized.work === locator.work && normalized.section === locator.section) {
-      return `[exact section](${normalized.url})`;
-    }
-  }
-  return safe(locator.url);
+function formatLocator(locator: PresentedPrimarySourceSearch['queries'][number]['providers'][number]['hits'][number]['locator']): string {
+  return `[exact section](${locator.url})`;
 }

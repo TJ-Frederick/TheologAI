@@ -95,6 +95,27 @@ export function recommendedToolCallsForPrompt(
         { tool: 'classic_text_lookup', arguments: { query: topic } },
       ];
     }
+    case 'primary-source-research': {
+      const topic = args?.topic?.trim() ?? '';
+      const work = args?.work?.trim();
+      const requestedLimit = Number(args?.maxSections?.trim() || '3');
+      const limit = Number.isSafeInteger(requestedLimit) && requestedLimit >= 1 && requestedLimit <= 5
+        ? requestedLimit
+        : 3;
+      return [{
+        tool: 'primary_source_search',
+        arguments: {
+          queries: [{
+            id: work ? 'exact-local-work' : 'topic-survey',
+            text: topic,
+            providers: ['local'],
+            match: 'all_terms',
+            ...(work ? { work } : {}),
+            limit,
+          }],
+        },
+      }];
+    }
     case 'donate':
       return [{ tool: 'donation_config', arguments: {} }];
     default:
@@ -140,6 +161,15 @@ export function registerPromptHandlers(server: Server): void {
         arguments: [
           { name: 'topic', description: 'The doctrine or topic to compare', required: true },
           { name: 'traditions', description: 'Comma-separated traditions to focus on', required: false },
+        ],
+      },
+      {
+        name: 'primary-source-research',
+        description: 'Find and read bounded evidence from the locally indexed historical collection',
+        arguments: [
+          { name: 'topic', description: 'Topic or terms to find in the local historical collection', required: true },
+          { name: 'work', description: 'Optional exact local work title or slug; not an author name', required: false },
+          { name: 'maxSections', description: 'Maximum selected sections as a string integer from 1 to 5. Default: 3.', required: false },
         ],
       },
       { name: 'donate', description: 'Guide for donating to support TheologAI development', arguments: [] },
@@ -215,6 +245,20 @@ Use structured \`passages[]\` when available, compare by its \`translation\`, re
 3. **Read sections** — Browse the relevant documents.
 4. **Biblical foundations** — Use \`bible_lookup\` and \`bible_cross_references\` for passages identified in the documents.
 5. **Compare** — Explain agreement, divergence, Scripture use, and historical context.`;
+        break;
+      }
+      case 'primary-source-research': {
+        const topic = args?.topic ?? '';
+        const work = args?.work?.trim();
+        text = `Research primary-source evidence about "${topic}"${work ? ` within the exact local work "${work}"` : ' across the locally indexed collection'}.
+
+1. **Run bounded discovery** — ${callText(calls[0])}. This workflow is local-only: do not claim it searched CCEL, the web, an exhaustive catalog, or works outside the server's collection.
+2. **Use the structured result** — Preserve query/provider grouping, rank, status, notices, document type/date, locator, and \`evidencePolicy\`. Treat every snippet as \`discovery_only\`, not as quotation evidence.
+3. **Read selected evidence** — Follow at most ${args?.maxSections?.trim() || '3'} canonical \`resource_link\` blocks using MCP \`resources/read\`. Confirm that the returned URI matches the selected locator before quoting the exact section.
+4. **Report provenance honestly** — Edition provenance is incomplete. Do not invent an author, edition, transcription source, publication date, or rights status. Work-level type/date metadata is not edition metadata.
+5. **Synthesize with limits** — Distinguish what the selected sections say from your interpretation. Name searches that returned no results or unsupported filters; do not treat missing hits as historical silence.
+
+This workflow supports a topic survey or one exact local-work search. It does not perform author comparisons; for comparisons, run separate bounded local searches and compare only sections you actually read.`;
         break;
       }
       case 'donate':

@@ -10,6 +10,24 @@ export const LOCAL_HISTORICAL_SOURCE = LOCAL_PRIMARY_SOURCE_ATTRIBUTION;
 
 const localSource = `*Source: ${LOCAL_HISTORICAL_SOURCE}*`;
 
+/** Canonical exact-section representation shared by resources/read and link sizing. */
+export function formatLocalDocumentSectionResource(doc: DocumentInfo, section: DocumentSection): string {
+  const heading = section.title
+    ? `## ${section.section_number ? `${section.section_number}. ` : ''}${section.title}`
+    : section.section_number ? `## Section ${section.section_number}` : '## Selected section';
+  return [
+    `# ${doc.title}\n`,
+    `**Type:** ${doc.type}`,
+    doc.date ? `**Date:** ${doc.date}` : '',
+    '',
+    heading,
+    '',
+    section.content,
+    '',
+    localSource,
+  ].filter(Boolean).join('\n');
+}
+
 /** Format a document listing */
 export function formatDocumentList(docs: DocumentInfo[]): string {
   let s = `**Available Historical Documents** (${docs.length})\n\n`;

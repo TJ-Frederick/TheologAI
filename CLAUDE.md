@@ -1,8 +1,8 @@
 # TheologAI — Development Guide
 
-Production MCP server for theological research. Eleven tools, five prompts, eight Bible translations, six commentaries, 17 historical documents, Greek/Hebrew language tools, and on-chain donation support. Tools, resources, and prompts are available on every transport; MCP Logging is stdio-only because HTTP is stateless.
+Production MCP server for theological research. Eleven tools, six prompts, eight Bible translations, six commentaries, 17 historical documents, Greek/Hebrew language tools, and on-chain donation support. Tools, resources, and prompts are available on every transport; MCP Logging is stdio-only because HTTP is stateless.
 
-<!-- theologai-public-contract tools=11 structured=bible_lookup,original_language_lookup,original_language_study,parallel_passages -->
+<!-- theologai-public-contract tools=11 structured=bible_lookup,original_language_lookup,original_language_study,parallel_passages,primary_source_search -->
 
 ## Quick Start
 
@@ -120,6 +120,7 @@ These prompts provide structured research methodologies. **Auto-trigger**: when 
 | `passage-exegesis` | `/mcp__theologai__passage-exegesis` | Exegete a passage, do deep analysis of verses, or study a text systematically |
 | `compare-translations` | `/mcp__theologai__compare-translations` | Compare how different translations render a passage, or explore translation differences |
 | `confession-study` | `/mcp__theologai__confession-study` | Compare doctrines across creeds, confessions, and catechisms from different traditions |
+| `primary-source-research` | `/mcp__theologai__primary-source-research` | Survey a topic or search one exact local work, then read selected exact sections as evidence |
 | `donate` | `/mcp__theologai__donate` | Donate, support the project, contribute financially, or ask about donations |
 
 When a user asks "what can you do?" or seems unsure how to proceed, mention these workflows as available research modes.

@@ -11,6 +11,7 @@ function providerResult(provider: 'local' | 'ccel_live', status: PrimarySourcePr
       locator: provider === 'local'
         ? { kind: 'local_section', documentId: 'doc', sectionId: String(index), url: `theologai://documents/doc#section-${index}` }
         : { kind: 'ccel_section', work: 'calvin/institutes', section: String(index), url: `https://ccel.org/ccel/calvin/institutes/${index}.html` },
+      ...(provider === 'local' ? { resourceSizeBytes: 100 + index } : {}),
       rankWithinProvider: index + 1, page: 1, snippetOnly: true, attribution: provider,
     })),
     notices: [],

@@ -53,8 +53,9 @@ subject to their stacked PR reviews, CI, operational gates, and merge order:
    must receive its own reviewable publication path before release.
 
 The integration candidate advertises eleven tools and structured output for
-`bible_lookup`, `parallel_passages`, `original_language_lookup`, and
-`original_language_study`. Markdown remains available for compatibility.
+`bible_lookup`, `parallel_passages`, `primary_source_search`,
+`original_language_lookup`, and `original_language_study`. Markdown remains
+available for compatibility.
 
 ## Release gates
 
@@ -70,10 +71,10 @@ Code readiness and operational readiness are deliberately separate:
 4. Preview deployment requires the repository's authorization label and
    protected environment approval. The live PR must still be open, non-draft,
    and authorized immediately before deployment.
-5. Preview smoke and a functional audit must cover all eleven tools, the four
+5. Preview smoke and a functional audit must cover all eleven tools, the five
    structured-output contracts, UBS default and explicit-source behavior,
    Strong's extended identities, local primary-source search, language study,
-   resources, prompts, and failure/privacy boundaries.
+   resources, all six prompts, and failure/privacy boundaries.
 6. Production D1 marker changes require explicit owner authorization, a
    conditional one-row update, immediate read-only readiness verification, and
    a prepared conditional rollback.
