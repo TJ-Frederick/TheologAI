@@ -8,12 +8,20 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { genesisOneOneLemmaReadinessPredicate, johnOneOneReadinessPredicate } from './data-integrity.js';
 import { computeD1CorpusIdentity, parseDataManifest, verifyD1Migrations } from './d1-corpus-identity.js';
 import { UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY, UBS_PARALLEL_PASSAGE_PROVENANCE } from '../src/kernel/ubsParallelSource.js';
+import type {
+  BiblicalLanguageUnicodeCorrectionLedger,
+  MorphologyUnicodeCorrection,
+} from './biblical-language-unicode-correction.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const manifestBytes = readFileSync(join(ROOT, 'data', 'data-manifest.json'));
 const MANIFEST = parseDataManifest(manifestBytes);
 verifyD1Migrations(ROOT, MANIFEST);
 const D1_CORPUS_IDENTITY = computeD1CorpusIdentity(MANIFEST);
+const UNICODE_CORRECTION = JSON.parse(readFileSync(
+  join(ROOT, 'data/biblical-languages/UNICODE-CORRECTION.json'),
+  'utf8',
+)) as BiblicalLanguageUnicodeCorrectionLedger;
 
 export const REQUIRED_COLUMNS: Readonly<Record<string, readonly string[]>> = {
   theologai_metadata: ['key', 'value'],
@@ -31,6 +39,57 @@ export const REQUIRED_COLUMNS: Readonly<Record<string, readonly string[]>> = {
   ubs_parallel_members: ['group_id', 'source_order', 'source_reference', 'normalized_reference', 'language_marker', 'alignment_basis', 'alignment_raw'],
   ubs_parallel_segments: ['group_id', 'member_order', 'segment_order', 'book_number', 'chapter', 'start_verse', 'end_verse'],
 };
+
+export interface MorphologyUnicodeReadinessContract {
+  cte: string;
+  checks: string[];
+  correctionCount: number;
+}
+
+function sqlLiteral(value: string): string {
+  return `'${value.replaceAll("'", "''")}'`;
+}
+
+/**
+ * Materialize every reviewed morphology correction as SQL data, then require an
+ * exact locator/value match. Fields are converted to fixed column names only
+ * after validation; ledger strings are always SQL-escaped literals.
+ */
+export function buildMorphologyUnicodeReadinessContract(
+  corrections: readonly MorphologyUnicodeCorrection[],
+): MorphologyUnicodeReadinessContract {
+  const locators = new Set<string>();
+  const values = corrections.map(correction => {
+    if (!/^[1-3]?[A-Za-z]+$/.test(correction.book)
+      || !Number.isSafeInteger(correction.chapter) || correction.chapter < 1
+      || !Number.isSafeInteger(correction.verse) || correction.verse < 1
+      || !Number.isSafeInteger(correction.position) || correction.position < 1
+      || !['text', 'lemma'].includes(correction.field)
+      || typeof correction.after !== 'string' || correction.after.includes('\uFFFD')) {
+      throw new Error('Invalid morphology Unicode correction readiness locator/value');
+    }
+    const column = correction.field === 'text' ? 'word_text' : 'lemma';
+    const locator = `${correction.book}/${correction.chapter}/${correction.verse}/${correction.position}/${column}`;
+    if (locators.has(locator)) throw new Error(`Duplicate morphology Unicode correction readiness locator: ${locator}`);
+    locators.add(locator);
+    return `(${sqlLiteral(correction.book)},${correction.chapter},${correction.verse},${correction.position},${sqlLiteral(column)},${sqlLiteral(correction.after)})`;
+  });
+  if (values.length !== 237) {
+    throw new Error(`Expected 237 morphology Unicode correction readiness cells, received ${values.length}`);
+  }
+  const cte = `unicode_morphology_expected(book,chapter,verse,position,field,expected_value) AS (VALUES\n${values.join(',\n')}\n)`;
+  const join = `m.book = e.book AND m.chapter = e.chapter AND m.verse = e.verse AND m.position = e.position`;
+  const selectedValue = `CASE e.field WHEN 'word_text' THEN m.word_text WHEN 'lemma' THEN m.lemma END`;
+  return {
+    cte,
+    correctionCount: values.length,
+    checks: [
+      `(SELECT COUNT(*) FROM unicode_morphology_expected) = ${values.length}`,
+      `(SELECT COUNT(*) FROM unicode_morphology_expected e JOIN morphology m ON ${join}) = ${values.length}`,
+      `(SELECT COUNT(*) FROM unicode_morphology_expected e JOIN morphology m ON ${join} WHERE ${selectedValue} IS NOT e.expected_value) = 0`,
+    ],
+  };
+}
 
 export function buildD1ReadinessSql(
   expectedCounts: Record<string, number>,
@@ -76,9 +135,35 @@ export function buildD1ReadinessSql(
     `(SELECT COUNT(*) FROM ubs_parallel_members WHERE source_reference != trim(source_reference) OR length(source_reference) <= 4 OR source_reference NOT GLOB '[A-Z0-9][A-Z0-9][A-Z0-9] *' OR normalized_reference = '' OR normalized_reference != trim(normalized_reference) OR alignment_raw = '' OR alignment_raw GLOB '*[^0-8]*' OR (language_marker = 'GRK' AND alignment_basis != 'UBSGNT5') OR (language_marker = 'HEB' AND alignment_basis NOT IN ('BHS','LXX'))) = 0`,
     `(SELECT COUNT(*) FROM ubs_parallel_segments WHERE book_number NOT BETWEEN 1 AND 66 OR chapter < 1 OR start_verse < 1 OR end_verse < start_verse) = 0`,
   ];
+  if (UNICODE_CORRECTION.strongs.length !== 9 || UNICODE_CORRECTION.morphology.length !== 237
+    || UNICODE_CORRECTION.contract.d1Cells !== 255) {
+    throw new Error('Biblical-language Unicode correction readiness contract drift');
+  }
+  const strongsSemanticChecks = UNICODE_CORRECTION.strongs.flatMap(correction => {
+    if (!/^[GH]\d+$/.test(correction.strongsNumber) || !['lemma', 'translit'].includes(correction.field)) {
+      throw new Error(`Invalid Strong's Unicode correction readiness locator`);
+    }
+    const column = correction.field === 'translit' ? 'transliteration' : 'lemma';
+    const expected = sqlLiteral(correction.after);
+    const strongsNumber = sqlLiteral(correction.strongsNumber);
+    return [
+      `(SELECT ${column} FROM strongs WHERE strongs_number = ${strongsNumber}) = ${expected}`,
+      `(SELECT ${column} FROM strongs_fts WHERE strongs_number = ${strongsNumber}) = ${expected}`,
+    ];
+  });
+  const morphologyUnicodeContract = buildMorphologyUnicodeReadinessContract(UNICODE_CORRECTION.morphology);
+  const unicodeAbsenceChecks = [
+    ['strongs', ['strongs_number', 'testament', 'lemma', 'transliteration', 'pronunciation', 'definition', 'derivation']],
+    ['strongs_fts', ['strongs_number', 'lemma', 'transliteration', 'definition']],
+    ['morphology', ['book', 'word_text', 'lemma', 'strongs_number', 'morph_code', 'gloss']],
+  ].map(([table, columns]) => {
+    const predicate = (columns as string[]).map(column => `instr(COALESCE(${column}, ''), char(65533)) > 0`).join(' OR ');
+    return `(SELECT COUNT(*) FROM ${table} WHERE ${predicate}) = 0`;
+  });
 
   return [
-    `SELECT CASE WHEN ${[integrityCheck, foreignKeyCheck, ...identityChecks, ...columnChecks, ...countChecks, indexCheck, ...ubsSemanticChecks, johnOneOneReadinessPredicate(), genesisOneOneLemmaReadinessPredicate()].join(' AND ')}`,
+    `WITH ${morphologyUnicodeContract.cte}`,
+    `SELECT CASE WHEN ${[integrityCheck, foreignKeyCheck, ...identityChecks, ...columnChecks, ...countChecks, indexCheck, ...ubsSemanticChecks, ...strongsSemanticChecks, ...morphologyUnicodeContract.checks, ...unicodeAbsenceChecks, johnOneOneReadinessPredicate(), genesisOneOneLemmaReadinessPredicate()].join(' AND ')}`,
     `THEN 'ready' ELSE json_extract('D1 readiness check failed', '$') END AS readiness;`,
   ].join('\n');
 }

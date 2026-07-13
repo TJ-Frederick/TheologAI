@@ -7,6 +7,7 @@ import {
   OPENSCRIPTURES_STRONGS,
   STEPBIBLE_DATA,
   assertPinnedSourceBytes,
+  deterministicBuildProvenance,
   trackedArtifactAttestation,
   sourceLockProjection,
   type PinnedSource,
@@ -45,7 +46,8 @@ function assertRegistrySource(source: PinnedSource): void {
       throw new Error(`Unsafe repository path for ${source.id}/${file.id}`);
     }
     assertExactPinnedRawUrl(file);
-    if (file.trackedPath && !/^data\/biblical-languages\/[A-Za-z0-9._/-]+$/.test(file.trackedPath)) {
+    if (file.trackedPath && (!/^data\/biblical-languages\/[A-Za-z0-9._/-]+$/.test(file.trackedPath)
+      || file.trackedPath.split('/').some(segment => segment === '' || segment === '.' || segment === '..'))) {
       throw new Error(`Unsafe tracked path for ${source.id}/${file.id}`);
     }
     if (!Number.isSafeInteger(file.bytes) || file.bytes < 1
@@ -61,13 +63,16 @@ function assertMetadata(
   source: PinnedSource,
   files: readonly PinnedSourceFile[],
   compiler: { id: string; version: number },
-  artifact: {
-    status: 'accepted_legacy_non_reproducible' | 'byte_reproducible_from_exact_verified_pins';
-    affectedArtifacts: number;
-  },
+  mode: 'reproducible' | 'tracked-lexicon',
+  identityKind: 'raw_sha256' | 'canonical_json_payload_sha256_v1' = 'raw_sha256',
 ): void {
   const actual = JSON.parse(readFileSync(join(root, relativePath), 'utf8')) as Record<string, unknown>;
-  const expected = trackedArtifactAttestation(source, files, compiler, artifact);
+  const expected = mode === 'reproducible'
+    ? deterministicBuildProvenance(source, files, compiler, identityKind)
+    : trackedArtifactAttestation(source, files, compiler, {
+      status: 'byte_reproducible_from_exact_verified_pins',
+      affectedArtifacts: 0,
+    });
   for (const [key, value] of Object.entries(expected)) {
     if (JSON.stringify(actual[key]) !== JSON.stringify(value)) {
       throw new Error(`Pinned provenance mismatch in ${relativePath}: ${key}`);
@@ -100,7 +105,7 @@ export function verifyBiblicalLanguageSources(root: string): void {
     OPENSCRIPTURES_STRONGS,
     OPENSCRIPTURES_STRONGS.files,
     { id: 'theologai-strongs-json', version: 1 },
-    { status: 'accepted_legacy_non_reproducible', affectedArtifacts: 2 },
+    'reproducible',
   );
   assertMetadata(
     root,
@@ -108,7 +113,8 @@ export function verifyBiblicalLanguageSources(root: string): void {
     STEPBIBLE_DATA,
     STEPBIBLE_DATA.files.filter(file => file.id.startsWith('tagnt-') || file.id.startsWith('tahot-')),
     { id: 'theologai-stepbible-morphology-json', version: 1 },
-    { status: 'accepted_legacy_non_reproducible', affectedArtifacts: 43 },
+    'reproducible',
+    'canonical_json_payload_sha256_v1',
   );
   assertMetadata(
     root,
@@ -116,7 +122,7 @@ export function verifyBiblicalLanguageSources(root: string): void {
     STEPBIBLE_DATA,
     tracked,
     { id: 'theologai-stepbible-lexicon-json', version: 1 },
-    { status: 'byte_reproducible_from_exact_verified_pins', affectedArtifacts: 0 },
+    'tracked-lexicon',
   );
 }
 

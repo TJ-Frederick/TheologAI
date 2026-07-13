@@ -24,6 +24,7 @@ function discoverCanonicalFiles(): string[] {
   return [
     'data/cross-references/cross_references.txt',
     'data/biblical-languages/SOURCE.json',
+    'data/biblical-languages/UNICODE-CORRECTION.json',
     'data/biblical-languages/strongs-greek.json',
     'data/biblical-languages/strongs-hebrew.json',
     'data/biblical-languages/strongs-metadata.json',

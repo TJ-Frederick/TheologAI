@@ -12,6 +12,7 @@ import {
   assertJohnOneOneDatabase,
 } from './data-integrity.js';
 import { computeD1CorpusIdentity, parseDataManifest, verifyD1Migrations } from './d1-corpus-identity.js';
+import { verifyBiblicalLanguageUnicodeD1 } from './verify-biblical-language-unicode-d1.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -100,6 +101,7 @@ try {
   assertJohnOneOneDatabase(db, 'Verified SQLite morphology');
   assertGenesisOneOneDatabase(db, 'Verified SQLite morphology');
   assertHebrewLemmaCoverageDatabase(db, 'Verified SQLite morphology');
+  verifyBiblicalLanguageUnicodeD1(ROOT, db, manifest.expectedCounts);
 
   const representativeQueries = [
     ["SELECT 1 FROM cross_references WHERE from_verse = 'John.3.16' LIMIT 1", 'John 3:16 cross-references'],

@@ -23,19 +23,18 @@
       "git_blob_sha1": "9c16d031f99d5de30a0219cb66d54d6e6401a664"
     }
   ],
-  "provenance_status": "forensic_attestation_of_tracked_inventory",
+  "provenance_status": "content_reproducible_build_from_exact_verified_pins",
   "source_attestation": {
-    "kind": "forensic_source_attestation_added_after_artifact_creation",
+    "kind": "build_time_byte_verification",
     "source_lock": "data/biblical-languages/SOURCE.json",
     "raw_inputs_byte_verified": true
   },
-  "tracked_artifact": {
-    "lineage": "historical_tracked_artifact_with_provenance_attested_after_creation",
-    "classification": "accepted_legacy_non_reproducible",
-    "byte_reproducible_from_pinned_inputs": false,
-    "affected_runtime_artifacts": 2,
-    "source_lock": "data/biblical-languages/SOURCE.json#derived_artifacts",
-    "clean_reproduction_compiler": {
+  "derived_artifact": {
+    "classification": "content_reproducible_from_exact_verified_pins",
+    "identity_kind": "raw_sha256",
+    "byte_reproducible_from_pinned_inputs": true,
+    "source_lock": "data/biblical-languages/SOURCE.json#sources",
+    "compiler": {
       "id": "theologai-strongs-json",
       "version": 1,
       "source_revision": "0acd2f251c2d35ff8db2dece4e0593979d3ac223"
