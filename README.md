@@ -3,11 +3,11 @@
 TheologAI is an MCP server for Bible study and theological research. It runs
 locally over stdio or Streamable HTTP and on Cloudflare Workers with D1.
 
-The current registry contains eleven tools, five guided prompts, eight English
+The current registry contains eleven tools, six guided prompts, eight English
 Bible translations, six commentary sources, 17 locally indexed
 historical documents, Strong's dictionaries, and Greek/Hebrew morphology.
 
-<!-- theologai-public-contract tools=11 structured=bible_lookup,original_language_lookup,original_language_study,parallel_passages -->
+<!-- theologai-public-contract tools=11 structured=bible_lookup,original_language_lookup,original_language_study,parallel_passages,primary_source_search -->
 
 ## Remote endpoint
 
@@ -41,7 +41,7 @@ fresh server and transport.
 | `parallel_passages` | Return complete UBS source-attested parallel groups by default; legacy curated edges and OpenBible.info cross references require explicit selectors and remain separate. |
 | `commentary_lookup` | Retrieve Matthew Henry, JFB, Adam Clarke, John Gill, Keil-Delitzsch (OT), or Tyndale notes. |
 | `classic_text_lookup` | Search and browse the 17 locally indexed historical documents. Remote CCEL document bodies are not retrieved or republished. |
-| `primary_source_search` | Execute a bounded, explicit query plan against the local historical index. Returns snippets and exact local section locators, not document bodies. |
+| `primary_source_search` | Execute a bounded local query plan with versioned structured results and native links to exact section resources. Snippets remain discovery-only. |
 | `original_language_lookup` | Look up a Strong's entry or search for matching Greek/Hebrew entries. |
 | `bible_verse_morphology` | Return word-by-word morphology for a specific verse. |
 | `original_language_study` | Resolve and study one Greek or Hebrew token in one verse with contextual morphology, source-separated lexical evidence, and explicit interpretive limits. |
@@ -60,11 +60,15 @@ and conflicting old/new values are rejected.
 
 All tools are annotated as read-only, non-destructive, and idempotent. Tool
 inputs use closed, bounded JSON Schema 2020-12 contracts. `bible_lookup`,
-`parallel_passages`, `original_language_lookup`, and `original_language_study`
+`parallel_passages`, `primary_source_search`, `original_language_lookup`, and `original_language_study`
 also advertise versioned object-root `outputSchema`
 contracts and return matching `structuredContent` beside the existing Markdown
-content. Their structured results include bounded, result-local provenance
-records; all other tools retain their current Markdown-only result contract.
+content. Bible, parallel-passage, and original-language structured results
+include bounded, result-local provenance records. Primary-source results do not
+invent edition provenance records: their evidence policy explicitly marks
+edition provenance incomplete, and they link only canonical local sections with
+exact UTF-8 sizes. All other tools retain their current Markdown-only result
+contract.
 
 ### Resources
 
@@ -83,6 +87,7 @@ records; all other tools retain their current Markdown-only result contract.
 | `passage-exegesis` | Text, language, cross references, commentary, and historical theology. |
 | `compare-translations` | Compare translation choices against morphology and lexical data. |
 | `confession-study` | Compare a doctrine across the locally indexed historical collection. |
+| `primary-source-research` | Survey a topic or search one exact local work, then read selected exact sections as evidence. |
 | `donate` | Explain voluntary donation options. |
 
 ## Content scope and provenance
@@ -114,6 +119,12 @@ CCEL discovery adapters remain in the codebase as future provider architecture,
 but they are not advertised by the MCP schemas or reachable through the public
 tool registry. Any future external provider rollout must remain discovery-only
 until edition-specific rights and provider-policy gates are satisfied.
+
+Local search metadata identifies the cataloged work type and date when known;
+it does not establish an author, edition, transcription provenance, publication
+date, or rights status. Search snippets are discovery aids. Quote or analyze a
+selected passage only after reading its exact `theologai://documents/...#section-...`
+resource. The collection and every response are bounded and non-exhaustive.
 
 ### Language and reference data
 

@@ -11,6 +11,7 @@ import { createParallelPassagesHandler } from '../../../src/tools/v2/parallelPas
 import { createStrongsLookupHandler } from '../../../src/tools/v2/strongsLookup.js';
 import { createVerseMorphologyHandler } from '../../../src/tools/v2/verseMorphology.js';
 import { createOriginalLanguageStudyHandler } from '../../../src/tools/v2/originalLanguageStudy.js';
+import { createPrimarySourceSearchHandler } from '../../../src/tools/v2/primarySourceSearch.js';
 
 const unused = {} as never;
 const tools: ToolHandler[] = [
@@ -22,6 +23,7 @@ const tools: ToolHandler[] = [
   createStrongsLookupHandler(unused),
   createVerseMorphologyHandler(unused),
   createOriginalLanguageStudyHandler(unused),
+  createPrimarySourceSearchHandler(unused),
   createDonationConfigHandler(unused),
 ];
 
@@ -38,6 +40,7 @@ describe('prompt-recommended tool-call contracts', () => {
     ['compare-translations', { reference: 'Philippians 2:6-8', translations: 'ESV,KJV,NET,BSB' }],
     ['compare-translations', { reference: 'John 1:1', translations: 'unknown' }],
     ['confession-study', { topic: 'justification', traditions: 'Reformed, Lutheran' }],
+    ['primary-source-research', { topic: "Lord's Supper", work: 'westminster-confession', maxSections: '2' }],
     ['donate', undefined],
   ] as const)('%s emits only calls accepted by advertised tool schemas', (name, args) => {
     const calls = recommendedToolCallsForPrompt(name, args);
@@ -82,5 +85,17 @@ describe('prompt-recommended tool-call contracts', () => {
     const calls = recommendedToolCallsForPrompt('word-study', { word: 'love', reference: 'John 3:16' });
     expect(calls.map(call => call.tool)).toContain('bible_verse_morphology');
     expect(calls.map(call => call.tool)).not.toContain('original_language_study');
+  });
+
+  it('keeps primary-source research local, bounded, and exact-work aware', () => {
+    expect(recommendedToolCallsForPrompt('primary-source-research', { topic: 'eucharist' })).toEqual([{
+      tool: 'primary_source_search',
+      arguments: { queries: [{ id: 'topic-survey', text: 'eucharist', providers: ['local'], match: 'all_terms', limit: 3 }] },
+    }]);
+    expect(recommendedToolCallsForPrompt('primary-source-research', {
+      topic: 'eucharist', work: 'council-of-trent', maxSections: '5',
+    })[0].arguments).toMatchObject({
+      queries: [{ id: 'exact-local-work', work: 'council-of-trent', providers: ['local'], limit: 5 }],
+    });
   });
 });

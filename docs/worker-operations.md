@@ -1,11 +1,11 @@
 # Worker operations
 
-## Deployment baseline and rollback posture (2026-07-12)
+## Deployment baseline and rollback posture (2026-07-13)
 
-PR #10 (`71a3f0d`) is the current production application baseline. Production
-deployed successfully after a read-only D1 readiness result of `ready`.
-Preview runs the Phase 3 PR #21 application from `446a9eb` against the prepared
-schema-0002, transform-version-3 database described below.
+PR #21 (`639d0a0`) is the current production application baseline. Protected
+workflow run `29257538930` deployed it after a read-only D1 readiness result of
+`ready`. Preview runs the final PR #21 head `247b280` against the schema-0002,
+transform-version-3 database described below.
 
 The deployed logical D1 bindings and retained rollback posture are recorded
 below as point-in-time evidence. Cloudflare deployment history and the approved
@@ -16,10 +16,10 @@ binding.
 
 | Environment | Active logical database | Current posture | Rollback posture |
 |---|---|---|---|
-| Production | `theologai-production-20260711-a` | PR #10 merge remains deployed while the Phase 3 production candidate below is reviewed. | The deployed Worker and this database are the retained matched rollback pair. Do not mix this database with Phase 3 code or delete it during the release window. |
-| Preview | `theologai-preview-20260712-b` | Phase 3 PR #21 head `173a6a4` deployed successfully by GitHub Actions run `29221227777` after the read-only readiness gate passed. | `theologai-preview-20260712-a` and `theologai-preview-20260710-c` are retained candidates only. Candidate `-a` predates transform version 3; candidate `-c` belongs to the earlier PR #10 deployment. Verify the retained Worker/config pair and run its exact readiness contract before either is used. |
+| Production | `theologai-production-20260713-a` | PR #21 merge `639d0a0` deployed successfully by GitHub Actions run `29257538930`; deployment `2a9dbaf4-3fa9-431a-b8ba-265f0809e2c2` serves Worker version `2e55ef40-d450-4978-adf6-9fc28c349e61`. | Retain Worker version `c291ca9f-bb1b-4e6e-abd5-d6a3ea4f0704` with `theologai-production-20260711-a` as the predecessor matched pair. Do not mix that database with Phase 3 code or delete it during the observation window. |
+| Preview | `theologai-preview-20260712-b` | Final PR #21 head `247b280` deployed successfully by GitHub Actions run `29256660848`; deployment `d28d1d73` serves Worker version `3c8ad7ef-50ed-42a7-9c71-2ac8c2dd6d7f`. | `theologai-preview-20260712-a` and `theologai-preview-20260710-c` are retained candidates only. Candidate `-a` predates transform version 3; candidate `-c` belongs to the earlier PR #10 deployment. Verify the retained Worker/config pair and run its exact readiness contract before either is used. |
 
-### Prepared Phase 3 production candidate (not deployed)
+### Active Phase 3 production database
 
 On 2026-07-13, `theologai-production-20260713-a` was created in Eastern North
 America (`ENAM`) with no jurisdiction restriction, migrated through
@@ -30,11 +30,11 @@ scoped materialization identity
 Its database ID is recorded only in the reviewable top-level binding in
 `wrangler.toml`.
 
-The strict remote readiness gate returned `ready` against the candidate before
-this binding change was committed. Updating `wrangler.toml` prepares the matched
-Phase 3 code/config release; it does not change the deployed production Worker. The
-existing PR #10 Worker and `theologai-production-20260711-a` remain active and
-must be retained together until the protected main-branch deployment succeeds.
+The strict remote readiness gate returned `ready` before the binding change was
+committed and again in protected production workflow run `29257538930`. That
+workflow deployed the matched PR #21 code and configuration. The independent
+post-deployment audit passed all 84 checks. Retain the predecessor PR #10 Worker
+and `theologai-production-20260711-a` together during the observation window.
 
 ### Active Phase 3 preview database
 
@@ -53,15 +53,15 @@ materialization identity
 Hebrew morphology transform version 3, the Genesis 1:1 Hebrew lemma sentinel,
 `quick_check = ok`, and zero foreign-key violations.
 
-GitHub Actions run `29220658995` subsequently rechecked live authorization and
-the remote readiness contract, then deployed PR #21 head `446a9eb` with this
-database bound to preview. Retain both earlier candidates during the verification
-window, but do not describe either as ready for this head without its own matched
+GitHub Actions run `29256660848` rechecked live authorization and the remote
+readiness contract, then deployed final PR #21 head `247b280` with this database
+bound to preview. Retain both earlier candidates during the verification window,
+but do not describe either as ready for this head without its own matched
 compatibility proof. Do not delete any retained database as part of deployment.
 
 ### Hebrew-lemma materialization follow-up
 
-The prepared `theologai-preview-20260712-b` candidate includes deterministic
+The active `theologai-preview-20260712-b` database includes deterministic
 Hebrew lemma population and passed the transform-version-3 readiness gate. The
 earlier `theologai-preview-20260712-a` candidate predates those materialized row
 changes and must not be marker-updated or rebound to an application revision

@@ -11,6 +11,8 @@ import { createWorkerMcpServer } from '../../../src/worker-server.js';
 import type { WorkerCompositionRoot } from '../../../src/tools/worker/index.js';
 import { StrongsService } from '../../../src/services/languages/StrongsService.js';
 import { readFileSync } from 'node:fs';
+import { createPrimarySourceSearchHandler } from '../../../src/tools/v2/primarySourceSearch.js';
+import { formatLocalDocumentSectionResource } from '../../../src/formatters/historicalFormatter.js';
 
 const TOOL_NAMES = [
   'bible_lookup',
@@ -434,6 +436,51 @@ describe('shared MCP registration', () => {
     expect(root.services.historicalService.getSection).toHaveBeenCalledWith('nicene-creed', '1');
   });
 
+  it('returns a native primary-source link whose exact byte size matches resources/read', async () => {
+    const root = makeMockRoot();
+    const doc = await root.services.historicalService.getDocument('nicene-creed');
+    const section = await root.services.historicalService.getSection('nicene-creed', '1');
+    const resourceText = formatLocalDocumentSectionResource(doc!, section);
+    const resourceSizeBytes = new TextEncoder().encode(resourceText).byteLength;
+    root.tools = root.tools.map(tool => tool.name === 'primary_source_search'
+      ? createPrimarySourceSearchHandler({ search: async () => ({
+        planStatus: 'complete',
+        queries: [{ id: 'topic', normalizedMode: 'all_terms', providers: [{
+          provider: 'local', status: 'ok', searched: true, page: 1, hitCount: 1, notices: [],
+          hits: [{
+            queryId: 'topic', provider: 'local', title: doc!.title,
+            sectionLabel: section.title, snippet: 'We believe',
+            locator: {
+              kind: 'local_section', documentId: doc!.id, sectionId: section.section_number,
+              url: 'theologai://documents/nicene-creed#section-1',
+            },
+            rankWithinProvider: 1, page: 1, snippetOnly: true,
+            attribution: 'TheologAI local historical-document collection',
+            documentType: doc!.type, documentDate: doc!.date!, resourceSizeBytes,
+          }],
+        }] }],
+        coverage: { localAttempted: true, localStatus: 'ok', localHitCount: 1, ccelAttempted: false, ccelHitCount: 0, notices: [] },
+      }) } as any)
+      : tool);
+    const client = await connect(createTheologAiMcpServer(root, '1.0.0-test').server);
+
+    const result = await client.callTool({
+      name: 'primary_source_search',
+      arguments: { queries: [{ id: 'topic', text: 'belief', providers: ['local'] }] },
+    });
+    const link = result.content.find(block => block.type === 'resource_link');
+    expect(link).toMatchObject({
+      type: 'resource_link', uri: 'theologai://documents/nicene-creed#section-1',
+      mimeType: 'text/markdown', size: resourceSizeBytes,
+      annotations: { audience: ['assistant'] },
+    });
+    if (!link || link.type !== 'resource_link') throw new Error('Expected resource link');
+    const read = await client.readResource({ uri: link.uri });
+    const readText = String(read.contents[0].text);
+    expect(new TextEncoder().encode(readText).byteLength).toBe(link.size);
+    expect(readText).toBe(resourceText);
+  });
+
   it('canonicalizes classical and extended Strong\'s resources and rejects invalid domain numbers', async () => {
     const root = makeMockRoot();
     const lookup = vi.fn(root.services.strongsService.lookup);
@@ -505,7 +552,7 @@ describe('shared MCP registration', () => {
     });
   });
 
-  it('lists all 5 prompts and renders guided workflows', async () => {
+  it('lists all 6 prompts and renders guided workflows', async () => {
     const client = await connect(createTheologAiMcpServer(makeMockRoot(), '1.0.0-test').server);
     const prompts = await client.listPrompts();
 
@@ -514,6 +561,7 @@ describe('shared MCP registration', () => {
       'passage-exegesis',
       'compare-translations',
       'confession-study',
+      'primary-source-research',
       'donate',
     ]);
 
@@ -570,6 +618,22 @@ describe('shared MCP registration', () => {
       type: 'text',
       text: expect.stringContaining('{"query":"love","limit":10}'),
     }));
+
+    const primarySource = await client.getPrompt({
+      name: 'primary-source-research',
+      arguments: { topic: "Lord's Supper", work: 'westminster-confession', maxSections: '2' },
+    });
+    expect(primarySource.messages[0].content).toEqual(expect.objectContaining({
+      type: 'text',
+      text: expect.stringContaining('"providers":["local"]'),
+    }));
+    expect(primarySource.messages[0].content).toEqual(expect.objectContaining({
+      text: expect.stringContaining('Edition provenance is incomplete'),
+    }));
+    const primarySourceText = primarySource.messages[0].content.type === 'text'
+      ? primarySource.messages[0].content.text
+      : '';
+    expect(primarySourceText).not.toContain('CCEL search');
 
     const donate = await client.getPrompt({ name: 'donate' });
     expect(donate.messages[0].content).toEqual(expect.objectContaining({

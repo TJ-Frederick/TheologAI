@@ -56,6 +56,7 @@ describe('MCP structured output validation', () => {
     expect(withOutput).toEqual([
       'bible_lookup',
       'parallel_passages',
+      'primary_source_search',
       'original_language_lookup',
       'original_language_study',
     ]);

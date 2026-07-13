@@ -1,10 +1,48 @@
 {
   "version": "1.0.0",
   "source": "OpenScriptures Strong's Hebrew and Greek Dictionaries",
-  "source_url": "https://github.com/openscriptures/strongs",
+  "repository_url": "https://github.com/openscriptures/strongs",
+  "source_url": "https://github.com/openscriptures/strongs/tree/0acd2f251c2d35ff8db2dece4e0593979d3ac223",
+  "commit_sha": "0acd2f251c2d35ff8db2dece4e0593979d3ac223",
+  "commit_date": "2021-07-15T14:50:54Z",
+  "inputs": [
+    {
+      "id": "strongs-greek-xml",
+      "repository_path": "greek/StrongsGreekDictionaryXML_1.4/strongsgreek.xml",
+      "raw_url": "https://raw.githubusercontent.com/openscriptures/strongs/0acd2f251c2d35ff8db2dece4e0593979d3ac223/greek/StrongsGreekDictionaryXML_1.4/strongsgreek.xml",
+      "bytes": 2636209,
+      "sha256": "df928f01b37632f8af9f16289ce58d10b958014cb5dbd1e1ea715a8d311a0625",
+      "git_blob_sha1": "4d7da5124a065cde874c53d08cce647df954d81f"
+    },
+    {
+      "id": "strongs-hebrew-xml",
+      "repository_path": "hebrew/StrongHebrewG.xml",
+      "raw_url": "https://raw.githubusercontent.com/openscriptures/strongs/0acd2f251c2d35ff8db2dece4e0593979d3ac223/hebrew/StrongHebrewG.xml",
+      "bytes": 6436400,
+      "sha256": "1f9659ea208f4c498843a0280dacb1448627c33ca77712642d8705793ab66061",
+      "git_blob_sha1": "9c16d031f99d5de30a0219cb66d54d6e6401a664"
+    }
+  ],
+  "provenance_status": "forensic_attestation_of_tracked_inventory",
+  "source_attestation": {
+    "kind": "forensic_source_attestation_added_after_artifact_creation",
+    "source_lock": "data/biblical-languages/SOURCE.json",
+    "raw_inputs_byte_verified": true
+  },
+  "tracked_artifact": {
+    "lineage": "historical_tracked_artifact_with_provenance_attested_after_creation",
+    "classification": "accepted_legacy_non_reproducible",
+    "byte_reproducible_from_pinned_inputs": false,
+    "affected_runtime_artifacts": 2,
+    "source_lock": "data/biblical-languages/SOURCE.json#derived_artifacts",
+    "clean_reproduction_compiler": {
+      "id": "theologai-strongs-json",
+      "version": 1,
+      "source_revision": "0acd2f251c2d35ff8db2dece4e0593979d3ac223"
+    }
+  },
   "license": "Public Domain",
   "attribution": "Open Scriptures (openscriptures.org)",
-  "build_date": "2025-10-16T19:10:48.637Z",
   "entries": {
     "greek": 5624,
     "hebrew": 8674,

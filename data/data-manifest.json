@@ -130,12 +130,28 @@
   },
   "files": [
     {
+      "path": "data/biblical-languages/SOURCE.json",
+      "sha256": "b08452232cb3a958254d1d6a226e9efe3533d5f29923b6005b38c8440e08dbad"
+    },
+    {
+      "path": "data/biblical-languages/stepbible-lexicons/metadata.json",
+      "sha256": "3c3cd436b3afd8da733145575897430254d47823f777efde67f169b5dc184f40"
+    },
+    {
       "path": "data/biblical-languages/stepbible-lexicons/tbesg-greek.json",
       "sha256": "67f818251764715a6ce9c85520cef6dfcb7ef870a77dccec8cf0e32ba0d46fae"
     },
     {
+      "path": "data/biblical-languages/stepbible-lexicons/tbesg-greek.txt",
+      "sha256": "312f723d7b8ef263bbdfb0451c9b8057125804dfff390b6f8544cff2a84b57f4"
+    },
+    {
       "path": "data/biblical-languages/stepbible-lexicons/tbesh-hebrew.json",
       "sha256": "b8723804c0a6a710c83239197d23b30239d63d5b024a4842f71106021624f469"
+    },
+    {
+      "path": "data/biblical-languages/stepbible-lexicons/tbesh-hebrew.txt",
+      "sha256": "bdfdd17c1377aa5400618930fd0ea6f9a6f8d77ffdbbcd575b35d2d81c89401f"
     },
     {
       "path": "data/biblical-languages/stepbible/greek/40-Matthew.json.gz",
@@ -402,8 +418,16 @@
       "sha256": "1988375c3d8db60b3077a9d5d3d81c178cb3e427f922b1ee9823512daef15fff"
     },
     {
+      "path": "data/biblical-languages/stepbible/index.json",
+      "sha256": "5f4722af18bb84e3031e8555aad32840e3e9c25a717e76ccda240a1eedbed0f7"
+    },
+    {
       "path": "data/biblical-languages/stepbible/morph-codes.json",
       "sha256": "e98d08c943e0dce8a8707bc9c7e26ed85a6b1101c0c8091df9d1ed9b739c53cd"
+    },
+    {
+      "path": "data/biblical-languages/stepbible/stepbible-metadata.json",
+      "sha256": "9e48498d0e18ad2c59b2c7e48c87480e5b20f822390d2b8ee883c313f10f7348"
     },
     {
       "path": "data/biblical-languages/strongs-greek.json",
@@ -412,6 +436,10 @@
     {
       "path": "data/biblical-languages/strongs-hebrew.json",
       "sha256": "e40ea10268bed5e9778c91268007d8c1d42d3cf2c839215c807ecc38ff5eeceb"
+    },
+    {
+      "path": "data/biblical-languages/strongs-metadata.json",
+      "sha256": "f2aa18d17850c3e54c27d2ed51401c9dea3c11698c481e2f6e3e8d1bbe14aea4"
     },
     {
       "path": "data/cross-references/cross_references.txt",

@@ -39,6 +39,18 @@ describe('Worker-safe JSON Schema validation', () => {
       message: expect.stringContaining(message),
     }));
   });
+
+  it.each([
+    [{ topic: 'x'.repeat(201) }, 'topic'],
+    [{ topic: 'grace', work: ' ' }, 'work'],
+    [{ topic: 'grace', maxSections: '0' }, 'maxSections'],
+    [{ topic: 'grace', maxSections: '2.5' }, 'maxSections'],
+  ])('bounds primary-source prompt arguments before rendering (%#)', (args, argument) => {
+    expect(() => validatePromptArguments('primary-source-research', args)).toThrow(expect.objectContaining({
+      code: -32602,
+      message: expect.stringContaining(`Argument "${argument}"`),
+    }));
+  });
   it('validates the two advertised output schemas with the same Worker-safe validator', () => {
     const bible = validatorFor(bibleLookupOutputSchema);
     const language = validatorFor(originalLanguageOutputSchema);

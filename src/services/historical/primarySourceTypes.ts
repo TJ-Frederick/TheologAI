@@ -45,28 +45,43 @@ export interface LocalSectionLocator {
 
 export type PrimarySourceLocator = CcelSectionLocator | LocalSectionLocator;
 
-export interface PrimarySourceSearchHit {
-  provider: PrimarySourceProvider;
+interface PrimarySourceSearchHitBase {
   title: string;
   author?: string;
   sectionLabel?: string;
   snippet: string;
-  locator: PrimarySourceLocator;
   rankWithinProvider: number;
   page: number;
   /** Search snippets are discovery metadata, never fetched evidence. */
   snippetOnly: true;
   attribution: string;
+  /** Reviewed catalog metadata. Absence means unknown, not that the work has no type/date. */
+  documentType?: string;
+  documentDate?: string;
 }
+
+export interface LocalPrimarySourceSearchHit extends PrimarySourceSearchHitBase {
+  provider: 'local';
+  locator: LocalSectionLocator;
+  /** Exact UTF-8 byte size of the corresponding MCP resource representation. */
+  resourceSizeBytes: number;
+}
+
+export interface CcelPrimarySourceSearchHit extends PrimarySourceSearchHitBase {
+  provider: 'ccel_live';
+  locator: CcelSectionLocator;
+}
+
+export type PrimarySourceSearchHit = LocalPrimarySourceSearchHit | CcelPrimarySourceSearchHit;
 
 export interface PrimarySourceSearchPlanQuery extends PrimarySourceSearchQuery {
   id: string;
   providers: PrimarySourceRequestedProvider[];
 }
 
-export interface PrimarySourcePlanHit extends PrimarySourceSearchHit {
+export type PrimarySourcePlanHit = PrimarySourceSearchHit & {
   queryId: string;
-}
+};
 
 export interface PrimarySourcePlanProviderResult extends Omit<PrimarySourceProviderResult, 'hits'> {
   hits: PrimarySourcePlanHit[];
