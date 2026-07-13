@@ -82,7 +82,7 @@ export function presentPrimarySourceSearch(result: PrimarySourceSearchPlanResult
     normalizedMode: query.normalizedMode,
     providers: query.providers.slice(0, 2).map(provider => {
       const hits = provider.hits.slice(0, 8).flatMap(hit => {
-        const presented = presentHit(hit);
+        const presented = presentHit(hit, query.id, provider.provider);
         return presented ? [presented] : [];
       });
       const omitted = provider.hits.length - hits.length;
@@ -90,7 +90,7 @@ export function presentPrimarySourceSearch(result: PrimarySourceSearchPlanResult
       const downgraded = omitted > 0 || countMismatch;
       const notices = [...provider.notices];
       if (omitted > 0) {
-        notices.push(`${omitted} ${provider.provider} hit${omitted === 1 ? '' : 's'} omitted because the locator or bounded metadata was invalid.`);
+        notices.push(`${omitted} ${provider.provider} hit${omitted === 1 ? '' : 's'} omitted because the locator, group attribution, or bounded metadata was invalid.`);
       }
       if (countMismatch) notices.push('Provider-reported hit count did not match its returned hit array.');
       return {
@@ -138,7 +138,16 @@ export function presentPrimarySourceSearch(result: PrimarySourceSearchPlanResult
 const COMPLETE_STATUSES = new Set<PrimarySourceProviderStatus>(['ok', 'no_results']);
 const UNAVAILABLE_STATUSES = new Set<PrimarySourceProviderStatus>(['unavailable', 'disabled', 'rate_limited', 'interface_changed']);
 
-function presentHit(hit: PrimarySourcePlanHit): PresentedPrimarySourceHit | undefined {
+function presentHit(
+  hit: PrimarySourcePlanHit,
+  expectedQueryId: string,
+  expectedProvider: PrimarySourceProvider,
+): PresentedPrimarySourceHit | undefined {
+  // A hit is evidence for exactly the query/provider group that contains it.
+  // Never repair or relabel a mismatched upstream result: omitting it causes
+  // the enclosing provider to be downgraded to interface_changed.
+  if (hit.queryId !== expectedQueryId || hit.provider !== expectedProvider) return undefined;
+
   const common = {
     queryId: boundedText(hit.queryId, 40),
     title: boundedText(hit.title, 300),
@@ -174,10 +183,16 @@ function presentHit(hit: PrimarySourcePlanHit): PresentedPrimarySourceHit | unde
     };
   }
 
-  const normalized = normalizeCcelSectionLocator(hit.locator.url);
-  if (!normalized || normalized.url !== hit.locator.url
-    || normalized.work !== hit.locator.work || normalized.section !== hit.locator.section) return undefined;
-  return { ...common, provider: 'ccel_live', locator: normalized };
+  if (hit.provider === 'ccel_live') {
+    const normalized = normalizeCcelSectionLocator(hit.locator.url);
+    if (!normalized || normalized.url !== hit.locator.url
+      || normalized.work !== hit.locator.work || normalized.section !== hit.locator.section) return undefined;
+    return { ...common, provider: 'ccel_live', locator: normalized };
+  }
+
+  // Runtime data can drift ahead of this closed public contract even though
+  // TypeScript currently knows only the two providers above.
+  return undefined;
 }
 
 function boundedText(value: string, maximum: number): string {

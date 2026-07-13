@@ -133,4 +133,62 @@ describe('primary_source_search handler', () => {
     expect(result.isError).toBe(true);
     expect(validatorFor(handler.outputSchema!)(result.structuredContent).valid).toBe(true);
   });
+
+  it('rejects hits attributed to another query or provider, including unknown future providers', async () => {
+    const validLocalHit = {
+      queryId: 'q1', provider: 'local', title: 'Valid local evidence', snippet: 'Kept.',
+      locator: {
+        kind: 'local_section', documentId: 'doc', sectionId: '1',
+        url: 'theologai://documents/doc#section-1',
+      },
+      rankWithinProvider: 1, page: 1, snippetOnly: true, attribution: 'Local', resourceSizeBytes: 10,
+    } as const;
+    const foreignProviderHit = {
+      queryId: 'q1', provider: 'ccel_live', title: 'Foreign provider evidence', snippet: 'Rejected.',
+      locator: {
+        kind: 'ccel_section', work: 'calvin/institutes', section: 'iv.xvii',
+        url: 'https://ccel.org/ccel/calvin/institutes/iv.xvii.html',
+      },
+      rankWithinProvider: 3, page: 1, snippetOnly: true, attribution: 'CCEL',
+    } as const;
+    const service = { search: vi.fn().mockResolvedValue({
+      planStatus: 'complete',
+      queries: [{ id: 'q1', normalizedMode: 'phrase', providers: [{
+        provider: 'local', status: 'ok', searched: true, page: 1, hitCount: 4, notices: [],
+        hits: [
+          validLocalHit,
+          { ...validLocalHit, queryId: 'q2', title: 'Foreign query evidence', rankWithinProvider: 2 },
+          foreignProviderHit,
+          { ...validLocalHit, provider: 'future_archive', title: 'Future provider evidence', rankWithinProvider: 4 },
+        ],
+      }] }],
+      coverage: { localAttempted: true, localStatus: 'ok', localHitCount: 4, ccelAttempted: false, ccelHitCount: 0, notices: [] },
+    }) };
+    const handler = createPrimarySourceSearchHandler(service as any);
+
+    const result = await handler.handler({ queries: [{ id: 'q1', text: 'faith', providers: ['local'] }] });
+
+    expect(result.content).toHaveLength(2);
+    expect(result.content[1]).toMatchObject({
+      type: 'resource_link', uri: 'theologai://documents/doc#section-1', size: 10,
+    });
+    expect(JSON.stringify(result)).not.toContain('Foreign query evidence');
+    expect(JSON.stringify(result)).not.toContain('Foreign provider evidence');
+    expect(JSON.stringify(result)).not.toContain('Future provider evidence');
+    expect(result.structuredContent).toMatchObject({
+      planStatus: 'partial',
+      queries: [{ providers: [{
+        provider: 'local', status: 'interface_changed', hitCount: 1,
+        hits: [{ provider: 'local', queryId: 'q1' }],
+        notices: [expect.stringContaining('3 local hits omitted')],
+      }] }],
+      coverage: { localStatus: 'interface_changed', localHitCount: 1 },
+    });
+    expect(validatorFor(handler.outputSchema!)(result.structuredContent).valid).toBe(true);
+
+    const schemaInvalidCrossProviderGroup = structuredClone(result.structuredContent) as any;
+    schemaInvalidCrossProviderGroup.queries[0].providers[0].hits = [foreignProviderHit];
+    schemaInvalidCrossProviderGroup.queries[0].providers[0].hitCount = 1;
+    expect(validatorFor(handler.outputSchema!)(schemaInvalidCrossProviderGroup).valid).toBe(false);
+  });
 });
