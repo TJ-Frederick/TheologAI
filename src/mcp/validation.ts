@@ -105,46 +105,68 @@ function normalizeValidationMessage(message: string): string {
 }
 
 const PROMPT_ARGUMENTS = {
-  'word-study': { required: ['word'], allowed: ['word', 'testament'] },
+  'word-study': { required: ['word'], allowed: ['word', 'testament', 'reference'] },
   'passage-exegesis': { required: ['reference'], allowed: ['reference', 'translation'] },
   'compare-translations': { required: ['reference'], allowed: ['reference', 'translations'] },
   'confession-study': { required: ['topic'], allowed: ['topic', 'traditions'] },
   donate: { required: [], allowed: [] },
 } as const;
 
-export function validatePromptArguments(name: string, args: Record<string, string> | undefined): void {
+export function validatePromptArguments(
+  name: unknown,
+  args: unknown,
+): asserts args is Record<string, string> | undefined {
+  if (typeof name !== 'string') {
+    throw new McpError(ErrorCode.InvalidParams, 'Prompt name must be a string');
+  }
   const definition = PROMPT_ARGUMENTS[name as keyof typeof PROMPT_ARGUMENTS];
   if (!definition) {
     throw new McpError(ErrorCode.InvalidParams, `Unknown prompt: ${name}`);
   }
 
-  const values = args ?? {};
+  if (args !== undefined && (args === null || typeof args !== 'object' || Array.isArray(args))) {
+    throw new McpError(ErrorCode.InvalidParams, `Arguments for prompt "${name}" must be an object`);
+  }
+  const values = (args ?? {}) as Record<string, unknown>;
   const unknown = Object.keys(values).find(key => !(definition.allowed as readonly string[]).includes(key));
   if (unknown) {
     throw new McpError(ErrorCode.InvalidParams, `Unknown argument "${unknown}" for prompt "${name}"`);
   }
 
-  const missing = (definition.required as readonly string[]).find(key => !values[key]?.trim());
+  const wrongType = Object.entries(values).find(([, value]) => typeof value !== 'string');
+  if (wrongType) {
+    throw new McpError(
+      ErrorCode.InvalidParams,
+      `Argument "${wrongType[0]}" for prompt "${name}" must be a string`,
+    );
+  }
+
+  const stringValues = values as Record<string, string>;
+
+  const missing = (definition.required as readonly string[]).find(key => !stringValues[key]?.trim());
   if (missing) {
     throw new McpError(ErrorCode.InvalidParams, `Missing required argument "${missing}" for prompt "${name}"`);
   }
 
-  const oversized = Object.entries(values).find(([, value]) => value.length > 500);
+  const oversized = Object.entries(stringValues).find(([, value]) => value.length > 500);
   if (oversized) {
     throw new McpError(ErrorCode.InvalidParams, `Argument "${oversized[0]}" for prompt "${name}" exceeds 500 characters`);
   }
 
   if (name === 'word-study') {
-    const word = values.word?.trim() ?? '';
+    const word = stringValues.word?.trim() ?? '';
     if (word.length < 2 || word.length > 100) {
       throw new McpError(ErrorCode.InvalidParams, 'Argument "word" for prompt "word-study" must be between 2 and 100 characters');
     }
-    if (values.testament && !['OT', 'NT'].includes(values.testament.toUpperCase())) {
+    if (stringValues.testament && !['OT', 'NT'].includes(stringValues.testament.toUpperCase())) {
       throw new McpError(ErrorCode.InvalidParams, 'Argument "testament" for prompt "word-study" must be OT or NT');
+    }
+    if ((stringValues.reference?.length ?? 0) > 100) {
+      throw new McpError(ErrorCode.InvalidParams, 'Argument "reference" for prompt "word-study" exceeds 100 characters');
     }
   }
 
-  if (['passage-exegesis', 'compare-translations'].includes(name) && (values.reference?.length ?? 0) > 100) {
+  if (['passage-exegesis', 'compare-translations'].includes(name) && (stringValues.reference?.length ?? 0) > 100) {
     throw new McpError(ErrorCode.InvalidParams, `Argument "reference" for prompt "${name}" exceeds 100 characters`);
   }
 }

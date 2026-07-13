@@ -23,13 +23,14 @@ THEOLOGAI_VERSION = "3.6.0"
 THEOLOGAI_ALLOWED_ORIGINS = "https://theologai.pages.dev"
 THEOLOGAI_MAX_REQUEST_BYTES = "1048576"
 THEOLOGAI_REQUEST_LOGS = "false"
+THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH = "false"
 
 # D1 database. The database_id is not sensitive (scoped to Cloudflare account).
 # For multi-environment setups, use [env.staging] / [env.production] sections.
 [[d1_databases]]
 binding = "THEOLOGAI_DB"
-database_name = "theologai-production-20260711-a"
-database_id = "324103e8-16b0-457b-8a2c-45f63a4d8735"
+database_name = "theologai-production-20260713-a"
+database_id = "daa96936-5ebf-41c3-bbca-2b281808138e"
 migrations_dir = "migrations"
 
 # Anonymous abuse control. Counters are intentionally local to each Cloudflare
@@ -61,11 +62,12 @@ THEOLOGAI_VERSION = "3.6.0-preview"
 THEOLOGAI_ALLOWED_ORIGINS = "https://theologai.pages.dev"
 THEOLOGAI_MAX_REQUEST_BYTES = "1048576"
 THEOLOGAI_REQUEST_LOGS = "true"
+THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH = "false"
 
 [[env.preview.d1_databases]]
 binding = "THEOLOGAI_DB"
-database_name = "theologai-preview-20260710-c"
-database_id = "7cd1b99e-49ed-4d7b-b056-e746b902c89f"
+database_name = "theologai-preview-20260712-b"
+database_id = "23e8d637-78dc-457b-9825-6ae4a625bf4d"
 migrations_dir = "migrations"
 
 # Preview uses a distinct namespace so load tests and PR validation cannot

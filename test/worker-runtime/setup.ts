@@ -1,6 +1,8 @@
 import { beforeAll } from 'vitest';
 import { applyD1Migrations, env } from 'cloudflare:test';
 import type { D1Migration } from '@cloudflare/vitest-pool-workers';
+import { UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY, UBS_PARALLEL_PASSAGE_PROVENANCE } from '../../src/kernel/ubsParallelSource.js';
+import { ubsFixture } from '../fixtures/ubsParallelCorpus.js';
 
 declare global {
   namespace Cloudflare {
@@ -104,5 +106,27 @@ beforeAll(async () => {
       'I believe in God the Father almighty, maker of heaven and earth.',
       'God Creation',
     ),
+  ]);
+
+  const group = (ubsFixture() as any).groups[0];
+  const source = UBS_PARALLEL_PASSAGE_PROVENANCE;
+  await env.THEOLOGAI_DB.batch([
+    env.THEOLOGAI_DB.prepare(`INSERT INTO ubs_parallel_sources VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(
+      source.sourceId, 'ubs-parallel-passages.v2', source.transformVersion, UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY,
+      source.title, source.publisher, source.copyright, source.license, source.licenseUrl, source.sourceUrl,
+      source.sourcePath, source.sourceCommit, source.sourceCommitDate, source.sourceBlob, source.sourceBytes,
+      source.sourceSha256, 1, source.modificationNote, 'source_attested_parallel', 'unspecified',
+    ),
+    env.THEOLOGAI_DB.prepare(`INSERT INTO ubs_parallel_groups VALUES (?,?,?,?,?)`).bind(
+      group.groupId, source.sourceId, group.sourceOrdinal, group.label, group.directionality,
+    ),
+    ...group.members.map((member: any) => env.THEOLOGAI_DB.prepare(`INSERT INTO ubs_parallel_members VALUES (?,?,?,?,?,?,?)`).bind(
+      group.groupId, member.sourceOrder, member.sourceReference, member.normalizedReference,
+      member.languageMarker, member.alignmentBasis, member.alignmentRaw,
+    )),
+    ...group.members.flatMap((member: any) => member.segments.map((segment: any, index: number) =>
+      env.THEOLOGAI_DB.prepare(`INSERT INTO ubs_parallel_segments VALUES (?,?,?,?,?,?,?)`).bind(
+        group.groupId, member.sourceOrder, index + 1, segment.bookNumber, segment.chapter, segment.startVerse, segment.endVerse,
+      ))),
   ]);
 });

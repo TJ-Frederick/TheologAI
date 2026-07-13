@@ -62,7 +62,11 @@ export class EsvAdapter implements BibleAdapter {
       reference: data.canonical || refStr,
       translation: 'ESV',
       text: data.passages[0].trim(),
-      citation: { source: 'English Standard Version', copyright: COPYRIGHT },
+      citation: {
+        source: 'English Standard Version',
+        copyright: COPYRIGHT,
+        url: 'https://www.esv.org/',
+      },
     };
   }
 

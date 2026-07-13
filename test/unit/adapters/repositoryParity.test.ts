@@ -8,6 +8,10 @@ import { D1CrossReferenceRepository } from '../../../src/adapters/d1/D1CrossRefe
 import { D1HistoricalDocumentRepository } from '../../../src/adapters/d1/D1HistoricalDocumentRepository.js';
 import { D1MorphologyRepository } from '../../../src/adapters/d1/D1MorphologyRepository.js';
 import { D1StrongsRepository } from '../../../src/adapters/d1/D1StrongsRepository.js';
+import { D1UbsParallelPassageRepository } from '../../../src/adapters/d1/D1UbsParallelPassageRepository.js';
+import { UbsParallelPassageRepository } from '../../../src/adapters/shared/UbsParallelPassageRepository.js';
+import { UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY, UBS_PARALLEL_PASSAGE_PROVENANCE } from '../../../src/kernel/ubsParallelSource.js';
+import { ubsFixture } from '../../fixtures/ubsParallelCorpus.js';
 
 function sqliteAsD1(db: Database.Database): D1Database {
   return {
@@ -42,6 +46,8 @@ describe('SQLite and D1 repository parity with identical real data', () => {
   let d1Morphology: D1MorphologyRepository;
   let sqliteStrongs: StrongsRepository;
   let d1Strongs: D1StrongsRepository;
+  let nodeUbs: UbsParallelPassageRepository;
+  let d1Ubs: D1UbsParallelPassageRepository;
 
   beforeAll(() => {
     db.exec(`
@@ -74,6 +80,10 @@ describe('SQLite and D1 repository parity with identical real data', () => {
         section_number TEXT, title TEXT, content TEXT NOT NULL, topics TEXT
       );
       CREATE VIRTUAL TABLE sections_fts USING fts5(title, content, topics);
+      CREATE TABLE ubs_parallel_sources (source_id TEXT PRIMARY KEY, schema_version TEXT, transform_version INTEGER, artifact_identity TEXT, title TEXT, publisher TEXT, copyright TEXT, license TEXT, license_url TEXT, source_url TEXT, source_path TEXT, source_commit TEXT, source_commit_date TEXT, source_blob TEXT, source_bytes INTEGER, source_sha256 TEXT, modified INTEGER, modification_note TEXT, label TEXT, directionality TEXT);
+      CREATE TABLE ubs_parallel_groups (group_id TEXT PRIMARY KEY, source_id TEXT, source_ordinal INTEGER, label TEXT, directionality TEXT);
+      CREATE TABLE ubs_parallel_members (group_id TEXT, source_order INTEGER, source_reference TEXT, normalized_reference TEXT, language_marker TEXT, alignment_basis TEXT, alignment_raw TEXT, PRIMARY KEY(group_id, source_order));
+      CREATE TABLE ubs_parallel_segments (group_id TEXT, member_order INTEGER, segment_order INTEGER, book_number INTEGER, chapter INTEGER, start_verse INTEGER, end_verse INTEGER, PRIMARY KEY(group_id, member_order, segment_order));
 
       INSERT INTO cross_references VALUES
         ('John.3.16', 'Rom.5.8', 42),
@@ -88,14 +98,22 @@ describe('SQLite and D1 repository parity with identical real data', () => {
       INSERT INTO strongs_fts
         SELECT strongs_number, lemma, transliteration, definition FROM strongs;
       INSERT INTO stepbible_lexicons VALUES
-        ('G0025', 'STEPBible', '{"gloss":"love"}');
+        ('G0025', 'STEPBible', '{"gloss":"love"}'),
+        ('G6000', 'STEPBible', '{"gloss":"to report"}'),
+        ('G21502', 'STEPBible', '{"gloss":"Heneia"}'),
+        ('H9001', 'STEPBible', '{"gloss":"&"}'),
+        ('H9049', 'STEPBible', '{"gloss":"they"}');
 
       INSERT INTO morphology VALUES
         ('Romans', 8, 28, 1, 'οἴδαμεν', 'οἶδα', 'G1492', 'V-RAI-1P', 'we know'),
         ('John', 3, 16, 1, 'ἠγάπησεν', 'ἀγαπάω', 'G0025', 'V-AAI-3S', 'loved'),
         ('Genesis', 1, 1, 1, 'בְּרֵאשִׁית', 'רֵאשִׁית', 'H7225', 'HNcfsa', 'in beginning'),
         ('Romans', 5, 8, 1, 'συνίστησιν', 'συνίστημι', 'G4921', 'V-PAI-3S', 'demonstrates'),
-        ('Romans', 8, 35, 1, 'ἀγάπης', 'ἀγάπη', 'G0025', 'N-GSF', 'love');
+        ('Romans', 8, 35, 1, 'ἀγάπης', 'ἀγάπη', 'G0025', 'N-GSF', 'love'),
+        ('John', 1, 1, 1, 'fixture-g6000', 'fixture', 'G6000', 'G:V', 'report'),
+        ('John', 1, 1, 2, 'fixture-g21502', 'fixture', 'G21502', 'G:N-PRI', 'Heneia'),
+        ('John', 1, 1, 3, 'fixture-h9001', 'fixture', 'H9001', 'H:Conj', '&'),
+        ('John', 1, 1, 4, 'fixture-h9049', 'fixture', 'H9049', 'Sp3f', 'they');
       INSERT INTO morph_codes VALUES ('V-AAI-3S', 'Verb Aorist Active Indicative 3rd Singular');
 
       INSERT INTO documents VALUES
@@ -108,6 +126,22 @@ describe('SQLite and D1 repository parity with identical real data', () => {
         SELECT id, title, content, topics FROM document_sections ORDER BY id;
     `);
 
+    const artifact = ubsFixture() as any;
+    const p = UBS_PARALLEL_PASSAGE_PROVENANCE;
+    db.prepare('INSERT INTO ubs_parallel_sources VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(
+      p.sourceId, 'ubs-parallel-passages.v2', p.transformVersion, UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY,
+      p.title, p.publisher, p.copyright, p.license, p.licenseUrl, p.sourceUrl, p.sourcePath, p.sourceCommit,
+      p.sourceCommitDate, p.sourceBlob, p.sourceBytes, p.sourceSha256, 1, p.modificationNote,
+      'source_attested_parallel', 'unspecified',
+    );
+    for (const group of artifact.groups) {
+      db.prepare('INSERT INTO ubs_parallel_groups VALUES (?,?,?,?,?)').run(group.groupId, p.sourceId, group.sourceOrdinal, group.label, group.directionality);
+      for (const member of group.members) {
+        db.prepare('INSERT INTO ubs_parallel_members VALUES (?,?,?,?,?,?,?)').run(group.groupId, member.sourceOrder, member.sourceReference, member.normalizedReference, member.languageMarker, member.alignmentBasis, member.alignmentRaw);
+        member.segments.forEach((segment: any, index: number) => db.prepare('INSERT INTO ubs_parallel_segments VALUES (?,?,?,?,?,?,?)').run(group.groupId, member.sourceOrder, index + 1, segment.bookNumber, segment.chapter, segment.startVerse, segment.endVerse));
+      }
+    }
+
     const d1 = sqliteAsD1(db);
     sqliteCrossReferences = new CrossReferenceRepository(db);
     d1CrossReferences = new D1CrossReferenceRepository(d1);
@@ -117,6 +151,8 @@ describe('SQLite and D1 repository parity with identical real data', () => {
     d1Morphology = new D1MorphologyRepository(d1);
     sqliteStrongs = new StrongsRepository(db);
     d1Strongs = new D1StrongsRepository(d1);
+    nodeUbs = new UbsParallelPassageRepository(artifact, artifact.artifactIdentity);
+    d1Ubs = new D1UbsParallelPassageRepository(d1);
   });
 
   afterAll(() => db.close());
@@ -153,6 +189,13 @@ describe('SQLite and D1 repository parity with identical real data', () => {
     });
     await expect(d1Historical.findDocumentByName('Nicene'))
       .resolves.toEqual(sqliteHistorical.findDocumentByName('Nicene'));
+    const primaryOptions = { text: 'one almighty', match: 'all_terms' as const, documentId: 'nicene-creed', limit: 8 };
+    await expect(d1Historical.searchPrimarySources(primaryOptions))
+      .resolves.toEqual(sqliteHistorical.searchPrimarySources(primaryOptions));
+    expect(sqliteHistorical.searchPrimarySources(primaryOptions)[0]).toMatchObject({
+      document: { id: 'nicene-creed', title: 'Nicene Creed' },
+      section: { section_number: '1' },
+    });
   });
 
   it('returns identical morphology with shared fallback and canonical book ordering', async () => {
@@ -185,6 +228,19 @@ describe('SQLite and D1 repository parity with identical real data', () => {
     await expect(d1Strongs.getLexiconEntry('G25'))
       .resolves.toEqual(sqliteStrongs.getLexiconEntry('G25'));
     await expect(d1Strongs.getStats()).resolves.toEqual(sqliteStrongs.getStats());
+  });
+
+  it.each(['G6000', 'H9001', 'H9049', 'G21502'])('preserves extended identity %s across SQLite and D1 lexicon/morphology repositories', async identity => {
+    await expect(d1Strongs.getLexiconEntry(identity)).resolves.toEqual(sqliteStrongs.getLexiconEntry(identity));
+    await expect(d1Morphology.getOccurrences(identity)).resolves.toEqual(sqliteMorphology.getOccurrences(identity));
+    await expect(d1Morphology.getDistribution(identity)).resolves.toEqual(sqliteMorphology.getDistribution(identity));
+    expect(sqliteStrongs.getLexiconEntry(identity)?.strongs_number).toBe(identity);
+    expect(sqliteMorphology.getOccurrences(identity)).toHaveLength(1);
+  });
+
+  it('reconstructs complete source-attested groups identically from Node JSON and D1', async () => {
+    await expect(d1Ubs.findGroups('Luke 6:35', 2)).resolves.toEqual(nodeUbs.findGroups('Luke 6:35', 2));
+    await expect(d1Ubs.getProvenance()).resolves.toEqual(nodeUbs.getProvenance());
   });
 
   it('normalizes ASCII transliteration search identically in SQLite and D1', async () => {

@@ -56,16 +56,30 @@ describe('MorphologyRepository', () => {
     expect(repo.getOccurrences('G1722', 3)).toEqual(occurrences);
     expect(db.statement('SELECT DISTINCT book, chapter, verse').all).toHaveBeenNthCalledWith(1, 'G1722', 100);
     expect(db.statement('SELECT DISTINCT book, chapter, verse').all).toHaveBeenNthCalledWith(2, 'G1722', 3);
+
+    repo.getOccurrences('g25i');
+    expect(db.statement('SELECT DISTINCT book, chapter, verse').all).toHaveBeenNthCalledWith(3, 'G0025I', 100);
+    expect(repo.getOccurrences('G0')).toEqual([]);
+  });
+
+  it.each(['G6000', 'H9001', 'H9049', 'G21502'])('uses extended morphology identity %s unchanged', identity => {
+    const db = new FakeSqliteDatabase([{ match: 'SELECT DISTINCT book, chapter, verse', all: [] }]);
+    const repo = new MorphologyRepository(db.asDatabase());
+    expect(repo.getOccurrences(identity)).toEqual([]);
+    expect(db.statement('SELECT DISTINCT book, chapter, verse').all).toHaveBeenCalledWith(identity, 100);
   });
 
   it('returns per-book verse distribution rows unchanged', () => {
     const distribution = [{ book: 'Romans', verse_count: 4 }, { book: 'John', verse_count: 9 }];
     const db = new FakeSqliteDatabase([{ match: 'COUNT(DISTINCT', all: distribution }]);
-    expect(new MorphologyRepository(db.asDatabase()).getDistribution('G1722')).toEqual([
+    const repo = new MorphologyRepository(db.asDatabase());
+    expect(repo.getDistribution('G1722')).toEqual([
       { book: 'John', verse_count: 9 },
       { book: 'Romans', verse_count: 4 },
     ]);
     expect(db.statement('COUNT(DISTINCT').all).toHaveBeenCalledWith('G1722');
+    repo.getDistribution('h430a');
+    expect(db.statement('COUNT(DISTINCT').all).toHaveBeenLastCalledWith('H0430A');
   });
 
   it('propagates database failures', () => {

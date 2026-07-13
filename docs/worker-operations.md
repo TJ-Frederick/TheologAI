@@ -1,18 +1,72 @@
 # Worker operations
 
-## Deployment baseline and rollback posture (2026-07-11)
+## Deployment baseline and rollback posture (2026-07-12)
 
 PR #10 (`71a3f0d`) is the current production application baseline. Production
 deployed successfully after a read-only D1 readiness result of `ready`.
-Preview contains the hardened PR #10 application code from `ccdfb8c`; its later
-production-only changes are not part of the preview baseline.
+Preview runs the Phase 3 PR #21 application from `446a9eb` against the prepared
+schema-0002, transform-version-3 database described below.
 
-The active logical D1 bindings are recorded in `wrangler.toml`:
+The deployed logical D1 bindings and retained rollback posture are recorded
+below as point-in-time evidence. Cloudflare deployment history and the approved
+GitHub deployment run are authoritative after a later deployment. A reviewable
+`wrangler.toml` change may point at a prepared candidate before any Worker
+deployment; in that state the configuration is not evidence of the deployed
+binding.
 
 | Environment | Active logical database | Current posture | Rollback posture |
 |---|---|---|---|
-| Production | `theologai-production-20260711-a` | PR #10 merge deployed after the read-only readiness gate passed. | Former `theologai-db` is a candidate only. Retention and compatibility are not verified here; if it predates current identity markers, a current-main redeploy may reject it. |
-| Preview | `theologai-preview-20260710-c` | Hardened PR #10 application code deployed from `ccdfb8c`. | Earlier preview databases are candidates only. Confirm retention, readiness compatibility, and the exact Worker revision before use. |
+| Production | `theologai-production-20260711-a` | PR #10 merge remains deployed while the Phase 3 production candidate below is reviewed. | The deployed Worker and this database are the retained matched rollback pair. Do not mix this database with Phase 3 code or delete it during the release window. |
+| Preview | `theologai-preview-20260712-b` | Phase 3 PR #21 head `173a6a4` deployed successfully by GitHub Actions run `29221227777` after the read-only readiness gate passed. | `theologai-preview-20260712-a` and `theologai-preview-20260710-c` are retained candidates only. Candidate `-a` predates transform version 3; candidate `-c` belongs to the earlier PR #10 deployment. Verify the retained Worker/config pair and run its exact readiness contract before either is used. |
+
+### Prepared Phase 3 production candidate (not deployed)
+
+On 2026-07-13, `theologai-production-20260713-a` was created in Eastern North
+America (`ENAM`) with no jurisdiction restriction, migrated through
+`0002_ubs_parallel_passages`, and populated from all 29 generated data files
+after the empty-target guard. The 30-file manifest contains 859,596 rows and
+scoped materialization identity
+`91afa5bcf8155ac9f8c5fd14d1d661657c83be9a8e5cd90a5783bfa38ae7dfa5`.
+Its database ID is recorded only in the reviewable top-level binding in
+`wrangler.toml`.
+
+The strict remote readiness gate returned `ready` against the candidate before
+this binding change was committed. Updating `wrangler.toml` prepares the matched
+Phase 3 code/config release; it does not change the deployed production Worker. The
+existing PR #10 Worker and `theologai-production-20260711-a` remain active and
+must be retained together until the protected main-branch deployment succeeds.
+
+### Active Phase 3 preview database
+
+On 2026-07-12, `theologai-preview-20260712-b` was created in Eastern North
+America (`ENAM`) with no jurisdiction restriction, migrated through
+`0002_ubs_parallel_passages`, and populated from all 29 generated data files,
+after beginning with the empty-target guard. The manifest contains 30 files
+total including that guard. Its database ID is kept in the
+reviewable preview binding in `wrangler.toml`; prior candidates remain available
+for rollback investigation and are not modified by this preparation.
+
+The strict remote readiness gate returned `ready`. Independent read-only checks
+also confirmed 859,596 exact manifest rows, both required UBS indexes, scoped
+materialization identity
+`91afa5bcf8155ac9f8c5fd14d1d661657c83be9a8e5cd90a5783bfa38ae7dfa5`,
+Hebrew morphology transform version 3, the Genesis 1:1 Hebrew lemma sentinel,
+`quick_check = ok`, and zero foreign-key violations.
+
+GitHub Actions run `29220658995` subsequently rechecked live authorization and
+the remote readiness contract, then deployed PR #21 head `446a9eb` with this
+database bound to preview. Retain both earlier candidates during the verification
+window, but do not describe either as ready for this head without its own matched
+compatibility proof. Do not delete any retained database as part of deployment.
+
+### Hebrew-lemma materialization follow-up
+
+The prepared `theologai-preview-20260712-b` candidate includes deterministic
+Hebrew lemma population and passed the transform-version-3 readiness gate. The
+earlier `theologai-preview-20260712-a` candidate predates those materialized row
+changes and must not be marker-updated or rebound to an application revision
+expecting transform version 3. The UBS parallel-passage source transform remains
+version 2; these are separate version domains.
 
 No rollback asset is claimed as known-good without a read-only inventory and
 compatibility check. Do not copy database IDs, credentials, API tokens, or
@@ -178,6 +232,14 @@ After environment approval and before deployment, each job runs a read-only D1
 readiness query that checks integrity, exact manifest row counts, and required
 indexes, column signatures, foreign keys, and schema/corpus identity markers. A
 missing, stale, partial, or incompatible corpus stops deployment.
+
+The corpus marker is the scoped D1 materialization identity derived from
+`data/data-manifest.json` `materializations.d1`, not the hash of the complete
+source inventory. Worker-bundled corpora may change without requiring a D1
+replacement; any D1 input, transform version, schema version, or expected-count
+drift still changes the marker and stops deployment. Legacy-marker transitions
+are conditional, separately authorized metadata writes documented in
+`docs/D1-DATA-WORKFLOW.md`; deploy workflows remain read-only with respect to D1.
 
 The identity markers were introduced with the reproducible corpus pipeline. An
 older remote database without `theologai_metadata` will intentionally fail the

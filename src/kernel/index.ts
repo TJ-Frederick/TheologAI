@@ -51,6 +51,37 @@ export {
 // Cache
 export { Cache } from './cache.js';
 
+// Strong's identity
+export {
+  parseStrongsIdentity,
+  STRONGS_IDENTITY_MAX_DIGITS,
+  STRONGS_IDENTITY_MAX_NUMBER,
+  STRONGS_IDENTITY_PATTERN,
+  type CanonicalStrongsIdentity,
+} from './strongs.js';
+
+// Source-attested parallel passage groups
+export type {
+  SourceParallelLanguageMarker,
+  SourceParallelAlignmentBasis,
+  SourceParallelReferenceSegment,
+  SourceParallelMember,
+  ParallelSourceProvenance,
+  SourceAttestedParallelGroup,
+  SourceAttestedParallelLookup,
+  ISourceAttestedParallelRepository,
+} from './sourceAttestedParallels.js';
+export {
+  parseSourceAttestedLookupReference,
+  type SourceAttestedLookupReference,
+} from './sourceAttestedReference.js';
+export {
+  UBS_PARALLEL_PASSAGE_PROVENANCE,
+  UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY,
+  computeUbsParallelArtifactIdentity,
+  deriveUbsParallelGroupId,
+} from './ubsParallelSource.js';
+
 // Provenance
 export {
   provenanceFromCitation,
@@ -60,6 +91,14 @@ export {
   type ProvenanceLink,
   type ProvenanceContext,
 } from './provenance.js';
+
+// Staged primary-source rollout flags
+export {
+  DEFAULT_PRIMARY_SOURCE_FEATURE_FLAGS,
+  readPrimarySourceFeatureFlags,
+  type PrimarySourceFeatureFlags,
+  type PrimarySourceFlagEnvironment,
+} from './featureFlags.js';
 
 // Types
 export type {

@@ -88,14 +88,18 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
         'parallel_passages',
         'commentary_lookup',
         'classic_text_lookup',
+        'primary_source_search',
         'original_language_lookup',
         'bible_verse_morphology',
+        'original_language_study',
         'donation_config',
         'verify_donation',
       ]);
       expect(listed.tools.filter(tool => tool.outputSchema).map(tool => tool.name)).toEqual([
         'bible_lookup',
+        'parallel_passages',
         'original_language_lookup',
+        'original_language_study',
       ]);
       expect(listed.tools.find(tool => tool.name === 'bible_lookup')?.outputSchema).toMatchObject({
         type: 'object',
@@ -161,6 +165,19 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
         arguments: { query: 'love', limit: 10 },
       });
       expect(materializedSearch.isError).not.toBe(true);
+
+      const primarySourceSearch = await client.callTool({
+        name: 'primary_source_search',
+        arguments: {
+          queries: [{ id: 'local-discovery', text: 'Lord’s Supper', providers: ['local'] }],
+        },
+      });
+      expect(primarySourceSearch).toMatchObject({
+        content: [expect.objectContaining({
+          text: expect.stringContaining('Plan status: **complete**'),
+        })],
+      });
+      expect(primarySourceSearch.isError).not.toBe(true);
 
       const result = await client.callTool({
         name: 'bible_lookup',

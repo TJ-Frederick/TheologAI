@@ -13,6 +13,8 @@ import {
   ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { NotFoundError } from '../kernel/errors.js';
+import { parseStrongsIdentity } from '../kernel/strongs.js';
+import { parseLocalDocumentResourceUri } from '../kernel/documentResource.js';
 import { LOCAL_HISTORICAL_SOURCE } from '../formatters/historicalFormatter.js';
 import type { ToolHandler } from '../kernel/types.js';
 import type { BibleService } from '../services/bible/BibleService.js';
@@ -27,7 +29,7 @@ import { jsonSchemaValidator } from './validation.js';
 export interface McpServerServices {
   bibleService: Pick<BibleService, 'getSupportedTranslations'>;
   commentaryService: Pick<CommentaryService, 'getAvailableCommentators'>;
-  historicalService: Pick<HistoricalDocumentService, 'listDocuments' | 'getDocument' | 'getSections'>;
+  historicalService: Pick<HistoricalDocumentService, 'listDocuments' | 'getDocument' | 'getSections' | 'getSection'>;
   strongsService: Pick<StrongsService, 'lookup'>;
 }
 
@@ -168,12 +170,34 @@ export function createTheologAiMcpServer(
       };
     }
 
-    // theologai://documents/{slug}
-    const docMatch = uri.match(/^theologai:\/\/documents\/(.+)$/);
-    if (docMatch) {
+    // theologai://documents/{slug}[#section-{sectionNumber}]
+    const documentResource = parseLocalDocumentResourceUri(uri);
+    if (documentResource) {
       try {
-        const slug = docMatch[1];
-        const doc = await services.historicalService.getDocument(slug);
+        const doc = await services.historicalService.getDocument(documentResource.documentId);
+
+        if (documentResource.sectionId !== undefined) {
+          if (doc.id !== documentResource.documentId) throw new NotFoundError('document', 'Exact document resource identity did not match.');
+          const section = await services.historicalService.getSection(doc.id, documentResource.sectionId);
+          const heading = section.title
+            ? `## ${section.section_number ? `${section.section_number}. ` : ''}${section.title}`
+            : section.section_number ? `## Section ${section.section_number}` : '## Selected section';
+          const lines = [
+            `# ${doc.title}\n`,
+            `**Type:** ${doc.type}`,
+            doc.date ? `**Date:** ${doc.date}` : '',
+            '',
+            heading,
+            '',
+            section.content,
+            '',
+            `*Source: ${LOCAL_HISTORICAL_SOURCE}*`,
+          ];
+          return {
+            contents: [{ uri, mimeType: 'text/markdown', text: lines.filter(Boolean).join('\n') }],
+          };
+        }
+
         const sections = await services.historicalService.getSections(doc.id);
 
         const lines = [
@@ -202,17 +226,21 @@ export function createTheologAiMcpServer(
     }
 
     // theologai://strongs/{number}
-    const strongsMatch = uri.match(/^theologai:\/\/strongs\/([GHgh]\d+[a-z]?)$/);
-    if (strongsMatch) {
+    const strongsMatch = uri.match(/^theologai:\/\/strongs\/([^/]+)$/);
+    const strongsIdentity = strongsMatch ? parseStrongsIdentity(strongsMatch[1]) : undefined;
+    if (strongsIdentity) {
       try {
-        const number = strongsMatch[1].toUpperCase();
-        const entry = await services.strongsService.lookup(number, true);
+        const entry = await services.strongsService.lookup(strongsIdentity.publicId, true);
 
         const lines = [
           `# ${entry.strongs_number} — ${entry.lemma}\n`,
           entry.transliteration ? `**Transliteration:** ${entry.transliteration}` : '',
           entry.pronunciation ? `**Pronunciation:** ${entry.pronunciation}` : '',
-          `**Testament:** ${entry.testament === 'OT' ? 'Old Testament (Hebrew)' : 'New Testament (Greek)'}`,
+          `**Testament:** ${entry.testament === 'OT'
+            ? 'Old Testament (Hebrew)'
+            : entry.testament === 'NT'
+              ? 'New Testament (Greek)'
+              : 'Not classified (source-language lexicon identity)'}`,
           `\n## Definition\n`,
           entry.definition,
         ];

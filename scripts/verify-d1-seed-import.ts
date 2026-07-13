@@ -8,24 +8,18 @@ import { tmpdir } from 'os';
 import { dirname, isAbsolute, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { sha256File } from './d1-seed-utils.js';
-import { assertJohnOneOneDatabase } from './data-integrity.js';
-
-interface SeedManifest {
-  manifestVersion: number;
-  algorithm: 'sha256';
-  schema: { version: string; path: string; sha256: string };
-  expectedCounts: Record<string, number>;
-  files: Array<{
-    path: string;
-    table: string;
-    sha256: string;
-    byteSize: number;
-  }>;
-}
+import {
+  assertGenesisOneOneDatabase,
+  assertHebrewLemmaCoverageDatabase,
+  assertJohnOneOneDatabase,
+} from './data-integrity.js';
+import { loadAndVerifyD1SeedManifest } from './d1-seed-manifest.js';
+import { validateUbsParallelGroup } from '../src/adapters/shared/UbsParallelPassageRepository.js';
+import type { ParallelSourceProvenance } from '../src/kernel/sourceAttestedParallels.js';
+import { UBS_PARALLEL_PASSAGE_PROVENANCE } from '../src/kernel/ubsParallelSource.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SEED_DIRECTORY = join(ROOT, 'scripts', 'd1-seed');
-const SEED_MANIFEST_PATH = join(SEED_DIRECTORY, 'seed-manifest.json');
 
 function databaseArgument(argv: string[]): string {
   let value: string | undefined;
@@ -53,7 +47,7 @@ function databaseArgument(argv: string[]): string {
 }
 
 function quoteIdentifier(identifier: string): string {
-  if (!/^[a-z_]+$/.test(identifier)) throw new Error(`Unsafe SQLite identifier: ${identifier}`);
+  if (!/^[a-z_][a-z0-9_]*$/.test(identifier)) throw new Error(`Unsafe SQLite identifier: ${identifier}`);
   return `"${identifier}"`;
 }
 
@@ -146,18 +140,79 @@ function assertRepresentativeFts(db: Database.Database): void {
   if (!sections) throw new Error("Imported historical FTS has no representative 'almighty' result");
 }
 
-const sourcePath = databaseArgument(process.argv.slice(2));
-if (!existsSync(SEED_MANIFEST_PATH)) {
-  throw new Error('D1 seed is absent; run npm run d1:seed:export first');
-}
-const manifest = JSON.parse(readFileSync(SEED_MANIFEST_PATH, 'utf8')) as SeedManifest;
-if (manifest.manifestVersion !== 1 || manifest.algorithm !== 'sha256') {
-  throw new Error('Unsupported D1 seed manifest');
+function assertUbsReconstruction(db: Database.Database, expectedCounts: Record<string, number>): void {
+  const incompleteGroups = db.prepare(`SELECT COUNT(*) AS count FROM ubs_parallel_groups g
+    WHERE (SELECT COUNT(*) FROM ubs_parallel_members m WHERE m.group_id = g.group_id) < 2`).get() as { count: number };
+  const incompleteMembers = db.prepare(`SELECT COUNT(*) AS count FROM ubs_parallel_members m
+    WHERE NOT EXISTS (SELECT 1 FROM ubs_parallel_segments s WHERE s.group_id = m.group_id AND s.member_order = m.source_order)`).get() as { count: number };
+  const source = db.prepare('SELECT artifact_identity, transform_version FROM ubs_parallel_sources').get() as { artifact_identity?: string; transform_version?: number } | undefined;
+  if (incompleteGroups.count !== 0 || incompleteMembers.count !== 0
+    || source?.artifact_identity !== 'a5fd0d4646cb69f426f592c6e334866191201fbe64691cd55c7f7ecd0ca9d4cc'
+    || source?.transform_version !== 2) {
+    throw new Error('Normalized UBS reconstruction is incomplete or has a stale artifact identity');
+  }
+  const ubsDelta = ['ubs_parallel_sources', 'ubs_parallel_groups', 'ubs_parallel_members', 'ubs_parallel_segments']
+    .reduce((sum, table) => sum + expectedCounts[table], 0);
+  if (ubsDelta !== 12_736) throw new Error(`Unexpected normalized UBS row delta: ${ubsDelta}`);
+
+  const sourceRow = db.prepare(`SELECT * FROM ubs_parallel_sources WHERE source_id = 'ubs_paratext_parallel_passages'`).get() as Record<string, any>;
+  const provenance: ParallelSourceProvenance = {
+    sourceId: sourceRow.source_id, title: sourceRow.title, publisher: sourceRow.publisher,
+    copyright: sourceRow.copyright, license: sourceRow.license, licenseUrl: sourceRow.license_url,
+    sourceUrl: sourceRow.source_url, sourcePath: sourceRow.source_path, sourceCommit: sourceRow.source_commit,
+    sourceCommitDate: sourceRow.source_commit_date, sourceBlob: sourceRow.source_blob,
+    sourceBytes: sourceRow.source_bytes, sourceSha256: sourceRow.source_sha256,
+    transformVersion: sourceRow.transform_version, modified: sourceRow.modified === 1,
+    modificationNote: sourceRow.modification_note,
+  };
+  if (JSON.stringify(provenance) !== JSON.stringify(UBS_PARALLEL_PASSAGE_PROVENANCE)
+    || sourceRow.schema_version !== 'ubs-parallel-passages.v2'
+    || sourceRow.label !== 'source_attested_parallel'
+    || sourceRow.directionality !== 'unspecified') {
+    throw new Error('Normalized UBS source provenance differs from the reviewed descriptor');
+  }
+  const groups = db.prepare('SELECT * FROM ubs_parallel_groups ORDER BY source_ordinal').all() as Record<string, any>[];
+  const members = db.prepare('SELECT * FROM ubs_parallel_members ORDER BY group_id, source_order').all() as Record<string, any>[];
+  const segments = db.prepare('SELECT * FROM ubs_parallel_segments ORDER BY group_id, member_order, segment_order').all() as Record<string, any>[];
+  const membersByGroup = new Map<string, Record<string, any>[]>();
+  for (const member of members) membersByGroup.set(member.group_id, [...(membersByGroup.get(member.group_id) ?? []), member]);
+  const segmentsByMember = new Map<string, Record<string, any>[]>();
+  for (const segment of segments) {
+    const key = `${segment.group_id}\0${segment.member_order}`;
+    segmentsByMember.set(key, [...(segmentsByMember.get(key) ?? []), segment]);
+  }
+  groups.forEach((group, groupIndex) => validateUbsParallelGroup({
+    groupId: group.group_id,
+    sourceOrdinal: group.source_ordinal,
+    label: group.label,
+    directionality: group.directionality,
+    provenance,
+    members: (membersByGroup.get(group.group_id) ?? []).map((member, memberIndex) => {
+      if (member.source_order !== memberIndex + 1) throw new Error('Normalized UBS member ordinals are not contiguous');
+      return {
+        sourceOrder: member.source_order,
+        sourceReference: member.source_reference,
+        normalizedReference: member.normalized_reference,
+        languageMarker: member.language_marker,
+        alignmentBasis: member.alignment_basis,
+        alignmentRaw: member.alignment_raw,
+        segments: (segmentsByMember.get(`${group.group_id}\0${member.source_order}`) ?? []).map((segment, segmentIndex) => {
+          if (segment.segment_order !== segmentIndex + 1) throw new Error('Normalized UBS segment ordinals are not contiguous');
+          return { bookNumber: segment.book_number, chapter: segment.chapter, startVerse: segment.start_verse, endVerse: segment.end_verse };
+        }),
+      };
+    }),
+  }, groupIndex + 1, provenance));
 }
 
-const schemaPath = join(ROOT, manifest.schema.path);
-if (!existsSync(schemaPath) || sha256File(schemaPath) !== manifest.schema.sha256) {
-  throw new Error('Tracked schema does not match the D1 seed manifest');
+const sourcePath = databaseArgument(process.argv.slice(2));
+const manifest = loadAndVerifyD1SeedManifest(ROOT, SEED_DIRECTORY);
+
+for (const migration of manifest.migrations) {
+  const migrationPath = join(ROOT, migration.path);
+  if (!existsSync(migrationPath) || sha256File(migrationPath) !== migration.sha256) {
+    throw new Error(`Tracked migration does not match the D1 seed manifest: ${migration.path}`);
+  }
 }
 for (const file of manifest.files) {
   const path = join(SEED_DIRECTORY, file.path);
@@ -175,7 +230,7 @@ try {
   target.pragma('journal_mode = OFF');
   target.pragma('synchronous = OFF');
   target.pragma('foreign_keys = ON');
-  target.exec(readFileSync(schemaPath, 'utf8'));
+  for (const migration of manifest.migrations) target.exec(readFileSync(join(ROOT, migration.path), 'utf8'));
 
   for (const file of manifest.files) {
     const sql = readFileSync(join(SEED_DIRECTORY, file.path), 'utf8');
@@ -192,7 +247,13 @@ try {
   assertDatabaseHealth(target, manifest.expectedCounts);
   assertJohnOneOneDatabase(source, 'Source SQLite morphology');
   assertJohnOneOneDatabase(target, 'Imported D1 morphology');
+  assertGenesisOneOneDatabase(source, 'Source SQLite morphology');
+  assertGenesisOneOneDatabase(target, 'Imported D1 morphology');
+  assertHebrewLemmaCoverageDatabase(source, 'Source SQLite morphology');
+  assertHebrewLemmaCoverageDatabase(target, 'Imported D1 morphology');
   assertRepresentativeFts(target);
+  assertUbsReconstruction(source, manifest.expectedCounts);
+  assertUbsReconstruction(target, manifest.expectedCounts);
 
   for (const table of Object.keys(manifest.expectedCounts)) {
     const sourceDigest = tableDigest(source, table);

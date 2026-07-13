@@ -1,5 +1,4 @@
 import type { BibleAdapter } from '../../src/adapters/bible/BibleAdapter.js';
-import type { CcelAdapter } from '../../src/adapters/commentary/CcelAdapter.js';
 import type { CommentaryAdapter } from '../../src/adapters/commentary/CommentaryAdapter.js';
 import type { OnChainVerifier } from '../../src/adapters/donation/OnChainVerifier.js';
 import type {
@@ -13,21 +12,16 @@ import type { McpCompositionRoot } from '../../src/mcp/server.js';
 import { BibleService } from '../../src/services/bible/BibleService.js';
 import { CrossReferenceService } from '../../src/services/bible/CrossReferenceService.js';
 import { ParallelPassageService } from '../../src/services/bible/ParallelPassageService.js';
-import { CcelService } from '../../src/services/commentary/CcelService.js';
+import { SourceAttestedParallelService } from '../../src/services/bible/SourceAttestedParallelService.js';
 import { CommentaryService } from '../../src/services/commentary/CommentaryService.js';
 import { DonationService } from '../../src/services/donation/DonationService.js';
 import { HistoricalDocumentService } from '../../src/services/historical/HistoricalDocumentService.js';
+import { LocalPrimarySourceSearchProvider } from '../../src/services/historical/LocalPrimarySourceSearchProvider.js';
+import { PrimarySourceSearchService } from '../../src/services/historical/PrimarySourceSearchService.js';
 import { MorphologyService } from '../../src/services/languages/MorphologyService.js';
 import { StrongsService } from '../../src/services/languages/StrongsService.js';
-import { createBibleLookupHandler } from '../../src/tools/v2/bibleLookup.js';
-import { createClassicTextsHandler } from '../../src/tools/v2/classicTexts.js';
-import { createCommentaryHandler } from '../../src/tools/v2/commentary.js';
-import { createCrossReferencesHandler } from '../../src/tools/v2/crossReferences.js';
-import { createDonationConfigHandler } from '../../src/tools/v2/donationConfig.js';
-import { createParallelPassagesHandler } from '../../src/tools/v2/parallelPassages.js';
-import { createStrongsLookupHandler } from '../../src/tools/v2/strongsLookup.js';
-import { createVerifyDonationHandler } from '../../src/tools/v2/verifyDonation.js';
-import { createVerseMorphologyHandler } from '../../src/tools/v2/verseMorphology.js';
+import { OriginalLanguageStudyService } from '../../src/services/languages/OriginalLanguageStudyService.js';
+import { createToolRegistry } from '../../src/tools/toolRegistry.js';
 import type { WorkerCompositionRoot } from '../../src/tools/worker/index.js';
 
 export type DeterministicMcpRoot = McpCompositionRoot & WorkerCompositionRoot;
@@ -48,7 +42,7 @@ export interface DeterministicMcpFixture {
  *
  * This fixture intentionally opens no database and performs no network calls.
  * It is shared by protocol integration tests and the official HTTP conformance
- * harness so both exercise the same nine real tool definitions.
+ * harness so both exercise the same eleven real tool definitions.
  */
 export function createDeterministicMcpFixture(): DeterministicMcpFixture {
   const biblePassageCalls: BiblePassageCall[] = [];
@@ -92,6 +86,7 @@ export function createDeterministicMcpFixture(): DeterministicMcpFixture {
     getSections: () => [],
     getSection: () => undefined,
     search: () => [],
+    searchPrimarySources: () => [],
     findDocumentByName: () => undefined,
   };
 
@@ -111,14 +106,6 @@ export function createDeterministicMcpFixture(): DeterministicMcpFixture {
     getDistribution: () => [],
   };
 
-  const ccelAdapter = {
-    getWorkSection: async (work: string, section: string) => ({
-      work,
-      section,
-      content: 'Deterministic classic text.',
-    }),
-  } as unknown as CcelAdapter;
-
   const onChainVerifier = {
     getEvidence: async () => {
       throw new Error('The deterministic verifier must not be called by conformance tests.');
@@ -127,32 +114,48 @@ export function createDeterministicMcpFixture(): DeterministicMcpFixture {
 
   const bibleService = new BibleService([bibleAdapter]);
   const crossReferenceService = new CrossReferenceService(crossReferenceRepository);
+  const sourceAttestedParallelService = new SourceAttestedParallelService({
+    findGroups: () => [],
+    getProvenance: () => ({
+      sourceId: 'fixture', title: 'Fixture', publisher: 'Fixture', copyright: 'Fixture', license: 'Fixture',
+      licenseUrl: 'https://example.test/license', sourceUrl: 'https://example.test/source', sourcePath: 'fixture',
+      sourceCommit: '0'.repeat(40), sourceCommitDate: '2026-01-01', sourceBlob: '0'.repeat(40), sourceBytes: 1,
+      sourceSha256: '0'.repeat(64), transformVersion: 1, modified: true, modificationNote: 'Fixture',
+    }),
+  });
   const parallelPassageService = new ParallelPassageService(
     crossReferenceRepository,
     bibleService,
     undefined,
     { description: 'Deterministic test fixture', version: '1', parallels: {} },
+    sourceAttestedParallelService,
   );
   const commentaryService = new CommentaryService([commentaryAdapter]);
   const historicalService = new HistoricalDocumentService(historicalRepository);
+  const primarySourceSearchService = new PrimarySourceSearchService(
+    new LocalPrimarySourceSearchProvider(historicalRepository),
+    { search: async () => ({ provider: 'ccel_live', status: 'disabled', searched: false, page: 1, hitCount: 0, hits: [], notices: [] }) },
+    { ccelLiveSearch: false },
+  );
   const strongsService = new StrongsService(strongsRepository);
   const morphologyService = new MorphologyService(morphologyRepository);
-  const ccelService = new CcelService(ccelAdapter);
+  const originalLanguageStudyService = new OriginalLanguageStudyService(morphologyRepository, strongsRepository);
   const donationService = new DonationService(onChainVerifier);
 
   const root = {
-    tools: [
-      createBibleLookupHandler(bibleService),
-      createCrossReferencesHandler(crossReferenceService),
-      createParallelPassagesHandler(parallelPassageService),
-      createCommentaryHandler(commentaryService),
-      createClassicTextsHandler(historicalService, ccelService),
-      createStrongsLookupHandler(strongsService),
-      createVerseMorphologyHandler(morphologyService),
-      createDonationConfigHandler(donationService),
-      createVerifyDonationHandler(donationService),
-    ],
-    services: { bibleService, commentaryService, historicalService, strongsService },
+    tools: createToolRegistry({
+      bibleService,
+      crossReferenceService,
+      parallelPassageService,
+      commentaryService,
+      historicalService,
+      primarySourceSearchService,
+      strongsService,
+      morphologyService,
+      originalLanguageStudyService,
+      donationService,
+    }),
+    services: { bibleService, commentaryService, historicalService, strongsService, sourceAttestedParallelService },
   } satisfies DeterministicMcpRoot;
 
   return { root, biblePassageCalls };

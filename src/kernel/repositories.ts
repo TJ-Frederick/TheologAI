@@ -115,11 +115,24 @@ export interface DocumentSection {
   topics: string[];
 }
 
+export interface PrimarySourceLocalSearchOptions {
+  text: string;
+  match: 'all_terms' | 'phrase';
+  documentId?: string;
+  limit: number;
+}
+
+export interface PrimarySourceLocalSearchRow {
+  document: DocumentInfo;
+  section: DocumentSection;
+}
+
 export interface IHistoricalDocumentRepository {
   listDocuments(): RepositoryResult<DocumentInfo[]>;
   getDocument(id: string): RepositoryResult<DocumentInfo | undefined>;
   getSections(documentId: string): RepositoryResult<DocumentSection[]>;
   getSection(documentId: string, sectionNumber: string): RepositoryResult<DocumentSection | undefined>;
   search(query: string, limit?: number): RepositoryResult<DocumentSection[]>;
+  searchPrimarySources(options: PrimarySourceLocalSearchOptions): RepositoryResult<PrimarySourceLocalSearchRow[]>;
   findDocumentByName(name: string): RepositoryResult<DocumentInfo | undefined>;
 }

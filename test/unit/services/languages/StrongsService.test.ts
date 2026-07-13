@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { StrongsService } from '../../../../src/services/languages/StrongsService.js';
 import { ValidationError, NotFoundError } from '../../../../src/kernel/errors.js';
+import { readFileSync } from 'node:fs';
 
 // ── Mock repository ──
 
@@ -22,6 +23,17 @@ const mockLexicon = {
     senses: { '1': { gloss: 'love', count: 85, usage: 'divine love' } },
   },
 };
+
+const stepBibleGreek = JSON.parse(readFileSync(new URL('../../../../data/biblical-languages/stepbible-lexicons/tbesg-greek.json', import.meta.url), 'utf8')) as Record<string, Record<string, unknown>>;
+const stepBibleHebrew = JSON.parse(readFileSync(new URL('../../../../data/biblical-languages/stepbible-lexicons/tbesh-hebrew.json', import.meta.url), 'utf8')) as Record<string, Record<string, unknown>>;
+
+function sourceLexicon(id: string) {
+  return {
+    strongs_number: id,
+    source: 'STEPBible',
+    extended_data: (id.startsWith('G') ? stepBibleGreek : stepBibleHebrew)[id],
+  };
+}
 
 function makeMockRepo() {
   return {
@@ -48,6 +60,14 @@ describe('StrongsService', () => {
       expect(repo.lookup).toHaveBeenCalledWith('G26');
     });
 
+    it('canonicalizes padding while preserving a sense suffix', async () => {
+      const repo = makeMockRepo();
+      const service = new StrongsService(repo as any);
+      await service.lookup(' g02385i ', true);
+      expect(repo.lookup).toHaveBeenCalledWith('G2385I');
+      expect(repo.getLexiconEntry).toHaveBeenCalledWith('G2385I');
+    });
+
     it('throws ValidationError for invalid format', async () => {
       const repo = makeMockRepo();
       const service = new StrongsService(repo as any);
@@ -60,11 +80,62 @@ describe('StrongsService', () => {
       await expect(service.lookup('')).rejects.toThrow(ValidationError);
     });
 
+    it.each(['G0', 'G100000', 'H999999', 'G9007199254740993'])('rejects zero or out-of-domain identity %s', async input => {
+      const repo = makeMockRepo();
+      await expect(new StrongsService(repo as any).lookup(input)).rejects.toThrow(ValidationError);
+      expect(repo.lookup).not.toHaveBeenCalled();
+    });
+
+    it.each(['G6000', 'H9001', 'H9049', 'G21502'])('returns source-backed lexicon-only identity %s without a classical row', async input => {
+      const repo = makeMockRepo();
+      repo.lookup.mockReturnValue(undefined);
+      repo.getLexiconEntry.mockReturnValue(sourceLexicon(input));
+      const result = await new StrongsService(repo as any).lookup(input, true);
+      expect(repo.lookup).toHaveBeenCalledWith(input);
+      expect(repo.getLexiconEntry).toHaveBeenCalledWith(input);
+      expect(result).toMatchObject({
+        strongs_number: input,
+        testament: null,
+        language: input.startsWith('G') ? 'Greek' : 'Hebrew',
+        sourceKind: 'stepbible_lexicon',
+        citation: { source: 'STEPBible lexicon data' },
+        lemma: sourceLexicon(input).extended_data.lemma,
+        extended: { strongsExtended: input },
+      });
+      expect(result.definition).not.toMatch(/<[^>]+>/);
+    });
+
+    it('does not infer New Testament classification for the LXX-only G21502 identity', async () => {
+      const repo = makeMockRepo();
+      repo.lookup.mockReturnValue(undefined);
+      repo.getLexiconEntry.mockReturnValue(sourceLexicon('G21502'));
+      const result = await new StrongsService(repo as any).lookup('G21502');
+      expect(result).toMatchObject({ strongs_number: 'G21502', language: 'Greek', testament: null });
+      expect(result.definition).toContain('LXX');
+    });
+
+    it('keeps lexicon-only summary source-backed without forcing extended detail', async () => {
+      const repo = makeMockRepo();
+      repo.lookup.mockReturnValue(undefined);
+      repo.getLexiconEntry.mockReturnValue(sourceLexicon('G6000'));
+      const result = await new StrongsService(repo as any).lookup('G6000', false);
+      expect(result.extended).toBeUndefined();
+      expect(result.citation).toEqual(expect.objectContaining({ source: 'STEPBible lexicon data', copyright: expect.stringContaining('CC BY 4.0') }));
+    });
+
+    it('does not base-join a missing suffixed identity when only the base lexicon exists', async () => {
+      const repo = makeMockRepo();
+      repo.lookup.mockReturnValue(undefined);
+      repo.getLexiconEntry.mockReturnValue(undefined);
+      await expect(new StrongsService(repo as any).lookup('G6000A')).rejects.toThrow(NotFoundError);
+      expect(repo.getLexiconEntry).toHaveBeenCalledWith('G6000A');
+    });
+
     it('throws NotFoundError when repo returns undefined', async () => {
       const repo = makeMockRepo();
       repo.lookup.mockReturnValue(undefined);
       const service = new StrongsService(repo as any);
-      await expect(service.lookup('G9999')).rejects.toThrow(NotFoundError);
+      await expect(service.lookup('G5624')).rejects.toThrow(NotFoundError);
     });
 
     it('maps repo entry to EnhancedStrongsResult with citation', async () => {

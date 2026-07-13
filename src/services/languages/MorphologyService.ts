@@ -13,6 +13,12 @@ const CITATION: Citation = {
   url: 'https://github.com/STEPBible/STEPBible-Data',
 };
 
+const HEBREW_LEMMA_CITATION: Citation = {
+  source: 'STEPBible TBESH Hebrew lexicon',
+  copyright: 'CC BY 4.0 (Tyndale House, Cambridge)',
+  url: 'https://github.com/STEPBible/STEPBible-Data',
+};
+
 export class MorphologyService {
   constructor(private repo: IMorphologyRepository) {}
 
@@ -62,6 +68,7 @@ export class MorphologyService {
       verse: ref.startVerse,
       words: verseWords,
       citation: CITATION,
+      ...(ref.book.testament === 'OT' ? { lemmaCitation: HEBREW_LEMMA_CITATION } : {}),
     };
   }
 

@@ -9,7 +9,8 @@ import type {
   OriginalLanguageExtendedV1,
   OriginalLanguageOutputV1,
 } from '../mcp/schemas/originalLanguage.js';
-import { normalizeLexiconText, summarizeDefinition } from '../formatters/languagesFormatter.js';
+import { summarizeDefinition } from '../formatters/languagesFormatter.js';
+import { normalizeLexiconText } from '../kernel/lexiconText.js';
 
 const STRONGS_CITATION = {
   source: "Strong's Concordance",
@@ -60,12 +61,16 @@ export function presentOriginalLanguageEntry(
   result: EnhancedStrongsResult,
   detailLevel: 'simple' | 'detailed',
 ): OriginalLanguageOutputV1 {
+  const stepBibleBase = result.sourceKind === 'stepbible_lexicon';
   const base = provenanceFromCitation(result.citation, {
     id: 'src-1',
     kind: 'lexicon',
     status: 'verified_source',
-    license: { label: 'Public Domain' },
-    attribution: 'OpenScriptures',
+    license: stepBibleBase ? {
+      label: 'CC BY 4.0',
+      url: 'https://creativecommons.org/licenses/by/4.0/',
+    } : { label: 'Public Domain' },
+    attribution: stepBibleBase ? 'Tyndale House, Cambridge' : 'OpenScriptures',
   });
   const provenance: ProvenanceRecord[] = [base];
   const provenanceIds = [base.id];
@@ -88,7 +93,7 @@ export function presentOriginalLanguageEntry(
   const extended = result.extended;
   const entry: OriginalLanguageEntryV1 = {
     strongsNumber: result.strongs_number,
-    language: languageFor(result.testament),
+    language: result.language ?? languageFor(result.testament, result.strongs_number),
     testament: result.testament,
     lemma: nullableText(result.lemma),
     ...(result.transliteration ? { transliteration: result.transliteration } : {}),
@@ -141,8 +146,10 @@ function strongsProvenance(): ProvenanceRecord {
   });
 }
 
-function languageFor(testament: 'OT' | 'NT'): 'Greek' | 'Hebrew' {
-  return testament === 'NT' ? 'Greek' : 'Hebrew';
+function languageFor(testament: 'OT' | 'NT' | null, strongsNumber?: string): 'Greek' | 'Hebrew' {
+  if (testament === 'NT') return 'Greek';
+  if (testament === 'OT') return 'Hebrew';
+  return strongsNumber?.startsWith('H') ? 'Hebrew' : 'Greek';
 }
 
 function nullableText(value: string | null | undefined): string | null {

@@ -1,7 +1,20 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { BibleService } from '../../../../src/services/bible/BibleService.js';
 import type { ICrossReferenceRepository } from '../../../../src/kernel/repositories.js';
-import { ParallelPassageService } from '../../../../src/services/bible/ParallelPassageService.js';
+import { ParallelPassageService as PublicParallelPassageService } from '../../../../src/services/bible/ParallelPassageService.js';
+import type { ParallelPassageLookupParams } from '../../../../src/kernel/types.js';
+
+/** Exercise the retained legacy algorithm through its now-required selector. */
+class ParallelPassageService extends PublicParallelPassageService {
+  override async lookup(params: ParallelPassageLookupParams): Promise<any> {
+    const result = await super.lookup({ corpora: ['theologai_legacy'], ...params });
+    return {
+      ...result,
+      primary: { reference: result.requestedReference },
+      parallels: result.legacyParallels,
+    };
+  }
+}
 
 function repository(references: Array<{ reference: string; votes: number }> = []): ICrossReferenceRepository {
   return {
@@ -102,13 +115,13 @@ describe('ParallelPassageService', () => {
   it.each([
     ['synoptic', 'Matthew 1:1', ['Luke 3:23-38']],
     ['quotation', 'Isaiah 53:5', ['1 Peter 2:24']],
-    ['thematic', 'Genesis 1:1', ['John 1:1', 'Romans 1:20']],
+    ['thematic', 'Genesis 1:1', ['John 1:1']],
   ] as const)('implements %s mode', async (mode, reference, expected) => {
     const repo = repository([{ reference: 'Rom.1.20', votes: 60 }]);
     const service = new ParallelPassageService(repo, undefined, undefined, fixture());
     const result = await service.lookup({ reference, mode });
     expect(result.parallels.map(item => item.reference)).toEqual(expected);
-    expect(repo.getCrossReferences).toHaveBeenCalledTimes(mode === 'thematic' ? 1 : 0);
+    expect(repo.getCrossReferences).not.toHaveBeenCalled();
   });
 
   it('classifies cross-boundary event members as thematic in thematic and auto modes', async () => {
@@ -176,14 +189,18 @@ describe('ParallelPassageService', () => {
     expect(repo.getCrossReferences).not.toHaveBeenCalled();
   });
 
-  it('auto mode merges canonicalized cross-references without duplicates', async () => {
+  it('keeps explicitly requested cross-references in their separate collection', async () => {
     const repo = repository([
       { reference: 'Luke 3:23-38', votes: 100 },
       { reference: 'Rom.1.20', votes: 40 },
     ]);
     const service = new ParallelPassageService(repo, undefined, undefined, fixture());
-    const result = await service.lookup({ reference: 'Matthew 1:1', mode: 'auto' });
-    expect(result.parallels.map(item => item.reference)).toEqual(['Luke 3:23-38', 'John 1:1', 'Romans 1:20']);
+    const result = await service.lookup({ reference: 'Matthew 1:1', mode: 'auto', includeOpenBibleCrossReferences: true });
+    expect(result.parallels.map((item: any) => item.reference)).toEqual(['Luke 3:23-38', 'John 1:1']);
+    expect(result.openBibleCrossReferences).toEqual([
+      { reference: 'Luke 3:23-38', votes: 100 },
+      { reference: 'Romans 1:20', votes: 40 },
+    ]);
   });
 
   it('loads parallel excerpts without an unused primary lookup, with bounded concurrency and partial warnings', async () => {

@@ -11,6 +11,8 @@ import {
   presentOriginalLanguageEntry,
   presentOriginalLanguageSearch,
 } from '../../presenters/originalLanguageStructured.js';
+import { parseStrongsIdentity, STRONGS_IDENTITY_PATTERN } from '../../kernel/strongs.js';
+import type { CanonicalStrongsIdentity } from '../../kernel/strongs.js';
 
 export function createStrongsLookupHandler(service: StrongsService): ToolHandler {
   return {
@@ -24,9 +26,9 @@ export function createStrongsLookupHandler(service: StrongsService): ToolHandler
         strongs_number: {
           type: 'string',
           minLength: 2,
-          maxLength: 16,
+          maxLength: 7,
           description: "Strong's number (e.g., G25 for Greek agapaō, H430 for Hebrew Elohim)",
-          pattern: '^[GHgh]\\d+[a-z]?$',
+          pattern: STRONGS_IDENTITY_PATTERN,
         },
         detail_level: { type: 'string', enum: ['simple', 'detailed'], description: 'Exact strongs_number lookups only; choose the amount of entry detail. Defaults to simple when omitted.' },
         include_extended: { type: 'boolean', description: 'Exact strongs_number lookups only; include STEPBible extended data. Defaults to false when omitted.' },
@@ -50,7 +52,7 @@ export function createStrongsLookupHandler(service: StrongsService): ToolHandler
 
     handler: async (params) => {
       try {
-        validateLookupMode(params);
+        const exactIdentity = validateLookupMode(params);
 
         if (Object.prototype.hasOwnProperty.call(params, 'query')) {
           const limit = typeof params.limit === 'number' ? params.limit : 10;
@@ -63,7 +65,7 @@ export function createStrongsLookupHandler(service: StrongsService): ToolHandler
         }
 
         const result = await service.lookup(
-          params.strongs_number as string,
+          exactIdentity!.publicId,
           params.include_extended === true,
         );
         const text = formatStrongsResult(result, params.detail_level as string);
@@ -81,7 +83,7 @@ export function createStrongsLookupHandler(service: StrongsService): ToolHandler
   };
 }
 
-function validateLookupMode(params: Record<string, unknown>): void {
+function validateLookupMode(params: Record<string, unknown>): CanonicalStrongsIdentity | undefined {
   const keys = Object.keys(params);
   const allowed = new Set(['strongs_number', 'detail_level', 'include_extended', 'query', 'limit']);
   const unknown = keys.find(key => !allowed.has(key));
@@ -107,10 +109,17 @@ function validateLookupMode(params: Record<string, unknown>): void {
     if (has('limit') && (!Number.isInteger(params.limit) || (params.limit as number) < 1 || (params.limit as number) > 20)) {
       throw new ValidationError('limit', 'limit must be an integer between 1 and 20.');
     }
-    return;
+    return undefined;
   }
 
-  if (typeof params.strongs_number !== 'string' || params.strongs_number.length < 2 || params.strongs_number.length > 16 || !/^[GHgh]\d+[a-z]?$/.test(params.strongs_number)) {
+  const identity = typeof params.strongs_number === 'string'
+    ? parseStrongsIdentity(params.strongs_number)
+    : undefined;
+  if (typeof params.strongs_number !== 'string'
+    || params.strongs_number.length < 2
+    || params.strongs_number.length > 7
+    || params.strongs_number !== params.strongs_number.trim()
+    || !identity) {
     throw new ValidationError('strongs_number', "strongs_number must match a Strong's number such as G25 or H430.");
   }
   if (has('limit')) {
@@ -122,4 +131,5 @@ function validateLookupMode(params: Record<string, unknown>): void {
   if (has('include_extended') && typeof params.include_extended !== 'boolean') {
     throw new ValidationError('include_extended', 'include_extended must be true or false.');
   }
+  return identity;
 }

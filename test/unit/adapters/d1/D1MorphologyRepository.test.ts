@@ -91,11 +91,21 @@ describe('D1MorphologyRepository', () => {
       expect(result).toEqual([occurrence]);
     });
 
+    it.each(['G6000', 'H9001', 'H9049', 'G21502'])('uses extended morphology identity %s unchanged', async identity => {
+      const db = createSimpleD1([]);
+      await expect(new D1MorphologyRepository(db as any).getOccurrences(identity)).resolves.toEqual([]);
+      expect(db.prepare.mock.results[0].value.bind).toHaveBeenCalledWith(identity, 100);
+    });
+
     it('passes strongsNumber and limit to .bind()', async () => {
       const db = createSimpleD1([]);
       const repo = new D1MorphologyRepository(db as any);
       await repo.getOccurrences('G25', 50);
-      expect(db.prepare.mock.results[0].value.bind).toHaveBeenCalledWith('G25', 50);
+      expect(db.prepare.mock.results[0].value.bind).toHaveBeenCalledWith('G0025', 50);
+
+      await repo.getOccurrences('g25i');
+      expect(db.prepare.mock.results[1].value.bind).toHaveBeenCalledWith('G0025I', 100);
+      expect(await repo.getOccurrences('G0')).toEqual([]);
     });
   });
 
@@ -117,7 +127,7 @@ describe('D1MorphologyRepository', () => {
       const db = createSimpleD1([]);
       const repo = new D1MorphologyRepository(db as any);
       await repo.getDistribution('G25');
-      expect(db.prepare.mock.results[0].value.bind).toHaveBeenCalledWith('G25');
+      expect(db.prepare.mock.results[0].value.bind).toHaveBeenCalledWith('G0025');
     });
   });
 });

@@ -4,19 +4,16 @@
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-
-interface SeedManifest {
-  expectedCounts: Record<string, number>;
-  files: Array<{ path: string; table: string }>;
-}
+import { loadAndVerifyD1SeedManifest } from './d1-seed-manifest.js';
+import { parseDataManifest } from './d1-corpus-identity.js';
+import { REQUIRED_COLUMNS } from './check-remote-d1-readiness.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SEED_ROOT = join(ROOT, 'scripts', 'd1-seed');
-const manifest = JSON.parse(
-  readFileSync(join(SEED_ROOT, 'seed-manifest.json'), 'utf8'),
-) as SeedManifest;
+const manifest = loadAndVerifyD1SeedManifest(ROOT, SEED_ROOT);
+const sourceManifest = parseDataManifest(readFileSync(join(ROOT, 'data', 'data-manifest.json')));
 const state = mkdtempSync(join(tmpdir(), 'theologai-wrangler-d1-'));
 const wrangler = join(ROOT, 'node_modules', 'wrangler', 'bin', 'wrangler.js');
 
@@ -41,6 +38,24 @@ function run(args: string[]): string {
 try {
   const common = ['THEOLOGAI_DB', '--local', '--persist-to', state, '--config', 'wrangler.toml'];
   run(['d1', 'migrations', 'apply', ...common]);
+  const migrationNames = sourceManifest.materializations.d1.migrations.map(migration => basename(migration.path));
+  const columnChecks = Object.entries(REQUIRED_COLUMNS).map(([table, columns]) =>
+    `(SELECT group_concat(name, ',') FROM (SELECT name FROM pragma_table_info('${table}') ORDER BY cid)) = '${columns.join(',')}'`
+  );
+  const schemaState = run([
+    'd1',
+    'execute',
+    ...common,
+    '--command',
+    `SELECT CASE WHEN
+      (SELECT COUNT(*) FROM d1_migrations) = ${migrationNames.length}
+      AND (SELECT group_concat(name, ',') FROM (SELECT name FROM d1_migrations ORDER BY id)) = '${migrationNames.join(',')}'
+      AND (SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name IN ('idx_xref_from','idx_xref_votes','idx_morph_verse','idx_morph_strongs','idx_ubs_groups_source_order','idx_ubs_segments_lookup')) = 6
+      AND ${columnChecks.join('\n      AND ')}
+      THEN 'schema-ready' ELSE json_extract('Wrangler-applied migration state mismatch', '$') END AS schema_state;`,
+    '--json',
+  ]);
+  if (!schemaState.includes('schema-ready')) throw new Error('Wrangler-applied migration state was not verified');
 
   const completeTables = new Set([
     'empty-target-check',
@@ -49,11 +64,19 @@ try {
     'documents',
     'document_sections',
     'fts',
+    'ubs_parallel_sources',
+    'ubs_parallel_groups',
+    'ubs_parallel_members',
+    'ubs_parallel_segments',
   ]);
   const firstChunkTables = new Set(['strongs', 'stepbible_lexicons', 'cross_references', 'morphology']);
+  const hebrewSentinelChunk = manifest.files.find(file => file.table === 'morphology'
+    && readFileSync(join(SEED_ROOT, file.path), 'utf8').includes("VALUES('Genesis',1,1,3,'אֱלֹהִ֑ים','אֱלֹהִים','H0430'"));
+  if (!hebrewSentinelChunk) throw new Error('Generated D1 seed has no Genesis 1:1 Hebrew lemma sentinel');
   const seen = new Set<string>();
   const representativeFiles = manifest.files.filter(file => {
     if (completeTables.has(file.table)) return true;
+    if (file.path === hebrewSentinelChunk.path) return true;
     if (!firstChunkTables.has(file.table) || seen.has(file.table)) return false;
     seen.add(file.table);
     return true;
@@ -80,9 +103,15 @@ try {
       AND (SELECT COUNT(*) FROM stepbible_lexicons) > 0
       AND (SELECT COUNT(*) FROM cross_references) > 0
       AND (SELECT COUNT(*) FROM morphology) > 0
+      AND (SELECT lemma FROM morphology WHERE book = 'Genesis' AND chapter = 1 AND verse = 1 AND position = 3) = 'אֱלֹהִים'
       AND (SELECT COUNT(*) FROM document_sections) = ${manifest.expectedCounts.document_sections}
       AND (SELECT COUNT(*) FROM strongs_fts) > 0
       AND (SELECT COUNT(*) FROM sections_fts) = ${manifest.expectedCounts.sections_fts}
+      AND (SELECT COUNT(*) FROM ubs_parallel_sources) = ${manifest.expectedCounts.ubs_parallel_sources}
+      AND (SELECT COUNT(*) FROM ubs_parallel_groups) = ${manifest.expectedCounts.ubs_parallel_groups}
+      AND (SELECT COUNT(*) FROM ubs_parallel_members) = ${manifest.expectedCounts.ubs_parallel_members}
+      AND (SELECT COUNT(*) FROM ubs_parallel_segments) = ${manifest.expectedCounts.ubs_parallel_segments}
+      AND (SELECT artifact_identity FROM ubs_parallel_sources LIMIT 1) = 'a5fd0d4646cb69f426f592c6e334866191201fbe64691cd55c7f7ecd0ca9d4cc'
       THEN 'ready' ELSE json_extract('Local D1 representative import failed', '$') END AS readiness;`,
     '--json',
   ]);

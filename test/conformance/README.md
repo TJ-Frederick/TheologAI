@@ -2,7 +2,7 @@
 
 `npm run test:conformance` runs the stable official MCP conformance runner
 against TheologAI's local Node Streamable HTTP transport. The harness uses the
-complete nine-tool registry with deterministic fakes, so it opens no database
+complete eleven-tool registry with deterministic fakes, so it opens no database
 and makes no provider or network calls.
 
 The allowlist is intentionally limited to protocol-generic scenarios that

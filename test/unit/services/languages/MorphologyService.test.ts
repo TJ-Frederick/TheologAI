@@ -107,6 +107,21 @@ describe('MorphologyService', () => {
       expect(result.chapter).toBe(1);
       expect(result.verse).toBe(1);
       expect(result.citation.source).toBe('STEPBible TAGNT/TAHOT');
+      expect(result.lemmaCitation).toBeUndefined();
+    });
+
+    it('attributes Hebrew lemmas to the separately tracked TBESH lexicon', async () => {
+      const repo = makeMockRepo();
+      repo.getVerseMorphology.mockReturnValue([
+        { position: 3, word_text: 'אֱלֹהִ֑ים', lemma: 'אֱלֹהִים', strongs_number: 'H0430', morph_code: 'HNcmpa', gloss: 'God' },
+      ]);
+      const result = await new MorphologyService(repo as any).getVerseMorphology('Genesis 1:1');
+
+      expect(result.words[0].lemma).toBe('אֱלֹהִים');
+      expect(result.lemmaCitation).toMatchObject({
+        source: 'STEPBible TBESH Hebrew lexicon',
+        copyright: 'CC BY 4.0 (Tyndale House, Cambridge)',
+      });
     });
   });
 

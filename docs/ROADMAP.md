@@ -1,102 +1,119 @@
 # TheologAI roadmap
 
-**Current baseline:** Phase 3 begins after PR #10, **Harden MCP architecture
-and release pipeline**, merged to `main` as commit
-`71a3f0d120ffd31c09424ba2a7caef88961d21e3` on 2026-07-11. The merge was
-deployed to production after the build, test, conformance, dependency-audit,
-and read-only D1 readiness gates passed. Preview contains the hardened PR #10
-application code from `ccdfb8c`; its later production-only changes are not
-part of that preview baseline.
-
-This document is the tracked source of truth for current sequencing. The
+This is the tracked source of truth for delivery status and sequencing. The
 ignored [dated architecture and roadmap assessment](../test-output/ARCHITECTURE_AND_ROADMAP_ASSESSMENT.md)
-is retained as local source context only; it does not define the current
-implementation contract.
+is local source context only and does not define the current product contract.
 
-## Completed baseline
+## Shipped baseline
 
-- **Phase 1 — MCP foundation:** completed through the current Node.js and
-  Workers composition roots, shared MCP registry, typed errors, and test
-  coverage.
-- **Phase 2 — production hardening:** completed by PR #10, including the
-  shared async service boundary, Worker/D1 parity, request policy and logging
-  controls, reproducible data/readiness gates, and release workflow checks.
+- **Phases 1–2 / PR #10:** MCP architecture and release-pipeline hardening,
+  merged as `71a3f0d120ffd31c09424ba2a7caef88961d21e3`.
+- **Phase 3 cleanup / PR #11:** current roadmap, honest public documentation,
+  explicit deployment configuration, and source-granularity guardrails, merged
+  as `3122843298b2dca5684c4544f21b9146f98a28bc`.
+- **Structured-output foundation / PR #12:** provenance primitives plus
+  structured results for Bible and Strong's lookup, merged as
+  `0cbe9ec044fcf3189e14f508f276017a810934ef`.
+- **UBS compiler / PR #13:** pinned UBS/Paratext source, license and provenance,
+  deterministic compiler, generated-artifact verifier, and regression tests,
+  merged as `4e02564531351f4a2de61d95dcebfd0dfd06d404`.
 
-The current public contract remains the one described in [README.md](../README.md),
-the MCP registry, and the deployed configuration. This roadmap does not change
-tool schemas, result types, commentary attribution, donation verification, or
-the Markdown response contract.
+These entries describe merged repository state. Deployment state is established
+only by the relevant protected workflow and post-deployment smoke evidence; a
+merge or this roadmap is not evidence that preview or production was deployed.
 
-## Phase 3 sequence
+## Current Phase 3 release train
 
-### PR 1 — production cleanup and roadmap baseline
+The following slices are implemented in the integration candidate and remain
+subject to their stacked PR reviews, CI, operational gates, and merge order:
 
-Status: **current bounded work item**.
+1. **PR #14 — bounded CCEL search adapter.** Defensive live-search transport,
+   rights notices, budgets, caching, circuit behavior, and feature gates. The
+   adapter is retained as inactive future-provider architecture and is not
+   advertised or reachable through the current public MCP schemas.
+2. **PR #15 — D1 materialization identity.** Distinguishes schema compatibility
+   from the exact materialized corpus. A production marker transition is a
+   separately authorized data operation, not a side effect of merge or deploy.
+3. **PR #16 — exact Strong's identities.** Preserves canonical and extended
+   OpenScriptures/STEPBible identifiers without lossy four-digit coercion.
+4. **PR #17 — local primary-source research.** Adds the bounded
+   `primary_source_search` query-plan workflow and resolvable local result
+   locators. External discovery remains future work.
+5. **PR #18 — UBS runtime foundation.** Adds strict repositories, provenance,
+   source integrity, and source-attested parallel-group domain contracts.
+6. **PR #19 — UBS D1 materialization.** Adds deterministic relational export,
+   import verification, readiness identity, and Worker repository support.
+7. **PR #20 — public UBS cutover.** Makes complete source-attested UBS groups the
+   unconditional default, with bounded structured output. Legacy curated edges
+   and OpenBible.info evidence remain available only through explicit separate
+   selectors; raw UBS alignment is opt-in.
+8. **Integrated language-study slice.** Adds `original_language_study`, a
+   context-first workflow for one token in one verse, with morphology,
+   source-separated lexical evidence, provenance, and interpretive limits. It
+   must receive its own reviewable publication path before release.
 
-- Publish this roadmap and quarantine stale planning documents with prominent
-  historical banners and links forward.
-- Record the 2026-07-11 production/preview deployment and D1 rollback posture
-  without secrets or unverified resource IDs.
-- Make the top-level production Wrangler target explicit for both secret upload
-  and deploy; retain the existing production and preview configuration model.
-- Document the Matthew Henry source-granularity boundary: scalar commentary is
-  returned only when the provider exposes an exact trustworthy identity;
-  chapter lookup is the fallback for section-level commentary.
-- Document fake-hash Ethereum `unavailable` as a non-blocking public-RPC
-  availability observation. Preserve fail-closed verification semantics.
+The integration candidate advertises eleven tools and structured output for
+`bible_lookup`, `parallel_passages`, `original_language_lookup`, and
+`original_language_study`. Markdown remains available for compatibility.
 
-**Non-goals:** no runtime inference changes, provenance model, structured
-output schema, D1 migration/seed/binding/secret changes, provider swap or paid
-RPC, action dependency upgrade, remote operation, or rollback rehearsal.
+## Release gates
 
-**Exit criteria:** the tracked docs contract test protects the roadmap link and
-historical banners; Wrangler production and preview dry-runs pass; typechecks
-and the full local test suite pass; no runtime or data contract files change.
+Code readiness and operational readiness are deliberately separate:
 
-### PR 2 — provenance primitives
+1. Each slice receives implementation review, targeted tests, Node and Worker
+   typechecks, build verification, and all required GitHub checks.
+2. Stacked changes are merged or rebased in dependency order; passing a child
+   PR against an unmerged parent is not proof that `main` is releasable.
+3. Preview D1 must have the expected schema and materialization marker before a
+   preview Worker is deployed. Migrations and imports are explicit operations;
+   deployment does not mutate D1.
+4. Preview deployment requires the repository's authorization label and
+   protected environment approval. The live PR must still be open, non-draft,
+   and authorized immediately before deployment.
+5. Preview smoke and a functional audit must cover all eleven tools, the four
+   structured-output contracts, UBS default and explicit-source behavior,
+   Strong's extended identities, local primary-source search, language study,
+   resources, prompts, and failure/privacy boundaries.
+6. Production D1 marker changes require explicit owner authorization, a
+   conditional one-row update, immediate read-only readiness verification, and
+   a prepared conditional rollback.
+7. Production merge/deployment occurs only after the integrated Sol review,
+   green required checks, successful preview audit, and protected production
+   approval. Production then receives the same bounded smoke audit.
 
-Depends on PR 1. Additive domain primitives for source, edition, license,
-retrieval reference, provider anchor, coverage, and citation identifiers. Keep
-current Markdown responses backward-compatible. Do not expand scalar
-commentary until the model can distinguish declared coverage from inferred
-coverage.
+No current roadmap statement claims that the pending D1 transition, preview
+deployment, production deployment, or any live CCEL enablement has happened.
 
-### PR 3 — structured research envelopes
+## Next work after this train
 
-Depends on PR 2. Add MCP `outputSchema` and `structuredContent` envelopes using
-the provenance fields. Text remains backward-compatible; structured fields are
-introduced only after their identifiers and compatibility rules are stable.
+- Expand primary-source discovery beyond the initial local collection through
+  rights-reviewed, freely redistributable editions and provider adapters. Do
+  not mirror or republish CCEL transcriptions without edition-specific rights.
+- Improve primary-source research bundles for topic surveys, within-work
+  location, and author comparison while leaving synthesis to the host model.
+- Extend original-language study with carefully sourced semantic-domain,
+  occurrence-distribution, and discourse evidence useful to both beginners and
+  readers of Greek or Hebrew.
+- Evaluate section-span commentary only where provider coverage can be stated
+  honestly; never relabel a section anchor as an exact verse range.
+- Continue modern MCP output improvements tool by tool when a stable structured
+  contract materially helps agents, retaining backward-compatible Markdown.
+- Rehearse matched Worker/D1 rollback and define retention policy before any
+  predecessor database cleanup.
 
-### PR 4 and later — section-aware research
+## Durable guardrails
 
-Depends on PR 3. Evaluate section-span commentary/CCEL retrieval, search
-bundles, richer citation output, and other research capabilities. A provider
-anchor must not be relabeled as an exact verse or inferred range without an
-explicitly represented coverage model.
-
-Independent operational maintenance—such as a paid RPC/SLO decision, action
-runtime upgrade, or rollback rehearsal—may be scheduled separately when it has
-its own authorization and evidence.
-
-## Operational guardrails
-
-- Production and preview D1 bindings are managed through the approved workflow;
-  deployments do not migrate or seed remote D1.
-- The read-only readiness gate must continue to require schema and corpus
-  identity markers. Do not weaken it to make an older database pass.
-- A code rollback and a D1 binding rollback are separate decisions. When the
-  predecessor database crosses a schema or metadata era, use a matched earlier
-  Worker/config/workflow revision or prepare a compatible replacement.
-- Public Ethereum RPC defaults are light-use defaults, not an uptime
-  commitment. A fake transaction hash is not a health probe; release smoke
-  tests use an operator-selected, already-mined public transaction.
-
-## Deferred decisions
-
-- Whether to add section-span commentary after provenance primitives exist.
-- Whether a supported RPC provider and an operational budget justify an
-  availability target.
-- When to upgrade pinned GitHub Actions after an official, mechanical release
-  review. Node-runtime warnings remain maintenance work, not PR 1 scope.
-- When predecessor D1 retention and compatibility have been independently
-  verified well enough to authorize cleanup.
+- Production and preview D1 bindings are distinct and managed through protected
+  workflows. Deployment never migrates or seeds remote D1.
+- Readiness requires schema and exact corpus/materialization identity. Do not
+  weaken it merely to make an older database pass.
+- Code rollback and D1 rollback are independent. Use a compatible matched pair
+  of Worker code and database state.
+- Historical public-domain text may be published when transcription provenance
+  is uncertain, but that uncertainty must be disclosed; a third party's
+  particular transcription is not assumed redistributable.
+- CCEL adapters remain inactive and outside the public MCP contract. A future
+  discovery-only rollout requires separate review and must not become crawling,
+  catalog mirroring, body republication, or permanent storage.
+- Public Ethereum RPC endpoints are light-use defaults, not an uptime SLO.
+  Donation verification remains fail-closed.

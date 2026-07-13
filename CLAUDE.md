@@ -1,6 +1,8 @@
 # TheologAI — Development Guide
 
-Production MCP server for theological research. Nine tools, five prompts, eight Bible translations, six commentaries, 17 historical documents, Greek/Hebrew language tools, and on-chain donation support. Tools, resources, and prompts are available on every transport; MCP Logging is stdio-only because HTTP is stateless.
+Production MCP server for theological research. Eleven tools, five prompts, eight Bible translations, six commentaries, 17 historical documents, Greek/Hebrew language tools, and on-chain donation support. Tools, resources, and prompts are available on every transport; MCP Logging is stdio-only because HTTP is stateless.
+
+<!-- theologai-public-contract tools=11 structured=bible_lookup,original_language_lookup,original_language_study,parallel_passages -->
 
 ## Quick Start
 
@@ -81,17 +83,19 @@ test/
 
 ## MCP Capabilities
 
-### Tools (9)
+### Tools (11)
 
 | Tool | Description |
 |------|-------------|
 | `bible_lookup` | Verse retrieval across 8 translations (ESV, NET, KJV, WEB, BSB, ASV, YLT, DBY) |
 | `bible_cross_references` | Thematic connections via OpenBible.info data |
-| `parallel_passages` | OT→NT quotations, synoptic parallels, thematic links |
+| `parallel_passages` | Complete UBS source-attested groups by default; explicit legacy curated edges and separate OpenBible.info rows |
 | `commentary_lookup` | 6 commentaries (Matthew Henry, JFB, Clarke, Gill, K-D, Tyndale) |
-| `classic_text_lookup` | Search/browse 17 local docs; retrieve a specifically named CCEL work section when available |
+| `classic_text_lookup` | Search and browse 17 locally indexed historical documents; no remote CCEL body retrieval |
+| `primary_source_search` | Run bounded local-only primary-source query plans with exact local section locators |
 | `original_language_lookup` | Strong's concordance (14,298 entries), Greek/Hebrew word studies |
 | `bible_verse_morphology` | Word-by-word grammatical analysis for all 66 books |
+| `original_language_study` | Context-first study of one Greek or Hebrew token in one verse, with structured evidence and interpretive limits |
 | `donation_config` | Donation configuration: supported tokens, recipient address, chain details |
 | `verify_donation` | On-chain donation verification across Ethereum, Base, and Radius |
 
@@ -131,7 +135,7 @@ capability.
 - **HelloAO** (`bible.helloao.org`) — Free, no auth, 1000+ translations + 6 commentaries
 - **ESV API** — Requires `ESV_API_KEY` env var, 100k/day limit
 - **NET Bible API** — Free, no auth, includes 60k translator notes
-- **CCEL** (`ccel.org`) — Classic theological texts with work-specific rights; see `NOTICE.md`
+- **CCEL future adapter** (`ccel.org`) — defensive discovery architecture retained but not exposed by current public schemas; see `NOTICE.md`
 
 ## Conventions
 

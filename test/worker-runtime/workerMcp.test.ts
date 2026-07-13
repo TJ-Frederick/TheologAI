@@ -217,6 +217,18 @@ describe('Worker MCP endpoint in workerd', () => {
         text: expect.stringMatching(/Apostles' Creed[\s\S]*The First Article[\s\S]*maker of heaven and earth/),
       }),
     ]);
+
+    const exactUri = 'theologai://documents/apostles-creed#section-1';
+    const exact = await rpc('resources/read', { uri: exactUri }, 41);
+    expect(exact.response.status).toBe(200);
+    expect(exact.message.error).toBeUndefined();
+    expect(exact.message.result?.contents).toEqual([
+      expect.objectContaining({
+        uri: exactUri,
+        mimeType: 'text/markdown',
+        text: expect.stringMatching(/Apostles' Creed[\s\S]*The First Article[\s\S]*maker of heaven and earth/),
+      }),
+    ]);
   });
 
   it('executes cross-reference and expanded morphology tools against D1', async () => {
@@ -253,11 +265,29 @@ describe('Worker MCP endpoint in workerd', () => {
     });
   });
 
+  it('rejects invalid and non-verse cross-reference inputs before D1 lookup', async () => {
+    for (const [id, reference, expected] of [
+      [501, 'John 99:1', 'Chapter 99 is out of range'],
+      [502, 'John 3', 'requires exactly one Bible verse'],
+      [503, 'John 3:16-17', 'requires exactly one Bible verse'],
+    ] as const) {
+      const result = await rpc('tools/call', {
+        name: 'bible_cross_references',
+        arguments: { reference },
+      }, id);
+      expect(result.response.status).toBe(200);
+      expect(result.message.error).toBeUndefined();
+      expect(result.message.result).toMatchObject({ isError: true });
+      expect(textContent(result.message)).toContain(expected);
+    }
+  });
+
   it('serves the curated synoptic and quotation groups through the Worker endpoint', async () => {
     const synoptic = await rpc('tools/call', {
       name: 'parallel_passages',
       arguments: {
         reference: 'Matthew 26:26',
+        corpora: ['theologai_legacy'],
         mode: 'synoptic',
         maxParallels: 1,
       },
@@ -276,6 +306,7 @@ describe('Worker MCP endpoint in workerd', () => {
       name: 'parallel_passages',
       arguments: {
         reference: 'Matthew 1:23',
+        corpora: ['theologai_legacy'],
         mode: 'quotation',
         maxParallels: 1,
       },
@@ -291,11 +322,38 @@ describe('Worker MCP endpoint in workerd', () => {
     });
   });
 
+  it('hard-defaults to complete D1-backed UBS groups without bundled UBS JSON', async () => {
+    const result = await rpc('tools/call', {
+      name: 'parallel_passages',
+      arguments: { reference: 'Luke 6:35', maxGroups: 1 },
+    }, 151);
+
+    expect(result.response.status).toBe(200);
+    expect(result.message.error).toBeUndefined();
+    expect(result.message.result).toMatchObject({
+      structuredContent: {
+        schemaVersion: '1',
+        corpora: ['ubs_source_attested'],
+        legacyParallels: [],
+        openBibleCrossReferences: [],
+        sourceAttestedGroups: [{
+          members: [
+            expect.objectContaining({ normalizedReference: 'Luke 6:27-28,35', matched: true }),
+            expect.objectContaining({ normalizedReference: 'Matthew 5:44', matched: false }),
+          ],
+        }],
+      },
+    });
+    expect(JSON.stringify(result.message.result?.structuredContent)).not.toContain('alignmentRaw');
+    expect(textContent(result.message)).toContain('_Matched passage: Luke 6:27-28,35_');
+  });
+
   it('keeps Worker parallel relationships edge-aware across Gospel and Pauline sources', async () => {
     const gospel = await rpc('tools/call', {
       name: 'parallel_passages',
       arguments: {
         reference: 'Matthew 3:13-17',
+        corpora: ['theologai_legacy'],
         mode: 'synoptic',
         useCrossReferences: false,
       },
@@ -312,6 +370,7 @@ describe('Worker MCP endpoint in workerd', () => {
       name: 'parallel_passages',
       arguments: {
         reference: '1 Corinthians 11:23-26',
+        corpora: ['theologai_legacy'],
         mode: 'synoptic',
         useCrossReferences: false,
       },
@@ -319,12 +378,13 @@ describe('Worker MCP endpoint in workerd', () => {
 
     expect(paulineSynoptic.response.status).toBe(200);
     expect(paulineSynoptic.message.error).toBeUndefined();
-    expect(textContent(paulineSynoptic.message)).toContain('No parallel passages found.');
+    expect(textContent(paulineSynoptic.message)).toContain('No TheologAI legacy curated parallels found.');
 
     const thematic = await rpc('tools/call', {
       name: 'parallel_passages',
       arguments: {
         reference: 'Matthew 26:26',
+        corpora: ['theologai_legacy'],
         mode: 'thematic',
         useCrossReferences: false,
       },
@@ -340,6 +400,7 @@ describe('Worker MCP endpoint in workerd', () => {
       name: 'parallel_passages',
       arguments: {
         reference: 'Matthew 26:26',
+        corpora: ['theologai_legacy'],
         mode: 'auto',
         useCrossReferences: false,
       },
@@ -355,6 +416,7 @@ describe('Worker MCP endpoint in workerd', () => {
       name: 'parallel_passages',
       arguments: {
         reference: '1 Corinthians 11:23-26',
+        corpora: ['theologai_legacy'],
         mode: 'auto',
         useCrossReferences: false,
       },
@@ -411,6 +473,29 @@ describe('Worker MCP endpoint in workerd', () => {
         }),
       }),
     ]);
+    expect(JSON.stringify(rendered.message.result?.messages)).toContain(
+      'do not infer quotation, dependence, synoptic direction, or a thematic relationship',
+    );
+
+    const wrongType = await rpc('prompts/get', {
+      name: 'passage-exegesis',
+      arguments: { reference: 316 },
+    }, 504);
+    expect(wrongType.response.status).toBe(200);
+    expect(wrongType.message.result).toBeUndefined();
+    expect(wrongType.message.error).toMatchObject({
+      code: -32602,
+      message: expect.stringContaining('Argument "reference" for prompt "passage-exegesis" must be a string'),
+    });
+
+    const wrongArgumentsContainer = await rpc('prompts/get', {
+      name: 'passage-exegesis',
+      arguments: [],
+    }, 505);
+    expect(wrongArgumentsContainer.message.error).toMatchObject({
+      code: -32602,
+      message: expect.stringContaining('Arguments for prompt "passage-exegesis" must be an object'),
+    });
   });
 
   it('returns tool execution errors for arguments that violate the advertised schema', async () => {

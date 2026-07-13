@@ -11,27 +11,25 @@ import {
   normalizeTransliteration,
   normalizedTransliterationSql,
 } from '../../kernel/transliteration.js';
+import { parseStrongsIdentity } from '../../kernel/strongs.js';
 
 export class D1StrongsRepository implements IStrongsRepository {
   constructor(private db: D1Database) {}
 
   async lookup(strongsNumber: string): Promise<StrongsEntry | undefined> {
-    const normalized = strongsNumber.toUpperCase().trim();
+    const identity = parseStrongsIdentity(strongsNumber);
+    if (!identity) return undefined;
 
-    // Try exact match first
+    // Try the suffix-preserving public identity first.
     let row = await this.db.prepare(
       'SELECT * FROM strongs WHERE strongs_number = ?'
-    ).bind(normalized).first<StrongsEntry>();
+    ).bind(identity.publicId).first<StrongsEntry>();
     if (row) return row;
 
-    // Try padded: G25 → G0025
-    const padded = normalized.replace(/^([GH])(\d+)$/, (_, prefix, num) =>
-      prefix + num.padStart(4, '0')
-    );
-    if (padded !== normalized) {
+    if (identity.morphologyKey !== identity.publicId) {
       row = await this.db.prepare(
         'SELECT * FROM strongs WHERE strongs_number = ?'
-      ).bind(padded).first<StrongsEntry>();
+      ).bind(identity.morphologyKey).first<StrongsEntry>();
     }
     return row ?? undefined;
   }
@@ -66,13 +64,11 @@ export class D1StrongsRepository implements IStrongsRepository {
   }
 
   async getLexiconEntry(strongsNumber: string): Promise<LexiconEntry | undefined> {
-    const padded = strongsNumber.toUpperCase().trim().replace(
-      /^([GH])(\d+)$/,
-      (_, prefix, num) => prefix + num.padStart(4, '0')
-    );
+    const identity = parseStrongsIdentity(strongsNumber);
+    if (!identity) return undefined;
     const row = await this.db.prepare(
       'SELECT * FROM stepbible_lexicons WHERE strongs_number = ?'
-    ).bind(padded).first<{ strongs_number: string; source: string; extended_data: string }>();
+    ).bind(identity.morphologyKey).first<{ strongs_number: string; source: string; extended_data: string }>();
     if (!row) return undefined;
 
     return {

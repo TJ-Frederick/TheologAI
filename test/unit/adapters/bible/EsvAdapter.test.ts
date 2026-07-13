@@ -53,6 +53,7 @@ describe('EsvAdapter', () => {
       citation: {
         source: 'English Standard Version',
         copyright: adapter.getCopyright(),
+        url: 'https://www.esv.org/',
       },
     });
 

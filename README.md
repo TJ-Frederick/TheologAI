@@ -3,9 +3,11 @@
 TheologAI is an MCP server for Bible study and theological research. It runs
 locally over stdio or Streamable HTTP and on Cloudflare Workers with D1.
 
-The current registry contains nine tools, five guided prompts, eight English
+The current registry contains eleven tools, five guided prompts, eight English
 Bible translations, six commentary sources, 17 locally indexed
 historical documents, Strong's dictionaries, and Greek/Hebrew morphology.
+
+<!-- theologai-public-contract tools=11 structured=bible_lookup,original_language_lookup,original_language_study,parallel_passages -->
 
 ## Remote endpoint
 
@@ -36,21 +38,30 @@ fresh server and transport.
 |---|---|
 | `bible_lookup` | Retrieve a passage in ESV, NET, KJV, WEB, BSB, ASV, YLT, or DBY; arrays compare translations. |
 | `bible_cross_references` | Query locally indexed OpenBible.info cross references. |
-| `parallel_passages` | Find curated, non-exhaustive synoptic, quotation, allusion, and thematic relationships, optionally augmented with cross references. |
+| `parallel_passages` | Return complete UBS source-attested parallel groups by default; legacy curated edges and OpenBible.info cross references require explicit selectors and remain separate. |
 | `commentary_lookup` | Retrieve Matthew Henry, JFB, Adam Clarke, John Gill, Keil-Delitzsch (OT), or Tyndale notes. |
-| `classic_text_lookup` | Search and browse the 17 local historical documents; retrieve a specifically named CCEL work section when available. |
+| `classic_text_lookup` | Search and browse the 17 locally indexed historical documents. Remote CCEL document bodies are not retrieved or republished. |
+| `primary_source_search` | Execute a bounded, explicit query plan against the local historical index. Returns snippets and exact local section locators, not document bodies. |
 | `original_language_lookup` | Look up a Strong's entry or search for matching Greek/Hebrew entries. |
 | `bible_verse_morphology` | Return word-by-word morphology for a specific verse. |
+| `original_language_study` | Resolve and study one Greek or Hebrew token in one verse with contextual morphology, source-separated lexical evidence, and explicit interpretive limits. |
 | `donation_config` | Return voluntary-donation recipient, asset, and chain configuration. |
 | `verify_donation` | Classify a transaction and confirm only supported transfers to the configured recipient. |
 
-Explicit `synoptic` mode only returns edges between Matthew, Mark, and Luke.
-Cross-boundary event members such as John or Paul remain available as thematic
-connections in `thematic` and `auto` modes.
+`parallel_passages` defaults unconditionally to `corpora:
+["ubs_source_attested"]`, with at most five complete groups. It does not fall
+back to the legacy corpus when UBS has no match. Raw UBS alignment metadata is
+opt-in. The older curated edge behavior remains available through
+`corpora: ["theologai_legacy"]`; its `mode` and `maxParallels` controls retain
+their prior item semantics. OpenBible.info rows are off by default and, when
+requested with `includeOpenBibleCrossReferences`, are returned in a separate
+collection. The deprecated `useCrossReferences` alias now also defaults false,
+and conflicting old/new values are rejected.
 
 All tools are annotated as read-only, non-destructive, and idempotent. Tool
-inputs use closed, bounded JSON Schema 2020-12 contracts. `bible_lookup` and
-`original_language_lookup` also advertise versioned object-root `outputSchema`
+inputs use closed, bounded JSON Schema 2020-12 contracts. `bible_lookup`,
+`parallel_passages`, `original_language_lookup`, and `original_language_study`
+also advertise versioned object-root `outputSchema`
 contracts and return matching `structuredContent` beside the existing Markdown
 content. Their structured results include bounded, result-local provenance
 records; all other tools retain their current Markdown-only result contract.
@@ -92,15 +103,17 @@ Scalar commentary is returned only when the provider exposes an exact,
 trustworthy verse identity. For section-level commentary, use chapter lookup
 as the truthful fallback rather than treating a section anchor as a verse span.
 
-### Historical documents and CCEL
+### Historical documents and external discovery
 
 The local database contains 17 tracked creeds, confessions, and
 catechisms. The exact count is enforced by `data/data-manifest.json`.
 
-CCEL support is deliberately bounded: callers can request a named work and
-exact section when its CCEL path is known. The server does **not** currently
-provide complete CCEL catalog discovery, catalog-wide search, or automatic
-Calvin-volume routing. Those are possible future features, not current claims.
+The public tools search and retrieve only the locally indexed collection. They
+do **not** currently fetch CCEL search results or document bodies. Defensive
+CCEL discovery adapters remain in the codebase as future provider architecture,
+but they are not advertised by the MCP schemas or reachable through the public
+tool registry. Any future external provider rollout must remain discovery-only
+until edition-specific rights and provider-policy gates are satisfied.
 
 ### Language and reference data
 
@@ -108,7 +121,10 @@ Calvin-volume routing. Those are possible future features, not current claims.
 - 447,748 indexed STEPBible morphology rows spanning all 66 books.
 - STEPBible lexicon extensions and morphology-code expansions.
 - OpenBible.info cross references.
-- A bundled curated, non-exhaustive parallel-passage corpus.
+- 2,193 UBS source-attested parallel groups (CC BY-SA 4.0), normalized into
+  SQLite/D1 with pinned source provenance and artifact identity.
+- A small bundled legacy curated parallel-passage corpus, available only by
+  explicit selector.
 
 Source hashes and expected database counts live in
 `data/data-manifest.json`. The SQLite database is a derived, ignored artifact.

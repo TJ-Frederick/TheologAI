@@ -8,6 +8,7 @@ import type {
   CrossReferenceResult,
   ParallelPassageResult,
   ParallelPassage,
+  ParallelPassageResearchResult,
 } from '../kernel/types.js';
 
 /** Format a single Bible result as Markdown */
@@ -114,4 +115,76 @@ export function formatParallelPassages(result: ParallelPassageResult): string {
   s += `\n*${result.citation.source}*`;
   if (result.citation.copyright) s += ` - ${result.citation.copyright}`;
   return s.trim();
+}
+
+/** Format the group-preserving UBS hard-cutover result. */
+export function formatParallelPassageResearch(result: ParallelPassageResearchResult): string {
+  let s = `**Parallel Passages for ${result.requestedReference}**\n`;
+
+  if (result.sourceAttestedGroups.length > 0) {
+    s += '\n### UBS source-attested groups\n';
+    s += '\n_These groups attest membership and source order only. They do not assert direction, relationship type, quotation status, or confidence._\n';
+    for (const group of result.sourceAttestedGroups) {
+      s += `\n**Group ${group.sourceOrdinal}**\n`;
+      for (const member of group.members) {
+        const label = member.matched
+          ? `_Matched passage: ${member.normalizedReference}_`
+          : `**${member.normalizedReference}**`;
+        s += `- ${label} (${member.languageMarker}; source order ${member.sourceOrder})\n`;
+        if (member.sourceReference !== member.normalizedReference) {
+          s += `  - UBS source locator: \`${member.sourceReference}\` (normalized lookup: ${member.normalizedReference})\n`;
+        }
+        if (member.alignmentBasis && member.alignmentRaw) {
+          s += `  - Alignment: ${member.alignmentBasis}; raw UBS codes \`${member.alignmentRaw}\`\n`;
+        }
+        if (member.excerpts?.length) {
+          for (const excerpt of member.excerpts) {
+            s += `  > Segment ${excerpt.segmentOrder} — ${excerpt.reference}: ${excerpt.text}${textAttribution(excerpt.translation, excerpt.provenanceIds, result)}\n`;
+          }
+        } else if (member.text) {
+          s += `  > ${member.text}${textAttribution(member.translation, member.provenanceIds ?? [], result)}\n`;
+        }
+      }
+    }
+  } else if (result.corpora.includes('ubs_source_attested')) {
+    s += '\nNo UBS source-attested parallel groups found.\n';
+  }
+
+  if (result.legacyParallels.length > 0) {
+    s += '\n### TheologAI legacy curated edges\n';
+    for (const parallel of result.legacyParallels) {
+      const confidence = Math.round(parallel.confidence * 100);
+      s += `- **${parallel.reference}** [${parallel.relationship}] (${confidence}% confidence)\n`;
+      if (parallel.text) s += `  > Text excerpt${textAttribution(parallel.translation, parallel.provenanceIds ?? [], result)}: ${parallel.text}\n`;
+      if (parallel.notes) s += `  *${parallel.notes}*\n`;
+    }
+  } else if (result.corpora.includes('theologai_legacy')) {
+    s += '\nNo TheologAI legacy curated parallels found.\n';
+  }
+
+  if (result.openBibleCrossReferences.length > 0) {
+    s += '\n### OpenBible.info cross references\n';
+    for (const reference of result.openBibleCrossReferences) {
+      s += `- **${reference.reference}** (${reference.votes} votes)\n`;
+    }
+  }
+  if (result.warnings?.length) {
+    s += `\n${result.warnings.map(warning => `*Warning: ${warning}*`).join('\n')}\n`;
+  }
+  if (result.provenance.length > 0) {
+    s += `\n*Sources: ${result.provenance.map(record => `${record.label}${record.license ? ` (${record.license.label})` : ''}`).join('; ')}*`;
+  }
+  return s.trim();
+}
+
+function textAttribution(
+  translation: string | undefined,
+  provenanceIds: string[],
+  result: ParallelPassageResearchResult,
+): string {
+  const translationSource = provenanceIds
+    .map(id => result.provenance.find(record => record.id === id))
+    .find(record => record?.kind === 'translation');
+  const details = [translation, translationSource?.label, translationSource?.rightsNotice].filter(Boolean);
+  return details.length > 0 ? ` (${details.join('; ')})` : '';
 }

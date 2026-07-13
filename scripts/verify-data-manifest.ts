@@ -6,20 +6,7 @@ import { existsSync, readFileSync, readdirSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { assertProvenanceMatches, type SourceMetadata } from './build-ubs-parallel-passages.js';
-
-interface ManifestFile {
-  path: string;
-  sha256: string;
-}
-
-interface DataManifest {
-  manifestVersion: number;
-  schemaVersion: string;
-  algorithm: 'sha256';
-  files: ManifestFile[];
-  expectedCounts: Record<string, number>;
-  sources?: Record<string, SourceMetadata>;
-}
+import { parseDataManifest, verifyD1Migrations, type DataManifest } from './d1-corpus-identity.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -63,10 +50,10 @@ function gitBlobChecksum(bytes: Buffer): string {
   ])).digest('hex');
 }
 
-const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf-8')) as DataManifest;
-if (manifest.manifestVersion !== 1 || manifest.algorithm !== 'sha256') {
-  throw new Error(`Unsupported data manifest format in ${MANIFEST_PATH}`);
-}
+const manifest = parseDataManifest(readFileSync(MANIFEST_PATH)) as DataManifest & {
+  sources?: Record<string, SourceMetadata>;
+};
+verifyD1Migrations(ROOT, manifest);
 
 const schemaPath = join(ROOT, 'migrations', `${manifest.schemaVersion}.sql`);
 if (!existsSync(schemaPath)) {

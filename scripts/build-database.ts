@@ -22,19 +22,30 @@ import {
 import { isAbsolute, join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { gunzipSync } from 'zlib';
-import { createHash } from 'crypto';
-import { assertJohnOneOneDatabase, assertJohnOneOneSource } from './data-integrity.js';
+import {
+  assertGenesisOneOneDatabase,
+  assertHebrewLemmaCoverageDatabase,
+  assertJohnOneOneDatabase,
+  assertJohnOneOneSource,
+} from './data-integrity.js';
+import { resolveMorphologyLemma } from './morphology-lemma.js';
+import { validateUbsParallelArtifact } from '../src/adapters/shared/UbsParallelPassageRepository.js';
+import {
+  computeD1CorpusIdentity,
+  D1SourceConsumptionRegistry,
+  parseDataManifest,
+  verifyD1Migrations,
+} from './d1-corpus-identity.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 const DATA = join(ROOT, 'data');
 const MANIFEST_PATH = join(DATA, 'data-manifest.json');
 const manifestBytes = readFileSync(MANIFEST_PATH);
-const manifest = JSON.parse(manifestBytes.toString('utf-8')) as {
-  schemaVersion: string;
-  expectedCounts: Record<string, number>;
-};
-const SCHEMA_PATH = join(ROOT, 'migrations', `${manifest.schemaVersion}.sql`);
+const manifest = parseDataManifest(manifestBytes);
+const d1CorpusIdentity = computeD1CorpusIdentity(manifest);
+const sourceRegistry = new D1SourceConsumptionRegistry(ROOT, manifest);
+const migrationBytes = verifyD1Migrations(ROOT, manifest);
 
 function getOutputPath(argv: string[]): string {
   const equalsArg = argv.find(arg => arg.startsWith('--output='));
@@ -86,16 +97,15 @@ db.pragma('foreign_keys = ON');
 
 // ── Schema ──
 
-db.exec(readFileSync(SCHEMA_PATH, 'utf-8'));
+for (const bytes of migrationBytes) db.exec(bytes.toString('utf-8'));
 const insertMetadata = db.prepare('INSERT INTO theologai_metadata (key, value) VALUES (?, ?)');
 insertMetadata.run('schema_version', manifest.schemaVersion);
-insertMetadata.run('corpus_manifest_sha256', createHash('sha256').update(manifestBytes).digest('hex'));
+insertMetadata.run('corpus_manifest_sha256', d1CorpusIdentity);
 
 // ── Tier 1: Cross-references ──
 
 log('Loading cross-references...');
-const xrefPath = join(DATA, 'cross-references', 'cross_references.txt');
-const xrefContent = readFileSync(xrefPath, 'utf-8');
+const xrefContent = sourceRegistry.read('data/cross-references/cross_references.txt', 'utf-8');
 const xrefLines = xrefContent.split('\n');
 
 const insertXref = db.prepare(
@@ -135,13 +145,14 @@ const strongsTx = db.transaction(() => {
     ['NT', 'G', 'strongs-greek.json'],
     ['OT', 'H', 'strongs-hebrew.json'],
   ] as const) {
-    const filePath = join(DATA, 'biblical-languages', filename);
+    const relativePath = `data/biblical-languages/${filename}`;
+    const filePath = join(ROOT, relativePath);
     if (!existsSync(filePath)) {
       log(`  Warning: ${filename} not found, skipping`);
       continue;
     }
 
-    const data = JSON.parse(readFileSync(filePath, 'utf-8'));
+    const data = JSON.parse(sourceRegistry.read(relativePath, 'utf-8'));
     for (const [key, entry] of Object.entries(data) as [string, any][]) {
       const def = typeof entry.def === 'string' ? entry.def : JSON.stringify(entry.def);
       const derivation = typeof entry.derivation === 'string'
@@ -163,6 +174,10 @@ log(`  Inserted ${strongsCount} Strong's entries`);
 
 log('Loading STEPBible morphology...');
 const stepbibleDir = join(DATA, 'biblical-languages', 'stepbible');
+const hebrewLexicon = JSON.parse(sourceRegistry.read(
+  'data/biblical-languages/stepbible-lexicons/tbesh-hebrew.json',
+  'utf-8',
+)) as Record<string, { lemma?: unknown }>;
 const insertMorph = db.prepare(
   'INSERT OR IGNORE INTO morphology (book, chapter, verse, position, word_text, lemma, strongs_number, morph_code, gloss) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
 );
@@ -179,7 +194,8 @@ const morphTx = db.transaction(() => {
 
     const files = readdirSync(dir).filter(f => f.endsWith('.json.gz')).sort();
     for (const file of files) {
-      const compressed = readFileSync(join(dir, file));
+      const relativePath = `data/biblical-languages/stepbible/${subdir}/${file}`;
+      const compressed = sourceRegistry.read(relativePath);
       const json = JSON.parse(gunzipSync(compressed).toString('utf-8'));
       const bookName = json.book as string;
       if (file === '43-John.json.gz') {
@@ -197,7 +213,7 @@ const morphTx = db.transaction(() => {
               parseInt(v, 10),
               w.position,
               w.text,
-              w.lemma || '',
+              resolveMorphologyLemma(w.lemma, w.strong, json.testament, hebrewLexicon),
               w.strong || null,
               w.morph || null,
               w.gloss || null,
@@ -215,13 +231,14 @@ const morphTx = db.transaction(() => {
 const morphCount = morphTx();
 log(`  Inserted ${morphCount} morphology words`);
 assertJohnOneOneDatabase(db);
+assertGenesisOneOneDatabase(db);
 
 // ── Tier 2: Morphology codes ──
 
 log('Loading morphology codes...');
 const morphCodesPath = join(stepbibleDir, 'morph-codes.json');
 if (existsSync(morphCodesPath)) {
-  const morphCodes = JSON.parse(readFileSync(morphCodesPath, 'utf-8'));
+  const morphCodes = JSON.parse(sourceRegistry.read('data/biblical-languages/stepbible/morph-codes.json', 'utf-8'));
   const insertMorphCode = db.prepare('INSERT OR IGNORE INTO morph_codes (code, expansion) VALUES (?, ?)');
   const morphCodeTx = db.transaction(() => {
     let count = 0;
@@ -250,13 +267,14 @@ const lexiconTx = db.transaction(() => {
     ['tbesg-greek.json', 'Abbott-Smith'],
     ['tbesh-hebrew.json', 'BDB'],
   ] as const) {
-    const filePath = join(lexiconDir, filename);
+    const relativePath = `data/biblical-languages/stepbible-lexicons/${filename}`;
+    const filePath = join(ROOT, relativePath);
     if (!existsSync(filePath)) {
       log(`  Warning: ${filename} not found, skipping`);
       continue;
     }
 
-    const data = JSON.parse(readFileSync(filePath, 'utf-8'));
+    const data = JSON.parse(sourceRegistry.read(relativePath, 'utf-8'));
     for (const [key, entry] of Object.entries(data) as [string, any][]) {
       insertLexicon.run(key, entry.source || defaultSource, JSON.stringify(entry));
       count++;
@@ -268,6 +286,7 @@ const lexiconTx = db.transaction(() => {
 
 const lexiconCount = lexiconTx();
 log(`  Inserted ${lexiconCount} lexicon entries`);
+assertHebrewLemmaCoverageDatabase(db);
 
 // ── Tier 3: Historical documents ──
 
@@ -290,7 +309,7 @@ const histTx = db.transaction(() => {
   const files = readdirSync(histDir).filter(f => f.endsWith('.json')).sort();
   for (const file of files) {
     const id = file.replace('.json', '');
-    const doc = JSON.parse(readFileSync(join(histDir, file), 'utf-8'));
+    const doc = JSON.parse(sourceRegistry.read(`data/historical-documents/${file}`, 'utf-8'));
 
     insertDoc.run(
       id,
@@ -321,6 +340,58 @@ const histTx = db.transaction(() => {
 
 const { docCount, sectionCount } = histTx();
 log(`  Inserted ${docCount} documents with ${sectionCount} sections`);
+
+// ── Tier 3: UBS source-attested parallel passages ──
+
+log('Loading UBS parallel passages...');
+const ubsArtifact = validateUbsParallelArtifact(JSON.parse(
+  sourceRegistry.read('src/data/ubs-parallel-passages.generated.json', 'utf8'),
+));
+const insertUbsSource = db.prepare(`INSERT INTO ubs_parallel_sources (
+  source_id, schema_version, transform_version, artifact_identity, title, publisher, copyright,
+  license, license_url, source_url, source_path, source_commit, source_commit_date, source_blob,
+  source_bytes, source_sha256, modified, modification_note, label, directionality
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+const insertUbsGroup = db.prepare(`INSERT INTO ubs_parallel_groups
+  (group_id, source_id, source_ordinal, label, directionality) VALUES (?, ?, ?, ?, ?)`);
+const insertUbsMember = db.prepare(`INSERT INTO ubs_parallel_members
+  (group_id, source_order, source_reference, normalized_reference, language_marker, alignment_basis, alignment_raw)
+  VALUES (?, ?, ?, ?, ?, ?, ?)`);
+const insertUbsSegment = db.prepare(`INSERT INTO ubs_parallel_segments
+  (group_id, member_order, segment_order, book_number, chapter, start_verse, end_verse)
+  VALUES (?, ?, ?, ?, ?, ?, ?)`);
+const ubsTx = db.transaction(() => {
+  const p = ubsArtifact.provenance;
+  insertUbsSource.run(
+    p.sourceId, ubsArtifact.schemaVersion, ubsArtifact.transformVersion, ubsArtifact.artifactIdentity,
+    p.title, p.publisher, p.copyright, p.license, p.licenseUrl, p.sourceUrl, p.sourcePath,
+    p.sourceCommit, p.sourceCommitDate, p.sourceBlob, p.sourceBytes, p.sourceSha256,
+    p.modified ? 1 : 0, p.modificationNote, ubsArtifact.label, ubsArtifact.directionality,
+  );
+  let members = 0;
+  let segments = 0;
+  for (const group of ubsArtifact.groups) {
+    insertUbsGroup.run(group.groupId, p.sourceId, group.sourceOrdinal, group.label, group.directionality);
+    for (const member of group.members) {
+      insertUbsMember.run(
+        group.groupId, member.sourceOrder, member.sourceReference, member.normalizedReference,
+        member.languageMarker, member.alignmentBasis, member.alignmentRaw,
+      );
+      members++;
+      member.segments.forEach((segment, index) => {
+        insertUbsSegment.run(
+          group.groupId, member.sourceOrder, index + 1, segment.bookNumber, segment.chapter,
+          segment.startVerse, segment.endVerse,
+        );
+        segments++;
+      });
+    }
+  }
+  return { groups: ubsArtifact.groups.length, members, segments };
+});
+const ubsCounts = ubsTx();
+log(`  Inserted ${ubsCounts.groups} UBS groups, ${ubsCounts.members} members, and ${ubsCounts.segments} segments`);
+sourceRegistry.assertAllConsumed();
 
 // ── Validate and finalize ──
 

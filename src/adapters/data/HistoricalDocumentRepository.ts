@@ -10,7 +10,14 @@ import type {
   IHistoricalDocumentRepository,
   DocumentInfo,
   DocumentSection,
+  PrimarySourceLocalSearchOptions,
+  PrimarySourceLocalSearchRow,
 } from '../../kernel/repositories.js';
+import {
+  composeLocalPrimarySourceFtsQuery,
+  LOCAL_PRIMARY_SOURCE_SEARCH_SQL,
+  LOCAL_PRIMARY_SOURCE_WORK_SEARCH_SQL,
+} from '../shared/primarySourceSearchSql.js';
 
 export type { DocumentInfo, DocumentSection } from '../../kernel/repositories.js';
 
@@ -21,6 +28,8 @@ export class HistoricalDocumentRepository implements IHistoricalDocumentReposito
   private stmtSections: Database.Statement;
   private stmtSectionByNum: Database.Statement;
   private stmtFtsSearch: Database.Statement;
+  private stmtPrimarySourceSearch: Database.Statement;
+  private stmtPrimarySourceWorkSearch: Database.Statement;
 
   constructor(db?: Database.Database) {
     this.db = db ?? getDatabase();
@@ -41,6 +50,8 @@ export class HistoricalDocumentRepository implements IHistoricalDocumentReposito
        ORDER BY rank, ds.id
        LIMIT ?`
     );
+    this.stmtPrimarySourceSearch = this.db.prepare(LOCAL_PRIMARY_SOURCE_SEARCH_SQL);
+    this.stmtPrimarySourceWorkSearch = this.db.prepare(LOCAL_PRIMARY_SOURCE_WORK_SEARCH_SQL);
   }
 
   /** List all available documents */
@@ -134,6 +145,15 @@ export class HistoricalDocumentRepository implements IHistoricalDocumentReposito
     }
   }
 
+  searchPrimarySources(options: PrimarySourceLocalSearchOptions): PrimarySourceLocalSearchRow[] {
+    validatePrimarySourceOptions(options);
+    const ftsQuery = composeLocalPrimarySourceFtsQuery(options.text, options.match);
+    const rows = options.documentId
+      ? this.stmtPrimarySourceWorkSearch.all(ftsQuery, options.documentId, options.limit)
+      : this.stmtPrimarySourceSearch.all(ftsQuery, options.limit);
+    return (rows as PrimarySourceSearchDatabaseRow[]).map(mapPrimarySourceRow);
+  }
+
   /** Find a document by name (fuzzy matching) */
   findDocumentByName(name: string): DocumentInfo | undefined {
     const normalized = name.toLowerCase().trim();
@@ -150,4 +170,44 @@ export class HistoricalDocumentRepository implements IHistoricalDocumentReposito
     // ID contains
     return docs.find(d => d.id.includes(normalized));
   }
+}
+
+interface PrimarySourceSearchDatabaseRow {
+  id: number;
+  document_id: string;
+  section_number: string | null;
+  title: string | null;
+  content: string;
+  topics: string | null;
+  document_title: string;
+  document_type: string;
+  document_date: string | null;
+  document_metadata: string | null;
+}
+
+function mapPrimarySourceRow(row: PrimarySourceSearchDatabaseRow): PrimarySourceLocalSearchRow {
+  return {
+    document: {
+      id: row.document_id,
+      title: row.document_title,
+      type: row.document_type,
+      date: row.document_date,
+      topics: row.document_metadata ? (JSON.parse(row.document_metadata).topics || []) : [],
+    },
+    section: {
+      id: row.id,
+      document_id: row.document_id,
+      section_number: row.section_number || '',
+      title: row.title || '',
+      content: row.content,
+      topics: row.topics ? JSON.parse(row.topics) : [],
+    },
+  };
+}
+
+function validatePrimarySourceOptions(options: PrimarySourceLocalSearchOptions): void {
+  if (!options || typeof options.text !== 'string' || options.text.length < 1) throw new Error('Primary-source search text is required');
+  if (options.match !== 'all_terms' && options.match !== 'phrase') throw new Error('Primary-source match mode is invalid');
+  if (!Number.isSafeInteger(options.limit) || options.limit < 1 || options.limit > 8) throw new Error('Primary-source limit must be 1..8');
+  if (options.documentId !== undefined && (typeof options.documentId !== 'string' || options.documentId.length < 1)) throw new Error('Primary-source document ID is invalid');
 }

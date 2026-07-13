@@ -2,6 +2,7 @@ import type { Schema } from '@cfworker/json-schema';
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 import type { ProvenanceRecord } from '../../kernel/provenance.js';
 import { createProvenanceRecordSchema } from './provenance.js';
+import { STRONGS_IDENTITY_PATTERN } from '../../kernel/strongs.js';
 
 export interface OriginalLanguageSenseV1 {
   gloss: string;
@@ -21,7 +22,7 @@ export interface OriginalLanguageExtendedV1 {
 export interface OriginalLanguageEntryV1 {
   strongsNumber: string;
   language: 'Greek' | 'Hebrew';
-  testament: 'NT' | 'OT';
+  testament: 'NT' | 'OT' | null;
   lemma: string | null;
   transliteration?: string;
   pronunciation?: string;
@@ -52,9 +53,9 @@ export interface OriginalLanguageOutputV1 {
 const entrySchema: Schema = {
   type: 'object',
   properties: {
-    strongsNumber: { type: 'string', minLength: 2, maxLength: 16, pattern: '^[GHgh]\\d+[a-z]?$' },
+    strongsNumber: { type: 'string', minLength: 2, maxLength: 7, pattern: STRONGS_IDENTITY_PATTERN },
     language: { type: 'string', enum: ['Greek', 'Hebrew'] },
-    testament: { type: 'string', enum: ['NT', 'OT'] },
+    testament: { type: ['string', 'null'], enum: ['NT', 'OT', null] },
     lemma: { type: ['string', 'null'], minLength: 1, maxLength: 500 },
     transliteration: { type: 'string', minLength: 1, maxLength: 500 },
     pronunciation: { type: 'string', minLength: 1, maxLength: 500 },
@@ -110,7 +111,7 @@ export const originalLanguageOutputSchema = {
         arguments: {
           type: 'object',
           properties: {
-            strongs_number: { type: 'string', minLength: 2, maxLength: 16, pattern: '^[GHgh]\\d+[a-z]?$' },
+            strongs_number: { type: 'string', minLength: 2, maxLength: 7, pattern: STRONGS_IDENTITY_PATTERN },
             detail_level: { const: 'detailed' },
             include_extended: { const: true },
           },

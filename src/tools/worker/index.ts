@@ -14,6 +14,7 @@ import { D1CrossReferenceRepository } from '../../adapters/d1/D1CrossReferenceRe
 import { D1StrongsRepository } from '../../adapters/d1/D1StrongsRepository.js';
 import { D1MorphologyRepository } from '../../adapters/d1/D1MorphologyRepository.js';
 import { D1HistoricalDocumentRepository } from '../../adapters/d1/D1HistoricalDocumentRepository.js';
+import { D1UbsParallelPassageRepository } from '../../adapters/d1/D1UbsParallelPassageRepository.js';
 
 // Bible adapters (HTTP-based, Workers-compatible)
 import { EsvAdapter } from '../../adapters/bible/EsvAdapter.js';
@@ -22,28 +23,22 @@ import { HelloAoAdapter } from '../../adapters/bible/HelloAoAdapter.js';
 
 // Commentary adapters
 import { HelloAoCommentaryAdapter } from '../../adapters/commentary/HelloAoCommentaryAdapter.js';
-import { CcelAdapter } from '../../adapters/commentary/CcelAdapter.js';
+import { CcelSearchAdapter } from '../../adapters/commentary/CcelSearchAdapter.js';
 
 // Services
 import { BibleService } from '../../services/bible/BibleService.js';
 import { CrossReferenceService } from '../../services/bible/CrossReferenceService.js';
 import { ParallelPassageService } from '../../services/bible/ParallelPassageService.js';
 import { CommentaryService } from '../../services/commentary/CommentaryService.js';
-import { CcelService } from '../../services/commentary/CcelService.js';
 import { HistoricalDocumentService } from '../../services/historical/HistoricalDocumentService.js';
+import { LocalPrimarySourceSearchProvider } from '../../services/historical/LocalPrimarySourceSearchProvider.js';
+import { PrimarySourceSearchService } from '../../services/historical/PrimarySourceSearchService.js';
 import { StrongsService } from '../../services/languages/StrongsService.js';
 import { MorphologyService } from '../../services/languages/MorphologyService.js';
+import { OriginalLanguageStudyService } from '../../services/languages/OriginalLanguageStudyService.js';
+import { SourceAttestedParallelService } from '../../services/bible/SourceAttestedParallelService.js';
 
-// Tool handlers
-import { createBibleLookupHandler } from '../v2/bibleLookup.js';
-import { createCrossReferencesHandler } from '../v2/crossReferences.js';
-import { createParallelPassagesHandler } from '../v2/parallelPassages.js';
-import { createCommentaryHandler } from '../v2/commentary.js';
-import { createClassicTextsHandler } from '../v2/classicTexts.js';
-import { createStrongsLookupHandler } from '../v2/strongsLookup.js';
-import { createVerseMorphologyHandler } from '../v2/verseMorphology.js';
-import { createDonationConfigHandler } from '../v2/donationConfig.js';
-import { createVerifyDonationHandler } from '../v2/verifyDonation.js';
+import { createToolRegistry } from '../toolRegistry.js';
 
 // Donation
 import { OnChainVerifier } from '../../adapters/donation/OnChainVerifier.js';
@@ -53,12 +48,14 @@ import { DonationService } from '../../services/donation/DonationService.js';
 import parallelPassagesData from '../../data/parallel-passages.json';
 
 import type { ToolHandler } from '../../kernel/types.js';
+import { readPrimarySourceFeatureFlags } from '../../kernel/featureFlags.js';
 
 export interface WorkerServices {
   bibleService: BibleService;
   commentaryService: CommentaryService;
   historicalService: HistoricalDocumentService;
   strongsService: StrongsService;
+  sourceAttestedParallelService: SourceAttestedParallelService;
 }
 
 export interface WorkerCompositionRoot {
@@ -71,10 +68,11 @@ export interface WorkerCompositionRoot {
 const netAdapter = new NetBibleAdapter();
 const helloaoAdapter = new HelloAoAdapter();
 const helloaoCommentary = new HelloAoCommentaryAdapter();
-const ccelAdapter = new CcelAdapter();
+// Cache/circuit state is isolate-scoped; the service gate prevents any call
+// while the non-secret rollout flag is false.
+const ccelSearchAdapter = new CcelSearchAdapter({ enabled: true });
 
 const commentaryService = new CommentaryService([helloaoCommentary]);
-const ccelService = new CcelService(ccelAdapter);
 
 // ESV adapter + BibleService are lazy-initialized on first request
 // because EsvAdapter needs env.ESV_API_KEY which isn't available at module scope.
@@ -117,38 +115,48 @@ export function createWorkerCompositionRoot(env: Env): WorkerCompositionRoot {
   const strongsRepo = new D1StrongsRepository(db);
   const morphRepo = new D1MorphologyRepository(db);
   const historicalRepo = new D1HistoricalDocumentRepository(db);
+  const sourceAttestedParallelRepo = new D1UbsParallelPassageRepository(db);
 
   // D1-dependent services (per-request)
   const crossRefService = new CrossReferenceService(crossRefRepo);
   const bibleService = getBibleService(env);
+  const sourceAttestedParallelService = new SourceAttestedParallelService(sourceAttestedParallelRepo);
   const parallelService = new ParallelPassageService(
     crossRefRepo,
     bibleService,
     undefined, // no databasePath in Workers
     parallelPassagesData as any, // preloaded from JSON module
+    sourceAttestedParallelService,
   );
   const historicalService = new HistoricalDocumentService(historicalRepo);
+  const primarySourceSearchService = new PrimarySourceSearchService(
+    new LocalPrimarySourceSearchProvider(historicalRepo),
+    ccelSearchAdapter,
+    readPrimarySourceFeatureFlags(env),
+  );
   const strongsService = new StrongsService(strongsRepo);
   const morphService = new MorphologyService(morphRepo);
+  const originalLanguageStudyService = new OriginalLanguageStudyService(morphRepo, strongsRepo);
 
   // Module-scope services (cached across requests)
   const donationService = getDonationService(env);
 
   // Tool handlers (per-request — hold D1-dependent services)
-  const tools = [
-    createBibleLookupHandler(bibleService),
-    createCrossReferencesHandler(crossRefService),
-    createParallelPassagesHandler(parallelService),
-    createCommentaryHandler(commentaryService),
-    createClassicTextsHandler(historicalService, ccelService),
-    createStrongsLookupHandler(strongsService),
-    createVerseMorphologyHandler(morphService),
-    createDonationConfigHandler(donationService),
-    createVerifyDonationHandler(donationService),
-  ];
+  const tools = createToolRegistry({
+    bibleService,
+    crossReferenceService: crossRefService,
+    parallelPassageService: parallelService,
+    commentaryService,
+    historicalService,
+    primarySourceSearchService,
+    strongsService,
+    morphologyService: morphService,
+    originalLanguageStudyService,
+    donationService,
+  });
 
   return {
     tools,
-    services: { bibleService, commentaryService, historicalService, strongsService },
+    services: { bibleService, commentaryService, historicalService, strongsService, sourceAttestedParallelService },
   };
 }

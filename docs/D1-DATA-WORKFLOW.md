@@ -3,7 +3,8 @@
 TheologAI treats database structure and corpus data as separate artifacts:
 
 - `migrations/*.sql` is the tracked, reviewable D1/SQLite schema history.
-- `data/data-manifest.json` identifies the tracked canonical corpus inputs.
+- `data/data-manifest.json` inventories every tracked canonical source and
+  separately declares the inputs consumed by the D1 materialization.
 - `data/theologai.db` is an ignored, reproducible local SQLite build artifact.
 - `scripts/d1-seed/` is an ignored, reproducible D1 bulk-seed artifact.
 
@@ -39,15 +40,15 @@ npm run d1:seed:export -- --database /absolute/path/to/corpus.db --clean
 
 The exporter is read-only with respect to its source database. It verifies the
 canonical source checksums and database row counts, derives columns and primary
-key ordering from that database, and uses the schema version named by the source
-manifest. It never copies schema SQL into the seed.
+key ordering from that database, and uses the ordered migration set named by the
+source manifest. It never copies migration SQL into the seed.
 
 Each SQL file is generated in an explicit table and primary-key order. Files
 target 8 MiB, and every individual statement is checked against D1's current
 100,000-byte maximum. Long historical sections are assembled from smaller,
 byte-validated statements. `seed-manifest.json` records, in application order:
 
-- the source-manifest and schema hashes;
+- the full source-inventory hash, scoped D1 materialization identity, and ordered migration hashes;
 - every seed file's SHA-256 and byte size;
 - statement and inserted-row counts;
 - the D1 statement and target-file limits used by the exporter; and
@@ -65,12 +66,20 @@ this runbook are the reproducibility contract.
 ### Corpus revisions and deployed metadata
 
 When a canonical source changes, update its checksum in `data/data-manifest.json`
-and verify the complete source manifest before building a replacement database.
-The manifest file is itself recorded in `theologai_metadata` as
-`corpus_manifest_sha256`; an existing D1 database therefore retains the previous
-corpus identity until it is replaced and cut over through the authorized remote
-workflow. Updating source files or the manifest does not mutate preview or
-production D1.
+and verify the complete source inventory. `materializations.d1.inputs` is the
+explicit allowlist of files read by `scripts/build-database.ts`. The build fails
+if it reads an undeclared source or leaves a declared D1 input unused.
+
+`theologai_metadata.corpus_manifest_sha256` stores a canonical D1 materialization
+identity, despite the legacy column name. The identity covers the D1 identity and
+transform versions, schema version plus every ordered migration path/checksum,
+sorted D1 input paths/checksums, and sorted
+expected table counts. The generated UBS parallel-passage artifact is now a D1
+input; the smaller curated legacy parallel corpus remains Worker-bundled and is
+not a D1 input. The seed manifest records the full inventory
+hash separately for provenance. Changing a non-D1 source therefore does not
+claim that D1 changed; changing any D1 input or materialization contract still
+blocks deployment until the corresponding database is prepared.
 
 For preview, a later deployment built from the revised manifest will remain
 blocked by the read-only readiness gate until a separately authorized preview
@@ -83,7 +92,8 @@ row and compares deterministic table hashes with the source SQLite database;
 `verify-workerd` applies complete metadata/document/FTS chunks plus a generated
 chunk of every large table through Wrangler's isolated local D1 runtime. This
 keeps the D1 syntax/runtime check practical while the full semantic verifier
-continues to cover all 846,860 rows. The exact production readiness query is
+continues to cover all 859,596 rows, including the exact 12,736-row normalized
+UBS delta. The exact production readiness query is
 separately exercised against the complete derived SQLite database.
 
 ### Readiness compatibility and rollback
@@ -198,6 +208,55 @@ Never apply a full seed to a populated database. The seed is not an incremental
 upsert or repair mechanism. Future corpus revisions need either a new empty D1
 database followed by a binding cutover, or a separately designed and reviewed
 incremental data migration.
+
+### One-time legacy identity transition
+
+Databases seeded before scoped D1 identities contain the full source-manifest
+hash. A reviewed release may transition only that metadata row after deterministic
+table-hash comparison proves the old and new D1 materializations equivalent.
+This is a remote production/preview write and always requires explicit owner
+authorization naming the environment, database, and exact hashes. It must never
+run automatically from a deploy job.
+
+Forward template (replace placeholders only after review):
+
+```sql
+UPDATE theologai_metadata
+SET value = '<NEW_SCOPED_D1_SHA256>'
+WHERE key = 'corpus_manifest_sha256'
+  AND value = '<EXPECTED_LEGACY_SHA256>';
+SELECT changes() AS changed_rows;
+```
+
+Require `changed_rows = 1`, then run the new read-only readiness check before
+deployment. If rollback to a release whose gate expects the legacy identity is
+required, obtain separate authorization and run the inverse conditional update:
+
+```sql
+UPDATE theologai_metadata
+SET value = '<EXPECTED_LEGACY_SHA256>'
+WHERE key = 'corpus_manifest_sha256'
+  AND value = '<NEW_SCOPED_D1_SHA256>';
+SELECT changes() AS changed_rows;
+```
+
+The current reviewed transition is from
+`0e5f19341d99fc9ec18f3a45b0ce019ed78d1fd40478997bde8fdee94a02ca55`
+to `118844cc76b2c091ca60f88d890c3253bbcefd15cad416d03bce3d0af0f4e0ad`.
+Do not copy either value to another database without independently proving its
+current marker and corpus equivalence.
+
+The subsequent Hebrew-lemma materialization is intentionally **not** a
+metadata-only transition. D1 materialization transform version 3 joins blank
+TAHOT Hebrew token lemmas to exact, tracked TBESH Strong's identities and has
+scoped identity
+`91afa5bcf8155ac9f8c5fd14d1d661657c83be9a8e5cd90a5783bfa38ae7dfa5`.
+Its immediate transform-version-2 predecessor is
+`961615b1da2ea26609e289d30d3bf000de5b2ea0f3542ffd01cb7ffe852d38ee`.
+Because morphology rows change between those identities, prepare a freshly
+migrated and fully seeded database and run the complete readiness gate; never
+advance an older database to the new identity by updating only
+`theologai_metadata`.
 
 Cloudflare's import guidance and tracked migration behavior are documented at:
 

@@ -5,14 +5,13 @@ import Database from 'better-sqlite3';
 import { existsSync, readFileSync } from 'fs';
 import { dirname, isAbsolute, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
-import { createHash } from 'crypto';
 import { buildD1ReadinessSql } from './check-remote-d1-readiness.js';
-import { assertJohnOneOneDatabase } from './data-integrity.js';
-
-interface DataManifest {
-  schemaVersion: string;
-  expectedCounts: Record<string, number>;
-}
+import {
+  assertGenesisOneOneDatabase,
+  assertHebrewLemmaCoverageDatabase,
+  assertJohnOneOneDatabase,
+} from './data-integrity.js';
+import { computeD1CorpusIdentity, parseDataManifest, verifyD1Migrations } from './d1-corpus-identity.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -39,9 +38,10 @@ function getDatabasePath(argv: string[]): string {
 const databasePath = getDatabasePath(process.argv.slice(2));
 if (!existsSync(databasePath)) throw new Error(`Database not found: ${databasePath}`);
 
-const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf-8')) as DataManifest;
+const manifest = parseDataManifest(readFileSync(MANIFEST_PATH));
+verifyD1Migrations(ROOT, manifest);
 const expectedTables = Object.keys(manifest.expectedCounts).sort();
-const expectedIndexes = ['idx_morph_strongs', 'idx_morph_verse', 'idx_xref_from', 'idx_xref_votes'];
+  const expectedIndexes = ['idx_morph_strongs', 'idx_morph_verse', 'idx_ubs_groups_source_order', 'idx_ubs_segments_lookup', 'idx_xref_from', 'idx_xref_votes'];
 const db = new Database(databasePath, { readonly: true, fileMustExist: true });
 
 try {
@@ -87,17 +87,19 @@ try {
   if (metadata.schema_version !== manifest.schemaVersion) {
     throw new Error(`Schema version marker mismatch: ${metadata.schema_version ?? 'missing'}`);
   }
-  const manifestHash = createHash('sha256').update(readFileSync(MANIFEST_PATH)).digest('hex');
-  if (metadata.corpus_manifest_sha256 !== manifestHash) {
-    throw new Error('Corpus manifest hash marker mismatch');
+  const d1CorpusIdentity = computeD1CorpusIdentity(manifest);
+  if (metadata.corpus_manifest_sha256 !== d1CorpusIdentity) {
+    throw new Error('D1 corpus identity marker mismatch');
   }
   const readiness = db.prepare(
-    buildD1ReadinessSql(manifest.expectedCounts, manifest.schemaVersion, manifestHash),
+    buildD1ReadinessSql(manifest.expectedCounts, manifest.schemaVersion, d1CorpusIdentity),
   ).get() as { readiness?: string } | undefined;
   if (readiness?.readiness !== 'ready') {
     throw new Error('Production D1 readiness SQL did not accept the complete derived database');
   }
   assertJohnOneOneDatabase(db, 'Verified SQLite morphology');
+  assertGenesisOneOneDatabase(db, 'Verified SQLite morphology');
+  assertHebrewLemmaCoverageDatabase(db, 'Verified SQLite morphology');
 
   const representativeQueries = [
     ["SELECT 1 FROM cross_references WHERE from_verse = 'John.3.16' LIMIT 1", 'John 3:16 cross-references'],

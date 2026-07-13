@@ -24,15 +24,14 @@ import {
   splitGeneratedSql,
   statementBytes,
 } from './d1-seed-utils.js';
-import { johnOneOneReadinessPredicate } from './data-integrity.js';
-
-interface SourceManifest {
-  manifestVersion: number;
-  schemaVersion: string;
-  algorithm: 'sha256';
-  files: Array<{ path: string; sha256: string }>;
-  expectedCounts: Record<string, number>;
-}
+import { genesisOneOneLemmaReadinessPredicate, johnOneOneReadinessPredicate } from './data-integrity.js';
+import {
+  computeD1CorpusIdentity,
+  computeSourceInventoryIdentity,
+  parseDataManifest,
+  verifyD1Migrations,
+  type DataManifest,
+} from './d1-corpus-identity.js';
 
 interface SeedStatement {
   sql: string;
@@ -61,6 +60,10 @@ const BASE_TABLES = [
   'stepbible_lexicons',
   'cross_references',
   'morphology',
+  'ubs_parallel_sources',
+  'ubs_parallel_groups',
+  'ubs_parallel_members',
+  'ubs_parallel_segments',
 ] as const;
 const EXPORT_ORDER = [...BASE_TABLES, 'fts'] as const;
 const CONTENT_CHARS_PER_STATEMENT = 10_000;
@@ -126,7 +129,7 @@ function sqlite(database: string, sql: string, json = false): string {
 }
 
 function sqlIdentifier(identifier: string): string {
-  if (!/^[a-z_]+$/.test(identifier)) throw new Error(`Unsafe SQLite identifier: ${identifier}`);
+  if (!/^[a-z_][a-z0-9_]*$/.test(identifier)) throw new Error(`Unsafe SQLite identifier: ${identifier}`);
   return `"${identifier}"`;
 }
 
@@ -139,17 +142,14 @@ function queryNumber(database: string, sql: string): number {
 function assertSemanticSource(database: string): void {
   const result = sqlite(
     database,
-    `SELECT CASE WHEN ${johnOneOneReadinessPredicate()} THEN 'ok' ELSE 'invalid' END;`,
+    `SELECT CASE WHEN ${johnOneOneReadinessPredicate()} AND ${genesisOneOneLemmaReadinessPredicate()} THEN 'ok' ELSE 'invalid' END;`,
   ).trim();
   if (result !== 'ok') {
-    throw new Error('Source database failed the John 1:1 Greek morphology integrity check');
+    throw new Error('Source database failed the Greek/Hebrew morphology integrity checks');
   }
 }
 
-function validateCanonicalSources(manifest: SourceManifest): void {
-  if (manifest.manifestVersion !== 1 || manifest.algorithm !== 'sha256') {
-    throw new Error('Unsupported canonical source manifest');
-  }
+function validateCanonicalSources(manifest: DataManifest): void {
   const paths = manifest.files.map(file => file.path);
   if (new Set(paths).size !== paths.length) throw new Error('Canonical source manifest has duplicate paths');
   if (JSON.stringify(paths) !== JSON.stringify([...paths].sort())) {
@@ -272,14 +272,11 @@ function writeChunks(table: string, ordinal: number, statements: SeedStatement[]
 
 const { database, clean } = parseArguments(process.argv.slice(2));
 const sourceManifestBytes = readFileSync(SOURCE_MANIFEST_PATH);
-const sourceManifest = JSON.parse(sourceManifestBytes.toString('utf8')) as SourceManifest;
+const sourceManifest = parseDataManifest(sourceManifestBytes);
+const d1CorpusIdentity = computeD1CorpusIdentity(sourceManifest);
+verifyD1Migrations(ROOT, sourceManifest);
 validateCanonicalSources(sourceManifest);
 assertSemanticSource(database);
-
-const schemaPath = join(ROOT, 'migrations', `${sourceManifest.schemaVersion}.sql`);
-if (!existsSync(schemaPath) || !statSync(schemaPath).isFile()) {
-  throw new Error(`Tracked schema migration is missing: ${schemaPath}`);
-}
 
 for (const table of [...BASE_TABLES, 'strongs_fts', 'sections_fts']) {
   const expected = sourceManifest.expectedCounts[table];
@@ -335,17 +332,18 @@ for (const file of files) {
 }
 
 const seedManifest = {
-  manifestVersion: 1,
+  manifestVersion: 2,
   algorithm: 'sha256',
   sourceManifest: {
     path: relative(ROOT, SOURCE_MANIFEST_PATH),
-    sha256: sha256Buffer(sourceManifestBytes),
+    sha256: computeSourceInventoryIdentity(sourceManifestBytes),
   },
-  schema: {
-    version: sourceManifest.schemaVersion,
-    path: relative(ROOT, schemaPath),
-    sha256: sha256File(schemaPath),
+  d1Materialization: {
+    identityVersion: sourceManifest.materializations.d1.identityVersion,
+    transformVersion: sourceManifest.materializations.d1.transformVersion,
+    sha256: d1CorpusIdentity,
   },
+  migrations: sourceManifest.materializations.d1.migrations.map(migration => ({ ...migration })),
   limits: {
     maximumStatementBytes: D1_MAX_STATEMENT_BYTES,
     targetFileBytes: D1_SEED_FILE_BYTES,

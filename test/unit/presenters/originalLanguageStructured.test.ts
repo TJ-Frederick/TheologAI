@@ -38,7 +38,6 @@ describe('original-language structured presenter', () => {
   it('maps detailed and extended exact fields to linked provenance', () => {
     const result = presentOriginalLanguageEntry({
       strongs_number: 'G25',
-      testament: 'NT',
       lemma: 'ἀγαπάω',
       transliteration: 'agapaō',
       pronunciation: 'ag-ap-ah-o',
@@ -83,5 +82,32 @@ describe('original-language structured presenter', () => {
         attribution: 'Tyndale House, Cambridge',
       },
     ]);
+  });
+
+  it('uses STEPBible as the sole base provenance for a lexicon-only identity', () => {
+    const result = presentOriginalLanguageEntry({
+      strongs_number: 'G21502',
+      testament: 'NT',
+      lemma: 'Ηνια',
+      transliteration: 'Henia',
+      definition: 'Heneia, man occurring at LXX in 1Ch.25.9',
+      citation: {
+        source: 'STEPBible lexicon data',
+        copyright: 'CC BY 4.0 (Tyndale House, Cambridge)',
+        url: 'https://github.com/STEPBible/STEPBible-Data',
+      },
+      sourceKind: 'stepbible_lexicon',
+      language: 'Greek',
+      testament: null,
+    }, 'simple');
+
+    expect(result.entries[0]).toMatchObject({ strongsNumber: 'G21502', language: 'Greek', testament: null, provenanceIds: ['src-1'] });
+    expect(result.provenance).toEqual([expect.objectContaining({
+      id: 'src-1',
+      label: 'STEPBible lexicon data',
+      rightsNotice: 'CC BY 4.0 (Tyndale House, Cambridge)',
+      license: { label: 'CC BY 4.0', url: 'https://creativecommons.org/licenses/by/4.0/' },
+      attribution: 'Tyndale House, Cambridge',
+    })]);
   });
 });

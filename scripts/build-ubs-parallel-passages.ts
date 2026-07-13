@@ -11,8 +11,21 @@ import {
   getBibleBookBounds,
   type BibleBook,
 } from '../src/kernel/books.js';
+import type {
+  ParallelSourceProvenance as KernelParallelSourceProvenance,
+  SourceAttestedParallelGroup as KernelSourceAttestedParallelGroup,
+  SourceParallelAlignmentBasis,
+  SourceParallelLanguageMarker,
+  SourceParallelMember as KernelSourceParallelMember,
+  SourceParallelReferenceSegment,
+} from '../src/kernel/sourceAttestedParallels.js';
+import {
+  computeUbsParallelArtifactIdentity,
+  deriveUbsParallelGroupId,
+  UBS_PARALLEL_PASSAGE_PROVENANCE,
+} from '../src/kernel/ubsParallelSource.js';
 
-export const TRANSFORM_VERSION = 1;
+export const TRANSFORM_VERSION = 2;
 export const LABEL = 'source_attested_parallel' as const;
 export const DIRECTIONALITY = 'unspecified' as const;
 
@@ -64,38 +77,12 @@ export function assertProvenanceMatches(left: SourceMetadata, right: SourceMetad
   }
 }
 
-export interface ReferenceSegment {
-  bookNumber: number;
-  chapter: number;
-  startVerse: number;
-  endVerse: number;
-}
-
-export type LanguageMarker = 'HEB' | 'GRK';
-export type AlignmentBasis = 'BHS' | 'LXX' | 'UBSGNT5';
-export interface SourceParallelMember {
-  sourceOrder: number;
-  sourceReference: string;
-  normalizedReference: string;
-  segments: ReferenceSegment[];
-  languageMarker: LanguageMarker;
-  alignmentBasis: AlignmentBasis;
-  alignmentRaw: string;
-}
-
-export interface ParallelSourceProvenance extends SourceMetadata {
-  modified: true;
-  modificationNote: string;
-}
-
-export interface SourceAttestedParallelGroup {
-  groupId: string;
-  sourceOrdinal: number;
-  label: typeof LABEL;
-  directionality: typeof DIRECTIONALITY;
-  members: SourceParallelMember[];
-  provenance: ParallelSourceProvenance;
-}
+export type ReferenceSegment = SourceParallelReferenceSegment;
+export type LanguageMarker = SourceParallelLanguageMarker;
+export type AlignmentBasis = SourceParallelAlignmentBasis;
+export type SourceParallelMember = KernelSourceParallelMember;
+export type ParallelSourceProvenance = KernelParallelSourceProvenance;
+export type SourceAttestedParallelGroup = KernelSourceAttestedParallelGroup;
 
 export interface ReferenceIndexEntry {
   groupId: string;
@@ -106,8 +93,9 @@ export interface ReferenceIndexEntry {
 }
 
 export interface GeneratedUbsCorpus {
-  schemaVersion: 'ubs-parallel-passages.v1';
+  schemaVersion: 'ubs-parallel-passages.v2';
   transformVersion: typeof TRANSFORM_VERSION;
+  artifactIdentity: string;
   label: typeof LABEL;
   directionality: typeof DIRECTIONALITY;
   license: {
@@ -142,8 +130,7 @@ export const DEFAULT_SOURCE_PATH = join(ROOT, 'data/parallel-passages/ubs-parate
 export const DEFAULT_METADATA_PATH = join(ROOT, 'data/parallel-passages/ubs-paratext/SOURCE.json');
 export const DEFAULT_OUTPUT_PATH = join(ROOT, 'src/data/ubs-parallel-passages.generated.json');
 
-const MODIFICATION_NOTE =
-  'References and alignment metadata normalized for local lookup; UBS group membership and member order preserved.';
+const MODIFICATION_NOTE = UBS_PARALLEL_PASSAGE_PROVENANCE.modificationNote;
 
 function fail(message: string): never {
   throw new Error(`[ubs-compiler] ${message}`);
@@ -449,7 +436,11 @@ export function compileUbsParallelPassages(xml: string | Buffer, metadata: Sourc
     const mixed = markers.size === 2;
     const canonicalMembers = passage.verses.map(verse => [verse.marker, verse.sourceReference, verse.alignmentRaw]);
     const canonical = JSON.stringify(canonicalMembers);
-    const groupId = `ubs-pp-${sha256(Buffer.from(canonical, 'utf8'))}`;
+    const groupId = deriveUbsParallelGroupId(passage.verses.map(verse => ({
+      languageMarker: verse.marker,
+      sourceReference: verse.sourceReference,
+      alignmentRaw: verse.alignmentRaw,
+    })));
     if (seenGroups.has(canonical) || seenGroups.has(groupId)) fail(`duplicate UBS group at source ordinal ${passageIndex + 1}`);
     seenGroups.add(canonical);
     seenGroups.add(groupId);
@@ -495,8 +486,8 @@ export function compileUbsParallelPassages(xml: string | Buffer, metadata: Sourc
   const referenceIndex: Record<string, ReferenceIndexEntry[]> = {};
   for (const key of [...index.keys()].sort()) referenceIndex[key] = index.get(key)!;
 
-  const output: GeneratedUbsCorpus = {
-    schemaVersion: 'ubs-parallel-passages.v1',
+  const identityProjection = {
+    schemaVersion: 'ubs-parallel-passages.v2' as const,
     transformVersion: TRANSFORM_VERSION,
     label: LABEL,
     directionality: DIRECTIONALITY,
@@ -504,6 +495,17 @@ export function compileUbsParallelPassages(xml: string | Buffer, metadata: Sourc
     provenance: sourceProvenance,
     groups,
     referenceIndex,
+  };
+  const output: GeneratedUbsCorpus = {
+    schemaVersion: identityProjection.schemaVersion,
+    transformVersion: identityProjection.transformVersion,
+    artifactIdentity: computeUbsParallelArtifactIdentity(identityProjection),
+    label: identityProjection.label,
+    directionality: identityProjection.directionality,
+    license: identityProjection.license,
+    provenance: identityProjection.provenance,
+    groups: identityProjection.groups,
+    referenceIndex: identityProjection.referenceIndex,
   };
   // Object insertion order is fixed above; compact output keeps the shared
   // Node/Worker artifact practical without changing its deterministic bytes.

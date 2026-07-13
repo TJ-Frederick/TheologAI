@@ -34,7 +34,7 @@ export class CommentaryService {
         if (params.maxLength && result.text.length > params.maxLength) {
           return {
             ...result,
-            text: result.text.substring(0, params.maxLength) + '...',
+            text: truncateWithEllipsis(result.text, params.maxLength),
           };
         }
 
@@ -76,4 +76,12 @@ export class CommentaryService {
     }
     return all;
   }
+}
+
+/** Keep the ellipsis inside the requested Unicode-character budget. */
+function truncateWithEllipsis(value: string, maxLength: number): string {
+  const characters = Array.from(value);
+  if (characters.length <= maxLength) return value;
+  if (maxLength === 1) return '…';
+  return `${characters.slice(0, maxLength - 1).join('')}…`;
 }

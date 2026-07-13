@@ -5,6 +5,7 @@
  * This is the single wiring point for dependency injection.
  */
 
+import type Database from 'better-sqlite3';
 import type { ToolHandler } from '../../kernel/types.js';
 
 // Adapters — Bible
@@ -14,40 +15,36 @@ import { HelloAoAdapter } from '../../adapters/bible/HelloAoAdapter.js';
 
 // Adapters — Commentary
 import { HelloAoCommentaryAdapter } from '../../adapters/commentary/HelloAoCommentaryAdapter.js';
-import { CcelAdapter } from '../../adapters/commentary/CcelAdapter.js';
+import { CcelSearchAdapter } from '../../adapters/commentary/CcelSearchAdapter.js';
 
 // Repositories (SQLite-backed)
 import { CrossReferenceRepository } from '../../adapters/data/CrossReferenceRepository.js';
 import { StrongsRepository } from '../../adapters/data/StrongsRepository.js';
 import { MorphologyRepository } from '../../adapters/data/MorphologyRepository.js';
 import { HistoricalDocumentRepository } from '../../adapters/data/HistoricalDocumentRepository.js';
+import { loadUbsParallelPassageRepository } from '../../adapters/data/loadUbsParallelPassages.js';
 
 // Services
 import { BibleService } from '../../services/bible/BibleService.js';
 import { CrossReferenceService } from '../../services/bible/CrossReferenceService.js';
 import { ParallelPassageService } from '../../services/bible/ParallelPassageService.js';
 import { CommentaryService } from '../../services/commentary/CommentaryService.js';
-import { CcelService } from '../../services/commentary/CcelService.js';
 import { HistoricalDocumentService } from '../../services/historical/HistoricalDocumentService.js';
+import { LocalPrimarySourceSearchProvider } from '../../services/historical/LocalPrimarySourceSearchProvider.js';
+import { PrimarySourceSearchService } from '../../services/historical/PrimarySourceSearchService.js';
 import { StrongsService } from '../../services/languages/StrongsService.js';
 import { MorphologyService } from '../../services/languages/MorphologyService.js';
+import { OriginalLanguageStudyService } from '../../services/languages/OriginalLanguageStudyService.js';
+import { SourceAttestedParallelService } from '../../services/bible/SourceAttestedParallelService.js';
 
-// Tool handlers
-import { createBibleLookupHandler } from './bibleLookup.js';
-import { createCrossReferencesHandler } from './crossReferences.js';
-import { createParallelPassagesHandler } from './parallelPassages.js';
-import { createCommentaryHandler } from './commentary.js';
-import { createClassicTextsHandler } from './classicTexts.js';
-import { createStrongsLookupHandler } from './strongsLookup.js';
-import { createVerseMorphologyHandler } from './verseMorphology.js';
-import { createDonationConfigHandler } from './donationConfig.js';
-import { createVerifyDonationHandler } from './verifyDonation.js';
+import { createToolRegistry } from '../toolRegistry.js';
 
 // Donation
 import { OnChainVerifier } from '../../adapters/donation/OnChainVerifier.js';
 import { DonationService } from '../../services/donation/DonationService.js';
 
 import { getDatabase } from '../../adapters/shared/Database.js';
+import { readPrimarySourceFeatureFlags } from '../../kernel/featureFlags.js';
 
 /** Services exposed for MCP Resources / Prompts (Phase 5+) */
 export interface ServerServices {
@@ -55,6 +52,7 @@ export interface ServerServices {
   commentaryService: CommentaryService;
   historicalService: HistoricalDocumentService;
   strongsService: StrongsService;
+  sourceAttestedParallelService: SourceAttestedParallelService;
 }
 
 /** Result of the composition root wiring */
@@ -63,18 +61,24 @@ export interface CompositionRoot {
   services: ServerServices;
 }
 
+export interface CompositionRootOptions {
+  /** Explicit database injection for isolated runtimes and clean-checkout tests. */
+  database?: Database.Database;
+}
+
 /**
  * Create all tool handlers and services with fully-wired dependency graph.
  */
-export function createCompositionRoot(): CompositionRoot {
+export function createCompositionRoot(options: CompositionRootOptions = {}): CompositionRoot {
   // Database
-  const db = getDatabase();
+  const db = options.database ?? getDatabase();
 
   // Repositories
   const crossRefRepo = new CrossReferenceRepository(db);
   const strongsRepo = new StrongsRepository(db);
   const morphRepo = new MorphologyRepository(db);
   const historicalRepo = new HistoricalDocumentRepository(db);
+  const sourceAttestedParallelRepo = loadUbsParallelPassageRepository();
 
   // Bible adapters
   const esvAdapter = new EsvAdapter();
@@ -83,38 +87,49 @@ export function createCompositionRoot(): CompositionRoot {
 
   // Commentary adapters
   const helloaoCommentary = new HelloAoCommentaryAdapter();
-  const ccelAdapter = new CcelAdapter();
+  const ccelSearchAdapter = new CcelSearchAdapter({ enabled: true });
 
   // Services
   const bibleService = new BibleService([esvAdapter, netAdapter, helloaoAdapter]);
   const crossRefService = new CrossReferenceService(crossRefRepo);
-  const parallelService = new ParallelPassageService(crossRefRepo, bibleService);
+  const sourceAttestedParallelService = new SourceAttestedParallelService(sourceAttestedParallelRepo);
+  const parallelService = new ParallelPassageService(
+    crossRefRepo, bibleService, undefined, undefined, sourceAttestedParallelService,
+  );
   const commentaryService = new CommentaryService([helloaoCommentary]);
-  const ccelService = new CcelService(ccelAdapter);
   const historicalService = new HistoricalDocumentService(historicalRepo);
+  const primarySourceSearchService = new PrimarySourceSearchService(
+    new LocalPrimarySourceSearchProvider(historicalRepo),
+    ccelSearchAdapter,
+    readPrimarySourceFeatureFlags({
+      THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH: process.env.THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH,
+    }),
+  );
   const strongsService = new StrongsService(strongsRepo);
   const morphService = new MorphologyService(morphRepo);
+  const originalLanguageStudyService = new OriginalLanguageStudyService(morphRepo, strongsRepo);
 
   // Donation (no DB dependency)
   const onChainVerifier = new OnChainVerifier({});
   const donationService = new DonationService(onChainVerifier);
 
   // Tool handlers
-  const tools = [
-    createBibleLookupHandler(bibleService),
-    createCrossReferencesHandler(crossRefService),
-    createParallelPassagesHandler(parallelService),
-    createCommentaryHandler(commentaryService),
-    createClassicTextsHandler(historicalService, ccelService),
-    createStrongsLookupHandler(strongsService),
-    createVerseMorphologyHandler(morphService),
-    createDonationConfigHandler(donationService),
-    createVerifyDonationHandler(donationService),
-  ];
+  const tools = createToolRegistry({
+    bibleService,
+    crossReferenceService: crossRefService,
+    parallelPassageService: parallelService,
+    commentaryService,
+    historicalService,
+    primarySourceSearchService,
+    strongsService,
+    morphologyService: morphService,
+    originalLanguageStudyService,
+    donationService,
+  });
 
   return {
     tools,
-    services: { bibleService, commentaryService, historicalService, strongsService },
+    services: { bibleService, commentaryService, historicalService, strongsService, sourceAttestedParallelService },
   };
 }
 

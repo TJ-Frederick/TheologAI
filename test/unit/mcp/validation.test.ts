@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatValidationError, validatorFor } from '../../../src/mcp/validation.js';
+import { formatValidationError, validatePromptArguments, validatorFor } from '../../../src/mcp/validation.js';
 import { createBibleLookupHandler } from '../../../src/tools/v2/bibleLookup.js';
 import { createClassicTextsHandler } from '../../../src/tools/v2/classicTexts.js';
 import { createCommentaryHandler } from '../../../src/tools/v2/commentary.js';
@@ -15,6 +15,30 @@ import { originalLanguageOutputSchema } from '../../../src/mcp/schemas/originalL
 const unused = {} as never;
 
 describe('Worker-safe JSON Schema validation', () => {
+  it.each([
+    ['reference', 316],
+    ['translation', ['NET']],
+    ['word', { value: 'love' }],
+  ])('classifies a non-string prompt %s as InvalidParams', (argument, value) => {
+    expect(() => validatePromptArguments(
+      argument === 'word' ? 'word-study' : 'passage-exegesis',
+      { [argument]: value, ...(argument === 'translation' ? { reference: 'John 3:16' } : {}) },
+    )).toThrow(expect.objectContaining({
+      code: -32602,
+      message: expect.stringContaining(`Argument "${argument}"`),
+    }));
+  });
+
+  it.each([
+    [316, undefined, 'Prompt name must be a string'],
+    ['passage-exegesis', [], 'must be an object'],
+    ['passage-exegesis', null, 'must be an object'],
+  ])('classifies an invalid prompt request boundary as InvalidParams', (name, args, message) => {
+    expect(() => validatePromptArguments(name, args)).toThrow(expect.objectContaining({
+      code: -32602,
+      message: expect.stringContaining(message),
+    }));
+  });
   it('validates the two advertised output schemas with the same Worker-safe validator', () => {
     const bible = validatorFor(bibleLookupOutputSchema);
     const language = validatorFor(originalLanguageOutputSchema);
@@ -110,7 +134,7 @@ describe('Worker-safe JSON Schema validation', () => {
     ['cross references', createCrossReferencesHandler(unused), { reference: 'John 3:16', maxResults: 5 }, { reference: 'John 3:16', maxResults: 1.5 }],
     ['parallel passages', createParallelPassagesHandler(unused), { reference: 'Matthew 1:1', mode: 'synoptic' }, { reference: 'Matthew 1:1', mode: 'invalid' }],
     ['commentary', createCommentaryHandler(unused), { reference: 'John 3:16', commentator: 'John Gill' }, { reference: 'John 3:16', commentator: 'Unknown' }],
-    ['classic texts', createClassicTextsHandler(unused, unused), { listWorks: true }, { listWorks: false }],
+    ['classic texts', createClassicTextsHandler(unused), { listWorks: true }, { listWorks: false }],
     ['original language', createStrongsLookupHandler(unused), { query: 'love', limit: 10 }, { query: 'love', limit: 21 }],
     ['morphology', createVerseMorphologyHandler(unused), { reference: 'John 3:16', expand_morphology: true }, { reference: 'John 3:16', expand_morphology: 'yes' }],
     ['donation config', createDonationConfigHandler(unused), {}, { extra: true }],
@@ -122,8 +146,8 @@ describe('Worker-safe JSON Schema validation', () => {
   });
 
   it.each([
-    ['classic-text conflicting modes', createClassicTextsHandler(unused, unused), { work: 'nicene-creed', query: 'trinity' }, 'query is the local-search mode'],
-    ['classic-text false mode selector', createClassicTextsHandler(unused, unused), { listWorks: false }, 'listWorks must be true'],
+    ['classic-text conflicting modes', createClassicTextsHandler(unused), { work: 'nicene-creed', query: 'trinity' }, 'query is the local-search mode'],
+    ['classic-text false mode selector', createClassicTextsHandler(unused), { listWorks: false }, 'listWorks must be true'],
     ['original-language conflicting modes', createStrongsLookupHandler(unused), { strongs_number: 'G26', limit: 5 }, 'limit is only valid with query search'],
   ])('keeps strict handler validation actionable for %s', async (_name, tool, arguments_, expected) => {
     const result = await tool.handler(arguments_);
@@ -132,7 +156,7 @@ describe('Worker-safe JSON Schema validation', () => {
   });
 
   it.each([
-    ['classic-text empty input', createClassicTextsHandler(unused, unused)],
+    ['classic-text empty input', createClassicTextsHandler(unused)],
     ['original-language empty input', createStrongsLookupHandler(unused)],
   ])('advertised flat schema rejects %s', (_name, tool) => {
     expect(validatorFor(tool.inputSchema)({}).valid).toBe(false);

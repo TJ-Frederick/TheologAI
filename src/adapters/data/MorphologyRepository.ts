@@ -15,6 +15,7 @@ import type {
 } from '../../kernel/repositories.js';
 import { expandHebrewMorphCode } from '../shared/hebrewMorphExpander.js';
 import { CANONICAL_BOOK_ORDER_SQL, sortByCanonicalBook } from '../shared/repositoryUtils.js';
+import { parseStrongsIdentity } from '../../kernel/strongs.js';
 
 export type { MorphWord } from '../../kernel/repositories.js';
 
@@ -74,11 +75,15 @@ export class MorphologyRepository implements IMorphologyRepository {
 
   /** Find verse occurrences for a Strong's number */
   getOccurrences(strongsNumber: string, limit: number = 100): WordOccurrence[] {
-    return this.stmtOccurrences.all(strongsNumber, limit) as WordOccurrence[];
+    const identity = parseStrongsIdentity(strongsNumber);
+    if (!identity) return [];
+    return this.stmtOccurrences.all(identity.morphologyKey, limit) as WordOccurrence[];
   }
 
   /** Count distinct verse occurrences by book for a Strong's number */
   getDistribution(strongsNumber: string): BookDistribution[] {
-    return sortByCanonicalBook(this.stmtDistribution.all(strongsNumber) as BookDistribution[]);
+    const identity = parseStrongsIdentity(strongsNumber);
+    if (!identity) return [];
+    return sortByCanonicalBook(this.stmtDistribution.all(identity.morphologyKey) as BookDistribution[]);
   }
 }

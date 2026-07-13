@@ -127,13 +127,21 @@ export interface CrossReferenceOptions {
 
 export interface ParallelPassageLookupParams {
   reference: string;
+  /** Corpus selection; omission is a hard default to UBS source-attested groups. */
+  corpora?: ParallelPassageCorpus[];
   mode?: 'auto' | 'synoptic' | 'quotation' | 'thematic';
   includeText?: boolean;
   translation?: string;
   showDifferences?: boolean;
+  maxGroups?: number;
+  includeAlignment?: boolean;
+  includeOpenBibleCrossReferences?: boolean;
+  /** @deprecated Use includeOpenBibleCrossReferences. */
   useCrossReferences?: boolean;
   maxParallels?: number;
 }
+
+export type ParallelPassageCorpus = 'ubs_source_attested' | 'theologai_legacy';
 
 export interface ParallelPassage {
   reference: string;
@@ -143,6 +151,7 @@ export interface ParallelPassage {
   confidence: number;
   uniqueElements?: string[];
   notes?: string;
+  provenanceIds?: string[];
 }
 
 export interface ParallelPassageAnalysis {
@@ -162,6 +171,49 @@ export interface ParallelPassageResult {
   analysis?: ParallelPassageAnalysis;
   citation: Citation;
   suggestedWorkflow?: string;
+  warnings?: string[];
+}
+
+export interface SourceAttestedParallelMemberResult {
+  sourceOrder: number;
+  sourceReference: string;
+  normalizedReference: string;
+  segments: Array<{ bookNumber: number; chapter: number; startVerse: number; endVerse: number }>;
+  languageMarker: 'HEB' | 'GRK';
+  matched: boolean;
+  alignmentBasis?: 'BHS' | 'LXX' | 'UBSGNT5';
+  alignmentRaw?: string;
+  text?: string;
+  translation?: string;
+  excerpts?: SourceAttestedSegmentExcerpt[];
+  provenanceIds: string[];
+}
+
+export interface SourceAttestedSegmentExcerpt {
+  segmentOrder: number;
+  reference: string;
+  text: string;
+  translation: string;
+  provenanceIds: string[];
+}
+
+export interface SourceAttestedParallelGroupResult {
+  groupId: string;
+  sourceOrdinal: number;
+  label: 'source_attested_parallel';
+  directionality: 'unspecified';
+  members: SourceAttestedParallelMemberResult[];
+  provenanceIds: string[];
+}
+
+/** Versioned public service result before MCP presentation. */
+export interface ParallelPassageResearchResult {
+  requestedReference: string;
+  corpora: ParallelPassageCorpus[];
+  sourceAttestedGroups: SourceAttestedParallelGroupResult[];
+  legacyParallels: ParallelPassage[];
+  openBibleCrossReferences: CrossReference[];
+  provenance: import('./provenance.js').ProvenanceRecord[];
   warnings?: string[];
 }
 
@@ -185,7 +237,7 @@ export type StrongsLookupParams =
 
 export interface StrongsResult {
   strongs_number: string;
-  testament: 'OT' | 'NT';
+  testament: 'OT' | 'NT' | null;
   lemma: string;
   transliteration?: string;
   pronunciation?: string;
@@ -201,6 +253,10 @@ export interface SenseInfo {
 }
 
 export interface EnhancedStrongsResult extends StrongsResult {
+  /** Identifies the source of the base fields without changing public output. */
+  sourceKind?: 'strongs_concordance' | 'stepbible_lexicon';
+  /** Known source language does not imply a biblical testament classification. */
+  language?: 'Greek' | 'Hebrew';
   extendedCitation?: Citation;
   extended?: {
     strongsExtended?: string;
@@ -244,6 +300,8 @@ export interface VerseMorphologyResult {
   verse: number;
   words: VerseWord[];
   citation: Citation;
+  /** Present when Hebrew lemmas were joined from the tracked TBESH lexicon. */
+  lemmaCitation?: Citation;
 }
 
 // ── STEPBible data structures ──

@@ -9,6 +9,8 @@ import { createTheologAiMcpServer, STATELESS_HTTP_CAPABILITIES } from '../../../
 import { BibleMCPServer } from '../../../src/server.js';
 import { createWorkerMcpServer } from '../../../src/worker-server.js';
 import type { WorkerCompositionRoot } from '../../../src/tools/worker/index.js';
+import { StrongsService } from '../../../src/services/languages/StrongsService.js';
+import { readFileSync } from 'node:fs';
 
 const TOOL_NAMES = [
   'bible_lookup',
@@ -16,8 +18,10 @@ const TOOL_NAMES = [
   'parallel_passages',
   'commentary_lookup',
   'classic_text_lookup',
+  'primary_source_search',
   'original_language_lookup',
   'bible_verse_morphology',
+  'original_language_study',
   'donation_config',
   'verify_donation',
 ];
@@ -72,6 +76,14 @@ function makeMockRoot(): McpCompositionRoot {
           content: 'We believe...',
           topics: [],
         }],
+        getSection: vi.fn(async (_documentId: string, sectionNumber: string) => ({
+          id: 1,
+          document_id: 'nicene-creed',
+          section_number: sectionNumber,
+          title: 'Article I',
+          content: 'We believe...',
+          topics: [],
+        })),
       },
       strongsService: {
         lookup: async () => ({
@@ -153,7 +165,7 @@ describe('shared MCP registration', () => {
     });
   });
 
-  it('lists all 9 tools and dispatches calls through the shared registry', async () => {
+  it('lists all 11 tools and dispatches calls through the shared registry', async () => {
     const root = makeMockRoot();
     const client = await connect(createTheologAiMcpServer(root, '1.0.0-test').server);
     const listed = await client.listTools();
@@ -370,6 +382,107 @@ describe('shared MCP registration', () => {
     });
   });
 
+  it('canonicalizes classical and extended Strong\'s resources and rejects invalid domain numbers', async () => {
+    const root = makeMockRoot();
+    const lookup = vi.fn(root.services.strongsService.lookup);
+    root.services.strongsService.lookup = lookup;
+    const client = await connect(createTheologAiMcpServer(root, '1.0.0-test').server);
+
+    await client.readResource({ uri: 'theologai://strongs/g02385i' });
+    expect(lookup).toHaveBeenCalledWith('G2385I', true);
+
+    for (const identity of ['G6000', 'H9001', 'H9049', 'G21502']) {
+      await client.readResource({ uri: `theologai://strongs/${identity}` });
+      expect(lookup).toHaveBeenCalledWith(identity, true);
+    }
+
+    for (const uri of ['theologai://strongs/G0', 'theologai://strongs/G100000', 'theologai://strongs/H999999']) {
+      await expect(client.readResource({ uri })).rejects.toMatchObject({ code: -32002, data: { uri } });
+    }
+    expect(lookup).toHaveBeenCalledTimes(5);
+  });
+
+  it('serves a source-grounded lexicon-only STEPBible resource', async () => {
+    const source = JSON.parse(readFileSync(new URL('../../../data/biblical-languages/stepbible-lexicons/tbesh-hebrew.json', import.meta.url), 'utf8')) as Record<string, Record<string, unknown>>;
+    const root = makeMockRoot();
+    root.services.strongsService = new StrongsService({
+      lookup: async () => undefined,
+      getLexiconEntry: async identity => ({ strongs_number: identity, source: 'STEPBible', extended_data: source[identity] }),
+      search: async () => [],
+      getStats: async () => ({ greek: 0, hebrew: 0, total: 0 }),
+    });
+    const client = await connect(createTheologAiMcpServer(root, '1.0.0-test').server);
+    const result = await client.readResource({ uri: 'theologai://strongs/H9001' });
+    expect(result.contents[0]).toMatchObject({
+      uri: 'theologai://strongs/H9001',
+      text: expect.stringContaining('# H9001 — /וַ'),
+    });
+    expect(String(result.contents[0].text)).toContain('Verbal vav');
+    expect(String(result.contents[0].text)).toContain('Not classified (source-language lexicon identity)');
+  });
+
+  it('resolves an exact document section without changing whole-document resources', async () => {
+    const root = makeMockRoot();
+    const client = await connect(createTheologAiMcpServer(root, '1.0.0-test').server);
+    const whole = await client.readResource({ uri: 'theologai://documents/nicene-creed' });
+    expect(String(whole.contents[0].text)).toContain('We believe...');
+
+    const exactUri = 'theologai://documents/nicene-creed#section-1';
+    const exact = await client.readResource({ uri: exactUri });
+    expect(exact.contents[0]).toMatchObject({ uri: exactUri, mimeType: 'text/markdown' });
+    expect(String(exact.contents[0].text)).toMatch(/Nicene Creed[\s\S]*Article I[\s\S]*We believe/);
+    expect(root.services.historicalService.getSection).toHaveBeenCalledWith('nicene-creed', '1');
+  });
+
+  it('canonicalizes classical and extended Strong\'s resources and rejects invalid domain numbers', async () => {
+    const root = makeMockRoot();
+    const lookup = vi.fn(root.services.strongsService.lookup);
+    root.services.strongsService.lookup = lookup;
+    const client = await connect(createTheologAiMcpServer(root, '1.0.0-test').server);
+
+    await client.readResource({ uri: 'theologai://strongs/g02385i' });
+    expect(lookup).toHaveBeenCalledWith('G2385I', true);
+
+    for (const identity of ['G6000', 'H9001', 'H9049', 'G21502']) {
+      await client.readResource({ uri: `theologai://strongs/${identity}` });
+      expect(lookup).toHaveBeenCalledWith(identity, true);
+    }
+
+    for (const uri of ['theologai://strongs/G0', 'theologai://strongs/G100000', 'theologai://strongs/H999999']) {
+      await expect(client.readResource({ uri })).rejects.toMatchObject({ code: -32002, data: { uri } });
+    }
+    expect(lookup).toHaveBeenCalledTimes(5);
+  });
+
+  it('serves a source-grounded lexicon-only STEPBible resource with nullable testament', async () => {
+    const source = JSON.parse(readFileSync(new URL('../../../data/biblical-languages/stepbible-lexicons/tbesh-hebrew.json', import.meta.url), 'utf8')) as Record<string, Record<string, unknown>>;
+    const root = makeMockRoot();
+    root.services.strongsService = new StrongsService({
+      lookup: async () => undefined,
+      getLexiconEntry: async identity => ({ strongs_number: identity, source: 'STEPBible', extended_data: source[identity] }),
+      search: async () => [],
+      getStats: async () => ({ greek: 0, hebrew: 0, total: 0 }),
+    });
+    const client = await connect(createTheologAiMcpServer(root, '1.0.0-test').server);
+    const result = await client.readResource({ uri: 'theologai://strongs/H9001' });
+    expect(result.contents[0]).toMatchObject({
+      uri: 'theologai://strongs/H9001',
+      text: expect.stringContaining('# H9001 — /וַ'),
+    });
+    expect(String(result.contents[0].text)).toContain('Verbal vav');
+    expect(String(result.contents[0].text)).toContain('Not classified (source-language lexicon identity)');
+  });
+
+  it.each([
+    'theologai://documents/nicene-creed#section-',
+    'theologai://documents/nicene-creed#section-..',
+    'theologai://documents/nicene-creed?section=1',
+    'theologai://documents/Nicene-Creed#section-1',
+  ])('rejects malformed exact-section resource %s', async uri => {
+    const client = await connect(createTheologAiMcpServer(makeMockRoot(), '1.0.0-test').server);
+    await expect(client.readResource({ uri })).rejects.toMatchObject({ code: -32002, data: { uri } });
+  });
+
   it.each([
     ['document', 'theologai://documents/nicene-creed'],
     ['strongs', 'theologai://strongs/G26'],
@@ -426,6 +539,23 @@ describe('shared MCP registration', () => {
     expect(passageExegesis.messages[0].content).toEqual(expect.objectContaining({
       text: expect.stringContaining('distinguish an unavailable translation'),
     }));
+    expect(passageExegesis.messages[0].content).toEqual(expect.objectContaining({
+      text: expect.stringContaining('do not infer quotation, dependence, synoptic direction, or a thematic relationship'),
+    }));
+    expect(passageExegesis.messages[0].content).toEqual(expect.objectContaining({
+      text: expect.stringContaining('community-ranked links as thematic leads, not UBS-attested parallels'),
+    }));
+
+    const rangeExegesis = await client.getPrompt({
+      name: 'passage-exegesis',
+      arguments: { reference: 'Romans 8:28-30' },
+    });
+    expect(rangeExegesis.messages[0].content).toEqual(expect.objectContaining({
+      text: expect.stringContaining('never pass a chapter or range'),
+    }));
+    expect(String(rangeExegesis.messages[0].content)).not.toContain(
+      '`bible_cross_references` with `{"reference":"Romans 8:28-30"}`',
+    );
 
     const compareTranslations = await client.getPrompt({
       name: 'compare-translations',
@@ -462,6 +592,20 @@ describe('shared MCP registration', () => {
     await expect(client.getPrompt({ name: 'word-study', arguments: { word: 'a' } })).rejects.toMatchObject({
       code: -32602,
       message: expect.stringContaining('between 2 and 100 characters'),
+    });
+    await expect(client.getPrompt({
+      name: 'passage-exegesis',
+      arguments: { reference: 316 } as never,
+    })).rejects.toMatchObject({
+      code: -32602,
+      message: expect.stringContaining('Argument "reference" for prompt "passage-exegesis" must be a string'),
+    });
+    await expect(client.getPrompt({
+      name: 'passage-exegesis',
+      arguments: [] as never,
+    })).rejects.toMatchObject({
+      code: -32602,
+      message: expect.stringContaining('Arguments for prompt "passage-exegesis" must be an object'),
     });
   });
 
