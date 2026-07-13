@@ -311,6 +311,19 @@ does not remove punctuation, accents, breathing marks, or cantillation. Public
 output must preserve that caveat or introduce a separately reviewed linguistic
 normalization layer.
 
+### Historical primary-source catalog scope (transform 6)
+
+Transform 6 persists the reviewed 17-work catalog manifest into
+`documents.metadata.catalog`. Its companion provenance manifest is also a
+checksum-pinned D1 input and must map every materialized creator/date field to
+an authoritative source review. Stable metadata provenance IDs are persisted
+with each catalog object; no source-page content is imported. It changes
+materialized rows and the scoped D1
+identity; it is not eligible for a metadata-marker-only transition. The exact
+manifest, conservative creator-role rules, filter semantics, readiness checks,
+and identity are recorded in
+[`PRIMARY-SOURCE-CATALOG-SCOPE.md`](PRIMARY-SOURCE-CATALOG-SCOPE.md).
+
 Cloudflare's import guidance and tracked migration behavior are documented at:
 
 - <https://developers.cloudflare.com/d1/best-practices/import-export-data/>

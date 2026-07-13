@@ -13,6 +13,7 @@ import type {
   BiblicalLanguageUnicodeCorrectionLedger,
   MorphologyUnicodeCorrection,
 } from './biblical-language-unicode-correction.js';
+import { parseHistoricalDocumentCatalog } from './historical-document-catalog.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const manifestBytes = readFileSync(join(ROOT, 'data', 'data-manifest.json'));
@@ -23,6 +24,10 @@ const UNICODE_CORRECTION = JSON.parse(readFileSync(
   join(ROOT, 'data/biblical-languages/UNICODE-CORRECTION.json'),
   'utf8',
 )) as BiblicalLanguageUnicodeCorrectionLedger;
+const HISTORICAL_CATALOG = parseHistoricalDocumentCatalog(JSON.parse(readFileSync(
+  join(ROOT, 'data/historical-document-catalog.json'),
+  'utf8',
+)));
 
 export const REQUIRED_COLUMNS: Readonly<Record<string, readonly string[]>> = {
   theologai_metadata: ['key', 'value'],
@@ -131,6 +136,19 @@ export function buildD1ReadinessSql(
     `(SELECT source_sha256 FROM ubs_parallel_sources WHERE source_id = 'ubs_paratext_parallel_passages') = '${UBS_PARALLEL_PASSAGE_PROVENANCE.sourceSha256}'`,
     `(SELECT transform_version FROM ubs_parallel_sources WHERE source_id = 'ubs_paratext_parallel_passages') = ${UBS_PARALLEL_PASSAGE_PROVENANCE.transformVersion}`,
   ];
+  const historicalCatalogChecks = [
+    `(SELECT COUNT(*) FROM documents WHERE json_type(metadata, '$.catalog') = 'object') = ${HISTORICAL_CATALOG.length}`,
+    ...HISTORICAL_CATALOG.map(entry => {
+      const metadata = JSON.stringify({
+        lookupAliases: entry.lookupAliases,
+        composition: entry.composition,
+        creators: entry.creators,
+        metadataStatus: entry.metadataStatus,
+        metadataProvenanceIds: entry.metadataProvenanceIds,
+      });
+      return `((SELECT json_extract(metadata, '$.catalog') FROM documents WHERE id = ${sqlLiteral(entry.documentId)}) = ${sqlLiteral(metadata)} AND (SELECT date FROM documents WHERE id = ${sqlLiteral(entry.documentId)}) = ${sqlLiteral(entry.composition.label)})`;
+    }),
+  ];
   const columnChecks = Object.entries(REQUIRED_COLUMNS).map(([table, columns]) =>
     `(SELECT group_concat(name, ',') FROM (SELECT name FROM pragma_table_info('${table}') ORDER BY cid)) = '${columns.join(',')}'`
   );
@@ -194,7 +212,7 @@ export function buildD1ReadinessSql(
 
   return [
     `WITH ${morphologyUnicodeContract.cte},\n${usageFoundationCtes}`,
-    `SELECT CASE WHEN ${[integrityCheck, foreignKeyCheck, ...identityChecks, ...columnChecks, ...countChecks, indexCheck, ...ubsSemanticChecks, ...strongsSemanticChecks, ...morphologyUnicodeContract.checks, ...usageFoundationChecks, ...unicodeAbsenceChecks, johnOneOneReadinessPredicate(), genesisOneOneLemmaReadinessPredicate()].join(' AND ')}`,
+    `SELECT CASE WHEN ${[integrityCheck, foreignKeyCheck, ...identityChecks, ...historicalCatalogChecks, ...columnChecks, ...countChecks, indexCheck, ...ubsSemanticChecks, ...strongsSemanticChecks, ...morphologyUnicodeContract.checks, ...usageFoundationChecks, ...unicodeAbsenceChecks, johnOneOneReadinessPredicate(), genesisOneOneLemmaReadinessPredicate()].join(' AND ')}`,
     `THEN 'ready' ELSE json_extract('D1 readiness check failed', '$') END AS readiness;`,
   ].join('\n');
 }

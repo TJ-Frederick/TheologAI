@@ -101,7 +101,16 @@ beforeAll(async () => {
       "Apostles' Creed",
       'Creed',
       'c. 390',
-      JSON.stringify({ topics: ['Trinity', 'Resurrection'] }),
+      JSON.stringify({
+        topics: ['Trinity', 'Resurrection'],
+        catalog: {
+          lookupAliases: ["The Apostles' Creed", "Apostles' Creed", 'Apostles Creed'],
+          composition: { label: 'Before the end of the 4th century (present form)' },
+          creators: [],
+          metadataStatus: 'anonymous',
+          metadataProvenanceIds: ['hist-meta-crc-apostles'],
+        },
+      }),
     ),
     env.THEOLOGAI_DB.prepare(`
       INSERT INTO document_sections (

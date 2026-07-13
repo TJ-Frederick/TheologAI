@@ -2,7 +2,7 @@ import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 
 const status = {
   type: 'string',
-  enum: ['ok', 'no_results', 'unavailable', 'disabled', 'rate_limited', 'interface_changed', 'unsupported_filter'],
+  enum: ['ok', 'no_results', 'unavailable', 'disabled', 'rate_limited', 'interface_changed', 'catalog_miss', 'unsupported_filter'],
 } as const;
 
 const localLocator = {
@@ -41,6 +41,47 @@ const commonHitProperties = {
   attribution: { type: 'string', minLength: 1, maxLength: 300 },
   documentType: { type: 'string', minLength: 1, maxLength: 100 },
   documentDate: { type: 'string', minLength: 1, maxLength: 100 },
+  creators: {
+    type: 'array', maxItems: 8, items: {
+      type: 'object', properties: {
+        name: { type: 'string', minLength: 1, maxLength: 160 },
+        role: { type: 'string', enum: ['author', 'issuing_body', 'drafting_body', 'revising_body', 'compiler'] },
+      }, required: ['name', 'role'], additionalProperties: false,
+    },
+  },
+  metadataStatus: { type: 'string', enum: ['reviewed', 'anonymous', 'collective', 'unknown'] },
+  metadataProvenanceIds: {
+    type: 'array', minItems: 1, maxItems: 4, uniqueItems: true,
+    items: { type: 'string', pattern: '^hist-meta-[a-z0-9]+(?:-[a-z0-9]+)*$', maxLength: 100 },
+  },
+} as const;
+
+const catalogScope = {
+  type: 'object',
+  properties: {
+    status: { type: 'string', enum: ['matched', 'catalog_miss', 'metadata_incomplete'] },
+    requested: {
+      type: 'object', properties: {
+        work: { type: 'string', minLength: 1, maxLength: 160 },
+        author: { type: 'string', minLength: 1, maxLength: 100 },
+        startYear: { type: 'integer', minimum: -5000, maximum: 3000 },
+        endYear: { type: 'integer', minimum: -5000, maximum: 3000 },
+      }, additionalProperties: false,
+    },
+    eligibleDocumentCount: { type: 'integer', minimum: 0, maximum: 17 },
+    eligibleDocuments: {
+      type: 'array', maxItems: 8, items: {
+        type: 'object', properties: {
+          id: { type: 'string', minLength: 1, maxLength: 160 },
+          title: { type: 'string', minLength: 1, maxLength: 300 },
+          metadataStatus: { type: 'string', enum: ['reviewed', 'anonymous', 'collective', 'unknown'] },
+        }, required: ['id', 'title', 'metadataStatus'], additionalProperties: false,
+      },
+    },
+    eligibleDocumentsTruncated: { type: 'boolean' },
+  },
+  required: ['status', 'requested', 'eligibleDocumentCount', 'eligibleDocuments', 'eligibleDocumentsTruncated'],
+  additionalProperties: false,
 } as const;
 
 const commonHitRequired = [
@@ -84,9 +125,10 @@ const provider = {
     properties: {
       ...providerProperties,
       provider: { const: 'local' },
+      scope: catalogScope,
       hits: { type: 'array', maxItems: 8, items: localHit },
     },
-    required: ['provider', 'status', 'searched', 'page', 'hitCount', 'hits', 'notices'],
+    required: ['provider', 'status', 'searched', 'page', 'hitCount', 'hits', 'notices', 'scope'],
     additionalProperties: false,
   }, {
     type: 'object',
@@ -103,7 +145,7 @@ const provider = {
 export const primarySourceSearchOutputSchema = {
   type: 'object',
   properties: {
-    schemaVersion: { const: '1' },
+    schemaVersion: { const: '2' },
     kind: { const: 'primary_source_search' },
     planStatus: { type: 'string', enum: ['complete', 'partial', 'unavailable'] },
     queries: {
@@ -140,8 +182,9 @@ export const primarySourceSearchOutputSchema = {
         selectedSectionAccess: { const: 'mcp_resource_read' },
         coverageScope: { const: 'bounded_non_exhaustive' },
         editionProvenance: { const: 'incomplete' },
+        lookupAliasUse: { const: 'exact_routing_only_not_metadata_evidence' },
       },
-      required: ['snippetUse', 'selectedSectionAccess', 'coverageScope', 'editionProvenance'],
+      required: ['snippetUse', 'selectedSectionAccess', 'coverageScope', 'editionProvenance', 'lookupAliasUse'],
       additionalProperties: false,
     },
   },

@@ -156,7 +156,7 @@ describe('createWorkerCompositionRoot', () => {
       const tool = root.tools.find(candidate => candidate.name === 'primary_source_search')!;
       const item = (tool.inputSchema.properties?.queries as any).items;
       expect(item.properties.providers).toMatchObject({ maxItems: 1, items: { enum: ['local'] } });
-      expect(item.properties.author.description).toContain('unsupported_filter');
+      expect(item.properties.author.description).toContain('separate query-plan items');
       expect(item.properties.page.description).toContain('only page 1');
     });
 

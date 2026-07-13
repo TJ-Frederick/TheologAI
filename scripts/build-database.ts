@@ -37,6 +37,10 @@ import {
   verifyD1Migrations,
 } from './d1-corpus-identity.js';
 import { BIBLE_BOOKS } from '../src/kernel/books.js';
+import {
+  parseHistoricalDocumentCatalog,
+  parseHistoricalDocumentCatalogProvenance,
+} from './historical-document-catalog.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -360,6 +364,13 @@ assertHebrewLemmaCoverageDatabase(db);
 
 log('Loading historical documents...');
 const histDir = join(DATA, 'historical-documents');
+const historicalCatalog = parseHistoricalDocumentCatalog(JSON.parse(
+  sourceRegistry.read('data/historical-document-catalog.json', 'utf-8'),
+));
+parseHistoricalDocumentCatalogProvenance(JSON.parse(
+  sourceRegistry.read('data/historical-document-catalog-provenance.json', 'utf-8'),
+), historicalCatalog);
+const historicalCatalogById = new Map(historicalCatalog.map(entry => [entry.documentId, entry]));
 const insertDoc = db.prepare(
   'INSERT OR IGNORE INTO documents (id, title, type, date, metadata) VALUES (?, ?, ?, ?, ?)'
 );
@@ -378,13 +389,24 @@ const histTx = db.transaction(() => {
   for (const file of files) {
     const id = file.replace('.json', '');
     const doc = JSON.parse(sourceRegistry.read(`data/historical-documents/${file}`, 'utf-8'));
+    const catalog = historicalCatalogById.get(id);
+    if (!catalog) throw new Error(`Historical document ${id} is missing from the reviewed catalog`);
 
     insertDoc.run(
       id,
       doc.title,
       doc.type || 'document',
-      doc.date || null,
-      JSON.stringify({ topics: doc.topics || [] }),
+      catalog.composition.label,
+      JSON.stringify({
+        topics: doc.topics || [],
+        catalog: {
+          lookupAliases: catalog.lookupAliases,
+          composition: catalog.composition,
+          creators: catalog.creators,
+          metadataStatus: catalog.metadataStatus,
+          metadataProvenanceIds: catalog.metadataProvenanceIds,
+        },
+      }),
     );
     docCount++;
 
@@ -401,6 +423,10 @@ const histTx = db.transaction(() => {
         sectionCount++;
       }
     }
+  }
+
+  if (docCount !== historicalCatalog.length) {
+    throw new Error(`Historical catalog/document mismatch: ${historicalCatalog.length} catalog entries, ${docCount} documents`);
   }
 
   return { docCount, sectionCount };

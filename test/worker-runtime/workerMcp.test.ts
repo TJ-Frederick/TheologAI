@@ -489,7 +489,7 @@ describe('Worker MCP endpoint in workerd', () => {
         }),
       ],
       structuredContent: {
-        schemaVersion: '1', kind: 'primary_source_search', planStatus: 'complete',
+        schemaVersion: '2', kind: 'primary_source_search', planStatus: 'complete',
         queries: [expect.objectContaining({
           providers: [expect.objectContaining({
             provider: 'local', hitCount: 1,
@@ -500,6 +500,7 @@ describe('Worker MCP endpoint in workerd', () => {
         evidencePolicy: {
           snippetUse: 'discovery_only', selectedSectionAccess: 'mcp_resource_read',
           coverageScope: 'bounded_non_exhaustive', editionProvenance: 'incomplete',
+          lookupAliasUse: 'exact_routing_only_not_metadata_evidence',
         },
       },
     });

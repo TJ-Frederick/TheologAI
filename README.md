@@ -41,7 +41,7 @@ fresh server and transport.
 | `parallel_passages` | Return complete UBS source-attested parallel groups by default; legacy curated edges and OpenBible.info cross references require explicit selectors and remain separate. |
 | `commentary_lookup` | Retrieve Matthew Henry, JFB, Adam Clarke, John Gill, Keil-Delitzsch (OT), or Tyndale notes. |
 | `classic_text_lookup` | Search and browse the 17 locally indexed historical documents. Remote CCEL document bodies are not retrieved or republished. |
-| `primary_source_search` | Execute a bounded local query plan with versioned structured results and native links to exact section resources. Snippets remain discovery-only. |
+| `primary_source_search` | Execute a bounded local query plan with versioned structured results, exact work/creator and inclusive composition-year scope, explicit catalog coverage, and native links to exact section resources. Snippets remain discovery-only. |
 | `original_language_lookup` | Look up or search Strong's entries, with opt-in exact corrected-corpus usage and bounded occurrence pages for exact identities. |
 | `bible_verse_morphology` | Return word-by-word morphology for a specific verse. |
 | `original_language_study` | Resolve and study one Greek or Hebrew token in one verse with contextual morphology, source-separated lexical evidence, and explicit interpretive limits. |
@@ -94,7 +94,7 @@ contract.
 | `passage-exegesis` | Text, language, cross references, commentary, and historical theology. |
 | `compare-translations` | Compare translation choices against morphology and lexical data. |
 | `confession-study` | Compare a doctrine across the locally indexed historical collection. |
-| `primary-source-research` | Survey a topic or search one exact local work, then read selected exact sections as evidence. |
+| `primary-source-research` | Survey a topic or scope separate creator, exact-work, and composition-year searches, then read selected exact sections as evidence. |
 | `donate` | Explain voluntary donation options. |
 
 ## Content scope and provenance
@@ -123,13 +123,19 @@ catechisms. The exact count is enforced by `data/data-manifest.json`.
 The public tools search and retrieve only the locally indexed collection. They
 do **not** currently fetch CCEL search results or document bodies. Defensive
 CCEL discovery adapters remain in the codebase as future provider architecture,
-but they are not advertised by the MCP schemas or reachable through the public
-tool registry. Any future external provider rollout must remain discovery-only
-until edition-specific rights and provider-policy gates are satisfied.
+but CCEL is not requestable in the public input schema and is unreachable from
+the public tool handler. The output schema retains dormant CCEL provider-result
+shapes for internal compatibility; those branches are not reachable from public
+tool calls. Any future external provider rollout must remain discovery-only until
+edition-specific rights and provider-policy gates are satisfied.
 
-Local search metadata identifies the cataloged work type and date when known;
-it does not establish an author, edition, transcription provenance, publication
-date, or rights status. Search snippets are discovery aids. Quote or analyze a
+Local search metadata uses exact lookup-only aliases for routing, plus reviewed composition
+date bounds when known, and explicitly named creators with their precise roles.
+Roles use the closed vocabulary `author`, `issuing_body`, `drafting_body`,
+`revising_body`, and `compiler`; a non-author role is not relabeled as
+authorship. Stable metadata provenance IDs resolve to the checksum-pinned
+companion review manifest. This metadata does not establish an edition, transcription
+provenance, publication date, or rights status. Search snippets are discovery aids. Quote or analyze a
 selected passage only after reading its exact `theologai://documents/...#section-...`
 resource. The collection and every response are bounded and non-exhaustive.
 

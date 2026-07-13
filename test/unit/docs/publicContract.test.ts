@@ -165,7 +165,8 @@ describe('published project contract', () => {
     expect(readme).not.toMatch(/eighteen locally indexed|18 locally indexed/i);
     expect(readme).not.toMatch(/six public-domain commentar/i);
     expect(readme).toContain('do **not** currently fetch CCEL search results or document bodies');
-    expect(readme).toContain('not advertised by the MCP schemas or reachable through the public');
+    expect(readme).toContain('CCEL is not requestable in the public input schema and is unreachable from');
+    expect(readme).toContain('output schema retains dormant CCEL provider-result');
     expect(historicalTestReport.slice(0, 500)).toContain('Historical test report');
     expect(historicalTestReport.slice(0, 500)).toContain('not the current product contract');
     expect(historicalArchitecture.slice(0, 700)).toContain('Historical architecture plan');

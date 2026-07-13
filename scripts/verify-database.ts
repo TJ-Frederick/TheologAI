@@ -108,6 +108,7 @@ try {
     ["SELECT 1 FROM strongs WHERE strongs_number = 'G25' LIMIT 1", "Strong's G25"],
     ["SELECT 1 FROM morphology WHERE book = 'Genesis' AND chapter = 1 AND verse = 1 LIMIT 1", 'Genesis 1:1 morphology'],
     ["SELECT 1 FROM documents WHERE id = 'nicene-creed' LIMIT 1", 'Nicene Creed'],
+    ["SELECT 1 FROM documents WHERE id = 'nicene-creed' AND json_extract(metadata, '$.catalog.composition.startYear') = 381 AND json_extract(metadata, '$.catalog.composition.endYear') = 381 AND json_extract(metadata, '$.catalog.creators[0].role') = 'revising_body' LIMIT 1", 'Nicene Creed reviewed catalog metadata'],
     ['SELECT 1 FROM morph_codes LIMIT 1', 'morphology-code data'],
   ] as const;
   for (const [query, label] of representativeQueries) {

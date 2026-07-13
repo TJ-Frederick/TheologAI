@@ -15,8 +15,9 @@ import type {
 import {
   composeLocalPrimarySourceFtsQuery,
   LOCAL_PRIMARY_SOURCE_SEARCH_SQL,
-  LOCAL_PRIMARY_SOURCE_WORK_SEARCH_SQL,
+  localPrimarySourceScopedSearchSql,
 } from '../shared/primarySourceSearchSql.js';
+import { mapDocumentDatabaseRow } from '../shared/historicalDocumentMetadata.js';
 
 export class D1HistoricalDocumentRepository implements IHistoricalDocumentRepository {
   constructor(private db: D1Database) {}
@@ -26,13 +27,7 @@ export class D1HistoricalDocumentRepository implements IHistoricalDocumentReposi
       'SELECT * FROM documents ORDER BY title, id'
     ).all<{ id: string; title: string; type: string; date: string | null; metadata: string }>();
 
-    return rows.map(r => ({
-      id: r.id,
-      title: r.title,
-      type: r.type,
-      date: r.date,
-      topics: r.metadata ? (JSON.parse(r.metadata).topics || []) : [],
-    }));
+    return rows.map(mapDocumentDatabaseRow);
   }
 
   async getDocument(id: string): Promise<DocumentInfo | undefined> {
@@ -41,13 +36,7 @@ export class D1HistoricalDocumentRepository implements IHistoricalDocumentReposi
     ).bind(id).first<{ id: string; title: string; type: string; date: string | null; metadata: string }>();
     if (!row) return undefined;
 
-    return {
-      id: row.id,
-      title: row.title,
-      type: row.type,
-      date: row.date,
-      topics: row.metadata ? (JSON.parse(row.metadata).topics || []) : [],
-    };
+    return mapDocumentDatabaseRow(row);
   }
 
   async getSections(documentId: string): Promise<DocumentSection[]> {
@@ -122,9 +111,11 @@ export class D1HistoricalDocumentRepository implements IHistoricalDocumentReposi
   async searchPrimarySources(options: PrimarySourceLocalSearchOptions): Promise<PrimarySourceLocalSearchRow[]> {
     validatePrimarySourceOptions(options);
     const ftsQuery = composeLocalPrimarySourceFtsQuery(options.text, options.match);
-    const statement = this.db.prepare(options.documentId ? LOCAL_PRIMARY_SOURCE_WORK_SEARCH_SQL : LOCAL_PRIMARY_SOURCE_SEARCH_SQL);
-    const bound = options.documentId
-      ? statement.bind(ftsQuery, options.documentId, options.limit)
+    const statement = this.db.prepare(options.documentIds
+      ? localPrimarySourceScopedSearchSql(options.documentIds.length)
+      : LOCAL_PRIMARY_SOURCE_SEARCH_SQL);
+    const bound = options.documentIds
+      ? statement.bind(ftsQuery, ...options.documentIds, options.limit)
       : statement.bind(ftsQuery, options.limit);
     const { results } = await bound.all<PrimarySourceSearchDatabaseRow>();
     return results.map(mapPrimarySourceRow);
@@ -159,13 +150,10 @@ interface PrimarySourceSearchDatabaseRow {
 
 function mapPrimarySourceRow(row: PrimarySourceSearchDatabaseRow): PrimarySourceLocalSearchRow {
   return {
-    document: {
-      id: row.document_id,
-      title: row.document_title,
-      type: row.document_type,
-      date: row.document_date,
-      topics: row.document_metadata ? (JSON.parse(row.document_metadata).topics || []) : [],
-    },
+    document: mapDocumentDatabaseRow({
+      id: row.document_id, title: row.document_title, type: row.document_type,
+      date: row.document_date, metadata: row.document_metadata,
+    }),
     section: {
       id: row.id,
       document_id: row.document_id,
@@ -181,5 +169,10 @@ function validatePrimarySourceOptions(options: PrimarySourceLocalSearchOptions):
   if (!options || typeof options.text !== 'string' || options.text.length < 1) throw new Error('Primary-source search text is required');
   if (options.match !== 'all_terms' && options.match !== 'phrase') throw new Error('Primary-source match mode is invalid');
   if (!Number.isSafeInteger(options.limit) || options.limit < 1 || options.limit > 8) throw new Error('Primary-source limit must be 1..8');
-  if (options.documentId !== undefined && (typeof options.documentId !== 'string' || options.documentId.length < 1)) throw new Error('Primary-source document ID is invalid');
+  if (options.documentIds !== undefined && (!Array.isArray(options.documentIds)
+    || options.documentIds.length < 1 || options.documentIds.length > 17
+    || options.documentIds.some(id => typeof id !== 'string' || id.length < 1)
+    || new Set(options.documentIds).size !== options.documentIds.length)) {
+    throw new Error('Primary-source document scope is invalid');
+  }
 }

@@ -23,7 +23,7 @@ describe('HistoricalDocumentRepository', () => {
   it('prepares all reusable document and FTS queries', () => {
     const db = new FakeSqliteDatabase();
     new HistoricalDocumentRepository(db.asDatabase());
-    expect(db.prepare).toHaveBeenCalledTimes(7);
+    expect(db.prepare).toHaveBeenCalledTimes(6);
     expect(db.statement('sections_fts MATCH').sql).toMatch(/ORDER BY rank, ds\.id\s+LIMIT \?/);
   });
 
@@ -99,11 +99,11 @@ describe('HistoricalDocumentRepository', () => {
     };
     const db = new FakeSqliteDatabase([{ match: 'JOIN documents d', all: [row] }]);
     const repo = new HistoricalDocumentRepository(db.asDatabase());
-    expect(repo.searchPrimarySources({ text: 'grace OR faith', match: 'all_terms', documentId: documentRow.id, limit: 8 })).toEqual([{
+    expect(repo.searchPrimarySources({ text: 'grace OR faith', match: 'all_terms', documentIds: [documentRow.id], limit: 8 })).toEqual([{
       document: { id: documentRow.id, title: documentRow.title, type: documentRow.type, date: documentRow.date, topics: ['Scripture', 'God'] },
       section: { id: 7, document_id: documentRow.id, section_number: '1.1', title: '', content: sectionRow.content, topics: ['revelation'] },
     }]);
-    expect(db.statement('AND ds.document_id = ?').all).toHaveBeenCalledWith('"grace" AND "OR" AND "faith"', documentRow.id, 8);
+    expect(db.statement('AND ds.document_id IN (?)').all).toHaveBeenCalledWith('"grace" AND "OR" AND "faith"', documentRow.id, 8);
     repo.searchPrimarySources({ text: 'union with Christ', match: 'phrase', limit: 3 });
     expect(db.statement(/JOIN documents d[\s\S]*ORDER BY rank/).all).toHaveBeenCalledWith('"union with Christ"', 3);
   });

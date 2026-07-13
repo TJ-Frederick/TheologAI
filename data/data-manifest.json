@@ -5,7 +5,7 @@
   "materializations": {
     "d1": {
       "identityVersion": 1,
-      "transformVersion": 5,
+      "transformVersion": 6,
       "migrations": [
         {
           "path": "migrations/0001_initial_schema.sql",
@@ -93,6 +93,8 @@
         "data/biblical-languages/strongs-greek.json",
         "data/biblical-languages/strongs-hebrew.json",
         "data/cross-references/cross_references.txt",
+        "data/historical-document-catalog-provenance.json",
+        "data/historical-document-catalog.json",
         "data/historical-documents/39-articles.json",
         "data/historical-documents/apostles-creed.json",
         "data/historical-documents/athanasian-creed.json",
@@ -452,6 +454,14 @@
     {
       "path": "data/cross-references/cross_references.txt",
       "sha256": "bb5a4f5cfb7f0faa07b171ee9b361285d6179bee705de16ead0690da16568191"
+    },
+    {
+      "path": "data/historical-document-catalog-provenance.json",
+      "sha256": "c207f10cdc771e4755f93213701ffbdf4a2c8395e02658c7d7dd8310441efef5"
+    },
+    {
+      "path": "data/historical-document-catalog.json",
+      "sha256": "af5ee0dbbb4b6d2a32ac2199a2d2b4c6dd6da0d1ffa55c14b4864a384b43c3ac"
     },
     {
       "path": "data/historical-documents/39-articles.json",

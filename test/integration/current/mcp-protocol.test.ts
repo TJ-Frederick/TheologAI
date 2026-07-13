@@ -184,7 +184,7 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
           text: expect.stringContaining('Plan status: **complete**'),
         })],
         structuredContent: {
-          schemaVersion: '1',
+          schemaVersion: '2',
           kind: 'primary_source_search',
           planStatus: 'complete',
           queries: [expect.anything()],
@@ -194,6 +194,7 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
             selectedSectionAccess: 'mcp_resource_read',
             coverageScope: 'bounded_non_exhaustive',
             editionProvenance: 'incomplete',
+            lookupAliasUse: 'exact_routing_only_not_metadata_evidence',
           },
         },
       });

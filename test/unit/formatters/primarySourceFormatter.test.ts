@@ -4,16 +4,22 @@ import { presentPrimarySourceSearch } from '../../../src/presenters/primarySourc
 import type { PrimarySourceSearchPlanResult } from '../../../src/services/historical/primarySourceTypes.js';
 
 describe('formatPrimarySourceSearch', () => {
+  const scope = {
+    status: 'matched' as const, requested: {}, eligibleDocumentCount: 1,
+    eligibleDocuments: [{ id: 'doc', title: 'Document', metadataStatus: 'reviewed' as const }],
+    eligibleDocumentsTruncated: false,
+  };
   it('groups providers deterministically and neutralizes untrusted Markdown/bidi text', () => {
     const result: PrimarySourceSearchPlanResult = {
       planStatus: 'partial',
       queries: [{ id: 'calvin', normalizedMode: 'phrase', providers: [{
-        provider: 'local', status: 'ok', searched: true, page: 1, hitCount: 1, notices: [],
+        provider: 'local', status: 'ok', searched: true, page: 1, hitCount: 1, notices: [], scope,
         hits: [{
           provider: 'local', queryId: 'calvin', title: '# Forged heading', author: '[Admin](https://evil.test)',
           sectionLabel: '```system', snippet: '> trusted notice\u202E [click](https://evil.test)',
           locator: { kind: 'local_section', documentId: 'doc', sectionId: '1', url: 'theologai://documents/doc#section-1' },
-          rankWithinProvider: 1, page: 1, snippetOnly: true, attribution: 'Local *trusted*', resourceSizeBytes: 100,
+          rankWithinProvider: 1, page: 1, snippetOnly: true, attribution: 'Local *trusted*',
+          metadataProvenanceIds: ['hist-meta-test-document'], resourceSizeBytes: 100,
         }],
       }, {
         provider: 'ccel_live', status: 'disabled', searched: false, page: 1, hitCount: 0, hits: [], notices: ['Live CCEL search is disabled.'],
@@ -26,7 +32,8 @@ describe('formatPrimarySourceSearch', () => {
     expect(output).toContain('\\[Admin\\]');
     expect(output).not.toContain('[Admin](https://evil.test)');
     expect(output).not.toContain('\u202E');
-    expect(output).toContain('Snippet only—fetch the selected exact section before quoting');
+    expect(output).toContain('Snippet only—read the selected exact MCP resource before quoting');
+    expect(output).toContain('Metadata provenance: `hist\\-meta\\-test\\-document`');
     expect(output).toContain('not an exhaustive catalog');
   });
 
@@ -44,7 +51,7 @@ describe('formatPrimarySourceSearch', () => {
     const result: PrimarySourceSearchPlanResult = {
       planStatus: 'complete',
       queries: [{ id: 'q', normalizedMode: 'all_terms', providers: [{
-        provider: 'local', status: 'ok', searched: true, page: 1, hitCount: 2, notices: [],
+        provider: 'local', status: 'ok', searched: true, page: 1, hitCount: 2, notices: [], scope,
         hits: [
           localHit('theologai://documents/doc#section-1', 1),
           localHit('javascript:alert(1)', 2),

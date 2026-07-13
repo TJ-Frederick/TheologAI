@@ -208,11 +208,11 @@ describe('biblical-language source revisions', () => {
     expect(() => assertPinnedSourceBytes(file, changed)).toThrow('Pinned source drift');
   });
 
-  it('pins the transform-5 usage-foundation D1 materialization identity', () => {
+  it('pins the transform-6 catalog-scope D1 materialization identity', () => {
     const manifest = parseDataManifest(readFileSync('data/data-manifest.json'));
     expect(computeD1CorpusIdentity(manifest))
-      .toBe('93ae4ca3c09493cf02a6b48154c991c133fd6ce235119fc4b8cba0256a36f881');
-    expect(manifest.materializations.d1.transformVersion).toBe(5);
+      .toBe('c334b4b91c3a7c334a9425937c7f99473f27014ddae6cea377ee38bd578a6707');
+    expect(manifest.materializations.d1.transformVersion).toBe(6);
     for (const provenanceOnly of [
       'data/biblical-languages/SOURCE.json',
       'data/biblical-languages/UNICODE-CORRECTION.json',

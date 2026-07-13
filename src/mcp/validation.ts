@@ -109,7 +109,7 @@ const PROMPT_ARGUMENTS = {
   'passage-exegesis': { required: ['reference'], allowed: ['reference', 'translation'] },
   'compare-translations': { required: ['reference'], allowed: ['reference', 'translations'] },
   'confession-study': { required: ['topic'], allowed: ['topic', 'traditions'] },
-  'primary-source-research': { required: ['topic'], allowed: ['topic', 'work', 'maxSections'] },
+  'primary-source-research': { required: ['topic'], allowed: ['topic', 'work', 'authors', 'startYear', 'endYear', 'maxSections'] },
   donate: { required: [], allowed: [] },
 } as const;
 
@@ -182,8 +182,32 @@ export function validatePromptArguments(
         throw new McpError(ErrorCode.InvalidParams, 'Argument "work" for prompt "primary-source-research" must be between 1 and 160 characters');
       }
     }
+    if (stringValues.authors !== undefined) {
+      const authors = stringValues.authors.split(',').map(value => value.trim()).filter(Boolean);
+      if (authors.length < 1 || authors.length > 4 || authors.some(value => Array.from(value).length > 100)) {
+        throw new McpError(ErrorCode.InvalidParams, 'Argument "authors" for prompt "primary-source-research" must contain 1 to 4 comma-separated canonical creator names');
+      }
+    }
+    const startYear = promptYear(stringValues.startYear, 'startYear');
+    const endYear = promptYear(stringValues.endYear, 'endYear');
+    if (startYear !== undefined && endYear !== undefined && startYear > endYear) {
+      throw new McpError(ErrorCode.InvalidParams, 'Argument "startYear" for prompt "primary-source-research" must be less than or equal to endYear');
+    }
     if (stringValues.maxSections !== undefined && !/^[1-5]$/.test(stringValues.maxSections.trim())) {
       throw new McpError(ErrorCode.InvalidParams, 'Argument "maxSections" for prompt "primary-source-research" must be a string integer from 1 to 5');
     }
   }
+}
+
+function promptYear(value: string | undefined, name: string): number | undefined {
+  if (value === undefined) return undefined;
+  const normalized = value.trim();
+  if (!/^-?\d{1,4}$/.test(normalized)) {
+    throw new McpError(ErrorCode.InvalidParams, `Argument "${name}" for prompt "primary-source-research" must be an integer year`);
+  }
+  const year = Number(normalized);
+  if (!Number.isSafeInteger(year) || year < -5000 || year > 3000) {
+    throw new McpError(ErrorCode.InvalidParams, `Argument "${name}" for prompt "primary-source-research" must be from -5000 to 3000`);
+  }
+  return year;
 }

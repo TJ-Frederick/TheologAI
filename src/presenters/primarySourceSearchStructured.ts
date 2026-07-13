@@ -13,6 +13,7 @@ export const PRIMARY_SOURCE_EVIDENCE_POLICY = {
   selectedSectionAccess: 'mcp_resource_read',
   coverageScope: 'bounded_non_exhaustive',
   editionProvenance: 'incomplete',
+  lookupAliasUse: 'exact_routing_only_not_metadata_evidence',
 } as const;
 
 export interface PresentedLocalPrimarySourceHit extends PresentedPrimarySourceHitBase {
@@ -40,6 +41,9 @@ interface PresentedPrimarySourceHitBase {
   attribution: string;
   documentType?: string;
   documentDate?: string;
+  creators?: Array<{ name: string; role: 'author' | 'issuing_body' | 'drafting_body' | 'revising_body' | 'compiler' }>;
+  metadataStatus?: 'reviewed' | 'anonymous' | 'collective' | 'unknown';
+  metadataProvenanceIds?: string[];
 }
 
 export interface PresentedPrimarySourceProvider {
@@ -50,6 +54,13 @@ export interface PresentedPrimarySourceProvider {
   hitCount: number;
   hits: PresentedPrimarySourceHit[];
   notices: string[];
+  scope?: {
+    status: 'matched' | 'catalog_miss' | 'metadata_incomplete';
+    requested: { work?: string; author?: string; startYear?: number; endYear?: number };
+    eligibleDocumentCount: number;
+    eligibleDocuments: Array<{ id: string; title: string; metadataStatus: 'reviewed' | 'anonymous' | 'collective' | 'unknown' }>;
+    eligibleDocumentsTruncated: boolean;
+  };
 }
 
 export interface PresentedPrimarySourceQuery {
@@ -59,7 +70,7 @@ export interface PresentedPrimarySourceQuery {
 }
 
 export interface PresentedPrimarySourceSearch extends Record<string, unknown> {
-  schemaVersion: '1';
+  schemaVersion: '2';
   kind: 'primary_source_search';
   planStatus: 'complete' | 'partial' | 'unavailable';
   queries: PresentedPrimarySourceQuery[];
@@ -107,13 +118,16 @@ export function presentPrimarySourceSearch(result: PrimarySourceSearchPlanResult
         });
         const omitted = provider.hits.length - hits.length;
         const countMismatch = provider.hitCount !== provider.hits.length;
-        const downgraded = omitted > 0 || countMismatch || providerGroupsOmitted;
+        const scope = provider.provider === 'local' ? presentScope(provider.scope) : undefined;
+        const scopeInvalid = provider.provider === 'local' && !scope;
+        const downgraded = omitted > 0 || countMismatch || providerGroupsOmitted || scopeInvalid;
         const notices = [...provider.notices];
         if (omitted > 0) {
           notices.push(`${omitted} ${provider.provider} hit${omitted === 1 ? '' : 's'} omitted because the locator, group attribution, or bounded metadata was invalid.`);
         }
         if (countMismatch) notices.push('Provider-reported hit count did not match its returned hit array.');
         if (providerGroupsOmitted) notices.push('One or more provider groups were omitted because the query exceeded the public provider-group limit.');
+        if (scopeInvalid) notices.push('Local catalog scope metadata was absent or invalid.');
         return {
           provider: provider.provider,
           status: downgraded ? 'interface_changed' as const : provider.status,
@@ -122,6 +136,9 @@ export function presentPrimarySourceSearch(result: PrimarySourceSearchPlanResult
           hitCount: hits.length,
           hits,
           notices: uniqueBounded(notices, 16, 500),
+          ...(provider.provider === 'local'
+            ? { scope: scope ?? { status: 'metadata_incomplete' as const, requested: {}, eligibleDocumentCount: 0, eligibleDocuments: [], eligibleDocumentsTruncated: false } }
+            : {}),
         };
       }),
     };
@@ -141,7 +158,7 @@ export function presentPrimarySourceSearch(result: PrimarySourceSearchPlanResult
         ? 'unavailable'
         : 'partial';
   return {
-    schemaVersion: '1',
+    schemaVersion: '2',
     kind: 'primary_source_search',
     planStatus,
     queries,
@@ -166,7 +183,7 @@ export function presentPrimarySourceSearch(result: PrimarySourceSearchPlanResult
   };
 }
 
-const COMPLETE_STATUSES = new Set<PrimarySourceProviderStatus>(['ok', 'no_results']);
+const COMPLETE_STATUSES = new Set<PrimarySourceProviderStatus>(['ok', 'no_results', 'catalog_miss']);
 const UNAVAILABLE_STATUSES = new Set<PrimarySourceProviderStatus>(['unavailable', 'disabled', 'rate_limited', 'interface_changed']);
 
 function presentHit(
@@ -178,6 +195,14 @@ function presentHit(
   // Never repair or relabel a mismatched upstream result: omitting it causes
   // the enclosing provider to be downgraded to interface_changed.
   if (hit.queryId !== expectedQueryId || hit.provider !== expectedProvider) return undefined;
+
+  const creators = hit.creators?.slice(0, 8).flatMap(creator => {
+    const name = boundedText(creator.name, 160);
+    const role = creator.role;
+    return name && CREATOR_ROLES.has(role) ? [{ name, role }] : [];
+  });
+  const metadataProvenanceIds = [...new Set((hit.metadataProvenanceIds ?? [])
+    .filter(id => /^hist-meta-[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id)))].slice(0, 4);
 
   const common = {
     queryId: boundedText(hit.queryId, 40),
@@ -191,6 +216,11 @@ function presentHit(
     attribution: boundedText(hit.attribution, 300),
     ...(hit.documentType ? { documentType: boundedText(hit.documentType, 100) } : {}),
     ...(hit.documentDate ? { documentDate: boundedText(hit.documentDate, 100) } : {}),
+    ...(creators?.length ? { creators } : {}),
+    ...(hit.metadataStatus && ['reviewed', 'anonymous', 'collective', 'unknown'].includes(hit.metadataStatus)
+      ? { metadataStatus: hit.metadataStatus }
+      : {}),
+    ...(metadataProvenanceIds.length ? { metadataProvenanceIds } : {}),
   };
   if (!common.queryId || !common.title || !common.attribution
     || !Number.isSafeInteger(common.rankWithinProvider) || common.rankWithinProvider < 1 || common.rankWithinProvider > 32
@@ -226,6 +256,8 @@ function presentHit(
   return undefined;
 }
 
+const CREATOR_ROLES = new Set(['author', 'issuing_body', 'drafting_body', 'revising_body', 'compiler'] as const);
+
 function boundedText(value: string, maximum: number): string {
   return Array.from(value.normalize('NFC')
     .replace(/[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u202A-\u202E\u2066-\u2069]/g, ' ')
@@ -243,7 +275,40 @@ function countHits(providers: PresentedPrimarySourceProvider[]): number {
 
 function aggregateStatus(providers: PresentedPrimarySourceProvider[]): PrimarySourceProviderStatus {
   const priority: PrimarySourceProviderStatus[] = [
-    'unavailable', 'rate_limited', 'interface_changed', 'disabled', 'unsupported_filter', 'ok', 'no_results',
+    'unavailable', 'rate_limited', 'interface_changed', 'disabled', 'unsupported_filter', 'ok', 'catalog_miss', 'no_results',
   ];
   return priority.find(status => providers.some(provider => provider.status === status)) ?? 'unavailable';
+}
+
+function presentScope(scope: PrimarySourceSearchPlanResult['queries'][number]['providers'][number]['scope']): PresentedPrimarySourceProvider['scope'] | undefined {
+  if (!scope || !['matched', 'catalog_miss', 'metadata_incomplete'].includes(scope.status)
+    || !Number.isSafeInteger(scope.eligibleDocumentCount) || scope.eligibleDocumentCount < 0 || scope.eligibleDocumentCount > 17) return undefined;
+  const eligibleDocuments = scope.eligibleDocuments.slice(0, 8).flatMap(document => {
+    const id = boundedText(document.id, 160);
+    const title = boundedText(document.title, 300);
+    return id && title && ['reviewed', 'anonymous', 'collective', 'unknown'].includes(document.metadataStatus)
+      ? [{ id, title, metadataStatus: document.metadataStatus }]
+      : [];
+  });
+  const work = scope.requested.work ? boundedText(scope.requested.work, 160) : undefined;
+  const author = scope.requested.author ? boundedText(scope.requested.author, 100) : undefined;
+  const startYear = scope.requested.startYear;
+  const endYear = scope.requested.endYear;
+  if ((scope.requested.work !== undefined && !work) || (scope.requested.author !== undefined && !author)
+    || (startYear !== undefined && (!Number.isSafeInteger(startYear) || startYear < -5000 || startYear > 3000))
+    || (endYear !== undefined && (!Number.isSafeInteger(endYear) || endYear < -5000 || endYear > 3000))
+    || (startYear !== undefined && endYear !== undefined && startYear > endYear)) return undefined;
+  const requested = {
+    ...(work ? { work } : {}),
+    ...(author ? { author } : {}),
+    ...(startYear !== undefined ? { startYear } : {}),
+    ...(endYear !== undefined ? { endYear } : {}),
+  };
+  return {
+    status: scope.status,
+    requested,
+    eligibleDocumentCount: scope.eligibleDocumentCount,
+    eligibleDocuments,
+    eligibleDocumentsTruncated: scope.eligibleDocumentsTruncated || scope.eligibleDocuments.length > eligibleDocuments.length,
+  };
 }

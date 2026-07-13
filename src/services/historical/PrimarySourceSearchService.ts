@@ -16,8 +16,8 @@ const MAX_QUERIES = 4;
 const MAX_CCEL_QUERIES = 3;
 const MAX_TOTAL_HITS = 32;
 const QUERY_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$/;
-const QUERY_KEYS = new Set(['id', 'text', 'providers', 'match', 'author', 'work', 'page', 'limit']);
-const COMPLETE_STATUSES = new Set<PrimarySourceProviderStatus>(['ok', 'no_results']);
+const QUERY_KEYS = new Set(['id', 'text', 'providers', 'match', 'author', 'work', 'startYear', 'endYear', 'page', 'limit']);
+const COMPLETE_STATUSES = new Set<PrimarySourceProviderStatus>(['ok', 'no_results', 'catalog_miss']);
 const UNAVAILABLE_STATUSES = new Set<PrimarySourceProviderStatus>(['unavailable', 'disabled', 'rate_limited', 'interface_changed']);
 
 export interface PrimarySourceSearchServiceOptions {
@@ -73,9 +73,16 @@ export class PrimarySourceSearchService {
       limit: query.limit,
       ...(query.author ? { author: query.author } : {}),
       ...(query.work ? { work: query.work } : {}),
+      ...(query.startYear !== undefined ? { startYear: query.startYear } : {}),
+      ...(query.endYear !== undefined ? { endYear: query.endYear } : {}),
     };
     let result: PrimarySourceProviderResult;
-    if (provider === 'ccel' && !this.options.ccelLiveSearch) {
+    if (provider === 'ccel' && (query.startYear !== undefined || query.endYear !== undefined)) {
+      result = {
+        provider: 'ccel_live', status: 'unsupported_filter', searched: false, page: query.page,
+        hitCount: 0, hits: [], notices: ['Live CCEL discovery does not expose reviewed composition-date bounds; the date restriction was not ignored.'],
+      };
+    } else if (provider === 'ccel' && !this.options.ccelLiveSearch) {
       result = {
         provider: 'ccel_live', status: 'disabled', searched: false, page: query.page,
         hitCount: 0, hits: [], notices: ['Live CCEL search is disabled. No remote request was made.'],
@@ -103,6 +110,8 @@ export class PrimarySourceSearchService {
 interface NormalizedPlanQuery extends Required<Pick<PrimarySourceSearchPlanQuery, 'id' | 'text' | 'providers' | 'match' | 'page' | 'limit'>> {
   author?: string;
   work?: string;
+  startYear?: number;
+  endYear?: number;
 }
 
 function validatePlan(input: unknown): NormalizedPlanQuery[] {
@@ -146,6 +155,11 @@ function validateQuery(input: unknown, index: number): NormalizedPlanQuery {
   if (!Number.isSafeInteger(limit) || (limit as number) < 1 || (limit as number) > 8) throw new ValidationError(`${path}.limit`, 'limit must be an integer from 1 to 8.');
   const author = query.author === undefined ? undefined : normalizeLiteral(query.author, `${path}.author`, 100);
   const work = query.work === undefined ? undefined : normalizeLiteral(query.work, `${path}.work`, 160);
+  const startYear = query.startYear === undefined ? undefined : normalizeYear(query.startYear, `${path}.startYear`);
+  const endYear = query.endYear === undefined ? undefined : normalizeYear(query.endYear, `${path}.endYear`);
+  if (startYear !== undefined && endYear !== undefined && startYear > endYear) {
+    throw new ValidationError(`${path}.startYear`, 'startYear must be less than or equal to endYear.');
+  }
   return {
     id: query.id,
     text,
@@ -155,7 +169,16 @@ function validateQuery(input: unknown, index: number): NormalizedPlanQuery {
     limit: limit as number,
     ...(author ? { author } : {}),
     ...(work ? { work } : {}),
+    ...(startYear !== undefined ? { startYear } : {}),
+    ...(endYear !== undefined ? { endYear } : {}),
   };
+}
+
+function normalizeYear(value: unknown, field: string): number {
+  if (!Number.isSafeInteger(value) || (value as number) < -5000 || (value as number) > 3000) {
+    throw new ValidationError(field, `${field} must be a safe integer from -5000 to 3000.`);
+  }
+  return value as number;
 }
 
 function normalizeLiteral(value: unknown, field: string, maximum: number): string {
@@ -182,6 +205,6 @@ function enforceAggregateHitBudget(queries: PrimarySourcePlanQueryResult[]): voi
 }
 
 function aggregateStatus(results: PrimarySourcePlanProviderResult[]): PrimarySourceProviderStatus {
-  const priority: PrimarySourceProviderStatus[] = ['unavailable', 'rate_limited', 'interface_changed', 'disabled', 'unsupported_filter', 'ok', 'no_results'];
+  const priority: PrimarySourceProviderStatus[] = ['unavailable', 'rate_limited', 'interface_changed', 'disabled', 'unsupported_filter', 'catalog_miss', 'ok', 'no_results'];
   return priority.find(status => results.some(result => result.status === status)) ?? 'unavailable';
 }

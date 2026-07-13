@@ -18,6 +18,7 @@ export type PrimarySourceProviderStatus =
   | 'disabled'
   | 'rate_limited'
   | 'interface_changed'
+  | 'catalog_miss'
   | 'unsupported_filter';
 
 export interface PrimarySourceSearchQuery {
@@ -25,6 +26,8 @@ export interface PrimarySourceSearchQuery {
   match?: PrimarySourceSearchMatch;
   author?: string;
   work?: string;
+  startYear?: number;
+  endYear?: number;
   page?: number;
   limit?: number;
 }
@@ -58,6 +61,22 @@ interface PrimarySourceSearchHitBase {
   /** Reviewed catalog metadata. Absence means unknown, not that the work has no type/date. */
   documentType?: string;
   documentDate?: string;
+  creators?: Array<{ name: string; role: 'author' | 'issuing_body' | 'drafting_body' | 'revising_body' | 'compiler' }>;
+  metadataStatus?: 'reviewed' | 'anonymous' | 'collective' | 'unknown';
+  /** Stable IDs into the checked-in historical metadata provenance manifest. */
+  metadataProvenanceIds?: string[];
+}
+
+export interface PrimarySourceCatalogScope {
+  status: 'matched' | 'catalog_miss' | 'metadata_incomplete';
+  requested: { work?: string; author?: string; startYear?: number; endYear?: number };
+  eligibleDocumentCount: number;
+  eligibleDocuments: Array<{
+    id: string;
+    title: string;
+    metadataStatus: 'reviewed' | 'anonymous' | 'collective' | 'unknown';
+  }>;
+  eligibleDocumentsTruncated: boolean;
 }
 
 export interface LocalPrimarySourceSearchHit extends PrimarySourceSearchHitBase {
@@ -119,4 +138,5 @@ export interface PrimarySourceProviderResult {
   hitCount: number;
   hits: PrimarySourceSearchHit[];
   notices: string[];
+  scope?: PrimarySourceCatalogScope;
 }

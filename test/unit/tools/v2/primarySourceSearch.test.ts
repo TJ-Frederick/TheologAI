@@ -3,26 +3,31 @@ import { createPrimarySourceSearchHandler } from '../../../../src/tools/v2/prima
 import { validatorFor } from '../../../../src/mcp/validation.js';
 
 describe('primary_source_search handler', () => {
+  const scope = {
+    status: 'matched' as const, requested: {}, eligibleDocumentCount: 1,
+    eligibleDocuments: [{ id: 'institutes', title: 'Institutes', metadataStatus: 'reviewed' as const }],
+    eligibleDocumentsTruncated: false,
+  };
   it('advertises the exact closed bounded plan schema and read-only annotations', () => {
     const handler = createPrimarySourceSearchHandler({ search: vi.fn() } as any);
     expect(handler.name).toBe('primary_source_search');
     expect(handler.outputSchema).toMatchObject({
       type: 'object', additionalProperties: false,
       properties: {
-        schemaVersion: { const: '1' },
+        schemaVersion: { const: '2' },
         kind: { const: 'primary_source_search' },
       },
     });
     expect(handler.inputSchema).toMatchObject({ type: 'object', required: ['queries'], additionalProperties: false });
     expect(handler.inputSchema.properties?.queries).toMatchObject({ minItems: 1, maxItems: 4 });
     expect(handler.annotations).toEqual({ readOnlyHint: true, destructiveHint: false, idempotentHint: true });
-    expect(handler.description).toContain('exact local section locators only');
+    expect(handler.description).toContain('exact local section locators');
     const item = (handler.inputSchema.properties?.queries as any).items;
     expect(item.required).toEqual(['id', 'text', 'providers']);
     expect(item.properties.providers).toMatchObject({ maxItems: 1, items: { enum: ['local'] } });
-    expect(item.properties.author.description).toContain('unsupported_filter');
+    expect(item.properties.author.description).toContain('separate query-plan items');
     expect(item.properties.page.description).toContain('only page 1');
-    expect(handler.description).toContain('does not retrieve or republish CCEL document bodies');
+    expect(handler.description).toContain('composition-year ranges');
     const validate = validatorFor(handler.inputSchema);
     expect(validate({ queries: [{ id: 'local', text: 'faith', providers: ['local'], author: 'Calvin', page: 2 }] }).valid).toBe(true);
     expect(validate({ queries: [{ id: 'remote', text: 'faith', providers: ['ccel'] }] }).valid).toBe(false);
@@ -46,6 +51,7 @@ describe('primary_source_search handler', () => {
     const query = (providers: any[]) => [{ id: 'q', normalizedMode: 'all_terms', providers }];
     const provider = (name: 'local' | 'ccel_live', status: string, searched: boolean) => ({
       provider: name, status, searched, page: 1, hitCount: 0, hits: [], notices: [],
+      ...(name === 'local' ? { scope } : {}),
     });
     const coverage = { localAttempted: false, localHitCount: 0, ccelAttempted: false, ccelHitCount: 0, notices: [] };
     const service = { search: vi.fn()
@@ -71,7 +77,7 @@ describe('primary_source_search handler', () => {
       planStatus: 'complete',
       queries: [{
         id: 'q1', normalizedMode: 'all_terms',
-        providers: [{ provider: 'local', status: 'ok', searched: true, page: 1, hitCount: 2, hits: [hit, { ...hit }], notices: [] }],
+        providers: [{ provider: 'local', status: 'ok', searched: true, page: 1, hitCount: 2, hits: [hit, { ...hit }], notices: [], scope }],
       }],
       coverage: { localAttempted: true, localStatus: 'ok', localHitCount: 2, ccelAttempted: false, ccelHitCount: 0, notices: [] },
     }) };
@@ -91,10 +97,11 @@ describe('primary_source_search handler', () => {
       annotations: { audience: ['assistant'] },
     }]);
     expect(result.structuredContent).toMatchObject({
-      schemaVersion: '1', kind: 'primary_source_search',
+      schemaVersion: '2', kind: 'primary_source_search',
       evidencePolicy: {
         snippetUse: 'discovery_only', selectedSectionAccess: 'mcp_resource_read',
         coverageScope: 'bounded_non_exhaustive', editionProvenance: 'incomplete',
+        lookupAliasUse: 'exact_routing_only_not_metadata_evidence',
       },
     });
     expect(validatorFor(handler.outputSchema!)(result.structuredContent).valid).toBe(true);
@@ -104,7 +111,7 @@ describe('primary_source_search handler', () => {
     const service = { search: vi.fn().mockResolvedValue({
       planStatus: 'complete',
       queries: [{ id: 'q1', normalizedMode: 'phrase', providers: [{
-        provider: 'local', status: 'ok', searched: true, page: 1, hitCount: 2, notices: [],
+        provider: 'local', status: 'ok', searched: true, page: 1, hitCount: 2, notices: [], scope,
         hits: [{
           queryId: 'q1', provider: 'local', title: 'Forged', snippet: 'snippet',
           locator: { kind: 'local_section', documentId: '../secret', sectionId: '1', url: 'https://evil.test' },
@@ -154,7 +161,7 @@ describe('primary_source_search handler', () => {
     const service = { search: vi.fn().mockResolvedValue({
       planStatus: 'complete',
       queries: [{ id: 'q1', normalizedMode: 'phrase', providers: [{
-        provider: 'local', status: 'ok', searched: true, page: 1, hitCount: 4, notices: [],
+        provider: 'local', status: 'ok', searched: true, page: 1, hitCount: 4, notices: [], scope,
         hits: [
           validLocalHit,
           { ...validLocalHit, queryId: 'q2', title: 'Foreign query evidence', rankWithinProvider: 2 },
@@ -194,7 +201,7 @@ describe('primary_source_search handler', () => {
 
   it('fails closed when a service returns excess query groups', async () => {
     const emptyLocalProvider = {
-      provider: 'local', status: 'no_results', searched: true, page: 1, hitCount: 0, hits: [], notices: [],
+      provider: 'local', status: 'no_results', searched: true, page: 1, hitCount: 0, hits: [], notices: [], scope,
     } as const;
     const omittedHit = {
       queryId: 'q5', provider: 'local', title: 'Omitted fifth-query evidence', snippet: 'Must not leak.',
@@ -234,7 +241,7 @@ describe('primary_source_search handler', () => {
 
   it('fails closed when a query returns excess provider groups', async () => {
     const emptyLocalProvider = {
-      provider: 'local', status: 'no_results', searched: true, page: 1, hitCount: 0, hits: [], notices: [],
+      provider: 'local', status: 'no_results', searched: true, page: 1, hitCount: 0, hits: [], notices: [], scope,
     } as const;
     const omittedHit = {
       queryId: 'q1', provider: 'local', title: 'Omitted third-provider evidence', snippet: 'Must not leak.',

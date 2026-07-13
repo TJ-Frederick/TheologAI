@@ -33,7 +33,7 @@ Migration `0003_original_language_usage.sql` is schema-only. The database
 builder materializes the aggregates from the same pinned, corrected source used
 for `morphology`; D1 receives them through the ordered deterministic seed.
 
-The reviewed corpus contract is:
+The usage-foundation slice's reviewed baseline contract is:
 
 - schema `0003_original_language_usage`;
 - materialization transform version `5`;
@@ -45,6 +45,12 @@ The reviewed corpus contract is:
 - 13,836 usage rows, 57,781 book rows, and 138,293 exact surface-form rows;
 - 1,069,506 total seeded rows across 17 manifest tables; and
 - 36 ordered seed files.
+
+The later historical-catalog integration advances the whole D1 materialization
+to transform `6` and identity
+`c334b4b91c3a7c334a9425937c7f99473f27014ddae6cea377ee38bd578a6707`.
+That unrelated metadata input does not change the scoped morphology-usage
+identity above, its result semantics, or existing usage cursors.
 
 Readiness verifies canonical book order, exact columns and indexes, aggregate
 token conservation, complete Strong's-key coverage, first-occurrence evidence,

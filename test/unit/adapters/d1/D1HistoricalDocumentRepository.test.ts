@@ -232,7 +232,7 @@ describe('D1HistoricalDocumentRepository', () => {
       };
       const db = createSimpleD1([row]);
       const result = await new D1HistoricalDocumentRepository(db as any).searchPrimarySources({
-        text: 'grace OR faith', match: 'all_terms', documentId: 'nicene-creed', limit: 8,
+        text: 'grace OR faith', match: 'all_terms', documentIds: ['nicene-creed'], limit: 8,
       });
       expect(db.prepare.mock.results[0].value.bind).toHaveBeenCalledWith('"grace" AND "OR" AND "faith"', 'nicene-creed', 8);
       expect(result[0]).toMatchObject({

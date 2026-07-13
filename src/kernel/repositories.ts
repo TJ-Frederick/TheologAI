@@ -157,6 +157,22 @@ export interface DocumentInfo {
   type: string;
   date: string | null;
   topics: string[];
+  catalog?: HistoricalDocumentCatalogMetadata;
+}
+
+export type HistoricalMetadataStatus = 'reviewed' | 'anonymous' | 'collective' | 'unknown';
+
+export interface HistoricalDocumentCreator {
+  name: string;
+  role: 'author' | 'issuing_body' | 'drafting_body' | 'revising_body' | 'compiler';
+}
+
+export interface HistoricalDocumentCatalogMetadata {
+  lookupAliases: string[];
+  composition: { startYear?: number; endYear?: number; label: string };
+  creators: HistoricalDocumentCreator[];
+  metadataStatus: HistoricalMetadataStatus;
+  metadataProvenanceIds: string[];
 }
 
 export interface DocumentSection {
@@ -171,7 +187,7 @@ export interface DocumentSection {
 export interface PrimarySourceLocalSearchOptions {
   text: string;
   match: 'all_terms' | 'phrase';
-  documentId?: string;
+  documentIds?: string[];
   limit: number;
 }
 

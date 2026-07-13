@@ -41,6 +41,7 @@ describe('prompt-recommended tool-call contracts', () => {
     ['compare-translations', { reference: 'John 1:1', translations: 'unknown' }],
     ['confession-study', { topic: 'justification', traditions: 'Reformed, Lutheran' }],
     ['primary-source-research', { topic: "Lord's Supper", work: 'westminster-confession', maxSections: '2' }],
+    ['primary-source-research', { topic: "Lord's Supper", authors: 'Philip Melanchthon,Westminster Assembly', startYear: '1500', endYear: '1700', maxSections: '2' }],
     ['donate', undefined],
   ] as const)('%s emits only calls accepted by advertised tool schemas', (name, args) => {
     const calls = recommendedToolCallsForPrompt(name, args);
@@ -107,6 +108,17 @@ describe('prompt-recommended tool-call contracts', () => {
       topic: 'eucharist', work: 'council-of-trent', maxSections: '5',
     })[0].arguments).toMatchObject({
       queries: [{ id: 'exact-local-work', work: 'council-of-trent', providers: ['local'], limit: 5 }],
+    });
+    expect(recommendedToolCallsForPrompt('primary-source-research', {
+      topic: 'eucharist', authors: 'Erasmus of Rotterdam, Martin Luther', startYear: '1500', endYear: '1600',
+    })[0].arguments).toEqual({
+      queries: [{
+        id: 'creator-1', text: 'eucharist', providers: ['local'], match: 'all_terms',
+        author: 'Erasmus of Rotterdam', startYear: 1500, endYear: 1600, limit: 3,
+      }, {
+        id: 'creator-2', text: 'eucharist', providers: ['local'], match: 'all_terms',
+        author: 'Martin Luther', startYear: 1500, endYear: 1600, limit: 3,
+      }],
     });
   });
 });

@@ -43,6 +43,24 @@ describe('PrimarySourceSearchService', () => {
     expect(ccel.search).not.toHaveBeenCalled();
   });
 
+  it('preserves separate creator scopes and mixed unfiltered/date/work plans', async () => {
+    const local = { search: vi.fn().mockResolvedValue(providerResult('local', 'catalog_miss', 0)) };
+    const service = new PrimarySourceSearchService(local as any, { search: vi.fn() } as any, { ccelLiveSearch: false });
+    const result = await service.search(plan([
+      query({ id: 'erasmus', author: 'Erasmus of Rotterdam' }),
+      query({ id: 'luther', author: 'Martin Luther' }),
+      query({ id: 'medieval', startYear: 500, endYear: 1500 }),
+      query({ id: 'institutes', work: 'Institutes of the Christian Religion' }),
+    ]));
+    expect(result.planStatus).toBe('complete');
+    expect(local.search.mock.calls.map(([call]) => call)).toEqual([
+      expect.objectContaining({ author: 'Erasmus of Rotterdam' }),
+      expect.objectContaining({ author: 'Martin Luther' }),
+      expect.objectContaining({ startYear: 500, endYear: 1500 }),
+      expect.objectContaining({ work: 'Institutes of the Christian Religion' }),
+    ]);
+  });
+
   it('returns explicit disabled coverage for ccel-only without calling the adapter', async () => {
     const ccel = { search: vi.fn() };
     const service = new PrimarySourceSearchService({ search: vi.fn() } as any, ccel as any, { ccelLiveSearch: false });
@@ -75,6 +93,8 @@ describe('PrimarySourceSearchService', () => {
     plan([query({ text: '\u0000bad' })]),
     plan([query({ providers: ['local', 'local'] })]),
     plan([query({ match: 'all_terms', text: 'one two three four five six seven eight nine ten eleven twelve thirteen' })]),
+    plan([query({ startYear: 1600, endYear: 1500 })]),
+    plan([query({ startYear: 1500.5 })]),
     { queries: [query()], extra: true },
   ])('rejects invalid bounded plans %#', async invalid => {
     const service = new PrimarySourceSearchService({ search: vi.fn() } as any, { search: vi.fn() } as any, { ccelLiveSearch: false });
