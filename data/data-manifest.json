@@ -131,7 +131,7 @@
   "files": [
     {
       "path": "data/biblical-languages/SOURCE.json",
-      "sha256": "0f8ec59920a47b60e1804f59877a76f055dc8c3396a8b7ac5546ff231bc39ad0"
+      "sha256": "b08452232cb3a958254d1d6a226e9efe3533d5f29923b6005b38c8440e08dbad"
     },
     {
       "path": "data/biblical-languages/stepbible-lexicons/metadata.json",
