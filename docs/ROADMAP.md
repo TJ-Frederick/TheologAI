@@ -22,6 +22,9 @@ is local source context only and does not define the current product contract.
   primary-source research, normalized UBS runtime and public cutover, and
   contextual original-language study, merged as
   `639d0a02c1c666340f0e2ee3bcb4b4d5a336d9fb`.
+- **Phase 3 follow-up integration / PR #26:** pinned, reproducible
+  biblical-language source revisions plus the primary-source evidence handoff,
+  merged as `65db03e8cd02098064a748f96cca8da22c974381`.
 
 These entries describe merged repository state. Deployment state is established
 only by the relevant protected workflow and post-deployment smoke evidence; a
@@ -56,33 +59,41 @@ PR #21. Their stacked PRs #14–#20 are closed as superseded review vehicles:
    context-first workflow for one token in one verse, with morphology,
    source-separated lexical evidence, provenance, and interpretive limits.
 
-The released server advertises eleven tools and structured output for
-`bible_lookup`, `parallel_passages`, `original_language_lookup`, and
-`original_language_study`. Markdown remains available for compatibility.
+The released server advertises eleven tools, six guided prompts, and structured
+output for `bible_lookup`, `parallel_passages`, `primary_source_search`,
+`original_language_lookup`, and `original_language_study`. Markdown remains
+available for compatibility.
 
-Protected production workflow run `29257538930` deployed the PR #21 merge after
-the exact-corpus readiness gate passed. The post-deployment production audit
-passed all 84 checks. Live CCEL discovery remains intentionally disabled and is
-not part of the public MCP contract.
+PR #26 made the two formerly staged follow-up slices part of the shipped
+baseline:
 
-## Current follow-up integration candidate
+1. **Pinned biblical-language source revisions.** Immutable upstream source
+   identities, source and generated-artifact verification, and a reproducible,
+   atomic regeneration workflow with semantic-drift reporting.
+2. **Primary-source evidence handoff.** A stable, bounded structured-output
+   contract for `primary_source_search`, the local-only
+   `primary-source-research` prompt, and exact native resource links for
+   selected canonical sections. It does not enable or advertise live CCEL
+   discovery.
 
-Two independently reviewed follow-up slices are staged after the shipped PR #21
-baseline and are not yet merged or deployed:
+Protected production workflow run `29267651916` deployed the PR #26 merge after
+the release gates passed. The post-deployment production audit passed 54/54
+checks, and the focused parallel-passage audit passed 11/11 checks. Live CCEL
+discovery remains intentionally disabled and is not part of the public MCP
+contract.
 
-1. **Pinned biblical-language source revisions.** Records immutable upstream
-   source identities, verifies source and generated-artifact integrity, and adds
-   a reproducible, atomic regeneration workflow with semantic-drift reporting.
-2. **Primary-source evidence handoff.** Gives `primary_source_search` a stable,
-   bounded structured-output contract plus the local-only
-   `primary-source-research` prompt and exact native resource links for selected
-   canonical sections. It does not enable or advertise live CCEL discovery.
+## Current release candidate
 
-The follow-up integration candidate still advertises eleven tools, but expands
-structured output to `bible_lookup`, `parallel_passages`,
-`primary_source_search`, `original_language_lookup`, and
-`original_language_study`, and expands the guided prompt set from five to six.
-These candidate counts do not describe the currently deployed PR #21 server.
+**PR #27 — biblical-language Unicode correction** is the current release
+candidate. It repairs the bounded historical UTF-8 corruption against the
+pinned OpenScriptures and STEPBible evidence, records the exact correction
+ledger, and advances the D1 materialization identity without changing corpus
+row counts or the public MCP tool inventory.
+
+PR #27 is not merged or deployed. Its next operational gate is a freshly
+migrated and fully seeded preview D1 replacement, followed by the protected
+preview deployment and complete preview audit. The currently bound preview and
+production databases must not be mutated in place to make the candidate pass.
 
 ## Release gates
 
@@ -113,11 +124,11 @@ Code readiness and operational readiness are deliberately separate:
 
 ## Next work
 
-- Correct known Greek/Hebrew Unicode normalization and display defects against
-  pinned-source evidence before expanding language-study interpretation.
-- After Unicode correctness is established, add the planned advanced-usage
-  schema for occurrence counts, book distribution, attested forms, and keyset
-  cursor pagination.
+- Complete PR #27 through a fresh preview D1 replacement, protected preview
+  deployment, and functional audit before any merge or production cutover.
+- After the Unicode correction is merged and safely released, add the planned
+  advanced-usage schema for occurrence counts, book distribution, attested
+  forms, and keyset cursor pagination.
 - Broaden advanced original-language study only after those foundations, using
   carefully sourced semantic-domain and discourse evidence useful to both
   beginners and readers of Greek or Hebrew.
