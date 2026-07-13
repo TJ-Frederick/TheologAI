@@ -116,12 +116,21 @@ deployment gates before it can be called shipped.
   and the current production D1 intentionally cannot satisfy its transform-5
   readiness contract.
 - **Original-language usage output.** The public occurrence-count, attested-form,
-  book-distribution, and keyset-pagination slice exists only as a local commit.
-  It has not been pushed, opened as a PR, deployed, or released.
+  book-distribution, and keyset-pagination slice is Sol-approved and preserved
+  as local commits. Its public cursor now uses a reproducible morphology-scoped
+  identity, `c3600bb55da75aa600f8c97885efa7d58a3e8c29c3fcc6445a553091011beabd`,
+  rather than coupling language pagination to unrelated D1 data. It has not
+  been pushed, opened as a PR, deployed, or released.
 - **Primary-source catalog and scope.** Catalog-aware discovery work is local
-  and uncommitted while its authoritative metadata provenance is being
-  completed and reviewed. It has not been pushed, deployed, or released, and it
-  does not enable CCEL or publish external document bodies.
+  and Sol-approved with authoritative per-claim metadata provenance,
+  conservative date routing, and lookup-only aliases separated from historical
+  evidence. It does not enable CCEL or publish external document bodies.
+- **Combined public candidate.** Usage output and catalog scope are integrated
+  in local commit `341de01` with transform-6 whole-D1 identity
+  `c334b4b91c3a7c334a9425937c7f99473f27014ddae6cea377ee38bd578a6707`.
+  The combined suite, deterministic seed reconstruction, Workerd import,
+  runtime, E2E, and conformance checks pass. The branch remains unpushed,
+  undeployed, and unreleased until the dependency and preview gates below.
 
 ## Release gates
 
@@ -162,12 +171,12 @@ Code readiness and operational readiness are deliberately separate:
   then use a fresh transform-5 preview D1 replacement to verify occurrence
   counts, book distribution, attested forms, keyset pagination, legacy
   behavior, and stale cursor rejection.
-- Integrate the provenance-complete primary-source catalog and scope slice after
-  that usage rehearsal, preserving the reviewed metadata claims and advancing
-  the materialization identity deliberately. Rehearse the combined transform-6
-  candidate against another fresh preview database, then merge and promote the
-  integrated release only through its separately authorized production-data
-  and deployment gates.
+- After that usage rehearsal, replay the already assembled combined candidate
+  onto the reviewed stack and confirm its morphology-scoped identity remains
+  stable while the whole-D1 identity advances. Rehearse the combined
+  transform-6 candidate against another fresh preview database, then merge and
+  promote the integrated release only through its separately authorized
+  production-data and deployment gates.
 - Broaden advanced original-language study only after those foundations, using
   carefully sourced semantic-domain and discourse evidence useful to both
   beginners and readers of Greek or Hebrew.
