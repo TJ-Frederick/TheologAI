@@ -515,9 +515,12 @@ describe('classic_text_lookup handler', () => {
     expect(textOf(result)).toContain('No locally indexed historical document matches');
   });
 
-  it('does not advertise or accept the former CCEL section argument', () => {
+  it('does not advertise or accept the former CCEL section argument', async () => {
     const handler = createServices().handler;
     expect(handler.inputSchema.properties).not.toHaveProperty('section');
+    const result = await handler.handler({ work: 'augustine/confessions', section: 'book-one' });
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toContain('Unknown argument "section"');
   });
 
   it('returns local search results', async () => {

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createPrimarySourceSearchHandler } from '../../../../src/tools/v2/primarySourceSearch.js';
+import { validatorFor } from '../../../../src/mcp/validation.js';
 
 describe('primary_source_search handler', () => {
   it('advertises the exact closed bounded plan schema and read-only annotations', () => {
@@ -15,6 +16,9 @@ describe('primary_source_search handler', () => {
     expect(item.properties.author.description).toContain('unsupported_filter');
     expect(item.properties.page.description).toContain('only page 1');
     expect(handler.description).toContain('does not retrieve or republish CCEL document bodies');
+    const validate = validatorFor(handler.inputSchema);
+    expect(validate({ queries: [{ id: 'local', text: 'faith', providers: ['local'], author: 'Calvin', page: 2 }] }).valid).toBe(true);
+    expect(validate({ queries: [{ id: 'remote', text: 'faith', providers: ['ccel'] }] }).valid).toBe(false);
   });
 
   it('forces every public query through the local provider', async () => {
