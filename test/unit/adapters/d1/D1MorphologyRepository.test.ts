@@ -51,6 +51,24 @@ describe('D1MorphologyRepository', () => {
       expect(result).toBe('Verb Qal Perfect 3rd Masculine Singular');
     });
 
+    it('uses the same strict slash-delimited Hebrew expansion as Node', async () => {
+      const db = createSimpleD1([], null);
+      const repo = new D1MorphologyRepository(db as any);
+      await expect(repo.expandMorphCode('HTd/Ncfsa'))
+        .resolves.toBe('Particle Definite Article / Noun Common Feminine Singular Absolute');
+      await expect(repo.expandMorphCode('HTd/Ncfsa/UNKNOWN')).resolves.toBeUndefined();
+    });
+
+    it('uses the same documented TEHMC extensions as Node', async () => {
+      const db = createSimpleD1([], null);
+      const repo = new D1MorphologyRepository(db as any);
+      await expect(repo.expandMorphCode('Hc/Vqw3ms'))
+        .resolves.toBe('Sequential Conjunction / Verb Qal Sequential Imperfect 3rd Masculine Singular');
+      await expect(repo.expandMorphCode('HTc')).resolves.toBe('Particle Condition or Consequence');
+      await expect(repo.expandMorphCode('HNpl')).resolves.toBe('Noun Proper Name Location');
+      await expect(repo.expandMorphCode('HNpt')).resolves.toBe('Noun Proper Name Title');
+    });
+
     it('returns undefined for non-Hebrew code when DB returns null', async () => {
       const db = createSimpleD1([], null);
       const repo = new D1MorphologyRepository(db as any);

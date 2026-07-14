@@ -209,6 +209,49 @@ describe('StrongsService', () => {
       expect(result.pronunciation).toBeUndefined();
       expect(result.derivation).toBeUndefined();
     });
+
+    it('normalizes OpenScriptures derivation JSON into readable canonical references', async () => {
+      const repo = makeMockRepo();
+      repo.lookup.mockReturnValue({
+        ...mockEntry,
+        derivation: JSON.stringify({
+          _: 'from  (as a negative particle) and ;',
+          strongsref: [
+            { $: { language: 'GREEK', strongs: '1' } },
+            { $: { language: 'GREEK', strongs: '0922' } },
+          ],
+        }),
+      });
+      const result = await new StrongsService(repo as any).lookup('G26');
+      expect(result.derivation).toBe('from G1 (as a negative particle) and G922;');
+      expect(result.derivation).not.toContain('{');
+    });
+
+    it('normalizes a cross-language OpenScriptures reference and preserves plain text', async () => {
+      const repo = makeMockRepo();
+      repo.lookup.mockReturnValue({
+        ...mockEntry,
+        derivation: '{"_":"of Hebrew origin ();","strongsref":[{"$":{"language":"HEBREW","strongs":"0175"}}]}',
+      });
+      await expect(new StrongsService(repo as any).lookup('G26'))
+        .resolves.toMatchObject({ derivation: 'of Hebrew origin (H175);' });
+
+      repo.lookup.mockReturnValue({ ...mockEntry, derivation: '  a primary word;  ' });
+      await expect(new StrongsService(repo as any).lookup('G26'))
+        .resolves.toMatchObject({ derivation: 'a primary word;' });
+    });
+
+    it.each([
+      '{not json',
+      '{"unexpected":"shape"}',
+      '{"_":"from ;","strongsref":[{"$":{"language":"UNKNOWN","strongs":"1"}}]}',
+      '{"_":"from ;","strongsref":[{"$":{"language":"GREEK","strongs":"0"}}]}',
+    ])('omits malformed or unknown OpenScriptures derivation JSON (%s)', async derivation => {
+      const repo = makeMockRepo();
+      repo.lookup.mockReturnValue({ ...mockEntry, derivation });
+      await expect(new StrongsService(repo as any).lookup('G26'))
+        .resolves.toMatchObject({ derivation: undefined });
+    });
   });
 
   describe('search', () => {

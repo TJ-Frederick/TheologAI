@@ -39,6 +39,10 @@ describe('MorphologyRepository', () => {
     const repo = new MorphologyRepository(db.asDatabase());
     expect(repo.expandMorphCode('PREP')).toBe('preposition');
     expect(repo.expandMorphCode('HVqp3ms')).toBe('Verb Qal Perfect 3rd Masculine Singular');
+    expect(repo.expandMorphCode('HTd/Ncmpa')).toBe('Particle Definite Article / Noun Common Masculine Plural Absolute');
+    expect(repo.expandMorphCode('Hc/Vqw3ms')).toBe('Sequential Conjunction / Verb Qal Sequential Imperfect 3rd Masculine Singular');
+    expect(repo.expandMorphCode('HNpl')).toBe('Noun Proper Name Location');
+    expect(repo.expandMorphCode('HTd/Ncmpa/UNKNOWN')).toBeUndefined();
     expect(repo.expandMorphCode('???')).toBeUndefined();
   });
 

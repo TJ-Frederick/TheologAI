@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { MorphologyService } from '../../../../src/services/languages/MorphologyService.js';
 import { NotFoundError, ValidationError } from '../../../../src/kernel/errors.js';
 import type { MorphWord } from '../../../../src/adapters/data/MorphologyRepository.js';
+import { expandHebrewMorphCode } from '../../../../src/adapters/shared/hebrewMorphExpander.js';
 
 // ── Mock repository ──
 
@@ -122,6 +123,17 @@ describe('MorphologyService', () => {
         source: 'STEPBible TBESH Hebrew lexicon',
         copyright: 'CC BY 4.0 (Tyndale House, Cambridge)',
       });
+    });
+
+    it('propagates compound Hebrew morphology expansion into verse output', async () => {
+      const repo = makeMockRepo();
+      repo.getVerseMorphology.mockReturnValue([
+        { position: 5, word_text: 'הַ/שָּׁמַ֖יִם', lemma: 'שָׁמַיִם', strongs_number: 'H8064', morph_code: 'HTd/Ncmpa', gloss: 'the/ heavens' },
+      ]);
+      repo.expandMorphCode.mockImplementation(expandHebrewMorphCode);
+      const result = await new MorphologyService(repo as any).getVerseMorphology('Genesis 1:1', true);
+      expect(result.words[0].morphExpanded)
+        .toBe('Particle Definite Article / Noun Common Masculine Plural Absolute');
     });
   });
 

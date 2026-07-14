@@ -64,7 +64,7 @@ export class StrongsService {
       transliteration: entry.transliteration ?? undefined,
       pronunciation: entry.pronunciation ?? undefined,
       definition: entry.definition,
-      derivation: entry.derivation ?? undefined,
+      derivation: normalizeOpenScripturesDerivation(entry.derivation),
       citation: CITATION,
     };
 
@@ -242,5 +242,122 @@ function stringValue(value: unknown): string | undefined {
 }
 
 function isSenseRecord(value: unknown): value is NonNullable<EnhancedStrongsResult['extended']>['senses'] {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+const DERIVATION_KEYS = new Set(['_', 'strongsref', 'greek', 'latin', 'pronunciation']);
+
+/**
+ * OpenScriptures XML is stored by the build pipeline as either readable text
+ * or an xml2js-shaped JSON string. Normalize that storage detail at the
+ * service boundary so every consumer (tools, studies, and resources) receives
+ * human text. Unknown or malformed JSON is omitted rather than exposed or
+ * interpreted speculatively.
+ */
+function normalizeOpenScripturesDerivation(value: string | null): string | undefined {
+  const raw = value?.trim();
+  if (!raw) return undefined;
+  if (!raw.startsWith('{') && !raw.startsWith('[')) return raw;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return undefined;
+  }
+  if (!isRecord(parsed) || Object.keys(parsed).some(key => !DERIVATION_KEYS.has(key))) return undefined;
+
+  const note = stringValue(parsed._);
+  if (!note) return undefined;
+  const references = parseDerivationReferences(parsed.strongsref);
+  if (references === undefined) return undefined;
+  const forms = parseLexicalForms(parsed.greek, parsed.latin);
+  if (forms === undefined || !validPronunciations(parsed.pronunciation)) return undefined;
+
+  let readableNote = normalizeDerivationNote(note);
+  if (references.length > 0 && forms.length === 0) {
+    const placeholders = [...readableNote.matchAll(/\(\s*\)| {2,}| (?=[;,)])/g)];
+    if (placeholders.length === references.length) {
+      let index = 0;
+      readableNote = readableNote.replace(/\(\s*\)| {2,}| (?=[;,)])/g, placeholder => {
+        const reference = references[index++];
+        if (placeholder.startsWith('(')) return `(${reference})`;
+        const punctuation = placeholder.trimStart();
+        return punctuation ? ` ${reference}${punctuation}` : ` ${reference} `;
+      });
+    }
+  }
+
+  readableNote = cleanDerivationPunctuation(readableNote);
+  const additions: string[] = [];
+  if (forms.length > 0) additions.push(`Related forms: ${forms.join(', ')}`);
+  if (references.length > 0 && !references.every(reference => readableNote.includes(reference))) {
+    additions.push(`Strong's references: ${references.join(', ')}`);
+  }
+  return [readableNote, ...additions].filter(Boolean).join(' ');
+}
+
+function parseDerivationReferences(value: unknown): string[] | undefined {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) return undefined;
+  const references: string[] = [];
+  for (const candidate of value) {
+    if (!isRecord(candidate) || Object.keys(candidate).some(key => key !== '$') || !isRecord(candidate.$)) return undefined;
+    const attributes = candidate.$;
+    if (Object.keys(attributes).some(key => !['language', 'strongs'].includes(key))) return undefined;
+    const prefix = attributes.language === 'GREEK' ? 'G' : attributes.language === 'HEBREW' ? 'H' : undefined;
+    if (!prefix || typeof attributes.strongs !== 'string') return undefined;
+    const identity = parseStrongsIdentity(`${prefix}${attributes.strongs}`);
+    if (!identity) return undefined;
+    references.push(identity.publicId);
+  }
+  return references;
+}
+
+function parseLexicalForms(greek: unknown, latin: unknown): string[] | undefined {
+  const forms: string[] = [];
+  if (greek !== undefined) {
+    if (!Array.isArray(greek)) return undefined;
+    for (const candidate of greek) {
+      if (!isRecord(candidate) || Object.keys(candidate).some(key => key !== '$') || !isRecord(candidate.$)) return undefined;
+      const attributes = candidate.$;
+      if (Object.keys(attributes).some(key => !['BETA', 'unicode', 'translit'].includes(key))) return undefined;
+      if (typeof attributes.unicode !== 'string' || !attributes.unicode.trim()) return undefined;
+      if (attributes.translit !== undefined && typeof attributes.translit !== 'string') return undefined;
+      const unicode = attributes.unicode.trim();
+      const translit = typeof attributes.translit === 'string' ? attributes.translit.trim() : '';
+      forms.push(translit ? `${unicode} (${translit})` : unicode);
+    }
+  }
+  if (latin !== undefined) {
+    if (!Array.isArray(latin) || latin.some(item => typeof item !== 'string' || !item.trim())) return undefined;
+    forms.push(...latin.map(item => (item as string).trim()));
+  }
+  return forms;
+}
+
+function validPronunciations(value: unknown): boolean {
+  if (value === undefined) return true;
+  return Array.isArray(value) && value.every(candidate => isRecord(candidate)
+    && Object.keys(candidate).every(key => key === '$')
+    && isRecord(candidate.$)
+    && Object.keys(candidate.$).every(key => key === 'strongs')
+    && typeof candidate.$.strongs === 'string');
+}
+
+function normalizeDerivationNote(value: string): string {
+  return value.replace(/[\t\r\n]+/g, ' ').trim();
+}
+
+function cleanDerivationPunctuation(value: string): string {
+  return value
+    .replace(/ {2,}/g, ' ')
+    .replace(/\(\s*\)/g, '')
+    .replace(/\s+([,.;:)])/g, '$1')
+    .replace(/\(\s+/g, '(')
+    .trim();
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }

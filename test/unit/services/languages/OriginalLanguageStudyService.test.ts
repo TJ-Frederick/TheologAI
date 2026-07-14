@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { OriginalLanguageStudyService } from '../../../../src/services/languages/OriginalLanguageStudyService.js';
 import type { IMorphologyRepository, IStrongsRepository, MorphWord } from '../../../../src/kernel/repositories.js';
 import { AdapterError, NotFoundError } from '../../../../src/kernel/errors.js';
+import { expandHebrewMorphCode } from '../../../../src/adapters/shared/hebrewMorphExpander.js';
 
 const loved: MorphWord = { position: 3, word_text: 'ἠγάπησεν', lemma: 'ἀγαπάω', strongs_number: 'G0025', morph_code: 'V-AAI-3S', gloss: 'loved' };
 
@@ -89,6 +90,36 @@ describe('OriginalLanguageStudyService', () => {
     const { morphology, strongs } = repos([word]);
     const result = await new OriginalLanguageStudyService(morphology, strongs).study({ reference: 'Genesis 1:1', target: 'God' });
     expect(result.language).toBe('Hebrew');
+  });
+
+  it('propagates strict compound grammar and normalized derivation into a Hebrew study', async () => {
+    const word: MorphWord = {
+      position: 5,
+      word_text: 'הַ/שָּׁמַ֖יִם',
+      lemma: 'שָׁמַיִם',
+      strongs_number: 'H8064',
+      morph_code: 'HTd/Ncmpa',
+      gloss: 'the/ heavens',
+    };
+    const { morphology, strongs } = repos([word]);
+    morphology.expandMorphCode = expandHebrewMorphCode;
+    strongs.lookup = id => ({
+      strongs_number: id,
+      testament: 'OT',
+      lemma: 'שָׁמַיִם',
+      transliteration: 'shamayim',
+      pronunciation: null,
+      definition: 'heavens',
+      derivation: '{"_":"from ;","strongsref":[{"$":{"language":"HEBREW","strongs":"08064"}}]}',
+    });
+    const result = await new OriginalLanguageStudyService(morphology, strongs)
+      .study({ reference: 'Genesis 1:1', target: 'H8064' });
+    expect(result.grammar).toEqual({
+      code: 'HTd/Ncmpa',
+      expansion: 'Particle Definite Article / Noun Common Masculine Plural Absolute',
+      certainty: 'expanded',
+    });
+    expect(result.dictionary?.derivation).toBe('from H8064;');
   });
 
   it('returns identical results through synchronous Node and asynchronous D1-shaped ports', async () => {
