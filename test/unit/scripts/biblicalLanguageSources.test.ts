@@ -210,8 +210,9 @@ describe('biblical-language source revisions', () => {
 
   it('pins the transform-6 catalog-scope D1 materialization identity', () => {
     const manifest = parseDataManifest(readFileSync('data/data-manifest.json'));
-    expect(computeD1CorpusIdentity(manifest))
-      .toBe('c334b4b91c3a7c334a9425937c7f99473f27014ddae6cea377ee38bd578a6707');
+    const d1Identity = computeD1CorpusIdentity(manifest);
+    expect(d1Identity).toBe('c334b4b91c3a7c334a9425937c7f99473f27014ddae6cea377ee38bd578a6707');
+    expect(sourceLockProjection().derived_artifacts.d1_materialization_identity).toBe(d1Identity);
     expect(manifest.materializations.d1.transformVersion).toBe(6);
     for (const provenanceOnly of [
       'data/biblical-languages/SOURCE.json',

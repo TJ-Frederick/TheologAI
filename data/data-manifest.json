@@ -137,7 +137,7 @@
   "files": [
     {
       "path": "data/biblical-languages/SOURCE.json",
-      "sha256": "5a1c620def8017895f6d3e795972f713aa4506ba15c0739f06aeeeea21ac293f"
+      "sha256": "ba3c0c38b06805612b00fd66fee1c60fb5a87e662c85a04a2ac4c9031ee9c425"
     },
     {
       "path": "data/biblical-languages/UNICODE-CORRECTION.json",

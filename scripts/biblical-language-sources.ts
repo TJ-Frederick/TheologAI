@@ -276,7 +276,7 @@ export function sourceLockProjection() {
     derived_artifacts: {
       status: 'content_reproducible_from_exact_verified_pins',
       tracked_manifest: 'data/data-manifest.json',
-      d1_materialization_identity: '93ae4ca3c09493cf02a6b48154c991c133fd6ce235119fc4b8cba0256a36f881',
+      d1_materialization_identity: 'c334b4b91c3a7c334a9425937c7f99473f27014ddae6cea377ee38bd578a6707',
       compared_artifacts: 72,
       comparison_identity_policy: 'canonical_decompressed_json_v1_sha256_for_json_gz_else_raw_sha256',
       changed_content_artifacts: 0,

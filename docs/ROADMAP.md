@@ -93,10 +93,12 @@ Production then passed the corresponding bounded post-deployment audit.
 
 The next integrated candidate replays the reviewed original-language usage and
 catalog-aware primary-source work onto the PR #27 production baseline in four
-commits: `2c2a29a`, `eccfad4`, `1b95201`, and `2506413`. It adds schema
+feature commits: `2c2a29a`, `eccfad4`, `1b95201`, and `2506413`, plus the
+required downstream Unicode-manifest preservation fix `a1c9da3`. It adds schema
 `0003_original_language_usage`, occurrence and distribution evidence with
 keyset pagination, progressive original-language output levels, and curated
-catalog scope for primary-source research.
+catalog scope for primary-source research. The later `e6f7f7f` commit only
+reconciles release documentation for this candidate.
 
 This transform-version-6 candidate is unmerged, unreleased, and not prepared
 for preview. Its whole-D1 identity
