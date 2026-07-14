@@ -142,12 +142,12 @@ describe('D1HistoricalDocumentRepository', () => {
   });
 
   describe('search', () => {
-    it('escapes quotes and asterisks from query', async () => {
+    it('uses controlled literal all-term FTS for punctuation and multiple terms', async () => {
       const db = createSimpleD1([]);
       const repo = new D1HistoricalDocumentRepository(db as any);
-      await repo.search("test'*\"");
+      await repo.search("Lord's Supper");
       const bindArgs = db.prepare.mock.results[0].value.bind.mock.calls[0];
-      expect(bindArgs[0]).toBe('"test"*');
+      expect(bindArgs[0]).toBe('"Lord\'s" AND "Supper"');
     });
 
     it('unwraps { results } from FTS join query', async () => {

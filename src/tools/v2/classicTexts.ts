@@ -6,22 +6,27 @@
 
 import type { ToolHandler } from '../../kernel/types.js';
 import type { HistoricalDocumentService } from '../../services/historical/HistoricalDocumentService.js';
-import { formatDocumentList, formatDocumentSections, formatSearchResults } from '../../formatters/historicalFormatter.js';
+import {
+  formatDocumentList,
+  formatDocumentSectionIndex,
+  formatDocumentSections,
+  formatSearchResults,
+} from '../../formatters/historicalFormatter.js';
 import { handleToolError, ValidationError } from '../../kernel/errors.js';
 
 export function createClassicTextsHandler(historicalService: HistoricalDocumentService): ToolHandler {
   return {
     name: 'classic_text_lookup',
-    description: 'Search and browse the locally indexed historical-document collection. Use exactly one mode: listWorks, query, work, or work with browseSections=true. Remote CCEL document bodies are not retrieved or republished.',
+    description: 'Search and browse the locally indexed historical-document collection. Search returns discovery-only snippets with canonical exact-section resource links; browseSections returns a compact section index; work alone preserves full-document lookup. Use exactly one mode: listWorks, query, work, or work with browseSections=true. Remote CCEL document bodies are not retrieved or republished.',
     inputSchema: {
       type: 'object',
       description: 'Flat mode fields are intentionally shown together for client discoverability; choose exactly one mode, with cross-field validity enforced strictly by the handler.',
       minProperties: 1,
       properties: {
         work: { type: 'string', minLength: 1, maxLength: 256, description: 'Named local document slug or title (e.g., "nicene-creed").' },
-        query: { type: 'string', minLength: 1, maxLength: 500, description: 'Search query across the local historical-document collection. Use alone.' },
+        query: { type: 'string', minLength: 1, maxLength: 500, description: 'Literal all-term search across the local historical-document collection. Use alone; returned snippets are discovery-only.' },
         listWorks: { type: 'boolean', const: true, description: 'List locally indexed historical documents. Use alone and set true.' },
-        browseSections: { type: 'boolean', const: true, description: 'List sections for a local work. Use with a work identifier and no section or query.' },
+        browseSections: { type: 'boolean', const: true, description: 'List a compact exact-section resource index for a local work. Use with a work identifier and no section or query.' },
       },
       additionalProperties: false,
     },
@@ -40,7 +45,7 @@ export function createClassicTextsHandler(historicalService: HistoricalDocumentS
         if (params.work && params.browseSections) {
           const doc = await historicalService.getDocument(params.work as string);
           const sections = await historicalService.getSections(doc.id);
-          return { content: [{ type: 'text', text: formatDocumentSections(doc, sections) }] };
+          return { content: [{ type: 'text', text: formatDocumentSectionIndex(doc, sections) }] };
         }
 
         // Look up a specific local document
@@ -58,7 +63,8 @@ export function createClassicTextsHandler(historicalService: HistoricalDocumentS
           // Search local docs first
           const localResults = await historicalService.search(params.query as string);
           if (localResults.length > 0) {
-            return { content: [{ type: 'text', text: formatSearchResults(params.query as string, localResults) }] };
+            const documents = await historicalService.listDocuments();
+            return { content: [{ type: 'text', text: formatSearchResults(params.query as string, localResults, documents) }] };
           }
 
           return { content: [{ type: 'text', text: `No results found for "${params.query}".` }] };

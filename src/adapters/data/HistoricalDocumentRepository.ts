@@ -109,8 +109,7 @@ export class HistoricalDocumentRepository implements IHistoricalDocumentReposito
 
   /** Full-text search across all document sections */
   search(query: string, limit: number = 20): DocumentSection[] {
-    const escaped = query.replace(/['"*]/g, '');
-    const ftsQuery = `"${escaped}"*`;
+    const ftsQuery = composeLocalPrimarySourceFtsQuery(query, 'all_terms');
 
     try {
       const rows = this.stmtFtsSearch.all(ftsQuery, limit) as Array<{

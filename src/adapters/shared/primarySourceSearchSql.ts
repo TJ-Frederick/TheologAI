@@ -26,6 +26,7 @@ export function localPrimarySourceScopedSearchSql(documentCount: number): string
 /** Compose only quoted FTS5 literals; caller text can never become FTS syntax. */
 export function composeLocalPrimarySourceFtsQuery(text: string, match: PrimarySourceSearchMatch): string {
   const quote = (value: string): string => `"${value.replaceAll('"', '""')}"`;
-  if (match === 'phrase') return quote(text);
-  return text.split(' ').map(quote).join(' AND ');
+  const normalized = text.normalize('NFC').trim().replace(/\s+/gu, ' ');
+  if (match === 'phrase') return quote(normalized);
+  return normalized.split(' ').map(quote).join(' AND ');
 }

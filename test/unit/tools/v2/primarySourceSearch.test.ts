@@ -62,6 +62,48 @@ describe('primary_source_search handler', () => {
     expect(await handler.handler({ queries: [] })).toMatchObject({ isError: true });
   });
 
+  it.each(['unsupported_filter', 'unavailable', 'disabled', 'rate_limited', 'interface_changed'] as const)(
+    'preserves the unsearched local %s status when catalog scope is not meaningful',
+    async status => {
+      const service = { search: vi.fn().mockResolvedValue({
+        planStatus: status === 'unsupported_filter' ? 'partial' : 'unavailable',
+        queries: [{ id: 'q', normalizedMode: 'all_terms', providers: [{
+          provider: 'local', status, searched: false, page: 2, hitCount: 0, hits: [], notices: [],
+        }] }],
+        coverage: { localAttempted: false, localStatus: status, localHitCount: 0, ccelAttempted: false, ccelHitCount: 0, notices: [] },
+      }) };
+      const handler = createPrimarySourceSearchHandler(service as any);
+
+      const result = await handler.handler({ queries: [{ id: 'q', text: 'faith', providers: ['local'], page: 2 }] });
+
+      expect(result.structuredContent).toMatchObject({
+        queries: [{ providers: [{ provider: 'local', status, searched: false }] }],
+        coverage: { localStatus: status },
+      });
+      expect((result.structuredContent as any).queries[0].providers[0]).not.toHaveProperty('scope');
+      expect(validatorFor(handler.outputSchema!)(result.structuredContent).valid).toBe(true);
+    },
+  );
+
+  it('still fails closed when a searched local result omits meaningful catalog scope', async () => {
+    const service = { search: vi.fn().mockResolvedValue({
+      planStatus: 'complete',
+      queries: [{ id: 'q', normalizedMode: 'all_terms', providers: [{
+        provider: 'local', status: 'no_results', searched: true, page: 1, hitCount: 0, hits: [], notices: [],
+      }] }],
+      coverage: { localAttempted: true, localStatus: 'no_results', localHitCount: 0, ccelAttempted: false, ccelHitCount: 0, notices: [] },
+    }) };
+    const handler = createPrimarySourceSearchHandler(service as any);
+
+    const result = await handler.handler({ queries: [{ id: 'q', text: 'faith', providers: ['local'] }] });
+
+    expect(result.structuredContent).toMatchObject({
+      planStatus: 'unavailable',
+      queries: [{ providers: [{ status: 'interface_changed', scope: { status: 'metadata_incomplete' } }] }],
+    });
+    expect(validatorFor(handler.outputSchema!)(result.structuredContent).valid).toBe(true);
+  });
+
   it('returns Markdown first, strict structured output, and one deduplicated native exact-section link', async () => {
     const hit = {
       queryId: 'q1', provider: 'local', title: 'Institutes', sectionLabel: 'Faith',

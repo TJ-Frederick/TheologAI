@@ -128,7 +128,7 @@ const provider = {
       scope: catalogScope,
       hits: { type: 'array', maxItems: 8, items: localHit },
     },
-    required: ['provider', 'status', 'searched', 'page', 'hitCount', 'hits', 'notices', 'scope'],
+    required: ['provider', 'status', 'searched', 'page', 'hitCount', 'hits', 'notices'],
     additionalProperties: false,
   }, {
     type: 'object',

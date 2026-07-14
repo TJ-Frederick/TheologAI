@@ -493,7 +493,9 @@ describe('classic_text_lookup handler', () => {
 
     expect(historical.getDocument).toHaveBeenCalledWith('Nicene Creed');
     expect(historical.getSections).toHaveBeenCalledWith('nicene-creed');
-    expect(textOf(result)).toContain('We believe in one God.');
+    expect(textOf(result)).toContain('Section 1 — The Creed');
+    expect(textOf(result)).toContain('theologai://documents/nicene-creed#section-1');
+    expect(textOf(result)).not.toContain('We believe in one God.');
   });
 
   it('returns a matching local work', async () => {
@@ -530,7 +532,10 @@ describe('classic_text_lookup handler', () => {
     const result = await handler.handler({ query: 'wisdom' });
 
     expect(historical.search).toHaveBeenCalledWith('wisdom');
+    expect(historical.listDocuments).toHaveBeenCalledOnce();
     expect(textOf(result)).toContain('Search Results for "wisdom"');
+    expect(textOf(result)).toContain('Nicene Creed — Section 1: The Creed');
+    expect(textOf(result)).toContain('Discovery snippet only');
   });
 
   it('rejects a scoped work query instead of silently ignoring it', async () => {

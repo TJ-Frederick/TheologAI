@@ -59,7 +59,7 @@ describe('HistoricalDocumentRepository', () => {
     expect(repo.getSection(documentRow.id, '9.9')).toBeUndefined();
   });
 
-  it('sanitizes FTS input, uses the default limit, and maps search rows', () => {
+  it('uses controlled literal all-term FTS, the default limit, and maps search rows', () => {
     const db = new FakeSqliteDatabase([{
       match: 'sections_fts MATCH',
       all: [{
@@ -73,7 +73,7 @@ describe('HistoricalDocumentRepository', () => {
     }]);
     const repo = new HistoricalDocumentRepository(db.asDatabase());
 
-    expect(repo.search(`grace'*"`)).toEqual([{
+    expect(repo.search(`Lord's Supper`)).toEqual([{
       id: 11,
       document_id: documentRow.id,
       section_number: '2.1',
@@ -81,7 +81,7 @@ describe('HistoricalDocumentRepository', () => {
       content: 'grace alone',
       topics: [],
     }]);
-    expect(db.statement('sections_fts MATCH').all).toHaveBeenCalledWith('"grace"*', 20);
+    expect(db.statement('sections_fts MATCH').all).toHaveBeenCalledWith('"Lord\'s" AND "Supper"', 20);
   });
 
   it('returns an empty result when FTS execution fails', () => {

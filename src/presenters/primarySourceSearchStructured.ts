@@ -119,7 +119,9 @@ export function presentPrimarySourceSearch(result: PrimarySourceSearchPlanResult
         const omitted = provider.hits.length - hits.length;
         const countMismatch = provider.hitCount !== provider.hits.length;
         const scope = provider.provider === 'local' ? presentScope(provider.scope) : undefined;
-        const scopeInvalid = provider.provider === 'local' && !scope;
+        const scopeIsMeaningful = provider.searched || provider.status === 'catalog_miss';
+        const scopeInvalid = provider.provider === 'local'
+          && ((provider.scope !== undefined && !scope) || (scopeIsMeaningful && !scope));
         const downgraded = omitted > 0 || countMismatch || providerGroupsOmitted || scopeInvalid;
         const notices = [...provider.notices];
         if (omitted > 0) {
@@ -136,9 +138,11 @@ export function presentPrimarySourceSearch(result: PrimarySourceSearchPlanResult
           hitCount: hits.length,
           hits,
           notices: uniqueBounded(notices, 16, 500),
-          ...(provider.provider === 'local'
-            ? { scope: scope ?? { status: 'metadata_incomplete' as const, requested: {}, eligibleDocumentCount: 0, eligibleDocuments: [], eligibleDocumentsTruncated: false } }
-            : {}),
+          ...(provider.provider === 'local' && scope
+            ? { scope }
+            : provider.provider === 'local' && scopeInvalid
+              ? { scope: { status: 'metadata_incomplete' as const, requested: {}, eligibleDocumentCount: 0, eligibleDocuments: [], eligibleDocumentsTruncated: false } }
+              : {}),
         };
       }),
     };

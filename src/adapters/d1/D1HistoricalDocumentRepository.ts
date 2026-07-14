@@ -77,8 +77,7 @@ export class D1HistoricalDocumentRepository implements IHistoricalDocumentReposi
   }
 
   async search(query: string, limit: number = 20): Promise<DocumentSection[]> {
-    const escaped = query.replace(/['"*]/g, '');
-    const ftsQuery = `"${escaped}"*`;
+    const ftsQuery = composeLocalPrimarySourceFtsQuery(query, 'all_terms');
 
     try {
       const { results: rows } = await this.db.prepare(
