@@ -150,6 +150,12 @@ describe('published project contract', () => {
     expect(readme).toContain(`${strongs.toLocaleString('en-US')} Strong's entries`);
     expect(developerGuide).toContain(`${documents} historical documents`);
     expect(confessionSkill).toContain(`includes ${documents} historical documents`);
+    expect(confessionSkill).toContain('Call `primary_source_search` with one bounded local query plan');
+    expect(confessionSkill).toContain('Follow each selected canonical `resource_link` with MCP `resources/read`');
+    expect(confessionSkill).toContain('Never relabel an issuing, drafting, revising, or');
+    expect(confessionSkill).toContain('Never infer a tradition or author attribution');
+    expect(confessionSkill).not.toContain('spanning the major Christian traditions');
+    expect(confessionSkill).not.toContain('Call `classic_text_lookup` with `{ "query"');
     expect(`${developerGuide}\n${confessionSkill}`).not.toMatch(/18 historical documents/i);
   });
 

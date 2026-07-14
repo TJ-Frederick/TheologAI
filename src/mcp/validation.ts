@@ -1,6 +1,7 @@
 import { Validator, type Schema } from '@cfworker/json-schema';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { JsonSchemaType } from '@modelcontextprotocol/sdk/validation/types.js';
+import { parseReference } from '../kernel/reference.js';
 
 export type SchemaValidationResult<T> = {
   valid: true;
@@ -164,6 +165,20 @@ export function validatePromptArguments(
     }
     if ((stringValues.reference?.length ?? 0) > 100) {
       throw new McpError(ErrorCode.InvalidParams, 'Argument "reference" for prompt "word-study" exceeds 100 characters');
+    }
+    const reference = stringValues.reference?.trim();
+    if (reference) {
+      try {
+        const parsed = parseReference(reference);
+        if (parsed.startVerse == null || parsed.endVerse != null) {
+          throw new Error('not one verse');
+        }
+      } catch {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          'Argument "reference" for prompt "word-study" must be exactly one valid Bible verse',
+        );
+      }
     }
   }
 

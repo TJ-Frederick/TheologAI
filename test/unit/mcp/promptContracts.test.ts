@@ -62,6 +62,21 @@ describe('prompt-recommended tool-call contracts', () => {
     expect(calls.some(call => call.tool === 'bible_cross_references')).toBe(false);
   });
 
+  it('keeps translation-range morphology bounded to later individual-verse calls', () => {
+    const rangeCalls = recommendedToolCallsForPrompt('compare-translations', {
+      reference: 'Philippians 2:6-8',
+    });
+    expect(rangeCalls.some(call => call.tool === 'bible_verse_morphology')).toBe(false);
+
+    const verseCalls = recommendedToolCallsForPrompt('compare-translations', {
+      reference: 'John 1:1',
+    });
+    expect(verseCalls).toContainEqual({
+      tool: 'bible_verse_morphology',
+      arguments: { reference: 'John 1:1', expand_morphology: true },
+    });
+  });
+
   it('never recommends a chapter to verse-only morphology or cross-reference tools', () => {
     const calls = recommendedToolCallsForPrompt('passage-exegesis', { reference: 'John 3' });
     expect(calls.some(call => call.tool === 'bible_verse_morphology')).toBe(false);
@@ -88,6 +103,14 @@ describe('prompt-recommended tool-call contracts', () => {
     expect(calls.map(call => call.tool)).not.toContain('original_language_study');
   });
 
+  it.each(['John 3', 'Romans 8:28-30', 'not a reference'])(
+    'never recommends single-verse morphology for invalid word-study context %s',
+    reference => {
+      const calls = recommendedToolCallsForPrompt('word-study', { word: 'love', reference });
+      expect(calls.some(call => call.tool === 'bible_verse_morphology')).toBe(false);
+    },
+  );
+
   it('keeps global usage opt-in, overview-only, and after context in guided word study', () => {
     const lexical = recommendedToolCallsForPrompt('word-study', { word: 'G26' });
     expect(lexical).toEqual([{
@@ -97,6 +120,20 @@ describe('prompt-recommended tool-call contracts', () => {
     const contextual = recommendedToolCallsForPrompt('word-study', { word: 'G26', reference: 'John 3:16' });
     expect(contextual.at(-1)).toEqual(lexical[0]);
     expect(contextual.find(call => call.tool === 'original_language_study')).toBeUndefined();
+  });
+
+  it('routes exact Strong\'s identities through the canonical kernel grammar', () => {
+    expect(recommendedToolCallsForPrompt('word-study', { word: 'g0026' })).toEqual([{
+      tool: 'original_language_lookup',
+      arguments: { strongs_number: 'G26', include_extended: true, detail_level: 'detailed', usage_level: 'overview' },
+    }]);
+
+    for (const malformed of ['G0', 'H00000', 'G123456']) {
+      expect(recommendedToolCallsForPrompt('word-study', { word: malformed })).toEqual([{
+        tool: 'original_language_lookup',
+        arguments: { query: malformed, limit: 10 },
+      }]);
+    }
   });
 
   it('keeps primary-source research local, bounded, and exact-work aware', () => {
@@ -120,5 +157,19 @@ describe('prompt-recommended tool-call contracts', () => {
         author: 'Martin Luther', startYear: 1500, endYear: 1600, limit: 3,
       }],
     });
+  });
+
+  it('uses bounded local primary-source discovery for confession study', () => {
+    expect(recommendedToolCallsForPrompt('confession-study', {
+      topic: 'justification', traditions: 'Reformed, Lutheran',
+    })).toEqual([{
+      tool: 'primary_source_search',
+      arguments: {
+        queries: [{
+          id: 'confession-topic', text: 'justification', providers: ['local'],
+          match: 'all_terms', limit: 5,
+        }],
+      },
+    }]);
   });
 });

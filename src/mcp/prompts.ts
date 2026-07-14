@@ -2,6 +2,7 @@ import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { GetPromptRequestSchema, ListPromptsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod/v4';
 import { parseReference } from '../kernel/reference.js';
+import { parseStrongsIdentity } from '../kernel/strongs.js';
 import { validatePromptArguments } from './validation.js';
 
 export interface RecommendedToolCall {
@@ -49,14 +50,17 @@ export function recommendedToolCallsForPrompt(
     case 'word-study': {
       const word = args?.word?.trim() ?? '';
       const reference = args?.reference?.trim();
-      const lexical = /^[GH]\d+[a-z]?$/i.test(word)
-        ? [{ tool: 'original_language_lookup', arguments: { strongs_number: word.toUpperCase(), include_extended: true, detail_level: 'detailed', usage_level: 'overview' } }]
+      const strongsIdentity = parseStrongsIdentity(word);
+      const lexical = strongsIdentity
+        ? [{ tool: 'original_language_lookup', arguments: { strongs_number: strongsIdentity.publicId, include_extended: true, detail_level: 'detailed', usage_level: 'overview' } }]
         : [{ tool: 'original_language_lookup', arguments: { query: word, limit: 10 } }];
       return reference
         ? [
           { tool: 'bible_lookup', arguments: { reference, translation: 'ESV', includeFootnotes: true } },
           { tool: 'bible_lookup', arguments: { reference, translation: 'KJV' } },
-          { tool: 'bible_verse_morphology', arguments: { reference, expand_morphology: true } },
+          ...(isSingleVerseReference(reference)
+            ? [{ tool: 'bible_verse_morphology', arguments: { reference, expand_morphology: true } }]
+            : []),
           ...lexical,
         ]
         : lexical;
@@ -77,6 +81,7 @@ export function recommendedToolCallsForPrompt(
     }
     case 'compare-translations': {
       const reference = args?.reference ?? '';
+      const singleVerse = isSingleVerseReference(reference);
       const requested = (args?.translations || 'ESV,KJV,NET,BSB')
         .split(',')
         .map(item => item.trim().toUpperCase())
@@ -85,15 +90,23 @@ export function recommendedToolCallsForPrompt(
       const selected = translations.length > 0 ? translations : ['ESV', 'KJV', 'NET', 'BSB'];
       return [
         ...selected.map(item => ({ tool: 'bible_lookup', arguments: { reference, translation: item } })),
-        { tool: 'bible_verse_morphology', arguments: { reference, expand_morphology: true } },
+        ...(singleVerse ? [{ tool: 'bible_verse_morphology', arguments: { reference, expand_morphology: true } }] : []),
       ];
     }
     case 'confession-study': {
       const topic = args?.topic ?? '';
-      return [
-        { tool: 'classic_text_lookup', arguments: { listWorks: true } },
-        { tool: 'classic_text_lookup', arguments: { query: topic } },
-      ];
+      return [{
+        tool: 'primary_source_search',
+        arguments: {
+          queries: [{
+            id: 'confession-topic',
+            text: topic,
+            providers: ['local'],
+            match: 'all_terms',
+            limit: 5,
+          }],
+        },
+      }];
     }
     case 'primary-source-research': {
       const topic = args?.topic?.trim() ?? '';
@@ -200,6 +213,7 @@ export function registerPromptHandlers(server: Server): void {
       case 'word-study': {
         const word = args?.word ?? '';
         const reference = args?.reference?.trim();
+        const exactStrongs = parseStrongsIdentity(word) !== undefined;
         const testament = args?.testament;
         const testamentHint = testament
           ? ` Focus on the ${testament.toUpperCase() === 'OT' ? 'Hebrew (Old Testament)' : 'Greek (New Testament)'}.`
@@ -209,12 +223,12 @@ export function registerPromptHandlers(server: Server): void {
 
 1. **Read the context** — ${callText(calls[0])}; compare ${callText(calls[1])}.
 2. **Resolve the verse token** — ${callText(calls[2])}. Identify the source form, lemma, Strong's identifier, or exact local gloss corresponding to the user's term. Then call \`original_language_study\` with ${reference} and that verse-local target. If it returns \`needs_disambiguation\`, select a candidate only from sentence context and call it again with that source position; do not guess.
-3. **Consult lexical and corpus evidence** — ${callText(calls[3])}. Keep OpenScriptures lexicon claims, STEPBible lexicon metadata, and counted \`corpusUsage\` source-separated. Present corpus frequency only after the verse-local meaning and never use it to select the sense.
+3. **Consult lexical and corpus evidence** — ${callText(calls[3])}.${exactStrongs ? '' : ' This first call is discovery only. After it resolves the relevant Strong\'s identity, make a subsequent exact `original_language_lookup` call with that returned `strongs_number`, `include_extended: true`, `detail_level: "detailed"`, and `usage_level: "overview"`; do not invent or hard-code an identifier.'} Keep OpenScriptures lexicon claims, STEPBible lexicon metadata, and counted \`corpusUsage\` source-separated. Present corpus frequency only after the verse-local meaning and never use it to select the sense.
 4. **Synthesize in this order** — Begin with **Meaning here, in plain English**, then explain why it fits the verse, the word identity, and grammar. Put broader lexical evidence after the contextual explanation.
 5. **Apply safeguards** — Context controls sense. A gloss is not a definition; a Strong's number is an identifier; morphology constrains but does not settle meaning; roots and etymology do not prove present meaning; never import every possible sense into one occurrence. Do not infer Aramaic from an H identifier.`
           : `Provide a lexical overview of "${word}".${testamentHint}
 
-1. **Identify candidate terms** — ${callText(calls[0])}. Prefer structured \`mode\`, \`entries\`, \`detailLevel\`, optional \`corpusUsage\`, and \`provenanceIds\`, with Markdown as fallback.
+1. **Identify candidate terms** — ${callText(calls[0])}. ${exactStrongs ? 'This is already an exact Strong\'s lookup.' : 'Treat this as discovery. After resolving the relevant candidate from the returned entries, make a subsequent exact `original_language_lookup` call with that returned `strongs_number`, `include_extended: true`, `detail_level: "detailed"`, and `usage_level: "overview"`; do not invent or hard-code an identifier.'} Prefer structured \`mode\`, \`entries\`, \`detailLevel\`, optional \`corpusUsage\`, and \`provenanceIds\`, with Markdown as fallback.
 2. **Label the scope honestly** — There is no verse context, so do not claim a contextual meaning. Invite a passage-specific study.
 3. **Apply safeguards** — Do not treat one English gloss as exhausting the term's semantic range. Counted morphology tokens are distinct from lexicon occurrence metadata. Frequency, a gloss, Strong's number, morphology, root, or etymology does not establish meaning in a verse, and do not import every possible sense into every occurrence.`;
         break;
@@ -235,13 +249,14 @@ export function registerPromptHandlers(server: Server): void {
       }
       case 'compare-translations': {
         const reference = args?.reference ?? '';
-        const lookupCalls = calls.slice(0, -1).map(call => `- ${callText(call)}`).join('\n');
+        const lookupCalls = calls.filter(call => call.tool === 'bible_lookup').map(call => `- ${callText(call)}`).join('\n');
+        const morphologyCall = calls.find(call => call.tool === 'bible_verse_morphology');
         text = `Compare ${reference} across multiple Bible translations.
 
 1. **Retrieve each translation**
 ${lookupCalls}
 Use structured \`passages[]\` when available, compare by its \`translation\`, report every \`failures[]\` item, and keep each citation/provenance link attached to the relevant translation. Fall back to the Markdown text when structured fields are unavailable.
-2. **Examine the original language** — ${callText(calls.at(-1)!)}.
+2. **Examine the original language** — ${morphologyCall ? `${callText(morphologyCall)}.` : 'This is not one exact verse. Select at most three consequential individual verses and call `bible_verse_morphology` separately for each; never pass the range or chapter to the single-verse tool.'}
 3. **Investigate divergences** — Make exact \`original_language_lookup\` calls for the relevant Strong's numbers. Request \`usage_level: "overview"\` only when distribution materially helps, keep it after verse-local analysis, and never infer contextual meaning from frequency.
 4. **Summarize** — Compare literal/dynamic choices and any theologically significant differences.`;
         break;
@@ -252,11 +267,11 @@ Use structured \`passages[]\` when available, compare by its \`translation\`, re
         const hint = traditions ? ` Focus on: ${traditions.split(',').map(item => item.trim()).join(', ')}.` : '';
         text = `Cross-tradition doctrinal comparison on "${topic}".${hint}
 
-1. **Identify documents** — ${callText(calls[0])}.
-2. **Search the local collection** — ${callText(calls[1])}.
-3. **Read sections** — Browse the relevant documents.
-4. **Biblical foundations** — Use \`bible_lookup\` and \`bible_cross_references\` for passages identified in the documents.
-5. **Compare** — Explain agreement, divergence, Scripture use, and historical context.`;
+1. **Run bounded local discovery** — ${callText(calls[0])}. Treat snippets as discovery-only and do not claim the search covered sources outside the hosted collection. The requested tradition names are comparison interests, not author filters or evidence that a work belongs to that tradition.
+2. **Preserve source metadata** — Keep each hit's creator names and creator roles exactly as returned. Never relabel an issuing, drafting, revising, or compiling body as an author, and never infer a work's tradition or author attribution from its title, topic, or the user's requested traditions.
+3. **Read exact evidence** — Before quotation, doctrinal claims, or comparison, follow the selected canonical \`resource_link\` blocks with MCP \`resources/read\` and confirm each returned URI matches the selected locator. Do not rely on snippets alone.
+4. **Biblical foundations** — Use \`bible_lookup\` and \`bible_cross_references\` for passages actually identified in the sections you read.
+5. **Compare cautiously** — Explain agreement, divergence, Scripture use, and historical context only from exact sections read. Distinguish document statements from interpretation, and do not treat missing search hits as historical silence.`;
         break;
       }
       case 'primary-source-research': {
