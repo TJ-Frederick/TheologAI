@@ -7,7 +7,7 @@ The current registry contains eleven tools, six guided prompts, eight English
 Bible translations, six commentary sources, 17 locally indexed
 historical documents, Strong's dictionaries, and Greek/Hebrew morphology.
 
-<!-- theologai-public-contract tools=11 structured=bible_lookup,original_language_lookup,original_language_study,parallel_passages,primary_source_search -->
+<!-- theologai-public-contract tools=11 structured=bible_lookup,bible_verse_morphology,original_language_lookup,original_language_study,parallel_passages,primary_source_search -->
 
 ## Remote endpoint
 
@@ -67,14 +67,15 @@ responses.
 
 All tools are annotated as read-only, non-destructive, and idempotent. Tool
 inputs use closed, bounded JSON Schema 2020-12 contracts. `bible_lookup`,
-`parallel_passages`, `primary_source_search`, `original_language_lookup`, and `original_language_study`
+`bible_verse_morphology`, `parallel_passages`, `primary_source_search`,
+`original_language_lookup`, and `original_language_study`
 also advertise versioned object-root `outputSchema`
 contracts and return matching `structuredContent` beside the existing Markdown
-content. Bible, parallel-passage, and original-language structured results
+content. Bible, verse-morphology, parallel-passage, and original-language structured results
 include bounded, result-local provenance records. Primary-source results do not
 invent edition provenance records: their evidence policy explicitly marks
 edition provenance incomplete, and they link only canonical local sections with
-exact UTF-8 sizes. All other tools retain their current Markdown-only result
+exact UTF-8 sizes. The remaining tools retain their current Markdown-only result
 contract.
 
 ### Resources

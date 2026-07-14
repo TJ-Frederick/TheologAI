@@ -13,6 +13,7 @@ import type {
 import { summarizeDefinition } from '../formatters/languagesFormatter.js';
 import { normalizeLexiconText } from '../kernel/lexiconText.js';
 import { MORPHOLOGY_USAGE_IDENTITY } from '../kernel/morphologyUsageCursor.js';
+import { createStepBibleProvenance, STEPBIBLE_SOURCE } from '../kernel/stepBibleSource.js';
 
 const STRONGS_CITATION = {
   source: "Strong's Concordance",
@@ -65,29 +66,22 @@ export function presentOriginalLanguageEntry(
   corpusUsage?: CorpusUsageResult,
 ): OriginalLanguageOutputV1 {
   const stepBibleBase = result.sourceKind === 'stepbible_lexicon';
-  const base = provenanceFromCitation(result.citation, {
-    id: 'src-1',
-    kind: 'lexicon',
-    status: 'verified_source',
-    license: stepBibleBase ? {
-      label: 'CC BY 4.0',
-      url: 'https://creativecommons.org/licenses/by/4.0/',
-    } : { label: 'Public Domain' },
-    attribution: stepBibleBase ? 'Tyndale House, Cambridge' : 'OpenScriptures',
-  });
+  const base = stepBibleBase
+    ? createStepBibleProvenance({
+      id: 'src-1', kind: 'lexicon', label: result.citation.source,
+      rightsNotice: result.citation.copyright,
+    })
+    : provenanceFromCitation(result.citation, {
+      id: 'src-1', kind: 'lexicon', status: 'verified_source',
+      license: { label: 'Public Domain' }, attribution: 'OpenScriptures',
+    });
   const provenance: ProvenanceRecord[] = [base];
   const provenanceIds = [base.id];
 
   if (result.extended && result.extendedCitation) {
-    const extended = provenanceFromCitation(result.extendedCitation, {
-      id: 'src-2',
-      kind: 'lexicon',
-      status: 'verified_source',
-      license: {
-        label: 'CC BY 4.0',
-        url: 'https://creativecommons.org/licenses/by/4.0/',
-      },
-      attribution: 'Tyndale House, Cambridge',
+    const extended = createStepBibleProvenance({
+      id: 'src-2', kind: 'lexicon', label: result.extendedCitation.source,
+      rightsNotice: result.extendedCitation.copyright,
     });
     provenance.push(extended);
     provenanceIds.push(extended.id);
@@ -123,16 +117,14 @@ export function presentOriginalLanguageEntry(
 
 function morphologyUsageProvenance(): ProvenanceRecord {
   return {
-    id: 'src-usage',
-    kind: 'morphology_dataset',
-    label: 'Corrected STEPBible morphology corpus',
-    url: 'https://github.com/STEPBible/STEPBible-Data',
-    license: { label: 'CC BY 4.0', url: 'https://creativecommons.org/licenses/by/4.0/' },
-    rightsNotice: 'CC BY 4.0 (Tyndale House, Cambridge)',
-    attribution: 'Tyndale House, Cambridge',
-    version: MORPHOLOGY_USAGE_IDENTITY,
-    status: 'verified_source',
-    note: 'Counts are derived from exact corrected morphology tokens and are distinct from lexicon occurrence metadata.',
+    ...createStepBibleProvenance({
+      id: 'src-usage',
+      kind: 'morphology_dataset',
+      label: 'Corrected STEPBible morphology corpus',
+      rightsNotice: 'CC BY 4.0 (Tyndale House, Cambridge)',
+      version: MORPHOLOGY_USAGE_IDENTITY,
+    }),
+    note: `Counts use derived corpus identity ${MORPHOLOGY_USAGE_IDENTITY}; upstream STEPBible source commit ${STEPBIBLE_SOURCE.commitSha}. They are distinct from lexicon occurrence metadata.`,
   };
 }
 

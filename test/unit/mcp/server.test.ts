@@ -591,6 +591,9 @@ describe('shared MCP registration', () => {
       text: expect.stringContaining('distinguish an unavailable translation'),
     }));
     expect(passageExegesis.messages[0].content).toEqual(expect.objectContaining({
+      text: expect.stringContaining('raw `morphologyCode` beside nullable `morphologyExpansion`'),
+    }));
+    expect(passageExegesis.messages[0].content).toEqual(expect.objectContaining({
       text: expect.stringContaining('do not infer quotation, dependence, synoptic direction, or a thematic relationship'),
     }));
     expect(passageExegesis.messages[0].content).toEqual(expect.objectContaining({
@@ -614,6 +617,9 @@ describe('shared MCP registration', () => {
     });
     expect(compareTranslations.messages[0].content).toEqual(expect.objectContaining({
       text: expect.stringContaining('compare by its `translation`, report every `failures[]` item'),
+    }));
+    expect(compareTranslations.messages[0].content).toEqual(expect.objectContaining({
+      text: expect.stringContaining('retain `provenanceIds` and `lemmaProvenanceIds`'),
     }));
 
     const compareTranslationRange = await client.getPrompt({
@@ -649,6 +655,20 @@ describe('shared MCP registration', () => {
       : '';
     expect(exactWordText).toContain('This is already an exact Strong\'s lookup');
     expect(exactWordText).not.toContain('do not invent or hard-code an identifier');
+
+    const contextualWord = await client.getPrompt({
+      name: 'word-study',
+      arguments: { word: 'love', reference: 'John 3:16' },
+    });
+    expect(contextualWord.messages[0].content).toEqual(expect.objectContaining({
+      text: expect.stringContaining('nullable `text`, `lemma`, and `morphologyExpansion`'),
+    }));
+    expect(contextualWord.messages[0].content).toEqual(expect.objectContaining({
+      text: expect.stringContaining('`provenanceIds` and `lemmaProvenanceIds`'),
+    }));
+    expect(contextualWord.messages[0].content).toEqual(expect.objectContaining({
+      text: expect.stringContaining('empty `lemmaProvenanceIds` means no lemma is present'),
+    }));
 
     const confessionStudy = await client.getPrompt({
       name: 'confession-study',

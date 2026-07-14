@@ -7,13 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-<!-- theologai-public-contract tools=11 structured=bible_lookup,original_language_lookup,original_language_study,parallel_passages,primary_source_search -->
+<!-- theologai-public-contract tools=11 structured=bible_lookup,bible_verse_morphology,original_language_lookup,original_language_study,parallel_passages,primary_source_search -->
 
 ### Added
 
 - Added stable MCP 2025-11-25 structured output and server-side schema
   validation for `bible_lookup`, `parallel_passages`,
-  `primary_source_search`, `original_language_lookup`, and
+  `bible_verse_morphology`, `primary_source_search`, `original_language_lookup`, and
   `original_language_study`, while keeping
   their Markdown content available for legacy clients.
 - Added bounded, result-local provenance records and structured-first guidance

@@ -6,6 +6,8 @@ import type { ToolHandler } from '../../kernel/types.js';
 import type { MorphologyService } from '../../services/languages/MorphologyService.js';
 import { formatMorphologyResult } from '../../formatters/languagesFormatter.js';
 import { handleToolError } from '../../kernel/errors.js';
+import { verseMorphologyOutputSchema } from '../../mcp/schemas/verseMorphology.js';
+import { presentVerseMorphologyStructured } from '../../presenters/verseMorphologyStructured.js';
 
 export function createVerseMorphologyHandler(service: MorphologyService): ToolHandler {
   return {
@@ -20,6 +22,7 @@ export function createVerseMorphologyHandler(service: MorphologyService): ToolHa
       required: ['reference'],
       additionalProperties: false,
     },
+    outputSchema: verseMorphologyOutputSchema,
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
 
     handler: async (params) => {
@@ -28,7 +31,10 @@ export function createVerseMorphologyHandler(service: MorphologyService): ToolHa
           params.reference as string,
           params.expand_morphology as boolean,
         );
-        return { content: [{ type: 'text', text: formatMorphologyResult(result) }] };
+        return {
+          content: [{ type: 'text', text: formatMorphologyResult(result) }],
+          structuredContent: presentVerseMorphologyStructured(result),
+        };
       } catch (error) {
         return handleToolError(error as Error);
       }
