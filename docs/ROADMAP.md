@@ -101,24 +101,34 @@ keyset pagination, progressive original-language output levels, and curated
 catalog scope for primary-source research. The separate `e6f7f7f` commit
 reconciles release documentation for this candidate.
 
-This transform-version-6 candidate is unmerged and unreleased. Draft PR #30 has
-a fresh prepared preview candidate,
+This transform-version-6 candidate is unmerged and not released to production.
+PR #30 uses the fresh preview database
 `theologai-preview-20260714-a`, migrated through schema 0003, populated from all
 36 manifest seed files, and verified by the strict read-only remote readiness
 gate. Its whole-D1 identity
 `c334b4b91c3a7c334a9425937c7f99473f27014ddae6cea377ee38bd578a6707` and scoped
 usage identity
 `c3600bb55da75aa600f8c97885efa7d58a3e8c29c3fcc6445a553091011beabd` are
-verified for the prepared corpus. It is not yet deployed: preview still serves
-Worker version `734aec3b-d6c3-456b-a203-c7f940a2d081` with
-`theologai-preview-20260713-c`; `theologai-preview-20260712-b` remains its matched
-rollback database. PRs #28 and #29 are closed as superseded by PR #30.
+verified for the prepared corpus. An initial protected preview deployment
+occurred on 2026-07-14 from commit `a660c97`, producing Worker version
+`e86fb87e-8ace-4972-a8a2-dba9682a6a55` with
+`theologai-preview-20260714-a` bound. Black-box audits found guided-workflow,
+Hebrew morphology interpretation, historical
+presenter/search/browse, and derivation-output issues. Corrective code is now in
+the PR candidate, but it must pass CI, protected preview redeployment, and a new
+black-box audit before production can be considered. This status does not bind
+the corrective release to an as-yet unknown final Worker version. Retain the
+verified PR #27 Worker version `734aec3b-d6c3-456b-a203-c7f940a2d081` with
+`theologai-preview-20260713-c` as the immediate matched rollback pair;
+`theologai-preview-20260712-b` remains older matched rollback history. PRs #28
+and #29 are closed as superseded by PR #30.
 
 The one-off owner-authorized deletion of unused legacy database
 `theologai-db-preview` (`f9f415e1-219b-4d17-bcf5-33a8abad02fa`) was completed.
-No other database deletion is authorized. The next release action is a
-preview-only protected deployment and audit; production remains a separate
-promotion decision.
+No other database deletion is authorized. The next release action is to finish
+CI, redeploy the corrective candidate through the protected preview workflow,
+and repeat the black-box audit. Production remains untouched and separately
+gated.
 
 ## Release gates
 
@@ -149,8 +159,8 @@ Code readiness and operational readiness are deliberately separate:
 
 ## Next work
 
-- Verify and release the integrated transform-version-6 candidate through a
-  fresh preview D1, protected preview deployment, and full black-box audit
+- Finish CI for the corrective transform-version-6 candidate, redeploy it
+  through the protected preview workflow, and repeat the full black-box audit
   before considering production promotion.
 - Broaden advanced original-language study only after those foundations, using
   carefully sourced semantic-domain and discourse evidence useful to both
