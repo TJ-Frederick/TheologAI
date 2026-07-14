@@ -137,6 +137,14 @@ and protected release process.
 
 ### Integrated research-output follow-up (unreleased)
 
+Draft PR #34 is the integrated research-output candidate at head `a8cd63b`.
+Component PRs #31-#33 are superseded review vehicles rather than independent
+release units. Combined local verification is complete: unit, integration, and
+Worker-runtime tests; Node, Worker, and Worker-runtime typechecks; build;
+documentation contract; and diff check all passed. Sol approved the combined
+integration. GitHub required checks and the protected preview audit remain
+pending. No preview or production deployment is authorized by this status.
+
 The integrated local-only application candidate upgrades
 `primary_source_search` to v3 without adding a tool, migration, corpus body,
 live CCEL path, configuration, or deployment change. It adds relevance and
@@ -148,8 +156,9 @@ reads remain mandatory.
 
 This slice preserves creator roles, routing-only alias policy, incomplete
 edition provenance, unestablished catalog rights status, canonical fail-closed
-section locators, and backward-compatible Markdown. It must pass SQLite/D1
-parity, protocol tests, integrated review, CI, and preview audit before release.
+section locators, and backward-compatible Markdown. Local protocol, parity, and
+integrated-review gates are complete; GitHub CI and preview audit must still
+pass before release.
 
 The same candidate adds v1 structured output for
 `bible_verse_morphology`. Its bounded `words[]` retain exact source order, raw
@@ -192,8 +201,9 @@ Code readiness and operational readiness are deliberately separate:
 
 ## Next work
 
-- Complete any final docs-only PR verification, then pause at the separate owner
-  gate before production merge or promotion.
+- PR #30 remains at its separate owner-controlled production gate: its preview
+  audit is complete, production is unchanged, and merge plus protected
+  production deployment require an explicit owner decision.
 - Broaden advanced original-language study only after those foundations, using
   carefully sourced semantic-domain and discourse evidence useful to both
   beginners and readers of Greek or Hebrew.
