@@ -6,8 +6,9 @@ PR #27 (`7b4e6c72182901ff77b5d175132a72d260e0418e`) is the last verified
 production application baseline. Protected workflow run `29289643276` deployed
 it after a read-only D1 readiness result of `ready`. Production remains
 untouched by the unmerged PR #30 work. Preview received an initial protected
-PR #30 deployment on 2026-07-14, as described below, and is undergoing a
-corrective preview-only release cycle after black-box audit findings.
+PR #30 deployment and a corrective protected deployment on 2026-07-14, as
+described below. Targeted and independent full-surface black-box re-audits of
+the corrective application found no P0-P2 issues.
 
 The deployed logical D1 bindings and retained rollback posture are recorded
 below as point-in-time evidence. Cloudflare deployment history and the approved
@@ -19,7 +20,7 @@ binding.
 | Environment | Deployed logical database | Current posture | Rollback posture |
 |---|---|---|---|
 | Production | `theologai-production-20260713-b` | PR #27 merge `7b4e6c72182901ff77b5d175132a72d260e0418e` deployed successfully by protected GitHub Actions run `29289643276`; GitHub deployment `5432211383` serves Worker version `49746830-16ce-40dc-b8a5-3cdc9ab79217` at 100%. | Retain Worker version `17869daf-f5e4-4d80-9240-6bc4fbb8d395` with `theologai-production-20260713-a` as the immediate matched rollback pair. Also retain Worker version `c291ca9f-bb1b-4e6e-abd5-d6a3ea4f0704` with `theologai-production-20260711-a` as secondary rollback history. Do not mix either database with incompatible code or delete it without separate owner approval. |
-| Preview | `theologai-preview-20260714-a` | An initial protected PR #30 preview deployment occurred on 2026-07-14 from commit `a660c97`, producing Worker version `e86fb87e-8ace-4972-a8a2-dba9682a6a55` with this schema-0003, transform-version-6 database. Black-box audits then found guided-workflow, Hebrew morphology interpretation, historical presenter/search/browse, and derivation-output issues. Corrective code is in the PR candidate and must pass CI, protected preview redeployment, and a new black-box audit before production can be considered. | Retain the independently verified PR #27 Worker version `734aec3b-d6c3-456b-a203-c7f940a2d081` with `theologai-preview-20260713-c` as the immediate matched rollback pair. Also retain `theologai-preview-20260712-b` with Worker version `3c8ad7ef-50ed-42a7-9c71-2ac8c2dd6d7f` as older matched rollback history. Do not delete another database without separate owner approval. |
+| Preview | `theologai-preview-20260714-a` | Protected run `29354086467` / job `87160929896` deployed corrective application commit `4760dbd` on 2026-07-14 as Worker version `5dd1fa0c-343c-4af4-83e6-b65003fb51c4` with this schema-0003, transform-version-6 database. All required CI checks and Verify Pins passed. Targeted and independent full-surface black-box re-audits found no P0-P2 issues and confirmed the previously identified P0-P2 guided-workflow, Hebrew morphology interpretation, historical presenter/search/browse, and derivation-output release findings were fixed. This is the audited corrective application evidence; a later docs-only deployment may have a different Worker UUID without changing that evidence. | Retain the independently verified PR #27 Worker version `734aec3b-d6c3-456b-a203-c7f940a2d081` with `theologai-preview-20260713-c` as the immediate matched rollback pair. Also retain `theologai-preview-20260712-b` with Worker version `3c8ad7ef-50ed-42a7-9c71-2ac8c2dd6d7f` as older matched rollback history. Do not delete another database without separate owner approval. |
 
 ### Retained immediate production rollback database
 
@@ -116,7 +117,7 @@ removed after the audit.
 At the time of this preview audit, production configuration, data, and Worker
 were unchanged. The later protected production release is recorded above.
 
-### Deployed transform-version-6 preview candidate under correction
+### Verified corrective transform-version-6 preview candidate
 
 The reconciled integrated candidate's four core feature commits are `2c2a29a`,
 `eccfad4`, `1b95201`, and `2506413`. On top of the PR #27 merge, the candidate
@@ -140,10 +141,16 @@ producing Worker version `e86fb87e-8ace-4972-a8a2-dba9682a6a55` with
 `theologai-preview-20260714-a` bound.
 Black-box audits found guided-workflow, Hebrew morphology interpretation,
 historical presenter/search/browse, and derivation-output issues. Corrective
-code is now in the PR candidate, but it must pass CI, protected preview
-redeployment, and a new black-box audit before the candidate is release-ready.
-This record intentionally does not predict the Worker version that a corrective
-redeployment will produce. Retain the verified PR #27 Worker version
+Corrective application commit `4760dbd` passed all required CI checks and Verify
+Pins, then protected run `29354086467` / job `87160929896` deployed it on
+2026-07-14 as
+Worker version `5dd1fa0c-343c-4af4-83e6-b65003fb51c4` with the same prepared D1
+database. Targeted and independent full-surface black-box re-audits found no
+P0-P2 issues and confirmed all previously identified P0-P2 release findings
+were fixed. This is the audited corrective application evidence; this record
+intentionally does not
+predict the Worker UUID produced by any later docs-only deployment. Retain the
+verified PR #27 Worker version
 `734aec3b-d6c3-456b-a203-c7f940a2d081` with `theologai-preview-20260713-c` as the
 immediate matched preview rollback pair, and retain
 `theologai-preview-20260712-b` with Worker version
@@ -152,9 +159,9 @@ immediate matched preview rollback pair, and retain
 
 The owner separately authorized deletion of only the unused legacy database
 `theologai-db-preview` (`f9f415e1-219b-4d17-bcf5-33a8abad02fa`), and that deletion
-was completed on 2026-07-14. No other database deletion is authorized. The
-corrective cycle remains preview-only; production is untouched and requires a
-separate decision and protected release process.
+was completed on 2026-07-14. No other database deletion is authorized.
+Production is untouched and requires a separate owner decision and protected
+release process.
 
 ### Hebrew-lemma materialization follow-up
 

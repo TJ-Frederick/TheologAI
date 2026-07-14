@@ -115,20 +115,25 @@ occurred on 2026-07-14 from commit `a660c97`, producing Worker version
 `theologai-preview-20260714-a` bound. Black-box audits found guided-workflow,
 Hebrew morphology interpretation, historical
 presenter/search/browse, and derivation-output issues. Corrective code is now in
-the PR candidate, but it must pass CI, protected preview redeployment, and a new
-black-box audit before production can be considered. This status does not bind
-the corrective release to an as-yet unknown final Worker version. Retain the
-verified PR #27 Worker version `734aec3b-d6c3-456b-a203-c7f940a2d081` with
+the PR candidate. Corrective application commit `4760dbd` passed all required
+CI checks and Verify Pins, then protected run `29354086467` / job `87160929896`
+deployed it on
+2026-07-14 as Worker version `5dd1fa0c-343c-4af4-83e6-b65003fb51c4` with the
+same D1 database. Targeted and independent full-surface black-box re-audits
+found no P0-P2 issues and confirmed all previously identified P0-P2 release
+findings were fixed. This is the audited corrective application evidence and
+does not predict the Worker UUID
+produced by any later docs-only deployment. Retain the verified PR #27 Worker
+version `734aec3b-d6c3-456b-a203-c7f940a2d081` with
 `theologai-preview-20260713-c` as the immediate matched rollback pair;
 `theologai-preview-20260712-b` remains older matched rollback history. PRs #28
 and #29 are closed as superseded by PR #30.
 
 The one-off owner-authorized deletion of unused legacy database
 `theologai-db-preview` (`f9f415e1-219b-4d17-bcf5-33a8abad02fa`) was completed.
-No other database deletion is authorized. The next release action is to finish
-CI, redeploy the corrective candidate through the protected preview workflow,
-and repeat the black-box audit. Production remains untouched and separately
-gated.
+No other database deletion is authorized. The corrective preview gate is
+complete. Production remains untouched and requires a separate owner decision
+and protected release process.
 
 ## Release gates
 
@@ -159,9 +164,12 @@ Code readiness and operational readiness are deliberately separate:
 
 ## Next work
 
-- Finish CI for the corrective transform-version-6 candidate, redeploy it
-  through the protected preview workflow, and repeat the full black-box audit
-  before considering production promotion.
+- Complete any final docs-only PR verification, then pause at the separate owner
+  gate before production merge or promotion.
+- Normalize direct `original_language_study` English targets for compound-affix
+  glosses, such as target `heavens` versus local gloss `the/ heavens`. The
+  guided workflow already succeeds, so this is a nonblocking follow-up rather
+  than a release blocker.
 - Broaden advanced original-language study only after those foundations, using
   carefully sourced semantic-domain and discourse evidence useful to both
   beginners and readers of Greek or Hebrew.
