@@ -30,6 +30,10 @@ export function createPrimarySourceSearchHandler(service: Pick<PrimarySourceSear
                 description: 'Current public provider contract. Only the locally indexed collection is available.',
               },
               match: { type: 'string', enum: ['all_terms', 'phrase'], default: 'all_terms' },
+              selection: {
+                type: 'string', enum: ['relevance', 'work_diversity'], default: 'relevance',
+                description: 'Use relevance for within-work location; use work_diversity for deterministic research bundles that round-robin across matching hosted works.',
+              },
               author: { type: 'string', minLength: 1, maxLength: 100, description: 'One exact reviewed creator name. Use separate query-plan items for different creators; creator roles are not relabeled as authorship.' },
               work: { type: 'string', minLength: 1, maxLength: 160, description: 'Exact hosted work slug, title, or lookup-only alias.' },
               startYear: { type: 'integer', minimum: -5000, maximum: 3000, description: 'Inclusive lower bound. A work is eligible when its reviewed composition interval overlaps the requested interval.' },

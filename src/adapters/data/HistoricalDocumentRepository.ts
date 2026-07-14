@@ -16,7 +16,7 @@ import type {
 import {
   composeLocalPrimarySourceFtsQuery,
   LOCAL_PRIMARY_SOURCE_SEARCH_SQL,
-  localPrimarySourceScopedSearchSql,
+  localPrimarySourceSearchSql,
 } from '../shared/primarySourceSearchSql.js';
 import { mapDocumentDatabaseRow } from '../shared/historicalDocumentMetadata.js';
 
@@ -134,10 +134,14 @@ export class HistoricalDocumentRepository implements IHistoricalDocumentReposito
   searchPrimarySources(options: PrimarySourceLocalSearchOptions): PrimarySourceLocalSearchRow[] {
     validatePrimarySourceOptions(options);
     const ftsQuery = composeLocalPrimarySourceFtsQuery(options.text, options.match);
+    const selection = options.selection ?? 'relevance';
+    const sql = localPrimarySourceSearchSql(selection, options.documentIds?.length);
+    const statement = selection === 'relevance' && options.documentIds === undefined
+      ? this.stmtPrimarySourceSearch
+      : this.db.prepare(sql);
     const rows = options.documentIds
-      ? this.db.prepare(localPrimarySourceScopedSearchSql(options.documentIds.length))
-        .all(ftsQuery, ...options.documentIds, options.limit)
-      : this.stmtPrimarySourceSearch.all(ftsQuery, options.limit);
+      ? statement.all(ftsQuery, ...options.documentIds, options.limit)
+      : statement.all(ftsQuery, options.limit);
     return (rows as PrimarySourceSearchDatabaseRow[]).map(mapPrimarySourceRow);
   }
 
@@ -192,7 +196,8 @@ function mapPrimarySourceRow(row: PrimarySourceSearchDatabaseRow): PrimarySource
 function validatePrimarySourceOptions(options: PrimarySourceLocalSearchOptions): void {
   if (!options || typeof options.text !== 'string' || options.text.length < 1) throw new Error('Primary-source search text is required');
   if (options.match !== 'all_terms' && options.match !== 'phrase') throw new Error('Primary-source match mode is invalid');
-  if (!Number.isSafeInteger(options.limit) || options.limit < 1 || options.limit > 8) throw new Error('Primary-source limit must be 1..8');
+  if (options.selection !== undefined && options.selection !== 'relevance' && options.selection !== 'work_diversity') throw new Error('Primary-source selection is invalid');
+  if (!Number.isSafeInteger(options.limit) || options.limit < 1 || options.limit > 9) throw new Error('Primary-source internal limit must be 1..9');
   if (options.documentIds !== undefined && (!Array.isArray(options.documentIds)
     || options.documentIds.length < 1 || options.documentIds.length > 17
     || options.documentIds.some(id => typeof id !== 'string' || id.length < 1)

@@ -140,11 +140,14 @@ describe('SQLite and D1 repository parity with identical real data', () => {
       INSERT INTO morph_codes VALUES ('V-AAI-3S', 'Verb Aorist Active Indicative 3rd Singular');
 
       INSERT INTO documents VALUES
-        ('nicene-creed', 'Nicene Creed', 'creed', '381', '{"topics":["trinity"]}');
+        ('nicene-creed', 'Nicene Creed', 'creed', '381', '{"topics":["trinity"]}'),
+        ('augsburg-confession', 'Augsburg Confession', 'confession', '1530', '{"topics":["doctrine"]}');
       INSERT INTO document_sections
         (id, document_id, section_number, title, content, topics) VALUES
         (1, 'nicene-creed', '1', 'The Creed', 'We believe in one almighty God.', '["trinity","God"]'),
-        (2, 'nicene-creed', '2', NULL, 'And in one Lord Jesus Christ.', NULL);
+        (2, 'nicene-creed', '2', NULL, 'And in one Lord Jesus Christ.', NULL),
+        (3, 'augsburg-confession', '1', 'God', 'Our churches teach with common consent one divine essence.', NULL),
+        (4, 'augsburg-confession', '2', 'The Son', 'One Christ is true God and true man.', NULL);
       INSERT INTO sections_fts(rowid, title, content, topics)
         SELECT id, title, content, topics FROM document_sections ORDER BY id;
     `);
@@ -212,13 +215,21 @@ describe('SQLite and D1 repository parity with identical real data', () => {
     });
     await expect(d1Historical.findDocumentByName('Nicene'))
       .resolves.toEqual(sqliteHistorical.findDocumentByName('Nicene'));
-    const primaryOptions = { text: 'one almighty', match: 'all_terms' as const, documentId: 'nicene-creed', limit: 8 };
+    const primaryOptions = { text: 'one almighty', match: 'all_terms' as const, documentIds: ['nicene-creed'], limit: 8 };
     await expect(d1Historical.searchPrimarySources(primaryOptions))
       .resolves.toEqual(sqliteHistorical.searchPrimarySources(primaryOptions));
     expect(sqliteHistorical.searchPrimarySources(primaryOptions)[0]).toMatchObject({
       document: { id: 'nicene-creed', title: 'Nicene Creed' },
       section: { section_number: '1' },
     });
+    const workDiverseOptions = {
+      text: 'one', match: 'all_terms' as const, selection: 'work_diversity' as const, limit: 3,
+    };
+    const sqliteDiverse = sqliteHistorical.searchPrimarySources(workDiverseOptions);
+    await expect(d1Historical.searchPrimarySources(workDiverseOptions)).resolves.toEqual(sqliteDiverse);
+    expect(new Set(sqliteDiverse.slice(0, 2).map(row => row.document.id))).toEqual(
+      new Set(['nicene-creed', 'augsburg-confession']),
+    );
   });
 
   it('returns identical morphology with shared fallback and canonical book ordering', async () => {

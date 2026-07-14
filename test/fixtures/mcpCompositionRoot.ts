@@ -138,7 +138,10 @@ export function createDeterministicMcpFixture(): DeterministicMcpFixture {
   const historicalService = new HistoricalDocumentService(historicalRepository);
   const primarySourceSearchService = new PrimarySourceSearchService(
     new LocalPrimarySourceSearchProvider(historicalRepository),
-    { search: async () => ({ provider: 'ccel_live', status: 'disabled', searched: false, page: 1, hitCount: 0, hits: [], notices: [] }) },
+    { search: async () => ({
+      provider: 'ccel_live', status: 'disabled', searched: false, page: 1, hitCount: 0, hits: [], notices: [],
+      resultWindow: { returnedHitCount: 0, additionalMatchStatus: 'not_evaluated' },
+    }) },
     { ccelLiveSearch: false },
   );
   const strongsService = new StrongsService(strongsRepository, morphologyRepository);

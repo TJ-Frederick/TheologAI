@@ -8,10 +8,14 @@ export function formatPrimarySourceSearch(result: PresentedPrimarySourceSearch):
     '',
   ];
   for (const query of result.queries) {
-    lines.push(`## Query \`${safe(query.id)}\``, '', `Match mode: ${query.normalizedMode}`, '');
+    lines.push(
+      `## Query \`${safe(query.id)}\``, '',
+      `Match mode: ${query.normalizedMode} · Selection: ${query.normalizedSelection}`, '',
+    );
     for (const provider of query.providers) {
       const name = provider.provider === 'local' ? 'Local historical index' : 'CCEL live search';
       lines.push(`### ${name}`, '', `Status: **${provider.status}** · Returned hits: ${provider.hitCount}`, '');
+      lines.push(`Result window: ${provider.resultWindow.additionalMatchStatus}`, '');
       if (provider.scope) {
         const requested = [
           provider.scope.requested.work ? `work=${safe(provider.scope.requested.work)}` : '',

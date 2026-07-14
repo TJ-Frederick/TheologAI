@@ -41,7 +41,7 @@ fresh server and transport.
 | `parallel_passages` | Return complete UBS source-attested parallel groups by default; legacy curated edges and OpenBible.info cross references require explicit selectors and remain separate. |
 | `commentary_lookup` | Retrieve Matthew Henry, JFB, Adam Clarke, John Gill, Keil-Delitzsch (OT), or Tyndale notes. |
 | `classic_text_lookup` | Search and browse the 17 locally indexed historical documents. Remote CCEL document bodies are not retrieved or republished. |
-| `primary_source_search` | Execute a bounded local query plan with versioned structured results, exact work/creator and inclusive composition-year scope, explicit catalog coverage, and native links to exact section resources. Snippets remain discovery-only. |
+| `primary_source_search` | Execute a bounded local query plan with v3 structured results, relevance or deterministic work-diverse selection, honest result windows, exact work/creator and inclusive composition-year scope, explicit catalog coverage, and native links to exact section resources. Snippets remain discovery-only. |
 | `original_language_lookup` | Look up or search Strong's entries, with opt-in exact corrected-corpus usage and bounded occurrence pages for exact identities. |
 | `bible_verse_morphology` | Return word-by-word morphology for a specific verse. |
 | `original_language_study` | Resolve and study one Greek or Hebrew token in one verse with contextual morphology, source-separated lexical evidence, and explicit interpretive limits. |
@@ -74,7 +74,9 @@ content. Bible, parallel-passage, and original-language structured results
 include bounded, result-local provenance records. Primary-source results do not
 invent edition provenance records: their evidence policy explicitly marks
 edition provenance incomplete, and they link only canonical local sections with
-exact UTF-8 sizes. All other tools retain their current Markdown-only result
+exact UTF-8 sizes. Their result windows say only whether one additional match
+was directly observed through private lookahead; they do not imply exhaustive
+counts. All other tools retain their current Markdown-only result
 contract.
 
 ### Resources
@@ -83,6 +85,7 @@ contract.
 |---|---|
 | `theologai://translations` | Available Bible translations. |
 | `theologai://commentaries` | Available commentary sources. |
+| `theologai://primary-sources/catalog` | JSON metadata inventory for the hosted primary-source collection; no document bodies or provenance URLs. |
 | `theologai://documents/{slug}` | A locally indexed creed, confession, or catechism. |
 | `theologai://strongs/{number}` | A Strong's dictionary entry such as `G26` or `H430`. |
 
@@ -93,8 +96,8 @@ contract.
 | `word-study` | Strong's lookup/search, morphology, context, and synthesis. |
 | `passage-exegesis` | Text, language, cross references, commentary, and historical theology. |
 | `compare-translations` | Compare translation choices against morphology and lexical data. |
-| `confession-study` | Compare a doctrine across the locally indexed historical collection. |
-| `primary-source-research` | Survey a topic or scope separate creator, exact-work, and composition-year searches, then read selected exact sections as evidence. |
+| `confession-study` | Inspect the hosted catalog, build a work-diverse doctrinal survey, then read selected exact sections. |
+| `primary-source-research` | Inspect the catalog; use work diversity for topic/creator surveys or relevance within one work; then read at most five unique exact sections as evidence. |
 | `donate` | Explain voluntary donation options. |
 
 ## Content scope and provenance

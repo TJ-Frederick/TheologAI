@@ -6,6 +6,7 @@
  */
 
 export type PrimarySourceSearchMatch = 'all_terms' | 'phrase';
+export type PrimarySourceSelection = 'relevance' | 'work_diversity';
 
 export type PrimarySourceRequestedProvider = 'local' | 'ccel';
 
@@ -30,6 +31,7 @@ export interface PrimarySourceSearchQuery {
   endYear?: number;
   page?: number;
   limit?: number;
+  selection?: PrimarySourceSelection;
 }
 
 export interface CcelSectionLocator {
@@ -102,14 +104,21 @@ export type PrimarySourcePlanHit = PrimarySourceSearchHit & {
   queryId: string;
 };
 
-export interface PrimarySourcePlanProviderResult extends Omit<PrimarySourceProviderResult, 'hits'> {
+export interface PrimarySourcePlanProviderResult extends Omit<PrimarySourceProviderResult, 'hits' | 'resultWindow'> {
   hits: PrimarySourcePlanHit[];
+  resultWindow: PrimarySourceResultWindow;
 }
 
 export interface PrimarySourcePlanQueryResult {
   id: string;
   normalizedMode: PrimarySourceSearchMatch;
+  normalizedSelection: PrimarySourceSelection;
   providers: PrimarySourcePlanProviderResult[];
+}
+
+export interface PrimarySourceResultWindow {
+  returnedHitCount: number;
+  additionalMatchStatus: 'additional_match_observed' | 'no_additional_match_observed' | 'not_evaluated';
 }
 
 export interface PrimarySourceSearchCoverage {
@@ -136,6 +145,8 @@ export interface PrimarySourceProviderResult {
   searched: boolean;
   page: number;
   hitCount: number;
+  /** Added by local lookahead; the plan service normalizes dormant providers to not_evaluated. */
+  resultWindow?: PrimarySourceResultWindow;
   hits: PrimarySourceSearchHit[];
   notices: string[];
   scope?: PrimarySourceCatalogScope;

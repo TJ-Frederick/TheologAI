@@ -3,6 +3,7 @@ import { buildLocalDocumentResourceUri } from '../../kernel/documentResource.js'
 import {
   LOCAL_PRIMARY_SOURCE_ATTRIBUTION,
   type PrimarySourceProviderResult,
+  type PrimarySourceResultWindow,
   type PrimarySourceSearchQuery,
 } from './primarySourceTypes.js';
 import { formatLocalDocumentSectionResource } from '../../formatters/historicalFormatter.js';
@@ -13,6 +14,7 @@ export class LocalPrimarySourceSearchProvider {
   async search(input: PrimarySourceSearchQuery): Promise<PrimarySourceProviderResult> {
     const page = input.page ?? 1;
     const limit = input.limit ?? 5;
+    const selection = input.selection ?? 'relevance';
     if (page !== 1) {
       return result('unsupported_filter', page, false, [], ['The local historical index does not support pagination; page was not silently ignored.']);
     }
@@ -25,10 +27,12 @@ export class LocalPrimarySourceSearchProvider {
     const rows = await this.repository.searchPrimarySources({
       text: input.text,
       match: input.match ?? 'all_terms',
+      selection,
       ...(selected.restricted ? { documentIds: selected.documents.map(document => document.id) } : {}),
-      limit,
+      limit: limit + 1,
     });
-    const hits = rows.map((row, index) => ({
+    const additionalMatchObserved = rows.length > limit;
+    const hits = rows.slice(0, limit).map((row, index) => ({
       provider: 'local' as const,
       title: row.document.title,
       ...(row.section.title ? { sectionLabel: row.section.title } : {}),
@@ -52,7 +56,10 @@ export class LocalPrimarySourceSearchProvider {
         formatLocalDocumentSectionResource(row.document, row.section),
       ).byteLength,
     }));
-    return result(hits.length > 0 ? 'ok' : 'no_results', page, true, hits, selected.notices, selected.scope);
+    return result(
+      hits.length > 0 ? 'ok' : 'no_results', page, true, hits, selected.notices, selected.scope,
+      additionalMatchObserved ? 'additional_match_observed' : 'no_additional_match_observed',
+    );
   }
 }
 
@@ -63,8 +70,13 @@ function result(
   hits: PrimarySourceProviderResult['hits'] = [],
   notices: string[] = [],
   scope?: PrimarySourceProviderResult['scope'],
+  additionalMatchStatus: PrimarySourceResultWindow['additionalMatchStatus'] = 'not_evaluated',
 ): PrimarySourceProviderResult {
-  return { provider: 'local', status, searched, page, hitCount: hits.length, hits, notices, ...(scope ? { scope } : {}) };
+  return {
+    provider: 'local', status, searched, page, hitCount: hits.length, hits, notices,
+    resultWindow: { returnedHitCount: hits.length, additionalMatchStatus },
+    ...(scope ? { scope } : {}),
+  };
 }
 
 function normalizeForExactComparison(value: string): string {
