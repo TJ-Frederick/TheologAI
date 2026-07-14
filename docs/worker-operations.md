@@ -115,23 +115,37 @@ removed after the audit.
 At the time of this preview audit, production configuration, data, and Worker
 were unchanged. The later protected production release is recorded above.
 
-### Unreleased transform-version-6 candidate
+### Prepared transform-version-6 preview candidate
 
 The reconciled integrated candidate's four core feature commits are `2c2a29a`,
 `eccfad4`, `1b95201`, and `2506413`. On top of the PR #27 merge, the candidate
 also requires the downstream Unicode-manifest preservation fix `a1c9da3` and
 source-lock synchronization `e8282c3`; the separate `e6f7f7f` commit reconciles
 release documentation. The candidate introduces migration
-`0003_original_language_usage` and transform version 6. It is unmerged,
-unreleased, and has not been materialized or prepared for preview.
+`0003_original_language_usage` and transform version 6. It is unmerged and
+unreleased. Draft PR #30 now points its reviewable preview configuration at the
+freshly prepared `theologai-preview-20260714-a` database
+(`0dab804f-8df0-4727-93bd-299612b6e179`). That database was migrated through
+`0003_original_language_usage`, populated from all 36 manifest seed files, and
+passed the strict read-only remote readiness gate with zero writes.
 
 The candidate whole-D1 identity
 `c334b4b91c3a7c334a9425937c7f99473f27014ddae6cea377ee38bd578a6707` and scoped
 usage identity
-`c3600bb55da75aa600f8c97885efa7d58a3e8c29c3fcc6445a553091011beabd` are
-provisional until deterministic regeneration and the full verification suite
-pass on the reconciled branch. Draft PRs #28 and #29 will be superseded only
-after their durable content is confirmed present in the consolidated PR.
+`c3600bb55da75aa600f8c97885efa7d58a3e8c29c3fcc6445a553091011beabd` match the
+values verified by the prepared database's readiness contract. This is not
+deployment evidence:
+preview still serves Worker version `734aec3b-d6c3-456b-a203-c7f940a2d081`
+against `theologai-preview-20260713-c` until PR #30 passes the protected preview
+deployment workflow. Retain `theologai-preview-20260712-b` with Worker version
+`3c8ad7ef-50ed-42a7-9c71-2ac8c2dd6d7f` as the matched preview rollback pair.
+PRs #28 and #29 are closed as superseded by PR #30.
+
+The owner separately authorized deletion of only the unused legacy database
+`theologai-db-preview` (`f9f415e1-219b-4d17-bcf5-33a8abad02fa`), and that deletion
+was completed on 2026-07-14. No other database deletion is authorized. Preview
+promotion remains preview-only; production preparation and promotion require a
+separate decision and protected release process.
 
 ### Hebrew-lemma materialization follow-up
 

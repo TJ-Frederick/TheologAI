@@ -101,15 +101,24 @@ keyset pagination, progressive original-language output levels, and curated
 catalog scope for primary-source research. The separate `e6f7f7f` commit
 reconciles release documentation for this candidate.
 
-This transform-version-6 candidate is unmerged, unreleased, and not prepared
-for preview. Its whole-D1 identity
+This transform-version-6 candidate is unmerged and unreleased. Draft PR #30 has
+a fresh prepared preview candidate,
+`theologai-preview-20260714-a`, migrated through schema 0003, populated from all
+36 manifest seed files, and verified by the strict read-only remote readiness
+gate. Its whole-D1 identity
 `c334b4b91c3a7c334a9425937c7f99473f27014ddae6cea377ee38bd578a6707` and scoped
 usage identity
 `c3600bb55da75aa600f8c97885efa7d58a3e8c29c3fcc6445a553091011beabd` are
-provisional until the rebased candidate completes deterministic reproduction,
-full verification, and independent release review. Draft PRs #28 and #29 will
-be superseded by the consolidated candidate after their durable content is
-confirmed present; they are not yet recorded as closed.
+verified for the prepared corpus. It is not yet deployed: preview still serves
+Worker version `734aec3b-d6c3-456b-a203-c7f940a2d081` with
+`theologai-preview-20260713-c`; `theologai-preview-20260712-b` remains its matched
+rollback database. PRs #28 and #29 are closed as superseded by PR #30.
+
+The one-off owner-authorized deletion of unused legacy database
+`theologai-db-preview` (`f9f415e1-219b-4d17-bcf5-33a8abad02fa`) was completed.
+No other database deletion is authorized. The next release action is a
+preview-only protected deployment and audit; production remains a separate
+promotion decision.
 
 ## Release gates
 
