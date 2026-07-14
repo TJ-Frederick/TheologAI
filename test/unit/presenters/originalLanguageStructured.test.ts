@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { presentOriginalLanguageEntry, presentOriginalLanguageSearch } from '../../../src/presenters/originalLanguageStructured.js';
+import { MORPHOLOGY_USAGE_IDENTITY } from '../../../src/kernel/morphologyUsageCursor.js';
+import { STEPBIBLE_SOURCE } from '../../../src/kernel/stepBibleSource.js';
 
 describe('original-language structured presenter', () => {
   it('keeps ambiguous search results at summary level without guessing nextStep', () => {
@@ -79,7 +81,8 @@ describe('original-language structured presenter', () => {
         id: 'src-2',
         rightsNotice: 'CC BY 4.0',
         license: { label: 'CC BY 4.0' },
-        attribution: 'Tyndale House, Cambridge',
+        attribution: 'Tyndale House, Cambridge / STEP Bible (www.stepbible.org)',
+        version: '0f60797c170f11a1f8dc75c5f7617973e2e66b0d',
       },
     ]);
   });
@@ -107,7 +110,9 @@ describe('original-language structured presenter', () => {
       label: 'STEPBible lexicon data',
       rightsNotice: 'CC BY 4.0 (Tyndale House, Cambridge)',
       license: { label: 'CC BY 4.0', url: 'https://creativecommons.org/licenses/by/4.0/' },
-      attribution: 'Tyndale House, Cambridge',
+      attribution: 'Tyndale House, Cambridge / STEP Bible (www.stepbible.org)',
+      version: '0f60797c170f11a1f8dc75c5f7617973e2e66b0d',
+      url: 'https://github.com/STEPBible/STEPBible-Data/tree/0f60797c170f11a1f8dc75c5f7617973e2e66b0d',
     })]);
   });
 
@@ -128,7 +133,13 @@ describe('original-language structured presenter', () => {
       exactMorphologyKey: 'H0430', sourceSurfaceVariants: [{ sourceForm: 'אֱלֹהִ֑ים' }], provenanceIds: ['src-usage'],
     });
     expect(result.provenance).toContainEqual(expect.objectContaining({
-      id: 'src-usage', kind: 'morphology_dataset', license: { label: 'CC BY 4.0', url: expect.any(String) },
+      id: 'src-usage',
+      kind: 'morphology_dataset',
+      license: { label: 'CC BY 4.0', url: expect.any(String) },
+      version: MORPHOLOGY_USAGE_IDENTITY,
+      url: STEPBIBLE_SOURCE.commitUrl,
+      attribution: STEPBIBLE_SOURCE.attribution,
+      note: expect.stringContaining(`upstream STEPBible source commit ${STEPBIBLE_SOURCE.commitSha}`),
     }));
   });
 

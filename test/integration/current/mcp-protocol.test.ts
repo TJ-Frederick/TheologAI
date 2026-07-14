@@ -100,6 +100,7 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
         'parallel_passages',
         'primary_source_search',
         'original_language_lookup',
+        'bible_verse_morphology',
         'original_language_study',
       ]);
       expect(listed.tools.find(tool => tool.name === 'bible_lookup')?.outputSchema).toMatchObject({
@@ -111,6 +112,15 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
         type: 'object',
         additionalProperties: false,
         properties: { schemaVersion: { const: '1' }, kind: { const: 'original_language_lookup' } },
+      });
+      expect(listed.tools.find(tool => tool.name === 'bible_verse_morphology')?.outputSchema).toMatchObject({
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          schemaVersion: { const: '1' },
+          kind: { const: 'bible_verse_morphology' },
+          words: { maxItems: 200 },
+        },
       });
       expect(listed.tools).toEqual(expect.arrayContaining([
         expect.objectContaining({

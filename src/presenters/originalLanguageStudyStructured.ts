@@ -1,6 +1,7 @@
 import type { ProvenanceRecord } from '../kernel/provenance.js';
 import type { OriginalLanguageStudyDomainResult, StudyToken } from '../services/languages/OriginalLanguageStudyService.js';
 import { normalizeLexiconText } from '../kernel/lexiconText.js';
+import { createStepBibleProvenance } from '../kernel/stepBibleSource.js';
 
 export const INTERPRETIVE_LIMITS = [
   ['context_controls_sense', 'Context controls the sense of a word in a verse.'],
@@ -9,7 +10,7 @@ export const INTERPRETIVE_LIMITS = [
   ['etymology_not_determinative', 'Derivation and roots do not determine contextual meaning.'],
   ['morphology_not_determinative', 'Grammar constrains interpretation but rarely settles it alone.'],
   ['avoid_illegitimate_totality_transfer', 'Do not import every possible sense into one occurrence.'],
-  ['corpus_scope_limit', 'Source classification is Greek or Hebrew; this result does not infer Aramaic, and exact upstream revision is not yet exposed.'],
+  ['corpus_scope_limit', 'Source classification is Greek or Hebrew; this result does not infer Aramaic. The exact pinned STEPBible revision is identified in provenance.'],
 ].map(([code, message]) => ({ code, message }));
 
 export function presentOriginalLanguageStudy(result: OriginalLanguageStudyDomainResult, position?: number): Record<string, unknown> {
@@ -45,8 +46,8 @@ export function presentOriginalLanguageStudy(result: OriginalLanguageStudyDomain
 
 function provenanceRecords(): ProvenanceRecord[] {
   return [
-    { id: 'stepbible-morphology', kind: 'morphology_dataset', label: 'STEPBible TAGNT/TAHOT', url: 'https://github.com/STEPBible/STEPBible-Data', license: { label: 'CC BY 4.0', url: 'https://creativecommons.org/licenses/by/4.0/' }, attribution: 'Tyndale House, Cambridge', status: 'verified_source', note: 'Exact upstream revision is not exposed by this corpus build.' },
+    createStepBibleProvenance({ id: 'stepbible-morphology', kind: 'morphology_dataset', label: 'STEPBible TAGNT/TAHOT' }),
     { id: 'openscriptures-strongs', kind: 'lexicon', label: "Strong's Concordance", url: 'https://github.com/openscriptures/strongs', license: { label: 'Public Domain' }, attribution: 'OpenScriptures', status: 'verified_source' },
-    { id: 'stepbible-lexicon', kind: 'lexicon', label: 'STEPBible lexicon data', url: 'https://github.com/STEPBible/STEPBible-Data', license: { label: 'CC BY 4.0', url: 'https://creativecommons.org/licenses/by/4.0/' }, attribution: 'Tyndale House, Cambridge', status: 'verified_source', note: 'Exact upstream revision is not exposed by this corpus build.' },
+    createStepBibleProvenance({ id: 'stepbible-lexicon', kind: 'lexicon', label: 'STEPBible lexicon data' }),
   ];
 }

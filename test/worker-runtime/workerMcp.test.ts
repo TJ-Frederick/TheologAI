@@ -129,6 +129,13 @@ describe('Worker MCP endpoint in workerd', () => {
           outputSchema: expect.objectContaining({ type: 'object', additionalProperties: false }),
         }),
         expect.objectContaining({
+          name: 'bible_verse_morphology',
+          outputSchema: expect.objectContaining({
+            type: 'object', additionalProperties: false,
+            properties: expect.objectContaining({ kind: { const: 'bible_verse_morphology' } }),
+          }),
+        }),
+        expect.objectContaining({
           name: 'primary_source_search',
           outputSchema: expect.objectContaining({ type: 'object', additionalProperties: false }),
         }),
@@ -285,6 +292,24 @@ describe('Worker MCP endpoint in workerd', () => {
           text: expect.stringMatching(/John 3:16[\s\S]*Οὕτως[\s\S]*Adverb[\s\S]*thus/),
         }),
       ],
+      structuredContent: {
+        schemaVersion: '1',
+        kind: 'bible_verse_morphology',
+        reference: 'John 3:16',
+        testament: 'NT',
+        language: 'Greek',
+        words: expect.arrayContaining([expect.objectContaining({
+          text: 'Οὕτως',
+          morphologyCode: expect.any(String),
+          morphologyExpansion: 'Adverb',
+          provenanceIds: ['stepbible-morphology'],
+          lemmaProvenanceIds: ['stepbible-morphology'],
+        })]),
+        provenance: [expect.objectContaining({
+          id: 'stepbible-morphology',
+          kind: 'morphology_dataset',
+        })],
+      },
     });
   });
 

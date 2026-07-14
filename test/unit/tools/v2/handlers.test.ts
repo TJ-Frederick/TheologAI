@@ -27,6 +27,8 @@ import { StrongsService as StrongsServiceClass } from '../../../../src/services/
 import { readFileSync } from 'node:fs';
 import type { ToolHandler, ToolResult } from '../../../../src/kernel/types.js';
 import type { DocumentInfo, DocumentSection } from '../../../../src/kernel/repositories.js';
+import { formatMorphologyResult } from '../../../../src/formatters/languagesFormatter.js';
+import { validatorFor } from '../../../../src/mcp/validation.js';
 
 function serviceDouble<T>(methods: Partial<{ [K in keyof T]: T[K] }>): T {
   return methods as unknown as T;
@@ -811,9 +813,9 @@ describe('original_language_lookup handler', () => {
 
 describe('bible_verse_morphology handler', () => {
   it('forwards expansion and formats expanded morphology', async () => {
-    const getVerseMorphology = vi.fn<MorphologyService['getVerseMorphology']>().mockResolvedValue({
+    const serviceResult = {
       reference: 'John 1:1',
-      testament: 'NT',
+      testament: 'NT' as const,
       book: 'John',
       chapter: 1,
       verse: 1,
@@ -827,14 +829,25 @@ describe('bible_verse_morphology handler', () => {
         gloss: 'in',
       }],
       citation,
-    });
+    };
+    const getVerseMorphology = vi.fn<MorphologyService['getVerseMorphology']>().mockResolvedValue(serviceResult);
     const handler = createVerseMorphologyHandler(serviceDouble({ getVerseMorphology }));
 
     const result = await handler.handler({ reference: 'John 1:1', expand_morphology: true });
 
     expect(getVerseMorphology).toHaveBeenCalledWith('John 1:1', true);
-    expect(textOf(result)).toContain('Word-by-Word Greek Analysis');
-    expect(textOf(result)).toContain('| preposition |');
+    expect(textOf(result)).toBe(formatMorphologyResult(serviceResult));
+    expect(result.structuredContent).toMatchObject({
+      schemaVersion: '1',
+      kind: 'bible_verse_morphology',
+      words: [{
+        strongsNumber: 'G1722',
+        morphologyCode: 'PREP',
+        morphologyExpansion: 'preposition',
+        gloss: 'in',
+      }],
+    });
+    expect(validatorFor(handler.outputSchema!)(result.structuredContent).valid).toBe(true);
   });
 
   it('returns service failures as tool errors', async () => {

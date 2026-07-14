@@ -124,6 +124,7 @@ describe('published project contract', () => {
       toolCount: 11,
       structuredTools: [
         'bible_lookup',
+        'bible_verse_morphology',
         'original_language_lookup',
         'original_language_study',
         'parallel_passages',
