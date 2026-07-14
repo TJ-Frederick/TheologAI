@@ -43,7 +43,7 @@ fresh server and transport.
 | `classic_text_lookup` | Search and browse the 17 locally indexed historical documents. Remote CCEL document bodies are not retrieved or republished. |
 | `primary_source_search` | Execute a bounded local query plan with v3 structured results, relevance or deterministic work-diverse selection, honest result windows, exact work/creator and inclusive composition-year scope, explicit catalog coverage, and native links to exact section resources. Snippets remain discovery-only. |
 | `original_language_lookup` | Look up or search Strong's entries, with opt-in exact corrected-corpus usage and bounded occurrence pages for exact identities. |
-| `bible_verse_morphology` | Return word-by-word morphology for a specific verse. |
+| `bible_verse_morphology` | Return bounded word-by-word morphology for one exact verse, with raw codes, nullable expansions, and separate pinned STEPBible morphology/lemma provenance. |
 | `original_language_study` | Resolve and study one Greek or Hebrew token in one verse with contextual morphology, source-separated lexical evidence, and explicit interpretive limits. |
 | `donation_config` | Return voluntary-donation recipient, asset, and chain configuration. |
 | `verify_donation` | Classify a transaction and confirm only supported transfers to the configured recipient. |

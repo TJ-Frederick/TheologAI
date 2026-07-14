@@ -135,20 +135,33 @@ No other database deletion is authorized. The corrective preview gate is
 complete. Production remains untouched and requires a separate owner decision
 and protected release process.
 
-### Primary-source research-bundle follow-up (unreleased)
+### Integrated research-output follow-up (unreleased)
 
-The next local-only application slice upgrades `primary_source_search` to v3
-without adding a tool, migration, corpus body, live CCEL path, configuration,
-or deployment change. It adds relevance and deterministic round-robin
-work-diverse selection, limit-plus-one result-window evidence, and the listed
-metadata-only `theologai://primary-sources/catalog` JSON resource. Guided topic
-and creator surveys use work diversity; exact-work location uses relevance;
-creator scopes remain separate and exact-resource reads remain mandatory.
+The integrated local-only application candidate upgrades
+`primary_source_search` to v3 without adding a tool, migration, corpus body,
+live CCEL path, configuration, or deployment change. It adds relevance and
+deterministic round-robin work-diverse selection, limit-plus-one result-window
+evidence, and the listed metadata-only `theologai://primary-sources/catalog`
+JSON resource. Guided topic and creator surveys use work diversity; exact-work
+location uses relevance; creator scopes remain separate and exact-resource
+reads remain mandatory.
 
 This slice preserves creator roles, routing-only alias policy, incomplete
 edition provenance, unestablished catalog rights status, canonical fail-closed
 section locators, and backward-compatible Markdown. It must pass SQLite/D1
 parity, protocol tests, integrated review, CI, and preview audit before release.
+
+The same candidate adds v1 structured output for
+`bible_verse_morphology`. Its bounded `words[]` retain exact source order, raw
+morphology codes, nullable conservative expansions, and distinct provenance
+links for the pinned STEPBible morphology and lemma sources. Guided word study,
+passage exegesis, and translation comparison prefer that structure while
+preserving Markdown fallback and the single-verse input boundary.
+
+Direct `original_language_study` English targets now also resolve aligned
+prefix/suffix gloss segments such as `heavens` within `the/ heavens`, while
+remaining fail-closed for ambiguous candidates. No corpus rows or source data
+were changed by that application-layer correction.
 
 ## Release gates
 
@@ -164,7 +177,7 @@ Code readiness and operational readiness are deliberately separate:
 4. Preview deployment requires the repository's authorization label and
    protected environment approval. The live PR must still be open, non-draft,
    and authorized immediately before deployment.
-5. Preview smoke and a functional audit must cover all eleven tools, the five
+5. Preview smoke and a functional audit must cover all eleven tools, the six
    structured-output contracts, UBS default and explicit-source behavior,
    Strong's extended identities, local primary-source search, language study,
    resources, all six prompts, and failure/privacy boundaries.
@@ -181,18 +194,14 @@ Code readiness and operational readiness are deliberately separate:
 
 - Complete any final docs-only PR verification, then pause at the separate owner
   gate before production merge or promotion.
-- Normalize direct `original_language_study` English targets for compound-affix
-  glosses, such as target `heavens` versus local gloss `the/ heavens`. The
-  guided workflow already succeeds, so this is a nonblocking follow-up rather
-  than a release blocker.
 - Broaden advanced original-language study only after those foundations, using
   carefully sourced semantic-domain and discourse evidence useful to both
   beginners and readers of Greek or Hebrew.
 - Expand primary-source discovery beyond the initial local collection through
   rights-reviewed, freely redistributable editions and provider adapters. Do
   not mirror or republish CCEL transcriptions without edition-specific rights.
-- Review, integrate, and preview-audit the prepared primary-source research
-  bundle slice, leaving synthesis to the host model.
+- Complete integrated review, CI, and preview audit for the combined
+  research-output candidate, leaving primary-source synthesis to the host model.
 - Evaluate section-span commentary only where provider coverage can be stated
   honestly; never relabel a section anchor as an exact verse range.
 - Continue modern MCP output improvements tool by tool when a stable structured
