@@ -137,13 +137,16 @@ and protected release process.
 
 ### Integrated research-output follow-up (unreleased)
 
-Draft PR #34 is the integrated research-output candidate at head `a8cd63b`.
+Draft PR #34 is the integrated research-output candidate; its exact release
+head is recorded in the live PR metadata and must match every final CI,
+deployment, and audit artifact.
 Component PRs #31-#33 are superseded review vehicles rather than independent
 release units. Combined local verification is complete: unit, integration, and
 Worker-runtime tests; Node, Worker, and Worker-runtime typechecks; build;
 documentation contract; and diff check all passed. Sol approved the combined
-integration. GitHub required checks and the protected preview audit remain
-pending. No preview or production deployment is authorized by this status.
+integration. Required GitHub checks must pass again at the final release head,
+and the protected preview audit remains pending. No preview or production
+deployment is authorized by this status.
 
 The integrated local-only application candidate upgrades
 `primary_source_search` to v3 without adding a tool, migration, corpus body,
@@ -161,9 +164,10 @@ future rollout.
 
 This slice preserves creator roles, routing-only alias policy, incomplete
 edition provenance, unestablished catalog rights status, canonical fail-closed
-section locators, and backward-compatible Markdown. Local protocol, parity, and
-integrated-review gates are complete; GitHub CI and preview audit must still
-pass before release.
+section locators, and backward-compatible local research behavior while
+intentionally removing inert external-provider boilerplate from the public
+Markdown. Local protocol, parity, and integrated-review gates are complete;
+GitHub CI and preview audit must still pass at the final head before release.
 
 The same candidate adds v1 structured output for
 `bible_verse_morphology`. Its bounded `words[]` retain exact source order, raw
