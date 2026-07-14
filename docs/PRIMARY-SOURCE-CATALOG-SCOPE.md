@@ -54,11 +54,28 @@ modeled as a continuous 1677-1689 interval.
 
 ## Query behavior
 
+The listed, readable `theologai://primary-sources/catalog` resource exposes the
+hosted inventory as `application/json`. Its versioned payload includes only
+reviewed work metadata already materialized in `documents.metadata.catalog`:
+identity, title, document type, exact lookup aliases, composition interval,
+creator names and roles, metadata status, and stable provenance IDs. It embeds
+no work body and no provenance URL. Its policy object states that scope is the
+hosted collection only, aliases are routing-only, edition provenance is
+incomplete, and rights status is not established by this inventory.
+
 Each query may include one exact `work`, one exact reviewed creator name in
 `author`, and inclusive `startYear`/`endYear` bounds. Date matching uses interval
 overlap: a work is eligible when its reviewed composition interval overlaps the
 requested interval. Multi-creator research uses separate query-plan entries so
 coverage and misses cannot be blended.
+
+Each query accepts `selection: relevance | work_diversity`; omission defaults
+to `relevance`. Relevance selection preserves FTS rank followed by stable
+section identity and is the appropriate within-work locator. Work diversity is
+deterministic round-robin selection: the best matching section from each work
+precedes every second-best section, then every third-best section, with
+relevance and stable section identity breaking ties inside a round. SQLite and
+D1 use the same SQL generator and ordering contract.
 
 Lookup aliases are exact routing aids only. They are not creator/date metadata,
 historical evidence, or text shown as a research result. Generic labels such as
@@ -84,7 +101,23 @@ Local hits include at most four stable `metadataProvenanceIds`, allowing an
 auditor to resolve each runtime creator/date claim to the companion manifest
 without embedding source descriptions or URLs in every result.
 
+Structured output schema v3 adds the query's required
+`normalizedSelection` and a required provider `resultWindow`. Local searched
+queries privately request `limit + 1`, return at most `limit`, and report only
+`additional_match_observed` or `no_additional_match_observed`. Unsearched,
+unavailable, unsupported, catalog-miss, and dormant external-provider results
+use `not_evaluated`. This is deliberately not a total count or an exhaustiveness
+claim. If a plan-wide or presentation boundary removes returned matches, the
+public window changes to `additional_match_observed` and preserves a
+partial/fail-closed envelope where applicable.
+
 Search snippets remain discovery-only. Clients must call MCP `resources/read`
 on selected canonical section links before quotation, author/work comparison,
 or substantive conclusions. Edition and transcription provenance remains
 incomplete as stated by the existing evidence policy.
+
+The `primary-source-research` and `confession-study` prompts read the catalog
+before search. Topic and creator comparisons use work diversity; exact-work
+location uses relevance. Creator comparisons remain separate query items, use
+no proxy for an absent requested creator, deduplicate exact locators, and read
+no more than five exact section resources before synthesis.

@@ -14,8 +14,7 @@ import type {
 } from '../../kernel/repositories.js';
 import {
   composeLocalPrimarySourceFtsQuery,
-  LOCAL_PRIMARY_SOURCE_SEARCH_SQL,
-  localPrimarySourceScopedSearchSql,
+  localPrimarySourceSearchSql,
 } from '../shared/primarySourceSearchSql.js';
 import { mapDocumentDatabaseRow } from '../shared/historicalDocumentMetadata.js';
 
@@ -110,9 +109,7 @@ export class D1HistoricalDocumentRepository implements IHistoricalDocumentReposi
   async searchPrimarySources(options: PrimarySourceLocalSearchOptions): Promise<PrimarySourceLocalSearchRow[]> {
     validatePrimarySourceOptions(options);
     const ftsQuery = composeLocalPrimarySourceFtsQuery(options.text, options.match);
-    const statement = this.db.prepare(options.documentIds
-      ? localPrimarySourceScopedSearchSql(options.documentIds.length)
-      : LOCAL_PRIMARY_SOURCE_SEARCH_SQL);
+    const statement = this.db.prepare(localPrimarySourceSearchSql(options.selection ?? 'relevance', options.documentIds?.length));
     const bound = options.documentIds
       ? statement.bind(ftsQuery, ...options.documentIds, options.limit)
       : statement.bind(ftsQuery, options.limit);
@@ -167,7 +164,8 @@ function mapPrimarySourceRow(row: PrimarySourceSearchDatabaseRow): PrimarySource
 function validatePrimarySourceOptions(options: PrimarySourceLocalSearchOptions): void {
   if (!options || typeof options.text !== 'string' || options.text.length < 1) throw new Error('Primary-source search text is required');
   if (options.match !== 'all_terms' && options.match !== 'phrase') throw new Error('Primary-source match mode is invalid');
-  if (!Number.isSafeInteger(options.limit) || options.limit < 1 || options.limit > 8) throw new Error('Primary-source limit must be 1..8');
+  if (options.selection !== undefined && options.selection !== 'relevance' && options.selection !== 'work_diversity') throw new Error('Primary-source selection is invalid');
+  if (!Number.isSafeInteger(options.limit) || options.limit < 1 || options.limit > 9) throw new Error('Primary-source internal limit must be 1..9');
   if (options.documentIds !== undefined && (!Array.isArray(options.documentIds)
     || options.documentIds.length < 1 || options.documentIds.length > 17
     || options.documentIds.some(id => typeof id !== 'string' || id.length < 1)

@@ -139,22 +139,22 @@ describe('prompt-recommended tool-call contracts', () => {
   it('keeps primary-source research local, bounded, and exact-work aware', () => {
     expect(recommendedToolCallsForPrompt('primary-source-research', { topic: 'eucharist' })).toEqual([{
       tool: 'primary_source_search',
-      arguments: { queries: [{ id: 'topic-survey', text: 'eucharist', providers: ['local'], match: 'all_terms', limit: 3 }] },
+      arguments: { queries: [{ id: 'topic-survey', text: 'eucharist', providers: ['local'], match: 'all_terms', selection: 'work_diversity', limit: 3 }] },
     }]);
     expect(recommendedToolCallsForPrompt('primary-source-research', {
       topic: 'eucharist', work: 'council-of-trent', maxSections: '5',
     })[0].arguments).toMatchObject({
-      queries: [{ id: 'exact-local-work', work: 'council-of-trent', providers: ['local'], limit: 5 }],
+      queries: [{ id: 'exact-local-work', work: 'council-of-trent', providers: ['local'], selection: 'relevance', limit: 5 }],
     });
     expect(recommendedToolCallsForPrompt('primary-source-research', {
       topic: 'eucharist', authors: 'Erasmus of Rotterdam, Martin Luther', startYear: '1500', endYear: '1600',
     })[0].arguments).toEqual({
       queries: [{
         id: 'creator-1', text: 'eucharist', providers: ['local'], match: 'all_terms',
-        author: 'Erasmus of Rotterdam', startYear: 1500, endYear: 1600, limit: 3,
+        selection: 'work_diversity', author: 'Erasmus of Rotterdam', startYear: 1500, endYear: 1600, limit: 3,
       }, {
         id: 'creator-2', text: 'eucharist', providers: ['local'], match: 'all_terms',
-        author: 'Martin Luther', startYear: 1500, endYear: 1600, limit: 3,
+        selection: 'work_diversity', author: 'Martin Luther', startYear: 1500, endYear: 1600, limit: 3,
       }],
     });
   });
@@ -167,7 +167,7 @@ describe('prompt-recommended tool-call contracts', () => {
       arguments: {
         queries: [{
           id: 'confession-topic', text: 'justification', providers: ['local'],
-          match: 'all_terms', limit: 5,
+          match: 'all_terms', selection: 'work_diversity', limit: 5,
         }],
       },
     }]);

@@ -122,6 +122,18 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
           words: { maxItems: 200 },
         },
       });
+      expect(listed.tools.find(tool => tool.name === 'primary_source_search')?.outputSchema).toMatchObject({
+        properties: { schemaVersion: { const: '3' } },
+      });
+      const resources = await client.listResources();
+      expect(resources.resources).toContainEqual(expect.objectContaining({
+        uri: 'theologai://primary-sources/catalog', mimeType: 'application/json',
+      }));
+      const catalog = await client.readResource({ uri: 'theologai://primary-sources/catalog' });
+      expect(JSON.parse(String(catalog.contents[0].text))).toMatchObject({
+        schemaVersion: '1', kind: 'local_primary_source_catalog', workCount: 0,
+        policies: { scope: 'hosted_collection_only', rightsStatus: 'not_established' },
+      });
       expect(listed.tools).toEqual(expect.arrayContaining([
         expect.objectContaining({
           name: 'bible_lookup',
@@ -194,10 +206,15 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
           text: expect.stringContaining('Plan status: **complete**'),
         })],
         structuredContent: {
-          schemaVersion: '2',
+          schemaVersion: '3',
           kind: 'primary_source_search',
           planStatus: 'complete',
-          queries: [expect.anything()],
+          queries: [expect.objectContaining({
+            normalizedSelection: 'relevance',
+            providers: [expect.objectContaining({
+              resultWindow: { returnedHitCount: 0, additionalMatchStatus: 'not_evaluated' },
+            })],
+          })],
           coverage: expect.any(Object),
           evidencePolicy: {
             snippetUse: 'discovery_only',

@@ -5,6 +5,7 @@ import type {
   PrimarySourceProvider,
   PrimarySourceProviderStatus,
   PrimarySourceSearchMatch,
+  PrimarySourceSelection,
   PrimarySourceSearchPlanResult,
 } from '../services/historical/primarySourceTypes.js';
 
@@ -52,6 +53,10 @@ export interface PresentedPrimarySourceProvider {
   searched: boolean;
   page: number;
   hitCount: number;
+  resultWindow: {
+    returnedHitCount: number;
+    additionalMatchStatus: 'additional_match_observed' | 'no_additional_match_observed' | 'not_evaluated';
+  };
   hits: PresentedPrimarySourceHit[];
   notices: string[];
   scope?: {
@@ -66,11 +71,12 @@ export interface PresentedPrimarySourceProvider {
 export interface PresentedPrimarySourceQuery {
   id: string;
   normalizedMode: PrimarySourceSearchMatch;
+  normalizedSelection: PrimarySourceSelection;
   providers: PresentedPrimarySourceProvider[];
 }
 
 export interface PresentedPrimarySourceSearch extends Record<string, unknown> {
-  schemaVersion: '2';
+  schemaVersion: '3';
   kind: 'primary_source_search';
   planStatus: 'complete' | 'partial' | 'unavailable';
   queries: PresentedPrimarySourceQuery[];
@@ -104,6 +110,9 @@ export function presentPrimarySourceSearch(result: PrimarySourceSearchPlanResult
         ? [`${omitted} provider group${omitted === 1 ? ' was' : 's were'} omitted from query ${boundedText(query.id, 40)} because the result exceeded the public limit of 2 providers per query.`]
         : [];
     }),
+    ...boundedQueries.flatMap(query => isSelection(query.normalizedSelection)
+      ? []
+      : [`Query ${boundedText(query.id, 40)} supplied invalid normalized selection metadata; relevance was used as a safe display fallback.`]),
   ];
   const envelopeChanged = envelopeNotices.length > 0;
   const queries = boundedQueries.map(query => {
@@ -111,6 +120,7 @@ export function presentPrimarySourceSearch(result: PrimarySourceSearchPlanResult
     return {
       id: boundedText(query.id, 40),
       normalizedMode: query.normalizedMode,
+      normalizedSelection: isSelection(query.normalizedSelection) ? query.normalizedSelection : 'relevance' as const,
       providers: query.providers.slice(0, 2).map(provider => {
         const hits = provider.hits.slice(0, 8).flatMap(hit => {
           const presented = presentHit(hit, query.id, provider.provider);
@@ -118,16 +128,18 @@ export function presentPrimarySourceSearch(result: PrimarySourceSearchPlanResult
         });
         const omitted = provider.hits.length - hits.length;
         const countMismatch = provider.hitCount !== provider.hits.length;
+        const resultWindowValid = validResultWindow(provider.resultWindow, provider.hits.length);
         const scope = provider.provider === 'local' ? presentScope(provider.scope) : undefined;
         const scopeIsMeaningful = provider.searched || provider.status === 'catalog_miss';
         const scopeInvalid = provider.provider === 'local'
           && ((provider.scope !== undefined && !scope) || (scopeIsMeaningful && !scope));
-        const downgraded = omitted > 0 || countMismatch || providerGroupsOmitted || scopeInvalid;
+        const downgraded = omitted > 0 || countMismatch || !resultWindowValid || providerGroupsOmitted || scopeInvalid;
         const notices = [...provider.notices];
         if (omitted > 0) {
           notices.push(`${omitted} ${provider.provider} hit${omitted === 1 ? '' : 's'} omitted because the locator, group attribution, or bounded metadata was invalid.`);
         }
         if (countMismatch) notices.push('Provider-reported hit count did not match its returned hit array.');
+        if (!resultWindowValid) notices.push('Provider result-window metadata was absent or invalid.');
         if (providerGroupsOmitted) notices.push('One or more provider groups were omitted because the query exceeded the public provider-group limit.');
         if (scopeInvalid) notices.push('Local catalog scope metadata was absent or invalid.');
         return {
@@ -136,6 +148,14 @@ export function presentPrimarySourceSearch(result: PrimarySourceSearchPlanResult
           searched: provider.searched,
           page: provider.page,
           hitCount: hits.length,
+          resultWindow: {
+            returnedHitCount: hits.length,
+            additionalMatchStatus: omitted > 0
+              ? 'additional_match_observed' as const
+              : resultWindowValid
+                ? provider.resultWindow.additionalMatchStatus
+                : 'not_evaluated' as const,
+          },
           hits,
           notices: uniqueBounded(notices, 16, 500),
           ...(provider.provider === 'local' && scope
@@ -154,15 +174,21 @@ export function presentPrimarySourceSearch(result: PrimarySourceSearchPlanResult
   const omittedCcel = omittedProviderGroups.filter(provider => provider.provider === 'ccel_live');
   const statuses = providers.map(provider => provider.status);
   const hasUsableResult = providers.some(provider => provider.hits.length > 0 || COMPLETE_STATUSES.has(provider.status));
-  const planStatus = envelopeChanged
+  const recomputedPlanStatus = envelopeChanged
     ? 'partial'
     : statuses.every(status => COMPLETE_STATUSES.has(status))
       ? 'complete'
       : !hasUsableResult && statuses.every(status => UNAVAILABLE_STATUSES.has(status))
         ? 'unavailable'
         : 'partial';
+  // A service-enforced aggregate response boundary is intentionally partial
+  // even when every individual provider status remains successful. Preserve
+  // that conservative downgrade; presentation can only degrade it further.
+  const planStatus = recomputedPlanStatus === 'complete' && result.planStatus === 'partial'
+    ? 'partial'
+    : recomputedPlanStatus;
   return {
-    schemaVersion: '2',
+    schemaVersion: '3',
     kind: 'primary_source_search',
     planStatus,
     queries,
@@ -185,6 +211,29 @@ export function presentPrimarySourceSearch(result: PrimarySourceSearchPlanResult
     },
     evidencePolicy: PRIMARY_SOURCE_EVIDENCE_POLICY,
   };
+}
+
+function validResultWindow(
+  value: PrimarySourcePlanResultWindow | undefined,
+  returnedHits: number,
+): value is PrimarySourcePlanResultWindow {
+  return value !== undefined
+    && Number.isSafeInteger(value.returnedHitCount)
+    && value.returnedHitCount === returnedHits
+    && RESULT_WINDOW_STATUSES.has(value.additionalMatchStatus);
+}
+
+type PrimarySourcePlanResultWindow = {
+  returnedHitCount: number;
+  additionalMatchStatus: 'additional_match_observed' | 'no_additional_match_observed' | 'not_evaluated';
+};
+
+const RESULT_WINDOW_STATUSES = new Set<PrimarySourcePlanResultWindow['additionalMatchStatus']>([
+  'additional_match_observed', 'no_additional_match_observed', 'not_evaluated',
+]);
+
+function isSelection(value: unknown): value is PrimarySourceSelection {
+  return value === 'relevance' || value === 'work_diversity';
 }
 
 const COMPLETE_STATUSES = new Set<PrimarySourceProviderStatus>(['ok', 'no_results', 'catalog_miss']);

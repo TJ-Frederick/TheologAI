@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with exact byte sizes. It does not advertise or invoke inactive CCEL adapters.
 - Added the local-only `primary-source-research` prompt for bounded topic surveys
   or exact-work searches followed by explicit MCP section reads.
+- Added v3 primary-source research bundles: relevance or deterministic
+  round-robin work selection, limit-plus-one result-window evidence, a
+  metadata-only `theologai://primary-sources/catalog` JSON resource, and guided
+  topic, exact-work, and separate-creator workflows. Markdown remains available.
 - Added `original_language_study`, a context-first study of one verse token that
   combines morphology and source-separated lexical evidence while stating its
   interpretive limits.

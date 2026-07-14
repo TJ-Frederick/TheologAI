@@ -135,6 +135,21 @@ No other database deletion is authorized. The corrective preview gate is
 complete. Production remains untouched and requires a separate owner decision
 and protected release process.
 
+### Primary-source research-bundle follow-up (unreleased)
+
+The next local-only application slice upgrades `primary_source_search` to v3
+without adding a tool, migration, corpus body, live CCEL path, configuration,
+or deployment change. It adds relevance and deterministic round-robin
+work-diverse selection, limit-plus-one result-window evidence, and the listed
+metadata-only `theologai://primary-sources/catalog` JSON resource. Guided topic
+and creator surveys use work diversity; exact-work location uses relevance;
+creator scopes remain separate and exact-resource reads remain mandatory.
+
+This slice preserves creator roles, routing-only alias policy, incomplete
+edition provenance, unestablished catalog rights status, canonical fail-closed
+section locators, and backward-compatible Markdown. It must pass SQLite/D1
+parity, protocol tests, integrated review, CI, and preview audit before release.
+
 ## Release gates
 
 Code readiness and operational readiness are deliberately separate:
@@ -176,8 +191,8 @@ Code readiness and operational readiness are deliberately separate:
 - Expand primary-source discovery beyond the initial local collection through
   rights-reviewed, freely redistributable editions and provider adapters. Do
   not mirror or republish CCEL transcriptions without edition-specific rights.
-- Improve primary-source research bundles for topic surveys, within-work
-  location, and author comparison while leaving synthesis to the host model.
+- Review, integrate, and preview-audit the prepared primary-source research
+  bundle slice, leaving synthesis to the host model.
 - Evaluate section-span commentary only where provider coverage can be stated
   honestly; never relabel a section anchor as an exact verse range.
 - Continue modern MCP output improvements tool by tool when a stable structured

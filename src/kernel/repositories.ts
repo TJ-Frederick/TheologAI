@@ -187,6 +187,7 @@ export interface DocumentSection {
 export interface PrimarySourceLocalSearchOptions {
   text: string;
   match: 'all_terms' | 'phrase';
+  selection?: 'relevance' | 'work_diversity';
   documentIds?: string[];
   limit: number;
 }

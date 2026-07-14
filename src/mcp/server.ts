@@ -25,6 +25,7 @@ import { internalError, resourceNotFound } from './errors.js';
 import { registerPromptHandlers } from './prompts.js';
 import { registerToolHandlers } from './tools.js';
 import { jsonSchemaValidator } from './validation.js';
+import { buildPrimarySourceCatalog, PRIMARY_SOURCE_CATALOG_URI } from './primarySourceCatalog.js';
 
 export interface McpServerServices {
   bibleService: Pick<BibleService, 'getSupportedTranslations'>;
@@ -97,6 +98,12 @@ export function createTheologAiMcpServer(
     // Individual historical documents
     try {
       const docs = await services.historicalService.listDocuments();
+      resources.push({
+        uri: PRIMARY_SOURCE_CATALOG_URI,
+        name: 'Local Primary-source Catalog',
+        description: 'Reviewed metadata for works hosted in the local primary-source collection',
+        mimeType: 'application/json',
+      });
       for (const doc of docs) {
         resources.push({
           uri: `theologai://documents/${doc.id}`,
@@ -168,6 +175,17 @@ export function createTheologAiMcpServer(
       return {
         contents: [{ uri, mimeType: 'text/markdown', text: lines.join('\n') }],
       };
+    }
+
+    if (uri === PRIMARY_SOURCE_CATALOG_URI) {
+      try {
+        const catalog = buildPrimarySourceCatalog(await services.historicalService.listDocuments());
+        return {
+          contents: [{ uri, mimeType: 'application/json', text: JSON.stringify(catalog, null, 2) }],
+        };
+      } catch {
+        throw internalError('Unable to read resource');
+      }
     }
 
     // theologai://documents/{slug}[#section-{sectionNumber}]

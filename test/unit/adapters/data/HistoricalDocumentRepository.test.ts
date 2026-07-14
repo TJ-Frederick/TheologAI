@@ -108,6 +108,18 @@ describe('HistoricalDocumentRepository', () => {
     expect(db.statement(/JOIN documents d[\s\S]*ORDER BY rank/).all).toHaveBeenCalledWith('"union with Christ"', 3);
   });
 
+  it('uses deterministic round-robin SQL for work-diverse selection', () => {
+    const db = new FakeSqliteDatabase([{ match: 'ranked_sections', all: [] }]);
+    const repo = new HistoricalDocumentRepository(db.asDatabase());
+
+    repo.searchPrimarySources({ text: 'grace', match: 'all_terms', selection: 'work_diversity', limit: 9 });
+
+    const statement = db.statement('ranked_sections');
+    expect(statement.sql).toMatch(/ROW_NUMBER\(\) OVER \([\s\S]*PARTITION BY document_id[\s\S]*ORDER BY relevance_rank, id/);
+    expect(statement.sql).toMatch(/ORDER BY work_rank, relevance_rank, id/);
+    expect(statement.all).toHaveBeenCalledWith('"grace"', 9);
+  });
+
   it('finds documents by exact id, title fragment, then id fragment', () => {
     const docs = [
       documentRow,

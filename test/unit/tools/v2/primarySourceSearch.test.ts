@@ -8,13 +8,16 @@ describe('primary_source_search handler', () => {
     eligibleDocuments: [{ id: 'institutes', title: 'Institutes', metadataStatus: 'reviewed' as const }],
     eligibleDocumentsTruncated: false,
   };
+  const resultWindow = (returnedHitCount: number, additionalMatchStatus = 'not_evaluated') => ({
+    returnedHitCount, additionalMatchStatus,
+  });
   it('advertises the exact closed bounded plan schema and read-only annotations', () => {
     const handler = createPrimarySourceSearchHandler({ search: vi.fn() } as any);
     expect(handler.name).toBe('primary_source_search');
     expect(handler.outputSchema).toMatchObject({
       type: 'object', additionalProperties: false,
       properties: {
-        schemaVersion: { const: '2' },
+        schemaVersion: { const: '3' },
         kind: { const: 'primary_source_search' },
       },
     });
@@ -25,6 +28,7 @@ describe('primary_source_search handler', () => {
     const item = (handler.inputSchema.properties?.queries as any).items;
     expect(item.required).toEqual(['id', 'text', 'providers']);
     expect(item.properties.providers).toMatchObject({ maxItems: 1, items: { enum: ['local'] } });
+    expect(item.properties.selection).toMatchObject({ enum: ['relevance', 'work_diversity'], default: 'relevance' });
     expect(item.properties.author.description).toContain('separate query-plan items');
     expect(item.properties.page.description).toContain('only page 1');
     expect(handler.description).toContain('composition-year ranges');
@@ -48,9 +52,10 @@ describe('primary_source_search handler', () => {
   });
 
   it('formats partial results and marks all-provider unavailability as a tool error', async () => {
-    const query = (providers: any[]) => [{ id: 'q', normalizedMode: 'all_terms', providers }];
+    const query = (providers: any[]) => [{ id: 'q', normalizedMode: 'all_terms', normalizedSelection: 'relevance', providers }];
     const provider = (name: 'local' | 'ccel_live', status: string, searched: boolean) => ({
       provider: name, status, searched, page: 1, hitCount: 0, hits: [], notices: [],
+      resultWindow: resultWindow(0),
       ...(name === 'local' ? { scope } : {}),
     });
     const coverage = { localAttempted: false, localHitCount: 0, ccelAttempted: false, ccelHitCount: 0, notices: [] };
@@ -62,13 +67,31 @@ describe('primary_source_search handler', () => {
     expect(await handler.handler({ queries: [] })).toMatchObject({ isError: true });
   });
 
+  it('preserves a service-declared partial aggregate window even when provider statuses are complete', async () => {
+    const service = { search: vi.fn().mockResolvedValue({
+      planStatus: 'partial',
+      queries: [{
+        id: 'q', normalizedMode: 'all_terms', normalizedSelection: 'relevance',
+        providers: [{
+          provider: 'local', status: 'no_results', searched: true, page: 1,
+          hitCount: 0, hits: [], notices: ['The plan-wide response budget truncated later provider results.'], scope,
+          resultWindow: resultWindow(0, 'additional_match_observed'),
+        }],
+      }],
+      coverage: { localAttempted: true, localHitCount: 0, ccelAttempted: false, ccelHitCount: 0, notices: [] },
+    }) };
+    const result = await createPrimarySourceSearchHandler(service as any).handler({ queries: [] });
+    expect(result.structuredContent).toMatchObject({ planStatus: 'partial' });
+  });
+
   it.each(['unsupported_filter', 'unavailable', 'disabled', 'rate_limited', 'interface_changed'] as const)(
     'preserves the unsearched local %s status when catalog scope is not meaningful',
     async status => {
       const service = { search: vi.fn().mockResolvedValue({
         planStatus: status === 'unsupported_filter' ? 'partial' : 'unavailable',
-        queries: [{ id: 'q', normalizedMode: 'all_terms', providers: [{
+        queries: [{ id: 'q', normalizedMode: 'all_terms', normalizedSelection: 'relevance', providers: [{
           provider: 'local', status, searched: false, page: 2, hitCount: 0, hits: [], notices: [],
+          resultWindow: resultWindow(0),
         }] }],
         coverage: { localAttempted: false, localStatus: status, localHitCount: 0, ccelAttempted: false, ccelHitCount: 0, notices: [] },
       }) };
@@ -88,8 +111,9 @@ describe('primary_source_search handler', () => {
   it('still fails closed when a searched local result omits meaningful catalog scope', async () => {
     const service = { search: vi.fn().mockResolvedValue({
       planStatus: 'complete',
-      queries: [{ id: 'q', normalizedMode: 'all_terms', providers: [{
+      queries: [{ id: 'q', normalizedMode: 'all_terms', normalizedSelection: 'relevance', providers: [{
         provider: 'local', status: 'no_results', searched: true, page: 1, hitCount: 0, hits: [], notices: [],
+        resultWindow: resultWindow(0, 'no_additional_match_observed'),
       }] }],
       coverage: { localAttempted: true, localStatus: 'no_results', localHitCount: 0, ccelAttempted: false, ccelHitCount: 0, notices: [] },
     }) };
@@ -118,8 +142,8 @@ describe('primary_source_search handler', () => {
     const service = { search: vi.fn().mockResolvedValue({
       planStatus: 'complete',
       queries: [{
-        id: 'q1', normalizedMode: 'all_terms',
-        providers: [{ provider: 'local', status: 'ok', searched: true, page: 1, hitCount: 2, hits: [hit, { ...hit }], notices: [], scope }],
+        id: 'q1', normalizedMode: 'all_terms', normalizedSelection: 'relevance',
+        providers: [{ provider: 'local', status: 'ok', searched: true, page: 1, hitCount: 2, resultWindow: resultWindow(2), hits: [hit, { ...hit }], notices: [], scope }],
       }],
       coverage: { localAttempted: true, localStatus: 'ok', localHitCount: 2, ccelAttempted: false, ccelHitCount: 0, notices: [] },
     }) };
@@ -139,7 +163,7 @@ describe('primary_source_search handler', () => {
       annotations: { audience: ['assistant'] },
     }]);
     expect(result.structuredContent).toMatchObject({
-      schemaVersion: '2', kind: 'primary_source_search',
+      schemaVersion: '3', kind: 'primary_source_search',
       evidencePolicy: {
         snippetUse: 'discovery_only', selectedSectionAccess: 'mcp_resource_read',
         coverageScope: 'bounded_non_exhaustive', editionProvenance: 'incomplete',
@@ -152,8 +176,9 @@ describe('primary_source_search handler', () => {
   it('omits malicious or noncanonical locators from both structured hits and links', async () => {
     const service = { search: vi.fn().mockResolvedValue({
       planStatus: 'complete',
-      queries: [{ id: 'q1', normalizedMode: 'phrase', providers: [{
+      queries: [{ id: 'q1', normalizedMode: 'phrase', normalizedSelection: 'relevance', providers: [{
         provider: 'local', status: 'ok', searched: true, page: 1, hitCount: 2, notices: [], scope,
+        resultWindow: resultWindow(2),
         hits: [{
           queryId: 'q1', provider: 'local', title: 'Forged', snippet: 'snippet',
           locator: { kind: 'local_section', documentId: '../secret', sectionId: '1', url: 'https://evil.test' },
@@ -202,8 +227,9 @@ describe('primary_source_search handler', () => {
     } as const;
     const service = { search: vi.fn().mockResolvedValue({
       planStatus: 'complete',
-      queries: [{ id: 'q1', normalizedMode: 'phrase', providers: [{
+      queries: [{ id: 'q1', normalizedMode: 'phrase', normalizedSelection: 'relevance', providers: [{
         provider: 'local', status: 'ok', searched: true, page: 1, hitCount: 4, notices: [], scope,
+        resultWindow: resultWindow(4),
         hits: [
           validLocalHit,
           { ...validLocalHit, queryId: 'q2', title: 'Foreign query evidence', rankWithinProvider: 2 },
@@ -244,6 +270,7 @@ describe('primary_source_search handler', () => {
   it('fails closed when a service returns excess query groups', async () => {
     const emptyLocalProvider = {
       provider: 'local', status: 'no_results', searched: true, page: 1, hitCount: 0, hits: [], notices: [], scope,
+      resultWindow: resultWindow(0, 'no_additional_match_observed'),
     } as const;
     const omittedHit = {
       queryId: 'q5', provider: 'local', title: 'Omitted fifth-query evidence', snippet: 'Must not leak.',
@@ -254,11 +281,11 @@ describe('primary_source_search handler', () => {
       rankWithinProvider: 1, page: 1, snippetOnly: true, attribution: 'Local', resourceSizeBytes: 25,
     } as const;
     const queries = [1, 2, 3, 4].map(number => ({
-      id: `q${number}`, normalizedMode: 'all_terms', providers: [emptyLocalProvider],
+      id: `q${number}`, normalizedMode: 'all_terms', normalizedSelection: 'relevance', providers: [emptyLocalProvider],
     }));
     queries.push({
-      id: 'q5', normalizedMode: 'all_terms',
-      providers: [{ ...emptyLocalProvider, status: 'ok', hitCount: 1, hits: [omittedHit] }],
+      id: 'q5', normalizedMode: 'all_terms', normalizedSelection: 'relevance',
+      providers: [{ ...emptyLocalProvider, status: 'ok', hitCount: 1, resultWindow: resultWindow(1), hits: [omittedHit] }],
     } as any);
     const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue({
       planStatus: 'complete', queries,
@@ -284,6 +311,7 @@ describe('primary_source_search handler', () => {
   it('fails closed when a query returns excess provider groups', async () => {
     const emptyLocalProvider = {
       provider: 'local', status: 'no_results', searched: true, page: 1, hitCount: 0, hits: [], notices: [], scope,
+      resultWindow: resultWindow(0, 'no_additional_match_observed'),
     } as const;
     const omittedHit = {
       queryId: 'q1', provider: 'local', title: 'Omitted third-provider evidence', snippet: 'Must not leak.',
@@ -295,10 +323,10 @@ describe('primary_source_search handler', () => {
     } as const;
     const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue({
       planStatus: 'complete',
-      queries: [{ id: 'q1', normalizedMode: 'all_terms', providers: [
+      queries: [{ id: 'q1', normalizedMode: 'all_terms', normalizedSelection: 'relevance', providers: [
         emptyLocalProvider,
         emptyLocalProvider,
-        { ...emptyLocalProvider, status: 'ok', hitCount: 1, hits: [omittedHit] },
+        { ...emptyLocalProvider, status: 'ok', hitCount: 1, resultWindow: resultWindow(1), hits: [omittedHit] },
       ] }],
       coverage: { localAttempted: true, localStatus: 'ok', localHitCount: 1, ccelAttempted: false, ccelHitCount: 0, notices: [] },
     }) } as any);

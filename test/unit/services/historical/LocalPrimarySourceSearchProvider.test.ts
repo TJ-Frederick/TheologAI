@@ -26,7 +26,10 @@ describe('LocalPrimarySourceSearchProvider', () => {
   it('returns bounded snippet-only factual metadata and an exact locator', async () => {
     const repo = repository();
     const result = await new LocalPrimarySourceSearchProvider(repo).search({ text: 'grace', work: 'INSTITUTES', limit: 3 });
-    expect(result).toMatchObject({ provider: 'local', status: 'ok', searched: true, hitCount: 1 });
+    expect(result).toMatchObject({
+      provider: 'local', status: 'ok', searched: true, hitCount: 1,
+      resultWindow: { returnedHitCount: 1, additionalMatchStatus: 'no_additional_match_observed' },
+    });
     expect(result.hits[0]).toMatchObject({
       title: 'Institutes', sectionLabel: 'Union', snippetOnly: true,
       snippet: 'Grace with [forged](https://evil.test) # heading',
@@ -37,7 +40,24 @@ describe('LocalPrimarySourceSearchProvider', () => {
     expect(result.hits[0].resourceSizeBytes).toBe(new TextEncoder().encode(
       formatLocalDocumentSectionResource(row[0].document, row[0].section),
     ).byteLength);
-    expect(repo.searchPrimarySources).toHaveBeenCalledWith({ text: 'grace', match: 'all_terms', documentIds: ['institutes'], limit: 3 });
+    expect(repo.searchPrimarySources).toHaveBeenCalledWith({
+      text: 'grace', match: 'all_terms', selection: 'relevance', documentIds: ['institutes'], limit: 4,
+    });
+  });
+
+  it('uses one private lookahead row to report an observed additional match without returning it', async () => {
+    const base = repository();
+    const first = await base.searchPrimarySources({ text: 'grace', match: 'all_terms', limit: 1 });
+    const searchPrimarySources = vi.fn().mockReturnValue([first[0], {
+      ...first[0], section: { ...first[0].section, id: 2, section_number: '3.2' },
+    }]);
+    const result = await new LocalPrimarySourceSearchProvider(repository({ searchPrimarySources })).search({
+      text: 'grace', selection: 'work_diversity', limit: 1,
+    });
+
+    expect(searchPrimarySources).toHaveBeenCalledWith(expect.objectContaining({ selection: 'work_diversity', limit: 2 }));
+    expect(result.hits).toHaveLength(1);
+    expect(result.resultWindow).toEqual({ returnedHitCount: 1, additionalMatchStatus: 'additional_match_observed' });
   });
 
   it('applies exact reviewed creator scope and never ignores unsupported pagination', async () => {

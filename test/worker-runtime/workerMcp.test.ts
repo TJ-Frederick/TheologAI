@@ -228,11 +228,22 @@ describe('Worker MCP endpoint in workerd', () => {
     expect(listed.message.error).toBeUndefined();
     expect(listed.message.result?.resources).toEqual(expect.arrayContaining([
       expect.objectContaining({
+        uri: 'theologai://primary-sources/catalog',
+        mimeType: 'application/json',
+      }),
+      expect.objectContaining({
         uri: 'theologai://documents/apostles-creed',
         name: "Apostles' Creed",
         description: 'Creed (c. 390)',
       }),
     ]));
+
+    const catalog = await rpc('resources/read', { uri: 'theologai://primary-sources/catalog' }, 40);
+    expect(catalog.response.status).toBe(200);
+    expect(JSON.parse(String((catalog.message.result?.contents as Array<{ text: string }>)[0].text))).toMatchObject({
+      schemaVersion: '1', kind: 'local_primary_source_catalog', workCount: 1,
+      policies: { scope: 'hosted_collection_only', rightsStatus: 'not_established' },
+    });
 
     const read = await rpc('resources/read', {
       uri: 'theologai://documents/apostles-creed',
@@ -514,10 +525,12 @@ describe('Worker MCP endpoint in workerd', () => {
         }),
       ],
       structuredContent: {
-        schemaVersion: '2', kind: 'primary_source_search', planStatus: 'complete',
+        schemaVersion: '3', kind: 'primary_source_search', planStatus: 'complete',
         queries: [expect.objectContaining({
+          normalizedSelection: 'relevance',
           providers: [expect.objectContaining({
             provider: 'local', hitCount: 1,
+            resultWindow: { returnedHitCount: 1, additionalMatchStatus: 'no_additional_match_observed' },
             hits: [expect.objectContaining({ documentType: 'Creed', documentDate: 'c. 390' })],
           })],
         })],

@@ -62,6 +62,13 @@ function makeMockRoot(): McpCompositionRoot {
           type: 'creed',
           date: '325',
           topics: ['trinity'],
+          catalog: {
+            lookupAliases: ['The Nicene Creed'],
+            composition: { startYear: 381, endYear: 381, label: '381 AD' },
+            creators: [{ name: 'First Council of Constantinople', role: 'revising_body' as const }],
+            metadataStatus: 'collective' as const,
+            metadataProvenanceIds: ['hist-meta-test-nicene'],
+          },
         }],
         getDocument: async () => ({
           id: 'nicene-creed',
@@ -306,6 +313,7 @@ describe('shared MCP registration', () => {
     expect(resources.resources.map(resource => resource.uri)).toEqual([
       'theologai://translations',
       'theologai://commentaries',
+      'theologai://primary-sources/catalog',
       'theologai://documents/nicene-creed',
     ]);
     expect(templates.resourceTemplates.map(template => template.uriTemplate)).toEqual([
@@ -326,6 +334,22 @@ describe('shared MCP registration', () => {
     expect(commentaries.contents[0]).toEqual(expect.objectContaining({
       text: expect.stringContaining('verseNumber metadata'),
     }));
+
+    const catalog = await client.readResource({ uri: 'theologai://primary-sources/catalog' });
+    expect(catalog.contents[0]).toMatchObject({ mimeType: 'application/json' });
+    expect(JSON.parse(String(catalog.contents[0].text))).toEqual({
+      schemaVersion: '1', kind: 'local_primary_source_catalog', workCount: 1,
+      works: [{
+        id: 'nicene-creed', title: 'Nicene Creed', documentType: 'creed',
+        lookupAliases: ['The Nicene Creed'], composition: { startYear: 381, endYear: 381, label: '381 AD' },
+        creators: [{ name: 'First Council of Constantinople', role: 'revising_body' }],
+        metadataStatus: 'collective', metadataProvenanceIds: ['hist-meta-test-nicene'],
+      }],
+      policies: {
+        scope: 'hosted_collection_only', lookupAliasUse: 'exact_routing_only_not_metadata_evidence',
+        editionProvenance: 'incomplete', rightsStatus: 'not_established',
+      },
+    });
   });
 
   it.each(LOGGING_SERVER_VARIANTS)('$name warns when historical resources are unavailable and returns static resources', async ({ create }) => {
@@ -445,8 +469,9 @@ describe('shared MCP registration', () => {
     root.tools = root.tools.map(tool => tool.name === 'primary_source_search'
       ? createPrimarySourceSearchHandler({ search: async () => ({
         planStatus: 'complete',
-        queries: [{ id: 'topic', normalizedMode: 'all_terms', providers: [{
+        queries: [{ id: 'topic', normalizedMode: 'all_terms', normalizedSelection: 'relevance', providers: [{
           provider: 'local', status: 'ok', searched: true, page: 1, hitCount: 1, notices: [],
+          resultWindow: { returnedHitCount: 1, additionalMatchStatus: 'no_additional_match_observed' },
           hits: [{
             queryId: 'topic', provider: 'local', title: doc!.title,
             sectionLabel: section.title, snippet: 'We believe',
@@ -678,7 +703,8 @@ describe('shared MCP registration', () => {
       ? confessionStudy.messages[0].content.text
       : '';
     expect(confessionText).toContain('`primary_source_search`');
-    expect(confessionText).toContain('follow the selected canonical `resource_link` blocks');
+    expect(confessionText).toContain('follow at most five unique canonical `resource_link` blocks');
+    expect(confessionText).toContain('theologai://primary-sources/catalog');
     expect(confessionText).toContain('Never relabel an issuing, drafting, revising, or compiling body as an author');
     expect(confessionText).toContain('never infer a work\'s tradition or author attribution');
 

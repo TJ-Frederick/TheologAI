@@ -22,6 +22,8 @@ prewritten grouping.
 
 ### Step 1: Identify Relevant Documents
 
+- Read `theologai://primary-sources/catalog` with MCP `resources/read` before
+  selecting works. Treat its aliases as exact routing aids, not evidence.
 - Treat any traditions named by the user as comparison interests, not as author
   filters or evidence that a document belongs to that tradition.
 - Do not infer tradition, authorship, or creator role from a title or topic.
@@ -29,7 +31,7 @@ prewritten grouping.
 ### Step 2: Search Across Traditions
 
 - Call `primary_source_search` with one bounded local query plan, for example
-  `{ "queries": [{ "id": "confession-topic", "text": "the doctrinal topic", "providers": ["local"], "match": "all_terms", "limit": 5 }] }`.
+  `{ "queries": [{ "id": "confession-topic", "text": "the doctrinal topic", "providers": ["local"], "match": "all_terms", "selection": "work_diversity", "limit": 5 }] }`.
 - Treat returned snippets as discovery-only. Preserve document metadata, creator
   names, and creator roles exactly as returned.
 - Do not claim the search covered sources outside the hosted collection, and do
@@ -37,7 +39,7 @@ prewritten grouping.
 
 ### Step 3: Read Specific Sections
 
-- Select only the most relevant returned sections.
+- Select at most five unique returned sections and deduplicate locators.
 - Follow each selected canonical `resource_link` with MCP `resources/read` and
   confirm the returned URI matches the selected locator.
 - Do not quote, characterize a position, or compare documents from snippets.

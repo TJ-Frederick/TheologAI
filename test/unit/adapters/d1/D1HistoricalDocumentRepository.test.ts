@@ -240,5 +240,16 @@ describe('D1HistoricalDocumentRepository', () => {
         section: { section_number: '1', content: 'We believe in one God...' },
       });
     });
+
+    it('uses the same deterministic work-diverse SQL and bindings as SQLite', async () => {
+      const db = createSimpleD1([]);
+      await new D1HistoricalDocumentRepository(db as any).searchPrimarySources({
+        text: 'grace', match: 'all_terms', selection: 'work_diversity', documentIds: ['nicene-creed'], limit: 9,
+      });
+      const sql = db.prepare.mock.calls[0][0] as string;
+      expect(sql).toMatch(/ROW_NUMBER\(\) OVER \([\s\S]*PARTITION BY document_id/);
+      expect(sql).toMatch(/ds\.document_id IN \(\?\)[\s\S]*ORDER BY work_rank, relevance_rank, id/);
+      expect(db.prepare.mock.results[0].value.bind).toHaveBeenCalledWith('"grace"', 'nicene-creed', 9);
+    });
   });
 });

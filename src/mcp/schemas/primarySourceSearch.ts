@@ -116,6 +116,18 @@ const providerProperties = {
   searched: { type: 'boolean' },
   page: { type: 'integer', minimum: 1, maximum: 3 },
   hitCount: { type: 'integer', minimum: 0, maximum: 8 },
+  resultWindow: {
+    type: 'object',
+    properties: {
+      returnedHitCount: { type: 'integer', minimum: 0, maximum: 8 },
+      additionalMatchStatus: {
+        type: 'string',
+        enum: ['additional_match_observed', 'no_additional_match_observed', 'not_evaluated'],
+      },
+    },
+    required: ['returnedHitCount', 'additionalMatchStatus'],
+    additionalProperties: false,
+  },
   notices: { type: 'array', maxItems: 16, items: { type: 'string', maxLength: 500 } },
 } as const;
 
@@ -128,7 +140,7 @@ const provider = {
       scope: catalogScope,
       hits: { type: 'array', maxItems: 8, items: localHit },
     },
-    required: ['provider', 'status', 'searched', 'page', 'hitCount', 'hits', 'notices'],
+    required: ['provider', 'status', 'searched', 'page', 'hitCount', 'resultWindow', 'hits', 'notices'],
     additionalProperties: false,
   }, {
     type: 'object',
@@ -137,7 +149,7 @@ const provider = {
       provider: { const: 'ccel_live' },
       hits: { type: 'array', maxItems: 8, items: ccelHit },
     },
-    required: ['provider', 'status', 'searched', 'page', 'hitCount', 'hits', 'notices'],
+    required: ['provider', 'status', 'searched', 'page', 'hitCount', 'resultWindow', 'hits', 'notices'],
     additionalProperties: false,
   }],
 } as const;
@@ -145,7 +157,7 @@ const provider = {
 export const primarySourceSearchOutputSchema = {
   type: 'object',
   properties: {
-    schemaVersion: { const: '2' },
+    schemaVersion: { const: '3' },
     kind: { const: 'primary_source_search' },
     planStatus: { type: 'string', enum: ['complete', 'partial', 'unavailable'] },
     queries: {
@@ -155,9 +167,10 @@ export const primarySourceSearchOutputSchema = {
         properties: {
           id: { type: 'string', minLength: 1, maxLength: 40 },
           normalizedMode: { type: 'string', enum: ['all_terms', 'phrase'] },
+          normalizedSelection: { type: 'string', enum: ['relevance', 'work_diversity'] },
           providers: { type: 'array', minItems: 1, maxItems: 2, items: provider },
         },
-        required: ['id', 'normalizedMode', 'providers'],
+        required: ['id', 'normalizedMode', 'normalizedSelection', 'providers'],
         additionalProperties: false,
       },
     },

@@ -16,7 +16,7 @@ const MAX_QUERIES = 4;
 const MAX_CCEL_QUERIES = 3;
 const MAX_TOTAL_HITS = 32;
 const QUERY_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$/;
-const QUERY_KEYS = new Set(['id', 'text', 'providers', 'match', 'author', 'work', 'startYear', 'endYear', 'page', 'limit']);
+const QUERY_KEYS = new Set(['id', 'text', 'providers', 'match', 'selection', 'author', 'work', 'startYear', 'endYear', 'page', 'limit']);
 const COMPLETE_STATUSES = new Set<PrimarySourceProviderStatus>(['ok', 'no_results', 'catalog_miss']);
 const UNAVAILABLE_STATUSES = new Set<PrimarySourceProviderStatus>(['unavailable', 'disabled', 'rate_limited', 'interface_changed']);
 
@@ -34,10 +34,12 @@ export class PrimarySourceSearchService {
   async search(input: unknown): Promise<PrimarySourceSearchPlanResult> {
     const queries = validatePlan(input);
     const queryResults = await Promise.all(queries.map(query => this.executeQuery(query)));
-    enforceAggregateHitBudget(queryResults);
+    const aggregateTruncated = enforceAggregateHitBudget(queryResults);
     const providerResults = queryResults.flatMap(query => query.providers);
     const statuses = providerResults.map(provider => provider.status);
-    const planStatus = statuses.every(status => COMPLETE_STATUSES.has(status))
+    const planStatus = aggregateTruncated
+      ? 'partial'
+      : statuses.every(status => COMPLETE_STATUSES.has(status))
       ? 'complete'
       : statuses.every(status => UNAVAILABLE_STATUSES.has(status))
       ? 'unavailable'
@@ -62,7 +64,7 @@ export class PrimarySourceSearchService {
 
   private async executeQuery(query: NormalizedPlanQuery): Promise<PrimarySourcePlanQueryResult> {
     const providers = await Promise.all(query.providers.map(provider => this.executeProvider(query, provider)));
-    return { id: query.id, normalizedMode: query.match, providers };
+    return { id: query.id, normalizedMode: query.match, normalizedSelection: query.selection, providers };
   }
 
   private async executeProvider(query: NormalizedPlanQuery, provider: PrimarySourceRequestedProvider): Promise<PrimarySourcePlanProviderResult> {
@@ -81,33 +83,40 @@ export class PrimarySourceSearchService {
       result = {
         provider: 'ccel_live', status: 'unsupported_filter', searched: false, page: query.page,
         hitCount: 0, hits: [], notices: ['Live CCEL discovery does not expose reviewed composition-date bounds; the date restriction was not ignored.'],
+        resultWindow: { returnedHitCount: 0, additionalMatchStatus: 'not_evaluated' },
       };
     } else if (provider === 'ccel' && !this.options.ccelLiveSearch) {
       result = {
         provider: 'ccel_live', status: 'disabled', searched: false, page: query.page,
         hitCount: 0, hits: [], notices: ['Live CCEL search is disabled. No remote request was made.'],
+        resultWindow: { returnedHitCount: 0, additionalMatchStatus: 'not_evaluated' },
       };
     } else {
       try {
         result = provider === 'local'
-          ? await this.local.search(providerQuery)
+          ? await this.local.search({ ...providerQuery, selection: query.selection })
           : await this.ccel.search(providerQuery);
       } catch {
         result = {
           provider: provider === 'local' ? 'local' : 'ccel_live',
           status: 'unavailable', searched: false, page: query.page,
           hitCount: 0, hits: [], notices: [`${provider === 'local' ? 'Local primary-source search' : 'Live CCEL search'} is temporarily unavailable.`],
+          resultWindow: { returnedHitCount: 0, additionalMatchStatus: 'not_evaluated' },
         };
       }
     }
     return {
       ...result,
+      resultWindow: result.resultWindow ?? {
+        returnedHitCount: result.hits.length,
+        additionalMatchStatus: 'not_evaluated',
+      },
       hits: result.hits.map(hit => ({ ...hit, queryId: query.id })),
     };
   }
 }
 
-interface NormalizedPlanQuery extends Required<Pick<PrimarySourceSearchPlanQuery, 'id' | 'text' | 'providers' | 'match' | 'page' | 'limit'>> {
+interface NormalizedPlanQuery extends Required<Pick<PrimarySourceSearchPlanQuery, 'id' | 'text' | 'providers' | 'match' | 'selection' | 'page' | 'limit'>> {
   author?: string;
   work?: string;
   startYear?: number;
@@ -144,6 +153,8 @@ function validateQuery(input: unknown, index: number): NormalizedPlanQuery {
   const match = query.match ?? 'all_terms';
   if (match !== 'all_terms' && match !== 'phrase') throw new ValidationError(`${path}.match`, 'match must be all_terms or phrase.');
   if (match === 'all_terms' && text.split(' ').length > 12) throw new ValidationError(`${path}.text`, 'all_terms text may contain at most 12 terms.');
+  const selection = query.selection ?? 'relevance';
+  if (selection !== 'relevance' && selection !== 'work_diversity') throw new ValidationError(`${path}.selection`, 'selection must be relevance or work_diversity.');
   if (!Array.isArray(query.providers) || query.providers.length < 1 || query.providers.length > 2) throw new ValidationError(`${path}.providers`, 'providers must contain local, ccel, or both.');
   const providers = query.providers as unknown[];
   if (providers.some(provider => provider !== 'local' && provider !== 'ccel') || new Set(providers).size !== providers.length) {
@@ -165,6 +176,7 @@ function validateQuery(input: unknown, index: number): NormalizedPlanQuery {
     text,
     providers: providers as PrimarySourceRequestedProvider[],
     match: match as PrimarySourceSearchMatch,
+    selection,
     page: page as number,
     limit: limit as number,
     ...(author ? { author } : {}),
@@ -190,18 +202,25 @@ function normalizeLiteral(value: unknown, field: string, maximum: number): strin
   return normalized;
 }
 
-function enforceAggregateHitBudget(queries: PrimarySourcePlanQueryResult[]): void {
+function enforceAggregateHitBudget(queries: PrimarySourcePlanQueryResult[]): boolean {
   let remaining = MAX_TOTAL_HITS;
+  let truncated = false;
   for (const query of queries) {
     for (const provider of query.providers) {
       if (provider.hits.length > remaining) {
+        truncated = true;
         provider.hits = provider.hits.slice(0, remaining);
         provider.hitCount = provider.hits.length;
+        provider.resultWindow = {
+          returnedHitCount: provider.hits.length,
+          additionalMatchStatus: 'additional_match_observed',
+        };
         provider.notices = [...provider.notices, 'The plan-wide 32-hit response budget truncated later provider results.'];
       }
       remaining -= provider.hits.length;
     }
   }
+  return truncated;
 }
 
 function aggregateStatus(results: PrimarySourcePlanProviderResult[]): PrimarySourceProviderStatus {

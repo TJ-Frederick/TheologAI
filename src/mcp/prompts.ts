@@ -103,6 +103,7 @@ export function recommendedToolCallsForPrompt(
             text: topic,
             providers: ['local'],
             match: 'all_terms',
+            selection: 'work_diversity',
             limit: 5,
           }],
         },
@@ -131,6 +132,7 @@ export function recommendedToolCallsForPrompt(
             text: topic,
             providers: ['local'],
             match: 'all_terms',
+            selection: work ? 'relevance' : 'work_diversity',
             ...scoped,
             ...(author ? { author } : {}),
             limit,
@@ -267,11 +269,12 @@ Use structured \`passages[]\` when available, compare by its \`translation\`, re
         const hint = traditions ? ` Focus on: ${traditions.split(',').map(item => item.trim()).join(', ')}.` : '';
         text = `Cross-tradition doctrinal comparison on "${topic}".${hint}
 
-1. **Run bounded local discovery** — ${callText(calls[0])}. Treat snippets as discovery-only and do not claim the search covered sources outside the hosted collection. The requested tradition names are comparison interests, not author filters or evidence that a work belongs to that tradition.
-2. **Preserve source metadata** — Keep each hit's creator names and creator roles exactly as returned. Never relabel an issuing, drafting, revising, or compiling body as an author, and never infer a work's tradition or author attribution from its title, topic, or the user's requested traditions.
-3. **Read exact evidence** — Before quotation, doctrinal claims, or comparison, follow the selected canonical \`resource_link\` blocks with MCP \`resources/read\` and confirm each returned URI matches the selected locator. Do not rely on snippets alone.
-4. **Biblical foundations** — Use \`bible_lookup\` and \`bible_cross_references\` for passages actually identified in the sections you read.
-5. **Compare cautiously** — Explain agreement, divergence, Scripture use, and historical context only from exact sections read. Distinguish document statements from interpretation, and do not treat missing search hits as historical silence.`;
+1. **Inspect the hosted catalog** — Read \`theologai://primary-sources/catalog\` with MCP \`resources/read\`. Use only its reviewed work and creator metadata to plan the comparison; aliases route exact work lookups but are not metadata evidence. Do not substitute another creator or work for one absent from this catalog.
+2. **Run bounded local discovery** — ${callText(calls[0])}. The work-diverse selection builds a deterministic topic survey across hosted works. Treat snippets as discovery-only and do not claim the search covered sources outside the hosted collection. The requested tradition names are comparison interests, not author filters or evidence that a work belongs to that tradition.
+3. **Preserve source metadata** — Keep each hit's creator names and creator roles exactly as returned. Never relabel an issuing, drafting, revising, or compiling body as an author, and never infer a work's tradition or author attribution from its title, topic, or the user's requested traditions.
+4. **Read exact evidence** — Before quotation, doctrinal claims, or comparison, follow at most five unique canonical \`resource_link\` blocks with MCP \`resources/read\` and confirm each returned URI matches the selected locator. Deduplicate repeated locators and do not rely on snippets alone.
+5. **Biblical foundations** — Use \`bible_lookup\` and \`bible_cross_references\` for passages actually identified in the sections you read.
+6. **Compare cautiously** — Explain agreement, divergence, Scripture use, and historical context only from exact sections read. Distinguish document statements from interpretation, and do not treat missing search hits as historical silence.`;
         break;
       }
       case 'primary-source-research': {
@@ -280,13 +283,14 @@ Use structured \`passages[]\` when available, compare by its \`translation\`, re
         const authors = args?.authors?.split(',').map(value => value.trim()).filter(Boolean) ?? [];
         text = `Research primary-source evidence about "${topic}"${work ? ` within the exact local work "${work}"` : ' across the locally indexed collection'}${authors.length ? ` for the separately scoped creators ${authors.map(value => `"${value}"`).join(', ')}` : ''}.
 
-1. **Run bounded discovery** — ${callText(calls[0])}. This workflow is local-only: do not claim it searched CCEL, the web, an exhaustive catalog, or works outside the server's collection.
-2. **Use the structured result** — Preserve each separate creator query, provider status, catalog \`scope\` status/count/work list/truncation, rank, notices, creator roles, document type/date, locator, and \`evidencePolicy\`. A \`catalog_miss\` means the hosted catalog did not match the restriction; \`no_results\` means eligible hosted works were searched but no text hit matched. Treat every snippet as \`discovery_only\`.
-3. **Read selected evidence before quotation or comparison** — Follow at most ${args?.maxSections?.trim() || '3'} canonical \`resource_link\` blocks using MCP \`resources/read\`. Confirm that the returned URI matches the selected locator. Do not quote, compare creators/works, or draw substantive conclusions from snippets alone.
-4. **Report provenance honestly** — Edition provenance is incomplete. Do not invent an author, edition, transcription source, publication date, or rights status. Work-level type/date metadata is not edition metadata.
-5. **Synthesize with limits** — Distinguish what the selected sections say from your interpretation. Name searches that returned no results or unsupported filters; do not treat missing hits as historical silence.
+1. **Inspect the hosted catalog** — Read \`theologai://primary-sources/catalog\` with MCP \`resources/read\`. Confirm requested exact works and creator names there before searching. If Calvin, Erasmus, Luther, or any other requested creator is absent, report that catalog gap; never use a confession or similarly themed work as a proxy.
+2. **Run bounded discovery** — ${callText(calls[0])}. This workflow is local-only: do not claim it searched CCEL, the web, an exhaustive catalog, or works outside the server's collection. Topic and creator surveys use deterministic work diversity; exact within-work location uses relevance.
+3. **Use the v3 structured result** — Preserve each separate creator query, \`normalizedSelection\`, provider status, \`resultWindow\`, catalog \`scope\` status/count/work list/truncation, rank, notices, creator roles, document type/date, locator, and \`evidencePolicy\`. \`additional_match_observed\` means only that at least one more match was seen beyond the returned window, not that the corpus was exhaustively counted. A \`catalog_miss\` means the hosted catalog did not match the restriction; \`no_results\` means eligible hosted works were searched but no text hit matched. Treat every snippet as \`discovery_only\`.
+4. **Read selected evidence before quotation or comparison** — Follow at most ${args?.maxSections?.trim() || '3'} unique canonical \`resource_link\` blocks using MCP \`resources/read\`. Deduplicate locators and confirm that every returned URI matches the selected locator. Do not quote, compare creators/works, or draw substantive conclusions from snippets alone.
+5. **Report provenance honestly** — Edition provenance is incomplete and rights status is not established by the catalog resource. Do not invent an author, edition, transcription source, publication date, or rights status. Work-level type/date metadata is not edition metadata.
+6. **Synthesize with limits** — Distinguish what the selected sections say from your interpretation. Name searches that returned no results or unsupported filters; do not treat missing hits as historical silence.
 
-This workflow supports a topic survey, exact local-work search, inclusive overlapping composition-year scope, and up to four creator scopes. Creator comparisons always use separate query-plan items and only sections actually read; a drafting or issuing body is never relabeled as an author.`;
+This workflow supports a topic survey, exact local-work search, inclusive overlapping composition-year scope, and up to four creator scopes. Creator comparisons always use separate query-plan items and only sections actually read; a drafting or issuing body is never relabeled as an author. Never issue more than four query groups or read more than five exact section resources in one workflow.`;
         break;
       }
       case 'donate':
