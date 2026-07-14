@@ -35,15 +35,18 @@ describe('formatPrimarySourceSearch', () => {
     expect(output).toContain('Snippet only—read the selected exact MCP resource before quoting');
     expect(output).toContain('Metadata provenance: `hist\\-meta\\-test\\-document`');
     expect(output).toContain('not an exhaustive catalog');
+    expect(output).toContain('Internal data outside the local public contract was omitted');
+    expect(output.toLowerCase()).not.toContain('ccel');
+    expect(output).not.toContain('disabled');
   });
 
-  it('renders only canonicalized evidence and reports rejected locators consistently', () => {
+  it('renders only canonical local evidence and never leaks an injected foreign group', () => {
     const localHit = (url: string, rank: number) => ({
       provider: 'local' as const, queryId: 'q', title: 'Title', snippet: 'Snippet',
       locator: { kind: 'local_section' as const, documentId: 'doc', sectionId: String(rank), url },
       rankWithinProvider: rank, page: 1, snippetOnly: true as const, attribution: 'Source', resourceSizeBytes: 100,
     });
-    const ccelHit = (url: string, rank: number) => ({
+    const foreignHit = (url: string, rank: number) => ({
       provider: 'ccel_live' as const, queryId: 'q', title: 'Title', snippet: 'Snippet',
       locator: { kind: 'ccel_section' as const, work: 'calvin/institutes', section: 'iv.xvii', url },
       rankWithinProvider: rank, page: 1, snippetOnly: true as const, attribution: 'Source',
@@ -57,10 +60,11 @@ describe('formatPrimarySourceSearch', () => {
           localHit('javascript:alert(1)', 2),
         ],
       }, {
-        provider: 'ccel_live', status: 'ok', searched: true, page: 1, hitCount: 2, notices: [],
+        provider: 'ccel_live', status: 'rate_limited', searched: true, page: 1, hitCount: 2,
+        notices: ['Secret foreign status and count: 2.'],
         hits: [
-          ccelHit('https://ccel.org/ccel/calvin/institutes/iv.xvii.html', 1),
-          ccelHit('https://evil.test/ccel/calvin/institutes/iv.xvii.html', 2),
+          foreignHit('https://ccel.org/ccel/calvin/institutes/iv.xvii.html', 1),
+          foreignHit('https://evil.test/ccel/calvin/institutes/iv.xvii.html', 2),
         ],
       }] }],
       coverage: { localAttempted: true, localStatus: 'ok', localHitCount: 2, ccelAttempted: true, ccelStatus: 'ok', ccelHitCount: 2, notices: [] },
@@ -68,19 +72,19 @@ describe('formatPrimarySourceSearch', () => {
     const presented = presentPrimarySourceSearch(result);
     const output = formatPrimarySourceSearch(presented);
     expect(output).toContain('[exact section](theologai://documents/doc#section-1)');
-    expect(output).toContain('[exact section](https://ccel.org/ccel/calvin/institutes/iv.xvii.html)');
     expect(output).not.toContain('javascript:');
     expect(output).not.toContain('evil.test');
+    expect(output.toLowerCase()).not.toContain('ccel');
+    expect(output).not.toContain('rate_limited');
+    expect(output).not.toContain('Secret foreign');
     expect(output).toContain('Status: **interface_changed**');
     expect(output).toContain('1 local hit omitted');
-    expect(output).toContain('1 ccel\\_live hit omitted');
     expect(presented).toMatchObject({
       planStatus: 'partial',
-      queries: [{ providers: [
-        { status: 'interface_changed', hitCount: 1 },
-        { status: 'interface_changed', hitCount: 1 },
-      ] }],
-      coverage: { localStatus: 'interface_changed', localHitCount: 1, ccelStatus: 'interface_changed', ccelHitCount: 1 },
+      queries: [{ providers: [{ provider: 'local', status: 'interface_changed', hitCount: 1 }] }],
+      coverage: { localStatus: 'interface_changed', localHitCount: 1 },
     });
+    expect(presented.coverage).not.toHaveProperty('ccelStatus');
+    expect(presented.coverage).not.toHaveProperty('ccelHitCount');
   });
 });

@@ -17,18 +17,6 @@ const localLocator = {
   additionalProperties: false,
 } as const;
 
-const ccelLocator = {
-  type: 'object',
-  properties: {
-    kind: { const: 'ccel_section' },
-    url: { type: 'string', maxLength: 2_048 },
-    work: { type: 'string', minLength: 1, maxLength: 160 },
-    section: { type: 'string', minLength: 1, maxLength: 160 },
-  },
-  required: ['kind', 'url', 'work', 'section'],
-  additionalProperties: false,
-} as const;
-
 const commonHitProperties = {
   queryId: { type: 'string', minLength: 1, maxLength: 40 },
   title: { type: 'string', minLength: 1, maxLength: 300 },
@@ -100,17 +88,6 @@ const localHit = {
   additionalProperties: false,
 } as const;
 
-const ccelHit = {
-  type: 'object',
-  properties: {
-    ...commonHitProperties,
-    provider: { const: 'ccel_live' },
-    locator: ccelLocator,
-  },
-  required: [...commonHitRequired, 'provider', 'locator'],
-  additionalProperties: false,
-} as const;
-
 const providerProperties = {
   status,
   searched: { type: 'boolean' },
@@ -132,26 +109,15 @@ const providerProperties = {
 } as const;
 
 const provider = {
-  oneOf: [{
-    type: 'object',
-    properties: {
-      ...providerProperties,
-      provider: { const: 'local' },
-      scope: catalogScope,
-      hits: { type: 'array', maxItems: 8, items: localHit },
-    },
-    required: ['provider', 'status', 'searched', 'page', 'hitCount', 'resultWindow', 'hits', 'notices'],
-    additionalProperties: false,
-  }, {
-    type: 'object',
-    properties: {
-      ...providerProperties,
-      provider: { const: 'ccel_live' },
-      hits: { type: 'array', maxItems: 8, items: ccelHit },
-    },
-    required: ['provider', 'status', 'searched', 'page', 'hitCount', 'resultWindow', 'hits', 'notices'],
-    additionalProperties: false,
-  }],
+  type: 'object',
+  properties: {
+    ...providerProperties,
+    provider: { const: 'local' },
+    scope: catalogScope,
+    hits: { type: 'array', maxItems: 8, items: localHit },
+  },
+  required: ['provider', 'status', 'searched', 'page', 'hitCount', 'resultWindow', 'hits', 'notices'],
+  additionalProperties: false,
 } as const;
 
 export const primarySourceSearchOutputSchema = {
@@ -168,7 +134,7 @@ export const primarySourceSearchOutputSchema = {
           id: { type: 'string', minLength: 1, maxLength: 40 },
           normalizedMode: { type: 'string', enum: ['all_terms', 'phrase'] },
           normalizedSelection: { type: 'string', enum: ['relevance', 'work_diversity'] },
-          providers: { type: 'array', minItems: 1, maxItems: 2, items: provider },
+          providers: { type: 'array', minItems: 1, maxItems: 1, items: provider },
         },
         required: ['id', 'normalizedMode', 'normalizedSelection', 'providers'],
         additionalProperties: false,
@@ -180,12 +146,9 @@ export const primarySourceSearchOutputSchema = {
         localAttempted: { type: 'boolean' },
         localStatus: status,
         localHitCount: { type: 'integer', minimum: 0, maximum: 32 },
-        ccelAttempted: { type: 'boolean' },
-        ccelStatus: status,
-        ccelHitCount: { type: 'integer', minimum: 0, maximum: 32 },
         notices: { type: 'array', maxItems: 32, items: { type: 'string', maxLength: 500 } },
       },
-      required: ['localAttempted', 'localHitCount', 'ccelAttempted', 'ccelHitCount', 'notices'],
+      required: ['localAttempted', 'localHitCount', 'notices'],
       additionalProperties: false,
     },
     evidencePolicy: {

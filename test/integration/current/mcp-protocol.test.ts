@@ -125,6 +125,24 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
       expect(listed.tools.find(tool => tool.name === 'primary_source_search')?.outputSchema).toMatchObject({
         properties: { schemaVersion: { const: '3' } },
       });
+      const primarySourceTool = listed.tools.find(tool => tool.name === 'primary_source_search')!;
+      expect(JSON.stringify(primarySourceTool.inputSchema).toLowerCase()).not.toContain('ccel');
+      expect(JSON.stringify(primarySourceTool.outputSchema).toLowerCase()).not.toContain('ccel');
+      expect((primarySourceTool.outputSchema!.properties!.queries as any).items.properties.providers)
+        .toMatchObject({ minItems: 1, maxItems: 1 });
+
+      const primarySource = await client.callTool({
+        name: 'primary_source_search',
+        arguments: { queries: [{ id: 'local-only', text: 'faith', providers: ['local'] }] },
+      });
+      expect(primarySource.isError).not.toBe(true);
+      expect(primarySource.structuredContent).toMatchObject({
+        schemaVersion: '3', kind: 'primary_source_search',
+        queries: [{ providers: [{ provider: 'local' }] }],
+        coverage: { localAttempted: false, localHitCount: 0 },
+      });
+      expect(JSON.stringify(primarySource).toLowerCase()).not.toContain('ccel');
+      expect((primarySource.structuredContent as any).coverage).not.toHaveProperty('ccelAttempted');
       const resources = await client.listResources();
       expect(resources.resources).toContainEqual(expect.objectContaining({
         uri: 'theologai://primary-sources/catalog', mimeType: 'application/json',

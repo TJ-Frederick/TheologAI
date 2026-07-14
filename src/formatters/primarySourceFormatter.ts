@@ -13,8 +13,7 @@ export function formatPrimarySourceSearch(result: PresentedPrimarySourceSearch):
       `Match mode: ${query.normalizedMode} · Selection: ${query.normalizedSelection}`, '',
     );
     for (const provider of query.providers) {
-      const name = provider.provider === 'local' ? 'Local historical index' : 'CCEL live search';
-      lines.push(`### ${name}`, '', `Status: **${provider.status}** · Returned hits: ${provider.hitCount}`, '');
+      lines.push('### Local historical index', '', `Status: **${provider.status}** · Returned hits: ${provider.hitCount}`, '');
       lines.push(`Result window: ${provider.resultWindow.additionalMatchStatus}`, '');
       if (provider.scope) {
         const requested = [
@@ -53,7 +52,6 @@ export function formatPrimarySourceSearch(result: PresentedPrimarySourceSearch):
   }
   lines.push('## Coverage', '');
   lines.push(`- Local: ${result.coverage.localStatus ?? 'not requested'}; ${result.coverage.localHitCount} returned hits`);
-  lines.push(`- CCEL: ${result.coverage.ccelStatus ?? 'not requested'}; ${result.coverage.ccelHitCount} returned hits`);
   for (const notice of result.coverage.notices) lines.push(`- ${safe(notice)}`);
   lines.push(
     '',

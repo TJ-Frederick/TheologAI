@@ -128,9 +128,9 @@ The public tools search and retrieve only the locally indexed collection. They
 do **not** currently fetch CCEL search results or document bodies. Defensive
 CCEL discovery adapters remain in the codebase as future provider architecture,
 but CCEL is not requestable in the public input schema and is unreachable from
-the public tool handler. The output schema retains dormant CCEL provider-result
-shapes for internal compatibility; those branches are not reachable from public
-tool calls. Any future external provider rollout must remain discovery-only until
+the public tool handler. The v3 output schema and structured result are also
+strictly local-only; dormant external-provider result shapes remain internal.
+Any future external provider rollout must remain discovery-only until
 edition-specific rights and provider-policy gates are satisfied.
 
 Local search metadata uses exact lookup-only aliases for routing, plus reviewed composition

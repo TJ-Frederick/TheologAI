@@ -154,6 +154,11 @@ JSON resource. Guided topic and creator surveys use work diversity; exact-work
 location uses relevance; creator scopes remain separate and exact-resource
 reads remain mandatory.
 
+The public v3 input, output schema, structured result, and Markdown are strictly
+local-only. Dormant external-provider adapters, service types, feature flags,
+and composition wiring remain internal and unchanged for a separately reviewed
+future rollout.
+
 This slice preserves creator roles, routing-only alias policy, incomplete
 edition provenance, unestablished catalog rights status, canonical fail-closed
 section locators, and backward-compatible Markdown. Local protocol, parity, and

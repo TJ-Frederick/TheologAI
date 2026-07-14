@@ -52,6 +52,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed public CCEL document-body retrieval and reconciled both historical
   tools with the currently local-only provider contract. Defensive external
   discovery architecture remains inactive for a separately reviewed future rollout.
+- Removed dormant external-provider branches from the public
+  `primary_source_search` v3 output schema and structured result while retaining
+  the inactive internal adapter and service architecture.
 - Completed structured source metadata for ESV, NET, and the bundled legacy
   parallel corpus without asserting an open license for copyrighted translations.
 - Corrected Tyndale Open Study Notes licensing to CC BY-SA 4.0.

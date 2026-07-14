@@ -141,6 +141,9 @@ describe('Worker MCP endpoint in workerd', () => {
         }),
       ]),
     });
+    const primarySourceTool = (listed.message.result?.tools as Array<Record<string, unknown>>)
+      .find(tool => tool.name === 'primary_source_search')!;
+    expect(JSON.stringify(primarySourceTool).toLowerCase()).not.toContain('ccel');
   });
 
   it('returns structured Bible content alongside the legacy Markdown result', async () => {
@@ -542,6 +545,10 @@ describe('Worker MCP endpoint in workerd', () => {
         },
       },
     });
+    expect(JSON.stringify(result.message.result).toLowerCase()).not.toContain('ccel');
+    expect(Object.keys((result.message.result?.structuredContent as any).coverage).sort()).toEqual([
+      'localAttempted', 'localHitCount', 'localStatus', 'notices',
+    ]);
     const blocks = result.message.result?.content as Array<Record<string, unknown>>;
     const link = blocks.find(block => block.type === 'resource_link')!;
     const read = await rpc('resources/read', { uri: link.uri }, 43);
