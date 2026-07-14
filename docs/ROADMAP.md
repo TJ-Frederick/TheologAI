@@ -25,6 +25,9 @@ is local source context only and does not define the current product contract.
 - **Phase 3 evidence follow-up / PR #26:** pinned biblical-language source
   reproduction plus structured primary-source evidence handoff, merged as
   `65db03e8cd02098064a748f96cca8da22c974381`.
+- **Biblical-language Unicode correction / PR #27:** pinned-source Unicode
+  corrections and exact generated-artifact reproduction, merged as
+  `7b4e6c72182901ff77b5d175132a72d260e0418e`.
 
 These entries describe merged repository state. Deployment state is established
 only by the relevant protected workflow and post-deployment smoke evidence; a
@@ -64,24 +67,46 @@ output for `bible_lookup`, `parallel_passages`, `primary_source_search`,
 `original_language_lookup`, and `original_language_study`. Markdown remains
 available for compatibility.
 
-Protected production workflow run `29267651916` deployed the PR #26 merge after
-the exact-corpus readiness gate passed. Live CCEL discovery remains intentionally
-disabled and is not part of the public MCP contract.
+Protected production workflow run `29289643276` deployed the PR #27 merge after
+the exact-corpus readiness gate passed. GitHub deployment `5432211383` serves
+Worker version `49746830-16ce-40dc-b8a5-3cdc9ab79217` at 100% with production D1
+`theologai-production-20260713-b` and scoped materialization identity
+`652245709aaed181345b0cf17f0091471ac3a3e323f6ae84cfd73a5d8b409c51`.
+Live CCEL discovery remains intentionally disabled and is not part of the
+public MCP contract.
 
-## Current Unicode correction release candidate
+## Shipped Unicode correction release
 
 PR #27 corrects pinned-source Unicode artifacts in the biblical-language corpus
-without broadening the interpretation contract. Its exact source and generated
-artifact reproduction checks are green. A fresh transform-version-4 D1 database
-has passed the complete readiness contract and is prepared for protected
-production deployment; the current production Worker and database remain
-unchanged until that workflow succeeds.
+without broadening the interpretation contract. Its exact-source and generated-
+artifact reproduction checks passed. A fresh transform-version-4 D1 database
+passed the complete readiness contract before protected production deployment.
 
-The candidate preserves eleven advertised tools, six guided prompts, local-only
+The release preserves eleven advertised tools, six guided prompts, local-only
 primary-source evidence, disabled CCEL discovery, and the existing public MCP
 contracts. Preview has passed the targeted Unicode audit across all nine
 corrected Strong's entries, 237 corrected morphology cells, and 11 affected
 parallel-passage cases, plus sampled checks of the remaining MCP surface.
+Production then passed the corresponding bounded post-deployment audit.
+
+## Unreleased integrated Phase 3 candidate
+
+The next integrated candidate replays the reviewed original-language usage and
+catalog-aware primary-source work onto the PR #27 production baseline in four
+commits: `2c2a29a`, `eccfad4`, `1b95201`, and `2506413`. It adds schema
+`0003_original_language_usage`, occurrence and distribution evidence with
+keyset pagination, progressive original-language output levels, and curated
+catalog scope for primary-source research.
+
+This transform-version-6 candidate is unmerged, unreleased, and not prepared
+for preview. Its whole-D1 identity
+`c334b4b91c3a7c334a9425937c7f99473f27014ddae6cea377ee38bd578a6707` and scoped
+usage identity
+`c3600bb55da75aa600f8c97885efa7d58a3e8c29c3fcc6445a553091011beabd` are
+provisional until the rebased candidate completes deterministic reproduction,
+full verification, and independent release review. Draft PRs #28 and #29 will
+be superseded by the consolidated candidate after their durable content is
+confirmed present; they are not yet recorded as closed.
 
 ## Release gates
 
@@ -112,9 +137,9 @@ Code readiness and operational readiness are deliberately separate:
 
 ## Next work
 
-- After Unicode correctness is established, add the planned advanced-usage
-  schema for occurrence counts, book distribution, attested forms, and keyset
-  cursor pagination.
+- Verify and release the integrated transform-version-6 candidate through a
+  fresh preview D1, protected preview deployment, and full black-box audit
+  before considering production promotion.
 - Broaden advanced original-language study only after those foundations, using
   carefully sourced semantic-domain and discourse evidence useful to both
   beginners and readers of Greek or Hebrew.
@@ -129,6 +154,11 @@ Code readiness and operational readiness are deliberately separate:
   contract materially helps agents, retaining backward-compatible Markdown.
 - Rehearse matched Worker/D1 rollback and define retention policy before any
   predecessor database cleanup.
+- Revisit the parked public-edge traffic issue: a Frankfurt/AWS client has
+  generated sustained anonymous production invocations. A future custom domain
+  can enable a narrowly scoped WAF control while keeping the MCP endpoint
+  public. This is non-gating; no hostname, Access, WAF, or limiter change is
+  currently approved.
 
 ## Durable guardrails
 
