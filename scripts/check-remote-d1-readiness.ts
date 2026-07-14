@@ -55,6 +55,29 @@ export interface MorphologyUnicodeReadinessContract {
   correctionCount: number;
 }
 
+interface D1ReadinessCheck {
+  id: string;
+  predicate: string;
+}
+
+interface D1ReadinessQueryContract {
+  ctes: string[];
+  checks: D1ReadinessCheck[];
+}
+
+interface RemoteD1ReadinessOptions {
+  database: string;
+  env?: string;
+  wrangler?: string;
+  cwd?: string;
+}
+
+type ReadinessCommandExecutor = (
+  file: string,
+  args: readonly string[],
+  options: { cwd: string; stdio: 'inherit' },
+) => unknown;
+
 function sqlLiteral(value: string): string {
   return `'${value.replaceAll("'", "''")}'`;
 }
@@ -100,16 +123,16 @@ export function buildMorphologyUnicodeReadinessContract(
   };
 }
 
-export function buildD1ReadinessSql(
+function buildD1ReadinessQueryContract(
   expectedCounts: Record<string, number>,
   schemaVersion = MANIFEST.schemaVersion,
   d1CorpusIdentity = D1_CORPUS_IDENTITY,
-): string {
-  const countChecks = Object.entries(expectedCounts).map(([table, count]) => {
+): D1ReadinessQueryContract {
+  const countChecks = Object.entries(expectedCounts).map(([table, count]): D1ReadinessCheck => {
     if (!/^[a-z_]+$/.test(table) || !Number.isSafeInteger(count) || count < 0) {
       throw new Error(`Invalid expected D1 count: ${table}=${count}`);
     }
-    return `(SELECT COUNT(*) FROM "${table}") = ${count}`;
+    return { id: `counts.${table}`, predicate: `(SELECT COUNT(*) FROM "${table}") = ${count}` };
   });
   const requiredIndexes = [
     'idx_xref_from',
@@ -129,15 +152,15 @@ export function buildD1ReadinessSql(
   if (!/^[a-z0-9_]+$/.test(schemaVersion) || !/^[a-f0-9]{64}$/.test(d1CorpusIdentity)) {
     throw new Error('Invalid schema or D1 corpus identity');
   }
-  const identityChecks = [
-    `(SELECT value FROM theologai_metadata WHERE key = 'schema_version') = '${schemaVersion}'`,
-    `(SELECT value FROM theologai_metadata WHERE key = 'corpus_manifest_sha256') = '${d1CorpusIdentity}'`,
-    `(SELECT artifact_identity FROM ubs_parallel_sources WHERE source_id = 'ubs_paratext_parallel_passages') = '${UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY}'`,
-    `(SELECT source_sha256 FROM ubs_parallel_sources WHERE source_id = 'ubs_paratext_parallel_passages') = '${UBS_PARALLEL_PASSAGE_PROVENANCE.sourceSha256}'`,
-    `(SELECT transform_version FROM ubs_parallel_sources WHERE source_id = 'ubs_paratext_parallel_passages') = ${UBS_PARALLEL_PASSAGE_PROVENANCE.transformVersion}`,
+  const identityChecks: D1ReadinessCheck[] = [
+    { id: 'identity.schema_version', predicate: `(SELECT value FROM theologai_metadata WHERE key = 'schema_version') = '${schemaVersion}'` },
+    { id: 'identity.corpus_manifest_sha256', predicate: `(SELECT value FROM theologai_metadata WHERE key = 'corpus_manifest_sha256') = '${d1CorpusIdentity}'` },
+    { id: 'identity.ubs_artifact', predicate: `(SELECT artifact_identity FROM ubs_parallel_sources WHERE source_id = 'ubs_paratext_parallel_passages') = '${UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY}'` },
+    { id: 'identity.ubs_source', predicate: `(SELECT source_sha256 FROM ubs_parallel_sources WHERE source_id = 'ubs_paratext_parallel_passages') = '${UBS_PARALLEL_PASSAGE_PROVENANCE.sourceSha256}'` },
+    { id: 'identity.ubs_transform', predicate: `(SELECT transform_version FROM ubs_parallel_sources WHERE source_id = 'ubs_paratext_parallel_passages') = ${UBS_PARALLEL_PASSAGE_PROVENANCE.transformVersion}` },
   ];
-  const historicalCatalogChecks = [
-    `(SELECT COUNT(*) FROM documents WHERE json_type(metadata, '$.catalog') = 'object') = ${HISTORICAL_CATALOG.length}`,
+  const historicalCatalogChecks: D1ReadinessCheck[] = [
+    { id: 'historical.catalog_count', predicate: `(SELECT COUNT(*) FROM documents WHERE json_type(metadata, '$.catalog') = 'object') = ${HISTORICAL_CATALOG.length}` },
     ...HISTORICAL_CATALOG.map(entry => {
       const metadata = JSON.stringify({
         lookupAliases: entry.lookupAliases,
@@ -146,25 +169,29 @@ export function buildD1ReadinessSql(
         metadataStatus: entry.metadataStatus,
         metadataProvenanceIds: entry.metadataProvenanceIds,
       });
-      return `((SELECT json_extract(metadata, '$.catalog') FROM documents WHERE id = ${sqlLiteral(entry.documentId)}) = ${sqlLiteral(metadata)} AND (SELECT date FROM documents WHERE id = ${sqlLiteral(entry.documentId)}) = ${sqlLiteral(entry.composition.label)})`;
+      return {
+        id: `historical.catalog.${entry.documentId}`,
+        predicate: `((SELECT json_extract(metadata, '$.catalog') FROM documents WHERE id = ${sqlLiteral(entry.documentId)}) = ${sqlLiteral(metadata)} AND (SELECT date FROM documents WHERE id = ${sqlLiteral(entry.documentId)}) = ${sqlLiteral(entry.composition.label)})`,
+      };
     }),
   ];
-  const columnChecks = Object.entries(REQUIRED_COLUMNS).map(([table, columns]) =>
-    `(SELECT group_concat(name, ',') FROM (SELECT name FROM pragma_table_info('${table}') ORDER BY cid)) = '${columns.join(',')}'`
-  );
-  const ubsSemanticChecks = [
-    `(SELECT MIN(source_ordinal) = 1 AND MAX(source_ordinal) = COUNT(*) FROM ubs_parallel_groups)`,
-    `(SELECT COUNT(*) FROM ubs_parallel_groups g WHERE g.source_id != 'ubs_paratext_parallel_passages' OR g.label != 'source_attested_parallel' OR g.directionality != 'unspecified') = 0`,
-    `(SELECT COUNT(*) FROM ubs_parallel_groups g WHERE NOT EXISTS (SELECT 1 FROM ubs_parallel_members m WHERE m.group_id = g.group_id) OR (SELECT MIN(source_order) FROM ubs_parallel_members m WHERE m.group_id = g.group_id) != 1 OR (SELECT MAX(source_order) FROM ubs_parallel_members m WHERE m.group_id = g.group_id) != (SELECT COUNT(*) FROM ubs_parallel_members m WHERE m.group_id = g.group_id)) = 0`,
-    `(SELECT COUNT(*) FROM ubs_parallel_members m WHERE NOT EXISTS (SELECT 1 FROM ubs_parallel_segments s WHERE s.group_id = m.group_id AND s.member_order = m.source_order) OR (SELECT MIN(segment_order) FROM ubs_parallel_segments s WHERE s.group_id = m.group_id AND s.member_order = m.source_order) != 1 OR (SELECT MAX(segment_order) FROM ubs_parallel_segments s WHERE s.group_id = m.group_id AND s.member_order = m.source_order) != (SELECT COUNT(*) FROM ubs_parallel_segments s WHERE s.group_id = m.group_id AND s.member_order = m.source_order)) = 0`,
-    `(SELECT COUNT(*) FROM ubs_parallel_members WHERE source_reference != trim(source_reference) OR length(source_reference) <= 4 OR source_reference NOT GLOB '[A-Z0-9][A-Z0-9][A-Z0-9] *' OR normalized_reference = '' OR normalized_reference != trim(normalized_reference) OR alignment_raw = '' OR alignment_raw GLOB '*[^0-8]*' OR (language_marker = 'GRK' AND alignment_basis != 'UBSGNT5') OR (language_marker = 'HEB' AND alignment_basis NOT IN ('BHS','LXX'))) = 0`,
-    `(SELECT COUNT(*) FROM ubs_parallel_segments WHERE book_number NOT BETWEEN 1 AND 66 OR chapter < 1 OR start_verse < 1 OR end_verse < start_verse) = 0`,
+  const columnChecks = Object.entries(REQUIRED_COLUMNS).map(([table, columns]): D1ReadinessCheck => ({
+    id: `schema.columns.${table}`,
+    predicate: `(SELECT group_concat(name, ',') FROM (SELECT name FROM pragma_table_info('${table}') ORDER BY cid)) = '${columns.join(',')}'`,
+  }));
+  const ubsSemanticChecks: D1ReadinessCheck[] = [
+    { id: 'ubs.source_ordinals', predicate: `(SELECT MIN(source_ordinal) = 1 AND MAX(source_ordinal) = COUNT(*) FROM ubs_parallel_groups)` },
+    { id: 'ubs.group_metadata', predicate: `(SELECT COUNT(*) FROM ubs_parallel_groups g WHERE g.source_id != 'ubs_paratext_parallel_passages' OR g.label != 'source_attested_parallel' OR g.directionality != 'unspecified') = 0` },
+    { id: 'ubs.member_ordinals', predicate: `(SELECT COUNT(*) FROM ubs_parallel_groups g WHERE NOT EXISTS (SELECT 1 FROM ubs_parallel_members m WHERE m.group_id = g.group_id) OR (SELECT MIN(source_order) FROM ubs_parallel_members m WHERE m.group_id = g.group_id) != 1 OR (SELECT MAX(source_order) FROM ubs_parallel_members m WHERE m.group_id = g.group_id) != (SELECT COUNT(*) FROM ubs_parallel_members m WHERE m.group_id = g.group_id)) = 0` },
+    { id: 'ubs.segment_ordinals', predicate: `(SELECT COUNT(*) FROM ubs_parallel_members m WHERE NOT EXISTS (SELECT 1 FROM ubs_parallel_segments s WHERE s.group_id = m.group_id AND s.member_order = m.source_order) OR (SELECT MIN(segment_order) FROM ubs_parallel_segments s WHERE s.group_id = m.group_id AND s.member_order = m.source_order) != 1 OR (SELECT MAX(segment_order) FROM ubs_parallel_segments s WHERE s.group_id = m.group_id AND s.member_order = m.source_order) != (SELECT COUNT(*) FROM ubs_parallel_segments s WHERE s.group_id = m.group_id AND s.member_order = m.source_order)) = 0` },
+    { id: 'ubs.member_values', predicate: `(SELECT COUNT(*) FROM ubs_parallel_members WHERE source_reference != trim(source_reference) OR length(source_reference) <= 4 OR source_reference NOT GLOB '[A-Z0-9][A-Z0-9][A-Z0-9] *' OR normalized_reference = '' OR normalized_reference != trim(normalized_reference) OR alignment_raw = '' OR alignment_raw GLOB '*[^0-8]*' OR (language_marker = 'GRK' AND alignment_basis != 'UBSGNT5') OR (language_marker = 'HEB' AND alignment_basis NOT IN ('BHS','LXX'))) = 0` },
+    { id: 'ubs.segment_values', predicate: `(SELECT COUNT(*) FROM ubs_parallel_segments WHERE book_number NOT BETWEEN 1 AND 66 OR chapter < 1 OR start_verse < 1 OR end_verse < start_verse) = 0` },
   ];
   if (UNICODE_CORRECTION.strongs.length !== 9 || UNICODE_CORRECTION.morphology.length !== 237
     || UNICODE_CORRECTION.contract.d1Cells !== 255) {
     throw new Error('Biblical-language Unicode correction readiness contract drift');
   }
-  const strongsSemanticChecks = UNICODE_CORRECTION.strongs.flatMap(correction => {
+  const strongsSemanticChecks = UNICODE_CORRECTION.strongs.flatMap((correction): D1ReadinessCheck[] => {
     if (!/^[GH]\d+$/.test(correction.strongsNumber) || !['lemma', 'translit'].includes(correction.field)) {
       throw new Error(`Invalid Strong's Unicode correction readiness locator`);
     }
@@ -172,8 +199,8 @@ export function buildD1ReadinessSql(
     const expected = sqlLiteral(correction.after);
     const strongsNumber = sqlLiteral(correction.strongsNumber);
     return [
-      `(SELECT ${column} FROM strongs WHERE strongs_number = ${strongsNumber}) = ${expected}`,
-      `(SELECT ${column} FROM strongs_fts WHERE strongs_number = ${strongsNumber}) = ${expected}`,
+      { id: `unicode.strongs.${correction.strongsNumber.toLowerCase()}.${column}.table`, predicate: `(SELECT ${column} FROM strongs WHERE strongs_number = ${strongsNumber}) = ${expected}` },
+      { id: `unicode.strongs.${correction.strongsNumber.toLowerCase()}.${column}.fts`, predicate: `(SELECT ${column} FROM strongs_fts WHERE strongs_number = ${strongsNumber}) = ${expected}` },
     ];
   });
   const morphologyUnicodeContract = buildMorphologyUnicodeReadinessContract(UNICODE_CORRECTION.morphology);
@@ -190,30 +217,90 @@ export function buildD1ReadinessSql(
   ), form_counts_expected(strongs_key,form_count) AS (
     SELECT strongs_key, COUNT(*) FROM form_usage_expected GROUP BY strongs_key
   )`;
-  const usageFoundationChecks = [
-    `(SELECT COUNT(*) FROM morphology WHERE book_order NOT BETWEEN 1 AND 66) = 0`,
-    `(SELECT COUNT(*) FROM morphology WHERE book_order != ${CANONICAL_BOOK_ORDER_SQL}) = 0`,
-    `(SELECT COUNT(*) FROM (SELECT expected.strongs_key, expected.token_count, expected.verse_count, expected.book_count, forms.form_count FROM usage_expected expected JOIN form_counts_expected forms USING (strongs_key) EXCEPT SELECT strongs_key, token_count, verse_count, book_count, form_count FROM strongs_usage_stats)) = 0`,
-    `(SELECT COUNT(*) FROM (SELECT strongs_key, token_count, verse_count, book_count, form_count FROM strongs_usage_stats EXCEPT SELECT expected.strongs_key, expected.token_count, expected.verse_count, expected.book_count, forms.form_count FROM usage_expected expected JOIN form_counts_expected forms USING (strongs_key))) = 0`,
-    `(SELECT COUNT(*) FROM (SELECT * FROM book_usage_expected EXCEPT SELECT strongs_key, book, book_order, token_count, verse_count FROM strongs_book_stats)) = 0`,
-    `(SELECT COUNT(*) FROM (SELECT strongs_key, book, book_order, token_count, verse_count FROM strongs_book_stats EXCEPT SELECT * FROM book_usage_expected)) = 0`,
-    `(SELECT COUNT(*) FROM (SELECT strongs_key, form_text, token_count, verse_count, first_key FROM form_usage_expected EXCEPT SELECT strongs_key, form_text, token_count, verse_count, printf('%02d:%05d:%05d:%05d', first_book_order, first_chapter, first_verse, first_position) FROM strongs_form_stats)) = 0`,
-    `(SELECT COUNT(*) FROM (SELECT strongs_key, form_text, token_count, verse_count, printf('%02d:%05d:%05d:%05d', first_book_order, first_chapter, first_verse, first_position) FROM strongs_form_stats EXCEPT SELECT strongs_key, form_text, token_count, verse_count, first_key FROM form_usage_expected)) = 0`,
-    `(SELECT COUNT(*) FROM strongs_form_stats form WHERE NOT EXISTS (SELECT 1 FROM morphology token WHERE token.strongs_number = form.strongs_key AND token.word_text = form.form_text AND token.book = form.first_book AND token.book_order = form.first_book_order AND token.chapter = form.first_chapter AND token.verse = form.first_verse AND token.position = form.first_position)) = 0`,
+  const usageFoundationChecks: D1ReadinessCheck[] = [
+    { id: 'usage.book_order_range', predicate: `(SELECT COUNT(*) FROM morphology WHERE book_order NOT BETWEEN 1 AND 66) = 0` },
+    { id: 'usage.book_order_canonical', predicate: `(SELECT COUNT(*) FROM morphology WHERE book_order != ${CANONICAL_BOOK_ORDER_SQL}) = 0` },
+    { id: 'usage.summary_missing', predicate: `(SELECT COUNT(*) FROM (SELECT expected.strongs_key, expected.token_count, expected.verse_count, expected.book_count, forms.form_count FROM usage_expected expected JOIN form_counts_expected forms USING (strongs_key) EXCEPT SELECT strongs_key, token_count, verse_count, book_count, form_count FROM strongs_usage_stats)) = 0` },
+    { id: 'usage.summary_extra', predicate: `(SELECT COUNT(*) FROM (SELECT strongs_key, token_count, verse_count, book_count, form_count FROM strongs_usage_stats EXCEPT SELECT expected.strongs_key, expected.token_count, expected.verse_count, expected.book_count, forms.form_count FROM usage_expected expected JOIN form_counts_expected forms USING (strongs_key))) = 0` },
+    { id: 'usage.books_missing', predicate: `(SELECT COUNT(*) FROM (SELECT * FROM book_usage_expected EXCEPT SELECT strongs_key, book, book_order, token_count, verse_count FROM strongs_book_stats)) = 0` },
+    { id: 'usage.books_extra', predicate: `(SELECT COUNT(*) FROM (SELECT strongs_key, book, book_order, token_count, verse_count FROM strongs_book_stats EXCEPT SELECT * FROM book_usage_expected)) = 0` },
+    { id: 'usage.forms_missing', predicate: `(SELECT COUNT(*) FROM (SELECT strongs_key, form_text, token_count, verse_count, first_key FROM form_usage_expected EXCEPT SELECT strongs_key, form_text, token_count, verse_count, printf('%02d:%05d:%05d:%05d', first_book_order, first_chapter, first_verse, first_position) FROM strongs_form_stats)) = 0` },
+    { id: 'usage.forms_extra', predicate: `(SELECT COUNT(*) FROM (SELECT strongs_key, form_text, token_count, verse_count, printf('%02d:%05d:%05d:%05d', first_book_order, first_chapter, first_verse, first_position) FROM strongs_form_stats EXCEPT SELECT strongs_key, form_text, token_count, verse_count, first_key FROM form_usage_expected)) = 0` },
+    { id: 'usage.form_first_occurrence', predicate: `(SELECT COUNT(*) FROM strongs_form_stats form WHERE NOT EXISTS (SELECT 1 FROM morphology token WHERE token.strongs_number = form.strongs_key AND token.word_text = form.form_text AND token.book = form.first_book AND token.book_order = form.first_book_order AND token.chapter = form.first_chapter AND token.verse = form.first_verse AND token.position = form.first_position)) = 0` },
   ];
   const unicodeAbsenceChecks = [
     ['strongs', ['strongs_number', 'testament', 'lemma', 'transliteration', 'pronunciation', 'definition', 'derivation']],
     ['strongs_fts', ['strongs_number', 'lemma', 'transliteration', 'definition']],
     ['morphology', ['book', 'word_text', 'lemma', 'strongs_number', 'morph_code', 'gloss']],
-  ].map(([table, columns]) => {
+  ].map(([table, columns]): D1ReadinessCheck => {
     const predicate = (columns as string[]).map(column => `instr(COALESCE(${column}, ''), char(65533)) > 0`).join(' OR ');
-    return `(SELECT COUNT(*) FROM ${table} WHERE ${predicate}) = 0`;
+    return { id: `unicode.replacement_absent.${table}`, predicate: `(SELECT COUNT(*) FROM ${table} WHERE ${predicate}) = 0` };
   });
 
+  const checks: D1ReadinessCheck[] = [
+    { id: 'integrity.quick_check', predicate: integrityCheck },
+    { id: 'integrity.foreign_keys', predicate: foreignKeyCheck },
+    ...identityChecks,
+    ...historicalCatalogChecks,
+    ...columnChecks,
+    ...countChecks,
+    { id: 'schema.required_indexes', predicate: indexCheck },
+    ...ubsSemanticChecks,
+    ...strongsSemanticChecks,
+    ...morphologyUnicodeContract.checks.map((predicate, index): D1ReadinessCheck => ({
+      id: ['unicode.morphology.expected_count', 'unicode.morphology.locators', 'unicode.morphology.values'][index]!,
+      predicate,
+    })),
+    ...usageFoundationChecks,
+    ...unicodeAbsenceChecks,
+    { id: 'data.john_1_1', predicate: johnOneOneReadinessPredicate() },
+    { id: 'data.genesis_1_1_lemma', predicate: genesisOneOneLemmaReadinessPredicate() },
+  ];
+  const ids = new Set<string>();
+  for (const check of checks) {
+    if (!/^[a-z0-9._:-]+$/.test(check.id) || ids.has(check.id)) {
+      throw new Error(`Invalid or duplicate D1 readiness check ID: ${check.id}`);
+    }
+    ids.add(check.id);
+  }
+  return {
+    ctes: [morphologyUnicodeContract.cte, usageFoundationCtes],
+    checks,
+  };
+}
+
+function buildD1ReadinessChecksCte(contract: D1ReadinessQueryContract): string {
+  const values = contract.checks.map(check =>
+    `(${sqlLiteral(check.id)}, (${check.predicate}))`
+  ).join(',\n');
+  return `WITH ${contract.ctes.join(',\n')},\nreadiness_checks(check_name, passed) AS (VALUES\n${values}\n)`;
+}
+
+export function buildD1ReadinessSql(
+  expectedCounts: Record<string, number>,
+  schemaVersion = MANIFEST.schemaVersion,
+  d1CorpusIdentity = D1_CORPUS_IDENTITY,
+): string {
+  const contract = buildD1ReadinessQueryContract(expectedCounts, schemaVersion, d1CorpusIdentity);
+  const expectedCheckCount = contract.checks.length;
   return [
-    `WITH ${morphologyUnicodeContract.cte},\n${usageFoundationCtes}`,
-    `SELECT CASE WHEN ${[integrityCheck, foreignKeyCheck, ...identityChecks, ...historicalCatalogChecks, ...columnChecks, ...countChecks, indexCheck, ...ubsSemanticChecks, ...strongsSemanticChecks, ...morphologyUnicodeContract.checks, ...usageFoundationChecks, ...unicodeAbsenceChecks, johnOneOneReadinessPredicate(), genesisOneOneLemmaReadinessPredicate()].join(' AND ')}`,
-    `THEN 'ready' ELSE json_extract('D1 readiness check failed', '$') END AS readiness;`,
+    buildD1ReadinessChecksCte(contract),
+    `SELECT CASE`,
+    `WHEN (SELECT COUNT(*) FROM readiness_checks) != ${expectedCheckCount} THEN json_extract('D1 readiness check inventory mismatch', '$')`,
+    `WHEN (SELECT COUNT(*) FROM readiness_checks WHERE passed IS 1) != ${expectedCheckCount} THEN json_extract('D1 readiness check failed', '$')`,
+    `ELSE 'ready' END AS readiness;`,
+  ].join('\n');
+}
+
+export function buildD1ReadinessDiagnosticSql(
+  expectedCounts: Record<string, number>,
+  schemaVersion = MANIFEST.schemaVersion,
+  d1CorpusIdentity = D1_CORPUS_IDENTITY,
+): string {
+  const contract = buildD1ReadinessQueryContract(expectedCounts, schemaVersion, d1CorpusIdentity);
+  return [
+    buildD1ReadinessChecksCte(contract),
+    `SELECT check_name, passed FROM readiness_checks WHERE passed IS NOT 1 ORDER BY check_name;`,
   ].join('\n');
 }
 
@@ -233,6 +320,31 @@ function parseArguments(argv: string[]): { database: string; env?: string; print
   return { database, env, printOnly };
 }
 
+export function runRemoteD1ReadinessCheck(
+  options: RemoteD1ReadinessOptions,
+  execute: ReadinessCommandExecutor = execFileSync,
+): void {
+  const wrangler = options.wrangler ?? join(ROOT, 'node_modules', 'wrangler', 'bin', 'wrangler.js');
+  const cwd = options.cwd ?? ROOT;
+  const executeSql = (sql: string): void => {
+    const args = [wrangler, 'd1', 'execute', options.database, '--remote', '--command', sql, '--json'];
+    if (options.env) args.push('--env', options.env);
+    execute(process.execPath, args, { cwd, stdio: 'inherit' });
+  };
+
+  try {
+    executeSql(buildD1ReadinessSql(MANIFEST.expectedCounts));
+  } catch (primaryError) {
+    process.stderr.write('Primary D1 readiness gate failed; requesting failed-check diagnostics.\n');
+    try {
+      executeSql(buildD1ReadinessDiagnosticSql(MANIFEST.expectedCounts));
+    } catch {
+      process.stderr.write('D1 readiness diagnostics could not be retrieved.\n');
+    }
+    throw primaryError;
+  }
+}
+
 function main(): void {
   const { database, env, printOnly } = parseArguments(process.argv.slice(2));
   const sql = buildD1ReadinessSql(MANIFEST.expectedCounts);
@@ -241,10 +353,7 @@ function main(): void {
     return;
   }
 
-  const wrangler = join(ROOT, 'node_modules', 'wrangler', 'bin', 'wrangler.js');
-  const args = [wrangler, 'd1', 'execute', database, '--remote', '--command', sql, '--json'];
-  if (env) args.push('--env', env);
-  execFileSync(process.execPath, args, { cwd: ROOT, stdio: 'inherit' });
+  runRemoteD1ReadinessCheck({ database, env });
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
