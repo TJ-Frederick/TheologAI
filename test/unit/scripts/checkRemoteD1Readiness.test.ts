@@ -9,6 +9,8 @@ import {
 } from '../../../scripts/check-remote-d1-readiness.js';
 import type { BiblicalLanguageUnicodeCorrectionLedger } from '../../../scripts/biblical-language-unicode-correction.js';
 
+const generatedDbPath = process.env.THEOLOGAI_TEST_DATABASE_PATH?.trim();
+
 describe('remote D1 readiness query', () => {
   it('builds a read-only exact-count and index gate', () => {
     const sql = buildD1ReadinessSql(
@@ -56,10 +58,10 @@ describe('remote D1 readiness query', () => {
       .toThrow('Invalid expected D1 count');
   });
 
-  it('fails when set-based usage totals or first-occurrence evidence drift', () => {
+  it.skipIf(!generatedDbPath)('fails when set-based usage totals or first-occurrence evidence drift', () => {
     const root = mkdtempSync(join(tmpdir(), 'theologai-readiness-mutation-'));
     const databasePath = join(root, 'theologai.db');
-    copyFileSync('data/theologai.db', databasePath);
+    copyFileSync(generatedDbPath!, databasePath);
     const manifest = JSON.parse(readFileSync('data/data-manifest.json', 'utf8')) as {
       expectedCounts: Record<string, number>;
     };
