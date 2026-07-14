@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { gunzipSync } from 'node:zlib';
 import { OriginalLanguageStudyService } from '../../../../src/services/languages/OriginalLanguageStudyService.js';
 import type { IMorphologyRepository, IStrongsRepository, MorphWord } from '../../../../src/kernel/repositories.js';
 import { AdapterError, NotFoundError } from '../../../../src/kernel/errors.js';
 import { expandHebrewMorphCode } from '../../../../src/adapters/shared/hebrewMorphExpander.js';
+import { resolveMorphologyLemma } from '../../../../scripts/morphology-lemma.js';
 
 const loved: MorphWord = { position: 3, word_text: 'ἠγάπησεν', lemma: 'ἀγαπάω', strongs_number: 'G0025', morph_code: 'V-AAI-3S', gloss: 'loved' };
 
@@ -120,6 +123,175 @@ describe('OriginalLanguageStudyService', () => {
       certainty: 'expanded',
     });
     expect(result.dictionary?.derivation).toBe('from H8064;');
+  });
+
+  it('matches only the identity-aligned gloss segment of a Hebrew compound', async () => {
+    const word: MorphWord = {
+      position: 5,
+      word_text: 'הַ/שָּׁמַ֖יִם',
+      lemma: 'שָׁמַיִם',
+      strongs_number: 'H8064',
+      morph_code: 'HTd/Ncmpa',
+      gloss: 'the/ heavens',
+    };
+    const { morphology, strongs } = repos([word]);
+    const service = new OriginalLanguageStudyService(morphology, strongs);
+
+    await expect(service.study({ reference: 'Genesis 1:1', target: 'heavens' }))
+      .resolves.toMatchObject({ selectedToken: { position: 5, gloss: 'the/ heavens' } });
+    await expect(service.study({ reference: 'Genesis 1:1', target: 'the' }))
+      .rejects.toThrow('No token');
+    await expect(service.study({ reference: 'Genesis 1:1', target: 'heaven' }))
+      .rejects.toThrow('No token');
+  });
+
+  it('uses a unique lemma-aligned segment before morphology fallback', async () => {
+    const word: MorphWord = {
+      position: 7,
+      word_text: 'מִן/הַ/“שָּׁמַ֖יִם׃”/ה',
+      lemma: 'שָׁמַיִם',
+      strongs_number: 'H8064',
+      morph_code: 'HR/Td/Ncmpa/Sd',
+      gloss: 'from/the/heavens/towards',
+    };
+    const { morphology, strongs } = repos([word]);
+    const service = new OriginalLanguageStudyService(morphology, strongs);
+
+    await expect(service.study({ reference: 'Genesis 1:1', target: 'heavens' }))
+      .resolves.toMatchObject({ selectedToken: { position: 7 } });
+    for (const target of ['from', 'the', 'towards']) {
+      await expect(service.study({ reference: 'Genesis 1:1', target }))
+        .rejects.toThrow('No token');
+    }
+  });
+
+  it('uses a sole content-bearing morphology segment when no source segment identifies the lemma', async () => {
+    const word: MorphWord = {
+      position: 1,
+      word_text: 'בְּ/רֵאשִׁ֖ית',
+      lemma: '',
+      strongs_number: 'H7225',
+      morph_code: 'HR/Ncfsa',
+      gloss: 'in/beginning',
+    };
+    const { morphology, strongs } = repos([word]);
+    const service = new OriginalLanguageStudyService(morphology, strongs);
+
+    await expect(service.study({ reference: 'Genesis 1:1', target: 'beginning' }))
+      .resolves.toMatchObject({ selectedToken: { position: 1 } });
+    await expect(service.study({ reference: 'Genesis 1:1', target: 'in' }))
+      .rejects.toThrow('No token');
+  });
+
+  it('can align a pronominal suffix by lemma without promoting a preposition gloss', async () => {
+    const word: MorphWord = {
+      position: 2,
+      word_text: 'לְ/ךָ',
+      lemma: 'ךָ',
+      strongs_number: 'H9031',
+      morph_code: 'HR/Sp2ms',
+      gloss: 'to/you',
+    };
+    const { morphology, strongs } = repos([word]);
+    const service = new OriginalLanguageStudyService(morphology, strongs);
+
+    await expect(service.study({ reference: 'Genesis 1:1', target: 'you' }))
+      .resolves.toMatchObject({ selectedToken: { position: 2 } });
+    await expect(service.study({ reference: 'Genesis 1:1', target: 'to' }))
+      .rejects.toThrow('No token');
+  });
+
+  it.each([
+    ['empty source segment', { word_text: 'הַ//שָּׁמַיִם', morph_code: 'HTd/Ncmpa', gloss: 'the/heavens' }],
+    ['empty morphology segment', { word_text: 'הַ/שָּׁמַיִם', morph_code: 'HTd//Ncmpa', gloss: 'the/heavens' }],
+    ['empty gloss segment', { word_text: 'הַ/שָּׁמַיִם', morph_code: 'HTd/Ncmpa', gloss: 'the//heavens' }],
+    ['unequal segment counts', { word_text: 'הַ/שָּׁמַיִם', morph_code: 'HTd/Ncmpa', gloss: 'the/very/heavens' }],
+    ['ambiguous content segments', { word_text: 'שָׁמַיִם/אֶרֶץ', lemma: 'אַחֵר', morph_code: 'HNcmpa/Ncfsa', gloss: 'heavens/earth' }],
+  ])('fails closed for %s', async (_name, malformed) => {
+    const word: MorphWord = {
+      position: 5,
+      lemma: 'שָׁמַיִם',
+      strongs_number: 'H8064',
+      ...malformed,
+    };
+    const { morphology, strongs } = repos([word]);
+    await expect(new OriginalLanguageStudyService(morphology, strongs)
+      .study({ reference: 'Genesis 1:1', target: 'heavens' }))
+      .rejects.toThrow('No token');
+  });
+
+  it('does not split Greek glosses or Hebrew rows without a Hebrew identity', async () => {
+    const greek: MorphWord = {
+      ...loved,
+      word_text: 'ὁ/κόσμος', lemma: 'κόσμος', morph_code: 'T-NSM/N-NSM', gloss: 'the/world',
+    };
+    const identityMismatch: MorphWord = {
+      ...greek, strongs_number: 'G2889', word_text: 'הַ/עוֹלָם', lemma: 'עוֹלָם', morph_code: 'HTd/Ncmsa',
+    };
+    for (const word of [greek, identityMismatch]) {
+      const { morphology, strongs } = repos([word]);
+      await expect(new OriginalLanguageStudyService(morphology, strongs)
+        .study({ reference: word === greek ? 'John 3:16' : 'Genesis 1:1', target: 'world' }))
+        .rejects.toThrow('No token');
+    }
+  });
+
+  it('preserves full-gloss priority and returns candidates for repeated segment matches', async () => {
+    const fullGloss: MorphWord = { ...loved, position: 1, gloss: 'heavens' };
+    const compound = (position: number): MorphWord => ({
+      position,
+      word_text: 'הַ/שָּׁמַיִם',
+      lemma: 'שָׁמַיִם',
+      strongs_number: 'H8064',
+      morph_code: 'HTd/Ncmpa',
+      gloss: 'the/heavens',
+    });
+    const exactRepos = repos([fullGloss, compound(2)]);
+    const exact = await new OriginalLanguageStudyService(exactRepos.morphology, exactRepos.strongs)
+      .study({ reference: 'Genesis 1:1', target: 'heavens' });
+    expect(exact.selectedToken?.position).toBe(1);
+
+    const repeatedRepos = repos([compound(2), compound(6)]);
+    const repeated = await new OriginalLanguageStudyService(repeatedRepos.morphology, repeatedRepos.strongs)
+      .study({ reference: 'Genesis 1:1', target: 'heavens' });
+    expect(repeated).toMatchObject({ status: 'needs_disambiguation' });
+    expect(repeated.candidates?.map(candidate => candidate.position)).toEqual([2, 6]);
+  });
+
+  it('satisfies the contract against the pinned Genesis 1:1 source row', async () => {
+    const genesis = JSON.parse(gunzipSync(readFileSync(new URL(
+      '../../../../data/biblical-languages/stepbible/hebrew/01-Genesis.json.gz',
+      import.meta.url,
+    ))).toString('utf8')) as {
+      testament: 'OT';
+      chapters: Record<string, Record<string, { words: Array<{
+        position: number; text: string; lemma: string; strong: string; morph: string; gloss: string;
+      }> }>>;
+    };
+    const lexicon = JSON.parse(readFileSync(new URL(
+      '../../../../data/biblical-languages/stepbible-lexicons/tbesh-hebrew.json',
+      import.meta.url,
+    ), 'utf8')) as Record<string, { lemma?: unknown }>;
+    const source = genesis.chapters['1']['1'].words.find(word => word.strong === 'H8064');
+    expect(source).toMatchObject({
+      position: 5,
+      text: 'הַ/שָּׁמַ֖יִם',
+      morph: 'HTd/Ncmpa',
+      gloss: 'the/ heavens',
+    });
+    const word: MorphWord = {
+      position: source!.position,
+      word_text: source!.text,
+      lemma: resolveMorphologyLemma(source!.lemma, source!.strong, genesis.testament, lexicon),
+      strongs_number: source!.strong,
+      morph_code: source!.morph,
+      gloss: source!.gloss,
+    };
+    const { morphology, strongs } = repos([word]);
+
+    await expect(new OriginalLanguageStudyService(morphology, strongs)
+      .study({ reference: 'Genesis 1:1', target: 'heavens' }))
+      .resolves.toMatchObject({ selectedToken: { position: 5, strongsNumber: 'H8064' } });
   });
 
   it('returns identical results through synchronous Node and asynchronous D1-shaped ports', async () => {
