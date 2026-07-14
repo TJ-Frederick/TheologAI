@@ -117,13 +117,13 @@ were unchanged. The later protected production release is recorded above.
 
 ### Unreleased transform-version-6 candidate
 
-The reconciled integrated candidate consists of four feature commits
-(`2c2a29a`, `eccfad4`, `1b95201`, and `2506413`) plus the required downstream
-Unicode-manifest preservation fix `a1c9da3` on top of the PR #27 merge. The
-later `e6f7f7f` commit only reconciles release documentation. The candidate
-introduces migration `0003_original_language_usage` and transform version 6.
-It is unmerged, unreleased, and has not been materialized or prepared for
-preview.
+The reconciled integrated candidate's four core feature commits are `2c2a29a`,
+`eccfad4`, `1b95201`, and `2506413`. On top of the PR #27 merge, the candidate
+also requires the downstream Unicode-manifest preservation fix `a1c9da3` and
+source-lock synchronization `e8282c3`; the separate `e6f7f7f` commit reconciles
+release documentation. The candidate introduces migration
+`0003_original_language_usage` and transform version 6. It is unmerged,
+unreleased, and has not been materialized or prepared for preview.
 
 The candidate whole-D1 identity
 `c334b4b91c3a7c334a9425937c7f99473f27014ddae6cea377ee38bd578a6707` and scoped
