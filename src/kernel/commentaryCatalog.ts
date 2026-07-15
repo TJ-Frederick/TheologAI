@@ -23,9 +23,8 @@ export const HELLOAO_COMMENTARY_DELIVERY = deepFreeze({
   label: 'HelloAO commentary delivery',
   url: 'https://bible.helloao.org',
   attribution: 'HelloAO',
-  version: 'not_reported',
   status: 'provider_attributed',
-  note: 'HelloAO supplies the commentary payload, which may come from the process-local one-hour response cache; this record does not identify or authenticate the underlying transcription edition.',
+  note: 'HelloAO supplies the commentary payload, which may come from the process-local one-hour response cache. Each result reports the provider corpus SHA-256, but that fingerprint does not identify or authenticate the underlying transcription edition.',
 } as const satisfies ProvenanceRecord);
 
 const UNPINNED_PUBLIC_DOMAIN_NOTE =
@@ -123,8 +122,8 @@ export const COMMENTARY_CATALOG = deepFreeze([
       url: 'https://www.tyndalehouse.com/resources/open-study-notes/',
       license: { label: 'CC BY-SA 4.0', url: 'https://creativecommons.org/licenses/by-sa/4.0/' },
       rightsNotice: 'CC BY-SA 4.0 — Tyndale House, Cambridge', attribution: 'Tyndale House, Cambridge',
-      version: 'not_reported', status: 'provider_attributed',
-      note: 'The provider attributes this work and license, but does not report a pinned revision for the delivered payload.',
+      status: 'provider_attributed',
+      note: 'The provider attributes this work and license. The per-result provider corpus SHA-256 does not identify a pinned underlying edition or transcription.',
     }),
   },
 ] as const satisfies readonly CommentaryCatalogEntry[]);

@@ -22,7 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   results require `verseNumber`; JFB, Clarke, and Tyndale may also use a
   provider entry explicitly typed as a verse. Results label commentary text as
   Markdown and separate conservative work rights from cached-or-live HelloAO
-  delivery. Retrieval reports that per-result cache status is not exposed.
+  delivery. Retrieval reports that per-result cache status is not exposed,
+  validates response-container work/book/chapter identity, and surfaces the
+  provider corpus SHA-256 without presenting it as edition provenance.
 - Added versioned `donation_config` results with explicit voluntary/no-feature-
   unlock policy, the shared public donation URL, recipient address, and ordered
   native/token asset metadata. The structure makes native addresses null,

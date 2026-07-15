@@ -40,6 +40,12 @@ interface ValidatedEntry {
   text?: string;
 }
 
+interface ValidatedProviderPayload {
+  content: unknown[];
+  chapterNumber: number;
+  providerRevision: `sha256:${string}`;
+}
+
 const MAX_CHAPTER_ENTRIES = 500;
 const MAX_CONTENT_ITEMS_PER_ENTRY = 5_000;
 const MAX_CONTENT_FRAGMENT_LENGTH = 100_000;
@@ -88,7 +94,22 @@ export class HelloAoCommentaryAdapter implements CommentaryAdapter {
       throw error;
     }
 
-    const extraction = this.extractCommentaryText(data, hao.chapter, hao.verse, meta.scalarPolicy);
+    const payload = this.validateProviderPayload(
+      data,
+      meta.providerWorkId,
+      hao.bookCode,
+      hao.chapter,
+    );
+    if (payload.kind === 'invalid') {
+      throw new AdapterIntegrityError('HelloAO', payload.reason);
+    }
+
+    const extraction = this.extractCommentaryText(
+      payload.content,
+      payload.chapterNumber,
+      hao.verse,
+      meta.scalarPolicy,
+    );
     if (extraction.kind === 'invalid') {
       throw new AdapterIntegrityError('HelloAO', extraction.reason);
     }
@@ -109,6 +130,7 @@ export class HelloAoCommentaryAdapter implements CommentaryAdapter {
       text: extraction.text,
       citation: { ...meta.citation },
       coverage: extraction.coverage,
+      providerRevision: payload.providerRevision,
     };
   }
 
@@ -125,15 +147,11 @@ export class HelloAoCommentaryAdapter implements CommentaryAdapter {
   }
 
   private extractCommentaryText(
-    data: unknown,
+    content: unknown[],
     chapterNumber: number,
     verseNumber: number | undefined,
     scalarIdentity: CommentaryScalarPolicy,
   ): ExtractionResult {
-    const chapter = this.getChapterContent(data);
-    if (chapter.kind === 'invalid') return chapter;
-    const content = chapter.content;
-
     const validEntries: ValidatedEntry[] = [];
     let chapterTextLength = 0;
     let chapterTextEntries = 0;
@@ -198,14 +216,46 @@ export class HelloAoCommentaryAdapter implements CommentaryAdapter {
     };
   }
 
-  private getChapterContent(data: unknown): { kind: 'chapter'; content: unknown[] } | { kind: 'invalid'; reason: string } {
-    if (!this.isRecord(data) || !this.isRecord(data.chapter) || !Array.isArray(data.chapter.content)) {
+  private validateProviderPayload(
+    data: unknown,
+    expectedCommentaryId: string,
+    expectedBookId: string,
+    expectedChapterNumber: number,
+  ): ({ kind: 'payload' } & ValidatedProviderPayload) | { kind: 'invalid'; reason: string } {
+    if (!this.isRecord(data)
+        || !this.isRecord(data.commentary)
+        || !this.isRecord(data.book)
+        || !this.isRecord(data.chapter)
+        || !Array.isArray(data.chapter.content)) {
       return { kind: 'invalid', reason: 'Malformed commentary chapter payload' };
+    }
+
+    if (data.commentary.id !== expectedCommentaryId) {
+      return { kind: 'invalid', reason: 'Commentary payload work identity mismatch' };
+    }
+    if (data.book.id !== expectedBookId) {
+      return { kind: 'invalid', reason: 'Commentary payload book identity mismatch' };
+    }
+    if (data.book.commentaryId !== expectedCommentaryId
+        || data.book.commentaryId !== data.commentary.id) {
+      return { kind: 'invalid', reason: 'Commentary payload book/work identity mismatch' };
+    }
+    if (data.chapter.number !== expectedChapterNumber) {
+      return { kind: 'invalid', reason: 'Commentary payload chapter identity mismatch' };
+    }
+    if (typeof data.commentary.sha256 !== 'string'
+        || !/^[0-9a-f]{64}$/i.test(data.commentary.sha256)) {
+      return { kind: 'invalid', reason: 'Malformed commentary provider revision' };
     }
     if (data.chapter.content.length > MAX_CHAPTER_ENTRIES) {
       return { kind: 'invalid', reason: 'Commentary chapter entry count exceeds safety limit' };
     }
-    return { kind: 'chapter', content: data.chapter.content };
+    return {
+      kind: 'payload',
+      content: data.chapter.content,
+      chapterNumber: data.chapter.number,
+      providerRevision: `sha256:${data.commentary.sha256.toLowerCase()}`,
+    };
   }
 
   private validateEntry(entry: unknown, index: number): ValidatedEntry | { kind: 'invalid'; reason: string } {

@@ -37,7 +37,7 @@ export interface CommentaryOutputV1 {
   retrieval: {
     mode: 'remote_cached_or_live';
     providerId: typeof HELLOAO_COMMENTARY_DELIVERY_ID;
-    providerRevision: 'not_reported';
+    providerRevision: `sha256:${string}`;
     cacheStatus: 'not_exposed';
   };
   provenance: [ProvenanceRecord, ProvenanceRecord];
@@ -208,7 +208,7 @@ export const commentaryOutputSchema = {
       properties: {
         mode: { type: 'string', const: 'remote_cached_or_live' },
         providerId: { type: 'string', const: HELLOAO_COMMENTARY_DELIVERY_ID },
-        providerRevision: { type: 'string', const: 'not_reported' },
+        providerRevision: { type: 'string', pattern: '^sha256:[0-9a-f]{64}$' },
         cacheStatus: { type: 'string', const: 'not_exposed' },
       },
       required: ['mode', 'providerId', 'providerRevision', 'cacheStatus'], additionalProperties: false,

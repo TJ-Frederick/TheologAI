@@ -74,6 +74,7 @@ export function createDeterministicMcpFixture(): DeterministicMcpFixture {
           identityBasis: 'provider_verse_number',
           providerIdentity: { field: 'verseNumber', value: 16 },
         },
+        providerRevision: `sha256:${'a'.repeat(64)}`,
       };
     },
     supportsBook: () => true,

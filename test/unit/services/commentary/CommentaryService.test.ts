@@ -4,6 +4,8 @@ import type { CommentaryAdapter } from '../../../../src/adapters/commentary/Comm
 import type { CommentaryAdapterResult } from '../../../../src/kernel/types.js';
 import { APIError, NotFoundError, ValidationError } from '../../../../src/kernel/errors.js';
 
+const PROVIDER_REVISION = `sha256:${'a'.repeat(64)}` as const;
+
 const exactJfb = (overrides: Partial<CommentaryAdapterResult> = {}): CommentaryAdapterResult => ({
   reference: 'John 3:16',
   commentator: 'Jamieson-Fausset-Brown',
@@ -14,6 +16,7 @@ const exactJfb = (overrides: Partial<CommentaryAdapterResult> = {}): CommentaryA
     identityBasis: 'provider_verse_number',
     providerIdentity: { field: 'verseNumber', value: 16 },
   },
+  providerRevision: PROVIDER_REVISION,
   ...overrides,
 });
 
@@ -67,6 +70,7 @@ describe('CommentaryService', () => {
           identityBasis: 'provider_chapter_payload',
           providerIdentity: { field: 'chapter_payload', chapter: 3 },
         },
+        providerRevision: PROVIDER_REVISION,
       });
       const result = await service.lookup({ reference: 'John 3' });
       expect(adapter.getCommentary).toHaveBeenCalledWith(expect.anything(), 'Matthew Henry');
@@ -181,6 +185,7 @@ describe('CommentaryService', () => {
           identityBasis: 'provider_chapter_payload',
           providerIdentity: { field: 'chapter_payload', chapter: 4 },
         },
+        providerRevision: PROVIDER_REVISION,
       });
       await expect(service.lookup({ reference: 'John 3' }))
         .rejects.toEqual(new APIError(502, 'Commentary provider returned invalid chapter coverage evidence.'));
@@ -190,6 +195,14 @@ describe('CommentaryService', () => {
       vi.mocked(adapter.getCommentary).mockResolvedValue(exactJfb({ text: 'x'.repeat(2 * 1024 * 1024 + 1) }));
       await expect(service.lookup({ reference: 'John 3:16', commentator: 'Jamieson-Fausset-Brown' }))
         .rejects.toEqual(new APIError(502, 'Commentary provider returned an oversized commentary payload.'));
+    });
+
+    it('rejects a missing or malformed provider corpus revision', async () => {
+      vi.mocked(adapter.getCommentary).mockResolvedValue(exactJfb({
+        providerRevision: 'not_reported' as any,
+      }));
+      await expect(service.lookup({ reference: 'John 3:16', commentator: 'Jamieson-Fausset-Brown' }))
+        .rejects.toEqual(new APIError(502, 'Commentary provider returned an invalid corpus revision.'));
     });
   });
 

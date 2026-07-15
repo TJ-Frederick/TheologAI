@@ -274,7 +274,10 @@ and Tyndale exact results from `verseNumber` or a `number` on an entry explicitl
 typed as `verse`. Commentary text is labeled `text/markdown`; exact work
 provenance remains separate from unpinned HelloAO delivery provenance. The
 retrieval contract says `remote_cached_or_live` because the adapter uses a
-process-local one-hour cache and does not expose per-result cache status. Scalar
+process-local one-hour cache and does not expose per-result cache status. The
+adapter fails closed unless HelloAO's response container matches the requested
+work, book, and chapter, and structured retrieval reports the validated
+provider corpus SHA-256 without treating it as edition provenance. Scalar
 absence remains an actionable chapter-oriented tool error with no structured
 content, while malformed or contradictory provider evidence fails closed.
 

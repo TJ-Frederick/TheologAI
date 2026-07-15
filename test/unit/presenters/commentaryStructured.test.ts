@@ -12,6 +12,8 @@ import { commentaryOutputSchema } from '../../../src/mcp/schemas/commentary.js';
 import { validatorFor } from '../../../src/mcp/validation.js';
 import { presentCommentaryStructured } from '../../../src/presenters/commentaryStructured.js';
 
+const PROVIDER_REVISION = `sha256:${'a'.repeat(64)}` as const;
+
 function jfbResult(overrides: Partial<CommentaryLookupResult> = {}): CommentaryLookupResult {
   return {
     commentary: {
@@ -24,6 +26,7 @@ function jfbResult(overrides: Partial<CommentaryLookupResult> = {}): CommentaryL
       identityBasis: 'provider_verse_number',
       providerIdentity: { field: 'verseNumber', value: 16 },
     },
+    providerRevision: PROVIDER_REVISION,
     textWindow: { unit: 'unicode_code_points', returnedCharacters: 8, sourceCharacters: 8, truncated: false },
     ...overrides,
   };
@@ -47,6 +50,7 @@ function chapterResult(
       identityBasis: 'provider_chapter_payload',
       providerIdentity: { field: 'chapter_payload', chapter: canonicalCommentator === 'Keil-Delitzsch' ? 1 : 3 },
     },
+    providerRevision: PROVIDER_REVISION,
     textWindow: { unit: 'unicode_code_points', returnedCharacters: 13, sourceCharacters: 13, truncated: false },
   };
 }
@@ -70,7 +74,7 @@ describe('presentCommentaryStructured', () => {
       },
       retrieval: {
         mode: 'remote_cached_or_live', providerId: 'helloao-commentary-delivery',
-        providerRevision: 'not_reported', cacheStatus: 'not_exposed',
+        providerRevision: PROVIDER_REVISION, cacheStatus: 'not_exposed',
       },
     });
   });
@@ -140,15 +144,22 @@ describe('presentCommentaryStructured', () => {
     const undisclosed = structuredClone(output) as any;
     delete undisclosed.retrieval.cacheStatus;
     expect(validatorFor(commentaryOutputSchema)(undisclosed).valid).toBe(false);
+
+    const unreported = structuredClone(output) as any;
+    unreported.retrieval.providerRevision = 'not_reported';
+    expect(validatorFor(commentaryOutputSchema)(unreported).valid).toBe(false);
   });
 
-  it('reports Tyndale attribution and ShareAlike license without inventing a revision', () => {
+  it('reports Tyndale attribution and ShareAlike license without treating the corpus hash as an edition', () => {
     const output = presentCommentaryStructured('John 3', 1000, chapterResult('Tyndale'));
     expect(output.provenance[0]).toMatchObject({
       id: 'tyndale-open-study-notes', attribution: 'Tyndale House, Cambridge',
-      license: { label: 'CC BY-SA 4.0' }, version: 'not_reported', status: 'provider_attributed',
+      license: { label: 'CC BY-SA 4.0' }, status: 'provider_attributed',
     });
+    expect(output.provenance[0]).not.toHaveProperty('version');
     expect(output.commentary.commentator).toBe('Tyndale');
+    expect(output.retrieval.providerRevision).toBe(PROVIDER_REVISION);
+    expect(output.provenance[1].note).toContain('does not identify or authenticate the underlying transcription edition');
     expect(output.commentary.textFormat).toBe('text/markdown');
     expect(validatorFor(commentaryOutputSchema)(output).valid).toBe(true);
   });

@@ -448,6 +448,7 @@ describe('commentary_lookup handler', () => {
         identityBasis: 'provider_verse_number',
         providerIdentity: { field: 'verseNumber', value: 1 },
       },
+      providerRevision: `sha256:${'a'.repeat(64)}`,
       textWindow: { unit: 'unicode_code_points', returnedCharacters: 15, sourceCharacters: 15, truncated: false },
     });
     const handler = createCommentaryHandler(serviceDouble({ lookup }));
@@ -487,6 +488,7 @@ describe('commentary_lookup handler', () => {
         identityBasis: 'provider_verse_number',
         providerIdentity: { field: 'verseNumber', value: 1 },
       },
+      providerRevision: `sha256:${'a'.repeat(64)}`,
       textWindow: { unit: 'unicode_code_points', returnedCharacters: 500, sourceCharacters: 500, truncated: false },
     });
     const handler = createCommentaryHandler(serviceDouble({ lookup }));

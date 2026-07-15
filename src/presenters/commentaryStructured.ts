@@ -35,7 +35,7 @@ export function presentCommentaryStructured(
     retrieval: {
       mode: 'remote_cached_or_live',
       providerId: HELLOAO_COMMENTARY_DELIVERY_ID,
-      providerRevision: 'not_reported',
+      providerRevision: result.providerRevision,
       cacheStatus: 'not_exposed',
     },
     provenance: [

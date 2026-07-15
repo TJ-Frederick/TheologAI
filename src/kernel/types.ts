@@ -120,6 +120,8 @@ export type CommentaryCoverageEvidence =
 /** Adapter output carries its evidence rather than leaving the service to infer it. */
 export interface CommentaryAdapterResult extends CommentaryResult {
   coverage: CommentaryCoverageEvidence;
+  /** Validated provider corpus fingerprint reported by the response container. */
+  providerRevision: `sha256:${string}`;
 }
 
 /** Service-owned identity, evidence, and text-window facts for MCP presentation. */
@@ -128,6 +130,7 @@ export interface CommentaryLookupResult {
   resolvedReference: string;
   canonicalCommentator: CanonicalCommentator;
   coverage: CommentaryCoverageEvidence;
+  providerRevision: `sha256:${string}`;
   textWindow: {
     unit: 'unicode_code_points';
     returnedCharacters: number;

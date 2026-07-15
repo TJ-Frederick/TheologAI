@@ -6,9 +6,43 @@ import {
   CommentaryScalarNotFoundError,
   ValidationError,
 } from '../../../../src/kernel/errors.js';
-import { parseReference } from '../../../../src/kernel/reference.js';
+import { parseReference, toHelloAO } from '../../../../src/kernel/reference.js';
 
-const response = (body: unknown): Response => new Response(JSON.stringify(body), { status: 200 });
+const PROVIDER_SHA256 = 'a'.repeat(64);
+
+interface ProviderIdentity {
+  commentaryId: string;
+  bookId: string;
+  chapterNumber: number;
+  bookCommentaryId?: string;
+  sha256?: string;
+}
+
+const response = (
+  body: unknown,
+  identity: ProviderIdentity = {
+    commentaryId: 'tyndale', bookId: 'JHN', chapterNumber: 3,
+  },
+): Response => {
+  if (typeof body !== 'object' || body === null || Array.isArray(body)
+      || typeof (body as any).chapter !== 'object' || (body as any).chapter === null) {
+    return new Response(JSON.stringify(body), { status: 200 });
+  }
+  return new Response(JSON.stringify({
+    commentary: { id: identity.commentaryId, sha256: identity.sha256 ?? PROVIDER_SHA256 },
+    book: {
+      id: identity.bookId,
+      commentaryId: identity.bookCommentaryId ?? identity.commentaryId,
+    },
+    ...body,
+    chapter: { number: identity.chapterNumber, ...(body as any).chapter },
+  }), { status: 200 });
+};
+
+function identityFor(commentaryId: string, reference: string): ProviderIdentity {
+  const helloAo = toHelloAO(parseReference(reference));
+  return { commentaryId, bookId: helloAo.bookCode, chapterNumber: helloAo.chapter };
+}
 
 function inlineTextEntry(number: number, length: number): Record<string, unknown> {
   const firstLength = Math.min(length, 100_000);
@@ -47,7 +81,7 @@ describe('HelloAoCommentaryAdapter', () => {
           ],
         }],
       },
-    }));
+    }, identityFor('jamieson-fausset-brown', 'John 3:16')));
     const adapter = new HelloAoCommentaryAdapter();
 
     await expect(adapter.getCommentary(parseReference('John 3:16'), '  JFB  ')).resolves.toEqual({
@@ -64,11 +98,54 @@ describe('HelloAoCommentaryAdapter', () => {
         identityBasis: 'provider_verse_number',
         providerIdentity: { field: 'verseNumber', value: 16 },
       },
+      providerRevision: `sha256:${PROVIDER_SHA256}`,
     });
     expect(String(vi.mocked(globalThis.fetch).mock.calls[0][0]))
       .toBe('https://bible.helloao.org/api/c/jamieson-fausset-brown/JHN/3.json');
     expect(adapter.supportedCommentators).toContain('Tyndale');
   });
+
+  it.each([
+    [
+      'wrong work',
+      identityFor('john-gill', 'John 3:16'),
+      'Commentary payload work identity mismatch',
+    ],
+    [
+      'wrong book',
+      { ...identityFor('tyndale', 'John 3:16'), bookId: 'GEN' },
+      'Commentary payload book identity mismatch',
+    ],
+    [
+      'wrong book commentaryId',
+      { ...identityFor('tyndale', 'John 3:16'), bookCommentaryId: 'john-gill' },
+      'Commentary payload book/work identity mismatch',
+    ],
+    [
+      'wrong chapter',
+      { ...identityFor('tyndale', 'John 3:16'), chapterNumber: 4 },
+      'Commentary payload chapter identity mismatch',
+    ],
+  ] as const)('fails closed before coverage for a %s container', async (_label, identity, reason) => {
+    vi.mocked(globalThis.fetch).mockResolvedValue(response({
+      chapter: { content: [{ verseNumber: 16, content: ['Mislabeled note'] }] },
+    }, identity));
+
+    await expect(new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3:16'), 'Tyndale'))
+      .rejects.toEqual(new AdapterIntegrityError('HelloAO', reason));
+  });
+
+  it.each(['not-a-hash', 'a'.repeat(63), `${'a'.repeat(63)}g`])(
+    'fails closed for malformed provider revision %s',
+    async (sha256) => {
+      vi.mocked(globalThis.fetch).mockResolvedValue(response({
+        chapter: { content: [{ verseNumber: 16, content: ['Study note'] }] },
+      }, { ...identityFor('tyndale', 'John 3:16'), sha256 }));
+
+      await expect(new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3:16'), 'Tyndale'))
+        .rejects.toEqual(new AdapterIntegrityError('HelloAO', 'Malformed commentary provider revision'));
+    },
+  );
 
   it('extracts an exact verse using number metadata', async () => {
     vi.mocked(globalThis.fetch).mockResolvedValue(response({
@@ -79,7 +156,7 @@ describe('HelloAoCommentaryAdapter', () => {
           { type: 'verse', number: 20, content: ['Later'] },
         ],
       },
-    }));
+    }, identityFor('adam-clarke', 'John 3:16')));
 
     const result = await new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3:16'), 'Clarke');
     expect(result.text).toBe('Exact');
@@ -94,7 +171,7 @@ describe('HelloAoCommentaryAdapter', () => {
   it('does not treat an untyped number field as exact verse identity', async () => {
     vi.mocked(globalThis.fetch).mockResolvedValue(response({
       chapter: { content: [{ number: 16, content: ['Ambiguous numbered section'] }] },
-    }));
+    }, identityFor('adam-clarke', 'John 3:16')));
 
     await expect(new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3:16'), 'Clarke'))
       .rejects.toEqual(new CommentaryScalarNotFoundError('HelloAO', 'John 3', 'No exact commentary match for John 3:16 in Adam Clarke'));
@@ -117,7 +194,7 @@ describe('HelloAoCommentaryAdapter', () => {
           { type: 'verse', number: 17, content: ['Later verse'] },
         ],
       },
-    }));
+    }, identityFor('adam-clarke', 'John 3:16')));
 
     await expect(new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3:16'), 'Clarke'))
       .rejects.toEqual(new CommentaryScalarNotFoundError('HelloAO', 'John 3', 'No exact commentary match for John 3:16 in Adam Clarke'));
@@ -133,7 +210,7 @@ describe('HelloAoCommentaryAdapter', () => {
           { type: 'verse', number: 22, content: ['Commentary spanning John 3:22-36'] },
         ],
       },
-    }));
+    }, identityFor('matthew-henry', reference)));
     const adapter = new HelloAoCommentaryAdapter();
 
     await expect(adapter.getCommentary(parseReference(reference), 'Matthew Henry'))
@@ -156,7 +233,7 @@ describe('HelloAoCommentaryAdapter', () => {
           { type: 'verse', number: 6, content: ['Commentary spanning Genesis 1:6-8'] },
         ],
       },
-    }));
+    }, identityFor('keil-delitzsch', 'Genesis 1:1')));
     const adapter = new HelloAoCommentaryAdapter();
 
     await expect(adapter.getCommentary(parseReference('Genesis 1:1'), 'Keil-Delitzsch'))
@@ -173,7 +250,7 @@ describe('HelloAoCommentaryAdapter', () => {
       chapter: {
         content: [{ type: 'verse', number: 17, content: ['For God sent not his Son into the world'] }],
       },
-    }));
+    }, identityFor('john-gill', 'John 3:16')));
 
     await expect(new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3:16'), 'John Gill'))
       .rejects.toEqual(new CommentaryScalarNotFoundError('HelloAO', 'John 3', 'No exact commentary match for John 3:16 in John Gill'));
@@ -187,7 +264,7 @@ describe('HelloAoCommentaryAdapter', () => {
           { type: 'verse', number: 16, content: ['For God sent not his Son into the world'] },
         ],
       },
-    }));
+    }, identityFor('john-gill', reference)));
 
     await expect(new HelloAoCommentaryAdapter().getCommentary(parseReference(reference), 'John Gill'))
       .rejects.toEqual(new CommentaryScalarNotFoundError('HelloAO', 'John 3', `No exact commentary match for ${reference} in John Gill`));
@@ -198,7 +275,7 @@ describe('HelloAoCommentaryAdapter', () => {
       chapter: {
         content: [{ verseNumber: 16, content: ['Genuine verse 16 commentary'] }],
       },
-    }));
+    }, identityFor('john-gill', 'John 3:16')));
 
     const result = await new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3:16'), 'John Gill');
 
@@ -262,7 +339,7 @@ describe('HelloAoCommentaryAdapter', () => {
           content: [{ text: 'Exact' }, { text: ',' }, { text: ' verse note.' }],
         }],
       },
-    }));
+    }, identityFor('jamieson-fausset-brown', 'John 3:16')));
 
     const result = await new HelloAoCommentaryAdapter().getCommentary(
       parseReference('John 3:16'),
@@ -299,7 +376,7 @@ describe('HelloAoCommentaryAdapter', () => {
           },
         ],
       },
-    }));
+    }, identityFor('john-gill', 'John 3')));
 
     const result = await new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3'), 'John Gill');
 
@@ -399,7 +476,7 @@ describe('HelloAoCommentaryAdapter', () => {
           { content: ['Second section'] },
         ],
       },
-    }));
+    }, identityFor('john-gill', 'Genesis 1')));
 
     const result = await new HelloAoCommentaryAdapter().getCommentary(parseReference('Genesis 1'), 'Gill');
     expect(result.text).toBe('First section\n\nSecond section');
@@ -490,7 +567,7 @@ describe('HelloAoCommentaryAdapter', () => {
           inlineTextEntry(5, 199_992),
         ],
       },
-    }));
+    }, identityFor('john-gill', 'John 3')));
 
     const result = await new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3'), 'John Gill');
 
@@ -508,7 +585,7 @@ describe('HelloAoCommentaryAdapter', () => {
           inlineTextEntry(5, 199_993),
         ],
       },
-    }));
+    }, identityFor('john-gill', 'John 3')));
 
     await expect(new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3'), 'John Gill'))
       .rejects.toEqual(new AdapterIntegrityError('HelloAO', 'Commentary chapter content exceeds safety limit'));
@@ -536,7 +613,12 @@ describe('HelloAoCommentaryAdapter', () => {
       chapter: {
         content: [{ type: 'verse', [metadata]: parsed.startVerse, content: [text] }],
       },
-    }));
+    }, identityFor({
+      'Jamieson-Fausset-Brown': 'jamieson-fausset-brown',
+      'Adam Clarke': 'adam-clarke',
+      'John Gill': 'john-gill',
+      Tyndale: 'tyndale',
+    }[commentator], reference)));
 
     const result = await new HelloAoCommentaryAdapter().getCommentary(parsed, commentator);
 

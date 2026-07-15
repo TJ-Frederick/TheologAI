@@ -92,7 +92,10 @@ returns provider-attested coverage evidence, Markdown commentary text, and
 separate work/delivery provenance beside its unchanged Markdown fallback.
 Its retrieval mode is `remote_cached_or_live`: HelloAO responses use a
 process-local one-hour cache, and an individual result's cache status is not
-exposed.
+exposed. Each response validates the requested work, book, and chapter against
+the provider container and reports HelloAO's corpus SHA-256 as the provider
+revision; that fingerprint identifies provider corpus bytes, not an edition or
+transcription source.
 `classic_text_lookup` retains its current Markdown-only result contract.
 
 ### Resources
@@ -144,7 +147,9 @@ use a provider entry explicitly typed as `verse`. The commentary text is
 explicitly `text/markdown`. Public-domain work provenance remains
 `transcription_source_uncertain` because HelloAO does not pin an edition or
 transcription; delivery provenance is recorded separately. Tyndale's
-provider-attributed CC BY-SA 4.0 rights and attribution remain explicit.
+provider-attributed CC BY-SA 4.0 rights and attribution remain explicit. The
+validated provider corpus SHA-256 does not resolve the underlying edition or
+transcription uncertainty.
 
 ### Historical documents and external discovery
 

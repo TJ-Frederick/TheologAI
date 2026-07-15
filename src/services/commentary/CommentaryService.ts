@@ -47,6 +47,9 @@ export class CommentaryService {
           throw new APIError(502, 'Commentary provider returned commentary for a different commentator.');
         }
         this.assertCoverageEvidence(ref, result.coverage, catalogEntry);
+        if (!/^sha256:[0-9a-f]{64}$/.test(result.providerRevision)) {
+          throw new APIError(502, 'Commentary provider returned an invalid corpus revision.');
+        }
 
         const sourceCharacters = Array.from(result.text).length;
         if (sourceCharacters > MAX_COMMENTARY_TEXT_CODE_POINTS) {
@@ -73,6 +76,7 @@ export class CommentaryService {
           resolvedReference: formatReference(ref),
           canonicalCommentator: catalogEntry.canonicalName,
           coverage: cloneCoverage(result.coverage),
+          providerRevision: result.providerRevision,
           textWindow: {
             unit: 'unicode_code_points',
             returnedCharacters,
