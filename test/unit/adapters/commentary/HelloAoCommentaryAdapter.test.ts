@@ -200,6 +200,88 @@ describe('HelloAoCommentaryAdapter', () => {
     expect(result.citation.copyright).toContain('creativecommons.org/licenses/by-sa/4.0');
   });
 
+  it('renders official Tyndale formatted text, headings, line breaks, and footnote references safely', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue(response({
+      chapter: {
+        content: [{
+          type: 'verse',
+          number: 16,
+          content: [
+            { heading: 'Love <and grace>' },
+            { text: 'For' },
+            { text: ' God' },
+            { lineBreak: true },
+            { text: 'loved <the world> & gave.' },
+            { noteId: 7 },
+          ],
+        }],
+      },
+    }));
+
+    const result = await new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3:16'), 'Tyndale');
+
+    expect(result.text).toBe(
+      '**Love &lt;and grace&gt;**\n\nFor God\nloved &lt;the world&gt; &amp; gave.',
+    );
+    expect(result.text).not.toMatch(/<|noteId|HelloAO|\[7\]/);
+  });
+
+  it('renders official formatted-text fragments for another exact provider', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue(response({
+      chapter: {
+        content: [{
+          type: 'verse',
+          verseNumber: 16,
+          content: [{ text: 'Exact' }, { text: ',' }, { text: ' verse note.' }],
+        }],
+      },
+    }));
+
+    const result = await new HelloAoCommentaryAdapter().getCommentary(
+      parseReference('John 3:16'),
+      'Jamieson-Fausset-Brown',
+    );
+
+    expect(result.text).toBe('Exact, verse note.');
+  });
+
+  it('preserves mixed official and existing content shapes in chapter mode', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue(response({
+      chapter: {
+        content: [
+          {
+            type: 'verse',
+            number: 1,
+            content: [
+              { type: 'heading', content: ['Legacy heading'] },
+              { type: 'text', content: ['Legacy paragraph'] },
+            ],
+          },
+          {
+            type: 'verse',
+            number: 2,
+            content: [
+              { heading: 'Official heading' },
+              { text: 'First line' },
+              { lineBreak: true },
+              { lineBreak: true },
+              { text: 'Second paragraph' },
+              { noteId: 9 },
+              'Existing string block',
+            ],
+          },
+        ],
+      },
+    }));
+
+    const result = await new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3'), 'John Gill');
+
+    expect(result.text).toBe(
+      '**Legacy heading**\n\nLegacy paragraph\n\n**Official heading**\n\nFirst line\n\nSecond paragraph\n\nExisting string block',
+    );
+    expect(result.text).not.toContain('noteId');
+  });
+
   it('combines every non-empty entry for a chapter request', async () => {
     vi.mocked(globalThis.fetch).mockResolvedValue(response({
       chapter: {
@@ -253,10 +335,39 @@ describe('HelloAoCommentaryAdapter', () => {
     ['duplicate exact verse entries', { chapter: { content: [{ type: 'verse', number: 16, content: ['first'] }, { type: 'verse', number: 16, content: ['second'] }] } }, 'Duplicate exact commentary identity'],
     ['an unknown content item', { chapter: { content: [{ type: 'verse', number: 16, content: [{ type: 'unknown', content: ['unsafe'] }] }] } }, 'Unknown commentary content item at index 0'],
     ['malformed text content', { chapter: { content: [{ type: 'verse', number: 16, content: [{ type: 'text', content: 'unsafe' }] }] } }, 'Malformed commentary text content at index 0'],
+    ['malformed formatted text', { chapter: { content: [{ type: 'verse', number: 16, content: [{ text: 42 }] }] } }, 'Malformed formatted commentary text at index 0'],
+    ['malformed inline heading', { chapter: { content: [{ type: 'verse', number: 16, content: [{ heading: ['unsafe'] }] }] } }, 'Malformed inline commentary heading at index 0'],
+    ['malformed inline line break', { chapter: { content: [{ type: 'verse', number: 16, content: [{ lineBreak: false }] }] } }, 'Malformed inline commentary line break at index 0'],
+    ['malformed footnote reference', { chapter: { content: [{ type: 'verse', number: 16, content: [{ noteId: '7' }] }] } }, 'Malformed commentary footnote reference at index 0'],
+    ['ambiguous official variant', { chapter: { content: [{ type: 'verse', number: 16, content: [{ text: 'one', heading: 'two' }] }] } }, 'Ambiguous commentary content item at index 0'],
+    ['mixed legacy and official discriminants', { chapter: { content: [{ type: 'verse', number: 16, content: [{ type: 'text', content: ['one'], text: 'two' }] }] } }, 'Ambiguous commentary content item at index 0'],
   ])('classifies %s as an integrity failure', async (_label, payload, reason) => {
     vi.mocked(globalThis.fetch).mockResolvedValue(response(payload));
 
     await expect(new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3:16'), 'tyndale'))
+      .rejects.toEqual(new AdapterIntegrityError('HelloAO', reason));
+  });
+
+  it.each([
+    [
+      'an oversized content fragment',
+      { chapter: { content: [{ type: 'verse', number: 16, content: [{ text: 'x'.repeat(100_001) }] }] } },
+      'Commentary text fragment exceeds safety limit at index 0',
+    ],
+    [
+      'too many content items',
+      { chapter: { content: [{ type: 'verse', number: 16, content: Array.from({ length: 5_001 }, () => ({ noteId: 1 })) }] } },
+      'Commentary entry content exceeds safety limit at index 0',
+    ],
+    [
+      'too many chapter entries',
+      { chapter: { content: Array.from({ length: 501 }, () => ({ type: 'verse', number: 1, content: ['text'] })) } },
+      'Commentary chapter entry count exceeds safety limit',
+    ],
+  ])('bounds %s as an integrity failure', async (_label, payload, reason) => {
+    vi.mocked(globalThis.fetch).mockResolvedValue(response(payload));
+
+    await expect(new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3:16'), 'Tyndale'))
       .rejects.toEqual(new AdapterIntegrityError('HelloAO', reason));
   });
 

@@ -45,6 +45,11 @@ interface ValidatedEntry {
 
 const PUBLIC_DOMAIN = 'Public Domain';
 const TYNDALE_LICENSE = 'CC BY-SA 4.0 — Tyndale House, Cambridge (https://creativecommons.org/licenses/by-sa/4.0/)';
+const MAX_CHAPTER_ENTRIES = 500;
+const MAX_CONTENT_ITEMS_PER_ENTRY = 5_000;
+const MAX_CONTENT_FRAGMENT_LENGTH = 100_000;
+const MAX_ENTRY_TEXT_LENGTH = 200_000;
+const MAX_CHAPTER_TEXT_LENGTH = 1_000_000;
 
 const CHAPTER_ONLY = { kind: 'chapterOnly' } as const;
 const VERSE_ENTRY_IDENTITIES = { kind: 'exactFields', fields: ['verseNumber', 'number'] } as const;
@@ -160,10 +165,17 @@ export class HelloAoCommentaryAdapter implements CommentaryAdapter {
     if (chapter.kind === 'invalid') return chapter;
     const content = chapter.content;
 
-    const entries = content.map((entry, index) => this.validateEntry(entry, index));
-    const invalid = entries.find((entry): entry is { kind: 'invalid'; reason: string } => entry.kind === 'invalid');
-    if (invalid) return invalid;
-    const validEntries = entries.filter((entry): entry is ValidatedEntry => entry.kind === 'entry');
+    const validEntries: ValidatedEntry[] = [];
+    let chapterTextLength = 0;
+    for (let index = 0; index < content.length; index++) {
+      const entry = this.validateEntry(content[index], index);
+      if (entry.kind === 'invalid') return entry;
+      chapterTextLength += entry.text?.length ?? 0;
+      if (chapterTextLength > MAX_CHAPTER_TEXT_LENGTH) {
+        return { kind: 'invalid', reason: 'Commentary chapter content exceeds safety limit' };
+      }
+      validEntries.push(entry);
+    }
 
     // If no specific verse, return all commentary for the chapter
     if (verseNumber == null) {
@@ -193,12 +205,18 @@ export class HelloAoCommentaryAdapter implements CommentaryAdapter {
     if (!this.isRecord(data) || !this.isRecord(data.chapter) || !Array.isArray(data.chapter.content)) {
       return { kind: 'invalid', reason: 'Malformed commentary chapter payload' };
     }
+    if (data.chapter.content.length > MAX_CHAPTER_ENTRIES) {
+      return { kind: 'invalid', reason: 'Commentary chapter entry count exceeds safety limit' };
+    }
     return { kind: 'chapter', content: data.chapter.content };
   }
 
   private validateEntry(entry: unknown, index: number): ValidatedEntry | { kind: 'invalid'; reason: string } {
     if (!this.isRecord(entry) || !Array.isArray(entry.content)) {
       return { kind: 'invalid', reason: `Malformed commentary entry at index ${index}` };
+    }
+    if (entry.content.length > MAX_CONTENT_ITEMS_PER_ENTRY) {
+      return { kind: 'invalid', reason: `Commentary entry content exceeds safety limit at index ${index}` };
     }
     if (entry.type != null && typeof entry.type !== 'string') {
       return { kind: 'invalid', reason: `Malformed commentary entry type at index ${index}` };
@@ -245,29 +263,126 @@ export class HelloAoCommentaryAdapter implements CommentaryAdapter {
   }
 
   private extractEntryText(entry: Record<string, any>): { kind: 'text'; text?: string } | { kind: 'invalid'; reason: string } {
-    const parts: string[] = [];
+    const blocks: string[] = [];
+    let current = '';
+    let renderedLength = 0;
+
+    const appendCurrent = (fragment: string): boolean => {
+      const next = this.appendFragment(current, fragment);
+      renderedLength += next.length - current.length;
+      current = next;
+      return renderedLength <= MAX_ENTRY_TEXT_LENGTH;
+    };
+    const flushCurrent = (): void => {
+      const text = current.trim();
+      if (text) blocks.push(text);
+      current = '';
+    };
+    const appendBlock = (block: string): boolean => {
+      flushCurrent();
+      if (block) {
+        blocks.push(block);
+        renderedLength += block.length;
+      }
+      return renderedLength <= MAX_ENTRY_TEXT_LENGTH;
+    };
+
     for (const item of entry.content) {
+      if (typeof item === 'string') {
+        const text = this.sanitizeContentFragment(item);
+        if (text == null) return { kind: 'invalid', reason: 'Commentary text fragment exceeds safety limit' };
+        if (!appendBlock(text)) return { kind: 'invalid', reason: 'Commentary entry text exceeds safety limit' };
+        continue;
+      }
+      if (!this.isRecord(item)) {
+        return { kind: 'invalid', reason: 'Unknown commentary content item' };
+      }
+
+      const officialKeys = ['text', 'heading', 'lineBreak', 'noteId'].filter(key => Object.hasOwn(item, key));
+      if (officialKeys.length > 1 || (item.type != null && officialKeys.length > 0)) {
+        return { kind: 'invalid', reason: 'Ambiguous commentary content item' };
+      }
+
       if (this.isRecord(item) && item.type === 'heading') {
         const heading = this.joinContent(item.content);
         if (heading == null) return { kind: 'invalid', reason: 'Malformed commentary heading content' };
-        if (heading) parts.push(`**${heading}**`);
+        if (!appendBlock(heading ? `**${heading}**` : '')) {
+          return { kind: 'invalid', reason: 'Commentary entry text exceeds safety limit' };
+        }
       } else if (this.isRecord(item) && item.type === 'text') {
         const text = this.joinContent(item.content);
         if (text == null) return { kind: 'invalid', reason: 'Malformed commentary text content' };
-        if (text) parts.push(text);
-      } else if (typeof item === 'string') {
-        parts.push(item);
+        if (!appendBlock(text)) return { kind: 'invalid', reason: 'Commentary entry text exceeds safety limit' };
+      } else if (officialKeys.length !== 1) {
+        return { kind: 'invalid', reason: 'Unknown commentary content item' };
+      } else if (officialKeys[0] === 'text') {
+        if (typeof item.text !== 'string') return { kind: 'invalid', reason: 'Malformed formatted commentary text' };
+        const text = this.sanitizeContentFragment(item.text);
+        if (text == null) return { kind: 'invalid', reason: 'Commentary text fragment exceeds safety limit' };
+        if (!appendCurrent(text)) return { kind: 'invalid', reason: 'Commentary entry text exceeds safety limit' };
+      } else if (officialKeys[0] === 'heading') {
+        if (typeof item.heading !== 'string') return { kind: 'invalid', reason: 'Malformed inline commentary heading' };
+        const heading = this.sanitizeContentFragment(item.heading);
+        if (heading == null) return { kind: 'invalid', reason: 'Commentary heading exceeds safety limit' };
+        if (!appendBlock(heading ? `**${heading}**` : '')) {
+          return { kind: 'invalid', reason: 'Commentary entry text exceeds safety limit' };
+        }
+      } else if (officialKeys[0] === 'lineBreak') {
+        if (item.lineBreak !== true) return { kind: 'invalid', reason: 'Malformed inline commentary line break' };
+        const next = current.endsWith('\n') ? `${current}\n` : `${current.trimEnd()}\n`;
+        renderedLength += next.length - current.length;
+        current = next;
+        if (renderedLength > MAX_ENTRY_TEXT_LENGTH) {
+          return { kind: 'invalid', reason: 'Commentary entry text exceeds safety limit' };
+        }
+      } else if (officialKeys[0] === 'noteId') {
+        if (!Number.isSafeInteger(item.noteId) || item.noteId < 0) {
+          return { kind: 'invalid', reason: 'Malformed commentary footnote reference' };
+        }
+        // The chapter commentary response does not supply authoritative note
+        // text. Match the Bible adapter's convention and omit the reference.
       } else {
         return { kind: 'invalid', reason: 'Unknown commentary content item' };
       }
     }
 
-    return { kind: 'text', text: parts.length > 0 ? parts.join('\n\n') : undefined };
+    flushCurrent();
+    const text = blocks.join('\n\n');
+    if (text.length > MAX_ENTRY_TEXT_LENGTH) {
+      return { kind: 'invalid', reason: 'Commentary entry text exceeds safety limit' };
+    }
+    return { kind: 'text', text: text || undefined };
   }
 
   private joinContent(value: unknown): string | undefined {
     if (!Array.isArray(value) || !value.every(item => typeof item === 'string')) return undefined;
-    return value.join(' ');
+    const fragments: string[] = [];
+    for (const item of value) {
+      const text = this.sanitizeContentFragment(item);
+      if (text == null) return undefined;
+      fragments.push(text);
+    }
+    return fragments.join(' ');
+  }
+
+  private sanitizeContentFragment(value: string): string | undefined {
+    if (value.length > MAX_CONTENT_FRAGMENT_LENGTH) return undefined;
+    return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+  }
+
+  /** Join provider fragments as words while leaving punctuation attached. */
+  private appendFragment(current: string, fragment: string): string {
+    if (!fragment) return current;
+    if (!current || /\s$/.test(current) || /^\s/.test(fragment) || /\n$/.test(current)) {
+      return current + fragment;
+    }
+
+    const previous = current[current.length - 1];
+    const next = fragment[0];
+    if (/^[,.;:!?%…)\]}"'”’]/u.test(next) || /^[([{"'“‘]/u.test(previous) || previous === '-' || next === '-') {
+      return current + fragment;
+    }
+    return `${current} ${fragment}`;
   }
 
   private isRecord(value: unknown): value is Record<string, any> {
