@@ -247,6 +247,20 @@ and do not affect feature access. The contract does not rank assets or claim pri
 or wallet support. It changes no verification behavior, chain configuration,
 secret, migration, D1 state, or deployment setting.
 
+### Structured donation-verification follow-up (unreleased)
+
+`verify_donation` now pairs its legacy Markdown with a conservative v1 object
+contract. It reports exactly Ethereum, Base, and Radius checks; distinguishes
+complete, partial, and unavailable provider coverage; and correlates each of
+the seven classifications with a transaction outcome and a single verification
+boolean. Only status-relevant transfers are returned, capped at 100 after all
+eligible transfers are classified so the exact pre-cap total and truncation are
+known. Supported amounts are asset-decimal values; unsupported amounts remain
+raw base units. Explorer links are generated only from chain-specific
+allowlists. Unknown, duplicate, missing, or mismatched chain evidence fails
+closed. A successful receipt means only
+`receipt_observed_no_confirmation_depth`, not confirmation depth or finality.
+
 ## Release gates
 
 Code readiness and operational readiness are deliberately separate:
@@ -261,7 +275,7 @@ Code readiness and operational readiness are deliberately separate:
 4. Preview deployment requires the repository's authorization label and
    protected environment approval. The live PR must still be open, non-draft,
    and authorized immediately before deployment.
-5. Preview smoke and a functional audit must cover all eleven tools, the eight
+5. Preview smoke and a functional audit must cover all eleven tools, the nine
    structured-output contracts, UBS default and explicit-source behavior,
    Strong's extended identities, local primary-source search, language study,
    resources, all six prompts, and failure/privacy boundaries.

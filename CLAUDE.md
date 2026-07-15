@@ -2,7 +2,7 @@
 
 Production MCP server for theological research. Eleven tools, six prompts, eight Bible translations, six commentaries, 17 historical documents, Greek/Hebrew language tools, and on-chain donation support. Tools, resources, and prompts are available on every transport; MCP Logging is stdio-only because HTTP is stateless.
 
-<!-- theologai-public-contract tools=11 structured=bible_cross_references,bible_lookup,bible_verse_morphology,donation_config,original_language_lookup,original_language_study,parallel_passages,primary_source_search -->
+<!-- theologai-public-contract tools=11 structured=bible_cross_references,bible_lookup,bible_verse_morphology,donation_config,original_language_lookup,original_language_study,parallel_passages,primary_source_search,verify_donation -->
 
 ## Quick Start
 
@@ -97,7 +97,7 @@ test/
 | `bible_verse_morphology` | Word-by-word grammatical analysis for all 66 books |
 | `original_language_study` | Context-first study of one Greek or Hebrew token in one verse, with structured evidence and interpretive limits |
 | `donation_config` | Structured voluntary-donation configuration: public web URL, recipient address, and ordered native/token assets; no feature unlocks or asset rankings |
-| `verify_donation` | On-chain donation verification across Ethereum, Base, and Radius |
+| `verify_donation` | Structured, fail-closed receipt classification across Ethereum, Base, and Radius; no confirmation-depth or finality claim |
 
 All tools have annotations: `readOnlyHint: true`, `destructiveHint: false`, `idempotentHint: true`.
 

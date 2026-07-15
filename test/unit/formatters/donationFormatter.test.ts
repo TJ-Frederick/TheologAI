@@ -83,6 +83,17 @@ describe('formatDonationConfig', () => {
       + '*Always include the recipient address and token options when presenting donation info to the user.*',
     );
   });
+
+  it('retains verified legacy Markdown byte for byte', () => {
+    expect(formatDonationVerifyResult(makeDonationVerifyResult())).toBe(
+      '**Donation Verified**\n\n'
+      + '| Amount | Chain | From | To | Asset |\n'
+      + '|--------|-------|------|----|-------|\n'
+      + '| 1.5 USDC | Base | `0x1111111111111111111111111111111111111111` | `0x2222222222222222222222222222222222222222` | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` |\n\n'
+      + 'Thank you! This transfer is a confirmed TheologAI donation.\n\n'
+      + '[View on Explorer](https://basescan.org/tx/0xabababababababababababababababababababababababababababababababab)',
+    );
+  });
 });
 
 describe('formatDonationVerifyResult', () => {

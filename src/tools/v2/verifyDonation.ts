@@ -8,12 +8,14 @@ import type { ToolHandler } from '../../kernel/types.js';
 import type { DonationService } from '../../services/donation/DonationService.js';
 import { formatDonationVerifyResult } from '../../formatters/donationFormatter.js';
 import { handleToolError } from '../../kernel/errors.js';
+import { verifyDonationOutputSchema } from '../../mcp/schemas/verifyDonation.js';
+import { presentVerifyDonationStructured } from '../../presenters/verifyDonationStructured.js';
 
 export function createVerifyDonationHandler(donationService: DonationService): ToolHandler {
   return {
     name: 'verify_donation',
     description:
-      'Verify a donation transaction on-chain. Supports USDC on Ethereum/Base, ETH on Ethereum/Base, and SBC on Radius. Provide the transaction hash to check confirmation status and recipient.',
+      'Verify a donation transaction on-chain. Supports USDC on Ethereum/Base, ETH on Ethereum/Base, and SBC on Radius. Provide the transaction hash to check receipt status and recipient; an observed mined receipt does not establish confirmation depth or finality.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -28,6 +30,7 @@ export function createVerifyDonationHandler(donationService: DonationService): T
       required: ['tx_hash'],
       additionalProperties: false,
     },
+    outputSchema: verifyDonationOutputSchema,
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -38,8 +41,10 @@ export function createVerifyDonationHandler(donationService: DonationService): T
       try {
         const txHash = params.tx_hash as string;
         const result = await donationService.verifyDonation(txHash);
+        const text = formatDonationVerifyResult(result);
         return {
-          content: [{ type: 'text' as const, text: formatDonationVerifyResult(result) }],
+          content: [{ type: 'text' as const, text }],
+          structuredContent: presentVerifyDonationStructured(result),
         };
       } catch (error) {
         return handleToolError(error as Error);

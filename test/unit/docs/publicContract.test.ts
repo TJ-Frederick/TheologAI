@@ -131,6 +131,7 @@ describe('published project contract', () => {
         'original_language_study',
         'parallel_passages',
         'primary_source_search',
+        'verify_donation',
       ],
     });
     for (const [index, document] of documents.entries()) {
