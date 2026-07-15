@@ -84,7 +84,32 @@ describe('HelloAoCommentaryAdapter', () => {
     }));
 
     await expect(new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3:16'), 'Clarke'))
-      .rejects.toEqual(new AdapterError('HelloAO', 'No commentary found for John 3:16 in Adam Clarke'));
+      .rejects.toEqual(new AdapterError('HelloAO', 'No exact commentary match for John 3:16 in Adam Clarke'));
+  });
+
+  it.each([
+    ['John 3:16', 'John 3'],
+    ['Romans 8:28', 'Romans 8'],
+  ])('fails closed for Matthew Henry scalar %s without unique verse metadata while its chapter remains available', async (reference, chapter) => {
+    vi.mocked(globalThis.fetch).mockResolvedValue(response({
+      chapter: {
+        content: [
+          { content: ['Chapter section one'] },
+          { content: ['Chapter section two'] },
+        ],
+      },
+    }));
+    const adapter = new HelloAoCommentaryAdapter();
+
+    await expect(adapter.getCommentary(parseReference(reference), 'Matthew Henry'))
+      .rejects.toEqual(new AdapterError('HelloAO', `No exact commentary match for ${reference} in Matthew Henry`));
+
+    await expect(adapter.getCommentary(parseReference(chapter), 'Matthew Henry'))
+      .resolves.toMatchObject({
+        reference: chapter,
+        commentator: 'Matthew Henry',
+        text: 'Chapter section one\n\nChapter section two',
+      });
   });
 
   it('never returns John 3:17 content for a John Gill 3:16 request', async () => {
@@ -95,7 +120,7 @@ describe('HelloAoCommentaryAdapter', () => {
     }));
 
     await expect(new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3:16'), 'John Gill'))
-      .rejects.toEqual(new AdapterError('HelloAO', 'John Gill scalar verse lookup is outside supported coverage for John 3:16'));
+      .rejects.toEqual(new AdapterError('HelloAO', 'No exact commentary match for John 3:16 in John Gill'));
   });
 
   it.each(['John 3:15', 'John 3:16'])('does not use John Gill number metadata for %s', async (reference) => {
@@ -109,7 +134,7 @@ describe('HelloAoCommentaryAdapter', () => {
     }));
 
     await expect(new HelloAoCommentaryAdapter().getCommentary(parseReference(reference), 'John Gill'))
-      .rejects.toEqual(new AdapterError('HelloAO', `John Gill scalar verse lookup is outside supported coverage for ${reference}`));
+      .rejects.toEqual(new AdapterError('HelloAO', `No exact commentary match for ${reference} in John Gill`));
   });
 
   it('accepts John Gill scalar commentary only with a genuine verseNumber field', async () => {
@@ -199,7 +224,7 @@ describe('HelloAoCommentaryAdapter', () => {
     vi.mocked(globalThis.fetch).mockResolvedValue(response(payload));
 
     await expect(new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3:16'), 'tyndale'))
-      .rejects.toEqual(new AdapterError('HelloAO', 'No commentary found for John 3:16 in Tyndale Open Study Notes'));
+      .rejects.toEqual(new AdapterError('HelloAO', 'No exact commentary match for John 3:16 in Tyndale Open Study Notes'));
   });
 
   it.each([

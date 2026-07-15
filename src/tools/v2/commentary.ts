@@ -10,7 +10,7 @@ import { handleToolError } from '../../kernel/errors.js';
 export function createCommentaryHandler(service: CommentaryService): ToolHandler {
   return {
     name: 'commentary_lookup',
-    description: 'Look up Bible commentary for one verse or a full chapter. Verse ranges are not supported. John Gill scalar lookups require exact provider verseNumber metadata; chapter lookup remains available. 6 commentators: Matthew Henry, JFB, Adam Clarke, John Gill, Keil-Delitzsch (OT only), Tyndale.',
+    description: 'Look up Bible commentary for one verse or a full chapter. Verse ranges are not supported. Exact-verse (scalar) coverage varies by commentary provider: an exact verse is returned only when its identity is trustworthy; otherwise request the full chapter or another commentator. Chapter results remain chapter-level commentary, not exact-verse commentary. 6 commentators: Matthew Henry, JFB, Adam Clarke, John Gill, Keil-Delitzsch (OT only), Tyndale.',
     inputSchema: {
       type: 'object',
       properties: {

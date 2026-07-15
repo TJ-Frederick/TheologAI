@@ -332,7 +332,10 @@ describe('shared MCP registration', () => {
       text: expect.stringContaining('John Gill'),
     }));
     expect(commentaries.contents[0]).toEqual(expect.objectContaining({
-      text: expect.stringContaining('verseNumber metadata'),
+      text: expect.stringContaining('coverage varies by commentary provider'),
+    }));
+    expect(commentaries.contents[0]).toEqual(expect.objectContaining({
+      text: expect.not.stringContaining('verseNumber metadata'),
     }));
 
     const catalog = await client.readResource({ uri: 'theologai://primary-sources/catalog' });
@@ -623,6 +626,12 @@ describe('shared MCP registration', () => {
     }));
     expect(passageExegesis.messages[0].content).toEqual(expect.objectContaining({
       text: expect.stringContaining('community-ranked links as thematic leads, not UBS-attested parallels'),
+    }));
+    expect(passageExegesis.messages[0].content).toEqual(expect.objectContaining({
+      text: expect.stringContaining('Exact-verse commentary coverage varies by provider'),
+    }));
+    expect(passageExegesis.messages[0].content).toEqual(expect.objectContaining({
+      text: expect.stringContaining('chapter-level evidence rather than attributing it to the requested verse'),
     }));
 
     const rangeExegesis = await client.getPrompt({

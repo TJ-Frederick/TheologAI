@@ -11,7 +11,7 @@ import { createStrongsLookupHandler } from '../../../../src/tools/v2/strongsLook
 import { createVerifyDonationHandler } from '../../../../src/tools/v2/verifyDonation.js';
 import { createVerseMorphologyHandler } from '../../../../src/tools/v2/verseMorphology.js';
 import { createOriginalLanguageStudyHandler } from '../../../../src/tools/v2/originalLanguageStudy.js';
-import { ValidationError } from '../../../../src/kernel/errors.js';
+import { AdapterError, ValidationError } from '../../../../src/kernel/errors.js';
 import { CommentaryService as CommentaryServiceClass } from '../../../../src/services/commentary/CommentaryService.js';
 import type { BibleService } from '../../../../src/services/bible/BibleService.js';
 import type { CrossReferenceService } from '../../../../src/services/bible/CrossReferenceService.js';
@@ -103,7 +103,8 @@ describe('v2 tool handler schemas', () => {
       limit: { minimum: 1, maximum: 20 },
     });
     expect(commentaryHandler.description).toContain('Verse ranges are not supported');
-    expect(commentaryHandler.description).toContain('John Gill scalar lookups require exact provider verseNumber metadata');
+    expect(commentaryHandler.description).toContain('Exact-verse (scalar) coverage varies by commentary provider');
+    expect(commentaryHandler.description).toContain('Chapter results remain chapter-level commentary');
     expect(commentary.properties?.reference).toMatchObject({
       description: expect.stringContaining('verse ranges are not supported'),
     });
@@ -425,6 +426,21 @@ describe('commentary_lookup handler', () => {
     const result = await handler.handler({ reference: 'John 1:1' });
 
     expect(result.isError).toBe(true);
+  });
+
+  it('turns a scalar commentary miss into actionable chapter guidance without exposing provider details', async () => {
+    const lookup = vi.fn<CommentaryService['lookup']>().mockRejectedValue(
+      new AdapterError('HelloAO', 'No exact commentary match for John 3:16 in Matthew Henry'),
+    );
+    const handler = createCommentaryHandler(serviceDouble({ lookup }));
+
+    const result = await handler.handler({ reference: 'John 3:16', commentator: 'Matthew Henry' });
+
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toBe(
+      'Not found: No trustworthy exact-verse commentary was available. Request the containing chapter (`John 3`) or try another commentator.',
+    );
+    expect(textOf(result)).not.toMatch(/HelloAO|verseNumber|metadata/i);
   });
 
   it('rejects verse ranges before calling the commentary provider', async () => {

@@ -48,6 +48,7 @@ Use this workflow when the user asks for:
   - Matthew Henry (devotional/practical)
   - John Gill (theological/exegetical)
   - Jamieson-Fausset-Brown or Adam Clarke for additional perspectives
+- Exact-verse coverage varies by commentary provider. If an exact-verse lookup has no trustworthy match, request the containing chapter or another commentator. Keep chapter commentary labeled at chapter level; never attribute it to the requested verse.
 - Note areas of agreement (likely settled interpretation) and disagreement (debated points)
 
 ### Step 5: Historical Theology

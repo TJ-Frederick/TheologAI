@@ -118,7 +118,13 @@ export function getUserMessage(error: Error): string {
  * only a stable category is returned to clients.
  */
 function getAdapterUserMessage(diagnosticMessage: string): string {
-  const detail = diagnosticMessage.replace(/^\[[^\]]+\]\s*/, '').toLowerCase();
+  const diagnosticDetail = diagnosticMessage.replace(/^\[[^\]]+\]\s*/, '');
+  const detail = diagnosticDetail.toLowerCase();
+
+  const exactCommentaryMiss = diagnosticDetail.match(/^No exact commentary match for (.+):\d+ in .+$/i);
+  if (exactCommentaryMiss) {
+    return `Not found: No trustworthy exact-verse commentary was available. Request the containing chapter (\`${exactCommentaryMiss[1]}\`) or try another commentator.`;
+  }
 
   if (/unsupported|not supported|only available|unknown commentator|outside .*coverage/.test(detail)) {
     return 'Unsupported coverage: This request is outside the supported coverage.';

@@ -114,6 +114,18 @@ describe('getUserMessage', () => {
       .toBe('Not found: No matching content was found.');
   });
 
+  it('gives an exact scalar commentary miss a safe, actionable chapter fallback', () => {
+    const message = getUserMessage(new AdapterError(
+      'HelloAO',
+      'No exact commentary match for 1 John 3:16 in Matthew Henry',
+    ));
+
+    expect(message).toBe(
+      'Not found: No trustworthy exact-verse commentary was available. Request the containing chapter (`1 John 3`) or try another commentator.',
+    );
+    expect(message).not.toMatch(/HelloAO|Matthew Henry|verseNumber|metadata/i);
+  });
+
   it('treats CCEL parser and upstream-shape failures as unavailable', () => {
     expect(getUserMessage(new AdapterError('CCEL', 'Could not find book content in response')))
       .toBe('Unavailable: The requested source is temporarily unavailable. Please try again later.');

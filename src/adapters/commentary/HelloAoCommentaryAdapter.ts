@@ -77,8 +77,8 @@ export class HelloAoCommentaryAdapter implements CommentaryAdapter {
 
     const text = this.extractCommentaryText(data, hao.verse, meta.verseIdentity);
     if (!text) {
-      if (meta.verseIdentity === 'verseNumberOnly' && hao.verse != null) {
-        throw new AdapterError('HelloAO', `John Gill scalar verse lookup is outside supported coverage for ${formatReference(ref)}`);
+      if (hao.verse != null) {
+        throw new AdapterError('HelloAO', `No exact commentary match for ${formatReference(ref)} in ${meta.displayName}`);
       }
       throw new AdapterError('HelloAO', `No commentary found for ${formatReference(ref)} in ${meta.displayName}`);
     }
