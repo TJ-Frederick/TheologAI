@@ -2,9 +2,9 @@
 
 ## Status
 
-This is disabled infrastructure, not CCEL enablement. Both
-`THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH` and
-live-search rollout remains `false` in production and preview. Stage A does not
+This is disabled infrastructure, not CCEL enablement.
+`THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH` remains `false` in production and preview.
+Stage A does not
 add a public coordinator binding, flag, or client. No MCP tool constructs a
 coordinator client, `primary_source_search` remains local-only, and this slice
 makes no CCEL request.
