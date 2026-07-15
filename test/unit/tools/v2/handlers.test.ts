@@ -952,17 +952,13 @@ describe('bible_verse_morphology handler', () => {
 
 describe('donation handlers', () => {
   it('formats donation configuration without accepting input fields', async () => {
+    const tokenAddress = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
+    const recipientAddress = '0xf2BE3382cF48ef5CAf21Ca3B01C4e6fC3Ea04B04';
     const getConfig = vi.fn<DonationService['getConfig']>().mockReturnValue({
-      recipientAddress: '0xrecipient',
+      recipientAddress,
       tokens: [{
-        symbol: 'ETH',
-        name: 'Ether',
-        chainId: 1,
-        chainName: 'Ethereum',
-        network: 'eip155:1',
-        asset: 'native',
-        decimals: 18,
-        isNative: true,
+        symbol: 'USDC', name: 'USD Coin', chainId: 8453, chainName: 'Base',
+        network: 'eip155:8453', asset: tokenAddress, decimals: 6, isNative: false,
       }],
     });
     const handler = createDonationConfigHandler(serviceDouble({ getConfig }));
@@ -970,8 +966,20 @@ describe('donation handlers', () => {
     const result = await handler.handler({});
 
     expect(getConfig).toHaveBeenCalledOnce();
-    expect(textOf(result)).toContain('`0xrecipient`');
-    expect(textOf(result)).toContain('| ETH | Ethereum | native | 18 |');
+    expect(textOf(result)).toContain(`\`${recipientAddress}\``);
+    expect(textOf(result)).toContain(`| USDC | Base | \`${tokenAddress}\` | 6 |`);
+    expect(result.structuredContent).toEqual({
+      schemaVersion: '1', kind: 'donation_config', voluntary: true,
+      featureAccessIndependentOfDonation: true,
+      assetOrderMeaning: 'configured_display_order_not_ranking',
+      webDonationUrl: 'https://theologai.pages.dev/',
+      recipientAddress,
+      assets: [{
+        symbol: 'USDC', name: 'USD Coin', chainId: 8453, chainName: 'Base',
+        network: 'eip155:8453', assetKind: 'token', assetAddress: tokenAddress, decimals: 6,
+      }],
+    });
+    expect(validatorFor(handler.outputSchema!)(result.structuredContent).valid).toBe(true);
   });
 
   it('returns configuration failures as tool errors', async () => {

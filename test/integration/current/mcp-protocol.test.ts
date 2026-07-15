@@ -103,6 +103,7 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
         'original_language_lookup',
         'bible_verse_morphology',
         'original_language_study',
+        'donation_config',
       ]);
       expect(listed.tools.find(tool => tool.name === 'bible_lookup')?.outputSchema).toMatchObject({
         type: 'object',
@@ -144,6 +145,11 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
       });
       expect(JSON.stringify(primarySource).toLowerCase()).not.toContain('ccel');
       expect((primarySource.structuredContent as any).coverage).not.toHaveProperty('ccelAttempted');
+      expect(listed.tools.find(tool => tool.name === 'donation_config')?.outputSchema).toMatchObject({
+        type: 'object',
+        additionalProperties: false,
+        properties: { schemaVersion: { const: '1' }, kind: { const: 'donation_config' } },
+      });
       const resources = await client.listResources();
       expect(resources.resources).toContainEqual(expect.objectContaining({
         uri: 'theologai://primary-sources/catalog', mimeType: 'application/json',

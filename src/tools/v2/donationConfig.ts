@@ -9,6 +9,8 @@ import type { ToolHandler } from '../../kernel/types.js';
 import type { DonationService } from '../../services/donation/DonationService.js';
 import { formatDonationConfig } from '../../formatters/donationFormatter.js';
 import { handleToolError } from '../../kernel/errors.js';
+import { donationConfigOutputSchema } from '../../mcp/schemas/donationConfig.js';
+import { presentDonationConfigStructured } from '../../presenters/donationConfigStructured.js';
 
 export function createDonationConfigHandler(donationService: DonationService): ToolHandler {
   return {
@@ -21,6 +23,7 @@ export function createDonationConfigHandler(donationService: DonationService): T
       required: [],
       additionalProperties: false,
     },
+    outputSchema: donationConfigOutputSchema,
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -33,6 +36,7 @@ export function createDonationConfigHandler(donationService: DonationService): T
         const text = formatDonationConfig(config);
         return {
           content: [{ type: 'text' as const, text }],
+          structuredContent: presentDonationConfigStructured(config),
         };
       } catch (error) {
         return handleToolError(error as Error);

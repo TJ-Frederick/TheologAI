@@ -68,6 +68,21 @@ describe('formatDonationConfig', () => {
     const out = formatDonationConfig(makeDonationConfig());
     expect(out).toBe(out.trim());
   });
+
+  it('retains the legacy Markdown byte for byte after sharing the public URL', () => {
+    expect(formatDonationConfig(makeDonationConfig())).toBe(
+      '**TheologAI Donations**\n\n'
+      + 'Donations help support TheologAI\'s development and are entirely voluntary — all features are free regardless.\n\n'
+      + '**Easiest option:** Donate via the web at [theologai.pages.dev](https://theologai.pages.dev/), which has a donation section with wallet connection support.\n\n'
+      + '**Recipient address:** `0xf2BE3382cF48ef5CAf21Ca3B01C4e6fC3Ea04B04`\n\n'
+      + '| Token | Chain | Contract | Decimals |\n'
+      + '|-------|-------|----------|----------|\n'
+      + '| USDC | Base | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` | 6 |\n'
+      + '| ETH | Ethereum | native | 18 |\n\n'
+      + '---\n'
+      + '*Always include the recipient address and token options when presenting donation info to the user.*',
+    );
+  });
 });
 
 describe('formatDonationVerifyResult', () => {
