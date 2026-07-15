@@ -11,6 +11,16 @@ THEOLOGAI_VERSION = "3.6.0-test"
 THEOLOGAI_REQUEST_LOGS = "false"
 THEOLOGAI_ALLOWED_ORIGINS = "https://allowed.example"
 THEOLOGAI_MAX_REQUEST_BYTES = "1024"
+THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH = "false"
+THEOLOGAI_ENABLE_CCEL_COORDINATOR = "false"
+
+[[durable_objects.bindings]]
+name = "THEOLOGAI_CCEL_COORDINATOR"
+class_name = "CcelGlobalCoordinator"
+
+[[migrations]]
+tag = "ccel-coordinator-test-v1"
+new_sqlite_classes = ["CcelGlobalCoordinator"]
 
 [[d1_databases]]
 binding = "THEOLOGAI_DB"

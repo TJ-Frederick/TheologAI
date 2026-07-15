@@ -1,6 +1,14 @@
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
+  resolve: {
+    // Node unit tests import the Worker entry point but never instantiate a
+    // Durable Object. Workerd runtime tests use vitest.worker.config.ts and the
+    // real cloudflare:workers module instead.
+    alias: {
+      'cloudflare:workers': new URL('./test/helpers/cloudflareWorkersShim.ts', import.meta.url).pathname,
+    },
+  },
   test: {
     globals: true,
     environment: 'node',
