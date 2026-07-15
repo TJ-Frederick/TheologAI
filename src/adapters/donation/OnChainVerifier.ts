@@ -3,9 +3,12 @@
 import { Cache } from '../../kernel/cache.js';
 import {
   DEFAULT_RPC_URLS,
+  SUPPORTED_DONATION_CHAINS,
   type ChainTransactionEvidence,
   type ChainTransferEvidence,
+  type DonationRpcKey,
   type ITransactionEvidenceProvider,
+  type SupportedDonationNetwork,
 } from '../../kernel/donation-types.js';
 import { readBoundedResponseText } from '../shared/HttpClient.js';
 
@@ -14,13 +17,25 @@ const ADDRESS_PATTERN = /^0x[0-9a-fA-F]{40}$/;
 const WORD_PATTERN = /^0x[0-9a-fA-F]{64}$/;
 const MAX_RPC_RESPONSE_BYTES = 1024 * 1024;
 
-interface RpcConfig { chainId: number; url: string; name: string }
+interface RpcConfig {
+  chainId: number;
+  chainName: string;
+  network: SupportedDonationNetwork;
+  url: string;
+}
 export interface OnChainVerifierOptions {
   ethereum?: string;
   base?: string;
   radius?: string;
   rpcTimeoutMs?: number;
 }
+type RpcOverrideKey = Exclude<keyof OnChainVerifierOptions, 'rpcTimeoutMs'>;
+
+const RPC_KEY_BY_NETWORK = {
+  'eip155:1': 'ethereum',
+  'eip155:8453': 'base',
+  'eip155:723': 'radius',
+} as const satisfies Record<SupportedDonationNetwork, RpcOverrideKey & DonationRpcKey>;
 interface RpcReceiptLog { address: string; topics: string[]; data: string }
 interface RpcReceipt { status: string; blockNumber: string; logs: RpcReceiptLog[] }
 interface RpcTransaction { from: string; to: string | null; value: string }
@@ -33,11 +48,13 @@ export class OnChainVerifier implements ITransactionEvidenceProvider {
 
   constructor(options: OnChainVerifierOptions = {}) {
     this.rpcTimeoutMs = options.rpcTimeoutMs ?? 15000;
-    this.rpcs = [
-      { chainId: 1, url: options.ethereum ?? DEFAULT_RPC_URLS.ethereum, name: 'Ethereum' },
-      { chainId: 8453, url: options.base ?? DEFAULT_RPC_URLS.base, name: 'Base' },
-      { chainId: 723, url: options.radius ?? DEFAULT_RPC_URLS.radius, name: 'Radius' },
-    ];
+    this.rpcs = SUPPORTED_DONATION_CHAINS.map(chain => {
+      const rpcKey = RPC_KEY_BY_NETWORK[chain.network];
+      return {
+        ...chain,
+        url: options[rpcKey] ?? DEFAULT_RPC_URLS[rpcKey],
+      };
+    });
   }
 
   async getEvidence(txHash: string): Promise<ChainTransactionEvidence[]> {
@@ -50,7 +67,12 @@ export class OnChainVerifier implements ITransactionEvidenceProvider {
   }
 
   private async getChainEvidence(rpc: RpcConfig, txHash: string): Promise<ChainTransactionEvidence> {
-    const base = { txHash, chainId: rpc.chainId, chainName: rpc.name, transfers: [] as ChainTransferEvidence[] };
+    const base = {
+      txHash,
+      chainId: rpc.chainId,
+      chainName: rpc.chainName,
+      transfers: [] as ChainTransferEvidence[],
+    };
     const [receiptResult, transactionResult] = await Promise.all([
       this.rpcCall<RpcReceipt>(rpc.url, 'eth_getTransactionReceipt', [txHash]),
       this.rpcCall<RpcTransaction>(rpc.url, 'eth_getTransactionByHash', [txHash]),

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { OnChainVerifier } from '../../../../src/adapters/donation/OnChainVerifier.js';
+import { SUPPORTED_DONATION_CHAINS } from '../../../../src/kernel/donation-types.js';
 
 const TX_HASH = `0x${'ab'.repeat(32)}`;
 const TOKEN = '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913';
@@ -48,6 +49,21 @@ afterEach(() => {
 });
 
 describe('OnChainVerifier evidence', () => {
+  it('verifies exactly every chain advertised by the shared donation catalog', async () => {
+    mockByChain(() => response(null));
+    const provider = new OnChainVerifier({ ethereum: 'eth', base: 'base', radius: 'radius' });
+
+    const evidence = await provider.getEvidence(TX_HASH);
+
+    expect(evidence.map(({ chainId, chainName }) => ({ chainId, chainName }))).toEqual(
+      SUPPORTED_DONATION_CHAINS.map(({ chainId, chainName }) => ({ chainId, chainName })),
+    );
+    expect(evidence).toHaveLength(SUPPORTED_DONATION_CHAINS.length);
+    expect(vi.mocked(fetch).mock.calls.map(([url]) => String(url)).sort()).toEqual(
+      ['eth', 'eth', 'base', 'base', 'radius', 'radius'].sort(),
+    );
+  });
+
   it('decodes every valid transfer log plus a native transfer', async () => {
     mockChains(
       receipt({ logs: [transfer(), transfer(TO, `0x${'33'.repeat(20)}`, 2n)] }),

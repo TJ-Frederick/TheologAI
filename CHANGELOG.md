@@ -7,15 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-<!-- theologai-public-contract tools=11 structured=bible_cross_references,bible_lookup,bible_verse_morphology,original_language_lookup,original_language_study,parallel_passages,primary_source_search -->
+<!-- theologai-public-contract tools=11 structured=bible_cross_references,bible_lookup,bible_verse_morphology,donation_config,original_language_lookup,original_language_study,parallel_passages,primary_source_search -->
 
 ### Added
 
 - Added stable MCP 2025-11-25 structured output and server-side schema
   validation for `bible_lookup`, `bible_cross_references`, `parallel_passages`,
-  `bible_verse_morphology`, `primary_source_search`, `original_language_lookup`, and
-  `original_language_study`, while keeping
+  `bible_verse_morphology`, `primary_source_search`, `original_language_lookup`,
+  `original_language_study`, and `donation_config`, while keeping
   their Markdown content available for legacy clients.
+- Added versioned `donation_config` results with explicit voluntary/no-feature-
+  unlock policy, the shared public donation URL, recipient address, and ordered
+  native/token asset metadata. The structure makes native addresses null,
+  rejects address/kind contradictions, retains exact token contract addresses,
+  and marks configured display order explicitly as non-ranking without implying price,
+  liquidity, bridge, or wallet capability.
 - Added versioned `bible_cross_references` results with requested and canonical
   references, effective query values, raw OpenBible.info ranking semantics,
   bounded positions, threshold-scoped result windows, and exact snapshot

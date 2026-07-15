@@ -2,11 +2,22 @@
 
 export const RECIPIENT_ADDRESS = '0xf2BE3382cF48ef5CAf21Ca3B01C4e6fC3Ea04B04';
 
-export const DEFAULT_RPC_URLS: Record<string, string> = {
+export const DONATION_CONFIG_LIMITS = Object.freeze({
+  maxAssets: 20,
+  maxSymbolLength: 16,
+  maxNameLength: 100,
+  maxChainNameLength: 100,
+  maxNetworkLength: 41,
+  maxDecimals: 255,
+});
+
+export const DEFAULT_RPC_URLS = Object.freeze({
   ethereum: 'https://eth.llamarpc.com',
   base: 'https://mainnet.base.org',
   radius: 'https://rpc.radiustech.xyz',
-};
+});
+
+export type DonationRpcKey = keyof typeof DEFAULT_RPC_URLS;
 
 export const EXPLORER_URLS: Record<number, string> = {
   1: 'https://etherscan.io/tx/',
@@ -25,17 +36,43 @@ export interface TokenConfig {
   isNative: boolean;
 }
 
-export const SUPPORTED_TOKENS: TokenConfig[] = [
-  { symbol: 'USDC', name: 'USD Coin', chainId: 8453, chainName: 'Base', network: 'eip155:8453', asset: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', decimals: 6, isNative: false },
-  { symbol: 'USDC', name: 'USD Coin', chainId: 1, chainName: 'Ethereum', network: 'eip155:1', asset: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', decimals: 6, isNative: false },
-  { symbol: 'ETH', name: 'Ether', chainId: 1, chainName: 'Ethereum', network: 'eip155:1', asset: 'native', decimals: 18, isNative: true },
-  { symbol: 'ETH', name: 'Ether', chainId: 8453, chainName: 'Base', network: 'eip155:8453', asset: 'native', decimals: 18, isNative: true },
-  { symbol: 'SBC', name: 'Stablecoin', chainId: 723, chainName: 'Radius', network: 'eip155:723', asset: '0x33ad9e4bd16b69b5bfded37d8b5d9ff9aba014fb', decimals: 6, isNative: false },
-];
+export interface DonationChainConfig {
+  chainId: number;
+  chainName: string;
+  network: string;
+}
+
+/** Canonical chain identities used by both verification and public output. */
+export const SUPPORTED_DONATION_CHAINS = Object.freeze([
+  Object.freeze({ chainId: 1, chainName: 'Ethereum', network: 'eip155:1' }),
+  Object.freeze({ chainId: 8453, chainName: 'Base', network: 'eip155:8453' }),
+  Object.freeze({ chainId: 723, chainName: 'Radius', network: 'eip155:723' }),
+] as const satisfies readonly DonationChainConfig[]);
+
+export type SupportedDonationNetwork = typeof SUPPORTED_DONATION_CHAINS[number]['network'];
+
+const chain = (chainId: number): DonationChainConfig => {
+  const configured = SUPPORTED_DONATION_CHAINS.find(candidate => candidate.chainId === chainId);
+  if (!configured) throw new Error(`Missing donation chain configuration for chain ${chainId}`);
+  return configured;
+};
+
+const token = (
+  asset: Pick<TokenConfig, 'symbol' | 'name' | 'chainId' | 'asset' | 'decimals' | 'isNative'>,
+): Readonly<TokenConfig> => Object.freeze({ ...asset, ...chain(asset.chainId) });
+
+/** Ordered for stable display only; array position is never an asset ranking. */
+export const SUPPORTED_TOKENS: readonly Readonly<TokenConfig>[] = Object.freeze([
+  token({ symbol: 'USDC', name: 'USD Coin', chainId: 8453, asset: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', decimals: 6, isNative: false }),
+  token({ symbol: 'USDC', name: 'USD Coin', chainId: 1, asset: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', decimals: 6, isNative: false }),
+  token({ symbol: 'ETH', name: 'Ether', chainId: 1, asset: 'native', decimals: 18, isNative: true }),
+  token({ symbol: 'ETH', name: 'Ether', chainId: 8453, asset: 'native', decimals: 18, isNative: true }),
+  token({ symbol: 'SBC', name: 'Stablecoin', chainId: 723, asset: '0x33ad9e4bd16b69b5bfded37d8b5d9ff9aba014fb', decimals: 6, isNative: false }),
+]);
 
 export interface DonationConfig {
   recipientAddress: string;
-  tokens: TokenConfig[];
+  tokens: readonly Readonly<TokenConfig>[];
 }
 
 export interface ChainTransferEvidence {

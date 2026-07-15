@@ -146,6 +146,15 @@ describe('Worker MCP endpoint in workerd', () => {
           name: 'primary_source_search',
           outputSchema: expect.objectContaining({ type: 'object', additionalProperties: false }),
         }),
+        expect.objectContaining({
+          name: 'donation_config',
+          outputSchema: expect.objectContaining({
+            type: 'object', additionalProperties: false,
+            properties: expect.objectContaining({
+              kind: expect.objectContaining({ const: 'donation_config' }),
+            }),
+          }),
+        }),
       ]),
     });
     const primarySourceTool = (listed.message.result?.tools as Array<Record<string, unknown>>)
@@ -187,6 +196,47 @@ describe('Worker MCP endpoint in workerd', () => {
           sourceSurfaceVariants: [expect.objectContaining({ sourceForm: 'ἀγάπη·' })],
           occurrences: [expect.objectContaining({ sourceForm: 'ἀγάπη·', exactMorphologyKey: 'G0026' })],
         },
+      },
+    });
+  });
+
+  it('returns structured donation configuration without changing its Markdown fallback', async () => {
+    const donation = await rpc('tools/call', {
+      name: 'donation_config',
+      arguments: {},
+    }, 32);
+
+    expect(donation.response.status).toBe(200);
+    expect(donation.message.error).toBeUndefined();
+    expect(donation.message.result).toMatchObject({
+      content: [expect.objectContaining({
+        type: 'text',
+        text: expect.stringContaining('[theologai.pages.dev](https://theologai.pages.dev/)'),
+      })],
+      structuredContent: {
+        schemaVersion: '1',
+        kind: 'donation_config',
+        voluntary: true,
+        featureAccessIndependentOfDonation: true,
+        assetOrderMeaning: 'configured_display_order_not_ranking',
+        webDonationUrl: 'https://theologai.pages.dev/',
+        recipientAddress: '0xf2BE3382cF48ef5CAf21Ca3B01C4e6fC3Ea04B04',
+        assets: [
+          expect.objectContaining({
+            symbol: 'USDC', chainId: 8453, assetKind: 'token',
+            assetAddress: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+          }),
+          expect.objectContaining({
+            symbol: 'USDC', chainId: 1, assetKind: 'token',
+            assetAddress: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+          }),
+          expect.objectContaining({ symbol: 'ETH', chainId: 1, assetKind: 'native', assetAddress: null }),
+          expect.objectContaining({ symbol: 'ETH', chainId: 8453, assetKind: 'native', assetAddress: null }),
+          expect.objectContaining({
+            symbol: 'SBC', chainId: 723, assetKind: 'token',
+            assetAddress: '0x33ad9e4bd16b69b5bfded37d8b5d9ff9aba014fb',
+          }),
+        ],
       },
     });
   });

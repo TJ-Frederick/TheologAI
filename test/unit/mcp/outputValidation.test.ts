@@ -63,6 +63,7 @@ describe('MCP structured output validation', () => {
       'original_language_lookup',
       'bible_verse_morphology',
       'original_language_study',
+      'donation_config',
     ]);
     for (const toolName of withOutput) {
       const schema = listed.tools.find(tool => tool.name === toolName)?.outputSchema;

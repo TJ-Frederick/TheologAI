@@ -7,7 +7,7 @@ The current registry contains eleven tools, six guided prompts, eight English
 Bible translations, six commentary sources, 17 locally indexed
 historical documents, Strong's dictionaries, and Greek/Hebrew morphology.
 
-<!-- theologai-public-contract tools=11 structured=bible_cross_references,bible_lookup,bible_verse_morphology,original_language_lookup,original_language_study,parallel_passages,primary_source_search -->
+<!-- theologai-public-contract tools=11 structured=bible_cross_references,bible_lookup,bible_verse_morphology,donation_config,original_language_lookup,original_language_study,parallel_passages,primary_source_search -->
 
 ## Remote endpoint
 
@@ -45,7 +45,7 @@ fresh server and transport.
 | `original_language_lookup` | Look up or search Strong's entries, with opt-in exact corrected-corpus usage and bounded occurrence pages for exact identities. |
 | `bible_verse_morphology` | Return bounded word-by-word morphology for one exact verse, with raw codes, nullable expansions, and separate pinned STEPBible morphology/lemma provenance. |
 | `original_language_study` | Resolve and study one Greek or Hebrew token in one verse with contextual morphology, source-separated lexical evidence, and explicit interpretive limits. |
-| `donation_config` | Return voluntary-donation recipient, asset, and chain configuration. |
+| `donation_config` | Return versioned structured voluntary-donation configuration with the public web URL, recipient, and ordered native/token assets; donations do not unlock features. |
 | `verify_donation` | Classify a transaction and confirm only supported transfers to the configured recipient. |
 
 `parallel_passages` defaults unconditionally to `corpora:
@@ -66,19 +66,25 @@ adds the top 10 exact source variants and defaults to 8 raw occurrences (maximum
 responses.
 
 All tools are annotated as read-only, non-destructive, and idempotent. Tool
-inputs use closed, bounded JSON Schema 2020-12 contracts. Seven tools also
+inputs use closed, bounded JSON Schema 2020-12 contracts. Eight tools also
 advertise versioned object-root `outputSchema` contracts and return matching
 `structuredContent` beside the existing Markdown content: `bible_lookup`,
 `bible_cross_references`, `bible_verse_morphology`, `parallel_passages`,
 `primary_source_search`, `original_language_lookup`, and
-`original_language_study`. Bible, cross-reference, verse-morphology,
+`original_language_study`, plus `donation_config`. Bible, cross-reference, verse-morphology,
 parallel-passage, and original-language structured results
 include bounded, result-local provenance records. Primary-source results do not
 invent edition provenance records: their evidence policy explicitly marks
 edition provenance incomplete, and they link only canonical local sections with
 exact UTF-8 sizes. Their result windows say only whether one additional match
 was directly observed through private lookahead; they do not imply exhaustive
-counts. All other tools retain their current Markdown-only result
+counts. Donation configuration returns
+`assetOrderMeaning: configured_display_order_not_ranking`, preserving its
+configured display order while explicitly saying only that the order is not a
+ranking or recommendation. Clients must not infer preference, price, liquidity,
+bridge availability, or wallet support from the configuration;
+native assets have a null structured address and tokens retain their exact
+contract address. The remaining tools retain their current Markdown-only result
 contract.
 
 ### Resources

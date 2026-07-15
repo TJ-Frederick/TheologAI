@@ -752,6 +752,13 @@ describe('shared MCP registration', () => {
       type: 'text',
       text: expect.stringContaining('theologai.pages.dev'),
     }));
+    const donateText = donate.messages[0].content.type === 'text'
+      ? donate.messages[0].content.text
+      : '';
+    expect(donateText).toContain('Prefer its structured `webDonationUrl`, `recipientAddress`, `assetOrderMeaning`, and `assets[]`');
+    expect(donateText).toContain('stable display order is not a ranking or recommendation');
+    expect(donateText).toContain('donations are voluntary and do not unlock features');
+    expect(donateText).toContain('Do not infer price, liquidity, bridge availability, or wallet support');
   });
 
   it('uses InvalidParams for unknown prompts and missing prompt arguments', async () => {

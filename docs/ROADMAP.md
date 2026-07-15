@@ -235,6 +235,18 @@ threshold, and every response—including an empty result—carries the exact
 checksum-pinned OpenBible.info snapshot provenance. It changes no corpus rows,
 SQL semantics, migration, configuration, or deployment behavior.
 
+### Structured donation-configuration follow-up (unreleased)
+
+The next bounded modern-output slice also adds a v1 object-root contract for
+`donation_config` while retaining the legacy Markdown. It exposes the existing
+public donation page, recipient, and configured asset values in their existing
+display order, includes a machine-readable marker that this order is not a
+ranking, and distinguishes native assets from tokens with a structurally
+enforced null-or-exact contract address. It states that donations are voluntary
+and do not affect feature access. The contract does not rank assets or claim price, liquidity, bridging,
+or wallet support. It changes no verification behavior, chain configuration,
+secret, migration, D1 state, or deployment setting.
+
 ## Release gates
 
 Code readiness and operational readiness are deliberately separate:
@@ -249,7 +261,7 @@ Code readiness and operational readiness are deliberately separate:
 4. Preview deployment requires the repository's authorization label and
    protected environment approval. The live PR must still be open, non-draft,
    and authorized immediately before deployment.
-5. Preview smoke and a functional audit must cover all eleven tools, the seven
+5. Preview smoke and a functional audit must cover all eleven tools, the eight
    structured-output contracts, UBS default and explicit-source behavior,
    Strong's extended identities, local primary-source search, language study,
    resources, all six prompts, and failure/privacy boundaries.

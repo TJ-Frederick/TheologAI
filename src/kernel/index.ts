@@ -95,6 +95,7 @@ export {
   OPENBIBLE_PROVENANCE_ID,
   OPENBIBLE_CROSS_REFERENCE_PROVENANCE,
 } from './openBibleCrossReferenceProvenance.js';
+export { PUBLIC_DONATION_URL } from './publicUrls.js';
 
 // Staged primary-source rollout flags
 export {
