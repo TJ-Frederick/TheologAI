@@ -167,7 +167,9 @@ upstream GET per admitted cache miss, at most five metadata hits, and at most
 240 Unicode characters per discovery snippet. It accepts only structurally
 reviewed Bootstrap result cards and reduces a tracking-bearing “Read online”
 link to a canonical allowlisted CCEL exact-section path; tracking query and hash
-values are discarded. These safeguards do not authorize or enable live use.
+values are discarded. Balanced-card parsing uses explicit title/author roles,
+and a no-results marker is accepted only when no competing result structure is
+present. These safeguards do not authorize or enable live use.
 Any future external provider rollout must remain discovery-only until
 edition-specific rights and provider-policy gates are satisfied.
 

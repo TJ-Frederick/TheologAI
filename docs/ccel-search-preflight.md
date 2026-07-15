@@ -21,7 +21,18 @@ live-search flag remains off by default.
   one `h5.card-title` with separate title and author spans, exactly one snippet
   paragraph, and exactly one “Read online” anchor. An earlier cover/image link
   is never treated as the section locator. Selector or anatomy ambiguity fails
-  closed as `interface_changed`.
+  closed as `interface_changed`. A bounded Node/Worker-compatible structural
+  tokenizer requires balanced cards and tracked child elements; metadata
+  outside a closed card, nested cards, and ambiguous div/card boundaries are
+  rejected. Title and author are selected by their explicit `title` and
+  `author` span class roles rather than DOM order, and the author role retains
+  the reviewed `by` marker.
+- Empty-state policy: `no_results` requires exactly one reviewed
+  `h2#CCEL_Search_results` immediately followed by exactly one
+  `<p>No results found.</p>`. A competing results heading, duplicate empty
+  marker, `.card` opening, `h5.card-title`, `p.card-text`, or “Read online”
+  anchor makes the response an interface contradiction. Contradictions are
+  never inserted into the negative cache.
 - Locator policy: a result locator must reduce to the exact allowlisted HTTPS
   path `https://ccel.org/ccel/{author}/{work}/{section}.html`. The complete
   provider query and hash are discarded before construction of the returned

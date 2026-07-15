@@ -179,10 +179,17 @@ describe('CcelSearchAdapter', () => {
 
   it('fails closed when a current-shape card has ambiguous anatomy or a noncanonical Read online URL', async () => {
     const ambiguous = resultCard(1).replace('</h5>', '<span class="extra">ambiguous</span></h5>');
-    await expect(new CcelSearchAdapter({
-      enabled: true,
-      fetchImpl: vi.fn<typeof fetch>().mockResolvedValue(htmlResponse(resultPage(ambiguous))),
-    }).search(query({ text: 'ambiguous card' }))).resolves.toMatchObject({ status: 'interface_changed', hits: [] });
+    const duplicateSnippet = resultCard(1).replace('</p>', '</p><p class="card-text">second snippet</p>');
+    const duplicateReadLink = resultCard(1).replace(
+      '</div></div>',
+      '<a href="/ccel/example/duplicate/section.html">Read online</a></div></div>',
+    );
+    for (const [index, card] of [ambiguous, duplicateSnippet, duplicateReadLink].entries()) {
+      await expect(new CcelSearchAdapter({
+        enabled: true,
+        fetchImpl: vi.fn<typeof fetch>().mockResolvedValue(htmlResponse(resultPage(card))),
+      }).search(query({ text: `ambiguous card ${index}` }))).resolves.toMatchObject({ status: 'interface_changed', hits: [] });
+    }
 
     const foreign = resultCard(1).replace(
       /href="\/ccel\/calvin\/institutes\/section1\.html[^"]*"/u,
@@ -192,6 +199,53 @@ describe('CcelSearchAdapter', () => {
       enabled: true,
       fetchImpl: vi.fn<typeof fetch>().mockResolvedValue(htmlResponse(resultPage(foreign))),
     }).search(query({ text: 'foreign locator' }))).resolves.toMatchObject({ status: 'interface_changed', hits: [] });
+  });
+
+  it('uses explicit span roles and rejects swapped, missing, wrong, or duplicate role classes', async () => {
+    const swappedOrder = resultCard(1).replace(
+      /(<span class="title">[\s\S]*?<\/span>)(<span class="author">[\s\S]*?<\/span>)/u,
+      '$2$1',
+    );
+    const orderIndependent = await new CcelSearchAdapter({
+      enabled: true,
+      fetchImpl: vi.fn<typeof fetch>().mockResolvedValue(htmlResponse(resultPage(swappedOrder))),
+    }).search(query({ text: 'role order' }));
+    expect(orderIndependent.hits[0]).toMatchObject({
+      title: 'Institutes of the Christian Religion',
+      author: 'Calvin, John',
+    });
+
+    const swappedRoles = resultCard(1)
+      .replace('class="title"', 'class="temporary-role"')
+      .replace('class="author"', 'class="title"')
+      .replace('class="temporary-role"', 'class="author"');
+    const invalidCards = [
+      swappedRoles,
+      resultCard(1).replace('class="title"', 'class="subtitle"'),
+      resultCard(1).replace('class="author"', 'class="creator"'),
+      resultCard(1).replace('class="author"', 'class="title"'),
+      resultCard(1).replace('class="author"', 'class="title author"'),
+    ];
+    for (const [index, card] of invalidCards.entries()) {
+      await expect(new CcelSearchAdapter({
+        enabled: true,
+        fetchImpl: vi.fn<typeof fetch>().mockResolvedValue(htmlResponse(resultPage(card))),
+      }).search(query({ text: `invalid role ${index}` }))).resolves.toMatchObject({ status: 'interface_changed', hits: [] });
+    }
+  });
+
+  it('rejects balanced trailing result metadata and nested or unbalanced card/div ambiguity', async () => {
+    const trailing = `${resultCard(1)}<h5 class="card-title"><span class="title">Trailing title</span><span class="author">by Trailing Author</span></h5><p class="card-text">Trailing snippet.</p><a href="/ccel/example/trailing/section.html">Read online</a>`;
+    const nestedCard = resultCard(1)
+      .replace('<div class="card-body">', '<div class="card-body"><div class="card">')
+      .replace('</div></div>', '</div></div></div>');
+    const unbalancedDiv = resultCard(1).replace('<h5 class="card-title">', '<div><h5 class="card-title">');
+    for (const [index, markup] of [trailing, nestedCard, unbalancedDiv].entries()) {
+      await expect(new CcelSearchAdapter({
+        enabled: true,
+        fetchImpl: vi.fn<typeof fetch>().mockResolvedValue(htmlResponse(resultPage(markup))),
+      }).search(query({ text: `structural ambiguity ${index}` }))).resolves.toMatchObject({ status: 'interface_changed', hits: [] });
+    }
   });
 
   it('caps the current-shape card output at five 240-code-point snippets without leaking tracking values', async () => {
@@ -245,6 +299,34 @@ describe('CcelSearchAdapter', () => {
     await expect(adapter.search(query({ text: 'drift one' }))).resolves.toMatchObject({ status: 'interface_changed' });
     await expect(adapter.search(query({ text: 'drift two' }))).resolves.toMatchObject({ status: 'interface_changed' });
     expect(adapter.getCircuitState()).toMatchObject({ status: 'open', reason: 'interface_changed' });
+  });
+
+  it('recognizes no-results only when the unique heading/adjacent marker has no contradictory result structure', async () => {
+    const validCard = resultCard(1);
+    const competingHeading = '<h2 id="CCEL_Search_results">CCEL Search results</h2>';
+    const duplicateEmpty = '<p>No results found.</p>';
+    const malformedCard = '<div class="card"><div class="card-body"><h5 class="card-title">';
+    const contradictions = [
+      noResultsFixture.replace('</main>', `${validCard}</main>`),
+      noResultsFixture.replace('</main>', `${competingHeading}</main>`),
+      noResultsFixture.replace('</main>', `${duplicateEmpty}</main>`),
+      noResultsFixture.replace('</main>', `${malformedCard}</main>`),
+      resultPage(`${validCard}<p>No results found.</p>`),
+    ];
+    for (const [index, markup] of contradictions.entries()) {
+      await expect(new CcelSearchAdapter({
+        enabled: true,
+        fetchImpl: vi.fn<typeof fetch>().mockResolvedValue(htmlResponse(markup)),
+      }).search(query({ text: `empty contradiction ${index}` }))).resolves.toMatchObject({ status: 'interface_changed', hits: [] });
+    }
+
+    const contradictoryThenEmpty = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(htmlResponse(contradictions[0]))
+      .mockResolvedValueOnce(htmlResponse(noResultsFixture));
+    const adapter = new CcelSearchAdapter({ enabled: true, fetchImpl: contradictoryThenEmpty });
+    await expect(adapter.search(query({ text: 'not negative cached' }))).resolves.toMatchObject({ status: 'interface_changed' });
+    await expect(adapter.search(query({ text: 'not negative cached' }))).resolves.toMatchObject({ status: 'no_results' });
+    expect(contradictoryThenEmpty).toHaveBeenCalledTimes(2);
   });
 
   it('caches successful and negative metadata briefly, but not failures', async () => {
@@ -716,8 +798,8 @@ describe('CcelSearchAdapter', () => {
     await expect(new CcelSearchAdapter({ enabled: true, fetchImpl: vi.fn<typeof fetch>().mockResolvedValue(htmlResponse(resultPage(nineCards))) }).search(query({ text: 'result cap', limit: 5 })))
       .resolves.toMatchObject({ status: 'ok', hitCount: 5 });
 
-    const fiftyCardsAndMalformed = `${Array.from({ length: 50 }, (_, index) => resultCard(index)).join('')}<article class="ccel-search-result"><a href="/ccel/calvin/institutes/unclosed.html">unclosed`;
-    await expect(new CcelSearchAdapter({ enabled: true, fetchImpl: vi.fn<typeof fetch>().mockResolvedValue(htmlResponse(resultPage(fiftyCardsAndMalformed))) }).search(query({ text: 'candidate cap' })))
+    const fiftyCards = Array.from({ length: 50 }, (_, index) => resultCard(index)).join('');
+    await expect(new CcelSearchAdapter({ enabled: true, fetchImpl: vi.fn<typeof fetch>().mockResolvedValue(htmlResponse(resultPage(fiftyCards))) }).search(query({ text: 'candidate cap' })))
       .resolves.toMatchObject({ status: 'ok', hitCount: 5 });
 
   });
