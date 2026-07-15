@@ -32,6 +32,14 @@ is local source context only and does not define the current product contract.
   catalog-aware local primary-source research, structured morphology, compound
   gloss resolution, and release-contract repairs, merged as
   `ce335266d989b40afebe398aeb39dbd2082d926a` after protected preview audit.
+- **Phase 3 production binding / PR #39:** reviewed transform-version-6
+  production binding and release records, merged as
+  `2412ee4031b8bbef16f359879d4a8a4884a6e053` and deployed through the protected
+  production workflow.
+- **Commentary coverage correction / PR #40:** source-specific scalar identity,
+  fail-closed section coverage, official content-shape parsing, and aligned
+  public guidance, reviewed at `32441d99de673eccce0a57fd74801fb94db04944`
+  and merged as `9f6aa128eeab663ef04a315ab0c14b8ae9a3376d`.
 
 These entries describe merged repository state. Deployment state is established
 only by the relevant protected workflow and post-deployment smoke evidence; a
@@ -71,13 +79,29 @@ output for `bible_lookup`, `parallel_passages`, `primary_source_search`,
 `original_language_lookup`, and `original_language_study`. Markdown remains
 available for compatibility.
 
-Protected production workflow run `29289643276` deployed the PR #27 merge after
-the exact-corpus readiness gate passed. GitHub deployment `5432211383` serves
-Worker version `49746830-16ce-40dc-b8a5-3cdc9ab79217` at 100% with production D1
-`theologai-production-20260713-b` and scoped materialization identity
-`652245709aaed181345b0cf17f0091471ac3a3e323f6ae84cfd73a5d8b409c51`.
-Live CCEL discovery remains intentionally disabled and is not part of the
-public MCP contract.
+Protected production workflow run `29418476587` deployed the PR #39 merge after
+the exact-corpus readiness gate passed. GitHub deployment `5457655742` deployed
+Worker version `a74f0848-5b68-4d7a-834e-aa3221ebda3b` at 100% with production D1
+`theologai-production-20260715-a`
+(`c6535a4a-1953-4279-b277-7368445fc61a`). The post-deployment strict readiness
+check returned `ready` with zero writes. The independent production audit
+scored 87/90 with no P0 or P1 findings and one P2 commentary-coverage finding.
+
+PR #40 corrected that finding without changing either D1 binding. Protected
+preview run `29425323205` deployed reviewed head
+`32441d99de673eccce0a57fd74801fb94db04944` as GitHub deployment `5459322775`
+and Worker version `34a0a557-9ddb-4940-9862-6b25e1dd98e6` at 100%, bound to
+preview D1 `theologai-preview-20260714-a`
+(`0dab804f-8df0-4727-93bd-299612b6e179`). The coordinator audit passed 15/15
+and the independent audit passed 27/27 with no P0-P3 findings. Protected
+production run `29427137668` then deployed merge
+`9f6aa128eeab663ef04a315ab0c14b8ae9a3376d` as GitHub deployment `5459432945`
+and Worker version `656e9e3a-7044-45ca-9144-4ec7eae94d8d` at 100%. That PR #40
+Worker is the current production version and remains bound to production D1
+`theologai-production-20260715-a`. Readiness returned `ready` with zero writes;
+the coordinator audit passed 15/15 and the independent audit passed 27/27 with
+no P0-P3 findings. Live CCEL discovery remains intentionally disabled and is
+not part of the public MCP contract.
 
 ## Shipped Unicode correction release
 
@@ -93,20 +117,21 @@ corrected Strong's entries, 237 corrected morphology cells, and 11 affected
 parallel-passage cases, plus sampled checks of the remaining MCP surface.
 Production then passed the corresponding bounded post-deployment audit.
 
-## Merged integrated Phase 3 candidate (production pending)
+## Shipped integrated Phase 3 release
 
-The next integrated candidate replays the reviewed original-language usage and
+The integrated release replays the reviewed original-language usage and
 catalog-aware primary-source work onto the PR #27 production baseline. Its four
 core feature commits are `2c2a29a`, `eccfad4`, `1b95201`, and `2506413`; the
-candidate also requires the downstream Unicode-manifest preservation fix
+release also requires the downstream Unicode-manifest preservation fix
 `a1c9da3` and source-lock synchronization `e8282c3`. It adds schema
 `0003_original_language_usage`, occurrence and distribution evidence with
 keyset pagination, progressive original-language output levels, and curated
 catalog scope for primary-source research. The separate `e6f7f7f` commit
 reconciles release documentation for this candidate.
 
-This transform-version-6 candidate is merged through PR #34 but is not yet
-released to production. Its protected preview uses the fresh preview database
+This transform-version-6 release merged through PR #34 and was released to
+production through the reviewed PR #39 binding cutover. Its protected preview
+uses the fresh preview database
 `theologai-preview-20260714-a`, migrated through schema 0003, populated from all
 36 manifest seed files, and verified by the strict read-only remote readiness
 gate. Its whole-D1 identity
@@ -118,29 +143,39 @@ occurred on 2026-07-14 from commit `a660c97`, producing Worker version
 `e86fb87e-8ace-4972-a8a2-dba9682a6a55` with
 `theologai-preview-20260714-a` bound. Black-box audits found guided-workflow,
 Hebrew morphology interpretation, historical
-presenter/search/browse, and derivation-output issues. Corrective code is now in
-the PR candidate. Corrective application commit `4760dbd` passed all required
+presenter/search/browse, and derivation-output issues. Corrective application
+commit `4760dbd` passed all required
 CI checks and Verify Pins, then protected run `29354086467` / job `87160929896`
 deployed it on
 2026-07-14 as Worker version `5dd1fa0c-343c-4af4-83e6-b65003fb51c4` with the
 same D1 database. Targeted and independent full-surface black-box re-audits
 found no P0-P2 issues and confirmed all previously identified P0-P2 release
 findings were fixed. This is the audited corrective application evidence and
-does not predict the Worker UUID
-produced by any later docs-only deployment. Retain the verified PR #27 Worker
-version `734aec3b-d6c3-456b-a203-c7f940a2d081` with
-`theologai-preview-20260713-c` as the immediate matched rollback pair;
-`theologai-preview-20260712-b` remains older matched rollback history. PRs #28
-and #29 are closed as superseded by PR #30.
+does not predict the Worker UUID produced by any later deployment. The current
+immediate preview rollback pair is PR #34 Worker version
+`ab270f0b-2627-4057-a182-a66cd750b118` with unchanged D1
+`theologai-preview-20260714-a`. Retain the verified PR #27 Worker version
+`734aec3b-d6c3-456b-a203-c7f940a2d081` with
+`theologai-preview-20260713-c` as older matched rollback history, and retain
+`theologai-preview-20260712-b` with Worker version
+`3c8ad7ef-50ed-42a7-9c71-2ac8c2dd6d7f` as still older matched rollback history.
+PRs #28 and #29 are closed as superseded by PR #30.
 
 The owner-authorized deletion of unused legacy database `theologai-db-preview`
 (`f9f415e1-219b-4d17-bcf5-33a8abad02fa`) was completed on 2026-07-14. The owner
 later authorized deletion of only `theologai-preview-20260710-a`
 (`3d010946-b530-4c7e-9e21-a900ff3c21a2`), completed on 2026-07-15. No other
 database deletion is authorized. The corrective preview gate is complete.
-Production remains on the PR #27 baseline pending the reviewed binding cutover.
+Protected production workflow run `29418476587` deployed exact PR #39 merge
+`2412ee4031b8bbef16f359879d4a8a4884a6e053` as Worker version
+`a74f0848-5b68-4d7a-834e-aa3221ebda3b` at 100%, bound to
+`theologai-production-20260715-a`. The post-deployment readiness result was
+`ready` with zero writes, and the bounded audit recorded only the commentary
+P2 subsequently corrected and released through PR #40. The corrective preview
+and production releases both passed 15/15 coordinator and 27/27 independent
+audits with no P0-P3 findings while retaining their existing D1 bindings.
 
-### Integrated research-output follow-up (merged; production pending)
+### Integrated research-output follow-up (shipped)
 
 PR #34 merged as `ce335266d989b40afebe398aeb39dbd2082d926a`; its reviewed head
 was `6467a93da84c095f4fe32a253d8ba816be8cb8c2`. Every production deployment
@@ -148,10 +183,11 @@ and audit artifact must match the binding-cutover head derived from that merge.
 Component PRs #31-#33 are superseded review vehicles rather than independent
 release units. Combined local verification and required GitHub checks passed,
 Sol approved the combined integration, and protected preview run `29379359308`
-plus independent black-box audits found no P0-P2 release findings. Production
-still requires the separately reviewed D1 binding cutover and protected gate.
+plus independent black-box audits found no P0-P2 release findings. PR #39 then
+completed the separately reviewed D1 binding cutover and protected production
+gate recorded above.
 
-The integrated local-only application candidate upgrades
+The integrated local-only application release upgrades
 `primary_source_search` to v3 without adding a tool, migration, corpus body,
 live CCEL path, configuration, or deployment change. It adds relevance and
 deterministic round-robin work-diverse selection, limit-plus-one result-window
@@ -169,10 +205,12 @@ This slice preserves creator roles, routing-only alias policy, incomplete
 edition provenance, unestablished catalog rights status, canonical fail-closed
 section locators, and backward-compatible local research behavior while
 intentionally removing inert external-provider boilerplate from the public
-Markdown. Local protocol, parity, integrated-review, CI, and preview-audit gates
-are complete. The remaining release work is the production binding and audit.
+Markdown. Local protocol, parity, integrated-review, CI, preview-audit,
+production-binding, and production-audit gates are complete. The production
+audit's sole P2 commentary-coverage finding was corrected and released through
+PR #40, with clean protected preview and production audits.
 
-The same candidate adds v1 structured output for
+The same release adds v1 structured output for
 `bible_verse_morphology`. Its bounded `words[]` retain exact source order, raw
 morphology codes, nullable conservative expansions, and distinct provenance
 links for the pinned STEPBible morphology and lemma sources. Guided word study,
@@ -213,9 +251,6 @@ Code readiness and operational readiness are deliberately separate:
 
 ## Next work
 
-- Complete the reviewed production cutover to the prepared transform-version-6
-  database, then run the bounded post-deployment audit before calling PR #34
-  released.
 - Broaden advanced original-language study only after those foundations, using
   carefully sourced semantic-domain and discourse evidence useful to both
   beginners and readers of Greek or Hebrew.
