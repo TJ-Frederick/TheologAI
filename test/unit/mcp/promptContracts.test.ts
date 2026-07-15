@@ -62,6 +62,20 @@ describe('prompt-recommended tool-call contracts', () => {
     expect(calls.some(call => call.tool === 'bible_cross_references')).toBe(false);
   });
 
+  it.each([
+    ['John 3:16', 'John 3'],
+    ['Romans 8:28-30', 'Romans 8'],
+    ['John 3', 'John 3'],
+  ])('uses containing-chapter commentary calls for passage exegesis of %s', (reference, chapter) => {
+    const commentaryCalls = recommendedToolCallsForPrompt('passage-exegesis', { reference })
+      .filter(call => call.tool === 'commentary_lookup');
+
+    expect(commentaryCalls).toEqual([
+      { tool: 'commentary_lookup', arguments: { reference: chapter, commentator: 'Matthew Henry' } },
+      { tool: 'commentary_lookup', arguments: { reference: chapter, commentator: 'John Gill' } },
+    ]);
+  });
+
   it('keeps translation-range morphology bounded to later individual-verse calls', () => {
     const rangeCalls = recommendedToolCallsForPrompt('compare-translations', {
       reference: 'Philippians 2:6-8',

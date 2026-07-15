@@ -4,6 +4,8 @@ import {
   ValidationError,
   RateLimitError,
   AdapterError,
+  AdapterIntegrityError,
+  CommentaryScalarNotFoundError,
   NotFoundError,
   PaymentError,
   TheologAIError,
@@ -17,6 +19,7 @@ describe('Error hierarchy', () => {
     expect(new ValidationError('ref', 'bad')).toBeInstanceOf(TheologAIError);
     expect(new RateLimitError(60)).toBeInstanceOf(TheologAIError);
     expect(new AdapterError('ESV', 'fail')).toBeInstanceOf(TheologAIError);
+    expect(new AdapterIntegrityError('ESV', 'bad shape')).toBeInstanceOf(AdapterError);
     expect(new NotFoundError('verse', 'not found')).toBeInstanceOf(TheologAIError);
     expect(new PaymentError('fail')).toBeInstanceOf(TheologAIError);
   });
@@ -112,6 +115,31 @@ describe('getUserMessage', () => {
       .toBe('Unsupported coverage: This request is outside the supported coverage.');
     expect(getUserMessage(new AdapterError('CCEL', 'HTTP 404: Not Found for https://ccel.example.test/missing')))
       .toBe('Not found: No matching content was found.');
+  });
+
+  it('gives an exact scalar commentary miss a safe, actionable chapter fallback', () => {
+    const message = getUserMessage(new CommentaryScalarNotFoundError(
+      'HelloAO',
+      '1 John 3',
+      'No exact commentary match for 1 John 3:16 in Matthew Henry',
+    ));
+
+    expect(message).toBe(
+      'Not found: No trustworthy exact-verse commentary was available. Request the containing chapter (`1 John 3`) or try another commentator.',
+    );
+    expect(message).not.toMatch(/HelloAO|Matthew Henry|verseNumber|metadata/i);
+  });
+
+  it('sanitizes typed adapter integrity failures as unavailable rather than not found', () => {
+    const message = getUserMessage(new AdapterIntegrityError(
+      'HelloAO',
+      'Conflicting commentary identity at index 0',
+    ));
+
+    expect(message).toBe(
+      'Unavailable: The requested source is temporarily unavailable. Please try again later.',
+    );
+    expect(message).not.toMatch(/HelloAO|conflicting|identity|index/i);
   });
 
   it('treats CCEL parser and upstream-shape failures as unavailable', () => {

@@ -115,9 +115,13 @@ Matthew Henry, Jamieson-Fausset-Brown, Adam Clarke, John Gill, and
 Keil-Delitzsch are treated as public-domain source texts. Tyndale Open Study
 Notes are CC BY-SA 4.0 and responses include attribution. See [NOTICE.md](NOTICE.md).
 
-Scalar commentary is returned only when the provider exposes an exact,
-trustworthy verse identity. For section-level commentary, use chapter lookup
-as the truthful fallback rather than treating a section anchor as a verse span.
+Scalar coverage varies by commentary provider and is returned only when the
+provider exposes an exact, trustworthy verse identity. When no exact match is
+available, request the containing chapter or another commentator. Keep chapter
+commentary labeled at chapter level rather than attributing it to one verse.
+Matthew Henry and Keil-Delitzsch currently expose multi-verse sections, so they
+are chapter-level sources. John Gill's current feed normally lacks the stronger
+exact-verse identity required for scalar lookup; use its chapter lookup instead.
 
 ### Historical documents and external discovery
 
