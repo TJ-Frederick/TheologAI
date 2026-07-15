@@ -91,6 +91,10 @@ export {
   type ProvenanceLink,
   type ProvenanceContext,
 } from './provenance.js';
+export {
+  OPENBIBLE_PROVENANCE_ID,
+  OPENBIBLE_CROSS_REFERENCE_PROVENANCE,
+} from './openBibleCrossReferenceProvenance.js';
 
 // Staged primary-source rollout flags
 export {

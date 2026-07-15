@@ -97,6 +97,7 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
       ]);
       expect(listed.tools.filter(tool => tool.outputSchema).map(tool => tool.name)).toEqual([
         'bible_lookup',
+        'bible_cross_references',
         'parallel_passages',
         'primary_source_search',
         'original_language_lookup',
@@ -244,6 +245,39 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
         },
       });
       expect(primarySourceSearch.isError).not.toBe(true);
+
+      const crossReferences = await client.callTool({
+        name: 'bible_cross_references',
+        arguments: { reference: 'Jn 3.16' },
+      });
+      expect(crossReferences).toMatchObject({
+        content: [expect.objectContaining({
+          text: expect.stringContaining('Cross-References for Jn 3.16'),
+        })],
+        structuredContent: {
+          schemaVersion: '1',
+          kind: 'bible_cross_references',
+          requestedReference: 'Jn 3.16',
+          resolvedReference: 'John 3:16',
+          query: { maxResults: 5, minVotes: 0 },
+          ranking: {
+            method: 'openbible_votes_descending',
+            tieBreak: 'source_reference_ascending',
+          },
+          semantics: {
+            evidenceUse: 'discovery_lead',
+            relationshipClassification: 'unspecified',
+            directionality: 'unspecified',
+          },
+          references: [],
+          resultWindow: { returnedCount: 0, qualifyingTotal: 0, hasMore: false },
+          provenance: [expect.objectContaining({
+            id: 'openbible-cross-references',
+            version: '2025-10-13',
+          })],
+        },
+      });
+      expect(crossReferences.isError).not.toBe(true);
 
       const result = await client.callTool({
         name: 'bible_lookup',

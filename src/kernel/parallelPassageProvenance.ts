@@ -1,9 +1,15 @@
 import type { ParallelSourceProvenance } from './sourceAttestedParallels.js';
 import type { ProvenanceRecord } from './provenance.js';
 
+// Compatibility exports for callers that historically imported OpenBible
+// provenance through the parallel-passage module.
+export {
+  OPENBIBLE_CROSS_REFERENCE_PROVENANCE,
+  OPENBIBLE_PROVENANCE_ID,
+} from './openBibleCrossReferenceProvenance.js';
+
 export const UBS_PARALLEL_PROVENANCE_ID = 'ubs-source-attested-parallels';
 export const LEGACY_PARALLEL_PROVENANCE_ID = 'theologai-legacy-parallels';
-export const OPENBIBLE_PROVENANCE_ID = 'openbible-cross-references';
 
 export function ubsParallelProvenanceRecord(source: ParallelSourceProvenance): ProvenanceRecord {
   return {
@@ -36,14 +42,4 @@ export const LEGACY_PARALLEL_PROVENANCE: Readonly<ProvenanceRecord> = Object.fre
   locator: 'src/data/parallel-passages.json',
   status: 'verified_source',
   note: 'Small non-exhaustive repository-curated relationship dataset retained for explicit compatibility queries; repository contents are distributed under the root ISC license unless a source-specific notice says otherwise.',
-});
-
-export const OPENBIBLE_CROSS_REFERENCE_PROVENANCE: Readonly<ProvenanceRecord> = Object.freeze({
-  id: OPENBIBLE_PROVENANCE_ID,
-  kind: 'cross_reference_dataset',
-  label: 'OpenBible.info cross references',
-  url: 'https://www.openbible.info/labs/cross-references/',
-  license: { label: 'CC BY 4.0', url: 'https://creativecommons.org/licenses/by/4.0/' },
-  attribution: 'OpenBible.info',
-  status: 'verified_source',
 });

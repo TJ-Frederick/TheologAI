@@ -123,6 +123,7 @@ describe('published project contract', () => {
     expect(nodeContract).toEqual({
       toolCount: 11,
       structuredTools: [
+        'bible_cross_references',
         'bible_lookup',
         'bible_verse_morphology',
         'original_language_lookup',

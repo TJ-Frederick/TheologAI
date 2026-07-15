@@ -57,6 +57,7 @@ describe('MCP structured output validation', () => {
     const withOutput = listed.tools.filter(tool => tool.outputSchema).map(tool => tool.name);
     expect(withOutput).toEqual([
       'bible_lookup',
+      'bible_cross_references',
       'parallel_passages',
       'primary_source_search',
       'original_language_lookup',

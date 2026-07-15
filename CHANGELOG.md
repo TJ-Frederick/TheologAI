@@ -7,15 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-<!-- theologai-public-contract tools=11 structured=bible_lookup,bible_verse_morphology,original_language_lookup,original_language_study,parallel_passages,primary_source_search -->
+<!-- theologai-public-contract tools=11 structured=bible_cross_references,bible_lookup,bible_verse_morphology,original_language_lookup,original_language_study,parallel_passages,primary_source_search -->
 
 ### Added
 
 - Added stable MCP 2025-11-25 structured output and server-side schema
-  validation for `bible_lookup`, `parallel_passages`,
+  validation for `bible_lookup`, `bible_cross_references`, `parallel_passages`,
   `bible_verse_morphology`, `primary_source_search`, `original_language_lookup`, and
   `original_language_study`, while keeping
   their Markdown content available for legacy clients.
+- Added versioned `bible_cross_references` results with requested and canonical
+  references, effective query values, raw OpenBible.info ranking semantics,
+  bounded positions, threshold-scoped result windows, and exact snapshot
+  provenance. The existing Markdown response is unchanged.
 - Added bounded, result-local provenance records and structured-first guidance
   to the word-study, passage-exegesis, and compare-translations prompts.
 - Added versioned grouped output and provenance for `parallel_passages`, with a

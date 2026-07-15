@@ -631,7 +631,13 @@ describe('shared MCP registration', () => {
       text: expect.stringContaining('do not infer quotation, dependence, synoptic direction, or a thematic relationship'),
     }));
     expect(passageExegesis.messages[0].content).toEqual(expect.objectContaining({
-      text: expect.stringContaining('community-ranked links as thematic leads, not UBS-attested parallels'),
+      text: expect.stringContaining('community-ranked links only as discovery leads and candidates for contextual investigation'),
+    }));
+    expect(passageExegesis.messages[0].content).toEqual(expect.objectContaining({
+      text: expect.stringContaining('dataset supplies no relationship classification or directionality'),
+    }));
+    expect(passageExegesis.messages[0].content).toEqual(expect.objectContaining({
+      text: expect.stringContaining('`requestedReference`, `resolvedReference`, `query`, `ranking`, `semantics`'),
     }));
     expect(passageExegesis.messages[0].content).toEqual(expect.objectContaining({
       text: expect.stringContaining('Exact-verse commentary coverage varies by provider'),
@@ -722,6 +728,8 @@ describe('shared MCP registration', () => {
     expect(confessionText).toContain('theologai://primary-sources/catalog');
     expect(confessionText).toContain('Never relabel an issuing, drafting, revising, or compiling body as an author');
     expect(confessionText).toContain('never infer a work\'s tradition or author attribution');
+    expect(confessionText).toContain('preserve returned positions and raw vote order');
+    expect(confessionText).toContain('relationship and directionality unspecified');
 
     const primarySource = await client.getPrompt({
       name: 'primary-source-research',

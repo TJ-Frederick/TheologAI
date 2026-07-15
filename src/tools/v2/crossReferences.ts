@@ -6,11 +6,13 @@ import type { ToolHandler } from '../../kernel/types.js';
 import type { CrossReferenceService } from '../../services/bible/CrossReferenceService.js';
 import { formatCrossReferences } from '../../formatters/bibleFormatter.js';
 import { handleToolError } from '../../kernel/errors.js';
+import { crossReferencesOutputSchema } from '../../mcp/schemas/crossReferences.js';
+import { presentCrossReferencesStructured } from '../../presenters/crossReferencesStructured.js';
 
 export function createCrossReferencesHandler(crossRefService: CrossReferenceService): ToolHandler {
   return {
     name: 'bible_cross_references',
-    description: 'Find cross-references for a Bible verse. Returns related passages ranked by community votes.',
+    description: 'Find OpenBible.info cross-reference discovery leads for one Bible verse, ranked by raw source votes. Relationship classification and directionality are unspecified.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -21,16 +23,25 @@ export function createCrossReferencesHandler(crossRefService: CrossReferenceServ
       required: ['reference'],
       additionalProperties: false,
     },
+    outputSchema: crossReferencesOutputSchema,
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
 
     handler: async (params) => {
       try {
+        const requestedReference = params.reference as string;
+        const query = {
+          maxResults: typeof params.maxResults === 'number' ? params.maxResults : 5,
+          minVotes: typeof params.minVotes === 'number' ? params.minVotes : 0,
+        };
         const result = await crossRefService.getCrossReferences(params.reference as string, {
-          maxResults: params.maxResults as number,
-          minVotes: params.minVotes as number,
+          maxResults: query.maxResults,
+          minVotes: query.minVotes,
         });
-        const text = formatCrossReferences(params.reference as string, result);
-        return { content: [{ type: 'text', text }] };
+        const text = formatCrossReferences(requestedReference, result);
+        return {
+          content: [{ type: 'text', text }],
+          structuredContent: presentCrossReferencesStructured(requestedReference, query, result),
+        };
       } catch (error) {
         return handleToolError(error as Error);
       }

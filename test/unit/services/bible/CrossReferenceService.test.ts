@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { CrossReferenceService } from '../../../../src/services/bible/CrossReferenceService.js';
+import { AdapterIntegrityError } from '../../../../src/kernel/errors.js';
 
 // ── Mock repository ──
 
@@ -24,6 +25,7 @@ describe('CrossReferenceService', () => {
     const service = new CrossReferenceService(repo as any);
     const result = await service.getCrossReferences('John 3:16');
     expect(repo.getCrossReferences).toHaveBeenCalledWith('John 3:16', undefined);
+    expect(result.resolvedReference).toBe('John 3:16');
     expect(result.references).toHaveLength(1);
   });
 
@@ -60,9 +62,184 @@ describe('CrossReferenceService', () => {
     const repo = makeMockRepo();
     const service = new CrossReferenceService(repo as any);
 
-    await service.getCrossReferences('Jn 3.16');
+    const result = await service.getCrossReferences('Jn 3.16');
 
     expect(repo.getCrossReferences).toHaveBeenCalledWith('John 3:16', undefined);
+    expect(result.resolvedReference).toBe('John 3:16');
+  });
+
+  it('does not allow a structurally wider repository result to replace resolvedReference', async () => {
+    const repo = makeMockRepo();
+    repo.getCrossReferences.mockReturnValue({
+      ...repo.getCrossReferences(),
+      resolvedReference: 'Genesis 1:1',
+    });
+    const service = new CrossReferenceService(repo as any);
+
+    const result = await service.getCrossReferences('Jn 3.16');
+
+    expect(result.resolvedReference).toBe('John 3:16');
+    expect(Object.keys(result)).toEqual([
+      'references', 'total', 'showing', 'hasMore', 'resolvedReference',
+    ]);
+  });
+
+  it('accepts deterministic vote-descending, source-key-ascending repository order', async () => {
+    const repo = makeMockRepo();
+    repo.getCrossReferences.mockReturnValue({
+      references: [
+        { reference: 'Psalms 22:1', votes: 40 },
+        { reference: '1 John 4:9', votes: 30 },
+        { reference: 'Romans 5:8', votes: 30 },
+      ],
+      total: 3,
+      showing: 3,
+      hasMore: false,
+    });
+    const service = new CrossReferenceService(repo as any);
+
+    await expect(service.getCrossReferences('John 3:16')).resolves.toMatchObject({
+      references: [
+        { reference: 'Psalms 22:1', votes: 40 },
+        { reference: '1 John 4:9', votes: 30 },
+        { reference: 'Romans 5:8', votes: 30 },
+      ],
+    });
+  });
+
+  it('accepts the scalar-then-range ranking returned for John 3:16', async () => {
+    const repo = makeMockRepo();
+    repo.getCrossReferences.mockReturnValue({
+      references: [
+        { reference: 'Romans 5:8', votes: 935 },
+        { reference: '1 John 4:9-10', votes: 663 },
+      ],
+      total: 2,
+      showing: 2,
+      hasMore: false,
+    });
+    const service = new CrossReferenceService(repo as any);
+
+    await expect(service.getCrossReferences('John 3:16')).resolves.toMatchObject({
+      references: [
+        { reference: 'Romans 5:8', votes: 935 },
+        { reference: '1 John 4:9-10', votes: 663 },
+      ],
+    });
+  });
+
+  it.each([
+    ['cross-chapter', 'Genesis 4:25-Genesis 5:32'],
+    ['cross-book', 'Acts 28:17-Romans 1:1'],
+    ['cross-book between single-chapter books', '2 John 1:1-3 John 1:15'],
+  ])('accepts a canonical %s destination range', async (_case, range) => {
+    const repo = makeMockRepo();
+    repo.getCrossReferences.mockReturnValue({
+      references: [{ reference: range, votes: 30 }],
+      total: 1,
+      showing: 1,
+      hasMore: false,
+    });
+    const service = new CrossReferenceService(repo as any);
+
+    await expect(service.getCrossReferences('John 3:16')).resolves.toMatchObject({
+      references: [{ reference: range, votes: 30 }],
+    });
+  });
+
+  it.each([
+    ['an alias instead of a canonical reference', {
+      references: [{ reference: 'Rom.5.8', votes: 42 }], total: 1, showing: 1, hasMore: false,
+    }],
+    ['a chapter instead of a scalar reference', {
+      references: [{ reference: 'Romans 5', votes: 42 }], total: 1, showing: 1, hasMore: false,
+    }],
+    ['a negative vote total', {
+      references: [{ reference: 'Romans 5:8', votes: -1 }], total: 1, showing: 1, hasMore: false,
+    }],
+    ['a fractional vote total', {
+      references: [{ reference: 'Romans 5:8', votes: 1.5 }], total: 1, showing: 1, hasMore: false,
+    }],
+    ['a row below the requested threshold', {
+      references: [{ reference: 'Romans 5:8', votes: 9 }], total: 1, showing: 1, hasMore: false,
+    }],
+    ['ascending vote order', {
+      references: [
+        { reference: 'Romans 5:8', votes: 20 },
+        { reference: '1 John 4:9', votes: 30 },
+      ], total: 2, showing: 2, hasMore: false,
+    }],
+    ['reverse source-key tie order', {
+      references: [
+        { reference: 'Romans 5:8', votes: 30 },
+        { reference: '1 John 4:9', votes: 30 },
+      ], total: 2, showing: 2, hasMore: false,
+    }],
+    ['duplicate source keys in one ranking', {
+      references: [
+        { reference: 'Romans 5:8', votes: 30 },
+        { reference: 'Romans 5:8', votes: 30 },
+      ], total: 2, showing: 2, hasMore: false,
+    }],
+    ['reverse raw source-key tie order involving a range', {
+      references: [
+        { reference: 'Romans 5:8', votes: 30 },
+        { reference: '1 John 4:9-10', votes: 30 },
+      ], total: 2, showing: 2, hasMore: false,
+    }],
+    ['a non-canonical expanded same-chapter range', {
+      references: [
+        { reference: '1 John 4:9-1 John 4:10', votes: 30 },
+      ], total: 1, showing: 1, hasMore: false,
+    }],
+    ['an invalid cross-chapter range endpoint', {
+      references: [
+        { reference: 'Psalms 148:4-Psalms 151:1', votes: 30 },
+      ], total: 1, showing: 1, hasMore: false,
+    }],
+    ['a backwards cross-chapter range', {
+      references: [
+        { reference: 'Genesis 5:1-Genesis 4:25', votes: 30 },
+      ], total: 1, showing: 1, hasMore: false,
+    }],
+    ['a backwards cross-book range', {
+      references: [
+        { reference: 'Romans 1:1-Acts 28:17', votes: 30 },
+      ], total: 1, showing: 1, hasMore: false,
+    }],
+  ])('rejects repository integrity failure: %s', async (_case, repositoryResult) => {
+    const repo = makeMockRepo();
+    repo.getCrossReferences.mockReturnValue(repositoryResult);
+    const service = new CrossReferenceService(repo as any);
+
+    await expect(service.getCrossReferences(
+      'John 3:16',
+      _case === 'a row below the requested threshold' ? { minVotes: 10 } : undefined,
+    )).rejects.toBeInstanceOf(AdapterIntegrityError);
+  });
+
+  it.each([
+    ['showing does not equal the returned row count', {
+      references: [{ reference: 'Romans 5:8', votes: 42 }], total: 1, showing: 0, hasMore: false,
+    }],
+    ['total is smaller than showing', {
+      references: [{ reference: 'Romans 5:8', votes: 42 }], total: 0, showing: 1, hasMore: false,
+    }],
+    ['hasMore disagrees with the result window', {
+      references: [{ reference: 'Romans 5:8', votes: 42 }], total: 2, showing: 1, hasMore: false,
+    }],
+    ['a non-integer total', {
+      references: [], total: 0.5, showing: 0, hasMore: false,
+    }],
+    ['a truncated window smaller than its requested limit', {
+      references: [{ reference: 'Romans 5:8', votes: 42 }], total: 2, showing: 1, hasMore: true,
+    }],
+  ])('rejects inconsistent repository window metadata: %s', async (_case, repositoryResult) => {
+    const repo = makeMockRepo();
+    repo.getCrossReferences.mockReturnValue(repositoryResult);
+    const service = new CrossReferenceService(repo as any);
+
+    await expect(service.getCrossReferences('John 3:16')).rejects.toBeInstanceOf(AdapterIntegrityError);
   });
 
   it('delegates getChapterStatistics to repository', async () => {
