@@ -38,7 +38,7 @@ Use this workflow when the user asks for:
 - Compare every member in a returned group, including the passage that matched the query. Use `includeText: true` when the workflow needs all member texts, and request `includeAlignment: true` only when raw UBS alignment evidence is useful.
 - Use `corpora: ["theologai_legacy"]` only when the user specifically wants the older curated relationship labels (`synoptic`, `quotation`, `allusion`, or `thematic`).
 - Request `includeOpenBibleCrossReferences: true` only for a separate, broader cross-reference list; do not present those rows as UBS-attested group members.
-- Call `bible_cross_references` to identify broader OpenBible.info discovery leads across Scripture. Keep its community-ranked, CC BY evidence separate from UBS groups.
+- Call `bible_cross_references` to identify broader OpenBible.info discovery leads across Scripture. Prefer its structured requested/resolved references, positioned rows, threshold-scoped result window, and provenance; preserve raw vote order. Keep this evidence separate from UBS groups, and do not infer a relationship classification or directionality.
 - Treat those links as candidates for contextual investigation, not proof of quotation, literary dependence, a source-attested parallel, or even a shared theme until the passages themselves support that conclusion.
 - Follow useful cross-references to build a biblical-theological framework while labeling the resulting synthesis as interpretation rather than dataset-attested relationship metadata.
 

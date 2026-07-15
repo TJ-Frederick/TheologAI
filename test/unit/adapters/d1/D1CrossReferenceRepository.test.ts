@@ -26,6 +26,19 @@ describe('D1CrossReferenceRepository', () => {
       expect(db.prepare).toHaveBeenCalledTimes(2);
     });
 
+    it('advertises deterministic source-key ordering for equal raw vote totals', async () => {
+      const db = createMockD1([
+        { sql: /SELECT to_verse/, all: { results: [] } },
+        { sql: /COUNT/, first: { count: 0 } },
+      ]);
+      const repo = new D1CrossReferenceRepository(db as any);
+
+      await repo.getCrossReferences('Gen.1.1');
+
+      const selectSql = db.prepare.mock.calls.find((call: string[]) => call[0].includes('SELECT to_verse'))?.[0];
+      expect(selectSql).toContain('ORDER BY votes DESC, to_verse ASC');
+    });
+
     it('respects maxResults option', async () => {
       const db = createMockD1([
         { sql: /SELECT to_verse/, all: { results: [] } },

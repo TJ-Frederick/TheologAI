@@ -222,6 +222,19 @@ prefix/suffix gloss segments such as `heavens` within `the/ heavens`, while
 remaining fail-closed for ambiguous candidates. No corpus rows or source data
 were changed by that application-layer correction.
 
+### Structured cross-reference follow-up (unreleased)
+
+The next modern-output slice adds a v1 object-root contract for
+`bible_cross_references` without changing its Markdown. It distinguishes the
+caller's requested reference from the canonical verse actually queried,
+materializes effective query defaults, preserves raw OpenBible.info vote order
+and source-reference tie-breaking, and marks every result as a discovery lead
+with relationship classification and directionality unspecified. Positions
+and result windows are bounded, totals are scoped to the requested vote
+threshold, and every response—including an empty result—carries the exact
+checksum-pinned OpenBible.info snapshot provenance. It changes no corpus rows,
+SQL semantics, migration, configuration, or deployment behavior.
+
 ## Release gates
 
 Code readiness and operational readiness are deliberately separate:
@@ -236,7 +249,7 @@ Code readiness and operational readiness are deliberately separate:
 4. Preview deployment requires the repository's authorization label and
    protected environment approval. The live PR must still be open, non-draft,
    and authorized immediately before deployment.
-5. Preview smoke and a functional audit must cover all eleven tools, the six
+5. Preview smoke and a functional audit must cover all eleven tools, the seven
    structured-output contracts, UBS default and explicit-source behavior,
    Strong's extended identities, local primary-source search, language study,
    resources, all six prompts, and failure/privacy boundaries.

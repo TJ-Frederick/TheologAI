@@ -2,7 +2,7 @@
 
 Production MCP server for theological research. Eleven tools, six prompts, eight Bible translations, six commentaries, 17 historical documents, Greek/Hebrew language tools, and on-chain donation support. Tools, resources, and prompts are available on every transport; MCP Logging is stdio-only because HTTP is stateless.
 
-<!-- theologai-public-contract tools=11 structured=bible_lookup,bible_verse_morphology,original_language_lookup,original_language_study,parallel_passages,primary_source_search -->
+<!-- theologai-public-contract tools=11 structured=bible_cross_references,bible_lookup,bible_verse_morphology,original_language_lookup,original_language_study,parallel_passages,primary_source_search -->
 
 ## Quick Start
 
@@ -88,7 +88,7 @@ test/
 | Tool | Description |
 |------|-------------|
 | `bible_lookup` | Verse retrieval across 8 translations (ESV, NET, KJV, WEB, BSB, ASV, YLT, DBY) |
-| `bible_cross_references` | Thematic connections via OpenBible.info data |
+| `bible_cross_references` | OpenBible.info discovery leads with raw vote ranking, unspecified relationship semantics, bounded result windows, and pinned snapshot provenance |
 | `parallel_passages` | Complete UBS source-attested groups by default; explicit legacy curated edges and separate OpenBible.info rows |
 | `commentary_lookup` | 6 commentaries (Matthew Henry, JFB, Clarke, Gill, K-D, Tyndale) |
 | `classic_text_lookup` | Search and browse 17 locally indexed historical documents; no remote CCEL body retrieval |

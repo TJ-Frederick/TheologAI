@@ -7,7 +7,7 @@ The current registry contains eleven tools, six guided prompts, eight English
 Bible translations, six commentary sources, 17 locally indexed
 historical documents, Strong's dictionaries, and Greek/Hebrew morphology.
 
-<!-- theologai-public-contract tools=11 structured=bible_lookup,bible_verse_morphology,original_language_lookup,original_language_study,parallel_passages,primary_source_search -->
+<!-- theologai-public-contract tools=11 structured=bible_cross_references,bible_lookup,bible_verse_morphology,original_language_lookup,original_language_study,parallel_passages,primary_source_search -->
 
 ## Remote endpoint
 
@@ -37,7 +37,7 @@ fresh server and transport.
 | Tool | Current behavior |
 |---|---|
 | `bible_lookup` | Retrieve a passage in ESV, NET, KJV, WEB, BSB, ASV, YLT, or DBY; arrays compare translations. |
-| `bible_cross_references` | Query locally indexed OpenBible.info cross references. |
+| `bible_cross_references` | Query locally indexed OpenBible.info cross references with raw vote ranking, explicit discovery-only semantics, threshold-scoped result windows, and pinned snapshot provenance. |
 | `parallel_passages` | Return complete UBS source-attested parallel groups by default; legacy curated edges and OpenBible.info cross references require explicit selectors and remain separate. |
 | `commentary_lookup` | Retrieve Matthew Henry, JFB, Adam Clarke, John Gill, Keil-Delitzsch (OT), or Tyndale notes. |
 | `classic_text_lookup` | Search and browse the 17 locally indexed historical documents. Remote CCEL document bodies are not retrieved or republished. |
@@ -66,12 +66,13 @@ adds the top 10 exact source variants and defaults to 8 raw occurrences (maximum
 responses.
 
 All tools are annotated as read-only, non-destructive, and idempotent. Tool
-inputs use closed, bounded JSON Schema 2020-12 contracts. `bible_lookup`,
-`bible_verse_morphology`, `parallel_passages`, `primary_source_search`,
-`original_language_lookup`, and `original_language_study`
-also advertise versioned object-root `outputSchema`
-contracts and return matching `structuredContent` beside the existing Markdown
-content. Bible, verse-morphology, parallel-passage, and original-language structured results
+inputs use closed, bounded JSON Schema 2020-12 contracts. Seven tools also
+advertise versioned object-root `outputSchema` contracts and return matching
+`structuredContent` beside the existing Markdown content: `bible_lookup`,
+`bible_cross_references`, `bible_verse_morphology`, `parallel_passages`,
+`primary_source_search`, `original_language_lookup`, and
+`original_language_study`. Bible, cross-reference, verse-morphology,
+parallel-passage, and original-language structured results
 include bounded, result-local provenance records. Primary-source results do not
 invent edition provenance records: their evidence policy explicitly marks
 edition provenance incomplete, and they link only canonical local sections with

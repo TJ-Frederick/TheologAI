@@ -26,7 +26,7 @@ import type {
 // ── Shared test data ──
 
 const crossRefResult = {
-  references: [{ reference: 'Rom.5.8', votes: 42 }],
+  references: [{ reference: 'Romans 5:8', votes: 42 }],
   total: 1,
   showing: 1,
   hasMore: false,
@@ -61,7 +61,7 @@ describe('Async/Sync Repository Parity', () => {
       const service = new CrossReferenceService(repo);
       const result = await service.getCrossReferences('John 3:16');
       expect(result.references).toHaveLength(1);
-      expect(result.references[0].reference).toBe('Rom.5.8');
+      expect(result.references[0].reference).toBe('Romans 5:8');
     });
 
     it('works with async repo (mockResolvedValue — D1 pattern)', async () => {
@@ -73,7 +73,7 @@ describe('Async/Sync Repository Parity', () => {
       const service = new CrossReferenceService(repo);
       const result = await service.getCrossReferences('John 3:16');
       expect(result.references).toHaveLength(1);
-      expect(result.references[0].reference).toBe('Rom.5.8');
+      expect(result.references[0].reference).toBe('Romans 5:8');
     });
   });
 

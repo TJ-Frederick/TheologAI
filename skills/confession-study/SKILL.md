@@ -49,7 +49,7 @@ prewritten grouping.
 
 - Identify the key Scripture passages each confession cites
 - Call `bible_lookup` on the most important proof texts
-- Call `bible_cross_references` to see the wider biblical support
+- Call `bible_cross_references` for wider discovery leads. Prefer its structured requested/resolved references, positioned rows, threshold-scoped result window, and provenance; preserve raw vote order, and do not infer relationship classification or directionality.
 
 ### Step 5: Comparison
 

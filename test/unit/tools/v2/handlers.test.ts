@@ -251,6 +251,7 @@ describe('bible_lookup handler', () => {
 describe('bible_cross_references handler', () => {
   it('forwards filtering options and formats pagination', async () => {
     const getCrossReferences = vi.fn<CrossReferenceService['getCrossReferences']>().mockResolvedValue({
+      resolvedReference: 'John 3:16',
       references: [{ reference: 'Romans 5:8', votes: 42 }],
       total: 3,
       showing: 1,
@@ -270,6 +271,58 @@ describe('bible_cross_references handler', () => {
     });
     expect(textOf(result)).toContain('Romans 5:8');
     expect(textOf(result)).toContain('Showing 1 of 3');
+    expect(result.structuredContent).toEqual(expect.objectContaining({
+      schemaVersion: '1',
+      kind: 'bible_cross_references',
+      requestedReference: 'John 3:16',
+      resolvedReference: 'John 3:16',
+      query: { maxResults: 1, minVotes: 10 },
+      ranking: {
+        method: 'openbible_votes_descending',
+        tieBreak: 'source_reference_ascending',
+      },
+      semantics: {
+        evidenceUse: 'discovery_lead',
+        relationshipClassification: 'unspecified',
+        directionality: 'unspecified',
+      },
+      references: [{
+        position: 1,
+        reference: 'Romans 5:8',
+        votes: 42,
+        provenanceIds: ['openbible-cross-references'],
+      }],
+      resultWindow: { returnedCount: 1, qualifyingTotal: 3, hasMore: true },
+      provenance: [expect.objectContaining({
+        id: 'openbible-cross-references',
+        version: '2025-10-13',
+        locator: expect.stringContaining('bb5a4f5cfb7f0faa07b171ee9b361285d6179bee705de16ead0690da16568191'),
+      })],
+    }));
+    expect(validatorFor(handler.outputSchema!)(result.structuredContent).valid).toBe(true);
+  });
+
+  it('materializes effective defaults and preserves raw requested Markdown', async () => {
+    const getCrossReferences = vi.fn<CrossReferenceService['getCrossReferences']>().mockResolvedValue({
+      resolvedReference: 'John 3:16', references: [], total: 0, showing: 0, hasMore: false,
+    });
+    const handler = createCrossReferencesHandler(serviceDouble({ getCrossReferences }));
+
+    const result = await handler.handler({ reference: 'Jn 3.16' });
+
+    expect(getCrossReferences).toHaveBeenCalledWith('Jn 3.16', { maxResults: 5, minVotes: 0 });
+    expect(textOf(result)).toBe(
+      '**Cross-References for Jn 3.16**\n\n'
+      + 'No cross-references found for this verse.\n\n'
+      + '*Source: OpenBible.info cross references — CC BY*',
+    );
+    expect(result.structuredContent).toMatchObject({
+      requestedReference: 'Jn 3.16', resolvedReference: 'John 3:16',
+      query: { maxResults: 5, minVotes: 0 }, references: [],
+      resultWindow: { returnedCount: 0, qualifyingTotal: 0, hasMore: false },
+      provenance: [expect.objectContaining({ id: 'openbible-cross-references' })],
+    });
+    expect(validatorFor(handler.outputSchema!)(result.structuredContent).valid).toBe(true);
   });
 
   it('returns service failures as MCP tool errors', async () => {

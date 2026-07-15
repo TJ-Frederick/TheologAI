@@ -125,6 +125,13 @@ describe('Worker MCP endpoint in workerd', () => {
           outputSchema: expect.objectContaining({ type: 'object', additionalProperties: false }),
         }),
         expect.objectContaining({
+          name: 'bible_cross_references',
+          outputSchema: expect.objectContaining({
+            type: 'object', additionalProperties: false,
+            properties: expect.objectContaining({ kind: { type: 'string', const: 'bible_cross_references' } }),
+          }),
+        }),
+        expect.objectContaining({
           name: 'original_language_lookup',
           outputSchema: expect.objectContaining({ type: 'object', additionalProperties: false }),
         }),
@@ -290,6 +297,33 @@ describe('Worker MCP endpoint in workerd', () => {
           text: expect.stringMatching(/Cross-References for John 3:16[\s\S]*Romans 5:8[\s\S]*42 votes/),
         }),
       ],
+      structuredContent: {
+        schemaVersion: '1',
+        kind: 'bible_cross_references',
+        requestedReference: 'John 3:16',
+        resolvedReference: 'John 3:16',
+        query: { maxResults: 1, minVotes: 0 },
+        ranking: {
+          method: 'openbible_votes_descending',
+          tieBreak: 'source_reference_ascending',
+        },
+        semantics: {
+          evidenceUse: 'discovery_lead',
+          relationshipClassification: 'unspecified',
+          directionality: 'unspecified',
+        },
+        references: [{
+          position: 1,
+          reference: 'Romans 5:8',
+          votes: 42,
+          provenanceIds: ['openbible-cross-references'],
+        }],
+        resultWindow: { returnedCount: 1, qualifyingTotal: 1, hasMore: false },
+        provenance: [expect.objectContaining({
+          id: 'openbible-cross-references',
+          version: '2025-10-13',
+        })],
+      },
     });
 
     const morphology = await rpc('tools/call', {
