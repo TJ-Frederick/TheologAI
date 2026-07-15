@@ -21,12 +21,17 @@ live-search flag remains off by default.
   one `h5.card-title` with separate title and author spans, exactly one snippet
   paragraph, and exactly one “Read online” anchor. An earlier cover/image link
   is never treated as the section locator. Selector or anatomy ambiguity fails
-  closed as `interface_changed`. A bounded Node/Worker-compatible structural
-  tokenizer requires balanced cards and tracked child elements; metadata
-  outside a closed card, nested cards, and ambiguous div/card boundaries are
-  rejected. Title and author are selected by their explicit `title` and
-  `author` span class roles rather than DOM order, and the author role retains
-  the reviewed `by` marker.
+  closed as `interface_changed`. HTML is parsed once with the standards-based
+  `parse5` HTML5 tree builder; the same pure-ESM implementation bundles for
+  Node and Workers. Result cards must be direct siblings after the reviewed
+  heading, and `.card-body`, title heading, title/author roles, snippet, and
+  “Read online” anchor must retain their reviewed direct-containment paths.
+  Metadata outside a closed card, nested cards, unreviewed wrappers, implied
+  closing tags, and ambiguous card boundaries are rejected. `template`,
+  `noscript`, `textarea`, `script`, `style`, SVG/MathML, other inert elements,
+  and hidden subtrees do not contribute metadata or visible text. Title and
+  author are selected by their exact `title` and `author` span class roles
+  rather than DOM order, and the author role retains the reviewed `by` marker.
 - Empty-state policy: `no_results` requires exactly one reviewed
   `h2#CCEL_Search_results` immediately followed by exactly one
   `<p>No results found.</p>`. A competing results heading, duplicate empty
@@ -41,8 +46,26 @@ live-search flag remains off by default.
 - Request/output policy: page 1 only; at most five hits; at most 240 Unicode
   characters per snippet; one upstream GET for an admitted cache miss; manual
   redirect mode with zero redirects followed; zero retries. Existing response
-  byte limits, wall/stream timeouts, queue bounds, cache bounds, circuit state,
-  and policy/security latches remain fail closed.
+  wall/stream timeouts, queue bounds, cache bounds, circuit state, and
+  policy/security latches remain fail closed. Because the HTML5 parse itself is
+  synchronous, input is capped at 256 KiB before parsing. The projected tree is
+  additionally capped at 10,000 nodes, 10,000 total attributes, 64 attributes
+  per element, depth 64, 100,000 text code units, and a 100 ms parse/traversal
+  deadline.
+- Parser dependency: `parse5` is exact-pinned at `8.0.1`, the current version
+  returned by the authoritative npm registry during this 2026-07-15 review.
+  Its package metadata declares MIT, pure ESM, and an ESM export at
+  `./dist/index.js`; its sole installed dependency edge is `entities@8.0.0`
+  (BSD-2-Clause). Worker dry-run bundling and Node/Worker typechecks are release
+  gates for this dormant adapter.
+- 2026-07-15 local verification on Node 22.23.1 measured 1,000 valid parses at
+  0.031 ms median / 2.846 ms maximum, 50 pre-parse rejections of a 100,000-
+  attribute input at 0.729 ms median / 0.819 ms maximum, and 50 bounded
+  rejections of 10,000 nested headings at 4.305 ms median / 10.153 ms maximum.
+  These figures are diagnostic observations, not portable performance SLAs.
+  Against the immediately preceding commit, the preview Worker dry bundle grew
+  from 2,603,119 to 2,893,515 raw bytes (+290,396) and from 492,279 to 554,011
+  gzip bytes (+61,732); Wrangler 4.107.0 completed both dry runs successfully.
 
 No live CCEL request, body persistence, production flag change, or remote
 mutation is authorized by this record.

@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { Window } from 'happy-dom';
 import {
   CCEL_SEARCH_LIMITS,
   CcelSearchAdapter,
   composeCcelSearchRequest,
   normalizeCcelSectionLocator,
+  parseCcelSearchHtml,
 } from '../../../../src/adapters/commentary/CcelSearchAdapter.js';
 import {
   DEFAULT_PRIMARY_SOURCE_FEATURE_FLAGS,
@@ -246,6 +248,78 @@ describe('CcelSearchAdapter', () => {
         fetchImpl: vi.fn<typeof fetch>().mockResolvedValue(htmlResponse(resultPage(markup))),
       }).search(query({ text: `structural ambiguity ${index}` }))).resolves.toMatchObject({ status: 'interface_changed', hits: [] });
     }
+  });
+
+  it('uses the HTML5 tree while excluding inert, raw-text, foreign, and hidden subtrees', () => {
+    const decoy = '<h5 class="card-title"><span class="title">Decoy</span><span class="author">by Decoy</span></h5><p class="card-text">Decoy.</p><a href="/ccel/decoy/work/section.html">Read online</a>';
+    const inertSubtrees = [
+      `<template>${decoy}</template>`,
+      `<noscript>${decoy}</noscript>`,
+      `<textarea>${decoy}</textarea>`,
+      '<svg xmlns="http://www.w3.org/2000/svg"><g><text>Read online Decoy</text></g></svg>',
+      '<math xmlns="http://www.w3.org/1998/Math/MathML"><mtext>Read online Decoy</mtext></math>',
+      `<div hidden>${decoy}</div>`,
+      `<div aria-hidden="TRUE">${decoy}</div>`,
+    ].join('');
+    const parsed = parseCcelSearchHtml(resultPage(`${inertSubtrees}${resultCard(1)}`), 1);
+    expect(parsed.hits).toHaveLength(1);
+    expect(parsed.hits[0]).toMatchObject({
+      title: 'Institutes of the Christian Religion',
+      author: 'Calvin, John',
+    });
+  });
+
+  it('fails closed when an unreviewed section changes the heading-to-card or card-to-body path', async () => {
+    const wrappedCard = `<section>${resultCard(1)}</section>`;
+    const wrappedBody = resultCard(1)
+      .replace('<div class="card-body">', '<section><div class="card-body">')
+      .replace('</div></div>', '</div></section></div>');
+    for (const [index, markup] of [wrappedCard, wrappedBody].entries()) {
+      await expect(new CcelSearchAdapter({
+        enabled: true,
+        fetchImpl: vi.fn<typeof fetch>().mockResolvedValue(htmlResponse(resultPage(markup))),
+      }).search(query({ text: `wrapper drift ${index}` }))).resolves.toMatchObject({ status: 'interface_changed', hits: [] });
+    }
+  });
+
+  it('rejects duplicate attributes instead of accepting the HTML5 first-value recovery', async () => {
+    const duplicateClass = resultCard(1).replace('class="card-body"', 'class="card-body" class="ignored"');
+    await expect(new CcelSearchAdapter({
+      enabled: true,
+      fetchImpl: vi.fn<typeof fetch>().mockResolvedValue(htmlResponse(resultPage(duplicateClass))),
+    }).search(query({ text: 'duplicate attribute' }))).resolves.toMatchObject({ status: 'interface_changed', hits: [] });
+  });
+
+  it('matches a browser DOM oracle for HTML5 entity decoding before plain-text escaping', () => {
+    const encodedTitle = 'Fish &amp; Bread &#x1F642; &notin; &lt;Witness&gt;';
+    const markup = resultPage(resultCard(1, { title: encodedTitle }));
+    const oracleWindow = new Window();
+    oracleWindow.document.write(markup);
+    const oracleText = oracleWindow.document.querySelector('span.title')?.textContent ?? '';
+    const expected = oracleText.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    expect(parseCcelSearchHtml(markup, 1).hits[0].title).toBe(expected);
+  });
+
+  it('bounds parse5 input and tree work for 100k attributes, deep wrappers, text, and nested headings', () => {
+    const hundredThousandAttributes = Array.from({ length: 100_000 }, (_, index) => ` a${index}=""`).join('');
+    const oversizedAttributeMarkup = `<html><body><main${hundredThousandAttributes}></main></body></html>`;
+    const startedAt = performance.now();
+    expect(() => parseCcelSearchHtml(oversizedAttributeMarkup, 1)).toThrow();
+    expect(performance.now() - startedAt).toBeLessThan(2_000);
+
+    const tooManyAttributes = `<main ${Array.from({ length: CCEL_SEARCH_LIMITS.maxAttributesPerElement + 1 }, (_, index) => `a${index}=""`).join(' ')}></main>`;
+    expect(() => parseCcelSearchHtml(tooManyAttributes, 1)).toThrow();
+
+    const deeplyWrapped = `${'<section>'.repeat(CCEL_SEARCH_LIMITS.maxTreeDepth + 1)}${resultPage(resultCard(1))}${'</section>'.repeat(CCEL_SEARCH_LIMITS.maxTreeDepth + 1)}`;
+    expect(() => parseCcelSearchHtml(deeplyWrapped, 1)).toThrow();
+
+    const excessiveText = `<html><body><div>${'x'.repeat(CCEL_SEARCH_LIMITS.maxTreeTextCharacters + 1)}</div></body></html>`;
+    expect(() => parseCcelSearchHtml(excessiveText, 1)).toThrow();
+
+    const nestedHeadings = `${'<h2>'.repeat(CCEL_SEARCH_LIMITS.maxTreeNodes)}${'</h2>'.repeat(CCEL_SEARCH_LIMITS.maxTreeNodes)}`;
+    const headingsStartedAt = performance.now();
+    expect(() => parseCcelSearchHtml(nestedHeadings, 1)).toThrow();
+    expect(performance.now() - headingsStartedAt).toBeLessThan(2_000);
   });
 
   it('caps the current-shape card output at five 240-code-point snippets without leaking tracking values', async () => {
