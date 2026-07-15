@@ -1,25 +1,35 @@
 <!--
-  Frozen sanitized capture: 2026-07-11.
-  Provenance: CCEL public HTML search surface, https://ccel.org/?page=1&text=union%20with%20Christ,
-  captured and reviewed 2026-07-11. This is a sanitized, dated capture of the
-  visible search-results structure: the CCEL Search results heading, h5 result
-  headings with section links, author text, and snippets. Redactions: site
-  navigation, analytics, account/session values, request-specific boilerplate,
-  and unrelated result cards were removed; no document body is included.
-  Adversarial markup cases are maintained in malicious.html, not in this
-  upstream-shaped capture.
+  Synthetic structural fixture, reviewed 2026-07-15.
+  It models the observed CCEL Bootstrap search-card anatomy without copying a
+  real work title, author, snippet, request token, or result identifier.
 -->
 <!doctype html>
 <html lang="en">
   <body>
     <main>
-      <h2>CCEL Search results</h2>
-      <h5><a href="/ccel/calvin/institutes/iv.xvii.html">Institutes of the Christian Religion</a> by Calvin, John</h5>
-      <p>Book IV, Chapter XVII</p>
-      <p>The Lord's Supper is a sign and seal of union with Christ &amp; the church.</p>
-      <h5><a href="https://www.ccel.org/ccel/schaff/hcc3/hcc3.iii.xii.iv.html">History of the Christian Church, Volume III</a> by Schaff, Philip</h5>
-      <p>§ 120. The Council of Nicaea, 325.</p>
-      <p>A bounded discovery snippet with <em>entities</em> and no document body.</p>
+      <h2 id="CCEL_Search_results">CCEL Search results</h2>
+      <div class="card mb-3">
+        <a href="/ccel/example/treatise/cover.html"><img alt="Synthetic cover"></a>
+        <div class="card-body">
+          <h5 class="card-title">
+            <span class="title">Treatise on Shared Life</span>
+            <span class="author">by Alex Example</span>
+          </h5>
+          <p class="card-text">A synthetic discovery snippet about shared life &amp; community.</p>
+          <a class="btn btn-primary" href="/ccel/example/treatise/part.one.html?token=synthetic-redacted&amp;queryID=synthetic-query&amp;resultID=1#match">Read online</a>
+        </div>
+      </div>
+      <div class="card mb-3">
+        <a href="/ccel/sample/history/cover.html"><img alt="Synthetic cover"></a>
+        <div class="card-body">
+          <h5 class="card-title">
+            <span class="title">A Synthetic Historical Survey</span>
+            <span class="author">by Sam Sample</span>
+          </h5>
+          <p class="card-text">A second bounded discovery snippet with <em>markup</em> but no document body.</p>
+          <a class="btn btn-primary" href="https://www.ccel.org/ccel/sample/history/chapter.two.html?token=synthetic-redacted&amp;queryID=synthetic-query&amp;resultID=2">Read online</a>
+        </div>
+      </div>
     </main>
   </body>
 </html>

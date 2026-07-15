@@ -25,14 +25,14 @@ export const CCEL_SEARCH_LIMITS = Object.freeze({
   maxWorkCharacters: 160,
   maxTerms: 12,
   maxComposedQueryCharacters: 768,
-  maxPage: 3,
-  maxHitsPerResponse: 8,
+  maxPage: 1,
+  maxHitsPerResponse: 5,
   maxCandidateResults: 50,
   maxResponseBytes: 1024 * 1024,
   maxTitleCharacters: 300,
   maxAuthorResultCharacters: 200,
   maxSectionCharacters: 300,
-  maxSnippetCharacters: 500,
+  maxSnippetCharacters: 240,
   maxLocatorUrlCharacters: 1024,
   maxLocatorSegmentCharacters: 128,
   maxLocatorWorkCharacters: 256,
@@ -41,8 +41,8 @@ export const CCEL_SEARCH_LIMITS = Object.freeze({
   maxAggregateResultCharacters: 12_000,
   timeoutMs: 8_000,
   totalRequestMs: 12_000,
-  maxRetries: 1,
-  maxRedirects: 2,
+  maxRetries: 0,
+  maxRedirects: 0,
   cacheTtlMs: 10 * 60 * 1000,
   negativeCacheTtlMs: 60 * 1000,
   cacheMaxEntries: 100,
@@ -470,90 +470,69 @@ export class CcelSearchAdapter {
     }
   }
 
-  private async fetchSearchHtml(initialUrl: string, deadline: number): Promise<string> {
-    for (let attempt = 0; attempt <= CCEL_SEARCH_LIMITS.maxRetries; attempt++) {
-      try {
-        return await this.fetchSearchHtmlAttempt(initialUrl, deadline);
-      } catch (error) {
-        if (!(error instanceof CcelSearchFailure) || error.kind !== 'network' || attempt === CCEL_SEARCH_LIMITS.maxRetries || this.now() >= deadline) throw error;
-      }
+  private async fetchSearchHtml(url: string, deadline: number): Promise<string> {
+    if (this.now() >= deadline) throw new CcelSearchFailure('network');
+    const validated = validateSearchUrl(url, this.baseUrl);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(TIMEOUT_ABORT_REASON), Math.min(CCEL_SEARCH_LIMITS.timeoutMs, Math.max(1, deadline - this.now())));
+    let response: Response;
+    try {
+      // One admitted provider search is one upstream GET. Redirects remain
+      // manual and are rejected; network and 5xx responses are never retried.
+      response = await this.fetchImpl(validated, {
+        method: 'GET',
+        headers: { 'Accept': 'text/html, application/xhtml+xml', 'User-Agent': USER_AGENT },
+        redirect: 'manual',
+        signal: controller.signal,
+      });
+    } catch {
+      clearTimeout(timeout);
+      if (controller.signal.reason === TIMEOUT_ABORT_REASON) throw new CcelSearchFailure('timeout');
+      throw new CcelSearchFailure('network');
     }
-    throw new CcelSearchFailure('network');
-  }
 
-  private async fetchSearchHtmlAttempt(initialUrl: string, deadline: number): Promise<string> {
-    let url = initialUrl;
-    for (let redirect = 0; redirect <= CCEL_SEARCH_LIMITS.maxRedirects; redirect++) {
-      if (this.now() >= deadline) throw new CcelSearchFailure('network');
-      const validated = validateSearchUrl(url, this.baseUrl);
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(TIMEOUT_ABORT_REASON), Math.min(CCEL_SEARCH_LIMITS.timeoutMs, Math.max(1, deadline - this.now())));
-      let response: Response;
-      try {
-        response = await this.fetchImpl(validated, {
-          method: 'GET',
-          headers: { 'Accept': 'text/html, application/xhtml+xml', 'User-Agent': USER_AGENT },
-          redirect: 'manual',
-          signal: controller.signal,
-        });
-      } catch {
-        clearTimeout(timeout);
-        if (controller.signal.reason === TIMEOUT_ABORT_REASON) throw new CcelSearchFailure('timeout');
-        if (redirect === 0) throw new CcelSearchFailure('network');
-        throw new CcelSearchFailure('policy');
-      }
-
-      if (response.status >= 300 && response.status <= 399 && response.status !== 304) {
-        const location = response.headers.get('Location');
-        await discardResponseBody(response);
-        clearTimeout(timeout);
-        if (!location || redirect === CCEL_SEARCH_LIMITS.maxRedirects) throw new CcelSearchFailure('policy');
-        try {
-          url = new URL(location, validated).toString();
-        } catch {
-          throw new CcelSearchFailure('policy');
-        }
-        continue;
-      }
-
-      if (response.status === 403) {
-        await discardResponseBody(response);
-        clearTimeout(timeout);
-        throw new CcelSearchFailure('forbidden');
-      }
-      if (response.status === 429) {
-        const retryAfter = parseRetryAfter(response.headers.get('Retry-After'), this.now());
-        await discardResponseBody(response);
-        clearTimeout(timeout);
-        throw new CcelSearchFailure('rate_limited', retryAfter);
-      }
-      if (response.status >= 500) {
-        await discardResponseBody(response);
-        clearTimeout(timeout);
-        throw new CcelSearchFailure('network');
-      }
-      if (response.status < 200 || response.status >= 300) {
-        await discardResponseBody(response);
-        clearTimeout(timeout);
-        throw new CcelSearchFailure('upstream');
-      }
-
-      const contentType = response.headers.get('Content-Type')?.toLowerCase() ?? '';
-      if (!contentType.includes('text/html') && !contentType.includes('application/xhtml+xml')) {
-        await discardResponseBody(response);
-        clearTimeout(timeout);
-        throw new CcelSearchFailure('parser');
-      }
-      try {
-        return await readBoundedBody(response, controller.signal);
-      } catch (error) {
-        if (error instanceof CcelSearchFailure) throw error;
-        throw new CcelSearchFailure('network');
-      } finally {
-        clearTimeout(timeout);
-      }
+    if (response.status >= 300 && response.status <= 399 && response.status !== 304) {
+      discardResponseBody(response);
+      clearTimeout(timeout);
+      throw new CcelSearchFailure('policy');
     }
-    throw new CcelSearchFailure('policy');
+
+    if (response.status === 403) {
+      discardResponseBody(response);
+      clearTimeout(timeout);
+      throw new CcelSearchFailure('forbidden');
+    }
+    if (response.status === 429) {
+      const retryAfter = parseRetryAfter(response.headers.get('Retry-After'), this.now());
+      discardResponseBody(response);
+      clearTimeout(timeout);
+      throw new CcelSearchFailure('rate_limited', retryAfter);
+    }
+    if (response.status >= 500) {
+      discardResponseBody(response);
+      clearTimeout(timeout);
+      throw new CcelSearchFailure('network');
+    }
+    if (response.status < 200 || response.status >= 300) {
+      discardResponseBody(response);
+      clearTimeout(timeout);
+      throw new CcelSearchFailure('upstream');
+    }
+
+    const contentType = response.headers.get('Content-Type')?.toLowerCase() ?? '';
+    if (!contentType.includes('text/html') && !contentType.includes('application/xhtml+xml')) {
+      discardResponseBody(response);
+      clearTimeout(timeout);
+      throw new CcelSearchFailure('parser');
+    }
+    try {
+      return await readBoundedBody(response, controller.signal);
+    } catch (error) {
+      if (error instanceof CcelSearchFailure) throw error;
+      throw new CcelSearchFailure('network');
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   private claimCircuitSlot(): CircuitClaim | undefined {
@@ -729,28 +708,17 @@ export function parseCcelSearchHtml(html: string, page: number): ParsedSearch {
   if (hasReviewedPolicyMarker(sanitizedHtml)) throw new CcelSearchFailure('policy');
   if (hasReviewedNoResultsMarker(sanitizedHtml)) return { hits: [], notices: [] };
 
-  const blocks = extractResultBlocks(sanitizedHtml).slice(0, CCEL_SEARCH_LIMITS.maxCandidateResults);
+  const blocks = extractResultCards(sanitizedHtml).slice(0, CCEL_SEARCH_LIMITS.maxCandidateResults);
   if (blocks.length === 0) throw new CcelSearchFailure('parser');
 
   const hits: PrimarySourceSearchHit[] = [];
   const seen = new Set<string>();
   let aggregateCharacters = 0;
   for (const block of blocks) {
-    const links = [...block.matchAll(/<a\b[^>]*href\s*=\s*(["'])(.*?)\1[^>]*>([\s\S]*?)<\/a>/gi)];
-    const link = links.find(candidate => normalizeCcelSectionLocator(candidate[2]));
-    if (!link) continue;
-    const locator = normalizeCcelSectionLocator(link[2]);
-    if (!locator || seen.has(locator.url)) continue;
-    const title = sanitizePlainText(extractClassText(block, /(?:result[-_ ]title|ccel[-_ ]title|title)/i) ?? link[3], CCEL_SEARCH_LIMITS.maxTitleCharacters);
-    if (!title) throw new CcelSearchFailure('parser');
-    const paragraphs = extractElementTexts(block, 'p');
-    const author = optionalText(block, /(?:result[-_ ]author|ccel[-_ ]author|author)/i, CCEL_SEARCH_LIMITS.maxAuthorResultCharacters)
-      ?? extractHeadingAuthor(block);
-    const sectionLabel = optionalText(block, /(?:result[-_ ]section|ccel[-_ ]section|section[-_ ]label)/i, CCEL_SEARCH_LIMITS.maxSectionCharacters)
-      ?? (paragraphs.length > 1 ? paragraphs[0] : undefined);
-    const snippet = optionalText(block, /(?:result[-_ ]snippet|ccel[-_ ]snippet|snippet|summary|description)/i, CCEL_SEARCH_LIMITS.maxSnippetCharacters)
-      ?? (paragraphs.length > 1 ? paragraphs[1] : paragraphs[0] ?? '');
-    const hitCharacters = title.length + (author?.length ?? 0) + (sectionLabel?.length ?? 0) + snippet.length
+    const card = parseResultCard(block);
+    if (seen.has(card.locator.url)) continue;
+    const { locator, title, author, snippet } = card;
+    const hitCharacters = title.length + author.length + snippet.length
       + locator.url.length + locator.work.length + locator.section.length;
     if (aggregateCharacters + hitCharacters > CCEL_SEARCH_LIMITS.maxAggregateResultCharacters) {
       throw new CcelSearchFailure('too_large');
@@ -760,8 +728,7 @@ export function parseCcelSearchHtml(html: string, page: number): ParsedSearch {
     hits.push({
       provider: 'ccel_live',
       title,
-      ...(author ? { author } : {}),
-      ...(sectionLabel ? { sectionLabel } : {}),
+      author,
       snippet,
       locator,
       rankWithinProvider: hits.length + 1,
@@ -780,54 +747,59 @@ function hasReviewedPolicyMarker(html: string): boolean {
 }
 
 function hasReviewedNoResultsMarker(html: string): boolean {
-  return /<h2\b[^>]*>\s*CCEL Search results\s*<\/h2>\s*<p\b[^>]*>\s*No results found\.\s*<\/p>/i.test(html);
+  return /<h2\b[^>]*\bid\s*=\s*(["'])CCEL_Search_results\1[^>]*>\s*CCEL Search results\s*<\/h2>\s*<p\b[^>]*>\s*No results found\.\s*<\/p>/i.test(html);
 }
 
-function extractResultBlocks(html: string): string[] {
-  const blocks: string[] = [];
-  const headings = /<h5\b[^>]*>[\s\S]*?<\/h5>/gi;
+function extractResultCards(html: string): string[] {
+  const heading = /<h2\b[^>]*\bid\s*=\s*(["'])CCEL_Search_results\1[^>]*>\s*CCEL Search results\s*<\/h2>/i.exec(html);
+  if (!heading) return [];
+  const resultsHtml = html.slice(heading.index + heading[0].length);
+  const cards: string[] = [];
+  const cardOpenings = /<div\b[^>]*\bclass\s*=\s*(["'])([^"']*)\1[^>]*>/gi;
   let match: RegExpExecArray | null;
-  const matches: Array<{ start: number; end: number }> = [];
-  while ((match = headings.exec(html)) !== null && matches.length < CCEL_SEARCH_LIMITS.maxCandidateResults) {
-    matches.push({ start: match.index, end: headings.lastIndex });
+  const starts: number[] = [];
+  while ((match = cardOpenings.exec(resultsHtml)) !== null && starts.length < CCEL_SEARCH_LIMITS.maxCandidateResults + 1) {
+    if (hasClassToken(match[2], 'card')) starts.push(match.index);
   }
-  for (let index = 0; index < matches.length; index++) {
-    const start = matches[index].start;
-    const nextStart = matches[index + 1]?.start ?? html.length;
+  for (let index = 0; index < Math.min(starts.length, CCEL_SEARCH_LIMITS.maxCandidateResults); index++) {
+    const start = starts[index];
+    const nextStart = starts[index + 1] ?? resultsHtml.length;
     const end = Math.min(nextStart, start + CCEL_SEARCH_LIMITS.maxAggregateResultCharacters);
-    const block = html.slice(start, end);
-    if (/<a\b[^>]*href\s*=\s*(["'])[^"']+\1[^>]*>/i.test(block)) blocks.push(block);
+    cards.push(resultsHtml.slice(start, end));
   }
-  return blocks;
+  return cards;
 }
 
-function extractClassText(block: string, classPattern: RegExp): string | undefined {
-  const element = new RegExp(`<([a-z0-9]+)\\b[^>]*class\\s*=\\s*(["'])[^"']*${classPattern.source}[^"']*\\2[^>]*>([\\s\\S]*?)<\\/\\1>`, 'i').exec(block);
-  return element?.[3];
+function parseResultCard(block: string): {
+  title: string;
+  author: string;
+  snippet: string;
+  locator: NonNullable<ReturnType<typeof normalizeCcelSectionLocator>>;
+} {
+  const headings = [...block.matchAll(/<h5\b[^>]*\bclass\s*=\s*(["'])([^"']*)\1[^>]*>([\s\S]*?)<\/h5>/gi)]
+    .filter(heading => hasClassToken(heading[2], 'card-title'));
+  if (headings.length !== 1) throw new CcelSearchFailure('parser');
+  const spans = [...headings[0][3].matchAll(/<span\b[^>]*>([\s\S]*?)<\/span>/gi)];
+  if (spans.length !== 2) throw new CcelSearchFailure('parser');
+  const title = sanitizePlainText(spans[0][1], CCEL_SEARCH_LIMITS.maxTitleCharacters);
+  const author = sanitizePlainText(spans[1][1], CCEL_SEARCH_LIMITS.maxAuthorResultCharacters)
+    .replace(/^\s*by\s+/i, '');
+  if (!title || !author) throw new CcelSearchFailure('parser');
+
+  const paragraphs = [...block.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)];
+  if (paragraphs.length !== 1) throw new CcelSearchFailure('parser');
+  const snippet = sanitizePlainText(paragraphs[0][1], CCEL_SEARCH_LIMITS.maxSnippetCharacters);
+
+  const readLinks = [...block.matchAll(/<a\b[^>]*href\s*=\s*(["'])(.*?)\1[^>]*>([\s\S]*?)<\/a>/gi)]
+    .filter(link => sanitizePlainText(link[3], 32).toLocaleLowerCase('en-US') === 'read online');
+  if (readLinks.length !== 1) throw new CcelSearchFailure('parser');
+  const locator = normalizeCcelSectionLocator(readLinks[0][2]);
+  if (!locator) throw new CcelSearchFailure('parser');
+  return { title, author, snippet, locator };
 }
 
-function optionalText(block: string, classPattern: RegExp, max: number): string | undefined {
-  const raw = extractClassText(block, classPattern);
-  return raw === undefined ? undefined : sanitizePlainText(raw, max);
-}
-
-function extractHeadingAuthor(block: string): string | undefined {
-  const heading = /<h5\b[^>]*>([\s\S]*?)<\/h5>/i.exec(block)?.[1];
-  if (!heading) return undefined;
-  const text = sanitizePlainText(heading, CCEL_SEARCH_LIMITS.maxAuthorResultCharacters + CCEL_SEARCH_LIMITS.maxTitleCharacters);
-  const author = /\s+by\s+(.+)$/i.exec(text)?.[1];
-  return author ? sanitizePlainText(author, CCEL_SEARCH_LIMITS.maxAuthorResultCharacters) : undefined;
-}
-
-function extractElementTexts(block: string, tag: 'p'): string[] {
-  const values: string[] = [];
-  const elements = new RegExp(`<${tag}\\b[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'gi');
-  let match: RegExpExecArray | null;
-  while ((match = elements.exec(block)) !== null && values.length < 3) {
-    const value = sanitizePlainText(match[1], CCEL_SEARCH_LIMITS.maxSnippetCharacters);
-    if (value) values.push(value);
-  }
-  return values;
+function hasClassToken(classValue: string, token: string): boolean {
+  return classValue.split(/\s+/u).includes(token);
 }
 
 function removeUnsafeMarkup(html: string): string {
@@ -849,14 +821,19 @@ function sanitizePlainText(html: string, maxCharacters: number): string {
 
 /** Normalize only exact CCEL section paths; this never follows the link. */
 export function normalizeCcelSectionLocator(input: string): { kind: 'ccel_section'; url: string; work: string; section: string } | undefined {
-  if (typeof input !== 'string' || input.length === 0 || input.length > CCEL_SEARCH_LIMITS.maxLocatorUrlCharacters || /%/i.test(input) || /(?:^|\/)\.\.?(?:\/|$)/.test(input)) return undefined;
+  if (typeof input !== 'string' || input.length === 0 || input.length > CCEL_SEARCH_LIMITS.maxLocatorUrlCharacters) return undefined;
+  const untrustedPath = input.split(/[?#]/u, 1)[0];
+  if (/%/i.test(untrustedPath) || /(?:^|\/)\.\.?(?:\/|$)/.test(untrustedPath)) return undefined;
   let url: URL;
   try {
     url = new URL(input, CCEL_SEARCH_URL);
   } catch {
     return undefined;
   }
-  if (url.protocol !== 'https:' || !['ccel.org', 'www.ccel.org'].includes(url.hostname.toLowerCase()) || url.username || url.password || url.port || url.search || url.hash) return undefined;
+  // The search UI adds opaque tracking query/hash values to its Read online
+  // link. Only the reviewed path becomes a locator; the entire query and hash
+  // are discarded and never copied into a result, cache entry, or log.
+  if (url.protocol !== 'https:' || !['ccel.org', 'www.ccel.org'].includes(url.hostname.toLowerCase()) || url.username || url.password || url.port) return undefined;
   if (!url.pathname.startsWith('/') || url.pathname.includes('//')) return undefined;
   const segments = url.pathname.slice(1).split('/');
   if (segments.length !== CCEL_SEARCH_LIMITS.maxLocatorSegments || segments[0] !== 'ccel' || segments.slice(0, -1).some(segment => segment.length > CCEL_SEARCH_LIMITS.maxLocatorSegmentCharacters || !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(segment) || segment === '.' || segment === '..')) return undefined;

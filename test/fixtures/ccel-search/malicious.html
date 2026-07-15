@@ -1,16 +1,20 @@
-<!-- Adversarial-only fixture: synthetic hostile markup for parser/security tests.
-     This is not an upstream capture and must not be used as provenance. -->
+<!-- Synthetic adversarial fixture; no upstream content or identifiers. -->
 <!doctype html>
 <html><body>
-  <main id="search-results">
-    <h2>CCEL Search results</h2>
-    <article class="ccel-search-result">
-      <h5 class="ccel-result-title"><a href="/ccel/calvin/institutes/iv.xvii.html">Institutes of the Christian Religion</a></h5>
-      <div class="ccel-result-author">Calvin, John</div>
-      <div class="ccel-result-section">Book IV, Chapter XVII</div>
-      <p class="ccel-result-snippet" onclick="alert('removed')">The Lord's Supper &amp; the church. &lt;script&gt;alert('encoded')&lt;/script&gt;</p>
-      <div hidden>Hidden non-result content</div>
-    </article>
+  <main>
+    <h2 id="CCEL_Search_results">CCEL Search results</h2>
+    <div class="card mb-3">
+      <a href="https://evil.example/ccel/example/work/cover.html"><img alt="Untrusted earlier link"></a>
+      <div class="card-body">
+        <h5 class="card-title">
+          <span class="title">Synthetic &lt;script&gt;alert('title')&lt;/script&gt;</span>
+          <span class="author">by Alex Example</span>
+        </h5>
+        <p class="card-text" onclick="alert('removed')">A safe snippet &amp; &lt;script&gt;alert('encoded')&lt;/script&gt;.</p>
+        <div hidden>Hidden non-result content</div>
+        <a class="btn" href="/ccel/example/work/section.one.html?token=do-not-return&amp;queryID=do-not-return&amp;resultID=do-not-return#fragment">Read online</a>
+      </div>
+    </div>
     <script>window.session = 'secret';</script>
     <style>.secret { display: block }</style>
     <form><input type="hidden" name="csrf" value="secret"></form>

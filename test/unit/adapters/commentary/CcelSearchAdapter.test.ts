@@ -28,18 +28,16 @@ const resultCard = (index: number, options: {
   author?: string;
   work?: string;
   title?: string;
-  section?: string;
   snippet?: string;
 } = {}): string => {
   const author = options.author ?? 'Calvin, John';
   const work = options.work ?? 'institutes';
   const title = options.title ?? 'Institutes of the Christian Religion';
-  const section = options.section ?? `Book IV, Chapter ${index}`;
   const snippet = options.snippet ?? `A bounded discovery result ${index}.`;
-  return `<article class="ccel-search-result"><h5 class="ccel-result-title"><a href="/ccel/calvin/${work}/section${index}.html">${title}</a></h5><div class="ccel-result-author">${author}</div><div class="ccel-result-section">${section}</div><p class="ccel-result-snippet">${snippet}</p></article>`;
+  return `<div class="card mb-3"><a href="/ccel/calvin/${work}/cover.html"><img alt="cover"></a><div class="card-body"><h5 class="card-title"><span class="title">${title}</span><span class="author">by ${author}</span></h5><p class="card-text">${snippet}</p><a class="btn" href="/ccel/calvin/${work}/section${index}.html?token=synthetic&amp;queryID=query&amp;resultID=${index}#match">Read online</a></div></div>`;
 };
 
-const resultPage = (cards: string): string => `<html><body><main id="search-results"><h2>CCEL Search results</h2>${cards}</main></body></html>`;
+const resultPage = (cards: string): string => `<html><body><main id="search-results"><h2 id="CCEL_Search_results">CCEL Search results</h2>${cards}</main></body></html>`;
 
 function discardableResponse(status: number, headers: Record<string, string> = {}): { response: Response; cancel: ReturnType<typeof vi.spyOn> } {
   const body = new ReadableStream<Uint8Array>({
@@ -64,11 +62,11 @@ describe('primary-source feature flags', () => {
 
 describe('composeCcelSearchRequest', () => {
   it('uses URLSearchParams encoding and escapes Lucene syntax as literals', () => {
-    const composed = composeCcelSearchRequest({ text: '  (grace) + truth  ', match: 'all_terms', page: 2, limit: 8 });
+    const composed = composeCcelSearchRequest({ text: '  (grace) + truth  ', match: 'all_terms', page: 1, limit: 5 });
     const url = new URL(composed.url);
     expect(url.origin).toBe('https://ccel.org');
     expect(url.pathname).toBe('/');
-    expect(url.searchParams.get('page')).toBe('2');
+    expect(url.searchParams.get('page')).toBe('1');
     expect(url.searchParams.get('text')).toBe('\\(grace\\) AND \\+ AND truth');
     expect(composed.url).not.toContain('(grace)');
     expect(composeCcelSearchRequest({ text: 'love OR truth' }).luceneQuery).toBe('love AND "OR" AND truth');
@@ -91,8 +89,8 @@ describe('composeCcelSearchRequest', () => {
       match: 'phrase',
     }).luceneQuery).toBe('"one two three four five six seven eight nine ten eleven twelve thirteen"');
     expect(() => composeCcelSearchRequest({ text: 'x'.repeat(201) })).toThrow('safe length');
-    expect(() => composeCcelSearchRequest({ text: 'x', page: 4 })).toThrow('page');
-    expect(() => composeCcelSearchRequest({ text: 'x', limit: 9 })).toThrow('limit');
+    expect(() => composeCcelSearchRequest({ text: 'x', page: 2 })).toThrow('page');
+    expect(() => composeCcelSearchRequest({ text: 'x', limit: 6 })).toThrow('limit');
     expect(() => composeCcelSearchRequest({ text: 'x', bogus: true } as never)).toThrow('Unknown');
   });
 
@@ -112,6 +110,12 @@ describe('normalizeCcelSectionLocator', () => {
     });
     expect(normalizeCcelSectionLocator('https://www.ccel.org/ccel/schaff/hcc3/hcc3.iii.xii.iv.html')?.url)
       .toBe('https://ccel.org/ccel/schaff/hcc3/hcc3.iii.xii.iv.html');
+    expect(normalizeCcelSectionLocator('/ccel/example/work/section.html?token=opaque%2Fvalue&queryID=q&resultID=r#match')).toEqual({
+      kind: 'ccel_section',
+      url: 'https://ccel.org/ccel/example/work/section.html',
+      work: 'example/work',
+      section: 'section',
+    });
   });
 
   it.each([
@@ -123,7 +127,6 @@ describe('normalizeCcelSectionLocator', () => {
     '/ccel/a/b.html',
     '/ccel/a/b/c/d.html',
     `/ccel/${'a'.repeat(CCEL_SEARCH_LIMITS.maxLocatorSegmentCharacters + 1)}/b/c.html`,
-    '/ccel/a/b/c.html?next=https://evil.example',
     '/ccel/a/b/.html',
     '/ccel/a/b/c.html/extra',
   ])('rejects unsafe locator %s', input => {
@@ -144,37 +147,77 @@ describe('CcelSearchAdapter', () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
+  it('locks the dormant rollout to page 1, five hits, 240 Unicode snippet characters, and zero retries or redirects', () => {
+    expect(CCEL_SEARCH_LIMITS).toMatchObject({
+      maxPage: 1,
+      maxHitsPerResponse: 5,
+      maxSnippetCharacters: 240,
+      maxRetries: 0,
+      maxRedirects: 0,
+    });
+  });
+
   it('parses bounded metadata, sanitizes entities, labels snippets as discovery-only, and never follows links', async () => {
     const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(htmlResponse(resultsFixture));
     const adapter = new CcelSearchAdapter({ enabled: true, fetchImpl });
     const result = await adapter.search(query({ limit: 2 }));
     expect(result).toMatchObject({ provider: 'ccel_live', status: 'ok', searched: true, hitCount: 2 });
     expect(result.hits[0]).toMatchObject({
-      title: 'Institutes of the Christian Religion',
-      author: 'Calvin, John',
-      sectionLabel: 'Book IV, Chapter XVII',
-      snippet: "The Lord's Supper is a sign and seal of union with Christ & the church.",
+      title: 'Treatise on Shared Life',
+      author: 'Alex Example',
+      snippet: 'A synthetic discovery snippet about shared life & community.',
       snippetOnly: true,
       attribution: 'CCEL (Christian Classics Ethereal Library)',
-      locator: { kind: 'ccel_section', work: 'calvin/institutes', section: 'iv.xvii' },
+      locator: { kind: 'ccel_section', url: 'https://ccel.org/ccel/example/treatise/part.one.html', work: 'example/treatise', section: 'part.one' },
     });
     expect(result.hits[0].snippet).not.toContain('<');
+    expect(JSON.stringify(result)).not.toMatch(/token|queryID|resultID|synthetic-redacted/);
     expect(fetchImpl).toHaveBeenCalledOnce();
     expect(fetchImpl.mock.calls[0][0]).toMatch(/^https:\/\/ccel\.org\/\?page=1&text=/);
     expect(fetchImpl.mock.calls[0][1]).toMatchObject({ method: 'GET', redirect: 'manual', signal: expect.any(AbortSignal) });
   });
 
+  it('fails closed when a current-shape card has ambiguous anatomy or a noncanonical Read online URL', async () => {
+    const ambiguous = resultCard(1).replace('</h5>', '<span class="extra">ambiguous</span></h5>');
+    await expect(new CcelSearchAdapter({
+      enabled: true,
+      fetchImpl: vi.fn<typeof fetch>().mockResolvedValue(htmlResponse(resultPage(ambiguous))),
+    }).search(query({ text: 'ambiguous card' }))).resolves.toMatchObject({ status: 'interface_changed', hits: [] });
+
+    const foreign = resultCard(1).replace(
+      /href="\/ccel\/calvin\/institutes\/section1\.html[^"]*"/u,
+      'href="https://evil.example/ccel/calvin/institutes/section1.html?token=secret"',
+    );
+    await expect(new CcelSearchAdapter({
+      enabled: true,
+      fetchImpl: vi.fn<typeof fetch>().mockResolvedValue(htmlResponse(resultPage(foreign))),
+    }).search(query({ text: 'foreign locator' }))).resolves.toMatchObject({ status: 'interface_changed', hits: [] });
+  });
+
+  it('caps the current-shape card output at five 240-code-point snippets without leaking tracking values', async () => {
+    const cards = Array.from({ length: 6 }, (_, index) => resultCard(index, { snippet: '🙂'.repeat(241) })).join('');
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(htmlResponse(resultPage(cards)));
+    const adapter = new CcelSearchAdapter({ enabled: true, fetchImpl });
+    const result = await adapter.search(query({ text: 'unicode cap' }));
+    expect(result).toMatchObject({ status: 'ok', hitCount: 5 });
+    expect(result.hits).toHaveLength(5);
+    expect(result.hits.every(hit => Array.from(hit.snippet).length === 240)).toBe(true);
+    expect(JSON.stringify(result)).not.toMatch(/token=|queryID|resultID|#match|synthetic/);
+    await expect(adapter.search(query({ text: 'unicode cap' }))).resolves.toEqual(result);
+    expect(fetchImpl).toHaveBeenCalledOnce();
+  });
+
   it('composes author/work restrictions into the request without broadening them', async () => {
     const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(htmlResponse(resultsFixture));
     const adapter = new CcelSearchAdapter({ enabled: true, fetchImpl });
-    const result = await adapter.search({ text: 'union with Christ', author: 'Calvin', work: 'Institutes' });
+    const result = await adapter.search({ text: 'union with Christ', author: 'Example', work: 'Treatise' });
     expect(result).toMatchObject({ status: 'unsupported_filter', hitCount: 1 });
-    expect(result.hits[0].locator).toMatchObject({ work: 'calvin/institutes' });
+    expect(result.hits[0].locator).toMatchObject({ work: 'example/treatise' });
     const requested = new URL(String(fetchImpl.mock.calls[0][0])).searchParams.get('text');
     expect(requested).toContain('author:');
     expect(requested).toContain('title:');
-    expect(requested).toContain('Calvin');
-    expect(requested).toContain('Institutes');
+    expect(requested).toContain('Example');
+    expect(requested).toContain('Treatise');
   });
 
   it('verifies unrestricted metadata as an ordered normalized phrase', async () => {
@@ -304,8 +347,6 @@ describe('CcelSearchAdapter', () => {
     const fetchImpl = vi.fn<typeof fetch>()
       .mockReturnValueOnce(policy)
       .mockReturnValueOnce(later)
-      // A 5xx is retried once. Keep that retry deterministic without allowing
-      // it to weaken the policy state established by the first request.
       .mockImplementation(async () => htmlResponse('server error', 503));
     const adapter = new CcelSearchAdapter({ enabled: true, fetchImpl });
 
@@ -490,18 +531,15 @@ describe('CcelSearchAdapter', () => {
     expect(adapter.getCircuitState()).toMatchObject({ status: 'closed', operatorReviewRequired: false });
   });
 
-  it('retries one network/5xx failure, then opens after three final network failures', async () => {
+  it('never retries network/5xx failures and opens after three admitted failures', async () => {
     let now = 3_000_000;
-    const fetchImpl = vi.fn<typeof fetch>()
-      .mockResolvedValueOnce(htmlResponse('server error', 503))
-      .mockResolvedValueOnce(htmlResponse(resultsFixture))
-      .mockResolvedValue(htmlResponse('server error', 503));
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(htmlResponse('server error', 503));
     const adapter = new CcelSearchAdapter({ enabled: true, fetchImpl, now: () => now });
-    await expect(adapter.search(query({ text: 'retry success' }))).resolves.toMatchObject({ status: 'ok' });
-    expect(fetchImpl).toHaveBeenCalledTimes(2);
-    await adapter.search(query({ text: 'failure one' }));
+    await expect(adapter.search(query({ text: 'failure one' }))).resolves.toMatchObject({ status: 'unavailable' });
+    expect(fetchImpl).toHaveBeenCalledOnce();
     await adapter.search(query({ text: 'failure two' }));
     await adapter.search(query({ text: 'failure three' }));
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
     expect(adapter.getCircuitState()).toMatchObject({ status: 'open', reason: 'network', recentNetworkFailures: 3 });
     now += CCEL_SEARCH_LIMITS.networkOpenMs + 1;
     expect(adapter.getCircuitState().status).toBe('half_open');
@@ -591,7 +629,7 @@ describe('CcelSearchAdapter', () => {
     await Promise.all([activeOne, activeTwo]);
   });
 
-  it('cancels every discarded redirect, non-2xx, wrong-type, and retry response body', async () => {
+  it('cancels every discarded redirect, non-2xx, wrong-type, and 5xx response body', async () => {
     for (const status of [403, 429, 404]) {
       const cancels: Array<ReturnType<typeof vi.spyOn>> = [];
       const fetchImpl = vi.fn<typeof fetch>().mockImplementation(async () => {
@@ -604,15 +642,15 @@ describe('CcelSearchAdapter', () => {
       expect(cancels[0]).toHaveBeenCalled();
     }
 
-    const retryCancels: Array<ReturnType<typeof vi.spyOn>> = [];
-    const retryFetch = vi.fn<typeof fetch>().mockImplementation(async () => {
+    const failureCancels: Array<ReturnType<typeof vi.spyOn>> = [];
+    const failureFetch = vi.fn<typeof fetch>().mockImplementation(async () => {
       const discarded = discardableResponse(503);
-      retryCancels.push(discarded.cancel);
+      failureCancels.push(discarded.cancel);
       return discarded.response;
     });
-    await new CcelSearchAdapter({ enabled: true, fetchImpl: retryFetch }).search(query({ text: 'retry bodies' }));
-    expect(retryCancels).toHaveLength(2);
-    expect(retryCancels.every(cancel => cancel.mock.calls.length > 0)).toBe(true);
+    await new CcelSearchAdapter({ enabled: true, fetchImpl: failureFetch }).search(query({ text: 'single failure body' }));
+    expect(failureCancels).toHaveLength(1);
+    expect(failureCancels[0]).toHaveBeenCalled();
 
     const wrongType = discardableResponse(200, { 'content-type': 'application/json' });
     await new CcelSearchAdapter({ enabled: true, fetchImpl: vi.fn<typeof fetch>().mockResolvedValue(wrongType.response) }).search(query({ text: 'wrong type body' }));
@@ -624,9 +662,10 @@ describe('CcelSearchAdapter', () => {
       .mockImplementationOnce(async () => htmlResponse(resultsFixture));
     await new CcelSearchAdapter({ enabled: true, fetchImpl: redirectFetch }).search(query({ text: 'same host redirect' }));
     expect(redirect.cancel).toHaveBeenCalled();
+    expect(redirectFetch).toHaveBeenCalledOnce();
   });
 
-  it('caps same-host redirects without following a fourth request', async () => {
+  it('never follows same-host redirects', async () => {
     const cancels: Array<ReturnType<typeof vi.spyOn>> = [];
     const fetchImpl = vi.fn<typeof fetch>().mockImplementation(async () => {
       const redirect = discardableResponse(302, { location: 'https://ccel.org/?page=1&text=redirect' });
@@ -635,7 +674,7 @@ describe('CcelSearchAdapter', () => {
     });
     await expect(new CcelSearchAdapter({ enabled: true, fetchImpl }).search(query({ text: 'redirect cap' })))
       .resolves.toMatchObject({ status: 'unavailable' });
-    expect(fetchImpl).toHaveBeenCalledTimes(CCEL_SEARCH_LIMITS.maxRedirects + 1);
+    expect(fetchImpl).toHaveBeenCalledOnce();
     expect(cancels.every(cancel => cancel.mock.calls.length > 0)).toBe(true);
   });
 
@@ -661,32 +700,26 @@ describe('CcelSearchAdapter', () => {
     expect(result.hits[0].snippet).toContain('&lt;script&gt;');
   });
 
-  it('enforces field, result, candidate, and aggregate output caps', async () => {
+  it('enforces field, result, and candidate output caps', async () => {
     const longCard = resultCard(1, {
       title: 'T'.repeat(CCEL_SEARCH_LIMITS.maxTitleCharacters + 50),
       author: 'A'.repeat(CCEL_SEARCH_LIMITS.maxAuthorResultCharacters + 50),
-      section: 'S'.repeat(CCEL_SEARCH_LIMITS.maxSectionCharacters + 50),
       snippet: 'N'.repeat(CCEL_SEARCH_LIMITS.maxSnippetCharacters + 50),
     });
     const bounded = await new CcelSearchAdapter({ enabled: true, fetchImpl: vi.fn<typeof fetch>().mockResolvedValue(htmlResponse(resultPage(longCard))) }).search(query({ text: 'field caps' }));
     expect(bounded).toMatchObject({ status: 'ok', hitCount: 1 });
     expect(bounded.hits[0].title.length).toBeLessThanOrEqual(CCEL_SEARCH_LIMITS.maxTitleCharacters);
     expect(bounded.hits[0].author?.length).toBeLessThanOrEqual(CCEL_SEARCH_LIMITS.maxAuthorResultCharacters);
-    expect(bounded.hits[0].sectionLabel?.length).toBeLessThanOrEqual(CCEL_SEARCH_LIMITS.maxSectionCharacters);
     expect(bounded.hits[0].snippet.length).toBeLessThanOrEqual(CCEL_SEARCH_LIMITS.maxSnippetCharacters);
 
     const nineCards = Array.from({ length: 9 }, (_, index) => resultCard(index)).join('');
-    await expect(new CcelSearchAdapter({ enabled: true, fetchImpl: vi.fn<typeof fetch>().mockResolvedValue(htmlResponse(resultPage(nineCards))) }).search(query({ text: 'result cap', limit: 8 })))
-      .resolves.toMatchObject({ status: 'ok', hitCount: 8 });
+    await expect(new CcelSearchAdapter({ enabled: true, fetchImpl: vi.fn<typeof fetch>().mockResolvedValue(htmlResponse(resultPage(nineCards))) }).search(query({ text: 'result cap', limit: 5 })))
+      .resolves.toMatchObject({ status: 'ok', hitCount: 5 });
 
     const fiftyCardsAndMalformed = `${Array.from({ length: 50 }, (_, index) => resultCard(index)).join('')}<article class="ccel-search-result"><a href="/ccel/calvin/institutes/unclosed.html">unclosed`;
     await expect(new CcelSearchAdapter({ enabled: true, fetchImpl: vi.fn<typeof fetch>().mockResolvedValue(htmlResponse(resultPage(fiftyCardsAndMalformed))) }).search(query({ text: 'candidate cap' })))
       .resolves.toMatchObject({ status: 'ok', hitCount: 5 });
 
-    const longSegment = 'b'.repeat(127);
-    const longFields = Array.from({ length: 8 }, (_, index) => `<article class="ccel-search-result"><h5 class="ccel-result-title"><a href="/ccel/${'a'.repeat(127)}/${longSegment}/${'c'.repeat(127)}${index}.html">${'T'.repeat(300)}</a></h5><div class="ccel-result-author">${'A'.repeat(200)}</div><div class="ccel-result-section">${'S'.repeat(300)}</div><p class="ccel-result-snippet">${'N'.repeat(500)}</p></article>`).join('');
-    await expect(new CcelSearchAdapter({ enabled: true, fetchImpl: vi.fn<typeof fetch>().mockResolvedValue(htmlResponse(resultPage(longFields))) }).search(query({ text: 'aggregate cap' })))
-      .resolves.toMatchObject({ status: 'unavailable' });
   });
 
   it('enforces streaming response overflow without retaining the body', async () => {
@@ -771,11 +804,9 @@ describe('CcelSearchAdapter', () => {
     await adapter.search(query({ limit: 5 }));
     await adapter.search(query({ limit: 1 }));
     await adapter.search(query({ match: 'phrase' }));
-    await adapter.search(query({ page: 2 }));
     await adapter.search(query({ author: 'Calvin' }));
     await adapter.search(query({ work: 'Institutes' }));
-    expect(fetchImpl.mock.calls.length).toBe(5);
-    expect(fetchImpl.mock.calls.length).toBe(5);
+    expect(fetchImpl.mock.calls.length).toBe(4);
 
     let ttlNow = 60_000;
     const ttlFetch = vi.fn<typeof fetch>().mockImplementation(async () => htmlResponse(single));
@@ -836,7 +867,7 @@ describe('CcelSearchAdapter', () => {
     const firstProbe = adapter.search({ text: 'half open one' });
     const secondProbe = adapter.search({ text: 'half open two' });
     await Promise.resolve();
-    expect(failures).toHaveBeenCalledTimes(7);
+    expect(failures).toHaveBeenCalledTimes(4);
     release();
     await expect(secondProbe).resolves.toMatchObject({ status: 'unavailable', searched: false });
     await expect(firstProbe).resolves.toMatchObject({ status: 'ok' });
@@ -856,7 +887,7 @@ describe('CcelSearchAdapter', () => {
       response: () => htmlResponse('server error', 503),
       reason: 'network' as const,
       backoffMs: CCEL_SEARCH_LIMITS.networkOpenMs,
-      fetchCount: 3,
+      fetchCount: 2,
     },
     {
       name: 'declared oversized response',

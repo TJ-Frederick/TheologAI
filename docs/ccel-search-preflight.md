@@ -5,8 +5,9 @@
 > retrieve or republish CCEL document bodies. A future discovery-only rollout
 > requires a new preflight and explicit release review.
 
-Recorded 2026-07-11 for PR 1. This is an operational review record, not an
-enablement approval. The live-search flag remains off by default.
+Originally recorded 2026-07-11 and updated 2026-07-15 for dormant parser-policy
+hardening. This is an architecture record, not an enablement approval. The
+live-search flag remains off by default.
 
 - Search surface reviewed: `https://ccel.org/?page=1&text=...`
 - Search contract reviewed: [CCEL Search Help](https://www.ccel.org/help/search), including the documented `author`, `authorID`, `title`, and `bookID` fields.
@@ -14,7 +15,23 @@ enablement approval. The live-search flag remains off by default.
 - Copyright status: no rights determination is made by this adapter. Search snippets are discovery-only metadata; edition-specific copyright and permission checks remain a later rollout gate. The [CCEL Copyright Policy](https://www.ccel.org/about/copyright.html) is reference material, not an approval.
 - Terms status: not reviewed or approved for this feature. Terms approval remains an explicit operator gate; copyright policy is not treated as a substitute for terms-of-use approval.
 - Robots status: not fetched by this slice. `https://www.ccel.org/robots.txt` must be checked manually by the operator immediately before any preview enablement and again for adapter releases. No automated test fetches robots or the live search surface.
-- Interface status: `search-results.html` is a dated, sanitized capture of the visible `h2` search heading, `h5` result headings, section links, and text metadata; `no-results.html` and `policy-page.html` preserve only their reviewed structural `h2`/`p` and `h1`/`p` states. Adversarial markup is isolated in `malicious.html` and is not provenance. Selector/state drift fails closed as `interface_changed`; upstream selector approval remains pending before enablement.
+- Interface status: tests use synthetic markup that models the reviewed
+  `h2#CCEL_Search_results` plus Bootstrap `.card` anatomy without copying real
+  titles, authors, snippets, or tracking values. Each card must contain exactly
+  one `h5.card-title` with separate title and author spans, exactly one snippet
+  paragraph, and exactly one “Read online” anchor. An earlier cover/image link
+  is never treated as the section locator. Selector or anatomy ambiguity fails
+  closed as `interface_changed`.
+- Locator policy: a result locator must reduce to the exact allowlisted HTTPS
+  path `https://ccel.org/ccel/{author}/{work}/{section}.html`. The complete
+  provider query and hash are discarded before construction of the returned
+  locator; `token`, `queryID`, `resultID`, and analogous opaque values are not
+  returned, cached, persisted, or logged by this adapter.
+- Request/output policy: page 1 only; at most five hits; at most 240 Unicode
+  characters per snippet; one upstream GET for an admitted cache miss; manual
+  redirect mode with zero redirects followed; zero retries. Existing response
+  byte limits, wall/stream timeouts, queue bounds, cache bounds, circuit state,
+  and policy/security latches remain fail closed.
 
 No live CCEL request, body persistence, production flag change, or remote
 mutation is authorized by this record.
