@@ -234,7 +234,7 @@ describe('HelloAoCommentaryAdapter', () => {
     const result = await new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3:16'), 'Tyndale');
 
     expect(result.text).toBe(
-      '**Love &lt;and grace&gt;**\n\nFor God\nloved &lt;the world&gt; &amp; gave.',
+      '**Love &lt;and grace&gt;**\n\nFor God  \nloved &lt;the world&gt; &amp; gave.',
     );
     expect(result.text).not.toMatch(/<|noteId|HelloAO|\[7\]/);
   });
@@ -290,7 +290,7 @@ describe('HelloAoCommentaryAdapter', () => {
     const result = await new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3'), 'John Gill');
 
     expect(result.text).toBe(
-      '**Legacy heading**\n\nLegacy paragraph\n\n**Official heading**\n\nFirst line\n\nSecond paragraph Existing string block',
+      '**Legacy heading**\n\nLegacy paragraph\n\n**Official heading**\n\nFirst line  \n  \nSecond paragraph Existing string block',
     );
     expect(result.text).not.toContain('noteId');
   });
@@ -309,7 +309,7 @@ describe('HelloAoCommentaryAdapter', () => {
     [
       'applies an inline line break between strings',
       ['First line', { lineBreak: true }, 'Second line'],
-      'First line\nSecond line',
+      'First line  \nSecond line',
     ],
   ])('%s', async (_label, content, expected) => {
     vi.mocked(globalThis.fetch).mockResolvedValue(response({
@@ -344,8 +344,36 @@ describe('HelloAoCommentaryAdapter', () => {
     const result = await new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3:16'), 'Tyndale');
 
     expect(result.text).toBe(
-      'Opening sentence.\n\n**Official heading**\n\nAfter heading\n\nLegacy block\n\nAfter legacy\n\nnew paragraph.',
+      'Opening sentence.\n\n**Official heading**\n\nAfter heading\n\nLegacy block\n\nAfter legacy  \n  \nnew paragraph.',
     );
+  });
+
+  it.each([
+    [
+      'John 3:16',
+      [
+        '3:16-21 Because there are no quotation marks around Jesus’ speech in the Greek text, translators debate where Jesus’ speech ends and John’s commentary begins; 3:16-21 might be John’s commentary.',
+        '3:16 The truth that God loved the world is basic to Christian understanding (1 Jn 4:9-10). God’s love extends beyond the limits of race and nation, even to those who oppose him (see “The World” Theme Note). • The Son came to save—not condemn (3:17)—men and women who habitually embrace the darkness (3:19-21).',
+      ],
+    ],
+    [
+      'John 3:22',
+      [
+        '3:22-36 John the Baptist identifies Jesus as the one who is truly from above (3:31); this requires John’s followers to shift their allegiance to Jesus.',
+        '3:22 Jesus spent some time . . . baptizing: See 4:2, which clarifies that Jesus’ disciples did the baptizing.',
+      ],
+    ],
+  ])('keeps consecutive production-shaped Tyndale notes for %s as separate paragraphs', async (reference, notes) => {
+    const parsed = parseReference(reference);
+    vi.mocked(globalThis.fetch).mockResolvedValue(response({
+      chapter: {
+        content: [{ type: 'verse', number: parsed.startVerse, content: notes }],
+      },
+    }));
+
+    const result = await new HelloAoCommentaryAdapter().getCommentary(parsed, 'Tyndale');
+
+    expect(result.text).toBe(notes.join('\n\n'));
   });
 
   it('combines every non-empty entry for a chapter request', async () => {

@@ -269,6 +269,11 @@ export class HelloAoCommentaryAdapter implements CommentaryAdapter {
   private extractEntryText(entry: Record<string, any>): { kind: 'text'; text?: string } | { kind: 'invalid'; reason: string } {
     const blocks: string[] = [];
     let current = '';
+    // A bare string is a possible note block until an official inline variant
+    // proves it belongs to a continued stream. A second bare string commits
+    // the first as a paragraph, preserving live Tyndale multi-note payloads.
+    let pendingBareString: string | undefined;
+    let inlineStreamActive = false;
     let renderedLength = 0;
 
     const appendCurrent = (fragment: string): boolean => {
@@ -290,12 +295,31 @@ export class HelloAoCommentaryAdapter implements CommentaryAdapter {
       }
       return renderedLength <= MAX_ENTRY_TEXT_LENGTH;
     };
+    const promotePendingBareString = (): boolean => {
+      if (pendingBareString == null) return true;
+      const pending = pendingBareString;
+      pendingBareString = undefined;
+      return appendCurrent(pending);
+    };
+    const commitPendingBareString = (): boolean => {
+      if (pendingBareString == null) return true;
+      const pending = pendingBareString;
+      pendingBareString = undefined;
+      return appendBlock(pending);
+    };
 
     for (const item of entry.content) {
       if (typeof item === 'string') {
         const text = this.sanitizeContentFragment(item);
         if (text == null) return { kind: 'invalid', reason: 'Commentary text fragment exceeds safety limit' };
-        if (!appendCurrent(text)) return { kind: 'invalid', reason: 'Commentary entry text exceeds safety limit' };
+        if (inlineStreamActive) {
+          if (!appendCurrent(text)) return { kind: 'invalid', reason: 'Commentary entry text exceeds safety limit' };
+        } else if (pendingBareString == null) {
+          pendingBareString = text;
+        } else {
+          if (!commitPendingBareString()) return { kind: 'invalid', reason: 'Commentary entry text exceeds safety limit' };
+          pendingBareString = text;
+        }
         continue;
       }
       if (!this.isRecord(item)) {
@@ -308,32 +332,44 @@ export class HelloAoCommentaryAdapter implements CommentaryAdapter {
       }
 
       if (this.isRecord(item) && item.type === 'heading') {
+        if (!commitPendingBareString()) return { kind: 'invalid', reason: 'Commentary entry text exceeds safety limit' };
         const heading = this.joinContent(item.content);
         if (heading == null) return { kind: 'invalid', reason: 'Malformed commentary heading content' };
         if (!appendBlock(heading ? `**${heading}**` : '')) {
           return { kind: 'invalid', reason: 'Commentary entry text exceeds safety limit' };
         }
+        inlineStreamActive = false;
       } else if (this.isRecord(item) && item.type === 'text') {
+        if (!commitPendingBareString()) return { kind: 'invalid', reason: 'Commentary entry text exceeds safety limit' };
         const text = this.joinContent(item.content);
         if (text == null) return { kind: 'invalid', reason: 'Malformed commentary text content' };
         if (!appendBlock(text)) return { kind: 'invalid', reason: 'Commentary entry text exceeds safety limit' };
+        inlineStreamActive = false;
       } else if (officialKeys.length !== 1) {
         return { kind: 'invalid', reason: 'Unknown commentary content item' };
       } else if (officialKeys[0] === 'text') {
         if (typeof item.text !== 'string') return { kind: 'invalid', reason: 'Malformed formatted commentary text' };
         const text = this.sanitizeContentFragment(item.text);
         if (text == null) return { kind: 'invalid', reason: 'Commentary text fragment exceeds safety limit' };
+        if (!promotePendingBareString()) return { kind: 'invalid', reason: 'Commentary entry text exceeds safety limit' };
+        inlineStreamActive = true;
         if (!appendCurrent(text)) return { kind: 'invalid', reason: 'Commentary entry text exceeds safety limit' };
       } else if (officialKeys[0] === 'heading') {
         if (typeof item.heading !== 'string') return { kind: 'invalid', reason: 'Malformed inline commentary heading' };
         const heading = this.sanitizeContentFragment(item.heading);
         if (heading == null) return { kind: 'invalid', reason: 'Commentary heading exceeds safety limit' };
+        if (!commitPendingBareString()) return { kind: 'invalid', reason: 'Commentary entry text exceeds safety limit' };
         if (!appendBlock(heading ? `**${heading}**` : '')) {
           return { kind: 'invalid', reason: 'Commentary entry text exceeds safety limit' };
         }
+        inlineStreamActive = false;
       } else if (officialKeys[0] === 'lineBreak') {
         if (item.lineBreak !== true) return { kind: 'invalid', reason: 'Malformed inline commentary line break' };
-        const next = `${current}\n`;
+        if (!promotePendingBareString()) return { kind: 'invalid', reason: 'Commentary entry text exceeds safety limit' };
+        inlineStreamActive = true;
+        // Markdown collapses a plain newline; two trailing spaces preserve the
+        // provider's explicit break. Repeated variants yield repeated hard breaks.
+        const next = `${current.replace(/[ \t]+$/u, '')}  \n`;
         renderedLength += next.length - current.length;
         current = next;
         if (renderedLength > MAX_ENTRY_TEXT_LENGTH) {
@@ -343,6 +379,8 @@ export class HelloAoCommentaryAdapter implements CommentaryAdapter {
         if (!Number.isSafeInteger(item.noteId) || item.noteId < 0) {
           return { kind: 'invalid', reason: 'Malformed commentary footnote reference' };
         }
+        if (!promotePendingBareString()) return { kind: 'invalid', reason: 'Commentary entry text exceeds safety limit' };
+        inlineStreamActive = true;
         // The chapter commentary response does not supply authoritative note
         // text. Match the Bible adapter's convention and omit the reference.
       } else {
@@ -350,6 +388,7 @@ export class HelloAoCommentaryAdapter implements CommentaryAdapter {
       }
     }
 
+    if (!commitPendingBareString()) return { kind: 'invalid', reason: 'Commentary entry text exceeds safety limit' };
     flushCurrent();
     const text = blocks.join('\n\n');
     if (text.length > MAX_ENTRY_TEXT_LENGTH) {
