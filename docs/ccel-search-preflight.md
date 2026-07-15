@@ -29,9 +29,17 @@ live-search flag remains off by default.
   Metadata outside a closed card, nested cards, unreviewed wrappers, implied
   closing tags, and ambiguous card boundaries are rejected. `template`,
   `noscript`, `textarea`, `script`, `style`, SVG/MathML, other inert elements,
-  and hidden subtrees do not contribute metadata or visible text. Title and
+  and subtrees marked with `hidden`, boolean `inert`, or ASCII-normalized
+  `aria-hidden="true"` do not contribute metadata or visible text. Title and
   author are selected by their exact `title` and `author` span class roles
   rather than DOM order, and the author role retains the reviewed `by` marker.
+  Accepted direct ancestry must also agree with parse5 source locations.
+  Table-context elements or source tags anywhere after the results heading are
+  rejected because the reviewed interface does not use tables and HTML5 foster
+  parenting can otherwise move card markup outside its source wrapper. Narrow
+  source-gap checks around accepted structural nodes likewise reject formatting
+  wrappers repaired by the adoption-agency algorithm; they do not implement a
+  second HTML tokenizer.
 - Empty-state policy: `no_results` requires exactly one reviewed
   `h2#CCEL_Search_results` immediately followed by exactly one
   `<p>No results found.</p>`. A competing results heading, duplicate empty
@@ -59,13 +67,13 @@ live-search flag remains off by default.
   (BSD-2-Clause). Worker dry-run bundling and Node/Worker typechecks are release
   gates for this dormant adapter.
 - 2026-07-15 local verification on Node 22.23.1 measured 1,000 valid parses at
-  0.031 ms median / 2.846 ms maximum, 50 pre-parse rejections of a 100,000-
-  attribute input at 0.729 ms median / 0.819 ms maximum, and 50 bounded
-  rejections of 10,000 nested headings at 4.305 ms median / 10.153 ms maximum.
+  0.035 ms median / 3.419 ms maximum, 50 pre-parse rejections of a 100,000-
+  attribute input at 0.795 ms median / 0.885 ms maximum, and 50 bounded
+  rejections of 10,000 nested headings at 5.636 ms median / 11.760 ms maximum.
   These figures are diagnostic observations, not portable performance SLAs.
-  Against the immediately preceding commit, the preview Worker dry bundle grew
-  from 2,603,119 to 2,893,515 raw bytes (+290,396) and from 492,279 to 554,011
-  gzip bytes (+61,732); Wrangler 4.107.0 completed both dry runs successfully.
+  Against the pre-parse5 `a47573f` baseline, the preview Worker dry bundle grew
+  from 2,603,119 to 2,899,157 raw bytes (+296,038) and from 492,279 to 555,191
+  gzip bytes (+62,912); Wrangler 4.107.0 completed both dry runs successfully.
 
 No live CCEL request, body persistence, production flag change, or remote
 mutation is authorized by this record.

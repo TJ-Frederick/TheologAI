@@ -269,6 +269,27 @@ describe('CcelSearchAdapter', () => {
     });
   });
 
+  it('treats boolean inert and ASCII-trimmed aria-hidden on result ancestry as excluded', async () => {
+    const inertCard = resultCard(1).replace('<div class="card mb-3">', '<div class="card mb-3" inert>');
+    const inertBody = resultCard(1).replace('<div class="card-body">', '<div class="card-body" inert>');
+    const inertAncestor = resultPage(resultCard(1)).replace('<main id="search-results">', '<main id="search-results" inert>');
+    const whitespaceAriaHidden = resultCard(1).replace(
+      '<div class="card mb-3">',
+      '<div class="card mb-3" aria-hidden=" \tTRUE\n ">',
+    );
+    for (const [index, markup] of [
+      resultPage(inertCard),
+      resultPage(inertBody),
+      inertAncestor,
+      resultPage(whitespaceAriaHidden),
+    ].entries()) {
+      await expect(new CcelSearchAdapter({
+        enabled: true,
+        fetchImpl: vi.fn<typeof fetch>().mockResolvedValue(htmlResponse(markup)),
+      }).search(query({ text: `inert ancestry ${index}` }))).resolves.toMatchObject({ status: 'interface_changed', hits: [] });
+    }
+  });
+
   it('fails closed when an unreviewed section changes the heading-to-card or card-to-body path', async () => {
     const wrappedCard = `<section>${resultCard(1)}</section>`;
     const wrappedBody = resultCard(1)
@@ -288,6 +309,26 @@ describe('CcelSearchAdapter', () => {
       enabled: true,
       fetchImpl: vi.fn<typeof fetch>().mockResolvedValue(htmlResponse(resultPage(duplicateClass))),
     }).search(query({ text: 'duplicate attribute' }))).resolves.toMatchObject({ status: 'interface_changed', hits: [] });
+  });
+
+  it('rejects table-source foster parenting and ignored table-context wrappers after the heading', async () => {
+    const fosterParentedCard = `<table>${resultCard(1)}</table>`;
+    const ignoredTableContext = `<tr><td>ignored by the HTML parser</td></tr>${resultCard(1)}`;
+    for (const [index, markup] of [fosterParentedCard, ignoredTableContext].entries()) {
+      await expect(new CcelSearchAdapter({
+        enabled: true,
+        fetchImpl: vi.fn<typeof fetch>().mockResolvedValue(htmlResponse(resultPage(markup))),
+      }).search(query({ text: `table repair ${index}` }))).resolves.toMatchObject({ status: 'interface_changed', hits: [] });
+    }
+  });
+
+  it('rejects adoption-agency repair that creates a direct card path absent from source', async () => {
+    const repairedCard = resultCard(1).replace('<div class="card-body">', '<div class="card-body"></i>');
+    const adoptionSourceWrapper = `<b><i>formatting wrapper</b>${repairedCard}</i>`;
+    await expect(new CcelSearchAdapter({
+      enabled: true,
+      fetchImpl: vi.fn<typeof fetch>().mockResolvedValue(htmlResponse(resultPage(adoptionSourceWrapper))),
+    }).search(query({ text: 'adoption source wrapper' }))).resolves.toMatchObject({ status: 'interface_changed', hits: [] });
   });
 
   it('matches a browser DOM oracle for HTML5 entity decoding before plain-text escaping', () => {

@@ -717,14 +717,17 @@ export function parseCcelSearchHtml(html: string, page: number): ParsedSearch {
   }
   const document = parseReviewedDocument(html);
   if (hasReviewedPolicyMarker(document)) throw new CcelSearchFailure('policy');
-  const searchState = identifySearchState(document);
+  const searchState = identifySearchState(html, document);
+  ensureParseDeadline(document);
   if (searchState.kind === 'empty') return { hits: [], notices: [] };
 
   const hits: PrimarySourceSearchHit[] = [];
   const seen = new Set<string>();
   let aggregateCharacters = 0;
   for (const element of searchState.cards) {
-    const card = parseResultCard(element);
+    ensureParseDeadline(document);
+    const card = parseResultCard(html, document, element);
+    ensureParseDeadline(document);
     if (seen.has(card.locator.url)) continue;
     const { locator, title, author, snippet } = card;
     const hitCharacters = title.length + author.length + snippet.length
@@ -759,6 +762,10 @@ interface ReviewedElement {
   attributes: ReadonlyMap<string, string>;
   order: number;
   explicitlyClosed: boolean;
+  sourceStart: number;
+  sourceEnd: number;
+  sourceContentStart: number;
+  sourceContentEnd: number;
   parent?: ReviewedElement;
   children: ReviewedElement[];
   content: Array<string | ReviewedElement>;
@@ -767,6 +774,7 @@ interface ReviewedElement {
 
 interface ReviewedDocument {
   elements: ReviewedElement[];
+  deadline: number;
 }
 
 type ReviewedSearchState =
@@ -778,7 +786,10 @@ const INERT_OR_NON_TEXT_ELEMENTS = new Set([
   'svg', 'template', 'textarea',
 ]);
 const STRICTLY_CLOSED_RESULT_ELEMENTS = new Set(['a', 'div', 'h2', 'h5', 'p', 'span']);
+const TABLE_CONTEXT_ELEMENTS = new Set(['caption', 'col', 'colgroup', 'table', 'tbody', 'td', 'tfoot', 'th', 'thead', 'tr']);
 const HTML_NAMESPACE = 'http://www.w3.org/1999/xhtml';
+const TABLE_SOURCE_PATTERN = /<\/?[\t\n\f\r ]*(?:caption|col|colgroup|table|tbody|td|tfoot|th|thead|tr)\b/iu;
+const ADOPTION_FORMATTING_SOURCE_PATTERN = /<\/?[\t\n\f\r ]*(?:b|big|code|em|font|i|nobr|s|small|strike|strong|tt|u)\b/iu;
 const REJECTED_PARSE_ERRORS = new Set([
   'duplicate-attribute',
   'eof-in-element-that-can-contain-only-text',
@@ -847,7 +858,8 @@ function parseReviewedDocument(html: string): ReviewedDocument {
       || node.namespaceURI !== HTML_NAMESPACE
       || INERT_OR_NON_TEXT_ELEMENTS.has(node.tagName)
       || attributes.has('hidden')
-      || attributes.get('aria-hidden')?.toLocaleLowerCase('en-US') === 'true';
+      || attributes.has('inert')
+      || trimAsciiWhitespace(attributes.get('aria-hidden') ?? '').toLocaleLowerCase('en-US') === 'true';
     let reviewedParent = frame.parent;
     if (!excluded) {
       const location = node.sourceCodeLocation;
@@ -856,6 +868,10 @@ function parseReviewedDocument(html: string): ReviewedDocument {
         attributes,
         order: elements.length,
         explicitlyClosed: location?.startTag !== undefined && location.endTag !== undefined,
+        sourceStart: location?.startOffset ?? -1,
+        sourceEnd: location?.endOffset ?? -1,
+        sourceContentStart: location?.startTag?.endOffset ?? -1,
+        sourceContentEnd: location?.endTag?.startOffset ?? -1,
         ...(frame.parent ? { parent: frame.parent } : {}),
         children: [],
         content: [],
@@ -885,11 +901,19 @@ function parseReviewedDocument(html: string): ReviewedDocument {
       .map(part => typeof part === 'string' ? part : part.text)
       .join('');
   }
-  return { elements };
+  return { elements, deadline };
 }
 
 function monotonicNow(): number {
   return globalThis.performance?.now() ?? Date.now();
+}
+
+function trimAsciiWhitespace(value: string): string {
+  return value.replace(/^[\t\n\f\r ]+|[\t\n\f\r ]+$/gu, '');
+}
+
+function ensureParseDeadline(document: ReviewedDocument): void {
+  if (monotonicNow() > document.deadline) throw new CcelSearchFailure('too_large');
 }
 
 function isTextNode(node: TreeNode): node is DefaultTreeAdapterTypes.TextNode {
@@ -909,7 +933,7 @@ function hasReviewedPolicyMarker(document: ReviewedDocument): boolean {
       && areAdjacentInContent(element, sibling)) === true);
 }
 
-function identifySearchState(document: ReviewedDocument): ReviewedSearchState {
+function identifySearchState(html: string, document: ReviewedDocument): ReviewedSearchState {
   const resultHeadings = document.elements.filter(element => element.name === 'h2' && (
     element.attributes.get('id') === 'CCEL_Search_results'
     || elementText(element, CCEL_SEARCH_LIMITS.maxTitleCharacters) === 'CCEL Search results'
@@ -918,9 +942,20 @@ function identifySearchState(document: ReviewedDocument): ReviewedSearchState {
   const heading = resultHeadings[0];
   if (heading.attributes.get('id') !== 'CCEL_Search_results'
     || elementText(heading, CCEL_SEARCH_LIMITS.maxTitleCharacters) !== 'CCEL Search results'
-    || !isExplicitlyClosed(heading)) {
+    || !isExplicitlyClosed(heading)
+    || !hasValidSourceBounds(heading)
+    || !hasDirectSourceContainment(heading.parent, heading)) {
     throw new CcelSearchFailure('parser');
   }
+  const resultsRegionEnd = heading.parent!.sourceContentEnd;
+  const resultsSource = html.slice(heading.sourceEnd, resultsRegionEnd);
+  if (TABLE_SOURCE_PATTERN.test(resultsSource)
+    || document.elements.some(element => TABLE_CONTEXT_ELEMENTS.has(element.name)
+      && element.sourceStart >= heading.sourceEnd
+      && element.sourceStart < resultsRegionEnd)) {
+    throw new CcelSearchFailure('parser');
+  }
+  assertNoNonAncestorSourceWrapper(document, heading);
 
   const emptyMarkers = document.elements.filter(element => element.name === 'p'
     && elementText(element, 64) === 'No results found.');
@@ -928,9 +963,14 @@ function identifySearchState(document: ReviewedDocument): ReviewedSearchState {
   const cards = allCards.filter(element => element.order > heading.order);
   if (cards.length > CCEL_SEARCH_LIMITS.maxCandidateResults) throw new CcelSearchFailure('too_large');
   for (const card of cards) {
-    if (card.parent !== heading.parent || ancestorWithClass(card.parent, 'card') || !isExplicitlyClosed(card)) {
+    if (card.parent !== heading.parent
+      || card.sourceStart < heading.sourceEnd
+      || ancestorWithClass(card.parent, 'card')
+      || !isExplicitlyClosed(card)
+      || !hasDirectSourceContainment(card.parent, card)) {
       throw new CcelSearchFailure('parser');
     }
+    assertNoNonAncestorSourceWrapper(document, card);
   }
   if (allCards.length !== cards.length) throw new CcelSearchFailure('parser');
 
@@ -944,6 +984,8 @@ function identifySearchState(document: ReviewedDocument): ReviewedSearchState {
     const immediate = marker !== undefined
       && marker.parent === heading.parent
       && isExplicitlyClosed(marker)
+      && hasDirectSourceContainment(marker.parent, marker)
+      && !sourceGapMatches(html, heading.sourceEnd, marker.sourceStart, ADOPTION_FORMATTING_SOURCE_PATTERN)
       && areAdjacentInContent(heading, marker);
     if (!immediate || cards.length > 0 || hasAnyResultMetadata(document, heading.order)) {
       throw new CcelSearchFailure('parser');
@@ -951,6 +993,19 @@ function identifySearchState(document: ReviewedDocument): ReviewedSearchState {
     return { kind: 'empty' };
   }
   if (cards.length === 0) throw new CcelSearchFailure('parser');
+  const sourceOrderedCards = [...cards].sort((left, right) => left.sourceStart - right.sourceStart);
+  if (sourceOrderedCards.some((card, index) => card !== cards[index])) throw new CcelSearchFailure('parser');
+  const resultGaps: Array<[number, number]> = [
+    [heading.sourceEnd, sourceOrderedCards[0].sourceStart],
+    ...sourceOrderedCards.slice(1).map((card, index): [number, number] => [sourceOrderedCards[index].sourceEnd, card.sourceStart]),
+  ];
+  const parentContentEnd = heading.parent?.sourceContentEnd ?? -1;
+  if (parentContentEnd >= sourceOrderedCards.at(-1)!.sourceEnd) {
+    resultGaps.push([sourceOrderedCards.at(-1)!.sourceEnd, parentContentEnd]);
+  }
+  if (resultGaps.some(([start, end]) => sourceGapMatches(html, start, end, ADOPTION_FORMATTING_SOURCE_PATTERN))) {
+    throw new CcelSearchFailure('parser');
+  }
   return { kind: 'results', cards };
 }
 
@@ -973,7 +1028,44 @@ function isResultMetadataElement(element: ReviewedElement): boolean {
     || (element.name === 'a' && elementText(element, 32).toLocaleLowerCase('en-US') === 'read online');
 }
 
-function parseResultCard(card: ReviewedElement): {
+function hasValidSourceBounds(element: ReviewedElement): boolean {
+  return element.sourceStart >= 0
+    && element.sourceContentStart >= element.sourceStart
+    && element.sourceContentEnd >= element.sourceContentStart
+    && element.sourceEnd >= element.sourceContentEnd;
+}
+
+function hasDirectSourceContainment(parent: ReviewedElement | undefined, child: ReviewedElement): boolean {
+  return parent !== undefined
+    && hasValidSourceBounds(parent)
+    && hasValidSourceBounds(child)
+    && child.sourceStart >= parent.sourceContentStart
+    && child.sourceEnd <= parent.sourceContentEnd;
+}
+
+function assertNoNonAncestorSourceWrapper(document: ReviewedDocument, element: ReviewedElement): void {
+  const hasWrapper = document.elements.some(candidate => candidate !== element
+    && hasValidSourceBounds(candidate)
+    && candidate.sourceStart <= element.sourceStart
+    && candidate.sourceEnd >= element.sourceEnd
+    && !isAncestor(candidate, element));
+  if (hasWrapper) throw new CcelSearchFailure('parser');
+}
+
+function isAncestor(candidate: ReviewedElement, element: ReviewedElement): boolean {
+  let current = element.parent;
+  while (current) {
+    if (current === candidate) return true;
+    current = current.parent;
+  }
+  return false;
+}
+
+function sourceGapMatches(html: string, start: number, end: number, pattern: RegExp): boolean {
+  return start < 0 || end < start || end > html.length || pattern.test(html.slice(start, end));
+}
+
+function parseResultCard(html: string, document: ReviewedDocument, card: ReviewedElement): {
   title: string;
   author: string;
   snippet: string;
@@ -983,18 +1075,30 @@ function parseResultCard(card: ReviewedElement): {
   const nestedCards = descendants.filter(element => element.name === 'div' && hasElementClass(element, 'card'));
   if (nestedCards.length > 0) throw new CcelSearchFailure('parser');
   const bodies = descendants.filter(element => element.name === 'div' && hasElementClass(element, 'card-body'));
-  if (bodies.length !== 1 || bodies[0].parent !== card || !isExplicitlyClosed(bodies[0])) {
+  if (bodies.length !== 1
+    || bodies[0].parent !== card
+    || !isExplicitlyClosed(bodies[0])
+    || !hasDirectSourceContainment(card, bodies[0])) {
     throw new CcelSearchFailure('parser');
   }
   const body = bodies[0];
+  assertNoNonAncestorSourceWrapper(document, body);
   const bodyDescendants = descendantElements(body);
 
   const headings = body.children.filter(element => element.name === 'h5' && hasElementClass(element, 'card-title'));
-  if (headings.length !== 1 || !isExplicitlyClosed(headings[0])) throw new CcelSearchFailure('parser');
-  const spans = descendantElements(headings[0]).filter(element => element.name === 'span');
-  if (spans.length !== 2 || spans.some(element => element.parent !== headings[0] || !isExplicitlyClosed(element))) {
+  if (headings.length !== 1
+    || !isExplicitlyClosed(headings[0])
+    || !hasDirectSourceContainment(body, headings[0])) {
     throw new CcelSearchFailure('parser');
   }
+  assertNoNonAncestorSourceWrapper(document, headings[0]);
+  const spans = descendantElements(headings[0]).filter(element => element.name === 'span');
+  if (spans.length !== 2 || spans.some(element => element.parent !== headings[0]
+    || !isExplicitlyClosed(element)
+    || !hasDirectSourceContainment(headings[0], element))) {
+    throw new CcelSearchFailure('parser');
+  }
+  spans.forEach(element => assertNoNonAncestorSourceWrapper(document, element));
   const titleSpans = spans.filter(element => hasElementClass(element, 'title'));
   const authorSpans = spans.filter(element => hasElementClass(element, 'author'));
   if (titleSpans.length !== 1 || authorSpans.length !== 1
@@ -1008,14 +1112,23 @@ function parseResultCard(card: ReviewedElement): {
   if (!author) throw new CcelSearchFailure('parser');
 
   const paragraphs = body.children.filter(element => element.name === 'p');
-  if (paragraphs.length !== 1 || !hasElementClass(paragraphs[0], 'card-text') || !isExplicitlyClosed(paragraphs[0])) {
+  if (paragraphs.length !== 1
+    || !hasElementClass(paragraphs[0], 'card-text')
+    || !isExplicitlyClosed(paragraphs[0])
+    || !hasDirectSourceContainment(body, paragraphs[0])) {
     throw new CcelSearchFailure('parser');
   }
+  assertNoNonAncestorSourceWrapper(document, paragraphs[0]);
   const snippet = elementText(paragraphs[0], CCEL_SEARCH_LIMITS.maxSnippetCharacters);
 
   const readLinks = body.children.filter(element => element.name === 'a'
     && elementText(element, 32).toLocaleLowerCase('en-US') === 'read online');
-  if (readLinks.length !== 1 || !isExplicitlyClosed(readLinks[0])) throw new CcelSearchFailure('parser');
+  if (readLinks.length !== 1
+    || !isExplicitlyClosed(readLinks[0])
+    || !hasDirectSourceContainment(body, readLinks[0])) {
+    throw new CcelSearchFailure('parser');
+  }
+  assertNoNonAncestorSourceWrapper(document, readLinks[0]);
   if (bodyDescendants.some(element => isResultMetadataElement(element)
     && element !== headings[0]
     && element !== paragraphs[0]
@@ -1025,6 +1138,21 @@ function parseResultCard(card: ReviewedElement): {
   const href = readLinks[0].attributes.get('href');
   const locator = href === undefined ? undefined : normalizeCcelSectionLocator(href);
   if (!locator) throw new CcelSearchFailure('parser');
+  const orderedSpans = [...spans].sort((left, right) => left.sourceStart - right.sourceStart);
+  const structuralGaps: Array<[number, number]> = [
+    [card.sourceContentStart, body.sourceStart],
+    [body.sourceEnd, card.sourceContentEnd],
+    [body.sourceContentStart, headings[0].sourceStart],
+    [headings[0].sourceEnd, paragraphs[0].sourceStart],
+    [paragraphs[0].sourceEnd, readLinks[0].sourceStart],
+    [readLinks[0].sourceEnd, body.sourceContentEnd],
+    [headings[0].sourceContentStart, orderedSpans[0].sourceStart],
+    [orderedSpans[0].sourceEnd, orderedSpans[1].sourceStart],
+    [orderedSpans[1].sourceEnd, headings[0].sourceContentEnd],
+  ];
+  if (structuralGaps.some(([start, end]) => sourceGapMatches(html, start, end, ADOPTION_FORMATTING_SOURCE_PATTERN))) {
+    throw new CcelSearchFailure('parser');
+  }
   return { title, author, snippet, locator };
 }
 
