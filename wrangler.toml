@@ -29,8 +29,8 @@ THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH = "false"
 # For multi-environment setups, use [env.staging] / [env.production] sections.
 [[d1_databases]]
 binding = "THEOLOGAI_DB"
-database_name = "theologai-production-20260713-b"
-database_id = "0e500e7f-626c-461a-9916-89e8d3e829ca"
+database_name = "theologai-production-20260715-a"
+database_id = "c6535a4a-1953-4279-b277-7368445fc61a"
 migrations_dir = "migrations"
 
 # Anonymous abuse control. Counters are intentionally local to each Cloudflare

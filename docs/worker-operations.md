@@ -1,14 +1,14 @@
 # Worker operations
 
-## Deployment baseline and rollback posture (2026-07-14)
+## Deployment baseline and rollback posture (2026-07-15)
 
-PR #27 (`7b4e6c72182901ff77b5d175132a72d260e0418e`) is the last verified
+PR #27 (`7b4e6c72182901ff77b5d175132a72d260e0418e`) remains the last verified
 production application baseline. Protected workflow run `29289643276` deployed
-it after a read-only D1 readiness result of `ready`. Production remains
-untouched by the unmerged PR #30 work. Preview received an initial protected
-PR #30 deployment and a corrective protected deployment on 2026-07-14, as
-described below. Targeted and independent full-surface black-box re-audits of
-the corrective application found no P0-P2 issues.
+it after a read-only D1 readiness result of `ready`. PR #34 merged as
+`ce335266d989b40afebe398aeb39dbd2082d926a` after green required checks and a
+successful protected preview audit, but production remains on PR #27 until the
+separately prepared transform-version-6 database binding passes its own PR,
+protected deployment, and post-deployment audit.
 
 The deployed logical D1 bindings and retained rollback posture are recorded
 below as point-in-time evidence. Cloudflare deployment history and the approved
@@ -20,7 +20,31 @@ binding.
 | Environment | Deployed logical database | Current posture | Rollback posture |
 |---|---|---|---|
 | Production | `theologai-production-20260713-b` | PR #27 merge `7b4e6c72182901ff77b5d175132a72d260e0418e` deployed successfully by protected GitHub Actions run `29289643276`; GitHub deployment `5432211383` serves Worker version `49746830-16ce-40dc-b8a5-3cdc9ab79217` at 100%. | Retain Worker version `17869daf-f5e4-4d80-9240-6bc4fbb8d395` with `theologai-production-20260713-a` as the immediate matched rollback pair. Also retain Worker version `c291ca9f-bb1b-4e6e-abd5-d6a3ea4f0704` with `theologai-production-20260711-a` as secondary rollback history. Do not mix either database with incompatible code or delete it without separate owner approval. |
-| Preview | `theologai-preview-20260714-a` | Protected run `29354086467` / job `87160929896` deployed corrective application commit `4760dbd` on 2026-07-14 as Worker version `5dd1fa0c-343c-4af4-83e6-b65003fb51c4` with this schema-0003, transform-version-6 database. All required CI checks and Verify Pins passed. Targeted and independent full-surface black-box re-audits found no P0-P2 issues and confirmed the previously identified P0-P2 guided-workflow, Hebrew morphology interpretation, historical presenter/search/browse, and derivation-output release findings were fixed. This is the audited corrective application evidence; a later docs-only deployment may have a different Worker UUID without changing that evidence. | Retain the independently verified PR #27 Worker version `734aec3b-d6c3-456b-a203-c7f940a2d081` with `theologai-preview-20260713-c` as the immediate matched rollback pair. Also retain `theologai-preview-20260712-b` with Worker version `3c8ad7ef-50ed-42a7-9c71-2ac8c2dd6d7f` as older matched rollback history. Do not delete another database without separate owner approval. |
+| Preview | `theologai-preview-20260714-a` | Protected run `29379359308` deployed the final PR #34 preview head on 2026-07-15 as Worker version `ab270f0b-2627-4057-a182-a66cd750b118`, serving this schema-0003, transform-version-6 D1 binding at 100%. Required checks, targeted audits, and the independent full-surface black-box audit found no P0-P2 release findings. | Retain the independently verified PR #27 Worker version `734aec3b-d6c3-456b-a203-c7f940a2d081` with `theologai-preview-20260713-c` as the immediate matched rollback pair. Also retain `theologai-preview-20260712-b` with Worker version `3c8ad7ef-50ed-42a7-9c71-2ac8c2dd6d7f` as older matched rollback history. Do not delete another database without separate owner approval. |
+
+### Prepared PR #34 production candidate (not deployed)
+
+On 2026-07-15, `theologai-production-20260715-a`
+(`c6535a4a-1953-4279-b277-7368445fc61a`) was created as a fresh, unrestricted
+`ENAM` database. The deployed `theologai-production-20260713-b` database was not
+modified. The candidate was migrated through `0003_original_language_usage`
+and populated from all 36 manifest files in recorded order, beginning with the
+empty-target guard. The verified manifest contains 1,069,506 rows, whole-D1
+identity `c334b4b91c3a7c334a9425937c7f99473f27014ddae6cea377ee38bd578a6707`,
+and usage identity
+`c3600bb55da75aa600f8c97885efa7d58a3e8c29c3fcc6445a553091011beabd`.
+
+Wrangler reported no pending migrations. The strict remote readiness gate
+returned `ready` with zero writes, served from the ENAM primary, after checking
+exact counts, schema and corpus identities, required columns and indexes,
+Unicode and language sentinels, UBS provenance, usage aggregates,
+`quick_check`, and foreign keys. The local top-level binding now describes this
+prepared candidate for review; it is not evidence of a production deployment.
+The superseded protected run `29388731059`, which targeted the old committed
+binding, was canceled without starting any steps. Preserve
+`theologai-production-20260713-b` as the deployed predecessor and immediate
+rollback database until the binding PR is merged, the new protected run is
+approved, and production passes its bounded audit.
 
 ### Retained immediate production rollback database
 
@@ -124,9 +148,9 @@ The reconciled integrated candidate's four core feature commits are `2c2a29a`,
 also requires the downstream Unicode-manifest preservation fix `a1c9da3` and
 source-lock synchronization `e8282c3`; the separate `e6f7f7f` commit reconciles
 release documentation. The candidate introduces migration
-`0003_original_language_usage` and transform version 6. It is unmerged and not
-released to production. PR #30 points its reviewable preview configuration at
-the freshly prepared `theologai-preview-20260714-a` database
+`0003_original_language_usage` and transform version 6. At preparation time it
+was unmerged, and PR #30 pointed its reviewable preview configuration at the
+freshly prepared `theologai-preview-20260714-a` database
 (`0dab804f-8df0-4727-93bd-299612b6e179`). That database was migrated through
 `0003_original_language_usage`, populated from all 36 manifest seed files, and
 passed the strict read-only remote readiness gate with zero writes.
@@ -141,15 +165,16 @@ producing Worker version `e86fb87e-8ace-4972-a8a2-dba9682a6a55` with
 `theologai-preview-20260714-a` bound.
 Black-box audits found guided-workflow, Hebrew morphology interpretation,
 historical presenter/search/browse, and derivation-output issues. Corrective
-Corrective application commit `4760dbd` passed all required CI checks and Verify
+application commit `4760dbd` passed all required CI checks and Verify
 Pins, then protected run `29354086467` / job `87160929896` deployed it on
 2026-07-14 as
 Worker version `5dd1fa0c-343c-4af4-83e6-b65003fb51c4` with the same prepared D1
 database. Targeted and independent full-surface black-box re-audits found no
 P0-P2 issues and confirmed all previously identified P0-P2 release findings
-were fixed. This is the audited corrective application evidence; this record
-intentionally does not
-predict the Worker UUID produced by any later docs-only deployment. Retain the
+were fixed. PR #34 subsequently merged as `ce335266d989b40afebe398aeb39dbd2082d926a`.
+Its final protected preview run `29379359308` deployed Worker version
+`ab270f0b-2627-4057-a182-a66cd750b118` at 100% with the same prepared preview
+database, and the final audits remained clear of P0-P2 findings. Retain the
 verified PR #27 Worker version
 `734aec3b-d6c3-456b-a203-c7f940a2d081` with `theologai-preview-20260713-c` as the
 immediate matched preview rollback pair, and retain
@@ -157,11 +182,15 @@ immediate matched preview rollback pair, and retain
 `3c8ad7ef-50ed-42a7-9c71-2ac8c2dd6d7f` as older matched rollback history. PRs
 #28 and #29 are closed as superseded by PR #30.
 
-The owner separately authorized deletion of only the unused legacy database
-`theologai-db-preview` (`f9f415e1-219b-4d17-bcf5-33a8abad02fa`), and that deletion
-was completed on 2026-07-14. No other database deletion is authorized.
-Production is untouched and requires a separate owner decision and protected
-release process.
+The owner separately authorized deletion of the unused legacy database
+`theologai-db-preview` (`f9f415e1-219b-4d17-bcf5-33a8abad02fa`), completed on
+2026-07-14, and later authorized deletion of only the unused legacy preview
+database `theologai-preview-20260710-a`
+(`3d010946-b530-4c7e-9e21-a900ff3c21a2`), completed on 2026-07-15. No other
+database deletion is authorized.
+Production remains on the prior binding. The owner authorized merge and
+deployment once the reviewed binding update, required checks, and protected
+release gate pass.
 
 ### Hebrew-lemma materialization follow-up
 
