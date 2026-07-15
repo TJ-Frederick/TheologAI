@@ -23,7 +23,7 @@ describe('HistoricalDocumentRepository', () => {
   it('prepares all reusable document and FTS queries', () => {
     const db = new FakeSqliteDatabase();
     new HistoricalDocumentRepository(db.asDatabase());
-    expect(db.prepare).toHaveBeenCalledTimes(7);
+    expect(db.prepare).toHaveBeenCalledTimes(6);
     expect(db.statement('sections_fts MATCH').sql).toMatch(/ORDER BY rank, ds\.id\s+LIMIT \?/);
   });
 
@@ -59,7 +59,7 @@ describe('HistoricalDocumentRepository', () => {
     expect(repo.getSection(documentRow.id, '9.9')).toBeUndefined();
   });
 
-  it('sanitizes FTS input, uses the default limit, and maps search rows', () => {
+  it('uses controlled literal all-term FTS, the default limit, and maps search rows', () => {
     const db = new FakeSqliteDatabase([{
       match: 'sections_fts MATCH',
       all: [{
@@ -73,7 +73,7 @@ describe('HistoricalDocumentRepository', () => {
     }]);
     const repo = new HistoricalDocumentRepository(db.asDatabase());
 
-    expect(repo.search(`grace'*"`)).toEqual([{
+    expect(repo.search(`Lord's Supper`)).toEqual([{
       id: 11,
       document_id: documentRow.id,
       section_number: '2.1',
@@ -81,7 +81,7 @@ describe('HistoricalDocumentRepository', () => {
       content: 'grace alone',
       topics: [],
     }]);
-    expect(db.statement('sections_fts MATCH').all).toHaveBeenCalledWith('"grace"*', 20);
+    expect(db.statement('sections_fts MATCH').all).toHaveBeenCalledWith('"Lord\'s" AND "Supper"', 20);
   });
 
   it('returns an empty result when FTS execution fails', () => {
@@ -99,13 +99,25 @@ describe('HistoricalDocumentRepository', () => {
     };
     const db = new FakeSqliteDatabase([{ match: 'JOIN documents d', all: [row] }]);
     const repo = new HistoricalDocumentRepository(db.asDatabase());
-    expect(repo.searchPrimarySources({ text: 'grace OR faith', match: 'all_terms', documentId: documentRow.id, limit: 8 })).toEqual([{
+    expect(repo.searchPrimarySources({ text: 'grace OR faith', match: 'all_terms', documentIds: [documentRow.id], limit: 8 })).toEqual([{
       document: { id: documentRow.id, title: documentRow.title, type: documentRow.type, date: documentRow.date, topics: ['Scripture', 'God'] },
       section: { id: 7, document_id: documentRow.id, section_number: '1.1', title: '', content: sectionRow.content, topics: ['revelation'] },
     }]);
-    expect(db.statement('AND ds.document_id = ?').all).toHaveBeenCalledWith('"grace" AND "OR" AND "faith"', documentRow.id, 8);
+    expect(db.statement('AND ds.document_id IN (?)').all).toHaveBeenCalledWith('"grace" AND "OR" AND "faith"', documentRow.id, 8);
     repo.searchPrimarySources({ text: 'union with Christ', match: 'phrase', limit: 3 });
     expect(db.statement(/JOIN documents d[\s\S]*ORDER BY rank/).all).toHaveBeenCalledWith('"union with Christ"', 3);
+  });
+
+  it('uses deterministic round-robin SQL for work-diverse selection', () => {
+    const db = new FakeSqliteDatabase([{ match: 'ranked_sections', all: [] }]);
+    const repo = new HistoricalDocumentRepository(db.asDatabase());
+
+    repo.searchPrimarySources({ text: 'grace', match: 'all_terms', selection: 'work_diversity', limit: 9 });
+
+    const statement = db.statement('ranked_sections');
+    expect(statement.sql).toMatch(/ROW_NUMBER\(\) OVER \([\s\S]*PARTITION BY document_id[\s\S]*ORDER BY relevance_rank, id/);
+    expect(statement.sql).toMatch(/ORDER BY work_rank, relevance_rank, id/);
+    expect(statement.all).toHaveBeenCalledWith('"grace"', 9);
   });
 
   it('finds documents by exact id, title fragment, then id fragment', () => {

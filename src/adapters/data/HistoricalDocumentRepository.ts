@@ -16,8 +16,9 @@ import type {
 import {
   composeLocalPrimarySourceFtsQuery,
   LOCAL_PRIMARY_SOURCE_SEARCH_SQL,
-  LOCAL_PRIMARY_SOURCE_WORK_SEARCH_SQL,
+  localPrimarySourceSearchSql,
 } from '../shared/primarySourceSearchSql.js';
+import { mapDocumentDatabaseRow } from '../shared/historicalDocumentMetadata.js';
 
 export type { DocumentInfo, DocumentSection } from '../../kernel/repositories.js';
 
@@ -29,7 +30,6 @@ export class HistoricalDocumentRepository implements IHistoricalDocumentReposito
   private stmtSectionByNum: Database.Statement;
   private stmtFtsSearch: Database.Statement;
   private stmtPrimarySourceSearch: Database.Statement;
-  private stmtPrimarySourceWorkSearch: Database.Statement;
 
   constructor(db?: Database.Database) {
     this.db = db ?? getDatabase();
@@ -51,7 +51,6 @@ export class HistoricalDocumentRepository implements IHistoricalDocumentReposito
        LIMIT ?`
     );
     this.stmtPrimarySourceSearch = this.db.prepare(LOCAL_PRIMARY_SOURCE_SEARCH_SQL);
-    this.stmtPrimarySourceWorkSearch = this.db.prepare(LOCAL_PRIMARY_SOURCE_WORK_SEARCH_SQL);
   }
 
   /** List all available documents */
@@ -60,13 +59,7 @@ export class HistoricalDocumentRepository implements IHistoricalDocumentReposito
       id: string; title: string; type: string; date: string | null; metadata: string;
     }>;
 
-    return rows.map(r => ({
-      id: r.id,
-      title: r.title,
-      type: r.type,
-      date: r.date,
-      topics: r.metadata ? (JSON.parse(r.metadata).topics || []) : [],
-    }));
+    return rows.map(mapDocumentDatabaseRow);
   }
 
   /** Get a document by its slug ID */
@@ -76,13 +69,7 @@ export class HistoricalDocumentRepository implements IHistoricalDocumentReposito
     } | undefined;
     if (!row) return undefined;
 
-    return {
-      id: row.id,
-      title: row.title,
-      type: row.type,
-      date: row.date,
-      topics: row.metadata ? (JSON.parse(row.metadata).topics || []) : [],
-    };
+    return mapDocumentDatabaseRow(row);
   }
 
   /** Get all sections of a document */
@@ -122,8 +109,7 @@ export class HistoricalDocumentRepository implements IHistoricalDocumentReposito
 
   /** Full-text search across all document sections */
   search(query: string, limit: number = 20): DocumentSection[] {
-    const escaped = query.replace(/['"*]/g, '');
-    const ftsQuery = `"${escaped}"*`;
+    const ftsQuery = composeLocalPrimarySourceFtsQuery(query, 'all_terms');
 
     try {
       const rows = this.stmtFtsSearch.all(ftsQuery, limit) as Array<{
@@ -148,9 +134,14 @@ export class HistoricalDocumentRepository implements IHistoricalDocumentReposito
   searchPrimarySources(options: PrimarySourceLocalSearchOptions): PrimarySourceLocalSearchRow[] {
     validatePrimarySourceOptions(options);
     const ftsQuery = composeLocalPrimarySourceFtsQuery(options.text, options.match);
-    const rows = options.documentId
-      ? this.stmtPrimarySourceWorkSearch.all(ftsQuery, options.documentId, options.limit)
-      : this.stmtPrimarySourceSearch.all(ftsQuery, options.limit);
+    const selection = options.selection ?? 'relevance';
+    const sql = localPrimarySourceSearchSql(selection, options.documentIds?.length);
+    const statement = selection === 'relevance' && options.documentIds === undefined
+      ? this.stmtPrimarySourceSearch
+      : this.db.prepare(sql);
+    const rows = options.documentIds
+      ? statement.all(ftsQuery, ...options.documentIds, options.limit)
+      : statement.all(ftsQuery, options.limit);
     return (rows as PrimarySourceSearchDatabaseRow[]).map(mapPrimarySourceRow);
   }
 
@@ -187,13 +178,10 @@ interface PrimarySourceSearchDatabaseRow {
 
 function mapPrimarySourceRow(row: PrimarySourceSearchDatabaseRow): PrimarySourceLocalSearchRow {
   return {
-    document: {
-      id: row.document_id,
-      title: row.document_title,
-      type: row.document_type,
-      date: row.document_date,
-      topics: row.document_metadata ? (JSON.parse(row.document_metadata).topics || []) : [],
-    },
+    document: mapDocumentDatabaseRow({
+      id: row.document_id, title: row.document_title, type: row.document_type,
+      date: row.document_date, metadata: row.document_metadata,
+    }),
     section: {
       id: row.id,
       document_id: row.document_id,
@@ -208,6 +196,12 @@ function mapPrimarySourceRow(row: PrimarySourceSearchDatabaseRow): PrimarySource
 function validatePrimarySourceOptions(options: PrimarySourceLocalSearchOptions): void {
   if (!options || typeof options.text !== 'string' || options.text.length < 1) throw new Error('Primary-source search text is required');
   if (options.match !== 'all_terms' && options.match !== 'phrase') throw new Error('Primary-source match mode is invalid');
-  if (!Number.isSafeInteger(options.limit) || options.limit < 1 || options.limit > 8) throw new Error('Primary-source limit must be 1..8');
-  if (options.documentId !== undefined && (typeof options.documentId !== 'string' || options.documentId.length < 1)) throw new Error('Primary-source document ID is invalid');
+  if (options.selection !== undefined && options.selection !== 'relevance' && options.selection !== 'work_diversity') throw new Error('Primary-source selection is invalid');
+  if (!Number.isSafeInteger(options.limit) || options.limit < 1 || options.limit > 9) throw new Error('Primary-source internal limit must be 1..9');
+  if (options.documentIds !== undefined && (!Array.isArray(options.documentIds)
+    || options.documentIds.length < 1 || options.documentIds.length > 17
+    || options.documentIds.some(id => typeof id !== 'string' || id.length < 1)
+    || new Set(options.documentIds).size !== options.documentIds.length)) {
+    throw new Error('Primary-source document scope is invalid');
+  }
 }

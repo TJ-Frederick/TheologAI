@@ -51,6 +51,24 @@ describe('D1MorphologyRepository', () => {
       expect(result).toBe('Verb Qal Perfect 3rd Masculine Singular');
     });
 
+    it('uses the same strict slash-delimited Hebrew expansion as Node', async () => {
+      const db = createSimpleD1([], null);
+      const repo = new D1MorphologyRepository(db as any);
+      await expect(repo.expandMorphCode('HTd/Ncfsa'))
+        .resolves.toBe('Particle Definite Article / Noun Common Feminine Singular Absolute');
+      await expect(repo.expandMorphCode('HTd/Ncfsa/UNKNOWN')).resolves.toBeUndefined();
+    });
+
+    it('uses the same documented TEHMC extensions as Node', async () => {
+      const db = createSimpleD1([], null);
+      const repo = new D1MorphologyRepository(db as any);
+      await expect(repo.expandMorphCode('Hc/Vqw3ms'))
+        .resolves.toBe('Sequential Conjunction / Verb Qal Sequential Imperfect 3rd Masculine Singular');
+      await expect(repo.expandMorphCode('HTc')).resolves.toBe('Particle Condition or Consequence');
+      await expect(repo.expandMorphCode('HNpl')).resolves.toBe('Noun Proper Name Location');
+      await expect(repo.expandMorphCode('HNpt')).resolves.toBe('Noun Proper Name Title');
+    });
+
     it('returns undefined for non-Hebrew code when DB returns null', async () => {
       const db = createSimpleD1([], null);
       const repo = new D1MorphologyRepository(db as any);
@@ -128,6 +146,39 @@ describe('D1MorphologyRepository', () => {
       const repo = new D1MorphologyRepository(db as any);
       await repo.getDistribution('G25');
       expect(db.prepare.mock.results[0].value.bind).toHaveBeenCalledWith('G0025');
+    });
+  });
+
+  describe('usage foundation', () => {
+    it('returns aggregate rows without dropping surface-form provenance', async () => {
+      const db = createMockD1([
+        { sql: 'FROM strongs_usage_stats', first: { strongs_key: 'G0025', token_count: 3, verse_count: 2, book_count: 2, form_count: 1 } },
+        { sql: 'FROM strongs_book_stats', all: { results: [{ book: 'John', book_order: 43, token_count: 3, verse_count: 2 }] } },
+        { sql: 'FROM strongs_form_stats', all: { results: [{ form_text: 'ἠγάπησεν', token_count: 3, verse_count: 2, first_book: 'John', first_book_order: 43, first_chapter: 3, first_verse: 16, first_position: 1 }] } },
+      ]);
+      const repo = new D1MorphologyRepository(db as any);
+      await expect(repo.getUsageStats('g25')).resolves.toMatchObject({ strongs_key: 'G0025', token_count: 3 });
+      await expect(repo.getBookUsage('G25')).resolves.toHaveLength(1);
+      await expect(repo.getFormUsage('G25')).resolves.toEqual([{
+        form_text: 'ἠγάπησεν', token_count: 3, verse_count: 2,
+        first: { book: 'John', book_order: 43, chapter: 3, verse: 16, position: 1 },
+      }]);
+    });
+
+    it('round-trips a verse-zero keyset position', async () => {
+      const rows = [
+        { book: 'Psalms', book_order: 19, chapter: 3, verse: 0, position: 1, word_text: 'a', lemma: 'a', strongs_number: 'H9998', morph_code: null, gloss: null },
+        { book: 'Psalms', book_order: 19, chapter: 3, verse: 0, position: 2, word_text: 'b', lemma: 'b', strongs_number: 'H9998', morph_code: null, gloss: null },
+        { book: 'Psalms', book_order: 19, chapter: 3, verse: 1, position: 1, word_text: 'c', lemma: 'c', strongs_number: 'H9998', morph_code: null, gloss: null },
+      ];
+      const db = createMockD1([
+        { sql: /FROM morphology WHERE strongs_number = \?[\s\S]*LIMIT/, all: { results: rows } },
+        { sql: /\(book_order, chapter, verse, position\) >/, all: { results: [rows[2]] } },
+      ]);
+      const repo = new D1MorphologyRepository(db as any);
+      const first = await repo.getTokenOccurrences('H9998', undefined, 2);
+      expect(first.next_after).toEqual({ book_order: 19, chapter: 3, verse: 0, position: 2 });
+      await expect(repo.getTokenOccurrences('H9998', first.next_after, 2)).resolves.toEqual({ occurrences: [rows[2]] });
     });
   });
 });

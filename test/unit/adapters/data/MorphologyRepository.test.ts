@@ -15,7 +15,7 @@ describe('MorphologyRepository', () => {
   it('prepares all reusable morphology queries', () => {
     const db = new FakeSqliteDatabase();
     new MorphologyRepository(db.asDatabase());
-    expect(db.prepare).toHaveBeenCalledTimes(5);
+    expect(db.prepare).toHaveBeenCalledTimes(11);
     expect(db.statement('COUNT(DISTINCT').sql).toContain('GROUP BY book');
   });
 
@@ -39,6 +39,10 @@ describe('MorphologyRepository', () => {
     const repo = new MorphologyRepository(db.asDatabase());
     expect(repo.expandMorphCode('PREP')).toBe('preposition');
     expect(repo.expandMorphCode('HVqp3ms')).toBe('Verb Qal Perfect 3rd Masculine Singular');
+    expect(repo.expandMorphCode('HTd/Ncmpa')).toBe('Particle Definite Article / Noun Common Masculine Plural Absolute');
+    expect(repo.expandMorphCode('Hc/Vqw3ms')).toBe('Sequential Conjunction / Verb Qal Sequential Imperfect 3rd Masculine Singular');
+    expect(repo.expandMorphCode('HNpl')).toBe('Noun Proper Name Location');
+    expect(repo.expandMorphCode('HTd/Ncmpa/UNKNOWN')).toBeUndefined();
     expect(repo.expandMorphCode('???')).toBeUndefined();
   });
 
@@ -85,5 +89,39 @@ describe('MorphologyRepository', () => {
   it('propagates database failures', () => {
     const db = new FakeSqliteDatabase([{ match: 'SELECT DISTINCT book', all: new Error('database unavailable') }]);
     expect(() => new MorphologyRepository(db.asDatabase()).getAvailableBooks()).toThrow('database unavailable');
+  });
+
+  it('returns deterministic usage, book, and surface-form aggregates', () => {
+    const db = new FakeSqliteDatabase([
+      { match: 'FROM strongs_usage_stats', get: { strongs_key: 'G0025', token_count: 3, verse_count: 2, book_count: 2, form_count: 1 } },
+      { match: 'FROM strongs_book_stats', all: [{ book: 'John', book_order: 43, token_count: 3, verse_count: 2 }] },
+      { match: 'FROM strongs_form_stats', all: [{ form_text: 'ἠγάπησεν', token_count: 3, verse_count: 2, first_book: 'John', first_book_order: 43, first_chapter: 3, first_verse: 16, first_position: 1 }] },
+    ]);
+    const repo = new MorphologyRepository(db.asDatabase());
+    expect(repo.getUsageStats('g25')).toMatchObject({ strongs_key: 'G0025', token_count: 3 });
+    expect(repo.getBookUsage('G25')).toEqual([{ book: 'John', book_order: 43, token_count: 3, verse_count: 2 }]);
+    expect(repo.getFormUsage('G25')).toEqual([{
+      form_text: 'ἠγάπησεν', token_count: 3, verse_count: 2,
+      first: { book: 'John', book_order: 43, chapter: 3, verse: 16, position: 1 },
+    }]);
+    expect(repo.getFormUsage('G25', 1)).toHaveLength(1);
+    expect(db.statement(/strongs_form_stats[\s\S]*LIMIT/).all).toHaveBeenCalledWith('G0025', 1);
+  });
+
+  it('paginates raw tokens without rejecting a verse-zero cursor', () => {
+    const rows = [
+      { book: 'Psalms', book_order: 19, chapter: 3, verse: 0, position: 1, word_text: 'a', lemma: 'a', strongs_number: 'H9998', morph_code: null, gloss: null },
+      { book: 'Psalms', book_order: 19, chapter: 3, verse: 0, position: 2, word_text: 'b', lemma: 'b', strongs_number: 'H9998', morph_code: null, gloss: null },
+      { book: 'Psalms', book_order: 19, chapter: 3, verse: 1, position: 1, word_text: 'c', lemma: 'c', strongs_number: 'H9998', morph_code: null, gloss: null },
+    ];
+    const db = new FakeSqliteDatabase([
+      { match: /FROM morphology WHERE strongs_number = \?[\s\S]*LIMIT/, all: rows },
+      { match: /\(book_order, chapter, verse, position\) >/, all: [rows[2]] },
+    ]);
+    const repo = new MorphologyRepository(db.asDatabase());
+    const first = repo.getTokenOccurrences('H9998', undefined, 2);
+    expect(first.occurrences).toHaveLength(2);
+    expect(first.next_after).toEqual({ book_order: 19, chapter: 3, verse: 0, position: 2 });
+    expect(repo.getTokenOccurrences('H9998', first.next_after, 2)).toEqual({ occurrences: [rows[2]] });
   });
 });

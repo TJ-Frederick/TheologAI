@@ -1,8 +1,9 @@
-import type { IHistoricalDocumentRepository } from '../../kernel/repositories.js';
+import type { DocumentInfo, IHistoricalDocumentRepository } from '../../kernel/repositories.js';
 import { buildLocalDocumentResourceUri } from '../../kernel/documentResource.js';
 import {
   LOCAL_PRIMARY_SOURCE_ATTRIBUTION,
   type PrimarySourceProviderResult,
+  type PrimarySourceResultWindow,
   type PrimarySourceSearchQuery,
 } from './primarySourceTypes.js';
 import { formatLocalDocumentSectionResource } from '../../formatters/historicalFormatter.js';
@@ -13,34 +14,25 @@ export class LocalPrimarySourceSearchProvider {
   async search(input: PrimarySourceSearchQuery): Promise<PrimarySourceProviderResult> {
     const page = input.page ?? 1;
     const limit = input.limit ?? 5;
-    if (input.author !== undefined) {
-      return result('unsupported_filter', page, false, [], ['The local historical index does not contain reviewed author metadata; the author restriction was not ignored.']);
-    }
+    const selection = input.selection ?? 'relevance';
     if (page !== 1) {
       return result('unsupported_filter', page, false, [], ['The local historical index does not support pagination; page was not silently ignored.']);
     }
-
-    let documentId: string | undefined;
-    if (input.work !== undefined) {
-      const requested = normalizeForExactComparison(input.work);
-      const matching = (await this.repository.listDocuments()).filter(document =>
-        normalizeForExactComparison(document.id) === requested
-        || normalizeForExactComparison(document.title) === requested
-      );
-      if (matching.length === 0) return result('no_results', page, true);
-      if (matching.length > 1) {
-        return result('unsupported_filter', page, false, [], ['The local work restriction is ambiguous and was not broadened.']);
-      }
-      documentId = matching[0].id;
+    const documents = await this.repository.listDocuments();
+    const selected = selectCatalogScope(documents, input);
+    if (selected.scope.eligibleDocumentCount === 0) {
+      return result('catalog_miss', page, false, [], selected.notices, selected.scope);
     }
 
     const rows = await this.repository.searchPrimarySources({
       text: input.text,
       match: input.match ?? 'all_terms',
-      ...(documentId ? { documentId } : {}),
-      limit,
+      selection,
+      ...(selected.restricted ? { documentIds: selected.documents.map(document => document.id) } : {}),
+      limit: limit + 1,
     });
-    const hits = rows.map((row, index) => ({
+    const additionalMatchObserved = rows.length > limit;
+    const hits = rows.slice(0, limit).map((row, index) => ({
       provider: 'local' as const,
       title: row.document.title,
       ...(row.section.title ? { sectionLabel: row.section.title } : {}),
@@ -57,11 +49,17 @@ export class LocalPrimarySourceSearchProvider {
       attribution: LOCAL_PRIMARY_SOURCE_ATTRIBUTION,
       documentType: row.document.type,
       ...(row.document.date ? { documentDate: row.document.date } : {}),
+      ...(row.document.catalog?.creators.length ? { creators: row.document.catalog.creators } : {}),
+      ...(row.document.catalog ? { metadataStatus: row.document.catalog.metadataStatus } : {}),
+      ...(row.document.catalog ? { metadataProvenanceIds: row.document.catalog.metadataProvenanceIds } : {}),
       resourceSizeBytes: new TextEncoder().encode(
         formatLocalDocumentSectionResource(row.document, row.section),
       ).byteLength,
     }));
-    return result(hits.length > 0 ? 'ok' : 'no_results', page, true, hits);
+    return result(
+      hits.length > 0 ? 'ok' : 'no_results', page, true, hits, selected.notices, selected.scope,
+      additionalMatchObserved ? 'additional_match_observed' : 'no_additional_match_observed',
+    );
   }
 }
 
@@ -71,12 +69,85 @@ function result(
   searched: boolean,
   hits: PrimarySourceProviderResult['hits'] = [],
   notices: string[] = [],
+  scope?: PrimarySourceProviderResult['scope'],
+  additionalMatchStatus: PrimarySourceResultWindow['additionalMatchStatus'] = 'not_evaluated',
 ): PrimarySourceProviderResult {
-  return { provider: 'local', status, searched, page, hitCount: hits.length, hits, notices };
+  return {
+    provider: 'local', status, searched, page, hitCount: hits.length, hits, notices,
+    resultWindow: { returnedHitCount: hits.length, additionalMatchStatus },
+    ...(scope ? { scope } : {}),
+  };
 }
 
 function normalizeForExactComparison(value: string): string {
   return value.normalize('NFC').trim().replace(/\s+/gu, ' ').toLocaleLowerCase('en-US');
+}
+
+const MAX_SCOPE_DOCUMENTS = 8;
+
+function selectCatalogScope(documents: DocumentInfo[], input: PrimarySourceSearchQuery): {
+  documents: DocumentInfo[];
+  restricted: boolean;
+  scope: NonNullable<PrimarySourceProviderResult['scope']>;
+  notices: string[];
+} {
+  const requested = {
+    ...(input.work ? { work: input.work } : {}),
+    ...(input.author ? { author: input.author } : {}),
+    ...(input.startYear !== undefined ? { startYear: input.startYear } : {}),
+    ...(input.endYear !== undefined ? { endYear: input.endYear } : {}),
+  };
+  const restricted = Object.keys(requested).length > 0;
+  let candidates = documents;
+  const notices: string[] = [];
+  let incomplete = false;
+
+  if (input.work !== undefined) {
+    const work = normalizeForExactComparison(input.work);
+    candidates = candidates.filter(document => [document.id, document.title, ...(document.catalog?.lookupAliases ?? [])]
+      .some(alias => normalizeForExactComparison(alias) === work));
+  }
+  if (input.author !== undefined) {
+    const author = normalizeForExactComparison(input.author);
+    incomplete = candidates.some(document => !document.catalog || document.catalog.creators.length === 0);
+    candidates = candidates.filter(document => document.catalog?.creators
+      .some(creator => normalizeForExactComparison(creator.name) === author));
+  }
+  if (input.startYear !== undefined || input.endYear !== undefined) {
+    incomplete = incomplete || candidates.some(document => document.catalog?.composition.startYear === undefined
+      || document.catalog.composition.endYear === undefined);
+    const requestedStart = input.startYear ?? Number.MIN_SAFE_INTEGER;
+    const requestedEnd = input.endYear ?? Number.MAX_SAFE_INTEGER;
+    candidates = candidates.filter(document => {
+      const composition = document.catalog?.composition;
+      return composition?.startYear !== undefined && composition.endYear !== undefined
+        && composition.startYear <= requestedEnd && composition.endYear >= requestedStart;
+    });
+  }
+
+  if (restricted && candidates.length === 0) {
+    notices.push('No hosted catalog work matched every requested work, creator, and inclusive overlapping composition-date restriction; the text search was not broadened.');
+  }
+  if (incomplete) {
+    notices.push('One or more hosted works lacked reviewed metadata needed to evaluate the requested scope and were not treated as matches.');
+  }
+  const eligibleDocuments = candidates.slice(0, MAX_SCOPE_DOCUMENTS).map(document => ({
+    id: document.id,
+    title: document.title,
+    metadataStatus: document.catalog?.metadataStatus ?? ('unknown' as const),
+  }));
+  return {
+    documents: candidates,
+    restricted,
+    notices,
+    scope: {
+      status: incomplete ? 'metadata_incomplete' : candidates.length === 0 ? 'catalog_miss' : 'matched',
+      requested,
+      eligibleDocumentCount: candidates.length,
+      eligibleDocuments,
+      eligibleDocumentsTruncated: candidates.length > eligibleDocuments.length,
+    },
+  };
 }
 
 export function boundedMatchContext(value: string, query: string, matchMode: 'all_terms' | 'phrase', maximum: number): string {

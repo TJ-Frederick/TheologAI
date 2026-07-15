@@ -13,7 +13,7 @@ import type { ResourceLink } from '@modelcontextprotocol/sdk/types.js';
 export function createPrimarySourceSearchHandler(service: Pick<PrimarySourceSearchService, 'search'>): ToolHandler {
   return {
     name: 'primary_source_search',
-    description: 'Execute an explicit, bounded query plan against the locally indexed historical-document collection. Returns snippets and exact local section locators only; fetch selected exact sections before quotation. Remote CCEL discovery is not part of the current public contract, and the server does not retrieve or republish CCEL document bodies.',
+    description: 'Execute an explicit, bounded query plan against the locally indexed historical-document collection. Supports exact catalog work aliases, exact reviewed creator names, and inclusive overlapping composition-year ranges. Returns catalog scope, snippets, and exact local section locators only; read selected exact resources before quotation or comparison.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -30,8 +30,14 @@ export function createPrimarySourceSearchHandler(service: Pick<PrimarySourceSear
                 description: 'Current public provider contract. Only the locally indexed collection is available.',
               },
               match: { type: 'string', enum: ['all_terms', 'phrase'], default: 'all_terms' },
-              author: { type: 'string', minLength: 1, maxLength: 100, description: 'Preserved planner restriction. The current local corpus reports unsupported_filter because reviewed author metadata is not yet available.' },
-              work: { type: 'string', minLength: 1, maxLength: 160 },
+              selection: {
+                type: 'string', enum: ['relevance', 'work_diversity'], default: 'relevance',
+                description: 'Use relevance for within-work location; use work_diversity for deterministic research bundles that round-robin across matching hosted works.',
+              },
+              author: { type: 'string', minLength: 1, maxLength: 100, description: 'One exact reviewed creator name. Use separate query-plan items for different creators; creator roles are not relabeled as authorship.' },
+              work: { type: 'string', minLength: 1, maxLength: 160, description: 'Exact hosted work slug, title, or lookup-only alias.' },
+              startYear: { type: 'integer', minimum: -5000, maximum: 3000, description: 'Inclusive lower bound. A work is eligible when its reviewed composition interval overlaps the requested interval.' },
+              endYear: { type: 'integer', minimum: -5000, maximum: 3000, description: 'Inclusive upper bound. Must be greater than or equal to startYear when both are provided.' },
               page: { type: 'integer', minimum: 1, maximum: 3, default: 1, description: 'Preserved planner field. The local provider supports only page 1 and reports unsupported_filter otherwise.' },
               limit: { type: 'integer', minimum: 1, maximum: 8, default: 5 },
             },

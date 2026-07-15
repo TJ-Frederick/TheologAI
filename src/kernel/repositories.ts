@@ -87,6 +87,51 @@ export interface BookDistribution {
   verse_count: number;
 }
 
+export interface UsageStats {
+  strongs_key: string;
+  token_count: number;
+  verse_count: number;
+  book_count: number;
+  /** Exact source surface-token variants; punctuation/cantillation are significant. */
+  form_count: number;
+}
+
+export interface BookUsage {
+  book: string;
+  book_order: number;
+  token_count: number;
+  verse_count: number;
+}
+
+export interface FormUsage {
+  /** Exact source word_text, not a linguistically normalized inflected form. */
+  form_text: string;
+  token_count: number;
+  verse_count: number;
+  first: CanonicalOccurrencePosition & { book: string };
+}
+
+export interface CanonicalOccurrencePosition {
+  book_order: number;
+  chapter: number;
+  verse: number;
+  position: number;
+}
+
+export interface TokenOccurrence extends CanonicalOccurrencePosition {
+  book: string;
+  word_text: string;
+  lemma: string;
+  strongs_number: string;
+  morph_code: string | null;
+  gloss: string | null;
+}
+
+export interface TokenOccurrencePage {
+  occurrences: TokenOccurrence[];
+  next_after?: CanonicalOccurrencePosition;
+}
+
 export interface IMorphologyRepository {
   getVerseMorphology(book: string, chapter: number, verse: number): RepositoryResult<MorphWord[]>;
   expandMorphCode(code: string): RepositoryResult<string | undefined>;
@@ -94,6 +139,14 @@ export interface IMorphologyRepository {
   hasVerse(book: string, chapter: number, verse: number): RepositoryResult<boolean>;
   getOccurrences(strongsNumber: string, limit?: number): RepositoryResult<WordOccurrence[]>;
   getDistribution(strongsNumber: string): RepositoryResult<BookDistribution[]>;
+  getUsageStats(strongsNumber: string): RepositoryResult<UsageStats | undefined>;
+  getBookUsage(strongsNumber: string): RepositoryResult<BookUsage[]>;
+  getFormUsage(strongsNumber: string, limit?: number): RepositoryResult<FormUsage[]>;
+  getTokenOccurrences(
+    strongsNumber: string,
+    after?: CanonicalOccurrencePosition,
+    limit?: number,
+  ): RepositoryResult<TokenOccurrencePage>;
 }
 
 // ── Historical document types & interface ──
@@ -104,6 +157,22 @@ export interface DocumentInfo {
   type: string;
   date: string | null;
   topics: string[];
+  catalog?: HistoricalDocumentCatalogMetadata;
+}
+
+export type HistoricalMetadataStatus = 'reviewed' | 'anonymous' | 'collective' | 'unknown';
+
+export interface HistoricalDocumentCreator {
+  name: string;
+  role: 'author' | 'issuing_body' | 'drafting_body' | 'revising_body' | 'compiler';
+}
+
+export interface HistoricalDocumentCatalogMetadata {
+  lookupAliases: string[];
+  composition: { startYear?: number; endYear?: number; label: string };
+  creators: HistoricalDocumentCreator[];
+  metadataStatus: HistoricalMetadataStatus;
+  metadataProvenanceIds: string[];
 }
 
 export interface DocumentSection {
@@ -118,7 +187,8 @@ export interface DocumentSection {
 export interface PrimarySourceLocalSearchOptions {
   text: string;
   match: 'all_terms' | 'phrase';
-  documentId?: string;
+  selection?: 'relevance' | 'work_diversity';
+  documentIds?: string[];
   limit: number;
 }
 

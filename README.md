@@ -7,7 +7,7 @@ The current registry contains eleven tools, six guided prompts, eight English
 Bible translations, six commentary sources, 17 locally indexed
 historical documents, Strong's dictionaries, and Greek/Hebrew morphology.
 
-<!-- theologai-public-contract tools=11 structured=bible_lookup,original_language_lookup,original_language_study,parallel_passages,primary_source_search -->
+<!-- theologai-public-contract tools=11 structured=bible_lookup,bible_verse_morphology,original_language_lookup,original_language_study,parallel_passages,primary_source_search -->
 
 ## Remote endpoint
 
@@ -41,9 +41,9 @@ fresh server and transport.
 | `parallel_passages` | Return complete UBS source-attested parallel groups by default; legacy curated edges and OpenBible.info cross references require explicit selectors and remain separate. |
 | `commentary_lookup` | Retrieve Matthew Henry, JFB, Adam Clarke, John Gill, Keil-Delitzsch (OT), or Tyndale notes. |
 | `classic_text_lookup` | Search and browse the 17 locally indexed historical documents. Remote CCEL document bodies are not retrieved or republished. |
-| `primary_source_search` | Execute a bounded local query plan with versioned structured results and native links to exact section resources. Snippets remain discovery-only. |
-| `original_language_lookup` | Look up a Strong's entry or search for matching Greek/Hebrew entries. |
-| `bible_verse_morphology` | Return word-by-word morphology for a specific verse. |
+| `primary_source_search` | Execute a bounded local query plan with v3 structured results, relevance or deterministic work-diverse selection, honest result windows, exact work/creator and inclusive composition-year scope, explicit catalog coverage, and native links to exact section resources. Snippets remain discovery-only. |
+| `original_language_lookup` | Look up or search Strong's entries, with opt-in exact corrected-corpus usage and bounded occurrence pages for exact identities. |
+| `bible_verse_morphology` | Return bounded word-by-word morphology for one exact verse, with raw codes, nullable expansions, and separate pinned STEPBible morphology/lemma provenance. |
 | `original_language_study` | Resolve and study one Greek or Hebrew token in one verse with contextual morphology, source-separated lexical evidence, and explicit interpretive limits. |
 | `donation_config` | Return voluntary-donation recipient, asset, and chain configuration. |
 | `verify_donation` | Classify a transaction and confirm only supported transfers to the configured recipient. |
@@ -58,16 +58,26 @@ requested with `includeOpenBibleCrossReferences`, are returned in a separate
 collection. The deprecated `useCrossReferences` alias now also defaults false,
 and conflicting old/new values are rejected.
 
+For exact `original_language_lookup` calls, corpus usage is opt-in. `overview`
+returns totals plus the complete canonical-book distribution only. `study`
+adds the top 10 exact source variants and defaults to 8 raw occurrences (maximum
+12). `technical` adds the top 25 variants and defaults to 20 raw occurrences
+(maximum 25). Search mode and calls that omit `usage_level` retain their prior
+responses.
+
 All tools are annotated as read-only, non-destructive, and idempotent. Tool
 inputs use closed, bounded JSON Schema 2020-12 contracts. `bible_lookup`,
-`parallel_passages`, `primary_source_search`, `original_language_lookup`, and `original_language_study`
+`bible_verse_morphology`, `parallel_passages`, `primary_source_search`,
+`original_language_lookup`, and `original_language_study`
 also advertise versioned object-root `outputSchema`
 contracts and return matching `structuredContent` beside the existing Markdown
-content. Bible, parallel-passage, and original-language structured results
+content. Bible, verse-morphology, parallel-passage, and original-language structured results
 include bounded, result-local provenance records. Primary-source results do not
 invent edition provenance records: their evidence policy explicitly marks
 edition provenance incomplete, and they link only canonical local sections with
-exact UTF-8 sizes. All other tools retain their current Markdown-only result
+exact UTF-8 sizes. Their result windows say only whether one additional match
+was directly observed through private lookahead; they do not imply exhaustive
+counts. All other tools retain their current Markdown-only result
 contract.
 
 ### Resources
@@ -76,6 +86,7 @@ contract.
 |---|---|
 | `theologai://translations` | Available Bible translations. |
 | `theologai://commentaries` | Available commentary sources. |
+| `theologai://primary-sources/catalog` | JSON metadata inventory for the hosted primary-source collection; no document bodies or provenance URLs. |
 | `theologai://documents/{slug}` | A locally indexed creed, confession, or catechism. |
 | `theologai://strongs/{number}` | A Strong's dictionary entry such as `G26` or `H430`. |
 
@@ -86,8 +97,8 @@ contract.
 | `word-study` | Strong's lookup/search, morphology, context, and synthesis. |
 | `passage-exegesis` | Text, language, cross references, commentary, and historical theology. |
 | `compare-translations` | Compare translation choices against morphology and lexical data. |
-| `confession-study` | Compare a doctrine across the locally indexed historical collection. |
-| `primary-source-research` | Survey a topic or search one exact local work, then read selected exact sections as evidence. |
+| `confession-study` | Inspect the hosted catalog, build a work-diverse doctrinal survey, then read selected exact sections. |
+| `primary-source-research` | Inspect the catalog; use work diversity for topic/creator surveys or relevance within one work; then read at most five unique exact sections as evidence. |
 | `donate` | Explain voluntary donation options. |
 
 ## Content scope and provenance
@@ -116,13 +127,19 @@ catechisms. The exact count is enforced by `data/data-manifest.json`.
 The public tools search and retrieve only the locally indexed collection. They
 do **not** currently fetch CCEL search results or document bodies. Defensive
 CCEL discovery adapters remain in the codebase as future provider architecture,
-but they are not advertised by the MCP schemas or reachable through the public
-tool registry. Any future external provider rollout must remain discovery-only
-until edition-specific rights and provider-policy gates are satisfied.
+but CCEL is not requestable in the public input schema and is unreachable from
+the public tool handler. The v3 output schema and structured result are also
+strictly local-only; dormant external-provider result shapes remain internal.
+Any future external provider rollout must remain discovery-only until
+edition-specific rights and provider-policy gates are satisfied.
 
-Local search metadata identifies the cataloged work type and date when known;
-it does not establish an author, edition, transcription provenance, publication
-date, or rights status. Search snippets are discovery aids. Quote or analyze a
+Local search metadata uses exact lookup-only aliases for routing, plus reviewed composition
+date bounds when known, and explicitly named creators with their precise roles.
+Roles use the closed vocabulary `author`, `issuing_body`, `drafting_body`,
+`revising_body`, and `compiler`; a non-author role is not relabeled as
+authorship. Stable metadata provenance IDs resolve to the checksum-pinned
+companion review manifest. This metadata does not establish an edition, transcription
+provenance, publication date, or rights status. Search snippets are discovery aids. Quote or analyze a
 selected passage only after reading its exact `theologai://documents/...#section-...`
 resource. The collection and every response are bounded and non-exhaustive.
 

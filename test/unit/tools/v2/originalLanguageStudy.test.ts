@@ -15,9 +15,21 @@ describe('original_language_study handler', () => {
     const result = await handler.handler({ reference: 'John 3:16', target: 'love' });
     expect(study).toHaveBeenCalledWith({ reference: 'John 3:16', target: 'love' });
     expect(result.content[0].text).toContain('Contextual evidence (for a plain-English explanation)');
+    expect(result.content[0].text).toContain('0f60797c170f11a1f8dc75c5f7617973e2e66b0d');
+    expect(result.content[0].text).not.toContain('revision is not exposed');
     expect(result.content[0].text).not.toContain('Meaning here, in plain English');
     expect(result.structuredContent).toMatchObject({ kind: 'original_language_study', status: 'partial', context: { language: 'Greek' } });
+    expect(result.structuredContent).not.toHaveProperty('corpusUsage');
+    expect(handler.outputSchema?.properties).not.toHaveProperty('corpusUsage');
     expect(validatorFor(handler.outputSchema!)(result.structuredContent).valid).toBe(true);
     expect((result.structuredContent?.interpretiveLimits as Array<{ code: string }>).map(x => x.code)).toContain('corpus_scope_limit');
+    expect(result.structuredContent?.provenance).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: 'stepbible-morphology',
+        version: '0f60797c170f11a1f8dc75c5f7617973e2e66b0d',
+        url: 'https://github.com/STEPBible/STEPBible-Data/tree/0f60797c170f11a1f8dc75c5f7617973e2e66b0d',
+        attribution: 'Tyndale House, Cambridge / STEP Bible (www.stepbible.org)',
+      }),
+    ]));
   });
 });

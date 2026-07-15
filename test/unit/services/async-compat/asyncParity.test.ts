@@ -114,6 +114,10 @@ describe('Async/Sync Repository Parity', () => {
         hasVerse: vi.fn().mockReturnValue(true),
         getOccurrences: vi.fn().mockReturnValue([]),
         getDistribution: vi.fn().mockReturnValue([]),
+        getUsageStats: vi.fn().mockReturnValue(undefined),
+        getBookUsage: vi.fn().mockReturnValue([]),
+        getFormUsage: vi.fn().mockReturnValue([]),
+        getTokenOccurrences: vi.fn().mockReturnValue({ occurrences: [] }),
       };
       const service = new MorphologyService(repo);
       const result = await service.getVerseMorphology('John 1:1');
@@ -129,6 +133,10 @@ describe('Async/Sync Repository Parity', () => {
         hasVerse: vi.fn().mockResolvedValue(true),
         getOccurrences: vi.fn().mockResolvedValue([]),
         getDistribution: vi.fn().mockResolvedValue([]),
+        getUsageStats: vi.fn().mockResolvedValue(undefined),
+        getBookUsage: vi.fn().mockResolvedValue([]),
+        getFormUsage: vi.fn().mockResolvedValue([]),
+        getTokenOccurrences: vi.fn().mockResolvedValue({ occurrences: [] }),
       };
       const service = new MorphologyService(repo);
       const result = await service.getVerseMorphology('John 1:1');

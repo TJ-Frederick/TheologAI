@@ -2,13 +2,17 @@
  * Pure formatting functions for biblical languages tool responses.
  */
 
-import type { EnhancedStrongsResult, VerseMorphologyResult, VerseWord } from '../kernel/types.js';
+import type { CorpusUsageResult, EnhancedStrongsResult, VerseMorphologyResult, VerseWord } from '../kernel/types.js';
 import type { StrongsEntry } from '../kernel/repositories.js';
 import { normalizeLexiconText } from '../kernel/lexiconText.js';
 export { normalizeLexiconText } from '../kernel/lexiconText.js';
 
 /** Format a Strong's lookup result */
-export function formatStrongsResult(result: EnhancedStrongsResult, detailLevel: string = 'simple'): string {
+export function formatStrongsResult(
+  result: EnhancedStrongsResult,
+  detailLevel: string = 'simple',
+  corpusUsage?: CorpusUsageResult,
+): string {
   const testament = result.language
     ?? (result.testament === 'NT' ? 'Greek' : result.testament === 'OT' ? 'Hebrew' : 'Source language');
 
@@ -48,7 +52,43 @@ export function formatStrongsResult(result: EnhancedStrongsResult, detailLevel: 
     s += `\n*Extended source: ${result.extendedCitation.source}*`;
     if (result.extendedCitation.copyright) s += ` - ${result.extendedCitation.copyright}`;
   }
+  if (corpusUsage) s += `\n\n${formatCorpusUsage(corpusUsage)}`;
   return s.trim();
+}
+
+function formatCorpusUsage(usage: CorpusUsageResult): string {
+  const lines = [
+    `## Corrected morphology-corpus usage (${usage.level})`,
+    '',
+    `**Exact morphology identity:** ${usage.exactMorphologyKey}`,
+    `**Morphology usage identity:** ${usage.corpusIdentity}`,
+  ];
+  if (!usage.attested) {
+    lines.push('', '*This exact identity is not attested in the counted morphology corpus.*');
+  } else {
+    lines.push(
+      `**Totals:** ${usage.totals.tokenCount} raw tokens; ${usage.totals.verseCount} verses; ${usage.totals.bookCount} books; ${usage.totals.sourceSurfaceVariantCount} exact source surface variants.`,
+      '',
+      '**Canonical book distribution:**',
+      ...usage.bookDistribution.map(book => `- ${book.book} (${book.canonicalOrder}): ${book.tokenCount} tokens in ${book.verseCount} verses`),
+      '',
+      '**Exact source surface variants:**',
+      ...usage.sourceSurfaceVariants.map(form => `- ${form.sourceForm}: ${form.tokenCount} tokens in ${form.verseCount} verses; first at ${form.firstOccurrence.book} ${form.firstOccurrence.chapter}:${form.firstOccurrence.verse}, position ${form.firstOccurrence.position}`),
+    );
+    if (usage.occurrences) {
+      lines.push('', '**Raw token occurrences:**', '', '| Reference | Position | Source form | Lemma | Morphology | Gloss |', '|---|---:|---|---|---|---|');
+      for (const occurrence of usage.occurrences) {
+        lines.push(`| ${occurrence.book} ${occurrence.chapter}:${occurrence.verse} | ${occurrence.position} | ${markdownCell(occurrence.sourceForm)} | ${markdownCell(occurrence.lemma)} | ${markdownCell(occurrence.morphologyCode ?? '—')} | ${markdownCell(occurrence.gloss ?? '—')} |`);
+      }
+      if (usage.nextOccurrenceCursor) lines.push('', `**Next occurrence cursor:** \`${usage.nextOccurrenceCursor}\``);
+    }
+  }
+  lines.push('', '**Cautions:**', ...usage.cautions.map(caution => `- ${caution}`), '', '*Usage source: corrected STEPBible morphology data — CC BY 4.0 (Tyndale House, Cambridge).*');
+  return lines.join('\n');
+}
+
+function markdownCell(value: string): string {
+  return value.replaceAll('|', '\\|').replaceAll('\n', ' ');
 }
 
 /** Normalize STEPBible markup before exposing it in either result view. */

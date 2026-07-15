@@ -100,6 +100,7 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
         'parallel_passages',
         'primary_source_search',
         'original_language_lookup',
+        'bible_verse_morphology',
         'original_language_study',
       ]);
       expect(listed.tools.find(tool => tool.name === 'bible_lookup')?.outputSchema).toMatchObject({
@@ -111,6 +112,45 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
         type: 'object',
         additionalProperties: false,
         properties: { schemaVersion: { const: '1' }, kind: { const: 'original_language_lookup' } },
+      });
+      expect(listed.tools.find(tool => tool.name === 'bible_verse_morphology')?.outputSchema).toMatchObject({
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          schemaVersion: { const: '1' },
+          kind: { const: 'bible_verse_morphology' },
+          words: { maxItems: 200 },
+        },
+      });
+      expect(listed.tools.find(tool => tool.name === 'primary_source_search')?.outputSchema).toMatchObject({
+        properties: { schemaVersion: { const: '3' } },
+      });
+      const primarySourceTool = listed.tools.find(tool => tool.name === 'primary_source_search')!;
+      expect(JSON.stringify(primarySourceTool.inputSchema).toLowerCase()).not.toContain('ccel');
+      expect(JSON.stringify(primarySourceTool.outputSchema).toLowerCase()).not.toContain('ccel');
+      expect((primarySourceTool.outputSchema!.properties!.queries as any).items.properties.providers)
+        .toMatchObject({ minItems: 1, maxItems: 1 });
+
+      const primarySource = await client.callTool({
+        name: 'primary_source_search',
+        arguments: { queries: [{ id: 'local-only', text: 'faith', providers: ['local'] }] },
+      });
+      expect(primarySource.isError).not.toBe(true);
+      expect(primarySource.structuredContent).toMatchObject({
+        schemaVersion: '3', kind: 'primary_source_search',
+        queries: [{ providers: [{ provider: 'local' }] }],
+        coverage: { localAttempted: false, localHitCount: 0 },
+      });
+      expect(JSON.stringify(primarySource).toLowerCase()).not.toContain('ccel');
+      expect((primarySource.structuredContent as any).coverage).not.toHaveProperty('ccelAttempted');
+      const resources = await client.listResources();
+      expect(resources.resources).toContainEqual(expect.objectContaining({
+        uri: 'theologai://primary-sources/catalog', mimeType: 'application/json',
+      }));
+      const catalog = await client.readResource({ uri: 'theologai://primary-sources/catalog' });
+      expect(JSON.parse(String(catalog.contents[0].text))).toMatchObject({
+        schemaVersion: '1', kind: 'local_primary_source_catalog', workCount: 0,
+        policies: { scope: 'hosted_collection_only', rightsStatus: 'not_established' },
       });
       expect(listed.tools).toEqual(expect.arrayContaining([
         expect.objectContaining({
@@ -138,9 +178,15 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
       expect(languageSchema?.properties).toMatchObject({
         strongs_number: expect.objectContaining({ type: 'string' }),
         query: expect.objectContaining({ type: 'string' }),
+        usage_level: expect.objectContaining({ enum: ['overview', 'study', 'technical'] }),
+        occurrence_limit: expect.objectContaining({ minimum: 1, maximum: 25 }),
+        occurrence_cursor: expect.objectContaining({ maxLength: 512 }),
       });
       expect(languageSchema?.properties?.detail_level).not.toHaveProperty('default');
       expect(languageSchema?.properties?.include_extended).not.toHaveProperty('default');
+      expect(languageSchema?.properties?.usage_level).not.toHaveProperty('default');
+      expect(languageSchema?.properties?.occurrence_limit).not.toHaveProperty('default');
+      expect(languageSchema?.properties?.occurrence_cursor).not.toHaveProperty('default');
       expect(languageSchema?.properties?.limit).not.toHaveProperty('default');
 
       const invalidClassic = await client.callTool({
@@ -178,16 +224,22 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
           text: expect.stringContaining('Plan status: **complete**'),
         })],
         structuredContent: {
-          schemaVersion: '1',
+          schemaVersion: '3',
           kind: 'primary_source_search',
           planStatus: 'complete',
-          queries: [expect.anything()],
+          queries: [expect.objectContaining({
+            normalizedSelection: 'relevance',
+            providers: [expect.objectContaining({
+              resultWindow: { returnedHitCount: 0, additionalMatchStatus: 'not_evaluated' },
+            })],
+          })],
           coverage: expect.any(Object),
           evidencePolicy: {
             snippetUse: 'discovery_only',
             selectedSectionAccess: 'mcp_resource_read',
             coverageScope: 'bounded_non_exhaustive',
             editionProvenance: 'incomplete',
+            lookupAliasUse: 'exact_routing_only_not_metadata_evidence',
           },
         },
       });

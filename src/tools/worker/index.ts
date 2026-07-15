@@ -134,7 +134,7 @@ export function createWorkerCompositionRoot(env: Env): WorkerCompositionRoot {
     ccelSearchAdapter,
     readPrimarySourceFeatureFlags(env),
   );
-  const strongsService = new StrongsService(strongsRepo);
+  const strongsService = new StrongsService(strongsRepo, morphRepo);
   const morphService = new MorphologyService(morphRepo);
   const originalLanguageStudyService = new OriginalLanguageStudyService(morphRepo, strongsRepo);
 

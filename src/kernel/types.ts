@@ -225,6 +225,9 @@ export type StrongsLookupParams =
     limit?: never;
     detail_level?: 'simple' | 'detailed';
     include_extended?: boolean;
+    usage_level?: 'overview' | 'study' | 'technical';
+    occurrence_limit?: number;
+    occurrence_cursor?: string;
   }
   | {
     query: string;
@@ -232,7 +235,51 @@ export type StrongsLookupParams =
     strongs_number?: never;
     detail_level?: never;
     include_extended?: never;
+    usage_level?: never;
+    occurrence_limit?: never;
+    occurrence_cursor?: never;
   };
+
+export type CorpusUsageLevel = 'overview' | 'study' | 'technical';
+
+export interface CorpusUsageResult {
+  level: CorpusUsageLevel;
+  exactMorphologyKey: string;
+  corpusIdentity: string;
+  attested: boolean;
+  totals: {
+    tokenCount: number;
+    verseCount: number;
+    bookCount: number;
+    sourceSurfaceVariantCount: number;
+  };
+  bookDistribution: Array<{
+    book: string;
+    canonicalOrder: number;
+    tokenCount: number;
+    verseCount: number;
+  }>;
+  sourceSurfaceVariants: Array<{
+    sourceForm: string;
+    tokenCount: number;
+    verseCount: number;
+    firstOccurrence: { book: string; canonicalOrder: number; chapter: number; verse: number; position: number };
+  }>;
+  occurrences?: Array<{
+    book: string;
+    canonicalOrder: number;
+    chapter: number;
+    verse: number;
+    position: number;
+    sourceForm: string;
+    lemma: string;
+    exactMorphologyKey: string;
+    morphologyCode: string | null;
+    gloss: string | null;
+  }>;
+  nextOccurrenceCursor?: string;
+  cautions: string[];
+}
 
 export interface StrongsResult {
   strongs_number: string;

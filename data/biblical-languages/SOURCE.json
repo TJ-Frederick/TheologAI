@@ -3,7 +3,7 @@
   "derived_artifacts": {
     "status": "content_reproducible_from_exact_verified_pins",
     "tracked_manifest": "data/data-manifest.json",
-    "d1_materialization_identity": "652245709aaed181345b0cf17f0091471ac3a3e323f6ae84cfd73a5d8b409c51",
+    "d1_materialization_identity": "c334b4b91c3a7c334a9425937c7f99473f27014ddae6cea377ee38bd578a6707",
     "compared_artifacts": 72,
     "comparison_identity_policy": "canonical_decompressed_json_v1_sha256_for_json_gz_else_raw_sha256",
     "changed_content_artifacts": 0,

@@ -7,13 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-<!-- theologai-public-contract tools=11 structured=bible_lookup,original_language_lookup,original_language_study,parallel_passages,primary_source_search -->
+<!-- theologai-public-contract tools=11 structured=bible_lookup,bible_verse_morphology,original_language_lookup,original_language_study,parallel_passages,primary_source_search -->
 
 ### Added
 
 - Added stable MCP 2025-11-25 structured output and server-side schema
   validation for `bible_lookup`, `parallel_passages`,
-  `primary_source_search`, `original_language_lookup`, and
+  `bible_verse_morphology`, `primary_source_search`, `original_language_lookup`, and
   `original_language_study`, while keeping
   their Markdown content available for legacy clients.
 - Added bounded, result-local provenance records and structured-first guidance
@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with exact byte sizes. It does not advertise or invoke inactive CCEL adapters.
 - Added the local-only `primary-source-research` prompt for bounded topic surveys
   or exact-work searches followed by explicit MCP section reads.
+- Added v3 primary-source research bundles: relevance or deterministic
+  round-robin work selection, limit-plus-one result-window evidence, a
+  metadata-only `theologai://primary-sources/catalog` JSON resource, and guided
+  topic, exact-work, and separate-creator workflows. Markdown remains available.
 - Added `original_language_study`, a context-first study of one verse token that
   combines morphology and source-separated lexical evidence while stating its
   interpretive limits.
@@ -48,6 +52,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed public CCEL document-body retrieval and reconciled both historical
   tools with the currently local-only provider contract. Defensive external
   discovery architecture remains inactive for a separately reviewed future rollout.
+- Removed dormant external-provider branches from the public
+  `primary_source_search` v3 output schema and structured result while retaining
+  the inactive internal adapter and service architecture.
 - Completed structured source metadata for ESV, NET, and the bundled legacy
   parallel corpus without asserting an open license for copyrighted translations.
 - Corrected Tyndale Open Study Notes licensing to CC BY-SA 4.0.

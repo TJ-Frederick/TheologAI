@@ -155,6 +155,12 @@ export class OriginalLanguageStudyService {
       .some(value => value != null && normalize(value) === normalized));
     if (direct.length > 0) return direct;
 
+    const compoundGloss = words.filter(word => {
+      const segment = selectAlignedHebrewGlossSegment(word);
+      return segment !== undefined && normalize(segment) === normalized;
+    });
+    if (compoundGloss.length > 0) return compoundGloss;
+
     const matches: MorphWord[] = [];
     const cache = new Map<string, EnhancedStrongsResult | null>();
     for (const word of words) {
@@ -192,4 +198,55 @@ function normalize(value: string): string {
   // script comparison insensitive to Greek accents/breathings and Hebrew
   // niqqud/cantillation while preserving every base letter and its order.
   return value.normalize('NFKD').replace(/\p{M}/gu, '').trim().toLocaleLowerCase('en-US');
+}
+
+const CONTENT_BEARING_HEBREW_PARTS = new Set(['N', 'V', 'A', 'D', 'P']);
+
+/**
+ * Select the one English gloss segment that is safely aligned with a Hebrew
+ * token's lexical identity. STEPBible uses slash-delimited morphemes, but a
+ * slash alone is not enough evidence: all three aligned fields must have the
+ * same non-empty shape, and selection must resolve to exactly one segment.
+ */
+function selectAlignedHebrewGlossSegment(word: MorphWord): string | undefined {
+  const identity = word.strongs_number ? parseStrongsIdentity(word.strongs_number) : undefined;
+  if (identity?.prefix !== 'H' || !word.morph_code || !word.gloss) return undefined;
+
+  const sourceSegments = splitNonEmptySegments(word.word_text);
+  const morphologySegments = splitNonEmptySegments(word.morph_code);
+  const glossSegments = splitNonEmptySegments(word.gloss);
+  if (!sourceSegments || !morphologySegments || !glossSegments
+    || sourceSegments.length < 2
+    || sourceSegments.length !== morphologySegments.length
+    || sourceSegments.length !== glossSegments.length
+    || !morphologySegments[0].startsWith('H')) {
+    return undefined;
+  }
+
+  const normalizedMorphology = [
+    morphologySegments[0].slice(1),
+    ...morphologySegments.slice(1),
+  ];
+  if (normalizedMorphology.some(segment => segment.length === 0 || segment.startsWith('H'))) {
+    return undefined;
+  }
+
+  const normalizedLemma = normalizeIdentitySegment(word.lemma);
+  const lemmaMatches = normalizedLemma
+    ? sourceSegments.flatMap((segment, index) => normalizeIdentitySegment(segment) === normalizedLemma ? [index] : [])
+    : [];
+  if (lemmaMatches.length === 1) return glossSegments[lemmaMatches[0]];
+
+  const contentBearing = normalizedMorphology.flatMap((segment, index) =>
+    CONTENT_BEARING_HEBREW_PARTS.has(segment[0]) ? [index] : []);
+  return contentBearing.length === 1 ? glossSegments[contentBearing[0]] : undefined;
+}
+
+function splitNonEmptySegments(value: string): string[] | undefined {
+  const segments = value.split('/').map(segment => segment.trim());
+  return segments.length >= 2 && segments.every(segment => segment.length > 0) ? segments : undefined;
+}
+
+function normalizeIdentitySegment(value: string): string {
+  return normalize(value).replace(/^\p{P}+|\p{P}+$/gu, '').trim();
 }

@@ -51,6 +51,24 @@ describe('Worker-safe JSON Schema validation', () => {
       message: expect.stringContaining(`Argument "${argument}"`),
     }));
   });
+
+  it.each(['John 3', 'Romans 8:28-30', 'not a reference'])(
+    'requires an optional word-study reference to be exactly one verse (%s)',
+    reference => {
+      expect(() => validatePromptArguments('word-study', { word: 'love', reference })).toThrow(
+        expect.objectContaining({
+          code: -32602,
+          message: expect.stringContaining('must be exactly one valid Bible verse'),
+        }),
+      );
+    },
+  );
+
+  it('accepts an exact verse as word-study context', () => {
+    expect(() => validatePromptArguments('word-study', {
+      word: 'love', reference: 'John 3:16',
+    })).not.toThrow();
+  });
   it('validates the two advertised output schemas with the same Worker-safe validator', () => {
     const bible = validatorFor(bibleLookupOutputSchema);
     const language = validatorFor(originalLanguageOutputSchema);

@@ -62,6 +62,13 @@ function makeMockRoot(): McpCompositionRoot {
           type: 'creed',
           date: '325',
           topics: ['trinity'],
+          catalog: {
+            lookupAliases: ['The Nicene Creed'],
+            composition: { startYear: 381, endYear: 381, label: '381 AD' },
+            creators: [{ name: 'First Council of Constantinople', role: 'revising_body' as const }],
+            metadataStatus: 'collective' as const,
+            metadataProvenanceIds: ['hist-meta-test-nicene'],
+          },
         }],
         getDocument: async () => ({
           id: 'nicene-creed',
@@ -306,6 +313,7 @@ describe('shared MCP registration', () => {
     expect(resources.resources.map(resource => resource.uri)).toEqual([
       'theologai://translations',
       'theologai://commentaries',
+      'theologai://primary-sources/catalog',
       'theologai://documents/nicene-creed',
     ]);
     expect(templates.resourceTemplates.map(template => template.uriTemplate)).toEqual([
@@ -326,6 +334,22 @@ describe('shared MCP registration', () => {
     expect(commentaries.contents[0]).toEqual(expect.objectContaining({
       text: expect.stringContaining('verseNumber metadata'),
     }));
+
+    const catalog = await client.readResource({ uri: 'theologai://primary-sources/catalog' });
+    expect(catalog.contents[0]).toMatchObject({ mimeType: 'application/json' });
+    expect(JSON.parse(String(catalog.contents[0].text))).toEqual({
+      schemaVersion: '1', kind: 'local_primary_source_catalog', workCount: 1,
+      works: [{
+        id: 'nicene-creed', title: 'Nicene Creed', documentType: 'creed',
+        lookupAliases: ['The Nicene Creed'], composition: { startYear: 381, endYear: 381, label: '381 AD' },
+        creators: [{ name: 'First Council of Constantinople', role: 'revising_body' }],
+        metadataStatus: 'collective', metadataProvenanceIds: ['hist-meta-test-nicene'],
+      }],
+      policies: {
+        scope: 'hosted_collection_only', lookupAliasUse: 'exact_routing_only_not_metadata_evidence',
+        editionProvenance: 'incomplete', rightsStatus: 'not_established',
+      },
+    });
   });
 
   it.each(LOGGING_SERVER_VARIANTS)('$name warns when historical resources are unavailable and returns static resources', async ({ create }) => {
@@ -445,8 +469,9 @@ describe('shared MCP registration', () => {
     root.tools = root.tools.map(tool => tool.name === 'primary_source_search'
       ? createPrimarySourceSearchHandler({ search: async () => ({
         planStatus: 'complete',
-        queries: [{ id: 'topic', normalizedMode: 'all_terms', providers: [{
+        queries: [{ id: 'topic', normalizedMode: 'all_terms', normalizedSelection: 'relevance', providers: [{
           provider: 'local', status: 'ok', searched: true, page: 1, hitCount: 1, notices: [],
+          resultWindow: { returnedHitCount: 1, additionalMatchStatus: 'no_additional_match_observed' },
           hits: [{
             queryId: 'topic', provider: 'local', title: doc!.title,
             sectionLabel: section.title, snippet: 'We believe',
@@ -571,10 +596,13 @@ describe('shared MCP registration', () => {
       text: expect.stringContaining('G26'),
     }));
     expect(wordStudy.messages[0].content).toEqual(expect.objectContaining({
-      text: expect.stringContaining('mode`, `entries`, `detailLevel`, and `provenanceIds`'),
+      text: expect.stringContaining('optional `corpusUsage`, and `provenanceIds`'),
     }));
     expect(wordStudy.messages[0].content).toEqual(expect.objectContaining({
       text: expect.stringContaining('Do not treat one English gloss as exhausting'),
+    }));
+    expect(wordStudy.messages[0].content).toEqual(expect.objectContaining({
+      text: expect.stringContaining('Counted morphology tokens are distinct from lexicon occurrence metadata'),
     }));
 
     const passageExegesis = await client.getPrompt({
@@ -586,6 +614,9 @@ describe('shared MCP registration', () => {
     }));
     expect(passageExegesis.messages[0].content).toEqual(expect.objectContaining({
       text: expect.stringContaining('distinguish an unavailable translation'),
+    }));
+    expect(passageExegesis.messages[0].content).toEqual(expect.objectContaining({
+      text: expect.stringContaining('raw `morphologyCode` beside nullable `morphologyExpansion`'),
     }));
     expect(passageExegesis.messages[0].content).toEqual(expect.objectContaining({
       text: expect.stringContaining('do not infer quotation, dependence, synoptic direction, or a thematic relationship'),
@@ -612,12 +643,70 @@ describe('shared MCP registration', () => {
     expect(compareTranslations.messages[0].content).toEqual(expect.objectContaining({
       text: expect.stringContaining('compare by its `translation`, report every `failures[]` item'),
     }));
+    expect(compareTranslations.messages[0].content).toEqual(expect.objectContaining({
+      text: expect.stringContaining('retain `provenanceIds` and `lemmaProvenanceIds`'),
+    }));
+
+    const compareTranslationRange = await client.getPrompt({
+      name: 'compare-translations',
+      arguments: { reference: 'Philippians 2:6-8' },
+    });
+    const compareTranslationRangeText = compareTranslationRange.messages[0].content.type === 'text'
+      ? compareTranslationRange.messages[0].content.text
+      : '';
+    expect(compareTranslationRangeText).toContain('Select at most three consequential individual verses');
+    expect(compareTranslationRangeText).not.toContain(
+      '`bible_verse_morphology` with `{"reference":"Philippians 2:6-8"',
+    );
 
     const searchedWord = await client.getPrompt({ name: 'word-study', arguments: { word: 'love' } });
     expect(searchedWord.messages[0].content).toEqual(expect.objectContaining({
       type: 'text',
       text: expect.stringContaining('{"query":"love","limit":10}'),
     }));
+    expect(searchedWord.messages[0].content).toEqual(expect.objectContaining({
+      text: expect.stringContaining('make a subsequent exact `original_language_lookup` call'),
+    }));
+    expect(searchedWord.messages[0].content).toEqual(expect.objectContaining({
+      text: expect.stringContaining('that returned `strongs_number`, `include_extended: true`, `detail_level: "detailed"`, and `usage_level: "overview"`'),
+    }));
+    const searchedWordText = searchedWord.messages[0].content.type === 'text'
+      ? searchedWord.messages[0].content.text
+      : '';
+    expect(searchedWordText).not.toMatch(/"strongs_number":"[GH]\d+/);
+
+    const exactWordText = wordStudy.messages[0].content.type === 'text'
+      ? wordStudy.messages[0].content.text
+      : '';
+    expect(exactWordText).toContain('This is already an exact Strong\'s lookup');
+    expect(exactWordText).not.toContain('do not invent or hard-code an identifier');
+
+    const contextualWord = await client.getPrompt({
+      name: 'word-study',
+      arguments: { word: 'love', reference: 'John 3:16' },
+    });
+    expect(contextualWord.messages[0].content).toEqual(expect.objectContaining({
+      text: expect.stringContaining('nullable `text`, `lemma`, and `morphologyExpansion`'),
+    }));
+    expect(contextualWord.messages[0].content).toEqual(expect.objectContaining({
+      text: expect.stringContaining('`provenanceIds` and `lemmaProvenanceIds`'),
+    }));
+    expect(contextualWord.messages[0].content).toEqual(expect.objectContaining({
+      text: expect.stringContaining('empty `lemmaProvenanceIds` means no lemma is present'),
+    }));
+
+    const confessionStudy = await client.getPrompt({
+      name: 'confession-study',
+      arguments: { topic: 'justification', traditions: 'Reformed, Lutheran' },
+    });
+    const confessionText = confessionStudy.messages[0].content.type === 'text'
+      ? confessionStudy.messages[0].content.text
+      : '';
+    expect(confessionText).toContain('`primary_source_search`');
+    expect(confessionText).toContain('follow at most five unique canonical `resource_link` blocks');
+    expect(confessionText).toContain('theologai://primary-sources/catalog');
+    expect(confessionText).toContain('Never relabel an issuing, drafting, revising, or compiling body as an author');
+    expect(confessionText).toContain('never infer a work\'s tradition or author attribution');
 
     const primarySource = await client.getPrompt({
       name: 'primary-source-research',
@@ -657,6 +746,14 @@ describe('shared MCP registration', () => {
       code: -32602,
       message: expect.stringContaining('between 2 and 100 characters'),
     });
+    for (const reference of ['John 3', 'Romans 8:28-30', 'not a reference']) {
+      await expect(client.getPrompt({
+        name: 'word-study', arguments: { word: 'love', reference },
+      })).rejects.toMatchObject({
+        code: -32602,
+        message: expect.stringContaining('must be exactly one valid Bible verse'),
+      });
+    }
     await expect(client.getPrompt({
       name: 'passage-exegesis',
       arguments: { reference: 316 } as never,

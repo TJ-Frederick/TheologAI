@@ -6,6 +6,7 @@ function providerResult(provider: 'local' | 'ccel_live', status: PrimarySourcePr
   return {
     provider, status, searched: status !== 'disabled', page: 1,
     hitCount: count,
+    resultWindow: { returnedHitCount: count, additionalMatchStatus: 'not_evaluated' },
     hits: Array.from({ length: count }, (_, index) => ({
       provider, title: `${provider} ${index}`, snippet: 'evidence',
       locator: provider === 'local'
@@ -38,9 +39,30 @@ describe('PrimarySourceSearchService', () => {
     const service = new PrimarySourceSearchService(local as any, ccel as any, { ccelLiveSearch: false });
     const result = await service.search(plan([query({ text: '  union\n with   Christ  ', providers: ['local'] })]));
     expect(result.planStatus).toBe('complete');
+    expect(result.queries[0]).toMatchObject({ normalizedMode: 'all_terms', normalizedSelection: 'relevance' });
     expect(result.queries[0].providers[0].hits[0].queryId).toBe('q1');
-    expect(local.search).toHaveBeenCalledWith(expect.objectContaining({ text: 'union with Christ', match: 'all_terms', page: 1, limit: 5 }));
+    expect(local.search).toHaveBeenCalledWith(expect.objectContaining({
+      text: 'union with Christ', match: 'all_terms', selection: 'relevance', page: 1, limit: 5,
+    }));
     expect(ccel.search).not.toHaveBeenCalled();
+  });
+
+  it('preserves separate creator scopes and mixed unfiltered/date/work plans', async () => {
+    const local = { search: vi.fn().mockResolvedValue(providerResult('local', 'catalog_miss', 0)) };
+    const service = new PrimarySourceSearchService(local as any, { search: vi.fn() } as any, { ccelLiveSearch: false });
+    const result = await service.search(plan([
+      query({ id: 'erasmus', author: 'Erasmus of Rotterdam' }),
+      query({ id: 'luther', author: 'Martin Luther' }),
+      query({ id: 'medieval', startYear: 500, endYear: 1500 }),
+      query({ id: 'institutes', work: 'Institutes of the Christian Religion' }),
+    ]));
+    expect(result.planStatus).toBe('complete');
+    expect(local.search.mock.calls.map(([call]) => call)).toEqual([
+      expect.objectContaining({ author: 'Erasmus of Rotterdam' }),
+      expect.objectContaining({ author: 'Martin Luther' }),
+      expect.objectContaining({ startYear: 500, endYear: 1500 }),
+      expect.objectContaining({ work: 'Institutes of the Christian Religion' }),
+    ]);
   });
 
   it('returns explicit disabled coverage for ccel-only without calling the adapter', async () => {
@@ -65,8 +87,11 @@ describe('PrimarySourceSearchService', () => {
     const ccel = { search: vi.fn().mockResolvedValue(providerResult('ccel_live', 'ok', 8)) };
     const queries = [0, 1, 2, 3].map(index => query({ id: `q${index}`, providers: ['local', ...(index < 3 ? ['ccel'] : [])], limit: 8 }));
     const result = await new PrimarySourceSearchService(local as any, ccel as any, { ccelLiveSearch: true }).search(plan(queries));
+    expect(result.planStatus).toBe('partial');
     expect(result.queries.flatMap(item => item.providers).flatMap(item => item.hits)).toHaveLength(32);
     expect(result.queries[0].providers[0].hits[0].rankWithinProvider).toBe(1);
+    const truncated = result.queries.flatMap(item => item.providers).find(item => item.hits.length < 8);
+    expect(truncated?.resultWindow.additionalMatchStatus).toBe('additional_match_observed');
   });
 
   it.each([
@@ -75,6 +100,9 @@ describe('PrimarySourceSearchService', () => {
     plan([query({ text: '\u0000bad' })]),
     plan([query({ providers: ['local', 'local'] })]),
     plan([query({ match: 'all_terms', text: 'one two three four five six seven eight nine ten eleven twelve thirteen' })]),
+    plan([query({ startYear: 1600, endYear: 1500 })]),
+    plan([query({ startYear: 1500.5 })]),
+    plan([query({ selection: 'random' })]),
     { queries: [query()], extra: true },
   ])('rejects invalid bounded plans %#', async invalid => {
     const service = new PrimarySourceSearchService({ search: vi.fn() } as any, { search: vi.fn() } as any, { ccelLiveSearch: false });

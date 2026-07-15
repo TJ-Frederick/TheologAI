@@ -7,7 +7,9 @@ import type { ToolHandler } from '../../../src/kernel/types.js';
 import { createTheologAiMcpServer } from '../../../src/mcp/server.js';
 import { createBibleLookupHandler } from '../../../src/tools/v2/bibleLookup.js';
 import { createStrongsLookupHandler } from '../../../src/tools/v2/strongsLookup.js';
+import { createVerseMorphologyHandler } from '../../../src/tools/v2/verseMorphology.js';
 import type { BibleService } from '../../../src/services/bible/BibleService.js';
+import type { MorphologyService } from '../../../src/services/languages/MorphologyService.js';
 import type { StrongsService } from '../../../src/services/languages/StrongsService.js';
 import { createDeterministicMcpFixture } from '../../fixtures/mcpCompositionRoot.js';
 
@@ -58,13 +60,14 @@ describe('MCP structured output validation', () => {
       'parallel_passages',
       'primary_source_search',
       'original_language_lookup',
+      'bible_verse_morphology',
       'original_language_study',
     ]);
     for (const toolName of withOutput) {
       const schema = listed.tools.find(tool => tool.name === toolName)?.outputSchema;
       expect(schema).toMatchObject({ type: 'object', additionalProperties: false });
       expect(schema).not.toHaveProperty('$ref');
-      expect(schema?.properties?.schemaVersion).toMatchObject({ const: '1' });
+      expect(schema?.properties?.schemaVersion).toMatchObject({ const: toolName === 'primary_source_search' ? '3' : '1' });
     }
   });
 
@@ -194,10 +197,38 @@ describe('MCP structured output validation', () => {
           },
         } : {}),
       }),
+      getCorpusUsage: async () => ({
+        level: 'technical' as const, exactMorphologyKey: 'G0026', corpusIdentity: 'c3600bb55da75aa600f8c97885efa7d58a3e8c29c3fcc6445a553091011beabd',
+        attested: true, totals: { tokenCount: 3, verseCount: 3, bookCount: 2, sourceSurfaceVariantCount: 2 },
+        bookDistribution: [{ book: 'John', canonicalOrder: 43, tokenCount: 2, verseCount: 2 }],
+        sourceSurfaceVariants: [{
+          sourceForm: 'ἀγάπη·', tokenCount: 1, verseCount: 1,
+          firstOccurrence: { book: 'John', canonicalOrder: 43, chapter: 3, verse: 16, position: 8 },
+        }],
+        occurrences: [{
+          book: 'John', canonicalOrder: 43, chapter: 3, verse: 16, position: 8,
+          sourceForm: 'ἀγάπη·', lemma: 'ἀγάπη', exactMorphologyKey: 'G0026', morphologyCode: 'N-NSF', gloss: 'love',
+        }], nextOccurrenceCursor: 'opaque_cursor', cautions: ['one', 'two', 'three'],
+      }),
     } as unknown as StrongsService;
+    const morphologyService = {
+      getVerseMorphology: async () => ({
+        reference: 'John 1:1', testament: 'NT' as const, book: 'John', chapter: 1, verse: 1,
+        words: [{
+          position: 1, text: '', lemma: '', strong: '', morph: '',
+          morphExpanded: undefined, gloss: '[ ]',
+        }],
+        citation: {
+          source: 'STEPBible TAGNT/TAHOT',
+          copyright: 'CC BY 4.0 (Tyndale House, Cambridge)',
+          url: 'https://github.com/STEPBible/STEPBible-Data',
+        },
+      }),
+    } as unknown as MorphologyService;
     const client = await connect([
       createBibleLookupHandler(bibleService),
       createStrongsLookupHandler(strongsService),
+      createVerseMorphologyHandler(morphologyService),
     ]);
 
     await client.listTools();
@@ -207,8 +238,10 @@ describe('MCP structured output validation', () => {
     const simple = await client.callTool({ name: 'original_language_lookup', arguments: { strongs_number: 'G26' } });
     const detailed = await client.callTool({ name: 'original_language_lookup', arguments: { strongs_number: 'G26', detail_level: 'detailed' } });
     const extended = await client.callTool({ name: 'original_language_lookup', arguments: { strongs_number: 'G26', include_extended: true, detail_level: 'detailed' } });
+    const usage = await client.callTool({ name: 'original_language_lookup', arguments: { strongs_number: 'G26', usage_level: 'technical', occurrence_limit: 1 } });
+    const morphology = await client.callTool({ name: 'bible_verse_morphology', arguments: { reference: 'John 1:1', expand_morphology: true } });
 
-    for (const result of [bibleSingle, biblePartial, search, simple, detailed, extended]) {
+    for (const result of [bibleSingle, biblePartial, search, simple, detailed, extended, usage, morphology]) {
       expect(result.isError).not.toBe(true);
       expect(result.content[0]).toMatchObject({ type: 'text', text: expect.any(String) });
       expect(result.structuredContent).toMatchObject({ schemaVersion: '1' });
@@ -223,6 +256,16 @@ describe('MCP structured output validation', () => {
     expect(extended.structuredContent).toMatchObject({
       mode: 'entry',
       entries: [{ extended: { definition: 'love\ndivine love & charity' } }],
+    });
+    expect(usage.structuredContent).toMatchObject({
+      corpusUsage: { exactMorphologyKey: 'G0026', occurrences: [{ sourceForm: 'ἀγάπη·' }] },
+    });
+    expect(morphology.structuredContent).toMatchObject({
+      kind: 'bible_verse_morphology',
+      words: [{
+        text: null, lemma: null, strongsNumber: null, morphologyCode: null,
+        morphologyExpansion: null, lemmaProvenanceIds: [],
+      }],
     });
   });
 

@@ -13,50 +13,37 @@ Use this workflow when the user asks about:
 
 ## Available Documents
 
-TheologAI includes 17 historical documents spanning the major Christian traditions:
-
-**Ecumenical Creeds:**
-- Apostles' Creed, Nicene Creed, Athanasian Creed, Chalcedonian Definition
-
-**Reformed:**
-- Westminster Confession, Westminster Larger Catechism, Westminster Shorter Catechism
-- Heidelberg Catechism, Belgic Confession, Canons of Dort
-
-**Lutheran:**
-- Augsburg Confession
-
-**Anglican:**
-- 39 Articles of Religion
-
-**Baptist:**
-- London Baptist Confession (1689)
-
-**Roman Catholic:**
-- Council of Trent, Baltimore Catechism
-
-**Eastern Orthodox:**
-- Confession of Dositheus, Philaret Catechism
+TheologAI includes 17 historical documents. Use the catalog and exact resources
+returned by the server to establish what is available and what each document
+says. The workflow must not assign a tradition or author from a title or from a
+prewritten grouping.
 
 ## Methodology
 
 ### Step 1: Identify Relevant Documents
 
-- Call `classic_text_lookup` with `{ "listWorks": true }` to see all available documents
-- Based on the topic, select relevant documents from different traditions
+- Read `theologai://primary-sources/catalog` with MCP `resources/read` before
+  selecting works. Treat its aliases as exact routing aids, not evidence.
+- Treat any traditions named by the user as comparison interests, not as author
+  filters or evidence that a document belongs to that tradition.
+- Do not infer tradition, authorship, or creator role from a title or topic.
 
 ### Step 2: Search Across Traditions
 
-- Call `classic_text_lookup` with `{ "query": "the doctrinal topic" }`
-- This searches across all documents using full-text search
-- Review results to identify which documents address the topic
+- Call `primary_source_search` with one bounded local query plan, for example
+  `{ "queries": [{ "id": "confession-topic", "text": "the doctrinal topic", "providers": ["local"], "match": "all_terms", "selection": "work_diversity", "limit": 5 }] }`.
+- Treat returned snippets as discovery-only. Preserve document metadata, creator
+  names, and creator roles exactly as returned.
+- Do not claim the search covered sources outside the hosted collection, and do
+  not treat missing hits as historical silence.
 
 ### Step 3: Read Specific Sections
 
-- For each relevant document, call `classic_text_lookup` with
-  `{ "work": "document-slug", "browseSections": true }` to inspect its sections
-- Call `classic_text_lookup` with `{ "work": "document-slug" }` to read the
-  locally indexed document
-- Quote the actual text rather than paraphrasing
+- Select at most five unique returned sections and deduplicate locators.
+- Follow each selected canonical `resource_link` with MCP `resources/read` and
+  confirm the returned URI matches the selected locator.
+- Do not quote, characterize a position, or compare documents from snippets.
+  Base those claims only on exact resources actually read.
 
 ### Step 4: Biblical Foundations
 
@@ -77,6 +64,10 @@ Present a structured comparison:
 
 - Represent each tradition charitably and accurately
 - Quote primary sources rather than characterizing positions
+- Preserve creator roles. Never relabel an issuing, drafting, revising, or
+  compiling body as an author.
+- Never infer a tradition or author attribution from a title, topic, or the
+  user's requested comparison traditions.
 - Note the historical context that shaped each document
 - Distinguish between formal confessional positions and popular beliefs
 - When traditions disagree, present the strongest version of each argument

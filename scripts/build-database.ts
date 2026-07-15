@@ -36,6 +36,11 @@ import {
   parseDataManifest,
   verifyD1Migrations,
 } from './d1-corpus-identity.js';
+import { BIBLE_BOOKS } from '../src/kernel/books.js';
+import {
+  parseHistoricalDocumentCatalog,
+  parseHistoricalDocumentCatalogProvenance,
+} from './historical-document-catalog.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -179,8 +184,9 @@ const hebrewLexicon = JSON.parse(sourceRegistry.read(
   'utf-8',
 )) as Record<string, { lemma?: unknown }>;
 const insertMorph = db.prepare(
-  'INSERT OR IGNORE INTO morphology (book, chapter, verse, position, word_text, lemma, strongs_number, morph_code, gloss) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  'INSERT OR IGNORE INTO morphology (book, chapter, verse, position, word_text, lemma, strongs_number, morph_code, gloss, book_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
 );
+const canonicalBookOrder = new Map(BIBLE_BOOKS.map(book => [book.stepbibleId, book.number]));
 
 const morphTx = db.transaction(() => {
   let count = 0;
@@ -198,6 +204,8 @@ const morphTx = db.transaction(() => {
       const compressed = sourceRegistry.read(relativePath);
       const json = JSON.parse(gunzipSync(compressed).toString('utf-8'));
       const bookName = json.book as string;
+      const bookOrder = canonicalBookOrder.get(bookName);
+      if (!bookOrder) throw new Error(`Unknown STEPBible morphology book: ${bookName}`);
       if (file === '43-John.json.gz') {
         assertJohnOneOneSource(json, `data/biblical-languages/stepbible/${subdir}/${file}`);
       }
@@ -217,6 +225,7 @@ const morphTx = db.transaction(() => {
               w.strong || null,
               w.morph || null,
               w.gloss || null,
+              bookOrder,
             );
             count++;
           }
@@ -232,6 +241,69 @@ const morphCount = morphTx();
 log(`  Inserted ${morphCount} morphology words`);
 assertJohnOneOneDatabase(db);
 assertGenesisOneOneDatabase(db);
+
+// ── Deterministic Strong's usage aggregates ──
+
+log("Materializing Strong's usage statistics...");
+db.exec(`
+  INSERT INTO strongs_book_stats
+    (strongs_key, book, book_order, token_count, verse_count)
+  SELECT strongs_number, book, book_order, COUNT(*),
+         COUNT(DISTINCT printf('%d:%d:%d', book_order, chapter, verse))
+  FROM morphology
+  WHERE strongs_number IS NOT NULL AND strongs_number <> ''
+  GROUP BY strongs_number, book, book_order
+  ORDER BY strongs_number, book_order;
+
+  WITH form_groups AS (
+    SELECT strongs_number AS strongs_key,
+           word_text AS form_text,
+           COUNT(*) AS token_count,
+           COUNT(DISTINCT printf('%d:%d:%d', book_order, chapter, verse)) AS verse_count
+    FROM morphology
+    WHERE strongs_number IS NOT NULL AND strongs_number <> ''
+    GROUP BY strongs_number, word_text
+  ), first_occurrences AS (
+    SELECT strongs_number AS strongs_key,
+           word_text AS form_text,
+           book AS first_book,
+           book_order AS first_book_order,
+           chapter AS first_chapter,
+           verse AS first_verse,
+           position AS first_position,
+           ROW_NUMBER() OVER (
+             PARTITION BY strongs_number, word_text
+             ORDER BY book_order, chapter, verse, position
+           ) AS occurrence_rank
+    FROM morphology
+    WHERE strongs_number IS NOT NULL AND strongs_number <> ''
+  )
+  INSERT INTO strongs_form_stats
+    (strongs_key, form_text, token_count, verse_count,
+     first_book, first_book_order, first_chapter, first_verse, first_position)
+  SELECT groups.strongs_key, groups.form_text, groups.token_count, groups.verse_count,
+         firsts.first_book, firsts.first_book_order,
+         firsts.first_chapter, firsts.first_verse, firsts.first_position
+  FROM form_groups groups
+  JOIN first_occurrences firsts
+   ON firsts.strongs_key = groups.strongs_key
+   AND firsts.form_text = groups.form_text
+   AND firsts.occurrence_rank = 1
+  ORDER BY groups.strongs_key, groups.form_text;
+
+  INSERT INTO strongs_usage_stats
+    (strongs_key, token_count, verse_count, book_count, form_count)
+  SELECT morphology.strongs_number,
+         COUNT(*),
+         COUNT(DISTINCT printf('%d:%d:%d', book_order, chapter, verse)),
+         COUNT(DISTINCT book_order),
+         (SELECT COUNT(*) FROM strongs_form_stats forms
+          WHERE forms.strongs_key = morphology.strongs_number)
+  FROM morphology
+  WHERE morphology.strongs_number IS NOT NULL AND morphology.strongs_number <> ''
+  GROUP BY morphology.strongs_number
+  ORDER BY morphology.strongs_number;
+`);
 
 // ── Tier 2: Morphology codes ──
 
@@ -292,6 +364,13 @@ assertHebrewLemmaCoverageDatabase(db);
 
 log('Loading historical documents...');
 const histDir = join(DATA, 'historical-documents');
+const historicalCatalog = parseHistoricalDocumentCatalog(JSON.parse(
+  sourceRegistry.read('data/historical-document-catalog.json', 'utf-8'),
+));
+parseHistoricalDocumentCatalogProvenance(JSON.parse(
+  sourceRegistry.read('data/historical-document-catalog-provenance.json', 'utf-8'),
+), historicalCatalog);
+const historicalCatalogById = new Map(historicalCatalog.map(entry => [entry.documentId, entry]));
 const insertDoc = db.prepare(
   'INSERT OR IGNORE INTO documents (id, title, type, date, metadata) VALUES (?, ?, ?, ?, ?)'
 );
@@ -310,13 +389,24 @@ const histTx = db.transaction(() => {
   for (const file of files) {
     const id = file.replace('.json', '');
     const doc = JSON.parse(sourceRegistry.read(`data/historical-documents/${file}`, 'utf-8'));
+    const catalog = historicalCatalogById.get(id);
+    if (!catalog) throw new Error(`Historical document ${id} is missing from the reviewed catalog`);
 
     insertDoc.run(
       id,
       doc.title,
       doc.type || 'document',
-      doc.date || null,
-      JSON.stringify({ topics: doc.topics || [] }),
+      catalog.composition.label,
+      JSON.stringify({
+        topics: doc.topics || [],
+        catalog: {
+          lookupAliases: catalog.lookupAliases,
+          composition: catalog.composition,
+          creators: catalog.creators,
+          metadataStatus: catalog.metadataStatus,
+          metadataProvenanceIds: catalog.metadataProvenanceIds,
+        },
+      }),
     );
     docCount++;
 
@@ -333,6 +423,10 @@ const histTx = db.transaction(() => {
         sectionCount++;
       }
     }
+  }
+
+  if (docCount !== historicalCatalog.length) {
+    throw new Error(`Historical catalog/document mismatch: ${historicalCatalog.length} catalog entries, ${docCount} documents`);
   }
 
   return { docCount, sectionCount };
@@ -407,12 +501,16 @@ if (foreignKeyViolations.length > 0) {
   throw new Error(`Foreign-key check failed: ${JSON.stringify(foreignKeyViolations)}`);
 }
 
+const countMismatches: string[] = [];
 for (const [table, expected] of Object.entries(manifest.expectedCounts)) {
   if (!/^[a-z_]+$/.test(table)) throw new Error(`Invalid table name in manifest: ${table}`);
   const row = db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get() as { count: number };
   if (row.count !== expected) {
-    throw new Error(`Unexpected ${table} count: expected ${expected}, received ${row.count}`);
+    countMismatches.push(`${table}: expected ${expected}, received ${row.count}`);
   }
+}
+if (countMismatches.length > 0) {
+  throw new Error(`Unexpected table counts: ${countMismatches.join('; ')}`);
 }
 
 db.close();

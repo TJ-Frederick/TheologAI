@@ -54,7 +54,7 @@ jobs:
   fresh-checkout-data:
     name: Fresh Checkout & Data
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
@@ -76,6 +76,13 @@ jobs:
 
       - name: Verify generated SQLite database
         run: npm run data:verify-db -- --database "$RUNNER_TEMP/theologai.db"
+
+      - name: Exercise D1 readiness checks against generated database
+        run: |
+          test -f "$THEOLOGAI_TEST_DATABASE_PATH"
+          npm run test:d1-readiness-generated-db
+        env:
+          THEOLOGAI_TEST_DATABASE_PATH: ${{ runner.temp }}/theologai.db
 
       - name: Export deterministic local D1 seed
         run: npm run d1:seed:export -- --database "$RUNNER_TEMP/theologai.db" --clean

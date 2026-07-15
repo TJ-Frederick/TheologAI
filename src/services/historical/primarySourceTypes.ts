@@ -6,6 +6,7 @@
  */
 
 export type PrimarySourceSearchMatch = 'all_terms' | 'phrase';
+export type PrimarySourceSelection = 'relevance' | 'work_diversity';
 
 export type PrimarySourceRequestedProvider = 'local' | 'ccel';
 
@@ -18,6 +19,7 @@ export type PrimarySourceProviderStatus =
   | 'disabled'
   | 'rate_limited'
   | 'interface_changed'
+  | 'catalog_miss'
   | 'unsupported_filter';
 
 export interface PrimarySourceSearchQuery {
@@ -25,8 +27,11 @@ export interface PrimarySourceSearchQuery {
   match?: PrimarySourceSearchMatch;
   author?: string;
   work?: string;
+  startYear?: number;
+  endYear?: number;
   page?: number;
   limit?: number;
+  selection?: PrimarySourceSelection;
 }
 
 export interface CcelSectionLocator {
@@ -58,6 +63,22 @@ interface PrimarySourceSearchHitBase {
   /** Reviewed catalog metadata. Absence means unknown, not that the work has no type/date. */
   documentType?: string;
   documentDate?: string;
+  creators?: Array<{ name: string; role: 'author' | 'issuing_body' | 'drafting_body' | 'revising_body' | 'compiler' }>;
+  metadataStatus?: 'reviewed' | 'anonymous' | 'collective' | 'unknown';
+  /** Stable IDs into the checked-in historical metadata provenance manifest. */
+  metadataProvenanceIds?: string[];
+}
+
+export interface PrimarySourceCatalogScope {
+  status: 'matched' | 'catalog_miss' | 'metadata_incomplete';
+  requested: { work?: string; author?: string; startYear?: number; endYear?: number };
+  eligibleDocumentCount: number;
+  eligibleDocuments: Array<{
+    id: string;
+    title: string;
+    metadataStatus: 'reviewed' | 'anonymous' | 'collective' | 'unknown';
+  }>;
+  eligibleDocumentsTruncated: boolean;
 }
 
 export interface LocalPrimarySourceSearchHit extends PrimarySourceSearchHitBase {
@@ -83,14 +104,21 @@ export type PrimarySourcePlanHit = PrimarySourceSearchHit & {
   queryId: string;
 };
 
-export interface PrimarySourcePlanProviderResult extends Omit<PrimarySourceProviderResult, 'hits'> {
+export interface PrimarySourcePlanProviderResult extends Omit<PrimarySourceProviderResult, 'hits' | 'resultWindow'> {
   hits: PrimarySourcePlanHit[];
+  resultWindow: PrimarySourceResultWindow;
 }
 
 export interface PrimarySourcePlanQueryResult {
   id: string;
   normalizedMode: PrimarySourceSearchMatch;
+  normalizedSelection: PrimarySourceSelection;
   providers: PrimarySourcePlanProviderResult[];
+}
+
+export interface PrimarySourceResultWindow {
+  returnedHitCount: number;
+  additionalMatchStatus: 'additional_match_observed' | 'no_additional_match_observed' | 'not_evaluated';
 }
 
 export interface PrimarySourceSearchCoverage {
@@ -117,6 +145,9 @@ export interface PrimarySourceProviderResult {
   searched: boolean;
   page: number;
   hitCount: number;
+  /** Added by local lookahead; the plan service normalizes dormant providers to not_evaluated. */
+  resultWindow?: PrimarySourceResultWindow;
   hits: PrimarySourceSearchHit[];
   notices: string[];
+  scope?: PrimarySourceCatalogScope;
 }

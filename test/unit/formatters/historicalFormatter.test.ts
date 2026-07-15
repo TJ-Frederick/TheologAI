@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   formatDocumentList,
+  formatDocumentSectionIndex,
   formatDocumentSections,
   formatSearchResults,
 } from '../../../src/formatters/historicalFormatter.js';
@@ -94,6 +95,17 @@ describe('formatDocumentSections', () => {
   });
 });
 
+describe('formatDocumentSectionIndex', () => {
+  it('returns compact attributable exact-section links without section bodies', () => {
+    const out = formatDocumentSectionIndex(makeDoc(), [makeSection()]);
+
+    expect(out).toContain('Nicene Creed — Section Index');
+    expect(out).toContain('Section 1 — Article I');
+    expect(out).toContain('[read exact section](theologai://documents/nicene-creed#section-1)');
+    expect(out).not.toContain('We believe in one God');
+  });
+});
+
 // ── formatSearchResults ──
 
 describe('formatSearchResults', () => {
@@ -108,8 +120,10 @@ describe('formatSearchResults', () => {
   });
 
   it('shows section titles when present', () => {
-    const out = formatSearchResults('grace', [makeSection({ title: 'Of Grace' })]);
-    expect(out).toContain('**Of Grace**');
+    const out = formatSearchResults('grace', [makeSection({ title: 'Of Grace' })], [makeDoc()]);
+    expect(out).toContain('**Nicene Creed — Section 1: Of Grace**');
+    expect(out).toContain('[Read the canonical exact section](theologai://documents/nicene-creed#section-1)');
+    expect(out).toContain('Discovery snippet only');
   });
 
   it('truncates content preview at 300 chars with ellipsis', () => {

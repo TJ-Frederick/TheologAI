@@ -142,12 +142,12 @@ describe('D1HistoricalDocumentRepository', () => {
   });
 
   describe('search', () => {
-    it('escapes quotes and asterisks from query', async () => {
+    it('uses controlled literal all-term FTS for punctuation and multiple terms', async () => {
       const db = createSimpleD1([]);
       const repo = new D1HistoricalDocumentRepository(db as any);
-      await repo.search("test'*\"");
+      await repo.search("Lord's Supper");
       const bindArgs = db.prepare.mock.results[0].value.bind.mock.calls[0];
-      expect(bindArgs[0]).toBe('"test"*');
+      expect(bindArgs[0]).toBe('"Lord\'s" AND "Supper"');
     });
 
     it('unwraps { results } from FTS join query', async () => {
@@ -232,13 +232,24 @@ describe('D1HistoricalDocumentRepository', () => {
       };
       const db = createSimpleD1([row]);
       const result = await new D1HistoricalDocumentRepository(db as any).searchPrimarySources({
-        text: 'grace OR faith', match: 'all_terms', documentId: 'nicene-creed', limit: 8,
+        text: 'grace OR faith', match: 'all_terms', documentIds: ['nicene-creed'], limit: 8,
       });
       expect(db.prepare.mock.results[0].value.bind).toHaveBeenCalledWith('"grace" AND "OR" AND "faith"', 'nicene-creed', 8);
       expect(result[0]).toMatchObject({
         document: { id: 'nicene-creed', title: 'Nicene Creed', topics: ['trinity', 'christology'] },
         section: { section_number: '1', content: 'We believe in one God...' },
       });
+    });
+
+    it('uses the same deterministic work-diverse SQL and bindings as SQLite', async () => {
+      const db = createSimpleD1([]);
+      await new D1HistoricalDocumentRepository(db as any).searchPrimarySources({
+        text: 'grace', match: 'all_terms', selection: 'work_diversity', documentIds: ['nicene-creed'], limit: 9,
+      });
+      const sql = db.prepare.mock.calls[0][0] as string;
+      expect(sql).toMatch(/ROW_NUMBER\(\) OVER \([\s\S]*PARTITION BY document_id/);
+      expect(sql).toMatch(/ds\.document_id IN \(\?\)[\s\S]*ORDER BY work_rank, relevance_rank, id/);
+      expect(db.prepare.mock.results[0].value.bind).toHaveBeenCalledWith('"grace"', 'nicene-creed', 9);
     });
   });
 });

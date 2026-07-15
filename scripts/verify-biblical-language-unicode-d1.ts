@@ -60,6 +60,8 @@ export function verifyBiblicalLanguageUnicodeD1(
     assert(row.count === expected, `Unicode D1 verifier row-count drift for ${table}`);
     rows += row.count;
   }
-  assert(rows === 859_596, `Unicode D1 total row-count drift: ${rows}`);
+  const derivedUsageRows = ['strongs_usage_stats', 'strongs_book_stats', 'strongs_form_stats']
+    .reduce((sum, table) => sum + (expectedCounts[table] ?? 0), 0);
+  assert(rows - derivedUsageRows === 859_596, `Unicode D1 canonical-source row-count drift: ${rows - derivedUsageRows}`);
   return { sourceCells: ledger.contract.sourceCells, d1Cells, rows };
 }

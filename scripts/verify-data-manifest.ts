@@ -8,6 +8,10 @@ import { fileURLToPath } from 'url';
 import { assertProvenanceMatches, type SourceMetadata } from './build-ubs-parallel-passages.js';
 import { parseDataManifest, verifyD1Migrations, type DataManifest } from './d1-corpus-identity.js';
 import { verifyBiblicalLanguageSources } from './verify-biblical-language-sources.js';
+import {
+  parseHistoricalDocumentCatalog,
+  parseHistoricalDocumentCatalogProvenance,
+} from './historical-document-catalog.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -23,6 +27,8 @@ function relativeDataFiles(directory: string, suffix: string): string[] {
 function discoverCanonicalFiles(): string[] {
   return [
     'data/cross-references/cross_references.txt',
+    'data/historical-document-catalog.json',
+    'data/historical-document-catalog-provenance.json',
     'data/biblical-languages/SOURCE.json',
     'data/biblical-languages/UNICODE-CORRECTION.json',
     'data/biblical-languages/strongs-greek.json',
@@ -64,6 +70,14 @@ const manifest = parseDataManifest(readFileSync(MANIFEST_PATH)) as DataManifest 
 };
 verifyD1Migrations(ROOT, manifest);
 verifyBiblicalLanguageSources(ROOT);
+const historicalCatalog = parseHistoricalDocumentCatalog(JSON.parse(readFileSync(
+  join(ROOT, 'data/historical-document-catalog.json'),
+  'utf8',
+)));
+parseHistoricalDocumentCatalogProvenance(JSON.parse(readFileSync(
+  join(ROOT, 'data/historical-document-catalog-provenance.json'),
+  'utf8',
+)), historicalCatalog);
 
 const schemaPath = join(ROOT, 'migrations', `${manifest.schemaVersion}.sql`);
 if (!existsSync(schemaPath)) {

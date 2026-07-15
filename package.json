@@ -41,6 +41,7 @@
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:unit": "vitest run test/unit",
+    "test:d1-readiness-generated-db": "vitest run test/unit/scripts/checkRemoteD1Readiness.test.ts",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:conformance": "tsx test/conformance/run-server-conformance.ts",
     "test:worker-runtime": "vitest run --config vitest.worker.config.ts",

@@ -37,10 +37,10 @@ function manifest(): DataManifest {
 }
 
 describe('D1 corpus identity', () => {
-  it('pins the normalized UBS D1 identity and includes the generated artifact', () => {
+  it('pins the catalog-scope D1 identity and includes the generated UBS artifact', () => {
     const current = parseDataManifest(readFileSync('data/data-manifest.json'));
     expect(computeD1CorpusIdentity(current))
-      .toBe('652245709aaed181345b0cf17f0091471ac3a3e323f6ae84cfd73a5d8b409c51');
+      .toBe('c334b4b91c3a7c334a9425937c7f99473f27014ddae6cea377ee38bd578a6707');
     const changedUbs = structuredClone(current);
     const ubs = changedUbs.files.find(file => file.path === 'src/data/ubs-parallel-passages.generated.json');
     expect(ubs).toBeDefined();

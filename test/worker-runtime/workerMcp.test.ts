@@ -129,11 +129,21 @@ describe('Worker MCP endpoint in workerd', () => {
           outputSchema: expect.objectContaining({ type: 'object', additionalProperties: false }),
         }),
         expect.objectContaining({
+          name: 'bible_verse_morphology',
+          outputSchema: expect.objectContaining({
+            type: 'object', additionalProperties: false,
+            properties: expect.objectContaining({ kind: { const: 'bible_verse_morphology' } }),
+          }),
+        }),
+        expect.objectContaining({
           name: 'primary_source_search',
           outputSchema: expect.objectContaining({ type: 'object', additionalProperties: false }),
         }),
       ]),
     });
+    const primarySourceTool = (listed.message.result?.tools as Array<Record<string, unknown>>)
+      .find(tool => tool.name === 'primary_source_search')!;
+    expect(JSON.stringify(primarySourceTool).toLowerCase()).not.toContain('ccel');
   });
 
   it('returns structured Bible content alongside the legacy Markdown result', async () => {
@@ -151,6 +161,25 @@ describe('Worker MCP endpoint in workerd', () => {
         kind: 'bible_lookup',
         passages: [expect.objectContaining({ translation: 'KJV', provenanceIds: expect.any(Array) })],
         failures: [],
+      },
+    });
+
+    const usage = await rpc('tools/call', {
+      name: 'original_language_lookup',
+      arguments: { strongs_number: 'G26', usage_level: 'technical', occurrence_limit: 1 },
+    }, 31);
+    expect(usage.response.status).toBe(200);
+    expect(usage.message.error).toBeUndefined();
+    expect(usage.message.result).toMatchObject({
+      content: [expect.objectContaining({ text: expect.stringContaining('1 raw tokens') })],
+      structuredContent: {
+        schemaVersion: '1', kind: 'original_language_lookup',
+        corpusUsage: {
+          exactMorphologyKey: 'G0026', attested: true,
+          totals: { tokenCount: 1, verseCount: 1, bookCount: 1, sourceSurfaceVariantCount: 1 },
+          sourceSurfaceVariants: [expect.objectContaining({ sourceForm: 'ἀγάπη·' })],
+          occurrences: [expect.objectContaining({ sourceForm: 'ἀγάπη·', exactMorphologyKey: 'G0026' })],
+        },
       },
     });
   });
@@ -202,11 +231,22 @@ describe('Worker MCP endpoint in workerd', () => {
     expect(listed.message.error).toBeUndefined();
     expect(listed.message.result?.resources).toEqual(expect.arrayContaining([
       expect.objectContaining({
+        uri: 'theologai://primary-sources/catalog',
+        mimeType: 'application/json',
+      }),
+      expect.objectContaining({
         uri: 'theologai://documents/apostles-creed',
         name: "Apostles' Creed",
         description: 'Creed (c. 390)',
       }),
     ]));
+
+    const catalog = await rpc('resources/read', { uri: 'theologai://primary-sources/catalog' }, 40);
+    expect(catalog.response.status).toBe(200);
+    expect(JSON.parse(String((catalog.message.result?.contents as Array<{ text: string }>)[0].text))).toMatchObject({
+      schemaVersion: '1', kind: 'local_primary_source_catalog', workCount: 1,
+      policies: { scope: 'hosted_collection_only', rightsStatus: 'not_established' },
+    });
 
     const read = await rpc('resources/read', {
       uri: 'theologai://documents/apostles-creed',
@@ -266,6 +306,24 @@ describe('Worker MCP endpoint in workerd', () => {
           text: expect.stringMatching(/John 3:16[\s\S]*Οὕτως[\s\S]*Adverb[\s\S]*thus/),
         }),
       ],
+      structuredContent: {
+        schemaVersion: '1',
+        kind: 'bible_verse_morphology',
+        reference: 'John 3:16',
+        testament: 'NT',
+        language: 'Greek',
+        words: expect.arrayContaining([expect.objectContaining({
+          text: 'Οὕτως',
+          morphologyCode: expect.any(String),
+          morphologyExpansion: 'Adverb',
+          provenanceIds: ['stepbible-morphology'],
+          lemmaProvenanceIds: ['stepbible-morphology'],
+        })]),
+        provenance: [expect.objectContaining({
+          id: 'stepbible-morphology',
+          kind: 'morphology_dataset',
+        })],
+      },
     });
   });
 
@@ -470,10 +528,12 @@ describe('Worker MCP endpoint in workerd', () => {
         }),
       ],
       structuredContent: {
-        schemaVersion: '1', kind: 'primary_source_search', planStatus: 'complete',
+        schemaVersion: '3', kind: 'primary_source_search', planStatus: 'complete',
         queries: [expect.objectContaining({
+          normalizedSelection: 'relevance',
           providers: [expect.objectContaining({
             provider: 'local', hitCount: 1,
+            resultWindow: { returnedHitCount: 1, additionalMatchStatus: 'no_additional_match_observed' },
             hits: [expect.objectContaining({ documentType: 'Creed', documentDate: 'c. 390' })],
           })],
         })],
@@ -481,9 +541,14 @@ describe('Worker MCP endpoint in workerd', () => {
         evidencePolicy: {
           snippetUse: 'discovery_only', selectedSectionAccess: 'mcp_resource_read',
           coverageScope: 'bounded_non_exhaustive', editionProvenance: 'incomplete',
+          lookupAliasUse: 'exact_routing_only_not_metadata_evidence',
         },
       },
     });
+    expect(JSON.stringify(result.message.result).toLowerCase()).not.toContain('ccel');
+    expect(Object.keys((result.message.result?.structuredContent as any).coverage).sort()).toEqual([
+      'localAttempted', 'localHitCount', 'localStatus', 'notices',
+    ]);
     const blocks = result.message.result?.content as Array<Record<string, unknown>>;
     const link = blocks.find(block => block.type === 'resource_link')!;
     const read = await rpc('resources/read', { uri: link.uri }, 43);

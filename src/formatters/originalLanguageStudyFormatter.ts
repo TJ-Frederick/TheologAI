@@ -1,4 +1,5 @@
 import type { OriginalLanguageStudyDomainResult } from '../services/languages/OriginalLanguageStudyService.js';
+import { STEPBIBLE_SOURCE } from '../kernel/stepBibleSource.js';
 
 export function formatOriginalLanguageStudy(result: OriginalLanguageStudyDomainResult): string {
   if (result.status === 'needs_disambiguation') {
@@ -17,7 +18,7 @@ export function formatOriginalLanguageStudy(result: OriginalLanguageStudyDomainR
     if (result.stepBible && result.dictionary?.sourceKind !== 'stepbible_lexicon') evidence += `\n\n### STEPBible lexicon\n\n${result.stepBible.definition ?? result.stepBible.gloss ?? 'No definition text available.'}`;
     sections.push(evidence);
   }
-  sections.push(`> Study cautions: A gloss is not a complete definition; Strong's numbers are identifiers; roots and etymology do not prove contextual meaning; do not import every possible sense into this occurrence.\n\n*Sources: STEPBible TAGNT/TAHOT; OpenScriptures Strong's and/or STEPBible lexicon where available. Source classification is Greek or Hebrew; this tool does not infer Aramaic. Exact upstream STEPBible revision is not exposed by this corpus build.*`);
+  sections.push(`> Study cautions: A gloss is not a complete definition; Strong's numbers are identifiers; roots and etymology do not prove contextual meaning; do not import every possible sense into this occurrence.\n\n*Sources: STEPBible TAGNT/TAHOT; OpenScriptures Strong's and/or STEPBible lexicon where available. Source classification is Greek or Hebrew; this tool does not infer Aramaic. Pinned STEPBible revision: [\`${STEPBIBLE_SOURCE.commitSha}\`](${STEPBIBLE_SOURCE.commitUrl}).*`);
   if (result.warnings.length) sections.push(`## Data limitations\n\n${result.warnings.map(w => `- ${w}`).join('\n')}`);
   return sections.join('\n\n');
 }

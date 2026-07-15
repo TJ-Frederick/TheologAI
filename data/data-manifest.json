@@ -1,11 +1,11 @@
 {
   "manifestVersion": 2,
-  "schemaVersion": "0002_ubs_parallel_passages",
+  "schemaVersion": "0003_original_language_usage",
   "algorithm": "sha256",
   "materializations": {
     "d1": {
       "identityVersion": 1,
-      "transformVersion": 4,
+      "transformVersion": 6,
       "migrations": [
         {
           "path": "migrations/0001_initial_schema.sql",
@@ -14,6 +14,10 @@
         {
           "path": "migrations/0002_ubs_parallel_passages.sql",
           "sha256": "2db4e445009cd8b5242fb7939517e9ac7c413da0cfa8824dca3def016681dd6f"
+        },
+        {
+          "path": "migrations/0003_original_language_usage.sql",
+          "sha256": "d171aec055e26e25e7432f16be01d36fb413b5e285737a898dfa6105ec977708"
         }
       ],
       "inputs": [
@@ -89,6 +93,8 @@
         "data/biblical-languages/strongs-greek.json",
         "data/biblical-languages/strongs-hebrew.json",
         "data/cross-references/cross_references.txt",
+        "data/historical-document-catalog-provenance.json",
+        "data/historical-document-catalog.json",
         "data/historical-documents/39-articles.json",
         "data/historical-documents/apostles-creed.json",
         "data/historical-documents/athanasian-creed.json",
@@ -131,7 +137,7 @@
   "files": [
     {
       "path": "data/biblical-languages/SOURCE.json",
-      "sha256": "c917f7ceeb624ea42d2a3645c3b66a4d570c5a633136121c04232fb54f9dba28"
+      "sha256": "ba3c0c38b06805612b00fd66fee1c60fb5a87e662c85a04a2ac4c9031ee9c425"
     },
     {
       "path": "data/biblical-languages/UNICODE-CORRECTION.json",
@@ -450,6 +456,14 @@
       "sha256": "bb5a4f5cfb7f0faa07b171ee9b361285d6179bee705de16ead0690da16568191"
     },
     {
+      "path": "data/historical-document-catalog-provenance.json",
+      "sha256": "c207f10cdc771e4755f93213701ffbdf4a2c8395e02658c7d7dd8310441efef5"
+    },
+    {
+      "path": "data/historical-document-catalog.json",
+      "sha256": "af5ee0dbbb4b6d2a32ac2199a2d2b4c6dd6da0d1ffa55c14b4864a384b43c3ac"
+    },
+    {
       "path": "data/historical-documents/39-articles.json",
       "sha256": "d7ebc9acc6221a1eeb9c1885ce8cf9ce4399fafe300dfa068e325bb48d95c99d"
     },
@@ -546,7 +560,10 @@
     "theologai_metadata": 2,
     "cross_references": 344799,
     "strongs": 14298,
+    "strongs_book_stats": 57781,
+    "strongs_form_stats": 138293,
     "strongs_fts": 14298,
+    "strongs_usage_stats": 13836,
     "morphology": 447748,
     "stepbible_lexicons": 19570,
     "documents": 17,
