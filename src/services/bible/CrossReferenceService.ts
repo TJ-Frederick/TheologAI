@@ -115,20 +115,64 @@ export class CrossReferenceService {
     }
   }
 
-  /** Validate a canonical scalar display reference and recover its exact TSV key. */
+  /** Validate a canonical display reference and recover its exact TSV key. */
   private canonicalSourceKey(reference: string): string {
-    let parsed: ReturnType<typeof parseReference>;
+    let parsed: ReturnType<typeof parseReference> | undefined;
     try {
       parsed = parseReference(reference);
     } catch {
-      this.integrityFailure('Cross-reference lookup returned an invalid canonical reference.');
+      // Cross-chapter and cross-book OpenBible ranges are rendered as two
+      // complete references, which the general parser intentionally does not
+      // accept as one BibleReference. Validate those endpoints below.
     }
 
-    if (parsed.startVerse == null || parsed.endVerse != null || formatReference(parsed) !== reference) {
-      this.integrityFailure('Cross-reference lookup returned a non-canonical reference.');
+    if (parsed?.startVerse != null && formatReference(parsed) === reference) {
+      const startKey = this.scalarSourceKey(parsed);
+      return parsed.endVerse == null
+        ? startKey
+        : `${startKey}-${parsed.book.abbreviation}.${parsed.chapter}.${parsed.endVerse}`;
     }
 
-    return `${parsed.book.abbreviation}.${parsed.chapter}.${parsed.startVerse}`;
+    const separator = reference.indexOf('-');
+    if (separator > 0 && separator === reference.lastIndexOf('-')) {
+      const startDisplay = reference.slice(0, separator);
+      const endDisplay = reference.slice(separator + 1);
+
+      try {
+        const start = parseReference(startDisplay);
+        const end = parseReference(endDisplay);
+        if (start.startVerse != null && start.endVerse == null
+          && end.startVerse != null && end.endVerse == null
+          && (start.book.number !== end.book.number || start.chapter !== end.chapter)
+          && this.isScalarEndpointAfter(start, end)
+          && `${formatReference(start)}-${formatReference(end)}` === reference) {
+          return `${this.scalarSourceKey(start)}-${this.scalarSourceKey(end)}`;
+        }
+      } catch {
+        // Fall through to the same fail-closed integrity error as every other
+        // malformed or non-canonical repository display value.
+      }
+    }
+
+    this.integrityFailure('Cross-reference lookup returned a non-canonical reference.');
+  }
+
+  /** Reconstruct one raw OpenBible endpoint from an already-validated scalar. */
+  private scalarSourceKey(reference: ReturnType<typeof parseReference>): string {
+    return `${reference.book.abbreviation}.${reference.chapter}.${reference.startVerse}`;
+  }
+
+  /** Require a strict forward range in canonical Bible order. */
+  private isScalarEndpointAfter(
+    start: ReturnType<typeof parseReference>,
+    end: ReturnType<typeof parseReference>,
+  ): boolean {
+    if (start.startVerse == null || end.startVerse == null) return false;
+    return end.book.number > start.book.number
+      || (end.book.number === start.book.number && (
+        end.chapter > start.chapter
+        || (end.chapter === start.chapter && end.startVerse > start.startVerse)
+      ));
   }
 
   private integrityFailure(message: string): never {

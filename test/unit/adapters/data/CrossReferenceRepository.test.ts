@@ -33,6 +33,24 @@ describe('CrossReferenceRepository', () => {
     expect(db.statement('COUNT(*)').get).toHaveBeenCalledWith('Gen.1.1', 2);
   });
 
+  it('maps same-chapter, cross-chapter, and cross-book OpenBible ranges canonically', () => {
+    const db = new FakeSqliteDatabase([
+      { match: 'SELECT to_verse', all: [
+        { to_verse: '1John.4.9-1John.4.10', votes: 42 },
+        { to_verse: 'Gen.4.25-Gen.5.32', votes: 41 },
+        { to_verse: 'Acts.28.17-Rom.1.1', votes: 40 },
+      ] },
+      { match: 'COUNT(*)', get: { count: 3 } },
+    ]);
+    const repo = new CrossReferenceRepository(db.asDatabase());
+
+    expect(repo.getCrossReferences('John 3:16').references).toEqual([
+      { reference: '1 John 4:9-10', votes: 42 },
+      { reference: 'Genesis 4:25-Genesis 5:32', votes: 41 },
+      { reference: 'Acts 28:17-Romans 1:1', votes: 40 },
+    ]);
+  });
+
   it('uses defaults, passes OpenBible keys through, and detects references', () => {
     const db = new FakeSqliteDatabase([
       { match: 'SELECT to_verse', all: [] },

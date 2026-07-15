@@ -104,6 +104,9 @@ describe('SQLite and D1 repository parity with identical real data', () => {
         ('John.3.16', '1John.4.9', 30),
         ('John.30.1', 'Rom.5.8', 99),
         ('John.3.17', 'Rom.8.1', 12),
+        ('John.4.1', '1John.4.9-1John.4.10', 32),
+        ('John.4.1', 'Gen.4.25-Gen.5.32', 31),
+        ('John.4.1', 'Acts.28.17-Rom.1.1', 30),
         ('Gen.2.1', 'Rom.5.8', 30),
         ('Gen.2.1', '1John.4.9', 30);
 
@@ -214,6 +217,22 @@ describe('SQLite and D1 repository parity with identical real data', () => {
 
     expect(sqliteCrossReferences.getCrossReferences('Genesis 2:1')).toEqual(expected);
     await expect(d1CrossReferences.getCrossReferences('Genesis 2:1')).resolves.toEqual(expected);
+  });
+
+  it('preserves identical canonical destination ranges in SQLite and D1', async () => {
+    const expected = {
+      references: [
+        { reference: '1 John 4:9-10', votes: 32 },
+        { reference: 'Genesis 4:25-Genesis 5:32', votes: 31 },
+        { reference: 'Acts 28:17-Romans 1:1', votes: 30 },
+      ],
+      total: 3,
+      showing: 3,
+      hasMore: false,
+    };
+
+    expect(sqliteCrossReferences.getCrossReferences('John 4:1')).toEqual(expected);
+    await expect(d1CrossReferences.getCrossReferences('John 4:1')).resolves.toEqual(expected);
   });
 
   it('returns complete and identical historical-document rows, including FTS search', async () => {
