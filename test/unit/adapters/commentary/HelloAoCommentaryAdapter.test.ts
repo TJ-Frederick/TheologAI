@@ -10,6 +10,19 @@ import { parseReference } from '../../../../src/kernel/reference.js';
 
 const response = (body: unknown): Response => new Response(JSON.stringify(body), { status: 200 });
 
+function inlineTextEntry(number: number, length: number): Record<string, unknown> {
+  const firstLength = Math.min(length, 100_000);
+  const remaining = length - firstLength;
+  return {
+    type: 'verse',
+    number,
+    content: [
+      { text: 'x'.repeat(firstLength) },
+      ...(remaining > 0 ? [{ text: ` ${'x'.repeat(remaining - 1)}` }] : []),
+    ],
+  };
+}
+
 describe('HelloAoCommentaryAdapter', () => {
   const originalFetch = globalThis.fetch;
 
@@ -277,9 +290,62 @@ describe('HelloAoCommentaryAdapter', () => {
     const result = await new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3'), 'John Gill');
 
     expect(result.text).toBe(
-      '**Legacy heading**\n\nLegacy paragraph\n\n**Official heading**\n\nFirst line\n\nSecond paragraph\n\nExisting string block',
+      '**Legacy heading**\n\nLegacy paragraph\n\n**Official heading**\n\nFirst line\n\nSecond paragraph Existing string block',
     );
     expect(result.text).not.toContain('noteId');
+  });
+
+  it.each([
+    [
+      'keeps strings around an omitted footnote in one sentence',
+      ['Before', { noteId: 1 }, ' after.'],
+      'Before after.',
+    ],
+    [
+      'keeps strings and formatted text in one sentence',
+      ['Before ', { text: 'emphasized' }, ' after.'],
+      'Before emphasized after.',
+    ],
+    [
+      'applies an inline line break between strings',
+      ['First line', { lineBreak: true }, 'Second line'],
+      'First line\nSecond line',
+    ],
+  ])('%s', async (_label, content, expected) => {
+    vi.mocked(globalThis.fetch).mockResolvedValue(response({
+      chapter: { content: [{ type: 'verse', number: 16, content }] },
+    }));
+
+    const result = await new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3:16'), 'Tyndale');
+
+    expect(result.text).toBe(expected);
+  });
+
+  it('uses deterministic block boundaries around headings and legacy block content', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue(response({
+      chapter: {
+        content: [{
+          type: 'verse',
+          number: 16,
+          content: [
+            'Opening sentence.',
+            { heading: 'Official heading' },
+            'After heading',
+            { type: 'text', content: ['Legacy block'] },
+            'After legacy',
+            { lineBreak: true },
+            { lineBreak: true },
+            'new paragraph.',
+          ],
+        }],
+      },
+    }));
+
+    const result = await new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3:16'), 'Tyndale');
+
+    expect(result.text).toBe(
+      'Opening sentence.\n\n**Official heading**\n\nAfter heading\n\nLegacy block\n\nAfter legacy\n\nnew paragraph.',
+    );
   });
 
   it('combines every non-empty entry for a chapter request', async () => {
@@ -369,6 +435,41 @@ describe('HelloAoCommentaryAdapter', () => {
 
     await expect(new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3:16'), 'Tyndale'))
       .rejects.toEqual(new AdapterIntegrityError('HelloAO', reason));
+  });
+
+  it('accepts a chapter whose final joined output is exactly the chapter limit including separators', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue(response({
+      chapter: {
+        content: [
+          inlineTextEntry(1, 200_000),
+          inlineTextEntry(2, 200_000),
+          inlineTextEntry(3, 200_000),
+          inlineTextEntry(4, 200_000),
+          inlineTextEntry(5, 199_992),
+        ],
+      },
+    }));
+
+    const result = await new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3'), 'John Gill');
+
+    expect(result.text).toHaveLength(1_000_000);
+  });
+
+  it('rejects a chapter one character over the final joined-output limit including separators', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue(response({
+      chapter: {
+        content: [
+          inlineTextEntry(1, 200_000),
+          inlineTextEntry(2, 200_000),
+          inlineTextEntry(3, 200_000),
+          inlineTextEntry(4, 200_000),
+          inlineTextEntry(5, 199_993),
+        ],
+      },
+    }));
+
+    await expect(new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3'), 'John Gill'))
+      .rejects.toEqual(new AdapterIntegrityError('HelloAO', 'Commentary chapter content exceeds safety limit'));
   });
 
   it.each([

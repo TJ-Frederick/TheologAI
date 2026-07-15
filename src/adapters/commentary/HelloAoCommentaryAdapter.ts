@@ -167,12 +167,16 @@ export class HelloAoCommentaryAdapter implements CommentaryAdapter {
 
     const validEntries: ValidatedEntry[] = [];
     let chapterTextLength = 0;
+    let chapterTextEntries = 0;
     for (let index = 0; index < content.length; index++) {
       const entry = this.validateEntry(content[index], index);
       if (entry.kind === 'invalid') return entry;
-      chapterTextLength += entry.text?.length ?? 0;
-      if (chapterTextLength > MAX_CHAPTER_TEXT_LENGTH) {
-        return { kind: 'invalid', reason: 'Commentary chapter content exceeds safety limit' };
+      if (entry.text != null) {
+        chapterTextLength += entry.text.length + (chapterTextEntries > 0 ? 2 : 0);
+        chapterTextEntries++;
+        if (chapterTextLength > MAX_CHAPTER_TEXT_LENGTH) {
+          return { kind: 'invalid', reason: 'Commentary chapter content exceeds safety limit' };
+        }
       }
       validEntries.push(entry);
     }
@@ -291,7 +295,7 @@ export class HelloAoCommentaryAdapter implements CommentaryAdapter {
       if (typeof item === 'string') {
         const text = this.sanitizeContentFragment(item);
         if (text == null) return { kind: 'invalid', reason: 'Commentary text fragment exceeds safety limit' };
-        if (!appendBlock(text)) return { kind: 'invalid', reason: 'Commentary entry text exceeds safety limit' };
+        if (!appendCurrent(text)) return { kind: 'invalid', reason: 'Commentary entry text exceeds safety limit' };
         continue;
       }
       if (!this.isRecord(item)) {
@@ -329,7 +333,7 @@ export class HelloAoCommentaryAdapter implements CommentaryAdapter {
         }
       } else if (officialKeys[0] === 'lineBreak') {
         if (item.lineBreak !== true) return { kind: 'invalid', reason: 'Malformed inline commentary line break' };
-        const next = current.endsWith('\n') ? `${current}\n` : `${current.trimEnd()}\n`;
+        const next = `${current}\n`;
         renderedLength += next.length - current.length;
         current = next;
         if (renderedLength > MAX_ENTRY_TEXT_LENGTH) {
