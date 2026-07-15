@@ -124,7 +124,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Async/sync parity tests proving dual-target compatibility (8 tests)
   - Reusable `mockD1` test helper
 
-## [3.4.0] - 2025-10-09
+## 3.4.0 - 2025-10-09
 
 ### Added - Enhanced Discovery & Commentary Navigation
 
@@ -219,7 +219,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [3.3.0] - 2025-10-08 (Previous Release)
+## 3.3.0 - 2025-10-08 (Previous Release)
 
 ### Added
 - 6 additional Bible translations (KJV, WEB, BSB, ASV, YLT, DBY) via HelloAO API
@@ -229,7 +229,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [3.2.0] - 2025-10-07
+## 3.2.0 - 2025-10-07
 
 ### Added
 - HelloAO Bible API integration
@@ -239,7 +239,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [3.1.0] - 2025-10-06
+## 3.1.0 - 2025-10-06
 
 ### Added
 - Matthew Henry's Complete Commentary (66 books) via CCEL
@@ -248,7 +248,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [2.5.0] - 2025-10-05
+## 2.5.0 - 2025-10-05
 
 ### Added
 - ESV HTML endpoint integration with footnote extraction
@@ -258,7 +258,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [2.0.0] - 2025-10-04
+## 2.0.0 - 2025-10-04
 
 ### Added
 - CCEL API adapter with Scripture, Work Section, and Fragment endpoints
@@ -271,7 +271,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.0.0] - 2025-10-03
+## 1.0.0 - 2025-10-03
 
 ### Added
 - Initial release
@@ -286,10 +286,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [Unreleased]: https://github.com/TJ-Frederick/TheologAI/compare/d395b3641eb00f6826eaba670c287f9a39dfa3da...HEAD
 [3.6.0]: https://github.com/TJ-Frederick/TheologAI/compare/v1.0.0-phase3.1...d395b3641eb00f6826eaba670c287f9a39dfa3da
-[3.4.0]: https://github.com/TJ-Frederick/TheologAI/compare/v3.3.0...v3.4.0
-[3.3.0]: https://github.com/yourusername/TheologAI/compare/v3.2.0...v3.3.0
-[3.2.0]: https://github.com/yourusername/TheologAI/compare/v3.1.0...v3.2.0
-[3.1.0]: https://github.com/yourusername/TheologAI/compare/v2.5.0...v3.1.0
-[2.5.0]: https://github.com/yourusername/TheologAI/compare/v2.0.0...v2.5.0
-[2.0.0]: https://github.com/yourusername/TheologAI/compare/v1.0.0...v2.0.0
-[1.0.0]: https://github.com/yourusername/TheologAI/releases/tag/v1.0.0
