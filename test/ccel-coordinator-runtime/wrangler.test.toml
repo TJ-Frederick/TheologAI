@@ -1,0 +1,13 @@
+name = "theologai-ccel-coordinator-runtime-test"
+main = "../../src/ccel-coordinator-worker.ts"
+compatibility_date = "2026-07-09"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+
+[[durable_objects.bindings]]
+name = "THEOLOGAI_CCEL_COORDINATOR"
+class_name = "CcelGlobalCoordinator"
+
+[exports.CcelGlobalCoordinator]
+type = "durable-object"
+storage = "sqlite"

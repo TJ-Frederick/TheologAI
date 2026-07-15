@@ -11,6 +11,7 @@ export const CCEL_UPSTREAM_MAX_RETRY_AFTER_SECONDS = 86_400;
 export const CCEL_UPSTREAM_HALF_OPEN_LEASE_MS = 30_000;
 export const CCEL_UPSTREAM_TRANSIENT_BASE_MS = 30_000;
 export const CCEL_UPSTREAM_TRANSIENT_MAX_MS = 10 * 60_000;
+export const CCEL_UPSTREAM_TERMINAL_ATTEMPT_LIMIT = 64;
 
 export type CcelCoordinatorCircuitState =
   | 'closed'
@@ -53,7 +54,21 @@ export type CcelAttemptOutcome =
 
 export interface CcelOutcomeRecord {
   applied: boolean;
+  disposition:
+    | 'applied'
+    | 'recorded_no_effect'
+    | 'duplicate'
+    | 'conflict'
+    | 'stale_epoch';
   state: CcelCoordinatorCircuitState;
+}
+
+export interface CcelTerminalAttempt {
+  recordSequence: number;
+  attemptId: number;
+  operatorEpoch: number;
+  outcomeKind: CcelAttemptOutcome['kind'];
+  retryAfterSeconds: number | null;
 }
 
 export interface CcelCoordinatorSnapshot {
@@ -66,6 +81,8 @@ export interface CcelCoordinatorSnapshot {
   transientFailures: number;
   probeInFlight: boolean;
   probeLeaseUntilMs: number;
+  terminalAttemptCount: number;
+  terminalRetiredThroughAttemptId: number;
 }
 
 /** Structured telemetry contracts; emitters must not add raw request fields. */
@@ -113,6 +130,9 @@ export interface CcelCoordinatorPersistenceState {
   transientFailures: number;
   probeAttemptId: number | null;
   probeLeaseUntilMs: number;
+  terminalSequence: number;
+  terminalRetiredThroughAttemptId: number;
+  terminalAttempts: CcelTerminalAttempt[];
 }
 
 export type Clock = () => number;
@@ -129,6 +149,9 @@ export function initialCcelCoordinatorState(): CcelCoordinatorPersistenceState {
     transientFailures: 0,
     probeAttemptId: null,
     probeLeaseUntilMs: 0,
+    terminalSequence: 0,
+    terminalRetiredThroughAttemptId: 0,
+    terminalAttempts: [],
   };
 }
 
@@ -232,14 +255,43 @@ export function transitionCcelOutcome(
   const state = validateAndCloneState(previous);
   validateAdmissionToken(token);
   validateOutcome(outcome);
-  const now = observeMonotonicTime(state, wallNowMs);
 
-  if (token.operatorEpoch !== state.operatorEpoch) return outcomeResult(state, false);
+  if (token.operatorEpoch !== state.operatorEpoch) {
+    return outcomeResult(state, false, 'stale_epoch');
+  }
   if (token.attemptId > state.attemptSequence) {
     throw new Error('Invalid CCEL admission token.');
   }
+  const existing = state.terminalAttempts.find(attempt =>
+    attempt.operatorEpoch === token.operatorEpoch && attempt.attemptId === token.attemptId);
+  if (existing) {
+    return outcomeResult(
+      state,
+      false,
+      terminalOutcomeMatches(existing, outcome) ? 'duplicate' : 'conflict',
+    );
+  }
+  if (token.attemptId <= state.terminalRetiredThroughAttemptId) {
+    // Exact outcome details are deliberately discarded after the bounded
+    // recent-history window. The token is still known to be terminal, so a
+    // replay can never mutate circuit state again.
+    return outcomeResult(state, false, 'duplicate');
+  }
+  const now = observeMonotonicTime(state, wallNowMs);
+  if (state.terminalSequence >= Number.MAX_SAFE_INTEGER) {
+    state.state = 'latched_interface';
+    state.backoffUntilMs = 0;
+    clearProbe(state);
+    return outcomeResult(state, false, 'recorded_no_effect');
+  }
+  if (!appendTerminalAttempt(state, token, outcome)) {
+    state.state = 'latched_interface';
+    state.backoffUntilMs = 0;
+    clearProbe(state);
+    return outcomeResult(state, false, 'recorded_no_effect');
+  }
   if (state.state === 'latched_policy' || state.state === 'latched_interface') {
-    return outcomeResult(state, false);
+    return outcomeResult(state, false, 'recorded_no_effect');
   }
 
   if (outcome.kind === 'policy_failure' || outcome.kind === 'interface_failure') {
@@ -247,7 +299,7 @@ export function transitionCcelOutcome(
     state.backoffUntilMs = 0;
     clearProbe(state);
     state.lastOutcomeSequence = Math.max(state.lastOutcomeSequence, token.attemptId);
-    return outcomeResult(state, true);
+    return outcomeResult(state, true, 'applied');
   }
 
   if (outcome.kind === 'rate_limited') {
@@ -256,30 +308,32 @@ export function transitionCcelOutcome(
     state.backoffUntilMs = Math.max(state.backoffUntilMs, safeTimestampAdd(now, retryMs));
     clearProbe(state);
     state.lastOutcomeSequence = Math.max(state.lastOutcomeSequence, token.attemptId);
-    return outcomeResult(state, true);
+    return outcomeResult(state, true, 'applied');
   }
 
   const matchingProbe = state.probeAttemptId === token.attemptId;
   if (outcome.kind === 'success') {
     if (state.state === 'closed') {
-      if (token.attemptId < state.lastOutcomeSequence) return outcomeResult(state, false);
+      if (token.attemptId < state.lastOutcomeSequence) {
+        return outcomeResult(state, false, 'recorded_no_effect');
+      }
       state.lastOutcomeSequence = token.attemptId;
       state.transientFailures = 0;
-      return outcomeResult(state, true);
+      return outcomeResult(state, true, 'applied');
     }
-    if (!matchingProbe) return outcomeResult(state, false);
+    if (!matchingProbe) return outcomeResult(state, false, 'recorded_no_effect');
     state.state = 'closed';
     state.backoffUntilMs = 0;
     state.transientFailures = 0;
     state.lastOutcomeSequence = Math.max(state.lastOutcomeSequence, token.attemptId);
     clearProbe(state);
-    return outcomeResult(state, true);
+    return outcomeResult(state, true, 'applied');
   }
 
   const mayApplyTransient = state.state === 'closed'
     ? token.attemptId >= state.lastOutcomeSequence
     : matchingProbe;
-  if (!mayApplyTransient) return outcomeResult(state, false);
+  if (!mayApplyTransient) return outcomeResult(state, false, 'recorded_no_effect');
   state.transientFailures = Math.min(state.transientFailures + 1, 31);
   const backoffMs = Math.min(
     CCEL_UPSTREAM_TRANSIENT_MAX_MS,
@@ -289,7 +343,7 @@ export function transitionCcelOutcome(
   state.backoffUntilMs = safeTimestampAdd(now, backoffMs);
   state.lastOutcomeSequence = Math.max(state.lastOutcomeSequence, token.attemptId);
   clearProbe(state);
-  return outcomeResult(state, true);
+  return outcomeResult(state, true, 'applied');
 }
 
 export function resetCcelCoordinatorState(
@@ -325,6 +379,8 @@ export function snapshotCcelCoordinatorState(
     transientFailures: current.transientFailures,
     probeInFlight: current.probeAttemptId !== null,
     probeLeaseUntilMs: current.probeLeaseUntilMs,
+    terminalAttemptCount: current.terminalAttempts.length,
+    terminalRetiredThroughAttemptId: current.terminalRetiredThroughAttemptId,
   };
 }
 
@@ -360,7 +416,11 @@ export class ProcessLocalCcelUpstreamCoordinator implements CcelOperatorUpstream
     outcome: CcelAttemptOutcome,
   ): Promise<CcelOutcomeRecord> {
     if (!this.enabled) {
-      return Promise.resolve({ applied: false, state: this.state.state });
+      return Promise.resolve({
+        applied: false,
+        disposition: 'recorded_no_effect',
+        state: this.state.state,
+      });
     }
     return this.exclusive(() => {
       const transition = transitionCcelOutcome(this.state, token, outcome, this.readClock());
@@ -417,8 +477,50 @@ function clearProbe(state: CcelCoordinatorPersistenceState): void {
 function outcomeResult(
   state: CcelCoordinatorPersistenceState,
   applied: boolean,
+  disposition: CcelOutcomeRecord['disposition'],
 ): CcelOutcomeTransition {
-  return { state, result: { applied, state: state.state } };
+  return { state, result: { applied, disposition, state: state.state } };
+}
+
+function appendTerminalAttempt(
+  state: CcelCoordinatorPersistenceState,
+  token: CcelAdmissionToken,
+  outcome: CcelAttemptOutcome,
+): boolean {
+  state.terminalSequence++;
+  const terminal: CcelTerminalAttempt = {
+    recordSequence: state.terminalSequence,
+    attemptId: token.attemptId,
+    operatorEpoch: token.operatorEpoch,
+    outcomeKind: outcome.kind,
+    retryAfterSeconds: outcome.kind === 'rate_limited' ? outcome.retryAfterSeconds : null,
+  };
+  state.terminalAttempts.push(terminal);
+
+  const terminalIds = new Set(state.terminalAttempts.map(attempt => attempt.attemptId));
+  while (terminalIds.has(state.terminalRetiredThroughAttemptId + 1)) {
+    state.terminalRetiredThroughAttemptId++;
+  }
+  if (state.terminalAttempts.length > CCEL_UPSTREAM_TERMINAL_ATTEMPT_LIMIT) {
+    const removableIndex = state.terminalAttempts.findIndex(attempt =>
+      attempt.attemptId <= state.terminalRetiredThroughAttemptId);
+    if (removableIndex < 0) {
+      state.terminalAttempts.pop();
+      return false;
+    }
+    state.terminalAttempts.splice(removableIndex, 1);
+  }
+  return true;
+}
+
+function terminalOutcomeMatches(
+  terminal: CcelTerminalAttempt,
+  outcome: CcelAttemptOutcome,
+): boolean {
+  return terminal.outcomeKind === outcome.kind
+    && terminal.retryAfterSeconds === (outcome.kind === 'rate_limited'
+      ? outcome.retryAfterSeconds
+      : null);
 }
 
 function validateAdmissionToken(token: CcelAdmissionToken): void {
@@ -477,6 +579,8 @@ function validateAndCloneState(
     'operatorEpoch',
     'transientFailures',
     'probeLeaseUntilMs',
+    'terminalSequence',
+    'terminalRetiredThroughAttemptId',
   ];
   for (const field of numericFields) {
     if (!isNonNegativeSafeInteger(state[field])) {
@@ -487,7 +591,48 @@ function validateAndCloneState(
       && (!Number.isSafeInteger(state.probeAttemptId) || state.probeAttemptId < 1)) {
     throw new Error('Invalid persisted CCEL coordinator probe.');
   }
-  return { ...state };
+  if (!Array.isArray(state.terminalAttempts)
+      || state.terminalAttempts.length > CCEL_UPSTREAM_TERMINAL_ATTEMPT_LIMIT) {
+    throw new Error('Invalid persisted CCEL terminal-attempt history.');
+  }
+  const seen = new Set<string>();
+  let previousSequence = 0;
+  const terminalAttempts = state.terminalAttempts.map(attempt => {
+    if (!isPlainObject(attempt)
+        || !Number.isSafeInteger(attempt.recordSequence)
+        || attempt.recordSequence < 1
+        || attempt.recordSequence <= previousSequence
+        || attempt.recordSequence > state.terminalSequence
+        || !Number.isSafeInteger(attempt.attemptId)
+        || attempt.attemptId < 1
+        || attempt.attemptId > state.attemptSequence
+        || !isNonNegativeSafeInteger(attempt.operatorEpoch)
+        || attempt.operatorEpoch !== state.operatorEpoch
+        || ![
+          'success',
+          'transient_failure',
+          'rate_limited',
+          'policy_failure',
+          'interface_failure',
+        ].includes(attempt.outcomeKind)
+        || (attempt.outcomeKind === 'rate_limited'
+          ? !Number.isSafeInteger(attempt.retryAfterSeconds)
+            || attempt.retryAfterSeconds === null
+            || attempt.retryAfterSeconds < 1
+            || attempt.retryAfterSeconds > CCEL_UPSTREAM_MAX_RETRY_AFTER_SECONDS
+          : attempt.retryAfterSeconds !== null)) {
+      throw new Error('Invalid persisted CCEL terminal-attempt record.');
+    }
+    const key = `${attempt.operatorEpoch}:${attempt.attemptId}`;
+    if (seen.has(key)) throw new Error('Duplicate persisted CCEL terminal-attempt token.');
+    seen.add(key);
+    previousSequence = attempt.recordSequence;
+    return { ...attempt };
+  });
+  if (state.terminalRetiredThroughAttemptId > state.attemptSequence) {
+    throw new Error('Invalid persisted CCEL terminal-attempt watermark.');
+  }
+  return { ...state, terminalAttempts };
 }
 
 function normalizeTimestamp(value: number, field: string): number {

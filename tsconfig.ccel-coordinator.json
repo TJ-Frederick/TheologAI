@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": [
+    "src/ccel-coordinator-worker.ts",
+    "src/http/worker/CcelGlobalCoordinator.ts",
+    "src/services/historical/CcelUpstreamCoordinator.ts",
+    "ccel-coordinator-configuration.d.ts"
+  ]
+}

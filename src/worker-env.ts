@@ -12,5 +12,4 @@ export type Env = Cloudflare.Env & {
   RADIUS_RPC_URL?: string;
   /** Staged primary-source switches; absent values remain disabled. */
   THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH?: string;
-  THEOLOGAI_ENABLE_CCEL_COORDINATOR?: string;
 };

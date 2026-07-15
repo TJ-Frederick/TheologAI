@@ -1,0 +1,54 @@
+name: Bootstrap CCEL Coordinator
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type BOOTSTRAP THEOLOGAI CCEL COORDINATOR'
+        required: true
+        type: string
+
+concurrency:
+  group: bootstrap-ccel-coordinator
+  cancel-in-progress: false
+
+jobs:
+  bootstrap:
+    name: Reconcile non-public coordinator owner
+    if: github.event.inputs.confirmation == 'BOOTSTRAP THEOLOGAI CCEL COORDINATOR'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Verify dedicated binding types
+        run: npm run types:ccel-coordinator:check
+
+      - name: Typecheck dedicated coordinator target
+        run: npm run typecheck:ccel-coordinator
+
+      - name: Validate dedicated coordinator bundle
+        run: npm run validate:ccel-coordinator-config
+
+      - name: Exercise coordinator policy and isolated Durable Object
+        run: |
+          npx vitest run test/unit/services/historical/CcelUpstreamCoordinator.test.ts
+          npm run test:ccel-coordinator-runtime
+
+      - name: Reconcile non-public coordinator owner and SQLite namespace
+        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
+        with:
+          wranglerVersion: '4.107.0'
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --config wrangler.ccel-coordinator.toml

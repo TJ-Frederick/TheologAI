@@ -24,18 +24,6 @@ THEOLOGAI_ALLOWED_ORIGINS = "https://theologai.pages.dev"
 THEOLOGAI_MAX_REQUEST_BYTES = "1048576"
 THEOLOGAI_REQUEST_LOGS = "false"
 THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH = "false"
-THEOLOGAI_ENABLE_CCEL_COORDINATOR = "false"
-
-# One named instance coordinates the single CCEL upstream origin. Cloudflare
-# gives the root Worker and each named environment separate Durable Object
-# namespaces; preview repeats this non-inherited binding below.
-[[durable_objects.bindings]]
-name = "THEOLOGAI_CCEL_COORDINATOR"
-class_name = "CcelGlobalCoordinator"
-
-[[migrations]]
-tag = "ccel-coordinator-v1"
-new_sqlite_classes = ["CcelGlobalCoordinator"]
 
 # D1 database. The database_id is not sensitive (scoped to Cloudflare account).
 # For multi-environment setups, use [env.staging] / [env.production] sections.
@@ -75,13 +63,6 @@ THEOLOGAI_ALLOWED_ORIGINS = "https://theologai.pages.dev"
 THEOLOGAI_MAX_REQUEST_BYTES = "1048576"
 THEOLOGAI_REQUEST_LOGS = "true"
 THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH = "false"
-THEOLOGAI_ENABLE_CCEL_COORDINATOR = "false"
-
-# Non-inherited binding: this creates a namespace owned by theologai-preview,
-# separate from the root theologai Worker namespace.
-[[env.preview.durable_objects.bindings]]
-name = "THEOLOGAI_CCEL_COORDINATOR"
-class_name = "CcelGlobalCoordinator"
 
 [[env.preview.d1_databases]]
 binding = "THEOLOGAI_DB"

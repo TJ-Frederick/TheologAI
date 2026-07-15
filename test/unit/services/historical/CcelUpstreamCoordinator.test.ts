@@ -39,7 +39,11 @@ describe('CCEL upstream coordinator policy', () => {
     await expect(coordinator.recordOutcome(
       { attemptId: 1, operatorEpoch: 0 },
       { kind: 'success' },
-    )).resolves.toEqual({ applied: false, state: 'closed' });
+    )).resolves.toEqual({
+      applied: false,
+      disposition: 'recorded_no_effect',
+      state: 'closed',
+    });
     expect(clockReads).toBe(0);
   });
 
@@ -66,7 +70,11 @@ describe('CCEL upstream coordinator policy', () => {
       { kind: 'rate_limited', retryAfterSeconds: 65 },
       2_000,
     );
-    expect(limited.result).toEqual({ applied: true, state: 'rate_limited' });
+    expect(limited.result).toEqual({
+      applied: true,
+      disposition: 'applied',
+      state: 'rate_limited',
+    });
     expect(limited.state.backoffUntilMs).toBe(67_000);
     expect(transitionCcelAdmission(limited.state, 66_001).decision).toEqual({
       kind: 'busy',
@@ -128,6 +136,115 @@ describe('CCEL upstream coordinator policy', () => {
     expect(older.state.backoffUntilMs).toBe(131_000);
   });
 
+  it('conservatively merges distinct out-of-order 429s in either permutation', () => {
+    const run = (firstRetry: number, secondRetry: number) => {
+      const first = transitionCcelAdmission(initialCcelCoordinatorState(), 0);
+      if (first.decision.kind !== 'admitted') throw new Error('expected first admission');
+      const second = transitionCcelAdmission(first.state, 10_000);
+      if (second.decision.kind !== 'admitted') throw new Error('expected second admission');
+      const firstReport = transitionCcelOutcome(
+        second.state,
+        first.decision.token,
+        { kind: 'rate_limited', retryAfterSeconds: firstRetry },
+        20_000,
+      );
+      return transitionCcelOutcome(
+        firstReport.state,
+        second.decision.token,
+        { kind: 'rate_limited', retryAfterSeconds: secondRetry },
+        20_000,
+      ).state;
+    };
+
+    expect(run(30, 120).backoffUntilMs).toBe(140_000);
+    expect(run(120, 30).backoffUntilMs).toBe(140_000);
+  });
+
+  it.each([
+    { kind: 'success' } as const,
+    { kind: 'transient_failure' } as const,
+    { kind: 'rate_limited', retryAfterSeconds: 45 } as const,
+    { kind: 'policy_failure' } as const,
+    { kind: 'interface_failure' } as const,
+  ])('makes a terminal $kind outcome first-write-wins', outcome => {
+    const admission = transitionCcelAdmission(initialCcelCoordinatorState(), 1_000);
+    if (admission.decision.kind !== 'admitted') throw new Error('expected admission');
+    const first = transitionCcelOutcome(
+      admission.state,
+      admission.decision.token,
+      outcome,
+      1_001,
+    );
+    const duplicate = transitionCcelOutcome(
+      first.state,
+      admission.decision.token,
+      outcome,
+      9_999_999,
+    );
+    const contradiction = transitionCcelOutcome(
+      duplicate.state,
+      admission.decision.token,
+      outcome.kind === 'success' ? { kind: 'transient_failure' } : { kind: 'success' },
+      10_000_000,
+    );
+
+    expect(duplicate.result).toMatchObject({ applied: false, disposition: 'duplicate' });
+    expect(duplicate.state).toEqual(first.state);
+    expect(contradiction.result).toMatchObject({ applied: false, disposition: 'conflict' });
+    expect(contradiction.state).toEqual(first.state);
+    expect(first.state.terminalAttempts).toHaveLength(1);
+  });
+
+  it('treats contradictory Retry-After values for one token as a conflict', () => {
+    const admission = transitionCcelAdmission(initialCcelCoordinatorState(), 0);
+    if (admission.decision.kind !== 'admitted') throw new Error('expected admission');
+    const first = transitionCcelOutcome(
+      admission.state,
+      admission.decision.token,
+      { kind: 'rate_limited', retryAfterSeconds: 30 },
+      1,
+    );
+    const conflict = transitionCcelOutcome(
+      first.state,
+      admission.decision.token,
+      { kind: 'rate_limited', retryAfterSeconds: 120 },
+      2,
+    );
+    expect(conflict.result.disposition).toBe('conflict');
+    expect(conflict.state.backoffUntilMs).toBe(first.state.backoffUntilMs);
+  });
+
+  it('bounds process-local terminal-attempt persistence', async () => {
+    let now = 0;
+    const coordinator = new ProcessLocalCcelUpstreamCoordinator({ enabled: true, now: () => now });
+    for (let index = 0; index < 70; index++) {
+      const admission = await coordinator.admit();
+      if (admission.kind !== 'admitted') throw new Error(`expected admission ${index}`);
+      await coordinator.recordOutcome(admission.token, { kind: 'success' });
+      now += 10_000;
+    }
+    const snapshot = await coordinator.snapshot();
+    expect(snapshot).toMatchObject({
+      attemptSequence: 70,
+      terminalAttemptCount: 64,
+      terminalRetiredThroughAttemptId: 70,
+    });
+  });
+
+  it('applies first-write-wins through the process-local coordinator', async () => {
+    const coordinator = new ProcessLocalCcelUpstreamCoordinator({ enabled: true, now: () => 100 });
+    const admission = await coordinator.admit();
+    if (admission.kind !== 'admitted') throw new Error('expected admission');
+    await expect(coordinator.recordOutcome(admission.token, { kind: 'rate_limited', retryAfterSeconds: 30 }))
+      .resolves.toMatchObject({ applied: true, disposition: 'applied' });
+    const beforeReplay = await coordinator.snapshot();
+    await expect(coordinator.recordOutcome(admission.token, { kind: 'rate_limited', retryAfterSeconds: 30 }))
+      .resolves.toMatchObject({ applied: false, disposition: 'duplicate' });
+    await expect(coordinator.recordOutcome(admission.token, { kind: 'success' }))
+      .resolves.toMatchObject({ applied: false, disposition: 'conflict' });
+    expect(await coordinator.snapshot()).toEqual(beforeReplay);
+  });
+
   it('backs off transient failures exponentially and closes on its probe success', () => {
     const admission = transitionCcelAdmission(initialCcelCoordinatorState(), 100);
     if (admission.decision.kind !== 'admitted') throw new Error('expected admission');
@@ -180,6 +297,8 @@ describe('CCEL upstream coordinator policy', () => {
       state: 'closed',
       operatorEpoch: 1,
       nextAllowedAtMs: 11_000,
+      terminalRetiredThroughAttemptId: 0,
+      terminalAttempts: [],
     });
     const stale = transitionCcelOutcome(
       reset,

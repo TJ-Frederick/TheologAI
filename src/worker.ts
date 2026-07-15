@@ -23,8 +23,6 @@ import {
   safeErrorName,
 } from './http/worker/telemetry.js';
 
-export { CcelGlobalCoordinator } from './http/worker/CcelGlobalCoordinator.js';
-
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     void ctx;

@@ -15,10 +15,6 @@ declare global {
       THEOLOGAI_ALLOWED_ORIGINS: string;
       THEOLOGAI_MAX_REQUEST_BYTES: string;
       THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH: string;
-      THEOLOGAI_ENABLE_CCEL_COORDINATOR: string;
-      THEOLOGAI_CCEL_COORDINATOR: DurableObjectNamespace<
-        import('../../src/http/worker/CcelGlobalCoordinator.js').CcelGlobalCoordinator
-      >;
     }
   }
 }
