@@ -1,4 +1,5 @@
 import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv';
+import Ajv2020 from 'ajv/dist/2020.js';
 import { describe, expect, it } from 'vitest';
 import {
   RECIPIENT_ADDRESS,
@@ -22,6 +23,29 @@ function expectValidInBothValidators(value: unknown): void {
 function expectInvalidInBothValidators(value: unknown): void {
   expect(internalValidate(value).valid).toBe(false);
   expect(sdkValidate(value).valid).toBe(false);
+}
+
+function expectWellFormedSchemaCombinators(value: unknown, path = '#'): void {
+  if (typeof value !== 'object' || value === null) return;
+
+  if (Array.isArray(value)) {
+    value.forEach((entry, index) => expectWellFormedSchemaCombinators(entry, `${path}/${index}`));
+    return;
+  }
+
+  for (const [key, entry] of Object.entries(value)) {
+    const entryPath = `${path}/${key}`;
+    if (key === 'allOf' || key === 'anyOf' || key === 'oneOf') {
+      expect(entry, `${entryPath} must be a non-empty schema array`).toBeInstanceOf(Array);
+      expect(entry as unknown[], `${entryPath} must contain at least one schema`).not.toHaveLength(0);
+    }
+    if (key === 'not') {
+      const isSchema = typeof entry === 'boolean'
+        || (typeof entry === 'object' && entry !== null && !Array.isArray(entry));
+      expect(isSchema, `${entryPath} must be a JSON Schema`).toBe(true);
+    }
+    expectWellFormedSchemaCombinators(entry, entryPath);
+  }
 }
 
 function result(overrides: Partial<DonationVerifyResult> = {}): DonationVerifyResult {
@@ -77,6 +101,25 @@ function chainStatusesFor(status: DonationVerifyResult['status']): DonationVerif
 }
 
 describe('presentVerifyDonationStructured', () => {
+  it('publishes a valid JSON Schema 2020-12 document with well-formed combinators', () => {
+    expectWellFormedSchemaCombinators(verifyDonationOutputSchema);
+
+    // The compact advertised schema relies on parent schemas for object/array types.
+    // Keep schema-keyword strictness on while disabling only Ajv's local strictTypes lint.
+    const ajv = new Ajv2020({ strict: true, strictTypes: false, allErrors: true });
+    expect(ajv.validateSchema(verifyDonationOutputSchema), ajv.errorsText(ajv.errors)).toBe(true);
+    expect(() => ajv.compile(verifyDonationOutputSchema)).not.toThrow();
+  });
+
+  it.each([
+    ['allOf', { properties: { nested: { allOf: [] } } }],
+    ['anyOf', { properties: { nested: { anyOf: [] } } }],
+    ['oneOf', { properties: { nested: { oneOf: [] } } }],
+    ['not', { properties: { nested: { not: [] } } }],
+  ])('rejects a malformed nested %s combinator', (_keyword, schema) => {
+    expect(() => expectWellFormedSchemaCombinators(schema)).toThrow();
+  });
+
   it('reports receipt observation without claiming confirmation depth or finality', () => {
     const output = presentVerifyDonationStructured(result());
 

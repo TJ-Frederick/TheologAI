@@ -401,12 +401,14 @@ for (let mask = 0; mask < 2 ** SUPPORTED_DONATION_CHAINS.length; mask += 1) {
       explorerLinks: {
         minItems: linkedChains.length,
         maxItems: linkedChains.length,
-        allOf: linkedChains.map(chain => ({
-          contains: {
-            properties: { chainId: { const: chain.chainId } },
-            required: ['chainId'],
-          },
-        })),
+        ...(linkedChains.length > 0 ? {
+          allOf: linkedChains.map(chain => ({
+            contains: {
+              properties: { chainId: { const: chain.chainId } },
+              required: ['chainId'],
+            },
+          })),
+        } : {}),
       },
     },
   });
