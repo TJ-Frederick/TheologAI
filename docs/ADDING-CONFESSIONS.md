@@ -1,5 +1,16 @@
 # Adding Historical Documents to TheologAI
 
+> **Legacy guide warning:** The download-and-parse workflow below records a
+> historical implementation technique; it is not approved for new ingestion.
+> In particular, do not download, copy, or republish CCEL-hosted text through
+> this workflow. New documents must follow the current rights-aware process in
+> [ROADMAP.md](ROADMAP.md) and the edition-specific provenance and licensing
+> requirements in [NOTICE.md](../NOTICE.md). The age of the underlying work does
+> not establish rights to a particular transcription, edition, or translation.
+> Do not acquire source text, create a parser, or add JSON until a review has
+> recorded the exact edition, source, license or public-domain basis,
+> transcription provenance, required attribution, and approval to redistribute.
+
 This guide documents the systematic approach for adding lengthy confessional documents (creeds, confessions, catechisms) to the TheologAI MCP server.
 
 ## Directory Structure
@@ -16,7 +27,11 @@ Each document is a JSON file with metadata fields:
 - `topics`: Array of searchable keywords
 - `sections`: Array of document sections (chapters, articles, or Q&A)
 
-## Adding a New Document
+## Adding a New Document After Rights Approval
+
+Every method below begins only after the hard approval prerequisite above is
+met. The examples describe data shaping after an approved source is already in
+hand; they do not authorize acquiring or copying a source.
 
 ### Method 1: Short Documents (Creeds)
 For brief documents like the Apostles' Creed, manually create the JSON file.
@@ -41,12 +56,14 @@ For brief documents like the Apostles' Creed, manually create the JSON file.
 ### Method 2: Lengthy Documents (Confessions, Catechisms)
 For large documents like Westminster Confession, use the parsing approach.
 
-#### Step-by-Step Process (Used for Westminster Confession):
+#### Historical parsing process (used for Westminster Confession)
 
-**1. Download Source Text**
-   - Find reliable plain text source (CCEL, denominational websites, Project Gutenberg)
-   - Prefer sources with clear structure and minimal formatting
-   - Example: `curl -o /tmp/westminster-confession.txt https://www.ccel.org/creeds/westminster-confession.txt`
+**1. Record the approved source**
+   - Record the exact edition, transcription provenance, source URL, rights
+     basis, license, attribution, and approval evidence.
+   - CCEL hosting is not rights evidence and CCEL text must not be downloaded or
+     republished through this process.
+   - Continue only with the exact source approved by the rights review.
 
 **2. Analyze Document Structure**
    ```bash
@@ -168,51 +185,56 @@ The `parse-westminster.py` script serves as a reusable template. To adapt for ot
    - Each source has unique artifacts
    - Add regex patterns specific to source formatting
 
-## Documents Ready to Add
+## Candidate Inventory — Not Approved to Add
+
+Every candidate below requires rights, edition, license, and transcription-
+provenance review and explicit approval before source acquisition or ingestion.
+The modern *Catechism of the Catholic Church* is not presumed public domain.
 
 ### Reformed/Presbyterian:
-- **Westminster Shorter Catechism** (Q&A format, ~107 questions)
-- **Westminster Larger Catechism** (Q&A format, ~196 questions)
-- **Belgic Confession** (37 articles)
-- **Canons of Dort** (5 heads of doctrine)
-- **Second Helvetic Confession** (30 chapters)
-- **Scots Confession** (25 chapters)
+- **Westminster Shorter Catechism** (Q&A format, ~107 questions) — rights/edition/license/provenance review required
+- **Westminster Larger Catechism** (Q&A format, ~196 questions) — rights/edition/license/provenance review required
+- **Belgic Confession** (37 articles) — rights/edition/license/provenance review required
+- **Canons of Dort** (5 heads of doctrine) — rights/edition/license/provenance review required
+- **Second Helvetic Confession** (30 chapters) — rights/edition/license/provenance review required
+- **Scots Confession** (25 chapters) — rights/edition/license/provenance review required
 
 ### Lutheran:
-- **Augsburg Confession** (28 articles + 21 articles)
-- **Small Catechism** (Luther, Q&A format)
-- **Large Catechism** (Luther, chapters)
-- **Formula of Concord** (12 articles)
+- **Augsburg Confession** (28 articles + 21 articles) — rights/edition/license/provenance review required
+- **Small Catechism** (Luther, Q&A format) — rights/edition/license/provenance review required
+- **Large Catechism** (Luther, chapters) — rights/edition/license/provenance review required
+- **Formula of Concord** (12 articles) — rights/edition/license/provenance review required
 
 ### Anglican:
-- **Thirty-Nine Articles** (39 articles)
+- **Thirty-Nine Articles** (39 articles) — rights/edition/license/provenance review required
 
 ### Baptist:
-- **London Baptist Confession** (1689, 32 chapters)
-- **New Hampshire Confession** (18 articles)
+- **London Baptist Confession** (1689, 32 chapters) — rights/edition/license/provenance review required
+- **New Hampshire Confession** (18 articles) — rights/edition/license/provenance review required
 
 ### Roman Catholic:
-- **Catechism of the Catholic Church** (~700 pages, 2865 articles)
-- **Council of Trent** (decrees and canons)
-- **First Vatican Council** (4 constitutions)
+- **Catechism of the Catholic Church** (~700 pages, 2865 articles) — modern
+  edition/translation; rights/edition/license/provenance review required
+- **Council of Trent** (decrees and canons) — rights/edition/license/provenance review required
+- **First Vatican Council** (4 constitutions) — rights/edition/license/provenance review required
 
 ### Eastern Orthodox:
-- **Confession of Dositheus** (18 decrees)
-- **Longer Catechism** (Philaret of Moscow, Q&A)
-- **Confession of Peter Mogila** (articles)
+- **Confession of Dositheus** (18 decrees) — rights/edition/license/provenance review required
+- **Longer Catechism** (Philaret of Moscow, Q&A) — rights/edition/license/provenance review required
+- **Confession of Peter Mogila** (articles) — rights/edition/license/provenance review required
 
 ## Estimated Sizes
 
 Based on Westminster Confession (34 chapters = 80KB = 12,770 words):
 
-| Document | Sections | Est. Size | Format |
-|----------|----------|-----------|--------|
-| Westminster Shorter Cat. | 107 Q | ~40 KB | Q&A |
-| Westminster Larger Cat. | 196 Q | ~150 KB | Q&A |
-| Belgic Confession | 37 art. | ~80 KB | Articles |
-| Augsburg Confession | 28 art. | ~60 KB | Articles |
-| Canons of Dort | 5 heads | ~70 KB | Heads/Articles |
-| Catechism of Catholic Church | 2865 art. | ~3 MB | Articles |
+| Document | Sections | Est. Size | Format | Status |
+|----------|----------|-----------|--------|--------|
+| Westminster Shorter Cat. | 107 Q | ~40 KB | Q&A | Rights/edition/license/provenance review required |
+| Westminster Larger Cat. | 196 Q | ~150 KB | Q&A | Rights/edition/license/provenance review required |
+| Belgic Confession | 37 art. | ~80 KB | Articles | Rights/edition/license/provenance review required |
+| Augsburg Confession | 28 art. | ~60 KB | Articles | Rights/edition/license/provenance review required |
+| Canons of Dort | 5 heads | ~70 KB | Heads/Articles | Rights/edition/license/provenance review required |
+| Catechism of Catholic Church | 2865 art. | ~3 MB | Articles | Modern edition; rights/edition/license/provenance review required |
 
 **Total estimated (all documents): ~4-6 MB**
 
