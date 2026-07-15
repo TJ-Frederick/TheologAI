@@ -104,6 +104,7 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
         'bible_verse_morphology',
         'original_language_study',
         'donation_config',
+        'verify_donation',
       ]);
       expect(listed.tools.find(tool => tool.name === 'bible_lookup')?.outputSchema).toMatchObject({
         type: 'object',
@@ -149,6 +150,11 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
         type: 'object',
         additionalProperties: false,
         properties: { schemaVersion: { const: '1' }, kind: { const: 'donation_config' } },
+      });
+      expect(listed.tools.find(tool => tool.name === 'verify_donation')?.outputSchema).toMatchObject({
+        type: 'object',
+        additionalProperties: false,
+        properties: { schemaVersion: { const: '1' }, kind: { const: 'verify_donation' } },
       });
       const resources = await client.listResources();
       expect(resources.resources).toContainEqual(expect.objectContaining({

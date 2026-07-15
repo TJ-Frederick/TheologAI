@@ -13,11 +13,15 @@ import { createVerseMorphologyHandler } from '../../../../src/tools/v2/verseMorp
 import { createOriginalLanguageStudyHandler } from '../../../../src/tools/v2/originalLanguageStudy.js';
 import { CommentaryScalarNotFoundError, ValidationError } from '../../../../src/kernel/errors.js';
 import { CommentaryService as CommentaryServiceClass } from '../../../../src/services/commentary/CommentaryService.js';
+import {
+  DonationService as DonationServiceClass,
+  type DonationService,
+} from '../../../../src/services/donation/DonationService.js';
 import type { BibleService } from '../../../../src/services/bible/BibleService.js';
 import type { CrossReferenceService } from '../../../../src/services/bible/CrossReferenceService.js';
 import type { ParallelPassageService } from '../../../../src/services/bible/ParallelPassageService.js';
 import type { CommentaryService } from '../../../../src/services/commentary/CommentaryService.js';
-import type { DonationService } from '../../../../src/services/donation/DonationService.js';
+import { RECIPIENT_ADDRESS, type ChainTransactionEvidence } from '../../../../src/kernel/donation-types.js';
 import type { HistoricalDocumentService } from '../../../../src/services/historical/HistoricalDocumentService.js';
 import type { PrimarySourceSearchService } from '../../../../src/services/historical/PrimarySourceSearchService.js';
 import type { MorphologyService } from '../../../../src/services/languages/MorphologyService.js';
@@ -1001,13 +1005,19 @@ describe('donation handlers', () => {
       transfers: [{
         chainId: 8453,
         chainName: 'Base',
-        from: '0xsender',
-        to: '0xrecipient',
+        from: `0x${'1'.repeat(40)}`,
+        to: '0xf2BE3382cF48ef5CAf21Ca3B01C4e6fC3Ea04B04',
         amount: '2.5',
         symbol: 'USDC',
-        tokenAddress: '0xtoken',
+        tokenAddress: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
       }],
-      explorerUrl: 'https://basescan.org/tx/example',
+      explorerUrl: `https://basescan.org/tx/0x${'a'.repeat(64)}`,
+      chainStatuses: [
+        { chainId: 1, chainName: 'Ethereum', state: 'absent' },
+        { chainId: 8453, chainName: 'Base', state: 'mined', minedSuccessfully: true },
+        { chainId: 723, chainName: 'Radius', state: 'absent' },
+      ],
+      classifiedTransferCount: 1,
     });
     const handler = createVerifyDonationHandler(serviceDouble({ verifyDonation }));
     const txHash = `0x${'a'.repeat(64)}`;
@@ -1018,6 +1028,65 @@ describe('donation handlers', () => {
     expect(textOf(result)).toContain('Donation Verified');
     expect(textOf(result)).toContain('2.5 USDC');
     expect(textOf(result)).toContain('View on Explorer');
+    expect(result.structuredContent).toMatchObject({
+      schemaVersion: '1', kind: 'verify_donation',
+      classification: { status: 'verified', donationVerified: true },
+      verificationPolicy: { finality: 'receipt_observed_no_confirmation_depth' },
+    });
+    expect(validatorFor(handler.outputSchema!)(result.structuredContent).valid).toBe(true);
+  });
+
+  it.each([
+    [
+      'over-uint256',
+      '1'.repeat(100),
+      '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+    ],
+    [
+      'leading-zero unsupported',
+      '0001',
+      `0x${'9'.repeat(40)}`,
+    ],
+  ])('returns structured unavailable evidence for a %s provider amount', async (_label, amount, tokenAddress) => {
+    const txHash = `0x${'c'.repeat(64)}`;
+    const evidence: ChainTransactionEvidence[] = [
+      {
+        txHash, chainId: 1, chainName: 'Ethereum', state: 'absent', transfers: [],
+      },
+      {
+        txHash,
+        chainId: 8453,
+        chainName: 'Base',
+        state: 'mined',
+        minedSuccessfully: true,
+        blockNumber: 100,
+        transfers: [{
+          from: `0x${'1'.repeat(40)}`,
+          to: RECIPIENT_ADDRESS,
+          amount,
+          tokenAddress,
+        }],
+      },
+      {
+        txHash, chainId: 723, chainName: 'Radius', state: 'absent', transfers: [],
+      },
+    ];
+    const handler = createVerifyDonationHandler(new DonationServiceClass({
+      getEvidence: vi.fn().mockResolvedValue(evidence),
+    }));
+
+    const result = await handler.handler({ tx_hash: txHash });
+
+    expect(result.isError).not.toBe(true);
+    expect(textOf(result)).toContain('Verification Temporarily Unavailable');
+    expect(textOf(result)).not.toContain(amount);
+    expect(result.structuredContent).toMatchObject({
+      kind: 'verify_donation',
+      classification: { status: 'unavailable', donationVerified: false },
+      coverage: { availability: 'unavailable', checkedChainCount: 0 },
+      transfers: [],
+    });
+    expect(validatorFor(handler.outputSchema!)(result.structuredContent).valid).toBe(true);
   });
 
   it('returns verification failures as tool errors', async () => {

@@ -155,6 +155,15 @@ describe('Worker MCP endpoint in workerd', () => {
             }),
           }),
         }),
+        expect.objectContaining({
+          name: 'verify_donation',
+          outputSchema: expect.objectContaining({
+            type: 'object', additionalProperties: false,
+            properties: expect.objectContaining({
+              kind: expect.objectContaining({ const: 'verify_donation' }),
+            }),
+          }),
+        }),
       ]),
     });
     const primarySourceTool = (listed.message.result?.tools as Array<Record<string, unknown>>)

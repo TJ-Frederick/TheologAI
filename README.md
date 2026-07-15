@@ -7,7 +7,7 @@ The current registry contains eleven tools, six guided prompts, eight English
 Bible translations, six commentary sources, 17 locally indexed
 historical documents, Strong's dictionaries, and Greek/Hebrew morphology.
 
-<!-- theologai-public-contract tools=11 structured=bible_cross_references,bible_lookup,bible_verse_morphology,donation_config,original_language_lookup,original_language_study,parallel_passages,primary_source_search -->
+<!-- theologai-public-contract tools=11 structured=bible_cross_references,bible_lookup,bible_verse_morphology,donation_config,original_language_lookup,original_language_study,parallel_passages,primary_source_search,verify_donation -->
 
 ## Remote endpoint
 
@@ -46,7 +46,7 @@ fresh server and transport.
 | `bible_verse_morphology` | Return bounded word-by-word morphology for one exact verse, with raw codes, nullable expansions, and separate pinned STEPBible morphology/lemma provenance. |
 | `original_language_study` | Resolve and study one Greek or Hebrew token in one verse with contextual morphology, source-separated lexical evidence, and explicit interpretive limits. |
 | `donation_config` | Return versioned structured voluntary-donation configuration with the public web URL, recipient, and ordered native/token assets; donations do not unlock features. |
-| `verify_donation` | Classify a transaction and confirm only supported transfers to the configured recipient. |
+| `verify_donation` | Return bounded, structured transaction evidence and verify only a successful receipt with a supported asset sent to the configured recipient; receipt observation does not claim confirmation depth or finality. |
 
 `parallel_passages` defaults unconditionally to `corpora:
 ["ubs_source_attested"]`, with at most five complete groups. It does not fall
@@ -66,13 +66,13 @@ adds the top 10 exact source variants and defaults to 8 raw occurrences (maximum
 responses.
 
 All tools are annotated as read-only, non-destructive, and idempotent. Tool
-inputs use closed, bounded JSON Schema 2020-12 contracts. Eight tools also
+inputs use closed, bounded JSON Schema 2020-12 contracts. Nine tools also
 advertise versioned object-root `outputSchema` contracts and return matching
 `structuredContent` beside the existing Markdown content: `bible_lookup`,
 `bible_cross_references`, `bible_verse_morphology`, `parallel_passages`,
 `primary_source_search`, `original_language_lookup`, and
-`original_language_study`, plus `donation_config`. Bible, cross-reference, verse-morphology,
-parallel-passage, and original-language structured results
+`original_language_study`, `donation_config`, and `verify_donation`. Bible,
+cross-reference, verse-morphology, parallel-passage, and original-language structured results
 include bounded, result-local provenance records. Primary-source results do not
 invent edition provenance records: their evidence policy explicitly marks
 edition provenance incomplete, and they link only canonical local sections with
@@ -84,8 +84,11 @@ configured display order while explicitly saying only that the order is not a
 ranking or recommendation. Clients must not infer preference, price, liquidity,
 bridge availability, or wallet support from the configuration;
 native assets have a null structured address and tokens retain their exact
-contract address. The remaining tools retain their current Markdown-only result
-contract.
+contract address. Donation verification exposes exactly three supported-chain
+checks, fail-closed coverage, status-relevant transfers capped at 100 with an
+exact classified total, allowlisted explorer links, and an explicit
+`receipt_observed_no_confirmation_depth` finality limit. `commentary_lookup`
+and `classic_text_lookup` retain their current Markdown-only result contracts.
 
 ### Resources
 

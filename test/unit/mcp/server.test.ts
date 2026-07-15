@@ -759,6 +759,8 @@ describe('shared MCP registration', () => {
     expect(donateText).toContain('stable display order is not a ranking or recommendation');
     expect(donateText).toContain('donations are voluntary and do not unlock features');
     expect(donateText).toContain('Do not infer price, liquidity, bridge availability, or wallet support');
+    expect(donateText).toContain('`receipt_observed_no_confirmation_depth` as receipt observation only');
+    expect(donateText).toContain('provider gaps fail closed');
   });
 
   it('uses InvalidParams for unknown prompts and missing prompt arguments', async () => {
