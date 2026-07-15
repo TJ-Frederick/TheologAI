@@ -335,6 +335,12 @@ describe('shared MCP registration', () => {
       text: expect.stringContaining('coverage varies by commentary provider'),
     }));
     expect(commentaries.contents[0]).toEqual(expect.objectContaining({
+      text: expect.stringContaining('John Gill** — chapter lookup recommended'),
+    }));
+    expect(commentaries.contents[0]).toEqual(expect.objectContaining({
+      text: expect.stringContaining('Matthew Henry** — chapter-level lookup'),
+    }));
+    expect(commentaries.contents[0]).toEqual(expect.objectContaining({
       text: expect.not.stringContaining('verseNumber metadata'),
     }));
 
@@ -631,7 +637,7 @@ describe('shared MCP registration', () => {
       text: expect.stringContaining('Exact-verse commentary coverage varies by provider'),
     }));
     expect(passageExegesis.messages[0].content).toEqual(expect.objectContaining({
-      text: expect.stringContaining('chapter-level evidence rather than attributing it to the requested verse'),
+      text: expect.stringContaining('chapter-level evidence rather than attributing them to one verse'),
     }));
 
     const rangeExegesis = await client.getPrompt({

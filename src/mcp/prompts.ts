@@ -38,6 +38,15 @@ function isSingleVerseReference(value: string): boolean {
   }
 }
 
+function containingChapterReference(value: string): string {
+  try {
+    const reference = parseReference(value);
+    return `${reference.book.name} ${reference.chapter}`;
+  } catch {
+    return value;
+  }
+}
+
 /**
  * Machine-checkable calls used by prompt prose. Keeping these structured lets
  * tests prove that guided workflows remain executable as tool schemas evolve.
@@ -68,14 +77,15 @@ export function recommendedToolCallsForPrompt(
     case 'passage-exegesis': {
       const reference = args?.reference ?? '';
       const singleVerse = isSingleVerseReference(reference);
+      const commentaryReference = containingChapterReference(reference);
       return [
         { tool: 'bible_lookup', arguments: { reference, translation: translation(args?.translation), includeFootnotes: true } },
         { tool: 'bible_lookup', arguments: { reference, translation: 'KJV' } },
         ...(singleVerse ? [{ tool: 'bible_verse_morphology', arguments: { reference, expand_morphology: true } }] : []),
         ...(singleVerse ? [{ tool: 'bible_cross_references', arguments: { reference } }] : []),
         { tool: 'parallel_passages', arguments: { reference, corpora: ['ubs_source_attested'], maxGroups: 5 } },
-        { tool: 'commentary_lookup', arguments: { reference, commentator: 'Matthew Henry' } },
-        { tool: 'commentary_lookup', arguments: { reference, commentator: 'John Gill' } },
+        { tool: 'commentary_lookup', arguments: { reference: commentaryReference, commentator: 'Matthew Henry' } },
+        { tool: 'commentary_lookup', arguments: { reference: commentaryReference, commentator: 'John Gill' } },
         { tool: 'classic_text_lookup', arguments: { query: `themes in ${reference}` } },
       ];
     }
@@ -245,7 +255,7 @@ export function registerPromptHandlers(server: Server): void {
 2. **Trace the passage before selecting terms** — Explain literary and discourse flow first. ${morphologyCall ? `For this single verse, ${callText(morphologyCall)}. Prefer structured \`words[]\`, retain raw \`morphologyCode\` beside nullable \`morphologyExpansion\`, and preserve both morphology and lemma provenance links; use Markdown only as fallback.` : 'This is a range: select at most three key individual verses and call `bible_verse_morphology` separately for each; never pass the range to a single-verse tool.'}
 3. **Study only consequential terms** — For a term affecting a real translation or interpretive question, call \`original_language_study\` with one exact verse and the verse-local target. Resolve ambiguity by source position rather than guessing.
 4. **Explore connections without conflating sources** — Use \`parallel_passages\` with \`corpora: ["ubs_source_attested"]\` for complete UBS source-attested groups. Preserve group membership and source order; because the source labels directionality unspecified, do not infer quotation, dependence, synoptic direction, or a thematic relationship. ${crossReferenceCall ? `${callText(crossReferenceCall)} separately for broader OpenBible.info discovery.` : 'This is not one exact verse: select at most three consequential individual verses and call `bible_cross_references` separately for each; never pass a chapter or range.'} Treat those community-ranked links as thematic leads, not UBS-attested parallels or evidence that one passage quotes another, and retain their separate attribution.
-5. **Consult commentaries and historical theology** — Use \`commentary_lookup\` and \`classic_text_lookup\`; note agreement and divergence. Exact-verse commentary coverage varies by provider. If a scalar commentary call has no exact match, retry with its containing chapter or another commentator; keep any chapter response labeled as chapter-level evidence rather than attributing it to the requested verse.
+5. **Consult commentaries and historical theology** — Use \`commentary_lookup\` and \`classic_text_lookup\`; note agreement and divergence. The recommended Matthew Henry and John Gill calls use the containing chapter because their current source metadata cannot safely support these scalar requests. Exact-verse commentary coverage varies by provider; if any scalar call has no exact match, retry with its containing chapter or another commentator. Keep chapter responses labeled as chapter-level evidence rather than attributing them to one verse.
 6. **Synthesize distinctly** — Separate observation, lexical evidence, interpretation, theological synthesis, and application. Context controls sense; never derive contextual meaning from a gloss, Strong's identifier, morphology, root, etymology, frequency, or every possible lexicon sense.`;
         break;
       }

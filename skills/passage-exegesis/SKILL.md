@@ -44,9 +44,9 @@ Use this workflow when the user asks for:
 
 ### Step 4: Commentary Tradition
 
-- Call `commentary_lookup` with at least two commentators:
-  - Matthew Henry (devotional/practical)
-  - John Gill (theological/exegetical)
+- Call `commentary_lookup` with the containing chapter for at least two commentators:
+  - Matthew Henry (devotional/practical; chapter-level source sections)
+  - John Gill (theological/exegetical; current scalar identity is insufficient)
   - Jamieson-Fausset-Brown or Adam Clarke for additional perspectives
 - Exact-verse coverage varies by commentary provider. If an exact-verse lookup has no trustworthy match, request the containing chapter or another commentator. Keep chapter commentary labeled at chapter level; never attribute it to the requested verse.
 - Note areas of agreement (likely settled interpretation) and disagreement (debated points)

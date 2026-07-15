@@ -119,6 +119,9 @@ Scalar coverage varies by commentary provider and is returned only when the
 provider exposes an exact, trustworthy verse identity. When no exact match is
 available, request the containing chapter or another commentator. Keep chapter
 commentary labeled at chapter level rather than attributing it to one verse.
+Matthew Henry and Keil-Delitzsch currently expose multi-verse sections, so they
+are chapter-level sources. John Gill's current feed normally lacks the stronger
+exact-verse identity required for scalar lookup; use its chapter lookup instead.
 
 ### Historical documents and external discovery
 

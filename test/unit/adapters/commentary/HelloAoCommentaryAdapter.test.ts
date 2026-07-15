@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HelloAoCommentaryAdapter } from '../../../../src/adapters/commentary/HelloAoCommentaryAdapter.js';
-import { AdapterError, ValidationError } from '../../../../src/kernel/errors.js';
+import {
+  AdapterError,
+  AdapterIntegrityError,
+  CommentaryScalarNotFoundError,
+  ValidationError,
+} from '../../../../src/kernel/errors.js';
 import { parseReference } from '../../../../src/kernel/reference.js';
 
 const response = (body: unknown): Response => new Response(JSON.stringify(body), { status: 200 });
@@ -26,7 +31,6 @@ describe('HelloAoCommentaryAdapter', () => {
             { type: 'heading', content: ['God\'s', 'love'] },
             { type: 'text', content: ['The', 'gospel.'] },
             'A final observation.',
-            { type: 'unknown', content: ['ignored'] },
           ],
         }],
       },
@@ -52,9 +56,9 @@ describe('HelloAoCommentaryAdapter', () => {
     vi.mocked(globalThis.fetch).mockResolvedValue(response({
       chapter: {
         content: [
-          { number: 10, content: ['Earlier'] },
-          { number: 16, content: ['Exact'] },
-          { number: 20, content: ['Later'] },
+          { type: 'verse', number: 10, content: ['Earlier'] },
+          { type: 'verse', number: 16, content: ['Exact'] },
+          { type: 'verse', number: 20, content: ['Later'] },
         ],
       },
     }));
@@ -62,6 +66,15 @@ describe('HelloAoCommentaryAdapter', () => {
     const result = await new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3:16'), 'Clarke');
     expect(result.text).toBe('Exact');
     expect(result.commentator).toBe('Adam Clarke');
+  });
+
+  it('does not treat an untyped number field as exact verse identity', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue(response({
+      chapter: { content: [{ number: 16, content: ['Ambiguous numbered section'] }] },
+    }));
+
+    await expect(new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3:16'), 'Clarke'))
+      .rejects.toEqual(new CommentaryScalarNotFoundError('HelloAO', 'John 3', 'No exact commentary match for John 3:16 in Adam Clarke'));
   });
 
   it('rejects verse ranges before making a provider request', async () => {
@@ -77,70 +90,90 @@ describe('HelloAoCommentaryAdapter', () => {
     vi.mocked(globalThis.fetch).mockResolvedValue(response({
       chapter: {
         content: [
-          { number: 15, content: ['Preceding verse'] },
-          { number: 17, content: ['Later verse'] },
+          { type: 'verse', number: 15, content: ['Preceding verse'] },
+          { type: 'verse', number: 17, content: ['Later verse'] },
         ],
       },
     }));
 
     await expect(new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3:16'), 'Clarke'))
-      .rejects.toEqual(new AdapterError('HelloAO', 'No exact commentary match for John 3:16 in Adam Clarke'));
+      .rejects.toEqual(new CommentaryScalarNotFoundError('HelloAO', 'John 3', 'No exact commentary match for John 3:16 in Adam Clarke'));
   });
 
-  it.each([
-    ['John 3:16', 'John 3'],
-    ['Romans 8:28', 'Romans 8'],
-  ])('fails closed for Matthew Henry scalar %s without unique verse metadata while its chapter remains available', async (reference, chapter) => {
+  it.each(['John 3:1', 'John 3:22'])(
+    'fails closed for Matthew Henry production-shaped multi-verse section anchor %s while its chapter remains available',
+    async (reference) => {
     vi.mocked(globalThis.fetch).mockResolvedValue(response({
       chapter: {
         content: [
-          { content: ['Chapter section one'] },
-          { content: ['Chapter section two'] },
+          { type: 'verse', number: 1, content: ['Commentary spanning John 3:1-21'] },
+          { type: 'verse', number: 22, content: ['Commentary spanning John 3:22-36'] },
         ],
       },
     }));
     const adapter = new HelloAoCommentaryAdapter();
 
     await expect(adapter.getCommentary(parseReference(reference), 'Matthew Henry'))
-      .rejects.toEqual(new AdapterError('HelloAO', `No exact commentary match for ${reference} in Matthew Henry`));
+      .rejects.toEqual(new CommentaryScalarNotFoundError('HelloAO', 'John 3', `No exact commentary match for ${reference} in Matthew Henry`));
 
-    await expect(adapter.getCommentary(parseReference(chapter), 'Matthew Henry'))
+    await expect(adapter.getCommentary(parseReference('John 3'), 'Matthew Henry'))
       .resolves.toMatchObject({
-        reference: chapter,
+        reference: 'John 3',
         commentator: 'Matthew Henry',
-        text: 'Chapter section one\n\nChapter section two',
+        text: 'Commentary spanning John 3:1-21\n\nCommentary spanning John 3:22-36',
+      });
+    },
+  );
+
+  it('treats Keil-Delitzsch numbered passage sections as chapter-only', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue(response({
+      chapter: {
+        content: [
+          { type: 'verse', number: 1, content: ['Commentary spanning Genesis 1:1-5'] },
+          { type: 'verse', number: 6, content: ['Commentary spanning Genesis 1:6-8'] },
+        ],
+      },
+    }));
+    const adapter = new HelloAoCommentaryAdapter();
+
+    await expect(adapter.getCommentary(parseReference('Genesis 1:1'), 'Keil-Delitzsch'))
+      .rejects.toEqual(new CommentaryScalarNotFoundError('HelloAO', 'Genesis 1', 'No exact commentary match for Genesis 1:1 in Keil-Delitzsch'));
+    await expect(adapter.getCommentary(parseReference('Genesis 1'), 'Keil-Delitzsch'))
+      .resolves.toMatchObject({
+        reference: 'Genesis 1',
+        text: 'Commentary spanning Genesis 1:1-5\n\nCommentary spanning Genesis 1:6-8',
       });
   });
 
   it('never returns John 3:17 content for a John Gill 3:16 request', async () => {
     vi.mocked(globalThis.fetch).mockResolvedValue(response({
       chapter: {
-        content: [{ number: 17, content: ['For God sent not his Son into the world'] }],
+        content: [{ type: 'verse', number: 17, content: ['For God sent not his Son into the world'] }],
       },
     }));
 
     await expect(new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3:16'), 'John Gill'))
-      .rejects.toEqual(new AdapterError('HelloAO', 'No exact commentary match for John 3:16 in John Gill'));
+      .rejects.toEqual(new CommentaryScalarNotFoundError('HelloAO', 'John 3', 'No exact commentary match for John 3:16 in John Gill'));
   });
 
   it.each(['John 3:15', 'John 3:16'])('does not use John Gill number metadata for %s', async (reference) => {
     vi.mocked(globalThis.fetch).mockResolvedValue(response({
       chapter: {
         content: [
-          { number: 15, content: ['For God so loved the world'] },
-          { number: 16, content: ['For God sent not his Son into the world'] },
+          { type: 'verse', number: 15, content: ['For God so loved the world'] },
+          { type: 'verse', number: 16, content: ['For God sent not his Son into the world'] },
         ],
       },
     }));
 
     await expect(new HelloAoCommentaryAdapter().getCommentary(parseReference(reference), 'John Gill'))
-      .rejects.toEqual(new AdapterError('HelloAO', `No exact commentary match for ${reference} in John Gill`));
+      .rejects.toEqual(new CommentaryScalarNotFoundError('HelloAO', 'John 3', `No exact commentary match for ${reference} in John Gill`));
   });
 
   it('accepts John Gill scalar commentary only with a genuine verseNumber field', async () => {
     vi.mocked(globalThis.fetch).mockResolvedValue(response({
       chapter: {
-        content: [{ verseNumber: 16, number: 15, content: ['Genuine verse 16 commentary'] }],
+        content: [{ verseNumber: 16, content: ['Genuine verse 16 commentary'] }],
       },
     }));
 
@@ -212,33 +245,42 @@ describe('HelloAoCommentaryAdapter', () => {
   });
 
   it.each([
-    ['a malformed payload', {}],
-    ['a non-array chapter content payload', { chapter: { content: { number: 16 } } }],
-    ['empty chapter content', { chapter: { content: [] } }],
-    ['an exact entry without array content', { chapter: { content: [{ verseNumber: 16, content: 'bad' }] } }],
-    ['an entry with malformed verse metadata', { chapter: { content: [{ number: 'not-a-verse', content: ['unsafe'] }] } }],
-    ['an entry with conflicting verse metadata', { chapter: { content: [{ verseNumber: 16, number: 17, content: ['unsafe'] }] } }],
-    ['duplicate exact verse entries', { chapter: { content: [{ number: 16, content: ['first'] }, { number: 16, content: ['second'] }] } }],
-    ['no preceding section', { chapter: { content: [{ verseNumber: 17, content: ['later'] }] } }],
-  ])('reports no commentary for %s', async (_label, payload) => {
+    ['a malformed payload', {}, 'Malformed commentary chapter payload'],
+    ['a non-array chapter content payload', { chapter: { content: { number: 16 } } }, 'Malformed commentary chapter payload'],
+    ['an exact entry without array content', { chapter: { content: [{ verseNumber: 16, content: 'bad' }] } }, 'Malformed commentary entry at index 0'],
+    ['an entry with malformed verse metadata', { chapter: { content: [{ number: 'not-a-verse', content: ['unsafe'] }] } }, 'Malformed commentary identity at index 0'],
+    ['an entry with conflicting verse metadata', { chapter: { content: [{ verseNumber: 16, number: 17, content: ['unsafe'] }] } }, 'Conflicting commentary identity at index 0'],
+    ['duplicate exact verse entries', { chapter: { content: [{ type: 'verse', number: 16, content: ['first'] }, { type: 'verse', number: 16, content: ['second'] }] } }, 'Duplicate exact commentary identity'],
+    ['an unknown content item', { chapter: { content: [{ type: 'verse', number: 16, content: [{ type: 'unknown', content: ['unsafe'] }] }] } }, 'Unknown commentary content item at index 0'],
+    ['malformed text content', { chapter: { content: [{ type: 'verse', number: 16, content: [{ type: 'text', content: 'unsafe' }] }] } }, 'Malformed commentary text content at index 0'],
+  ])('classifies %s as an integrity failure', async (_label, payload, reason) => {
     vi.mocked(globalThis.fetch).mockResolvedValue(response(payload));
 
     await expect(new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3:16'), 'tyndale'))
-      .rejects.toEqual(new AdapterError('HelloAO', 'No exact commentary match for John 3:16 in Tyndale Open Study Notes'));
+      .rejects.toEqual(new AdapterIntegrityError('HelloAO', reason));
   });
 
   it.each([
-    ['Matthew Henry', 'Genesis 1:1', 'verseNumber', 'Genesis opening', 'Matthew Henry'],
+    ['empty chapter content', { chapter: { content: [] } }],
+    ['no exact entry', { chapter: { content: [{ type: 'verse', number: 17, content: ['later'] }] } }],
+    ['exact entry with valid empty content', { chapter: { content: [{ type: 'verse', number: 16, content: [] }] } }],
+  ])('classifies structurally valid scalar absence for %s as an actionable no-match', async (_label, payload) => {
+    vi.mocked(globalThis.fetch).mockResolvedValue(response(payload));
+
+    await expect(new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3:16'), 'tyndale'))
+      .rejects.toEqual(new CommentaryScalarNotFoundError('HelloAO', 'John 3', 'No exact commentary match for John 3:16 in Tyndale Open Study Notes'));
+  });
+
+  it.each([
     ['Jamieson-Fausset-Brown', 'John 3:16', 'number', 'JFB exact', 'Jamieson-Fausset-Brown'],
     ['Adam Clarke', 'Romans 8:28', 'verseNumber', 'Clarke exact', 'Adam Clarke'],
     ['John Gill', 'Exodus 3:14', 'verseNumber', 'Gill exact', 'John Gill'],
-    ['Keil-Delitzsch', 'Genesis 1:1', 'number', 'Keil exact', 'Keil-Delitzsch'],
-    ['Tyndale', 'John 3:16', 'verseNumber', 'Tyndale exact', 'Tyndale Open Study Notes'],
+    ['Tyndale', 'John 3:16', 'number', 'Tyndale exact', 'Tyndale Open Study Notes'],
   ] as const)('preserves exact reference identity for %s (%s)', async (commentator, reference, metadata, text, displayName) => {
     const parsed = parseReference(reference);
     vi.mocked(globalThis.fetch).mockResolvedValue(response({
       chapter: {
-        content: [{ [metadata]: parsed.startVerse, content: [text] }],
+        content: [{ type: 'verse', [metadata]: parsed.startVerse, content: [text] }],
       },
     }));
 
@@ -249,10 +291,15 @@ describe('HelloAoCommentaryAdapter', () => {
     expect(result.commentator).toBe(displayName);
   });
 
-  it('surfaces malformed upstream JSON', async () => {
+  it('classifies malformed upstream JSON as an integrity failure', async () => {
     vi.mocked(globalThis.fetch).mockResolvedValue(new Response('not-json', { status: 200 }));
 
     await expect(new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3:16'), 'John Gill'))
-      .rejects.toBeInstanceOf(SyntaxError);
+      .rejects.toMatchObject({
+        name: 'AdapterIntegrityError',
+        source: 'HelloAO',
+        message: '[HelloAO] Malformed commentary JSON payload',
+        cause: expect.any(SyntaxError),
+      });
   });
 });

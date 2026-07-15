@@ -11,7 +11,7 @@ import { createStrongsLookupHandler } from '../../../../src/tools/v2/strongsLook
 import { createVerifyDonationHandler } from '../../../../src/tools/v2/verifyDonation.js';
 import { createVerseMorphologyHandler } from '../../../../src/tools/v2/verseMorphology.js';
 import { createOriginalLanguageStudyHandler } from '../../../../src/tools/v2/originalLanguageStudy.js';
-import { AdapterError, ValidationError } from '../../../../src/kernel/errors.js';
+import { CommentaryScalarNotFoundError, ValidationError } from '../../../../src/kernel/errors.js';
 import { CommentaryService as CommentaryServiceClass } from '../../../../src/services/commentary/CommentaryService.js';
 import type { BibleService } from '../../../../src/services/bible/BibleService.js';
 import type { CrossReferenceService } from '../../../../src/services/bible/CrossReferenceService.js';
@@ -104,6 +104,8 @@ describe('v2 tool handler schemas', () => {
     });
     expect(commentaryHandler.description).toContain('Verse ranges are not supported');
     expect(commentaryHandler.description).toContain('Exact-verse (scalar) coverage varies by commentary provider');
+    expect(commentaryHandler.description).toContain('John Gill scalar lookup requires stronger exact-verse metadata');
+    expect(commentaryHandler.description).toContain('Matthew Henry and Keil-Delitzsch are currently chapter-level');
     expect(commentaryHandler.description).toContain('Chapter results remain chapter-level commentary');
     expect(commentary.properties?.reference).toMatchObject({
       description: expect.stringContaining('verse ranges are not supported'),
@@ -430,7 +432,11 @@ describe('commentary_lookup handler', () => {
 
   it('turns a scalar commentary miss into actionable chapter guidance without exposing provider details', async () => {
     const lookup = vi.fn<CommentaryService['lookup']>().mockRejectedValue(
-      new AdapterError('HelloAO', 'No exact commentary match for John 3:16 in Matthew Henry'),
+      new CommentaryScalarNotFoundError(
+        'HelloAO',
+        'John 3',
+        'No exact commentary match for John 3:16 in Matthew Henry',
+      ),
     );
     const handler = createCommentaryHandler(serviceDouble({ lookup }));
 

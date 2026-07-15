@@ -56,6 +56,26 @@ export class AdapterError extends TheologAIError {
   }
 }
 
+/** External response was received but its shape or identity is not trustworthy. */
+export class AdapterIntegrityError extends AdapterError {
+  constructor(source: string, message: string, cause?: Error) {
+    super(source, message, cause);
+    this.name = 'AdapterIntegrityError';
+  }
+}
+
+/** A valid commentary payload had no trustworthy match for one exact verse. */
+export class CommentaryScalarNotFoundError extends AdapterError {
+  constructor(
+    source: string,
+    public readonly chapterReference: string,
+    message: string,
+  ) {
+    super(source, message);
+    this.name = 'CommentaryScalarNotFoundError';
+  }
+}
+
 /** Requested resource not found (book, verse, document, etc.) */
 export class NotFoundError extends TheologAIError {
   constructor(
@@ -100,6 +120,12 @@ export function getUserMessage(error: Error): string {
       ? `Payment verification failed for tx ${error.txHash}: ${error.message}`
       : `Payment error: ${error.message}`;
   }
+  if (error instanceof AdapterIntegrityError) {
+    return 'Unavailable: The requested source is temporarily unavailable. Please try again later.';
+  }
+  if (error instanceof CommentaryScalarNotFoundError) {
+    return `Not found: No trustworthy exact-verse commentary was available. Request the containing chapter (\`${error.chapterReference}\`) or try another commentator.`;
+  }
   if (error instanceof AdapterError) {
     return getAdapterUserMessage(error.message);
   }
@@ -118,13 +144,7 @@ export function getUserMessage(error: Error): string {
  * only a stable category is returned to clients.
  */
 function getAdapterUserMessage(diagnosticMessage: string): string {
-  const diagnosticDetail = diagnosticMessage.replace(/^\[[^\]]+\]\s*/, '');
-  const detail = diagnosticDetail.toLowerCase();
-
-  const exactCommentaryMiss = diagnosticDetail.match(/^No exact commentary match for (.+):\d+ in .+$/i);
-  if (exactCommentaryMiss) {
-    return `Not found: No trustworthy exact-verse commentary was available. Request the containing chapter (\`${exactCommentaryMiss[1]}\`) or try another commentator.`;
-  }
+  const detail = diagnosticMessage.replace(/^\[[^\]]+\]\s*/, '').toLowerCase();
 
   if (/unsupported|not supported|only available|unknown commentator|outside .*coverage/.test(detail)) {
     return 'Unsupported coverage: This request is outside the supported coverage.';
