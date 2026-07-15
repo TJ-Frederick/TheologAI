@@ -40,6 +40,18 @@ is local source context only and does not define the current product contract.
   fail-closed section coverage, official content-shape parsing, and aligned
   public guidance, reviewed at `32441d99de673eccce0a57fd74801fb94db04944`
   and merged as `9f6aa128eeab663ef04a315ab0c14b8ae9a3376d`.
+- **Structured cross references / PR #35:** bounded, provenance-bearing v1
+  output for `bible_cross_references`, merged as
+  `d9b24eb2b7045b8d156b90be185c399a661c6f40`.
+- **Structured donation configuration / PR #36:** conservative v1 public
+  configuration output, merged as
+  `551b599a12f4844915504ba5529066a1bbff7797`.
+- **Structured donation verification / PR #38:** fail-closed v1 transaction
+  evidence and coverage output, merged as
+  `1d7369b1c232e9469abe5475d8e5f77cd22c9f13`.
+- **Structured commentary / PR #37:** provider-evidenced coverage identity,
+  rights and delivery provenance, and bounded v1 output, merged as
+  `d395b3641eb00f6826eaba670c287f9a39dfa3da`.
 
 These entries describe merged repository state. Deployment state is established
 only by the relevant protected workflow and post-deployment smoke evidence; a
@@ -74,34 +86,29 @@ PR #21. Their stacked PRs #14–#20 are closed as superseded review vehicles:
    context-first workflow for one token in one verse, with morphology,
    source-separated lexical evidence, provenance, and interpretive limits.
 
-The released server advertises eleven tools, six guided prompts, and structured
-output for `bible_lookup`, `parallel_passages`, `primary_source_search`,
-`original_language_lookup`, and `original_language_study`. Markdown remains
-available for compatibility.
+The released server advertises eleven tools and six guided prompts. Ten tools
+have versioned structured contracts while retaining Markdown compatibility;
+`classic_text_lookup` is the sole Markdown-only tool.
 
-Protected production workflow run `29418476587` deployed the PR #39 merge after
-the exact-corpus readiness gate passed. GitHub deployment `5457655742` deployed
-Worker version `a74f0848-5b68-4d7a-834e-aa3221ebda3b` at 100% with production D1
-`theologai-production-20260715-a`
-(`c6535a4a-1953-4279-b277-7368445fc61a`). The post-deployment strict readiness
-check returned `ready` with zero writes. The independent production audit
-scored 87/90 with no P0 or P1 findings and one P2 commentary-coverage finding.
+The structured-output release ledger is:
 
-PR #40 corrected that finding without changing either D1 binding. Protected
-preview run `29425323205` deployed reviewed head
-`32441d99de673eccce0a57fd74801fb94db04944` as GitHub deployment `5459322775`
-and Worker version `34a0a557-9ddb-4940-9862-6b25e1dd98e6` at 100%, bound to
-preview D1 `theologai-preview-20260714-a`
-(`0dab804f-8df0-4727-93bd-299612b6e179`). The coordinator audit passed 15/15
-and the independent audit passed 27/27 with no P0-P3 findings. Protected
-production run `29427137668` then deployed merge
-`9f6aa128eeab663ef04a315ab0c14b8ae9a3376d` as GitHub deployment `5459432945`
-and Worker version `656e9e3a-7044-45ca-9144-4ec7eae94d8d` at 100%. That PR #40
-Worker is the current production version and remains bound to production D1
-`theologai-production-20260715-a`. Readiness returned `ready` with zero writes;
-the coordinator audit passed 15/15 and the independent audit passed 27/27 with
-no P0-P3 findings. Live CCEL discovery remains intentionally disabled and is
-not part of the public MCP contract.
+- PR #35: production run `29436689148`, deployment `5461346778`, Worker
+  `24da1fd6-7a99-447e-86d4-17571d901b09`; coordinator 9/9 and independent
+  10/10 audits, with no findings.
+- PR #36: production run `29441298979`, deployment `5462262765`, Worker
+  `b10427f0-9692-45ec-9089-e3027be58805`; coordinator 7/7 and independent
+  23/23 audits, with no findings.
+- PR #38: production run `29448002771`, deployment `5463551874`, Worker
+  `e0371eb4-05c6-4415-b479-b01ac2630be0`; production audit 94/94, with no
+  findings.
+- PR #37: production run `29451333738`, deployment `5464194228`, Worker
+  `9d2b757b-8b9b-4318-b09d-14f62815bf82`; coordinator 73/73 and independent
+  91/91 audits, with no P0-P3 findings.
+
+Each release retained production D1 `theologai-production-20260715-a`
+(`c6535a4a-1953-4279-b277-7368445fc61a`), passed strict readiness as `ready`,
+and performed zero readiness writes. Live CCEL discovery remains intentionally
+disabled and outside the public MCP contract.
 
 ## Shipped Unicode correction release
 
@@ -222,9 +229,9 @@ prefix/suffix gloss segments such as `heavens` within `the/ heavens`, while
 remaining fail-closed for ambiguous candidates. No corpus rows or source data
 were changed by that application-layer correction.
 
-### Structured cross-reference follow-up (unreleased)
+### Structured cross-reference follow-up (shipped)
 
-The next modern-output slice adds a v1 object-root contract for
+This modern-output slice adds a v1 object-root contract for
 `bible_cross_references` without changing its Markdown. It distinguishes the
 caller's requested reference from the canonical verse actually queried,
 materializes effective query defaults, preserves raw OpenBible.info vote order
@@ -235,9 +242,9 @@ threshold, and every response—including an empty result—carries the exact
 checksum-pinned OpenBible.info snapshot provenance. It changes no corpus rows,
 SQL semantics, migration, configuration, or deployment behavior.
 
-### Structured donation-configuration follow-up (unreleased)
+### Structured donation-configuration follow-up (shipped)
 
-The next bounded modern-output slice also adds a v1 object-root contract for
+This bounded modern-output slice adds a v1 object-root contract for
 `donation_config` while retaining the legacy Markdown. It exposes the existing
 public donation page, recipient, and configured asset values in their existing
 display order, includes a machine-readable marker that this order is not a
@@ -247,7 +254,7 @@ and do not affect feature access. The contract does not rank assets or claim pri
 or wallet support. It changes no verification behavior, chain configuration,
 secret, migration, D1 state, or deployment setting.
 
-### Structured donation-verification follow-up (unreleased)
+### Structured donation-verification follow-up (shipped)
 
 `verify_donation` now pairs its legacy Markdown with a conservative v1 object
 contract. It reports exactly Ethereum, Base, and Radius checks; distinguishes
@@ -261,7 +268,7 @@ allowlists. Unknown, duplicate, missing, or mismatched chain evidence fails
 closed. A successful receipt means only
 `receipt_observed_no_confirmation_depth`, not confirmation depth or finality.
 
-### Structured commentary follow-up (unreleased)
+### Structured commentary follow-up (shipped)
 
 `commentary_lookup` now pairs its byte-compatible legacy Markdown with a v1
 object-root result. Coverage is carried from provider parsing into the service
@@ -310,12 +317,15 @@ Code readiness and operational readiness are deliberately separate:
 
 ## Next work
 
-- Broaden advanced original-language study only after those foundations, using
-  carefully sourced semantic-domain and discourse evidence useful to both
-  beginners and readers of Greek or Hebrew.
-- Expand primary-source discovery beyond the initial local collection through
-  rights-reviewed, freely redistributable editions and provider adapters. Do
-  not mirror or republish CCEL transcriptions without edition-specific rights.
+- Decide and review a bounded, discovery-only public rollout of the retained
+  CCEL search adapter. It must remain request-scoped and must not crawl, mirror,
+  store, or republish CCEL document bodies.
+- Expand the local primary-source corpus with rights-reviewed, freely
+  redistributable editions and explicit edition provenance. Do not mirror or
+  republish CCEL transcriptions without edition-specific rights.
+- Broaden original-language study with a separately sourced semantic-domain
+  layer useful to both beginners and readers of Greek or Hebrew; evaluate
+  MACULA discourse/context evidence only after that foundation is reviewed.
 - Evaluate section-span commentary only where provider coverage can be stated
   honestly; never relabel a section anchor as an exact verse range.
 - Continue modern MCP output improvements tool by tool when a stable structured

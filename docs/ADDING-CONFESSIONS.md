@@ -1,5 +1,13 @@
 # Adding Historical Documents to TheologAI
 
+> **Legacy guide warning:** The download-and-parse workflow below records a
+> historical implementation technique; it is not approved for new ingestion.
+> In particular, do not download, copy, or republish CCEL-hosted text through
+> this workflow. New documents must follow the current rights-aware process in
+> [ROADMAP.md](ROADMAP.md) and the edition-specific provenance and licensing
+> requirements in [NOTICE.md](../NOTICE.md). The age of the underlying work does
+> not establish rights to a particular transcription, edition, or translation.
+
 This guide documents the systematic approach for adding lengthy confessional documents (creeds, confessions, catechisms) to the TheologAI MCP server.
 
 ## Directory Structure
