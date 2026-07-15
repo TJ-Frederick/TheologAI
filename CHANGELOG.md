@@ -7,15 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-<!-- theologai-public-contract tools=11 structured=bible_cross_references,bible_lookup,bible_verse_morphology,donation_config,original_language_lookup,original_language_study,parallel_passages,primary_source_search,verify_donation -->
+<!-- theologai-public-contract tools=11 structured=bible_cross_references,bible_lookup,bible_verse_morphology,commentary_lookup,donation_config,original_language_lookup,original_language_study,parallel_passages,primary_source_search,verify_donation -->
 
 ### Added
 
 - Added stable MCP 2025-11-25 structured output and server-side schema
   validation for `bible_lookup`, `bible_cross_references`, `parallel_passages`,
   `bible_verse_morphology`, `primary_source_search`, `original_language_lookup`,
-  `original_language_study`, `donation_config`, and `verify_donation`, while keeping
+  `original_language_study`, `commentary_lookup`, `donation_config`, and `verify_donation`, while keeping
   their Markdown content available for legacy clients.
+- Added versioned `commentary_lookup` results whose exact-verse claims come
+  from explicit provider identity evidence rather than request shape. Matthew
+  Henry and Keil-Delitzsch are structurally chapter-only; John Gill exact
+  results require `verseNumber`; JFB, Clarke, and Tyndale may also use a
+  provider entry explicitly typed as a verse. Results label commentary text as
+  Markdown and separate conservative work rights from cached-or-live HelloAO
+  delivery. Retrieval reports that per-result cache status is not exposed.
 - Added versioned `donation_config` results with explicit voluntary/no-feature-
   unlock policy, the shared public donation URL, recipient address, and ordered
   native/token asset metadata. The structure makes native addresses null,

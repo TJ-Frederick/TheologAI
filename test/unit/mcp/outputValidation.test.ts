@@ -59,6 +59,7 @@ describe('MCP structured output validation', () => {
       'bible_lookup',
       'bible_cross_references',
       'parallel_passages',
+      'commentary_lookup',
       'primary_source_search',
       'original_language_lookup',
       'bible_verse_morphology',

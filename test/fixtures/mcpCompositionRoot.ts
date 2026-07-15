@@ -62,13 +62,18 @@ export function createDeterministicMcpFixture(): DeterministicMcpFixture {
   };
 
   const commentaryAdapter: CommentaryAdapter = {
-    supportedCommentators: ['Test Commentary'],
+    supportedCommentators: ['Jamieson-Fausset-Brown'],
     async getCommentary(_reference, commentator) {
       return {
         reference: 'John 3:16',
-        commentator,
+        commentator: 'Jamieson-Fausset-Brown',
         text: 'Deterministic commentary.',
         citation: { source: 'Deterministic test fixture' },
+        coverage: {
+          requestedScope: 'verse', returnedGranularity: 'exact_verse',
+          identityBasis: 'provider_verse_number',
+          providerIdentity: { field: 'verseNumber', value: 16 },
+        },
       };
     },
     supportsBook: () => true,

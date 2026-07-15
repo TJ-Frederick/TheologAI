@@ -49,6 +49,7 @@ Use this workflow when the user asks for:
   - John Gill (theological/exegetical; current scalar identity is insufficient)
   - Jamieson-Fausset-Brown or Adam Clarke for additional perspectives
 - Exact-verse coverage varies by commentary provider. If an exact-verse lookup has no trustworthy match, request the containing chapter or another commentator. Keep chapter commentary labeled at chapter level; never attribute it to the requested verse.
+- Prefer structured `coverage`, `commentary`, `retrieval`, and `provenance`; use the legacy Markdown as fallback. Treat `exact_verse` only as the returned provider identity evidence states and `chapter_aggregate` only as chapter-level evidence. Never infer a section span, and keep the commentary work's rights/provenance distinct from cached-or-live HelloAO delivery. Per-result cache status is not exposed.
 - Note areas of agreement (likely settled interpretation) and disagreement (debated points)
 
 ### Step 5: Historical Theology

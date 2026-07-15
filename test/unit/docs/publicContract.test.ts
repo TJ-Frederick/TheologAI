@@ -126,6 +126,7 @@ describe('published project contract', () => {
         'bible_cross_references',
         'bible_lookup',
         'bible_verse_morphology',
+        'commentary_lookup',
         'donation_config',
         'original_language_lookup',
         'original_language_study',

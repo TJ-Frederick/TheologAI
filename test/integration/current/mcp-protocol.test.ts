@@ -99,6 +99,7 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
         'bible_lookup',
         'bible_cross_references',
         'parallel_passages',
+        'commentary_lookup',
         'primary_source_search',
         'original_language_lookup',
         'bible_verse_morphology',
@@ -110,6 +111,15 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
         type: 'object',
         additionalProperties: false,
         properties: { schemaVersion: { const: '1' }, kind: { const: 'bible_lookup' } },
+      });
+      expect(listed.tools.find(tool => tool.name === 'commentary_lookup')?.outputSchema).toMatchObject({
+        type: 'object', additionalProperties: false,
+        properties: {
+          kind: { const: 'commentary_lookup' },
+          commentary: expect.objectContaining({
+            properties: expect.objectContaining({ textFormat: { type: 'string', const: 'text/markdown' } }),
+          }),
+        },
       });
       expect(listed.tools.find(tool => tool.name === 'original_language_lookup')?.outputSchema).toMatchObject({
         type: 'object',
@@ -146,6 +156,27 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
       });
       expect(JSON.stringify(primarySource).toLowerCase()).not.toContain('ccel');
       expect((primarySource.structuredContent as any).coverage).not.toHaveProperty('ccelAttempted');
+      const commentary = await client.callTool({
+        name: 'commentary_lookup',
+        arguments: { reference: 'John 3:16', commentator: 'Jamieson-Fausset-Brown' },
+      });
+      expect(commentary.isError).not.toBe(true);
+      expect(commentary.content[0]).toMatchObject({
+        type: 'text', text: expect.stringContaining('Jamieson-Fausset-Brown Commentary on John 3:16'),
+      });
+      expect(commentary.structuredContent).toMatchObject({
+        schemaVersion: '1', kind: 'commentary_lookup', resolvedReference: 'John 3:16',
+        coverage: {
+          requestedScope: 'verse', returnedGranularity: 'exact_verse',
+          identityBasis: 'provider_verse_number',
+          providerIdentity: { field: 'verseNumber', value: 16 }, sectionSpanClaim: 'none',
+        },
+        commentary: {
+          commentator: 'Jamieson-Fausset-Brown', textFormat: 'text/markdown',
+          provenanceIds: ['jamieson-fausset-brown-commentary', 'helloao-commentary-delivery'],
+        },
+        retrieval: { mode: 'remote_cached_or_live', cacheStatus: 'not_exposed' },
+      });
       expect(listed.tools.find(tool => tool.name === 'donation_config')?.outputSchema).toMatchObject({
         type: 'object',
         additionalProperties: false,

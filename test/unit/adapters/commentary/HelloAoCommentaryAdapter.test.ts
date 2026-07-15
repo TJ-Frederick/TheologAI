@@ -59,6 +59,11 @@ describe('HelloAoCommentaryAdapter', () => {
         copyright: 'Public Domain',
         url: 'https://bible.helloao.org',
       },
+      coverage: {
+        requestedScope: 'verse', returnedGranularity: 'exact_verse',
+        identityBasis: 'provider_verse_number',
+        providerIdentity: { field: 'verseNumber', value: 16 },
+      },
     });
     expect(String(vi.mocked(globalThis.fetch).mock.calls[0][0]))
       .toBe('https://bible.helloao.org/api/c/jamieson-fausset-brown/JHN/3.json');
@@ -79,6 +84,11 @@ describe('HelloAoCommentaryAdapter', () => {
     const result = await new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3:16'), 'Clarke');
     expect(result.text).toBe('Exact');
     expect(result.commentator).toBe('Adam Clarke');
+    expect(result.coverage).toEqual({
+      requestedScope: 'verse', returnedGranularity: 'exact_verse',
+      identityBasis: 'provider_typed_verse_number',
+      providerIdentity: { field: 'number', value: 16, entryType: 'verse' },
+    });
   });
 
   it('does not treat an untyped number field as exact verse identity', async () => {
@@ -193,6 +203,10 @@ describe('HelloAoCommentaryAdapter', () => {
     const result = await new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3:16'), 'John Gill');
 
     expect(result.text).toBe('Genuine verse 16 commentary');
+    expect(result.coverage).toMatchObject({
+      identityBasis: 'provider_verse_number',
+      providerIdentity: { field: 'verseNumber', value: 16 },
+    });
   });
 
   it('attributes Tyndale Open Study Notes under CC BY-SA 4.0', async () => {

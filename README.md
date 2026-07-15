@@ -7,7 +7,7 @@ The current registry contains eleven tools, six guided prompts, eight English
 Bible translations, six commentary sources, 17 locally indexed
 historical documents, Strong's dictionaries, and Greek/Hebrew morphology.
 
-<!-- theologai-public-contract tools=11 structured=bible_cross_references,bible_lookup,bible_verse_morphology,donation_config,original_language_lookup,original_language_study,parallel_passages,primary_source_search,verify_donation -->
+<!-- theologai-public-contract tools=11 structured=bible_cross_references,bible_lookup,bible_verse_morphology,commentary_lookup,donation_config,original_language_lookup,original_language_study,parallel_passages,primary_source_search,verify_donation -->
 
 ## Remote endpoint
 
@@ -66,10 +66,10 @@ adds the top 10 exact source variants and defaults to 8 raw occurrences (maximum
 responses.
 
 All tools are annotated as read-only, non-destructive, and idempotent. Tool
-inputs use closed, bounded JSON Schema 2020-12 contracts. Nine tools also
+inputs use closed, bounded JSON Schema 2020-12 contracts. Ten tools also
 advertise versioned object-root `outputSchema` contracts and return matching
 `structuredContent` beside the existing Markdown content: `bible_lookup`,
-`bible_cross_references`, `bible_verse_morphology`, `parallel_passages`,
+`bible_cross_references`, `bible_verse_morphology`, `parallel_passages`, `commentary_lookup`,
 `primary_source_search`, `original_language_lookup`, and
 `original_language_study`, `donation_config`, and `verify_donation`. Bible,
 cross-reference, verse-morphology, parallel-passage, and original-language structured results
@@ -88,7 +88,12 @@ contract address. Donation verification exposes exactly three supported-chain
 checks, fail-closed coverage, status-relevant transfers capped at 100 with an
 exact classified total, allowlisted explorer links, and an explicit
 `receipt_observed_no_confirmation_depth` finality limit. `commentary_lookup`
-and `classic_text_lookup` retain their current Markdown-only result contracts.
+returns provider-attested coverage evidence, Markdown commentary text, and
+separate work/delivery provenance beside its unchanged Markdown fallback.
+Its retrieval mode is `remote_cached_or_live`: HelloAO responses use a
+process-local one-hour cache, and an individual result's cache status is not
+exposed.
+`classic_text_lookup` retains its current Markdown-only result contract.
 
 ### Resources
 
@@ -132,6 +137,14 @@ commentary labeled at chapter level rather than attributing it to one verse.
 Matthew Henry and Keil-Delitzsch currently expose multi-verse sections, so they
 are chapter-level sources. John Gill's current feed normally lacks the stronger
 exact-verse identity required for scalar lookup; use its chapter lookup instead.
+Structured commentary makes those rules machine-readable: Matthew Henry and
+Keil-Delitzsch cannot claim `exact_verse`; John Gill can do so only from a
+genuine provider `verseNumber`; and JFB, Clarke, and Tyndale may additionally
+use a provider entry explicitly typed as `verse`. The commentary text is
+explicitly `text/markdown`. Public-domain work provenance remains
+`transcription_source_uncertain` because HelloAO does not pin an edition or
+transcription; delivery provenance is recorded separately. Tyndale's
+provider-attributed CC BY-SA 4.0 rights and attribution remain explicit.
 
 ### Historical documents and external discovery
 

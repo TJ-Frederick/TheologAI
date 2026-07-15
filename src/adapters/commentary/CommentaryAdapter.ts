@@ -4,15 +4,15 @@
  * All commentary providers implement this contract.
  */
 
-import type { CommentaryResult } from '../../kernel/types.js';
+import type { CommentaryAdapterResult } from '../../kernel/types.js';
 import type { BibleReference } from '../../kernel/reference.js';
 
 export interface CommentaryAdapter {
   /** Commentator names this adapter handles */
-  readonly supportedCommentators: string[];
+  readonly supportedCommentators: readonly string[];
 
   /** Fetch commentary for a parsed reference */
-  getCommentary(ref: BibleReference, commentator: string): Promise<CommentaryResult>;
+  getCommentary(ref: BibleReference, commentator: string): Promise<CommentaryAdapterResult>;
 
   /** Whether a commentator supports a specific book */
   supportsBook(commentator: string, bookName: string): boolean;

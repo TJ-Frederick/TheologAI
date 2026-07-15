@@ -88,6 +88,54 @@ export interface CommentaryResult {
   citation: Citation;
 }
 
+export type CanonicalCommentator =
+  | 'Matthew Henry'
+  | 'Jamieson-Fausset-Brown'
+  | 'Adam Clarke'
+  | 'John Gill'
+  | 'Keil-Delitzsch'
+  | 'Tyndale';
+
+/** Provider evidence for the granularity and identity of returned commentary. */
+export type CommentaryCoverageEvidence =
+  | {
+    requestedScope: 'chapter';
+    returnedGranularity: 'chapter_aggregate';
+    identityBasis: 'provider_chapter_payload';
+    providerIdentity: { field: 'chapter_payload'; chapter: number };
+  }
+  | {
+    requestedScope: 'verse';
+    returnedGranularity: 'exact_verse';
+    identityBasis: 'provider_verse_number';
+    providerIdentity: { field: 'verseNumber'; value: number };
+  }
+  | {
+    requestedScope: 'verse';
+    returnedGranularity: 'exact_verse';
+    identityBasis: 'provider_typed_verse_number';
+    providerIdentity: { field: 'number'; value: number; entryType: 'verse' };
+  };
+
+/** Adapter output carries its evidence rather than leaving the service to infer it. */
+export interface CommentaryAdapterResult extends CommentaryResult {
+  coverage: CommentaryCoverageEvidence;
+}
+
+/** Service-owned identity, evidence, and text-window facts for MCP presentation. */
+export interface CommentaryLookupResult {
+  commentary: CommentaryResult;
+  resolvedReference: string;
+  canonicalCommentator: CanonicalCommentator;
+  coverage: CommentaryCoverageEvidence;
+  textWindow: {
+    unit: 'unicode_code_points';
+    returnedCharacters: number;
+    sourceCharacters: number;
+    truncated: boolean;
+  };
+}
+
 // ── Historical documents ──
 
 export interface HistoricalSearchParams {

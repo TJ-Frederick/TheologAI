@@ -6,10 +6,19 @@
  */
 
 import type { CommentaryAdapter } from './CommentaryAdapter.js';
-import type { CommentaryResult } from '../../kernel/types.js';
+import type {
+  CommentaryAdapterResult,
+  CommentaryCoverageEvidence,
+} from '../../kernel/types.js';
 import type { BibleReference } from '../../kernel/reference.js';
 import { formatReference, toHelloAO } from '../../kernel/reference.js';
 import { findBook } from '../../kernel/books.js';
+import {
+  CANONICAL_COMMENTATORS,
+  resolveCommentaryCatalogEntry,
+  type CommentaryCatalogEntry,
+  type CommentaryScalarPolicy,
+} from '../../kernel/commentaryCatalog.js';
 import { HttpClient } from '../shared/HttpClient.js';
 import {
   AdapterError,
@@ -18,20 +27,8 @@ import {
   ValidationError,
 } from '../../kernel/errors.js';
 
-interface CommentatorMeta {
-  id: string;
-  displayName: string;
-  otOnly?: boolean;
-  copyright: string;
-  scalarIdentity: ScalarIdentityPolicy;
-}
-
-type ScalarIdentityPolicy =
-  | { kind: 'exactFields'; fields: readonly ('number' | 'verseNumber')[] }
-  | { kind: 'chapterOnly' };
-
 type ExtractionResult =
-  | { kind: 'found'; text: string }
+  | { kind: 'found'; text: string; coverage: CommentaryCoverageEvidence }
   | { kind: 'absent' }
   | { kind: 'invalid'; reason: string };
 
@@ -43,40 +40,14 @@ interface ValidatedEntry {
   text?: string;
 }
 
-const PUBLIC_DOMAIN = 'Public Domain';
-const TYNDALE_LICENSE = 'CC BY-SA 4.0 — Tyndale House, Cambridge (https://creativecommons.org/licenses/by-sa/4.0/)';
 const MAX_CHAPTER_ENTRIES = 500;
 const MAX_CONTENT_ITEMS_PER_ENTRY = 5_000;
 const MAX_CONTENT_FRAGMENT_LENGTH = 100_000;
 const MAX_ENTRY_TEXT_LENGTH = 200_000;
 const MAX_CHAPTER_TEXT_LENGTH = 1_000_000;
 
-const CHAPTER_ONLY = { kind: 'chapterOnly' } as const;
-const VERSE_ENTRY_IDENTITIES = { kind: 'exactFields', fields: ['verseNumber', 'number'] } as const;
-const VERSE_NUMBER_IS_EXACT = { kind: 'exactFields', fields: ['verseNumber'] } as const;
-
-const COMMENTATORS: Record<string, CommentatorMeta> = {
-  // Matthew Henry and Keil-Delitzsch use numbered multi-verse sections. Their
-  // `number` values are section anchors, not exact-verse identities.
-  'matthew henry': { id: 'matthew-henry', displayName: 'Matthew Henry', copyright: PUBLIC_DOMAIN, scalarIdentity: CHAPTER_ONLY },
-  'keil-delitzsch': { id: 'keil-delitzsch', displayName: 'Keil-Delitzsch', otOnly: true, copyright: PUBLIC_DOMAIN, scalarIdentity: CHAPTER_ONLY },
-  // These sources publish verse-scoped entries under `number`.
-  'jfb': { id: 'jamieson-fausset-brown', displayName: 'Jamieson-Fausset-Brown', copyright: PUBLIC_DOMAIN, scalarIdentity: VERSE_ENTRY_IDENTITIES },
-  'jamieson-fausset-brown': { id: 'jamieson-fausset-brown', displayName: 'Jamieson-Fausset-Brown', copyright: PUBLIC_DOMAIN, scalarIdentity: VERSE_ENTRY_IDENTITIES },
-  'adam clarke': { id: 'adam-clarke', displayName: 'Adam Clarke', copyright: PUBLIC_DOMAIN, scalarIdentity: VERSE_ENTRY_IDENTITIES },
-  'clarke': { id: 'adam-clarke', displayName: 'Adam Clarke', copyright: PUBLIC_DOMAIN, scalarIdentity: VERSE_ENTRY_IDENTITIES },
-  'tyndale': { id: 'tyndale', displayName: 'Tyndale Open Study Notes', copyright: TYNDALE_LICENSE, scalarIdentity: VERSE_ENTRY_IDENTITIES },
-  // Gill's provider `number` is not accepted. Scalar lookup remains available
-  // only if the source supplies the stronger `verseNumber` identity.
-  'john gill': { id: 'john-gill', displayName: 'John Gill', copyright: PUBLIC_DOMAIN, scalarIdentity: VERSE_NUMBER_IS_EXACT },
-  'gill': { id: 'john-gill', displayName: 'John Gill', copyright: PUBLIC_DOMAIN, scalarIdentity: VERSE_NUMBER_IS_EXACT },
-};
-
 export class HelloAoCommentaryAdapter implements CommentaryAdapter {
-  readonly supportedCommentators = [
-    'Matthew Henry', 'Jamieson-Fausset-Brown', 'Adam Clarke',
-    'John Gill', 'Keil-Delitzsch', 'Tyndale',
-  ];
+  readonly supportedCommentators = CANONICAL_COMMENTATORS;
 
   private client: HttpClient;
 
@@ -89,7 +60,7 @@ export class HelloAoCommentaryAdapter implements CommentaryAdapter {
     });
   }
 
-  async getCommentary(ref: BibleReference, commentator: string): Promise<CommentaryResult> {
+  async getCommentary(ref: BibleReference, commentator: string): Promise<CommentaryAdapterResult> {
     if (ref.endVerse != null) {
       throw new ValidationError(
         'reference',
@@ -102,14 +73,14 @@ export class HelloAoCommentaryAdapter implements CommentaryAdapter {
       throw new AdapterError('HelloAO', `Unknown commentator: "${commentator}". Available: ${this.supportedCommentators.join(', ')}`);
     }
 
-    if (meta.otOnly && ref.book.testament === 'NT') {
-      throw new AdapterError('HelloAO', `${meta.displayName} is only available for Old Testament books.`);
+    if (meta.testamentCoverage === 'old_testament' && ref.book.testament === 'NT') {
+      throw new AdapterError('HelloAO', `${meta.canonicalName} is only available for Old Testament books.`);
     }
 
     const hao = toHelloAO(ref);
     let data: unknown;
     try {
-      data = await this.client.getJSON<unknown>(`/${meta.id}/${hao.bookCode}/${hao.chapter}.json`);
+      data = await this.client.getJSON<unknown>(`/${meta.providerWorkId}/${hao.bookCode}/${hao.chapter}.json`);
     } catch (error) {
       if (error instanceof SyntaxError) {
         throw new AdapterIntegrityError('HelloAO', 'Malformed commentary JSON payload', error);
@@ -117,7 +88,7 @@ export class HelloAoCommentaryAdapter implements CommentaryAdapter {
       throw error;
     }
 
-    const extraction = this.extractCommentaryText(data, hao.verse, meta.scalarIdentity);
+    const extraction = this.extractCommentaryText(data, hao.chapter, hao.verse, meta.scalarPolicy);
     if (extraction.kind === 'invalid') {
       throw new AdapterIntegrityError('HelloAO', extraction.reason);
     }
@@ -126,40 +97,38 @@ export class HelloAoCommentaryAdapter implements CommentaryAdapter {
         throw new CommentaryScalarNotFoundError(
           'HelloAO',
           `${ref.book.name} ${ref.chapter}`,
-          `No exact commentary match for ${formatReference(ref)} in ${meta.displayName}`,
+          `No exact commentary match for ${formatReference(ref)} in ${meta.resultDisplayName}`,
         );
       }
-      throw new AdapterError('HelloAO', `No commentary found for ${formatReference(ref)} in ${meta.displayName}`);
+      throw new AdapterError('HelloAO', `No commentary found for ${formatReference(ref)} in ${meta.resultDisplayName}`);
     }
 
     return {
       reference: formatReference(ref),
-      commentator: meta.displayName,
+      commentator: meta.resultDisplayName,
       text: extraction.text,
-      citation: {
-        source: `${meta.displayName} Commentary`,
-        copyright: meta.copyright,
-        url: 'https://bible.helloao.org',
-      },
+      citation: { ...meta.citation },
+      coverage: extraction.coverage,
     };
   }
 
   supportsBook(commentator: string, bookName: string): boolean {
     const meta = this.resolveCommentator(commentator);
     if (!meta) return false;
-    if (!meta.otOnly) return true;
+    if (meta.testamentCoverage !== 'old_testament') return true;
 
     return findBook(bookName)?.testament === 'OT';
   }
 
-  private resolveCommentator(name: string): CommentatorMeta | undefined {
-    return COMMENTATORS[name.toLowerCase().trim()];
+  private resolveCommentator(name: string): CommentaryCatalogEntry | undefined {
+    return resolveCommentaryCatalogEntry(name);
   }
 
   private extractCommentaryText(
     data: unknown,
+    chapterNumber: number,
     verseNumber: number | undefined,
-    scalarIdentity: ScalarIdentityPolicy,
+    scalarIdentity: CommentaryScalarPolicy,
   ): ExtractionResult {
     const chapter = this.getChapterContent(data);
     if (chapter.kind === 'invalid') return chapter;
@@ -184,25 +153,49 @@ export class HelloAoCommentaryAdapter implements CommentaryAdapter {
     // If no specific verse, return all commentary for the chapter
     if (verseNumber == null) {
       const parts = validEntries.map(entry => entry.text).filter((text): text is string => text != null);
-      return parts.length > 0 ? { kind: 'found', text: parts.join('\n\n') } : { kind: 'absent' };
+      return parts.length > 0
+        ? {
+          kind: 'found', text: parts.join('\n\n'),
+          coverage: {
+            requestedScope: 'chapter', returnedGranularity: 'chapter_aggregate',
+            identityBasis: 'provider_chapter_payload',
+            providerIdentity: { field: 'chapter_payload', chapter: chapterNumber },
+          },
+        }
+        : { kind: 'absent' };
     }
 
-    if (scalarIdentity.kind === 'chapterOnly') return { kind: 'absent' };
+    if (scalarIdentity.kind === 'chapter_only') return { kind: 'absent' };
 
     // Verse requests require an exact, trustworthy provider identity. A
     // neighboring entry may be broader commentary or commentary for another
     // verse, so never substitute it for the requested verse.
     const identities = validEntries
-      .map(entry => this.getScalarIdentity(entry, scalarIdentity.fields))
-      .filter((identity): identity is number => identity != null);
-    if (new Set(identities).size !== identities.length) {
+      .map(entry => this.getScalarIdentity(entry, scalarIdentity))
+      .filter((identity): identity is Exclude<ReturnType<HelloAoCommentaryAdapter['getScalarIdentity']>, undefined> => identity != null);
+    if (new Set(identities.map(identity => identity.value)).size !== identities.length) {
       return { kind: 'invalid', reason: 'Duplicate exact commentary identity' };
     }
 
-    const exactEntry = validEntries.find(entry => this.getScalarIdentity(entry, scalarIdentity.fields) === verseNumber);
-    if (!exactEntry?.text) return { kind: 'absent' };
+    const exactEntry = validEntries
+      .map(entry => ({ entry, identity: this.getScalarIdentity(entry, scalarIdentity) }))
+      .find(candidate => candidate.identity?.value === verseNumber);
+    if (!exactEntry?.entry.text || !exactEntry.identity) return { kind: 'absent' };
 
-    return { kind: 'found', text: exactEntry.text };
+    return {
+      kind: 'found', text: exactEntry.entry.text,
+      coverage: exactEntry.identity.field === 'verseNumber'
+        ? {
+          requestedScope: 'verse', returnedGranularity: 'exact_verse',
+          identityBasis: 'provider_verse_number',
+          providerIdentity: { field: 'verseNumber', value: exactEntry.identity.value },
+        }
+        : {
+          requestedScope: 'verse', returnedGranularity: 'exact_verse',
+          identityBasis: 'provider_typed_verse_number',
+          providerIdentity: { field: 'number', value: exactEntry.identity.value, entryType: 'verse' },
+        },
+    };
   }
 
   private getChapterContent(data: unknown): { kind: 'chapter'; content: unknown[] } | { kind: 'invalid'; reason: string } {
@@ -245,12 +238,13 @@ export class HelloAoCommentaryAdapter implements CommentaryAdapter {
 
   private getScalarIdentity(
     entry: ValidatedEntry,
-    acceptedFields: readonly ('number' | 'verseNumber')[],
-  ): number | undefined {
-    for (const field of acceptedFields) {
-      if (entry[field] == null) continue;
-      if (field === 'number' && entry.entryType !== 'verse') continue;
-      return entry[field];
+    policy: CommentaryScalarPolicy,
+  ): { field: 'verseNumber' | 'number'; value: number } | undefined {
+    if (policy.kind === 'chapter_only') return undefined;
+    if (entry.verseNumber != null) return { field: 'verseNumber', value: entry.verseNumber };
+    if (policy.kind === 'verse_number_or_typed_number'
+        && entry.number != null && entry.entryType === 'verse') {
+      return { field: 'number', value: entry.number };
     }
     return undefined;
   }

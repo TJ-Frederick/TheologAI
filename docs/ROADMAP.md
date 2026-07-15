@@ -261,6 +261,23 @@ allowlists. Unknown, duplicate, missing, or mismatched chain evidence fails
 closed. A successful receipt means only
 `receipt_observed_no_confirmation_depth`, not confirmation depth or finality.
 
+### Structured commentary follow-up (unreleased)
+
+`commentary_lookup` now pairs its byte-compatible legacy Markdown with a v1
+object-root result. Coverage is carried from provider parsing into the service
+as explicit identity evidence rather than inferred from the requested
+reference. The shared commentator catalog drives provider IDs, aliases, public
+coverage guidance, tool enums, and work rights. Its schema makes Matthew Henry
+and Keil-Delitzsch exact-verse results impossible, permits John Gill exact
+results only with a genuine provider `verseNumber`, and permits JFB, Clarke,
+and Tyndale exact results from `verseNumber` or a `number` on an entry explicitly
+typed as `verse`. Commentary text is labeled `text/markdown`; exact work
+provenance remains separate from unpinned HelloAO delivery provenance. The
+retrieval contract says `remote_cached_or_live` because the adapter uses a
+process-local one-hour cache and does not expose per-result cache status. Scalar
+absence remains an actionable chapter-oriented tool error with no structured
+content, while malformed or contradictory provider evidence fails closed.
+
 ## Release gates
 
 Code readiness and operational readiness are deliberately separate:
@@ -275,7 +292,7 @@ Code readiness and operational readiness are deliberately separate:
 4. Preview deployment requires the repository's authorization label and
    protected environment approval. The live PR must still be open, non-draft,
    and authorized immediately before deployment.
-5. Preview smoke and a functional audit must cover all eleven tools, the nine
+5. Preview smoke and a functional audit must cover all eleven tools, the ten
    structured-output contracts, UBS default and explicit-source behavior,
    Strong's extended identities, local primary-source search, language study,
    resources, all six prompts, and failure/privacy boundaries.
