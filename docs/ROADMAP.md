@@ -28,6 +28,10 @@ is local source context only and does not define the current product contract.
 - **Biblical-language Unicode correction / PR #27:** pinned-source Unicode
   corrections and exact generated-artifact reproduction, merged as
   `7b4e6c72182901ff77b5d175132a72d260e0418e`.
+- **Integrated Phase 3 research output / PR #34:** original-language usage,
+  catalog-aware local primary-source research, structured morphology, compound
+  gloss resolution, and release-contract repairs, merged as
+  `ce335266d989b40afebe398aeb39dbd2082d926a` after protected preview audit.
 
 These entries describe merged repository state. Deployment state is established
 only by the relevant protected workflow and post-deployment smoke evidence; a
@@ -89,7 +93,7 @@ corrected Strong's entries, 237 corrected morphology cells, and 11 affected
 parallel-passage cases, plus sampled checks of the remaining MCP surface.
 Production then passed the corresponding bounded post-deployment audit.
 
-## Unreleased integrated Phase 3 candidate
+## Merged integrated Phase 3 candidate (production pending)
 
 The next integrated candidate replays the reviewed original-language usage and
 catalog-aware primary-source work onto the PR #27 production baseline. Its four
@@ -101,8 +105,8 @@ keyset pagination, progressive original-language output levels, and curated
 catalog scope for primary-source research. The separate `e6f7f7f` commit
 reconciles release documentation for this candidate.
 
-This transform-version-6 candidate is unmerged and not released to production.
-PR #30 uses the fresh preview database
+This transform-version-6 candidate is merged through PR #34 but is not yet
+released to production. Its protected preview uses the fresh preview database
 `theologai-preview-20260714-a`, migrated through schema 0003, populated from all
 36 manifest seed files, and verified by the strict read-only remote readiness
 gate. Its whole-D1 identity
@@ -129,24 +133,23 @@ version `734aec3b-d6c3-456b-a203-c7f940a2d081` with
 `theologai-preview-20260712-b` remains older matched rollback history. PRs #28
 and #29 are closed as superseded by PR #30.
 
-The one-off owner-authorized deletion of unused legacy database
-`theologai-db-preview` (`f9f415e1-219b-4d17-bcf5-33a8abad02fa`) was completed.
-No other database deletion is authorized. The corrective preview gate is
-complete. Production remains untouched and requires a separate owner decision
-and protected release process.
+The owner-authorized deletion of unused legacy database `theologai-db-preview`
+(`f9f415e1-219b-4d17-bcf5-33a8abad02fa`) was completed on 2026-07-14. The owner
+later authorized deletion of only `theologai-preview-20260710-a`
+(`3d010946-b530-4c7e-9e21-a900ff3c21a2`), completed on 2026-07-15. No other
+database deletion is authorized. The corrective preview gate is complete.
+Production remains on the PR #27 baseline pending the reviewed binding cutover.
 
-### Integrated research-output follow-up (unreleased)
+### Integrated research-output follow-up (merged; production pending)
 
-Draft PR #34 is the integrated research-output candidate; its exact release
-head is recorded in the live PR metadata and must match every final CI,
-deployment, and audit artifact.
+PR #34 merged as `ce335266d989b40afebe398aeb39dbd2082d926a`; its reviewed head
+was `6467a93da84c095f4fe32a253d8ba816be8cb8c2`. Every production deployment
+and audit artifact must match the binding-cutover head derived from that merge.
 Component PRs #31-#33 are superseded review vehicles rather than independent
-release units. Combined local verification is complete: unit, integration, and
-Worker-runtime tests; Node, Worker, and Worker-runtime typechecks; build;
-documentation contract; and diff check all passed. Sol approved the combined
-integration. Required GitHub checks must pass again at the final release head,
-and the protected preview audit remains pending. No preview or production
-deployment is authorized by this status.
+release units. Combined local verification and required GitHub checks passed,
+Sol approved the combined integration, and protected preview run `29379359308`
+plus independent black-box audits found no P0-P2 release findings. Production
+still requires the separately reviewed D1 binding cutover and protected gate.
 
 The integrated local-only application candidate upgrades
 `primary_source_search` to v3 without adding a tool, migration, corpus body,
@@ -166,8 +169,8 @@ This slice preserves creator roles, routing-only alias policy, incomplete
 edition provenance, unestablished catalog rights status, canonical fail-closed
 section locators, and backward-compatible local research behavior while
 intentionally removing inert external-provider boilerplate from the public
-Markdown. Local protocol, parity, and integrated-review gates are complete;
-GitHub CI and preview audit must still pass at the final head before release.
+Markdown. Local protocol, parity, integrated-review, CI, and preview-audit gates
+are complete. The remaining release work is the production binding and audit.
 
 The same candidate adds v1 structured output for
 `bible_verse_morphology`. Its bounded `words[]` retain exact source order, raw
@@ -210,17 +213,15 @@ Code readiness and operational readiness are deliberately separate:
 
 ## Next work
 
-- PR #30 remains at its separate owner-controlled production gate: its preview
-  audit is complete, production is unchanged, and merge plus protected
-  production deployment require an explicit owner decision.
+- Complete the reviewed production cutover to the prepared transform-version-6
+  database, then run the bounded post-deployment audit before calling PR #34
+  released.
 - Broaden advanced original-language study only after those foundations, using
   carefully sourced semantic-domain and discourse evidence useful to both
   beginners and readers of Greek or Hebrew.
 - Expand primary-source discovery beyond the initial local collection through
   rights-reviewed, freely redistributable editions and provider adapters. Do
   not mirror or republish CCEL transcriptions without edition-specific rights.
-- Complete integrated review, CI, and preview audit for the combined
-  research-output candidate, leaving primary-source synthesis to the host model.
 - Evaluate section-span commentary only where provider coverage can be stated
   honestly; never relabel a section anchor as an exact verse range.
 - Continue modern MCP output improvements tool by tool when a stable structured

@@ -92,9 +92,10 @@ row and compares deterministic table hashes with the source SQLite database;
 `verify-workerd` applies complete metadata/document/FTS chunks plus a generated
 chunk of every large table through Wrangler's isolated local D1 runtime. This
 keeps the D1 syntax/runtime check practical while the full semantic verifier
-continues to cover all 859,596 rows, including the exact 12,736-row normalized
-UBS delta. The exact production readiness query is
-separately exercised against the complete derived SQLite database.
+continues to cover every row declared by the generated seed manifest (currently
+1,069,506 rows), including the normalized UBS corpus and original-language
+usage aggregates. The exact production readiness query is separately exercised
+against the complete derived SQLite database.
 
 ### Readiness compatibility and rollback
 
