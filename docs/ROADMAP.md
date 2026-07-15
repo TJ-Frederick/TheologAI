@@ -99,8 +99,8 @@ The structured-output release ledger is:
   `b10427f0-9692-45ec-9089-e3027be58805`; coordinator 7/7 and independent
   23/23 audits, with no findings.
 - PR #38: production run `29448002771`, deployment `5463551874`, Worker
-  `e0371eb4-05c6-4415-b479-b01ac2630be0`; production audit 94/94, with no
-  findings.
+  `e0371eb4-05c6-4415-b479-b01ac2630be0`; coordinator 11/11 and independent
+  94/94 audits, with no findings.
 - PR #37: production run `29451333738`, deployment `5464194228`, Worker
   `9d2b757b-8b9b-4318-b09d-14f62815bf82`; coordinator 73/73 and independent
   91/91 audits, with no P0-P3 findings.
@@ -109,6 +109,16 @@ Each release retained production D1 `theologai-production-20260715-a`
 (`c6535a4a-1953-4279-b277-7368445fc61a`), passed strict readiness as `ready`,
 and performed zero readiness writes. Live CCEL discovery remains intentionally
 disabled and outside the public MCP contract.
+
+The current production Worker is PR #37 version
+`9d2b757b-8b9b-4318-b09d-14f62815bf82`; its immediate compatible same-D1
+predecessor is PR #38 version `e0371eb4-05c6-4415-b479-b01ac2630be0`. The
+current preview Worker is PR #37 version
+`fb2b8e41-4310-43f3-a8f0-571a64a733ac`; its immediate compatible same-D1
+predecessor is PR #38 version `404b7eb3-7244-436d-bfa5-8359ac3a4aab`. Both
+preview versions use `theologai-preview-20260714-a`
+(`0dab804f-8df0-4727-93bd-299612b6e179`). These are retained rollback options;
+no rollback is recorded as executed.
 
 ## Shipped Unicode correction release
 
@@ -158,8 +168,8 @@ deployed it on
 same D1 database. Targeted and independent full-surface black-box re-audits
 found no P0-P2 issues and confirmed all previously identified P0-P2 release
 findings were fixed. This is the audited corrective application evidence and
-does not predict the Worker UUID produced by any later deployment. The current
-immediate preview rollback pair is PR #34 Worker version
+does not predict the Worker UUID produced by any later deployment. At that
+point, the immediate preview rollback pair was PR #34 Worker version
 `ab270f0b-2627-4057-a182-a66cd750b118` with unchanged D1
 `theologai-preview-20260714-a`. Retain the verified PR #27 Worker version
 `734aec3b-d6c3-456b-a203-c7f940a2d081` with

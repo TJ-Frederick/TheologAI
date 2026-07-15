@@ -2,14 +2,12 @@
 
 ## Deployment baseline and rollback posture (2026-07-15)
 
-PR #40 merge `9f6aa128eeab663ef04a315ab0c14b8ae9a3376d` is the verified
-production application baseline. It corrects the sole P2 commentary-coverage
-finding from the historical PR #39 production audit without changing the
-transform-version-6 corpus or either D1 binding. Protected production run
-`29427137668` returned a read-only D1 readiness result of `ready` with zero
-writes, then GitHub deployment `5459432945` deployed Worker version
-`656e9e3a-7044-45ca-9144-4ec7eae94d8d` at 100%. The coordinator audit passed
-15/15 and the independent audit passed 27/27 with no P0-P3 findings.
+PR #37 merge `d395b3641eb00f6826eaba670c287f9a39dfa3da` is the verified
+production application baseline. Protected production run `29451333738`
+returned a read-only D1 readiness result of `ready` with zero writes, then
+GitHub deployment `5464194228` deployed Worker version
+`9d2b757b-8b9b-4318-b09d-14f62815bf82` at 100%. The coordinator audit passed
+73/73 and the independent audit passed 91/91 with no P0-P3 findings.
 
 The deployed logical D1 bindings and retained rollback posture are recorded
 below as point-in-time evidence. Cloudflare deployment history and the approved
@@ -20,8 +18,8 @@ binding.
 
 | Environment | Deployed logical database | Current posture | Rollback posture |
 |---|---|---|---|
-| Production | `theologai-production-20260715-a` (`c6535a4a-1953-4279-b277-7368445fc61a`) | PR #40 merge `9f6aa128eeab663ef04a315ab0c14b8ae9a3376d` deployed successfully by protected GitHub Actions run `29427137668`; GitHub deployment `5459432945` serves Worker version `656e9e3a-7044-45ca-9144-4ec7eae94d8d` at 100%. Post-deployment readiness was `ready` with zero writes; coordinator and independent audits passed 15/15 and 27/27 with no P0-P3 findings. | Retain PR #39 Worker version `a74f0848-5b68-4d7a-834e-aa3221ebda3b` with the same `theologai-production-20260715-a` D1 as the immediate matched rollback pair. Also retain Worker version `49746830-16ce-40dc-b8a5-3cdc9ab79217` with `theologai-production-20260713-b`, Worker version `17869daf-f5e4-4d80-9240-6bc4fbb8d395` with `theologai-production-20260713-a`, and Worker version `c291ca9f-bb1b-4e6e-abd5-d6a3ea4f0704` with `theologai-production-20260711-a` as older rollback history. Do not mix a database with incompatible code or delete another database without separate owner approval. |
-| Preview | `theologai-preview-20260714-a` (`0dab804f-8df0-4727-93bd-299612b6e179`) | Protected run `29425323205` deployed reviewed PR #40 head `32441d99de673eccce0a57fd74801fb94db04944` as GitHub deployment `5459322775` and Worker version `34a0a557-9ddb-4940-9862-6b25e1dd98e6` at 100%. Coordinator and independent audits passed 15/15 and 27/27 with no P0-P3 findings. | Retain PR #34 Worker version `ab270f0b-2627-4057-a182-a66cd750b118` with the same `theologai-preview-20260714-a` D1 as the immediate matched rollback pair. Also retain Worker version `734aec3b-d6c3-456b-a203-c7f940a2d081` with `theologai-preview-20260713-c` and Worker version `3c8ad7ef-50ed-42a7-9c71-2ac8c2dd6d7f` with `theologai-preview-20260712-b` as older matched rollback history. Do not delete another database without separate owner approval. |
+| Production | `theologai-production-20260715-a` (`c6535a4a-1953-4279-b277-7368445fc61a`) | PR #37 merge `d395b3641eb00f6826eaba670c287f9a39dfa3da` deployed by protected run `29451333738`; deployment `5464194228` serves Worker `9d2b757b-8b9b-4318-b09d-14f62815bf82` at 100%. Readiness was `ready` with zero writes; coordinator and independent audits passed 73/73 and 91/91 with no P0-P3 findings. | Retain PR #38 Worker `e0371eb4-05c6-4415-b479-b01ac2630be0` with the same production D1 as the immediate compatible predecessor. Older matched pairs remain historical options below. No rollback is recorded as executed; do not mix incompatible code and data or delete another database without separate owner approval. |
+| Preview | `theologai-preview-20260714-a` (`0dab804f-8df0-4727-93bd-299612b6e179`) | Protected run `29450048707` deployed reviewed PR #37 head `5c6df7f1a340a9a0b43c3260d104cbd6d8d1ebfb` as deployment `5464127644` and Worker `fb2b8e41-4310-43f3-a8f0-571a64a733ac` at 100%. Coordinator and independent audits completed with no P0-P3 findings. | Retain PR #38 Worker `404b7eb3-7244-436d-bfa5-8359ac3a4aab` with the same preview D1 as the immediate compatible predecessor. Older matched pairs remain historical options below. No rollback is recorded as executed; do not delete another database without separate owner approval. |
 
 ### Deployed PR #39 transform-version-6 production replacement
 
@@ -50,9 +48,9 @@ zero writes.
 
 The independent bounded production audit scored 87/90 with no P0 or P1
 findings. Its only P2 concerned exact-verse commentary coverage. PR #40 later
-corrected and released that finding as recorded below. Preserve this PR #39
-Worker with `theologai-production-20260715-a` as the immediate matched rollback
-pair for the corrective release. Preserve the older matched rollback records
+corrected and released that finding as recorded below. This PR #39 Worker with
+`theologai-production-20260715-a` was the immediate matched rollback pair for
+the corrective release. Preserve the older matched rollback records
 below as well; no additional database deletion is authorized without separate
 owner approval.
 
@@ -208,8 +206,8 @@ P0-P2 issues and confirmed all previously identified P0-P2 release findings
 were fixed. PR #34 subsequently merged as `ce335266d989b40afebe398aeb39dbd2082d926a`.
 Its final protected preview run `29379359308` deployed Worker version
 `ab270f0b-2627-4057-a182-a66cd750b118` at 100% with the same prepared preview
-database, and the final audits remained clear of P0-P2 findings. Retain the
-current immediate preview rollback pair: PR #34 Worker version
+database, and the final audits remained clear of P0-P2 findings. At that point,
+the immediate preview rollback pair was PR #34 Worker version
 `ab270f0b-2627-4057-a182-a66cd750b118` with unchanged D1
 `theologai-preview-20260714-a`. The verified PR #27 Worker version
 `734aec3b-d6c3-456b-a203-c7f940a2d081` with `theologai-preview-20260713-c` is

@@ -7,9 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [3.6.0] - 2026-07-15
-
 <!-- theologai-public-contract tools=11 structured=bible_cross_references,bible_lookup,bible_verse_morphology,commentary_lookup,donation_config,original_language_lookup,original_language_study,parallel_passages,primary_source_search,verify_donation -->
+
+## [3.6.0] - 2026-07-15
 
 ### Added
 
@@ -284,8 +284,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/TJ-Frederick/TheologAI/compare/v3.6.0...HEAD
-[3.6.0]: https://github.com/TJ-Frederick/TheologAI/compare/v3.4.0...v3.6.0
+[Unreleased]: https://github.com/TJ-Frederick/TheologAI/compare/d395b3641eb00f6826eaba670c287f9a39dfa3da...HEAD
+[3.6.0]: https://github.com/TJ-Frederick/TheologAI/compare/v1.0.0-phase3.1...d395b3641eb00f6826eaba670c287f9a39dfa3da
 [3.4.0]: https://github.com/TJ-Frederick/TheologAI/compare/v3.3.0...v3.4.0
 [3.3.0]: https://github.com/yourusername/TheologAI/compare/v3.2.0...v3.3.0
 [3.2.0]: https://github.com/yourusername/TheologAI/compare/v3.1.0...v3.2.0
