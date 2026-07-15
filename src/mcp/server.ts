@@ -26,6 +26,7 @@ import { registerPromptHandlers } from './prompts.js';
 import { registerToolHandlers } from './tools.js';
 import { jsonSchemaValidator } from './validation.js';
 import { buildPrimarySourceCatalog, PRIMARY_SOURCE_CATALOG_URI } from './primarySourceCatalog.js';
+import { COMMENTARY_CATALOG } from '../kernel/commentaryCatalog.js';
 
 export interface McpServerServices {
   bibleService: Pick<BibleService, 'getSupportedTranslations'>;
@@ -164,20 +165,12 @@ export function createTheologAiMcpServer(
 
     // theologai://commentaries
     if (uri === 'theologai://commentaries') {
-      const commentators = services.commentaryService.getAvailableCommentators();
       const lines = [
         '# Available Commentaries\n',
-        ...commentators.map(c => {
-          if (c === 'Matthew Henry' || c === 'Keil-Delitzsch') {
-            return `- **${c}** — chapter-level lookup; numbered source sections can span multiple verses.`;
-          }
-          if (c === 'John Gill') {
-            return '- **John Gill** — chapter lookup recommended; current source metadata normally cannot establish a trustworthy exact-verse match.';
-          }
-          return `- **${c}**`;
-        }),
+        ...COMMENTARY_CATALOG.map(entry =>
+          `- **${entry.canonicalName}** — ${entry.publicCoverageDescription}.`),
         '\n*Exact-verse (scalar) coverage varies by commentary provider. When an exact match is unavailable, request the containing chapter or another commentator; chapter results must remain labeled as chapter-level commentary.*',
-        `\n*${commentators.length} commentators available via HelloAO. Licensing varies by work; tool results include attribution.*`,
+        `\n*${COMMENTARY_CATALOG.length} commentators available via HelloAO. Licensing varies by work; tool results include attribution and provenance.*`,
       ];
       return {
         contents: [{ uri, mimeType: 'text/markdown', text: lines.join('\n') }],

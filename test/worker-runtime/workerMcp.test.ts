@@ -132,6 +132,20 @@ describe('Worker MCP endpoint in workerd', () => {
           }),
         }),
         expect.objectContaining({
+          name: 'commentary_lookup',
+          outputSchema: expect.objectContaining({
+            type: 'object', additionalProperties: false,
+            properties: expect.objectContaining({
+              kind: expect.objectContaining({ const: 'commentary_lookup' }),
+              commentary: expect.objectContaining({
+                properties: expect.objectContaining({
+                  textFormat: expect.objectContaining({ const: 'text/markdown' }),
+                }),
+              }),
+            }),
+          }),
+        }),
+        expect.objectContaining({
           name: 'original_language_lookup',
           outputSchema: expect.objectContaining({ type: 'object', additionalProperties: false }),
         }),

@@ -441,10 +441,15 @@ describe('parallel_passages handler', () => {
 describe('commentary_lookup handler', () => {
   it('forwards optional commentator and maximum length', async () => {
     const lookup = vi.fn<CommentaryService['lookup']>().mockResolvedValue({
-      reference: 'John 1:1',
-      commentator: 'John Gill',
-      text: 'Commentary body',
-      citation,
+      commentary: { reference: 'John 1:1', commentator: 'John Gill', text: 'Commentary body', citation },
+      resolvedReference: 'John 1:1', canonicalCommentator: 'John Gill',
+      coverage: {
+        requestedScope: 'verse', returnedGranularity: 'exact_verse',
+        identityBasis: 'provider_verse_number',
+        providerIdentity: { field: 'verseNumber', value: 1 },
+      },
+      providerRevision: `sha256:${'a'.repeat(64)}`,
+      textWindow: { unit: 'unicode_code_points', returnedCharacters: 15, sourceCharacters: 15, truncated: false },
     });
     const handler = createCommentaryHandler(serviceDouble({ lookup }));
 
@@ -459,16 +464,32 @@ describe('commentary_lookup handler', () => {
       commentator: 'John Gill',
       maxLength: 500,
     });
-    expect(textOf(result)).toContain('John Gill Commentary on John 1:1');
-    expect(textOf(result)).toContain('Commentary body');
+    expect(textOf(result)).toBe(
+      '**John Gill Commentary on John 1:1**\n\nCommentary body\n\n*Source: Test source* - Test license',
+    );
+    expect(result.structuredContent).toMatchObject({
+      schemaVersion: '1', kind: 'commentary_lookup',
+      query: { commentator: 'John Gill', maxResponseCharacters: 500 },
+      coverage: {
+        identityBasis: 'provider_verse_number',
+        providerIdentity: { field: 'verseNumber', value: 1 },
+      },
+      commentary: { commentator: 'John Gill', text: 'Commentary body', textFormat: 'text/markdown' },
+    });
+    expect(validatorFor(handler.outputSchema!)(result.structuredContent).valid).toBe(true);
   });
 
   it('applies maxLength to the complete formatted Markdown response', async () => {
     const lookup = vi.fn<CommentaryService['lookup']>().mockResolvedValue({
-      reference: 'John 1:1',
-      commentator: 'John Gill',
-      text: '𐐷'.repeat(500),
-      citation,
+      commentary: { reference: 'John 1:1', commentator: 'John Gill', text: '𐐷'.repeat(500), citation },
+      resolvedReference: 'John 1:1', canonicalCommentator: 'John Gill',
+      coverage: {
+        requestedScope: 'verse', returnedGranularity: 'exact_verse',
+        identityBasis: 'provider_verse_number',
+        providerIdentity: { field: 'verseNumber', value: 1 },
+      },
+      providerRevision: `sha256:${'a'.repeat(64)}`,
+      textWindow: { unit: 'unicode_code_points', returnedCharacters: 500, sourceCharacters: 500, truncated: false },
     });
     const handler = createCommentaryHandler(serviceDouble({ lookup }));
 
@@ -485,6 +506,7 @@ describe('commentary_lookup handler', () => {
     const result = await handler.handler({ reference: 'John 1:1' });
 
     expect(result.isError).toBe(true);
+    expect(result).not.toHaveProperty('structuredContent');
   });
 
   it('turns a scalar commentary miss into actionable chapter guidance without exposing provider details', async () => {
@@ -500,6 +522,7 @@ describe('commentary_lookup handler', () => {
     const result = await handler.handler({ reference: 'John 3:16', commentator: 'Matthew Henry' });
 
     expect(result.isError).toBe(true);
+    expect(result).not.toHaveProperty('structuredContent');
     expect(textOf(result)).toBe(
       'Not found: No trustworthy exact-verse commentary was available. Request the containing chapter (`John 3`) or try another commentator.',
     );

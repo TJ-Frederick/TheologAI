@@ -96,6 +96,16 @@ export {
   OPENBIBLE_CROSS_REFERENCE_PROVENANCE,
 } from './openBibleCrossReferenceProvenance.js';
 export { PUBLIC_DONATION_URL } from './publicUrls.js';
+export {
+  COMMENTARY_CATALOG,
+  CANONICAL_COMMENTATORS,
+  HELLOAO_COMMENTARY_DELIVERY,
+  HELLOAO_COMMENTARY_DELIVERY_ID,
+  resolveCommentaryCatalogEntry,
+  commentaryCatalogEntry,
+  type CommentaryCatalogEntry,
+  type CommentaryScalarPolicy,
+} from './commentaryCatalog.js';
 
 // Staged primary-source rollout flags
 export {
@@ -118,6 +128,10 @@ export type {
   BibleLookupMultipleResult,
   CommentaryLookupParams,
   CommentaryResult,
+  CanonicalCommentator,
+  CommentaryCoverageEvidence,
+  CommentaryAdapterResult,
+  CommentaryLookupResult,
   HistoricalSearchParams,
   HistoricalResult,
   CrossReference,
