@@ -6,6 +6,7 @@
  * enabled by a caller that has passed the rollout gate.
  */
 
+import { parse, type DefaultTreeAdapterTypes } from 'parse5';
 import { ValidationError } from '../../kernel/errors.js';
 import {
   type PrimarySourceProviderResult,
@@ -13,7 +14,6 @@ import {
   type PrimarySourceSearchMatch,
   type PrimarySourceSearchQuery,
 } from '../../services/historical/primarySourceTypes.js';
-import { decodeHtmlEntities, stripHtml } from '../shared/HtmlParser.js';
 import type { PrimarySourceFeatureFlags } from '../../kernel/featureFlags.js';
 
 export const CCEL_SEARCH_ATTRIBUTION = 'CCEL (Christian Classics Ethereal Library)' as const;
@@ -25,14 +25,22 @@ export const CCEL_SEARCH_LIMITS = Object.freeze({
   maxWorkCharacters: 160,
   maxTerms: 12,
   maxComposedQueryCharacters: 768,
-  maxPage: 3,
-  maxHitsPerResponse: 8,
+  maxPage: 1,
+  maxHitsPerResponse: 5,
   maxCandidateResults: 50,
-  maxResponseBytes: 1024 * 1024,
+  maxTreeNodes: 10_000,
+  maxTreeAttributes: 10_000,
+  maxAttributesPerElement: 64,
+  maxTreeDepth: 64,
+  maxTreeTextCharacters: 100_000,
+  maxParseTraversalMs: 100,
+  // parse5 is standards-compliant but parses synchronously, so an input cap
+  // must bound work before tree traversal can enforce its finer budgets.
+  maxResponseBytes: 256 * 1024,
   maxTitleCharacters: 300,
   maxAuthorResultCharacters: 200,
   maxSectionCharacters: 300,
-  maxSnippetCharacters: 500,
+  maxSnippetCharacters: 240,
   maxLocatorUrlCharacters: 1024,
   maxLocatorSegmentCharacters: 128,
   maxLocatorWorkCharacters: 256,
@@ -41,8 +49,8 @@ export const CCEL_SEARCH_LIMITS = Object.freeze({
   maxAggregateResultCharacters: 12_000,
   timeoutMs: 8_000,
   totalRequestMs: 12_000,
-  maxRetries: 1,
-  maxRedirects: 2,
+  maxRetries: 0,
+  maxRedirects: 0,
   cacheTtlMs: 10 * 60 * 1000,
   negativeCacheTtlMs: 60 * 1000,
   cacheMaxEntries: 100,
@@ -470,90 +478,69 @@ export class CcelSearchAdapter {
     }
   }
 
-  private async fetchSearchHtml(initialUrl: string, deadline: number): Promise<string> {
-    for (let attempt = 0; attempt <= CCEL_SEARCH_LIMITS.maxRetries; attempt++) {
-      try {
-        return await this.fetchSearchHtmlAttempt(initialUrl, deadline);
-      } catch (error) {
-        if (!(error instanceof CcelSearchFailure) || error.kind !== 'network' || attempt === CCEL_SEARCH_LIMITS.maxRetries || this.now() >= deadline) throw error;
-      }
+  private async fetchSearchHtml(url: string, deadline: number): Promise<string> {
+    if (this.now() >= deadline) throw new CcelSearchFailure('network');
+    const validated = validateSearchUrl(url, this.baseUrl);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(TIMEOUT_ABORT_REASON), Math.min(CCEL_SEARCH_LIMITS.timeoutMs, Math.max(1, deadline - this.now())));
+    let response: Response;
+    try {
+      // One admitted provider search is one upstream GET. Redirects remain
+      // manual and are rejected; network and 5xx responses are never retried.
+      response = await this.fetchImpl(validated, {
+        method: 'GET',
+        headers: { 'Accept': 'text/html, application/xhtml+xml', 'User-Agent': USER_AGENT },
+        redirect: 'manual',
+        signal: controller.signal,
+      });
+    } catch {
+      clearTimeout(timeout);
+      if (controller.signal.reason === TIMEOUT_ABORT_REASON) throw new CcelSearchFailure('timeout');
+      throw new CcelSearchFailure('network');
     }
-    throw new CcelSearchFailure('network');
-  }
 
-  private async fetchSearchHtmlAttempt(initialUrl: string, deadline: number): Promise<string> {
-    let url = initialUrl;
-    for (let redirect = 0; redirect <= CCEL_SEARCH_LIMITS.maxRedirects; redirect++) {
-      if (this.now() >= deadline) throw new CcelSearchFailure('network');
-      const validated = validateSearchUrl(url, this.baseUrl);
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(TIMEOUT_ABORT_REASON), Math.min(CCEL_SEARCH_LIMITS.timeoutMs, Math.max(1, deadline - this.now())));
-      let response: Response;
-      try {
-        response = await this.fetchImpl(validated, {
-          method: 'GET',
-          headers: { 'Accept': 'text/html, application/xhtml+xml', 'User-Agent': USER_AGENT },
-          redirect: 'manual',
-          signal: controller.signal,
-        });
-      } catch {
-        clearTimeout(timeout);
-        if (controller.signal.reason === TIMEOUT_ABORT_REASON) throw new CcelSearchFailure('timeout');
-        if (redirect === 0) throw new CcelSearchFailure('network');
-        throw new CcelSearchFailure('policy');
-      }
-
-      if (response.status >= 300 && response.status <= 399 && response.status !== 304) {
-        const location = response.headers.get('Location');
-        await discardResponseBody(response);
-        clearTimeout(timeout);
-        if (!location || redirect === CCEL_SEARCH_LIMITS.maxRedirects) throw new CcelSearchFailure('policy');
-        try {
-          url = new URL(location, validated).toString();
-        } catch {
-          throw new CcelSearchFailure('policy');
-        }
-        continue;
-      }
-
-      if (response.status === 403) {
-        await discardResponseBody(response);
-        clearTimeout(timeout);
-        throw new CcelSearchFailure('forbidden');
-      }
-      if (response.status === 429) {
-        const retryAfter = parseRetryAfter(response.headers.get('Retry-After'), this.now());
-        await discardResponseBody(response);
-        clearTimeout(timeout);
-        throw new CcelSearchFailure('rate_limited', retryAfter);
-      }
-      if (response.status >= 500) {
-        await discardResponseBody(response);
-        clearTimeout(timeout);
-        throw new CcelSearchFailure('network');
-      }
-      if (response.status < 200 || response.status >= 300) {
-        await discardResponseBody(response);
-        clearTimeout(timeout);
-        throw new CcelSearchFailure('upstream');
-      }
-
-      const contentType = response.headers.get('Content-Type')?.toLowerCase() ?? '';
-      if (!contentType.includes('text/html') && !contentType.includes('application/xhtml+xml')) {
-        await discardResponseBody(response);
-        clearTimeout(timeout);
-        throw new CcelSearchFailure('parser');
-      }
-      try {
-        return await readBoundedBody(response, controller.signal);
-      } catch (error) {
-        if (error instanceof CcelSearchFailure) throw error;
-        throw new CcelSearchFailure('network');
-      } finally {
-        clearTimeout(timeout);
-      }
+    if (response.status >= 300 && response.status <= 399 && response.status !== 304) {
+      discardResponseBody(response);
+      clearTimeout(timeout);
+      throw new CcelSearchFailure('policy');
     }
-    throw new CcelSearchFailure('policy');
+
+    if (response.status === 403) {
+      discardResponseBody(response);
+      clearTimeout(timeout);
+      throw new CcelSearchFailure('forbidden');
+    }
+    if (response.status === 429) {
+      const retryAfter = parseRetryAfter(response.headers.get('Retry-After'), this.now());
+      discardResponseBody(response);
+      clearTimeout(timeout);
+      throw new CcelSearchFailure('rate_limited', retryAfter);
+    }
+    if (response.status >= 500) {
+      discardResponseBody(response);
+      clearTimeout(timeout);
+      throw new CcelSearchFailure('network');
+    }
+    if (response.status < 200 || response.status >= 300) {
+      discardResponseBody(response);
+      clearTimeout(timeout);
+      throw new CcelSearchFailure('upstream');
+    }
+
+    const contentType = response.headers.get('Content-Type')?.toLowerCase() ?? '';
+    if (!contentType.includes('text/html') && !contentType.includes('application/xhtml+xml')) {
+      discardResponseBody(response);
+      clearTimeout(timeout);
+      throw new CcelSearchFailure('parser');
+    }
+    try {
+      return await readBoundedBody(response, controller.signal);
+    } catch (error) {
+      if (error instanceof CcelSearchFailure) throw error;
+      throw new CcelSearchFailure('network');
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   private claimCircuitSlot(): CircuitClaim | undefined {
@@ -725,32 +712,25 @@ function tokenizeWords(value: string): string[] {
 /** Parse only known result metadata; selector drift is an error, not no-results. */
 export function parseCcelSearchHtml(html: string, page: number): ParsedSearch {
   if (html.length === 0) throw new CcelSearchFailure('parser');
-  const sanitizedHtml = removeUnsafeMarkup(html);
-  if (hasReviewedPolicyMarker(sanitizedHtml)) throw new CcelSearchFailure('policy');
-  if (hasReviewedNoResultsMarker(sanitizedHtml)) return { hits: [], notices: [] };
-
-  const blocks = extractResultBlocks(sanitizedHtml).slice(0, CCEL_SEARCH_LIMITS.maxCandidateResults);
-  if (blocks.length === 0) throw new CcelSearchFailure('parser');
+  if (new TextEncoder().encode(html).byteLength > CCEL_SEARCH_LIMITS.maxResponseBytes) {
+    throw new CcelSearchFailure('too_large');
+  }
+  const document = parseReviewedDocument(html);
+  if (hasReviewedPolicyMarker(document)) throw new CcelSearchFailure('policy');
+  const searchState = identifySearchState(html, document);
+  ensureParseDeadline(document);
+  if (searchState.kind === 'empty') return { hits: [], notices: [] };
 
   const hits: PrimarySourceSearchHit[] = [];
   const seen = new Set<string>();
   let aggregateCharacters = 0;
-  for (const block of blocks) {
-    const links = [...block.matchAll(/<a\b[^>]*href\s*=\s*(["'])(.*?)\1[^>]*>([\s\S]*?)<\/a>/gi)];
-    const link = links.find(candidate => normalizeCcelSectionLocator(candidate[2]));
-    if (!link) continue;
-    const locator = normalizeCcelSectionLocator(link[2]);
-    if (!locator || seen.has(locator.url)) continue;
-    const title = sanitizePlainText(extractClassText(block, /(?:result[-_ ]title|ccel[-_ ]title|title)/i) ?? link[3], CCEL_SEARCH_LIMITS.maxTitleCharacters);
-    if (!title) throw new CcelSearchFailure('parser');
-    const paragraphs = extractElementTexts(block, 'p');
-    const author = optionalText(block, /(?:result[-_ ]author|ccel[-_ ]author|author)/i, CCEL_SEARCH_LIMITS.maxAuthorResultCharacters)
-      ?? extractHeadingAuthor(block);
-    const sectionLabel = optionalText(block, /(?:result[-_ ]section|ccel[-_ ]section|section[-_ ]label)/i, CCEL_SEARCH_LIMITS.maxSectionCharacters)
-      ?? (paragraphs.length > 1 ? paragraphs[0] : undefined);
-    const snippet = optionalText(block, /(?:result[-_ ]snippet|ccel[-_ ]snippet|snippet|summary|description)/i, CCEL_SEARCH_LIMITS.maxSnippetCharacters)
-      ?? (paragraphs.length > 1 ? paragraphs[1] : paragraphs[0] ?? '');
-    const hitCharacters = title.length + (author?.length ?? 0) + (sectionLabel?.length ?? 0) + snippet.length
+  for (const element of searchState.cards) {
+    ensureParseDeadline(document);
+    const card = parseResultCard(html, document, element);
+    ensureParseDeadline(document);
+    if (seen.has(card.locator.url)) continue;
+    const { locator, title, author, snippet } = card;
+    const hitCharacters = title.length + author.length + snippet.length
       + locator.url.length + locator.work.length + locator.section.length;
     if (aggregateCharacters + hitCharacters > CCEL_SEARCH_LIMITS.maxAggregateResultCharacters) {
       throw new CcelSearchFailure('too_large');
@@ -760,8 +740,7 @@ export function parseCcelSearchHtml(html: string, page: number): ParsedSearch {
     hits.push({
       provider: 'ccel_live',
       title,
-      ...(author ? { author } : {}),
-      ...(sectionLabel ? { sectionLabel } : {}),
+      author,
       snippet,
       locator,
       rankWithinProvider: hits.length + 1,
@@ -775,71 +754,447 @@ export function parseCcelSearchHtml(html: string, page: number): ParsedSearch {
   return { hits, notices: [] };
 }
 
-function hasReviewedPolicyMarker(html: string): boolean {
-  return /<h1\b[^>]*>\s*Access denied\s*<\/h1>\s*<p\b[^>]*>\s*Please complete the CAPTCHA to continue\.\s*<\/p>/i.test(html);
+type TreeNode = DefaultTreeAdapterTypes.Node;
+type TreeElement = DefaultTreeAdapterTypes.Element;
+
+interface ReviewedElement {
+  name: string;
+  attributes: ReadonlyMap<string, string>;
+  order: number;
+  explicitlyClosed: boolean;
+  sourceStart: number;
+  sourceEnd: number;
+  sourceContentStart: number;
+  sourceContentEnd: number;
+  parent?: ReviewedElement;
+  children: ReviewedElement[];
+  content: Array<string | ReviewedElement>;
+  text: string;
 }
 
-function hasReviewedNoResultsMarker(html: string): boolean {
-  return /<h2\b[^>]*>\s*CCEL Search results\s*<\/h2>\s*<p\b[^>]*>\s*No results found\.\s*<\/p>/i.test(html);
+interface ReviewedDocument {
+  elements: ReviewedElement[];
+  deadline: number;
 }
 
-function extractResultBlocks(html: string): string[] {
-  const blocks: string[] = [];
-  const headings = /<h5\b[^>]*>[\s\S]*?<\/h5>/gi;
-  let match: RegExpExecArray | null;
-  const matches: Array<{ start: number; end: number }> = [];
-  while ((match = headings.exec(html)) !== null && matches.length < CCEL_SEARCH_LIMITS.maxCandidateResults) {
-    matches.push({ start: match.index, end: headings.lastIndex });
+type ReviewedSearchState =
+  | { kind: 'empty' }
+  | { kind: 'results'; cards: ReviewedElement[] };
+
+const INERT_OR_NON_TEXT_ELEMENTS = new Set([
+  'canvas', 'embed', 'iframe', 'math', 'noscript', 'object', 'script', 'style',
+  'svg', 'template', 'textarea',
+]);
+const STRICTLY_CLOSED_RESULT_ELEMENTS = new Set(['a', 'div', 'h2', 'h5', 'p', 'span']);
+const TABLE_CONTEXT_ELEMENTS = new Set(['caption', 'col', 'colgroup', 'table', 'tbody', 'td', 'tfoot', 'th', 'thead', 'tr']);
+const HTML_NAMESPACE = 'http://www.w3.org/1999/xhtml';
+const TABLE_SOURCE_PATTERN = /<\/?[\t\n\f\r ]*(?:caption|col|colgroup|table|tbody|td|tfoot|th|thead|tr)\b/iu;
+const ADOPTION_FORMATTING_SOURCE_PATTERN = /<\/?[\t\n\f\r ]*(?:b|big|code|em|font|i|nobr|s|small|strike|strong|tt|u)\b/iu;
+const REJECTED_PARSE_ERRORS = new Set([
+  'duplicate-attribute',
+  'eof-in-element-that-can-contain-only-text',
+  'unexpected-null-character',
+]);
+
+/**
+ * Build one standards-compliant HTML5 tree in both Node and Workers. The
+ * synchronous parse is protected by the byte cap; this traversal adds node,
+ * attribute, depth, text, and elapsed-time budgets and creates a much smaller
+ * view containing only visible HTML elements.
+ */
+function parseReviewedDocument(html: string): ReviewedDocument {
+  const startedAt = monotonicNow();
+  const deadline = startedAt + CCEL_SEARCH_LIMITS.maxParseTraversalMs;
+  let rejectedParseError = false;
+  let tree: DefaultTreeAdapterTypes.Document;
+  try {
+    tree = parse(html, {
+      sourceCodeLocationInfo: true,
+      onParseError: error => {
+        if (REJECTED_PARSE_ERRORS.has(error.code)) rejectedParseError = true;
+      },
+    });
+  } catch {
+    throw new CcelSearchFailure('parser');
   }
-  for (let index = 0; index < matches.length; index++) {
-    const start = matches[index].start;
-    const nextStart = matches[index + 1]?.start ?? html.length;
-    const end = Math.min(nextStart, start + CCEL_SEARCH_LIMITS.maxAggregateResultCharacters);
-    const block = html.slice(start, end);
-    if (/<a\b[^>]*href\s*=\s*(["'])[^"']+\1[^>]*>/i.test(block)) blocks.push(block);
+  if (monotonicNow() > deadline) throw new CcelSearchFailure('too_large');
+  if (rejectedParseError) throw new CcelSearchFailure('parser');
+
+  const elements: ReviewedElement[] = [];
+  const pending: Array<{
+    node: TreeNode;
+    depth: number;
+    excluded: boolean;
+    parent?: ReviewedElement;
+  }> = [...tree.childNodes].reverse().map(node => ({ node, depth: 1, excluded: false }));
+  let nodeCount = 0;
+  let attributeCount = 0;
+  let textCharacters = 0;
+
+  while (pending.length > 0) {
+    const frame = pending.pop();
+    if (!frame) break;
+    nodeCount++;
+    if (nodeCount > CCEL_SEARCH_LIMITS.maxTreeNodes) throw new CcelSearchFailure('too_large');
+    if (frame.depth > CCEL_SEARCH_LIMITS.maxTreeDepth) throw new CcelSearchFailure('too_large');
+    if ((nodeCount & 127) === 0 && monotonicNow() > deadline) throw new CcelSearchFailure('too_large');
+
+    if (isTextNode(frame.node)) {
+      textCharacters += frame.node.value.length;
+      if (textCharacters > CCEL_SEARCH_LIMITS.maxTreeTextCharacters) throw new CcelSearchFailure('too_large');
+      if (!frame.excluded && frame.parent) frame.parent.content.push(frame.node.value);
+      continue;
+    }
+    if (!isTreeElement(frame.node)) continue;
+
+    const node = frame.node;
+    attributeCount += node.attrs.length;
+    if (node.attrs.length > CCEL_SEARCH_LIMITS.maxAttributesPerElement
+      || attributeCount > CCEL_SEARCH_LIMITS.maxTreeAttributes) {
+      throw new CcelSearchFailure('too_large');
+    }
+    const attributes = new Map(node.attrs.map(attribute => [attribute.name, attribute.value]));
+    const excluded = frame.excluded
+      || node.namespaceURI !== HTML_NAMESPACE
+      || INERT_OR_NON_TEXT_ELEMENTS.has(node.tagName)
+      || attributes.has('hidden')
+      || attributes.has('inert')
+      || trimAsciiWhitespace(attributes.get('aria-hidden') ?? '').toLocaleLowerCase('en-US') === 'true';
+    let reviewedParent = frame.parent;
+    if (!excluded) {
+      const location = node.sourceCodeLocation;
+      const reviewed: ReviewedElement = {
+        name: node.tagName,
+        attributes,
+        order: elements.length,
+        explicitlyClosed: location?.startTag !== undefined && location.endTag !== undefined,
+        sourceStart: location?.startOffset ?? -1,
+        sourceEnd: location?.endOffset ?? -1,
+        sourceContentStart: location?.startTag?.endOffset ?? -1,
+        sourceContentEnd: location?.endTag?.startOffset ?? -1,
+        ...(frame.parent ? { parent: frame.parent } : {}),
+        children: [],
+        content: [],
+        text: '',
+      };
+      frame.parent?.children.push(reviewed);
+      frame.parent?.content.push(reviewed);
+      elements.push(reviewed);
+      reviewedParent = reviewed;
+    }
+
+    const childNodes = node.tagName === 'template' && 'content' in node
+      ? node.content.childNodes
+      : node.childNodes;
+    for (let index = childNodes.length - 1; index >= 0; index--) {
+      pending.push({
+        node: childNodes[index],
+        depth: frame.depth + 1,
+        excluded,
+        ...(reviewedParent ? { parent: reviewedParent } : {}),
+      });
+    }
   }
-  return blocks;
-}
-
-function extractClassText(block: string, classPattern: RegExp): string | undefined {
-  const element = new RegExp(`<([a-z0-9]+)\\b[^>]*class\\s*=\\s*(["'])[^"']*${classPattern.source}[^"']*\\2[^>]*>([\\s\\S]*?)<\\/\\1>`, 'i').exec(block);
-  return element?.[3];
-}
-
-function optionalText(block: string, classPattern: RegExp, max: number): string | undefined {
-  const raw = extractClassText(block, classPattern);
-  return raw === undefined ? undefined : sanitizePlainText(raw, max);
-}
-
-function extractHeadingAuthor(block: string): string | undefined {
-  const heading = /<h5\b[^>]*>([\s\S]*?)<\/h5>/i.exec(block)?.[1];
-  if (!heading) return undefined;
-  const text = sanitizePlainText(heading, CCEL_SEARCH_LIMITS.maxAuthorResultCharacters + CCEL_SEARCH_LIMITS.maxTitleCharacters);
-  const author = /\s+by\s+(.+)$/i.exec(text)?.[1];
-  return author ? sanitizePlainText(author, CCEL_SEARCH_LIMITS.maxAuthorResultCharacters) : undefined;
-}
-
-function extractElementTexts(block: string, tag: 'p'): string[] {
-  const values: string[] = [];
-  const elements = new RegExp(`<${tag}\\b[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'gi');
-  let match: RegExpExecArray | null;
-  while ((match = elements.exec(block)) !== null && values.length < 3) {
-    const value = sanitizePlainText(match[1], CCEL_SEARCH_LIMITS.maxSnippetCharacters);
-    if (value) values.push(value);
+  if (monotonicNow() > deadline) throw new CcelSearchFailure('too_large');
+  for (let index = elements.length - 1; index >= 0; index--) {
+    elements[index].text = elements[index].content
+      .map(part => typeof part === 'string' ? part : part.text)
+      .join('');
   }
-  return values;
+  return { elements, deadline };
 }
 
-function removeUnsafeMarkup(html: string): string {
-  return html
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/<(script|style|form|nav|header|footer)\b[^>]*>[\s\S]*?<\/\1>/gi, '')
-    .replace(/<[^>]*\b(?:hidden|aria-hidden\s*=\s*["']true["'])[^>]*>[\s\S]*?<\/[^>]+>/gi, '');
+function monotonicNow(): number {
+  return globalThis.performance?.now() ?? Date.now();
 }
 
-function sanitizePlainText(html: string, maxCharacters: number): string {
-  const stripped = stripHtml(html);
-  const decoded = decodeHtmlEntities(stripped)
+function trimAsciiWhitespace(value: string): string {
+  return value.replace(/^[\t\n\f\r ]+|[\t\n\f\r ]+$/gu, '');
+}
+
+function ensureParseDeadline(document: ReviewedDocument): void {
+  if (monotonicNow() > document.deadline) throw new CcelSearchFailure('too_large');
+}
+
+function isTextNode(node: TreeNode): node is DefaultTreeAdapterTypes.TextNode {
+  return node.nodeName === '#text';
+}
+
+function isTreeElement(node: TreeNode): node is TreeElement {
+  return 'tagName' in node && Array.isArray(node.attrs);
+}
+
+function hasReviewedPolicyMarker(document: ReviewedDocument): boolean {
+  return document.elements.some(element => element.name === 'h1'
+    && elementText(element, 64).toLocaleLowerCase('en-US') === 'access denied'
+    && element.parent?.children.some(sibling => sibling.order > element.order
+      && sibling.name === 'p'
+      && elementText(sibling, 128) === 'Please complete the CAPTCHA to continue.'
+      && areAdjacentInContent(element, sibling)) === true);
+}
+
+function identifySearchState(html: string, document: ReviewedDocument): ReviewedSearchState {
+  const resultHeadings = document.elements.filter(element => element.name === 'h2' && (
+    element.attributes.get('id') === 'CCEL_Search_results'
+    || elementText(element, CCEL_SEARCH_LIMITS.maxTitleCharacters) === 'CCEL Search results'
+  ));
+  if (resultHeadings.length !== 1) throw new CcelSearchFailure('parser');
+  const heading = resultHeadings[0];
+  if (heading.attributes.get('id') !== 'CCEL_Search_results'
+    || elementText(heading, CCEL_SEARCH_LIMITS.maxTitleCharacters) !== 'CCEL Search results'
+    || !isExplicitlyClosed(heading)
+    || !hasValidSourceBounds(heading)
+    || !hasDirectSourceContainment(heading.parent, heading)) {
+    throw new CcelSearchFailure('parser');
+  }
+  const resultsRegionEnd = heading.parent!.sourceContentEnd;
+  const resultsSource = html.slice(heading.sourceEnd, resultsRegionEnd);
+  if (TABLE_SOURCE_PATTERN.test(resultsSource)
+    || document.elements.some(element => TABLE_CONTEXT_ELEMENTS.has(element.name)
+      && element.sourceStart >= heading.sourceEnd
+      && element.sourceStart < resultsRegionEnd)) {
+    throw new CcelSearchFailure('parser');
+  }
+  assertNoNonAncestorSourceWrapper(document, heading);
+
+  const emptyMarkers = document.elements.filter(element => element.name === 'p'
+    && elementText(element, 64) === 'No results found.');
+  const allCards = document.elements.filter(element => element.name === 'div' && hasElementClass(element, 'card'));
+  const cards = allCards.filter(element => element.order > heading.order);
+  if (cards.length > CCEL_SEARCH_LIMITS.maxCandidateResults) throw new CcelSearchFailure('too_large');
+  for (const card of cards) {
+    if (card.parent !== heading.parent
+      || card.sourceStart < heading.sourceEnd
+      || ancestorWithClass(card.parent, 'card')
+      || !isExplicitlyClosed(card)
+      || !hasDirectSourceContainment(card.parent, card)) {
+      throw new CcelSearchFailure('parser');
+    }
+    assertNoNonAncestorSourceWrapper(document, card);
+  }
+  if (allCards.length !== cards.length) throw new CcelSearchFailure('parser');
+
+  const resultLikeOutsideCard = document.elements.some(element => element.order > heading.order
+    && isResultMetadataElement(element)
+    && !ancestorWithClass(element.parent, 'card'));
+  if (resultLikeOutsideCard) throw new CcelSearchFailure('parser');
+
+  if (emptyMarkers.length > 0) {
+    const marker = emptyMarkers.length === 1 ? emptyMarkers[0] : undefined;
+    const immediate = marker !== undefined
+      && marker.parent === heading.parent
+      && isExplicitlyClosed(marker)
+      && hasDirectSourceContainment(marker.parent, marker)
+      && !sourceGapMatches(html, heading.sourceEnd, marker.sourceStart, ADOPTION_FORMATTING_SOURCE_PATTERN)
+      && areAdjacentInContent(heading, marker);
+    if (!immediate || cards.length > 0 || hasAnyResultMetadata(document, heading.order)) {
+      throw new CcelSearchFailure('parser');
+    }
+    return { kind: 'empty' };
+  }
+  if (cards.length === 0) throw new CcelSearchFailure('parser');
+  const sourceOrderedCards = [...cards].sort((left, right) => left.sourceStart - right.sourceStart);
+  if (sourceOrderedCards.some((card, index) => card !== cards[index])) throw new CcelSearchFailure('parser');
+  const resultGaps: Array<[number, number]> = [
+    [heading.sourceEnd, sourceOrderedCards[0].sourceStart],
+    ...sourceOrderedCards.slice(1).map((card, index): [number, number] => [sourceOrderedCards[index].sourceEnd, card.sourceStart]),
+  ];
+  const parentContentEnd = heading.parent?.sourceContentEnd ?? -1;
+  if (parentContentEnd >= sourceOrderedCards.at(-1)!.sourceEnd) {
+    resultGaps.push([sourceOrderedCards.at(-1)!.sourceEnd, parentContentEnd]);
+  }
+  if (resultGaps.some(([start, end]) => sourceGapMatches(html, start, end, ADOPTION_FORMATTING_SOURCE_PATTERN))) {
+    throw new CcelSearchFailure('parser');
+  }
+  return { kind: 'results', cards };
+}
+
+function areAdjacentInContent(first: ReviewedElement, second: ReviewedElement): boolean {
+  if (!first.parent || first.parent !== second.parent) return false;
+  const firstIndex = first.parent.content.indexOf(first);
+  const secondIndex = first.parent.content.indexOf(second);
+  if (firstIndex < 0 || secondIndex <= firstIndex) return false;
+  return first.parent.content.slice(firstIndex + 1, secondIndex)
+    .every(part => typeof part === 'string' && /^[\t\n\f\r ]*$/u.test(part));
+}
+
+function hasAnyResultMetadata(document: ReviewedDocument, after: number): boolean {
+  return document.elements.some(element => element.order > after && isResultMetadataElement(element));
+}
+
+function isResultMetadataElement(element: ReviewedElement): boolean {
+  return (element.name === 'h5' && hasElementClass(element, 'card-title'))
+    || (element.name === 'p' && hasElementClass(element, 'card-text'))
+    || (element.name === 'a' && elementText(element, 32).toLocaleLowerCase('en-US') === 'read online');
+}
+
+function hasValidSourceBounds(element: ReviewedElement): boolean {
+  return element.sourceStart >= 0
+    && element.sourceContentStart >= element.sourceStart
+    && element.sourceContentEnd >= element.sourceContentStart
+    && element.sourceEnd >= element.sourceContentEnd;
+}
+
+function hasDirectSourceContainment(parent: ReviewedElement | undefined, child: ReviewedElement): boolean {
+  return parent !== undefined
+    && hasValidSourceBounds(parent)
+    && hasValidSourceBounds(child)
+    && child.sourceStart >= parent.sourceContentStart
+    && child.sourceEnd <= parent.sourceContentEnd;
+}
+
+function assertNoNonAncestorSourceWrapper(document: ReviewedDocument, element: ReviewedElement): void {
+  const hasWrapper = document.elements.some(candidate => candidate !== element
+    && hasValidSourceBounds(candidate)
+    && candidate.sourceStart <= element.sourceStart
+    && candidate.sourceEnd >= element.sourceEnd
+    && !isAncestor(candidate, element));
+  if (hasWrapper) throw new CcelSearchFailure('parser');
+}
+
+function isAncestor(candidate: ReviewedElement, element: ReviewedElement): boolean {
+  let current = element.parent;
+  while (current) {
+    if (current === candidate) return true;
+    current = current.parent;
+  }
+  return false;
+}
+
+function sourceGapMatches(html: string, start: number, end: number, pattern: RegExp): boolean {
+  return start < 0 || end < start || end > html.length || pattern.test(html.slice(start, end));
+}
+
+function parseResultCard(html: string, document: ReviewedDocument, card: ReviewedElement): {
+  title: string;
+  author: string;
+  snippet: string;
+  locator: NonNullable<ReturnType<typeof normalizeCcelSectionLocator>>;
+} {
+  const descendants = descendantElements(card);
+  const nestedCards = descendants.filter(element => element.name === 'div' && hasElementClass(element, 'card'));
+  if (nestedCards.length > 0) throw new CcelSearchFailure('parser');
+  const bodies = descendants.filter(element => element.name === 'div' && hasElementClass(element, 'card-body'));
+  if (bodies.length !== 1
+    || bodies[0].parent !== card
+    || !isExplicitlyClosed(bodies[0])
+    || !hasDirectSourceContainment(card, bodies[0])) {
+    throw new CcelSearchFailure('parser');
+  }
+  const body = bodies[0];
+  assertNoNonAncestorSourceWrapper(document, body);
+  const bodyDescendants = descendantElements(body);
+
+  const headings = body.children.filter(element => element.name === 'h5' && hasElementClass(element, 'card-title'));
+  if (headings.length !== 1
+    || !isExplicitlyClosed(headings[0])
+    || !hasDirectSourceContainment(body, headings[0])) {
+    throw new CcelSearchFailure('parser');
+  }
+  assertNoNonAncestorSourceWrapper(document, headings[0]);
+  const spans = descendantElements(headings[0]).filter(element => element.name === 'span');
+  if (spans.length !== 2 || spans.some(element => element.parent !== headings[0]
+    || !isExplicitlyClosed(element)
+    || !hasDirectSourceContainment(headings[0], element))) {
+    throw new CcelSearchFailure('parser');
+  }
+  spans.forEach(element => assertNoNonAncestorSourceWrapper(document, element));
+  const titleSpans = spans.filter(element => hasElementClass(element, 'title'));
+  const authorSpans = spans.filter(element => hasElementClass(element, 'author'));
+  if (titleSpans.length !== 1 || authorSpans.length !== 1
+    || spans.some(element => Number(hasElementClass(element, 'title')) + Number(hasElementClass(element, 'author')) !== 1)) {
+    throw new CcelSearchFailure('parser');
+  }
+  const title = elementText(titleSpans[0], CCEL_SEARCH_LIMITS.maxTitleCharacters);
+  const authorMarker = elementText(authorSpans[0], CCEL_SEARCH_LIMITS.maxAuthorResultCharacters + 3);
+  if (!title || /^by\s+/iu.test(title) || !/^by\s+\S/iu.test(authorMarker)) throw new CcelSearchFailure('parser');
+  const author = sanitizePlainText(authorMarker.replace(/^by\s+/iu, ''), CCEL_SEARCH_LIMITS.maxAuthorResultCharacters);
+  if (!author) throw new CcelSearchFailure('parser');
+
+  const paragraphs = body.children.filter(element => element.name === 'p');
+  if (paragraphs.length !== 1
+    || !hasElementClass(paragraphs[0], 'card-text')
+    || !isExplicitlyClosed(paragraphs[0])
+    || !hasDirectSourceContainment(body, paragraphs[0])) {
+    throw new CcelSearchFailure('parser');
+  }
+  assertNoNonAncestorSourceWrapper(document, paragraphs[0]);
+  const snippet = elementText(paragraphs[0], CCEL_SEARCH_LIMITS.maxSnippetCharacters);
+
+  const readLinks = body.children.filter(element => element.name === 'a'
+    && elementText(element, 32).toLocaleLowerCase('en-US') === 'read online');
+  if (readLinks.length !== 1
+    || !isExplicitlyClosed(readLinks[0])
+    || !hasDirectSourceContainment(body, readLinks[0])) {
+    throw new CcelSearchFailure('parser');
+  }
+  assertNoNonAncestorSourceWrapper(document, readLinks[0]);
+  if (bodyDescendants.some(element => isResultMetadataElement(element)
+    && element !== headings[0]
+    && element !== paragraphs[0]
+    && element !== readLinks[0])) {
+    throw new CcelSearchFailure('parser');
+  }
+  const href = readLinks[0].attributes.get('href');
+  const locator = href === undefined ? undefined : normalizeCcelSectionLocator(href);
+  if (!locator) throw new CcelSearchFailure('parser');
+  const orderedSpans = [...spans].sort((left, right) => left.sourceStart - right.sourceStart);
+  const structuralGaps: Array<[number, number]> = [
+    [card.sourceContentStart, body.sourceStart],
+    [body.sourceEnd, card.sourceContentEnd],
+    [body.sourceContentStart, headings[0].sourceStart],
+    [headings[0].sourceEnd, paragraphs[0].sourceStart],
+    [paragraphs[0].sourceEnd, readLinks[0].sourceStart],
+    [readLinks[0].sourceEnd, body.sourceContentEnd],
+    [headings[0].sourceContentStart, orderedSpans[0].sourceStart],
+    [orderedSpans[0].sourceEnd, orderedSpans[1].sourceStart],
+    [orderedSpans[1].sourceEnd, headings[0].sourceContentEnd],
+  ];
+  if (structuralGaps.some(([start, end]) => sourceGapMatches(html, start, end, ADOPTION_FORMATTING_SOURCE_PATTERN))) {
+    throw new CcelSearchFailure('parser');
+  }
+  return { title, author, snippet, locator };
+}
+
+function descendantElements(element: ReviewedElement): ReviewedElement[] {
+  const descendants: ReviewedElement[] = [];
+  const pending = [...element.children].reverse();
+  while (pending.length > 0) {
+    const child = pending.pop();
+    if (!child) break;
+    descendants.push(child);
+    for (let index = child.children.length - 1; index >= 0; index--) pending.push(child.children[index]);
+  }
+  return descendants;
+}
+
+function elementText(element: ReviewedElement, maxCharacters: number): string {
+  return sanitizePlainText(element.text, maxCharacters);
+}
+
+function hasElementClass(element: ReviewedElement, token: string): boolean {
+  return hasClassToken(element.attributes.get('class') ?? '', token);
+}
+
+function ancestorWithClass(element: ReviewedElement | undefined, token: string): ReviewedElement | undefined {
+  let current = element;
+  while (current) {
+    if (hasElementClass(current, token)) return current;
+    current = current.parent;
+  }
+  return undefined;
+}
+
+function hasClassToken(classValue: string, token: string): boolean {
+  return classValue.split(/[\t\n\f\r ]+/u).includes(token);
+}
+
+function isExplicitlyClosed(element: ReviewedElement): boolean {
+  return !STRICTLY_CLOSED_RESULT_ELEMENTS.has(element.name) || element.explicitlyClosed;
+}
+
+function sanitizePlainText(text: string, maxCharacters: number): string {
+  const decoded = text
     .replace(/[\u0000-\u001F\u007F-\u009F]/g, ' ')
     .replace(/\s+/gu, ' ')
     .trim();
@@ -849,14 +1204,19 @@ function sanitizePlainText(html: string, maxCharacters: number): string {
 
 /** Normalize only exact CCEL section paths; this never follows the link. */
 export function normalizeCcelSectionLocator(input: string): { kind: 'ccel_section'; url: string; work: string; section: string } | undefined {
-  if (typeof input !== 'string' || input.length === 0 || input.length > CCEL_SEARCH_LIMITS.maxLocatorUrlCharacters || /%/i.test(input) || /(?:^|\/)\.\.?(?:\/|$)/.test(input)) return undefined;
+  if (typeof input !== 'string' || input.length === 0 || input.length > CCEL_SEARCH_LIMITS.maxLocatorUrlCharacters) return undefined;
+  const untrustedPath = input.split(/[?#]/u, 1)[0];
+  if (/%/i.test(untrustedPath) || /(?:^|\/)\.\.?(?:\/|$)/.test(untrustedPath)) return undefined;
   let url: URL;
   try {
     url = new URL(input, CCEL_SEARCH_URL);
   } catch {
     return undefined;
   }
-  if (url.protocol !== 'https:' || !['ccel.org', 'www.ccel.org'].includes(url.hostname.toLowerCase()) || url.username || url.password || url.port || url.search || url.hash) return undefined;
+  // The search UI adds opaque tracking query/hash values to its Read online
+  // link. Only the reviewed path becomes a locator; the entire query and hash
+  // are discarded and never copied into a result, cache entry, or log.
+  if (url.protocol !== 'https:' || !['ccel.org', 'www.ccel.org'].includes(url.hostname.toLowerCase()) || url.username || url.password || url.port) return undefined;
   if (!url.pathname.startsWith('/') || url.pathname.includes('//')) return undefined;
   const segments = url.pathname.slice(1).split('/');
   if (segments.length !== CCEL_SEARCH_LIMITS.maxLocatorSegments || segments[0] !== 'ccel' || segments.slice(0, -1).some(segment => segment.length > CCEL_SEARCH_LIMITS.maxLocatorSegmentCharacters || !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(segment) || segment === '.' || segment === '..')) return undefined;

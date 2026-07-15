@@ -162,6 +162,14 @@ CCEL discovery adapters remain in the codebase as future provider architecture,
 but CCEL is not requestable in the public input schema and is unreachable from
 the public tool handler. The v3 output schema and structured result are also
 strictly local-only; dormant external-provider result shapes remain internal.
+The dormant adapter is restricted to page 1, one non-following/non-retried
+upstream GET per admitted cache miss, at most five metadata hits, and at most
+240 Unicode characters per discovery snippet. It accepts only structurally
+reviewed Bootstrap result cards and reduces a tracking-bearing “Read online”
+link to a canonical allowlisted CCEL exact-section path; tracking query and hash
+values are discarded. Balanced-card parsing uses explicit title/author roles,
+and a no-results marker is accepted only when no competing result structure is
+present. These safeguards do not authorize or enable live use.
 Any future external provider rollout must remain discovery-only until
 edition-specific rights and provider-policy gates are satisfied.
 

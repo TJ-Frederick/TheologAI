@@ -36,6 +36,7 @@ export interface PrimarySourceSearchQuery {
 
 export interface CcelSectionLocator {
   kind: 'ccel_section';
+  /** Canonical exact-section URL; provider tracking query/hash values are never retained. */
   url: string;
   work: string;
   section: string;
