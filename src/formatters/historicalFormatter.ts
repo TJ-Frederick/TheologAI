@@ -5,6 +5,7 @@
 import type { DocumentInfo, DocumentSection } from '../adapters/data/HistoricalDocumentRepository.js';
 import { buildLocalDocumentResourceUri } from '../kernel/documentResource.js';
 import { LOCAL_PRIMARY_SOURCE_ATTRIBUTION } from '../services/historical/primarySourceTypes.js';
+import { CLASSIC_TEXT_LIMITS } from '../kernel/classicTextContract.js';
 
 /** Provenance label for documents bundled with the server. No edition is implied. */
 export const LOCAL_HISTORICAL_SOURCE = LOCAL_PRIMARY_SOURCE_ATTRIBUTION;
@@ -108,7 +109,7 @@ export function formatSearchResults(
     return uri ? [{ section, uri }] : [];
   });
   if (attributableSections.length === 0) return `No attributable results found for "${query}".`;
-  const displayedSections = attributableSections.slice(0, 10);
+  const displayedSections = attributableSections.slice(0, CLASSIC_TEXT_LIMITS.searchHits);
   const count = attributableSections.length > displayedSections.length
     ? `(showing first ${displayedSections.length}; additional matches observed)`
     : `(${attributableSections.length} results)`;

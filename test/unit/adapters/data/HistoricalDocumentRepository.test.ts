@@ -59,6 +59,20 @@ describe('HistoricalDocumentRepository', () => {
     expect(repo.getSection(documentRow.id, '9.9')).toBeUndefined();
   });
 
+  it.each([
+    ['non-text content', { content: 42 }],
+    ['malformed topics', { topics: '[' }],
+    ['non-array topics', { topics: '{}' }],
+    ['non-string topic', { topics: '["topic",1]' }],
+  ])('rejects corrupt stored section %s', (_label, corruption) => {
+    const db = new FakeSqliteDatabase([{
+      match: 'document_sections WHERE document_id = ? ORDER',
+      all: [{ ...sectionRow, ...corruption }],
+    }]);
+    expect(() => new HistoricalDocumentRepository(db.asDatabase()).getSections(documentRow.id))
+      .toThrow(/Stored classic-text section/);
+  });
+
   it('uses controlled literal all-term FTS, the default limit, and maps search rows', () => {
     const db = new FakeSqliteDatabase([{
       match: 'sections_fts MATCH',

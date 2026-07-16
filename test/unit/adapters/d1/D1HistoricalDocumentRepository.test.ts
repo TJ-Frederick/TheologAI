@@ -115,6 +115,17 @@ describe('D1HistoricalDocumentRepository', () => {
       const repo = new D1HistoricalDocumentRepository(db as any);
       await expect(repo.getSections('test')).rejects.toThrow('title must contain');
     });
+
+    it.each([
+      ['non-text content', { content: 42 }],
+      ['malformed topics', { topics: '[' }],
+      ['non-array topics', { topics: '{}' }],
+      ['non-string topic', { topics: '["topic",1]' }],
+    ])('rejects corrupt stored section %s', async (_label, corruption) => {
+      const db = createSimpleD1([{ ...sampleSectionRow, ...corruption }]);
+      const repo = new D1HistoricalDocumentRepository(db as any);
+      await expect(repo.getSections('test')).rejects.toThrow(/Stored classic-text section/);
+    });
   });
 
   describe('getSection', () => {

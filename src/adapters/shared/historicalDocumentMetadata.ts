@@ -2,6 +2,7 @@ import type { DocumentInfo, DocumentSection, HistoricalDocumentCatalogMetadata }
 import {
   assertClassicTextDocumentMetadata,
   assertClassicTextSectionMetadata,
+  parseClassicTextSectionTopics,
 } from '../../kernel/classicTextContract.js';
 
 interface DocumentDatabaseRow {
@@ -39,21 +40,23 @@ interface DocumentSectionDatabaseRow {
 }
 
 export function mapDocumentSectionDatabaseRow(row: DocumentSectionDatabaseRow): DocumentSection {
-  const identity = {
+  const stored = {
     id: row.id,
     documentId: row.document_id,
     sectionNumber: row.section_number,
     title: row.title,
-  };
-  assertClassicTextSectionMetadata(identity, `Stored classic-text section ${String(row.id)}`);
-  if (typeof row.content !== 'string') throw new Error(`Stored classic-text section ${String(row.id)} content must be text`);
-  const topics = parseTopics(row.topics, `Stored classic-text section ${String(row.id)}`);
-  return {
-    id: identity.id!,
-    document_id: identity.documentId,
-    section_number: identity.sectionNumber,
-    title: identity.title,
     content: row.content,
+    topics: row.topics,
+  };
+  const context = `Stored classic-text section ${String(row.id)}`;
+  assertClassicTextSectionMetadata(stored, context);
+  const topics = parseClassicTextSectionTopics(stored.topics, context);
+  return {
+    id: stored.id!,
+    document_id: stored.documentId,
+    section_number: stored.sectionNumber,
+    title: stored.title,
+    content: stored.content,
     topics,
   };
 }
@@ -65,16 +68,6 @@ function parseMetadata(value: string | null): Record<string, unknown> {
     throw new Error('Stored classic-text document metadata must be a JSON object');
   }
   return parsed as Record<string, unknown>;
-}
-
-function parseTopics(value: unknown, context: string): string[] {
-  if (value === null || value === '') return [];
-  if (typeof value !== 'string') throw new Error(`${context} topics must be JSON text`);
-  const parsed = JSON.parse(value) as unknown;
-  if (!Array.isArray(parsed) || !parsed.every(item => typeof item === 'string')) {
-    throw new Error(`${context} topics must be a JSON string array`);
-  }
-  return parsed;
 }
 
 function isCatalogMetadata(value: unknown): value is HistoricalDocumentCatalogMetadata {

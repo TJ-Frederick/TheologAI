@@ -264,13 +264,13 @@ export function validateClassicTextsOutputSemantics(value: unknown): boolean {
     const linkWindow = record(directory?.linkWindow);
     const sections = Array.isArray(directory?.sections) ? directory.sections : undefined;
     if (!directory || !resultWindow || !linkWindow || !sections) return false;
-    const emitted = Math.min(32, sections.length);
-    const additional = sections.length > 32
+    const emitted = Math.min(CLASSIC_TEXT_LIMITS.nativeDirectoryLinks, sections.length);
+    const additional = sections.length > CLASSIC_TEXT_LIMITS.nativeDirectoryLinks
       ? 'additional_link_observed'
       : 'no_additional_link_observed';
     return resultWindow.returnedCount === sections.length
       && resultWindow.additionalMatchStatus === 'no_additional_match_observed'
-      && linkWindow.maximumResourceLinks === 32
+      && linkWindow.maximumResourceLinks === CLASSIC_TEXT_LIMITS.nativeDirectoryLinks
       && linkWindow.emittedResourceLinkCount === emitted
       && linkWindow.additionalLinkStatus === additional;
   }

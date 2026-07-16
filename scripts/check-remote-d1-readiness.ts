@@ -66,6 +66,10 @@ interface D1ReadinessQueryContract {
   checks: D1ReadinessCheck[];
 }
 
+export function classicTextSectionReadinessPredicate(): string {
+  return `(SELECT COUNT(*) FROM document_sections WHERE typeof(id) != 'integer' OR id < 0 OR id > ${Number.MAX_SAFE_INTEGER} OR typeof(document_id) != 'text' OR length(document_id) NOT BETWEEN 1 AND ${CLASSIC_TEXT_LIMITS.documentIdCharacters} OR document_id NOT GLOB '[A-Za-z0-9]*' OR document_id GLOB '*[^A-Za-z0-9._-]*' OR document_id IN ('.','..') OR typeof(section_number) != 'text' OR length(section_number) NOT BETWEEN 1 AND ${CLASSIC_TEXT_LIMITS.sectionNumberCharacters} OR section_number NOT GLOB '[A-Za-z0-9]*' OR section_number GLOB '*[^A-Za-z0-9._:-]*' OR section_number IN ('.','..') OR length('theologai://documents/' || document_id || '#section-' || section_number) > ${CLASSIC_TEXT_LIMITS.resourceUriCharacters} OR typeof(title) != 'text' OR length(title) > ${CLASSIC_TEXT_LIMITS.titleCharacters} OR typeof(content) != 'text' OR CASE WHEN topics IS NULL OR topics = '' THEN 0 WHEN typeof(topics) != 'text' THEN 1 WHEN json_valid(topics) != 1 THEN 1 WHEN json_type(topics) != 'array' THEN 1 WHEN EXISTS (SELECT 1 FROM json_each(topics) WHERE type != 'text') THEN 1 ELSE 0 END) = 0`;
+}
+
 interface RemoteD1ReadinessOptions {
   database: string;
   env?: string;
@@ -191,7 +195,7 @@ function buildD1ReadinessQueryContract(
     },
     {
       id: 'historical.output.section_metadata',
-      predicate: `(SELECT COUNT(*) FROM document_sections WHERE typeof(id) != 'integer' OR id < 0 OR id > ${Number.MAX_SAFE_INTEGER} OR typeof(document_id) != 'text' OR length(document_id) NOT BETWEEN 1 AND ${CLASSIC_TEXT_LIMITS.documentIdCharacters} OR document_id NOT GLOB '[A-Za-z0-9]*' OR document_id GLOB '*[^A-Za-z0-9._-]*' OR document_id IN ('.','..') OR typeof(section_number) != 'text' OR length(section_number) NOT BETWEEN 1 AND ${CLASSIC_TEXT_LIMITS.sectionNumberCharacters} OR section_number NOT GLOB '[A-Za-z0-9]*' OR section_number GLOB '*[^A-Za-z0-9._:-]*' OR section_number IN ('.','..') OR length('theologai://documents/' || document_id || '#section-' || section_number) > ${CLASSIC_TEXT_LIMITS.resourceUriCharacters} OR typeof(title) != 'text' OR length(title) > ${CLASSIC_TEXT_LIMITS.titleCharacters}) = 0`,
+      predicate: classicTextSectionReadinessPredicate(),
     },
   ];
   const columnChecks = Object.entries(REQUIRED_COLUMNS).map(([table, columns]): D1ReadinessCheck => ({

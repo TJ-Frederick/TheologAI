@@ -442,6 +442,8 @@ const histTx = db.transaction(() => {
           documentId: id,
           sectionNumber: sectionNum,
           title,
+          content,
+          topics,
         }, `Historical document ${id} section ${i + 1}`);
 
         insertSection.run(id, sectionNum, title, content, topics);

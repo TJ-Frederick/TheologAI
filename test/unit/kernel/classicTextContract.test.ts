@@ -21,6 +21,8 @@ describe('classic-text stored metadata contract', () => {
     documentId: 'd'.repeat(CLASSIC_TEXT_LIMITS.documentIdCharacters),
     sectionNumber: 's'.repeat(CLASSIC_TEXT_LIMITS.sectionNumberCharacters),
     title: 'T'.repeat(CLASSIC_TEXT_LIMITS.titleCharacters),
+    content: '',
+    topics: '["topic",""]',
   });
 
   it('accepts every stored document and section field at its exact maximum', () => {
@@ -45,6 +47,10 @@ describe('classic-text stored metadata contract', () => {
     ['document id', () => ({ ...sectionAtLimits(), documentId: `d${'x'.repeat(CLASSIC_TEXT_LIMITS.documentIdCharacters)}` })],
     ['section number', () => ({ ...sectionAtLimits(), sectionNumber: `s${'x'.repeat(CLASSIC_TEXT_LIMITS.sectionNumberCharacters)}` })],
     ['section title', () => ({ ...sectionAtLimits(), title: 'T'.repeat(CLASSIC_TEXT_LIMITS.titleCharacters + 1) })],
+    ['section content', () => ({ ...sectionAtLimits(), content: 42 })],
+    ['section topics JSON', () => ({ ...sectionAtLimits(), topics: '[' })],
+    ['section topics shape', () => ({ ...sectionAtLimits(), topics: '{}' })],
+    ['section topics values', () => ({ ...sectionAtLimits(), topics: '["topic",1]' })],
   ])('rejects %s at max plus one with a clear field error', (_field, build) => {
     expect(() => assertClassicTextSectionMetadata(build(), 'Fixture section'))
       .toThrow(/Fixture section/);
@@ -55,5 +61,9 @@ describe('classic-text stored metadata contract', () => {
       .toThrow('cannot form a bounded canonical resource URI');
     expect(() => assertClassicTextSectionMetadata({ ...sectionAtLimits(), sectionNumber: '../bad' }))
       .toThrow('cannot form a bounded canonical resource URI');
+  });
+
+  it.each([null, '', '[]', '["topic",""]'])('accepts the stored topics boundary %j', topics => {
+    expect(() => assertClassicTextSectionMetadata({ ...sectionAtLimits(), topics })).not.toThrow();
   });
 });

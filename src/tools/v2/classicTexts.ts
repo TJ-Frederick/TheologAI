@@ -94,7 +94,7 @@ export function createClassicTextsHandler(historicalService: HistoricalDocumentS
         if (params.query) {
           // Search local docs first
           const query = params.query as string;
-          const localResults = await historicalService.search(query, 11);
+          const localResults = await historicalService.search(query, CLASSIC_TEXT_LIMITS.searchLookahead);
           const documents = localResults.length > 0 ? await historicalService.listDocuments() : [];
           const presented = presentClassicTextSearch(query, localResults, documents);
           if (localResults.length > 0) {
