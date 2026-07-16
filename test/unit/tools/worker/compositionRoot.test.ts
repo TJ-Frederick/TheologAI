@@ -152,13 +152,39 @@ describe('createWorkerCompositionRoot', () => {
   });
 
   describe('primary-source public provider contract', () => {
-    it('does not advertise CCEL provider controls', () => {
+    it('keeps the production-default contract at v3 with CCEL unadvertised', () => {
       const root = createWorkerCompositionRoot(makeEnv());
+      expect(root.primarySourceContract).toEqual({
+        exposeCcelDiscovery: false,
+        ccelLiveSearch: false,
+        ccelCoordinator: false,
+        contractVersion: '3',
+        liveCcelEnabled: false,
+      });
       const tool = root.tools.find(candidate => candidate.name === 'primary_source_search')!;
       const item = (tool.inputSchema.properties?.queries as any).items;
       expect(item.properties.providers).toMatchObject({ maxItems: 1, items: { enum: ['local'] } });
       expect(item.properties.author.description).toContain('separate query-plan items');
       expect(item.properties.page.description).toContain('only page 1');
+    });
+
+    it('exposes preview v4 while adapter and Durable Object lookup remain unreachable at 100', async () => {
+      const getByName = vi.fn();
+      const root = createWorkerCompositionRoot(makeEnv({
+        THEOLOGAI_EXPOSE_CCEL_DISCOVERY: 'true',
+        THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH: 'false',
+        THEOLOGAI_ENABLE_CCEL_COORDINATOR: 'false',
+        THEOLOGAI_CCEL_COORDINATOR: { getByName } as any,
+      }));
+      expect(root.primarySourceContract).toMatchObject({ contractVersion: '4', liveCcelEnabled: false });
+      const tool = root.tools.find(candidate => candidate.name === 'primary_source_search')!;
+      expect(tool.outputSchema?.properties?.schemaVersion).toEqual({ const: '4' });
+      expect(tool.annotations?.openWorldHint).toBe(true);
+      await tool.handler({ queries: [{ id: 'remote', text: 'grace', providers: ['ccel'] }] });
+      // Fetch is owned by the adapter. Proving the adapter and namespace lookup
+      // are untouched also proves no upstream fetch can begin in this state.
+      expect(primarySourceMocks.search).not.toHaveBeenCalled();
+      expect(getByName).not.toHaveBeenCalled();
     });
 
     it('does not expose the live adapter even when its future rollout flag is true', async () => {

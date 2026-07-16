@@ -68,13 +68,15 @@ async function rateLimitKey(ip: string, userAgent: string): Promise<string> {
 }
 
 describe('Worker MCP endpoint in workerd', () => {
-  it('executes the dormant v4 exposure contract in workerd without enabling live CCEL', async () => {
-    const root = createWorkerCompositionRoot({
-      ...env,
-      THEOLOGAI_EXPOSE_CCEL_DISCOVERY: 'true',
-      THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH: 'false',
-      THEOLOGAI_ENABLE_CCEL_COORDINATOR: 'false',
-    } as unknown as Env);
+  it('executes the checked-in preview v4 contract without enabling live CCEL', async () => {
+    expect(env.THEOLOGAI_EXPOSE_CCEL_DISCOVERY).toBe('true');
+    expect(env.THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH).toBe('false');
+    expect(env.THEOLOGAI_ENABLE_CCEL_COORDINATOR).toBe('false');
+    const root = createWorkerCompositionRoot(env as unknown as Env);
+    expect(root.primarySourceContract).toMatchObject({
+      contractVersion: '4',
+      liveCcelEnabled: false,
+    });
     const tool = root.tools.find(candidate => candidate.name === 'primary_source_search')!;
     expect(tool.outputSchema?.properties?.schemaVersion).toEqual({ const: '4' });
     expect(tool.annotations).toMatchObject({ openWorldHint: true });
@@ -205,7 +207,12 @@ describe('Worker MCP endpoint in workerd', () => {
     });
     const primarySourceTool = (listed.message.result?.tools as Array<Record<string, unknown>>)
       .find(tool => tool.name === 'primary_source_search')!;
-    expect(JSON.stringify(primarySourceTool).toLowerCase()).not.toContain('ccel');
+    expect(primarySourceTool).toMatchObject({
+      annotations: { openWorldHint: true },
+      outputSchema: { properties: { schemaVersion: { const: '4' } } },
+    });
+    expect((((primarySourceTool.inputSchema as any).properties.queries.items)
+      .properties.providers.items.enum)).toEqual(['local', 'ccel']);
   });
 
   it('returns structured Bible content alongside the legacy Markdown result', async () => {
@@ -649,7 +656,7 @@ describe('Worker MCP endpoint in workerd', () => {
     expect(result.message.error).toBeUndefined();
     expect(result.message.result).toMatchObject({
       content: [
-        expect.objectContaining({ type: 'text', text: expect.stringContaining('Plan status: **complete**') }),
+        expect.objectContaining({ type: 'text', text: expect.any(String) }),
         expect.objectContaining({
           type: 'resource_link',
           uri: 'theologai://documents/apostles-creed#section-1',
@@ -658,7 +665,8 @@ describe('Worker MCP endpoint in workerd', () => {
         }),
       ],
       structuredContent: {
-        schemaVersion: '3', kind: 'primary_source_search', planStatus: 'complete',
+        schemaVersion: '4', kind: 'primary_source_search', planStatus: 'complete',
+        responseWindow: { unit: 'utf8_bytes', maximum: 32768, truncated: false },
         queries: [expect.objectContaining({
           normalizedSelection: 'relevance',
           providers: [expect.objectContaining({
@@ -669,15 +677,19 @@ describe('Worker MCP endpoint in workerd', () => {
         })],
         coverage: expect.any(Object),
         evidencePolicy: {
-          snippetUse: 'discovery_only', selectedSectionAccess: 'mcp_resource_read',
-          coverageScope: 'bounded_non_exhaustive', editionProvenance: 'incomplete',
+          snippetUse: 'discovery_only', localSectionAccess: 'mcp_resource_read',
+          externalSectionAccess: 'direct_url_only', coverageScope: 'bounded_non_exhaustive',
+          externalRightsStatus: 'not_determined',
           lookupAliasUse: 'exact_routing_only_not_metadata_evidence',
         },
       },
     });
-    expect(JSON.stringify(result.message.result).toLowerCase()).not.toContain('ccel');
+    expect((result.message.result?.content as Array<Record<string, unknown>>)[0]).toEqual({
+      type: 'text',
+      text: JSON.stringify(result.message.result?.structuredContent),
+    });
     expect(Object.keys((result.message.result?.structuredContent as any).coverage).sort()).toEqual([
-      'localAttempted', 'localHitCount', 'localStatus', 'notices',
+      'ccelAttempted', 'ccelHitCount', 'localAttempted', 'localHitCount', 'localStatus', 'notices',
     ]);
     const blocks = result.message.result?.content as Array<Record<string, unknown>>;
     const link = blocks.find(block => block.type === 'resource_link')!;
@@ -694,8 +706,34 @@ describe('Worker MCP endpoint in workerd', () => {
     expect(listed.message.result?.prompts).toEqual(expect.arrayContaining([
       expect.objectContaining({ name: 'passage-exegesis' }),
       expect.objectContaining({ name: 'word-study' }),
-      expect.objectContaining({ name: 'primary-source-research' }),
+      expect.objectContaining({
+        name: 'primary-source-research',
+        description: expect.stringContaining('optional external discovery leads'),
+      }),
     ]));
+
+    const primarySourcePrompt = await rpc('prompts/get', {
+      name: 'primary-source-research',
+      arguments: { topic: 'eucharist', authors: 'Martin Luther' },
+    }, 801);
+    expect(primarySourcePrompt.message.error).toBeUndefined();
+    expect(JSON.stringify(primarySourcePrompt.message.result?.messages)).toContain(
+      'Each call contains at most one CCEL-bearing query',
+    );
+    expect(JSON.stringify(primarySourcePrompt.message.result?.messages)).toContain(
+      'Never quote, compare creators or works, or draw substantive conclusions from any search snippet alone',
+    );
+
+    const confessionPrompt = await rpc('prompts/get', {
+      name: 'confession-study', arguments: { topic: 'justification' },
+    }, 802);
+    expect(confessionPrompt.message.error).toBeUndefined();
+    expect(JSON.stringify(confessionPrompt.message.result?.messages)).toContain(
+      'external `external_url` locator',
+    );
+    expect(JSON.stringify(confessionPrompt.message.result?.messages)).toContain(
+      'rights status is not determined',
+    );
 
     const rendered = await rpc('prompts/get', {
       name: 'passage-exegesis',

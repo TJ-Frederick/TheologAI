@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- theologai-public-contract tools=11 structured=bible_cross_references,bible_lookup,bible_verse_morphology,commentary_lookup,donation_config,original_language_lookup,original_language_study,parallel_passages,primary_source_search,verify_donation -->
 
+### Changed
+
+- Staged a preview-only hard cutover to the v4 primary-source discovery
+  contract and guided workflows. Preview still keeps live CCEL search and
+  coordinator execution disabled, so external queries return disabled without
+  adapter, Durable Object, or network work. Production remains v3/local-only.
+
 ## [3.6.0] - 2026-07-15
 
 ### Added

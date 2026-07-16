@@ -27,7 +27,9 @@ export default defineConfig({
           THEOLOGAI_REQUEST_LOGS: 'false',
           THEOLOGAI_ALLOWED_ORIGINS: 'https://allowed.example',
           THEOLOGAI_MAX_REQUEST_BYTES: '1024',
-          THEOLOGAI_EXPOSE_CCEL_DISCOVERY: 'false',
+          // Model the checked-in preview contract: v4 is visible, but both
+          // execution switches remain false and no upstream path can run.
+          THEOLOGAI_EXPOSE_CCEL_DISCOVERY: 'true',
           THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH: 'false',
           THEOLOGAI_ENABLE_CCEL_COORDINATOR: 'false',
         },
