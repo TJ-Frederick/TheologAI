@@ -8,6 +8,7 @@ import type {
   IStrongsRepository,
 } from '../../src/kernel/repositories.js';
 import type { BibleReference } from '../../src/kernel/reference.js';
+import { DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG } from '../../src/kernel/featureFlags.js';
 import type { McpCompositionRoot } from '../../src/mcp/server.js';
 import { BibleService } from '../../src/services/bible/BibleService.js';
 import { CrossReferenceService } from '../../src/services/bible/CrossReferenceService.js';
@@ -142,13 +143,14 @@ export function createDeterministicMcpFixture(): DeterministicMcpFixture {
   );
   const commentaryService = new CommentaryService([commentaryAdapter]);
   const historicalService = new HistoricalDocumentService(historicalRepository);
+  const primarySourceContract = DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG;
   const primarySourceSearchService = new PrimarySourceSearchService(
     new LocalPrimarySourceSearchProvider(historicalRepository),
     { search: async () => ({
       provider: 'ccel_live', status: 'disabled', searched: false, page: 1, hitCount: 0, hits: [], notices: [],
       resultWindow: { returnedHitCount: 0, additionalMatchStatus: 'not_evaluated' },
     }) },
-    { ccelLiveSearch: false },
+    primarySourceContract,
   );
   const strongsService = new StrongsService(strongsRepository, morphologyRepository);
   const morphologyService = new MorphologyService(morphologyRepository);
@@ -163,12 +165,14 @@ export function createDeterministicMcpFixture(): DeterministicMcpFixture {
       commentaryService,
       historicalService,
       primarySourceSearchService,
+      primarySourceContract,
       strongsService,
       morphologyService,
       originalLanguageStudyService,
       donationService,
     }),
     services: { bibleService, commentaryService, historicalService, strongsService, sourceAttestedParallelService },
+    primarySourceContract,
   } satisfies DeterministicMcpRoot;
 
   return { root, biblePassageCalls };

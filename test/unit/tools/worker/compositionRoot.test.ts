@@ -145,6 +145,7 @@ describe('createWorkerCompositionRoot', () => {
           readOnlyHint: true,
           destructiveHint: false,
           idempotentHint: true,
+          ...(tool.name === 'primary_source_search' ? { openWorldHint: false } : {}),
         });
       }
     });
@@ -165,6 +166,40 @@ describe('createWorkerCompositionRoot', () => {
       const tool = root.tools.find(candidate => candidate.name === 'primary_source_search')!;
       await tool.handler({ queries: [{ id: 'local', text: 'grace', providers: ['local'] }] });
       expect(primarySourceMocks.search).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [false, false, false], [false, false, true], [false, true, false], [false, true, true],
+      [true, false, false], [true, false, true], [true, true, false],
+    ])('keeps CCEL unreachable unless all three gates are true (%s,%s,%s)', async (exposure, live, coordinator) => {
+      const getByName = vi.fn();
+      const root = createWorkerCompositionRoot(makeEnv({
+        THEOLOGAI_EXPOSE_CCEL_DISCOVERY: exposure ? 'true' : 'false',
+        THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH: live ? 'true' : 'false',
+        THEOLOGAI_ENABLE_CCEL_COORDINATOR: coordinator ? 'true' : 'false',
+        THEOLOGAI_CCEL_COORDINATOR: { getByName } as any,
+      }));
+      const tool = root.tools.find(candidate => candidate.name === 'primary_source_search')!;
+      await tool.handler({ queries: [{ id: 'remote', text: 'grace', providers: ['ccel'] }] });
+      expect(primarySourceMocks.search).not.toHaveBeenCalled();
+      expect(getByName).not.toHaveBeenCalled();
+    });
+
+    it('passes the coordinator to the shared adapter only for the 111 gate state', async () => {
+      const getByName = vi.fn();
+      const root = createWorkerCompositionRoot(makeEnv({
+        THEOLOGAI_EXPOSE_CCEL_DISCOVERY: 'true',
+        THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH: 'true',
+        THEOLOGAI_ENABLE_CCEL_COORDINATOR: 'true',
+        THEOLOGAI_CCEL_COORDINATOR: { getByName } as any,
+      }));
+      const tool = root.tools.find(candidate => candidate.name === 'primary_source_search')!;
+      await tool.handler({ queries: [{ id: 'remote', text: 'grace', providers: ['ccel'] }] });
+      expect(primarySourceMocks.search).toHaveBeenCalledOnce();
+      expect(primarySourceMocks.search.mock.calls[0]?.[1]).toBeDefined();
+      // The adapter mock does not invoke the coordinator, proving composition
+      // itself never instantiates the named object.
+      expect(getByName).not.toHaveBeenCalled();
     });
   });
 

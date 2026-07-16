@@ -3,10 +3,11 @@
 ## Status
 
 This is disabled infrastructure, not CCEL enablement.
-`THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH` and
+`THEOLOGAI_EXPOSE_CCEL_DISCOVERY`, `THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH`, and
 `THEOLOGAI_ENABLE_CCEL_COORDINATOR` remain `false` in production and preview.
-The public binding client exists for a later slice, but no composition root or
-MCP tool constructs it. `primary_source_search` remains local-only, and this
+The public binding client and dormant v4 composition wiring exist, but the
+checked-in all-false gate prevents coordinator lookup, adapter search, and
+network access. `primary_source_search` therefore remains local-only, and this
 slice makes no CCEL request or Durable Object RPC.
 
 ## One-origin architecture
@@ -168,6 +169,26 @@ callers sharing that instance in one OS process; separate Node processes are
 not coordinated. A multi-process local deployment must use one process, route
 CCEL discovery through a single coordinator service, or keep live discovery
 disabled.
+
+## Dormant v4 contract wiring
+
+The public Worker and Node composition roots share one contract configuration.
+The v4 application contract is exposed only by
+`THEOLOGAI_EXPOSE_CCEL_DISCOVERY`; an origin attempt additionally requires both
+live-search and coordinator switches. The sole live predicate is therefore all
+three switches together. Any false switch leaves the external adapter,
+Durable Object lookup, and network path untouched.
+
+Each runtime retains one module-scoped executor/cache and supplies its
+request-appropriate coordinator only at the external search call. The executor
+orders work as validation, cache, local capacity, admission, one fetch, one
+terminal outcome, then optional cache. In coordinated mode the coordinator is
+the sole latch/backoff/circuit authority. Node coordination is process-local;
+multi-process Node deployments must keep live discovery disabled unless they
+provide one shared coordinator.
+
+This remains dormant infrastructure. Checked-in production and preview values
+select the local-only v3 contract and make no CCEL request.
 
 Once Stage B is bound and a later approved slice enables it, the global coordinator is intentionally a bottleneck: the maximum admitted
 CCEL-origin load is 0.1 requests/second across production and preview combined.

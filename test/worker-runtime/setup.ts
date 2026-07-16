@@ -14,7 +14,9 @@ declare global {
       THEOLOGAI_REQUEST_LOGS: string;
       THEOLOGAI_ALLOWED_ORIGINS: string;
       THEOLOGAI_MAX_REQUEST_BYTES: string;
+      THEOLOGAI_EXPOSE_CCEL_DISCOVERY: string;
       THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH: string;
+      THEOLOGAI_ENABLE_CCEL_COORDINATOR: string;
     }
   }
 }

@@ -186,4 +186,25 @@ describe('prompt-recommended tool-call contracts', () => {
       },
     }]);
   });
+
+  it('branches v4 workflows into readable local evidence and sequential external discovery', () => {
+    const v4 = {
+      exposeCcelDiscovery: true, ccelLiveSearch: false, ccelCoordinator: false,
+      contractVersion: '4' as const, liveCcelEnabled: false,
+    };
+    const calls = recommendedToolCallsForPrompt('primary-source-research', {
+      topic: 'eucharist', authors: 'Erasmus of Rotterdam, Martin Luther',
+      startYear: '500', endYear: '1500',
+    }, v4);
+    expect((calls[0]!.arguments.queries as Array<{ providers: string[] }>).every(query => query.providers[0] === 'local')).toBe(true);
+    expect(calls.slice(1)).toHaveLength(2);
+    for (const call of calls.slice(1)) {
+      const queries = call.arguments.queries as Array<{ providers: string[] }>;
+      expect(queries).toHaveLength(1);
+      expect(queries[0]!.providers).toEqual(['ccel']);
+      expect(queries[0]).toMatchObject({ startYear: 500, endYear: 1500 });
+    }
+    expect(recommendedToolCallsForPrompt('confession-study', { topic: 'justification' }, v4)[0]!.arguments)
+      .toMatchObject({ queries: [{ providers: ['local', 'ccel'] }] });
+  });
 });

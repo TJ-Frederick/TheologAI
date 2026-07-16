@@ -49,6 +49,7 @@ jobs:
         run: |
           npm run typecheck:worker-runtime
           npm run typecheck:ccel-coordinator-test
+          npm run typecheck:test-fixtures
 
       - name: Verify canonical data sources
         run: npm run data:verify-sources

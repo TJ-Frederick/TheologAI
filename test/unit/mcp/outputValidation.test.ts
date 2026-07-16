@@ -8,15 +8,21 @@ import { createTheologAiMcpServer } from '../../../src/mcp/server.js';
 import { createBibleLookupHandler } from '../../../src/tools/v2/bibleLookup.js';
 import { createStrongsLookupHandler } from '../../../src/tools/v2/strongsLookup.js';
 import { createVerseMorphologyHandler } from '../../../src/tools/v2/verseMorphology.js';
+import { createPrimarySourceSearchHandler } from '../../../src/tools/v2/primarySourceSearch.js';
 import type { BibleService } from '../../../src/services/bible/BibleService.js';
 import type { MorphologyService } from '../../../src/services/languages/MorphologyService.js';
 import type { StrongsService } from '../../../src/services/languages/StrongsService.js';
 import { createDeterministicMcpFixture } from '../../fixtures/mcpCompositionRoot.js';
+import { DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG } from '../../../src/kernel/featureFlags.js';
 
 const connected: Array<{ client: Client; server: Server }> = [];
 type LogMessage = { level: string; logger?: string; data: unknown };
 
-async function connect(tools: ToolHandler[], logs?: LogMessage[]): Promise<Client> {
+async function connect(
+  tools: ToolHandler[],
+  logs?: LogMessage[],
+  primarySourceContract = DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG,
+): Promise<Client> {
   const root = {
     tools,
     services: {
@@ -29,6 +35,7 @@ async function connect(tools: ToolHandler[], logs?: LogMessage[]): Promise<Clien
       },
       strongsService: { lookup: async () => undefined },
     },
+    primarySourceContract,
   };
   const server = createTheologAiMcpServer(root, 'output-validation-test').server;
   const client = new Client({ name: 'output-validation-client', version: '1.0.0' }, { capabilities: {} });
@@ -126,6 +133,96 @@ describe('MCP structured output validation', () => {
       data: { event: 'tool_output_validation_failed', tool: 'malformed_structured_test' },
     }]);
     expect(handler).toHaveBeenCalledOnce();
+  });
+
+  it('validates any structured result even when the handler marks it as an error', async () => {
+    const client = await connect([{
+      name: 'malformed_structured_error',
+      description: 'Test malformed structured error output',
+      inputSchema: { type: 'object', additionalProperties: false },
+      outputSchema: {
+        type: 'object',
+        properties: { schemaVersion: { const: '4' }, value: { type: 'string' } },
+        required: ['schemaVersion', 'value'],
+        additionalProperties: false,
+      },
+      handler: async () => ({
+        content: [{ type: 'text' as const, text: 'sanitized unavailable' }],
+        structuredContent: { schemaVersion: '4', value: 42, secret: 'must not escape' },
+        isError: true,
+      }),
+    }]);
+
+    const failure = await client.callTool({ name: 'malformed_structured_error', arguments: {} }).catch(error => error as Error);
+    expect(failure).toMatchObject({ code: -32603, message: expect.stringContaining('Internal server error') });
+    expect(JSON.stringify(failure)).not.toContain('must not escape');
+  });
+
+  it('allows a generic isError result to omit structured output', async () => {
+    const client = await connect([{
+      name: 'generic_structured_error',
+      description: 'Test generic error without structured output',
+      inputSchema: { type: 'object', additionalProperties: false },
+      outputSchema: {
+        type: 'object', properties: { value: { type: 'string' } }, required: ['value'], additionalProperties: false,
+      },
+      handler: async () => ({ content: [{ type: 'text' as const, text: 'safe generic error' }], isError: true }),
+    }]);
+
+    await expect(client.callTool({ name: 'generic_structured_error', arguments: {} })).resolves.toMatchObject({ isError: true });
+  });
+
+  it('accepts a v4 primary-source result after control-only optional metadata is omitted', async () => {
+    const contract = {
+      exposeCcelDiscovery: true, ccelLiveSearch: false, ccelCoordinator: false,
+      contractVersion: '4' as const, liveCcelEnabled: false,
+    };
+    const handler = createPrimarySourceSearchHandler({
+      search: async () => ({
+        planStatus: 'complete' as const,
+        queries: [{
+          id: 'local', normalizedMode: 'all_terms' as const, normalizedSelection: 'relevance' as const,
+          providers: [{
+            provider: 'local' as const, status: 'ok' as const, searched: true, page: 1, hitCount: 1,
+            resultWindow: { returnedHitCount: 1, additionalMatchStatus: 'no_additional_match_observed' as const },
+            notices: [],
+            scope: {
+              status: 'matched' as const, requested: {}, eligibleDocumentCount: 1,
+              eligibleDocuments: [{ id: 'doc', title: 'Document', metadataStatus: 'reviewed' as const }],
+              eligibleDocumentsTruncated: false,
+            },
+            hits: [{
+              queryId: 'local', provider: 'local' as const, title: 'Section',
+              author: '\u0001', sectionLabel: '\u0002', documentType: '\u0003', documentDate: '\u0004',
+              snippet: 'Discovery lead', rankWithinProvider: 1, page: 1, snippetOnly: true as const,
+              attribution: 'Local', resourceSizeBytes: 10,
+              locator: {
+                kind: 'local_section' as const, documentId: 'doc', sectionId: '1',
+                url: 'theologai://documents/doc#section-1',
+              },
+            }],
+          }],
+        }],
+        coverage: {
+          localAttempted: true, localStatus: 'ok' as const, localHitCount: 1,
+          ccelAttempted: false, ccelHitCount: 0, notices: [],
+        },
+      }),
+    } as any, contract);
+    const client = await connect([handler], undefined, contract);
+
+    const result = await client.callTool({
+      name: 'primary_source_search',
+      arguments: { queries: [{ id: 'local', text: 'grace', providers: ['local'] }] },
+    });
+    expect(result.isError).not.toBe(true);
+    const structured = result.structuredContent as any;
+    const hit = structured.queries[0].providers[0].hits[0];
+    expect(hit).not.toHaveProperty('author');
+    expect(hit).not.toHaveProperty('sectionLabel');
+    expect(hit).not.toHaveProperty('documentType');
+    expect(hit).not.toHaveProperty('documentDate');
+    expect(structured).toMatchObject({ planStatus: 'partial', responseWindow: { truncated: true } });
   });
 
   it('rejects additional fields even when required structured fields are valid', async () => {

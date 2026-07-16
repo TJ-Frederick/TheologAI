@@ -14,6 +14,7 @@ import {
   type NodeHttpRuntime,
 } from '../../../src/http/nodeHttpServer.js';
 import type { McpCompositionRoot } from '../../../src/mcp/server.js';
+import { DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG } from '../../../src/kernel/featureFlags.js';
 import { BibleMCPServer } from '../../../src/server.js';
 import { BibleService } from '../../../src/services/bible/BibleService.js';
 import { createBibleLookupHandler } from '../../../src/tools/v2/bibleLookup.js';
@@ -355,6 +356,7 @@ function makeRoot(): McpCompositionRoot {
         }),
       },
     },
+    primarySourceContract: DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG,
   };
 }
 
