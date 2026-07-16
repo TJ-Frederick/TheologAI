@@ -1,0 +1,191 @@
+# Custom-domain migration and rollback
+
+This runbook governs the infrastructure-only migration to `theologai.xyz`.
+It must not be combined with application behavior, database, corpus,
+rate-limit, CCEL, dependency, or feature changes. No existing route, domain,
+deployment, database, or compatibility endpoint may be deleted without
+separate owner approval.
+
+## Address and ownership map
+
+| Address | Owner | Purpose |
+|---|---|---|
+| `https://theologai.xyz` | Cloudflare Pages project `theologai` | Canonical website. |
+| `https://www.theologai.xyz` | Cloudflare redirect rule, if enabled | Optional permanent redirect to the apex. |
+| `https://mcp.theologai.xyz/mcp` | Production Worker `theologai` | Canonical production MCP endpoint. |
+| `https://preview-mcp.theologai.xyz/mcp` | Preview Worker `theologai-preview` | Canonical preview MCP endpoint. |
+| `https://theologai.pages.dev/` | Existing Pages project | Website compatibility and rollback alias. |
+| `https://theologai.tjfrederick.workers.dev/mcp` | Production Worker | Production compatibility and rollback alias. |
+| `https://theologai-preview.tjfrederick.workers.dev/mcp` | Preview Worker | Preview compatibility and rollback alias. |
+
+The apex Pages custom domain and Worker custom-domain subdomains do not compete:
+Pages owns only the apex, while each Worker owns one distinct hostname. Before
+activation, inspect live DNS and Custom Domains for conflicting A, AAAA, CNAME,
+Worker route, Pages domain, redirect, or Bulk Redirect ownership. Do not replace
+or delete a conflict automatically; stop for an owner routing decision.
+
+Cloudflare provisions and renews certificates for Pages and Worker custom
+domains after ownership validation. Treat a route as unavailable until its
+certificate is active and a fresh TLS request succeeds. DNS records, Pages
+custom-domain attachment, and the optional `www` redirect may require manual
+Cloudflare dashboard action even though Worker routes are declared in
+`wrangler.toml`.
+
+## Known-good pre-migration baseline
+
+The rollback anchor is PR #50 merge
+`16e633bc70dbbea668caacf87f994a2536441092`, protected production run
+`29527760541`, GitHub deployment `5479150556`, Cloudflare deployment
+`5822242e-d0bf-43a9-bbbc-0ec7d6edd180`, and production Worker version
+`32520410-d363-4b2b-83d1-cb7613eab2f1` at 100%. It uses production D1
+`theologai-production-20260715-a`
+(`c6535a4a-1953-4279-b277-7368445fc61a`), rate namespace `361201` at 120/60,
+and CCEL flags `000`. Its post-deployment black-box audit passed 72/72
+assertions with no P0-P3 findings: parallel-text 44/44, protocol/inventory/CCEL
+9/9, and HTTP/CORS/negotiation/under-budget rate behavior 19/19.
+
+Preview remains Worker version `50bdd564-63da-4461-9a5b-73c61f26f7e6`, D1
+`theologai-preview-20260714-a`
+(`0dab804f-8df0-4727-93bd-299612b6e179`), rate namespace `361202`, and CCEL
+flags `100`. A preview deployment necessarily creates a new Worker version;
+record that version after deployment. The preview D1, rate namespace, CCEL
+flags, and environment ownership—not the previous Worker version—must remain
+invariant through domain attachment.
+
+## Reviewable phase split
+
+Keep the full diff visible for final review, but publish it in two ordered
+commits so public metadata never points to an unavailable website:
+
+**Phase A — routing and release controls:**
+
+- `.github/workflows/deploy.yml`
+- `.github/workflows/pr.yml`
+- `wrangler.toml`
+- `worker-configuration.d.ts`
+- `scripts/detect-production-custom-domain-change.ts`
+- `docs/CUSTOM-DOMAIN-MIGRATION.md`
+- `docs/ROADMAP.md`
+- `docs/worker-operations.md`
+- `test/unit/config/customDomainConfig.test.ts`
+- `test/unit/scripts/detectProductionCustomDomainChange.test.ts`
+- `test/unit/worker/workerEntryPoint.test.ts`
+
+Deploy and audit Phase A on preview, then attach and verify the Pages apex.
+Do not merge the pull request after Phase A.
+
+**Phase B — endpoint-metadata cutover after the apex is live:**
+
+- `README.md`
+- `CHANGELOG.md`
+- `docs/PARALLEL-PREVIEW-AUDIT.md`
+- `src/kernel/publicUrls.ts`
+- `src/formatters/donationFormatter.ts`
+- `src/mcp/prompts.ts`
+- `test/unit/config/customDomainEndpointMetadata.test.ts`
+- `test/unit/formatters/donationFormatter.test.ts`
+- `test/unit/mcp/server.test.ts`
+- `test/unit/tools/v2/handlers.test.ts`
+- `test/worker-runtime/workerMcp.test.ts`
+
+The public donation URL, its Markdown label, guided donation prompt, README
+client examples, changelog endpoint declaration, and canonical preview-audit
+example are a deliberate endpoint-metadata exception within this otherwise
+infrastructure-only release. Add Phase B only after `https://theologai.xyz`
+serves correctly. Redeploy and re-audit preview after Phase B before merge.
+The Node and Worker fallback origin constants remain on the legacy Pages origin;
+the explicit dual-origin Wrangler variables provide hosted migration support.
+
+## Preview-first migration
+
+1. Reconfirm the baseline Worker versions, traffic percentages, D1 bindings,
+   rate namespaces, CCEL flags, and successful legacy endpoints using read-only
+   inventory.
+2. Confirm `preview-mcp.theologai.xyz` has no conflicting DNS, Pages, Worker,
+   redirect, or certificate ownership.
+3. Push the reviewed commit to its pull request and explicitly authorize only
+   that pull request's preview deployment. Do not merge it yet. Wrangler must
+   retain `workers_dev = true` while attaching the preview custom domain.
+4. Wait for active custom-domain status and a valid TLS certificate.
+5. From a fresh MCP session, verify initialization and protocol negotiation;
+   tools, resources, and prompts inventory; representative calls; exact-origin
+   CORS for both website origins; rejected arbitrary origins; OPTIONS; expected
+   under-budget rate behavior; and `/mcp` routing.
+6. Repeat a compatibility smoke test through the preview `workers.dev` alias.
+   Confirm both hostnames reach only `theologai-preview`, D1
+   `theologai-preview-20260714-a`, rate namespace `361202`, and CCEL state
+   `100`. Record the new preview Worker version. Remove preview authorization
+   after the audit and verify revocation.
+
+Do not proceed if preview changes application results, crosses into production
+bindings, fails TLS, or causes the compatibility alias to stop working.
+
+## Website apex and optional `www`
+
+1. Attach `theologai.xyz` to the existing Pages project; do not create a second
+   content deployment or move the apex to a Worker.
+2. Wait for Cloudflare DNS validation and an active certificate, then verify the
+   apex document, navigation, assets, donation path, status codes, and TLS.
+3. Verify `https://theologai.pages.dev/` still serves the same site as a
+   compatibility alias.
+4. If desired, configure `www.theologai.xyz` as a redirect-only hostname to
+   `https://theologai.xyz`, preserving path and query. Verify HTTP-to-HTTPS and
+   `www` redirects do not loop or send traffic to an MCP Worker.
+
+The optional `www` redirect is an owner-visible routing choice. If an existing
+record or application owns `www`, pause rather than overwriting it.
+
+## Production custom domain
+
+Only after preview and the website pass:
+
+1. Confirm `mcp.theologai.xyz` has no conflicting ownership.
+2. Merge the same reviewed pull request only after preview and the website have
+   passed. Approve its protected production deployment and keep
+   `workers_dev = true`.
+3. Wait for active custom-domain and certificate status.
+4. Run the same fresh-session MCP, CORS, OPTIONS, representative-tool,
+   under-budget rate, and isolation checks used for preview.
+5. Confirm production reaches only Worker `theologai`, production D1
+   `theologai-production-20260715-a`, rate namespace `361201`, and CCEL state
+   `000`; confirm preview retains its distinct bindings and state.
+6. Smoke-test the production `workers.dev` compatibility alias and record exact
+   post-migration Worker/Pages versions, DNS/custom-domain state, audit counts,
+   and remaining risks.
+
+The production workflow runs the website, preview MCP, and preview CORS
+prerequisite only when the complete push range from GitHub's previous `main`
+SHA adds, removes, or changes the production `mcp.theologai.xyz` declaration.
+The workflow fetches that exact predecessor if its shallow checkout does not
+contain it. This covers merge, squash, and multi-commit rebase strategies and
+makes the migration fail closed without permanently coupling unrelated future
+production hotfixes to preview or website availability. An unchanged
+declaration skips the gate.
+
+## Client cutover
+
+After both custom MCP domains pass independent black-box audit, make the custom
+URLs canonical in clients and documentation. Preserve the old URL alongside
+each client entry as a commented or separately named rollback target where the
+client format allows it. Reconnect and reinitialize MCP sessions after changing
+a URL; cached capability inventories are not migration evidence.
+
+## Rollback
+
+Domain rollback does not require deleting anything:
+
+1. Point affected MCP clients back to the matching `workers.dev` compatibility
+   alias, or the website back to `theologai.pages.dev`.
+2. If the new Worker version itself is unhealthy, restore PR #50 production
+   Worker version `32520410-d363-4b2b-83d1-cb7613eab2f1` with its unchanged
+   production D1, or the recorded preview baseline with its unchanged preview
+   D1. Re-run readiness before any Worker rollback.
+3. Disable or detach a custom hostname only after explicit owner approval; do
+   not delete its DNS record, route, certificate, deployment, or legacy alias as
+   an automatic rollback step.
+4. Re-run the legacy-endpoint smoke tests and environment-isolation checks.
+
+If certificate issuance, DNS ownership, Pages attachment, or redirect setup
+cannot be completed through the available API/CLI, record the exact pending
+dashboard action for the owner. Do not work around it with a conflicting DNS
+record or a new proxy Worker.

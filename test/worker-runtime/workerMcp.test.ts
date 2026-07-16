@@ -264,7 +264,7 @@ describe('Worker MCP endpoint in workerd', () => {
     expect(donation.message.result).toMatchObject({
       content: [expect.objectContaining({
         type: 'text',
-        text: expect.stringContaining('[theologai.pages.dev](https://theologai.pages.dev/)'),
+        text: expect.stringContaining('[theologai.xyz](https://theologai.xyz/)'),
       })],
       structuredContent: {
         schemaVersion: '1',
@@ -272,7 +272,7 @@ describe('Worker MCP endpoint in workerd', () => {
         voluntary: true,
         featureAccessIndependentOfDonation: true,
         assetOrderMeaning: 'configured_display_order_not_ranking',
-        webDonationUrl: 'https://theologai.pages.dev/',
+        webDonationUrl: 'https://theologai.xyz/',
         recipientAddress: '0xf2BE3382cF48ef5CAf21Ca3B01C4e6fC3Ea04B04',
         assets: [
           expect.objectContaining({

@@ -9,16 +9,41 @@ historical documents, Strong's dictionaries, and Greek/Hebrew morphology.
 
 <!-- theologai-public-contract tools=11 structured=bible_cross_references,bible_lookup,bible_verse_morphology,commentary_lookup,donation_config,original_language_lookup,original_language_study,parallel_passages,primary_source_search,verify_donation -->
 
-## Remote endpoint
+## Public website and remote endpoints
 
-The hosted anonymous endpoint is:
+The public website is [theologai.xyz](https://theologai.xyz). The hosted
+anonymous production MCP endpoint is:
 
 ```text
-https://theologai.tjfrederick.workers.dev/mcp
+https://mcp.theologai.xyz/mcp
 ```
 
 `/mcp` is canonical. `/` remains a temporary compatibility alias and may be
 removed after its usage falls to zero.
+
+The preview MCP endpoint is
+`https://preview-mcp.theologai.xyz/mcp`. The previous addresses remain
+operational as compatibility and rollback aliases:
+
+- Website: `https://theologai.pages.dev/`
+- Production MCP: `https://theologai.tjfrederick.workers.dev/mcp`
+- Preview MCP: `https://theologai-preview.tjfrederick.workers.dev/mcp`
+
+Remote MCP client configuration:
+
+```json
+{
+  "mcpServers": {
+    "theologai": {
+      "url": "https://mcp.theologai.xyz/mcp"
+    }
+  }
+}
+```
+
+Use the preview URL only for explicitly authorized release testing. To roll a
+client back without changing server state, replace the custom URL with the
+corresponding `workers.dev` compatibility alias above.
 
 ## MCP capabilities
 
@@ -267,7 +292,7 @@ HTTP configuration:
 |---|---|---|
 | `HOST` | `127.0.0.1` | Listen address. |
 | `MCP_ALLOWED_HOSTS` | Loopback hosts | Additional accepted Host names. |
-| `MCP_ALLOWED_ORIGINS` | `https://theologai.pages.dev` | Comma-separated exact browser origins. |
+| `MCP_ALLOWED_ORIGINS` | `https://theologai.pages.dev` | Comma-separated exact browser origins. Hosted Workers explicitly accept both `https://theologai.xyz` and this legacy website origin during migration. |
 | `MCP_MAX_BODY_BYTES` | `1048576` | Maximum request body size. |
 | `THEOLOGAI_DATABASE_PATH` | `data/theologai.db` | Explicit derived SQLite database path. |
 

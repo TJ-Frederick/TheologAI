@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Prepared an infrastructure-only migration to `theologai.xyz`, with
+  `mcp.theologai.xyz/mcp` and `preview-mcp.theologai.xyz/mcp` as the canonical
+  production and preview MCP addresses. The existing `pages.dev` and
+  `workers.dev` addresses remain enabled as compatibility and rollback aliases.
 - Staged a preview-only hard cutover to the v4 primary-source discovery
   contract and guided workflows. Preview still keeps live CCEL search and
   coordinator execution disabled, so external queries return disabled without

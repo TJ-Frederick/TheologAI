@@ -76,6 +76,10 @@ is local source context only and does not define the current product contract.
 - **Structured commentary / PR #37:** provider-evidenced coverage identity,
   rights and delivery provenance, and bounded v1 output, merged as
   `d395b3641eb00f6826eaba670c287f9a39dfa3da`.
+- **Bounded parallel-text enrichment / PR #50:** fixed-budget text scheduling,
+  bounded excerpts, per-target outcome identity, and executable remote audit,
+  merged as `16e633bc70dbbea668caacf87f994a2536441092` and released through the
+  protected production workflow.
 
 These entries describe merged repository state. Deployment state is established
 only by the relevant protected workflow and post-deployment smoke evidence; a
@@ -135,13 +139,13 @@ Each release retained production D1 `theologai-production-20260715-a`
 and performed zero readiness writes. Live CCEL discovery remains intentionally
 disabled; only preview exposes its non-executing v4 contract.
 
-The current production Worker is PR #48 version
-`e4d0cc54-f3c4-4a27-98ad-fc259edd9a72`, bound to
+The current production Worker is PR #50 version
+`32520410-d363-4b2b-83d1-cb7613eab2f1`, bound to
 `theologai-production-20260715-a`
 (`c6535a4a-1953-4279-b277-7368445fc61a`). Its CCEL rollout state is `000`:
 contract exposure, live search, and coordinator execution are all disabled.
-The current preview Worker is PR #48 version
-`5f381dc2-1116-435d-8292-8557891000ad`, bound to
+The current preview Worker is PR #50 version
+`50bdd564-63da-4461-9a5b-73c61f26f7e6`, bound to
 `theologai-preview-20260714-a`
 (`0dab804f-8df0-4727-93bd-299612b6e179`). Its state is `100`: the v4 discovery
 contract is exposed, but live search and coordinator execution are disabled.
@@ -154,6 +158,26 @@ fresh-session requests and 65/65 assertions, all with no P0–P3 findings. The
 production audit confirmed the parallel-passage v2 sentinels and exact preview
 parity except for the intended preview-v4/production-v3 primary-source delta;
 it made no CCEL request, chain RPC, limiter probe, or mutation.
+
+PR #50 protected production run `29527760541` and GitHub deployment
+`5479150556` produced Cloudflare deployment
+`5822242e-d0bf-43a9-bbbc-0ec7d6edd180` and the production Worker above at
+100%. Its targeted text audit passed 44/44 assertions, protocol/inventory/CCEL
+passed 9/9, and HTTP/CORS/negotiation/under-budget rate behavior passed 19/19:
+72/72 total with no P0-P3 findings. Production retained rate namespace
+`361201` at 120/60 and preview retained namespace `361202`; no D1 binding or
+CCEL flag changed.
+
+## Next contained infrastructure workstream
+
+Before publishing the pending classic-text structured-output work, migrate the
+canonical public addresses to `theologai.xyz` in this order: preview MCP,
+website apex and optional `www` redirect, then production MCP. Preserve all
+`pages.dev` and `workers.dev` addresses as compatibility and rollback aliases.
+The migration is infrastructure-only and must not change application behavior,
+databases, corpora, rate limits, CCEL gates, dependencies, or feature contracts.
+The executable sequence and rollback requirements are in
+[CUSTOM-DOMAIN-MIGRATION.md](CUSTOM-DOMAIN-MIGRATION.md).
 
 ## Shipped Unicode correction release
 

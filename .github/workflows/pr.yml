@@ -189,7 +189,9 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository &&
       contains(github.event.pull_request.labels.*.name, 'deploy-preview')
     runs-on: ubuntu-latest
-    environment: preview
+    environment:
+      name: preview
+      url: https://preview-mcp.theologai.xyz/mcp
     permissions:
       contents: read
       pull-requests: write
@@ -284,8 +286,10 @@ jobs:
             const body = [
               '### Preview Deployed',
               '',
-              '**URL:** https://theologai-preview.tjfrederick.workers.dev',
-              '**MCP Endpoint:** `https://theologai-preview.tjfrederick.workers.dev/mcp`',
+              '**Canonical URL:** https://preview-mcp.theologai.xyz',
+              '**Canonical MCP Endpoint:** `https://preview-mcp.theologai.xyz/mcp`',
+              '**Compatibility alias:** https://theologai-preview.tjfrederick.workers.dev',
+              '**Compatibility MCP endpoint:** `https://theologai-preview.tjfrederick.workers.dev/mcp`',
               '',
               `Deployed from commit \`${sha}\`.`,
             ].join('\n');

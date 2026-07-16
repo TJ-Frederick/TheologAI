@@ -4,7 +4,7 @@ Run the executable MCP audit after a preview deployment and before production pr
 
 ```bash
 npm run audit:parallel-preview -- \
-  --url https://theologai-preview.example.workers.dev/mcp \
+  --url https://preview-mcp.theologai.xyz/mcp \
   --output test-output/parallel-preview-audit.json
 ```
 
@@ -46,5 +46,10 @@ do not exactly match their target states.
 The server bounds every returned passage excerpt to 200 Unicode code points
 before the audit receives it. The evidence therefore records only bounded
 excerpts, never a full provider passage payload.
+
+The compatibility endpoint
+`https://theologai-preview.tjfrederick.workers.dev/mcp` should receive a
+separate alias smoke check during the custom-domain observation period, but the
+custom endpoint above is canonical for release evidence.
 
 Use `--timeout-ms`, `--fixture`, or `--output` to override their defaults. The evidence file deliberately records no request headers or credentials; the preview endpoint must be reachable using its normal anonymous MCP access policy.

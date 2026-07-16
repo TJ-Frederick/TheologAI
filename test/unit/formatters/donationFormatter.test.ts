@@ -42,7 +42,7 @@ describe('formatDonationConfig', () => {
 
   it('includes web UI link', () => {
     const out = formatDonationConfig(makeDonationConfig());
-    expect(out).toContain('theologai.pages.dev');
+    expect(out).toContain('theologai.xyz');
   });
 
   it('includes voluntary disclaimer', () => {
@@ -73,7 +73,7 @@ describe('formatDonationConfig', () => {
     expect(formatDonationConfig(makeDonationConfig())).toBe(
       '**TheologAI Donations**\n\n'
       + 'Donations help support TheologAI\'s development and are entirely voluntary — all features are free regardless.\n\n'
-      + '**Easiest option:** Donate via the web at [theologai.pages.dev](https://theologai.pages.dev/), which has a donation section with wallet connection support.\n\n'
+      + '**Easiest option:** Donate via the web at [theologai.xyz](https://theologai.xyz/), which has a donation section with wallet connection support.\n\n'
       + '**Recipient address:** `0xf2BE3382cF48ef5CAf21Ca3B01C4e6fC3Ea04B04`\n\n'
       + '| Token | Chain | Contract | Decimals |\n'
       + '|-------|-------|----------|----------|\n'

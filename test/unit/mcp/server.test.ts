@@ -770,7 +770,7 @@ describe('shared MCP registration', () => {
     const donate = await client.getPrompt({ name: 'donate' });
     expect(donate.messages[0].content).toEqual(expect.objectContaining({
       type: 'text',
-      text: expect.stringContaining('theologai.pages.dev'),
+      text: expect.stringContaining('theologai.xyz'),
     }));
     const donateText = donate.messages[0].content.type === 'text'
       ? donate.messages[0].content.text

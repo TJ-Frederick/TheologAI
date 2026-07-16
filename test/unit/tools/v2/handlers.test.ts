@@ -1045,7 +1045,7 @@ describe('donation handlers', () => {
       schemaVersion: '1', kind: 'donation_config', voluntary: true,
       featureAccessIndependentOfDonation: true,
       assetOrderMeaning: 'configured_display_order_not_ranking',
-      webDonationUrl: 'https://theologai.pages.dev/',
+      webDonationUrl: 'https://theologai.xyz/',
       recipientAddress,
       assets: [{
         symbol: 'USDC', name: 'USD Coin', chainId: 8453, chainName: 'Base',
