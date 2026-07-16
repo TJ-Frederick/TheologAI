@@ -6,7 +6,7 @@ import { PUBLIC_DONATION_URL } from '../kernel/publicUrls.js';
 export function formatDonationConfig(config: DonationConfig): string {
   let s = '**TheologAI Donations**\n\n';
   s += 'Donations help support TheologAI\'s development and are entirely voluntary — all features are free regardless.\n\n';
-  s += `**Easiest option:** Donate via the web at [theologai.pages.dev](${PUBLIC_DONATION_URL}), which has a donation section with wallet connection support.\n\n`;
+  s += `**Easiest option:** Donate via the web at [theologai.xyz](${PUBLIC_DONATION_URL}), which has a donation section with wallet connection support.\n\n`;
   s += `**Recipient address:** \`${config.recipientAddress}\`\n\n`;
   s += '| Token | Chain | Contract | Decimals |\n|-------|-------|----------|----------|\n';
   for (const token of config.tokens) {

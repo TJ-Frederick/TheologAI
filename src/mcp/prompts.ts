@@ -389,7 +389,7 @@ This workflow supports a topic survey, exact local-work search, inclusive overla
       case 'donate':
         text = `The user wants to donate to TheologAI. Donations are voluntary and all features remain free.
 
-The public donation page is [theologai.pages.dev](${PUBLIC_DONATION_URL}).
+The public donation page is [theologai.xyz](${PUBLIC_DONATION_URL}).
 
 For current recipient, asset, contract, and chain details, call ${callText(calls[0])}. Prefer its structured \`webDonationUrl\`, \`recipientAddress\`, \`assetOrderMeaning\`, and \`assets[]\`; \`assetOrderMeaning\` explicitly says the stable display order is not a ranking or recommendation, and the Markdown remains the fallback. A native asset has a null \`assetAddress\`; a token has its exact contract address. Do not infer price, liquidity, bridge availability, or wallet support. Reiterate that donations are voluntary and do not unlock features. If the user later supplies a transaction hash for verification, call \`verify_donation\` and prefer its structured classification, coverage, chain checks, transfers, and verification policy. Treat \`receipt_observed_no_confirmation_depth\` as receipt observation only, never as confirmation depth or finality; provider gaps fail closed. If a wallet MCP tool is available, use only capabilities that tool itself advertises to help the user prepare the transfer.`;
         break;
