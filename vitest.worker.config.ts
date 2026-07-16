@@ -27,6 +27,7 @@ export default defineConfig({
           THEOLOGAI_REQUEST_LOGS: 'false',
           THEOLOGAI_ALLOWED_ORIGINS: 'https://allowed.example',
           THEOLOGAI_MAX_REQUEST_BYTES: '1024',
+          THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH: 'false',
         },
         d1Databases: {
           THEOLOGAI_DB: 'theologai-worker-runtime-test',

@@ -77,3 +77,8 @@ live-search flag remains off by default.
 
 No live CCEL request, body persistence, production flag change, or remote
 mutation is authorized by this record.
+
+The next dormant rollout slice adds the content-free admission/circuit design
+documented in [CCEL-UPSTREAM-COORDINATOR.md](./CCEL-UPSTREAM-COORDINATOR.md).
+It remains unwired from the public tool and does not supersede this preflight's
+operator, rights, robots, or interface-review gates.

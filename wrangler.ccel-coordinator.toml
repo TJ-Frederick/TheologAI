@@ -1,0 +1,11 @@
+name = "theologai-ccel-coordinator"
+main = "src/ccel-coordinator-worker.ts"
+compatibility_date = "2026-07-09"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+
+# Declarative exports are authoritative for this brand-new namespace. No
+# legacy migration has ever been deployed for this owner script.
+[exports.CcelGlobalCoordinator]
+type = "durable-object"
+storage = "sqlite"

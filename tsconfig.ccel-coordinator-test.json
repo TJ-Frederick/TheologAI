@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.ccel-coordinator.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "types": [
+      "@cloudflare/workers-types",
+      "@cloudflare/vitest-pool-workers/types"
+    ]
+  },
+  "include": [
+    "src/ccel-coordinator-worker.ts",
+    "src/http/worker/CcelGlobalCoordinator.ts",
+    "src/services/historical/CcelUpstreamCoordinator.ts",
+    "test/ccel-coordinator-runtime/**/*.ts",
+    "ccel-coordinator-configuration.d.ts"
+  ]
+}

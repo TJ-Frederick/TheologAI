@@ -19,6 +19,7 @@
     "node_modules",
     "dist",
     "src/worker.ts",
+    "src/ccel-coordinator-worker.ts",
     "src/worker-server.ts",
     "src/worker-env.ts",
     "src/http/worker",

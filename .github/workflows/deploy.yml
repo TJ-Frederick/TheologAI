@@ -27,19 +27,28 @@ jobs:
       - run: npm ci
 
       - name: Verify generated Worker binding types
-        run: npm run types:worker:check
+        run: |
+          npm run types:worker:check
+          npm run types:ccel-coordinator:check
 
       - name: Validate production and preview Worker configuration
-        run: npm run validate:worker-config
+        run: |
+          npm run validate:worker-config
+          npm run validate:ccel-coordinator-config
+          npm run validate:ccel-coordinator-test-config
 
       - name: Typecheck Node.js target
         run: npm run typecheck:node
 
       - name: Typecheck Workers target
-        run: npm run typecheck:worker
+        run: |
+          npm run typecheck:worker
+          npm run typecheck:ccel-coordinator
 
       - name: Typecheck Worker runtime tests
-        run: npm run typecheck:worker-runtime
+        run: |
+          npm run typecheck:worker-runtime
+          npm run typecheck:ccel-coordinator-test
 
       - name: Verify canonical data sources
         run: npm run data:verify-sources
@@ -75,7 +84,9 @@ jobs:
         run: npm run test:integration
 
       - name: Exercise Worker MCP endpoint with isolated D1
-        run: npm run test:worker-runtime
+        run: |
+          npm run test:worker-runtime
+          npm run test:ccel-coordinator-runtime
 
       - name: Exercise production-like Worker bundle without test-only globals
         run: npm run test:worker-production-runtime
