@@ -47,6 +47,13 @@ describe('ParallelPassageService hard-cutover contract', () => {
     expect(result.sourceAttestedResultWindow).toEqual({
       requestedLimit: 5, returnedGroupCount: 1, additionalMatchStatus: 'no_additional_match_observed',
     });
+    expect(result.textEnrichment).toEqual({
+      requested: false, translation: null,
+      budget: { unit: 'unique_canonical_passage_lookups', maximum: 12 },
+      uniqueTargetCount: 3, scheduledLookupCount: 0, succeededLookupCount: 0,
+      failedLookupCount: 0, omittedLookupCount: 0, completionStatus: 'not_requested',
+    });
+    expect(result.sourceAttestedGroups[0].members.every(member => member.textEnrichmentStatus === 'not_requested')).toBe(true);
   });
 
   it('preserves legacy edge items only under the explicit legacy selector', async () => {
@@ -58,6 +65,7 @@ describe('ParallelPassageService hard-cutover contract', () => {
     });
     expect(result.legacyParallels).toEqual([{
       reference: 'Matthew 5:44', relationship: 'thematic', confidence: 0.8, notes: 'legacy note',
+      textEnrichmentStatus: 'not_requested',
       provenanceIds: ['theologai-legacy-parallels'],
     }]);
   });
@@ -139,9 +147,14 @@ describe('ParallelPassageService hard-cutover contract', () => {
     const service = new ParallelPassageService(crossReferences(), { lookup } as any, undefined, legacyFixture(), sourceService() as any);
     const result = await service.lookup({ reference: 'Luke 6:35', includeText: true });
     expect(result.warnings).toEqual([
-      'Text unavailable for Luke 6:27-28.',
-      'Text unavailable for Luke 6:35.',
+      'Text enrichment failed for 2 scheduled lookups: Luke 6:27-28; Luke 6:35.',
     ]);
+    expect(result.textEnrichment).toMatchObject({
+      uniqueTargetCount: 3, scheduledLookupCount: 3, succeededLookupCount: 1,
+      failedLookupCount: 2, omittedLookupCount: 0, completionStatus: 'incomplete',
+    });
+    expect(result.sourceAttestedGroups[0].members.map(member => member.textEnrichmentStatus))
+      .toEqual(['unavailable', 'complete']);
     expect(result.sourceAttestedGroups[0].members[1].text).toBe('Matthew 5:44: Available');
     expect(result.sourceAttestedGroups[0].members[1].excerpts).toEqual([
       expect.objectContaining({ segmentOrder: 1, reference: 'Matthew 5:44', text: 'Available' }),
@@ -251,8 +264,7 @@ describe('ParallelPassageService hard-cutover contract', () => {
     const second = await run({ 'Luke 6:27-28': 1, 'Luke 6:35': 2, 'Matthew 5:44': 20 });
     expect(JSON.stringify(second)).toBe(JSON.stringify(first));
     expect(first.warnings).toEqual([
-      'Text unavailable for Luke 6:35.',
-      'Text unavailable for Matthew 5:44.',
+      'Text enrichment failed for 2 scheduled lookups: Luke 6:35; Matthew 5:44.',
     ]);
   });
 

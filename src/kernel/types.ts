@@ -16,6 +16,8 @@ export interface ToolHandler {
   inputSchema: Tool['inputSchema'];
   outputSchema?: Tool['outputSchema'];
   annotations?: Tool['annotations'];
+  /** Optional cross-field validation that JSON Schema cannot fully express. */
+  validateStructuredOutput?: (value: Record<string, unknown>) => boolean;
   handler: (params: Record<string, unknown>) => Promise<ToolResult>;
 }
 
@@ -181,7 +183,7 @@ export interface ParallelPassageLookupParams {
   corpora?: ParallelPassageCorpus[];
   mode?: 'auto' | 'synoptic' | 'quotation' | 'thematic';
   includeText?: boolean;
-  translation?: string;
+  translation?: ParallelTextTranslation;
   showDifferences?: boolean;
   maxGroups?: number;
   includeAlignment?: boolean;
@@ -202,6 +204,31 @@ export interface ParallelPassage {
   uniqueElements?: string[];
   notes?: string;
   provenanceIds?: string[];
+}
+
+export type ParallelTextEnrichmentStatus =
+  | 'not_requested'
+  | 'complete'
+  | 'partial'
+  | 'unavailable'
+  | 'budget_omitted';
+
+export type ParallelTextTranslation = 'ESV' | 'NET' | 'KJV' | 'WEB' | 'BSB' | 'ASV' | 'YLT' | 'DBY';
+
+export interface ParallelTextEnrichment {
+  requested: boolean;
+  translation: ParallelTextTranslation | null;
+  budget: { unit: 'unique_canonical_passage_lookups'; maximum: 12 };
+  uniqueTargetCount: number;
+  scheduledLookupCount: number;
+  succeededLookupCount: number;
+  failedLookupCount: number;
+  omittedLookupCount: number;
+  completionStatus: 'not_requested' | 'complete' | 'incomplete';
+}
+
+export interface ResearchLegacyParallel extends ParallelPassage {
+  textEnrichmentStatus: ParallelTextEnrichmentStatus;
 }
 
 export interface ParallelPassageAnalysis {
@@ -237,6 +264,7 @@ export interface SourceAttestedParallelMemberResult {
   translation?: string;
   excerpts?: SourceAttestedSegmentExcerpt[];
   provenanceIds: string[];
+  textEnrichmentStatus: ParallelTextEnrichmentStatus;
 }
 
 export interface SourceAttestedSegmentExcerpt {
@@ -268,9 +296,10 @@ export interface ParallelPassageResearchResult {
   corpora: ParallelPassageCorpus[];
   sourceAttestedGroups: SourceAttestedParallelGroupResult[];
   sourceAttestedResultWindow: SourceAttestedResultWindow;
-  legacyParallels: ParallelPassage[];
+  legacyParallels: ResearchLegacyParallel[];
   openBibleCrossReferences: CrossReference[];
   provenance: import('./provenance.js').ProvenanceRecord[];
+  textEnrichment: ParallelTextEnrichment;
   warnings?: string[];
 }
 

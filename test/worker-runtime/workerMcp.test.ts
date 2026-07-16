@@ -531,7 +531,7 @@ describe('Worker MCP endpoint in workerd', () => {
     expect(result.message.error).toBeUndefined();
     expect(result.message.result).toMatchObject({
       structuredContent: {
-        schemaVersion: '2',
+        schemaVersion: '3',
         corpora: ['ubs_source_attested'],
         legacyParallels: [],
         openBibleCrossReferences: [],
@@ -546,19 +546,24 @@ describe('Worker MCP endpoint in workerd', () => {
           returnedGroupCount: 1,
           additionalMatchStatus: 'no_additional_match_observed',
         },
+        textEnrichment: {
+          requested: false, translation: null, uniqueTargetCount: 3,
+          scheduledLookupCount: 0, succeededLookupCount: 0, failedLookupCount: 0,
+          omittedLookupCount: 0, completionStatus: 'not_requested',
+        },
       },
     });
     expect(JSON.stringify(result.message.result?.structuredContent)).not.toContain('alignmentRaw');
     expect(textContent(result.message)).toContain('_Matched passage: Luke 6:27-28,35_');
   });
 
-  it('exposes honest v2 UBS result windows for the reviewed black-box sentinels', async () => {
+  it('exposes honest v3 UBS result windows for the reviewed black-box sentinels', async () => {
     const defaultMark = await rpc('tools/call', {
       name: 'parallel_passages', arguments: { reference: 'Mark 10:19' },
     }, 152);
     expect(defaultMark.message.result).toMatchObject({
       structuredContent: {
-        schemaVersion: '2',
+        schemaVersion: '3',
         sourceAttestedGroups: expect.arrayContaining([expect.any(Object)]),
         sourceAttestedResultWindow: {
           requestedLimit: 5, returnedGroupCount: 5, additionalMatchStatus: 'additional_match_observed',

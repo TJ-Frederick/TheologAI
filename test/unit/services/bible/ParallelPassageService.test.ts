@@ -226,7 +226,7 @@ describe('ParallelPassageService', () => {
     expect(result.primary).toEqual({ reference: 'Matthew 1:1' });
     expect(result.parallels[0]).toMatchObject({ text: 'Text for Luke 3:23-38', translation: 'WEB' });
     expect(result.parallels[1]).not.toHaveProperty('text');
-    expect(result.warnings).toContain('Text unavailable for John 1:1.');
+    expect(result.warnings).toContain('Text enrichment failed for 1 scheduled lookup: John 1:1.');
     expect(maximum).toBeLessThanOrEqual(4);
     expect(lookup).not.toHaveBeenCalledWith({ reference: 'Matthew 1:1', translation: 'WEB' });
   });
@@ -235,6 +235,6 @@ describe('ParallelPassageService', () => {
     const service = new ParallelPassageService(repository(), undefined, undefined, fixture());
     const result = await service.lookup({ reference: 'Isaiah 53:5', includeText: true, useCrossReferences: false });
     expect(result.parallels).toHaveLength(1);
-    expect(result.warnings).toEqual(['Passage text is unavailable in this runtime.']);
+    expect(result.warnings).toEqual(['Text enrichment failed for 1 scheduled lookup: 1 Peter 2:24.']);
   });
 });

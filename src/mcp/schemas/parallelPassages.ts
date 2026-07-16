@@ -7,10 +7,15 @@ const textFields = {
   translation: { type: 'string' },
 } as const;
 
+const textEnrichmentStatus = {
+  type: 'string',
+  enum: ['not_requested', 'complete', 'partial', 'unavailable', 'budget_omitted'],
+} as const;
+
 export const parallelPassagesOutputSchema = {
   type: 'object',
   properties: {
-    schemaVersion: { type: 'string', const: '2' },
+    schemaVersion: { type: 'string', const: '3' },
     kind: { type: 'string', const: 'parallel_passages' },
     requestedReference: { type: 'string' },
     corpora: {
@@ -34,6 +39,7 @@ export const parallelPassagesOutputSchema = {
                 normalizedReference: { type: 'string' }, languageMarker: { type: 'string', enum: ['HEB', 'GRK'] },
                 matched: { type: 'boolean' }, alignmentBasis: { type: 'string', enum: ['BHS', 'LXX', 'UBSGNT5'] },
                 alignmentRaw: { type: 'string' }, ...textFields,
+                textEnrichmentStatus,
                 excerpts: {
                   type: 'array', minItems: 1,
                   items: {
@@ -61,7 +67,17 @@ export const parallelPassagesOutputSchema = {
                   },
                 },
               },
-              required: ['sourceOrder', 'sourceReference', 'normalizedReference', 'segments', 'languageMarker', 'matched', 'provenanceIds'],
+              required: ['sourceOrder', 'sourceReference', 'normalizedReference', 'segments', 'languageMarker', 'matched', 'textEnrichmentStatus', 'provenanceIds'],
+              allOf: [
+                {
+                  if: { properties: { textEnrichmentStatus: { const: 'complete' } } },
+                  then: { required: ['text', 'translation', 'excerpts'] },
+                },
+                {
+                  if: { properties: { textEnrichmentStatus: { enum: ['not_requested', 'unavailable', 'budget_omitted'] } } },
+                  then: { not: { anyOf: [{ required: ['text'] }, { required: ['translation'] }, { required: ['excerpts'] }] } },
+                },
+              ],
               additionalProperties: false,
             },
           },
@@ -92,8 +108,19 @@ export const parallelPassagesOutputSchema = {
           relationship: { type: 'string', enum: ['synoptic', 'quotation', 'allusion', 'thematic'] },
           confidence: { type: 'number' }, uniqueElements: { type: 'array', items: { type: 'string' } },
           notes: { type: 'string' }, provenanceIds: { type: 'array', minItems: 1, items: { type: 'string' } },
+          textEnrichmentStatus,
         },
-        required: ['reference', 'relationship', 'confidence', 'provenanceIds'], additionalProperties: false,
+        required: ['reference', 'relationship', 'confidence', 'textEnrichmentStatus', 'provenanceIds'], additionalProperties: false,
+        allOf: [
+          {
+            if: { properties: { textEnrichmentStatus: { const: 'complete' } } },
+            then: { required: ['text', 'translation'] },
+          },
+          {
+            if: { properties: { textEnrichmentStatus: { enum: ['not_requested', 'unavailable', 'budget_omitted'] } } },
+            then: { not: { anyOf: [{ required: ['text'] }, { required: ['translation'] }] } },
+          },
+        ],
       },
     },
     openBibleCrossReferences: {
@@ -106,15 +133,80 @@ export const parallelPassagesOutputSchema = {
       },
     },
     provenance: { type: 'array', items: createProvenanceRecordSchema() },
+    textEnrichment: {
+      type: 'object',
+      properties: {
+        requested: { type: 'boolean' },
+        translation: {
+          type: ['string', 'null'],
+          enum: ['ESV', 'NET', 'KJV', 'WEB', 'BSB', 'ASV', 'YLT', 'DBY', null],
+        },
+        budget: {
+          type: 'object',
+          properties: {
+            unit: { type: 'string', const: 'unique_canonical_passage_lookups' },
+            maximum: { type: 'integer', const: 12 },
+          },
+          required: ['unit', 'maximum'],
+          additionalProperties: false,
+        },
+        uniqueTargetCount: { type: 'integer', minimum: 0 },
+        scheduledLookupCount: { type: 'integer', minimum: 0, maximum: 12 },
+        succeededLookupCount: { type: 'integer', minimum: 0, maximum: 12 },
+        failedLookupCount: { type: 'integer', minimum: 0, maximum: 12 },
+        omittedLookupCount: { type: 'integer', minimum: 0 },
+        completionStatus: { type: 'string', enum: ['not_requested', 'complete', 'incomplete'] },
+      },
+      required: [
+        'requested', 'translation', 'budget', 'uniqueTargetCount', 'scheduledLookupCount',
+        'succeededLookupCount', 'failedLookupCount', 'omittedLookupCount', 'completionStatus',
+      ],
+      oneOf: [
+        {
+          properties: {
+            requested: { const: false }, translation: { type: 'null' },
+            scheduledLookupCount: { const: 0 }, succeededLookupCount: { const: 0 },
+            failedLookupCount: { const: 0 }, omittedLookupCount: { const: 0 },
+            completionStatus: { const: 'not_requested' },
+          },
+          required: [
+            'requested', 'translation', 'scheduledLookupCount', 'succeededLookupCount',
+            'failedLookupCount', 'omittedLookupCount', 'completionStatus',
+          ],
+        },
+        {
+          properties: {
+            requested: { const: true },
+            translation: { type: 'string', enum: ['ESV', 'NET', 'KJV', 'WEB', 'BSB', 'ASV', 'YLT', 'DBY'] },
+            failedLookupCount: { const: 0 }, omittedLookupCount: { const: 0 },
+            completionStatus: { const: 'complete' },
+          },
+          required: ['requested', 'translation', 'failedLookupCount', 'omittedLookupCount', 'completionStatus'],
+        },
+        {
+          properties: {
+            requested: { const: true },
+            translation: { type: 'string', enum: ['ESV', 'NET', 'KJV', 'WEB', 'BSB', 'ASV', 'YLT', 'DBY'] },
+            completionStatus: { const: 'incomplete' },
+          },
+          required: ['requested', 'translation', 'completionStatus'],
+          anyOf: [
+            { properties: { failedLookupCount: { type: 'integer', minimum: 1 } }, required: ['failedLookupCount'] },
+            { properties: { omittedLookupCount: { type: 'integer', minimum: 1 } }, required: ['omittedLookupCount'] },
+          ],
+        },
+      ],
+      additionalProperties: false,
+    },
     warnings: { type: 'array', items: { type: 'string' } },
   },
-  required: ['schemaVersion', 'kind', 'requestedReference', 'corpora', 'sourceAttestedGroups', 'sourceAttestedResultWindow', 'legacyParallels', 'openBibleCrossReferences', 'provenance'],
+  required: ['schemaVersion', 'kind', 'requestedReference', 'corpora', 'sourceAttestedGroups', 'sourceAttestedResultWindow', 'legacyParallels', 'openBibleCrossReferences', 'provenance', 'textEnrichment'],
   additionalProperties: false,
 } as NonNullable<Tool['outputSchema']>;
 
-export interface ParallelPassagesOutputV2 {
+export interface ParallelPassagesOutputV3 {
   [key: string]: unknown;
-  schemaVersion: '2';
+  schemaVersion: '3';
   kind: 'parallel_passages';
   requestedReference: string;
   corpora: Array<'ubs_source_attested' | 'theologai_legacy'>;
@@ -127,5 +219,16 @@ export interface ParallelPassagesOutputV2 {
   legacyParallels: Array<Record<string, unknown>>;
   openBibleCrossReferences: Array<Record<string, unknown>>;
   provenance: ProvenanceRecord[];
+  textEnrichment: {
+    requested: boolean;
+    translation: 'ESV' | 'NET' | 'KJV' | 'WEB' | 'BSB' | 'ASV' | 'YLT' | 'DBY' | null;
+    budget: { unit: 'unique_canonical_passage_lookups'; maximum: 12 };
+    uniqueTargetCount: number;
+    scheduledLookupCount: number;
+    succeededLookupCount: number;
+    failedLookupCount: number;
+    omittedLookupCount: number;
+    completionStatus: 'not_requested' | 'complete' | 'incomplete';
+  };
   warnings?: string[];
 }

@@ -1,18 +1,19 @@
 /**
- * parallel_passages tool handler (v2).
+ * parallel_passages tool handler (v3).
  */
 
-import type { ToolHandler } from '../../kernel/types.js';
+import type { ParallelPassageLookupParams, ToolHandler } from '../../kernel/types.js';
 import type { ParallelPassageService } from '../../services/bible/ParallelPassageService.js';
 import { formatParallelPassageResearch } from '../../formatters/bibleFormatter.js';
 import { handleToolError } from '../../kernel/errors.js';
 import { parallelPassagesOutputSchema } from '../../mcp/schemas/parallelPassages.js';
 import { presentParallelPassagesStructured } from '../../presenters/parallelPassagesStructured.js';
+import { validateParallelPassagesOutputSemantics } from '../../mcp/parallelPassagesOutputValidation.js';
 
 export function createParallelPassagesHandler(service: ParallelPassageService): ToolHandler {
   return {
     name: 'parallel_passages',
-    description: 'Find source-attested UBS parallel-passage groups by default. TheologAI legacy curated edges and OpenBible.info cross references require explicit opt-in.',
+    description: 'Find complete source-attested UBS parallel-passage groups by default. Optional passage-text enrichment uses at most 12 unique canonical lookups with explicit per-item and aggregate completion status. TheologAI legacy curated edges and OpenBible.info cross references require explicit opt-in.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -24,7 +25,7 @@ export function createParallelPassagesHandler(service: ParallelPassageService): 
           description: 'Parallel corpora to query. Omission searches only UBS source-attested groups.',
         },
         mode: { type: 'string', enum: ['auto', 'synoptic', 'quotation', 'thematic'], description: 'TheologAI legacy corpus only; requires corpora to include theologai_legacy. Omission uses auto internally when legacy is selected.' },
-        includeText: { type: 'boolean', default: false, description: 'Enrich every returned UBS group member and legacy item with passage text when available.' },
+        includeText: { type: 'boolean', default: false, description: 'Attempt passage-text enrichment for the first 12 unique canonical targets in deterministic UBS-then-legacy order; metadata remains complete and every item reports its enrichment status.' },
         translation: { type: 'string', enum: ['ESV', 'NET', 'KJV', 'WEB', 'BSB', 'ASV', 'YLT', 'DBY'], default: 'ESV' },
         maxGroups: { type: 'integer', minimum: 1, maximum: 10, default: 5, description: 'Maximum complete UBS groups.' },
         includeAlignment: { type: 'boolean', default: false, description: 'Include raw UBS alignment metadata; UBS corpus only.' },
@@ -36,6 +37,7 @@ export function createParallelPassagesHandler(service: ParallelPassageService): 
       additionalProperties: false,
     },
     outputSchema: parallelPassagesOutputSchema,
+    validateStructuredOutput: validateParallelPassagesOutputSemantics,
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
 
     handler: async (params) => {
@@ -45,7 +47,7 @@ export function createParallelPassagesHandler(service: ParallelPassageService): 
           corpora: params.corpora as any,
           mode: params.mode as any,
           includeText: params.includeText as boolean,
-          translation: params.translation as string,
+          translation: params.translation as ParallelPassageLookupParams['translation'],
           maxParallels: params.maxParallels as number,
           maxGroups: params.maxGroups as number,
           includeAlignment: params.includeAlignment as boolean,

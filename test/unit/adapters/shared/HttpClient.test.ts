@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HttpClient } from '../../../../src/adapters/shared/HttpClient.js';
+import {
+  DEFAULT_HTTP_MAX_RETRIES,
+  BIBLE_TEXT_HTTP_MAX_RETRIES,
+  CLOUDFLARE_FREE_EXTERNAL_SUBREQUEST_LIMIT,
+  PARALLEL_TEXT_LOOKUP_BUDGET,
+  PARALLEL_TEXT_RESERVED_SUBREQUEST_HEADROOM,
+} from '../../../../src/kernel/requestLimits.js';
+import { createBibleHttpClient } from '../../../../src/adapters/bible/createBibleHttpClient.js';
 import { AdapterError } from '../../../../src/kernel/errors.js';
 
 describe('HttpClient timeouts', () => {
@@ -98,6 +106,23 @@ describe('HttpClient requests, caching, and errors', () => {
     globalThis.fetch = originalFetch;
     vi.useRealTimers();
     vi.restoreAllMocks();
+  });
+
+  it('keeps parallel text enrichment below the reviewed upstream-attempt headroom', () => {
+    expect(DEFAULT_HTTP_MAX_RETRIES).toBe(2);
+    expect(BIBLE_TEXT_HTTP_MAX_RETRIES).toBe(2);
+    expect((1 + BIBLE_TEXT_HTTP_MAX_RETRIES) * PARALLEL_TEXT_LOOKUP_BUDGET)
+      .toBeLessThanOrEqual(
+        CLOUDFLARE_FREE_EXTERNAL_SUBREQUEST_LIMIT - PARALLEL_TEXT_RESERVED_SUBREQUEST_HEADROOM,
+      );
+    expect(CLOUDFLARE_FREE_EXTERNAL_SUBREQUEST_LIMIT).toBe(50);
+    expect(PARALLEL_TEXT_RESERVED_SUBREQUEST_HEADROOM).toBe(14);
+  });
+
+  it('pins remote Bible clients to the reviewed retry ceiling', () => {
+    const client = createBibleHttpClient({ source: 'Bible fixture', cacheTtlMs: 0 });
+    expect((client as unknown as { maxRetries: number }).maxRetries).toBe(BIBLE_TEXT_HTTP_MAX_RETRIES);
+    client.dispose();
   });
 
   it('combines base URL and headers, parses JSON, and caches it', async () => {

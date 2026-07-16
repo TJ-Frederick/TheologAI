@@ -638,6 +638,19 @@ describe('shared MCP registration', () => {
       text: expect.stringContaining('do not infer quotation, dependence, synoptic direction, or a thematic relationship'),
     }));
     expect(passageExegesis.messages[0].content).toEqual(expect.objectContaining({
+      text: expect.stringContaining('without silently fanning out to translation providers'),
+    }));
+    expect(passageExegesis.messages[0].content).toEqual(expect.objectContaining({
+      text: expect.stringContaining('make a separate `parallel_passages` call'),
+    }));
+    expect(passageExegesis.messages[0].content).toEqual(expect.objectContaining({
+      text: expect.stringContaining('same reference, corpus selection, and `maxGroups`'),
+    }));
+    expect(String(passageExegesis.messages[0].content)).not.toContain('reference/groups');
+    expect(passageExegesis.messages[0].content).toEqual(expect.objectContaining({
+      text: expect.stringContaining('every member\'s `textEnrichmentStatus`'),
+    }));
+    expect(passageExegesis.messages[0].content).toEqual(expect.objectContaining({
       text: expect.stringContaining('community-ranked links only as discovery leads and candidates for contextual investigation'),
     }));
     expect(passageExegesis.messages[0].content).toEqual(expect.objectContaining({

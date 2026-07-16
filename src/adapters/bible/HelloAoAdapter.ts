@@ -9,7 +9,8 @@ import type { BibleAdapter } from './BibleAdapter.js';
 import type { BibleResult, Footnote } from '../../kernel/types.js';
 import type { BibleReference } from '../../kernel/reference.js';
 import { formatReference, toHelloAO } from '../../kernel/reference.js';
-import { HttpClient } from '../shared/HttpClient.js';
+import type { HttpClient } from '../shared/HttpClient.js';
+import { createBibleHttpClient } from './createBibleHttpClient.js';
 import { AdapterError } from '../../kernel/errors.js';
 
 interface TranslationMeta {
@@ -35,7 +36,7 @@ export class HelloAoAdapter implements BibleAdapter {
   private client: HttpClient;
 
   constructor() {
-    this.client = new HttpClient({
+    this.client = createBibleHttpClient({
       source: 'HelloAO',
       baseUrl: 'https://bible.helloao.org/api',
       cacheTtlMs: 60 * 60 * 1000,

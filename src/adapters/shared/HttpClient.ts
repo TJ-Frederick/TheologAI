@@ -5,6 +5,7 @@
  */
 
 import { AdapterError } from '../../kernel/errors.js';
+import { DEFAULT_HTTP_MAX_RETRIES } from '../../kernel/requestLimits.js';
 
 const DEFAULT_MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 const DEFAULT_MAX_CACHE_BYTES = 8 * 1024 * 1024;
@@ -42,7 +43,7 @@ export class HttpClient {
   constructor(options: HttpClientOptions) {
     this.source = options.source;
     this.baseUrl = options.baseUrl ?? '';
-    this.maxRetries = options.maxRetries ?? 2;
+    this.maxRetries = options.maxRetries ?? DEFAULT_HTTP_MAX_RETRIES;
     this.headers = options.headers ?? {};
     this.timeoutMs = options.timeoutMs ?? 15000;
     this.maxResponseBytes = options.maxResponseBytes ?? DEFAULT_MAX_RESPONSE_BYTES;

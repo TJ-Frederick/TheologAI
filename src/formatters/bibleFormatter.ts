@@ -144,6 +144,11 @@ export function formatParallelPassageResearch(result: ParallelPassageResearchRes
         } else if (member.text) {
           s += `  > ${member.text}${textAttribution(member.translation, member.provenanceIds ?? [], result)}\n`;
         }
+        if (result.textEnrichment.requested
+          && member.textEnrichmentStatus !== 'complete'
+          && member.textEnrichmentStatus !== 'not_requested') {
+          s += `  - Text enrichment for ${member.normalizedReference}: ${member.textEnrichmentStatus}; use \`bible_lookup\` for material missing text.\n`;
+        }
       }
     }
   } else if (result.corpora.includes('ubs_source_attested')) {
@@ -166,6 +171,11 @@ export function formatParallelPassageResearch(result: ParallelPassageResearchRes
       const confidence = Math.round(parallel.confidence * 100);
       s += `- **${parallel.reference}** [${parallel.relationship}] (${confidence}% confidence)\n`;
       if (parallel.text) s += `  > Text excerpt${textAttribution(parallel.translation, parallel.provenanceIds ?? [], result)}: ${parallel.text}\n`;
+      if (result.textEnrichment.requested
+        && parallel.textEnrichmentStatus !== 'complete'
+        && parallel.textEnrichmentStatus !== 'not_requested') {
+        s += `  - Text enrichment for ${parallel.reference}: ${parallel.textEnrichmentStatus}; use \`bible_lookup\` for material missing text.\n`;
+      }
       if (parallel.notes) s += `  *${parallel.notes}*\n`;
     }
   } else if (result.corpora.includes('theologai_legacy')) {
@@ -180,6 +190,10 @@ export function formatParallelPassageResearch(result: ParallelPassageResearchRes
   }
   if (result.warnings?.length) {
     s += `\n${result.warnings.map(warning => `*Warning: ${warning}*`).join('\n')}\n`;
+  }
+  const enrichment = result.textEnrichment;
+  if (enrichment.requested) {
+    s += `\n_Text enrichment: ${enrichment.succeededLookupCount}/${enrichment.uniqueTargetCount} unique passages returned; ${enrichment.failedLookupCount} unavailable; ${enrichment.omittedLookupCount} omitted by the ${enrichment.budget.maximum}-lookup budget._\n`;
   }
   if (result.provenance.length > 0) {
     s += `\n*Sources: ${result.provenance.map(record => `${record.label}${record.license ? ` (${record.license.label})` : ''}`).join('; ')}*`;

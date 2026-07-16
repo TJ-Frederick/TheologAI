@@ -101,7 +101,10 @@ describe('prompt-recommended tool-call contracts', () => {
     const calls = recommendedToolCallsForPrompt('passage-exegesis', { reference: 'John 3:16' });
     expect(calls).toContainEqual({
       tool: 'parallel_passages',
-      arguments: { reference: 'John 3:16', corpora: ['ubs_source_attested'], maxGroups: 5 },
+      arguments: {
+        reference: 'John 3:16', corpora: ['ubs_source_attested'], maxGroups: 5,
+        includeText: false,
+      },
     });
     expect(calls).toContainEqual({
       tool: 'bible_cross_references',

@@ -6,7 +6,8 @@ import type { BibleAdapter } from './BibleAdapter.js';
 import type { BibleResult } from '../../kernel/types.js';
 import type { BibleReference } from '../../kernel/reference.js';
 import { formatReference, parseReference } from '../../kernel/reference.js';
-import { HttpClient } from '../shared/HttpClient.js';
+import type { HttpClient } from '../shared/HttpClient.js';
+import { createBibleHttpClient } from './createBibleHttpClient.js';
 import { APIError } from '../../kernel/errors.js';
 import { stripHtml } from '../shared/HtmlParser.js';
 
@@ -17,7 +18,7 @@ export class NetBibleAdapter implements BibleAdapter {
   private client: HttpClient;
 
   constructor() {
-    this.client = new HttpClient({
+    this.client = createBibleHttpClient({
       source: 'NET Bible',
       baseUrl: 'https://labs.bible.org/api/',
       cacheTtlMs: 60 * 60 * 1000,
