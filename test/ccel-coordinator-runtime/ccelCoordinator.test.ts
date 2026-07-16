@@ -235,6 +235,104 @@ describe('CCEL global Durable Object coordinator', () => {
     });
   });
 
+  it('never admits when the absolute reservation is unrepresentable, including after reset', async () => {
+    const stub = env.THEOLOGAI_CCEL_COORDINATOR.getByName('timestamp-reservation-overflow');
+    await stub.snapshot();
+    const floor = Number.MAX_SAFE_INTEGER - 5_000;
+    await runInDurableObject(stub, async (_instance, state) => {
+      state.storage.sql.exec(
+        `UPDATE ccel_coordinator_state
+         SET last_observed_at_ms = ?, next_allowed_at_ms = 0`,
+        floor,
+      );
+    });
+
+    const decisions = await Promise.all([stub.admit(), stub.admit()]);
+    expect(decisions).toEqual([
+      { kind: 'latched', reason: 'interface', operatorAction: 'reset_after_review' },
+      { kind: 'latched', reason: 'interface', operatorAction: 'reset_after_review' },
+    ]);
+    await expect(stub.snapshot()).resolves.toMatchObject({
+      state: 'latched_interface',
+      attemptSequence: 0,
+      nextAllowedAtMs: 0,
+      lastObservedAtMs: floor,
+    });
+
+    await expect(stub.resetAfterOperatorReview()).resolves.toMatchObject({ state: 'closed' });
+    const afterReset = await Promise.all([stub.admit(), stub.admit()]);
+    expect(afterReset.every(decision => decision.kind === 'latched')).toBe(true);
+    await expect(stub.snapshot()).resolves.toMatchObject({
+      state: 'latched_interface',
+      attemptSequence: 0,
+      operatorEpoch: 1,
+    });
+  });
+
+  it('latches instead of creating an immediately expired maximum probe lease', async () => {
+    const stub = env.THEOLOGAI_CCEL_COORDINATOR.getByName('timestamp-probe-overflow');
+    await stub.snapshot();
+    await runInDurableObject(stub, async (_instance, state) => {
+      state.storage.sql.exec(
+        `UPDATE ccel_coordinator_state
+         SET state = 'rate_limited', last_observed_at_ms = ?,
+             next_allowed_at_ms = 0, backoff_until_ms = 0`,
+        Number.MAX_SAFE_INTEGER - 20_000,
+      );
+    });
+    await expect(stub.admit()).resolves.toMatchObject({ kind: 'latched', reason: 'interface' });
+    await expect(stub.snapshot()).resolves.toMatchObject({
+      state: 'latched_interface',
+      attemptSequence: 0,
+      probeInFlight: false,
+    });
+  });
+
+  it.each([
+    {
+      name: 'rate-limit',
+      outcome: { kind: 'rate_limited', retryAfterSeconds: 1 } as const,
+      floor: Number.MAX_SAFE_INTEGER - 500,
+    },
+    {
+      name: 'transient',
+      outcome: { kind: 'transient_failure' } as const,
+      floor: Number.MAX_SAFE_INTEGER - 20_000,
+    },
+  ])('persists one $name terminal report and latches on backoff overflow', async ({
+    name,
+    outcome,
+    floor,
+  }) => {
+    const stub = env.THEOLOGAI_CCEL_COORDINATOR.getByName(`timestamp-${name}-overflow`);
+    const admission = await stub.admit();
+    if (admission.kind !== 'admitted') throw new Error('expected admission');
+    await runInDurableObject(stub, async (_instance, state) => {
+      state.storage.sql.exec(
+        'UPDATE ccel_coordinator_state SET last_observed_at_ms = ?',
+        floor,
+      );
+    });
+
+    await expect(stub.recordOutcome(admission.token, outcome)).resolves.toEqual({
+      applied: true,
+      disposition: 'applied',
+      state: 'latched_interface',
+    });
+    const afterFirst = await stub.snapshot();
+    expect(afterFirst).toMatchObject({
+      state: 'latched_interface',
+      backoffUntilMs: 0,
+      terminalAttemptCount: 1,
+    });
+    await expect(stub.recordOutcome(admission.token, outcome)).resolves.toMatchObject({
+      applied: false,
+      disposition: 'duplicate',
+    });
+    expect(await stub.snapshot()).toEqual(afterFirst);
+    await expect(stub.admit()).resolves.toMatchObject({ kind: 'latched', reason: 'interface' });
+  });
+
   it('latches interface failures and requires the internal reset pathway', async () => {
     const stub = env.THEOLOGAI_CCEL_COORDINATOR.getByName('latch');
     const admission = await stub.admit();

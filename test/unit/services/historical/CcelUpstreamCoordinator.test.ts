@@ -105,6 +105,94 @@ describe('CCEL upstream coordinator policy', () => {
     });
   });
 
+  it('latches before an unrepresentable ordinary reservation and re-latches after reset', () => {
+    const nearMaximum = initialCcelCoordinatorState();
+    nearMaximum.lastObservedAtMs = Number.MAX_SAFE_INTEGER - 5_000;
+
+    const rejected = transitionCcelAdmission(nearMaximum, 0);
+    expect(rejected.decision).toEqual({
+      kind: 'latched',
+      reason: 'interface',
+      operatorAction: 'reset_after_review',
+    });
+    expect(rejected.state).toMatchObject({
+      state: 'latched_interface',
+      attemptSequence: 0,
+      nextAllowedAtMs: 0,
+      lastObservedAtMs: Number.MAX_SAFE_INTEGER - 5_000,
+    });
+    expect(transitionCcelAdmission(rejected.state, Number.MAX_SAFE_INTEGER).decision)
+      .toMatchObject({ kind: 'latched', reason: 'interface' });
+
+    const reset = resetCcelCoordinatorState(rejected.state, 0);
+    expect(reset.state).toBe('closed');
+    const relatched = transitionCcelAdmission(reset, 0);
+    expect(relatched.decision).toMatchObject({ kind: 'latched', reason: 'interface' });
+    expect(relatched.state.attemptSequence).toBe(0);
+  });
+
+  it('latches before an unrepresentable half-open probe lease', () => {
+    const nearMaximum = initialCcelCoordinatorState();
+    nearMaximum.state = 'rate_limited';
+    nearMaximum.lastObservedAtMs = Number.MAX_SAFE_INTEGER - 20_000;
+
+    const rejected = transitionCcelAdmission(nearMaximum, 0);
+    expect(rejected.decision).toMatchObject({ kind: 'latched', reason: 'interface' });
+    expect(rejected.state).toMatchObject({
+      state: 'latched_interface',
+      attemptSequence: 0,
+      probeAttemptId: null,
+      probeLeaseUntilMs: 0,
+    });
+  });
+
+  it.each([
+    {
+      outcome: { kind: 'rate_limited', retryAfterSeconds: 1 } as const,
+      floor: Number.MAX_SAFE_INTEGER - 500,
+    },
+    {
+      outcome: { kind: 'transient_failure' } as const,
+      floor: Number.MAX_SAFE_INTEGER - 20_000,
+    },
+  ])('records $outcome.kind once and latches when its backoff cannot be represented', ({
+    outcome,
+    floor,
+  }) => {
+    const admission = transitionCcelAdmission(initialCcelCoordinatorState(), 0);
+    if (admission.decision.kind !== 'admitted') throw new Error('expected admission');
+    const nearMaximum = { ...admission.state, lastObservedAtMs: floor };
+
+    const failedClosed = transitionCcelOutcome(
+      nearMaximum,
+      admission.decision.token,
+      outcome,
+      0,
+    );
+    expect(failedClosed.result).toEqual({
+      applied: true,
+      disposition: 'applied',
+      state: 'latched_interface',
+    });
+    expect(failedClosed.state).toMatchObject({
+      state: 'latched_interface',
+      backoffUntilMs: 0,
+      terminalSequence: 1,
+    });
+    expect(failedClosed.state.terminalAttempts).toHaveLength(1);
+    expect(transitionCcelAdmission(failedClosed.state, Number.MAX_SAFE_INTEGER).decision)
+      .toMatchObject({ kind: 'latched', reason: 'interface' });
+
+    const duplicate = transitionCcelOutcome(
+      failedClosed.state,
+      admission.decision.token,
+      outcome,
+      Number.MAX_SAFE_INTEGER,
+    );
+    expect(duplicate.result).toMatchObject({ applied: false, disposition: 'duplicate' });
+    expect(duplicate.state).toEqual(failedClosed.state);
+  });
+
   it('persists a bounded Retry-After and allows only one half-open probe', () => {
     const admission = transitionCcelAdmission(initialCcelCoordinatorState(), 1_000);
     expect(admission.decision.kind).toBe('admitted');

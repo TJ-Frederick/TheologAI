@@ -92,8 +92,11 @@ with its absolute reservation. Busy, latched, and probe-in-flight reads do not
 advance the returned floor and cause no SQLite write. Persisted absolute
 `next_allowed_at_ms` and backoff deadlines therefore remain the safety boundary
 across restart and wall-clock rollback without rejected-call write
-amplification. An expired half-open lease allows one replacement probe so a
-crashed caller cannot wedge the origin forever.
+amplification. If an absolute reservation, probe lease, or outcome backoff
+would exceed JavaScript's maximum safe integer timestamp, the coordinator
+latches `latched_interface` before admitting or exposing an already-expired
+deadline. An expired half-open lease allows one replacement probe so a crashed
+caller cannot wedge the origin forever.
 
 ## First reconciliation and release order
 

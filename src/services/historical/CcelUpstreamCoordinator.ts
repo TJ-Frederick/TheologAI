@@ -206,27 +206,23 @@ export function transitionCcelAdmission(
   }
 
   if (state.attemptSequence >= Number.MAX_SAFE_INTEGER) {
-    state.lastObservedAtMs = now;
-    state.state = 'latched_interface';
-    state.backoffUntilMs = 0;
-    clearProbe(state);
-    return {
-      state,
-      decision: {
-        kind: 'latched',
-        reason: 'interface',
-        operatorAction: 'reset_after_review',
-      },
-    };
+    return latchInterfaceAdmission(state, now);
   }
 
+  const nextAllowedAtMs = futureTimestamp(now, CCEL_UPSTREAM_MIN_INTERVAL_MS);
+  const probeLeaseUntilMs = probe
+    ? futureTimestamp(now, CCEL_UPSTREAM_HALF_OPEN_LEASE_MS)
+    : 0;
+  if (nextAllowedAtMs === null || probeLeaseUntilMs === null) {
+    return latchInterfaceAdmission(state, now);
+  }
   const attemptId = state.attemptSequence + 1;
   state.lastObservedAtMs = now;
   state.attemptSequence = attemptId;
-  state.nextAllowedAtMs = safeTimestampAdd(now, CCEL_UPSTREAM_MIN_INTERVAL_MS);
+  state.nextAllowedAtMs = nextAllowedAtMs;
   if (probe) {
     state.probeAttemptId = attemptId;
-    state.probeLeaseUntilMs = safeTimestampAdd(now, CCEL_UPSTREAM_HALF_OPEN_LEASE_MS);
+    state.probeLeaseUntilMs = probeLeaseUntilMs;
   } else {
     state.probeAttemptId = null;
     state.probeLeaseUntilMs = 0;
@@ -307,8 +303,13 @@ export function transitionCcelOutcome(
 
   if (outcome.kind === 'rate_limited') {
     const retryMs = outcome.retryAfterSeconds * 1_000;
+    const rateLimitUntilMs = futureTimestamp(now, retryMs);
+    if (rateLimitUntilMs === null) {
+      latchInterfaceOutcome(state, token);
+      return outcomeResult(state, true, 'applied');
+    }
     state.state = 'rate_limited';
-    state.backoffUntilMs = Math.max(state.backoffUntilMs, safeTimestampAdd(now, retryMs));
+    state.backoffUntilMs = Math.max(state.backoffUntilMs, rateLimitUntilMs);
     clearProbe(state);
     state.lastOutcomeSequence = Math.max(state.lastOutcomeSequence, token.attemptId);
     return outcomeResult(state, true, 'applied');
@@ -342,8 +343,13 @@ export function transitionCcelOutcome(
     CCEL_UPSTREAM_TRANSIENT_MAX_MS,
     CCEL_UPSTREAM_TRANSIENT_BASE_MS * (2 ** Math.min(state.transientFailures - 1, 10)),
   );
+  const transientBackoffUntilMs = futureTimestamp(now, backoffMs);
+  if (transientBackoffUntilMs === null) {
+    latchInterfaceOutcome(state, token);
+    return outcomeResult(state, true, 'applied');
+  }
   state.state = 'transient_backoff';
-  state.backoffUntilMs = safeTimestampAdd(now, backoffMs);
+  state.backoffUntilMs = transientBackoffUntilMs;
   state.lastOutcomeSequence = Math.max(state.lastOutcomeSequence, token.attemptId);
   clearProbe(state);
   return outcomeResult(state, true, 'applied');
@@ -468,13 +474,46 @@ function boundedRetryAfterSeconds(remainingMs: number): number {
   ));
 }
 
-function safeTimestampAdd(timestamp: number, durationMs: number): number {
-  return Math.min(Number.MAX_SAFE_INTEGER, timestamp + durationMs);
+function futureTimestamp(timestamp: number, durationMs: number): number | null {
+  if (!isNonNegativeSafeInteger(timestamp)
+      || !isNonNegativeSafeInteger(durationMs)
+      || timestamp > Number.MAX_SAFE_INTEGER - durationMs) {
+    return null;
+  }
+  return timestamp + durationMs;
 }
 
 function clearProbe(state: CcelCoordinatorPersistenceState): void {
   state.probeAttemptId = null;
   state.probeLeaseUntilMs = 0;
+}
+
+function latchInterfaceAdmission(
+  state: CcelCoordinatorPersistenceState,
+  now: number,
+): CcelAdmissionTransition {
+  state.lastObservedAtMs = now;
+  state.state = 'latched_interface';
+  state.backoffUntilMs = 0;
+  clearProbe(state);
+  return {
+    state,
+    decision: {
+      kind: 'latched',
+      reason: 'interface',
+      operatorAction: 'reset_after_review',
+    },
+  };
+}
+
+function latchInterfaceOutcome(
+  state: CcelCoordinatorPersistenceState,
+  token: CcelAdmissionToken,
+): void {
+  state.state = 'latched_interface';
+  state.backoffUntilMs = 0;
+  state.lastOutcomeSequence = Math.max(state.lastOutcomeSequence, token.attemptId);
+  clearProbe(state);
 }
 
 function outcomeResult(
