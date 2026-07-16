@@ -6,7 +6,8 @@ import type { BibleAdapter } from './BibleAdapter.js';
 import type { BibleResult } from '../../kernel/types.js';
 import type { BibleReference } from '../../kernel/reference.js';
 import { formatReference, parseReference, referencesEqual } from '../../kernel/reference.js';
-import { HttpClient } from '../shared/HttpClient.js';
+import type { HttpClient } from '../shared/HttpClient.js';
+import { createBibleHttpClient } from './createBibleHttpClient.js';
 import { APIError } from '../../kernel/errors.js';
 
 const COPYRIGHT = 'ESV® Bible (English Standard Version®), copyright © 2001 by Crossway';
@@ -18,7 +19,7 @@ export class EsvAdapter implements BibleAdapter {
 
   constructor(apiKey?: string) {
     this.apiKey = apiKey || process.env.ESV_API_KEY || '';
-    this.client = new HttpClient({
+    this.client = createBibleHttpClient({
       source: 'ESV',
       baseUrl: 'https://api.esv.org/v3/passage',
       cacheTtlMs: 60 * 60 * 1000,

@@ -10,12 +10,17 @@
     {
       "name": "default bounded result observes an additional UBS group",
       "arguments": { "reference": "Mark 10:19" },
-      "assert": ["success", "v2AdditionalDefaultWindow"]
+      "assert": ["success", "v3AdditionalDefaultWindow"]
     },
     {
       "name": "reviewed maximum returns seven observed groups without an extra match",
       "arguments": { "reference": "Mark 10:19", "maxGroups": 10 },
-      "assert": ["success", "v2MaximumObservedWindow"]
+      "assert": ["success", "v3MaximumObservedWindow"]
+    },
+    {
+      "name": "v3 text enrichment enforces the 12-target budget without losing metadata",
+      "arguments": { "reference": "Mark 10:19", "maxGroups": 10, "includeText": true, "translation": "WEB" },
+      "assert": ["success", "v3MaximumObservedWindow", "v3TextBudgetApplied", "textBudgetPreservesMetadataAndStatuses", "excerptsBounded"]
     },
     {
       "name": "Kings Chronicles and Isaiah remain one complete source group",

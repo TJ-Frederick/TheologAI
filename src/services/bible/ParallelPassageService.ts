@@ -9,6 +9,10 @@ import type {
   ParallelPassageLookupParams,
   ParallelPassageResearchResult,
   ParallelPassage,
+  ParallelTextEnrichment,
+  ParallelTextEnrichmentStatus,
+  ParallelTextTranslation,
+  ResearchLegacyParallel,
   SourceAttestedParallelGroupResult,
   SourceAttestedResultWindow,
 } from '../../kernel/types.js';
@@ -27,7 +31,11 @@ import {
 import { provenanceFromCitation, type ProvenanceRecord } from '../../kernel/provenance.js';
 import { translationProvenanceContext } from '../../kernel/translationProvenance.js';
 import type { BibleResult } from '../../kernel/types.js';
-import { findBookByNumber } from '../../kernel/books.js';
+import { PARALLEL_TEXT_LOOKUP_BUDGET } from '../../kernel/requestLimits.js';
+import {
+  canonicalParallelSegmentReference,
+  orderedUniqueParallelTextTargets,
+} from '../../kernel/parallelTextTargets.js';
 
 type Relationship = ParallelPassage['relationship'];
 interface RawParallelEntry {
@@ -54,6 +62,7 @@ interface CuratedMember {
   parsed: BibleReference;
 }
 type TextService = Pick<BibleService, 'lookup'>;
+const TEXT_LOOKUP_CONCURRENCY = 4;
 
 export class ParallelPassageService {
   private readonly groupsByReference = new Map<string, CuratedGroup[]>();
@@ -100,9 +109,17 @@ export class ParallelPassageService {
     }
     if (corpora.includes('theologai_legacy')) provenance.push({ ...LEGACY_PARALLEL_PROVENANCE });
     if (includeOpenBible) provenance.push({ ...OPENBIBLE_CROSS_REFERENCE_PROVENANCE });
-    if (params.includeText) {
-      await this.attachTexts(sourceAttestedGroups, legacyParallels, params.translation || 'ESV', warnings, provenance);
-    }
+    const textEnrichment = params.includeText
+      ? await this.attachTexts(
+        sourceAttestedGroups,
+        legacyParallels,
+        params.translation || 'ESV',
+        warnings,
+        provenance,
+      )
+      : notRequestedTextEnrichment(
+        orderedUniqueParallelTextTargets(sourceAttestedGroups, legacyParallels).length,
+      );
     return {
       requestedReference: primaryReference,
       corpora,
@@ -111,6 +128,7 @@ export class ParallelPassageService {
       legacyParallels,
       openBibleCrossReferences,
       provenance,
+      textEnrichment,
       warnings: warnings.length > 0 ? [...new Set(warnings)] : undefined,
     };
   }
@@ -135,6 +153,7 @@ export class ParallelPassageService {
         segments: member.segments.map(segment => ({ ...segment })),
         languageMarker: member.languageMarker,
         matched: member.segments.some(segment => requested.some(query => sourceSegmentsOverlap(segment, query))),
+        textEnrichmentStatus: 'not_requested' as const,
         provenanceIds: [UBS_PARALLEL_PROVENANCE_ID],
         ...(params.includeAlignment ? { alignmentBasis: member.alignmentBasis, alignmentRaw: member.alignmentRaw } : {}),
       })),
@@ -152,10 +171,10 @@ export class ParallelPassageService {
     };
   }
 
-  private lookupLegacy(primaryReference: string, params: ParallelPassageLookupParams): ParallelPassage[] {
+  private lookupLegacy(primaryReference: string, params: ParallelPassageLookupParams): ResearchLegacyParallel[] {
     const mode = params.mode ?? 'auto';
     const maxParallels = normalizeMaxParallels(params.maxParallels);
-    const candidates = new Map<string, ParallelPassage>();
+    const candidates = new Map<string, ResearchLegacyParallel>();
     const primaryParsed = parseReference(primaryReference);
     for (const group of this.findGroups(primaryReference, primaryParsed)) {
       for (const member of group.members) {
@@ -164,6 +183,7 @@ export class ParallelPassageService {
         if (!relationshipMatchesMode(relationship, mode)) continue;
         candidates.set(member.reference, {
           reference: member.reference, relationship, confidence: group.confidence, notes: group.notes,
+          textEnrichmentStatus: 'not_requested',
           provenanceIds: [LEGACY_PARALLEL_PROVENANCE_ID],
         });
       }
@@ -233,23 +253,21 @@ export class ParallelPassageService {
 
   private async attachTexts(
     sourceGroups: SourceAttestedParallelGroupResult[],
-    legacyParallels: ParallelPassage[],
-    translation: string,
+    legacyParallels: ResearchLegacyParallel[],
+    translation: ParallelTextTranslation,
     warnings: string[],
     provenance: ProvenanceRecord[],
-  ): Promise<void> {
-    if (!this.bibleService) {
-      warnings.push('Passage text is unavailable in this runtime.');
-      return;
-    }
-
-    const targets: Array<{ reference: string; apply: (result: BibleResult, provenanceId: string) => void }> = [
+  ): Promise<ParallelTextEnrichment> {
+    const targets: Array<{
+      reference: string;
+      apply: (result: BibleResult, provenanceId: string) => void;
+    }> = [
       ...sourceGroups.flatMap(group => group.members.flatMap(member => member.segments.map((segment, segmentIndex) => ({
-        reference: canonicalSegmentReference(segment),
+        reference: canonicalParallelSegmentReference(segment),
         apply: (result: BibleResult, provenanceId: string) => {
           const excerpt = {
             segmentOrder: segmentIndex + 1,
-            reference: canonicalSegmentReference(segment),
+            reference: canonicalParallelSegmentReference(segment),
             text: boundExcerpt(result.text),
             translation: result.translation,
             provenanceIds: [provenanceId],
@@ -275,40 +293,103 @@ export class ParallelPassageService {
     for (const target of targets) {
       consumersByReference.set(target.reference, [...(consumersByReference.get(target.reference) ?? []), target]);
     }
-    const plans = [...consumersByReference.entries()].map(([reference, consumers]) => ({ reference, consumers }));
-    const outcomes: Array<{ ok: true; result: BibleResult } | { ok: false }> = new Array(plans.length);
-    await mapWithConcurrency(plans.map((plan, index) => ({ index, reference: plan.reference })), 4, async plan => {
-      try {
-        outcomes[plan.index] = {
-          ok: true,
-          result: await this.bibleService!.lookup({ reference: plan.reference, translation }),
-        };
-      } catch {
-        outcomes[plan.index] = { ok: false };
-      }
-    });
+    const plans = orderedUniqueParallelTextTargets(sourceGroups, legacyParallels)
+      .map(reference => ({ reference, consumers: consumersByReference.get(reference) ?? [] }));
+    const scheduledPlans = plans.slice(0, PARALLEL_TEXT_LOOKUP_BUDGET);
+    const outcomes = new Map<string, { status: 'succeeded'; result: BibleResult } | { status: 'failed' } | { status: 'omitted' }>();
+    for (const plan of plans.slice(PARALLEL_TEXT_LOOKUP_BUDGET)) outcomes.set(plan.reference, { status: 'omitted' });
+
+    if (this.bibleService) {
+      await mapWithConcurrency(scheduledPlans, TEXT_LOOKUP_CONCURRENCY, async plan => {
+        try {
+          outcomes.set(plan.reference, {
+            status: 'succeeded',
+            result: await this.bibleService!.lookup({ reference: plan.reference, translation }),
+          });
+        } catch {
+          outcomes.set(plan.reference, { status: 'failed' });
+        }
+      });
+    } else {
+      for (const plan of scheduledPlans) outcomes.set(plan.reference, { status: 'failed' });
+    }
 
     const provenanceBySource = new Map<string, string>();
-    for (let index = 0; index < plans.length; index++) {
-      const plan = plans[index];
-      const outcome = outcomes[index];
-      if (!outcome?.ok) {
-        warnings.push(`Text unavailable for ${plan.reference}.`);
-        continue;
-      }
+    for (const plan of scheduledPlans) {
+      const outcome = outcomes.get(plan.reference);
+      if (!outcome || outcome.status !== 'succeeded') continue;
       const provenanceId = translationProvenanceId(outcome.result, provenance, provenanceBySource);
       for (const consumer of plan.consumers) consumer.apply(outcome.result, provenanceId);
     }
+
+    for (const group of sourceGroups) {
+      for (const member of group.members) {
+        member.textEnrichmentStatus = combineTextStatuses(
+          member.segments.map(segment => outcomeStatus(outcomes.get(canonicalParallelSegmentReference(segment)))),
+        );
+      }
+    }
+    for (const parallel of legacyParallels) {
+      parallel.textEnrichmentStatus = combineTextStatuses([outcomeStatus(outcomes.get(parallel.reference))]);
+    }
+
+    const failedReferences = scheduledPlans
+      .filter(plan => outcomes.get(plan.reference)?.status === 'failed')
+      .map(plan => plan.reference);
+    const omittedLookupCount = Math.max(0, plans.length - scheduledPlans.length);
+    if (omittedLookupCount > 0) {
+      warnings.push(`Text enrichment omitted ${omittedLookupCount} of ${plans.length} unique passage lookups because the per-request budget is ${PARALLEL_TEXT_LOOKUP_BUDGET}.`);
+    }
+    if (failedReferences.length > 0) {
+      const examples = failedReferences.slice(0, 3);
+      const remainder = failedReferences.length - examples.length;
+      warnings.push(`Text enrichment failed for ${failedReferences.length} scheduled lookup${failedReferences.length === 1 ? '' : 's'}: ${examples.join('; ')}${remainder > 0 ? `; and ${remainder} more` : ''}.`);
+    }
+
+    const succeededLookupCount = scheduledPlans.length - failedReferences.length;
+    return {
+      requested: true,
+      translation,
+      budget: { unit: 'unique_canonical_passage_lookups', maximum: PARALLEL_TEXT_LOOKUP_BUDGET },
+      uniqueTargetCount: plans.length,
+      scheduledLookupCount: scheduledPlans.length,
+      succeededLookupCount,
+      failedLookupCount: failedReferences.length,
+      omittedLookupCount,
+      completionStatus: failedReferences.length === 0 && omittedLookupCount === 0 ? 'complete' : 'incomplete',
+    };
   }
 }
 
-function canonicalSegmentReference(segment: { bookNumber: number; chapter: number; startVerse: number; endVerse: number }): string {
-  const book = findBookByNumber(segment.bookNumber);
-  if (!book) throw new Error(`Unknown canonical book number ${segment.bookNumber}`);
-  const verses = segment.startVerse === segment.endVerse
-    ? `${segment.startVerse}`
-    : `${segment.startVerse}-${segment.endVerse}`;
-  return `${book.name} ${segment.chapter}:${verses}`;
+function notRequestedTextEnrichment(uniqueTargetCount: number): ParallelTextEnrichment {
+  return {
+    requested: false,
+    translation: null,
+    budget: { unit: 'unique_canonical_passage_lookups', maximum: PARALLEL_TEXT_LOOKUP_BUDGET },
+    uniqueTargetCount,
+    scheduledLookupCount: 0,
+    succeededLookupCount: 0,
+    failedLookupCount: 0,
+    omittedLookupCount: 0,
+    completionStatus: 'not_requested',
+  };
+}
+
+function outcomeStatus(
+  outcome: { status: 'succeeded' } | { status: 'failed' } | { status: 'omitted' } | undefined,
+): Exclude<ParallelTextEnrichmentStatus, 'not_requested' | 'partial'> {
+  if (outcome?.status === 'succeeded') return 'complete';
+  if (outcome?.status === 'omitted') return 'budget_omitted';
+  return 'unavailable';
+}
+
+function combineTextStatuses(
+  statuses: Array<Exclude<ParallelTextEnrichmentStatus, 'not_requested' | 'partial'>>,
+): ParallelTextEnrichmentStatus {
+  if (statuses.every(status => status === 'complete')) return 'complete';
+  if (statuses.every(status => status === 'unavailable')) return 'unavailable';
+  if (statuses.every(status => status === 'budget_omitted')) return 'budget_omitted';
+  return 'partial';
 }
 
 /** Bound public excerpts by Unicode code points, including the ellipsis. */

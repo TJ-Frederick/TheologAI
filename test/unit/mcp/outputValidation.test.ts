@@ -9,6 +9,7 @@ import { createBibleLookupHandler } from '../../../src/tools/v2/bibleLookup.js';
 import { createStrongsLookupHandler } from '../../../src/tools/v2/strongsLookup.js';
 import { createVerseMorphologyHandler } from '../../../src/tools/v2/verseMorphology.js';
 import { createPrimarySourceSearchHandler } from '../../../src/tools/v2/primarySourceSearch.js';
+import { createParallelPassagesHandler } from '../../../src/tools/v2/parallelPassages.js';
 import type { BibleService } from '../../../src/services/bible/BibleService.js';
 import type { MorphologyService } from '../../../src/services/languages/MorphologyService.js';
 import type { StrongsService } from '../../../src/services/languages/StrongsService.js';
@@ -78,7 +79,7 @@ describe('MCP structured output validation', () => {
       const schema = listed.tools.find(tool => tool.name === toolName)?.outputSchema;
       expect(schema).toMatchObject({ type: 'object', additionalProperties: false });
       expect(schema).not.toHaveProperty('$ref');
-      const expectedVersion = toolName === 'primary_source_search' ? '3' : toolName === 'parallel_passages' ? '2' : '1';
+      const expectedVersion = toolName === 'primary_source_search' || toolName === 'parallel_passages' ? '3' : '1';
       expect(schema?.properties?.schemaVersion).toMatchObject({ const: expectedVersion });
     }
   });
@@ -134,6 +135,66 @@ describe('MCP structured output validation', () => {
       data: { event: 'tool_output_validation_failed', tool: 'malformed_structured_test' },
     }]);
     expect(handler).toHaveBeenCalledOnce();
+  });
+
+  it('rejects schema-valid but contradictory parallel-passage algebra', async () => {
+    const handler = createParallelPassagesHandler({
+      lookup: async () => ({
+        requestedReference: 'Matthew 1:1', corpora: ['ubs_source_attested'],
+        sourceAttestedGroups: [],
+        sourceAttestedResultWindow: {
+          requestedLimit: 5, returnedGroupCount: 0, additionalMatchStatus: 'no_additional_match_observed',
+        },
+        legacyParallels: [], openBibleCrossReferences: [], provenance: [],
+        textEnrichment: {
+          requested: true, translation: 'WEB',
+          budget: { unit: 'unique_canonical_passage_lookups', maximum: 12 },
+          uniqueTargetCount: 1, scheduledLookupCount: 1, succeededLookupCount: 1,
+          failedLookupCount: 1, omittedLookupCount: 0, completionStatus: 'incomplete',
+        },
+      }),
+    } as any);
+    const client = await connect([handler]);
+
+    await expect(client.callTool({ name: 'parallel_passages', arguments: { reference: 'Matthew 1:1' } }))
+      .rejects.toMatchObject({ code: -32603, message: expect.stringContaining('Internal server error') });
+  });
+
+  it.each([
+    {
+      name: 'returned count differs from emitted groups', corpora: ['ubs_source_attested'],
+      window: { requestedLimit: 5, returnedGroupCount: 1, additionalMatchStatus: 'no_additional_match_observed' },
+    },
+    {
+      name: 'selected UBS corpus is marked not evaluated', corpora: ['ubs_source_attested'],
+      window: { requestedLimit: 5, returnedGroupCount: 0, additionalMatchStatus: 'not_evaluated' },
+    },
+    {
+      name: 'unselected UBS corpus is marked evaluated', corpora: ['theologai_legacy'],
+      window: { requestedLimit: 5, returnedGroupCount: 0, additionalMatchStatus: 'no_additional_match_observed' },
+    },
+    {
+      name: 'additional match is claimed below the requested window', corpora: ['ubs_source_attested'],
+      window: { requestedLimit: 5, returnedGroupCount: 0, additionalMatchStatus: 'additional_match_observed' },
+    },
+  ])('rejects invalid parallel result-window protocol state: $name', async ({ corpora, window }) => {
+    const handler = createParallelPassagesHandler({
+      lookup: async () => ({
+        requestedReference: 'Matthew 1:1', corpora,
+        sourceAttestedGroups: [], sourceAttestedResultWindow: window,
+        legacyParallels: [], openBibleCrossReferences: [], provenance: [],
+        textEnrichment: {
+          requested: false, translation: null,
+          budget: { unit: 'unique_canonical_passage_lookups', maximum: 12 },
+          uniqueTargetCount: 0, scheduledLookupCount: 0, succeededLookupCount: 0,
+          failedLookupCount: 0, omittedLookupCount: 0, completionStatus: 'not_requested',
+        },
+      }),
+    } as any);
+    const client = await connect([handler]);
+
+    await expect(client.callTool({ name: 'parallel_passages', arguments: { reference: 'Matthew 1:1' } }))
+      .rejects.toMatchObject({ code: -32603, message: expect.stringContaining('Internal server error') });
   });
 
   it('validates any structured result even when the handler marks it as an error', async () => {

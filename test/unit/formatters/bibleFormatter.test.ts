@@ -85,11 +85,16 @@ describe('formatParallelPassageResearch', () => {
         id: 'translation-1', kind: 'translation', label: 'Provider A', status: 'provider_attributed',
         rightsNotice: 'Licensed text', version: 'WEB',
       }],
+      textEnrichment: {
+        requested: true, translation: 'WEB', budget: { unit: 'unique_canonical_passage_lookups', maximum: 12 },
+        uniqueTargetCount: 2, scheduledLookupCount: 2, succeededLookupCount: 2,
+        failedLookupCount: 0, omittedLookupCount: 0, completionStatus: 'complete',
+      },
       sourceAttestedGroups: [{
         groupId: 'ubs-pp-test', sourceOrdinal: 1, label: 'source_attested_parallel', directionality: 'unspecified',
         provenanceIds: ['ubs'], members: [
-          { sourceOrder: 1, sourceReference: 'LUK 6:35', normalizedReference: 'Luke 6:35', segments: [{ bookNumber: 42, chapter: 6, startVerse: 35, endVerse: 35 }], languageMarker: 'GRK', matched: true, text: 'Matched full text', translation: 'WEB', provenanceIds: ['ubs', 'translation-1'], excerpts: [{ segmentOrder: 1, reference: 'Luke 6:35', text: 'Matched full text', translation: 'WEB', provenanceIds: ['translation-1'] }] },
-          { sourceOrder: 2, sourceReference: 'MAT 5:44', normalizedReference: 'Matthew 5:44', segments: [{ bookNumber: 40, chapter: 5, startVerse: 44, endVerse: 44 }], languageMarker: 'GRK', matched: false, text: 'Parallel full text', translation: 'WEB', provenanceIds: ['ubs', 'translation-1'] },
+          { sourceOrder: 1, sourceReference: 'LUK 6:35', normalizedReference: 'Luke 6:35', segments: [{ bookNumber: 42, chapter: 6, startVerse: 35, endVerse: 35 }], languageMarker: 'GRK', matched: true, text: 'Matched full text', translation: 'WEB', textEnrichmentStatus: 'complete', provenanceIds: ['ubs', 'translation-1'], excerpts: [{ segmentOrder: 1, reference: 'Luke 6:35', text: 'Matched full text', translation: 'WEB', provenanceIds: ['translation-1'] }] },
+          { sourceOrder: 2, sourceReference: 'MAT 5:44', normalizedReference: 'Matthew 5:44', segments: [{ bookNumber: 40, chapter: 5, startVerse: 44, endVerse: 44 }], languageMarker: 'GRK', matched: false, text: 'Parallel full text', translation: 'WEB', textEnrichmentStatus: 'complete', provenanceIds: ['ubs', 'translation-1'] },
         ],
       }],
     };
@@ -105,6 +110,45 @@ describe('formatParallelPassageResearch', () => {
     expect(output).toContain('Parallel full text');
     expect(output).toContain('(WEB; Provider A; Licensed text)');
     expect(output).toContain('Raise `maxGroups` (up to 10) or narrow the reference');
+    expect(output).toContain('Text enrichment: 2/2 unique passages returned; 0 unavailable; 0 omitted by the 12-lookup budget.');
+    expect(output).not.toContain('Text enrichment for');
+  });
+
+  it('identifies each non-complete text target for Markdown-only follow-up', () => {
+    const result = {
+      requestedReference: 'Matthew 1:1', corpora: ['ubs_source_attested', 'theologai_legacy'],
+      sourceAttestedResultWindow: { requestedLimit: 1, returnedGroupCount: 1, additionalMatchStatus: 'no_additional_match_observed' },
+      sourceAttestedGroups: [{
+        groupId: 'group', sourceOrdinal: 1, label: 'source_attested_parallel', directionality: 'unspecified',
+        provenanceIds: ['ubs'], members: [{
+          sourceOrder: 1, sourceReference: 'MAT 1:1-2', normalizedReference: 'Matthew 1:1-2',
+          segments: [
+            { bookNumber: 40, chapter: 1, startVerse: 1, endVerse: 1 },
+            { bookNumber: 40, chapter: 1, startVerse: 2, endVerse: 2 },
+          ],
+          languageMarker: 'GRK', matched: true, textEnrichmentStatus: 'partial', provenanceIds: ['ubs'],
+        }, {
+          sourceOrder: 2, sourceReference: 'MRK 1:1', normalizedReference: 'Mark 1:1',
+          segments: [{ bookNumber: 41, chapter: 1, startVerse: 1, endVerse: 1 }],
+          languageMarker: 'GRK', matched: false, textEnrichmentStatus: 'budget_omitted', provenanceIds: ['ubs'],
+        }],
+      }],
+      legacyParallels: [{
+        reference: 'Luke 1:1', relationship: 'thematic', confidence: 0.8,
+        textEnrichmentStatus: 'unavailable', provenanceIds: ['legacy'],
+      }],
+      openBibleCrossReferences: [], provenance: [],
+      textEnrichment: {
+        requested: true, translation: 'WEB', budget: { unit: 'unique_canonical_passage_lookups', maximum: 12 },
+        uniqueTargetCount: 4, scheduledLookupCount: 3, succeededLookupCount: 0,
+        failedLookupCount: 3, omittedLookupCount: 1, completionStatus: 'incomplete',
+      },
+    } satisfies ParallelPassageResearchResult;
+    const output = formatParallelPassageResearch(result);
+    expect(output).toContain('Text enrichment for Matthew 1:1-2: partial');
+    expect(output).toContain('Text enrichment for Mark 1:1: budget_omitted');
+    expect(output).toContain('Text enrichment for Luke 1:1: unavailable');
+    expect(output.match(/use `bible_lookup` for material missing text/g)).toHaveLength(3);
   });
 
   it('recommends only narrowing at the reviewed maximum and avoids exhaustiveness claims', () => {
@@ -112,11 +156,17 @@ describe('formatParallelPassageResearch', () => {
       requestedReference: 'Mark 10:19', corpora: ['ubs_source_attested'], sourceAttestedGroups: [],
       sourceAttestedResultWindow: { requestedLimit: 10, returnedGroupCount: 10, additionalMatchStatus: 'additional_match_observed' },
       legacyParallels: [], openBibleCrossReferences: [], provenance: [],
+      textEnrichment: {
+        requested: false, translation: null, budget: { unit: 'unique_canonical_passage_lookups', maximum: 12 },
+        uniqueTargetCount: 0, scheduledLookupCount: 0, succeededLookupCount: 0,
+        failedLookupCount: 0, omittedLookupCount: 0, completionStatus: 'not_requested',
+      },
     } satisfies ParallelPassageResearchResult;
     const output = formatParallelPassageResearch(result);
     expect(output).toContain('Narrow the reference');
     expect(output).not.toContain('Raise `maxGroups`');
     expect(output).not.toMatch(/exhaustive|total|cursor/i);
+    expect(output).not.toContain('Text enrichment:');
   });
 });
 

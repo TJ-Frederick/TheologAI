@@ -61,6 +61,19 @@ requested with `includeOpenBibleCrossReferences`, are returned in a separate
 collection. The deprecated `useCrossReferences` alias now also defaults false,
 and conflicting old/new values are rejected.
 
+When `includeText` is true, enrichment has a fixed budget of 12 unique
+canonical passage lookups and concurrency four. Targets are selected once in
+UBS group/member/segment order followed by legacy order, with cross-corpus
+deduplication; cache hits do not refund slots and failures do not trigger
+backfill. Complete parallel metadata is always retained. Structured schema v3
+reports the aggregate `textEnrichment` outcome and a required
+`textEnrichmentStatus` on every UBS member and legacy item; successful UBS
+segment text appears only in `excerpts`.
+The remote Bible-adapter ceiling of two HTTP retries therefore permits at most 36 upstream
+attempts for the 12 scheduled lookups, preserving headroom below the
+50-subrequest Worker limit; this relationship is executable policy, not only
+documentation.
+
 For exact `original_language_lookup` calls, corpus usage is opt-in. `overview`
 returns totals plus the complete canonical-book distribution only. `study`
 adds the top 10 exact source variants and defaults to 8 raw occurrences (maximum

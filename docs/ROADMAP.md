@@ -333,6 +333,26 @@ provider corpus SHA-256 without treating it as edition provenance. Scalar
 absence remains an actionable chapter-oriented tool error with no structured
 content, while malformed or contradictory provider evidence fails closed.
 
+## Active release candidate: bounded parallel text enrichment
+
+The next `parallel_passages` application-contract slice advances its structured
+schema from v2 to v3 for every call. With `includeText: true`, it schedules at
+most 12 unique canonical passage lookups at concurrency four, in deterministic
+UBS group/member/segment order followed by legacy order. Cross-corpus duplicate
+targets share one lookup; cache hits never refund a slot and failures never
+backfill later targets. All group and legacy metadata remains present.
+The remote Bible-adapter ceiling of two HTTP retries mechanically caps this path at 36
+upstream attempts and preserves headroom below the 50-subrequest Worker limit.
+
+The required aggregate `textEnrichment` object reports the fixed budget,
+targets, scheduled/succeeded/failed/omitted counts, translation, and completion
+status. Every UBS member and legacy item reports a required status, and only
+successful UBS segment lookups produce excerpts. Bounded deterministic warnings
+and the Markdown footer disclose incomplete enrichment. This candidate changes
+no corpus, migration, D1 materialization, binding, feature flag, rate limit, or
+deployment configuration and is not shipped until review and release gates
+complete.
+
 ## Release gates
 
 Code readiness and operational readiness are deliberately separate:

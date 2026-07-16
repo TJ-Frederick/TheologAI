@@ -359,9 +359,9 @@ describe('parallel_passages handler', () => {
     expect(output.properties.legacyParallels.items.properties.text.maxLength).toBe(200);
   });
 
-  it('advertises the required v2 honest UBS result-window contract', () => {
+  it('advertises the required v3 honest UBS result-window and text-enrichment contracts', () => {
     const output = createParallelPassagesHandler(serviceDouble({ lookup: vi.fn() })).outputSchema as any;
-    expect(output.properties.schemaVersion).toEqual({ type: 'string', const: '2' });
+    expect(output.properties.schemaVersion).toEqual({ type: 'string', const: '3' });
     expect(output.required).toContain('sourceAttestedResultWindow');
     expect(output.properties.sourceAttestedResultWindow).toMatchObject({
       additionalProperties: false,
@@ -376,6 +376,18 @@ describe('parallel_passages handler', () => {
     });
     expect(output.properties).not.toHaveProperty('total');
     expect(output.properties).not.toHaveProperty('cursor');
+    expect(output.required).toContain('textEnrichment');
+    expect(output.properties.textEnrichment).toMatchObject({
+      additionalProperties: false,
+      properties: {
+        budget: { properties: { maximum: { const: 12 } } },
+        completionStatus: { enum: ['not_requested', 'complete', 'incomplete'] },
+      },
+    });
+    const statuses = ['not_requested', 'complete', 'partial', 'unavailable', 'budget_omitted'];
+    expect(output.properties.sourceAttestedGroups.items.properties.members.items.properties.textEnrichmentStatus.enum)
+      .toEqual(statuses);
+    expect(output.properties.legacyParallels.items.properties.textEnrichmentStatus.enum).toEqual(statuses);
   });
 
   it('accepts fully materialized advertised defaults without inferring legacy controls', async () => {
@@ -383,6 +395,11 @@ describe('parallel_passages handler', () => {
       requestedReference: 'John 3:16', corpora: ['ubs_source_attested'], sourceAttestedGroups: [],
       sourceAttestedResultWindow: { requestedLimit: 5, returnedGroupCount: 0, additionalMatchStatus: 'no_additional_match_observed' },
       legacyParallels: [], openBibleCrossReferences: [], provenance: [],
+      textEnrichment: {
+        requested: false, translation: null, budget: { unit: 'unique_canonical_passage_lookups', maximum: 12 },
+        uniqueTargetCount: 0, scheduledLookupCount: 0, succeededLookupCount: 0,
+        failedLookupCount: 0, omittedLookupCount: 0, completionStatus: 'not_requested',
+      },
     });
     const handler = createParallelPassagesHandler(serviceDouble({ lookup }));
     const properties = handler.inputSchema.properties as Record<string, Record<string, unknown>>;
@@ -408,9 +425,16 @@ describe('parallel_passages handler', () => {
         relationship: 'synoptic',
         confidence: 0.95,
         text: 'And as they were eating...',
+        textEnrichmentStatus: 'complete',
+        provenanceIds: ['legacy'],
       }],
       openBibleCrossReferences: [],
       provenance: [],
+      textEnrichment: {
+        requested: true, translation: 'KJV', budget: { unit: 'unique_canonical_passage_lookups', maximum: 12 },
+        uniqueTargetCount: 1, scheduledLookupCount: 1, succeededLookupCount: 1,
+        failedLookupCount: 0, omittedLookupCount: 0, completionStatus: 'complete',
+      },
     });
     const handler = createParallelPassagesHandler(serviceDouble({ lookup }));
 
@@ -427,7 +451,7 @@ describe('parallel_passages handler', () => {
       useCrossReferences: false,
     });
     expect(result.structuredContent).toMatchObject({
-      schemaVersion: '2', kind: 'parallel_passages', corpora: ['theologai_legacy'],
+      schemaVersion: '3', kind: 'parallel_passages', corpora: ['theologai_legacy'],
       sourceAttestedGroups: [], openBibleCrossReferences: [],
       sourceAttestedResultWindow: { requestedLimit: 5, returnedGroupCount: 0, additionalMatchStatus: 'not_evaluated' },
     });

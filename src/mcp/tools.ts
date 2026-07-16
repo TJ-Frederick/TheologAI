@@ -81,7 +81,13 @@ export function registerToolHandlers(
         throw internalError();
       }
       const validation = outputValidators.get(name)?.(result.structuredContent);
-      if (!validation?.valid) {
+      const semanticValidation = validation?.valid && tool.validateStructuredOutput
+        ? safelyValidateStructuredOutput(
+          tool.validateStructuredOutput,
+          result.structuredContent as Record<string, unknown>,
+        )
+        : true;
+      if (!validation?.valid || !semanticValidation) {
         await reportOutputValidationFailure(server, logging, name);
         throw internalError();
       }
@@ -89,6 +95,17 @@ export function registerToolHandlers(
 
     return result as CallToolResult;
   });
+}
+
+function safelyValidateStructuredOutput(
+  validate: (value: Record<string, unknown>) => boolean,
+  value: Record<string, unknown>,
+): boolean {
+  try {
+    return validate(value);
+  } catch {
+    return false;
+  }
 }
 
 async function reportOutputValidationFailure(

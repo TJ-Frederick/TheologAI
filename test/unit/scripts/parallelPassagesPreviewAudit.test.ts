@@ -30,35 +30,35 @@ describe('parallel-passages preview audit assertions', () => {
     }).every(check => check.passed)).toBe(true);
   });
 
-  it('verifies exact v2 bounded-window sentinels without accepting totals or off-by-one counts', () => {
+  it('verifies exact v3 bounded-window sentinels without accepting totals or off-by-one counts', () => {
     const group = (reference: string): Record<string, unknown> => ({
       members: [{ normalizedReference: reference }],
     });
     const defaultResult: ToolEvidence = {
       content: [{ type: 'text', text: 'Raise `maxGroups` (up to 10) or narrow the reference' }],
       structuredContent: {
-        schemaVersion: '2',
+        schemaVersion: '3',
         sourceAttestedGroups: Array.from({ length: 5 }, () => group('Mark 10:19')),
         sourceAttestedResultWindow: {
           requestedLimit: 5, returnedGroupCount: 5, additionalMatchStatus: 'additional_match_observed',
         },
       },
     };
-    expect(evaluateCase({ name: 'default', arguments: {}, assert: ['v2AdditionalDefaultWindow'] }, defaultResult)[0].passed).toBe(true);
+    expect(evaluateCase({ name: 'default', arguments: {}, assert: ['v3AdditionalDefaultWindow'] }, defaultResult)[0].passed).toBe(true);
     const malformed = structuredClone(defaultResult);
     (malformed.structuredContent!.sourceAttestedResultWindow as Record<string, unknown>).returnedGroupCount = 6;
-    expect(evaluateCase({ name: 'bad', arguments: {}, assert: ['v2AdditionalDefaultWindow'] }, malformed)[0].passed).toBe(false);
+    expect(evaluateCase({ name: 'bad', arguments: {}, assert: ['v3AdditionalDefaultWindow'] }, malformed)[0].passed).toBe(false);
 
     const maximumResult: ToolEvidence = {
       structuredContent: {
-        schemaVersion: '2',
+        schemaVersion: '3',
         sourceAttestedGroups: Array.from({ length: 7 }, () => group('Mark 10:19')),
         sourceAttestedResultWindow: {
           requestedLimit: 10, returnedGroupCount: 7, additionalMatchStatus: 'no_additional_match_observed',
         },
       },
     };
-    expect(evaluateCase({ name: 'maximum', arguments: {}, assert: ['v2MaximumObservedWindow'] }, maximumResult)[0].passed).toBe(true);
+    expect(evaluateCase({ name: 'maximum', arguments: {}, assert: ['v3MaximumObservedWindow'] }, maximumResult)[0].passed).toBe(true);
   });
 
   it('verifies complete/distinct source groups and the legacy-only not-evaluated state', () => {
@@ -83,6 +83,57 @@ describe('parallel-passages preview audit assertions', () => {
         sourceAttestedResultWindow: { requestedLimit: 5, returnedGroupCount: 0, additionalMatchStatus: 'not_evaluated' },
       },
     })[0].passed).toBe(true);
+  });
+
+  it('rejects removed budgets, contradictory counts, backfill, metadata loss, and status/text conflicts', () => {
+    const members = Array.from({ length: 14 }, (_, index) => {
+      const verse = index + 1;
+      const reference = `Matthew 1:${verse}`;
+      const member = {
+        sourceOrder: verse, sourceReference: `MAT 1:${verse}`, normalizedReference: reference,
+        segments: [{ bookNumber: 40, chapter: 1, startVerse: verse, endVerse: verse }],
+        languageMarker: 'GRK', matched: index < 12,
+        textEnrichmentStatus: index < 12 ? 'complete' : 'budget_omitted',
+        provenanceIds: index < 12 ? ['ubs', 'web'] : ['ubs'],
+      };
+      return index < 12 ? {
+        ...member, text: `text ${verse}`, translation: 'WEB',
+        excerpts: [{ segmentOrder: 1, reference, text: `text ${verse}`, translation: 'WEB', provenanceIds: ['web'] }],
+      } : member;
+    });
+    const response: ToolEvidence = {
+      structuredContent: {
+        schemaVersion: '3', kind: 'parallel_passages', requestedReference: 'Matthew 1:1',
+        corpora: ['ubs_source_attested'],
+        sourceAttestedGroups: [{
+          groupId: 'group', sourceOrdinal: 1, label: 'source_attested_parallel', directionality: 'unspecified',
+          members, provenanceIds: ['ubs'],
+        }],
+        sourceAttestedResultWindow: {
+          requestedLimit: 10, returnedGroupCount: 1, additionalMatchStatus: 'no_additional_match_observed',
+        },
+        legacyParallels: [], openBibleCrossReferences: [], provenance: [],
+        textEnrichment: {
+          requested: true, translation: 'WEB', budget: { unit: 'unique_canonical_passage_lookups', maximum: 12 },
+          uniqueTargetCount: 14, scheduledLookupCount: 12, succeededLookupCount: 12,
+          failedLookupCount: 0, omittedLookupCount: 2, completionStatus: 'incomplete',
+        },
+      },
+    };
+    const assertions = ['v3TextBudgetApplied', 'textBudgetPreservesMetadataAndStatuses'];
+    expect(evaluateCase({ name: 'valid', arguments: {}, assert: assertions }, response).every(check => check.passed)).toBe(true);
+
+    for (const mutate of [
+      (copy: ToolEvidence) => { (copy.structuredContent!.textEnrichment as any).scheduledLookupCount = 13; },
+      (copy: ToolEvidence) => { (copy.structuredContent!.textEnrichment as any).failedLookupCount = 1; },
+      (copy: ToolEvidence) => { (copy.structuredContent!.textEnrichment as any).omittedLookupCount = 0; },
+      (copy: ToolEvidence) => { delete (copy.structuredContent!.sourceAttestedGroups as any[])[0].members[0].sourceReference; },
+      (copy: ToolEvidence) => { delete (copy.structuredContent!.sourceAttestedGroups as any[])[0].members[0].excerpts; },
+    ]) {
+      const copy = structuredClone(response);
+      mutate(copy);
+      expect(evaluateCase({ name: 'invalid', arguments: {}, assert: assertions }, copy).every(check => check.passed)).toBe(false);
+    }
   });
 
   it('never retains full provider or Markdown text in persisted evidence', () => {
