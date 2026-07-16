@@ -19,7 +19,7 @@ import {
   LOCAL_PRIMARY_SOURCE_SEARCH_SQL,
   localPrimarySourceSearchSql,
 } from '../shared/primarySourceSearchSql.js';
-import { mapDocumentDatabaseRow } from '../shared/historicalDocumentMetadata.js';
+import { mapDocumentDatabaseRow, mapDocumentSectionDatabaseRow } from '../shared/historicalDocumentMetadata.js';
 
 export type { DocumentInfo, DocumentSection } from '../../kernel/repositories.js';
 
@@ -80,14 +80,7 @@ export class HistoricalDocumentRepository implements IHistoricalDocumentReposito
       title: string; content: string; topics: string;
     }>;
 
-    return rows.map(r => ({
-      id: r.id,
-      document_id: r.document_id,
-      section_number: r.section_number,
-      title: r.title || '',
-      content: r.content,
-      topics: r.topics ? JSON.parse(r.topics) : [],
-    }));
+    return rows.map(mapDocumentSectionDatabaseRow);
   }
 
   /** Get a specific section by number */
@@ -98,14 +91,7 @@ export class HistoricalDocumentRepository implements IHistoricalDocumentReposito
     } | undefined;
     if (!row) return undefined;
 
-    return {
-      id: row.id,
-      document_id: row.document_id,
-      section_number: row.section_number,
-      title: row.title || '',
-      content: row.content,
-      topics: row.topics ? JSON.parse(row.topics) : [],
-    };
+    return mapDocumentSectionDatabaseRow(row);
   }
 
   /** Full-text search across all document sections */
@@ -118,14 +104,7 @@ export class HistoricalDocumentRepository implements IHistoricalDocumentReposito
         title: string | null; content: string; topics: string | null;
       }>;
 
-      return rows.map(r => ({
-        id: r.id,
-        document_id: r.document_id,
-        section_number: r.section_number || '',
-        title: r.title || '',
-        content: r.content,
-        topics: r.topics ? JSON.parse(r.topics) : [],
-      }));
+      return rows.map(mapDocumentSectionDatabaseRow);
     } catch (error) {
       if (isFtsSyntaxError(error)) return [];
       throw error;
@@ -183,14 +162,7 @@ function mapPrimarySourceRow(row: PrimarySourceSearchDatabaseRow): PrimarySource
       id: row.document_id, title: row.document_title, type: row.document_type,
       date: row.document_date, metadata: row.document_metadata,
     }),
-    section: {
-      id: row.id,
-      document_id: row.document_id,
-      section_number: row.section_number || '',
-      title: row.title || '',
-      content: row.content,
-      topics: row.topics ? JSON.parse(row.topics) : [],
-    },
+    section: mapDocumentSectionDatabaseRow(row),
   };
 }
 

@@ -110,11 +110,10 @@ describe('D1HistoricalDocumentRepository', () => {
       expect(result[0].topics).toEqual([]);
     });
 
-    it('handles empty/null title', async () => {
+    it('rejects a null stored title instead of normalizing evidence', async () => {
       const db = createSimpleD1([{ ...sampleSectionRow, title: null }]);
       const repo = new D1HistoricalDocumentRepository(db as any);
-      const result = await repo.getSections('test');
-      expect(result[0].title).toBe('');
+      await expect(repo.getSections('test')).rejects.toThrow('title must contain');
     });
   });
 

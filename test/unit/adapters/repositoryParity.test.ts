@@ -150,7 +150,7 @@ describe('SQLite and D1 repository parity with identical real data', () => {
       INSERT INTO document_sections
         (id, document_id, section_number, title, content, topics) VALUES
         (1, 'nicene-creed', '1', 'The Creed', 'We believe in one almighty God.', '["trinity","God"]'),
-        (2, 'nicene-creed', '2', NULL, 'And in one Lord Jesus Christ.', NULL),
+        (2, 'nicene-creed', '2', '', 'And in one Lord Jesus Christ.', NULL),
         (3, 'augsburg-confession', '1', 'God', 'Our churches teach with common consent one divine essence.', NULL),
         (4, 'augsburg-confession', '2', 'The Son', 'One Christ is true God and true man.', NULL);
       INSERT INTO sections_fts(rowid, title, content, topics)

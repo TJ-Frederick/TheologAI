@@ -10,6 +10,7 @@ import {
   runRemoteD1ReadinessCheck,
 } from '../../../scripts/check-remote-d1-readiness.js';
 import type { BiblicalLanguageUnicodeCorrectionLedger } from '../../../scripts/biblical-language-unicode-correction.js';
+import { CLASSIC_TEXT_LIMITS } from '../../../src/kernel/classicTextContract.js';
 
 const generatedDbPath = process.env.THEOLOGAI_TEST_DATABASE_PATH?.trim();
 
@@ -42,6 +43,14 @@ describe('remote D1 readiness query', () => {
     expect(sql).toContain('MAX(source_ordinal) = COUNT(*)');
     expect(sql).toContain('MAX(source_order)');
     expect(sql).toContain('MAX(segment_order)');
+    expect(sql).toContain("('historical.output.work_count', (");
+    expect(sql).toContain("('historical.output.sections_per_work', (");
+    expect(sql).toContain("('historical.output.document_metadata', (");
+    expect(sql).toContain("('historical.output.section_metadata', (");
+    expect(sql).toContain(`length(title) NOT BETWEEN 1 AND ${CLASSIC_TEXT_LIMITS.titleCharacters}`);
+    expect(sql).toContain(`json_array_length(metadata, '$.topics') > ${CLASSIC_TEXT_LIMITS.topicCount}`);
+    expect(sql).toContain(`length(section_number) NOT BETWEEN 1 AND ${CLASSIC_TEXT_LIMITS.sectionNumberCharacters}`);
+    expect(sql).toContain(`HAVING COUNT(*) > ${CLASSIC_TEXT_LIMITS.sectionsPerWork}`);
     expect(sql).toContain("alignment_raw GLOB '*[^0-8]*'");
     expect(sql).toContain("language_marker = 'GRK' AND alignment_basis != 'UBSGNT5'");
     expect(sql).toContain('usage_expected(strongs_key,token_count,verse_count,book_count) AS');

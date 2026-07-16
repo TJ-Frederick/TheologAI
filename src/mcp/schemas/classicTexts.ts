@@ -1,10 +1,11 @@
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
+import { CLASSIC_TEXT_LIMITS } from '../../kernel/classicTextContract.js';
 
 const resourceLocator = {
   type: 'object',
   properties: {
     kind: { const: 'mcp_resource' },
-    uri: { type: 'string', minLength: 1, maxLength: 384 },
+    uri: { type: 'string', minLength: 1, maxLength: CLASSIC_TEXT_LIMITS.resourceUriCharacters },
     resourceSizeBytes: { type: 'integer', minimum: 0, maximum: Number.MAX_SAFE_INTEGER },
   },
   required: ['kind', 'uri', 'resourceSizeBytes'],
@@ -15,7 +16,7 @@ const unsizedResourceLocator = {
   type: 'object',
   properties: {
     kind: { const: 'mcp_resource' },
-    uri: { type: 'string', minLength: 1, maxLength: 384 },
+    uri: { type: 'string', minLength: 1, maxLength: CLASSIC_TEXT_LIMITS.resourceUriCharacters },
   },
   required: ['kind', 'uri'],
   additionalProperties: false,
@@ -24,11 +25,11 @@ const unsizedResourceLocator = {
 const catalogWorkSummary = {
   type: 'object',
   properties: {
-    id: { type: 'string', minLength: 1, maxLength: 160 },
-    title: { type: 'string', minLength: 1, maxLength: 300 },
-    type: { type: 'string', minLength: 1, maxLength: 100 },
-    date: { oneOf: [{ type: 'string', minLength: 1, maxLength: 100 }, { type: 'null' }] },
-    topics: { type: 'array', maxItems: 64, items: { type: 'string', maxLength: 160 } },
+    id: { type: 'string', minLength: 1, maxLength: CLASSIC_TEXT_LIMITS.documentIdCharacters },
+    title: { type: 'string', minLength: 1, maxLength: CLASSIC_TEXT_LIMITS.titleCharacters },
+    type: { type: 'string', minLength: 1, maxLength: CLASSIC_TEXT_LIMITS.typeCharacters },
+    date: { oneOf: [{ type: 'string', minLength: 1, maxLength: CLASSIC_TEXT_LIMITS.dateCharacters }, { type: 'null' }] },
+    topics: { type: 'array', maxItems: CLASSIC_TEXT_LIMITS.topicCount, items: { type: 'string', maxLength: CLASSIC_TEXT_LIMITS.topicCharacters } },
     resource: unsizedResourceLocator,
   },
   required: ['id', 'title', 'type', 'date', 'topics', 'resource'],
@@ -38,11 +39,11 @@ const catalogWorkSummary = {
 const workSummary = {
   type: 'object',
   properties: {
-    id: { type: 'string', minLength: 1, maxLength: 160 },
-    title: { type: 'string', minLength: 1, maxLength: 300 },
-    type: { type: 'string', minLength: 1, maxLength: 100 },
-    date: { oneOf: [{ type: 'string', minLength: 1, maxLength: 100 }, { type: 'null' }] },
-    topics: { type: 'array', maxItems: 64, items: { type: 'string', maxLength: 160 } },
+    id: { type: 'string', minLength: 1, maxLength: CLASSIC_TEXT_LIMITS.documentIdCharacters },
+    title: { type: 'string', minLength: 1, maxLength: CLASSIC_TEXT_LIMITS.titleCharacters },
+    type: { type: 'string', minLength: 1, maxLength: CLASSIC_TEXT_LIMITS.typeCharacters },
+    date: { oneOf: [{ type: 'string', minLength: 1, maxLength: CLASSIC_TEXT_LIMITS.dateCharacters }, { type: 'null' }] },
+    topics: { type: 'array', maxItems: CLASSIC_TEXT_LIMITS.topicCount, items: { type: 'string', maxLength: CLASSIC_TEXT_LIMITS.topicCharacters } },
     resource: resourceLocator,
   },
   required: ['id', 'title', 'type', 'date', 'topics', 'resource'],
@@ -103,8 +104,8 @@ const listWorks = {
     coverage: { const: 'complete_local_work_inventory' },
     delivery: { const: 'metadata_summary' },
     nativeResourceLinks: { const: 'not_emitted' },
-    works: { type: 'array', maxItems: 100, items: catalogWorkSummary },
-    resultWindow: resultWindow(100),
+    works: { type: 'array', maxItems: CLASSIC_TEXT_LIMITS.workCount, items: catalogWorkSummary },
+    resultWindow: resultWindow(CLASSIC_TEXT_LIMITS.workCount),
   },
   required: ['coverage', 'delivery', 'nativeResourceLinks', 'works', 'resultWindow'],
   additionalProperties: false,
@@ -114,8 +115,8 @@ const sectionDirectoryEntry = {
   type: 'object',
   properties: {
     id: { type: 'integer', minimum: 0, maximum: Number.MAX_SAFE_INTEGER },
-    sectionNumber: { type: 'string', maxLength: 160 },
-    title: { type: 'string', maxLength: 300 },
+    sectionNumber: { type: 'string', maxLength: CLASSIC_TEXT_LIMITS.sectionNumberCharacters },
+    title: { type: 'string', maxLength: CLASSIC_TEXT_LIMITS.titleCharacters },
     resource: unsizedResourceLocator,
   },
   required: ['id', 'sectionNumber', 'title', 'resource'],
@@ -127,13 +128,13 @@ const browseSections = {
   properties: {
     coverage: { const: 'complete_section_directory' },
     work: catalogWorkSummary,
-    sections: { type: 'array', maxItems: 2000, items: sectionDirectoryEntry },
-    resultWindow: resultWindow(2000),
+    sections: { type: 'array', maxItems: CLASSIC_TEXT_LIMITS.sectionsPerWork, items: sectionDirectoryEntry },
+    resultWindow: resultWindow(CLASSIC_TEXT_LIMITS.sectionsPerWork),
     linkWindow: {
       type: 'object',
       properties: {
-        maximumResourceLinks: { const: 32 },
-        emittedResourceLinkCount: { type: 'integer', minimum: 0, maximum: 32 },
+        maximumResourceLinks: { const: CLASSIC_TEXT_LIMITS.nativeDirectoryLinks },
+        emittedResourceLinkCount: { type: 'integer', minimum: 0, maximum: CLASSIC_TEXT_LIMITS.nativeDirectoryLinks },
         additionalLinkStatus: {
           type: 'string',
           enum: ['additional_link_observed', 'no_additional_link_observed'],
@@ -151,7 +152,7 @@ const work = {
   type: 'object',
   properties: {
     work: workSummary,
-    sectionCount: { type: 'integer', minimum: 0, maximum: 2000 },
+    sectionCount: { type: 'integer', minimum: 0, maximum: CLASSIC_TEXT_LIMITS.sectionsPerWork },
     bodyDelivery: { const: 'markdown_only' },
   },
   required: ['work', 'sectionCount', 'bodyDelivery'],
@@ -161,14 +162,14 @@ const work = {
 const searchHit = {
   type: 'object',
   properties: {
-    rank: { type: 'integer', minimum: 1, maximum: 10 },
+    rank: { type: 'integer', minimum: 1, maximum: CLASSIC_TEXT_LIMITS.searchHits },
     work: {
       type: 'object',
       properties: {
-        id: { type: 'string', minLength: 1, maxLength: 160 },
-        title: { type: 'string', minLength: 1, maxLength: 300 },
-        type: { type: 'string', minLength: 1, maxLength: 100 },
-        date: { oneOf: [{ type: 'string', minLength: 1, maxLength: 100 }, { type: 'null' }] },
+        id: { type: 'string', minLength: 1, maxLength: CLASSIC_TEXT_LIMITS.documentIdCharacters },
+        title: { type: 'string', minLength: 1, maxLength: CLASSIC_TEXT_LIMITS.titleCharacters },
+        type: { type: 'string', minLength: 1, maxLength: CLASSIC_TEXT_LIMITS.typeCharacters },
+        date: { oneOf: [{ type: 'string', minLength: 1, maxLength: CLASSIC_TEXT_LIMITS.dateCharacters }, { type: 'null' }] },
       },
       required: ['id', 'title', 'type', 'date'],
       additionalProperties: false,
@@ -177,7 +178,7 @@ const searchHit = {
       ...sectionDirectoryEntry,
       properties: { ...sectionDirectoryEntry.properties, resource: resourceLocator },
     },
-    discoverySnippet: { type: 'string', maxLength: 303 },
+    discoverySnippet: { type: 'string', maxLength: CLASSIC_TEXT_LIMITS.discoverySnippetCharacters },
     snippetOnly: { const: true },
   },
   required: ['rank', 'work', 'section', 'discoverySnippet', 'snippetOnly'],
@@ -189,8 +190,8 @@ const search = {
   properties: {
     query: { type: 'string', minLength: 1, maxLength: 500 },
     status: { type: 'string', enum: ['ok', 'no_results'] },
-    hits: { type: 'array', maxItems: 10, items: searchHit },
-    resultWindow: resultWindow(10),
+    hits: { type: 'array', maxItems: CLASSIC_TEXT_LIMITS.searchHits, items: searchHit },
+    resultWindow: resultWindow(CLASSIC_TEXT_LIMITS.searchHits),
   },
   required: ['query', 'status', 'hits', 'resultWindow'],
   additionalProperties: false,

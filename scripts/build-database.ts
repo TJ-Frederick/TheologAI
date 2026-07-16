@@ -38,6 +38,11 @@ import {
 } from './d1-corpus-identity.js';
 import { BIBLE_BOOKS } from '../src/kernel/books.js';
 import {
+  assertClassicTextDocumentMetadata,
+  assertClassicTextSectionMetadata,
+  CLASSIC_TEXT_LIMITS,
+} from '../src/kernel/classicTextContract.js';
+import {
   parseHistoricalDocumentCatalog,
   parseHistoricalDocumentCatalogProvenance,
 } from './historical-document-catalog.js';
@@ -386,19 +391,31 @@ const histTx = db.transaction(() => {
   let sectionCount = 0;
 
   const files = readdirSync(histDir).filter(f => f.endsWith('.json')).sort();
+  if (files.length > CLASSIC_TEXT_LIMITS.workCount) {
+    throw new Error(`Historical document inventory contains ${files.length} works; v1 permits at most ${CLASSIC_TEXT_LIMITS.workCount}`);
+  }
   for (const file of files) {
     const id = file.replace('.json', '');
     const doc = JSON.parse(sourceRegistry.read(`data/historical-documents/${file}`, 'utf-8'));
     const catalog = historicalCatalogById.get(id);
     if (!catalog) throw new Error(`Historical document ${id} is missing from the reviewed catalog`);
 
+    const documentMetadata = {
+      id,
+      title: doc.title,
+      type: doc.type || 'document',
+      date: catalog.composition.label,
+      topics: doc.topics || [],
+    };
+    assertClassicTextDocumentMetadata(documentMetadata, `Historical document ${id}`);
+
     insertDoc.run(
       id,
-      doc.title,
-      doc.type || 'document',
-      catalog.composition.label,
+      documentMetadata.title,
+      documentMetadata.type,
+      documentMetadata.date,
       JSON.stringify({
-        topics: doc.topics || [],
+        topics: documentMetadata.topics,
         catalog: {
           lookupAliases: catalog.lookupAliases,
           composition: catalog.composition,
@@ -411,12 +428,21 @@ const histTx = db.transaction(() => {
     docCount++;
 
     if (Array.isArray(doc.sections)) {
+      if (doc.sections.length > CLASSIC_TEXT_LIMITS.sectionsPerWork) {
+        throw new Error(`Historical document ${id} contains ${doc.sections.length} sections; v1 permits at most ${CLASSIC_TEXT_LIMITS.sectionsPerWork}`);
+      }
       for (let i = 0; i < doc.sections.length; i++) {
         const s = doc.sections[i];
         const content = s.content || s.answer || s.a || '';
         const title = s.title || s.question || s.chapter || s.q || '';
         const sectionNum = s.question_number || s.section_number || String(i + 1);
         const topics = JSON.stringify(s.topics || []);
+
+        assertClassicTextSectionMetadata({
+          documentId: id,
+          sectionNumber: sectionNum,
+          title,
+        }, `Historical document ${id} section ${i + 1}`);
 
         insertSection.run(id, sectionNum, title, content, topics);
         insertSectionFTS.run(title, content, topics);

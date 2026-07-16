@@ -22,6 +22,7 @@ import {
   validateClassicTextsOutputSemantics,
 } from '../../presenters/classicTextsStructured.js';
 import type { ResourceLink } from '@modelcontextprotocol/sdk/types.js';
+import { CLASSIC_TEXT_LIMITS } from '../../kernel/classicTextContract.js';
 
 export function createClassicTextsHandler(historicalService: HistoricalDocumentService): ToolHandler {
   return {
@@ -132,7 +133,7 @@ type Locator = { uri: string; resourceSizeBytes?: number };
 type SectionWithResource = { sectionNumber: string; title: string; resource: Locator };
 
 function sectionResourceLinks(sections: SectionWithResource[]): ResourceLink[] {
-  return sections.slice(0, 32).map(section => resourceLink(
+  return sections.slice(0, CLASSIC_TEXT_LIMITS.nativeDirectoryLinks).map(section => resourceLink(
     section.resource,
     section.title || `Section ${section.sectionNumber}`,
     'Exact locally hosted historical-document section.',

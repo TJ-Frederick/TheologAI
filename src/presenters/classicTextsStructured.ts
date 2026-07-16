@@ -6,10 +6,11 @@ import {
   formatHistoricalDiscoverySnippet,
 } from '../formatters/historicalFormatter.js';
 import { OutputLimitError } from '../kernel/errors.js';
+import { CLASSIC_TEXT_LIMITS } from '../kernel/classicTextContract.js';
 
 const encoder = new TextEncoder();
-export const CLASSIC_TEXT_WORK_LIMIT = 100;
-export const CLASSIC_TEXT_SECTION_LIMIT = 2000;
+export const CLASSIC_TEXT_WORK_LIMIT = CLASSIC_TEXT_LIMITS.workCount;
+export const CLASSIC_TEXT_SECTION_LIMIT = CLASSIC_TEXT_LIMITS.sectionsPerWork;
 
 export const CLASSIC_TEXT_EVIDENCE_POLICY = {
   providerScope: 'local_only',
@@ -157,9 +158,9 @@ export function presentClassicTextDirectory(work: PreparedClassicTextWork) {
         additionalMatchStatus: 'no_additional_match_observed' as const,
       },
       linkWindow: {
-        maximumResourceLinks: 32 as const,
-        emittedResourceLinkCount: Math.min(sections.length, 32),
-        additionalLinkStatus: sections.length > 32
+        maximumResourceLinks: CLASSIC_TEXT_LIMITS.nativeDirectoryLinks,
+        emittedResourceLinkCount: Math.min(sections.length, CLASSIC_TEXT_LIMITS.nativeDirectoryLinks),
+        additionalLinkStatus: sections.length > CLASSIC_TEXT_LIMITS.nativeDirectoryLinks
           ? 'additional_link_observed' as const
           : 'no_additional_link_observed' as const,
       },
@@ -201,7 +202,7 @@ export function presentClassicTextSearch(
   // Validate the lookahead locator too: it is evidence for the additional-match claim,
   // but do not format or encode content that is not selected for delivery.
   for (const candidate of candidates) unsizedResourceForSection(candidate.document, candidate.section);
-  const hits = candidates.slice(0, 10).map(({ document, section }, index) => ({
+  const hits = candidates.slice(0, CLASSIC_TEXT_LIMITS.searchHits).map(({ document, section }, index) => ({
     rank: index + 1,
     work: {
       id: document.id,
@@ -221,7 +222,7 @@ export function presentClassicTextSearch(
       hits,
       resultWindow: {
         returnedCount: hits.length,
-        additionalMatchStatus: candidates.length > 10
+        additionalMatchStatus: candidates.length > CLASSIC_TEXT_LIMITS.searchHits
           ? 'additional_match_observed' as const
           : 'no_additional_match_observed' as const,
       },
@@ -278,11 +279,11 @@ export function validateClassicTextsOutputSemantics(value: unknown): boolean {
     const search = record(root.search);
     const resultWindow = record(search?.resultWindow);
     const hits = Array.isArray(search?.hits) ? search.hits : undefined;
-    if (!search || !resultWindow || !hits || hits.length > 10) return false;
+    if (!search || !resultWindow || !hits || hits.length > CLASSIC_TEXT_LIMITS.searchHits) return false;
     const additional = resultWindow.additionalMatchStatus;
     return resultWindow.returnedCount === hits.length
       && search.status === (hits.length === 0 ? 'no_results' : 'ok')
-      && (hits.length === 10
+      && (hits.length === CLASSIC_TEXT_LIMITS.searchHits
         ? additional === 'additional_match_observed' || additional === 'no_additional_match_observed'
         : additional === 'no_additional_match_observed');
   }

@@ -477,6 +477,26 @@ describe('shared MCP registration', () => {
     expect(root.services.historicalService.getSection).toHaveBeenCalledWith('nicene-creed', '1');
   });
 
+  it('rejects a fuzzy whole-document URI while preserving exact whole-document reads', async () => {
+    const root = makeMockRoot();
+    const getSections = vi.fn(root.services.historicalService.getSections);
+    root.services.historicalService.getSections = getSections;
+    const client = await connect(createTheologAiMcpServer(root, '1.0.0-test').server);
+
+    const exactUri = 'theologai://documents/nicene-creed';
+    const exact = await client.readResource({ uri: exactUri });
+    expect(exact.contents[0]).toMatchObject({ uri: exactUri, mimeType: 'text/markdown' });
+    expect(String(exact.contents[0].text)).toContain('We believe...');
+    getSections.mockClear();
+
+    const fuzzyUri = 'theologai://documents/nicene';
+    await expect(client.readResource({ uri: fuzzyUri })).rejects.toMatchObject({
+      code: -32002,
+      data: { uri: fuzzyUri },
+    });
+    expect(getSections).not.toHaveBeenCalled();
+  });
+
   it('returns a native primary-source link whose exact byte size matches resources/read', async () => {
     const root = makeMockRoot();
     const doc = await root.services.historicalService.getDocument('nicene-creed');

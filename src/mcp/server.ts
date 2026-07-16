@@ -196,9 +196,11 @@ export function createTheologAiMcpServer(
     if (documentResource) {
       try {
         const doc = await services.historicalService.getDocument(documentResource.documentId);
+        if (doc.id !== documentResource.documentId) {
+          throw new NotFoundError('document', 'Exact document resource identity did not match.');
+        }
 
         if (documentResource.sectionId !== undefined) {
-          if (doc.id !== documentResource.documentId) throw new NotFoundError('document', 'Exact document resource identity did not match.');
           const section = await services.historicalService.getSection(doc.id, documentResource.sectionId);
           return {
             contents: [{
