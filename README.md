@@ -51,7 +51,10 @@ fresh server and transport.
 `parallel_passages` defaults unconditionally to `corpora:
 ["ubs_source_attested"]`, with at most five complete groups. It does not fall
 back to the legacy corpus when UBS has no match. Raw UBS alignment metadata is
-opt-in. The older curated edge behavior remains available through
+opt-in. Its structured result includes a bounded UBS result window: the server
+reports only whether one additional source-attested group was directly observed
+beyond `maxGroups`, never a total, cursor, or exhaustive-coverage claim. The
+lookahead group is not returned or text-enriched. The older curated edge behavior remains available through
 `corpora: ["theologai_legacy"]`; its `mode` and `maxParallels` controls retain
 their prior item semantics. OpenBible.info rows are off by default and, when
 requested with `includeOpenBibleCrossReferences`, are returned in a separate

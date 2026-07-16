@@ -10,6 +10,7 @@ import type {
   ParallelPassageResearchResult,
   ParallelPassage,
   SourceAttestedParallelGroupResult,
+  SourceAttestedResultWindow,
 } from '../../kernel/types.js';
 import type { ICrossReferenceRepository } from '../../kernel/repositories.js';
 import { parseReference, formatReference, type BibleReference } from '../../kernel/reference.js';
@@ -73,9 +74,17 @@ export class ParallelPassageService {
     const corpora = normalizeCorpora(params);
     const primaryReference = normalizeResearchReference(params.reference);
     const warnings: string[] = [];
-    const sourceAttestedGroups = corpora.includes('ubs_source_attested')
+    const sourceAttested = corpora.includes('ubs_source_attested')
       ? await this.lookupSourceAttested(primaryReference, params, warnings)
-      : [];
+      : {
+        groups: [],
+        window: {
+          requestedLimit: normalizeMaxGroups(params.maxGroups),
+          returnedGroupCount: 0,
+          additionalMatchStatus: 'not_evaluated' as const,
+        },
+      };
+    const sourceAttestedGroups = sourceAttested.groups;
     const legacyParallels = corpora.includes('theologai_legacy')
       ? this.lookupLegacy(primaryReference, params)
       : [];
@@ -98,6 +107,7 @@ export class ParallelPassageService {
       requestedReference: primaryReference,
       corpora,
       sourceAttestedGroups,
+      sourceAttestedResultWindow: sourceAttested.window,
       legacyParallels,
       openBibleCrossReferences,
       provenance,
@@ -109,11 +119,11 @@ export class ParallelPassageService {
     reference: string,
     params: ParallelPassageLookupParams,
     warnings: string[],
-  ): Promise<SourceAttestedParallelGroupResult[]> {
+  ): Promise<{ groups: SourceAttestedParallelGroupResult[]; window: SourceAttestedResultWindow }> {
     if (!this.sourceAttestedService) throw new Error('UBS source-attested parallels are unavailable in this runtime');
     const lookup = await this.sourceAttestedService.lookup({ reference, maxGroups: params.maxGroups });
     const requested = parseSourceAttestedLookupReference(lookup.reference).segments;
-    return lookup.groups.map(group => ({
+    const groups = lookup.groups.map(group => ({
       groupId: group.groupId,
       sourceOrdinal: group.sourceOrdinal,
       label: group.label,
@@ -130,6 +140,16 @@ export class ParallelPassageService {
       })),
       provenanceIds: [UBS_PARALLEL_PROVENANCE_ID],
     }));
+    return {
+      groups,
+      window: {
+        requestedLimit: lookup.requestedLimit,
+        returnedGroupCount: groups.length,
+        additionalMatchStatus: lookup.additionalMatchObserved
+          ? 'additional_match_observed'
+          : 'no_additional_match_observed',
+      },
+    };
   }
 
   private lookupLegacy(primaryReference: string, params: ParallelPassageLookupParams): ParallelPassage[] {
@@ -380,6 +400,14 @@ function isSynopticGospel(reference: BibleReference): boolean {
 function normalizeMaxParallels(value: number | undefined): number {
   if (value === undefined || !Number.isFinite(value)) return 10;
   return Math.min(Math.max(Math.trunc(value), 1), 50);
+}
+
+function normalizeMaxGroups(value: number | undefined): number {
+  const maxGroups = value ?? 5;
+  if (!Number.isSafeInteger(maxGroups) || maxGroups < 1 || maxGroups > 10) {
+    throw new ValidationError('maxGroups', 'maxGroups must be an integer from 1 to 10.');
+  }
+  return maxGroups;
 }
 
 function referenceScopeKey(reference: BibleReference): string {

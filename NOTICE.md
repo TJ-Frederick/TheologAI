@@ -20,6 +20,15 @@ those sources.
 - STEPBible TAGNT/TAHOT and related lexical data: CC BY 4.0; attribution to
   STEP Bible / Tyndale House, Cambridge.
 - OpenBible.info cross references: CC BY.
+- [UBS Parallel Passage Database](https://github.com/ubsicap/ubs-open-license/tree/fd7bcf88b20a1522d3916f437f012c561466fe7b/parallel%20passages),
+  © 2023 United Bible Societies: CC BY-SA 4.0. TheologAI modifies the
+  pinned `ParallelPassages.xml` source by parsing reference locators,
+  normalizing them to its canonical book registry while retaining the original
+  locators and source order, deriving deterministic group identities, and
+  building lookup indexes. The resulting parallel groups remain attributed to
+  the UBS Parallel Passage Database and carry the same ShareAlike license; the
+  transformations do not add relationship types, direction, quotation status,
+  confidence, or inferred parallels.
 
 ## Local historical documents
 

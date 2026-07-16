@@ -34,7 +34,13 @@ export class SourceAttestedParallelService {
     if (!Number.isSafeInteger(maxGroups) || maxGroups < 1 || maxGroups > 10) {
       throw new ValidationError('maxGroups', 'maxGroups must be an integer from 1 to 10.');
     }
-    return { reference, groups: await this.repository.findGroups(reference, maxGroups) };
+    const result = await this.repository.findGroups(reference, maxGroups);
+    return {
+      reference,
+      groups: result.groups,
+      requestedLimit: maxGroups,
+      additionalMatchObserved: result.additionalMatchObserved,
+    };
   }
 
   async getProvenance(): Promise<Readonly<ParallelSourceProvenance>> {

@@ -256,11 +256,18 @@ export interface SourceAttestedParallelGroupResult {
   provenanceIds: string[];
 }
 
+export interface SourceAttestedResultWindow {
+  requestedLimit: number;
+  returnedGroupCount: number;
+  additionalMatchStatus: 'additional_match_observed' | 'no_additional_match_observed' | 'not_evaluated';
+}
+
 /** Versioned public service result before MCP presentation. */
 export interface ParallelPassageResearchResult {
   requestedReference: string;
   corpora: ParallelPassageCorpus[];
   sourceAttestedGroups: SourceAttestedParallelGroupResult[];
+  sourceAttestedResultWindow: SourceAttestedResultWindow;
   legacyParallels: ParallelPassage[];
   openBibleCrossReferences: CrossReference[];
   provenance: import('./provenance.js').ProvenanceRecord[];

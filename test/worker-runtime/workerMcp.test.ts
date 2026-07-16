@@ -531,20 +531,69 @@ describe('Worker MCP endpoint in workerd', () => {
     expect(result.message.error).toBeUndefined();
     expect(result.message.result).toMatchObject({
       structuredContent: {
-        schemaVersion: '1',
+        schemaVersion: '2',
         corpora: ['ubs_source_attested'],
         legacyParallels: [],
         openBibleCrossReferences: [],
         sourceAttestedGroups: [{
           members: [
+            expect.objectContaining({ normalizedReference: 'Matthew 5:44-45', matched: false }),
             expect.objectContaining({ normalizedReference: 'Luke 6:27-28,35', matched: true }),
-            expect.objectContaining({ normalizedReference: 'Matthew 5:44', matched: false }),
           ],
         }],
+        sourceAttestedResultWindow: {
+          requestedLimit: 1,
+          returnedGroupCount: 1,
+          additionalMatchStatus: 'no_additional_match_observed',
+        },
       },
     });
     expect(JSON.stringify(result.message.result?.structuredContent)).not.toContain('alignmentRaw');
     expect(textContent(result.message)).toContain('_Matched passage: Luke 6:27-28,35_');
+  });
+
+  it('exposes honest v2 UBS result windows for the reviewed black-box sentinels', async () => {
+    const defaultMark = await rpc('tools/call', {
+      name: 'parallel_passages', arguments: { reference: 'Mark 10:19' },
+    }, 152);
+    expect(defaultMark.message.result).toMatchObject({
+      structuredContent: {
+        schemaVersion: '2',
+        sourceAttestedGroups: expect.arrayContaining([expect.any(Object)]),
+        sourceAttestedResultWindow: {
+          requestedLimit: 5, returnedGroupCount: 5, additionalMatchStatus: 'additional_match_observed',
+        },
+      },
+    });
+    expect((defaultMark.message.result?.structuredContent as any).sourceAttestedGroups).toHaveLength(5);
+    expect(textContent(defaultMark.message)).toContain('Raise `maxGroups` (up to 10) or narrow the reference');
+
+    const maximumMark = await rpc('tools/call', {
+      name: 'parallel_passages', arguments: { reference: 'Mark 10:19', maxGroups: 10 },
+    }, 153);
+    expect(maximumMark.message.result).toMatchObject({
+      structuredContent: {
+        sourceAttestedResultWindow: {
+          requestedLimit: 10, returnedGroupCount: 7, additionalMatchStatus: 'no_additional_match_observed',
+        },
+      },
+    });
+    expect((maximumMark.message.result?.structuredContent as any).sourceAttestedGroups).toHaveLength(7);
+
+    const kings = await rpc('tools/call', {
+      name: 'parallel_passages', arguments: { reference: '2 Kings 18:13' },
+    }, 154);
+    const kingsMembers = (kings.message.result?.structuredContent as any).sourceAttestedGroups[0].members;
+    expect(kingsMembers.map((member: any) => member.normalizedReference)).toEqual([
+      '2 Kings 18:13', '2 Chronicles 32:1', 'Isaiah 36:1',
+    ]);
+
+    const matthew = await rpc('tools/call', {
+      name: 'parallel_passages', arguments: { reference: 'Matthew 3:3' },
+    }, 155);
+    const matthewGroups = (matthew.message.result?.structuredContent as any).sourceAttestedGroups;
+    expect(matthewGroups).toHaveLength(2);
+    expect(new Set(matthewGroups.map((group: any) => group.groupId)).size).toBe(2);
   });
 
   it('keeps Worker parallel relationships edge-aware across Gospel and Pauline sources', async () => {

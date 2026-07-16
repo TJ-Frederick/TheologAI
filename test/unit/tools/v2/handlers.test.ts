@@ -359,9 +359,29 @@ describe('parallel_passages handler', () => {
     expect(output.properties.legacyParallels.items.properties.text.maxLength).toBe(200);
   });
 
+  it('advertises the required v2 honest UBS result-window contract', () => {
+    const output = createParallelPassagesHandler(serviceDouble({ lookup: vi.fn() })).outputSchema as any;
+    expect(output.properties.schemaVersion).toEqual({ type: 'string', const: '2' });
+    expect(output.required).toContain('sourceAttestedResultWindow');
+    expect(output.properties.sourceAttestedResultWindow).toMatchObject({
+      additionalProperties: false,
+      required: ['requestedLimit', 'returnedGroupCount', 'additionalMatchStatus'],
+      properties: {
+        requestedLimit: { minimum: 1, maximum: 10 },
+        returnedGroupCount: { minimum: 0, maximum: 10 },
+        additionalMatchStatus: {
+          enum: ['additional_match_observed', 'no_additional_match_observed', 'not_evaluated'],
+        },
+      },
+    });
+    expect(output.properties).not.toHaveProperty('total');
+    expect(output.properties).not.toHaveProperty('cursor');
+  });
+
   it('accepts fully materialized advertised defaults without inferring legacy controls', async () => {
     const lookup = vi.fn<ParallelPassageService['lookup']>().mockResolvedValue({
       requestedReference: 'John 3:16', corpora: ['ubs_source_attested'], sourceAttestedGroups: [],
+      sourceAttestedResultWindow: { requestedLimit: 5, returnedGroupCount: 0, additionalMatchStatus: 'no_additional_match_observed' },
       legacyParallels: [], openBibleCrossReferences: [], provenance: [],
     });
     const handler = createParallelPassagesHandler(serviceDouble({ lookup }));
@@ -382,6 +402,7 @@ describe('parallel_passages handler', () => {
       requestedReference: 'Matthew 26:26-28',
       corpora: ['theologai_legacy'],
       sourceAttestedGroups: [],
+      sourceAttestedResultWindow: { requestedLimit: 5, returnedGroupCount: 0, additionalMatchStatus: 'not_evaluated' },
       legacyParallels: [{
         reference: 'Mark 14:22-24',
         relationship: 'synoptic',
@@ -406,8 +427,9 @@ describe('parallel_passages handler', () => {
       useCrossReferences: false,
     });
     expect(result.structuredContent).toMatchObject({
-      schemaVersion: '1', kind: 'parallel_passages', corpora: ['theologai_legacy'],
+      schemaVersion: '2', kind: 'parallel_passages', corpora: ['theologai_legacy'],
       sourceAttestedGroups: [], openBibleCrossReferences: [],
+      sourceAttestedResultWindow: { requestedLimit: 5, returnedGroupCount: 0, additionalMatchStatus: 'not_evaluated' },
     });
 
     expect(lookup).toHaveBeenCalledWith({

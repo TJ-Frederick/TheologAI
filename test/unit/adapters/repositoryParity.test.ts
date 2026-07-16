@@ -11,7 +11,7 @@ import { D1StrongsRepository } from '../../../src/adapters/d1/D1StrongsRepositor
 import { D1UbsParallelPassageRepository } from '../../../src/adapters/d1/D1UbsParallelPassageRepository.js';
 import { UbsParallelPassageRepository } from '../../../src/adapters/shared/UbsParallelPassageRepository.js';
 import { UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY, UBS_PARALLEL_PASSAGE_PROVENANCE } from '../../../src/kernel/ubsParallelSource.js';
-import { ubsFixture } from '../../fixtures/ubsParallelCorpus.js';
+import generatedUbsCorpus from '../../../src/data/ubs-parallel-passages.generated.json';
 import { StrongsService } from '../../../src/services/languages/StrongsService.js';
 
 function sqliteAsD1(db: Database.Database): D1Database {
@@ -157,7 +157,7 @@ describe('SQLite and D1 repository parity with identical real data', () => {
         SELECT id, title, content, topics FROM document_sections ORDER BY id;
     `);
 
-    const artifact = ubsFixture() as any;
+    const artifact = generatedUbsCorpus as any;
     const p = UBS_PARALLEL_PASSAGE_PROVENANCE;
     db.prepare('INSERT INTO ubs_parallel_sources VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(
       p.sourceId, 'ubs-parallel-passages.v2', p.transformVersion, UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY,
@@ -351,6 +351,33 @@ describe('SQLite and D1 repository parity with identical real data', () => {
   it('reconstructs complete source-attested groups identically from Node JSON and D1', async () => {
     await expect(d1Ubs.findGroups('Luke 6:35', 2)).resolves.toEqual(nodeUbs.findGroups('Luke 6:35', 2));
     await expect(d1Ubs.getProvenance()).resolves.toEqual(nodeUbs.getProvenance());
+  });
+
+  it.each([
+    ['Mark 10:19', 5],
+    ['Mark 10:19', 10],
+    ['2 Kings 18:13', 5],
+    ['Matthew 3:3', 5],
+  ] as const)('returns identical bounded UBS windows for %s at limit %i', async (reference, limit) => {
+    const shared = nodeUbs.findGroups(reference, limit);
+    const d1 = await d1Ubs.findGroups(reference, limit);
+    expect(d1).toEqual(shared);
+    expect(d1.groups.every(group => group.members.length >= 2)).toBe(true);
+  });
+
+  it('proves the required actual-corpus result-window observations in both repositories', async () => {
+    const defaultMark = await d1Ubs.findGroups('Mark 10:19', 5);
+    expect(defaultMark).toMatchObject({ additionalMatchObserved: true });
+    expect(defaultMark.groups).toHaveLength(5);
+    const maximumMark = await d1Ubs.findGroups('Mark 10:19', 10);
+    expect(maximumMark).toMatchObject({ additionalMatchObserved: false });
+    expect(maximumMark.groups).toHaveLength(7);
+    expect((await d1Ubs.findGroups('2 Kings 18:13', 5)).groups[0].members.map(member => member.normalizedReference)).toEqual([
+      '2 Kings 18:13', '2 Chronicles 32:1', 'Isaiah 36:1',
+    ]);
+    const matthew = await d1Ubs.findGroups('Matthew 3:3', 5);
+    expect(matthew.groups).toHaveLength(2);
+    expect(new Set(matthew.groups.map(group => group.groupId)).size).toBe(2);
   });
 
   it('normalizes ASCII transliteration search identically in SQLite and D1', async () => {
