@@ -1,13 +1,16 @@
 # CCEL live-search preflight record
 
-> **Current status:** architecture record only. The public MCP schemas do not
-> advertise CCEL, no public tool can invoke this adapter, and TheologAI does not
-> retrieve or republish CCEL document bodies. A future discovery-only rollout
-> requires a new preflight and explicit release review.
+> **Current status:** exposure-only preview record. Production remains on the
+> local-only v3 contract. Preview advertises the v4 CCEL discovery shape, but
+> both execution switches remain off: no public call can reach the adapter,
+> coordinator lookup/RPC, or upstream fetch. TheologAI does not retrieve or
+> republish CCEL document bodies. Live discovery still requires a new preflight,
+> operator/rights decisions, and explicit release review.
 
-Originally recorded 2026-07-11 and updated 2026-07-15 for dormant parser-policy
-hardening. This is an architecture record, not an enablement approval. The
-live-search flag remains off by default.
+Originally recorded 2026-07-11, updated 2026-07-15 for dormant parser-policy
+hardening, and reconciled 2026-07-16 for preview-only v4 exposure. This is an
+architecture record, not an enablement approval. The live-search and
+coordinator flags remain off in production and preview.
 
 - Search surface reviewed: `https://ccel.org/?page=1&text=...`
 - Search contract reviewed: [CCEL Search Help](https://www.ccel.org/help/search), including the documented `author`, `authorID`, `title`, and `bookID` fields.
@@ -75,10 +78,11 @@ live-search flag remains off by default.
   from 2,603,119 to 2,899,157 raw bytes (+296,038) and from 492,279 to 555,191
   gzip bytes (+62,912); Wrangler 4.107.0 completed both dry runs successfully.
 
-No live CCEL request, body persistence, production flag change, or remote
-mutation is authorized by this record.
+No live CCEL request, body persistence, production flag change, coordinator
+execution, or remote mutation is authorized by this record. The preview-only
+exposure flag changes an MCP contract, not the upstream execution policy.
 
-The next dormant rollout slice adds the content-free admission/circuit design
-documented in [CCEL-UPSTREAM-COORDINATOR.md](./CCEL-UPSTREAM-COORDINATOR.md).
-It remains unwired from the public tool and does not supersede this preflight's
-operator, rights, robots, or interface-review gates.
+The content-free admission/circuit design and staged gates are documented in
+[CCEL-UPSTREAM-COORDINATOR.md](./CCEL-UPSTREAM-COORDINATOR.md). Preview v4
+exposure does not supersede this preflight's operator, rights, robots, or
+interface-review gates.

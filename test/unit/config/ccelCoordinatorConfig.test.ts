@@ -22,12 +22,37 @@ const coordinatorTypes = readFileSync(
   new URL('../../../ccel-coordinator-configuration.d.ts', import.meta.url),
   'utf8',
 );
+const workerTypes = readFileSync(
+  new URL('../../../worker-configuration.d.ts', import.meta.url),
+  'utf8',
+);
+
+const productionConfig = config.slice(0, config.indexOf('[env.preview]'));
+const previewConfig = config.slice(config.indexOf('[env.preview]'));
 
 describe('CCEL coordinator Worker environments', () => {
-  it('keeps all three public rollout flags false', () => {
-    expect(config.match(/THEOLOGAI_EXPOSE_CCEL_DISCOVERY = "false"/g)).toHaveLength(2);
-    expect(config.match(/THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH = "false"/g)).toHaveLength(2);
-    expect(config.match(/THEOLOGAI_ENABLE_CCEL_COORDINATOR = "false"/g)).toHaveLength(2);
+  it('exposes v4 only in preview while keeping every execution gate false', () => {
+    expect(productionConfig).toContain('THEOLOGAI_EXPOSE_CCEL_DISCOVERY = "false"');
+    expect(productionConfig).toContain('THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH = "false"');
+    expect(productionConfig).toContain('THEOLOGAI_ENABLE_CCEL_COORDINATOR = "false"');
+    expect(productionConfig).not.toContain('THEOLOGAI_EXPOSE_CCEL_DISCOVERY = "true"');
+
+    expect(previewConfig).toContain('THEOLOGAI_EXPOSE_CCEL_DISCOVERY = "true"');
+    expect(previewConfig).toContain('THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH = "false"');
+    expect(previewConfig).toContain('THEOLOGAI_ENABLE_CCEL_COORDINATOR = "false"');
+    expect(previewConfig).not.toContain('THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH = "true"');
+    expect(previewConfig).not.toContain('THEOLOGAI_ENABLE_CCEL_COORDINATOR = "true"');
+  });
+
+  it('generates exact production/preview rollout literals from Wrangler config', () => {
+    expect(workerTypes).toContain('THEOLOGAI_EXPOSE_CCEL_DISCOVERY: "true" | "false";');
+    const previewEnv = workerTypes.slice(
+      workerTypes.indexOf('interface PreviewEnv'),
+      workerTypes.indexOf('interface Env extends __BaseEnv_Env'),
+    );
+    expect(previewEnv).toContain('THEOLOGAI_EXPOSE_CCEL_DISCOVERY: "true";');
+    expect(previewEnv).toContain('THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH: "false";');
+    expect(previewEnv).toContain('THEOLOGAI_ENABLE_CCEL_COORDINATOR: "false";');
   });
 
   it('binds both public Workers externally to the same owner', () => {

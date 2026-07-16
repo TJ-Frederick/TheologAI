@@ -20,9 +20,9 @@ type CoordinatorNamespace = DurableObjectNamespace<CcelGlobalCoordinator>;
  * Binding client for gated internal adapter injection.
  *
  * Exposure, live search, and coordinator rollout switches must all be true.
- * Current production and preview configurations set all three false, so the
- * composition root never constructs this client and public search remains
- * local-only.
+ * Production is 000; preview is exposure-only 100. Because both environments
+ * leave at least one execution gate false, the composition root never
+ * constructs this client unless a later configuration explicitly reaches 111.
  */
 export class WorkerCcelUpstreamCoordinator implements CcelUpstreamCoordinator {
   private readonly enabled: boolean;

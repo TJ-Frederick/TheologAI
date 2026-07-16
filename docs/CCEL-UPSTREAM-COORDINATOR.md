@@ -1,14 +1,16 @@
-# CCEL upstream coordinator (dormant rollout slice)
+# CCEL upstream coordinator (staged rollout)
 
 ## Status
 
-This is disabled infrastructure, not CCEL enablement.
-`THEOLOGAI_EXPOSE_CCEL_DISCOVERY`, `THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH`, and
-`THEOLOGAI_ENABLE_CCEL_COORDINATOR` remain `false` in production and preview.
-The public binding client and dormant v4 composition wiring exist, but the
-checked-in all-false gate prevents coordinator lookup, adapter search, and
-network access. `primary_source_search` therefore remains local-only, and this
-slice makes no CCEL request or Durable Object RPC.
+This remains an exposure-only preview stage, not CCEL enablement. Production
+keeps `THEOLOGAI_EXPOSE_CCEL_DISCOVERY`,
+`THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH`, and
+`THEOLOGAI_ENABLE_CCEL_COORDINATOR` all `false`, so its public contract remains
+v3/local-only. Preview sets only `THEOLOGAI_EXPOSE_CCEL_DISCOVERY` to `true`;
+its live-search and coordinator switches remain `false`. Preview therefore
+advertises the v4 discovery contract and guided workflows, but every external
+query returns a disabled provider result without adapter search, Durable Object
+lookup/RPC, or network access. No CCEL request is authorized by this stage.
 
 ## One-origin architecture
 
@@ -118,7 +120,7 @@ be absent (`404`). An existing owner (`200`) or any unexpected response fails
 the job automatically; the workflow never overwrites or reconciles an existing
 owner.
 
-For the first release, use two independently reviewable stages:
+The coordinator foundation used two independently reviewable stages:
 
 1. Merge Stage A only: the dedicated owner, declarative export, tests, generated
    types, documentation, and protected bootstrap workflow. Public production
@@ -139,6 +141,14 @@ For the first release, use two independently reviewable stages:
 6. After review and preview validation, merge Stage B and let the protected
    production workflow deploy the same external binding. Do not update the
    dedicated owner as part of a preview release.
+
+Stage C then published the v4 contract and execution wiring with all public
+flags false. Stage D is a separate preview-only hard cutover of the exposure
+flag: review and deploy it through the protected preview environment, verify
+the advertised tool and prompt schemas, and confirm external calls return
+`disabled`. Do not change either execution flag, update the coordinator owner,
+or approve live search in this stage. Production remains on v3 until a later,
+separately reviewed cutover.
 
 Dry-runs validate configuration but do not prove that an external owner exists;
 that is why release order is an explicit operator invariant.
@@ -170,7 +180,7 @@ not coordinated. A multi-process local deployment must use one process, route
 CCEL discovery through a single coordinator service, or keep live discovery
 disabled.
 
-## Dormant v4 contract wiring
+## Staged v4 contract wiring
 
 The public Worker and Node composition roots share one contract configuration.
 The v4 application contract is exposed only by
@@ -187,8 +197,15 @@ the sole latch/backoff/circuit authority. Node coordination is process-local;
 multi-process Node deployments must keep live discovery disabled unless they
 provide one shared coordinator.
 
-This remains dormant infrastructure. Checked-in production and preview values
-select the local-only v3 contract and make no CCEL request.
+Checked-in production values select the local-only v3 contract. Checked-in
+preview values select v4 exposure only; because the live-search and coordinator
+values remain false, preview also makes no CCEL request or Durable Object RPC.
+
+MCP clients can cache `tools/list` and `prompts/list` results for the life of a
+connection. This is a hard contract cutover rather than a negotiated opt-in, so
+reconnect and reinitialize a preview client after deployment before auditing
+the v4 schemas and workflows. Do not interpret a stale client schema as the
+Worker's current contract.
 
 Once Stage B is bound and a later approved slice enables it, the global coordinator is intentionally a bottleneck: the maximum admitted
 CCEL-origin load is 0.1 requests/second across production and preview combined.

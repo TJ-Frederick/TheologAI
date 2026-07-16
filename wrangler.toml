@@ -71,7 +71,9 @@ THEOLOGAI_VERSION = "3.6.0-preview"
 THEOLOGAI_ALLOWED_ORIGINS = "https://theologai.pages.dev"
 THEOLOGAI_MAX_REQUEST_BYTES = "1048576"
 THEOLOGAI_REQUEST_LOGS = "true"
-THEOLOGAI_EXPOSE_CCEL_DISCOVERY = "false"
+# Preview exposes the v4 discovery contract for schema/workflow verification.
+# Live search and coordinator execution remain separately disabled below.
+THEOLOGAI_EXPOSE_CCEL_DISCOVERY = "true"
 THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH = "false"
 THEOLOGAI_ENABLE_CCEL_COORDINATOR = "false"
 

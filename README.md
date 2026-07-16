@@ -41,7 +41,7 @@ fresh server and transport.
 | `parallel_passages` | Return complete UBS source-attested parallel groups by default; legacy curated edges and OpenBible.info cross references require explicit selectors and remain separate. |
 | `commentary_lookup` | Retrieve Matthew Henry, JFB, Adam Clarke, John Gill, Keil-Delitzsch (OT), or Tyndale notes. |
 | `classic_text_lookup` | Search and browse the 17 locally indexed historical documents. Remote CCEL document bodies are not retrieved or republished. |
-| `primary_source_search` | Execute a bounded local query plan with v3 structured results, relevance or deterministic work-diverse selection, honest result windows, exact work/creator and inclusive composition-year scope, explicit catalog coverage, and native links to exact section resources. Snippets remain discovery-only. |
+| `primary_source_search` | Execute bounded primary-source query plans. Production is v3/local-only; preview exposes the v4 local-plus-CCEL discovery contract while CCEL execution remains disabled before adapter, coordinator, or fetch. Snippets remain discovery-only, and selected local sections are readable resources. |
 | `original_language_lookup` | Look up or search Strong's entries, with opt-in exact corrected-corpus usage and bounded occurrence pages for exact identities. |
 | `bible_verse_morphology` | Return bounded word-by-word morphology for one exact verse, with raw codes, nullable expansions, and separate pinned STEPBible morphology/lemma provenance. |
 | `original_language_study` | Resolve and study one Greek or Hebrew token in one verse with contextual morphology, source-separated lexical evidence, and explicit interpretive limits. |
@@ -156,12 +156,18 @@ transcription uncertainty.
 The local database contains 17 tracked creeds, confessions, and
 catechisms. The exact count is enforced by `data/data-manifest.json`.
 
-The public tools search and retrieve only the locally indexed collection. They
-do **not** currently fetch CCEL search results or document bodies. Defensive
-CCEL discovery adapters remain in the codebase as future provider architecture,
-but CCEL is not requestable in the public input schema and is unreachable from
-the public tool handler. The v3 output schema and structured result are also
-strictly local-only; dormant external-provider result shapes remain internal.
+The production tools search and retrieve only the locally indexed collection.
+They do **not** currently fetch CCEL search results or document bodies, and the
+production v3 schema remains strictly local-only. Preview stages a hard v4
+contract cutover: it advertises external CCEL discovery inputs and guided
+workflows, but live search and coordinator execution remain disabled. External
+preview queries therefore return a disabled provider result before adapter
+invocation, Durable Object lookup/RPC, or fetch. MCP clients should reconnect
+and reinitialize after the preview deployment because tool and prompt schemas
+may be cached for an existing connection.
+
+Defensive CCEL discovery adapters remain in the codebase as future provider
+architecture.
 The dormant adapter is restricted to page 1, one non-following/non-retried
 upstream GET per admitted cache miss, at most five metadata hits, and at most
 240 Unicode characters per discovery snippet. It accepts only structurally

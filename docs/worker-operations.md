@@ -16,6 +16,24 @@ GitHub deployment run are authoritative after a later deployment. A reviewable
 deployment; in that state the configuration is not evidence of the deployed
 binding.
 
+### Stage D preview v4 exposure candidate
+
+The checked-in Stage D configuration is intentionally asymmetric. Production
+remains `false/false/false` for CCEL exposure, live search, and coordinator
+execution, preserving the v3/local-only public contract. Preview is
+`true/false/false`: it exposes the v4 tool schema and guided workflows while the
+single live predicate remains false. In that state an external query returns a
+disabled provider result before adapter invocation, Durable Object lookup/RPC,
+or fetch. This configuration is a release candidate until a protected preview
+deployment and black-box audit provide authoritative runtime evidence; it does
+not authorize live CCEL access or any production change.
+
+Because MCP clients may cache tool and prompt schemas within an initialized
+connection, reconnect and reinitialize the audit client after the preview
+deployment. Audit the fresh `tools/list` and `prompts/list` responses before
+calling `primary_source_search`; otherwise a client can continue presenting a
+stale v3 schema even though the Worker has cut over to v4.
+
 | Environment | Deployed logical database | Current posture | Rollback posture |
 |---|---|---|---|
 | Production | `theologai-production-20260715-a` (`c6535a4a-1953-4279-b277-7368445fc61a`) | PR #37 merge `d395b3641eb00f6826eaba670c287f9a39dfa3da` deployed by protected run `29451333738`; deployment `5464194228` serves Worker `9d2b757b-8b9b-4318-b09d-14f62815bf82` at 100%. Readiness was `ready` with zero writes; coordinator and independent audits passed 73/73 and 91/91 with no P0-P3 findings. | Retain PR #38 Worker `e0371eb4-05c6-4415-b479-b01ac2630be0` with the same production D1 as the immediate compatible predecessor. Older matched pairs remain historical options below. No rollback is recorded as executed; do not mix incompatible code and data or delete another database without separate owner approval. |
