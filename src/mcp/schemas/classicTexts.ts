@@ -116,7 +116,7 @@ const sectionDirectoryEntry = {
   properties: {
     id: { type: 'integer', minimum: 0, maximum: Number.MAX_SAFE_INTEGER },
     sectionNumber: { type: 'string', maxLength: CLASSIC_TEXT_LIMITS.sectionNumberCharacters },
-    title: { type: 'string', maxLength: CLASSIC_TEXT_LIMITS.titleCharacters },
+    title: { type: 'string', maxLength: CLASSIC_TEXT_LIMITS.sectionTitleCharacters },
     resource: unsizedResourceLocator,
   },
   required: ['id', 'sectionNumber', 'title', 'resource'],

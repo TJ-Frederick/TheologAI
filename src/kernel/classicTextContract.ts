@@ -10,9 +10,10 @@ export const CLASSIC_TEXT_LIMITS = {
   sectionsPerWork: 2000,
   documentIdCharacters: 160,
   titleCharacters: 300,
+  sectionTitleCharacters: 500,
   typeCharacters: 100,
   dateCharacters: 100,
-  topicCount: 64,
+  topicCount: 100,
   topicCharacters: 160,
   sectionNumberCharacters: 160,
   resourceUriCharacters: 384,
@@ -81,7 +82,7 @@ export function assertClassicTextSectionMetadata(
   }
   assertBoundedText(section.documentId, 1, CLASSIC_TEXT_LIMITS.documentIdCharacters, `${context} document id`);
   assertBoundedText(section.sectionNumber, 1, CLASSIC_TEXT_LIMITS.sectionNumberCharacters, `${context} section number`);
-  assertBoundedText(section.title, 0, CLASSIC_TEXT_LIMITS.titleCharacters, `${context} title`);
+  assertBoundedText(section.title, 0, CLASSIC_TEXT_LIMITS.sectionTitleCharacters, `${context} title`);
   if (typeof section.content !== 'string') throw new Error(`${context} content must be text`);
   assertClassicTextSectionTopics(section.topics, context);
   const uri = buildLocalDocumentResourceUri(section.documentId, section.sectionNumber);
