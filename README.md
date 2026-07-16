@@ -339,14 +339,16 @@ per-request D1 repositories. Both targets share one MCP registry.
 
 - The current tracked roadmap is [docs/ROADMAP.md](docs/ROADMAP.md), beginning
   after the PR #10 production baseline.
-- Full CCEL discovery and search are future work.
+- Live CCEL discovery and search remain gated future work; preview currently
+  exposes only the non-executing v4 contract.
 - The local historical collection needs document-level edition, source, and
   license metadata before redistribution claims can be made.
 - Hosted MCP Logging would require a deliberate stateful-session design.
 - Authentication, saved workspaces, completions, and MCP tasks should be added
-  only when a concrete workflow requires them. Structured output is currently
-  limited to the two representative lookup tools above; further conversions
-  require separate compatibility review.
+  only when a concrete workflow requires them. Ten tools now provide versioned
+  structured output beside compatible Markdown; `classic_text_lookup` alone
+  remains Markdown-only. Further contract revisions require separate
+  compatibility review.
 - Remote D1 compatibility must be checked before any deployment; migration or
   corpus replacement requires separate review and approval.
 

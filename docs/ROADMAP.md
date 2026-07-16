@@ -40,6 +40,30 @@ is local source context only and does not define the current product contract.
   fail-closed section coverage, official content-shape parsing, and aligned
   public guidance, reviewed at `32441d99de673eccce0a57fd74801fb94db04944`
   and merged as `9f6aa128eeab663ef04a315ab0c14b8ae9a3376d`.
+- **Release-record reconciliation / PRs #41–#42:** recorded the reviewed Phase
+  3 production correction and reconciled the shipped structured-output train,
+  merged as `7dc6ef9d6e0f3b76ff10384a2b3f6fed94270ef4` and
+  `e9eb7a71088518040a2467d654b73e6470d064dd`.
+- **Dormant CCEL parser hardening / PR #43:** standards-based, fail-closed
+  parsing with strict request, result, snippet, URL, and resource budgets;
+  public schemas and all rollout flags remained unchanged, merged as
+  `2009b3ae41433af4a207f2c917c41238112c570c`.
+- **CCEL coordinator stages A–B / PRs #44–#45:** created the dedicated
+  non-public global-budget owner, then wired dormant public clients behind a
+  separate coordinator flag; the dedicated owner gained no public route or
+  `workers.dev` target, and no live CCEL request was enabled, merged as
+  `6752480895421d290c4c3f95a1cb4130b8115f24` and
+  `1377648c01593b848f625c056187530de2086832`.
+- **Modern CCEL discovery contract / PRs #46–#47:** added the bounded v4
+  primary-source contract behind three gates, then exposed only that contract
+  in preview while leaving live search and coordinator execution disabled;
+  production remains v3/local-only, merged as
+  `1b13d5958d32835c3821498dfad52236cd5f3069` and
+  `a763eac9df51727dae97a03d53a6b853128c0ca4`.
+- **Honest UBS result window / PR #48:** `parallel_passages` structured schema
+  v2 reports whether one private lookahead group was directly observed without
+  returning, reconstructing, or enriching it, merged as
+  `ccb2db182f61a6dd15df29aa270666425c1b70b4`.
 - **Structured cross references / PR #35:** bounded, provenance-bearing v1
   output for `bible_cross_references`, merged as
   `d9b24eb2b7045b8d156b90be185c399a661c6f40`.
@@ -64,8 +88,9 @@ PR #21. Their stacked PRs #14–#20 are closed as superseded review vehicles:
 
 1. **PR #14 — bounded CCEL search adapter.** Defensive live-search transport,
    rights notices, budgets, caching, circuit behavior, and feature gates. The
-   adapter is retained as inactive future-provider architecture and is not
-   advertised or reachable through the current public MCP schemas.
+   adapter was retained as inactive future-provider architecture and was not
+   advertised or reachable through the production public MCP schema shipped by
+   PR #21. Preview later exposed a non-executing v4 contract through PR #47.
 2. **PR #15 — D1 materialization identity.** Distinguishes schema compatibility
    from the exact materialized corpus. Production was cut over to a freshly
    materialized replacement rather than mutating the predecessor database.
@@ -108,17 +133,27 @@ The structured-output release ledger is:
 Each release retained production D1 `theologai-production-20260715-a`
 (`c6535a4a-1953-4279-b277-7368445fc61a`), passed strict readiness as `ready`,
 and performed zero readiness writes. Live CCEL discovery remains intentionally
-disabled and outside the public MCP contract.
+disabled; only preview exposes its non-executing v4 contract.
 
-The current production Worker is PR #37 version
-`9d2b757b-8b9b-4318-b09d-14f62815bf82`; its immediate compatible same-D1
-predecessor is PR #38 version `e0371eb4-05c6-4415-b479-b01ac2630be0`. The
-current preview Worker is PR #37 version
-`fb2b8e41-4310-43f3-a8f0-571a64a733ac`; its immediate compatible same-D1
-predecessor is PR #38 version `404b7eb3-7244-436d-bfa5-8359ac3a4aab`. Both
-preview versions use `theologai-preview-20260714-a`
-(`0dab804f-8df0-4727-93bd-299612b6e179`). These are retained rollback options;
-no rollback is recorded as executed.
+The current production Worker is PR #48 version
+`e4d0cc54-f3c4-4a27-98ad-fc259edd9a72`, bound to
+`theologai-production-20260715-a`
+(`c6535a4a-1953-4279-b277-7368445fc61a`). Its CCEL rollout state is `000`:
+contract exposure, live search, and coordinator execution are all disabled.
+The current preview Worker is PR #48 version
+`5f381dc2-1116-435d-8292-8557891000ad`, bound to
+`theologai-preview-20260714-a`
+(`0dab804f-8df0-4727-93bd-299612b6e179`). Its state is `100`: the v4 discovery
+contract is exposed, but live search and coordinator execution are disabled.
+
+PR #47's exposure-only preview audit recorded 91 fresh requests and 126
+assertions with no P0–P3 findings; its production control recorded 38 requests
+and 70 assertions with no P0–P3 findings. PR #48's preview audit recorded 30
+fresh requests and 73/73 assertions, and its production audit recorded 16
+fresh-session requests and 65/65 assertions, all with no P0–P3 findings. The
+production audit confirmed the parallel-passage v2 sentinels and exact preview
+parity except for the intended preview-v4/production-v3 primary-source delta;
+it made no CCEL request, chain RPC, limiter probe, or mutation.
 
 ## Shipped Unicode correction release
 
@@ -328,14 +363,28 @@ Code readiness and operational readiness are deliberately separate:
 ## Next work
 
 - Decide and review a bounded, discovery-only public rollout of the retained
-  CCEL search adapter. It must remain request-scoped and must not crawl, mirror,
-  store, or republish CCEL document bodies.
+  CCEL search adapter. Live preview testing requires explicit owner acceptance
+  of the residual policy ambiguity: free, donation-independent discovery with
+  at most five attributed 240-character provider snippets and clean links, no
+  body retrieval or republication, and no durable content storage. Applicable
+  operational and terms boundaries have not yet been reviewed or approved.
+  Immediately before any live preview canary, recheck the current CCEL search
+  interface, robots guidance, copyright policy, and operational/terms boundary;
+  record that evidence and repeat the owner decision. Until then preview stays
+  `100`, production stays `000`, and neither environment may make a CCEL
+  request.
 - Expand the local primary-source corpus with rights-reviewed, freely
   redistributable editions and explicit edition provenance. Do not mirror or
   republish CCEL transcriptions without edition-specific rights.
 - Broaden original-language study with a separately sourced semantic-domain
   layer useful to both beginners and readers of Greek or Hebrew; evaluate
   MACULA discourse/context evidence only after that foundation is reviewed.
+  The currently exposed TBESH `Meaning` definitions derive from Online Bible
+  material whose source notice says permission should be obtained before use in
+  a project. The owner must decide whether to stop exposing those definitions
+  until a clearly redistributable replacement is selected (recommended) or
+  explicitly accept the residual risk. Do not expand their use meanwhile; the
+  separately CC BY 4.0 STEPBible morphology evidence remains usable on its own.
 - Evaluate section-span commentary only where provider coverage can be stated
   honestly; never relabel a section anchor as an exact verse range.
 - Continue modern MCP output improvements tool by tool when a stable structured
@@ -359,8 +408,10 @@ Code readiness and operational readiness are deliberately separate:
 - Historical public-domain text may be published when transcription provenance
   is uncertain, but that uncertainty must be disclosed; a third party's
   particular transcription is not assumed redistributable.
-- CCEL adapters remain inactive and outside the public MCP contract. A future
-  discovery-only rollout requires separate review and must not become crawling,
-  catalog mirroring, body republication, or permanent storage.
+- CCEL execution remains inactive. Preview exposes the v4 discovery contract
+  only; production remains v3/local-only. A future live discovery rollout
+  requires the explicit owner policy decision above and separate review, and
+  must not become crawling, catalog mirroring, body republication, or permanent
+  storage.
 - Public Ethereum RPC endpoints are light-use defaults, not an uptime SLO.
   Donation verification remains fail-closed.
