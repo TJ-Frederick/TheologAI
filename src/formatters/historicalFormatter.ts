@@ -127,12 +127,14 @@ export function formatSearchResults(
   return `${s.trim()}\n\n${localSource}`;
 }
 
-/** First 300 Unicode code points, shared by Markdown and structured discovery. */
+/** Bounded Unicode-code-point preview shared by Markdown and structured discovery. */
 export function formatHistoricalDiscoverySnippet(content: string): string {
   let snippet = '';
   let count = 0;
   for (const codePoint of content) {
-    if (count === 300) return `${snippet}...`;
+    if (count === CLASSIC_TEXT_LIMITS.discoverySnippetBodyCharacters) {
+      return `${snippet}${CLASSIC_TEXT_LIMITS.discoverySnippetEllipsis}`;
+    }
     snippet += codePoint;
     count += 1;
   }

@@ -1,6 +1,8 @@
 import { buildLocalDocumentResourceUri } from './documentResource.js';
 
 const CLASSIC_TEXT_SEARCH_HITS = 10;
+const CLASSIC_TEXT_DISCOVERY_SNIPPET_BODY_CHARACTERS = 300;
+const CLASSIC_TEXT_DISCOVERY_SNIPPET_ELLIPSIS = '...';
 
 /** Shared storage and v1 output bounds for locally hosted classic texts. */
 export const CLASSIC_TEXT_LIMITS = {
@@ -17,7 +19,10 @@ export const CLASSIC_TEXT_LIMITS = {
   nativeDirectoryLinks: 32,
   searchHits: CLASSIC_TEXT_SEARCH_HITS,
   searchLookahead: CLASSIC_TEXT_SEARCH_HITS + 1,
-  discoverySnippetCharacters: 303,
+  discoverySnippetBodyCharacters: CLASSIC_TEXT_DISCOVERY_SNIPPET_BODY_CHARACTERS,
+  discoverySnippetEllipsis: CLASSIC_TEXT_DISCOVERY_SNIPPET_ELLIPSIS,
+  discoverySnippetCharacters: CLASSIC_TEXT_DISCOVERY_SNIPPET_BODY_CHARACTERS
+    + [...CLASSIC_TEXT_DISCOVERY_SNIPPET_ELLIPSIS].length,
 } as const;
 
 export interface ClassicTextStoredDocumentMetadata {
