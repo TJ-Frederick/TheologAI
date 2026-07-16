@@ -14,6 +14,14 @@ const bootstrapWorkflow = readFileSync(
   new URL('../../../.github/workflows/bootstrap-ccel-coordinator.yml', import.meta.url),
   'utf8',
 );
+const packageJson = JSON.parse(readFileSync(
+  new URL('../../../package.json', import.meta.url),
+  'utf8',
+)) as { scripts: Record<string, string> };
+const coordinatorTypes = readFileSync(
+  new URL('../../../ccel-coordinator-configuration.d.ts', import.meta.url),
+  'utf8',
+);
 
 describe('CCEL coordinator Worker environments', () => {
   it('keeps live CCEL search false and leaves public coordinator integration absent', () => {
@@ -43,11 +51,31 @@ describe('CCEL coordinator Worker environments', () => {
     expect(ownerConfig).toContain('workers_dev = false');
   });
 
-  it('requires an explicit production-gated bootstrap confirmation', () => {
+  it('validates before approval and creates only an absent owner from main', () => {
     expect(bootstrapWorkflow).toContain('workflow_dispatch:');
     expect(bootstrapWorkflow).not.toMatch(/\n\s+(push|pull_request):/);
-    expect(bootstrapWorkflow).toContain('environment: production');
+    const validateStart = bootstrapWorkflow.indexOf('  validate:\n');
+    const deployStart = bootstrapWorkflow.indexOf('  deploy:\n');
+    expect(validateStart).toBeGreaterThan(0);
+    expect(deployStart).toBeGreaterThan(validateStart);
+    expect(bootstrapWorkflow.slice(validateStart, deployStart)).not.toContain('environment:');
+    expect(bootstrapWorkflow.slice(deployStart)).toContain('needs: validate');
+    expect(bootstrapWorkflow.slice(deployStart)).toContain('environment: production');
+    expect(bootstrapWorkflow).toContain("refs/heads/main");
     expect(bootstrapWorkflow).toContain('BOOTSTRAP THEOLOGAI CCEL COORDINATOR');
+    expect(bootstrapWorkflow).toContain('/workers/scripts/theologai-ccel-coordinator');
+    expect(bootstrapWorkflow).toContain('404)');
+    expect(bootstrapWorkflow).toContain('200)');
+    expect(bootstrapWorkflow).toContain('ref: ${{ github.sha }}');
     expect(bootstrapWorkflow).toContain('--config wrangler.ccel-coordinator.toml');
+  });
+
+  it('commits only generated environment declarations for the owner', () => {
+    expect(packageJson.scripts['types:ccel-coordinator']).toContain('--include-runtime false');
+    expect(packageJson.scripts['types:ccel-coordinator:check'])
+      .toContain('--include-runtime false');
+    expect(coordinatorTypes).toContain('durableNamespaces: "CcelGlobalCoordinator"');
+    expect(coordinatorTypes).not.toContain('declare class DurableObject');
+    expect(coordinatorTypes.split('\n').length).toBeLessThan(50);
   });
 });

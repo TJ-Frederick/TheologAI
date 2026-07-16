@@ -38,8 +38,8 @@
     "typecheck:worker-runtime": "tsc --noEmit -p test/worker-runtime/tsconfig.json",
     "types:worker": "WRANGLER_LOG_PATH=test-output/wrangler/logs wrangler types worker-configuration.d.ts --config wrangler.toml --env-file /dev/null",
     "types:worker:check": "WRANGLER_LOG_PATH=test-output/wrangler/logs wrangler types worker-configuration.d.ts --config wrangler.toml --env-file /dev/null --check",
-    "types:ccel-coordinator": "WRANGLER_LOG_PATH=test-output/wrangler/logs wrangler types ccel-coordinator-configuration.d.ts --config wrangler.ccel-coordinator.toml --env-file /dev/null",
-    "types:ccel-coordinator:check": "WRANGLER_LOG_PATH=test-output/wrangler/logs wrangler types ccel-coordinator-configuration.d.ts --config wrangler.ccel-coordinator.toml --env-file /dev/null --check",
+    "types:ccel-coordinator": "WRANGLER_LOG_PATH=test-output/wrangler/logs wrangler types ccel-coordinator-configuration.d.ts --config wrangler.ccel-coordinator.toml --env-file /dev/null --include-runtime false",
+    "types:ccel-coordinator:check": "WRANGLER_LOG_PATH=test-output/wrangler/logs wrangler types ccel-coordinator-configuration.d.ts --config wrangler.ccel-coordinator.toml --env-file /dev/null --include-runtime false --check",
     "validate:worker-config": "WRANGLER_LOG_PATH=test-output/wrangler/logs wrangler deploy --dry-run --env= --outdir test-output/wrangler/production && WRANGLER_LOG_PATH=test-output/wrangler/logs wrangler deploy --dry-run --env preview --outdir test-output/wrangler/preview",
     "validate:ccel-coordinator-config": "WRANGLER_LOG_PATH=test-output/wrangler/logs wrangler deploy --dry-run --config wrangler.ccel-coordinator.toml --outdir test-output/wrangler/ccel-coordinator",
     "validate:ccel-coordinator-test-config": "WRANGLER_LOG_PATH=test-output/wrangler/logs wrangler deploy --dry-run --config test/ccel-coordinator-runtime/wrangler.test.toml --outdir test-output/wrangler/ccel-coordinator-test",
@@ -93,6 +93,7 @@
     "zod": "4.3.6"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "4.20260702.1",
     "@cloudflare/vitest-pool-workers": "^0.18.4",
     "@modelcontextprotocol/conformance": "0.1.16",
     "@types/better-sqlite3": "^7.6.12",

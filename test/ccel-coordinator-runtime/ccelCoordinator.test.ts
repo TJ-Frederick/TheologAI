@@ -192,15 +192,46 @@ describe('CCEL global Durable Object coordinator', () => {
         future,
         future + 10_000,
       );
+      state.storage.sql.exec(`
+        CREATE TABLE rejected_admission_write_count (count INTEGER NOT NULL);
+        INSERT INTO rejected_admission_write_count VALUES (0);
+        CREATE TRIGGER count_rejected_admission_state_writes
+        AFTER UPDATE ON ccel_coordinator_state
+        BEGIN
+          UPDATE rejected_admission_write_count SET count = count + 1;
+        END;
+      `);
     });
-    await expect(stub.admit()).resolves.toMatchObject({
+    const reacquiredStub = env.THEOLOGAI_CCEL_COORDINATOR.getByName('clock-rollback');
+    await expect(reacquiredStub.admit()).resolves.toMatchObject({
       kind: 'busy',
       reason: 'minimum_interval',
       retryAfterSeconds: 10,
     });
-    await expect(stub.snapshot()).resolves.toMatchObject({
+    await expect(reacquiredStub.snapshot()).resolves.toMatchObject({
       lastObservedAtMs: future,
       nextAllowedAtMs: future + 10_000,
+    });
+    await runInDurableObject(reacquiredStub, async (_instance, state) => {
+      expect(state.storage.sql
+        .exec<{ count: number }>('SELECT count FROM rejected_admission_write_count')
+        .one().count).toBe(0);
+    });
+
+    await expect(reacquiredStub.resetAfterOperatorReview()).resolves.toMatchObject({
+      lastObservedAtMs: future,
+      nextAllowedAtMs: future + 10_000,
+      operatorEpoch: 1,
+    });
+    await expect(reacquiredStub.admit()).resolves.toMatchObject({
+      kind: 'busy',
+      reason: 'minimum_interval',
+      retryAfterSeconds: 10,
+    });
+    await runInDurableObject(reacquiredStub, async (_instance, state) => {
+      expect(state.storage.sql
+        .exec<{ count: number }>('SELECT count FROM rejected_admission_write_count')
+        .one().count).toBe(1);
     });
   });
 

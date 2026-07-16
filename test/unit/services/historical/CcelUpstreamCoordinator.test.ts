@@ -59,6 +59,52 @@ describe('CCEL upstream coordinator policy', () => {
     });
   });
 
+  it('does not commit a rejected observation before a later clock rollback', () => {
+    const admitted = transitionCcelAdmission(initialCcelCoordinatorState(), 100_000);
+    const rejectedAtLaterWallTime = transitionCcelAdmission(admitted.state, 105_000);
+
+    expect(rejectedAtLaterWallTime.decision).toEqual({
+      kind: 'busy',
+      reason: 'minimum_interval',
+      retryAfterSeconds: 5,
+    });
+    expect(rejectedAtLaterWallTime.state).toEqual(admitted.state);
+
+    const afterRollback = transitionCcelAdmission(rejectedAtLaterWallTime.state, 90_000);
+    expect(afterRollback.decision).toEqual({
+      kind: 'busy',
+      reason: 'minimum_interval',
+      retryAfterSeconds: 10,
+    });
+    expect(afterRollback.state).toEqual(admitted.state);
+  });
+
+  it('keeps process-local rejected observations read-only across rollback and reset', async () => {
+    let now = 100_000;
+    const coordinator = new ProcessLocalCcelUpstreamCoordinator({ enabled: true, now: () => now });
+    await expect(coordinator.admit()).resolves.toMatchObject({ kind: 'admitted' });
+
+    now = 105_000;
+    await expect(coordinator.admit()).resolves.toEqual({
+      kind: 'busy',
+      reason: 'minimum_interval',
+      retryAfterSeconds: 5,
+    });
+    await expect(coordinator.snapshot()).resolves.toMatchObject({ lastObservedAtMs: 100_000 });
+
+    now = 90_000;
+    await expect(coordinator.admit()).resolves.toEqual({
+      kind: 'busy',
+      reason: 'minimum_interval',
+      retryAfterSeconds: 10,
+    });
+    await expect(coordinator.resetAfterOperatorReview()).resolves.toMatchObject({
+      lastObservedAtMs: 100_000,
+      nextAllowedAtMs: 110_000,
+      operatorEpoch: 1,
+    });
+  });
+
   it('persists a bounded Retry-After and allows only one half-open probe', () => {
     const admission = transitionCcelAdmission(initialCcelCoordinatorState(), 1_000);
     expect(admission.decision.kind).toBe('admitted');

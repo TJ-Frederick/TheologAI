@@ -5,7 +5,10 @@
     "moduleResolution": "Bundler",
     "strict": true,
     "skipLibCheck": true,
-    "noEmit": true
+    "noEmit": true,
+    "types": [
+      "@cloudflare/workers-types"
+    ]
   },
   "include": [
     "src/ccel-coordinator-worker.ts",

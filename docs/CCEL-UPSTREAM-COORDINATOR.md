@@ -4,10 +4,10 @@
 
 This is disabled infrastructure, not CCEL enablement.
 `THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH` remains `false` in production and preview.
-Stage A does not
-add a public coordinator binding, flag, or client. No MCP tool constructs a
-coordinator client, `primary_source_search` remains local-only, and this slice
-makes no CCEL request.
+Stage A adds no public coordinator binding, no public coordinator client, and
+no `THEOLOGAI_ENABLE_CCEL_COORDINATOR` flag. Those are strictly future Stage B
+changes. `primary_source_search` remains local-only, and Stage A makes no CCEL
+request.
 
 ## One-origin architecture
 
@@ -22,9 +22,9 @@ bootstrapped before Stage B adds either public binding. The Stage B target is:
 | `theologai` | `theologai-ccel-coordinator` | shared |
 | `theologai-preview` | `theologai-ccel-coordinator` | shared |
 
-That target is deliberate: preview must not create a second 10-second budget against
-the same origin. The isolated Worker-runtime test owns a separate local-only
-namespace and cannot affect Cloudflare state.
+That future target is deliberate: preview must not create a second 10-second
+budget against the same origin. The isolated coordinator-runtime test owns a
+separate local-only namespace and cannot affect Cloudflare state.
 
 The owner uses Wrangler's declarative export syntax:
 
@@ -85,39 +85,55 @@ terminal token, or circuit transition.
   reviewed the condition and calls the internal reset pathway. No public route
   exposes reset.
 
-The persisted last-observed timestamp is a monotonic floor. If wall time moves
-backward, admission remains closed until time catches up; rollback cannot
-accelerate a fetch. An expired half-open lease allows one replacement probe so
-a crashed caller cannot wedge the origin forever.
+Admission calculates its effective time as the greater of wall time and the
+persisted last-observed floor. An admitted request, or an admission transition
+that actually changes circuit state, persists that effective observation along
+with its absolute reservation. Busy, latched, and probe-in-flight reads do not
+advance the returned floor and cause no SQLite write. Persisted absolute
+`next_allowed_at_ms` and backoff deadlines therefore remain the safety boundary
+across restart and wall-clock rollback without rejected-call write
+amplification. An expired half-open lease allows one replacement probe so a
+crashed caller cannot wedge the origin forever.
 
 ## First reconciliation and release order
 
-Do not merge or deploy Stage B's public bindings until the dedicated owner exists. The only
-repository-owned creation path is the manual **Bootstrap CCEL Coordinator**
-workflow. It has no push or pull-request trigger, uses the protected
-`production` environment, requires the exact confirmation
-`BOOTSTRAP THEOLOGAI CCEL COORDINATOR`, and validates generated types,
-typechecks, tests, and a Wrangler dry-run before reconciliation.
+Do not merge or deploy Stage B's public bindings until the dedicated owner
+exists. The only repository-owned creation path is the manual **Bootstrap CCEL
+Coordinator** workflow. It has no push or pull-request trigger and is
+initial-bootstrap-only.
+
+Its unprotected validation job first requires the exact
+`refs/heads/main` dispatch ref and confirmation
+`BOOTSTRAP THEOLOGAI CCEL COORDINATOR`, then checks generated types,
+typechecks, tests, and a Wrangler dry-run. Only successful validation makes the
+dependent deploy job request approval for the protected `production`
+environment. After approval grants the environment-scoped Cloudflare token and
+account ID, an automated read-only API preflight requires the owner script to
+be absent (`404`). An existing owner (`200`) or any unexpected response fails
+the job automatically; the workflow never overwrites or reconciles an existing
+owner.
 
 For the first release, use two independently reviewable stages:
 
 1. Merge Stage A only: the dedicated owner, declarative export, tests, generated
    types, documentation, and protected bootstrap workflow. Public production
    and preview configs remain unbound and deploy normally.
-2. Dispatch **Bootstrap CCEL Coordinator** from the default branch, enter the exact confirmation, and
-   approve the `production` environment.
-3. Review Wrangler's first reconciliation. The expected change is creation of
-   the new `CcelGlobalCoordinator` SQLite export owned by
-   `theologai-ccel-coordinator`. If Wrangler reports an existing, replaced,
-   transferred, or deleted resource, stop and investigate instead of approving.
-4. Only after owner reconciliation succeeds, merge Stage B. It adds the dormant
+2. Dispatch **Bootstrap CCEL Coordinator** from `main` and enter the exact
+   confirmation. Wait for the unprotected validation job to pass, then approve
+   the dependent `production` environment job.
+3. The approved job checks that `theologai-ccel-coordinator` is absent and, only
+   after a `404`, creates the owner and its new `CcelGlobalCoordinator` SQLite
+   export. Any existing or ambiguous state fails automatically.
+4. Only after owner creation succeeds, open Stage B. It adds the dormant
    production and preview external bindings, the coordinator client, and a
    second false rollout flag. Both callers must retain the exact same
-   `script_name`; keep `deploy-preview` absent until production deployment has
-   validated the binding.
-5. After Stage B production deployment succeeds, preview may be authorized for
-   smoke testing. Both flags remain false, so neither caller instantiates the
-   Durable Object or contacts CCEL.
+   `script_name`.
+5. Run Stage B checks, authorize its protected preview deployment, and smoke
+   test preview. Both flags remain false, so preview does not instantiate the
+   Durable Object or contact CCEL.
+6. After review and preview validation, merge Stage B and let the protected
+   production workflow deploy the same external binding. Do not update the
+   dedicated owner as part of a preview release.
 
 Dry-runs validate configuration but do not prove that an external owner exists;
 that is why release order is an explicit operator invariant.
@@ -130,12 +146,14 @@ coordinator. Removing a binding or owner config also does not authorize
 deletion. A declarative deletion/tombstone is a destructive operation and must
 never be added or executed without separate, explicit owner approval.
 
-Prefer forward repair for owner code or SQLite schema faults. Keep the owner
-deployed and both feature flags false while repairing, validate against the
-persisted schema, then reconcile the fixed owner through the protected workflow.
-A public Worker rollback is safe only if its configuration remains compatible
-with the persistent owner. Never create a replacement namespace as an ad-hoc
-rollback: that would silently reset the global origin budget.
+Prefer forward repair for owner code or SQLite schema faults. The bootstrap
+workflow cannot perform that repair because its absent-owner preflight will
+fail. Keep the owner deployed and all public enablement flags false, then use a
+separately reviewed forward-repair workflow/change that validates compatibility
+with the persisted schema. A public Worker rollback is safe only if its
+configuration remains compatible with the persistent owner. Never create a
+replacement namespace as an ad-hoc rollback: that would silently reset the
+global origin budget.
 
 ## Node behavior
 

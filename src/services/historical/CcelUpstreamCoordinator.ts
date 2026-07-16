@@ -165,7 +165,8 @@ export function transitionCcelAdmission(
   wallNowMs: number,
 ): CcelAdmissionTransition {
   const state = validateAndCloneState(previous);
-  const now = observeMonotonicTime(state, wallNowMs);
+  const wallNow = normalizeTimestamp(wallNowMs, 'clock');
+  const now = Math.max(state.lastObservedAtMs, wallNow);
 
   if (state.state === 'latched_policy' || state.state === 'latched_interface') {
     return {
@@ -205,6 +206,7 @@ export function transitionCcelAdmission(
   }
 
   if (state.attemptSequence >= Number.MAX_SAFE_INTEGER) {
+    state.lastObservedAtMs = now;
     state.state = 'latched_interface';
     state.backoffUntilMs = 0;
     clearProbe(state);
@@ -219,6 +221,7 @@ export function transitionCcelAdmission(
   }
 
   const attemptId = state.attemptSequence + 1;
+  state.lastObservedAtMs = now;
   state.attemptSequence = attemptId;
   state.nextAllowedAtMs = safeTimestampAdd(now, CCEL_UPSTREAM_MIN_INTERVAL_MS);
   if (probe) {
