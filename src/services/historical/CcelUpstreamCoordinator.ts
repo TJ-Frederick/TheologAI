@@ -90,7 +90,8 @@ export type CcelCoordinatorEvent =
   | {
       event: 'theologai.ccel.coordinator.admission';
       decision: CcelAdmissionDecision['kind'];
-      state: CcelCoordinatorCircuitState;
+      /** Present only when the decision itself determines the state exactly. */
+      state?: CcelCoordinatorCircuitState;
       probe?: boolean;
       retryAfterSeconds?: number;
     }

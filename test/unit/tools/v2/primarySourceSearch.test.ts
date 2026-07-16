@@ -31,7 +31,7 @@ describe('primary_source_search handler', () => {
     });
     expect(handler.inputSchema).toMatchObject({ type: 'object', required: ['queries'], additionalProperties: false });
     expect(handler.inputSchema.properties?.queries).toMatchObject({ minItems: 1, maxItems: 4 });
-    expect(handler.annotations).toEqual({ readOnlyHint: true, destructiveHint: false, idempotentHint: true });
+    expect(handler.annotations).toEqual({ readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false });
     expect(handler.description).toContain('exact local section locators');
     const item = (handler.inputSchema.properties?.queries as any).items;
     expect(item.required).toEqual(['id', 'text', 'providers']);
@@ -455,5 +455,155 @@ describe('primary_source_search handler', () => {
     expect(JSON.stringify(result)).not.toContain('theologai://documents/secret');
     expect(result.content).toHaveLength(1);
     expect(validatorFor(handler.outputSchema!)(result.structuredContent).valid).toBe(true);
+  });
+});
+
+describe('primary_source_search v4 contract', () => {
+  const v4 = {
+    exposeCcelDiscovery: true,
+    ccelLiveSearch: false,
+    ccelCoordinator: false,
+    contractVersion: '4' as const,
+    liveCcelEnabled: false,
+  };
+
+  function plan(externalUrl = 'https://ccel.org/ccel/calvin/institutes/iv.xvii.html') {
+    return {
+      planStatus: 'complete' as const,
+      queries: [{
+        id: 'q1', normalizedMode: 'all_terms' as const, normalizedSelection: 'relevance' as const,
+        providers: [{
+          provider: 'local' as const, status: 'ok' as const, searched: true, page: 1, hitCount: 1,
+          resultWindow: { returnedHitCount: 1, additionalMatchStatus: 'no_additional_match_observed' as const },
+          notices: [], scope: {
+            status: 'matched' as const, requested: {}, eligibleDocumentCount: 1,
+            eligibleDocuments: [{ id: 'doc', title: 'Document', metadataStatus: 'reviewed' as const }],
+            eligibleDocumentsTruncated: false,
+          },
+          hits: [{
+            queryId: 'q1', provider: 'local' as const, title: 'Local section', snippet: 'Local evidence lead',
+            rankWithinProvider: 1, page: 1, snippetOnly: true as const, attribution: 'Local', resourceSizeBytes: 42,
+            locator: { kind: 'local_section' as const, url: 'theologai://documents/doc#section-1', documentId: 'doc', sectionId: '1' },
+          }],
+        }, {
+          provider: 'ccel_live' as const, status: 'ok' as const, searched: true, page: 1, hitCount: 1,
+          resultWindow: { returnedHitCount: 1, additionalMatchStatus: 'no_additional_match_observed' as const }, notices: [],
+          hits: [{
+            queryId: 'q1', provider: 'ccel_live' as const, title: 'External section', snippet: 'Unreviewed external lead',
+            rankWithinProvider: 1, page: 1, snippetOnly: true as const, attribution: 'CCEL',
+            locator: { kind: 'ccel_section' as const, url: externalUrl, work: 'calvin/institutes', section: 'iv.xvii' },
+          }],
+        }],
+      }],
+      coverage: { localAttempted: true, localHitCount: 1, ccelAttempted: true, ccelHitCount: 1, notices: [] },
+    };
+  }
+
+  it('advertises strict v4 providers and open-world behavior', () => {
+    const handler = createPrimarySourceSearchHandler({ search: vi.fn() } as any, v4);
+    expect(handler.outputSchema?.properties?.schemaVersion).toEqual({ const: '4' });
+    expect(handler.annotations).toMatchObject({ openWorldHint: true });
+    const query = (handler.inputSchema.properties?.queries as any).items;
+    expect(query.properties.providers).toMatchObject({ maxItems: 2, items: { enum: ['local', 'ccel'] } });
+    expect(query.properties.selection.description).toContain('CCEL discovery');
+    expect(query.properties.author.description).toContain('unreviewed provider search restriction');
+    expect(query.properties.work.description).toContain('unreviewed provider');
+    expect(query.properties.startYear.description).toContain('Unsupported for CCEL');
+    expect(query.properties.endYear.description).toContain('Unsupported for CCEL');
+    expect(query.properties.page.description).toContain('page 1 only');
+    expect(query.properties.limit.description).toContain('capped at 5');
+    expect(validatorFor(handler.inputSchema)({ queries: [{ id: 'q', text: 'faith', providers: ['ccel'] }] }).valid).toBe(true);
+  });
+
+  it('uses exact compact JSON parity and emits native links only for final local hits', async () => {
+    const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue(plan()) } as any, v4);
+    const result = await handler.handler({ queries: [{ id: 'q1', text: 'faith', providers: ['local', 'ccel'] }] });
+    expect(result.content[0]).toEqual({ type: 'text', text: JSON.stringify(result.structuredContent) });
+    expect(result.content.filter(item => item.type === 'resource_link')).toHaveLength(1);
+    expect(JSON.stringify(result.content.slice(1))).not.toContain('ccel.org');
+    expect(result.structuredContent).toMatchObject({
+      schemaVersion: '4', responseWindow: { unit: 'utf8_bytes', maximum: 32768, truncated: false },
+      queries: [{ providers: [
+        { hits: [{ locator: { kind: 'mcp_resource', uri: 'theologai://documents/doc#section-1' } }] },
+        { hits: [{ locator: { kind: 'external_url', url: 'https://ccel.org/ccel/calvin/institutes/iv.xvii.html' } }] },
+      ] }],
+    });
+    expect(new TextEncoder().encode((result.content[0] as { text: string }).text).byteLength).toBeLessThanOrEqual(32768);
+    expect(validatorFor(handler.outputSchema!)(result.structuredContent).valid).toBe(true);
+  });
+
+  it('omits control-only optional metadata while preserving a schema-valid v4 hit', async () => {
+    const adversarial = plan();
+    const local = adversarial.queries[0]!.providers[0]!;
+    const hit = local.hits[0]!;
+    hit.author = '\u0001';
+    hit.sectionLabel = '\u0002';
+    hit.documentType = '\u0003';
+    hit.documentDate = '\u0004';
+    adversarial.queries[0]!.providers = [local];
+    adversarial.coverage.ccelAttempted = false;
+    adversarial.coverage.ccelHitCount = 0;
+    const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue(adversarial) } as any, v4);
+
+    const result = await handler.handler({ queries: [{ id: 'q1', text: 'faith', providers: ['local'] }] });
+    const structured = result.structuredContent as any;
+    const sanitized = structured.queries[0].providers[0].hits[0];
+    expect(sanitized).not.toHaveProperty('author');
+    expect(sanitized).not.toHaveProperty('sectionLabel');
+    expect(sanitized).not.toHaveProperty('documentType');
+    expect(sanitized).not.toHaveProperty('documentDate');
+    expect(structured).toMatchObject({ planStatus: 'partial', responseWindow: { truncated: true } });
+    expect(result.content[0]).toEqual({ type: 'text', text: JSON.stringify(structured) });
+    expect(validatorFor(handler.outputSchema!)(structured).valid).toBe(true);
+  });
+
+  it('keeps exact JSON/schema parity for structured unavailable errors', async () => {
+    const unavailable = plan();
+    unavailable.planStatus = 'unavailable';
+    for (const provider of unavailable.queries[0]!.providers) {
+      provider.status = 'disabled';
+      provider.searched = false;
+      provider.hitCount = 0;
+      provider.hits = [] as never;
+      provider.resultWindow = { returnedHitCount: 0, additionalMatchStatus: 'not_evaluated' };
+    }
+    const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue(unavailable) } as any, v4);
+    const result = await handler.handler({ queries: [{ id: 'q1', text: 'faith', providers: ['local', 'ccel'] }] });
+    expect(result.isError).toBe(true);
+    expect(result.content[0]).toEqual({ type: 'text', text: JSON.stringify(result.structuredContent) });
+    expect(validatorFor(handler.outputSchema!)(result.structuredContent).valid).toBe(true);
+  });
+
+  it.each([
+    'http://ccel.org/ccel/calvin/institutes/iv.xvii.html',
+    'https://www.ccel.org/ccel/calvin/institutes/iv.xvii.html',
+    'https://ccel.org/ccel/calvin/institutes/iv.xvii.html?token=secret',
+    'https://ccel.org.evil.test/ccel/calvin/institutes/iv.xvii.html',
+  ])('omits a malicious external locator without emitting a link (%s)', async externalUrl => {
+    const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue(plan(externalUrl)) } as any, v4);
+    const result = await handler.handler({ queries: [{ id: 'q1', text: 'faith', providers: ['local', 'ccel'] }] });
+    expect(JSON.stringify(result)).not.toContain(externalUrl);
+    expect(result.structuredContent).toMatchObject({ planStatus: 'partial', queries: [{ providers: [{ hitCount: 1 }, { status: 'interface_changed', hitCount: 0 }] }] });
+    expect(result.content.filter(item => item.type === 'resource_link')).toHaveLength(1);
+    expect(validatorFor(handler.outputSchema!)(result.structuredContent).valid).toBe(true);
+  });
+
+  it('sanitizes malformed service drift to one global external provider group', async () => {
+    const adversarial = plan();
+    const external = adversarial.queries[0]!.providers[1]!;
+    adversarial.queries.push({
+      id: 'q2', normalizedMode: 'all_terms', normalizedSelection: 'relevance',
+      providers: [{
+        ...external,
+        hits: external.hits.map(hit => ({ ...hit, queryId: 'q2' })),
+      }],
+    });
+    const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue(adversarial) } as any, v4);
+    const result = await handler.handler({ queries: [{ id: 'q1', text: 'faith', providers: ['ccel'] }] });
+    const structured = result.structuredContent as any;
+    expect(structured.queries.flatMap((query: any) => query.providers)
+      .filter((provider: any) => provider.provider === 'ccel_live')).toHaveLength(1);
+    expect(structured).toMatchObject({ planStatus: 'partial', responseWindow: { truncated: true } });
+    expect(validatorFor(handler.outputSchema!)(structured).valid).toBe(true);
   });
 });

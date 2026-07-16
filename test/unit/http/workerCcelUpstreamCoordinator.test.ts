@@ -12,6 +12,7 @@ const factoryLacksOperatorReset: LacksOperatorReset<FactorySurface> = true;
 const classLacksOperatorReset: LacksOperatorReset<ClassSurface> = true;
 
 function createFactoryHarness(
+  exposureEnabled: boolean,
   liveSearchEnabled: boolean,
   coordinatorEnabled: boolean,
 ) {
@@ -42,6 +43,7 @@ function createFactoryHarness(
   }));
   const getByName = vi.fn(() => ({ admit, recordOutcome, snapshot }));
   const env = {
+    THEOLOGAI_EXPOSE_CCEL_DISCOVERY: exposureEnabled ? 'true' : 'false',
     THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH: liveSearchEnabled ? 'true' : 'false',
     THEOLOGAI_ENABLE_CCEL_COORDINATOR: coordinatorEnabled ? 'true' : 'false',
     THEOLOGAI_CCEL_COORDINATOR: { getByName },
@@ -64,14 +66,19 @@ describe('public Worker CCEL coordinator surface', () => {
   });
 
   it.each([
-    { flags: '00', liveSearchEnabled: false, coordinatorEnabled: false },
-    { flags: '10', liveSearchEnabled: true, coordinatorEnabled: false },
-    { flags: '01', liveSearchEnabled: false, coordinatorEnabled: true },
+    { flags: '000', exposureEnabled: false, liveSearchEnabled: false, coordinatorEnabled: false },
+    { flags: '001', exposureEnabled: false, liveSearchEnabled: false, coordinatorEnabled: true },
+    { flags: '010', exposureEnabled: false, liveSearchEnabled: true, coordinatorEnabled: false },
+    { flags: '011', exposureEnabled: false, liveSearchEnabled: true, coordinatorEnabled: true },
+    { flags: '100', exposureEnabled: true, liveSearchEnabled: false, coordinatorEnabled: false },
+    { flags: '101', exposureEnabled: true, liveSearchEnabled: false, coordinatorEnabled: true },
+    { flags: '110', exposureEnabled: true, liveSearchEnabled: true, coordinatorEnabled: false },
   ])('keeps the $flags factory path local without constructing the Durable Object', async ({
+    exposureEnabled,
     liveSearchEnabled,
     coordinatorEnabled,
   }) => {
-    const harness = createFactoryHarness(liveSearchEnabled, coordinatorEnabled);
+    const harness = createFactoryHarness(exposureEnabled, liveSearchEnabled, coordinatorEnabled);
 
     await expect(harness.coordinator.admit()).resolves.toEqual({ kind: 'disabled' });
     await expect(harness.coordinator.recordOutcome(
@@ -93,8 +100,8 @@ describe('public Worker CCEL coordinator surface', () => {
     expect(harness.snapshot).not.toHaveBeenCalled();
   });
 
-  it('uses the singleton Durable Object exactly once for the 11 factory path', async () => {
-    const harness = createFactoryHarness(true, true);
+  it('uses the singleton Durable Object exactly once for the 111 factory path', async () => {
+    const harness = createFactoryHarness(true, true, true);
 
     await expect(harness.coordinator.admit()).resolves.toMatchObject({ kind: 'admitted' });
 

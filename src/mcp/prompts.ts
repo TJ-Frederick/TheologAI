@@ -5,6 +5,8 @@ import { parseReference } from '../kernel/reference.js';
 import { parseStrongsIdentity } from '../kernel/strongs.js';
 import { PUBLIC_DONATION_URL } from '../kernel/publicUrls.js';
 import { validatePromptArguments } from './validation.js';
+import type { PrimarySourceContractConfig } from '../kernel/featureFlags.js';
+import { DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG } from '../kernel/featureFlags.js';
 
 export interface RecommendedToolCall {
   tool: string;
@@ -55,6 +57,7 @@ function containingChapterReference(value: string): string {
 export function recommendedToolCallsForPrompt(
   name: string,
   args: Record<string, string> | undefined,
+  contract: PrimarySourceContractConfig = DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG,
 ): RecommendedToolCall[] {
   switch (name) {
     case 'word-study': {
@@ -112,7 +115,7 @@ export function recommendedToolCallsForPrompt(
           queries: [{
             id: 'confession-topic',
             text: topic,
-            providers: ['local'],
+            providers: contract.contractVersion === '4' ? ['local', 'ccel'] : ['local'],
             match: 'all_terms',
             selection: 'work_diversity',
             limit: 5,
@@ -135,7 +138,7 @@ export function recommendedToolCallsForPrompt(
         ...(startYear !== undefined ? { startYear } : {}),
         ...(endYear !== undefined ? { endYear } : {}),
       };
-      return [{
+      const localCall: RecommendedToolCall = {
         tool: 'primary_source_search',
         arguments: {
           queries: (authors.length ? authors : [undefined]).map((author, index) => ({
@@ -149,7 +152,27 @@ export function recommendedToolCallsForPrompt(
             limit,
           })),
         },
-      }];
+      };
+      if (contract.contractVersion !== '4') return [localCall];
+      const externalScopes = authors.length ? authors : [undefined];
+      return [
+        localCall,
+        ...externalScopes.map((author, index): RecommendedToolCall => ({
+          tool: 'primary_source_search',
+          arguments: {
+            queries: [{
+              id: author ? `external-creator-${index + 1}` : 'external-topic',
+              text: topic,
+              providers: ['ccel'],
+              match: 'all_terms',
+              selection: 'relevance',
+              ...scoped,
+              ...(author ? { author } : {}),
+              limit,
+            }],
+          },
+        })),
+      ];
     }
     case 'donate':
       return [{ tool: 'donation_config', arguments: {} }];
@@ -162,7 +185,10 @@ function callText(call: RecommendedToolCall): string {
   return `\`${call.tool}\` with \`${JSON.stringify(call.arguments)}\``;
 }
 
-export function registerPromptHandlers(server: Server): void {
+export function registerPromptHandlers(
+  server: Server,
+  contract: PrimarySourceContractConfig = DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG,
+): void {
   server.setRequestHandler(ListPromptsRequestSchema, async () => ({
     prompts: [
       {
@@ -200,13 +226,45 @@ export function registerPromptHandlers(server: Server): void {
       },
       {
         name: 'primary-source-research',
-        description: 'Find and read bounded evidence from the locally indexed historical collection',
+        description: contract.contractVersion === '4'
+          ? 'Find local evidence and optional external discovery leads without treating snippets as evidence'
+          : 'Find and read bounded evidence from the locally indexed historical collection',
         arguments: [
-          { name: 'topic', description: 'Topic or terms to find in the local historical collection', required: true },
-          { name: 'work', description: 'Optional exact local work title or slug; not an author name', required: false },
-          { name: 'authors', description: 'Optional comma-separated canonical creator names. Each creator becomes a separate query; creator roles remain explicit.', required: false },
-          { name: 'startYear', description: 'Optional inclusive composition-year lower bound as an integer string.', required: false },
-          { name: 'endYear', description: 'Optional inclusive composition-year upper bound as an integer string.', required: false },
+          {
+            name: 'topic',
+            description: contract.contractVersion === '4'
+              ? 'Topic or terms for hosted local evidence and optional external CCEL discovery.'
+              : 'Topic or terms to find in the local historical collection',
+            required: true,
+          },
+          {
+            name: 'work',
+            description: contract.contractVersion === '4'
+              ? 'Optional exact hosted-local work title/slug and unreviewed external provider work restriction; not shared reviewed metadata or an author name.'
+              : 'Optional exact local work title or slug; not an author name',
+            required: false,
+          },
+          {
+            name: 'authors',
+            description: contract.contractVersion === '4'
+              ? 'Optional comma-separated creators. Each becomes a separate exact reviewed local creator query and a separate unreviewed external provider restriction; creator roles remain explicit.'
+              : 'Optional comma-separated canonical creator names. Each creator becomes a separate query; creator roles remain explicit.',
+            required: false,
+          },
+          {
+            name: 'startYear',
+            description: contract.contractVersion === '4'
+              ? 'Optional inclusive local composition-year lower bound as an integer string. CCEL does not support this filter, so external calls return unsupported_filter without upstream admission.'
+              : 'Optional inclusive composition-year lower bound as an integer string.',
+            required: false,
+          },
+          {
+            name: 'endYear',
+            description: contract.contractVersion === '4'
+              ? 'Optional inclusive local composition-year upper bound as an integer string. CCEL does not support this filter, so external calls return unsupported_filter without upstream admission.'
+              : 'Optional inclusive composition-year upper bound as an integer string.',
+            required: false,
+          },
           { name: 'maxSections', description: 'Maximum selected sections as a string integer from 1 to 5. Default: 3.', required: false },
         ],
       },
@@ -219,7 +277,7 @@ export function registerPromptHandlers(server: Server): void {
     validatePromptArguments(name, args);
     // validatePromptArguments narrows both values after the permissive wire boundary.
     if (typeof name !== 'string') throw new Error('Unreachable prompt-name validation state');
-    const calls = recommendedToolCallsForPrompt(name, args);
+    const calls = recommendedToolCallsForPrompt(name, args, contract);
 
     let text: string;
     switch (name) {
@@ -278,7 +336,16 @@ Use structured \`passages[]\` when available, compare by its \`translation\`, re
         const topic = args?.topic ?? '';
         const traditions = args?.traditions;
         const hint = traditions ? ` Focus on: ${traditions.split(',').map(item => item.trim()).join(', ')}.` : '';
-        text = `Cross-tradition doctrinal comparison on "${topic}".${hint}
+        text = contract.contractVersion === '4'
+          ? `Cross-tradition doctrinal comparison on "${topic}".${hint}
+
+1. **Inspect the hosted catalog** — Read \`theologai://primary-sources/catalog\` with MCP \`resources/read\`. Its reviewed metadata applies only to the hosted local collection.
+2. **Run bounded discovery** — ${callText(calls[0])}. Preserve local and external provider groups separately. The requested traditions are comparison interests, not creator filters or inferred metadata.
+3. **Use snippets only to select evidence** — Every snippet is discovery-only. For a local \`mcp_resource\` locator, read the exact URI with MCP \`resources/read\` before quotation or substantive comparison. For an external \`external_url\` locator, open the direct URL independently; it is not an MCP resource and its rights status is not determined.
+4. **Do not promote external metadata** — CCEL titles, creators, section labels, and snippets are unreviewed provider search results. Never quote, attribute doctrine, or compare positions from those snippets alone.
+5. **Read exact evidence** — Read at most five unique selected sections total. Confirm each local resource URI or external page identity before using its content, and keep local reviewed metadata distinct from external provider metadata.
+6. **Compare cautiously** — Explain agreement, divergence, Scripture use, and historical context only from exact sections actually read. Missing hits are not historical silence.`
+          : `Cross-tradition doctrinal comparison on "${topic}".${hint}
 
 1. **Inspect the hosted catalog** — Read \`theologai://primary-sources/catalog\` with MCP \`resources/read\`. Use only its reviewed work and creator metadata to plan the comparison; aliases route exact work lookups but are not metadata evidence. Do not substitute another creator or work for one absent from this catalog.
 2. **Run bounded local discovery** — ${callText(calls[0])}. The work-diverse selection builds a deterministic topic survey across hosted works. Treat snippets as discovery-only and do not claim the search covered sources outside the hosted collection. The requested tradition names are comparison interests, not author filters or evidence that a work belongs to that tradition.
@@ -292,7 +359,17 @@ Use structured \`passages[]\` when available, compare by its \`translation\`, re
         const topic = args?.topic ?? '';
         const work = args?.work?.trim();
         const authors = args?.authors?.split(',').map(value => value.trim()).filter(Boolean) ?? [];
-        text = `Research primary-source evidence about "${topic}"${work ? ` within the exact local work "${work}"` : ' across the locally indexed collection'}${authors.length ? ` for the separately scoped creators ${authors.map(value => `"${value}"`).join(', ')}` : ''}.
+        const externalCalls = calls.slice(1).map(call => callText(call)).join('; then ');
+        text = contract.contractVersion === '4'
+          ? `Research primary-source evidence about "${topic}"${work ? ` within the requested work "${work}"` : ''}${authors.length ? ` for the separately scoped creators ${authors.map(value => `"${value}"`).join(', ')}` : ''}.
+
+1. **Inspect local scope** — Read \`theologai://primary-sources/catalog\` with MCP \`resources/read\`. Its reviewed work and creator metadata describes only the hosted local collection; an absent creator is a local catalog gap, not evidence that no external source exists.
+2. **Search local evidence** — ${callText(calls[0])}. Use local catalog scope and deterministic selection as returned.
+3. **Search external discovery sequentially** — ${externalCalls || 'No external query is needed.'} Each call contains at most one CCEL-bearing query. Do not combine creator comparisons into multiple CCEL queries in one call.
+4. **Use the v4 contract** — Preserve query/provider/rank order, provider status, notices, \`responseWindow\`, and \`evidencePolicy\`. Local locators are exact readable MCP resources. External locators are direct CCEL URLs only, with unreviewed provider-search metadata and rights status not determined.
+5. **Read before evidence use** — Follow at most ${args?.maxSections?.trim() || '3'} selected locators. Use MCP \`resources/read\` only for local \`mcp_resource\` URIs. Open external \`external_url\` pages directly and verify the page independently. Never quote, compare creators or works, or draw substantive conclusions from any search snippet alone.
+6. **Synthesize with provenance** — Keep reviewed local metadata separate from external provider metadata. Distinguish exact text read from interpretation, name unavailable/unsupported searches, and do not treat missing results as historical silence.`
+          : `Research primary-source evidence about "${topic}"${work ? ` within the exact local work "${work}"` : ' across the locally indexed collection'}${authors.length ? ` for the separately scoped creators ${authors.map(value => `"${value}"`).join(', ')}` : ''}.
 
 1. **Inspect the hosted catalog** — Read \`theologai://primary-sources/catalog\` with MCP \`resources/read\`. Confirm requested exact works and creator names there before searching. If Calvin, Erasmus, Luther, or any other requested creator is absent, report that catalog gap; never use a confession or similarly themed work as a proxy.
 2. **Run bounded discovery** — ${callText(calls[0])}. This workflow is local-only: do not claim it searched CCEL, the web, an exhaustive catalog, or works outside the server's collection. Topic and creator surveys use deterministic work diversity; exact within-work location uses relevance.

@@ -50,6 +50,7 @@ jobs:
         run: |
           npm run typecheck:worker-runtime
           npm run typecheck:ccel-coordinator-test
+          npm run typecheck:test-fixtures
 
       - name: Run unit tests with enforced coverage thresholds
         run: npm run test:coverage

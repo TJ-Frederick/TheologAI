@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { env, SELF } from 'cloudflare:test';
+import { createWorkerCompositionRoot } from '../../src/tools/worker/index.js';
+import type { Env } from '../../src/worker-env.js';
 
 const MCP_URL = 'https://worker.test/mcp';
 const ALLOWED_ORIGIN = 'https://allowed.example';
@@ -66,6 +68,27 @@ async function rateLimitKey(ip: string, userAgent: string): Promise<string> {
 }
 
 describe('Worker MCP endpoint in workerd', () => {
+  it('executes the dormant v4 exposure contract in workerd without enabling live CCEL', async () => {
+    const root = createWorkerCompositionRoot({
+      ...env,
+      THEOLOGAI_EXPOSE_CCEL_DISCOVERY: 'true',
+      THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH: 'false',
+      THEOLOGAI_ENABLE_CCEL_COORDINATOR: 'false',
+    } as unknown as Env);
+    const tool = root.tools.find(candidate => candidate.name === 'primary_source_search')!;
+    expect(tool.outputSchema?.properties?.schemaVersion).toEqual({ const: '4' });
+    expect(tool.annotations).toMatchObject({ openWorldHint: true });
+    const result = await tool.handler({ queries: [{ id: 'external', text: 'grace', providers: ['ccel'] }] });
+    expect(result).toMatchObject({
+      isError: true,
+      structuredContent: {
+        schemaVersion: '4', planStatus: 'unavailable',
+        coverage: { ccelAttempted: false, ccelStatus: 'disabled', ccelHitCount: 0 },
+      },
+    });
+    expect(result.content[0]).toEqual({ type: 'text', text: JSON.stringify(result.structuredContent) });
+  });
+
   it('provides the configured rate-limit binding in the Workers runtime', async () => {
     await expect(env.THEOLOGAI_RATE_LIMITER.limit({
       key: `worker-runtime-smoke-${crypto.randomUUID()}`,

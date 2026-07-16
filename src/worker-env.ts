@@ -15,6 +15,7 @@ export type Env = Omit<Cloudflare.Env, 'THEOLOGAI_CCEL_COORDINATOR'> & {
   BASE_RPC_URL?: string;
   RADIUS_RPC_URL?: string;
   /** Staged primary-source switches; absent values remain disabled. */
+  THEOLOGAI_EXPOSE_CCEL_DISCOVERY?: string;
   THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH?: string;
   THEOLOGAI_ENABLE_CCEL_COORDINATOR?: string;
 };

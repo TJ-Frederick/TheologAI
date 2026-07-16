@@ -27,6 +27,7 @@ import { registerToolHandlers } from './tools.js';
 import { jsonSchemaValidator } from './validation.js';
 import { buildPrimarySourceCatalog, PRIMARY_SOURCE_CATALOG_URI } from './primarySourceCatalog.js';
 import { COMMENTARY_CATALOG } from '../kernel/commentaryCatalog.js';
+import type { PrimarySourceContractConfig } from '../kernel/featureFlags.js';
 
 export interface McpServerServices {
   bibleService: Pick<BibleService, 'getSupportedTranslations'>;
@@ -38,6 +39,7 @@ export interface McpServerServices {
 export interface McpCompositionRoot {
   tools: ToolHandler[];
   services: McpServerServices;
+  primarySourceContract: PrimarySourceContractConfig;
 }
 
 export interface McpCapabilityProfile {
@@ -53,6 +55,7 @@ export function createTheologAiMcpServer(
   version: string,
   profile: McpCapabilityProfile = STDIO_CAPABILITIES,
 ): McpServer {
+  assertPrimarySourceContractParity(root);
   const mcpServer = new McpServer(
     { name: 'theologai-bible-server', version },
     {
@@ -276,7 +279,18 @@ export function createTheologAiMcpServer(
     throw resourceNotFound(uri);
   });
 
-  registerPromptHandlers(server);
+  registerPromptHandlers(server, root.primarySourceContract);
 
   return mcpServer;
+}
+
+function assertPrimarySourceContractParity(root: McpCompositionRoot): void {
+  const tool = root.tools.find(candidate => candidate.name === 'primary_source_search');
+  if (!tool) return;
+  const advertisedVersion = (tool.outputSchema?.properties?.schemaVersion as { const?: unknown } | undefined)?.const;
+  const expectedOpenWorld = root.primarySourceContract.contractVersion === '4';
+  if (advertisedVersion !== root.primarySourceContract.contractVersion
+    || tool.annotations?.openWorldHint !== expectedOpenWorld) {
+    throw new Error('primary_source_search tool and guided-prompt contracts must use the same configuration.');
+  }
 }

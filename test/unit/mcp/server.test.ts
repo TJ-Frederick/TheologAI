@@ -13,6 +13,8 @@ import { StrongsService } from '../../../src/services/languages/StrongsService.j
 import { readFileSync } from 'node:fs';
 import { createPrimarySourceSearchHandler } from '../../../src/tools/v2/primarySourceSearch.js';
 import { formatLocalDocumentSectionResource } from '../../../src/formatters/historicalFormatter.js';
+import { DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG } from '../../../src/kernel/featureFlags.js';
+import { primarySourceSearchOutputSchema } from '../../../src/mcp/schemas/primarySourceSearch.js';
 
 const TOOL_NAMES = [
   'bible_lookup',
@@ -38,7 +40,11 @@ function makeMockTool(name: string): ToolHandler {
       required: ['reference'],
       additionalProperties: false,
     },
-    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
+    ...(name === 'primary_source_search' ? { outputSchema: primarySourceSearchOutputSchema } : {}),
+    annotations: {
+      readOnlyHint: true, destructiveHint: false, idempotentHint: true,
+      ...(name === 'primary_source_search' ? { openWorldHint: false } : {}),
+    },
     handler: vi.fn().mockResolvedValue({
       content: [{ type: 'text', text: `Result from ${name}` }],
     } satisfies ToolResult),
@@ -108,6 +114,7 @@ function makeMockRoot(): McpCompositionRoot {
         }),
       },
     },
+    primarySourceContract: DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG,
   };
 }
 
@@ -761,6 +768,90 @@ describe('shared MCP registration', () => {
     expect(donateText).toContain('Do not infer price, liquidity, bridge availability, or wallet support');
     expect(donateText).toContain('`receipt_observed_no_confirmation_depth` as receipt observation only');
     expect(donateText).toContain('provider gaps fail closed');
+  });
+
+  it('renders v4 primary-source prompts with separate local and external evidence access', async () => {
+    const root = makeMockRoot();
+    root.primarySourceContract = {
+      exposeCcelDiscovery: true, ccelLiveSearch: false, ccelCoordinator: false,
+      contractVersion: '4', liveCcelEnabled: false,
+    };
+    root.tools = root.tools.map(tool => tool.name === 'primary_source_search'
+      ? createPrimarySourceSearchHandler({ search: vi.fn() } as any, root.primarySourceContract)
+      : tool);
+    const client = await connect(createTheologAiMcpServer(root, '1.0.0-v4-test').server);
+    const listed = await client.listPrompts();
+    const primaryDefinition = listed.prompts.find(prompt => prompt.name === 'primary-source-research')!;
+    const argumentDescription = (name: string) => primaryDefinition.arguments?.find(argument => argument.name === name)?.description ?? '';
+    expect(argumentDescription('topic')).toContain('optional external CCEL discovery');
+    expect(argumentDescription('work')).toContain('unreviewed external provider work restriction');
+    expect(argumentDescription('authors')).toContain('unreviewed external provider restriction');
+    expect(argumentDescription('startYear')).toContain('return unsupported_filter without upstream admission');
+    expect(argumentDescription('endYear')).toContain('return unsupported_filter without upstream admission');
+    const primary = await client.getPrompt({
+      name: 'primary-source-research',
+      arguments: {
+        topic: 'eucharist', authors: 'Erasmus of Rotterdam,Martin Luther',
+        startYear: '500', endYear: '1500',
+      },
+    });
+    const primaryText = primary.messages[0]?.content.type === 'text' ? primary.messages[0].content.text : '';
+    expect(primaryText).toContain('Use MCP `resources/read` only for local `mcp_resource` URIs');
+    expect(primaryText).toContain('Open external `external_url` pages directly');
+    expect(primaryText).toContain('Each call contains at most one CCEL-bearing query');
+    expect(primaryText).toContain('"startYear":500,"endYear":1500');
+    expect(primaryText).toContain('Never quote, compare creators or works, or draw substantive conclusions from any search snippet alone');
+
+    const confession = await client.getPrompt({ name: 'confession-study', arguments: { topic: 'justification' } });
+    const confessionText = confession.messages[0]?.content.type === 'text' ? confession.messages[0].content.text : '';
+    expect(confessionText).toContain('external `external_url` locator');
+    expect(confessionText).toContain('it is not an MCP resource');
+    expect(confessionText).toContain('rights status is not determined');
+  });
+
+  it('rejects tool/prompt contract divergence at server construction', () => {
+    const root = makeMockRoot();
+    root.primarySourceContract = {
+      exposeCcelDiscovery: true, ccelLiveSearch: false, ccelCoordinator: false,
+      contractVersion: '4', liveCcelEnabled: false,
+    };
+    expect(() => createTheologAiMcpServer(root, 'mismatched-contract-test'))
+      .toThrow('tool and guided-prompt contracts must use the same configuration');
+  });
+
+  it('advertises and executes the exact v4 tool contract through MCP', async () => {
+    const contract = {
+      exposeCcelDiscovery: true, ccelLiveSearch: false, ccelCoordinator: false,
+      contractVersion: '4' as const, liveCcelEnabled: false,
+    };
+    const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue({
+      planStatus: 'unavailable',
+      queries: [{
+        id: 'external', normalizedMode: 'all_terms', normalizedSelection: 'relevance',
+        providers: [{
+          provider: 'ccel_live', status: 'disabled', searched: false, page: 1, hitCount: 0,
+          resultWindow: { returnedHitCount: 0, additionalMatchStatus: 'not_evaluated' }, hits: [], notices: [],
+        }],
+      }],
+      coverage: { localAttempted: false, localHitCount: 0, ccelAttempted: false, ccelStatus: 'disabled', ccelHitCount: 0, notices: [] },
+    }) } as any, contract);
+    const root = makeMockRoot();
+    root.primarySourceContract = contract;
+    root.tools = root.tools.map(tool => tool.name === 'primary_source_search' ? handler : tool);
+    const client = await connect(createTheologAiMcpServer(root, '1.0.0-v4-tool-test').server);
+
+    const listed = await client.listTools();
+    const advertised = listed.tools.find(tool => tool.name === 'primary_source_search')!;
+    expect(advertised.outputSchema?.properties?.schemaVersion).toEqual({ const: '4' });
+    expect(advertised.annotations).toMatchObject({ openWorldHint: true });
+    expect((advertised.inputSchema.properties?.queries as any).items.properties.providers.items.enum).toEqual(['local', 'ccel']);
+
+    const called = await client.callTool({
+      name: 'primary_source_search',
+      arguments: { queries: [{ id: 'external', text: 'grace', providers: ['ccel'] }] },
+    });
+    expect(called).toMatchObject({ isError: true, structuredContent: { schemaVersion: '4', planStatus: 'unavailable' } });
+    expect(called.content[0]).toEqual({ type: 'text', text: JSON.stringify(called.structuredContent) });
   });
 
   it('uses InvalidParams for unknown prompts and missing prompt arguments', async () => {

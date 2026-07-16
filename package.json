@@ -36,6 +36,7 @@
     "typecheck:ccel-coordinator": "tsc --noEmit -p tsconfig.ccel-coordinator.json",
     "typecheck:ccel-coordinator-test": "tsc --noEmit -p tsconfig.ccel-coordinator-test.json",
     "typecheck:worker-runtime": "tsc --noEmit -p test/worker-runtime/tsconfig.json",
+    "typecheck:test-fixtures": "tsc --noEmit -p tsconfig.test-fixtures.json",
     "types:worker": "WRANGLER_LOG_PATH=test-output/wrangler/logs wrangler types worker-configuration.d.ts --config wrangler.toml --env-file /dev/null",
     "types:worker:check": "WRANGLER_LOG_PATH=test-output/wrangler/logs wrangler types worker-configuration.d.ts --config wrangler.toml --env-file /dev/null --check",
     "types:ccel-coordinator": "WRANGLER_LOG_PATH=test-output/wrangler/logs wrangler types ccel-coordinator-configuration.d.ts --config wrangler.ccel-coordinator.toml --env-file /dev/null --include-runtime false",

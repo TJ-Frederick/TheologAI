@@ -24,7 +24,8 @@ const coordinatorTypes = readFileSync(
 );
 
 describe('CCEL coordinator Worker environments', () => {
-  it('keeps both public rollout flags false', () => {
+  it('keeps all three public rollout flags false', () => {
+    expect(config.match(/THEOLOGAI_EXPOSE_CCEL_DISCOVERY = "false"/g)).toHaveLength(2);
     expect(config.match(/THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH = "false"/g)).toHaveLength(2);
     expect(config.match(/THEOLOGAI_ENABLE_CCEL_COORDINATOR = "false"/g)).toHaveLength(2);
   });

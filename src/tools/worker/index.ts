@@ -49,6 +49,7 @@ import parallelPassagesData from '../../data/parallel-passages.json';
 
 import type { ToolHandler } from '../../kernel/types.js';
 import { readPrimarySourceFeatureFlags } from '../../kernel/featureFlags.js';
+import { createWorkerCcelUpstreamCoordinator } from '../../http/worker/WorkerCcelUpstreamCoordinator.js';
 
 export interface WorkerServices {
   bibleService: BibleService;
@@ -61,6 +62,7 @@ export interface WorkerServices {
 export interface WorkerCompositionRoot {
   tools: ToolHandler[];
   services: WorkerServices;
+  primarySourceContract: ReturnType<typeof readPrimarySourceFeatureFlags>;
 }
 
 // ── Module-scope singletons (created once per isolate) ──
@@ -70,7 +72,10 @@ const helloaoAdapter = new HelloAoAdapter();
 const helloaoCommentary = new HelloAoCommentaryAdapter();
 // Cache/circuit state is isolate-scoped; the service gate prevents any call
 // while the non-secret rollout flag is false.
-const ccelSearchAdapter = new CcelSearchAdapter({ enabled: true });
+const ccelSearchAdapter = new CcelSearchAdapter({
+  enabled: true,
+  telemetry: event => console.info(JSON.stringify(event)),
+});
 
 const commentaryService = new CommentaryService([helloaoCommentary]);
 
@@ -129,10 +134,12 @@ export function createWorkerCompositionRoot(env: Env): WorkerCompositionRoot {
     sourceAttestedParallelService,
   );
   const historicalService = new HistoricalDocumentService(historicalRepo);
+  const primarySourceContract = readPrimarySourceFeatureFlags(env);
   const primarySourceSearchService = new PrimarySourceSearchService(
     new LocalPrimarySourceSearchProvider(historicalRepo),
     ccelSearchAdapter,
-    readPrimarySourceFeatureFlags(env),
+    primarySourceContract,
+    primarySourceContract.liveCcelEnabled ? createWorkerCcelUpstreamCoordinator(env, primarySourceContract) : undefined,
   );
   const strongsService = new StrongsService(strongsRepo, morphRepo);
   const morphService = new MorphologyService(morphRepo);
@@ -149,6 +156,7 @@ export function createWorkerCompositionRoot(env: Env): WorkerCompositionRoot {
     commentaryService,
     historicalService,
     primarySourceSearchService,
+    primarySourceContract,
     strongsService,
     morphologyService: morphService,
     originalLanguageStudyService,
@@ -158,5 +166,6 @@ export function createWorkerCompositionRoot(env: Env): WorkerCompositionRoot {
   return {
     tools,
     services: { bibleService, commentaryService, historicalService, strongsService, sourceAttestedParallelService },
+    primarySourceContract,
   };
 }
