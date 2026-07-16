@@ -15,6 +15,11 @@ import {
   type PrimarySourceSearchQuery,
 } from '../../services/historical/primarySourceTypes.js';
 import type { PrimarySourceFeatureFlags } from '../../kernel/featureFlags.js';
+import type {
+  CcelAttemptOutcome,
+  CcelCoordinatorEvent,
+  CcelUpstreamCoordinator,
+} from '../../services/historical/CcelUpstreamCoordinator.js';
 
 export const CCEL_SEARCH_ATTRIBUTION = 'CCEL (Christian Classics Ethereal Library)' as const;
 export const CCEL_SEARCH_URL = 'https://ccel.org/';
@@ -56,12 +61,6 @@ export const CCEL_SEARCH_LIMITS = Object.freeze({
   cacheMaxEntries: 100,
   cacheMaxBytes: 8 * 1024 * 1024,
   maxConcurrentRequests: 2,
-  maxQueuedRequests: 4,
-  networkFailureWindowMs: 5 * 60 * 1000,
-  networkFailureThreshold: 3,
-  networkOpenMs: 10 * 60 * 1000,
-  policyOpenMs: 30 * 60 * 1000,
-  maxCircuitOpenMs: 24 * 60 * 60 * 1000,
 });
 
 const SAFE_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,11}$/;
@@ -83,6 +82,8 @@ export interface CcelSearchAdapterOptions {
   /** Lower test/deployment budgets are allowed; the locked maxima cannot be raised. */
   cacheMaxEntries?: number;
   cacheMaxBytes?: number;
+  /** Content-free observational events only. Sink failures are ignored. */
+  telemetry?: (event: CcelCoordinatorEvent) => void | Promise<void>;
 }
 
 export interface ComposedCcelSearchRequest {
@@ -95,18 +96,6 @@ export interface ComposedCcelSearchRequest {
   luceneQuery: string;
   url: string;
   cacheKey: string;
-}
-
-type CircuitReason = 'network' | 'policy' | 'rate_limited' | 'interface_changed';
-type CircuitStatus = 'closed' | 'open' | 'half_open';
-
-export interface CcelCircuitSnapshot {
-  status: CircuitStatus;
-  reason?: CircuitReason;
-  openUntil?: number;
-  recentNetworkFailures: number;
-  parserFailures: number;
-  operatorReviewRequired: boolean;
 }
 
 type FailureKind = 'network' | 'timeout' | 'forbidden' | 'rate_limited' | 'policy' | 'parser' | 'upstream' | 'too_large';
@@ -178,16 +167,6 @@ class MetadataCache {
   private delete(key: string, entry: CacheEntry): void {
     if (this.entries.delete(key)) this.totalBytes -= entry.bytes;
   }
-}
-
-interface QueuedRequest {
-  task: () => Promise<PrimarySourceProviderResult>;
-  resolve: (value: PrimarySourceProviderResult) => void;
-}
-
-interface CircuitClaim {
-  generation: number;
-  operatorEpoch: number;
 }
 
 /** Compose a literal, bounded query for CCEL's documented search fields. */
@@ -345,23 +324,15 @@ export class CcelSearchAdapter {
   private readonly now: Clock;
   private readonly baseUrl: string;
   private readonly cache: MetadataCache;
-  private readonly queue: QueuedRequest[] = [];
+  private readonly telemetry: (event: CcelCoordinatorEvent) => void | Promise<void>;
   private activeRequests = 0;
-  private circuitStatus: CircuitStatus = 'closed';
-  private circuitReason: CircuitReason | undefined;
-  private circuitOpenUntil: number | undefined;
-  private halfOpenProbeInFlight = false;
-  private policyReviewRequired = false;
-  private parserFailures = 0;
-  private networkFailures: number[] = [];
-  private circuitGeneration = 0;
-  private operatorEpoch = 0;
 
   constructor(options: CcelSearchAdapterOptions = {}) {
     this.enabled = options.enabled ?? options.featureFlags?.ccelLiveSearch ?? false;
     this.fetchImpl = options.fetchImpl ?? globalThis.fetch;
     this.now = options.now ?? Date.now;
     this.baseUrl = validateSearchOrigin(options.baseUrl ?? CCEL_SEARCH_URL);
+    this.telemetry = options.telemetry ?? (() => undefined);
     const cacheMaxEntries = options.cacheMaxEntries ?? CCEL_SEARCH_LIMITS.cacheMaxEntries;
     const cacheMaxBytes = options.cacheMaxBytes ?? CCEL_SEARCH_LIMITS.cacheMaxBytes;
     if (!Number.isSafeInteger(cacheMaxEntries) || cacheMaxEntries < 1 || cacheMaxEntries > CCEL_SEARCH_LIMITS.cacheMaxEntries) {
@@ -373,51 +344,116 @@ export class CcelSearchAdapter {
     this.cache = new MetadataCache(cacheMaxEntries, cacheMaxBytes);
   }
 
-  async search(input: PrimarySourceSearchQuery): Promise<PrimarySourceProviderResult> {
+  async search(
+    input: PrimarySourceSearchQuery,
+    coordinator: CcelUpstreamCoordinator,
+  ): Promise<PrimarySourceProviderResult> {
     const request = composeCcelSearchRequest(input);
     if (!this.enabled) return resultFor('disabled', request.page, ['Live CCEL search is disabled.'], [], false);
-    // Capture admission before this request can enter the queue. An operator
-    // reset invalidates queued as well as active work from the reviewed epoch.
-    const admissionEpoch = this.operatorEpoch;
-    const deadline = this.now() + CCEL_SEARCH_LIMITS.totalRequestMs;
-
     const cached = this.cache.get(request.cacheKey, this.now());
-    if (cached) return { ...cached, hits: cached.hits.slice(0, request.limit), hitCount: Math.min(cached.hitCount, request.limit) };
+    if (cached) {
+      return {
+        ...cached,
+        hits: cached.hits.slice(0, request.limit),
+        hitCount: Math.min(cached.hitCount, request.limit),
+      };
+    }
 
-    if (this.activeRequests + this.queue.length >= CCEL_SEARCH_LIMITS.maxConcurrentRequests + CCEL_SEARCH_LIMITS.maxQueuedRequests) {
+    // Coordinated traffic never queues locally: admission must occur
+    // immediately before the one origin fetch, not while waiting in a queue.
+    if (this.activeRequests >= CCEL_SEARCH_LIMITS.maxConcurrentRequests) {
       return resultFor('unavailable', request.page, ['Live CCEL search is busy; try again later.'], [], false);
     }
 
-    return this.enqueue(() => this.performSearch(request, deadline, admissionEpoch));
-  }
+    this.activeRequests++;
+    try {
+      const admission = await coordinator.admit();
+      this.emitTelemetry({
+        event: 'theologai.ccel.coordinator.admission',
+        decision: admission.kind,
+        ...(admission.kind === 'admitted' ? { probe: admission.probe } : {}),
+        ...(admission.kind === 'busy' ? { retryAfterSeconds: admission.retryAfterSeconds } : {}),
+        ...(admission.kind === 'latched'
+          ? { state: admission.reason === 'policy' ? 'latched_policy' as const : 'latched_interface' as const }
+          : admission.kind === 'disabled' ? { state: 'closed' as const } : {}),
+      });
+      if (admission.kind === 'disabled') {
+        return resultFor('disabled', request.page, ['Live CCEL search is disabled. No remote request was made.'], [], false);
+      }
+      if (admission.kind === 'busy') {
+        return resultFor('rate_limited', request.page, ['Live CCEL search is temporarily busy; try again later.'], [], false);
+      }
+      if (admission.kind === 'latched') {
+        return resultFor(
+          admission.reason === 'interface' ? 'interface_changed' : 'unavailable',
+          request.page,
+          ['Live CCEL search is temporarily unavailable pending operator review.'],
+          [],
+          false,
+        );
+      }
 
-  getCircuitState(): CcelCircuitSnapshot {
-    this.refreshCircuitState();
-    return {
-      status: this.circuitStatus,
-      ...(this.circuitReason ? { reason: this.circuitReason } : {}),
-      ...(this.circuitOpenUntil ? { openUntil: this.circuitOpenUntil } : {}),
-      recentNetworkFailures: this.recentNetworkFailureCount(),
-      parserFailures: this.parserFailures,
-      operatorReviewRequired: this.policyReviewRequired,
-    };
-  }
+      const deadline = this.now() + CCEL_SEARCH_LIMITS.totalRequestMs;
+      let result: PrimarySourceProviderResult;
+      let cacheable: PrimarySourceProviderResult | undefined;
+      let outcome: CcelAttemptOutcome;
+      try {
+        const html = await this.fetchSearchHtml(request.url, deadline);
+        const parsed = parseCcelSearchHtml(html, request.page);
+        const filtered = applyCcelRestrictions(parsed.hits, request);
+        result = filtered.rejected > 0
+          ? resultFor('unsupported_filter', request.page, ['CCEL search results did not satisfy the requested author/work restriction.'], filtered.hits.slice(0, request.limit))
+          : filtered.hits.length === 0
+            ? resultFor('no_results', request.page, parsed.notices, [])
+            : resultFor('ok', request.page, parsed.notices, filtered.hits.slice(0, request.limit));
+        outcome = { kind: 'success' };
+        if (filtered.rejected === 0) {
+          cacheable = { ...result, hits: filtered.hits, hitCount: filtered.hits.length };
+        }
+      } catch (error) {
+        const failure = error instanceof CcelSearchFailure ? error : new CcelSearchFailure('network');
+        outcome = outcomeForFailure(failure);
+        result = outcome.kind === 'interface_failure'
+          ? resultFor('interface_changed', request.page, ['Live CCEL search is temporarily unavailable.'])
+          : this.failureResult(request.page, failure);
+      }
 
-  /** Explicit operator action required after a CCEL policy/403 signal. */
-  resetCircuitAfterReview(): void {
-    // Invalidate every request admitted before the operator's decision. A late
-    // completion from the old epoch must not recreate or otherwise mutate the
-    // state that was explicitly reviewed and reset.
-    this.operatorEpoch++;
-    this.circuitGeneration++;
-    this.policyReviewRequired = false;
-    this.circuitStatus = 'closed';
-    this.circuitReason = undefined;
-    this.circuitOpenUntil = undefined;
-    this.halfOpenProbeInFlight = false;
-    this.parserFailures = 0;
-    this.networkFailures = [];
-    this.cache.clear();
+      // Exactly one terminal RPC follows every admitted origin attempt. A
+      // transport ambiguity may mean the coordinator applied it even when the
+      // response is lost, so never attempt a second record.
+      let recorded;
+      try {
+        recorded = await coordinator.recordOutcome(admission.token, outcome);
+      } catch {
+        return resultFor('unavailable', request.page, ['Live CCEL search outcome could not be safely finalized.'], [], false);
+      }
+      this.emitTelemetry({
+        event: 'theologai.ccel.coordinator.outcome',
+        outcome: outcome.kind,
+        applied: recorded.applied,
+        state: recorded.state,
+      });
+      if (!recorded.applied || recorded.disposition !== 'applied') {
+        return resultFor('unavailable', request.page, ['Live CCEL search outcome could not be safely finalized.'], [], false);
+      }
+      if (outcome.kind === 'success' && recorded.state !== 'closed') {
+        return resultFor('unavailable', request.page, ['Live CCEL search became unavailable while the attempt was being finalized.'], [], false);
+      }
+      if (outcome.kind === 'success' && cacheable) {
+        this.cache.set(
+          request.cacheKey,
+          cacheable,
+          this.now() + (cacheable.hits.length === 0
+            ? CCEL_SEARCH_LIMITS.negativeCacheTtlMs
+            : CCEL_SEARCH_LIMITS.cacheTtlMs),
+        );
+      }
+      return result;
+    } catch {
+      return resultFor('unavailable', request.page, ['Live CCEL search is temporarily unavailable.'], [], false);
+    } finally {
+      this.activeRequests--;
+    }
   }
 
   getCacheStats(): { entries: number; bytes: number } {
@@ -428,53 +464,17 @@ export class CcelSearchAdapter {
     this.cache.clear();
   }
 
-  private enqueue(task: () => Promise<PrimarySourceProviderResult>): Promise<PrimarySourceProviderResult> {
-    if (this.activeRequests < CCEL_SEARCH_LIMITS.maxConcurrentRequests) return this.start(task);
-    return new Promise(resolve => this.queue.push({ task, resolve }));
-  }
-
-  private start(task: () => Promise<PrimarySourceProviderResult>): Promise<PrimarySourceProviderResult> {
-    this.activeRequests++;
-    return task()
-      .catch(() => resultFor('unavailable', 1, ['Live CCEL search is temporarily unavailable.']))
-      .finally(() => {
-        this.activeRequests--;
-        const next = this.queue.shift();
-        if (next) void this.start(next.task).then(next.resolve);
-      });
-  }
-
-  private async performSearch(request: ComposedCcelSearchRequest, deadline: number, admissionEpoch: number): Promise<PrimarySourceProviderResult> {
-    if (admissionEpoch !== this.operatorEpoch) {
-      return resultFor('unavailable', request.page, ['Live CCEL search request was invalidated by operator review.'], [], false);
-    }
-    if (this.now() >= deadline) return resultFor('unavailable', request.page, ['Live CCEL search request budget expired before execution.'], [], false);
-    const claim = this.claimCircuitSlot();
-    if (!claim) return this.circuitUnavailable(request.page);
-
+  private emitTelemetry(event: CcelCoordinatorEvent): void {
     try {
-      const html = await this.fetchSearchHtml(request.url, deadline);
-      const parsed = parseCcelSearchHtml(html, request.page);
-      const filtered = applyCcelRestrictions(parsed.hits, request);
-      // A policy signal from another in-flight request is monotonic until an
-      // operator explicitly resets it. Do not publish or cache a success that
-      // raced with that signal.
-      if (!this.recordSuccess(claim)) return this.circuitUnavailable(request.page);
-      const result = filtered.rejected > 0
-        ? resultFor('unsupported_filter', request.page, ['CCEL search results did not satisfy the requested author/work restriction.'], filtered.hits.slice(0, request.limit))
-        : filtered.hits.length === 0
-        ? resultFor('no_results', request.page, parsed.notices, [])
-        : resultFor('ok', request.page, parsed.notices, filtered.hits.slice(0, request.limit));
-      // Cache only recognized successful/no-result metadata, never raw HTML or failures.
-      if (filtered.rejected === 0) {
-        const cacheable = { ...result, hits: filtered.hits, hitCount: filtered.hits.length };
-        this.cache.set(request.cacheKey, cacheable, this.now() + (filtered.hits.length === 0 ? CCEL_SEARCH_LIMITS.negativeCacheTtlMs : CCEL_SEARCH_LIMITS.cacheTtlMs));
+      const pending = this.telemetry(event);
+      if (pending) {
+        // A telemetry sink is observational. Explicitly consume an asynchronous
+        // rejection without putting logging latency or failure on the request
+        // path; synchronous sinks remain the normal Worker implementation.
+        void pending.catch(() => undefined);
       }
-      return result;
-    } catch (error) {
-      const failure = error instanceof CcelSearchFailure ? error : new CcelSearchFailure('network');
-      this.recordFailure(failure, claim);
-      return this.failureResult(request.page, failure);
+    } catch {
+      // Telemetry is strictly observational and can never change execution.
     }
   }
 
@@ -543,118 +543,24 @@ export class CcelSearchAdapter {
     }
   }
 
-  private claimCircuitSlot(): CircuitClaim | undefined {
-    this.refreshCircuitState();
-    if (this.policyReviewRequired || this.circuitStatus === 'open') return undefined;
-    if (this.circuitStatus === 'half_open') {
-      if (this.halfOpenProbeInFlight) return undefined;
-      this.halfOpenProbeInFlight = true;
-    }
-    return { generation: this.circuitGeneration, operatorEpoch: this.operatorEpoch };
-  }
-
-  private refreshCircuitState(): void {
-    if (!this.policyReviewRequired && this.circuitStatus === 'open' && this.circuitOpenUntil !== undefined && this.now() >= this.circuitOpenUntil) {
-      this.circuitStatus = 'half_open';
-      this.circuitOpenUntil = undefined;
-      this.halfOpenProbeInFlight = false;
-      this.circuitGeneration++;
-    }
-  }
-
-  private recordSuccess(claim: CircuitClaim): boolean {
-    if (!this.isCurrentClaim(claim) || this.policyReviewRequired || this.circuitStatus === 'open') return false;
-    const closedHalfOpenCircuit = this.circuitStatus === 'half_open';
-    this.circuitStatus = 'closed';
-    this.circuitReason = undefined;
-    this.circuitOpenUntil = undefined;
-    this.halfOpenProbeInFlight = false;
-    this.parserFailures = 0;
-    this.networkFailures = [];
-    if (closedHalfOpenCircuit) this.circuitGeneration++;
-    return true;
-  }
-
-  private recordFailure(failure: CcelSearchFailure, claim: CircuitClaim): void {
-    // An operator reset is an epoch boundary. Nothing admitted before it may
-    // mutate the reviewed state, even if that late completion is another 403.
-    if (claim.operatorEpoch !== this.operatorEpoch) return;
-    // A policy/403 signal is strongest and remains latched until explicit
-    // operator reset. Same-epoch weaker completions cannot replace it.
-    if (this.policyReviewRequired) return;
-    const now = this.now();
-    if (failure.kind === 'forbidden' || failure.kind === 'policy') {
-      this.openCircuit('policy', CCEL_SEARCH_LIMITS.policyOpenMs, true);
-      return;
-    }
-    // Rate-limit signals merge monotonically even when concurrent: a later
-    // completion may extend Retry-After, but can never shorten it.
-    if (failure.kind === 'rate_limited') {
-      const duration = Math.min(CCEL_SEARCH_LIMITS.maxCircuitOpenMs, Math.max(CCEL_SEARCH_LIMITS.policyOpenMs, failure.retryAfterMs ?? 0));
-      if (this.circuitStatus === 'open' && this.circuitReason === 'rate_limited') {
-        this.circuitOpenUntil = Math.max(this.circuitOpenUntil ?? 0, now + duration);
-      } else {
-        this.openCircuit('rate_limited', duration);
-      }
-      return;
-    }
-    // All remaining outcomes are weaker than a state transition completed
-    // after this request was admitted.
-    if (!this.isCurrentClaim(claim)) return;
-    if (this.circuitStatus === 'half_open' && (failure.kind === 'upstream' || failure.kind === 'too_large')) {
-      // A probe must positively validate the interface before traffic resumes.
-      // Unexpected 4xx responses and response-bound violations indicate that
-      // the reviewed surface is not currently usable, so reopen with bounded
-      // interface-change backoff instead of permitting an immediate new probe.
-      this.openCircuit('interface_changed', CCEL_SEARCH_LIMITS.policyOpenMs);
-      return;
-    }
-    if (failure.kind === 'parser') {
-      this.parserFailures++;
-      if (this.parserFailures >= 2 || this.circuitStatus === 'half_open') this.openCircuit('interface_changed', CCEL_SEARCH_LIMITS.policyOpenMs);
-      else this.halfOpenProbeInFlight = false;
-      return;
-    }
-    if (failure.kind === 'network' || failure.kind === 'timeout') {
-      this.networkFailures = this.networkFailures.filter(timestamp => now - timestamp <= CCEL_SEARCH_LIMITS.networkFailureWindowMs);
-      this.networkFailures.push(now);
-      if (this.networkFailures.length >= CCEL_SEARCH_LIMITS.networkFailureThreshold || this.circuitStatus === 'half_open') {
-        this.openCircuit('network', CCEL_SEARCH_LIMITS.networkOpenMs);
-      }
-      return;
-    }
-    this.halfOpenProbeInFlight = false;
-  }
-
-  private openCircuit(reason: CircuitReason, durationMs: number, operatorReviewRequired = false): void {
-    this.circuitGeneration++;
-    this.circuitStatus = 'open';
-    this.circuitReason = reason;
-    this.policyReviewRequired = operatorReviewRequired;
-    this.circuitOpenUntil = operatorReviewRequired ? undefined : this.now() + Math.min(durationMs, CCEL_SEARCH_LIMITS.maxCircuitOpenMs);
-    this.halfOpenProbeInFlight = false;
-    if (operatorReviewRequired) this.cache.clear();
-  }
-
-  private isCurrentClaim(claim: CircuitClaim): boolean {
-    return claim.operatorEpoch === this.operatorEpoch && claim.generation === this.circuitGeneration;
-  }
-
-  private recentNetworkFailureCount(): number {
-    const cutoff = this.now() - CCEL_SEARCH_LIMITS.networkFailureWindowMs;
-    this.networkFailures = this.networkFailures.filter(timestamp => timestamp >= cutoff);
-    return this.networkFailures.length;
-  }
-
-  private circuitUnavailable(page: number): PrimarySourceProviderResult {
-    const status = this.circuitReason === 'rate_limited' ? 'rate_limited' : this.circuitReason === 'interface_changed' ? 'interface_changed' : 'unavailable';
-    return resultFor(status, page, ['Live CCEL search is temporarily unavailable.'], [], false);
-  }
-
   private failureResult(page: number, failure: CcelSearchFailure): PrimarySourceProviderResult {
     const status = failure.kind === 'rate_limited' ? 'rate_limited' : failure.kind === 'parser' ? 'interface_changed' : 'unavailable';
     return resultFor(status, page, ['Live CCEL search is temporarily unavailable.']);
   }
+}
+
+function outcomeForFailure(failure: CcelSearchFailure): CcelAttemptOutcome {
+  if (failure.kind === 'rate_limited') {
+    return {
+      kind: 'rate_limited',
+      retryAfterSeconds: Math.min(86_400, Math.max(1, Math.ceil((failure.retryAfterMs ?? 0) / 1000))),
+    };
+  }
+  if (failure.kind === 'forbidden' || failure.kind === 'policy') return { kind: 'policy_failure' };
+  if (failure.kind === 'parser' || failure.kind === 'too_large' || failure.kind === 'upstream') {
+    return { kind: 'interface_failure' };
+  }
+  return { kind: 'transient_failure' };
 }
 
 interface ParsedSearch {

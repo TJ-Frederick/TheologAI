@@ -1,6 +1,8 @@
 import { ValidationError } from '../../kernel/errors.js';
 import type { CcelSearchAdapter } from '../../adapters/commentary/CcelSearchAdapter.js';
 import type { LocalPrimarySourceSearchProvider } from './LocalPrimarySourceSearchProvider.js';
+import type { PrimarySourceContractConfig } from '../../kernel/featureFlags.js';
+import type { CcelUpstreamCoordinator } from './CcelUpstreamCoordinator.js';
 import {
   type PrimarySourcePlanProviderResult,
   type PrimarySourcePlanQueryResult,
@@ -13,22 +15,21 @@ import {
 } from './primarySourceTypes.js';
 
 const MAX_QUERIES = 4;
-const MAX_CCEL_QUERIES = 3;
+export const MAX_CCEL_QUERIES = 1;
 const MAX_TOTAL_HITS = 32;
 const QUERY_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$/;
 const QUERY_KEYS = new Set(['id', 'text', 'providers', 'match', 'selection', 'author', 'work', 'startYear', 'endYear', 'page', 'limit']);
 const COMPLETE_STATUSES = new Set<PrimarySourceProviderStatus>(['ok', 'no_results', 'catalog_miss']);
 const UNAVAILABLE_STATUSES = new Set<PrimarySourceProviderStatus>(['unavailable', 'disabled', 'rate_limited', 'interface_changed']);
 
-export interface PrimarySourceSearchServiceOptions {
-  ccelLiveSearch: boolean;
-}
+export type PrimarySourceSearchServiceOptions = PrimarySourceContractConfig;
 
 export class PrimarySourceSearchService {
   constructor(
     private readonly local: Pick<LocalPrimarySourceSearchProvider, 'search'>,
     private readonly ccel: Pick<CcelSearchAdapter, 'search'>,
     private readonly options: PrimarySourceSearchServiceOptions,
+    private readonly coordinator?: CcelUpstreamCoordinator,
   ) {}
 
   async search(input: unknown): Promise<PrimarySourceSearchPlanResult> {
@@ -79,13 +80,15 @@ export class PrimarySourceSearchService {
       ...(query.endYear !== undefined ? { endYear: query.endYear } : {}),
     };
     let result: PrimarySourceProviderResult;
-    if (provider === 'ccel' && (query.startYear !== undefined || query.endYear !== undefined)) {
+    if (provider === 'ccel' && (query.page > 1 || query.startYear !== undefined || query.endYear !== undefined)) {
       result = {
         provider: 'ccel_live', status: 'unsupported_filter', searched: false, page: query.page,
-        hitCount: 0, hits: [], notices: ['Live CCEL discovery does not expose reviewed composition-date bounds; the date restriction was not ignored.'],
+        hitCount: 0, hits: [], notices: [query.page > 1
+          ? 'Live CCEL discovery supports page 1 only; the requested page was not silently changed.'
+          : 'Live CCEL discovery does not expose reviewed composition-date bounds; the date restriction was not ignored.'],
         resultWindow: { returnedHitCount: 0, additionalMatchStatus: 'not_evaluated' },
       };
-    } else if (provider === 'ccel' && !this.options.ccelLiveSearch) {
+    } else if (provider === 'ccel' && (!this.options.liveCcelEnabled || !this.coordinator)) {
       result = {
         provider: 'ccel_live', status: 'disabled', searched: false, page: query.page,
         hitCount: 0, hits: [], notices: ['Live CCEL search is disabled. No remote request was made.'],
@@ -95,7 +98,7 @@ export class PrimarySourceSearchService {
       try {
         result = provider === 'local'
           ? await this.local.search({ ...providerQuery, selection: query.selection })
-          : await this.ccel.search(providerQuery);
+          : await this.ccel.search(providerQuery, this.coordinator!);
       } catch {
         result = {
           provider: provider === 'local' ? 'local' : 'ccel_live',

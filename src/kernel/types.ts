@@ -20,7 +20,7 @@ export interface ToolHandler {
 }
 
 export type ToolResult = Omit<CallToolResult, 'content'> & {
-  /** Legacy Markdown is always first; later blocks may use the native MCP union. */
+  /** A text fallback is always first; later blocks may use the native MCP union. */
   content: [TextContent, ...ContentBlock[]];
 };
 

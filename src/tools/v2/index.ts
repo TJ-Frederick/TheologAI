@@ -45,6 +45,7 @@ import { DonationService } from '../../services/donation/DonationService.js';
 
 import { getDatabase } from '../../adapters/shared/Database.js';
 import { readPrimarySourceFeatureFlags } from '../../kernel/featureFlags.js';
+import { ProcessLocalCcelUpstreamCoordinator } from '../../services/historical/CcelUpstreamCoordinator.js';
 
 /** Services exposed for MCP Resources / Prompts (Phase 5+) */
 export interface ServerServices {
@@ -59,12 +60,22 @@ export interface ServerServices {
 export interface CompositionRoot {
   tools: ToolHandler[];
   services: ServerServices;
+  primarySourceContract: ReturnType<typeof readPrimarySourceFeatureFlags>;
 }
 
 export interface CompositionRootOptions {
   /** Explicit database injection for isolated runtimes and clean-checkout tests. */
   database?: Database.Database;
 }
+
+// One cache/executor and one process-local budget per Node process. Multi-process
+// deployments must keep live discovery disabled unless they provide a shared
+// coordinator outside this composition root.
+const nodeCcelSearchAdapter = new CcelSearchAdapter({
+  enabled: true,
+  telemetry: event => console.error(JSON.stringify(event)),
+});
+const nodeCcelCoordinator = new ProcessLocalCcelUpstreamCoordinator({ enabled: true });
 
 /**
  * Create all tool handlers and services with fully-wired dependency graph.
@@ -87,7 +98,11 @@ export function createCompositionRoot(options: CompositionRootOptions = {}): Com
 
   // Commentary adapters
   const helloaoCommentary = new HelloAoCommentaryAdapter();
-  const ccelSearchAdapter = new CcelSearchAdapter({ enabled: true });
+  const primarySourceContract = readPrimarySourceFeatureFlags({
+    THEOLOGAI_EXPOSE_CCEL_DISCOVERY: process.env.THEOLOGAI_EXPOSE_CCEL_DISCOVERY,
+    THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH: process.env.THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH,
+    THEOLOGAI_ENABLE_CCEL_COORDINATOR: process.env.THEOLOGAI_ENABLE_CCEL_COORDINATOR,
+  });
 
   // Services
   const bibleService = new BibleService([esvAdapter, netAdapter, helloaoAdapter]);
@@ -100,10 +115,9 @@ export function createCompositionRoot(options: CompositionRootOptions = {}): Com
   const historicalService = new HistoricalDocumentService(historicalRepo);
   const primarySourceSearchService = new PrimarySourceSearchService(
     new LocalPrimarySourceSearchProvider(historicalRepo),
-    ccelSearchAdapter,
-    readPrimarySourceFeatureFlags({
-      THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH: process.env.THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH,
-    }),
+    nodeCcelSearchAdapter,
+    primarySourceContract,
+    primarySourceContract.liveCcelEnabled ? nodeCcelCoordinator : undefined,
   );
   const strongsService = new StrongsService(strongsRepo, morphRepo);
   const morphService = new MorphologyService(morphRepo);
@@ -121,6 +135,7 @@ export function createCompositionRoot(options: CompositionRootOptions = {}): Com
     commentaryService,
     historicalService,
     primarySourceSearchService,
+    primarySourceContract,
     strongsService,
     morphologyService: morphService,
     originalLanguageStudyService,
@@ -130,6 +145,7 @@ export function createCompositionRoot(options: CompositionRootOptions = {}): Com
   return {
     tools,
     services: { bibleService, commentaryService, historicalService, strongsService, sourceAttestedParallelService },
+    primarySourceContract,
   };
 }
 

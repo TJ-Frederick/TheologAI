@@ -1,31 +1,55 @@
 /**
- * Non-secret rollout switches for the staged primary-source workstream.
+ * One shared, non-secret contract and execution gate for primary-source search.
  *
- * This switch is retained for future discovery-provider integration tests.
- * The current public MCP schemas expose only the local provider, so setting the
- * flag alone cannot enable CCEL or make a remote adapter publicly reachable.
+ * Exposure selects the public v3/v4 application contract.  Live CCEL work is
+ * permitted only when all three switches are true; no caller should recreate
+ * that predicate independently.
  */
 
-export interface PrimarySourceFeatureFlags {
+export interface PrimarySourceContractConfig {
+  exposeCcelDiscovery: boolean;
   ccelLiveSearch: boolean;
+  ccelCoordinator: boolean;
+  contractVersion: '3' | '4';
+  liveCcelEnabled: boolean;
 }
 
-export const DEFAULT_PRIMARY_SOURCE_FEATURE_FLAGS: Readonly<PrimarySourceFeatureFlags> = Object.freeze({
+export type PrimarySourceFeatureFlags = PrimarySourceContractConfig;
+
+export const DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG: Readonly<PrimarySourceContractConfig> = Object.freeze({
+  exposeCcelDiscovery: false,
   ccelLiveSearch: false,
+  ccelCoordinator: false,
+  contractVersion: '3',
+  liveCcelEnabled: false,
 });
 
+export const DEFAULT_PRIMARY_SOURCE_FEATURE_FLAGS = DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG;
+
 export interface PrimarySourceFlagEnvironment {
+  THEOLOGAI_EXPOSE_CCEL_DISCOVERY?: string;
   THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH?: string;
+  THEOLOGAI_ENABLE_CCEL_COORDINATOR?: string;
 }
 
 function enabledValue(value: string | undefined): boolean {
   return value?.trim().toLowerCase() === 'true';
 }
 
-export function readPrimarySourceFeatureFlags(
+export function readPrimarySourceContractConfig(
   env: PrimarySourceFlagEnvironment = {},
-): PrimarySourceFeatureFlags {
+): PrimarySourceContractConfig {
+  const exposeCcelDiscovery = enabledValue(env.THEOLOGAI_EXPOSE_CCEL_DISCOVERY);
+  const ccelLiveSearch = enabledValue(env.THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH);
+  const ccelCoordinator = enabledValue(env.THEOLOGAI_ENABLE_CCEL_COORDINATOR);
   return {
-    ccelLiveSearch: enabledValue(env.THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH),
+    exposeCcelDiscovery,
+    ccelLiveSearch,
+    ccelCoordinator,
+    contractVersion: exposeCcelDiscovery ? '4' : '3',
+    liveCcelEnabled: exposeCcelDiscovery && ccelLiveSearch && ccelCoordinator,
   };
 }
+
+/** Backwards-compatible name retained for existing internal callers. */
+export const readPrimarySourceFeatureFlags = readPrimarySourceContractConfig;

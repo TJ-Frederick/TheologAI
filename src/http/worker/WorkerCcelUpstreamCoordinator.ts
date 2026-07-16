@@ -1,4 +1,5 @@
 import type { Env } from '../../worker-env.js';
+import { readPrimarySourceContractConfig, type PrimarySourceContractConfig } from '../../kernel/featureFlags.js';
 import type { CcelGlobalCoordinator } from './CcelGlobalCoordinator.js';
 import {
   initialCcelCoordinatorState,
@@ -16,11 +17,12 @@ export const CCEL_COORDINATOR_SINGLETON_NAME = 'ccel-public-search-origin-v1';
 type CoordinatorNamespace = DurableObjectNamespace<CcelGlobalCoordinator>;
 
 /**
- * Binding client for future internal adapter injection.
+ * Binding client for gated internal adapter injection.
  *
- * Both rollout switches must be explicitly true. Current production and
- * preview configurations set both false, and no composition root constructs
- * this client, so public primary_source_search remains local-only.
+ * Exposure, live search, and coordinator rollout switches must all be true.
+ * Current production and preview configurations set all three false, so the
+ * composition root never constructs this client and public search remains
+ * local-only.
  */
 export class WorkerCcelUpstreamCoordinator implements CcelUpstreamCoordinator {
   private readonly enabled: boolean;
@@ -63,10 +65,11 @@ export class WorkerCcelUpstreamCoordinator implements CcelUpstreamCoordinator {
   }
 }
 
-export function createWorkerCcelUpstreamCoordinator(env: Env): CcelUpstreamCoordinator {
-  const liveSearchEnabled = env.THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH?.trim().toLowerCase() === 'true';
-  const coordinatorEnabled = env.THEOLOGAI_ENABLE_CCEL_COORDINATOR?.trim().toLowerCase() === 'true';
+export function createWorkerCcelUpstreamCoordinator(
+  env: Env,
+  contract: PrimarySourceContractConfig = readPrimarySourceContractConfig(env),
+): CcelUpstreamCoordinator {
   return new WorkerCcelUpstreamCoordinator(env.THEOLOGAI_CCEL_COORDINATOR, {
-    enabled: liveSearchEnabled && coordinatorEnabled,
+    enabled: contract.liveCcelEnabled,
   });
 }

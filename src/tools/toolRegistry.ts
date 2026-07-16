@@ -18,6 +18,7 @@ import { createPrimarySourceSearchHandler } from './v2/primarySourceSearch.js';
 import { createStrongsLookupHandler } from './v2/strongsLookup.js';
 import { createVerifyDonationHandler } from './v2/verifyDonation.js';
 import { createVerseMorphologyHandler } from './v2/verseMorphology.js';
+import type { PrimarySourceContractConfig } from '../kernel/featureFlags.js';
 
 export interface ToolRegistryDependencies {
   bibleService: Parameters<typeof createBibleLookupHandler>[0];
@@ -26,6 +27,7 @@ export interface ToolRegistryDependencies {
   commentaryService: Parameters<typeof createCommentaryHandler>[0];
   historicalService: Parameters<typeof createClassicTextsHandler>[0];
   primarySourceSearchService: Parameters<typeof createPrimarySourceSearchHandler>[0];
+  primarySourceContract: PrimarySourceContractConfig;
   strongsService: Parameters<typeof createStrongsLookupHandler>[0];
   morphologyService: Parameters<typeof createVerseMorphologyHandler>[0];
   originalLanguageStudyService: Parameters<typeof createOriginalLanguageStudyHandler>[0];
@@ -39,7 +41,7 @@ export function createToolRegistry(dependencies: ToolRegistryDependencies): Tool
     createParallelPassagesHandler(dependencies.parallelPassageService),
     createCommentaryHandler(dependencies.commentaryService),
     createClassicTextsHandler(dependencies.historicalService),
-    createPrimarySourceSearchHandler(dependencies.primarySourceSearchService),
+    createPrimarySourceSearchHandler(dependencies.primarySourceSearchService, dependencies.primarySourceContract),
     createStrongsLookupHandler(dependencies.strongsService),
     createVerseMorphologyHandler(dependencies.morphologyService),
     createOriginalLanguageStudyHandler(dependencies.originalLanguageStudyService),
