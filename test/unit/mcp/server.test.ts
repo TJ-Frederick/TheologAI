@@ -12,7 +12,8 @@ import type { WorkerCompositionRoot } from '../../../src/tools/worker/index.js';
 import { StrongsService } from '../../../src/services/languages/StrongsService.js';
 import { readFileSync } from 'node:fs';
 import { createPrimarySourceSearchHandler } from '../../../src/tools/v2/primarySourceSearch.js';
-import { formatLocalDocumentSectionResource } from '../../../src/formatters/historicalFormatter.js';
+import { createClassicTextsHandler } from '../../../src/tools/v2/classicTexts.js';
+import { formatLocalDocumentResource, formatLocalDocumentSectionResource } from '../../../src/formatters/historicalFormatter.js';
 import { DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG } from '../../../src/kernel/featureFlags.js';
 import { primarySourceSearchOutputSchema } from '../../../src/mcp/schemas/primarySourceSearch.js';
 
@@ -522,6 +523,45 @@ describe('shared MCP registration', () => {
     expect(readText).toBe(resourceText);
   });
 
+  it('keeps classic-text whole-document and exact-section link sizes byte-identical to resources/read', async () => {
+    const root = makeMockRoot();
+    const document = await root.services.historicalService.getDocument('nicene-creed');
+    const sections = await root.services.historicalService.getSections('nicene-creed');
+    const service = {
+      listDocuments: root.services.historicalService.listDocuments,
+      getDocument: root.services.historicalService.getDocument,
+      getSections: root.services.historicalService.getSections,
+      getSection: root.services.historicalService.getSection,
+      findDocument: async () => document,
+      search: async () => sections,
+    };
+    root.tools = root.tools.map(tool => tool.name === 'classic_text_lookup'
+      ? createClassicTextsHandler(service as any)
+      : tool);
+    const client = await connect(createTheologAiMcpServer(root, '1.0.0-test').server);
+
+    const workResult = await client.callTool({
+      name: 'classic_text_lookup', arguments: { work: 'nicene-creed' },
+    });
+    const workLink = workResult.content.find(block => block.type === 'resource_link');
+    if (!workLink || workLink.type !== 'resource_link') throw new Error('Expected whole-document link');
+    const workRead = await client.readResource({ uri: workLink.uri });
+    const workText = String(workRead.contents[0].text);
+    expect(workText).toBe(formatLocalDocumentResource(document!, sections));
+    expect(new TextEncoder().encode(workText).byteLength).toBe(workLink.size);
+    expect(JSON.stringify(workResult.structuredContent)).not.toContain('We believe...');
+
+    const searchResult = await client.callTool({
+      name: 'classic_text_lookup', arguments: { query: 'believe' },
+    });
+    const sectionLink = searchResult.content.find(block => block.type === 'resource_link');
+    if (!sectionLink || sectionLink.type !== 'resource_link') throw new Error('Expected exact-section link');
+    const sectionRead = await client.readResource({ uri: sectionLink.uri });
+    const sectionText = String(sectionRead.contents[0].text);
+    expect(sectionText).toBe(formatLocalDocumentSectionResource(document!, sections[0]));
+    expect(new TextEncoder().encode(sectionText).byteLength).toBe(sectionLink.size);
+  });
+
   it('canonicalizes classical and extended Strong\'s resources and rejects invalid domain numbers', async () => {
     const root = makeMockRoot();
     const lookup = vi.fn(root.services.strongsService.lookup);
@@ -664,6 +704,12 @@ describe('shared MCP registration', () => {
     }));
     expect(passageExegesis.messages[0].content).toEqual(expect.objectContaining({
       text: expect.stringContaining('chapter-level evidence rather than attributing them to one verse'),
+    }));
+    expect(passageExegesis.messages[0].content).toEqual(expect.objectContaining({
+      text: expect.stringContaining('use `resources/read` before quotation, attribution, or comparison'),
+    }));
+    expect(passageExegesis.messages[0].content).toEqual(expect.objectContaining({
+      text: expect.stringContaining('`no_results` status means only that this bounded local collection returned no match'),
     }));
 
     const rangeExegesis = await client.getPrompt({

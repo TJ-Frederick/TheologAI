@@ -15,9 +15,9 @@ export interface ToolHandler {
   description: string;
   inputSchema: Tool['inputSchema'];
   outputSchema?: Tool['outputSchema'];
-  annotations?: Tool['annotations'];
   /** Optional cross-field validation that JSON Schema cannot fully express. */
   validateStructuredOutput?: (value: Record<string, unknown>) => boolean;
+  annotations?: Tool['annotations'];
   handler: (params: Record<string, unknown>) => Promise<ToolResult>;
 }
 

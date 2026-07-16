@@ -89,6 +89,12 @@ describe('HistoricalDocumentRepository', () => {
     expect(new HistoricalDocumentRepository(db.asDatabase()).search('(', 4)).toEqual([]);
   });
 
+  it('does not conceal a non-syntax backend failure as no results', () => {
+    const db = new FakeSqliteDatabase([{ match: 'sections_fts MATCH', all: new Error('database unavailable') }]);
+    expect(() => new HistoricalDocumentRepository(db.asDatabase()).search('grace', 4))
+      .toThrow('database unavailable');
+  });
+
   it('uses controlled literal FTS and exact work filtering for primary-source discovery', () => {
     const row = {
       ...sectionRow,

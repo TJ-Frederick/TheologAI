@@ -696,7 +696,20 @@ describe('Worker MCP endpoint in workerd', () => {
           type: 'text',
           text: expect.stringMatching(/Search Results for "almighty"[\s\S]*The First Article[\s\S]*maker of heaven and earth/),
         }),
+        expect.objectContaining({
+          type: 'resource_link',
+          uri: 'theologai://documents/apostles-creed#section-1',
+          mimeType: 'text/markdown', size: expect.any(Number),
+          annotations: { audience: ['assistant'] },
+        }),
       ],
+      structuredContent: expect.objectContaining({
+        schemaVersion: '1', kind: 'classic_text_lookup', mode: 'search',
+        search: expect.objectContaining({
+          status: 'ok',
+          hits: [expect.objectContaining({ snippetOnly: true })],
+        }),
+      }),
     });
   });
 

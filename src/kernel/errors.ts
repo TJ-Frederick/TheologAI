@@ -36,6 +36,14 @@ export class ValidationError extends TheologAIError {
   }
 }
 
+/** A complete v1 response cannot be represented without exceeding its advertised ceiling. */
+export class OutputLimitError extends TheologAIError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'OutputLimitError';
+  }
+}
+
 /** Rate limit exceeded */
 export class RateLimitError extends TheologAIError {
   constructor(public readonly retryAfter: number) {
@@ -105,6 +113,9 @@ export function getUserMessage(error: Error): string {
   }
   if (error instanceof ValidationError) {
     return `Invalid input: ${error.message}`;
+  }
+  if (error instanceof OutputLimitError) {
+    return `Unavailable: ${error.message} The response was not truncated.`;
   }
   if (error instanceof NotFoundError) {
     if (error.resource === 'adapter' || containsImplementationDetail(error.message)) {

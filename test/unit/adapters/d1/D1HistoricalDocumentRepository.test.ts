@@ -176,6 +176,18 @@ describe('D1HistoricalDocumentRepository', () => {
       warn.mockRestore();
     });
 
+    it('does not conceal a non-syntax backend failure as no results', async () => {
+      const db = {
+        prepare: vi.fn().mockImplementation(() => ({
+          bind: vi.fn().mockReturnValue({
+            all: vi.fn().mockRejectedValue(new Error('D1 database unavailable')),
+          }),
+        })),
+      };
+      await expect(new D1HistoricalDocumentRepository(db as any).search('grace'))
+        .rejects.toThrow('D1 database unavailable');
+    });
+
     it('passes limit to .bind()', async () => {
       const db = createSimpleD1([]);
       const repo = new D1HistoricalDocumentRepository(db as any);

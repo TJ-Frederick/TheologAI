@@ -29,6 +29,26 @@ export function formatLocalDocumentSectionResource(doc: DocumentInfo, section: D
   ].filter(Boolean).join('\n');
 }
 
+/** Canonical whole-document representation shared by resources/read and link sizing. */
+export function formatLocalDocumentResource(doc: DocumentInfo, sections: DocumentSection[]): string {
+  const lines = [
+    `# ${doc.title}\n`,
+    `**Type:** ${doc.type}`,
+    doc.date ? `**Date:** ${doc.date}` : '',
+    '',
+  ];
+
+  for (const section of sections) {
+    if (section.title) {
+      lines.push(`## ${section.section_number ? `${section.section_number}. ` : ''}${section.title}\n`);
+    }
+    lines.push(section.content);
+    lines.push('');
+  }
+  lines.push(localSource);
+  return lines.filter(Boolean).join('\n');
+}
+
 /** Format a document listing */
 export function formatDocumentList(docs: DocumentInfo[]): string {
   let s = `**Available Historical Documents** (${docs.length})\n\n`;
@@ -72,7 +92,12 @@ export function formatDocumentSectionIndex(doc: DocumentInfo, sections: Document
 }
 
 /** Format search results */
-export function formatSearchResults(query: string, sections: DocumentSection[], documents: DocumentInfo[] = []): string {
+export function formatSearchResults(
+  query: string,
+  sections: DocumentSection[],
+  documents: DocumentInfo[] = [],
+  preparedSnippets: readonly string[] = [],
+): string {
   if (sections.length === 0) {
     return `No results found for "${query}".`;
   }
@@ -85,18 +110,30 @@ export function formatSearchResults(query: string, sections: DocumentSection[], 
   if (attributableSections.length === 0) return `No attributable results found for "${query}".`;
   const displayedSections = attributableSections.slice(0, 10);
   const count = attributableSections.length > displayedSections.length
-    ? `(showing ${displayedSections.length} of ${attributableSections.length} results)`
+    ? `(showing first ${displayedSections.length}; additional matches observed)`
     : `(${attributableSections.length} results)`;
   let s = `**Search Results for "${query}"** ${count}\n\n`;
 
-  for (const { section, uri } of displayedSections) {
+  for (const [index, { section, uri }] of displayedSections.entries()) {
     const document = documentTitles.get(section.document_id) ?? section.document_id;
     const sectionIdentity = section.section_number ? `Section ${section.section_number}` : 'Selected section';
     s += `**${document} — ${sectionIdentity}${section.title ? `: ${section.title}` : ''}**\n`;
     s += `[Read the canonical exact section](${uri})\n\n`;
-    const preview = section.content.substring(0, 300);
-    s += `*Discovery snippet only — read the exact section before quoting:* ${preview}${section.content.length > 300 ? '...' : ''}\n\n`;
+    const snippet = preparedSnippets[index] ?? formatHistoricalDiscoverySnippet(section.content);
+    s += `*Discovery snippet only — read the exact section before quoting:* ${snippet}\n\n`;
   }
 
   return `${s.trim()}\n\n${localSource}`;
+}
+
+/** First 300 Unicode code points, shared by Markdown and structured discovery. */
+export function formatHistoricalDiscoverySnippet(content: string): string {
+  let snippet = '';
+  let count = 0;
+  for (const codePoint of content) {
+    if (count === 300) return `${snippet}...`;
+    snippet += codePoint;
+    count += 1;
+  }
+  return snippet;
 }

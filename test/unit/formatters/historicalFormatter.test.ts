@@ -152,7 +152,7 @@ describe('formatSearchResults', () => {
     const sections = Array.from({ length: 15 }, (_, i) => makeSection({ id: i }));
     const out = formatSearchResults('test', sections);
 
-    expect(out).toContain('(showing 10 of 15 results)');
+    expect(out).toContain('(showing first 10; additional matches observed)');
   });
 
   it('labels local historical output without inventing edition metadata', () => {

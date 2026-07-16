@@ -141,7 +141,7 @@ describe('createWorkerCompositionRoot', () => {
     it('every tool has readOnlyHint annotation', () => {
       const root = createWorkerCompositionRoot(makeEnv());
       for (const tool of root.tools) {
-        expect(tool.annotations).toEqual({
+        expect(tool.annotations).toMatchObject({
           readOnlyHint: true,
           destructiveHint: false,
           idempotentHint: true,

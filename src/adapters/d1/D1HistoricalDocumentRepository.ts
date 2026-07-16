@@ -14,6 +14,7 @@ import type {
 } from '../../kernel/repositories.js';
 import {
   composeLocalPrimarySourceFtsQuery,
+  isFtsSyntaxError,
   localPrimarySourceSearchSql,
 } from '../shared/primarySourceSearchSql.js';
 import { mapDocumentDatabaseRow } from '../shared/historicalDocumentMetadata.js';
@@ -99,10 +100,9 @@ export class D1HistoricalDocumentRepository implements IHistoricalDocumentReposi
         content: r.content,
         topics: r.topics ? JSON.parse(r.topics) : [],
       }));
-    } catch {
-      // FTS5 queries can fail on malformed input. The repository contract uses
-      // an empty result for invalid search syntax and never logs raw errors.
-      return [];
+    } catch (error) {
+      if (isFtsSyntaxError(error)) return [];
+      throw error;
     }
   }
 

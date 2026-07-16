@@ -15,6 +15,7 @@ import type {
 } from '../../kernel/repositories.js';
 import {
   composeLocalPrimarySourceFtsQuery,
+  isFtsSyntaxError,
   LOCAL_PRIMARY_SOURCE_SEARCH_SQL,
   localPrimarySourceSearchSql,
 } from '../shared/primarySourceSearchSql.js';
@@ -125,9 +126,9 @@ export class HistoricalDocumentRepository implements IHistoricalDocumentReposito
         content: r.content,
         topics: r.topics ? JSON.parse(r.topics) : [],
       }));
-    } catch {
-      // FTS query syntax error — fall back to empty
-      return [];
+    } catch (error) {
+      if (isFtsSyntaxError(error)) return [];
+      throw error;
     }
   }
 
