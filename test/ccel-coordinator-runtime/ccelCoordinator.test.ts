@@ -1,8 +1,10 @@
 import {
   env,
+  listDurableObjectIds,
   runInDurableObject,
 } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
+import { WorkerCcelUpstreamCoordinator } from '../../src/http/worker/WorkerCcelUpstreamCoordinator.js';
 import type { CcelAttemptOutcome } from '../../src/services/historical/CcelUpstreamCoordinator.js';
 
 const terminalOutcomes: CcelAttemptOutcome[] = [
@@ -360,6 +362,27 @@ describe('CCEL global Durable Object coordinator', () => {
         disposition: 'stale_epoch',
         state: 'closed',
       });
+  });
+
+  it('does not instantiate or call the shared namespace while both flags are false', async () => {
+    const before = await listDurableObjectIds(env.THEOLOGAI_CCEL_COORDINATOR);
+    const beforeIds = before.map(id => id.toString()).sort();
+    const coordinator = new WorkerCcelUpstreamCoordinator(env.THEOLOGAI_CCEL_COORDINATOR);
+
+    await expect(coordinator.admit()).resolves.toEqual({ kind: 'disabled' });
+    await expect(coordinator.recordOutcome(
+      { attemptId: 1, operatorEpoch: 0 },
+      { kind: 'success' },
+    )).resolves.toEqual({
+      applied: false,
+      disposition: 'recorded_no_effect',
+      state: 'closed',
+    });
+    await coordinator.snapshot();
+    expect('resetAfterOperatorReview' in coordinator).toBe(false);
+
+    const after = await listDurableObjectIds(env.THEOLOGAI_CCEL_COORDINATOR);
+    expect(after.map(id => id.toString()).sort()).toEqual(beforeIds);
   });
 
 });

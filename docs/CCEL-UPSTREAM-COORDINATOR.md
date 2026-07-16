@@ -3,28 +3,29 @@
 ## Status
 
 This is disabled infrastructure, not CCEL enablement.
-`THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH` remains `false` in production and preview.
-Stage A adds no public coordinator binding, no public coordinator client, and
-no `THEOLOGAI_ENABLE_CCEL_COORDINATOR` flag. Those are strictly future Stage B
-changes. `primary_source_search` remains local-only, and Stage A makes no CCEL
-request.
+`THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH` and
+`THEOLOGAI_ENABLE_CCEL_COORDINATOR` remain `false` in production and preview.
+The public binding client exists for a later slice, but no composition root or
+MCP tool constructs it. `primary_source_search` remains local-only, and this
+slice makes no CCEL request or Durable Object RPC.
 
 ## One-origin architecture
 
 CCEL is one upstream origin, so it must have one global admission budget.
-`theologai-ccel-coordinator` is the dedicated, non-public Worker prepared to own
-the single SQLite Durable Object namespace. It has `workers_dev = false`, no
-route, and a defense-in-depth 404 handler. Stage A must be merged and its owner
-bootstrapped before Stage B adds either public binding. The Stage B target is:
+`theologai-ccel-coordinator` is the dedicated, non-public Worker that owns the
+single SQLite Durable Object namespace. It has `workers_dev = false`, no route,
+and a defense-in-depth 404 handler. Stage A must be merged and its owner
+bootstrapped before this Stage B binding commit is published. Both public
+Workers then bind externally to the same owner:
 
 | Public caller | Binding owner (`script_name`) | Namespace |
 | --- | --- | --- |
 | `theologai` | `theologai-ccel-coordinator` | shared |
 | `theologai-preview` | `theologai-ccel-coordinator` | shared |
 
-That future target is deliberate: preview must not create a second 10-second
-budget against the same origin. The isolated coordinator-runtime test owns a
-separate local-only namespace and cannot affect Cloudflare state.
+This is deliberate: preview must not create a second 10-second budget against
+the same origin. The isolated coordinator-runtime test owns a separate local-only
+namespace and cannot affect Cloudflare state.
 
 The owner uses Wrangler's declarative export syntax:
 
