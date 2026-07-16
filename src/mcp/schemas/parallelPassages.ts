@@ -10,7 +10,7 @@ const textFields = {
 export const parallelPassagesOutputSchema = {
   type: 'object',
   properties: {
-    schemaVersion: { type: 'string', const: '1' },
+    schemaVersion: { type: 'string', const: '2' },
     kind: { type: 'string', const: 'parallel_passages' },
     requestedReference: { type: 'string' },
     corpora: {
@@ -71,6 +71,19 @@ export const parallelPassagesOutputSchema = {
         additionalProperties: false,
       },
     },
+    sourceAttestedResultWindow: {
+      type: 'object',
+      properties: {
+        requestedLimit: { type: 'integer', minimum: 1, maximum: 10 },
+        returnedGroupCount: { type: 'integer', minimum: 0, maximum: 10 },
+        additionalMatchStatus: {
+          type: 'string',
+          enum: ['additional_match_observed', 'no_additional_match_observed', 'not_evaluated'],
+        },
+      },
+      required: ['requestedLimit', 'returnedGroupCount', 'additionalMatchStatus'],
+      additionalProperties: false,
+    },
     legacyParallels: {
       type: 'array', items: {
         type: 'object',
@@ -95,17 +108,22 @@ export const parallelPassagesOutputSchema = {
     provenance: { type: 'array', items: createProvenanceRecordSchema() },
     warnings: { type: 'array', items: { type: 'string' } },
   },
-  required: ['schemaVersion', 'kind', 'requestedReference', 'corpora', 'sourceAttestedGroups', 'legacyParallels', 'openBibleCrossReferences', 'provenance'],
+  required: ['schemaVersion', 'kind', 'requestedReference', 'corpora', 'sourceAttestedGroups', 'sourceAttestedResultWindow', 'legacyParallels', 'openBibleCrossReferences', 'provenance'],
   additionalProperties: false,
 } as NonNullable<Tool['outputSchema']>;
 
-export interface ParallelPassagesOutputV1 {
+export interface ParallelPassagesOutputV2 {
   [key: string]: unknown;
-  schemaVersion: '1';
+  schemaVersion: '2';
   kind: 'parallel_passages';
   requestedReference: string;
   corpora: Array<'ubs_source_attested' | 'theologai_legacy'>;
   sourceAttestedGroups: Array<Record<string, unknown>>;
+  sourceAttestedResultWindow: {
+    requestedLimit: number;
+    returnedGroupCount: number;
+    additionalMatchStatus: 'additional_match_observed' | 'no_additional_match_observed' | 'not_evaluated';
+  };
   legacyParallels: Array<Record<string, unknown>>;
   openBibleCrossReferences: Array<Record<string, unknown>>;
   provenance: ProvenanceRecord[];

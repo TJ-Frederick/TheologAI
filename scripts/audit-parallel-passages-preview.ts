@@ -17,8 +17,14 @@ export interface ToolEvidence {
 }
 
 type StructuredResult = {
+  schemaVersion?: string;
   corpora?: string[];
   sourceAttestedGroups?: Array<{ members?: Array<Record<string, unknown>> }>;
+  sourceAttestedResultWindow?: {
+    requestedLimit?: number;
+    returnedGroupCount?: number;
+    additionalMatchStatus?: string;
+  };
   legacyParallels?: Array<Record<string, unknown>>;
   openBibleCrossReferences?: Array<Record<string, unknown>>;
   provenance?: Array<Record<string, unknown>>;
@@ -59,6 +65,32 @@ const assertions: Record<string, (result: ToolEvidence) => boolean> = {
   defaultsAccepted: result => result.isError !== true
     && structured(result).corpora?.length === 1
     && structured(result).corpora[0] === 'ubs_source_attested',
+  v2AdditionalDefaultWindow: result => structured(result).schemaVersion === '2'
+    && structured(result).sourceAttestedGroups?.length === 5
+    && structured(result).sourceAttestedResultWindow?.requestedLimit === 5
+    && structured(result).sourceAttestedResultWindow?.returnedGroupCount === 5
+    && structured(result).sourceAttestedResultWindow?.additionalMatchStatus === 'additional_match_observed'
+    && /Raise `maxGroups` \(up to 10\) or narrow the reference/.test(text(result)),
+  v2MaximumObservedWindow: result => structured(result).schemaVersion === '2'
+    && structured(result).sourceAttestedGroups?.length === 7
+    && structured(result).sourceAttestedResultWindow?.requestedLimit === 10
+    && structured(result).sourceAttestedResultWindow?.returnedGroupCount === 7
+    && structured(result).sourceAttestedResultWindow?.additionalMatchStatus === 'no_additional_match_observed',
+  completeKingsChroniclesIsaiahGroup: result => structured(result).sourceAttestedGroups?.some(group => {
+    const references = group.members?.map(member => member.normalizedReference);
+    return ['2 Kings 18:13', '2 Chronicles 32:1', 'Isaiah 36:1'].every(reference => references?.includes(reference));
+  }) ?? false,
+  distinctMatthewGroups: result => {
+    const groups = structured(result).sourceAttestedGroups ?? [];
+    const identities = groups.map(group => group.members?.map(member => member.normalizedReference).join('|'));
+    return groups.length === 2
+      && groups.every(group => group.members?.some(member => member.normalizedReference === 'Matthew 3:3'))
+      && new Set(identities).size === 2;
+  },
+  ubsNotEvaluated: result => structured(result).sourceAttestedGroups?.length === 0
+    && structured(result).sourceAttestedResultWindow?.requestedLimit === 5
+    && structured(result).sourceAttestedResultWindow?.returnedGroupCount === 0
+    && structured(result).sourceAttestedResultWindow?.additionalMatchStatus === 'not_evaluated',
 };
 
 export function evaluateCase(testCase: AuditCase, result: ToolEvidence) {

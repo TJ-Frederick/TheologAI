@@ -18,6 +18,7 @@ import type {
   ISourceAttestedParallelRepository,
   ParallelSourceProvenance,
   SourceAttestedParallelGroup,
+  SourceAttestedParallelRepositoryResult,
   SourceParallelMember,
   SourceParallelReferenceSegment,
 } from '../../kernel/sourceAttestedParallels.js';
@@ -71,23 +72,32 @@ export class UbsParallelPassageRepository implements ISourceAttestedParallelRepo
     this.referenceIndex = corpus.referenceIndex;
   }
 
-  findGroups(reference: string, maxGroups = Number.POSITIVE_INFINITY): readonly SourceAttestedParallelGroup[] {
-    if (maxGroups !== Number.POSITIVE_INFINITY && (!Number.isSafeInteger(maxGroups) || maxGroups < 1)) {
-      throw new Error('maxGroups must be a positive safe integer');
+  findGroups(reference: string, maxGroups = 10): SourceAttestedParallelRepositoryResult {
+    if (!Number.isSafeInteger(maxGroups) || maxGroups < 1 || maxGroups > 10) {
+      throw new Error('maxGroups must be an integer from 1 to 10');
     }
     const parsed = parseSourceAttestedLookupReference(reference);
     if (parsed.segments.length > 8) throw new Error('reference exceeds the reviewed 8-segment query bound');
-    const groupIds = new Set<string>();
+    const candidateGroups: SourceAttestedParallelGroup[] = [];
+    const candidateIds = new Set<string>();
+    const observationLimit = maxGroups + 1;
     for (const segment of parsed.segments) {
       const entries = this.referenceIndex[`${segment.bookNumber}:${segment.chapter}`] ?? [];
       for (const entry of entries) {
-        if (entry.startVerse <= segment.endVerse && segment.startVerse <= entry.endVerse) groupIds.add(entry.groupId);
+        if (entry.startVerse > segment.endVerse || segment.startVerse > entry.endVerse || candidateIds.has(entry.groupId)) continue;
+        const group = this.groupsById.get(entry.groupId)!;
+        const insertionIndex = candidateGroups.findIndex(candidate => candidate.sourceOrdinal > group.sourceOrdinal);
+        candidateGroups.splice(insertionIndex < 0 ? candidateGroups.length : insertionIndex, 0, group);
+        candidateIds.add(group.groupId);
+        if (candidateGroups.length > observationLimit) {
+          candidateIds.delete(candidateGroups.pop()!.groupId);
+        }
       }
     }
-    return [...groupIds]
-      .map(groupId => this.groupsById.get(groupId)!)
-      .sort((left, right) => left.sourceOrdinal - right.sourceOrdinal)
-      .slice(0, maxGroups);
+    return Object.freeze({
+      groups: Object.freeze(candidateGroups.slice(0, maxGroups)),
+      additionalMatchObserved: candidateGroups.length > maxGroups,
+    });
   }
 
   getProvenance(): Readonly<ParallelSourceProvenance> {

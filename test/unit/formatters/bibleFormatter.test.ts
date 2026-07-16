@@ -80,6 +80,7 @@ describe('formatParallelPassageResearch', () => {
   it('preserves complete groups while visually de-emphasizing the matched member', () => {
     const result: ParallelPassageResearchResult = {
       requestedReference: 'Luke 6:35', corpora: ['ubs_source_attested'], legacyParallels: [],
+      sourceAttestedResultWindow: { requestedLimit: 1, returnedGroupCount: 1, additionalMatchStatus: 'additional_match_observed' },
       openBibleCrossReferences: [], provenance: [{
         id: 'translation-1', kind: 'translation', label: 'Provider A', status: 'provider_attributed',
         rightsNotice: 'Licensed text', version: 'WEB',
@@ -103,6 +104,19 @@ describe('formatParallelPassageResearch', () => {
     expect(output).toContain('Segment 1 — Luke 6:35: Matched full text');
     expect(output).toContain('Parallel full text');
     expect(output).toContain('(WEB; Provider A; Licensed text)');
+    expect(output).toContain('Raise `maxGroups` (up to 10) or narrow the reference');
+  });
+
+  it('recommends only narrowing at the reviewed maximum and avoids exhaustiveness claims', () => {
+    const result = {
+      requestedReference: 'Mark 10:19', corpora: ['ubs_source_attested'], sourceAttestedGroups: [],
+      sourceAttestedResultWindow: { requestedLimit: 10, returnedGroupCount: 10, additionalMatchStatus: 'additional_match_observed' },
+      legacyParallels: [], openBibleCrossReferences: [], provenance: [],
+    } satisfies ParallelPassageResearchResult;
+    const output = formatParallelPassageResearch(result);
+    expect(output).toContain('Narrow the reference');
+    expect(output).not.toContain('Raise `maxGroups`');
+    expect(output).not.toMatch(/exhaustive|total|cursor/i);
   });
 });
 

@@ -5,6 +5,7 @@ import type {
   ISourceAttestedParallelRepository,
   ParallelSourceProvenance,
   SourceAttestedParallelGroup,
+  SourceAttestedParallelRepositoryResult,
   SourceParallelMember,
   SourceParallelReferenceSegment,
 } from '../../kernel/sourceAttestedParallels.js';
@@ -42,7 +43,7 @@ export class D1UbsParallelPassageRepository implements ISourceAttestedParallelRe
     return Object.freeze(provenance);
   }
 
-  async findGroups(reference: string, maxGroups = MAX_GROUPS): Promise<readonly SourceAttestedParallelGroup[]> {
+  async findGroups(reference: string, maxGroups = MAX_GROUPS): Promise<SourceAttestedParallelRepositoryResult> {
     if (!Number.isSafeInteger(maxGroups) || maxGroups < 1 || maxGroups > MAX_GROUPS) {
       throw new Error(`maxGroups must be an integer from 1 to ${MAX_GROUPS}`);
     }
@@ -57,11 +58,17 @@ export class D1UbsParallelPassageRepository implements ISourceAttestedParallelRe
         WHERE g.source_id = ? AND (${clauses.join(' OR ')})
         ORDER BY g.source_ordinal, g.group_id
         LIMIT ?`,
-    ).bind(SOURCE_ID, ...bindings, maxGroups).all<Pick<GroupRow, 'group_id' | 'source_ordinal'>>();
-    if (ids.length === 0) return Object.freeze([]);
+    ).bind(SOURCE_ID, ...bindings, maxGroups + 1).all<Pick<GroupRow, 'group_id' | 'source_ordinal'>>();
+    if (ids.length > maxGroups + 1
+      || new Set(ids.map(row => row.group_id)).size !== ids.length
+      || ids.some((row, index) => index > 0 && row.source_ordinal <= ids[index - 1].source_ordinal)) {
+      throw new Error('UBS group-ID lookahead exceeded its reviewed bound or source order');
+    }
+    if (ids.length === 0) return Object.freeze({ groups: Object.freeze([]), additionalMatchObserved: false });
 
-    const placeholders = ids.map(() => '?').join(',');
-    const groupIds = ids.map(row => row.group_id);
+    const selectedIdsForReturn = ids.slice(0, maxGroups);
+    const placeholders = selectedIdsForReturn.map(() => '?').join(',');
+    const groupIds = selectedIdsForReturn.map(row => row.group_id);
     const [source, groupsResult, membersResult, segmentsResult] = await Promise.all([
       this.getProvenance(),
       this.db.prepare(`SELECT group_id, source_ordinal, label, directionality FROM ubs_parallel_groups WHERE group_id IN (${placeholders}) ORDER BY source_ordinal, group_id LIMIT ?`).bind(...groupIds, maxGroups).all<GroupRow>(),
@@ -81,13 +88,13 @@ export class D1UbsParallelPassageRepository implements ISourceAttestedParallelRe
       segments.push(row);
       segmentsByMember.set(key, segments);
     }
-    const selectedIds = new Set(ids.map(row => row.group_id));
-    const selectedOrdinals = new Map(ids.map(row => [row.group_id, row.source_ordinal]));
+    const selectedIds = new Set(selectedIdsForReturn.map(row => row.group_id));
+    const selectedOrdinals = new Map(selectedIdsForReturn.map(row => [row.group_id, row.source_ordinal]));
     const rowsAreScoped = groupsResult.results.every(row => selectedIds.has(row.group_id))
       && membersResult.results.every(row => selectedIds.has(row.group_id))
       && segmentsResult.results.every(row => selectedIds.has(row.group_id));
-    if (!rowsAreScoped || groupsResult.results.length !== ids.length
-      || new Set(groupsResult.results.map(row => row.group_id)).size !== ids.length
+    if (!rowsAreScoped || groupsResult.results.length !== selectedIdsForReturn.length
+      || new Set(groupsResult.results.map(row => row.group_id)).size !== selectedIdsForReturn.length
       || groupsResult.results.some(row => selectedOrdinals.get(row.group_id) !== row.source_ordinal)
       || membersResult.results.length >= MAX_MEMBERS || segmentsResult.results.length >= MAX_SEGMENTS) {
       throw new Error('UBS complete-group query exceeded its reviewed bounds or returned incomplete data');
@@ -123,7 +130,10 @@ export class D1UbsParallelPassageRepository implements ISourceAttestedParallelRe
     if (consumedSegments !== segmentsResult.results.length) {
       throw new Error('UBS segment rows do not belong to reconstructed members');
     }
-    return Object.freeze(groups);
+    return Object.freeze({
+      groups: Object.freeze(groups),
+      additionalMatchObserved: ids.length > maxGroups,
+    });
   }
 }
 

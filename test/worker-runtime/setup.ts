@@ -2,7 +2,7 @@ import { beforeAll } from 'vitest';
 import { applyD1Migrations, env } from 'cloudflare:test';
 import type { D1Migration } from '@cloudflare/vitest-pool-workers';
 import { UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY, UBS_PARALLEL_PASSAGE_PROVENANCE } from '../../src/kernel/ubsParallelSource.js';
-import { ubsFixture } from '../fixtures/ubsParallelCorpus.js';
+import generatedUbsCorpus from '../../src/data/ubs-parallel-passages.generated.json';
 
 declare global {
   namespace Cloudflare {
@@ -143,7 +143,6 @@ beforeAll(async () => {
     ),
   ]);
 
-  const group = (ubsFixture() as any).groups[0];
   const source = UBS_PARALLEL_PASSAGE_PROVENANCE;
   await env.THEOLOGAI_DB.batch([
     env.THEOLOGAI_DB.prepare(`INSERT INTO ubs_parallel_sources VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(
@@ -152,16 +151,26 @@ beforeAll(async () => {
       source.sourcePath, source.sourceCommit, source.sourceCommitDate, source.sourceBlob, source.sourceBytes,
       source.sourceSha256, 1, source.modificationNote, 'source_attested_parallel', 'unspecified',
     ),
-    env.THEOLOGAI_DB.prepare(`INSERT INTO ubs_parallel_groups VALUES (?,?,?,?,?)`).bind(
-      group.groupId, source.sourceId, group.sourceOrdinal, group.label, group.directionality,
-    ),
-    ...group.members.map((member: any) => env.THEOLOGAI_DB.prepare(`INSERT INTO ubs_parallel_members VALUES (?,?,?,?,?,?,?)`).bind(
-      group.groupId, member.sourceOrder, member.sourceReference, member.normalizedReference,
-      member.languageMarker, member.alignmentBasis, member.alignmentRaw,
-    )),
-    ...group.members.flatMap((member: any) => member.segments.map((segment: any, index: number) =>
-      env.THEOLOGAI_DB.prepare(`INSERT INTO ubs_parallel_segments VALUES (?,?,?,?,?,?,?)`).bind(
-        group.groupId, member.sourceOrder, index + 1, segment.bookNumber, segment.chapter, segment.startVerse, segment.endVerse,
-      ))),
   ]);
+  const requiredGroups = (generatedUbsCorpus as any).groups.filter((group: any) => group.members.some((member: any) =>
+    member.normalizedReference === 'Mark 10:19'
+      || member.normalizedReference === '2 Kings 18:13'
+      || member.normalizedReference === 'Matthew 3:3'
+      || member.segments.some((segment: any) => segment.bookNumber === 42 && segment.chapter === 6
+        && segment.startVerse <= 35 && segment.endVerse >= 35)));
+  for (const group of requiredGroups) {
+    await env.THEOLOGAI_DB.batch([
+      env.THEOLOGAI_DB.prepare(`INSERT INTO ubs_parallel_groups VALUES (?,?,?,?,?)`).bind(
+        group.groupId, source.sourceId, group.sourceOrdinal, group.label, group.directionality,
+      ),
+      ...group.members.map((member: any) => env.THEOLOGAI_DB.prepare(`INSERT INTO ubs_parallel_members VALUES (?,?,?,?,?,?,?)`).bind(
+        group.groupId, member.sourceOrder, member.sourceReference, member.normalizedReference,
+        member.languageMarker, member.alignmentBasis, member.alignmentRaw,
+      )),
+      ...group.members.flatMap((member: any) => member.segments.map((segment: any, index: number) =>
+        env.THEOLOGAI_DB.prepare(`INSERT INTO ubs_parallel_segments VALUES (?,?,?,?,?,?,?)`).bind(
+          group.groupId, member.sourceOrder, index + 1, segment.bookNumber, segment.chapter, segment.startVerse, segment.endVerse,
+        ))),
+    ]);
+  }
 });

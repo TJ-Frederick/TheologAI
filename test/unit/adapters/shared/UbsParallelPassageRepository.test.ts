@@ -22,13 +22,13 @@ describe('UbsParallelPassageRepository', () => {
       license: 'CC BY-SA 4.0',
     });
     expect(generatedCorpus.artifactIdentity).toBe(UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY);
-    expect(repository.findGroups('Matthew 3:16-17', 1)[0].members.map(member => member.normalizedReference)).toEqual([
+    expect(repository.findGroups('Matthew 3:16-17', 1).groups[0].members.map(member => member.normalizedReference)).toEqual([
       'Matthew 3:16-17', 'Mark 1:10-11', 'Luke 3:21-22', 'John 1:32',
     ]);
-    expect(repository.findGroups('2 Kings 18:13', 1)[0].members.map(member => member.normalizedReference)).toEqual([
+    expect(repository.findGroups('2 Kings 18:13', 1).groups[0].members.map(member => member.normalizedReference)).toEqual([
       '2 Kings 18:13', '2 Chronicles 32:1', 'Isaiah 36:1',
     ]);
-    expect(repository.findGroups('Psalm 18:51', 1)[0].members.map(member => member.normalizedReference)).toContain('Psalms 18:51');
+    expect(repository.findGroups('Psalm 18:51', 1).groups[0].members.map(member => member.normalizedReference)).toContain('Psalms 18:51');
 
     const cases: Array<[string, string[]]> = [
       ['Matthew 14:20', ['Matthew 14:20', 'Mark 6:42-43', 'Luke 9:17', 'John 6:12-13']],
@@ -37,13 +37,13 @@ describe('UbsParallelPassageRepository', () => {
       ['Isaiah 40:3', ['Isaiah 40:3', 'Matthew 3:3', 'Mark 1:3', 'Luke 3:4', 'John 1:23']],
     ];
     for (const [reference, members] of cases) {
-      const group = repository.findGroups(reference).find(candidate => members.every(member => candidate.members.some(item => item.normalizedReference === member)));
+      const group = repository.findGroups(reference).groups.find(candidate => members.every(member => candidate.members.some(item => item.normalizedReference === member)));
       expect(group?.members.map(member => member.normalizedReference)).toEqual(members);
       expect(group).toMatchObject({ label: 'source_attested_parallel', directionality: 'unspecified' });
       expect(group).not.toHaveProperty('confidence');
     }
-    expect(repository.findGroups('Matthew 3:3').length).toBeGreaterThanOrEqual(2);
-    expect(repository.findGroups('Luke 6:35').some(group => group.members.some(member => member.sourceReference.includes(',')))).toBe(true);
+    expect(repository.findGroups('Matthew 3:3').groups.length).toBeGreaterThanOrEqual(2);
+    expect(repository.findGroups('Luke 6:35').groups.some(group => group.members.some(member => member.sourceReference.includes(',')))).toBe(true);
   });
 
   it('rejects a fully coordinated but unreviewed artifact rewrite at the pinned root', () => {
@@ -78,19 +78,22 @@ describe('UbsParallelPassageRepository', () => {
   it('supports exact, overlap, reverse, discontinuous, deduplicated, source-ordered lookup', () => {
     const repository = fixtureRepository();
     const exact = repository.findGroups('Luke 6:35');
-    expect(exact.map(group => group.sourceOrdinal)).toEqual([1, 2]);
-    expect(exact[0].members).toHaveLength(2);
-    expect(repository.findGroups('Luke 6:29-34')).toEqual([]);
-    expect(repository.findGroups('Luke 6:27-28,35').map(group => group.sourceOrdinal)).toEqual([1, 2]);
-    expect(repository.findGroups('Luke 6:28-35').map(group => group.sourceOrdinal)).toEqual([1, 2]);
-    expect(repository.findGroups('Matthew 5:44')[0].groupId).toBe(exact[0].groupId);
-    expect(repository.findGroups('Luke 6', 1).map(group => group.sourceOrdinal)).toEqual([1]);
-    expect(() => repository.findGroups('Luke 6:35', 0)).toThrow('positive safe integer');
+    expect(exact.groups.map(group => group.sourceOrdinal)).toEqual([1, 2]);
+    expect(exact.groups[0].members).toHaveLength(2);
+    expect(repository.findGroups('Luke 6:29-34')).toEqual({ groups: [], additionalMatchObserved: false });
+    expect(repository.findGroups('Luke 6:27-28,35').groups.map(group => group.sourceOrdinal)).toEqual([1, 2]);
+    expect(repository.findGroups('Luke 6:28-35').groups.map(group => group.sourceOrdinal)).toEqual([1, 2]);
+    expect(repository.findGroups('Matthew 5:44').groups[0].groupId).toBe(exact.groups[0].groupId);
+    expect(repository.findGroups('Luke 6', 1).groups.map(group => group.sourceOrdinal)).toEqual([1]);
+    expect(() => repository.findGroups('Luke 6:35', 0)).toThrow('1 to 10');
   });
 
   it('returns immutable complete groups and provenance', () => {
     const repository = fixtureRepository();
-    const group = repository.findGroups('Luke 6:35')[0];
+    const result = repository.findGroups('Luke 6:35');
+    const group = result.groups[0];
+    expect(Object.isFrozen(result)).toBe(true);
+    expect(Object.isFrozen(result.groups)).toBe(true);
     expect(Object.isFrozen(group)).toBe(true);
     expect(Object.isFrozen(group.members)).toBe(true);
     expect(Object.isFrozen(group.members[0].segments)).toBe(true);
@@ -145,8 +148,32 @@ describe('UbsParallelPassageRepository', () => {
     const node = loadUbsParallelPassageRepository(new URL('../../../../src/data/ubs-parallel-passages.generated.json', import.meta.url).pathname);
     const worker = new UbsParallelPassageRepository(generatedCorpus);
     for (const reference of ['Matthew 3:3', 'Isaiah 40:3', 'Luke 6:35', '2 Kings 18:13']) {
-      expect(node.findGroups(reference).map(group => group.groupId)).toEqual(worker.findGroups(reference).map(group => group.groupId));
-      expect(node.findGroups(reference).map(group => group.provenance)).toEqual(worker.findGroups(reference).map(group => group.provenance));
+      expect(node.findGroups(reference).groups.map(group => group.groupId)).toEqual(worker.findGroups(reference).groups.map(group => group.groupId));
+      expect(node.findGroups(reference).groups.map(group => group.provenance)).toEqual(worker.findGroups(reference).groups.map(group => group.provenance));
     }
+  });
+
+  it('reports only a one-group lookahead without returning or implying a total', () => {
+    const repository = new UbsParallelPassageRepository(generatedCorpus);
+    const bounded = repository.findGroups('Mark 10:19', 5);
+    expect(bounded.groups).toHaveLength(5);
+    expect(bounded.additionalMatchObserved).toBe(true);
+    expect(bounded).not.toHaveProperty('total');
+    expect(bounded).not.toHaveProperty('cursor');
+
+    const reviewedMaximum = repository.findGroups('Mark 10:19', 10);
+    expect(reviewedMaximum.groups).toHaveLength(7);
+    expect(reviewedMaximum.additionalMatchObserved).toBe(false);
+  });
+
+  it('preserves complete source groups and distinct source attestations in the honest window', () => {
+    const repository = new UbsParallelPassageRepository(generatedCorpus);
+    expect(repository.findGroups('2 Kings 18:13', 5).groups[0].members.map(member => member.normalizedReference)).toEqual([
+      '2 Kings 18:13', '2 Chronicles 32:1', 'Isaiah 36:1',
+    ]);
+    const matthew = repository.findGroups('Matthew 3:3', 5);
+    expect(matthew.groups).toHaveLength(2);
+    expect(new Set(matthew.groups.map(group => group.groupId)).size).toBe(2);
+    expect(matthew.groups.map(group => group.sourceOrdinal)).toEqual([1316, 1436]);
   });
 });

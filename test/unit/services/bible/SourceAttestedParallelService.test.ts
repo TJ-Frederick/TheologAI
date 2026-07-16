@@ -15,7 +15,19 @@ describe('SourceAttestedParallelService', () => {
     const result = await new SourceAttestedParallelService(repository).lookup({ reference: 'lk 6:35' });
     expect(result.reference).toBe('Luke 6:35');
     expect(result.groups.map(group => group.sourceOrdinal)).toEqual([1, 2]);
+    expect(result).toMatchObject({ requestedLimit: 5, additionalMatchObserved: false });
     expect(findGroups).toHaveBeenCalledWith('Luke 6:35', 5);
+  });
+
+  it('carries the repository lookahead observation without exposing the lookahead group', async () => {
+    const groups = fixtureRepository().findGroups('Luke 6:35', 2).groups;
+    const repository: ISourceAttestedParallelRepository = {
+      findGroups: vi.fn().mockResolvedValue({ groups: groups.slice(0, 1), additionalMatchObserved: true }),
+      getProvenance: vi.fn(),
+    };
+    const result = await new SourceAttestedParallelService(repository).lookup({ reference: 'Luke 6:35', maxGroups: 1 });
+    expect(result.groups).toHaveLength(1);
+    expect(result).toMatchObject({ requestedLimit: 1, additionalMatchObserved: true });
   });
 
   it('passes an explicit limit without flattening or changing source evidence', async () => {

@@ -17,7 +17,9 @@ function crossReferences(references: Array<{ reference: string; votes: number }>
 function sourceService() {
   const group = (ubsFixture() as any).groups[0];
   return {
-    lookup: vi.fn().mockResolvedValue({ reference: 'Luke 6:35', groups: [group] }),
+    lookup: vi.fn().mockImplementation(async ({ maxGroups }: { maxGroups?: number }) => ({
+      reference: 'Luke 6:35', groups: [group], requestedLimit: maxGroups ?? 5, additionalMatchObserved: false,
+    })),
     getProvenance: vi.fn().mockResolvedValue(UBS_PARALLEL_PASSAGE_PROVENANCE),
   };
 }
@@ -42,16 +44,43 @@ describe('ParallelPassageService hard-cutover contract', () => {
     expect(result.openBibleCrossReferences).toEqual([]);
     expect(result.sourceAttestedGroups[0].members.map(member => member.matched)).toEqual([true, false]);
     expect(result.sourceAttestedGroups[0].members[0]).not.toHaveProperty('alignmentRaw');
+    expect(result.sourceAttestedResultWindow).toEqual({
+      requestedLimit: 5, returnedGroupCount: 1, additionalMatchStatus: 'no_additional_match_observed',
+    });
   });
 
   it('preserves legacy edge items only under the explicit legacy selector', async () => {
     const service = new ParallelPassageService(crossReferences(), undefined, undefined, legacyFixture(), sourceService() as any);
     const result = await service.lookup({ reference: 'Luke 6:35', corpora: ['theologai_legacy'], mode: 'thematic' });
     expect(result.sourceAttestedGroups).toEqual([]);
+    expect(result.sourceAttestedResultWindow).toEqual({
+      requestedLimit: 5, returnedGroupCount: 0, additionalMatchStatus: 'not_evaluated',
+    });
     expect(result.legacyParallels).toEqual([{
       reference: 'Matthew 5:44', relationship: 'thematic', confidence: 0.8, notes: 'legacy note',
       provenanceIds: ['theologai-legacy-parallels'],
     }]);
+  });
+
+  it('reports observed lookahead without returning or enriching it', async () => {
+    const group = (ubsFixture() as any).groups[0];
+    const source = {
+      lookup: vi.fn().mockResolvedValue({
+        reference: 'Luke 6:35', groups: [group], requestedLimit: 1, additionalMatchObserved: true,
+      }),
+      getProvenance: vi.fn().mockResolvedValue(UBS_PARALLEL_PASSAGE_PROVENANCE),
+    };
+    const lookup = vi.fn().mockImplementation(async ({ reference }) => ({
+      reference, translation: 'WEB', text: reference, citation: { source: 'fixture' },
+    }));
+    const result = await new ParallelPassageService(
+      crossReferences(), { lookup } as any, undefined, legacyFixture(), source as any,
+    ).lookup({ reference: 'Luke 6:35', maxGroups: 1, includeText: true });
+    expect(result.sourceAttestedGroups).toHaveLength(1);
+    expect(result.sourceAttestedResultWindow).toEqual({
+      requestedLimit: 1, returnedGroupCount: 1, additionalMatchStatus: 'additional_match_observed',
+    });
+    expect(lookup).toHaveBeenCalledTimes(3);
   });
 
   it('keeps OpenBible separate and off unless explicitly requested', async () => {

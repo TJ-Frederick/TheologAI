@@ -1,11 +1,31 @@
 {
-  "schemaVersion": "2",
+  "schemaVersion": "3",
   "tool": "parallel_passages",
   "cases": [
     {
       "name": "hard default is UBS only",
       "arguments": { "reference": "Luke 6:35" },
       "assert": ["success", "ubsGroupsPresent"]
+    },
+    {
+      "name": "default bounded result observes an additional UBS group",
+      "arguments": { "reference": "Mark 10:19" },
+      "assert": ["success", "v2AdditionalDefaultWindow"]
+    },
+    {
+      "name": "reviewed maximum returns seven observed groups without an extra match",
+      "arguments": { "reference": "Mark 10:19", "maxGroups": 10 },
+      "assert": ["success", "v2MaximumObservedWindow"]
+    },
+    {
+      "name": "Kings Chronicles and Isaiah remain one complete source group",
+      "arguments": { "reference": "2 Kings 18:13" },
+      "assert": ["success", "completeKingsChroniclesIsaiahGroup"]
+    },
+    {
+      "name": "Matthew locator preserves distinct source groups",
+      "arguments": { "reference": "Matthew 3:3" },
+      "assert": ["success", "distinctMatthewGroups"]
     },
     {
       "name": "alignment is explicit",
@@ -20,7 +40,7 @@
     {
       "name": "legacy remains explicit and unchanged",
       "arguments": { "reference": "Matthew 26:26", "corpora": ["theologai_legacy"], "mode": "synoptic", "maxParallels": 2 },
-      "assert": ["success", "legacyParallelsPresent"]
+      "assert": ["success", "legacyParallelsPresent", "ubsNotEvaluated"]
     },
     {
       "name": "both corpora remain separated",

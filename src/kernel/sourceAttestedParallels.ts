@@ -52,9 +52,16 @@ export interface SourceAttestedParallelGroup {
 export interface SourceAttestedParallelLookup {
   reference: string;
   groups: readonly SourceAttestedParallelGroup[];
+  requestedLimit: number;
+  additionalMatchObserved: boolean;
+}
+
+export interface SourceAttestedParallelRepositoryResult {
+  groups: readonly SourceAttestedParallelGroup[];
+  additionalMatchObserved: boolean;
 }
 
 export interface ISourceAttestedParallelRepository {
-  findGroups(reference: string, maxGroups?: number): RepositoryResult<readonly SourceAttestedParallelGroup[]>;
+  findGroups(reference: string, maxGroups?: number): RepositoryResult<SourceAttestedParallelRepositoryResult>;
   getProvenance(): RepositoryResult<Readonly<ParallelSourceProvenance>>;
 }

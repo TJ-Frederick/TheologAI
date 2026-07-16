@@ -126,7 +126,7 @@ export function createDeterministicMcpFixture(): DeterministicMcpFixture {
   const bibleService = new BibleService([bibleAdapter]);
   const crossReferenceService = new CrossReferenceService(crossReferenceRepository);
   const sourceAttestedParallelService = new SourceAttestedParallelService({
-    findGroups: () => [],
+    findGroups: () => ({ groups: [], additionalMatchObserved: false }),
     getProvenance: () => ({
       sourceId: 'fixture', title: 'Fixture', publisher: 'Fixture', copyright: 'Fixture', license: 'Fixture',
       licenseUrl: 'https://example.test/license', sourceUrl: 'https://example.test/source', sourcePath: 'fixture',

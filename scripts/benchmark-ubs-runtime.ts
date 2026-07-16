@@ -28,5 +28,6 @@ process.stdout.write(`${JSON.stringify({
   elapsedMs: Number(elapsedMs.toFixed(2)),
   retainedHeapDeltaMiB: Number(((after.heapUsed - before.heapUsed) / 1024 / 1024).toFixed(2)),
   retainedRssDeltaMiB: Number(((after.rss - before.rss) / 1024 / 1024).toFixed(2)),
-  sampleGroups: sample.length,
+  sampleGroups: sample.groups.length,
+  sampleAdditionalMatchObserved: sample.additionalMatchObserved,
 }, null, 2)}\n`);

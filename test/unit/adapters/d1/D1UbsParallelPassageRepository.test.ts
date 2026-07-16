@@ -10,7 +10,7 @@ interface FixtureRows {
   segments: any[];
 }
 
-function fixtureDb(mutate?: (rows: FixtureRows) => void) {
+function fixtureDb(mutate?: (rows: FixtureRows) => void, additionalMatch = false) {
   const artifact = ubsFixture() as any;
   const group = artifact.groups[0];
   const p = UBS_PARALLEL_PASSAGE_PROVENANCE;
@@ -30,7 +30,10 @@ function fixtureDb(mutate?: (rows: FixtureRows) => void) {
   return {
     group,
     db: createMockD1([
-      { sql: 'SELECT DISTINCT g.group_id', all: { results: [{ group_id: group.groupId, source_ordinal: group.sourceOrdinal }] } },
+      { sql: 'SELECT DISTINCT g.group_id', all: { results: [
+        { group_id: group.groupId, source_ordinal: group.sourceOrdinal },
+        ...(additionalMatch ? [{ group_id: `ubs-pp-${'f'.repeat(64)}`, source_ordinal: group.sourceOrdinal + 1 }] : []),
+      ] } },
       { sql: 'SELECT * FROM ubs_parallel_sources', first: {
         source_id: p.sourceId, schema_version: 'ubs-parallel-passages.v2', transform_version: p.transformVersion,
         artifact_identity: UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY, title: p.title, publisher: p.publisher,
@@ -51,12 +54,12 @@ describe('D1UbsParallelPassageRepository', () => {
     const { db, group } = fixtureDb();
     const repository = new D1UbsParallelPassageRepository(db as any);
     const results = await repository.findGroups('Luke 6:35', 1);
-    expect(results).toEqual([group]);
-    expect(Object.isFrozen(results[0].members[0].segments)).toBe(true);
+    expect(results).toEqual({ groups: [group], additionalMatchObserved: false });
+    expect(Object.isFrozen(results.groups[0].members[0].segments)).toBe(true);
     expect(await repository.getProvenance()).toEqual(UBS_PARALLEL_PASSAGE_PROVENANCE);
     expect(db.prepare.mock.calls[0][0]).toContain('LIMIT ?');
     expect(db.prepare.mock.results[0].value.bind).toHaveBeenCalledWith(
-      'ubs_paratext_parallel_passages', 42, 6, 35, 35, 1,
+      'ubs_paratext_parallel_passages', 42, 6, 35, 35, 2,
     );
   });
 
@@ -68,8 +71,38 @@ describe('D1UbsParallelPassageRepository', () => {
 
   it('returns no groups without issuing reconstruction queries', async () => {
     const db = createMockD1([{ sql: 'SELECT DISTINCT g.group_id', all: { results: [] } }]);
-    await expect(new D1UbsParallelPassageRepository(db as any).findGroups('John 1:1', 5)).resolves.toEqual([]);
+    await expect(new D1UbsParallelPassageRepository(db as any).findGroups('John 1:1', 5)).resolves.toEqual({ groups: [], additionalMatchObserved: false });
     expect(db.prepare).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['more than one lookahead', [
+      { group_id: `ubs-pp-${'a'.repeat(64)}`, source_ordinal: 1 },
+      { group_id: `ubs-pp-${'b'.repeat(64)}`, source_ordinal: 2 },
+      { group_id: `ubs-pp-${'c'.repeat(64)}`, source_ordinal: 3 },
+    ]],
+    ['duplicate IDs', [
+      { group_id: `ubs-pp-${'a'.repeat(64)}`, source_ordinal: 1 },
+      { group_id: `ubs-pp-${'a'.repeat(64)}`, source_ordinal: 2 },
+    ]],
+    ['non-increasing source order', [
+      { group_id: `ubs-pp-${'a'.repeat(64)}`, source_ordinal: 2 },
+      { group_id: `ubs-pp-${'b'.repeat(64)}`, source_ordinal: 1 },
+    ]],
+  ])('rejects malformed %s from the bounded ID query before reconstruction', async (_name, ids) => {
+    const db = createMockD1([{ sql: 'SELECT DISTINCT g.group_id', all: { results: ids } }]);
+    await expect(new D1UbsParallelPassageRepository(db as any).findGroups('Luke 6:35', 1)).rejects.toThrow('lookahead');
+    expect(db.prepare).toHaveBeenCalledTimes(1);
+  });
+
+  it('observes one extra ID while reconstructing only the returned complete groups', async () => {
+    const { db, group } = fixtureDb(undefined, true);
+    const result = await new D1UbsParallelPassageRepository(db as any).findGroups('Luke 6:35', 1);
+    expect(result).toEqual({ groups: [group], additionalMatchObserved: true });
+    expect(db.prepare.mock.calls[2][0]).toContain('ubs_parallel_groups');
+    expect(db.prepare.mock.results[2].value.bind).toHaveBeenCalledWith(group.groupId, 1);
+    expect(db.prepare.mock.results[3].value.bind).toHaveBeenCalledWith(group.groupId, 400);
+    expect(db.prepare.mock.results[4].value.bind).toHaveBeenCalledWith(group.groupId, 800);
   });
 
   it.each([

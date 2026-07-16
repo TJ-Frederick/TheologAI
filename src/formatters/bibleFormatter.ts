@@ -150,6 +150,16 @@ export function formatParallelPassageResearch(result: ParallelPassageResearchRes
     s += '\nNo UBS source-attested parallel groups found.\n';
   }
 
+  if (result.sourceAttestedResultWindow.additionalMatchStatus === 'additional_match_observed') {
+    s += result.sourceAttestedResultWindow.requestedLimit < 10
+      ? '\n_At least one additional UBS source-attested group was observed beyond this bounded result window. Raise `maxGroups` (up to 10) or narrow the reference to inspect more focused results._\n'
+      : '\n_At least one additional UBS source-attested group was observed beyond this bounded result window. Narrow the reference to inspect more focused results._\n';
+  } else if (result.sourceAttestedResultWindow.additionalMatchStatus === 'no_additional_match_observed') {
+    s += '\n_No additional UBS source-attested group was observed by the bounded lookahead for this request._\n';
+  } else {
+    s += '\n_The UBS source-attested result window was not evaluated because that corpus was not selected._\n';
+  }
+
   if (result.legacyParallels.length > 0) {
     s += '\n### TheologAI legacy curated edges\n';
     for (const parallel of result.legacyParallels) {
