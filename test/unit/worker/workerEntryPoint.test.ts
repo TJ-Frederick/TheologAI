@@ -43,7 +43,7 @@ function makeEnv() {
     ESV_API_KEY: 'test-key',
     THEOLOGAI_VERSION: '1.0.0-test',
     THEOLOGAI_REQUEST_LOGS: 'false',
-    THEOLOGAI_ALLOWED_ORIGINS: 'https://theologai.pages.dev',
+    THEOLOGAI_ALLOWED_ORIGINS: 'https://theologai.xyz,https://theologai.pages.dev',
     THEOLOGAI_MAX_REQUEST_BYTES: String(1024 * 1024),
   };
 }
@@ -94,6 +94,19 @@ describe('Worker Entry Point', () => {
     );
     expect(response.headers.get('Access-Control-Allow-Origin')).toBe('https://two.example');
     expect(response.headers.get('Vary')).toContain('Origin');
+  });
+
+  it.each([
+    'https://theologai.xyz',
+    'https://theologai.pages.dev',
+  ])('accepts the canonical and legacy website origin: %s', async (origin) => {
+    const response = await worker.fetch(
+      makeRequest('/mcp', 'POST', { Origin: origin }),
+      env as never,
+      ctx,
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Access-Control-Allow-Origin')).toBe(origin);
   });
 
   it('rejects an untrusted origin before constructing MCP dependencies', async () => {

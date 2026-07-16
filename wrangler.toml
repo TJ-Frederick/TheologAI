@@ -2,6 +2,10 @@ name = "theologai"
 main = "src/worker.ts"
 compatibility_date = "2026-07-09"
 compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+routes = [
+  { pattern = "mcp.theologai.xyz", custom_domain = true },
+]
 
 [observability.logs]
 enabled = true
@@ -20,7 +24,7 @@ ai = "./src/shims/ai-stub.ts"
 
 [vars]
 THEOLOGAI_VERSION = "3.6.0"
-THEOLOGAI_ALLOWED_ORIGINS = "https://theologai.pages.dev"
+THEOLOGAI_ALLOWED_ORIGINS = "https://theologai.xyz,https://theologai.pages.dev"
 THEOLOGAI_MAX_REQUEST_BYTES = "1048576"
 THEOLOGAI_REQUEST_LOGS = "false"
 THEOLOGAI_EXPOSE_CCEL_DISCOVERY = "false"
@@ -65,10 +69,14 @@ period = 60
 
 [env.preview]
 name = "theologai-preview"
+workers_dev = true
+routes = [
+  { pattern = "preview-mcp.theologai.xyz", custom_domain = true },
+]
 
 [env.preview.vars]
 THEOLOGAI_VERSION = "3.6.0-preview"
-THEOLOGAI_ALLOWED_ORIGINS = "https://theologai.pages.dev"
+THEOLOGAI_ALLOWED_ORIGINS = "https://theologai.xyz,https://theologai.pages.dev"
 THEOLOGAI_MAX_REQUEST_BYTES = "1048576"
 THEOLOGAI_REQUEST_LOGS = "true"
 # Preview exposes the v4 discovery contract for schema/workflow verification.

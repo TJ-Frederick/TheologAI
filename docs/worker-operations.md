@@ -1,6 +1,31 @@
 # Worker operations
 
-## Deployment baseline and rollback posture (2026-07-15)
+## Known-good PR #50 production baseline (2026-07-16)
+
+PR #50 merge `16e633bc70dbbea668caacf87f994a2536441092` is the
+pre-custom-domain rollback anchor. Protected run `29527760541`, GitHub
+deployment `5479150556`, and Cloudflare deployment
+`5822242e-d0bf-43a9-bbbc-0ec7d6edd180` deployed Worker version
+`32520410-d363-4b2b-83d1-cb7613eab2f1` at 100%. Read-only readiness preserved
+production D1 `theologai-production-20260715-a`
+(`c6535a4a-1953-4279-b277-7368445fc61a`), rate namespace `361201` at 120/60,
+and CCEL flags `000`.
+
+The post-deployment black-box audit passed 72/72 assertions with no P0-P3
+findings: parallel-text 44/44, protocol/inventory/CCEL 9/9, and
+HTTP/CORS/negotiation/under-budget rate behavior 19/19. Preview remains Worker
+`50bdd564-63da-4461-9a5b-73c61f26f7e6`, D1
+`theologai-preview-20260714-a`
+(`0dab804f-8df0-4727-93bd-299612b6e179`), rate namespace `361202`, and CCEL
+flags `100`.
+
+The next contained workstream adds custom domains without changing those
+logical bindings or behaviors. Follow
+[CUSTOM-DOMAIN-MIGRATION.md](CUSTOM-DOMAIN-MIGRATION.md) preview-first. Keep
+the `pages.dev` and both `workers.dev` endpoints operational; no deletion or
+route replacement is authorized.
+
+## Earlier deployment baseline and rollback posture (2026-07-15)
 
 PR #37 merge `d395b3641eb00f6826eaba670c287f9a39dfa3da` is the verified
 production application baseline. Protected production run `29451333738`
