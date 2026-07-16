@@ -24,18 +24,20 @@ const coordinatorTypes = readFileSync(
 );
 
 describe('CCEL coordinator Worker environments', () => {
-  it('keeps live CCEL search false and leaves public coordinator integration absent', () => {
+  it('keeps both public rollout flags false', () => {
     expect(config.match(/THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH = "false"/g)).toHaveLength(2);
-    expect(config).not.toContain('THEOLOGAI_ENABLE_CCEL_COORDINATOR');
-    expect(config).not.toContain('THEOLOGAI_CCEL_COORDINATOR');
-    expect(config).not.toContain('script_name = "theologai-ccel-coordinator"');
+    expect(config.match(/THEOLOGAI_ENABLE_CCEL_COORDINATOR = "false"/g)).toHaveLength(2);
   });
 
-  it('keeps the existing public Workers unchanged during owner bootstrap', () => {
+  it('binds both public Workers externally to the same owner', () => {
     expect(config).toContain('name = "theologai"');
     expect(config).toContain('[env.preview]\nname = "theologai-preview"');
+    expect(config.match(/name = "THEOLOGAI_CCEL_COORDINATOR"/g)).toHaveLength(2);
+    expect(config.match(/class_name = "CcelGlobalCoordinator"/g)).toHaveLength(2);
+    expect(config.match(/script_name = "theologai-ccel-coordinator"/g)).toHaveLength(2);
     expect(config).not.toContain('new_sqlite_classes');
     expect(config).not.toContain('new_classes');
+    expect(config).not.toContain('[[migrations]]');
   });
 
   it('uses declarative SQLite exports for every brand-new local namespace', () => {
