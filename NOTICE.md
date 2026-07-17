@@ -40,6 +40,25 @@ edition or translation. Treat this collection as research data pending a
 document-by-document provenance audit; do not assume blanket public-domain or
 redistribution rights. Completing that audit is a release-roadmap item.
 
+### EEBO-TCP A17662 — Norton 1561 Institutes (inactive Gate 1 packet)
+
+- The exact transcription is `A17662.xml` from Text Creation Partnership
+  repository commit `32191150ad4a919dfd2c28c89b1dbc1c2396252a`, accompanied
+  by that repository's unmodified per-work `README.md` at the same commit.
+- The per-work README dedicates this EEBO-TCP Phase I keyboarded and encoded
+  text under [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/).
+  The [TCP licensing page](https://textcreationpartnership.org/about-the-tcp/about-partner-libraries/licensing-and-access/)
+  provides broader program context.
+- Attribution retained as project policy: Text Creation Partnership, EEBO-TCP
+  Phase I, A17662. TheologAI converts TEI structure into deterministic
+  plain-text sections, resolves line-end glyph markers without modernizing
+  spelling, and preserves gaps and marginal notes as explicit markers.
+- This rights determination covers the pinned transcription and XML encoding.
+  It does **not** cover source page images or facsimiles. No images,
+  facsimiles, or CCEL material are included in this packet.
+- The packet is an offline acquisition and normalization foundation only. It
+  is not registered in the public corpus, database, Worker, or MCP catalog.
+
 ## CCEL
 
 The Christian Classics Ethereal Library hosts works with heterogeneous source

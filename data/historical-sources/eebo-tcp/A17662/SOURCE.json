@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "eebo-tcp-source-lock.v1",
+  "sourceId": "eebo-tcp-a17662-norton-1561",
+  "repositoryUrl": "https://github.com/textcreationpartnership/A17662",
+  "sourceCommit": "32191150ad4a919dfd2c28c89b1dbc1c2396252a",
+  "acquiredAt": "2026-07-17T20:05:08Z",
+  "artifacts": [
+    {
+      "role": "transcription_xml",
+      "sourcePath": "A17662.xml",
+      "sourceUrl": "https://raw.githubusercontent.com/textcreationpartnership/A17662/32191150ad4a919dfd2c28c89b1dbc1c2396252a/A17662.xml",
+      "localPath": "data/historical-sources/eebo-tcp/A17662/A17662.xml",
+      "gitBlobSha1": "16a1c67eede080180fad5c8f7790eac811255fa6",
+      "bytes": 4820278,
+      "sha256": "90124aa3bf17f7dcb5cab40719ed362c91c0018194b7397884b58f6b10daf5a4"
+    },
+    {
+      "role": "rights_and_provenance",
+      "sourcePath": "README.md",
+      "sourceUrl": "https://raw.githubusercontent.com/textcreationpartnership/A17662/32191150ad4a919dfd2c28c89b1dbc1c2396252a/README.md",
+      "localPath": "data/historical-sources/eebo-tcp/A17662/README.md",
+      "gitBlobSha1": "8acbc19251c8c4bbd3bbdc8a86d1c18a241f1d2a",
+      "bytes": 32260,
+      "sha256": "79287eb13717149ec5d3fdbf461b21ebd83aa211745c87c41b23260d5ff87b8a"
+    }
+  ],
+  "rights": {
+    "status": "public_domain_cc0_1_0",
+    "scope": "The keyboarded and encoded EEBO-TCP Phase I transcription and XML only.",
+    "instrumentUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "tcpLicensingUrl": "https://textcreationpartnership.org/about-the-tcp/about-partner-libraries/licensing-and-access/",
+    "attributionPolicy": "Credit Text Creation Partnership, EEBO-TCP Phase I, and A17662 as project policy.",
+    "excluded": [
+      "page_images",
+      "facsimiles",
+      "ccel_material"
+    ]
+  },
+  "normalization": {
+    "transformVersion": 1,
+    "packagePath": "data/historical-sources/eebo-tcp/A17662/norton-1561.edition.json",
+    "reportPath": "data/historical-sources/eebo-tcp/A17662/NORMALIZATION_REPORT.json",
+    "modificationNote": "TEI structure is converted to PR62 plain-text edition sections; archaic spelling is retained, line-end glyph markers are resolved without modernizing words, gaps and marginal notes remain explicit, page/facsimile pointers are omitted, and no image or CCEL content is included."
+  }
+}
