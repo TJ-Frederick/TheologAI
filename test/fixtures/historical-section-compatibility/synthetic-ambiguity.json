@@ -1,0 +1,25 @@
+{
+  "fixtureVersion": 1,
+  "sourcePolicy": "invented_synthetic_only",
+  "provisionalAliasTarget": "1",
+  "group": {
+    "documentId": "synthetic-catechism",
+    "legacySectionId": "1",
+    "members": [
+      {
+        "sourceOrdinal": 1,
+        "sourceSignature": "1111111111111111111111111111111111111111111111111111111111111111",
+        "plannedSectionKey": "1",
+        "sqliteBuilderRowId": 1,
+        "d1SeedOrdinal": 1
+      },
+      {
+        "sourceOrdinal": 2,
+        "sourceSignature": "2222222222222222222222222222222222222222222222222222222222222222",
+        "plannedSectionKey": "assigned-0001",
+        "sqliteBuilderRowId": 2,
+        "d1SeedOrdinal": 2
+      }
+    ]
+  }
+}

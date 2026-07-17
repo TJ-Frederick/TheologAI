@@ -504,6 +504,12 @@ Code readiness and operational readiness are deliberately separate:
   edition/provenance fields; it is not a rollout of evidence already present
   in current schemas. Any corpus release remains a **pending rights and release
   decision** and must preserve CCEL-disabled behavior during protected audit.
+- The inactive historical section-compatibility evidence slice records the
+  checked-in 23/256/233 local source/SQLite/D1 ordering projection without
+  source body text or a production target claim. Node `.get()` and D1 `.first()`
+  remain `unordered_no_compatibility_proof`; the deployment decision is pending
+  until a deterministic runtime order or authoritative production mapping is
+  separately reviewed.
 - Review a bounded, discovery-only public rollout of the retained CCEL search
   adapter. The owner accepts free, donation-independent discovery with at most
   five short, attributed 240-character provider snippets and clean links, with
