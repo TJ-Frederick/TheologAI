@@ -33,6 +33,22 @@ function legacyFixture() {
 }
 
 describe('ParallelPassageService hard-cutover contract', () => {
+  it.each([
+    { corpora: ['theologai_legacy'] as const },
+    { corpora: ['ubs_source_attested', 'theologai_legacy'] as const },
+    { mode: 'auto' as const },
+    { maxParallels: 5 },
+    { includeOpenBibleCrossReferences: false },
+    { useCrossReferences: false },
+  ])('rejects non-UBS continuation controls before any provider work: %j', async controls => {
+    const source = sourceService();
+    const cross = crossReferences();
+    const service = new ParallelPassageService(cross, undefined, undefined, legacyFixture(), source as any);
+    await expect(service.lookup({ reference: 'Luke 6:35', groupCursor: 'opaque', ...controls } as any))
+      .rejects.toThrow('groupCursor');
+    expect(source.lookup).not.toHaveBeenCalled();
+    expect(cross.getCrossReferences).not.toHaveBeenCalled();
+  });
   it('defaults only to complete UBS groups with alignment omitted', async () => {
     const source = sourceService();
     const service = new ParallelPassageService(crossReferences(), undefined, undefined, legacyFixture(), source as any);

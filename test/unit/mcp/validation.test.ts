@@ -175,6 +175,19 @@ describe('Worker-safe JSON Schema validation', () => {
     expect(validate(rejected).valid).toBe(false);
   });
 
+  it('advertises groupCursor as UBS-only and rejects even false legacy/OpenBible controls', () => {
+    const validate = validatorFor(createParallelPassagesHandler(unused).inputSchema);
+    expect(validate({ reference: 'Mark 10:19', groupCursor: 'opaque', corpora: ['ubs_source_attested'] }).valid).toBe(true);
+    for (const control of [
+      { corpora: ['theologai_legacy'] },
+      { corpora: ['ubs_source_attested', 'theologai_legacy'] },
+      { mode: 'auto' }, { maxParallels: 1 },
+      { includeOpenBibleCrossReferences: false }, { useCrossReferences: false },
+    ]) {
+      expect(validate({ reference: 'Mark 10:19', groupCursor: 'opaque', ...control }).valid).toBe(false);
+    }
+  });
+
   it.each([
     ['classic-text conflicting modes', createClassicTextsHandler(unused), { work: 'nicene-creed', query: 'trinity' }, 'query is the local-search mode'],
     ['classic-text false mode selector', createClassicTextsHandler(unused), { listWorks: false }, 'listWorks must be true'],

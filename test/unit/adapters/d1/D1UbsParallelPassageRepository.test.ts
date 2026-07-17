@@ -3,6 +3,7 @@ import { D1UbsParallelPassageRepository } from '../../../../src/adapters/d1/D1Ub
 import { UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY, UBS_PARALLEL_PASSAGE_PROVENANCE } from '../../../../src/kernel/ubsParallelSource.js';
 import { ubsFixture } from '../../../fixtures/ubsParallelCorpus.js';
 import { createMockD1 } from '../../../helpers/mockD1.js';
+import { UbsParallelPassageRepository } from '../../../../src/adapters/shared/UbsParallelPassageRepository.js';
 
 interface FixtureRows {
   groups: any[];
@@ -10,9 +11,15 @@ interface FixtureRows {
   segments: any[];
 }
 
-function fixtureDb(mutate?: (rows: FixtureRows) => void, additionalMatch = false) {
+function fixtureDb(
+  mutate?: (rows: FixtureRows) => void,
+  additionalMatch = false,
+  sourceOrdinal?: number,
+  groupIndex = 0,
+  cursorBoundary: { cumulative_group_count: number; boundary_group_count: number } = { cumulative_group_count: 1, boundary_group_count: 1 },
+) {
   const artifact = ubsFixture() as any;
-  const group = artifact.groups[0];
+  const group = { ...artifact.groups[groupIndex], sourceOrdinal: sourceOrdinal ?? artifact.groups[groupIndex].sourceOrdinal };
   const p = UBS_PARALLEL_PASSAGE_PROVENANCE;
   const rows: FixtureRows = {
     groups: [{ group_id: group.groupId, source_ordinal: group.sourceOrdinal, label: group.label, directionality: group.directionality }],
@@ -30,6 +37,7 @@ function fixtureDb(mutate?: (rows: FixtureRows) => void, additionalMatch = false
   return {
     group,
     db: createMockD1([
+      { sql: 'COUNT(DISTINCT CASE WHEN g.source_ordinal <= ?', first: cursorBoundary },
       { sql: 'SELECT DISTINCT g.group_id', all: { results: [
         { group_id: group.groupId, source_ordinal: group.sourceOrdinal },
         ...(additionalMatch ? [{ group_id: `ubs-pp-${'f'.repeat(64)}`, source_ordinal: group.sourceOrdinal + 1 }] : []),
@@ -59,8 +67,54 @@ describe('D1UbsParallelPassageRepository', () => {
     expect(await repository.getProvenance()).toEqual(UBS_PARALLEL_PASSAGE_PROVENANCE);
     expect(db.prepare.mock.calls[0][0]).toContain('LIMIT ?');
     expect(db.prepare.mock.results[0].value.bind).toHaveBeenCalledWith(
-      'ubs_paratext_parallel_passages', 42, 6, 35, 35, 2,
+      'ubs_paratext_parallel_passages', 0, 42, 6, 35, 35, 2,
     );
+  });
+
+  it('binds the source-ordinal keyset before segment parameters without increasing query count', async () => {
+    const { db } = fixtureDb(undefined, false, 88);
+    await new D1UbsParallelPassageRepository(db as any).findGroups('Luke 6:35', 1, 87);
+    expect(db.prepare.mock.calls[0][0]).toContain('g.source_ordinal > ?');
+    expect(db.prepare.mock.results[0].value.bind).toHaveBeenCalledWith(
+      'ubs_paratext_parallel_passages', 87, 42, 6, 35, 35, 2,
+    );
+    expect(db.prepare).toHaveBeenCalledTimes(5);
+  });
+
+  it('uses one aggregate D1 query to validate the exact query-bound cumulative cursor boundary', async () => {
+    const { db } = fixtureDb();
+    const repository = new D1UbsParallelPassageRepository(db as any);
+    await expect(repository.hasValidGroupCursorBoundary('Luke 6:35', {
+      pageSize: 1, afterSourceOrdinal: 1, cumulativeGroupCount: 1,
+    })).resolves.toBe(true);
+    expect(db.prepare).toHaveBeenCalledTimes(2);
+    expect(db.prepare.mock.calls[1][0]).toContain('COUNT(DISTINCT CASE WHEN g.source_ordinal <= ?');
+    expect(db.prepare.mock.results[1].value.bind).toHaveBeenCalledWith(
+      1, 1, 'ubs_paratext_parallel_passages', 42, 6, 35, 35,
+    );
+
+    const falseBoundary = fixtureDb(undefined, false, undefined, 0, {
+      cumulative_group_count: 1, boundary_group_count: 0,
+    });
+    await expect(new D1UbsParallelPassageRepository(falseBoundary.db as any).hasValidGroupCursorBoundary('Luke 6:35', {
+      pageSize: 1, afterSourceOrdinal: 99, cumulativeGroupCount: 1,
+    })).resolves.toBe(false);
+  });
+
+  it('matches Node group boundaries, ordering, and terminal state across keyset pages', async () => {
+    const artifact = ubsFixture() as any;
+    const node = new UbsParallelPassageRepository(artifact, artifact.artifactIdentity);
+    const nodeFirst = node.findGroups('Luke 6:35', 1);
+    const nodeSecond = node.findGroups('Luke 6:35', 1, nodeFirst.groups[0].sourceOrdinal);
+
+    const d1FirstFixture = fixtureDb(undefined, true, undefined, 0);
+    const d1SecondFixture = fixtureDb(undefined, false, undefined, 1);
+    const d1First = await new D1UbsParallelPassageRepository(d1FirstFixture.db as any).findGroups('Luke 6:35', 1);
+    const d1Second = await new D1UbsParallelPassageRepository(d1SecondFixture.db as any)
+      .findGroups('Luke 6:35', 1, d1First.groups[0].sourceOrdinal);
+
+    expect(d1First).toEqual(nodeFirst);
+    expect(d1Second).toEqual(nodeSecond);
   });
 
   it('rejects requests outside the reviewed group bound before querying D1', async () => {
@@ -89,9 +143,13 @@ describe('D1UbsParallelPassageRepository', () => {
       { group_id: `ubs-pp-${'a'.repeat(64)}`, source_ordinal: 2 },
       { group_id: `ubs-pp-${'b'.repeat(64)}`, source_ordinal: 1 },
     ]],
+    ['row at the cursor boundary', [
+      { group_id: `ubs-pp-${'a'.repeat(64)}`, source_ordinal: 1 },
+    ]],
   ])('rejects malformed %s from the bounded ID query before reconstruction', async (_name, ids) => {
     const db = createMockD1([{ sql: 'SELECT DISTINCT g.group_id', all: { results: ids } }]);
-    await expect(new D1UbsParallelPassageRepository(db as any).findGroups('Luke 6:35', 1)).rejects.toThrow('lookahead');
+    const after = _name === 'row at the cursor boundary' ? 1 : 0;
+    await expect(new D1UbsParallelPassageRepository(db as any).findGroups('Luke 6:35', 1, after)).rejects.toThrow('lookahead');
     expect(db.prepare).toHaveBeenCalledTimes(1);
   });
 

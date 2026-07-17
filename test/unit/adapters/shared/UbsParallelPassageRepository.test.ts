@@ -166,6 +166,37 @@ describe('UbsParallelPassageRepository', () => {
     expect(reviewedMaximum.additionalMatchObserved).toBe(false);
   });
 
+  it('uses a source-ordinal keyset and never returns or reconstructs lookahead', () => {
+    const repository = fixtureRepository();
+    const first = repository.findGroups('Luke 6:35', 1);
+    expect(first.groups.map(group => group.sourceOrdinal)).toEqual([1]);
+    expect(first.additionalMatchObserved).toBe(true);
+    const second = repository.findGroups('Luke 6:35', 1, first.groups[0].sourceOrdinal);
+    expect(second.groups.map(group => group.sourceOrdinal)).toEqual([2]);
+    expect(second.additionalMatchObserved).toBe(false);
+    expect(repository.findGroups('Luke 6:35', 1, 2)).toEqual({ groups: [], additionalMatchObserved: false });
+    expect(() => repository.findGroups('Luke 6:35', 1, -1)).toThrow('non-negative integer');
+  });
+
+  it('validates a cursor position against the exact current query and cumulative page boundary', () => {
+    const repository = fixtureRepository();
+    expect(repository.hasValidGroupCursorBoundary('Luke 6:35', {
+      pageSize: 1, afterSourceOrdinal: 1, cumulativeGroupCount: 1,
+    })).toBe(true);
+    expect(repository.hasValidGroupCursorBoundary('Luke 6:35', {
+      pageSize: 1, afterSourceOrdinal: 2, cumulativeGroupCount: 2,
+    })).toBe(true);
+    expect(repository.hasValidGroupCursorBoundary('Luke 6:35', {
+      pageSize: 1, afterSourceOrdinal: 2, cumulativeGroupCount: 1,
+    })).toBe(false);
+    expect(repository.hasValidGroupCursorBoundary('Luke 6:35', {
+      pageSize: 1, afterSourceOrdinal: 99, cumulativeGroupCount: 2,
+    })).toBe(false);
+    expect(repository.hasValidGroupCursorBoundary('Matthew 5:44', {
+      pageSize: 1, afterSourceOrdinal: 2, cumulativeGroupCount: 2,
+    })).toBe(false);
+  });
+
   it('preserves complete source groups and distinct source attestations in the honest window', () => {
     const repository = new UbsParallelPassageRepository(generatedCorpus);
     expect(repository.findGroups('2 Kings 18:13', 5).groups[0].members.map(member => member.normalizedReference)).toEqual([

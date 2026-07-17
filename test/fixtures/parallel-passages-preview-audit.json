@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "3",
+  "schemaVersion": "4",
   "tool": "parallel_passages",
   "cases": [
     {
@@ -10,17 +10,55 @@
     {
       "name": "default bounded result observes an additional UBS group",
       "arguments": { "reference": "Mark 10:19" },
-      "assert": ["success", "v3AdditionalDefaultWindow"]
+      "assert": ["success", "v4AdditionalDefaultWindow", "v4SemanticsValid"]
+    },
+    {
+      "name": "opaque continuation returns the remaining UBS groups only",
+      "cursorFrom": "default bounded result observes an additional UBS group",
+      "arguments": { "reference": "Mark 10:19", "maxGroups": 5 },
+      "assert": ["success", "ubsGroupsPresent", "terminalCursorAbsent", "v4SemanticsValid"]
+    },
+    {
+      "name": "malformed opaque cursor is an invalid parameter",
+      "cursorFrom": "default bounded result observes an additional UBS group",
+      "cursorMutation": "malformed",
+      "arguments": { "reference": "Mark 10:19", "maxGroups": 5 },
+      "assert": ["toolError", "invalidCursorParameter"]
+    },
+    {
+      "name": "canonical false-terminal cursor is an invalid parameter",
+      "cursorFrom": "default bounded result observes an additional UBS group",
+      "cursorMutation": "false_terminal",
+      "arguments": { "reference": "Mark 10:19", "maxGroups": 5 },
+      "assert": ["toolError", "invalidCursorParameter"]
+    },
+    {
+      "name": "opaque cursor cannot be replayed against another passage",
+      "cursorFrom": "default bounded result observes an additional UBS group",
+      "arguments": { "reference": "Matthew 5:44" },
+      "assert": ["toolError", "cursorQueryMessage"]
+    },
+    {
+      "name": "opaque cursor rejects an explicit OpenBible control",
+      "cursorFrom": "default bounded result observes an additional UBS group",
+      "arguments": { "reference": "Mark 10:19", "includeOpenBibleCrossReferences": false },
+      "assert": ["toolError"]
+    },
+    {
+      "name": "opaque cursor rejects text enrichment",
+      "cursorFrom": "default bounded result observes an additional UBS group",
+      "arguments": { "reference": "Mark 10:19", "maxGroups": 5, "includeText": true },
+      "assert": ["toolError"]
     },
     {
       "name": "reviewed maximum returns seven observed groups without an extra match",
       "arguments": { "reference": "Mark 10:19", "maxGroups": 10 },
-      "assert": ["success", "v3MaximumObservedWindow"]
+      "assert": ["success", "v4MaximumObservedWindow", "v4SemanticsValid"]
     },
     {
-      "name": "v3 text enrichment enforces the 12-target budget without losing metadata",
+      "name": "v4 text enrichment enforces the 12-target budget without losing metadata",
       "arguments": { "reference": "Mark 10:19", "maxGroups": 10, "includeText": true, "translation": "WEB" },
-      "assert": ["success", "v3MaximumObservedWindow", "v3TextBudgetApplied", "textBudgetPreservesMetadataAndStatuses", "excerptsBounded"]
+      "assert": ["success", "v4MaximumObservedWindow", "v4TextBudgetApplied", "textBudgetPreservesMetadataAndStatuses", "excerptsBounded"]
     },
     {
       "name": "Kings Chronicles and Isaiah remain one complete source group",

@@ -69,6 +69,7 @@ export type {
   ParallelSourceProvenance,
   SourceAttestedParallelGroup,
   SourceAttestedParallelLookup,
+  SourceAttestedParallelCursorBoundary,
   ISourceAttestedParallelRepository,
 } from './sourceAttestedParallels.js';
 export {

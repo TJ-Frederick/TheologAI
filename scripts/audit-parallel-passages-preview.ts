@@ -9,6 +9,10 @@ export interface AuditCase {
   name: string;
   arguments: Record<string, unknown>;
   assert: string[];
+  /** Inject the prior named case's returned nextCursor as groupCursor. */
+  cursorFrom?: string;
+  /** Deterministically corrupt or move the injected cursor for negative cases. */
+  cursorMutation?: 'malformed' | 'false_terminal';
 }
 
 export interface ToolEvidence {
@@ -20,11 +24,16 @@ export interface ToolEvidence {
 type StructuredResult = {
   schemaVersion?: string;
   corpora?: string[];
-  sourceAttestedGroups?: Array<{ members?: Array<Record<string, unknown>> }>;
+  sourceAttestedGroups?: Array<{
+    groupId?: string;
+    sourceOrdinal?: number;
+    members?: Array<Record<string, unknown>>;
+  }>;
   sourceAttestedResultWindow?: {
     requestedLimit?: number;
     returnedGroupCount?: number;
     additionalMatchStatus?: string;
+    nextCursor?: string;
   };
   legacyParallels?: Array<Record<string, unknown>>;
   openBibleCrossReferences?: Array<Record<string, unknown>>;
@@ -69,25 +78,33 @@ const assertions: Record<string, (result: ToolEvidence) => boolean> = {
     && /OpenBible\.info cross references/.test(text(result)),
   openBibleAttribution: result => /OpenBible\.info.*CC BY/i.test(text(result)),
   conflictMessage: result => /conflict/i.test(text(result)),
+  cursorQueryMessage: result => /groupCursor.*different normalized passage query/i.test(text(result)),
+  invalidCursorParameter: result => result.isError === true
+    && /^Invalid input: .*groupCursor/i.test(text(result)),
   explicitLegacyInstruction: result => /require corpora.*theologai_legacy/i.test(text(result)),
   defaultsAccepted: result => result.isError !== true
     && structured(result).corpora?.length === 1
-    && structured(result).corpora[0] === 'ubs_source_attested',
-  v3AdditionalDefaultWindow: result => structured(result).schemaVersion === '3'
+    && structured(result).corpora?.[0] === 'ubs_source_attested',
+  v4SemanticsValid: result => validateParallelPassagesOutputSemantics(
+    structured(result) as Record<string, unknown>,
+  ),
+  v4AdditionalDefaultWindow: result => structured(result).schemaVersion === '4'
     && structured(result).sourceAttestedGroups?.length === 5
     && structured(result).sourceAttestedResultWindow?.requestedLimit === 5
     && structured(result).sourceAttestedResultWindow?.returnedGroupCount === 5
     && structured(result).sourceAttestedResultWindow?.additionalMatchStatus === 'additional_match_observed'
-    && /Raise `maxGroups` \(up to 10\) or narrow the reference/.test(text(result)),
-  v3MaximumObservedWindow: result => structured(result).schemaVersion === '3'
+    && typeof structured(result).sourceAttestedResultWindow?.nextCursor === 'string'
+    && /sourceAttestedResultWindow\.nextCursor.*input `groupCursor`/.test(text(result)),
+  v4MaximumObservedWindow: result => structured(result).schemaVersion === '4'
     && structured(result).sourceAttestedGroups?.length === 7
     && structured(result).sourceAttestedResultWindow?.requestedLimit === 10
     && structured(result).sourceAttestedResultWindow?.returnedGroupCount === 7
-    && structured(result).sourceAttestedResultWindow?.additionalMatchStatus === 'no_additional_match_observed',
-  v3TextBudgetApplied: result => {
+    && structured(result).sourceAttestedResultWindow?.additionalMatchStatus === 'no_additional_match_observed'
+    && structured(result).sourceAttestedResultWindow?.nextCursor === undefined,
+  v4TextBudgetApplied: result => {
     const output = structured(result);
     const enrichment = output.textEnrichment;
-    return output.schemaVersion === '3'
+    return output.schemaVersion === '4'
       && enrichment?.requested === true
       && enrichment.translation === 'WEB'
       && enrichment.budget?.unit === 'unique_canonical_passage_lookups'
@@ -102,6 +119,8 @@ const assertions: Record<string, (result: ToolEvidence) => boolean> = {
       && enrichment.scheduledLookupCount === enrichment.succeededLookupCount + enrichment.failedLookupCount
       && validateParallelPassagesOutputSemantics(output as Record<string, unknown>);
   },
+  terminalCursorAbsent: result => structured(result).sourceAttestedResultWindow?.additionalMatchStatus === 'no_additional_match_observed'
+    && structured(result).sourceAttestedResultWindow?.nextCursor === undefined,
   textBudgetPreservesMetadataAndStatuses: result => {
     const output = structured(result);
     const groups = output.sourceAttestedGroups ?? [];
@@ -158,16 +177,32 @@ export async function runAudit(url: URL, cases: AuditCase[], timeoutMs = 30_000)
   const transport = new StreamableHTTPClientTransport(url);
   const startedAt = new Date().toISOString();
   const records: Array<Record<string, unknown>> = [];
+  const rawResults = new Map<string, ToolEvidence>();
   try {
     await withTimeout(client.connect(transport), timeoutMs, 'MCP initialize');
     for (const testCase of cases) {
       const started = Date.now();
       try {
+        const prior = testCase.cursorFrom ? rawResults.get(testCase.cursorFrom) : undefined;
+        const priorCursor = prior && structured(prior).sourceAttestedResultWindow?.nextCursor;
+        if (testCase.cursorFrom && typeof priorCursor !== 'string') {
+          throw new Error(`cursor source case did not return nextCursor: ${testCase.cursorFrom}`);
+        }
+        if (testCase.cursorMutation && !priorCursor) {
+          throw new Error(`cursor mutation requires cursorFrom: ${testCase.cursorMutation}`);
+        }
+        const groupCursor = priorCursor
+          ? mutateAuditCursor(priorCursor, testCase.cursorMutation)
+          : undefined;
         const response = await withTimeout(client.callTool({
           name: 'parallel_passages',
-          arguments: testCase.arguments,
+          arguments: { ...testCase.arguments, ...(groupCursor ? { groupCursor } : {}) },
         }), timeoutMs, testCase.name) as ToolEvidence;
+        rawResults.set(testCase.name, response);
         const checks = evaluateCase(testCase, response);
+        // A deliberately invalid continuation is an expected negative case;
+        // only successful continuations must prove strict non-overlap.
+        if (prior && response.isError !== true) checks.push(continuationCheck(prior, response));
         records.push({
           ...testCase,
           durationMs: Date.now() - started,
@@ -186,6 +221,92 @@ export async function runAudit(url: URL, cases: AuditCase[], timeoutMs = 30_000)
     schemaVersion: '1', audit: 'parallel-passages-preview', endpoint: url.toString(), startedAt,
     finishedAt: new Date().toISOString(), passed: records.every(record => record.passed), records,
   };
+}
+
+export function continuationCheck(prior: ToolEvidence, current: ToolEvidence) {
+  const previousGroups = structured(prior).sourceAttestedGroups ?? [];
+  const currentGroups = structured(current).sourceAttestedGroups ?? [];
+  const previousIds = new Set(previousGroups.map(group => group.groupId));
+  const previousLast = Number(previousGroups.at(-1)?.sourceOrdinal);
+  const currentOrdinals = currentGroups.map(group => Number(group.sourceOrdinal));
+  const passed = currentGroups.length > 0
+    && currentGroups.every(group => typeof group.groupId === 'string' && !previousIds.has(group.groupId))
+    && currentOrdinals.every((ordinal, index) => Number.isSafeInteger(ordinal)
+      && ordinal > previousLast && (index === 0 || ordinal > currentOrdinals[index - 1]));
+  return { id: 'continuationStrictlyAfterPriorPage', passed, detail: undefined };
+}
+
+/**
+ * Build bounded negative-test cursors from a real returned cursor. The false
+ * terminal form stays canonically encoded and preserves every binding except
+ * its claimed source ordinal, so only server-side boundary validation can
+ * reject it.
+ */
+export function mutateAuditCursor(
+  cursor: string,
+  mutation: AuditCase['cursorMutation'],
+): string {
+  if (!mutation) return cursor;
+  if (cursor.length < 1 || cursor.length > 2048 || !/^[A-Za-z0-9_-]+$/.test(cursor)) {
+    throw new Error('audit cursor source is malformed or oversized');
+  }
+  if (mutation === 'malformed') {
+    const index = Math.floor(cursor.length / 2);
+    return `${cursor.slice(0, index)}+${cursor.slice(index + 1)}`;
+  }
+  if (mutation !== 'false_terminal') throw new Error(`unsupported audit cursor mutation: ${String(mutation)}`);
+  const value = parseAuditCursor(cursor);
+  const mutated = encodeBase64Url(JSON.stringify({
+    v: value.v,
+    operation: value.operation,
+    artifact: value.artifact,
+    segments: value.segments,
+    pageSize: value.pageSize,
+    afterSourceOrdinal: Number.MAX_SAFE_INTEGER,
+    cumulativeGroupCount: value.cumulativeGroupCount,
+  }));
+  if (mutated.length > 2048) throw new Error('mutated audit cursor exceeds the public input bound');
+  return mutated;
+}
+
+interface AuditCursorPayload {
+  v: number;
+  operation: string;
+  artifact: string;
+  segments: unknown[];
+  pageSize: number;
+  afterSourceOrdinal: number;
+  cumulativeGroupCount: number;
+}
+
+function parseAuditCursor(cursor: string): AuditCursorPayload {
+  let value: unknown;
+  try {
+    value = JSON.parse(decodeBase64Url(cursor));
+  } catch {
+    throw new Error('audit cursor source cannot be decoded');
+  }
+  if (!record(value)
+    || Object.keys(value).sort().join(',') !== 'afterSourceOrdinal,artifact,cumulativeGroupCount,operation,pageSize,segments,v'
+    || value.v !== 1 || typeof value.operation !== 'string' || typeof value.artifact !== 'string'
+    || !Array.isArray(value.segments) || !Number.isSafeInteger(value.pageSize)
+    || !Number.isSafeInteger(value.afterSourceOrdinal) || !Number.isSafeInteger(value.cumulativeGroupCount)) {
+    throw new Error('audit cursor source has an unexpected payload');
+  }
+  return value as unknown as AuditCursorPayload;
+}
+
+function decodeBase64Url(value: string): string {
+  const base64 = value.replaceAll('-', '+').replaceAll('_', '/').padEnd(Math.ceil(value.length / 4) * 4, '=');
+  return Buffer.from(base64, 'base64').toString('utf8');
+}
+
+function encodeBase64Url(value: string): string {
+  return Buffer.from(value, 'utf8').toString('base64url');
+}
+
+function record(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 /** Never persist an unbounded provider or Markdown text field in audit evidence. */

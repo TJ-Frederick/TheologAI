@@ -5,6 +5,8 @@ import {
   type ParallelTextSegmentLike,
   type ParallelTextSourceGroupLike,
 } from '../kernel/parallelTextTargets.js';
+import { decodeParallelGroupCursor } from '../kernel/parallelGroupCursor.js';
+import { parseSourceAttestedLookupReference } from '../kernel/sourceAttestedReference.js';
 
 const TRANSLATIONS = new Set(['ESV', 'NET', 'KJV', 'WEB', 'BSB', 'ASV', 'YLT', 'DBY']);
 const ITEM_STATUSES = new Set(['not_requested', 'complete', 'partial', 'unavailable', 'budget_omitted']);
@@ -22,7 +24,7 @@ interface LegacyEvidence {
 
 /** Validate parallel-passage algebra and text/status relationships beyond JSON Schema. */
 export function validateParallelPassagesOutputSemantics(value: Record<string, unknown>): boolean {
-  if (value.schemaVersion !== '3') return false;
+  if (value.schemaVersion !== '4') return false;
   const enrichment = record(value.textEnrichment);
   if (!enrichment) return false;
   const requested = enrichment.requested;
@@ -54,7 +56,7 @@ export function validateParallelPassagesOutputSemantics(value: Record<string, un
   if (!corpora || !groups || !legacy) return false;
   const hasUbsCorpus = corpora.includes('ubs_source_attested');
   const hasLegacyCorpus = corpora.includes('theologai_legacy');
-  if (!validateResultWindow(value.sourceAttestedResultWindow, groups.length, hasUbsCorpus)
+  if (!validateResultWindow(value.sourceAttestedResultWindow, groups, hasUbsCorpus, value.requestedReference)
     || (!hasUbsCorpus && groups.length > 0)
     || (!hasLegacyCorpus && legacy.length > 0)) return false;
 
@@ -151,19 +153,39 @@ export function validateParallelPassagesOutputSemantics(value: Record<string, un
   return true;
 }
 
-function validateResultWindow(value: unknown, groupCount: number, hasUbsCorpus: boolean): boolean {
+function validateResultWindow(
+  value: unknown,
+  groups: unknown[],
+  hasUbsCorpus: boolean,
+  requestedReference: unknown,
+): boolean {
   const window = record(value);
   if (!window) return false;
   const requestedLimit = integer(window.requestedLimit);
   const returnedGroupCount = integer(window.returnedGroupCount);
   const status = window.additionalMatchStatus;
+  const nextCursor = window.nextCursor;
   if (requestedLimit === undefined || requestedLimit < 1 || requestedLimit > 10
-    || returnedGroupCount === undefined || returnedGroupCount !== groupCount
+    || returnedGroupCount === undefined || returnedGroupCount !== groups.length
     || returnedGroupCount > requestedLimit) return false;
-  if (!hasUbsCorpus) return groupCount === 0 && status === 'not_evaluated';
+  const ordinals = groups.map(group => integer(record(group)?.sourceOrdinal));
+  if (ordinals.some(ordinal => ordinal === undefined)
+    || ordinals.some((ordinal, index) => index > 0 && ordinal! <= ordinals[index - 1]!)) return false;
+  if (!hasUbsCorpus) return groups.length === 0 && status === 'not_evaluated' && nextCursor === undefined;
   if (status === 'not_evaluated') return false;
-  if (status === 'additional_match_observed') return returnedGroupCount === requestedLimit;
-  return status === 'no_additional_match_observed';
+  if (status === 'additional_match_observed') {
+    if (returnedGroupCount !== requestedLimit || typeof nextCursor !== 'string' || typeof requestedReference !== 'string') return false;
+    try {
+      const segments = parseSourceAttestedLookupReference(requestedReference).segments;
+      const cursor = decodeParallelGroupCursor(nextCursor, segments, requestedLimit);
+      return cursor.afterSourceOrdinal === ordinals.at(-1)
+        && cursor.cumulativeGroupCount >= returnedGroupCount
+        && cursor.cumulativeGroupCount % requestedLimit === 0;
+    } catch {
+      return false;
+    }
+  }
+  return status === 'no_additional_match_observed' && nextCursor === undefined;
 }
 
 function combineTargetStates(states: DerivedTargetState[]): Exclude<ReportedStatus, 'not_requested'> {

@@ -14,15 +14,26 @@ The command initializes a real Streamable HTTP MCP client and invokes
 failed case and writes bounded JSON evidence. It covers a valid no-result query,
 UBS and legacy corpora separately and together, alignment, text attribution,
 separate OpenBible evidence, invalid arguments, and schema-defaulting clients.
-It verifies the v3 bounded UBS result window: Mark 10:19 observes an additional
-group at the default limit but returns seven groups with no additional match at
+It verifies the v4 navigable UBS result window: Mark 10:19 observes an additional
+group at the default limit, injects the returned
+`sourceAttestedResultWindow.nextCursor` as input `groupCursor`, returns the
+remaining strictly later groups without overlap, and returns seven groups with no additional match at
 `maxGroups: 10`; 2 Kings 18:13 preserves its complete
 Kings/Chronicles/Isaiah group; Matthew 3:3 returns distinct groups; and a
-legacy-only request reports that UBS was not evaluated. These are not totals,
-cursors, or exhaustiveness claims.
+legacy-only request reports that UBS was not evaluated. These are not totals or
+exhaustiveness claims; the cursor is canonically encoded and bound to the exact
+ordered query, UBS artifact, operation, and `maxGroups` page size. It is an
+untrusted position claim: Node and D1 validate the source ordinal and
+cumulative prior result count against the current matching set before serving a
+continuation. The D1 continuation adds one aggregate boundary query, not a
+per-group/member/segment query; its normal group lookup remains bounded to one
+ID lookahead plus complete-group reconstruction queries. The audit also
+rejects replay against a different passage, malformed or false-terminal
+positions, explicit OpenBible controls, and `includeText: true` on a
+continuation.
 
 The Mark 10:19 `includeText: true` sentinel supplies more than 12 unique
-canonical targets. It requires schema v3, exactly 12 scheduled lookups, a
+canonical targets. It requires schema v4, exactly 12 scheduled lookups, a
 positive omitted count, both count equations, the fixed budget identity, and
 semantically consistent aggregate and per-item statuses. The emitted source
 metadata determines the exact target order: every occurrence of each of the

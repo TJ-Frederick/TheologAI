@@ -18,6 +18,7 @@ import type {
   ISourceAttestedParallelRepository,
   ParallelSourceProvenance,
   SourceAttestedParallelGroup,
+  SourceAttestedParallelCursorBoundary,
   SourceAttestedParallelRepositoryResult,
   SourceParallelMember,
   SourceParallelReferenceSegment,
@@ -72,37 +73,72 @@ export class UbsParallelPassageRepository implements ISourceAttestedParallelRepo
     this.referenceIndex = corpus.referenceIndex;
   }
 
-  findGroups(reference: string, maxGroups = 10): SourceAttestedParallelRepositoryResult {
+  findGroups(reference: string, maxGroups = 10, afterSourceOrdinal = 0): SourceAttestedParallelRepositoryResult {
     if (!Number.isSafeInteger(maxGroups) || maxGroups < 1 || maxGroups > 10) {
       throw new Error('maxGroups must be an integer from 1 to 10');
     }
+    if (!Number.isSafeInteger(afterSourceOrdinal) || afterSourceOrdinal < 0) {
+      throw new Error('afterSourceOrdinal must be a non-negative integer');
+    }
     const parsed = parseSourceAttestedLookupReference(reference);
     if (parsed.segments.length > 8) throw new Error('reference exceeds the reviewed 8-segment query bound');
-    const candidateGroups: SourceAttestedParallelGroup[] = [];
-    const candidateIds = new Set<string>();
-    const observationLimit = maxGroups + 1;
-    for (const segment of parsed.segments) {
-      const entries = this.referenceIndex[`${segment.bookNumber}:${segment.chapter}`] ?? [];
-      for (const entry of entries) {
-        if (entry.startVerse > segment.endVerse || segment.startVerse > entry.endVerse || candidateIds.has(entry.groupId)) continue;
-        const group = this.groupsById.get(entry.groupId)!;
-        const insertionIndex = candidateGroups.findIndex(candidate => candidate.sourceOrdinal > group.sourceOrdinal);
-        candidateGroups.splice(insertionIndex < 0 ? candidateGroups.length : insertionIndex, 0, group);
-        candidateIds.add(group.groupId);
-        if (candidateGroups.length > observationLimit) {
-          candidateIds.delete(candidateGroups.pop()!.groupId);
-        }
-      }
-    }
+    const candidateGroups = this.matchingGroups(parsed.segments)
+      .filter(group => group.sourceOrdinal > afterSourceOrdinal);
     return Object.freeze({
       groups: Object.freeze(candidateGroups.slice(0, maxGroups)),
       additionalMatchObserved: candidateGroups.length > maxGroups,
     });
   }
 
+  hasValidGroupCursorBoundary(reference: string, boundary: SourceAttestedParallelCursorBoundary): boolean {
+    if (!isCursorBoundaryShape(boundary)) return false;
+    let parsed;
+    try {
+      parsed = parseSourceAttestedLookupReference(reference);
+    } catch {
+      return false;
+    }
+    if (parsed.segments.length > 8) return false;
+    const matching = this.matchingGroups(parsed.segments);
+    const boundaryIndex = matching.findIndex(group => group.sourceOrdinal === boundary.afterSourceOrdinal);
+    return boundaryIndex >= 0
+      && boundary.cumulativeGroupCount === boundaryIndex + 1
+      && boundary.cumulativeGroupCount % boundary.pageSize === 0;
+  }
+
   getProvenance(): Readonly<ParallelSourceProvenance> {
     return this.provenance;
   }
+
+  /**
+   * Node's pinned JSON artifact is small enough to derive all matching group
+   * ordinals once. Public lookup still returns only maxGroups plus an in-memory
+   * boolean lookahead; this full set is used exclusively to validate an
+   * untrusted cursor's claimed page boundary.
+   */
+  private matchingGroups(segments: readonly SourceParallelReferenceSegment[]): SourceAttestedParallelGroup[] {
+    const candidateIds = new Set<string>();
+    const candidateGroups: SourceAttestedParallelGroup[] = [];
+    for (const segment of segments) {
+      const entries = this.referenceIndex[`${segment.bookNumber}:${segment.chapter}`] ?? [];
+      for (const entry of entries) {
+        if (entry.startVerse > segment.endVerse || segment.startVerse > entry.endVerse || candidateIds.has(entry.groupId)) continue;
+        const group = this.groupsById.get(entry.groupId);
+        if (!group) throw new Error('UBS reference index points to a missing group');
+        candidateIds.add(group.groupId);
+        candidateGroups.push(group);
+      }
+    }
+    return candidateGroups.sort((left, right) => left.sourceOrdinal - right.sourceOrdinal || left.groupId.localeCompare(right.groupId));
+  }
+}
+
+function isCursorBoundaryShape(boundary: SourceAttestedParallelCursorBoundary): boolean {
+  return Number.isSafeInteger(boundary.pageSize) && boundary.pageSize >= 1 && boundary.pageSize <= 10
+    && Number.isSafeInteger(boundary.afterSourceOrdinal) && boundary.afterSourceOrdinal >= 1
+    && Number.isSafeInteger(boundary.cumulativeGroupCount)
+    && boundary.cumulativeGroupCount >= boundary.pageSize
+    && boundary.cumulativeGroupCount % boundary.pageSize === 0;
 }
 
 export function validateUbsParallelArtifact(input: unknown, expectedArtifactIdentity = UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY): ValidatedUbsCorpus {

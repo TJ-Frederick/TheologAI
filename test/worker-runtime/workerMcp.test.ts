@@ -574,7 +574,7 @@ describe('Worker MCP endpoint in workerd', () => {
     expect(result.message.error).toBeUndefined();
     expect(result.message.result).toMatchObject({
       structuredContent: {
-        schemaVersion: '3',
+        schemaVersion: '4',
         corpora: ['ubs_source_attested'],
         legacyParallels: [],
         openBibleCrossReferences: [],
@@ -600,21 +600,59 @@ describe('Worker MCP endpoint in workerd', () => {
     expect(textContent(result.message)).toContain('_Matched passage: Luke 6:27-28,35_');
   });
 
-  it('exposes honest v3 UBS result windows for the reviewed black-box sentinels', async () => {
+  it('exposes honest v4 navigable UBS result windows for the reviewed black-box sentinels', async () => {
     const defaultMark = await rpc('tools/call', {
       name: 'parallel_passages', arguments: { reference: 'Mark 10:19' },
     }, 152);
     expect(defaultMark.message.result).toMatchObject({
       structuredContent: {
-        schemaVersion: '3',
+        schemaVersion: '4',
         sourceAttestedGroups: expect.arrayContaining([expect.any(Object)]),
         sourceAttestedResultWindow: {
           requestedLimit: 5, returnedGroupCount: 5, additionalMatchStatus: 'additional_match_observed',
         },
       },
     });
-    expect((defaultMark.message.result?.structuredContent as any).sourceAttestedGroups).toHaveLength(5);
-    expect(textContent(defaultMark.message)).toContain('Raise `maxGroups` (up to 10) or narrow the reference');
+    const defaultStructured = defaultMark.message.result?.structuredContent as any;
+    expect(defaultStructured.sourceAttestedGroups).toHaveLength(5);
+    expect(defaultStructured.sourceAttestedResultWindow.nextCursor).toMatch(/^[A-Za-z0-9_-]+$/);
+    expect(textContent(defaultMark.message)).toContain('`sourceAttestedResultWindow.nextCursor` back as input `groupCursor`');
+
+    const continuedMark = await rpc('tools/call', {
+      name: 'parallel_passages', arguments: {
+        reference: 'Mark 10:19', maxGroups: 5,
+        groupCursor: defaultStructured.sourceAttestedResultWindow.nextCursor,
+      },
+    }, 1152);
+    const continuedStructured = continuedMark.message.result?.structuredContent as any;
+    expect(continuedStructured.sourceAttestedGroups).toHaveLength(2);
+    expect(continuedStructured.sourceAttestedResultWindow).toEqual({
+      requestedLimit: 5, returnedGroupCount: 2, additionalMatchStatus: 'no_additional_match_observed',
+    });
+    const previousIds = new Set(defaultStructured.sourceAttestedGroups.map((group: any) => group.groupId));
+    const previousLast = defaultStructured.sourceAttestedGroups.at(-1).sourceOrdinal;
+    expect(continuedStructured.sourceAttestedGroups.every((group: any) => (
+      !previousIds.has(group.groupId) && group.sourceOrdinal > previousLast
+    ))).toBe(true);
+
+    const mixedCursor = await rpc('tools/call', {
+      name: 'parallel_passages', arguments: {
+        reference: 'Mark 10:19',
+        groupCursor: defaultStructured.sourceAttestedResultWindow.nextCursor,
+        includeOpenBibleCrossReferences: false,
+      },
+    }, 1153);
+    expect(mixedCursor.message.result).toMatchObject({ isError: true });
+
+    const enrichedCursor = await rpc('tools/call', {
+      name: 'parallel_passages', arguments: {
+        reference: 'Mark 10:19', maxGroups: 5,
+        groupCursor: defaultStructured.sourceAttestedResultWindow.nextCursor,
+        includeText: true,
+      },
+    }, 1154);
+    expect(enrichedCursor.message.result).toMatchObject({ isError: true });
+    expect(textContent(enrichedCursor.message)).toContain('includeText');
 
     const maximumMark = await rpc('tools/call', {
       name: 'parallel_passages', arguments: { reference: 'Mark 10:19', maxGroups: 10 },

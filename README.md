@@ -78,8 +78,16 @@ fresh server and transport.
 back to the legacy corpus when UBS has no match. Raw UBS alignment metadata is
 opt-in. Its structured result includes a bounded UBS result window: the server
 reports only whether one additional source-attested group was directly observed
-beyond `maxGroups`, never a total, cursor, or exhaustive-coverage claim. The
-lookahead group is not returned or text-enriched. The older curated edge behavior remains available through
+beyond `maxGroups`, never a total or exhaustive-coverage claim. When another
+group is observed, schema v4 returns an opaque cursor in structured output at
+`sourceAttestedResultWindow.nextCursor`. Pass that same opaque value back as the
+input `groupCursor`; it is bound to the exact ordered passage segments, UBS
+artifact, operation, `maxGroups` page size, and last returned source ordinal.
+The server validates the claimed ordinal and cumulative page boundary against
+its current UBS result set before continuing.
+Continuation is UBS-only and rejects legacy/OpenBible controls and
+`includeText: true`; the lookahead group is not returned, reconstructed, or
+text-enriched. The older curated edge behavior remains available through
 `corpora: ["theologai_legacy"]`; its `mode` and `maxParallels` controls retain
 their prior item semantics. OpenBible.info rows are off by default and, when
 requested with `includeOpenBibleCrossReferences`, are returned in a separate
@@ -90,7 +98,7 @@ When `includeText` is true, enrichment has a fixed budget of 12 unique
 canonical passage lookups and concurrency four. Targets are selected once in
 UBS group/member/segment order followed by legacy order, with cross-corpus
 deduplication; cache hits do not refund slots and failures do not trigger
-backfill. Complete parallel metadata is always retained. Structured schema v3
+backfill. Complete parallel metadata is always retained. Structured schema v4
 reports the aggregate `textEnrichment` outcome and a required
 `textEnrichmentStatus` on every UBS member and legacy item; successful UBS
 segment text appears only in `excerpts`.

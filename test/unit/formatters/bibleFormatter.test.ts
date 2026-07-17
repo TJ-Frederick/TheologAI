@@ -109,7 +109,7 @@ describe('formatParallelPassageResearch', () => {
     expect(output).toContain('Segment 1 — Luke 6:35: Matched full text');
     expect(output).toContain('Parallel full text');
     expect(output).toContain('(WEB; Provider A; Licensed text)');
-    expect(output).toContain('Raise `maxGroups` (up to 10) or narrow the reference');
+    expect(output).toContain('`sourceAttestedResultWindow.nextCursor` back as input `groupCursor`');
     expect(output).toContain('Text enrichment: 2/2 unique passages returned; 0 unavailable; 0 omitted by the 12-lookup budget.');
     expect(output).not.toContain('Text enrichment for');
   });
@@ -151,7 +151,7 @@ describe('formatParallelPassageResearch', () => {
     expect(output.match(/use `bible_lookup` for material missing text/g)).toHaveLength(3);
   });
 
-  it('recommends only narrowing at the reviewed maximum and avoids exhaustiveness claims', () => {
+  it('offers continuation even at the reviewed page maximum without totals or exhaustiveness claims', () => {
     const result = {
       requestedReference: 'Mark 10:19', corpora: ['ubs_source_attested'], sourceAttestedGroups: [],
       sourceAttestedResultWindow: { requestedLimit: 10, returnedGroupCount: 10, additionalMatchStatus: 'additional_match_observed' },
@@ -163,9 +163,8 @@ describe('formatParallelPassageResearch', () => {
       },
     } satisfies ParallelPassageResearchResult;
     const output = formatParallelPassageResearch(result);
-    expect(output).toContain('Narrow the reference');
-    expect(output).not.toContain('Raise `maxGroups`');
-    expect(output).not.toMatch(/exhaustive|total|cursor/i);
+    expect(output).toContain('`sourceAttestedResultWindow.nextCursor` back as input `groupCursor`');
+    expect(output).not.toMatch(/exhaustive|total/i);
     expect(output).not.toContain('Text enrichment:');
   });
 });

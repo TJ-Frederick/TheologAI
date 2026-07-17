@@ -2,12 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { parallelPassagesOutputSchema } from '../../../src/mcp/schemas/parallelPassages.js';
 import { validateParallelPassagesOutputSemantics } from '../../../src/mcp/parallelPassagesOutputValidation.js';
 import { validatorFor } from '../../../src/mcp/validation.js';
+import { encodeParallelGroupCursor } from '../../../src/kernel/parallelGroupCursor.js';
 
 const validateSchema = validatorFor(parallelPassagesOutputSchema);
 
 function output(textEnrichment: Record<string, unknown>, overrides: Record<string, unknown> = {}) {
   return {
-    schemaVersion: '3', kind: 'parallel_passages', requestedReference: 'Matthew 1:1',
+    schemaVersion: '4', kind: 'parallel_passages', requestedReference: 'Matthew 1:1',
     corpora: ['ubs_source_attested'], sourceAttestedGroups: [],
     sourceAttestedResultWindow: {
       requestedLimit: 5, returnedGroupCount: 0, additionalMatchStatus: 'no_additional_match_observed',
@@ -148,18 +149,58 @@ describe('parallel-passage structured semantic validation', () => {
   });
 
   it.each([
-    [{ requestedLimit: 5, returnedGroupCount: 1, additionalMatchStatus: 'no_additional_match_observed' }, ['ubs_source_attested'], 'returned count drift'],
-    [{ requestedLimit: 5, returnedGroupCount: 0, additionalMatchStatus: 'not_evaluated' }, ['ubs_source_attested'], 'selected UBS marked not evaluated'],
-    [{ requestedLimit: 5, returnedGroupCount: 0, additionalMatchStatus: 'no_additional_match_observed' }, ['theologai_legacy'], 'unselected UBS marked evaluated'],
-    [{ requestedLimit: 5, returnedGroupCount: 0, additionalMatchStatus: 'additional_match_observed' }, ['ubs_source_attested'], 'additional match without a full window'],
-  ] as const)('rejects invalid result-window protocol state: %s', (sourceAttestedResultWindow, corpora) => {
+    [{ requestedLimit: 5, returnedGroupCount: 1, additionalMatchStatus: 'no_additional_match_observed' }, ['ubs_source_attested'], true, 'returned count drift'],
+    [{ requestedLimit: 5, returnedGroupCount: 0, additionalMatchStatus: 'not_evaluated' }, ['ubs_source_attested'], true, 'selected UBS marked not evaluated'],
+    [{ requestedLimit: 5, returnedGroupCount: 0, additionalMatchStatus: 'no_additional_match_observed' }, ['theologai_legacy'], true, 'unselected UBS marked evaluated'],
+    [{ requestedLimit: 5, returnedGroupCount: 0, additionalMatchStatus: 'additional_match_observed' }, ['ubs_source_attested'], false, 'additional match without a full window or cursor'],
+  ] as const)('rejects invalid result-window protocol state: %s', (sourceAttestedResultWindow, corpora, schemaValid) => {
     const invalid = output({
       requested: false, translation: null, budget, uniqueTargetCount: 0,
       scheduledLookupCount: 0, succeededLookupCount: 0, failedLookupCount: 0,
       omittedLookupCount: 0, completionStatus: 'not_requested',
     }, { sourceAttestedResultWindow, corpora: [...corpora] });
-    expect(validateSchema(invalid).valid).toBe(true);
+    expect(validateSchema(invalid).valid).toBe(schemaValid);
     expect(validateParallelPassagesOutputSemantics(invalid)).toBe(false);
+  });
+
+  it('accepts only a query-bound next cursor whose ordinal equals the last returned group', () => {
+    const member = {
+      sourceOrder: 1, sourceReference: 'MAT 1:1', normalizedReference: 'Matthew 1:1',
+      segments: [{ bookNumber: 40, chapter: 1, startVerse: 1, endVerse: 1 }],
+      languageMarker: 'GRK', matched: true, textEnrichmentStatus: 'not_requested', provenanceIds: ['ubs'],
+    };
+    const groups = [1, 3].map((sourceOrdinal) => ({
+      groupId: `group-${sourceOrdinal}`, sourceOrdinal, label: 'source_attested_parallel', directionality: 'unspecified',
+      members: [member, { ...member, sourceOrder: 2 }], provenanceIds: ['ubs'],
+    }));
+    const nextCursor = encodeParallelGroupCursor(member.segments, {
+      pageSize: 2, afterSourceOrdinal: 3, cumulativeGroupCount: 2,
+    });
+    const valid = output({
+      requested: false, translation: null, budget, uniqueTargetCount: 1,
+      scheduledLookupCount: 0, succeededLookupCount: 0, failedLookupCount: 0,
+      omittedLookupCount: 0, completionStatus: 'not_requested',
+    }, {
+      sourceAttestedGroups: groups,
+      sourceAttestedResultWindow: {
+        requestedLimit: 2, returnedGroupCount: 2, additionalMatchStatus: 'additional_match_observed', nextCursor,
+      },
+    });
+    expect(validateSchema(valid).valid).toBe(true);
+    expect(validateParallelPassagesOutputSemantics(valid)).toBe(true);
+    for (const cursor of [
+      encodeParallelGroupCursor(member.segments, {
+        pageSize: 2, afterSourceOrdinal: 2, cumulativeGroupCount: 2,
+      }),
+      encodeParallelGroupCursor([{ ...member.segments[0], startVerse: 2, endVerse: 2 }], {
+        pageSize: 2, afterSourceOrdinal: 3, cumulativeGroupCount: 2,
+      }),
+    ]) {
+      expect(validateParallelPassagesOutputSemantics({
+        ...valid,
+        sourceAttestedResultWindow: { ...(valid.sourceAttestedResultWindow as object), nextCursor: cursor },
+      })).toBe(false);
+    }
   });
 
   it.each([

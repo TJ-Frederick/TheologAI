@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { evaluateCase, sanitizeEvidence, type AuditCase, type ToolEvidence } from '../../../scripts/audit-parallel-passages-preview.js';
+import {
+  continuationCheck, evaluateCase, mutateAuditCursor, sanitizeEvidence,
+  type AuditCase, type ToolEvidence,
+} from '../../../scripts/audit-parallel-passages-preview.js';
+import { decodeParallelGroupCursor, encodeParallelGroupCursor } from '../../../src/kernel/parallelGroupCursor.js';
 
 describe('parallel-passages preview audit assertions', () => {
   it('evaluates structured groups, alignment, text attribution, and separate OpenBible evidence', () => {
@@ -28,37 +32,82 @@ describe('parallel-passages preview audit assertions', () => {
     expect(evaluateCase({ name: 'conflict', arguments: {}, assert: ['toolError', 'conflictMessage'] }, {
       isError: true, content: [{ type: 'text', text: 'Arguments conflict.' }],
     }).every(check => check.passed)).toBe(true);
+    expect(evaluateCase({ name: 'cursor', arguments: {}, assert: ['toolError', 'cursorQueryMessage'] }, {
+      isError: true, content: [{ type: 'text', text: 'Invalid input: groupCursor belongs to a different normalized passage query.' }],
+    }).every(check => check.passed)).toBe(true);
+    expect(evaluateCase({ name: 'boundary', arguments: {}, assert: ['toolError', 'invalidCursorParameter'] }, {
+      isError: true, content: [{ type: 'text', text: 'Invalid input: groupCursor is not a valid page boundary for the current UBS result set.' }],
+    }).every(check => check.passed)).toBe(true);
+    expect(evaluateCase({ name: 'generic', arguments: {}, assert: ['invalidCursorParameter'] }, {
+      isError: true, content: [{ type: 'text', text: 'I encountered an error retrieving that information.' }],
+    })[0].passed).toBe(false);
   });
 
-  it('verifies exact v3 bounded-window sentinels without accepting totals or off-by-one counts', () => {
+  it('builds bounded malformed and canonical false-terminal cursors from real output', () => {
+    const segments = [{ bookNumber: 41, chapter: 10, startVerse: 19, endVerse: 19 }];
+    const source = encodeParallelGroupCursor(segments, {
+      pageSize: 5, afterSourceOrdinal: 100, cumulativeGroupCount: 5,
+    });
+    const malformed = mutateAuditCursor(source, 'malformed');
+    expect(malformed).toHaveLength(source.length);
+    expect(malformed).toContain('+');
+    expect(malformed).not.toMatch(/^[A-Za-z0-9_-]+$/);
+
+    const falseTerminal = mutateAuditCursor(source, 'false_terminal');
+    expect(falseTerminal.length).toBeLessThanOrEqual(2048);
+    expect(falseTerminal).toMatch(/^[A-Za-z0-9_-]+$/);
+    expect(mutateAuditCursor(source, 'false_terminal')).toBe(falseTerminal);
+    expect(decodeParallelGroupCursor(falseTerminal, segments, 5)).toEqual({
+      pageSize: 5,
+      afterSourceOrdinal: Number.MAX_SAFE_INTEGER,
+      cumulativeGroupCount: 5,
+    });
+  });
+
+  it('requires a continuation page to be strictly later and non-overlapping', () => {
+    const prior: ToolEvidence = { structuredContent: { sourceAttestedGroups: [
+      { groupId: 'a', sourceOrdinal: 10 }, { groupId: 'b', sourceOrdinal: 20 },
+    ] } };
+    expect(continuationCheck(prior, { structuredContent: { sourceAttestedGroups: [
+      { groupId: 'c', sourceOrdinal: 21 }, { groupId: 'd', sourceOrdinal: 40 },
+    ] } }).passed).toBe(true);
+    expect(continuationCheck(prior, { structuredContent: { sourceAttestedGroups: [
+      { groupId: 'b', sourceOrdinal: 21 },
+    ] } }).passed).toBe(false);
+    expect(continuationCheck(prior, { structuredContent: { sourceAttestedGroups: [
+      { groupId: 'c', sourceOrdinal: 19 },
+    ] } }).passed).toBe(false);
+  });
+
+  it('verifies exact v4 navigable-window sentinels without accepting totals or off-by-one counts', () => {
     const group = (reference: string): Record<string, unknown> => ({
       members: [{ normalizedReference: reference }],
     });
     const defaultResult: ToolEvidence = {
-      content: [{ type: 'text', text: 'Raise `maxGroups` (up to 10) or narrow the reference' }],
+      content: [{ type: 'text', text: 'Continue by passing structured `sourceAttestedResultWindow.nextCursor` back as input `groupCursor`' }],
       structuredContent: {
-        schemaVersion: '3',
+        schemaVersion: '4',
         sourceAttestedGroups: Array.from({ length: 5 }, () => group('Mark 10:19')),
         sourceAttestedResultWindow: {
-          requestedLimit: 5, returnedGroupCount: 5, additionalMatchStatus: 'additional_match_observed',
+          requestedLimit: 5, returnedGroupCount: 5, additionalMatchStatus: 'additional_match_observed', nextCursor: 'opaque',
         },
       },
     };
-    expect(evaluateCase({ name: 'default', arguments: {}, assert: ['v3AdditionalDefaultWindow'] }, defaultResult)[0].passed).toBe(true);
+    expect(evaluateCase({ name: 'default', arguments: {}, assert: ['v4AdditionalDefaultWindow'] }, defaultResult)[0].passed).toBe(true);
     const malformed = structuredClone(defaultResult);
     (malformed.structuredContent!.sourceAttestedResultWindow as Record<string, unknown>).returnedGroupCount = 6;
-    expect(evaluateCase({ name: 'bad', arguments: {}, assert: ['v3AdditionalDefaultWindow'] }, malformed)[0].passed).toBe(false);
+    expect(evaluateCase({ name: 'bad', arguments: {}, assert: ['v4AdditionalDefaultWindow'] }, malformed)[0].passed).toBe(false);
 
     const maximumResult: ToolEvidence = {
       structuredContent: {
-        schemaVersion: '3',
+        schemaVersion: '4',
         sourceAttestedGroups: Array.from({ length: 7 }, () => group('Mark 10:19')),
         sourceAttestedResultWindow: {
           requestedLimit: 10, returnedGroupCount: 7, additionalMatchStatus: 'no_additional_match_observed',
         },
       },
     };
-    expect(evaluateCase({ name: 'maximum', arguments: {}, assert: ['v3MaximumObservedWindow'] }, maximumResult)[0].passed).toBe(true);
+    expect(evaluateCase({ name: 'maximum', arguments: {}, assert: ['v4MaximumObservedWindow'] }, maximumResult)[0].passed).toBe(true);
   });
 
   it('verifies complete/distinct source groups and the legacy-only not-evaluated state', () => {
@@ -103,7 +152,7 @@ describe('parallel-passages preview audit assertions', () => {
     });
     const response: ToolEvidence = {
       structuredContent: {
-        schemaVersion: '3', kind: 'parallel_passages', requestedReference: 'Matthew 1:1',
+        schemaVersion: '4', kind: 'parallel_passages', requestedReference: 'Matthew 1:1',
         corpora: ['ubs_source_attested'],
         sourceAttestedGroups: [{
           groupId: 'group', sourceOrdinal: 1, label: 'source_attested_parallel', directionality: 'unspecified',
@@ -120,7 +169,7 @@ describe('parallel-passages preview audit assertions', () => {
         },
       },
     };
-    const assertions = ['v3TextBudgetApplied', 'textBudgetPreservesMetadataAndStatuses'];
+    const assertions = ['v4TextBudgetApplied', 'textBudgetPreservesMetadataAndStatuses'];
     expect(evaluateCase({ name: 'valid', arguments: {}, assert: assertions }, response).every(check => check.passed)).toBe(true);
 
     for (const mutate of [

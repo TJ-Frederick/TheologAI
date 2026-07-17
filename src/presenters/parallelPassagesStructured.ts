@@ -2,12 +2,12 @@ import type { ParallelPassageResearchResult } from '../kernel/types.js';
 import {
   OPENBIBLE_PROVENANCE_ID,
 } from '../kernel/parallelPassageProvenance.js';
-import type { ParallelPassagesOutputV3 } from '../mcp/schemas/parallelPassages.js';
+import type { ParallelPassagesOutputV4 } from '../mcp/schemas/parallelPassages.js';
 
 /** Present separated research sources without collapsing groups into inferred edges. */
-export function presentParallelPassagesStructured(result: ParallelPassageResearchResult): ParallelPassagesOutputV3 {
+export function presentParallelPassagesStructured(result: ParallelPassageResearchResult): ParallelPassagesOutputV4 {
   return {
-    schemaVersion: '3',
+    schemaVersion: '4',
     kind: 'parallel_passages',
     requestedReference: result.requestedReference,
     corpora: [...result.corpora],

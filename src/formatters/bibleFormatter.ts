@@ -156,9 +156,7 @@ export function formatParallelPassageResearch(result: ParallelPassageResearchRes
   }
 
   if (result.sourceAttestedResultWindow.additionalMatchStatus === 'additional_match_observed') {
-    s += result.sourceAttestedResultWindow.requestedLimit < 10
-      ? '\n_At least one additional UBS source-attested group was observed beyond this bounded result window. Raise `maxGroups` (up to 10) or narrow the reference to inspect more focused results._\n'
-      : '\n_At least one additional UBS source-attested group was observed beyond this bounded result window. Narrow the reference to inspect more focused results._\n';
+    s += '\n_At least one additional UBS source-attested group was observed. Continue by passing structured `sourceAttestedResultWindow.nextCursor` back as input `groupCursor` while keeping the same reference._\n';
   } else if (result.sourceAttestedResultWindow.additionalMatchStatus === 'no_additional_match_observed') {
     s += '\n_No additional UBS source-attested group was observed by the bounded lookahead for this request._\n';
   } else {

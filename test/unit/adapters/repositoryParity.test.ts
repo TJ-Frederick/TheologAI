@@ -354,6 +354,24 @@ describe('SQLite and D1 repository parity with identical real data', () => {
     await expect(d1Ubs.getProvenance()).resolves.toEqual(nodeUbs.getProvenance());
   });
 
+  it('validates an actual-corpus cursor boundary identically in Node and D1', async () => {
+    const firstPage = nodeUbs.findGroups('Mark 10:19', 5);
+    const genuine = {
+      pageSize: 5,
+      afterSourceOrdinal: firstPage.groups.at(-1)!.sourceOrdinal,
+      cumulativeGroupCount: 5,
+    };
+    await expect(d1Ubs.hasValidGroupCursorBoundary('Mark 10:19', genuine))
+      .resolves.toBe(nodeUbs.hasValidGroupCursorBoundary('Mark 10:19', genuine));
+    expect(nodeUbs.hasValidGroupCursorBoundary('Mark 10:19', genuine)).toBe(true);
+    await expect(d1Ubs.hasValidGroupCursorBoundary('Mark 10:19', {
+      ...genuine, cumulativeGroupCount: 10,
+    })).resolves.toBe(false);
+    expect(nodeUbs.hasValidGroupCursorBoundary('Mark 10:19', {
+      ...genuine, afterSourceOrdinal: genuine.afterSourceOrdinal + 1,
+    })).toBe(false);
+  });
+
   it.each([
     ['Mark 10:19', 5],
     ['Mark 10:19', 10],
