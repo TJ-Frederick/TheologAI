@@ -82,6 +82,36 @@ export {
   deriveUbsParallelGroupId,
 } from './ubsParallelSource.js';
 
+// Planned source-attested UBS dictionary semantics (source-free foundation).
+export type {
+  UbsSemanticLanguage,
+  UbsSemanticPublicLanguage,
+  UbsLexicalIdentityPrefix,
+  UbsSemanticSourceProvenance,
+  UbsSemanticSource,
+  UbsSemanticEntry,
+  UbsSemanticSense,
+  UbsSemanticDomainRef,
+  UbsSemanticDomain,
+  UbsSemanticReferenceEvidence,
+  UbsSemanticRepositoryOrder,
+  UbsSemanticRepositoryCollection,
+  UbsSemanticPageRequest,
+  UbsSemanticPaginatedOperation,
+  IUbsSemanticRepository,
+  UbsLexicalSenseCandidate,
+  UbsSemanticResolution,
+} from './ubsSemanticDomain.js';
+export {
+  UBS_SEMANTIC_REPOSITORY_LIMITS,
+  UBS_SEMANTIC_REPOSITORY_ORDER,
+  UBS_SEMANTIC_ARTIFACT_VERSION,
+  UBS_SEMANTIC_TRANSFORM_VERSION,
+  createUbsSemanticCursor,
+  parseUbsSemanticCursor,
+  createUbsSemanticRepositoryCollection,
+} from './ubsSemanticDomain.js';
+
 // Provenance
 export {
   provenanceFromCitation,

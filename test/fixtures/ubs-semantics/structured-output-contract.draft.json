@@ -1,0 +1,346 @@
+{
+  "$comment": "DESIGN FIXTURE ONLY. Hebrew-only public v1; not registered by any MCP tool.",
+  "contractVersion": "ubs-hebrew-semantic-evidence.draft-v1",
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "oneOf": [
+      {
+        "properties": {
+          "audience": { "enum": ["beginner", "expert"] },
+          "status": { "const": "exact_context" },
+          "plainLanguage": { "type": "string", "minLength": 1 },
+          "senseId": { "type": "string", "minLength": 1 },
+          "lexicalIdentities": { "$ref": "#/$defs/publicHebrewIdentities" },
+          "meaning": { "$ref": "#/$defs/meaning" },
+          "referenceEvidence": { "$ref": "#/$defs/referenceEvidence" },
+          "alignmentEvidence": { "$ref": "#/$defs/alignmentEvidence" },
+          "withheldEvidence": { "$ref": "#/$defs/withheldEvidence" },
+          "provenance": { "$ref": "#/$defs/provenance" }
+        },
+        "required": ["audience", "status", "plainLanguage", "senseId", "lexicalIdentities", "meaning", "referenceEvidence", "alignmentEvidence", "withheldEvidence", "provenance"],
+        "additionalProperties": false
+      },
+      {
+        "properties": {
+          "audience": { "enum": ["beginner", "expert"] },
+          "status": { "const": "lexical_candidates" },
+          "plainLanguage": { "type": "string", "minLength": 1 },
+          "reason": { "enum": ["no_reference_evidence", "reference_alignment_unproven", "ambiguous_reference_alignment"] },
+          "lexicalIdentities": { "$ref": "#/$defs/publicHebrewIdentities" },
+          "candidates": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "properties": {
+                "senseId": { "type": "string", "minLength": 1 },
+                "meaning": { "$ref": "#/$defs/meaning" }
+              },
+              "required": ["senseId", "meaning"],
+              "additionalProperties": false
+            }
+          },
+          "withheldEvidence": { "$ref": "#/$defs/withheldEvidence" },
+          "provenance": { "$ref": "#/$defs/provenance" }
+        },
+        "required": ["audience", "status", "plainLanguage", "reason", "lexicalIdentities", "candidates", "withheldEvidence", "provenance"],
+        "additionalProperties": false
+      },
+      {
+        "properties": {
+          "audience": { "enum": ["beginner", "expert"] },
+          "status": { "const": "unavailable" },
+          "plainLanguage": { "type": "string", "minLength": 1 },
+          "reason": { "enum": ["no_lexical_entry", "no_publishable_semantic_evidence"] },
+          "withheldEvidence": { "$ref": "#/$defs/withheldEvidence" }
+        },
+        "required": ["audience", "status", "plainLanguage", "reason", "withheldEvidence"],
+        "additionalProperties": false
+      }
+    ],
+    "$defs": {
+      "publicHebrewIdentities": {
+        "type": "array",
+        "minItems": 1,
+        "uniqueItems": true,
+        "items": { "type": "string", "pattern": "^H(?!0000$)[0-9]{4}$" }
+      },
+      "domainEvidence": {
+        "type": "object",
+        "properties": {
+          "domainId": { "type": "string", "minLength": 1 },
+          "label": { "type": "string", "minLength": 1 },
+          "description": { "type": "string", "minLength": 1 }
+        },
+        "required": ["domainId", "label"],
+        "additionalProperties": false
+      },
+      "meaning": {
+        "type": "object",
+        "properties": {
+          "definition": { "type": "string", "minLength": 1 },
+          "glosses": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+          "domains": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/domainEvidence" } }
+        },
+        "required": ["definition", "glosses", "domains"],
+        "additionalProperties": false
+      },
+      "referenceEvidence": {
+        "type": "object",
+        "properties": {
+          "sourceId": { "type": "string", "minLength": 1 },
+          "senseId": { "type": "string", "minLength": 1 },
+          "evidenceId": { "type": "string", "minLength": 1 },
+          "sourceReference": { "type": "string", "minLength": 1 },
+          "normalizedReference": { "type": "string", "minLength": 1 },
+          "kind": { "const": "source_attested_sense_reference" }
+        },
+        "required": ["sourceId", "senseId", "evidenceId", "sourceReference", "normalizedReference", "kind"],
+        "additionalProperties": false
+      },
+      "alignmentEvidence": {
+        "type": "object",
+        "properties": {
+          "status": { "const": "verified_token_alignment" },
+          "morphologyTokenIdentity": { "type": "string", "minLength": 1 },
+          "verifierVersion": { "type": "integer", "minimum": 1 }
+        },
+        "required": ["status", "morphologyTokenIdentity", "verifierVersion"],
+        "additionalProperties": false
+      },
+      "withheldEvidence": {
+        "type": "array",
+        "minItems": 2,
+        "maxItems": 2,
+        "prefixItems": [
+          {
+            "type": "object",
+            "properties": {
+              "source": { "const": "TBESH" },
+              "field": { "const": "Meaning" },
+              "status": { "const": "withheld_rights_boundary" }
+            },
+            "required": ["source", "field", "status"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "source": { "const": "UBS Hebrew dictionary" },
+              "field": { "const": "A#### lexical identities" },
+              "status": { "const": "withheld_public_v1_scope" }
+            },
+            "required": ["source", "field", "status"],
+            "additionalProperties": false
+          }
+        ],
+        "items": false
+      },
+      "sourceProvenance": {
+        "type": "object",
+        "properties": {
+          "sourceRole": { "enum": ["dictionary", "lexical_domains"] },
+          "artifactName": { "enum": ["UBSHebrewDic-v0.9.2-en.JSON", "UBSHebrewDicLexicalDomains-v0.9.2-en.JSON"] },
+          "sourceVersion": { "const": "0.9.2" },
+          "sourceUrl": { "type": "string", "pattern": "^https://" },
+          "sourceCommit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+          "sourceBlob": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+          "sourceSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "publisher": { "const": "United Bible Societies" },
+          "license": { "const": "CC BY-SA 4.0" },
+          "licenseUrl": { "const": "https://creativecommons.org/licenses/by-sa/4.0/" },
+          "modificationDescription": { "type": "string", "minLength": 1 }
+        },
+        "required": ["sourceRole", "artifactName", "sourceVersion", "sourceUrl", "sourceCommit", "sourceBlob", "sourceSha256", "publisher", "license", "licenseUrl", "modificationDescription"],
+        "additionalProperties": false
+      },
+      "provenance": {
+        "type": "object",
+        "properties": {
+          "sources": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "prefixItems": [
+              {
+                "allOf": [
+                  { "$ref": "#/$defs/sourceProvenance" },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "sourceRole": { "const": "dictionary" },
+                      "artifactName": { "const": "UBSHebrewDic-v0.9.2-en.JSON" }
+                    },
+                    "required": ["sourceRole", "artifactName"]
+                  }
+                ]
+              },
+              {
+                "allOf": [
+                  { "$ref": "#/$defs/sourceProvenance" },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "sourceRole": { "const": "lexical_domains" },
+                      "artifactName": { "const": "UBSHebrewDicLexicalDomains-v0.9.2-en.JSON" }
+                    },
+                    "required": ["sourceRole", "artifactName"]
+                  }
+                ]
+              }
+            ],
+            "items": false
+          },
+          "transformation": {
+            "type": "object",
+            "properties": {
+              "schemaVersion": { "const": "ubs-semantics.v1" },
+              "transformVersion": { "const": 7 },
+              "artifactIdentity": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+            },
+            "required": ["schemaVersion", "transformVersion", "artifactIdentity"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["sources", "transformation"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "statusValues": ["exact_context", "lexical_candidates", "unavailable"],
+  "invariants": [
+    "exact_context requires readable definition, gloss, structured domain evidence, source-attested reference evidence, and verified local token alignment",
+    "a lexical identity match alone returns lexical_candidates with an explicit ambiguity reason, never exact_context",
+    "public v1 exposes only H#### identities; A#### identities are retained internally and explicitly withheld",
+    "TBESH Meaning is withheld and never copied into a definition, gloss, or fallback"
+  ],
+  "beginnerExample": {
+    "audience": "beginner",
+    "status": "lexical_candidates",
+    "plainLanguage": "This Hebrew word has more than one possible dictionary sense, and the available evidence does not prove which one applies here.",
+    "reason": "reference_alignment_unproven",
+    "lexicalIdentities": ["H0001"],
+    "candidates": [
+      {
+        "senseId": "synthetic-sense-one",
+        "meaning": {
+          "definition": "SYNTHETIC DEFINITION — NOT UBS CONTENT",
+          "glosses": ["SYNTHETIC GLOSS"],
+          "domains": [
+            { "domainId": "synthetic-domain-child", "label": "SYNTHETIC DOMAIN CHILD" }
+          ]
+        }
+      }
+    ],
+    "withheldEvidence": [
+      { "source": "TBESH", "field": "Meaning", "status": "withheld_rights_boundary" },
+      { "source": "UBS Hebrew dictionary", "field": "A#### lexical identities", "status": "withheld_public_v1_scope" }
+    ],
+    "provenance": {
+      "sources": [
+        {
+          "sourceRole": "dictionary",
+          "artifactName": "UBSHebrewDic-v0.9.2-en.JSON",
+          "sourceVersion": "0.9.2",
+          "sourceUrl": "https://example.invalid/no-source-bytes/dictionary",
+          "sourceCommit": "1111111111111111111111111111111111111111",
+          "sourceBlob": "2222222222222222222222222222222222222222",
+          "sourceSha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "publisher": "United Bible Societies",
+          "license": "CC BY-SA 4.0",
+          "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+          "modificationDescription": "Synthetic design metadata only; no source content used."
+        },
+        {
+          "sourceRole": "lexical_domains",
+          "artifactName": "UBSHebrewDicLexicalDomains-v0.9.2-en.JSON",
+          "sourceVersion": "0.9.2",
+          "sourceUrl": "https://example.invalid/no-source-bytes/lexical-domains",
+          "sourceCommit": "4444444444444444444444444444444444444444",
+          "sourceBlob": "5555555555555555555555555555555555555555",
+          "sourceSha256": "6666666666666666666666666666666666666666666666666666666666666666",
+          "publisher": "United Bible Societies",
+          "license": "CC BY-SA 4.0",
+          "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+          "modificationDescription": "Synthetic design metadata only; no source content used."
+        }
+      ],
+      "transformation": {
+        "schemaVersion": "ubs-semantics.v1",
+        "transformVersion": 7,
+        "artifactIdentity": "7777777777777777777777777777777777777777777777777777777777777777"
+      }
+    }
+  },
+  "expertExample": {
+    "audience": "expert",
+    "status": "exact_context",
+    "plainLanguage": "The source sense is attested at this reference and separately aligned to this exact local morphology token.",
+    "senseId": "synthetic-sense-one",
+    "lexicalIdentities": ["H0001"],
+    "meaning": {
+      "definition": "SYNTHETIC DEFINITION — NOT UBS CONTENT",
+      "glosses": ["SYNTHETIC GLOSS"],
+      "domains": [
+        {
+          "domainId": "synthetic-domain-child",
+          "label": "SYNTHETIC DOMAIN CHILD",
+          "description": "Invented structured domain evidence."
+        }
+      ]
+    },
+    "referenceEvidence": {
+      "sourceId": "synthetic-hebrew-dictionary",
+      "senseId": "synthetic-sense-one",
+      "evidenceId": "synthetic-reference-one",
+      "sourceReference": "SYN 1:1",
+      "normalizedReference": "Synthetic 1:1",
+      "kind": "source_attested_sense_reference"
+    },
+    "alignmentEvidence": {
+      "status": "verified_token_alignment",
+      "morphologyTokenIdentity": "synthetic-token-1",
+      "verifierVersion": 1
+    },
+    "withheldEvidence": [
+      { "source": "TBESH", "field": "Meaning", "status": "withheld_rights_boundary" },
+      { "source": "UBS Hebrew dictionary", "field": "A#### lexical identities", "status": "withheld_public_v1_scope" }
+    ],
+    "provenance": {
+      "sources": [
+        {
+          "sourceRole": "dictionary",
+          "artifactName": "UBSHebrewDic-v0.9.2-en.JSON",
+          "sourceVersion": "0.9.2",
+          "sourceUrl": "https://example.invalid/no-source-bytes/dictionary",
+          "sourceCommit": "1111111111111111111111111111111111111111",
+          "sourceBlob": "2222222222222222222222222222222222222222",
+          "sourceSha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "publisher": "United Bible Societies",
+          "license": "CC BY-SA 4.0",
+          "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+          "modificationDescription": "Synthetic design metadata only; no source content used."
+        },
+        {
+          "sourceRole": "lexical_domains",
+          "artifactName": "UBSHebrewDicLexicalDomains-v0.9.2-en.JSON",
+          "sourceVersion": "0.9.2",
+          "sourceUrl": "https://example.invalid/no-source-bytes/lexical-domains",
+          "sourceCommit": "4444444444444444444444444444444444444444",
+          "sourceBlob": "5555555555555555555555555555555555555555",
+          "sourceSha256": "6666666666666666666666666666666666666666666666666666666666666666",
+          "publisher": "United Bible Societies",
+          "license": "CC BY-SA 4.0",
+          "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+          "modificationDescription": "Synthetic design metadata only; no source content used."
+        }
+      ],
+      "transformation": {
+        "schemaVersion": "ubs-semantics.v1",
+        "transformVersion": 7,
+        "artifactIdentity": "7777777777777777777777777777777777777777777777777777777777777777"
+      }
+    }
+  }
+}
