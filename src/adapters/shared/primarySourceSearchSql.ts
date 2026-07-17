@@ -1,4 +1,5 @@
 import type { PrimarySourceSearchMatch, PrimarySourceSelection } from '../../services/historical/primarySourceTypes.js';
+import { CLASSIC_TEXT_LIMITS } from '../../kernel/classicTextContract.js';
 
 export const LOCAL_PRIMARY_SOURCE_SEARCH_SQL = `SELECT ds.id, ds.document_id, ds.section_number, ds.title, ds.content, ds.topics,
        d.title AS document_title, d.type AS document_type, d.date AS document_date, d.metadata AS document_metadata
@@ -11,25 +12,29 @@ export const LOCAL_PRIMARY_SOURCE_SEARCH_SQL = `SELECT ds.id, ds.document_id, ds
 
 export const LOCAL_PRIMARY_SOURCE_WORK_DIVERSE_SEARCH_SQL = workDiverseSql();
 
+// One JSON-array bind keeps scoped searches below D1's 100-parameter ceiling;
+// json_each is available in both Cloudflare D1 and the local SQLite runtime.
 export function localPrimarySourceScopedSearchSql(documentCount: number): string {
-  if (!Number.isSafeInteger(documentCount) || documentCount < 1 || documentCount > 17) {
-    throw new Error('Local primary-source document scope must contain 1..17 documents');
+  if (!Number.isSafeInteger(documentCount) || documentCount < 1 || documentCount > CLASSIC_TEXT_LIMITS.workCount) {
+    throw new Error(`Local primary-source document scope must contain 1..${CLASSIC_TEXT_LIMITS.workCount} documents`);
   }
   return `SELECT ds.id, ds.document_id, ds.section_number, ds.title, ds.content, ds.topics,
        d.title AS document_title, d.type AS document_type, d.date AS document_date, d.metadata AS document_metadata
   FROM sections_fts
   JOIN document_sections ds ON ds.id = sections_fts.rowid
   JOIN documents d ON d.id = ds.document_id
- WHERE sections_fts MATCH ? AND ds.document_id IN (${Array(documentCount).fill('?').join(', ')})
+ WHERE sections_fts MATCH ?
+   AND ds.document_id IN (SELECT value FROM json_each(?) WHERE type = 'text')
  ORDER BY rank, ds.id
  LIMIT ?`;
 }
 
 export function localPrimarySourceWorkDiverseScopedSearchSql(documentCount: number): string {
-  if (!Number.isSafeInteger(documentCount) || documentCount < 1 || documentCount > 17) {
-    throw new Error('Local primary-source document scope must contain 1..17 documents');
+  if (!Number.isSafeInteger(documentCount) || documentCount < 1 || documentCount > CLASSIC_TEXT_LIMITS.workCount) {
+    throw new Error(`Local primary-source document scope must contain 1..${CLASSIC_TEXT_LIMITS.workCount} documents`);
   }
-  return workDiverseSql(` AND ds.document_id IN (${Array(documentCount).fill('?').join(', ')})`);
+  return workDiverseSql(`
+       AND ds.document_id IN (SELECT value FROM json_each(?) WHERE type = 'text')`);
 }
 
 export function localPrimarySourceSearchSql(selection: PrimarySourceSelection, documentCount?: number): string {

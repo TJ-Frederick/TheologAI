@@ -20,6 +20,7 @@ import {
   localPrimarySourceSearchSql,
 } from '../shared/primarySourceSearchSql.js';
 import { mapDocumentDatabaseRow, mapDocumentSectionDatabaseRow } from '../shared/historicalDocumentMetadata.js';
+import { CLASSIC_TEXT_LIMITS } from '../../kernel/classicTextContract.js';
 
 export type { DocumentInfo, DocumentSection } from '../../kernel/repositories.js';
 
@@ -120,7 +121,7 @@ export class HistoricalDocumentRepository implements IHistoricalDocumentReposito
       ? this.stmtPrimarySourceSearch
       : this.db.prepare(sql);
     const rows = options.documentIds
-      ? statement.all(ftsQuery, ...options.documentIds, options.limit)
+      ? statement.all(ftsQuery, JSON.stringify(options.documentIds), options.limit)
       : statement.all(ftsQuery, options.limit);
     return (rows as PrimarySourceSearchDatabaseRow[]).map(mapPrimarySourceRow);
   }
@@ -172,7 +173,7 @@ function validatePrimarySourceOptions(options: PrimarySourceLocalSearchOptions):
   if (options.selection !== undefined && options.selection !== 'relevance' && options.selection !== 'work_diversity') throw new Error('Primary-source selection is invalid');
   if (!Number.isSafeInteger(options.limit) || options.limit < 1 || options.limit > 9) throw new Error('Primary-source internal limit must be 1..9');
   if (options.documentIds !== undefined && (!Array.isArray(options.documentIds)
-    || options.documentIds.length < 1 || options.documentIds.length > 17
+    || options.documentIds.length < 1 || options.documentIds.length > CLASSIC_TEXT_LIMITS.workCount
     || options.documentIds.some(id => typeof id !== 'string' || id.length < 1)
     || new Set(options.documentIds).size !== options.documentIds.length)) {
     throw new Error('Primary-source document scope is invalid');

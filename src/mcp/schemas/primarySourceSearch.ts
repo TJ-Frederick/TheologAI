@@ -1,4 +1,5 @@
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
+import { CLASSIC_TEXT_LIMITS } from '../../kernel/classicTextContract.js';
 
 const status = {
   type: 'string',
@@ -56,7 +57,7 @@ const catalogScope = {
         endYear: { type: 'integer', minimum: -5000, maximum: 3000 },
       }, additionalProperties: false,
     },
-    eligibleDocumentCount: { type: 'integer', minimum: 0, maximum: 17 },
+    eligibleDocumentCount: { type: 'integer', minimum: 0, maximum: CLASSIC_TEXT_LIMITS.workCount },
     eligibleDocuments: {
       type: 'array', maxItems: 8, items: {
         type: 'object', properties: {

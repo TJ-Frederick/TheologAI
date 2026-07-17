@@ -17,6 +17,8 @@ import { createDeterministicMcpFixture } from '../../fixtures/mcpCompositionRoot
 import { DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG } from '../../../src/kernel/featureFlags.js';
 import { classicTextsOutputSchema } from '../../../src/mcp/schemas/classicTexts.js';
 import { validateClassicTextsOutputSemantics } from '../../../src/presenters/classicTextsStructured.js';
+import { primarySourceSearchOutputSchema } from '../../../src/mcp/schemas/primarySourceSearch.js';
+import { primarySourceSearchV4OutputSchema } from '../../../src/mcp/schemas/primarySourceSearchV4.js';
 
 const connected: Array<{ client: Client; server: Server }> = [];
 type LogMessage = { level: string; logger?: string; data: unknown };
@@ -63,6 +65,61 @@ describe('MCP structured output validation', () => {
     const bytes = new TextEncoder().encode(JSON.stringify(classicTextsOutputSchema)).byteLength;
     expect(bytes).toBeGreaterThan(15_000);
     expect(bytes).toBeLessThanOrEqual(16_384);
+  });
+
+  it.each([
+    ['v3', primarySourceSearchOutputSchema],
+    ['v4', primarySourceSearchV4OutputSchema],
+  ] as const)('accepts 100 eligible works and rejects 101 at the %s output-schema boundary', async (version, outputSchema) => {
+    const structuredContent = (eligibleDocumentCount: number) => ({
+      schemaVersion: version === 'v3' ? '3' : '4',
+      kind: 'primary_source_search',
+      planStatus: 'complete',
+      ...(version === 'v4' ? { responseWindow: { unit: 'utf8_bytes', maximum: 32768, truncated: false } } : {}),
+      queries: [{
+        id: 'q', normalizedMode: 'all_terms', normalizedSelection: 'relevance',
+        providers: [{
+          provider: 'local', status: 'no_results', searched: true, page: 1, hitCount: 0,
+          resultWindow: { returnedHitCount: 0, additionalMatchStatus: 'no_additional_match_observed' },
+          hits: [], notices: [],
+          scope: {
+            status: 'matched', requested: {}, eligibleDocumentCount,
+            eligibleDocuments: [], eligibleDocumentsTruncated: true,
+          },
+        }],
+      }],
+      coverage: {
+        localAttempted: true, localStatus: 'no_results', localHitCount: 0,
+        ...(version === 'v4' ? { ccelAttempted: false, ccelHitCount: 0 } : {}),
+        notices: [],
+      },
+      evidencePolicy: version === 'v4'
+        ? {
+          snippetUse: 'discovery_only', localSectionAccess: 'mcp_resource_read', externalSectionAccess: 'direct_url_only',
+          coverageScope: 'bounded_non_exhaustive', externalRightsStatus: 'not_determined',
+          lookupAliasUse: 'exact_routing_only_not_metadata_evidence',
+        }
+        : {
+          snippetUse: 'discovery_only', selectedSectionAccess: 'mcp_resource_read', coverageScope: 'bounded_non_exhaustive',
+          editionProvenance: 'incomplete', lookupAliasUse: 'exact_routing_only_not_metadata_evidence',
+        },
+    });
+    let count = 100;
+    const client = await connect([{
+      name: `primary_scope_${version}`,
+      description: 'Primary-source scope boundary fixture',
+      inputSchema: { type: 'object', additionalProperties: false },
+      outputSchema,
+      handler: async () => ({
+        content: [{ type: 'text' as const, text: 'safe fallback' }],
+        structuredContent: structuredContent(count),
+      }),
+    }]);
+
+    await expect(client.callTool({ name: `primary_scope_${version}`, arguments: {} })).resolves.not.toMatchObject({ isError: true });
+    count = 101;
+    await expect(client.callTool({ name: `primary_scope_${version}`, arguments: {} }))
+      .rejects.toMatchObject({ code: -32603, message: expect.stringContaining('Internal server error') });
   });
 
   it('advertises output schemas for exactly the converted tools', async () => {
