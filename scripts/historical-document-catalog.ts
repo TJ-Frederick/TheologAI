@@ -1,3 +1,5 @@
+import { CLASSIC_TEXT_LIMITS } from '../src/kernel/classicTextContract.js';
+
 export type HistoricalMetadataStatus = 'reviewed' | 'anonymous' | 'collective' | 'unknown';
 
 export const HISTORICAL_CREATOR_ROLES = [
@@ -40,8 +42,9 @@ export function parseHistoricalDocumentCatalog(value: unknown): HistoricalCatalo
   const root = value as Record<string, unknown>;
   assertExactKeys(root, ['schemaVersion', 'lookupAliasPolicy', 'documents'], 'catalog root');
   if (root.schemaVersion !== 3 || root.lookupAliasPolicy !== HISTORICAL_LOOKUP_ALIAS_POLICY
-    || !Array.isArray(root.documents) || root.documents.length !== 17) {
-    throw new Error('Historical-document catalog must contain exactly 17 schema-v3 documents with the exact lookup-only alias policy');
+    || !Array.isArray(root.documents) || root.documents.length < 1
+    || root.documents.length > CLASSIC_TEXT_LIMITS.workCount) {
+    throw new Error(`Historical-document catalog must contain 1..${CLASSIC_TEXT_LIMITS.workCount} schema-v3 documents with the exact lookup-only alias policy`);
   }
   const ids = new Set<string>();
   const aliases = new Set<string>();

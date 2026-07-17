@@ -256,7 +256,9 @@ describe('D1HistoricalDocumentRepository', () => {
       const result = await new D1HistoricalDocumentRepository(db as any).searchPrimarySources({
         text: 'grace OR faith', match: 'all_terms', documentIds: ['nicene-creed'], limit: 8,
       });
-      expect(db.prepare.mock.results[0].value.bind).toHaveBeenCalledWith('"grace" AND "OR" AND "faith"', 'nicene-creed', 8);
+      expect(db.prepare.mock.results[0].value.bind).toHaveBeenCalledWith(
+        '"grace" AND "OR" AND "faith"', JSON.stringify(['nicene-creed']), 8,
+      );
       expect(result[0]).toMatchObject({
         document: { id: 'nicene-creed', title: 'Nicene Creed', topics: ['trinity', 'christology'] },
         section: { section_number: '1', content: 'We believe in one God...' },
@@ -270,8 +272,40 @@ describe('D1HistoricalDocumentRepository', () => {
       });
       const sql = db.prepare.mock.calls[0][0] as string;
       expect(sql).toMatch(/ROW_NUMBER\(\) OVER \([\s\S]*PARTITION BY document_id/);
-      expect(sql).toMatch(/ds\.document_id IN \(\?\)[\s\S]*ORDER BY work_rank, relevance_rank, id/);
-      expect(db.prepare.mock.results[0].value.bind).toHaveBeenCalledWith('"grace"', 'nicene-creed', 9);
+      expect(sql).toMatch(/ds\.document_id IN \(SELECT value FROM json_each\(\?\) WHERE type = 'text'\)[\s\S]*ORDER BY work_rank, relevance_rank, id/);
+      expect(db.prepare.mock.results[0].value.bind).toHaveBeenCalledWith(
+        '"grace"', JSON.stringify(['nicene-creed']), 9,
+      );
+    });
+
+    it('accepts a 100-work scope and rejects 101 works before querying D1', async () => {
+      const db = createSimpleD1([]);
+      const repo = new D1HistoricalDocumentRepository(db as any);
+      const documentIds = Array.from({ length: 100 }, (_, index) => `doc-${index + 1}`);
+
+      await expect(repo.searchPrimarySources({ text: 'grace', match: 'all_terms', documentIds, limit: 8 }))
+        .resolves.toEqual([]);
+      expect((db.prepare.mock.calls[0][0] as string).match(/\?/g)).toHaveLength(3);
+      expect(db.prepare.mock.results[0].value.bind).toHaveBeenCalledWith(
+        '"grace"', JSON.stringify(documentIds), 8,
+      );
+
+      await expect(repo.searchPrimarySources({
+        text: 'grace', match: 'all_terms', selection: 'work_diversity', documentIds, limit: 8,
+      })).resolves.toEqual([]);
+      expect((db.prepare.mock.calls[1][0] as string).match(/\?/g)).toHaveLength(3);
+      expect(db.prepare.mock.results[1].value.bind).toHaveBeenCalledWith(
+        '"grace"', JSON.stringify(documentIds), 8,
+      );
+
+      const preparesBeforeInvalid = db.prepare.mock.calls.length;
+      await expect(repo.searchPrimarySources({
+        text: 'grace', match: 'all_terms', documentIds: [...documentIds, 'doc-101'], limit: 8,
+      })).rejects.toThrow('Primary-source document scope is invalid');
+      await expect(repo.searchPrimarySources({
+        text: 'grace', match: 'all_terms', documentIds: ['doc-1', 42] as unknown as string[], limit: 8,
+      })).rejects.toThrow('Primary-source document scope is invalid');
+      expect(db.prepare).toHaveBeenCalledTimes(preparesBeforeInvalid);
     });
   });
 });

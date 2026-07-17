@@ -123,7 +123,9 @@ describe('HistoricalDocumentRepository', () => {
       document: { id: documentRow.id, title: documentRow.title, type: documentRow.type, date: documentRow.date, topics: ['Scripture', 'God'] },
       section: { id: 7, document_id: documentRow.id, section_number: '1.1', title: '', content: sectionRow.content, topics: ['revelation'] },
     }]);
-    expect(db.statement('AND ds.document_id IN (?)').all).toHaveBeenCalledWith('"grace" AND "OR" AND "faith"', documentRow.id, 8);
+    expect(db.statement('json_each(?)').all).toHaveBeenCalledWith(
+      '"grace" AND "OR" AND "faith"', JSON.stringify([documentRow.id]), 8,
+    );
     repo.searchPrimarySources({ text: 'union with Christ', match: 'phrase', limit: 3 });
     expect(db.statement(/JOIN documents d[\s\S]*ORDER BY rank/).all).toHaveBeenCalledWith('"union with Christ"', 3);
   });
@@ -138,6 +140,33 @@ describe('HistoricalDocumentRepository', () => {
     expect(statement.sql).toMatch(/ROW_NUMBER\(\) OVER \([\s\S]*PARTITION BY document_id[\s\S]*ORDER BY relevance_rank, id/);
     expect(statement.sql).toMatch(/ORDER BY work_rank, relevance_rank, id/);
     expect(statement.all).toHaveBeenCalledWith('"grace"', 9);
+  });
+
+  it('accepts a 100-work primary-source scope and rejects 101 works', () => {
+    const db = new FakeSqliteDatabase([{ match: 'JOIN documents d', all: [] }]);
+    const repo = new HistoricalDocumentRepository(db.asDatabase());
+    const documentIds = Array.from({ length: 100 }, (_, index) => `doc-${index + 1}`);
+
+    expect(repo.searchPrimarySources({ text: 'grace', match: 'all_terms', documentIds, limit: 8 })).toEqual([]);
+    const relevance = db.statement('json_each(?)');
+    expect(relevance.sql.match(/\?/g)).toHaveLength(3);
+    expect(relevance.all).toHaveBeenCalledWith('"grace"', JSON.stringify(documentIds), 8);
+
+    repo.searchPrimarySources({
+      text: 'grace', match: 'all_terms', selection: 'work_diversity', documentIds, limit: 8,
+    });
+    const diverse = db.statement('ranked_sections');
+    expect(diverse.sql.match(/\?/g)).toHaveLength(3);
+    expect(diverse.all).toHaveBeenCalledWith('"grace"', JSON.stringify(documentIds), 8);
+
+    const preparesBeforeInvalid = db.prepare.mock.calls.length;
+    expect(() => repo.searchPrimarySources({
+      text: 'grace', match: 'all_terms', documentIds: [...documentIds, 'doc-101'], limit: 8,
+    })).toThrow('Primary-source document scope is invalid');
+    expect(() => repo.searchPrimarySources({
+      text: 'grace', match: 'all_terms', documentIds: ['doc-1', 42] as unknown as string[], limit: 8,
+    })).toThrow('Primary-source document scope is invalid');
+    expect(db.prepare).toHaveBeenCalledTimes(preparesBeforeInvalid);
   });
 
   it('finds documents by exact id, title fragment, then id fragment', () => {

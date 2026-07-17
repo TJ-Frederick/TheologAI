@@ -1,4 +1,5 @@
 import { buildLocalDocumentResourceUri } from '../kernel/documentResource.js';
+import { CLASSIC_TEXT_LIMITS } from '../kernel/classicTextContract.js';
 import {
   CCEL_COMPOSITION_DATE_NOTICE,
   type PrimarySourcePlanHit,
@@ -367,7 +368,8 @@ function canonicalExternalUrl(value: string): string | undefined {
 
 function presentScope(scope: PrimarySourceSearchPlanResult['queries'][number]['providers'][number]['scope']): PresentedProvider['scope'] | undefined {
   if (!scope || !['matched', 'catalog_miss', 'metadata_incomplete'].includes(scope.status)
-    || !Number.isSafeInteger(scope.eligibleDocumentCount) || scope.eligibleDocumentCount < 0 || scope.eligibleDocumentCount > 17) return undefined;
+    || !Number.isSafeInteger(scope.eligibleDocumentCount) || scope.eligibleDocumentCount < 0
+    || scope.eligibleDocumentCount > CLASSIC_TEXT_LIMITS.workCount) return undefined;
   const eligibleDocuments = scope.eligibleDocuments.slice(0, 5).flatMap(document => {
     const id = boundedText(document.id, 160);
     const title = boundedText(document.title, 300);

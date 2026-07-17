@@ -259,7 +259,8 @@ describe('SQLite and D1 repository parity with identical real data', () => {
       section: { section_number: '1' },
     });
     const workDiverseOptions = {
-      text: 'one', match: 'all_terms' as const, selection: 'work_diversity' as const, limit: 3,
+      text: 'one', match: 'all_terms' as const, selection: 'work_diversity' as const,
+      documentIds: ['nicene-creed', 'augsburg-confession'], limit: 3,
     };
     const sqliteDiverse = sqliteHistorical.searchPrimarySources(workDiverseOptions);
     await expect(d1Historical.searchPrimarySources(workDiverseOptions)).resolves.toEqual(sqliteDiverse);

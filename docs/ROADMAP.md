@@ -88,6 +88,18 @@ is local source context only and does not define the current product contract.
   output for the curated local collection, merged as
   `9250bbd393ed99530e52ee656eee11fb8e841c7e` from reviewed source culminating
   in `ec2ae6480f372d2b8869592e51c199c66894508a`. Merge evidence alone does not establish a runtime deployment.
+- **TBESH Meaning suppression / PR #53:** withheld the Online-Bible-derived
+  Hebrew `Meaning` field while preserving safely sourced identity, form,
+  morphology, lemma, and brief-gloss evidence, merged as
+  `5588a1fdf2e4d8a4203aba0bba3eb3cdc205837e`.
+- **Guarded CCEL readiness / PR #54:** shipped the protected operator and
+  release architecture inertly, with production flags `000` and no live CCEL
+  request, merged as `c3f4b8df82104eb7a32002e2ed820026a1d6dc4c`.
+- **Guided CCEL date fallback / PR #55:** kept hosted-local date bounds exact,
+  made the single guided external query explicitly unbounded by date, and
+  added search-and-synthesis warnings. Production remained at flags `000` and
+  made zero live CCEL calls; merged as
+  `671a0f3fd632358f001dd5ac8e1721e32c09d39e`.
 
 These entries describe merged repository state. Deployment state is established
 only by the relevant protected workflow and post-deployment smoke evidence; a
@@ -366,7 +378,7 @@ Code readiness and operational readiness are deliberately separate:
 4. Preview deployment requires the repository's authorization label and
    protected environment approval. The live PR must still be open, non-draft,
    and authorized immediately before deployment.
-5. Preview smoke and a functional audit must cover all eleven tools, the ten
+5. Preview smoke and a functional audit must cover all eleven tools, the eleven
    structured-output contracts, UBS default and explicit-source behavior,
    Strong's extended identities, local primary-source search, language study,
    resources, all six prompts, and failure/privacy boundaries.
@@ -381,6 +393,14 @@ Code readiness and operational readiness are deliberately separate:
 
 ## Next work
 
+- Land the migration-free catalog-capacity prerequisite before either data
+  slice: keep the existing 100-work hard ceiling centralized and use a single
+  D1-safe JSON/`json_each` scope bind while the hosted corpus remains 17 works.
+  After explicit license and vendoring approval, the planned UBS semantic
+  runtime uses migration `0004` and transform 7. Corpus provenance follows in
+  migration `0005` and transform 8 only after a stable canonical section-key
+  compatibility design; current display section numbers are not unique. Keep
+  the existing 32-source provenance cap as a required pack-sizing check.
 - Review a bounded, discovery-only public rollout of the retained CCEL search
   adapter. The owner accepts free, donation-independent discovery with at most
   five attributed 240-character provider snippets and clean links, with no

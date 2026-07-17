@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Centralized the historical-work catalog and search-scope capacity at the
+  existing 100-work hard ceiling, using one D1-safe JSON/`json_each` bind for
+  scoped work IDs. The hosted corpus and readiness inventory remain 17 works;
+  this changes no database schema, public contract version, or transform.
+
 - Updated the v4 guided primary-source workflow for CCEL's lack of reviewed
   composition-date filtering. Requested year bounds remain exact on hosted-
   local queries; the one external discovery call omits them and repeats a

@@ -127,6 +127,25 @@ describe('primary-source v4 structured presentation', () => {
     expect(provider.notices).not.toContain(CCEL_COMPOSITION_DATE_NOTICE);
   });
 
+  it('preserves a 100-work local scope and rejects 101 as interface drift', () => {
+    const plan = largePlan();
+    plan.queries = [plan.queries[0]!];
+    const provider = plan.queries[0]!.providers[0]!;
+    provider.status = 'no_results';
+    provider.hitCount = 0;
+    provider.hits = [];
+    provider.resultWindow = { returnedHitCount: 0, additionalMatchStatus: 'no_additional_match_observed' };
+    provider.scope!.eligibleDocumentCount = 100;
+    provider.scope!.eligibleDocuments = [];
+    provider.scope!.eligibleDocumentsTruncated = true;
+
+    expect(presentPrimarySourceSearchV4(plan).queries[0]!.providers[0]!.scope?.eligibleDocumentCount).toBe(100);
+    provider.scope!.eligibleDocumentCount = 101;
+    const rejected = presentPrimarySourceSearchV4(plan).queries[0]!.providers[0]!;
+    expect(rejected.status).toBe('interface_changed');
+    expect(rejected).not.toHaveProperty('scope');
+  });
+
   it('publishes bounded retry guidance only for a rate-limited external provider', () => {
     const plan = largePlan();
     const external = externalProvider('external', 0) as ReturnType<typeof externalProvider> & { retryAfterSeconds?: number };

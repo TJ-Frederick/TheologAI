@@ -23,6 +23,27 @@ describe('reviewed historical-document catalog', () => {
     expect(HISTORICAL_LOOKUP_ALIAS_POLICY).toBe('exact_routing_only_not_metadata_evidence');
   });
 
+  it('accepts 1..100 catalog entries and rejects empty or oversized catalogs', () => {
+    const raw = JSON.parse(readFileSync('data/historical-document-catalog.json', 'utf8'));
+    const template = raw.documents[0];
+    const documents = Array.from({ length: 100 }, (_, index) => ({
+      ...structuredClone(template),
+      documentId: `boundary-document-${index + 1}`,
+      lookupAliases: [`Boundary Document ${index + 1}`],
+    }));
+
+    expect(parseHistoricalDocumentCatalog({ ...raw, documents })).toHaveLength(100);
+    expect(() => parseHistoricalDocumentCatalog({ ...raw, documents: [] })).toThrow('1..100');
+    expect(() => parseHistoricalDocumentCatalog({
+      ...raw,
+      documents: [...documents, {
+        ...structuredClone(template),
+        documentId: 'boundary-document-101',
+        lookupAliases: ['Boundary Document 101'],
+      }],
+    })).toThrow('1..100');
+  });
+
   it('keeps uncertainty explicit and never relabels collective roles as authorship', () => {
     expect(catalog.find(entry => entry.documentId === 'apostles-creed')).toMatchObject({
       composition: { label: 'Before the end of the 4th century (present form)' }, creators: [], metadataStatus: 'anonymous',

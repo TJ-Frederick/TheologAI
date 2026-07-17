@@ -87,4 +87,26 @@ describe('formatPrimarySourceSearch', () => {
     expect(presented.coverage).not.toHaveProperty('ccelStatus');
     expect(presented.coverage).not.toHaveProperty('ccelHitCount');
   });
+
+  it('preserves a 100-work catalog scope and fails closed at 101', () => {
+    const makeResult = (eligibleDocumentCount: number): PrimarySourceSearchPlanResult => ({
+      planStatus: 'complete',
+      queries: [{ id: 'q', normalizedMode: 'all_terms', normalizedSelection: 'relevance', providers: [{
+        provider: 'local', status: 'no_results', searched: true, page: 1, hitCount: 0,
+        resultWindow: { returnedHitCount: 0, additionalMatchStatus: 'no_additional_match_observed' },
+        hits: [], notices: [],
+        scope: {
+          status: 'matched', requested: {}, eligibleDocumentCount,
+          eligibleDocuments: [], eligibleDocumentsTruncated: true,
+        },
+      }] }],
+      coverage: { localAttempted: true, localStatus: 'no_results', localHitCount: 0, ccelAttempted: false, ccelHitCount: 0, notices: [] },
+    });
+
+    expect(presentPrimarySourceSearch(makeResult(100)).queries[0]!.providers[0]!.scope?.eligibleDocumentCount).toBe(100);
+    expect(presentPrimarySourceSearch(makeResult(101)).queries[0]!.providers[0]).toMatchObject({
+      status: 'interface_changed',
+      scope: { status: 'metadata_incomplete', eligibleDocumentCount: 0 },
+    });
+  });
 });
