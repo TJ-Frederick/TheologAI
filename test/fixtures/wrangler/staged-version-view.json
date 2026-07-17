@@ -1,0 +1,40 @@
+{
+  "id": "223e4567-e89b-42d3-a456-426614174000",
+  "number": 42,
+  "metadata": {
+    "created_on": "2026-07-17T06:00:00.000Z",
+    "author_email": "release@example.invalid",
+    "source": "wrangler"
+  },
+  "annotations": {
+    "workers/message": "Stage THEOLOGAI_CCEL_OPERATOR_TOKEN without traffic",
+    "workers/tag": "ccel-operator-secret-staged"
+  },
+  "resources": {
+    "script": {
+      "etag": "4f8e2a",
+      "handlers": ["fetch"],
+      "last_deployed_from": "wrangler"
+    },
+    "script_runtime": {
+      "compatibility_date": "2026-07-09",
+      "compatibility_flags": ["nodejs_compat"]
+    },
+    "bindings": [
+      { "name": "THEOLOGAI_DB", "type": "d1", "id": "c6535a4a-1953-4279-b277-7368445fc61a" },
+      { "name": "THEOLOGAI_CCEL_COORDINATOR", "type": "durable_object_namespace", "class_name": "CcelGlobalCoordinator", "script_name": "theologai-ccel-coordinator" },
+      { "name": "THEOLOGAI_RATE_LIMITER", "type": "ratelimit", "namespace_id": "361201", "simple": { "limit": 120, "period": 60 } },
+      { "name": "THEOLOGAI_CCEL_OPERATOR_AUTH_LIMITER", "type": "ratelimit", "namespace_id": "361203", "simple": { "limit": 12, "period": 60 } },
+      { "name": "CF_VERSION_METADATA", "type": "version_metadata" },
+      { "name": "THEOLOGAI_VERSION", "type": "plain_text", "text": "3.6.0" },
+      { "name": "THEOLOGAI_ALLOWED_ORIGINS", "type": "plain_text", "text": "https://theologai.xyz,https://theologai.pages.dev" },
+      { "name": "THEOLOGAI_MAX_REQUEST_BYTES", "type": "plain_text", "text": "1048576" },
+      { "name": "THEOLOGAI_REQUEST_LOGS", "type": "plain_text", "text": "false" },
+      { "name": "THEOLOGAI_EXPOSE_CCEL_DISCOVERY", "type": "plain_text", "text": "false" },
+      { "name": "THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH", "type": "plain_text", "text": "false" },
+      { "name": "THEOLOGAI_ENABLE_CCEL_COORDINATOR", "type": "plain_text", "text": "false" },
+      { "name": "ESV_API_KEY", "type": "secret_text" },
+      { "name": "THEOLOGAI_CCEL_OPERATOR_TOKEN", "type": "secret_text" }
+    ]
+  }
+}

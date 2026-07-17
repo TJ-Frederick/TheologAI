@@ -1,0 +1,6 @@
+# Intentionally minimal configuration for version/secret release operations.
+# Do not add routes, workers_dev, observability, assets, or environment bindings.
+name = "theologai"
+main = "src/worker.ts"
+compatibility_date = "2026-07-09"
+compatibility_flags = ["nodejs_compat"]

@@ -111,6 +111,13 @@ the same key. Provisioning either is a separate, explicit owner operation;
 checked-in configuration remains inert, and an absent Worker secret remains a
 constant-shaped 404.
 
+The exact staged provisioning, independent promotion, equality audit, and
+non-destructive rollback gates are defined in
+[CCEL-OPERATOR-SECRET-PROVISIONING.md](./CCEL-OPERATOR-SECRET-PROVISIONING.md).
+Generic agreement does not authorize either secret write. Plain
+`wrangler secret put` is deliberately excluded because it creates and deploys
+a Worker version immediately.
+
 ## Durable behavior and circuit policy
 
 RPC admission reads state, reserves `next_allowed_at_ms`, and writes that
