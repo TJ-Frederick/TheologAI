@@ -13,6 +13,7 @@ import { StrongsService } from '../../../src/services/languages/StrongsService.j
 import { readFileSync } from 'node:fs';
 import { createPrimarySourceSearchHandler } from '../../../src/tools/v2/primarySourceSearch.js';
 import { createClassicTextsHandler } from '../../../src/tools/v2/classicTexts.js';
+import { createParallelPassagesHandler } from '../../../src/tools/v2/parallelPassages.js';
 import { formatLocalDocumentResource, formatLocalDocumentSectionResource } from '../../../src/formatters/historicalFormatter.js';
 import { DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG } from '../../../src/kernel/featureFlags.js';
 import { primarySourceSearchV4OutputSchema } from '../../../src/mcp/schemas/primarySourceSearchV4.js';
@@ -206,6 +207,24 @@ describe('shared MCP registration', () => {
     });
     expect(result.content).toEqual([{ type: 'text', text: 'Result from bible_lookup' }]);
     expect(root.tools[0].handler).toHaveBeenCalledWith({ reference: 'John 3:16' });
+  });
+
+  it('preserves bounded UBS survey navigation in the parallel_passages tools/list contract', async () => {
+    const root = makeMockRoot();
+    root.tools = root.tools.map(tool => tool.name === 'parallel_passages'
+      ? createParallelPassagesHandler({ lookup: vi.fn() } as never)
+      : tool);
+    const client = await connect(createTheologAiMcpServer(root, 'parallel-navigation-test').server);
+
+    const advertised = (await client.listTools()).tools.find(tool => tool.name === 'parallel_passages');
+
+    expect(advertised?.description).toContain('full requested chapter/range, not a representative verse');
+    expect(advertised?.description).toContain('corpora: ["ubs_source_attested"], maxGroups: 5, includeText: false');
+    expect(advertised?.description).toContain('additional_match_observed');
+    expect(advertised?.description).toContain('nextCursor');
+    expect(advertised?.description).toContain('pass that `nextCursor` unchanged as `groupCursor` while preserving exactly the same `reference`, `corpora`, and `maxGroups`');
+    expect(advertised?.description).toContain('Stop after three pages');
+    expect(advertised?.description).toContain('survey is bounded');
   });
 
   it.each(LOGGING_SERVER_VARIANTS)('$name emits sanitized tool execution logs after client opt-in', async ({ create }) => {

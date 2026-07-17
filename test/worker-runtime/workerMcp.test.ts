@@ -169,6 +169,10 @@ describe('Worker MCP endpoint in workerd', () => {
           }),
         }),
         expect.objectContaining({
+          name: 'parallel_passages',
+          description: expect.stringContaining('pass that `nextCursor` unchanged as `groupCursor` while preserving exactly the same `reference`, `corpora`, and `maxGroups`'),
+        }),
+        expect.objectContaining({
           name: 'commentary_lookup',
           outputSchema: expect.objectContaining({
             type: 'object', additionalProperties: false,
