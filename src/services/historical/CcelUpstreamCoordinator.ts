@@ -85,6 +85,12 @@ export interface CcelCoordinatorSnapshot {
   terminalRetiredThroughAttemptId: number;
 }
 
+export interface CcelOperatorResetResult {
+  applied: boolean;
+  reason: 'applied' | 'state_mismatch' | 'epoch_mismatch' | 'not_latched';
+  snapshot: CcelCoordinatorSnapshot;
+}
+
 /** Structured telemetry contracts; emitters must not add raw request fields. */
 export type CcelCoordinatorEvent =
   | {

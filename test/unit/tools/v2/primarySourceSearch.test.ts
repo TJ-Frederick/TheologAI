@@ -574,6 +574,29 @@ describe('primary_source_search v4 contract', () => {
     expect(validatorFor(handler.outputSchema!)(result.structuredContent).valid).toBe(true);
   });
 
+  it('requires retry guidance exactly for rate-limited external providers', async () => {
+    const rateLimited = plan();
+    rateLimited.planStatus = 'unavailable';
+    rateLimited.queries[0]!.providers = [{
+      provider: 'ccel_live', status: 'rate_limited', searched: false, page: 1, hitCount: 0,
+      resultWindow: { returnedHitCount: 0, additionalMatchStatus: 'not_evaluated' },
+      hits: [], notices: [], retryAfterSeconds: 7,
+    }];
+    rateLimited.coverage = { localAttempted: false, localHitCount: 0, ccelAttempted: true, ccelHitCount: 0, notices: [] };
+    const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue(rateLimited) } as any, v4);
+    const result = await handler.handler({ queries: [{ id: 'q1', text: 'faith', providers: ['ccel'] }] });
+    const validate = validatorFor(handler.outputSchema!);
+    expect(validate(result.structuredContent).valid).toBe(true);
+
+    const missing = structuredClone(result.structuredContent as object) as any;
+    delete missing.queries[0].providers[0].retryAfterSeconds;
+    expect(validate(missing).valid).toBe(false);
+
+    const unexpected = structuredClone(result.structuredContent as object) as any;
+    unexpected.queries[0].providers[0].status = 'no_results';
+    expect(validate(unexpected).valid).toBe(false);
+  });
+
   it.each([
     'http://ccel.org/ccel/calvin/institutes/iv.xvii.html',
     'https://www.ccel.org/ccel/calvin/institutes/iv.xvii.html',

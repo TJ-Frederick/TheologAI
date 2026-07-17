@@ -54,6 +54,7 @@ type PresentedProvider = {
   resultWindow: { returnedHitCount: number; additionalMatchStatus: 'additional_match_observed' | 'no_additional_match_observed' | 'not_evaluated' };
   hits: PresentedPrimarySourceV4Hit[];
   notices: string[];
+  retryAfterSeconds?: number;
   scope?: {
     status: 'matched' | 'catalog_miss' | 'metadata_incomplete';
     requested: { work?: string; author?: string; startYear?: number; endYear?: number };
@@ -178,7 +179,14 @@ function providerDraft(
   const scopeInvalid = providerKind === 'local'
     && ((provider.scope !== undefined && scope === undefined) || (scopeRequired && scope === undefined));
   const pageInvalid = !Number.isSafeInteger(provider.page) || provider.page < 1 || provider.page > 3;
-  const contractInvalid = countMismatch || !validWindow || scopeInvalid || pageInvalid || optionalMetadataInvalid;
+  const retryAfterValid = provider.retryAfterSeconds === undefined
+    ? provider.status !== 'rate_limited'
+    : provider.provider === 'ccel_live'
+      && provider.status === 'rate_limited'
+      && Number.isSafeInteger(provider.retryAfterSeconds)
+      && provider.retryAfterSeconds >= 1
+      && provider.retryAfterSeconds <= 86_400;
+  const contractInvalid = countMismatch || !validWindow || scopeInvalid || pageInvalid || optionalMetadataInvalid || !retryAfterValid;
   const status = STATUS.has(provider.status) && invalidCandidates === 0 && !contractInvalid ? provider.status : 'interface_changed';
   return {
     provider: providerKind,
@@ -191,10 +199,14 @@ function providerDraft(
       ...(!validWindow ? ['Provider result-window metadata was invalid.'] : []),
       ...(scopeInvalid ? ['Local catalog scope metadata was absent or invalid.'] : []),
       ...(pageInvalid ? ['Provider page metadata was invalid.'] : []),
+      ...(!retryAfterValid ? ['Provider retry-after metadata was absent or invalid.'] : []),
       ...(optionalMetadataInvalid ? ['One or more empty optional metadata fields were omitted after sanitization.'] : []),
       ...provider.notices,
     ], 4, 240),
     ...(scope ? { scope } : {}),
+    ...(retryAfterValid && provider.retryAfterSeconds !== undefined
+      ? { retryAfterSeconds: provider.retryAfterSeconds }
+      : {}),
     sourceAdditional: validWindow ? provider.resultWindow!.additionalMatchStatus : 'not_evaluated',
     candidates,
     invalidCandidates,
@@ -229,6 +241,7 @@ function buildEnvelope(
         },
         hits,
         notices: provider.notices,
+        ...(provider.retryAfterSeconds === undefined ? {} : { retryAfterSeconds: provider.retryAfterSeconds }),
         ...(provider.scope ? { scope: provider.scope } : {}),
       };
     }),

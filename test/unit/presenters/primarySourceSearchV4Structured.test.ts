@@ -86,6 +86,22 @@ function largePlan(): PrimarySourceSearchPlanResult {
 }
 
 describe('primary-source v4 structured presentation', () => {
+  it('publishes bounded retry guidance only for a rate-limited external provider', () => {
+    const plan = largePlan();
+    const external = externalProvider('external', 0) as ReturnType<typeof externalProvider> & { retryAfterSeconds?: number };
+    external.status = 'rate_limited' as never;
+    external.searched = false;
+    external.retryAfterSeconds = 11;
+    plan.queries = [{ id: 'external', normalizedMode: 'all_terms', normalizedSelection: 'relevance', providers: [external] }];
+    const provider = presentPrimarySourceSearchV4(plan).queries[0]!.providers[0]!;
+    expect(provider).toMatchObject({ status: 'rate_limited', retryAfterSeconds: 11 });
+
+    external.retryAfterSeconds = 0;
+    const invalid = presentPrimarySourceSearchV4(plan).queries[0]!.providers[0]!;
+    expect(invalid.status).toBe('interface_changed');
+    expect(invalid).not.toHaveProperty('retryAfterSeconds');
+  });
+
   it('stops at the first non-fitting hit and recomputes every public count within 32 KiB', () => {
     const presented = presentPrimarySourceSearchV4(largePlan());
     const json = JSON.stringify(presented);

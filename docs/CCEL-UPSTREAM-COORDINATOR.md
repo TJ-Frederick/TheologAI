@@ -71,7 +71,45 @@ interface latch instead of forgetting a token and risking a replay.
 
 There is no parameter or persistence column for a search query, URL, HTML,
 snippet, result, client identity, IP address, or user agent. Structured event
-types exist for future telemetry, but this slice does not emit them.
+types and operator logs remain content-free.
+
+## Protected observation and reset
+
+The public Workers include a non-MCP `POST /internal/ccel-coordinator` route.
+It is inert and returns the same non-cacheable 404 for every failure unless an
+environment-specific `THEOLOGAI_CCEL_OPERATOR_TOKEN` secret is explicitly
+provisioned. Preview and production do not inherit one another's secret. The
+route has no CORS support and accepts only bounded JSON plus HMAC-SHA256 headers.
+The signature covers the exact method, path, timestamp, nonce, and request body;
+requests also name the exact live Cloudflare Worker version ID.
+
+Before reading the body or performing HMAC work, a dedicated fail-closed
+Cloudflare limiter permits 12 authentication attempts per minute for the hash
+of the connecting IP plus user agent. Production and preview use separate
+namespaces, and neither shares counters or keyspace with anonymous MCP traffic.
+This keeps hostile fingerprints from consuming the GitHub operator runner's
+fingerprint while bounding unauthenticated crypto/body work. Limiter failure,
+missing fingerprint inputs, and exhaustion retain the same constant 404.
+
+Snapshot is read-only. Reset accepts only `latched_policy` or
+`latched_interface` and requires the exact observed state and `operatorEpoch`.
+The Durable Object checks both and advances the epoch in the same SQLite
+transaction, so replay cannot reset a later state. Closed, transient-backoff,
+and rate-limited states cannot be reset through this route. Successful auth is
+outside the anonymous MCP limiter; unrelated hostile fingerprints cannot spend
+the operator runner's dedicated pre-auth budget. Logs contain only action,
+outcome, circuit state, epoch, and Worker
+version—never the secret, signature, nonce, request body, query, content, or
+identity.
+
+The manual **Operate CCEL Coordinator** workflow is main-only, protected by the
+`production` environment, and requires an exact confirmation, version UUID,
+and reset preconditions. Both public Workers bind to the same Durable Object,
+so a reset through either environment affects the one shared upstream circuit.
+The Worker secret and the GitHub `production` environment secret must contain
+the same key. Provisioning either is a separate, explicit owner operation;
+checked-in configuration remains inert, and an absent Worker secret remains a
+constant-shaped 404.
 
 ## Durable behavior and circuit policy
 
@@ -86,8 +124,8 @@ terminal token, or circuit transition.
 - `rate_limited`: honor a validated 1–86,400 second Retry-After, then one
   bounded half-open probe.
 - `latched_policy` / `latched_interface`: admit nothing until an operator has
-  reviewed the condition and calls the internal reset pathway. No public route
-  exposes reset.
+  reviewed the condition and calls the signed internal reset pathway. No
+  anonymous or MCP route exposes reset.
 
 Admission calculates its effective time as the greater of wall time and the
 persisted last-observed floor. An admitted request, or an admission transition
@@ -210,3 +248,8 @@ Worker's current contract.
 Once Stage B is bound and a later approved slice enables it, the global coordinator is intentionally a bottleneck: the maximum admitted
 CCEL-origin load is 0.1 requests/second across production and preview combined.
 Local corpus search remains independent if the circuit latches.
+
+The adapter returns a bounded integer `retryAfterSeconds` on every v4
+`rate_limited` provider result. Guided primary-source research issues at most
+one CCEL-bearing call per prompt materialization and defers additional creator
+scopes to later turns after that interval.

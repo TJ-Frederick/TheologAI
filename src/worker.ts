@@ -22,10 +22,16 @@ import {
   logWorkerRequestEvent,
   safeErrorName,
 } from './http/worker/telemetry.js';
+import { handleCcelOperatorRequest } from './http/worker/ccelOperator.js';
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     void ctx;
+    // This signed, fail-closed route is outside public MCP telemetry and its
+    // limiter; the handler applies a distinct fail-closed pre-auth budget.
+    const operatorResponse = await handleCcelOperatorRequest(request, env);
+    if (operatorResponse) return operatorResponse;
+
     const startedAt = Date.now();
     const metadata = getWorkerRequestMetadata(request);
     const origin = request.headers.get('Origin');

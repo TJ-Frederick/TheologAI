@@ -200,13 +200,14 @@ describe('prompt-recommended tool-call contracts', () => {
       startYear: '500', endYear: '1500',
     }, v4);
     expect((calls[0]!.arguments.queries as Array<{ providers: string[] }>).every(query => query.providers[0] === 'local')).toBe(true);
-    expect(calls.slice(1)).toHaveLength(2);
+    expect(calls.slice(1)).toHaveLength(1);
     for (const call of calls.slice(1)) {
       const queries = call.arguments.queries as Array<{ providers: string[] }>;
       expect(queries).toHaveLength(1);
       expect(queries[0]!.providers).toEqual(['ccel']);
       expect(queries[0]).toMatchObject({ startYear: 500, endYear: 1500 });
     }
+    expect((calls[1]!.arguments.queries as Array<{ author?: string }>)[0]!.author).toBe('Erasmus of Rotterdam');
     expect(recommendedToolCallsForPrompt('confession-study', { topic: 'justification' }, v4)[0]!.arguments)
       .toMatchObject({ queries: [{ providers: ['local', 'ccel'] }] });
   });

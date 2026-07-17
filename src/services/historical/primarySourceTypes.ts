@@ -150,5 +150,7 @@ export interface PrimarySourceProviderResult {
   resultWindow?: PrimarySourceResultWindow;
   hits: PrimarySourceSearchHit[];
   notices: string[];
+  /** Honest bounded wait guidance, present only for a rate-limited live CCEL provider. */
+  retryAfterSeconds?: number;
   scope?: PrimarySourceCatalogScope;
 }

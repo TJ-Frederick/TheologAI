@@ -159,24 +159,27 @@ export function recommendedToolCallsForPrompt(
         },
       };
       if (contract.contractVersion !== '4') return [localCall];
-      const externalScopes = authors.length ? authors : [undefined];
+      // A prompt materialization may authorize only one cold CCEL attempt. The
+      // shared coordinator enforces a global origin interval, so additional
+      // creator scopes belong in later, independently paced turns.
+      const externalScope = authors[0];
       return [
         localCall,
-        ...externalScopes.map((author, index): RecommendedToolCall => ({
+        {
           tool: 'primary_source_search',
           arguments: {
             queries: [{
-              id: author ? `external-creator-${index + 1}` : 'external-topic',
+              id: externalScope ? 'external-creator-1' : 'external-topic',
               text: topic,
               providers: ['ccel'],
               match: 'all_terms',
               selection: 'relevance',
               ...scoped,
-              ...(author ? { author } : {}),
+              ...(externalScope ? { author: externalScope } : {}),
               limit,
             }],
           },
-        })),
+        },
       ];
     }
     case 'donate':
@@ -252,7 +255,7 @@ export function registerPromptHandlers(
           {
             name: 'authors',
             description: contract.contractVersion === '4'
-              ? 'Optional comma-separated creators. Each becomes a separate exact reviewed local creator query and a separate unreviewed external provider restriction; creator roles remain explicit.'
+              ? 'Optional comma-separated creators. Each becomes a separate exact reviewed local creator query; only the first creator is the immediate unreviewed external scope, and later creators require independently paced follow-up calls. Creator roles remain explicit.'
               : 'Optional comma-separated canonical creator names. Each creator becomes a separate query; creator roles remain explicit.',
             required: false,
           },
@@ -365,12 +368,13 @@ Use structured \`passages[]\` when available, compare by its \`translation\`, re
         const work = args?.work?.trim();
         const authors = args?.authors?.split(',').map(value => value.trim()).filter(Boolean) ?? [];
         const externalCalls = calls.slice(1).map(call => callText(call)).join('; then ');
+        const deferredAuthors = authors.slice(1);
         text = contract.contractVersion === '4'
           ? `Research primary-source evidence about "${topic}"${work ? ` within the requested work "${work}"` : ''}${authors.length ? ` for the separately scoped creators ${authors.map(value => `"${value}"`).join(', ')}` : ''}.
 
 1. **Inspect local scope** — Read \`theologai://primary-sources/catalog\` with MCP \`resources/read\`. Its reviewed work and creator metadata describes only the hosted local collection; an absent creator is a local catalog gap, not evidence that no external source exists.
 2. **Search local evidence** — ${callText(calls[0])}. Use local catalog scope and deterministic selection as returned.
-3. **Search external discovery sequentially** — ${externalCalls || 'No external query is needed.'} Each call contains at most one CCEL-bearing query. Do not combine creator comparisons into multiple CCEL queries in one call.
+3. **Search one external scope now** — ${externalCalls || 'No external query is needed.'} This prompt authorizes at most one CCEL-bearing call. Each call contains at most one CCEL-bearing query.${deferredAuthors.length ? ` Defer ${deferredAuthors.map(value => `"${value}"`).join(', ')} to separate later turns.` : ''} If the provider returns \`rate_limited\`, wait at least its structured \`retryAfterSeconds\` before a later call; never retry immediately. Do not combine creator comparisons into multiple CCEL queries in one call.
 4. **Use the v4 contract** — Preserve query/provider/rank order, provider status, notices, \`responseWindow\`, and \`evidencePolicy\`. Local locators are exact readable MCP resources. External locators are direct CCEL URLs only, with unreviewed provider-search metadata and rights status not determined.
 5. **Read before evidence use** — Follow at most ${args?.maxSections?.trim() || '3'} selected locators. Use MCP \`resources/read\` only for local \`mcp_resource\` URIs. Open external \`external_url\` pages directly and verify the page independently. Never quote, compare creators or works, or draw substantive conclusions from any search snippet alone.
 6. **Synthesize with provenance** — Keep reviewed local metadata separate from external provider metadata. Distinguish exact text read from interpretation, name unavailable/unsupported searches, and do not treat missing results as historical silence.`

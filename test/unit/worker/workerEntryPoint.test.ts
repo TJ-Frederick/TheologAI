@@ -145,6 +145,24 @@ describe('Worker Entry Point', () => {
     expect(mockCreateRoot).not.toHaveBeenCalled();
   });
 
+  it('keeps the unprovisioned operator route outside MCP telemetry and rate limiting', async () => {
+    env.THEOLOGAI_REQUEST_LOGS = 'true';
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    try {
+      const response = await worker.fetch(
+        makeRequest('/internal/ccel-coordinator', 'POST', { 'Content-Type': 'application/json' }, '{}'),
+        env as never,
+        ctx,
+      );
+      expect(response.status).toBe(404);
+      expect(env.THEOLOGAI_RATE_LIMITER.limit).not.toHaveBeenCalled();
+      expect(mockCreateRoot).not.toHaveBeenCalled();
+      expect(logSpy).not.toHaveBeenCalled();
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+
   it.each([
     ['/favicon.ico', 'GET', 404, 'Not found'],
     ['/mcp', 'PUT', 405, 'Method not allowed'],

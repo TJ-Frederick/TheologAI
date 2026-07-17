@@ -133,11 +133,21 @@ describe('CcelSearchAdapter coordinated execution', () => {
       now: () => Date.parse('2026-07-16T00:00:00Z'),
       fetchImpl: vi.fn<typeof fetch>().mockResolvedValue(htmlResponse('limited', 429, headers)),
     });
-    await adapter.search(query(), gate);
+    const result = await adapter.search(query(), gate);
+    expect(result).toMatchObject({ status: 'rate_limited', retryAfterSeconds: expectedSeconds });
     expect(gate.recordOutcome).toHaveBeenCalledWith(expect.anything(), {
       kind: 'rate_limited',
       retryAfterSeconds: expectedSeconds,
     });
+  });
+
+  it('returns the coordinator busy interval without an upstream request', async () => {
+    const fetchImpl = vi.fn<typeof fetch>();
+    const result = await testAdapter({ enabled: true, fetchImpl }).search(query(), coordinator({
+      admission: { kind: 'busy', reason: 'minimum_interval', retryAfterSeconds: 7 },
+    }));
+    expect(result).toMatchObject({ status: 'rate_limited', searched: false, retryAfterSeconds: 7 });
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it('emits only bounded content-free admission/outcome telemetry and ignores sink failure', async () => {
