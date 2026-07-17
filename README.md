@@ -239,6 +239,13 @@ link to a canonical allowlisted CCEL exact-section path; tracking query and hash
 values are discarded. Balanced-card parsing uses explicit title/author roles,
 and a no-results marker is accepted only when no competing result structure is
 present. These safeguards do not authorize or enable live use.
+CCEL does not provide reviewed composition-year filtering. The v4 guided
+primary-source workflow therefore keeps any requested year bounds on its local
+queries, sends its single external discovery query without year fields, and
+repeats an explicit warning that CCEL results cannot establish membership in
+the requested historical period. Direct v4 queries that combine CCEL with
+either year field remain `unsupported_filter` before adapter or coordinator
+admission; the public tool schema documents that strict boundary.
 Any future external provider rollout must remain discovery-only until
 edition-specific rights and provider-policy gates are satisfied.
 

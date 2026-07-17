@@ -252,4 +252,13 @@ Local corpus search remains independent if the circuit latches.
 The adapter returns a bounded integer `retryAfterSeconds` on every v4
 `rate_limited` provider result. Guided primary-source research issues at most
 one CCEL-bearing call per prompt materialization and defers additional creator
-scopes to later turns after that interval.
+scopes to later turns after that interval. CCEL cannot enforce reviewed
+composition-year bounds. Guided research retains exact requested bounds on
+hosted-local queries but deliberately omits `startYear` and `endYear` from that
+single external call. Every executable unbounded CCEL provider result begins
+with the invariant notice `CCEL discovery was not composition-date filtered;
+its results cannot establish membership in a requested historical period.`
+The generated workflow repeats the warning while searching and synthesizing
+and names the requested local range. A direct CCEL-bearing query with either
+year field still returns `unsupported_filter` before adapter invocation or
+coordinator admission. This fallback does not infer, add, or validate dates.

@@ -5,6 +5,8 @@
  * MCP tool or a fetch/batch orchestration service.
  */
 
+export const CCEL_COMPOSITION_DATE_NOTICE = 'CCEL discovery was not composition-date filtered; its results cannot establish membership in a requested historical period.';
+
 export type PrimarySourceSearchMatch = 'all_terms' | 'phrase';
 export type PrimarySourceSelection = 'relevance' | 'work_diversity';
 

@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Updated the v4 guided primary-source workflow for CCEL's lack of reviewed
+  composition-date filtering. Requested year bounds remain exact on hosted-
+  local queries; the one external discovery call omits them and repeats a
+  bounded warning at search and synthesis. Direct CCEL queries containing a
+  year bound remain `unsupported_filter` before adapter or coordinator
+  admission. No contract version, rollout flag, or live authorization changed.
+
 - Withheld the Online-Bible-derived TBESH Hebrew `Meaning` field from lookup,
   study, and Strong's-resource output. Exact identities, Hebrew forms,
   transliteration, morphology, lemma, and Tyndale-created brief glosses remain;

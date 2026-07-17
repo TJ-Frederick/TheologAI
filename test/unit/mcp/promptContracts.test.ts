@@ -190,24 +190,47 @@ describe('prompt-recommended tool-call contracts', () => {
     }]);
   });
 
-  it('branches v4 workflows into readable local evidence and sequential external discovery', () => {
+  it.each([
+    ['no dates', {}, {}],
+    ['lower bound only', { startYear: '500' }, { startYear: 500 }],
+    ['upper bound only', { endYear: '1500' }, { endYear: 1500 }],
+    ['both bounds', { startYear: '500', endYear: '1500' }, { startYear: 500, endYear: 1500 }],
+  ])('keeps %s on local calls while making one unbounded, sequential v4 external discovery call', (_label, dateArgs, expectedLocalDates) => {
     const v4 = {
       exposeCcelDiscovery: true, ccelLiveSearch: false, ccelCoordinator: false,
       contractVersion: '4' as const, liveCcelEnabled: false,
     };
     const calls = recommendedToolCallsForPrompt('primary-source-research', {
       topic: 'eucharist', authors: 'Erasmus of Rotterdam, Martin Luther',
-      startYear: '500', endYear: '1500',
+      ...dateArgs,
     }, v4);
-    expect((calls[0]!.arguments.queries as Array<{ providers: string[] }>).every(query => query.providers[0] === 'local')).toBe(true);
+    const localQueries = calls[0]!.arguments.queries as Array<Record<string, unknown>>;
+    expect(localQueries.every(query => (query.providers as string[])[0] === 'local')).toBe(true);
+    expect(localQueries).toHaveLength(2);
+    for (const localQuery of localQueries) expect(localQuery).toMatchObject(expectedLocalDates);
     expect(calls.slice(1)).toHaveLength(1);
-    for (const call of calls.slice(1)) {
-      const queries = call.arguments.queries as Array<{ providers: string[] }>;
-      expect(queries).toHaveLength(1);
-      expect(queries[0]!.providers).toEqual(['ccel']);
-      expect(queries[0]).toMatchObject({ startYear: 500, endYear: 1500 });
-    }
-    expect((calls[1]!.arguments.queries as Array<{ author?: string }>)[0]!.author).toBe('Erasmus of Rotterdam');
+    const externalQueries = calls[1]!.arguments.queries as Array<Record<string, unknown>>;
+    expect(externalQueries).toHaveLength(1);
+    expect(externalQueries[0]).toMatchObject({ providers: ['ccel'], author: 'Erasmus of Rotterdam' });
+    expect(externalQueries[0]).not.toHaveProperty('startYear');
+    expect(externalQueries[0]).not.toHaveProperty('endYear');
+    const validateV4 = validatorFor(createPrimarySourceSearchHandler(unused, v4).inputSchema);
+    for (const call of calls) expect(validateV4(call.arguments).valid).toBe(true);
+  });
+
+  it('retains the optional work restriction in both guided scopes without copying date bounds to CCEL', () => {
+    const v4 = {
+      exposeCcelDiscovery: true, ccelLiveSearch: false, ccelCoordinator: false,
+      contractVersion: '4' as const, liveCcelEnabled: false,
+    };
+    const calls = recommendedToolCallsForPrompt('primary-source-research', {
+      topic: 'sacraments', work: 'Institutes', startYear: '1536', endYear: '1559',
+    }, v4);
+    expect(calls[0]!.arguments).toMatchObject({ queries: [{ work: 'Institutes', startYear: 1536, endYear: 1559 }] });
+    expect(calls[1]!.arguments).toEqual({ queries: [{
+      id: 'external-topic', text: 'sacraments', providers: ['ccel'], match: 'all_terms',
+      selection: 'relevance', work: 'Institutes', limit: 3,
+    }] });
     expect(recommendedToolCallsForPrompt('confession-study', { topic: 'justification' }, v4)[0]!.arguments)
       .toMatchObject({ queries: [{ providers: ['local', 'ccel'] }] });
   });

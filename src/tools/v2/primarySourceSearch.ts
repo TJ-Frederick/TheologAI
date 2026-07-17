@@ -66,13 +66,13 @@ export function createPrimarySourceSearchHandler(
               startYear: {
                 type: 'integer', minimum: -5000, maximum: 3000,
                 description: v4
-                  ? 'Local inclusive composition-overlap lower bound. Unsupported for CCEL and reported as unsupported_filter without an upstream request.'
+                  ? 'Hosted-local inclusive composition-overlap lower bound. A direct query whose providers include ccel cannot use this field: it returns unsupported_filter before adapter or coordinator admission.'
                   : 'Inclusive lower bound. A work is eligible when its reviewed composition interval overlaps the requested interval.',
               },
               endYear: {
                 type: 'integer', minimum: -5000, maximum: 3000,
                 description: v4
-                  ? 'Local inclusive composition-overlap upper bound; must be >= startYear. Unsupported for CCEL and never silently ignored.'
+                  ? 'Hosted-local inclusive composition-overlap upper bound; must be >= startYear. A direct query whose providers include ccel cannot use this field: it returns unsupported_filter before adapter or coordinator admission.'
                   : 'Inclusive upper bound. Must be greater than or equal to startYear when both are provided.',
               },
               page: {

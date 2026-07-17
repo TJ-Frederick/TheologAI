@@ -12,6 +12,7 @@ import {
   type PrimarySourceSearchMatch,
   type PrimarySourceSearchPlanQuery,
   type PrimarySourceSearchPlanResult,
+  CCEL_COMPOSITION_DATE_NOTICE,
 } from './primarySourceTypes.js';
 
 const MAX_QUERIES = 4;
@@ -107,6 +108,16 @@ export class PrimarySourceSearchService {
           resultWindow: { returnedHitCount: 0, additionalMatchStatus: 'not_evaluated' },
         };
       }
+    }
+    if (provider === 'ccel' && result.status !== 'disabled' && query.page === 1
+      && query.startYear === undefined && query.endYear === undefined) {
+      result = {
+        ...result,
+        notices: [
+          CCEL_COMPOSITION_DATE_NOTICE,
+          ...result.notices.filter(notice => notice !== CCEL_COMPOSITION_DATE_NOTICE),
+        ],
+      };
     }
     return {
       ...result,
