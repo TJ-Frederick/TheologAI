@@ -1209,6 +1209,33 @@ describe('original_language_lookup handler', () => {
     expect(textOf(result)).not.toContain('New Testament');
   });
 
+  it('withholds real TBESH Hebrew Meaning from both Markdown and structured exact output', async () => {
+    const source = JSON.parse(readFileSync(new URL('../../../../data/biblical-languages/stepbible-lexicons/tbesh-hebrew.json', import.meta.url), 'utf8')) as Record<string, Record<string, unknown>>;
+    const forbidden = String(source.H9001.definition);
+    const service = new StrongsServiceClass({
+      lookup: async () => undefined,
+      getLexiconEntry: async () => ({ strongs_number: 'H9001', source: 'STEPBible', extended_data: source.H9001 }),
+      search: async () => [],
+      getStats: async () => ({ greek: 0, hebrew: 0, total: 0 }),
+    });
+
+    const result = await createStrongsLookupHandler(service).handler({
+      strongs_number: 'H9001', include_extended: true, detail_level: 'detailed',
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(textOf(result)).toContain('Gloss: &');
+    expect(textOf(result)).toContain('Semantic evidence unavailable');
+    expect(textOf(result)).toContain('Evidence policy');
+    expect(JSON.stringify(result)).not.toContain(forbidden);
+    expect(result.structuredContent).toMatchObject({
+      entries: [{
+        strongsNumber: 'H9001', definition: null, gloss: '&',
+        evidencePolicy: { code: 'tbesh_meaning_withheld', semanticEvidence: 'unavailable' },
+      }],
+    });
+  });
+
   it('returns service validation failures as tool errors', async () => {
     const lookup = vi.fn<StrongsService['lookup']>().mockRejectedValue(
       new ValidationError('strongs_number', 'Expected G#### or H####'),

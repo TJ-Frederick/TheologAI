@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Withheld the Online-Bible-derived TBESH Hebrew `Meaning` field from lookup,
+  study, and Strong's-resource output. Exact identities, Hebrew forms,
+  transliteration, morphology, lemma, and Tyndale-created brief glosses remain;
+  structured and Markdown output now disclose when semantic definition
+  evidence is unavailable instead of fabricating a replacement.
+
 - Added a closed v1 structured contract to all four `classic_text_lookup`
   modes while preserving their Markdown. It exposes the complete local work
   inventory as metadata summaries without body reads or native catalog links;

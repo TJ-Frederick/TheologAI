@@ -334,6 +334,49 @@ describe('Worker MCP endpoint in workerd', () => {
     });
   });
 
+  it('withholds TBESH Meaning across Worker tool, resource, and contextual-study paths', async () => {
+    const forbidden = 'FORBIDDEN ONLINE BIBLE MEANING WORKER SENTINEL';
+    const exact = await rpc('tools/call', {
+      name: 'original_language_lookup',
+      arguments: { strongs_number: 'H9001', include_extended: true, detail_level: 'detailed' },
+    }, 33);
+    expect(exact.response.status).toBe(200);
+    expect(exact.message.error).toBeUndefined();
+    expect(JSON.stringify(exact.message)).not.toContain(forbidden);
+    expect(textContent(exact.message)).toContain('Gloss: &');
+    expect(exact.message.result).toMatchObject({
+      structuredContent: {
+        entries: [{
+          strongsNumber: 'H9001', definition: null, gloss: '&',
+          evidencePolicy: { code: 'tbesh_meaning_withheld', semanticEvidence: 'unavailable' },
+        }],
+      },
+    });
+
+    const resource = await rpc('resources/read', { uri: 'theologai://strongs/H9001' }, 34);
+    expect(resource.response.status).toBe(200);
+    expect(JSON.stringify(resource.message)).not.toContain(forbidden);
+    expect(JSON.stringify(resource.message)).toContain('Evidence policy');
+
+    const study = await rpc('tools/call', {
+      name: 'original_language_study',
+      arguments: { reference: 'Genesis 1:1', target: 'H9001' },
+    }, 35);
+    expect(study.response.status).toBe(200);
+    expect(study.message.error).toBeUndefined();
+    expect(JSON.stringify(study.message)).not.toContain(forbidden);
+    expect(textContent(study.message)).toContain('TBESH Meaning field is withheld');
+    expect(study.message.result).toMatchObject({
+      structuredContent: {
+        status: 'partial',
+        lexiconEvidence: [{
+          kind: 'stepbible_lexicon', gloss: '&',
+          evidencePolicy: { code: 'tbesh_meaning_withheld', semanticEvidence: 'unavailable' },
+        }],
+      },
+    });
+  });
+
   it('lists the document fixture dynamically and reads its D1-backed resource', async () => {
     const listed = await rpc('resources/list');
 

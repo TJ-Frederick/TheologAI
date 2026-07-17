@@ -25,6 +25,8 @@ const STEP_BIBLE_CITATION: Citation = {
   url: 'https://github.com/STEPBible/STEPBible-Data',
 };
 
+export const TBESH_MEANING_WITHHELD_NOTICE = 'The Online-Bible-derived TBESH Meaning field is withheld because its source notice requires permission for project use. Hebrew identity, form, transliteration, morphology, lemma, and the Tyndale-created brief gloss remain available; no replacement definition or contextual sense is inferred.';
+
 interface StepBibleLexiconData {
   extendedStrongs?: unknown;
   gloss?: unknown;
@@ -71,8 +73,11 @@ export class StrongsService {
     if (includeExtended) {
       if (lexicon) {
         const data = lexicon.extended_data as StepBibleLexiconData;
-        result.extended = extendedFromLexicon(data, lexicon.source);
+        result.extended = extendedFromLexicon(data, lexicon.source, identity.prefix);
         result.extendedCitation = STEP_BIBLE_CITATION;
+        if (identity.prefix === 'H') {
+          result.evidencePolicy = tbeshEvidencePolicy('base_dictionary_only');
+        }
       }
     }
 
@@ -207,11 +212,16 @@ function resultFromStepBible(
 ): EnhancedStrongsResult {
   const data = lexicon.extended_data as StepBibleLexiconData;
   const lemma = stringValue(data.lemma);
-  const rawDefinition = stringValue(data.definition) ?? stringValue(data.gloss);
-  if (!lemma || !rawDefinition) {
+  if (!lemma) {
     throw new NotFoundError('strongs', `Strong's number ${publicId} has no complete lexicon entry`);
   }
-  const definition = normalizeLexiconText(rawDefinition);
+  const rawDefinition = prefix === 'G'
+    ? stringValue(data.definition) ?? stringValue(data.gloss)
+    : undefined;
+  if (prefix === 'G' && !rawDefinition) {
+    throw new NotFoundError('strongs', `Strong's number ${publicId} has no complete lexicon entry`);
+  }
+  const definition = rawDefinition ? normalizeLexiconText(rawDefinition) : null;
   const result: EnhancedStrongsResult = {
     strongs_number: publicId,
     testament: null,
@@ -221,19 +231,35 @@ function resultFromStepBible(
     definition,
     citation: STEP_BIBLE_CITATION,
     sourceKind: 'stepbible_lexicon',
+    ...(prefix === 'H' ? { evidencePolicy: tbeshEvidencePolicy('unavailable') } : {}),
   };
-  if (includeExtended) result.extended = extendedFromLexicon(data, lexicon.source);
+  if (includeExtended) result.extended = extendedFromLexicon(data, lexicon.source, prefix);
   return result;
 }
 
-function extendedFromLexicon(data: StepBibleLexiconData, fallbackSource: string): NonNullable<EnhancedStrongsResult['extended']> {
+function extendedFromLexicon(
+  data: StepBibleLexiconData,
+  fallbackSource: string,
+  prefix: 'G' | 'H',
+): NonNullable<EnhancedStrongsResult['extended']> {
   return {
     strongsExtended: stringValue(data.extendedStrongs),
     gloss: stringValue(data.gloss),
-    definition: stringValue(data.definition),
+    ...(prefix === 'G' ? { definition: stringValue(data.definition) } : {}),
     morphologyCode: stringValue(data.morph),
     source: stringValue(data.source) ?? fallbackSource,
-    senses: isSenseRecord(data.senses) ? data.senses : undefined,
+    ...(isSenseRecord(data.senses) ? { senses: data.senses } : {}),
+  };
+}
+
+function tbeshEvidencePolicy(
+  semanticEvidence: 'base_dictionary_only' | 'unavailable',
+): NonNullable<EnhancedStrongsResult['evidencePolicy']> {
+  return {
+    code: 'tbesh_meaning_withheld',
+    semanticEvidence,
+    withheldFields: ['tbesh_meaning'],
+    notice: TBESH_MEANING_WITHHELD_NOTICE,
   };
 }
 

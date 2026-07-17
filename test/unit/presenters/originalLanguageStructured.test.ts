@@ -116,6 +116,49 @@ describe('original-language structured presenter', () => {
     })]);
   });
 
+  it('represents withheld TBESH Meaning as null and preserves only approved Hebrew evidence', () => {
+    const forbidden = 'FORBIDDEN ONLINE BIBLE MEANING';
+    const result = presentOriginalLanguageEntry({
+      strongs_number: 'H9001', testament: null, language: 'Hebrew', lemma: '/וַ',
+      transliteration: '/wa', definition: null, sourceKind: 'stepbible_lexicon',
+      citation: { source: 'STEPBible lexicon data', copyright: 'CC BY 4.0 (Tyndale House, Cambridge)' },
+      extended: { strongsExtended: 'H9001', gloss: '&', morphologyCode: 'H:C', source: 'TBESH' },
+      evidencePolicy: {
+        code: 'tbesh_meaning_withheld', semanticEvidence: 'unavailable',
+        withheldFields: ['tbesh_meaning'], notice: 'TBESH Meaning is withheld; no replacement is inferred.',
+      },
+    }, 'detailed');
+
+    expect(result.entries[0]).toMatchObject({
+      strongsNumber: 'H9001', language: 'Hebrew', definition: null, gloss: '&',
+      extended: { strongsExtended: 'H9001', morphologyCode: 'H:C', lexicon: 'TBESH' },
+      evidencePolicy: { code: 'tbesh_meaning_withheld', semanticEvidence: 'unavailable' },
+    });
+    expect(result.entries[0].extended).not.toHaveProperty('definition');
+    expect(result.provenance[0].note).toContain('no replacement is inferred');
+    expect(JSON.stringify(result)).not.toContain(forbidden);
+  });
+
+  it('does not qualify a safe OpenScriptures definition with the TBESH rights notice', () => {
+    const result = presentOriginalLanguageEntry({
+      strongs_number: 'H430', testament: 'OT', lemma: 'אֱלֹהִים', definition: 'God, gods',
+      citation: { source: "Strong's Concordance", copyright: 'Public Domain (OpenScriptures)' },
+      extendedCitation: { source: 'STEPBible lexicon data', copyright: 'CC BY 4.0 (Tyndale House, Cambridge)' },
+      extended: { strongsExtended: 'H0430', gloss: 'God/gods', morphologyCode: 'H:N-MP' },
+      evidencePolicy: {
+        code: 'tbesh_meaning_withheld', semanticEvidence: 'base_dictionary_only',
+        withheldFields: ['tbesh_meaning'], notice: 'TBESH Meaning is withheld.',
+      },
+    }, 'detailed');
+
+    expect(result.entries[0]).toMatchObject({
+      definition: 'God, gods', gloss: 'God/gods',
+      evidencePolicy: { semanticEvidence: 'base_dictionary_only' },
+    });
+    expect(result.provenance[0]).not.toHaveProperty('note');
+    expect(result.provenance[1].note).toBe('TBESH Meaning is withheld.');
+  });
+
   it('presents exact corrected-corpus usage with separate morphology provenance', () => {
     const result = presentOriginalLanguageEntry({
       strongs_number: 'H430', testament: 'OT', lemma: 'אֱלֹהִים', definition: 'God, gods',

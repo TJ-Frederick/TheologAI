@@ -123,6 +123,10 @@ export class OriginalLanguageStudyService {
         ...(lexical.pronunciation ? { pronunciation: lexical.pronunciation } : {}),
         joinKind: lexicalIdentity?.publicId === identity.publicId ? 'exact' : lexicalIdentity?.number === identity.number ? 'base' : 'none',
       };
+      if (lexical.evidencePolicy) {
+        if (lexical.evidencePolicy.semanticEvidence === 'unavailable') result.status = 'partial';
+        result.warnings.push(lexical.evidencePolicy.notice);
+      }
       if (!result.stepBible) {
         result.status = 'partial';
         result.warnings.push('No separate STEPBible lexicon evidence is available for this identity.');

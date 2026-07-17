@@ -239,8 +239,16 @@ export function createTheologAiMcpServer(
               ? 'New Testament (Greek)'
               : 'Not classified (source-language lexicon identity)'}`,
           `\n## Definition\n`,
-          entry.definition,
+          entry.definition ?? 'Semantic evidence unavailable from the retained Hebrew lexicon fields.',
         ];
+
+        if (entry.evidencePolicy && entry.extended?.gloss) {
+          lines.push(`\n## Brief gloss\n`, entry.extended.gloss);
+        }
+
+        if (entry.evidencePolicy) {
+          lines.push(`\n## Evidence policy\n`, entry.evidencePolicy.notice);
+        }
 
         if (entry.derivation) {
           lines.push(`\n## Derivation\n`, entry.derivation);

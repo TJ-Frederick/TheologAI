@@ -105,6 +105,24 @@ describe('formatStrongsResult', () => {
     expect(out).toContain('**Definition:** love, goodwill');
   });
 
+  it('discloses unavailable Hebrew semantic evidence without inventing a definition', () => {
+    const forbidden = 'FORBIDDEN ONLINE BIBLE MEANING';
+    const out = formatStrongsResult(makeStrongsResult({
+      strongs_number: 'H9001', testament: null, language: 'Hebrew', lemma: '/וַ',
+      transliteration: '/wa', pronunciation: undefined, definition: null,
+      extended: { strongsExtended: 'H9001', gloss: '&', morphologyCode: 'H:C' },
+      evidencePolicy: {
+        code: 'tbesh_meaning_withheld', semanticEvidence: 'unavailable',
+        withheldFields: ['tbesh_meaning'], notice: 'TBESH Meaning is withheld.',
+      },
+    }));
+
+    expect(out).toContain('Semantic evidence unavailable');
+    expect(out).toContain('Gloss: &');
+    expect(out).toContain('**Evidence policy:** TBESH Meaning is withheld.');
+    expect(out).not.toContain(forbidden);
+  });
+
   it('omits transliteration when null', () => {
     const out = formatStrongsResult(makeStrongsResult({ transliteration: undefined }));
     expect(out).not.toContain('**Transliteration:**');
