@@ -892,8 +892,10 @@ describe('shared MCP registration', () => {
     expect(argumentDescription('work')).toContain('unreviewed external provider work restriction');
     expect(argumentDescription('authors')).toContain('only the first creator is the immediate unreviewed external scope');
     expect(argumentDescription('authors')).toContain('independently paced follow-up calls');
-    expect(argumentDescription('startYear')).toContain('return unsupported_filter without upstream admission');
-    expect(argumentDescription('endYear')).toContain('return unsupported_filter without upstream admission');
+    expect(argumentDescription('startYear')).toContain('guided external fallback deliberately omits this bound');
+    expect(argumentDescription('startYear')).toContain('direct CCEL query containing it returns unsupported_filter');
+    expect(argumentDescription('endYear')).toContain('guided external fallback deliberately omits this bound');
+    expect(argumentDescription('endYear')).toContain('direct CCEL query containing it returns unsupported_filter');
     const primary = await client.getPrompt({
       name: 'primary-source-research',
       arguments: {
@@ -905,14 +907,40 @@ describe('shared MCP registration', () => {
     expect(primaryText).toContain('Use MCP `resources/read` only for local `mcp_resource` URIs');
     expect(primaryText).toContain('Open external `external_url` pages directly');
     expect(primaryText).toContain('Each call contains at most one CCEL-bearing query');
-    expect(primaryText).toContain('"startYear":500,"endYear":1500');
+    expect(primaryText).toContain('"providers":["local"],"match":"all_terms","selection":"work_diversity","startYear":500,"endYear":1500');
+    expect(primaryText).toContain('"providers":["ccel"],"match":"all_terms","selection":"relevance","author":"Erasmus of Rotterdam"');
+    expect(primaryText.match(/The external CCEL call deliberately omits the requested local composition-year bounds; any returned CCEL hit cannot establish membership in that requested local range\./g)).toHaveLength(2);
+    expect(primaryText).not.toContain('CCEL discovery was not composition-date filtered');
+    expect(primaryText.match(/The requested hosted-local composition range is 500 through 1500, inclusive\./g)).toHaveLength(2);
+    expect(primaryText).toContain('name disabled, unavailable, or unsupported searches');
     expect(primaryText).toContain('Never quote, compare creators or works, or draw substantive conclusions from any search snippet alone');
+
+    for (const [dateArguments, localJson, scopeText, warningText] of [
+      [{}, '', 'No hosted-local composition-year range was requested.', 'CCEL does not provide composition-date filtering; any returned hit is not composition-date evidence.'],
+      [{ startYear: '500' }, ',"startYear":500', 'The requested hosted-local composition range begins at 500 and has no upper bound.', 'The external CCEL call deliberately omits the requested local composition-year bounds; any returned CCEL hit cannot establish membership in that requested local range.'],
+      [{ endYear: '1500' }, ',"endYear":1500', 'The requested hosted-local composition range ends at 1500 and has no lower bound.', 'The external CCEL call deliberately omits the requested local composition-year bounds; any returned CCEL hit cannot establish membership in that requested local range.'],
+    ] as const) {
+      const rendered = await client.getPrompt({
+        name: 'primary-source-research',
+        arguments: { topic: 'eucharist', ...dateArguments },
+      });
+      const text = rendered.messages[0]?.content.type === 'text' ? rendered.messages[0].content.text : '';
+      expect(text).toContain(`"selection":"work_diversity"${localJson},"limit":3`);
+      expect(text).toContain('"providers":["ccel"],"match":"all_terms","selection":"relevance","limit":3');
+      expect(text.match(new RegExp(scopeText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'))).toHaveLength(2);
+      expect(text.match(new RegExp(warningText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'))).toHaveLength(2);
+      expect(text).not.toContain('CCEL discovery was not composition-date filtered');
+      expect(text).toContain('name disabled, unavailable, or unsupported searches');
+    }
 
     const confession = await client.getPrompt({ name: 'confession-study', arguments: { topic: 'justification' } });
     const confessionText = confession.messages[0]?.content.type === 'text' ? confession.messages[0].content.text : '';
     expect(confessionText).toContain('external `external_url` locator');
     expect(confessionText).toContain('it is not an MCP resource');
     expect(confessionText).toContain('rights status is not determined');
+    expect(confessionText.match(/CCEL does not provide composition-date filtering; any returned hit is not composition-date evidence\./g)).toHaveLength(2);
+    expect(confessionText).not.toContain('CCEL discovery was not composition-date filtered');
+    expect(confessionText).toContain('Name any disabled, unavailable, or unsupported provider');
   });
 
   it('rejects tool/prompt contract divergence at server construction', () => {

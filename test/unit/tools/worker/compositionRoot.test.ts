@@ -227,6 +227,32 @@ describe('createWorkerCompositionRoot', () => {
       // itself never instantiates the named object.
       expect(getByName).not.toHaveBeenCalled();
     });
+
+    it.each([
+      { startYear: 500 },
+      { endYear: 1500 },
+      { startYear: 500, endYear: 1500 },
+    ])('rejects direct date-filtered CCEL input before Worker adapter or coordinator admission (%o)', async dateBounds => {
+      const getByName = vi.fn();
+      const root = createWorkerCompositionRoot(makeEnv({
+        THEOLOGAI_EXPOSE_CCEL_DISCOVERY: 'true',
+        THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH: 'true',
+        THEOLOGAI_ENABLE_CCEL_COORDINATOR: 'true',
+        THEOLOGAI_CCEL_COORDINATOR: { getByName } as any,
+      }));
+      const tool = root.tools.find(candidate => candidate.name === 'primary_source_search')!;
+
+      const result = await tool.handler({
+        queries: [{ id: 'remote', text: 'grace', providers: ['ccel'], ...dateBounds }],
+      });
+
+      expect(result.structuredContent).toMatchObject({
+        queries: [{ providers: [{ provider: 'ccel_live', status: 'unsupported_filter', searched: false }] }],
+      });
+      expect(JSON.stringify(result)).not.toContain('CCEL discovery was not composition-date filtered');
+      expect(primarySourceMocks.search).not.toHaveBeenCalled();
+      expect(getByName).not.toHaveBeenCalled();
+    });
   });
 
   describe('service exposure', () => {

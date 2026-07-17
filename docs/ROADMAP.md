@@ -387,6 +387,12 @@ Code readiness and operational readiness are deliberately separate:
   full-content scraping, body retrieval, mirroring, hosting, republication, or
   durable CCEL content storage. This does not claim CCEL separately licenses
   snippets. Applicable operational and terms boundaries remain release gates.
+  Because CCEL cannot enforce composition-year bounds, the owner approved a
+  guided broad topical fallback: retain exact year bounds on hosted-local
+  queries, omit them from the one external call, and warn at search and
+  synthesis that CCEL results cannot establish membership in the requested
+  historical period. Direct CCEL-plus-year tool input remains fail-closed as
+  `unsupported_filter` before adapter or coordinator admission.
   Immediately before any live preview canary, recheck the current CCEL search
   interface, robots guidance, copyright policy, and operational/terms boundary;
   record that evidence and repeat the owner decision. Until then preview stays
@@ -433,6 +439,7 @@ Code readiness and operational readiness are deliberately separate:
   only; production remains v3/local-only. A future live discovery rollout
   requires the explicit owner policy decision above and separate review, and
   must not become crawling, catalog mirroring, body republication, or permanent
-  storage.
+  storage. Date-fallback contract work does not change any rollout flag or
+  authorize a live request.
 - Public Ethereum RPC endpoints are light-use defaults, not an uptime SLO.
   Donation verification remains fail-closed.

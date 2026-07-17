@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { presentPrimarySourceSearchV4 } from '../../../src/presenters/primarySourceSearchV4Structured.js';
 import type { PrimarySourceSearchPlanResult } from '../../../src/services/historical/primarySourceTypes.js';
+import { CCEL_COMPOSITION_DATE_NOTICE } from '../../../src/services/historical/primarySourceTypes.js';
 
 function localHit(queryId: string, rank: number, marker = '') {
   const sectionId = `${queryId}-${rank}`;
@@ -86,6 +87,46 @@ function largePlan(): PrimarySourceSearchPlanResult {
 }
 
 describe('primary-source v4 structured presentation', () => {
+  it('defensively prepends the date invariant to every executable external provider result', () => {
+    const plan = largePlan();
+    const external = externalProvider('external', 1);
+    external.notices = ['Provider-specific notice.'];
+    plan.queries = [{ id: 'external', normalizedMode: 'all_terms', normalizedSelection: 'relevance', providers: [external] }];
+    plan.coverage = { localAttempted: false, localHitCount: 0, ccelAttempted: true, ccelStatus: 'ok', ccelHitCount: 1, notices: [] };
+
+    const presented = presentPrimarySourceSearchV4(plan);
+
+    expect(presented.queries[0]!.providers[0]!.notices).toEqual([
+      CCEL_COMPOSITION_DATE_NOTICE,
+      'Provider-specific notice.',
+    ]);
+    expect(presented.coverage.notices[0]).toBe(CCEL_COMPOSITION_DATE_NOTICE);
+  });
+
+  it('does not attach the unbounded-search warning to a rejected date-filtered CCEL query', () => {
+    const plan = largePlan();
+    const external = externalProvider('external', 0);
+    external.status = 'unsupported_filter';
+    external.searched = false;
+    external.notices = ['Live CCEL discovery does not expose reviewed composition-date bounds.'];
+    plan.queries = [{ id: 'external', normalizedMode: 'all_terms', normalizedSelection: 'relevance', providers: [external] }];
+
+    const provider = presentPrimarySourceSearchV4(plan).queries[0]!.providers[0]!;
+    expect(provider.notices).not.toContain(CCEL_COMPOSITION_DATE_NOTICE);
+  });
+
+  it('does not imply an unbounded search occurred when the external provider is disabled', () => {
+    const plan = largePlan();
+    const external = externalProvider('external', 0);
+    external.status = 'disabled' as never;
+    external.searched = false;
+    external.notices = ['Live CCEL search is disabled. No remote request was made.'];
+    plan.queries = [{ id: 'external', normalizedMode: 'all_terms', normalizedSelection: 'relevance', providers: [external] }];
+
+    const provider = presentPrimarySourceSearchV4(plan).queries[0]!.providers[0]!;
+    expect(provider.notices).not.toContain(CCEL_COMPOSITION_DATE_NOTICE);
+  });
+
   it('publishes bounded retry guidance only for a rate-limited external provider', () => {
     const plan = largePlan();
     const external = externalProvider('external', 0) as ReturnType<typeof externalProvider> & { retryAfterSeconds?: number };

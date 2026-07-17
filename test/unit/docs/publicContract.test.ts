@@ -169,12 +169,14 @@ describe('published project contract', () => {
   });
 
   it('does not reintroduce retired scope claims', async () => {
-    const [readme, historicalTestReport, historicalArchitecture, historicalDevelopment, workerConfig] = await Promise.all([
+    const [readme, historicalTestReport, historicalArchitecture, historicalDevelopment, workerConfig, coordinatorGuide, roadmap] = await Promise.all([
       readProjectFile('README.md'),
       readProjectFile('TEST_REPORT.md'),
       readProjectFile('docs/bible-mcp-architecture.md'),
       readProjectFile('docs/bible-mcp-development-plan.md'),
       readProjectFile('wrangler.toml'),
+      readProjectFile('docs/CCEL-UPSTREAM-COORDINATOR.md'),
+      readProjectFile('docs/ROADMAP.md'),
     ]);
 
     expect(readme).not.toMatch(/1,000\+.*CCEL/i);
@@ -188,6 +190,12 @@ describe('published project contract', () => {
     expect(readme).toContain('Durable Object lookup/RPC, or fetch');
     expect(readme).toContain('reconnect');
     expect(readme).toContain('reinitialize');
+    expect(readme).toMatch(/keeps any requested year bounds on its local\s+queries/);
+    expect(readme).toMatch(/Direct v4 queries that combine CCEL with\s+either year field/);
+    expect(coordinatorGuide).toContain('Every executable unbounded CCEL provider result begins');
+    expect(coordinatorGuide).toContain('A direct CCEL-bearing query with either');
+    expect(roadmap).toContain('guided broad topical fallback');
+    expect(roadmap).toContain('Direct CCEL-plus-year tool input remains fail-closed');
     const primarySourceToolRow = readme.split('\n')
       .find(line => line.startsWith('| `primary_source_search` |'));
     expect(primarySourceToolRow).toContain('Production is v3/local-only');

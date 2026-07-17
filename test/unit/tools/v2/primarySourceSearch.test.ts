@@ -508,8 +508,10 @@ describe('primary_source_search v4 contract', () => {
     expect(query.properties.selection.description).toContain('CCEL discovery');
     expect(query.properties.author.description).toContain('unreviewed provider search restriction');
     expect(query.properties.work.description).toContain('unreviewed provider');
-    expect(query.properties.startYear.description).toContain('Unsupported for CCEL');
-    expect(query.properties.endYear.description).toContain('Unsupported for CCEL');
+    expect(query.properties.startYear.description).toContain('direct query whose providers include ccel');
+    expect(query.properties.startYear.description).toContain('before adapter or coordinator admission');
+    expect(query.properties.endYear.description).toContain('direct query whose providers include ccel');
+    expect(query.properties.endYear.description).toContain('before adapter or coordinator admission');
     expect(query.properties.page.description).toContain('page 1 only');
     expect(query.properties.limit.description).toContain('capped at 5');
     expect(validatorFor(handler.inputSchema)({ queries: [{ id: 'q', text: 'faith', providers: ['ccel'] }] }).valid).toBe(true);

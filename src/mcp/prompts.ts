@@ -14,6 +14,8 @@ export interface RecommendedToolCall {
 }
 
 const TRANSLATIONS = new Set(['ESV', 'NET', 'KJV', 'WEB', 'BSB', 'ASV', 'YLT', 'DBY']);
+const CCEL_DATE_CAPABILITY_NOTICE = 'CCEL does not provide composition-date filtering; any returned hit is not composition-date evidence.';
+const CCEL_DATED_FALLBACK_NOTICE = 'The external CCEL call deliberately omits the requested local composition-year bounds; any returned CCEL hit cannot establish membership in that requested local range.';
 
 /**
  * The upstream SDK's strict string record throws an unclassified ZodError before
@@ -143,6 +145,9 @@ export function recommendedToolCallsForPrompt(
         ...(startYear !== undefined ? { startYear } : {}),
         ...(endYear !== undefined ? { endYear } : {}),
       };
+      const externalScope = {
+        ...(work ? { work } : {}),
+      };
       const localCall: RecommendedToolCall = {
         tool: 'primary_source_search',
         arguments: {
@@ -162,20 +167,20 @@ export function recommendedToolCallsForPrompt(
       // A prompt materialization may authorize only one cold CCEL attempt. The
       // shared coordinator enforces a global origin interval, so additional
       // creator scopes belong in later, independently paced turns.
-      const externalScope = authors[0];
+      const externalAuthor = authors[0];
       return [
         localCall,
         {
           tool: 'primary_source_search',
           arguments: {
             queries: [{
-              id: externalScope ? 'external-creator-1' : 'external-topic',
+              id: externalAuthor ? 'external-creator-1' : 'external-topic',
               text: topic,
               providers: ['ccel'],
               match: 'all_terms',
               selection: 'relevance',
-              ...scoped,
-              ...(externalScope ? { author: externalScope } : {}),
+              ...externalScope,
+              ...(externalAuthor ? { author: externalAuthor } : {}),
               limit,
             }],
           },
@@ -262,14 +267,14 @@ export function registerPromptHandlers(
           {
             name: 'startYear',
             description: contract.contractVersion === '4'
-              ? 'Optional inclusive local composition-year lower bound as an integer string. CCEL does not support this filter, so external calls return unsupported_filter without upstream admission.'
+              ? 'Optional inclusive hosted-local composition-year lower bound as an integer string. The guided external fallback deliberately omits this bound and warns that CCEL results are not date-filtered; a direct CCEL query containing it returns unsupported_filter without upstream admission.'
               : 'Optional inclusive composition-year lower bound as an integer string.',
             required: false,
           },
           {
             name: 'endYear',
             description: contract.contractVersion === '4'
-              ? 'Optional inclusive local composition-year upper bound as an integer string. CCEL does not support this filter, so external calls return unsupported_filter without upstream admission.'
+              ? 'Optional inclusive hosted-local composition-year upper bound as an integer string. The guided external fallback deliberately omits this bound and warns that CCEL results are not date-filtered; a direct CCEL query containing it returns unsupported_filter without upstream admission.'
               : 'Optional inclusive composition-year upper bound as an integer string.',
             required: false,
           },
@@ -348,11 +353,11 @@ Use structured \`passages[]\` when available, compare by its \`translation\`, re
           ? `Cross-tradition doctrinal comparison on "${topic}".${hint}
 
 1. **Inspect the hosted catalog** — Read \`theologai://primary-sources/catalog\` with MCP \`resources/read\`. Its reviewed metadata applies only to the hosted local collection.
-2. **Run bounded discovery** — ${callText(calls[0])}. Preserve local and external provider groups separately. The requested traditions are comparison interests, not creator filters or inferred metadata.
+2. **Run bounded discovery** — ${callText(calls[0])}. ${CCEL_DATE_CAPABILITY_NOTICE} Preserve local and external provider groups separately. The requested traditions are comparison interests, not creator filters or inferred metadata.
 3. **Use snippets only to select evidence** — Every snippet is discovery-only. For a local \`mcp_resource\` locator, read the exact URI with MCP \`resources/read\` before quotation or substantive comparison. For an external \`external_url\` locator, open the direct URL independently; it is not an MCP resource and its rights status is not determined.
 4. **Do not promote external metadata** — CCEL titles, creators, section labels, and snippets are unreviewed provider search results. Never quote, attribute doctrine, or compare positions from those snippets alone.
 5. **Read exact evidence** — Read at most five unique selected sections total. Confirm each local resource URI or external page identity before using its content, and keep local reviewed metadata distinct from external provider metadata.
-6. **Compare cautiously** — Explain agreement, divergence, Scripture use, and historical context only from exact sections actually read. Missing hits are not historical silence.`
+6. **Compare cautiously** — ${CCEL_DATE_CAPABILITY_NOTICE} Name any disabled, unavailable, or unsupported provider before drawing conclusions. Explain agreement, divergence, Scripture use, and historical context only from exact sections actually read. Missing hits are not historical silence.`
           : `Cross-tradition doctrinal comparison on "${topic}".${hint}
 
 1. **Inspect the hosted catalog** — Read \`theologai://primary-sources/catalog\` with MCP \`resources/read\`. Use only its reviewed work and creator metadata to plan the comparison; aliases route exact work lookups but are not metadata evidence. Do not substitute another creator or work for one absent from this catalog.
@@ -369,15 +374,30 @@ Use structured \`passages[]\` when available, compare by its \`translation\`, re
         const authors = args?.authors?.split(',').map(value => value.trim()).filter(Boolean) ?? [];
         const externalCalls = calls.slice(1).map(call => callText(call)).join('; then ');
         const deferredAuthors = authors.slice(1);
+        const startYear = args?.startYear === undefined ? undefined : Number(args.startYear.trim());
+        const endYear = args?.endYear === undefined ? undefined : Number(args.endYear.trim());
+        const localDateScope = startYear !== undefined && endYear !== undefined
+          ? `The requested hosted-local composition range is ${startYear} through ${endYear}, inclusive.`
+          : startYear !== undefined
+            ? `The requested hosted-local composition range begins at ${startYear} and has no upper bound.`
+            : endYear !== undefined
+              ? `The requested hosted-local composition range ends at ${endYear} and has no lower bound.`
+              : 'No hosted-local composition-year range was requested.';
+        const externalDateSafeguard = startYear !== undefined || endYear !== undefined
+          ? CCEL_DATED_FALLBACK_NOTICE
+          : CCEL_DATE_CAPABILITY_NOTICE;
+        const externalDateCallInstruction = startYear !== undefined || endYear !== undefined
+          ? 'Do not add either year field to the external call.'
+          : 'Do not add `startYear` or `endYear` to the external call because CCEL cannot enforce them.';
         text = contract.contractVersion === '4'
           ? `Research primary-source evidence about "${topic}"${work ? ` within the requested work "${work}"` : ''}${authors.length ? ` for the separately scoped creators ${authors.map(value => `"${value}"`).join(', ')}` : ''}.
 
 1. **Inspect local scope** — Read \`theologai://primary-sources/catalog\` with MCP \`resources/read\`. Its reviewed work and creator metadata describes only the hosted local collection; an absent creator is a local catalog gap, not evidence that no external source exists.
-2. **Search local evidence** — ${callText(calls[0])}. Use local catalog scope and deterministic selection as returned.
-3. **Search one external scope now** — ${externalCalls || 'No external query is needed.'} This prompt authorizes at most one CCEL-bearing call. Each call contains at most one CCEL-bearing query.${deferredAuthors.length ? ` Defer ${deferredAuthors.map(value => `"${value}"`).join(', ')} to separate later turns.` : ''} If the provider returns \`rate_limited\`, wait at least its structured \`retryAfterSeconds\` before a later call; never retry immediately. Do not combine creator comparisons into multiple CCEL queries in one call.
+2. **Search local evidence** — ${callText(calls[0])}. Use local catalog scope and deterministic selection as returned. ${localDateScope}
+3. **Search one external scope now** — ${externalCalls || 'No external query is needed.'} ${externalDateSafeguard} ${externalDateCallInstruction} This prompt authorizes at most one CCEL-bearing call. Each call contains at most one CCEL-bearing query.${deferredAuthors.length ? ` Defer ${deferredAuthors.map(value => `"${value}"`).join(', ')} to separate later turns.` : ''} If the provider returns \`rate_limited\`, wait at least its structured \`retryAfterSeconds\` before a later call; never retry immediately. Do not combine creator comparisons into multiple CCEL queries in one call.
 4. **Use the v4 contract** — Preserve query/provider/rank order, provider status, notices, \`responseWindow\`, and \`evidencePolicy\`. Local locators are exact readable MCP resources. External locators are direct CCEL URLs only, with unreviewed provider-search metadata and rights status not determined.
 5. **Read before evidence use** — Follow at most ${args?.maxSections?.trim() || '3'} selected locators. Use MCP \`resources/read\` only for local \`mcp_resource\` URIs. Open external \`external_url\` pages directly and verify the page independently. Never quote, compare creators or works, or draw substantive conclusions from any search snippet alone.
-6. **Synthesize with provenance** — Keep reviewed local metadata separate from external provider metadata. Distinguish exact text read from interpretation, name unavailable/unsupported searches, and do not treat missing results as historical silence.`
+6. **Synthesize with provenance** — ${localDateScope} ${externalDateSafeguard} Keep reviewed local metadata separate from external provider metadata. Distinguish exact text read from interpretation, name disabled, unavailable, or unsupported searches, and do not treat missing results as historical silence.`
           : `Research primary-source evidence about "${topic}"${work ? ` within the exact local work "${work}"` : ' across the locally indexed collection'}${authors.length ? ` for the separately scoped creators ${authors.map(value => `"${value}"`).join(', ')}` : ''}.
 
 1. **Inspect the hosted catalog** — Read \`theologai://primary-sources/catalog\` with MCP \`resources/read\`. Confirm requested exact works and creator names there before searching. If Calvin, Erasmus, Luther, or any other requested creator is absent, report that catalog gap; never use a confession or similarly themed work as a proxy.

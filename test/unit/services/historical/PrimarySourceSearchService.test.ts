@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { PrimarySourceSearchService } from '../../../../src/services/historical/PrimarySourceSearchService.js';
 import type { PrimarySourceProviderResult } from '../../../../src/services/historical/primarySourceTypes.js';
+import { CCEL_COMPOSITION_DATE_NOTICE } from '../../../../src/services/historical/primarySourceTypes.js';
 import { readPrimarySourceContractConfig } from '../../../../src/kernel/featureFlags.js';
 
 function providerResult(provider: 'local' | 'ccel_live', status: PrimarySourceProviderResult['status'] = 'ok', count = 1): PrimarySourceProviderResult {
@@ -107,6 +108,7 @@ describe('PrimarySourceSearchService', () => {
     const service = new PrimarySourceSearchService({ search: vi.fn() } as any, ccel as any, dormant);
     const result = await service.search(plan([query({ providers: ['ccel'] })]));
     expect(result).toMatchObject({ planStatus: 'unavailable', coverage: { ccelAttempted: false, ccelStatus: 'disabled' } });
+    expect(result.queries[0]!.providers[0]!.notices).not.toContain(CCEL_COMPOSITION_DATE_NOTICE);
     expect(ccel.search).not.toHaveBeenCalled();
   });
 
@@ -114,15 +116,59 @@ describe('PrimarySourceSearchService', () => {
     { page: 2 },
     { startYear: 1200 },
     { endYear: 1600 },
+    { startYear: 1200, endYear: 1600 },
   ])('classifies unsupported CCEL filters before admission or provider work (%o)', async unsupported => {
     const ccel = { search: vi.fn() };
     const gate = { admit: vi.fn(), recordOutcome: vi.fn(), snapshot: vi.fn() } as any;
     const service = new PrimarySourceSearchService({ search: vi.fn() } as any, ccel as any, live, gate);
     const result = await service.search(plan([query({ providers: ['ccel'], ...unsupported })]));
     expect(result).toMatchObject({ planStatus: 'partial', queries: [{ providers: [{ status: 'unsupported_filter', searched: false }] }] });
+    expect(result.queries[0]!.providers[0]!.notices).not.toContain(CCEL_COMPOSITION_DATE_NOTICE);
     expect(ccel.search).not.toHaveBeenCalled();
     expect(gate.admit).not.toHaveBeenCalled();
   });
+
+  it('executes the local half of a direct mixed date query but rejects its CCEL half before admission', async () => {
+    const local = { search: vi.fn().mockResolvedValue(providerResult('local', 'no_results', 0)) };
+    const ccel = { search: vi.fn() };
+    const gate = { admit: vi.fn(), recordOutcome: vi.fn(), snapshot: vi.fn() } as any;
+    const service = new PrimarySourceSearchService(local as any, ccel as any, live, gate);
+
+    const result = await service.search(plan([query({
+      providers: ['local', 'ccel'], startYear: 500, endYear: 1500,
+    })]));
+
+    expect(result.queries[0]!.providers).toMatchObject([
+      { provider: 'local', status: 'no_results', searched: true },
+      { provider: 'ccel_live', status: 'unsupported_filter', searched: false },
+    ]);
+    expect(local.search).toHaveBeenCalledWith(expect.objectContaining({ startYear: 500, endYear: 1500 }));
+    expect(ccel.search).not.toHaveBeenCalled();
+    expect(gate.admit).not.toHaveBeenCalled();
+  });
+
+  it.each(['ok', 'no_results', 'unavailable', 'rate_limited', 'interface_changed'] as const)(
+    'prepends the composition-date invariant to an executable unbounded CCEL %s result',
+    async status => {
+      const returned = providerResult('ccel_live', status, status === 'ok' ? 1 : 0);
+      returned.notices = ['Provider-specific notice.'];
+      if (status === 'rate_limited') returned.retryAfterSeconds = 10;
+      const ccel = { search: vi.fn().mockResolvedValue(returned) };
+      const service = new PrimarySourceSearchService({ search: vi.fn() } as any, ccel as any, live, coordinator);
+
+      const result = await service.search(plan([query({ providers: ['ccel'] })]));
+
+      expect(ccel.search).toHaveBeenCalledTimes(1);
+      const [adapterQuery, passedCoordinator] = ccel.search.mock.calls[0]!;
+      expect(adapterQuery).not.toHaveProperty('startYear');
+      expect(adapterQuery).not.toHaveProperty('endYear');
+      expect(passedCoordinator).toBe(coordinator);
+      expect(result.queries[0]!.providers[0]!.notices).toEqual([
+        CCEL_COMPOSITION_DATE_NOTICE,
+        'Provider-specific notice.',
+      ]);
+    },
+  );
 
   it('isolates failures and never turns local no-results plus CCEL failure into complete no-results', async () => {
     const local = { search: vi.fn().mockResolvedValue(providerResult('local', 'no_results', 0)) };

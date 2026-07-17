@@ -1,8 +1,9 @@
 import { buildLocalDocumentResourceUri } from '../kernel/documentResource.js';
-import type {
-  PrimarySourcePlanHit,
-  PrimarySourceProviderStatus,
-  PrimarySourceSearchPlanResult,
+import {
+  CCEL_COMPOSITION_DATE_NOTICE,
+  type PrimarySourcePlanHit,
+  type PrimarySourceProviderStatus,
+  type PrimarySourceSearchPlanResult,
 } from '../services/historical/primarySourceTypes.js';
 
 export const PRIMARY_SOURCE_V4_MAX_BYTES = 32_768;
@@ -194,6 +195,10 @@ function providerDraft(
     searched: provider.searched === true,
     page: Number.isSafeInteger(provider.page) && provider.page >= 1 && provider.page <= 3 ? provider.page : 1,
     notices: uniqueBounded([
+      ...(providerKind === 'ccel_live'
+        && provider.status !== 'unsupported_filter' && provider.status !== 'disabled'
+        ? [CCEL_COMPOSITION_DATE_NOTICE]
+        : []),
       ...(invalidCandidates ? ['One or more unsafe or mismatched provider hits were omitted.'] : []),
       ...(countMismatch ? ['Provider-reported hit count did not match its returned hit array.'] : []),
       ...(!validWindow ? ['Provider result-window metadata was invalid.'] : []),
@@ -201,7 +206,7 @@ function providerDraft(
       ...(pageInvalid ? ['Provider page metadata was invalid.'] : []),
       ...(!retryAfterValid ? ['Provider retry-after metadata was absent or invalid.'] : []),
       ...(optionalMetadataInvalid ? ['One or more empty optional metadata fields were omitted after sanitization.'] : []),
-      ...provider.notices,
+      ...provider.notices.filter(notice => notice !== CCEL_COMPOSITION_DATE_NOTICE),
     ], 4, 240),
     ...(scope ? { scope } : {}),
     ...(retryAfterValid && provider.retryAfterSeconds !== undefined
