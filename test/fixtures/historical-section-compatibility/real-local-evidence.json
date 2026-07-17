@@ -7,7 +7,7 @@
     "nodeGetCurrentResolution": "unordered_no_compatibility_proof",
     "d1FirstCurrentResolution": "unordered_no_compatibility_proof",
     "productionObservedTarget": null,
-    "decisionStatus": "pending"
+    "decisionStatus": "approved_source_first"
   },
   "expectedCollisionReport": {
     "collisionGroups": 23,

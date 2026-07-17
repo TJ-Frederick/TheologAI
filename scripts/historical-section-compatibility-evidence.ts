@@ -5,10 +5,12 @@
  * can replace ambiguous display-number locators.
  *
  * This is deliberately an offline verification boundary. It records neither
- * section text nor a claimed production result. The current Node `.get()` and
+ * section text or a claimed production result. The current Node `.get()` and
  * D1 `.first()` queries have no ORDER BY, so their target remains
- * `unordered_no_compatibility_proof` until a separately reviewed runtime
- * change or production observation establishes otherwise.
+ * `unordered_no_compatibility_proof`. The owner has separately approved the
+ * checked-in source-first aliases as the authoritative target for a future
+ * migration; that decision does not claim that either current runtime ever
+ * returned that target.
  */
 
 import { execFileSync } from 'node:child_process';
@@ -61,7 +63,7 @@ export interface HistoricalSectionCompatibilityEvidence {
     nodeGetCurrentResolution: typeof UNORDERED_NO_COMPATIBILITY_PROOF;
     d1FirstCurrentResolution: typeof UNORDERED_NO_COMPATIBILITY_PROOF;
     productionObservedTarget: null;
-    decisionStatus: 'pending';
+    decisionStatus: 'approved_source_first';
   };
   expectedCollisionReport: {
     collisionGroups: number;
@@ -77,11 +79,11 @@ export interface HistoricalSectionCompatibilityVerificationReport {
   collisionGroups: number;
   affectedSections: number;
   newlyAddressableSections: number;
-  sourceFirstLowestRowFirstSeedAndProvisionalAliasAgreements: number;
+  sourceFirstLowestRowFirstSeedAndApprovedAliasAgreements: number;
   nodeGetCurrentResolution: typeof UNORDERED_NO_COMPATIBILITY_PROOF;
   d1FirstCurrentResolution: typeof UNORDERED_NO_COMPATIBILITY_PROOF;
   productionObservedTarget: null;
-  decisionStatus: 'pending';
+  decisionStatus: 'approved_source_first';
 }
 
 export interface HistoricalSectionMaterializedRow {
@@ -102,7 +104,7 @@ interface DerivedHistoricalSectionRow extends HistoricalSectionCompatibilityEvid
 interface DerivedHistoricalSectionCompatibility {
   evidence: HistoricalSectionCompatibilityEvidence;
   allRows: DerivedHistoricalSectionRow[];
-  provisionalAliasByGroup: Map<string, string>;
+  sourceFirstAliasByGroup: Map<string, string>;
 }
 
 /** Parse the checked-in packet with an intentionally exact, closed schema. */
@@ -137,8 +139,8 @@ export function parseHistoricalSectionCompatibilityEvidence(value: unknown): His
   if (compatibilityStatus.nodeGetCurrentResolution !== UNORDERED_NO_COMPATIBILITY_PROOF
     || compatibilityStatus.d1FirstCurrentResolution !== UNORDERED_NO_COMPATIBILITY_PROOF
     || compatibilityStatus.productionObservedTarget !== null
-    || compatibilityStatus.decisionStatus !== 'pending') {
-    throw new Error('Historical section compatibility evidence must retain its unordered, unobserved, pending status');
+    || compatibilityStatus.decisionStatus !== 'approved_source_first') {
+    throw new Error('Historical section compatibility evidence must retain its unordered, unobserved, approved-source-first status');
   }
 
   const expectedCollisionReport = collisionReport(root.expectedCollisionReport, 'Historical section compatibility evidence report');
@@ -204,7 +206,7 @@ export function parseHistoricalSectionCompatibilityEvidence(value: unknown): His
       nodeGetCurrentResolution: UNORDERED_NO_COMPATIBILITY_PROOF,
       d1FirstCurrentResolution: UNORDERED_NO_COMPATIBILITY_PROOF,
       productionObservedTarget: null,
-      decisionStatus: 'pending',
+      decisionStatus: 'approved_source_first',
     },
     expectedCollisionReport,
     collisionGroups,
@@ -221,7 +223,7 @@ export function deriveHistoricalSectionCompatibilityEvidence(root: string): Deri
   const plan = readHistoricalSectionKeyPlan(root);
   const documents = new Map(plan.documents.map(document => [document.documentId, document]));
   const rowsByGroup = new Map<string, DerivedHistoricalSectionRow[]>();
-  const provisionalAliasByGroup = new Map<string, string>();
+  const sourceFirstAliasByGroup = new Map<string, string>();
   const allRows: DerivedHistoricalSectionRow[] = [];
 
   let sqliteBuilderRowId = 0;
@@ -250,8 +252,8 @@ export function deriveHistoricalSectionCompatibilityEvidence(root: string): Deri
       group.push(row);
       rowsByGroup.set(groupId, group);
       const alias = aliases.get(legacySectionId);
-      if (!alias) throw new Error(`Historical section compatibility source lacks a provisional alias: ${source.documentId}#${legacySectionId}`);
-      provisionalAliasByGroup.set(groupId, alias);
+      if (!alias) throw new Error(`Historical section compatibility source lacks a source-first alias: ${source.documentId}#${legacySectionId}`);
+      sourceFirstAliasByGroup.set(groupId, alias);
     }
   }
 
@@ -273,7 +275,7 @@ export function deriveHistoricalSectionCompatibilityEvidence(root: string): Deri
       nodeGetCurrentResolution: UNORDERED_NO_COMPATIBILITY_PROOF,
       d1FirstCurrentResolution: UNORDERED_NO_COMPATIBILITY_PROOF,
       productionObservedTarget: null,
-      decisionStatus: 'pending',
+      decisionStatus: 'approved_source_first',
     },
     expectedCollisionReport: {
       collisionGroups: report.collisionGroups,
@@ -282,7 +284,7 @@ export function deriveHistoricalSectionCompatibilityEvidence(root: string): Deri
     },
     collisionGroups,
   };
-  return { evidence: parseHistoricalSectionCompatibilityEvidence(evidence), allRows, provisionalAliasByGroup };
+  return { evidence: parseHistoricalSectionCompatibilityEvidence(evidence), allRows, sourceFirstAliasByGroup };
 }
 
 /** Verify the immutable packet against the current local sources and plan. */
@@ -365,9 +367,9 @@ export function readHistoricalSectionRowsFromD1Seed(seedDirectory: string): Hist
 }
 
 /**
- * Prove that the checked-in source-first proposal matches local row and seed
- * order. This does not establish what either unordered runtime query returned
- * in production.
+ * Prove that the owner-approved source-first alias target matches local row
+ * and seed order. This does not establish what either unordered runtime query
+ * returned in production.
  */
 export function verifyHistoricalSectionCompatibilityMaterialization(
   root: string,
@@ -401,9 +403,9 @@ export function verifyHistoricalSectionCompatibilityMaterialization(
   const parsed = parseHistoricalSectionCompatibilityEvidence(evidence);
   for (const group of parsed.collisionGroups) {
     const groupId = compatibilityGroupId(group.documentId, group.legacySectionId);
-    const alias = derived.provisionalAliasByGroup.get(groupId);
-    if (!alias) throw new Error(`Historical section compatibility plan has no provisional alias for ${group.documentId}#${group.legacySectionId}`);
-    verifyProvisionalSourceFirstAgreement(group, alias);
+    const alias = derived.sourceFirstAliasByGroup.get(groupId);
+    if (!alias) throw new Error(`Historical section compatibility plan has no source-first alias for ${group.documentId}#${group.legacySectionId}`);
+    verifyApprovedSourceFirstAgreement(group, alias);
   }
 
   return {
@@ -412,11 +414,11 @@ export function verifyHistoricalSectionCompatibilityMaterialization(
     collisionGroups: parsed.expectedCollisionReport.collisionGroups,
     affectedSections: parsed.expectedCollisionReport.affectedSections,
     newlyAddressableSections: parsed.expectedCollisionReport.newlyAddressableSections,
-    sourceFirstLowestRowFirstSeedAndProvisionalAliasAgreements: parsed.collisionGroups.length,
+    sourceFirstLowestRowFirstSeedAndApprovedAliasAgreements: parsed.collisionGroups.length,
     nodeGetCurrentResolution: UNORDERED_NO_COMPATIBILITY_PROOF,
     d1FirstCurrentResolution: UNORDERED_NO_COMPATIBILITY_PROOF,
     productionObservedTarget: null,
-    decisionStatus: 'pending',
+    decisionStatus: 'approved_source_first',
   };
 }
 
@@ -435,13 +437,13 @@ export function verifyCurrentUnorderedSectionResolutionSource(root: string): voi
 }
 
 /**
- * Check only the local ordering proposal for one collision group. It is useful
- * for adversarial tests and deliberately cannot make an unordered runtime
- * query or an unobserved production target authoritative.
+ * Check the owner-approved source-first target for one collision group. It is
+ * useful for adversarial tests and deliberately cannot make an unordered
+ * runtime query or an unobserved production target authoritative.
  */
-export function verifyProvisionalSourceFirstAgreement(
+export function verifyApprovedSourceFirstAgreement(
   group: HistoricalSectionCompatibilityEvidenceGroup,
-  provisionalAliasTarget: string,
+  sourceFirstAliasTarget: string,
 ): void {
   if (!group.members.length) throw new Error(`Historical section compatibility group ${group.documentId}#${group.legacySectionId} has no members`);
   const sourceFirst = group.members[0]!;
@@ -449,8 +451,8 @@ export function verifyProvisionalSourceFirstAgreement(
   const firstSeed = [...group.members].sort((left, right) => left.d1SeedOrdinal - right.d1SeedOrdinal)[0]!;
   if (sourceFirst.sourceSignature !== lowestRow.sourceSignature
     || sourceFirst.sourceSignature !== firstSeed.sourceSignature
-    || sourceFirst.plannedSectionKey !== provisionalAliasTarget) {
-    throw new Error(`Historical section compatibility proposal does not agree locally for ${group.documentId}#${group.legacySectionId}`);
+    || sourceFirst.plannedSectionKey !== sourceFirstAliasTarget) {
+    throw new Error(`Historical section compatibility approved source-first target does not agree locally for ${group.documentId}#${group.legacySectionId}`);
   }
 }
 

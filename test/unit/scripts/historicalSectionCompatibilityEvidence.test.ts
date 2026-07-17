@@ -11,7 +11,7 @@ import {
   verifyCurrentUnorderedSectionResolutionSource,
   verifyHistoricalSectionCompatibilityEvidenceFromSources,
   verifyHistoricalSectionCompatibilityMaterialization,
-  verifyProvisionalSourceFirstAgreement,
+  verifyApprovedSourceFirstAgreement,
   type HistoricalSectionCompatibilityEvidence,
   type HistoricalSectionCompatibilityEvidenceGroup,
 } from '../../../scripts/historical-section-compatibility-evidence.js';
@@ -25,10 +25,10 @@ function realEvidence(): HistoricalSectionCompatibilityEvidence {
   )));
 }
 
-function syntheticGroup(): { group: HistoricalSectionCompatibilityEvidenceGroup; provisionalAliasTarget: string } {
+function syntheticGroup(): { group: HistoricalSectionCompatibilityEvidenceGroup; sourceFirstAliasTarget: string } {
   const raw = JSON.parse(readFileSync('test/fixtures/historical-section-compatibility/synthetic-ambiguity.json', 'utf8')) as {
     group: HistoricalSectionCompatibilityEvidenceGroup;
-    provisionalAliasTarget: string;
+    sourceFirstAliasTarget: string;
   };
   return raw;
 }
@@ -67,21 +67,21 @@ describe('historical section compatibility evidence', () => {
     }
   });
 
-  it('retains no claimed production target or deterministic runtime result', () => {
+  it('records the approved future source-first target without claiming a production runtime result', () => {
     const evidence = realEvidence();
     expect(evidence.compatibilityStatus).toEqual({
       nodeGetCurrentResolution: UNORDERED_NO_COMPATIBILITY_PROOF,
       d1FirstCurrentResolution: UNORDERED_NO_COMPATIBILITY_PROOF,
       productionObservedTarget: null,
-      decisionStatus: 'pending',
+      decisionStatus: 'approved_source_first',
     });
     expect(() => verifyCurrentUnorderedSectionResolutionSource(ROOT)).not.toThrow();
   });
 
   it.each([
-    ['a production target', (raw: any) => { raw.compatibilityStatus.productionObservedTarget = 'assigned-0001'; }, 'unordered, unobserved, pending'],
-    ['a deterministic Node resolution', (raw: any) => { raw.compatibilityStatus.nodeGetCurrentResolution = 'lowest_row'; }, 'unordered, unobserved, pending'],
-    ['a non-pending decision', (raw: any) => { raw.compatibilityStatus.decisionStatus = 'approved'; }, 'unordered, unobserved, pending'],
+    ['a production target', (raw: any) => { raw.compatibilityStatus.productionObservedTarget = 'assigned-0001'; }, 'unordered, unobserved, approved-source-first'],
+    ['a deterministic Node resolution', (raw: any) => { raw.compatibilityStatus.nodeGetCurrentResolution = 'lowest_row'; }, 'unordered, unobserved, approved-source-first'],
+    ['a pending decision', (raw: any) => { raw.compatibilityStatus.decisionStatus = 'pending'; }, 'unordered, unobserved, approved-source-first'],
     ['an extra body field', (raw: any) => { raw.collisionGroups[0].members[0].content = 'must not be recorded'; }, 'exact keys'],
     ['a reordered D1 ordinal', (raw: any) => { raw.collisionGroups[0].members[1].d1SeedOrdinal = raw.collisionGroups[0].members[0].d1SeedOrdinal; }, 'D1 seed ordinals must be strictly increasing'],
     ['a non-SHA source signature', (raw: any) => { raw.collisionGroups[0].members[0].sourceSignature = 'not-a-hash'; }, 'lowercase SHA-256'],
@@ -94,16 +94,16 @@ describe('historical section compatibility evidence', () => {
     expect(() => parseHistoricalSectionCompatibilityEvidence(raw)).toThrow(message);
   });
 
-  it('proves the synthetic source-first/lowest-row/first-seed proposal without calling it deployed behavior', () => {
+  it('proves the synthetic approved source-first/lowest-row/first-seed target without calling it deployed behavior', () => {
     const synthetic = syntheticGroup();
-    expect(() => verifyProvisionalSourceFirstAgreement(synthetic.group, synthetic.provisionalAliasTarget)).not.toThrow();
+    expect(() => verifyApprovedSourceFirstAgreement(synthetic.group, synthetic.sourceFirstAliasTarget)).not.toThrow();
 
     const wrongLowest = structuredClone(synthetic.group);
     [wrongLowest.members[0]!.sqliteBuilderRowId, wrongLowest.members[1]!.sqliteBuilderRowId] = [2, 1];
-    expect(() => verifyProvisionalSourceFirstAgreement(wrongLowest, synthetic.provisionalAliasTarget))
+    expect(() => verifyApprovedSourceFirstAgreement(wrongLowest, synthetic.sourceFirstAliasTarget))
       .toThrow('does not agree locally');
 
-    expect(() => verifyProvisionalSourceFirstAgreement(synthetic.group, 'assigned-0001'))
+    expect(() => verifyApprovedSourceFirstAgreement(synthetic.group, 'assigned-0001'))
       .toThrow('does not agree locally');
   });
 
@@ -128,9 +128,9 @@ describe('historical section compatibility evidence', () => {
       collisionGroups: 23,
       affectedSections: 256,
       newlyAddressableSections: 233,
-      sourceFirstLowestRowFirstSeedAndProvisionalAliasAgreements: 23,
+      sourceFirstLowestRowFirstSeedAndApprovedAliasAgreements: 23,
       productionObservedTarget: null,
-      decisionStatus: 'pending',
+      decisionStatus: 'approved_source_first',
     });
 
     seedRows[0]!.d1SeedOrdinal = 2;

@@ -1,7 +1,7 @@
 {
   "fixtureVersion": 1,
   "sourcePolicy": "invented_synthetic_only",
-  "provisionalAliasTarget": "1",
+  "sourceFirstAliasTarget": "1",
   "group": {
     "documentId": "synthetic-catechism",
     "legacySectionId": "1",

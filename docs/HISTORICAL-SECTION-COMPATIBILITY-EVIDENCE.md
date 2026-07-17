@@ -27,16 +27,17 @@ The verifier regenerates that compact projection from the local source JSON and
 the checked-in section-key ledger. It then reads only `id`, `document_id`, and
 `section_number` from a newly generated SQLite database, and only the matching
 identity columns from a manifest-checked D1 seed. For every collision group it
-checks that these four *local* proposals agree:
+checks that these four *local* projections agree:
 
 1. first source-array row;
 2. lowest generated SQLite row ID;
 3. first deterministic D1 seed INSERT; and
-4. the ledger's provisional legacy alias target.
+4. the ledger's source-first legacy alias target.
 
-That is useful evidence for a later compatibility decision. It does **not** say
-what the public runtime returned, and it does **not** make a future alias
-authoritative.
+The owner has approved that existing source-first target as authoritative for
+the future migration. This packet still does **not** say what the public
+runtime returned, and the approval does **not** change a future migration's
+separate implementation, review, or release gates.
 
 ## Why no runtime target is claimed
 
@@ -50,7 +51,7 @@ duplicate locator. The packet is intentionally fixed at:
   "nodeGetCurrentResolution": "unordered_no_compatibility_proof",
   "d1FirstCurrentResolution": "unordered_no_compatibility_proof",
   "productionObservedTarget": null,
-  "decisionStatus": "pending"
+  "decisionStatus": "approved_source_first"
 }
 ```
 
@@ -75,13 +76,16 @@ The pull-request and production workflows run the same verifier only after
 they have built the database and reproduced the local D1 seed. It makes no
 network request and does not contact preview or production.
 
-## Later decision gate
+## Approved target and remaining gates
 
-Before migration `0005`, transform 8, or any public canonical-key/legacy-alias
-behavior, separately choose one of the following:
+The owner approved source-first for every ambiguous legacy locator. The
+checked-in source-first alias targets are therefore authoritative **only as the
+selected target for a future migration**; no production-observation capture is
+needed. `productionObservedTarget` deliberately remains `null`, because this
+is not a claim about the unordered deployed Node or D1 reads.
 
-1. release and black-box audit an explicit deterministic legacy-read order; or
-2. capture an authoritative, privacy-safe production mapping for every
-   ambiguous locator.
-
-Only that later reviewed decision may establish historical compatibility.
+Migration `0005`, transform 8, canonical-key/legacy-alias runtime behavior,
+database or D1 changes, and any preview or production release remain separate
+gates. That later work must implement deterministic canonical/alias reads and
+receive its own review and black-box audit; this inactive evidence packet does
+not make a public behavior change.
