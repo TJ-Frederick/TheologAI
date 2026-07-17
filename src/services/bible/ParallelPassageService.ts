@@ -80,6 +80,7 @@ export class ParallelPassageService {
   }
 
   async lookup(params: ParallelPassageLookupParams): Promise<ParallelPassageResearchResult> {
+    validateCursorIsolation(params);
     const corpora = normalizeCorpora(params);
     const primaryReference = normalizeResearchReference(params.reference);
     const warnings: string[] = [];
@@ -139,7 +140,11 @@ export class ParallelPassageService {
     warnings: string[],
   ): Promise<{ groups: SourceAttestedParallelGroupResult[]; window: SourceAttestedResultWindow }> {
     if (!this.sourceAttestedService) throw new Error('UBS source-attested parallels are unavailable in this runtime');
-    const lookup = await this.sourceAttestedService.lookup({ reference, maxGroups: params.maxGroups });
+    const lookup = await this.sourceAttestedService.lookup({
+      reference,
+      maxGroups: params.maxGroups,
+      groupCursor: params.groupCursor,
+    });
     const requested = parseSourceAttestedLookupReference(lookup.reference).segments;
     const groups = lookup.groups.map(group => ({
       groupId: group.groupId,
@@ -167,6 +172,7 @@ export class ParallelPassageService {
         additionalMatchStatus: lookup.additionalMatchObserved
           ? 'additional_match_observed'
           : 'no_additional_match_observed',
+        ...(lookup.nextCursor ? { nextCursor: lookup.nextCursor } : {}),
       },
     };
   }
@@ -413,6 +419,26 @@ function normalizeCorpora(params: ParallelPassageLookupParams): ParallelPassageC
     throw new ValidationError('includeAlignment', 'includeAlignment requires the ubs_source_attested corpus.');
   }
   return [...corpora];
+}
+
+function validateCursorIsolation(params: ParallelPassageLookupParams): void {
+  if (params.groupCursor === undefined) return;
+  if (typeof params.groupCursor !== 'string' || params.groupCursor.length < 1) {
+    throw new ValidationError('groupCursor', 'groupCursor must be a non-empty opaque string.');
+  }
+  if (params.corpora !== undefined
+    && (!Array.isArray(params.corpora) || params.corpora.length !== 1 || params.corpora[0] !== 'ubs_source_attested')) {
+    throw new ValidationError('groupCursor', "groupCursor continuation is UBS-only; corpora must be ['ubs_source_attested'].");
+  }
+  if (params.mode !== undefined || params.maxParallels !== undefined) {
+    throw new ValidationError('groupCursor', 'groupCursor cannot be combined with TheologAI legacy controls.');
+  }
+  if (params.includeText === true) {
+    throw new ValidationError('groupCursor', 'groupCursor cannot be combined with includeText: true.');
+  }
+  if (params.includeOpenBibleCrossReferences !== undefined || params.useCrossReferences !== undefined) {
+    throw new ValidationError('groupCursor', 'groupCursor cannot be combined with OpenBible controls.');
+  }
 }
 
 function translationProvenanceId(

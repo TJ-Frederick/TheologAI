@@ -5,6 +5,7 @@ import type {
   ISourceAttestedParallelRepository,
   ParallelSourceProvenance,
   SourceAttestedParallelGroup,
+  SourceAttestedParallelCursorBoundary,
   SourceAttestedParallelRepositoryResult,
   SourceParallelMember,
   SourceParallelReferenceSegment,
@@ -24,6 +25,7 @@ interface SourceRow {
   source_url: string; source_path: string; source_commit: string; source_commit_date: string; source_blob: string;
   source_bytes: number; source_sha256: string; transform_version: number; modified: number; modification_note: string;
 }
+interface CursorBoundaryRow { cumulative_group_count: number | string; boundary_group_count: number | string }
 
 export class D1UbsParallelPassageRepository implements ISourceAttestedParallelRepository {
   constructor(private readonly db: D1Database) {}
@@ -43,9 +45,12 @@ export class D1UbsParallelPassageRepository implements ISourceAttestedParallelRe
     return Object.freeze(provenance);
   }
 
-  async findGroups(reference: string, maxGroups = MAX_GROUPS): Promise<SourceAttestedParallelRepositoryResult> {
+  async findGroups(reference: string, maxGroups = MAX_GROUPS, afterSourceOrdinal = 0): Promise<SourceAttestedParallelRepositoryResult> {
     if (!Number.isSafeInteger(maxGroups) || maxGroups < 1 || maxGroups > MAX_GROUPS) {
       throw new Error(`maxGroups must be an integer from 1 to ${MAX_GROUPS}`);
+    }
+    if (!Number.isSafeInteger(afterSourceOrdinal) || afterSourceOrdinal < 0) {
+      throw new Error('afterSourceOrdinal must be a non-negative integer');
     }
     const parsed = parseSourceAttestedLookupReference(reference);
     if (parsed.segments.length > 8) throw new Error('reference exceeds the reviewed 8-segment query bound');
@@ -55,12 +60,13 @@ export class D1UbsParallelPassageRepository implements ISourceAttestedParallelRe
       `SELECT DISTINCT g.group_id, g.source_ordinal
          FROM ubs_parallel_segments s
          JOIN ubs_parallel_groups g ON g.group_id = s.group_id
-        WHERE g.source_id = ? AND (${clauses.join(' OR ')})
+        WHERE g.source_id = ? AND g.source_ordinal > ? AND (${clauses.join(' OR ')})
         ORDER BY g.source_ordinal, g.group_id
         LIMIT ?`,
-    ).bind(SOURCE_ID, ...bindings, maxGroups + 1).all<Pick<GroupRow, 'group_id' | 'source_ordinal'>>();
+    ).bind(SOURCE_ID, afterSourceOrdinal, ...bindings, maxGroups + 1).all<Pick<GroupRow, 'group_id' | 'source_ordinal'>>();
     if (ids.length > maxGroups + 1
       || new Set(ids.map(row => row.group_id)).size !== ids.length
+      || ids.some(row => !Number.isSafeInteger(row.source_ordinal) || row.source_ordinal <= afterSourceOrdinal)
       || ids.some((row, index) => index > 0 && row.source_ordinal <= ids[index - 1].source_ordinal)) {
       throw new Error('UBS group-ID lookahead exceeded its reviewed bound or source order');
     }
@@ -135,6 +141,52 @@ export class D1UbsParallelPassageRepository implements ISourceAttestedParallelRe
       additionalMatchObserved: ids.length > maxGroups,
     });
   }
+
+  /**
+   * Validate an untrusted cursor against D1 rather than trusting its encoded
+   * ordinal. This adds one aggregate query for a continuation, never
+   * one query per group/member/segment. The normal lookup remains a single
+   * maxGroups + 1 ID lookahead followed by at most three complete-group
+   * reconstruction queries.
+   */
+  async hasValidGroupCursorBoundary(
+    reference: string,
+    boundary: SourceAttestedParallelCursorBoundary,
+  ): Promise<boolean> {
+    if (!isCursorBoundaryShape(boundary)) return false;
+    let parsed;
+    try {
+      parsed = parseSourceAttestedLookupReference(reference);
+    } catch {
+      return false;
+    }
+    if (parsed.segments.length > 8) return false;
+    // This checks the pinned artifact/source descriptor before the aggregate
+    // reads rows from its source_id. A stale or incompatible D1 corpus fails
+    // closed instead of validating an otherwise similar ordinal.
+    await this.getProvenance();
+    const clauses = parsed.segments.map(() => '(s.book_number = ? AND s.chapter = ? AND s.start_verse <= ? AND s.end_verse >= ?)');
+    const bindings = parsed.segments.flatMap(segment => [segment.bookNumber, segment.chapter, segment.endVerse, segment.startVerse]);
+    const row = await this.db.prepare(
+      `SELECT
+         COUNT(DISTINCT CASE WHEN g.source_ordinal <= ? THEN g.group_id END) AS cumulative_group_count,
+         COUNT(DISTINCT CASE WHEN g.source_ordinal = ? THEN g.group_id END) AS boundary_group_count
+         FROM ubs_parallel_segments s
+         JOIN ubs_parallel_groups g ON g.group_id = s.group_id
+        WHERE g.source_id = ? AND (${clauses.join(' OR ')})`,
+    ).bind(boundary.afterSourceOrdinal, boundary.afterSourceOrdinal, SOURCE_ID, ...bindings).first<CursorBoundaryRow>();
+    return Number(row?.cumulative_group_count) === boundary.cumulativeGroupCount
+      && Number(row?.boundary_group_count) === 1
+      && boundary.cumulativeGroupCount % boundary.pageSize === 0;
+  }
+}
+
+function isCursorBoundaryShape(boundary: SourceAttestedParallelCursorBoundary): boolean {
+  return Number.isSafeInteger(boundary.pageSize) && boundary.pageSize >= 1 && boundary.pageSize <= MAX_GROUPS
+    && Number.isSafeInteger(boundary.afterSourceOrdinal) && boundary.afterSourceOrdinal >= 1
+    && Number.isSafeInteger(boundary.cumulativeGroupCount)
+    && boundary.cumulativeGroupCount >= boundary.pageSize
+    && boundary.cumulativeGroupCount % boundary.pageSize === 0;
 }
 
 function mapProvenance(row: SourceRow): ParallelSourceProvenance {

@@ -9,6 +9,7 @@ import type {
 } from '../../src/kernel/repositories.js';
 import type { BibleReference } from '../../src/kernel/reference.js';
 import { DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG } from '../../src/kernel/featureFlags.js';
+import type { ISourceAttestedParallelRepository } from '../../src/kernel/sourceAttestedParallels.js';
 import type { McpCompositionRoot } from '../../src/mcp/server.js';
 import { BibleService } from '../../src/services/bible/BibleService.js';
 import { CrossReferenceService } from '../../src/services/bible/CrossReferenceService.js';
@@ -125,15 +126,19 @@ export function createDeterministicMcpFixture(): DeterministicMcpFixture {
 
   const bibleService = new BibleService([bibleAdapter]);
   const crossReferenceService = new CrossReferenceService(crossReferenceRepository);
-  const sourceAttestedParallelService = new SourceAttestedParallelService({
+  const sourceAttestedParallelRepository = {
     findGroups: () => ({ groups: [], additionalMatchObserved: false }),
+    // This fixture has no source-attested groups, so no continuation boundary
+    // can be genuine. Deny by default instead of silently authorizing cursors.
+    hasValidGroupCursorBoundary: () => false,
     getProvenance: () => ({
       sourceId: 'fixture', title: 'Fixture', publisher: 'Fixture', copyright: 'Fixture', license: 'Fixture',
       licenseUrl: 'https://example.test/license', sourceUrl: 'https://example.test/source', sourcePath: 'fixture',
       sourceCommit: '0'.repeat(40), sourceCommitDate: '2026-01-01', sourceBlob: '0'.repeat(40), sourceBytes: 1,
       sourceSha256: '0'.repeat(64), transformVersion: 1, modified: true, modificationNote: 'Fixture',
     }),
-  });
+  } satisfies ISourceAttestedParallelRepository;
+  const sourceAttestedParallelService = new SourceAttestedParallelService(sourceAttestedParallelRepository);
   const parallelPassageService = new ParallelPassageService(
     crossReferenceRepository,
     bibleService,

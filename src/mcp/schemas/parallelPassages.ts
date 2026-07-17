@@ -15,7 +15,7 @@ const textEnrichmentStatus = {
 export const parallelPassagesOutputSchema = {
   type: 'object',
   properties: {
-    schemaVersion: { type: 'string', const: '3' },
+    schemaVersion: { type: 'string', const: '4' },
     kind: { type: 'string', const: 'parallel_passages' },
     requestedReference: { type: 'string' },
     corpora: {
@@ -96,9 +96,17 @@ export const parallelPassagesOutputSchema = {
           type: 'string',
           enum: ['additional_match_observed', 'no_additional_match_observed', 'not_evaluated'],
         },
+        nextCursor: { type: 'string', minLength: 1, maxLength: 2048, description: 'Opaque UBS-only continuation cursor; present exactly when one additional UBS group was observed.' },
       },
       required: ['requestedLimit', 'returnedGroupCount', 'additionalMatchStatus'],
       additionalProperties: false,
+      allOf: [
+        {
+          if: { properties: { additionalMatchStatus: { const: 'additional_match_observed' } } },
+          then: { required: ['nextCursor'] },
+          else: { not: { required: ['nextCursor'] } },
+        },
+      ],
     },
     legacyParallels: {
       type: 'array', items: {
@@ -204,9 +212,9 @@ export const parallelPassagesOutputSchema = {
   additionalProperties: false,
 } as NonNullable<Tool['outputSchema']>;
 
-export interface ParallelPassagesOutputV3 {
+export interface ParallelPassagesOutputV4 {
   [key: string]: unknown;
-  schemaVersion: '3';
+  schemaVersion: '4';
   kind: 'parallel_passages';
   requestedReference: string;
   corpora: Array<'ubs_source_attested' | 'theologai_legacy'>;
@@ -215,6 +223,7 @@ export interface ParallelPassagesOutputV3 {
     requestedLimit: number;
     returnedGroupCount: number;
     additionalMatchStatus: 'additional_match_observed' | 'no_additional_match_observed' | 'not_evaluated';
+    nextCursor?: string;
   };
   legacyParallels: Array<Record<string, unknown>>;
   openBibleCrossReferences: Array<Record<string, unknown>>;

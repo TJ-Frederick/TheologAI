@@ -54,6 +54,7 @@ export interface SourceAttestedParallelLookup {
   groups: readonly SourceAttestedParallelGroup[];
   requestedLimit: number;
   additionalMatchObserved: boolean;
+  nextCursor?: string;
 }
 
 export interface SourceAttestedParallelRepositoryResult {
@@ -61,7 +62,22 @@ export interface SourceAttestedParallelRepositoryResult {
   additionalMatchObserved: boolean;
 }
 
+/**
+ * The untrusted claims carried by a decoded public continuation cursor. The
+ * repository validates these against its current, pinned corpus before a
+ * continuation can be served.
+ */
+export interface SourceAttestedParallelCursorBoundary {
+  pageSize: number;
+  afterSourceOrdinal: number;
+  cumulativeGroupCount: number;
+}
+
 export interface ISourceAttestedParallelRepository {
-  findGroups(reference: string, maxGroups?: number): RepositoryResult<SourceAttestedParallelRepositoryResult>;
+  findGroups(reference: string, maxGroups?: number, afterSourceOrdinal?: number): RepositoryResult<SourceAttestedParallelRepositoryResult>;
+  hasValidGroupCursorBoundary(
+    reference: string,
+    boundary: SourceAttestedParallelCursorBoundary,
+  ): RepositoryResult<boolean>;
   getProvenance(): RepositoryResult<Readonly<ParallelSourceProvenance>>;
 }

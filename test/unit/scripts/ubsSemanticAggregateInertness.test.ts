@@ -6,7 +6,7 @@ const repo = new URL('../../../', import.meta.url);
 const moduleName = 'ubsSemanticEvidenceBundle';
 
 const reviewedBasePins = {
-  'src/kernel/index.ts': 'e7c00224d935dba7bc6e22cc7bfeb79c9ffab58656715688d58f7302cdec5d20',
+  'src/kernel/index.ts': '7df4dc9b32e1a9d4589296d2a32e743eb1e812711e0e4faba8b58066a7b1cde6',
   'src/tools/v2/index.ts': '2bdf52660313eea971ed51253120288488938812c014c7764d6bb85c233251bd',
   'src/tools/worker/index.ts': 'feb1679a520185d11f2b6082b70ea3ef6c2b87652ff49c97c0acedfb76d83b90',
   'src/worker.ts': '07a439b6f5f20be1e6651ceaad71b4ca189579592c743e5e0f3770d80ba12d44',

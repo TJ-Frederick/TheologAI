@@ -153,8 +153,9 @@ describe('MCP structured output validation', () => {
       const schema = listed.tools.find(tool => tool.name === toolName)?.outputSchema;
       expect(schema).toMatchObject({ type: 'object', additionalProperties: false });
       expect(schema).not.toHaveProperty('$ref');
-      const expectedVersion = toolName === 'primary_source_search' ? '4'
-        : toolName === 'parallel_passages' ? '3' : '1';
+      const expectedVersion = toolName === 'primary_source_search' || toolName === 'parallel_passages'
+        ? '4'
+        : '1';
       expect(schema?.properties?.schemaVersion).toMatchObject({ const: expectedVersion });
     }
   });

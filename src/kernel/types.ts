@@ -186,6 +186,8 @@ export interface ParallelPassageLookupParams {
   translation?: ParallelTextTranslation;
   showDifferences?: boolean;
   maxGroups?: number;
+  /** Opaque UBS-only continuation cursor returned by a prior v4 result. */
+  groupCursor?: string;
   includeAlignment?: boolean;
   includeOpenBibleCrossReferences?: boolean;
   /** @deprecated Use includeOpenBibleCrossReferences. */
@@ -288,6 +290,7 @@ export interface SourceAttestedResultWindow {
   requestedLimit: number;
   returnedGroupCount: number;
   additionalMatchStatus: 'additional_match_observed' | 'no_additional_match_observed' | 'not_evaluated';
+  nextCursor?: string;
 }
 
 /** Versioned public service result before MCP presentation. */

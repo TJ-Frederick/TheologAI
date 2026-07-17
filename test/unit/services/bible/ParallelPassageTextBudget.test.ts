@@ -5,6 +5,7 @@ import { ParallelPassageService } from '../../../../src/services/bible/ParallelP
 import { presentParallelPassagesStructured } from '../../../../src/presenters/parallelPassagesStructured.js';
 import { loadUbsParallelPassageRepository } from '../../../../src/adapters/data/loadUbsParallelPassages.js';
 import { SourceAttestedParallelService } from '../../../../src/services/bible/SourceAttestedParallelService.js';
+import { orderedUniqueParallelTextTargets } from '../../../../src/kernel/parallelTextTargets.js';
 
 function crossReferences(): ICrossReferenceRepository {
   return {
@@ -68,6 +69,27 @@ function service(lookup: ReturnType<typeof vi.fn>) {
 }
 
 describe('ParallelPassageService fixed text-enrichment budget', () => {
+  it('never enriches a cursor continuation, preserving an unambiguous page boundary contract', async () => {
+    const source = new SourceAttestedParallelService(loadUbsParallelPassageRepository());
+    const lookup = successfulLookup();
+    const runtime = new ParallelPassageService(
+      crossReferences(), { lookup } as any, undefined, undefined, source,
+    );
+    const first = await runtime.lookup({
+      reference: 'Mark 10:19', maxGroups: 5, includeText: true, translation: 'WEB',
+    });
+    const firstTargets = orderedUniqueParallelTextTargets(first.sourceAttestedGroups, []);
+    expect(lookup.mock.calls.map(([params]) => params.reference)).toEqual(firstTargets.slice(0, 12));
+    expect(first.sourceAttestedResultWindow.nextCursor).toBeDefined();
+
+    lookup.mockClear();
+    await expect(runtime.lookup({
+      reference: 'Mark 10:19', maxGroups: 5, includeText: true, translation: 'WEB',
+      groupCursor: first.sourceAttestedResultWindow.nextCursor,
+    })).rejects.toThrow('includeText: true');
+    expect(lookup).not.toHaveBeenCalled();
+  });
+
   it('keeps the executable preview sentinel above the real 12-target corpus boundary', async () => {
     const source = new SourceAttestedParallelService(loadUbsParallelPassageRepository());
     const lookup = successfulLookup();

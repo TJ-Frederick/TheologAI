@@ -351,6 +351,7 @@ describe('parallel_passages handler', () => {
     expect(properties.mode).not.toHaveProperty('default');
     expect(properties.maxParallels).not.toHaveProperty('default');
     expect(properties.useCrossReferences).not.toHaveProperty('default');
+    expect(properties.includeOpenBibleCrossReferences).not.toHaveProperty('default');
   });
 
   it('advertises the same 200-code-point bound used for structured excerpts', () => {
@@ -362,9 +363,9 @@ describe('parallel_passages handler', () => {
     expect(output.properties.legacyParallels.items.properties.text.maxLength).toBe(200);
   });
 
-  it('advertises the required v3 honest UBS result-window and text-enrichment contracts', () => {
+  it('advertises the required v4 navigable UBS result-window and text-enrichment contracts', () => {
     const output = createParallelPassagesHandler(serviceDouble({ lookup: vi.fn() })).outputSchema as any;
-    expect(output.properties.schemaVersion).toEqual({ type: 'string', const: '3' });
+    expect(output.properties.schemaVersion).toEqual({ type: 'string', const: '4' });
     expect(output.required).toContain('sourceAttestedResultWindow');
     expect(output.properties.sourceAttestedResultWindow).toMatchObject({
       additionalProperties: false,
@@ -414,7 +415,7 @@ describe('parallel_passages handler', () => {
     expect(result.isError).not.toBe(true);
     expect(lookup).toHaveBeenCalledWith(expect.objectContaining({
       corpora: ['ubs_source_attested'], maxGroups: 5, includeAlignment: false,
-      includeOpenBibleCrossReferences: false, mode: undefined, maxParallels: undefined, useCrossReferences: undefined,
+      includeOpenBibleCrossReferences: undefined, mode: undefined, maxParallels: undefined, useCrossReferences: undefined,
     }));
   });
   it('forwards all lookup controls and formats text-bearing parallels', async () => {
@@ -454,7 +455,7 @@ describe('parallel_passages handler', () => {
       useCrossReferences: false,
     });
     expect(result.structuredContent).toMatchObject({
-      schemaVersion: '3', kind: 'parallel_passages', corpora: ['theologai_legacy'],
+      schemaVersion: '4', kind: 'parallel_passages', corpora: ['theologai_legacy'],
       sourceAttestedGroups: [], openBibleCrossReferences: [],
       sourceAttestedResultWindow: { requestedLimit: 5, returnedGroupCount: 0, additionalMatchStatus: 'not_evaluated' },
     });
