@@ -121,6 +121,65 @@ is local source context only and does not define the current product contract.
   `cc0b798d-37ee-4438-8ff9-c7fffd21263f`; preview deployment authorization was
   then removed and verified revoked. Protected production run `29568524548`
   successfully deployed Worker `afaa3361-df99-4b38-9597-c9076e29ac83`.
+- **Roadmap reconciliation / PR #60:** recorded the PR #56–#59 status,
+  approved cursor direction, and bounded CCEL excerpt policy in this tracked
+  roadmap only, merged as
+  `552043fdfb6efd1f34990167fa5dd3c7fb48092c`. It changed no runtime,
+  source, migration, or D1 state, but its normal protected production run
+  `29574373701` deployed Worker `7affe60a-90e5-4588-9711-83ad589fbf51`
+  against the existing production D1.
+- **UBS semantic draft-contract hardening / PR #61:** corrected inactive,
+  source-free semantic identity, result-window, cursor, evidence, alignment,
+  Unicode, and byte-bound contracts, merged as
+  `4add86f6453fb82d96426fb3b858d4a96be58c9c`. It did not vendor semantic
+  artifacts, add migration `0004`, advance transform 7, alter D1, or register
+  semantic MCP behavior. Its normal protected production run `29575501471`
+  deployed the behaviorally inactive code as Worker
+  `9faca1e3-0d64-4927-befc-d702e0d17707` against the existing production D1.
+- **Edition-provenance foundation / PR #62:** added strict source-free work and
+  edition rights/provenance contracts and adversarial checks, merged as
+  `315ddb73d99bb8c93993344588ce74db12559d56`. It did not acquire corpus
+  bytes, alter D1, or register a runtime surface. Its normal protected
+  production run `29576509796` deployed the behaviorally inactive code as
+  Worker `baecc989-5d88-4281-98d0-43c30465f6da` against the existing
+  production D1.
+- **Inactive Hebrew semantic-resolution seam / PR #63:** added the source-free,
+  unregistered, trusted-alignment seam and its complete-evidence guards, merged
+  as `e781a419f7d6c4ad9c403bc0dc83671d8d91bd88`. It did not activate a
+  semantic provider, vendor source artifacts, add a migration, or change MCP
+  behavior. Its normal protected production run `29578634873` deployed the
+  behaviorally inactive code as Worker
+  `96adff83-dd42-4604-b253-f135dbb7120c` against the existing production D1.
+- **Inactive UBS semantic aggregate / PR #64:** added a source-free,
+  unregistered aggregate contract, merged as
+  `e20132f63cf22fa54d3a4821807efbce93879ae8`. This is a foundation only, not
+  a public feature or deployment: it did not add semantic artifacts, migration
+  `0004`, transform 7, D1 rows, runtime wiring, or an MCP surface.
+  Its GitHub deployment record `5490679777` moved from waiting to error when
+  production run `29587993437` was cancelled before protected approval; the
+  run had no steps, no Worker was deployed, and no Worker version was created.
+- **Primary-source output hard cutover / PR #65:** released the same-tree
+  production-v4/local-only and preview-v5/discovery-only profiles without a
+  new tool, corpus body, or live CCEL execution, merged as
+  `2af3c206b9d537a8bf9d29cad535db9664e9556e`. Protected production run
+  `29596472550` deployed Worker `7453b578-08db-4c3e-a5e4-43ba38fc0abf` against
+  the existing production D1 and passed its post-deployment black-box audit.
+- **Server-validated parallel-passage cursor / PR #66:** released the v4
+  continuation cursor hard cutover, including UBS-only continuation behavior
+  and rejection of legacy/OpenBible controls with a cursor, merged as
+  `b26bc518722733503e3601c4dee147e77ecae3b9`. Protected production run
+  `29602026367` deployed Worker `59cd1385-8635-4823-9b7e-add61e01ecbe` against
+  the existing production D1 and passed its post-deployment compatibility
+  audit.
+- **Inactive original-language-study v2 contract / PR #67:** added only
+  synthetic fixtures and test-scoped draft contract/design checks, merged as
+  `3480a8d42f3ad0cefcc181c7fae837a5d5ae3c9a`. It is not compiled or registered
+  by either runtime, carries no source bytes, and changes no schema, migration,
+  D1, Worker, or public MCP behavior. GitHub deployment record `5494097938`
+  moved from waiting to error when automatic production run `29605213950` was
+  cancelled before protected approval; the run had no deploy step and created
+  no Worker version. Production remained on
+  `59cd1385-8635-4823-9b7e-add61e01ecbe`.
 
 These entries describe merged repository state. Deployment state is established
 only by the relevant protected workflow and post-deployment smoke evidence; a
@@ -425,26 +484,26 @@ Code readiness and operational readiness are deliberately separate:
   prerequisite and per-edition rights approvals before migration `0005` and
   transform 8. Current display section numbers are not unique. Keep the
   existing 32-source provenance cap as a required pack-sizing check.
-- Sequence the next inactive foundations first: correct the source-free
-  original-language identity/result-window contract, add its synthetic-only
-  unregistered service, and establish the primary-source edition/provenance
-  manifest compiler boundary without adding corpus bytes. These slices must
-  not register tools, alter D1, or change live schemas.
-- Treat executable pagination as an integrated later release, not an inactive
-  foundation. On 2026-07-17 the owner approved a public v4 cursor hard cutover,
-  UBS-only continuation behavior, and rejection of legacy/OpenBible controls
-  when a cursor is present. `includeText: false` remains the existing shipped
-  default. Implement and audit the cursor contract and runtime together behind
-  the protected preview workflow; keep any subsequent workflow/prompt work as
-  a separate slice.
-- Prospective primary-source work is limited to explicit searched/read/deferred
-  coverage semantics and future edition/provenance contract fields; it is not
-  a rollout of evidence already present in the current schemas. Its public
-  release is a **pending release decision** and must preserve CCEL-disabled
-  behavior during protected audit. The original-language MCP surface is also a
-  **pending product decision**: choose whether to extend
-  `original_language_study` or register a new tool only after the synthetic
-  service and aggregate-query foundations are reviewed.
+- PRs #61–#64 and #67 complete the planned inactive semantic and provenance
+  foundations: source-free semantic contracts, the unregistered Hebrew
+  resolution and aggregate seams, edition/provenance contracts, and a
+  synthetic-only v2 `original_language_study` design. They do not license or
+  vendor UBS semantic data, acquire corpus bytes, alter D1, or register a live
+  schema. The original-language surface decision is resolved: extend the
+  existing `original_language_study` tool and keep the tool inventory stable;
+  do not register a new tool.
+- The v4 `parallel_passages` cursor hard cutover is released and audited in PR
+  #66. It preserves UBS-only continuation behavior, rejects legacy/OpenBible
+  controls when a cursor is present, and retains `includeText: false` as the
+  existing default. Any future workflow or prompt change remains a separate
+  slice rather than another cursor implementation.
+- The primary-source output-profile hard cutover is released in PR #65:
+  production is v4/local-only and preview is v5/discovery-only, with CCEL
+  execution still disabled. Prospective corpus work remains limited to
+  explicit searched/read/deferred coverage semantics and future
+  edition/provenance fields; it is not a rollout of evidence already present
+  in current schemas. Any corpus release remains a **pending rights and release
+  decision** and must preserve CCEL-disabled behavior during protected audit.
 - Review a bounded, discovery-only public rollout of the retained CCEL search
   adapter. The owner accepts free, donation-independent discovery with at most
   five short, attributed 240-character provider snippets and clean links, with
