@@ -16,21 +16,81 @@ const auditOptions = {
   authorization: 'I AUTHORIZE TWO LIVE CCEL PREVIEW REQUESTS',
 };
 
-function envelope(provider: Record<string, unknown>, planStatus = 'complete') {
+const localEditionReadiness = {
+  foundation: 'edition-provenance-foundation.v1', editionIdentity: 'not_established',
+  provenance: 'incomplete', exactArtifactRights: 'not_established_by_this_contract',
+};
+const externalEditionReadiness = {
+  editionIdentity: 'provider_unreviewed', provenance: 'provider_unreviewed',
+  exactArtifactRights: 'not_determined',
+};
+
+function toolSchema(version: '3' | '4' | '5', includeCcel: boolean, retryAfterSeconds = false): { properties: Record<string, unknown> } {
+  const local = { properties: { provider: { const: 'local' } } };
+  const external = { properties: {
+    provider: { const: 'ccel_live' }, ...(retryAfterSeconds ? { retryAfterSeconds: { type: 'integer' } } : {}),
+  } };
+  return { properties: {
+    schemaVersion: { const: version },
+    queries: { items: { properties: { providers: { items: includeCcel ? { oneOf: [local, external] } : local } } } },
+  } };
+}
+
+function envelope(searchProvider: ReturnType<typeof provider>, planStatus = 'complete') {
+  const searched = searchProvider.searched;
+  const kind = searchProvider.provider;
+  const observation = { queryId: 'audit', provider: kind, status: searchProvider.status };
   return {
-    schemaVersion: '4', kind: 'primary_source_search', planStatus,
+    schemaVersion: '5', kind: 'primary_source_search', planStatus,
     responseWindow: { unit: 'utf8_bytes', maximum: 32_768, truncated: false },
-    queries: [{ id: 'audit', normalizedMode: 'all_terms', normalizedSelection: 'relevance', providers: [provider] }],
-    coverage: { localAttempted: false, localHitCount: 0, ccelAttempted: true, ccelHitCount: 0, notices: [] },
-    evidencePolicy: { snippetUse: 'discovery_only', localSectionAccess: 'mcp_resource_read', externalSectionAccess: 'direct_url_only', coverageScope: 'bounded_non_exhaustive', externalRightsStatus: 'not_determined', lookupAliasUse: 'exact_routing_only_not_metadata_evidence' },
+    queries: [{ id: 'audit', normalizedMode: 'all_terms', normalizedSelection: 'relevance', providers: [searchProvider] }],
+    coverage: {
+      localAttempted: kind === 'local' && searched, localHitCount: kind === 'local' ? searchProvider.hitCount : 0,
+      ccelAttempted: kind === 'ccel_live' && searched, ccelHitCount: kind === 'ccel_live' ? searchProvider.hitCount : 0,
+      notices: [], serverObserved: {
+        searched: searched ? [{ ...observation, returnedHitCount: searchProvider.hitCount }] : [],
+        notSearched: searched ? [] : [observation],
+      },
+    },
+    evidencePolicy: {
+      snippetUse: 'discovery_only', localSectionAccess: 'mcp_resource_read', externalSectionAccess: 'direct_url_only',
+      coverageScope: 'bounded_non_exhaustive', externalRightsStatus: 'not_determined', lookupAliasUse: 'exact_routing_only_not_metadata_evidence',
+      coverageLedger: {
+        searched: 'server_observed_provider_execution', read: 'host_observed_successful_exact_resource_or_page_read',
+        deferred: 'host_recorded_intentional_deferral', notSearched: 'server_observed_provider_non_execution',
+      },
+    },
   };
 }
 
-function provider(kind: 'local' | 'ccel_live', status: string, retryAfterSeconds?: number) {
+function provider(
+  kind: 'local' | 'ccel_live',
+  status: string,
+  retryAfterSeconds?: number,
+  hits: Array<Record<string, unknown>> = [],
+) {
+  const searched = status !== 'rate_limited';
   return {
-    provider: kind, status, searched: status !== 'rate_limited', page: 1, hitCount: 0,
-    resultWindow: { returnedHitCount: 0, additionalMatchStatus: 'no_additional_match_observed' },
-    hits: [], notices: [], ...(retryAfterSeconds === undefined ? {} : { retryAfterSeconds }),
+    provider: kind, status, searched, page: 1, hitCount: hits.length,
+    resultWindow: { returnedHitCount: hits.length, additionalMatchStatus: 'no_additional_match_observed' },
+    hits, notices: [],
+    ...(kind === 'local' && searched ? { scope: { eligibleDocuments: [{ editionReadiness: localEditionReadiness }] } } : {}),
+    ...(retryAfterSeconds === undefined ? {} : { retryAfterSeconds }),
+  };
+}
+
+function externalHit() {
+  return {
+    provider: 'ccel_live', snippet: 'A short authorized discovery snippet.',
+    metadataStatus: 'provider_search_result_unreviewed', editionReadiness: externalEditionReadiness,
+    locator: { kind: 'external_url', url: 'https://ccel.org/ccel/calvin/institutes/iv.xvii.html' },
+  };
+}
+
+function localHit() {
+  return {
+    provider: 'local', snippet: 'A local discovery snippet.', editionReadiness: localEditionReadiness,
+    locator: { kind: 'mcp_resource', uri: 'theologai://documents/example' },
   };
 }
 
@@ -59,22 +119,22 @@ describe('CCEL operational scripts', () => {
     let ccelCalls = 0;
     let possibleOriginAdmissions = 0;
     const production: CcelAuditClient = {
-      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: { properties: { schemaVersion: { const: '3' } } } }] }),
+      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('4', false) }] }),
       callTool: vi.fn(), close: vi.fn().mockResolvedValue(undefined),
     };
     const preview: CcelAuditClient = {
-      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: { properties: { schemaVersion: { const: '4' }, retryAfterSeconds: {} } } }] }),
+      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('5', true, true) }] }),
       callTool: vi.fn(async request => {
         const providers = ((request.arguments.queries as Array<{ providers: string[] }>)[0]?.providers ?? []);
         if (providers.includes('ccel')) {
           ccelCalls++;
           if (ccelCalls === 1) {
             possibleOriginAdmissions++;
-            return { structuredContent: envelope(provider('ccel_live', 'no_results')) };
+            return { structuredContent: envelope(provider('ccel_live', 'ok', undefined, [externalHit()])) };
           }
           return { isError: true, structuredContent: envelope(provider('ccel_live', 'rate_limited', 10), 'unavailable') };
         }
-        return { structuredContent: envelope(provider('local', 'no_results')) };
+        return { structuredContent: envelope(provider('local', 'ok', undefined, [localHit()])) };
       }),
       close: vi.fn().mockResolvedValue(undefined),
     };
@@ -83,8 +143,8 @@ describe('CCEL operational scripts', () => {
     });
     expect(report).toMatchObject({
       passed: true,
-      productionControl: { liveCallMade: false },
-      preview: { ccelBearingToolCallMaximum: 2, upstreamOriginAdmissionMaximum: 2 },
+      productionControl: { contractVersion: '4', liveCallMade: false },
+      preview: { contractVersion: '5', ccelBearingToolCallMaximum: 2, upstreamOriginAdmissionMaximum: 2 },
     });
     expect(ccelCalls).toBe(2);
     expect(possibleOriginAdmissions).toBeLessThanOrEqual(2);
@@ -92,14 +152,85 @@ describe('CCEL operational scripts', () => {
     expect(preview.callTool).toHaveBeenCalledTimes(3);
   });
 
-  it('stops after two possible origin admissions even when the mocked coordinator violates busy policy', async () => {
-    let possibleOriginAdmissions = 0;
+  it('fails closed before any tool call when preview still advertises v4', async () => {
+    const stalePreviewSchema = toolSchema('4', true, true);
+    stalePreviewSchema.properties.unrelatedVersion = { const: '5' };
     const production: CcelAuditClient = {
-      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: { properties: { schemaVersion: { const: '3' } } } }] }),
+      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('4', false) }] }),
       callTool: vi.fn(), close: vi.fn().mockResolvedValue(undefined),
     };
     const preview: CcelAuditClient = {
-      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: { properties: { schemaVersion: { const: '4' }, retryAfterSeconds: {} } } }] }),
+      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: stalePreviewSchema }] }),
+      callTool: vi.fn(), close: vi.fn().mockResolvedValue(undefined),
+    };
+    await expect(runCcelPreviewAudit(auditOptions, {
+      connect: async url => url === auditOptions.productionUrl ? production : preview,
+    })).rejects.toThrow(/preview v5 CCEL contract/);
+    expect(production.callTool).not.toHaveBeenCalled();
+    expect(preview.callTool).not.toHaveBeenCalled();
+  });
+
+  it('fails closed before any tool call when production still advertises v3', async () => {
+    const staleProductionSchema = toolSchema('3', false);
+    staleProductionSchema.properties.unrelatedVersion = { const: '4' };
+    const production: CcelAuditClient = {
+      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: staleProductionSchema }] }),
+      callTool: vi.fn(), close: vi.fn().mockResolvedValue(undefined),
+    };
+    const preview: CcelAuditClient = {
+      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('5', true, true) }] }),
+      callTool: vi.fn(), close: vi.fn().mockResolvedValue(undefined),
+    };
+    await expect(runCcelPreviewAudit(auditOptions, {
+      connect: async url => url === auditOptions.productionUrl ? production : preview,
+    })).rejects.toThrow(/production v4 local-only control/);
+    expect(production.callTool).not.toHaveBeenCalled();
+    expect(preview.callTool).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['an extra unreported search observation', (output: ReturnType<typeof envelope>) => {
+      output.coverage.serverObserved.searched.push({
+        queryId: 'unknown', provider: 'ccel_live', status: 'ok', returnedHitCount: 0,
+      });
+    }],
+    ['a missing provider execution flag', (output: ReturnType<typeof envelope>) => {
+      Reflect.deleteProperty(output.queries[0]!.providers[0]!, 'searched');
+    }],
+  ])('fails closed on %s in the v5 coverage ledger', async (_label, corrupt) => {
+    let ccelCalls = 0;
+    const production: CcelAuditClient = {
+      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('4', false) }] }),
+      callTool: vi.fn(), close: vi.fn().mockResolvedValue(undefined),
+    };
+    const preview: CcelAuditClient = {
+      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('5', true, true) }] }),
+      callTool: vi.fn(async () => {
+        ccelCalls++;
+        if (ccelCalls === 1) {
+          const output = envelope(provider('ccel_live', 'no_results'));
+          corrupt(output);
+          return { structuredContent: output };
+        }
+        return { isError: true, structuredContent: envelope(provider('ccel_live', 'rate_limited', 10), 'unavailable') };
+      }),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    await expect(runCcelPreviewAudit(auditOptions, {
+      connect: async url => url === auditOptions.productionUrl ? production : preview,
+    })).rejects.toThrow(/coverage|execution state/);
+    expect(production.callTool).not.toHaveBeenCalled();
+    expect(preview.callTool).toHaveBeenCalledTimes(2);
+  });
+
+  it('stops after two possible origin admissions even when the mocked coordinator violates busy policy', async () => {
+    let possibleOriginAdmissions = 0;
+    const production: CcelAuditClient = {
+      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('4', false) }] }),
+      callTool: vi.fn(), close: vi.fn().mockResolvedValue(undefined),
+    };
+    const preview: CcelAuditClient = {
+      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('5', true, true) }] }),
       callTool: vi.fn(async () => {
         possibleOriginAdmissions++;
         return { structuredContent: envelope(provider('ccel_live', 'no_results')) };
@@ -115,11 +246,11 @@ describe('CCEL operational scripts', () => {
 
   it('rejects an isError response unless it is the exact CCEL-only rate-limit form', async () => {
     const production: CcelAuditClient = {
-      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: { properties: { schemaVersion: { const: '3' } } } }] }),
+      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('4', false) }] }),
       callTool: vi.fn(), close: vi.fn().mockResolvedValue(undefined),
     };
     const preview: CcelAuditClient = {
-      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: { properties: { schemaVersion: { const: '4' }, retryAfterSeconds: {} } } }] }),
+      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('5', true, true) }] }),
       callTool: vi.fn().mockResolvedValue({ isError: true, structuredContent: envelope(provider('local', 'rate_limited', 3), 'unavailable') }),
       close: vi.fn().mockResolvedValue(undefined),
     };

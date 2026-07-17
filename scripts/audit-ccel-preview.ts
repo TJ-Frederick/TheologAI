@@ -35,14 +35,50 @@ export function parseCcelAuditArgs(argv: string[]): CcelAuditOptions {
 }
 
 type Provider = {
-  provider?: string; status?: string; retryAfterSeconds?: number; hitCount?: number;
-  hits?: Array<{ snippet?: string; locator?: { kind?: string; url?: string } }>;
+  provider?: string; status?: string; searched?: boolean; retryAfterSeconds?: number; hitCount?: number;
+  scope?: { eligibleDocuments?: Array<{ editionReadiness?: EditionReadiness }> };
+  hits?: Array<{
+    snippet?: string; metadataStatus?: string; editionReadiness?: EditionReadiness;
+    locator?: { kind?: string; url?: string; uri?: string };
+  }>;
+};
+type EditionReadiness = {
+  foundation?: string; editionIdentity?: string; provenance?: string; exactArtifactRights?: string;
+};
+type CoverageObservation = {
+  queryId?: string; provider?: string; status?: string; returnedHitCount?: number;
 };
 type SearchOutput = {
   schemaVersion?: string; planStatus?: string;
   responseWindow?: { unit?: string; maximum?: number; truncated?: boolean };
-  evidencePolicy?: { snippetUse?: string; externalSectionAccess?: string };
-  queries?: Array<{ providers?: Provider[] }>;
+  coverage?: {
+    localAttempted?: boolean; localHitCount?: number; ccelAttempted?: boolean; ccelHitCount?: number;
+    serverObserved?: { searched?: CoverageObservation[]; notSearched?: CoverageObservation[] };
+  };
+  evidencePolicy?: {
+    snippetUse?: string; localSectionAccess?: string; externalSectionAccess?: string;
+    coverageScope?: string; externalRightsStatus?: string; lookupAliasUse?: string;
+    coverageLedger?: Record<string, string>;
+  };
+  queries?: Array<{ id?: string; providers?: Provider[] }>;
+};
+
+const LOCAL_EDITION_READINESS = {
+  foundation: 'edition-provenance-foundation.v1',
+  editionIdentity: 'not_established',
+  provenance: 'incomplete',
+  exactArtifactRights: 'not_established_by_this_contract',
+};
+const EXTERNAL_EDITION_READINESS = {
+  editionIdentity: 'provider_unreviewed',
+  provenance: 'provider_unreviewed',
+  exactArtifactRights: 'not_determined',
+};
+const COVERAGE_LEDGER = {
+  searched: 'server_observed_provider_execution',
+  read: 'host_observed_successful_exact_resource_or_page_read',
+  deferred: 'host_recorded_intentional_deferral',
+  notSearched: 'server_observed_provider_non_execution',
 };
 
 type AuditToolResponse = {
@@ -85,8 +121,12 @@ export async function runCcelPreviewAudit(options: CcelAuditOptions, dependencie
     const previewTools = await preview.listTools();
     const productionSchema = toolSchema(productionTools.tools, 'primary_source_search');
     const previewSchema = toolSchema(previewTools.tools, 'primary_source_search');
-    assert(JSON.stringify(productionSchema).includes('"const":"3"') && !JSON.stringify(productionSchema).includes('"ccel"'), 'production 000 control');
-    assert(JSON.stringify(previewSchema).includes('"const":"4"') && JSON.stringify(previewSchema).includes('retryAfterSeconds'), 'preview v4 contract');
+    assert(schemaVersionIs(productionSchema, '4')
+      && !schemaContainsConst(productionSchema, 'ccel_live')
+      && !schemaContainsProperty(productionSchema, 'retryAfterSeconds'), 'production v4 local-only control');
+    assert(schemaVersionIs(previewSchema, '5')
+      && schemaContainsConst(previewSchema, 'ccel_live')
+      && schemaContainsProperty(previewSchema, 'retryAfterSeconds'), 'preview v5 CCEL contract');
 
     // Exactly two concurrent CCEL-only calls exercise the one global Durable
     // Object budget without relying on process-local cache affinity or elapsed
@@ -99,21 +139,21 @@ export async function runCcelPreviewAudit(options: CcelAuditOptions, dependencie
     const cold = contenders.filter(output => ['ok', 'no_results'].includes(provider(output, 'ccel_live')?.status ?? ''));
     const busy = contenders.filter(output => provider(output, 'ccel_live')?.status === 'rate_limited');
     assert(cold.length === 1 && busy.length === 1, 'one admitted discovery and one globally rate-limited contender');
-    for (const output of contenders) assertValidV4Envelope(output);
+    for (const output of contenders) assertValidV5Envelope(output);
     assertValidExternalDiscovery(provider(cold[0]!, 'ccel_live')!);
     assertValidRateLimited(provider(busy[0]!, 'ccel_live')!);
 
     // Local search is deliberately separate and cannot consume an origin slot.
     const local = await search(preview, ccelBudget, 'audit-local-fallback', 'justification', ['local']);
     assert(['ok', 'no_results', 'catalog_miss'].includes(provider(local, 'local')?.status ?? ''), 'usable local fallback independent of CCEL');
-    assertValidV4Envelope(local);
+    assertValidV5Envelope(local);
     assert(ccelBudget.snapshot() === 2, 'exactly two CCEL-bearing tool calls');
 
     return {
       schemaVersion: '1', audit: 'ccel-live-preview', passed: true,
-      productionControl: { contractVersion: '3', liveCallMade: false },
+      productionControl: { contractVersion: '4', liveCallMade: false },
       preview: {
-        contractVersion: '4', ccelBearingToolCallMaximum: 2, upstreamOriginAdmissionMaximum: 2,
+        contractVersion: '5', ccelBearingToolCallMaximum: 2, upstreamOriginAdmissionMaximum: 2,
         statuses: [...contenders, local].map(summarize),
       },
       privacy: 'No query, title, snippet, content, URL, header, or client identity is retained.',
@@ -139,14 +179,81 @@ function assertValidRateLimited(external: Provider): void {
   void boundedAuditSleepMs(external.retryAfterSeconds!);
 }
 
-function assertValidV4Envelope(output: SearchOutput): void {
-  assert(output.schemaVersion === '4'
+function assertValidV5Envelope(output: SearchOutput): void {
+  assert(output.schemaVersion === '5'
     && output.responseWindow?.unit === 'utf8_bytes'
     && output.responseWindow.maximum === 32_768
     && typeof output.responseWindow.truncated === 'boolean'
     && output.evidencePolicy?.snippetUse === 'discovery_only'
+    && output.evidencePolicy.localSectionAccess === 'mcp_resource_read'
     && output.evidencePolicy.externalSectionAccess === 'direct_url_only'
-    && !JSON.stringify(output).includes('resource_link'), 'compact v4 discovery semantics');
+    && output.evidencePolicy.coverageScope === 'bounded_non_exhaustive'
+    && output.evidencePolicy.externalRightsStatus === 'not_determined'
+    && output.evidencePolicy.lookupAliasUse === 'exact_routing_only_not_metadata_evidence'
+    && matchesExactRecord(output.evidencePolicy.coverageLedger, COVERAGE_LEDGER)
+    && !JSON.stringify(output).includes('resource_link'), 'compact v5 discovery semantics');
+
+  const searched = output.coverage?.serverObserved?.searched;
+  const notSearched = output.coverage?.serverObserved?.notSearched;
+  assert(Array.isArray(searched) && Array.isArray(notSearched), 'v5 server-observed coverage ledger');
+  const providers = output.queries?.flatMap(query => (query.providers ?? []).map(item => ({ queryId: query.id, item }))) ?? [];
+  const providerKeys = providers.map(({ queryId, item }) => `${String(queryId)}\u0000${String(item.provider)}`);
+  assert(providerKeys.length > 0
+    && new Set(providerKeys).size === providerKeys.length
+    && searched.length + notSearched.length === providers.length, 'one-to-one provider coverage');
+  for (const { queryId, item } of providers) {
+    assert(typeof queryId === 'string' && queryId.length > 0
+      && (item.provider === 'local' || item.provider === 'ccel_live')
+      && typeof item.searched === 'boolean'
+      && Number.isSafeInteger(item.hitCount)
+      && item.hitCount === (item.hits?.length ?? 0), 'explicit bounded provider execution state');
+    const searchedMatches = searched.filter(observation => observation.queryId === queryId && observation.provider === item.provider);
+    const notSearchedMatches = notSearched.filter(observation => observation.queryId === queryId && observation.provider === item.provider);
+    if (item.searched) {
+      assert(searchedMatches.length === 1 && notSearchedMatches.length === 0
+        && searchedMatches[0]?.status === item.status
+        && searchedMatches[0]?.returnedHitCount === item.hitCount, 'truthful searched-provider coverage');
+    } else {
+      assert(searchedMatches.length === 0 && notSearchedMatches.length === 1
+        && notSearchedMatches[0]?.status === item.status, 'truthful non-executed-provider coverage');
+    }
+    if (item.provider === 'local') assertValidLocalEditionReadiness(item);
+    if (item.provider === 'ccel_live') assertValidExternalEditionReadiness(item);
+  }
+
+  const local = providers.filter(({ item }) => item.provider === 'local').map(({ item }) => item);
+  const external = providers.filter(({ item }) => item.provider === 'ccel_live').map(({ item }) => item);
+  assert(output.coverage?.localAttempted === local.some(item => item.searched === true)
+    && output.coverage.localHitCount === local.reduce((count, item) => count + (item.hitCount ?? 0), 0)
+    && output.coverage.ccelAttempted === external.some(item => item.searched === true)
+    && output.coverage.ccelHitCount === external.reduce((count, item) => count + (item.hitCount ?? 0), 0),
+  'v5 aggregate coverage');
+}
+
+function assertValidLocalEditionReadiness(local: Provider): void {
+  for (const hit of local.hits ?? []) {
+    assert(matchesExactRecord(hit.editionReadiness, LOCAL_EDITION_READINESS)
+      && hit.locator?.kind === 'mcp_resource'
+      && typeof hit.locator.uri === 'string', 'local edition readiness and resource access');
+  }
+  for (const document of local.scope?.eligibleDocuments ?? []) {
+    assert(matchesExactRecord(document.editionReadiness, LOCAL_EDITION_READINESS), 'local scope edition readiness');
+  }
+}
+
+function assertValidExternalEditionReadiness(external: Provider): void {
+  for (const hit of external.hits ?? []) {
+    assert(matchesExactRecord(hit.editionReadiness, EXTERNAL_EDITION_READINESS)
+      && hit.metadataStatus === 'provider_search_result_unreviewed', 'external edition readiness');
+  }
+}
+
+function matchesExactRecord(actual: Record<string, unknown> | undefined, expected: Record<string, string>): boolean {
+  if (!actual) return false;
+  const actualKeys = Object.keys(actual).sort();
+  const expectedKeys = Object.keys(expected).sort();
+  return actualKeys.length === expectedKeys.length
+    && actualKeys.every((key, index) => key === expectedKeys[index] && actual[key] === expected[key]);
 }
 
 function assertValidExternalDiscovery(external: Provider): void {
@@ -220,6 +327,25 @@ function toolSchema(tools: Array<{ name: string; outputSchema?: object }>, name:
   const schema = tools.find(tool => tool.name === name)?.outputSchema;
   if (!schema) throw new Error(`Missing ${name} output schema.`);
   return schema;
+}
+
+function schemaVersionIs(schema: object, expected: string): boolean {
+  const properties = (schema as { properties?: Record<string, unknown> }).properties;
+  const schemaVersion = properties?.schemaVersion as { const?: unknown } | undefined;
+  return schemaVersion?.const === expected;
+}
+
+function schemaContainsConst(value: unknown, expected: string): boolean {
+  if (!value || typeof value !== 'object') return false;
+  if ('const' in value && (value as { const?: unknown }).const === expected) return true;
+  return Object.values(value).some(item => schemaContainsConst(item, expected));
+}
+
+function schemaContainsProperty(value: unknown, expected: string): boolean {
+  if (!value || typeof value !== 'object') return false;
+  const properties = (value as { properties?: unknown }).properties;
+  if (properties && typeof properties === 'object' && expected in properties) return true;
+  return Object.values(value).some(item => schemaContainsProperty(item, expected));
 }
 
 function assert(condition: boolean, label: string): asserts condition {
