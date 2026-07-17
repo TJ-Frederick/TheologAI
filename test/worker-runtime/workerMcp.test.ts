@@ -212,7 +212,7 @@ describe('Worker MCP endpoint in workerd', () => {
       .find(tool => tool.name === 'primary_source_search')!;
     expect(primarySourceTool).toMatchObject({
       annotations: { openWorldHint: true },
-      outputSchema: { properties: { schemaVersion: { const: '4' } } },
+      outputSchema: { properties: { schemaVersion: { const: '5' } } },
     });
     expect((((primarySourceTool.inputSchema as any).properties.queries.items)
       .properties.providers.items.enum)).toEqual(['local', 'ccel']);
