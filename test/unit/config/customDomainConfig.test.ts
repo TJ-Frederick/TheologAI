@@ -93,7 +93,7 @@ describe('custom-domain infrastructure contract', () => {
     expect(WORKER_DEFAULT_ALLOWED_ORIGIN).toBe('https://theologai.pages.dev');
   });
 
-  it('documents the baseline, aliases, no-deletion rule, and preview-first merge sequence', async () => {
+  it('documents the release-time baseline, aliases, no-deletion rule, and preview-first merge sequence', async () => {
     const migration = await readProjectFile('docs/CUSTOM-DOMAIN-MIGRATION.md');
     for (const value of [
       'https://theologai.xyz',
@@ -105,10 +105,15 @@ describe('custom-domain infrastructure contract', () => {
     ]) {
       expect(migration).toContain(value);
     }
-    expect(migration).toMatch(/No existing route, domain,\s+deployment, database, or compatibility endpoint may be deleted/);
-    expect(migration).toContain('16e633bc70dbbea668caacf87f994a2536441092');
-    expect(migration).toContain('72/72');
+    expect(migration).toMatch(/No existing\s+route, domain,\s*deployment, database, or compatibility endpoint may be deleted/);
+    expect(migration).toContain('Release-time known-good baseline');
+    expect(migration).not.toContain('PR #50 production');
     expect(migration).toContain('Do not merge it yet');
     expect(migration).toContain('Merge the same reviewed pull request only after preview and the website have');
+    expect(migration).toContain('sampled guard diagnostic');
+    expect(migration).toContain('$workers.event.response.status');
+    expect(migration).toMatch(/Never treat this sampled view as\s+an exact\s+billing, invocation, or guard-block count/);
+    expect(migration).toContain('Cache-Control: no-store');
+    expect(migration).toContain('Authorization');
   });
 });

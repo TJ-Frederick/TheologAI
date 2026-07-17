@@ -32,26 +32,37 @@ custom-domain attachment, and the optional `www` redirect may require manual
 Cloudflare dashboard action even though Worker routes are declared in
 `wrangler.toml`.
 
-## Known-good pre-migration baseline
+## Release-time known-good baseline
 
-The rollback anchor is PR #50 merge
-`16e633bc70dbbea668caacf87f994a2536441092`, protected production run
-`29527760541`, GitHub deployment `5479150556`, Cloudflare deployment
-`5822242e-d0bf-43a9-bbbc-0ec7d6edd180`, and production Worker version
-`32520410-d363-4b2b-83d1-cb7613eab2f1` at 100%. It uses production D1
+The rollback anchor is deliberately a release-time record, not a stale version
+in this document. Immediately before the temporary redirect is deployed, the
+release coordinator must capture in the protected production approval and
+deployment comment:
+
+- the exact approved production source SHA and the immediately preceding
+  known-good production release (the post-PR #70 release if that is the chosen
+  predecessor);
+- the GitHub Actions run, GitHub deployment, Cloudflare deployment, Worker
+  version, and 100% traffic assignment for that predecessor;
+- production D1 name and ID, rate-limit namespace and policy, CCEL flags, and
+  custom-domain state; and
+- the fresh initialization, CORS, representative-tool, and black-box audit
+  evidence for that predecessor.
+
+Do not substitute an historical deployment identifier for this record. If the
+planned predecessor is not yet released or has not passed its audit, capture
+the actual approved predecessor immediately before release and stop if it is
+not a suitable rollback target. The production D1 remains
 `theologai-production-20260715-a`
 (`c6535a4a-1953-4279-b277-7368445fc61a`), rate namespace `361201` at 120/60,
-and CCEL flags `000`. Its post-deployment black-box audit passed 72/72
-assertions with no P0-P3 findings: parallel-text 44/44, protocol/inventory/CCEL
-9/9, and HTTP/CORS/negotiation/under-budget rate behavior 19/19.
+and CCEL flags `000` unless a separately reviewed release changes one of them.
 
-Preview remains Worker version `50bdd564-63da-4461-9a5b-73c61f26f7e6`, D1
+A preview deployment necessarily creates a new Worker version. Record that
+version after each preview deployment; preview must continue to use D1
 `theologai-preview-20260714-a`
 (`0dab804f-8df0-4727-93bd-299612b6e179`), rate namespace `361202`, and CCEL
-flags `100`. A preview deployment necessarily creates a new Worker version;
-record that version after deployment. The preview D1, rate namespace, CCEL
-flags, and environment ownership—not the previous Worker version—must remain
-invariant through domain attachment.
+flags `100`. Those bindings and environment ownership—not a prior Worker
+version—must remain invariant through this migration.
 
 ## Reviewable phase split
 
@@ -181,11 +192,49 @@ During the client cutover window, the production Worker handles the legacy
 reads, or MCP construction:
 
 - The exact IP and user-agent tuple of the AWS Frankfurt poller observed on
-  2026-07-17 receives `410 Gone` on the legacy hostname and `403 Forbidden` on
-  any other hostname.
+  2026-07-17 receives `410 Gone` on the legacy production hostname and `403
+  Forbidden` on the production custom hostname. The tuple is never blocked on
+  preview or arbitrary hostnames.
 - Every other method and path on the legacy hostname receives `308 Permanent
   Redirect` to the same path and query on `https://mcp.theologai.xyz`.
-- Preview hostnames are not redirected.
+- A browser preflight from an exact configured website origin to `/` or `/mcp`
+  receives the existing `204` CORS response instead of a cross-origin redirect.
+  An actual legacy request still receives the redirect with the same exact
+  `Access-Control-Allow-Origin` and `Vary: Origin` behavior. Untrusted origins
+  are never reflected.
+- Preview hostnames are not redirected. This does not make the temporary
+  redirect an authentication migration: browsers and client libraries can strip
+  or decline to forward origin-scoped `Authorization` credentials across a
+  hostname redirect. The current endpoint is anonymous; a future authenticated
+  client must move directly to the canonical URL rather than rely on this
+  redirect.
+- The redirect uses `Cache-Control: no-store` throughout burn-in. Its effective
+  shared/browser cache horizon is zero even though the status is `308`. Do not
+  raise that horizon in this release. A separately reviewed change may use a
+  short cache only after at least seven full days of clean redirect telemetry,
+  no unresolved CORS/client reports, and explicit owner approval.
+
+### Burn-in telemetry
+
+The sampled guard diagnostic is the existing Cloudflare Workers Observability
+Query Builder for Worker `theologai`, using its configured 25% head-sampled
+invocation logs. Save and run this bounded query over 15-minute and 24-hour
+windows:
+
+```text
+$workers.event.response.status = 308 OR $workers.event.response.status = 410
+```
+
+Group by `$workers.event.response.status` and
+`$workers.event.request.path`; use the Worker Metrics request-count chart for
+the unsampled aggregate invocation trend. The routing invariant makes the
+sampled diagnostic host and guard-specific without collecting client identity:
+only the production legacy hostname emits `308`, and only its exact poller
+tuple emits `410`. Production-custom-host poller blocks are `403` and must not
+be counted from the generic `403` population. Never treat this sampled view as
+an exact billing, invocation, or guard-block count, and do not raise log
+sampling merely to observe this migration. Keep `THEOLOGAI_REQUEST_LOGS`
+disabled in production.
 
 Monitor status codes and host traffic throughout the window. Once legitimate
 legacy traffic has fallen to an acceptable level, obtain owner approval to set
@@ -202,10 +251,10 @@ Domain rollback does not require deleting anything:
    revert the migration gate or restore the preceding Worker version before
    using that alias. The website can independently return to
    `theologai.pages.dev`.
-2. If the new Worker version itself is unhealthy, restore PR #50 production
-   Worker version `32520410-d363-4b2b-83d1-cb7613eab2f1` with its unchanged
-   production D1, or the recorded preview baseline with its unchanged preview
-   D1. Re-run readiness before any Worker rollback.
+2. If the new Worker version itself is unhealthy, restore the exact
+   release-time production baseline recorded above with its unchanged production
+   D1, or the recorded preview baseline with its unchanged preview D1. Re-run
+   readiness before any Worker rollback.
 3. Disable or detach a custom hostname only after explicit owner approval; do
    not delete its DNS record, route, certificate, deployment, or legacy alias as
    an automatic rollback step.
