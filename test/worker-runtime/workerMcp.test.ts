@@ -643,6 +643,7 @@ describe('Worker MCP endpoint in workerd', () => {
       },
     }, 1153);
     expect(mixedCursor.message.result).toMatchObject({ isError: true });
+    expect(textContent(mixedCursor.message)).toContain('Invalid arguments for parallel_passages');
 
     const enrichedCursor = await rpc('tools/call', {
       name: 'parallel_passages', arguments: {
@@ -652,7 +653,7 @@ describe('Worker MCP endpoint in workerd', () => {
       },
     }, 1154);
     expect(enrichedCursor.message.result).toMatchObject({ isError: true });
-    expect(textContent(enrichedCursor.message)).toContain('includeText');
+    expect(textContent(enrichedCursor.message)).toContain('Invalid arguments for parallel_passages');
 
     const maximumMark = await rpc('tools/call', {
       name: 'parallel_passages', arguments: { reference: 'Mark 10:19', maxGroups: 10 },

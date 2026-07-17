@@ -182,6 +182,7 @@ describe('Worker-safe JSON Schema validation', () => {
       { corpora: ['theologai_legacy'] },
       { corpora: ['ubs_source_attested', 'theologai_legacy'] },
       { mode: 'auto' }, { maxParallels: 1 },
+      { includeText: true },
       { includeOpenBibleCrossReferences: false }, { useCrossReferences: false },
     ]) {
       expect(validate({ reference: 'Mark 10:19', groupCursor: 'opaque', ...control }).valid).toBe(false);
