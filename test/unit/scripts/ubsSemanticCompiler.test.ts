@@ -152,6 +152,20 @@ describe('source-free Hebrew UBS semantic compiler skeleton', () => {
     expect(() => compile(input)).toThrow();
   });
 
+  it.each([
+    'Synthetic\u0000 1:1',
+    'Synthetic\u0085 1:1',
+    'Synthetic\u202e 1:1',
+    'Synthetic\u200b 1:1',
+    'Synthetic\ud800 1:1',
+    'Synthetic\u2028 1:1',
+    `Synthetic${String.fromCodePoint(0x10ffff)} 1:1`,
+  ])('rejects hostile normalized-reference input at compiler ingestion: %j', normalizedReference => {
+    const input = fixture();
+    input.entries[0].senses[0].references[0].normalizedReference = normalizedReference;
+    expect(() => compile(input)).toThrow(/normalizedReference/);
+  });
+
   it('requires exactly one dictionary and one lexical-domain source', () => {
     const missing = fixture(); missing.sources.pop();
     expect(() => compile(missing)).toThrow('exactly the dictionary and lexical-domain artifacts');

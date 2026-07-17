@@ -1,6 +1,6 @@
 {
-  "$comment": "DESIGN FIXTURE ONLY. Hebrew-only public v1; not registered by any MCP tool.",
-  "contractVersion": "ubs-hebrew-semantic-evidence.draft-v1",
+  "$comment": "DESIGN FIXTURE ONLY. Hebrew-only public v1; not registered by any MCP tool. JSON Schema validates structure; the inactive pure presenter guard separately enforces relational bindings, arithmetic, and the serialized UTF-8 byte cap.",
+  "contractVersion": "ubs-hebrew-semantic-evidence.draft-v2",
   "schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
@@ -8,70 +8,82 @@
       {
         "properties": {
           "audience": { "enum": ["beginner", "expert"] },
-          "status": { "const": "exact_context" },
-          "plainLanguage": { "type": "string", "minLength": 1 },
-          "senseId": { "type": "string", "minLength": 1 },
-          "lexicalIdentities": { "$ref": "#/$defs/publicHebrewIdentities" },
+          "status": { "const": "reference_aligned_source_candidate" },
+          "plainLanguage": { "type": "string", "minLength": 1, "maxLength": 2000 },
+          "identity": { "$ref": "#/$defs/publicIdentityBoundary" },
+          "normalizedReference": { "type": "string", "minLength": 1, "maxLength": 100 },
+          "senseId": { "type": "string", "minLength": 1, "maxLength": 128 },
           "meaning": { "$ref": "#/$defs/meaning" },
           "referenceEvidence": { "$ref": "#/$defs/referenceEvidence" },
           "alignmentEvidence": { "$ref": "#/$defs/alignmentEvidence" },
+          "resultWindow": { "$ref": "#/$defs/resultWindow" },
+          "responseWindow": { "$ref": "#/$defs/responseWindow" },
           "withheldEvidence": { "$ref": "#/$defs/withheldEvidence" },
           "provenance": { "$ref": "#/$defs/provenance" }
         },
-        "required": ["audience", "status", "plainLanguage", "senseId", "lexicalIdentities", "meaning", "referenceEvidence", "alignmentEvidence", "withheldEvidence", "provenance"],
+        "required": ["audience", "status", "plainLanguage", "identity", "normalizedReference", "senseId", "meaning", "referenceEvidence", "alignmentEvidence", "resultWindow", "responseWindow", "withheldEvidence", "provenance"],
         "additionalProperties": false
       },
       {
         "properties": {
           "audience": { "enum": ["beginner", "expert"] },
           "status": { "const": "lexical_candidates" },
-          "plainLanguage": { "type": "string", "minLength": 1 },
+          "plainLanguage": { "type": "string", "minLength": 1, "maxLength": 2000 },
           "reason": { "enum": ["no_reference_evidence", "reference_alignment_unproven", "ambiguous_reference_alignment"] },
-          "lexicalIdentities": { "$ref": "#/$defs/publicHebrewIdentities" },
+          "identity": { "$ref": "#/$defs/publicIdentityBoundary" },
+          "normalizedReference": { "type": "string", "minLength": 1, "maxLength": 100 },
           "candidates": {
             "type": "array",
             "minItems": 1,
+            "maxItems": 8,
             "items": {
               "type": "object",
               "properties": {
-                "senseId": { "type": "string", "minLength": 1 },
+                "senseId": { "type": "string", "minLength": 1, "maxLength": 128 },
                 "meaning": { "$ref": "#/$defs/meaning" }
               },
               "required": ["senseId", "meaning"],
               "additionalProperties": false
             }
           },
+          "resultWindow": { "$ref": "#/$defs/resultWindow" },
+          "responseWindow": { "$ref": "#/$defs/responseWindow" },
           "withheldEvidence": { "$ref": "#/$defs/withheldEvidence" },
           "provenance": { "$ref": "#/$defs/provenance" }
         },
-        "required": ["audience", "status", "plainLanguage", "reason", "lexicalIdentities", "candidates", "withheldEvidence", "provenance"],
+        "required": ["audience", "status", "plainLanguage", "reason", "identity", "normalizedReference", "candidates", "resultWindow", "responseWindow", "withheldEvidence", "provenance"],
         "additionalProperties": false
       },
       {
         "properties": {
           "audience": { "enum": ["beginner", "expert"] },
           "status": { "const": "unavailable" },
-          "plainLanguage": { "type": "string", "minLength": 1 },
+          "plainLanguage": { "type": "string", "minLength": 1, "maxLength": 2000 },
           "reason": { "enum": ["no_lexical_entry", "no_publishable_semantic_evidence"] },
+          "resultWindow": { "$ref": "#/$defs/resultWindow" },
+          "responseWindow": { "$ref": "#/$defs/responseWindow" },
           "withheldEvidence": { "$ref": "#/$defs/withheldEvidence" }
         },
-        "required": ["audience", "status", "plainLanguage", "reason", "withheldEvidence"],
+        "required": ["audience", "status", "plainLanguage", "reason", "resultWindow", "responseWindow", "withheldEvidence"],
         "additionalProperties": false
       }
     ],
     "$defs": {
-      "publicHebrewIdentities": {
-        "type": "array",
-        "minItems": 1,
-        "uniqueItems": true,
-        "items": { "type": "string", "pattern": "^H(?!0000$)[0-9]{4}$" }
+      "publicIdentityBoundary": {
+        "type": "object",
+        "properties": {
+          "publicStrongs": { "type": "string", "pattern": "^H(?:[1-9][0-9]{0,3})$", "maxLength": 5 },
+          "sourceIdentity": { "type": "string", "pattern": "^H(?!0000$)[0-9]{4}$", "minLength": 5, "maxLength": 5 }
+        },
+        "required": ["publicStrongs", "sourceIdentity"],
+        "additionalProperties": false
       },
       "domainEvidence": {
         "type": "object",
         "properties": {
-          "domainId": { "type": "string", "minLength": 1 },
-          "label": { "type": "string", "minLength": 1 },
-          "description": { "type": "string", "minLength": 1 }
+          "domainId": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "label": { "type": "string", "minLength": 1, "maxLength": 1000 },
+          "description": { "type": "string", "minLength": 1, "maxLength": 5000 }
         },
         "required": ["domainId", "label"],
         "additionalProperties": false
@@ -79,9 +91,9 @@
       "meaning": {
         "type": "object",
         "properties": {
-          "definition": { "type": "string", "minLength": 1 },
-          "glosses": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
-          "domains": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/domainEvidence" } }
+          "definition": { "type": "string", "minLength": 1, "maxLength": 20000 },
+          "glosses": { "type": "array", "minItems": 1, "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 1000 } },
+          "domains": { "type": "array", "minItems": 1, "maxItems": 16, "items": { "$ref": "#/$defs/domainEvidence" } }
         },
         "required": ["definition", "glosses", "domains"],
         "additionalProperties": false
@@ -89,11 +101,11 @@
       "referenceEvidence": {
         "type": "object",
         "properties": {
-          "sourceId": { "type": "string", "minLength": 1 },
-          "senseId": { "type": "string", "minLength": 1 },
-          "evidenceId": { "type": "string", "minLength": 1 },
-          "sourceReference": { "type": "string", "minLength": 1 },
-          "normalizedReference": { "type": "string", "minLength": 1 },
+          "sourceId": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "senseId": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "evidenceId": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "sourceReference": { "type": "string", "minLength": 1, "maxLength": 100 },
+          "normalizedReference": { "type": "string", "minLength": 1, "maxLength": 100 },
           "kind": { "const": "source_attested_sense_reference" }
         },
         "required": ["sourceId", "senseId", "evidenceId", "sourceReference", "normalizedReference", "kind"],
@@ -103,10 +115,69 @@
         "type": "object",
         "properties": {
           "status": { "const": "verified_token_alignment" },
-          "morphologyTokenIdentity": { "type": "string", "minLength": 1 },
-          "verifierVersion": { "type": "integer", "minimum": 1 }
+          "morphologyTokenIdentity": { "type": "string", "minLength": 1, "maxLength": 512 },
+          "verifierVersion": { "type": "integer", "minimum": 1, "maximum": 1000000 }
         },
         "required": ["status", "morphologyTokenIdentity", "verifierVersion"],
+        "additionalProperties": false
+      },
+      "continuation": {
+        "type": "object",
+        "properties": {
+          "cursor": { "type": "string", "minLength": 1, "maxLength": 4096, "pattern": "^ubs1_(?:[0-9a-f]{2})+$" },
+          "operation": { "const": "semantic_candidates" },
+          "artifactIdentity": { "type": "string", "pattern": "^[0-9a-f]{64}$", "minLength": 64, "maxLength": 64 },
+          "query": {
+            "type": "object",
+            "properties": {
+              "publicStrongs": { "type": "string", "pattern": "^H(?:[1-9][0-9]{0,3})$", "maxLength": 5 },
+              "sourceIdentity": { "type": "string", "pattern": "^H(?!0000$)[0-9]{4}$", "minLength": 5, "maxLength": 5 },
+              "normalizedReference": { "type": "string", "minLength": 1, "maxLength": 100 }
+            },
+            "required": ["publicStrongs", "sourceIdentity", "normalizedReference"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["cursor", "operation", "artifactIdentity", "query"],
+        "additionalProperties": false
+      },
+      "resultWindow": {
+        "type": "object",
+        "properties": {
+          "priorCount": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+          "returnedCount": { "type": "integer", "minimum": 0, "maximum": 8 },
+          "consumedCount": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+          "totalCount": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+          "hasMore": { "type": "boolean" },
+          "continuation": { "$ref": "#/$defs/continuation" }
+        },
+        "required": ["priorCount", "returnedCount", "consumedCount", "totalCount", "hasMore"],
+        "oneOf": [
+          {
+            "properties": {
+              "hasMore": { "const": false },
+              "continuation": false
+            },
+            "required": ["hasMore"]
+          },
+          {
+            "properties": {
+              "hasMore": { "const": true },
+              "continuation": { "$ref": "#/$defs/continuation" }
+            },
+            "required": ["hasMore", "continuation"]
+          }
+        ],
+        "additionalProperties": false
+      },
+      "responseWindow": {
+        "type": "object",
+        "properties": {
+          "unit": { "const": "utf8_bytes" },
+          "maximum": { "const": 32768 },
+          "truncated": { "type": "boolean" }
+        },
+        "required": ["unit", "maximum", "truncated"],
         "additionalProperties": false
       },
       "withheldEvidence": {
@@ -143,14 +214,14 @@
           "sourceRole": { "enum": ["dictionary", "lexical_domains"] },
           "artifactName": { "enum": ["UBSHebrewDic-v0.9.2-en.JSON", "UBSHebrewDicLexicalDomains-v0.9.2-en.JSON"] },
           "sourceVersion": { "const": "0.9.2" },
-          "sourceUrl": { "type": "string", "pattern": "^https://" },
+          "sourceUrl": { "type": "string", "pattern": "^https://", "maxLength": 1000 },
           "sourceCommit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
           "sourceBlob": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
           "sourceSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
           "publisher": { "const": "United Bible Societies" },
           "license": { "const": "CC BY-SA 4.0" },
           "licenseUrl": { "const": "https://creativecommons.org/licenses/by-sa/4.0/" },
-          "modificationDescription": { "type": "string", "minLength": 1 }
+          "modificationDescription": { "type": "string", "minLength": 1, "maxLength": 1000 }
         },
         "required": ["sourceRole", "artifactName", "sourceVersion", "sourceUrl", "sourceCommit", "sourceBlob", "sourceSha256", "publisher", "license", "licenseUrl", "modificationDescription"],
         "additionalProperties": false
@@ -208,11 +279,14 @@
       }
     }
   },
-  "statusValues": ["exact_context", "lexical_candidates", "unavailable"],
+  "statusValues": ["reference_aligned_source_candidate", "lexical_candidates", "unavailable"],
   "invariants": [
-    "exact_context requires readable definition, gloss, structured domain evidence, source-attested reference evidence, and verified local token alignment",
-    "a lexical identity match alone returns lexical_candidates with an explicit ambiguity reason, never exact_context",
-    "public v1 exposes only H#### identities; A#### identities are retained internally and explicitly withheld",
+    "reference_aligned_source_candidate reports one source candidate attested at the reference and separately aligned to the local token; it does not claim that the source adjudicates contextual meaning",
+    "a lexical identity match alone returns lexical_candidates with an explicit ambiguity reason, never reference_aligned_source_candidate",
+    "public/user identity remains unpadded H430 while source/internal identity is H0430; A#### identities are retained internally and explicitly withheld",
+    "a continuation is present if and only if resultWindow.hasMore is true and is bound to the exact operation, artifact identity, public/source identity pair, and normalized reference",
+    "resultWindow requires priorCount + returnedCount = consumedCount <= totalCount, and hasMore is true if and only if consumedCount is less than totalCount",
+    "the serialized UTF-8 response is capped at responseWindow.maximum and every field/item cap is independently enforced",
     "TBESH Meaning is withheld and never copied into a definition, gloss, or fallback"
   ],
   "beginnerExample": {
@@ -220,7 +294,8 @@
     "status": "lexical_candidates",
     "plainLanguage": "This Hebrew word has more than one possible dictionary sense, and the available evidence does not prove which one applies here.",
     "reason": "reference_alignment_unproven",
-    "lexicalIdentities": ["H0001"],
+    "identity": { "publicStrongs": "H1", "sourceIdentity": "H0001" },
+    "normalizedReference": "Synthetic 1:1",
     "candidates": [
       {
         "senseId": "synthetic-sense-one",
@@ -233,6 +308,24 @@
         }
       }
     ],
+    "resultWindow": {
+      "priorCount": 0,
+      "returnedCount": 1,
+      "consumedCount": 1,
+      "totalCount": 2,
+      "hasMore": true,
+      "continuation": {
+        "cursor": "ubs1_7b2276657273696f6e223a312c226f7065726174696f6e223a2273656d616e7469635f63616e64696461746573222c2261727469666163744964656e74697479223a2237373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737222c227075626c69635374726f6e6773223a224831222c22736f757263654964656e74697479223a224830303031222c226e6f726d616c697a65645265666572656e6365223a2253796e74686574696320313a31222c227072696f72436f756e74223a317d",
+        "operation": "semantic_candidates",
+        "artifactIdentity": "7777777777777777777777777777777777777777777777777777777777777777",
+        "query": {
+          "publicStrongs": "H1",
+          "sourceIdentity": "H0001",
+          "normalizedReference": "Synthetic 1:1"
+        }
+      }
+    },
+    "responseWindow": { "unit": "utf8_bytes", "maximum": 32768, "truncated": false },
     "withheldEvidence": [
       { "source": "TBESH", "field": "Meaning", "status": "withheld_rights_boundary" },
       { "source": "UBS Hebrew dictionary", "field": "A#### lexical identities", "status": "withheld_public_v1_scope" }
@@ -275,10 +368,11 @@
   },
   "expertExample": {
     "audience": "expert",
-    "status": "exact_context",
-    "plainLanguage": "The source sense is attested at this reference and separately aligned to this exact local morphology token.",
+    "status": "reference_aligned_source_candidate",
+    "plainLanguage": "This source candidate is attested at the reference and separately aligned to the local morphology token; that evidence does not by itself settle the word's contextual meaning.",
     "senseId": "synthetic-sense-one",
-    "lexicalIdentities": ["H0001"],
+    "identity": { "publicStrongs": "H1", "sourceIdentity": "H0001" },
+    "normalizedReference": "Synthetic 1:1",
     "meaning": {
       "definition": "SYNTHETIC DEFINITION — NOT UBS CONTENT",
       "glosses": ["SYNTHETIC GLOSS"],
@@ -303,6 +397,8 @@
       "morphologyTokenIdentity": "synthetic-token-1",
       "verifierVersion": 1
     },
+    "resultWindow": { "priorCount": 0, "returnedCount": 1, "consumedCount": 1, "totalCount": 1, "hasMore": false },
+    "responseWindow": { "unit": "utf8_bytes", "maximum": 32768, "truncated": false },
     "withheldEvidence": [
       { "source": "TBESH", "field": "Meaning", "status": "withheld_rights_boundary" },
       { "source": "UBS Hebrew dictionary", "field": "A#### lexical identities", "status": "withheld_public_v1_scope" }

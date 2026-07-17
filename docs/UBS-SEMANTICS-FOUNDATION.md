@@ -12,14 +12,22 @@ one-to-many `H####`/`A####` identities, senses, lexical domains, and
 source-attested reference evidence as separate records with per-artifact
 provenance. A dictionary reference is evidence about a source sense; it does
 not establish that a local morphology token has that sense. Public output may
-say `exact_context` only when a separately versioned verifier proves both the
-source sense/reference and exact local token alignment. Otherwise output is
-`lexical_candidates` with an explicit reason or `unavailable`.
+say `reference_aligned_source_candidate` only when a separately versioned
+verifier proves both the source sense/reference and exact local token alignment.
+That status still reports a source candidate, not an adjudicated contextual
+meaning. Otherwise output is `lexical_candidates` with an explicit reason or
+`unavailable`.
 
-Internal compilation preserves both `H####` and `A####`. Public Hebrew v1
-exposes only `H####` and explicitly reports that `A####` is withheld from the
-public scope. TBESH `Meaning` remains separately withheld at the rights
-boundary.
+Internal compilation and repository cursors preserve and may query both fixed-
+width `H####` and `A####` source identities. The future public boundary does
+not broaden the shared Strong's parser: a user-facing identity remains the
+existing unpadded `H430`, mapped explicitly to the source/internal `H0430`.
+Repository entry lookup accepts only a validated, branded fixed-width internal
+identity, including on the cursor-free first page; invalid raw strings fail at
+the boundary instead of reaching a future adapter.
+Public Hebrew v1 never accepts or emits `A####`; it explicitly reports that
+those identities are withheld from the public scope. TBESH `Meaning` remains
+separately withheld at the rights boundary.
 
 ## Bounded implementation slices A–H
 
@@ -89,25 +97,53 @@ honest totals, stable ordering, deterministic keyset cursors bound to the exact
 operation, query scope, and semantic artifact identity (preventing replay after
 a corpus or environment change), and no Worker-bundle inclusion of source
 artifacts. The repository returns evidence and candidates; it never resolves a
-contextual token sense.
+contextual token sense. Every page records the count returned by prior pages;
+`prior + showing` may never exceed the honest total, and a continuation is
+present if and only if more rows remain. This makes a short terminal page
+honest instead of comparing the global total only with the current page.
 
 ### G. Structured contract and presentation
 
 Review and version the draft fixture before registering it. Every
-`exact_context` result includes a human-readable definition, glosses, structured
-domain evidence, source-attested reference evidence, and verified token
-alignment. Beginner output always gives a plain-language explanation. Candidate
-output gives an explicit ambiguity reason. Expert provenance retains both exact
-artifact versions, commits, blobs, hashes, modification descriptions, publisher,
-license, and transformation identity.
+`reference_aligned_source_candidate` result includes a human-readable
+definition, glosses, structured domain evidence, source-attested reference
+evidence, and verified token alignment while explicitly denying that this
+settles contextual meaning. Beginner output always gives a plain-language
+explanation. Candidate output gives an explicit ambiguity reason. Expert
+provenance retains both exact artifact versions, commits, blobs, hashes,
+modification descriptions, publisher, license, and transformation identity.
 Public provenance includes each exact HTTPS source URL. Reference evidence
 always carries its exact `sourceId` and `senseId`; an evidence row cannot be
 presented without both identities.
 
-The public identity list is `H####` only. Its exact two-item withholding array
+The public identity boundary labels both forms without conflating them:
+`publicStrongs` uses existing unpadded user syntax such as `H430`, while
+`sourceIdentity` records the matched fixed-width UBS key such as `H0430`.
+Only H identities cross that boundary. Its exact two-item withholding array
 reports both the `A####` public-scope withholding and TBESH `Meaning` rights
 withholding; extra or missing entries fail validation. Neither withheld field
 may be blended into UBS definitions or glosses. Markdown remains compatible.
+
+The inactive draft caps the serialized semantic response at 32 KiB UTF-8 and
+also bounds every definition, gloss, identifier, reference, domain, candidate
+array, and provenance field. Every branch carries an honest result window.
+A continuation is allowed exactly when `hasMore` is true and carries the opaque
+cursor plus its exact operation, artifact identity, public/source identity pair,
+and normalized-reference binding. JSON Schema enforces the structural and field
+bounds only; it cannot enforce relational arithmetic or the total serialized
+byte size. The inactive pure presenter guard separately binds the request,
+top-level identity/reference, continuation, and provenance artifact, validates
+status-specific counts and window arithmetic, and returns the exact serialized
+string after enforcing the 32 KiB UTF-8 cap. Runtime registration and actual
+presentation remain later work. The stronger reference-aligned status also
+requires the output token identity and verifier version to match a trusted
+caller-supplied alignment assertion. That assertion also binds the exact source,
+sense, and evidence-row identities, so a valid token/verifier pair cannot
+authorize swapped semantic evidence. None of those values is trusted merely
+because it appears in the proposed output. One shared bounded normalized-
+reference validator is used by compiler ingestion, repository cursor
+creation/parsing, and the presenter request; it rejects control, format,
+bidirectional, line-separator, noncharacter, and malformed non-scalar Unicode.
 
 ### H. Release and audit
 

@@ -3,6 +3,7 @@ import type {
   UbsSemanticDomain,
   UbsSemanticDomainRef,
   UbsSemanticEntry,
+  UbsInternalLexicalIdentity,
   UbsSemanticReferenceEvidence,
   UbsSemanticSense,
   UbsSemanticSource,
@@ -11,6 +12,7 @@ import type {
 import {
   UBS_SEMANTIC_ARTIFACT_VERSION,
   UBS_SEMANTIC_TRANSFORM_VERSION,
+  requireUbsSemanticNormalizedReference,
 } from '../../src/kernel/ubsSemanticDomain.js';
 
 export const UBS_SEMANTIC_INTERMEDIATE_SCHEMA = 'theologai-ubs-semantics-intermediate.synthetic-v1';
@@ -183,7 +185,9 @@ function parseEntries(input: unknown, sourceId: string, domainSourceId: string):
     exactKeys(value, ['entryId', 'sourceOrdinal', 'lemma', 'transliteration', 'partOfSpeech', 'lexicalIdentities', 'senses'], path);
     const entryId = identifier(value.entryId, `${path}.entryId`);
     const lexicalIdentities = stringArray(value.lexicalIdentities, `${path}.lexicalIdentities`)
-      .map((identity, index) => patternString(identity, LEXICAL_IDENTITY, `${path}.lexicalIdentities[${index}]`));
+      .map((identity, index) => patternString(
+        identity, LEXICAL_IDENTITY, `${path}.lexicalIdentities[${index}]`,
+      ) as UbsInternalLexicalIdentity);
     if (lexicalIdentities.length === 0) throw new Error(`${path}.lexicalIdentities must not be empty`);
     unique(lexicalIdentities, `${path} lexical identity`);
     lexicalIdentities.sort(compareCodePoints);
@@ -237,7 +241,10 @@ function parseEntries(input: unknown, sourceId: string, domainSourceId: string):
           senseId: referenceSenseId,
           sourceOrdinal: positiveInteger(reference.sourceOrdinal, `${referencePath}.sourceOrdinal`),
           sourceReference: cleanString(reference.sourceReference, `${referencePath}.sourceReference`),
-          normalizedReference: cleanString(reference.normalizedReference, `${referencePath}.normalizedReference`),
+          normalizedReference: requireUbsSemanticNormalizedReference(
+            reference.normalizedReference,
+            `${referencePath}.normalizedReference`,
+          ),
           evidenceKind: 'source_attested_sense_reference',
         });
       }
