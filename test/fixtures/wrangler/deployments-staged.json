@@ -1,0 +1,15 @@
+[
+  {
+    "id": "423e4567-e89b-42d3-a456-426614174000",
+    "source": "wrangler",
+    "strategy": "percentage",
+    "author_email": "release@example.invalid",
+    "created_on": "2026-07-17T07:00:00.000Z",
+    "versions": [
+      {
+        "version_id": "223e4567-e89b-42d3-a456-426614174000",
+        "percentage": 100
+      }
+    ]
+  }
+]

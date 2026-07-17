@@ -1,0 +1,27 @@
+[
+  {
+    "id": "123e4567-e89b-42d3-a456-426614174000",
+    "number": 41,
+    "metadata": {
+      "created_on": "2026-07-17T04:00:00.000Z",
+      "author_email": "release@example.invalid",
+      "source": "wrangler"
+    },
+    "annotations": {
+      "workers/message": "Known-good production baseline"
+    }
+  },
+  {
+    "id": "223e4567-e89b-42d3-a456-426614174000",
+    "number": 42,
+    "metadata": {
+      "created_on": "2026-07-17T06:00:00.000Z",
+      "author_email": "release@example.invalid",
+      "source": "wrangler"
+    },
+    "annotations": {
+      "workers/message": "Stage THEOLOGAI_CCEL_OPERATOR_TOKEN without traffic",
+      "workers/tag": "ccel-operator-secret-staged"
+    }
+  }
+]
