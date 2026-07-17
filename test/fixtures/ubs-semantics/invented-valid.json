@@ -1,0 +1,87 @@
+{
+  "schemaVersion": "theologai-ubs-semantics-intermediate.synthetic-v1",
+  "fixtureStatus": "invented_synthetic_only",
+  "sources": [
+    {
+      "sourceId": "synthetic-hebrew-dictionary",
+      "sourceRole": "dictionary",
+      "title": "SYNTHETIC SENTINEL — NOT UBS DICTIONARY CONTENT",
+      "artifactName": "UBSHebrewDic-v0.9.2-en.JSON",
+      "artifactVersion": "0.9.2",
+      "language": "Hebrew",
+      "publisher": "United Bible Societies",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "sourceUrl": "https://example.invalid/no-source-bytes/dictionary",
+      "sourceCommit": "1111111111111111111111111111111111111111",
+      "sourceBlob": "2222222222222222222222222222222222222222",
+      "sourceSha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "transformVersion": 7,
+      "modified": true,
+      "modificationNote": "Synthetic sentinel metadata only; no UBS source bytes or content used."
+    },
+    {
+      "sourceId": "synthetic-hebrew-lexical-domains",
+      "sourceRole": "lexical_domains",
+      "title": "SYNTHETIC SENTINEL — NOT UBS LEXICAL-DOMAIN CONTENT",
+      "artifactName": "UBSHebrewDicLexicalDomains-v0.9.2-en.JSON",
+      "artifactVersion": "0.9.2",
+      "language": "Hebrew",
+      "publisher": "United Bible Societies",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "sourceUrl": "https://example.invalid/no-source-bytes/lexical-domains",
+      "sourceCommit": "4444444444444444444444444444444444444444",
+      "sourceBlob": "5555555555555555555555555555555555555555",
+      "sourceSha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "transformVersion": 7,
+      "modified": true,
+      "modificationNote": "Synthetic sentinel metadata only; no UBS source bytes or content used."
+    }
+  ],
+  "domains": [
+    {
+      "domainId": "synthetic-domain-root",
+      "sourceOrdinal": 1,
+      "parentDomainId": null,
+      "label": "SYNTHETIC DOMAIN ROOT",
+      "description": "Invented sentinel domain; not UBS content."
+    },
+    {
+      "domainId": "synthetic-domain-child",
+      "sourceOrdinal": 2,
+      "parentDomainId": "synthetic-domain-root",
+      "label": "SYNTHETIC DOMAIN CHILD",
+      "description": null
+    }
+  ],
+  "entries": [
+    {
+      "entryId": "synthetic-entry-one",
+      "sourceOrdinal": 1,
+      "lemma": "SYNTHETIC_HEBREW_SENTINEL_LEMMA",
+      "transliteration": "SYNTHETIC_TRANSLITERATION",
+      "partOfSpeech": "SYNTHETIC_PART_OF_SPEECH",
+      "lexicalIdentities": ["H0001", "A0001"],
+      "senses": [
+        {
+          "senseId": "synthetic-sense-one",
+          "entryId": "synthetic-entry-one",
+          "sourceOrdinal": 1,
+          "definition": "SYNTHETIC DEFINITION — NOT UBS CONTENT",
+          "glosses": ["SYNTHETIC GLOSS", "SYNTHETIC ALTERNATE GLOSS"],
+          "domainIds": ["synthetic-domain-child"],
+          "references": [
+            {
+              "evidenceId": "synthetic-reference-one",
+              "senseId": "synthetic-sense-one",
+              "sourceOrdinal": 1,
+              "sourceReference": "SYN 1:1",
+              "normalizedReference": "Synthetic 1:1"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
