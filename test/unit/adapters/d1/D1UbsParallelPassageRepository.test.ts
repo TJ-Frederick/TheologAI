@@ -117,6 +117,25 @@ describe('D1UbsParallelPassageRepository', () => {
     expect(d1Second).toEqual(nodeSecond);
   });
 
+  it('uses a finite open-ended chapter bound and matches Node across keyset pages', async () => {
+    const artifact = ubsFixture() as any;
+    const node = new UbsParallelPassageRepository(artifact, artifact.artifactIdentity);
+    const nodeFirst = node.findGroups('Luke 6', 1);
+    const nodeSecond = node.findGroups('Luke 6', 1, nodeFirst.groups[0].sourceOrdinal);
+
+    const d1FirstFixture = fixtureDb(undefined, true, undefined, 0);
+    const d1SecondFixture = fixtureDb(undefined, false, undefined, 1);
+    const d1First = await new D1UbsParallelPassageRepository(d1FirstFixture.db as any).findGroups('Luke 6', 1);
+    const d1Second = await new D1UbsParallelPassageRepository(d1SecondFixture.db as any)
+      .findGroups('Luke 6', 1, d1First.groups[0].sourceOrdinal);
+
+    expect(d1First).toEqual(nodeFirst);
+    expect(d1Second).toEqual(nodeSecond);
+    expect(d1FirstFixture.db.prepare.mock.results[0].value.bind).toHaveBeenCalledWith(
+      'ubs_paratext_parallel_passages', 0, 42, 6, Number.MAX_SAFE_INTEGER, 1, 2,
+    );
+  });
+
   it('rejects requests outside the reviewed group bound before querying D1', async () => {
     const { db } = fixtureDb();
     await expect(new D1UbsParallelPassageRepository(db as any).findGroups('Luke 6:35', 11)).rejects.toThrow('1 to 10');

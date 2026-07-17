@@ -85,6 +85,14 @@ describe('UbsParallelPassageRepository', () => {
     expect(repository.findGroups('Luke 6:28-35').groups.map(group => group.sourceOrdinal)).toEqual([1, 2]);
     expect(repository.findGroups('Matthew 5:44').groups[0].groupId).toBe(exact.groups[0].groupId);
     expect(repository.findGroups('Luke 6', 1).groups.map(group => group.sourceOrdinal)).toEqual([1]);
+    const generatedRepository = new UbsParallelPassageRepository(generatedCorpus);
+    const psalmVerseBeyondEnglishMax = generatedCorpus.groups.find(group => group.members.some(member => (
+      member.normalizedReference === 'Psalms 18:51'
+    )));
+    expect(psalmVerseBeyondEnglishMax).toBeDefined();
+    expect(generatedRepository.findGroups('Psalms 18', 1, psalmVerseBeyondEnglishMax!.sourceOrdinal - 1).groups.some(group => group.members.some(member => (
+      member.normalizedReference === 'Psalms 18:51'
+    )))).toBe(true);
     expect(() => repository.findGroups('Luke 6:35', 0)).toThrow('1 to 10');
   });
 

@@ -372,9 +372,75 @@ describe('SQLite and D1 repository parity with identical real data', () => {
     })).toBe(false);
   });
 
+  it('paginates actual chapter-only UBS windows identically in Node and D1', async () => {
+    const reference = 'Mark 10';
+    const nodeFirst = nodeUbs.findGroups(reference, 5);
+    const d1First = await d1Ubs.findGroups(reference, 5);
+    expect(d1First).toEqual(nodeFirst);
+    expect(nodeFirst.groups).toHaveLength(5);
+    expect(nodeFirst.additionalMatchObserved).toBe(true);
+
+    const afterSourceOrdinal = nodeFirst.groups.at(-1)!.sourceOrdinal;
+    const nodeSecond = nodeUbs.findGroups(reference, 5, afterSourceOrdinal);
+    const d1Second = await d1Ubs.findGroups(reference, 5, afterSourceOrdinal);
+    expect(d1Second).toEqual(nodeSecond);
+    expect(d1Second.groups.every(group => group.sourceOrdinal > afterSourceOrdinal)).toBe(true);
+
+    const genuine = { pageSize: 5, afterSourceOrdinal, cumulativeGroupCount: 5 };
+    await expect(d1Ubs.hasValidGroupCursorBoundary(reference, genuine))
+      .resolves.toBe(nodeUbs.hasValidGroupCursorBoundary(reference, genuine));
+    expect(nodeUbs.hasValidGroupCursorBoundary(reference, genuine)).toBe(true);
+    await expect(d1Ubs.hasValidGroupCursorBoundary(reference, {
+      ...genuine, cumulativeGroupCount: 10,
+    })).resolves.toBe(false);
+  });
+
+  it('preserves chapter-only source-versification beyond English maxima in Node and D1', async () => {
+    const psalmVerseBeyondEnglishMax = (generatedUbsCorpus as any).groups.find((group: any) => group.members.some(
+      (member: any) => member.normalizedReference === 'Psalms 18:51',
+    ));
+    expect(psalmVerseBeyondEnglishMax).toBeDefined();
+    const reference = 'Psalms 18';
+    const matchingOrdinals: number[] = [];
+    let afterSourceOrdinal = 0;
+    let page = nodeUbs.findGroups(reference, 10, afterSourceOrdinal);
+    for (;;) {
+      matchingOrdinals.push(...page.groups.map(group => group.sourceOrdinal));
+      if (!page.additionalMatchObserved) break;
+      const lastGroup = page.groups.at(-1);
+      if (!lastGroup) break;
+      afterSourceOrdinal = lastGroup.sourceOrdinal;
+      page = nodeUbs.findGroups(reference, 10, afterSourceOrdinal);
+    }
+    const targetIndex = matchingOrdinals.indexOf(psalmVerseBeyondEnglishMax.sourceOrdinal);
+    expect(targetIndex).toBeGreaterThanOrEqual(0);
+    const priorSourceOrdinal = psalmVerseBeyondEnglishMax.sourceOrdinal - 1;
+    const node = nodeUbs.findGroups(reference, 1, priorSourceOrdinal);
+    const d1 = await d1Ubs.findGroups(reference, 1, priorSourceOrdinal);
+    expect(d1).toEqual(node);
+    expect(node.groups[0].members).toContainEqual(expect.objectContaining({ normalizedReference: 'Psalms 18:51' }));
+
+    const boundary = {
+      pageSize: 1,
+      afterSourceOrdinal: psalmVerseBeyondEnglishMax.sourceOrdinal,
+      cumulativeGroupCount: targetIndex + 1,
+    };
+    await expect(d1Ubs.hasValidGroupCursorBoundary(reference, boundary))
+      .resolves.toBe(nodeUbs.hasValidGroupCursorBoundary(reference, boundary));
+    expect(nodeUbs.hasValidGroupCursorBoundary(reference, boundary)).toBe(true);
+  });
+
   it.each([
     ['Mark 10:19', 5],
     ['Mark 10:19', 10],
+    ['1 Chronicles 1', 5],
+    ['Mark 10', 5],
+    ['Matthew 5', 5],
+    ['Luke 6', 5],
+    ['2 Kings 18', 5],
+    ['Isaiah 36', 5],
+    ['John 3', 5],
+    ['Psalms 18', 5],
     ['2 Kings 18:13', 5],
     ['Matthew 3:3', 5],
   ] as const)('returns identical bounded UBS windows for %s at limit %i', async (reference, limit) => {

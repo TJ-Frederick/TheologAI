@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { env, SELF } from 'cloudflare:test';
 import { createWorkerCompositionRoot } from '../../src/tools/worker/index.js';
 import type { Env } from '../../src/worker-env.js';
+import { encodeParallelGroupCursor } from '../../src/kernel/parallelGroupCursor.js';
+import { parseSourceAttestedLookupReference } from '../../src/kernel/sourceAttestedReference.js';
 
 const MCP_URL = 'https://worker.test/mcp';
 const ALLOWED_ORIGIN = 'https://allowed.example';
@@ -668,6 +670,53 @@ describe('Worker MCP endpoint in workerd', () => {
     expect(continuedStructured.sourceAttestedGroups.every((group: any) => (
       !previousIds.has(group.groupId) && group.sourceOrdinal > previousLast
     ))).toBe(true);
+
+    const chapterMark = await rpc('tools/call', {
+      name: 'parallel_passages', arguments: { reference: 'Mark 10', maxGroups: 5 },
+    }, 1155);
+    expect(chapterMark.response.status).toBe(200);
+    expect(chapterMark.message.error).toBeUndefined();
+    const chapterStructured = chapterMark.message.result?.structuredContent as any;
+    expect(chapterStructured.sourceAttestedGroups).toHaveLength(5);
+    expect(chapterStructured.sourceAttestedResultWindow).toMatchObject({
+      requestedLimit: 5,
+      returnedGroupCount: 5,
+      additionalMatchStatus: 'additional_match_observed',
+    });
+
+    const chapterContinued = await rpc('tools/call', {
+      name: 'parallel_passages', arguments: {
+        reference: 'Mark 10', maxGroups: 5,
+        groupCursor: chapterStructured.sourceAttestedResultWindow.nextCursor,
+      },
+    }, 1156);
+    expect(chapterContinued.message.error).toBeUndefined();
+    const chapterContinuedStructured = chapterContinued.message.result?.structuredContent as any;
+    expect(chapterContinuedStructured.sourceAttestedGroups).toHaveLength(2);
+    expect(chapterContinuedStructured.sourceAttestedGroups.every((group: any) => (
+      group.sourceOrdinal > chapterStructured.sourceAttestedGroups.at(-1).sourceOrdinal
+    ))).toBe(true);
+
+    const falseTerminal = encodeParallelGroupCursor(
+      parseSourceAttestedLookupReference('Mark 10').segments,
+      { pageSize: 5, afterSourceOrdinal: Number.MAX_SAFE_INTEGER, cumulativeGroupCount: 5 },
+    );
+    const falseTerminalResult = await rpc('tools/call', {
+      name: 'parallel_passages', arguments: {
+        reference: 'Mark 10', maxGroups: 5, groupCursor: falseTerminal,
+      },
+    }, 1157);
+    expect(falseTerminalResult.message.result).toMatchObject({ isError: true });
+    expect(textContent(falseTerminalResult.message)).toContain('groupCursor is not a valid page boundary');
+
+    const mismatchedChapterCursor = await rpc('tools/call', {
+      name: 'parallel_passages', arguments: {
+        reference: 'Mark 10:19', maxGroups: 5,
+        groupCursor: chapterStructured.sourceAttestedResultWindow.nextCursor,
+      },
+    }, 1158);
+    expect(mismatchedChapterCursor.message.result).toMatchObject({ isError: true });
+    expect(textContent(mismatchedChapterCursor.message)).toContain('groupCursor belongs to a different normalized passage query');
 
     const mixedCursor = await rpc('tools/call', {
       name: 'parallel_passages', arguments: {
