@@ -782,6 +782,11 @@ describe('classic_text_lookup handler', () => {
       mode: 'work',
       document: { sectionCount: 1, bodyDelivery: 'markdown_only' },
     });
+    const resourceSizeBytes = (result.structuredContent as any).document.work.resource.resourceSizeBytes;
+    expect(result.content.find(block => block.type === 'resource_link')).toMatchObject({
+      type: 'resource_link', size: resourceSizeBytes,
+      _meta: { 'theologai/resourceSizeBytes': resourceSizeBytes },
+    });
     expect(JSON.stringify(result.structuredContent)).not.toContain('We believe in one God.');
   });
 

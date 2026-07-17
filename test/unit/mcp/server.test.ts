@@ -15,7 +15,7 @@ import { createPrimarySourceSearchHandler } from '../../../src/tools/v2/primaryS
 import { createClassicTextsHandler } from '../../../src/tools/v2/classicTexts.js';
 import { formatLocalDocumentResource, formatLocalDocumentSectionResource } from '../../../src/formatters/historicalFormatter.js';
 import { DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG } from '../../../src/kernel/featureFlags.js';
-import { primarySourceSearchOutputSchema } from '../../../src/mcp/schemas/primarySourceSearch.js';
+import { primarySourceSearchV4OutputSchema } from '../../../src/mcp/schemas/primarySourceSearchV4.js';
 
 const TOOL_NAMES = [
   'bible_lookup',
@@ -41,7 +41,7 @@ function makeMockTool(name: string): ToolHandler {
       required: ['reference'],
       additionalProperties: false,
     },
-    ...(name === 'primary_source_search' ? { outputSchema: primarySourceSearchOutputSchema } : {}),
+    ...(name === 'primary_source_search' ? { outputSchema: primarySourceSearchV4OutputSchema } : {}),
     annotations: {
       readOnlyHint: true, destructiveHint: false, idempotentHint: true,
       ...(name === 'primary_source_search' ? { openWorldHint: false } : {}),
@@ -355,16 +355,24 @@ describe('shared MCP registration', () => {
     const catalog = await client.readResource({ uri: 'theologai://primary-sources/catalog' });
     expect(catalog.contents[0]).toMatchObject({ mimeType: 'application/json' });
     expect(JSON.parse(String(catalog.contents[0].text))).toEqual({
-      schemaVersion: '1', kind: 'local_primary_source_catalog', workCount: 1,
+      schemaVersion: '2', kind: 'local_primary_source_catalog', workCount: 1,
       works: [{
         id: 'nicene-creed', title: 'Nicene Creed', documentType: 'creed',
         lookupAliases: ['The Nicene Creed'], composition: { startYear: 381, endYear: 381, label: '381 AD' },
         creators: [{ name: 'First Council of Constantinople', role: 'revising_body' }],
         metadataStatus: 'collective', metadataProvenanceIds: ['hist-meta-test-nicene'],
+        editionReadiness: {
+          foundation: 'edition-provenance-foundation.v1', editionIdentity: 'not_established',
+          provenance: 'incomplete', exactArtifactRights: 'not_established_by_this_contract',
+        },
       }],
       policies: {
         scope: 'hosted_collection_only', lookupAliasUse: 'exact_routing_only_not_metadata_evidence',
         editionProvenance: 'incomplete', rightsStatus: 'not_established',
+        editionReadiness: {
+          foundation: 'edition-provenance-foundation.v1', editionIdentity: 'not_established',
+          provenance: 'incomplete', exactArtifactRights: 'not_established_by_this_contract',
+        },
       },
     });
   });
@@ -556,13 +564,13 @@ describe('shared MCP registration', () => {
     const link = result.content.find(block => block.type === 'resource_link');
     expect(link).toMatchObject({
       type: 'resource_link', uri: 'theologai://documents/nicene-creed#section-1',
-      mimeType: 'text/markdown', size: resourceSizeBytes,
+      mimeType: 'text/markdown', _meta: { 'theologai/resourceSizeBytes': resourceSizeBytes },
       annotations: { audience: ['assistant'] },
     });
     if (!link || link.type !== 'resource_link') throw new Error('Expected resource link');
     const read = await client.readResource({ uri: link.uri });
     const readText = String(read.contents[0].text);
-    expect(new TextEncoder().encode(readText).byteLength).toBe(link.size);
+    expect(new TextEncoder().encode(readText).byteLength).toBe((link._meta as any)?.['theologai/resourceSizeBytes']);
     expect(readText).toBe(resourceText);
   });
 
@@ -591,7 +599,7 @@ describe('shared MCP registration', () => {
     const workRead = await client.readResource({ uri: workLink.uri });
     const workText = String(workRead.contents[0].text);
     expect(workText).toBe(formatLocalDocumentResource(document!, sections));
-    expect(new TextEncoder().encode(workText).byteLength).toBe(workLink.size);
+    expect(new TextEncoder().encode(workText).byteLength).toBe((workLink._meta as any)?.['theologai/resourceSizeBytes']);
     expect(JSON.stringify(workResult.structuredContent)).not.toContain('We believe...');
 
     const searchResult = await client.callTool({
@@ -602,7 +610,7 @@ describe('shared MCP registration', () => {
     const sectionRead = await client.readResource({ uri: sectionLink.uri });
     const sectionText = String(sectionRead.contents[0].text);
     expect(sectionText).toBe(formatLocalDocumentSectionResource(document!, sections[0]));
-    expect(new TextEncoder().encode(sectionText).byteLength).toBe(sectionLink.size);
+    expect(new TextEncoder().encode(sectionText).byteLength).toBe((sectionLink._meta as any)?.['theologai/resourceSizeBytes']);
   });
 
   it('canonicalizes classical and extended Strong\'s resources and rejects invalid domain numbers', async () => {
@@ -875,16 +883,16 @@ describe('shared MCP registration', () => {
     expect(donateText).toContain('provider gaps fail closed');
   });
 
-  it('renders v4 primary-source prompts with separate local and external evidence access', async () => {
+  it('renders v5 primary-source prompts with separate local and external evidence access', async () => {
     const root = makeMockRoot();
     root.primarySourceContract = {
       exposeCcelDiscovery: true, ccelLiveSearch: false, ccelCoordinator: false,
-      contractVersion: '4', liveCcelEnabled: false,
+      contractVersion: '5', liveCcelEnabled: false,
     };
     root.tools = root.tools.map(tool => tool.name === 'primary_source_search'
       ? createPrimarySourceSearchHandler({ search: vi.fn() } as any, root.primarySourceContract)
       : tool);
-    const client = await connect(createTheologAiMcpServer(root, '1.0.0-v4-test').server);
+    const client = await connect(createTheologAiMcpServer(root, '1.0.0-v5-test').server);
     const listed = await client.listPrompts();
     const primaryDefinition = listed.prompts.find(prompt => prompt.name === 'primary-source-research')!;
     const argumentDescription = (name: string) => primaryDefinition.arguments?.find(argument => argument.name === name)?.description ?? '';
@@ -947,16 +955,16 @@ describe('shared MCP registration', () => {
     const root = makeMockRoot();
     root.primarySourceContract = {
       exposeCcelDiscovery: true, ccelLiveSearch: false, ccelCoordinator: false,
-      contractVersion: '4', liveCcelEnabled: false,
+      contractVersion: '5', liveCcelEnabled: false,
     };
     expect(() => createTheologAiMcpServer(root, 'mismatched-contract-test'))
       .toThrow('tool and guided-prompt contracts must use the same configuration');
   });
 
-  it('advertises and executes the exact v4 tool contract through MCP', async () => {
+  it('advertises and executes the exact v5 tool contract through MCP', async () => {
     const contract = {
       exposeCcelDiscovery: true, ccelLiveSearch: false, ccelCoordinator: false,
-      contractVersion: '4' as const, liveCcelEnabled: false,
+      contractVersion: '5' as const, liveCcelEnabled: false,
     };
     const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue({
       planStatus: 'unavailable',
@@ -972,11 +980,11 @@ describe('shared MCP registration', () => {
     const root = makeMockRoot();
     root.primarySourceContract = contract;
     root.tools = root.tools.map(tool => tool.name === 'primary_source_search' ? handler : tool);
-    const client = await connect(createTheologAiMcpServer(root, '1.0.0-v4-tool-test').server);
+    const client = await connect(createTheologAiMcpServer(root, '1.0.0-v5-tool-test').server);
 
     const listed = await client.listTools();
     const advertised = listed.tools.find(tool => tool.name === 'primary_source_search')!;
-    expect(advertised.outputSchema?.properties?.schemaVersion).toEqual({ const: '4' });
+    expect(advertised.outputSchema?.properties?.schemaVersion).toEqual({ const: '5' });
     expect(advertised.annotations).toMatchObject({ openWorldHint: true });
     expect((advertised.inputSchema.properties?.queries as any).items.properties.providers.items.enum).toEqual(['local', 'ccel']);
 
@@ -984,8 +992,8 @@ describe('shared MCP registration', () => {
       name: 'primary_source_search',
       arguments: { queries: [{ id: 'external', text: 'grace', providers: ['ccel'] }] },
     });
-    expect(called).toMatchObject({ isError: true, structuredContent: { schemaVersion: '4', planStatus: 'unavailable' } });
-    expect(called.content[0]).toEqual({ type: 'text', text: JSON.stringify(called.structuredContent) });
+    expect(called).toMatchObject({ isError: true, structuredContent: { schemaVersion: '5', planStatus: 'unavailable' } });
+    expect(called.content[0]).toMatchObject({ type: 'text', text: expect.stringContaining('# Primary-source discovery') });
   });
 
   it('uses InvalidParams for unknown prompts and missing prompt arguments', async () => {

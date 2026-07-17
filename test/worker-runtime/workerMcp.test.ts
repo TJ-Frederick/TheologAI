@@ -68,27 +68,30 @@ async function rateLimitKey(ip: string, userAgent: string): Promise<string> {
 }
 
 describe('Worker MCP endpoint in workerd', () => {
-  it('executes the checked-in preview v4 contract without enabling live CCEL', async () => {
+  it('executes the checked-in preview v5 contract without enabling live CCEL', async () => {
     expect(env.THEOLOGAI_EXPOSE_CCEL_DISCOVERY).toBe('true');
     expect(env.THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH).toBe('false');
     expect(env.THEOLOGAI_ENABLE_CCEL_COORDINATOR).toBe('false');
     const root = createWorkerCompositionRoot(env as unknown as Env);
     expect(root.primarySourceContract).toMatchObject({
-      contractVersion: '4',
+      contractVersion: '5',
       liveCcelEnabled: false,
     });
     const tool = root.tools.find(candidate => candidate.name === 'primary_source_search')!;
-    expect(tool.outputSchema?.properties?.schemaVersion).toEqual({ const: '4' });
+    expect(tool.outputSchema?.properties?.schemaVersion).toEqual({ const: '5' });
     expect(tool.annotations).toMatchObject({ openWorldHint: true });
     const result = await tool.handler({ queries: [{ id: 'external', text: 'grace', providers: ['ccel'] }] });
     expect(result).toMatchObject({
       isError: true,
       structuredContent: {
-        schemaVersion: '4', planStatus: 'unavailable',
+        schemaVersion: '5', planStatus: 'unavailable',
         coverage: { ccelAttempted: false, ccelStatus: 'disabled', ccelHitCount: 0 },
       },
     });
-    expect(result.content[0]).toEqual({ type: 'text', text: JSON.stringify(result.structuredContent) });
+    expect(result.content[0]).toMatchObject({
+      type: 'text',
+      text: expect.stringContaining('CCEL discovery lead: **disabled**'),
+    });
   });
 
   it('provides the configured rate-limit binding in the Workers runtime', async () => {
@@ -209,7 +212,7 @@ describe('Worker MCP endpoint in workerd', () => {
       .find(tool => tool.name === 'primary_source_search')!;
     expect(primarySourceTool).toMatchObject({
       annotations: { openWorldHint: true },
-      outputSchema: { properties: { schemaVersion: { const: '4' } } },
+      outputSchema: { properties: { schemaVersion: { const: '5' } } },
     });
     expect((((primarySourceTool.inputSchema as any).properties.queries.items)
       .properties.providers.items.enum)).toEqual(['local', 'ccel']);
@@ -396,9 +399,27 @@ describe('Worker MCP endpoint in workerd', () => {
 
     const catalog = await rpc('resources/read', { uri: 'theologai://primary-sources/catalog' }, 40);
     expect(catalog.response.status).toBe(200);
-    expect(JSON.parse(String((catalog.message.result?.contents as Array<{ text: string }>)[0].text))).toMatchObject({
-      schemaVersion: '1', kind: 'local_primary_source_catalog', workCount: 1,
-      policies: { scope: 'hosted_collection_only', rightsStatus: 'not_established' },
+    expect(JSON.parse(String((catalog.message.result?.contents as Array<{ text: string }>)[0].text))).toEqual({
+      schemaVersion: '2', kind: 'local_primary_source_catalog', workCount: 1,
+      works: [{
+        id: 'apostles-creed', title: "Apostles' Creed", documentType: 'Creed',
+        lookupAliases: ["The Apostles' Creed", "Apostles' Creed", 'Apostles Creed'],
+        composition: { label: 'Before the end of the 4th century (present form)' },
+        creators: [], metadataStatus: 'anonymous',
+        metadataProvenanceIds: ['hist-meta-crc-apostles'],
+        editionReadiness: {
+          foundation: 'edition-provenance-foundation.v1', editionIdentity: 'not_established',
+          provenance: 'incomplete', exactArtifactRights: 'not_established_by_this_contract',
+        },
+      }],
+      policies: {
+        scope: 'hosted_collection_only', lookupAliasUse: 'exact_routing_only_not_metadata_evidence',
+        editionProvenance: 'incomplete', rightsStatus: 'not_established',
+        editionReadiness: {
+          foundation: 'edition-provenance-foundation.v1', editionIdentity: 'not_established',
+          provenance: 'incomplete', exactArtifactRights: 'not_established_by_this_contract',
+        },
+      },
     });
 
     const read = await rpc('resources/read', {
@@ -775,7 +796,7 @@ describe('Worker MCP endpoint in workerd', () => {
         }),
       ],
       structuredContent: {
-        schemaVersion: '4', kind: 'primary_source_search', planStatus: 'complete',
+        schemaVersion: '5', kind: 'primary_source_search', planStatus: 'complete',
         responseWindow: { unit: 'utf8_bytes', maximum: 32768, truncated: false },
         queries: [expect.objectContaining({
           normalizedSelection: 'relevance',
@@ -785,21 +806,33 @@ describe('Worker MCP endpoint in workerd', () => {
             hits: [expect.objectContaining({ documentType: 'Creed', documentDate: 'c. 390' })],
           })],
         })],
-        coverage: expect.any(Object),
+        coverage: expect.objectContaining({
+          localAttempted: true, localHitCount: 1,
+          ccelAttempted: false, ccelHitCount: 0,
+          serverObserved: {
+            searched: [expect.objectContaining({ queryId: 'creed', provider: 'local', returnedHitCount: 1 })],
+            notSearched: [],
+          },
+        }),
         evidencePolicy: {
           snippetUse: 'discovery_only', localSectionAccess: 'mcp_resource_read',
           externalSectionAccess: 'direct_url_only', coverageScope: 'bounded_non_exhaustive',
           externalRightsStatus: 'not_determined',
           lookupAliasUse: 'exact_routing_only_not_metadata_evidence',
+          coverageLedger: {
+            searched: 'server_observed_provider_execution',
+            read: 'host_observed_successful_exact_resource_or_page_read',
+            deferred: 'host_recorded_intentional_deferral',
+            notSearched: 'server_observed_provider_non_execution',
+          },
         },
       },
     });
-    expect((result.message.result?.content as Array<Record<string, unknown>>)[0]).toEqual({
-      type: 'text',
-      text: JSON.stringify(result.message.result?.structuredContent),
+    expect((result.message.result?.content as Array<Record<string, unknown>>)[0]).toMatchObject({
+      type: 'text', text: expect.stringContaining('# Primary-source discovery'),
     });
     expect(Object.keys((result.message.result?.structuredContent as any).coverage).sort()).toEqual([
-      'ccelAttempted', 'ccelHitCount', 'localAttempted', 'localHitCount', 'localStatus', 'notices',
+      'ccelAttempted', 'ccelHitCount', 'localAttempted', 'localHitCount', 'localStatus', 'notices', 'serverObserved',
     ]);
     const blocks = result.message.result?.content as Array<Record<string, unknown>>;
     const link = blocks.find(block => block.type === 'resource_link')!;

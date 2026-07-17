@@ -7,6 +7,38 @@
 
 export const CCEL_COMPOSITION_DATE_NOTICE = 'CCEL discovery was not composition-date filtered; its results cannot establish membership in a requested historical period.';
 
+/**
+ * The current hosted collection predates the per-edition provenance compiler.
+ * This intentionally says only what the server has established: it does not
+ * turn public-domain underlying works into claims about their transcription,
+ * edition, or redistribution permission.
+ */
+export const LOCAL_EDITION_READINESS = Object.freeze({
+  foundation: 'edition-provenance-foundation.v1',
+  editionIdentity: 'not_established',
+  provenance: 'incomplete',
+  exactArtifactRights: 'not_established_by_this_contract',
+} as const);
+
+/** Provider search results are not reviewed editions or local corpus claims. */
+export const EXTERNAL_EDITION_READINESS = Object.freeze({
+  editionIdentity: 'provider_unreviewed',
+  provenance: 'provider_unreviewed',
+  exactArtifactRights: 'not_determined',
+} as const);
+
+/**
+ * Search execution is server-observable.  Resource reads and intentional
+ * deferrals happen in the MCP host after this tool response, so they belong in
+ * the host's final research ledger rather than being guessed here.
+ */
+export const PRIMARY_SOURCE_COVERAGE_POLICY = Object.freeze({
+  searched: 'server_observed_provider_execution',
+  read: 'host_observed_successful_exact_resource_or_page_read',
+  deferred: 'host_recorded_intentional_deferral',
+  notSearched: 'server_observed_provider_non_execution',
+} as const);
+
 export type PrimarySourceSearchMatch = 'all_terms' | 'phrase';
 export type PrimarySourceSelection = 'relevance' | 'work_diversity';
 
@@ -132,6 +164,20 @@ export interface PrimarySourceSearchCoverage {
   ccelStatus?: PrimarySourceProviderStatus;
   ccelHitCount: number;
   notices: string[];
+  /** Facts known at tool-return time; no future resource read is inferred. */
+  serverObserved?: {
+    searched: Array<{
+      queryId: string;
+      provider: PrimarySourceProvider;
+      status: PrimarySourceProviderStatus;
+      returnedHitCount: number;
+    }>;
+    notSearched: Array<{
+      queryId: string;
+      provider: PrimarySourceProvider;
+      status: PrimarySourceProviderStatus;
+    }>;
+  };
 }
 
 export interface PrimarySourceSearchPlanResult {

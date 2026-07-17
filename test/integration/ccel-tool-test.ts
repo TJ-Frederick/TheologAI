@@ -8,11 +8,11 @@ import { recommendedToolCallsForPrompt } from '../../src/mcp/prompts.js';
 
 export function assertRetiredCcelToolContractGuard(): void {
   const v3 = recommendedToolCallsForPrompt('primary-source-research', { topic: 'guard' });
-  const v4 = recommendedToolCallsForPrompt('primary-source-research', { topic: 'guard', authors: 'One,Two' }, {
+  const v5 = recommendedToolCallsForPrompt('primary-source-research', { topic: 'guard', authors: 'One,Two' }, {
     exposeCcelDiscovery: true, ccelLiveSearch: false, ccelCoordinator: false,
-    contractVersion: '4', liveCcelEnabled: false,
+    contractVersion: '5', liveCcelEnabled: false,
   });
-  if (JSON.stringify(v3).includes('"ccel"') || v4.slice(1).length !== 1) {
+  if (JSON.stringify(v3).includes('"ccel"') || v5.slice(1).length !== 1) {
     throw new Error('Primary-source CCEL contract guard failed.');
   }
 }

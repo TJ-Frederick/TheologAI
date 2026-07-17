@@ -18,6 +18,11 @@ returned by the server to establish what is available and what each document
 says. The workflow must not assign a tradition or author from a title or from a
 prewritten grouping.
 
+Production advertises the v4 local-only `primary_source_search` contract.
+Preview may advertise v5, which adds a separately reported CCEL discovery
+provider. Preserve that provider's state and unreviewed metadata separately; a
+disabled provider did not search or read CCEL.
+
 ## Methodology
 
 ### Step 1: Identify Relevant Documents
@@ -32,6 +37,8 @@ prewritten grouping.
 
 - Call `primary_source_search` with one bounded local query plan, for example
   `{ "queries": [{ "id": "confession-topic", "text": "the doctrinal topic", "providers": ["local"], "match": "all_terms", "selection": "work_diversity", "limit": 5 }] }`.
+- On a v5 endpoint, request the separate `ccel` provider only when a discovery
+  lead is materially useful. It is never local catalog evidence.
 - Treat returned snippets as discovery-only. Preserve document metadata, creator
   names, and creator roles exactly as returned.
 - Do not claim the search covered sources outside the hosted collection, and do
@@ -44,6 +51,21 @@ prewritten grouping.
   confirm the returned URI matches the selected locator.
 - Do not quote, characterize a position, or compare documents from snippets.
   Base those claims only on exact resources actually read.
+- Treat local `editionReadiness` as fail-closed: this contract has not
+  established exact edition identity, transcription provenance, or
+  exact-artifact redistribution rights.
+
+### Step 3b: Close the Coverage Ledger
+
+- **Searched:** copy only returned provider execution states.
+- **Read:** record only exact local MCP resources or external pages successfully
+  opened after discovery.
+- **Deferred:** record selected leads intentionally left unread, with a reason.
+- **Not searched:** record only a provider or scope the tool reports as not
+  executed.
+
+The server cannot observe later resource reads or intentional deferrals. Never
+invent either from snippets alone.
 
 ### Step 4: Biblical Foundations
 

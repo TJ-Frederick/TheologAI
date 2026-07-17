@@ -66,7 +66,7 @@ fresh server and transport.
 | `parallel_passages` | Return complete UBS source-attested parallel groups by default; legacy curated edges and OpenBible.info cross references require explicit selectors and remain separate. |
 | `commentary_lookup` | Retrieve Matthew Henry, JFB, Adam Clarke, John Gill, Keil-Delitzsch (OT), or Tyndale notes. |
 | `classic_text_lookup` | Search and browse the 17 locally indexed historical documents. Remote CCEL document bodies are not retrieved or republished. |
-| `primary_source_search` | Execute bounded primary-source query plans. Production is v3/local-only; preview exposes the v4 local-plus-CCEL discovery contract while CCEL execution remains disabled before adapter, coordinator, or fetch. Snippets remain discovery-only, and selected local sections are readable resources. |
+| `primary_source_search` | Execute bounded primary-source query plans. Production is v4/local-only; preview exposes the v5 local-plus-CCEL discovery contract while CCEL execution remains disabled before adapter, coordinator, or fetch. Snippets remain discovery-only, selected local sections are readable resources, and research workflows maintain explicit searched/read/deferred/not-searched coverage ledgers. |
 | `original_language_lookup` | Look up or search Strong's entries, with opt-in rights-reviewed STEPBible metadata, exact corrected-corpus usage, and bounded occurrence pages for exact identities. The Online-Bible-derived TBESH Hebrew `Meaning` field is withheld. |
 | `bible_verse_morphology` | Return bounded word-by-word morphology for one exact verse, with raw codes, nullable expansions, and separate pinned STEPBible morphology/lemma provenance. |
 | `original_language_study` | Resolve and study one Greek or Hebrew token in one verse with contextual morphology, source-separated lexical evidence, and explicit interpretive limits. |
@@ -167,7 +167,7 @@ edition provenance is incomplete, and rights status is not established.
 |---|---|
 | `theologai://translations` | Available Bible translations. |
 | `theologai://commentaries` | Available commentary sources. |
-| `theologai://primary-sources/catalog` | JSON metadata inventory for the hosted primary-source collection; no document bodies or provenance URLs. |
+| `theologai://primary-sources/catalog` | v2 JSON metadata inventory for the hosted primary-source collection; no document bodies, provenance URLs, source hashes, or rights instruments. Each work carries a fail-closed edition-readiness disclosure. |
 | `theologai://documents/{slug}` | A locally indexed creed, confession, or catechism. |
 | `theologai://strongs/{number}` | A Strong's dictionary entry such as `G26` or `H430`. |
 
@@ -221,7 +221,7 @@ catechisms. The exact count is enforced by `data/data-manifest.json`.
 
 The production tools search and retrieve only the locally indexed collection.
 They do **not** currently fetch CCEL search results or document bodies, and the
-production v3 schema remains strictly local-only. Preview stages a hard v4
+production v4 schema remains strictly local-only. Preview stages a hard v5
 contract cutover: it advertises external CCEL discovery inputs and guided
 workflows, but live search and coordinator execution remain disabled. External
 preview queries therefore return a disabled provider result before adapter
@@ -239,11 +239,11 @@ link to a canonical allowlisted CCEL exact-section path; tracking query and hash
 values are discarded. Balanced-card parsing uses explicit title/author roles,
 and a no-results marker is accepted only when no competing result structure is
 present. These safeguards do not authorize or enable live use.
-CCEL does not provide reviewed composition-year filtering. The v4 guided
+CCEL does not provide reviewed composition-year filtering. The v5 guided
 primary-source workflow therefore keeps any requested year bounds on its local
 queries, sends its single external discovery query without year fields, and
 repeats an explicit warning that CCEL results cannot establish membership in
-the requested historical period. Direct v4 queries that combine CCEL with
+the requested historical period. Direct v5 queries that combine CCEL with
 either year field remain `unsupported_filter` before adapter or coordinator
 admission; the public tool schema documents that strict boundary.
 Any future external provider rollout must remain discovery-only until
@@ -409,7 +409,7 @@ per-request D1 repositories. Both targets share one MCP registry.
 - The current tracked roadmap is [docs/ROADMAP.md](docs/ROADMAP.md), beginning
   after the PR #10 production baseline.
 - Live CCEL discovery and search remain gated future work; preview currently
-  exposes only the non-executing v4 contract.
+  exposes only the non-executing v5 contract while production remains v4/local-only.
 - The local historical collection needs document-level edition, source, and
   license metadata before redistribution claims can be made.
 - Hosted MCP Logging would require a deliberate stateful-session design.
