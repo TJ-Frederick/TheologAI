@@ -127,9 +127,46 @@ candidates per call, with explicit incomplete-coverage metadata when those
 bounds intervene. It never reports evidence as unavailable from an offset,
 partial, or capped window, and its unpaged sense, domain, and exact-reference
 queries must return internally consistent complete first pages. This
-deliberately temporary per-operation choreography is
-not the future aggregate repository query: OL-S2 must replace its bounded N+1
-shape before any runtime composition or public registration.
+deliberately temporary per-operation choreography is not suitable for runtime
+composition or public registration.
+
+OL-S2 adds an inactive `IUbsSemanticEvidenceBundleRepository` contract for one
+bounded aggregate operation. It returns at most eight entry/sense candidate
+rows plus their bounded domain, exact-reference, and two-source provenance
+evidence, together with honest lexical-entry, semantic-sense, nested-evidence,
+and candidate-window totals. Thus a future resolver can distinguish no entry
+from an entry without senses and can fail closed when a returned or whole-query
+window is incomplete without issuing one query per candidate. The operation's
+repository call count is exactly one for an empty, short, or full page.
+
+Every published aggregate object is reconstructed from an explicit allowlist of
+validated fields; adapter-only properties are neither read nor carried into the
+result. Lexical identities, bounded domain references and details, and exact
+reference evidence are canonicalized with stable code-point and ordinal
+ordering, so equivalent Node and D1 rows produce the same result. A candidate's
+`domainTotal` is the authoritative pre-slice count: its returned domain refs
+and details are capped at 16 and may be fewer than that total, in which case
+`domain_evidence` explicitly records incompleteness. This supports real senses
+with more domains than one response can safely include without pretending that
+the capped window is complete.
+
+Aggregate continuation cursors use the candidate's canonical entry/sense
+keyset and bind the exact aggregate operation, order, semantic artifact SHA-256,
+internal H#### identity, normalized reference, and prior result count. The
+decoded cursor remains an untrusted request: the single aggregate repository
+operation must validate that its exact keyset and prior count describe a real
+ordered boundary for that exact artifact/query/order, then return its own
+authoritative boundary attestation. The coordinator rejects missing, stale,
+forged, noncanonical, false-terminal, or mismatched attestations before it
+publishes any result or coverage window. A synthetically constructed cursor is
+acceptable only when it names a genuine boundary; it grants no access beyond
+public source material. No HMAC secret is needed for this read-only continuation
+model.
+
+The contract remains source-free and unregistered: it names no table, index,
+SQL, D1 binding, migration, or source path, and it is absent from both Worker
+and Node composition. Actual storage layout and query-plan work remain deferred
+until the exact approved source artifacts can be inspected rather than inferred.
 
 Repository validation also mirrors compiler identity guarantees: lexical
 identities and source ordinals are unique where their schema defines them, and
