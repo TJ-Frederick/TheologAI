@@ -1,0 +1,62 @@
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+
+const repo = new URL('../../../', import.meta.url);
+const serviceName = 'HebrewSemanticEvidenceService';
+
+const activeIdentityPins = {
+  'src/tools/toolRegistry.ts': '6847062cd5c9e131f17c5146c5e070283925bed5606a7b68b06538129c92c7f0',
+  'src/tools/v2/index.ts': '2bdf52660313eea971ed51253120288488938812c014c7764d6bb85c233251bd',
+  'src/tools/worker/index.ts': 'feb1679a520185d11f2b6082b70ea3ef6c2b87652ff49c97c0acedfb76d83b90',
+  'src/server.ts': '6b372c049cb7741344bc446b2409524739cc9acba5a3121bc09dbdc8e90acd22',
+  'src/worker-server.ts': '3f65b62179b267ac9b15fe682c69342be7ebee8a09430473b797c113e812782a',
+  'src/worker.ts': '07a439b6f5f20be1e6651ceaad71b4ca189579592c743e5e0f3770d80ba12d44',
+  'src/mcp/prompts.ts': '6122a305d1a6025f1c980e1f105f78c02b4eb156061d12c44942d163c40002da',
+  'src/mcp/schemas/originalLanguageStudy.ts': 'a98e5966d8a2a850487b4882c49f04c48fc697eee308f6e89c67e06af50fefac',
+  'src/presenters/originalLanguageStudyStructured.ts': '49818eb62e89980498669442a4bfc1886944d7751fc675940b17368a030995d9',
+  'src/formatters/originalLanguageStudyFormatter.ts': '30a10bf826c6c3174f2e0fb00907f6104735b165fdbfd5915a0ff22bc09b2536',
+  'data/data-manifest.json': 'ba4f6fc73086716bd03f8e8d65a181719fba834aa61a90e65b168169744fa424',
+  'wrangler.toml': '512128beeb51f9134381f06cebd822b3402a3f99c6622410989bd3d188f711bc',
+  'worker-configuration.d.ts': 'e316f64679951b32417f0c85b02fc92e61dae25d879d28921df15caf8706fe55',
+  'package.json': '4a9e337f9ee795a2d962ad9d6b5161fb36d166a7bf5547aca0c69813709f1ec4',
+  'test/fixtures/ubs-semantics/structured-output-contract.draft.json': '4564884999aee552c4d1560c442c38b373fb19626a88da5af6455c892628e181',
+} as const;
+
+describe('inactive UBS semantic resolution seam', () => {
+  it('does not enter Node, Worker, tool, prompt, resource, or configuration composition', () => {
+    for (const path of [
+      'src/tools/toolRegistry.ts', 'src/tools/v2/index.ts', 'src/tools/worker/index.ts',
+      'src/server.ts', 'src/worker-server.ts', 'src/mcp/prompts.ts', 'src/kernel/index.ts',
+      'src/services/index.ts', 'wrangler.toml', 'package.json',
+    ]) {
+      let source: string;
+      try {
+        source = readFileSync(new URL(path, repo), 'utf8');
+      } catch {
+        continue;
+      }
+      expect(source, path).not.toContain(serviceName);
+    }
+  });
+
+  it('pins active bundle inputs, inventory roots, config, and data identity to the reviewed stack base', () => {
+    for (const [path, expected] of Object.entries(activeIdentityPins)) {
+      const actual = createHash('sha256').update(readFileSync(new URL(path, repo))).digest('hex');
+      expect(actual, path).toBe(expected);
+    }
+  });
+
+  it('does not add executable migration, source artifact, or active transform identity', () => {
+    const service = readFileSync(new URL('src/services/languages/HebrewSemanticEvidenceService.ts', repo), 'utf8');
+    expect(service).not.toMatch(/from ['"][^'"]*(?:data\/|migrations\/|adapters\/d1|adapters\/data)/);
+    const manifest = JSON.parse(readFileSync(new URL('data/data-manifest.json', repo), 'utf8')) as {
+      schemaVersion: string;
+      materializations: { d1: { transformVersion: number } };
+    };
+    expect(manifest).toMatchObject({
+      schemaVersion: '0003_original_language_usage',
+      materializations: { d1: { transformVersion: 6 } },
+    });
+  });
+});

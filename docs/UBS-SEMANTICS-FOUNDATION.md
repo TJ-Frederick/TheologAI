@@ -102,6 +102,40 @@ contextual token sense. Every page records the count returned by prior pages;
 present if and only if more rows remain. This makes a short terminal page
 honest instead of comparing the global total only with the current page.
 
+An inactive, source-free `HebrewSemanticEvidenceService` now exercises this
+boundary only with invented synthetic fixtures. It is deliberately absent from
+all composition roots and public exports. The seam accepts only the existing
+public Hebrew H-number grammar, forwards an internal repository page request,
+and returns candidates or unavailable evidence by default. The stronger
+`reference_aligned_source_candidate` status requires a separately versioned
+assertion bound to one exact morphology token, H#### identity, normalized
+reference, source, entry, sense, and reference-evidence row. Exact reference
+matching does not infer overlap for ranges. Multiple exact assertions remain
+ambiguous; every supplied assertion must match one exact returned evidence row,
+and missing, off-page, or mismatched trusted evidence fails closed rather than
+promoting a sense. Caller-controlled request fields and each alignment assertion
+are copied into immutable primitive snapshots before the first repository await,
+so later caller mutation cannot change a validated result. Each request,
+cursor, alignment-array element, and exact alignment property is read only once;
+accessor- or Proxy-backed records therefore cannot swap a value between
+validation, matching, and presentation. The alignment collection must also be
+a dense zero-to-eight-element array with an honest safe-integer length and no
+own assertion index hidden beyond that reported length.
+
+The seam inspects at most 16 senses and returns at most eight publishable
+candidates per call, with explicit incomplete-coverage metadata when those
+bounds intervene. It never reports evidence as unavailable from an offset,
+partial, or capped window, and its unpaged sense, domain, and exact-reference
+queries must return internally consistent complete first pages. This
+deliberately temporary per-operation choreography is
+not the future aggregate repository query: OL-S2 must replace its bounded N+1
+shape before any runtime composition or public registration.
+
+Repository validation also mirrors compiler identity guarantees: lexical
+identities and source ordinals are unique where their schema defines them, and
+source-qualified sense and reference-evidence identities cannot recur across a
+single resolution.
+
 ### G. Structured contract and presentation
 
 Review and version the draft fixture before registering it. Every
