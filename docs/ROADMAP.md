@@ -100,6 +100,27 @@ is local source context only and does not define the current product contract.
   added search-and-synthesis warnings. Production remained at flags `000` and
   made zero live CCEL calls; merged as
   `671a0f3fd632358f001dd5ac8e1721e32c09d39e`.
+- **Catalog-capacity prerequisite / PR #56:** centralized the existing
+  100-work and 2,000-section ceilings and replaced variable D1 scope binds
+  with one JSON/`json_each` bind, without changing the hosted corpus or public
+  behavior; merged as `427748f637a66b9faed05994c08d2d90209e186a`.
+- **Protected CCEL secret workflow / PR #57:** shipped separate protected
+  staging and promotion paths for the operator secret, but did not provision
+  that secret, enable execution, or make a live CCEL request; merged as
+  `38b9ad4940cb77e7672ac330662bfdbba82888a9`.
+- **Historical section-key foundation / PR #58:** added the migration-free
+  plan, verifier, and workflow guards needed to identify ambiguous legacy
+  locators. It did not add a migration, change D1, or make proposed source-first
+  targets authoritative; merged as `36daf0d6fa29b0354c8c83b11a5bc46b1ea2854b`.
+- **UBS Hebrew semantics foundation / PR #59:** added source-free contracts,
+  synthetic fixtures, capacity gates, and a non-executable draft schema. It
+  did not vendor UBS artifacts, add migration `0004`, advance transform 7,
+  change D1, or register semantic MCP behavior; merged as
+  `f0c9e8a5f24f6164a4ebba74b53910a0049d3f81`. Required exact-head CI passed.
+  Protected preview run `29566989144` successfully deployed Worker
+  `cc0b798d-37ee-4438-8ff9-c7fffd21263f`; preview deployment authorization was
+  then removed and verified revoked. Protected production run `29568524548`
+  successfully deployed Worker `afaa3361-df99-4b38-9597-c9076e29ac83`.
 
 These entries describe merged repository state. Deployment state is established
 only by the relevant protected workflow and post-deployment smoke evidence; a
@@ -393,20 +414,44 @@ Code readiness and operational readiness are deliberately separate:
 
 ## Next work
 
-- Land the migration-free catalog-capacity prerequisite before either data
-  slice: keep the existing 100-work hard ceiling centralized and use a single
-  D1-safe JSON/`json_each` scope bind while the hosted corpus remains 17 works.
-  After explicit license and vendoring approval, the planned UBS semantic
-  runtime uses migration `0004` and transform 7. Corpus provenance follows in
-  migration `0005` and transform 8 only after a stable canonical section-key
-  compatibility design; current display section numbers are not unique. Keep
-  the existing 32-source provenance cap as a required pack-sizing check.
+- The migration-free catalog-capacity prerequisite shipped in PR #56; retain
+  its centralized 100-work and 2,000-section ceilings and single D1-safe
+  JSON/`json_each` scope bind. The UBS semantic data release remains gated on
+  owner approval of the exact two source artifacts and their license evidence,
+  followed by source inspection, deterministic compilation, and capacity
+  verification. Migration `0004` and transform 7 then require separate
+  authorization before any semantic runtime or protected release. Historical
+  corpus provenance remains later: complete the legacy section-compatibility
+  prerequisite and per-edition rights approvals before migration `0005` and
+  transform 8. Current display section numbers are not unique. Keep the
+  existing 32-source provenance cap as a required pack-sizing check.
+- Sequence the next inactive foundations first: correct the source-free
+  original-language identity/result-window contract, add its synthetic-only
+  unregistered service, and establish the primary-source edition/provenance
+  manifest compiler boundary without adding corpus bytes. These slices must
+  not register tools, alter D1, or change live schemas.
+- Treat executable pagination as an integrated later release, not an inactive
+  foundation. On 2026-07-17 the owner approved a public v4 cursor hard cutover,
+  UBS-only continuation behavior, and rejection of legacy/OpenBible controls
+  when a cursor is present. `includeText: false` remains the existing shipped
+  default. Implement and audit the cursor contract and runtime together behind
+  the protected preview workflow; keep any subsequent workflow/prompt work as
+  a separate slice.
+- Prospective primary-source work is limited to explicit searched/read/deferred
+  coverage semantics and future edition/provenance contract fields; it is not
+  a rollout of evidence already present in the current schemas. Its public
+  release is a **pending release decision** and must preserve CCEL-disabled
+  behavior during protected audit. The original-language MCP surface is also a
+  **pending product decision**: choose whether to extend
+  `original_language_study` or register a new tool only after the synthetic
+  service and aggregate-query foundations are reviewed.
 - Review a bounded, discovery-only public rollout of the retained CCEL search
   adapter. The owner accepts free, donation-independent discovery with at most
-  five attributed 240-character provider snippets and clean links, with no
-  full-content scraping, body retrieval, mirroring, hosting, republication, or
-  durable CCEL content storage. This does not claim CCEL separately licenses
-  snippets. Applicable operational and terms boundaries remain release gates.
+  five short, attributed 240-character provider snippets and clean links, with
+  no full-content scraping, body retrieval, mirroring, hosting, republication,
+  or durable CCEL content storage. This product approval does not claim CCEL
+  separately licenses snippets. Applicable authorization, operational, and
+  terms boundaries remain release gates.
   Because CCEL cannot enforce composition-year bounds, the owner approved a
   guided broad topical fallback: retain exact year bounds on hosted-local
   queries, omit them from the one external call, and warn at search and
