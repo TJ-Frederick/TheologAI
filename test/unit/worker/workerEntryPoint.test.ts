@@ -54,6 +54,18 @@ function makeRequest(path = '/mcp', method = 'POST', headers?: HeadersInit, body
   return new Request(`https://example.com${path}`, init);
 }
 
+function makeHostRequest(
+  host: string,
+  path = '/mcp',
+  method = 'POST',
+  headers?: HeadersInit,
+  body?: BodyInit,
+) {
+  const init: RequestInit & { duplex?: 'half' } = { method, headers, body };
+  if (body instanceof ReadableStream) init.duplex = 'half';
+  return new Request(`https://${host}${path}`, init);
+}
+
 function makeCtx(): ExecutionContext {
   return { waitUntil: vi.fn(), passThroughOnException: vi.fn() } as unknown as ExecutionContext;
 }
@@ -67,6 +79,97 @@ describe('Worker Entry Point', () => {
     mockHandleMcp.mockResolvedValue({ response: new Response('ok') });
     env = makeEnv();
     ctx = makeCtx();
+  });
+
+  describe('legacy production endpoint migration', () => {
+    const legacyHost = 'theologai.tjfrederick.workers.dev';
+    const primaryHost = 'mcp.theologai.xyz';
+    const pollerHeaders = {
+      'CF-Connecting-IP': '18.192.206.183',
+      'User-Agent': 'Go-http-client/2.0',
+    };
+
+    it.each(['GET', 'POST', 'DELETE', 'OPTIONS'])('redirects legacy %s requests with 308', async (method) => {
+      const response = await worker.fetch(
+        makeHostRequest(legacyHost, '/mcp?source=legacy', method),
+        env as never,
+        ctx,
+      );
+
+      expect(response.status).toBe(308);
+      expect(response.headers.get('Location')).toBe(
+        'https://mcp.theologai.xyz/mcp?source=legacy',
+      );
+      expect(response.headers.get('Cache-Control')).toBe('public, max-age=3600');
+      expect(env.THEOLOGAI_RATE_LIMITER.limit).not.toHaveBeenCalled();
+      expect(mockCreateRoot).not.toHaveBeenCalled();
+    });
+
+    it('redirects before consuming a streaming request body', async () => {
+      const request = makeHostRequest(
+        legacyHost,
+        '/mcp',
+        'POST',
+        undefined,
+        new ReadableStream<Uint8Array>(),
+      );
+
+      const response = await worker.fetch(request, env as never, ctx);
+
+      expect(response.status).toBe(308);
+      expect(request.bodyUsed).toBe(false);
+      expect(mockHandleMcp).not.toHaveBeenCalled();
+    });
+
+    it('returns 410 for the confirmed poller on the legacy hostname', async () => {
+      const response = await worker.fetch(
+        makeHostRequest(legacyHost, '/mcp', 'POST', pollerHeaders),
+        env as never,
+        ctx,
+      );
+
+      expect(response.status).toBe(410);
+      await expect(response.text()).resolves.toBe('Gone');
+      expect(response.headers.get('Location')).toBeNull();
+      expect(response.headers.get('Cache-Control')).toBe('private, no-store');
+      expect(env.THEOLOGAI_RATE_LIMITER.limit).not.toHaveBeenCalled();
+      expect(mockCreateRoot).not.toHaveBeenCalled();
+    });
+
+    it('returns 403 if the confirmed poller reaches the primary hostname', async () => {
+      const response = await worker.fetch(
+        makeHostRequest(primaryHost, '/mcp', 'POST', pollerHeaders),
+        env as never,
+        ctx,
+      );
+
+      expect(response.status).toBe(403);
+      await expect(response.text()).resolves.toBe('Forbidden');
+      expect(response.headers.get('Location')).toBeNull();
+      expect(env.THEOLOGAI_RATE_LIMITER.limit).not.toHaveBeenCalled();
+      expect(mockCreateRoot).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      { 'CF-Connecting-IP': '18.192.206.183', 'User-Agent': 'another-client/1.0' },
+      { 'CF-Connecting-IP': '203.0.113.10', 'User-Agent': 'Go-http-client/2.0' },
+    ])('does not block partial poller identity matches', async (headers) => {
+      const response = await worker.fetch(
+        makeHostRequest(legacyHost, '/mcp', 'POST', headers),
+        env as never,
+        ctx,
+      );
+
+      expect(response.status).toBe(308);
+    });
+
+    it('continues serving ordinary requests on the primary hostname', async () => {
+      const request = makeHostRequest(primaryHost);
+      const response = await worker.fetch(request, env as never, ctx);
+
+      expect(response.status).toBe(200);
+      expect(mockHandleMcp).toHaveBeenCalledWith(mockServer, request);
+    });
   });
 
   it('creates a fresh composition root and MCP server for an accepted request', async () => {

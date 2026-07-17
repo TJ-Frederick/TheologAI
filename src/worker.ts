@@ -15,6 +15,7 @@ import {
   getMaxRequestBytes,
   responseWithCors,
 } from './http/worker/requestPolicy.js';
+import { getLegacyEndpointResponse } from './http/worker/legacyEndpoint.js';
 import { getRateLimitResponse } from './http/worker/rateLimit.js';
 import {
   getWorkerRequestMetadata,
@@ -53,6 +54,15 @@ export default {
     };
 
     try {
+      const legacyEndpointResponse = getLegacyEndpointResponse(request);
+      if (legacyEndpointResponse) {
+        return complete(
+          legacyEndpointResponse.response,
+          true,
+          legacyEndpointResponse.reason,
+        );
+      }
+
       const earlyResponse = getEarlyResponse(env, request, metadata);
       if (earlyResponse) {
         return complete(earlyResponse.response, true, earlyResponse.reason);

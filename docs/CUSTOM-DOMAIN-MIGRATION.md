@@ -1,10 +1,11 @@
 # Custom-domain migration and rollback
 
-This runbook governs the infrastructure-only migration to `theologai.xyz`.
-It must not be combined with application behavior, database, corpus,
-rate-limit, CCEL, dependency, or feature changes. No existing route, domain,
-deployment, database, or compatibility endpoint may be deleted without
-separate owner approval.
+This runbook governs the infrastructure-only migration to `theologai.xyz` and
+the separately reviewed, post-migration legacy-host redirect window. The
+initial domain migration must not be combined with application behavior,
+database, corpus, rate-limit, CCEL, dependency, or feature changes. No existing
+route, domain, deployment, database, or compatibility endpoint may be deleted
+without separate owner approval.
 
 ## Address and ownership map
 
@@ -15,7 +16,7 @@ separate owner approval.
 | `https://mcp.theologai.xyz/mcp` | Production Worker `theologai` | Canonical production MCP endpoint. |
 | `https://preview-mcp.theologai.xyz/mcp` | Preview Worker `theologai-preview` | Canonical preview MCP endpoint. |
 | `https://theologai.pages.dev/` | Existing Pages project | Website compatibility and rollback alias. |
-| `https://theologai.tjfrederick.workers.dev/mcp` | Production Worker | Production compatibility and rollback alias. |
+| `https://theologai.tjfrederick.workers.dev/mcp` | Production Worker | Temporary 308 migration alias; the confirmed abusive poller is rejected before redirect. |
 | `https://theologai-preview.tjfrederick.workers.dev/mcp` | Preview Worker | Preview compatibility and rollback alias. |
 
 The apex Pages custom domain and Worker custom-domain subdomains do not compete:
@@ -167,15 +168,40 @@ declaration skips the gate.
 After both custom MCP domains pass independent black-box audit, make the custom
 URLs canonical in clients and documentation. Preserve the old URL alongside
 each client entry as a commented or separately named rollback target where the
-client format allows it. Reconnect and reinitialize MCP sessions after changing
-a URL; cached capability inventories are not migration evidence.
+client format allows it until the temporary redirect window begins. Once the
+redirect is active, restoring direct legacy service requires reverting the
+migration gate or restoring the preceding Worker version. Reconnect and
+reinitialize MCP sessions after changing a URL; cached capability inventories
+are not migration evidence.
+
+## Temporary legacy-host redirect window
+
+During the client cutover window, the production Worker handles the legacy
+`workers.dev` hostname before origin validation, rate limiting, request-body
+reads, or MCP construction:
+
+- The exact IP and user-agent tuple of the AWS Frankfurt poller observed on
+  2026-07-17 receives `410 Gone` on the legacy hostname and `403 Forbidden` on
+  any other hostname.
+- Every other method and path on the legacy hostname receives `308 Permanent
+  Redirect` to the same path and query on `https://mcp.theologai.xyz`.
+- Preview hostnames are not redirected.
+
+Monitor status codes and host traffic throughout the window. Once legitimate
+legacy traffic has fallen to an acceptable level, obtain owner approval to set
+`workers_dev = false`, remove the temporary poller rule, and update this runbook.
+The redirect and block reduce application work but still count as legacy Worker
+invocations until the `workers.dev` route is disabled.
 
 ## Rollback
 
 Domain rollback does not require deleting anything:
 
-1. Point affected MCP clients back to the matching `workers.dev` compatibility
-   alias, or the website back to `theologai.pages.dev`.
+1. Before the temporary redirect window, point affected MCP clients back to the
+   matching `workers.dev` compatibility alias. During the redirect window,
+   revert the migration gate or restore the preceding Worker version before
+   using that alias. The website can independently return to
+   `theologai.pages.dev`.
 2. If the new Worker version itself is unhealthy, restore PR #50 production
    Worker version `32520410-d363-4b2b-83d1-cb7613eab2f1` with its unchanged
    production D1, or the recorded preview baseline with its unchanged preview
