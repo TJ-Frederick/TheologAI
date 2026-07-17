@@ -1,0 +1,16 @@
+{
+  "extends": "../../../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "../../..",
+    "types": ["node", "vitest/globals"]
+  },
+  "include": [
+    "support/**/*.ts",
+    "../../unit/formatters/originalLanguageStudyV2DraftFormatter.test.ts",
+    "../../unit/mcp/originalLanguageStudyV2DraftSchema.test.ts",
+    "../../unit/presenters/originalLanguageStudyV2DraftStructured.test.ts",
+    "../../unit/scripts/originalLanguageStudyV2DraftInertness.test.ts",
+    "../../unit/services/languages/OriginalLanguageStudyV2DraftCoordinator.test.ts"
+  ]
+}
