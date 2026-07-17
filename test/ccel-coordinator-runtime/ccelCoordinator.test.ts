@@ -220,10 +220,14 @@ describe('CCEL global Durable Object coordinator', () => {
         .one().count).toBe(0);
     });
 
-    await expect(reacquiredStub.resetAfterOperatorReview()).resolves.toMatchObject({
-      lastObservedAtMs: future,
-      nextAllowedAtMs: future + 10_000,
-      operatorEpoch: 1,
+    await expect(reacquiredStub.resetAfterOperatorReview('latched_interface', 0)).resolves.toMatchObject({
+      applied: false,
+      reason: 'not_latched',
+      snapshot: {
+        lastObservedAtMs: future,
+        nextAllowedAtMs: future + 10_000,
+        operatorEpoch: 0,
+      },
     });
     await expect(reacquiredStub.admit()).resolves.toMatchObject({
       kind: 'busy',
@@ -233,7 +237,7 @@ describe('CCEL global Durable Object coordinator', () => {
     await runInDurableObject(reacquiredStub, async (_instance, state) => {
       expect(state.storage.sql
         .exec<{ count: number }>('SELECT count FROM rejected_admission_write_count')
-        .one().count).toBe(1);
+        .one().count).toBe(0);
     });
   });
 
@@ -261,7 +265,9 @@ describe('CCEL global Durable Object coordinator', () => {
       lastObservedAtMs: floor,
     });
 
-    await expect(stub.resetAfterOperatorReview()).resolves.toMatchObject({ state: 'closed' });
+    await expect(stub.resetAfterOperatorReview('latched_interface', 0)).resolves.toMatchObject({
+      applied: true, snapshot: { state: 'closed' },
+    });
     const afterReset = await Promise.all([stub.admit(), stub.admit()]);
     expect(afterReset.every(decision => decision.kind === 'latched')).toBe(true);
     await expect(stub.snapshot()).resolves.toMatchObject({
@@ -349,12 +355,16 @@ describe('CCEL global Durable Object coordinator', () => {
       kind: 'latched',
       reason: 'interface',
     });
-    const reset = await stub.resetAfterOperatorReview();
+    const reset = await stub.resetAfterOperatorReview('latched_interface', 0);
     expect(reset).toMatchObject({
-      state: 'closed',
-      operatorEpoch: 1,
-      terminalAttemptCount: 0,
-      terminalRetiredThroughAttemptId: 0,
+      applied: true,
+      reason: 'applied',
+      snapshot: {
+        state: 'closed',
+        operatorEpoch: 1,
+        terminalAttemptCount: 0,
+        terminalRetiredThroughAttemptId: 0,
+      },
     });
     await expect(stub.recordOutcome(admission.token, { kind: 'policy_failure' }))
       .resolves.toEqual({

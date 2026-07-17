@@ -4,8 +4,8 @@
 > local-only v3 contract. Preview advertises the v4 CCEL discovery shape, but
 > both execution switches remain off: no public call can reach the adapter,
 > coordinator lookup/RPC, or upstream fetch. TheologAI does not retrieve or
-> republish CCEL document bodies. Live discovery still requires a new preflight,
-> operator/rights decisions, and explicit release review.
+> republish CCEL document bodies. Live discovery still requires a fresh
+> operational preflight and explicit release review.
 
 Originally recorded 2026-07-11, updated 2026-07-15 for dormant parser-policy
 hardening, and reconciled 2026-07-16 for preview-only v4 exposure. This is an
@@ -15,9 +15,18 @@ coordinator flags remain off in production and preview.
 - Search surface reviewed: `https://ccel.org/?page=1&text=...`
 - Search contract reviewed: [CCEL Search Help](https://www.ccel.org/help/search), including the documented `author`, `authorID`, `title`, and `bookID` fields.
 - Exact locator shape reviewed: `https://ccel.org/ccel/{author}/{work}/{section}.html`.
-- Copyright status: no rights determination is made by this adapter. Search snippets are discovery-only metadata; edition-specific copyright and permission checks remain a later rollout gate. The [CCEL Copyright Policy](https://www.ccel.org/about/copyright.html) is reference material, not an approval.
+- Product boundary approved by the owner on 2026-07-16: retain the existing
+  bounded discovery model of at most five attributed, 240-character search
+  snippets and clean result links. Do not scrape full content, retrieve document
+  bodies, mirror or host CCEL material, or durably store CCEL content. This is a
+  product boundary, not a claim that CCEL separately licenses search snippets.
+- Copyright status: no rights determination is made by this adapter. Search snippets are discovery-only metadata; edition-specific copyright and permission checks remain required for any separate local-corpus republication. The [CCEL Copyright Policy](https://www.ccel.org/about/copyright.html) is reference material, not an approval.
 - Terms status: not reviewed or approved for this feature. Terms approval remains an explicit operator gate; copyright policy is not treated as a substitute for terms-of-use approval.
-- Robots status: not fetched by this slice. `https://www.ccel.org/robots.txt` must be checked manually by the operator immediately before any preview enablement and again for adapter releases. No automated test fetches robots or the live search surface.
+- Robots observation on 2026-07-16: `https://ccel.org/robots.txt` returned HTTP
+  200 with a wildcard `Crawl-delay: 10` and no wildcard disallow rule. This
+  observation is not permission or a durable policy guarantee. Recheck it
+  immediately before an authorized preview audit; automated tests never fetch
+  robots or the live search surface.
 - Interface status: tests use synthetic markup that models the reviewed
   `h2#CCEL_Search_results` plus Bootstrap `.card` anatomy without copying real
   titles, authors, snippets, or tracking values. Each card must contain exactly
@@ -84,5 +93,5 @@ exposure flag changes an MCP contract, not the upstream execution policy.
 
 The content-free admission/circuit design and staged gates are documented in
 [CCEL-UPSTREAM-COORDINATOR.md](./CCEL-UPSTREAM-COORDINATOR.md). Preview v4
-exposure does not supersede this preflight's operator, rights, robots, or
+exposure does not supersede this preflight's operational, robots, terms, or
 interface-review gates.

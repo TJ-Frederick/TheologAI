@@ -80,6 +80,14 @@ is local source context only and does not define the current product contract.
   bounded excerpts, per-target outcome identity, and executable remote audit,
   merged as `16e633bc70dbbea668caacf87f994a2536441092` and released through the
   protected production workflow.
+- **Canonical custom domains / PR #51:** infrastructure-only canonical website
+  and MCP routing with legacy compatibility aliases retained, merged as
+  `989fe5a7cdb04823c46085289dd8653741e394f5` from reviewed source
+  `01570c78289cd5a5aafa652fa8da1f9ea936a506`. Merge evidence alone does not establish a runtime deployment.
+- **Classic-text structured output / PR #52:** bounded, storage-validated v1
+  output for the curated local collection, merged as
+  `9250bbd393ed99530e52ee656eee11fb8e841c7e` from reviewed source culminating
+  in `ec2ae6480f372d2b8869592e51c199c66894508a`. Merge evidence alone does not establish a runtime deployment.
 
 These entries describe merged repository state. Deployment state is established
 only by the relevant protected workflow and post-deployment smoke evidence; a
@@ -148,17 +156,6 @@ Each release retained production D1 `theologai-production-20260715-a`
 and performed zero readiness writes. Live CCEL discovery remains intentionally
 disabled; only preview exposes its non-executing v4 contract.
 
-The current production Worker is PR #50 version
-`32520410-d363-4b2b-83d1-cb7613eab2f1`, bound to
-`theologai-production-20260715-a`
-(`c6535a4a-1953-4279-b277-7368445fc61a`). Its CCEL rollout state is `000`:
-contract exposure, live search, and coordinator execution are all disabled.
-The current preview Worker is PR #50 version
-`50bdd564-63da-4461-9a5b-73c61f26f7e6`, bound to
-`theologai-preview-20260714-a`
-(`0dab804f-8df0-4727-93bd-299612b6e179`). Its state is `100`: the v4 discovery
-contract is exposed, but live search and coordinator execution are disabled.
-
 PR #47's exposure-only preview audit recorded 91 fresh requests and 126
 assertions with no P0–P3 findings; its production control recorded 38 requests
 and 70 assertions with no P0–P3 findings. PR #48's preview audit recorded 30
@@ -176,17 +173,6 @@ passed 9/9, and HTTP/CORS/negotiation/under-budget rate behavior passed 19/19:
 72/72 total with no P0-P3 findings. Production retained rate namespace
 `361201` at 120/60 and preview retained namespace `361202`; no D1 binding or
 CCEL flag changed.
-
-## Next contained infrastructure workstream
-
-Before publishing the pending classic-text structured-output work, migrate the
-canonical public addresses to `theologai.xyz` in this order: preview MCP,
-website apex and optional `www` redirect, then production MCP. Preserve all
-`pages.dev` and `workers.dev` addresses as compatibility and rollback aliases.
-The migration is infrastructure-only and must not change application behavior,
-databases, corpora, rate limits, CCEL gates, dependencies, or feature contracts.
-The executable sequence and rollback requirements are in
-[CUSTOM-DOMAIN-MIGRATION.md](CUSTOM-DOMAIN-MIGRATION.md).
 
 ## Shipped Unicode correction release
 
@@ -366,26 +352,6 @@ provider corpus SHA-256 without treating it as edition provenance. Scalar
 absence remains an actionable chapter-oriented tool error with no structured
 content, while malformed or contradictory provider evidence fails closed.
 
-## Active release candidate: bounded parallel text enrichment
-
-The next `parallel_passages` application-contract slice advances its structured
-schema from v2 to v3 for every call. With `includeText: true`, it schedules at
-most 12 unique canonical passage lookups at concurrency four, in deterministic
-UBS group/member/segment order followed by legacy order. Cross-corpus duplicate
-targets share one lookup; cache hits never refund a slot and failures never
-backfill later targets. All group and legacy metadata remains present.
-The remote Bible-adapter ceiling of two HTTP retries mechanically caps this path at 36
-upstream attempts and preserves headroom below the 50-subrequest Worker limit.
-
-The required aggregate `textEnrichment` object reports the fixed budget,
-targets, scheduled/succeeded/failed/omitted counts, translation, and completion
-status. Every UBS member and legacy item reports a required status, and only
-successful UBS segment lookups produce excerpts. Bounded deterministic warnings
-and the Markdown footer disclose incomplete enrichment. This candidate changes
-no corpus, migration, D1 materialization, binding, feature flag, rate limit, or
-deployment configuration and is not shipped until review and release gates
-complete.
-
 ## Release gates
 
 Code readiness and operational readiness are deliberately separate:
@@ -415,12 +381,12 @@ Code readiness and operational readiness are deliberately separate:
 
 ## Next work
 
-- Decide and review a bounded, discovery-only public rollout of the retained
-  CCEL search adapter. Live preview testing requires explicit owner acceptance
-  of the residual policy ambiguity: free, donation-independent discovery with
-  at most five attributed 240-character provider snippets and clean links, no
-  body retrieval or republication, and no durable content storage. Applicable
-  operational and terms boundaries have not yet been reviewed or approved.
+- Review a bounded, discovery-only public rollout of the retained CCEL search
+  adapter. The owner accepts free, donation-independent discovery with at most
+  five attributed 240-character provider snippets and clean links, with no
+  full-content scraping, body retrieval, mirroring, hosting, republication, or
+  durable CCEL content storage. This does not claim CCEL separately licenses
+  snippets. Applicable operational and terms boundaries remain release gates.
   Immediately before any live preview canary, recheck the current CCEL search
   interface, robots guidance, copyright policy, and operational/terms boundary;
   record that evidence and repeat the owner decision. Until then preview stays

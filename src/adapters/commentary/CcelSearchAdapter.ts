@@ -66,7 +66,7 @@ export const CCEL_SEARCH_LIMITS = Object.freeze({
 const SAFE_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,11}$/;
 const ALLOWED_QUERY_KEYS = new Set(['text', 'match', 'author', 'work', 'page', 'limit']);
 const LUCENE_SPECIAL_CHARACTERS = new Set('+-!(){}[]^"~*?:\\&|'.split(''));
-const USER_AGENT = 'TheologAI/primary-source-search (bounded user-requested discovery; contact project maintainers)';
+const USER_AGENT = 'TheologAI/primary-source-search (bounded user-requested discovery; https://theologai.xyz)';
 
 type FetchImplementation = typeof fetch;
 type Clock = () => number;
@@ -310,8 +310,18 @@ function resultFor(
   notices: string[] = [],
   hits: PrimarySourceSearchHit[] = [],
   searched = true,
+  retryAfterSeconds?: number,
 ): PrimarySourceProviderResult {
-  return { provider: 'ccel_live', status, searched, page, hitCount: hits.length, hits, notices };
+  const boundedRetryAfter = status === 'rate_limited'
+    && Number.isSafeInteger(retryAfterSeconds)
+    && retryAfterSeconds! >= 1
+    && retryAfterSeconds! <= 86_400
+    ? retryAfterSeconds
+    : undefined;
+  return {
+    provider: 'ccel_live', status, searched, page, hitCount: hits.length, hits, notices,
+    ...(boundedRetryAfter === undefined ? {} : { retryAfterSeconds: boundedRetryAfter }),
+  };
 }
 
 /**
@@ -381,7 +391,14 @@ export class CcelSearchAdapter {
         return resultFor('disabled', request.page, ['Live CCEL search is disabled. No remote request was made.'], [], false);
       }
       if (admission.kind === 'busy') {
-        return resultFor('rate_limited', request.page, ['Live CCEL search is temporarily busy; try again later.'], [], false);
+        return resultFor(
+          'rate_limited',
+          request.page,
+          ['Live CCEL search is temporarily busy; retry after the reported interval.'],
+          [],
+          false,
+          admission.retryAfterSeconds,
+        );
       }
       if (admission.kind === 'latched') {
         return resultFor(
@@ -545,7 +562,10 @@ export class CcelSearchAdapter {
 
   private failureResult(page: number, failure: CcelSearchFailure): PrimarySourceProviderResult {
     const status = failure.kind === 'rate_limited' ? 'rate_limited' : failure.kind === 'parser' ? 'interface_changed' : 'unavailable';
-    return resultFor(status, page, ['Live CCEL search is temporarily unavailable.']);
+    const retryAfterSeconds = failure.kind === 'rate_limited'
+      ? Math.min(86_400, Math.max(1, Math.ceil((failure.retryAfterMs ?? 0) / 1_000)))
+      : undefined;
+    return resultFor(status, page, ['Live CCEL search is temporarily unavailable.'], [], true, retryAfterSeconds);
   }
 }
 

@@ -133,8 +133,18 @@ const localProvider = {
 
 const externalProvider = {
   type: 'object',
-  properties: { ...providerCommon, provider: { const: 'ccel_live' }, hits: { type: 'array', maxItems: 5, items: externalHit } },
+  properties: {
+    ...providerCommon,
+    provider: { const: 'ccel_live' },
+    retryAfterSeconds: { type: 'integer', minimum: 1, maximum: 86400 },
+    hits: { type: 'array', maxItems: 5, items: externalHit },
+  },
   required: ['provider', 'status', 'searched', 'page', 'hitCount', 'resultWindow', 'hits', 'notices'],
+  allOf: [{
+    if: { properties: { status: { const: 'rate_limited' } }, required: ['status'] },
+    then: { required: ['retryAfterSeconds'] },
+    else: { not: { required: ['retryAfterSeconds'] } },
+  }],
   additionalProperties: false,
 } as const;
 

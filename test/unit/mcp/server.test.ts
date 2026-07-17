@@ -890,7 +890,8 @@ describe('shared MCP registration', () => {
     const argumentDescription = (name: string) => primaryDefinition.arguments?.find(argument => argument.name === name)?.description ?? '';
     expect(argumentDescription('topic')).toContain('optional external CCEL discovery');
     expect(argumentDescription('work')).toContain('unreviewed external provider work restriction');
-    expect(argumentDescription('authors')).toContain('unreviewed external provider restriction');
+    expect(argumentDescription('authors')).toContain('only the first creator is the immediate unreviewed external scope');
+    expect(argumentDescription('authors')).toContain('independently paced follow-up calls');
     expect(argumentDescription('startYear')).toContain('return unsupported_filter without upstream admission');
     expect(argumentDescription('endYear')).toContain('return unsupported_filter without upstream admission');
     const primary = await client.getPrompt({

@@ -11,6 +11,7 @@ import {
   type CcelCoordinatorPersistenceState,
   type CcelCoordinatorSnapshot,
   type CcelOutcomeRecord,
+  type CcelOperatorResetResult,
   type CcelTerminalAttempt,
 } from '../../services/historical/CcelUpstreamCoordinator.js';
 
@@ -86,12 +87,26 @@ export class CcelGlobalCoordinator extends DurableObject<CoordinatorRuntimeEnv> 
     return this.ctx.storage.transactionSync(() => snapshotCcelCoordinatorState(this.readState()));
   }
 
-  /** Internal-only operator pathway; no public HTTP or MCP route calls it. */
-  resetAfterOperatorReview(): CcelCoordinatorSnapshot {
+  /** Authenticated operator pathway. Exact state+epoch makes replay harmless. */
+  resetAfterOperatorReview(
+    expectedState: 'latched_policy' | 'latched_interface',
+    expectedOperatorEpoch: number,
+  ): CcelOperatorResetResult {
     return this.ctx.storage.transactionSync(() => {
-      const state = resetCcelCoordinatorState(this.readState(), Date.now());
+      const previous = this.readState();
+      const snapshot = snapshotCcelCoordinatorState(previous);
+      if (previous.state !== 'latched_policy' && previous.state !== 'latched_interface') {
+        return { applied: false, reason: 'not_latched', snapshot };
+      }
+      if (previous.state !== expectedState) {
+        return { applied: false, reason: 'state_mismatch', snapshot };
+      }
+      if (previous.operatorEpoch !== expectedOperatorEpoch) {
+        return { applied: false, reason: 'epoch_mismatch', snapshot };
+      }
+      const state = resetCcelCoordinatorState(previous, Date.now());
       this.writeState(state, true);
-      return snapshotCcelCoordinatorState(state);
+      return { applied: true, reason: 'applied', snapshot: snapshotCcelCoordinatorState(state) };
     });
   }
 
