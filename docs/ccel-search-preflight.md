@@ -1,16 +1,17 @@
 # CCEL live-search preflight record
 
 > **Current status:** exposure-only preview record. Production remains on the
-> local-only v3 contract. Preview advertises the v4 CCEL discovery shape, but
+> local-only v4 contract. Preview advertises the v5 CCEL discovery shape, but
 > both execution switches remain off: no public call can reach the adapter,
 > coordinator lookup/RPC, or upstream fetch. TheologAI does not retrieve or
 > republish CCEL document bodies. Live discovery still requires a fresh
 > operational preflight and explicit release review.
 
 Originally recorded 2026-07-11, updated 2026-07-15 for dormant parser-policy
-hardening, and reconciled 2026-07-16 for preview-only v4 exposure. This is an
-architecture record, not an enablement approval. The live-search and
-coordinator flags remain off in production and preview.
+hardening, and reconciled 2026-07-16 for preview-only v4 exposure. Updated
+2026-07-17 for preview-only v5 exposure. This is an architecture record, not
+an enablement approval. The live-search and coordinator flags remain off in
+production and preview.
 
 - Search surface reviewed: `https://ccel.org/?page=1&text=...`
 - Search contract reviewed: [CCEL Search Help](https://www.ccel.org/help/search), including the documented `author`, `authorID`, `title`, and `bookID` fields.
@@ -92,6 +93,6 @@ execution, or remote mutation is authorized by this record. The preview-only
 exposure flag changes an MCP contract, not the upstream execution policy.
 
 The content-free admission/circuit design and staged gates are documented in
-[CCEL-UPSTREAM-COORDINATOR.md](./CCEL-UPSTREAM-COORDINATOR.md). Preview v4
+[CCEL-UPSTREAM-COORDINATOR.md](./CCEL-UPSTREAM-COORDINATOR.md). Preview v5
 exposure does not supersede this preflight's operational, robots, terms, or
 interface-review gates.
