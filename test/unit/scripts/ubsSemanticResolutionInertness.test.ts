@@ -16,7 +16,7 @@ const activeIdentityPins = {
   'src/presenters/originalLanguageStudyStructured.ts': '49818eb62e89980498669442a4bfc1886944d7751fc675940b17368a030995d9',
   'src/formatters/originalLanguageStudyFormatter.ts': '30a10bf826c6c3174f2e0fb00907f6104735b165fdbfd5915a0ff22bc09b2536',
   'data/data-manifest.json': 'ba4f6fc73086716bd03f8e8d65a181719fba834aa61a90e65b168169744fa424',
-  'wrangler.toml': '512128beeb51f9134381f06cebd822b3402a3f99c6622410989bd3d188f711bc',
+  'wrangler.toml': '50dd24d0963893b5c8b17ec61d4ebe7c98eeb7f7692a988684bde09835017e4f',
   'worker-configuration.d.ts': 'e316f64679951b32417f0c85b02fc92e61dae25d879d28921df15caf8706fe55',
   'package.json': '4a9e337f9ee795a2d962ad9d6b5161fb36d166a7bf5547aca0c69813709f1ec4',
   'test/fixtures/ubs-semantics/structured-output-contract.draft.json': '4564884999aee552c4d1560c442c38b373fb19626a88da5af6455c892628e181',
