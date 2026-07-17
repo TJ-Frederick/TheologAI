@@ -47,6 +47,28 @@ describe('SourceAttestedParallelService', () => {
     expect(second).not.toHaveProperty('nextCursor');
   });
 
+  it('paginates a chapter-only query with a cursor-safe finite upper bound', async () => {
+    const repository = fixtureRepository();
+    const service = new SourceAttestedParallelService(repository);
+    const first = await service.lookup({ reference: 'Luke 6', maxGroups: 1 });
+    expect(first.reference).toBe('Luke 6');
+    expect(first.groups.map(group => group.sourceOrdinal)).toEqual([1]);
+    expect(first.nextCursor).toBeDefined();
+
+    const second = await service.lookup({ reference: 'Luke 6', maxGroups: 1, groupCursor: first.nextCursor });
+    expect(second.groups.map(group => group.sourceOrdinal)).toEqual([2]);
+    expect(second.additionalMatchObserved).toBe(false);
+    expect(second).not.toHaveProperty('nextCursor');
+
+    const parsed = parseSourceAttestedLookupReference('Luke 6');
+    expect(parsed.segments).toEqual([{
+      bookNumber: 42,
+      chapter: 6,
+      startVerse: 1,
+      endVerse: Number.MAX_SAFE_INTEGER,
+    }]);
+  });
+
   it('rejects a cursor replayed against a different normalized ordered query', async () => {
     const service = new SourceAttestedParallelService(fixtureRepository());
     const first = await service.lookup({ reference: 'Luke 6:35', maxGroups: 1 });
@@ -65,6 +87,20 @@ describe('SourceAttestedParallelService', () => {
     await expect(service.lookup({ reference: 'Luke 6:35', maxGroups: 1, groupCursor: forged }))
       .rejects.toThrow('valid page boundary');
     expect(findGroups).not.toHaveBeenCalled();
+  });
+
+  it('rejects false-terminal and mismatched cursors for a chapter-only query', async () => {
+    const service = new SourceAttestedParallelService(fixtureRepository());
+    const segments = parseSourceAttestedLookupReference('Luke 6').segments;
+    const falseTerminal = encodeParallelGroupCursor(segments, {
+      pageSize: 1, afterSourceOrdinal: 2, cumulativeGroupCount: 1,
+    });
+    await expect(service.lookup({ reference: 'Luke 6', maxGroups: 1, groupCursor: falseTerminal }))
+      .rejects.toThrow('valid page boundary');
+
+    const first = await service.lookup({ reference: 'Luke 6', maxGroups: 1 });
+    await expect(service.lookup({ reference: 'Luke 6:35', maxGroups: 1, groupCursor: first.nextCursor }))
+      .rejects.toThrow('different normalized passage query');
   });
 
   it('requires the continuation request to retain the page size encoded by the cursor', async () => {

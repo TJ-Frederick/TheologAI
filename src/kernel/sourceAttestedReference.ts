@@ -9,6 +9,16 @@ export interface SourceAttestedLookupReference {
   segments: SourceParallelReferenceSegment[];
 }
 
+/**
+ * Finite upper bound used for an open-ended chapter query.
+ *
+ * Source-attested verse numbers can exceed the English translation bounds,
+ * while SQL and opaque cursor JSON cannot safely carry `Infinity`. The pinned
+ * corpus uses ordinary positive verse numbers, so the largest safe integer is
+ * a lossless cross-runtime representation of "through the end of the chapter".
+ */
+export const SOURCE_ATTESTED_OPEN_ENDED_VERSE = Number.MAX_SAFE_INTEGER;
+
 export function parseSourceAttestedLookupReference(input: string): SourceAttestedLookupReference {
   const raw = input.trim();
   if (!raw.includes(',')) {
@@ -20,7 +30,7 @@ export function parseSourceAttestedLookupReference(input: string): SourceAtteste
           bookNumber: parsed.book.number,
           chapter: parsed.chapter,
           startVerse: parsed.startVerse ?? 1,
-          endVerse: parsed.endVerse ?? parsed.startVerse ?? Number.POSITIVE_INFINITY,
+          endVerse: parsed.endVerse ?? parsed.startVerse ?? SOURCE_ATTESTED_OPEN_ENDED_VERSE,
         }],
       };
     } catch {

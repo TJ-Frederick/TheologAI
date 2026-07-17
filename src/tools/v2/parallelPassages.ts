@@ -13,7 +13,7 @@ import { validateParallelPassagesOutputSemantics } from '../../mcp/parallelPassa
 export function createParallelPassagesHandler(service: ParallelPassageService): ToolHandler {
   return {
     name: 'parallel_passages',
-    description: 'Find complete source-attested UBS parallel-passage groups by default, with an opaque UBS-only continuation cursor when another group is observed. Optional passage-text enrichment uses at most 12 unique canonical lookups with explicit per-item and aggregate completion status. TheologAI legacy curated edges and OpenBible.info cross references require explicit opt-in.',
+    description: 'Find complete source-attested UBS parallel-passage groups by default, with an opaque UBS-only continuation cursor when another group is observed. For a broad survey, use the user\'s full requested chapter/range, not a representative verse. Start metadata-only with `{ reference, corpora: ["ubs_source_attested"], maxGroups: 5, includeText: false }`. Continue only when `sourceAttestedResultWindow.additionalMatchStatus` is `additional_match_observed`, `nextCursor` is present, and another page is useful: pass that `nextCursor` unchanged as `groupCursor` while preserving exactly the same `reference`, `corpora`, and `maxGroups`. Stop after three pages; if the cap could omit useful groups, disclose that the survey is bounded. Passage-text enrichment has a deterministic 12-lookup cap; TheologAI legacy curated edges and OpenBible.info cross references require explicit opt-in.',
     inputSchema: {
       type: 'object',
       properties: {

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { env, SELF } from 'cloudflare:test';
 import { createWorkerCompositionRoot } from '../../src/tools/worker/index.js';
 import type { Env } from '../../src/worker-env.js';
+import { encodeParallelGroupCursor } from '../../src/kernel/parallelGroupCursor.js';
+import { parseSourceAttestedLookupReference } from '../../src/kernel/sourceAttestedReference.js';
 
 const MCP_URL = 'https://worker.test/mcp';
 const ALLOWED_ORIGIN = 'https://allowed.example';
@@ -41,6 +43,15 @@ function textContent(message: JsonRpcResponse): string {
     ))
     .map(block => block.text)
     .join('\n');
+}
+
+function promptText(message: JsonRpcResponse): string {
+  const prompt = message.result?.messages?.[0];
+  if (typeof prompt !== 'object' || prompt === null || !('content' in prompt)) return '';
+  const content = prompt.content;
+  return typeof content === 'object' && content !== null && 'text' in content && typeof content.text === 'string'
+    ? content.text
+    : '';
 }
 
 async function rpc(
@@ -158,6 +169,10 @@ describe('Worker MCP endpoint in workerd', () => {
             type: 'object', additionalProperties: false,
             properties: expect.objectContaining({ kind: { type: 'string', const: 'bible_cross_references' } }),
           }),
+        }),
+        expect.objectContaining({
+          name: 'parallel_passages',
+          description: expect.stringContaining('pass that `nextCursor` unchanged as `groupCursor` while preserving exactly the same `reference`, `corpora`, and `maxGroups`'),
         }),
         expect.objectContaining({
           name: 'commentary_lookup',
@@ -656,6 +671,53 @@ describe('Worker MCP endpoint in workerd', () => {
       !previousIds.has(group.groupId) && group.sourceOrdinal > previousLast
     ))).toBe(true);
 
+    const chapterMark = await rpc('tools/call', {
+      name: 'parallel_passages', arguments: { reference: 'Mark 10', maxGroups: 5 },
+    }, 1155);
+    expect(chapterMark.response.status).toBe(200);
+    expect(chapterMark.message.error).toBeUndefined();
+    const chapterStructured = chapterMark.message.result?.structuredContent as any;
+    expect(chapterStructured.sourceAttestedGroups).toHaveLength(5);
+    expect(chapterStructured.sourceAttestedResultWindow).toMatchObject({
+      requestedLimit: 5,
+      returnedGroupCount: 5,
+      additionalMatchStatus: 'additional_match_observed',
+    });
+
+    const chapterContinued = await rpc('tools/call', {
+      name: 'parallel_passages', arguments: {
+        reference: 'Mark 10', maxGroups: 5,
+        groupCursor: chapterStructured.sourceAttestedResultWindow.nextCursor,
+      },
+    }, 1156);
+    expect(chapterContinued.message.error).toBeUndefined();
+    const chapterContinuedStructured = chapterContinued.message.result?.structuredContent as any;
+    expect(chapterContinuedStructured.sourceAttestedGroups).toHaveLength(2);
+    expect(chapterContinuedStructured.sourceAttestedGroups.every((group: any) => (
+      group.sourceOrdinal > chapterStructured.sourceAttestedGroups.at(-1).sourceOrdinal
+    ))).toBe(true);
+
+    const falseTerminal = encodeParallelGroupCursor(
+      parseSourceAttestedLookupReference('Mark 10').segments,
+      { pageSize: 5, afterSourceOrdinal: Number.MAX_SAFE_INTEGER, cumulativeGroupCount: 5 },
+    );
+    const falseTerminalResult = await rpc('tools/call', {
+      name: 'parallel_passages', arguments: {
+        reference: 'Mark 10', maxGroups: 5, groupCursor: falseTerminal,
+      },
+    }, 1157);
+    expect(falseTerminalResult.message.result).toMatchObject({ isError: true });
+    expect(textContent(falseTerminalResult.message)).toContain('groupCursor is not a valid page boundary');
+
+    const mismatchedChapterCursor = await rpc('tools/call', {
+      name: 'parallel_passages', arguments: {
+        reference: 'Mark 10:19', maxGroups: 5,
+        groupCursor: chapterStructured.sourceAttestedResultWindow.nextCursor,
+      },
+    }, 1158);
+    expect(mismatchedChapterCursor.message.result).toMatchObject({ isError: true });
+    expect(textContent(mismatchedChapterCursor.message)).toContain('groupCursor belongs to a different normalized passage query');
+
     const mixedCursor = await rpc('tools/call', {
       name: 'parallel_passages', arguments: {
         reference: 'Mark 10:19',
@@ -933,8 +995,47 @@ describe('Worker MCP endpoint in workerd', () => {
         }),
       }),
     ]);
-    expect(JSON.stringify(rendered.message.result?.messages)).toContain(
+    const renderedPrompt = promptText(rendered.message);
+    const initialParallelCall = renderedPrompt.match(/`parallel_passages` with `([^`]+)`/);
+    expect(initialParallelCall?.[1]).toBeDefined();
+    expect(JSON.parse(initialParallelCall![1]!)).toEqual({
+      reference: 'John 3:16', corpora: ['ubs_source_attested'], maxGroups: 5, includeText: false,
+    });
+    expect(renderedPrompt).toContain('preserving exactly the same `reference`, `corpora`, and `maxGroups`');
+    expect(renderedPrompt).toContain('omit `includeText`, translation, alignment, legacy, and OpenBible controls');
+    expect(renderedPrompt).toContain('Never inspect, decode, or rewrite the cursor');
+    expect(renderedPrompt).toContain('Stop at a terminal window, once the evidence is sufficient, or after two continuation calls');
+    expect(renderedPrompt).toContain('if that cap ends a potentially useful survey, disclose that it was bounded');
+    expect(renderedPrompt).toContain('Preserve each selected group and every member intact; do not dedupe or flatten the groups');
+    expect(renderedPrompt).toContain('separate text-enrichment queue by traversing the selected groups and their members in returned source order');
+    expect(renderedPrompt).toContain('Dedupe only that queue by `normalizedReference`, keeping its first occurrence');
+    expect(renderedPrompt).toContain('label every later unique queue reference `budget_omitted` before lookup');
+    expect(renderedPrompt).toContain('never backfill with later references');
+    expect(renderedPrompt).toContain('`bible_cross_references` with `{"reference":"John 3:16"}` separately for broader OpenBible.info discovery');
+    expect(renderedPrompt).not.toContain('complete UBS source-attested group metadata');
+    expect(renderedPrompt).toContain(
       'do not infer quotation, dependence, synoptic direction, or a thematic relationship',
+    );
+    expect(renderedPrompt).toContain(
+      '`sourceAttestedResultWindow.additionalMatchStatus` is `additional_match_observed`',
+    );
+    expect(renderedPrompt).toContain(
+      'Pass that `nextCursor` unchanged as `groupCursor`',
+    );
+    expect(renderedPrompt).toContain(
+      'at most three pages / 15 groups',
+    );
+    expect(renderedPrompt).toContain(
+      'at most two materially relevant groups',
+    );
+    expect(renderedPrompt).toContain(
+      'only for the first 12 unique queue references',
+    );
+    expect(renderedPrompt).toContain(
+      'Never combine `groupCursor` with `includeText`',
+    );
+    expect(renderedPrompt).not.toContain(
+      'plus `includeText: true`',
     );
 
     const wrongType = await rpc('prompts/get', {

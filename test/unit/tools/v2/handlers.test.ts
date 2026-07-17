@@ -345,6 +345,18 @@ describe('bible_cross_references handler', () => {
 });
 
 describe('parallel_passages handler', () => {
+  it('advertises bounded UBS survey navigation for clients that do not retrieve guided prompts', () => {
+    const { description } = createParallelPassagesHandler(serviceDouble({ lookup: vi.fn() }));
+
+    expect(description).toContain('full requested chapter/range, not a representative verse');
+    expect(description).toContain('corpora: ["ubs_source_attested"], maxGroups: 5, includeText: false');
+    expect(description).toContain('additional_match_observed');
+    expect(description).toContain('nextCursor');
+    expect(description).toContain('pass that `nextCursor` unchanged as `groupCursor` while preserving exactly the same `reference`, `corpora`, and `maxGroups`');
+    expect(description).toContain('Stop after three pages');
+    expect(description).toContain('survey is bounded');
+  });
+
   it('does not advertise defaults for source-specific legacy compatibility fields', () => {
     const handler = createParallelPassagesHandler(serviceDouble({ lookup: vi.fn() }));
     const properties = handler.inputSchema.properties as Record<string, Record<string, unknown>>;

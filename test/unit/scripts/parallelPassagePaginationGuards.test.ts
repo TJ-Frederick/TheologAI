@@ -30,6 +30,30 @@ describe('parallel-passage pagination storage guards', () => {
     expect(tool).toContain('groupCursor:');
   });
 
+  it('keeps the guided exegesis workflow metadata-first and cursor-safe', () => {
+    const prompt = readFileSync(new URL('../../../src/mcp/prompts.ts', import.meta.url), 'utf8');
+    const skill = readFileSync(new URL('../../../skills/passage-exegesis/SKILL.md', import.meta.url), 'utf8');
+    for (const guidance of [prompt, skill]) {
+      expect(guidance).toContain('additional_match_observed');
+      expect(guidance).toContain('nextCursor');
+      expect(guidance).toContain('groupCursor');
+      expect(guidance).toContain('three pages / 15 groups');
+      expect(guidance).toContain('two materially relevant groups');
+      expect(guidance).toContain('first 12 unique queue references');
+      expect(guidance).toContain('Preserve each selected group and every member intact; do not dedupe or flatten the groups');
+      expect(guidance).toContain('separate text-enrichment queue');
+      expect(guidance).toContain('Dedupe only that queue by');
+      expect(guidance).toContain('normalizedReference');
+      expect(guidance).toContain('budget_omitted');
+      expect(guidance).toContain('before lookup');
+      expect(guidance).toContain('never backfill with later references');
+      expect(guidance).toContain('Never inspect, decode, or rewrite the cursor');
+      expect(guidance).toMatch(/Never combine[^a-z]*groupCursor[^a-z]+with[^a-z]+includeText/);
+      expect(guidance).not.toContain('includeText: true');
+      expect(guidance).not.toContain('complete UBS source-attested group metadata');
+    }
+  });
+
   it('keeps executable malformed and false-terminal cases in the preview fixture', () => {
     const fixture = JSON.parse(readFileSync(
       new URL('../../fixtures/parallel-passages-preview-audit.json', import.meta.url),
