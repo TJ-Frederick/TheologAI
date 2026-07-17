@@ -147,7 +147,7 @@ describe('globally inactive original_language_study v2 fixture packet', () => {
     expect(designInputs.some(isDraftPacketPath)).toBe(true);
   });
 
-  it('keeps runtime package entrypoints semantic and records npm publication as a separate known non-release debt', () => {
+  it('keeps runtime package entrypoints semantic and records npm packing as an unmanaged diagnostic', () => {
     const packageJson = JSON.parse(readRepoFile('package.json')) as Record<string, unknown>;
     const entrypointTargets = packageEntrypointTargets(packageJson);
     expect(entrypointTargets).toEqual(['dist/index.js']);
@@ -155,11 +155,10 @@ describe('globally inactive original_language_study v2 fixture packet', () => {
     expect(packageCommandTexts(packageJson).some(command => hasDraftReference(command))).toBe(false);
 
     const packlist = npmPacklistPaths();
-    // This repository does not currently publish from npm. The actual packlist
-    // includes the design packet and omits the configured Node entrypoint, so
-    // it is evidence of packaging debt—not an assertion of package exclusion.
+    // npm packing is not a distribution contract for this repository. Record
+    // the packet's current diagnostic visibility without coupling inertness to
+    // build output that may or may not exist in a developer worktree.
     expect(packlist.filter(isDraftPacketPath).sort()).toEqual(expectedPacketPaths);
-    expect(packlist).not.toContain('dist/index.js');
     expect(packageJson.files).toBeUndefined();
   });
 
