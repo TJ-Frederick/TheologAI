@@ -137,7 +137,7 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
         },
       });
       expect(listed.tools.find(tool => tool.name === 'primary_source_search')?.outputSchema).toMatchObject({
-        properties: { schemaVersion: { const: '3' } },
+        properties: { schemaVersion: { const: '4' } },
       });
       const primarySourceTool = listed.tools.find(tool => tool.name === 'primary_source_search')!;
       expect(JSON.stringify(primarySourceTool.inputSchema).toLowerCase()).not.toContain('ccel');
@@ -151,7 +151,7 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
       });
       expect(primarySource.isError).not.toBe(true);
       expect(primarySource.structuredContent).toMatchObject({
-        schemaVersion: '3', kind: 'primary_source_search',
+        schemaVersion: '4', kind: 'primary_source_search',
         queries: [{ providers: [{ provider: 'local' }] }],
         coverage: { localAttempted: false, localHitCount: 0 },
       });
@@ -194,7 +194,7 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
       }));
       const catalog = await client.readResource({ uri: 'theologai://primary-sources/catalog' });
       expect(JSON.parse(String(catalog.contents[0].text))).toMatchObject({
-        schemaVersion: '1', kind: 'local_primary_source_catalog', workCount: 0,
+        schemaVersion: '2', kind: 'local_primary_source_catalog', workCount: 0,
         policies: { scope: 'hosted_collection_only', rightsStatus: 'not_established' },
       });
       expect(listed.tools).toEqual(expect.arrayContaining([
@@ -269,7 +269,7 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
           text: expect.stringContaining('Plan status: **complete**'),
         })],
         structuredContent: {
-          schemaVersion: '3',
+          schemaVersion: '4',
           kind: 'primary_source_search',
           planStatus: 'complete',
           queries: [expect.objectContaining({
@@ -281,9 +281,8 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
           coverage: expect.any(Object),
           evidencePolicy: {
             snippetUse: 'discovery_only',
-            selectedSectionAccess: 'mcp_resource_read',
+            localSectionAccess: 'mcp_resource_read',
             coverageScope: 'bounded_non_exhaustive',
-            editionProvenance: 'incomplete',
             lookupAliasUse: 'exact_routing_only_not_metadata_evidence',
           },
         },

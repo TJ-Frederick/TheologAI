@@ -49,6 +49,13 @@ export class PrimarySourceSearchService {
 
     const localResults = providerResults.filter(provider => provider.provider === 'local');
     const ccelResults = providerResults.filter(provider => provider.provider === 'ccel_live');
+    const observed = queryResults.flatMap(query => query.providers.map(provider => ({
+      queryId: query.id,
+      provider: provider.provider,
+      status: provider.status,
+      returnedHitCount: provider.hitCount,
+      searched: provider.searched,
+    })));
     return {
       planStatus,
       queries: queryResults,
@@ -60,6 +67,11 @@ export class PrimarySourceSearchService {
         ...(ccelResults.length ? { ccelStatus: aggregateStatus(ccelResults) } : {}),
         ccelHitCount: ccelResults.reduce((total, result) => total + result.hitCount, 0),
         notices: [...new Set(providerResults.flatMap(result => result.notices))],
+        serverObserved: {
+          searched: observed.filter(provider => provider.searched).map(({ searched: _searched, ...provider }) => provider),
+          notSearched: observed.filter(provider => !provider.searched)
+            .map(({ searched: _searched, returnedHitCount: _returnedHitCount, ...provider }) => provider),
+        },
       },
     };
   }

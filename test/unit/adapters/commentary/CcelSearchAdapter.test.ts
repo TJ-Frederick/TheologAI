@@ -267,7 +267,7 @@ describe('primary-source feature flags', () => {
   it('defaults all three rollout gates off and derives one live predicate', () => {
     expect(DEFAULT_PRIMARY_SOURCE_FEATURE_FLAGS).toEqual({
       exposeCcelDiscovery: false, ccelLiveSearch: false, ccelCoordinator: false,
-      contractVersion: '3', liveCcelEnabled: false,
+      contractVersion: '4', liveCcelEnabled: false,
     });
     expect(readPrimarySourceFeatureFlags()).toEqual(DEFAULT_PRIMARY_SOURCE_FEATURE_FLAGS);
     expect(readPrimarySourceFeatureFlags({
@@ -276,7 +276,7 @@ describe('primary-source feature flags', () => {
       THEOLOGAI_ENABLE_CCEL_COORDINATOR: 'TRUE',
     })).toEqual({
       exposeCcelDiscovery: true, ccelLiveSearch: true, ccelCoordinator: true,
-      contractVersion: '4', liveCcelEnabled: true,
+      contractVersion: '5', liveCcelEnabled: true,
     });
   });
 });

@@ -2,12 +2,18 @@ import { buildLocalDocumentResourceUri } from '../kernel/documentResource.js';
 import { CLASSIC_TEXT_LIMITS } from '../kernel/classicTextContract.js';
 import {
   CCEL_COMPOSITION_DATE_NOTICE,
+  EXTERNAL_EDITION_READINESS,
+  LOCAL_EDITION_READINESS,
+  PRIMARY_SOURCE_COVERAGE_POLICY,
   type PrimarySourcePlanHit,
   type PrimarySourceProviderStatus,
   type PrimarySourceSearchPlanResult,
 } from '../services/historical/primarySourceTypes.js';
 
+/** Total MCP delivery allowance: structured model, fallback text, and links. */
 export const PRIMARY_SOURCE_V4_MAX_BYTES = 32_768;
+/** Reserve deterministic room for the fallback and capped native link metadata. */
+export const PRIMARY_SOURCE_STRUCTURED_MAX_BYTES = 20_480;
 
 const COMPLETE = new Set<PrimarySourceProviderStatus>(['ok', 'no_results', 'catalog_miss']);
 const UNAVAILABLE = new Set<PrimarySourceProviderStatus>(['unavailable', 'disabled', 'rate_limited', 'interface_changed']);
@@ -20,10 +26,19 @@ const textEncoder = new TextEncoder();
 export const PRIMARY_SOURCE_V4_EVIDENCE_POLICY = {
   snippetUse: 'discovery_only',
   localSectionAccess: 'mcp_resource_read',
+  coverageScope: 'bounded_non_exhaustive',
+  lookupAliasUse: 'exact_routing_only_not_metadata_evidence',
+  coverageLedger: PRIMARY_SOURCE_COVERAGE_POLICY,
+} as const;
+
+export const PRIMARY_SOURCE_V5_EVIDENCE_POLICY = {
+  snippetUse: 'discovery_only',
+  localSectionAccess: 'mcp_resource_read',
   externalSectionAccess: 'direct_url_only',
   coverageScope: 'bounded_non_exhaustive',
   externalRightsStatus: 'not_determined',
   lookupAliasUse: 'exact_routing_only_not_metadata_evidence',
+  coverageLedger: PRIMARY_SOURCE_COVERAGE_POLICY,
 } as const;
 
 type LocalHit = {
@@ -32,6 +47,7 @@ type LocalHit = {
   provider: 'local';
   locator: { kind: 'mcp_resource'; uri: string; documentId: string; sectionId: string };
   resourceSizeBytes: number;
+  editionReadiness: typeof LOCAL_EDITION_READINESS;
   documentType?: string; documentDate?: string;
   creators?: Array<{ name: string; role: 'author' | 'issuing_body' | 'drafting_body' | 'revising_body' | 'compiler' }>;
   metadataStatus?: 'reviewed' | 'anonymous' | 'collective' | 'unknown';
@@ -43,6 +59,7 @@ type ExternalHit = {
   rankWithinProvider: number; page: number; snippetOnly: true; attribution: string;
   provider: 'ccel_live'; locator: { kind: 'external_url'; url: string };
   metadataStatus: 'provider_search_result_unreviewed';
+  editionReadiness: typeof EXTERNAL_EDITION_READINESS;
 };
 
 export type PresentedPrimarySourceV4Hit = LocalHit | ExternalHit;
@@ -61,10 +78,33 @@ type PresentedProvider = {
     status: 'matched' | 'catalog_miss' | 'metadata_incomplete';
     requested: { work?: string; author?: string; startYear?: number; endYear?: number };
     eligibleDocumentCount: number;
-    eligibleDocuments: Array<{ id: string; title: string; metadataStatus: 'reviewed' | 'anonymous' | 'collective' | 'unknown' }>;
+    eligibleDocuments: Array<{
+      id: string; title: string; metadataStatus: 'reviewed' | 'anonymous' | 'collective' | 'unknown';
+      editionReadiness: typeof LOCAL_EDITION_READINESS;
+    }>;
     eligibleDocumentsTruncated: boolean;
   };
 };
+
+export interface PresentedPrimarySourceSearchV5 extends Record<string, unknown> {
+  schemaVersion: '5';
+  kind: 'primary_source_search';
+  planStatus: 'complete' | 'partial' | 'unavailable';
+  responseWindow: { unit: 'utf8_bytes'; maximum: 32768; truncated: boolean };
+  queries: Array<{
+    id: string;
+    normalizedMode: 'all_terms' | 'phrase';
+    normalizedSelection: 'relevance' | 'work_diversity';
+    providers: PresentedProvider[];
+  }>;
+  coverage: {
+    localAttempted: boolean; localStatus?: PrimarySourceProviderStatus; localHitCount: number;
+    ccelAttempted: boolean; ccelStatus?: PrimarySourceProviderStatus; ccelHitCount: number;
+    notices: string[];
+    serverObserved: ServerObservedCoverage;
+  };
+  evidencePolicy: typeof PRIMARY_SOURCE_V5_EVIDENCE_POLICY;
+}
 
 export interface PresentedPrimarySourceSearchV4 extends Record<string, unknown> {
   schemaVersion: '4';
@@ -79,11 +119,15 @@ export interface PresentedPrimarySourceSearchV4 extends Record<string, unknown> 
   }>;
   coverage: {
     localAttempted: boolean; localStatus?: PrimarySourceProviderStatus; localHitCount: number;
-    ccelAttempted: boolean; ccelStatus?: PrimarySourceProviderStatus; ccelHitCount: number;
-    notices: string[];
+    notices: string[]; serverObserved: ServerObservedCoverage;
   };
   evidencePolicy: typeof PRIMARY_SOURCE_V4_EVIDENCE_POLICY;
 }
+
+type ServerObservedCoverage = {
+  searched: Array<{ queryId: string; provider: 'local' | 'ccel_live'; status: PrimarySourceProviderStatus; returnedHitCount: number }>;
+  notSearched: Array<{ queryId: string; provider: 'local' | 'ccel_live'; status: PrimarySourceProviderStatus }>;
+};
 
 type ProviderDraft = Omit<PresentedProvider, 'hitCount' | 'resultWindow' | 'hits'> & {
   sourceAdditional: PresentedProvider['resultWindow']['additionalMatchStatus'];
@@ -98,12 +142,13 @@ type PresentedHitCandidate = {
 };
 
 /** Build the one sanitized presentation model used for JSON text and links. */
-export function presentPrimarySourceSearchV4(result: PrimarySourceSearchPlanResult): PresentedPrimarySourceSearchV4 {
+export function presentPrimarySourceSearchV5(result: PrimarySourceSearchPlanResult): PresentedPrimarySourceSearchV5 {
   let ccelGroupSeen = false;
   const sourceQueryCount = result.queries.length;
   const queryDrafts = result.queries.slice(0, 4).flatMap(query => {
     const seen = new Set<'local' | 'ccel_live'>();
     const providers = query.providers.flatMap(provider => {
+      if (provider.provider !== 'local' && provider.provider !== 'ccel_live') return [];
       if (seen.has(provider.provider) || seen.size >= 2) return [];
       if (provider.provider === 'ccel_live') {
         if (ccelGroupSeen) return [];
@@ -123,8 +168,10 @@ export function presentPrimarySourceSearchV4(result: PrimarySourceSearchPlanResu
   });
 
   const selected = queryDrafts.map(query => query.providers.map(() => [] as PresentedPrimarySourceV4Hit[]));
-  let truncated = sourceQueryCount > queryDrafts.length
+  const structuralOmission = sourceQueryCount > queryDrafts.length
     || queryDrafts.some(query => query.sourceProviderCount > query.providers.length)
+    || result.queries.slice(0, 4).some(query => query.providers.some(provider => provider.provider !== 'local' && provider.provider !== 'ccel_live'));
+  let truncated = structuralOmission
     || queryDrafts.some(query => query.providers.some(provider => provider.invalidCandidates > 0 || provider.contractInvalid));
 
   outer: for (let queryIndex = 0; queryIndex < queryDrafts.length; queryIndex++) {
@@ -137,8 +184,15 @@ export function presentPrimarySourceSearchV4(result: PrimarySourceSearchPlanResu
         // truncated partial form (`false` vs `true`, `complete` vs `partial`).
         // Budget against that larger representation so an all-fitting result
         // cannot cross the limit only when the final flags are recomputed.
-        const conservative = buildEnvelope(queryDrafts, selected, false, result.planStatus);
-        if (utf8Bytes(conservative) > PRIMARY_SOURCE_V4_MAX_BYTES) {
+        const conservative = buildEnvelope(
+          queryDrafts,
+          selected,
+          false,
+          result.planStatus,
+          structuralOmission,
+          queryDrafts.some(item => item.providers.some(provider => provider.invalidCandidates > 0)),
+        );
+        if (utf8Bytes(conservative) > PRIMARY_SOURCE_STRUCTURED_MAX_BYTES) {
           selected[queryIndex]![providerIndex]!.pop();
           truncated = true;
           break outer;
@@ -147,14 +201,70 @@ export function presentPrimarySourceSearchV4(result: PrimarySourceSearchPlanResu
     }
   }
 
-  const presented = buildEnvelope(queryDrafts, selected, truncated, result.planStatus);
+  const presented = buildEnvelope(
+    queryDrafts,
+    selected,
+    truncated,
+    result.planStatus,
+    structuralOmission,
+    queryDrafts.some(item => item.providers.some(provider => provider.invalidCandidates > 0)),
+  );
   // The bounded base envelope is intentionally small. This assertion converts
   // future schema growth into a fail-closed implementation defect, never an
   // oversized MCP payload.
-  if (utf8Bytes(presented) > PRIMARY_SOURCE_V4_MAX_BYTES) {
-    throw new Error('Primary-source v4 response envelope exceeds its UTF-8 byte budget.');
+  if (utf8Bytes(presented) > PRIMARY_SOURCE_STRUCTURED_MAX_BYTES) {
+    throw new Error('Primary-source structured model exceeds its reserved delivery budget.');
   }
   return presented;
+}
+
+/**
+ * Production local-only cutover. The normal handler removes CCEL inputs before
+ * service execution; this additional boundary prevents stale/malformed service
+ * output from leaking discovery-provider identity into the local contract.
+ */
+export function presentPrimarySourceSearchV4(result: PrimarySourceSearchPlanResult): PresentedPrimarySourceSearchV4 {
+  const excludedExternal = result.queries.some(query => query.providers.some(provider => provider.provider !== 'local'));
+  const localOnly: PrimarySourceSearchPlanResult = {
+    ...result,
+    queries: result.queries.map(query => {
+      const local = query.providers.filter(provider => provider.provider === 'local');
+      return {
+        ...query,
+        providers: local.length > 0 ? local : [{
+          provider: 'local' as const,
+          status: 'interface_changed' as const,
+          searched: false,
+          page: 1,
+          hitCount: 0,
+          hits: [],
+          notices: ['Internal data outside the local public contract was omitted.'],
+          resultWindow: { returnedHitCount: 0, additionalMatchStatus: 'not_evaluated' as const },
+        }],
+      };
+    }),
+  };
+  const v5 = presentPrimarySourceSearchV5(localOnly);
+  return {
+    schemaVersion: '4',
+    kind: v5.kind,
+    planStatus: excludedExternal ? 'partial' : v5.planStatus,
+    responseWindow: { ...v5.responseWindow, truncated: v5.responseWindow.truncated || excludedExternal },
+    queries: v5.queries,
+    coverage: {
+      localAttempted: v5.coverage.localAttempted,
+      ...(v5.coverage.localStatus ? { localStatus: v5.coverage.localStatus } : {}),
+      localHitCount: v5.coverage.localHitCount,
+      notices: excludedExternal
+        ? uniqueBounded([...v5.coverage.notices, 'Internal data outside the local public contract was omitted.'], 8, 240)
+        : v5.coverage.notices,
+      serverObserved: {
+        searched: v5.coverage.serverObserved.searched.filter(item => item.provider === 'local'),
+        notSearched: v5.coverage.serverObserved.notSearched.filter(item => item.provider === 'local'),
+      },
+    },
+    evidencePolicy: PRIMARY_SOURCE_V4_EVIDENCE_POLICY,
+  };
 }
 
 function providerDraft(
@@ -182,7 +292,7 @@ function providerDraft(
     && ((provider.scope !== undefined && scope === undefined) || (scopeRequired && scope === undefined));
   const pageInvalid = !Number.isSafeInteger(provider.page) || provider.page < 1 || provider.page > 3;
   const retryAfterValid = provider.retryAfterSeconds === undefined
-    ? provider.status !== 'rate_limited'
+    ? provider.provider === 'local' || provider.status !== 'rate_limited'
     : provider.provider === 'ccel_live'
       && provider.status === 'rate_limited'
       && Number.isSafeInteger(provider.retryAfterSeconds)
@@ -190,6 +300,15 @@ function providerDraft(
       && provider.retryAfterSeconds <= 86_400;
   const contractInvalid = countMismatch || !validWindow || scopeInvalid || pageInvalid || optionalMetadataInvalid || !retryAfterValid;
   const status = STATUS.has(provider.status) && invalidCandidates === 0 && !contractInvalid ? provider.status : 'interface_changed';
+  const failClosedScope = scopeRequired && scope === undefined
+    ? {
+        status: 'metadata_incomplete' as const,
+        requested: {},
+        eligibleDocumentCount: 0,
+        eligibleDocuments: [],
+        eligibleDocumentsTruncated: false,
+      }
+    : undefined;
   return {
     provider: providerKind,
     status,
@@ -209,7 +328,7 @@ function providerDraft(
       ...(optionalMetadataInvalid ? ['One or more empty optional metadata fields were omitted after sanitization.'] : []),
       ...provider.notices.filter(notice => notice !== CCEL_COMPOSITION_DATE_NOTICE),
     ], 4, 240),
-    ...(scope ? { scope } : {}),
+    ...(scope ?? failClosedScope ? { scope: scope ?? failClosedScope } : {}),
     ...(retryAfterValid && provider.retryAfterSeconds !== undefined
       ? { retryAfterSeconds: provider.retryAfterSeconds }
       : {}),
@@ -225,7 +344,9 @@ function buildEnvelope(
   selected: PresentedPrimarySourceV4Hit[][][],
   truncated: boolean,
   sourcePlanStatus: PrimarySourceSearchPlanResult['planStatus'],
-): PresentedPrimarySourceSearchV4 {
+  structuralOmission: boolean,
+  invalidHitOmission: boolean,
+): PresentedPrimarySourceSearchV5 {
   const queries = drafts.map((query, queryIndex) => ({
     id: query.id,
     normalizedMode: query.normalizedMode,
@@ -257,29 +378,35 @@ function buildEnvelope(
   const ccel = providers.filter(provider => provider.provider === 'ccel_live');
   const statuses = providers.map(provider => provider.status);
   const hasUsable = providers.some(provider => provider.hits.length > 0 || COMPLETE.has(provider.status));
-  const recomputed = truncated || sourcePlanStatus === 'partial'
+  const recomputed = sourcePlanStatus === 'partial'
     ? 'partial'
-    : statuses.length > 0 && statuses.every(status => COMPLETE.has(status))
+    : !hasUsable && statuses.length > 0 && statuses.every(status => UNAVAILABLE.has(status))
+      ? invalidHitOmission ? 'partial' : 'unavailable'
+      : truncated
+        ? 'partial'
+        : statuses.length > 0 && statuses.every(status => COMPLETE.has(status))
       ? 'complete'
-      : !hasUsable && statuses.length > 0 && statuses.every(status => UNAVAILABLE.has(status))
-        ? 'unavailable'
         : 'partial';
   return {
-    schemaVersion: '4',
+    schemaVersion: '5',
     kind: 'primary_source_search',
     planStatus: recomputed,
     responseWindow: { unit: 'utf8_bytes', maximum: PRIMARY_SOURCE_V4_MAX_BYTES, truncated },
     queries,
     coverage: {
       localAttempted: local.some(provider => provider.searched),
-      ...(local.length ? { localStatus: aggregateStatus(local) } : {}),
+      ...(local.length ? { localStatus: structuralOmission ? 'interface_changed' as const : aggregateStatus(local) } : {}),
       localHitCount: local.reduce((sum, provider) => sum + provider.hits.length, 0),
       ccelAttempted: ccel.some(provider => provider.searched),
       ...(ccel.length ? { ccelStatus: aggregateStatus(ccel) } : {}),
       ccelHitCount: ccel.reduce((sum, provider) => sum + provider.hits.length, 0),
-      notices: uniqueBounded(providers.flatMap(provider => provider.notices), 8, 240),
+      notices: uniqueBounded([
+        ...providers.flatMap(provider => provider.notices),
+        ...(structuralOmission ? ['One or more provider groups exceeded the public contract and were omitted.'] : []),
+      ], 8, 240),
+      serverObserved: presentServerObserved(queries),
     },
-    evidencePolicy: PRIMARY_SOURCE_V4_EVIDENCE_POLICY,
+    evidencePolicy: PRIMARY_SOURCE_V5_EVIDENCE_POLICY,
   };
 }
 
@@ -318,6 +445,7 @@ function presentHit(
         provider,
         locator: { kind: 'external_url', url },
         metadataStatus: 'provider_search_result_unreviewed',
+        editionReadiness: EXTERNAL_EDITION_READINESS,
       },
       optionalMetadataInvalid,
     };
@@ -342,6 +470,7 @@ function presentHit(
       provider,
       locator: { kind: 'mcp_resource', uri, documentId: hit.locator.documentId, sectionId: hit.locator.sectionId },
       resourceSizeBytes: hit.resourceSizeBytes,
+      editionReadiness: LOCAL_EDITION_READINESS,
       ...(documentType ? { documentType } : {}),
       ...(documentDate ? { documentDate } : {}),
       ...(creators?.length ? { creators } : {}),
@@ -374,7 +503,7 @@ function presentScope(scope: PrimarySourceSearchPlanResult['queries'][number]['p
     const id = boundedText(document.id, 160);
     const title = boundedText(document.title, 300);
     return id && title && ['reviewed', 'anonymous', 'collective', 'unknown'].includes(document.metadataStatus)
-      ? [{ id, title, metadataStatus: document.metadataStatus }]
+      ? [{ id, title, metadataStatus: document.metadataStatus, editionReadiness: LOCAL_EDITION_READINESS }]
       : [];
   });
   const work = scope.requested.work ? boundedText(scope.requested.work, 160) : undefined;
@@ -395,6 +524,28 @@ function presentScope(scope: PrimarySourceSearchPlanResult['queries'][number]['p
     eligibleDocuments,
     eligibleDocumentsTruncated: scope.eligibleDocumentsTruncated || scope.eligibleDocuments.length > eligibleDocuments.length,
   };
+}
+
+function presentServerObserved(
+  queries: Array<{ id: string; providers: PresentedProvider[] }>,
+): ServerObservedCoverage {
+  const searched: ServerObservedCoverage['searched'] = [];
+  const notSearched: ServerObservedCoverage['notSearched'] = [];
+  for (const query of queries) {
+    for (const provider of query.providers) {
+      if (provider.searched) {
+        searched.push({
+          queryId: query.id,
+          provider: provider.provider,
+          status: provider.status,
+          returnedHitCount: provider.hitCount,
+        });
+      } else {
+        notSearched.push({ queryId: query.id, provider: provider.provider, status: provider.status });
+      }
+    }
+  }
+  return { searched, notSearched };
 }
 
 function aggregateStatus(providers: PresentedProvider[]): PrimarySourceProviderStatus {

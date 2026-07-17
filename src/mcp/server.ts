@@ -282,7 +282,7 @@ function assertPrimarySourceContractParity(root: McpCompositionRoot): void {
   const tool = root.tools.find(candidate => candidate.name === 'primary_source_search');
   if (!tool) return;
   const advertisedVersion = (tool.outputSchema?.properties?.schemaVersion as { const?: unknown } | undefined)?.const;
-  const expectedOpenWorld = root.primarySourceContract.contractVersion === '4';
+  const expectedOpenWorld = root.primarySourceContract.contractVersion === '5';
   if (advertisedVersion !== root.primarySourceContract.contractVersion
     || tool.annotations?.openWorldHint !== expectedOpenWorld) {
     throw new Error('primary_source_search tool and guided-prompt contracts must use the same configuration.');

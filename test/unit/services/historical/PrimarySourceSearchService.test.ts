@@ -23,8 +23,8 @@ function providerResult(provider: 'local' | 'ccel_live', status: PrimarySourcePr
 
 const plan = (queries: unknown[]) => ({ queries });
 const query = (overrides: Record<string, unknown> = {}) => ({ id: 'q1', text: 'union with Christ', providers: ['local'], ...overrides });
-const dormant = { exposeCcelDiscovery: false, ccelLiveSearch: false, ccelCoordinator: false, contractVersion: '3' as const, liveCcelEnabled: false };
-const live = { exposeCcelDiscovery: true, ccelLiveSearch: true, ccelCoordinator: true, contractVersion: '4' as const, liveCcelEnabled: true };
+const dormant = { exposeCcelDiscovery: false, ccelLiveSearch: false, ccelCoordinator: false, contractVersion: '4' as const, liveCcelEnabled: false };
+const live = { exposeCcelDiscovery: true, ccelLiveSearch: true, ccelCoordinator: true, contractVersion: '5' as const, liveCcelEnabled: true };
 const coordinator = { admit: vi.fn(), recordOutcome: vi.fn(), snapshot: vi.fn() } as any;
 
 describe('PrimarySourceSearchService', () => {
