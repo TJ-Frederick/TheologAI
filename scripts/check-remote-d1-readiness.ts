@@ -9,6 +9,7 @@ import { genesisOneOneLemmaReadinessPredicate, johnOneOneReadinessPredicate } fr
 import { computeD1CorpusIdentity, parseDataManifest, verifyD1Migrations } from './d1-corpus-identity.js';
 import { UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY, UBS_PARALLEL_PASSAGE_PROVENANCE } from '../src/kernel/ubsParallelSource.js';
 import { CANONICAL_BOOK_ORDER_SQL } from '../src/adapters/shared/repositoryUtils.js';
+import { CLASSIC_TEXT_LIMITS } from '../src/kernel/classicTextContract.js';
 import type {
   BiblicalLanguageUnicodeCorrectionLedger,
   MorphologyUnicodeCorrection,
@@ -63,6 +64,10 @@ interface D1ReadinessCheck {
 interface D1ReadinessQueryContract {
   ctes: string[];
   checks: D1ReadinessCheck[];
+}
+
+export function classicTextSectionReadinessPredicate(): string {
+  return `(SELECT COUNT(*) FROM document_sections WHERE typeof(id) != 'integer' OR id < 0 OR id > ${Number.MAX_SAFE_INTEGER} OR typeof(document_id) != 'text' OR length(document_id) NOT BETWEEN 1 AND ${CLASSIC_TEXT_LIMITS.documentIdCharacters} OR document_id NOT GLOB '[A-Za-z0-9]*' OR document_id GLOB '*[^A-Za-z0-9._-]*' OR document_id IN ('.','..') OR typeof(section_number) != 'text' OR length(section_number) NOT BETWEEN 1 AND ${CLASSIC_TEXT_LIMITS.sectionNumberCharacters} OR section_number NOT GLOB '[A-Za-z0-9]*' OR section_number GLOB '*[^A-Za-z0-9._:-]*' OR section_number IN ('.','..') OR length('theologai://documents/' || document_id || '#section-' || section_number) > ${CLASSIC_TEXT_LIMITS.resourceUriCharacters} OR typeof(title) != 'text' OR length(title) > ${CLASSIC_TEXT_LIMITS.sectionTitleCharacters} OR typeof(content) != 'text' OR CASE WHEN topics IS NULL OR topics = '' THEN 0 WHEN typeof(topics) != 'text' THEN 1 WHEN json_valid(topics) != 1 THEN 1 WHEN json_type(topics) != 'array' THEN 1 WHEN EXISTS (SELECT 1 FROM json_each(topics) WHERE type != 'text') THEN 1 ELSE 0 END) = 0`;
 }
 
 interface RemoteD1ReadinessOptions {
@@ -175,6 +180,24 @@ function buildD1ReadinessQueryContract(
       };
     }),
   ];
+  const historicalOutputChecks: D1ReadinessCheck[] = [
+    {
+      id: 'historical.output.work_count',
+      predicate: `(SELECT COUNT(*) FROM documents) <= ${CLASSIC_TEXT_LIMITS.workCount}`,
+    },
+    {
+      id: 'historical.output.sections_per_work',
+      predicate: `(SELECT COUNT(*) FROM (SELECT document_id FROM document_sections GROUP BY document_id HAVING COUNT(*) > ${CLASSIC_TEXT_LIMITS.sectionsPerWork})) = 0`,
+    },
+    {
+      id: 'historical.output.document_metadata',
+      predicate: `(SELECT COUNT(*) FROM documents WHERE typeof(id) != 'text' OR length(id) NOT BETWEEN 1 AND ${CLASSIC_TEXT_LIMITS.documentIdCharacters} OR id NOT GLOB '[A-Za-z0-9]*' OR id GLOB '*[^A-Za-z0-9._-]*' OR id IN ('.','..') OR length('theologai://documents/' || id) > ${CLASSIC_TEXT_LIMITS.resourceUriCharacters} OR typeof(title) != 'text' OR length(title) NOT BETWEEN 1 AND ${CLASSIC_TEXT_LIMITS.titleCharacters} OR typeof(type) != 'text' OR length(type) NOT BETWEEN 1 AND ${CLASSIC_TEXT_LIMITS.typeCharacters} OR (date IS NOT NULL AND (typeof(date) != 'text' OR length(date) NOT BETWEEN 1 AND ${CLASSIC_TEXT_LIMITS.dateCharacters})) OR CASE WHEN metadata IS NULL OR metadata = '' THEN 0 WHEN json_valid(metadata) != 1 THEN 1 WHEN json_type(metadata) != 'object' THEN 1 WHEN json_type(metadata, '$.topics') IS NULL THEN 0 WHEN json_type(metadata, '$.topics') != 'array' THEN 1 WHEN json_array_length(metadata, '$.topics') > ${CLASSIC_TEXT_LIMITS.topicCount} THEN 1 WHEN EXISTS (SELECT 1 FROM json_each(metadata, '$.topics') WHERE type != 'text' OR length(value) > ${CLASSIC_TEXT_LIMITS.topicCharacters}) THEN 1 ELSE 0 END) = 0`,
+    },
+    {
+      id: 'historical.output.section_metadata',
+      predicate: classicTextSectionReadinessPredicate(),
+    },
+  ];
   const columnChecks = Object.entries(REQUIRED_COLUMNS).map(([table, columns]): D1ReadinessCheck => ({
     id: `schema.columns.${table}`,
     predicate: `(SELECT group_concat(name, ',') FROM (SELECT name FROM pragma_table_info('${table}') ORDER BY cid)) = '${columns.join(',')}'`,
@@ -242,6 +265,7 @@ function buildD1ReadinessQueryContract(
     { id: 'integrity.foreign_keys', predicate: foreignKeyCheck },
     ...identityChecks,
     ...historicalCatalogChecks,
+    ...historicalOutputChecks,
     ...columnChecks,
     ...countChecks,
     { id: 'schema.required_indexes', predicate: indexCheck },

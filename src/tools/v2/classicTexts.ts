@@ -13,6 +13,16 @@ import {
   formatSearchResults,
 } from '../../formatters/historicalFormatter.js';
 import { handleToolError, ValidationError } from '../../kernel/errors.js';
+import { classicTextsOutputSchema } from '../../mcp/schemas/classicTexts.js';
+import {
+  presentClassicTextCatalog,
+  presentClassicTextDirectory,
+  presentClassicTextSearch,
+  presentClassicTextWork,
+  validateClassicTextsOutputSemantics,
+} from '../../presenters/classicTextsStructured.js';
+import type { ResourceLink } from '@modelcontextprotocol/sdk/types.js';
+import { CLASSIC_TEXT_LIMITS } from '../../kernel/classicTextContract.js';
 
 export function createClassicTextsHandler(historicalService: HistoricalDocumentService): ToolHandler {
   return {
@@ -30,7 +40,11 @@ export function createClassicTextsHandler(historicalService: HistoricalDocumentS
       },
       additionalProperties: false,
     },
-    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
+    outputSchema: classicTextsOutputSchema,
+    validateStructuredOutput: validateClassicTextsOutputSemantics,
+    annotations: {
+      readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false,
+    },
 
     handler: async (params) => {
       try {
@@ -38,14 +52,25 @@ export function createClassicTextsHandler(historicalService: HistoricalDocumentS
         // List works
         if (params.listWorks) {
           const docs = await historicalService.listDocuments();
-          return { content: [{ type: 'text', text: formatDocumentList(docs) }] };
+          const presented = presentClassicTextCatalog(docs);
+          return {
+            content: [{ type: 'text', text: formatDocumentList(docs) }],
+            structuredContent: presented,
+          };
         }
 
         // Browse a specific document
         if (params.work && params.browseSections) {
           const doc = await historicalService.getDocument(params.work as string);
           const sections = await historicalService.getSections(doc.id);
-          return { content: [{ type: 'text', text: formatDocumentSectionIndex(doc, sections) }] };
+          const presented = presentClassicTextDirectory({ document: doc, sections });
+          return {
+            content: [
+              { type: 'text', text: formatDocumentSectionIndex(doc, sections) },
+              ...sectionResourceLinks(presented.directory.sections),
+            ],
+            structuredContent: presented,
+          };
         }
 
         // Look up a specific local document
@@ -55,19 +80,45 @@ export function createClassicTextsHandler(historicalService: HistoricalDocumentS
             throw new ValidationError('work', `No locally indexed historical document matches "${params.work}".`);
           }
           const sections = await historicalService.getSections(doc.id);
-          return { content: [{ type: 'text', text: formatDocumentSections(doc, sections) }] };
+          const presented = presentClassicTextWork({ document: doc, sections });
+          return {
+            content: [
+              { type: 'text', text: formatDocumentSections(doc, sections) },
+              resourceLink(presented.document.work.resource, doc.title, 'Complete local historical document.'),
+            ],
+            structuredContent: presented,
+          };
         }
 
         // Search by query
         if (params.query) {
           // Search local docs first
-          const localResults = await historicalService.search(params.query as string);
+          const query = params.query as string;
+          const localResults = await historicalService.search(query, CLASSIC_TEXT_LIMITS.searchLookahead);
+          const documents = localResults.length > 0 ? await historicalService.listDocuments() : [];
+          const presented = presentClassicTextSearch(query, localResults, documents);
           if (localResults.length > 0) {
-            const documents = await historicalService.listDocuments();
-            return { content: [{ type: 'text', text: formatSearchResults(params.query as string, localResults, documents) }] };
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: formatSearchResults(
+                    query,
+                    localResults,
+                    documents,
+                    presented.search.hits.map(hit => hit.discoverySnippet),
+                  ),
+                },
+                ...searchResourceLinks(presented.search.hits),
+              ],
+              structuredContent: presented,
+            };
           }
 
-          return { content: [{ type: 'text', text: `No results found for "${params.query}".` }] };
+          return {
+            content: [{ type: 'text', text: `No results found for "${query}".` }],
+            structuredContent: presented,
+          };
         }
 
         throw new ValidationError('mode', 'Choose exactly one mode: list local works, search local documents, or browse a local work.');
@@ -75,6 +126,38 @@ export function createClassicTextsHandler(historicalService: HistoricalDocumentS
         return handleToolError(error as Error);
       }
     },
+  };
+}
+
+type Locator = { uri: string; resourceSizeBytes?: number };
+type SectionWithResource = { sectionNumber: string; title: string; resource: Locator };
+
+function sectionResourceLinks(sections: SectionWithResource[]): ResourceLink[] {
+  return sections.slice(0, CLASSIC_TEXT_LIMITS.nativeDirectoryLinks).map(section => resourceLink(
+    section.resource,
+    section.title || `Section ${section.sectionNumber}`,
+    'Exact locally hosted historical-document section.',
+  ));
+}
+
+function searchResourceLinks(hits: Array<{ section: SectionWithResource }>): ResourceLink[] {
+  return hits.map(hit => resourceLink(
+    hit.section.resource,
+    hit.section.title || `Section ${hit.section.sectionNumber}`,
+    'Exact local section selected by classic-text discovery.',
+  ));
+}
+
+function resourceLink(locator: Locator, title: string, description: string): ResourceLink {
+  return {
+    type: 'resource_link',
+    uri: locator.uri,
+    name: locator.uri.replace('theologai://documents/', 'classic-text/'),
+    title,
+    description,
+    mimeType: 'text/markdown',
+    ...(locator.resourceSizeBytes === undefined ? {} : { size: locator.resourceSizeBytes }),
+    annotations: { audience: ['assistant'] },
   };
 }
 

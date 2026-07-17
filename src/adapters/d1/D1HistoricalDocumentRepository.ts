@@ -14,9 +14,10 @@ import type {
 } from '../../kernel/repositories.js';
 import {
   composeLocalPrimarySourceFtsQuery,
+  isFtsSyntaxError,
   localPrimarySourceSearchSql,
 } from '../shared/primarySourceSearchSql.js';
-import { mapDocumentDatabaseRow } from '../shared/historicalDocumentMetadata.js';
+import { mapDocumentDatabaseRow, mapDocumentSectionDatabaseRow } from '../shared/historicalDocumentMetadata.js';
 
 export class D1HistoricalDocumentRepository implements IHistoricalDocumentRepository {
   constructor(private db: D1Database) {}
@@ -46,14 +47,7 @@ export class D1HistoricalDocumentRepository implements IHistoricalDocumentReposi
       title: string; content: string; topics: string;
     }>();
 
-    return rows.map(r => ({
-      id: r.id,
-      document_id: r.document_id,
-      section_number: r.section_number,
-      title: r.title || '',
-      content: r.content,
-      topics: r.topics ? JSON.parse(r.topics) : [],
-    }));
+    return rows.map(mapDocumentSectionDatabaseRow);
   }
 
   async getSection(documentId: string, sectionNumber: string): Promise<DocumentSection | undefined> {
@@ -65,14 +59,7 @@ export class D1HistoricalDocumentRepository implements IHistoricalDocumentReposi
     }>();
     if (!row) return undefined;
 
-    return {
-      id: row.id,
-      document_id: row.document_id,
-      section_number: row.section_number,
-      title: row.title || '',
-      content: row.content,
-      topics: row.topics ? JSON.parse(row.topics) : [],
-    };
+    return mapDocumentSectionDatabaseRow(row);
   }
 
   async search(query: string, limit: number = 20): Promise<DocumentSection[]> {
@@ -91,18 +78,10 @@ export class D1HistoricalDocumentRepository implements IHistoricalDocumentReposi
         title: string; content: string; topics: string;
       }>();
 
-      return rows.map(r => ({
-        id: r.id,
-        document_id: r.document_id,
-        section_number: r.section_number || '',
-        title: r.title || '',
-        content: r.content,
-        topics: r.topics ? JSON.parse(r.topics) : [],
-      }));
-    } catch {
-      // FTS5 queries can fail on malformed input. The repository contract uses
-      // an empty result for invalid search syntax and never logs raw errors.
-      return [];
+      return rows.map(mapDocumentSectionDatabaseRow);
+    } catch (error) {
+      if (isFtsSyntaxError(error)) return [];
+      throw error;
     }
   }
 
@@ -150,14 +129,7 @@ function mapPrimarySourceRow(row: PrimarySourceSearchDatabaseRow): PrimarySource
       id: row.document_id, title: row.document_title, type: row.document_type,
       date: row.document_date, metadata: row.document_metadata,
     }),
-    section: {
-      id: row.id,
-      document_id: row.document_id,
-      section_number: row.section_number || '',
-      title: row.title || '',
-      content: row.content,
-      topics: row.topics ? JSON.parse(row.topics) : [],
-    },
+    section: mapDocumentSectionDatabaseRow(row),
   };
 }
 

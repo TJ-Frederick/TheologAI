@@ -15,7 +15,7 @@ import {
 import { NotFoundError } from '../kernel/errors.js';
 import { parseStrongsIdentity } from '../kernel/strongs.js';
 import { parseLocalDocumentResourceUri } from '../kernel/documentResource.js';
-import { formatLocalDocumentSectionResource, LOCAL_HISTORICAL_SOURCE } from '../formatters/historicalFormatter.js';
+import { formatLocalDocumentResource, formatLocalDocumentSectionResource } from '../formatters/historicalFormatter.js';
 import type { ToolHandler } from '../kernel/types.js';
 import type { BibleService } from '../services/bible/BibleService.js';
 import type { CommentaryService } from '../services/commentary/CommentaryService.js';
@@ -196,9 +196,11 @@ export function createTheologAiMcpServer(
     if (documentResource) {
       try {
         const doc = await services.historicalService.getDocument(documentResource.documentId);
+        if (doc.id !== documentResource.documentId) {
+          throw new NotFoundError('document', 'Exact document resource identity did not match.');
+        }
 
         if (documentResource.sectionId !== undefined) {
-          if (doc.id !== documentResource.documentId) throw new NotFoundError('document', 'Exact document resource identity did not match.');
           const section = await services.historicalService.getSection(doc.id, documentResource.sectionId);
           return {
             contents: [{
@@ -211,24 +213,8 @@ export function createTheologAiMcpServer(
 
         const sections = await services.historicalService.getSections(doc.id);
 
-        const lines = [
-          `# ${doc.title}\n`,
-          `**Type:** ${doc.type}`,
-          doc.date ? `**Date:** ${doc.date}` : '',
-          '',
-        ];
-
-        for (const section of sections) {
-          if (section.title) {
-            lines.push(`## ${section.section_number ? `${section.section_number}. ` : ''}${section.title}\n`);
-          }
-          lines.push(section.content);
-          lines.push('');
-        }
-        lines.push(`*Source: ${LOCAL_HISTORICAL_SOURCE}*`);
-
         return {
-          contents: [{ uri, mimeType: 'text/markdown', text: lines.filter(Boolean).join('\n') }],
+          contents: [{ uri, mimeType: 'text/markdown', text: formatLocalDocumentResource(doc, sections) }],
         };
       } catch (error) {
         if (error instanceof NotFoundError) throw resourceNotFound(uri);

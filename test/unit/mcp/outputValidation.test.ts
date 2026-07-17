@@ -15,6 +15,8 @@ import type { MorphologyService } from '../../../src/services/languages/Morpholo
 import type { StrongsService } from '../../../src/services/languages/StrongsService.js';
 import { createDeterministicMcpFixture } from '../../fixtures/mcpCompositionRoot.js';
 import { DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG } from '../../../src/kernel/featureFlags.js';
+import { classicTextsOutputSchema } from '../../../src/mcp/schemas/classicTexts.js';
+import { validateClassicTextsOutputSemantics } from '../../../src/presenters/classicTextsStructured.js';
 
 const connected: Array<{ client: Client; server: Server }> = [];
 type LogMessage = { level: string; logger?: string; data: unknown };
@@ -57,6 +59,12 @@ afterEach(async () => {
 });
 
 describe('MCP structured output validation', () => {
+  it('keeps the classic-text schema compact after moving cross-field search algebra to semantic validation', () => {
+    const bytes = new TextEncoder().encode(JSON.stringify(classicTextsOutputSchema)).byteLength;
+    expect(bytes).toBeGreaterThan(15_000);
+    expect(bytes).toBeLessThanOrEqual(16_384);
+  });
+
   it('advertises output schemas for exactly the converted tools', async () => {
     const { root } = createDeterministicMcpFixture();
     const client = await connect(root.tools);
@@ -68,6 +76,7 @@ describe('MCP structured output validation', () => {
       'bible_cross_references',
       'parallel_passages',
       'commentary_lookup',
+      'classic_text_lookup',
       'primary_source_search',
       'original_language_lookup',
       'bible_verse_morphology',
@@ -197,6 +206,65 @@ describe('MCP structured output validation', () => {
       .rejects.toMatchObject({ code: -32603, message: expect.stringContaining('Internal server error') });
   });
 
+  it('fails closed when semantic output validation throws without disclosing private details', async () => {
+    const logs: LogMessage[] = [];
+    const client = await connect([{
+      name: 'throwing_semantic_output',
+      description: 'Throwing semantic validator fixture',
+      inputSchema: { type: 'object', additionalProperties: false },
+      outputSchema: {
+        type: 'object',
+        properties: { value: { type: 'string' } },
+        required: ['value'],
+        additionalProperties: false,
+      },
+      validateStructuredOutput: () => {
+        throw new Error('PRIVATE_SEMANTIC_SENTINEL');
+      },
+      handler: async () => ({
+        content: [{ type: 'text' as const, text: 'safe fallback' }],
+        structuredContent: { value: 'schema-valid' },
+      }),
+    }], logs);
+
+    await client.setLoggingLevel('error');
+    const failure = await client.callTool({ name: 'throwing_semantic_output', arguments: {} })
+      .catch(error => error as Error);
+    expect(failure).toMatchObject({ code: -32603, message: expect.stringContaining('Internal server error') });
+    expect(JSON.stringify(failure)).not.toContain('PRIVATE_SEMANTIC_SENTINEL');
+    expect(logs).toEqual([{
+      level: 'error',
+      logger: 'theologai.tools',
+      data: { event: 'tool_output_validation_failed', tool: 'throwing_semantic_output' },
+    }]);
+  });
+
+  it('does not invoke semantic validation when JSON Schema validation fails', async () => {
+    const validateStructuredOutput = vi.fn(() => {
+      throw new Error('semantic validator must not run');
+    });
+    const client = await connect([{
+      name: 'schema_before_semantics',
+      description: 'Schema-first validation fixture',
+      inputSchema: { type: 'object', additionalProperties: false },
+      outputSchema: {
+        type: 'object',
+        properties: { value: { type: 'string' } },
+        required: ['value'],
+        additionalProperties: false,
+      },
+      validateStructuredOutput,
+      handler: async () => ({
+        content: [{ type: 'text' as const, text: 'safe fallback' }],
+        structuredContent: { value: 42 },
+      }),
+    }]);
+
+    await expect(client.callTool({ name: 'schema_before_semantics', arguments: {} }))
+      .rejects.toMatchObject({ code: -32603, message: expect.stringContaining('Internal server error') });
+    expect(validateStructuredOutput).not.toHaveBeenCalled();
+  });
+
   it('validates any structured result even when the handler marks it as an error', async () => {
     const client = await connect([{
       name: 'malformed_structured_error',
@@ -232,6 +300,93 @@ describe('MCP structured output validation', () => {
     }]);
 
     await expect(client.callTool({ name: 'generic_structured_error', arguments: {} })).resolves.toMatchObject({ isError: true });
+  });
+
+  it('rejects contradictory classic-text search status and window semantics at the MCP boundary', async () => {
+    const client = await connect([{
+      name: 'classic_contract_negative',
+      description: 'Invalid classic-text result fixture',
+      inputSchema: { type: 'object', additionalProperties: false },
+      outputSchema: classicTextsOutputSchema,
+      validateStructuredOutput: validateClassicTextsOutputSemantics,
+      handler: async () => ({
+        content: [{ type: 'text' as const, text: 'safe fallback' }],
+        structuredContent: {
+          schemaVersion: '1', kind: 'classic_text_lookup', mode: 'search',
+          evidencePolicy: {
+            providerScope: 'local_only', remoteDocumentBodies: 'disabled',
+            editionProvenance: 'incomplete', rightsStatus: 'not_established',
+            searchSnippets: 'discovery_only', selectedContentAccess: 'mcp_resource_read',
+          },
+          search: {
+            query: 'grace', status: 'no_results', hits: [],
+            resultWindow: { returnedCount: 0, additionalMatchStatus: 'additional_match_observed' },
+          },
+        },
+      }),
+    }]);
+
+    await expect(client.callTool({ name: 'classic_contract_negative', arguments: {} }))
+      .rejects.toMatchObject({ code: -32603, message: expect.stringContaining('Internal server error') });
+  });
+
+  it.each([
+    ['catalog count', {
+      schemaVersion: '1', kind: 'classic_text_lookup', mode: 'list_works',
+      evidencePolicy: {
+        providerScope: 'local_only', remoteDocumentBodies: 'disabled',
+        editionProvenance: 'incomplete', rightsStatus: 'not_established',
+        searchSnippets: 'discovery_only', selectedContentAccess: 'mcp_resource_read',
+      },
+      catalog: {
+        coverage: 'complete_local_work_inventory', delivery: 'metadata_summary', nativeResourceLinks: 'not_emitted',
+        works: [{
+          id: 'doc', title: 'Document', type: 'confession', date: null, topics: [],
+          resource: { kind: 'mcp_resource', uri: 'theologai://documents/doc' },
+        }],
+        resultWindow: { returnedCount: 0, additionalMatchStatus: 'no_additional_match_observed' },
+      },
+    }],
+    ['directory link count', {
+      schemaVersion: '1', kind: 'classic_text_lookup', mode: 'browse_sections',
+      evidencePolicy: {
+        providerScope: 'local_only', remoteDocumentBodies: 'disabled',
+        editionProvenance: 'incomplete', rightsStatus: 'not_established',
+        searchSnippets: 'discovery_only', selectedContentAccess: 'mcp_resource_read',
+      },
+      directory: {
+        coverage: 'complete_section_directory',
+        work: {
+          id: 'doc', title: 'Document', type: 'confession', date: null, topics: [],
+          resource: { kind: 'mcp_resource', uri: 'theologai://documents/doc' },
+        },
+        sections: [{
+          id: 1, sectionNumber: '1', title: 'One',
+          resource: { kind: 'mcp_resource', uri: 'theologai://documents/doc#section-1' },
+        }],
+        resultWindow: { returnedCount: 1, additionalMatchStatus: 'no_additional_match_observed' },
+        linkWindow: {
+          maximumResourceLinks: 32, emittedResourceLinkCount: 0,
+          additionalLinkStatus: 'no_additional_link_observed',
+        },
+      },
+    }],
+  ])('rejects schema-valid semantic classic-text %s mutations at the MCP boundary', async (_label, structuredContent) => {
+    const client = await connect([{
+      name: `classic_semantic_${_label.replaceAll(' ', '_')}`,
+      description: 'Semantic classic-text failure fixture',
+      inputSchema: { type: 'object', additionalProperties: false },
+      outputSchema: classicTextsOutputSchema,
+      validateStructuredOutput: validateClassicTextsOutputSemantics,
+      handler: async () => ({
+        content: [{ type: 'text' as const, text: 'safe fallback' }],
+        structuredContent,
+      }),
+    }]);
+
+    await expect(client.callTool({
+      name: `classic_semantic_${_label.replaceAll(' ', '_')}`, arguments: {},
+    })).rejects.toMatchObject({ code: -32603, message: expect.stringContaining('Internal server error') });
   });
 
   it('accepts a v4 primary-source result after control-only optional metadata is omitted', async () => {

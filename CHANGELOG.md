@@ -7,10 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-<!-- theologai-public-contract tools=11 structured=bible_cross_references,bible_lookup,bible_verse_morphology,commentary_lookup,donation_config,original_language_lookup,original_language_study,parallel_passages,primary_source_search,verify_donation -->
+<!-- theologai-public-contract tools=11 structured=bible_cross_references,bible_lookup,bible_verse_morphology,classic_text_lookup,commentary_lookup,donation_config,original_language_lookup,original_language_study,parallel_passages,primary_source_search,verify_donation -->
 
 ### Changed
 
+- Added a closed v1 structured contract to all four `classic_text_lookup`
+  modes while preserving their Markdown. It exposes the complete local work
+  inventory as metadata summaries without body reads or native catalog links;
+  directory locators are unsized, while directly selected work and search
+  evidence retains exact byte-sized MCP resources. The 100-work and
+  2,000-section complete-result ceilings fail explicitly instead of truncating.
+  Invalid stored document or section locators now fail closed as integrity
+  hardening rather than being omitted or attributed approximately.
 - Prepared an infrastructure-only migration to `theologai.xyz`, with
   `mcp.theologai.xyz/mcp` and `preview-mcp.theologai.xyz/mcp` as the canonical
   production and preview MCP addresses. The existing `pages.dev` and

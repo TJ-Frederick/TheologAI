@@ -110,11 +110,21 @@ describe('D1HistoricalDocumentRepository', () => {
       expect(result[0].topics).toEqual([]);
     });
 
-    it('handles empty/null title', async () => {
+    it('rejects a null stored title instead of normalizing evidence', async () => {
       const db = createSimpleD1([{ ...sampleSectionRow, title: null }]);
       const repo = new D1HistoricalDocumentRepository(db as any);
-      const result = await repo.getSections('test');
-      expect(result[0].title).toBe('');
+      await expect(repo.getSections('test')).rejects.toThrow('title must contain');
+    });
+
+    it.each([
+      ['non-text content', { content: 42 }],
+      ['malformed topics', { topics: '[' }],
+      ['non-array topics', { topics: '{}' }],
+      ['non-string topic', { topics: '["topic",1]' }],
+    ])('rejects corrupt stored section %s', async (_label, corruption) => {
+      const db = createSimpleD1([{ ...sampleSectionRow, ...corruption }]);
+      const repo = new D1HistoricalDocumentRepository(db as any);
+      await expect(repo.getSections('test')).rejects.toThrow(/Stored classic-text section/);
     });
   });
 
@@ -174,6 +184,18 @@ describe('D1HistoricalDocumentRepository', () => {
       expect(result).toEqual([]);
       expect(warn).not.toHaveBeenCalled();
       warn.mockRestore();
+    });
+
+    it('does not conceal a non-syntax backend failure as no results', async () => {
+      const db = {
+        prepare: vi.fn().mockImplementation(() => ({
+          bind: vi.fn().mockReturnValue({
+            all: vi.fn().mockRejectedValue(new Error('D1 database unavailable')),
+          }),
+        })),
+      };
+      await expect(new D1HistoricalDocumentRepository(db as any).search('grace'))
+        .rejects.toThrow('D1 database unavailable');
     });
 
     it('passes limit to .bind()', async () => {

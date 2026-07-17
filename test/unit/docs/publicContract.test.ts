@@ -126,6 +126,7 @@ describe('published project contract', () => {
         'bible_cross_references',
         'bible_lookup',
         'bible_verse_morphology',
+        'classic_text_lookup',
         'commentary_lookup',
         'donation_config',
         'original_language_lookup',
@@ -138,6 +139,9 @@ describe('published project contract', () => {
     for (const [index, document] of documents.entries()) {
       expect(parsePublicContractMarker(document, documentPaths[index])).toEqual(nodeContract);
     }
+    expect(documents[0]).toContain('All eleven tools\nadvertise versioned object-root `outputSchema` contracts');
+    expect(documents[0]).not.toMatch(/Ten tools also\s+advertise versioned object-root/);
+    expect(documents[0]).toContain('work-inventory contract is intentionally bounded at 100 works');
   });
 
   it('keeps advertised corpus counts sourced from the data manifest', async () => {

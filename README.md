@@ -7,7 +7,7 @@ The current registry contains eleven tools, six guided prompts, eight English
 Bible translations, six commentary sources, 17 locally indexed
 historical documents, Strong's dictionaries, and Greek/Hebrew morphology.
 
-<!-- theologai-public-contract tools=11 structured=bible_cross_references,bible_lookup,bible_verse_morphology,commentary_lookup,donation_config,original_language_lookup,original_language_study,parallel_passages,primary_source_search,verify_donation -->
+<!-- theologai-public-contract tools=11 structured=bible_cross_references,bible_lookup,bible_verse_morphology,classic_text_lookup,commentary_lookup,donation_config,original_language_lookup,original_language_study,parallel_passages,primary_source_search,verify_donation -->
 
 ## Public website and remote endpoints
 
@@ -107,12 +107,13 @@ adds the top 10 exact source variants and defaults to 8 raw occurrences (maximum
 responses.
 
 All tools are annotated as read-only, non-destructive, and idempotent. Tool
-inputs use closed, bounded JSON Schema 2020-12 contracts. Ten tools also
+inputs use closed, bounded JSON Schema 2020-12 contracts. All eleven tools
 advertise versioned object-root `outputSchema` contracts and return matching
 `structuredContent` beside the existing Markdown content: `bible_lookup`,
-`bible_cross_references`, `bible_verse_morphology`, `parallel_passages`, `commentary_lookup`,
-`primary_source_search`, `original_language_lookup`, and
-`original_language_study`, `donation_config`, and `verify_donation`. Bible,
+`bible_cross_references`, `bible_verse_morphology`, `parallel_passages`,
+`commentary_lookup`, `classic_text_lookup`, `primary_source_search`,
+`original_language_lookup`, `original_language_study`, `donation_config`, and
+`verify_donation`. Bible,
 cross-reference, verse-morphology, parallel-passage, and original-language structured results
 include bounded, result-local provenance records. Primary-source results do not
 invent edition provenance records: their evidence policy explicitly marks
@@ -137,7 +138,19 @@ exposed. Each response validates the requested work, book, and chapter against
 the provider container and reports HelloAO's corpus SHA-256 as the provider
 revision; that fingerprint identifies provider corpus bytes, not an edition or
 transcription source.
-`classic_text_lookup` retains its current Markdown-only result contract.
+`classic_text_lookup` preserves its Markdown result in all four modes and also
+returns a closed versioned structured contract. Catalog mode is a metadata
+summary of the complete local work inventory: it exposes validated, unsized
+structured resource locators, emits no native links, and never reads document
+bodies. The work-inventory contract is intentionally bounded at 100 works;
+the server fails rather than truncating if the inventory exceeds that ceiling.
+Section-directory mode exposes its complete index with unsized locators, caps
+native links at 32, and similarly fails above 2,000 sections. Search exposes at
+most ten discovery-only snippets plus one private lookahead; selected work and
+search resources retain exact UTF-8 sizes. Read a selected exact resource
+before quotation. Invalid stored resource identities fail closed as integrity
+hardening. The contract is local-only: remote document bodies are disabled,
+edition provenance is incomplete, and rights status is not established.
 
 ### Resources
 
@@ -383,10 +396,9 @@ per-request D1 repositories. Both targets share one MCP registry.
   license metadata before redistribution claims can be made.
 - Hosted MCP Logging would require a deliberate stateful-session design.
 - Authentication, saved workspaces, completions, and MCP tasks should be added
-  only when a concrete workflow requires them. Ten tools now provide versioned
-  structured output beside compatible Markdown; `classic_text_lookup` alone
-  remains Markdown-only. Further contract revisions require separate
-  compatibility review.
+  only when a concrete workflow requires them. All eleven tools provide
+  versioned structured output beside compatible Markdown. Further contract
+  revisions require separate compatibility review.
 - Remote D1 compatibility must be checked before any deployment; migration or
   corpus replacement requires separate review and approval.
 

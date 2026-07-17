@@ -33,6 +33,7 @@ import type { ToolHandler, ToolResult } from '../../../../src/kernel/types.js';
 import type { DocumentInfo, DocumentSection } from '../../../../src/kernel/repositories.js';
 import { formatMorphologyResult } from '../../../../src/formatters/languagesFormatter.js';
 import { validatorFor } from '../../../../src/mcp/validation.js';
+import { validateClassicTextsOutputSemantics } from '../../../../src/presenters/classicTextsStructured.js';
 
 function serviceDouble<T>(methods: Partial<{ [K in keyof T]: T[K] }>): T {
   return methods as unknown as T;
@@ -80,9 +81,10 @@ describe('v2 tool handler schemas', () => {
       serviceDouble<CommentaryService>({}),
     );
     const commentary = commentaryHandler.inputSchema;
-    const classicTexts = createClassicTextsHandler(
+    const classicTextsHandler = createClassicTextsHandler(
       serviceDouble<HistoricalDocumentService>({}),
-    ).inputSchema;
+    );
+    const classicTexts = classicTextsHandler.inputSchema;
     const originalLanguage = createStrongsLookupHandler(serviceDouble<StrongsService>({})).inputSchema;
 
     expect(bible.properties?.reference).toMatchObject({ minLength: 1, maxLength: 100 });
@@ -100,6 +102,7 @@ describe('v2 tool handler schemas', () => {
       listWorks: { const: true },
       browseSections: { const: true },
     });
+    expect(classicTextsHandler.annotations).toMatchObject({ openWorldHint: false });
     expect(originalLanguage).not.toHaveProperty('oneOf');
     expect(originalLanguage.properties).toMatchObject({
       strongs_number: { minLength: 2, maxLength: 7 },
@@ -628,12 +631,64 @@ describe('classic_text_lookup handler', () => {
 
   it('lists local works', async () => {
     const { handler, historical } = createServices();
+    historical.getSections.mockRejectedValue(new Error('body storage unavailable'));
 
     const result = await handler.handler({ listWorks: true });
 
     expect(historical.listDocuments).toHaveBeenCalledOnce();
     expect(textOf(result)).toContain('Available Historical Documents');
     expect(textOf(result)).toContain('`nicene-creed`');
+    expect(result.structuredContent).toMatchObject({
+      schemaVersion: '1', kind: 'classic_text_lookup', mode: 'list_works',
+      catalog: {
+        coverage: 'complete_local_work_inventory',
+        delivery: 'metadata_summary', nativeResourceLinks: 'not_emitted',
+        resultWindow: { returnedCount: 1, additionalMatchStatus: 'no_additional_match_observed' },
+        works: [{ id: 'nicene-creed', resource: { uri: 'theologai://documents/nicene-creed' } }],
+      },
+      evidencePolicy: {
+        providerScope: 'local_only', remoteDocumentBodies: 'disabled',
+        editionProvenance: 'incomplete', rightsStatus: 'not_established',
+      },
+    });
+    expect(historical.getSections).not.toHaveBeenCalled();
+    expect(result.content).toHaveLength(1);
+    expect((result.structuredContent as any).catalog.works[0].resource).not.toHaveProperty('resourceSizeBytes');
+  });
+
+  it('lists more than 32 catalog entries without reading bodies or silently omitting metadata', async () => {
+    const { handler, historical } = createServices();
+    historical.listDocuments.mockResolvedValue(Array.from({ length: 40 }, (_, index) => ({
+      ...document, id: `document-${index + 1}`, title: `Document ${index + 1}`,
+    })));
+
+    const result = await handler.handler({ listWorks: true });
+    const catalog = (result.structuredContent as any).catalog;
+    expect(catalog.works).toHaveLength(40);
+    expect(catalog.resultWindow).toEqual({
+      returnedCount: 40, additionalMatchStatus: 'no_additional_match_observed',
+    });
+    expect(catalog.nativeResourceLinks).toBe('not_emitted');
+    expect(historical.getSections).not.toHaveBeenCalled();
+    expect(result.content.filter(block => block.type === 'resource_link')).toHaveLength(0);
+  });
+
+  it('returns exactly 100 works and fails rather than truncating 101', async () => {
+    const { handler, historical } = createServices();
+    const works = Array.from({ length: 101 }, (_, index) => ({
+      ...document, id: `document-${index + 1}`, title: `Document ${index + 1}`,
+    }));
+    historical.listDocuments.mockResolvedValueOnce(works.slice(0, 100));
+    const atLimit = await handler.handler({ listWorks: true });
+    expect((atLimit.structuredContent as any).catalog.works).toHaveLength(100);
+    expect(atLimit.isError).not.toBe(true);
+
+    historical.listDocuments.mockResolvedValueOnce(works);
+    const overLimit = await handler.handler({ listWorks: true });
+    expect(overLimit.isError).toBe(true);
+    expect(overLimit.structuredContent).toBeUndefined();
+    expect(textOf(overLimit)).toContain('101 works');
+    expect(textOf(overLimit)).toContain('was not truncated');
   });
 
   it('browses sections using the canonical document ID', async () => {
@@ -646,6 +701,73 @@ describe('classic_text_lookup handler', () => {
     expect(textOf(result)).toContain('Section 1 — The Creed');
     expect(textOf(result)).toContain('theologai://documents/nicene-creed#section-1');
     expect(textOf(result)).not.toContain('We believe in one God.');
+    expect(result.structuredContent).toMatchObject({
+      mode: 'browse_sections',
+      directory: {
+        coverage: 'complete_section_directory',
+        sections: [{ sectionNumber: '1', resource: { uri: 'theologai://documents/nicene-creed#section-1' } }],
+        linkWindow: { maximumResourceLinks: 32, emittedResourceLinkCount: 1 },
+      },
+    });
+    expect((result.structuredContent as any).directory.work.resource)
+      .not.toHaveProperty('resourceSizeBytes');
+    expect((result.structuredContent as any).directory.sections[0].resource)
+      .not.toHaveProperty('resourceSizeBytes');
+    expect(result.content.find(block => block.type === 'resource_link'))
+      .not.toHaveProperty('size');
+  });
+
+  it('returns a complete large directory while capping native resource links at 32', async () => {
+    const { handler, historical } = createServices();
+    historical.getSections.mockResolvedValue(Array.from({ length: 40 }, (_, index) => ({
+      ...section,
+      id: index + 1,
+      section_number: String(index + 1),
+      title: `Section ${index + 1}`,
+      content: `Body ${index + 1}`,
+    })));
+
+    const result = await handler.handler({ work: document.id, browseSections: true });
+    const structured = result.structuredContent as any;
+    expect(structured.directory.sections).toHaveLength(40);
+    expect(structured.directory.resultWindow).toEqual({
+      returnedCount: 40, additionalMatchStatus: 'no_additional_match_observed',
+    });
+    expect(structured.directory.linkWindow).toEqual({
+      maximumResourceLinks: 32, emittedResourceLinkCount: 32,
+      additionalLinkStatus: 'additional_link_observed',
+    });
+    expect(result.content.filter(block => block.type === 'resource_link')).toHaveLength(32);
+  });
+
+  it('returns exactly 2000 directory entries and fails rather than truncating 2001', async () => {
+    const { handler, historical } = createServices();
+    const sections = Array.from({ length: 2001 }, (_, index) => ({
+      ...section,
+      id: index + 1,
+      section_number: String(index + 1),
+      title: `Section ${index + 1}`,
+      content: `Body ${index + 1}`,
+    }));
+    historical.getSections.mockResolvedValueOnce(sections.slice(0, 2000));
+    const atLimit = await handler.handler({ work: document.id, browseSections: true });
+    expect((atLimit.structuredContent as any).directory.sections).toHaveLength(2000);
+    expect(atLimit.isError).not.toBe(true);
+
+    historical.getSections.mockResolvedValueOnce(sections);
+    const overLimit = await handler.handler({ work: document.id, browseSections: true });
+    expect(overLimit.isError).toBe(true);
+    expect(overLimit.structuredContent).toBeUndefined();
+    expect(textOf(overLimit)).toContain('2001 sections');
+    expect(textOf(overLimit)).toContain('was not truncated');
+
+    historical.findDocument.mockResolvedValueOnce(document);
+    historical.getSections.mockResolvedValueOnce(sections);
+    const overLimitWork = await handler.handler({ work: document.id });
+    expect(overLimitWork.isError).toBe(true);
+    expect(overLimitWork.structuredContent).toBeUndefined();
+    expect(textOf(overLimitWork)).toContain('2001 sections');
+    expect(textOf(overLimitWork)).toContain('was not truncated');
   });
 
   it('returns a matching local work', async () => {
@@ -655,7 +777,12 @@ describe('classic_text_lookup handler', () => {
     const result = await handler.handler({ work: 'nicene-creed' });
 
     expect(historical.getSections).toHaveBeenCalledWith('nicene-creed');
-    expect(textOf(result)).toContain('Nicene Creed');
+    expect(textOf(result)).toBe(`**Nicene Creed** (creed, 381)\n\n### The Creed\n\nWe believe in one God.\n\n*Source: TheologAI local historical-document collection*`);
+    expect(result.structuredContent).toMatchObject({
+      mode: 'work',
+      document: { sectionCount: 1, bodyDelivery: 'markdown_only' },
+    });
+    expect(JSON.stringify(result.structuredContent)).not.toContain('We believe in one God.');
   });
 
   it('does not retrieve a remote body when a work is not local', async () => {
@@ -681,11 +808,74 @@ describe('classic_text_lookup handler', () => {
 
     const result = await handler.handler({ query: 'wisdom' });
 
-    expect(historical.search).toHaveBeenCalledWith('wisdom');
+    expect(historical.search).toHaveBeenCalledWith('wisdom', 11);
     expect(historical.listDocuments).toHaveBeenCalledOnce();
     expect(textOf(result)).toContain('Search Results for "wisdom"');
     expect(textOf(result)).toContain('Nicene Creed — Section 1: The Creed');
     expect(textOf(result)).toContain('Discovery snippet only');
+    expect(result.structuredContent).toMatchObject({
+      mode: 'search',
+      search: {
+        status: 'ok',
+        hits: [{ snippetOnly: true, section: { resource: { uri: 'theologai://documents/nicene-creed#section-1' } } }],
+        resultWindow: { returnedCount: 1, additionalMatchStatus: 'no_additional_match_observed' },
+      },
+    });
+  });
+
+  it('uses one private lookahead and reports only ten search hits', async () => {
+    const { handler, historical } = createServices();
+    historical.search.mockResolvedValue(Array.from({ length: 11 }, (_, index) => ({
+      ...section,
+      id: index + 1,
+      section_number: String(index + 1),
+      content: `grâce ${index + 1}`,
+    })));
+
+    const result = await handler.handler({ query: 'grace' });
+    const structured = result.structuredContent as any;
+    expect(structured.search.hits).toHaveLength(10);
+    expect(structured.search.resultWindow).toEqual({
+      returnedCount: 10, additionalMatchStatus: 'additional_match_observed',
+    });
+    expect(result.content.filter(block => block.type === 'resource_link')).toHaveLength(10);
+    const first = structured.search.hits[0].section.resource;
+    expect(first.resourceSizeBytes).toBeGreaterThan('grâce 1'.length);
+  });
+
+  it('reports exactly ten hits without claiming an unobserved additional match', async () => {
+    const { handler, historical } = createServices();
+    historical.search.mockResolvedValue(Array.from({ length: 10 }, (_, index) => ({
+      ...section, id: index + 1, section_number: String(index + 1),
+    })));
+
+    const result = await handler.handler({ query: 'grace' });
+    expect((result.structuredContent as any).search).toMatchObject({
+      status: 'ok',
+      resultWindow: { returnedCount: 10, additionalMatchStatus: 'no_additional_match_observed' },
+    });
+  });
+
+  it('uses the same code-point-safe discovery snippet in Markdown and structured output', async () => {
+    const { handler, historical } = createServices();
+    const content = `${'a'.repeat(299)}😀tail`;
+    historical.search.mockResolvedValue([{ ...section, content }]);
+
+    const result = await handler.handler({ query: 'emoji' });
+    const snippet = (result.structuredContent as any).search.hits[0].discoverySnippet;
+    expect([...snippet.slice(0, -3)]).toHaveLength(300);
+    expect(snippet).toBe(`${'a'.repeat(299)}😀...`);
+    expect(textOf(result)).toContain(snippet);
+    expect(snippet).not.toContain('\ud83d...');
+  });
+
+  it('fails closed when a stored section cannot form a canonical resource URI', async () => {
+    const { handler, historical } = createServices();
+    historical.search.mockResolvedValue([{ ...section, section_number: '../bad' }]);
+
+    const result = await handler.handler({ query: 'grace' });
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent).toBeUndefined();
   });
 
   it('rejects a scoped work query instead of silently ignoring it', async () => {
@@ -714,6 +904,9 @@ describe('classic_text_lookup handler', () => {
     const noAction = await handler.handler({});
 
     expect(textOf(noResults)).toBe('No results found for "not-present".');
+    expect(noResults.structuredContent).toMatchObject({
+      mode: 'search', search: { status: 'no_results', hits: [], resultWindow: { returnedCount: 0 } },
+    });
     expect(noAction.isError).toBe(true);
     expect(textOf(noAction)).toContain('classic-text lookup mode');
   });
@@ -726,6 +919,76 @@ describe('classic_text_lookup handler', () => {
 
     expect(result.isError).toBe(true);
     expect(textOf(result)).toContain('I encountered an error');
+  });
+
+  it('does not report a search backend failure as no_results', async () => {
+    const { handler, historical } = createServices();
+    historical.search.mockRejectedValue(new Error('database unavailable'));
+
+    const result = await handler.handler({ query: 'grace' });
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent).toBeUndefined();
+    expect(textOf(result)).not.toContain('No results found');
+  });
+
+  it('emits schema-valid v1 output for all four modes', async () => {
+    const { handler, historical } = createServices();
+    historical.findDocument.mockResolvedValue(document);
+    historical.search.mockResolvedValue([section]);
+    const validate = validatorFor(handler.outputSchema!);
+    for (const params of [
+      { listWorks: true },
+      { work: document.id, browseSections: true },
+      { work: document.id },
+      { query: 'belief' },
+    ]) {
+      const result = await handler.handler(params);
+      const validation = validate(result.structuredContent);
+      expect(validation.valid, validation.errorMessage).toBe(true);
+    }
+  });
+
+  it('rejects contradictory search statuses, counts, and result windows', async () => {
+    const { handler, historical } = createServices();
+    historical.search.mockResolvedValue([section]);
+    const valid = await handler.handler({ query: 'belief' });
+    const validate = validatorFor(handler.outputSchema!);
+    const structured = valid.structuredContent as any;
+    const invalid = [
+      { ...structured, search: { ...structured.search, status: 'no_results' } },
+      { ...structured, search: { ...structured.search, hits: [], resultWindow: { returnedCount: 0, additionalMatchStatus: 'no_additional_match_observed' } } },
+      { ...structured, search: { ...structured.search, resultWindow: { returnedCount: 2, additionalMatchStatus: 'no_additional_match_observed' } } },
+      { ...structured, search: { ...structured.search, resultWindow: { returnedCount: 1, additionalMatchStatus: 'additional_match_observed' } } },
+    ];
+    for (const candidate of invalid) {
+      expect(validate(candidate).valid).toBe(true);
+      expect(validateClassicTextsOutputSemantics(candidate)).toBe(false);
+      expect(handler.validateStructuredOutput?.(candidate)).toBe(false);
+    }
+  });
+
+  it('rejects schema-valid catalog and directory cardinality mutations semantically', async () => {
+    const { handler } = createServices();
+    const validateSchema = validatorFor(handler.outputSchema!);
+    const catalog = (await handler.handler({ listWorks: true })).structuredContent as any;
+    const directory = (await handler.handler({ work: document.id, browseSections: true })).structuredContent as any;
+    const wrongCatalogCount = {
+      ...catalog,
+      catalog: { ...catalog.catalog, resultWindow: { ...catalog.catalog.resultWindow, returnedCount: 0 } },
+    };
+    const wrongDirectoryLinks = {
+      ...directory,
+      directory: {
+        ...directory.directory,
+        linkWindow: { ...directory.directory.linkWindow, emittedResourceLinkCount: 0 },
+      },
+    };
+
+    for (const candidate of [wrongCatalogCount, wrongDirectoryLinks]) {
+      expect(validateSchema(candidate).valid).toBe(true);
+      expect(validateClassicTextsOutputSemantics(candidate)).toBe(false);
+      expect(handler.validateStructuredOutput?.(candidate)).toBe(false);
+    }
   });
 });
 

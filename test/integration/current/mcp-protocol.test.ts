@@ -100,6 +100,7 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
         'bible_cross_references',
         'parallel_passages',
         'commentary_lookup',
+        'classic_text_lookup',
         'primary_source_search',
         'original_language_lookup',
         'bible_verse_morphology',

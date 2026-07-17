@@ -76,3 +76,9 @@ export function composeLocalPrimarySourceFtsQuery(text: string, match: PrimarySo
   if (match === 'phrase') return quote(normalized);
   return normalized.split(' ').map(quote).join(' AND ');
 }
+
+/** Only malformed FTS query syntax is a legitimate empty-search result. */
+export function isFtsSyntaxError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /(?:\bfts5?\b.*\bsyntax\b|\bsyntax\b.*\bfts5?\b)/iu.test(message);
+}

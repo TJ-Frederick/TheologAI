@@ -115,9 +115,18 @@ PR #21. Their stacked PRs #14–#20 are closed as superseded review vehicles:
    context-first workflow for one token in one verse, with morphology,
    source-separated lexical evidence, provenance, and interpretive limits.
 
-The released server advertises eleven tools and six guided prompts. Ten tools
-have versioned structured contracts while retaining Markdown compatibility;
-`classic_text_lookup` is the sole Markdown-only tool.
+The server advertises eleven tools and six guided prompts. All eleven tools
+have versioned structured contracts while retaining Markdown compatibility.
+`classic_text_lookup` preserves its four existing modes while adding explicit
+bounded result windows. Its catalog is a metadata summary of the complete local
+work inventory, with unsized structured locators, no body reads, and no native
+catalog links. Directly selected work and search resources retain exact UTF-8
+sizes; section directories use unsized locators and cap native links at 32.
+
+Before the hosted inventory reaches 100 works or a work reaches 2,000 sections,
+explicitly revisit the current complete-result contracts. The v1 implementation
+fails above either ceiling and must not silently truncate or introduce
+pagination under its complete-inventory semantics.
 
 The structured-output release ledger is:
 

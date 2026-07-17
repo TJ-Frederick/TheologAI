@@ -1,4 +1,9 @@
-import type { DocumentInfo, HistoricalDocumentCatalogMetadata } from '../../kernel/repositories.js';
+import type { DocumentInfo, DocumentSection, HistoricalDocumentCatalogMetadata } from '../../kernel/repositories.js';
+import {
+  assertClassicTextDocumentMetadata,
+  assertClassicTextSectionMetadata,
+  parseClassicTextSectionTopics,
+} from '../../kernel/classicTextContract.js';
 
 interface DocumentDatabaseRow {
   id: string;
@@ -10,24 +15,59 @@ interface DocumentDatabaseRow {
 
 export function mapDocumentDatabaseRow(row: DocumentDatabaseRow): DocumentInfo {
   const metadata = parseMetadata(row.metadata);
-  return {
+  const topics = metadata.topics === undefined ? [] : metadata.topics;
+  const document = {
     id: row.id,
     title: row.title,
     type: row.type,
     date: row.date,
-    topics: Array.isArray(metadata.topics) && metadata.topics.every(item => typeof item === 'string')
-      ? metadata.topics
-      : [],
+    topics,
+  };
+  assertClassicTextDocumentMetadata(document, `Stored classic-text document ${String(row.id)}`);
+  return {
+    ...document,
     ...(isCatalogMetadata(metadata.catalog) ? { catalog: metadata.catalog } : {}),
+  };
+}
+
+interface DocumentSectionDatabaseRow {
+  id: unknown;
+  document_id: unknown;
+  section_number: unknown;
+  title: unknown;
+  content: unknown;
+  topics: unknown;
+}
+
+export function mapDocumentSectionDatabaseRow(row: DocumentSectionDatabaseRow): DocumentSection {
+  const stored = {
+    id: row.id,
+    documentId: row.document_id,
+    sectionNumber: row.section_number,
+    title: row.title,
+    content: row.content,
+    topics: row.topics,
+  };
+  const context = `Stored classic-text section ${String(row.id)}`;
+  assertClassicTextSectionMetadata(stored, context);
+  const topics = parseClassicTextSectionTopics(stored.topics, context);
+  return {
+    id: stored.id!,
+    document_id: stored.documentId,
+    section_number: stored.sectionNumber,
+    title: stored.title,
+    content: stored.content,
+    topics,
   };
 }
 
 function parseMetadata(value: string | null): Record<string, unknown> {
   if (!value) return {};
   const parsed = JSON.parse(value) as unknown;
-  return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-    ? parsed as Record<string, unknown>
-    : {};
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('Stored classic-text document metadata must be a JSON object');
+  }
+  return parsed as Record<string, unknown>;
 }
 
 function isCatalogMetadata(value: unknown): value is HistoricalDocumentCatalogMetadata {
