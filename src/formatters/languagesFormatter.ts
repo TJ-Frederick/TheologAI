@@ -20,7 +20,11 @@ export function formatStrongsResult(
   s += `**Lemma:** ${result.lemma}\n`;
   if (result.transliteration) s += `**Transliteration:** ${result.transliteration}\n`;
   if (result.pronunciation) s += `**Pronunciation:** ${result.pronunciation}\n`;
-  s += `**Definition:** ${result.definition}\n`;
+  if (result.definition) {
+    s += `**Definition:** ${result.definition}\n`;
+  } else if (result.evidencePolicy) {
+    s += '**Definition:** Semantic evidence unavailable from the retained Hebrew lexicon fields.\n';
+  }
 
   if (detailLevel === 'detailed' && result.derivation) s += `**Derivation:** ${result.derivation}\n`;
 
@@ -44,6 +48,10 @@ export function formatStrongsResult(
         s += `- ${sense.gloss} (${sense.count}x): ${sense.usage}\n`;
       }
     }
+  }
+
+  if (result.evidencePolicy) {
+    s += `\n**Evidence policy:** ${result.evidencePolicy.notice}\n`;
   }
 
   s += `\n*Source: ${result.citation.source}*`;

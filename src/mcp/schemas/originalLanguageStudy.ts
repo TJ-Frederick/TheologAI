@@ -1,5 +1,6 @@
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 import { createProvenanceRecordSchema } from './provenance.js';
+import { ORIGINAL_LANGUAGE_EVIDENCE_NOTICE_MAX_LENGTH } from './originalLanguage.js';
 
 const tokenSchema = {
   type: 'object',
@@ -47,7 +48,7 @@ export const originalLanguageStudyOutputSchema = {
     },
     lexiconEvidence: {
       type: 'array', maxItems: 2, items: {
-        type: 'object', properties: { sourceId: { type: 'string' }, kind: { type: 'string', enum: ['dictionary', 'stepbible_lexicon'] }, lemma: { type: 'string' }, definition: { type: 'string' }, derivation: { type: 'string' }, gloss: { type: 'string' }, lexicon: { type: 'string' }, provenanceIds: { type: 'array', items: { type: 'string' }, minItems: 1 } },
+        type: 'object', properties: { sourceId: { type: 'string' }, kind: { type: 'string', enum: ['dictionary', 'stepbible_lexicon'] }, lemma: { type: 'string' }, definition: { type: 'string' }, derivation: { type: 'string' }, gloss: { type: 'string' }, lexicon: { type: 'string' }, evidencePolicy: { type: 'object', properties: { code: { const: 'tbesh_meaning_withheld' }, semanticEvidence: { type: 'string', enum: ['base_dictionary_only', 'unavailable'] }, withheldFields: { type: 'array', items: { const: 'tbesh_meaning' }, minItems: 1, maxItems: 1 }, notice: { type: 'string', minLength: 1, maxLength: ORIGINAL_LANGUAGE_EVIDENCE_NOTICE_MAX_LENGTH } }, required: ['code', 'semanticEvidence', 'withheldFields', 'notice'], additionalProperties: false }, provenanceIds: { type: 'array', items: { type: 'string' }, minItems: 1 } },
         required: ['sourceId', 'kind', 'provenanceIds'], additionalProperties: false,
       },
     },

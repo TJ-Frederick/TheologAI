@@ -432,12 +432,14 @@ Code readiness and operational readiness are deliberately separate:
 - Broaden original-language study with a separately sourced semantic-domain
   layer useful to both beginners and readers of Greek or Hebrew; evaluate
   MACULA discourse/context evidence only after that foundation is reviewed.
-  The currently exposed TBESH `Meaning` definitions derive from Online Bible
-  material whose source notice says permission should be obtained before use in
-  a project. The owner must decide whether to stop exposing those definitions
-  until a clearly redistributable replacement is selected (recommended) or
-  explicitly accept the residual risk. Do not expand their use meanwhile; the
-  separately CC BY 4.0 STEPBible morphology evidence remains usable on its own.
+  The owner approved a hard cutover that withholds the TBESH `Meaning` field,
+  which derives from Online Bible material whose source notice says permission
+  should be obtained before project use. Exact identities, forms,
+  transliteration, morphology, lemma, and Tyndale-created brief glosses remain,
+  with explicit unavailable-evidence disclosure and no fabricated replacement.
+  Select and review a clearly redistributable semantic-domain source before
+  expanding semantic claims; the separately CC BY 4.0 STEPBible morphology
+  evidence remains usable on its own.
 - Evaluate section-span commentary only where provider coverage can be stated
   honestly; never relabel a section anchor as an exact verse range.
 - Continue modern MCP output improvements tool by tool when a stable structured

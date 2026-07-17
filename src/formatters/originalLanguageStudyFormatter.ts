@@ -14,8 +14,20 @@ export function formatOriginalLanguageStudy(result: OriginalLanguageStudyDomainR
   ];
   if (result.dictionary || result.stepBible) {
     let evidence = '## Source-separated lexical evidence';
-    if (result.dictionary) evidence += `\n\n### ${result.dictionary.sourceKind === 'stepbible_lexicon' ? 'STEPBible lexicon' : "OpenScriptures Strong's"}\n\n${result.dictionary.definition}`;
-    if (result.stepBible && result.dictionary?.sourceKind !== 'stepbible_lexicon') evidence += `\n\n### STEPBible lexicon\n\n${result.stepBible.definition ?? result.stepBible.gloss ?? 'No definition text available.'}`;
+    if (result.dictionary) {
+      const dictionaryText = result.dictionary.definition
+        ?? (result.dictionary.evidencePolicy && result.dictionary.extended?.gloss
+          ? `Semantic definition evidence is unavailable.\n\n**Brief gloss (translation cue, not a definition):** ${result.dictionary.extended.gloss}`
+          : 'Semantic definition evidence is unavailable.');
+      evidence += `\n\n### ${result.dictionary.sourceKind === 'stepbible_lexicon' ? 'STEPBible lexicon' : "OpenScriptures Strong's"}\n\n${dictionaryText}`;
+    }
+    if (result.stepBible && result.dictionary?.sourceKind !== 'stepbible_lexicon') {
+      const stepBibleText = result.dictionary?.evidencePolicy
+        ? `Semantic definition evidence is unavailable from TBESH.\n\n${result.stepBible.gloss ? `**Brief gloss (translation cue, not a definition):** ${result.stepBible.gloss}` : 'No brief gloss is available.'}`
+        : result.stepBible.definition ?? result.stepBible.gloss ?? 'No definition text available.';
+      evidence += `\n\n### STEPBible lexicon\n\n${stepBibleText}`;
+    }
+    if (result.dictionary?.evidencePolicy) evidence += `\n\n**Evidence policy:** ${result.dictionary.evidencePolicy.notice}`;
     sections.push(evidence);
   }
   sections.push(`> Study cautions: A gloss is not a complete definition; Strong's numbers are identifiers; roots and etymology do not prove contextual meaning; do not import every possible sense into this occurrence.\n\n*Sources: STEPBible TAGNT/TAHOT; OpenScriptures Strong's and/or STEPBible lexicon where available. Source classification is Greek or Hebrew; this tool does not infer Aramaic. Pinned STEPBible revision: [\`${STEPBIBLE_SOURCE.commitSha}\`](${STEPBIBLE_SOURCE.commitUrl}).*`);

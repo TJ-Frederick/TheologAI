@@ -67,7 +67,7 @@ fresh server and transport.
 | `commentary_lookup` | Retrieve Matthew Henry, JFB, Adam Clarke, John Gill, Keil-Delitzsch (OT), or Tyndale notes. |
 | `classic_text_lookup` | Search and browse the 17 locally indexed historical documents. Remote CCEL document bodies are not retrieved or republished. |
 | `primary_source_search` | Execute bounded primary-source query plans. Production is v3/local-only; preview exposes the v4 local-plus-CCEL discovery contract while CCEL execution remains disabled before adapter, coordinator, or fetch. Snippets remain discovery-only, and selected local sections are readable resources. |
-| `original_language_lookup` | Look up or search Strong's entries, with opt-in exact corrected-corpus usage and bounded occurrence pages for exact identities. |
+| `original_language_lookup` | Look up or search Strong's entries, with opt-in rights-reviewed STEPBible metadata, exact corrected-corpus usage, and bounded occurrence pages for exact identities. The Online-Bible-derived TBESH Hebrew `Meaning` field is withheld. |
 | `bible_verse_morphology` | Return bounded word-by-word morphology for one exact verse, with raw codes, nullable expansions, and separate pinned STEPBible morphology/lemma provenance. |
 | `original_language_study` | Resolve and study one Greek or Hebrew token in one verse with contextual morphology, source-separated lexical evidence, and explicit interpretive limits. |
 | `donation_config` | Return versioned structured voluntary-donation configuration with the public web URL, recipient, and ordered native/token assets; donations do not unlock features. |
@@ -105,6 +105,15 @@ adds the top 10 exact source variants and defaults to 8 raw occurrences (maximum
 12). `technical` adds the top 25 variants and defaults to 20 raw occurrences
 (maximum 25). Search mode and calls that omit `usage_level` retain their prior
 responses.
+
+For Hebrew STEPBible extensions, TheologAI retains exact Strong's identities,
+forms, transliteration, morphology, lemma, and the Tyndale-created brief gloss.
+It does not return or use the TBESH `Meaning` field, whose source notice says
+permission should be obtained from Online Bible before project use. Structured
+results mark this evidence policy explicitly; a missing Hebrew semantic
+definition remains unavailable rather than being reconstructed from a gloss,
+frequency, morphology, or other metadata. OpenScriptures definitions and Greek
+STEPBible evidence are unaffected.
 
 All tools are annotated as read-only, non-destructive, and idempotent. Tool
 inputs use closed, bounded JSON Schema 2020-12 contracts. All eleven tools
@@ -247,7 +256,9 @@ resource. The collection and every response are bounded and non-exhaustive.
 
 - 14,298 Strong's entries from OpenScriptures.
 - 447,748 indexed STEPBible morphology rows spanning all 66 books.
-- STEPBible lexicon extensions and morphology-code expansions.
+- Rights-reviewed STEPBible lexicon metadata and morphology-code expansions;
+  the TBESH Hebrew `Meaning` field is withheld while its separately sourced
+  identity, form, lemma, morphology, transliteration, and brief gloss remain.
 - OpenBible.info cross references.
 - 2,193 UBS source-attested parallel groups (CC BY-SA 4.0), normalized into
   SQLite/D1 with pinned source provenance and artifact identity.

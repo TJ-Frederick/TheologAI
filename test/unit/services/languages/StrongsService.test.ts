@@ -102,7 +102,16 @@ describe('StrongsService', () => {
         lemma: sourceLexicon(input).extended_data.lemma,
         extended: { strongsExtended: input },
       });
-      expect(result.definition).not.toMatch(/<[^>]+>/);
+      if (input.startsWith('H')) {
+        expect(result.definition).toBeNull();
+        expect(result.evidencePolicy).toMatchObject({
+          code: 'tbesh_meaning_withheld',
+          semanticEvidence: 'unavailable',
+          withheldFields: ['tbesh_meaning'],
+        });
+      } else {
+        expect(result.definition).not.toMatch(/<[^>]+>/);
+      }
     });
 
     it('does not infer New Testament classification for the LXX-only G21502 identity', async () => {
@@ -191,6 +200,80 @@ describe('StrongsService', () => {
       });
     });
 
+    it('never reads or emits TBESH Meaning while retaining approved Hebrew fields', async () => {
+      const forbidden = 'FORBIDDEN ONLINE BIBLE MEANING SENTINEL';
+      const extendedData: Record<string, unknown> = {
+        extendedStrongs: 'H9001',
+        lemma: '/וַ',
+        translit: '/wa',
+        morph: 'H:C',
+        gloss: '&',
+        senses: { retained: { gloss: 'separately licensed sense', usage: 'approved evidence', count: 1 } },
+      };
+      Object.defineProperty(extendedData, 'definition', {
+        enumerable: true,
+        get: () => { throw new Error(`TBESH Meaning was read: ${forbidden}`); },
+      });
+      const repo = makeMockRepo();
+      repo.lookup.mockReturnValue(undefined);
+      repo.getLexiconEntry.mockReturnValue({
+        strongs_number: 'H9001', source: 'STEPBible', extended_data: extendedData,
+      });
+
+      const result = await new StrongsService(repo as any).lookup('H9001', true);
+
+      expect(result).toMatchObject({
+        strongs_number: 'H9001', lemma: '/וַ', transliteration: '/wa', definition: null,
+        extended: {
+          strongsExtended: 'H9001', gloss: '&', morphologyCode: 'H:C',
+          senses: { retained: { gloss: 'separately licensed sense', usage: 'approved evidence', count: 1 } },
+        },
+        evidencePolicy: { code: 'tbesh_meaning_withheld', semanticEvidence: 'unavailable' },
+      });
+      expect(result.extended).not.toHaveProperty('definition');
+      expect(JSON.stringify(result)).not.toContain(forbidden);
+    });
+
+    it('keeps the public-domain OpenScriptures Hebrew definition but withholds joined TBESH Meaning', async () => {
+      const forbidden = 'FORBIDDEN JOINED TBESH MEANING';
+      const repo = makeMockRepo();
+      repo.lookup.mockReturnValue({
+        strongs_number: 'H430', testament: 'OT', lemma: 'אֱלֹהִים', transliteration: 'elohim',
+        pronunciation: null, definition: 'God, gods', derivation: null,
+      });
+      repo.getLexiconEntry.mockReturnValue({
+        strongs_number: 'H430', source: 'STEPBible', extended_data: {
+          extendedStrongs: 'H0430', lemma: 'אֱלֹהִים', translit: 'elohim', morph: 'H:N-MP',
+          gloss: 'God/gods', definition: forbidden,
+        },
+      });
+
+      const result = await new StrongsService(repo as any).lookup('H430', true);
+
+      expect(result.definition).toBe('God, gods');
+      expect(result.extended).toMatchObject({ gloss: 'God/gods', morphologyCode: 'H:N-MP' });
+      expect(result.extended).not.toHaveProperty('definition');
+      expect(result.evidencePolicy?.semanticEvidence).toBe('base_dictionary_only');
+      expect(JSON.stringify(result)).not.toContain(forbidden);
+    });
+
+    it('does not suppress the separately licensed Greek lexicon definition', async () => {
+      const repo = makeMockRepo();
+      repo.lookup.mockReturnValue(undefined);
+      repo.getLexiconEntry.mockReturnValue({
+        strongs_number: 'G6000', source: 'STEPBible', extended_data: {
+          extendedStrongs: 'G6000', lemma: 'φιξτυρε', gloss: 'fixture gloss',
+          definition: 'licensed Greek definition', morph: 'G:N-M',
+        },
+      });
+
+      const result = await new StrongsService(repo as any).lookup('G6000', true);
+
+      expect(result.definition).toBe('licensed Greek definition');
+      expect(result.extended?.definition).toBe('licensed Greek definition');
+      expect(result).not.toHaveProperty('evidencePolicy');
+    });
+
     it('handles missing lexicon entry gracefully', async () => {
       const repo = makeMockRepo();
       repo.getLexiconEntry.mockReturnValue(undefined);
@@ -260,6 +343,7 @@ describe('StrongsService', () => {
       const service = new StrongsService(repo as any);
       const results = await service.search('agape', 10);
       expect(repo.search).toHaveBeenCalledWith('agape', 10);
+      expect(repo.getLexiconEntry).not.toHaveBeenCalled();
       expect(results).toHaveLength(1);
     });
 

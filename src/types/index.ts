@@ -149,7 +149,7 @@ export interface StrongsResult {
   lemma: string;
   transliteration?: string;
   pronunciation?: string;
-  definition: string;
+  definition: string | null;
   derivation?: string;
   citation: Citation;
 }
@@ -162,6 +162,12 @@ export interface SenseInfo {
 }
 
 export interface EnhancedStrongsResult extends StrongsResult {
+  evidencePolicy?: {
+    code: 'tbesh_meaning_withheld';
+    semanticEvidence: 'base_dictionary_only' | 'unavailable';
+    withheldFields: ['tbesh_meaning'];
+    notice: string;
+  };
   extended?: {
     strongsExtended?: string;
     occurrences?: number;

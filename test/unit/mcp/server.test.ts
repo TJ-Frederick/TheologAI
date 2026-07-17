@@ -460,8 +460,31 @@ describe('shared MCP registration', () => {
       uri: 'theologai://strongs/H9001',
       text: expect.stringContaining('# H9001 — /וַ'),
     });
-    expect(String(result.contents[0].text)).toContain('Verbal vav');
+    expect(String(result.contents[0].text)).not.toContain('Verbal vav');
+    expect(String(result.contents[0].text)).toContain('Semantic evidence unavailable');
+    expect(String(result.contents[0].text)).toContain('## Brief gloss\n\n&');
+    expect(String(result.contents[0].text)).toContain('## Evidence policy');
     expect(String(result.contents[0].text)).toContain('Not classified (source-language lexicon identity)');
+  });
+
+  it('keeps a Greek Strong\'s resource byte-compatible when extended data includes a gloss', async () => {
+    const root = makeMockRoot();
+    root.services.strongsService.lookup = async () => ({
+      strongs_number: 'G6000', testament: null, language: 'Greek' as const,
+      lemma: 'φιξτυρε', transliteration: 'fixture', definition: 'licensed Greek definition',
+      citation: { source: 'STEPBible lexicon data', copyright: 'CC BY 4.0' },
+      sourceKind: 'stepbible_lexicon' as const,
+      extended: { strongsExtended: 'G6000', gloss: 'fixture gloss', definition: 'licensed Greek definition' },
+    });
+    const client = await connect(createTheologAiMcpServer(root, '1.0.0-test').server);
+
+    const result = await client.readResource({ uri: 'theologai://strongs/G6000' });
+
+    expect(String(result.contents[0].text)).toBe(
+      '# G6000 — φιξτυρε\n\n**Transliteration:** fixture\n**Testament:** Not classified (source-language lexicon identity)\n\n## Definition\n\nlicensed Greek definition',
+    );
+    expect(String(result.contents[0].text)).not.toContain('fixture gloss');
+    expect(String(result.contents[0].text)).not.toContain('Evidence policy');
   });
 
   it('resolves an exact document section without changing whole-document resources', async () => {
@@ -617,7 +640,10 @@ describe('shared MCP registration', () => {
       uri: 'theologai://strongs/H9001',
       text: expect.stringContaining('# H9001 — /וַ'),
     });
-    expect(String(result.contents[0].text)).toContain('Verbal vav');
+    expect(String(result.contents[0].text)).not.toContain('Verbal vav');
+    expect(String(result.contents[0].text)).toContain('Semantic evidence unavailable');
+    expect(String(result.contents[0].text)).toContain('## Brief gloss\n\n&');
+    expect(String(result.contents[0].text)).toContain('## Evidence policy');
     expect(String(result.contents[0].text)).toContain('Not classified (source-language lexicon identity)');
   });
 

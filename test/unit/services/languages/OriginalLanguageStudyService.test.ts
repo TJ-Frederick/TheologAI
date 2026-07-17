@@ -95,6 +95,36 @@ describe('OriginalLanguageStudyService', () => {
     expect(result.language).toBe('Hebrew');
   });
 
+  it('keeps a Hebrew study complete when safe OpenScriptures semantics remain available', async () => {
+    const forbidden = 'FORBIDDEN ONLINE BIBLE MEANING';
+    const word: MorphWord = {
+      ...loved, word_text: 'אֱלֹהִים', lemma: 'אֱלֹהִים', strongs_number: 'H0430',
+      morph_code: 'HNcmpa', gloss: 'God',
+    };
+    const { morphology, strongs } = repos([word], { expansion: 'Noun Common Masculine Plural Absolute' });
+    strongs.lookup = id => ({
+      strongs_number: id, testament: 'OT', lemma: 'אֱלֹהִים', transliteration: 'elohim',
+      pronunciation: null, definition: 'God, gods', derivation: null,
+    });
+    strongs.getLexiconEntry = id => ({
+      strongs_number: id, source: 'TBESH', extended_data: {
+        extendedStrongs: 'H0430', lemma: 'אֱלֹהִים', translit: 'elohim',
+        gloss: 'God/gods', definition: forbidden,
+      },
+    });
+
+    const result = await new OriginalLanguageStudyService(morphology, strongs)
+      .study({ reference: 'Genesis 1:1', target: 'H430' });
+
+    expect(result.status).toBe('complete');
+    expect(result.dictionary).toMatchObject({
+      definition: 'God, gods', extended: { gloss: 'God/gods' },
+      evidencePolicy: { semanticEvidence: 'base_dictionary_only', withheldFields: ['tbesh_meaning'] },
+    });
+    expect(JSON.stringify(result)).not.toContain(forbidden);
+    expect(result.warnings).toEqual([expect.stringContaining('TBESH Meaning field is withheld')]);
+  });
+
   it('propagates strict compound grammar and normalized derivation into a Hebrew study', async () => {
     const word: MorphWord = {
       position: 5,

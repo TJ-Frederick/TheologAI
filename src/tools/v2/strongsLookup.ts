@@ -19,7 +19,7 @@ import { MORPHOLOGY_USAGE_CURSOR_MAX_LENGTH } from '../../kernel/morphologyUsage
 export function createStrongsLookupHandler(service: StrongsService): ToolHandler {
   return {
     name: 'original_language_lookup',
-    description: "Look up an exact Strong's number or search Greek/Hebrew lemmas, transliterations, and definitions. Use exactly one mode: strongs_number for an exact lookup, or query for a search. Exact lookup can opt into extended STEPBible lexicon data or exact corrected-corpus usage evidence.",
+    description: "Look up an exact Strong's number or search Greek/Hebrew lemmas, transliterations, and OpenScriptures definitions. Use exactly one mode: strongs_number for an exact lookup, or query for a search. Exact lookup can opt into rights-reviewed STEPBible metadata or exact corrected-corpus usage evidence. The Online-Bible-derived TBESH Hebrew Meaning field is withheld; brief glosses are not definitions.",
     inputSchema: {
       type: 'object',
       description: 'Flat mode fields are intentionally shown together for client discoverability; choose exactly one mode, with cross-field validity enforced strictly by the handler.',
@@ -33,7 +33,7 @@ export function createStrongsLookupHandler(service: StrongsService): ToolHandler
           pattern: STRONGS_IDENTITY_PATTERN,
         },
         detail_level: { type: 'string', enum: ['simple', 'detailed'], description: 'Exact strongs_number lookups only; choose the amount of entry detail. Defaults to simple when omitted.' },
-        include_extended: { type: 'boolean', description: 'Exact strongs_number lookups only; include STEPBible extended data. Defaults to false when omitted.' },
+        include_extended: { type: 'boolean', description: 'Exact strongs_number lookups only; include rights-reviewed STEPBible metadata. Hebrew TBESH Meaning definitions are withheld while Tyndale-created brief gloss, form, transliteration, morphology, and lemma remain available. Defaults to false when omitted.' },
         usage_level: { type: 'string', enum: ['overview', 'study', 'technical'], description: 'Exact strongs_number lookups only; opt into counted morphology-corpus usage. overview returns totals and complete canonical-book distribution only; study adds the top 10 exact source variants and a default 8-token page; technical adds the top 25 variants and a default 20-token page. Omit to preserve the legacy response.' },
         occurrence_limit: { type: 'integer', minimum: 1, maximum: 25, description: 'Study/technical usage only; bounded raw-token page size. Maximum 12 for study or 25 for technical.' },
         occurrence_cursor: { type: 'string', minLength: 1, maxLength: MORPHOLOGY_USAGE_CURSOR_MAX_LENGTH, pattern: '^[A-Za-z0-9_-]+$', description: 'Study/technical usage only; opaque cursor returned by the preceding page for this exact identity and corpus.' },

@@ -63,6 +63,11 @@ Present contextual findings in this order:
 - Roots and etymology do not prove present contextual meaning.
 - Never import every possible sense into one occurrence.
 - Keep OpenScriptures and STEPBible evidence separately attributed.
+- For Hebrew, the Online-Bible-derived TBESH `Meaning` field is withheld because
+  its source notice requires permission for project use. Preserve the returned
+  identity, form, transliteration, morphology, lemma, and Tyndale-created brief
+  gloss, but do not reconstruct the missing definition or relabel the gloss as
+  semantic-domain evidence.
 - Keep lexicon `extended.occurrences` distinct from counted morphology
   `corpusUsage.totals.tokenCount`; they are different source claims.
 - Exact source surface variants preserve punctuation, accents, breathing marks,

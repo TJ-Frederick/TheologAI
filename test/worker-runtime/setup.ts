@@ -57,6 +57,19 @@ beforeAll(async () => {
       ) VALUES (?, ?, ?, ?)
     `).bind('G0026', 'ἀγάπη', 'agapē', 'love, goodwill, benevolence'),
     env.THEOLOGAI_DB.prepare(`
+      INSERT INTO stepbible_lexicons (strongs_number, source, extended_data)
+      VALUES (?, ?, ?)
+    `).bind('H9001', 'STEPBible', JSON.stringify({
+      extendedStrongs: 'H9001', lemma: '/וַ', translit: '/wa', morph: 'H:C', gloss: '&',
+      definition: 'FORBIDDEN ONLINE BIBLE MEANING WORKER SENTINEL',
+    })),
+    env.THEOLOGAI_DB.prepare(`
+      INSERT INTO morphology (
+        book, chapter, verse, position, word_text, lemma,
+        strongs_number, morph_code, gloss, book_order
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind('Genesis', 1, 1, 1, 'וַ', '/וַ', 'H9001', 'H:C', '&', 1),
+    env.THEOLOGAI_DB.prepare(`
       INSERT INTO morphology (
         book,
         chapter,

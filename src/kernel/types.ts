@@ -374,7 +374,7 @@ export interface StrongsResult {
   lemma: string;
   transliteration?: string;
   pronunciation?: string;
-  definition: string;
+  definition: string | null;
   derivation?: string;
   citation: Citation;
 }
@@ -390,6 +390,13 @@ export interface EnhancedStrongsResult extends StrongsResult {
   sourceKind?: 'strongs_concordance' | 'stepbible_lexicon';
   /** Known source language does not imply a biblical testament classification. */
   language?: 'Greek' | 'Hebrew';
+  /** Records a source-specific rights boundary without fabricating replacement semantics. */
+  evidencePolicy?: {
+    code: 'tbesh_meaning_withheld';
+    semanticEvidence: 'base_dictionary_only' | 'unavailable';
+    withheldFields: ['tbesh_meaning'];
+    notice: string;
+  };
   extendedCitation?: Citation;
   extended?: {
     strongsExtended?: string;

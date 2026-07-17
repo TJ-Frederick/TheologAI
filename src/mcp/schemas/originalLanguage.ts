@@ -1,6 +1,8 @@
 import type { Schema } from '@cfworker/json-schema';
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 import type { ProvenanceRecord } from '../../kernel/provenance.js';
+
+export const ORIGINAL_LANGUAGE_EVIDENCE_NOTICE_MAX_LENGTH = 1000;
 import { createProvenanceRecordSchema } from './provenance.js';
 import { STRONGS_IDENTITY_PATTERN } from '../../kernel/strongs.js';
 import type { CorpusUsageResult } from '../../kernel/types.js';
@@ -32,6 +34,12 @@ export interface OriginalLanguageEntryV1 {
   definition: string | null;
   derivation?: string;
   extended?: OriginalLanguageExtendedV1;
+  evidencePolicy?: {
+    code: 'tbesh_meaning_withheld';
+    semanticEvidence: 'base_dictionary_only' | 'unavailable';
+    withheldFields: ['tbesh_meaning'];
+    notice: string;
+  };
   provenanceIds: string[];
 }
 
@@ -172,6 +180,20 @@ const entrySchema: Schema = {
           },
         },
       },
+      additionalProperties: false,
+    },
+    evidencePolicy: {
+      type: 'object',
+      properties: {
+        code: { const: 'tbesh_meaning_withheld' },
+        semanticEvidence: { type: 'string', enum: ['base_dictionary_only', 'unavailable'] },
+        withheldFields: {
+          type: 'array', minItems: 1, maxItems: 1,
+          items: { const: 'tbesh_meaning' },
+        },
+        notice: { type: 'string', minLength: 1, maxLength: ORIGINAL_LANGUAGE_EVIDENCE_NOTICE_MAX_LENGTH },
+      },
+      required: ['code', 'semanticEvidence', 'withheldFields', 'notice'],
       additionalProperties: false,
     },
     provenanceIds: {

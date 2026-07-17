@@ -75,6 +75,7 @@ export function presentOriginalLanguageEntry(
       id: 'src-1', kind: 'lexicon', status: 'verified_source',
       license: { label: 'Public Domain' }, attribution: 'OpenScriptures',
     });
+  if (stepBibleBase && result.evidencePolicy) base.note = result.evidencePolicy.notice;
   const provenance: ProvenanceRecord[] = [base];
   const provenanceIds = [base.id];
 
@@ -83,6 +84,7 @@ export function presentOriginalLanguageEntry(
       id: 'src-2', kind: 'lexicon', label: result.extendedCitation.source,
       rightsNotice: result.extendedCitation.copyright,
     });
+    if (result.evidencePolicy) extended.note = result.evidencePolicy.notice;
     provenance.push(extended);
     provenanceIds.push(extended.id);
   }
@@ -101,6 +103,7 @@ export function presentOriginalLanguageEntry(
     definition: nullableText(result.definition),
     ...(detailLevel === 'detailed' && result.derivation ? { derivation: result.derivation } : {}),
     ...(extended ? { extended: presentExtended(extended) } : {}),
+    ...(result.evidencePolicy ? { evidencePolicy: result.evidencePolicy } : {}),
     provenanceIds,
   };
 

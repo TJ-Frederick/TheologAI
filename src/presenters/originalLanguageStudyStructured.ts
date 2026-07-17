@@ -25,7 +25,9 @@ export function presentOriginalLanguageStudy(result: OriginalLanguageStudyDomain
       kind: stepOnly ? 'stepbible_lexicon' : 'dictionary',
       ...(lexical.lemma ? { lemma: lexical.lemma } : {}),
       ...(lexical.definition ? { definition: normalizeLexiconText(lexical.definition) } : {}),
+      ...(stepOnly && lexical.evidencePolicy && lexical.extended?.gloss ? { gloss: lexical.extended.gloss } : {}),
       ...(lexical.derivation ? { derivation: lexical.derivation } : {}),
+      ...(lexical.evidencePolicy ? { evidencePolicy: lexical.evidencePolicy } : {}),
       provenanceIds: [stepOnly ? 'stepbible-lexicon' : 'openscriptures-strongs'],
     });
     provenanceIds.add(stepOnly ? 'stepbible-lexicon' : 'openscriptures-strongs');
