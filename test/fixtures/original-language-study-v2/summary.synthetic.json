@@ -1,0 +1,15 @@
+{
+  "fixtureVersion": 1,
+  "sourcePolicy": "invented_synthetic_only",
+  "scenario": { "candidateCount": 1, "detail": "summary", "serverVerifiedAlignment": false },
+  "request": { "reference": "Synthetic 1:1", "target": "H1", "position": 1, "detail": "summary" },
+  "expected": {
+    "schemaVersion": "2",
+    "composedV1SchemaVersion": "1",
+    "composedV1Language": "Hebrew",
+    "composedV1Definition": "SYNTHETIC EXISTING V1 DEFINITION",
+    "semanticStatus": "lexical_candidates",
+    "candidateSenseIds": ["synthetic-sense-01"],
+    "candidateDetailStatuses": ["summary"]
+  }
+}
