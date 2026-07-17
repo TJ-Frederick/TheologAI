@@ -47,7 +47,7 @@ describe('custom-domain infrastructure contract', () => {
 
     expect(productionWorkflow).toContain('name: production');
     expect(productionWorkflow).toContain('url: https://mcp.theologai.xyz/mcp');
-    expect(productionWorkflow).toContain('fetch-depth: 2');
+    expect(productionWorkflow).toContain('fetch-depth: 0');
     const detectorStart = productionWorkflow.indexOf('- name: Detect production custom-domain declaration change');
     const prerequisiteStart = productionWorkflow.indexOf('- name: Require live website and audited preview custom domain');
     const deployStart = productionWorkflow.indexOf('- name: Deploy to Cloudflare Workers');
