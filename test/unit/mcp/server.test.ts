@@ -719,6 +719,24 @@ describe('shared MCP registration', () => {
       name: 'passage-exegesis',
       arguments: { reference: 'John 3:16' },
     });
+    const passageExegesisText = (passageExegesis.messages[0]!.content as { text: string }).text;
+    const initialParallelCall = passageExegesisText.match(/`parallel_passages` with `([^`]+)`/);
+    expect(initialParallelCall?.[1]).toBeDefined();
+    expect(JSON.parse(initialParallelCall![1]!)).toEqual({
+      reference: 'John 3:16', corpora: ['ubs_source_attested'], maxGroups: 5, includeText: false,
+    });
+    expect(passageExegesisText).toContain('preserving exactly the same `reference`, `corpora`, and `maxGroups`');
+    expect(passageExegesisText).toContain('omit `includeText`, translation, alignment, legacy, and OpenBible controls');
+    expect(passageExegesisText).toContain('Never inspect, decode, or rewrite the cursor');
+    expect(passageExegesisText).toContain('Stop at a terminal window, once the evidence is sufficient, or after two continuation calls');
+    expect(passageExegesisText).toContain('if that cap ends a potentially useful survey, disclose that it was bounded');
+    expect(passageExegesisText).toContain('Preserve each selected group and every member intact; do not dedupe or flatten the groups');
+    expect(passageExegesisText).toContain('separate text-enrichment queue by traversing the selected groups and their members in returned source order');
+    expect(passageExegesisText).toContain('Dedupe only that queue by `normalizedReference`, keeping its first occurrence');
+    expect(passageExegesisText).toContain('label every later unique queue reference `budget_omitted` before lookup');
+    expect(passageExegesisText).toContain('never backfill with later references');
+    expect(passageExegesisText).toContain('`bible_cross_references` with `{"reference":"John 3:16"}` separately for broader OpenBible.info discovery');
+    expect(passageExegesisText).not.toContain('complete UBS source-attested group metadata');
     expect(passageExegesis.messages[0].content).toEqual(expect.objectContaining({
       text: expect.stringContaining('`passages[]` and retain each translation'),
     }));
@@ -735,15 +753,28 @@ describe('shared MCP registration', () => {
       text: expect.stringContaining('without silently fanning out to translation providers'),
     }));
     expect(passageExegesis.messages[0].content).toEqual(expect.objectContaining({
-      text: expect.stringContaining('make a separate `parallel_passages` call'),
+      text: expect.stringContaining('Browse structured group metadata only'),
     }));
     expect(passageExegesis.messages[0].content).toEqual(expect.objectContaining({
-      text: expect.stringContaining('same reference, corpus selection, and `maxGroups`'),
+      text: expect.stringContaining('`sourceAttestedResultWindow.additionalMatchStatus` is `additional_match_observed`'),
     }));
     expect(String(passageExegesis.messages[0].content)).not.toContain('reference/groups');
     expect(passageExegesis.messages[0].content).toEqual(expect.objectContaining({
-      text: expect.stringContaining('every member\'s `textEnrichmentStatus`'),
+      text: expect.stringContaining('Pass that `nextCursor` unchanged as `groupCursor`'),
     }));
+    expect(passageExegesis.messages[0].content).toEqual(expect.objectContaining({
+      text: expect.stringContaining('at most three pages / 15 groups'),
+    }));
+    expect(passageExegesis.messages[0].content).toEqual(expect.objectContaining({
+      text: expect.stringContaining('at most two materially relevant groups'),
+    }));
+    expect(passageExegesis.messages[0].content).toEqual(expect.objectContaining({
+      text: expect.stringContaining('only for the first 12 unique queue references'),
+    }));
+    expect(passageExegesis.messages[0].content).toEqual(expect.objectContaining({
+      text: expect.stringContaining('Never combine `groupCursor` with `includeText`'),
+    }));
+    expect(String(passageExegesis.messages[0].content)).not.toContain('plus `includeText: true`');
     expect(passageExegesis.messages[0].content).toEqual(expect.objectContaining({
       text: expect.stringContaining('community-ranked links only as discovery leads and candidates for contextual investigation'),
     }));

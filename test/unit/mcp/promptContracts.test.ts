@@ -99,19 +99,22 @@ describe('prompt-recommended tool-call contracts', () => {
 
   it('keeps UBS groups and OpenBible discovery in separate passage-exegesis calls', () => {
     const calls = recommendedToolCallsForPrompt('passage-exegesis', { reference: 'John 3:16' });
-    expect(calls).toContainEqual({
+    const parallelCalls = calls.filter(call => call.tool === 'parallel_passages');
+    expect(parallelCalls).toEqual([{
       tool: 'parallel_passages',
       arguments: {
         reference: 'John 3:16', corpora: ['ubs_source_attested'], maxGroups: 5,
         includeText: false,
       },
-    });
+    }]);
     expect(calls).toContainEqual({
       tool: 'bible_cross_references',
       arguments: { reference: 'John 3:16' },
     });
-    expect(calls.find(call => call.tool === 'parallel_passages')?.arguments)
-      .not.toHaveProperty('includeOpenBibleCrossReferences');
+    expect(parallelCalls[0]?.arguments).toEqual({
+      reference: 'John 3:16', corpora: ['ubs_source_attested'], maxGroups: 5,
+      includeText: false,
+    });
   });
 
   it('uses morphology to resolve a contextual word before a dynamic study call', () => {

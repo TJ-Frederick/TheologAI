@@ -43,6 +43,15 @@ function textContent(message: JsonRpcResponse): string {
     .join('\n');
 }
 
+function promptText(message: JsonRpcResponse): string {
+  const prompt = message.result?.messages?.[0];
+  if (typeof prompt !== 'object' || prompt === null || !('content' in prompt)) return '';
+  const content = prompt.content;
+  return typeof content === 'object' && content !== null && 'text' in content && typeof content.text === 'string'
+    ? content.text
+    : '';
+}
+
 async function rpc(
   method: string,
   params?: Record<string, unknown>,
@@ -933,8 +942,47 @@ describe('Worker MCP endpoint in workerd', () => {
         }),
       }),
     ]);
-    expect(JSON.stringify(rendered.message.result?.messages)).toContain(
+    const renderedPrompt = promptText(rendered.message);
+    const initialParallelCall = renderedPrompt.match(/`parallel_passages` with `([^`]+)`/);
+    expect(initialParallelCall?.[1]).toBeDefined();
+    expect(JSON.parse(initialParallelCall![1]!)).toEqual({
+      reference: 'John 3:16', corpora: ['ubs_source_attested'], maxGroups: 5, includeText: false,
+    });
+    expect(renderedPrompt).toContain('preserving exactly the same `reference`, `corpora`, and `maxGroups`');
+    expect(renderedPrompt).toContain('omit `includeText`, translation, alignment, legacy, and OpenBible controls');
+    expect(renderedPrompt).toContain('Never inspect, decode, or rewrite the cursor');
+    expect(renderedPrompt).toContain('Stop at a terminal window, once the evidence is sufficient, or after two continuation calls');
+    expect(renderedPrompt).toContain('if that cap ends a potentially useful survey, disclose that it was bounded');
+    expect(renderedPrompt).toContain('Preserve each selected group and every member intact; do not dedupe or flatten the groups');
+    expect(renderedPrompt).toContain('separate text-enrichment queue by traversing the selected groups and their members in returned source order');
+    expect(renderedPrompt).toContain('Dedupe only that queue by `normalizedReference`, keeping its first occurrence');
+    expect(renderedPrompt).toContain('label every later unique queue reference `budget_omitted` before lookup');
+    expect(renderedPrompt).toContain('never backfill with later references');
+    expect(renderedPrompt).toContain('`bible_cross_references` with `{"reference":"John 3:16"}` separately for broader OpenBible.info discovery');
+    expect(renderedPrompt).not.toContain('complete UBS source-attested group metadata');
+    expect(renderedPrompt).toContain(
       'do not infer quotation, dependence, synoptic direction, or a thematic relationship',
+    );
+    expect(renderedPrompt).toContain(
+      '`sourceAttestedResultWindow.additionalMatchStatus` is `additional_match_observed`',
+    );
+    expect(renderedPrompt).toContain(
+      'Pass that `nextCursor` unchanged as `groupCursor`',
+    );
+    expect(renderedPrompt).toContain(
+      'at most three pages / 15 groups',
+    );
+    expect(renderedPrompt).toContain(
+      'at most two materially relevant groups',
+    );
+    expect(renderedPrompt).toContain(
+      'only for the first 12 unique queue references',
+    );
+    expect(renderedPrompt).toContain(
+      'Never combine `groupCursor` with `includeText`',
+    );
+    expect(renderedPrompt).not.toContain(
+      'plus `includeText: true`',
     );
 
     const wrongType = await rpc('prompts/get', {
