@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { presentPrimarySourceSearchV4 } from '../../../src/presenters/primarySourceSearchV4Structured.js';
+import { presentPrimarySourceSearchV5 } from '../../../src/presenters/primarySourceSearchV4Structured.js';
 import type { PrimarySourceSearchPlanResult } from '../../../src/services/historical/primarySourceTypes.js';
 import { CCEL_COMPOSITION_DATE_NOTICE } from '../../../src/services/historical/primarySourceTypes.js';
 
@@ -86,7 +86,7 @@ function largePlan(): PrimarySourceSearchPlanResult {
   };
 }
 
-describe('primary-source v4 structured presentation', () => {
+describe('primary-source v5 structured presentation', () => {
   it('defensively prepends the date invariant to every executable external provider result', () => {
     const plan = largePlan();
     const external = externalProvider('external', 1);
@@ -94,7 +94,7 @@ describe('primary-source v4 structured presentation', () => {
     plan.queries = [{ id: 'external', normalizedMode: 'all_terms', normalizedSelection: 'relevance', providers: [external] }];
     plan.coverage = { localAttempted: false, localHitCount: 0, ccelAttempted: true, ccelStatus: 'ok', ccelHitCount: 1, notices: [] };
 
-    const presented = presentPrimarySourceSearchV4(plan);
+    const presented = presentPrimarySourceSearchV5(plan);
 
     expect(presented.queries[0]!.providers[0]!.notices).toEqual([
       CCEL_COMPOSITION_DATE_NOTICE,
@@ -111,7 +111,7 @@ describe('primary-source v4 structured presentation', () => {
     external.notices = ['Live CCEL discovery does not expose reviewed composition-date bounds.'];
     plan.queries = [{ id: 'external', normalizedMode: 'all_terms', normalizedSelection: 'relevance', providers: [external] }];
 
-    const provider = presentPrimarySourceSearchV4(plan).queries[0]!.providers[0]!;
+    const provider = presentPrimarySourceSearchV5(plan).queries[0]!.providers[0]!;
     expect(provider.notices).not.toContain(CCEL_COMPOSITION_DATE_NOTICE);
   });
 
@@ -123,7 +123,7 @@ describe('primary-source v4 structured presentation', () => {
     external.notices = ['Live CCEL search is disabled. No remote request was made.'];
     plan.queries = [{ id: 'external', normalizedMode: 'all_terms', normalizedSelection: 'relevance', providers: [external] }];
 
-    const provider = presentPrimarySourceSearchV4(plan).queries[0]!.providers[0]!;
+    const provider = presentPrimarySourceSearchV5(plan).queries[0]!.providers[0]!;
     expect(provider.notices).not.toContain(CCEL_COMPOSITION_DATE_NOTICE);
   });
 
@@ -139,11 +139,11 @@ describe('primary-source v4 structured presentation', () => {
     provider.scope!.eligibleDocuments = [];
     provider.scope!.eligibleDocumentsTruncated = true;
 
-    expect(presentPrimarySourceSearchV4(plan).queries[0]!.providers[0]!.scope?.eligibleDocumentCount).toBe(100);
+    expect(presentPrimarySourceSearchV5(plan).queries[0]!.providers[0]!.scope?.eligibleDocumentCount).toBe(100);
     provider.scope!.eligibleDocumentCount = 101;
-    const rejected = presentPrimarySourceSearchV4(plan).queries[0]!.providers[0]!;
+    const rejected = presentPrimarySourceSearchV5(plan).queries[0]!.providers[0]!;
     expect(rejected.status).toBe('interface_changed');
-    expect(rejected).not.toHaveProperty('scope');
+    expect(rejected).toMatchObject({ scope: { status: 'metadata_incomplete', eligibleDocumentCount: 0 } });
   });
 
   it('publishes bounded retry guidance only for a rate-limited external provider', () => {
@@ -153,19 +153,19 @@ describe('primary-source v4 structured presentation', () => {
     external.searched = false;
     external.retryAfterSeconds = 11;
     plan.queries = [{ id: 'external', normalizedMode: 'all_terms', normalizedSelection: 'relevance', providers: [external] }];
-    const provider = presentPrimarySourceSearchV4(plan).queries[0]!.providers[0]!;
+    const provider = presentPrimarySourceSearchV5(plan).queries[0]!.providers[0]!;
     expect(provider).toMatchObject({ status: 'rate_limited', retryAfterSeconds: 11 });
 
     external.retryAfterSeconds = 0;
-    const invalid = presentPrimarySourceSearchV4(plan).queries[0]!.providers[0]!;
+    const invalid = presentPrimarySourceSearchV5(plan).queries[0]!.providers[0]!;
     expect(invalid.status).toBe('interface_changed');
     expect(invalid).not.toHaveProperty('retryAfterSeconds');
   });
 
-  it('stops at the first non-fitting hit and recomputes every public count within 32 KiB', () => {
-    const presented = presentPrimarySourceSearchV4(largePlan());
+  it('stops at the first non-fitting hit and recomputes every public count within the structured delivery reserve', () => {
+    const presented = presentPrimarySourceSearchV5(largePlan());
     const json = JSON.stringify(presented);
-    expect(new TextEncoder().encode(json).byteLength).toBeLessThanOrEqual(32768);
+    expect(new TextEncoder().encode(json).byteLength).toBeLessThanOrEqual(20480);
     expect(presented).toMatchObject({ planStatus: 'partial', responseWindow: { unit: 'utf8_bytes', maximum: 32768, truncated: true } });
     expect(json).not.toContain('FINAL_MARKER');
     const providers = presented.queries.flatMap(query => query.providers);
@@ -181,7 +181,7 @@ describe('primary-source v4 structured presentation', () => {
     expect(providers[0]?.scope?.eligibleDocumentsTruncated).toBe(true);
   });
 
-  it('budgets against the larger complete, non-truncated envelope at the exact byte boundary', () => {
+  it('reserves delivery space while preserving a truthful structured response window', () => {
     const boundaryPlan = (twoByteCharacters: number) => {
       const plan = largePlan();
       plan.queries = [plan.queries[0]!];
@@ -194,20 +194,16 @@ describe('primary-source v4 structured presentation', () => {
       return plan;
     };
 
-    const exact = presentPrimarySourceSearchV4(boundaryPlan(118));
-    expect(exact.responseWindow.truncated).toBe(false);
-    expect(exact.planStatus).toBe('complete');
-    expect(exact.queries[0]!.providers[0]!.hits).toHaveLength(8);
-    expect(new TextEncoder().encode(JSON.stringify(exact)).byteLength).toBe(32768);
-
-    // One additional UTF-8 byte makes the non-truncated all-eight-hit envelope
-    // exactly 32,769 bytes. The truncated/partial tentative form is two bytes
-    // smaller, so probing against that form would admit the hit and then throw.
-    const overflow = presentPrimarySourceSearchV4(boundaryPlan(119));
-    expect(overflow.responseWindow.truncated).toBe(true);
-    expect(overflow.planStatus).toBe('partial');
-    expect(overflow.queries[0]!.providers[0]!.hits).toHaveLength(7);
-    expect(new TextEncoder().encode(JSON.stringify(overflow)).byteLength).toBeLessThanOrEqual(32768);
+    const first = presentPrimarySourceSearchV5(boundaryPlan(118));
+    const second = presentPrimarySourceSearchV5(boundaryPlan(119));
+    for (const presented of [first, second]) {
+      expect(presented.responseWindow.maximum).toBe(32768);
+      expect(new TextEncoder().encode(JSON.stringify(presented)).byteLength).toBeLessThanOrEqual(20480);
+      for (const provider of presented.queries.flatMap(query => query.providers)) {
+        expect(provider.hitCount).toBe(provider.hits.length);
+        expect(provider.resultWindow.returnedHitCount).toBe(provider.hits.length);
+      }
+    }
   });
 
   it('uses stable query/provider order and rank order without leaking external routing fields', () => {
@@ -216,7 +212,7 @@ describe('primary-source v4 structured presentation', () => {
     plan.queries[0]!.providers[0]!.hits = [localHit('q2', 2), localHit('q2', 1)];
     plan.queries[0]!.providers[0]!.hitCount = 2;
     plan.queries[0]!.providers[0]!.resultWindow.returnedHitCount = 2;
-    const presented = presentPrimarySourceSearchV4(plan);
+    const presented = presentPrimarySourceSearchV5(plan);
     expect(presented.queries.map(query => query.id)).toEqual(['q2', 'q1']);
     expect(presented.queries[0]!.providers[0]!.hits.map(hit => hit.rankWithinProvider)).toEqual([1, 2]);
     expect(JSON.stringify(presented)).not.toContain('ccel_section');
@@ -237,7 +233,7 @@ describe('primary-source v4 structured presentation', () => {
     plan.queries = [query];
     plan.coverage.localHitCount = 1;
 
-    const presented = presentPrimarySourceSearchV4(plan);
+    const presented = presentPrimarySourceSearchV5(plan);
     const sanitized = presented.queries[0]!.providers[0]!.hits[0]!;
     expect(sanitized).not.toHaveProperty('author');
     expect(sanitized).not.toHaveProperty('sectionLabel');
@@ -258,7 +254,7 @@ describe('primary-source v4 structured presentation', () => {
     ];
     plan.coverage = { localAttempted: false, localHitCount: 0, ccelAttempted: true, ccelStatus: 'ok', ccelHitCount: 13, notices: [] };
 
-    const presented = presentPrimarySourceSearchV4(plan);
+    const presented = presentPrimarySourceSearchV5(plan);
     const externalProviders = presented.queries.flatMap(query => query.providers)
       .filter(provider => provider.provider === 'ccel_live');
     expect(externalProviders).toHaveLength(1);

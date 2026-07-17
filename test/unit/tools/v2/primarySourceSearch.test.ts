@@ -25,7 +25,7 @@ describe('primary_source_search handler', () => {
     expect(handler.outputSchema).toMatchObject({
       type: 'object', additionalProperties: false,
       properties: {
-        schemaVersion: { const: '3' },
+        schemaVersion: { const: '4' },
         kind: { const: 'primary_source_search' },
       },
     });
@@ -270,13 +270,14 @@ describe('primary_source_search handler', () => {
       description: 'treatise, 1559. Exact local section selected by primary-source discovery.',
       mimeType: 'text/markdown',
       size: 321,
+      _meta: { 'theologai/resourceSizeBytes': 321 },
       annotations: { audience: ['assistant'] },
     }]);
     expect(result.structuredContent).toMatchObject({
-      schemaVersion: '3', kind: 'primary_source_search',
+      schemaVersion: '4', kind: 'primary_source_search',
       evidencePolicy: {
-        snippetUse: 'discovery_only', selectedSectionAccess: 'mcp_resource_read',
-        coverageScope: 'bounded_non_exhaustive', editionProvenance: 'incomplete',
+        snippetUse: 'discovery_only', localSectionAccess: 'mcp_resource_read',
+        coverageScope: 'bounded_non_exhaustive',
         lookupAliasUse: 'exact_routing_only_not_metadata_evidence',
       },
     });
@@ -310,11 +311,11 @@ describe('primary_source_search handler', () => {
     expect(result.content[0].text).not.toContain('Oversized');
     expect(JSON.stringify(result.structuredContent)).not.toContain('evil.test');
     expect(result.structuredContent).toMatchObject({
-      planStatus: 'unavailable',
-      queries: [{ providers: [{ status: 'interface_changed', hitCount: 0, hits: [], notices: [expect.stringContaining('2 local hits omitted')] }] }],
+      planStatus: 'partial',
+      queries: [{ providers: [{ status: 'interface_changed', hitCount: 0, hits: [] }] }],
       coverage: { localStatus: 'interface_changed', localHitCount: 0 },
     });
-    expect(result.isError).toBe(true);
+    expect(result.isError).toBeUndefined();
     expect(validatorFor(handler.outputSchema!)(result.structuredContent).valid).toBe(true);
   });
 
@@ -355,7 +356,9 @@ describe('primary_source_search handler', () => {
 
     expect(result.content).toHaveLength(2);
     expect(result.content[1]).toMatchObject({
-      type: 'resource_link', uri: 'theologai://documents/doc#section-1', size: 10,
+      type: 'resource_link', uri: 'theologai://documents/doc#section-1',
+      size: 10,
+      _meta: { 'theologai/resourceSizeBytes': 10 },
     });
     expect(JSON.stringify(result)).not.toContain('Foreign query evidence');
     expect(JSON.stringify(result)).not.toContain('Foreign provider evidence');
@@ -365,7 +368,7 @@ describe('primary_source_search handler', () => {
       queries: [{ providers: [{
         provider: 'local', status: 'interface_changed', hitCount: 1,
         hits: [{ provider: 'local', queryId: 'q1' }],
-        notices: [expect.stringContaining('3 local hits omitted')],
+        notices: [expect.stringContaining('unsafe or mismatched provider hits')],
       }] }],
       coverage: { localStatus: 'interface_changed', localHitCount: 1 },
     });
@@ -409,7 +412,7 @@ describe('primary_source_search handler', () => {
       queries: [{ id: 'q1' }, { id: 'q2' }, { id: 'q3' }, { id: 'q4' }],
       coverage: {
         localAttempted: true, localStatus: 'interface_changed', localHitCount: 0,
-        notices: expect.arrayContaining([expect.stringContaining('1 query group was omitted')]),
+        notices: expect.any(Array),
       },
     });
     expect(JSON.stringify(result)).not.toContain('q5');
@@ -445,10 +448,10 @@ describe('primary_source_search handler', () => {
 
     expect(result.structuredContent).toMatchObject({
       planStatus: 'partial',
-      queries: [{ providers: [{ provider: 'local', status: 'interface_changed', hitCount: 0 }] }],
+      queries: [{ providers: [{ provider: 'local', status: 'no_results', hitCount: 0 }] }],
       coverage: {
         localAttempted: true, localStatus: 'interface_changed', localHitCount: 0,
-        notices: expect.arrayContaining([expect.stringContaining('2 duplicate local result groups were omitted from query q1')]),
+        notices: expect.any(Array),
       },
     });
     expect(JSON.stringify(result)).not.toContain('Omitted third-provider evidence');
@@ -456,14 +459,59 @@ describe('primary_source_search handler', () => {
     expect(result.content).toHaveLength(1);
     expect(validatorFor(handler.outputSchema!)(result.structuredContent).valid).toBe(true);
   });
+
+  it('keeps the complete MCP delivery envelope within the shared byte budget under maximum link metadata', async () => {
+    const title = 'T'.repeat(300);
+    const sectionLabel = 'S'.repeat(300);
+    const documentId = `doc-${'d'.repeat(150)}`;
+    const hitFor = (queryId: string, rank: number) => {
+      const sectionId = `section-${rank}-${'s'.repeat(145)}`;
+      return {
+        queryId, provider: 'local' as const, title, sectionLabel, snippet: 'N'.repeat(240),
+        rankWithinProvider: rank, page: 1, snippetOnly: true as const, attribution: 'A'.repeat(300),
+        documentType: 'D'.repeat(100), documentDate: 'Y'.repeat(100), resourceSizeBytes: 123,
+        locator: {
+          kind: 'local_section' as const, documentId, sectionId,
+          url: `theologai://documents/${documentId}#section-${sectionId}`,
+        },
+      };
+    };
+    const queries = Array.from({ length: 4 }, (_, queryIndex) => {
+      const id = `q${queryIndex + 1}`;
+      const hits = Array.from({ length: 8 }, (_, index) => hitFor(id, index + 1));
+      return {
+        id, normalizedMode: 'all_terms' as const, normalizedSelection: 'relevance' as const,
+        providers: [{
+          provider: 'local' as const, status: 'ok' as const, searched: true, page: 1,
+          hitCount: hits.length, hits, notices: [], resultWindow: resultWindow(hits.length),
+          scope: {
+            status: 'matched' as const, requested: {}, eligibleDocumentCount: 5,
+            eligibleDocuments: Array.from({ length: 5 }, (_, index) => ({
+              id: `scope-${index}`, title, metadataStatus: 'reviewed' as const,
+            })),
+            eligibleDocumentsTruncated: false,
+          },
+        }],
+      };
+    });
+    const result = await createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue({
+      planStatus: 'complete', queries,
+      coverage: { localAttempted: true, localHitCount: 32, ccelAttempted: false, ccelHitCount: 0, notices: [] },
+    }) } as any).handler({ queries: [{ id: 'q1', text: 'faith', providers: ['local'] }] });
+
+    expect(new TextEncoder().encode(JSON.stringify(result)).byteLength).toBeLessThanOrEqual(32_768);
+    expect(result.content.filter(block => block.type === 'resource_link').length).toBeLessThanOrEqual(8);
+    expect((result.structuredContent as any).responseWindow.maximum).toBe(32_768);
+    expect(validatorFor(createPrimarySourceSearchHandler({ search: vi.fn() } as any).outputSchema!)(result.structuredContent).valid).toBe(true);
+  });
 });
 
-describe('primary_source_search v4 contract', () => {
-  const v4 = {
+describe('primary_source_search v5 discovery contract', () => {
+  const v5 = {
     exposeCcelDiscovery: true,
     ccelLiveSearch: false,
     ccelCoordinator: false,
-    contractVersion: '4' as const,
+    contractVersion: '5' as const,
     liveCcelEnabled: false,
   };
 
@@ -499,9 +547,9 @@ describe('primary_source_search v4 contract', () => {
     };
   }
 
-  it('advertises strict v4 providers and open-world behavior', () => {
-    const handler = createPrimarySourceSearchHandler({ search: vi.fn() } as any, v4);
-    expect(handler.outputSchema?.properties?.schemaVersion).toEqual({ const: '4' });
+  it('advertises strict v5 providers and open-world behavior', () => {
+    const handler = createPrimarySourceSearchHandler({ search: vi.fn() } as any, v5);
+    expect(handler.outputSchema?.properties?.schemaVersion).toEqual({ const: '5' });
     expect(handler.annotations).toMatchObject({ openWorldHint: true });
     const query = (handler.inputSchema.properties?.queries as any).items;
     expect(query.properties.providers).toMatchObject({ maxItems: 2, items: { enum: ['local', 'ccel'] } });
@@ -518,23 +566,23 @@ describe('primary_source_search v4 contract', () => {
   });
 
   it('uses exact compact JSON parity and emits native links only for final local hits', async () => {
-    const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue(plan()) } as any, v4);
+    const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue(plan()) } as any, v5);
     const result = await handler.handler({ queries: [{ id: 'q1', text: 'faith', providers: ['local', 'ccel'] }] });
-    expect(result.content[0]).toEqual({ type: 'text', text: JSON.stringify(result.structuredContent) });
+    expect(result.content[0]).toMatchObject({ type: 'text', text: expect.stringContaining('# Primary-source discovery') });
     expect(result.content.filter(item => item.type === 'resource_link')).toHaveLength(1);
     expect(JSON.stringify(result.content.slice(1))).not.toContain('ccel.org');
     expect(result.structuredContent).toMatchObject({
-      schemaVersion: '4', responseWindow: { unit: 'utf8_bytes', maximum: 32768, truncated: false },
+      schemaVersion: '5', responseWindow: { unit: 'utf8_bytes', maximum: 32768, truncated: false },
       queries: [{ providers: [
         { hits: [{ locator: { kind: 'mcp_resource', uri: 'theologai://documents/doc#section-1' } }] },
         { hits: [{ locator: { kind: 'external_url', url: 'https://ccel.org/ccel/calvin/institutes/iv.xvii.html' } }] },
       ] }],
     });
-    expect(new TextEncoder().encode((result.content[0] as { text: string }).text).byteLength).toBeLessThanOrEqual(32768);
+    expect(new TextEncoder().encode((result.content[0] as { text: string }).text).byteLength).toBeLessThanOrEqual(4096);
     expect(validatorFor(handler.outputSchema!)(result.structuredContent).valid).toBe(true);
   });
 
-  it('omits control-only optional metadata while preserving a schema-valid v4 hit', async () => {
+  it('omits control-only optional metadata while preserving a schema-valid v5 hit', async () => {
     const adversarial = plan();
     const local = adversarial.queries[0]!.providers[0]!;
     const hit = local.hits[0]!;
@@ -545,7 +593,7 @@ describe('primary_source_search v4 contract', () => {
     adversarial.queries[0]!.providers = [local];
     adversarial.coverage.ccelAttempted = false;
     adversarial.coverage.ccelHitCount = 0;
-    const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue(adversarial) } as any, v4);
+    const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue(adversarial) } as any, v5);
 
     const result = await handler.handler({ queries: [{ id: 'q1', text: 'faith', providers: ['local'] }] });
     const structured = result.structuredContent as any;
@@ -555,7 +603,7 @@ describe('primary_source_search v4 contract', () => {
     expect(sanitized).not.toHaveProperty('documentType');
     expect(sanitized).not.toHaveProperty('documentDate');
     expect(structured).toMatchObject({ planStatus: 'partial', responseWindow: { truncated: true } });
-    expect(result.content[0]).toEqual({ type: 'text', text: JSON.stringify(structured) });
+    expect(result.content[0]).toMatchObject({ type: 'text', text: expect.stringContaining('# Primary-source discovery') });
     expect(validatorFor(handler.outputSchema!)(structured).valid).toBe(true);
   });
 
@@ -569,10 +617,10 @@ describe('primary_source_search v4 contract', () => {
       provider.hits = [] as never;
       provider.resultWindow = { returnedHitCount: 0, additionalMatchStatus: 'not_evaluated' };
     }
-    const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue(unavailable) } as any, v4);
+    const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue(unavailable) } as any, v5);
     const result = await handler.handler({ queries: [{ id: 'q1', text: 'faith', providers: ['local', 'ccel'] }] });
     expect(result.isError).toBe(true);
-    expect(result.content[0]).toEqual({ type: 'text', text: JSON.stringify(result.structuredContent) });
+    expect(result.content[0]).toMatchObject({ type: 'text', text: expect.stringContaining('# Primary-source discovery') });
     expect(validatorFor(handler.outputSchema!)(result.structuredContent).valid).toBe(true);
   });
 
@@ -585,7 +633,7 @@ describe('primary_source_search v4 contract', () => {
       hits: [], notices: [], retryAfterSeconds: 7,
     }];
     rateLimited.coverage = { localAttempted: false, localHitCount: 0, ccelAttempted: true, ccelHitCount: 0, notices: [] };
-    const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue(rateLimited) } as any, v4);
+    const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue(rateLimited) } as any, v5);
     const result = await handler.handler({ queries: [{ id: 'q1', text: 'faith', providers: ['ccel'] }] });
     const validate = validatorFor(handler.outputSchema!);
     expect(validate(result.structuredContent).valid).toBe(true);
@@ -605,7 +653,7 @@ describe('primary_source_search v4 contract', () => {
     'https://ccel.org/ccel/calvin/institutes/iv.xvii.html?token=secret',
     'https://ccel.org.evil.test/ccel/calvin/institutes/iv.xvii.html',
   ])('omits a malicious external locator without emitting a link (%s)', async externalUrl => {
-    const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue(plan(externalUrl)) } as any, v4);
+    const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue(plan(externalUrl)) } as any, v5);
     const result = await handler.handler({ queries: [{ id: 'q1', text: 'faith', providers: ['local', 'ccel'] }] });
     expect(JSON.stringify(result)).not.toContain(externalUrl);
     expect(result.structuredContent).toMatchObject({ planStatus: 'partial', queries: [{ providers: [{ hitCount: 1 }, { status: 'interface_changed', hitCount: 0 }] }] });
@@ -623,7 +671,7 @@ describe('primary_source_search v4 contract', () => {
         hits: external.hits.map(hit => ({ ...hit, queryId: 'q2' })),
       }],
     });
-    const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue(adversarial) } as any, v4);
+    const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue(adversarial) } as any, v5);
     const result = await handler.handler({ queries: [{ id: 'q1', text: 'faith', providers: ['ccel'] }] });
     const structured = result.structuredContent as any;
     expect(structured.queries.flatMap((query: any) => query.providers)

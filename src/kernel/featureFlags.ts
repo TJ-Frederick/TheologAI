@@ -1,7 +1,7 @@
 /**
  * One shared, non-secret contract and execution gate for primary-source search.
  *
- * Exposure selects the public v3/v4 application contract.  Live CCEL work is
+ * Exposure selects the public v4/v5 application contract.  Live CCEL work is
  * permitted only when all three switches are true; no caller should recreate
  * that predicate independently.
  */
@@ -10,7 +10,8 @@ export interface PrimarySourceContractConfig {
   exposeCcelDiscovery: boolean;
   ccelLiveSearch: boolean;
   ccelCoordinator: boolean;
-  contractVersion: '3' | '4';
+  /** v4 is hosted-local; v5 adds the separately gated CCEL discovery shape. */
+  contractVersion: '4' | '5';
   liveCcelEnabled: boolean;
 }
 
@@ -20,7 +21,7 @@ export const DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG: Readonly<PrimarySourceContr
   exposeCcelDiscovery: false,
   ccelLiveSearch: false,
   ccelCoordinator: false,
-  contractVersion: '3',
+  contractVersion: '4',
   liveCcelEnabled: false,
 });
 
@@ -46,7 +47,7 @@ export function readPrimarySourceContractConfig(
     exposeCcelDiscovery,
     ccelLiveSearch,
     ccelCoordinator,
-    contractVersion: exposeCcelDiscovery ? '4' : '3',
+    contractVersion: exposeCcelDiscovery ? '5' : '4',
     liveCcelEnabled: exposeCcelDiscovery && ccelLiveSearch && ccelCoordinator,
   };
 }

@@ -500,8 +500,8 @@ Code readiness and operational readiness are deliberately separate:
 - Historical public-domain text may be published when transcription provenance
   is uncertain, but that uncertainty must be disclosed; a third party's
   particular transcription is not assumed redistributable.
-- CCEL execution remains inactive. Preview exposes the v4 discovery contract
-  only; production remains v3/local-only. A future live discovery rollout
+- CCEL execution remains inactive. Preview exposes the v5 discovery contract
+  only; production remains v4/local-only. A future live discovery rollout
   requires the explicit owner policy decision above and separate review, and
   must not become crawling, catalog mirroring, body republication, or permanent
   storage. Date-fallback contract work does not change any rollout flag or

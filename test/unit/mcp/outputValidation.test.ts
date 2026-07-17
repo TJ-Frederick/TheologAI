@@ -17,8 +17,7 @@ import { createDeterministicMcpFixture } from '../../fixtures/mcpCompositionRoot
 import { DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG } from '../../../src/kernel/featureFlags.js';
 import { classicTextsOutputSchema } from '../../../src/mcp/schemas/classicTexts.js';
 import { validateClassicTextsOutputSemantics } from '../../../src/presenters/classicTextsStructured.js';
-import { primarySourceSearchOutputSchema } from '../../../src/mcp/schemas/primarySourceSearch.js';
-import { primarySourceSearchV4OutputSchema } from '../../../src/mcp/schemas/primarySourceSearchV4.js';
+import { primarySourceSearchV4OutputSchema, primarySourceSearchV5OutputSchema } from '../../../src/mcp/schemas/primarySourceSearchV4.js';
 
 const connected: Array<{ client: Client; server: Server }> = [];
 type LogMessage = { level: string; logger?: string; data: unknown };
@@ -68,14 +67,14 @@ describe('MCP structured output validation', () => {
   });
 
   it.each([
-    ['v3', primarySourceSearchOutputSchema],
     ['v4', primarySourceSearchV4OutputSchema],
+    ['v5', primarySourceSearchV5OutputSchema],
   ] as const)('accepts 100 eligible works and rejects 101 at the %s output-schema boundary', async (version, outputSchema) => {
     const structuredContent = (eligibleDocumentCount: number) => ({
-      schemaVersion: version === 'v3' ? '3' : '4',
+      schemaVersion: version === 'v4' ? '4' : '5',
       kind: 'primary_source_search',
       planStatus: 'complete',
-      ...(version === 'v4' ? { responseWindow: { unit: 'utf8_bytes', maximum: 32768, truncated: false } } : {}),
+      responseWindow: { unit: 'utf8_bytes', maximum: 32768, truncated: false },
       queries: [{
         id: 'q', normalizedMode: 'all_terms', normalizedSelection: 'relevance',
         providers: [{
@@ -90,18 +89,27 @@ describe('MCP structured output validation', () => {
       }],
       coverage: {
         localAttempted: true, localStatus: 'no_results', localHitCount: 0,
-        ...(version === 'v4' ? { ccelAttempted: false, ccelHitCount: 0 } : {}),
+        ...(version === 'v5' ? { ccelAttempted: false, ccelHitCount: 0 } : {}),
         notices: [],
+        serverObserved: { searched: [{ queryId: 'q', provider: 'local', status: 'no_results', returnedHitCount: 0 }], notSearched: [] },
       },
-      evidencePolicy: version === 'v4'
+      evidencePolicy: version === 'v5'
         ? {
           snippetUse: 'discovery_only', localSectionAccess: 'mcp_resource_read', externalSectionAccess: 'direct_url_only',
           coverageScope: 'bounded_non_exhaustive', externalRightsStatus: 'not_determined',
           lookupAliasUse: 'exact_routing_only_not_metadata_evidence',
+          coverageLedger: {
+            searched: 'server_observed_provider_execution', read: 'host_observed_successful_exact_resource_or_page_read',
+            deferred: 'host_recorded_intentional_deferral', notSearched: 'server_observed_provider_non_execution',
+          },
         }
         : {
-          snippetUse: 'discovery_only', selectedSectionAccess: 'mcp_resource_read', coverageScope: 'bounded_non_exhaustive',
-          editionProvenance: 'incomplete', lookupAliasUse: 'exact_routing_only_not_metadata_evidence',
+          snippetUse: 'discovery_only', localSectionAccess: 'mcp_resource_read', coverageScope: 'bounded_non_exhaustive',
+          lookupAliasUse: 'exact_routing_only_not_metadata_evidence',
+          coverageLedger: {
+            searched: 'server_observed_provider_execution', read: 'host_observed_successful_exact_resource_or_page_read',
+            deferred: 'host_recorded_intentional_deferral', notSearched: 'server_observed_provider_non_execution',
+          },
         },
     });
     let count = 100;
@@ -145,7 +153,8 @@ describe('MCP structured output validation', () => {
       const schema = listed.tools.find(tool => tool.name === toolName)?.outputSchema;
       expect(schema).toMatchObject({ type: 'object', additionalProperties: false });
       expect(schema).not.toHaveProperty('$ref');
-      const expectedVersion = toolName === 'primary_source_search' || toolName === 'parallel_passages' ? '3' : '1';
+      const expectedVersion = toolName === 'primary_source_search' ? '4'
+        : toolName === 'parallel_passages' ? '3' : '1';
       expect(schema?.properties?.schemaVersion).toMatchObject({ const: expectedVersion });
     }
   });
@@ -449,7 +458,7 @@ describe('MCP structured output validation', () => {
   it('accepts a v4 primary-source result after control-only optional metadata is omitted', async () => {
     const contract = {
       exposeCcelDiscovery: true, ccelLiveSearch: false, ccelCoordinator: false,
-      contractVersion: '4' as const, liveCcelEnabled: false,
+      contractVersion: '5' as const, liveCcelEnabled: false,
     };
     const handler = createPrimarySourceSearchHandler({
       search: async () => ({

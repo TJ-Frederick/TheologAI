@@ -183,23 +183,23 @@ describe('published project contract', () => {
     expect(readme).not.toMatch(/eighteen locally indexed|18 locally indexed/i);
     expect(readme).not.toMatch(/six public-domain commentar/i);
     expect(readme).toContain('do **not** currently fetch CCEL search results or document bodies');
-    expect(readme).toContain('production v3 schema remains strictly local-only');
-    expect(readme).toContain('Preview stages a hard v4');
+    expect(readme).toContain('production v4 schema remains strictly local-only');
+    expect(readme).toContain('Preview stages a hard v5');
     expect(readme).toContain('live search and coordinator execution remain disabled');
     expect(readme).toContain('before adapter');
     expect(readme).toContain('Durable Object lookup/RPC, or fetch');
     expect(readme).toContain('reconnect');
     expect(readme).toContain('reinitialize');
     expect(readme).toMatch(/keeps any requested year bounds on its local\s+queries/);
-    expect(readme).toMatch(/Direct v4 queries that combine CCEL with\s+either year field/);
+    expect(readme).toMatch(/Direct v5 queries that combine CCEL with\s+either year field/);
     expect(coordinatorGuide).toContain('Every executable unbounded CCEL provider result begins');
     expect(coordinatorGuide).toContain('A direct CCEL-bearing query with either');
     expect(roadmap).toContain('guided broad topical fallback');
     expect(roadmap).toContain('Direct CCEL-plus-year tool input remains fail-closed');
     const primarySourceToolRow = readme.split('\n')
       .find(line => line.startsWith('| `primary_source_search` |'));
-    expect(primarySourceToolRow).toContain('Production is v3/local-only');
-    expect(primarySourceToolRow).toContain('preview exposes the v4 local-plus-CCEL discovery contract');
+    expect(primarySourceToolRow).toContain('Production is v4/local-only');
+    expect(primarySourceToolRow).toContain('preview exposes the v5 local-plus-CCEL discovery contract');
     expect(primarySourceToolRow).toContain('execution remains disabled before adapter, coordinator, or fetch');
     const previewStart = workerConfig.indexOf('[env.preview]');
     expect(previewStart).toBeGreaterThan(0);

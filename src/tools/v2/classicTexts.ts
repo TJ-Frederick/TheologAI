@@ -149,6 +149,8 @@ function searchResourceLinks(hits: Array<{ section: SectionWithResource }>): Res
 }
 
 function resourceLink(locator: Locator, title: string, description: string): ResourceLink {
+  // The declared MCP SDK exposes standard Resource.size. Retain it at runtime
+  // even if a stale local SDK type definition omits the optional field.
   return {
     type: 'resource_link',
     uri: locator.uri,
@@ -157,8 +159,11 @@ function resourceLink(locator: Locator, title: string, description: string): Res
     description,
     mimeType: 'text/markdown',
     ...(locator.resourceSizeBytes === undefined ? {} : { size: locator.resourceSizeBytes }),
+    ...(locator.resourceSizeBytes === undefined
+      ? {}
+      : { _meta: { 'theologai/resourceSizeBytes': locator.resourceSizeBytes } }),
     annotations: { audience: ['assistant'] },
-  };
+  } as ResourceLink & { size?: number };
 }
 
 function validateMode(params: Record<string, unknown>): void {

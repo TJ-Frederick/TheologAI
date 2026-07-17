@@ -12,6 +12,20 @@ export const LOCAL_HISTORICAL_SOURCE = LOCAL_PRIMARY_SOURCE_ATTRIBUTION;
 
 const localSource = `*Source: ${LOCAL_HISTORICAL_SOURCE}*`;
 
+/**
+ * Current local bodies are retained for research continuity, but have not yet
+ * passed the per-edition review boundary introduced by the provenance
+ * foundation. Keep this disclosure with every exact resource a model may read.
+ */
+const editionReadinessDisclosure = [
+  '## Edition and provenance disclosure',
+  '',
+  'This hosted text is available for research, but this contract has not established its exact edition or transcription identity.',
+  '- Provenance review: incomplete.',
+  '- Exact-artifact redistribution rights: not established by this contract.',
+  '- Do not infer edition, transcription source, or republication permission from the historical work alone.',
+].join('\n');
+
 /** Canonical exact-section representation shared by resources/read and link sizing. */
 export function formatLocalDocumentSectionResource(doc: DocumentInfo, section: DocumentSection): string {
   const heading = section.title
@@ -25,6 +39,8 @@ export function formatLocalDocumentSectionResource(doc: DocumentInfo, section: D
     heading,
     '',
     section.content,
+    '',
+    editionReadinessDisclosure,
     '',
     localSource,
   ].filter(Boolean).join('\n');
@@ -46,6 +62,8 @@ export function formatLocalDocumentResource(doc: DocumentInfo, sections: Documen
     lines.push(section.content);
     lines.push('');
   }
+  lines.push(editionReadinessDisclosure);
+  lines.push('');
   lines.push(localSource);
   return lines.filter(Boolean).join('\n');
 }
