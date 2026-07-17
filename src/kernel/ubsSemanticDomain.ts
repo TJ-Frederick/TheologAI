@@ -9,8 +9,88 @@
 export type UbsSemanticLanguage = 'Hebrew';
 export type UbsSemanticPublicLanguage = 'Hebrew';
 export type UbsLexicalIdentityPrefix = 'H' | 'A';
+declare const UBS_INTERNAL_LEXICAL_IDENTITY: unique symbol;
+/** Source/internal identity. A#### never crosses the future public boundary. */
+export type UbsInternalLexicalIdentity = (`${UbsLexicalIdentityPrefix}${string}` & {
+  readonly [UBS_INTERNAL_LEXICAL_IDENTITY]: true;
+});
+export type UbsInternalHebrewLexicalIdentity = UbsInternalLexicalIdentity & `H${string}`;
+/** Existing user-facing Strong's grammar remains unpadded (for example H430). */
+export type UbsPublicHebrewStrongs = `H${number}`;
 export const UBS_SEMANTIC_ARTIFACT_VERSION = '0.9.2' as const;
 export const UBS_SEMANTIC_TRANSFORM_VERSION = 7 as const;
+export const UBS_SEMANTIC_CURSOR_MAX_LENGTH = 4096;
+export const UBS_SEMANTIC_NORMALIZED_REFERENCE_MAX_CHARACTERS = 100;
+
+export const UBS_SEMANTIC_DRAFT_OUTPUT_LIMITS = Object.freeze({
+  responseBytes: 32 * 1024,
+  plainLanguageCharacters: 2_000,
+  definitionCharacters: 20_000,
+  glossCharacters: 1_000,
+  glossesPerSense: 16,
+  domainsPerSense: 16,
+  candidatesPerResponse: 8,
+  identifierCharacters: 128,
+  referenceCharacters: UBS_SEMANTIC_NORMALIZED_REFERENCE_MAX_CHARACTERS,
+  sourceUrlCharacters: 1_000,
+  modificationDescriptionCharacters: 1_000,
+} as const);
+
+export interface UbsPublicHebrewIdentityBoundary {
+  publicStrongs: UbsPublicHebrewStrongs;
+  sourceIdentity: UbsInternalHebrewLexicalIdentity;
+}
+
+/**
+ * Map the existing public Strong's grammar to the fixed-width UBS source key.
+ * This is deliberately Hebrew-only, suffix-free, and limited to the source's
+ * four decimal digits. It does not broaden the shared public Strong's parser.
+ */
+export function parseUbsPublicHebrewIdentity(input: string): UbsPublicHebrewIdentityBoundary | undefined {
+  const match = /^H([0-9]{1,4})$/i.exec(input.trim());
+  if (!match) return undefined;
+  const number = Number(match[1]);
+  if (!Number.isSafeInteger(number) || number < 1) return undefined;
+  return {
+    publicStrongs: `H${number}` as UbsPublicHebrewStrongs,
+    sourceIdentity: requireUbsInternalLexicalIdentity(
+      `H${String(number).padStart(4, '0')}`,
+    ) as UbsInternalHebrewLexicalIdentity,
+  };
+}
+
+export function isUbsInternalLexicalIdentity(value: string): value is UbsInternalLexicalIdentity {
+  return /^[HA](?!0000$)[0-9]{4}$/.test(value);
+}
+
+/** Fail-closed constructor used before an untrusted identity reaches a repository. */
+export function requireUbsInternalLexicalIdentity(value: string): UbsInternalLexicalIdentity {
+  if (!isUbsInternalLexicalIdentity(value)) {
+    throw new Error('UBS semantic repository identity must be a canonical fixed-width H#### or A#### source identity');
+  }
+  return value;
+}
+
+/** Shared fail-closed boundary for every normalized-reference seam. */
+export function requireUbsSemanticNormalizedReference(value: unknown, label = 'UBS semantic normalized reference'): string {
+  if (typeof value !== 'string'
+    || !value
+    || value !== value.trim()
+    || [...value].length > UBS_SEMANTIC_NORMALIZED_REFERENCE_MAX_CHARACTERS
+    || value !== value.normalize('NFC')) {
+    throw new Error(`${label} must be non-empty, trimmed, NFC, and at most ${UBS_SEMANTIC_NORMALIZED_REFERENCE_MAX_CHARACTERS} Unicode characters`);
+  }
+  if (/[\p{Cc}\p{Cf}\p{Cs}\p{Zl}\p{Zp}]/u.test(value)) {
+    throw new Error(`${label} contains a forbidden control, format, bidi, line-separator, or non-scalar character`);
+  }
+  for (const character of value) {
+    const codePoint = character.codePointAt(0)!;
+    if ((codePoint >= 0xfdd0 && codePoint <= 0xfdef) || (codePoint & 0xffff) >= 0xfffe) {
+      throw new Error(`${label} contains a forbidden Unicode noncharacter`);
+    }
+  }
+  return value;
+}
 
 interface UbsSemanticSourceCommonProvenance {
   sourceId: string;
@@ -47,7 +127,7 @@ export interface UbsSemanticEntry {
   transliteration?: string;
   partOfSpeech?: string;
   /** One Hebrew source entry can retain multiple H#### and/or A#### identities. */
-  lexicalIdentities: string[];
+  lexicalIdentities: UbsInternalLexicalIdentity[];
 }
 
 export interface UbsSemanticSense {
@@ -111,6 +191,8 @@ export interface UbsSemanticRepositoryCollection<
   items: T[];
   total: number;
   showing: number;
+  priorShowing: number;
+  consumed: number;
   hasMore: boolean;
   nextCursor?: string;
   order: Order;
@@ -126,30 +208,49 @@ export function createUbsSemanticRepositoryCollection<
   total: number,
   order: Order,
   limit: Limit,
-  continuation?: {
-    nextCursor: string;
-    operation: UbsSemanticPaginatedOperation;
-    artifactIdentity: string;
-    queryScope: readonly string[];
+  page: {
+    /** Number of rows returned by all preceding pages for this exact query. */
+    priorShowing: number;
+    continuation?: {
+      nextCursor: string;
+      operation: UbsSemanticPaginatedOperation;
+      artifactIdentity: string;
+      queryScope: readonly string[];
+    };
   },
 ): UbsSemanticRepositoryCollection<T, Order, Limit> {
   if (!Number.isSafeInteger(limit) || limit <= 0) throw new Error('UBS semantic repository limit must be a positive safe integer');
   if (items.length > limit) throw new Error(`UBS semantic repository returned ${items.length} items above its ${limit}-item cap`);
-  if (!Number.isSafeInteger(total) || total < items.length) {
-    throw new Error('UBS semantic repository total must be a safe integer at least as large as the returned window');
+  if (!Number.isSafeInteger(total) || total < 0) {
+    throw new Error('UBS semantic repository total must be a non-negative safe integer');
+  }
+  if (!Number.isSafeInteger(page.priorShowing) || page.priorShowing < 0) {
+    throw new Error('UBS semantic repository priorShowing must be a non-negative safe integer');
+  }
+  const consumed = page.priorShowing + items.length;
+  if (!Number.isSafeInteger(consumed) || consumed > total) {
+    throw new Error('UBS semantic repository prior and current windows cannot exceed total matches');
+  }
+  const hasMore = consumed < total;
+  const continuation = page.continuation;
+  if (hasMore !== (continuation !== undefined)) {
+    throw new Error('UBS semantic repository continuation must be present if and only if more matches remain');
   }
   if (continuation !== undefined) {
-    if (total <= items.length) throw new Error('UBS semantic repository continuation requires more total matches than the returned page');
     if (CURSOR_OPERATION_CONTRACT[continuation.operation].order !== order) {
       throw new Error('UBS semantic cursor operation does not match the collection order');
     }
-    parseUbsSemanticCursor(
+    const parsedContinuation = parseUbsSemanticCursor(
       continuation.nextCursor, continuation.operation, continuation.artifactIdentity, continuation.queryScope,
     );
+    if (parsedContinuation.priorShowing !== consumed) {
+      throw new Error('UBS semantic continuation prior position must equal the consumed result count');
+    }
     if (items.length === 0) throw new Error('UBS semantic repository cannot continue an empty page');
   }
   return {
-    items: [...items], total, showing: items.length, hasMore: continuation !== undefined, order, limit,
+    items: [...items], total, showing: items.length, priorShowing: page.priorShowing,
+    consumed, hasMore, order, limit,
     ...(continuation === undefined ? {} : { nextCursor: continuation.nextCursor }),
   };
 }
@@ -179,13 +280,17 @@ export function createUbsSemanticCursor(
   artifactIdentity: string,
   queryScope: readonly string[],
   keyset: readonly string[],
+  priorShowing: number,
 ): string {
   const contract = CURSOR_OPERATION_CONTRACT[operation];
   validateArtifactIdentity(artifactIdentity);
   validateOperationCursorValues(operation, queryScope, keyset);
-  const payload = JSON.stringify({ version: 1, operation, order: contract.order, artifactIdentity, queryScope, keyset });
+  validateCursorPriorShowing(priorShowing);
+  const payload = JSON.stringify({
+    version: 1, operation, order: contract.order, artifactIdentity, queryScope, keyset, priorShowing,
+  });
   const cursor = `ubs1_${[...new TextEncoder().encode(payload)].map(byte => byte.toString(16).padStart(2, '0')).join('')}`;
-  if (cursor.length > 4096) throw new Error('UBS semantic cursor exceeds the 4096-character limit');
+  if (cursor.length > UBS_SEMANTIC_CURSOR_MAX_LENGTH) throw new Error('UBS semantic cursor exceeds the 4096-character limit');
   return cursor;
 }
 
@@ -194,9 +299,9 @@ export function parseUbsSemanticCursor(
   expectedOperation: UbsSemanticPaginatedOperation,
   expectedArtifactIdentity: string,
   expectedQueryScope: readonly string[],
-): string[] {
+): { keyset: string[]; priorShowing: number } {
   validateArtifactIdentity(expectedArtifactIdentity);
-  if (cursor.length > 4096) throw new Error('UBS semantic cursor exceeds the 4096-character limit');
+  if (cursor.length > UBS_SEMANTIC_CURSOR_MAX_LENGTH) throw new Error('UBS semantic cursor exceeds the 4096-character limit');
   if (!/^ubs1_(?:[0-9a-f]{2})+$/.test(cursor)) throw new Error('UBS semantic cursor has an invalid encoding');
   const bytes = cursor.slice(5).match(/../g)!.map(byte => Number.parseInt(byte, 16));
   let value: unknown;
@@ -208,26 +313,38 @@ export function parseUbsSemanticCursor(
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('UBS semantic cursor payload must be an object');
   const record = value as Record<string, unknown>;
   const contract = CURSOR_OPERATION_CONTRACT[expectedOperation];
-  if (JSON.stringify(Object.keys(record)) !== JSON.stringify(['version', 'operation', 'order', 'artifactIdentity', 'queryScope', 'keyset'])
+  if (JSON.stringify(Object.keys(record)) !== JSON.stringify([
+    'version', 'operation', 'order', 'artifactIdentity', 'queryScope', 'keyset', 'priorShowing',
+  ])
     || record.version !== 1 || record.operation !== expectedOperation || record.order !== contract.order
     || record.artifactIdentity !== expectedArtifactIdentity
     || !Array.isArray(record.queryScope) || !Array.isArray(record.keyset)) {
     throw new Error('UBS semantic cursor does not match the requested operation or semantic artifact');
   }
   validateOperationCursorValues(expectedOperation, record.queryScope, record.keyset);
+  validateCursorPriorShowing(record.priorShowing);
   if (JSON.stringify(record.queryScope) !== JSON.stringify(expectedQueryScope)) {
     throw new Error('UBS semantic cursor does not match the requested query scope');
   }
   const keyset = record.keyset as string[];
-  if (createUbsSemanticCursor(expectedOperation, expectedArtifactIdentity, expectedQueryScope, keyset) !== cursor) {
+  const priorShowing = record.priorShowing as number;
+  if (createUbsSemanticCursor(
+    expectedOperation, expectedArtifactIdentity, expectedQueryScope, keyset, priorShowing,
+  ) !== cursor) {
     throw new Error('UBS semantic cursor is not canonical');
   }
-  return [...keyset];
+  return { keyset: [...keyset], priorShowing };
+}
+
+function validateCursorPriorShowing(value: unknown): asserts value is number {
+  if (!Number.isSafeInteger(value) || (value as number) <= 0) {
+    throw new Error('UBS semantic cursor priorShowing must be a positive safe integer');
+  }
 }
 
 function validateCursorValues(values: readonly unknown[], expectedArity: number, label: string): asserts values is string[] {
   if (values.length !== expectedArity || values.some(value => typeof value !== 'string'
-    || !value || value !== value.trim() || value.length > 512 || /[\u0000-\u001f\u007f]/.test(value))) {
+    || !value || value !== value.trim() || value.length > 512)) {
     throw new Error(`UBS semantic cursor ${label} must contain exactly ${expectedArity} bounded canonical values`);
   }
 }
@@ -252,11 +369,10 @@ function validateOperationCursorValues(
       throw new Error('UBS semantic cursor ordinal is not a canonical positive decimal');
     }
   };
-  const reference = (value: string): void => {
-    if (value !== value.normalize('NFC')) throw new Error('UBS semantic cursor normalized reference must be NFC');
-  };
   if (operation === 'getEntriesByLexicalIdentity') {
-    if (!/^H(?!0000$)[0-9]{4}$/.test(queryScope[0]!)) throw new Error('UBS semantic cursor requires a canonical H#### identity');
+    if (!isUbsInternalLexicalIdentity(queryScope[0]!)) {
+      throw new Error('UBS semantic internal cursor requires a canonical H#### or A#### source identity');
+    }
     id(keyset[0] as string, 'source ID'); ordinal(keyset[1] as string); id(keyset[2] as string, 'entry ID');
   } else if (operation === 'getSensesForEntry') {
     id(queryScope[0]!, 'source ID'); id(queryScope[1]!, 'entry ID');
@@ -266,7 +382,9 @@ function validateOperationCursorValues(
     ordinal(keyset[0] as string); id(keyset[1] as string, 'domain ID');
   } else {
     id(queryScope[0]!, 'source ID'); id(queryScope[1]!, 'sense ID');
-    if (operation === 'findReferenceEvidence') reference(queryScope[2]!);
+    if (operation === 'findReferenceEvidence') {
+      requireUbsSemanticNormalizedReference(queryScope[2], 'UBS semantic cursor normalized reference');
+    }
     ordinal(keyset[0] as string); id(keyset[1] as string, 'evidence ID');
   }
 }
@@ -279,7 +397,7 @@ function validateOperationCursorValues(
 export interface IUbsSemanticRepository {
   getSource(sourceId: string): Promise<UbsSemanticSource | undefined>;
   getEntry(sourceId: string, entryId: string): Promise<UbsSemanticEntry | undefined>;
-  getEntriesByLexicalIdentity(identity: string, page?: UbsSemanticPageRequest): Promise<UbsSemanticRepositoryCollection<
+  getEntriesByLexicalIdentity(identity: UbsInternalLexicalIdentity, page?: UbsSemanticPageRequest): Promise<UbsSemanticRepositoryCollection<
     UbsSemanticEntry,
     typeof UBS_SEMANTIC_REPOSITORY_ORDER.entriesByLexicalIdentity,
     typeof UBS_SEMANTIC_REPOSITORY_LIMITS.entriesByLexicalIdentity
@@ -320,7 +438,8 @@ export interface UbsLexicalSenseCandidate {
 
 export type UbsSemanticResolution =
   | {
-      status: 'exact_context';
+      /** A source candidate is attested at the reference and aligned locally; it is not an adjudicated meaning. */
+      status: 'reference_aligned_source_candidate';
       sense: UbsSemanticSense;
       domains: UbsSemanticDomain[];
       referenceEvidence: UbsSemanticReferenceEvidence;
