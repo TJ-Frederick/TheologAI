@@ -291,6 +291,11 @@ Requirements:
 - npm.
 - `sqlite3` for the D1 seed export/import workflow.
 
+This repository declares npm publication unsupported (`package.json` sets
+`"private": true`): it is run from a Git checkout or deployed to Cloudflare,
+not published as an npm package. `npm pack` remains an unmanaged diagnostic
+only; it is not a supported distribution artifact.
+
 ```bash
 npm ci
 npm run data:verify-sources
