@@ -4,6 +4,8 @@ This directory is an offline, migration-inert preparation area. Nothing here is 
 
 `SOURCE_LOCK.json` is the immutable acquisition lock. It records exact official URLs, local paths, byte counts, SHA-256 hashes, edition/translator evidence, rights evidence, territorial caveats, and the Project Gutenberg transformation notice relevant to PG19950. The raw sources remain in their provider-specific directories. `NORMALIZATION_REPORT.json` and the three `*.sections.json` files are deterministic derived artifacts; each derived artifact is explicitly `inactive` and `sectioned_only`.
 
+The 20 artifact references in `SOURCE_LOCK.json` resolve to 18 unique local provider artifacts because the Project Gutenberg license is shared by the three Gutenberg candidates. Each of those exact 18 paths is marked `-text` in the root `.gitattributes`. This prevents `core.autocrlf` and other Git text conversion from changing raw line endings or whitespace on another platform: even a whitespace-only change would invalidate the recorded source SHA-256 and blur the boundary between the acquired source and the explicit offline normalization step. The derived JSON preparation outputs intentionally remain ordinary text files.
+
 The normalizer performs no network access. It verifies every locked artifact before compiling, uses fatal UTF-8 decoding, rejects BOM, NUL, replacement characters, and lone carriage returns, changes CRLF to LF, removes only the Project Gutenberg START/END marker lines and their adjacent wrapper blank lines, preserves whitespace at internal section boundaries, and performs no spelling, punctuation, citation, or vocabulary modernization.
 
 Prepared scopes:

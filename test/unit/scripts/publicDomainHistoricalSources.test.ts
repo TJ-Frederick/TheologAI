@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -12,6 +13,7 @@ import {
   buildAll,
   parseSourceLock,
   serializeArtifact,
+  sha256,
   strictUtf8,
 } from '../../../scripts/prepare-public-domain-historical-sources.js';
 
@@ -67,6 +69,62 @@ function filesBelow(path: string): string[] {
 }
 
 describe('public-domain historical source preparation', () => {
+  it('preserves every byte-locked provider artifact in both Git and the working tree', () => {
+    const uniqueArtifacts = new Map(
+      EXPECTED_SOURCE_LOCK.candidates
+        .flatMap(candidate => candidate.artifacts)
+        .map(artifact => [artifact.localPath, artifact]),
+    );
+    expect(EXPECTED_SOURCE_LOCK.candidates.flatMap(candidate => candidate.artifacts)).toHaveLength(20);
+    expect(uniqueArtifacts.size).toBe(18);
+
+    for (const artifact of uniqueArtifacts.values()) {
+      const attribute = execFileSync('git', ['check-attr', 'text', '--', artifact.localPath], {
+        cwd: root,
+        encoding: 'utf8',
+      });
+      expect(attribute).toBe(`${artifact.localPath}: text: unset\n`);
+
+      const trackedBlob = execFileSync('git', ['show', `:${artifact.localPath}`], {
+        cwd: root,
+        maxBuffer: 16 * 1024 * 1024,
+      });
+      const workingTreeBytes = readFileSync(resolve(root, artifact.localPath));
+      expect(trackedBlob.byteLength).toBe(artifact.bytes);
+      expect(sha256(trackedBlob)).toBe(artifact.sha256);
+      expect(workingTreeBytes.byteLength).toBe(artifact.bytes);
+      expect(sha256(workingTreeBytes)).toBe(artifact.sha256);
+      expect(workingTreeBytes.equals(trackedBlob)).toBe(true);
+    }
+
+    // The page-audit protection must name the two reviewed images exactly,
+    // rather than silently applying to a future sibling image.
+    const unreviewedSibling = 'data/historical-sources/internet-archive/a566189200cypruoft/page-audit/unreviewed-sibling.jpg';
+    const siblingAttribute = execFileSync('git', ['check-attr', 'text', '--', unreviewedSibling], {
+      cwd: root,
+      encoding: 'utf8',
+    });
+    expect(siblingAttribute).toBe(`${unreviewedSibling}: text: unspecified\n`);
+
+    // The lock and compiler outputs are derived text, not acquired evidence.
+    // Keep the safeguard narrow enough that normal repository text handling
+    // still applies to them and to the implementation itself.
+    for (const derivedPath of [
+      'data/historical-sources/public-domain-prep/SOURCE_LOCK.json',
+      'data/historical-sources/public-domain-prep/NORMALIZATION_REPORT.json',
+      'data/historical-sources/public-domain-prep/calvin-john-allen-sixth-american.sections.json',
+      'data/historical-sources/public-domain-prep/aquinas-tertia-pars-q73-q83.sections.json',
+      'data/historical-sources/public-domain-prep/augustine-confessions-pusey.sections.json',
+      'scripts/prepare-public-domain-historical-sources.ts',
+    ]) {
+      const attribute = execFileSync('git', ['check-attr', 'text', '--', derivedPath], {
+        cwd: root,
+        encoding: 'utf8',
+      });
+      expect(attribute).toBe(`${derivedPath}: text: unspecified\n`);
+    }
+  });
+
   it('accepts only the exact closed-schema acquisition lock', () => {
     const locked = JSON.parse(readFileSync(resolve(prep, 'SOURCE_LOCK.json'), 'utf8'));
     expect(parseSourceLock(locked)).toEqual(EXPECTED_SOURCE_LOCK);

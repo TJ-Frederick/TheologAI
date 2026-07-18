@@ -1,2 +1,25 @@
 # Wrangler's generated declaration file contains upstream formatting whitespace.
 worker-configuration.d.ts -whitespace
+
+# The lock has 20 artifact references to 18 unique provider artifacts because
+# the Project Gutenberg license is shared. These are the exact acquired paths.
+# Keep the exact acquired bytes: core.autocrlf or any text normalization would
+# change their source-lock SHA-256. Derived preparation JSON intentionally remains text.
+data/historical-sources/project-gutenberg/pg45001/pg45001.txt -text
+data/historical-sources/project-gutenberg/pg45001/pg45001.rdf -text
+data/historical-sources/project-gutenberg/pg64392/pg64392.txt -text
+data/historical-sources/project-gutenberg/pg64392/pg64392.rdf -text
+data/historical-sources/project-gutenberg/pg19950/pg19950.txt -text
+data/historical-sources/project-gutenberg/pg19950/pg19950.rdf -text
+data/historical-sources/project-gutenberg/pg3296/pg3296.txt -text
+data/historical-sources/project-gutenberg/pg3296/pg3296.rdf -text
+data/historical-sources/project-gutenberg/shared/license.html -text
+data/historical-sources/internet-archive/a566189200cypruoft/metadata.json -text
+data/historical-sources/internet-archive/a566189200cypruoft/a566189200cypruoft_djvu.txt -text
+data/historical-sources/internet-archive/a566189200cypruoft/a566189200cypruoft_djvu.xml -text
+data/historical-sources/internet-archive/a566189200cypruoft/a566189200cypruoft_marc.xml -text
+data/historical-sources/internet-archive/a566189200cypruoft/a566189200cypruoft_meta.xml -text
+data/historical-sources/internet-archive/a566189200cypruoft/scandata.xml -text
+data/historical-sources/internet-archive/a566189200cypruoft/publicdomain-license.html -text
+data/historical-sources/internet-archive/a566189200cypruoft/page-audit/leaf-0007-series-title.jpg -text
+data/historical-sources/internet-archive/a566189200cypruoft/page-audit/leaf-0013-work-title.jpg -text
