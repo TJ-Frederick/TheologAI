@@ -1,15 +1,19 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { normalizeCcelSectionLocator } from '../src/adapters/commentary/CcelSearchAdapter.js';
+import { CCEL_UPSTREAM_TERMINAL_ATTEMPT_LIMIT, type CcelCoordinatorSnapshot } from '../src/services/historical/CcelUpstreamCoordinator.js';
+import { runOperatorRequest } from './ccel-coordinator-operator.js';
 
 export const LIVE_AUDIT_CONFIRMATION = 'I AUTHORIZE TWO LIVE CCEL PREVIEW REQUESTS';
 const PREVIEW_URL = 'https://preview-mcp.theologai.xyz/mcp';
 const PRODUCTION_URL = 'https://mcp.theologai.xyz/mcp';
+const PRODUCTION_OPERATOR_ENDPOINT = 'https://mcp.theologai.xyz/internal/ccel-coordinator';
 
 export interface CcelAuditOptions {
   previewUrl: string;
   productionUrl: string;
   authorization: string;
+  productionWorkerVersionId: string;
 }
 
 export function parseCcelAuditArgs(argv: string[]): CcelAuditOptions {
@@ -19,17 +23,20 @@ export function parseCcelAuditArgs(argv: string[]): CcelAuditOptions {
     if (!key?.startsWith('--') || value === undefined || values.has(key)) throw new Error('Invalid audit arguments.');
     values.set(key, value);
   }
-  if ([...values.keys()].some(key => !['--preview-url', '--production-url', '--authorize-live-ccel'].includes(key))) {
+  if ([...values.keys()].some(key => ![
+    '--preview-url', '--production-url', '--authorize-live-ccel', '--production-worker-version-id',
+  ].includes(key))) {
     throw new Error('Unknown audit argument.');
   }
   const options = {
     previewUrl: values.get('--preview-url') ?? '',
     productionUrl: values.get('--production-url') ?? '',
     authorization: values.get('--authorize-live-ccel') ?? '',
+    productionWorkerVersionId: values.get('--production-worker-version-id') ?? '',
   };
   if (options.previewUrl !== PREVIEW_URL || options.productionUrl !== PRODUCTION_URL
-    || options.authorization !== LIVE_AUDIT_CONFIRMATION) {
-    throw new Error('Live audit remains inert without the exact canonical URLs and authorization phrase.');
+    || options.authorization !== LIVE_AUDIT_CONFIRMATION || !isUuid(options.productionWorkerVersionId)) {
+    throw new Error('Live audit remains inert without canonical URLs, the exact authorization phrase, and a valid production Worker UUID.');
   }
   return options;
 }
@@ -94,6 +101,9 @@ export interface CcelAuditClient {
 
 export interface CcelAuditDependencies {
   connect?: (url: string, name: string) => Promise<CcelAuditClient>;
+  /** Existing protected operator route; never receives or returns provider content. */
+  snapshotCoordinator?: () => Promise<CcelCoordinatorSnapshot>;
+  now?: () => number;
 }
 
 class CcelCallBudget {
@@ -113,6 +123,9 @@ class CcelCallBudget {
 
 export async function runCcelPreviewAudit(options: CcelAuditOptions, dependencies: CcelAuditDependencies = {}) {
   const connectClient = dependencies.connect ?? connect;
+  const snapshotCoordinator = dependencies.snapshotCoordinator
+    ?? (() => readProtectedCoordinatorSnapshot(options.productionWorkerVersionId));
+  const now = dependencies.now ?? Date.now;
   const production = await connectClient(options.productionUrl, 'theologai-ccel-production-control');
   const preview = await connectClient(options.previewUrl, 'theologai-ccel-preview-audit');
   const ccelBudget = new CcelCallBudget(2);
@@ -128,6 +141,12 @@ export async function runCcelPreviewAudit(options: CcelAuditOptions, dependencie
       && schemaContainsConst(previewSchema, 'ccel_live')
       && schemaContainsProperty(previewSchema, 'retryAfterSeconds'), 'preview v5 CCEL contract');
 
+    // These are public-contract proofs before any tool call. The protected
+    // snapshot adds only content-free coordinator evidence; it never reserves
+    // an origin slot or changes the circuit.
+    const preSnapshot = await readAuditSnapshot(snapshotCoordinator, 'pre');
+    assertCanaryReady(preSnapshot, now());
+
     // Exactly two concurrent CCEL-only calls exercise the one global Durable
     // Object budget without relying on process-local cache affinity or elapsed
     // wall time. One may be admitted; the other must receive structured busy.
@@ -142,6 +161,8 @@ export async function runCcelPreviewAudit(options: CcelAuditOptions, dependencie
     for (const output of contenders) assertValidV5Envelope(output);
     assertValidExternalDiscovery(provider(cold[0]!, 'ccel_live')!);
     assertValidRateLimited(provider(busy[0]!, 'ccel_live')!);
+    const postSnapshot = await readAuditSnapshot(snapshotCoordinator, 'post');
+    const coordinator = assertCanaryDelta(preSnapshot, postSnapshot);
 
     // Local search is deliberately separate and cannot consume an origin slot.
     const local = await search(preview, ccelBudget, 'audit-local-fallback', 'justification', ['local']);
@@ -151,17 +172,112 @@ export async function runCcelPreviewAudit(options: CcelAuditOptions, dependencie
 
     return {
       schemaVersion: '1', audit: 'ccel-live-preview', passed: true,
-      productionControl: { contractVersion: '4', liveCallMade: false },
+      productionControl: {
+        contractVersionObserved: '4', discoverySchemaObserved: 'local_only', toolsListCalls: 1,
+        protectedSnapshotReads: 2, toolCallInvocations: 0,
+      },
       preview: {
-        contractVersion: '5', ccelBearingToolCallMaximum: 2, upstreamOriginAdmissionMaximum: 2,
+        contractVersionObserved: '5', discoverySchemaObserved: 'ccel_exposed', ccelBearingToolCallMaximum: 2,
+        upstreamOriginAdmissionObserved: coordinator.delta.admissionCount,
         statuses: [...contenders, local].map(summarize),
       },
-      privacy: 'No query, title, snippet, content, URL, header, or client identity is retained.',
+      coordinator,
+      privacy: 'No query, title, snippet, content, URL, header, token, nonce, or client identity is retained.',
     };
   } finally {
     await production.close().catch(() => undefined);
     await preview.close().catch(() => undefined);
   }
+}
+
+async function readAuditSnapshot(
+  snapshotCoordinator: () => Promise<CcelCoordinatorSnapshot>,
+  phase: 'pre' | 'post',
+): Promise<CcelCoordinatorSnapshot> {
+  try {
+    return await snapshotCoordinator();
+  } catch {
+    throw new Error(`Audit failed: protected coordinator ${phase}-snapshot unavailable.`);
+  }
+}
+
+async function readProtectedCoordinatorSnapshot(workerVersionId: string): Promise<CcelCoordinatorSnapshot> {
+  const secret = process.env.THEOLOGAI_CCEL_OPERATOR_TOKEN ?? '';
+  const response = await runOperatorRequest({
+    endpoint: PRODUCTION_OPERATOR_ENDPOINT,
+    action: 'snapshot',
+    workerVersionId,
+  }, secret);
+  const snapshot = (response as { snapshot?: unknown }).snapshot;
+  if (!isCoordinatorSnapshot(snapshot)) throw new Error('Audit failed: protected coordinator snapshot was malformed.');
+  return snapshot;
+}
+
+function assertCanaryReady(snapshot: CcelCoordinatorSnapshot, observedAtMs: number): void {
+  assert(isCoordinatorSnapshot(snapshot), 'protected coordinator pre-snapshot shape');
+  assert(Number.isSafeInteger(observedAtMs) && observedAtMs >= 0, 'safe audit clock');
+  assert(snapshot.state === 'closed'
+    && snapshot.transientFailures === 0
+    && snapshot.backoffUntilMs === 0
+    && snapshot.probeInFlight === false
+    && snapshot.probeLeaseUntilMs === 0
+    && snapshot.nextAllowedAtMs <= observedAtMs
+    && snapshot.terminalAttemptCount <= CCEL_UPSTREAM_TERMINAL_ATTEMPT_LIMIT
+    && snapshot.terminalRetiredThroughAttemptId === snapshot.attemptSequence,
+  'clean coordinator precondition');
+}
+
+function assertCanaryDelta(pre: CcelCoordinatorSnapshot, post: CcelCoordinatorSnapshot) {
+  assert(isCoordinatorSnapshot(post), 'protected coordinator post-snapshot shape');
+  const admissionCount = post.attemptSequence - pre.attemptSequence;
+  const terminalOutcomeCount = post.terminalAttemptCount - pre.terminalAttemptCount;
+  const terminalRetirementCount = post.terminalRetiredThroughAttemptId - pre.terminalRetiredThroughAttemptId;
+  const expectedTerminalOutcomeCount = pre.terminalAttemptCount === CCEL_UPSTREAM_TERMINAL_ATTEMPT_LIMIT ? 0 : 1;
+  assert(post.operatorEpoch === pre.operatorEpoch
+    && admissionCount === 1
+    && terminalOutcomeCount === expectedTerminalOutcomeCount
+    && terminalRetirementCount === 1
+    && post.state === 'closed'
+    && post.transientFailures === 0
+    && post.backoffUntilMs === 0
+    && post.probeInFlight === false
+    && post.probeLeaseUntilMs === 0,
+  'one admitted and finalized contender with a closed terminal circuit');
+  return {
+    pre: summarizeCoordinatorSnapshot(pre),
+    post: summarizeCoordinatorSnapshot(post),
+    delta: {
+      admissionCount,
+      terminalOutcomeCount,
+      terminalRetirementCount,
+      operatorEpochChanged: false,
+    },
+    terminalCircuitState: 'closed',
+  };
+}
+
+function summarizeCoordinatorSnapshot(snapshot: CcelCoordinatorSnapshot) {
+  return {
+    state: snapshot.state,
+    attemptSequence: snapshot.attemptSequence,
+    terminalAttemptCount: snapshot.terminalAttemptCount,
+    terminalRetiredThroughAttemptId: snapshot.terminalRetiredThroughAttemptId,
+    probeInFlight: snapshot.probeInFlight,
+    transientFailures: snapshot.transientFailures,
+    backoffActive: snapshot.backoffUntilMs > 0,
+  };
+}
+
+function isCoordinatorSnapshot(value: unknown): value is CcelCoordinatorSnapshot {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  if (!['closed', 'transient_backoff', 'rate_limited', 'latched_policy', 'latched_interface'].includes(String(record.state))
+    || typeof record.probeInFlight !== 'boolean') return false;
+  return [
+    record.nextAllowedAtMs, record.backoffUntilMs, record.lastObservedAtMs, record.attemptSequence,
+    record.operatorEpoch, record.transientFailures, record.probeLeaseUntilMs,
+    record.terminalAttemptCount, record.terminalRetiredThroughAttemptId,
+  ].every(item => Number.isSafeInteger(item) && (item as number) >= 0);
 }
 
 export function boundedAuditSleepMs(retryAfterSeconds: number): number {
@@ -346,6 +462,10 @@ function schemaContainsProperty(value: unknown, expected: string): boolean {
   const properties = (value as { properties?: unknown }).properties;
   if (properties && typeof properties === 'object' && expected in properties) return true;
   return Object.values(value).some(item => schemaContainsProperty(item, expected));
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
 function assert(condition: boolean, label: string): asserts condition {
