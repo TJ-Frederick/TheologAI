@@ -7,6 +7,11 @@ import { parseSourceAttestedLookupReference } from '../../src/kernel/sourceAttes
 
 const MCP_URL = 'https://worker.test/mcp';
 const ALLOWED_ORIGIN = 'https://allowed.example';
+const LEGACY_PRODUCTION_MCP_URL = 'https://theologai.tjfrederick.workers.dev/mcp';
+const PRIMARY_PRODUCTION_MCP_URL = 'https://mcp.theologai.xyz/mcp';
+const PREVIEW_MCP_URL = 'https://preview-mcp.theologai.xyz/mcp';
+const LEGACY_PRODUCTION_OPERATOR_URL = 'https://theologai.tjfrederick.workers.dev/internal/ccel-coordinator';
+const PRIMARY_PRODUCTION_OPERATOR_URL = 'https://mcp.theologai.xyz/internal/ccel-coordinator';
 
 interface JsonRpcResponse {
   jsonrpc: '2.0';
@@ -79,6 +84,64 @@ async function rateLimitKey(ip: string, userAgent: string): Promise<string> {
 }
 
 describe('Worker MCP endpoint in workerd', () => {
+  it('keeps the legacy production migration browser-safe and scopes the poller guard to production hosts', async () => {
+    const browserPreflight = await SELF.fetch(LEGACY_PRODUCTION_MCP_URL, {
+      method: 'OPTIONS',
+      headers: {
+        Origin: ALLOWED_ORIGIN,
+        'Access-Control-Request-Method': 'POST',
+        'Access-Control-Request-Headers': 'Content-Type, Mcp-Protocol-Version',
+      },
+    });
+    expect(browserPreflight.status).toBe(204);
+    expect(browserPreflight.headers.get('Location')).toBeNull();
+    expect(browserPreflight.headers.get('Access-Control-Allow-Origin')).toBe(ALLOWED_ORIGIN);
+
+    const browserRequest = await SELF.fetch(LEGACY_PRODUCTION_MCP_URL, {
+      method: 'POST',
+      redirect: 'manual',
+      headers: { Origin: ALLOWED_ORIGIN },
+      body: '{}',
+    });
+    expect(browserRequest.status).toBe(308);
+    expect(browserRequest.headers.get('Location')).toBe(PRIMARY_PRODUCTION_MCP_URL);
+    expect(browserRequest.headers.get('Cache-Control')).toBe('no-store');
+    expect(browserRequest.headers.get('Access-Control-Allow-Origin')).toBe(ALLOWED_ORIGIN);
+
+    const legacyOperator = await SELF.fetch(LEGACY_PRODUCTION_OPERATOR_URL, {
+      method: 'POST',
+      redirect: 'manual',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    expect(legacyOperator.status).toBe(308);
+    expect(legacyOperator.headers.get('Location')).toBe(PRIMARY_PRODUCTION_OPERATOR_URL);
+
+    const pollerHeaders = {
+      'CF-Connecting-IP': '18.192.206.183',
+      'User-Agent': 'Go-http-client/2.0',
+    };
+    await expect(SELF.fetch(LEGACY_PRODUCTION_MCP_URL, { method: 'POST', headers: pollerHeaders }))
+      .resolves.toMatchObject({ status: 410 });
+    await expect(SELF.fetch(PRIMARY_PRODUCTION_MCP_URL, { method: 'POST', headers: pollerHeaders }))
+      .resolves.toMatchObject({ status: 403 });
+    await expect(SELF.fetch(LEGACY_PRODUCTION_OPERATOR_URL, {
+      method: 'POST', headers: { ...pollerHeaders, 'Content-Type': 'application/json' }, body: '{}',
+    })).resolves.toMatchObject({ status: 410 });
+
+    const previewRequest = await SELF.fetch(PREVIEW_MCP_URL, {
+      method: 'POST',
+      headers: {
+        ...pollerHeaders,
+        Accept: 'application/json, text/event-stream',
+        'Content-Type': 'application/json',
+        'Mcp-Protocol-Version': '2025-11-25',
+      },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 70, method: 'tools/list' }),
+    });
+    expect(previewRequest.status).toBe(200);
+  });
+
   it('executes the checked-in preview v5 contract without enabling live CCEL', async () => {
     expect(env.THEOLOGAI_EXPOSE_CCEL_DISCOVERY).toBe('true');
     expect(env.THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH).toBe('false');

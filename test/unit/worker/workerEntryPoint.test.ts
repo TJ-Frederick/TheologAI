@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createHmac } from 'node:crypto';
 
 const { mockRoot, mockServer, mockHandleMcp, mockCreateRoot, mockCreateServer } = vi.hoisted(() => {
   const mockRoot = { tools: [], services: {} };
@@ -35,6 +36,10 @@ vi.mock('../../../src/http/worker/mcpHandler.js', () => ({
 import worker from '../../../src/worker.js';
 
 function makeEnv() {
+  const operatorCoordinator = {
+    idFromName: vi.fn().mockReturnValue('operator-coordinator-id'),
+    get: vi.fn().mockReturnValue({ snapshot: vi.fn() }),
+  };
   return {
     THEOLOGAI_DB: {} as D1Database,
     THEOLOGAI_RATE_LIMITER: {
@@ -45,6 +50,12 @@ function makeEnv() {
     THEOLOGAI_REQUEST_LOGS: 'false',
     THEOLOGAI_ALLOWED_ORIGINS: 'https://theologai.xyz,https://theologai.pages.dev',
     THEOLOGAI_MAX_REQUEST_BYTES: String(1024 * 1024),
+    THEOLOGAI_CCEL_OPERATOR_TOKEN: 'operator-test-secret-that-is-at-least-32-characters',
+    CF_VERSION_METADATA: { id: '123e4567-e89b-42d3-a456-426614174000' },
+    THEOLOGAI_CCEL_OPERATOR_AUTH_LIMITER: {
+      limit: vi.fn().mockResolvedValue({ success: true }),
+    },
+    THEOLOGAI_CCEL_COORDINATOR: operatorCoordinator,
   };
 }
 
@@ -52,6 +63,44 @@ function makeRequest(path = '/mcp', method = 'POST', headers?: HeadersInit, body
   const init: RequestInit & { duplex?: 'half' } = { method, headers, body };
   if (body instanceof ReadableStream) init.duplex = 'half';
   return new Request(`https://example.com${path}`, init);
+}
+
+function makeHostRequest(
+  host: string,
+  path = '/mcp',
+  method = 'POST',
+  headers?: HeadersInit,
+  body?: BodyInit,
+) {
+  const init: RequestInit & { duplex?: 'half' } = { method, headers, body };
+  if (body instanceof ReadableStream) init.duplex = 'half';
+  return new Request(`https://${host}${path}`, init);
+}
+
+function makeSignedOperatorRequest(host: string, headers: HeadersInit = {}): Request {
+  const secret = 'operator-test-secret-that-is-at-least-32-characters';
+  const timestamp = String(Date.now());
+  const nonce = 'abcdefghijklmnopqrstuvwxyzABCDEF';
+  const body = JSON.stringify({ action: 'snapshot', workerVersionId: '123e4567-e89b-42d3-a456-426614174000' });
+  const signature = createHmac('sha256', secret)
+    .update(`POST\n/internal/ccel-coordinator\n${timestamp}\n${nonce}\n${body}`)
+    .digest('hex');
+  const bodyBytes = new TextEncoder().encode(body);
+  const streamingBody = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(bodyBytes);
+      controller.close();
+    },
+  });
+  return makeHostRequest(host, '/internal/ccel-coordinator', 'POST', {
+    'Content-Type': 'application/json',
+    'X-TheologAI-Timestamp': timestamp,
+    'X-TheologAI-Nonce': nonce,
+    'X-TheologAI-Signature': signature,
+    'CF-Connecting-IP': '192.0.2.44',
+    'User-Agent': 'theologai-operator-test/1.0',
+    ...headers,
+  }, streamingBody);
 }
 
 function makeCtx(): ExecutionContext {
@@ -67,6 +116,175 @@ describe('Worker Entry Point', () => {
     mockHandleMcp.mockResolvedValue({ response: new Response('ok') });
     env = makeEnv();
     ctx = makeCtx();
+  });
+
+  describe('legacy production endpoint migration', () => {
+    const legacyHost = 'theologai.tjfrederick.workers.dev';
+    const primaryHost = 'mcp.theologai.xyz';
+    const pollerHeaders = {
+      'CF-Connecting-IP': '18.192.206.183',
+      'User-Agent': 'Go-http-client/2.0',
+    };
+
+    it.each(['GET', 'POST', 'DELETE', 'OPTIONS'])('redirects native legacy %s requests with 308', async (method) => {
+      const response = await worker.fetch(
+        makeHostRequest(legacyHost, '/mcp?source=legacy', method),
+        env as never,
+        ctx,
+      );
+
+      expect(response.status).toBe(308);
+      expect(response.headers.get('Location')).toBe(
+        'https://mcp.theologai.xyz/mcp?source=legacy',
+      );
+      expect(response.headers.get('Cache-Control')).toBe('no-store');
+      expect(env.THEOLOGAI_RATE_LIMITER.limit).not.toHaveBeenCalled();
+      expect(mockCreateRoot).not.toHaveBeenCalled();
+    });
+
+    it('answers an allowed browser preflight before redirecting the actual request', async () => {
+      const response = await worker.fetch(
+        makeHostRequest(legacyHost, '/mcp', 'OPTIONS', {
+          Origin: 'https://theologai.xyz',
+          'Access-Control-Request-Method': 'POST',
+          'Access-Control-Request-Headers': 'Content-Type, Mcp-Protocol-Version',
+        }),
+        env as never,
+        ctx,
+      );
+
+      expect(response.status).toBe(204);
+      expect(response.headers.get('Location')).toBeNull();
+      expect(response.headers.get('Cache-Control')).toBe('no-store');
+      expect(response.headers.get('Access-Control-Allow-Origin')).toBe('https://theologai.xyz');
+      expect(response.headers.get('Access-Control-Allow-Methods')).toBe('POST, OPTIONS');
+      expect(response.headers.get('Access-Control-Allow-Headers')).toContain('Mcp-Protocol-Version');
+      expect(env.THEOLOGAI_RATE_LIMITER.limit).not.toHaveBeenCalled();
+      expect(mockCreateRoot).not.toHaveBeenCalled();
+    });
+
+    it('includes exact-origin CORS headers on an allowed browser redirect', async () => {
+      const response = await worker.fetch(
+        makeHostRequest(legacyHost, '/mcp?source=browser', 'POST', {
+          Origin: 'https://theologai.pages.dev',
+        }),
+        env as never,
+        ctx,
+      );
+
+      expect(response.status).toBe(308);
+      expect(response.headers.get('Access-Control-Allow-Origin')).toBe('https://theologai.pages.dev');
+      expect(response.headers.get('Vary')).toContain('Origin');
+    });
+
+    it('does not reflect an untrusted browser origin on a legacy redirect', async () => {
+      const response = await worker.fetch(
+        makeHostRequest(legacyHost, '/mcp', 'POST', { Origin: 'https://evil.example' }),
+        env as never,
+        ctx,
+      );
+
+      expect(response.status).toBe(308);
+      expect(response.headers.get('Access-Control-Allow-Origin')).toBeNull();
+      expect(response.headers.get('Vary')).toContain('Origin');
+    });
+
+    it('redirects before consuming a streaming request body', async () => {
+      const request = makeHostRequest(
+        legacyHost,
+        '/mcp',
+        'POST',
+        undefined,
+        new ReadableStream<Uint8Array>(),
+      );
+
+      const response = await worker.fetch(request, env as never, ctx);
+
+      expect(response.status).toBe(308);
+      expect(request.bodyUsed).toBe(false);
+      expect(mockHandleMcp).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      { name: 'redirects', headers: {}, status: 308 },
+      { name: 'blocks the exact poller before', headers: pollerHeaders, status: 410 },
+    ])('$name the legacy operator path without invoking any application dependency', async ({ headers, status }) => {
+      const request = makeSignedOperatorRequest(legacyHost, headers);
+
+      const response = await worker.fetch(request, env as never, ctx);
+
+      expect(response.status).toBe(status);
+      expect(request.bodyUsed).toBe(false);
+      expect(env.THEOLOGAI_CCEL_OPERATOR_AUTH_LIMITER.limit).not.toHaveBeenCalled();
+      expect(env.THEOLOGAI_CCEL_COORDINATOR.idFromName).not.toHaveBeenCalled();
+      expect(env.THEOLOGAI_CCEL_COORDINATOR.get).not.toHaveBeenCalled();
+      expect(env.THEOLOGAI_RATE_LIMITER.limit).not.toHaveBeenCalled();
+      expect(mockCreateRoot).not.toHaveBeenCalled();
+      expect(mockCreateServer).not.toHaveBeenCalled();
+      expect(mockHandleMcp).not.toHaveBeenCalled();
+    });
+
+    it('returns 410 for the confirmed poller on the legacy hostname', async () => {
+      const response = await worker.fetch(
+        makeHostRequest(legacyHost, '/mcp', 'POST', pollerHeaders),
+        env as never,
+        ctx,
+      );
+
+      expect(response.status).toBe(410);
+      await expect(response.text()).resolves.toBe('Gone');
+      expect(response.headers.get('Location')).toBeNull();
+      expect(response.headers.get('Cache-Control')).toBe('private, no-store');
+      expect(env.THEOLOGAI_RATE_LIMITER.limit).not.toHaveBeenCalled();
+      expect(mockCreateRoot).not.toHaveBeenCalled();
+    });
+
+    it('returns 403 if the confirmed poller reaches the primary hostname', async () => {
+      const response = await worker.fetch(
+        makeHostRequest(primaryHost, '/mcp', 'POST', pollerHeaders),
+        env as never,
+        ctx,
+      );
+
+      expect(response.status).toBe(403);
+      await expect(response.text()).resolves.toBe('Forbidden');
+      expect(response.headers.get('Location')).toBeNull();
+      expect(env.THEOLOGAI_RATE_LIMITER.limit).not.toHaveBeenCalled();
+      expect(mockCreateRoot).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      'theologai-preview.tjfrederick.workers.dev',
+      'preview-mcp.theologai.xyz',
+      'unrelated.example',
+    ])('never applies the production poller block to %s', async (host) => {
+      const request = makeHostRequest(host, '/mcp', 'POST', pollerHeaders);
+      const response = await worker.fetch(request, env as never, ctx);
+
+      expect(response.status).toBe(200);
+      expect(mockHandleMcp).toHaveBeenCalledWith(mockServer, request);
+    });
+
+    it.each([
+      { 'CF-Connecting-IP': '18.192.206.183', 'User-Agent': 'another-client/1.0' },
+      { 'CF-Connecting-IP': '203.0.113.10', 'User-Agent': 'Go-http-client/2.0' },
+    ])('does not block partial poller identity matches', async (headers) => {
+      const response = await worker.fetch(
+        makeHostRequest(legacyHost, '/mcp', 'POST', headers),
+        env as never,
+        ctx,
+      );
+
+      expect(response.status).toBe(308);
+    });
+
+    it('continues serving ordinary requests on the primary hostname', async () => {
+      const request = makeHostRequest(primaryHost);
+      const response = await worker.fetch(request, env as never, ctx);
+
+      expect(response.status).toBe(200);
+      expect(mockHandleMcp).toHaveBeenCalledWith(mockServer, request);
+    });
   });
 
   it('creates a fresh composition root and MCP server for an accepted request', async () => {

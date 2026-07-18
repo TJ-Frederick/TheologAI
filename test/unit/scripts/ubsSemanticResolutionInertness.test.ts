@@ -11,7 +11,7 @@ const activeIdentityPins = {
   'src/tools/worker/index.ts': 'feb1679a520185d11f2b6082b70ea3ef6c2b87652ff49c97c0acedfb76d83b90',
   'src/server.ts': '6b372c049cb7741344bc446b2409524739cc9acba5a3121bc09dbdc8e90acd22',
   'src/worker-server.ts': '3f65b62179b267ac9b15fe682c69342be7ebee8a09430473b797c113e812782a',
-  'src/worker.ts': '07a439b6f5f20be1e6651ceaad71b4ca189579592c743e5e0f3770d80ba12d44',
+  'src/worker.ts': '619a0a66c30ade7ec8f78f13c59ed0791c67d1ae956eb69e0b126ba20f7dc92d',
   'src/mcp/schemas/originalLanguageStudy.ts': 'a98e5966d8a2a850487b4882c49f04c48fc697eee308f6e89c67e06af50fefac',
   'src/presenters/originalLanguageStudyStructured.ts': '49818eb62e89980498669442a4bfc1886944d7751fc675940b17368a030995d9',
   'src/formatters/originalLanguageStudyFormatter.ts': '30a10bf826c6c3174f2e0fb00907f6104735b165fdbfd5915a0ff22bc09b2536',

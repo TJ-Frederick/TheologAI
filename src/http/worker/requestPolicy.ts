@@ -31,6 +31,21 @@ function getAllowedOrigins(env: Env): Set<string> {
   return new Set(origins.filter(Boolean));
 }
 
+/**
+ * Return an exact configured browser origin, never a caller-supplied value.
+ *
+ * The legacy-host migration uses this before the normal request guard so a
+ * browser that still has the old endpoint can complete its preflight without
+ * reflecting an untrusted Origin on a redirect response.
+ */
+export function getAllowedCorsOrigin(env: Env, origin: string | null): string | null {
+  return origin && getAllowedOrigins(env).has(origin) ? origin : null;
+}
+
+export function isAllowedMcpPath(pathname: string): boolean {
+  return ALLOWED_PATHS.has(pathname);
+}
+
 function mergeVary(current: string | null, value: string): string {
   const values = new Set((current ?? '').split(',').map(entry => entry.trim()).filter(Boolean));
   values.add(value);
@@ -71,9 +86,7 @@ export function getEarlyResponse(
 ): GuardResponse | null {
   const url = new URL(request.url);
   const origin = request.headers.get('Origin');
-  const allowedOrigin = origin && getAllowedOrigins(env).has(origin)
-    ? origin
-    : null;
+  const allowedOrigin = getAllowedCorsOrigin(env, origin);
 
   if (origin && !allowedOrigin) {
     return {
@@ -85,7 +98,7 @@ export function getEarlyResponse(
     };
   }
 
-  if (!ALLOWED_PATHS.has(url.pathname)) {
+  if (!isAllowedMcpPath(url.pathname)) {
     return {
       response: responseWithCors(allowedOrigin, 'Not found', {
         status: 404,

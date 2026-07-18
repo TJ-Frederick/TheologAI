@@ -15,6 +15,7 @@ import {
   getMaxRequestBytes,
   responseWithCors,
 } from './http/worker/requestPolicy.js';
+import { getLegacyEndpointResponse } from './http/worker/legacyEndpoint.js';
 import { getRateLimitResponse } from './http/worker/rateLimit.js';
 import {
   getWorkerRequestMetadata,
@@ -27,6 +28,24 @@ import { handleCcelOperatorRequest } from './http/worker/ccelOperator.js';
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     void ctx;
+    // The production legacy-host guard must precede every application route,
+    // including the signed operator path. That keeps migration redirects and
+    // the exact poller block outside body reads, limiters, and Durable Objects.
+    const legacyEndpointResponse = getLegacyEndpointResponse(env, request);
+    if (legacyEndpointResponse) {
+      const startedAt = Date.now();
+      const metadata = getWorkerRequestMetadata(request);
+      logWorkerRequestEvent(env, metadata, { event: 'theologai.worker.request.start' });
+      logWorkerRequestEvent(env, metadata, {
+        event: 'theologai.worker.request.complete',
+        status: legacyEndpointResponse.response.status,
+        guarded: true,
+        guardReason: legacyEndpointResponse.reason,
+        durationMs: Date.now() - startedAt,
+      });
+      return legacyEndpointResponse.response;
+    }
+
     // This signed, fail-closed route is outside public MCP telemetry and its
     // limiter; the handler applies a distinct fail-closed pre-auth budget.
     const operatorResponse = await handleCcelOperatorRequest(request, env);
