@@ -1,6 +1,6 @@
 {
   "$comment": "DESIGN FIXTURE ONLY. Hebrew-only public v1; not registered by any MCP tool. JSON Schema validates structure; the inactive pure presenter guard separately enforces relational bindings, arithmetic, and the serialized UTF-8 byte cap.",
-  "contractVersion": "ubs-hebrew-semantic-evidence.draft-v2",
+  "contractVersion": "ubs-hebrew-semantic-evidence.draft-v3",
   "schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
@@ -115,10 +115,63 @@
         "type": "object",
         "properties": {
           "status": { "const": "verified_token_alignment" },
+          "proofContract": { "const": "theologai-exact-hebrew-token-alignment.v1" },
+          "verifierVersion": { "type": "integer", "minimum": 1, "maximum": 1000000 },
+          "sourceIdentity": { "type": "string", "pattern": "^H(?!0000$)[0-9]{4}$", "minLength": 5, "maxLength": 5 },
+          "normalizedReference": { "type": "string", "minLength": 1, "maxLength": 100 },
+          "artifactIdentity": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "artifactVersion": { "const": "0.9.2" },
+          "artifactSources": {
+            "type": "object",
+            "properties": {
+              "dictionary": { "$ref": "#/$defs/alignmentArtifactSource" },
+              "lexicalDomains": { "$ref": "#/$defs/alignmentArtifactSource" }
+            },
+            "required": ["dictionary", "lexicalDomains"],
+            "additionalProperties": false
+          },
+          "sourceId": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "entryId": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "senseId": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "evidenceId": { "type": "string", "minLength": 1, "maxLength": 128 },
           "morphologyTokenIdentity": { "type": "string", "minLength": 1, "maxLength": 512 },
-          "verifierVersion": { "type": "integer", "minimum": 1, "maximum": 1000000 }
+          "morphologyTokenCoordinates": {
+            "type": "object",
+            "properties": {
+              "canonicalReference": { "type": "string", "minLength": 1, "maxLength": 100 },
+              "normalizedReference": { "type": "string", "minLength": 1, "maxLength": 100 },
+              "position": { "type": "integer", "minimum": 1, "maximum": 200 }
+            },
+            "required": ["canonicalReference", "normalizedReference", "position"],
+            "additionalProperties": false
+          },
+          "morphologyTokenWitness": {
+            "type": "object",
+            "properties": {
+              "text": { "type": "string", "minLength": 1, "maxLength": 2000 },
+              "lemma": { "type": "string", "minLength": 1, "maxLength": 2000 },
+              "strongsNumber": { "type": ["string", "null"], "maxLength": 128 },
+              "morphologyCode": { "type": ["string", "null"], "maxLength": 512 },
+              "gloss": { "type": ["string", "null"], "maxLength": 2000 }
+            },
+            "required": ["text", "lemma", "strongsNumber", "morphologyCode", "gloss"],
+            "additionalProperties": false
+          }
         },
-        "required": ["status", "morphologyTokenIdentity", "verifierVersion"],
+        "required": ["status", "proofContract", "verifierVersion", "sourceIdentity", "normalizedReference", "artifactIdentity", "artifactVersion", "artifactSources", "sourceId", "entryId", "senseId", "evidenceId", "morphologyTokenIdentity", "morphologyTokenCoordinates", "morphologyTokenWitness"],
+        "additionalProperties": false
+      },
+      "alignmentArtifactSource": {
+        "type": "object",
+        "properties": {
+          "sourceId": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "sourceRole": { "enum": ["dictionary", "lexical_domains"] },
+          "artifactName": { "enum": ["UBSHebrewDic-v0.9.2-en.JSON", "UBSHebrewDicLexicalDomains-v0.9.2-en.JSON"] },
+          "artifactIdentity": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "artifactVersion": { "const": "0.9.2" },
+          "sourceSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        },
+        "required": ["sourceId", "sourceRole", "artifactName", "artifactIdentity", "artifactVersion", "sourceSha256"],
         "additionalProperties": false
       },
       "continuation": {
@@ -281,7 +334,8 @@
   },
   "statusValues": ["reference_aligned_source_candidate", "lexical_candidates", "unavailable"],
   "invariants": [
-    "reference_aligned_source_candidate reports one source candidate attested at the reference and separately aligned to the local token; it does not claim that the source adjudicates contextual meaning",
+    "reference_aligned_source_candidate requires the future server-side theologai-exact-hebrew-token-alignment.v1 proof and reports one source candidate attested at the reference; it does not claim that the source adjudicates contextual meaning",
+    "coordinate equality, a coordinate-only UBS/TAHOT attestation, or a caller-supplied token identifier never satisfies verified_token_alignment and always remains lexical_candidates",
     "a lexical identity match alone returns lexical_candidates with an explicit ambiguity reason, never reference_aligned_source_candidate",
     "public/user identity remains unpadded H430 while source/internal identity is H0430; A#### identities are retained internally and explicitly withheld",
     "a continuation is present if and only if resultWindow.hasMore is true and is bound to the exact operation, artifact identity, public/source identity pair, and normalized reference",
@@ -394,8 +448,47 @@
     },
     "alignmentEvidence": {
       "status": "verified_token_alignment",
+      "proofContract": "theologai-exact-hebrew-token-alignment.v1",
+      "verifierVersion": 1,
+      "sourceIdentity": "H0001",
+      "normalizedReference": "Synthetic 1:1",
+      "artifactIdentity": "7777777777777777777777777777777777777777777777777777777777777777",
+      "artifactVersion": "0.9.2",
+      "artifactSources": {
+        "dictionary": {
+          "sourceId": "synthetic-hebrew-dictionary",
+          "sourceRole": "dictionary",
+          "artifactName": "UBSHebrewDic-v0.9.2-en.JSON",
+          "artifactIdentity": "7777777777777777777777777777777777777777777777777777777777777777",
+          "artifactVersion": "0.9.2",
+          "sourceSha256": "3333333333333333333333333333333333333333333333333333333333333333"
+        },
+        "lexicalDomains": {
+          "sourceId": "synthetic-lexical-domains",
+          "sourceRole": "lexical_domains",
+          "artifactName": "UBSHebrewDicLexicalDomains-v0.9.2-en.JSON",
+          "artifactIdentity": "7777777777777777777777777777777777777777777777777777777777777777",
+          "artifactVersion": "0.9.2",
+          "sourceSha256": "6666666666666666666666666666666666666666666666666666666666666666"
+        }
+      },
+      "sourceId": "synthetic-hebrew-dictionary",
+      "entryId": "synthetic-entry-one",
+      "senseId": "synthetic-sense-one",
+      "evidenceId": "synthetic-reference-one",
       "morphologyTokenIdentity": "synthetic-token-1",
-      "verifierVersion": 1
+      "morphologyTokenCoordinates": {
+        "canonicalReference": "Synthetic 1:1",
+        "normalizedReference": "Synthetic 1:1",
+        "position": 1
+      },
+      "morphologyTokenWitness": {
+        "text": "SYNTHETIC TOKEN",
+        "lemma": "SYNTHETIC LEMMA",
+        "strongsNumber": "H1",
+        "morphologyCode": "HNcmsa",
+        "gloss": "SYNTHETIC LOCAL GLOSS"
+      }
     },
     "resultWindow": { "priorCount": 0, "returnedCount": 1, "consumedCount": 1, "totalCount": 1, "hasMore": false },
     "responseWindow": { "unit": "utf8_bytes", "maximum": 32768, "truncated": false },

@@ -16,6 +16,7 @@
     "data:verify-sources": "tsx scripts/verify-data-manifest.ts",
     "data:verify-section-keys": "tsx scripts/historical-section-key-plan.ts",
     "data:verify-language-sources": "tsx scripts/verify-biblical-language-sources.ts",
+    "data:verify-ubs-hebrew-coordinate-audit": "tsx scripts/reproduce-ubs-hebrew-v092-coordinate-audit.ts",
     "data:reproduce-language-sources": "tsx scripts/reproduce-biblical-language-sources.ts",
     "data:verify-language-reproduction-report": "tsx scripts/verify-biblical-language-reproduction-report.ts",
     "data:write-language-source-lock": "tsx scripts/write-biblical-language-source-lock.ts",

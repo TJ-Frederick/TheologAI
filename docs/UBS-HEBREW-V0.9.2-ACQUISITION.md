@@ -2,12 +2,13 @@
 
 ## Scope and state
 
-This is a source-acquisition and schema-inspection record only. TheologAI has
+This remains an inactive source-acquisition package. TheologAI has
 vendored exactly two unmodified English UBS Hebrew v0.9.2 JSON artifacts from
 the pinned upstream revision, plus the exact relevant upstream license and
-notices. No UBS-derived rows, migration, transform, D1 materialization, runtime
-registration, tool, prompt, resource, or public semantic output exists in this
-change.
+notices. A strict raw decoder and raw-coordinate verifier now produce separate
+deterministic audit reports without changing the immutable Gate 1 schema
+report. No migration, transform 7, D1 materialization, runtime registration,
+tool, prompt, resource, or public semantic output exists in this change.
 
 | Artifact | Upstream blob | Bytes | SHA-256 |
 | --- | --- | ---: | --- |
@@ -17,7 +18,19 @@ change.
 Both files are pinned to [`ubsicap/ubs-open-license` commit
 `3a6edd8212df2e1189037ad39687726990c80d56`](https://github.com/ubsicap/ubs-open-license/tree/3a6edd8212df2e1189037ad39687726990c80d56).
 The executable verifier recomputes each raw SHA-256, Git blob SHA-1, byte
-count, and the inspected schema report.
+count, and the inspected schema report. Coordinate validation additionally
+pins `usfm-bible/usfmtc` commit
+`a222dd3e78360f8e275ca56f4307af7e02b2430a`, its reviewed `reference.py`, and
+its MIT license. The existing four exact TAHOT source pins remain authoritative
+for raw Hebrew coordinates.
+
+`COORDINATE-AUDIT.json` is itself byte-pinned as
+`d174d827bbfdf7d1c35a8836ff28a5453a2947ac5020eb5df060fed1732a1f30` in
+`SOURCE.json`. `npm run data:verify-ubs-hebrew-coordinate-audit` downloads all
+four exact immutable TAHOT inputs through the hash-first pinned-source
+downloader, rebuilds the 260,813-reference audit, and rejects either report
+byte drift or a structural-report mismatch. This is a verification-only
+command; it writes no source, transform, database, or runtime artifact.
 
 ## Attribution, license, and provenance
 
@@ -75,11 +88,29 @@ crosswalk. That boundary is explicit in `SCHEMA-REPORT.json`.
 The anchor is therefore evidence that UBS associates a lexical meaning with an
 encoded source token location, subject to those unresolved validity boundaries.
 
-It is not a verified alignment to TheologAI’s STEPBible morphology tokens. The
-two datasets have no approved crosswalk or token-alignment verifier in this
-repository. No future public result may promote an anchored UBS sense to a
-contextual token meaning until that separately versioned verifier proves the
-match.
+It is not a verified alignment to TheologAI’s generated morphology positions.
+The coordinate verifier proves exact native-coordinate coverage and can attest
+one explicitly supplied UBS-anchor/TAHOT-token locator; it never derives that
+pair from word position and cannot establish a TheologAI morphology-token
+alignment, lexical identity, or contextual sense. The caller-supplied locator
+is replaced by the canonical raw indexed TAHOT token before evidence is
+emitted, so cloned-field mutations cannot forge coordinates or word elements.
+Coordinate-only evidence is always unpromoted lexical-candidate evidence.
+
+Any future `verified_token_alignment` status requires a different,
+server-side `theologai-exact-hebrew-token-alignment.v1` proof contract. That
+contract must bind one independently pinned TheologAI morphology-token witness
+to canonical UBS evidence and must not trust a client-supplied coordinate or
+token ID. It is intentionally not implemented, accepted, or emitted by this
+inactive package.
+
+The decoder audit records 8,345 exact `H####`/`A####` identity occurrences and
+excludes 617 base forms with no representable exact identity. It drops 208
+blank domain-assignment rows. Twenty-seven senses have a null domain source and
+another 207 contain only blank assignments, leaving 234 usable zero-domain
+senses; zero domains are valid rather than fabricated. Definitions are
+published only when all source markup is safe and fully validated. Glosses
+remain available when a definition is absent or excluded.
 
 ## Capacity boundary
 
@@ -92,15 +123,16 @@ gate remains separately required after those approved steps exist.
 
 ## Deferred work
 
-This acquisition does **not** authorize migration `0004`, transform 7, a
-source-specific decoder, compiler, SQLite/D1 storage, a database import, or any
-preview/production deployment. Those are separately gated after the planned
-decoder and alignment-verifier design have been reviewed.
+This package does **not** authorize migration `0004`, transform 7, SQLite/D1
+storage, seed generation, a database import, runtime wiring, or any
+preview/production deployment. The decoder, normalized inactive contract, and
+coordinate attestation remain design-time inputs for a separately reviewed
+materialization and release.
 
 ## npm publication boundary
 
-`npm pack --dry-run --json --ignore-scripts` currently includes all eleven
-files in this Gate 1 packet incidentally. The package has no `files` allowlist
+`npm pack --dry-run --json --ignore-scripts` currently includes this inactive
+packet incidentally. The package has no `files` allowlist
 or `.npmignore`, and the same dry run omits the configured `dist/index.js`
 entrypoint. That is existing packaging debt, not a supported distribution
 surface or evidence that these sources are intended for npm.

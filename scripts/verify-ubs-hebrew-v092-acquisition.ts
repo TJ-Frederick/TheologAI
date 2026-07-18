@@ -27,8 +27,8 @@ const COVERAGE_AND_COMPLETENESS = Object.freeze({
   theologaiPolicy: 'No current or future TheologAI result may imply complete Hebrew lexical or reference coverage solely from this acquisition.',
 });
 const MODIFICATIONS = Object.freeze({
-  performed: 'None. The two approved JSON artifacts and the three notices are verbatim byte copies from the pinned revision. No migration, transform, compiler, materialization, D1 row, runtime, tool, prompt, resource, or public output was added.',
-  plannedButNotPerformed: 'A future separately approved decoder, transform, schema/migration 0004, token-alignment verifier, materialization, and release may derive a bounded semantic layer from these inputs.',
+  performed: 'The two approved JSON artifacts and three notices remain verbatim. A migration-free, inactive raw decoder and coordinate-validation design were added with deterministic audit reports; neither source artifact was modified.',
+  plannedButNotPerformed: 'No executable migration 0004, transform 7, seed, manifest registration, D1 row, adapter, query plan, composition-root wiring, runtime tool, prompt, resource, public output, or deployment was added.',
 });
 const FUTURE_ATTRIBUTION_AND_SHARE_ALIKE_POLICY = 'Before sharing any derived rows, exports, database copies, or semantic output based on these artifacts, preserve the UBS/SDBH attribution, the pinned source URI, the CC BY-SA 4.0 URI, and a clear change description; offer the derived semantic layer under CC BY-SA 4.0 or a compatible license. Do not claim that this policy extends CC BY-SA to unrelated TheologAI code or datasets, while preserving every license that independently applies. Final release wording remains subject to rights review.';
 
@@ -66,6 +66,27 @@ export const UBS_HEBREW_V092_ARTIFACTS = Object.freeze([
   },
 ] as const satisfies readonly UbsPinnedFile[]);
 
+export const UBS_HEBREW_REFERENCE_VALIDATION_ARTIFACTS = Object.freeze([
+  {
+    id: 'usfmtc-reference-py',
+    repositoryPath: 'src/usfmtc/reference.py',
+    trackedPath: `${SOURCE_ROOT}/reference-validation/usfmtc-reference.py`,
+    sourceUrl: 'https://raw.githubusercontent.com/usfm-bible/usfmtc/a222dd3e78360f8e275ca56f4307af7e02b2430a/src/usfmtc/reference.py',
+    gitBlobSha1: '16cd6fc2a42664a494a5989b8587247a27331cb6',
+    bytes: 40_159,
+    sha256: 'eaff130bef0b6f6dde52386acb8c7a2e5111be11f1ca104522cffef72ea42b69',
+  },
+  {
+    id: 'usfmtc-mit-license',
+    repositoryPath: 'LICENSE',
+    trackedPath: `${SOURCE_ROOT}/reference-validation/USFMTC-LICENSE`,
+    sourceUrl: 'https://raw.githubusercontent.com/usfm-bible/usfmtc/a222dd3e78360f8e275ca56f4307af7e02b2430a/LICENSE',
+    gitBlobSha1: '94b86440d4155c330b5fc17459effd133044064f',
+    bytes: 1_061,
+    sha256: '8d67696c8d8dca45ebed80adf43d53a8c5f4ebc563ace89da23d1af3b3e50be9',
+  },
+] as const satisfies readonly UbsPinnedFile[]);
+
 export const UBS_HEBREW_V092_NOTICES = Object.freeze([
   {
     id: 'cc-by-sa-4.0-license',
@@ -95,6 +116,13 @@ export const UBS_HEBREW_V092_NOTICES = Object.freeze([
     sha256: 'f18eab18a4bad4a83f45981064139f89a96cb4ae97e0e72833d709ae2fb52940',
   },
 ] as const satisfies readonly UbsPinnedFile[]);
+
+/** Exact reviewed bytes for the separately reproducible coordinate audit. */
+export const UBS_HEBREW_V092_COORDINATE_AUDIT = Object.freeze({
+  schemaVersion: 'theologai-ubs-tahot-coordinate-audit.v1',
+  trackedPath: `${SOURCE_ROOT}/COORDINATE-AUDIT.json`,
+  sha256: 'd174d827bbfdf7d1c35a8836ff28a5453a2947ac5020eb5df060fed1732a1f30',
+} as const);
 
 const ENTRY_KEYS = Object.freeze([
   'AlphaPos', 'AlternateLemmas', 'Authors', 'BaseForms', 'ContributorNote', 'Contributors', 'Dates',
@@ -455,6 +483,26 @@ function sourceManifestProjection(): Record<string, unknown> {
       copyright: COPYRIGHT_NOTICE,
     },
     artifacts: UBS_HEBREW_V092_ARTIFACTS.map(projectFile),
+    referenceValidation: {
+      purpose: 'Pin the reviewed USFM book/chapter reference table and its MIT license; TAHOT remains authoritative for raw Hebrew coordinates and usfmtc does not establish token alignment.',
+      repository: 'https://github.com/usfm-bible/usfmtc',
+      commit: 'a222dd3e78360f8e275ca56f4307af7e02b2430a',
+      license: 'MIT',
+      artifacts: UBS_HEBREW_REFERENCE_VALIDATION_ARTIFACTS.map(projectFile),
+    },
+    inactiveAuditReports: [
+      {
+        schemaVersion: 'theologai-ubs-hebrew-decoder-audit.v1',
+        trackedPath: `${SOURCE_ROOT}/DECODER-AUDIT.json`,
+        purpose: 'Deterministic normalized projection counts, fail-closed exclusions, and projection identity; separate from immutable Gate 1 SCHEMA-REPORT.json.',
+      },
+      {
+        schemaVersion: 'theologai-ubs-tahot-coordinate-audit.v1',
+        trackedPath: `${SOURCE_ROOT}/COORDINATE-AUDIT.json`,
+        sha256: UBS_HEBREW_V092_COORDINATE_AUDIT.sha256,
+        purpose: 'Exact raw UBS/TAHOT native-coordinate set equality and reviewed source pins; not contextual token or sense adjudication.',
+      },
+    ],
     upstreamNotices: UBS_HEBREW_V092_NOTICES.map(projectFile),
     coverageAndCompleteness: COVERAGE_AND_COMPLETENESS,
     modifications: MODIFICATIONS,
@@ -474,8 +522,16 @@ function verifyAcquisitionManifest(root: string): void {
 
 export function verifyUbsHebrewV092Acquisition(root: string): SchemaInspection {
   verifyAcquisitionManifest(root);
-  for (const file of [...UBS_HEBREW_V092_ARTIFACTS, ...UBS_HEBREW_V092_NOTICES]) {
+  for (const file of [
+    ...UBS_HEBREW_V092_ARTIFACTS,
+    ...UBS_HEBREW_REFERENCE_VALIDATION_ARTIFACTS,
+    ...UBS_HEBREW_V092_NOTICES,
+  ]) {
     assertPinnedUbsHebrewV092Bytes(file, readFileSync(join(root, file.trackedPath)));
+  }
+  if (sha256(readFileSync(join(root, UBS_HEBREW_V092_COORDINATE_AUDIT.trackedPath)))
+    !== UBS_HEBREW_V092_COORDINATE_AUDIT.sha256) {
+    throw new Error('Tracked UBS/TAHOT coordinate audit byte hash drift');
   }
   const dictionary = readFileSync(join(root, UBS_HEBREW_V092_ARTIFACTS[0].trackedPath));
   const domains = readFileSync(join(root, UBS_HEBREW_V092_ARTIFACTS[1].trackedPath));

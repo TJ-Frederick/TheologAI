@@ -11,6 +11,7 @@ import type {
 } from '../../src/kernel/ubsSemanticDomain.js';
 import {
   UBS_SEMANTIC_ARTIFACT_VERSION,
+  UBS_SEMANTIC_DEFINITION_EXCLUSION_REASONS,
   UBS_SEMANTIC_TRANSFORM_VERSION,
   requireUbsSemanticNormalizedReference,
 } from '../../src/kernel/ubsSemanticDomain.js';
@@ -206,7 +207,10 @@ function parseEntries(input: unknown, sourceId: string, domainSourceId: string):
     for (const [senseIndex, inputSense] of inputSenses.entries()) {
       const sensePath = `${path}.senses[${senseIndex}]`;
       const sense = object(inputSense, sensePath);
-      exactKeys(sense, ['senseId', 'entryId', 'sourceOrdinal', 'definition', 'glosses', 'domainIds', 'references'], sensePath);
+      exactKeys(sense, [
+        'senseId', 'entryId', 'sourceOrdinal', 'definitionStatus', 'definition',
+        'definitionExclusionReasons', 'glosses', 'domainIds', 'references',
+      ], sensePath, ['definition']);
       const senseId = identifier(sense.senseId, `${sensePath}.senseId`);
       const senseEntryId = identifier(sense.entryId, `${sensePath}.entryId`);
       if (senseEntryId !== entryId) {
@@ -214,17 +218,36 @@ function parseEntries(input: unknown, sourceId: string, domainSourceId: string):
       }
       const domainIds = stringArray(sense.domainIds, `${sensePath}.domainIds`)
         .map((id, index) => identifier(id, `${sensePath}.domainIds[${index}]`));
-      if (domainIds.length === 0) throw new Error(`${sensePath}.domainIds must not be empty`);
       unique(domainIds, `${sensePath} domain ID`);
       domainIds.sort(compareCodePoints);
       const glosses = stringArray(sense.glosses, `${sensePath}.glosses`)
         .map((gloss, index) => cleanString(gloss, `${sensePath}.glosses[${index}]`));
       unique(glosses, `${sensePath} gloss`);
       const domainRefs: UbsSemanticDomainRef[] = domainIds.map(domainId => ({ sourceId: domainSourceId, domainId }));
+      const definitionStatus = enumString(sense.definitionStatus, [
+        'published', 'absent_in_source', 'excluded_unresolved_markup',
+      ] as const, `${sensePath}.definitionStatus`);
+      const definition = optionalCleanString(sense.definition, `${sensePath}.definition`);
+      const definitionExclusionReasons = stringArray(
+        sense.definitionExclusionReasons, `${sensePath}.definitionExclusionReasons`,
+      ).map((reason, index) => enumString(
+        reason, UBS_SEMANTIC_DEFINITION_EXCLUSION_REASONS,
+        `${sensePath}.definitionExclusionReasons[${index}]`,
+      ));
+      unique(definitionExclusionReasons, `${sensePath} definition exclusion reason`);
+      if (definitionExclusionReasons.length > 8) {
+        throw new Error(`${sensePath}.definitionExclusionReasons must contain at most eight reasons`);
+      }
+      if ((definitionStatus === 'published') !== (definition !== undefined)
+        || (definitionStatus === 'excluded_unresolved_markup') !== (definitionExclusionReasons.length > 0)) {
+        throw new Error(`${sensePath} definition status, text, and exclusion reasons are inconsistent`);
+      }
       senses.push({
         senseId, sourceId, entryId: senseEntryId,
         sourceOrdinal: positiveInteger(sense.sourceOrdinal, `${sensePath}.sourceOrdinal`),
-        definition: cleanString(sense.definition, `${sensePath}.definition`),
+        definitionStatus,
+        ...(definition === undefined ? {} : { definition }),
+        definitionExclusionReasons,
         glosses, domainRefs,
       });
 
@@ -333,10 +356,10 @@ function array(value: unknown, path: string): unknown[] {
   if (!Array.isArray(value)) throw new Error(`${path} must be an array`);
   return value;
 }
-function exactKeys(value: JsonObject, allowed: readonly string[], path: string): void {
+function exactKeys(value: JsonObject, allowed: readonly string[], path: string, optional: readonly string[] = []): void {
   const extras = Object.keys(value).filter(key => !allowed.includes(key));
   if (extras.length) throw new Error(`${path} contains unsupported field(s): ${extras.sort().join(', ')}`);
-  const missing = allowed.filter(key => !(key in value));
+  const missing = allowed.filter(key => !optional.includes(key) && !(key in value));
   if (missing.length) throw new Error(`${path} is missing field(s): ${missing.join(', ')}`);
 }
 function cleanString(value: unknown, path: string): string {
@@ -345,8 +368,14 @@ function cleanString(value: unknown, path: string): string {
   return value.normalize('NFC');
 }
 function optionalCleanString(value: unknown, path: string): string | undefined {
-  if (value === null) return undefined;
+  if (value === null || value === undefined) return undefined;
   return cleanString(value, path);
+}
+function enumString<const T extends string>(value: unknown, allowed: readonly T[], path: string): T {
+  if (typeof value !== 'string' || !allowed.includes(value as T)) {
+    throw new Error(`${path} must be one of ${allowed.join(', ')}`);
+  }
+  return value as T;
 }
 function identifier(value: unknown, path: string): string {
   return patternString(value, ID, path);

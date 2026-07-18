@@ -12,6 +12,7 @@ import {
 } from '../../../src/kernel/ubsSemanticDomain.js';
 import type {
   IUbsSemanticRepository,
+  FutureExactHebrewTokenAlignmentProof,
   UbsInternalLexicalIdentity,
   UbsSemanticResolution,
   UbsSemanticSource,
@@ -213,6 +214,9 @@ describe('UBS semantic domain contract', () => {
   it('requires verified token alignment without claiming an adjudicated contextual meaning', () => {
     type Aligned = Extract<UbsSemanticResolution, { status: 'reference_aligned_source_candidate' }>;
     expectTypeOf<Aligned['alignmentEvidence']['status']>().toEqualTypeOf<'verified_token_alignment'>();
+    expectTypeOf<Aligned['alignmentEvidence']['proofContract']>()
+      .toEqualTypeOf<'theologai-exact-hebrew-token-alignment.v1'>();
+    expectTypeOf<Aligned['alignmentEvidence']>().toEqualTypeOf<FutureExactHebrewTokenAlignmentProof>();
     expectTypeOf<Aligned>().toHaveProperty('referenceEvidence');
   });
 });

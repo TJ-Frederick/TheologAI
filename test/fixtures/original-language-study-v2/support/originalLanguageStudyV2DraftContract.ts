@@ -1,8 +1,10 @@
 import { createHash } from 'node:crypto';
 import type { OriginalLanguageStudyDomainResult } from '../../../../src/services/languages/OriginalLanguageStudyService.js';
 import type {
+  FutureExactHebrewTokenAlignmentProof,
   UbsInternalHebrewLexicalIdentity,
   UbsPublicHebrewStrongs,
+  UbsSemanticDefinitionExclusionReason,
 } from '../../../../src/kernel/ubsSemanticDomain.js';
 
 export const ORIGINAL_LANGUAGE_STUDY_V2_DRAFT_SCHEMA_VERSION = '2' as const;
@@ -22,15 +24,12 @@ export interface OriginalLanguageStudyV2DraftRequest {
   cursor?: string;
 }
 
-export interface ServerVerifiedHebrewSemanticAlignment {
-  status: 'verified_token_alignment';
-  morphologyTokenIdentity: string;
-  verifierVersion: number;
-  sourceId: string;
-  entryId: string;
-  senseId: string;
-  evidenceId: string;
-}
+/**
+ * A future exact proof is copied only from server-owned context.  Keeping the
+ * draft seam structurally identical to the canonical proof type prevents this
+ * fixture from accidentally becoming a weaker promotion path.
+ */
+export interface ServerVerifiedHebrewSemanticAlignment extends FutureExactHebrewTokenAlignmentProof {}
 
 /** Server-owned context. None of these semantic identities are caller input. */
 export interface OriginalLanguageStudyV2DraftAuthoritativeContext {
@@ -52,23 +51,43 @@ export interface OriginalLanguageStudyV2DraftResolvedRequest {
   cursor?: string;
 }
 
+export interface OriginalLanguageStudyV2DraftSelectedTokenWitness {
+  position: number;
+  text: string;
+  lemma: string;
+  strongsNumber: string | null;
+  morphologyCode: string | null;
+  gloss: string | null;
+}
+
 export interface OriginalLanguageStudyV2DraftCursorBinding {
   requestReference: string;
   requestTarget: string;
   requestPosition: number | null;
   canonicalReference: string;
-  selectedToken: {
-    position: number;
-    text: string;
-    lemma: string;
-    strongsNumber: string | null;
-    morphologyCode: string | null;
-    gloss: string | null;
-  };
+  selectedToken: OriginalLanguageStudyV2DraftSelectedTokenWitness;
   publicStrongs: UbsPublicHebrewStrongs;
   sourceIdentity: UbsInternalHebrewLexicalIdentity;
   normalizedReference: string;
   artifactIdentity: string;
+}
+
+/**
+ * Deterministic server witness for a token selected by the current v1 study.
+ * It is not a client credential: exact promotion also compares every clear
+ * witness field, reference coordinate, provenance source, and candidate ID.
+ */
+export function deriveOriginalLanguageStudyV2MorphologyTokenIdentity(
+  binding: Pick<OriginalLanguageStudyV2DraftCursorBinding,
+    'canonicalReference' | 'normalizedReference' | 'selectedToken'>,
+): string {
+  const payload = JSON.stringify({
+    version: 1,
+    canonicalReference: binding.canonicalReference,
+    normalizedReference: binding.normalizedReference,
+    selectedToken: binding.selectedToken,
+  });
+  return `theologai-morphology-token.v1:${createHash('sha256').update(payload).digest('hex')}`;
 }
 
 export interface OriginalLanguageStudyV2DraftResultWindow {
@@ -98,7 +117,9 @@ export type OriginalLanguageStudyV2DraftCandidate =
   | (OriginalLanguageStudyV2DraftCandidateIdentity & {
       detailStatus: 'detailed';
       lemma: string;
-      definition: string;
+      definitionStatus: 'published' | 'absent_in_source' | 'excluded_unresolved_markup';
+      definition?: string;
+      definitionExclusionReasons: readonly UbsSemanticDefinitionExclusionReason[];
       glosses: readonly string[];
       domains: readonly {
         sourceId: string;

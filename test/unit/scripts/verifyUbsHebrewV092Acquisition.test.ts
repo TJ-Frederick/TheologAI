@@ -90,6 +90,9 @@ describe('UBS Hebrew v0.9.2 acquisition verifier', () => {
       value => { value.artifacts[0].gitBlobSha1 = '0'.repeat(40); },
       value => { value.artifacts[0].sha256 = '0'.repeat(64); },
       value => { value.artifacts[0].id = 'wrong-artifact'; },
+      value => { value.referenceValidation.commit = '0'.repeat(40); },
+      value => { value.referenceValidation.artifacts[0].sha256 = '0'.repeat(64); },
+      value => { value.inactiveAuditReports[1].sha256 = '0'.repeat(64); },
     ];
     for (const mutate of mutations) {
       const changed = manifest();

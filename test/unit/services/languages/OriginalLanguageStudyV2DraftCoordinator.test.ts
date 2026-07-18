@@ -69,6 +69,25 @@ describe('inactive original_language_study v2 aggregate coordinator', () => {
     expect(detailed.responseWindow.used).toBeLessThanOrEqual(32 * 1024);
   });
 
+  it('preserves definition status and clean glosses for a zero-domain detailed candidate', async () => {
+    const value = syntheticCandidate(1);
+    value.sense.definitionStatus = 'excluded_unresolved_markup';
+    delete value.sense.definition;
+    value.sense.definitionExclusionReasons = ['malformed_or_unknown_markup'];
+    value.sense.domainRefs = [];
+    value.domains = [];
+    value.domainTotal = 0;
+    const output = (await syntheticCoordinator([value]).coordinator.study(
+      syntheticRequest(undefined, 'detailed'),
+    )).output;
+    if (!('candidates' in output.semanticEvidence)) throw new Error('expected candidate evidence');
+    expect(output.semanticEvidence.candidates[0]).toMatchObject({
+      detailStatus: 'detailed', definitionStatus: 'excluded_unresolved_markup',
+      definitionExclusionReasons: ['malformed_or_unknown_markup'], domains: [], domainTotal: 0,
+    });
+    expect(output.semanticEvidence.candidates[0]).not.toHaveProperty('definition');
+  });
+
   it('rejects caller-supplied semantic identities before provider or repository access', async () => {
     for (const forbidden of ['sourceIdentity', 'artifactIdentity', 'serverVerifiedAlignment', 'verifierVersion']) {
       const current = syntheticCoordinator();
@@ -129,7 +148,7 @@ describe('inactive original_language_study v2 aggregate coordinator', () => {
       .rejects.toThrow(/full selected-token request context|artifact/i);
   });
 
-  it('requires exact server alignment while preserving candidate-not-resolution language', async () => {
+  it('requires a full current server proof before promotion while preserving candidate-not-resolution language', async () => {
     const presentation = await syntheticCoordinator([syntheticCandidate(1)], syntheticContext('Hebrew', true))
       .coordinator.study(syntheticRequest(undefined, 'detailed'));
     expect(presentation.output.semanticEvidence).toMatchObject({
@@ -138,10 +157,36 @@ describe('inactive original_language_study v2 aggregate coordinator', () => {
     });
     expect(presentation.output.semanticEvidence.plainLanguage).toContain('not an adjudicated contextual meaning');
 
-    const bad = syntheticContext('Hebrew', true);
-    bad.v1Result = syntheticHebrewV1Result();
-    bad.serverVerifiedAlignment!.senseId = 'synthetic-sense-02';
-    await expect(syntheticCoordinator([syntheticCandidate(1)], bad).coordinator.study(syntheticRequest()))
-      .rejects.toThrow('does not match one complete exact aggregate candidate');
+    const mismatches: readonly [string, (context: ReturnType<typeof syntheticContext>) => void, RegExp][] = [
+      ['stale aggregate artifact', context => { context.serverVerifiedAlignment!.artifactIdentity = 'b'.repeat(64); },
+        /does not match one complete exact aggregate candidate/],
+      ['stale artifact version', context => { (context.serverVerifiedAlignment! as any).artifactVersion = '0.9.1'; },
+        /pinned UBS artifact version/],
+      ['stale dictionary source hash', context => {
+        context.serverVerifiedAlignment!.artifactSources.dictionary.sourceSha256 = 'b'.repeat(64);
+      }, /does not match one complete exact aggregate candidate/],
+      ['different normalized reference', context => { context.serverVerifiedAlignment!.normalizedReference = 'Synthetic 1:2'; },
+        /does not match one complete exact aggregate candidate/],
+      ['arbitrary morphology token identity', context => {
+        context.serverVerifiedAlignment!.morphologyTokenIdentity = 'attacker-chosen-token';
+      }, /does not match one complete exact aggregate candidate/],
+      ['different selected morphology token', context => {
+        context.v1Result.selectedToken!.text = 'OTHER SYNTHETIC TOKEN';
+      }, /does not match one complete exact aggregate candidate/],
+      ['source mismatch', context => { context.serverVerifiedAlignment!.sourceId = 'other-source'; },
+        /does not match one complete exact aggregate candidate/],
+      ['entry mismatch', context => { context.serverVerifiedAlignment!.entryId = 'synthetic-entry-02'; },
+        /does not match one complete exact aggregate candidate/],
+      ['sense mismatch', context => { context.serverVerifiedAlignment!.senseId = 'synthetic-sense-02'; },
+        /does not match one complete exact aggregate candidate/],
+      ['evidence mismatch', context => { context.serverVerifiedAlignment!.evidenceId = 'synthetic-reference-02'; },
+        /does not match one complete exact aggregate candidate/],
+    ];
+    for (const [name, mutate, expected] of mismatches) {
+      const bad = syntheticContext('Hebrew', true);
+      mutate(bad);
+      await expect(syntheticCoordinator([syntheticCandidate(1)], bad).coordinator.study(syntheticRequest()), name)
+        .rejects.toThrow(expected);
+    }
   });
 });

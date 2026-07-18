@@ -16,6 +16,7 @@ import {
   type OriginalLanguageStudyV2DraftAuthoritativeContext,
 } from './OriginalLanguageStudyV2DraftCoordinator.js';
 import type { OriginalLanguageStudyV2DraftCursorBinding } from './originalLanguageStudyV2DraftContract.js';
+import { deriveOriginalLanguageStudyV2MorphologyTokenIdentity } from './originalLanguageStudyV2DraftContract.js';
 
 export const SYNTHETIC_ARTIFACT = 'a'.repeat(64);
 export const SYNTHETIC_H0001 = requireUbsInternalLexicalIdentity('H0001') as UbsInternalHebrewLexicalIdentity;
@@ -48,7 +49,9 @@ export function syntheticCandidate(index: number, definitionCharacters = 0): Ubs
     sense: {
       senseId: `synthetic-sense-${suffix}`, sourceId: 'synthetic-dictionary', entryId: `synthetic-entry-${suffix}`,
       sourceOrdinal: index,
+      definitionStatus: 'published',
       definition: definitionCharacters > 0 ? `SYNTHETIC ${'D'.repeat(definitionCharacters - 10)}` : `SYNTHETIC DEFINITION ${suffix}`,
+      definitionExclusionReasons: [],
       glosses: [`SYNTHETIC GLOSS ${suffix}`],
       domainRefs: [{ sourceId: 'synthetic-domains', domainId: `synthetic-domain-${suffix}` }],
     },
@@ -161,12 +164,48 @@ export function syntheticContext(
   alignment = false,
 ): OriginalLanguageStudyV2DraftAuthoritativeContext {
   if (language === 'Greek') return { v1Result: syntheticGreekV1Result() };
+  const v1Result = syntheticHebrewV1Result();
+  const selectedToken = v1Result.selectedToken!;
+  const binding = {
+    canonicalReference: v1Result.reference,
+    normalizedReference: v1Result.reference,
+    selectedToken,
+  };
+  const dictionary = syntheticSource('dictionary');
+  const lexicalDomains = syntheticSource('lexical_domains');
   return {
-    v1Result: syntheticHebrewV1Result(), semanticArtifactIdentity: SYNTHETIC_ARTIFACT,
+    v1Result, semanticArtifactIdentity: SYNTHETIC_ARTIFACT,
     ...(alignment ? { serverVerifiedAlignment: {
-      status: 'verified_token_alignment' as const, morphologyTokenIdentity: 'synthetic-token-1', verifierVersion: 1,
+      status: 'verified_token_alignment' as const,
+      proofContract: 'theologai-exact-hebrew-token-alignment.v1' as const,
+      verifierVersion: 1,
+      sourceIdentity: SYNTHETIC_H0001,
+      normalizedReference: v1Result.reference,
+      artifactIdentity: SYNTHETIC_ARTIFACT,
+      artifactVersion: '0.9.2' as const,
+      artifactSources: {
+        dictionary: {
+          sourceId: dictionary.sourceId, sourceRole: dictionary.sourceRole, artifactName: dictionary.artifactName,
+          artifactIdentity: dictionary.artifactIdentity, artifactVersion: dictionary.artifactVersion,
+          sourceSha256: dictionary.sourceSha256,
+        },
+        lexicalDomains: {
+          sourceId: lexicalDomains.sourceId, sourceRole: lexicalDomains.sourceRole,
+          artifactName: lexicalDomains.artifactName, artifactIdentity: lexicalDomains.artifactIdentity,
+          artifactVersion: lexicalDomains.artifactVersion, sourceSha256: lexicalDomains.sourceSha256,
+        },
+      },
       sourceId: 'synthetic-dictionary', entryId: 'synthetic-entry-01', senseId: 'synthetic-sense-01',
       evidenceId: 'synthetic-reference-01',
+      morphologyTokenIdentity: deriveOriginalLanguageStudyV2MorphologyTokenIdentity(binding),
+      morphologyTokenCoordinates: {
+        canonicalReference: v1Result.reference, normalizedReference: v1Result.reference,
+        position: selectedToken.position,
+      },
+      morphologyTokenWitness: {
+        text: selectedToken.text, lemma: selectedToken.lemma, strongsNumber: selectedToken.strongsNumber,
+        morphologyCode: selectedToken.morphologyCode, gloss: selectedToken.gloss,
+      },
     } } : {}),
   };
 }

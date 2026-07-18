@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "theologai-ubs-tahot-coordinate-audit.v1",
+  "ubsReferenceRecords": 260813,
+  "ubsUniqueNativeCoordinates": 23213,
+  "tahotUniqueNativeCoordinates": 23213,
+  "coordinateSetEquality": true,
+  "missingUbsCoordinates": [],
+  "extraTahotCoordinates": [],
+  "footnoteSuffixRecords": 2697,
+  "tahotRawTokens": 305652,
+  "nativeToNormalizedDifferences": 2094,
+  "pins": {
+    "stepBibleCommit": "0f60797c170f11a1f8dc75c5f7617973e2e66b0d",
+    "tahot": [
+      { "id": "tahot-gen-deu", "bytes": 18190455, "sha256": "e9b8546ee48fe0bfc57c3b70f5f40e98d96580e803526d19026224e31753368b", "gitBlobSha1": "eb051292f8cee648c4f3eaf1b48cd0f1f30dc1d5" },
+      { "id": "tahot-isa-mal", "bytes": 17977518, "sha256": "f3ded203d2a74d6368932c97ae550d1d0754b271af491dc0dedf36fe3ba0bcc5", "gitBlobSha1": "1cfe6718a1dae0d5d45a57a942d3f7f716ac6342" },
+      { "id": "tahot-job-sng", "bytes": 9540133, "sha256": "84e118a97e5725e3847cdfdd593873513021c790c63cc91a0d41fca2b5db2ed5", "gitBlobSha1": "3d7af689417b54ebc468700b2bd86a8ba5377530" },
+      { "id": "tahot-jos-est", "bytes": 24500317, "sha256": "195fee1dc3653bab33701f170734eb894ed647c10cd08cc61749375fe8b73775", "gitBlobSha1": "e3824344f6dea1a3f51932d1b0a53537c3c2023e" }
+    ],
+    "usfmtc": {
+      "commit": "a222dd3e78360f8e275ca56f4307af7e02b2430a",
+      "referenceBlob": "16cd6fc2a42664a494a5989b8587247a27331cb6",
+      "referenceSha256": "eaff130bef0b6f6dde52386acb8c7a2e5111be11f1ca104522cffef72ea42b69",
+      "licenseBlob": "94b86440d4155c330b5fc17459effd133044064f",
+      "licenseSha256": "8d67696c8d8dca45ebed80adf43d53a8c5f4ebc563ace89da23d1af3b3e50be9"
+    }
+  }
+}

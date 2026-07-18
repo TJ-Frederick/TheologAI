@@ -101,6 +101,7 @@ describe('source-free UBS semantic design guards', () => {
     expect(contract.beginnerExample.status).toBe('lexical_candidates');
     expect(contract.expertExample.status).toBe('reference_aligned_source_candidate');
     expect(contract.expertExample.alignmentEvidence.status).toBe('verified_token_alignment');
+    expect(contract.expertExample.alignmentEvidence.proofContract).toBe('theologai-exact-hebrew-token-alignment.v1');
     expect(contract.expertExample.referenceEvidence).toMatchObject({
       sourceId: 'synthetic-hebrew-dictionary',
       senseId: contract.expertExample.senseId,
@@ -109,11 +110,7 @@ describe('source-free UBS semantic design guards', () => {
     const request = {
       publicStrongs: 'H1', normalizedReference: 'Synthetic 1:1',
       artifactIdentity: contract.expertExample.provenance.transformation.artifactIdentity,
-      expectedAlignment: {
-        morphologyTokenIdentity: 'synthetic-token-1', verifierVersion: 1,
-        sourceId: 'synthetic-hebrew-dictionary', senseId: 'synthetic-sense-one',
-        evidenceId: 'synthetic-reference-one',
-      },
+      expectedAlignment: structuredClone(contract.expertExample.alignmentEvidence),
     };
     expect(validate(contract.beginnerExample), validate.errors?.map((error: any) => error.message).join('; ')).toBe(true);
     expect(validate(contract.expertExample), validate.errors?.map((error: any) => error.message).join('; ')).toBe(true);
@@ -214,11 +211,7 @@ describe('source-free UBS semantic design guards', () => {
     const request = {
       publicStrongs: 'H1', normalizedReference: 'Synthetic 1:1',
       artifactIdentity: contract.beginnerExample.provenance.transformation.artifactIdentity,
-      expectedAlignment: {
-        morphologyTokenIdentity: 'synthetic-token-1', verifierVersion: 1,
-        sourceId: 'synthetic-hebrew-dictionary', senseId: 'synthetic-sense-one',
-        evidenceId: 'synthetic-reference-one',
-      },
+      expectedAlignment: structuredClone(contract.expertExample.alignmentEvidence),
     };
     const guard = (output: unknown, expected: RegExp): void => {
       expect(validate(output), validate.errors?.map((error: any) => error.message).join('; ')).toBe(true);
@@ -290,6 +283,24 @@ describe('source-free UBS semantic design guards', () => {
     const unrelatedVerifier = structuredClone(contract.expertExample);
     unrelatedVerifier.alignmentEvidence.verifierVersion = 2;
     guard(unrelatedVerifier, /trusted alignment proof identity/);
+
+    for (const mutate of [
+      (value: any) => { value.alignmentEvidence.artifactIdentity = '8'.repeat(64); },
+      (value: any) => { value.alignmentEvidence.artifactSources.dictionary.sourceSha256 = '9'.repeat(64); },
+      (value: any) => { value.alignmentEvidence.normalizedReference = 'Synthetic 1:2'; },
+      (value: any) => { value.alignmentEvidence.morphologyTokenCoordinates.position = 2; },
+      (value: any) => { value.alignmentEvidence.morphologyTokenWitness.text = 'ARBITRARY TOKEN'; },
+      (value: any) => { value.alignmentEvidence.entryId = 'other-entry'; },
+    ]) {
+      const staleOrCrossBoundProof = structuredClone(contract.expertExample);
+      mutate(staleOrCrossBoundProof);
+      guard(staleOrCrossBoundProof, /trusted alignment proof identity/);
+    }
+
+    const coordinateOnly = structuredClone(contract.expertExample);
+    coordinateOnly.alignmentEvidence.status = 'coordinate_attested_unpromoted';
+    delete coordinateOnly.alignmentEvidence.proofContract;
+    expect(validate(coordinateOnly)).toBe(false);
 
     const swappedSource = structuredClone(contract.expertExample);
     swappedSource.referenceEvidence.sourceId = 'other-dictionary-source';

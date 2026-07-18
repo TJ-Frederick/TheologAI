@@ -81,7 +81,16 @@ const detailedCandidate = {
     ...candidateIdentityProperties,
     detailStatus: { const: 'detailed' },
     lemma: { type: 'string', minLength: 1, maxLength: 2_000 },
+    definitionStatus: { enum: ['published', 'absent_in_source', 'excluded_unresolved_markup'] },
     definition: { type: 'string', minLength: 1, maxLength: 20_000 },
+    definitionExclusionReasons: {
+      type: 'array', maxItems: 8, uniqueItems: true,
+      items: { enum: [
+        'unsafe_attribution_markup', 'unsafe_note_markup',
+        'malformed_lexical_link_markup', 'unvalidated_scripture_link_markup',
+        'malformed_or_unknown_markup',
+      ] },
+    },
     glosses: {
       type: 'array', minItems: 1, maxItems: 16, uniqueItems: true,
       items: { type: 'string', minLength: 1, maxLength: 1_000 },
@@ -101,7 +110,7 @@ const detailedCandidate = {
         additionalProperties: false,
       },
     },
-    domainTotal: { type: 'integer', minimum: 1, maximum: 1_000_000 },
+    domainTotal: { type: 'integer', minimum: 0, maximum: 1_000_000 },
     referenceEvidence: {
       type: 'array', maxItems: 16,
       items: {
@@ -121,8 +130,27 @@ const detailedCandidate = {
     },
     referenceEvidenceTotal: { type: 'integer', minimum: 0, maximum: 1_000_000 },
   },
-  required: [...candidateIdentityRequired, 'detailStatus', 'lemma', 'definition', 'glosses', 'domains',
+  required: [...candidateIdentityRequired, 'detailStatus', 'lemma', 'definitionStatus',
+    'definitionExclusionReasons', 'glosses', 'domains',
     'domainTotal', 'referenceEvidence', 'referenceEvidenceTotal'],
+  allOf: [
+    {
+      if: { properties: { definitionStatus: { const: 'published' } }, required: ['definitionStatus'] },
+      then: {
+        required: ['definition'],
+        properties: {
+          definition: { type: 'string' },
+          definitionExclusionReasons: { type: 'array', maxItems: 0 },
+        },
+      },
+      else: { not: { required: ['definition'] } },
+    },
+    {
+      if: { properties: { definitionStatus: { const: 'excluded_unresolved_markup' } }, required: ['definitionStatus'] },
+      then: { properties: { definitionExclusionReasons: { type: 'array', minItems: 1 } } },
+      else: { properties: { definitionExclusionReasons: { type: 'array', maxItems: 0 } } },
+    },
+  ],
   additionalProperties: false,
 } as const;
 
@@ -197,18 +225,61 @@ const withheldEvidence = {
   items: false,
 } as const;
 
+const alignmentArtifactSource = {
+  type: 'object',
+  properties: {
+    sourceId: { type: 'string', minLength: 1, maxLength: 128 },
+    sourceRole: { enum: ['dictionary', 'lexical_domains'] },
+    artifactName: { enum: ['UBSHebrewDic-v0.9.2-en.JSON', 'UBSHebrewDicLexicalDomains-v0.9.2-en.JSON'] },
+    artifactIdentity: { type: 'string', pattern: '^[0-9a-f]{64}$' },
+    artifactVersion: { const: '0.9.2' },
+    sourceSha256: { type: 'string', pattern: '^[0-9a-f]{64}$' },
+  },
+  required: ['sourceId', 'sourceRole', 'artifactName', 'artifactIdentity', 'artifactVersion', 'sourceSha256'],
+  additionalProperties: false,
+} as const;
+
 const alignment = {
   type: 'object',
   properties: {
     status: { const: 'verified_token_alignment' },
-    morphologyTokenIdentity: { type: 'string', minLength: 1, maxLength: 512 },
+    proofContract: { const: 'theologai-exact-hebrew-token-alignment.v1' },
     verifierVersion: { type: 'integer', minimum: 1, maximum: 1_000_000 },
+    sourceIdentity: { type: 'string', pattern: '^H(?!0000$)[0-9]{4}$', minLength: 5, maxLength: 5 },
+    normalizedReference: { type: 'string', minLength: 1, maxLength: 100 },
+    artifactIdentity: { type: 'string', pattern: '^[0-9a-f]{64}$' },
+    artifactVersion: { const: '0.9.2' },
+    artifactSources: {
+      type: 'object', properties: { dictionary: alignmentArtifactSource, lexicalDomains: alignmentArtifactSource },
+      required: ['dictionary', 'lexicalDomains'], additionalProperties: false,
+    },
     sourceId: { type: 'string', minLength: 1, maxLength: 128 },
     entryId: { type: 'string', minLength: 1, maxLength: 128 },
     senseId: { type: 'string', minLength: 1, maxLength: 128 },
     evidenceId: { type: 'string', minLength: 1, maxLength: 128 },
+    morphologyTokenIdentity: { type: 'string', minLength: 1, maxLength: 512 },
+    morphologyTokenCoordinates: {
+      type: 'object', properties: {
+        canonicalReference: { type: 'string', minLength: 1, maxLength: 100 },
+        normalizedReference: { type: 'string', minLength: 1, maxLength: 100 },
+        position: { type: 'integer', minimum: 1, maximum: 200 },
+      }, required: ['canonicalReference', 'normalizedReference', 'position'], additionalProperties: false,
+    },
+    morphologyTokenWitness: {
+      type: 'object', properties: {
+        text: { type: 'string', minLength: 1, maxLength: 2_000 },
+        lemma: { type: 'string', minLength: 1, maxLength: 2_000 },
+        strongsNumber: { type: ['string', 'null'], maxLength: 128 },
+        morphologyCode: { type: ['string', 'null'], maxLength: 512 },
+        gloss: { type: ['string', 'null'], maxLength: 2_000 },
+      }, required: ['text', 'lemma', 'strongsNumber', 'morphologyCode', 'gloss'], additionalProperties: false,
+    },
   },
-  required: ['status', 'morphologyTokenIdentity', 'verifierVersion', 'sourceId', 'entryId', 'senseId', 'evidenceId'],
+  required: [
+    'status', 'proofContract', 'verifierVersion', 'sourceIdentity', 'normalizedReference',
+    'artifactIdentity', 'artifactVersion', 'artifactSources', 'sourceId', 'entryId', 'senseId', 'evidenceId',
+    'morphologyTokenIdentity', 'morphologyTokenCoordinates', 'morphologyTokenWitness',
+  ],
   additionalProperties: false,
 } as const;
 

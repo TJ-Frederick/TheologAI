@@ -33,6 +33,45 @@
       "trackedPath": "data/biblical-languages/ubs-open-license/v0.9.2/en/UBSHebrewDicLexicalDomains-v0.9.2-en.JSON"
     }
   ],
+  "referenceValidation": {
+    "purpose": "Pin the reviewed USFM book/chapter reference table and its MIT license; TAHOT remains authoritative for raw Hebrew coordinates and usfmtc does not establish token alignment.",
+    "repository": "https://github.com/usfm-bible/usfmtc",
+    "commit": "a222dd3e78360f8e275ca56f4307af7e02b2430a",
+    "license": "MIT",
+    "artifacts": [
+      {
+        "id": "usfmtc-reference-py",
+        "repositoryPath": "src/usfmtc/reference.py",
+        "sourceUrl": "https://raw.githubusercontent.com/usfm-bible/usfmtc/a222dd3e78360f8e275ca56f4307af7e02b2430a/src/usfmtc/reference.py",
+        "gitBlobSha1": "16cd6fc2a42664a494a5989b8587247a27331cb6",
+        "bytes": 40159,
+        "sha256": "eaff130bef0b6f6dde52386acb8c7a2e5111be11f1ca104522cffef72ea42b69",
+        "trackedPath": "data/biblical-languages/ubs-open-license/v0.9.2/reference-validation/usfmtc-reference.py"
+      },
+      {
+        "id": "usfmtc-mit-license",
+        "repositoryPath": "LICENSE",
+        "sourceUrl": "https://raw.githubusercontent.com/usfm-bible/usfmtc/a222dd3e78360f8e275ca56f4307af7e02b2430a/LICENSE",
+        "gitBlobSha1": "94b86440d4155c330b5fc17459effd133044064f",
+        "bytes": 1061,
+        "sha256": "8d67696c8d8dca45ebed80adf43d53a8c5f4ebc563ace89da23d1af3b3e50be9",
+        "trackedPath": "data/biblical-languages/ubs-open-license/v0.9.2/reference-validation/USFMTC-LICENSE"
+      }
+    ]
+  },
+  "inactiveAuditReports": [
+    {
+      "schemaVersion": "theologai-ubs-hebrew-decoder-audit.v1",
+      "trackedPath": "data/biblical-languages/ubs-open-license/v0.9.2/DECODER-AUDIT.json",
+      "purpose": "Deterministic normalized projection counts, fail-closed exclusions, and projection identity; separate from immutable Gate 1 SCHEMA-REPORT.json."
+    },
+    {
+      "schemaVersion": "theologai-ubs-tahot-coordinate-audit.v1",
+      "trackedPath": "data/biblical-languages/ubs-open-license/v0.9.2/COORDINATE-AUDIT.json",
+      "sha256": "d174d827bbfdf7d1c35a8836ff28a5453a2947ac5020eb5df060fed1732a1f30",
+      "purpose": "Exact raw UBS/TAHOT native-coordinate set equality and reviewed source pins; not contextual token or sense adjudication."
+    }
+  ],
   "upstreamNotices": [
     {
       "id": "cc-by-sa-4.0-license",
@@ -68,8 +107,8 @@
     "theologaiPolicy": "No current or future TheologAI result may imply complete Hebrew lexical or reference coverage solely from this acquisition."
   },
   "modifications": {
-    "performed": "None. The two approved JSON artifacts and the three notices are verbatim byte copies from the pinned revision. No migration, transform, compiler, materialization, D1 row, runtime, tool, prompt, resource, or public output was added.",
-    "plannedButNotPerformed": "A future separately approved decoder, transform, schema/migration 0004, token-alignment verifier, materialization, and release may derive a bounded semantic layer from these inputs."
+    "performed": "The two approved JSON artifacts and three notices remain verbatim. A migration-free, inactive raw decoder and coordinate-validation design were added with deterministic audit reports; neither source artifact was modified.",
+    "plannedButNotPerformed": "No executable migration 0004, transform 7, seed, manifest registration, D1 row, adapter, query plan, composition-root wiring, runtime tool, prompt, resource, public output, or deployment was added."
   },
   "futureAttributionAndShareAlikePolicy": "Before sharing any derived rows, exports, database copies, or semantic output based on these artifacts, preserve the UBS/SDBH attribution, the pinned source URI, the CC BY-SA 4.0 URI, and a clear change description; offer the derived semantic layer under CC BY-SA 4.0 or a compatible license. Do not claim that this policy extends CC BY-SA to unrelated TheologAI code or datasets, while preserving every license that independently applies. Final release wording remains subject to rights review."
 }

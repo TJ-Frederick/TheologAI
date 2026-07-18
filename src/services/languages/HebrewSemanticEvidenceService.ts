@@ -9,6 +9,7 @@
 import {
   UBS_SEMANTIC_REPOSITORY_LIMITS,
   UBS_SEMANTIC_REPOSITORY_ORDER,
+  UBS_SEMANTIC_DEFINITION_EXCLUSION_REASONS,
   parseUbsPublicHebrewIdentity,
   requireUbsInternalLexicalIdentity,
   requireUbsSemanticNormalizedReference,
@@ -29,30 +30,61 @@ import type {
   UbsSemanticSource,
 } from '../../kernel/ubsSemanticDomain.js';
 
+export type { FutureExactHebrewTokenAlignmentProof } from '../../kernel/ubsSemanticDomain.js';
+
 export const HEBREW_SEMANTIC_EVIDENCE_LIMITS = Object.freeze({
   candidates: 8,
   sensesInspected: 16,
-  trustedAlignments: 8,
   morphologyTokenIdentityCharacters: 512,
   entryLemmaCharacters: 2_000,
   entryTransliterationCharacters: 2_000,
   entryPartOfSpeechCharacters: 512,
-  verifierVersionMaximum: 1_000_000,
+} as const);
+
+const REVIEWED_TAHOT_PINS = Object.freeze([
+  { id: 'tahot-gen-deu', sha256: 'e9b8546ee48fe0bfc57c3b70f5f40e98d96580e803526d19026224e31753368b', gitBlobSha1: 'eb051292f8cee648c4f3eaf1b48cd0f1f30dc1d5' },
+  { id: 'tahot-isa-mal', sha256: 'f3ded203d2a74d6368932c97ae550d1d0754b271af491dc0dedf36fe3ba0bcc5', gitBlobSha1: '1cfe6718a1dae0d5d45a57a942d3f7f716ac6342' },
+  { id: 'tahot-job-sng', sha256: '84e118a97e5725e3847cdfdd593873513021c790c63cc91a0d41fca2b5db2ed5', gitBlobSha1: '3d7af689417b54ebc468700b2bd86a8ba5377530' },
+  { id: 'tahot-jos-est', sha256: '195fee1dc3653bab33701f170734eb894ed647c10cd08cc61749375fe8b73775', gitBlobSha1: 'e3824344f6dea1a3f51932d1b0a53537c3c2023e' },
+] as const);
+const REVIEWED_USFMTC = Object.freeze({
+  commit: 'a222dd3e78360f8e275ca56f4307af7e02b2430a',
+  referenceBlob: '16cd6fc2a42664a494a5989b8587247a27331cb6',
+  referenceSha256: 'eaff130bef0b6f6dde52386acb8c7a2e5111be11f1ca104522cffef72ea42b69',
+  licenseBlob: '94b86440d4155c330b5fc17459effd133044064f',
+  licenseSha256: '8d67696c8d8dca45ebed80adf43d53a8c5f4ebc563ace89da23d1af3b3e50be9',
 } as const);
 
 export type HebrewSemanticEvidenceAudience = 'beginner' | 'expert';
 
-/** A separately versioned verifier must explicitly attest this exact row. */
-export interface TrustedHebrewTokenAlignment {
-  status: 'verified_token_alignment';
-  morphologyTokenIdentity: string;
-  verifierVersion: number;
-  sourceIdentity: UbsInternalHebrewLexicalIdentity;
-  normalizedReference: string;
-  sourceId: string;
-  entryId: string;
-  senseId: string;
-  evidenceId: string;
+/**
+ * A raw-coordinate observation. It is intentionally not a token alignment:
+ * a UBS anchor and a TAHOT token can share a verse coordinate without proving
+ * that the token, lexical identity, or sense is the same.
+ */
+export interface CoordinateOnlyHebrewReferenceAttestation {
+  status: 'coordinate_attested_unpromoted';
+  coordinateAttestation: {
+    schemaVersion: 'theologai-ubs-tahot-coordinate-attestation.v1';
+    verifierVersion: number;
+    artifactIdentity: string;
+    sourceId: string;
+    entryId: string;
+    senseId: string;
+    evidenceId: string;
+    rawAnchor: string;
+    footnoteSuffix: string;
+    nativeCoordinate: { bookNumber: number; bookCode: string; chapter: number; verse: number };
+    normalizedCoordinate: { bookNumber: number; bookCode: string; chapter: number; verse: number };
+    normalizedReference: string;
+    tahotTokenIdentity: string;
+    tahotWordElement: string;
+    tahotFileId: string;
+    tahotFileLine: number;
+    tahotCorpus: readonly { id: string; sha256: string; gitBlobSha1: string }[];
+    usfmtc: { commit: string; referenceBlob: string; referenceSha256: string; licenseBlob: string; licenseSha256: string };
+    limitation: 'coordinate_and_explicit_pair_only_not_token_alignment_or_lexical_sense_adjudication';
+  };
 }
 
 export interface HebrewSemanticEvidenceRequest {
@@ -61,7 +93,8 @@ export interface HebrewSemanticEvidenceRequest {
   audience: HebrewSemanticEvidenceAudience;
   /** Internal repository continuation only; this is not a public result cursor. */
   entryPage?: UbsSemanticPageRequest;
-  trustedAlignments?: readonly TrustedHebrewTokenAlignment[];
+  /** Optional design-time coordinate observation; never promotes a candidate. */
+  coordinateOnlyAttestation?: CoordinateOnlyHebrewReferenceAttestation;
 }
 
 export interface HebrewSemanticEvidenceCoverage {
@@ -102,7 +135,7 @@ interface HebrewSemanticEvidenceRequestSnapshot {
   normalizedReference: string;
   audience: HebrewSemanticEvidenceAudience;
   entryPage?: Readonly<UbsSemanticPageRequest>;
-  trustedAlignments: unknown;
+  coordinateOnlyAttestation: unknown;
 }
 
 export class HebrewSemanticEvidenceService {
@@ -117,9 +150,7 @@ export class HebrewSemanticEvidenceService {
       throw new Error('UBS Hebrew semantic evidence audience must be beginner or expert');
     }
     const normalizedReference = requireUbsSemanticNormalizedReference(requestSnapshot.normalizedReference);
-    const trustedAlignments = validateTrustedAlignments(
-      requestSnapshot.trustedAlignments, identity.sourceIdentity, normalizedReference,
-    );
+    validateCoordinateOnlyAttestation(requestSnapshot.coordinateOnlyAttestation, normalizedReference);
     const entryPage = requestSnapshot.entryPage;
     const entries = await this.repository.getEntriesByLexicalIdentity(identity.sourceIdentity, entryPage);
     validateCollection(entries, UBS_SEMANTIC_REPOSITORY_ORDER.entriesByLexicalIdentity,
@@ -141,7 +172,7 @@ export class HebrewSemanticEvidenceService {
       validateCompleteFirstPage(senses, 'sense');
       validateSenses(senses.items, entry, seenSenseIdentities);
       if (senses.hasMore) evidenceIncomplete = true;
-      for (const sense of prioritizeTrustedSenses(senses.items, entry, trustedAlignments)) {
+      for (const sense of senses.items) {
         if (candidates.length >= HEBREW_SEMANTIC_EVIDENCE_LIMITS.candidates) {
           evidenceIncomplete = true;
           break outer;
@@ -160,8 +191,6 @@ export class HebrewSemanticEvidenceService {
           throw new Error('repository domain collection does not completely represent the sense domain references');
         }
         if (domains.hasMore) evidenceIncomplete = true;
-        if (domains.items.length === 0) continue;
-
         const references = await this.repository.findReferenceEvidence(
           sense.sourceId, sense.senseId, normalizedReference,
         );
@@ -189,7 +218,6 @@ export class HebrewSemanticEvidenceService {
       }, coverage, []);
     }
     if (candidates.length === 0) {
-      if (trustedAlignments.length > 0) throw new Error('trusted alignment does not match publishable repository evidence');
       if (evidenceIncomplete) {
         throw new Error('incomplete repository evidence cannot establish that publishable semantic evidence is unavailable');
       }
@@ -198,49 +226,29 @@ export class HebrewSemanticEvidenceService {
       }, coverage, []);
     }
 
-    const matches = matchTrustedAlignments(candidates, trustedAlignments);
-    if (matches.length !== trustedAlignments.length) {
-      throw new Error('every trusted alignment must match one exact returned entry, sense, reference evidence row, and query scope');
-    }
     const provenanceSources = await loadExactCandidateProvenance(this.repository, candidates);
-    const matchedCandidateCount = new Set(matches.map(match => [
-      match.candidate.entry.sourceId, match.candidate.entry.entryId, match.candidate.sense.senseId,
-    ].join('\0'))).size;
-    if (matchedCandidateCount === 1) {
-      const match = [...matches].sort((left, right) => compare(
-        [left.referenceEvidence.sourceOrdinal, left.referenceEvidence.evidenceId],
-        [right.referenceEvidence.sourceOrdinal, right.referenceEvidence.evidenceId],
-      ))[0]!;
-      return result(identity, normalizedReference, audience, {
-        status: 'reference_aligned_source_candidate',
-        sense: match.candidate.sense,
-        domains: [...match.candidate.domains],
-        referenceEvidence: match.referenceEvidence,
-        alignmentEvidence: {
-          status: 'verified_token_alignment',
-          morphologyTokenIdentity: match.alignment.morphologyTokenIdentity,
-          verifierVersion: match.alignment.verifierVersion,
-        },
-      }, coverage, provenanceSources);
-    }
-
     const hasReferenceEvidence = candidates.some(candidate => candidate.matchingReferences.length > 0);
     return result(identity, normalizedReference, audience, {
       status: 'lexical_candidates',
       candidates: candidates.map(({ sense, domains }) => ({ sense, domains: [...domains] })),
-      reason: matchedCandidateCount > 1
-        ? 'ambiguous_reference_alignment'
-        : hasReferenceEvidence || evidenceIncomplete ? 'reference_alignment_unproven' : 'no_reference_evidence',
+      reason: hasReferenceEvidence || evidenceIncomplete ? 'reference_alignment_unproven' : 'no_reference_evidence',
     }, coverage, provenanceSources);
   }
 }
 
 function snapshotRequest(request: HebrewSemanticEvidenceRequest): Readonly<HebrewSemanticEvidenceRequestSnapshot> {
   if (!request || typeof request !== 'object') throw new Error('UBS Hebrew semantic evidence request must be a record');
+  if (Object.keys(request).some(key => ![
+    'publicStrongs', 'normalizedReference', 'audience', 'entryPage', 'coordinateOnlyAttestation',
+  ].includes(key))) {
+    throw new Error('UBS Hebrew semantic evidence request contains an unsupported field');
+  }
   const publicStrongs = request.publicStrongs;
   const normalizedReference = request.normalizedReference;
   const audience = request.audience;
-  const trustedAlignments = request.trustedAlignments;
+  const rawCoordinateOnlyAttestation = request.coordinateOnlyAttestation;
+  const coordinateOnlyAttestation = rawCoordinateOnlyAttestation === undefined
+    ? undefined : structuredClone(rawCoordinateOnlyAttestation);
   const rawEntryPage = request.entryPage;
   let entryPage: Readonly<UbsSemanticPageRequest> | undefined;
   if (rawEntryPage !== undefined) {
@@ -254,7 +262,7 @@ function snapshotRequest(request: HebrewSemanticEvidenceRequest): Readonly<Hebre
     publicStrongs,
     normalizedReference,
     audience,
-    trustedAlignments: trustedAlignments ?? Object.freeze([]),
+    coordinateOnlyAttestation,
     ...(entryPage ? { entryPage } : {}),
   });
 }
@@ -298,111 +306,74 @@ function explanation(resolution: UbsSemanticResolution, audience: HebrewSemantic
     : 'No complete, publishable semantic evidence is available for this Hebrew identity.';
 }
 
-function validateTrustedAlignments(
-  values: unknown,
-  sourceIdentity: UbsInternalHebrewLexicalIdentity,
+function validateCoordinateOnlyAttestation(
+  value: unknown,
   normalizedReference: string,
-): readonly Readonly<TrustedHebrewTokenAlignment>[] {
-  if (!Array.isArray(values)) {
-    throw new Error('trusted alignments exceed the reviewed eight-assertion bound');
+): Readonly<CoordinateOnlyHebrewReferenceAttestation> | undefined {
+  if (value === undefined) return undefined;
+  if (!value || typeof value !== 'object' || Array.isArray(value)
+    || Object.keys(value).sort().join(',') !== 'coordinateAttestation,status') {
+    throw new Error('coordinate-only attestation must be one exact reviewed assertion');
   }
-  const length = values.length;
-  if (!Number.isSafeInteger(length) || length < 0
-    || length > HEBREW_SEMANTIC_EVIDENCE_LIMITS.trustedAlignments) {
-    throw new Error('trusted alignments must have an honest safe-integer length from zero through eight');
+  const caller = value as CoordinateOnlyHebrewReferenceAttestation;
+  if (caller.status !== 'coordinate_attested_unpromoted') {
+    throw new Error('coordinate-only attestation must not claim verified token alignment');
   }
-  for (const key of Reflect.ownKeys(values)) {
-    if (typeof key !== 'string' || !isCanonicalArrayIndex(key)) continue;
-    if (Number(key) >= length) {
-      throw new Error('trusted alignments must be a dense array with no assertion hidden beyond its reported length');
-    }
+  const attestation = caller.coordinateAttestation;
+  if (!attestation || typeof attestation !== 'object' || Array.isArray(attestation)
+    || Object.keys(attestation).sort().join(',') !== [
+      'artifactIdentity', 'entryId', 'evidenceId', 'footnoteSuffix', 'limitation',
+      'nativeCoordinate', 'normalizedCoordinate', 'normalizedReference', 'rawAnchor',
+      'schemaVersion', 'senseId', 'sourceId', 'tahotCorpus', 'tahotFileId',
+      'tahotFileLine', 'tahotTokenIdentity', 'tahotWordElement', 'usfmtc', 'verifierVersion',
+    ].sort().join(',')) {
+    throw new Error('coordinate-only attestation is incomplete');
   }
-  const callerRecords: unknown[] = [];
-  for (let index = 0; index < length; index += 1) {
-    if (!Object.prototype.hasOwnProperty.call(values, index)) {
-      throw new Error('trusted alignments must be a dense array with every reported index present');
-    }
-    callerRecords.push(values[index]);
+  if (attestation.schemaVersion !== 'theologai-ubs-tahot-coordinate-attestation.v1'
+    || attestation.limitation !== 'coordinate_and_explicit_pair_only_not_token_alignment_or_lexical_sense_adjudication'
+    || attestation.verifierVersion !== 1
+    || !/^[0-9a-f]{64}$/.test(attestation.artifactIdentity)
+    || requireUbsSemanticNormalizedReference(attestation.normalizedReference, 'coordinate-only normalized reference') !== normalizedReference) {
+    throw new Error('coordinate-only attestation coordinate, reference, or verifier binding is invalid');
   }
-  const snapshots: Readonly<TrustedHebrewTokenAlignment>[] = [];
-  const tokenIdentities = new Set<string>();
-  const exactKeys = new Set<string>();
-  for (const value of callerRecords) {
-    if (!value || typeof value !== 'object') {
-      throw new Error('trusted alignment is not bound to the exact token, source identity, normalized reference, and verifier version');
-    }
-    const caller = value as Record<keyof TrustedHebrewTokenAlignment, unknown>;
-    const status = caller.status;
-    const morphologyTokenIdentity = caller.morphologyTokenIdentity;
-    const verifierVersion = caller.verifierVersion;
-    const callerSourceIdentity = caller.sourceIdentity;
-    const callerNormalizedReference = caller.normalizedReference;
-    const sourceId = caller.sourceId;
-    const entryId = caller.entryId;
-    const senseId = caller.senseId;
-    const evidenceId = caller.evidenceId;
-    if (typeof status !== 'string' || typeof morphologyTokenIdentity !== 'string'
-      || typeof verifierVersion !== 'number' || typeof callerSourceIdentity !== 'string'
-      || typeof callerNormalizedReference !== 'string' || typeof sourceId !== 'string'
-      || typeof entryId !== 'string' || typeof senseId !== 'string' || typeof evidenceId !== 'string') {
-      throw new Error('trusted alignment exact-key fields must be primitive strings plus one numeric verifier version');
-    }
-    const snapshot = Object.freeze({
-      status,
-      morphologyTokenIdentity,
-      verifierVersion,
-      sourceIdentity: callerSourceIdentity,
-      normalizedReference: callerNormalizedReference,
-      sourceId,
-      entryId,
-      senseId,
-      evidenceId,
-    }) as Readonly<TrustedHebrewTokenAlignment>;
-    if (Object.keys(value).sort().join(',') !== 'entryId,evidenceId,morphologyTokenIdentity,normalizedReference,senseId,sourceId,sourceIdentity,status,verifierVersion'
-      || snapshot.status !== 'verified_token_alignment'
-      || snapshot.sourceIdentity !== sourceIdentity
-      || requireUbsSemanticNormalizedReference(snapshot.normalizedReference, 'trusted alignment normalized reference') !== normalizedReference
-      || !Number.isSafeInteger(snapshot.verifierVersion) || snapshot.verifierVersion < 1
-      || snapshot.verifierVersion > HEBREW_SEMANTIC_EVIDENCE_LIMITS.verifierVersionMaximum) {
-      throw new Error('trusted alignment is not bound to the exact token, source identity, normalized reference, and verifier version');
-    }
-    boundedText(
-      snapshot.morphologyTokenIdentity,
-      HEBREW_SEMANTIC_EVIDENCE_LIMITS.morphologyTokenIdentityCharacters,
-      'trusted alignment morphology token identity',
-    );
-    for (const [label, identifier] of [
-      ['source', snapshot.sourceId], ['entry', snapshot.entryId], ['sense', snapshot.senseId], ['evidence', snapshot.evidenceId],
-    ] as const) requireIdentifier(identifier, `trusted alignment ${label} ID`);
-    tokenIdentities.add(snapshot.morphologyTokenIdentity);
-    const exactKey = [snapshot.sourceId, snapshot.entryId, snapshot.senseId, snapshot.evidenceId].join('\0');
-    if (exactKeys.has(exactKey)) throw new Error('trusted alignments contain a duplicate exact assertion');
-    exactKeys.add(exactKey);
-    snapshots.push(snapshot);
+  for (const [label, identifier] of [
+    ['source', attestation.sourceId], ['entry', attestation.entryId],
+    ['sense', attestation.senseId], ['evidence', attestation.evidenceId],
+    ['TAHOT file', attestation.tahotFileId],
+  ] as const) requireIdentifier(identifier, `coordinate-only ${label} ID`);
+  boundedText(attestation.rawAnchor, 512, 'coordinate-only raw anchor');
+  boundedPossiblyEmptyText(attestation.footnoteSuffix, 128, 'coordinate-only footnote suffix');
+  boundedText(attestation.tahotTokenIdentity, HEBREW_SEMANTIC_EVIDENCE_LIMITS.morphologyTokenIdentityCharacters,
+    'coordinate-only TAHOT token identity');
+  boundedText(attestation.tahotWordElement, 512, 'coordinate-only TAHOT word element');
+  positiveInteger(attestation.tahotFileLine, 'coordinate-only TAHOT file line');
+  validateCoordinate(attestation.nativeCoordinate, 'coordinate-only native');
+  validateCoordinate(attestation.normalizedCoordinate, 'coordinate-only normalized');
+  if (!Array.isArray(attestation.tahotCorpus) || attestation.tahotCorpus.length !== 4) {
+    throw new Error('coordinate-only attestation must bind the exact four-file TAHOT corpus');
   }
-  if (tokenIdentities.size > 1) throw new Error('trusted alignments must describe one exact local morphology token');
-  return Object.freeze(snapshots);
-}
-
-function isCanonicalArrayIndex(value: string): boolean {
-  if (!/^(?:0|[1-9][0-9]*)$/.test(value)) return false;
-  const numeric = Number(value);
-  return Number.isSafeInteger(numeric) && numeric >= 0 && numeric < 0xffff_ffff
-    && String(numeric) === value;
-}
-
-function prioritizeTrustedSenses(
-  senses: readonly UbsSemanticSense[],
-  entry: UbsSemanticEntry,
-  alignments: readonly TrustedHebrewTokenAlignment[],
-): UbsSemanticSense[] {
-  const trustedSenseIds = new Set(alignments
-    .filter(alignment => alignment.sourceId === entry.sourceId && alignment.entryId === entry.entryId)
-    .map(alignment => alignment.senseId));
-  return [
-    ...senses.filter(sense => trustedSenseIds.has(sense.senseId)),
-    ...senses.filter(sense => !trustedSenseIds.has(sense.senseId)),
-  ];
+  const corpusIds = new Set<string>();
+  for (const pin of attestation.tahotCorpus) {
+    if (!pin || typeof pin !== 'object' || Object.keys(pin).sort().join(',') !== 'gitBlobSha1,id,sha256'
+      || !/^[a-z0-9][a-z0-9_.-]*$/.test(pin.id) || !/^[0-9a-f]{64}$/.test(pin.sha256)
+      || !/^[0-9a-f]{40}$/.test(pin.gitBlobSha1) || corpusIds.has(pin.id)) {
+      throw new Error('coordinate-only TAHOT corpus pins are malformed or duplicated');
+    }
+    corpusIds.add(pin.id);
+  }
+  if (JSON.stringify(attestation.tahotCorpus) !== JSON.stringify(REVIEWED_TAHOT_PINS)) {
+    throw new Error('coordinate-only TAHOT corpus differs from the exact reviewed pin set');
+  }
+  const usfmtc = attestation.usfmtc;
+  if (!usfmtc || typeof usfmtc !== 'object'
+    || Object.keys(usfmtc).sort().join(',') !== 'commit,licenseBlob,licenseSha256,referenceBlob,referenceSha256'
+    || !/^[0-9a-f]{40}$/.test(usfmtc.commit) || !/^[0-9a-f]{40}$/.test(usfmtc.referenceBlob)
+    || !/^[0-9a-f]{64}$/.test(usfmtc.referenceSha256) || !/^[0-9a-f]{40}$/.test(usfmtc.licenseBlob)
+    || !/^[0-9a-f]{64}$/.test(usfmtc.licenseSha256)
+    || JSON.stringify(usfmtc) !== JSON.stringify(REVIEWED_USFMTC)) {
+    throw new Error('coordinate-only usfmtc pins are malformed');
+  }
+  return Object.freeze(structuredClone(caller));
 }
 
 function validateEntries(items: readonly UbsSemanticEntry[], identity: UbsInternalHebrewLexicalIdentity): void {
@@ -461,15 +432,33 @@ function validateSenses(
     resolutionIdentities.add(exactIdentity);
     if (ordinals.has(sense.sourceOrdinal)) throw new Error('repository senses contain a duplicate source ordinal within an entry');
     ordinals.add(sense.sourceOrdinal);
-    boundedText(sense.definition, 20_000, 'sense definition');
+    if (!['published', 'absent_in_source', 'excluded_unresolved_markup'].includes(sense.definitionStatus)) {
+      throw new Error('sense definition status is invalid');
+    }
+    if (sense.definition === undefined) {
+      if (sense.definitionStatus === 'published') throw new Error('published sense definition is missing');
+    } else {
+      boundedText(sense.definition, 20_000, 'sense definition');
+      if (sense.definitionStatus !== 'published') throw new Error('unpublished sense exposes definition text');
+    }
+    if (!Array.isArray(sense.definitionExclusionReasons) || sense.definitionExclusionReasons.length > 8
+      || new Set(sense.definitionExclusionReasons).size !== sense.definitionExclusionReasons.length
+      || (sense.definitionStatus === 'excluded_unresolved_markup') !== (sense.definitionExclusionReasons.length > 0)) {
+      throw new Error('sense definition exclusion reasons are malformed, duplicated, unbounded, or inconsistent');
+    }
+    for (const reason of sense.definitionExclusionReasons) {
+      if (!UBS_SEMANTIC_DEFINITION_EXCLUSION_REASONS.includes(reason)) {
+        throw new Error('sense definition exclusion reason is unsupported');
+      }
+    }
     if (!Array.isArray(sense.glosses) || sense.glosses.length < 1 || sense.glosses.length > 16) {
       throw new Error('sense glosses must contain one to sixteen publishable values');
     }
     for (const gloss of sense.glosses) boundedText(gloss, 1_000, 'sense gloss');
     if (new Set(sense.glosses).size !== sense.glosses.length) throw new Error('sense glosses must be unique');
-    if (!Array.isArray(sense.domainRefs) || sense.domainRefs.length < 1 || sense.domainRefs.length > 16
+    if (!Array.isArray(sense.domainRefs) || sense.domainRefs.length > 16
       || new Set(sense.domainRefs.map(ref => `${ref.sourceId}\0${ref.domainId}`)).size !== sense.domainRefs.length) {
-      throw new Error('sense domain references must contain one to sixteen unique source/domain identities');
+      throw new Error('sense domain references must contain zero to sixteen unique source/domain identities');
     }
     if (prior && compare([prior.sourceOrdinal, prior.senseId], [sense.sourceOrdinal, sense.senseId]) >= 0) {
       throw new Error('repository senses are not in strict canonical order');
@@ -544,7 +533,7 @@ async function loadExactCandidateProvenance(
       if (!ids.includes(id)) ids.push(id);
     }
   }
-  if (ids.length !== 2) throw new Error('publishable semantic candidates require exactly the dictionary and lexical-domain sources');
+  if (ids.length < 1 || ids.length > 2) throw new Error('publishable semantic candidates require bounded exact source provenance');
   const sources: UbsSemanticSource[] = [];
   for (const id of ids) {
     const source = await repository.getSource(id);
@@ -555,10 +544,11 @@ async function loadExactCandidateProvenance(
     sources.push(source);
   }
   sources.sort((left, right) => roleOrder(left.sourceRole) - roleOrder(right.sourceRole));
-  if (sources[0]?.sourceRole !== 'dictionary' || sources[1]?.sourceRole !== 'lexical_domains') {
-    throw new Error('publishable semantic provenance must contain dictionary then lexical-domain source roles');
+  if (sources[0]?.sourceRole !== 'dictionary'
+    || (sources.length === 2 && sources[1]?.sourceRole !== 'lexical_domains')) {
+    throw new Error('publishable semantic provenance must contain dictionary and, when used, lexical-domain source roles');
   }
-  if (sources[0].artifactIdentity !== sources[1].artifactIdentity) {
+  if (sources.length === 2 && sources[0].artifactIdentity !== sources[1]!.artifactIdentity) {
     throw new Error('publishable semantic provenance sources do not share one exact semantic artifact identity');
   }
   return sources;
@@ -592,15 +582,6 @@ function validHttpsUrl(value: unknown): boolean {
   } catch {
     return false;
   }
-}
-
-function matchTrustedAlignments(candidates: readonly CandidateEvidence[], alignments: readonly TrustedHebrewTokenAlignment[]) {
-  return alignments.flatMap(alignment => candidates.flatMap(candidate => {
-    if (candidate.entry.sourceId !== alignment.sourceId || candidate.entry.entryId !== alignment.entryId
-      || candidate.sense.senseId !== alignment.senseId) return [];
-    const referenceEvidence = candidate.matchingReferences.find(evidence => evidence.evidenceId === alignment.evidenceId);
-    return referenceEvidence ? [{ candidate, referenceEvidence, alignment }] : [];
-  }));
 }
 
 function coverageFor(
@@ -672,6 +653,28 @@ function boundedText(value: unknown, maximum: number, label: string): asserts va
     || [...value].length > maximum || /[\p{Cc}\p{Cf}\p{Cs}\p{Zl}\p{Zp}]/u.test(value)
     || hasUnicodeNoncharacter(value)) {
     throw new Error(`${label} must be non-empty, trimmed, NFC, permitted Unicode, and within its character bound`);
+  }
+}
+
+function boundedPossiblyEmptyText(value: unknown, maximum: number, label: string): asserts value is string {
+  if (typeof value !== 'string' || value !== value.trim() || value !== value.normalize('NFC')
+    || [...value].length > maximum || /[\p{Cc}\p{Cf}\p{Cs}\p{Zl}\p{Zp}]/u.test(value)
+    || hasUnicodeNoncharacter(value)) {
+    throw new Error(`${label} must be trimmed, NFC, permitted Unicode, and within its character bound`);
+  }
+}
+
+function validateCoordinate(value: unknown, label: string): void {
+  if (!value || typeof value !== 'object' || Array.isArray(value)
+    || Object.keys(value).sort().join(',') !== 'bookCode,bookNumber,chapter,verse') {
+    throw new Error(`trusted alignment ${label} coordinate is incomplete`);
+  }
+  const coordinate = value as { bookNumber: unknown; bookCode: unknown; chapter: unknown; verse: unknown };
+  positiveInteger(coordinate.bookNumber, `trusted alignment ${label} book number`);
+  positiveInteger(coordinate.chapter, `trusted alignment ${label} chapter`);
+  positiveInteger(coordinate.verse, `trusted alignment ${label} verse`);
+  if (typeof coordinate.bookCode !== 'string' || !/^[A-Z0-9]{3}$/.test(coordinate.bookCode)) {
+    throw new Error(`trusted alignment ${label} book code is invalid`);
   }
 }
 

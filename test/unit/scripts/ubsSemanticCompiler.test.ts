@@ -67,6 +67,35 @@ describe('source-free Hebrew UBS semantic compiler skeleton', () => {
   });
 
   it.each([
+    ['absent_in_source', []],
+    ['excluded_unresolved_markup', ['malformed_or_unknown_markup']],
+  ] as const)('retains gloss-only %s senses with zero domains', (definitionStatus, reasons) => {
+    const input = fixture();
+    const semanticSense = input.entries[0].senses[0];
+    semanticSense.definitionStatus = definitionStatus;
+    delete semanticSense.definition;
+    semanticSense.definitionExclusionReasons = reasons;
+    semanticSense.domainIds = [];
+    const compiled = compile(input);
+    expect(compiled.senses[0]).toMatchObject({
+      definitionStatus, definitionExclusionReasons: reasons, domainRefs: [],
+    });
+    expect(compiled.senses[0].definition).toBeUndefined();
+  });
+
+  it('rejects inconsistent definition status/text/reason combinations', () => {
+    for (const mutate of [
+      (sense: Fixture) => { sense.definitionStatus = 'absent_in_source'; },
+      (sense: Fixture) => { delete sense.definition; },
+      (sense: Fixture) => { sense.definitionStatus = 'excluded_unresolved_markup'; },
+      (sense: Fixture) => { sense.definitionExclusionReasons = ['malformed_or_unknown_markup']; },
+    ]) {
+      const input = fixture(); mutate(input.entries[0].senses[0]);
+      expect(() => compile(input)).toThrow('definition status, text, and exclusion reasons are inconsistent');
+    }
+  });
+
+  it.each([
     ['root', (x: Fixture) => { x.unreviewed = true; }],
     ['source', (x: Fixture) => { x.sources[0].unreviewed = true; }],
     ['domain', (x: Fixture) => { x.domains[0].unreviewed = true; }],
