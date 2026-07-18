@@ -1,0 +1,125 @@
+{
+  "schemaVersion": "public-domain-normalization-report.v1",
+  "sourceLock": {
+    "path": "data/historical-sources/public-domain-prep/SOURCE_LOCK.json",
+    "bytes": 10143,
+    "sha256": "80349f69fa24a9272648d44a0fa890269fb25fec8bd352ac8266261e7b212396"
+  },
+  "parser": {
+    "networkAccess": false,
+    "decoder": "TextDecoder utf-8 fatal; BOM/NUL/replacement/lone-CR rejected",
+    "lineEndingTransformation": "CRLF to LF only",
+    "wrapperTransformation": "Gutenberg START/END marker lines and adjacent wrapper blank lines excluded",
+    "sectionBoundaryWhitespace": "preserved verbatim",
+    "modernization": "none"
+  },
+  "evidenceAudit": {
+    "rdfPublicDomainAssertions": 4,
+    "rdfSemanticAssertions": 4,
+    "calvinVolumes": 2,
+    "aquinasTransformationNoticeAudited": true,
+    "directCcelArtifacts": 0,
+    "augustineTranslatorAudited": true
+  },
+  "structuralAudit": {
+    "calvinVolumeII": {
+      "reviewedMarkers": [
+        "Footnote 1404:",
+        "INDEX OF THE PRINCIPAL MATTERS.",
+        "SCRIPTURE INDEX TO CALVIN’S INSTITUTES.",
+        "● Transcriber’s Notes:"
+      ],
+      "orderedSectionKeys": [
+        "book-4-chapter-20",
+        "book-4-chapter-20-footnotes",
+        "index-of-principal-matters",
+        "scripture-index-to-calvins-institutes",
+        "transcribers-notes"
+      ],
+      "totalCalvinSections": 91
+    },
+    "aquinasQ73ToQ83": {
+      "questionOrder": [
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        83
+      ],
+      "articleVector": [
+        6,
+        8,
+        8,
+        8,
+        8,
+        6,
+        8,
+        12,
+        4,
+        10,
+        6
+      ],
+      "totalSections": 95
+    }
+  },
+  "generated": [
+    {
+      "sourceId": "gutenberg-pg45001-pg64392-john-allen-calvin",
+      "path": "data/historical-sources/public-domain-prep/calvin-john-allen-sixth-american.sections.json",
+      "bytes": 4039426,
+      "sha256": "c08cf5715bdf8f1659986495f8df8334d02e9a516515107a5002287161717cac",
+      "sections": 91,
+      "contentUtf8Bytes": 3951036
+    },
+    {
+      "sourceId": "gutenberg-pg19950-aquinas-tertia-pars-q73-q83",
+      "path": "data/historical-sources/public-domain-prep/aquinas-tertia-pars-q73-q83.sections.json",
+      "bytes": 497027,
+      "sha256": "42a6d49a5e3097199bd823246475b1c72c4d57d4ef1d170b595d15307c1e92dd",
+      "sections": 95,
+      "contentUtf8Bytes": 471325
+    },
+    {
+      "sourceId": "gutenberg-pg3296-pusey-augustine-confessions",
+      "path": "data/historical-sources/public-domain-prep/augustine-confessions-pusey.sections.json",
+      "bytes": 615300,
+      "sha256": "2a1bd9db46b66cf62ce112c43dbd1a11863da251b99dd2c70300dd0a3d95f284",
+      "sections": 14,
+      "contentUtf8Bytes": 602961
+    }
+  ],
+  "blocked": [
+    {
+      "sourceId": "internet-archive-a566189200cypruoft-cyril-1839",
+      "reason": "The inspected title pages identify only “Translated by members of the English Church” and “Translated, with notes and indices.” Internet Archive metadata lists Richard William Church and John Henry Newman as untyped creators. The exact individual translator/editor roles cannot be established without inference, so normalization is hard-stopped.",
+      "normalizedArtifacts": 0,
+      "audit": {
+        "ocrObjects": 402,
+        "scandataLeafCount": 406,
+        "titlePageLeaf": 13,
+        "lectureObjectPages": {
+          "lecturexix": 312,
+          "lecturexx": 317,
+          "lecturexxi": 321,
+          "lecturexxii": 324,
+          "lecturexxiii": 327
+        },
+        "roleConclusion": "blocked_untyped_collective_credit"
+      }
+    }
+  ],
+  "exclusions": {
+    "ccelArtifacts": 0,
+    "unofficialPdfs": 0,
+    "migrations": 0,
+    "manifests": 0,
+    "d1Seeds": 0,
+    "runtimeWiring": 0
+  }
+}
