@@ -1,0 +1,1949 @@
+{
+  "schemaVersion": 1,
+  "kind": "historical_section_compatibility_evidence",
+  "historicalSectionKeyPlanSha256": "27d82c139aeb8521fab535a0988c0e7f0902e6b3aedf1970bb8a5c0b26702fbf",
+  "sourcePolicy": "content_free_local_materialization_evidence",
+  "compatibilityStatus": {
+    "nodeGetCurrentResolution": "unordered_no_compatibility_proof",
+    "d1FirstCurrentResolution": "unordered_no_compatibility_proof",
+    "productionObservedTarget": null,
+    "decisionStatus": "approved_source_first"
+  },
+  "expectedCollisionReport": {
+    "collisionGroups": 23,
+    "affectedSections": 256,
+    "newlyAddressableSections": 233
+  },
+  "collisionGroups": [
+    {
+      "documentId": "baltimore-catechism",
+      "legacySectionId": "1",
+      "members": [
+        {
+          "sourceOrdinal": 1,
+          "sourceSignature": "3b9f6c7055ea4e80b4f15f129109fcd95b632e27738a90dc8f4c634253838524",
+          "plannedSectionKey": "1",
+          "sqliteBuilderRowId": 178,
+          "d1SeedOrdinal": 178
+        },
+        {
+          "sourceOrdinal": 70,
+          "sourceSignature": "cd910a3466911dfff461a7d6474a747ec51ee276033e35dffbacbe9810e9fee5",
+          "plannedSectionKey": "assigned-0001",
+          "sqliteBuilderRowId": 247,
+          "d1SeedOrdinal": 247
+        },
+        {
+          "sourceOrdinal": 75,
+          "sourceSignature": "2444df000b0623dc0529dd6f6351932669ca1bbe508729d5095d1133b5b1569d",
+          "plannedSectionKey": "assigned-0004",
+          "sqliteBuilderRowId": 252,
+          "d1SeedOrdinal": 252
+        },
+        {
+          "sourceOrdinal": 118,
+          "sourceSignature": "752d9fa314a8ff504f972b665a691fe4d18b26fed0a53ac2a56375de03f22ae1",
+          "plannedSectionKey": "assigned-0006",
+          "sqliteBuilderRowId": 295,
+          "d1SeedOrdinal": 295
+        },
+        {
+          "sourceOrdinal": 139,
+          "sourceSignature": "fef8e893c3dbd44cb0b187664583f060f007327ff00eb7662ae366bbd04419c9",
+          "plannedSectionKey": "assigned-0010",
+          "sqliteBuilderRowId": 316,
+          "d1SeedOrdinal": 316
+        },
+        {
+          "sourceOrdinal": 207,
+          "sourceSignature": "cbfa80cd8702198c25c91d927e2aa066404c75800d86c533713e54615f26de6a",
+          "plannedSectionKey": "assigned-0018",
+          "sqliteBuilderRowId": 384,
+          "d1SeedOrdinal": 384
+        },
+        {
+          "sourceOrdinal": 211,
+          "sourceSignature": "88320eb92069578148d4156b79d54ba9f44cbc1c15487c837f5ec69d665d8c9e",
+          "plannedSectionKey": "assigned-0020",
+          "sqliteBuilderRowId": 388,
+          "d1SeedOrdinal": 388
+        },
+        {
+          "sourceOrdinal": 219,
+          "sourceSignature": "be08296530138c144704e1aee0e0dd058bf320ad5875f232aaa663d7227224f9",
+          "plannedSectionKey": "assigned-0027",
+          "sqliteBuilderRowId": 396,
+          "d1SeedOrdinal": 396
+        },
+        {
+          "sourceOrdinal": 229,
+          "sourceSignature": "d7389b8875572ee5b19995de6e39909cb0297cc67e302101efd9281d8927c070",
+          "plannedSectionKey": "assigned-0034",
+          "sqliteBuilderRowId": 406,
+          "d1SeedOrdinal": 406
+        },
+        {
+          "sourceOrdinal": 325,
+          "sourceSignature": "2a2a881a6659b89f61f41d975e6f7325d075641bf234c884b4b565234f867565",
+          "plannedSectionKey": "assigned-0044",
+          "sqliteBuilderRowId": 502,
+          "d1SeedOrdinal": 502
+        },
+        {
+          "sourceOrdinal": 405,
+          "sourceSignature": "dcc0d9e1f317f63b28c820ecf4747619e8484025d3e46afca9f32635bcbb3805",
+          "plannedSectionKey": "assigned-0050",
+          "sqliteBuilderRowId": 582,
+          "d1SeedOrdinal": 582
+        },
+        {
+          "sourceOrdinal": 424,
+          "sourceSignature": "ec237668f55c43da0391a9dde0ff6603906fc7018861c7e22c2f6b689ca23a84",
+          "plannedSectionKey": "assigned-0053",
+          "sqliteBuilderRowId": 601,
+          "d1SeedOrdinal": 601
+        },
+        {
+          "sourceOrdinal": 438,
+          "sourceSignature": "970a0c81338a1f11133ad3e86e2fa9080f5c2f8803b5984369aade52d45c093c",
+          "plannedSectionKey": "assigned-0057",
+          "sqliteBuilderRowId": 615,
+          "d1SeedOrdinal": 615
+        },
+        {
+          "sourceOrdinal": 445,
+          "sourceSignature": "1095d9ec5137870408daa881b3bfc9c2238ba92a7e9a03407f18d4b3850b204a",
+          "plannedSectionKey": "assigned-0062",
+          "sqliteBuilderRowId": 622,
+          "d1SeedOrdinal": 622
+        },
+        {
+          "sourceOrdinal": 511,
+          "sourceSignature": "03f8bdce7df2422fe1bc97356ece73c9f7f480e5fad927348431e47fc41af1fe",
+          "plannedSectionKey": "assigned-0067",
+          "sqliteBuilderRowId": 688,
+          "d1SeedOrdinal": 688
+        },
+        {
+          "sourceOrdinal": 522,
+          "sourceSignature": "e934d95596394e271bd49ab17c3ea6acd1b93ad29d36d1155fa7956f1551e210",
+          "plannedSectionKey": "assigned-0071",
+          "sqliteBuilderRowId": 699,
+          "d1SeedOrdinal": 699
+        },
+        {
+          "sourceOrdinal": 541,
+          "sourceSignature": "902aeb0de2d3881b22b90c96f1d2e82a98663b0ace5d7b4392095bbaf30bb926",
+          "plannedSectionKey": "assigned-0075",
+          "sqliteBuilderRowId": 718,
+          "d1SeedOrdinal": 718
+        },
+        {
+          "sourceOrdinal": 549,
+          "sourceSignature": "8a14852d7e47a53a59826c4bb2bca4557a26dcd9ddb49951336aca21c0db1223",
+          "plannedSectionKey": "assigned-0079",
+          "sqliteBuilderRowId": 726,
+          "d1SeedOrdinal": 726
+        },
+        {
+          "sourceOrdinal": 559,
+          "sourceSignature": "a1d6d159b5d8162b36ffacb0a695be57cf4182715772fffc7ad0bc3d326db9af",
+          "plannedSectionKey": "assigned-0084",
+          "sqliteBuilderRowId": 736,
+          "d1SeedOrdinal": 736
+        },
+        {
+          "sourceOrdinal": 564,
+          "sourceSignature": "21ecdb1f3163bdc56a6bc6b0a64adc69ad55d5026c6d5235f7ae30f12896c1a9",
+          "plannedSectionKey": "assigned-0088",
+          "sqliteBuilderRowId": 741,
+          "d1SeedOrdinal": 741
+        }
+      ]
+    },
+    {
+      "documentId": "baltimore-catechism",
+      "legacySectionId": "10",
+      "members": [
+        {
+          "sourceOrdinal": 10,
+          "sourceSignature": "955379f310ddec87dd789b1c4674a46701c1855ffb9b766747cacfbe9f996a93",
+          "plannedSectionKey": "10",
+          "sqliteBuilderRowId": 187,
+          "d1SeedOrdinal": 187
+        },
+        {
+          "sourceOrdinal": 238,
+          "sourceSignature": "58603da3319d9974194dd3eb7f14b98fee490396c7107539c7c50843a258ec54",
+          "plannedSectionKey": "assigned-0043",
+          "sqliteBuilderRowId": 415,
+          "d1SeedOrdinal": 415
+        }
+      ]
+    },
+    {
+      "documentId": "baltimore-catechism",
+      "legacySectionId": "2",
+      "members": [
+        {
+          "sourceOrdinal": 2,
+          "sourceSignature": "148a16569368e8707bf6562b6c8eb7c5a0da56eaeb79875da5cef9440da3c1ba",
+          "plannedSectionKey": "2",
+          "sqliteBuilderRowId": 179,
+          "d1SeedOrdinal": 179
+        },
+        {
+          "sourceOrdinal": 71,
+          "sourceSignature": "d8b2331e47d168fae7e16561726f0179e9a7efb12a9c821f91d5eb790b77bd17",
+          "plannedSectionKey": "assigned-0002",
+          "sqliteBuilderRowId": 248,
+          "d1SeedOrdinal": 248
+        },
+        {
+          "sourceOrdinal": 76,
+          "sourceSignature": "06fa075988d0f662ecaeb1c3d49848492fa81d82fd1adca74b2beec64be2b571",
+          "plannedSectionKey": "assigned-0005",
+          "sqliteBuilderRowId": 253,
+          "d1SeedOrdinal": 253
+        },
+        {
+          "sourceOrdinal": 119,
+          "sourceSignature": "a9334e772b23f96d117116d944ad6354d1afbf100b89faa1f9e450c07eaa2a02",
+          "plannedSectionKey": "assigned-0007",
+          "sqliteBuilderRowId": 296,
+          "d1SeedOrdinal": 296
+        },
+        {
+          "sourceOrdinal": 140,
+          "sourceSignature": "6875fa26880b07f8b9b653b4fc40cfecc665f1606a7ea0956dfdddaa313f84d0",
+          "plannedSectionKey": "assigned-0011",
+          "sqliteBuilderRowId": 317,
+          "d1SeedOrdinal": 317
+        },
+        {
+          "sourceOrdinal": 208,
+          "sourceSignature": "e382cddf5450a2af1e7ff02e98531ffafc7c5cc2384f84f7abb3c8ec31c5aaa7",
+          "plannedSectionKey": "assigned-0019",
+          "sqliteBuilderRowId": 385,
+          "d1SeedOrdinal": 385
+        },
+        {
+          "sourceOrdinal": 212,
+          "sourceSignature": "abc1b6f458279da4e453b9146a84803a20a8062b12bd592e4157b9c0fbd8be5f",
+          "plannedSectionKey": "assigned-0021",
+          "sqliteBuilderRowId": 389,
+          "d1SeedOrdinal": 389
+        },
+        {
+          "sourceOrdinal": 220,
+          "sourceSignature": "7bba09e98a626ce665db7fc413f1e07ee1dbe6c5a8f0dd4303206b67dddfb9c5",
+          "plannedSectionKey": "assigned-0028",
+          "sqliteBuilderRowId": 397,
+          "d1SeedOrdinal": 397
+        },
+        {
+          "sourceOrdinal": 230,
+          "sourceSignature": "8ba27539a02dae3fb5d88827cae76e1765929be54ca3d6f3ab34554a8a7ee64e",
+          "plannedSectionKey": "assigned-0035",
+          "sqliteBuilderRowId": 407,
+          "d1SeedOrdinal": 407
+        },
+        {
+          "sourceOrdinal": 326,
+          "sourceSignature": "00f5adcaac9103c54b101d8fd3671bdf91c85cdf3e3e4233448d309e2c61e869",
+          "plannedSectionKey": "assigned-0045",
+          "sqliteBuilderRowId": 503,
+          "d1SeedOrdinal": 503
+        },
+        {
+          "sourceOrdinal": 406,
+          "sourceSignature": "1557849236aad3af8a39d0499802fa7c04aed3d0d4f1d80a707a9da41de33c59",
+          "plannedSectionKey": "assigned-0051",
+          "sqliteBuilderRowId": 583,
+          "d1SeedOrdinal": 583
+        },
+        {
+          "sourceOrdinal": 425,
+          "sourceSignature": "8a4528857015f3ba2f1d5b34b273b47905b621e499c2b652a0d07c4b7d850b89",
+          "plannedSectionKey": "assigned-0054",
+          "sqliteBuilderRowId": 602,
+          "d1SeedOrdinal": 602
+        },
+        {
+          "sourceOrdinal": 439,
+          "sourceSignature": "6232a2cd9451c02873e2523a681a97bfaa5ecf2680e5f24557666e2b4346519f",
+          "plannedSectionKey": "assigned-0058",
+          "sqliteBuilderRowId": 616,
+          "d1SeedOrdinal": 616
+        },
+        {
+          "sourceOrdinal": 446,
+          "sourceSignature": "b15266b7cb7d1e46561828b1e8e43e003dc9729ee835ed3bf979d4217cbd15bd",
+          "plannedSectionKey": "assigned-0063",
+          "sqliteBuilderRowId": 623,
+          "d1SeedOrdinal": 623
+        },
+        {
+          "sourceOrdinal": 512,
+          "sourceSignature": "1c15d16443a04b67f481a2006c7b3ab7a9542caf9e311c379b2d803e266b94eb",
+          "plannedSectionKey": "assigned-0068",
+          "sqliteBuilderRowId": 689,
+          "d1SeedOrdinal": 689
+        },
+        {
+          "sourceOrdinal": 523,
+          "sourceSignature": "c9731e8808c63ed475a316e37a9a77e80c2524526af20eabf8e27b7a8227c87c",
+          "plannedSectionKey": "assigned-0072",
+          "sqliteBuilderRowId": 700,
+          "d1SeedOrdinal": 700
+        },
+        {
+          "sourceOrdinal": 542,
+          "sourceSignature": "cc0122fdeb719cb42e7f99d0e8131b3df25644807b6bdb0d13434d90b88c0949",
+          "plannedSectionKey": "assigned-0076",
+          "sqliteBuilderRowId": 719,
+          "d1SeedOrdinal": 719
+        },
+        {
+          "sourceOrdinal": 550,
+          "sourceSignature": "4082123812c4e286eaaa50593d0e3dec230a967251d0de72078df29a6befa148",
+          "plannedSectionKey": "assigned-0080",
+          "sqliteBuilderRowId": 727,
+          "d1SeedOrdinal": 727
+        },
+        {
+          "sourceOrdinal": 560,
+          "sourceSignature": "9b1677850a5cadf35dddc88120dfce7e900d885bb91ff2c3c5ea4e1411243900",
+          "plannedSectionKey": "assigned-0085",
+          "sqliteBuilderRowId": 737,
+          "d1SeedOrdinal": 737
+        },
+        {
+          "sourceOrdinal": 565,
+          "sourceSignature": "95f0b1c20948cd76d1321f7c8c2c3fbcb4113d584783a841a6b702acbc9032f6",
+          "plannedSectionKey": "assigned-0089",
+          "sqliteBuilderRowId": 742,
+          "d1SeedOrdinal": 742
+        }
+      ]
+    },
+    {
+      "documentId": "baltimore-catechism",
+      "legacySectionId": "3",
+      "members": [
+        {
+          "sourceOrdinal": 3,
+          "sourceSignature": "f8ae661a0690e3f53556add9045f436a17359139bed41efd5256c9de81716328",
+          "plannedSectionKey": "3",
+          "sqliteBuilderRowId": 180,
+          "d1SeedOrdinal": 180
+        },
+        {
+          "sourceOrdinal": 72,
+          "sourceSignature": "e0cbc28c3b965aa99415f17547ec534ae9bd92042e4020649a8571ded35c693a",
+          "plannedSectionKey": "assigned-0003",
+          "sqliteBuilderRowId": 249,
+          "d1SeedOrdinal": 249
+        },
+        {
+          "sourceOrdinal": 120,
+          "sourceSignature": "7e9990c839700cce612ec6142be4283309d48124702435c5fb47d4d34906a99d",
+          "plannedSectionKey": "assigned-0008",
+          "sqliteBuilderRowId": 297,
+          "d1SeedOrdinal": 297
+        },
+        {
+          "sourceOrdinal": 141,
+          "sourceSignature": "c31f2165c191dc3f6a25562cd455a71c2a28693464052da5ad67c14445331c91",
+          "plannedSectionKey": "assigned-0012",
+          "sqliteBuilderRowId": 318,
+          "d1SeedOrdinal": 318
+        },
+        {
+          "sourceOrdinal": 213,
+          "sourceSignature": "35aa4cab27e3397f99149b45b4befd90c16f650123e0e5c7090766d0c719e8b3",
+          "plannedSectionKey": "assigned-0022",
+          "sqliteBuilderRowId": 390,
+          "d1SeedOrdinal": 390
+        },
+        {
+          "sourceOrdinal": 221,
+          "sourceSignature": "e60a5135a0fd26481f54ebee2d875411fcc09135b335ccbfe3c62b48c357ae8d",
+          "plannedSectionKey": "assigned-0029",
+          "sqliteBuilderRowId": 398,
+          "d1SeedOrdinal": 398
+        },
+        {
+          "sourceOrdinal": 231,
+          "sourceSignature": "950c0d77d3bf93db2d7f74a1dad5a375c09e9bf9acfb7d843890f61d22f8f632",
+          "plannedSectionKey": "assigned-0036",
+          "sqliteBuilderRowId": 408,
+          "d1SeedOrdinal": 408
+        },
+        {
+          "sourceOrdinal": 327,
+          "sourceSignature": "edb447efbb0e63bb96df2ed0beb317174415366fdf9b33f1656d6786fa6e59d0",
+          "plannedSectionKey": "assigned-0046",
+          "sqliteBuilderRowId": 504,
+          "d1SeedOrdinal": 504
+        },
+        {
+          "sourceOrdinal": 407,
+          "sourceSignature": "b9f14bb2a104c81b7c8f85cf37b844dc5e14eaa69bb7684e60fb82bacc3cef68",
+          "plannedSectionKey": "assigned-0052",
+          "sqliteBuilderRowId": 584,
+          "d1SeedOrdinal": 584
+        },
+        {
+          "sourceOrdinal": 426,
+          "sourceSignature": "38eeaa008ac06ff5de60a447267a4718e2d0e40118ee99c740ce35358b5cc20e",
+          "plannedSectionKey": "assigned-0055",
+          "sqliteBuilderRowId": 603,
+          "d1SeedOrdinal": 603
+        },
+        {
+          "sourceOrdinal": 440,
+          "sourceSignature": "6c2b06d500cd62ad51a79eb47f19d0afeb964ad72b78429f5ee6988e06f12daa",
+          "plannedSectionKey": "assigned-0059",
+          "sqliteBuilderRowId": 617,
+          "d1SeedOrdinal": 617
+        },
+        {
+          "sourceOrdinal": 447,
+          "sourceSignature": "3eb85b65221f8a3ee269821a644630e306a304e85e8d498b89a020b50fb44e4a",
+          "plannedSectionKey": "assigned-0064",
+          "sqliteBuilderRowId": 624,
+          "d1SeedOrdinal": 624
+        },
+        {
+          "sourceOrdinal": 513,
+          "sourceSignature": "6ea130124ecac5ca909f679dfc2675daf3f6989df5f3539f62f0a5e7c3f9a043",
+          "plannedSectionKey": "assigned-0069",
+          "sqliteBuilderRowId": 690,
+          "d1SeedOrdinal": 690
+        },
+        {
+          "sourceOrdinal": 524,
+          "sourceSignature": "b03e73d34cdd9350736f81605a4d6288c26f52722d4d05439b26fe7c40e85d2f",
+          "plannedSectionKey": "assigned-0073",
+          "sqliteBuilderRowId": 701,
+          "d1SeedOrdinal": 701
+        },
+        {
+          "sourceOrdinal": 543,
+          "sourceSignature": "220cc1032fb68da770cccb25df08432e887808689bc462aa2f381c1751ec015c",
+          "plannedSectionKey": "assigned-0077",
+          "sqliteBuilderRowId": 720,
+          "d1SeedOrdinal": 720
+        },
+        {
+          "sourceOrdinal": 551,
+          "sourceSignature": "86543e7030febf210ab3d59282b8ae26f426e104acef0c904787c36fe53522b6",
+          "plannedSectionKey": "assigned-0081",
+          "sqliteBuilderRowId": 728,
+          "d1SeedOrdinal": 728
+        },
+        {
+          "sourceOrdinal": 561,
+          "sourceSignature": "43e5ecd838324fc23d1f9a003919277e3753dbd8f9cf51fcd611872150e02fc6",
+          "plannedSectionKey": "assigned-0086",
+          "sqliteBuilderRowId": 738,
+          "d1SeedOrdinal": 738
+        },
+        {
+          "sourceOrdinal": 566,
+          "sourceSignature": "a560075df22619124ab5ad1f9bcffe2a06ced02b49c422d5af385c6d1a05d898",
+          "plannedSectionKey": "assigned-0090",
+          "sqliteBuilderRowId": 743,
+          "d1SeedOrdinal": 743
+        }
+      ]
+    },
+    {
+      "documentId": "baltimore-catechism",
+      "legacySectionId": "4",
+      "members": [
+        {
+          "sourceOrdinal": 4,
+          "sourceSignature": "232b23a961faf9c4645f42333ee6cb6231a9520183978b2c00ff92f26c605bd8",
+          "plannedSectionKey": "4",
+          "sqliteBuilderRowId": 181,
+          "d1SeedOrdinal": 181
+        },
+        {
+          "sourceOrdinal": 121,
+          "sourceSignature": "3353e82d4339cb25d13d4c7b52ec95c4978edfa0c069236838d9717efed7026f",
+          "plannedSectionKey": "assigned-0009",
+          "sqliteBuilderRowId": 298,
+          "d1SeedOrdinal": 298
+        },
+        {
+          "sourceOrdinal": 142,
+          "sourceSignature": "4b1002cb30b09a0fcda7519f8c732f29db78aa593c3dd740e8a94f5fd2cf5246",
+          "plannedSectionKey": "assigned-0013",
+          "sqliteBuilderRowId": 319,
+          "d1SeedOrdinal": 319
+        },
+        {
+          "sourceOrdinal": 214,
+          "sourceSignature": "081a3cc872436e7a71dbf4e4b07047ad9824918edd3cb741bf711d11d8713f13",
+          "plannedSectionKey": "assigned-0023",
+          "sqliteBuilderRowId": 391,
+          "d1SeedOrdinal": 391
+        },
+        {
+          "sourceOrdinal": 222,
+          "sourceSignature": "da2d2819cde0cd3874537ccdd89d1a7acbfb9aced20e36c943f4ecbb6b167ddd",
+          "plannedSectionKey": "assigned-0030",
+          "sqliteBuilderRowId": 399,
+          "d1SeedOrdinal": 399
+        },
+        {
+          "sourceOrdinal": 232,
+          "sourceSignature": "84daca93c667bc22f04e98d90cf69c2daa0f88410ef2bad1f2144e3d9b94de20",
+          "plannedSectionKey": "assigned-0037",
+          "sqliteBuilderRowId": 409,
+          "d1SeedOrdinal": 409
+        },
+        {
+          "sourceOrdinal": 328,
+          "sourceSignature": "8cb42da9a88903d8a398ec2c1c1fcb6e2383af247c44f0364cc7ac65738b80ae",
+          "plannedSectionKey": "assigned-0047",
+          "sqliteBuilderRowId": 505,
+          "d1SeedOrdinal": 505
+        },
+        {
+          "sourceOrdinal": 427,
+          "sourceSignature": "45ad0639d1187bb4a6cc86606bfdda63da28840122b29af7546cef3ae6401bc7",
+          "plannedSectionKey": "assigned-0056",
+          "sqliteBuilderRowId": 604,
+          "d1SeedOrdinal": 604
+        },
+        {
+          "sourceOrdinal": 441,
+          "sourceSignature": "4bddecd16fb99ce42a2a9a755c8d8f5e316793c41cffe6492ba711d77c5d654e",
+          "plannedSectionKey": "assigned-0060",
+          "sqliteBuilderRowId": 618,
+          "d1SeedOrdinal": 618
+        },
+        {
+          "sourceOrdinal": 448,
+          "sourceSignature": "35ebaccfa7a0d29af088f429099791dbfefc44d418dbcc989f2851a3a5787124",
+          "plannedSectionKey": "assigned-0065",
+          "sqliteBuilderRowId": 625,
+          "d1SeedOrdinal": 625
+        },
+        {
+          "sourceOrdinal": 514,
+          "sourceSignature": "fe7981752fe006ed870bbf5f491db117cedd03e0d067637a3cd98a73efb9e838",
+          "plannedSectionKey": "assigned-0070",
+          "sqliteBuilderRowId": 691,
+          "d1SeedOrdinal": 691
+        },
+        {
+          "sourceOrdinal": 525,
+          "sourceSignature": "126173c5a5120b75a5c842e97d84753b8bd9dade611e9dc85faa035255136df5",
+          "plannedSectionKey": "assigned-0074",
+          "sqliteBuilderRowId": 702,
+          "d1SeedOrdinal": 702
+        },
+        {
+          "sourceOrdinal": 544,
+          "sourceSignature": "4e0d5116c01d0d3ebba70512b32f64d1f59a5fa1c98050803c0fb7e3a08ca7ab",
+          "plannedSectionKey": "assigned-0078",
+          "sqliteBuilderRowId": 721,
+          "d1SeedOrdinal": 721
+        },
+        {
+          "sourceOrdinal": 552,
+          "sourceSignature": "3368ab148884f761741dd8c272492f876269036fd5c8cecad0bee21c28f016ff",
+          "plannedSectionKey": "assigned-0082",
+          "sqliteBuilderRowId": 729,
+          "d1SeedOrdinal": 729
+        },
+        {
+          "sourceOrdinal": 562,
+          "sourceSignature": "f6d49d74740b5213e7b18b44093d9272c9fe2eb331bb47979044babc98cd87c6",
+          "plannedSectionKey": "assigned-0087",
+          "sqliteBuilderRowId": 739,
+          "d1SeedOrdinal": 739
+        },
+        {
+          "sourceOrdinal": 567,
+          "sourceSignature": "1016c3a228fa02932b6e798d8ec9625b8fa86c80c296286daa8f7a8d309f16cd",
+          "plannedSectionKey": "assigned-0091",
+          "sqliteBuilderRowId": 744,
+          "d1SeedOrdinal": 744
+        }
+      ]
+    },
+    {
+      "documentId": "baltimore-catechism",
+      "legacySectionId": "5",
+      "members": [
+        {
+          "sourceOrdinal": 5,
+          "sourceSignature": "b361a7033f706dea47a7eb698d778a4e77e3a36b4fbbe2c49b9dcfde5a962bc3",
+          "plannedSectionKey": "5",
+          "sqliteBuilderRowId": 182,
+          "d1SeedOrdinal": 182
+        },
+        {
+          "sourceOrdinal": 143,
+          "sourceSignature": "e9536ae304ae45eb78162aab570b9d18ae61891acdb3e6f1370b6bc283e01e8e",
+          "plannedSectionKey": "assigned-0014",
+          "sqliteBuilderRowId": 320,
+          "d1SeedOrdinal": 320
+        },
+        {
+          "sourceOrdinal": 215,
+          "sourceSignature": "6b2cadd76796ebed1f7e57d805a46e590bbb03503d8a37d31a6a3a7ad2834804",
+          "plannedSectionKey": "assigned-0024",
+          "sqliteBuilderRowId": 392,
+          "d1SeedOrdinal": 392
+        },
+        {
+          "sourceOrdinal": 223,
+          "sourceSignature": "ba1e6fc5e13e0a3c19973e8419c6860b6368c000580e6d015361d250295b85cd",
+          "plannedSectionKey": "assigned-0031",
+          "sqliteBuilderRowId": 400,
+          "d1SeedOrdinal": 400
+        },
+        {
+          "sourceOrdinal": 233,
+          "sourceSignature": "3d99e387494b7cbe817ec3190086caeab8ac984a7e2e2f040aa231515187edae",
+          "plannedSectionKey": "assigned-0038",
+          "sqliteBuilderRowId": 410,
+          "d1SeedOrdinal": 410
+        },
+        {
+          "sourceOrdinal": 329,
+          "sourceSignature": "e3c35e06fb1847ee000a01174b323ffaa44080c75c87af73c34f76f79bdb4ae9",
+          "plannedSectionKey": "assigned-0048",
+          "sqliteBuilderRowId": 506,
+          "d1SeedOrdinal": 506
+        },
+        {
+          "sourceOrdinal": 442,
+          "sourceSignature": "659067e1e20fcdedd185923ae5141e3c8506662fc0d75729403c2784963207c8",
+          "plannedSectionKey": "assigned-0061",
+          "sqliteBuilderRowId": 619,
+          "d1SeedOrdinal": 619
+        },
+        {
+          "sourceOrdinal": 449,
+          "sourceSignature": "fa25798070fb50c85a76fccb90cdfcf451d8ce3b1d272bdbeab427e68f8e514e",
+          "plannedSectionKey": "assigned-0066",
+          "sqliteBuilderRowId": 626,
+          "d1SeedOrdinal": 626
+        },
+        {
+          "sourceOrdinal": 553,
+          "sourceSignature": "709741c007e4ff2b2f836c2cd835ed0d38d14f42159154a427fbb674c21826d1",
+          "plannedSectionKey": "assigned-0083",
+          "sqliteBuilderRowId": 730,
+          "d1SeedOrdinal": 730
+        },
+        {
+          "sourceOrdinal": 568,
+          "sourceSignature": "0a554d274d4cf6fa994b1e2d58488396949ea294a549cba81f1751be3249a6d1",
+          "plannedSectionKey": "assigned-0092",
+          "sqliteBuilderRowId": 745,
+          "d1SeedOrdinal": 745
+        }
+      ]
+    },
+    {
+      "documentId": "baltimore-catechism",
+      "legacySectionId": "6",
+      "members": [
+        {
+          "sourceOrdinal": 6,
+          "sourceSignature": "e69e903f68c494bdbc3fe3b2a95ef166efa3fa3659b5c56305b80737ce475dd7",
+          "plannedSectionKey": "6",
+          "sqliteBuilderRowId": 183,
+          "d1SeedOrdinal": 183
+        },
+        {
+          "sourceOrdinal": 144,
+          "sourceSignature": "2786943da6fb3198ac31edd54ac3e674dcdb58144f247c012c7511c3cacb307b",
+          "plannedSectionKey": "assigned-0015",
+          "sqliteBuilderRowId": 321,
+          "d1SeedOrdinal": 321
+        },
+        {
+          "sourceOrdinal": 216,
+          "sourceSignature": "a73a7fc0ba261db3a2bdfa5120a54369a9c08c2c816545cbd0c588375795c9fc",
+          "plannedSectionKey": "assigned-0025",
+          "sqliteBuilderRowId": 393,
+          "d1SeedOrdinal": 393
+        },
+        {
+          "sourceOrdinal": 224,
+          "sourceSignature": "85d6083362cfdf2882276431cbd6a66fed69a8b78154f9be97c311ed97ac5ee3",
+          "plannedSectionKey": "assigned-0032",
+          "sqliteBuilderRowId": 401,
+          "d1SeedOrdinal": 401
+        },
+        {
+          "sourceOrdinal": 234,
+          "sourceSignature": "4ef7989acddef7502433739310ae8f5f4ed1fd287d63c53d171045a8628baa6c",
+          "plannedSectionKey": "assigned-0039",
+          "sqliteBuilderRowId": 411,
+          "d1SeedOrdinal": 411
+        },
+        {
+          "sourceOrdinal": 330,
+          "sourceSignature": "56e71876c69d4b560c0c3a080dbf68c21cf16d22d6eefd552651188d95cbd028",
+          "plannedSectionKey": "assigned-0049",
+          "sqliteBuilderRowId": 507,
+          "d1SeedOrdinal": 507
+        }
+      ]
+    },
+    {
+      "documentId": "baltimore-catechism",
+      "legacySectionId": "7",
+      "members": [
+        {
+          "sourceOrdinal": 7,
+          "sourceSignature": "c5a26f608248eec88661e3a84b3fa1a153e4e298da64176053a1cc620c270240",
+          "plannedSectionKey": "7",
+          "sqliteBuilderRowId": 184,
+          "d1SeedOrdinal": 184
+        },
+        {
+          "sourceOrdinal": 145,
+          "sourceSignature": "40320f79b498dee304f01fd97fd1845d6ab41266d06a593224076f27aa9706d2",
+          "plannedSectionKey": "assigned-0016",
+          "sqliteBuilderRowId": 322,
+          "d1SeedOrdinal": 322
+        },
+        {
+          "sourceOrdinal": 217,
+          "sourceSignature": "23cfacea6300cc87eefa8e4509aafd545bf93211bc404a72ff5ea2d4ec734fdf",
+          "plannedSectionKey": "assigned-0026",
+          "sqliteBuilderRowId": 394,
+          "d1SeedOrdinal": 394
+        },
+        {
+          "sourceOrdinal": 225,
+          "sourceSignature": "6facbd2fb4f298f3e0d7f7f9a9c51945df49465c36f5c5a60bfb4e6c995eefa6",
+          "plannedSectionKey": "assigned-0033",
+          "sqliteBuilderRowId": 402,
+          "d1SeedOrdinal": 402
+        },
+        {
+          "sourceOrdinal": 235,
+          "sourceSignature": "dd23fce2bf4639018ad626121900c6c5bab024499ca817309daa3ac01de01309",
+          "plannedSectionKey": "assigned-0040",
+          "sqliteBuilderRowId": 412,
+          "d1SeedOrdinal": 412
+        }
+      ]
+    },
+    {
+      "documentId": "baltimore-catechism",
+      "legacySectionId": "8",
+      "members": [
+        {
+          "sourceOrdinal": 8,
+          "sourceSignature": "c7c323665551fc7c03e62f069e94b66103833caaa163370d871a0524720f74fe",
+          "plannedSectionKey": "8",
+          "sqliteBuilderRowId": 185,
+          "d1SeedOrdinal": 185
+        },
+        {
+          "sourceOrdinal": 146,
+          "sourceSignature": "3d82a93d08ab9dc46214b4b7f5b54d70f789befac35400e262bb59a583c562ea",
+          "plannedSectionKey": "assigned-0017",
+          "sqliteBuilderRowId": 323,
+          "d1SeedOrdinal": 323
+        },
+        {
+          "sourceOrdinal": 236,
+          "sourceSignature": "2fb68c132ad72d4b215c21cfa750e9550430968bec7f31f36ca8fe7fe2cf7084",
+          "plannedSectionKey": "assigned-0041",
+          "sqliteBuilderRowId": 413,
+          "d1SeedOrdinal": 413
+        }
+      ]
+    },
+    {
+      "documentId": "baltimore-catechism",
+      "legacySectionId": "9",
+      "members": [
+        {
+          "sourceOrdinal": 9,
+          "sourceSignature": "0f5edb577ad432dd70ab88150dfcc10c53df9797492f0af0442d108e2c6cd394",
+          "plannedSectionKey": "9",
+          "sqliteBuilderRowId": 186,
+          "d1SeedOrdinal": 186
+        },
+        {
+          "sourceOrdinal": 237,
+          "sourceSignature": "0c8e7190ddc0f5d83e566890a66e21a4c15d499aca5413a9b789ef6260eba631",
+          "plannedSectionKey": "assigned-0042",
+          "sqliteBuilderRowId": 414,
+          "d1SeedOrdinal": 414
+        }
+      ]
+    },
+    {
+      "documentId": "philaret-catechism",
+      "legacySectionId": "1",
+      "members": [
+        {
+          "sourceOrdinal": 1,
+          "sourceSignature": "e10cf20c64cfb92a06ada66d1db989d0c01aa205d440c2c366f2d6ec363e99fb",
+          "plannedSectionKey": "1",
+          "sqliteBuilderRowId": 1966,
+          "d1SeedOrdinal": 1966
+        },
+        {
+          "sourceOrdinal": 58,
+          "sourceSignature": "505a8548e6fef335513c9612879edc27a8f6c82bf5cdf9af739070120a30803f",
+          "plannedSectionKey": "assigned-0001",
+          "sqliteBuilderRowId": 2023,
+          "d1SeedOrdinal": 2023
+        },
+        {
+          "sourceOrdinal": 73,
+          "sourceSignature": "c1fa5206e506e58522dfd15df3d03b6b70c5159c54f13954f49788769e3de251",
+          "plannedSectionKey": "assigned-0006",
+          "sqliteBuilderRowId": 2038,
+          "d1SeedOrdinal": 2038
+        },
+        {
+          "sourceOrdinal": 304,
+          "sourceSignature": "3f1c476515bd4a9b504f32ed60d00102ab5886ac68a90cf7cb5a08936b6554f5",
+          "plannedSectionKey": "assigned-0018",
+          "sqliteBuilderRowId": 2269,
+          "d1SeedOrdinal": 2269
+        },
+        {
+          "sourceOrdinal": 424,
+          "sourceSignature": "f713c1e26727892b680213aef9e69335718fd3a3531e454f68f8673211117386",
+          "plannedSectionKey": "assigned-0025",
+          "sqliteBuilderRowId": 2389,
+          "d1SeedOrdinal": 2389
+        },
+        {
+          "sourceOrdinal": 469,
+          "sourceSignature": "4bfff6635025c1f63a937b39e7d5a11709c15fc924c26fea096895c6b5de3b14",
+          "plannedSectionKey": "assigned-0032",
+          "sqliteBuilderRowId": 2434,
+          "d1SeedOrdinal": 2434
+        },
+        {
+          "sourceOrdinal": 503,
+          "sourceSignature": "8fedfe5d7eaf851d9b10c8e9a537862a29a492e3a666136be97f5f7494879c5c",
+          "plannedSectionKey": "assigned-0041",
+          "sqliteBuilderRowId": 2468,
+          "d1SeedOrdinal": 2468
+        },
+        {
+          "sourceOrdinal": 511,
+          "sourceSignature": "1724b8a83fd88c0c1550daf253cf00db6a014dd5fe0943e63a30878a966f4c88",
+          "plannedSectionKey": "assigned-0048",
+          "sqliteBuilderRowId": 2476,
+          "d1SeedOrdinal": 2476
+        },
+        {
+          "sourceOrdinal": 544,
+          "sourceSignature": "a490db813cbbbde8542f6a3cf56c5f3763412cde7cd7324040497ec36ea61575",
+          "plannedSectionKey": "assigned-0055",
+          "sqliteBuilderRowId": 2509,
+          "d1SeedOrdinal": 2509
+        },
+        {
+          "sourceOrdinal": 569,
+          "sourceSignature": "2b7504ac26d80ce660c0c77e28cc944ee6fbbccf163b718ef7b34c1df1522d11",
+          "plannedSectionKey": "assigned-0065",
+          "sqliteBuilderRowId": 2534,
+          "d1SeedOrdinal": 2534
+        },
+        {
+          "sourceOrdinal": 574,
+          "sourceSignature": "b1c77f1b767f785abf74e3d6b973541098d461425bc6dd58752027171b558feb",
+          "plannedSectionKey": "assigned-0068",
+          "sqliteBuilderRowId": 2539,
+          "d1SeedOrdinal": 2539
+        },
+        {
+          "sourceOrdinal": 585,
+          "sourceSignature": "dd6ba67b0d904b2f19753853f3e1c12966329191754492bc4cad8c5be71bdd0e",
+          "plannedSectionKey": "assigned-0078",
+          "sqliteBuilderRowId": 2550,
+          "d1SeedOrdinal": 2550
+        },
+        {
+          "sourceOrdinal": 588,
+          "sourceSignature": "d5fd7f483d18419fa192559cdb7b5250c2631ae646057b1f78056b22659f8509",
+          "plannedSectionKey": "assigned-0080",
+          "sqliteBuilderRowId": 2553,
+          "d1SeedOrdinal": 2553
+        },
+        {
+          "sourceOrdinal": 617,
+          "sourceSignature": "f87d3d6d0c4330002b9af107ead977cd43804997883c80e78f0ac88d879f7ef0",
+          "plannedSectionKey": "assigned-0093",
+          "sqliteBuilderRowId": 2582,
+          "d1SeedOrdinal": 2582
+        },
+        {
+          "sourceOrdinal": 629,
+          "sourceSignature": "d3df7b898dcb334c8bde5c192503527ab437d7fa1ba7c8f92b22de26f0945581",
+          "plannedSectionKey": "assigned-0096",
+          "sqliteBuilderRowId": 2594,
+          "d1SeedOrdinal": 2594
+        },
+        {
+          "sourceOrdinal": 646,
+          "sourceSignature": "3701c409709f6525ab3d61d670da6207ff43ec0ff7d74659cc48e975e300d195",
+          "plannedSectionKey": "assigned-0104",
+          "sqliteBuilderRowId": 2611,
+          "d1SeedOrdinal": 2611
+        },
+        {
+          "sourceOrdinal": 671,
+          "sourceSignature": "a38e73e8711c771adf31c199684e9273b4d8fa29f721e353f9b0d94cf357f716",
+          "plannedSectionKey": "assigned-0117",
+          "sqliteBuilderRowId": 2636,
+          "d1SeedOrdinal": 2636
+        },
+        {
+          "sourceOrdinal": 681,
+          "sourceSignature": "aa021a8c34353272c437564dfe9d4dedea158bf7e3c712a25d7c1a557282cc01",
+          "plannedSectionKey": "assigned-0121",
+          "sqliteBuilderRowId": 2646,
+          "d1SeedOrdinal": 2646
+        },
+        {
+          "sourceOrdinal": 703,
+          "sourceSignature": "8c6301f7b4ece346d7b21d2c98df0254e7dd264178738c3f6596c6d6f9d76526",
+          "plannedSectionKey": "assigned-0126",
+          "sqliteBuilderRowId": 2668,
+          "d1SeedOrdinal": 2668
+        },
+        {
+          "sourceOrdinal": 716,
+          "sourceSignature": "95b4eddac424270f61c8ff1106daa7e7bfc9839b94337aa0923736f7641fe8d9",
+          "plannedSectionKey": "assigned-0131",
+          "sqliteBuilderRowId": 2681,
+          "d1SeedOrdinal": 2681
+        },
+        {
+          "sourceOrdinal": 725,
+          "sourceSignature": "27c2c9ab6fc9f81480b44d83dffccc5367fc22c596b6a57a635fe3de931ea9c3",
+          "plannedSectionKey": "assigned-0132",
+          "sqliteBuilderRowId": 2690,
+          "d1SeedOrdinal": 2690
+        },
+        {
+          "sourceOrdinal": 738,
+          "sourceSignature": "f64f5f9bf097b3f2b29179d8512837603fbd95090bba16030b2eb81b5b1a19fa",
+          "plannedSectionKey": "assigned-0140",
+          "sqliteBuilderRowId": 2703,
+          "d1SeedOrdinal": 2703
+        }
+      ]
+    },
+    {
+      "documentId": "philaret-catechism",
+      "legacySectionId": "10",
+      "members": [
+        {
+          "sourceOrdinal": 10,
+          "sourceSignature": "c84fde816e915e5bf0f24c1e9ae56d36b8759ad12ebdc217959d40365b1c83f8",
+          "plannedSectionKey": "10",
+          "sqliteBuilderRowId": 1975,
+          "d1SeedOrdinal": 1975
+        },
+        {
+          "sourceOrdinal": 82,
+          "sourceSignature": "033ce821e9da2eeee1d73b899eee0f99984941b0604fbdc7fbf42d232bf3e423",
+          "plannedSectionKey": "assigned-0015",
+          "sqliteBuilderRowId": 2047,
+          "d1SeedOrdinal": 2047
+        },
+        {
+          "sourceOrdinal": 553,
+          "sourceSignature": "fc68f6e3cd706e88bfd4afebfe03115f4f93faf53dbf052f6374522aea0c9f0f",
+          "plannedSectionKey": "assigned-0064",
+          "sqliteBuilderRowId": 2518,
+          "d1SeedOrdinal": 2518
+        },
+        {
+          "sourceOrdinal": 583,
+          "sourceSignature": "7fde0c66e4f63abee9dfa76b22fe317076fa436d72a816854356f3104d2b4589",
+          "plannedSectionKey": "assigned-0077",
+          "sqliteBuilderRowId": 2548,
+          "d1SeedOrdinal": 2548
+        },
+        {
+          "sourceOrdinal": 597,
+          "sourceSignature": "4ee8f41a39fad2c1430ffd15f0fba54eec60941047791e91b7824ff4dafec901",
+          "plannedSectionKey": "assigned-0089",
+          "sqliteBuilderRowId": 2562,
+          "d1SeedOrdinal": 2562
+        },
+        {
+          "sourceOrdinal": 655,
+          "sourceSignature": "5fec9181b9b55e3dc18dea344b15058b24a1c9b0f949633b5d802b8baf011660",
+          "plannedSectionKey": "assigned-0113",
+          "sqliteBuilderRowId": 2620,
+          "d1SeedOrdinal": 2620
+        }
+      ]
+    },
+    {
+      "documentId": "philaret-catechism",
+      "legacySectionId": "11",
+      "members": [
+        {
+          "sourceOrdinal": 11,
+          "sourceSignature": "df982659e4473297ce945b79a95575c9c835d0f87138e57671e48db45eaa8988",
+          "plannedSectionKey": "11",
+          "sqliteBuilderRowId": 1976,
+          "d1SeedOrdinal": 1976
+        },
+        {
+          "sourceOrdinal": 83,
+          "sourceSignature": "9774ee31938bbd043061da1f26ecc1f93db1b8f2e7e3e097a7b417548338f298",
+          "plannedSectionKey": "assigned-0016",
+          "sqliteBuilderRowId": 2048,
+          "d1SeedOrdinal": 2048
+        },
+        {
+          "sourceOrdinal": 598,
+          "sourceSignature": "de33c9f7b7abbfa3300b923ba7d22a12a98b87bd3fc8443b90b666a0b15d2b24",
+          "plannedSectionKey": "assigned-0090",
+          "sqliteBuilderRowId": 2563,
+          "d1SeedOrdinal": 2563
+        },
+        {
+          "sourceOrdinal": 656,
+          "sourceSignature": "4eafe07108079d3fc84481cc9dd290f12ab8173975386c71c650dbe8f08b56d9",
+          "plannedSectionKey": "assigned-0114",
+          "sqliteBuilderRowId": 2621,
+          "d1SeedOrdinal": 2621
+        }
+      ]
+    },
+    {
+      "documentId": "philaret-catechism",
+      "legacySectionId": "12",
+      "members": [
+        {
+          "sourceOrdinal": 12,
+          "sourceSignature": "db64ffc3f738552e6da80a9f338bfcde71e06c7bec9b2e8010b3ef3ab79dffb7",
+          "plannedSectionKey": "12",
+          "sqliteBuilderRowId": 1977,
+          "d1SeedOrdinal": 1977
+        },
+        {
+          "sourceOrdinal": 84,
+          "sourceSignature": "fa9ad8e37b05f5b94feb00918d3bc7480baafee86229d501436da1e11fe87b61",
+          "plannedSectionKey": "assigned-0017",
+          "sqliteBuilderRowId": 2049,
+          "d1SeedOrdinal": 2049
+        },
+        {
+          "sourceOrdinal": 599,
+          "sourceSignature": "d37bfcee7446da995ff8feddf8e3eb88abef7b99ad92d53b9c02b99fa9c63514",
+          "plannedSectionKey": "assigned-0091",
+          "sqliteBuilderRowId": 2564,
+          "d1SeedOrdinal": 2564
+        },
+        {
+          "sourceOrdinal": 657,
+          "sourceSignature": "e20ee8eb68cf8d4859eecb0c594f99db7c144baab4cfe62d57cb5aecaba048a0",
+          "plannedSectionKey": "assigned-0115",
+          "sqliteBuilderRowId": 2622,
+          "d1SeedOrdinal": 2622
+        }
+      ]
+    },
+    {
+      "documentId": "philaret-catechism",
+      "legacySectionId": "13",
+      "members": [
+        {
+          "sourceOrdinal": 13,
+          "sourceSignature": "0042e982ed660728c9a8328c7d14a022a10eb75b19a1c0d4b32fe20132cd2ea9",
+          "plannedSectionKey": "13",
+          "sqliteBuilderRowId": 1978,
+          "d1SeedOrdinal": 1978
+        },
+        {
+          "sourceOrdinal": 600,
+          "sourceSignature": "7900b2ada3ec74006be816fe0917b39ed6e43a5e4a6225b5a6d22c25fd2319dc",
+          "plannedSectionKey": "assigned-0092",
+          "sqliteBuilderRowId": 2565,
+          "d1SeedOrdinal": 2565
+        },
+        {
+          "sourceOrdinal": 658,
+          "sourceSignature": "81ed2a7ee021eff710764bb06c3dea64f250c2f9857f5cfd7e807115bab43e46",
+          "plannedSectionKey": "assigned-0116",
+          "sqliteBuilderRowId": 2623,
+          "d1SeedOrdinal": 2623
+        }
+      ]
+    },
+    {
+      "documentId": "philaret-catechism",
+      "legacySectionId": "2",
+      "members": [
+        {
+          "sourceOrdinal": 2,
+          "sourceSignature": "446463bbf0410d342efd78b089fdfb52d308bf6b31b01ef967fe5bc539c7df07",
+          "plannedSectionKey": "2",
+          "sqliteBuilderRowId": 1967,
+          "d1SeedOrdinal": 1967
+        },
+        {
+          "sourceOrdinal": 59,
+          "sourceSignature": "6242765f5d262831908aaddd21ed8f020ed5fe389ff1b0a6e0165e49d4761626",
+          "plannedSectionKey": "assigned-0002",
+          "sqliteBuilderRowId": 2024,
+          "d1SeedOrdinal": 2024
+        },
+        {
+          "sourceOrdinal": 74,
+          "sourceSignature": "2cc2f919f31c449a04ca0b45608272f3182c036e5295e944d2e72f68d3246b62",
+          "plannedSectionKey": "assigned-0007",
+          "sqliteBuilderRowId": 2039,
+          "d1SeedOrdinal": 2039
+        },
+        {
+          "sourceOrdinal": 305,
+          "sourceSignature": "20ecdaa8f70f8264d3a0d9d146fcb58cb5bd8791c22341ebc1f6736a2a626939",
+          "plannedSectionKey": "assigned-0019",
+          "sqliteBuilderRowId": 2270,
+          "d1SeedOrdinal": 2270
+        },
+        {
+          "sourceOrdinal": 425,
+          "sourceSignature": "ce47ded3a931477fc9c936de9f8d3d705f8dd2ca731e0afd296d149ea901a0d5",
+          "plannedSectionKey": "assigned-0026",
+          "sqliteBuilderRowId": 2390,
+          "d1SeedOrdinal": 2390
+        },
+        {
+          "sourceOrdinal": 470,
+          "sourceSignature": "e2c24e9fc4a89a59b270e7de735b56e39e6f2206d73ce78f391f34e4c139a276",
+          "plannedSectionKey": "assigned-0033",
+          "sqliteBuilderRowId": 2435,
+          "d1SeedOrdinal": 2435
+        },
+        {
+          "sourceOrdinal": 504,
+          "sourceSignature": "ae344c140edf58c5630aa1296eece389a8db335fd4a4c11f5fdda67bca5d66ab",
+          "plannedSectionKey": "assigned-0042",
+          "sqliteBuilderRowId": 2469,
+          "d1SeedOrdinal": 2469
+        },
+        {
+          "sourceOrdinal": 512,
+          "sourceSignature": "b565dd7a183d13b7f799e41160f5e9846bfc25a67e96acd6099350d46e6875ba",
+          "plannedSectionKey": "assigned-0049",
+          "sqliteBuilderRowId": 2477,
+          "d1SeedOrdinal": 2477
+        },
+        {
+          "sourceOrdinal": 545,
+          "sourceSignature": "efc91c197a044695850071eccdac31d2847cdf9abb23373ed05f99942c737466",
+          "plannedSectionKey": "assigned-0056",
+          "sqliteBuilderRowId": 2510,
+          "d1SeedOrdinal": 2510
+        },
+        {
+          "sourceOrdinal": 570,
+          "sourceSignature": "f274435da11447323c636c83a6f6ad6fbdcfa1a9a7b7a866b94b3b0c52ca95a0",
+          "plannedSectionKey": "assigned-0066",
+          "sqliteBuilderRowId": 2535,
+          "d1SeedOrdinal": 2535
+        },
+        {
+          "sourceOrdinal": 575,
+          "sourceSignature": "26011c9b903c94a336b6c7107c76eb03da22f9ffb4b5540b68786e0861871f2e",
+          "plannedSectionKey": "assigned-0069",
+          "sqliteBuilderRowId": 2540,
+          "d1SeedOrdinal": 2540
+        },
+        {
+          "sourceOrdinal": 586,
+          "sourceSignature": "d953cad93f21cef95c41f6055054792eb17c275860c2e36ae8d3f95c52dc1c56",
+          "plannedSectionKey": "assigned-0079",
+          "sqliteBuilderRowId": 2551,
+          "d1SeedOrdinal": 2551
+        },
+        {
+          "sourceOrdinal": 589,
+          "sourceSignature": "f29e2c8f3473779a40049f06c491d6941c5cdd2cb2d713201d8919612db5bb6c",
+          "plannedSectionKey": "assigned-0081",
+          "sqliteBuilderRowId": 2554,
+          "d1SeedOrdinal": 2554
+        },
+        {
+          "sourceOrdinal": 618,
+          "sourceSignature": "956c4958f442df834889ef2ebc8a478acc59a5d0177fee9a6667804115bd5fe1",
+          "plannedSectionKey": "assigned-0094",
+          "sqliteBuilderRowId": 2583,
+          "d1SeedOrdinal": 2583
+        },
+        {
+          "sourceOrdinal": 630,
+          "sourceSignature": "aad5593b86627f68aa32d0699b897be4ae606fc000ff5d33ea8d13029a47f6e6",
+          "plannedSectionKey": "assigned-0097",
+          "sqliteBuilderRowId": 2595,
+          "d1SeedOrdinal": 2595
+        },
+        {
+          "sourceOrdinal": 647,
+          "sourceSignature": "d3a12b23468c72a75a6600cc5b62bc61b1549cfd55adad8383bf8587e0b5e93a",
+          "plannedSectionKey": "assigned-0105",
+          "sqliteBuilderRowId": 2612,
+          "d1SeedOrdinal": 2612
+        },
+        {
+          "sourceOrdinal": 672,
+          "sourceSignature": "f87695593d90b1170099f490d18ce3a3435a6a0660e5f0524bd6566acea3ffb6",
+          "plannedSectionKey": "assigned-0118",
+          "sqliteBuilderRowId": 2637,
+          "d1SeedOrdinal": 2637
+        },
+        {
+          "sourceOrdinal": 682,
+          "sourceSignature": "75b20b2379c10317f2849a8d9ebfcf8d6a3b2b39b84d942606de016c1e50ce39",
+          "plannedSectionKey": "assigned-0122",
+          "sqliteBuilderRowId": 2647,
+          "d1SeedOrdinal": 2647
+        },
+        {
+          "sourceOrdinal": 704,
+          "sourceSignature": "923fac9321bc49a5156909f10a7f6aa990340c28537ea6ec063e32df5c81c4e8",
+          "plannedSectionKey": "assigned-0127",
+          "sqliteBuilderRowId": 2669,
+          "d1SeedOrdinal": 2669
+        },
+        {
+          "sourceOrdinal": 726,
+          "sourceSignature": "2f1089331d0b283b368e18780b9b819e066cb5d6ad3291eb17adf65b2865cff9",
+          "plannedSectionKey": "assigned-0133",
+          "sqliteBuilderRowId": 2691,
+          "d1SeedOrdinal": 2691
+        },
+        {
+          "sourceOrdinal": 739,
+          "sourceSignature": "4ee29602e4559d7b2a56a646f52e1d3b07ba73a41b2fb94eb2cd2b7c27ee6c08",
+          "plannedSectionKey": "assigned-0141",
+          "sqliteBuilderRowId": 2704,
+          "d1SeedOrdinal": 2704
+        }
+      ]
+    },
+    {
+      "documentId": "philaret-catechism",
+      "legacySectionId": "3",
+      "members": [
+        {
+          "sourceOrdinal": 3,
+          "sourceSignature": "38e2ca4749050fb17b89cf70da992106184851630aa677f096de9bb3c5d17dce",
+          "plannedSectionKey": "3",
+          "sqliteBuilderRowId": 1968,
+          "d1SeedOrdinal": 1968
+        },
+        {
+          "sourceOrdinal": 60,
+          "sourceSignature": "a9f18514b15e4becb3b0e924ec3b100d839ee147bd62663a348ca7069107bd5f",
+          "plannedSectionKey": "assigned-0003",
+          "sqliteBuilderRowId": 2025,
+          "d1SeedOrdinal": 2025
+        },
+        {
+          "sourceOrdinal": 75,
+          "sourceSignature": "8f5333ce4d2badf5b8082694e29913add93bf1fa158860ccbd1cced29ca1680e",
+          "plannedSectionKey": "assigned-0008",
+          "sqliteBuilderRowId": 2040,
+          "d1SeedOrdinal": 2040
+        },
+        {
+          "sourceOrdinal": 306,
+          "sourceSignature": "304ac39bbb61e0ea4374081ea4b62eed9e2e7d30789b6dd1726861e1f01a6fed",
+          "plannedSectionKey": "assigned-0020",
+          "sqliteBuilderRowId": 2271,
+          "d1SeedOrdinal": 2271
+        },
+        {
+          "sourceOrdinal": 426,
+          "sourceSignature": "7e3b526adf8fa9fd9a9282eaa9e763a22f081db6bb9552a89b935e903c1c702f",
+          "plannedSectionKey": "assigned-0027",
+          "sqliteBuilderRowId": 2391,
+          "d1SeedOrdinal": 2391
+        },
+        {
+          "sourceOrdinal": 471,
+          "sourceSignature": "196da80f3e73aeb3391ad564e88468e5aa6b18a55158585794fa88d35e337eda",
+          "plannedSectionKey": "assigned-0034",
+          "sqliteBuilderRowId": 2436,
+          "d1SeedOrdinal": 2436
+        },
+        {
+          "sourceOrdinal": 505,
+          "sourceSignature": "6f1f48f0961add127c652074c223cdc825e51201a53fd20d891d46203ac9e7f2",
+          "plannedSectionKey": "assigned-0043",
+          "sqliteBuilderRowId": 2470,
+          "d1SeedOrdinal": 2470
+        },
+        {
+          "sourceOrdinal": 513,
+          "sourceSignature": "b14db6d46165eed55ada58b1bb6bb79da923ff960ae0a3f32adc3a8c8d3f1350",
+          "plannedSectionKey": "assigned-0050",
+          "sqliteBuilderRowId": 2478,
+          "d1SeedOrdinal": 2478
+        },
+        {
+          "sourceOrdinal": 546,
+          "sourceSignature": "dcff88e89082e45b86e9ce29b5473ec710f6c1756a94d9021903caea5e4cb2ed",
+          "plannedSectionKey": "assigned-0057",
+          "sqliteBuilderRowId": 2511,
+          "d1SeedOrdinal": 2511
+        },
+        {
+          "sourceOrdinal": 571,
+          "sourceSignature": "96c77850a0a73fba0c139fbb5f919cfba15d3c2b0ba2086402a70690fe6ba774",
+          "plannedSectionKey": "assigned-0067",
+          "sqliteBuilderRowId": 2536,
+          "d1SeedOrdinal": 2536
+        },
+        {
+          "sourceOrdinal": 576,
+          "sourceSignature": "4dbca5eb2fa1507811d04ee1107eac8cd8abb2817661af8d39cc57b1a48cccee",
+          "plannedSectionKey": "assigned-0070",
+          "sqliteBuilderRowId": 2541,
+          "d1SeedOrdinal": 2541
+        },
+        {
+          "sourceOrdinal": 590,
+          "sourceSignature": "0e0149fc2a136400887b1593e6af08384063888ce0ff7056e0d1dbdd37fb9afa",
+          "plannedSectionKey": "assigned-0082",
+          "sqliteBuilderRowId": 2555,
+          "d1SeedOrdinal": 2555
+        },
+        {
+          "sourceOrdinal": 619,
+          "sourceSignature": "247ec4a9df44e76921f85e8bac974abc6956dbb0723e3acec7c3a58ae1042c86",
+          "plannedSectionKey": "assigned-0095",
+          "sqliteBuilderRowId": 2584,
+          "d1SeedOrdinal": 2584
+        },
+        {
+          "sourceOrdinal": 631,
+          "sourceSignature": "e7cea4a153029fce40bc0e4656dc6c8e3ca77ca9e2cf3e6bb3a369f62145de24",
+          "plannedSectionKey": "assigned-0098",
+          "sqliteBuilderRowId": 2596,
+          "d1SeedOrdinal": 2596
+        },
+        {
+          "sourceOrdinal": 648,
+          "sourceSignature": "901cc408604b5b377628e20a6a9df12223ca65685d41671d052c6cb301f362eb",
+          "plannedSectionKey": "assigned-0106",
+          "sqliteBuilderRowId": 2613,
+          "d1SeedOrdinal": 2613
+        },
+        {
+          "sourceOrdinal": 673,
+          "sourceSignature": "be06beba43bc60781cb29c6b2db670afaf743225160dc8a58682f8a18812ccbd",
+          "plannedSectionKey": "assigned-0119",
+          "sqliteBuilderRowId": 2638,
+          "d1SeedOrdinal": 2638
+        },
+        {
+          "sourceOrdinal": 683,
+          "sourceSignature": "7343c2272b94d97b970011ca755ad2e176019cbf1a4a64cee10551e2e3f62962",
+          "plannedSectionKey": "assigned-0123",
+          "sqliteBuilderRowId": 2648,
+          "d1SeedOrdinal": 2648
+        },
+        {
+          "sourceOrdinal": 705,
+          "sourceSignature": "3ffc6ee31993a49ec47db1a3e000371181db13149698923a705c7d0381db2561",
+          "plannedSectionKey": "assigned-0128",
+          "sqliteBuilderRowId": 2670,
+          "d1SeedOrdinal": 2670
+        },
+        {
+          "sourceOrdinal": 727,
+          "sourceSignature": "bdf3dee849ec5cb9e566190d53192636583a8b8c0737eafed27c67d076d6c421",
+          "plannedSectionKey": "assigned-0134",
+          "sqliteBuilderRowId": 2692,
+          "d1SeedOrdinal": 2692
+        }
+      ]
+    },
+    {
+      "documentId": "philaret-catechism",
+      "legacySectionId": "4",
+      "members": [
+        {
+          "sourceOrdinal": 4,
+          "sourceSignature": "501b29b5dbb8bb0de376aadffc45d1c08df1bff98f0eab5b3bb34418f6c42565",
+          "plannedSectionKey": "4",
+          "sqliteBuilderRowId": 1969,
+          "d1SeedOrdinal": 1969
+        },
+        {
+          "sourceOrdinal": 61,
+          "sourceSignature": "6971ff2e0e4d12f41a7b7baa96f600ca5e39b196c8ee085c2f5ec6d23fd52506",
+          "plannedSectionKey": "assigned-0004",
+          "sqliteBuilderRowId": 2026,
+          "d1SeedOrdinal": 2026
+        },
+        {
+          "sourceOrdinal": 76,
+          "sourceSignature": "90d9aebf94f37caf9db3141b2a0130d8333049ae1f5e9c6bdcef7cd815e00fd5",
+          "plannedSectionKey": "assigned-0009",
+          "sqliteBuilderRowId": 2041,
+          "d1SeedOrdinal": 2041
+        },
+        {
+          "sourceOrdinal": 307,
+          "sourceSignature": "80cc48db20c25a65ce29b7634f10336dfe7cf3c624886f488b26753baad775d4",
+          "plannedSectionKey": "assigned-0021",
+          "sqliteBuilderRowId": 2272,
+          "d1SeedOrdinal": 2272
+        },
+        {
+          "sourceOrdinal": 427,
+          "sourceSignature": "40f3e4ed57e7e54d80e71abef5db004ee253e93723e9e99e74a7f3310dd97360",
+          "plannedSectionKey": "assigned-0028",
+          "sqliteBuilderRowId": 2392,
+          "d1SeedOrdinal": 2392
+        },
+        {
+          "sourceOrdinal": 472,
+          "sourceSignature": "57e358e2f42750086e6ea89bef2dbc14ef60367c4a32a662f841209dd781b918",
+          "plannedSectionKey": "assigned-0035",
+          "sqliteBuilderRowId": 2437,
+          "d1SeedOrdinal": 2437
+        },
+        {
+          "sourceOrdinal": 506,
+          "sourceSignature": "77c02335f32699f992733740307dc9f5817d1cc7d0e4f13d8c897786aa4e5ebe",
+          "plannedSectionKey": "assigned-0044",
+          "sqliteBuilderRowId": 2471,
+          "d1SeedOrdinal": 2471
+        },
+        {
+          "sourceOrdinal": 514,
+          "sourceSignature": "feb58f166f655a1761268f0e85ca92f79efa7321a3422c004737bd3b8e079382",
+          "plannedSectionKey": "assigned-0051",
+          "sqliteBuilderRowId": 2479,
+          "d1SeedOrdinal": 2479
+        },
+        {
+          "sourceOrdinal": 547,
+          "sourceSignature": "3d5c5731e0dfaf31a31a2391170e7a3398f69332fa2a86c7c73a7b1e1c629de0",
+          "plannedSectionKey": "assigned-0058",
+          "sqliteBuilderRowId": 2512,
+          "d1SeedOrdinal": 2512
+        },
+        {
+          "sourceOrdinal": 577,
+          "sourceSignature": "699073165f97bab5c7eacc43fc68b3c5727d3284c57766635a953badf561e188",
+          "plannedSectionKey": "assigned-0071",
+          "sqliteBuilderRowId": 2542,
+          "d1SeedOrdinal": 2542
+        },
+        {
+          "sourceOrdinal": 591,
+          "sourceSignature": "dcd16ae7ae6805f182e57679532001a36fdfd5afb2b48e42a1ae90770d7f3748",
+          "plannedSectionKey": "assigned-0083",
+          "sqliteBuilderRowId": 2556,
+          "d1SeedOrdinal": 2556
+        },
+        {
+          "sourceOrdinal": 632,
+          "sourceSignature": "21b190832655457d67afcd748b9c48dc60f282a575d5219c3ae0dd456ebcf738",
+          "plannedSectionKey": "assigned-0099",
+          "sqliteBuilderRowId": 2597,
+          "d1SeedOrdinal": 2597
+        },
+        {
+          "sourceOrdinal": 649,
+          "sourceSignature": "f317af9d24e279521cb279f4c05315f56f7928416c4a5ca3b7efa692f5d89283",
+          "plannedSectionKey": "assigned-0107",
+          "sqliteBuilderRowId": 2614,
+          "d1SeedOrdinal": 2614
+        },
+        {
+          "sourceOrdinal": 674,
+          "sourceSignature": "5ff3c29d74d549bd5ec25a8a7c35eaaf514d7735229bb7d173e1c37229bd4a12",
+          "plannedSectionKey": "assigned-0120",
+          "sqliteBuilderRowId": 2639,
+          "d1SeedOrdinal": 2639
+        },
+        {
+          "sourceOrdinal": 684,
+          "sourceSignature": "a28425a1317c021c23472603b5a464e6ae082fcaf83e47d7cf9586e9b4a22ec8",
+          "plannedSectionKey": "assigned-0124",
+          "sqliteBuilderRowId": 2649,
+          "d1SeedOrdinal": 2649
+        },
+        {
+          "sourceOrdinal": 706,
+          "sourceSignature": "07aac09ac50d9f4ceece40fca2ac22f7067c31e4b3e849852e8e44d09500700a",
+          "plannedSectionKey": "assigned-0129",
+          "sqliteBuilderRowId": 2671,
+          "d1SeedOrdinal": 2671
+        },
+        {
+          "sourceOrdinal": 728,
+          "sourceSignature": "0f791d91191b99750d199c21d19b9a83ebccd013d322d463effc09e68e8d7e4f",
+          "plannedSectionKey": "assigned-0135",
+          "sqliteBuilderRowId": 2693,
+          "d1SeedOrdinal": 2693
+        }
+      ]
+    },
+    {
+      "documentId": "philaret-catechism",
+      "legacySectionId": "5",
+      "members": [
+        {
+          "sourceOrdinal": 5,
+          "sourceSignature": "9e441f06dfd24152bba29046e5a86e739be9a688ff52fbb72916eb4d7cba2afe",
+          "plannedSectionKey": "5",
+          "sqliteBuilderRowId": 1970,
+          "d1SeedOrdinal": 1970
+        },
+        {
+          "sourceOrdinal": 62,
+          "sourceSignature": "fc193d0c9baf91f7ae91d46ba3073c74b0716129fbdb294f5924226344b46bb5",
+          "plannedSectionKey": "assigned-0005",
+          "sqliteBuilderRowId": 2027,
+          "d1SeedOrdinal": 2027
+        },
+        {
+          "sourceOrdinal": 77,
+          "sourceSignature": "6bd9b7e5ac2a120ad72c4f740d845f53323e1a6e102f41cbc05051dcbc1ca217",
+          "plannedSectionKey": "assigned-0010",
+          "sqliteBuilderRowId": 2042,
+          "d1SeedOrdinal": 2042
+        },
+        {
+          "sourceOrdinal": 308,
+          "sourceSignature": "57d8a94da5b19cf793282a37aed786a1978fa36010994312a672852f00b5ea52",
+          "plannedSectionKey": "assigned-0022",
+          "sqliteBuilderRowId": 2273,
+          "d1SeedOrdinal": 2273
+        },
+        {
+          "sourceOrdinal": 428,
+          "sourceSignature": "91481c471468d5266cb2d1fd9eb8343e7126e897ff7a736a7efc77d39e892ea3",
+          "plannedSectionKey": "assigned-0029",
+          "sqliteBuilderRowId": 2393,
+          "d1SeedOrdinal": 2393
+        },
+        {
+          "sourceOrdinal": 473,
+          "sourceSignature": "db101cdbfcc0251b5d2b848de6d64a4270e98e211a7c7243d4a107b83ced4d93",
+          "plannedSectionKey": "assigned-0036",
+          "sqliteBuilderRowId": 2438,
+          "d1SeedOrdinal": 2438
+        },
+        {
+          "sourceOrdinal": 507,
+          "sourceSignature": "e513b2b2f511ff4d1fe8667110f962d8e9073c00f03a3175d18257b7f42d4154",
+          "plannedSectionKey": "assigned-0045",
+          "sqliteBuilderRowId": 2472,
+          "d1SeedOrdinal": 2472
+        },
+        {
+          "sourceOrdinal": 515,
+          "sourceSignature": "65a6abeb883c15e2de9aaeaf1fca862810829bb34f4571ff8e36716891d94d51",
+          "plannedSectionKey": "assigned-0052",
+          "sqliteBuilderRowId": 2480,
+          "d1SeedOrdinal": 2480
+        },
+        {
+          "sourceOrdinal": 548,
+          "sourceSignature": "66d39a71e46083020845ca8787400d7ae0182783bf3ef1bfd6e9bfbf569c53e9",
+          "plannedSectionKey": "assigned-0059",
+          "sqliteBuilderRowId": 2513,
+          "d1SeedOrdinal": 2513
+        },
+        {
+          "sourceOrdinal": 578,
+          "sourceSignature": "3d5e42fbf718781c752fa1206c36b89bd273bb061843fb1af63f686f62a366df",
+          "plannedSectionKey": "assigned-0072",
+          "sqliteBuilderRowId": 2543,
+          "d1SeedOrdinal": 2543
+        },
+        {
+          "sourceOrdinal": 592,
+          "sourceSignature": "5a01561dc810804cf83f68f1c7c58d450ed4dd614113e3115417cdcc325250b0",
+          "plannedSectionKey": "assigned-0084",
+          "sqliteBuilderRowId": 2557,
+          "d1SeedOrdinal": 2557
+        },
+        {
+          "sourceOrdinal": 633,
+          "sourceSignature": "fc3bb0ef246ed63f751747055c3568c27f2c9a838334fc3da377647d255e1c7e",
+          "plannedSectionKey": "assigned-0100",
+          "sqliteBuilderRowId": 2598,
+          "d1SeedOrdinal": 2598
+        },
+        {
+          "sourceOrdinal": 650,
+          "sourceSignature": "bb2f813101f62837bc4c3a7a78e747d2d61291a0c335a7bed7962f5c0a84c67e",
+          "plannedSectionKey": "assigned-0108",
+          "sqliteBuilderRowId": 2615,
+          "d1SeedOrdinal": 2615
+        },
+        {
+          "sourceOrdinal": 685,
+          "sourceSignature": "5820d2b428938f5724200c2a35c6d3a371f8a5312131611f45aaa01a9817668c",
+          "plannedSectionKey": "assigned-0125",
+          "sqliteBuilderRowId": 2650,
+          "d1SeedOrdinal": 2650
+        },
+        {
+          "sourceOrdinal": 707,
+          "sourceSignature": "ea978204d884700e261d18e16846cc6184e3253c246c9b663a35f50a90e03630",
+          "plannedSectionKey": "assigned-0130",
+          "sqliteBuilderRowId": 2672,
+          "d1SeedOrdinal": 2672
+        },
+        {
+          "sourceOrdinal": 729,
+          "sourceSignature": "7a8d78ea4d60db8fde7320d6196ce7a30bcd6f1cd1a3c4285e91d3c46d4c47e8",
+          "plannedSectionKey": "assigned-0136",
+          "sqliteBuilderRowId": 2694,
+          "d1SeedOrdinal": 2694
+        }
+      ]
+    },
+    {
+      "documentId": "philaret-catechism",
+      "legacySectionId": "6",
+      "members": [
+        {
+          "sourceOrdinal": 6,
+          "sourceSignature": "dab7f9e7a41ab8b2104d7ffac09e4091465544e056c26b22088dc2f48c834fd5",
+          "plannedSectionKey": "6",
+          "sqliteBuilderRowId": 1971,
+          "d1SeedOrdinal": 1971
+        },
+        {
+          "sourceOrdinal": 78,
+          "sourceSignature": "1404c1160bb76241e3f247d8b8913e688b7f078843d849bae67ddec75c261563",
+          "plannedSectionKey": "assigned-0011",
+          "sqliteBuilderRowId": 2043,
+          "d1SeedOrdinal": 2043
+        },
+        {
+          "sourceOrdinal": 309,
+          "sourceSignature": "cf6933a6528f06cd3f37c9c065f57bff65c6f465c7b5f4ec9b36e8840d002ad5",
+          "plannedSectionKey": "assigned-0023",
+          "sqliteBuilderRowId": 2274,
+          "d1SeedOrdinal": 2274
+        },
+        {
+          "sourceOrdinal": 429,
+          "sourceSignature": "c144b12faa1f39bd1557fa5e75f3840b557877031bbd48a1845c33834a36822c",
+          "plannedSectionKey": "assigned-0030",
+          "sqliteBuilderRowId": 2394,
+          "d1SeedOrdinal": 2394
+        },
+        {
+          "sourceOrdinal": 474,
+          "sourceSignature": "12b073578d0700d58b27c7d90583b1f84928559c446db617b29a5df17ba3f536",
+          "plannedSectionKey": "assigned-0037",
+          "sqliteBuilderRowId": 2439,
+          "d1SeedOrdinal": 2439
+        },
+        {
+          "sourceOrdinal": 508,
+          "sourceSignature": "609061b560ce503b77d18cee2ffd7870472b5ee6a9b8ca5df363c77b4cfe4bea",
+          "plannedSectionKey": "assigned-0046",
+          "sqliteBuilderRowId": 2473,
+          "d1SeedOrdinal": 2473
+        },
+        {
+          "sourceOrdinal": 516,
+          "sourceSignature": "f4c22e4e6fdb8b45979cbb17825476dff9eba2f371c856558d307638462039ec",
+          "plannedSectionKey": "assigned-0053",
+          "sqliteBuilderRowId": 2481,
+          "d1SeedOrdinal": 2481
+        },
+        {
+          "sourceOrdinal": 549,
+          "sourceSignature": "3b6845985e0b3985e903a684c7e09780524fb79107163f7b0d9ca3352677d309",
+          "plannedSectionKey": "assigned-0060",
+          "sqliteBuilderRowId": 2514,
+          "d1SeedOrdinal": 2514
+        },
+        {
+          "sourceOrdinal": 579,
+          "sourceSignature": "41b1f16ffb470ecf9934b67f48f2cbba9cdc1baea47ed6687c345e07ba5b728e",
+          "plannedSectionKey": "assigned-0073",
+          "sqliteBuilderRowId": 2544,
+          "d1SeedOrdinal": 2544
+        },
+        {
+          "sourceOrdinal": 593,
+          "sourceSignature": "2d431628b71bdeec73b09588319cd4aa979486766597292082fea5a0c1900789",
+          "plannedSectionKey": "assigned-0085",
+          "sqliteBuilderRowId": 2558,
+          "d1SeedOrdinal": 2558
+        },
+        {
+          "sourceOrdinal": 634,
+          "sourceSignature": "6f56c06bbed2c6840822e8a24a786d9ba8c2ffeefeb4f4097f980a6a101f1b6c",
+          "plannedSectionKey": "assigned-0101",
+          "sqliteBuilderRowId": 2599,
+          "d1SeedOrdinal": 2599
+        },
+        {
+          "sourceOrdinal": 651,
+          "sourceSignature": "3a4f6303a70cee972bb3bda487f7f08879f17abc1a26d42bc0a6b6a50086f0ef",
+          "plannedSectionKey": "assigned-0109",
+          "sqliteBuilderRowId": 2616,
+          "d1SeedOrdinal": 2616
+        },
+        {
+          "sourceOrdinal": 730,
+          "sourceSignature": "a2e64c8ed625af230c94cb460dadc525067727a4d676c1f104c305ec573d47ca",
+          "plannedSectionKey": "assigned-0137",
+          "sqliteBuilderRowId": 2695,
+          "d1SeedOrdinal": 2695
+        }
+      ]
+    },
+    {
+      "documentId": "philaret-catechism",
+      "legacySectionId": "7",
+      "members": [
+        {
+          "sourceOrdinal": 7,
+          "sourceSignature": "fa75c2981488fda4fa8cf5a7d55e2b73b5352169d97dbeb7b2dbe01915f08e74",
+          "plannedSectionKey": "7",
+          "sqliteBuilderRowId": 1972,
+          "d1SeedOrdinal": 1972
+        },
+        {
+          "sourceOrdinal": 79,
+          "sourceSignature": "2e126df13caca765460fdf9e7d7df0844a1a3885170199656781078ef10af39b",
+          "plannedSectionKey": "assigned-0012",
+          "sqliteBuilderRowId": 2044,
+          "d1SeedOrdinal": 2044
+        },
+        {
+          "sourceOrdinal": 310,
+          "sourceSignature": "4d2b33ee533698e1d3ba88090e4206c4ab20183b5aab2dfb6b3b17c39c1ca59b",
+          "plannedSectionKey": "assigned-0024",
+          "sqliteBuilderRowId": 2275,
+          "d1SeedOrdinal": 2275
+        },
+        {
+          "sourceOrdinal": 430,
+          "sourceSignature": "86d69af2f4c4a423a1c17492f1e7d3eed6993301e27082b24648cbaad877c3fe",
+          "plannedSectionKey": "assigned-0031",
+          "sqliteBuilderRowId": 2395,
+          "d1SeedOrdinal": 2395
+        },
+        {
+          "sourceOrdinal": 475,
+          "sourceSignature": "3a55c3730f3cbd2b0be9bb8b42838267253584a9434f656aadffa88d9466fed8",
+          "plannedSectionKey": "assigned-0038",
+          "sqliteBuilderRowId": 2440,
+          "d1SeedOrdinal": 2440
+        },
+        {
+          "sourceOrdinal": 509,
+          "sourceSignature": "5642d22e940e7a8b05392f4f8f3bb2e36a93614f4f8c21107e847f4d0150fd85",
+          "plannedSectionKey": "assigned-0047",
+          "sqliteBuilderRowId": 2474,
+          "d1SeedOrdinal": 2474
+        },
+        {
+          "sourceOrdinal": 517,
+          "sourceSignature": "c99c8133ca69c149bca65f57450143f8484fca23d1e972be93714bc689a26599",
+          "plannedSectionKey": "assigned-0054",
+          "sqliteBuilderRowId": 2482,
+          "d1SeedOrdinal": 2482
+        },
+        {
+          "sourceOrdinal": 550,
+          "sourceSignature": "1115ebd5b1d6f4c1285fd7e9f2ac0d03a44b39ac1f2d7fd047d5a65ffd2381dd",
+          "plannedSectionKey": "assigned-0061",
+          "sqliteBuilderRowId": 2515,
+          "d1SeedOrdinal": 2515
+        },
+        {
+          "sourceOrdinal": 580,
+          "sourceSignature": "c7b0bed411586a9461f2821e5c699cff74c2639882467c2138221295391ef2d0",
+          "plannedSectionKey": "assigned-0074",
+          "sqliteBuilderRowId": 2545,
+          "d1SeedOrdinal": 2545
+        },
+        {
+          "sourceOrdinal": 594,
+          "sourceSignature": "83253ff406fac5b3213381b218b017a086764a44e0144d9245c80254342e50bb",
+          "plannedSectionKey": "assigned-0086",
+          "sqliteBuilderRowId": 2559,
+          "d1SeedOrdinal": 2559
+        },
+        {
+          "sourceOrdinal": 635,
+          "sourceSignature": "882552d304ee01d126e988611d26e8dcbe41c92c81d636c5a0bac8c7772ea2bf",
+          "plannedSectionKey": "assigned-0102",
+          "sqliteBuilderRowId": 2600,
+          "d1SeedOrdinal": 2600
+        },
+        {
+          "sourceOrdinal": 652,
+          "sourceSignature": "a68d2bf8142e76c946721f41d2e6a5ba2573c6f53b055fb53ef90107f6aeaba9",
+          "plannedSectionKey": "assigned-0110",
+          "sqliteBuilderRowId": 2617,
+          "d1SeedOrdinal": 2617
+        },
+        {
+          "sourceOrdinal": 731,
+          "sourceSignature": "633dbd0d264ff03a7c9abaacac7b7d19c30b7695c81566575f96e4ae5054e2ec",
+          "plannedSectionKey": "assigned-0138",
+          "sqliteBuilderRowId": 2696,
+          "d1SeedOrdinal": 2696
+        }
+      ]
+    },
+    {
+      "documentId": "philaret-catechism",
+      "legacySectionId": "8",
+      "members": [
+        {
+          "sourceOrdinal": 8,
+          "sourceSignature": "1408d6d94efb3884d822aefedddc40ddb3370df1f3352828135d473473902f15",
+          "plannedSectionKey": "8",
+          "sqliteBuilderRowId": 1973,
+          "d1SeedOrdinal": 1973
+        },
+        {
+          "sourceOrdinal": 80,
+          "sourceSignature": "0125c58ec3794abb0a21d0f438466d9c4a6bd990cb83c10aeb4fa2d5a2654436",
+          "plannedSectionKey": "assigned-0013",
+          "sqliteBuilderRowId": 2045,
+          "d1SeedOrdinal": 2045
+        },
+        {
+          "sourceOrdinal": 476,
+          "sourceSignature": "b7394750189dfe8a5a85fd60568bb0260cdce3364028fb74de9c2665ddcc6349",
+          "plannedSectionKey": "assigned-0039",
+          "sqliteBuilderRowId": 2441,
+          "d1SeedOrdinal": 2441
+        },
+        {
+          "sourceOrdinal": 551,
+          "sourceSignature": "d23c906721dc1d15e5065777df051fc36902a98260f51e3c7b18805421987258",
+          "plannedSectionKey": "assigned-0062",
+          "sqliteBuilderRowId": 2516,
+          "d1SeedOrdinal": 2516
+        },
+        {
+          "sourceOrdinal": 581,
+          "sourceSignature": "b86e899fd3d0fd7dcc4689cd1132603d13ee1934e6f53a8a40aef7b550259173",
+          "plannedSectionKey": "assigned-0075",
+          "sqliteBuilderRowId": 2546,
+          "d1SeedOrdinal": 2546
+        },
+        {
+          "sourceOrdinal": 595,
+          "sourceSignature": "6077ecba7b1d287f0e0418b024295e2582985f49c6a242f60a622ca274a7655a",
+          "plannedSectionKey": "assigned-0087",
+          "sqliteBuilderRowId": 2560,
+          "d1SeedOrdinal": 2560
+        },
+        {
+          "sourceOrdinal": 636,
+          "sourceSignature": "3491f321c51911bcd143b2893030b6754aff2091fe87b57a9633f5e4a307e5d6",
+          "plannedSectionKey": "assigned-0103",
+          "sqliteBuilderRowId": 2601,
+          "d1SeedOrdinal": 2601
+        },
+        {
+          "sourceOrdinal": 653,
+          "sourceSignature": "7c747d557cdbdaf41ca0a9a5742551363265a9984a63f8becba2446a9fac3c8c",
+          "plannedSectionKey": "assigned-0111",
+          "sqliteBuilderRowId": 2618,
+          "d1SeedOrdinal": 2618
+        },
+        {
+          "sourceOrdinal": 732,
+          "sourceSignature": "00702ee5ba9dc32bc3c215d8681a1fd04e5bdbc4448df3bdc8020c9588913f5c",
+          "plannedSectionKey": "assigned-0139",
+          "sqliteBuilderRowId": 2697,
+          "d1SeedOrdinal": 2697
+        }
+      ]
+    },
+    {
+      "documentId": "philaret-catechism",
+      "legacySectionId": "9",
+      "members": [
+        {
+          "sourceOrdinal": 9,
+          "sourceSignature": "d0b11ebb73f6fba10c1a6eb038cb5cd20b74a9ee1a73eac0e01cdf926a91193b",
+          "plannedSectionKey": "9",
+          "sqliteBuilderRowId": 1974,
+          "d1SeedOrdinal": 1974
+        },
+        {
+          "sourceOrdinal": 81,
+          "sourceSignature": "ff1643516e7da4c8b368a05d18a2c64f7218f98931088a9dd19fbe4ddfbbb2a9",
+          "plannedSectionKey": "assigned-0014",
+          "sqliteBuilderRowId": 2046,
+          "d1SeedOrdinal": 2046
+        },
+        {
+          "sourceOrdinal": 477,
+          "sourceSignature": "03928fba49cc6f70117949720e8dacf84d133195675a751d8c7a1965bb8ad8d2",
+          "plannedSectionKey": "assigned-0040",
+          "sqliteBuilderRowId": 2442,
+          "d1SeedOrdinal": 2442
+        },
+        {
+          "sourceOrdinal": 552,
+          "sourceSignature": "3bf956dd7c572eb3425cbcc6ab8a5074e48e0fc52649434df763ab3eb8cb76bd",
+          "plannedSectionKey": "assigned-0063",
+          "sqliteBuilderRowId": 2517,
+          "d1SeedOrdinal": 2517
+        },
+        {
+          "sourceOrdinal": 582,
+          "sourceSignature": "1bb5eb141404534ff2b0bbc2cf96ea8d90e1de30caf4c337cf22eac4f506f34d",
+          "plannedSectionKey": "assigned-0076",
+          "sqliteBuilderRowId": 2547,
+          "d1SeedOrdinal": 2547
+        },
+        {
+          "sourceOrdinal": 596,
+          "sourceSignature": "e5b080b59d76b0b65a85935012185dc3ecf2894b2dfbff408263de8f352a4f8a",
+          "plannedSectionKey": "assigned-0088",
+          "sqliteBuilderRowId": 2561,
+          "d1SeedOrdinal": 2561
+        },
+        {
+          "sourceOrdinal": 654,
+          "sourceSignature": "43b6d9618bbc85b171a800b6751fdbfb1dbf9be3527f4fa21818bdfab33b20dd",
+          "plannedSectionKey": "assigned-0112",
+          "sqliteBuilderRowId": 2619,
+          "d1SeedOrdinal": 2619
+        }
+      ]
+    }
+  ]
+}

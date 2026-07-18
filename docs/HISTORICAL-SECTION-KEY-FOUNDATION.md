@@ -17,8 +17,10 @@ duplicate `(document_id, section_number)` groups: 256 rows share a locator and
 The current Node and D1 section reads filter by document and section number but
 specify no `ORDER BY`; SQLite does not promise which matching row `.get()` or
 `.first()` returns. No deployed target for an ambiguous locator has therefore
-been compatibility-proven. This plan records the first source row only as a
-`provisional_source_first_target` proposal.
+been compatibility-proven. This immutable plan records the first source row in
+the legacy-named `provisional_source_first_target` field; a later owner
+decision approves those existing values as the authoritative targets for the
+future migration, without claiming a deployed result.
 
 The numeric database row ID, JSON array position, section title, content hash,
 and a freshly recomputed duplicate suffix are not durable identities. A text
@@ -32,12 +34,14 @@ coverage to canonicalized source objects; they are drift detectors, not section
 identities and must never be used to regenerate keys.
 
 - Every previously unambiguous section keeps its old fragment as its key.
-- The proposed source-first row in each ambiguous group also keeps the old
-  fragment. This is not evidence of historical or deployed resolution.
+- The source-first row in each ambiguous group also keeps the old fragment.
+  The ledger field remains named `provisional_source_first_target`, but its
+  existing value is owner-approved as the authoritative target for the future
+  migration. This is not evidence of historical or deployed resolution.
 - The other 233 rows have frozen, reviewed assigned IDs. Their IDs are
   authoritative because they are checked in, not because of their numbering.
-- Each distinct old fragment has exactly one provisional legacy-resolution
-  sentinel aimed at the proposed source-first row.
+- Each distinct old fragment has exactly one legacy-resolution sentinel aimed
+  at the owner-approved source-first row.
 - New keys must use the existing URI-safe alphabet, contain 1–160 characters,
   form a canonical resource URI within the shared encoded-length bound, and be
   unique within a work.
@@ -88,11 +92,12 @@ before aliases and must never fall back to an ambiguous display number. The
 later versioned MCP contracts can then expose canonical `sectionKey` separately
 from display `sectionNumber`.
 
-Before migration 0005 is activated, compatibility needs a separate prerequisite:
-either release and black-box audit a deterministic legacy-read ordering change,
-or capture an authoritative production mapping for every ambiguous locator.
-That prerequisite decides whether the provisional source-first targets are
-correct. It is intentionally not implemented in this foundation branch.
+The owner has approved the existing source-first targets for future migration
+`0005`, so no production-observation capture is required to select those
+targets. Migration `0005` itself remains a separate gated implementation: it
+must add deterministic canonical/alias reads, receive independent review and
+black-box audit, and only then may be considered for preview or production.
+It is intentionally not implemented in this foundation branch.
 
 This foundation does not authorize a source pack or establish edition,
 translation, transcription, OCR, or republication provenance. Those remain

@@ -120,6 +120,12 @@ jobs:
           npm run d1:seed:verify
           npm run d1:seed:verify-import -- --database "$RUNNER_TEMP/theologai.db"
 
+      - name: Verify historical section compatibility evidence against generated local artifacts
+        run: >-
+          npx --no-install tsx scripts/historical-section-compatibility-evidence.ts
+          --database "$RUNNER_TEMP/theologai.db"
+          --seed-directory scripts/d1-seed
+
       - name: Import generated seed through local D1
         run: npm run d1:seed:verify-workerd
 

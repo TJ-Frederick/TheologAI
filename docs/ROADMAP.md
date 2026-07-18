@@ -110,8 +110,9 @@ is local source context only and does not define the current product contract.
   `38b9ad4940cb77e7672ac330662bfdbba82888a9`.
 - **Historical section-key foundation / PR #58:** added the migration-free
   plan, verifier, and workflow guards needed to identify ambiguous legacy
-  locators. It did not add a migration, change D1, or make proposed source-first
-  targets authoritative; merged as `36daf0d6fa29b0354c8c83b11a5bc46b1ea2854b`.
+  locators. PR #58 itself did not add a migration or change D1; a later owner
+  decision approves its existing source-first targets for a future migration.
+  It merged as `36daf0d6fa29b0354c8c83b11a5bc46b1ea2854b`.
 - **UBS Hebrew semantics foundation / PR #59:** added source-free contracts,
   synthetic fixtures, capacity gates, and a non-executable draft schema. It
   did not vendor UBS artifacts, add migration `0004`, advance transform 7,
@@ -480,10 +481,11 @@ Code readiness and operational readiness are deliberately separate:
   followed by source inspection, deterministic compilation, and capacity
   verification. Migration `0004` and transform 7 then require separate
   authorization before any semantic runtime or protected release. Historical
-  corpus provenance remains later: complete the legacy section-compatibility
-  prerequisite and per-edition rights approvals before migration `0005` and
-  transform 8. Current display section numbers are not unique. Keep the
-  existing 32-source provenance cap as a required pack-sizing check.
+  corpus provenance remains later: complete per-edition rights approvals and
+  the separately gated migration `0005`/transform 8 implementation; the
+  source-first compatibility target decision is already recorded, but current
+  display section numbers remain non-unique. Keep the existing 32-source
+  provenance cap as a required pack-sizing check.
 - PRs #61–#64 and #67 complete the planned inactive semantic and provenance
   foundations: source-free semantic contracts, the unregistered Hebrew
   resolution and aggregate seams, edition/provenance contracts, and a
@@ -504,6 +506,14 @@ Code readiness and operational readiness are deliberately separate:
   edition/provenance fields; it is not a rollout of evidence already present
   in current schemas. Any corpus release remains a **pending rights and release
   decision** and must preserve CCEL-disabled behavior during protected audit.
+- The inactive historical section-compatibility evidence slice records the
+  checked-in 23/256/233 local source/SQLite/D1 ordering projection without
+  source body text or a production target claim. The owner has approved the
+  existing source-first alias targets as authoritative for a future migration;
+  `productionObservedTarget` remains null. Node `.get()` and D1 `.first()`
+  remain `unordered_no_compatibility_proof`. Migration `0005`, transform 8,
+  deterministic runtime behavior, D1, preview, and production remain separate
+  implementation and release gates.
 - Review a bounded, discovery-only public rollout of the retained CCEL search
   adapter. The owner accepts free, donation-independent discovery with at most
   five short, attributed 240-character provider snippets and clean links, with
