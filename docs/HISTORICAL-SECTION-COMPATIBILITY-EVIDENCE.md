@@ -1,5 +1,12 @@
 # Historical section compatibility evidence
 
+The approved source-first decision in this packet is also consumed by the
+migration-free, runtime-inactive compiler described in
+`docs/HISTORICAL-SECTION-SOURCE-FIRST-COMPILER.md`. That compiler freezes all
+17 works and all section/alias identities behind a compact regenerated-output
+attestation; it does not change the current unordered runtime behavior described
+below.
+
 This is an inactive, offline prerequisite for a later historical-section-key
 migration. It changes no historical JSON source, database schema, D1 seed,
 repository query, MCP resource, tool, prompt, Worker configuration, or deployed
