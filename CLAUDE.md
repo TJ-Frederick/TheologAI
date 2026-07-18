@@ -34,13 +34,13 @@ src/
 │   └── index.ts          # createWorkerCompositionRoot() — D1 wiring (per-request)
 ├── services/             # Business logic — async, works with both SQLite and D1
 │   ├── bible/            # BibleService, CrossReferenceService, ParallelPassageService
-│   ├── commentary/       # CommentaryService, CcelService
+│   ├── commentary/       # CommentaryService
 │   ├── historical/       # HistoricalDocumentService
 │   ├── languages/        # StrongsService, MorphologyService
 │   └── donation/         # DonationService
 ├── adapters/             # External API clients + data repositories
 │   ├── bible/            # EsvAdapter, NetBibleAdapter, HelloAoAdapter
-│   ├── commentary/       # HelloAoCommentaryAdapter, CcelAdapter
+│   ├── commentary/       # HelloAoCommentaryAdapter, metadata-only CcelSearchAdapter
 │   ├── donation/         # OnChainVerifier
 │   ├── data/             # SQLite repositories (Node.js — better-sqlite3)
 │   ├── d1/               # D1 repositories (Workers — Cloudflare D1)

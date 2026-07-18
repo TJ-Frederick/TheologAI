@@ -55,14 +55,6 @@ vi.mock('../../../../src/adapters/commentary/HelloAoCommentaryAdapter.js', () =>
   }),
 }));
 
-vi.mock('../../../../src/adapters/commentary/CcelAdapter.js', () => ({
-  CcelAdapter: vi.fn().mockImplementation(function () {
-    return {
-      search: vi.fn(),
-    };
-  }),
-}));
-
 vi.mock('../../../../src/adapters/commentary/CcelSearchAdapter.js', () => ({
   CcelSearchAdapter: vi.fn().mockImplementation(function () {
     return { search: primarySourceMocks.search };

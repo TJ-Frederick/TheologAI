@@ -1,9 +1,11 @@
 /**
  * Bounded, metadata-only search against CCEL's public HTML search surface.
  *
- * This adapter is intentionally separate from CcelAdapter. It never fetches a
- * result link, never returns a work body, and is disabled unless explicitly
- * enabled by a caller that has passed the rollout gate.
+ * This is the sole CCEL network adapter. It performs only bounded root-search
+ * discovery: result links remain opaque metadata locators and are never
+ * dereferenced, and no CCEL work or Scripture body is retrieved. The adapter
+ * is disabled unless explicitly enabled by a caller that passed the rollout
+ * gate.
  */
 
 import { parse, type DefaultTreeAdapterTypes } from 'parse5';
