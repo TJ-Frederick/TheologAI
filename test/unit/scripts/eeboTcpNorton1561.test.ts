@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   parseSourceLock,
   parseStrictLocalXml,
+  reviewedBookChildren,
   verifyCheckedInNortonNormalization,
 } from '../../../scripts/normalize-eebo-tcp-norton-1561.js';
 
@@ -86,6 +87,7 @@ describe('inactive EEBO-TCP A17662 Norton 1561 Gate 1 packet', () => {
     expect(report.sourceStructure).toEqual({
       books: 4,
       chapters: 80,
+      bookTrailersPreserved: 2,
       explicitMilestones: 1_178,
       gaps: 1_999,
       marginalNotes: 3_203,
@@ -100,9 +102,9 @@ describe('inactive EEBO-TCP A17662 Norton 1561 Gate 1 packet', () => {
     );
     expect(report.package).toMatchObject({
       sectionCount: 1_250,
-      totalContentUtf8Bytes: 3_748_054,
-      compiledPackageUtf8Bytes: 4_058_746,
-      compiledPackageSha256: '4550f3d64eccb73ed9ad2bd6ffa43e20846d36ae2e932615d186275e520c55c9',
+      totalContentUtf8Bytes: 3_747_794,
+      compiledPackageUtf8Bytes: 4_058_506,
+      compiledPackageSha256: '3054f4446b2e92af87c1713ee1c44d6745bca42a32aed7c67890d25fedbdff33',
     });
     expect(Object.values(report.package.headroom).every(value => value >= 0)).toBe(true);
     expect(report.deterministic).toEqual({
@@ -124,10 +126,46 @@ describe('inactive EEBO-TCP A17662 Norton 1561 Gate 1 packet', () => {
 
     expect(rendered).toContain('vvrytten in Latine by maister Ihon Caluin');
     expect(rendered).toContain('Quenes maiesties iniunctions');
+    expect(rendered).toContain('more plētiful frute');
+    expect(rendered).toContain('I was certainly enformed');
+    expect(rendered).not.toContain('plē tiful');
+    expect(rendered).not.toContain('cer tainly');
     expect(rendered).toContain('⟦gap: illegible; 1 letter; marker •⟧');
     expect(rendered).toContain('⟦margin note: Pro. xxix.xviii.⟧');
     expect(rendered).toContain('⟦unresolved glyph: char:abque⟧');
     expect(rendered).not.toMatch(/tcp:7550:|\bfacs=|ccel/i);
+  });
+
+  it('preserves the two reviewed book trailers at the ends of their final chapter segments', () => {
+    const { compiled, report } = verifyCheckedInNortonNormalization();
+    const firstBookFinal = compiled.package.sections[156]!;
+    const thirdBookFinal = compiled.package.sections[777]!;
+
+    expect(report.sourceStructure).toMatchObject({
+      bookTrailersPreserved: 2,
+      lineEndHyphensResolved: 10_424,
+      lineEndUnhyphensResolved: 115,
+    });
+    expect(firstBookFinal).toMatchObject({
+      sourceOrdinal: 157,
+      sectionKey: 'a17662-source-ordinal-0157',
+    });
+    expect(firstBookFinal.content).toMatch(/\n\nThe ende of the fyrst booke\.$/);
+    expect(thirdBookFinal).toMatchObject({
+      sourceOrdinal: 778,
+      sectionKey: 'a17662-source-ordinal-0778',
+    });
+    expect(thirdBookFinal.content).toMatch(/\n\nThe ende of the third Boke\.$/);
+  });
+
+  it.each([
+    ['unknown child', '<div n="1" type="book"><head>Book</head><argument/><div n="1" type="chapter"/></div>'],
+    ['direct text', '<div n="1" type="book"><head>Book</head>unreviewed<div n="1" type="chapter"/></div>'],
+    ['chapter after trailer', '<div n="1" type="book"><head>Book</head><div n="1" type="chapter"/><trailer>End.</trailer><div n="2" type="chapter"/></div>'],
+    ['trailer attributes', '<div n="1" type="book"><head>Book</head><div n="1" type="chapter"/><trailer type="end">End.</trailer></div>'],
+  ])('fails closed on unreviewed book-level structure: %s', (_label, xml) => {
+    const book = parseStrictLocalXml(xml);
+    expect(() => reviewedBookChildren(book, '1')).toThrow(/book 1/);
   });
 
   it('accepts only local predefined or valid numeric XML character references', () => {

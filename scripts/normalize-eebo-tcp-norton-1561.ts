@@ -43,7 +43,7 @@ const PACKAGE_LOCAL_PATH = 'data/historical-sources/eebo-tcp/A17662/norton-1561.
 const REPORT_LOCAL_PATH = 'data/historical-sources/eebo-tcp/A17662/NORMALIZATION_REPORT.json';
 const RIGHTS_SCOPE = 'The keyboarded and encoded EEBO-TCP Phase I transcription and XML only.';
 const ATTRIBUTION_POLICY = 'Credit Text Creation Partnership, EEBO-TCP Phase I, and A17662 as project policy.';
-const MODIFICATION_NOTE = 'TEI structure is converted to PR62 plain-text edition sections; archaic spelling is retained, line-end glyph markers are resolved without modernizing words, gaps and marginal notes remain explicit, page/facsimile pointers are omitted, and no image or CCEL content is included.';
+const MODIFICATION_NOTE = 'TEI structure is converted to PR62 plain-text edition sections; archaic spelling is retained, line-end glyph markers are resolved without modernizing words, gaps, marginal notes, and book trailers remain explicit, page/facsimile pointers are omitted, and no image or CCEL content is included.';
 
 type SourceArtifactRole = 'transcription_xml' | 'rights_and_provenance';
 
@@ -81,6 +81,9 @@ export interface EeboSourceLock {
 }
 
 type XmlPart = string | XmlNode;
+
+const LINE_END_JOIN = Symbol('eebo-tcp-line-end-join');
+type RenderToken = string | typeof LINE_END_JOIN;
 
 export interface XmlNode {
   name: string;
@@ -142,6 +145,7 @@ export interface NortonNormalizationReport {
   sourceStructure: {
     books: number;
     chapters: number;
+    bookTrailersPreserved: number;
     explicitMilestones: number;
     gaps: number;
     marginalNotes: number;
@@ -503,6 +507,24 @@ function cleanRendered(value: string): string {
     .normalize('NFC');
 }
 
+function joinRenderedTokens(tokens: RenderToken[]): string {
+  let rendered = '';
+  let joinNextText = false;
+  for (const token of tokens) {
+    if (token === LINE_END_JOIN) {
+      if (joinNextText) fail('adjacent line-end join markers are unsupported');
+      rendered = rendered.replace(/\s+$/u, '');
+      joinNextText = true;
+      continue;
+    }
+    const text = joinNextText ? token.replace(/^\s+/u, '') : token;
+    rendered += text;
+    if (joinNextText && text.length > 0) joinNextText = false;
+  }
+  if (joinNextText) fail('line-end join marker has no following text');
+  return rendered;
+}
+
 const TRANSPARENT_TEXT_ELEMENTS = new Set([
   'am', 'bibl', 'closer', 'date', 'dateline', 'epigraph', 'ex', 'expan',
   'hi', 'label', 'q', 'ref', 'seg', 'signed', 'trailer',
@@ -511,10 +533,10 @@ const BLOCK_TEXT_ELEMENTS = new Set(['div', 'head', 'item', 'l', 'list', 'p']);
 
 function renderNode(
   node: XmlNode,
-  parts: string[],
+  parts: RenderToken[],
   counters: RenderCounters,
-  onMilestone?: (node: XmlNode) => string[],
-): string[] {
+  onMilestone?: (node: XmlNode) => RenderToken[],
+): RenderToken[] {
   if (node.name === 'pb') {
     counters.pageBreaksOmitted++;
     return parts;
@@ -546,9 +568,13 @@ function renderNode(
   }
   if (node.name === 'g') {
     const reference = node.attributes.ref;
-    if (reference === 'char:EOLhyphen') counters.lineEndHyphensResolved++;
-    else if (reference === 'char:EOLunhyphen') counters.lineEndUnhyphensResolved++;
-    else if (reference === 'char:cmbAbbrStroke' || reference === 'char:punc') {
+    if (reference === 'char:EOLhyphen') {
+      parts.push(LINE_END_JOIN);
+      counters.lineEndHyphensResolved++;
+    } else if (reference === 'char:EOLunhyphen') {
+      parts.push(LINE_END_JOIN);
+      counters.lineEndUnhyphensResolved++;
+    } else if (reference === 'char:cmbAbbrStroke' || reference === 'char:punc') {
       for (const part of node.parts) parts = renderPart(part, parts, counters, onMilestone);
     } else if (reference === 'char:abque' && node.parts.length === 0) {
       parts.push(' ⟦unresolved glyph: char:abque⟧ ');
@@ -570,10 +596,10 @@ function renderNode(
 
 function renderPart(
   part: XmlPart,
-  parts: string[],
+  parts: RenderToken[],
   counters: RenderCounters,
-  onMilestone?: (node: XmlNode) => string[],
-): string[] {
+  onMilestone?: (node: XmlNode) => RenderToken[],
+): RenderToken[] {
   if (typeof part === 'string') {
     parts.push(normalizedText(part));
     return parts;
@@ -582,9 +608,9 @@ function renderPart(
 }
 
 function renderParts(partsToRender: XmlPart[], counters: RenderCounters): string {
-  let parts: string[] = [];
+  let parts: RenderToken[] = [];
   for (const part of partsToRender) parts = renderPart(part, parts, counters);
-  return cleanRendered(parts.join(''));
+  return cleanRendered(joinRenderedTokens(parts));
 }
 
 function directHead(node: XmlNode, counters: RenderCounters): string {
@@ -630,8 +656,8 @@ function renderChapterSegments(
   assessmentReasons: string[],
 ): DraftSection[] {
   const milestoneValues: string[] = [];
-  const segmentParts: string[][] = [[]];
-  const onMilestone = (milestone: XmlNode): string[] => {
+  const segmentParts: RenderToken[][] = [[]];
+  const onMilestone = (milestone: XmlNode): RenderToken[] => {
     const keys = Object.keys(milestone.attributes).sort();
     if (JSON.stringify(keys) !== JSON.stringify(['n', 'type', 'unit'])) {
       assessmentReasons.push(`book ${bookNumber} chapter ${chapterNumber} has a milestone with unexpected attributes`);
@@ -662,7 +688,7 @@ function renderChapterSegments(
   const chapterHeading = directHead(chapter, counters) || `Chapter ${chapterNumber}`;
   return segmentParts.flatMap((rawParts, index) => {
     const prefix = index === 0 && bookHeading ? `${bookHeading}\n\n` : '';
-    const content = cleanRendered(prefix + rawParts.join(''));
+    const content = cleanRendered(prefix + joinRenderedTokens(rawParts));
     if (!content) {
       assessmentReasons.push(`book ${bookNumber} chapter ${chapterNumber} milestone segment ${index + 1} is empty`);
       return [];
@@ -676,10 +702,61 @@ function renderChapterSegments(
   });
 }
 
+interface ReviewedBookChildren {
+  chapters: XmlNode[];
+  trailer?: XmlNode;
+}
+
+export function reviewedBookChildren(book: XmlNode, bookNumber: string): ReviewedBookChildren {
+  const children = childElements(book);
+  const chapters: XmlNode[] = [];
+  let trailer: XmlNode | undefined;
+  let stage: 'prefix' | 'chapters' | 'suffix' = 'prefix';
+  let headSeen = false;
+
+  for (const part of book.parts) {
+    if (typeof part === 'string') {
+      if (part.trim()) fail(`book ${bookNumber} contains unreviewed direct text`);
+      continue;
+    }
+    if (!['pb', 'head', 'div', 'trailer'].includes(part.name)) {
+      fail(`book ${bookNumber} contains unreviewed book-level <${part.name}>`);
+    }
+  }
+
+  for (const child of children) {
+    if (stage === 'prefix' && child.name === 'pb') continue;
+    if (stage === 'prefix' && child.name === 'head' && !headSeen) {
+      headSeen = true;
+      stage = 'chapters';
+      continue;
+    }
+    if (stage === 'chapters' && child.name === 'div') {
+      chapters.push(child);
+      continue;
+    }
+    if (stage === 'chapters' && child.name === 'trailer' && chapters.length > 0) {
+      if (Object.keys(child.attributes).length !== 0) {
+        fail(`book ${bookNumber} trailer has unreviewed attributes`);
+      }
+      trailer = child;
+      stage = 'suffix';
+      continue;
+    }
+    if (stage === 'suffix' && child.name === 'pb') continue;
+    fail(`book ${bookNumber} has unreviewed book-level order at <${child.name}>`);
+  }
+  if (!headSeen || chapters.length === 0) {
+    fail(`book ${bookNumber} must contain one heading followed by chapters`);
+  }
+  return { chapters, trailer };
+}
+
 function collectDraftSections(text: XmlNode, counters: RenderCounters): {
   drafts: DraftSection[];
   books: number;
   chapters: number;
+  bookTrailersPreserved: number;
   explicitMilestones: number;
   assessmentReasons: string[];
 } {
@@ -694,13 +771,16 @@ function collectDraftSections(text: XmlNode, counters: RenderCounters): {
   }
 
   const books = childElements(body, 'div');
+  let bookTrailersPreserved = 0;
   books.forEach((book, bookIndex) => {
     const bookNumber = book.attributes.n ?? '';
     if (book.attributes.type !== 'book' || bookNumber !== String(bookIndex + 1)) {
       assessmentReasons.push(`body book ${bookIndex + 1} has noncanonical type or n`);
     }
     const bookHeading = directHead(book, counters);
-    const chapters = childElements(book, 'div');
+    const reviewed = reviewedBookChildren(book, bookNumber || String(bookIndex + 1));
+    const chapters = reviewed.chapters;
+    const bookDraftStart = drafts.length;
     chapters.forEach((chapter, chapterIndex) => {
       const chapterNumber = chapter.attributes.n ?? '';
       if (chapter.attributes.type !== 'chapter' || chapterNumber !== String(chapterIndex + 1)) {
@@ -715,6 +795,26 @@ function collectDraftSections(text: XmlNode, counters: RenderCounters): {
         assessmentReasons,
       ));
     });
+    const expectedTrailer = bookNumber === '1'
+      ? 'The ende of the fyrst booke.'
+      : bookNumber === '3'
+        ? 'The ende of the third Boke.'
+        : undefined;
+    if (Boolean(reviewed.trailer) !== Boolean(expectedTrailer)) {
+      fail(`book ${bookNumber || bookIndex + 1} trailer presence drifted from the reviewed source`);
+    }
+    if (reviewed.trailer) {
+      const trailerText = renderParts(reviewed.trailer.parts, counters);
+      if (trailerText !== expectedTrailer) {
+        fail(`book ${bookNumber || bookIndex + 1} trailer text drifted from the reviewed source`);
+      }
+      const finalDraft = drafts.at(-1);
+      if (!finalDraft || drafts.length === bookDraftStart) {
+        fail(`book ${bookNumber || bookIndex + 1} trailer has no preceding chapter segment`);
+      }
+      finalDraft.content = cleanRendered(`${finalDraft.content}\n\n${trailerText}`);
+      bookTrailersPreserved++;
+    }
   });
 
   for (const division of childElements(back, 'div')) {
@@ -745,7 +845,14 @@ function collectDraftSections(text: XmlNode, counters: RenderCounters): {
 
   const chapterCount = books.reduce((total, book) => total + childElements(book, 'div').length, 0);
   const explicitMilestones = countNodes(body, node => node.name === 'milestone');
-  return { drafts, books: books.length, chapters: chapterCount, explicitMilestones, assessmentReasons };
+  return {
+    drafts,
+    books: books.length,
+    chapters: chapterCount,
+    bookTrailersPreserved,
+    explicitMilestones,
+    assessmentReasons,
+  };
 }
 
 function compilationPackage(
@@ -891,8 +998,13 @@ export function buildNortonNormalization(
     `${section.displayLabel}\n${section.heading}\n${section.content}`,
   ))) fail('normalized section content contains CCEL material');
   if (counters.gaps !== 1_999 || counters.marginalNotes !== 3_203
-    || counters.pageBreaksOmitted !== 1_044 || counters.unresolvedGlyphMarkers !== 2) {
-    fail(`reviewed TEI preservation/omission counts drifted: ${JSON.stringify(counters)}`);
+    || counters.pageBreaksOmitted !== 1_044 || counters.lineEndHyphensResolved !== 10_424
+    || counters.lineEndUnhyphensResolved !== 115 || counters.unresolvedGlyphMarkers !== 2
+    || collected.bookTrailersPreserved !== 2) {
+    fail(`reviewed TEI preservation/omission counts drifted: ${JSON.stringify({
+      ...counters,
+      bookTrailersPreserved: collected.bookTrailersPreserved,
+    })}`);
   }
 
   const sectionBytes = compiled.package.sections.map(section => utf8Length(section.content));
@@ -919,6 +1031,7 @@ export function buildNortonNormalization(
     sourceStructure: {
       books: collected.books,
       chapters: collected.chapters,
+      bookTrailersPreserved: collected.bookTrailersPreserved,
       explicitMilestones: collected.explicitMilestones,
       ...counters,
     },

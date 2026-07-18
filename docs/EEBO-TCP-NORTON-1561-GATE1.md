@@ -33,9 +33,14 @@ and facsimiles are excluded, and no CCEL material is used.
   malformed XML, unknown text elements, and unknown glyph references;
 - accepts only XML predefined and valid numeric character references;
 - retains original spelling and Unicode text;
-- resolves EEBO line-end hyphen markers without modernizing words;
+- resolves 10,424 EEBO line-end hyphen and 115 unhyphen markers without
+  inserting whitespace or modernizing words;
 - preserves all 1,999 gaps, 3,203 body/front/back marginal notes, and two
   unresolved `char:abque` glyphs as explicit textual markers;
+- preserves both reviewed book-level trailers in source order at the ends of
+  their final chapter segments, without inventing semantic citation keys;
+- rejects unreviewed direct book-level elements, text, trailer attributes, or
+  child order;
 - removes all 1,044 page/facsimile pointers from the compiled package; and
 - compiles twice and requires byte-identical canonical output.
 
@@ -45,9 +50,10 @@ Run the checked-in verifier with:
 node_modules/.bin/tsx scripts/normalize-eebo-tcp-norton-1561.ts --verify
 ```
 
-The generated report records 4 books, 80 chapters, 1,178 explicit milestones,
-1,250 normalized sections, 3,748,054 content bytes, and a 4,058,746-byte
-compiled package. Every configured foundation cap has positive headroom.
+The generated report records 4 books, 80 chapters, two preserved book
+trailers, 1,178 explicit milestones, 1,250 normalized sections, 3,747,794
+content bytes, and a 4,058,506-byte compiled package. Every configured
+foundation cap has positive headroom.
 
 ## Citation-key finding
 

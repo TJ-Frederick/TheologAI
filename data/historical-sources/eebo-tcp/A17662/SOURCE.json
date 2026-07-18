@@ -40,6 +40,6 @@
     "transformVersion": 1,
     "packagePath": "data/historical-sources/eebo-tcp/A17662/norton-1561.edition.json",
     "reportPath": "data/historical-sources/eebo-tcp/A17662/NORMALIZATION_REPORT.json",
-    "modificationNote": "TEI structure is converted to PR62 plain-text edition sections; archaic spelling is retained, line-end glyph markers are resolved without modernizing words, gaps and marginal notes remain explicit, page/facsimile pointers are omitted, and no image or CCEL content is included."
+    "modificationNote": "TEI structure is converted to PR62 plain-text edition sections; archaic spelling is retained, line-end glyph markers are resolved without modernizing words, gaps, marginal notes, and book trailers remain explicit, page/facsimile pointers are omitted, and no image or CCEL content is included."
   }
 }

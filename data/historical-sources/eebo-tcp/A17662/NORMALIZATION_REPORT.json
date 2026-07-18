@@ -26,6 +26,7 @@
   "sourceStructure": {
     "books": 4,
     "chapters": 80,
+    "bookTrailersPreserved": 2,
     "explicitMilestones": 1178,
     "gaps": 1999,
     "marginalNotes": 3203,
@@ -621,10 +622,10 @@
   },
   "package": {
     "sectionCount": 1250,
-    "maxSectionContentUtf8Bytes": 50479,
-    "totalContentUtf8Bytes": 3748054,
-    "compiledPackageUtf8Bytes": 4058746,
-    "compiledPackageSha256": "4550f3d64eccb73ed9ad2bd6ffa43e20846d36ae2e932615d186275e520c55c9",
+    "maxSectionContentUtf8Bytes": 50474,
+    "totalContentUtf8Bytes": 3747794,
+    "compiledPackageUtf8Bytes": 4058506,
+    "compiledPackageSha256": "3054f4446b2e92af87c1713ee1c44d6745bca42a32aed7c67890d25fedbdff33",
     "limits": {
       "sections": 2000,
       "sectionUtf8Bytes": 131072,
@@ -634,15 +635,15 @@
     },
     "headroom": {
       "sections": 750,
-      "maxSectionContentUtf8Bytes": 80593,
-      "packageContentUtf8Bytes": 446250,
-      "compiledPackageUtf8Bytes": 659846,
+      "maxSectionContentUtf8Bytes": 80598,
+      "packageContentUtf8Bytes": 446510,
+      "compiledPackageUtf8Bytes": 660086,
       "sourceArtifactBytes": 62288586
     }
   },
   "deterministic": {
-    "secondCompileSha256": "4550f3d64eccb73ed9ad2bd6ffa43e20846d36ae2e932615d186275e520c55c9",
+    "secondCompileSha256": "3054f4446b2e92af87c1713ee1c44d6745bca42a32aed7c67890d25fedbdff33",
     "byteIdentical": true
   },
-  "modificationNote": "TEI structure is converted to PR62 plain-text edition sections; archaic spelling is retained, line-end glyph markers are resolved without modernizing words, gaps and marginal notes remain explicit, page/facsimile pointers are omitted, and no image or CCEL content is included."
+  "modificationNote": "TEI structure is converted to PR62 plain-text edition sections; archaic spelling is retained, line-end glyph markers are resolved without modernizing words, gaps, marginal notes, and book trailers remain explicit, page/facsimile pointers are omitted, and no image or CCEL content is included."
 }
