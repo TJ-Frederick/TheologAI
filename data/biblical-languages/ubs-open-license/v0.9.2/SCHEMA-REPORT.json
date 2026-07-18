@@ -1,0 +1,183 @@
+{
+  "schemaVersion": "theologai-ubs-hebrew-v0.9.2-schema-inspection-v1",
+  "inspectionScope": "Raw-source count and shape inspection only; no decoding, normalization, transformation, token alignment, materialization, or public semantic output.",
+  "rawArtifacts": [
+    {
+      "id": "ubs-hebrew-dictionary-en-v0.9.2",
+      "bytes": 23110129,
+      "sha256": "1686a25dd31dc9afb7b932927e160070667c73caedad11aa7e4482c21f800e8e",
+      "gitBlobSha1": "39e218d17f1961495ea7052e342bd9707432cdc0"
+    },
+    {
+      "id": "ubs-hebrew-lexical-domains-en-v0.9.2",
+      "bytes": 114281,
+      "sha256": "fbc862b2c46966cf7f3bf19c2f3e79a7391c34f8c737e1979fa5178ac603d0df",
+      "gitBlobSha1": "88b69b48b00d8306c6d596107b3123de1d41574b"
+    }
+  ],
+  "sourceAcquisitionCapacity": {
+    "rawArtifactBytes": 23224410,
+    "rawNoticeBytes": 26532,
+    "totalVendoredRawBytes": 23250942,
+    "plannedDatabaseCeilingBytes": 367001600,
+    "materializedDatabaseMeasurement": null,
+    "conclusion": "Raw source size is not a D1 materialization measurement. Migration, transform, generated seed, and built-database capacity verification remain separately gated."
+  },
+  "dictionary": {
+    "topLevel": "array",
+    "entries": 7932,
+    "uniqueMainIds": 7932,
+    "baseForms": 8902,
+    "uniqueBaseFormIds": 8902,
+    "lexicalMeanings": 16224,
+    "uniqueLexIds": 16224,
+    "senseLocalizations": 16224,
+    "englishSenseLocalizations": 16224,
+    "domainAssignments": 16686,
+    "fieldSets": {
+      "entry": [
+        "AlphaPos",
+        "AlternateLemmas",
+        "Authors",
+        "BaseForms",
+        "ContributorNote",
+        "Contributors",
+        "Dates",
+        "HasAramaic",
+        "InLXX",
+        "Lemma",
+        "Localizations",
+        "MainId",
+        "MainLinks",
+        "Notes",
+        "StrongCodes",
+        "Version"
+      ],
+      "baseForm": [
+        "BaseFormID",
+        "BaseFormLinks",
+        "Constructs",
+        "CrossReferences",
+        "Etymologies",
+        "Inflections",
+        "LEXMeanings",
+        "MeaningsOfName",
+        "PartsOfSpeech",
+        "RelatedLemmas",
+        "RelatedNames"
+      ],
+      "lexicalMeaning": [
+        "CONMeanings",
+        "LEXAntonyms",
+        "LEXCollocations",
+        "LEXCoordinates",
+        "LEXCoreDomains",
+        "LEXCrossReferences",
+        "LEXDomains",
+        "LEXEntryCode",
+        "LEXForms",
+        "LEXID",
+        "LEXIllustrations",
+        "LEXImages",
+        "LEXIndent",
+        "LEXIsBiblicalTerm",
+        "LEXLinks",
+        "LEXParallels",
+        "LEXReferences",
+        "LEXSenses",
+        "LEXSubDomains",
+        "LEXSynonyms",
+        "LEXValencies",
+        "LEXVideos"
+      ],
+      "senseLocalization": [
+        "Comments",
+        "DefinitionLong",
+        "DefinitionShort",
+        "Glosses",
+        "LanguageCode",
+        "LastEdited",
+        "LastEditedBy"
+      ],
+      "domainAssignment": [
+        "Domain",
+        "DomainCode",
+        "DomainSource",
+        "DomainSourceCode"
+      ]
+    },
+    "lexicalReferences": {
+      "records": 260813,
+      "uniqueRecords": 259462,
+      "anchorFormat": "BBBCCCVVVSSWWW",
+      "anchorDigits": 14,
+      "allRowsStartWithSourceTokenAnchor": true,
+      "bareAnchors": 258116,
+      "anchorsWithSuffix": 2697,
+      "footnoteMarkers": 2698,
+      "bangN001Suffixes": 1,
+      "negativeN033Markers": 1,
+      "multiMarkerSuffixes": 1,
+      "suffixKind": "upstream footnote notation retained in raw string",
+      "structuralFieldValidation": {
+        "books": "1-39 observed global field range",
+        "chapters": "1-150 observed global field range; no book/chapter cross-validation",
+        "verses": "1-176 observed global field range; no chapter/verse cross-validation",
+        "segment": "00",
+        "word": "positive even integer encoded in three digits",
+        "biblicalReferenceValidity": "not established by this Gate 1 inspection"
+      },
+      "observedCoordinateRange": {
+        "book": [
+          1,
+          39
+        ],
+        "chapter": [
+          1,
+          150
+        ],
+        "verse": [
+          1,
+          176
+        ],
+        "word": [
+          2,
+          152
+        ]
+      }
+    }
+  },
+  "domains": {
+    "topLevel": "array",
+    "records": 411,
+    "uniqueCodes": 411,
+    "levels": {
+      "1": 4,
+      "2": 18,
+      "3": 46,
+      "4": 300,
+      "5": 43
+    },
+    "localizations": 411,
+    "englishLocalizations": 411,
+    "fieldSets": {
+      "domain": [
+        "Code",
+        "Entries",
+        "HasSubDomains",
+        "Level",
+        "Prototype",
+        "Reference",
+        "SemanticDomainLocalizations"
+      ],
+      "localization": [
+        "Comment",
+        "Description",
+        "Label",
+        "LanguageCode",
+        "Opposite"
+      ]
+    }
+  },
+  "alignmentBoundary": "UBS source token anchors are not verified alignments to TheologAI morphology tokens; no contextual-token semantic assertion is authorized without a separately versioned alignment verifier."
+}

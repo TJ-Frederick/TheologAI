@@ -1,0 +1,75 @@
+{
+  "schemaVersion": "theologai-ubs-hebrew-acquisition-v1",
+  "status": "verbatim_source_vendored_no_transformation_or_runtime_registration",
+  "upstream": {
+    "publisher": "United Bible Societies",
+    "repository": "https://github.com/ubsicap/ubs-open-license",
+    "commit": "3a6edd8212df2e1189037ad39687726990c80d56",
+    "commitUrl": "https://github.com/ubsicap/ubs-open-license/tree/3a6edd8212df2e1189037ad39687726990c80d56",
+    "commitDate": "2026-07-09T18:17:22Z",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+    "copyright": "(UBS Dictionary of Biblical Hebrew © United Bible Societies, 2023.  Adapted from Semantic Dictionary of Biblical Hebrew © 2000-2023 United Bible Societies.)"
+  },
+  "artifacts": [
+    {
+      "id": "ubs-hebrew-dictionary-en-v0.9.2",
+      "version": "0.9.2",
+      "repositoryPath": "dictionaries/hebrew/JSON/UBSHebrewDic-v0.9.2-en.JSON",
+      "sourceUrl": "https://raw.githubusercontent.com/ubsicap/ubs-open-license/3a6edd8212df2e1189037ad39687726990c80d56/dictionaries/hebrew/JSON/UBSHebrewDic-v0.9.2-en.JSON",
+      "gitBlobSha1": "39e218d17f1961495ea7052e342bd9707432cdc0",
+      "bytes": 23110129,
+      "sha256": "1686a25dd31dc9afb7b932927e160070667c73caedad11aa7e4482c21f800e8e",
+      "trackedPath": "data/biblical-languages/ubs-open-license/v0.9.2/en/UBSHebrewDic-v0.9.2-en.JSON"
+    },
+    {
+      "id": "ubs-hebrew-lexical-domains-en-v0.9.2",
+      "version": "0.9.2",
+      "repositoryPath": "dictionaries/hebrew/JSON/UBSHebrewDicLexicalDomains-v0.9.2-en.JSON",
+      "sourceUrl": "https://raw.githubusercontent.com/ubsicap/ubs-open-license/3a6edd8212df2e1189037ad39687726990c80d56/dictionaries/hebrew/JSON/UBSHebrewDicLexicalDomains-v0.9.2-en.JSON",
+      "gitBlobSha1": "88b69b48b00d8306c6d596107b3123de1d41574b",
+      "bytes": 114281,
+      "sha256": "fbc862b2c46966cf7f3bf19c2f3e79a7391c34f8c737e1979fa5178ac603d0df",
+      "trackedPath": "data/biblical-languages/ubs-open-license/v0.9.2/en/UBSHebrewDicLexicalDomains-v0.9.2-en.JSON"
+    }
+  ],
+  "upstreamNotices": [
+    {
+      "id": "cc-by-sa-4.0-license",
+      "repositoryPath": "LICENSE.md",
+      "sourceUrl": "https://raw.githubusercontent.com/ubsicap/ubs-open-license/3a6edd8212df2e1189037ad39687726990c80d56/LICENSE.md",
+      "gitBlobSha1": "3b7b82d0da2db857eda1a798dbd908ea136f07b5",
+      "bytes": 20131,
+      "sha256": "7abe19ec9bb73b36141b999b861d24ad855e808bafe0f81e84cce28556f6c297",
+      "trackedPath": "data/biblical-languages/ubs-open-license/v0.9.2/upstream-notices/LICENSE.md"
+    },
+    {
+      "id": "dictionary-release-note",
+      "repositoryPath": "dictionaries/README.md",
+      "sourceUrl": "https://raw.githubusercontent.com/ubsicap/ubs-open-license/3a6edd8212df2e1189037ad39687726990c80d56/dictionaries/README.md",
+      "gitBlobSha1": "6255bc7628139e801d30ca9d3b4549880e33c09f",
+      "bytes": 3208,
+      "sha256": "a3129082d10950457a0449878cadc5927c4f5707e058cb35aef572fd70fe9a56",
+      "trackedPath": "data/biblical-languages/ubs-open-license/v0.9.2/upstream-notices/DICTIONARIES-README.md"
+    },
+    {
+      "id": "hebrew-specific-notice",
+      "repositoryPath": "dictionaries/hebrew/README.md",
+      "sourceUrl": "https://raw.githubusercontent.com/ubsicap/ubs-open-license/3a6edd8212df2e1189037ad39687726990c80d56/dictionaries/hebrew/README.md",
+      "gitBlobSha1": "684b1403ab7638ec398e9c9713fc419bee659504",
+      "bytes": 3193,
+      "sha256": "f18eab18a4bad4a83f45981064139f89a96cb4ae97e0e72833d709ae2fb52940",
+      "trackedPath": "data/biblical-languages/ubs-open-license/v0.9.2/upstream-notices/HEBREW-README.md"
+    }
+  ],
+  "coverageAndCompleteness": {
+    "upstreamHebrewNotice": "The Hebrew-specific upstream notice describes SDBH as ongoing and says around 90% of Old Testament words are included; treat the corpus as non-exhaustive.",
+    "upstreamV092ReleaseNote": "The upstream dictionaries notice labels version 0.9.2 as entries added and says now at 99%. This conflicting broader release-note wording does not authorize a completeness claim.",
+    "theologaiPolicy": "No current or future TheologAI result may imply complete Hebrew lexical or reference coverage solely from this acquisition."
+  },
+  "modifications": {
+    "performed": "None. The two approved JSON artifacts and the three notices are verbatim byte copies from the pinned revision. No migration, transform, compiler, materialization, D1 row, runtime, tool, prompt, resource, or public output was added.",
+    "plannedButNotPerformed": "A future separately approved decoder, transform, schema/migration 0004, token-alignment verifier, materialization, and release may derive a bounded semantic layer from these inputs."
+  },
+  "futureAttributionAndShareAlikePolicy": "Before sharing any derived rows, exports, database copies, or semantic output based on these artifacts, preserve the UBS/SDBH attribution, the pinned source URI, the CC BY-SA 4.0 URI, and a clear change description; offer the derived semantic layer under CC BY-SA 4.0 or a compatible license. Do not claim that this policy extends CC BY-SA to unrelated TheologAI code or datasets, while preserving every license that independently applies. Final release wording remains subject to rights review."
+}
