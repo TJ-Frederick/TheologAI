@@ -8,6 +8,7 @@
 import {
   UBS_SEMANTIC_CURSOR_MAX_LENGTH,
   UBS_SEMANTIC_DRAFT_OUTPUT_LIMITS,
+  UBS_SEMANTIC_DEFINITION_EXCLUSION_REASONS,
   requireUbsInternalLexicalIdentity,
   requireUbsSemanticNormalizedReference,
 } from './ubsSemanticDomain.js';
@@ -385,7 +386,7 @@ function cloneAndValidateCandidate(
   if (!rawEntry || !rawSense || !Array.isArray(rawDomains) || !Array.isArray(rawMatchingReferences)) {
     throw new Error('UBS semantic aggregate candidate row is malformed');
   }
-  positiveSafeInteger(domainTotal, 'bundle domain total');
+  nonNegativeSafeInteger(domainTotal, 'bundle domain total');
   nonNegativeSafeInteger(matchingReferenceTotal, 'bundle matching-reference total');
   if (rawDomains.length > UBS_SEMANTIC_EVIDENCE_BUNDLE_LIMITS.domainsPerSense
     || rawMatchingReferences.length > UBS_SEMANTIC_EVIDENCE_BUNDLE_LIMITS.matchingReferencesPerSense) {
@@ -473,13 +474,36 @@ function cloneAndValidateEntry(raw: UbsSemanticEntry): UbsSemanticEntry {
 function cloneAndValidateSense(raw: UbsSemanticSense): UbsSemanticSense {
   if (!raw || typeof raw !== 'object') throw new Error('UBS semantic aggregate sense is malformed');
   const {
-    senseId, sourceId, entryId, sourceOrdinal, definition, glosses: rawGlosses, domainRefs: rawDomainRefs,
+    senseId, sourceId, entryId, sourceOrdinal, definitionStatus, definition,
+    definitionExclusionReasons: rawDefinitionExclusionReasons,
+    glosses: rawGlosses, domainRefs: rawDomainRefs,
   } = raw;
   identifier(sourceId, 'bundle sense source ID');
   identifier(entryId, 'bundle sense entry ID');
   identifier(senseId, 'bundle sense ID');
   positiveSafeInteger(sourceOrdinal, 'bundle sense ordinal');
-  boundedText(definition, UBS_SEMANTIC_DRAFT_OUTPUT_LIMITS.definitionCharacters, 'bundle sense definition');
+  if (!['published', 'absent_in_source', 'excluded_unresolved_markup'].includes(definitionStatus)) {
+    throw new Error('UBS semantic aggregate sense definition status is invalid');
+  }
+  if (definition === undefined) {
+    if (definitionStatus === 'published') throw new Error('published bundle sense definition is missing');
+  } else {
+    boundedText(definition, UBS_SEMANTIC_DRAFT_OUTPUT_LIMITS.definitionCharacters, 'bundle sense definition');
+    if (definitionStatus !== 'published') throw new Error('unpublished bundle sense must not expose definition text');
+  }
+  if (!Array.isArray(rawDefinitionExclusionReasons) || rawDefinitionExclusionReasons.length > 8) {
+    throw new Error('UBS semantic aggregate sense definition exclusion reasons are malformed or unbounded');
+  }
+  const definitionExclusionReasons = rawDefinitionExclusionReasons.map(reason => {
+    if (!UBS_SEMANTIC_DEFINITION_EXCLUSION_REASONS.includes(reason)) {
+      throw new Error('UBS semantic aggregate sense definition exclusion reason is unsupported');
+    }
+    return reason;
+  });
+  if (new Set(definitionExclusionReasons).size !== definitionExclusionReasons.length
+    || (definitionStatus === 'excluded_unresolved_markup') !== (definitionExclusionReasons.length > 0)) {
+    throw new Error('UBS semantic aggregate sense definition exclusion reasons are inconsistent');
+  }
   if (!Array.isArray(rawGlosses) || rawGlosses.length < 1
     || rawGlosses.length > UBS_SEMANTIC_DRAFT_OUTPUT_LIMITS.glossesPerSense
     || new Set(rawGlosses).size !== rawGlosses.length) {
@@ -498,7 +522,11 @@ function cloneAndValidateSense(raw: UbsSemanticSense): UbsSemanticSense {
   if (new Set(domainRefs.map(domainReferenceIdentity)).size !== domainRefs.length) {
     throw new Error('UBS semantic aggregate bounded domain references are duplicated');
   }
-  return { senseId, sourceId, entryId, sourceOrdinal, definition, glosses, domainRefs };
+  return {
+    senseId, sourceId, entryId, sourceOrdinal, definitionStatus,
+    ...(definition === undefined ? {} : { definition }),
+    definitionExclusionReasons, glosses, domainRefs,
+  };
 }
 
 function cloneAndValidateDomainRef(raw: UbsSemanticDomainRef): UbsSemanticDomainRef {

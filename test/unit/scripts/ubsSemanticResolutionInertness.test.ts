@@ -18,7 +18,7 @@ const activeIdentityPins = {
   'data/data-manifest.json': 'ba4f6fc73086716bd03f8e8d65a181719fba834aa61a90e65b168169744fa424',
   'wrangler.toml': '50dd24d0963893b5c8b17ec61d4ebe7c98eeb7f7692a988684bde09835017e4f',
   'worker-configuration.d.ts': 'e316f64679951b32417f0c85b02fc92e61dae25d879d28921df15caf8706fe55',
-  'test/fixtures/ubs-semantics/structured-output-contract.draft.json': '4564884999aee552c4d1560c442c38b373fb19626a88da5af6455c892628e181',
+  'test/fixtures/ubs-semantics/structured-output-contract.draft.json': 'c5c11254fc84e1ac75200b5b93cb967dfe17e99150e88525cb95d6f58d05c8f2',
 } as const;
 
 describe('inactive UBS semantic resolution seam', () => {

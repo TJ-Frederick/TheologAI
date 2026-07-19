@@ -7,6 +7,7 @@ import {
 import {
   parseUbsPublicHebrewIdentity,
   requireUbsSemanticNormalizedReference,
+  type UbsInternalHebrewLexicalIdentity,
   type UbsPublicHebrewStrongs,
   type UbsSemanticSource,
 } from '../../../../src/kernel/ubsSemanticDomain.js';
@@ -17,6 +18,7 @@ import {
   ORIGINAL_LANGUAGE_STUDY_V2_DRAFT_RESPONSE_BYTES,
   ORIGINAL_LANGUAGE_STUDY_V2_DRAFT_SCHEMA_VERSION,
   createOriginalLanguageStudyV2DraftCursor,
+  deriveOriginalLanguageStudyV2MorphologyTokenIdentity,
   parseOriginalLanguageStudyV2DraftCursor,
   type IOriginalLanguageStudyV2DraftContextProvider,
   type OriginalLanguageStudyV2DraftAuthoritativeContext,
@@ -191,7 +193,7 @@ function buildHebrewEvidence(
     };
   }
   const candidates = bundle.candidates.map(candidate => presentCandidate(candidate, detail));
-  const aligned = exactServerVerifiedCandidate(bundle, alignment);
+  const aligned = exactServerVerifiedCandidate(bundle, alignment, binding);
   if (aligned) {
     return {
       ...common,
@@ -235,7 +237,9 @@ function presentCandidate(
     ...identity,
     detailStatus: 'detailed',
     lemma: candidate.entry.lemma,
-    definition: candidate.sense.definition,
+    definitionStatus: candidate.sense.definitionStatus,
+    ...(candidate.sense.definition === undefined ? {} : { definition: candidate.sense.definition }),
+    definitionExclusionReasons: [...candidate.sense.definitionExclusionReasons],
     glosses: [...candidate.sense.glosses],
     domains: candidate.domains.map(domain => ({
       sourceId: domain.sourceId, sourceRole: 'lexical_domains' as const,
@@ -256,15 +260,54 @@ function presentCandidate(
 function exactServerVerifiedCandidate(
   bundle: UbsSemanticEvidenceBundle,
   alignment: ServerVerifiedHebrewSemanticAlignment | undefined,
+  binding: OriginalLanguageStudyV2DraftCursorBinding,
 ): ServerVerifiedHebrewSemanticAlignment | undefined {
   if (alignment === undefined || !bundle.coverage.completeForWholeQuery || bundle.candidates.length !== 1
     || bundle.coverage.semanticSenseTotal !== 1) return undefined;
   const candidate = bundle.candidates[0]!;
   const evidence = candidate.matchingReferences[0];
+  const dictionary = bundle.sources.find(source => source.sourceRole === 'dictionary');
+  const lexicalDomains = bundle.sources.find(source => source.sourceRole === 'lexical_domains');
   if (candidate.matchingReferenceTotal !== 1 || candidate.matchingReferences.length !== 1 || !evidence
+    || bundle.sources.length !== 2 || !dictionary || !lexicalDomains
+    || alignment.sourceIdentity !== bundle.query.sourceIdentity
+    || alignment.normalizedReference !== bundle.query.normalizedReference
+    || alignment.normalizedReference !== binding.normalizedReference
+    || alignment.artifactIdentity !== bundle.query.artifactIdentity
+    || alignment.artifactVersion !== '0.9.2'
+    || !sameArtifactSource(alignment.artifactSources.dictionary, dictionary)
+    || !sameArtifactSource(alignment.artifactSources.lexicalDomains, lexicalDomains)
+    || alignment.morphologyTokenIdentity !== deriveOriginalLanguageStudyV2MorphologyTokenIdentity(binding)
+    || alignment.morphologyTokenCoordinates.canonicalReference !== binding.canonicalReference
+    || alignment.morphologyTokenCoordinates.normalizedReference !== binding.normalizedReference
+    || alignment.morphologyTokenCoordinates.position !== binding.selectedToken.position
+    || !sameSelectedTokenWitness(alignment.morphologyTokenWitness, binding.selectedToken)
     || alignment.sourceId !== candidate.sense.sourceId || alignment.entryId !== candidate.entry.entryId
     || alignment.senseId !== candidate.sense.senseId || alignment.evidenceId !== evidence.evidenceId) return undefined;
   return { ...alignment };
+}
+
+function sameArtifactSource(
+  proof: ServerVerifiedHebrewSemanticAlignment['artifactSources']['dictionary'],
+  source: UbsSemanticSource,
+): boolean {
+  return proof.sourceId === source.sourceId
+    && proof.sourceRole === source.sourceRole
+    && proof.artifactName === source.artifactName
+    && proof.artifactIdentity === source.artifactIdentity
+    && proof.artifactVersion === source.artifactVersion
+    && proof.sourceSha256 === source.sourceSha256;
+}
+
+function sameSelectedTokenWitness(
+  proof: ServerVerifiedHebrewSemanticAlignment['morphologyTokenWitness'],
+  selected: OriginalLanguageStudyV2DraftCursorBinding['selectedToken'],
+): boolean {
+  return proof.text === selected.text
+    && proof.lemma === selected.lemma
+    && proof.strongsNumber === selected.strongsNumber
+    && proof.morphologyCode === selected.morphologyCode
+    && proof.gloss === selected.gloss;
 }
 
 function candidateReason(bundle: UbsSemanticEvidenceBundle):
@@ -351,20 +394,128 @@ function snapshotSelectedToken(token: NonNullable<OriginalLanguageStudyDomainRes
 function snapshotAlignment(input: unknown): ServerVerifiedHebrewSemanticAlignment {
   const record = objectOf(input, 'server-verified alignment');
   exactKeys(record,
-    ['status', 'morphologyTokenIdentity', 'verifierVersion', 'sourceId', 'entryId', 'senseId', 'evidenceId'],
-    ['status', 'morphologyTokenIdentity', 'verifierVersion', 'sourceId', 'entryId', 'senseId', 'evidenceId']);
+    [
+      'status', 'proofContract', 'verifierVersion', 'sourceIdentity', 'normalizedReference',
+      'artifactIdentity', 'artifactVersion', 'artifactSources', 'sourceId', 'entryId', 'senseId', 'evidenceId',
+      'morphologyTokenIdentity', 'morphologyTokenCoordinates', 'morphologyTokenWitness',
+    ],
+    [
+      'status', 'proofContract', 'verifierVersion', 'sourceIdentity', 'normalizedReference',
+      'artifactIdentity', 'artifactVersion', 'artifactSources', 'sourceId', 'entryId', 'senseId', 'evidenceId',
+      'morphologyTokenIdentity', 'morphologyTokenCoordinates', 'morphologyTokenWitness',
+    ]);
   if (record.status !== 'verified_token_alignment') throw new Error('alignment status must be verified_token_alignment');
+  if (record.proofContract !== 'theologai-exact-hebrew-token-alignment.v1') {
+    throw new Error('alignment must use the exact server-side token proof contract');
+  }
   if (typeof record.verifierVersion !== 'number' || !Number.isSafeInteger(record.verifierVersion)
     || record.verifierVersion < 1 || record.verifierVersion > 1_000_000) throw new Error('alignment verifier version is invalid');
   return Object.freeze({
     status: 'verified_token_alignment',
-    morphologyTokenIdentity: text(record.morphologyTokenIdentity, 512, 'alignment.morphologyTokenIdentity'),
+    proofContract: 'theologai-exact-hebrew-token-alignment.v1',
     verifierVersion: record.verifierVersion,
+    sourceIdentity: hebrewIdentity(record.sourceIdentity, 'alignment.sourceIdentity'),
+    normalizedReference: requireUbsSemanticNormalizedReference(
+      record.normalizedReference,
+      'alignment.normalizedReference',
+    ),
+    artifactIdentity: sha256(record.artifactIdentity, 'alignment.artifactIdentity'),
+    artifactVersion: exactArtifactVersion(record.artifactVersion, 'alignment.artifactVersion'),
+    artifactSources: snapshotArtifactSources(record.artifactSources),
     sourceId: identifier(record.sourceId, 'alignment.sourceId'),
     entryId: identifier(record.entryId, 'alignment.entryId'),
     senseId: identifier(record.senseId, 'alignment.senseId'),
     evidenceId: identifier(record.evidenceId, 'alignment.evidenceId'),
+    morphologyTokenIdentity: text(record.morphologyTokenIdentity, 512, 'alignment.morphologyTokenIdentity'),
+    morphologyTokenCoordinates: snapshotTokenCoordinates(record.morphologyTokenCoordinates),
+    morphologyTokenWitness: snapshotTokenWitness(record.morphologyTokenWitness),
   });
+}
+
+function snapshotArtifactSources(input: unknown): ServerVerifiedHebrewSemanticAlignment['artifactSources'] {
+  const record = objectOf(input, 'alignment.artifactSources');
+  exactKeys(record, ['dictionary', 'lexicalDomains'], ['dictionary', 'lexicalDomains']);
+  return Object.freeze({
+    dictionary: snapshotArtifactSource(record.dictionary, 'dictionary'),
+    lexicalDomains: snapshotArtifactSource(record.lexicalDomains, 'lexical_domains'),
+  });
+}
+
+function snapshotArtifactSource(
+  input: unknown,
+  expectedRole: 'dictionary' | 'lexical_domains',
+): ServerVerifiedHebrewSemanticAlignment['artifactSources']['dictionary'] {
+  const record = objectOf(input, `alignment.artifactSources.${expectedRole}`);
+  exactKeys(record,
+    ['sourceId', 'sourceRole', 'artifactName', 'artifactIdentity', 'artifactVersion', 'sourceSha256'],
+    ['sourceId', 'sourceRole', 'artifactName', 'artifactIdentity', 'artifactVersion', 'sourceSha256']);
+  if (record.sourceRole !== expectedRole
+    || (expectedRole === 'dictionary' && record.artifactName !== 'UBSHebrewDic-v0.9.2-en.JSON')
+    || (expectedRole === 'lexical_domains' && record.artifactName !== 'UBSHebrewDicLexicalDomains-v0.9.2-en.JSON')) {
+    throw new Error(`alignment artifact source must be the exact ${expectedRole} UBS artifact`);
+  }
+  return Object.freeze({
+    sourceId: identifier(record.sourceId, `alignment.${expectedRole}.sourceId`),
+    sourceRole: expectedRole,
+    artifactName: record.artifactName,
+    artifactIdentity: sha256(record.artifactIdentity, `alignment.${expectedRole}.artifactIdentity`),
+    artifactVersion: exactArtifactVersion(record.artifactVersion, `alignment.${expectedRole}.artifactVersion`),
+    sourceSha256: sha256(record.sourceSha256, `alignment.${expectedRole}.sourceSha256`),
+  }) as ServerVerifiedHebrewSemanticAlignment['artifactSources']['dictionary'];
+}
+
+function snapshotTokenCoordinates(
+  input: unknown,
+): ServerVerifiedHebrewSemanticAlignment['morphologyTokenCoordinates'] {
+  const record = objectOf(input, 'alignment.morphologyTokenCoordinates');
+  exactKeys(record, ['canonicalReference', 'normalizedReference', 'position'],
+    ['canonicalReference', 'normalizedReference', 'position']);
+  const position = record.position;
+  if (typeof position !== 'number' || !Number.isSafeInteger(position) || position < 1 || position > 200) {
+    throw new Error('alignment morphology token position is invalid');
+  }
+  return Object.freeze({
+    canonicalReference: text(record.canonicalReference, 100, 'alignment.canonicalReference'),
+    normalizedReference: requireUbsSemanticNormalizedReference(
+      record.normalizedReference,
+      'alignment.morphologyTokenCoordinates.normalizedReference',
+    ),
+    position,
+  });
+}
+
+function snapshotTokenWitness(
+  input: unknown,
+): ServerVerifiedHebrewSemanticAlignment['morphologyTokenWitness'] {
+  const record = objectOf(input, 'alignment.morphologyTokenWitness');
+  exactKeys(record, ['text', 'lemma', 'strongsNumber', 'morphologyCode', 'gloss'],
+    ['text', 'lemma', 'strongsNumber', 'morphologyCode', 'gloss']);
+  return Object.freeze({
+    text: text(record.text, 2_000, 'alignment morphology token text'),
+    lemma: text(record.lemma, 2_000, 'alignment morphology token lemma'),
+    strongsNumber: nullableText(record.strongsNumber, 128, 'alignment morphology token Strong\'s number'),
+    morphologyCode: nullableText(record.morphologyCode, 512, 'alignment morphology token morphology code'),
+    gloss: nullableText(record.gloss, 2_000, 'alignment morphology token gloss'),
+  });
+}
+
+function hebrewIdentity(value: unknown, label: string): UbsInternalHebrewLexicalIdentity {
+  if (typeof value !== 'string' || !/^H(?!0000$)[0-9]{4}$/.test(value)) {
+    throw new Error(`${label} must be a canonical fixed-width H#### identity`);
+  }
+  return value as UbsInternalHebrewLexicalIdentity;
+}
+
+function sha256(value: unknown, label: string): string {
+  if (typeof value !== 'string' || !/^[0-9a-f]{64}$/.test(value)) {
+    throw new Error(`${label} must be a lowercase SHA-256`);
+  }
+  return value;
+}
+
+function exactArtifactVersion(value: unknown, label: string): '0.9.2' {
+  if (value !== '0.9.2') throw new Error(`${label} must be the pinned UBS artifact version`);
+  return value;
 }
 
 function objectOf(input: unknown, label: string): Record<string, unknown> {
@@ -384,6 +535,11 @@ function text(value: unknown, maximum: number, label: string): string {
     throw new Error(`${label} must be non-empty, trimmed, NFC, bounded, and control-free`);
   }
   return value;
+}
+
+function nullableText(value: unknown, maximum: number, label: string): string | null {
+  if (value === null) return null;
+  return text(value, maximum, label);
 }
 
 function identifier(value: unknown, label: string): string {

@@ -119,6 +119,64 @@ export type UbsSemanticSource = UbsSemanticSourceProvenance & {
   artifactIdentity: string;
 };
 
+/**
+ * The server-only proof shape required before a future semantic candidate may
+ * be described as aligned with one morphology token.  This is intentionally
+ * more specific than a coordinate observation: every source artifact, the
+ * source row, and the exact selected-token witness must be re-bound to the
+ * current request before promotion.
+ *
+ * It is a contract only.  No current composition root accepts or produces
+ * this proof, and a coordinate-only UBS/TAHOT attestation never satisfies it.
+ */
+export interface FutureExactHebrewTokenAlignmentProof {
+  status: 'verified_token_alignment';
+  proofContract: 'theologai-exact-hebrew-token-alignment.v1';
+  verifierVersion: number;
+  /** Fixed-width internal H#### identity selected for the current request. */
+  sourceIdentity: UbsInternalHebrewLexicalIdentity;
+  /** Current query reference, normalized at the shared semantic boundary. */
+  normalizedReference: string;
+  /** Exact transformed artifact and both pinned input-artifact witnesses. */
+  artifactIdentity: string;
+  artifactVersion: typeof UBS_SEMANTIC_ARTIFACT_VERSION;
+  artifactSources: {
+    dictionary: FutureExactHebrewTokenAlignmentArtifactSource;
+    lexicalDomains: FutureExactHebrewTokenAlignmentArtifactSource;
+  };
+  /** Canonical UBS source row identity for the one selected candidate. */
+  sourceId: string;
+  entryId: string;
+  senseId: string;
+  evidenceId: string;
+  /**
+   * Server-derived stable identity for the selected morphology token.  It is
+   * also checked against the token coordinates and complete local witness.
+   */
+  morphologyTokenIdentity: string;
+  morphologyTokenCoordinates: {
+    canonicalReference: string;
+    normalizedReference: string;
+    position: number;
+  };
+  morphologyTokenWitness: {
+    text: string;
+    lemma: string;
+    strongsNumber: string | null;
+    morphologyCode: string | null;
+    gloss: string | null;
+  };
+}
+
+export interface FutureExactHebrewTokenAlignmentArtifactSource {
+  sourceId: string;
+  sourceRole: 'dictionary' | 'lexical_domains';
+  artifactName: 'UBSHebrewDic-v0.9.2-en.JSON' | 'UBSHebrewDicLexicalDomains-v0.9.2-en.JSON';
+  artifactIdentity: string;
+  artifactVersion: typeof UBS_SEMANTIC_ARTIFACT_VERSION;
+  sourceSha256: string;
+}
+
 export interface UbsSemanticEntry {
   entryId: string;
   sourceId: string;
@@ -135,10 +193,23 @@ export interface UbsSemanticSense {
   sourceId: string;
   entryId: string;
   sourceOrdinal: number;
-  definition: string;
+  definitionStatus: 'published' | 'absent_in_source' | 'excluded_unresolved_markup';
+  definition?: string;
+  /** Bounded machine-readable reasons; empty unless unresolved source markup was excluded. */
+  definitionExclusionReasons: UbsSemanticDefinitionExclusionReason[];
   glosses: string[];
   domainRefs: UbsSemanticDomainRef[];
 }
+
+export const UBS_SEMANTIC_DEFINITION_EXCLUSION_REASONS = Object.freeze([
+  'unsafe_attribution_markup',
+  'unsafe_note_markup',
+  'malformed_lexical_link_markup',
+  'unvalidated_scripture_link_markup',
+  'malformed_or_unknown_markup',
+] as const);
+export type UbsSemanticDefinitionExclusionReason =
+  typeof UBS_SEMANTIC_DEFINITION_EXCLUSION_REASONS[number];
 
 export interface UbsSemanticDomainRef {
   sourceId: string;
@@ -443,11 +514,8 @@ export type UbsSemanticResolution =
       sense: UbsSemanticSense;
       domains: UbsSemanticDomain[];
       referenceEvidence: UbsSemanticReferenceEvidence;
-      alignmentEvidence: {
-        status: 'verified_token_alignment';
-        morphologyTokenIdentity: string;
-        verifierVersion: number;
-      };
+      /** Not satisfied by UBS/TAHOT coordinate equality or coordinate attestation. */
+      alignmentEvidence: FutureExactHebrewTokenAlignmentProof;
     }
   | {
       status: 'lexical_candidates';

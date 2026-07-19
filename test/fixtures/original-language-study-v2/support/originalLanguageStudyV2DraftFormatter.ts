@@ -107,7 +107,12 @@ function renderCandidate(lines: string[], candidate: OriginalLanguageStudyV2Draf
   lines.push(`\- ${m(candidate.senseId)} in ${m(candidate.entryId)}; detail ${m(candidate.detailStatus)}\.`);
   if (candidate.detailStatus !== 'detailed') return;
   lines.push(`  \- Lemma: ${m(candidate.lemma)}`);
-  lines.push(`  \- Definition: ${m(candidate.definition)}`);
+  lines.push(candidate.definition === undefined
+    ? `  \- Definition: unavailable \(${m(candidate.definitionStatus)}\)`
+    : `  \- Definition: ${m(candidate.definition)}`);
+  if (candidate.definitionExclusionReasons.length) {
+    lines.push(`  \- Definition exclusion: ${candidate.definitionExclusionReasons.map(m).join('; ')}`);
+  }
   lines.push(`  \- Glosses: ${candidate.glosses.map(m).join('; ')}`);
   if (candidate.domains.length) lines.push(`  \- Domains: ${candidate.domains.map(domain => m(domain.label)).join('; ')}`);
   if (candidate.referenceEvidence.length) {

@@ -30,4 +30,19 @@ describe('inactive original_language_study v2 Markdown formatter', () => {
     expect(markdown).toContain('https\\:\\/\\/example\\.invalid\\/dictionary');
     expect(markdown).not.toContain('[link](https://evil.invalid)');
   });
+
+  it('discloses an excluded definition without rendering undefined', async () => {
+    const value = syntheticCandidate(1);
+    value.sense.definitionStatus = 'excluded_unresolved_markup';
+    delete value.sense.definition;
+    value.sense.definitionExclusionReasons = ['malformed_or_unknown_markup'];
+    const presentation = await syntheticCoordinator([value]).coordinator.study(
+      syntheticRequest(undefined, 'detailed'),
+    );
+    const markdown = formatOriginalLanguageStudyV2Draft(presentation.output);
+    expect(markdown).toContain('Definition: unavailable');
+    expect(markdown).toContain('excluded\\_unresolved\\_markup');
+    expect(markdown).toContain('Definition exclusion: malformed\\_or\\_unknown\\_markup');
+    expect(markdown).not.toContain('Definition: undefined');
+  });
 });

@@ -55,7 +55,8 @@ function candidate(index: number, normalizedReference = 'Synthetic 1:1'): UbsSem
   const sense: UbsSemanticSense = {
     sourceId: 'synthetic-dictionary', entryId: entry.entryId,
     senseId: `sense-${suffix}`, sourceOrdinal: index,
-    definition: `SYNTHETIC DEFINITION ${suffix}`, glosses: [`GLOSS ${suffix}`],
+    definitionStatus: 'published', definition: `SYNTHETIC DEFINITION ${suffix}`,
+    definitionExclusionReasons: [], glosses: [`GLOSS ${suffix}`],
     domainRefs: [{ sourceId: domain.sourceId, domainId: domain.domainId }],
   };
   const evidence: UbsSemanticReferenceEvidence = {
@@ -601,7 +602,7 @@ describe('inactive UBS semantic aggregate evidence bundle', () => {
       { message: 'strict canonical order', mutate: page => { page.items.reverse(); } },
       { message: 'duplicate sense identity', mutate: page => { page.items[1] = structuredClone(page.items[0]); } },
       { message: 'exact query identity', mutate: page => { page.items[0].matchingReferences[0].normalizedReference = 'Synthetic 1:2'; } },
-      { message: 'domain total', mutate: page => { page.items[0].domainTotal = 0; } },
+      { message: 'domain total', mutate: page => { page.items[0].domainTotal = -1; } },
       { message: 'provenance is malformed', mutate: page => { page.sources[0].artifactIdentity = OTHER_ARTIFACT; } },
       { message: 'honest candidate window', mutate: page => { page.semanticSenseTotal = 1; } },
       { message: 'inconsistent evidence', mutate: page => { page.items[1].entry.lemma = 'INCONSISTENT LEMMA'; } },
@@ -630,6 +631,38 @@ describe('inactive UBS semantic aggregate evidence bundle', () => {
       await expect(queryUbsSemanticEvidenceBundle(repository, request())).rejects.toThrow(testCase.message);
       expect(repository.queryCount).toBe(1);
     }
+  });
+
+  it('publishes a complete lexical candidate with no source domain assignment', async () => {
+    const value = candidate(1);
+    value.sense.domainRefs = [];
+    value.domains = [];
+    value.domainTotal = 0;
+    const result = await queryUbsSemanticEvidenceBundle(
+      new SyntheticAggregateRepository([value]), request(),
+    );
+    expect(result.candidates[0]).toMatchObject({ domains: [], domainTotal: 0 });
+    expect(result.coverage.completeForWholeQuery).toBe(true);
+  });
+
+  it('preserves an excluded definition state while rejecting unknown exclusion reasons', async () => {
+    const value = candidate(1);
+    value.sense.definitionStatus = 'excluded_unresolved_markup';
+    delete value.sense.definition;
+    value.sense.definitionExclusionReasons = ['malformed_or_unknown_markup'];
+    const result = await queryUbsSemanticEvidenceBundle(
+      new SyntheticAggregateRepository([value]), request(),
+    );
+    expect(result.candidates[0]!.sense).toMatchObject({
+      definitionStatus: 'excluded_unresolved_markup',
+      definitionExclusionReasons: ['malformed_or_unknown_markup'],
+    });
+    expect(result.candidates[0]!.sense).not.toHaveProperty('definition');
+
+    value.sense.definitionExclusionReasons = ['unsupported_reason' as never];
+    await expect(queryUbsSemanticEvidenceBundle(
+      new SyntheticAggregateRepository([value]), request(),
+    )).rejects.toThrow('unsupported');
   });
 
   it('rejects stale cursor position metadata and pages that do not advance', async () => {

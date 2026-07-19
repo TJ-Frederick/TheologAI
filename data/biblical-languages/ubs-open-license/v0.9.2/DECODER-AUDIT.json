@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "theologai-ubs-hebrew-decoder-audit.v1",
+  "raw": { "entries": 7932, "baseForms": 8902, "senses": 16224, "references": 260813, "domains": 411 },
+  "projection": { "entries": 8285, "senses": 15123, "references": 249901, "domains": 411 },
+  "identities": { "acceptedOccurrences": 8345, "excludedOccurrences": 734, "excludedBaseForms": 617 },
+  "definitions": {
+    "nonblank": 16220,
+    "published": 16097,
+    "absentInSource": 4,
+    "excludedUnresolvedMarkup": 123,
+    "markupOccurrences": { "L": 9599, "S": 8, "A": 59, "N": 23 },
+    "malformedLexicalLinks": 3
+  },
+  "glosses": { "sensesWithCleanNonemptyGlosses": 16224 },
+  "domains": {
+    "blankAssignmentsDropped": 208,
+    "rawNullDomainSenses": 27,
+    "blankOnlyDomainSenses": 207,
+    "zeroDomainSenses": 234
+  },
+  "maximumReferencesPerSense": 10944,
+  "deterministicProjectionSha256": "c9b4d3bc13199bc3d4ca9dfd60c808e0ae93c31c8b65dc4d34f4069086cfb516"
+}

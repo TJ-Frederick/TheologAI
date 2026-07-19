@@ -3,11 +3,15 @@ import { parseUbsPublicHebrewIdentity } from '../../../../src/kernel/ubsSemantic
 import { parseUbsSemanticEvidenceBundleCursor } from '../../../../src/kernel/ubsSemanticEvidenceBundle.js';
 import {
   ORIGINAL_LANGUAGE_STUDY_V2_DRAFT_RESPONSE_BYTES,
+  deriveOriginalLanguageStudyV2MorphologyTokenIdentity,
   parseOriginalLanguageStudyV2DraftCursor,
   type OriginalLanguageStudyV2DraftCandidate,
   type OriginalLanguageStudyV2DraftCursorBinding,
+  type OriginalLanguageStudyV2DraftProvenanceSource,
   type OriginalLanguageStudyV2DraftResult,
   type OriginalLanguageStudyV2DraftResultWindow,
+  type OriginalLanguageStudyV2DraftSelectedTokenWitness,
+  type ServerVerifiedHebrewSemanticAlignment,
 } from './originalLanguageStudyV2DraftContract.js';
 import { originalLanguageStudyV2DraftOutputSchema } from './originalLanguageStudyV2DraftSchema.js';
 
@@ -177,10 +181,45 @@ function validateRelationalContract(output: OriginalLanguageStudyV2DraftResult):
     const alignment = evidence.alignmentEvidence;
     if (alignment.sourceId !== candidate.sourceId || alignment.entryId !== candidate.entryId
       || alignment.senseId !== candidate.senseId || candidate.referenceEvidenceIds.length !== 1
-      || alignment.evidenceId !== candidate.referenceEvidenceIds[0]) {
+      || alignment.evidenceId !== candidate.referenceEvidenceIds[0]
+      || alignment.sourceIdentity !== evidence.identity.sourceIdentity
+      || alignment.normalizedReference !== evidence.normalizedReference
+      || alignment.artifactIdentity !== evidence.provenance.artifactIdentity
+      || alignment.artifactVersion !== dictionary.artifactVersion
+      || !sameAlignmentArtifactSource(alignment.artifactSources.dictionary, dictionary)
+      || !sameAlignmentArtifactSource(alignment.artifactSources.lexicalDomains, domains)
+      || alignment.morphologyTokenCoordinates.canonicalReference !== context.reference
+      || alignment.morphologyTokenCoordinates.normalizedReference !== evidence.normalizedReference
+      || alignment.morphologyTokenCoordinates.position !== selectedToken.position
+      || alignment.morphologyTokenWitness.text !== selectedToken.text
+      || alignment.morphologyTokenWitness.lemma !== selectedToken.lemma
+      || alignment.morphologyTokenWitness.strongsNumber !== selectedToken.strongsNumber
+      || alignment.morphologyTokenWitness.morphologyCode !== selectedToken.morphologyCode
+      || alignment.morphologyTokenWitness.gloss !== selectedToken.gloss
+      || alignment.morphologyTokenIdentity !== deriveOriginalLanguageStudyV2MorphologyTokenIdentity({
+        canonicalReference: context.reference as string,
+        normalizedReference: evidence.normalizedReference,
+        selectedToken: {
+          position: selectedToken.position, text: selectedToken.text, lemma: selectedToken.lemma,
+          strongsNumber: selectedToken.strongsNumber, morphologyCode: selectedToken.morphologyCode,
+          gloss: selectedToken.gloss,
+        } as OriginalLanguageStudyV2DraftSelectedTokenWitness,
+      })) {
       throw new Error('alignment must bind the exact candidate and reference-evidence identity');
     }
   }
+}
+
+function sameAlignmentArtifactSource(
+  proof: ServerVerifiedHebrewSemanticAlignment['artifactSources']['dictionary'],
+  source: OriginalLanguageStudyV2DraftProvenanceSource,
+): boolean {
+  return proof.sourceId === source.sourceId
+    && proof.sourceRole === source.sourceRole
+    && proof.artifactName === source.artifactName
+    && proof.artifactIdentity === source.artifactIdentity
+    && proof.artifactVersion === source.artifactVersion
+    && proof.sourceSha256 === source.sourceSha256;
 }
 
 function validateWindow(

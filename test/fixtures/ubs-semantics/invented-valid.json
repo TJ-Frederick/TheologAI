@@ -68,7 +68,9 @@
           "senseId": "synthetic-sense-one",
           "entryId": "synthetic-entry-one",
           "sourceOrdinal": 1,
+          "definitionStatus": "published",
           "definition": "SYNTHETIC DEFINITION — NOT UBS CONTENT",
+          "definitionExclusionReasons": [],
           "glosses": ["SYNTHETIC GLOSS", "SYNTHETIC ALTERNATE GLOSS"],
           "domainIds": ["synthetic-domain-child"],
           "references": [

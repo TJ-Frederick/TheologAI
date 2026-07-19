@@ -11,23 +11,31 @@ const repoPath = fileURLToPath(new URL('../../../', import.meta.url));
 const require = createRequire(import.meta.url);
 const sourceRoot = 'data/biblical-languages/ubs-open-license/v0.9.2';
 const packetPaths = [
+  `${sourceRoot}/COORDINATE-AUDIT.json`,
+  `${sourceRoot}/DECODER-AUDIT.json`,
   `${sourceRoot}/SCHEMA-REPORT.json`,
   `${sourceRoot}/SOURCE.json`,
   `${sourceRoot}/en/UBSHebrewDic-v0.9.2-en.JSON`,
   `${sourceRoot}/en/UBSHebrewDicLexicalDomains-v0.9.2-en.JSON`,
+  `${sourceRoot}/reference-validation/USFMTC-LICENSE`,
+  `${sourceRoot}/reference-validation/usfmtc-reference.py`,
   `${sourceRoot}/upstream-notices/DICTIONARIES-README.md`,
   `${sourceRoot}/upstream-notices/HEBREW-README.md`,
   `${sourceRoot}/upstream-notices/LICENSE.md`,
   'docs/UBS-HEBREW-V0.9.2-ACQUISITION.md',
   'scripts/verify-ubs-hebrew-v092-acquisition.ts',
+  'scripts/reproduce-ubs-hebrew-v092-coordinate-audit.ts',
+  'scripts/ubs-semantics/coordinateVerifier.ts',
+  'scripts/ubs-semantics/rawDecoder.ts',
   'test/unit/scripts/ubsHebrewV092AcquisitionInertness.test.ts',
+  'test/unit/scripts/ubsRawDecoderAndCoordinateVerifier.test.ts',
   'test/unit/scripts/verifyUbsHebrewV092Acquisition.test.ts',
 ].sort();
 const runtimeEntrypoints = ['src/index.ts', 'src/worker.ts', 'src/ccel-coordinator-worker.ts'] as const;
 const exactAcquisitionReference = /data\/biblical-languages\/ubs-open-license\/v0\.9\.2|verify-ubs-hebrew-v092-acquisition|UBS-HEBREW-V0\.9\.2-ACQUISITION/i;
 
 describe('UBS Hebrew v0.9.2 acquisition remains globally inactive', () => {
-  it('limits the packet to the exact eleven approved regular files', () => {
+  it('limits the packet to the exact reviewed inactive files', () => {
     const candidates = repositoryPaths().filter(isPacketCandidate).sort();
     expect(candidates).toEqual(packetPaths);
     expect(candidates.every(path => lstatSync(resolve(repoPath, path)).isFile())).toBe(true);
@@ -105,6 +113,9 @@ function isPacketCandidate(path: string): boolean {
     || /(?:^|\/)UBS-HEBREW-V0\.9\.2-ACQUISITION\.md$/i.test(path)
     || /(?:^|\/)verifyUbsHebrewV092Acquisition\.test\.ts$/i.test(path)
     || /(?:^|\/)ubsHebrewV092AcquisitionInertness\.test\.ts$/i.test(path)
+    || /(?:^|\/)ubsRawDecoderAndCoordinateVerifier\.test\.ts$/i.test(path)
+    || /(?:^|\/)ubs-semantics\/(?:rawDecoder|coordinateVerifier)\.ts$/i.test(path)
+    || /(?:^|\/)reproduce-ubs-hebrew-v092-coordinate-audit\.ts$/i.test(path)
     || /(?:^|\/)verify-ubs-hebrew-v092-acquisition\.ts$/i.test(path);
 }
 

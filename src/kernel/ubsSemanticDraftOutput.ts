@@ -5,20 +5,14 @@ import {
   parseUbsPublicHebrewIdentity,
   requireUbsSemanticNormalizedReference,
 } from './ubsSemanticDomain.js';
-import type { UbsPublicHebrewIdentityBoundary } from './ubsSemanticDomain.js';
+import type { FutureExactHebrewTokenAlignmentProof, UbsPublicHebrewIdentityBoundary } from './ubsSemanticDomain.js';
 
 export interface UbsSemanticDraftOutputRequest {
   publicStrongs: string;
   normalizedReference: string;
   artifactIdentity: string;
-  /** Trusted verifier assertion required before the stronger aligned status may be emitted. */
-  expectedAlignment?: {
-    morphologyTokenIdentity: string;
-    verifierVersion: number;
-    sourceId: string;
-    senseId: string;
-    evidenceId: string;
-  };
+  /** Full server-owned proof; coordinate-only evidence never satisfies this. */
+  expectedAlignment?: FutureExactHebrewTokenAlignmentProof;
 }
 
 export function createUbsSemanticDraftContinuationCursor(
@@ -135,10 +129,8 @@ export function serializeValidatedUbsSemanticDraftOutput(
     if (expectedAlignment === undefined) {
       throw new Error('UBS semantic aligned source candidate requires a trusted expected alignment assertion');
     }
-    const alignment = draftObject(root.alignmentEvidence, 'output.alignmentEvidence');
-    if (alignment.status !== 'verified_token_alignment'
-      || alignment.morphologyTokenIdentity !== expectedAlignment.morphologyTokenIdentity
-      || alignment.verifierVersion !== expectedAlignment.verifierVersion
+    const alignment = normalizeExactAlignment(root.alignmentEvidence, 'output.alignmentEvidence');
+    if (!sameExactAlignment(alignment, expectedAlignment)
       || root.senseId !== expectedAlignment.senseId
       || evidence.sourceId !== expectedAlignment.sourceId
       || evidence.senseId !== expectedAlignment.senseId
@@ -182,27 +174,14 @@ function validateUbsSemanticDraftRequest(
     throw new Error('UBS semantic draft artifact identity must be a lowercase SHA-256');
   }
   if (request.expectedAlignment !== undefined) {
-    const tokenIdentity = request.expectedAlignment.morphologyTokenIdentity;
-    if (!tokenIdentity
-      || tokenIdentity !== tokenIdentity.trim()
-      || tokenIdentity !== tokenIdentity.normalize('NFC')
-      || [...tokenIdentity].length > 512
-      || hasHostileUnicode(tokenIdentity)) {
-      throw new Error('UBS semantic draft expected morphology token identity must be non-empty, trimmed, NFC, bounded, and control-free');
-    }
-    if (!Number.isSafeInteger(request.expectedAlignment.verifierVersion)
-      || request.expectedAlignment.verifierVersion < 1
-      || request.expectedAlignment.verifierVersion > 1_000_000) {
-      throw new Error('UBS semantic draft expected verifier version must be a bounded positive safe integer');
-    }
-    for (const [field, value] of [
-      ['sourceId', request.expectedAlignment.sourceId],
-      ['senseId', request.expectedAlignment.senseId],
-      ['evidenceId', request.expectedAlignment.evidenceId],
-    ] as const) {
-      if (!/^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$/.test(value) || value.length > 128) {
-        throw new Error(`UBS semantic draft expected alignment ${field} must be a canonical bounded identifier`);
-      }
+    const expected = normalizeExactAlignment(request.expectedAlignment, 'UBS semantic draft expected alignment');
+    if (expected.sourceIdentity !== expectedIdentity.sourceIdentity
+      || expected.normalizedReference !== request.normalizedReference
+      || expected.morphologyTokenCoordinates.normalizedReference !== request.normalizedReference
+      || expected.artifactIdentity !== request.artifactIdentity
+      || expected.artifactSources.dictionary.artifactIdentity !== request.artifactIdentity
+      || expected.artifactSources.lexicalDomains.artifactIdentity !== request.artifactIdentity) {
+      throw new Error('UBS semantic draft expected alignment is stale for its request identity, reference, or artifact');
     }
   }
   return expectedIdentity;
@@ -215,6 +194,158 @@ function hasHostileUnicode(value: string): boolean {
     if ((codePoint >= 0xfdd0 && codePoint <= 0xfdef) || (codePoint & 0xffff) >= 0xfffe) return true;
   }
   return false;
+}
+
+function normalizeExactAlignment(input: unknown, path: string): FutureExactHebrewTokenAlignmentProof {
+  const record = draftObject(input, path);
+  exactProperties(record,
+    [
+      'status', 'proofContract', 'verifierVersion', 'sourceIdentity', 'normalizedReference',
+      'artifactIdentity', 'artifactVersion', 'artifactSources', 'sourceId', 'entryId', 'senseId', 'evidenceId',
+      'morphologyTokenIdentity', 'morphologyTokenCoordinates', 'morphologyTokenWitness',
+    ], path);
+  if (record.status !== 'verified_token_alignment'
+    || record.proofContract !== 'theologai-exact-hebrew-token-alignment.v1') {
+    throw new Error(`${path} must use the exact server-side token proof contract`);
+  }
+  const verifierVersion = draftInteger(record.verifierVersion, `${path}.verifierVersion`);
+  if (verifierVersion < 1 || verifierVersion > 1_000_000) {
+    throw new Error(`${path}.verifierVersion must be a bounded positive safe integer`);
+  }
+  return {
+    status: 'verified_token_alignment',
+    proofContract: 'theologai-exact-hebrew-token-alignment.v1',
+    verifierVersion,
+    sourceIdentity: canonicalHebrewIdentity(record.sourceIdentity, `${path}.sourceIdentity`),
+    normalizedReference: requireUbsSemanticNormalizedReference(record.normalizedReference, `${path}.normalizedReference`),
+    artifactIdentity: canonicalSha256(record.artifactIdentity, `${path}.artifactIdentity`),
+    artifactVersion: artifactVersion(record.artifactVersion, `${path}.artifactVersion`),
+    artifactSources: normalizeArtifactSources(record.artifactSources, `${path}.artifactSources`),
+    sourceId: canonicalIdentifier(record.sourceId, `${path}.sourceId`),
+    entryId: canonicalIdentifier(record.entryId, `${path}.entryId`),
+    senseId: canonicalIdentifier(record.senseId, `${path}.senseId`),
+    evidenceId: canonicalIdentifier(record.evidenceId, `${path}.evidenceId`),
+    morphologyTokenIdentity: canonicalText(record.morphologyTokenIdentity, 512, `${path}.morphologyTokenIdentity`),
+    morphologyTokenCoordinates: normalizeTokenCoordinates(record.morphologyTokenCoordinates, `${path}.morphologyTokenCoordinates`),
+    morphologyTokenWitness: normalizeTokenWitness(record.morphologyTokenWitness, `${path}.morphologyTokenWitness`),
+  };
+}
+
+function normalizeArtifactSources(
+  input: unknown,
+  path: string,
+): FutureExactHebrewTokenAlignmentProof['artifactSources'] {
+  const record = draftObject(input, path);
+  exactProperties(record, ['dictionary', 'lexicalDomains'], path);
+  return {
+    dictionary: normalizeArtifactSource(record.dictionary, 'dictionary', path),
+    lexicalDomains: normalizeArtifactSource(record.lexicalDomains, 'lexical_domains', path),
+  };
+}
+
+function normalizeArtifactSource(
+  input: unknown,
+  role: 'dictionary' | 'lexical_domains',
+  path: string,
+): FutureExactHebrewTokenAlignmentProof['artifactSources']['dictionary'] {
+  const record = draftObject(input, `${path}.${role}`);
+  exactProperties(record,
+    ['sourceId', 'sourceRole', 'artifactName', 'artifactIdentity', 'artifactVersion', 'sourceSha256'],
+    `${path}.${role}`);
+  const expectedName = role === 'dictionary'
+    ? 'UBSHebrewDic-v0.9.2-en.JSON'
+    : 'UBSHebrewDicLexicalDomains-v0.9.2-en.JSON';
+  if (record.sourceRole !== role || record.artifactName !== expectedName) {
+    throw new Error(`${path}.${role} must identify the exact ${role} UBS artifact`);
+  }
+  return {
+    sourceId: canonicalIdentifier(record.sourceId, `${path}.${role}.sourceId`),
+    sourceRole: role,
+    artifactName: expectedName,
+    artifactIdentity: canonicalSha256(record.artifactIdentity, `${path}.${role}.artifactIdentity`),
+    artifactVersion: artifactVersion(record.artifactVersion, `${path}.${role}.artifactVersion`),
+    sourceSha256: canonicalSha256(record.sourceSha256, `${path}.${role}.sourceSha256`),
+  } as FutureExactHebrewTokenAlignmentProof['artifactSources']['dictionary'];
+}
+
+function normalizeTokenCoordinates(
+  input: unknown,
+  path: string,
+): FutureExactHebrewTokenAlignmentProof['morphologyTokenCoordinates'] {
+  const record = draftObject(input, path);
+  exactProperties(record, ['canonicalReference', 'normalizedReference', 'position'], path);
+  const position = draftInteger(record.position, `${path}.position`);
+  if (position < 1 || position > 200) throw new Error(`${path}.position must be an integer from 1 through 200`);
+  return {
+    canonicalReference: canonicalText(record.canonicalReference, 100, `${path}.canonicalReference`),
+    normalizedReference: requireUbsSemanticNormalizedReference(record.normalizedReference, `${path}.normalizedReference`),
+    position,
+  };
+}
+
+function normalizeTokenWitness(
+  input: unknown,
+  path: string,
+): FutureExactHebrewTokenAlignmentProof['morphologyTokenWitness'] {
+  const record = draftObject(input, path);
+  exactProperties(record, ['text', 'lemma', 'strongsNumber', 'morphologyCode', 'gloss'], path);
+  return {
+    text: canonicalText(record.text, 2_000, `${path}.text`),
+    lemma: canonicalText(record.lemma, 2_000, `${path}.lemma`),
+    strongsNumber: nullableCanonicalText(record.strongsNumber, 128, `${path}.strongsNumber`),
+    morphologyCode: nullableCanonicalText(record.morphologyCode, 512, `${path}.morphologyCode`),
+    gloss: nullableCanonicalText(record.gloss, 2_000, `${path}.gloss`),
+  };
+}
+
+function sameExactAlignment(
+  left: FutureExactHebrewTokenAlignmentProof,
+  right: FutureExactHebrewTokenAlignmentProof,
+): boolean {
+  return JSON.stringify(left) === JSON.stringify(normalizeExactAlignment(right, 'UBS semantic draft expected alignment'));
+}
+
+function exactProperties(record: Record<string, unknown>, expected: readonly string[], path: string): void {
+  const actual = Object.keys(record);
+  if (actual.length !== expected.length || actual.some(key => !expected.includes(key)) || expected.some(key => !(key in record))) {
+    throw new Error(`${path} must have exactly the reviewed proof fields`);
+  }
+}
+
+function canonicalText(value: unknown, maximum: number, path: string): string {
+  if (typeof value !== 'string' || !value || value !== value.trim() || value !== value.normalize('NFC')
+    || [...value].length > maximum || hasHostileUnicode(value)) {
+    throw new Error(`${path} must be non-empty, trimmed, NFC, bounded, and control-free`);
+  }
+  return value;
+}
+
+function nullableCanonicalText(value: unknown, maximum: number, path: string): string | null {
+  return value === null ? null : canonicalText(value, maximum, path);
+}
+
+function canonicalIdentifier(value: unknown, path: string): string {
+  if (typeof value !== 'string' || value.length > 128 || !/^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$/.test(value)) {
+    throw new Error(`${path} must be a canonical bounded identifier`);
+  }
+  return value;
+}
+
+function canonicalHebrewIdentity(value: unknown, path: string): FutureExactHebrewTokenAlignmentProof['sourceIdentity'] {
+  if (typeof value !== 'string' || !/^H(?!0000$)[0-9]{4}$/.test(value)) {
+    throw new Error(`${path} must be a canonical fixed-width H#### identity`);
+  }
+  return value as FutureExactHebrewTokenAlignmentProof['sourceIdentity'];
+}
+
+function canonicalSha256(value: unknown, path: string): string {
+  if (typeof value !== 'string' || !/^[0-9a-f]{64}$/.test(value)) throw new Error(`${path} must be a lowercase SHA-256`);
+  return value;
+}
+
+function artifactVersion(value: unknown, path: string): '0.9.2' {
+  if (value !== '0.9.2') throw new Error(`${path} must be the pinned UBS artifact version`);
+  return value;
 }
 
 function draftObject(value: unknown, path: string): Record<string, unknown> {
