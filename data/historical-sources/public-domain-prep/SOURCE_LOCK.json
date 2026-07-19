@@ -1,0 +1,207 @@
+{
+  "schemaVersion": "public-domain-source-lock.v1",
+  "acquiredOn": "2026-07-18",
+  "networkPolicy": "acquisition_complete_normalization_offline",
+  "candidates": [
+    {
+      "sourceId": "gutenberg-pg45001-pg64392-john-allen-calvin",
+      "status": "locked",
+      "edition": "Sixth American Edition, Revised and Corrected; two volumes; John Allen translation",
+      "rights": {
+        "status": "public_domain_in_usa",
+        "evidence": "Both pinned RDF records state: Public domain in the USA.",
+        "territoryCaveat": "Users outside the United States must check local law."
+      },
+      "artifacts": [
+        {
+          "role": "volume_1_utf8_text",
+          "sourceUrl": "https://www.gutenberg.org/cache/epub/45001/pg45001.txt",
+          "localPath": "data/historical-sources/project-gutenberg/pg45001/pg45001.txt",
+          "bytes": 1925334,
+          "sha256": "7318da7684a4b9e9cf55bd7d0eb0da19c16dec59117ff51cda2050f5f601f9e9"
+        },
+        {
+          "role": "volume_1_rdf_metadata",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/45001.rdf",
+          "localPath": "data/historical-sources/project-gutenberg/pg45001/pg45001.rdf",
+          "bytes": 19094,
+          "sha256": "beb6186c2a011ab75ce5660b9167da1a9d3bfc14c39dac3c23cc4f22499f48f6"
+        },
+        {
+          "role": "volume_2_utf8_text",
+          "sourceUrl": "https://www.gutenberg.org/cache/epub/64392/pg64392.txt",
+          "localPath": "data/historical-sources/project-gutenberg/pg64392/pg64392.txt",
+          "bytes": 2134847,
+          "sha256": "a1e35c9f41d978f7b3257f9115b59acfd2a80c41ae11736628710b773cef1003"
+        },
+        {
+          "role": "volume_2_rdf_metadata",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/64392.rdf",
+          "localPath": "data/historical-sources/project-gutenberg/pg64392/pg64392.rdf",
+          "bytes": 17028,
+          "sha256": "8311cd8ff964f7625defb3b079a6afd76ef100226072953dffefadfe4db681d8"
+        },
+        {
+          "role": "project_gutenberg_license",
+          "sourceUrl": "https://www.gutenberg.org/policy/license.html",
+          "localPath": "data/historical-sources/project-gutenberg/shared/license.html",
+          "bytes": 32318,
+          "sha256": "3df0bb72fa6820227533369d85ccdfbfae8290a402dc553c6a969f52d7fbf6c9"
+        }
+      ]
+    },
+    {
+      "sourceId": "gutenberg-pg19950-aquinas-tertia-pars-q73-q83",
+      "status": "locked",
+      "edition": "Benziger Brothers English Dominican Province translation as transformed in Project Gutenberg 19950",
+      "rights": {
+        "status": "public_domain_in_usa",
+        "evidence": "Pinned RDF record states: Public domain in the USA.",
+        "territoryCaveat": "Users outside the United States must check local law."
+      },
+      "transformationNotice": "The Gutenberg text says its earlier electronic edition was made available through CCEL, then corrected and supplemented by David McClamrock; it enumerates formatting, citation, footnote, transliteration, and correction changes. No CCEL artifact was acquired.",
+      "artifacts": [
+        {
+          "role": "utf8_text",
+          "sourceUrl": "https://www.gutenberg.org/cache/epub/19950/pg19950.txt",
+          "localPath": "data/historical-sources/project-gutenberg/pg19950/pg19950.txt",
+          "bytes": 2757535,
+          "sha256": "4adb238f7c98be1c4c7d71275d29d479d923d2c447d16a692365c79ada81cdb5"
+        },
+        {
+          "role": "rdf_metadata",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/19950.rdf",
+          "localPath": "data/historical-sources/project-gutenberg/pg19950/pg19950.rdf",
+          "bytes": 17764,
+          "sha256": "c424168085c4d2b7445c37bf2745b5f3891890dce4ed71944acfb2bc717150aa"
+        },
+        {
+          "role": "project_gutenberg_license",
+          "sourceUrl": "https://www.gutenberg.org/policy/license.html",
+          "localPath": "data/historical-sources/project-gutenberg/shared/license.html",
+          "bytes": 32318,
+          "sha256": "3df0bb72fa6820227533369d85ccdfbfae8290a402dc553c6a969f52d7fbf6c9"
+        }
+      ]
+    },
+    {
+      "sourceId": "gutenberg-pg3296-pusey-augustine-confessions",
+      "status": "locked",
+      "edition": "The Confessions of Saint Augustine, translated by E. B. Pusey (Edward Bouverie)",
+      "rights": {
+        "status": "public_domain_in_usa",
+        "evidence": "Pinned RDF record states: Public domain in the USA.",
+        "territoryCaveat": "Users outside the United States must check local law."
+      },
+      "artifacts": [
+        {
+          "role": "utf8_text",
+          "sourceUrl": "https://www.gutenberg.org/cache/epub/3296/pg3296.txt",
+          "localPath": "data/historical-sources/project-gutenberg/pg3296/pg3296.txt",
+          "bytes": 632167,
+          "sha256": "5a036498dc7c546a98b9e7a31952e030ca74db7dd111b30029354efe12bcd691"
+        },
+        {
+          "role": "rdf_metadata",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/3296.rdf",
+          "localPath": "data/historical-sources/project-gutenberg/pg3296/pg3296.rdf",
+          "bytes": 20797,
+          "sha256": "ff7a0b21049a9db1c398f563f68c95383e75e83d8de84366f90b634114647c16"
+        },
+        {
+          "role": "project_gutenberg_license",
+          "sourceUrl": "https://www.gutenberg.org/policy/license.html",
+          "localPath": "data/historical-sources/project-gutenberg/shared/license.html",
+          "bytes": 32318,
+          "sha256": "3df0bb72fa6820227533369d85ccdfbfae8290a402dc553c6a969f52d7fbf6c9"
+        }
+      ]
+    },
+    {
+      "sourceId": "internet-archive-a566189200cypruoft-cyril-1839",
+      "status": "blocked",
+      "edition": "The Catechetical Lectures of S. Cyril, Archbishop of Jerusalem (Oxford/London, 1839)",
+      "rights": {
+        "status": "public_domain_mark",
+        "evidence": "Pinned item metadata licenseurl points to the Creative Commons public-domain instrument.",
+        "territoryCaveat": "The item and edition evidence is retained; no broader jurisdictional warranty is made."
+      },
+      "blocker": "The inspected title pages identify only “Translated by members of the English Church” and “Translated, with notes and indices.” Internet Archive metadata lists Richard William Church and John Henry Newman as untyped creators. The exact individual translator/editor roles cannot be established without inference, so normalization is hard-stopped.",
+      "boundaryAudit": {
+        "result": "boundaries_clear_but_candidate_blocked_on_roles",
+        "djvuObjectPages": {
+          "lecture19": 312,
+          "lecture20": 317,
+          "lecture21": 321,
+          "lecture22": 324,
+          "lecture23": 327
+        }
+      },
+      "artifacts": [
+        {
+          "role": "item_metadata_json",
+          "sourceUrl": "https://archive.org/metadata/a566189200cypruoft",
+          "localPath": "data/historical-sources/internet-archive/a566189200cypruoft/metadata.json",
+          "bytes": 8787,
+          "sha256": "3ec905f0a94c046702fc16d75b8ee21a0ca73034a45b8912b013961dd773a558"
+        },
+        {
+          "role": "djvu_text",
+          "sourceUrl": "https://archive.org/download/a566189200cypruoft/a566189200cypruoft_djvu.txt",
+          "localPath": "data/historical-sources/internet-archive/a566189200cypruoft/a566189200cypruoft_djvu.txt",
+          "bytes": 919759,
+          "sha256": "db70a6c3fb15f2114665729dfeae21d88e2ec40db58d0544079a701bf3c58179"
+        },
+        {
+          "role": "djvu_xml",
+          "sourceUrl": "https://archive.org/download/a566189200cypruoft/a566189200cypruoft_djvu.xml",
+          "localPath": "data/historical-sources/internet-archive/a566189200cypruoft/a566189200cypruoft_djvu.xml",
+          "bytes": 8561307,
+          "sha256": "0621c0de6b332bf5f01422b168639a365a4cc1f25b179d0ced25748322bc4b8d"
+        },
+        {
+          "role": "marc_xml",
+          "sourceUrl": "https://archive.org/download/a566189200cypruoft/a566189200cypruoft_marc.xml",
+          "localPath": "data/historical-sources/internet-archive/a566189200cypruoft/a566189200cypruoft_marc.xml",
+          "bytes": 3799,
+          "sha256": "6ef0f7f19b19cc59341b8418fe320acf468cc420f268573387ee62c9a76bbaf6"
+        },
+        {
+          "role": "item_meta_xml",
+          "sourceUrl": "https://archive.org/download/a566189200cypruoft/a566189200cypruoft_meta.xml",
+          "localPath": "data/historical-sources/internet-archive/a566189200cypruoft/a566189200cypruoft_meta.xml",
+          "bytes": 2034,
+          "sha256": "8381f446240d2ec7fddbd1ad987d4234574a4d2960441b31fe13e61cd73fb6a5"
+        },
+        {
+          "role": "scandata_xml",
+          "sourceUrl": "https://archive.org/download/a566189200cypruoft/scandata.xml",
+          "localPath": "data/historical-sources/internet-archive/a566189200cypruoft/scandata.xml",
+          "bytes": 200777,
+          "sha256": "1ffc3bd69f9819908f2e1481fdc03214506ad0f617981e339d4cbd9450281f4c"
+        },
+        {
+          "role": "public_domain_instrument",
+          "sourceUrl": "https://creativecommons.org/licenses/publicdomain/",
+          "localPath": "data/historical-sources/internet-archive/a566189200cypruoft/publicdomain-license.html",
+          "bytes": 30419,
+          "sha256": "122cd2dba6c0edfe907f7853e06aa096ee0ba00cd8362f2d96b6bd781288d208"
+        },
+        {
+          "role": "series_title_page_image",
+          "sourceUrl": "https://archive.org/download/a566189200cypruoft/page/n6_w1600.jpg",
+          "localPath": "data/historical-sources/internet-archive/a566189200cypruoft/page-audit/leaf-0007-series-title.jpg",
+          "bytes": 652660,
+          "sha256": "41cfae40f8615cd7938803fb23450dd3334d8005403dd0180884c018559b355c"
+        },
+        {
+          "role": "work_title_page_image",
+          "sourceUrl": "https://archive.org/download/a566189200cypruoft/page/n12_w1600.jpg",
+          "localPath": "data/historical-sources/internet-archive/a566189200cypruoft/page-audit/leaf-0013-work-title.jpg",
+          "bytes": 602513,
+          "sha256": "68e8dc0929671531506382874b2d0747952c562fec7e6a5f937d13604f771d2d"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8" ?><record xmlns="http://www.loc.gov/MARC21/slim">
+  <leader>01222cam a2200289 a 4500</leader>
+  <controlfield tag="008">880822s1839    enke   g b    001 0 eng d</controlfield>
+  <datafield tag="035" ind1=" " ind2=" ">
+    <subfield code="a">a5661892</subfield>
+  </datafield>
+  <datafield tag="040" ind1=" " ind2=" ">
+    <subfield code="b">eng</subfield>
+    <subfield code="d">CaOTSM</subfield>
+    <subfield code="d">CSmyS</subfield>
+  </datafield>
+  <datafield tag="041" ind1="0" ind2=" ">
+    <subfield code="a">eng</subfield>
+    <subfield code="h">grc</subfield>
+  </datafield>
+  <datafield tag="050" ind1=" " ind2="4">
+    <subfield code="a">BR65.C82</subfield>
+    <subfield code="b">E5 1839</subfield>
+  </datafield>
+  <datafield tag="100" ind1="0" ind2=" ">
+    <subfield code="a">Cyril,</subfield>
+    <subfield code="c">Saint, Bishop of Jerusalem,</subfield>
+    <subfield code="d">ca. 315-386.</subfield>
+  </datafield>
+  <datafield tag="245" ind1="1" ind2="4">
+    <subfield code="a">The catechetical lectures of S. Cyril, Archbishop of Jerusalem /</subfield>
+    <subfield code="c">translated, with notes and indices.</subfield>
+  </datafield>
+  <datafield tag="260" ind1=" " ind2=" ">
+    <subfield code="a">Oxford :</subfield>
+    <subfield code="b">John Henry Parker ;</subfield>
+    <subfield code="a">London :</subfield>
+    <subfield code="b">Rivingtons,</subfield>
+    <subfield code="c">1839.</subfield>
+  </datafield>
+  <datafield tag="300" ind1=" " ind2=" ">
+    <subfield code="a">xlvi, 312 p. :</subfield>
+    <subfield code="b">plan ;</subfield>
+    <subfield code="c">22 cm.</subfield>
+  </datafield>
+  <datafield tag="440" ind1=" " ind2="0">
+    <subfield code="a">Library of fathers of the Holy Catholic Church ;</subfield>
+    <subfield code="v">v.2.</subfield>
+  </datafield>
+  <datafield tag="500" ind1=" " ind2=" ">
+    <subfield code="a">smcnc418.</subfield>
+  </datafield>
+  <datafield tag="500" ind1=" " ind2=" ">
+    <subfield code="a">Translation and notes by Richard William Church.</subfield>
+  </datafield>
+  <datafield tag="500" ind1=" " ind2=" ">
+    <subfield code="a">Preface signed J.H.N. (John Henry Newman).</subfield>
+  </datafield>
+  <datafield tag="504" ind1=" " ind2=" ">
+    <subfield code="a">Includes bibliographical references and indexes.</subfield>
+  </datafield>
+  <datafield tag="596" ind1=" " ind2=" ">
+    <subfield code="a">45</subfield>
+  </datafield>
+  <datafield tag="600" ind1="0" ind2="0">
+    <subfield code="a">Cyril,</subfield>
+    <subfield code="c">Saint, Bishop of Jerusalem,</subfield>
+    <subfield code="d">ca. 315-386.</subfield>
+  </datafield>
+  <datafield tag="650" ind1=" " ind2="0">
+    <subfield code="a">Catechetical sermons.</subfield>
+  </datafield>
+  <datafield tag="650" ind1=" " ind2="0">
+    <subfield code="a">Catechetics</subfield>
+    <subfield code="x">History</subfield>
+    <subfield code="y">Early church, ca. 30-600.</subfield>
+  </datafield>
+  <datafield tag="650" ind1=" " ind2="0">
+    <subfield code="a">Theology, Doctrinal</subfield>
+    <subfield code="x">History</subfield>
+    <subfield code="y">Early church, ca. 30-600.</subfield>
+  </datafield>
+  <datafield tag="700" ind1="1" ind2=" ">
+    <subfield code="a">Church, Richard William,</subfield>
+    <subfield code="d">1815-1890.</subfield>
+  </datafield>
+  <datafield tag="700" ind1="1" ind2=" ">
+    <subfield code="a">Newman, John Henry,</subfield>
+    <subfield code="d">1801-1890.</subfield>
+  </datafield>
+  <datafield tag="926" ind1=" " ind2=" ">
+    <subfield code="a">E_RESOURCE</subfield>
+    <subfield code="b">ONLINE</subfield>
+    <subfield code="c">Online resource SMC</subfield>
+    <subfield code="d">E_RESOURCE</subfield>
+    <subfield code="f">1</subfield>
+  </datafield>
+</record>
