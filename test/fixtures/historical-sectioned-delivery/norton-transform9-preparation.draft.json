@@ -1,0 +1,98 @@
+{
+  "schemaVersion": 1,
+  "kind": "historical_sectioned_delivery_norton_transform9_preparation",
+  "runtimeStatus": "inactive_until_transform_9",
+  "delivery": {
+    "mode": "sectioned_only",
+    "wholeDocumentResource": {
+      "representation": "bounded_landing_metadata_only",
+      "maxUtf8Bytes": 16384,
+      "fields": [
+        "workId",
+        "editionId",
+        "title",
+        "language",
+        "sectionCount",
+        "browseContract"
+      ],
+      "sectionDirectory": "not_included",
+      "body": "not_included"
+    },
+    "browse": {
+      "maxSectionEntries": 32,
+      "entryFields": [
+        "sourceOrdinal",
+        "sectionKey",
+        "displayLabel",
+        "heading",
+        "resourceUri"
+      ],
+      "body": "not_included",
+      "nativeResourceLinks": "exact_section_only",
+      "cursor": {
+        "version": "historical-sectioned-only-cursor-v1",
+        "bindings": [
+          "contractVersion",
+          "documentId",
+          "editionId",
+          "packageSha256",
+          "lastSourceOrdinal"
+        ]
+      }
+    },
+    "exactSectionResource": {
+      "body": "only_body_delivery_route"
+    }
+  },
+  "transform": {
+    "targetTransformVersion": 9,
+    "predecessor": {
+      "transformVersion": 8,
+      "scope": "existing_17_historical_documents_only"
+    },
+    "migrationStatus": "not_authorized",
+    "dataManifestStatus": "unchanged"
+  },
+  "work": {
+    "workId": "calvin-institutes-of-the-christian-religion",
+    "title": "Institutes of the Christian Religion",
+    "composition": {
+      "startYear": 1536,
+      "endYear": 1559,
+      "statement": "successive Latin editions; final Latin edition 1559"
+    },
+    "metadataProvenance": {
+      "authority": "Bibliotheque nationale de France canonical work record",
+      "locator": "https://catalogue.bnf.fr/ark:/12148/cb11963198n",
+      "reviewedAt": "2026-07-18"
+    }
+  },
+  "edition": {
+    "documentId": "calvin-institutes-norton-1561-eebo-tcp-a17662",
+    "editionId": "calvin-institutes-norton-1561-eebo-tcp-a17662",
+    "workId": "calvin-institutes-of-the-christian-religion",
+    "language": "en",
+    "publication": {
+      "year": 1561,
+      "statement": "London: Reinolde Wolfe and Richarde Harison, 1561"
+    },
+    "editionProvenance": {
+      "sourceId": "eebo-tcp-a17662-norton-1561",
+      "sourceCommit": "32191150ad4a919dfd2c28c89b1dbc1c2396252a",
+      "reviewedAt": "2026-07-17",
+      "exactArtifactStatus": "verified_with_uncertainty"
+    }
+  },
+  "gate1Package": {
+    "path": "data/historical-sources/eebo-tcp/A17662/norton-1561.edition.json",
+    "sha256": "3054f4446b2e92af87c1713ee1c44d6745bca42a32aed7c67890d25fedbdff33",
+    "bytes": 4058506,
+    "sectionCount": 1250,
+    "sectionKeys": {
+      "prefix": "a17662-source-ordinal-",
+      "first": "a17662-source-ordinal-0001",
+      "last": "a17662-source-ordinal-1250"
+    }
+  },
+  "genericAliasStatus": "dormant_until_future_activation"
+}
