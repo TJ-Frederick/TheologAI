@@ -142,7 +142,10 @@ capability.
 - **HelloAO** (`bible.helloao.org`) — Free, no auth, 1000+ translations + 6 commentaries
 - **ESV API** — Requires `ESV_API_KEY` env var, 100k/day limit
 - **NET Bible API** — Free, no auth, includes 60k translator notes
-- **CCEL future adapter** (`ccel.org`) — defensive discovery architecture retained but not exposed by current public schemas; see `NOTICE.md`
+- **CCEL discovery adapter** (`ccel.org`) — bounded future-provider architecture;
+  preview exposes only its disabled v5 discovery contract, production remains
+  v4/local-only, and neither environment may execute a CCEL request without a
+  separate release gate. The legacy body reader has been retired; see `NOTICE.md`.
 
 ## Conventions
 
@@ -167,3 +170,20 @@ npm run build:stepbible:lexicons # STEPBible lexicons → src/data/
 ```
 
 The SQLite database (`data/theologai.db`) is a derived artifact. Cross-references, Strong's, morphology, and historical documents are all queried via FTS5-indexed SQLite.
+
+## Release-state boundary
+
+PR #72 is the deployed remote baseline: production Worker
+`762485da-9e02-46a0-9777-e0d8743b9dbf` and preview Worker
+`8ed4ad1a-f45f-4cdc-a6de-5358f59b6d44`. The production `workers.dev` endpoint
+redirects ordinary requests to the canonical custom domain; the exact
+abusive-poller tuple is rejected instead, while the preview legacy endpoint
+remains direct. Later behaviorally inert repository merges through `6c0ab39`
+have not been deployed.
+
+The acquired UBS Hebrew and historical public-domain packets are deliberately
+outside the runtime, SQLite/D1 materialization, MCP registry, and hosted
+17-work catalog. Migration `0004` / transform 7, migration `0005` / transform
+8, Norton transform 9, and later edition transforms require separate approval.
+The `0004` / transform 7 data layer must precede `0005` / transform 8.
+`package.json` is private: npm distribution is unsupported.

@@ -1,29 +1,60 @@
 # Worker operations
 
-## Known-good PR #50 production baseline (2026-07-16)
+## Current known-good PR #72 remote baseline (2026-07-17)
 
-PR #50 merge `16e633bc70dbbea668caacf87f994a2536441092` is the
-pre-custom-domain rollback anchor. Protected run `29527760541`, GitHub
-deployment `5479150556`, and Cloudflare deployment
-`5822242e-d0bf-43a9-bbbc-0ec7d6edd180` deployed Worker version
+PR #72 merge `72a8ee5eef9b909a373b085d1a4f193484ddfe8a` is the current
+known-good remote baseline. Protected preview run `29621708718` deployed
+preview Worker `8ed4ad1a-f45f-4cdc-a6de-5358f59b6d44`; protected production
+run `29622634088` and Cloudflare deployment
+`a4697fd1-deda-4dae-a16c-635454218bc8` deployed production Worker
+`762485da-9e02-46a0-9777-e0d8743b9dbf`. The release retained production D1
+`theologai-production-20260715-a`
+(`c6535a4a-1953-4279-b277-7368445fc61a`), preview D1
+`theologai-preview-20260714-a`
+(`0dab804f-8df0-4727-93bd-299612b6e179`), rate namespaces `361201` and
+`361202` at 120/60, and CCEL flags `000` (production) / `100` (preview).
+
+The independent preview audit returned GO with no P0-P3 findings across 22
+read-only requests, and its source-attested regression passed 22/22. The
+independent production audit likewise returned GO with no P0-P3 findings in no
+more than 22 read-only requests; its source-attested regression passed 22/22.
+
+Ordinary requests to the production `theologai.tjfrederick.workers.dev` host
+now return a no-store 308 to `mcp.theologai.xyz`. The exact abusive-poller
+tuple (`CF-Connecting-IP: 18.192.206.183` plus `User-Agent:
+Go-http-client/2.0`) is rejected rather than redirected; supported browser CORS
+preflight remains local. The preview
+`theologai-preview.tjfrederick.workers.dev` host remains a direct compatibility
+endpoint. The primary-source MCP schema is production v4/local-only and preview
+v5/discovery-only; CCEL execution remains disabled in both environments.
+
+Later merges through `6c0ab39052864a3fc1f0628f98d10491fa431719` are
+behaviorally inert repository merges and have not been deployed. In particular,
+they do not change the deployed Workers, D1 bindings, historical catalog, UBS
+semantic runtime, or CCEL execution state. No deletion, route replacement, or
+other destructive cleanup is authorized by this record.
+
+Any eventual UBS semantic D1 release must complete migration `0004` / transform
+7 before the dependent historical migration `0005` / transform 8. Neither is
+part of this deployed baseline.
+
+## Historical PR #50 pre-custom-domain rollback anchor (2026-07-16)
+
+Before the PR #51 custom-domain release and the later PR #72 legacy-host
+behavior release, PR #50 merge
+`16e633bc70dbbea668caacf87f994a2536441092` was the pre-custom-domain rollback
+anchor. Protected run `29527760541`, GitHub deployment `5479150556`, and
+Cloudflare deployment `5822242e-d0bf-43a9-bbbc-0ec7d6edd180` deployed Worker
 `32520410-d363-4b2b-83d1-cb7613eab2f1` at 100%. Read-only readiness preserved
 production D1 `theologai-production-20260715-a`
 (`c6535a4a-1953-4279-b277-7368445fc61a`), rate namespace `361201` at 120/60,
 and CCEL flags `000`.
 
-The post-deployment black-box audit passed 72/72 assertions with no P0-P3
+Its post-deployment black-box audit passed 72/72 assertions with no P0-P3
 findings: parallel-text 44/44, protocol/inventory/CCEL 9/9, and
-HTTP/CORS/negotiation/under-budget rate behavior 19/19. Preview remains Worker
-`50bdd564-63da-4461-9a5b-73c61f26f7e6`, D1
-`theologai-preview-20260714-a`
-(`0dab804f-8df0-4727-93bd-299612b6e179`), rate namespace `361202`, and CCEL
-flags `100`.
-
-The next contained workstream adds custom domains without changing those
-logical bindings or behaviors. Follow
-[CUSTOM-DOMAIN-MIGRATION.md](CUSTOM-DOMAIN-MIGRATION.md) preview-first. Keep
-the `pages.dev` and both `workers.dev` endpoints operational; no deletion or
-route replacement is authorized.
+HTTP/CORS/negotiation/under-budget rate behavior 19/19. The PR #72 baseline
+supersedes it operationally; retain this record only as historical rollback
+evidence, not as a claim about the currently deployed Worker.
 
 ## Earlier deployment baseline and rollback posture (2026-07-15)
 
@@ -41,7 +72,7 @@ GitHub deployment run are authoritative after a later deployment. A reviewable
 deployment; in that state the configuration is not evidence of the deployed
 binding.
 
-### Stage D preview v5 exposure candidate
+### Deployed Stage D preview v5 profile (historical release record)
 
 The checked-in Stage D configuration is intentionally asymmetric. Production
 remains `false/false/false` for CCEL exposure, live search, and coordinator
@@ -49,9 +80,9 @@ execution, preserving the v4/local-only public contract. Preview is
 `true/false/false`: it exposes the v5 tool schema and guided workflows while the
 single live predicate remains false. In that state an external query returns a
 disabled provider result before adapter invocation, Durable Object lookup/RPC,
-or fetch. This configuration is a release candidate until a protected preview
-deployment and black-box audit provide authoritative runtime evidence; it does
-not authorize live CCEL access or any production change.
+or fetch. Protected preview deployment and black-box audit have established
+this as the deployed preview v5 profile. It still does not authorize live CCEL
+access or any production behavior beyond the documented v4/local-only profile.
 
 Because MCP clients may cache tool and prompt schemas within an initialized
 connection, reconnect and reinitialize the audit client after the preview
@@ -59,7 +90,7 @@ deployment. Audit the fresh `tools/list` and `prompts/list` responses before
 calling `primary_source_search`; otherwise a client can continue presenting a
 stale v4 schema even though the Worker has cut over to v5.
 
-| Environment | Deployed logical database | Current posture | Rollback posture |
+| Environment | Deployed logical database | Recorded point-in-time posture | Rollback posture |
 |---|---|---|---|
 | Production | `theologai-production-20260715-a` (`c6535a4a-1953-4279-b277-7368445fc61a`) | PR #37 merge `d395b3641eb00f6826eaba670c287f9a39dfa3da` deployed by protected run `29451333738`; deployment `5464194228` serves Worker `9d2b757b-8b9b-4318-b09d-14f62815bf82` at 100%. Readiness was `ready` with zero writes; coordinator and independent audits passed 73/73 and 91/91 with no P0-P3 findings. | Retain PR #38 Worker `e0371eb4-05c6-4415-b479-b01ac2630be0` with the same production D1 as the immediate compatible predecessor. Older matched pairs remain historical options below. No rollback is recorded as executed; do not mix incompatible code and data or delete another database without separate owner approval. |
 | Preview | `theologai-preview-20260714-a` (`0dab804f-8df0-4727-93bd-299612b6e179`) | Protected run `29450048707` deployed reviewed PR #37 head `5c6df7f1a340a9a0b43c3260d104cbd6d8d1ebfb` as deployment `5464127644` and Worker `fb2b8e41-4310-43f3-a8f0-571a64a733ac` at 100%. Coordinator and independent audits completed with no P0-P3 findings. | Retain PR #38 Worker `404b7eb3-7244-436d-bfa5-8359ac3a4aab` with the same preview D1 as the immediate compatible predecessor. Older matched pairs remain historical options below. No rollback is recorded as executed; do not delete another database without separate owner approval. |
@@ -354,11 +385,13 @@ necessarily persisted by Cloudflare.
 
 A sustained anonymous client from AWS infrastructure in Frankfurt has generated
 heavy production invocation volume. The current Worker-side limiter cannot
-prevent those requests from counting as Worker invocations. A custom domain
-would allow a future narrowly scoped WAF control while preserving public MCP
-access. This item is non-gating and parked pending an owner domain decision; no
-hostname rotation, Cloudflare Access policy, WAF rule, or limiter change is
-currently approved.
+prevent those requests from counting as Worker invocations. The custom domain
+and ordinary-request production legacy-host redirect are already deployed.
+`workers_dev` remains enabled and the one exact abusive-poller tuple remains a
+temporary mitigation. Disabling `workers_dev`, changing or removing that tuple
+rule, or adding a narrowly scoped WAF control while preserving public MCP
+access each remain separately owner-gated. No Cloudflare Access, hostname, WAF,
+or limiter change is currently approved.
 
 ## Runtime configuration ownership
 
@@ -369,8 +402,11 @@ dashboard-only plaintext variables: Wrangler removes undeclared variables on a
 later deploy unless `keep_vars` is enabled, and this project deliberately does
 not enable it.
 
-API keys and provider-bearing RPC URLs remain optional Worker secrets. No raw
-client denylist is stored in source or generated binding types.
+API keys and provider-bearing RPC URLs remain optional Worker secrets. The
+temporary exact `CF-Connecting-IP` plus `User-Agent` abusive-poller exception
+is source-controlled request policy in `src/http/worker/legacyEndpoint.ts`; it
+is evaluated for the incoming request and does not create a persisted telemetry
+field or dashboard-configured denylist.
 
 ## Donation verification preview smoke test
 
