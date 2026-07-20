@@ -390,11 +390,17 @@ function validateEntries(items: readonly UbsSemanticEntry[], identity: UbsIntern
       HEBREW_SEMANTIC_EVIDENCE_LIMITS.entryTransliterationCharacters,
       'entry transliteration',
     );
-    if (entry.partOfSpeech !== undefined) boundedText(
-      entry.partOfSpeech,
-      HEBREW_SEMANTIC_EVIDENCE_LIMITS.entryPartOfSpeechCharacters,
-      'entry part of speech',
-    );
+    if (entry.partOfSpeech !== undefined) {
+      if (!Array.isArray(entry.partOfSpeech) || entry.partOfSpeech.length > 16
+        || new Set(entry.partOfSpeech).size !== entry.partOfSpeech.length) {
+        throw new Error('repository entry parts of speech must be a bounded unique array');
+      }
+      for (const [index, partOfSpeech] of entry.partOfSpeech.entries()) boundedText(
+        partOfSpeech,
+        HEBREW_SEMANTIC_EVIDENCE_LIMITS.entryPartOfSpeechCharacters,
+        `entry part of speech ${index + 1}`,
+      );
+    }
     if (!Array.isArray(entry.lexicalIdentities) || !entry.lexicalIdentities.includes(identity)) {
       throw new Error('repository entry is not attached to the requested branded lexical identity');
     }

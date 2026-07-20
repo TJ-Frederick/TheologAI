@@ -4,6 +4,20 @@ import { parseUbsSourceTokenReference } from '../verify-ubs-hebrew-v092-acquisit
 import type { DecodedUbsCoordinateReference, UbsValidatedDefinitionReference } from './rawDecoder.js';
 
 export const UBS_TAHOT_COORDINATE_VERIFIER_VERSION = 1 as const;
+export const UBS_TAHOT_NATIVE_TO_NORMALIZED_BRIDGE_SCHEMA =
+  'theologai-ubs-tahot-native-to-normalized-bridge.v1' as const;
+export const UBS_TAHOT_NATIVE_TO_NORMALIZED_BRIDGE_COMPILER_VERSION = 1 as const;
+export const UBS_TAHOT_COORDINATE_AUDIT_SHA256 =
+  'd174d827bbfdf7d1c35a8836ff28a5453a2947ac5020eb5df060fed1732a1f30' as const;
+/**
+ * The pinned TAHOT files carry a common human-readable attribution header.
+ * Retain only its bounded checksum in code: parsed token rows are accepted
+ * only after both their full-file pins and the reviewed attribution header
+ * have matched.
+ */
+export const TAHOT_ATTRIBUTION_HEADER_LINE_COUNT = 19 as const;
+export const TAHOT_ATTRIBUTION_HEADER_SHA256 =
+  '92848ccec4937ecd165514fa1fad292238217a864c3a0720bb9a9bc33be2ac82' as const;
 export const USFMTC_COMMIT = 'a222dd3e78360f8e275ca56f4307af7e02b2430a' as const;
 export const USFMTC_REFERENCE_PATH = 'src/usfmtc/reference.py' as const;
 export const USFMTC_REFERENCE_BLOB = '16cd6fc2a42664a494a5989b8587247a27331cb6' as const;
@@ -83,6 +97,35 @@ export interface UbsTahotCoordinateIndex {
   };
 }
 
+export interface UbsTahotNativeToNormalizedBridge {
+  readonly schemaVersion: typeof UBS_TAHOT_NATIVE_TO_NORMALIZED_BRIDGE_SCHEMA;
+  readonly compilerVersion: typeof UBS_TAHOT_NATIVE_TO_NORMALIZED_BRIDGE_COMPILER_VERSION;
+  readonly normalizationRule: 'identity_when_no_canonical_override';
+  readonly coordinateAudit: {
+    readonly schemaVersion: 'theologai-ubs-tahot-coordinate-audit.v1';
+    readonly sha256: typeof UBS_TAHOT_COORDINATE_AUDIT_SHA256;
+  };
+  readonly attributionHeader: {
+    readonly lines: typeof TAHOT_ATTRIBUTION_HEADER_LINE_COUNT;
+    readonly sha256: typeof TAHOT_ATTRIBUTION_HEADER_SHA256;
+  };
+  readonly tahot: readonly { id: string; sha256: string; gitBlobSha1: string }[];
+  readonly usfmtc: UbsTahotCoordinateIndex['usfmtc'];
+  /** Book codes required to reconstruct identity mappings without TAHOT bytes. */
+  readonly defaultBookCodes: readonly { bookNumber: number; bookCode: string }[];
+  /** Complete native-coordinate membership set, compactly encoded as BBB:CCC:VVV keys. */
+  readonly nativeCoordinateKeys: readonly string[];
+  /**
+   * Native references are deliberately allowed to map to several normalized
+   * references.  The bridge never chooses one of those alternatives.
+   */
+  readonly overrides: readonly {
+    nativeCoordinate: TahotCoordinate;
+    normalizedCoordinates: readonly TahotCoordinate[];
+  }[];
+  readonly bridgeIdentity: string;
+}
+
 export interface UbsTahotCoordinateAudit {
   readonly schemaVersion: 'theologai-ubs-tahot-coordinate-audit.v1';
   readonly ubsReferenceRecords: number;
@@ -154,6 +197,7 @@ export function createUbsTahotCoordinateIndex(
   for (const { pin, bytes } of [...tahotInputs].sort((left, right) => compare(left.pin.id, right.pin.id))) {
     assertPinnedBytes(pin, bytes);
     const text = decodeUtf8(bytes, pin.id);
+    assertTahotAttributionHeader(text, pin.id);
     for (const [lineIndex, line] of text.split(/\r?\n/).entries()) {
       const firstField = line.split('\t', 1)[0]!.trim();
       if (!/^(?:[1-3][A-Za-z]{2}|[A-Za-z]{3})\./.test(firstField)) continue;
@@ -199,6 +243,94 @@ export function createUbsTahotCoordinateIndex(
       licenseBlob: USFMTC_LICENSE_BLOB,
       licenseSha256: USFMTC_LICENSE_SHA256,
     },
+  };
+}
+
+/** Build the compact override-only bridge from the complete pinned TAHOT corpus. */
+export function createUbsTahotNativeToNormalizedBridge(
+  index: UbsTahotCoordinateIndex,
+): UbsTahotNativeToNormalizedBridge {
+  const overrides = [...index.nativeToNormalized]
+    .map(([nativeKey, normalizedCoordinates]) => {
+      const nativeCoordinate = parseCoordinateKey(nativeKey, index.usfmBookByNumber);
+      const normalized = [...normalizedCoordinates]
+        .map(coordinate => ({ ...coordinate }))
+        .sort((left, right) => compare(coordinateSortKey(left), coordinateSortKey(right)));
+      return { nativeCoordinate, normalizedCoordinates: normalized };
+    })
+    .filter(({ nativeCoordinate, normalizedCoordinates }) => normalizedCoordinates.length !== 1
+      || coordinateKey(nativeCoordinate) !== coordinateKey(normalizedCoordinates[0]!))
+    .sort((left, right) => compare(coordinateSortKey(left.nativeCoordinate), coordinateSortKey(right.nativeCoordinate)));
+  const payload = {
+    schemaVersion: UBS_TAHOT_NATIVE_TO_NORMALIZED_BRIDGE_SCHEMA,
+    compilerVersion: UBS_TAHOT_NATIVE_TO_NORMALIZED_BRIDGE_COMPILER_VERSION,
+    normalizationRule: 'identity_when_no_canonical_override' as const,
+    coordinateAudit: {
+      schemaVersion: 'theologai-ubs-tahot-coordinate-audit.v1' as const,
+      sha256: UBS_TAHOT_COORDINATE_AUDIT_SHA256,
+    },
+    attributionHeader: {
+      lines: TAHOT_ATTRIBUTION_HEADER_LINE_COUNT,
+      sha256: TAHOT_ATTRIBUTION_HEADER_SHA256,
+    },
+    tahot: index.tahotPins.map(pin => ({ id: pin.id, sha256: pin.sha256, gitBlobSha1: pin.gitBlobSha1 })),
+    usfmtc: index.usfmtc,
+    defaultBookCodes: [...index.usfmBookByNumber]
+      .map(([bookNumber, book]) => ({ bookNumber, bookCode: book.code }))
+      .sort((left, right) => left.bookNumber - right.bookNumber),
+    nativeCoordinateKeys: [...index.nativeToNormalized.keys()]
+      .sort((left, right) => compare(coordinateSortKeyFromKey(left), coordinateSortKeyFromKey(right))),
+    overrides,
+  };
+  return { ...payload, bridgeIdentity: sha256(canonicalJson(payload)) };
+}
+
+/** Exact canonical bytes for a tracked bridge; a trailing newline is part of its identity contract. */
+export function serializeUbsTahotNativeToNormalizedBridge(bridge: UbsTahotNativeToNormalizedBridge): string {
+  const parsed = validateUbsTahotNativeToNormalizedBridge(bridge);
+  return `${canonicalJson(parsed)}\n`;
+}
+
+export function parseUbsTahotNativeToNormalizedBridge(bytes: Uint8Array | string): UbsTahotNativeToNormalizedBridge {
+  const text = typeof bytes === 'string' ? bytes : decodeUtf8(bytes, 'native-to-normalized bridge');
+  if (!text.endsWith('\n') || text.includes('\r')) throw new Error('Native-to-normalized bridge must use canonical LF-terminated JSON');
+  let value: unknown;
+  try { value = JSON.parse(text); } catch { throw new Error('Native-to-normalized bridge is not valid JSON'); }
+  const bridge = validateUbsTahotNativeToNormalizedBridge(value);
+  if (`${canonicalJson(bridge)}\n` !== text) throw new Error('Native-to-normalized bridge is not canonically serialized');
+  return bridge;
+}
+
+/** Resolve a source native coordinate without collapsing a legitimate one-to-many mapping. */
+export function resolveUbsTahotNormalizedCoordinates(
+  bridge: UbsTahotNativeToNormalizedBridge,
+  native: Pick<TahotCoordinate, 'bookNumber' | 'chapter' | 'verse'>,
+): readonly TahotCoordinate[] {
+  return createUbsTahotNormalizedCoordinateResolver(bridge)(native);
+}
+
+/**
+ * Validate once, then resolve many source references without re-parsing a
+ * 23k-coordinate bridge for every one of the 250k semantic evidence rows.
+ */
+export function createUbsTahotNormalizedCoordinateResolver(bridge: UbsTahotNativeToNormalizedBridge): (
+  native: Pick<TahotCoordinate, 'bookNumber' | 'chapter' | 'verse'>,
+) => readonly TahotCoordinate[] {
+  const parsed = validateUbsTahotNativeToNormalizedBridge(bridge);
+  const nativeKeys = new Set(parsed.nativeCoordinateKeys);
+  const overrides = new Map(parsed.overrides.map(item => [coordinateKey(item.nativeCoordinate), item.normalizedCoordinates]));
+  const bookCodes = new Map(parsed.defaultBookCodes.map(item => [item.bookNumber, item.bookCode]));
+  return native => {
+    const key = `${native.bookNumber}:${native.chapter}:${native.verse}`;
+    if (!nativeKeys.has(key)) throw new Error('Native coordinate is absent from the exact bridge membership set');
+    const override = overrides.get(key);
+    if (override) return override.map(item => ({ ...item }));
+    const bookCode = bookCodes.get(native.bookNumber);
+    if (!bookCode || !Number.isSafeInteger(native.chapter) || native.chapter < 1
+      || !Number.isSafeInteger(native.verse) || native.verse < 1) {
+      throw new Error('Native coordinate cannot be resolved through the exact normalized bridge');
+    }
+    return [{ bookNumber: native.bookNumber, bookCode, chapter: native.chapter, verse: native.verse }];
   };
 }
 
@@ -369,6 +501,200 @@ function parsePinnedUsfmtcOldTestament(bytes: Uint8Array): Map<number, { code: s
     throw new Error('Pinned usfmtc OT mapping boundaries differ from GEN-MAL');
   }
   return result;
+}
+
+function assertTahotAttributionHeader(text: string, fileId: string): void {
+  const header = text.split(/\r?\n/).slice(0, TAHOT_ATTRIBUTION_HEADER_LINE_COUNT).join('\n');
+  if (sha256(header) !== TAHOT_ATTRIBUTION_HEADER_SHA256) {
+    throw new Error(`TAHOT attribution header drift for ${fileId}`);
+  }
+}
+
+function validateUbsTahotNativeToNormalizedBridge(value: unknown): UbsTahotNativeToNormalizedBridge {
+  const root = record(value, 'Native-to-normalized bridge');
+  exactRecordKeys(root, [
+    'schemaVersion', 'compilerVersion', 'normalizationRule', 'coordinateAudit', 'attributionHeader',
+    'tahot', 'usfmtc', 'defaultBookCodes', 'nativeCoordinateKeys', 'overrides', 'bridgeIdentity',
+  ], 'Native-to-normalized bridge');
+  if (root.schemaVersion !== UBS_TAHOT_NATIVE_TO_NORMALIZED_BRIDGE_SCHEMA
+    || root.compilerVersion !== UBS_TAHOT_NATIVE_TO_NORMALIZED_BRIDGE_COMPILER_VERSION
+    || root.normalizationRule !== 'identity_when_no_canonical_override') {
+    throw new Error('Native-to-normalized bridge has an unsupported schema, compiler, or normalization rule');
+  }
+  const coordinateAudit = record(root.coordinateAudit, 'Native-to-normalized bridge coordinate audit');
+  exactRecordKeys(coordinateAudit, ['schemaVersion', 'sha256'], 'Native-to-normalized bridge coordinate audit');
+  if (coordinateAudit.schemaVersion !== 'theologai-ubs-tahot-coordinate-audit.v1'
+    || coordinateAudit.sha256 !== UBS_TAHOT_COORDINATE_AUDIT_SHA256) {
+    throw new Error('Native-to-normalized bridge does not bind the exact coordinate audit');
+  }
+  const attributionHeader = record(root.attributionHeader, 'Native-to-normalized bridge attribution header');
+  exactRecordKeys(attributionHeader, ['lines', 'sha256'], 'Native-to-normalized bridge attribution header');
+  if (attributionHeader.lines !== TAHOT_ATTRIBUTION_HEADER_LINE_COUNT
+    || attributionHeader.sha256 !== TAHOT_ATTRIBUTION_HEADER_SHA256) {
+    throw new Error('Native-to-normalized bridge attribution header witness differs from the reviewed pin');
+  }
+  if (!Array.isArray(root.tahot) || canonicalJson(root.tahot) !== canonicalJson(
+    [...PINNED_TAHOT_FILES].sort((left, right) => compare(left.id, right.id))
+      .map(pin => ({ id: pin.id, sha256: pin.sha256, gitBlobSha1: pin.gitBlobSha1 })),
+  )) {
+    throw new Error('Native-to-normalized bridge TAHOT witnesses differ from the exact reviewed pins');
+  }
+  const usfmtc = record(root.usfmtc, 'Native-to-normalized bridge usfmtc');
+  exactRecordKeys(usfmtc, ['commit', 'referenceBlob', 'referenceSha256', 'licenseBlob', 'licenseSha256'],
+    'Native-to-normalized bridge usfmtc');
+  const expectedUsfmtc = {
+    commit: USFMTC_COMMIT, referenceBlob: USFMTC_REFERENCE_BLOB, referenceSha256: USFMTC_REFERENCE_SHA256,
+    licenseBlob: USFMTC_LICENSE_BLOB, licenseSha256: USFMTC_LICENSE_SHA256,
+  };
+  if (canonicalJson(usfmtc) !== canonicalJson(expectedUsfmtc)) {
+    throw new Error('Native-to-normalized bridge usfmtc witness differs from the exact reviewed pin');
+  }
+  if (!Array.isArray(root.defaultBookCodes) || root.defaultBookCodes.length !== 39) {
+    throw new Error('Native-to-normalized bridge default book codes are incomplete');
+  }
+  const defaultBookCodes = root.defaultBookCodes.map((item, index) => {
+    const candidate = record(item, `Native-to-normalized bridge default book ${index + 1}`);
+    exactRecordKeys(candidate, ['bookNumber', 'bookCode'], `Native-to-normalized bridge default book ${index + 1}`);
+    if (!Number.isSafeInteger(candidate.bookNumber) || candidate.bookNumber !== index + 1
+      || typeof candidate.bookCode !== 'string' || !/^[A-Z0-9]{3}$/.test(candidate.bookCode)) {
+      throw new Error('Native-to-normalized bridge default book code is malformed or unordered');
+    }
+    return { bookNumber: candidate.bookNumber, bookCode: candidate.bookCode };
+  });
+  if (defaultBookCodes[0]!.bookCode !== 'GEN' || defaultBookCodes[38]!.bookCode !== 'MAL') {
+    throw new Error('Native-to-normalized bridge default book-code bounds differ from GEN-MAL');
+  }
+  if (!Array.isArray(root.nativeCoordinateKeys) || root.nativeCoordinateKeys.length === 0) {
+    throw new Error('Native-to-normalized bridge native-coordinate membership set is missing');
+  }
+  let priorNativeCoordinateKey = '';
+  const nativeBookCodes = new Map(defaultBookCodes.map(book => [book.bookNumber, { code: book.bookCode }]));
+  const nativeCoordinateKeys = root.nativeCoordinateKeys.map((value, index) => {
+    if (typeof value !== 'string') throw new Error('Native-to-normalized bridge native-coordinate key is not a string');
+    const coordinate = parseCoordinateKey(value, nativeBookCodes);
+    const key = coordinateSortKey(coordinate);
+    if (key <= priorNativeCoordinateKey) {
+      throw new Error('Native-to-normalized bridge native-coordinate membership set is duplicated or unordered');
+    }
+    priorNativeCoordinateKey = key;
+    if (index === 0 && value !== '1:1:1') throw new Error('Native-to-normalized bridge native-coordinate lower bound drift');
+    return value;
+  });
+  if (!Array.isArray(root.overrides)) throw new Error('Native-to-normalized bridge overrides must be an array');
+  let previous = '';
+  const overrideKeys = new Set<string>();
+  const overrides = root.overrides.map((item, index) => {
+    const candidate = record(item, `Native-to-normalized bridge override ${index + 1}`);
+    exactRecordKeys(candidate, ['nativeCoordinate', 'normalizedCoordinates'], `Native-to-normalized bridge override ${index + 1}`);
+    const nativeCoordinate = bridgeCoordinate(candidate.nativeCoordinate, defaultBookCodes,
+      `Native-to-normalized bridge override ${index + 1} native coordinate`);
+    if (!Array.isArray(candidate.normalizedCoordinates) || candidate.normalizedCoordinates.length < 1) {
+      throw new Error('Native-to-normalized bridge override must retain one or more normalized coordinates');
+    }
+    const normalizedCoordinates = candidate.normalizedCoordinates.map((normalized, normalizedIndex) =>
+      bridgeCoordinate(normalized, defaultBookCodes,
+        `Native-to-normalized bridge override ${index + 1} normalized coordinate ${normalizedIndex + 1}`, true));
+    const normalizedKeys = normalizedCoordinates.map(coordinateSortKey);
+    if (new Set(normalizedKeys).size !== normalizedKeys.length
+      || normalizedKeys.some((key, normalizedIndex) => normalizedIndex > 0 && normalizedKeys[normalizedIndex - 1]! >= key)) {
+      throw new Error('Native-to-normalized bridge normalized coordinates are duplicated or not canonical');
+    }
+    if (normalizedCoordinates.length === 1 && coordinateKey(nativeCoordinate) === coordinateKey(normalizedCoordinates[0]!)) {
+      throw new Error('Native-to-normalized bridge must omit identity-only override rows');
+    }
+    const key = coordinateSortKey(nativeCoordinate);
+    if (key <= previous || overrideKeys.has(key)) {
+      throw new Error('Native-to-normalized bridge overrides are duplicated or not in canonical order');
+    }
+    previous = key; overrideKeys.add(key);
+    return { nativeCoordinate, normalizedCoordinates };
+  });
+  if (typeof root.bridgeIdentity !== 'string' || !/^[0-9a-f]{64}$/.test(root.bridgeIdentity)) {
+    throw new Error('Native-to-normalized bridge identity is malformed');
+  }
+  const payload = {
+    schemaVersion: root.schemaVersion,
+    compilerVersion: root.compilerVersion,
+    normalizationRule: root.normalizationRule,
+    coordinateAudit,
+    attributionHeader,
+    tahot: root.tahot,
+    usfmtc,
+    defaultBookCodes,
+    nativeCoordinateKeys,
+    overrides,
+  };
+  if (sha256(canonicalJson(payload)) !== root.bridgeIdentity) {
+    throw new Error('Native-to-normalized bridge identity does not match its canonical payload');
+  }
+  return { ...payload, bridgeIdentity: root.bridgeIdentity } as UbsTahotNativeToNormalizedBridge;
+}
+
+function bridgeCoordinate(
+  value: unknown,
+  defaultBookCodes: readonly { bookNumber: number; bookCode: string }[],
+  label: string,
+  allowVerseZero = false,
+): TahotCoordinate {
+  const coordinate = record(value, label);
+  exactRecordKeys(coordinate, ['bookNumber', 'bookCode', 'chapter', 'verse'], label);
+  if (!Number.isSafeInteger(coordinate.bookNumber) || coordinate.bookNumber < 1 || coordinate.bookNumber > 39
+    || typeof coordinate.bookCode !== 'string' || coordinate.bookCode !== defaultBookCodes[coordinate.bookNumber - 1]?.bookCode
+    || !Number.isSafeInteger(coordinate.chapter) || coordinate.chapter < 1
+    || !Number.isSafeInteger(coordinate.verse) || coordinate.verse < (allowVerseZero ? 0 : 1)) {
+    throw new Error(`${label} is malformed or does not use the exact default book-code map`);
+  }
+  return {
+    bookNumber: coordinate.bookNumber, bookCode: coordinate.bookCode,
+    chapter: coordinate.chapter, verse: coordinate.verse,
+  };
+}
+
+function parseCoordinateKey(
+  value: string,
+  bookByNumber: ReadonlyMap<number, { code: string }>,
+): TahotCoordinate {
+  const match = /^([1-9][0-9]*):([1-9][0-9]*):([1-9][0-9]*)$/.exec(value);
+  if (!match) throw new Error('TAHOT coordinate index has a malformed native coordinate key');
+  const bookNumber = Number(match[1]);
+  const bookCode = bookByNumber.get(bookNumber)?.code;
+  if (!bookCode) throw new Error('TAHOT coordinate index native coordinate has no USFM book code');
+  return { bookNumber, bookCode, chapter: Number(match[2]), verse: Number(match[3]) };
+}
+
+function coordinateSortKey(value: Pick<TahotCoordinate, 'bookNumber' | 'chapter' | 'verse'>): string {
+  return `${String(value.bookNumber).padStart(3, '0')}:${String(value.chapter).padStart(3, '0')}:${String(value.verse).padStart(3, '0')}`;
+}
+
+function coordinateSortKeyFromKey(value: string): string {
+  const match = /^([1-9][0-9]*):([1-9][0-9]*):([1-9][0-9]*)$/.exec(value);
+  if (!match) throw new Error('TAHOT coordinate index has a malformed coordinate key');
+  return `${match[1]!.padStart(3, '0')}:${match[2]!.padStart(3, '0')}:${match[3]!.padStart(3, '0')}`;
+}
+
+function record(value: unknown, label: string): Record<string, any> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be an object`);
+  return value as Record<string, any>;
+}
+
+function exactRecordKeys(value: Record<string, unknown>, expected: readonly string[], label: string): void {
+  const actual = Object.keys(value).sort(compare);
+  const sortedExpected = [...expected].sort(compare);
+  if (actual.length !== sortedExpected.length || actual.some((key, index) => key !== sortedExpected[index])) {
+    throw new Error(`${label} has unsupported or missing fields`);
+  }
+}
+
+function canonicalJson(value: unknown): string {
+  if (value === null || typeof value === 'boolean' || typeof value === 'number' || typeof value === 'string') {
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (typeof value === 'object') {
+    const object = value as Record<string, unknown>;
+    return `{${Object.keys(object).sort(compare).map(key => `${JSON.stringify(key)}:${canonicalJson(object[key])}`).join(',')}}`;
+  }
+  throw new Error('Canonical JSON cannot serialize undefined, bigint, symbol, or function values');
 }
 
 export function parseTahotReferenceAndType(

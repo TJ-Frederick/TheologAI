@@ -259,12 +259,27 @@ is local source context only and does not define the current product contract.
   safeguards remain, but live execution is still separately gated; no CCEL
   body is fetched, mirrored, stored, or republished, merged as
   `abd1c39ffd37f121e5871e64c6b11bcd10d8d3c8`.
+- **Roadmap and release-state reconciliation / PR #82:** aligned public
+  documentation with the PR #72 deployed baseline and the later repository-only
+  acquisition/preparation work, merged as
+  `023804681d725e9600f3ff3dbfce347417c23eff`. It changed no Worker, D1 data,
+  MCP behavior, or deployment state.
+- **UBS Hebrew deterministic compilation / U3-T7 / PR #83:** completed the
+  migration-free canonical semantic compiler, compact native-to-normalized
+  bridge, content-free reproducibility audit, exact embedded rights/provenance
+  notices, and full-corpus integrity checks. The complete semantic artifact is
+  generated only in memory and remains untracked. This work is runtime-inert:
+  it adds no SQLite/D1 materialization, migration `0004`, transform 7,
+  composition-root registration, MCP behavior, or deployment. Materialized
+  capacity verification and separate owner authorization for migration `0004`
+  / transform 7 remain the next gates.
 
-These entries describe merged repository state. Deployment state is established
-only by the relevant protected workflow and post-deployment smoke evidence; a
-merge or this roadmap is not evidence that preview or production was deployed.
-No merge after PR #72 through `6c0ab39052864a3fc1f0628f98d10491fa431719`
-was deployed: production remains the PR #72 Worker
+Entries through PR #82 describe merged repository state. The U3-T7 work carried
+by PR #83 is repository-only and undeployed; merging it would not itself be
+deployment evidence. Deployment state is established only by the relevant
+protected workflow and post-deployment smoke evidence. No merge after PR #72
+through PR #82 at `023804681d725e9600f3ff3dbfce347417c23eff` was deployed.
+Production remains the PR #72 Worker
 `762485da-9e02-46a0-9777-e0d8743b9dbf`, and preview remains the PR #72 Worker
 `8ed4ad1a-f45f-4cdc-a6de-5358f59b6d44`.
 
@@ -558,14 +573,15 @@ Code readiness and operational readiness are deliberately separate:
 
 - The migration-free catalog-capacity prerequisite shipped in PR #56; retain
   its centralized 100-work and 2,000-section ceilings and single D1-safe
-  JSON/`json_each` scope bind. The approved UBS artifacts, decoder, and
-  coordinate evidence are now present, but they remain acquisition/design-time
-  inputs only. Deterministic compilation and capacity verification precede the
-  separately owner-gated migration `0004` and transform 7; neither may add
-  semantic runtime behavior or reach preview/production without a new review
-  and release gate. This data layer must complete before the dependent
-  historical migration `0005` / transform 8. Keep the existing 32-source
-  provenance cap as a required pack-sizing check.
+  JSON/`json_each` scope bind. The approved UBS artifacts, decoder, coordinate
+  evidence, and deterministic U3-T7 compiler/bridge/audit are now complete but
+  remain acquisition/design-time inputs only. Materialized capacity
+  verification and separate owner authorization for migration `0004` /
+  transform 7 are next; neither may add semantic runtime behavior or reach
+  preview/production without a new review and release gate. This data layer
+  must complete before the dependent historical migration `0005` / transform
+  8. Keep the existing 32-source provenance cap as a required pack-sizing
+  check.
 - PRs #61–#64 and #67 complete the planned inactive semantic and provenance
   foundations: source-free semantic contracts, the unregistered Hebrew
   resolution and aggregate seams, edition/provenance contracts, and a
@@ -623,10 +639,11 @@ Code readiness and operational readiness are deliberately separate:
 - Broaden original-language study for both beginners and readers of Greek or
   Hebrew using the already selected and acquired UBS Hebrew v0.9.2 semantic
   source (PRs #75 and #79), rather than selecting another semantic-domain
-  source. Next comes deterministic compilation, capacity verification, and the
-  separately owner-gated migration `0004` / transform 7 materialization, which
-  requires explicit authorization; only after that data layer is verified may a
-  separate runtime-activation release extend the existing
+  source. U3-T7 deterministic compilation is complete and runtime-inert. Next
+  come materialized capacity verification and the separately owner-gated
+  migration `0004` / transform 7 materialization, which requires explicit
+  authorization; only after that data layer is verified may a separate
+  runtime-activation release extend the existing
   `original_language_study` tool. This prerequisite comes before migration
   `0005` / transform 8. Evaluate MACULA
   discourse/context evidence only after that foundation is active and reviewed.

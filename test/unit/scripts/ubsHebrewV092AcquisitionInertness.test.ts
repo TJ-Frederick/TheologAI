@@ -13,7 +13,9 @@ const sourceRoot = 'data/biblical-languages/ubs-open-license/v0.9.2';
 const packetPaths = [
   `${sourceRoot}/COORDINATE-AUDIT.json`,
   `${sourceRoot}/DECODER-AUDIT.json`,
+  `${sourceRoot}/NATIVE-TO-NORMALIZED-BRIDGE.json`,
   `${sourceRoot}/SCHEMA-REPORT.json`,
+  `${sourceRoot}/SEMANTIC-COMPILATION-AUDIT.json`,
   `${sourceRoot}/SOURCE.json`,
   `${sourceRoot}/en/UBSHebrewDic-v0.9.2-en.JSON`,
   `${sourceRoot}/en/UBSHebrewDicLexicalDomains-v0.9.2-en.JSON`,
@@ -23,11 +25,16 @@ const packetPaths = [
   `${sourceRoot}/upstream-notices/HEBREW-README.md`,
   `${sourceRoot}/upstream-notices/LICENSE.md`,
   'docs/UBS-HEBREW-V0.9.2-ACQUISITION.md',
+  'docs/UBS-HEBREW-V0.9.2-DERIVED-NOTICE.md',
+  'scripts/build-ubs-hebrew-v092-coordinate-bridge.ts',
   'scripts/verify-ubs-hebrew-v092-acquisition.ts',
+  'scripts/verify-ubs-hebrew-v092-semantic-compilation.ts',
   'scripts/reproduce-ubs-hebrew-v092-coordinate-audit.ts',
   'scripts/ubs-semantics/coordinateVerifier.ts',
+  'scripts/ubs-semantics/pinnedCompiler.ts',
   'scripts/ubs-semantics/rawDecoder.ts',
   'test/unit/scripts/ubsHebrewV092AcquisitionInertness.test.ts',
+  'test/unit/scripts/ubsHebrewV092SemanticCompiler.test.ts',
   'test/unit/scripts/ubsRawDecoderAndCoordinateVerifier.test.ts',
   'test/unit/scripts/verifyUbsHebrewV092Acquisition.test.ts',
 ].sort();
@@ -114,9 +121,12 @@ function isPacketCandidate(path: string): boolean {
     || /(?:^|\/)verifyUbsHebrewV092Acquisition\.test\.ts$/i.test(path)
     || /(?:^|\/)ubsHebrewV092AcquisitionInertness\.test\.ts$/i.test(path)
     || /(?:^|\/)ubsRawDecoderAndCoordinateVerifier\.test\.ts$/i.test(path)
-    || /(?:^|\/)ubs-semantics\/(?:rawDecoder|coordinateVerifier)\.ts$/i.test(path)
+    || /(?:^|\/)ubs-semantics\/(?:rawDecoder|coordinateVerifier|pinnedCompiler)\.ts$/i.test(path)
     || /(?:^|\/)reproduce-ubs-hebrew-v092-coordinate-audit\.ts$/i.test(path)
-    || /(?:^|\/)verify-ubs-hebrew-v092-acquisition\.ts$/i.test(path);
+    || /(?:^|\/)build-ubs-hebrew-v092-coordinate-bridge\.ts$/i.test(path)
+    || /(?:^|\/)verify-ubs-hebrew-v092-(?:acquisition|semantic-compilation)\.ts$/i.test(path)
+    || /(?:^|\/)ubsHebrewV092SemanticCompiler\.test\.ts$/i.test(path)
+    || /(?:^|\/)UBS-HEBREW-V0\.9\.2-DERIVED-NOTICE\.md$/i.test(path);
 }
 
 function isWiringPath(path: string): boolean {

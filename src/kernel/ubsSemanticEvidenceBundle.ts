@@ -450,7 +450,17 @@ function cloneAndValidateEntry(raw: UbsSemanticEntry): UbsSemanticEntry {
   positiveSafeInteger(sourceOrdinal, 'bundle entry ordinal');
   boundedText(lemma, 2_000, 'bundle entry lemma');
   if (transliteration !== undefined) boundedText(transliteration, 2_000, 'bundle entry transliteration');
-  if (partOfSpeech !== undefined) boundedText(partOfSpeech, 512, 'bundle entry part of speech');
+  if (partOfSpeech !== undefined) {
+    if (!Array.isArray(partOfSpeech) || partOfSpeech.length > 16) {
+      throw new Error('bundle entry parts of speech are malformed or unbounded');
+    }
+    for (const [index, value] of partOfSpeech.entries()) {
+      boundedText(value, 512, `bundle entry part of speech ${index + 1}`);
+    }
+    if (new Set(partOfSpeech).size !== partOfSpeech.length) {
+      throw new Error('bundle entry parts of speech are duplicated');
+    }
+  }
   if (!Array.isArray(rawLexicalIdentities)
     || rawLexicalIdentities.length > UBS_SEMANTIC_EVIDENCE_BUNDLE_LIMITS.lexicalIdentitiesPerEntry) {
     throw new Error('UBS semantic aggregate entry lexical identities are malformed or unbounded');
@@ -466,7 +476,7 @@ function cloneAndValidateEntry(raw: UbsSemanticEntry): UbsSemanticEntry {
     sourceOrdinal,
     lemma,
     ...(transliteration === undefined ? {} : { transliteration }),
-    ...(partOfSpeech === undefined ? {} : { partOfSpeech }),
+    ...(partOfSpeech === undefined ? {} : { partOfSpeech: [...partOfSpeech].sort(compareCodePoints) }),
     lexicalIdentities,
   };
 }

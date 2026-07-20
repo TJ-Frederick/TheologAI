@@ -178,12 +178,18 @@ PR #72 is the deployed remote baseline: production Worker
 `8ed4ad1a-f45f-4cdc-a6de-5358f59b6d44`. The production `workers.dev` endpoint
 redirects ordinary requests to the canonical custom domain; the exact
 abusive-poller tuple is rejected instead, while the preview legacy endpoint
-remains direct. Later behaviorally inert repository merges through `6c0ab39`
-have not been deployed.
+remains direct. The later documentation reconciliation through PR #82
+(`023804681d725e9600f3ff3dbfce347417c23eff`) is repository-only and has not
+been deployed. The U3-T7 compiler work carried by PR #83 is also repository-only
+and undeployed.
 
 The acquired UBS Hebrew and historical public-domain packets are deliberately
 outside the runtime, SQLite/D1 materialization, MCP registry, and hosted
-17-work catalog. Migration `0004` / transform 7, migration `0005` / transform
-8, Norton transform 9, and later edition transforms require separate approval.
-The `0004` / transform 7 data layer must precede `0005` / transform 8.
+17-work catalog. U3-T7 adds only an inactive in-memory compiler,
+native-to-normalized coordinate bridge, and content-free audit; it does not
+change SQLite/D1, MCP output, or any deployment. Capacity planning and separate
+owner authorization remain required for migration `0004` / transform 7,
+migration `0005` / transform 8, Norton transform 9, and later edition
+transforms. The `0004` / transform 7 data layer must precede `0005` / transform
+8.
 `package.json` is private: npm distribution is unsupported.

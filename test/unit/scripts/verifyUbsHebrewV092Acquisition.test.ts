@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   UBS_HEBREW_V092_ARTIFACTS,
   assertPinnedUbsHebrewV092Bytes,
+  assertTrackedUbsHebrewV092DerivedArtifactBytes,
   assertUbsHebrewV092SourceManifest,
   parseUbsSourceTokenReference,
   verifyUbsHebrewV092Acquisition,
@@ -41,6 +42,26 @@ describe('UBS Hebrew v0.9.2 acquisition verifier', () => {
     const changed = Buffer.from(readFileSync(artifact.trackedPath));
     changed[changed.length - 1] ^= 1;
     expect(() => assertPinnedUbsHebrewV092Bytes(artifact, changed)).toThrow('SHA-256 drift');
+  });
+
+  it('rejects one-byte changes to both tracked U3-T7 derived artifacts from SOURCE.json byte pins', () => {
+    const source = manifest();
+    const semanticAudit = source.inactiveAuditReports.find((report: Record<string, unknown>) =>
+      report.schemaVersion === 'theologai-ubs-hebrew-semantic-compilation-audit.v1');
+    const artifacts = [
+      ['native-to-normalized-bridge', source.inertDerivedArtifacts.coordinateBridge],
+      ['semantic-compilation-audit', semanticAudit],
+    ] as const;
+    for (const [id, artifact] of artifacts) {
+      const changed = Buffer.from(readFileSync(artifact.trackedPath as string));
+      changed[changed.length - 1] ^= 1;
+      expect(() => assertTrackedUbsHebrewV092DerivedArtifactBytes({
+        id,
+        trackedPath: artifact.trackedPath as string,
+        bytes: artifact.bytes as number,
+        sha256: artifact.sha256 as string,
+      }, changed)).toThrow('SHA-256 drift');
+    }
   });
 
   it('validates the inspected field shape and preserves every observed footnote anomaly', () => {
@@ -93,6 +114,10 @@ describe('UBS Hebrew v0.9.2 acquisition verifier', () => {
       value => { value.referenceValidation.commit = '0'.repeat(40); },
       value => { value.referenceValidation.artifacts[0].sha256 = '0'.repeat(64); },
       value => { value.inactiveAuditReports[1].sha256 = '0'.repeat(64); },
+      value => { value.inertDerivedArtifacts.coordinateBridge.bytes = 1; },
+      value => { value.inertDerivedArtifacts.coordinateBridge.sha256 = '0'.repeat(64); },
+      value => { value.inactiveAuditReports[2].bytes = 1; },
+      value => { value.inactiveAuditReports[2].sha256 = '0'.repeat(64); },
     ];
     for (const mutate of mutations) {
       const changed = manifest();

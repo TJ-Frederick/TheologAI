@@ -2,15 +2,18 @@
 
 ## Scope and state
 
-This remains an inactive source-acquisition package. TheologAI has
+This remains an inactive source-acquisition and deterministic-compilation
+package. TheologAI has
 vendored exactly two unmodified English UBS Hebrew v0.9.2 JSON artifacts from
 the pinned upstream revision, plus the exact relevant upstream license and
 notices. PR #79 added a strict raw decoder and raw-coordinate verifier that
 produce separate deterministic audit reports without changing the immutable
-Gate 1 schema report. The package is absent from SQLite/D1 materialization,
-runtime composition, tool/prompt/resource registration, and MCP output. No
-migration `0004`, transform 7, preview deployment, or production deployment is
-authorized or implied by its presence in the repository.
+Gate 1 schema report. U3-T7 now also has an exact canonical
+native-to-normalized coordinate bridge and an in-memory compiler with a
+content-free reproducibility audit. The package remains absent from SQLite/D1
+materialization, runtime composition, tool/prompt/resource registration, and
+MCP output. No migration `0004`, transform 7, preview deployment, or production
+deployment is authorized or implied by its presence in the repository.
 
 | Artifact | Upstream blob | Bytes | SHA-256 |
 | --- | --- | ---: | --- |
@@ -34,6 +37,16 @@ downloader, rebuilds the 260,813-reference audit, and rejects either report
 byte drift or a structural-report mismatch. This is a verification-only
 command; it writes no source, transform, database, or runtime artifact.
 
+The tracked U3-T7 `NATIVE-TO-NORMALIZED-BRIDGE.json` is byte-pinned in
+`SOURCE.json` at 581,298 bytes and SHA-256
+`f3d7ec4963fb8512148f7884dcb98a60e7cd459178965dc0bd981dd34f21b149`.
+The content-free `SEMANTIC-COMPILATION-AUDIT.json` is independently byte-pinned
+at 2,336 bytes and SHA-256
+`9eb3322e7e2f09899f3d8e43be13cc5aa3996d0572740041ce555c478dd37afa`.
+The acquisition verifier checks both byte length and SHA-256 directly from
+`SOURCE.json`; a one-byte change fails before any future transformation can
+use the packet.
+
 ## Attribution, license, and provenance
 
 The retained upstream copyright statement is “(UBS Dictionary of Biblical
@@ -54,6 +67,10 @@ v0.9.2 added entries and is “now at 99%.” Those statements are not reconcile
 here. TheologAI must therefore treat this source as non-exhaustive and make no
 completeness claim in a future feature without a separately reviewed evidence
 basis.
+
+The completed [derived-material notice](UBS-HEBREW-V0.9.2-DERIVED-NOTICE.md)
+records the U3-T7 modification, exact coordinate witnesses, license boundaries,
+and required future delivery notice.
 
 If a later approved implementation shares derived rows, exports, database
 copies, or semantic output, it must retain UBS/SDBH attribution, the pinned
@@ -144,5 +161,7 @@ npm.
 
 Do **not** publish the current package or this acquisition packet to npm. npm
 distribution is not a product goal. The `private: true` safeguard does not make
-the dry-run packlist a supported artifact; any future packaging-policy change
+the dry-run packlist a supported artifact. The package commands added for
+U3-T7 only reproduce or verify inert local bridge/audit material; they do not
+make npm a supported distribution surface. Any future packaging-policy change
 requires a separately approved workstream.

@@ -61,7 +61,7 @@
       "sourceOrdinal": 1,
       "lemma": "SYNTHETIC_HEBREW_SENTINEL_LEMMA",
       "transliteration": "SYNTHETIC_TRANSLITERATION",
-      "partOfSpeech": "SYNTHETIC_PART_OF_SPEECH",
+      "partOfSpeech": ["SYNTHETIC_PART_OF_SPEECH"],
       "lexicalIdentities": ["H0001", "A0001"],
       "senses": [
         {
