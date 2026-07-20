@@ -95,10 +95,13 @@ describe('UBS semantic local materialization guards', () => {
       .run(artifactIdentity, 'synthetic-dictionary', 'reference.one', 'sense.one', 'Synthetic 1:1', '01001001000001');
     expect(() => db.prepare(`INSERT INTO ubs_semantic_reference_evidence VALUES (2, ?, ?, ?, ?, 1, ?, ?, '', 1, 'GEN', 1, 0)`)
       .run(artifactIdentity, 'synthetic-domains', 'reference.cross-source', 'sense.one', 'Synthetic 1:1', '01001001000001')).toThrow();
-    db.prepare(`INSERT INTO ubs_semantic_normalized_coordinates VALUES (1, ?, 1, 'reference.one', 1, 1, 'GEN', 1, 0, 'Genesis 1:0')`)
-      .run(artifactIdentity);
-    expect(() => db.prepare(`INSERT INTO ubs_semantic_normalized_coordinates VALUES (2, ?, 1, 'reference.one', 1, 1, 'GEN', 1, 0, 'Genesis 1:0')`)
-      .run('8'.repeat(64))).toThrow();
+    db.prepare(`INSERT INTO ubs_semantic_normalized_coordinates VALUES (1, 1, 1, 19, 'PSA', 1, 0, 'Psalms 1:0')`).run();
+    // Coordinates retain only the globally unique evidence key. A copied
+    // evidence ID therefore cannot be mismatched in the child row at all.
+    expect((db.prepare(`SELECT name FROM pragma_table_info('ubs_semantic_normalized_coordinates')`)
+      .all() as Array<{ name: string }>).map(column => column.name)).not.toContain('evidence_id');
+    expect(() => db.prepare(`INSERT INTO ubs_semantic_normalized_coordinates VALUES (2, 2, 2, 1, 'GEN', 1, 0, 'Genesis 1:0')`).run()).toThrow();
+    expect(() => db.prepare(`INSERT INTO ubs_semantic_normalized_coordinates VALUES (2, 1, 1, 19, 'PSA', 1, 0, 'Psalms 1:0')`).run()).toThrow();
     db.close();
   });
 

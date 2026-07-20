@@ -1,10 +1,11 @@
 # UBS Hebrew v0.9.2 derived-material notice
 
-This notice applies only to the inactive U3-T7 coordinate bridge and to the
-untracked semantic artifact reproducible from the exact pinned inputs. It does
-not apply CC BY-SA to TheologAI code or unrelated datasets. The reproducible
-artifact itself embeds versioned `rightsNotice` and `provenanceNotice` records
-with this same scoped boundary, source identity, and change disclosure.
+This notice applies only to the inactive U3-T7 coordinate bridge and the
+transform-7 derived semantic layer reproducible from the exact pinned inputs.
+It does not apply CC BY-SA to TheologAI code or unrelated datasets. The
+reproducible artifact itself embeds versioned `rightsNotice` and
+`provenanceNotice` records with this same scoped boundary, source identity, and
+change disclosure.
 
 ## UBS/SDBH source and ShareAlike boundary
 
@@ -29,8 +30,9 @@ retains all H#### and A#### source identities internally, retains arrays of
 parts of speech, excludes unresolved definition markup, links lexical domains,
 and retains raw source anchors and suffixes. The derived semantic layer and the
 coordinate bridge are offered under CC BY-SA 4.0 on this conservative policy.
-No full derived semantic corpus is tracked, bundled, served, or published in
-U3-T7.
+M4A materializes the derived rows only in the local SQLite build and
+deterministic local D1 seed for verification; no full derived semantic corpus
+is bundled in a Worker, served by MCP, or published to a remote database.
 
 Every reproduced artifact carries the exact source names, pinned URLs, Git
 blobs, SHA-256 values, the retained UBS/SDBH copyright and ancestry statement,
@@ -59,9 +61,16 @@ adjudicate a contextual word sense.
 
 ## Current state
 
-U3-T7 is migration-free and runtime-inert. It adds no D1 data, manifest entry,
-adapter, tool, prompt, resource, Worker input, public output, or deployment.
-Any later SQLite/D1 export or MCP response based on this semantic layer must
-carry the scoped UBS/SDBH attribution, source links, modification description,
-and applicable ShareAlike provenance without implying a license change for
-unrelated project material.
+U3-T7 plus M4A are local-only and runtime-inert. M4A adds migration `0004`,
+transform 7, local SQLite materialization, deterministic D1 seed/import
+verification, and inactive Node/D1 adapters. None is registered in a runtime
+composition root. No remote D1 import, Worker binding, preview deployment,
+production deployment, MCP output, tool, prompt, or resource is authorized or
+present.
+
+`SOURCE.json` is retained as the historical acquisition-gate snapshot for the
+pinned source packet and support artifacts; it is not rewritten as a release
+record. Any later remote SQLite/D1 use or MCP response based on this semantic
+layer must separately authorize and carry the scoped UBS/SDBH attribution,
+source links, modification description, and applicable ShareAlike provenance
+without implying a license change for unrelated project material.

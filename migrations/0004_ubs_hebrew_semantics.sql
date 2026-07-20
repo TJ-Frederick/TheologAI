@@ -129,7 +129,6 @@ CREATE TABLE ubs_semantic_reference_evidence (
   native_chapter INTEGER NOT NULL CHECK (native_chapter > 0),
   -- Psalm superscriptions retain the source's verse zero coordinate.
   native_verse INTEGER NOT NULL CHECK (native_verse >= 0),
-  UNIQUE (artifact_identity, evidence_key),
   FOREIGN KEY (artifact_identity, source_id) REFERENCES ubs_semantic_sources(artifact_identity, source_id),
   FOREIGN KEY (artifact_identity, sense_id) REFERENCES ubs_semantic_senses(artifact_identity, sense_id),
   FOREIGN KEY (artifact_identity, source_id, sense_id)
@@ -138,18 +137,21 @@ CREATE TABLE ubs_semantic_reference_evidence (
 
 CREATE TABLE ubs_semantic_normalized_coordinates (
   coordinate_key INTEGER PRIMARY KEY,
-  artifact_identity TEXT NOT NULL,
   evidence_key INTEGER NOT NULL,
-  evidence_id TEXT NOT NULL,
   target_ordinal INTEGER NOT NULL CHECK (target_ordinal > 0),
   normalized_book_number INTEGER NOT NULL CHECK (normalized_book_number BETWEEN 1 AND 66),
   normalized_book_code TEXT NOT NULL CHECK (normalized_book_code GLOB '[A-Z0-9][A-Z0-9][A-Z0-9]'),
   normalized_chapter INTEGER NOT NULL CHECK (normalized_chapter > 0),
-  normalized_verse INTEGER NOT NULL CHECK (normalized_verse >= 0),
+  -- Verse zero represents a Psalm superscription only. The canonical display
+  -- string and book code are checked by the deterministic materializer and
+  -- stored-data readiness assertions below the schema boundary.
+  normalized_verse INTEGER NOT NULL CHECK (normalized_verse > 0 OR normalized_book_number = 19),
   normalized_reference TEXT NOT NULL CHECK (normalized_reference = trim(normalized_reference) AND length(normalized_reference) > 0),
-  FOREIGN KEY (evidence_key) REFERENCES ubs_semantic_reference_evidence(evidence_key),
-  FOREIGN KEY (artifact_identity, evidence_key)
-    REFERENCES ubs_semantic_reference_evidence(artifact_identity, evidence_key)
+  -- evidence_key is a global parent identity. Do not duplicate artifact or
+  -- evidence IDs here: the normalized child therefore cannot drift away from
+  -- its parent lineage, and the compact key remains D1/SQLite-compatible.
+  UNIQUE (evidence_key, target_ordinal),
+  FOREIGN KEY (evidence_key) REFERENCES ubs_semantic_reference_evidence(evidence_key)
 );
 
 CREATE INDEX idx_ubs_semantic_identity_candidate
@@ -159,6 +161,6 @@ CREATE INDEX idx_ubs_semantic_sense_candidate_order
 CREATE INDEX idx_ubs_semantic_sense_domain_order
   ON ubs_semantic_sense_domains(artifact_identity, sense_id, domain_ordinal, domain_id);
 CREATE INDEX idx_ubs_semantic_coordinate_lookup
-  ON ubs_semantic_normalized_coordinates(artifact_identity, normalized_reference, evidence_key);
+  ON ubs_semantic_normalized_coordinates(normalized_reference, evidence_key);
 CREATE INDEX idx_ubs_semantic_evidence_sense_order
-  ON ubs_semantic_reference_evidence(artifact_identity, sense_id, source_ordinal, evidence_key);
+  ON ubs_semantic_reference_evidence(sense_id, source_ordinal, evidence_key);

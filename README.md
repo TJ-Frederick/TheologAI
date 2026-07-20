@@ -56,6 +56,13 @@ server state, use the direct preview
 `workers.dev` address above; the production `workers.dev` address intentionally
 redirects rather than serving a separate legacy Worker.
 
+The subsequent UBS Hebrew M4A slice is local-only and inactive: it completes
+migration `0004`, transform 7, local SQLite materialization, deterministic D1
+seed/import verification, and inactive Node/D1 adapters. It is absent from
+both composition roots, remote D1 databases, Worker bindings, preview,
+production, and MCP output. The pinned packet's `SOURCE.json` remains a
+historical acquisition-gate snapshot, not deployment evidence.
+
 ## MCP capabilities
 
 | Transport | Tools | Resources | Prompts | MCP Logging |

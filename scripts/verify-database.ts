@@ -152,8 +152,7 @@ try {
     {
       label: 'UBS Hebrew normalized-coordinate lookup',
       sql: `SELECT evidence_key FROM ubs_semantic_normalized_coordinates
-            WHERE artifact_identity = (SELECT artifact_identity FROM ubs_semantic_artifacts)
-              AND normalized_reference = 'Genesis 1:1' ORDER BY evidence_key LIMIT 17`,
+            WHERE normalized_reference = 'Genesis 1:1' ORDER BY evidence_key LIMIT 17`,
       index: 'idx_ubs_semantic_coordinate_lookup',
     },
   ] as const;

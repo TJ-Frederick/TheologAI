@@ -21,7 +21,7 @@
         },
         {
           "path": "migrations/0004_ubs_hebrew_semantics.sql",
-          "sha256": "877d896ab5cf825c5bf84fb5145812575d8207d7e6a9eb47325debd80cd633b1"
+          "sha256": "9d1266c7e9a04a0f621fe6b7f5b38b6041933e6dc801a8c93c5c529546134668"
         }
       ],
       "inputs": [

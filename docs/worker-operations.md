@@ -32,16 +32,19 @@ The later documentation reconciliation through PR #82
 (`023804681d725e9600f3ff3dbfce347417c23eff`) is repository-only and has not
 been deployed. The U3-T7 compiler work carried by PR #83 is also repository-only
 and undeployed. U3-T7 adds an inactive in-memory semantic compiler,
-native-to-normalized coordinate bridge, and
-content-free audit; it does not change the deployed Workers, D1 bindings,
-SQLite/D1 schemas, historical catalog, MCP output, UBS semantic runtime, or
+native-to-normalized coordinate bridge, and content-free audit. The later M4A
+local-only slice adds migration `0004`, transform 7, local SQLite
+materialization, deterministic D1 seed/import verification, and inactive
+Node/D1 adapters. Neither slice changes the deployed Workers, remote D1
+databases or bindings, historical catalog, MCP output, UBS semantic runtime, or
 CCEL execution state. No deletion, route replacement, or other destructive
 cleanup is authorized by this record.
 
-Any eventual UBS semantic D1 release must complete migration `0004` / transform
-7 before the dependent historical migration `0005` / transform 8. Capacity
-planning and separate owner authorization are still required; neither is part
-of this deployed baseline.
+Any eventual UBS semantic D1 release must separately authorize remote migration
+`0004` / transform 7 and a reviewed binding/deployment sequence before the
+dependent historical migration `0005` / transform 8. The completed local
+capacity and seed checks are not remote-release evidence and neither is part of
+this deployed baseline.
 
 ## Historical PR #50 pre-custom-domain rollback anchor (2026-07-16)
 

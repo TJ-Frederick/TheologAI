@@ -18,6 +18,9 @@ import { validateUbsParallelGroup } from '../src/adapters/shared/UbsParallelPass
 import type { ParallelSourceProvenance } from '../src/kernel/sourceAttestedParallels.js';
 import { UBS_PARALLEL_PASSAGE_PROVENANCE } from '../src/kernel/ubsParallelSource.js';
 import {
+  buildUbsSemanticStoredIntegrityPredicates,
+} from './check-remote-d1-readiness.js';
+import {
   createUbsSemanticStorageContract,
   type UbsSemanticStorageAudit,
 } from './ubs-semantics/storageContract.js';
@@ -231,7 +234,6 @@ function assertUbsSemanticReconstruction(db: Database.Database, expectedCounts: 
     || artifact.transformation_witness_json !== storage.artifact.transformationWitnessJson) {
     throw new Error('UBS semantic artifact metadata is incomplete or stale');
   }
-  const identity = artifact.artifact_identity as string;
   const sourceRows = db.prepare(`SELECT artifact_identity, source_id, source_role, schema_version, transform_version,
     title, artifact_name, artifact_version, language, source_url, source_commit, source_blob, source_sha256,
     license, license_url, publisher, modified, modification_description
@@ -277,11 +279,11 @@ function assertUbsSemanticReconstruction(db: Database.Database, expectedCounts: 
     (SELECT COUNT(*) FROM ubs_semantic_reference_evidence e LEFT JOIN ubs_semantic_senses s
       ON s.artifact_identity = e.artifact_identity AND s.sense_id = e.sense_id WHERE s.sense_id IS NULL) AS evidence,
     (SELECT COUNT(*) FROM ubs_semantic_normalized_coordinates c LEFT JOIN ubs_semantic_reference_evidence e
-      ON e.evidence_key = c.evidence_key AND e.artifact_identity = c.artifact_identity WHERE e.evidence_key IS NULL) AS coordinates,
+      ON e.evidence_key = c.evidence_key WHERE e.evidence_key IS NULL) AS coordinates,
     (SELECT COUNT(*) FROM ubs_semantic_normalized_coordinates WHERE normalized_verse < 0) AS negative_verses,
-    (SELECT COUNT(*) FROM ubs_semantic_normalized_coordinates WHERE artifact_identity = ? AND normalized_reference = '') AS blank_references,
-    (SELECT COUNT(*) FROM (SELECT evidence_key FROM ubs_semantic_normalized_coordinates WHERE artifact_identity = ? GROUP BY evidence_key HAVING COUNT(*) > 1)) AS one_to_many
-  `).get(identity, identity) as Record<string, number>;
+    (SELECT COUNT(*) FROM ubs_semantic_normalized_coordinates WHERE normalized_reference = '') AS blank_references,
+    (SELECT COUNT(*) FROM (SELECT evidence_key FROM ubs_semantic_normalized_coordinates GROUP BY evidence_key HAVING COUNT(*) > 1)) AS one_to_many
+  `).get() as Record<string, number>;
   if (Object.values(unlinked).some(value => !Number.isSafeInteger(value))
     || unlinked.senses !== 0 || unlinked.evidence !== 0 || unlinked.coordinates !== 0
     || unlinked.negative_verses !== 0 || unlinked.blank_references !== 0
@@ -289,9 +291,15 @@ function assertUbsSemanticReconstruction(db: Database.Database, expectedCounts: 
     throw new Error(`UBS semantic reconstruction integrity drift: ${JSON.stringify(unlinked)}`);
   }
   const coordinateRows = db.prepare(`SELECT COUNT(*) AS count FROM ubs_semantic_normalized_coordinates
-    WHERE artifact_identity = ?`).get(identity) as { count: number };
+  `).get() as { count: number };
   if (coordinateRows.count !== UBS_SEMANTIC_AUDIT.projection.normalizedCoordinateRows) {
     throw new Error('UBS semantic normalized-coordinate row count drifted');
+  }
+  const storedCoordinateIntegrity = db.prepare(`SELECT CASE WHEN
+    ${buildUbsSemanticStoredIntegrityPredicates().join('\n    AND ')}
+    THEN 1 ELSE 0 END AS ready`).get() as { ready: number };
+  if (storedCoordinateIntegrity.ready !== 1) {
+    throw new Error('UBS semantic stored coordinate integrity drifted');
   }
   assertUbsSemanticStoredArtifactIdentity(db, UBS_SEMANTIC_STORAGE);
 }

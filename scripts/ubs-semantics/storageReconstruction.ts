@@ -3,6 +3,7 @@
 import { createHash } from 'node:crypto';
 import type Database from 'better-sqlite3';
 import { canonicalJson } from './pinnedCompiler.js';
+import { normalizedReference } from './materialization.js';
 
 export interface UbsSemanticStoredContract {
   readonly artifact: {
@@ -107,7 +108,7 @@ export function assertUbsSemanticStoredArtifactIdentity(
     ORDER BY e.source_ordinal, s.source_ordinal, r.source_ordinal, r.evidence_id, r.evidence_key`).all() as Array<Record<string, unknown>>;
   const coordinates = new Map<number, Array<Record<string, unknown>>>();
   for (const row of db.prepare(`SELECT evidence_key, target_ordinal, normalized_book_number, normalized_book_code,
-    normalized_chapter, normalized_verse
+    normalized_chapter, normalized_verse, normalized_reference
     FROM ubs_semantic_normalized_coordinates ORDER BY evidence_key, target_ordinal, coordinate_key`).iterate() as Iterable<Record<string, unknown>>) {
     const key = integer(row.evidence_key, 'coordinate evidence key');
     coordinates.set(key, [...(coordinates.get(key) ?? []), row]);
@@ -158,10 +159,11 @@ export function assertUbsSemanticStoredArtifactIdentity(
     })),
     referenceEvidence: evidence.map(row => {
       const evidenceKey = integer(row.evidence_key, 'evidence key');
+      const evidenceId = text(row.evidence_id, 'evidence ID');
       const normalized = coordinates.get(evidenceKey);
       if (!normalized?.length) throw new Error(`UBS semantic evidence ${evidenceKey} has no normalized coordinate`);
       return {
-        evidenceId: text(row.evidence_id, 'evidence ID'), sourceId: text(row.source_id, 'evidence source ID'),
+        evidenceId, sourceId: text(row.source_id, 'evidence source ID'),
         senseId: text(row.sense_id, 'evidence sense ID'), sourceOrdinal: integer(row.source_ordinal, 'evidence ordinal'),
         sourceReference: text(row.source_reference, 'source reference'), rawAnchor: text(row.raw_anchor, 'raw anchor'),
         footnoteSuffix: text(row.footnote_suffix, 'footnote suffix'),
@@ -169,11 +171,21 @@ export function assertUbsSemanticStoredArtifactIdentity(
           bookNumber: integer(row.native_book_number, 'native book number'), bookCode: text(row.native_book_code, 'native book code'),
           chapter: integer(row.native_chapter, 'native chapter'), verse: integer(row.native_verse, 'native verse'),
         },
-        normalizedCoordinates: normalized.map(coordinate => ({
-          bookNumber: integer(coordinate.normalized_book_number, 'normalized book number'),
-          bookCode: text(coordinate.normalized_book_code, 'normalized book code'),
-          chapter: integer(coordinate.normalized_chapter, 'normalized chapter'), verse: integer(coordinate.normalized_verse, 'normalized verse'),
-        })),
+        normalizedCoordinates: normalized.map((coordinate, coordinateIndex) => {
+          if (integer(coordinate.target_ordinal, 'normalized coordinate ordinal') !== coordinateIndex + 1) {
+            throw new Error(`UBS semantic evidence ${evidenceKey} has non-contiguous normalized coordinate ordinals`);
+          }
+          const normalizedCoordinate = {
+            bookNumber: integer(coordinate.normalized_book_number, 'normalized book number'),
+            bookCode: text(coordinate.normalized_book_code, 'normalized book code'),
+            chapter: integer(coordinate.normalized_chapter, 'normalized chapter'),
+            verse: integer(coordinate.normalized_verse, 'normalized verse'),
+          };
+          if (text(coordinate.normalized_reference, 'normalized reference') !== normalizedReference(normalizedCoordinate)) {
+            throw new Error(`UBS semantic coordinate ${evidenceKey} has a non-canonical normalized reference`);
+          }
+          return normalizedCoordinate;
+        }),
       };
     }),
   };

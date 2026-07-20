@@ -1,6 +1,6 @@
 /** Shared, local-only transform-7 materialization helpers. */
 import type Database from 'better-sqlite3';
-import { BIBLE_BOOKS } from '../../src/kernel/books.js';
+import { BIBLE_BOOKS, getBibleBookBounds } from '../../src/kernel/books.js';
 import type { D1SourceConsumptionRegistry } from '../d1-corpus-identity.js';
 import {
   compilePinnedUbsHebrewV092FromBytes,
@@ -98,9 +98,9 @@ export function insertUbsSemanticMaterialization(
     raw_anchor, footnote_suffix, native_book_number, native_book_code, native_chapter, native_verse
   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
   const insertCoordinate = db.prepare(`INSERT INTO ubs_semantic_normalized_coordinates (
-    coordinate_key, artifact_identity, evidence_key, evidence_id, target_ordinal, normalized_book_number, normalized_book_code,
+    coordinate_key, evidence_key, target_ordinal, normalized_book_number, normalized_book_code,
     normalized_chapter, normalized_verse, normalized_reference
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
   const identity = artifact.artifactIdentity;
   const counts = { ...UBS_SEMANTIC_EXPECTED_COUNTS };
   for (const key of Object.keys(counts) as Array<keyof typeof counts>) counts[key] = 0;
@@ -157,7 +157,7 @@ export function insertUbsSemanticMaterialization(
       counts.ubs_semantic_reference_evidence++;
       for (const [index, coordinate] of evidence.normalizedCoordinates.entries()) {
         coordinateKey++;
-        insertCoordinate.run(coordinateKey, identity, evidenceKey, evidence.evidenceId, index + 1, coordinate.bookNumber,
+        insertCoordinate.run(coordinateKey, evidenceKey, index + 1, coordinate.bookNumber,
           coordinate.bookCode, coordinate.chapter, coordinate.verse, normalizedReference(coordinate));
         counts.ubs_semantic_normalized_coordinates++;
       }
@@ -173,12 +173,17 @@ export function insertUbsSemanticMaterialization(
 
 export function normalizedReference(coordinate: {
   bookNumber: number;
+  bookCode: string;
   chapter: number;
   verse: number;
 }): string {
   const book = BIBLE_BOOKS.find(candidate => candidate.number === coordinate.bookNumber);
   if (!book || !Number.isSafeInteger(coordinate.chapter) || !Number.isSafeInteger(coordinate.verse)
-    || coordinate.chapter < 1 || coordinate.verse < 0) {
+    || coordinate.bookCode !== book.helloaoCode
+    || coordinate.chapter < 1 || coordinate.chapter > getBibleBookBounds(book).maxVerseByChapter.length
+    || coordinate.verse < 0
+    || (coordinate.verse === 0 && book.number !== 19)
+    || (coordinate.verse > 0 && coordinate.verse > getBibleBookBounds(book).maxVerseByChapter[coordinate.chapter - 1]!)) {
     throw new Error('UBS normalized coordinate is outside the canonical Bible registry');
   }
   return `${book.name} ${coordinate.chapter}:${coordinate.verse}`;

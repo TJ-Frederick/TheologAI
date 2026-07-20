@@ -98,11 +98,11 @@ describe('transform-7 UBS semantic aggregate repositories', () => {
       }
     }
     const insertEvidence = db.prepare(`INSERT INTO ubs_semantic_reference_evidence VALUES (?, ?, ?, ?, 'sense-01', ?, ?, '01001001000001', '', 1, 'GEN', 1, 1)`);
-    const insertCoordinate = db.prepare(`INSERT INTO ubs_semantic_normalized_coordinates VALUES (?, ?, ?, ?, 1, 1, 'GEN', 1, 1, 'Genesis 1:1')`);
+    const insertCoordinate = db.prepare(`INSERT INTO ubs_semantic_normalized_coordinates VALUES (?, ?, 1, 1, 'GEN', 1, 1, 'Genesis 1:1')`);
     for (let ordinal = 1; ordinal <= 17; ordinal++) {
       const evidenceId = `evidence-${String(ordinal).padStart(2, '0')}`;
       insertEvidence.run(ordinal, artifactIdentity, dictionarySourceId, evidenceId, ordinal, `Genesis 1:1 note ${ordinal}`);
-      insertCoordinate.run(ordinal, artifactIdentity, ordinal, evidenceId);
+      insertCoordinate.run(ordinal, ordinal);
     }
     const counted = countedSqliteAsD1(db);
     d1 = new D1UbsSemanticEvidenceBundleRepository(counted.db);

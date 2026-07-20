@@ -87,7 +87,7 @@ export function buildUbsSemanticAggregateStatements(
              FROM ubs_semantic_reference_evidence r
              JOIN ubs_semantic_normalized_coordinates nc ON nc.evidence_key = r.evidence_key
             WHERE r.artifact_identity = c.artifact_identity AND r.sense_id = c.sense_id
-              AND nc.artifact_identity = c.artifact_identity AND nc.normalized_reference = ?) AS matching_reference_total
+              AND nc.normalized_reference = ?) AS matching_reference_total
         FROM candidate_window c
         ORDER BY c.source_id, c.entry_source_ordinal, c.entry_id, c.sense_source_ordinal, c.sense_id`,
       bindings: [...windowBindings, query.normalizedReference],
@@ -113,7 +113,7 @@ export function buildUbsSemanticAggregateStatements(
           JOIN ubs_semantic_reference_evidence r
             ON r.artifact_identity = c.artifact_identity AND r.sense_id = c.sense_id
           JOIN ubs_semantic_normalized_coordinates nc
-            ON nc.evidence_key = r.evidence_key AND nc.artifact_identity = r.artifact_identity
+            ON nc.evidence_key = r.evidence_key
           WHERE nc.normalized_reference = ?
           GROUP BY c.sense_id, r.evidence_key
         ) SELECT * FROM matched_evidence WHERE evidence_rank <= 16

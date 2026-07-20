@@ -8,7 +8,10 @@ import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadAndVerifyD1SeedManifest } from './d1-seed-manifest.js';
 import { parseDataManifest } from './d1-corpus-identity.js';
-import { REQUIRED_COLUMNS } from './check-remote-d1-readiness.js';
+import {
+  buildUbsSemanticStoredIntegrityPredicates,
+  REQUIRED_COLUMNS,
+} from './check-remote-d1-readiness.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SEED_ROOT = join(ROOT, 'scripts', 'd1-seed');
@@ -42,6 +45,7 @@ try {
   const columnChecks = Object.entries(REQUIRED_COLUMNS).map(([table, columns]) =>
     `(SELECT group_concat(name, ',') FROM (SELECT name FROM pragma_table_info('${table}') ORDER BY cid)) = '${columns.join(',')}'`
   );
+  const semanticIntegrityChecks = buildUbsSemanticStoredIntegrityPredicates();
   const schemaState = run([
     'd1',
     'execute',
@@ -101,6 +105,7 @@ try {
       AND (SELECT COUNT(*) FROM ubs_semantic_sense_domains) = ${manifest.expectedCounts.ubs_semantic_sense_domains}
       AND (SELECT COUNT(*) FROM ubs_semantic_reference_evidence) = ${manifest.expectedCounts.ubs_semantic_reference_evidence}
       AND (SELECT COUNT(*) FROM ubs_semantic_normalized_coordinates) = ${manifest.expectedCounts.ubs_semantic_normalized_coordinates}
+      AND ${semanticIntegrityChecks.join('\n      AND ')}
       THEN 'ready' ELSE json_extract('Local D1 full import failed', '$') END AS readiness;`,
     '--json',
   ]);

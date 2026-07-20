@@ -10,6 +10,7 @@ import { computeD1CorpusIdentity, parseDataManifest, verifyD1Migrations } from '
 import { UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY, UBS_PARALLEL_PASSAGE_PROVENANCE } from '../src/kernel/ubsParallelSource.js';
 import { CANONICAL_BOOK_ORDER_SQL } from '../src/adapters/shared/repositoryUtils.js';
 import { CLASSIC_TEXT_LIMITS } from '../src/kernel/classicTextContract.js';
+import { BIBLE_BOOKS } from '../src/kernel/books.js';
 import type {
   BiblicalLanguageUnicodeCorrectionLedger,
   MorphologyUnicodeCorrection,
@@ -67,7 +68,7 @@ export const REQUIRED_COLUMNS: Readonly<Record<string, readonly string[]>> = {
   ubs_semantic_senses: ['artifact_identity', 'source_id', 'sense_id', 'source_sense_id', 'entry_id', 'source_ordinal', 'definition_status', 'definition', 'definition_exclusion_reasons_json', 'glosses_json'],
   ubs_semantic_sense_domains: ['artifact_identity', 'sense_id', 'domain_id', 'domain_ordinal'],
   ubs_semantic_reference_evidence: ['evidence_key', 'artifact_identity', 'source_id', 'evidence_id', 'sense_id', 'source_ordinal', 'source_reference', 'raw_anchor', 'footnote_suffix', 'native_book_number', 'native_book_code', 'native_chapter', 'native_verse'],
-  ubs_semantic_normalized_coordinates: ['coordinate_key', 'artifact_identity', 'evidence_key', 'evidence_id', 'target_ordinal', 'normalized_book_number', 'normalized_book_code', 'normalized_chapter', 'normalized_verse', 'normalized_reference'],
+  ubs_semantic_normalized_coordinates: ['coordinate_key', 'evidence_key', 'target_ordinal', 'normalized_book_number', 'normalized_book_code', 'normalized_chapter', 'normalized_verse', 'normalized_reference'],
 };
 
 export interface MorphologyUnicodeReadinessContract {
@@ -105,6 +106,42 @@ type ReadinessCommandExecutor = (
 
 function sqlLiteral(value: string): string {
   return `'${value.replaceAll("'", "''")}'`;
+}
+
+/**
+ * Read-only assertions shared by remote D1 and local Workerd seed gates.
+ * The stored display reference is the exact string later used by the inactive
+ * aggregate lookup, so it must remain a deterministic projection of the
+ * normalized coordinate rather than merely non-empty text. The globally unique
+ * evidence key is the child-to-parent lineage boundary: evidence IDs are read
+ * only from the parent row and cannot drift in a duplicated child column.
+ */
+export function buildUbsSemanticStoredIntegrityPredicates(): readonly string[] {
+  const canonicalCase = (column: 'name' | 'helloaoCode') => `CASE c.normalized_book_number\n${BIBLE_BOOKS
+    .map(book => `WHEN ${book.number} THEN ${sqlLiteral(book[column])}`).join('\n')}\nEND`;
+  const canonicalName = canonicalCase('name');
+  const canonicalCode = canonicalCase('helloaoCode');
+  return Object.freeze([
+    `(SELECT COUNT(*) FROM ubs_semantic_normalized_coordinates c
+      LEFT JOIN ubs_semantic_reference_evidence e
+        ON e.evidence_key = c.evidence_key
+      WHERE e.evidence_key IS NULL) = 0`,
+    `(SELECT COUNT(*) FROM (
+      SELECT evidence_key, target_ordinal
+      FROM ubs_semantic_normalized_coordinates
+      GROUP BY evidence_key, target_ordinal HAVING COUNT(*) != 1
+    )) = 0`,
+    `(SELECT COUNT(*) FROM ubs_semantic_normalized_coordinates c
+      WHERE c.normalized_book_code IS NOT (${canonicalCode})
+         OR c.normalized_reference IS NOT printf('%s %d:%d', (${canonicalName}), c.normalized_chapter, c.normalized_verse)
+         OR (c.normalized_verse = 0 AND c.normalized_book_number != 19)) = 0`,
+    `(SELECT COUNT(*) FROM (
+      SELECT evidence_key
+      FROM ubs_semantic_normalized_coordinates
+      GROUP BY evidence_key
+      HAVING MIN(target_ordinal) != 1 OR MAX(target_ordinal) != COUNT(*)
+    )) = 0`,
+  ]);
 }
 
 /**
@@ -256,13 +293,19 @@ function buildD1ReadinessQueryContract(
     `modified = 1`,
     `modification_description = ${sqlLiteral(source.modificationDescription)}`,
   ].join(' AND ');
+  const [coordinateEvidenceBinding, coordinateOrdinalUniqueness, coordinateCanonicalReference, coordinateOrdinalContiguity] =
+    buildUbsSemanticStoredIntegrityPredicates();
   const ubsHebrewSemanticChecks: D1ReadinessCheck[] = [
     { id: 'ubs_hebrew_semantic.artifact_identity', predicate: `(SELECT artifact_identity FROM ubs_semantic_artifacts) = ${sqlLiteral(semanticArtifact.artifactIdentity)}` },
     { id: 'ubs_hebrew_semantic.artifact_contract', predicate: `(SELECT COUNT(*) FROM ubs_semantic_artifacts WHERE artifact_identity = ${sqlLiteral(semanticArtifact.artifactIdentity)} AND schema_version = ${sqlLiteral(semanticArtifact.schemaVersion)} AND compiler_version = ${semanticArtifact.compilerVersion} AND transform_version = ${semanticArtifact.transformVersion} AND rights_notice_json = ${sqlLiteral(semanticArtifact.rightsNoticeJson)} AND provenance_notice_json = ${sqlLiteral(semanticArtifact.provenanceNoticeJson)} AND transformation_witness_json = ${sqlLiteral(semanticArtifact.transformationWitnessJson)}) = 1 AND (SELECT COUNT(*) FROM ubs_semantic_artifacts) = 1` },
     { id: 'ubs_hebrew_semantic.source_contract', predicate: `(SELECT COUNT(*) FROM ubs_semantic_sources) = ${UBS_SEMANTIC_STORAGE.sources.length} AND ${UBS_SEMANTIC_STORAGE.sources.map(source => `(SELECT COUNT(*) FROM ubs_semantic_sources WHERE ${semanticSourcePredicate(source)}) = 1`).join(' AND ')}` },
     { id: 'ubs_hebrew_semantic.normalized_coordinates', predicate: `(SELECT COUNT(*) FROM ubs_semantic_normalized_coordinates) = ${UBS_SEMANTIC_AUDIT.projection.normalizedCoordinateRows} AND (SELECT COUNT(*) FROM ubs_semantic_normalized_coordinates WHERE normalized_verse < 0 OR normalized_reference = '') = 0` },
     { id: 'ubs_hebrew_semantic.coordinate_cardinality', predicate: `(SELECT COUNT(*) FROM (SELECT evidence_key FROM ubs_semantic_normalized_coordinates GROUP BY evidence_key HAVING COUNT(*) > 1)) = ${UBS_SEMANTIC_AUDIT.projection.sourceEvidenceWithAmbiguousNormalizedCoordinates}` },
-    { id: 'ubs_hebrew_semantic.relationships', predicate: `(SELECT COUNT(*) FROM ubs_semantic_reference_evidence e LEFT JOIN ubs_semantic_senses s ON s.artifact_identity = e.artifact_identity AND s.sense_id = e.sense_id WHERE s.sense_id IS NULL) = 0 AND (SELECT COUNT(*) FROM ubs_semantic_normalized_coordinates c LEFT JOIN ubs_semantic_reference_evidence e ON e.evidence_key = c.evidence_key AND e.artifact_identity = c.artifact_identity WHERE e.evidence_key IS NULL) = 0` },
+    { id: 'ubs_hebrew_semantic.coordinate_evidence_binding', predicate: coordinateEvidenceBinding },
+    { id: 'ubs_hebrew_semantic.coordinate_ordinal_unique', predicate: coordinateOrdinalUniqueness },
+    { id: 'ubs_hebrew_semantic.coordinate_reference_canonical', predicate: coordinateCanonicalReference },
+    { id: 'ubs_hebrew_semantic.coordinate_ordinals_contiguous', predicate: coordinateOrdinalContiguity },
+    { id: 'ubs_hebrew_semantic.relationships', predicate: `(SELECT COUNT(*) FROM ubs_semantic_reference_evidence e LEFT JOIN ubs_semantic_senses s ON s.artifact_identity = e.artifact_identity AND s.sense_id = e.sense_id WHERE s.sense_id IS NULL) = 0` },
   ];
   if (UNICODE_CORRECTION.strongs.length !== 9 || UNICODE_CORRECTION.morphology.length !== 237
     || UNICODE_CORRECTION.contract.d1Cells !== 255) {

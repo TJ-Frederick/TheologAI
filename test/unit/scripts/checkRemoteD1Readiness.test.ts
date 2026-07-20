@@ -59,6 +59,12 @@ describe('remote D1 readiness query', () => {
     expect(sql).toContain(`HAVING COUNT(*) > ${CLASSIC_TEXT_LIMITS.sectionsPerWork}`);
     expect(sql).toContain("alignment_raw GLOB '*[^0-8]*'");
     expect(sql).toContain("language_marker = 'GRK' AND alignment_basis != 'UBSGNT5'");
+    expect(sql).toContain("'ubs_hebrew_semantic.coordinate_evidence_binding'");
+    expect(sql).toContain("'ubs_hebrew_semantic.coordinate_ordinal_unique'");
+    expect(sql).toContain("'ubs_hebrew_semantic.coordinate_reference_canonical'");
+    expect(sql).toContain("'ubs_hebrew_semantic.coordinate_ordinals_contiguous'");
+    expect(sql).toContain('ON e.evidence_key = c.evidence_key');
+    expect(sql).toContain("printf('%s %d:%d'");
     expect(sql).toContain('usage_expected(strongs_key,token_count,verse_count,book_count) AS');
     expect(sql).toContain('book_usage_expected(strongs_key,book,book_order,token_count,verse_count) AS');
     expect(sql).toContain('form_usage_expected(strongs_key,form_text,token_count,verse_count,first_key) AS');
@@ -200,6 +206,16 @@ describe('remote D1 readiness query', () => {
         WHERE source_id = 'ubs-hebrew-dictionary-en-v0.9.2'`).run(semanticSource);
       assertReady();
 
+      const coordinate = db.prepare(`SELECT coordinate_key, normalized_reference
+        FROM ubs_semantic_normalized_coordinates ORDER BY coordinate_key LIMIT 1`)
+        .get() as { coordinate_key: number; normalized_reference: string };
+      db.prepare('UPDATE ubs_semantic_normalized_coordinates SET normalized_reference = ? WHERE coordinate_key = ?')
+        .run('Not a canonical reference', coordinate.coordinate_key);
+      assertRejected();
+      db.prepare('UPDATE ubs_semantic_normalized_coordinates SET normalized_reference = ? WHERE coordinate_key = ?')
+        .run(coordinate.normalized_reference, coordinate.coordinate_key);
+      assertReady();
+
       const form = db.prepare('SELECT strongs_key, form_text, first_book FROM strongs_form_stats ORDER BY strongs_key, form_text LIMIT 1')
         .get() as { strongs_key: string; form_text: string; first_book: string };
       db.prepare('UPDATE strongs_form_stats SET first_book = ? WHERE strongs_key = ? AND form_text = ?')
@@ -222,6 +238,27 @@ describe('remote D1 readiness query', () => {
     const db = new Database(databasePath);
     try {
       expect(() => assertUbsSemanticStoredContract(db, contract)).not.toThrow();
+      expect(() => assertUbsSemanticStoredArtifactIdentity(db, contract)).not.toThrow();
+      const coordinate = db.prepare(`SELECT coordinate_key, evidence_key, normalized_reference
+        FROM ubs_semantic_normalized_coordinates ORDER BY coordinate_key LIMIT 1`)
+        .get() as { coordinate_key: number; evidence_key: number; normalized_reference: string };
+      const evidence = db.prepare(`SELECT evidence_key, evidence_id FROM ubs_semantic_reference_evidence
+        WHERE evidence_key = ?`).get(coordinate.evidence_key) as { evidence_key: number; evidence_id: string };
+      db.prepare('UPDATE ubs_semantic_reference_evidence SET evidence_id = ? WHERE evidence_key = ?')
+        .run('tampered-evidence-id', evidence.evidence_key);
+      expect(() => assertUbsSemanticStoredArtifactIdentity(db, contract))
+        .toThrow('do not reproduce their declared artifact identity');
+      db.prepare('UPDATE ubs_semantic_reference_evidence SET evidence_id = ? WHERE evidence_key = ?')
+        .run(evidence.evidence_id, evidence.evidence_key);
+      db.pragma('foreign_keys = ON');
+      expect(() => db.prepare('UPDATE ubs_semantic_normalized_coordinates SET evidence_key = ? WHERE coordinate_key = ?')
+        .run(-1, coordinate.coordinate_key)).toThrow();
+      db.prepare('UPDATE ubs_semantic_normalized_coordinates SET normalized_reference = ? WHERE coordinate_key = ?')
+        .run('Not a canonical reference', coordinate.coordinate_key);
+      expect(() => assertUbsSemanticStoredArtifactIdentity(db, contract))
+        .toThrow('non-canonical normalized reference');
+      db.prepare('UPDATE ubs_semantic_normalized_coordinates SET normalized_reference = ? WHERE coordinate_key = ?')
+        .run(coordinate.normalized_reference, coordinate.coordinate_key);
       expect(() => assertUbsSemanticStoredArtifactIdentity(db, contract)).not.toThrow();
       const entry = db.prepare('SELECT entry_id, lemma FROM ubs_semantic_entries ORDER BY entry_id LIMIT 1')
         .get() as { entry_id: string; lemma: string };

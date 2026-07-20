@@ -270,9 +270,18 @@ is local source context only and does not define the current product contract.
   notices, and full-corpus integrity checks. The complete semantic artifact is
   generated only in memory and remains untracked. This work is runtime-inert:
   it adds no SQLite/D1 materialization, migration `0004`, transform 7,
-  composition-root registration, MCP behavior, or deployment. Materialized
-  capacity verification and separate owner authorization for migration `0004`
-  / transform 7 remain the next gates.
+  composition-root registration, MCP behavior, or deployment. At that stage,
+  local materialized capacity verification and separate owner authorization for
+  migration `0004` / transform 7 were the next gates; M4A records their
+  completed local-only successor below.
+
+- **UBS Hebrew M4A local materialization (unpublished):** completed migration
+  `0004`, transform 7, local SQLite materialization, deterministic D1
+  seed/import verification, and inactive Node/D1 aggregate adapters. This is
+  local-only and runtime-inert: no composition-root registration, remote D1
+  import, binding change, preview/prod deployment, or MCP behavior is present
+  or authorized. `SOURCE.json` remains the historical acquisition-gate
+  snapshot, not a release-state record.
 
 Entries through PR #82 describe merged repository state. The U3-T7 work carried
 by PR #83 is repository-only and undeployed; merging it would not itself be
@@ -574,11 +583,11 @@ Code readiness and operational readiness are deliberately separate:
 - The migration-free catalog-capacity prerequisite shipped in PR #56; retain
   its centralized 100-work and 2,000-section ceilings and single D1-safe
   JSON/`json_each` scope bind. The approved UBS artifacts, decoder, coordinate
-  evidence, and deterministic U3-T7 compiler/bridge/audit are now complete but
-  remain acquisition/design-time inputs only. Materialized capacity
-  verification and separate owner authorization for migration `0004` /
-  transform 7 are next; neither may add semantic runtime behavior or reach
-  preview/production without a new review and release gate. This data layer
+  evidence, deterministic U3-T7 compiler/bridge/audit, and M4A local
+  materialization/seed verification are now complete. The next gate is a
+  separately owner-authorized remote migration `0004` / transform 7 release;
+  it may not add semantic runtime behavior or reach preview/production without
+  a new review and release gate. This data layer
   must complete before the dependent historical migration `0005` / transform
   8. Keep the existing 32-source provenance cap as a required pack-sizing
   check.
@@ -639,10 +648,10 @@ Code readiness and operational readiness are deliberately separate:
 - Broaden original-language study for both beginners and readers of Greek or
   Hebrew using the already selected and acquired UBS Hebrew v0.9.2 semantic
   source (PRs #75 and #79), rather than selecting another semantic-domain
-  source. U3-T7 deterministic compilation is complete and runtime-inert. Next
-  come materialized capacity verification and the separately owner-gated
-  migration `0004` / transform 7 materialization, which requires explicit
-  authorization; only after that data layer is verified may a separate
+  source. U3-T7 deterministic compilation and M4A local-only materialization
+  are complete and runtime-inert. Next comes the separately owner-gated remote
+  migration `0004` / transform 7 release, which requires explicit
+  authorization; only after that data layer is remotely verified may a separate
   runtime-activation release extend the existing
   `original_language_study` tool. This prerequisite comes before migration
   `0005` / transform 8. Evaluate MACULA

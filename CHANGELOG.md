@@ -22,10 +22,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Completed the runtime-inert UBS Hebrew U3-T7 compiler, canonical
   native-to-normalized bridge, content-free reproducibility audit, embedded
   rights/provenance notice, and full-corpus integrity verification. The full
-  semantic artifact remains untracked and is not present in SQLite, D1, MCP
-  schemas/output, Worker composition, preview, or production. Materialized
-  capacity verification and separately owner-gated migration `0004` /
-  transform 7 remain future work.
+  semantic artifact remains untracked. The local-only M4A follow-on completes
+  migration `0004`, transform 7, SQLite materialization, deterministic D1
+  seed/import verification, and inactive Node/D1 adapters. None is registered
+  in Worker or Node composition, present in remote D1, bound to a Worker,
+  exposed through MCP, or deployed to preview or production. `SOURCE.json`
+  remains the historical acquisition-gate snapshot rather than deployment
+  evidence.
 
 - Clarified endpoint migration behavior: ordinary production `workers.dev`
   requests temporarily redirect to the canonical custom domain, while the
