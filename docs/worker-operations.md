@@ -29,9 +29,10 @@ endpoint. The primary-source MCP schema is production v4/local-only and preview
 v5/discovery-only; CCEL execution remains disabled in both environments.
 
 The later documentation reconciliation through PR #82
-(`023804681d725e9600f3ff3dbfce347417c23eff`) and the current U3-T7 compiler
-work are repository-only and have not been deployed. U3-T7 adds an inactive
-in-memory semantic compiler, native-to-normalized coordinate bridge, and
+(`023804681d725e9600f3ff3dbfce347417c23eff`) is repository-only and has not
+been deployed. The U3-T7 compiler work carried by PR #83 is also repository-only
+and undeployed. U3-T7 adds an inactive in-memory semantic compiler,
+native-to-normalized coordinate bridge, and
 content-free audit; it does not change the deployed Workers, D1 bindings,
 SQLite/D1 schemas, historical catalog, MCP output, UBS semantic runtime, or
 CCEL execution state. No deletion, route replacement, or other destructive

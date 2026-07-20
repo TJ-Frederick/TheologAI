@@ -274,13 +274,12 @@ is local source context only and does not define the current product contract.
   capacity verification and separate owner authorization for migration `0004`
   / transform 7 remain the next gates.
 
-These entries describe merged repository state. Deployment state is established
-only by the relevant protected workflow and post-deployment smoke evidence; a
-merge or this roadmap is not evidence that preview or production was deployed.
-No merge after PR #72 through PR #82 at
-`023804681d725e9600f3ff3dbfce347417c23eff` was deployed, and the current
-PR #83 U3-T7 change is likewise repository-only and undeployed. Production
-remains the PR #72 Worker
+Entries through PR #82 describe merged repository state. The U3-T7 work carried
+by PR #83 is repository-only and undeployed; merging it would not itself be
+deployment evidence. Deployment state is established only by the relevant
+protected workflow and post-deployment smoke evidence. No merge after PR #72
+through PR #82 at `023804681d725e9600f3ff3dbfce347417c23eff` was deployed.
+Production remains the PR #72 Worker
 `762485da-9e02-46a0-9777-e0d8743b9dbf`, and preview remains the PR #72 Worker
 `8ed4ad1a-f45f-4cdc-a6de-5358f59b6d44`.
 

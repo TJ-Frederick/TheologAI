@@ -49,9 +49,10 @@ Use the preview URL only for explicitly authorized release testing. The current
 known-good remote baseline is PR #72: production Worker
 `762485da-9e02-46a0-9777-e0d8743b9dbf` and preview Worker
 `8ed4ad1a-f45f-4cdc-a6de-5358f59b6d44`. The later documentation reconciliation
-through PR #82 (`023804681d725e9600f3ff3dbfce347417c23eff`) and the current
-U3-T7 compiler work are repository-only and have not been deployed. For a
-preview-client rollback without changing server state, use the direct preview
+through PR #82 (`023804681d725e9600f3ff3dbfce347417c23eff`) is repository-only
+and has not been deployed. The U3-T7 compiler work carried by PR #83 is also
+repository-only and undeployed. For a preview-client rollback without changing
+server state, use the direct preview
 `workers.dev` address above; the production `workers.dev` address intentionally
 redirects rather than serving a separate legacy Worker.
 

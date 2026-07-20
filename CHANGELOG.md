@@ -15,8 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   deployed Worker baseline: production serves Worker
   `762485da-9e02-46a0-9777-e0d8743b9dbf`, preview serves Worker
   `8ed4ad1a-f45f-4cdc-a6de-5358f59b6d44`, and the later behaviorally inert
-  repository merges through `023804681d725e9600f3ff3dbfce347417c23eff` and
-  the current repository-only PR #83 work are not remote deployments.
+  repository merges through `023804681d725e9600f3ff3dbfce347417c23eff` are
+  not remote deployments. The U3-T7 work carried by PR #83 is likewise
+  repository-only and undeployed.
 
 - Completed the runtime-inert UBS Hebrew U3-T7 compiler, canonical
   native-to-normalized bridge, content-free reproducibility audit, embedded

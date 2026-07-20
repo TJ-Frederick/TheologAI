@@ -179,8 +179,9 @@ PR #72 is the deployed remote baseline: production Worker
 redirects ordinary requests to the canonical custom domain; the exact
 abusive-poller tuple is rejected instead, while the preview legacy endpoint
 remains direct. The later documentation reconciliation through PR #82
-(`023804681d725e9600f3ff3dbfce347417c23eff`) and the current U3-T7 compiler
-work are repository-only and have not been deployed.
+(`023804681d725e9600f3ff3dbfce347417c23eff`) is repository-only and has not
+been deployed. The U3-T7 compiler work carried by PR #83 is also repository-only
+and undeployed.
 
 The acquired UBS Hebrew and historical public-domain packets are deliberately
 outside the runtime, SQLite/D1 materialization, MCP registry, and hosted
