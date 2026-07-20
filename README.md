@@ -22,12 +22,16 @@ https://mcp.theologai.xyz/mcp
 removed after its usage falls to zero.
 
 The preview MCP endpoint is
-`https://preview-mcp.theologai.xyz/mcp`. The previous addresses remain
-operational as compatibility and rollback aliases:
+`https://preview-mcp.theologai.xyz/mcp`. The legacy addresses have deliberately
+different migration behavior:
 
 - Website: `https://theologai.pages.dev/`
-- Production MCP: `https://theologai.tjfrederick.workers.dev/mcp`
-- Preview MCP: `https://theologai-preview.tjfrederick.workers.dev/mcp`
+- Production MCP: `https://theologai.tjfrederick.workers.dev/mcp` is a
+  temporary, no-store HTTP 308 redirect to the canonical production endpoint
+  for ordinary requests. The one documented abusive-poller IP-plus-user-agent
+  tuple is rejected instead, and browser CORS preflight remains local.
+- Preview MCP: `https://theologai-preview.tjfrederick.workers.dev/mcp` remains
+  a direct compatibility and rollback endpoint for the preview Worker.
 
 Remote MCP client configuration:
 
@@ -41,9 +45,14 @@ Remote MCP client configuration:
 }
 ```
 
-Use the preview URL only for explicitly authorized release testing. To roll a
-client back without changing server state, replace the custom URL with the
-corresponding `workers.dev` compatibility alias above.
+Use the preview URL only for explicitly authorized release testing. The current
+known-good remote baseline is PR #72: production Worker
+`762485da-9e02-46a0-9777-e0d8743b9dbf` and preview Worker
+`8ed4ad1a-f45f-4cdc-a6de-5358f59b6d44`. Later inert merges through
+`6c0ab39052864a3fc1f0628f98d10491fa431719` have not been deployed. For a
+preview-client rollback without changing server state, use the direct preview
+`workers.dev` address above; the production `workers.dev` address intentionally
+redirects rather than serving a separate legacy Worker.
 
 ## MCP capabilities
 
@@ -227,18 +236,30 @@ transcription uncertainty.
 The local database contains 17 tracked creeds, confessions, and
 catechisms. The exact count is enforced by `data/data-manifest.json`.
 
+Approved UBS Hebrew and public-domain historical-source packets are checked
+into the repository for deterministic verification and future release work.
+They are not part of the local/remote database, the 17-work catalog, MCP
+resources, or current tool output. In particular, UBS migration `0004` /
+transform 7 and historical compatibility migration `0005` / transform 8 remain
+separate owner and release gates, in that order: `0004` / transform 7 precedes
+`0005` / transform 8. Norton is a later transform-9,
+`sectioned_only` candidate. Cyril remains blocked with zero output pending
+reliable translator attribution.
+
 The production tools search and retrieve only the locally indexed collection.
 They do **not** currently fetch CCEL search results or document bodies, and the
-production v4 schema remains strictly local-only. Preview stages a hard v5
-contract cutover: it advertises external CCEL discovery inputs and guided
-workflows, but live search and coordinator execution remain disabled. External
-preview queries therefore return a disabled provider result before adapter
+production v4 schema remains strictly local-only. The former release-plan
+wording, “Preview stages a hard v5 contract cutover,” is historical: the
+deployed preview now serves the v5 discovery-only schema and advertises
+external CCEL discovery inputs and guided workflows. In this deployed state,
+live search and coordinator execution remain disabled; external preview queries
+therefore return a disabled provider result before adapter
 invocation, Durable Object lookup/RPC, or fetch. MCP clients should reconnect
-and reinitialize after the preview deployment because tool and prompt schemas
+and reinitialize after any endpoint/profile change because tool and prompt schemas
 may be cached for an existing connection.
 
-Defensive CCEL discovery adapters remain in the codebase as future provider
-architecture.
+The retained `CcelSearchAdapter` remains in the codebase as bounded future
+provider architecture.
 The dormant adapter is restricted to page 1, one non-following/non-retried
 upstream GET per admitted cache miss, at most five metadata hits, and at most
 240 Unicode characters per discovery snippet. It accepts only structurally
@@ -423,6 +444,9 @@ per-request D1 repositories. Both targets share one MCP registry.
   after the PR #10 production baseline.
 - Live CCEL discovery and search remain gated future work; preview currently
   exposes only the non-executing v5 contract while production remains v4/local-only.
+  The legacy CCEL body reader is retired; the retained discovery adapter is
+  bounded, does not fetch until separately authorized, and must never become
+  CCEL body mirroring or republication.
 - The local historical collection needs document-level edition, source, and
   license metadata before redistribution claims can be made.
 - Hosted MCP Logging would require a deliberate stateful-session design.

@@ -5,10 +5,12 @@
 This remains an inactive source-acquisition package. TheologAI has
 vendored exactly two unmodified English UBS Hebrew v0.9.2 JSON artifacts from
 the pinned upstream revision, plus the exact relevant upstream license and
-notices. A strict raw decoder and raw-coordinate verifier now produce separate
-deterministic audit reports without changing the immutable Gate 1 schema
-report. No migration, transform 7, D1 materialization, runtime registration,
-tool, prompt, resource, or public semantic output exists in this change.
+notices. PR #79 added a strict raw decoder and raw-coordinate verifier that
+produce separate deterministic audit reports without changing the immutable
+Gate 1 schema report. The package is absent from SQLite/D1 materialization,
+runtime composition, tool/prompt/resource registration, and MCP output. No
+migration `0004`, transform 7, preview deployment, or production deployment is
+authorized or implied by its presence in the repository.
 
 | Artifact | Upstream blob | Bytes | SHA-256 |
 | --- | --- | ---: | --- |
@@ -127,17 +129,20 @@ This package does **not** authorize migration `0004`, transform 7, SQLite/D1
 storage, seed generation, a database import, runtime wiring, or any
 preview/production deployment. The decoder, normalized inactive contract, and
 coordinate attestation remain design-time inputs for a separately reviewed
-materialization and release.
+materialization and release. That migration `0004` / transform 7 data layer
+must complete before the dependent historical migration `0005` / transform 8.
 
 ## npm publication boundary
 
-`npm pack --dry-run --json --ignore-scripts` currently includes this inactive
-packet incidentally. The package has no `files` allowlist
-or `.npmignore`, and the same dry run omits the configured `dist/index.js`
-entrypoint. That is existing packaging debt, not a supported distribution
-surface or evidence that these sources are intended for npm.
+`package.json` now declares `"private": true`; npm publication is unsupported.
+`npm pack --dry-run --json --ignore-scripts` remains an unmanaged diagnostic
+that exposes this inactive packet incidentally. The package has no `files`
+allowlist or `.npmignore`, and the same dry run omits the configured
+`dist/index.js` entrypoint. That is source-exposure/packaging debt, not a
+supported distribution surface or evidence that these sources are intended for
+npm.
 
 Do **not** publish the current package or this acquisition packet to npm. npm
-distribution is not a product goal. This acquisition makes no change to
-`package.json`, package-private state, `.npmignore`, or any package command;
-packaging policy can be addressed only in a separately approved workstream.
+distribution is not a product goal. The `private: true` safeguard does not make
+the dry-run packlist a supported artifact; any future packaging-policy change
+requires a separately approved workstream.

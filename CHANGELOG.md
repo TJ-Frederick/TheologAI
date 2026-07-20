@@ -11,6 +11,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Reconciled public release documentation through PR #81. PR #72 remains the
+  deployed Worker baseline: production serves Worker
+  `762485da-9e02-46a0-9777-e0d8743b9dbf`, preview serves Worker
+  `8ed4ad1a-f45f-4cdc-a6de-5358f59b6d44`, and the later behaviorally inert
+  repository merges through `6c0ab39052864a3fc1f0628f98d10491fa431719` are
+  not a remote deployment.
+
+- Clarified endpoint migration behavior: ordinary production `workers.dev`
+  requests temporarily redirect to the canonical custom domain, while the
+  documented abusive-poller IP-plus-user-agent tuple is rejected and preview
+  `workers.dev` remains a direct compatibility endpoint. Production keeps the
+  primary-source v4/local-only schema; preview keeps the v5 discovery-only
+  schema, with CCEL execution disabled in both environments.
+
+- Recorded that the acquired UBS Hebrew and historical-source packets remain
+  inactive: they add no D1 rows, runtime/MCP surface, or hosted historical
+  work. Migration `0004`/transform 7, migration `0005`/transform 8, Norton
+  transform 9, and subsequent edition transforms remain separately gated;
+  `0004`/transform 7 is the required predecessor of `0005`/transform 8.
+
+- Retired the unreachable CCEL body reader while retaining the bounded,
+  disabled discovery adapter. npm distribution remains unsupported and the
+  package remains private.
+
 - Centralized the historical-work catalog and search-scope capacity at the
   existing 100-work hard ceiling, using one D1-safe JSON/`json_each` bind for
   scoped work IDs. The hosted corpus and readiness inventory remain 17 works;
@@ -37,14 +61,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   2,000-section complete-result ceilings fail explicitly instead of truncating.
   Invalid stored document or section locators now fail closed as integrity
   hardening rather than being omitted or attributed approximately.
-- Prepared an infrastructure-only migration to `theologai.xyz`, with
-  `mcp.theologai.xyz/mcp` and `preview-mcp.theologai.xyz/mcp` as the canonical
-  production and preview MCP addresses. The existing `pages.dev` and
-  `workers.dev` addresses remain enabled as compatibility and rollback aliases.
-- Staged a preview-only hard cutover to the v4 primary-source discovery
-  contract and guided workflows. Preview still keeps live CCEL search and
-  coordinator execution disabled, so external queries return disabled without
-  adapter, Durable Object, or network work. Production remains v3/local-only.
+- Established `mcp.theologai.xyz/mcp` and `preview-mcp.theologai.xyz/mcp` as
+  the canonical production and preview MCP addresses. The Pages alias remains
+  available; production `workers.dev` is a redirect and preview `workers.dev`
+  remains direct for compatibility/rollback.
+- Released the primary-source profile split: preview advertises v5
+  discovery-only inputs while production is v4/local-only. Live CCEL search
+  and coordinator execution remain disabled, so external preview queries stop
+  before adapter, Durable Object, or network work.
 
 ## [3.6.0] - 2026-07-15
 

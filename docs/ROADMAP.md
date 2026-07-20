@@ -181,10 +181,92 @@ is local source context only and does not define the current product contract.
   cancelled before protected approval; the run had no deploy step and created
   no Worker version. Production remained on
   `59cd1385-8635-4823-9b7e-add61e01ecbe`.
+- **Release-ledger reconciliation / PR #68:** documented the completed Phase 3
+  releases through PR #67 only. It changed no runtime, corpus, D1, Worker, or
+  deployment state, merged as
+  `1ae5842747a5f4e14ce871fd3e45273f1e5e6e59`. Its automatic production run
+  `29610768745` was cancelled with zero steps; no Worker was deployed.
+- **Durable inactive-study guard / PR #69:** strengthened the test-only,
+  synthetic `original_language_study` v2 packet guard. It does not change a
+  public tool, prompt, resource, source artifact, migration, D1, or Worker,
+  merged as `403cdfe9ad7564c1dab4e885d692899f7f9714fe`. Its automatic
+  production run `29609784254` was cancelled with zero steps; no Worker was
+  deployed.
+- **Bounded parallel-passage cursor repair / PR #70:** repaired finite
+  chapter-boundary parsing and Node/D1 continuation-cursor validation, then
+  updated the guided workflow. Protected preview run `29618447214` deployed
+  Worker `42ca956c-bf0b-46bf-bdcc-df0c56ef3eb5`; protected production run
+  `29619813297` deployed Worker `e5a7db48-776c-460d-9309-d7d5a96d8f26`.
+  The two production audits passed 22/22 and 11/11 assertions. It adds no new
+  corpus, migration, or semantic UBS contract, merged as
+  `ee9dd8fc65d7c97b46c63f22872b83d970e0fe2f`.
+- **EEBO-TCP Norton acquisition / PR #71:** acquired and byte-locked the CC0
+  1561 Norton translation source plus a normalization report and Gate 1
+  evidence. It is not in SQLite, D1, the historical catalog, a resource, or
+  an MCP response. The future bounded `sectioned_only` publication remains
+  transform 9, not a present feature, merged as
+  `f6888fc4dbee03a3ccdd20411d284318ea22a21b`.
+- **Legacy production-host migration / PR #72:** established the current
+  known-good remote baseline. It redirects the production
+  `theologai.tjfrederick.workers.dev` host to `mcp.theologai.xyz` for ordinary
+  requests (while preserving CORS preflight behavior); the exact documented
+  abusive-poller IP-plus-user-agent tuple is rejected instead of redirected.
+  The preview `workers.dev` host remains a direct compatibility endpoint.
+  Protected deployment and audit produced
+  production Worker `762485da-9e02-46a0-9777-e0d8743b9dbf` and preview Worker
+  `8ed4ad1a-f45f-4cdc-a6de-5358f59b6d44`. The primary-source MCP contract is
+  production v4/local-only and preview v5/discovery-only, with CCEL execution
+  disabled in both environments. Merged as
+  `72a8ee5eef9b909a373b085d1a4f193484ddfe8a`.
+- **Historical compatibility evidence / PR #73:** checked in a source-first
+  alias decision and ordering evidence only. It does not create migration
+  `0005`, transform 8, rows, runtime behavior, or a deployment, merged as
+  `7303f4cdaeab9061a8c0b956af56300df5657f34`.
+- **Unsupported npm distribution / PR #74:** set `package.json` to
+  `private: true` and recorded that npm publication and `npm pack` are not
+  supported distribution paths, merged as
+  `2190d5af8b3d04dd115a36758ae18d3335ca11ec`.
+- **Pinned UBS Hebrew acquisition / PR #75:** vendored the approved two
+  English UBS Hebrew v0.9.2 artifacts and notices under the conservative
+  CC BY-SA policy, with acquisition verification. The packet remains absent
+  from D1, runtime composition, MCP schemas, resources, and output; migration
+  `0004` and transform 7 are still separately gated, merged as
+  `cd1a72e7fdd00dec365952b71b770f03db42d4ed`.
+- **CCEL canary observability / PR #76:** improved audit evidence for the
+  separately gated live-preview path without enabling a provider request,
+  merged as `a5fa03185661c4cf09c90c2544e79169efdcd7ab`.
+- **Source-first compatibility compiler / PR #77:** prepared deterministic
+  compatibility compilation against the approved aliases, without migration
+  `0005`, transform 8, D1 changes, runtime registration, or deployment,
+  merged as `ba171c0b2247aef55b92398546180770ddcaffc5`.
+- **Norton sectioned-delivery preparation / PR #78:** prepared a bounded
+  `sectioned_only` transform-9 contract for the acquired Norton source. It
+  emits no catalog record, SQLite/D1 row, resource, or MCP output, merged as
+  `bf59fa3b1ab19d5243ce1c5ee7bb08095badbf08`.
+- **UBS Hebrew U2 preparation / PR #79:** added raw decoding and
+  coordinate-attestation evidence for the acquired packet. Its semantic
+  candidates remain inactive and unregistered; it does not add migration
+  `0004`, transform 7, D1 data, or MCP behavior, merged as
+  `a4b1a27f7acfce9ebd1432ca6db03a8df124a05c`.
+- **Additional public-domain source preparation / PR #80:** acquired the
+  approved Calvin, Aquinas III questions 73–83, and Augustine source packets
+  with provenance/normalization evidence. They are not locally published,
+  seeded, indexed, or exposed. Cyril remains blocked with zero normalized or
+  published output pending reliable translator attribution, merged as
+  `6c0ab39052864a3fc1f0628f98d10491fa431719`.
+- **CCEL legacy body-reader retirement / PR #81:** removed the unreachable
+  body-reading service and adapter. The bounded discovery adapter and its
+  safeguards remain, but live execution is still separately gated; no CCEL
+  body is fetched, mirrored, stored, or republished, merged as
+  `abd1c39ffd37f121e5871e64c6b11bcd10d8d3c8`.
 
 These entries describe merged repository state. Deployment state is established
 only by the relevant protected workflow and post-deployment smoke evidence; a
 merge or this roadmap is not evidence that preview or production was deployed.
+No merge after PR #72 through `6c0ab39052864a3fc1f0628f98d10491fa431719`
+was deployed: production remains the PR #72 Worker
+`762485da-9e02-46a0-9777-e0d8743b9dbf`, and preview remains the PR #72 Worker
+`8ed4ad1a-f45f-4cdc-a6de-5358f59b6d44`.
 
 ## Shipped Phase 3 release train
 
@@ -476,15 +558,13 @@ Code readiness and operational readiness are deliberately separate:
 
 - The migration-free catalog-capacity prerequisite shipped in PR #56; retain
   its centralized 100-work and 2,000-section ceilings and single D1-safe
-  JSON/`json_each` scope bind. The UBS semantic data release remains gated on
-  owner approval of the exact two source artifacts and their license evidence,
-  followed by source inspection, deterministic compilation, and capacity
-  verification. Migration `0004` and transform 7 then require separate
-  authorization before any semantic runtime or protected release. Historical
-  corpus provenance remains later: complete per-edition rights approvals and
-  the separately gated migration `0005`/transform 8 implementation; the
-  source-first compatibility target decision is already recorded, but current
-  display section numbers remain non-unique. Keep the existing 32-source
+  JSON/`json_each` scope bind. The approved UBS artifacts, decoder, and
+  coordinate evidence are now present, but they remain acquisition/design-time
+  inputs only. Deterministic compilation and capacity verification precede the
+  separately owner-gated migration `0004` and transform 7; neither may add
+  semantic runtime behavior or reach preview/production without a new review
+  and release gate. This data layer must complete before the dependent
+  historical migration `0005` / transform 8. Keep the existing 32-source
   provenance cap as a required pack-sizing check.
 - PRs #61–#64 and #67 complete the planned inactive semantic and provenance
   foundations: source-free semantic contracts, the unregistered Hebrew
@@ -506,14 +586,16 @@ Code readiness and operational readiness are deliberately separate:
   edition/provenance fields; it is not a rollout of evidence already present
   in current schemas. Any corpus release remains a **pending rights and release
   decision** and must preserve CCEL-disabled behavior during protected audit.
-- The inactive historical section-compatibility evidence slice records the
-  checked-in 23/256/233 local source/SQLite/D1 ordering projection without
-  source body text or a production target claim. The owner has approved the
-  existing source-first alias targets as authoritative for a future migration;
-  `productionObservedTarget` remains null. Node `.get()` and D1 `.first()`
-  remain `unordered_no_compatibility_proof`. Migration `0005`, transform 8,
-  deterministic runtime behavior, D1, preview, and production remain separate
-  implementation and release gates.
+- The historical source-first aliases are authoritative for a future
+  compatibility release, but the evidence/compiler remains preparatory.
+  `productionObservedTarget` remains null and Node `.get()`/D1 `.first()`
+  remain `unordered_no_compatibility_proof`. Migration `0005` and transform 8
+  depend on the prior migration `0004` / transform 7 data layer and are then
+  separately gated before any deterministic runtime behavior, D1 rows, preview,
+  or production change. Norton is a later transform-9
+  `sectioned_only` release; Calvin, Aquinas, and Augustine need later
+  per-edition transforms and release approvals. Cyril remains a zero-output
+  blocked source until translator attribution is established.
 - Review a bounded, discovery-only public rollout of the retained CCEL search
   adapter. The owner accepts free, donation-independent discovery with at most
   five short, attributed 240-character provider snippets and clean links, with
@@ -533,19 +615,28 @@ Code readiness and operational readiness are deliberately separate:
   `100`, production stays `000`, and neither environment may make a CCEL
   request.
 - Expand the local primary-source corpus with rights-reviewed, freely
-  redistributable editions and explicit edition provenance. Do not mirror or
-  republish CCEL transcriptions without edition-specific rights.
-- Broaden original-language study with a separately sourced semantic-domain
-  layer useful to both beginners and readers of Greek or Hebrew; evaluate
-  MACULA discourse/context evidence only after that foundation is reviewed.
+  redistributable editions and explicit edition provenance. The acquired Norton
+  and other public-domain packets do not count as the 17-work hosted corpus
+  until their separately reviewed transforms, D1 preparation, and release
+  gates are complete. Do not mirror or republish CCEL transcriptions without
+  edition-specific rights.
+- Broaden original-language study for both beginners and readers of Greek or
+  Hebrew using the already selected and acquired UBS Hebrew v0.9.2 semantic
+  source (PRs #75 and #79), rather than selecting another semantic-domain
+  source. Next comes deterministic compilation, capacity verification, and the
+  separately owner-gated migration `0004` / transform 7 materialization, which
+  requires explicit authorization; only after that data layer is verified may a
+  separate runtime-activation release extend the existing
+  `original_language_study` tool. This prerequisite comes before migration
+  `0005` / transform 8. Evaluate MACULA
+  discourse/context evidence only after that foundation is active and reviewed.
   The owner approved a hard cutover that withholds the TBESH `Meaning` field,
   which derives from Online Bible material whose source notice says permission
   should be obtained before project use. Exact identities, forms,
   transliteration, morphology, lemma, and Tyndale-created brief glosses remain,
   with explicit unavailable-evidence disclosure and no fabricated replacement.
-  Select and review a clearly redistributable semantic-domain source before
-  expanding semantic claims; the separately CC BY 4.0 STEPBible morphology
-  evidence remains usable on its own.
+  The separately CC BY 4.0 STEPBible morphology evidence remains usable on its
+  own.
 - Evaluate section-span commentary only where provider coverage can be stated
   honestly; never relabel a section anchor as an exact verse range.
 - Continue modern MCP output improvements tool by tool when a stable structured
@@ -553,10 +644,11 @@ Code readiness and operational readiness are deliberately separate:
 - Rehearse matched Worker/D1 rollback and define retention policy before any
   predecessor database cleanup.
 - Revisit the parked public-edge traffic issue: a Frankfurt/AWS client has
-  generated sustained anonymous production invocations. A future custom domain
-  can enable a narrowly scoped WAF control while keeping the MCP endpoint
-  public. This is non-gating; no hostname, Access, WAF, or limiter change is
-  currently approved.
+  generated sustained anonymous production invocations. The custom domain and
+  ordinary-request PR #72 legacy-host redirect are already deployed. Any
+  further `workers_dev` disablement, change to the exact abusive-poller tuple
+  rule, or narrowly scoped WAF control remains separately gated; no Access,
+  hostname, WAF, or limiter change is currently approved.
 
 ## Durable guardrails
 
@@ -573,7 +665,8 @@ Code readiness and operational readiness are deliberately separate:
   only; production remains v4/local-only. A future live discovery rollout
   requires the explicit owner policy decision above and separate review, and
   must not become crawling, catalog mirroring, body republication, or permanent
-  storage. Date-fallback contract work does not change any rollout flag or
-  authorize a live request.
+  storage. The legacy CCEL body reader is retired; the retained discovery
+  adapter remains bounded and inactive. Date-fallback contract work does not
+  change any rollout flag or authorize a live request.
 - Public Ethereum RPC endpoints are light-use defaults, not an uptime SLO.
   Donation verification remains fail-closed.
