@@ -13,24 +13,27 @@ import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const REPOSITORY = 'https://github.com/ubsicap/ubs-open-license';
-const COMMIT = '3a6edd8212df2e1189037ad39687726990c80d56';
+export const UBS_HEBREW_V092_REPOSITORY = 'https://github.com/ubsicap/ubs-open-license';
+export const UBS_HEBREW_V092_COMMIT = '3a6edd8212df2e1189037ad39687726990c80d56';
+const REPOSITORY = UBS_HEBREW_V092_REPOSITORY;
+const COMMIT = UBS_HEBREW_V092_COMMIT;
 const SOURCE_ROOT = 'data/biblical-languages/ubs-open-license/v0.9.2';
 const SCHEMA_REPORT_PATH = `${SOURCE_ROOT}/SCHEMA-REPORT.json`;
 const SOURCE_MANIFEST_PATH = `${SOURCE_ROOT}/SOURCE.json`;
 const SOURCE_SCHEMA_VERSION = 'theologai-ubs-hebrew-acquisition-v1';
 const SCHEMA_REPORT_VERSION = 'theologai-ubs-hebrew-v0.9.2-schema-inspection-v1';
-const COPYRIGHT_NOTICE = '(UBS Dictionary of Biblical Hebrew © United Bible Societies, 2023.  Adapted from Semantic Dictionary of Biblical Hebrew © 2000-2023 United Bible Societies.)';
+export const UBS_HEBREW_V092_COPYRIGHT_NOTICE = '(UBS Dictionary of Biblical Hebrew © United Bible Societies, 2023.  Adapted from Semantic Dictionary of Biblical Hebrew © 2000-2023 United Bible Societies.)';
+const COPYRIGHT_NOTICE = UBS_HEBREW_V092_COPYRIGHT_NOTICE;
 const COVERAGE_AND_COMPLETENESS = Object.freeze({
   upstreamHebrewNotice: 'The Hebrew-specific upstream notice describes SDBH as ongoing and says around 90% of Old Testament words are included; treat the corpus as non-exhaustive.',
   upstreamV092ReleaseNote: 'The upstream dictionaries notice labels version 0.9.2 as entries added and says now at 99%. This conflicting broader release-note wording does not authorize a completeness claim.',
   theologaiPolicy: 'No current or future TheologAI result may imply complete Hebrew lexical or reference coverage solely from this acquisition.',
 });
 const MODIFICATIONS = Object.freeze({
-  performed: 'The two approved JSON artifacts and three notices remain verbatim. A migration-free, inactive raw decoder and coordinate-validation design were added with deterministic audit reports; neither source artifact was modified.',
-  plannedButNotPerformed: 'No executable migration 0004, transform 7, seed, manifest registration, D1 row, adapter, query plan, composition-root wiring, runtime tool, prompt, resource, public output, or deployment was added.',
+  performed: 'The two approved JSON artifacts and three notices remain verbatim. A migration-free, inactive raw decoder, exact TAHOT/usfmtc coordinate bridge, and deterministic in-memory semantic compiler were added; neither source artifact was modified, and no full semantic corpus is tracked.',
+  plannedButNotPerformed: 'No executable migration 0004, global data-manifest transform advancement, seed, manifest registration, D1 row, adapter, query plan, composition-root wiring, runtime tool, prompt, resource, public output, or deployment was added.',
 });
-const FUTURE_ATTRIBUTION_AND_SHARE_ALIKE_POLICY = 'Before sharing any derived rows, exports, database copies, or semantic output based on these artifacts, preserve the UBS/SDBH attribution, the pinned source URI, the CC BY-SA 4.0 URI, and a clear change description; offer the derived semantic layer under CC BY-SA 4.0 or a compatible license. Do not claim that this policy extends CC BY-SA to unrelated TheologAI code or datasets, while preserving every license that independently applies. Final release wording remains subject to rights review.';
+const FUTURE_ATTRIBUTION_AND_SHARE_ALIKE_POLICY = 'Before sharing any derived rows, exports, database copies, or semantic output based on these artifacts, preserve the UBS/SDBH attribution, the pinned source URI, the CC BY-SA 4.0 URI, and a clear change description; offer the derived semantic layer under CC BY-SA 4.0 or a compatible license. Do not claim that this policy extends CC BY-SA to unrelated TheologAI code or datasets, while preserving every license that independently applies. The finalized scoped release wording is in docs/UBS-HEBREW-V0.9.2-DERIVED-NOTICE.md.';
 
 export interface UbsPinnedFile {
   readonly id: string;
@@ -123,6 +126,13 @@ export const UBS_HEBREW_V092_COORDINATE_AUDIT = Object.freeze({
   trackedPath: `${SOURCE_ROOT}/COORDINATE-AUDIT.json`,
   sha256: 'd174d827bbfdf7d1c35a8836ff28a5453a2947ac5020eb5df060fed1732a1f30',
 } as const);
+
+export interface UbsTrackedDerivedArtifact {
+  readonly id: 'native-to-normalized-bridge' | 'semantic-compilation-audit';
+  readonly trackedPath: string;
+  readonly bytes: number;
+  readonly sha256: string;
+}
 
 const ENTRY_KEYS = Object.freeze([
   'AlphaPos', 'AlternateLemmas', 'Authors', 'BaseForms', 'ContributorNote', 'Contributors', 'Dates',
@@ -471,7 +481,7 @@ function sourceManifestProjection(): Record<string, unknown> {
   });
   return {
     schemaVersion: SOURCE_SCHEMA_VERSION,
-    status: 'verbatim_source_vendored_no_transformation_or_runtime_registration',
+    status: 'verbatim_source_vendored_with_inert_derived_compilation_material_no_runtime_registration',
     upstream: {
       publisher: 'United Bible Societies',
       repository: REPOSITORY,
@@ -502,7 +512,33 @@ function sourceManifestProjection(): Record<string, unknown> {
         sha256: UBS_HEBREW_V092_COORDINATE_AUDIT.sha256,
         purpose: 'Exact raw UBS/TAHOT native-coordinate set equality and reviewed source pins; not contextual token or sense adjudication.',
       },
+      {
+        schemaVersion: 'theologai-ubs-hebrew-semantic-compilation-audit.v1',
+        trackedPath: `${SOURCE_ROOT}/SEMANTIC-COMPILATION-AUDIT.json`,
+        bytes: 2336,
+        sha256: '9eb3322e7e2f09899f3d8e43be13cc5aa3996d0572740041ce555c478dd37afa',
+        purpose: 'Content-free deterministic compiler counts, exact provenance witnesses, semantic-payload identity, and complete-artifact byte identity; no semantic corpus bytes are tracked.',
+      },
     ],
+    inertDerivedArtifacts: {
+      coordinateBridge: {
+        schemaVersion: 'theologai-ubs-tahot-native-to-normalized-bridge.v1',
+        trackedPath: `${SOURCE_ROOT}/NATIVE-TO-NORMALIZED-BRIDGE.json`,
+        bytes: 581298,
+        sha256: 'f3d7ec4963fb8512148f7884dcb98a60e7cd459178965dc0bd981dd34f21b149',
+        license: 'CC BY-SA 4.0',
+        licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/',
+        modificationDescription: 'Canonical override-only native-to-normalized coordinate bridge derived from four exact TAHOT pins and the pinned usfmtc reference table; it preserves one-to-many mappings and does not prove token alignment or contextual sense.',
+        tahot: {
+          repository: 'https://github.com/STEPBible/STEPBible-Data',
+          commit: '0f60797c170f11a1f8dc75c5f7617973e2e66b0d',
+          license: 'CC BY 4.0',
+          licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
+          attribution: 'Tyndale House, Cambridge / STEP Bible (www.stepbible.org)',
+          attributionHeader: { lines: 19, sha256: '92848ccec4937ecd165514fa1fad292238217a864c3a0720bb9a9bc33be2ac82' },
+        },
+      },
+    },
     upstreamNotices: UBS_HEBREW_V092_NOTICES.map(projectFile),
     coverageAndCompleteness: COVERAGE_AND_COMPLETENESS,
     modifications: MODIFICATIONS,
@@ -517,7 +553,57 @@ export function assertUbsHebrewV092SourceManifest(manifest: unknown): void {
 }
 
 function verifyAcquisitionManifest(root: string): void {
-  assertUbsHebrewV092SourceManifest(JSON.parse(readFileSync(join(root, SOURCE_MANIFEST_PATH), 'utf8')));
+  const manifest = JSON.parse(readFileSync(join(root, SOURCE_MANIFEST_PATH), 'utf8')) as Record<string, unknown>;
+  assertUbsHebrewV092SourceManifest(manifest);
+  for (const artifact of trackedDerivedArtifactsFromManifest(manifest)) {
+    assertTrackedUbsHebrewV092DerivedArtifactBytes(
+      artifact,
+      readFileSync(join(root, artifact.trackedPath)),
+    );
+  }
+}
+
+/**
+ * The bridge and the content-free audit are ordinary tracked derivative files,
+ * so their SOURCE.json byte pins must be verified directly rather than merely
+ * being described by the compliance projection above.
+ */
+export function assertTrackedUbsHebrewV092DerivedArtifactBytes(
+  artifact: UbsTrackedDerivedArtifact,
+  bytes: Uint8Array,
+): void {
+  if (bytes.byteLength !== artifact.bytes) {
+    throw new Error(`Tracked UBS derived artifact byte length drift for ${artifact.id}`);
+  }
+  if (sha256(bytes) !== artifact.sha256) {
+    throw new Error(`Tracked UBS derived artifact SHA-256 drift for ${artifact.id}`);
+  }
+}
+
+function trackedDerivedArtifactsFromManifest(manifest: Record<string, unknown>): readonly UbsTrackedDerivedArtifact[] {
+  const inertDerivedArtifacts = asRecord(manifest.inertDerivedArtifacts, 'SOURCE.inertDerivedArtifacts');
+  const coordinateBridge = asRecord(inertDerivedArtifacts.coordinateBridge, 'SOURCE.coordinateBridge');
+  const inactiveAuditReports = asArray(manifest.inactiveAuditReports, 'SOURCE.inactiveAuditReports');
+  const semanticAudit = inactiveAuditReports.find(report => asRecord(report, 'SOURCE.inactiveAuditReports[]').schemaVersion
+    === 'theologai-ubs-hebrew-semantic-compilation-audit.v1');
+  if (!semanticAudit) throw new Error('SOURCE semantic compilation audit pin is missing');
+  return [
+    trackedDerivedArtifact('native-to-normalized-bridge', coordinateBridge),
+    trackedDerivedArtifact('semantic-compilation-audit', asRecord(semanticAudit, 'SOURCE.semanticCompilationAudit')),
+  ];
+}
+
+function trackedDerivedArtifact(
+  id: UbsTrackedDerivedArtifact['id'],
+  value: Record<string, unknown>,
+): UbsTrackedDerivedArtifact {
+  const trackedPath = asString(value.trackedPath, `SOURCE ${id} trackedPath`);
+  const bytes = value.bytes;
+  const sha = asString(value.sha256, `SOURCE ${id} sha256`);
+  if (!Number.isSafeInteger(bytes) || bytes < 1 || !/^[0-9a-f]{64}$/.test(sha)) {
+    throw new Error(`SOURCE ${id} byte pin is malformed`);
+  }
+  return { id, trackedPath, bytes, sha256: sha };
 }
 
 export function verifyUbsHebrewV092Acquisition(root: string): SchemaInspection {

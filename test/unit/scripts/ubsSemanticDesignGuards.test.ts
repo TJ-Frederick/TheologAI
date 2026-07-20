@@ -364,12 +364,13 @@ describe('source-free UBS semantic design guards', () => {
       .toThrow(/serialized UTF-8 bytes/);
   });
 
-  it('marks both named future source artifacts as unapproved and not vendored', () => {
+  it('redirects the former template to the completed, still runtime-inert notice', () => {
     const notice = readFileSync(new URL('docs/templates/UBS-SEMANTICS-NOTICE-TEMPLATE.md', repo), 'utf8');
     expect(notice).toContain('UBSHebrewDic-v0.9.2-en.JSON');
     expect(notice).toContain('UBSHebrewDicLexicalDomains-v0.9.2-en.JSON');
     expect(notice).not.toContain('UBSGreek');
-    expect(notice).toContain('source bytes are unapproved and not vendored');
+    expect(notice).toContain('derived-material notice');
+    expect(notice).not.toContain('source bytes are unapproved and not vendored');
     expect(notice).toContain('CC BY-SA 4.0');
   });
 });

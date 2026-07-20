@@ -193,13 +193,13 @@ function parseEntries(input: unknown, sourceId: string, domainSourceId: string):
     unique(lexicalIdentities, `${path} lexical identity`);
     lexicalIdentities.sort(compareCodePoints);
     const transliteration = optionalCleanString(value.transliteration, `${path}.transliteration`);
-    const partOfSpeech = optionalCleanString(value.partOfSpeech, `${path}.partOfSpeech`);
+    const partOfSpeech = optionalStringArray(value.partOfSpeech, `${path}.partOfSpeech`);
     entries.push({
       entryId, sourceId,
       sourceOrdinal: positiveInteger(value.sourceOrdinal, `${path}.sourceOrdinal`),
       lemma: cleanString(value.lemma, `${path}.lemma`),
       ...(transliteration ? { transliteration } : {}),
-      ...(partOfSpeech ? { partOfSpeech } : {}),
+      ...(partOfSpeech === undefined ? {} : { partOfSpeech }),
       lexicalIdentities,
     });
 
@@ -370,6 +370,12 @@ function cleanString(value: unknown, path: string): string {
 function optionalCleanString(value: unknown, path: string): string | undefined {
   if (value === null || value === undefined) return undefined;
   return cleanString(value, path);
+}
+function optionalStringArray(value: unknown, path: string): string[] | undefined {
+  if (value === null || value === undefined) return undefined;
+  const values = stringArray(value, path).map((item, index) => cleanString(item, `${path}[${index}]`));
+  unique(values, `${path} value`);
+  return values.sort(compareCodePoints);
 }
 function enumString<const T extends string>(value: unknown, allowed: readonly T[], path: string): T {
   if (typeof value !== 'string' || !allowed.includes(value as T)) {

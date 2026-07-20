@@ -28,15 +28,19 @@ preflight remains local. The preview
 endpoint. The primary-source MCP schema is production v4/local-only and preview
 v5/discovery-only; CCEL execution remains disabled in both environments.
 
-Later merges through `6c0ab39052864a3fc1f0628f98d10491fa431719` are
-behaviorally inert repository merges and have not been deployed. In particular,
-they do not change the deployed Workers, D1 bindings, historical catalog, UBS
-semantic runtime, or CCEL execution state. No deletion, route replacement, or
-other destructive cleanup is authorized by this record.
+The later documentation reconciliation through PR #82
+(`023804681d725e9600f3ff3dbfce347417c23eff`) and the current U3-T7 compiler
+work are repository-only and have not been deployed. U3-T7 adds an inactive
+in-memory semantic compiler, native-to-normalized coordinate bridge, and
+content-free audit; it does not change the deployed Workers, D1 bindings,
+SQLite/D1 schemas, historical catalog, MCP output, UBS semantic runtime, or
+CCEL execution state. No deletion, route replacement, or other destructive
+cleanup is authorized by this record.
 
 Any eventual UBS semantic D1 release must complete migration `0004` / transform
-7 before the dependent historical migration `0005` / transform 8. Neither is
-part of this deployed baseline.
+7 before the dependent historical migration `0005` / transform 8. Capacity
+planning and separate owner authorization are still required; neither is part
+of this deployed baseline.
 
 ## Historical PR #50 pre-custom-domain rollback anchor (2026-07-16)
 

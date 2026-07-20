@@ -183,7 +183,12 @@ export interface UbsSemanticEntry {
   sourceOrdinal: number;
   lemma: string;
   transliteration?: string;
-  partOfSpeech?: string;
+  /**
+   * Source values are a set, not a display string.  Retaining the canonical
+   * array prevents a future materializer from silently dropping a secondary
+   * part-of-speech (the inspected UBS input contains multi-value entries).
+   */
+  partOfSpeech?: readonly string[];
   /** One Hebrew source entry can retain multiple H#### and/or A#### identities. */
   lexicalIdentities: UbsInternalLexicalIdentity[];
 }

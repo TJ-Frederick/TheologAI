@@ -29,6 +29,14 @@ those sources.
   the UBS Parallel Passage Database and carry the same ShareAlike license; the
   transformations do not add relationship types, direction, quotation status,
   confidence, or inferred parallels.
+- UBS Hebrew Dictionary v0.9.2 / Semantic Dictionary of Biblical Hebrew,
+  © United Bible Societies: [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
+  The inactive U3-T7 native-to-normalized coordinate bridge is a scoped derived
+  data layer under that license. Its exact source pins, modification description,
+  TAHOT/usfmtc witnesses, warranty disclaimer link, and strict coordinate-only
+  limitation are in [the derived-material notice](docs/UBS-HEBREW-V0.9.2-DERIVED-NOTICE.md).
+  No full UBS semantic corpus is included in a runtime bundle, database, or MCP
+  response in this release.
 
 ## Local historical documents
 

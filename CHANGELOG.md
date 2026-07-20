@@ -11,12 +11,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Reconciled public release documentation through PR #81. PR #72 remains the
+- Reconciled public release documentation through PR #82. PR #72 remains the
   deployed Worker baseline: production serves Worker
   `762485da-9e02-46a0-9777-e0d8743b9dbf`, preview serves Worker
   `8ed4ad1a-f45f-4cdc-a6de-5358f59b6d44`, and the later behaviorally inert
-  repository merges through `6c0ab39052864a3fc1f0628f98d10491fa431719` are
-  not a remote deployment.
+  repository merges through `023804681d725e9600f3ff3dbfce347417c23eff` and
+  the current repository-only PR #83 work are not remote deployments.
+
+- Completed the runtime-inert UBS Hebrew U3-T7 compiler, canonical
+  native-to-normalized bridge, content-free reproducibility audit, embedded
+  rights/provenance notice, and full-corpus integrity verification. The full
+  semantic artifact remains untracked and is not present in SQLite, D1, MCP
+  schemas/output, Worker composition, preview, or production. Materialized
+  capacity verification and separately owner-gated migration `0004` /
+  transform 7 remain future work.
 
 - Clarified endpoint migration behavior: ordinary production `workers.dev`
   requests temporarily redirect to the canonical custom domain, while the
