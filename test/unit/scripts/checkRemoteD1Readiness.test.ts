@@ -11,6 +11,11 @@ import {
   runRemoteD1ReadinessCheck,
 } from '../../../scripts/check-remote-d1-readiness.js';
 import type { BiblicalLanguageUnicodeCorrectionLedger } from '../../../scripts/biblical-language-unicode-correction.js';
+import { createUbsSemanticStorageContract } from '../../../scripts/ubs-semantics/storageContract.js';
+import {
+  assertUbsSemanticStoredArtifactIdentity,
+  assertUbsSemanticStoredContract,
+} from '../../../scripts/ubs-semantics/storageReconstruction.js';
 import { CLASSIC_TEXT_LIMITS } from '../../../src/kernel/classicTextContract.js';
 
 const generatedDbPath = process.env.THEOLOGAI_TEST_DATABASE_PATH?.trim();
@@ -180,11 +185,56 @@ describe('remote D1 readiness query', () => {
       db.prepare("INSERT INTO theologai_metadata (key, value) VALUES ('schema_version', ?)").run(schemaVersion);
       assertReady();
 
+      const semanticArtifact = db.prepare('SELECT rights_notice_json FROM ubs_semantic_artifacts').pluck().get() as string;
+      db.prepare("UPDATE ubs_semantic_artifacts SET rights_notice_json = '{}'").run();
+      assertRejected();
+      db.prepare('UPDATE ubs_semantic_artifacts SET rights_notice_json = ?').run(semanticArtifact);
+      assertReady();
+
+      const semanticSource = db.prepare(`SELECT source_blob FROM ubs_semantic_sources
+        WHERE source_id = 'ubs-hebrew-dictionary-en-v0.9.2'`).pluck().get() as string;
+      db.prepare(`UPDATE ubs_semantic_sources SET source_blob = ?
+        WHERE source_id = 'ubs-hebrew-dictionary-en-v0.9.2'`).run('0'.repeat(40));
+      assertRejected();
+      db.prepare(`UPDATE ubs_semantic_sources SET source_blob = ?
+        WHERE source_id = 'ubs-hebrew-dictionary-en-v0.9.2'`).run(semanticSource);
+      assertReady();
+
       const form = db.prepare('SELECT strongs_key, form_text, first_book FROM strongs_form_stats ORDER BY strongs_key, form_text LIMIT 1')
         .get() as { strongs_key: string; form_text: string; first_book: string };
       db.prepare('UPDATE strongs_form_stats SET first_book = ? WHERE strongs_key = ? AND form_text = ?')
         .run(form.first_book === 'Genesis' ? 'Exodus' : 'Genesis', form.strongs_key, form.form_text);
       assertRejected();
+    } finally {
+      db.close();
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 30_000);
+
+  it.skipIf(!generatedDbPath)('binds semantic provenance and every relational semantic row to the pinned artifact identity', () => {
+    const root = mkdtempSync(join(tmpdir(), 'theologai-semantic-identity-mutation-'));
+    const databasePath = join(root, 'theologai.db');
+    copyFileSync(generatedDbPath!, databasePath);
+    const audit = JSON.parse(readFileSync(
+      'data/biblical-languages/ubs-open-license/v0.9.2/SEMANTIC-COMPILATION-AUDIT.json', 'utf8',
+    ));
+    const contract = createUbsSemanticStorageContract(audit);
+    const db = new Database(databasePath);
+    try {
+      expect(() => assertUbsSemanticStoredContract(db, contract)).not.toThrow();
+      expect(() => assertUbsSemanticStoredArtifactIdentity(db, contract)).not.toThrow();
+      const entry = db.prepare('SELECT entry_id, lemma FROM ubs_semantic_entries ORDER BY entry_id LIMIT 1')
+        .get() as { entry_id: string; lemma: string };
+      db.prepare('UPDATE ubs_semantic_entries SET lemma = ? WHERE entry_id = ?')
+        .run(`${entry.lemma} altered`, entry.entry_id);
+      expect(() => assertUbsSemanticStoredArtifactIdentity(db, contract))
+        .toThrow('do not reproduce their declared artifact identity');
+      db.prepare('UPDATE ubs_semantic_entries SET lemma = ? WHERE entry_id = ?')
+        .run(entry.lemma, entry.entry_id);
+      expect(() => assertUbsSemanticStoredArtifactIdentity(db, contract)).not.toThrow();
+      db.prepare("UPDATE ubs_semantic_artifacts SET provenance_notice_json = '{}'").run();
+      expect(() => assertUbsSemanticStoredContract(db, contract))
+        .toThrow('artifact metadata is incomplete or stale');
     } finally {
       db.close();
       rmSync(root, { recursive: true, force: true });

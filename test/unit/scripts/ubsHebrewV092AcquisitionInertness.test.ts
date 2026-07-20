@@ -89,7 +89,7 @@ describe('UBS Hebrew v0.9.2 acquisition remains globally inactive', () => {
     }
   });
 
-  it('is unreachable from every runtime entrypoint and absent from runtime/config/migration/data wiring', () => {
+  it('is unreachable from every runtime entrypoint while local materialization records its exact source inputs', () => {
     const reachable = new Set<string>();
     for (const entrypoint of runtimeEntrypoints) {
       for (const path of reachableModules(entrypoint)) reachable.add(path);
@@ -97,10 +97,25 @@ describe('UBS Hebrew v0.9.2 acquisition remains globally inactive', () => {
     expect([...reachable].filter(isPacketCandidate)).toEqual([]);
     expect([...reachable].filter(path => exactAcquisitionReference.test(read(path)))).toEqual([]);
 
-    const wiringPaths = repositoryPaths().filter(isWiringPath).filter(path => !packetPaths.includes(path));
-    expect(wiringPaths.filter(path => exactAcquisitionReference.test(read(path))).sort()).toEqual([]);
-    expect(existsSync(resolve(repoPath, 'migrations/0004_ubs_hebrew_semantics.sql'))).toBe(false);
-    expect(read('data/data-manifest.json')).not.toContain(sourceRoot);
+    for (const path of ['wrangler.toml', 'package.json', 'src/worker.ts', 'src/worker-server.ts']) {
+      expect(read(path), path).not.toMatch(exactAcquisitionReference);
+    }
+    expect(existsSync(resolve(repoPath, 'migrations/0004_ubs_hebrew_semantics.sql'))).toBe(true);
+    const manifest = JSON.parse(read('data/data-manifest.json')) as {
+      schemaVersion: string;
+      materializations: { d1: { transformVersion: number; inputs: string[] } };
+    };
+    expect(manifest).toMatchObject({
+      schemaVersion: '0004_ubs_hebrew_semantics',
+      materializations: { d1: { transformVersion: 7 } },
+    });
+    expect(manifest.materializations.d1.inputs.filter(path => path.startsWith(sourceRoot))).toEqual([
+      `${sourceRoot}/NATIVE-TO-NORMALIZED-BRIDGE.json`,
+      `${sourceRoot}/SEMANTIC-COMPILATION-AUDIT.json`,
+      `${sourceRoot}/SOURCE.json`,
+      `${sourceRoot}/en/UBSHebrewDic-v0.9.2-en.JSON`,
+      `${sourceRoot}/en/UBSHebrewDicLexicalDomains-v0.9.2-en.JSON`,
+    ]);
   });
 
   it('records npm inclusion as prohibited incidental packaging debt without changing package policy', () => {
@@ -127,15 +142,6 @@ function isPacketCandidate(path: string): boolean {
     || /(?:^|\/)verify-ubs-hebrew-v092-(?:acquisition|semantic-compilation)\.ts$/i.test(path)
     || /(?:^|\/)ubsHebrewV092SemanticCompiler\.test\.ts$/i.test(path)
     || /(?:^|\/)UBS-HEBREW-V0\.9\.2-DERIVED-NOTICE\.md$/i.test(path);
-}
-
-function isWiringPath(path: string): boolean {
-  return path === 'package.json' || path === 'package-lock.json'
-    || path === 'data/data-manifest.json'
-    || path === 'data/biblical-languages/SOURCE.json'
-    || path.startsWith('.github/workflows/') || path.startsWith('migrations/')
-    || path.startsWith('scripts/') || path.startsWith('src/')
-    || /(?:^|\/)(?:wrangler(?:\.[^/]+)?\.toml|.*configuration\.d\.ts|tsconfig(?:\.[^/]+)?\.json)$/.test(path);
 }
 
 function repositoryPaths(): string[] {

@@ -15,6 +15,10 @@ import type {
   MorphologyUnicodeCorrection,
 } from './biblical-language-unicode-correction.js';
 import { parseHistoricalDocumentCatalog } from './historical-document-catalog.js';
+import {
+  createUbsSemanticStorageContract,
+  type UbsSemanticStorageAudit,
+} from './ubs-semantics/storageContract.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const manifestBytes = readFileSync(join(ROOT, 'data', 'data-manifest.json'));
@@ -29,6 +33,13 @@ const HISTORICAL_CATALOG = parseHistoricalDocumentCatalog(JSON.parse(readFileSyn
   join(ROOT, 'data/historical-document-catalog.json'),
   'utf8',
 )));
+const UBS_SEMANTIC_AUDIT = JSON.parse(readFileSync(
+  join(ROOT, 'data/biblical-languages/ubs-open-license/v0.9.2/SEMANTIC-COMPILATION-AUDIT.json'),
+  'utf8',
+)) as UbsSemanticStorageAudit & {
+  projection: { normalizedCoordinateRows: number; sourceEvidenceWithAmbiguousNormalizedCoordinates: number };
+};
+const UBS_SEMANTIC_STORAGE = createUbsSemanticStorageContract(UBS_SEMANTIC_AUDIT);
 
 export const REQUIRED_COLUMNS: Readonly<Record<string, readonly string[]>> = {
   theologai_metadata: ['key', 'value'],
@@ -48,6 +59,15 @@ export const REQUIRED_COLUMNS: Readonly<Record<string, readonly string[]>> = {
   ubs_parallel_groups: ['group_id', 'source_id', 'source_ordinal', 'label', 'directionality'],
   ubs_parallel_members: ['group_id', 'source_order', 'source_reference', 'normalized_reference', 'language_marker', 'alignment_basis', 'alignment_raw'],
   ubs_parallel_segments: ['group_id', 'member_order', 'segment_order', 'book_number', 'chapter', 'start_verse', 'end_verse'],
+  ubs_semantic_artifacts: ['artifact_identity', 'schema_version', 'compiler_version', 'transform_version', 'rights_notice_json', 'provenance_notice_json', 'transformation_witness_json'],
+  ubs_semantic_sources: ['artifact_identity', 'source_id', 'source_role', 'schema_version', 'transform_version', 'title', 'artifact_name', 'artifact_version', 'language', 'source_url', 'source_commit', 'source_blob', 'source_sha256', 'license', 'license_url', 'publisher', 'modified', 'modification_description'],
+  ubs_semantic_domains: ['artifact_identity', 'source_id', 'domain_id', 'source_ordinal', 'parent_domain_id', 'label', 'description'],
+  ubs_semantic_entries: ['artifact_identity', 'source_id', 'entry_id', 'source_entry_id', 'source_ordinal', 'lemma', 'part_of_speech_json'],
+  ubs_semantic_entry_identities: ['artifact_identity', 'entry_id', 'lexical_identity'],
+  ubs_semantic_senses: ['artifact_identity', 'source_id', 'sense_id', 'source_sense_id', 'entry_id', 'source_ordinal', 'definition_status', 'definition', 'definition_exclusion_reasons_json', 'glosses_json'],
+  ubs_semantic_sense_domains: ['artifact_identity', 'sense_id', 'domain_id', 'domain_ordinal'],
+  ubs_semantic_reference_evidence: ['evidence_key', 'artifact_identity', 'source_id', 'evidence_id', 'sense_id', 'source_ordinal', 'source_reference', 'raw_anchor', 'footnote_suffix', 'native_book_number', 'native_book_code', 'native_chapter', 'native_verse'],
+  ubs_semantic_normalized_coordinates: ['coordinate_key', 'artifact_identity', 'evidence_key', 'evidence_id', 'target_ordinal', 'normalized_book_number', 'normalized_book_code', 'normalized_chapter', 'normalized_verse', 'normalized_reference'],
 };
 
 export interface MorphologyUnicodeReadinessContract {
@@ -149,6 +169,11 @@ function buildD1ReadinessQueryContract(
     'idx_strongs_form_stats_rank',
     'idx_ubs_groups_source_order',
     'idx_ubs_segments_lookup',
+    'idx_ubs_semantic_identity_candidate',
+    'idx_ubs_semantic_sense_candidate_order',
+    'idx_ubs_semantic_sense_domain_order',
+    'idx_ubs_semantic_coordinate_lookup',
+    'idx_ubs_semantic_evidence_sense_order',
   ];
   const quotedIndexes = requiredIndexes.map(name => `'${name}'`).join(',');
   const indexCheck = `(SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name IN (${quotedIndexes})) = ${requiredIndexes.length}`;
@@ -210,6 +235,35 @@ function buildD1ReadinessQueryContract(
     { id: 'ubs.member_values', predicate: `(SELECT COUNT(*) FROM ubs_parallel_members WHERE source_reference != trim(source_reference) OR length(source_reference) <= 4 OR source_reference NOT GLOB '[A-Z0-9][A-Z0-9][A-Z0-9] *' OR normalized_reference = '' OR normalized_reference != trim(normalized_reference) OR alignment_raw = '' OR alignment_raw GLOB '*[^0-8]*' OR (language_marker = 'GRK' AND alignment_basis != 'UBSGNT5') OR (language_marker = 'HEB' AND alignment_basis NOT IN ('BHS','LXX'))) = 0` },
     { id: 'ubs.segment_values', predicate: `(SELECT COUNT(*) FROM ubs_parallel_segments WHERE book_number NOT BETWEEN 1 AND 66 OR chapter < 1 OR start_verse < 1 OR end_verse < start_verse) = 0` },
   ];
+  const semanticArtifact = UBS_SEMANTIC_STORAGE.artifact;
+  const semanticSourcePredicate = (source: typeof UBS_SEMANTIC_STORAGE.sources[number]) => [
+    `artifact_identity = ${sqlLiteral(semanticArtifact.artifactIdentity)}`,
+    `source_id = ${sqlLiteral(source.sourceId)}`,
+    `source_role = ${sqlLiteral(source.sourceRole)}`,
+    `schema_version = ${sqlLiteral(source.schemaVersion)}`,
+    `transform_version = ${source.transformVersion}`,
+    `title = ${sqlLiteral(source.title)}`,
+    `artifact_name = ${sqlLiteral(source.artifactName)}`,
+    `artifact_version = ${sqlLiteral(source.artifactVersion)}`,
+    `language = 'Hebrew'`,
+    `source_url = ${sqlLiteral(source.sourceUrl)}`,
+    `source_commit = ${sqlLiteral(source.sourceCommit)}`,
+    `source_blob = ${sqlLiteral(source.sourceBlob)}`,
+    `source_sha256 = ${sqlLiteral(source.sourceSha256)}`,
+    `license = ${sqlLiteral(source.license)}`,
+    `license_url = ${sqlLiteral(source.licenseUrl)}`,
+    `publisher = ${sqlLiteral(source.publisher)}`,
+    `modified = 1`,
+    `modification_description = ${sqlLiteral(source.modificationDescription)}`,
+  ].join(' AND ');
+  const ubsHebrewSemanticChecks: D1ReadinessCheck[] = [
+    { id: 'ubs_hebrew_semantic.artifact_identity', predicate: `(SELECT artifact_identity FROM ubs_semantic_artifacts) = ${sqlLiteral(semanticArtifact.artifactIdentity)}` },
+    { id: 'ubs_hebrew_semantic.artifact_contract', predicate: `(SELECT COUNT(*) FROM ubs_semantic_artifacts WHERE artifact_identity = ${sqlLiteral(semanticArtifact.artifactIdentity)} AND schema_version = ${sqlLiteral(semanticArtifact.schemaVersion)} AND compiler_version = ${semanticArtifact.compilerVersion} AND transform_version = ${semanticArtifact.transformVersion} AND rights_notice_json = ${sqlLiteral(semanticArtifact.rightsNoticeJson)} AND provenance_notice_json = ${sqlLiteral(semanticArtifact.provenanceNoticeJson)} AND transformation_witness_json = ${sqlLiteral(semanticArtifact.transformationWitnessJson)}) = 1 AND (SELECT COUNT(*) FROM ubs_semantic_artifacts) = 1` },
+    { id: 'ubs_hebrew_semantic.source_contract', predicate: `(SELECT COUNT(*) FROM ubs_semantic_sources) = ${UBS_SEMANTIC_STORAGE.sources.length} AND ${UBS_SEMANTIC_STORAGE.sources.map(source => `(SELECT COUNT(*) FROM ubs_semantic_sources WHERE ${semanticSourcePredicate(source)}) = 1`).join(' AND ')}` },
+    { id: 'ubs_hebrew_semantic.normalized_coordinates', predicate: `(SELECT COUNT(*) FROM ubs_semantic_normalized_coordinates) = ${UBS_SEMANTIC_AUDIT.projection.normalizedCoordinateRows} AND (SELECT COUNT(*) FROM ubs_semantic_normalized_coordinates WHERE normalized_verse < 0 OR normalized_reference = '') = 0` },
+    { id: 'ubs_hebrew_semantic.coordinate_cardinality', predicate: `(SELECT COUNT(*) FROM (SELECT evidence_key FROM ubs_semantic_normalized_coordinates GROUP BY evidence_key HAVING COUNT(*) > 1)) = ${UBS_SEMANTIC_AUDIT.projection.sourceEvidenceWithAmbiguousNormalizedCoordinates}` },
+    { id: 'ubs_hebrew_semantic.relationships', predicate: `(SELECT COUNT(*) FROM ubs_semantic_reference_evidence e LEFT JOIN ubs_semantic_senses s ON s.artifact_identity = e.artifact_identity AND s.sense_id = e.sense_id WHERE s.sense_id IS NULL) = 0 AND (SELECT COUNT(*) FROM ubs_semantic_normalized_coordinates c LEFT JOIN ubs_semantic_reference_evidence e ON e.evidence_key = c.evidence_key AND e.artifact_identity = c.artifact_identity WHERE e.evidence_key IS NULL) = 0` },
+  ];
   if (UNICODE_CORRECTION.strongs.length !== 9 || UNICODE_CORRECTION.morphology.length !== 237
     || UNICODE_CORRECTION.contract.d1Cells !== 255) {
     throw new Error('Biblical-language Unicode correction readiness contract drift');
@@ -270,6 +324,7 @@ function buildD1ReadinessQueryContract(
     ...countChecks,
     { id: 'schema.required_indexes', predicate: indexCheck },
     ...ubsSemanticChecks,
+    ...ubsHebrewSemanticChecks,
     ...strongsSemanticChecks,
     ...morphologyUnicodeContract.checks.map((predicate, index): D1ReadinessCheck => ({
       id: ['unicode.morphology.expected_count', 'unicode.morphology.locators', 'unicode.morphology.values'][index]!,

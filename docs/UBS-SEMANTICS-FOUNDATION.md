@@ -77,6 +77,11 @@ current 2 MB row, 100 bound-parameter, and 100 KB statement limits plus
 TheologAI's 8 MiB seed-chunk limit. Cloudflare's limits were rechecked on
 2026-07-17 at <https://developers.cloudflare.com/d1/platform/limits/>.
 
+The deterministic exporter batches ordinary literal INSERTs at 16 KiB, below
+the 100 KB D1 limit: local Workerd rejects some otherwise-valid near-limit
+statements with `SQLITE_NOMEM`. Historical sections remain one-row INSERTs so
+their source-first compatibility evidence can retain its exact row ordinal.
+
 Capacity input must contain the complete named table, query-operation, and seed-
 file inventories without omissions or duplicates. Seed inventory comes from a
 generated-style manifest and supports contiguous numbered chunks per table,

@@ -49,7 +49,7 @@ const TAHOT_CC_BY_40_URL = 'https://creativecommons.org/licenses/by/4.0/' as con
 const USFMTC_REPOSITORY = 'https://github.com/usfm-bible/usfmtc' as const;
 const USFMTC_MIT_LICENSE_URL =
   'https://github.com/usfm-bible/usfmtc/blob/a222dd3e78360f8e275ca56f4307af7e02b2430a/LICENSE' as const;
-const DERIVED_MODIFICATION_SUMMARY =
+export const UBS_PINNED_SEMANTIC_MODIFICATION_SUMMARY =
   'Deterministic migration-free normalization: canonical source IDs, NFC text, safe definitions, retained POS arrays, domain links, and coordinate-only native-to-normalized bridge references.' as const;
 
 export interface PinnedUbsSemanticSource {
@@ -78,7 +78,7 @@ export interface PinnedUbsSemanticArtifact {
     readonly schemaVersion: typeof UBS_PINNED_SEMANTIC_RIGHTS_NOTICE_SCHEMA;
     readonly scope: 'derived_semantic_layer_and_coordinate_bridge_only_not_theologai_code_or_unrelated_data';
     readonly derivedLayerLicense: { readonly name: 'CC BY-SA 4.0'; readonly url: typeof UBS_CC_BY_SA_40_URL };
-    readonly modificationSummary: typeof DERIVED_MODIFICATION_SUMMARY;
+    readonly modificationSummary: typeof UBS_PINNED_SEMANTIC_MODIFICATION_SUMMARY;
     readonly warrantyAndDisclaimer: {
       readonly statement: 'CC_BY_SA_4_0_is_offered_as_is_without_warranties_to_the_extent_provided_in_legal_code_section_5';
       readonly legalCodeSection5Url: typeof UBS_CC_BY_SA_40_LEGALCODE_SECTION_5_URL;
@@ -168,6 +168,49 @@ export interface PinnedUbsSemanticArtifact {
   readonly artifactIdentity: string;
 }
 
+/**
+ * The fixed DB fields that can be recovered from the pinned audit without
+ * decoding the two source artifacts. Seed and remote-readiness guards use it
+ * to reject provenance JSON that is merely well-formed but no longer true.
+ */
+export function createPinnedUbsSemanticStorageContract(input: {
+  readonly artifactIdentity: string;
+  readonly coordinateBridgeIdentity: string;
+  readonly coordinateBridgeSha256: string;
+  readonly coordinateAuditSha256: string;
+  readonly tahotPins: readonly { readonly id: string; readonly sha256: string; readonly gitBlobSha1: string }[];
+  readonly usfmtc: {
+    readonly commit: string;
+    readonly referenceBlob: string;
+    readonly referenceSha256: string;
+    readonly licenseBlob: string;
+    readonly licenseSha256: string;
+  };
+}): Pick<PinnedUbsSemanticArtifact,
+  'artifactIdentity' | 'sources' | 'rightsNotice' | 'provenanceNotice' | 'transformationWitness'> {
+  const sources: readonly PinnedUbsSemanticSource[] = [
+    sourceFromPin(UBS_HEBREW_V092_ARTIFACTS[0], 'ubs-hebrew-dictionary-en-v0.9.2', 'dictionary', 'UBSHebrewDic-v0.9.2-en.JSON'),
+    sourceFromPin(UBS_HEBREW_V092_ARTIFACTS[1], 'ubs-hebrew-lexical-domains-en-v0.9.2', 'lexical_domains', 'UBSHebrewDicLexicalDomains-v0.9.2-en.JSON'),
+  ];
+  return {
+    artifactIdentity: input.artifactIdentity,
+    sources,
+    rightsNotice: createRightsNotice(),
+    provenanceNotice: createProvenanceNotice(sources),
+    transformationWitness: {
+      coordinateBridgeIdentity: input.coordinateBridgeIdentity,
+      coordinateBridgeSha256: input.coordinateBridgeSha256,
+      coordinateAudit: {
+        schemaVersion: 'theologai-ubs-tahot-coordinate-audit.v1',
+        sha256: input.coordinateAuditSha256,
+      },
+      tahot: input.tahotPins,
+      usfmtc: input.usfmtc,
+      limitation: 'coordinate_bridge_only_not_token_alignment_or_contextual_sense_adjudication',
+    },
+  };
+}
+
 export interface PinnedUbsSemanticCompilationAudit {
   readonly schemaVersion: 'theologai-ubs-hebrew-semantic-compilation-audit.v1';
   readonly compilerVersion: typeof UBS_PINNED_SEMANTIC_COMPILER_VERSION;
@@ -219,6 +262,26 @@ export function compilePinnedUbsHebrewV092(root: string): {
   const dictionary = readFileSync(join(root, UBS_HEBREW_V092_ARTIFACTS[0].trackedPath));
   const domains = readFileSync(join(root, UBS_HEBREW_V092_ARTIFACTS[1].trackedPath));
   const bridgeBytes = readFileSync(join(root, UBS_PINNED_SEMANTIC_BRIDGE_PATH));
+  return compilePinnedUbsHebrewV092FromBytes({ dictionary, domains, bridgeBytes });
+}
+
+/**
+ * Compile strictly supplied, already-verified source bytes.  Materializers use
+ * this form so every input is consumed through D1SourceConsumptionRegistry;
+ * the disk-reading convenience wrapper above is reserved for audit tooling.
+ */
+export function compilePinnedUbsHebrewV092FromBytes(input: {
+  dictionary: Uint8Array;
+  domains: Uint8Array;
+  bridgeBytes: Uint8Array;
+}): {
+  artifact: PinnedUbsSemanticArtifact;
+  canonicalArtifactSha256: string;
+  canonicalArtifactByteLength: number;
+  audit: PinnedUbsSemanticCompilationAudit;
+  canonicalAudit: string;
+} {
+  const { dictionary, domains, bridgeBytes } = input;
   const bridge = parseUbsTahotNativeToNormalizedBridge(bridgeBytes);
   const resolveNormalizedCoordinates = createUbsTahotNormalizedCoordinateResolver(bridge);
   const projection = decodePinnedUbsHebrewV092(dictionary, domains,
@@ -346,7 +409,7 @@ function sourceFromPin(
     sourceCommit, sourceBlob: pin.gitBlobSha1, sourceSha256: pin.sha256,
     license: 'CC BY-SA 4.0', licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/',
     publisher: 'United Bible Societies', modified: true,
-    modificationDescription: DERIVED_MODIFICATION_SUMMARY,
+    modificationDescription: UBS_PINNED_SEMANTIC_MODIFICATION_SUMMARY,
   };
 }
 
@@ -355,7 +418,7 @@ function createRightsNotice(): PinnedUbsSemanticArtifact['rightsNotice'] {
     schemaVersion: UBS_PINNED_SEMANTIC_RIGHTS_NOTICE_SCHEMA,
     scope: 'derived_semantic_layer_and_coordinate_bridge_only_not_theologai_code_or_unrelated_data',
     derivedLayerLicense: { name: 'CC BY-SA 4.0', url: UBS_CC_BY_SA_40_URL },
-    modificationSummary: DERIVED_MODIFICATION_SUMMARY,
+    modificationSummary: UBS_PINNED_SEMANTIC_MODIFICATION_SUMMARY,
     warrantyAndDisclaimer: {
       statement: 'CC_BY_SA_4_0_is_offered_as_is_without_warranties_to_the_extent_provided_in_legal_code_section_5',
       legalCodeSection5Url: UBS_CC_BY_SA_40_LEGALCODE_SECTION_5_URL,
@@ -597,7 +660,7 @@ function assertEmbeddedRightsAndProvenanceNotice(artifact: PinnedUbsSemanticArti
     || rights.scope !== 'derived_semantic_layer_and_coordinate_bridge_only_not_theologai_code_or_unrelated_data'
     || rights.derivedLayerLicense.name !== 'CC BY-SA 4.0'
     || rights.derivedLayerLicense.url !== UBS_CC_BY_SA_40_URL
-    || rights.modificationSummary !== DERIVED_MODIFICATION_SUMMARY
+    || rights.modificationSummary !== UBS_PINNED_SEMANTIC_MODIFICATION_SUMMARY
     || rights.warrantyAndDisclaimer.statement !== 'CC_BY_SA_4_0_is_offered_as_is_without_warranties_to_the_extent_provided_in_legal_code_section_5'
     || rights.warrantyAndDisclaimer.legalCodeSection5Url !== UBS_CC_BY_SA_40_LEGALCODE_SECTION_5_URL
     || rights.externalNoticeReference !== UBS_PINNED_SEMANTIC_DERIVED_NOTICE_PATH) {

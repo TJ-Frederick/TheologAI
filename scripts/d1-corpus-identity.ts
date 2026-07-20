@@ -57,6 +57,15 @@ export const D1_EXPECTED_TABLES = Object.freeze([
   'ubs_parallel_members',
   'ubs_parallel_segments',
   'ubs_parallel_sources',
+  'ubs_semantic_artifacts',
+  'ubs_semantic_domains',
+  'ubs_semantic_entries',
+  'ubs_semantic_entry_identities',
+  'ubs_semantic_normalized_coordinates',
+  'ubs_semantic_reference_evidence',
+  'ubs_semantic_sense_domains',
+  'ubs_semantic_senses',
+  'ubs_semantic_sources',
 ] as const);
 
 export function parseDataManifest(bytes: Buffer | string): DataManifest {

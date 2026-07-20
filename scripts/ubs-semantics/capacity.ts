@@ -6,6 +6,7 @@ export const D1_MAX_ROW_BYTES = 2_000_000;
 export const D1_MAX_BOUND_PARAMETERS = 100;
 
 export const UBS_SEMANTIC_TABLE_INVENTORY = Object.freeze([
+  'ubs_semantic_artifacts',
   'ubs_semantic_sources',
   'ubs_semantic_domains',
   'ubs_semantic_entries',
@@ -13,21 +14,18 @@ export const UBS_SEMANTIC_TABLE_INVENTORY = Object.freeze([
   'ubs_semantic_senses',
   'ubs_semantic_sense_domains',
   'ubs_semantic_reference_evidence',
+  'ubs_semantic_normalized_coordinates',
 ] as const);
 
 export const UBS_SEMANTIC_OPERATION_INVENTORY = Object.freeze([
-  'getSource',
-  'getEntry',
-  'getEntriesByLexicalIdentity',
-  'getSense',
-  'getSensesForEntry',
-  'getDomain',
-  'getDomainsForSense',
-  'getReferenceEvidenceForSense',
-  'findReferenceEvidence',
+  'aggregate_metadata_and_boundary',
+  'aggregate_candidates',
+  'aggregate_domains',
+  'aggregate_references',
+  'aggregate_sources',
 ] as const);
 
-export const UBS_SEMANTIC_SEED_MANIFEST_SCHEMA = 'theologai-ubs-semantics-seed.synthetic-v1' as const;
+export const UBS_SEMANTIC_SEED_MANIFEST_SCHEMA = 'theologai-ubs-semantics-seed.v1' as const;
 
 export interface UbsSemanticSeedManifestFile {
   table: typeof UBS_SEMANTIC_TABLE_INVENTORY[number];
@@ -122,7 +120,7 @@ export function assessUbsSemanticCapacity(input: UbsSemanticCapacityInput): UbsS
 
 function validateSeedManifest(manifest: UbsSemanticSeedManifest): UbsSemanticSeedManifestFile[] {
   if (manifest.schemaVersion !== UBS_SEMANTIC_SEED_MANIFEST_SCHEMA || manifest.generated !== true) {
-    throw new Error('UBS semantic seed manifest must be the generated synthetic-v1 schema');
+    throw new Error('UBS semantic seed manifest must use the generated transform-7 schema');
   }
   if (!Array.isArray(manifest.files) || manifest.files.length === 0) throw new Error('seed file inventory must not be empty');
   const names = manifest.files.map(file => file.name);

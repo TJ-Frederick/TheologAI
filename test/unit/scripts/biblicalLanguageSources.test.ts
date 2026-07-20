@@ -35,7 +35,8 @@ function unicodeCorrectionFixture(): {
   return {
     ledger,
     comparedPaths: [
-      ...manifest.materializations.d1.inputs.filter(path => path.startsWith('data/biblical-languages/')),
+      ...manifest.materializations.d1.inputs.filter(path => path.startsWith('data/biblical-languages/')
+        && !path.startsWith('data/biblical-languages/ubs-open-license/')),
       'data/biblical-languages/stepbible/index.json',
     ].sort(),
   };
@@ -208,12 +209,16 @@ describe('biblical-language source revisions', () => {
     expect(() => assertPinnedSourceBytes(file, changed)).toThrow('Pinned source drift');
   });
 
-  it('pins the transform-6 catalog-scope D1 materialization identity', () => {
+  it('pins the transform-7 local semantic D1 materialization identity', () => {
     const manifest = parseDataManifest(readFileSync('data/data-manifest.json'));
     const d1Identity = computeD1CorpusIdentity(manifest);
-    expect(d1Identity).toBe('c334b4b91c3a7c334a9425937c7f99473f27014ddae6cea377ee38bd578a6707');
-    expect(sourceLockProjection().derived_artifacts.d1_materialization_identity).toBe(d1Identity);
-    expect(manifest.materializations.d1.transformVersion).toBe(6);
+    expect(d1Identity).toBe('bae47e93c80c54e0223c5bd3a2f56f6be7057b1aa563343abf2523b117cf7f39');
+    // This lock documents the earlier language-source reproduction transform.
+    // The new semantic corpus has its own checked manifest and must not be
+    // retroactively folded into that historical reproduction identity.
+    expect(sourceLockProjection().derived_artifacts.d1_materialization_identity)
+      .toBe('c334b4b91c3a7c334a9425937c7f99473f27014ddae6cea377ee38bd578a6707');
+    expect(manifest.materializations.d1.transformVersion).toBe(7);
     for (const provenanceOnly of [
       'data/biblical-languages/SOURCE.json',
       'data/biblical-languages/UNICODE-CORRECTION.json',

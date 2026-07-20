@@ -46,6 +46,10 @@ import {
   parseHistoricalDocumentCatalog,
   parseHistoricalDocumentCatalogProvenance,
 } from './historical-document-catalog.js';
+import {
+  compileUbsSemanticMaterialization,
+  insertUbsSemanticMaterialization,
+} from './ubs-semantics/materialization.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -513,6 +517,15 @@ const ubsTx = db.transaction(() => {
 });
 const ubsCounts = ubsTx();
 log(`  Inserted ${ubsCounts.groups} UBS groups, ${ubsCounts.members} members, and ${ubsCounts.segments} segments`);
+
+// ── Tier 3: UBS Hebrew semantic evidence (inactive repository-only data) ──
+
+log('Loading UBS Hebrew semantic evidence...');
+const ubsSemanticMaterialization = compileUbsSemanticMaterialization(sourceRegistry);
+const ubsSemanticCounts = insertUbsSemanticMaterialization(db, ubsSemanticMaterialization.artifact);
+log(`  Inserted ${ubsSemanticCounts.ubs_semantic_entries} UBS semantic entries, `
+  + `${ubsSemanticCounts.ubs_semantic_senses} senses, and `
+  + `${ubsSemanticCounts.ubs_semantic_reference_evidence} reference-evidence rows`);
 sourceRegistry.assertAllConsumed();
 
 // ── Validate and finalize ──

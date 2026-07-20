@@ -15,7 +15,6 @@ const activeIdentityPins = {
   'src/mcp/schemas/originalLanguageStudy.ts': 'a98e5966d8a2a850487b4882c49f04c48fc697eee308f6e89c67e06af50fefac',
   'src/presenters/originalLanguageStudyStructured.ts': '49818eb62e89980498669442a4bfc1886944d7751fc675940b17368a030995d9',
   'src/formatters/originalLanguageStudyFormatter.ts': '30a10bf826c6c3174f2e0fb00907f6104735b165fdbfd5915a0ff22bc09b2536',
-  'data/data-manifest.json': 'ba4f6fc73086716bd03f8e8d65a181719fba834aa61a90e65b168169744fa424',
   'wrangler.toml': '50dd24d0963893b5c8b17ec61d4ebe7c98eeb7f7692a988684bde09835017e4f',
   'worker-configuration.d.ts': 'e316f64679951b32417f0c85b02fc92e61dae25d879d28921df15caf8706fe55',
   'test/fixtures/ubs-semantics/structured-output-contract.draft.json': 'c5c11254fc84e1ac75200b5b93cb967dfe17e99150e88525cb95d6f58d05c8f2',
@@ -38,14 +37,14 @@ describe('inactive UBS semantic resolution seam', () => {
     }
   });
 
-  it('pins active bundle inputs, inventory roots, config, and data identity to the reviewed stack base', () => {
+  it('pins active bundle roots and configuration to the reviewed stack base', () => {
     for (const [path, expected] of Object.entries(activeIdentityPins)) {
       const actual = createHash('sha256').update(readFileSync(new URL(path, repo))).digest('hex');
       expect(actual, path).toBe(expected);
     }
   });
 
-  it('does not add executable migration, source artifact, or active transform identity', () => {
+  it('keeps semantic resolution uncomposed while transform 7 remains local data only', () => {
     const service = readFileSync(new URL('src/services/languages/HebrewSemanticEvidenceService.ts', repo), 'utf8');
     expect(service).not.toMatch(/from ['"][^'"]*(?:data\/|migrations\/|adapters\/d1|adapters\/data)/);
     const manifest = JSON.parse(readFileSync(new URL('data/data-manifest.json', repo), 'utf8')) as {
@@ -53,8 +52,8 @@ describe('inactive UBS semantic resolution seam', () => {
       materializations: { d1: { transformVersion: number } };
     };
     expect(manifest).toMatchObject({
-      schemaVersion: '0003_original_language_usage',
-      materializations: { d1: { transformVersion: 6 } },
+      schemaVersion: '0004_ubs_hebrew_semantics',
+      materializations: { d1: { transformVersion: 7 } },
     });
   });
 });

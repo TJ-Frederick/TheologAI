@@ -37,18 +37,18 @@ function input(): UbsSemanticCapacityInput {
 }
 
 describe('UBS semantic D1 capacity gate', () => {
-  it('covers every direct read, listing, and reference-match repository operation', () => {
+  it('covers each statement in the fixed aggregate repository operation', () => {
     expect(UBS_SEMANTIC_OPERATION_INVENTORY).toEqual([
-      'getSource', 'getEntry', 'getEntriesByLexicalIdentity', 'getSense', 'getSensesForEntry',
-      'getDomain', 'getDomainsForSense', 'getReferenceEvidenceForSense', 'findReferenceEvidence',
+      'aggregate_metadata_and_boundary', 'aggregate_candidates', 'aggregate_domains',
+      'aggregate_references', 'aggregate_sources',
     ]);
   });
 
   it('deterministically estimates sampled inputs below the planned ceiling', () => {
     const report = assertUbsSemanticCapacity(input());
     expect(report.projectionKind).toBe('sampled_projection');
-    expect(report.estimatedSemanticLayerBytes).toBe(15_001_000);
-    expect(report.projectedDatabaseBytes).toBe(172_287_400);
+    expect(report.estimatedSemanticLayerBytes).toBe(15_001_400);
+    expect(report.projectedDatabaseBytes).toBe(172_287_800);
     expect(report.largestQueryStatementBytes).toBe(200);
     expect(report.largestSeedStatementBytes).toBe(200);
     expect(report.withinPlannedDatabaseCeiling).toBe(true);

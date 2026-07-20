@@ -7,8 +7,7 @@ import {
   finalizeBiblicalLanguageUnicodeManifest,
 } from '../../../scripts/finalize-biblical-language-unicode-manifest.js';
 
-const TRANSFORM_5_IDENTITY = '93ae4ca3c09493cf02a6b48154c991c133fd6ce235119fc4b8cba0256a36f881';
-const TRANSFORM_6_IDENTITY = 'c334b4b91c3a7c334a9425937c7f99473f27014ddae6cea377ee38bd578a6707';
+const TRANSFORM_7_IDENTITY = 'bae47e93c80c54e0223c5bd3a2f56f6be7057b1aa563343abf2523b117cf7f39';
 const CATALOG_INPUTS = [
   'data/historical-document-catalog-provenance.json',
   'data/historical-document-catalog.json',
@@ -25,34 +24,30 @@ function currentInputs(): { manifest: DataManifest; ledger: BiblicalLanguageUnic
 }
 
 describe('biblical-language Unicode manifest finalizer', () => {
-  it('is read-only-idempotent for the checked-in transform-6 catalog manifest', () => {
+  it('is read-only-idempotent for the checked-in transform-7 local semantic manifest', () => {
     const before = readFileSync('data/data-manifest.json', 'utf8');
     const result = finalizeBiblicalLanguageUnicodeManifest(process.cwd(), false);
 
     expect(result).toMatchObject({
-      identity: TRANSFORM_6_IDENTITY,
-      transformVersion: 6,
+      identity: TRANSFORM_7_IDENTITY,
+      transformVersion: 7,
       changedPaths: [],
     });
     expect(`${JSON.stringify(result.manifest, null, 2)}\n`).toBe(before);
     expect(readFileSync('data/data-manifest.json', 'utf8')).toBe(before);
   });
 
-  it('continues to validate the transform-5 usage foundation', () => {
+  it('does not downgrade the approved transform-7 materialization', () => {
     const { manifest, ledger } = currentInputs();
-    manifest.materializations.d1.transformVersion = 5;
-    manifest.materializations.d1.inputs = manifest.materializations.d1.inputs
-      .filter(path => !CATALOG_INPUTS.includes(path));
-
     const result = buildFinalizedBiblicalLanguageUnicodeManifest(process.cwd(), manifest, ledger);
     expect(result).toMatchObject({
-      identity: TRANSFORM_5_IDENTITY,
-      transformVersion: 5,
+      identity: TRANSFORM_7_IDENTITY,
+      transformVersion: 7,
       changedPaths: [],
     });
   });
 
-  it.each(CATALOG_INPUTS)('rejects transform 6 without required catalog input %s', path => {
+  it.each(CATALOG_INPUTS)('rejects transform 7 without required catalog input %s', path => {
     const { manifest, ledger } = currentInputs();
     manifest.materializations.d1.inputs = manifest.materializations.d1.inputs
       .filter(input => input !== path);
@@ -61,12 +56,12 @@ describe('biblical-language Unicode manifest finalizer', () => {
       .toThrow(`Transform 6 must retain historical catalog D1 input: ${path}`);
   });
 
-  it('rejects unreviewed downstream transform versions rather than downgrading them', () => {
+  it('rejects an unreviewed downstream transform rather than downgrading it', () => {
     const { manifest, ledger } = currentInputs();
-    manifest.materializations.d1.transformVersion = 7;
+    manifest.materializations.d1.transformVersion = 8;
 
     expect(() => buildFinalizedBiblicalLanguageUnicodeManifest(process.cwd(), manifest, ledger))
       .toThrow('Unexpected pre-correction D1 transform version');
-    expect(manifest.materializations.d1.transformVersion).toBe(7);
+    expect(manifest.materializations.d1.transformVersion).toBe(8);
   });
 });
