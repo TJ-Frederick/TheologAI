@@ -1,0 +1,109 @@
+{
+  "schemaVersion": "augustine-pusey-strict-normalization-report.v1",
+  "status": "inactive_local_preparation",
+  "sourceArtifacts": [
+    {
+      "role": "utf8_text",
+      "sourceUrl": "https://www.gutenberg.org/cache/epub/3296/pg3296.txt",
+      "localPath": "data/historical-sources/project-gutenberg/pg3296/pg3296.txt",
+      "bytes": 632167,
+      "sha256": "5a036498dc7c546a98b9e7a31952e030ca74db7dd111b30029354efe12bcd691"
+    },
+    {
+      "role": "rdf_metadata",
+      "sourceUrl": "https://www.gutenberg.org/ebooks/3296.rdf",
+      "localPath": "data/historical-sources/project-gutenberg/pg3296/pg3296.rdf",
+      "bytes": 20797,
+      "sha256": "ff7a0b21049a9db1c398f563f68c95383e75e83d8de84366f90b634114647c16"
+    },
+    {
+      "role": "project_gutenberg_license_reference",
+      "sourceUrl": "https://www.gutenberg.org/policy/license.html",
+      "localPath": "data/historical-sources/project-gutenberg/shared/license.html",
+      "bytes": 32318,
+      "sha256": "3df0bb72fa6820227533369d85ccdfbfae8290a402dc553c6a969f52d7fbf6c9"
+    }
+  ],
+  "provenance": {
+    "acquisition": {
+      "value": "2026-07-18",
+      "precision": "day",
+      "noInventedTime": true
+    },
+    "electronicTranscription": {
+      "releaseDate": "2002-06-01",
+      "updatedDate": "2023-05-05",
+      "untypedSourceColophonCredit": "Robert S. Munday; copied from the Project Gutenberg source Credits line with no contributor role asserted.",
+      "status": "verified_with_uncertainty"
+    }
+  },
+  "rights": {
+    "status": "public_domain_in_usa",
+    "nonUsCaveat": "Users outside the United States must check local law before use or redistribution.",
+    "projectGutenbergPolicyReference": {
+      "localPath": "data/historical-sources/project-gutenberg/shared/license.html",
+      "sourceUrl": "https://www.gutenberg.org/policy/license.html",
+      "separateFromDeliveredBody": true
+    }
+  },
+  "normalization": {
+    "decoder": "strict_utf8_fatal",
+    "lineEndingTransformation": "crlf_to_lf",
+    "wrapperTransformation": "gutenberg_start_end_markers_and_adjacent_blank_lines_excluded",
+    "modernization": "none",
+    "contentSha256": "0bf36ef838426ea44987c157160e18fec43b00fba2e87eec90c3797a1eaa9730",
+    "sectionKeys": [
+      "front-matter",
+      "book-1",
+      "book-2",
+      "book-3",
+      "book-4",
+      "book-5",
+      "book-6",
+      "book-7",
+      "book-8",
+      "book-9",
+      "book-10",
+      "book-11",
+      "book-12",
+      "book-13"
+    ],
+    "sectionContentUtf8Bytes": [
+      130,
+      37766,
+      20515,
+      30026,
+      37225,
+      36624,
+      42815,
+      45433,
+      43781,
+      47960,
+      86537,
+      49752,
+      55964,
+      68433
+    ],
+    "totalContentUtf8Bytes": 602961,
+    "maxSectionUtf8Bytes": 86537
+  },
+  "package": {
+    "path": "data/historical-sources/project-gutenberg/pg3296/augustine-pusey.strict-edition-package.json",
+    "schemaVersion": "edition-provenance-foundation.v1",
+    "sectionCount": 14,
+    "compiledPackageUtf8Bytes": 617899,
+    "compiledPackageSha256": "bd0fb78a6a1c004b634f2924292b25894f9ec0525981a7372eeeb0167655212b"
+  },
+  "deterministic": {
+    "secondCompileSha256": "bd0fb78a6a1c004b634f2924292b25894f9ec0525981a7372eeeb0167655212b",
+    "byteIdentical": true
+  },
+  "inertness": {
+    "migration": false,
+    "transform": false,
+    "databaseOrD1Seed": false,
+    "runtimeOrMcpRegistration": false,
+    "manifestOrCatalog": false,
+    "deploymentOrWorkflow": false
+  }
+}

@@ -63,6 +63,11 @@ export interface ImmutableSourceArtifact {
   };
   sha256: string;
   bytes: number;
+  /**
+   * Canonical UTC instant when the acquisition record establishes a time, or a
+   * canonical calendar date when it establishes only a day.  A consumer must
+   * not manufacture a clock time merely to satisfy this field.
+   */
   acquiredAt: string;
 }
 
@@ -370,7 +375,7 @@ function validateSource(input: unknown): ImmutableSourceArtifact {
     pin: { kind, value: pinValue },
     sha256,
     bytes: integerAt(record.bytes, `${path}.bytes`, 1, EDITION_PROVENANCE_LIMITS.sourceArtifactBytes),
-    acquiredAt: instantAt(record.acquiredAt, `${path}.acquiredAt`),
+    acquiredAt: acquisitionRecordAt(record.acquiredAt, `${path}.acquiredAt`),
   };
 }
 
@@ -547,7 +552,11 @@ function validateProvenance(input: unknown): EditionProvenanceReview {
 
 function validateSection(input: unknown, path: string): FrozenEditionSection {
   const record = objectAt(input, path, ['sourceOrdinal', 'sectionKey', 'displayLabel', 'heading', 'content']);
-  const content = safeTextAt(record.content, `${path}.content`, Number.MAX_SAFE_INTEGER, true, true);
+  // A frozen source boundary may faithfully end one section with blank LF-only
+  // separation before the next source heading.  Preserve that evidence rather
+  // than silently trimming or relocating it, while continuing to reject tabs,
+  // spaces, and CR at either boundary.
+  const content = safeTextAt(record.content, `${path}.content`, Number.MAX_SAFE_INTEGER, true, true, true);
   if (utf8Length(content) > EDITION_PROVENANCE_LIMITS.sectionUtf8Bytes) {
     fail(`${path}.content`, `exceeds ${EDITION_PROVENANCE_LIMITS.sectionUtf8Bytes} UTF-8 bytes`);
   }
@@ -568,7 +577,7 @@ function validateSection(input: unknown, path: string): FrozenEditionSection {
  * inactive; active formatters are intentionally unchanged.
  */
 export function escapeEditionPlainTextForMarkdown(content: string): string {
-  const value = safeTextAt(content, '$.content', Number.MAX_SAFE_INTEGER, true, true);
+  const value = safeTextAt(content, '$.content', Number.MAX_SAFE_INTEGER, true, true, true);
   return value.replace(/[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/g, '\\$&');
 }
 
@@ -664,12 +673,18 @@ function safeTextAt(
   maxCharacters: number,
   allowLineBreaks = false,
   allowPlainTextSyntax = false,
+  allowBoundaryLineFeeds = false,
 ): string {
   const raw = stringAt(input, path);
   if (hasLoneSurrogate(raw)) fail(path, 'contains a lone UTF-16 surrogate');
   const value = raw.normalize('NFC');
-  if (!value || value !== value.trim() || [...value].length > maxCharacters) {
+  if (allowLineBreaks && value.includes('\r')) fail(path, 'contains a carriage return; corpus text must use line feeds');
+  const boundaryTrimmed = allowBoundaryLineFeeds ? value.replace(/^\n+|\n+$/g, '') : value;
+  if (!value || !boundaryTrimmed || boundaryTrimmed !== boundaryTrimmed.trim() || [...value].length > maxCharacters) {
     fail(path, `must be non-empty, trimmed, and at most ${maxCharacters} Unicode characters`);
+  }
+  if (allowBoundaryLineFeeds && !allowLineBreaks) {
+    fail(path, 'cannot allow boundary line feeds when line breaks are forbidden');
   }
   const forbiddenControls = allowLineBreaks
     ? /[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069\ufeff]/u
@@ -796,6 +811,25 @@ function instantAt(input: unknown, path: string): string {
     fail(path, 'must be a canonical UTC instant with whole seconds');
   }
   return value;
+}
+
+/**
+ * Source collections do not always retain a time of acquisition.  Preserve
+ * the strongest truthful precision: a full canonical UTC instant where known,
+ * otherwise a canonical ISO calendar date.  This is intentionally stricter
+ * than accepting arbitrary ISO-like strings or timezone offsets.
+ */
+function acquisitionRecordAt(input: unknown, path: string): string {
+  const value = stringAt(input, path);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return dateAt(value, path);
+  try {
+    return instantAt(value, path);
+  } catch (error) {
+    if (error instanceof EditionProvenanceValidationError) {
+      fail(path, 'must be a canonical UTC instant with whole seconds or a canonical ISO calendar date when no time is established');
+    }
+    throw error;
+  }
 }
 
 function canonicalStringify(value: unknown): string {
