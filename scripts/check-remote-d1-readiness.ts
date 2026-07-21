@@ -10,11 +10,16 @@ import { computeD1CorpusIdentity, parseDataManifest, verifyD1Migrations } from '
 import { UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY, UBS_PARALLEL_PASSAGE_PROVENANCE } from '../src/kernel/ubsParallelSource.js';
 import { CANONICAL_BOOK_ORDER_SQL } from '../src/adapters/shared/repositoryUtils.js';
 import { CLASSIC_TEXT_LIMITS } from '../src/kernel/classicTextContract.js';
+import { BIBLE_BOOKS, getBibleBookBounds } from '../src/kernel/books.js';
 import type {
   BiblicalLanguageUnicodeCorrectionLedger,
   MorphologyUnicodeCorrection,
 } from './biblical-language-unicode-correction.js';
 import { parseHistoricalDocumentCatalog } from './historical-document-catalog.js';
+import {
+  createUbsSemanticStorageContract,
+  type UbsSemanticStorageAudit,
+} from './ubs-semantics/storageContract.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const manifestBytes = readFileSync(join(ROOT, 'data', 'data-manifest.json'));
@@ -29,6 +34,13 @@ const HISTORICAL_CATALOG = parseHistoricalDocumentCatalog(JSON.parse(readFileSyn
   join(ROOT, 'data/historical-document-catalog.json'),
   'utf8',
 )));
+const UBS_SEMANTIC_AUDIT = JSON.parse(readFileSync(
+  join(ROOT, 'data/biblical-languages/ubs-open-license/v0.9.2/SEMANTIC-COMPILATION-AUDIT.json'),
+  'utf8',
+)) as UbsSemanticStorageAudit & {
+  projection: { normalizedCoordinateRows: number; sourceEvidenceWithAmbiguousNormalizedCoordinates: number };
+};
+const UBS_SEMANTIC_STORAGE = createUbsSemanticStorageContract(UBS_SEMANTIC_AUDIT);
 
 export const REQUIRED_COLUMNS: Readonly<Record<string, readonly string[]>> = {
   theologai_metadata: ['key', 'value'],
@@ -48,6 +60,15 @@ export const REQUIRED_COLUMNS: Readonly<Record<string, readonly string[]>> = {
   ubs_parallel_groups: ['group_id', 'source_id', 'source_ordinal', 'label', 'directionality'],
   ubs_parallel_members: ['group_id', 'source_order', 'source_reference', 'normalized_reference', 'language_marker', 'alignment_basis', 'alignment_raw'],
   ubs_parallel_segments: ['group_id', 'member_order', 'segment_order', 'book_number', 'chapter', 'start_verse', 'end_verse'],
+  ubs_semantic_artifacts: ['artifact_identity', 'schema_version', 'compiler_version', 'transform_version', 'rights_notice_json', 'provenance_notice_json', 'transformation_witness_json'],
+  ubs_semantic_sources: ['artifact_identity', 'source_id', 'source_role', 'schema_version', 'transform_version', 'title', 'artifact_name', 'artifact_version', 'language', 'source_url', 'source_commit', 'source_blob', 'source_sha256', 'license', 'license_url', 'publisher', 'modified', 'modification_description'],
+  ubs_semantic_domains: ['artifact_identity', 'source_id', 'domain_id', 'source_ordinal', 'parent_domain_id', 'label', 'description'],
+  ubs_semantic_entries: ['artifact_identity', 'source_id', 'entry_id', 'source_entry_id', 'source_ordinal', 'lemma', 'part_of_speech_json'],
+  ubs_semantic_entry_identities: ['artifact_identity', 'entry_id', 'lexical_identity'],
+  ubs_semantic_senses: ['artifact_identity', 'source_id', 'sense_id', 'source_sense_id', 'entry_id', 'source_ordinal', 'definition_status', 'definition', 'definition_exclusion_reasons_json', 'glosses_json'],
+  ubs_semantic_sense_domains: ['artifact_identity', 'sense_id', 'domain_id', 'domain_ordinal'],
+  ubs_semantic_reference_evidence: ['evidence_key', 'artifact_identity', 'source_id', 'evidence_id', 'sense_id', 'source_ordinal', 'source_reference', 'raw_anchor', 'footnote_suffix', 'native_book_number', 'native_book_code', 'native_chapter', 'native_verse'],
+  ubs_semantic_normalized_coordinates: ['coordinate_key', 'evidence_key', 'target_ordinal', 'normalized_book_number', 'normalized_book_code', 'normalized_chapter', 'normalized_verse', 'normalized_reference'],
 };
 
 export interface MorphologyUnicodeReadinessContract {
@@ -85,6 +106,61 @@ type ReadinessCommandExecutor = (
 
 function sqlLiteral(value: string): string {
   return `'${value.replaceAll("'", "''")}'`;
+}
+
+/**
+ * Read-only assertions shared by remote D1 and local Workerd seed gates.
+ * The stored display reference is the exact string later used by the inactive
+ * aggregate lookup, so it must remain a deterministic projection of the
+ * normalized coordinate rather than merely non-empty text. The globally unique
+ * evidence key is the child-to-parent lineage boundary: evidence IDs are read
+ * only from the parent row and cannot drift in a duplicated child column.
+ */
+export function buildUbsSemanticStoredIntegrityPredicates(): readonly string[] {
+  const canonicalCase = (column: 'name' | 'helloaoCode') => `CASE c.normalized_book_number\n${BIBLE_BOOKS
+    .map(book => `WHEN ${book.number} THEN ${sqlLiteral(book[column])}`).join('\n')}\nEND`;
+  const canonicalName = canonicalCase('name');
+  const canonicalCode = canonicalCase('helloaoCode');
+  // One compact JSON array-of-arrays carries the full canonical chapter and
+  // verse bounds into the read-only SQL gate. D1 and SQLite both expose the
+  // JSON functions used here, and the literal is emitted once inside this
+  // self-contained scalar CTE rather than repeated for every Bible book.
+  const canonicalVerseBounds = sqlLiteral(JSON.stringify(
+    BIBLE_BOOKS.map(book => getBibleBookBounds(book).maxVerseByChapter),
+  ));
+  return Object.freeze([
+    `(SELECT COUNT(*) FROM ubs_semantic_normalized_coordinates c
+      LEFT JOIN ubs_semantic_reference_evidence e
+        ON e.evidence_key = c.evidence_key
+      WHERE e.evidence_key IS NULL) = 0`,
+    `(SELECT COUNT(*) FROM (
+      SELECT evidence_key, target_ordinal
+      FROM ubs_semantic_normalized_coordinates
+      GROUP BY evidence_key, target_ordinal HAVING COUNT(*) != 1
+    )) = 0`,
+    `(SELECT COUNT(*) FROM ubs_semantic_normalized_coordinates c
+      WHERE c.normalized_book_code IS NOT (${canonicalCode})
+         OR c.normalized_reference IS NOT printf('%s %d:%d', (${canonicalName}), c.normalized_chapter, c.normalized_verse)
+         OR (c.normalized_verse = 0 AND c.normalized_book_number != 19)) = 0`,
+    `(WITH canonical_verse_bounds(bounds_json) AS (VALUES (${canonicalVerseBounds}))
+      SELECT COUNT(*) FROM (
+        SELECT DISTINCT normalized_book_number, normalized_chapter, normalized_verse
+        FROM ubs_semantic_normalized_coordinates
+      ) c
+      CROSS JOIN canonical_verse_bounds b
+      WHERE c.normalized_chapter NOT BETWEEN 1 AND json_array_length(
+              b.bounds_json, '$[' || (c.normalized_book_number - 1) || ']')
+         OR c.normalized_verse NOT BETWEEN
+              CASE WHEN c.normalized_book_number = 19 THEN 0 ELSE 1 END
+              AND json_extract(b.bounds_json, '$[' || (c.normalized_book_number - 1)
+                || '][' || (c.normalized_chapter - 1) || ']')) = 0`,
+    `(SELECT COUNT(*) FROM (
+      SELECT evidence_key
+      FROM ubs_semantic_normalized_coordinates
+      GROUP BY evidence_key
+      HAVING MIN(target_ordinal) != 1 OR MAX(target_ordinal) != COUNT(*)
+    )) = 0`,
+  ]);
 }
 
 /**
@@ -149,6 +225,11 @@ function buildD1ReadinessQueryContract(
     'idx_strongs_form_stats_rank',
     'idx_ubs_groups_source_order',
     'idx_ubs_segments_lookup',
+    'idx_ubs_semantic_identity_candidate',
+    'idx_ubs_semantic_sense_candidate_order',
+    'idx_ubs_semantic_sense_domain_order',
+    'idx_ubs_semantic_coordinate_lookup',
+    'idx_ubs_semantic_evidence_sense_order',
   ];
   const quotedIndexes = requiredIndexes.map(name => `'${name}'`).join(',');
   const indexCheck = `(SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name IN (${quotedIndexes})) = ${requiredIndexes.length}`;
@@ -210,6 +291,43 @@ function buildD1ReadinessQueryContract(
     { id: 'ubs.member_values', predicate: `(SELECT COUNT(*) FROM ubs_parallel_members WHERE source_reference != trim(source_reference) OR length(source_reference) <= 4 OR source_reference NOT GLOB '[A-Z0-9][A-Z0-9][A-Z0-9] *' OR normalized_reference = '' OR normalized_reference != trim(normalized_reference) OR alignment_raw = '' OR alignment_raw GLOB '*[^0-8]*' OR (language_marker = 'GRK' AND alignment_basis != 'UBSGNT5') OR (language_marker = 'HEB' AND alignment_basis NOT IN ('BHS','LXX'))) = 0` },
     { id: 'ubs.segment_values', predicate: `(SELECT COUNT(*) FROM ubs_parallel_segments WHERE book_number NOT BETWEEN 1 AND 66 OR chapter < 1 OR start_verse < 1 OR end_verse < start_verse) = 0` },
   ];
+  const semanticArtifact = UBS_SEMANTIC_STORAGE.artifact;
+  const semanticSourcePredicate = (source: typeof UBS_SEMANTIC_STORAGE.sources[number]) => [
+    `artifact_identity = ${sqlLiteral(semanticArtifact.artifactIdentity)}`,
+    `source_id = ${sqlLiteral(source.sourceId)}`,
+    `source_role = ${sqlLiteral(source.sourceRole)}`,
+    `schema_version = ${sqlLiteral(source.schemaVersion)}`,
+    `transform_version = ${source.transformVersion}`,
+    `title = ${sqlLiteral(source.title)}`,
+    `artifact_name = ${sqlLiteral(source.artifactName)}`,
+    `artifact_version = ${sqlLiteral(source.artifactVersion)}`,
+    `language = 'Hebrew'`,
+    `source_url = ${sqlLiteral(source.sourceUrl)}`,
+    `source_commit = ${sqlLiteral(source.sourceCommit)}`,
+    `source_blob = ${sqlLiteral(source.sourceBlob)}`,
+    `source_sha256 = ${sqlLiteral(source.sourceSha256)}`,
+    `license = ${sqlLiteral(source.license)}`,
+    `license_url = ${sqlLiteral(source.licenseUrl)}`,
+    `publisher = ${sqlLiteral(source.publisher)}`,
+    `modified = 1`,
+    `modification_description = ${sqlLiteral(source.modificationDescription)}`,
+  ].join(' AND ');
+  const [coordinateEvidenceBinding, coordinateOrdinalUniqueness, coordinateCanonicalReference,
+    coordinateCanonicalBounds, coordinateOrdinalContiguity] =
+    buildUbsSemanticStoredIntegrityPredicates();
+  const ubsHebrewSemanticChecks: D1ReadinessCheck[] = [
+    { id: 'ubs_hebrew_semantic.artifact_identity', predicate: `(SELECT artifact_identity FROM ubs_semantic_artifacts) = ${sqlLiteral(semanticArtifact.artifactIdentity)}` },
+    { id: 'ubs_hebrew_semantic.artifact_contract', predicate: `(SELECT COUNT(*) FROM ubs_semantic_artifacts WHERE artifact_identity = ${sqlLiteral(semanticArtifact.artifactIdentity)} AND schema_version = ${sqlLiteral(semanticArtifact.schemaVersion)} AND compiler_version = ${semanticArtifact.compilerVersion} AND transform_version = ${semanticArtifact.transformVersion} AND rights_notice_json = ${sqlLiteral(semanticArtifact.rightsNoticeJson)} AND provenance_notice_json = ${sqlLiteral(semanticArtifact.provenanceNoticeJson)} AND transformation_witness_json = ${sqlLiteral(semanticArtifact.transformationWitnessJson)}) = 1 AND (SELECT COUNT(*) FROM ubs_semantic_artifacts) = 1` },
+    { id: 'ubs_hebrew_semantic.source_contract', predicate: `(SELECT COUNT(*) FROM ubs_semantic_sources) = ${UBS_SEMANTIC_STORAGE.sources.length} AND ${UBS_SEMANTIC_STORAGE.sources.map(source => `(SELECT COUNT(*) FROM ubs_semantic_sources WHERE ${semanticSourcePredicate(source)}) = 1`).join(' AND ')}` },
+    { id: 'ubs_hebrew_semantic.normalized_coordinates', predicate: `(SELECT COUNT(*) FROM ubs_semantic_normalized_coordinates) = ${UBS_SEMANTIC_AUDIT.projection.normalizedCoordinateRows} AND (SELECT COUNT(*) FROM ubs_semantic_normalized_coordinates WHERE normalized_verse < 0 OR normalized_reference = '') = 0` },
+    { id: 'ubs_hebrew_semantic.coordinate_cardinality', predicate: `(SELECT COUNT(*) FROM (SELECT evidence_key FROM ubs_semantic_normalized_coordinates GROUP BY evidence_key HAVING COUNT(*) > 1)) = ${UBS_SEMANTIC_AUDIT.projection.sourceEvidenceWithAmbiguousNormalizedCoordinates}` },
+    { id: 'ubs_hebrew_semantic.coordinate_evidence_binding', predicate: coordinateEvidenceBinding },
+    { id: 'ubs_hebrew_semantic.coordinate_ordinal_unique', predicate: coordinateOrdinalUniqueness },
+    { id: 'ubs_hebrew_semantic.coordinate_reference_canonical', predicate: coordinateCanonicalReference },
+    { id: 'ubs_hebrew_semantic.coordinate_bounds_canonical', predicate: coordinateCanonicalBounds },
+    { id: 'ubs_hebrew_semantic.coordinate_ordinals_contiguous', predicate: coordinateOrdinalContiguity },
+    { id: 'ubs_hebrew_semantic.relationships', predicate: `(SELECT COUNT(*) FROM ubs_semantic_reference_evidence e LEFT JOIN ubs_semantic_senses s ON s.artifact_identity = e.artifact_identity AND s.sense_id = e.sense_id WHERE s.sense_id IS NULL) = 0` },
+  ];
   if (UNICODE_CORRECTION.strongs.length !== 9 || UNICODE_CORRECTION.morphology.length !== 237
     || UNICODE_CORRECTION.contract.d1Cells !== 255) {
     throw new Error('Biblical-language Unicode correction readiness contract drift');
@@ -270,6 +388,7 @@ function buildD1ReadinessQueryContract(
     ...countChecks,
     { id: 'schema.required_indexes', predicate: indexCheck },
     ...ubsSemanticChecks,
+    ...ubsHebrewSemanticChecks,
     ...strongsSemanticChecks,
     ...morphologyUnicodeContract.checks.map((predicate, index): D1ReadinessCheck => ({
       id: ['unicode.morphology.expected_count', 'unicode.morphology.locators', 'unicode.morphology.values'][index]!,
@@ -300,6 +419,36 @@ function buildD1ReadinessChecksCte(contract: D1ReadinessQueryContract): string {
   return `WITH ${contract.ctes.join(',\n')},\nreadiness_checks(check_name, passed) AS (VALUES\n${values}\n)`;
 }
 
+/**
+ * Return a checked, minimal projection of the fixed readiness inventory.
+ *
+ * The remote gate always evaluates the complete inventory. Targeted
+ * projections are intentionally limited to diagnostics and local corruption
+ * tests: they reuse the production predicates rather than maintaining a
+ * second, weaker copy of a check just to make a failure observable.
+ */
+function selectD1ReadinessChecks(
+  contract: D1ReadinessQueryContract,
+  checkNames: readonly string[] | undefined,
+): D1ReadinessQueryContract {
+  if (checkNames === undefined) return contract;
+  if (checkNames.length === 0) throw new Error('At least one D1 readiness check is required');
+
+  const available = new Map(contract.checks.map(check => [check.id, check]));
+  const selected = checkNames.map(checkName => {
+    if (!/^[a-z0-9._:-]+$/.test(checkName)) {
+      throw new Error(`Invalid D1 readiness check ID: ${checkName}`);
+    }
+    const check = available.get(checkName);
+    if (!check) throw new Error(`Unknown D1 readiness check ID: ${checkName}`);
+    return check;
+  });
+  if (new Set(checkNames).size !== checkNames.length) {
+    throw new Error('Duplicate D1 readiness check ID');
+  }
+  return { ...contract, checks: selected };
+}
+
 export function buildD1ReadinessSql(
   expectedCounts: Record<string, number>,
   schemaVersion = MANIFEST.schemaVersion,
@@ -320,8 +469,12 @@ export function buildD1ReadinessDiagnosticSql(
   expectedCounts: Record<string, number>,
   schemaVersion = MANIFEST.schemaVersion,
   d1CorpusIdentity = D1_CORPUS_IDENTITY,
+  checkNames?: readonly string[],
 ): string {
-  const contract = buildD1ReadinessQueryContract(expectedCounts, schemaVersion, d1CorpusIdentity);
+  const contract = selectD1ReadinessChecks(
+    buildD1ReadinessQueryContract(expectedCounts, schemaVersion, d1CorpusIdentity),
+    checkNames,
+  );
   return [
     buildD1ReadinessChecksCte(contract),
     `SELECT check_name, passed FROM readiness_checks WHERE passed IS NOT 1 ORDER BY check_name;`,

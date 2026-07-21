@@ -12,84 +12,97 @@ import {
 
 const repo = new URL('../../../', import.meta.url);
 
-describe('source-free UBS semantic design guards', () => {
-  it('keeps 0004 as a non-executable design fixture', () => {
-    const draft = readFileSync(new URL('test/fixtures/ubs-semantics/0004_ubs_hebrew_semantics.draft.sql', repo), 'utf8');
-    expect(draft).toContain('DESIGN FIXTURE ONLY. NOT AN EXECUTABLE MIGRATION');
-    expect(existsSync(new URL('migrations/0004_ubs_hebrew_semantics.sql', repo))).toBe(false);
+describe('UBS semantic local materialization guards', () => {
+  it('makes transform 7 an executable, independently discoverable migration', () => {
+    const migration = new URL('migrations/0004_ubs_hebrew_semantics.sql', repo);
+    expect(existsSync(migration)).toBe(true);
+    expect(readFileSync(migration, 'utf8')).toContain('CREATE TABLE ubs_semantic_artifacts');
     expect(readdirSync(new URL('migrations/', repo))).toEqual([
       '0001_initial_schema.sql',
       '0002_ubs_parallel_passages.sql',
       '0003_original_language_usage.sql',
+      '0004_ubs_hebrew_semantics.sql',
     ]);
   });
 
-  it('does not advance the data schema or materialization transform', () => {
+  it('advances only the local data schema and materialization transform', () => {
     const manifest = JSON.parse(readFileSync(new URL('data/data-manifest.json', repo), 'utf8')) as {
       schemaVersion: string;
       materializations: { d1: { transformVersion: number; migrations: Array<{ path: string }> } };
     };
-    expect(manifest.schemaVersion).toBe('0003_original_language_usage');
-    expect(manifest.materializations.d1.transformVersion).toBe(6);
-    expect(manifest.materializations.d1.migrations.map(item => item.path)).not.toContain('migrations/0004_ubs_hebrew_semantics.sql');
+    expect(manifest.schemaVersion).toBe('0004_ubs_hebrew_semantics');
+    expect(manifest.materializations.d1.transformVersion).toBe(7);
+    expect(manifest.materializations.d1.migrations.map(item => item.path)).toContain('migrations/0004_ubs_hebrew_semantics.sql');
   });
 
-  it('keeps the relational design internally valid and strict in an in-memory fixture', () => {
-    const draft = readFileSync(new URL('test/fixtures/ubs-semantics/0004_ubs_hebrew_semantics.draft.sql', repo), 'utf8');
+  it('keeps the executable relational layer strict in an in-memory fixture', () => {
+    const migration = readFileSync(new URL('migrations/0004_ubs_hebrew_semantics.sql', repo), 'utf8');
     const db = new Database(':memory:');
     db.pragma('foreign_keys = ON');
-    db.exec(draft);
+    db.exec(migration);
+    const artifactIdentity = '1'.repeat(64);
+    db.prepare(`INSERT INTO ubs_semantic_artifacts VALUES (?, 'theologai-ubs-hebrew-semantic-compiled.v1', 1, 7, '{}', '{}', '{}')`)
+      .run(artifactIdentity);
     const insertSource = db.prepare(`INSERT INTO ubs_semantic_sources (
-      source_id, source_role, schema_version, artifact_identity, title,
-      artifact_name, artifact_version, language, publisher, license, license_url,
-      source_url, source_commit, source_blob, source_sha256, transform_version,
-      modified, modification_note
-    ) VALUES (?, ?, 'ubs-semantics.v1', ?, ?, ?, '0.9.2', 'Hebrew',
-      'United Bible Societies', 'CC BY-SA 4.0',
-      'https://creativecommons.org/licenses/by-sa/4.0/', ?, ?, ?, ?, 7, 1, ?)`);
+      artifact_identity, source_id, source_role, schema_version, transform_version, title,
+      artifact_name, artifact_version, language, source_url, source_commit, source_blob,
+      source_sha256, license, license_url, publisher, modified, modification_description
+    ) VALUES (?, ?, ?, 'ubs-semantics.v1', 7, ?, ?, '0.9.2', 'Hebrew', ?, ?, ?, ?,
+      'CC BY-SA 4.0', 'https://creativecommons.org/licenses/by-sa/4.0/',
+      'United Bible Societies', 1, ?)`);
     insertSource.run(
-      'synthetic-dictionary', 'dictionary', '1'.repeat(64), 'Synthetic dictionary',
-      'UBSHebrewDic-v0.9.2-en.JSON', 'https://example.invalid/dictionary',
-      '2'.repeat(40), '3'.repeat(40), '4'.repeat(64), 'Invented only.',
+      artifactIdentity, 'synthetic-dictionary', 'dictionary', 'Synthetic dictionary',
+      'UBSHebrewDic-v0.9.2-en.JSON', 'https://example.invalid/dictionary', '2'.repeat(40),
+      '3'.repeat(40), '4'.repeat(64), 'Derived only from the pinned source.',
     );
     insertSource.run(
-      'synthetic-domains', 'lexical_domains', '1'.repeat(64), 'Synthetic domains',
-      'UBSHebrewDicLexicalDomains-v0.9.2-en.JSON', 'https://example.invalid/domains',
-      '5'.repeat(40), '6'.repeat(40), '7'.repeat(64), 'Invented only.',
+      artifactIdentity, 'synthetic-domains', 'lexical_domains', 'Synthetic domains',
+      'UBSHebrewDicLexicalDomains-v0.9.2-en.JSON', 'https://example.invalid/domains', '5'.repeat(40),
+      '6'.repeat(40), '7'.repeat(64), 'Derived only from the pinned source.',
     );
     expect(() => db.prepare(`UPDATE ubs_semantic_sources SET source_sha256 = 'not-a-hash' WHERE source_role = 'dictionary'`).run()).toThrow();
     expect(() => db.prepare(`UPDATE ubs_semantic_sources SET artifact_identity = 'short' WHERE source_role = 'dictionary'`).run()).toThrow();
     expect(() => db.prepare(`UPDATE ubs_semantic_sources SET artifact_version = '0.9.3' WHERE source_role = 'dictionary'`).run()).toThrow();
     expect(() => db.prepare(`UPDATE ubs_semantic_sources SET transform_version = 8 WHERE source_role = 'dictionary'`).run()).toThrow();
     expect(() => db.prepare(`UPDATE ubs_semantic_sources SET title = '' WHERE source_role = 'dictionary'`).run()).toThrow();
-    db.prepare(`INSERT INTO ubs_semantic_entries VALUES (?, 'dictionary', ?, 1, ?, NULL, NULL)`)
-      .run('synthetic-dictionary', 'entry.one', 'SYNTHETIC LEMMA');
-    expect(() => db.prepare(`UPDATE ubs_semantic_entries SET entry_id = 'entry..invalid' WHERE entry_id = 'entry.one'`).run()).toThrow();
+    db.prepare(`INSERT INTO ubs_semantic_entries VALUES (?, ?, ?, ?, 1, ?, '[]')`)
+      .run(artifactIdentity, 'synthetic-dictionary', 'entry.one', 'source-entry-one', 'SYNTHETIC LEMMA');
+    expect(() => db.prepare(`UPDATE ubs_semantic_entries SET entry_id = 'entry$invalid' WHERE entry_id = 'entry.one'`).run()).toThrow();
     const identity = db.prepare(`INSERT INTO ubs_semantic_entry_identities VALUES (?, ?, ?)`);
-    expect(() => identity.run('synthetic-dictionary', 'entry.one', 'G0001')).toThrow();
-    expect(() => identity.run('synthetic-dictionary', 'entry.one', 'A000001')).toThrow();
-    expect(() => identity.run('synthetic-dictionary', 'entry.one', 'A0000')).toThrow();
-    expect(() => identity.run('synthetic-dictionary', 'entry.one', 'A0001')).not.toThrow();
-    expect(() => db.prepare(`INSERT INTO ubs_semantic_domains VALUES (?, 'lexical_domains', ?, 1, ?, ?, NULL)`)
-      .run('synthetic-domains', 'child', 'missing-parent', 'Invented child')).toThrow();
-    expect(() => db.prepare(`INSERT INTO ubs_semantic_domains VALUES (?, 'lexical_domains', ?, 1, NULL, ?, NULL)`)
-      .run('synthetic-domains', '-invalid', 'Invented invalid')).toThrow();
-    expect(() => db.prepare(`INSERT INTO ubs_semantic_domains VALUES (?, 'lexical_domains', ?, 1, NULL, ?, NULL)`)
-      .run('synthetic-dictionary', 'wrong-role', 'Invented invalid')).toThrow();
-    expect(() => db.prepare(`INSERT INTO ubs_semantic_domains VALUES (?, 'lexical_domains', ?, 1, NULL, ?, NULL)`)
-      .run('synthetic-domains', 'invalid-', 'Invented invalid')).toThrow();
-    db.prepare(`INSERT INTO ubs_semantic_domains VALUES (?, 'lexical_domains', ?, 1, NULL, ?, NULL)`)
-      .run('synthetic-domains', 'root', 'Synthetic root');
-    db.prepare(`INSERT INTO ubs_semantic_domains VALUES (?, 'lexical_domains', ?, 2, ?, ?, NULL)`)
-      .run('synthetic-domains', 'child', 'root', 'Synthetic child');
-    expect(() => db.prepare(`INSERT INTO ubs_semantic_senses VALUES (?, 'dictionary', ?, ?, 1, ?, ?)`)
-      .run('synthetic-dictionary', 'entry.one', 'sense.invalid', 'Synthetic definition', '{}')).toThrow();
-    db.prepare(`INSERT INTO ubs_semantic_senses VALUES (?, 'dictionary', ?, ?, 1, ?, ?)`)
-      .run('synthetic-dictionary', 'entry.one', 'sense.one', 'Synthetic definition', '["Synthetic gloss"]');
-    db.prepare(`INSERT INTO ubs_semantic_sense_domains VALUES (?, 'dictionary', ?, ?, 'lexical_domains', ?)`)
-      .run('synthetic-dictionary', 'sense.one', 'synthetic-domains', 'child');
-    expect(() => db.prepare(`INSERT INTO ubs_semantic_reference_evidence VALUES (?, 'dictionary', ?, ?, 1, ?, ?, ?)`)
-      .run('synthetic-dictionary', 'sense.one', 'reference.invalid', 'SYN 1:1', ' ', 'source_attested_sense_reference')).toThrow();
+    expect(() => identity.run(artifactIdentity, 'entry.one', 'G0001')).toThrow();
+    expect(() => identity.run(artifactIdentity, 'entry.one', 'A000001')).toThrow();
+    expect(() => identity.run(artifactIdentity, 'entry.one', 'A0000')).toThrow();
+    expect(() => identity.run(artifactIdentity, 'entry.one', 'H0001')).not.toThrow();
+    expect(() => db.prepare(`INSERT INTO ubs_semantic_domains VALUES (?, ?, ?, 1, ?, ?, NULL)`)
+      .run(artifactIdentity, 'synthetic-domains', 'child', 'missing-parent', 'Synthetic child')).toThrow();
+    expect(() => db.prepare(`INSERT INTO ubs_semantic_domains VALUES (?, ?, ?, 1, NULL, ?, NULL)`)
+      .run(artifactIdentity, 'synthetic-domains', 'invalid$domain', 'Synthetic invalid')).toThrow();
+    db.prepare(`INSERT INTO ubs_semantic_domains VALUES (?, ?, ?, 1, NULL, ?, NULL)`)
+      .run(artifactIdentity, 'synthetic-domains', 'root', 'Synthetic root');
+    db.prepare(`INSERT INTO ubs_semantic_domains VALUES (?, ?, ?, 2, ?, ?, NULL)`)
+      .run(artifactIdentity, 'synthetic-domains', 'child', 'root', 'Synthetic child');
+    expect(() => db.prepare(`INSERT INTO ubs_semantic_senses VALUES (?, ?, ?, ?, ?, 1, 'published', NULL, '[]', '["Synthetic gloss"]')`)
+      .run(artifactIdentity, 'synthetic-dictionary', 'sense.invalid', 'source-sense-invalid', 'entry.one')).toThrow();
+    expect(() => db.prepare(`INSERT INTO ubs_semantic_senses VALUES (?, ?, ?, ?, ?, 1, 'published', ?, '[]', '["Synthetic gloss"]')`)
+      .run(artifactIdentity, 'synthetic-domains', 'sense.cross-source', 'source-sense-cross-source', 'entry.one', 'Synthetic definition')).toThrow();
+    db.prepare(`INSERT INTO ubs_semantic_senses VALUES (?, ?, ?, ?, ?, 1, 'published', ?, '[]', '["Synthetic gloss"]')`)
+      .run(artifactIdentity, 'synthetic-dictionary', 'sense.one', 'source-sense-one', 'entry.one', 'Synthetic definition');
+    db.prepare(`INSERT INTO ubs_semantic_sense_domains VALUES (?, ?, ?, 1)`)
+      .run(artifactIdentity, 'sense.one', 'child');
+    expect(() => db.prepare(`INSERT INTO ubs_semantic_reference_evidence VALUES (1, ?, ?, ?, ?, 1, ?, ?, '', 1, 'GEN', 1, 1)`)
+      .run(artifactIdentity, 'synthetic-dictionary', 'reference.invalid', 'sense.one', 'Synthetic 1:1', 'not-a-coordinate')).toThrow();
+    db.prepare(`INSERT INTO ubs_semantic_reference_evidence VALUES (1, ?, ?, ?, ?, 1, ?, ?, '', 1, 'GEN', 1, 0)`)
+      .run(artifactIdentity, 'synthetic-dictionary', 'reference.one', 'sense.one', 'Synthetic 1:1', '01001001000001');
+    expect(() => db.prepare(`INSERT INTO ubs_semantic_reference_evidence VALUES (2, ?, ?, ?, ?, 1, ?, ?, '', 1, 'GEN', 1, 0)`)
+      .run(artifactIdentity, 'synthetic-domains', 'reference.cross-source', 'sense.one', 'Synthetic 1:1', '01001001000001')).toThrow();
+    db.prepare(`INSERT INTO ubs_semantic_normalized_coordinates VALUES (1, 1, 1, 19, 'PSA', 1, 0, 'Psalms 1:0')`).run();
+    expect(() => db.prepare(`INSERT INTO ubs_semantic_normalized_coordinates VALUES (2, 1, 2, 19, 'PSA', 1, -1, 'Psalms 1:-1')`).run()).toThrow();
+    // Coordinates retain only the globally unique evidence key. A copied
+    // evidence ID therefore cannot be mismatched in the child row at all.
+    expect((db.prepare(`SELECT name FROM pragma_table_info('ubs_semantic_normalized_coordinates')`)
+      .all() as Array<{ name: string }>).map(column => column.name)).not.toContain('evidence_id');
+    expect(() => db.prepare(`INSERT INTO ubs_semantic_normalized_coordinates VALUES (2, 2, 2, 1, 'GEN', 1, 0, 'Genesis 1:0')`).run()).toThrow();
+    expect(() => db.prepare(`INSERT INTO ubs_semantic_normalized_coordinates VALUES (2, 1, 1, 19, 'PSA', 1, 0, 'Psalms 1:0')`).run()).toThrow();
     db.close();
   });
 

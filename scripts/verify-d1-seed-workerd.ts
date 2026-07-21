@@ -1,5 +1,5 @@
 #!/usr/bin/env tsx
-/** Import representative generated chunks through Wrangler's isolated local D1 runtime. */
+/** Import the complete generated seed through Wrangler's isolated local D1 runtime. */
 
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
@@ -8,7 +8,10 @@ import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadAndVerifyD1SeedManifest } from './d1-seed-manifest.js';
 import { parseDataManifest } from './d1-corpus-identity.js';
-import { REQUIRED_COLUMNS } from './check-remote-d1-readiness.js';
+import {
+  buildUbsSemanticStoredIntegrityPredicates,
+  REQUIRED_COLUMNS,
+} from './check-remote-d1-readiness.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SEED_ROOT = join(ROOT, 'scripts', 'd1-seed');
@@ -30,8 +33,8 @@ function run(args: string[]): string {
       maxBuffer: 16 * 1024 * 1024,
     });
   } catch (error) {
-    const failure = error as { stderr?: string; stdout?: string };
-    throw new Error(`Wrangler local D1 verification failed:\n${failure.stderr ?? failure.stdout ?? 'unknown error'}`);
+    const failure = error as { stderr?: string; stdout?: string; message?: string };
+    throw new Error(`Wrangler local D1 verification failed:\n${failure.stderr ?? failure.stdout ?? failure.message ?? 'unknown error'}`);
   }
 }
 
@@ -42,6 +45,7 @@ try {
   const columnChecks = Object.entries(REQUIRED_COLUMNS).map(([table, columns]) =>
     `(SELECT group_concat(name, ',') FROM (SELECT name FROM pragma_table_info('${table}') ORDER BY cid)) = '${columns.join(',')}'`
   );
+  const semanticIntegrityChecks = buildUbsSemanticStoredIntegrityPredicates();
   const schemaState = run([
     'd1',
     'execute',
@@ -50,46 +54,23 @@ try {
     `SELECT CASE WHEN
       (SELECT COUNT(*) FROM d1_migrations) = ${migrationNames.length}
       AND (SELECT group_concat(name, ',') FROM (SELECT name FROM d1_migrations ORDER BY id)) = '${migrationNames.join(',')}'
-      AND (SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name IN ('idx_xref_from','idx_xref_votes','idx_morph_verse','idx_morph_strongs','idx_morph_strongs_canonical','idx_strongs_book_stats_order','idx_strongs_form_stats_rank','idx_ubs_groups_source_order','idx_ubs_segments_lookup')) = 9
+      AND (SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name IN ('idx_xref_from','idx_xref_votes','idx_morph_verse','idx_morph_strongs','idx_morph_strongs_canonical','idx_strongs_book_stats_order','idx_strongs_form_stats_rank','idx_ubs_groups_source_order','idx_ubs_segments_lookup','idx_ubs_semantic_identity_candidate','idx_ubs_semantic_sense_candidate_order','idx_ubs_semantic_sense_domain_order','idx_ubs_semantic_coordinate_lookup','idx_ubs_semantic_evidence_sense_order')) = 14
       AND ${columnChecks.join('\n      AND ')}
       THEN 'schema-ready' ELSE json_extract('Wrangler-applied migration state mismatch', '$') END AS schema_state;`,
     '--json',
   ]);
   if (!schemaState.includes('schema-ready')) throw new Error('Wrangler-applied migration state was not verified');
 
-  const completeTables = new Set([
-    'empty-target-check',
-    'theologai_metadata',
-    'morph_codes',
-    'strongs_usage_stats',
-    'strongs_book_stats',
-    'strongs_form_stats',
-    'documents',
-    'document_sections',
-    'fts',
-    'ubs_parallel_sources',
-    'ubs_parallel_groups',
-    'ubs_parallel_members',
-    'ubs_parallel_segments',
-  ]);
-  const firstChunkTables = new Set(['strongs', 'stepbible_lexicons', 'cross_references', 'morphology']);
-  const hebrewSentinelChunk = manifest.files.find(file => file.table === 'morphology'
-    && readFileSync(join(SEED_ROOT, file.path), 'utf8').includes("VALUES('Genesis',1,1,3,'אֱלֹהִ֑ים','אֱלֹהִים','H0430'"));
-  if (!hebrewSentinelChunk) throw new Error('Generated D1 seed has no Genesis 1:1 Hebrew lemma sentinel');
-  const seen = new Set<string>();
-  const representativeFiles = manifest.files.filter(file => {
-    if (completeTables.has(file.table)) return true;
-    if (file.path === hebrewSentinelChunk.path) return true;
-    if (!firstChunkTables.has(file.table) || seen.has(file.table)) return false;
-    seen.add(file.table);
-    return true;
-  });
-
-  for (const [index, file] of representativeFiles.entries()) {
+  // A sampled import would not prove relational integrity across Transform 7.
+  // The preceding generated-SQLite verification measures the same complete,
+  // deterministic corpus against the 350 MiB capacity ceiling. Workerd
+  // intentionally blocks SQLite page-count PRAGMAs, so this phase proves that
+  // every generated statement is accepted by its local D1 runtime instead.
+  for (const [index, file] of manifest.files.entries()) {
     if (!/^[a-z0-9-]+-\d{3}\.sql$/.test(file.path)) {
       throw new Error(`Unsafe generated seed path: ${file.path}`);
     }
-    console.error(`[verify-d1-seed-workerd] ${index + 1}/${representativeFiles.length} ${file.path}`);
+    console.error(`[verify-d1-seed-workerd] ${index + 1}/${manifest.files.length} ${file.path}`);
     run(['d1', 'execute', ...common, '--file', join(SEED_ROOT, file.path)]);
   }
 
@@ -115,11 +96,21 @@ try {
       AND (SELECT COUNT(*) FROM ubs_parallel_members) = ${manifest.expectedCounts.ubs_parallel_members}
       AND (SELECT COUNT(*) FROM ubs_parallel_segments) = ${manifest.expectedCounts.ubs_parallel_segments}
       AND (SELECT artifact_identity FROM ubs_parallel_sources LIMIT 1) = 'a5fd0d4646cb69f426f592c6e334866191201fbe64691cd55c7f7ecd0ca9d4cc'
-      THEN 'ready' ELSE json_extract('Local D1 representative import failed', '$') END AS readiness;`,
+      AND (SELECT COUNT(*) FROM ubs_semantic_artifacts) = ${manifest.expectedCounts.ubs_semantic_artifacts}
+      AND (SELECT COUNT(*) FROM ubs_semantic_sources) = ${manifest.expectedCounts.ubs_semantic_sources}
+      AND (SELECT COUNT(*) FROM ubs_semantic_domains) = ${manifest.expectedCounts.ubs_semantic_domains}
+      AND (SELECT COUNT(*) FROM ubs_semantic_entries) = ${manifest.expectedCounts.ubs_semantic_entries}
+      AND (SELECT COUNT(*) FROM ubs_semantic_entry_identities) = ${manifest.expectedCounts.ubs_semantic_entry_identities}
+      AND (SELECT COUNT(*) FROM ubs_semantic_senses) = ${manifest.expectedCounts.ubs_semantic_senses}
+      AND (SELECT COUNT(*) FROM ubs_semantic_sense_domains) = ${manifest.expectedCounts.ubs_semantic_sense_domains}
+      AND (SELECT COUNT(*) FROM ubs_semantic_reference_evidence) = ${manifest.expectedCounts.ubs_semantic_reference_evidence}
+      AND (SELECT COUNT(*) FROM ubs_semantic_normalized_coordinates) = ${manifest.expectedCounts.ubs_semantic_normalized_coordinates}
+      AND ${semanticIntegrityChecks.join('\n      AND ')}
+      THEN 'ready' ELSE json_extract('Local D1 full import failed', '$') END AS readiness;`,
     '--json',
   ]);
   if (!readiness.includes('ready')) throw new Error('Local D1 readiness result was not ready');
-  console.error(`[verify-d1-seed-workerd] Imported ${representativeFiles.length} representative seed files through local D1.`);
+  console.error(`[verify-d1-seed-workerd] Imported ${manifest.files.length} seed files through local D1; verify-database measures this same corpus against the 350 MiB gate.`);
 } finally {
   rmSync(state, { recursive: true, force: true });
 }

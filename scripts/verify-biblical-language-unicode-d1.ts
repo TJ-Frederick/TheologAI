@@ -62,6 +62,14 @@ export function verifyBiblicalLanguageUnicodeD1(
   }
   const derivedUsageRows = ['strongs_usage_stats', 'strongs_book_stats', 'strongs_form_stats']
     .reduce((sum, table) => sum + (expectedCounts[table] ?? 0), 0);
-  assert(rows - derivedUsageRows === 859_596, `Unicode D1 canonical-source row-count drift: ${rows - derivedUsageRows}`);
+  const ubsSemanticRows = [
+    'ubs_semantic_artifacts', 'ubs_semantic_sources', 'ubs_semantic_domains',
+    'ubs_semantic_entries', 'ubs_semantic_entry_identities', 'ubs_semantic_senses',
+    'ubs_semantic_sense_domains', 'ubs_semantic_reference_evidence',
+    'ubs_semantic_normalized_coordinates',
+  ].reduce((sum, table) => sum + (expectedCounts[table] ?? 0), 0);
+  assert(ubsSemanticRows === 549_458, `UBS semantic canonical-source row-count drift: ${ubsSemanticRows}`);
+  assert(rows - derivedUsageRows === 859_596 + ubsSemanticRows,
+    `Unicode D1 canonical-source row-count drift: ${rows - derivedUsageRows}`);
   return { sourceCells: ledger.contract.sourceCells, d1Cells, rows };
 }

@@ -15,7 +15,18 @@ import type {
   StrongsDriftRecord,
 } from './biblical-language-semantic-drift.js';
 import { artifactContentIdentity, type ArtifactIdentityKind } from './artifact-content-identity.js';
-import { parseDataManifest } from './d1-corpus-identity.js';
+import { computeD1CorpusIdentity, parseDataManifest } from './d1-corpus-identity.js';
+import { resolveBiblicalLanguageReproductionOwnership } from './biblical-language-reproduction-ownership.js';
+
+export const LEGACY_REPRODUCTION_SCOPE_SCHEMA_VERSION =
+  'theologai-biblical-language-legacy-reproduction-scope.v1';
+
+export interface LegacyReproductionScope {
+  /** Versioned record of the historical 72-artifact reproduction boundary. */
+  schemaVersion: typeof LEGACY_REPRODUCTION_SCOPE_SCHEMA_VERSION;
+  /** Historical D1 identity for the legacy artifact set, never the live manifest identity. */
+  historicalMaterializationIdentity: string;
+}
 
 export interface ReproductionReport {
   status: string;
@@ -23,7 +34,10 @@ export interface ReproductionReport {
     openscriptures: string;
     stepbible: string;
   };
+  /** Always the actual identity of the manifest used for this report. */
   d1MaterializationIdentity: string;
+  /** The historical identity of the deliberately narrower legacy artifact scope. */
+  legacyReproductionScope: LegacyReproductionScope;
   comparedArtifacts: number;
   changedArtifacts: number;
   comparisonIdentityPolicy: string;
@@ -153,10 +167,7 @@ export function verifyReproductionArtifactInventory(
 
 function trackedRuntimeArtifacts(root: string): TrackedArtifactIdentity[] {
   const manifest = parseDataManifest(readFileSync(join(root, 'data/data-manifest.json')));
-  const paths = [
-    ...manifest.materializations.d1.inputs.filter(path => path.startsWith('data/biblical-languages/')),
-    'data/biblical-languages/stepbible/index.json',
-  ].sort();
+  const paths = resolveBiblicalLanguageReproductionOwnership(manifest).legacyReproducerArtifacts;
   return paths.map(path => {
     const identity = artifactContentIdentity(path, readFileSync(join(root, path)));
     return {
@@ -166,6 +177,23 @@ function trackedRuntimeArtifacts(root: string): TrackedArtifactIdentity[] {
       rawSha256: identity.rawSha256,
     };
   });
+}
+
+function currentD1MaterializationIdentity(root: string): string {
+  return computeD1CorpusIdentity(parseDataManifest(readFileSync(join(root, 'data/data-manifest.json'))));
+}
+
+function verifyLegacyReproductionScope(
+  report: ReproductionReport,
+  historicalMaterializationIdentity: string,
+): void {
+  const expected: LegacyReproductionScope = {
+    schemaVersion: LEGACY_REPRODUCTION_SCOPE_SCHEMA_VERSION,
+    historicalMaterializationIdentity,
+  };
+  if (JSON.stringify(report.legacyReproductionScope) !== JSON.stringify(expected)) {
+    fail('versioned legacy reproduction scope', JSON.stringify(report.legacyReproductionScope));
+  }
 }
 
 function verifyStrongs(records: StrongsDriftRecord[], report: SemanticDriftReport['strongs']): void {
@@ -255,7 +283,7 @@ function verifyMorphology(records: MorphologyDriftRecord[], report: SemanticDrif
 
 export function verifyExpectedLegacyReproductionReport(report: ReproductionReport): void {
   const expected = {
-    d1_materialization_identity: '91afa5bcf8155ac9f8c5fd14d1d661657c83be9a8e5cd90a5783bfa38ae7dfa5',
+    historical_materialization_identity: '91afa5bcf8155ac9f8c5fd14d1d661657c83be9a8e5cd90a5783bfa38ae7dfa5',
     compared_artifacts: 72,
     comparison_identity_policy: 'canonical_decompressed_json_v1_sha256_for_json_gz_else_raw_sha256',
     changed_content_artifacts: 45,
@@ -268,7 +296,7 @@ export function verifyExpectedLegacyReproductionReport(report: ReproductionRepor
     ['status', report.status, 'legacy-derived-content-drift'],
     ['OpenScriptures source pin', report.sourcePins?.openscriptures, OPENSCRIPTURES_STRONGS.commit],
     ['STEPBible source pin', report.sourcePins?.stepbible, STEPBIBLE_DATA.commit],
-    ['D1 materialization identity', report.d1MaterializationIdentity, expected.d1_materialization_identity],
+    ['current D1 materialization identity', report.d1MaterializationIdentity, currentD1MaterializationIdentity(ROOT)],
     ['compared artifact count', report.comparedArtifacts, expected.compared_artifacts],
     ['comparison identity policy', report.comparisonIdentityPolicy, expected.comparison_identity_policy],
     ['changed content artifact count', report.changedArtifacts, expected.changed_content_artifacts],
@@ -280,6 +308,7 @@ export function verifyExpectedLegacyReproductionReport(report: ReproductionRepor
   for (const [label, actual, value] of checks) {
     assertValue(label, actual, value);
   }
+  verifyLegacyReproductionScope(report, expected.historical_materialization_identity);
   verifyReproductionArtifactInventory(report, trackedRuntimeArtifacts(ROOT));
   verifyRawDiagnostics(report);
   if (!Array.isArray(report.changed) || report.changed.length !== report.changedArtifacts) {
@@ -324,11 +353,12 @@ export function verifyExpectedLegacyReproductionReport(report: ReproductionRepor
 
 export function verifyCorrectedReproductionReport(report: ReproductionReport): void {
   const expected = sourceLockProjection().derived_artifacts;
+  verifyLegacyReproductionScope(report, expected.d1_materialization_identity);
   const checks: Array<[string, unknown, unknown]> = [
     ['status', report.status, 'content-reproducible'],
     ['OpenScriptures source pin', report.sourcePins?.openscriptures, OPENSCRIPTURES_STRONGS.commit],
     ['STEPBible source pin', report.sourcePins?.stepbible, STEPBIBLE_DATA.commit],
-    ['D1 materialization identity', report.d1MaterializationIdentity, expected.d1_materialization_identity],
+    ['current D1 materialization identity', report.d1MaterializationIdentity, currentD1MaterializationIdentity(ROOT)],
     ['compared artifact count', report.comparedArtifacts, expected.compared_artifacts],
     ['comparison identity policy', report.comparisonIdentityPolicy, expected.comparison_identity_policy],
     ['changed content artifact count', report.changedArtifacts, 0],

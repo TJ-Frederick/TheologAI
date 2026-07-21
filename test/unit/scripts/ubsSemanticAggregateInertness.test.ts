@@ -11,7 +11,6 @@ const reviewedBasePins = {
   'src/tools/worker/index.ts': 'feb1679a520185d11f2b6082b70ea3ef6c2b87652ff49c97c0acedfb76d83b90',
   'src/worker.ts': '619a0a66c30ade7ec8f78f13c59ed0791c67d1ae956eb69e0b126ba20f7dc92d',
   'src/worker-server.ts': '3f65b62179b267ac9b15fe682c69342be7ebee8a09430473b797c113e812782a',
-  'data/data-manifest.json': 'ba4f6fc73086716bd03f8e8d65a181719fba834aa61a90e65b168169744fa424',
   'wrangler.toml': '50dd24d0963893b5c8b17ec61d4ebe7c98eeb7f7692a988684bde09835017e4f',
   'worker-configuration.d.ts': 'e316f64679951b32417f0c85b02fc92e61dae25d879d28921df15caf8706fe55',
 } as const;
@@ -28,14 +27,14 @@ describe('inactive UBS semantic aggregate bundle contract', () => {
     }
   });
 
-  it('preserves reviewed Worker inputs, configuration, inventory, and active data identity', () => {
+  it('preserves reviewed Worker composition and configuration', () => {
     for (const [path, expected] of Object.entries(reviewedBasePins)) {
       const actual = createHash('sha256').update(readFileSync(new URL(path, repo))).digest('hex');
       expect(actual, path).toBe(expected);
     }
   });
 
-  it('contains no storage layout, source bytes, migration, D1 adapter, or runtime binding', () => {
+  it('keeps storage local-only: transform 7 is materialized but not composed into a runtime', () => {
     const source = readFileSync(new URL('src/kernel/ubsSemanticEvidenceBundle.ts', repo), 'utf8');
     expect(source).not.toMatch(/from ['"][^'"]*(?:data\/|migrations\/|adapters\/d1|adapters\/data)/);
     expect(source).not.toMatch(/\b(?:SELECT|INSERT|CREATE TABLE|D1Database|better-sqlite3)\b/i);
@@ -44,8 +43,10 @@ describe('inactive UBS semantic aggregate bundle contract', () => {
       materializations: { d1: { transformVersion: number } };
     };
     expect(manifest).toMatchObject({
-      schemaVersion: '0003_original_language_usage',
-      materializations: { d1: { transformVersion: 6 } },
+      schemaVersion: '0004_ubs_hebrew_semantics',
+      materializations: { d1: { transformVersion: 7 } },
     });
+    const adapter = readFileSync(new URL('src/adapters/d1/D1UbsSemanticEvidenceBundleRepository.ts', repo), 'utf8');
+    expect(adapter).toContain('exactly five statements');
   });
 });

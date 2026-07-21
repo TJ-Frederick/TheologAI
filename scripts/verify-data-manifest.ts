@@ -6,7 +6,12 @@ import { existsSync, readFileSync, readdirSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { assertProvenanceMatches, type SourceMetadata } from './build-ubs-parallel-passages.js';
-import { parseDataManifest, verifyD1Migrations, type DataManifest } from './d1-corpus-identity.js';
+import {
+  parseDataManifest,
+  verifyD1Migrations,
+  verifyManifestFileChecksum,
+  type DataManifest,
+} from './d1-corpus-identity.js';
 import { verifyBiblicalLanguageSources } from './verify-biblical-language-sources.js';
 import {
   parseHistoricalDocumentCatalog,
@@ -42,6 +47,11 @@ function discoverCanonicalFiles(): string[] {
     'data/biblical-languages/stepbible-lexicons/tbesg-greek.json',
     'data/biblical-languages/stepbible-lexicons/tbesh-hebrew.txt',
     'data/biblical-languages/stepbible-lexicons/tbesh-hebrew.json',
+    'data/biblical-languages/ubs-open-license/v0.9.2/NATIVE-TO-NORMALIZED-BRIDGE.json',
+    'data/biblical-languages/ubs-open-license/v0.9.2/SEMANTIC-COMPILATION-AUDIT.json',
+    'data/biblical-languages/ubs-open-license/v0.9.2/SOURCE.json',
+    'data/biblical-languages/ubs-open-license/v0.9.2/en/UBSHebrewDic-v0.9.2-en.JSON',
+    'data/biblical-languages/ubs-open-license/v0.9.2/en/UBSHebrewDicLexicalDomains-v0.9.2-en.JSON',
     ...relativeDataFiles('data/biblical-languages/stepbible/greek', '.json.gz'),
     ...relativeDataFiles('data/biblical-languages/stepbible/hebrew', '.json.gz'),
     ...relativeDataFiles('data/historical-documents', '.json'),
@@ -125,10 +135,7 @@ if (JSON.stringify(listed) !== JSON.stringify(discovered)) {
 for (const file of manifest.files) {
   const absolutePath = join(ROOT, file.path);
   if (!existsSync(absolutePath)) throw new Error(`Canonical source file is missing: ${file.path}`);
-  const actual = checksum(absolutePath);
-  if (actual !== file.sha256) {
-    throw new Error(`Checksum mismatch for ${file.path}: expected ${file.sha256}, received ${actual}`);
-  }
+  verifyManifestFileChecksum(ROOT, file);
 }
 
 console.error(`[verify-data-manifest] Verified ${manifest.files.length} canonical source files.`);

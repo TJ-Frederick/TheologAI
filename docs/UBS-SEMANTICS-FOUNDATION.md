@@ -1,9 +1,21 @@
-# Source-free UBS Hebrew semantic foundation
+# UBS Hebrew semantic foundation
 
-This is pre-approval engineering only. It contains no downloaded or copied UBS
-dictionary bytes, no executable `0004` migration, no D1 rows, and no runtime,
-tool, prompt, resource, manifest, transform, or public-contract change. Every
-semantic fixture value is an unmistakable synthetic sentinel, not UBS content.
+The approved source acquisition and the M4A local-only materialization are
+complete. The repository contains the exact approved UBS source pair, an
+executable local migration `0004_ubs_hebrew_semantics`, transform 7, a derived
+SQLite build, deterministic D1 seed generation/import verification, and
+inactive Node SQLite and Worker-D1 aggregate adapters. Those local artifacts
+are verification inputs only: no runtime composition root registers them, and
+they cause no tool, prompt, resource, manifest-public-contract, binding,
+remote-D1, preview, production, or deployment change.
+
+The owner authorized draft-PR publication of this local M4A slice, but it had
+not yet been published when this state record was authored. That authorization
+does not extend to remote migration, runtime registration, or deployment.
+
+`SOURCE.json` remains the historical acquisition-gate snapshot for the pinned
+source packet and derived support files. It is not a current release-state
+record and must not be rewritten to imply a remote release.
 
 The planned Hebrew-only layer uses exactly
 `UBSHebrewDic-v0.9.2-en.JSON` and
@@ -31,11 +43,12 @@ separately withheld at the rights boundary.
 
 ## Bounded implementation slices A–H
 
-### A. Owner and rights gate
+### A. Owner and rights boundary
 
-Approve or reject vendoring the exact two files above and the CC BY-SA 4.0
-boundary. Until approval, source acquisition, source-specific decoding,
-migration creation, materialization, and public exposure are blocked.
+The owner approved vendoring the exact two files above under the scoped CC
+BY-SA 4.0 policy, and separately approved M4A local-only materialization.
+Neither approval authorizes public exposure, a remote D1 import, a binding
+change, or a deployment.
 
 ### B. Source pins and provenance
 
@@ -66,16 +79,24 @@ compiler twice from a fresh checkout. Preserve `A####` internally only.
 
 ### E. Schema, materialization, and D1 capacity
 
-Turn the SQL design fixture into migration `0004` only after review, then move
-the global data transform from 6 to 7. The design separates the dictionary and
-lexical-domain sources and uses a cross-source sense/domain join. Parent domains
-must be inserted first, matching compiler order and immediate foreign keys.
+M4A turned the reviewed SQL design into migration `0004`, moved the local data
+transform from 6 to 7, and materialized the full derived projection into local
+SQLite. The migration separates dictionary and lexical-domain sources, retains
+the cross-source sense/domain join, and requires parent domains before children.
+The deterministic local D1 seed/import and Workerd verification use that exact
+schema. This work is complete only locally; no remote D1 database has received
+the migration or seed, and no Worker binding has changed.
 
 Measure the built database and deterministic seed, not only source size. The
 project gate is at most 350 MiB. The harness also enforces Cloudflare D1's
 current 2 MB row, 100 bound-parameter, and 100 KB statement limits plus
 TheologAI's 8 MiB seed-chunk limit. Cloudflare's limits were rechecked on
 2026-07-17 at <https://developers.cloudflare.com/d1/platform/limits/>.
+
+The deterministic exporter batches ordinary literal INSERTs at 16 KiB, below
+the 100 KB D1 limit: local Workerd rejects some otherwise-valid near-limit
+statements with `SQLITE_NOMEM`. Historical sections remain one-row INSERTs so
+their source-first compatibility evidence can retain its exact row ordinal.
 
 Capacity input must contain the complete named table, query-operation, and seed-
 file inventories without omissions or duplicates. Seed inventory comes from a
@@ -90,9 +111,10 @@ gate requires the actual materialized database size.
 
 ### F. Repository and adapter parity
 
-Implement Node SQLite and Worker D1 adapters behind
-`IUbsSemanticRepository`. Use the shared caps and order identifiers in the
-kernel contract. Prove result parity, query plans, bounded result windows with
+M4A implements inactive Node SQLite and Worker D1 adapters behind the
+`IUbsSemanticEvidenceBundleRepository` aggregate contract. They preserve the
+shared caps and order identifiers and are verified for parity, query plans,
+bounded result windows with
 honest totals, stable ordering, deterministic keyset cursors bound to the exact
 operation, query scope, and semantic artifact identity (preventing replay after
 a corpus or environment change), and no Worker-bundle inclusion of source
@@ -163,10 +185,10 @@ acceptable only when it names a genuine boundary; it grants no access beyond
 public source material. No HMAC secret is needed for this read-only continuation
 model.
 
-The contract remains source-free and unregistered: it names no table, index,
-SQL, D1 binding, migration, or source path, and it is absent from both Worker
-and Node composition. Actual storage layout and query-plan work remain deferred
-until the exact approved source artifacts can be inspected rather than inferred.
+The public semantic service and aggregate seam remain unregistered in both
+Worker and Node composition. The local adapters name the completed storage
+layout so it can be verified, but no runtime path can call them and no remote
+D1 binding, preview, or production environment has been changed.
 
 Repository validation also mirrors compiler identity guarantees: lexical
 identities and source ordinals are unique where their schema defines them, and
@@ -218,18 +240,22 @@ bidirectional, line-separator, noncharacter, and malformed non-scalar Unicode.
 
 ### H. Release and audit
 
-Prepare a fresh preview D1, run readiness and identity checks, deploy only after
-protected approval, and black-box beginner/expert, ambiguity, missing-data,
+The completed local checks are prerequisites, not release evidence. A future
+release must separately authorize a fresh preview D1, remote migration/seed,
+binding change, protected preview deployment, and black-box audit before any
+production decision. It must cover beginner/expert, ambiguity, missing-data,
 attribution, withheld-evidence, environment-isolation, and rollback paths.
-Production follows only after independent review and owner approval. Code and
-D1 rollback remain a matched pair; no predecessor database is deleted without
-separate permission.
+Code and D1 rollback remain a matched pair; no predecessor database is deleted
+without separate permission.
 
-## Draft relational boundary
+## Relational boundary
 
-The non-executable SQL test fixture separates both sources, domains, entries,
-entry-to-identity joins, senses, cross-source sense-to-domain joins, and
-reference evidence. It applies strict nonempty text, normalized ID, exact
-artifact, hash, identity, Hebrew language, JSON gloss-array, and foreign-key
-checks. Names and indexes remain draft until real-source inspection and
-measurement.
+The historical SQL test fixture remains a compact design guard. The executable
+local migration now separates both sources, domains, entries, entry-to-identity
+joins, senses, cross-source sense-to-domain joins, reference evidence, and
+normalized coordinates. It enforces strict text/ID/hash/language/JSON and
+foreign-key boundaries. Each coordinate retains only the globally unique parent
+evidence key, so a duplicated evidence ID cannot drift; its target ordinal is
+unique per evidence. Reconstructing the stored artifact additionally rejects a
+non-canonical normalized-reference string. These local guarantees do not
+register or expose a runtime feature.

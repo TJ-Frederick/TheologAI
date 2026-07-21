@@ -2,7 +2,7 @@
 /** Verify a generated TheologAI SQLite database without modifying it. */
 
 import Database from 'better-sqlite3';
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, readFileSync, statSync } from 'fs';
 import { dirname, isAbsolute, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { buildD1ReadinessSql } from './check-remote-d1-readiness.js';
@@ -13,6 +13,7 @@ import {
 } from './data-integrity.js';
 import { computeD1CorpusIdentity, parseDataManifest, verifyD1Migrations } from './d1-corpus-identity.js';
 import { verifyBiblicalLanguageUnicodeD1 } from './verify-biblical-language-unicode-d1.js';
+import { UBS_SEMANTICS_DATABASE_CEILING_BYTES } from './ubs-semantics/capacity.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -42,10 +43,14 @@ if (!existsSync(databasePath)) throw new Error(`Database not found: ${databasePa
 const manifest = parseDataManifest(readFileSync(MANIFEST_PATH));
 verifyD1Migrations(ROOT, manifest);
 const expectedTables = Object.keys(manifest.expectedCounts).sort();
-  const expectedIndexes = ['idx_morph_strongs', 'idx_morph_strongs_canonical', 'idx_morph_verse', 'idx_strongs_book_stats_order', 'idx_strongs_form_stats_rank', 'idx_ubs_groups_source_order', 'idx_ubs_segments_lookup', 'idx_xref_from', 'idx_xref_votes'];
+const expectedIndexes = ['idx_morph_strongs', 'idx_morph_strongs_canonical', 'idx_morph_verse', 'idx_strongs_book_stats_order', 'idx_strongs_form_stats_rank', 'idx_ubs_groups_source_order', 'idx_ubs_segments_lookup', 'idx_ubs_semantic_identity_candidate', 'idx_ubs_semantic_sense_candidate_order', 'idx_ubs_semantic_sense_domain_order', 'idx_ubs_semantic_coordinate_lookup', 'idx_ubs_semantic_evidence_sense_order', 'idx_xref_from', 'idx_xref_votes'];
 const db = new Database(databasePath, { readonly: true, fileMustExist: true });
 
 try {
+  const databaseBytes = statSync(databasePath).size;
+  if (databaseBytes > UBS_SEMANTICS_DATABASE_CEILING_BYTES) {
+    throw new Error(`SQLite database exceeds the 350 MiB UBS semantic capacity gate: ${databaseBytes} bytes`);
+  }
   const integrityRows = db.pragma('integrity_check') as Array<Record<string, string>>;
   if (integrityRows.length !== 1 || Object.values(integrityRows[0])[0] !== 'ok') {
     throw new Error(`SQLite integrity check failed: ${JSON.stringify(integrityRows)}`);
@@ -110,6 +115,7 @@ try {
     ["SELECT 1 FROM documents WHERE id = 'nicene-creed' LIMIT 1", 'Nicene Creed'],
     ["SELECT 1 FROM documents WHERE id = 'nicene-creed' AND json_extract(metadata, '$.catalog.composition.startYear') = 381 AND json_extract(metadata, '$.catalog.composition.endYear') = 381 AND json_extract(metadata, '$.catalog.creators[0].role') = 'revising_body' LIMIT 1", 'Nicene Creed reviewed catalog metadata'],
     ['SELECT 1 FROM morph_codes LIMIT 1', 'morphology-code data'],
+    ["SELECT 1 FROM ubs_semantic_artifacts WHERE transform_version = 7 LIMIT 1", 'UBS Hebrew semantic artifact'],
   ] as const;
   for (const [query, label] of representativeQueries) {
     if (!db.prepare(query).get()) throw new Error(`Representative record is missing: ${label}`);
@@ -135,6 +141,19 @@ try {
             WHERE strongs_key = 'G0025'
             ORDER BY token_count DESC, verse_count DESC, form_text LIMIT 100`,
       index: 'idx_strongs_form_stats_rank',
+    },
+    {
+      label: 'UBS Hebrew candidate identity',
+      sql: `SELECT entry_id FROM ubs_semantic_entry_identities
+            WHERE artifact_identity = (SELECT artifact_identity FROM ubs_semantic_artifacts)
+              AND lexical_identity = 'H0430' ORDER BY entry_id LIMIT 9`,
+      index: 'idx_ubs_semantic_identity_candidate',
+    },
+    {
+      label: 'UBS Hebrew normalized-coordinate lookup',
+      sql: `SELECT evidence_key FROM ubs_semantic_normalized_coordinates
+            WHERE normalized_reference = 'Genesis 1:1' ORDER BY evidence_key LIMIT 17`,
+      index: 'idx_ubs_semantic_coordinate_lookup',
     },
   ] as const;
   for (const plan of queryPlans) {

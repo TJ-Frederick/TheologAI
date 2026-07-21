@@ -17,9 +17,23 @@ import { loadAndVerifyD1SeedManifest } from './d1-seed-manifest.js';
 import { validateUbsParallelGroup } from '../src/adapters/shared/UbsParallelPassageRepository.js';
 import type { ParallelSourceProvenance } from '../src/kernel/sourceAttestedParallels.js';
 import { UBS_PARALLEL_PASSAGE_PROVENANCE } from '../src/kernel/ubsParallelSource.js';
+import {
+  buildUbsSemanticStoredIntegrityPredicates,
+} from './check-remote-d1-readiness.js';
+import {
+  createUbsSemanticStorageContract,
+  type UbsSemanticStorageAudit,
+} from './ubs-semantics/storageContract.js';
+import { assertUbsSemanticStoredArtifactIdentity } from './ubs-semantics/storageReconstruction.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SEED_DIRECTORY = join(ROOT, 'scripts', 'd1-seed');
+const UBS_SEMANTIC_AUDIT = JSON.parse(readFileSync(join(
+  ROOT, 'data/biblical-languages/ubs-open-license/v0.9.2/SEMANTIC-COMPILATION-AUDIT.json',
+), 'utf8')) as UbsSemanticStorageAudit & {
+  projection: { normalizedCoordinateRows: number; sourceEvidenceWithAmbiguousNormalizedCoordinates: number };
+};
+const UBS_SEMANTIC_STORAGE = createUbsSemanticStorageContract(UBS_SEMANTIC_AUDIT);
 
 function databaseArgument(argv: string[]): string {
   let value: string | undefined;
@@ -205,6 +219,91 @@ function assertUbsReconstruction(db: Database.Database, expectedCounts: Record<s
   }, groupIndex + 1, provenance));
 }
 
+function assertUbsSemanticReconstruction(db: Database.Database, expectedCounts: Record<string, number>): void {
+  const storage = UBS_SEMANTIC_STORAGE;
+  const artifact = db.prepare(`SELECT artifact_identity, schema_version, compiler_version, transform_version,
+    rights_notice_json, provenance_notice_json, transformation_witness_json
+    FROM ubs_semantic_artifacts`).get() as Record<string, unknown> | undefined;
+  if (!artifact
+    || artifact.artifact_identity !== storage.artifact.artifactIdentity
+    || artifact.schema_version !== storage.artifact.schemaVersion
+    || artifact.compiler_version !== storage.artifact.compilerVersion
+    || artifact.transform_version !== storage.artifact.transformVersion
+    || artifact.rights_notice_json !== storage.artifact.rightsNoticeJson
+    || artifact.provenance_notice_json !== storage.artifact.provenanceNoticeJson
+    || artifact.transformation_witness_json !== storage.artifact.transformationWitnessJson) {
+    throw new Error('UBS semantic artifact metadata is incomplete or stale');
+  }
+  const sourceRows = db.prepare(`SELECT artifact_identity, source_id, source_role, schema_version, transform_version,
+    title, artifact_name, artifact_version, language, source_url, source_commit, source_blob, source_sha256,
+    license, license_url, publisher, modified, modification_description
+    FROM ubs_semantic_sources ORDER BY source_role, source_id`).all() as Array<Record<string, unknown>>;
+  const expectedSources = storage.sources.map(source => ({
+    artifact_identity: storage.artifact.artifactIdentity,
+    source_id: source.sourceId,
+    source_role: source.sourceRole,
+    schema_version: source.schemaVersion,
+    transform_version: source.transformVersion,
+    title: source.title,
+    artifact_name: source.artifactName,
+    artifact_version: source.artifactVersion,
+    language: 'Hebrew',
+    source_url: source.sourceUrl,
+    source_commit: source.sourceCommit,
+    source_blob: source.sourceBlob,
+    source_sha256: source.sourceSha256,
+    license: source.license,
+    license_url: source.licenseUrl,
+    publisher: source.publisher,
+    modified: 1,
+    modification_description: source.modificationDescription,
+  }));
+  if (JSON.stringify(sourceRows) !== JSON.stringify(expectedSources)) {
+    throw new Error('UBS semantic source provenance is incomplete or drifted');
+  }
+  const countDelta = Object.entries({
+    ubs_semantic_artifacts: 1,
+    ubs_semantic_sources: 2,
+    ubs_semantic_domains: 411,
+    ubs_semantic_entries: 8285,
+    ubs_semantic_entry_identities: 9981,
+    ubs_semantic_senses: 15123,
+    ubs_semantic_sense_domains: 15361,
+    ubs_semantic_reference_evidence: 249901,
+    ubs_semantic_normalized_coordinates: 250393,
+  }).reduce((sum, [table, expected]) => sum + (expectedCounts[table] === expected ? expected : -1), 0);
+  if (countDelta !== 549458) throw new Error('UBS semantic manifest row inventory drifted');
+  const unlinked = db.prepare(`SELECT
+    (SELECT COUNT(*) FROM ubs_semantic_senses s LEFT JOIN ubs_semantic_entries e
+      ON e.artifact_identity = s.artifact_identity AND e.entry_id = s.entry_id WHERE e.entry_id IS NULL) AS senses,
+    (SELECT COUNT(*) FROM ubs_semantic_reference_evidence e LEFT JOIN ubs_semantic_senses s
+      ON s.artifact_identity = e.artifact_identity AND s.sense_id = e.sense_id WHERE s.sense_id IS NULL) AS evidence,
+    (SELECT COUNT(*) FROM ubs_semantic_normalized_coordinates c LEFT JOIN ubs_semantic_reference_evidence e
+      ON e.evidence_key = c.evidence_key WHERE e.evidence_key IS NULL) AS coordinates,
+    (SELECT COUNT(*) FROM ubs_semantic_normalized_coordinates WHERE normalized_verse < 0) AS negative_verses,
+    (SELECT COUNT(*) FROM ubs_semantic_normalized_coordinates WHERE normalized_reference = '') AS blank_references,
+    (SELECT COUNT(*) FROM (SELECT evidence_key FROM ubs_semantic_normalized_coordinates GROUP BY evidence_key HAVING COUNT(*) > 1)) AS one_to_many
+  `).get() as Record<string, number>;
+  if (Object.values(unlinked).some(value => !Number.isSafeInteger(value))
+    || unlinked.senses !== 0 || unlinked.evidence !== 0 || unlinked.coordinates !== 0
+    || unlinked.negative_verses !== 0 || unlinked.blank_references !== 0
+    || unlinked.one_to_many !== UBS_SEMANTIC_AUDIT.projection.sourceEvidenceWithAmbiguousNormalizedCoordinates) {
+    throw new Error(`UBS semantic reconstruction integrity drift: ${JSON.stringify(unlinked)}`);
+  }
+  const coordinateRows = db.prepare(`SELECT COUNT(*) AS count FROM ubs_semantic_normalized_coordinates
+  `).get() as { count: number };
+  if (coordinateRows.count !== UBS_SEMANTIC_AUDIT.projection.normalizedCoordinateRows) {
+    throw new Error('UBS semantic normalized-coordinate row count drifted');
+  }
+  const storedCoordinateIntegrity = db.prepare(`SELECT CASE WHEN
+    ${buildUbsSemanticStoredIntegrityPredicates().join('\n    AND ')}
+    THEN 1 ELSE 0 END AS ready`).get() as { ready: number };
+  if (storedCoordinateIntegrity.ready !== 1) {
+    throw new Error('UBS semantic stored coordinate integrity drifted');
+  }
+  assertUbsSemanticStoredArtifactIdentity(db, UBS_SEMANTIC_STORAGE);
+}
+
 const sourcePath = databaseArgument(process.argv.slice(2));
 const manifest = loadAndVerifyD1SeedManifest(ROOT, SEED_DIRECTORY);
 
@@ -254,6 +353,8 @@ try {
   assertRepresentativeFts(target);
   assertUbsReconstruction(source, manifest.expectedCounts);
   assertUbsReconstruction(target, manifest.expectedCounts);
+  assertUbsSemanticReconstruction(source, manifest.expectedCounts);
+  assertUbsSemanticReconstruction(target, manifest.expectedCounts);
 
   for (const table of Object.keys(manifest.expectedCounts)) {
     const sourceDigest = tableDigest(source, table);

@@ -57,6 +57,15 @@ export const D1_EXPECTED_TABLES = Object.freeze([
   'ubs_parallel_members',
   'ubs_parallel_segments',
   'ubs_parallel_sources',
+  'ubs_semantic_artifacts',
+  'ubs_semantic_domains',
+  'ubs_semantic_entries',
+  'ubs_semantic_entry_identities',
+  'ubs_semantic_normalized_coordinates',
+  'ubs_semantic_reference_evidence',
+  'ubs_semantic_sense_domains',
+  'ubs_semantic_senses',
+  'ubs_semantic_sources',
 ] as const);
 
 export function parseDataManifest(bytes: Buffer | string): DataManifest {
@@ -156,6 +165,15 @@ export function verifyD1Migrations(root: string, manifest: DataManifest): Buffer
     }
     return bytes;
   });
+}
+
+/** Verify one manifest-declared canonical input without widening its scope. */
+export function verifyManifestFileChecksum(root: string, file: DataManifestFile): void {
+  const bytes = readFileSync(join(root, file.path));
+  const actualSha256 = createHash('sha256').update(bytes).digest('hex');
+  if (actualSha256 !== file.sha256) {
+    throw new Error(`Manifest checksum mismatch for ${file.path}: expected ${file.sha256}, received ${actualSha256}`);
+  }
 }
 
 export class D1SourceConsumptionRegistry {

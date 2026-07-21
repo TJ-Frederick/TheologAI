@@ -48,13 +48,22 @@ Remote MCP client configuration:
 Use the preview URL only for explicitly authorized release testing. The current
 known-good remote baseline is PR #72: production Worker
 `762485da-9e02-46a0-9777-e0d8743b9dbf` and preview Worker
-`8ed4ad1a-f45f-4cdc-a6de-5358f59b6d44`. The later documentation reconciliation
-through PR #82 (`023804681d725e9600f3ff3dbfce347417c23eff`) is repository-only
-and has not been deployed. The U3-T7 compiler work carried by PR #83 is also
-repository-only and undeployed. For a preview-client rollback without changing
+`8ed4ad1a-f45f-4cdc-a6de-5358f59b6d44`. The later repository changes through
+merged PR #83 (`93d5837b05249c15127ab20107f86443cccf4e1e`) are repository-only
+and have not been deployed. For a preview-client rollback without changing
 server state, use the direct preview
 `workers.dev` address above; the production `workers.dev` address intentionally
 redirects rather than serving a separate legacy Worker.
+
+The subsequent UBS Hebrew M4A slice is local-only and inactive: it completes
+migration `0004`, transform 7, local SQLite materialization, deterministic D1
+seed/import verification, and inactive Node/D1 adapters. It is absent from
+both composition roots, remote D1 databases, Worker bindings, preview,
+production, and MCP output. The pinned packet's `SOURCE.json` remains a
+historical acquisition-gate snapshot, not deployment evidence.
+The owner has authorized this M4A branch for draft-PR publication, but at the
+time of this document update it has not yet been published; that authorization
+does not authorize remote D1 work or deployment.
 
 ## MCP capabilities
 
@@ -240,14 +249,18 @@ catechisms. The exact count is enforced by `data/data-manifest.json`.
 
 Approved UBS Hebrew and public-domain historical-source packets are checked
 into the repository for deterministic verification and future release work.
-They are not part of the local/remote database, the 17-work catalog, MCP
-resources, or current tool output. The U3-T7 work adds a migration-free,
-in-memory semantic compiler, native-to-normalized coordinate bridge, and
-content-free compilation audit, but those artifacts remain runtime-inert.
-Materializing them still requires capacity planning and separate owner
-authorization for UBS migration `0004` / transform 7; historical compatibility
-migration `0005` / transform 8 remains separately gated and follows it. Norton
-is a later transform-9,
+M4A now materializes the UBS source pair in the derived local SQLite database
+and deterministic local D1 seed only. Those rows remain absent from remote D1,
+both composition roots, MCP resources, and current tool output. The historical
+source packets remain outside the local and remote 17-work catalog and current
+tool output. U3-T7 provides the in-memory semantic compiler,
+native-to-normalized coordinate bridge, and content-free compilation audit;
+M4A adds local migration `0004` / transform 7, capacity verification, seed
+verification, and inactive adapters. Draft-PR publication of M4A is authorized
+but had not occurred when this text was authored. Any remote migration,
+binding, runtime activation, preview, or production change remains separately
+gated. Historical compatibility migration `0005` / transform 8 follows that
+remote data-layer gate. Norton is a later transform-9,
 `sectioned_only` candidate. Cyril remains blocked with zero output pending
 reliable translator attribution.
 

@@ -18,6 +18,7 @@ import {
   D1_MAX_STATEMENT_BYTES,
   D1_SEED_FILE_BYTES,
   assertSafeStatement,
+  batchInsertValueTuples,
   insertedRows,
   sha256Buffer,
   sha256File,
@@ -67,6 +68,15 @@ const BASE_TABLES = [
   'ubs_parallel_groups',
   'ubs_parallel_members',
   'ubs_parallel_segments',
+  'ubs_semantic_artifacts',
+  'ubs_semantic_sources',
+  'ubs_semantic_domains',
+  'ubs_semantic_entries',
+  'ubs_semantic_entry_identities',
+  'ubs_semantic_senses',
+  'ubs_semantic_sense_domains',
+  'ubs_semantic_reference_evidence',
+  'ubs_semantic_normalized_coordinates',
 ] as const;
 const EXPORT_ORDER = [...BASE_TABLES, 'fts'] as const;
 const CONTENT_CHARS_PER_STATEMENT = 10_000;
@@ -198,10 +208,17 @@ function exportTable(database: string, table: string): SeedStatement[] {
     return `quote(${sqlIdentifier(column)})`;
   }).join(` || ',' || `);
   const order = primaryKey.map(column => sqlIdentifier(column.name)).join(',');
+  const insertPrefix = `INSERT INTO ${sqlIdentifier(table)}(${columnSql}) VALUES`;
   const query =
-    `SELECT 'INSERT INTO ${sqlIdentifier(table)}(${columnSql}) VALUES(' || ${values} || ');' ` +
+    `SELECT '(' || ${values} || ');' ` +
     `FROM ${sqlIdentifier(table)} ORDER BY ${order};`;
-  const statements = splitGeneratedSql(sqlite(database, query)).map(sql => ({ sql, rows: 1 }));
+  const tuples = splitGeneratedSql(sqlite(database, query)).map(sql => sql.slice(0, -1));
+  // Historical section identity proof reads the exact one-row statement
+  // shape, including its deterministic ordinal. All other ordinary tables use
+  // bounded multi-row INSERTs so full local Workerd imports remain practical.
+  const statements: SeedStatement[] = table === 'document_sections'
+    ? tuples.map(tuple => ({ sql: `${insertPrefix}${tuple};`, rows: 1 }))
+    : batchInsertValueTuples(insertPrefix, tuples);
 
   if (table === 'document_sections') {
     const content = sqlIdentifier('content');
