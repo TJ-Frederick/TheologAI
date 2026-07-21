@@ -19,6 +19,8 @@ export const AQUINAS_A1_SOURCE_LOCK_SHA256 = 'c5cfdd1edd132bf59968cbabe4c7de2180
 export const AQUINAS_A1_LOCAL_RECEIPT_SHA256 = 'bc0dab9ce5dc3672ccf2a81182655c75eaf6ef4f280584a40e079bf82a11719d' as const;
 export const AQUINAS_A1_TOPOLOGY_LOCK_SHA256 = 'ce6197ba036ec7200f43513f9e6676ccfd5cb5a4727077a440770416bdf6978b' as const;
 export const AQUINAS_A1_DISCREPANCY_LEDGER_SHA256 = 'c8e10cbf29d710b89fe48aa91d18f25489c96039116e53254d0592dfb0b68120' as const;
+/** The historical ledger entry hashes are retained as opaque legacy A1 evidence, not recomputed under a new policy. */
+export const AQUINAS_A1_DISCREPANCY_ENTRY_HASH_ALGORITHM = 'legacy_a1_canonical_entry_sha256' as const;
 export const AQUINAS_A1_PACKAGE_IDENTITY = Object.freeze({ workId: 'thomas-aquinas-summa-theologiae', editionId: 'aquinas-summa-english-dominican-gutenberg-electronic', collectionId: 'aquinas-summa-pg-v1', contentFormat: 'plain_text', availability: 'local_only_inactive' } as const);
 export const AQUINAS_A1_SOURCES = Object.freeze([
   { ebookId: 17611, partKey: 'prima', htmlMemberBytes: 3_090_576, htmlMemberSha256: '310b8743376036b42faa6b6d1a835aee2cf4e531dcf14ab8d9bb4f1d30edf088', intellectualStartByte: 18_414, cutoffEndByte: 3_070_657, rawCoverageSha256: 'ea9b7c7efb5f15dce4b07847983a224ec41b5ff8b8cd6980a84c24cbd8ac2314' },
@@ -26,7 +28,7 @@ export const AQUINAS_A1_SOURCES = Object.freeze([
   { ebookId: 18755, partKey: 'secunda-secundae', htmlMemberBytes: 4_485_696, htmlMemberSha256: 'e8badeb59c78974db051cab37e6e841d78b2a83fb62e031668d29a7d7b9c4337', intellectualStartByte: 19_082, cutoffEndByte: 4_465_767, rawCoverageSha256: '8be29f08da126b3b3d08eff85248f471d6e4e8e2941d1477d87004512fae942f' },
   { ebookId: 19950, partKey: 'tertia', htmlMemberBytes: 2_927_390, htmlMemberSha256: '12fff95d7637f1e475057dfe60f3d550c571bf0a04fa84ddb9653e46e88fb079', intellectualStartByte: 17_012, cutoffEndByte: 2_907_468, rawCoverageSha256: '62e0f60cb7d5fb6f793f8fb7f7f55d5f2daead136fc3a506b700aa81a706a4f9' },
 ] as const);
-export const AQUINAS_A1_TOPOLOGY_VECTOR = Object.freeze({ questionCount: 512, questionVectorSha256: '714b55268d7c2c777a12b17f7a4d3464fecc1eea69d4652568ab670e0a500aa9', questionKeysSha256: '1c3cfe11af52a7e29a09aae6ce64e854eac18bc96e5b05c55f8200e407022049', preambleCount: 512, articleCount: 2_669, articleVectorSha256: '4cb1703d44c2d7563477bd5dff9f7e346f64891b2bad2c59ed01c6c24ed0dfd3', articleKeysSha256: '6cfcf13360da2d30464ab48268c71b4d1b8408d7971ba497b41ddcce30ed79bd', orderedArticleKeysSha256: 'c55f3c3027743f68071f8316842452bf1de99f3ac4b42f2dd98afe1492d8a917', partPrologues: [{ partKey: 'prima', count: 1 }, { partKey: 'prima-secundae', count: 1 }, { partKey: 'secunda-secundae', count: 0 }, { partKey: 'tertia', count: 1 }], partQuestionPreambles: [{ partKey: 'prima', count: 119 }, { partKey: 'prima-secundae', count: 114 }, { partKey: 'secunda-secundae', count: 189 }, { partKey: 'tertia', count: 90 }], partArticles: [{ partKey: 'prima', count: 584 }, { partKey: 'prima-secundae', count: 619 }, { partKey: 'secunda-secundae', count: 917 }, { partKey: 'tertia', count: 549 }] } as const);
+export const AQUINAS_A1_TOPOLOGY_VECTOR = Object.freeze({ questionCount: 512, questionVectorSha256: '714b55268d7c2c777a12b17f7a4d3464fecc1eea69d4652568ab670e0a500aa9', questionKeysSha256: '1c3cfe11af52a7e29a09aae6ce64e854eac18bc96e5b05c55f8200e407022049', preambleCount: 512, articleCount: 2_669, articleVectorSha256: '4cb1703d44c2d7563477bd5dff9f7e346f64891b2bad2c59ed01c6c24ed0dfd3', articleKeysSha256: '6cfcf13360da2d30464ab48268c71b4d1b8408d7971ba497b41ddcce30ed79bd', orderedArticleKeysSha256: 'c55f3c3027743f68071f8316842452bf1de99f3ac4b42f2dd98afe1492d8a917', typedRangeCount: 3_184, typedRangesSha256: AQUINAS_A1_TOPOLOGY_LOCK_SHA256, partPrologues: [{ partKey: 'prima', count: 1 }, { partKey: 'prima-secundae', count: 1 }, { partKey: 'secunda-secundae', count: 0 }, { partKey: 'tertia', count: 1 }], partQuestionPreambles: [{ partKey: 'prima', count: 119 }, { partKey: 'prima-secundae', count: 114 }, { partKey: 'secunda-secundae', count: 189 }, { partKey: 'tertia', count: 90 }], partArticles: [{ partKey: 'prima', count: 584 }, { partKey: 'prima-secundae', count: 619 }, { partKey: 'secunda-secundae', count: 917 }, { partKey: 'tertia', count: 549 }] } as const);
 export const AQUINAS_A1_RIGHTS_AND_COVERAGE = Object.freeze({ jurisdiction: 'US-only', rightsStatus: 'public_domain', editionLineageDisclosure: 'English Dominican Province (EDP), Benziger Brothers, Perry/McClamrock transcription, CCEL-lineage electronic edition.', limitations: ['remaining_defects', 'no_pages', 'not_critical', 'diplomatic_not_facsimile'], authorialCoverageThrough: 'tertia.q090', supplement: 'excluded', exclusionKinds: ['source_wrapper', 'gutenberg_license', 'electronic_edition_provenance', 'dedication', 'table_of_contents', 'editorial_interlude', 'structural_metadata', 'supplement'] } as const);
 const AQUINAS_A1_DISCREPANCY_ROWS = `001|ceeb5adfa5f46cb93d296c158cd9baa3466601a1caf44bedda12502c8e45fe88|prima.q019|prima.q019.a009
 002|46c89512db5e88a411f0a0fda4c11b29fc4c2c54b3b361cc48906666651e8ba5|prima.q028|prima.q028.a004
@@ -120,6 +122,8 @@ export interface SourceArtifactEvidence {
   intellectualStartByte: number;
   cutoffEndByte: number;
   rawCoverageSha256: string;
+  /** Transient only; omitted from PersistedPackage. */
+  html: string;
 }
 
 export interface RawSpan {
@@ -203,7 +207,11 @@ export interface TransientSectionedEditionCollectionDraft {
   sourceLockSha256: string;
   localReceiptSha256: string;
   topologyLockSha256: string;
+  /** Count and domain-separated digest of the ordered prologue/preamble/article source spans. */
+  typedRangeCount: number;
+  typedRangesSha256: string;
   discrepancyLedgerSha256: string;
+  /** Full reviewed source member, retained only while this transient draft is compiled. */
   sourceArtifacts: SourceArtifactEvidence[];
   rightsAndCoverage: typeof AQUINAS_A1_RIGHTS_AND_COVERAGE;
   partPrologues: TransientPartPrologue[];
@@ -261,11 +269,18 @@ export interface PersistedPackage {
   sourceLockSha256: string;
   localReceiptSha256: string;
   topologyLockSha256: string;
+  typedRangeCount: number;
+  typedRangesSha256: string;
   discrepancyLedgerSha256: string;
+  discrepancyEntryHashAlgorithm: typeof AQUINAS_A1_DISCREPANCY_ENTRY_HASH_ALGORITHM;
+  /** Synthetic fixtures are explicitly non-release; attested packages carry null. */
+  fixtureStatus: 'synthetic_fixture_non_release' | null;
   rightsAndCoverage: typeof AQUINAS_A1_RIGHTS_AND_COVERAGE;
-  sourceArtifacts: SourceArtifactEvidence[];
+  /** Source-member HTML is deliberately absent from persisted package bytes. */
+  sourceArtifacts: Omit<SourceArtifactEvidence, 'html'>[];
   exclusions: PersistedExclusion[];
-  discrepancyInventory: Omit<TransientDiscrepancy, 'observed' | 'resolved'>[];
+  /** Ledgered observation/resolution spans remain auditable without retaining source HTML. */
+  discrepancyInventory: TransientDiscrepancy[];
   shard: {
     shardId: string;
     partKey: AquinasPackagePartKey;
@@ -365,7 +380,10 @@ export function validateTransientSectionedEditionCollectionPackageDraft(input: u
 }
 
 export function compileSectionedEditionCollectionPackage(input: unknown): CompiledSectionedEditionCollectionPackageSet {
-  const draft = validateTransientDraft(input);
+  return compileValidatedTransientDraft(validateTransientDraft(input));
+}
+
+function compileValidatedTransientDraft(draft: TransientSectionedEditionCollectionDraft): CompiledSectionedEditionCollectionPackageSet {
   const compiled = compileTransientDraft(draft);
   const packages = shardCompiledDraft(draft, compiled.questions, compiled.prologues);
   const manifest = buildManifest(packages, draft);
@@ -374,7 +392,9 @@ export function compileSectionedEditionCollectionPackage(input: unknown): Compil
 
 /** Recompiles from transient reviewed input and performs exact byte-for-byte persisted-file verification. */
 export function verifyPersistedPackageBytes(input: unknown, persistedBytes: readonly Uint8Array[]): CompiledSectionedEditionCollectionPackageSet {
-  const compiled = compileSectionedEditionCollectionPackage(input);
+  const draft = validateTransientDraft(input);
+  if (draft.mode !== 'a1_attested') fail('$.mode', 'release byte verification accepts only a1_attested reviewed input; synthetic fixtures are non-release');
+  const compiled = compileValidatedTransientDraft(draft);
   if (persistedBytes.length !== compiled.packages.length) fail('persistedBytes', 'must contain one canonical file per deterministic shard');
   for (let index = 0; index < compiled.packages.length; index += 1) {
     if (!sameBytes(compiled.packages[index]!.persistedBytes, persistedBytes[index]!)) fail(`persistedBytes[${index}]`, 'does not byte-compare with canonical recompilation from transient input');
@@ -389,12 +409,13 @@ export function validateImmutableA1EvidenceDescriptor(): void {
   if (AQUINAS_A1_DISCREPANCY_INVENTORY.length !== 46) fail('A1.discrepancies', 'must bind the ordered 46-entry discrepancy inventory');
   const prologues = AQUINAS_A1_TOPOLOGY_VECTOR.partPrologues.map(value => `${value.partKey}:${value.count}`).join(',');
   if (prologues !== 'prima:1,prima-secundae:1,secunda-secundae:0,tertia:1') fail('A1.prologues', 'must include Prima, I-II, and III only');
+  if (AQUINAS_A1_TOPOLOGY_VECTOR.typedRangeCount !== 3_184 || AQUINAS_A1_TOPOLOGY_VECTOR.typedRangesSha256 !== AQUINAS_A1_TOPOLOGY_LOCK_SHA256) fail('A1.typedRanges', 'must bind the exact 3,184 typed child-span topology lock');
   if (AQUINAS_A1_TOPOLOGY_VECTOR.partQuestionPreambles.map(value => value.count).join(',') !== '119,114,189,90' || AQUINAS_A1_TOPOLOGY_VECTOR.partArticles.map(value => value.count).join(',') !== '584,619,917,549') fail('A1.topology', 'must retain exact per-part preamble and article counts');
   if (AQUINAS_A1_RIGHTS_AND_COVERAGE.authorialCoverageThrough !== 'tertia.q090' || AQUINAS_A1_RIGHTS_AND_COVERAGE.supplement !== 'excluded') fail('A1.coverage', 'must stop authorial delivery at III.90 and exclude the Supplement');
 }
 
 function validateTransientDraft(input: unknown): TransientSectionedEditionCollectionDraft {
-  const root = objectAt(input, '$', ['mode', 'schemaVersion', 'normalizationPolicy', 'identity', 'sourceLockSha256', 'localReceiptSha256', 'topologyLockSha256', 'discrepancyLedgerSha256', 'sourceArtifacts', 'rightsAndCoverage', 'partPrologues', 'exclusions', 'discrepancies', 'questions']);
+  const root = objectAt(input, '$', ['mode', 'schemaVersion', 'normalizationPolicy', 'identity', 'sourceLockSha256', 'localReceiptSha256', 'topologyLockSha256', 'typedRangeCount', 'typedRangesSha256', 'discrepancyLedgerSha256', 'sourceArtifacts', 'rightsAndCoverage', 'partPrologues', 'exclusions', 'discrepancies', 'questions']);
   const mode = enumAt(root.mode, '$.mode', ['synthetic_fixture', 'a1_attested'] as const);
   literalAt(root.schemaVersion, '$.schemaVersion', SECTIONED_EDITION_COLLECTION_PACKAGE_SCHEMA);
   literalAt(root.normalizationPolicy, '$.normalizationPolicy', SECTIONED_EDITION_COLLECTION_NORMALIZATION_POLICY);
@@ -405,16 +426,22 @@ function validateTransientDraft(input: unknown): TransientSectionedEditionCollec
   const sourceLockSha256 = shaAt(root.sourceLockSha256, '$.sourceLockSha256');
   const localReceiptSha256 = shaAt(root.localReceiptSha256, '$.localReceiptSha256');
   const topologyLockSha256 = shaAt(root.topologyLockSha256, '$.topologyLockSha256');
+  const typedRangeCount = integerAt(root.typedRangeCount, '$.typedRangeCount', 1);
+  const typedRangesSha256 = shaAt(root.typedRangesSha256, '$.typedRangesSha256');
   const discrepancyLedgerSha256 = shaAt(root.discrepancyLedgerSha256, '$.discrepancyLedgerSha256');
   const rightsAndCoverage = validateRightsAndCoverage(root.rightsAndCoverage, '$.rightsAndCoverage');
   const partPrologues = arrayAt(root.partPrologues, '$.partPrologues', 0, 3).map((value, index) => validatePrologue(value, `$.partPrologues[${index}]`, artifacts));
+  assertExactPrologueInventory(partPrologues, '$.partPrologues');
   const exclusions = arrayAt(root.exclusions, '$.exclusions', 0, 16_384).map((value, index) => validateExclusion(value, `$.exclusions[${index}]`, artifacts));
   const discrepancies = arrayAt(root.discrepancies, '$.discrepancies', 0, 46).map((value, index) => validateDiscrepancy(value, `$.discrepancies[${index}]`));
   const refs = new Map(discrepancies.map(value => [value.ref, value] as const));
   const questions = arrayAt(root.questions, '$.questions', 1, 512).map((value, index) => validateQuestion(value, `$.questions[${index}]`, artifacts, refs));
+  const typedRanges = typedRangeRows(partPrologues, questions);
+  if (typedRangeCount !== typedRanges.length) fail('$.typedRangeCount', 'must equal the exact ordered prologue/preamble/article source-range count');
+  literalAt(typedRangesSha256, '$.typedRangesSha256', typedRangeDigest(typedRanges));
   assertDraftStats([...partPrologues.map(value => value.child), ...questions.flatMap(question => [question.preamble, ...question.articles])], exclusions);
   assertCoverage(sourceArtifacts, partPrologues, exclusions, questions);
-  const draft = { mode, schemaVersion: SECTIONED_EDITION_COLLECTION_PACKAGE_SCHEMA, normalizationPolicy: SECTIONED_EDITION_COLLECTION_NORMALIZATION_POLICY, identity, sourceLockSha256, localReceiptSha256, topologyLockSha256, discrepancyLedgerSha256, sourceArtifacts, rightsAndCoverage, partPrologues, exclusions, discrepancies, questions };
+  const draft = { mode, schemaVersion: SECTIONED_EDITION_COLLECTION_PACKAGE_SCHEMA, normalizationPolicy: SECTIONED_EDITION_COLLECTION_NORMALIZATION_POLICY, identity, sourceLockSha256, localReceiptSha256, topologyLockSha256, typedRangeCount, typedRangesSha256, discrepancyLedgerSha256, sourceArtifacts, rightsAndCoverage, partPrologues, exclusions, discrepancies, questions };
   if (mode === 'a1_attested') assertA1AttestedDraft(draft);
   return draft;
 }
@@ -432,17 +459,23 @@ function validateRightsAndCoverage(input: unknown, path: string): typeof AQUINAS
 }
 
 function validateSourceArtifact(input: unknown, path: string): SourceArtifactEvidence {
-  const root = objectAt(input, path, ['artifactId', 'partKey', 'htmlMemberBytes', 'htmlMemberSha256', 'intellectualStartByte', 'cutoffEndByte', 'rawCoverageSha256']);
+  const root = objectAt(input, path, ['artifactId', 'partKey', 'htmlMemberBytes', 'htmlMemberSha256', 'intellectualStartByte', 'cutoffEndByte', 'rawCoverageSha256', 'html']);
   const start = integerAt(root.intellectualStartByte, `${path}.intellectualStartByte`, 0);
   const end = integerAt(root.cutoffEndByte, `${path}.cutoffEndByte`, start + 1);
+  const html = textAt(root.html, `${path}.html`, SECTIONED_EDITION_COLLECTION_PACKAGE_LIMITS.draftRawUtf8Bytes);
+  const htmlMemberBytes = integerAt(root.htmlMemberBytes, `${path}.htmlMemberBytes`, end);
+  if (utf8Length(html) !== htmlMemberBytes || sha256Hex(html) !== root.htmlMemberSha256) fail(path, 'must bind exact full artifact bytes and ordinary SHA-256');
+  const coverage = decodeUtf8(utf8Bytes(html).slice(start, end), `${path}.rawCoverage`);
+  if (sha256Hex(coverage) !== root.rawCoverageSha256) fail(path, 'must bind the separately scoped intellectual rawCoverage SHA-256');
   return {
     artifactId: safeIdAt(root.artifactId, `${path}.artifactId`),
     partKey: enumAt(root.partKey, `${path}.partKey`, AQUINAS_PACKAGE_PARTS.map(part => part.key)),
-    htmlMemberBytes: integerAt(root.htmlMemberBytes, `${path}.htmlMemberBytes`, end),
+    htmlMemberBytes,
     htmlMemberSha256: shaAt(root.htmlMemberSha256, `${path}.htmlMemberSha256`),
     intellectualStartByte: start,
     cutoffEndByte: end,
     rawCoverageSha256: shaAt(root.rawCoverageSha256, `${path}.rawCoverageSha256`),
+    html,
   };
 }
 
@@ -456,6 +489,30 @@ function validatePrologue(input: unknown, path: string, artifacts: ReadonlyMap<s
   return { partKey, child };
 }
 
+/** A1 never permits a fabricated II-II prologue or a missing Prima/I-II/III prologue. */
+function assertExactPrologueInventory(prologues: readonly TransientPartPrologue[], path: string): void {
+  const actual = prologues.map(value => value.partKey);
+  equalCanonical(actual, ['prima', 'prima-secundae', 'tertia'], path, 'must contain exactly the ordered Prima, I-II, and III prologues (none for II-II)');
+}
+
+type TypedRangeRow = readonly [kind: TransientChild['kind'], partKey: AquinasPackagePartKey, questionKey: string | null, articleKey: string | null, artifactId: string, startByte: number, endByte: number, rawSha256: string];
+
+/** Ordered child-span inventory forbids changing preamble/article boundaries without changing the committed digest. */
+function typedRangeRows(prologues: readonly TransientPartPrologue[], questions: readonly TransientQuestion[]): TypedRangeRow[] {
+  return [
+    ...prologues.map(value => typedRangeRow(value.child, value.partKey, null)),
+    ...questions.flatMap(question => [typedRangeRow(question.preamble, question.partKey, question.questionKey), ...question.articles.map(article => typedRangeRow(article, question.partKey, question.questionKey))]),
+  ];
+}
+
+function typedRangeRow(child: TransientChild, partKey: AquinasPackagePartKey, questionKey: string | null): TypedRangeRow {
+  return [child.kind, partKey, questionKey, child.articleKey ?? null, child.source.artifactId, child.source.span.startByte, child.source.span.endByte, child.source.span.rawSha256];
+}
+
+function typedRangeDigest(rows: readonly TypedRangeRow[]): string {
+  return domainHash('sectioned-edition-collection-package.typed-child-ranges.v1', canonicalSectionedEditionCollectionPackageBytes(rows));
+}
+
 function validateExclusion(input: unknown, path: string, artifacts: ReadonlyMap<string, SourceArtifactEvidence>): TransientExclusion {
   const root = objectAt(input, path, ['exclusionId', 'kind', 'artifactId', 'span', 'html']);
   const artifactId = safeIdAt(root.artifactId, `${path}.artifactId`);
@@ -463,6 +520,7 @@ function validateExclusion(input: unknown, path: string, artifacts: ReadonlyMap<
   const html = textAt(root.html, `${path}.html`, SECTIONED_EDITION_COLLECTION_PACKAGE_LIMITS.childRawUtf8Bytes);
   const span = validateRawSpan(root.span, `${path}.span`);
   if (utf8Length(html) !== span.endByte - span.startByte || sha256Hex(html) !== span.rawSha256) fail(`${path}`, 'must hash-verify its transient excluded bytes against the exact span');
+  assertSpanMatchesArtifact(artifacts.get(artifactId)!, span, `${path}.span`);
   return { exclusionId: safeIdAt(root.exclusionId, `${path}.exclusionId`), kind: enumAt(root.kind, `${path}.kind`, AQUINAS_A1_RIGHTS_AND_COVERAGE.exclusionKinds), artifactId, span, html };
 }
 
@@ -489,6 +547,7 @@ function validateQuestion(input: unknown, path: string, artifacts: ReadonlyMap<s
   const artifact = artifacts.get(artifactId);
   if (!artifact || artifact.partKey !== partKey) fail(`${path}.source.artifactId`, 'must use the matching part artifact');
   const source = { artifactId, span: validateRawSpan(sourceRoot.span, `${path}.source.span`) };
+  assertSpanMatchesArtifact(artifact, source.span, `${path}.source.span`);
   const articleCount = integerAt(root.articleCount, `${path}.articleCount`, 1);
   const preamble = validateChild(root.preamble, `${path}.preamble`, artifacts, 'preamble');
   const articles = arrayAt(root.articles, `${path}.articles`, articleCount, articleCount).map((value, index) => validateChild(value, `${path}.articles[${index}]`, artifacts, 'article'));
@@ -516,7 +575,10 @@ function validateChild(input: unknown, path: string, artifacts: ReadonlyMap<stri
   const artifactId = safeIdAt(sourceRoot.artifactId, `${path}.source.artifactId`);
   if (!artifacts.has(artifactId)) fail(`${path}.source.artifactId`, 'must reference a declared source artifact');
   const span = validateRawSpan(sourceRoot.span, `${path}.source.span`);
+  const artifact = artifacts.get(artifactId)!;
+  assertSpanMatchesArtifact(artifact, span, `${path}.source.span`);
   const blocks = arrayAt(sourceRoot.blocks, `${path}.source.blocks`, 1, SECTIONED_EDITION_COLLECTION_PACKAGE_LIMITS.childBlocks).map((value, index) => validateBlock(value, `${path}.source.blocks[${index}]`));
+  for (let index = 0; index < blocks.length; index += 1) assertSpanMatchesArtifact(artifact, blocks[index]!.span, `${path}.source.blocks[${index}].span`);
   assertBlockCoverage(span, blocks, `${path}.source`);
   const article = expectedKind === 'article' ? { articleKey: articleKeyAt(root.articleKey, `${path}.articleKey`), ordinal: integerAt(root.ordinal, `${path}.ordinal`, 1) } : {};
   return { kind: expectedKind, ...article, source: { artifactId, span, blocks }, bracketPreservationStatus: SECTIONED_EDITION_COLLECTION_BRACKET_PRESERVATION_STATUS, correctionStatus: SECTIONED_EDITION_COLLECTION_CORRECTION_STATUS };
@@ -525,7 +587,6 @@ function validateChild(input: unknown, path: string, artifacts: ReadonlyMap<stri
 function validateBlock(input: unknown, path: string): TransientReviewedBlock {
   const root = objectAt(input, path, ['span', 'html', 'topology']);
   const html = textAt(root.html, `${path}.html`, SECTIONED_EDITION_COLLECTION_PACKAGE_LIMITS.childRawUtf8Bytes);
-  if (/\r|\n/.test(html)) fail(`${path}.html`, 'must not contain literal LF/CR; line feeds are represented only by br elements');
   const span = validateRawSpan(root.span, `${path}.span`);
   if (utf8Length(html) !== span.endByte - span.startByte) fail(`${path}.span`, 'must exactly cover transient raw HTML bytes');
   literalAt(span.rawSha256, `${path}.span.rawSha256`, sha256Hex(html));
@@ -583,43 +644,63 @@ function compileChild(child: TransientChild, startByte: number, path: string): P
 /** Real-shaped parse5 renderer: one pinned container, explicit inline topology, and br-derived LF only. */
 export function renderReviewedElement(block: TransientReviewedBlock, path = 'block'): { content: string; stats: RawStats } {
   assertTextUnicode(block.html, path, true);
-  if (/\r|\n/.test(block.html)) fail(path, 'must not contain literal LF/CR; line feeds are represented only by br elements');
   const parserErrors: string[] = [];
   const fragment = parseFragment(block.html, { onParseError: error => parserErrors.push(error.code) });
   if (parserErrors.length > 0) fail(path, `parse5 rejected malformed reviewed markup (${parserErrors[0]})`);
-  if (fragment.childNodes.length !== 1) fail(path, 'must contain exactly one reviewed container element');
-  const container = fragment.childNodes[0]!;
+  const meaningful = fragment.childNodes.filter(node => !(node.nodeName === '#text' && 'value' in node && /^[\u0009-\u000d\u0020]*$/.test(node.value)));
+  if (meaningful.length !== 1) fail(path, 'must contain one reviewed container plus only separator whitespace');
+  const container = meaningful[0]!;
   if (!('tagName' in container) || container.tagName !== block.topology.containerTag) fail(path, 'does not match the pinned reviewed container topology');
   const state = { nodes: 0, depth: 0, attributes: 0 };
-  const content = renderContainer(container, block.topology, state, 1, path).normalize('NFC');
+  const content = materializeTokens(renderContainer(container, block.topology, state, 1, path)).normalize('NFC');
   assertContent(content, path);
   const stats = { rawUtf8Bytes: utf8Length(block.html), nodes: state.nodes, depth: state.depth, attributes: state.attributes, blocks: 1 };
   assertStats(stats, 'child', path);
   return { content, stats };
 }
 
-function renderContainer(node: DefaultTreeAdapterTypes.Element, topology: ReviewedTopology, state: { nodes: number; depth: number; attributes: number }, depth: number, path: string): string {
+type RenderToken = { type: 'text'; value: string } | { type: 'br' };
+function renderContainer(node: DefaultTreeAdapterTypes.Element, topology: ReviewedTopology, state: { nodes: number; depth: number; attributes: number }, depth: number, path: string): RenderToken[] {
   state.nodes += 1; state.depth = Math.max(state.depth, depth); state.attributes += node.attrs.length;
-  if (node.attrs.length !== 0) fail(path, 'reviewed container and inline elements must have no attributes');
-  return renderNodes(node.childNodes, topology, state, depth + 1, path).replace(/[\u0009\u000b\u000c\u0020]+/g, ' ').replace(/ *\n */g, '\n').replace(/^ +| +$/g, '');
+  validateInertAttributes(node.attrs, path);
+  return renderNodes(node.childNodes, topology, state, depth + 1, path);
 }
 
-function renderNodes(nodes: readonly DefaultTreeAdapterTypes.ChildNode[], topology: ReviewedTopology, state: { nodes: number; depth: number; attributes: number }, depth: number, path: string): string {
-  const content: string[] = [];
+function renderNodes(nodes: readonly DefaultTreeAdapterTypes.ChildNode[], topology: ReviewedTopology, state: { nodes: number; depth: number; attributes: number }, depth: number, path: string): RenderToken[] {
+  const content: RenderToken[] = [];
   for (let index = 0; index < nodes.length; index += 1) {
     const node = nodes[index]!;
     state.nodes += 1; state.depth = Math.max(state.depth, depth);
-    if (node.nodeName === '#text' && 'value' in node) { content.push(node.value); continue; }
-    if ('tagName' in node && node.tagName === 'br') { if (node.attrs.length !== 0 || node.childNodes.length !== 0) fail(`${path}[${index}]`, 'br must be attribute-free and empty'); content.push('\n'); continue; }
+    if (node.nodeName === '#text' && 'value' in node) { content.push({ type: 'text', value: node.value }); continue; }
+    if ('tagName' in node && node.tagName === 'br') { if (node.attrs.length !== 0 || node.childNodes.length !== 0) fail(`${path}[${index}]`, 'br must be attribute-free and empty'); content.push({ type: 'br' }); continue; }
     if ('tagName' in node && topology.inlineTags.includes(node.tagName as ReviewedTopology['inlineTags'][number])) {
-      if (node.attrs.length !== 0) fail(`${path}[${index}]`, 'inline topology permits no attributes');
+      validateInertAttributes(node.attrs, `${path}[${index}]`);
       state.attributes += node.attrs.length;
-      content.push(renderNodes(node.childNodes, topology, state, depth + 1, `${path}[${index}]`));
+      content.push(...renderNodes(node.childNodes, topology, state, depth + 1, `${path}[${index}]`));
       continue;
     }
     fail(`${path}[${index}]`, 'contains a node outside the pinned container/inline topology');
   }
-  return content.join('');
+  return content;
+}
+
+function materializeTokens(tokens: readonly RenderToken[]): string {
+  const chunks: string[] = [];
+  for (const token of tokens) {
+    if (token.type === 'br') { if (chunks.length > 0) chunks[chunks.length - 1] = chunks.at(-1)!.replace(/ +$/g, ''); chunks.push('\n'); continue; }
+    const text = token.value.replace(/[\u0009-\u000d\u0020]+/g, ' ');
+    if (chunks.at(-1) === '\n') chunks.push(text.replace(/^ +/g, '')); else chunks.push(text);
+  }
+  return chunks.join('').replace(/^ +| +$/g, '');
+}
+function validateInertAttributes(attrs: readonly { name: string; value: string }[], path: string): void {
+  const names = new Set<string>();
+  for (const attr of attrs) {
+    if (names.has(attr.name) || !['id', 'class'].includes(attr.name)) fail(path, 'allows only closed inert id/class attributes');
+    names.add(attr.name);
+    if (attr.name === 'id' && !/^[A-Za-z][A-Za-z0-9._:-]{0,127}$/.test(attr.value)) fail(path, 'contains an invalid inert id');
+    if (attr.name === 'class' && !/^[A-Za-z0-9_-]+(?: [A-Za-z0-9_-]+)*$/.test(attr.value)) fail(path, 'contains an invalid inert class');
+  }
 }
 
 function shardCompiledDraft(draft: TransientSectionedEditionCollectionDraft, questions: readonly PersistedQuestion[], prologues: ReadonlyMap<AquinasPackagePartKey, PersistedChild>): CompiledSectionedEditionCollectionPackage[] {
@@ -656,11 +737,15 @@ function makePackage(draft: TransientSectionedEditionCollectionDraft, partKey: A
     sourceLockSha256: draft.sourceLockSha256,
     localReceiptSha256: draft.localReceiptSha256,
     topologyLockSha256: draft.topologyLockSha256,
+    typedRangeCount: draft.typedRangeCount,
+    typedRangesSha256: draft.typedRangesSha256,
     discrepancyLedgerSha256: draft.discrepancyLedgerSha256,
+    discrepancyEntryHashAlgorithm: AQUINAS_A1_DISCREPANCY_ENTRY_HASH_ALGORITHM,
+    fixtureStatus: draft.mode === 'synthetic_fixture' ? 'synthetic_fixture_non_release' : null,
     rightsAndCoverage: draft.rightsAndCoverage,
-    sourceArtifacts: structuredClone(draft.sourceArtifacts),
+    sourceArtifacts: draft.sourceArtifacts.map(({ html: _html, ...source }) => structuredClone(source)),
     exclusions: draft.exclusions.map(value => ({ exclusionId: value.exclusionId, kind: value.kind, artifactId: value.artifactId, span: value.span })),
-    discrepancyInventory: draft.discrepancies.map(value => ({ ref: value.ref, canonicalEntrySha256: value.canonicalEntrySha256, questionKey: value.questionKey, articleKey: value.articleKey })),
+    discrepancyInventory: structuredClone(draft.discrepancies),
     shard: { shardId: `aquinas-summa-pg-v1.${partKey}.shard-${String(ordinal).padStart(4, '0')}`, partKey, ordinal, firstQuestionKey: questionKeys[0]!, lastQuestionKey: questionKeys.at(-1)!, questionKeys, orderedArticleKeysSha256: domainHash('sectioned-edition-collection-package.article-keys.v1', canonicalSectionedEditionCollectionPackageBytes(articleKeys)), normalizedContentUtf8Bytes },
     partPrologue: ordinal === 1 ? partPrologue : null,
     questions: structuredClone([...questions]),
@@ -680,8 +765,10 @@ function assertA1AttestedDraft(draft: TransientSectionedEditionCollectionDraft):
   literalAt(draft.sourceLockSha256, '$.sourceLockSha256', AQUINAS_A1_SOURCE_LOCK_SHA256);
   literalAt(draft.localReceiptSha256, '$.localReceiptSha256', AQUINAS_A1_LOCAL_RECEIPT_SHA256);
   literalAt(draft.topologyLockSha256, '$.topologyLockSha256', AQUINAS_A1_TOPOLOGY_LOCK_SHA256);
+  literalAt(draft.typedRangeCount, '$.typedRangeCount', AQUINAS_A1_TOPOLOGY_VECTOR.typedRangeCount);
+  literalAt(draft.typedRangesSha256, '$.typedRangesSha256', AQUINAS_A1_TOPOLOGY_VECTOR.typedRangesSha256);
   literalAt(draft.discrepancyLedgerSha256, '$.discrepancyLedgerSha256', AQUINAS_A1_DISCREPANCY_LEDGER_SHA256);
-  equalCanonical(draft.sourceArtifacts, AQUINAS_A1_SOURCES.map(source => ({ artifactId: `pg-${source.ebookId}`, ...source })), '$.sourceArtifacts', 'must bind the four exact A0 HTML IDs, bytes, and hashes');
+  equalCanonical(draft.sourceArtifacts.map(({ html: _html, ...source }) => source), AQUINAS_A1_SOURCES.map(source => ({ artifactId: `pg-${source.ebookId}`, ...source })), '$.sourceArtifacts', 'must bind the four exact A0 HTML IDs, bytes, and hashes');
   const questions = draft.questions.map(question => [question.questionKey, question.partKey, question.questionNumber, question.articleCount, question.source.span.startByte, question.source.span.endByte, question.source.span.rawSha256, question.orderedArticleKeysSha256, question.bracketStatus, question.sourceLocatorStatus, question.sourceStructureStatus]);
   literalAt(domainHash('sectioned-edition-collection-package.question-vector.v1', canonicalSectionedEditionCollectionPackageBytes(questions)), '$.questions', AQUINAS_A1_TOPOLOGY_VECTOR.questionVectorSha256);
   const articleKeys = draft.questions.flatMap(question => question.articles.map(article => article.articleKey!));
@@ -704,10 +791,26 @@ function assertCoverage(artifacts: readonly SourceArtifactEvidence[], prologues:
       ...questions.filter(value => value.source.artifactId === artifact.artifactId).map(value => value.source.span),
       ...exclusions.filter(value => value.artifactId === artifact.artifactId).map(value => value.span),
     ].sort((left, right) => left.startByte - right.startByte);
-    let cursor = artifact.intellectualStartByte;
-    for (const range of ranges) { if (range.startByte !== cursor) fail(`$.coverage.${artifact.artifactId}`, 'included authorial and excluded ranges must have no gaps or overlaps'); cursor = range.endByte; }
-    if (cursor !== artifact.cutoffEndByte) fail(`$.coverage.${artifact.artifactId}`, 'must exactly cover intellectual source boundaries');
+    let cursor = 0;
+    for (const range of ranges) {
+      if (range.startByte !== cursor) fail(`$.coverage.${artifact.artifactId}`, 'included authorial and excluded ranges must have no gaps or overlaps');
+      assertSpanMatchesArtifact(artifact, range, `$.coverage.${artifact.artifactId}`);
+      cursor = range.endByte;
+    }
+    if (cursor !== artifact.htmlMemberBytes) fail(`$.coverage.${artifact.artifactId}`, 'must exactly cover full artifact boundaries including prefix and post-cutoff exclusions');
   }
+}
+
+/** Binds every persisted raw span to the actual transient source-member bytes, not just to caller-supplied hashes. */
+function assertSpanMatchesArtifact(artifact: SourceArtifactEvidence, span: RawSpan, path: string): void {
+  if (span.startByte < 0 || span.endByte > artifact.htmlMemberBytes) fail(path, 'falls outside the declared full artifact member');
+  const raw = decodeUtf8(utf8Bytes(artifact.html).slice(span.startByte, span.endByte), path);
+  if (sha256Hex(raw) !== span.rawSha256) fail(path, 'does not match the raw SHA-256 of the actual full artifact member slice');
+}
+
+function decodeUtf8(bytes: Uint8Array, path: string): string {
+  try { return new TextDecoder('utf-8', { fatal: true }).decode(bytes); }
+  catch { fail(path, 'must begin and end on exact UTF-8 source-member byte boundaries'); }
 }
 
 function assertDraftStats(children: readonly TransientChild[], exclusions: readonly TransientExclusion[]): void {
@@ -830,6 +933,7 @@ function canonicalize(value: unknown): unknown {
 function domainHash(domain: string, bytes: Uint8Array): string { return sha256Hex(`${domain}:${new TextDecoder().decode(bytes)}`); }
 function sameBytes(left: Uint8Array, right: Uint8Array): boolean { return left.byteLength === right.byteLength && left.every((value, index) => value === right[index]); }
 function utf8Length(value: string): number { return new TextEncoder().encode(value).byteLength; }
+function utf8Bytes(value: string): Uint8Array { return new TextEncoder().encode(value); }
 function assertTextUnicode(value: string, path: string, allowAsciiWhitespace: boolean): void {
   for (let index = 0; index < value.length; index += 1) {
     const unit = value.charCodeAt(index); let point = unit;
