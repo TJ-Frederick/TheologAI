@@ -2,15 +2,21 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import {
   AQUINAS_A1_DISCREPANCY_INVENTORY,
   AQUINAS_A1_DISCREPANCY_ENTRY_HASH_ALGORITHM,
+  AQUINAS_A1_SOURCE_TYPED_RANGE_PROJECTION_ALGORITHM,
+  AQUINAS_A1_SOURCE_TYPED_RANGES,
   AQUINAS_A1_PACKAGE_IDENTITY,
   AQUINAS_A1_RIGHTS_AND_COVERAGE,
   SECTIONED_EDITION_COLLECTION_PACKAGE_LIMITS,
   SectionedEditionCollectionPackageValidationError,
+  assertReleaseManifestAttestation,
+  assertReleasePackageAttestation,
   buildMaximalWithinPartPackagePlan,
   canonicalSectionedEditionCollectionPackageBytes,
   compileSectionedEditionCollectionPackage,
   expectedAquinasPackageQuestionKeys,
   renderReviewedElement,
+  validateA1DiscrepancyProjection,
+  validateA1SourceTypedRangeProjection,
   validateTransientSectionedEditionCollectionPackageDraft,
   validateImmutableA1EvidenceDescriptor,
   verifyPersistedPackageBytes,
@@ -36,6 +42,10 @@ describe('inactive sectioned edition collection package contract', () => {
     expect(() => validateImmutableA1EvidenceDescriptor()).not.toThrow();
     expect(AQUINAS_A1_DISCREPANCY_INVENTORY).toHaveLength(46);
     expect(AQUINAS_A1_DISCREPANCY_ENTRY_HASH_ALGORITHM).toBe('legacy_a1_canonical_entry_sha256');
+    expect(AQUINAS_A1_SOURCE_TYPED_RANGE_PROJECTION_ALGORITHM).toBe('sha256_utf8_canonical_json_content_free_typed_range.v1');
+    expect(AQUINAS_A1_SOURCE_TYPED_RANGES.map(value => value.typedRangeCount)).toEqual([705, 735, 1106, 642]);
+    expect(() => validateA1SourceTypedRangeProjection(AQUINAS_A1_SOURCE_TYPED_RANGES)).not.toThrow();
+    expect(() => validateA1DiscrepancyProjection(AQUINAS_A1_DISCREPANCY_INVENTORY)).not.toThrow();
     expect(AQUINAS_A1_DISCREPANCY_INVENTORY.map(entry => entry.ref)).toEqual([
       ...Array.from({ length: 46 }, (_, index) => `a1-ledger-${String(index + 1).padStart(3, '0')}`),
     ]);
@@ -46,6 +56,20 @@ describe('inactive sectioned edition collection package contract', () => {
     expect(fixtureCompiled.manifest.shards.flatMap(shard => shard.questionKeys)).toEqual(expectedAquinasPackageQuestionKeys());
     expect(fixtureDraft.partPrologues.map(value => value.partKey)).toEqual(['prima', 'prima-secundae', 'tertia']);
     expect(fixtureDraft.typedRangeCount).toBe(3_184);
+
+    const typedRangeDrift = structuredClone(AQUINAS_A1_SOURCE_TYPED_RANGES);
+    typedRangeDrift[0]!.typedRangesSha256 = sha256Hex('changed-native-source-range');
+    expect(() => validateA1SourceTypedRangeProjection(typedRangeDrift)).toThrow(/sourceTypedRanges/);
+    for (const mutate of [
+      (value: typeof AQUINAS_A1_DISCREPANCY_INVENTORY) => { value[0]!.codes[0] = 'changed_code'; },
+      (value: typeof AQUINAS_A1_DISCREPANCY_INVENTORY) => { value[0]!.resolutionBasis = 'ledgered_missing_question_heading_scope'; },
+      (value: typeof AQUINAS_A1_DISCREPANCY_INVENTORY) => { value[0]!.evidenceEndByte += 1; },
+      (value: typeof AQUINAS_A1_DISCREPANCY_INVENTORY) => { value[0]!.resolvedArticleCount = 1; },
+    ]) {
+      const drift = structuredClone(AQUINAS_A1_DISCREPANCY_INVENTORY);
+      mutate(drift);
+      expect(() => validateA1DiscrepancyProjection(drift)).toThrow(/A1\.discrepancies/);
+    }
   });
 
   it('renders actual outerHTML shapes with inert attributes, separator whitespace, NFC, and br-only LF', () => {
@@ -57,6 +81,8 @@ describe('inactive sectioned edition collection package contract', () => {
     expect(() => renderReviewedElement(block('<p>literal \uE000 stays literal</p>', 0))).not.toThrow();
     expect(renderReviewedElement(block('<p>literal \uE000 stays literal</p>', 0)).content).toContain('\uE000');
     expect(renderReviewedElement(block('<p>a\r\nb</p>', 0)).content).toBe('a b');
+    expect(renderReviewedElement(block('<p>a <i> b </i> c<br> d</p>', 0)).content).toBe('a b c\nd');
+    expect(renderReviewedElement(block('<p>a\n b</p>', 0)).content).toBe('a b');
     expect(() => renderReviewedElement(block('<p onclick="alert(1)">x</p>', 0))).toThrow(/id\/class/);
     expect(() => renderReviewedElement(block('<p style="display:none">x</p>', 0))).toThrow(/id\/class/);
     expect(() => renderReviewedElement(block('<p><a>not-pinned</a></p>', 0))).toThrow(/pinned/);
@@ -74,6 +100,13 @@ describe('inactive sectioned edition collection package contract', () => {
     expect(first.package.discrepancyEntryHashAlgorithm).toBe('legacy_a1_canonical_entry_sha256');
     expect(first.package.typedRangeCount).toBe(3_184);
     expect(first.package.typedRangesSha256).toBe(fixtureDraft.typedRangesSha256);
+    expect(fixtureCompiled.manifest).toMatchObject({ attestationMode: 'synthetic_fixture', fixtureStatus: 'synthetic_fixture_non_release' });
+    expect(() => assertReleasePackageAttestation(first.package)).toThrow(/synthetic/);
+    expect(() => assertReleaseManifestAttestation(fixtureCompiled.manifest)).toThrow(/synthetic/);
+    const { aggregateSha256, ...manifestBase } = fixtureCompiled.manifest;
+    const aggregateFor = (value: typeof manifestBase) => sha256Hex(`sectioned-edition-collection-manifest.v1:${new TextDecoder().decode(canonicalSectionedEditionCollectionPackageBytes(value))}`);
+    expect(aggregateSha256).toBe(aggregateFor(manifestBase));
+    expect(aggregateSha256).not.toBe(aggregateFor({ ...manifestBase, fixtureStatus: null, attestationMode: 'a1_attested' }));
     expect(first.package.questions[0]!.preamble.source).toEqual(expect.objectContaining({
       artifactId: 'synthetic-prima', outputSha256: expect.any(String),
     }));
