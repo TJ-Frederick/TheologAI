@@ -219,7 +219,7 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
-      "resolvedPreambleStartByte": 1854354,
+      "resolvedPreambleStartByte": 1854235,
       "resolvedPreambleEndByte": 1854426,
       "resolvedArticleStartByte": 1854426,
       "resolvedArticleEndByte": 1860858,
@@ -245,7 +245,7 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
-      "resolvedPreambleStartByte": 1860977,
+      "resolvedPreambleStartByte": 1860858,
       "resolvedPreambleEndByte": 1861048,
       "resolvedArticleStartByte": 1861048,
       "resolvedArticleEndByte": 1868279,
@@ -1160,5 +1160,5 @@
       "resolutionBasis": "ordinal_position_and_declared_count"
     }
   ],
-  "aggregateSha256": "7ba012b5fda4c2ba1188639ca1007fb0e0f6cd67818d58d97b587ea84cc3efcc"
+  "aggregateSha256": "f24a4db06b7afa2ce2cc97a242886e37168a7d546b62dc8de0b61b5e9dea60a9"
 }

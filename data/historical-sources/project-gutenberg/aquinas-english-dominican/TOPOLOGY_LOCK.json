@@ -5,7 +5,7 @@
   "editionId": "aquinas-summa-english-dominican-gutenberg-electronic",
   "sourceLockSha256": "c5cfdd1edd132bf59968cbabe4c7de2180c42d205735ca6c06aec626104a180b",
   "localReceiptSha256": "bc0dab9ce5dc3672ccf2a81182655c75eaf6ef4f280584a40e079bf82a11719d",
-  "discrepancyLedgerSha256": "fa0659953588848590f0634826645f4ae244664dc7ecda4172f21364234381dc",
+  "discrepancyLedgerSha256": "c8e10cbf29d710b89fe48aa91d18f25489c96039116e53254d0592dfb0b68120",
   "parser": {
     "name": "parse5",
     "version": "8.0.1",
@@ -9333,5 +9333,5 @@
   ],
   "orderedQuestionKeysSha256": "bb162ca263467cc315f3db7d9f0aebe4959819bdd519255fde1bb96ceb892302",
   "orderedArticleKeysSha256": "c55f3c3027743f68071f8316842452bf1de99f3ac4b42f2dd98afe1492d8a917",
-  "aggregateSha256": "cedde784782759636c2458114cb6e2232145f7c80b2a5f4604818c8e51f9098e"
+  "aggregateSha256": "a4bc3f7a552e58a3d6a94540a5de7eee9c200fa12eb861401d951dbaf0879568"
 }

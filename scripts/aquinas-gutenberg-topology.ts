@@ -33,7 +33,7 @@ export const AQUINAS_GUTENBERG_TOPOLOGY_DISCREPANCY_LEDGER_PATH = 'data/historic
 export const AQUINAS_GUTENBERG_TOPOLOGY_SCHEMA = 'aquinas-gutenberg-topology-lock.v1';
 export const AQUINAS_GUTENBERG_TOPOLOGY_DISCREPANCY_SCHEMA = 'aquinas-gutenberg-topology-discrepancy-ledger.v1';
 export const AQUINAS_GUTENBERG_TOPOLOGY_PARSER = Object.freeze({ name: 'parse5', version: '8.0.1', sourceCodeLocationInfo: true } as const);
-const EXPECTED_TOPOLOGY_LOCK_SHA256 = '6359eac89c7ab852188aa4ae2b7af1c461d1a638f02ae8b53e25fa3001e41e30';
+const EXPECTED_TOPOLOGY_LOCK_SHA256 = 'ce6197ba036ec7200f43513f9e6676ccfd5cb5a4727077a440770416bdf6978b';
 const MAX_HTML_BYTES = 6_000_000;
 const MAX_TREE_NODES = 150_000;
 const MAX_TREE_DEPTH = 64;
@@ -409,12 +409,10 @@ function buildQuestionTopology(
     let articles: readonly ResolvedArticle[];
     if (inScope.length === 0) {
       if (artifact.ebookId !== 17611 || ![71, 72].includes(questionNumber) || declared?.count !== 1) fail(`eBook ${artifact.ebookId} question ${questionNumber} has no article-heading candidate`);
-      const preambleStart = elements[declared.index + 1];
-      if (!preambleStart || preambleStart.startChar >= endChar) fail(`eBook ${artifact.ebookId} question ${questionNumber} absent-heading evidence has no preamble span`);
       const articleStart = firstObjectionOneAfterDeclaration(elements, declared.index, endChar);
       if (!articleStart || articleStart.startChar >= endChar) fail(`eBook ${artifact.ebookId} question ${questionNumber} absent-heading evidence has no article span`);
       articles = [{ ordinal: 1, startChar: articleStart.startChar, candidate: undefined }];
-      discrepancies.push(discrepancyForAbsentArticle(artifact, questionNumber, preambleStart.startChar, articleStart.startChar, endChar, html, byteOffsets));
+      discrepancies.push(discrepancyForAbsentArticle(artifact, questionNumber, startChar, articleStart.startChar, endChar, html, byteOffsets));
     } else {
       const declarationRule = DECLARATION_RULES.find(rule => rule.ebookId === artifact.ebookId && rule.questionNumber === questionNumber);
       if (!declared) {
