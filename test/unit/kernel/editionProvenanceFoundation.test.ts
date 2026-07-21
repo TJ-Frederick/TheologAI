@@ -5,6 +5,7 @@ import {
   EditionProvenanceValidationError,
   compileEditionPackage,
   escapeEditionPlainTextForMarkdown,
+  escapeFrozenEditionSectionContentForMarkdown,
   validateEditionCompilationPackage,
 } from '../../../src/kernel/editionProvenanceFoundation.js';
 import { inventedEditionPackageFixture } from '../../fixtures/editionProvenanceFoundation.js';
@@ -454,6 +455,24 @@ describe('inactive edition provenance foundation', () => {
     const sourceExactBoundary = inventedEditionPackageFixture();
     (sourceExactBoundary.sections as Record<string, unknown>[])[0]!.content = 'First source section.\n\n';
     expect(() => validateEditionCompilationPackage(sourceExactBoundary)).not.toThrow();
+    expect(escapeFrozenEditionSectionContentForMarkdown('First source section.\n\n'))
+      .toBe('First source section\\.\n\n');
+
+    const leadingLfBoundary = inventedEditionPackageFixture();
+    (leadingLfBoundary.sections as Record<string, unknown>[])[0]!.content = '\n\nFirst source section.\n';
+    expect(() => validateEditionCompilationPackage(leadingLfBoundary)).not.toThrow();
+    expect(escapeFrozenEditionSectionContentForMarkdown('\n\nFirst source section.\n'))
+      .toBe('\n\nFirst source section\\.\n');
+
+    const allLineFeeds = inventedEditionPackageFixture();
+    (allLineFeeds.sections as Record<string, unknown>[])[0]!.content = '\n\n';
+    expectValidationError(allLineFeeds, '$.sections[0].content', 'trimmed except');
+    expect(() => escapeFrozenEditionSectionContentForMarkdown('\n\n')).toThrow(/trimmed except/);
+
+    const leadingTab = inventedEditionPackageFixture();
+    (leadingTab.sections as Record<string, unknown>[])[0]!.content = '\tFirst source section.';
+    expectValidationError(leadingTab, '$.sections[0].content', 'trimmed except');
+    expect(() => escapeFrozenEditionSectionContentForMarkdown('\tFirst source section.')).toThrow(/trimmed except/);
 
     const trailingSpace = inventedEditionPackageFixture();
     (trailingSpace.sections as Record<string, unknown>[])[0]!.content = 'First source section. \n';
@@ -577,6 +596,12 @@ describe('inactive edition provenance foundation', () => {
       .toBe([...punctuation].map(character => `\\${character}`).join(''));
     expect(escapeEditionPlainTextForMarkdown('Synthetic https://example.invalid and [brackets].'))
       .toBe('Synthetic https\\:\\/\\/example\\.invalid and \\[brackets\\]\\.');
+  });
+
+  it('keeps the shared Markdown escape boundary strict about outer whitespace', () => {
+    expect(() => escapeEditionPlainTextForMarkdown('\nSource section.')).toThrow(/trimmed/);
+    expect(() => escapeEditionPlainTextForMarkdown('Source section.\n')).toThrow(/trimmed/);
+    expect(() => escapeEditionPlainTextForMarkdown('Source section. \n')).toThrow(/trimmed/);
   });
 
   it('rejects every Unicode noncharacter in both metadata and corpus bodies', () => {

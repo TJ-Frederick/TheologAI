@@ -56,6 +56,14 @@ cleanup, or editorial reconstruction. The source acquisition record establishes
 the date `2026-07-18`, but no time of day; the foundation accepts that canonical
 date instead of inventing a timestamp.
 
+Some frozen section boundaries faithfully retain LF-only separation adjacent to
+the next source block. This does not weaken the ordinary Markdown safety
+boundary: `escapeEditionPlainTextForMarkdown` remains strict and rejects outer
+whitespace. A future renderer of `FrozenEditionSection.content` must instead
+use `escapeFrozenEditionSectionContentForMarkdown`, which validates and retains
+only those LF boundaries while sending the trimmed source text through the
+strict generic escaper. The current packet has no renderer or runtime use.
+
 ## Offline verification
 
 No package script is registered. Run the direct command locally:

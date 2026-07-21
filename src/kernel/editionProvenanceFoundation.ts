@@ -208,9 +208,11 @@ export interface FrozenEditionSection {
   displayLabel: string;
   heading: string;
   /**
-   * Stored plain text. Any future Markdown renderer MUST pass this exact value
-   * through escapeEditionPlainTextForMarkdown; validation does not interpret
-   * Markdown-looking source prose as executable syntax.
+   * Stored plain text. Frozen source segmentation may preserve LF-only outer
+   * boundaries, so a future Markdown renderer MUST pass this exact value
+   * through escapeFrozenEditionSectionContentForMarkdown. The generic
+   * escapeEditionPlainTextForMarkdown boundary intentionally remains strict
+   * and accepts only the trimmed core text.
    */
   content: string;
 }
@@ -218,7 +220,7 @@ export interface FrozenEditionSection {
 export interface EditionCompilationPackage {
   schemaVersion: 'edition-provenance-foundation.v1';
   sectionKeyPolicy: 'frozen_reviewed_v1';
-  /** Corpus bodies are plain text; future Markdown presentation requires the exported escaping boundary. */
+  /** Corpus bodies are plain text; future Markdown presentation requires the section-aware exported escaping boundary. */
   contentFormat: 'plain_text';
   work: HistoricalWorkIdentity;
   edition: EditionTranscriptionIdentity;
@@ -552,11 +554,7 @@ function validateProvenance(input: unknown): EditionProvenanceReview {
 
 function validateSection(input: unknown, path: string): FrozenEditionSection {
   const record = objectAt(input, path, ['sourceOrdinal', 'sectionKey', 'displayLabel', 'heading', 'content']);
-  // A frozen source boundary may faithfully end one section with blank LF-only
-  // separation before the next source heading.  Preserve that evidence rather
-  // than silently trimming or relocating it, while continuing to reject tabs,
-  // spaces, and CR at either boundary.
-  const content = safeTextAt(record.content, `${path}.content`, Number.MAX_SAFE_INTEGER, true, true, true);
+  const content = frozenSectionTextWithLfBoundariesAt(record.content, `${path}.content`, Number.MAX_SAFE_INTEGER);
   if (utf8Length(content) > EDITION_PROVENANCE_LIMITS.sectionUtf8Bytes) {
     fail(`${path}.content`, `exceeds ${EDITION_PROVENANCE_LIMITS.sectionUtf8Bytes} UTF-8 bytes`);
   }
@@ -573,12 +571,25 @@ function validateSection(input: unknown, path: string): FrozenEditionSection {
  * Sole presentation-security boundary for emitting edition plain text inside
  * future CommonMark/GFM. It escapes every ASCII punctuation character, which
  * includes all link, image, autolink, HTML, entity, and destination delimiters.
- * Future Markdown renderers MUST call this function. This foundation is
- * inactive; active formatters are intentionally unchanged.
+ * Future Markdown renderers MUST call this function for trimmed plain text;
+ * FrozenEditionSection.content uses its section-aware wrapper below. This
+ * foundation is inactive; active formatters are intentionally unchanged.
  */
 export function escapeEditionPlainTextForMarkdown(content: string): string {
-  const value = safeTextAt(content, '$.content', Number.MAX_SAFE_INTEGER, true, true, true);
+  const value = safeTextAt(content, '$.content', Number.MAX_SAFE_INTEGER, true, true);
   return value.replace(/[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/g, '\\$&');
+}
+
+/**
+ * Presentation boundary for FrozenEditionSection.content only. It validates
+ * and preserves the exact LF-only source boundaries, while routing the
+ * trimmed interior through the strict generic Markdown escaper. This keeps
+ * exact source segmentation reproducible without making the generic escaper
+ * accept outer whitespace.
+ */
+export function escapeFrozenEditionSectionContentForMarkdown(content: string): string {
+  const boundary = splitFrozenSectionContentAt(content, '$.content', Number.MAX_SAFE_INTEGER);
+  return `${boundary.leadingLineFeeds}${escapeEditionPlainTextForMarkdown(boundary.interior)}${boundary.trailingLineFeeds}`;
 }
 
 function validateContributorGroups(input: unknown): EditionContributorGroups {
@@ -673,18 +684,12 @@ function safeTextAt(
   maxCharacters: number,
   allowLineBreaks = false,
   allowPlainTextSyntax = false,
-  allowBoundaryLineFeeds = false,
 ): string {
   const raw = stringAt(input, path);
   if (hasLoneSurrogate(raw)) fail(path, 'contains a lone UTF-16 surrogate');
   const value = raw.normalize('NFC');
-  if (allowLineBreaks && value.includes('\r')) fail(path, 'contains a carriage return; corpus text must use line feeds');
-  const boundaryTrimmed = allowBoundaryLineFeeds ? value.replace(/^\n+|\n+$/g, '') : value;
-  if (!value || !boundaryTrimmed || boundaryTrimmed !== boundaryTrimmed.trim() || [...value].length > maxCharacters) {
+  if (!value || value !== value.trim() || [...value].length > maxCharacters) {
     fail(path, `must be non-empty, trimmed, and at most ${maxCharacters} Unicode characters`);
-  }
-  if (allowBoundaryLineFeeds && !allowLineBreaks) {
-    fail(path, 'cannot allow boundary line feeds when line breaks are forbidden');
   }
   const forbiddenControls = allowLineBreaks
     ? /[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069\ufeff]/u
@@ -712,6 +717,45 @@ function safeTextAt(
     fail(path, 'contains markup or executable-content syntax');
   }
   return value;
+}
+
+interface FrozenSectionContentBoundary {
+  leadingLineFeeds: string;
+  interior: string;
+  trailingLineFeeds: string;
+}
+
+/**
+ * Frozen source segmentation can carry LF-only separation with the preceding
+ * or following source block. This is deliberately narrower than safeTextAt:
+ * it applies only to stored section text and is never used by the Markdown
+ * escaping boundary. Tabs, spaces, CR, and all other outer whitespace remain
+ * invalid, so no renderer or generic metadata caller inherits this exception.
+ */
+function splitFrozenSectionContentAt(input: unknown, path: string, maxCharacters: number): FrozenSectionContentBoundary {
+  const raw = stringAt(input, path);
+  if (hasLoneSurrogate(raw)) fail(path, 'contains a lone UTF-16 surrogate');
+  const value = raw.normalize('NFC');
+  if (!value || [...value].length > maxCharacters) {
+    fail(path, `must be non-empty, trimmed, and at most ${maxCharacters} Unicode characters`);
+  }
+  if (value.includes('\r')) fail(path, 'contains a carriage return; corpus text must use line feeds');
+  const interior = value.replace(/^\n+|\n+$/g, '');
+  if (!interior || interior !== interior.trim()) {
+    fail(path, 'must be trimmed except for LF-only frozen source boundaries');
+  }
+  // Validate the preserved interior with the ordinary multiline corpus rules.
+  safeTextAt(interior, path, maxCharacters, true, true);
+  const leadingLineFeeds = value.match(/^\n+/u)?.[0] ?? '';
+  const trailingLineFeeds = value.match(/\n+$/u)?.[0] ?? '';
+  return { leadingLineFeeds, interior, trailingLineFeeds };
+}
+
+function frozenSectionTextWithLfBoundariesAt(input: unknown, path: string, maxCharacters: number): string {
+  const boundary = splitFrozenSectionContentAt(input, path, maxCharacters);
+  // Rejoin rather than trim or relocate the evidence: canonical serialization
+  // preserves the exact source boundary placement.
+  return `${boundary.leadingLineFeeds}${boundary.interior}${boundary.trailingLineFeeds}`;
 }
 
 function idAt(input: unknown, path: string): string {

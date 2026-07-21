@@ -3,6 +3,10 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  escapeEditionPlainTextForMarkdown,
+  escapeFrozenEditionSectionContentForMarkdown,
+} from '../../../src/kernel/editionProvenanceFoundation.js';
+import {
   AUGUSTINE_PUSEY_STRICT_ACQUIRED_ON,
   AUGUSTINE_PUSEY_STRICT_CONTENT_UTF8_BYTES,
   AUGUSTINE_PUSEY_STRICT_MAX_SECTION_UTF8_BYTES,
@@ -167,5 +171,23 @@ describe('inactive Augustine/Pusey strict edition package', () => {
     const bodyHash = createHash('sha256').update(compiled.package.sections.map(section => section.content).join('')).digest('hex');
     expect(bodyHash).toBe(verifyCheckedInAugustinePuseyStrictPackage().report.normalization.contentSha256);
     expect(compiled.package.sections.every(section => section.content === section.content.normalize('NFC'))).toBe(true);
+  });
+
+  it('provides every frozen Augustine section with a strict, boundary-preserving Markdown presentation path', () => {
+    const { compiled } = verifyCheckedInAugustinePuseyStrictPackage();
+    expect(compiled.package.sections).toHaveLength(14);
+
+    for (const section of compiled.package.sections) {
+      const leadingLineFeeds = section.content.match(/^\n+/u)?.[0] ?? '';
+      const trailingLineFeeds = section.content.match(/\n+$/u)?.[0] ?? '';
+      const interior = section.content.slice(leadingLineFeeds.length, section.content.length - trailingLineFeeds.length);
+      const rendered = escapeFrozenEditionSectionContentForMarkdown(section.content);
+
+      expect(rendered).toBe(
+        `${leadingLineFeeds}${escapeEditionPlainTextForMarkdown(interior)}${trailingLineFeeds}`,
+      );
+      expect(rendered.startsWith(leadingLineFeeds)).toBe(true);
+      expect(rendered.endsWith(trailingLineFeeds)).toBe(true);
+    }
   });
 });
