@@ -167,6 +167,15 @@ export function verifyD1Migrations(root: string, manifest: DataManifest): Buffer
   });
 }
 
+/** Verify one manifest-declared canonical input without widening its scope. */
+export function verifyManifestFileChecksum(root: string, file: DataManifestFile): void {
+  const bytes = readFileSync(join(root, file.path));
+  const actualSha256 = createHash('sha256').update(bytes).digest('hex');
+  if (actualSha256 !== file.sha256) {
+    throw new Error(`Manifest checksum mismatch for ${file.path}: expected ${file.sha256}, received ${actualSha256}`);
+  }
+}
+
 export class D1SourceConsumptionRegistry {
   private readonly declared: Map<string, string>;
   private readonly consumed = new Set<string>();

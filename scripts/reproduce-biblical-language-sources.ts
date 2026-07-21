@@ -7,10 +7,18 @@ import { dirname, join, relative } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { computeD1CorpusIdentity, parseDataManifest } from './d1-corpus-identity.js';
-import { OPENSCRIPTURES_STRONGS, STEPBIBLE_DATA } from './biblical-language-sources.js';
+import {
+  OPENSCRIPTURES_STRONGS,
+  STEPBIBLE_DATA,
+  sourceLockProjection,
+} from './biblical-language-sources.js';
+import { resolveBiblicalLanguageReproductionOwnership } from './biblical-language-reproduction-ownership.js';
 import { computeBiblicalLanguageSemanticDrift } from './biblical-language-semantic-drift.js';
 import { publishFilesAtomically, writeFileAtomically } from './atomic-publication.js';
-import { verifyExpectedLegacyReproductionReport } from './verify-biblical-language-reproduction-report.js';
+import {
+  LEGACY_REPRODUCTION_SCOPE_SCHEMA_VERSION,
+  verifyExpectedLegacyReproductionReport,
+} from './verify-biblical-language-reproduction-report.js';
 import {
   createBiblicalLanguageUnicodeCorrectionLedger,
   verifyBiblicalLanguageUnicodeCorrection,
@@ -41,9 +49,8 @@ function runBuilder(script: string, outputRoot: string): void {
 }
 
 const manifest = parseDataManifest(readFileSync(MANIFEST_PATH));
-const runtimePaths = manifest.materializations.d1.inputs
-  .filter(path => path.startsWith('data/biblical-languages/'));
-const comparedPaths = [...runtimePaths, 'data/biblical-languages/stepbible/index.json'].sort();
+const ownership = resolveBiblicalLanguageReproductionOwnership(manifest);
+const comparedPaths = ownership.legacyReproducerArtifacts;
 const outputRoot = mkdtempSync(join(tmpdir(), 'theologai-language-reproduction-'));
 const prepare = process.argv.slice(2).includes(PREPARE_ARGUMENT);
 if (process.argv.slice(2).some(argument => argument !== PREPARE_ARGUMENT)) {
@@ -112,7 +119,18 @@ try {
       openscriptures: OPENSCRIPTURES_STRONGS.commit,
       stepbible: STEPBIBLE_DATA.commit,
     },
+    // This is always the actual manifest identity present when the report was
+    // produced, including separately verified transform-7 UBS inputs.
     d1MaterializationIdentity: computeD1CorpusIdentity(manifest),
+    // The 72-artifact legacy reproducer is deliberately narrower than the
+    // current D1 corpus. Its historical identity is scope evidence only and
+    // is therefore explicitly versioned rather than overloaded above.
+    legacyReproductionScope: {
+      schemaVersion: LEGACY_REPRODUCTION_SCOPE_SCHEMA_VERSION,
+      historicalMaterializationIdentity: changed.length === 0
+        ? sourceLockProjection().derived_artifacts.d1_materialization_identity
+        : sourceLockProjection().derived_artifacts.unicode_correction.legacy_d1_materialization_identity,
+    },
     comparedArtifacts: comparedPaths.length,
     comparisonIdentityPolicy: IDENTITY_POLICY,
     trackedContentInventorySha256: createHash('sha256').update(JSON.stringify(trackedContentInventory)).digest('hex'),
@@ -128,7 +146,7 @@ try {
       join(ROOT, 'data/biblical-languages'),
       join(outputRoot, 'biblical-languages'),
     ),
-    policy: 'Gzip JSON is compared by canonical decompressed payload; raw container hashes are diagnostic because zlib output varies. This command never updates tracked runtime artifacts.',
+    policy: 'This command owns only the declared OpenScriptures/STEPBible artifact inventory. UBS Hebrew v0.9.2 inputs are validated by the data manifest plus their exact acquisition and semantic-compilation verifiers. Gzip JSON is compared by canonical decompressed payload; raw container hashes are diagnostic because zlib output varies. This command never updates tracked runtime artifacts.',
   };
   writeFileAtomically(REPORT_PATH, `${JSON.stringify(report, null, 2)}\n`);
   console.error(`[reproduce-biblical-language-sources] Report: ${relative(ROOT, REPORT_PATH)}`);

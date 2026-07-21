@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   OPENSCRIPTURES_COMMIT,
@@ -12,9 +14,18 @@ import {
   sourceFile,
   trackedArtifactAttestation,
 } from '../../../scripts/biblical-language-sources.js';
-import { computeD1CorpusIdentity, parseDataManifest } from '../../../scripts/d1-corpus-identity.js';
+import {
+  computeD1CorpusIdentity,
+  parseDataManifest,
+  verifyManifestFileChecksum,
+} from '../../../scripts/d1-corpus-identity.js';
+import {
+  UBS_HEBREW_V092_SEMANTIC_MATERIALIZATION_INPUTS,
+  resolveBiblicalLanguageReproductionOwnership,
+} from '../../../scripts/biblical-language-reproduction-ownership.js';
 import { verifyBiblicalLanguageSources } from '../../../scripts/verify-biblical-language-sources.js';
 import {
+  LEGACY_REPRODUCTION_SCOPE_SCHEMA_VERSION,
   verifyCorrectedReproductionReport,
   verifyReproductionArtifactInventory,
 } from '../../../scripts/verify-biblical-language-reproduction-report.js';
@@ -34,11 +45,7 @@ function unicodeCorrectionFixture(): {
   )) as BiblicalLanguageUnicodeCorrectionLedger;
   return {
     ledger,
-    comparedPaths: [
-      ...manifest.materializations.d1.inputs.filter(path => path.startsWith('data/biblical-languages/')
-        && !path.startsWith('data/biblical-languages/ubs-open-license/')),
-      'data/biblical-languages/stepbible/index.json',
-    ].sort(),
+    comparedPaths: resolveBiblicalLanguageReproductionOwnership(manifest).legacyReproducerArtifacts,
   };
 }
 
@@ -234,15 +241,61 @@ describe('biblical-language source revisions', () => {
     }
   });
 
+  it('assigns every materialized language input to an explicit verifier owner', () => {
+    const manifest = parseDataManifest(readFileSync('data/data-manifest.json'));
+    const ownership = resolveBiblicalLanguageReproductionOwnership(manifest);
+    expect(ownership.legacyReproducerArtifacts).toHaveLength(72);
+    expect(ownership.separatelyVerifiedUbsInputs).toEqual([
+      ...UBS_HEBREW_V092_SEMANTIC_MATERIALIZATION_INPUTS,
+    ]);
+
+    const missingUbs = structuredClone(manifest);
+    missingUbs.materializations.d1.inputs = missingUbs.materializations.d1.inputs
+      .filter(path => path !== UBS_HEBREW_V092_SEMANTIC_MATERIALIZATION_INPUTS[0]);
+    expect(() => resolveBiblicalLanguageReproductionOwnership(missingUbs))
+      .toThrow('UBS Hebrew v0.9.2 semantic materialization ownership mismatch');
+
+    const unowned = structuredClone(manifest);
+    unowned.materializations.d1.inputs.push('data/biblical-languages/future-corpus/input.json');
+    expect(() => resolveBiblicalLanguageReproductionOwnership(unowned))
+      .toThrow('Every materialized biblical-language input must have an explicit deterministic verifier owner');
+  });
+
+  it('makes the manifest itself reject missing or changed separately owned UBS inputs', () => {
+    const manifest = parseDataManifest(readFileSync('data/data-manifest.json'));
+    const path = UBS_HEBREW_V092_SEMANTIC_MATERIALIZATION_INPUTS.at(-1)!;
+    const entry = manifest.files.find(file => file.path === path)!;
+    const root = mkdtempSync(join(tmpdir(), 'theologai-ubs-manifest-'));
+    const target = join(root, path);
+    try {
+      mkdirSync(dirname(target), { recursive: true });
+      writeFileSync(target, readFileSync(path));
+      expect(() => verifyManifestFileChecksum(root, entry)).not.toThrow();
+
+      unlinkSync(target);
+      expect(() => verifyManifestFileChecksum(root, entry)).toThrow();
+
+      writeFileSync(target, 'changed UBS input');
+      expect(() => verifyManifestFileChecksum(root, entry)).toThrow('Manifest checksum mismatch');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('fails closed when a corrected reproduction report contains any residual drift', () => {
     const expected = sourceLockProjection().derived_artifacts;
+    const manifest = parseDataManifest(readFileSync('data/data-manifest.json'));
     const report = {
       status: 'content-reproducible',
       sourcePins: {
         openscriptures: OPENSCRIPTURES_COMMIT,
         stepbible: STEPBIBLE_COMMIT,
       },
-      d1MaterializationIdentity: expected.d1_materialization_identity,
+      d1MaterializationIdentity: computeD1CorpusIdentity(manifest),
+      legacyReproductionScope: {
+        schemaVersion: LEGACY_REPRODUCTION_SCOPE_SCHEMA_VERSION,
+        historicalMaterializationIdentity: expected.d1_materialization_identity,
+      },
       comparedArtifacts: expected.compared_artifacts,
       changedArtifacts: 0,
       comparisonIdentityPolicy: expected.comparison_identity_policy,
@@ -259,6 +312,21 @@ describe('biblical-language source revisions', () => {
       .toThrow('semantic structural issue count');
     expect(() => verifyCorrectedReproductionReport({ ...report, changedArtifacts: 1 } as any))
       .toThrow('changed content artifact count');
+    expect(() => verifyCorrectedReproductionReport({
+      ...report,
+      d1MaterializationIdentity: expected.d1_materialization_identity,
+    } as any)).toThrow('current D1 materialization identity');
+    expect(() => verifyCorrectedReproductionReport({
+      ...report,
+      legacyReproductionScope: {
+        ...report.legacyReproductionScope,
+        historicalMaterializationIdentity: '0'.repeat(64),
+      },
+    } as any)).toThrow('versioned legacy reproduction scope');
+    expect(() => verifyCorrectedReproductionReport({
+      ...report,
+      missingArtifacts: ['data/biblical-languages/strongs-greek.json'],
+    } as any)).toThrow('missing artifact count');
     expect(() => verifyCorrectedReproductionReport({
       ...report,
       sourcePins: { ...report.sourcePins, stepbible: '0'.repeat(40) },

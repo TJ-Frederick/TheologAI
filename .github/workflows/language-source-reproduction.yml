@@ -8,6 +8,7 @@ on:
       - 'data/biblical-languages/**'
       - 'data/data-manifest.json'
       - 'scripts/biblical-language-sources.ts'
+      - 'scripts/biblical-language-reproduction-ownership.ts'
       - 'scripts/biblical-language-semantic-drift.ts'
       - 'scripts/biblical-language-unicode-correction.ts'
       - 'scripts/artifact-content-identity.ts'
@@ -23,9 +24,14 @@ on:
       - 'scripts/verify-biblical-language-unicode-d1.ts'
       - 'scripts/verify-biblical-language-sources.ts'
       - 'scripts/verify-biblical-language-reproduction-report.ts'
+      - 'scripts/verify-ubs-hebrew-v092-acquisition.ts'
+      - 'scripts/verify-ubs-hebrew-v092-semantic-compilation.ts'
+      - 'scripts/ubs-semantics/**'
       - 'scripts/verify-data-manifest.ts'
       - 'test/unit/scripts/biblicalLanguageSources.test.ts'
       - 'test/unit/scripts/languageBuildInfrastructure.test.ts'
+      - 'test/unit/scripts/ubsHebrewV092AcquisitionInertness.test.ts'
+      - 'test/unit/scripts/ubsHebrewV092SemanticCompiler.test.ts'
       - 'package-lock.json'
       - 'package.json'
   schedule:
@@ -56,6 +62,11 @@ jobs:
 
       - name: Verify immutable source lock and canonical inventory offline
         run: npm run data:verify-sources
+
+      - name: Verify separately owned UBS Hebrew acquisition and semantic artifacts
+        run: |
+          ./node_modules/.bin/tsx scripts/verify-ubs-hebrew-v092-acquisition.ts
+          npm run data:verify-ubs-hebrew-semantic-compilation
 
       - name: Rebuild pinned sources without modifying tracked artifacts
         run: npm run data:reproduce-language-sources
