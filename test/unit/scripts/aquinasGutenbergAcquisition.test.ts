@@ -106,6 +106,8 @@ describe('Aquinas Gutenberg local acquisition/source-rights lock', () => {
     expect(lock.comparisonWitness).toMatchObject({
       sourceLockSchemaVersion: 'theologai-aquinas-shapcote-ia-source-lock.v1',
       sourceLockSha256: 'a245dbc007b76e1975eb26462a75a5e5992954d9042fc6de96477f0b30351594',
+      receiptSchemaVersion: 'theologai-aquinas-shapcote-ia-local-receipt.v1',
+      receiptSha256: '71f0312d497835b11a474b3254c4d5226952a539425461a2b1d6795848ed5399',
     });
     expect(sourceLockDigest(process.cwd())).toMatch(/^[a-f0-9]{64}$/);
   });
@@ -120,6 +122,7 @@ describe('Aquinas Gutenberg local acquisition/source-rights lock', () => {
       lock => { lock.rightsAndProvenance.rightsStatus = 'worldwide_public_domain'; },
       lock => { delete lock.rightsAndProvenance.electronicEditionProvenance.translator; },
       lock => { lock.comparisonWitness.sourceLockSchemaVersion = 'other'; },
+      lock => { lock.comparisonWitness.receiptSha256 = '0'.repeat(64); },
     ];
     for (const mutate of mutations) {
       const changed = lockJson();
@@ -154,6 +157,17 @@ describe('Aquinas Gutenberg local acquisition/source-rights lock', () => {
       { path: '../pg.html', body: 'traversal' },
       { path: 'cover.png', body: 'png', method: 0 },
     ]), expected)).toThrow('hostile ZIP member path');
+  });
+
+  it('bounds DEFLATE output by the central-directory declaration before decompression can expand a hostile member', () => {
+    const hostile = zip([
+      { path: 'pg.html', body: 'A'.repeat(32_768) },
+      { path: 'cover.png', body: 'png', method: 0 },
+    ]);
+    const central = hostile.indexOf(Buffer.from([0x50, 0x4b, 0x01, 0x02]));
+    hostile.writeUInt32LE(1, 22); // local-header uncompressed byte count
+    hostile.writeUInt32LE(1, central + 24); // matching central-directory lie
+    expect(() => parseStrictZip(hostile, ['pg.html', 'cover.png'])).toThrow('cannot be safely decompressed within its declared size bound');
   });
 
   it('rejects archive and contained-member bytes before any future corpus reader can use them', () => {

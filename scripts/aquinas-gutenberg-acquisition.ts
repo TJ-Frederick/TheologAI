@@ -22,7 +22,7 @@ export const AQUINAS_GUTENBERG_RECEIPT_VERSION = 'theologai-aquinas-gutenberg-lo
 
 // This binds the reviewed lock byte-for-byte. Changing a pin requires review of
 // both the JSON and this executable guard; a receipt alone cannot redefine it.
-const EXPECTED_SOURCE_LOCK_SHA256 = 'd54422a0cf80a11ddcfd1352fdae8c238d969160606de208a734aac29603726a';
+const EXPECTED_SOURCE_LOCK_SHA256 = 'c5cfdd1edd132bf59968cbabe4c7de2180c42d205735ca6c06aec626104a180b';
 const GUTENBERG_HOST = 'www.gutenberg.org';
 const MAX_ARCHIVE_BYTES = 2_000_000;
 const MAX_CATALOG_BYTES = 128_000;
@@ -77,6 +77,7 @@ export type AquinasGutenbergSourceLock = Readonly<{
     sourceLockSchemaVersion: 'theologai-aquinas-shapcote-ia-source-lock.v1';
     sourceLockSha256: string;
     receiptSchemaVersion: 'theologai-aquinas-shapcote-ia-local-receipt.v1';
+    receiptSha256: string;
   }>;
   artifacts: readonly AquinasGutenbergArtifact[];
 }>;
@@ -274,9 +275,9 @@ export function parseAquinasGutenbergSourceLock(value: unknown): AquinasGutenber
     if (!(key in provenance)) fail(`source lock provenance omits ${key}`);
   }
   const witness = record(source.comparisonWitness, 'source lock comparisonWitness');
-  exactKeys(witness, ['relationship', 'sourceLockSchemaVersion', 'sourceLockSha256', 'receiptSchemaVersion'], 'source lock comparisonWitness');
+  exactKeys(witness, ['relationship', 'sourceLockSchemaVersion', 'sourceLockSha256', 'receiptSchemaVersion', 'receiptSha256'], 'source lock comparisonWitness');
   if (witness.sourceLockSchemaVersion !== 'theologai-aquinas-shapcote-ia-source-lock.v1' || witness.receiptSchemaVersion !== 'theologai-aquinas-shapcote-ia-local-receipt.v1') fail('comparison witness identity drifted');
-  hex(string(witness.sourceLockSha256, 'source lock comparisonWitness.sourceLockSha256'), 'source lock comparisonWitness.sourceLockSha256');
+  if (witness.sourceLockSha256 !== 'a245dbc007b76e1975eb26462a75a5e5992954d9042fc6de96477f0b30351594' || witness.receiptSha256 !== '71f0312d497835b11a474b3254c4d5226952a539425461a2b1d6795848ed5399') fail('comparison witness digest drifted');
   const artifacts = array(source.artifacts, 'source lock artifacts').map(parseArtifact);
   const expected = [
     [17611, 'prima', 'q001-q119'],
@@ -305,6 +306,7 @@ export function parseAquinasGutenbergSourceLock(value: unknown): AquinasGutenber
       sourceLockSchemaVersion: 'theologai-aquinas-shapcote-ia-source-lock.v1',
       sourceLockSha256: string(witness.sourceLockSha256, 'source lock comparisonWitness.sourceLockSha256'),
       receiptSchemaVersion: 'theologai-aquinas-shapcote-ia-local-receipt.v1',
+      receiptSha256: string(witness.receiptSha256, 'source lock comparisonWitness.receiptSha256'),
     },
     artifacts,
   };
@@ -336,6 +338,18 @@ function crc32(bytes: Uint8Array): number {
   let value = 0xffffffff;
   for (const byte of bytes) value = CRC_TABLE[(value ^ byte) & 0xff]! ^ (value >>> 8);
   return (value ^ 0xffffffff) >>> 0;
+}
+
+function inflateRawBounded(bytes: Uint8Array, maximumOutputBytes: number, label: string): Buffer {
+  if (!Number.isSafeInteger(maximumOutputBytes) || maximumOutputBytes < 0 || maximumOutputBytes > MAX_MEMBER_BYTES) fail(`${label} has an unsafe declared uncompressed size`);
+  let inflated: Buffer;
+  try {
+    inflated = inflateRawSync(bytes, { maxOutputLength: maximumOutputBytes });
+  } catch {
+    fail(`${label} cannot be safely decompressed within its declared size bound`);
+  }
+  if (inflated.byteLength > maximumOutputBytes) fail(`${label} exceeded its declared uncompressed size bound`);
+  return inflated;
 }
 
 function u16(bytes: Uint8Array, offset: number, label: string): number {
@@ -430,12 +444,7 @@ export function parseStrictZip(bytes: Uint8Array, expectedMemberPaths: readonly 
     const localPath = strictUtf8(bytes.subarray(localOffset + 30, localOffset + 30 + localNameBytes), `local member ${index} path`);
     if (localPath !== path) fail(`local member ${index} path disagrees with the central directory`);
     const memberData = bytes.subarray(dataOffset, dataEnd);
-    let inflated: Uint8Array;
-    try {
-      inflated = method === 0 ? memberData : inflateRawSync(memberData);
-    } catch {
-      fail(`local member ${index} cannot be safely decompressed`);
-    }
+    const inflated = method === 0 ? memberData : inflateRawBounded(memberData, uncompressedBytes, `local member ${index}`);
     if (inflated.byteLength !== uncompressedBytes || crc32(inflated) !== expectedCrc) fail(`local member ${index} failed its size or CRC check`);
     members.push({ path, method, crc32: expectedCrc, compressedBytes: memberData, uncompressedBytes });
     cursor = next;
@@ -447,11 +456,7 @@ export function parseStrictZip(bytes: Uint8Array, expectedMemberPaths: readonly 
 }
 
 function inflateMember(member: ZipMember, label: string): Buffer {
-  try {
-    return Buffer.from(member.method === 0 ? member.compressedBytes : inflateRawSync(member.compressedBytes));
-  } catch {
-    fail(`${label} cannot be decompressed`);
-  }
+  return member.method === 0 ? Buffer.from(member.compressedBytes) : inflateRawBounded(member.compressedBytes, member.uncompressedBytes, label);
 }
 
 export function extractAndVerifyLockedHtml(artifact: AquinasGutenbergArtifact, archiveBytes: Uint8Array): Buffer {
@@ -461,6 +466,10 @@ export function extractAndVerifyLockedHtml(artifact: AquinasGutenbergArtifact, a
   if (!html || members.filter(member => member.path === artifact.htmlMember.path).length !== 1) fail(`eBook ${artifact.ebookId} HTML member is missing or ambiguous`);
   const inflated = inflateMember(html, `eBook ${artifact.ebookId} HTML member`);
   if (inflated.byteLength !== artifact.htmlMember.bytes || sha256(inflated) !== artifact.htmlMember.sha256) fail(`eBook ${artifact.ebookId} HTML member byte identity drifted`);
+  const htmlText = strictUtf8(inflated, `eBook ${artifact.ebookId} HTML member`);
+  if (!htmlText.includes(`<meta name="dcterms.created" content="${artifact.htmlMember.dctermsCreated}">`) || !htmlText.includes(`<meta name="dcterms.modified" content="${artifact.htmlMember.dctermsModified}">`)) {
+    fail(`eBook ${artifact.ebookId} locked dcterms metadata drifted`);
+  }
   return inflated;
 }
 
