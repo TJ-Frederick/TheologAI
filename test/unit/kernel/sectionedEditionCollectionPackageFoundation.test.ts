@@ -4,8 +4,10 @@ import {
   AQUINAS_A1_DISCREPANCY_ENTRY_HASH_ALGORITHM,
   AQUINAS_A1_SOURCE_TYPED_RANGE_PROJECTION_ALGORITHM,
   AQUINAS_A1_SOURCE_TYPED_RANGES,
+  AQUINAS_A1_SOURCES,
   AQUINAS_A1_PACKAGE_IDENTITY,
   AQUINAS_A1_RIGHTS_AND_COVERAGE,
+  AQUINAS_A1_TOPOLOGY_VECTOR,
   SECTIONED_EDITION_COLLECTION_PACKAGE_LIMITS,
   SectionedEditionCollectionPackageValidationError,
   assertReleaseManifestAttestation,
@@ -70,6 +72,33 @@ describe('inactive sectioned edition collection package contract', () => {
       mutate(drift);
       expect(() => validateA1DiscrepancyProjection(drift)).toThrow(/A1\.discrepancies/);
     }
+  });
+
+  it('deep-freezes every exported A1 commitment graph, including nested evidence arrays', () => {
+    const source = AQUINAS_A1_SOURCES[0]!;
+    const typedRange = AQUINAS_A1_SOURCE_TYPED_RANGES[0]!;
+    const topologyPart = AQUINAS_A1_TOPOLOGY_VECTOR.partArticles[0]!;
+    const discrepancy = AQUINAS_A1_DISCREPANCY_INVENTORY[0]!;
+
+    for (const value of [
+      AQUINAS_A1_SOURCES, source,
+      AQUINAS_A1_SOURCE_TYPED_RANGES, typedRange,
+      AQUINAS_A1_TOPOLOGY_VECTOR, AQUINAS_A1_TOPOLOGY_VECTOR.partArticles, topologyPart,
+      AQUINAS_A1_RIGHTS_AND_COVERAGE, AQUINAS_A1_RIGHTS_AND_COVERAGE.limitations, AQUINAS_A1_RIGHTS_AND_COVERAGE.exclusionKinds,
+      AQUINAS_A1_DISCREPANCY_INVENTORY, discrepancy, discrepancy.codes,
+    ]) expect(Object.isFrozen(value)).toBe(true);
+
+    expect(Reflect.set(source, 'htmlMemberBytes', 0)).toBe(false);
+    expect(Reflect.set(typedRange, 'typedRangesSha256', '0'.repeat(64))).toBe(false);
+    expect(Reflect.set(topologyPart, 'count', 0)).toBe(false);
+    expect(Reflect.set(AQUINAS_A1_RIGHTS_AND_COVERAGE.limitations, '0', 'changed')).toBe(false);
+    expect(Reflect.set(AQUINAS_A1_RIGHTS_AND_COVERAGE.exclusionKinds, '0', 'changed')).toBe(false);
+    expect(Reflect.set(discrepancy, 'evidenceEndByte', 0)).toBe(false);
+    expect(Reflect.set(discrepancy.codes, '0', 'changed')).toBe(false);
+    expect(source.htmlMemberBytes).toBe(3_090_576);
+    expect(typedRange.typedRangeCount).toBe(705);
+    expect(topologyPart.count).toBe(584);
+    expect(discrepancy.evidenceEndByte).toBe(601_735);
   });
 
   it('renders actual outerHTML shapes with inert attributes, separator whitespace, NFC, and br-only LF', () => {
