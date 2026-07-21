@@ -7,6 +7,7 @@ import {
   buildD1ReadinessDiagnosticSql,
   buildD1ReadinessSql,
   buildMorphologyUnicodeReadinessContract,
+  buildUbsSemanticStoredIntegrityPredicates,
   classicTextSectionReadinessPredicate,
   runRemoteD1ReadinessCheck,
 } from '../../../scripts/check-remote-d1-readiness.js';
@@ -62,9 +63,13 @@ describe('remote D1 readiness query', () => {
     expect(sql).toContain("'ubs_hebrew_semantic.coordinate_evidence_binding'");
     expect(sql).toContain("'ubs_hebrew_semantic.coordinate_ordinal_unique'");
     expect(sql).toContain("'ubs_hebrew_semantic.coordinate_reference_canonical'");
+    expect(sql).toContain("'ubs_hebrew_semantic.coordinate_bounds_canonical'");
     expect(sql).toContain("'ubs_hebrew_semantic.coordinate_ordinals_contiguous'");
     expect(sql).toContain('ON e.evidence_key = c.evidence_key');
     expect(sql).toContain("printf('%s %d:%d'");
+    expect(sql).toContain('canonical_verse_bounds(bounds_json)');
+    expect(sql).toContain('json_array_length');
+    expect(sql).toContain('json_extract');
     expect(sql).toContain('usage_expected(strongs_key,token_count,verse_count,book_count) AS');
     expect(sql).toContain('book_usage_expected(strongs_key,book,book_order,token_count,verse_count) AS');
     expect(sql).toContain('form_usage_expected(strongs_key,form_text,token_count,verse_count,first_key) AS');
@@ -78,6 +83,52 @@ describe('remote D1 readiness query', () => {
     expect(sql).toContain("('integrity.quick_check', (");
     expect(sql).toContain("('data.genesis_1_1_lemma', (");
     expect(sql).not.toMatch(/\b(?:INSERT|UPDATE|DELETE|DROP|ALTER)\b/);
+  });
+
+  it('rejects negative Psalm and out-of-canon chapter/verse coordinates in every shared D1 gate', () => {
+    const db = new Database(':memory:');
+    db.exec(`CREATE TABLE ubs_semantic_reference_evidence (evidence_key INTEGER PRIMARY KEY);
+      CREATE TABLE ubs_semantic_normalized_coordinates (
+        coordinate_key INTEGER PRIMARY KEY,
+        evidence_key INTEGER NOT NULL,
+        target_ordinal INTEGER NOT NULL,
+        normalized_book_number INTEGER NOT NULL,
+        normalized_book_code TEXT NOT NULL,
+        normalized_chapter INTEGER NOT NULL,
+        normalized_verse INTEGER NOT NULL,
+        normalized_reference TEXT NOT NULL
+      );
+      INSERT INTO ubs_semantic_reference_evidence VALUES (1);
+      INSERT INTO ubs_semantic_normalized_coordinates
+        VALUES (1, 1, 1, 1, 'GEN', 1, 31, 'Genesis 1:31');`);
+    const predicates = buildUbsSemanticStoredIntegrityPredicates();
+    const readiness = () => (db.prepare(
+      `SELECT CASE WHEN ${predicates.join(' AND ')} THEN 1 ELSE 0 END AS ready`,
+    ).get() as { ready: number }).ready;
+    const setCoordinate = db.prepare(`UPDATE ubs_semantic_normalized_coordinates SET
+      normalized_book_number = ?, normalized_book_code = ?, normalized_chapter = ?,
+      normalized_verse = ?, normalized_reference = ? WHERE coordinate_key = 1`);
+    try {
+      expect(readiness()).toBe(1);
+      setCoordinate.run(19, 'PSA', 1, 0, 'Psalms 1:0');
+      expect(readiness()).toBe(1);
+      setCoordinate.run(19, 'PSA', 1, -1, 'Psalms 1:-1');
+      expect(readiness()).toBe(0);
+      setCoordinate.run(1, 'GEN', 99, 99, 'Genesis 99:99');
+      expect(readiness()).toBe(0);
+      setCoordinate.run(1, 'GEN', 1, 32, 'Genesis 1:32');
+      expect(readiness()).toBe(0);
+
+      // The seed-import and local Workerd verifiers execute this exact shared
+      // predicate inventory, so their gates cannot silently omit the bounds.
+      const seedImport = readFileSync('scripts/verify-d1-seed-import.ts', 'utf8');
+      const workerd = readFileSync('scripts/verify-d1-seed-workerd.ts', 'utf8');
+      expect(seedImport).toContain('buildUbsSemanticStoredIntegrityPredicates().join');
+      expect(workerd).toContain('buildUbsSemanticStoredIntegrityPredicates();');
+      expect(workerd).toContain("semanticIntegrityChecks.join");
+    } finally {
+      db.close();
+    }
   });
 
   it('uses the same stable, unique check inventory for failure diagnostics', () => {
@@ -225,7 +276,7 @@ describe('remote D1 readiness query', () => {
       db.close();
       rmSync(root, { recursive: true, force: true });
     }
-  }, 30_000);
+  }, 60_000);
 
   it.skipIf(!generatedDbPath)('binds semantic provenance and every relational semantic row to the pinned artifact identity', () => {
     const root = mkdtempSync(join(tmpdir(), 'theologai-semantic-identity-mutation-'));

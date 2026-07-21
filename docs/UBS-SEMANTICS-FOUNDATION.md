@@ -9,6 +9,10 @@ are verification inputs only: no runtime composition root registers them, and
 they cause no tool, prompt, resource, manifest-public-contract, binding,
 remote-D1, preview, production, or deployment change.
 
+The owner authorized draft-PR publication of this local M4A slice, but it had
+not yet been published when this state record was authored. That authorization
+does not extend to remote migration, runtime registration, or deployment.
+
 `SOURCE.json` remains the historical acquisition-gate snapshot for the pinned
 source packet and derived support files. It is not a current release-state
 record and must not be rewritten to imply a remote release.

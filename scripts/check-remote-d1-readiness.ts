@@ -10,7 +10,7 @@ import { computeD1CorpusIdentity, parseDataManifest, verifyD1Migrations } from '
 import { UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY, UBS_PARALLEL_PASSAGE_PROVENANCE } from '../src/kernel/ubsParallelSource.js';
 import { CANONICAL_BOOK_ORDER_SQL } from '../src/adapters/shared/repositoryUtils.js';
 import { CLASSIC_TEXT_LIMITS } from '../src/kernel/classicTextContract.js';
-import { BIBLE_BOOKS } from '../src/kernel/books.js';
+import { BIBLE_BOOKS, getBibleBookBounds } from '../src/kernel/books.js';
 import type {
   BiblicalLanguageUnicodeCorrectionLedger,
   MorphologyUnicodeCorrection,
@@ -121,6 +121,13 @@ export function buildUbsSemanticStoredIntegrityPredicates(): readonly string[] {
     .map(book => `WHEN ${book.number} THEN ${sqlLiteral(book[column])}`).join('\n')}\nEND`;
   const canonicalName = canonicalCase('name');
   const canonicalCode = canonicalCase('helloaoCode');
+  // One compact JSON array-of-arrays carries the full canonical chapter and
+  // verse bounds into the read-only SQL gate. D1 and SQLite both expose the
+  // JSON functions used here, and the literal is emitted once inside this
+  // self-contained scalar CTE rather than repeated for every Bible book.
+  const canonicalVerseBounds = sqlLiteral(JSON.stringify(
+    BIBLE_BOOKS.map(book => getBibleBookBounds(book).maxVerseByChapter),
+  ));
   return Object.freeze([
     `(SELECT COUNT(*) FROM ubs_semantic_normalized_coordinates c
       LEFT JOIN ubs_semantic_reference_evidence e
@@ -135,6 +142,18 @@ export function buildUbsSemanticStoredIntegrityPredicates(): readonly string[] {
       WHERE c.normalized_book_code IS NOT (${canonicalCode})
          OR c.normalized_reference IS NOT printf('%s %d:%d', (${canonicalName}), c.normalized_chapter, c.normalized_verse)
          OR (c.normalized_verse = 0 AND c.normalized_book_number != 19)) = 0`,
+    `(WITH canonical_verse_bounds(bounds_json) AS (VALUES (${canonicalVerseBounds}))
+      SELECT COUNT(*) FROM (
+        SELECT DISTINCT normalized_book_number, normalized_chapter, normalized_verse
+        FROM ubs_semantic_normalized_coordinates
+      ) c
+      CROSS JOIN canonical_verse_bounds b
+      WHERE c.normalized_chapter NOT BETWEEN 1 AND json_array_length(
+              b.bounds_json, '$[' || (c.normalized_book_number - 1) || ']')
+         OR c.normalized_verse NOT BETWEEN
+              CASE WHEN c.normalized_book_number = 19 THEN 0 ELSE 1 END
+              AND json_extract(b.bounds_json, '$[' || (c.normalized_book_number - 1)
+                || '][' || (c.normalized_chapter - 1) || ']')) = 0`,
     `(SELECT COUNT(*) FROM (
       SELECT evidence_key
       FROM ubs_semantic_normalized_coordinates
@@ -293,7 +312,8 @@ function buildD1ReadinessQueryContract(
     `modified = 1`,
     `modification_description = ${sqlLiteral(source.modificationDescription)}`,
   ].join(' AND ');
-  const [coordinateEvidenceBinding, coordinateOrdinalUniqueness, coordinateCanonicalReference, coordinateOrdinalContiguity] =
+  const [coordinateEvidenceBinding, coordinateOrdinalUniqueness, coordinateCanonicalReference,
+    coordinateCanonicalBounds, coordinateOrdinalContiguity] =
     buildUbsSemanticStoredIntegrityPredicates();
   const ubsHebrewSemanticChecks: D1ReadinessCheck[] = [
     { id: 'ubs_hebrew_semantic.artifact_identity', predicate: `(SELECT artifact_identity FROM ubs_semantic_artifacts) = ${sqlLiteral(semanticArtifact.artifactIdentity)}` },
@@ -304,6 +324,7 @@ function buildD1ReadinessQueryContract(
     { id: 'ubs_hebrew_semantic.coordinate_evidence_binding', predicate: coordinateEvidenceBinding },
     { id: 'ubs_hebrew_semantic.coordinate_ordinal_unique', predicate: coordinateOrdinalUniqueness },
     { id: 'ubs_hebrew_semantic.coordinate_reference_canonical', predicate: coordinateCanonicalReference },
+    { id: 'ubs_hebrew_semantic.coordinate_bounds_canonical', predicate: coordinateCanonicalBounds },
     { id: 'ubs_hebrew_semantic.coordinate_ordinals_contiguous', predicate: coordinateOrdinalContiguity },
     { id: 'ubs_hebrew_semantic.relationships', predicate: `(SELECT COUNT(*) FROM ubs_semantic_reference_evidence e LEFT JOIN ubs_semantic_senses s ON s.artifact_identity = e.artifact_identity AND s.sense_id = e.sense_id WHERE s.sense_id IS NULL) = 0` },
   ];

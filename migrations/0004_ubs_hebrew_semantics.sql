@@ -145,7 +145,9 @@ CREATE TABLE ubs_semantic_normalized_coordinates (
   -- Verse zero represents a Psalm superscription only. The canonical display
   -- string and book code are checked by the deterministic materializer and
   -- stored-data readiness assertions below the schema boundary.
-  normalized_verse INTEGER NOT NULL CHECK (normalized_verse > 0 OR normalized_book_number = 19),
+  normalized_verse INTEGER NOT NULL CHECK (
+    normalized_verse >= 0 AND (normalized_verse != 0 OR normalized_book_number = 19)
+  ),
   normalized_reference TEXT NOT NULL CHECK (normalized_reference = trim(normalized_reference) AND length(normalized_reference) > 0),
   -- evidence_key is a global parent identity. Do not duplicate artifact or
   -- evidence IDs here: the normalized child therefore cannot drift away from

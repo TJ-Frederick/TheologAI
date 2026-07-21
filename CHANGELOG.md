@@ -11,13 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Reconciled public release documentation through PR #82. PR #72 remains the
+- Reconciled public release documentation through merged PR #83. PR #72
+  remains the
   deployed Worker baseline: production serves Worker
   `762485da-9e02-46a0-9777-e0d8743b9dbf`, preview serves Worker
   `8ed4ad1a-f45f-4cdc-a6de-5358f59b6d44`, and the later behaviorally inert
-  repository merges through `023804681d725e9600f3ff3dbfce347417c23eff` are
-  not remote deployments. The U3-T7 work carried by PR #83 is likewise
-  repository-only and undeployed.
+  repository merges through `93d5837b05249c15127ab20107f86443cccf4e1e` are
+  not remote deployments.
 
 - Completed the runtime-inert UBS Hebrew U3-T7 compiler, canonical
   native-to-normalized bridge, content-free reproducibility audit, embedded
@@ -28,7 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in Worker or Node composition, present in remote D1, bound to a Worker,
   exposed through MCP, or deployed to preview or production. `SOURCE.json`
   remains the historical acquisition-gate snapshot rather than deployment
-  evidence.
+  evidence. Draft-PR publication of M4A is owner-authorized but had not yet
+  occurred when this entry was authored; remote migration and deployment are
+  still unapproved.
 
 - Clarified endpoint migration behavior: ordinary production `workers.dev`
   requests temporarily redirect to the canonical custom domain, while the
@@ -37,10 +39,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   primary-source v4/local-only schema; preview keeps the v5 discovery-only
   schema, with CCEL execution disabled in both environments.
 
-- Recorded that the acquired UBS Hebrew and historical-source packets remain
-  inactive: they add no D1 rows, runtime/MCP surface, or hosted historical
-  work. Migration `0004`/transform 7, migration `0005`/transform 8, Norton
-  transform 9, and subsequent edition transforms remain separately gated;
+- Recorded that the acquired source packets remain inactive at runtime. M4A
+  adds UBS rows only to derived local SQLite and the deterministic local D1
+  seed; it adds no remote D1 rows or runtime/MCP surface. The remote release of
+  migration `0004`/transform 7, migration `0005`/transform 8, Norton transform
+  9, and subsequent edition transforms remain separately gated; remote
   `0004`/transform 7 is the required predecessor of `0005`/transform 8.
 
 - Retired the unreachable CCEL body reader while retaining the bounded,

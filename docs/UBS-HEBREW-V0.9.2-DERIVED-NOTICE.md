@@ -34,6 +34,10 @@ M4A materializes the derived rows only in the local SQLite build and
 deterministic local D1 seed for verification; no full derived semantic corpus
 is bundled in a Worker, served by MCP, or published to a remote database.
 
+Draft-PR publication of this local-only M4A work is owner-authorized but had not
+yet occurred when this notice was updated; remote D1 and deployment remain
+separately gated.
+
 Every reproduced artifact carries the exact source names, pinned URLs, Git
 blobs, SHA-256 values, the retained UBS/SDBH copyright and ancestry statement,
 this notice's path, the CC BY-SA legal-code warranty/disclaimer link, and the

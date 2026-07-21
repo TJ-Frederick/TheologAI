@@ -275,19 +275,22 @@ is local source context only and does not define the current product contract.
   migration `0004` / transform 7 were the next gates; M4A records their
   completed local-only successor below.
 
-- **UBS Hebrew M4A local materialization (unpublished):** completed migration
+- **UBS Hebrew M4A local materialization (draft publication authorized):**
+  completed migration
   `0004`, transform 7, local SQLite materialization, deterministic D1
   seed/import verification, and inactive Node/D1 aggregate adapters. This is
   local-only and runtime-inert: no composition-root registration, remote D1
   import, binding change, preview/prod deployment, or MCP behavior is present
-  or authorized. `SOURCE.json` remains the historical acquisition-gate
-  snapshot, not a release-state record.
+  or authorized. The owner authorized draft-PR publication, but the branch had
+  not yet been published when this record was authored. `SOURCE.json` remains
+  the historical acquisition-gate snapshot, not a release-state record.
 
-Entries through PR #82 describe merged repository state. The U3-T7 work carried
-by PR #83 is repository-only and undeployed; merging it would not itself be
-deployment evidence. Deployment state is established only by the relevant
-protected workflow and post-deployment smoke evidence. No merge after PR #72
-through PR #82 at `023804681d725e9600f3ff3dbfce347417c23eff` was deployed.
+Entries through PR #83 describe merged repository state. PR #83 is
+repository-only and undeployed; its merge is not deployment evidence. M4A is a
+later local-only draft whose publication is authorized but not yet complete.
+Deployment state is established only by the relevant protected workflow and
+post-deployment smoke evidence. No merge after PR #72 through PR #83 at
+`93d5837b05249c15127ab20107f86443cccf4e1e` was deployed.
 Production remains the PR #72 Worker
 `762485da-9e02-46a0-9777-e0d8743b9dbf`, and preview remains the PR #72 Worker
 `8ed4ad1a-f45f-4cdc-a6de-5358f59b6d44`.

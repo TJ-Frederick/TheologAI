@@ -14,7 +14,7 @@ const LEDGER_PATH = 'data/biblical-languages/UNICODE-CORRECTION.json';
 const EXPECTED_IDENTITIES = Object.freeze({
   5: '93ae4ca3c09493cf02a6b48154c991c133fd6ce235119fc4b8cba0256a36f881',
   6: 'c334b4b91c3a7c334a9425937c7f99473f27014ddae6cea377ee38bd578a6707',
-  7: 'bae47e93c80c54e0223c5bd3a2f56f6be7057b1aa563343abf2523b117cf7f39',
+  7: '3708bf7e3ab903c409453fdf4fdac1b68848547f91f0b516855dd21765de4796',
 } as const);
 const HISTORICAL_CATALOG_INPUTS = Object.freeze([
   'data/historical-document-catalog-provenance.json',
