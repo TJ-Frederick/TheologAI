@@ -18,6 +18,10 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "locator_article_ordinal_mismatch"
       ],
@@ -39,6 +43,10 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "locator_article_ordinal_mismatch"
       ],
@@ -60,6 +68,10 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "locator_article_ordinal_mismatch"
       ],
@@ -81,6 +93,10 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "locator_question_scope_mismatch"
       ],
@@ -102,6 +118,10 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "locator_syntax_noncanonical"
       ],
@@ -123,6 +143,10 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "locator_syntax_noncanonical",
         "article_heading_tag_noncanonical"
@@ -145,6 +169,10 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "locator_article_ordinal_mismatch"
       ],
@@ -166,6 +194,10 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "locator_article_ordinal_mismatch"
       ],
@@ -179,16 +211,21 @@
       "articleKey": "prima.q071.a001",
       "observedLocator": null,
       "observedTagName": null,
-      "evidenceStartByte": 1854354,
+      "evidenceStartByte": 1854426,
       "evidenceEndByte": 1860858,
-      "evidenceSha256": "7e89ee5c4cab691f29c9e26e88218da34db9670dd61dc78ccd27099db8da3855",
+      "evidenceSha256": "734ddc1cce643b98662ed4dd39d59a9199a735552cdbb5de7b914cb002dcda5a",
       "containingElementStartByte": null,
       "containingElementEndByte": null,
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
+      "resolvedPreambleStartByte": 1854354,
+      "resolvedPreambleEndByte": 1854426,
+      "resolvedArticleStartByte": 1854426,
+      "resolvedArticleEndByte": 1860858,
       "codes": [
-        "article_heading_absent"
+        "article_heading_absent",
+        "article_locator_absent"
       ],
       "resolutionBasis": "ordinal_position_and_declared_count"
     },
@@ -200,16 +237,21 @@
       "articleKey": "prima.q072.a001",
       "observedLocator": null,
       "observedTagName": null,
-      "evidenceStartByte": 1860977,
+      "evidenceStartByte": 1861048,
       "evidenceEndByte": 1868279,
-      "evidenceSha256": "056f66f3d7cd30296378b54b80725d44af6aee0e6fbbfc80df839756d5e4d896",
+      "evidenceSha256": "0267507e95bb52b9b0ba79ed8b4db0d77725a7af4c4ce60fcb00cd4e47a5c31c",
       "containingElementStartByte": null,
       "containingElementEndByte": null,
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
+      "resolvedPreambleStartByte": 1860977,
+      "resolvedPreambleEndByte": 1861048,
+      "resolvedArticleStartByte": 1861048,
+      "resolvedArticleEndByte": 1868279,
       "codes": [
-        "article_heading_absent"
+        "article_heading_absent",
+        "article_locator_absent"
       ],
       "resolutionBasis": "ordinal_position_and_declared_count"
     },
@@ -229,6 +271,10 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "locator_article_ordinal_mismatch"
       ],
@@ -250,6 +296,10 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "locator_part_prefix_missing"
       ],
@@ -271,6 +321,10 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "locator_article_ordinal_mismatch"
       ],
@@ -292,6 +346,10 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "question_heading_absent"
       ],
@@ -313,6 +371,10 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "locator_article_ordinal_mismatch"
       ],
@@ -334,7 +396,12 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
+      "resolvedPreambleStartByte": 605411,
+      "resolvedPreambleEndByte": 606179,
+      "resolvedArticleStartByte": 606179,
+      "resolvedArticleEndByte": 611349,
       "codes": [
+        "article_locator_absent",
         "question_heading_retyped_article_boundary"
       ],
       "resolutionBasis": "ordinal_position_and_declared_count"
@@ -355,6 +422,10 @@
       "containingElementSha256": "e09bb9d88d0b9a10c964bda6275f6dcb43ea559e2874f330e47c9ba74b1df717",
       "observedDeclaredArticleCount": 4,
       "resolvedArticleCount": 5,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "declared_article_count_mismatch"
       ],
@@ -376,6 +447,10 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "locator_syntax_noncanonical"
       ],
@@ -397,6 +472,10 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "locator_article_ordinal_mismatch"
       ],
@@ -418,6 +497,10 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "locator_syntax_noncanonical"
       ],
@@ -439,6 +522,10 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": 4,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "declared_article_count_absent"
       ],
@@ -460,6 +547,10 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "locator_syntax_noncanonical"
       ],
@@ -481,6 +572,10 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "locator_part_prefix_mismatch"
       ],
@@ -502,6 +597,10 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "locator_article_ordinal_mismatch",
         "article_ordinal_position_mismatch"
@@ -524,6 +623,10 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "locator_article_ordinal_mismatch",
         "article_ordinal_position_mismatch"
@@ -546,6 +649,10 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "article_locator_absent",
         "article_heading_tag_noncanonical"
@@ -568,6 +675,10 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "locator_syntax_noncanonical"
       ],
@@ -589,6 +700,10 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "locator_question_scope_mismatch"
       ],
@@ -610,6 +725,10 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "locator_article_ordinal_mismatch"
       ],
@@ -631,6 +750,10 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "locator_syntax_noncanonical"
       ],
@@ -652,6 +775,10 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "locator_article_ordinal_mismatch"
       ],
@@ -673,6 +800,10 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": 1,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "declared_article_count_absent"
       ],
@@ -694,6 +825,10 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "locator_syntax_noncanonical"
       ],
@@ -715,6 +850,10 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": 1,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "declared_article_count_absent"
       ],
@@ -736,6 +875,10 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "locator_article_ordinal_mismatch"
       ],
@@ -757,6 +900,10 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "locator_article_ordinal_mismatch"
       ],
@@ -778,6 +925,10 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "locator_article_ordinal_mismatch"
       ],
@@ -799,6 +950,10 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "locator_article_ordinal_mismatch"
       ],
@@ -820,6 +975,10 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "locator_question_scope_mismatch"
       ],
@@ -841,6 +1000,10 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "question_heading_absent"
       ],
@@ -862,6 +1025,10 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "locator_part_prefix_mismatch"
       ],
@@ -883,6 +1050,10 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "locator_syntax_noncanonical"
       ],
@@ -904,6 +1075,10 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "locator_article_ordinal_mismatch"
       ],
@@ -925,6 +1100,10 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": 6,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "declared_article_count_absent"
       ],
@@ -946,6 +1125,10 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "locator_article_ordinal_mismatch"
       ],
@@ -967,11 +1150,15 @@
       "containingElementSha256": null,
       "observedDeclaredArticleCount": null,
       "resolvedArticleCount": null,
+      "resolvedPreambleStartByte": null,
+      "resolvedPreambleEndByte": null,
+      "resolvedArticleStartByte": null,
+      "resolvedArticleEndByte": null,
       "codes": [
         "locator_question_scope_mismatch"
       ],
       "resolutionBasis": "ordinal_position_and_declared_count"
     }
   ],
-  "aggregateSha256": "bca0fa6f2d818c67c68a495f56657ea7eaecc89e64ce0a42e6b5bc93ea9d11da"
+  "aggregateSha256": "7ba012b5fda4c2ba1188639ca1007fb0e0f6cd67818d58d97b587ea84cc3efcc"
 }

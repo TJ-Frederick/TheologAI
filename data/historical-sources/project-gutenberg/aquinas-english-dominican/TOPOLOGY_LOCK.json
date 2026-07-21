@@ -5,7 +5,7 @@
   "editionId": "aquinas-summa-english-dominican-gutenberg-electronic",
   "sourceLockSha256": "c5cfdd1edd132bf59968cbabe4c7de2180c42d205735ca6c06aec626104a180b",
   "localReceiptSha256": "bc0dab9ce5dc3672ccf2a81182655c75eaf6ef4f280584a40e079bf82a11719d",
-  "discrepancyLedgerSha256": "e7ce5b2f661bdd66589e32f61adbfb9158ec8d6cf68fc1c8b03f0b3771fa1dc7",
+  "discrepancyLedgerSha256": "fa0659953588848590f0634826645f4ae244664dc7ecda4172f21364234381dc",
   "parser": {
     "name": "parse5",
     "version": "8.0.1",
@@ -22,7 +22,7 @@
       "cutoffEndByte": 3070657,
       "rawCoverageSha256": "ea9b7c7efb5f15dce4b07847983a224ec41b5ff8b8cd6980a84c24cbd8ac2314",
       "typedRangeCount": 705,
-      "typedRangesSha256": "e71510dbc83d5cfc8bab1602870020204f0958601be78f7e512dbd534a849faf",
+      "typedRangesSha256": "f88706cdd02f1cf881ec2ccec6fe674be1fb983c84ecb1286c1f9077232212b0",
       "typedBlockCounts": {
         "authorial_part_prologue": 1,
         "authorial_question_preamble": 119,
@@ -1388,7 +1388,7 @@
       },
       "orderedArticleKeysSha256": "3a27ab589534b7c819d6b4361cf21cdc6e962e436f894130b97e711eb7afb7ef",
       "bracketStatus": "mixed_unresolved_preserve_verbatim_in_a2",
-      "source_locator_status": "verified",
+      "source_locator_status": "discrepancy_ledgered",
       "source_structure_status": "discrepancy_ledgered",
       "order": 71
     },
@@ -1406,7 +1406,7 @@
       },
       "orderedArticleKeysSha256": "65a9ffe452664488c20a97ff920599da5d49547f16ecfaacce7aca45aa4c8c8d",
       "bracketStatus": "mixed_unresolved_preserve_verbatim_in_a2",
-      "source_locator_status": "verified",
+      "source_locator_status": "discrepancy_ledgered",
       "source_structure_status": "discrepancy_ledgered",
       "order": 72
     },
@@ -2666,7 +2666,7 @@
       },
       "orderedArticleKeysSha256": "123d8458970a113a196db0cf72daf97c080361df59eb4d6d4301d00d33a4f1bb",
       "bracketStatus": "mixed_unresolved_preserve_verbatim_in_a2",
-      "source_locator_status": "verified",
+      "source_locator_status": "discrepancy_ledgered",
       "source_structure_status": "discrepancy_ledgered",
       "order": 142
     },
@@ -9333,5 +9333,5 @@
   ],
   "orderedQuestionKeysSha256": "bb162ca263467cc315f3db7d9f0aebe4959819bdd519255fde1bb96ceb892302",
   "orderedArticleKeysSha256": "c55f3c3027743f68071f8316842452bf1de99f3ac4b42f2dd98afe1492d8a917",
-  "aggregateSha256": "acb4215f0ae49f8a931afb7e62ca004cddd12334a8675e3fd319acf5de9e3bdb"
+  "aggregateSha256": "cedde784782759636c2458114cb6e2232145f7c80b2a5f4604818c8e51f9098e"
 }

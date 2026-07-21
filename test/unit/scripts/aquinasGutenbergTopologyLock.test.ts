@@ -15,7 +15,7 @@ describe('Aquinas Gutenberg content-free topology lock', () => {
   it('binds the frozen four-source topology with no runtime registration', () => {
     const lock = JSON.parse(read(AQUINAS_GUTENBERG_TOPOLOGY_LOCK_PATH)) as {
       status: string;
-      questions: { questionKey: string; source_locator_status: string; source_structure_status: string }[];
+      questions: { questionKey: string; rawSpanStartByte: number; source_locator_status: string; source_structure_status: string }[];
       sources: { ebookId: number; editorialInterludeCount: number }[];
     };
 
@@ -25,6 +25,8 @@ describe('Aquinas Gutenberg content-free topology lock', () => {
     expect(lock.sources.map(source => source.editorialInterludeCount)).toEqual([0, 0, 0, 1]);
     expect(question(lock, 'prima-secundae.q038')).toMatchObject({ source_locator_status: 'verified', source_structure_status: 'discrepancy_ledgered' });
     expect(question(lock, 'prima.q019')).toMatchObject({ source_locator_status: 'discrepancy_ledgered', source_structure_status: 'discrepancy_ledgered' });
+    expect(question(lock, 'prima-secundae.q023')).toMatchObject({ source_locator_status: 'discrepancy_ledgered', source_structure_status: 'discrepancy_ledgered' });
+    expect(question(lock, 'secunda-secundae.q183')).toMatchObject({ rawSpanStartByte: 4_083_371 });
   });
 
   it('requires the exact checked-in content-free discrepancy ledger', () => {
@@ -46,6 +48,21 @@ describe('Aquinas Gutenberg content-free topology lock', () => {
       resolvedArticleCount: 5,
       resolutionBasis: 'article_shell_count_and_preamble_evidence',
     });
+    expect(ledger.entries.find(entry => entry.questionKey === 'prima-secundae.q023')).toMatchObject({
+      codes: ['article_locator_absent', 'question_heading_retyped_article_boundary'],
+      resolvedPreambleStartByte: 605_411,
+      resolvedPreambleEndByte: 606_179,
+      resolvedArticleStartByte: 606_179,
+      resolvedArticleEndByte: 611_349,
+    });
+    expect(ledger.entries.filter(entry => entry.questionKey === 'prima.q071' || entry.questionKey === 'prima.q072').map(entry => [entry.questionKey, entry.resolvedPreambleStartByte, entry.resolvedArticleStartByte, entry.codes])).toEqual([
+      ['prima.q071', 1_854_354, 1_854_426, ['article_heading_absent', 'article_locator_absent']],
+      ['prima.q072', 1_860_977, 1_861_048, ['article_heading_absent', 'article_locator_absent']],
+    ]);
+    expect(ledger.entries.filter(entry => entry.questionKey === 'secunda-secundae.q019').map(entry => entry.articleKey)).toEqual([
+      'secunda-secundae.q019.a007',
+      'secunda-secundae.q019.a008',
+    ]);
   });
 });
 

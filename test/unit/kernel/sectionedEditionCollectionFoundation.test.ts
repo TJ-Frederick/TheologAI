@@ -70,6 +70,16 @@ describe('inactive sectioned collection foundation', () => {
     expect(() => buildMaximalWithinPartShards(SOURCE_LOCK_SHA256, metrics)).toThrow(SectionedEditionCollectionValidationError);
   });
 
+  it('rejects a single question whose serialized package size exceeds its reviewed gate', () => {
+    const metrics = syntheticMetrics();
+    metrics[0] = {
+      ...metrics[0]!,
+      serializedPackageUtf8Bytes: SECTIONED_EDITION_COLLECTION_LIMITS.compiledPackageUtf8Bytes + 1,
+    };
+
+    expect(() => buildMaximalWithinPartShards(SOURCE_LOCK_SHA256, metrics)).toThrow(/cannot fit/);
+  });
+
   it('rejects non-canonical metrics and dishonest manifest details', () => {
     const metrics = syntheticMetrics();
     const manifest = buildMaximalWithinPartShards(SOURCE_LOCK_SHA256, metrics);

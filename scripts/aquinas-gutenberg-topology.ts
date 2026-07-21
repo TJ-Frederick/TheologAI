@@ -33,7 +33,7 @@ export const AQUINAS_GUTENBERG_TOPOLOGY_DISCREPANCY_LEDGER_PATH = 'data/historic
 export const AQUINAS_GUTENBERG_TOPOLOGY_SCHEMA = 'aquinas-gutenberg-topology-lock.v1';
 export const AQUINAS_GUTENBERG_TOPOLOGY_DISCREPANCY_SCHEMA = 'aquinas-gutenberg-topology-discrepancy-ledger.v1';
 export const AQUINAS_GUTENBERG_TOPOLOGY_PARSER = Object.freeze({ name: 'parse5', version: '8.0.1', sourceCodeLocationInfo: true } as const);
-const EXPECTED_TOPOLOGY_LOCK_SHA256 = '171f7a2d7714b474d867f874449c24f8ef482314f4ab5da4660bc0fe487ca11d';
+const EXPECTED_TOPOLOGY_LOCK_SHA256 = '6359eac89c7ab852188aa4ae2b7af1c461d1a638f02ae8b53e25fa3001e41e30';
 const MAX_HTML_BYTES = 6_000_000;
 const MAX_TREE_NODES = 150_000;
 const MAX_TREE_DEPTH = 64;
@@ -91,6 +91,10 @@ export type AquinasTopologyDiscrepancy = Readonly<{
   containingElementSha256: string | null;
   observedDeclaredArticleCount: number | null;
   resolvedArticleCount: number | null;
+  resolvedPreambleStartByte: number | null;
+  resolvedPreambleEndByte: number | null;
+  resolvedArticleStartByte: number | null;
+  resolvedArticleEndByte: number | null;
   codes: readonly string[];
   resolutionBasis: 'ordinal_position_and_declared_count' | 'ledgered_missing_question_heading_scope' | 'article_shell_count_and_preamble_evidence';
 }>;
@@ -405,10 +409,12 @@ function buildQuestionTopology(
     let articles: readonly ResolvedArticle[];
     if (inScope.length === 0) {
       if (artifact.ebookId !== 17611 || ![71, 72].includes(questionNumber) || declared?.count !== 1) fail(`eBook ${artifact.ebookId} question ${questionNumber} has no article-heading candidate`);
-      const articleStart = elements[declared.index + 1];
+      const preambleStart = elements[declared.index + 1];
+      if (!preambleStart || preambleStart.startChar >= endChar) fail(`eBook ${artifact.ebookId} question ${questionNumber} absent-heading evidence has no preamble span`);
+      const articleStart = firstObjectionOneAfterDeclaration(elements, declared.index, endChar);
       if (!articleStart || articleStart.startChar >= endChar) fail(`eBook ${artifact.ebookId} question ${questionNumber} absent-heading evidence has no article span`);
       articles = [{ ordinal: 1, startChar: articleStart.startChar, candidate: undefined }];
-      discrepancies.push(discrepancyForAbsentArticle(artifact, questionNumber, articleStart.startChar, endChar, html, byteOffsets));
+      discrepancies.push(discrepancyForAbsentArticle(artifact, questionNumber, preambleStart.startChar, articleStart.startChar, endChar, html, byteOffsets));
     } else {
       const declarationRule = DECLARATION_RULES.find(rule => rule.ebookId === artifact.ebookId && rule.questionNumber === questionNumber);
       if (!declared) {
@@ -427,6 +433,21 @@ function buildQuestionTopology(
         if (discrepancy) discrepancies.push(discrepancy);
         return { ordinal, startChar: candidate.startChar, candidate };
       });
+      const retypedArticleIndex = articles.findIndex(article => article.candidate?.role === 'retyped_question_heading');
+      if (retypedArticleIndex !== -1) {
+        const retypedArticle = articles[retypedArticleIndex]!;
+        discrepancies.push(discrepancyForRetypedQuestionBoundary(
+          artifact,
+          questionNumber,
+          retypedArticle.ordinal,
+          retypedArticle.candidate!,
+          startChar,
+          retypedArticle.startChar,
+          articles[retypedArticleIndex + 1]?.startChar ?? endChar,
+          html,
+          byteOffsets,
+        ));
+      }
     }
     if (articles[0]!.startChar <= startChar || articles[0]!.startChar >= endChar) fail(`eBook ${artifact.ebookId} question ${questionNumber} preamble boundary is invalid`);
     const questionKey = `${artifact.partKey}.q${String(questionNumber).padStart(3, '0')}`;
@@ -569,7 +590,7 @@ function canonicalDiscrepancies(entries: readonly AquinasTopologyDiscrepancy[]):
 }
 
 function validateDiscrepancy(value: unknown, path: string): AquinasTopologyDiscrepancy {
-  const entry = exactObject(value, path, ['ebookId', 'partKey', 'htmlMemberSha256', 'questionKey', 'articleKey', 'observedLocator', 'observedTagName', 'evidenceStartByte', 'evidenceEndByte', 'evidenceSha256', 'containingElementStartByte', 'containingElementEndByte', 'containingElementSha256', 'observedDeclaredArticleCount', 'resolvedArticleCount', 'codes', 'resolutionBasis']);
+  const entry = exactObject(value, path, ['ebookId', 'partKey', 'htmlMemberSha256', 'questionKey', 'articleKey', 'observedLocator', 'observedTagName', 'evidenceStartByte', 'evidenceEndByte', 'evidenceSha256', 'containingElementStartByte', 'containingElementEndByte', 'containingElementSha256', 'observedDeclaredArticleCount', 'resolvedArticleCount', 'resolvedPreambleStartByte', 'resolvedPreambleEndByte', 'resolvedArticleStartByte', 'resolvedArticleEndByte', 'codes', 'resolutionBasis']);
   const ebookId = positiveInteger(entry.ebookId, `${path}.ebookId`);
   const partKey = enumPartKey(entry.partKey, `${path}.partKey`);
   const htmlMemberSha256 = sha256String(entry.htmlMemberSha256, `${path}.htmlMemberSha256`);
@@ -588,12 +609,19 @@ function validateDiscrepancy(value: unknown, path: string): AquinasTopologyDiscr
   if (containingElementStartByte !== null && containingElementEndByte! <= containingElementStartByte) fail(`${path}.containing element range is invalid`);
   const observedDeclaredArticleCount = nullablePositiveInteger(entry.observedDeclaredArticleCount, `${path}.observedDeclaredArticleCount`);
   const resolvedArticleCount = nullablePositiveInteger(entry.resolvedArticleCount, `${path}.resolvedArticleCount`);
+  const resolvedPreambleStartByte = nullableNonnegativeInteger(entry.resolvedPreambleStartByte, `${path}.resolvedPreambleStartByte`);
+  const resolvedPreambleEndByte = nullablePositiveInteger(entry.resolvedPreambleEndByte, `${path}.resolvedPreambleEndByte`);
+  const resolvedArticleStartByte = nullableNonnegativeInteger(entry.resolvedArticleStartByte, `${path}.resolvedArticleStartByte`);
+  const resolvedArticleEndByte = nullablePositiveInteger(entry.resolvedArticleEndByte, `${path}.resolvedArticleEndByte`);
+  const boundaryValues = [resolvedPreambleStartByte, resolvedPreambleEndByte, resolvedArticleStartByte, resolvedArticleEndByte];
+  if (!boundaryValues.every(value => value === null) && !boundaryValues.every(value => value !== null)) fail(`${path}.resolved boundary evidence must be all present or all absent`);
+  if (resolvedPreambleStartByte !== null && (resolvedPreambleEndByte! < resolvedPreambleStartByte || resolvedArticleStartByte! !== resolvedPreambleEndByte || resolvedArticleEndByte! <= resolvedArticleStartByte!)) fail(`${path}.resolved boundary evidence is invalid`);
   const codes = denseValues(entry.codes, `${path}.codes`).map((code, index) => nonemptyString(code, `${path}.codes[${index}]`));
   if (codes.length === 0 || new Set(codes).size !== codes.length) fail(`${path}.codes must be a nonempty unique sequence`);
   const resolutionBasis = entry.resolutionBasis;
   if (resolutionBasis !== 'ordinal_position_and_declared_count' && resolutionBasis !== 'ledgered_missing_question_heading_scope' && resolutionBasis !== 'article_shell_count_and_preamble_evidence') fail(`${path}.resolutionBasis is invalid`);
   if (resolutionBasis === 'article_shell_count_and_preamble_evidence' && resolvedArticleCount === null) fail(`${path}.count evidence requires a resolved article count`);
-  return { ebookId, partKey, htmlMemberSha256, questionKey, articleKey, observedLocator, observedTagName, evidenceStartByte, evidenceEndByte, evidenceSha256, containingElementStartByte, containingElementEndByte, containingElementSha256, observedDeclaredArticleCount, resolvedArticleCount, codes, resolutionBasis };
+  return { ebookId, partKey, htmlMemberSha256, questionKey, articleKey, observedLocator, observedTagName, evidenceStartByte, evidenceEndByte, evidenceSha256, containingElementStartByte, containingElementEndByte, containingElementSha256, observedDeclaredArticleCount, resolvedArticleCount, resolvedPreambleStartByte, resolvedPreambleEndByte, resolvedArticleStartByte, resolvedArticleEndByte, codes, resolutionBasis };
 }
 
 function exactObject(value: unknown, path: string, expectedKeys: readonly string[]): Record<string, unknown> {
@@ -784,6 +812,12 @@ function missingQuestionHeadingStart(elements: readonly BodyElement[], candidate
   fail('ledgered missing question heading has no scope declaration');
 }
 
+function firstObjectionOneAfterDeclaration(elements: readonly BodyElement[], declarationIndex: number, endChar: number): BodyElement {
+  const candidate = elements.find(element => element.index > declarationIndex && element.startChar < endChar && /^Objection 1:/.test(element.text));
+  if (!candidate || candidate.tagName !== 'p') fail('ledgered absent article heading has no exact direct first-objection boundary');
+  return candidate;
+}
+
 function discrepancyForCandidate(
   artifact: AquinasGutenbergArtifact,
   questionNumber: number,
@@ -793,7 +827,7 @@ function discrepancyForCandidate(
   offsets: Uint32Array,
 ): AquinasTopologyDiscrepancy | undefined {
   if (candidate.role === 'retyped_question_heading') {
-    return discrepancyRecord(artifact, questionNumber, ordinal, null, candidate.tagName, candidate.startChar, candidate.endChar, html, offsets, ['question_heading_retyped_article_boundary'], 'ordinal_position_and_declared_count');
+    return undefined;
   }
   const expectedPartCode = partCode(artifact.partKey);
   const codes: string[] = [];
@@ -809,6 +843,36 @@ function discrepancyForCandidate(
   if (candidate.tagName !== 'p') codes.push('article_heading_tag_noncanonical');
   if (codes.length === 0) return undefined;
   return discrepancyRecord(artifact, questionNumber, ordinal, candidate.rawLocator, candidate.tagName, candidate.startChar, candidate.endChar, html, offsets, codes, 'ordinal_position_and_declared_count');
+}
+
+function discrepancyForRetypedQuestionBoundary(
+  artifact: AquinasGutenbergArtifact,
+  questionNumber: number,
+  ordinal: number,
+  candidate: ArticleCandidate,
+  preambleStartChar: number,
+  articleStartChar: number,
+  articleEndChar: number,
+  html: string,
+  offsets: Uint32Array,
+): AquinasTopologyDiscrepancy {
+  return discrepancyRecord(
+    artifact,
+    questionNumber,
+    ordinal,
+    null,
+    candidate.tagName,
+    candidate.startChar,
+    candidate.endChar,
+    html,
+    offsets,
+    ['article_locator_absent', 'question_heading_retyped_article_boundary'],
+    'ordinal_position_and_declared_count',
+    undefined,
+    null,
+    null,
+    { preambleStartChar, preambleEndChar: articleStartChar, articleStartChar, articleEndChar },
+  );
 }
 
 function isAcceptedLocatorSyntax(rawLocator: string, partCode: string, questionNumber: number, ordinal: number): boolean {
@@ -889,12 +953,29 @@ function discrepancyForMissingDeclaration(
 function discrepancyForAbsentArticle(
   artifact: AquinasGutenbergArtifact,
   questionNumber: number,
+  preambleStartChar: number,
   articleStartChar: number,
   questionEndChar: number,
   html: string,
   offsets: Uint32Array,
 ): AquinasTopologyDiscrepancy {
-  return discrepancyRecord(artifact, questionNumber, 1, null, null, articleStartChar, questionEndChar, html, offsets, ['article_heading_absent'], 'ordinal_position_and_declared_count');
+  return discrepancyRecord(
+    artifact,
+    questionNumber,
+    1,
+    null,
+    null,
+    articleStartChar,
+    questionEndChar,
+    html,
+    offsets,
+    ['article_heading_absent', 'article_locator_absent'],
+    'ordinal_position_and_declared_count',
+    undefined,
+    null,
+    null,
+    { preambleStartChar, preambleEndChar: articleStartChar, articleStartChar, articleEndChar: questionEndChar },
+  );
 }
 
 function discrepancyForMissingQuestionHeading(
@@ -921,6 +1002,7 @@ function discrepancyRecord(
   containingElement: Readonly<{ startChar: number; endChar: number }> | undefined = undefined,
   observedDeclaredArticleCount: number | null = null,
   resolvedArticleCount: number | null = null,
+  resolvedBoundary: Readonly<{ preambleStartChar: number; preambleEndChar: number; articleStartChar: number; articleEndChar: number }> | undefined = undefined,
 ): AquinasTopologyDiscrepancy {
   const questionKey = `${artifact.partKey}.q${String(questionNumber).padStart(3, '0')}`;
   return {
@@ -939,6 +1021,10 @@ function discrepancyRecord(
     containingElementSha256: containingElement === undefined ? null : sha256Bytes(utf8Slice(html, offsets, containingElement.startChar, containingElement.endChar)),
     observedDeclaredArticleCount,
     resolvedArticleCount,
+    resolvedPreambleStartByte: resolvedBoundary === undefined ? null : offsets[resolvedBoundary.preambleStartChar]!,
+    resolvedPreambleEndByte: resolvedBoundary === undefined ? null : offsets[resolvedBoundary.preambleEndChar]!,
+    resolvedArticleStartByte: resolvedBoundary === undefined ? null : offsets[resolvedBoundary.articleStartChar]!,
+    resolvedArticleEndByte: resolvedBoundary === undefined ? null : offsets[resolvedBoundary.articleEndChar]!,
     codes: [...codes],
     resolutionBasis,
   };
