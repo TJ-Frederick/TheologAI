@@ -141,6 +141,23 @@ describe('remote D1 readiness query', () => {
     expect(new Set(primaryIds).size).toBe(primaryIds.length);
     expect(checkIds(diagnostic)).toEqual(primaryIds);
     expect(diagnostic).toContain('WHERE passed IS NOT 1 ORDER BY check_name');
+    const targeted = buildD1ReadinessDiagnosticSql(
+      expectedCounts,
+      '0001_initial_schema',
+      'a'.repeat(64),
+      ['identity.schema_version'],
+    );
+    expect(checkIds(targeted)).toEqual(['identity.schema_version']);
+    expect(() => buildD1ReadinessDiagnosticSql(expectedCounts, undefined, undefined, []))
+      .toThrow('At least one D1 readiness check is required');
+    expect(() => buildD1ReadinessDiagnosticSql(expectedCounts, undefined, undefined, ['unknown.check']))
+      .toThrow('Unknown D1 readiness check ID: unknown.check');
+    expect(() => buildD1ReadinessDiagnosticSql(
+      expectedCounts,
+      undefined,
+      undefined,
+      ['identity.schema_version', 'identity.schema_version'],
+    )).toThrow('Duplicate D1 readiness check ID');
   });
 
   it('accepts valid section content/topics boundaries and rejects corrupt stored values', () => {
@@ -208,7 +225,7 @@ describe('remote D1 readiness query', () => {
       .toThrow('Invalid expected D1 count');
   });
 
-  it.skipIf(!generatedDbPath)('fails when set-based usage totals or first-occurrence evidence drift', () => {
+  it.skipIf(!generatedDbPath)('fails when generated readiness predicates detect aggregate or semantic drift', () => {
     const root = mkdtempSync(join(tmpdir(), 'theologai-readiness-mutation-'));
     const databasePath = join(root, 'theologai.db');
     copyFileSync(generatedDbPath!, databasePath);
@@ -218,60 +235,70 @@ describe('remote D1 readiness query', () => {
     const sql = buildD1ReadinessSql(manifest.expectedCounts);
     const db = new Database(databasePath);
     const assertReady = () => expect(db.prepare(sql).get()).toEqual({ readiness: 'ready' });
-    const assertRejected = () => expect(() => db.prepare(sql).get()).toThrow();
+    const assertFailedChecks = (checkNames: readonly string[]) => {
+      const diagnostics = db.prepare(buildD1ReadinessDiagnosticSql(
+        manifest.expectedCounts,
+        undefined,
+        undefined,
+        checkNames,
+      )).all() as Array<{ check_name: string; passed: number | null }>;
+      expect(diagnostics.map(row => row.check_name)).toEqual([...checkNames].sort());
+      expect(diagnostics.every(row => row.passed !== 1)).toBe(true);
+    };
+    const withRollback = (callback: () => void) => {
+      db.exec('SAVEPOINT readiness_mutation');
+      try {
+        callback();
+      } finally {
+        db.exec('ROLLBACK TO readiness_mutation');
+        db.exec('RELEASE readiness_mutation');
+      }
+    };
     try {
+      // Keep one end-to-end execution of the complete production inventory.
+      // Individual corruptions below select only their check(s) from that same
+      // generated inventory, avoiding repeated 258 MiB aggregate scans.
       assertReady();
       const usage = db.prepare('SELECT strongs_key, token_count FROM strongs_usage_stats ORDER BY strongs_key LIMIT 1')
         .get() as { strongs_key: string; token_count: number };
-      db.prepare('UPDATE strongs_usage_stats SET token_count = ? WHERE strongs_key = ?')
-        .run(usage.token_count + 1, usage.strongs_key);
-      assertRejected();
-      db.prepare('UPDATE strongs_usage_stats SET token_count = ? WHERE strongs_key = ?')
-        .run(usage.token_count, usage.strongs_key);
-      assertReady();
+      withRollback(() => {
+        db.prepare('UPDATE strongs_usage_stats SET token_count = ? WHERE strongs_key = ?')
+          .run(usage.token_count + 1, usage.strongs_key);
+        assertFailedChecks(['usage.summary_extra', 'usage.summary_missing']);
+      });
 
-      const schemaVersion = db.prepare("SELECT value FROM theologai_metadata WHERE key = 'schema_version'")
-        .pluck().get() as string;
-      db.prepare("DELETE FROM theologai_metadata WHERE key = 'schema_version'").run();
-      assertRejected();
-      const diagnostics = db.prepare(buildD1ReadinessDiagnosticSql(manifest.expectedCounts)).all() as Array<{
-        check_name: string;
-        passed: number | null;
-      }>;
-      expect(diagnostics).toContainEqual({ check_name: 'identity.schema_version', passed: null });
-      db.prepare("INSERT INTO theologai_metadata (key, value) VALUES ('schema_version', ?)").run(schemaVersion);
-      assertReady();
+      withRollback(() => {
+        db.prepare("DELETE FROM theologai_metadata WHERE key = 'schema_version'").run();
+        assertFailedChecks(['identity.schema_version']);
+      });
 
-      const semanticArtifact = db.prepare('SELECT rights_notice_json FROM ubs_semantic_artifacts').pluck().get() as string;
-      db.prepare("UPDATE ubs_semantic_artifacts SET rights_notice_json = '{}'").run();
-      assertRejected();
-      db.prepare('UPDATE ubs_semantic_artifacts SET rights_notice_json = ?').run(semanticArtifact);
-      assertReady();
+      withRollback(() => {
+        db.prepare("UPDATE ubs_semantic_artifacts SET rights_notice_json = '{}'").run();
+        assertFailedChecks(['ubs_hebrew_semantic.artifact_contract']);
+      });
 
-      const semanticSource = db.prepare(`SELECT source_blob FROM ubs_semantic_sources
-        WHERE source_id = 'ubs-hebrew-dictionary-en-v0.9.2'`).pluck().get() as string;
-      db.prepare(`UPDATE ubs_semantic_sources SET source_blob = ?
-        WHERE source_id = 'ubs-hebrew-dictionary-en-v0.9.2'`).run('0'.repeat(40));
-      assertRejected();
-      db.prepare(`UPDATE ubs_semantic_sources SET source_blob = ?
-        WHERE source_id = 'ubs-hebrew-dictionary-en-v0.9.2'`).run(semanticSource);
-      assertReady();
+      withRollback(() => {
+        db.prepare(`UPDATE ubs_semantic_sources SET source_blob = ?
+          WHERE source_id = 'ubs-hebrew-dictionary-en-v0.9.2'`).run('0'.repeat(40));
+        assertFailedChecks(['ubs_hebrew_semantic.source_contract']);
+      });
 
-      const coordinate = db.prepare(`SELECT coordinate_key, normalized_reference
+      const coordinate = db.prepare(`SELECT coordinate_key
         FROM ubs_semantic_normalized_coordinates ORDER BY coordinate_key LIMIT 1`)
-        .get() as { coordinate_key: number; normalized_reference: string };
-      db.prepare('UPDATE ubs_semantic_normalized_coordinates SET normalized_reference = ? WHERE coordinate_key = ?')
-        .run('Not a canonical reference', coordinate.coordinate_key);
-      assertRejected();
-      db.prepare('UPDATE ubs_semantic_normalized_coordinates SET normalized_reference = ? WHERE coordinate_key = ?')
-        .run(coordinate.normalized_reference, coordinate.coordinate_key);
-      assertReady();
+        .get() as { coordinate_key: number };
+      withRollback(() => {
+        db.prepare('UPDATE ubs_semantic_normalized_coordinates SET normalized_reference = ? WHERE coordinate_key = ?')
+          .run('Not a canonical reference', coordinate.coordinate_key);
+        assertFailedChecks(['ubs_hebrew_semantic.coordinate_reference_canonical']);
+      });
 
       const form = db.prepare('SELECT strongs_key, form_text, first_book FROM strongs_form_stats ORDER BY strongs_key, form_text LIMIT 1')
         .get() as { strongs_key: string; form_text: string; first_book: string };
-      db.prepare('UPDATE strongs_form_stats SET first_book = ? WHERE strongs_key = ? AND form_text = ?')
-        .run(form.first_book === 'Genesis' ? 'Exodus' : 'Genesis', form.strongs_key, form.form_text);
-      assertRejected();
+      withRollback(() => {
+        db.prepare('UPDATE strongs_form_stats SET first_book = ? WHERE strongs_key = ? AND form_text = ?')
+          .run(form.first_book === 'Genesis' ? 'Exodus' : 'Genesis', form.strongs_key, form.form_text);
+        assertFailedChecks(['usage.form_first_occurrence']);
+      });
     } finally {
       db.close();
       rmSync(root, { recursive: true, force: true });
@@ -287,42 +314,51 @@ describe('remote D1 readiness query', () => {
     ));
     const contract = createUbsSemanticStorageContract(audit);
     const db = new Database(databasePath);
+    const withRollback = (callback: () => void) => {
+      db.exec('SAVEPOINT semantic_identity_mutation');
+      try {
+        callback();
+      } finally {
+        db.exec('ROLLBACK TO semantic_identity_mutation');
+        db.exec('RELEASE semantic_identity_mutation');
+      }
+    };
     try {
       expect(() => assertUbsSemanticStoredContract(db, contract)).not.toThrow();
       expect(() => assertUbsSemanticStoredArtifactIdentity(db, contract)).not.toThrow();
-      const coordinate = db.prepare(`SELECT coordinate_key, evidence_key, normalized_reference
+      const coordinate = db.prepare(`SELECT coordinate_key, evidence_key
         FROM ubs_semantic_normalized_coordinates ORDER BY coordinate_key LIMIT 1`)
-        .get() as { coordinate_key: number; evidence_key: number; normalized_reference: string };
-      const evidence = db.prepare(`SELECT evidence_key, evidence_id FROM ubs_semantic_reference_evidence
-        WHERE evidence_key = ?`).get(coordinate.evidence_key) as { evidence_key: number; evidence_id: string };
-      db.prepare('UPDATE ubs_semantic_reference_evidence SET evidence_id = ? WHERE evidence_key = ?')
-        .run('tampered-evidence-id', evidence.evidence_key);
-      expect(() => assertUbsSemanticStoredArtifactIdentity(db, contract))
-        .toThrow('do not reproduce their declared artifact identity');
-      db.prepare('UPDATE ubs_semantic_reference_evidence SET evidence_id = ? WHERE evidence_key = ?')
-        .run(evidence.evidence_id, evidence.evidence_key);
+        .get() as { coordinate_key: number; evidence_key: number };
+      withRollback(() => {
+        db.prepare('UPDATE ubs_semantic_reference_evidence SET evidence_id = ? WHERE evidence_key = ?')
+          .run('tampered-evidence-id', coordinate.evidence_key);
+        expect(() => assertUbsSemanticStoredArtifactIdentity(db, contract))
+          .toThrow('do not reproduce their declared artifact identity');
+      });
       db.pragma('foreign_keys = ON');
-      expect(() => db.prepare('UPDATE ubs_semantic_normalized_coordinates SET evidence_key = ? WHERE coordinate_key = ?')
-        .run(-1, coordinate.coordinate_key)).toThrow();
-      db.prepare('UPDATE ubs_semantic_normalized_coordinates SET normalized_reference = ? WHERE coordinate_key = ?')
-        .run('Not a canonical reference', coordinate.coordinate_key);
-      expect(() => assertUbsSemanticStoredArtifactIdentity(db, contract))
-        .toThrow('non-canonical normalized reference');
-      db.prepare('UPDATE ubs_semantic_normalized_coordinates SET normalized_reference = ? WHERE coordinate_key = ?')
-        .run(coordinate.normalized_reference, coordinate.coordinate_key);
-      expect(() => assertUbsSemanticStoredArtifactIdentity(db, contract)).not.toThrow();
+      withRollback(() => {
+        expect(() => db.prepare('UPDATE ubs_semantic_normalized_coordinates SET evidence_key = ? WHERE coordinate_key = ?')
+          .run(-1, coordinate.coordinate_key)).toThrow();
+      });
+      withRollback(() => {
+        db.prepare('UPDATE ubs_semantic_normalized_coordinates SET normalized_reference = ? WHERE coordinate_key = ?')
+          .run('Not a canonical reference', coordinate.coordinate_key);
+        expect(() => assertUbsSemanticStoredArtifactIdentity(db, contract))
+          .toThrow('non-canonical normalized reference');
+      });
       const entry = db.prepare('SELECT entry_id, lemma FROM ubs_semantic_entries ORDER BY entry_id LIMIT 1')
         .get() as { entry_id: string; lemma: string };
-      db.prepare('UPDATE ubs_semantic_entries SET lemma = ? WHERE entry_id = ?')
-        .run(`${entry.lemma} altered`, entry.entry_id);
-      expect(() => assertUbsSemanticStoredArtifactIdentity(db, contract))
-        .toThrow('do not reproduce their declared artifact identity');
-      db.prepare('UPDATE ubs_semantic_entries SET lemma = ? WHERE entry_id = ?')
-        .run(entry.lemma, entry.entry_id);
-      expect(() => assertUbsSemanticStoredArtifactIdentity(db, contract)).not.toThrow();
-      db.prepare("UPDATE ubs_semantic_artifacts SET provenance_notice_json = '{}'").run();
-      expect(() => assertUbsSemanticStoredContract(db, contract))
-        .toThrow('artifact metadata is incomplete or stale');
+      withRollback(() => {
+        db.prepare('UPDATE ubs_semantic_entries SET lemma = ? WHERE entry_id = ?')
+          .run(`${entry.lemma} altered`, entry.entry_id);
+        expect(() => assertUbsSemanticStoredArtifactIdentity(db, contract))
+          .toThrow('do not reproduce their declared artifact identity');
+      });
+      withRollback(() => {
+        db.prepare("UPDATE ubs_semantic_artifacts SET provenance_notice_json = '{}'").run();
+        expect(() => assertUbsSemanticStoredContract(db, contract))
+          .toThrow('artifact metadata is incomplete or stale');
+      });
     } finally {
       db.close();
       rmSync(root, { recursive: true, force: true });

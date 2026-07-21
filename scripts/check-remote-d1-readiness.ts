@@ -419,6 +419,36 @@ function buildD1ReadinessChecksCte(contract: D1ReadinessQueryContract): string {
   return `WITH ${contract.ctes.join(',\n')},\nreadiness_checks(check_name, passed) AS (VALUES\n${values}\n)`;
 }
 
+/**
+ * Return a checked, minimal projection of the fixed readiness inventory.
+ *
+ * The remote gate always evaluates the complete inventory. Targeted
+ * projections are intentionally limited to diagnostics and local corruption
+ * tests: they reuse the production predicates rather than maintaining a
+ * second, weaker copy of a check just to make a failure observable.
+ */
+function selectD1ReadinessChecks(
+  contract: D1ReadinessQueryContract,
+  checkNames: readonly string[] | undefined,
+): D1ReadinessQueryContract {
+  if (checkNames === undefined) return contract;
+  if (checkNames.length === 0) throw new Error('At least one D1 readiness check is required');
+
+  const available = new Map(contract.checks.map(check => [check.id, check]));
+  const selected = checkNames.map(checkName => {
+    if (!/^[a-z0-9._:-]+$/.test(checkName)) {
+      throw new Error(`Invalid D1 readiness check ID: ${checkName}`);
+    }
+    const check = available.get(checkName);
+    if (!check) throw new Error(`Unknown D1 readiness check ID: ${checkName}`);
+    return check;
+  });
+  if (new Set(checkNames).size !== checkNames.length) {
+    throw new Error('Duplicate D1 readiness check ID');
+  }
+  return { ...contract, checks: selected };
+}
+
 export function buildD1ReadinessSql(
   expectedCounts: Record<string, number>,
   schemaVersion = MANIFEST.schemaVersion,
@@ -439,8 +469,12 @@ export function buildD1ReadinessDiagnosticSql(
   expectedCounts: Record<string, number>,
   schemaVersion = MANIFEST.schemaVersion,
   d1CorpusIdentity = D1_CORPUS_IDENTITY,
+  checkNames?: readonly string[],
 ): string {
-  const contract = buildD1ReadinessQueryContract(expectedCounts, schemaVersion, d1CorpusIdentity);
+  const contract = selectD1ReadinessChecks(
+    buildD1ReadinessQueryContract(expectedCounts, schemaVersion, d1CorpusIdentity),
+    checkNames,
+  );
   return [
     buildD1ReadinessChecksCte(contract),
     `SELECT check_name, passed FROM readiness_checks WHERE passed IS NOT 1 ORDER BY check_name;`,
