@@ -39,6 +39,7 @@ const MAX_TREE_NODES = 150_000;
 const MAX_TREE_DEPTH = 64;
 const MAX_ATTRIBUTES = 32;
 const MAX_TEXT_NODE_CHARS = 262_144;
+const UTF8_SLICE_CACHE = new Map<string, Buffer>();
 
 export type AquinasTopologyBlockType =
   | 'authorial_part_prologue'
@@ -57,6 +58,47 @@ export type ContentFreeTypedRange = Readonly<{
   startByte: number;
   endByte: number;
   sha256: string;
+}>;
+
+/**
+ * Content-free source plan for the A2 local compiler.  It deliberately carries
+ * byte ranges and reviewed container topology only; callers must separately
+ * obtain the verified source-member bytes from the A0 cache.
+ */
+export type AquinasGutenbergReviewedBlockPlan = Readonly<{
+  startByte: number;
+  endByte: number;
+  sha256: string;
+  containerTag: 'p' | 'div' | 'blockquote' | 'h4' | 'h5';
+  inlineTags: readonly ('i' | 'em' | 'b' | 'strong' | 'span' | 'sup' | 'sub')[];
+}>;
+
+export type AquinasGutenbergReviewedRangePlan = Readonly<{
+  type: AquinasTopologyBlockType;
+  startByte: number;
+  endByte: number;
+  sha256: string;
+  blocks: readonly AquinasGutenbergReviewedBlockPlan[];
+}>;
+
+export type AquinasGutenbergReviewedQuestionPlan = Readonly<{
+  questionKey: string;
+  questionNumber: number;
+  articleCount: number;
+  startByte: number;
+  endByte: number;
+  sha256: string;
+  preamble: AquinasGutenbergReviewedRangePlan;
+  articles: readonly AquinasGutenbergReviewedRangePlan[];
+}>;
+
+export type AquinasGutenbergReviewedSourcePlan = Readonly<{
+  source: AquinasTopologySource;
+  partPrologue: AquinasGutenbergReviewedRangePlan | null;
+  questions: readonly AquinasGutenbergReviewedQuestionPlan[];
+  exclusions: readonly AquinasGutenbergReviewedRangePlan[];
+  typedRanges: readonly ContentFreeTypedRange[];
+  discrepancies: readonly AquinasTopologyDiscrepancy[];
 }>;
 
 export type AquinasTopologyQuestion = Readonly<{
@@ -143,6 +185,7 @@ type BodyElement = Readonly<{
   startChar: number;
   endChar: number;
   text: string;
+  node: DefaultTreeAdapterTypes.Element;
 }>;
 
 type LocatedRange = Readonly<{
@@ -289,7 +332,20 @@ function buildTopologyLock(raw: RawTopologyScan, discrepancyLedgerSha256: string
   return { ...base, aggregateSha256: sha256Text(canonicalSectionedCollectionJson(base)) };
 }
 
+type ArtifactTopologyScan = Readonly<{
+  text: string;
+  byteOffsets: Uint32Array;
+  elements: readonly BodyElement[];
+  topology: TopologyBuild;
+  source: AquinasTopologySource;
+}>;
+
 function scanOneHtml(artifact: AquinasGutenbergArtifact, html: Buffer): Readonly<{ source: AquinasTopologySource; questions: readonly Omit<AquinasTopologyQuestion, 'order'>[]; discrepancies: readonly AquinasTopologyDiscrepancy[] }> {
+  const scan = scanArtifactTopology(artifact, html);
+  return { source: scan.source, questions: scan.topology.rows, discrepancies: scan.topology.discrepancies };
+}
+
+function scanArtifactTopology(artifact: AquinasGutenbergArtifact, html: Buffer): ArtifactTopologyScan {
   if (html.byteLength !== artifact.htmlMember.bytes || html.byteLength > MAX_HTML_BYTES) fail(`eBook ${artifact.ebookId} HTML violates the reviewed input-size bound`);
   const text = strictHtmlUtf8(html, `eBook ${artifact.ebookId} HTML`);
   const byteOffsets = utf8Offsets(text);
@@ -303,7 +359,131 @@ function scanOneHtml(artifact: AquinasGutenbergArtifact, html: Buffer): Readonly
   const topology = buildQuestionTopology(artifact, elements, intellectualCandidates, firstQuestionOneArticle.index, text, byteOffsets);
   const ranges = buildCoverageRanges(artifact, topology);
   const source = buildSourceSummary(artifact, text, byteOffsets, ranges);
-  return { source, questions: topology.rows, discrepancies: topology.discrepancies };
+  return { text, byteOffsets, elements, topology, source };
+}
+
+/**
+ * Replays the locked A1 scanner for one already-verified HTML member and
+ * exposes only byte boundaries, hashes, and closed reviewed HTML topology.
+ * It never writes source data and never returns source prose.
+ */
+export function buildAquinasGutenbergReviewedSourcePlan(artifact: AquinasGutenbergArtifact, html: Buffer): AquinasGutenbergReviewedSourcePlan {
+  const scan = scanArtifactTopology(artifact, html);
+  const coverage = buildCoverageRanges(artifact, scan.topology);
+  const elementIndexByStart = new Map(scan.elements.map((element, index) => [element.startChar, index] as const));
+  const typedRanges = coverage.map(range => contentFreeRange(range, scan.text, scan.byteOffsets));
+  const partPrologue = scan.topology.prologue === undefined
+    ? null
+    : reviewedRangePlan(scan.topology.prologue, scan.elements, elementIndexByStart, scan.text, scan.byteOffsets);
+  const questions = scan.topology.resolvedQuestions.map((question, index) => {
+    const row = scan.topology.rows[index]!;
+    const preamble: LocatedRange = {
+      type: 'authorial_question_preamble',
+      startChar: question.startChar,
+      endChar: question.articles[0]!.startChar,
+    };
+    const articles = question.articles.map((article, articleIndex): LocatedRange => ({
+      type: 'authorial_article',
+      startChar: article.startChar,
+      endChar: question.articles[articleIndex + 1]?.startChar ?? question.endChar,
+    }));
+    return {
+      questionKey: row.questionKey,
+      questionNumber: row.questionNumber,
+      articleCount: row.articleCount,
+      startByte: scan.byteOffsets[question.startChar]!,
+      endByte: scan.byteOffsets[question.endChar]!,
+      sha256: sha256Bytes(utf8Slice(scan.text, scan.byteOffsets, question.startChar, question.endChar)),
+      preamble: reviewedRangePlan(preamble, scan.elements, elementIndexByStart, scan.text, scan.byteOffsets),
+      articles: articles.map(range => reviewedRangePlan(range, scan.elements, elementIndexByStart, scan.text, scan.byteOffsets)),
+    };
+  });
+  const exclusions: AquinasGutenbergReviewedRangePlan[] = [];
+  const intellectualStartChar = coverage[0]!.startChar;
+  if (intellectualStartChar > 0) exclusions.push(reviewedRangePlan({ type: 'source_wrapper', startChar: 0, endChar: intellectualStartChar }, scan.elements, elementIndexByStart, scan.text, scan.byteOffsets, false));
+  for (const range of coverage) if (!isAuthorialRange(range.type)) exclusions.push(reviewedRangePlan(range, scan.elements, elementIndexByStart, scan.text, scan.byteOffsets, false));
+  if (scan.topology.cutoffEndChar < scan.text.length) exclusions.push(reviewedRangePlan({ type: 'gutenberg_license', startChar: scan.topology.cutoffEndChar, endChar: scan.text.length }, scan.elements, elementIndexByStart, scan.text, scan.byteOffsets, false));
+  assertExactCoverage(
+    [
+      ...(partPrologue === null ? [] : [{ type: 'authorial_part_prologue' as const, startChar: scan.topology.prologue!.startChar, endChar: scan.topology.prologue!.endChar }]),
+      ...scan.topology.resolvedQuestions.flatMap(question => [
+        { type: 'authorial_question_preamble' as const, startChar: question.startChar, endChar: question.articles[0]!.startChar },
+        ...question.articles.map((article, index) => ({ type: 'authorial_article' as const, startChar: article.startChar, endChar: question.articles[index + 1]?.startChar ?? question.endChar })),
+      ]),
+      ...exclusions.map(exclusion => ({ type: exclusion.type, startChar: byteToChar(scan.byteOffsets, exclusion.startByte), endChar: byteToChar(scan.byteOffsets, exclusion.endByte) })),
+    ],
+    0,
+    scan.text.length,
+    artifact.ebookId,
+  );
+  return { source: scan.source, partPrologue, questions, exclusions, typedRanges, discrepancies: scan.topology.discrepancies };
+}
+
+function isAuthorialRange(type: AquinasTopologyBlockType): boolean {
+  return type === 'authorial_part_prologue' || type === 'authorial_question_preamble' || type === 'authorial_article';
+}
+
+function contentFreeRange(range: LocatedRange, text: string, offsets: Uint32Array): ContentFreeTypedRange {
+  return {
+    type: range.type,
+    startByte: offsets[range.startChar]!,
+    endByte: offsets[range.endChar]!,
+    sha256: sha256Bytes(utf8Slice(text, offsets, range.startChar, range.endChar)),
+  };
+}
+
+function reviewedRangePlan(range: LocatedRange, elements: readonly BodyElement[], elementIndexByStart: ReadonlyMap<number, number>, text: string, offsets: Uint32Array, reviewBlocks = true): AquinasGutenbergReviewedRangePlan {
+  if (!reviewBlocks) return { ...contentFreeRange(range, text, offsets), blocks: [] };
+  const first = elementIndexByStart.get(range.startChar);
+  if (first === undefined) fail('reviewed block plan does not begin at the source range boundary');
+  const blocks: BodyElement[] = [];
+  for (let index = first; index < elements.length && elements[index]!.startChar < range.endChar; index += 1) blocks.push(elements[index]!);
+  if (blocks.length === 0) fail('reviewed block plan has no direct body elements');
+  const planBlocks = blocks.map((element, index): AquinasGutenbergReviewedBlockPlan => {
+    const endChar = blocks[index + 1]?.startChar ?? range.endChar;
+    if (element.endChar > endChar) fail('reviewed block plan is not bounded by a direct body element');
+    const topology = reviewedContainerTopology(element);
+    return {
+      startByte: offsets[element.startChar]!,
+      endByte: offsets[endChar]!,
+      sha256: sha256Bytes(utf8Slice(text, offsets, element.startChar, endChar)),
+      ...topology,
+    };
+  });
+  if (planBlocks.length > 0 && planBlocks.at(-1)!.endByte !== offsets[range.endChar]!) fail('reviewed block plan does not reach the source range boundary');
+  return {
+    ...contentFreeRange(range, text, offsets),
+    blocks: planBlocks,
+  };
+}
+
+function reviewedContainerTopology(element: BodyElement): Pick<AquinasGutenbergReviewedBlockPlan, 'containerTag' | 'inlineTags'> {
+  if (!['p', 'div', 'blockquote', 'h4', 'h5'].includes(element.tagName)) fail(`reviewed block ${element.index} has an unsupported container tag`);
+  const inlineOrder = ['i', 'em', 'b', 'strong', 'span', 'sup', 'sub'] as const;
+  const inlineTags = new Set<typeof inlineOrder[number]>();
+  const visit = (node: DefaultTreeAdapterTypes.Node): void => {
+    if (node.nodeName === '#text') return;
+    if (!('tagName' in node)) fail(`reviewed block ${element.index} contains an unsupported node`);
+    if (node.tagName === 'br') return;
+    if (!inlineOrder.includes(node.tagName as typeof inlineOrder[number])) fail(`reviewed block ${element.index} contains an unsupported inline tag`);
+    inlineTags.add(node.tagName as typeof inlineOrder[number]);
+    for (const child of node.childNodes) visit(child);
+  };
+  for (const child of element.node.childNodes) visit(child);
+  return { containerTag: element.tagName as AquinasGutenbergReviewedBlockPlan['containerTag'], inlineTags: inlineOrder.filter(tag => inlineTags.has(tag)) };
+}
+
+function byteToChar(offsets: Uint32Array, byte: number): number {
+  let low = 0;
+  let high = offsets.length - 1;
+  while (low <= high) {
+    const middle = Math.floor((low + high) / 2);
+    const value = offsets[middle]!;
+    if (value === byte) return middle;
+    if (value < byte) low = middle + 1;
+    else high = middle - 1;
+  }
+  fail('reviewed range plan has a non-UTF-8 byte boundary');
 }
 
 function buildQuestionTopology(
@@ -721,7 +901,7 @@ function directBodyElements(body: DefaultTreeAdapterTypes.Element, html: string)
     if (element.tagName === 'style') fail('body contains a forbidden style element');
     const { startOffset, endOffset } = element.sourceCodeLocation;
     if (!Number.isSafeInteger(startOffset) || !Number.isSafeInteger(endOffset) || startOffset >= endOffset || endOffset > html.length) fail('body element has invalid source offsets');
-    elements.push({ tagName: element.tagName, index: elements.length, startChar: startOffset, endChar: endOffset, text: collapseText(elementText(element)) });
+    elements.push({ tagName: element.tagName, index: elements.length, startChar: startOffset, endChar: endOffset, text: collapseText(elementText(element)), node: element });
   }
   if (elements.length === 0) fail('body has no located direct elements');
   return elements;
@@ -1091,7 +1271,12 @@ function utf8Offsets(text: string): Uint32Array {
 }
 
 function utf8Slice(text: string, offsets: Uint32Array, startChar: number, endChar: number): Buffer {
-  const bytes = Buffer.from(text, 'utf8');
+  let bytes = UTF8_SLICE_CACHE.get(text);
+  if (bytes === undefined) {
+    if (UTF8_SLICE_CACHE.size >= 16) UTF8_SLICE_CACHE.clear();
+    bytes = Buffer.from(text, 'utf8');
+    UTF8_SLICE_CACHE.set(text, bytes);
+  }
   return bytes.subarray(offsets[startChar]!, offsets[endChar]!);
 }
 

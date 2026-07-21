@@ -747,8 +747,15 @@ function materializeTokens(tokens: readonly RenderToken[]): string {
 function validateInertAttributes(attrs: readonly { name: string; value: string }[], path: string): void {
   const names = new Set<string>();
   for (const attr of attrs) {
-    if (names.has(attr.name) || !['id', 'class'].includes(attr.name)) fail(path, 'allows only closed inert id/class attributes');
+    if (names.has(attr.name)) fail(path, 'contains a duplicate attribute');
     names.add(attr.name);
+    if (attr.name === 'style') {
+      // Source-only Gutenberg margin hints are permitted because rendering
+      // drops every attribute; this closed grammar forbids arbitrary CSS.
+      if (!/^(?:margin-top: (?:[1-9]|[1-9][0-9])em|margin-left: (?:0|[1-9][0-9]?)%; margin-right: (?:0|[1-9][0-9]?)%)$/.test(attr.value)) fail(path, 'allows only closed inert id/class or discarded margin-style attributes');
+      continue;
+    }
+    if (!['id', 'class'].includes(attr.name)) fail(path, 'allows only closed inert id/class or discarded margin-style attributes');
     if (attr.name === 'id' && !/^[A-Za-z][A-Za-z0-9._:-]{0,127}$/.test(attr.value)) fail(path, 'contains an invalid inert id');
     if (attr.name === 'class' && !/^[A-Za-z0-9_-]+(?: [A-Za-z0-9_-]+)*$/.test(attr.value)) fail(path, 'contains an invalid inert class');
   }
@@ -819,7 +826,12 @@ function assertA1AttestedDraft(draft: TransientSectionedEditionCollectionDraft):
   literalAt(draft.typedRangeCount, '$.typedRangeCount', AQUINAS_A1_TOPOLOGY_VECTOR.authorialChildRangeCount);
   assertA1NativeSourceTypedRangeProjection(draft);
   literalAt(draft.discrepancyLedgerSha256, '$.discrepancyLedgerSha256', AQUINAS_A1_DISCREPANCY_LEDGER_SHA256);
-  equalCanonical(draft.sourceArtifacts.map(({ html: _html, ...source }) => source), AQUINAS_A1_SOURCES.map(source => ({ artifactId: `pg-${source.ebookId}`, ...source })), '$.sourceArtifacts', 'must bind the four exact A0 HTML IDs, bytes, and hashes');
+  equalCanonical(
+    draft.sourceArtifacts.map(({ html: _html, ...source }) => source),
+    AQUINAS_A1_SOURCES.map(({ ebookId, ...source }) => ({ artifactId: `pg-${ebookId}`, ...source })),
+    '$.sourceArtifacts',
+    'must bind the four exact A0 HTML IDs, bytes, and hashes',
+  );
   const questions = draft.questions.map(question => [question.questionKey, question.partKey, question.questionNumber, question.articleCount, question.source.span.startByte, question.source.span.endByte, question.source.span.rawSha256, question.orderedArticleKeysSha256, question.bracketStatus, question.sourceLocatorStatus, question.sourceStructureStatus]);
   literalAt(domainHash('sectioned-edition-collection-package.question-vector.v1', canonicalSectionedEditionCollectionPackageBytes(questions)), '$.questions', AQUINAS_A1_TOPOLOGY_VECTOR.questionVectorSha256);
   const articleKeys = draft.questions.flatMap(question => question.articles.map(article => article.articleKey!));
@@ -874,9 +886,19 @@ function assertCoverage(artifacts: readonly SourceArtifactEvidence[], prologues:
 }
 
 /** Binds every persisted raw span to the actual transient source-member bytes, not just to caller-supplied hashes. */
+const sourceArtifactUtf8Cache = new WeakMap<SourceArtifactEvidence, Uint8Array>();
+
+function sourceArtifactUtf8(artifact: SourceArtifactEvidence): Uint8Array {
+  const cached = sourceArtifactUtf8Cache.get(artifact);
+  if (cached !== undefined) return cached;
+  const bytes = utf8Bytes(artifact.html);
+  sourceArtifactUtf8Cache.set(artifact, bytes);
+  return bytes;
+}
+
 function assertSpanMatchesArtifact(artifact: SourceArtifactEvidence, span: RawSpan, path: string): void {
   if (span.startByte < 0 || span.endByte > artifact.htmlMemberBytes) fail(path, 'falls outside the declared full artifact member');
-  const raw = decodeUtf8(utf8Bytes(artifact.html).slice(span.startByte, span.endByte), path);
+  const raw = decodeUtf8(sourceArtifactUtf8(artifact).slice(span.startByte, span.endByte), path);
   if (sha256Hex(raw) !== span.rawSha256) fail(path, 'does not match the raw SHA-256 of the actual full artifact member slice');
 }
 

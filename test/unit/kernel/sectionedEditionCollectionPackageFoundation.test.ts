@@ -83,6 +83,7 @@ describe('inactive sectioned edition collection package contract', () => {
     expect(renderReviewedElement(block('<p>a\r\nb</p>', 0)).content).toBe('a b');
     expect(renderReviewedElement(block('<p>a <i> b </i> c<br> d</p>', 0)).content).toBe('a b c\nd');
     expect(renderReviewedElement(block('<p>a\n b</p>', 0)).content).toBe('a b');
+    expect(renderReviewedElement(block('<p style="margin-top: 2em">source-only layout</p>', 0)).content).toBe('source-only layout');
     expect(() => renderReviewedElement(block('<p onclick="alert(1)">x</p>', 0))).toThrow(/id\/class/);
     expect(() => renderReviewedElement(block('<p style="display:none">x</p>', 0))).toThrow(/id\/class/);
     expect(() => renderReviewedElement(block('<p><a>not-pinned</a></p>', 0))).toThrow(/pinned/);
