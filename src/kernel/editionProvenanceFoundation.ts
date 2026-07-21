@@ -63,6 +63,11 @@ export interface ImmutableSourceArtifact {
   };
   sha256: string;
   bytes: number;
+  /**
+   * Canonical UTC instant when the acquisition record establishes a time, or a
+   * canonical calendar date when it establishes only a day.  A consumer must
+   * not manufacture a clock time merely to satisfy this field.
+   */
   acquiredAt: string;
 }
 
@@ -203,9 +208,11 @@ export interface FrozenEditionSection {
   displayLabel: string;
   heading: string;
   /**
-   * Stored plain text. Any future Markdown renderer MUST pass this exact value
-   * through escapeEditionPlainTextForMarkdown; validation does not interpret
-   * Markdown-looking source prose as executable syntax.
+   * Stored plain text. Frozen source segmentation may preserve LF-only outer
+   * boundaries, so a future Markdown renderer MUST pass this exact value
+   * through escapeFrozenEditionSectionContentForMarkdown. The generic
+   * escapeEditionPlainTextForMarkdown boundary intentionally remains strict
+   * and accepts only the trimmed core text.
    */
   content: string;
 }
@@ -213,7 +220,7 @@ export interface FrozenEditionSection {
 export interface EditionCompilationPackage {
   schemaVersion: 'edition-provenance-foundation.v1';
   sectionKeyPolicy: 'frozen_reviewed_v1';
-  /** Corpus bodies are plain text; future Markdown presentation requires the exported escaping boundary. */
+  /** Corpus bodies are plain text; future Markdown presentation requires the section-aware exported escaping boundary. */
   contentFormat: 'plain_text';
   work: HistoricalWorkIdentity;
   edition: EditionTranscriptionIdentity;
@@ -370,7 +377,7 @@ function validateSource(input: unknown): ImmutableSourceArtifact {
     pin: { kind, value: pinValue },
     sha256,
     bytes: integerAt(record.bytes, `${path}.bytes`, 1, EDITION_PROVENANCE_LIMITS.sourceArtifactBytes),
-    acquiredAt: instantAt(record.acquiredAt, `${path}.acquiredAt`),
+    acquiredAt: acquisitionRecordAt(record.acquiredAt, `${path}.acquiredAt`),
   };
 }
 
@@ -547,7 +554,7 @@ function validateProvenance(input: unknown): EditionProvenanceReview {
 
 function validateSection(input: unknown, path: string): FrozenEditionSection {
   const record = objectAt(input, path, ['sourceOrdinal', 'sectionKey', 'displayLabel', 'heading', 'content']);
-  const content = safeTextAt(record.content, `${path}.content`, Number.MAX_SAFE_INTEGER, true, true);
+  const content = frozenSectionTextWithLfBoundariesAt(record.content, `${path}.content`, Number.MAX_SAFE_INTEGER);
   if (utf8Length(content) > EDITION_PROVENANCE_LIMITS.sectionUtf8Bytes) {
     fail(`${path}.content`, `exceeds ${EDITION_PROVENANCE_LIMITS.sectionUtf8Bytes} UTF-8 bytes`);
   }
@@ -564,12 +571,25 @@ function validateSection(input: unknown, path: string): FrozenEditionSection {
  * Sole presentation-security boundary for emitting edition plain text inside
  * future CommonMark/GFM. It escapes every ASCII punctuation character, which
  * includes all link, image, autolink, HTML, entity, and destination delimiters.
- * Future Markdown renderers MUST call this function. This foundation is
- * inactive; active formatters are intentionally unchanged.
+ * Future Markdown renderers MUST call this function for trimmed plain text;
+ * FrozenEditionSection.content uses its section-aware wrapper below. This
+ * foundation is inactive; active formatters are intentionally unchanged.
  */
 export function escapeEditionPlainTextForMarkdown(content: string): string {
   const value = safeTextAt(content, '$.content', Number.MAX_SAFE_INTEGER, true, true);
   return value.replace(/[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/g, '\\$&');
+}
+
+/**
+ * Presentation boundary for FrozenEditionSection.content only. It validates
+ * and preserves the exact LF-only source boundaries, while routing the
+ * trimmed interior through the strict generic Markdown escaper. This keeps
+ * exact source segmentation reproducible without making the generic escaper
+ * accept outer whitespace.
+ */
+export function escapeFrozenEditionSectionContentForMarkdown(content: string): string {
+  const boundary = splitFrozenSectionContentAt(content, '$.content', Number.MAX_SAFE_INTEGER);
+  return `${boundary.leadingLineFeeds}${escapeEditionPlainTextForMarkdown(boundary.interior)}${boundary.trailingLineFeeds}`;
 }
 
 function validateContributorGroups(input: unknown): EditionContributorGroups {
@@ -699,6 +719,45 @@ function safeTextAt(
   return value;
 }
 
+interface FrozenSectionContentBoundary {
+  leadingLineFeeds: string;
+  interior: string;
+  trailingLineFeeds: string;
+}
+
+/**
+ * Frozen source segmentation can carry LF-only separation with the preceding
+ * or following source block. This is deliberately narrower than safeTextAt:
+ * it applies only to stored section text and is never used by the Markdown
+ * escaping boundary. Tabs, spaces, CR, and all other outer whitespace remain
+ * invalid, so no renderer or generic metadata caller inherits this exception.
+ */
+function splitFrozenSectionContentAt(input: unknown, path: string, maxCharacters: number): FrozenSectionContentBoundary {
+  const raw = stringAt(input, path);
+  if (hasLoneSurrogate(raw)) fail(path, 'contains a lone UTF-16 surrogate');
+  const value = raw.normalize('NFC');
+  if (!value || [...value].length > maxCharacters) {
+    fail(path, `must be non-empty, trimmed, and at most ${maxCharacters} Unicode characters`);
+  }
+  if (value.includes('\r')) fail(path, 'contains a carriage return; corpus text must use line feeds');
+  const interior = value.replace(/^\n+|\n+$/g, '');
+  if (!interior || interior !== interior.trim()) {
+    fail(path, 'must be trimmed except for LF-only frozen source boundaries');
+  }
+  // Validate the preserved interior with the ordinary multiline corpus rules.
+  safeTextAt(interior, path, maxCharacters, true, true);
+  const leadingLineFeeds = value.match(/^\n+/u)?.[0] ?? '';
+  const trailingLineFeeds = value.match(/\n+$/u)?.[0] ?? '';
+  return { leadingLineFeeds, interior, trailingLineFeeds };
+}
+
+function frozenSectionTextWithLfBoundariesAt(input: unknown, path: string, maxCharacters: number): string {
+  const boundary = splitFrozenSectionContentAt(input, path, maxCharacters);
+  // Rejoin rather than trim or relocate the evidence: canonical serialization
+  // preserves the exact source boundary placement.
+  return `${boundary.leadingLineFeeds}${boundary.interior}${boundary.trailingLineFeeds}`;
+}
+
 function idAt(input: unknown, path: string): string {
   const value = stringAt(input, path);
   if (!/^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$/.test(value) || value.length > 128) {
@@ -796,6 +855,25 @@ function instantAt(input: unknown, path: string): string {
     fail(path, 'must be a canonical UTC instant with whole seconds');
   }
   return value;
+}
+
+/**
+ * Source collections do not always retain a time of acquisition.  Preserve
+ * the strongest truthful precision: a full canonical UTC instant where known,
+ * otherwise a canonical ISO calendar date.  This is intentionally stricter
+ * than accepting arbitrary ISO-like strings or timezone offsets.
+ */
+function acquisitionRecordAt(input: unknown, path: string): string {
+  const value = stringAt(input, path);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return dateAt(value, path);
+  try {
+    return instantAt(value, path);
+  } catch (error) {
+    if (error instanceof EditionProvenanceValidationError) {
+      fail(path, 'must be a canonical UTC instant with whole seconds or a canonical ISO calendar date when no time is established');
+    }
+    throw error;
+  }
 }
 
 function canonicalStringify(value: unknown): string {
