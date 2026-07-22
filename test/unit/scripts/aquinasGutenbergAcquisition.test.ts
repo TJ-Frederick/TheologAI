@@ -3,9 +3,12 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { deflateRawSync } from 'node:zlib';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
+  AQUINAS_GUTENBERG_GENERATED_RECEIPT_LOCAL_PATH,
+  AQUINAS_GUTENBERG_RECEIPT_PATH,
   AQUINAS_GUTENBERG_SOURCE_LOCK_PATH,
+  acquireAquinasGutenberg,
   extractAndVerifyLockedHtml,
   fetchExactGutenbergBytes,
   parseAquinasGutenbergSourceLock,
@@ -89,6 +92,15 @@ function zip(entries: readonly ZipEntry[]): Buffer {
 
 function lockJson(): Record<string, any> {
   return JSON.parse(readFileSync(AQUINAS_GUTENBERG_SOURCE_LOCK_PATH, 'utf8')) as Record<string, any>;
+}
+
+function seedTrackedAcquisitionEvidence(root: string): Buffer {
+  for (const path of [AQUINAS_GUTENBERG_SOURCE_LOCK_PATH, AQUINAS_GUTENBERG_RECEIPT_PATH]) {
+    const destination = join(root, path);
+    mkdirSync(dirname(destination), { recursive: true });
+    writeFileSync(destination, readFileSync(path));
+  }
+  return readFileSync(AQUINAS_GUTENBERG_RECEIPT_PATH);
 }
 
 describe('Aquinas Gutenberg local acquisition/source-rights lock', () => {
@@ -190,5 +202,36 @@ describe('Aquinas Gutenberg local acquisition/source-rights lock', () => {
       'fixture archive',
       async () => new Response('', { status: 302, headers: { location: 'https://evil.invalid/file.zip' } }),
     )).rejects.toThrow('redirected to an unapproved or mutable endpoint');
+  });
+
+  it('lets fresh-checkout acquisition pass destination preflight without overwriting the tracked reviewed receipt', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'theologai-aquinas-gutenberg-fresh-checkout-'));
+    const reviewedReceipt = seedTrackedAcquisitionEvidence(root);
+    const fetchReached = vi.fn(async (): Promise<Response> => {
+      throw new Error('fetch reached after destination preflight');
+    });
+
+    await expect(acquireAquinasGutenberg(root, fetchReached)).rejects.toThrow('fetch reached after destination preflight');
+    expect(fetchReached).toHaveBeenCalled();
+    expect(readFileSync(join(root, AQUINAS_GUTENBERG_RECEIPT_PATH))).toEqual(reviewedReceipt);
+  });
+
+  it('fails closed before downloading when any generated acquisition destination already exists', async () => {
+    const lock = readAquinasGutenbergSourceLock(process.cwd());
+    for (const localPath of [AQUINAS_GUTENBERG_GENERATED_RECEIPT_LOCAL_PATH, lock.artifacts[0]!.archive.localPath]) {
+      const root = mkdtempSync(join(tmpdir(), 'theologai-aquinas-gutenberg-hostile-destination-'));
+      const reviewedReceipt = seedTrackedAcquisitionEvidence(root);
+      const destination = join(root, 'data/historical-sources/project-gutenberg/aquinas-english-dominican', localPath);
+      mkdirSync(dirname(destination), { recursive: true });
+      writeFileSync(destination, 'hostile pre-existing bytes');
+      const fetchNotReached = vi.fn(async (): Promise<Response> => {
+        throw new Error('download must not start');
+      });
+
+      await expect(acquireAquinasGutenberg(root, fetchNotReached)).rejects.toThrow('no-clobber policy');
+      expect(fetchNotReached).not.toHaveBeenCalled();
+      expect(readFileSync(destination, 'utf8')).toBe('hostile pre-existing bytes');
+      expect(readFileSync(join(root, AQUINAS_GUTENBERG_RECEIPT_PATH))).toEqual(reviewedReceipt);
+    }
   });
 });

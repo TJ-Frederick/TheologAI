@@ -16,13 +16,19 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 export const AQUINAS_GUTENBERG_ROOT = 'data/historical-sources/project-gutenberg/aquinas-english-dominican';
 export const AQUINAS_GUTENBERG_SOURCE_LOCK_PATH = `${AQUINAS_GUTENBERG_ROOT}/SOURCE_LOCK.json`;
+// Reviewed, tracked evidence from the approved acquisition. Keep this path and
+// its bytes stable because downstream topology locks bind its digest.
 export const AQUINAS_GUTENBERG_RECEIPT_PATH = `${AQUINAS_GUTENBERG_ROOT}/LOCAL_ACQUISITION_RECEIPT.json`;
+// Per-checkout acquisition output. Unlike the reviewed receipt above, this is
+// generated beneath the ignored local/ boundary and is always no-clobber.
+export const AQUINAS_GUTENBERG_GENERATED_RECEIPT_LOCAL_PATH = 'local/LOCAL_ACQUISITION_RECEIPT.json';
 export const AQUINAS_GUTENBERG_SOURCE_LOCK_VERSION = 'theologai-aquinas-gutenberg-source-lock.v1';
 export const AQUINAS_GUTENBERG_RECEIPT_VERSION = 'theologai-aquinas-gutenberg-local-receipt.v1';
 
 // This binds the reviewed lock byte-for-byte. Changing a pin requires review of
 // both the JSON and this executable guard; a receipt alone cannot redefine it.
 const EXPECTED_SOURCE_LOCK_SHA256 = 'c5cfdd1edd132bf59968cbabe4c7de2180c42d205735ca6c06aec626104a180b';
+const EXPECTED_REVIEWED_RECEIPT_SHA256 = 'bc0dab9ce5dc3672ccf2a81182655c75eaf6ef4f280584a40e079bf82a11719d';
 const GUTENBERG_HOST = 'www.gutenberg.org';
 const MAX_ARCHIVE_BYTES = 2_000_000;
 const MAX_CATALOG_BYTES = 128_000;
@@ -664,9 +670,9 @@ async function downloadAndValidate(lock: AquinasGutenbergSourceLock, artifact: A
 }
 
 function assertAcquisitionDestinationsEmpty(cwd: string, lock: AquinasGutenbergSourceLock): void {
-  const receipt = resolve(cwd, AQUINAS_GUTENBERG_RECEIPT_PATH);
-  assertNoSymlink(dirname(receipt), 'receipt parent');
-  assertDestinationAbsent(receipt, 'receipt');
+  const receipt = relativeToLocal(cwd, AQUINAS_GUTENBERG_GENERATED_RECEIPT_LOCAL_PATH);
+  assertNoSymlink(dirname(receipt), 'generated receipt parent');
+  assertDestinationAbsent(receipt, AQUINAS_GUTENBERG_GENERATED_RECEIPT_LOCAL_PATH);
   for (const artifact of lock.artifacts) {
     for (const candidate of [artifact.archive.localPath, artifact.catalogSnapshot.localPath, ...Object.values(evidencePaths(artifact))]) {
       const path = relativeToLocal(cwd, candidate);
@@ -700,9 +706,8 @@ function receiptBytes(receipt: AquinasGutenbergReceipt): Buffer {
 }
 
 function writeReceiptNoClobber(cwd: string, receipt: AquinasGutenbergReceipt): void {
-  const path = resolve(cwd, AQUINAS_GUTENBERG_RECEIPT_PATH);
-  const root = resolve(cwd);
-  writeNoClobber(path, receiptBytes(receipt), root, 'receipt');
+  const path = relativeToLocal(cwd, AQUINAS_GUTENBERG_GENERATED_RECEIPT_LOCAL_PATH);
+  writeNoClobber(path, receiptBytes(receipt), localRoot(cwd), 'generated receipt');
 }
 
 function parseLocalEvidence(value: unknown, label: string): LocalEvidence {
@@ -777,11 +782,18 @@ export async function acquireAquinasGutenberg(cwd = ROOT, fetchImpl: FetchLike =
 
 export function verifyLocalAquinasGutenbergAcquisition(cwd = ROOT): AquinasGutenbergReceipt {
   const lock = readAquinasGutenbergSourceLock(cwd);
-  const receiptPath = resolve(cwd, AQUINAS_GUTENBERG_RECEIPT_PATH);
+  const generatedReceiptPath = relativeToLocal(cwd, AQUINAS_GUTENBERG_GENERATED_RECEIPT_LOCAL_PATH);
+  const receiptPath = existsSync(generatedReceiptPath)
+    ? generatedReceiptPath
+    : resolve(cwd, AQUINAS_GUTENBERG_RECEIPT_PATH);
   if (!existsSync(receiptPath)) fail('local acquisition receipt is missing');
   const receiptStat = lstatSync(receiptPath);
   if (receiptStat.isSymbolicLink() || !receiptStat.isFile()) fail('local acquisition receipt is not a safe regular file');
-  const receipt = parseReceipt(JSON.parse(strictUtf8(readFileSync(receiptPath), 'local acquisition receipt')), lock);
+  const receiptFile = readFileSync(receiptPath);
+  if (receiptPath !== generatedReceiptPath && sha256(receiptFile) !== EXPECTED_REVIEWED_RECEIPT_SHA256) {
+    fail('reviewed acquisition receipt byte identity drifted');
+  }
+  const receipt = parseReceipt(JSON.parse(strictUtf8(receiptFile, 'local acquisition receipt')), lock);
   assertReceiptMatchesLock(receipt, lock);
   for (const [index, artifact] of lock.artifacts.entries()) {
     const entry = receipt.artifacts[index]!;
