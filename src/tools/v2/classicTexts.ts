@@ -77,9 +77,17 @@ export function createClassicTextsHandler(historicalService: HistoricalDocumentS
           const doc = await historicalService.getDocument(params.work as string);
           const profile = await historicalService.getDeliveryProfile(doc.id);
           if (profile.deliveryMode === 'sectioned_only') {
-            const after = params.cursor === undefined
-              ? undefined
-              : decodeHistoricalSectionedOnlyCursor(params.cursor as string, profile);
+            let after;
+            if (params.cursor !== undefined) {
+              try {
+                after = decodeHistoricalSectionedOnlyCursor(params.cursor as string, profile);
+              } catch (error) {
+                if (error instanceof HistoricalSectionedOnlyCursorError) {
+                  throw new ValidationError('cursor', 'Historical section browse cursor is malformed, stale, or non-canonical.');
+                }
+                throw error;
+              }
+            }
             if (after && !await historicalService.hasHistoricalSectionBoundary(doc.id, after)) {
               throw new ValidationError('cursor', 'Historical section browse cursor does not name a current section boundary.');
             }
@@ -174,9 +182,7 @@ export function createClassicTextsHandler(historicalService: HistoricalDocumentS
 
         throw new ValidationError('mode', 'Choose exactly one mode: list local works, search local documents, or browse a local work.');
       } catch (error) {
-        return handleToolError(error instanceof HistoricalSectionedOnlyCursorError
-          ? new ValidationError('cursor', 'Historical section browse cursor is malformed, stale, or non-canonical.')
-          : error as Error);
+        return handleToolError(error as Error);
       }
     },
   };
@@ -258,6 +264,9 @@ function validateMode(params: Record<string, unknown>): void {
       || !has('work') || keys.length < 2 || keys.length > 3
       || (has('cursor') && (typeof params.cursor !== 'string' || !/^[A-Za-z0-9_-]{1,2048}$/.test(params.cursor)))) {
       throw new ValidationError('browseSections', 'browseSections=true requires a local work identifier and optional opaque cursor only.');
+    }
+    if (params.work.length > 256) {
+      throw new ValidationError('work', 'work must be a non-empty named local document slug or title.');
     }
     return;
   }

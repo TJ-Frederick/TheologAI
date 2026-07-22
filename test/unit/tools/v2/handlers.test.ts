@@ -960,6 +960,16 @@ describe('classic_text_lookup handler', () => {
     expect(historical.browseHistoricalSectionSummaries).not.toHaveBeenCalled();
   });
 
+  it('enforces the 256-character work limit before a browse lookup', async () => {
+    const { handler, historical } = createServices();
+
+    const result = await handler.handler({ work: 'x'.repeat(257), browseSections: true });
+
+    expect(result).toMatchObject({ isError: true });
+    expect(textOf(result)).toBe('Invalid input: work must be a non-empty named local document slug or title.');
+    expect(historical.getDocument).not.toHaveBeenCalled();
+  });
+
   it('maps malformed, stale, non-canonical, and boundary-mismatched section cursors to invalid input', async () => {
     const { handler, historical } = createServices();
     const sectioned: HistoricalDocumentDeliveryProfile = {
@@ -994,6 +1004,28 @@ describe('classic_text_lookup handler', () => {
     expect(boundaryMismatch).toMatchObject({ isError: true });
     expect(textOf(boundaryMismatch)).toBe('Invalid input: Historical section browse cursor does not name a current section boundary.');
     expect(historical.browseHistoricalSectionSummaries).not.toHaveBeenCalled();
+  });
+
+  it('keeps an invalid server-returned continuation boundary as an internal error', async () => {
+    const { handler, historical } = createServices();
+    const sectioned: HistoricalDocumentDeliveryProfile = {
+      ...profile, workId: 'synthetic-work', editionId: 'synthetic-edition',
+      sectionPackageIdentity: 'b'.repeat(64), deliveryMode: 'sectioned_only', sectionCount: 33,
+      landingMaxBytes: 16_384, browsePageSize: 32, cursorVersion: 1,
+    };
+    const rows = Array.from({ length: 33 }, (_, index) => ({
+      ...summary, sectionKey: `source-${String(index + 1).padStart(4, '0')}`,
+      sourceOrdinal: index + 1,
+    }));
+    rows[31] = { ...rows[31]!, sectionKey: '../invalid-server-key' };
+    historical.getDeliveryProfile.mockResolvedValue(sectioned);
+    historical.browseHistoricalSectionSummaries.mockResolvedValue(rows);
+
+    const result = await handler.handler({ work: document.id, browseSections: true });
+
+    expect(result).toMatchObject({ isError: true });
+    expect(textOf(result)).toBe('I encountered an error retrieving that information. Please try again.');
+    expect(textOf(result)).not.toContain('Invalid input:');
   });
 
   it('distinguishes an empty global search from a missing action', async () => {
