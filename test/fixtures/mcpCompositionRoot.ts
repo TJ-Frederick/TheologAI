@@ -93,7 +93,12 @@ export function createDeterministicMcpFixture(): DeterministicMcpFixture {
     getDocument: () => undefined,
     getSections: () => [],
     getSection: () => undefined,
+    getDeliveryProfile: () => undefined,
+    resolveSection: () => undefined,
+    browseHistoricalSectionSummaries: () => [],
+    hasHistoricalSectionBoundary: () => false,
     search: () => [],
+    searchResolvedSections: () => [],
     searchPrimarySources: () => [],
     findDocumentByName: () => undefined,
   };
