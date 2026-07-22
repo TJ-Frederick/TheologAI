@@ -33,6 +33,8 @@ import { splitGeneratedSql } from './d1-seed-utils.js';
 export const HISTORICAL_SECTION_COMPATIBILITY_EVIDENCE_KIND =
   'historical_section_compatibility_evidence' as const;
 export const HISTORICAL_SECTION_COMPATIBILITY_EVIDENCE_SCHEMA_VERSION = 1 as const;
+export const HISTORICAL_SECTION_COMPATIBILITY_EVIDENCE_PATH =
+  'data/historical-section-compatibility-evidence.json';
 export const UNORDERED_NO_COMPATIBILITY_PROOF =
   'unordered_no_compatibility_proof' as const;
 
@@ -653,8 +655,8 @@ if (invokedPath === fileURLToPath(import.meta.url)) {
   const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
   const { database, seedDirectory } = parseCliArguments(process.argv.slice(2));
   const evidence = parseHistoricalSectionCompatibilityEvidence(parseJsonFile(
-    join(root, 'test/fixtures/historical-section-compatibility/real-local-evidence.json'),
-    'Historical section compatibility evidence fixture',
+    join(root, HISTORICAL_SECTION_COMPATIBILITY_EVIDENCE_PATH),
+    'Historical section compatibility evidence input',
   ));
   const report = verifyHistoricalSectionCompatibilityMaterialization(
     root,

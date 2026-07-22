@@ -54,7 +54,7 @@ try {
     `SELECT CASE WHEN
       (SELECT COUNT(*) FROM d1_migrations) = ${migrationNames.length}
       AND (SELECT group_concat(name, ',') FROM (SELECT name FROM d1_migrations ORDER BY id)) = '${migrationNames.join(',')}'
-      AND (SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name IN ('idx_xref_from','idx_xref_votes','idx_morph_verse','idx_morph_strongs','idx_morph_strongs_canonical','idx_strongs_book_stats_order','idx_strongs_form_stats_rank','idx_ubs_groups_source_order','idx_ubs_segments_lookup','idx_ubs_semantic_identity_candidate','idx_ubs_semantic_sense_candidate_order','idx_ubs_semantic_sense_domain_order','idx_ubs_semantic_coordinate_lookup','idx_ubs_semantic_evidence_sense_order')) = 14
+      AND (SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name IN ('idx_xref_from','idx_xref_votes','idx_morph_verse','idx_morph_strongs','idx_morph_strongs_canonical','idx_strongs_book_stats_order','idx_strongs_form_stats_rank','idx_ubs_groups_source_order','idx_ubs_segments_lookup','idx_ubs_semantic_identity_candidate','idx_ubs_semantic_sense_candidate_order','idx_ubs_semantic_sense_domain_order','idx_ubs_semantic_coordinate_lookup','idx_ubs_semantic_evidence_sense_order','idx_document_sections_id_document','idx_historical_section_identities_browse','idx_historical_section_aliases_target')) = 17
       AND ${columnChecks.join('\n      AND ')}
       THEN 'schema-ready' ELSE json_extract('Wrangler-applied migration state mismatch', '$') END AS schema_state;`,
     '--json',
@@ -89,6 +89,9 @@ try {
       AND (SELECT COUNT(*) FROM morphology) > 0
       AND (SELECT lemma FROM morphology WHERE book = 'Genesis' AND chapter = 1 AND verse = 1 AND position = 3) = 'אֱלֹהִים'
       AND (SELECT COUNT(*) FROM document_sections) = ${manifest.expectedCounts.document_sections}
+      AND (SELECT COUNT(*) FROM historical_document_delivery_profiles) = ${manifest.expectedCounts.historical_document_delivery_profiles}
+      AND (SELECT COUNT(*) FROM historical_section_identities) = ${manifest.expectedCounts.historical_section_identities}
+      AND (SELECT COUNT(*) FROM historical_section_aliases) = ${manifest.expectedCounts.historical_section_aliases}
       AND (SELECT COUNT(*) FROM strongs_fts) > 0
       AND (SELECT COUNT(*) FROM sections_fts) = ${manifest.expectedCounts.sections_fts}
       AND (SELECT COUNT(*) FROM ubs_parallel_sources) = ${manifest.expectedCounts.ubs_parallel_sources}

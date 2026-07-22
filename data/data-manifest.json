@@ -1,11 +1,11 @@
 {
   "manifestVersion": 2,
-  "schemaVersion": "0004_ubs_hebrew_semantics",
+  "schemaVersion": "0005_historical_section_identity_delivery",
   "algorithm": "sha256",
   "materializations": {
     "d1": {
       "identityVersion": 1,
-      "transformVersion": 7,
+      "transformVersion": 8,
       "migrations": [
         {
           "path": "migrations/0001_initial_schema.sql",
@@ -22,6 +22,10 @@
         {
           "path": "migrations/0004_ubs_hebrew_semantics.sql",
           "sha256": "56f38c32ad02fa9908f4b6770aed54cf978227ce33ffb7bc1183f0ea03477532"
+        },
+        {
+          "path": "migrations/0005_historical_section_identity_delivery.sql",
+          "sha256": "0a002aaab77940d0fa8b9b4fd5c346c7a924e211d91c5d2519ea4882e326a5fa"
         }
       ],
       "inputs": [
@@ -104,6 +108,9 @@
         "data/cross-references/cross_references.txt",
         "data/historical-document-catalog-provenance.json",
         "data/historical-document-catalog.json",
+        "data/historical-section-compatibility-attestation.json",
+        "data/historical-section-compatibility-evidence.json",
+        "data/historical-section-key-plan.json",
         "data/historical-documents/39-articles.json",
         "data/historical-documents/apostles-creed.json",
         "data/historical-documents/athanasian-creed.json",
@@ -561,6 +568,18 @@
       "sha256": "581bdbd02fe99b97a6e236b893bce459d8b8b477789df9e16c5ef8dbcf612b85"
     },
     {
+      "path": "data/historical-section-compatibility-attestation.json",
+      "sha256": "73a69ed4c4928b5dd3e50b7f4b367b7e9c9a68ae3d4107d70e6f385a3f28ba46"
+    },
+    {
+      "path": "data/historical-section-compatibility-evidence.json",
+      "sha256": "1bce9dc7d8511c3e204f37365b83db80aeef0baa70a827c4be2cf95edc662370"
+    },
+    {
+      "path": "data/historical-section-key-plan.json",
+      "sha256": "8d051c6b9f519b61bff1ba2b7c0ea718189ff221bdd37df3d6b7139d5e786ef2"
+    },
+    {
       "path": "data/parallel-passages/ubs-paratext/LICENSE.md",
       "sha256": "924513d06ecd19f5abb3d5a41973452983bf2b471347253d07d7cc529a466c8c"
     },
@@ -597,6 +616,9 @@
     "stepbible_lexicons": 19570,
     "documents": 17,
     "document_sections": 3054,
+    "historical_document_delivery_profiles": 17,
+    "historical_section_identities": 3054,
+    "historical_section_aliases": 2821,
     "sections_fts": 3054,
     "morph_codes": 20,
     "ubs_parallel_sources": 1,

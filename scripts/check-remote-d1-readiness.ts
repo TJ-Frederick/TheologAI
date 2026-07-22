@@ -54,6 +54,9 @@ export const REQUIRED_COLUMNS: Readonly<Record<string, readonly string[]>> = {
   stepbible_lexicons: ['strongs_number', 'source', 'extended_data'],
   documents: ['id', 'title', 'type', 'date', 'metadata'],
   document_sections: ['id', 'document_id', 'section_number', 'title', 'content', 'topics'],
+  historical_document_delivery_profiles: ['document_id', 'work_id', 'edition_id', 'immutable_corpus_identity', 'section_package_identity', 'delivery_mode', 'section_count', 'landing_max_bytes', 'browse_page_size', 'cursor_version', 'provenance_json', 'rights_json'],
+  historical_section_identities: ['document_id', 'section_key', 'source_ordinal', 'document_section_id'],
+  historical_section_aliases: ['document_id', 'legacy_section_id', 'section_key', 'source_ordinal'],
   sections_fts: ['title', 'content', 'topics'],
   morph_codes: ['code', 'expansion'],
   ubs_parallel_sources: ['source_id', 'schema_version', 'transform_version', 'artifact_identity', 'title', 'publisher', 'copyright', 'license', 'license_url', 'source_url', 'source_path', 'source_commit', 'source_commit_date', 'source_blob', 'source_bytes', 'source_sha256', 'modified', 'modification_note', 'label', 'directionality'],
@@ -230,6 +233,9 @@ function buildD1ReadinessQueryContract(
     'idx_ubs_semantic_sense_domain_order',
     'idx_ubs_semantic_coordinate_lookup',
     'idx_ubs_semantic_evidence_sense_order',
+    'idx_document_sections_id_document',
+    'idx_historical_section_identities_browse',
+    'idx_historical_section_aliases_target',
   ];
   const quotedIndexes = requiredIndexes.map(name => `'${name}'`).join(',');
   const indexCheck = `(SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name IN (${quotedIndexes})) = ${requiredIndexes.length}`;
@@ -277,6 +283,30 @@ function buildD1ReadinessQueryContract(
     {
       id: 'historical.output.section_metadata',
       predicate: classicTextSectionReadinessPredicate(),
+    },
+    {
+      id: 'historical.transform8.profile_coverage',
+      predicate: `(SELECT COUNT(*) FROM historical_document_delivery_profiles) = (SELECT COUNT(*) FROM documents) AND (SELECT COUNT(*) FROM documents d LEFT JOIN historical_document_delivery_profiles p ON p.document_id = d.id WHERE p.document_id IS NULL) = 0`,
+    },
+    {
+      id: 'historical.transform8.legacy_profile_contract',
+      predicate: `(SELECT COUNT(*) FROM historical_document_delivery_profiles WHERE work_id IS NOT NULL OR edition_id IS NOT NULL OR section_package_identity IS NOT NULL OR delivery_mode != 'complete_document' OR landing_max_bytes != 0 OR browse_page_size != 0 OR cursor_version != 0 OR section_count < 1 OR json_valid(provenance_json) != 1 OR json_type(provenance_json) != 'object' OR json_valid(rights_json) != 1 OR json_type(rights_json) != 'object') = 0`,
+    },
+    {
+      id: 'historical.transform8.identity_coverage',
+      predicate: `(SELECT COUNT(*) FROM historical_section_identities) = (SELECT COUNT(*) FROM document_sections) AND (SELECT COUNT(*) FROM document_sections s LEFT JOIN historical_section_identities i ON i.document_section_id = s.id AND i.document_id = s.document_id WHERE i.document_section_id IS NULL) = 0 AND (SELECT COUNT(*) FROM historical_section_identities i LEFT JOIN document_sections s ON s.id = i.document_section_id AND s.document_id = i.document_id WHERE s.id IS NULL) = 0`,
+    },
+    {
+      id: 'historical.transform8.source_ordinals',
+      predicate: `(SELECT COUNT(*) FROM historical_document_delivery_profiles p WHERE (SELECT MIN(source_ordinal) FROM historical_section_identities i WHERE i.document_id = p.document_id) != 1 OR (SELECT MAX(source_ordinal) FROM historical_section_identities i WHERE i.document_id = p.document_id) != p.section_count OR (SELECT COUNT(*) FROM historical_section_identities i WHERE i.document_id = p.document_id) != p.section_count) = 0`,
+    },
+    {
+      id: 'historical.transform8.alias_coverage_source_first',
+      predicate: `(WITH legacy_groups AS (SELECT s.document_id, s.section_number AS legacy_section_id, MIN(i.source_ordinal) AS source_ordinal, COUNT(*) AS members FROM document_sections s JOIN historical_section_identities i ON i.document_section_id = s.id AND i.document_id = s.document_id GROUP BY s.document_id, s.section_number) SELECT COUNT(*) FROM legacy_groups g LEFT JOIN historical_section_aliases a ON a.document_id = g.document_id AND a.legacy_section_id = g.legacy_section_id AND a.source_ordinal = g.source_ordinal WHERE a.document_id IS NULL) = 0 AND (SELECT COUNT(*) FROM historical_section_aliases) = (SELECT COUNT(*) FROM (SELECT document_id, section_number FROM document_sections GROUP BY document_id, section_number))`,
+    },
+    {
+      id: 'historical.transform8.alias_non_shadowing',
+      predicate: `(SELECT COUNT(*) FROM historical_section_aliases a JOIN historical_section_identities i ON i.document_id = a.document_id AND i.section_key = a.legacy_section_id WHERE i.section_key != a.section_key) = 0`,
     },
   ];
   const columnChecks = Object.entries(REQUIRED_COLUMNS).map(([table, columns]): D1ReadinessCheck => ({

@@ -47,6 +47,21 @@ import {
   parseHistoricalDocumentCatalogProvenance,
 } from './historical-document-catalog.js';
 import {
+  compileHistoricalSectionCompatibility,
+  parseHistoricalSectionCompatibilityAttestation,
+} from './historical-section-compatibility-compiler.js';
+import { parseHistoricalSectionCompatibilityEvidence } from './historical-section-compatibility-evidence.js';
+import {
+  assertHistoricalSectionTransform8Materialization,
+  historicalSectionBodyProjectionSha256,
+  type HistoricalSectionMaterializedRow,
+} from './historical-section-compatibility-materialization.js';
+import {
+  parseHistoricalSectionKeyPlan,
+  sha256Canonical,
+  type HistoricalSectionSourceDocument,
+} from './historical-section-key-plan.js';
+import {
   compileUbsSemanticMaterialization,
   insertUbsSemanticMaterialization,
 } from './ubs-semantics/materialization.js';
@@ -380,8 +395,19 @@ parseHistoricalDocumentCatalogProvenance(JSON.parse(
   sourceRegistry.read('data/historical-document-catalog-provenance.json', 'utf-8'),
 ), historicalCatalog);
 const historicalCatalogById = new Map(historicalCatalog.map(entry => [entry.documentId, entry]));
+const historicalSectionKeyPlan = parseHistoricalSectionKeyPlan(JSON.parse(
+  sourceRegistry.read('data/historical-section-key-plan.json', 'utf-8'),
+));
+const historicalSectionCompatibilityEvidence = parseHistoricalSectionCompatibilityEvidence(JSON.parse(
+  sourceRegistry.read('data/historical-section-compatibility-evidence.json', 'utf-8'),
+));
+const historicalSectionCompatibilityAttestation = parseHistoricalSectionCompatibilityAttestation(JSON.parse(
+  sourceRegistry.read('data/historical-section-compatibility-attestation.json', 'utf-8'),
+));
+const historicalSectionSources: HistoricalSectionSourceDocument[] = [];
+const materializedHistoricalSections: HistoricalSectionMaterializedRow[] = [];
 const insertDoc = db.prepare(
-  'INSERT OR IGNORE INTO documents (id, title, type, date, metadata) VALUES (?, ?, ?, ?, ?)'
+  'INSERT INTO documents (id, title, type, date, metadata) VALUES (?, ?, ?, ?, ?)'
 );
 const insertSection = db.prepare(
   'INSERT INTO document_sections (document_id, section_number, title, content, topics) VALUES (?, ?, ?, ?, ?)'
@@ -390,7 +416,7 @@ const insertSectionFTS = db.prepare(
   'INSERT INTO sections_fts (title, content, topics) VALUES (?, ?, ?)'
 );
 
-const histTx = db.transaction(() => {
+const materializeHistoricalDocuments = () => {
   let docCount = 0;
   let sectionCount = 0;
 
@@ -401,6 +427,14 @@ const histTx = db.transaction(() => {
   for (const file of files) {
     const id = file.replace('.json', '');
     const doc = JSON.parse(sourceRegistry.read(`data/historical-documents/${file}`, 'utf-8'));
+    if (!Array.isArray(doc.sections)) {
+      throw new Error(`Historical document ${id} has no sections array`);
+    }
+    historicalSectionSources.push({
+      documentId: id,
+      sourcePath: `data/historical-documents/${file}`,
+      value: doc as Record<string, unknown> & { sections: unknown[] },
+    });
     const catalog = historicalCatalogById.get(id);
     if (!catalog) throw new Error(`Historical document ${id} is missing from the reviewed catalog`);
 
@@ -431,29 +465,40 @@ const histTx = db.transaction(() => {
     );
     docCount++;
 
-    if (Array.isArray(doc.sections)) {
-      if (doc.sections.length > CLASSIC_TEXT_LIMITS.sectionsPerWork) {
-        throw new Error(`Historical document ${id} contains ${doc.sections.length} sections; v1 permits at most ${CLASSIC_TEXT_LIMITS.sectionsPerWork}`);
-      }
-      for (let i = 0; i < doc.sections.length; i++) {
-        const s = doc.sections[i];
-        const content = s.content || s.answer || s.a || '';
-        const title = s.title || s.question || s.chapter || s.q || '';
-        const sectionNum = s.question_number || s.section_number || String(i + 1);
-        const topics = JSON.stringify(s.topics || []);
+    if (doc.sections.length > CLASSIC_TEXT_LIMITS.sectionsPerWork) {
+      throw new Error(`Historical document ${id} contains ${doc.sections.length} sections; v1 permits at most ${CLASSIC_TEXT_LIMITS.sectionsPerWork}`);
+    }
+    for (let i = 0; i < doc.sections.length; i++) {
+      const s = doc.sections[i];
+      const content = s.content || s.answer || s.a || '';
+      const title = s.title || s.question || s.chapter || s.q || '';
+      const sectionNum = String(s.question_number || s.section_number || String(i + 1));
+      const topics = JSON.stringify(s.topics || []);
 
-        assertClassicTextSectionMetadata({
-          documentId: id,
-          sectionNumber: sectionNum,
-          title,
-          content,
-          topics,
-        }, `Historical document ${id} section ${i + 1}`);
+      assertClassicTextSectionMetadata({
+        documentId: id,
+        sectionNumber: sectionNum,
+        title,
+        content,
+        topics,
+      }, `Historical document ${id} section ${i + 1}`);
 
-        insertSection.run(id, sectionNum, title, content, topics);
-        insertSectionFTS.run(title, content, topics);
-        sectionCount++;
+      const inserted = insertSection.run(id, sectionNum, title, content, topics);
+      const documentSectionId = Number(inserted.lastInsertRowid);
+      if (!Number.isSafeInteger(documentSectionId) || documentSectionId < 1) {
+        throw new Error(`Historical document ${id} section ${i + 1} did not receive a safe storage id`);
       }
+      materializedHistoricalSections.push({
+        documentId: id,
+        sourceOrdinal: i + 1,
+        documentSectionId,
+        legacySectionId: sectionNum,
+        title,
+        content,
+        topics,
+      });
+      insertSectionFTS.run(title, content, topics);
+      sectionCount++;
     }
   }
 
@@ -462,10 +507,120 @@ const histTx = db.transaction(() => {
   }
 
   return { docCount, sectionCount };
-});
+};
 
-const { docCount, sectionCount } = histTx();
+const materializeHistoricalTransform8 = db.transaction(() => {
+const { docCount, sectionCount } = materializeHistoricalDocuments();
 log(`  Inserted ${docCount} documents with ${sectionCount} sections`);
+
+// ── Transform 8: historical delivery + canonical identity sidecars ──
+
+log('Materializing historical section identities...');
+const historicalCompatibility = compileHistoricalSectionCompatibility(
+  historicalSectionKeyPlan,
+  historicalSectionSources,
+  historicalSectionCompatibilityEvidence,
+);
+if (sha256Canonical(historicalCompatibility.attestation) !== sha256Canonical(historicalSectionCompatibilityAttestation)) {
+  throw new Error('Historical section compatibility attestation does not match manifest-bound authoritative inputs');
+}
+const historicalPlanByDocument = new Map(
+  historicalSectionKeyPlan.documents.map(document => [document.documentId, document]),
+);
+const historicalProfileInputs = historicalCompatibility.map.documents.map(document => {
+  const plan = historicalPlanByDocument.get(document.documentId);
+  if (!plan) throw new Error(`Historical compatibility map has no manifest-bound plan document: ${document.documentId}`);
+  return {
+    documentId: document.documentId,
+    // Existing local works deliberately do not assert work/edition/package
+    // identities or rights beyond their frozen source bytes. Those fields are
+    // reserved for a later reviewed sectioned-edition materialization.
+    workId: null,
+    editionId: null,
+    immutableCorpusIdentity: plan.sourceCanonicalSha256,
+    sectionPackageIdentity: null,
+    provenanceJson: JSON.stringify({
+      status: 'legacy_local_document_without_edition_assertion',
+      sourcePath: plan.sourcePath,
+      sourceCanonicalSha256: plan.sourceCanonicalSha256,
+      sectionKeyPlanCanonicalSha256: historicalCompatibility.attestation.inputs.historicalSectionKeyPlanCanonicalSha256,
+    }),
+    rightsJson: JSON.stringify({
+      status: 'not_retroactively_asserted',
+      editionRights: 'not_established',
+      redistributionApproval: 'not_asserted',
+    }),
+  } as const;
+});
+const historicalTransform8Rows = assertHistoricalSectionTransform8Materialization(
+  historicalCompatibility,
+  materializedHistoricalSections,
+  historicalProfileInputs,
+);
+const historicalBodyProjectionBefore = historicalSectionBodyProjectionSha256(materializedHistoricalSections);
+const insertHistoricalDeliveryProfile = db.prepare(`INSERT INTO historical_document_delivery_profiles (
+  document_id, work_id, edition_id, immutable_corpus_identity, section_package_identity,
+  delivery_mode, section_count, landing_max_bytes, browse_page_size, cursor_version,
+  provenance_json, rights_json
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+const insertHistoricalSectionIdentity = db.prepare(`INSERT INTO historical_section_identities (
+  document_id, section_key, source_ordinal, document_section_id
+) VALUES (?, ?, ?, ?)`);
+const insertHistoricalSectionAlias = db.prepare(`INSERT INTO historical_section_aliases (
+  document_id, legacy_section_id, section_key, source_ordinal
+) VALUES (?, ?, ?, ?)`);
+for (const profile of historicalTransform8Rows.deliveryProfiles) {
+  insertHistoricalDeliveryProfile.run(
+    profile.documentId, profile.workId, profile.editionId, profile.immutableCorpusIdentity,
+    profile.sectionPackageIdentity, profile.deliveryMode, profile.sectionCount,
+    profile.landingMaxBytes, profile.browsePageSize, profile.cursorVersion,
+    profile.provenanceJson, profile.rightsJson,
+  );
+}
+for (const identity of historicalTransform8Rows.identities) {
+  insertHistoricalSectionIdentity.run(
+    identity.documentId, identity.sectionKey, identity.sourceOrdinal, identity.documentSectionId,
+  );
+}
+for (const alias of historicalTransform8Rows.legacyAliases) {
+  insertHistoricalSectionAlias.run(
+    alias.documentId, alias.legacySectionId, alias.sectionKey, alias.sourceOrdinal,
+  );
+}
+const sourceOrdinalByStorageId = new Map(
+  materializedHistoricalSections.map(section => [section.documentSectionId, section.sourceOrdinal]),
+);
+const storedHistoricalSections = db.prepare(`SELECT
+  id AS documentSectionId, document_id AS documentId, section_number AS legacySectionId,
+  title, content, topics
+  FROM document_sections ORDER BY id`).all().map(row => {
+  const section = row as {
+    documentSectionId: number; documentId: string; legacySectionId: string;
+    title: string; content: string; topics: string;
+  };
+  const sourceOrdinal = sourceOrdinalByStorageId.get(section.documentSectionId);
+  if (!sourceOrdinal) throw new Error(`Historical section storage row is outside the Transform 8 projection: ${section.documentSectionId}`);
+  return { ...section, sourceOrdinal };
+});
+if (historicalSectionBodyProjectionSha256(storedHistoricalSections) !== historicalBodyProjectionBefore) {
+  throw new Error('Transform 8 sidecar materialization changed the historical section body projection');
+}
+const historicalFtsMismatches = db.prepare(`SELECT COUNT(*) AS count
+  FROM document_sections section
+  LEFT JOIN sections_fts fts ON fts.rowid = section.id
+  WHERE fts.rowid IS NULL OR fts.title IS NOT section.title
+    OR fts.content IS NOT section.content OR fts.topics IS NOT section.topics`).get() as { count: number };
+if (historicalFtsMismatches.count !== 0) {
+  throw new Error(`Transform 8 sidecar materialization changed ${historicalFtsMismatches.count} historical FTS rows`);
+}
+if (process.env.THEOLOGAI_TRANSFORM8_TEST_FAIL_AFTER_SIDECARS === '1') {
+  throw new Error('Forced Transform 8 late failure after historical sidecar assertions');
+}
+log(`  Inserted ${historicalTransform8Rows.deliveryProfiles.length} delivery profiles, `
+  + `${historicalTransform8Rows.identities.length} identities, and `
+  + `${historicalTransform8Rows.legacyAliases.length} legacy aliases`);
+});
+materializeHistoricalTransform8();
 
 // ── Tier 3: UBS source-attested parallel passages ──
 

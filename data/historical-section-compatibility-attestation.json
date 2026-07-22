@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "kind": "historical_section_source_first_compiler_attestation",
+  "policy": {
+    "scope": "existing_17_local_works_only",
+    "sourceAuthority": "current_checked_in_historical_documents",
+    "keyAuthority": "checked_in_immutable_section_key_plan",
+    "legacyAliasTarget": "approved_source_first",
+    "resolutionOrder": "canonical_before_legacy_alias",
+    "contentPolicy": "excluded_source_signatures_only",
+    "runtimeStatus": "inactive_until_0005_transform_8",
+    "productionObservedTarget": null
+  },
+  "inputs": {
+    "historicalSectionKeyPlanCanonicalSha256": "27d82c139aeb8521fab535a0988c0e7f0902e6b3aedf1970bb8a5c0b26702fbf",
+    "historicalSourcesCanonicalSha256": "9c987dc30ed3a9dfe29c83a25693c55797cef367deeb4f764386fa07fb3b61c4",
+    "approvedSourceFirstEvidenceCanonicalSha256": "158082ee3e42bcc211b955970ed13a2f0e1758df9cf1ae8b2bac6fc961f4a085"
+  },
+  "exactCounts": {
+    "documentCount": 17,
+    "sectionCount": 3054,
+    "legacyLocatorCount": 2821,
+    "collisionGroups": 23,
+    "affectedSections": 256,
+    "newlyAddressableSections": 233
+  },
+  "canonicalOutputSha256": "3a8734e7f5ee4974f7b88811e7507021cfaddd5cfdbc0ab6f801b1e7d43a5bc5"
+}

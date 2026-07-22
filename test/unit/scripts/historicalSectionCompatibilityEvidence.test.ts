@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  HISTORICAL_SECTION_COMPATIBILITY_EVIDENCE_PATH,
   UNORDERED_NO_COMPATIBILITY_PROOF,
   deriveHistoricalSectionCompatibilityEvidence,
   parseHistoricalSectionCompatibilityEvidence,
@@ -20,7 +21,7 @@ const ROOT = process.cwd();
 
 function realEvidence(): HistoricalSectionCompatibilityEvidence {
   return parseHistoricalSectionCompatibilityEvidence(JSON.parse(readFileSync(
-    'test/fixtures/historical-section-compatibility/real-local-evidence.json',
+    HISTORICAL_SECTION_COMPATIBILITY_EVIDENCE_PATH,
     'utf8',
   )));
 }
@@ -38,7 +39,7 @@ describe('historical section compatibility evidence', () => {
     const evidence = realEvidence();
     const derived = verifyHistoricalSectionCompatibilityEvidenceFromSources(ROOT, evidence);
     const raw = JSON.parse(readFileSync(
-      'test/fixtures/historical-section-compatibility/real-local-evidence.json',
+      HISTORICAL_SECTION_COMPATIBILITY_EVIDENCE_PATH,
       'utf8',
     )) as Record<string, unknown>;
 
@@ -87,7 +88,7 @@ describe('historical section compatibility evidence', () => {
     ['a non-SHA source signature', (raw: any) => { raw.collisionGroups[0].members[0].sourceSignature = 'not-a-hash'; }, 'lowercase SHA-256'],
   ])('fails closed on %s', (_label, mutate, message) => {
     const raw = JSON.parse(readFileSync(
-      'test/fixtures/historical-section-compatibility/real-local-evidence.json',
+      HISTORICAL_SECTION_COMPATIBILITY_EVIDENCE_PATH,
       'utf8',
     ));
     mutate(raw);

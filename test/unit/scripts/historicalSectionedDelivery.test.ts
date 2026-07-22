@@ -151,7 +151,7 @@ describe('inactive sectioned_only historical delivery and Norton transform-9 pre
     expect(Object.values(packageJson.scripts).join('\n')).not.toContain('historical-sectioned-delivery');
     expect(readFileSync('data/data-manifest.json', 'utf8')).not.toContain(NORTON_EDITION_ID);
     const migrations = walkFiles('migrations');
-    expect(migrations.some(path => /(?:^|\/)0005(?:[_.-]|$)/.test(path))).toBe(false);
+    expect(migrations.some(path => /(?:^|\/)0005_historical_section_identity_delivery\.sql$/.test(path))).toBe(true);
 
     const operationalScripts = walkFiles('scripts')
       .filter(path => /\.(?:[cm]?[jt]s|sh)$/.test(path))

@@ -34,7 +34,7 @@ describe('inactive UBS semantic aggregate bundle contract', () => {
     }
   });
 
-  it('keeps storage local-only: transform 7 is materialized but not composed into a runtime', () => {
+  it('keeps semantic storage local-only under the transform-8 historical successor', () => {
     const source = readFileSync(new URL('src/kernel/ubsSemanticEvidenceBundle.ts', repo), 'utf8');
     expect(source).not.toMatch(/from ['"][^'"]*(?:data\/|migrations\/|adapters\/d1|adapters\/data)/);
     expect(source).not.toMatch(/\b(?:SELECT|INSERT|CREATE TABLE|D1Database|better-sqlite3)\b/i);
@@ -43,8 +43,8 @@ describe('inactive UBS semantic aggregate bundle contract', () => {
       materializations: { d1: { transformVersion: number } };
     };
     expect(manifest).toMatchObject({
-      schemaVersion: '0004_ubs_hebrew_semantics',
-      materializations: { d1: { transformVersion: 7 } },
+      schemaVersion: '0005_historical_section_identity_delivery',
+      materializations: { d1: { transformVersion: 8 } },
     });
     const adapter = readFileSync(new URL('src/adapters/d1/D1UbsSemanticEvidenceBundleRepository.ts', repo), 'utf8');
     expect(adapter).toContain('exactly five statements');
