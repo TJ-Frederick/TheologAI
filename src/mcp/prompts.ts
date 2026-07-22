@@ -122,7 +122,7 @@ export function recommendedToolCallsForPrompt(
           queries: [{
             id: 'confession-topic',
             text: topic,
-            providers: contract.contractVersion === '5' ? ['local', 'ccel'] : ['local'],
+            providers: contract.contractVersion === '7' ? ['local', 'ccel'] : ['local'],
             match: 'all_terms',
             selection: 'work_diversity',
             limit: 5,
@@ -163,7 +163,7 @@ export function recommendedToolCallsForPrompt(
           })),
         },
       };
-      if (contract.contractVersion !== '5') return [localCall];
+      if (contract.contractVersion !== '7') return [localCall];
       // A prompt materialization may authorize only one cold CCEL attempt. The
       // shared coordinator enforces a global origin interval, so additional
       // creator scopes belong in later, independently paced turns.
@@ -239,41 +239,41 @@ export function registerPromptHandlers(
       },
       {
         name: 'primary-source-research',
-        description: contract.contractVersion === '5'
+        description: contract.contractVersion === '7'
           ? 'Find local evidence and optional external discovery leads without treating snippets as evidence'
           : 'Find and read bounded evidence from the locally indexed historical collection',
         arguments: [
           {
             name: 'topic',
-            description: contract.contractVersion === '5'
+            description: contract.contractVersion === '7'
               ? 'Topic or terms for hosted local evidence and optional external CCEL discovery.'
               : 'Topic or terms to find in the local historical collection',
             required: true,
           },
           {
             name: 'work',
-            description: contract.contractVersion === '5'
+            description: contract.contractVersion === '7'
               ? 'Optional exact hosted-local work title/slug and unreviewed external provider work restriction; not shared reviewed metadata or an author name.'
               : 'Optional exact local work title or slug; not an author name',
             required: false,
           },
           {
             name: 'authors',
-            description: contract.contractVersion === '5'
+            description: contract.contractVersion === '7'
               ? 'Optional comma-separated creators. Each becomes a separate exact reviewed local creator query; only the first creator is the immediate unreviewed external scope, and later creators require independently paced follow-up calls. Creator roles remain explicit.'
               : 'Optional comma-separated canonical creator names. Each creator becomes a separate query; creator roles remain explicit.',
             required: false,
           },
           {
             name: 'startYear',
-            description: contract.contractVersion === '5'
+            description: contract.contractVersion === '7'
               ? 'Optional inclusive hosted-local composition-year lower bound as an integer string. The guided external fallback deliberately omits this bound and warns that CCEL results are not date-filtered; a direct CCEL query containing it returns unsupported_filter without upstream admission.'
               : 'Optional inclusive composition-year lower bound as an integer string.',
             required: false,
           },
           {
             name: 'endYear',
-            description: contract.contractVersion === '5'
+            description: contract.contractVersion === '7'
               ? 'Optional inclusive hosted-local composition-year upper bound as an integer string. The guided external fallback deliberately omits this bound and warns that CCEL results are not date-filtered; a direct CCEL query containing it returns unsupported_filter without upstream admission.'
               : 'Optional inclusive composition-year upper bound as an integer string.',
             required: false,
@@ -349,7 +349,7 @@ Use structured \`passages[]\` when available, compare by its \`translation\`, re
         const topic = args?.topic ?? '';
         const traditions = args?.traditions;
         const hint = traditions ? ` Focus on: ${traditions.split(',').map(item => item.trim()).join(', ')}.` : '';
-        text = contract.contractVersion === '5'
+        text = contract.contractVersion === '7'
           ? `Cross-tradition doctrinal comparison on "${topic}".${hint}
 
 1. **Inspect the hosted catalog** — Read \`theologai://primary-sources/catalog\` with MCP \`resources/read\`. Its reviewed metadata applies only to the hosted local collection.
@@ -391,13 +391,13 @@ Use structured \`passages[]\` when available, compare by its \`translation\`, re
         const externalDateCallInstruction = startYear !== undefined || endYear !== undefined
           ? 'Do not add either year field to the external call.'
           : 'Do not add `startYear` or `endYear` to the external call because CCEL cannot enforce them.';
-        text = contract.contractVersion === '5'
+        text = contract.contractVersion === '7'
           ? `Research primary-source evidence about "${topic}"${work ? ` within the requested work "${work}"` : ''}${authors.length ? ` for the separately scoped creators ${authors.map(value => `"${value}"`).join(', ')}` : ''}.
 
 1. **Inspect local scope** — Read \`theologai://primary-sources/catalog\` with MCP \`resources/read\`. Its reviewed work and creator metadata describes only the hosted local collection; an absent creator is a local catalog gap, not evidence that no external source exists.
 2. **Search local evidence** — ${callText(calls[0])}. Use local catalog scope and deterministic selection as returned. ${localDateScope}
 3. **Search one external scope now** — ${externalCalls || 'No external query is needed.'} ${externalDateSafeguard} ${externalDateCallInstruction} This prompt authorizes at most one CCEL-bearing call. Each call contains at most one CCEL-bearing query.${deferredAuthors.length ? ` Defer ${deferredAuthors.map(value => `"${value}"`).join(', ')} to separate later turns.` : ''} If the provider returns \`rate_limited\`, wait at least its structured \`retryAfterSeconds\` before a later call; never retry immediately. Do not combine creator comparisons into multiple CCEL queries in one call.
-4. **Use the v5 contract** — Preserve query/provider/rank order, provider status, notices, \`responseWindow\`, and \`evidencePolicy\`. Local locators are exact readable MCP resources with fail-closed edition-readiness disclosures. External locators are direct CCEL URLs only, with unreviewed provider-search metadata and rights status not determined.
+4. **Use the v7 contract** — Preserve query/provider/rank order, provider status, notices, \`responseWindow\`, and \`evidencePolicy\`. Local locators carry canonical \`sectionKey\` and \`sourceOrdinal\`; external locators are direct CCEL URLs only, with unreviewed provider-search metadata and rights status not determined.
 5. **Read before evidence use** — Follow at most ${args?.maxSections?.trim() || '3'} selected locators. Use MCP \`resources/read\` only for local \`mcp_resource\` URIs. Open external \`external_url\` pages directly and verify the page independently. Never quote, compare creators or works, or draw substantive conclusions from any search snippet alone.
 6. **Close the coverage ledger** — Before synthesis, explicitly record searched from provider states; read only after successful exact MCP-resource or direct-page reads; deferred selected leads with an intentional reason; and not-searched providers/scopes returned as not executed. The server cannot observe your later reads or deferrals.
 7. **Synthesize with provenance** — ${localDateScope} ${externalDateSafeguard} Keep reviewed local metadata separate from external provider metadata. Distinguish exact text read from interpretation, name disabled, unavailable, or unsupported searches, and do not treat missing results as historical silence.`
@@ -405,7 +405,7 @@ Use structured \`passages[]\` when available, compare by its \`translation\`, re
 
 1. **Inspect the hosted catalog** — Read \`theologai://primary-sources/catalog\` with MCP \`resources/read\`. Confirm requested exact works and creator names there before searching. If Calvin, Erasmus, Luther, or any other requested creator is absent, report that catalog gap; never use a confession or similarly themed work as a proxy.
 2. **Run bounded discovery** — ${callText(calls[0])}. This workflow is local-only: do not claim it searched CCEL, the web, an exhaustive catalog, or works outside the server's collection. Topic and creator surveys use deterministic work diversity; exact within-work location uses relevance.
-3. **Use the v4 structured result** — Preserve each separate creator query, \`normalizedSelection\`, provider status, \`resultWindow\`, catalog \`scope\` status/count/work list/truncation, rank, notices, creator roles, document type/date, locator, edition readiness, and \`evidencePolicy\`. \`additional_match_observed\` means only that at least one more match was seen beyond the returned window, not that the corpus was exhaustively counted. A \`catalog_miss\` means the hosted catalog did not match the restriction; \`no_results\` means eligible hosted works were searched but no text hit matched. Treat every snippet as \`discovery_only\`.
+3. **Use the v6 structured result** — Preserve each separate creator query, \`normalizedSelection\`, provider status, \`resultWindow\`, catalog \`scope\` status/count/work list/truncation, rank, notices, creator roles, document type/date, canonical \`sectionKey\`/\`sourceOrdinal\` locator, edition readiness, and \`evidencePolicy\`. \`additional_match_observed\` means only that at least one more match was seen beyond the returned window, not that the corpus was exhaustively counted. A \`catalog_miss\` means the hosted catalog did not match the restriction; \`no_results\` means eligible hosted works were searched but no text hit matched. Treat every snippet as \`discovery_only\`.
 4. **Read selected evidence before quotation or comparison** — Follow at most ${args?.maxSections?.trim() || '3'} unique canonical \`resource_link\` blocks using MCP \`resources/read\`. Deduplicate locators and confirm that every returned URI matches the selected locator. Do not quote, compare creators/works, or draw substantive conclusions from snippets alone.
 5. **Report provenance honestly** — Edition provenance is incomplete and rights status is not established by the catalog resource. Do not invent an author, edition, transcription source, publication date, or rights status. Work-level type/date metadata is not edition metadata.
 6. **Close the coverage ledger** — Report searched from provider states; count a section as read only after its exact MCP resource returned successfully; list intentionally deferred selected sections with reasons; and list not-searched scope only when the server reported non-execution. Do not infer later reads or deferrals from search output.

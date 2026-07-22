@@ -2,9 +2,11 @@ import type { PrimarySourceSearchMatch, PrimarySourceSelection } from '../../ser
 import { CLASSIC_TEXT_LIMITS } from '../../kernel/classicTextContract.js';
 
 export const LOCAL_PRIMARY_SOURCE_SEARCH_SQL = `SELECT ds.id, ds.document_id, ds.section_number, ds.title, ds.content, ds.topics,
+       i.section_key, i.source_ordinal,
        d.title AS document_title, d.type AS document_type, d.date AS document_date, d.metadata AS document_metadata
   FROM sections_fts
   JOIN document_sections ds ON ds.id = sections_fts.rowid
+  JOIN historical_section_identities i ON i.document_section_id = ds.id AND i.document_id = ds.document_id
   JOIN documents d ON d.id = ds.document_id
  WHERE sections_fts MATCH ?
  ORDER BY rank, ds.id
@@ -19,9 +21,11 @@ export function localPrimarySourceScopedSearchSql(documentCount: number): string
     throw new Error(`Local primary-source document scope must contain 1..${CLASSIC_TEXT_LIMITS.workCount} documents`);
   }
   return `SELECT ds.id, ds.document_id, ds.section_number, ds.title, ds.content, ds.topics,
+       i.section_key, i.source_ordinal,
        d.title AS document_title, d.type AS document_type, d.date AS document_date, d.metadata AS document_metadata
   FROM sections_fts
   JOIN document_sections ds ON ds.id = sections_fts.rowid
+  JOIN historical_section_identities i ON i.document_section_id = ds.id AND i.document_id = ds.document_id
   JOIN documents d ON d.id = ds.document_id
  WHERE sections_fts MATCH ?
    AND ds.document_id IN (SELECT value FROM json_each(?) WHERE type = 'text')
@@ -55,10 +59,12 @@ export function localPrimarySourceSearchSql(selection: PrimarySourceSelection, d
 function workDiverseSql(scope = ''): string {
   return `WITH matching_sections AS (
     SELECT ds.id, ds.document_id, ds.section_number, ds.title, ds.content, ds.topics,
+           i.section_key, i.source_ordinal,
            d.title AS document_title, d.type AS document_type, d.date AS document_date,
            d.metadata AS document_metadata, bm25(sections_fts) AS relevance_rank
       FROM sections_fts
       JOIN document_sections ds ON ds.id = sections_fts.rowid
+      JOIN historical_section_identities i ON i.document_section_id = ds.id AND i.document_id = ds.document_id
       JOIN documents d ON d.id = ds.document_id
      WHERE sections_fts MATCH ?${scope}
   ), ranked_sections AS (
@@ -67,7 +73,7 @@ function workDiverseSql(scope = ''): string {
     ) AS work_rank
       FROM matching_sections
   )
-  SELECT id, document_id, section_number, title, content, topics,
+  SELECT id, document_id, section_number, title, content, topics, section_key, source_ordinal,
          document_title, document_type, document_date, document_metadata
     FROM ranked_sections
    ORDER BY work_rank, relevance_rank, id

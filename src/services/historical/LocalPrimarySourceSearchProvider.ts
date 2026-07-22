@@ -6,7 +6,7 @@ import {
   type PrimarySourceResultWindow,
   type PrimarySourceSearchQuery,
 } from './primarySourceTypes.js';
-import { formatLocalDocumentSectionResource } from '../../formatters/historicalFormatter.js';
+import { formatLocalDocumentSectionResourceWithIdentity } from '../../formatters/historicalFormatter.js';
 
 export class LocalPrimarySourceSearchProvider {
   constructor(private readonly repository: IHistoricalDocumentRepository) {}
@@ -40,8 +40,9 @@ export class LocalPrimarySourceSearchProvider {
       locator: {
         kind: 'local_section' as const,
         documentId: row.document.id,
-        sectionId: row.section.section_number,
-        url: buildLocalDocumentResourceUri(row.document.id, row.section.section_number)!,
+        sectionKey: row.sectionKey,
+        sourceOrdinal: row.sourceOrdinal,
+        url: buildLocalDocumentResourceUri(row.document.id, row.sectionKey)!,
       },
       rankWithinProvider: index + 1,
       page,
@@ -53,7 +54,12 @@ export class LocalPrimarySourceSearchProvider {
       ...(row.document.catalog ? { metadataStatus: row.document.catalog.metadataStatus } : {}),
       ...(row.document.catalog ? { metadataProvenanceIds: row.document.catalog.metadataProvenanceIds } : {}),
       resourceSizeBytes: new TextEncoder().encode(
-        formatLocalDocumentSectionResource(row.document, row.section),
+        formatLocalDocumentSectionResourceWithIdentity(row.document, row.section, {
+          sectionKey: row.sectionKey,
+          sourceOrdinal: row.sourceOrdinal,
+          resolution: 'canonical',
+          canonicalUri: buildLocalDocumentResourceUri(row.document.id, row.sectionKey)!,
+        }),
       ).byteLength,
     }));
     return result(

@@ -80,7 +80,9 @@ export interface LocalSectionLocator {
   kind: 'local_section';
   url: string;
   documentId: string;
-  sectionId: string;
+  /** Canonical Transform-8 public identity, never the storage/legacy id. */
+  sectionKey: string;
+  sourceOrdinal: number;
 }
 
 export type PrimarySourceLocator = CcelSectionLocator | LocalSectionLocator;

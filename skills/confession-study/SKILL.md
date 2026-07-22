@@ -18,8 +18,8 @@ returned by the server to establish what is available and what each document
 says. The workflow must not assign a tradition or author from a title or from a
 prewritten grouping.
 
-Production advertises the v4 local-only `primary_source_search` contract.
-Preview may advertise v5, which adds a separately reported CCEL discovery
+Production advertises the v6 local-only `primary_source_search` contract.
+Preview may advertise v7, which adds a separately reported CCEL discovery
 provider. Preserve that provider's state and unreviewed metadata separately; a
 disabled provider did not search or read CCEL.
 
@@ -37,7 +37,7 @@ disabled provider did not search or read CCEL.
 
 - Call `primary_source_search` with one bounded local query plan, for example
   `{ "queries": [{ "id": "confession-topic", "text": "the doctrinal topic", "providers": ["local"], "match": "all_terms", "selection": "work_diversity", "limit": 5 }] }`.
-- On a v5 endpoint, request the separate `ccel` provider only when a discovery
+- On a v7 endpoint, request the separate `ccel` provider only when a discovery
   lead is materially useful. It is never local catalog evidence.
 - Treat returned snippets as discovery-only. Preserve document metadata, creator
   names, and creator roles exactly as returned.
@@ -47,7 +47,9 @@ disabled provider did not search or read CCEL.
 ### Step 3: Read Specific Sections
 
 - Select at most five unique returned sections and deduplicate locators.
-- Follow each selected canonical `resource_link` with MCP `resources/read` and
+- Preserve each local locator's canonical `sectionKey` and `sourceOrdinal`; the
+  legacy display label is explanatory only, never a routing identity. Follow
+  each selected canonical `resource_link` with MCP `resources/read` and
   confirm the returned URI matches the selected locator.
 - Do not quote, characterize a position, or compare documents from snippets.
   Base those claims only on exact resources actually read.

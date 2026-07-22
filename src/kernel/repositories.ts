@@ -184,6 +184,49 @@ export interface DocumentSection {
   topics: string[];
 }
 
+/** Immutable Transform-8 delivery facts for one hosted historical document. */
+export interface HistoricalDocumentDeliveryProfile {
+  documentId: string;
+  workId: string | null;
+  editionId: string | null;
+  immutableCorpusIdentity: string;
+  sectionPackageIdentity: string | null;
+  deliveryMode: 'complete_document' | 'sectioned_only';
+  sectionCount: number;
+  landingMaxBytes: 0 | 16_384;
+  browsePageSize: 0 | 32;
+  cursorVersion: 0 | 1;
+  provenance: Record<string, unknown>;
+  rights: Record<string, unknown>;
+}
+
+/**
+ * A section resolved through the Transform-8 source-first sidecars.  The
+ * legacy storage id and legacy section number remain implementation details;
+ * public producers must use sectionKey/sourceOrdinal instead.
+ */
+export interface ResolvedHistoricalSection {
+  document: DocumentInfo;
+  section: DocumentSection;
+  sectionKey: string;
+  sourceOrdinal: number;
+  requestedSectionId: string;
+  resolution: 'canonical' | 'legacy_alias';
+}
+
+export interface HistoricalSectionBrowseBoundary {
+  sourceOrdinal: number;
+  sectionKey: string;
+}
+
+/** Metadata-only row for sectioned-only directory pages; deliberately no body. */
+export interface HistoricalSectionSummary extends HistoricalSectionBrowseBoundary {
+  documentId: string;
+  /** Legacy display-only label; it is never a routable identity. */
+  legacyDisplayLabel: string;
+  heading: string;
+}
+
 export interface PrimarySourceLocalSearchOptions {
   text: string;
   match: 'all_terms' | 'phrase';
@@ -195,6 +238,8 @@ export interface PrimarySourceLocalSearchOptions {
 export interface PrimarySourceLocalSearchRow {
   document: DocumentInfo;
   section: DocumentSection;
+  sectionKey: string;
+  sourceOrdinal: number;
 }
 
 export interface IHistoricalDocumentRepository {
@@ -202,7 +247,20 @@ export interface IHistoricalDocumentRepository {
   getDocument(id: string): RepositoryResult<DocumentInfo | undefined>;
   getSections(documentId: string): RepositoryResult<DocumentSection[]>;
   getSection(documentId: string, sectionNumber: string): RepositoryResult<DocumentSection | undefined>;
+  getDeliveryProfile(documentId: string): RepositoryResult<HistoricalDocumentDeliveryProfile | undefined>;
+  /** Canonical key lookup first; legacy aliases are considered only on a miss. */
+  resolveSection(documentId: string, sectionId: string): RepositoryResult<ResolvedHistoricalSection | undefined>;
+  /** Ordered metadata-only rows for the bounded sectioned-only browser. */
+  browseHistoricalSectionSummaries(
+    documentId: string,
+    after: HistoricalSectionBrowseBoundary | undefined,
+    limit: number,
+  ): RepositoryResult<HistoricalSectionSummary[]>;
+  /** Metadata-only cursor-boundary proof; it must never fetch a section body. */
+  hasHistoricalSectionBoundary(documentId: string, boundary: HistoricalSectionBrowseBoundary): RepositoryResult<boolean>;
   search(query: string, limit?: number): RepositoryResult<DocumentSection[]>;
+  /** FTS discovery rows with the canonical Transform-8 identity attached. */
+  searchResolvedSections(query: string, limit?: number): RepositoryResult<ResolvedHistoricalSection[]>;
   searchPrimarySources(options: PrimarySourceLocalSearchOptions): RepositoryResult<PrimarySourceLocalSearchRow[]>;
   findDocumentByName(name: string): RepositoryResult<DocumentInfo | undefined>;
 }

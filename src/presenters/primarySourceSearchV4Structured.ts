@@ -45,7 +45,7 @@ type LocalHit = {
   queryId: string; title: string; author?: string; sectionLabel?: string; snippet: string;
   rankWithinProvider: number; page: number; snippetOnly: true; attribution: string;
   provider: 'local';
-  locator: { kind: 'mcp_resource'; uri: string; documentId: string; sectionId: string };
+  locator: { kind: 'mcp_resource'; uri: string; documentId: string; sectionKey: string; sourceOrdinal: number };
   resourceSizeBytes: number;
   editionReadiness: typeof LOCAL_EDITION_READINESS;
   documentType?: string; documentDate?: string;
@@ -87,7 +87,7 @@ type PresentedProvider = {
 };
 
 export interface PresentedPrimarySourceSearchV5 extends Record<string, unknown> {
-  schemaVersion: '5';
+  schemaVersion: '7';
   kind: 'primary_source_search';
   planStatus: 'complete' | 'partial' | 'unavailable';
   responseWindow: { unit: 'utf8_bytes'; maximum: 32768; truncated: boolean };
@@ -107,7 +107,7 @@ export interface PresentedPrimarySourceSearchV5 extends Record<string, unknown> 
 }
 
 export interface PresentedPrimarySourceSearchV4 extends Record<string, unknown> {
-  schemaVersion: '4';
+  schemaVersion: '6';
   kind: 'primary_source_search';
   planStatus: 'complete' | 'partial' | 'unavailable';
   responseWindow: { unit: 'utf8_bytes'; maximum: 32768; truncated: boolean };
@@ -246,7 +246,7 @@ export function presentPrimarySourceSearchV4(result: PrimarySourceSearchPlanResu
   };
   const v5 = presentPrimarySourceSearchV5(localOnly);
   return {
-    schemaVersion: '4',
+    schemaVersion: '6',
     kind: v5.kind,
     planStatus: excludedExternal ? 'partial' : v5.planStatus,
     responseWindow: { ...v5.responseWindow, truncated: v5.responseWindow.truncated || excludedExternal },
@@ -266,6 +266,10 @@ export function presentPrimarySourceSearchV4(result: PrimarySourceSearchPlanResu
     evidencePolicy: PRIMARY_SOURCE_V4_EVIDENCE_POLICY,
   };
 }
+
+/** Public Transform-8 profile names; legacy function names remain compatibility aliases. */
+export const presentPrimarySourceSearchV6 = presentPrimarySourceSearchV4;
+export const presentPrimarySourceSearchV7 = presentPrimarySourceSearchV5;
 
 function providerDraft(
   provider: PrimarySourceSearchPlanResult['queries'][number]['providers'][number],
@@ -388,7 +392,7 @@ function buildEnvelope(
       ? 'complete'
         : 'partial';
   return {
-    schemaVersion: '5',
+    schemaVersion: '7',
     kind: 'primary_source_search',
     planStatus: recomputed,
     responseWindow: { unit: 'utf8_bytes', maximum: PRIMARY_SOURCE_V4_MAX_BYTES, truncated },
@@ -452,8 +456,10 @@ function presentHit(
   }
 
   if (hit.provider !== 'local' || hit.locator.kind !== 'local_section') return undefined;
-  const uri = buildLocalDocumentResourceUri(hit.locator.documentId, hit.locator.sectionId);
-  if (!uri || uri !== hit.locator.url || !Number.isSafeInteger(hit.resourceSizeBytes) || hit.resourceSizeBytes < 0) return undefined;
+  const uri = buildLocalDocumentResourceUri(hit.locator.documentId, hit.locator.sectionKey);
+  if (!uri || uri !== hit.locator.url || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/.test(hit.locator.sectionKey)
+    || !Number.isSafeInteger(hit.locator.sourceOrdinal) || hit.locator.sourceOrdinal < 1
+    || !Number.isSafeInteger(hit.resourceSizeBytes) || hit.resourceSizeBytes < 0) return undefined;
   const creators = hit.creators?.slice(0, 8).flatMap(creator => {
     const name = boundedText(creator.name, 160);
     return name && CREATOR_ROLES.has(creator.role) ? [{ name, role: creator.role }] : [];
@@ -468,7 +474,10 @@ function presentHit(
     hit: {
       ...common,
       provider,
-      locator: { kind: 'mcp_resource', uri, documentId: hit.locator.documentId, sectionId: hit.locator.sectionId },
+      locator: {
+        kind: 'mcp_resource', uri, documentId: hit.locator.documentId,
+        sectionKey: hit.locator.sectionKey, sourceOrdinal: hit.locator.sourceOrdinal,
+      },
       resourceSizeBytes: hit.resourceSizeBytes,
       editionReadiness: LOCAL_EDITION_READINESS,
       ...(documentType ? { documentType } : {}),

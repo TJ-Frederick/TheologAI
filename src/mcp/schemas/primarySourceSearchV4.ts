@@ -77,9 +77,10 @@ const localHit = {
         kind: { const: 'mcp_resource' },
         uri: { type: 'string', minLength: 1, maxLength: 384 },
         documentId: { type: 'string', minLength: 1, maxLength: 160 },
-        sectionId: { type: 'string', minLength: 1, maxLength: 160 },
+        sectionKey: { type: 'string', minLength: 1, maxLength: 160 },
+        sourceOrdinal: { type: 'integer', minimum: 1, maximum: Number.MAX_SAFE_INTEGER },
       },
-      required: ['kind', 'uri', 'documentId', 'sectionId'],
+      required: ['kind', 'uri', 'documentId', 'sectionKey', 'sourceOrdinal'],
       additionalProperties: false,
     },
     resourceSizeBytes: { type: 'integer', minimum: 0, maximum: Number.MAX_SAFE_INTEGER },
@@ -235,7 +236,7 @@ const localServerObserved = {
 export const primarySourceSearchV5OutputSchema = {
   type: 'object',
   properties: {
-    schemaVersion: { const: '5' },
+    schemaVersion: { const: '7' },
     kind: { const: 'primary_source_search' },
     planStatus: { type: 'string', enum: ['complete', 'partial', 'unavailable'] },
     responseWindow: {
@@ -296,7 +297,7 @@ export const primarySourceSearchV5OutputSchema = {
 export const primarySourceSearchV4OutputSchema = {
   type: 'object',
   properties: {
-    schemaVersion: { const: '4' },
+    schemaVersion: { const: '6' },
     kind: { const: 'primary_source_search' },
     planStatus: { type: 'string', enum: ['complete', 'partial', 'unavailable'] },
     responseWindow: {
@@ -338,3 +339,7 @@ export const primarySourceSearchV4OutputSchema = {
   required: ['schemaVersion', 'kind', 'planStatus', 'responseWindow', 'queries', 'coverage', 'evidencePolicy'],
   additionalProperties: false,
 } as NonNullable<Tool['outputSchema']>;
+
+/** Public Transform-8 names.  The legacy export names remain internal compatibility aliases only. */
+export const primarySourceSearchV7OutputSchema = primarySourceSearchV5OutputSchema;
+export const primarySourceSearchV6OutputSchema = primarySourceSearchV4OutputSchema;

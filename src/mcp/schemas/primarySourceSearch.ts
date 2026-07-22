@@ -12,9 +12,10 @@ const localLocator = {
     kind: { const: 'local_section' },
     url: { type: 'string', maxLength: 384 },
     documentId: { type: 'string', minLength: 1, maxLength: 160 },
-    sectionId: { type: 'string', minLength: 1, maxLength: 160 },
+    sectionKey: { type: 'string', minLength: 1, maxLength: 160 },
+    sourceOrdinal: { type: 'integer', minimum: 1, maximum: Number.MAX_SAFE_INTEGER },
   },
-  required: ['kind', 'url', 'documentId', 'sectionId'],
+  required: ['kind', 'url', 'documentId', 'sectionKey', 'sourceOrdinal'],
   additionalProperties: false,
 } as const;
 

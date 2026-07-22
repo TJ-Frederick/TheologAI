@@ -2,7 +2,11 @@
  * Historical document service using SQLite repository.
  */
 
-import type { IHistoricalDocumentRepository, DocumentInfo, DocumentSection } from '../../kernel/repositories.js';
+import type {
+  IHistoricalDocumentRepository, DocumentInfo, DocumentSection,
+  HistoricalDocumentDeliveryProfile, HistoricalSectionBrowseBoundary, ResolvedHistoricalSection,
+  HistoricalSectionSummary,
+} from '../../kernel/repositories.js';
 import { NotFoundError } from '../../kernel/errors.js';
 
 export class HistoricalDocumentService {
@@ -36,9 +40,37 @@ export class HistoricalDocumentService {
     return section;
   }
 
+  async getDeliveryProfile(documentId: string): Promise<HistoricalDocumentDeliveryProfile> {
+    const profile = await this.repo.getDeliveryProfile(documentId);
+    if (!profile) throw new NotFoundError('document', `Historical delivery profile not found for "${documentId}"`);
+    return profile;
+  }
+
+  async resolveSection(documentId: string, sectionId: string): Promise<ResolvedHistoricalSection> {
+    const section = await this.repo.resolveSection(documentId, sectionId);
+    if (!section) throw new NotFoundError('section', `Section ${sectionId} not found in "${documentId}"`);
+    return section;
+  }
+
+  async browseHistoricalSectionSummaries(
+    documentId: string,
+    after: HistoricalSectionBrowseBoundary | undefined,
+    limit: number,
+  ): Promise<HistoricalSectionSummary[]> {
+    return await this.repo.browseHistoricalSectionSummaries(documentId, after, limit);
+  }
+
+  async hasHistoricalSectionBoundary(documentId: string, boundary: HistoricalSectionBrowseBoundary): Promise<boolean> {
+    return await this.repo.hasHistoricalSectionBoundary(documentId, boundary);
+  }
+
   /** Search across all documents */
   async search(query: string, limit?: number): Promise<DocumentSection[]> {
     return await this.repo.search(query, limit);
+  }
+
+  async searchResolvedSections(query: string, limit?: number): Promise<ResolvedHistoricalSection[]> {
+    return await this.repo.searchResolvedSections(query, limit);
   }
 
   /** Find document by name with fuzzy matching */
