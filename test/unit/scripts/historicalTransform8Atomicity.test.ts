@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
@@ -12,6 +12,7 @@ describe('Transform 8 historical materialization atomicity', () => {
   it('rolls back every historical body, FTS, and sidecar row after a forced late failure', () => {
     const workspace = mkdtempSync(join(tmpdir(), 'theologai-transform8-atomicity-'));
     const output = join(workspace, 'target.db');
+    const snapshot = join(workspace, 'post-rollback-snapshot.json');
     const target = new Database(output);
     try {
       target.pragma('foreign_keys = ON');
@@ -30,10 +31,38 @@ describe('Transform 8 historical materialization atomicity', () => {
         '--output', output,
       ], {
         cwd: ROOT,
-        env: { ...process.env, THEOLOGAI_TRANSFORM8_TEST_FAIL_AFTER_SIDECARS: '1' },
+        env: {
+          ...process.env,
+          THEOLOGAI_TRANSFORM8_TEST_FAIL_AFTER_SIDECARS: '1',
+          THEOLOGAI_TRANSFORM8_TEST_FAILURE_SNAPSHOT: snapshot,
+        },
         stdio: 'ignore',
       })).toThrow();
 
+      // The build script records this while the temporary database is still
+      // open, after the outer Transform-8 transaction has rolled back and
+      // before its catch block removes temporary files. This proves rollback
+      // rather than inferring it only from the preserved destination database.
+      expect(existsSync(snapshot)).toBe(true);
+      const failedTransaction = JSON.parse(readFileSync(snapshot, 'utf8')) as {
+        kind: string;
+        forcedLateFailure: boolean;
+        error: string;
+        rowCounts: Record<string, number>;
+      };
+      expect(failedTransaction.kind).toBe('transform8_late_failure_post_rollback_pre_cleanup');
+      expect(failedTransaction.forcedLateFailure).toBe(true);
+      expect(failedTransaction.error).toContain('Forced Transform 8 late failure');
+      expect(failedTransaction.rowCounts).toEqual({
+        documents: 0,
+        document_sections: 0,
+        sections_fts: 0,
+        historical_document_delivery_profiles: 0,
+        historical_section_identities: 0,
+        historical_section_aliases: 0,
+      });
+
+      // Destination preservation remains a secondary external observation.
       const preserved = new Database(output, { readonly: true, fileMustExist: true });
       try {
         for (const table of [

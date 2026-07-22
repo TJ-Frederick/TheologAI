@@ -9,6 +9,7 @@ import {
   buildMorphologyUnicodeReadinessContract,
   buildUbsSemanticStoredIntegrityPredicates,
   classicTextSectionReadinessPredicate,
+  MAX_D1_READINESS_SQL_BYTES,
   runRemoteD1ReadinessCheck,
 } from '../../../scripts/check-remote-d1-readiness.js';
 import type { BiblicalLanguageUnicodeCorrectionLedger } from '../../../scripts/biblical-language-unicode-correction.js';
@@ -17,9 +18,65 @@ import {
   assertUbsSemanticStoredArtifactIdentity,
   assertUbsSemanticStoredContract,
 } from '../../../scripts/ubs-semantics/storageReconstruction.js';
+import { buildHistoricalTransform8ExpectedAuthority } from '../../../scripts/historical-transform8-authority-audit.js';
 import { CLASSIC_TEXT_LIMITS } from '../../../src/kernel/classicTextContract.js';
 
 const generatedDbPath = process.env.THEOLOGAI_TEST_DATABASE_PATH?.trim();
+
+function remoteAuthorityExecutor(): {
+  calls: string[][];
+  execute: (_file: string, args: readonly string[], options: { stdio: 'inherit' | 'pipe' }) => string | undefined;
+  close: () => void;
+} {
+  const expected = buildHistoricalTransform8ExpectedAuthority(process.cwd());
+  const db = new Database(':memory:');
+  db.exec(`CREATE TABLE historical_document_delivery_profiles (
+      document_id TEXT, work_id TEXT, edition_id TEXT, immutable_corpus_identity TEXT,
+      section_package_identity TEXT, delivery_mode TEXT, section_count INTEGER,
+      landing_max_bytes INTEGER, browse_page_size INTEGER, cursor_version INTEGER,
+      provenance_json TEXT, rights_json TEXT
+    );
+    CREATE TABLE historical_section_identities (
+      document_id TEXT, section_key TEXT, source_ordinal INTEGER, document_section_id INTEGER
+    );
+    CREATE TABLE historical_section_aliases (
+      document_id TEXT, legacy_section_id TEXT, section_key TEXT, source_ordinal INTEGER
+    );
+    CREATE TABLE document_sections (
+      id INTEGER PRIMARY KEY, document_id TEXT, section_number TEXT, title TEXT, content TEXT, topics TEXT
+    );
+    CREATE TABLE sections_fts (title TEXT, content TEXT, topics TEXT);`);
+  const insertProfile = db.prepare(`INSERT INTO historical_document_delivery_profiles VALUES
+    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+  for (const row of expected.profiles) {
+    insertProfile.run(row.documentId, row.workId, row.editionId, row.immutableCorpusIdentity,
+      row.sectionPackageIdentity, row.deliveryMode, row.sectionCount, row.landingMaxBytes,
+      row.browsePageSize, row.cursorVersion, row.provenanceJson, row.rightsJson);
+  }
+  const insertIdentity = db.prepare('INSERT INTO historical_section_identities VALUES (?, ?, ?, ?)');
+  for (const [index, row] of expected.identities.entries()) {
+    insertIdentity.run(row.documentId, row.sectionKey, row.sourceOrdinal, index + 1);
+  }
+  const insertAlias = db.prepare('INSERT INTO historical_section_aliases VALUES (?, ?, ?, ?)');
+  for (const row of expected.aliases) insertAlias.run(row.documentId, row.legacySectionId, row.sectionKey, row.sourceOrdinal);
+  const insertSection = db.prepare('INSERT INTO document_sections VALUES (?, ?, ?, ?, ?, ?)');
+  const insertFts = db.prepare('INSERT INTO sections_fts(rowid, title, content, topics) VALUES (?, ?, ?, ?)');
+  for (const [index, row] of expected.bodyFtsSample.entries()) {
+    insertSection.run(index + 1, row.documentId, row.legacySectionId, row.title, row.content, row.topics);
+    insertFts.run(index + 1, row.ftsTitle, row.ftsContent, row.ftsTopics);
+  }
+  const calls: string[][] = [];
+  return {
+    calls,
+    execute: (_file, args, options) => {
+      calls.push([...args]);
+      if (options.stdio === 'inherit') return undefined;
+      const sql = args[args.indexOf('--command') + 1]!;
+      return JSON.stringify([{ success: true, results: db.prepare(sql).all() }]);
+    },
+    close: () => db.close(),
+  };
+}
 
 describe('remote D1 readiness query', () => {
   it('builds a read-only exact-count and index gate', () => {
@@ -54,6 +111,14 @@ describe('remote D1 readiness query', () => {
     expect(sql).toContain("('historical.output.sections_per_work', (");
     expect(sql).toContain("('historical.output.document_metadata', (");
     expect(sql).toContain("('historical.output.section_metadata', (");
+    expect(sql).toContain("('historical.transform8.collision_groups', (");
+    expect(sql).toContain("('historical.transform8.collision_affected_sections', (");
+    expect(sql).toContain("('historical.transform8.collision_newly_addressable_sections', (");
+    expect(sql).toContain("('historical.transform8.full_fts_parity', (");
+    expect(sql).toContain('LEFT JOIN sections_fts fts ON fts.rowid = section.id');
+    expect(sql).toContain(') = 23');
+    expect(sql).toContain(') = 256');
+    expect(sql).toContain(') = 233');
     expect(sql).toContain(`length(title) NOT BETWEEN 1 AND ${CLASSIC_TEXT_LIMITS.titleCharacters}`);
     expect(sql).toContain(`json_array_length(metadata, '$.topics') > ${CLASSIC_TEXT_LIMITS.topicCount}`);
     expect(sql).toContain(`length(section_number) NOT BETWEEN 1 AND ${CLASSIC_TEXT_LIMITS.sectionNumberCharacters}`);
@@ -83,6 +148,7 @@ describe('remote D1 readiness query', () => {
     expect(sql).toContain("('integrity.quick_check', (");
     expect(sql).toContain("('data.genesis_1_1_lemma', (");
     expect(sql).not.toMatch(/\b(?:INSERT|UPDATE|DELETE|DROP|ALTER)\b/);
+    expect(Buffer.byteLength(sql, 'utf8')).toBeLessThanOrEqual(MAX_D1_READINESS_SQL_BYTES);
   });
 
   it('rejects negative Psalm and out-of-canon chapter/verse coordinates in every shared D1 gate', () => {
@@ -124,8 +190,8 @@ describe('remote D1 readiness query', () => {
       const seedImport = readFileSync('scripts/verify-d1-seed-import.ts', 'utf8');
       const workerd = readFileSync('scripts/verify-d1-seed-workerd.ts', 'utf8');
       expect(seedImport).toContain('buildUbsSemanticStoredIntegrityPredicates().join');
-      expect(workerd).toContain('buildUbsSemanticStoredIntegrityPredicates();');
-      expect(workerd).toContain("semanticIntegrityChecks.join");
+      expect(workerd).toContain('buildD1ReadinessSql(sourceManifest.expectedCounts)');
+      expect(workerd).toContain('auditHistoricalTransform8Authority(ROOT');
     } finally {
       db.close();
     }
@@ -141,6 +207,8 @@ describe('remote D1 readiness query', () => {
     expect(new Set(primaryIds).size).toBe(primaryIds.length);
     expect(checkIds(diagnostic)).toEqual(primaryIds);
     expect(diagnostic).toContain('WHERE passed IS NOT 1 ORDER BY check_name');
+    expect(Buffer.byteLength(primary, 'utf8')).toBeLessThanOrEqual(MAX_D1_READINESS_SQL_BYTES);
+    expect(Buffer.byteLength(diagnostic, 'utf8')).toBeLessThanOrEqual(MAX_D1_READINESS_SQL_BYTES);
     const targeted = buildD1ReadinessDiagnosticSql(
       expectedCounts,
       '0001_initial_schema',
@@ -191,16 +259,19 @@ describe('remote D1 readiness query', () => {
     }
   });
 
-  it('makes one primary call on success and requests diagnostics only after failure', () => {
-    const calls: string[][] = [];
-    const execute = (_file: string, args: readonly string[]) => {
-      calls.push([...args]);
-    };
-    runRemoteD1ReadinessCheck({ database: 'preview', env: 'preview', wrangler: '/tmp/wrangler' }, execute);
-    expect(calls).toHaveLength(1);
-    expect(calls[0]).toContain('--json');
-    expect(calls[0]).toContain('--env');
-    expect(calls[0].join('\n')).toContain('WHERE passed IS 1');
+  it('runs primary readiness, then bounded authority pages, and requests diagnostics only after failure', () => {
+    const remote = remoteAuthorityExecutor();
+    try {
+      runRemoteD1ReadinessCheck({ database: 'preview', env: 'preview', wrangler: '/tmp/wrangler' }, remote.execute);
+      expect(remote.calls).toHaveLength(27); // production readiness plus 26 bounded audit reads
+      expect(remote.calls[0]).toContain('--json');
+      expect(remote.calls[0]).toContain('--env');
+      expect(remote.calls[0].join('\n')).toContain('WHERE passed IS 1');
+      expect(remote.calls.slice(1).every(call => call.join('\n').includes('LIMIT 256') || call.join('\n').includes('LIMIT 32'))).toBe(true);
+      expect(remote.calls.slice(1).every(call => call.join('\n').includes('--remote'))).toBe(true);
+    } finally {
+      remote.close();
+    }
 
     const primaryError = new Error('primary failed');
     const failedCalls: string[][] = [];
@@ -223,6 +294,14 @@ describe('remote D1 readiness query', () => {
   it('rejects unsafe manifest identifiers', () => {
     expect(() => buildD1ReadinessSql({ 'documents; DROP TABLE documents': 17 }))
       .toThrow('Invalid expected D1 count');
+  });
+
+  it('fails closed before issuing an oversized primary or diagnostic D1 request', () => {
+    const oversizedSchema = 'a'.repeat(MAX_D1_READINESS_SQL_BYTES + 1);
+    expect(() => buildD1ReadinessSql({ documents: 17 }, oversizedSchema, 'a'.repeat(64)))
+      .toThrow(`D1 readiness primary SQL exceeds ${MAX_D1_READINESS_SQL_BYTES} bytes`);
+    expect(() => buildD1ReadinessDiagnosticSql({ documents: 17 }, oversizedSchema, 'a'.repeat(64)))
+      .toThrow(`D1 readiness diagnostic SQL exceeds ${MAX_D1_READINESS_SQL_BYTES} bytes`);
   });
 
   it.skipIf(!generatedDbPath)('fails when generated readiness predicates detect aggregate or semantic drift', () => {

@@ -11,6 +11,7 @@ import { UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY, UBS_PARALLEL_PASSAGE_PROVENANCE
 import { CANONICAL_BOOK_ORDER_SQL } from '../src/adapters/shared/repositoryUtils.js';
 import { CLASSIC_TEXT_LIMITS } from '../src/kernel/classicTextContract.js';
 import { BIBLE_BOOKS, getBibleBookBounds } from '../src/kernel/books.js';
+import { EXPECTED_HISTORICAL_SECTION_COLLISIONS } from './historical-section-key-plan.js';
 import type {
   BiblicalLanguageUnicodeCorrectionLedger,
   MorphologyUnicodeCorrection,
@@ -20,6 +21,10 @@ import {
   createUbsSemanticStorageContract,
   type UbsSemanticStorageAudit,
 } from './ubs-semantics/storageContract.js';
+import {
+  auditHistoricalTransform8Authority,
+  parseHistoricalTransform8D1Page,
+} from './historical-transform8-authority-audit.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const manifestBytes = readFileSync(join(ROOT, 'data', 'data-manifest.json'));
@@ -41,6 +46,9 @@ const UBS_SEMANTIC_AUDIT = JSON.parse(readFileSync(
   projection: { normalizedCoordinateRows: number; sourceEvidenceWithAmbiguousNormalizedCoordinates: number };
 };
 const UBS_SEMANTIC_STORAGE = createUbsSemanticStorageContract(UBS_SEMANTIC_AUDIT);
+
+/** D1's command interface is deliberately kept below its request-size ceiling. */
+export const MAX_D1_READINESS_SQL_BYTES = 100_000;
 
 export const REQUIRED_COLUMNS: Readonly<Record<string, readonly string[]>> = {
   theologai_metadata: ['key', 'value'],
@@ -104,7 +112,7 @@ interface RemoteD1ReadinessOptions {
 type ReadinessCommandExecutor = (
   file: string,
   args: readonly string[],
-  options: { cwd: string; stdio: 'inherit' },
+  options: { cwd: string; stdio: 'inherit' | 'pipe'; encoding?: 'utf8' },
 ) => unknown;
 
 function sqlLiteral(value: string): string {
@@ -308,6 +316,24 @@ function buildD1ReadinessQueryContract(
       id: 'historical.transform8.alias_non_shadowing',
       predicate: `(SELECT COUNT(*) FROM historical_section_aliases a JOIN historical_section_identities i ON i.document_id = a.document_id AND i.section_key = a.legacy_section_id WHERE i.section_key != a.section_key) = 0`,
     },
+    {
+      // The count gate for sections_fts is generated from the manifest; this
+      // join proves each of those rows still mirrors its source section.
+      id: 'historical.transform8.full_fts_parity',
+      predicate: `(SELECT COUNT(*) FROM document_sections section LEFT JOIN sections_fts fts ON fts.rowid = section.id WHERE fts.rowid IS NULL OR fts.title IS NOT section.title OR fts.content IS NOT section.content OR fts.topics IS NOT section.topics) = 0`,
+    },
+    {
+      id: 'historical.transform8.collision_groups',
+      predicate: `(SELECT COUNT(*) FROM (SELECT document_id, section_number FROM document_sections GROUP BY document_id, section_number HAVING COUNT(*) > 1)) = ${EXPECTED_HISTORICAL_SECTION_COLLISIONS.collisionGroups}`,
+    },
+    {
+      id: 'historical.transform8.collision_affected_sections',
+      predicate: `(SELECT COALESCE(SUM(member_count), 0) FROM (SELECT COUNT(*) AS member_count FROM document_sections GROUP BY document_id, section_number HAVING COUNT(*) > 1)) = ${EXPECTED_HISTORICAL_SECTION_COLLISIONS.affectedSections}`,
+    },
+    {
+      id: 'historical.transform8.collision_newly_addressable_sections',
+      predicate: `(SELECT COALESCE(SUM(member_count - 1), 0) FROM (SELECT COUNT(*) AS member_count FROM document_sections GROUP BY document_id, section_number HAVING COUNT(*) > 1)) = ${EXPECTED_HISTORICAL_SECTION_COLLISIONS.newlyAddressableSections}`,
+    },
   ];
   const columnChecks = Object.entries(REQUIRED_COLUMNS).map(([table, columns]): D1ReadinessCheck => ({
     id: `schema.columns.${table}`,
@@ -486,13 +512,13 @@ export function buildD1ReadinessSql(
 ): string {
   const contract = buildD1ReadinessQueryContract(expectedCounts, schemaVersion, d1CorpusIdentity);
   const expectedCheckCount = contract.checks.length;
-  return [
+  return assertD1ReadinessSqlByteBound('primary', [
     buildD1ReadinessChecksCte(contract),
     `SELECT CASE`,
     `WHEN (SELECT COUNT(*) FROM readiness_checks) != ${expectedCheckCount} THEN json_extract('D1 readiness check inventory mismatch', '$')`,
     `WHEN (SELECT COUNT(*) FROM readiness_checks WHERE passed IS 1) != ${expectedCheckCount} THEN json_extract('D1 readiness check failed', '$')`,
     `ELSE 'ready' END AS readiness;`,
-  ].join('\n');
+  ].join('\n'));
 }
 
 export function buildD1ReadinessDiagnosticSql(
@@ -505,10 +531,18 @@ export function buildD1ReadinessDiagnosticSql(
     buildD1ReadinessQueryContract(expectedCounts, schemaVersion, d1CorpusIdentity),
     checkNames,
   );
-  return [
+  return assertD1ReadinessSqlByteBound('diagnostic', [
     buildD1ReadinessChecksCte(contract),
     `SELECT check_name, passed FROM readiness_checks WHERE passed IS NOT 1 ORDER BY check_name;`,
-  ].join('\n');
+  ].join('\n'));
+}
+
+function assertD1ReadinessSqlByteBound(kind: 'primary' | 'diagnostic', sql: string): string {
+  const bytes = Buffer.byteLength(sql, 'utf8');
+  if (bytes > MAX_D1_READINESS_SQL_BYTES) {
+    throw new Error(`D1 readiness ${kind} SQL exceeds ${MAX_D1_READINESS_SQL_BYTES} bytes: ${bytes}`);
+  }
+  return sql;
 }
 
 function parseArguments(argv: string[]): { database: string; env?: string; printOnly: boolean } {
@@ -533,14 +567,21 @@ export function runRemoteD1ReadinessCheck(
 ): void {
   const wrangler = options.wrangler ?? join(ROOT, 'node_modules', 'wrangler', 'bin', 'wrangler.js');
   const cwd = options.cwd ?? ROOT;
-  const executeSql = (sql: string): void => {
+  const executeSql = (sql: string, capture = false): unknown => {
     const args = [wrangler, 'd1', 'execute', options.database, '--remote', '--command', sql, '--json'];
     if (options.env) args.push('--env', options.env);
-    execute(process.execPath, args, { cwd, stdio: 'inherit' });
+    return execute(process.execPath, args, capture ? { cwd, stdio: 'pipe', encoding: 'utf8' } : { cwd, stdio: 'inherit' });
   };
 
   try {
     executeSql(buildD1ReadinessSql(MANIFEST.expectedCounts));
+    const audit = auditHistoricalTransform8Authority(ROOT, sql => {
+      const result = executeSql(sql, true);
+      return parseHistoricalTransform8D1Page(
+        typeof result === 'string' ? result : Buffer.isBuffer(result) ? result.toString('utf8') : String(result),
+      );
+    });
+    process.stderr.write(`Transform-8 D1 authority audit passed (${audit.pages.profiles}/${audit.pages.identities}/${audit.pages.aliases} pages).\n`);
   } catch (primaryError) {
     process.stderr.write('Primary D1 readiness gate failed; requesting failed-check diagnostics.\n');
     try {

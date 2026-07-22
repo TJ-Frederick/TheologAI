@@ -18,6 +18,7 @@ import {
   renameSync,
   statSync,
   unlinkSync,
+  writeFileSync,
 } from 'fs';
 import { isAbsolute, join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
@@ -105,6 +106,31 @@ function cleanupTemporaryDatabase(): void {
   removeIfPresent(TEMP_DB_PATH);
   removeIfPresent(`${TEMP_DB_PATH}-shm`);
   removeIfPresent(`${TEMP_DB_PATH}-wal`);
+}
+
+/** Test-only post-rollback observation point, deliberately before temp cleanup. */
+function captureTransform8FailureSnapshot(database: Database.Database | undefined, error: unknown): void {
+  const snapshotPath = process.env.THEOLOGAI_TRANSFORM8_TEST_FAILURE_SNAPSHOT;
+  if (!snapshotPath || !database?.open) return;
+  const tables = [
+    'documents',
+    'document_sections',
+    'sections_fts',
+    'historical_document_delivery_profiles',
+    'historical_section_identities',
+    'historical_section_aliases',
+  ] as const;
+  const rowCounts = Object.fromEntries(tables.map(table => [
+    table,
+    (database.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get() as { count: number }).count,
+  ]));
+  writeFileSync(snapshotPath, `${JSON.stringify({
+    kind: 'transform8_late_failure_post_rollback_pre_cleanup',
+    temporaryDatabasePath: TEMP_DB_PATH,
+    forcedLateFailure: process.env.THEOLOGAI_TRANSFORM8_TEST_FAIL_AFTER_SIDECARS === '1',
+    error: error instanceof Error ? error.message : String(error),
+    rowCounts,
+  })}\n`, 'utf8');
 }
 
 function log(msg: string) {
@@ -724,6 +750,7 @@ renameSync(TEMP_DB_PATH, DB_PATH);
 
 log(`Database build complete at ${DB_PATH}`);
 } catch (error) {
+  captureTransform8FailureSnapshot(db, error);
   if (db?.open) db.close();
   cleanupTemporaryDatabase();
   throw error;

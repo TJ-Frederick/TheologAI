@@ -16,6 +16,7 @@ import { verifyBiblicalLanguageUnicodeD1 } from './verify-biblical-language-unic
 import { UBS_SEMANTICS_DATABASE_CEILING_BYTES } from './ubs-semantics/capacity.js';
 import { verifyHistoricalSectionCompatibilityAttestationFromDisk } from './historical-section-compatibility-compiler.js';
 import { historicalLegacySectionId, readHistoricalSectionSources, sha256Canonical } from './historical-section-key-plan.js';
+import { auditHistoricalTransform8Authority } from './historical-transform8-authority-audit.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -205,6 +206,10 @@ try {
   assertHebrewLemmaCoverageDatabase(db, 'Verified SQLite morphology');
   verifyBiblicalLanguageUnicodeD1(ROOT, db, manifest.expectedCounts);
   assertHistoricalTransform8Materialization(db);
+  auditHistoricalTransform8Authority(ROOT, sql => {
+    const rows = db.prepare(sql).all();
+    return { rows, responseBytes: Buffer.byteLength(JSON.stringify(rows), 'utf8') };
+  });
 
   const representativeQueries = [
     ["SELECT 1 FROM cross_references WHERE from_verse = 'John.3.16' LIMIT 1", 'John 3:16 cross-references'],
