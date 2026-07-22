@@ -1,18 +1,28 @@
 import { createHash } from 'node:crypto';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { deflateRawSync } from 'node:zlib';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
+  AQUINAS_GUTENBERG_GENERATED_RECEIPT_LOCAL_PATH,
+  AQUINAS_GUTENBERG_CATALOG_IDENTITY_LOCK_PATH,
+  AQUINAS_GUTENBERG_RECEIPT_PATH,
   AQUINAS_GUTENBERG_SOURCE_LOCK_PATH,
+  acquireAquinasGutenberg,
+  catalogSemanticIdentityDigest,
+  extractAndVerifyCatalogSemanticIdentity,
   extractAndVerifyLockedHtml,
   fetchExactGutenbergBytes,
   parseAquinasGutenbergSourceLock,
+  readAquinasGutenbergCatalogIdentityLock,
   parseStrictZip,
   readAquinasGutenbergSourceLock,
   sourceLockDigest,
+  verifyLocalAquinasGutenbergAcquisition,
   writeNoClobber,
+  type AquinasGutenbergCatalogIdentityArtifact,
+  type AquinasGutenbergReviewedPins,
 } from '../../../scripts/aquinas-gutenberg-acquisition.js';
 
 const CRC_TABLE = (() => {
@@ -91,6 +101,150 @@ function lockJson(): Record<string, any> {
   return JSON.parse(readFileSync(AQUINAS_GUTENBERG_SOURCE_LOCK_PATH, 'utf8')) as Record<string, any>;
 }
 
+function seedTrackedAcquisitionEvidence(root: string): Buffer {
+  for (const path of [AQUINAS_GUTENBERG_SOURCE_LOCK_PATH, AQUINAS_GUTENBERG_RECEIPT_PATH, AQUINAS_GUTENBERG_CATALOG_IDENTITY_LOCK_PATH]) {
+    const destination = join(root, path);
+    mkdirSync(dirname(destination), { recursive: true });
+    writeFileSync(destination, readFileSync(path));
+  }
+  return readFileSync(AQUINAS_GUTENBERG_RECEIPT_PATH);
+}
+
+function digest(bytes: Uint8Array): string {
+  return createHash('sha256').update(bytes).digest('hex');
+}
+
+function catalogHtml(artifact: AquinasGutenbergCatalogIdentityArtifact, siteCount = '78,967', downloads = '1936'): Buffer {
+  const identity = artifact.semanticIdentity;
+  const lastUpdate = identity.lastUpdate
+    ? `<tr property="dcterms:modified" datatype="xsd:date" content="${identity.lastUpdate.machineDate}"><th>Last Update</th><td>${identity.lastUpdate.displayDate}</td></tr>`
+    : '';
+  return Buffer.from(`<!doctype html><html><body>
+<a href="/ebooks/" title="Start a new search."><span itemprop="name">${siteCount} free eBooks</span></a>
+<div typeof="pgterms:ebook" about="[ebook:${artifact.ebookId}]">
+<table id="about_book_table">
+<tr><th>Author</th><td><a href="${identity.author.agentPath}" about="${identity.author.agentAboutPath}" itemprop="creator">${identity.author.name}</a></td></tr>
+<tr><th>Title</th><td>${identity.titleLines[0]}<br>${identity.titleLines[1]}</td></tr>
+<tr><th>Note</th><td>Wikipedia page about this book</td></tr>
+<tr><th>Credits</th><td>${identity.credits}</td></tr>
+<tr><th>Reading Level</th><td>Computed presentation metadata</td></tr>
+<tr content="${identity.language.code}"><th>Language</th><td>${identity.language.label}</td></tr>
+<tr content="${identity.locClass}"><th>LoC Class</th><td>${identity.locClass}</td></tr>
+<tr><th>Subject</th><td>Subject one</td></tr>
+<tr><th>Subject</th><td>Subject two</td></tr>
+<tr><th>Subject</th><td>Subject three</td></tr>
+<tr><th>Subject</th><td>Subject four</td></tr>
+<tr><th>Category</th><td>${identity.category}</td></tr>
+<tr><th>eBook-No.</th><td>${artifact.ebookId}</td></tr>
+<tr content="${identity.release.machineDate}"><th>Release Date</th><td>${identity.release.displayDate}</td></tr>
+${lastUpdate}
+<tr><th>Copyright</th><td>${identity.rightsStatement}</td></tr>
+<tr><th>Downloads</th><td>${downloads} downloads in the last 30 days.</td></tr>
+</table></div>
+<a href="${identity.archiveDownload.path}" type="${identity.archiveDownload.mediaType}">${identity.archiveDownload.label}</a>
+</body></html>`, 'utf8');
+}
+
+function syntheticArchiveHtml(artifact: Record<string, any>, source: Record<string, any>): string {
+  const notice = source.rightsAndProvenance.internalUnrestrictedUseEvidence.requiredPhrases.join('\n');
+  const provenance = [
+    'originally produced by Sandra',
+    'made available through the Christian\nClassics Ethereal Library',
+    'I have eliminated\nunnecessary formatting in the text, corrected some errors in\ntranscription, and added the dedication, tables of contents,\nPrologue, and the numbers of the questions and articles, as they\nappeared in the printed translation published by Benziger Brothers.',
+    'In a few places, where obvious errors appeared in the Benziger\nBrothers edition, I have corrected them by reference to a Latin text\nof the <i>Summa.</i> These corrections are indicated by English text in\nbrackets.',
+    '* Any matter that appeared in a footnote in the Benziger Brothers\nedition is presented in brackets at the point in the text where the\nfootnote mark appeared.',
+    'Fathers of the English Dominican Province',
+    'BENZIGER BROTHERS',
+    'Anything else in this electronic edition that does not correspond to\nthe content of the Benziger Brothers edition may be regarded as a\ndefect in this edition and attributed to me (David McClamrock).',
+  ].join('\n');
+  return `<html><head><meta name="dcterms.created" content="${artifact.htmlMember.dctermsCreated}"><meta name="dcterms.modified" content="${artifact.htmlMember.dctermsModified}"></head><body><div>This eBook is for the use of anyone anywhere in the United States\n${notice}</div><h2>NOTE TO THIS ELECTRONIC EDITION</h2><p>${provenance}</p></body></html>`;
+}
+
+function syntheticEvidence(html: string): { notice: Buffer; provenance: Buffer } {
+  const noticeStart = html.indexOf('<div>This eBook is for the use of anyone anywhere in the United States');
+  const noticeEnd = html.indexOf('</div>', noticeStart) + '</div>'.length;
+  const provenanceStart = html.indexOf('>NOTE TO THIS ELECTRONIC EDITION</');
+  const provenanceEnd = html.indexOf('</p>', provenanceStart) + '</p>'.length;
+  return { notice: Buffer.from(html.slice(noticeStart, noticeEnd)), provenance: Buffer.from(html.slice(provenanceStart, provenanceEnd)) };
+}
+
+function syntheticAcquisitionScenario(root: string): {
+  pins: AquinasGutenbergReviewedPins;
+  responses: Map<string, Buffer>;
+  reviewedReceiptBytes: Buffer;
+  catalogLock: ReturnType<typeof readAquinasGutenbergCatalogIdentityLock>;
+} {
+  const source = lockJson();
+  const catalogLockJson = JSON.parse(readFileSync(AQUINAS_GUTENBERG_CATALOG_IDENTITY_LOCK_PATH, 'utf8')) as Record<string, any>;
+  const reviewCatalogs = new Map<number, Buffer>();
+  const acquisitionCatalogs = new Map<number, Buffer>();
+  const archives = new Map<number, Buffer>();
+  const evidence = new Map<number, { notice: Buffer; provenance: Buffer }>();
+  for (const [index, artifact] of source.artifacts.entries()) {
+    const identityArtifact = catalogLockJson.artifacts[index] as AquinasGutenbergCatalogIdentityArtifact;
+    const html = syntheticArchiveHtml(artifact, source);
+    const archive = zip([
+      { path: artifact.archive.memberPaths[0], body: html },
+      { path: artifact.archive.memberPaths[1], body: 'synthetic cover', method: 0 },
+    ]);
+    artifact.archive.bytes = archive.byteLength;
+    artifact.archive.sha256 = digest(archive);
+    artifact.htmlMember.bytes = Buffer.byteLength(html);
+    artifact.htmlMember.sha256 = digest(Buffer.from(html));
+    const reviewCatalog = catalogHtml(identityArtifact, '78,000', '1');
+    artifact.catalogSnapshot.bytes = reviewCatalog.byteLength;
+    artifact.catalogSnapshot.sha256 = digest(reviewCatalog);
+    reviewCatalogs.set(artifact.ebookId, reviewCatalog);
+    acquisitionCatalogs.set(artifact.ebookId, catalogHtml(identityArtifact, '79,001', '2345'));
+    archives.set(artifact.ebookId, archive);
+    evidence.set(artifact.ebookId, syntheticEvidence(html));
+  }
+  const sourceBytes = Buffer.from(`${JSON.stringify(source, null, 2)}\n`);
+  const sourceLockSha256 = digest(sourceBytes);
+  const reviewedReceipt = {
+    schemaVersion: 'theologai-aquinas-gutenberg-local-receipt.v1',
+    sourceLockSha256,
+    acquiredAt: '2026-07-21T00:00:00.000Z',
+    artifacts: source.artifacts.map((artifact: Record<string, any>) => {
+      const localEvidence = evidence.get(artifact.ebookId)!;
+      const catalog = reviewCatalogs.get(artifact.ebookId)!;
+      return {
+        ebookId: artifact.ebookId,
+        archive: { path: artifact.archive.localPath, bytes: artifact.archive.bytes, sha256: artifact.archive.sha256 },
+        catalogSnapshot: { path: artifact.catalogSnapshot.localPath, bytes: catalog.byteLength, sha256: digest(catalog) },
+        htmlMember: { path: artifact.htmlMember.path, bytes: artifact.htmlMember.bytes, sha256: artifact.htmlMember.sha256 },
+        unrestrictedUseNotice: { path: `local/evidence/pg${artifact.ebookId}-unrestricted-use-notice.html`, bytes: localEvidence.notice.byteLength, sha256: digest(localEvidence.notice) },
+        electronicEditionProvenance: { path: `local/evidence/pg${artifact.ebookId}-electronic-edition-provenance.html`, bytes: localEvidence.provenance.byteLength, sha256: digest(localEvidence.provenance) },
+      };
+    }),
+  };
+  const reviewedReceiptBytes = Buffer.from(`${JSON.stringify(reviewedReceipt, null, 2)}\n`);
+  const reviewedReceiptSha256 = digest(reviewedReceiptBytes);
+  catalogLockJson.sourceLockSha256 = sourceLockSha256;
+  catalogLockJson.reviewedReceiptSha256 = reviewedReceiptSha256;
+  const catalogLockBytes = Buffer.from(`${JSON.stringify(catalogLockJson, null, 2)}\n`);
+  const pins = { sourceLockSha256, reviewedReceiptSha256, catalogIdentityLockSha256: digest(catalogLockBytes) };
+  for (const [path, bytes] of [
+    [AQUINAS_GUTENBERG_SOURCE_LOCK_PATH, sourceBytes],
+    [AQUINAS_GUTENBERG_RECEIPT_PATH, reviewedReceiptBytes],
+    [AQUINAS_GUTENBERG_CATALOG_IDENTITY_LOCK_PATH, catalogLockBytes],
+  ] as const) {
+    const destination = join(root, path);
+    mkdirSync(dirname(destination), { recursive: true });
+    writeFileSync(destination, bytes);
+  }
+  const responses = new Map<string, Buffer>();
+  for (const artifact of source.artifacts) {
+    responses.set(artifact.archive.url, archives.get(artifact.ebookId)!);
+    responses.set(artifact.catalogSnapshot.url, acquisitionCatalogs.get(artifact.ebookId)!);
+  }
+  return { pins, responses, reviewedReceiptBytes, catalogLock: readAquinasGutenbergCatalogIdentityLock(root, pins) };
+}
+
+function fakeFetch(responses: Map<string, Buffer>): (input: string) => Promise<Response> {
+  return async input => new Response(responses.get(input) ?? 'missing fixture', { status: responses.has(input) ? 200 : 404 });
+}
+
 describe('Aquinas Gutenberg local acquisition/source-rights lock', () => {
   it('binds the reviewed four-part archive, member, catalog, provenance, and IA-witness identities', () => {
     const lock = readAquinasGutenbergSourceLock(process.cwd());
@@ -110,6 +264,45 @@ describe('Aquinas Gutenberg local acquisition/source-rights lock', () => {
       receiptSha256: '71f0312d497835b11a474b3254c4d5226952a539425461a2b1d6795848ed5399',
     });
     expect(sourceLockDigest(process.cwd())).toMatch(/^[a-f0-9]{64}$/);
+    const catalogLock = readAquinasGutenbergCatalogIdentityLock(process.cwd());
+    expect(catalogLock.artifacts.map(artifact => artifact.ebookId)).toEqual([17611, 17897, 18755, 19950]);
+    expect(catalogLock.sourceLockSha256).toBe('c5cfdd1edd132bf59968cbabe4c7de2180c42d205735ca6c06aec626104a180b');
+    expect(catalogLock.reviewedReceiptSha256).toBe('bc0dab9ce5dc3672ccf2a81182655c75eaf6ef4f280584a40e079bf82a11719d');
+  });
+
+  it('accepts the current live catalog shape across both documented counter changes and rejects invariant drift', () => {
+    const source = readAquinasGutenbergSourceLock(process.cwd());
+    const catalogLock = readAquinasGutenbergCatalogIdentityLock(process.cwd());
+    const liveDownloads = ['1936', '1729', '2108', '1457'];
+    for (const [index, artifact] of source.artifacts.entries()) {
+      const identity = catalogLock.artifacts[index]!;
+      const first = extractAndVerifyCatalogSemanticIdentity(artifact, identity, catalogHtml(identity, '78,967', liveDownloads[index]), source);
+      const counterDrift = extractAndVerifyCatalogSemanticIdentity(artifact, identity, catalogHtml(identity, '79,001', '999999'), source);
+      expect(catalogSemanticIdentityDigest({ ...identity, semanticIdentity: first })).toBe(catalogSemanticIdentityDigest({ ...identity, semanticIdentity: counterDrift }));
+    }
+    const identity = catalogLock.artifacts[0]!;
+    const mismatched = Buffer.from(catalogHtml(identity).toString('utf8').replace(identity.semanticIdentity.credits, 'Unreviewed credits'));
+    expect(() => extractAndVerifyCatalogSemanticIdentity(source.artifacts[0]!, identity, mismatched, source)).toThrow('catalog semantic identity drifted');
+  });
+
+  it('rejects an unknown Edition row instead of treating it as out-of-projection presentation', () => {
+    const source = readAquinasGutenbergSourceLock(process.cwd());
+    const identity = readAquinasGutenbergCatalogIdentityLock(process.cwd()).artifacts[0]!;
+    const injected = Buffer.from(catalogHtml(identity).toString('utf8').replace(
+      '</table>',
+      '<tr><th>Edition</th><td>Hostile replacement edition</td></tr></table>',
+    ));
+    expect(() => extractAndVerifyCatalogSemanticIdentity(source.artifacts[0]!, identity, injected, source)).toThrow('unknown row label: Edition');
+  });
+
+  it('rejects extra coauthor text outside the single reviewed creator link', () => {
+    const source = readAquinasGutenbergSourceLock(process.cwd());
+    const identity = readAquinasGutenbergCatalogIdentityLock(process.cwd()).artifacts[0]!;
+    const injected = Buffer.from(catalogHtml(identity).toString('utf8').replace(
+      `${identity.semanticIdentity.author.name}</a></td>`,
+      `${identity.semanticIdentity.author.name}</a>; Hostile Coauthor</td>`,
+    ));
+    expect(() => extractAndVerifyCatalogSemanticIdentity(source.artifacts[0]!, identity, injected, source)).toThrow('Author cell must contain only');
   });
 
   it('rejects topology, provenance, rights, member, URL, and comparison-witness drift', () => {
@@ -190,5 +383,92 @@ describe('Aquinas Gutenberg local acquisition/source-rights lock', () => {
       'fixture archive',
       async () => new Response('', { status: 302, headers: { location: 'https://evil.invalid/file.zip' } }),
     )).rejects.toThrow('redirected to an unapproved or mutable endpoint');
+  });
+
+  it('lets fresh-checkout acquisition pass destination preflight without overwriting the tracked reviewed receipt', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'theologai-aquinas-gutenberg-fresh-checkout-'));
+    const reviewedReceipt = seedTrackedAcquisitionEvidence(root);
+    const fetchReached = vi.fn(async (): Promise<Response> => {
+      throw new Error('fetch reached after destination preflight');
+    });
+
+    await expect(acquireAquinasGutenberg(root, fetchReached)).rejects.toThrow('fetch reached after destination preflight');
+    expect(fetchReached).toHaveBeenCalled();
+    expect(readFileSync(join(root, AQUINAS_GUTENBERG_RECEIPT_PATH))).toEqual(reviewedReceipt);
+  });
+
+  it('fails closed before downloading when any generated acquisition destination already exists', async () => {
+    const lock = readAquinasGutenbergSourceLock(process.cwd());
+    for (const localPath of [AQUINAS_GUTENBERG_GENERATED_RECEIPT_LOCAL_PATH, lock.artifacts[0]!.archive.localPath]) {
+      const root = mkdtempSync(join(tmpdir(), 'theologai-aquinas-gutenberg-hostile-destination-'));
+      const reviewedReceipt = seedTrackedAcquisitionEvidence(root);
+      const destination = join(root, 'data/historical-sources/project-gutenberg/aquinas-english-dominican', localPath);
+      mkdirSync(dirname(destination), { recursive: true });
+      writeFileSync(destination, 'hostile pre-existing bytes');
+      const fetchNotReached = vi.fn(async (): Promise<Response> => {
+        throw new Error('download must not start');
+      });
+
+      await expect(acquireAquinasGutenberg(root, fetchNotReached)).rejects.toThrow('no-clobber policy');
+      expect(fetchNotReached).not.toHaveBeenCalled();
+      expect(readFileSync(destination, 'utf8')).toBe('hostile pre-existing bytes');
+      expect(readFileSync(join(root, AQUINAS_GUTENBERG_RECEIPT_PATH))).toEqual(reviewedReceipt);
+    }
+  });
+
+  it('completes a full fresh-checkout acquisition with fake locked responses and counter-drifted catalog snapshots', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'theologai-aquinas-gutenberg-full-acquire-'));
+    const scenario = syntheticAcquisitionScenario(root);
+
+    const receipt = await acquireAquinasGutenberg(root, fakeFetch(scenario.responses), scenario.pins);
+
+    expect(receipt.schemaVersion).toBe('theologai-aquinas-gutenberg-generated-receipt.v1');
+    expect(receipt.reviewedReceiptSha256).toBe(scenario.pins.reviewedReceiptSha256);
+    expect(receipt.catalogIdentityLockSha256).toBe(scenario.pins.catalogIdentityLockSha256);
+    expect(receipt.artifacts).toHaveLength(4);
+    expect(readFileSync(join(root, AQUINAS_GUTENBERG_RECEIPT_PATH))).toEqual(scenario.reviewedReceiptBytes);
+    expect(verifyLocalAquinasGutenbergAcquisition(root, scenario.pins).artifacts).toHaveLength(4);
+  });
+
+  it('rejects a semantic catalog mismatch before creating any local acquisition output', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'theologai-aquinas-gutenberg-semantic-no-write-'));
+    const scenario = syntheticAcquisitionScenario(root);
+    const first = scenario.catalogLock.artifacts[0]!;
+    const url = `https://www.gutenberg.org${first.catalogPath}`;
+    scenario.responses.set(url, Buffer.from(scenario.responses.get(url)!.toString('utf8').replace(first.semanticIdentity.credits, 'Hostile catalog credits')));
+
+    await expect(acquireAquinasGutenberg(root, fakeFetch(scenario.responses), scenario.pins)).rejects.toThrow('catalog semantic identity drifted');
+    expect(existsSync(join(root, 'data/historical-sources/project-gutenberg/aquinas-english-dominican/local'))).toBe(false);
+    expect(readFileSync(join(root, AQUINAS_GUTENBERG_RECEIPT_PATH))).toEqual(scenario.reviewedReceiptBytes);
+  });
+
+  it('compares candidate provenance to authenticated reviewed evidence before the first write', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'theologai-aquinas-gutenberg-reviewed-mismatch-'));
+    const scenario = syntheticAcquisitionScenario(root);
+    const reviewed = JSON.parse(scenario.reviewedReceiptBytes.toString('utf8')) as Record<string, any>;
+    reviewed.artifacts[0].electronicEditionProvenance.sha256 = '0'.repeat(64);
+    const reviewedBytes = Buffer.from(`${JSON.stringify(reviewed, null, 2)}\n`);
+    const reviewedReceiptSha256 = digest(reviewedBytes);
+    writeFileSync(join(root, AQUINAS_GUTENBERG_RECEIPT_PATH), reviewedBytes);
+    const catalogLock = JSON.parse(readFileSync(join(root, AQUINAS_GUTENBERG_CATALOG_IDENTITY_LOCK_PATH), 'utf8')) as Record<string, any>;
+    catalogLock.reviewedReceiptSha256 = reviewedReceiptSha256;
+    const catalogLockBytes = Buffer.from(`${JSON.stringify(catalogLock, null, 2)}\n`);
+    writeFileSync(join(root, AQUINAS_GUTENBERG_CATALOG_IDENTITY_LOCK_PATH), catalogLockBytes);
+    const pins = { ...scenario.pins, reviewedReceiptSha256, catalogIdentityLockSha256: digest(catalogLockBytes) };
+
+    await expect(acquireAquinasGutenberg(root, fakeFetch(scenario.responses), pins)).rejects.toThrow('candidate identity drifted from reviewed receipt');
+    expect(existsSync(join(root, 'data/historical-sources/project-gutenberg/aquinas-english-dominican/local'))).toBe(false);
+  });
+
+  it('rejects a tampered tracked reviewed receipt even when a valid generated receipt and cache exist', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'theologai-aquinas-gutenberg-reviewed-tamper-'));
+    const scenario = syntheticAcquisitionScenario(root);
+    await acquireAquinasGutenberg(root, fakeFetch(scenario.responses), scenario.pins);
+    const generatedPath = join(root, 'data/historical-sources/project-gutenberg/aquinas-english-dominican', AQUINAS_GUTENBERG_GENERATED_RECEIPT_LOCAL_PATH);
+    expect(existsSync(generatedPath)).toBe(true);
+    writeFileSync(join(root, AQUINAS_GUTENBERG_RECEIPT_PATH), Buffer.concat([scenario.reviewedReceiptBytes, Buffer.from('\n')]));
+
+    expect(() => verifyLocalAquinasGutenbergAcquisition(root, scenario.pins)).toThrow('reviewed acquisition receipt byte identity drifted');
+    expect(existsSync(generatedPath)).toBe(true);
   });
 });
