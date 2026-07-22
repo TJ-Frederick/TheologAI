@@ -20,8 +20,9 @@ data/theologai.db-shm
 data/theologai.db-wal
 
 # Local-only raw archives and rights/provenance evidence for the locked
-# four-part Project Gutenberg Aquinas acquisition. SOURCE_LOCK.json and the
-# receipt are review metadata; nothing under local/ is vendored.
+# four-part Project Gutenberg Aquinas acquisition. SOURCE_LOCK.json, the
+# reviewed receipt, and CATALOG_IDENTITY_LOCK.json are tracked review metadata;
+# nothing under local/ is vendored.
 data/historical-sources/project-gutenberg/aquinas-english-dominican/local/
 
 # Test outputs and temp files
