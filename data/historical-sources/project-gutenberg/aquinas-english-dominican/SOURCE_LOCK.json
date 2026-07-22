@@ -1,0 +1,191 @@
+{
+  "schemaVersion": "theologai-aquinas-gutenberg-source-lock.v1",
+  "sourceIdentity": "aquinas-english-dominican-gutenberg-four-part-v1",
+  "acquisitionScope": {
+    "edition": "Project Gutenberg electronic editions of the English Dominican Province/Benziger translation, with Sandra K. Perry source e-text and David McClamrock corrections and editorial additions",
+    "corpusBoundary": "This acquisition preserves the four official Project Gutenberg artifacts only. It does not compile, normalize, index, or publish corpus text.",
+    "parts": [
+      "prima_pars.q001-q119",
+      "prima_secundae.q001-q114",
+      "secunda_secundae.q001-q189",
+      "tertia.q001-q090"
+    ],
+    "excluded": [
+      "Tertia Pars questions 91 and later",
+      "Supplement",
+      "all parser, corpus package, catalog, runtime, database, migration, and workflow changes"
+    ]
+  },
+  "acquisitionPolicy": {
+    "approvedArchiveOrigin": "https://www.gutenberg.org",
+    "approvedCatalogOrigin": "https://www.gutenberg.org",
+    "redirectPolicy": "No redirect is accepted for an archive or catalog snapshot. A redirect, a non-HTTPS URL, a non-www.gutenberg.org host, a query, a fragment, or a pathname mismatch fails closed.",
+    "storagePolicy": "Raw ZIP archives, catalog snapshots, extracted HTML evidence, notice evidence, and provenance evidence are local-only under local/ and must remain ignored. The lock and receipt are hash/provenance metadata, not corpus text.",
+    "archiveSafetyPolicy": "Only the exact reviewed member set is accepted. ZIP64, encrypted entries, duplicate or normalization-colliding paths, unsafe paths, symlinks, unexpected members, unsupported compression, oversized members, malformed local headers, CRC mismatch, and ambiguous or missing HTML fail closed.",
+    "noClobberPolicy": "Acquisition never replaces an existing archive, snapshot, evidence file, or receipt. Any destination, symlink, or unsafe parent collision fails closed."
+  },
+  "rightsAndProvenance": {
+    "rightsStatus": "public_domain_in_usa",
+    "territoryCaveat": "The catalog statement and internal notice support a United States position only; this lock makes no worldwide public-domain conclusion.",
+    "catalogStatement": "Public domain in the USA.",
+    "projectGutenbergLicensePolicyUrl": "https://www.gutenberg.org/policy/license.html",
+    "internalUnrestrictedUseEvidence": {
+      "requiredPhrases": [
+        "This eBook is for the use of anyone anywhere in the United States",
+        "If you are not located in the United States,",
+        "START: FULL LICENSE",
+        "THE FULL PROJECT GUTENBERG™ LICENSE",
+        "you may\r\ndo practically ANYTHING in the United States with eBooks not protected\r\nby U.S. copyright law."
+      ]
+    },
+    "electronicEditionProvenance": {
+      "sourceEtextCreator": "Sandra K. Perry, Perrysburg, Ohio",
+      "sourceEtextAvailability": "made available through the Christian Classics Ethereal Library <http://www.ccel.org>",
+      "electronicEditionEditor": "David McClamrock",
+      "disclosedEditorActions": [
+        "eliminated unnecessary formatting",
+        "corrected transcription errors",
+        "added the dedication, tables of contents, Prologue, and question/article numbering from the Benziger Brothers printed translation",
+        "checked some obvious Benziger Brothers errors against a Latin text and marked corrections with bracketed English text",
+        "presented Benziger Brothers footnote matter in brackets at its textual position",
+        "accepted responsibility for other electronic-edition divergences from the Benziger Brothers edition"
+      ],
+      "translator": "Fathers of the English Dominican Province",
+      "printedTranslationPublisher": "Benziger Brothers",
+      "ccelBoundary": "CCEL is recorded solely as disclosed historical provenance. This acquisition makes no CCEL request and stores no CCEL HTML, metadata, navigation, annotation, or packaging."
+    }
+  },
+  "comparisonWitness": {
+    "relationship": "Independent PIMS / University of Toronto Internet Archive page-image comparison and corroboration witness; it is not an input to this acquisition and is not copied or transcribed here.",
+    "sourceLockSchemaVersion": "theologai-aquinas-shapcote-ia-source-lock.v1",
+    "sourceLockSha256": "a245dbc007b76e1975eb26462a75a5e5992954d9042fc6de96477f0b30351594",
+    "receiptSchemaVersion": "theologai-aquinas-shapcote-ia-local-receipt.v1",
+    "receiptSha256": "71f0312d497835b11a474b3254c4d5226952a539425461a2b1d6795848ed5399"
+  },
+  "artifacts": [
+    {
+      "ebookId": 17611,
+      "partKey": "prima",
+      "questionRange": "q001-q119",
+      "archive": {
+        "url": "https://www.gutenberg.org/cache/epub/17611/pg17611-h.zip",
+        "localPath": "local/archives/pg17611-h.zip",
+        "bytes": 970487,
+        "sha256": "cd67660a85693de3ead953162db89677a29d59c6fc739e6faf0b4fb4f57fb8b2",
+        "memberPaths": [
+          "pg17611-images.html",
+          "17611-cover.png"
+        ]
+      },
+      "htmlMember": {
+        "path": "pg17611-images.html",
+        "bytes": 3090576,
+        "sha256": "310b8743376036b42faa6b6d1a835aee2cf4e531dcf14ab8d9bb4f1d30edf088",
+        "dctermsCreated": "2006-01-26",
+        "dctermsModified": "2026-07-07T20:12:10.761524+00:00"
+      },
+      "catalogSnapshot": {
+        "url": "https://www.gutenberg.org/ebooks/17611",
+        "localPath": "local/catalog/pg17611.html",
+        "bytes": 23960,
+        "sha256": "557be8272523147a6716d2914160bd31bc2514370c76f498b0d5138e0e767779",
+        "releaseDate": "Jan 26, 2006",
+        "issuedMachineDate": "2021-01-03",
+        "lastUpdate": "Jan 3, 2021"
+      }
+    },
+    {
+      "ebookId": 17897,
+      "partKey": "prima-secundae",
+      "questionRange": "q001-q114",
+      "archive": {
+        "url": "https://www.gutenberg.org/cache/epub/17897/pg17897-h.zip",
+        "localPath": "local/archives/pg17897-h.zip",
+        "bytes": 979217,
+        "sha256": "378ad159b217adfa26868e1600319125a63202fd955e96ab8aca51961229d698",
+        "memberPaths": [
+          "pg17897-images.html",
+          "17897-cover.png"
+        ]
+      },
+      "htmlMember": {
+        "path": "pg17897-images.html",
+        "bytes": 3088562,
+        "sha256": "fcb4441c3771bde971c2bff47c0894b8294a813c20c6fa24dfd3ab997491a1eb",
+        "dctermsCreated": "2006-03-01",
+        "dctermsModified": "2026-07-07T23:28:05.613443+00:00"
+      },
+      "catalogSnapshot": {
+        "url": "https://www.gutenberg.org/ebooks/17897",
+        "localPath": "local/catalog/pg17897.html",
+        "bytes": 23843,
+        "sha256": "312756a0edf9a5ffc3c36b11066595496e6def0e951580e29b46999cf04eac61",
+        "releaseDate": "Mar 1, 2006",
+        "issuedMachineDate": "2006-03-01",
+        "lastUpdate": null
+      }
+    },
+    {
+      "ebookId": 18755,
+      "partKey": "secunda-secundae",
+      "questionRange": "q001-q189",
+      "archive": {
+        "url": "https://www.gutenberg.org/cache/epub/18755/pg18755-h.zip",
+        "localPath": "local/archives/pg18755-h.zip",
+        "bytes": 1436264,
+        "sha256": "3d8d24ff85ac392fc2d3da6563d75362ae388ef9dc5403573ab769cebf967146",
+        "memberPaths": [
+          "pg18755-images.html",
+          "18755-cover.png"
+        ]
+      },
+      "htmlMember": {
+        "path": "pg18755-images.html",
+        "bytes": 4485696,
+        "sha256": "e8badeb59c78974db051cab37e6e841d78b2a83fb62e031668d29a7d7b9c4337",
+        "dctermsCreated": "2006-07-04",
+        "dctermsModified": "2026-07-08T09:54:15.669256+00:00"
+      },
+      "catalogSnapshot": {
+        "url": "https://www.gutenberg.org/ebooks/18755",
+        "localPath": "local/catalog/pg18755.html",
+        "bytes": 23855,
+        "sha256": "ec59fef8e65f47e84f88be4a374b2cbec220c876a3d539ada9f5de4b1b14bab8",
+        "releaseDate": "Jul 4, 2006",
+        "issuedMachineDate": "2006-07-04",
+        "lastUpdate": null
+      }
+    },
+    {
+      "ebookId": 19950,
+      "partKey": "tertia",
+      "questionRange": "q001-q090",
+      "archive": {
+        "url": "https://www.gutenberg.org/cache/epub/19950/pg19950-h.zip",
+        "localPath": "local/archives/pg19950-h.zip",
+        "bytes": 949369,
+        "sha256": "ac431f87de4a2fa9edb5cf0b02134c45a79e48fea3b9c3ee9f3c10cf183e52b8",
+        "memberPaths": [
+          "pg19950-images.html",
+          "19950-cover.png"
+        ]
+      },
+      "htmlMember": {
+        "path": "pg19950-images.html",
+        "bytes": 2927390,
+        "sha256": "12fff95d7637f1e475057dfe60f3d550c571bf0a04fa84ddb9653e46e88fb079",
+        "dctermsCreated": "2006-11-28",
+        "dctermsModified": "2026-07-08T19:11:34.638815+00:00"
+      },
+      "catalogSnapshot": {
+        "url": "https://www.gutenberg.org/ebooks/19950",
+        "localPath": "local/catalog/pg19950.html",
+        "bytes": 23722,
+        "sha256": "391b0b763d75794fd2ac364010429740f6ecaa7dc61c8b5a78350a7331198808",
+        "releaseDate": "Nov 28, 2006",
+        "issuedMachineDate": "2006-11-28",
+        "lastUpdate": null
+      }
+    }
+  ]
+}

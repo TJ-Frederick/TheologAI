@@ -1,0 +1,119 @@
+{
+  "schemaVersion": "theologai-aquinas-gutenberg-local-receipt.v1",
+  "sourceLockSha256": "c5cfdd1edd132bf59968cbabe4c7de2180c42d205735ca6c06aec626104a180b",
+  "acquiredAt": "2026-07-21T17:49:25.185Z",
+  "artifacts": [
+    {
+      "ebookId": 17611,
+      "archive": {
+        "path": "local/archives/pg17611-h.zip",
+        "bytes": 970487,
+        "sha256": "cd67660a85693de3ead953162db89677a29d59c6fc739e6faf0b4fb4f57fb8b2"
+      },
+      "catalogSnapshot": {
+        "path": "local/catalog/pg17611.html",
+        "bytes": 23960,
+        "sha256": "557be8272523147a6716d2914160bd31bc2514370c76f498b0d5138e0e767779"
+      },
+      "htmlMember": {
+        "path": "pg17611-images.html",
+        "bytes": 3090576,
+        "sha256": "310b8743376036b42faa6b6d1a835aee2cf4e531dcf14ab8d9bb4f1d30edf088"
+      },
+      "unrestrictedUseNotice": {
+        "path": "local/evidence/pg17611-unrestricted-use-notice.html",
+        "bytes": 526,
+        "sha256": "a232fbc3c0022a4b4bf6e04bc0071d1cfe7b60601d4bd8eca4b0fec3652b5f94"
+      },
+      "electronicEditionProvenance": {
+        "path": "local/evidence/pg17611-electronic-edition-provenance.html",
+        "bytes": 3349,
+        "sha256": "ac1b5ba769b06ef18b319897a01b1615f99c0034096c30ab466cc92edb33d2cd"
+      }
+    },
+    {
+      "ebookId": 17897,
+      "archive": {
+        "path": "local/archives/pg17897-h.zip",
+        "bytes": 979217,
+        "sha256": "378ad159b217adfa26868e1600319125a63202fd955e96ab8aca51961229d698"
+      },
+      "catalogSnapshot": {
+        "path": "local/catalog/pg17897.html",
+        "bytes": 23843,
+        "sha256": "312756a0edf9a5ffc3c36b11066595496e6def0e951580e29b46999cf04eac61"
+      },
+      "htmlMember": {
+        "path": "pg17897-images.html",
+        "bytes": 3088562,
+        "sha256": "fcb4441c3771bde971c2bff47c0894b8294a813c20c6fa24dfd3ab997491a1eb"
+      },
+      "unrestrictedUseNotice": {
+        "path": "local/evidence/pg17897-unrestricted-use-notice.html",
+        "bytes": 526,
+        "sha256": "a232fbc3c0022a4b4bf6e04bc0071d1cfe7b60601d4bd8eca4b0fec3652b5f94"
+      },
+      "electronicEditionProvenance": {
+        "path": "local/evidence/pg17897-electronic-edition-provenance.html",
+        "bytes": 3349,
+        "sha256": "d7cfc301c399764ab2fa20fc0ac6044766a95d1c761b74c15bf1f633a3701b82"
+      }
+    },
+    {
+      "ebookId": 18755,
+      "archive": {
+        "path": "local/archives/pg18755-h.zip",
+        "bytes": 1436264,
+        "sha256": "3d8d24ff85ac392fc2d3da6563d75362ae388ef9dc5403573ab769cebf967146"
+      },
+      "catalogSnapshot": {
+        "path": "local/catalog/pg18755.html",
+        "bytes": 23855,
+        "sha256": "ec59fef8e65f47e84f88be4a374b2cbec220c876a3d539ada9f5de4b1b14bab8"
+      },
+      "htmlMember": {
+        "path": "pg18755-images.html",
+        "bytes": 4485696,
+        "sha256": "e8badeb59c78974db051cab37e6e841d78b2a83fb62e031668d29a7d7b9c4337"
+      },
+      "unrestrictedUseNotice": {
+        "path": "local/evidence/pg18755-unrestricted-use-notice.html",
+        "bytes": 526,
+        "sha256": "a232fbc3c0022a4b4bf6e04bc0071d1cfe7b60601d4bd8eca4b0fec3652b5f94"
+      },
+      "electronicEditionProvenance": {
+        "path": "local/evidence/pg18755-electronic-edition-provenance.html",
+        "bytes": 3349,
+        "sha256": "d7cfc301c399764ab2fa20fc0ac6044766a95d1c761b74c15bf1f633a3701b82"
+      }
+    },
+    {
+      "ebookId": 19950,
+      "archive": {
+        "path": "local/archives/pg19950-h.zip",
+        "bytes": 949369,
+        "sha256": "ac431f87de4a2fa9edb5cf0b02134c45a79e48fea3b9c3ee9f3c10cf183e52b8"
+      },
+      "catalogSnapshot": {
+        "path": "local/catalog/pg19950.html",
+        "bytes": 23722,
+        "sha256": "391b0b763d75794fd2ac364010429740f6ecaa7dc61c8b5a78350a7331198808"
+      },
+      "htmlMember": {
+        "path": "pg19950-images.html",
+        "bytes": 2927390,
+        "sha256": "12fff95d7637f1e475057dfe60f3d550c571bf0a04fa84ddb9653e46e88fb079"
+      },
+      "unrestrictedUseNotice": {
+        "path": "local/evidence/pg19950-unrestricted-use-notice.html",
+        "bytes": 526,
+        "sha256": "a232fbc3c0022a4b4bf6e04bc0071d1cfe7b60601d4bd8eca4b0fec3652b5f94"
+      },
+      "electronicEditionProvenance": {
+        "path": "local/evidence/pg19950-electronic-edition-provenance.html",
+        "bytes": 3374,
+        "sha256": "b1ea2f3d62729598e6b7bd6280a5f2939548fe993190aa59af99b2a2ea341fe8"
+      }
+    }
+  ]
+}
