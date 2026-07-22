@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { IHistoricalDocumentRepository } from '../../../../src/kernel/repositories.js';
 import { LocalPrimarySourceSearchProvider } from '../../../../src/services/historical/LocalPrimarySourceSearchProvider.js';
-import { formatLocalDocumentSectionResource } from '../../../../src/formatters/historicalFormatter.js';
+import { formatLocalDocumentSectionResourceWithIdentity } from '../../../../src/formatters/historicalFormatter.js';
 
 function repository(overrides: Partial<IHistoricalDocumentRepository> = {}): IHistoricalDocumentRepository {
   const catalog = {
@@ -17,6 +17,7 @@ function repository(overrides: Partial<IHistoricalDocumentRepository> = {}): IHi
     searchPrimarySources: vi.fn().mockReturnValue([{
       document: { id: 'institutes', title: 'Institutes', type: 'treatise', date: '1559', topics: [], catalog },
       section: { id: 1, document_id: 'institutes', section_number: '3.1', title: 'Union', content: 'Grace\n\nwith [forged](https://evil.test) # heading', topics: [] },
+      sectionKey: 'source-0001', sourceOrdinal: 1,
     }]),
     ...overrides,
   };
@@ -33,12 +34,15 @@ describe('LocalPrimarySourceSearchProvider', () => {
     expect(result.hits[0]).toMatchObject({
       title: 'Institutes', sectionLabel: 'Union', snippetOnly: true,
       snippet: 'Grace with [forged](https://evil.test) # heading',
-      locator: { kind: 'local_section', documentId: 'institutes', sectionId: '3.1', url: 'theologai://documents/institutes#section-3.1' },
+      locator: { kind: 'local_section', documentId: 'institutes', sectionKey: 'source-0001', sourceOrdinal: 1, url: 'theologai://documents/institutes#section-source-0001' },
       documentType: 'treatise', documentDate: '1559', metadataProvenanceIds: ['hist-meta-test-calvin'], resourceSizeBytes: expect.any(Number),
     });
     const row = await repo.searchPrimarySources({ text: 'grace', match: 'all_terms', documentIds: ['institutes'], limit: 3 });
     expect(result.hits[0].resourceSizeBytes).toBe(new TextEncoder().encode(
-      formatLocalDocumentSectionResource(row[0].document, row[0].section),
+      formatLocalDocumentSectionResourceWithIdentity(row[0].document, row[0].section, {
+        sectionKey: row[0].sectionKey, sourceOrdinal: row[0].sourceOrdinal,
+        resolution: 'canonical', canonicalUri: 'theologai://documents/institutes#section-source-0001',
+      }),
     ).byteLength);
     expect(repo.searchPrimarySources).toHaveBeenCalledWith({
       text: 'grace', match: 'all_terms', selection: 'relevance', documentIds: ['institutes'], limit: 4,

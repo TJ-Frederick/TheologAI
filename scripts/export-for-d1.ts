@@ -57,6 +57,9 @@ const BASE_TABLES = [
   'morph_codes',
   'documents',
   'document_sections',
+  'historical_document_delivery_profiles',
+  'historical_section_identities',
+  'historical_section_aliases',
   'strongs',
   'stepbible_lexicons',
   'cross_references',
@@ -207,7 +210,9 @@ function exportTable(database: string, table: string): SeedStatement[] {
     }
     return `quote(${sqlIdentifier(column)})`;
   }).join(` || ',' || `);
-  const order = primaryKey.map(column => sqlIdentifier(column.name)).join(',');
+  const order = table === 'historical_section_identities'
+    ? ['document_id', 'source_ordinal', 'section_key'].map(sqlIdentifier).join(',')
+    : primaryKey.map(column => sqlIdentifier(column.name)).join(',');
   const insertPrefix = `INSERT INTO ${sqlIdentifier(table)}(${columnSql}) VALUES`;
   const query =
     `SELECT '(' || ${values} || ');' ` +

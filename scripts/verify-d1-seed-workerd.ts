@@ -9,7 +9,11 @@ import { fileURLToPath } from 'node:url';
 import { loadAndVerifyD1SeedManifest } from './d1-seed-manifest.js';
 import { parseDataManifest } from './d1-corpus-identity.js';
 import {
-  buildUbsSemanticStoredIntegrityPredicates,
+  auditHistoricalTransform8Authority,
+  parseHistoricalTransform8D1Page,
+} from './historical-transform8-authority-audit.js';
+import {
+  buildD1ReadinessSql,
   REQUIRED_COLUMNS,
 } from './check-remote-d1-readiness.js';
 
@@ -45,7 +49,6 @@ try {
   const columnChecks = Object.entries(REQUIRED_COLUMNS).map(([table, columns]) =>
     `(SELECT group_concat(name, ',') FROM (SELECT name FROM pragma_table_info('${table}') ORDER BY cid)) = '${columns.join(',')}'`
   );
-  const semanticIntegrityChecks = buildUbsSemanticStoredIntegrityPredicates();
   const schemaState = run([
     'd1',
     'execute',
@@ -54,7 +57,7 @@ try {
     `SELECT CASE WHEN
       (SELECT COUNT(*) FROM d1_migrations) = ${migrationNames.length}
       AND (SELECT group_concat(name, ',') FROM (SELECT name FROM d1_migrations ORDER BY id)) = '${migrationNames.join(',')}'
-      AND (SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name IN ('idx_xref_from','idx_xref_votes','idx_morph_verse','idx_morph_strongs','idx_morph_strongs_canonical','idx_strongs_book_stats_order','idx_strongs_form_stats_rank','idx_ubs_groups_source_order','idx_ubs_segments_lookup','idx_ubs_semantic_identity_candidate','idx_ubs_semantic_sense_candidate_order','idx_ubs_semantic_sense_domain_order','idx_ubs_semantic_coordinate_lookup','idx_ubs_semantic_evidence_sense_order')) = 14
+      AND (SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name IN ('idx_xref_from','idx_xref_votes','idx_morph_verse','idx_morph_strongs','idx_morph_strongs_canonical','idx_strongs_book_stats_order','idx_strongs_form_stats_rank','idx_ubs_groups_source_order','idx_ubs_segments_lookup','idx_ubs_semantic_identity_candidate','idx_ubs_semantic_sense_candidate_order','idx_ubs_semantic_sense_domain_order','idx_ubs_semantic_coordinate_lookup','idx_ubs_semantic_evidence_sense_order','idx_document_sections_id_document','idx_historical_section_identities_browse','idx_historical_section_aliases_target')) = 17
       AND ${columnChecks.join('\n      AND ')}
       THEN 'schema-ready' ELSE json_extract('Wrangler-applied migration state mismatch', '$') END AS schema_state;`,
     '--json',
@@ -74,43 +77,21 @@ try {
     run(['d1', 'execute', ...common, '--file', join(SEED_ROOT, file.path)]);
   }
 
-  const readiness = run([
+  const readiness = parseHistoricalTransform8D1Page(run([
     'd1',
     'execute',
     ...common,
     '--command',
-    `SELECT CASE WHEN
-      (SELECT quick_check FROM pragma_quick_check LIMIT 1) = 'ok'
-      AND (SELECT COUNT(*) FROM pragma_foreign_key_check) = 0
-      AND (SELECT COUNT(*) FROM theologai_metadata) = 2
-      AND (SELECT COUNT(*) FROM strongs) > 0
-      AND (SELECT COUNT(*) FROM stepbible_lexicons) > 0
-      AND (SELECT COUNT(*) FROM cross_references) > 0
-      AND (SELECT COUNT(*) FROM morphology) > 0
-      AND (SELECT lemma FROM morphology WHERE book = 'Genesis' AND chapter = 1 AND verse = 1 AND position = 3) = 'אֱלֹהִים'
-      AND (SELECT COUNT(*) FROM document_sections) = ${manifest.expectedCounts.document_sections}
-      AND (SELECT COUNT(*) FROM strongs_fts) > 0
-      AND (SELECT COUNT(*) FROM sections_fts) = ${manifest.expectedCounts.sections_fts}
-      AND (SELECT COUNT(*) FROM ubs_parallel_sources) = ${manifest.expectedCounts.ubs_parallel_sources}
-      AND (SELECT COUNT(*) FROM ubs_parallel_groups) = ${manifest.expectedCounts.ubs_parallel_groups}
-      AND (SELECT COUNT(*) FROM ubs_parallel_members) = ${manifest.expectedCounts.ubs_parallel_members}
-      AND (SELECT COUNT(*) FROM ubs_parallel_segments) = ${manifest.expectedCounts.ubs_parallel_segments}
-      AND (SELECT artifact_identity FROM ubs_parallel_sources LIMIT 1) = 'a5fd0d4646cb69f426f592c6e334866191201fbe64691cd55c7f7ecd0ca9d4cc'
-      AND (SELECT COUNT(*) FROM ubs_semantic_artifacts) = ${manifest.expectedCounts.ubs_semantic_artifacts}
-      AND (SELECT COUNT(*) FROM ubs_semantic_sources) = ${manifest.expectedCounts.ubs_semantic_sources}
-      AND (SELECT COUNT(*) FROM ubs_semantic_domains) = ${manifest.expectedCounts.ubs_semantic_domains}
-      AND (SELECT COUNT(*) FROM ubs_semantic_entries) = ${manifest.expectedCounts.ubs_semantic_entries}
-      AND (SELECT COUNT(*) FROM ubs_semantic_entry_identities) = ${manifest.expectedCounts.ubs_semantic_entry_identities}
-      AND (SELECT COUNT(*) FROM ubs_semantic_senses) = ${manifest.expectedCounts.ubs_semantic_senses}
-      AND (SELECT COUNT(*) FROM ubs_semantic_sense_domains) = ${manifest.expectedCounts.ubs_semantic_sense_domains}
-      AND (SELECT COUNT(*) FROM ubs_semantic_reference_evidence) = ${manifest.expectedCounts.ubs_semantic_reference_evidence}
-      AND (SELECT COUNT(*) FROM ubs_semantic_normalized_coordinates) = ${manifest.expectedCounts.ubs_semantic_normalized_coordinates}
-      AND ${semanticIntegrityChecks.join('\n      AND ')}
-      THEN 'ready' ELSE json_extract('Local D1 full import failed', '$') END AS readiness;`,
+    buildD1ReadinessSql(sourceManifest.expectedCounts),
     '--json',
-  ]);
-  if (!readiness.includes('ready')) throw new Error('Local D1 readiness result was not ready');
-  console.error(`[verify-d1-seed-workerd] Imported ${manifest.files.length} seed files through local D1; verify-database measures this same corpus against the 350 MiB gate.`);
+  ]));
+  if (readiness.rows.length !== 1 || (readiness.rows[0] as { readiness?: unknown }).readiness !== 'ready') {
+    throw new Error('Production local D1 readiness result was not ready');
+  }
+  const authority = auditHistoricalTransform8Authority(ROOT, sql => parseHistoricalTransform8D1Page(run([
+    'd1', 'execute', ...common, '--command', sql, '--json',
+  ])));
+  console.error(`[verify-d1-seed-workerd] Imported ${manifest.files.length} seed files through local D1; production readiness and Transform-8 authority audit passed (${authority.pages.profiles}/${authority.pages.identities}/${authority.pages.aliases} pages).`);
 } finally {
   rmSync(state, { recursive: true, force: true });
 }

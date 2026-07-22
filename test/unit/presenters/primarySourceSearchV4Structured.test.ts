@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { presentPrimarySourceSearchV5 } from '../../../src/presenters/primarySourceSearchV4Structured.js';
+import { presentPrimarySourceSearchV7 } from '../../../src/presenters/primarySourceSearchV4Structured.js';
 import type { PrimarySourceSearchPlanResult } from '../../../src/services/historical/primarySourceTypes.js';
 import { CCEL_COMPOSITION_DATE_NOTICE } from '../../../src/services/historical/primarySourceTypes.js';
 
 function localHit(queryId: string, rank: number, marker = '') {
-  const sectionId = `${queryId}-${rank}`;
+  const sectionKey = `${queryId}-${rank}`;
   return {
     queryId,
     provider: 'local' as const,
@@ -21,7 +21,7 @@ function localHit(queryId: string, rank: number, marker = '') {
     creators: Array.from({ length: 8 }, (_, index) => ({ name: `${index}${'C'.repeat(158)}`, role: 'author' as const })),
     metadataStatus: 'reviewed' as const,
     metadataProvenanceIds: ['hist-meta-one', 'hist-meta-two', 'hist-meta-three', 'hist-meta-four'],
-    locator: { kind: 'local_section' as const, documentId: 'doc', sectionId, url: `theologai://documents/doc#section-${sectionId}` },
+    locator: { kind: 'local_section' as const, documentId: 'doc', sectionKey, sourceOrdinal: rank, url: `theologai://documents/doc#section-${sectionKey}` },
     resourceSizeBytes: 100,
   };
 }
@@ -86,7 +86,7 @@ function largePlan(): PrimarySourceSearchPlanResult {
   };
 }
 
-describe('primary-source v5 structured presentation', () => {
+describe('primary-source v7 structured presentation', () => {
   it('defensively prepends the date invariant to every executable external provider result', () => {
     const plan = largePlan();
     const external = externalProvider('external', 1);
@@ -94,7 +94,7 @@ describe('primary-source v5 structured presentation', () => {
     plan.queries = [{ id: 'external', normalizedMode: 'all_terms', normalizedSelection: 'relevance', providers: [external] }];
     plan.coverage = { localAttempted: false, localHitCount: 0, ccelAttempted: true, ccelStatus: 'ok', ccelHitCount: 1, notices: [] };
 
-    const presented = presentPrimarySourceSearchV5(plan);
+    const presented = presentPrimarySourceSearchV7(plan);
 
     expect(presented.queries[0]!.providers[0]!.notices).toEqual([
       CCEL_COMPOSITION_DATE_NOTICE,
@@ -111,7 +111,7 @@ describe('primary-source v5 structured presentation', () => {
     external.notices = ['Live CCEL discovery does not expose reviewed composition-date bounds.'];
     plan.queries = [{ id: 'external', normalizedMode: 'all_terms', normalizedSelection: 'relevance', providers: [external] }];
 
-    const provider = presentPrimarySourceSearchV5(plan).queries[0]!.providers[0]!;
+    const provider = presentPrimarySourceSearchV7(plan).queries[0]!.providers[0]!;
     expect(provider.notices).not.toContain(CCEL_COMPOSITION_DATE_NOTICE);
   });
 
@@ -123,7 +123,7 @@ describe('primary-source v5 structured presentation', () => {
     external.notices = ['Live CCEL search is disabled. No remote request was made.'];
     plan.queries = [{ id: 'external', normalizedMode: 'all_terms', normalizedSelection: 'relevance', providers: [external] }];
 
-    const provider = presentPrimarySourceSearchV5(plan).queries[0]!.providers[0]!;
+    const provider = presentPrimarySourceSearchV7(plan).queries[0]!.providers[0]!;
     expect(provider.notices).not.toContain(CCEL_COMPOSITION_DATE_NOTICE);
   });
 
@@ -139,9 +139,9 @@ describe('primary-source v5 structured presentation', () => {
     provider.scope!.eligibleDocuments = [];
     provider.scope!.eligibleDocumentsTruncated = true;
 
-    expect(presentPrimarySourceSearchV5(plan).queries[0]!.providers[0]!.scope?.eligibleDocumentCount).toBe(100);
+    expect(presentPrimarySourceSearchV7(plan).queries[0]!.providers[0]!.scope?.eligibleDocumentCount).toBe(100);
     provider.scope!.eligibleDocumentCount = 101;
-    const rejected = presentPrimarySourceSearchV5(plan).queries[0]!.providers[0]!;
+    const rejected = presentPrimarySourceSearchV7(plan).queries[0]!.providers[0]!;
     expect(rejected.status).toBe('interface_changed');
     expect(rejected).toMatchObject({ scope: { status: 'metadata_incomplete', eligibleDocumentCount: 0 } });
   });
@@ -153,17 +153,17 @@ describe('primary-source v5 structured presentation', () => {
     external.searched = false;
     external.retryAfterSeconds = 11;
     plan.queries = [{ id: 'external', normalizedMode: 'all_terms', normalizedSelection: 'relevance', providers: [external] }];
-    const provider = presentPrimarySourceSearchV5(plan).queries[0]!.providers[0]!;
+    const provider = presentPrimarySourceSearchV7(plan).queries[0]!.providers[0]!;
     expect(provider).toMatchObject({ status: 'rate_limited', retryAfterSeconds: 11 });
 
     external.retryAfterSeconds = 0;
-    const invalid = presentPrimarySourceSearchV5(plan).queries[0]!.providers[0]!;
+    const invalid = presentPrimarySourceSearchV7(plan).queries[0]!.providers[0]!;
     expect(invalid.status).toBe('interface_changed');
     expect(invalid).not.toHaveProperty('retryAfterSeconds');
   });
 
   it('stops at the first non-fitting hit and recomputes every public count within the structured delivery reserve', () => {
-    const presented = presentPrimarySourceSearchV5(largePlan());
+    const presented = presentPrimarySourceSearchV7(largePlan());
     const json = JSON.stringify(presented);
     expect(new TextEncoder().encode(json).byteLength).toBeLessThanOrEqual(20480);
     expect(presented).toMatchObject({ planStatus: 'partial', responseWindow: { unit: 'utf8_bytes', maximum: 32768, truncated: true } });
@@ -194,8 +194,8 @@ describe('primary-source v5 structured presentation', () => {
       return plan;
     };
 
-    const first = presentPrimarySourceSearchV5(boundaryPlan(118));
-    const second = presentPrimarySourceSearchV5(boundaryPlan(119));
+    const first = presentPrimarySourceSearchV7(boundaryPlan(118));
+    const second = presentPrimarySourceSearchV7(boundaryPlan(119));
     for (const presented of [first, second]) {
       expect(presented.responseWindow.maximum).toBe(32768);
       expect(new TextEncoder().encode(JSON.stringify(presented)).byteLength).toBeLessThanOrEqual(20480);
@@ -212,7 +212,7 @@ describe('primary-source v5 structured presentation', () => {
     plan.queries[0]!.providers[0]!.hits = [localHit('q2', 2), localHit('q2', 1)];
     plan.queries[0]!.providers[0]!.hitCount = 2;
     plan.queries[0]!.providers[0]!.resultWindow.returnedHitCount = 2;
-    const presented = presentPrimarySourceSearchV5(plan);
+    const presented = presentPrimarySourceSearchV7(plan);
     expect(presented.queries.map(query => query.id)).toEqual(['q2', 'q1']);
     expect(presented.queries[0]!.providers[0]!.hits.map(hit => hit.rankWithinProvider)).toEqual([1, 2]);
     expect(JSON.stringify(presented)).not.toContain('ccel_section');
@@ -233,7 +233,7 @@ describe('primary-source v5 structured presentation', () => {
     plan.queries = [query];
     plan.coverage.localHitCount = 1;
 
-    const presented = presentPrimarySourceSearchV5(plan);
+    const presented = presentPrimarySourceSearchV7(plan);
     const sanitized = presented.queries[0]!.providers[0]!.hits[0]!;
     expect(sanitized).not.toHaveProperty('author');
     expect(sanitized).not.toHaveProperty('sectionLabel');
@@ -254,7 +254,7 @@ describe('primary-source v5 structured presentation', () => {
     ];
     plan.coverage = { localAttempted: false, localHitCount: 0, ccelAttempted: true, ccelStatus: 'ok', ccelHitCount: 13, notices: [] };
 
-    const presented = presentPrimarySourceSearchV5(plan);
+    const presented = presentPrimarySourceSearchV7(plan);
     const externalProviders = presented.queries.flatMap(query => query.providers)
       .filter(provider => provider.provider === 'ccel_live');
     expect(externalProviders).toHaveLength(1);

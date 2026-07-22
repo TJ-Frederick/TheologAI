@@ -29,6 +29,10 @@ function makeMockRepo() {
     findDocumentByName: vi.fn().mockReturnValue(undefined),
     getSections: vi.fn().mockReturnValue([mockSection]),
     getSection: vi.fn().mockReturnValue(mockSection),
+    resolveSection: vi.fn().mockReturnValue({
+      document: mockDoc, section: mockSection, sectionKey: 'source-0001', sourceOrdinal: 1,
+      requestedSectionId: 'source-0001', resolution: 'canonical',
+    }),
     search: vi.fn().mockReturnValue([mockSection]),
   };
 }
@@ -92,6 +96,24 @@ describe('HistoricalDocumentService', () => {
       repo.getSection.mockReturnValue(undefined);
       const service = new HistoricalDocumentService(repo as any);
       await expect(service.getSection('nicene-creed', '99')).rejects.toThrow(NotFoundError);
+    });
+  });
+
+  describe('resolveSection', () => {
+    it('preserves the repository source-first result', async () => {
+      const repo = makeMockRepo();
+      const service = new HistoricalDocumentService(repo as any);
+      const resolved = await service.resolveSection('nicene-creed', 'source-0001');
+      expect(repo.resolveSection).toHaveBeenCalledWith('nicene-creed', 'source-0001');
+      expect(resolved).toMatchObject({ sectionKey: 'source-0001', sourceOrdinal: 1, resolution: 'canonical' });
+    });
+
+    it('keeps unknown transform-8 IDs in the not-found error taxonomy', async () => {
+      const repo = makeMockRepo();
+      repo.resolveSection.mockReturnValue(undefined);
+      const service = new HistoricalDocumentService(repo as any);
+      await expect(service.resolveSection('nicene-creed', 'not-a-reviewed-section-key'))
+        .rejects.toThrow(NotFoundError);
     });
   });
 

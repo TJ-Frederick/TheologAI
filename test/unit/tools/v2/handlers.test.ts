@@ -30,10 +30,12 @@ import type { OriginalLanguageStudyService } from '../../../../src/services/lang
 import { StrongsService as StrongsServiceClass } from '../../../../src/services/languages/StrongsService.js';
 import { readFileSync } from 'node:fs';
 import type { ToolHandler, ToolResult } from '../../../../src/kernel/types.js';
-import type { DocumentInfo, DocumentSection } from '../../../../src/kernel/repositories.js';
+import type { DocumentInfo, DocumentSection, HistoricalDocumentDeliveryProfile, HistoricalSectionSummary, ResolvedHistoricalSection } from '../../../../src/kernel/repositories.js';
 import { formatMorphologyResult } from '../../../../src/formatters/languagesFormatter.js';
 import { validatorFor } from '../../../../src/mcp/validation.js';
 import { validateClassicTextsOutputSemantics } from '../../../../src/presenters/classicTextsStructured.js';
+import { encodeHistoricalSectionedOnlyCursor } from '../../../../src/kernel/historicalSectionedDelivery.js';
+import { Buffer } from 'node:buffer';
 
 function serviceDouble<T>(methods: Partial<{ [K in keyof T]: T[K] }>): T {
   return methods as unknown as T;
@@ -627,14 +629,34 @@ describe('classic_text_lookup handler', () => {
     content: 'We believe in one God.',
     topics: ['trinity'],
   };
+  const profile: HistoricalDocumentDeliveryProfile = {
+    documentId: document.id, workId: null, editionId: null,
+    immutableCorpusIdentity: 'a'.repeat(64), sectionPackageIdentity: null,
+    deliveryMode: 'complete_document', sectionCount: 1,
+    landingMaxBytes: 0, browsePageSize: 0, cursorVersion: 0,
+    provenance: {}, rights: {},
+  };
+  const resolved: ResolvedHistoricalSection = {
+    document, section, sectionKey: 'source-0001', sourceOrdinal: 1,
+    requestedSectionId: 'source-0001', resolution: 'canonical',
+  };
+  const summary: HistoricalSectionSummary = {
+    documentId: document.id, sectionKey: 'source-0001', sourceOrdinal: 1,
+    legacyDisplayLabel: '1', heading: 'The Creed',
+  };
 
   function createServices() {
     const historical = {
       listDocuments: vi.fn<HistoricalDocumentService['listDocuments']>().mockResolvedValue([document]),
       getDocument: vi.fn<HistoricalDocumentService['getDocument']>().mockResolvedValue(document),
       getSections: vi.fn<HistoricalDocumentService['getSections']>().mockResolvedValue([section]),
+      getDeliveryProfile: vi.fn<HistoricalDocumentService['getDeliveryProfile']>().mockResolvedValue(profile),
+      browseHistoricalSectionSummaries: vi.fn<HistoricalDocumentService['browseHistoricalSectionSummaries']>().mockResolvedValue([summary]),
+      hasHistoricalSectionBoundary: vi.fn<HistoricalDocumentService['hasHistoricalSectionBoundary']>().mockResolvedValue(true),
+      resolveSection: vi.fn<HistoricalDocumentService['resolveSection']>().mockResolvedValue(resolved),
       findDocument: vi.fn<HistoricalDocumentService['findDocument']>().mockResolvedValue(undefined),
       search: vi.fn<HistoricalDocumentService['search']>().mockResolvedValue([]),
+      searchResolvedSections: vi.fn<HistoricalDocumentService['searchResolvedSections']>().mockResolvedValue([]),
     };
     return {
       historical,
@@ -652,7 +674,7 @@ describe('classic_text_lookup handler', () => {
     expect(textOf(result)).toContain('Available Historical Documents');
     expect(textOf(result)).toContain('`nicene-creed`');
     expect(result.structuredContent).toMatchObject({
-      schemaVersion: '1', kind: 'classic_text_lookup', mode: 'list_works',
+      schemaVersion: '2', kind: 'classic_text_lookup', mode: 'list_works',
       catalog: {
         coverage: 'complete_local_work_inventory',
         delivery: 'metadata_summary', nativeResourceLinks: 'not_emitted',
@@ -710,15 +732,15 @@ describe('classic_text_lookup handler', () => {
     const result = await handler.handler({ work: 'Nicene Creed', browseSections: true });
 
     expect(historical.getDocument).toHaveBeenCalledWith('Nicene Creed');
-    expect(historical.getSections).toHaveBeenCalledWith('nicene-creed');
-    expect(textOf(result)).toContain('Section 1 — The Creed');
-    expect(textOf(result)).toContain('theologai://documents/nicene-creed#section-1');
+    expect(historical.browseHistoricalSectionSummaries).toHaveBeenCalledWith('nicene-creed', undefined, 2001);
+    expect(textOf(result)).toContain('1 — The Creed');
+    expect(textOf(result)).toContain('theologai://documents/nicene-creed#section-source-0001');
     expect(textOf(result)).not.toContain('We believe in one God.');
     expect(result.structuredContent).toMatchObject({
       mode: 'browse_sections',
       directory: {
         coverage: 'complete_section_directory',
-        sections: [{ sectionNumber: '1', resource: { uri: 'theologai://documents/nicene-creed#section-1' } }],
+        sections: [{ sectionKey: 'source-0001', sourceOrdinal: 1, resource: { uri: 'theologai://documents/nicene-creed#section-source-0001' } }],
         linkWindow: { maximumResourceLinks: 32, emittedResourceLinkCount: 1 },
       },
     });
@@ -732,12 +754,9 @@ describe('classic_text_lookup handler', () => {
 
   it('returns a complete large directory while capping native resource links at 32', async () => {
     const { handler, historical } = createServices();
-    historical.getSections.mockResolvedValue(Array.from({ length: 40 }, (_, index) => ({
-      ...section,
-      id: index + 1,
-      section_number: String(index + 1),
-      title: `Section ${index + 1}`,
-      content: `Body ${index + 1}`,
+    historical.browseHistoricalSectionSummaries.mockResolvedValue(Array.from({ length: 40 }, (_, index) => ({
+      ...summary, sectionKey: `source-${String(index + 1).padStart(4, '0')}`,
+      sourceOrdinal: index + 1, legacyDisplayLabel: String(index + 1), heading: `Section ${index + 1}`,
     })));
 
     const result = await handler.handler({ work: document.id, browseSections: true });
@@ -762,12 +781,12 @@ describe('classic_text_lookup handler', () => {
       title: `Section ${index + 1}`,
       content: `Body ${index + 1}`,
     }));
-    historical.getSections.mockResolvedValueOnce(sections.slice(0, 2000));
+    historical.browseHistoricalSectionSummaries.mockResolvedValueOnce(sections.slice(0, 2000).map((value, index) => ({ ...summary, sectionKey: `source-${String(index + 1).padStart(4, '0')}`, sourceOrdinal: index + 1, legacyDisplayLabel: value.section_number, heading: value.title })));
     const atLimit = await handler.handler({ work: document.id, browseSections: true });
     expect((atLimit.structuredContent as any).directory.sections).toHaveLength(2000);
     expect(atLimit.isError).not.toBe(true);
 
-    historical.getSections.mockResolvedValueOnce(sections);
+    historical.browseHistoricalSectionSummaries.mockResolvedValueOnce(sections.map((value, index) => ({ ...summary, sectionKey: `source-${String(index + 1).padStart(4, '0')}`, sourceOrdinal: index + 1, legacyDisplayLabel: value.section_number, heading: value.title })));
     const overLimit = await handler.handler({ work: document.id, browseSections: true });
     expect(overLimit.isError).toBe(true);
     expect(overLimit.structuredContent).toBeUndefined();
@@ -822,20 +841,19 @@ describe('classic_text_lookup handler', () => {
 
   it('returns local search results', async () => {
     const { handler, historical } = createServices();
-    historical.search.mockResolvedValue([section]);
+    historical.searchResolvedSections.mockResolvedValue([resolved]);
 
     const result = await handler.handler({ query: 'wisdom' });
 
-    expect(historical.search).toHaveBeenCalledWith('wisdom', 11);
-    expect(historical.listDocuments).toHaveBeenCalledOnce();
+    expect(historical.searchResolvedSections).toHaveBeenCalledWith('wisdom', 11);
     expect(textOf(result)).toContain('Search Results for "wisdom"');
-    expect(textOf(result)).toContain('Nicene Creed — Section 1: The Creed');
+    expect(textOf(result)).toContain('Nicene Creed — Section source-0001 (source 1): The Creed');
     expect(textOf(result)).toContain('Discovery snippet only');
     expect(result.structuredContent).toMatchObject({
       mode: 'search',
       search: {
         status: 'ok',
-        hits: [{ snippetOnly: true, section: { resource: { uri: 'theologai://documents/nicene-creed#section-1' } } }],
+        hits: [{ snippetOnly: true, section: { resource: { uri: 'theologai://documents/nicene-creed#section-source-0001' } } }],
         resultWindow: { returnedCount: 1, additionalMatchStatus: 'no_additional_match_observed' },
       },
     });
@@ -843,11 +861,9 @@ describe('classic_text_lookup handler', () => {
 
   it('uses one private lookahead and reports only ten search hits', async () => {
     const { handler, historical } = createServices();
-    historical.search.mockResolvedValue(Array.from({ length: 11 }, (_, index) => ({
-      ...section,
-      id: index + 1,
-      section_number: String(index + 1),
-      content: `grâce ${index + 1}`,
+    historical.searchResolvedSections.mockResolvedValue(Array.from({ length: 11 }, (_, index) => ({
+      ...resolved, sectionKey: `source-${String(index + 1).padStart(4, '0')}`, sourceOrdinal: index + 1,
+      section: { ...section, id: index + 1, section_number: String(index + 1), content: `grâce ${index + 1}` },
     })));
 
     const result = await handler.handler({ query: 'grace' });
@@ -863,8 +879,9 @@ describe('classic_text_lookup handler', () => {
 
   it('reports exactly ten hits without claiming an unobserved additional match', async () => {
     const { handler, historical } = createServices();
-    historical.search.mockResolvedValue(Array.from({ length: 10 }, (_, index) => ({
-      ...section, id: index + 1, section_number: String(index + 1),
+    historical.searchResolvedSections.mockResolvedValue(Array.from({ length: 10 }, (_, index) => ({
+      ...resolved, sectionKey: `source-${String(index + 1).padStart(4, '0')}`, sourceOrdinal: index + 1,
+      section: { ...section, id: index + 1, section_number: String(index + 1) },
     })));
 
     const result = await handler.handler({ query: 'grace' });
@@ -877,7 +894,7 @@ describe('classic_text_lookup handler', () => {
   it('uses the same code-point-safe discovery snippet in Markdown and structured output', async () => {
     const { handler, historical } = createServices();
     const content = `${'a'.repeat(299)}😀tail`;
-    historical.search.mockResolvedValue([{ ...section, content }]);
+    historical.searchResolvedSections.mockResolvedValue([{ ...resolved, section: { ...section, content } }]);
 
     const result = await handler.handler({ query: 'emoji' });
     const snippet = (result.structuredContent as any).search.hits[0].discoverySnippet;
@@ -889,7 +906,7 @@ describe('classic_text_lookup handler', () => {
 
   it('fails closed when a stored section cannot form a canonical resource URI', async () => {
     const { handler, historical } = createServices();
-    historical.search.mockResolvedValue([{ ...section, section_number: '../bad' }]);
+    historical.searchResolvedSections.mockResolvedValue([{ ...resolved, sectionKey: '../bad' }]);
 
     const result = await handler.handler({ query: 'grace' });
     expect(result.isError).toBe(true);
@@ -913,6 +930,102 @@ describe('classic_text_lookup handler', () => {
     expect(result.isError).toBe(true);
     expect(textOf(result)).toContain('query is the local-search mode');
     expect(historical.search).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [{ cursor: 'opaque' }],
+    [{ listWorks: true, cursor: 'opaque' }],
+    [{ query: 'grace', cursor: 'opaque' }],
+    [{ browseSections: true, cursor: 'opaque' }],
+    [{ work: document.id, cursor: 'opaque' }],
+  ])('rejects cursor in every raw mode other than sectioned work browsing: %j', async params => {
+    const { handler, historical } = createServices();
+
+    const result = await handler.handler(params);
+
+    expect(result).toMatchObject({ isError: true });
+    expect(textOf(result)).toBe('Invalid input: cursor requires work and browseSections=true.');
+    expect(historical.listDocuments).not.toHaveBeenCalled();
+    expect(historical.searchResolvedSections).not.toHaveBeenCalled();
+    expect(historical.browseHistoricalSectionSummaries).not.toHaveBeenCalled();
+  });
+
+  it('rejects a cursor for complete-document browsing instead of silently ignoring it', async () => {
+    const { handler, historical } = createServices();
+
+    const result = await handler.handler({ work: document.id, browseSections: true, cursor: 'opaque' });
+
+    expect(result).toMatchObject({ isError: true });
+    expect(textOf(result)).toBe('Invalid input: cursor is available only for sectioned-only browsing.');
+    expect(historical.browseHistoricalSectionSummaries).not.toHaveBeenCalled();
+  });
+
+  it('enforces the 256-character work limit before a browse lookup', async () => {
+    const { handler, historical } = createServices();
+
+    const result = await handler.handler({ work: 'x'.repeat(257), browseSections: true });
+
+    expect(result).toMatchObject({ isError: true });
+    expect(textOf(result)).toBe('Invalid input: work must be a non-empty named local document slug or title.');
+    expect(historical.getDocument).not.toHaveBeenCalled();
+  });
+
+  it('maps malformed, stale, non-canonical, and boundary-mismatched section cursors to invalid input', async () => {
+    const { handler, historical } = createServices();
+    const sectioned: HistoricalDocumentDeliveryProfile = {
+      ...profile, workId: 'synthetic-work', editionId: 'synthetic-edition',
+      sectionPackageIdentity: 'b'.repeat(64), deliveryMode: 'sectioned_only', sectionCount: 33,
+      landingMaxBytes: 16_384, browsePageSize: 32, cursorVersion: 1,
+    };
+    historical.getDeliveryProfile.mockResolvedValue(sectioned);
+    const position = { sourceOrdinal: 1, sectionKey: 'source-0001' };
+    const validCursor = encodeHistoricalSectionedOnlyCursor(sectioned, position);
+    const staleCursor = encodeHistoricalSectionedOnlyCursor({
+      ...sectioned, sectionPackageIdentity: 'c'.repeat(64),
+    }, position);
+    const nonCanonicalCursor = Buffer.from(JSON.stringify({
+      documentId: sectioned.documentId,
+      contractVersion: 'historical-sectioned-only-cursor-v1',
+      editionId: sectioned.editionId,
+      immutableCorpusIdentity: sectioned.sectionPackageIdentity,
+      pageSize: 32,
+      lastSourceOrdinal: 1,
+      lastSectionKey: 'source-0001',
+    }), 'utf8').toString('base64url');
+
+    for (const cursor of ['not-a-canonical-cursor', staleCursor, nonCanonicalCursor]) {
+      const result = await handler.handler({ work: document.id, browseSections: true, cursor });
+      expect(result).toMatchObject({ isError: true });
+      expect(textOf(result)).toBe('Invalid input: Historical section browse cursor is malformed, stale, or non-canonical.');
+    }
+
+    historical.hasHistoricalSectionBoundary.mockResolvedValueOnce(false);
+    const boundaryMismatch = await handler.handler({ work: document.id, browseSections: true, cursor: validCursor });
+    expect(boundaryMismatch).toMatchObject({ isError: true });
+    expect(textOf(boundaryMismatch)).toBe('Invalid input: Historical section browse cursor does not name a current section boundary.');
+    expect(historical.browseHistoricalSectionSummaries).not.toHaveBeenCalled();
+  });
+
+  it('keeps an invalid server-returned continuation boundary as an internal error', async () => {
+    const { handler, historical } = createServices();
+    const sectioned: HistoricalDocumentDeliveryProfile = {
+      ...profile, workId: 'synthetic-work', editionId: 'synthetic-edition',
+      sectionPackageIdentity: 'b'.repeat(64), deliveryMode: 'sectioned_only', sectionCount: 33,
+      landingMaxBytes: 16_384, browsePageSize: 32, cursorVersion: 1,
+    };
+    const rows = Array.from({ length: 33 }, (_, index) => ({
+      ...summary, sectionKey: `source-${String(index + 1).padStart(4, '0')}`,
+      sourceOrdinal: index + 1,
+    }));
+    rows[31] = { ...rows[31]!, sectionKey: '../invalid-server-key' };
+    historical.getDeliveryProfile.mockResolvedValue(sectioned);
+    historical.browseHistoricalSectionSummaries.mockResolvedValue(rows);
+
+    const result = await handler.handler({ work: document.id, browseSections: true });
+
+    expect(result).toMatchObject({ isError: true });
+    expect(textOf(result)).toBe('I encountered an error retrieving that information. Please try again.');
+    expect(textOf(result)).not.toContain('Invalid input:');
   });
 
   it('distinguishes an empty global search from a missing action', async () => {
@@ -941,7 +1054,7 @@ describe('classic_text_lookup handler', () => {
 
   it('does not report a search backend failure as no_results', async () => {
     const { handler, historical } = createServices();
-    historical.search.mockRejectedValue(new Error('database unavailable'));
+    historical.searchResolvedSections.mockRejectedValue(new Error('database unavailable'));
 
     const result = await handler.handler({ query: 'grace' });
     expect(result.isError).toBe(true);
@@ -949,10 +1062,10 @@ describe('classic_text_lookup handler', () => {
     expect(textOf(result)).not.toContain('No results found');
   });
 
-  it('emits schema-valid v1 output for all four modes', async () => {
+  it('emits schema-valid v2 output for all four modes', async () => {
     const { handler, historical } = createServices();
     historical.findDocument.mockResolvedValue(document);
-    historical.search.mockResolvedValue([section]);
+    historical.searchResolvedSections.mockResolvedValue([resolved]);
     const validate = validatorFor(handler.outputSchema!);
     for (const params of [
       { listWorks: true },
@@ -968,7 +1081,7 @@ describe('classic_text_lookup handler', () => {
 
   it('rejects contradictory search statuses, counts, and result windows', async () => {
     const { handler, historical } = createServices();
-    historical.search.mockResolvedValue([section]);
+    historical.searchResolvedSections.mockResolvedValue([resolved]);
     const valid = await handler.handler({ query: 'belief' });
     const validate = validatorFor(handler.outputSchema!);
     const structured = valid.structuredContent as any;
@@ -1007,6 +1120,45 @@ describe('classic_text_lookup handler', () => {
       expect(validateClassicTextsOutputSemantics(candidate)).toBe(false);
       expect(handler.validateStructuredOutput?.(candidate)).toBe(false);
     }
+  });
+
+  it('keeps a synthetic sectioned-only work bounded, metadata-only, and cursor-truthful', async () => {
+    const { handler, historical } = createServices();
+    const sectioned: HistoricalDocumentDeliveryProfile = {
+      ...profile, workId: 'synthetic-work', editionId: 'synthetic-edition',
+      sectionPackageIdentity: 'b'.repeat(64), deliveryMode: 'sectioned_only', sectionCount: 33,
+      landingMaxBytes: 16_384, browsePageSize: 32, cursorVersion: 1,
+    };
+    const rows = Array.from({ length: 33 }, (_, index) => ({
+      ...summary, sectionKey: `source-${String(index + 1).padStart(4, '0')}`,
+      sourceOrdinal: index + 1, legacyDisplayLabel: String(index + 1), heading: `Heading ${index + 1}`,
+    }));
+    historical.findDocument.mockResolvedValue(document);
+    historical.getDeliveryProfile.mockResolvedValue(sectioned);
+    historical.browseHistoricalSectionSummaries.mockImplementation(async (_id, after) => {
+      const start = after ? rows.findIndex(row => row.sourceOrdinal === after.sourceOrdinal && row.sectionKey === after.sectionKey) + 1 : 0;
+      return rows.slice(start, start + 33);
+    });
+
+    const landing = await handler.handler({ work: document.id });
+    expect(new TextEncoder().encode(textOf(landing)).byteLength).toBeLessThanOrEqual(16_384);
+    expect(textOf(landing)).not.toContain('We believe in one God.');
+    expect((landing.structuredContent as any).landing).toMatchObject({ bodyDelivery: 'exact_section_resource_only', sectionCount: 33 });
+
+    const first = await handler.handler({ work: document.id, browseSections: true });
+    const firstDirectory = (first.structuredContent as any).directory;
+    expect(firstDirectory.sections).toHaveLength(32);
+    expect(firstDirectory.pagination.nextCursor).toMatch(/^[A-Za-z0-9_-]+$/);
+    expect(firstDirectory.sections.every((entry: any) => !('content' in entry))).toBe(true);
+    expect(textOf(first)).not.toContain('We believe in one God.');
+
+    const second = await handler.handler({ work: document.id, browseSections: true, cursor: firstDirectory.pagination.nextCursor });
+    expect((second.structuredContent as any).directory).toMatchObject({
+      sections: [{ sectionKey: 'source-0033', sourceOrdinal: 33 }],
+      resultWindow: { returnedCount: 1, additionalMatchStatus: 'no_additional_match_observed' },
+    });
+    await expect(handler.handler({ work: document.id, browseSections: true, cursor: 'not-a-canonical-cursor' }))
+      .resolves.toMatchObject({ isError: true });
   });
 });
 

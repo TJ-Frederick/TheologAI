@@ -18,7 +18,7 @@ export const PRIMARY_SOURCE_EVIDENCE_POLICY = {
 
 export interface PresentedLocalPrimarySourceHit extends PresentedPrimarySourceHitBase {
   provider: 'local';
-  locator: { kind: 'local_section'; url: string; documentId: string; sectionId: string };
+  locator: { kind: 'local_section'; url: string; documentId: string; sectionKey: string; sourceOrdinal: number };
   resourceSizeBytes: number;
 }
 
@@ -289,7 +289,7 @@ function presentHit(
     || !Number.isSafeInteger(common.rankWithinProvider) || common.rankWithinProvider < 1 || common.rankWithinProvider > 32
     || !Number.isSafeInteger(common.page) || common.page < 1 || common.page > 3) return undefined;
 
-  const canonical = buildLocalDocumentResourceUri(hit.locator.documentId, hit.locator.sectionId);
+  const canonical = buildLocalDocumentResourceUri(hit.locator.documentId, hit.locator.sectionKey);
   const size = hit.resourceSizeBytes;
   if (!canonical || canonical !== hit.locator.url
     || !Number.isSafeInteger(size) || size < 0 || size > Number.MAX_SAFE_INTEGER) return undefined;
@@ -300,7 +300,8 @@ function presentHit(
       kind: 'local_section',
       url: canonical,
       documentId: hit.locator.documentId,
-      sectionId: hit.locator.sectionId,
+      sectionKey: hit.locator.sectionKey,
+      sourceOrdinal: hit.locator.sourceOrdinal,
     },
     resourceSizeBytes: size,
   };

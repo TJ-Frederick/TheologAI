@@ -1,5 +1,4 @@
-import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   HISTORICAL_SECTION_COMPATIBILITY_ATTESTATION_PATH,
@@ -159,7 +158,7 @@ describe('historical section source-first compatibility compiler', () => {
   it('refuses source drift and a decision packet that no longer matches collision members', () => {
     const plan = parseHistoricalSectionKeyPlan(JSON.parse(readFileSync('data/historical-section-key-plan.json', 'utf8')));
     const evidence = parseHistoricalSectionCompatibilityEvidence(JSON.parse(readFileSync(
-      'test/fixtures/historical-section-compatibility/real-local-evidence.json',
+      'data/historical-section-compatibility-evidence.json',
       'utf8',
     )));
     const changedSources = structuredClone(readHistoricalSectionSources(ROOT));
@@ -172,69 +171,34 @@ describe('historical section source-first compatibility compiler', () => {
       .toThrow('does not exactly cover compiled collision members and keys');
   });
 
-  it('remains unreferenced by every bounded operational build, data, deployment, and runtime surface', () => {
-    const forbiddenReferences = [
-      'historical-section-compatibility-compiler',
-      'historical-section-compatibility-schema',
-      'source-first-compiler-attestation',
-      'historical_section_source_first_compatibility_map',
-    ];
-    const allowedPreparationScripts = new Set([
-      'scripts/historical-section-compatibility-compiler.ts',
-      'scripts/historical-section-compatibility-schema.ts',
-    ]);
-    const operationalScripts = walkFiles('scripts')
-      .filter(path => /\.(?:[cm]?[jt]s|sh)$/.test(path))
-      .filter(path => !allowedPreparationScripts.has(path));
-    const manifestsAndSeeds = [
-      ...walkFiles('data'),
-      ...walkFiles('test/fixtures'),
-    ].filter(path => /(?:^|\/)[^/]*(?:manifest|seed)[^/]*(?:\/|$)/i.test(path));
-    const wranglerConfigs = [
-      ...readdirSync('.').filter(path => /^wrangler.*\.toml$/.test(path)),
-      ...walkFiles('test').filter(path => /(?:^|\/)wrangler[^/]*\.toml$/.test(path)),
-    ];
-    const surfaces = [...new Set([
-      ...walkFiles('src'),
-      ...walkFiles('migrations'),
-      ...walkFiles('.github/workflows'),
-      ...operationalScripts,
-      ...manifestsAndSeeds,
-      ...wranglerConfigs,
-      'package.json',
-      'package-lock.json',
-    ])].sort();
-
-    expect(surfaces).toEqual(expect.arrayContaining([
-      'src/index.ts',
-      'migrations/0001_initial_schema.sql',
-      '.github/workflows/pr.yml',
-      'scripts/build-database.ts',
-      'scripts/export-for-d1.ts',
-      'scripts/export-for-d1.sh',
-      'scripts/d1-seed-manifest.ts',
-      'scripts/d1-seed-utils.ts',
-      'scripts/verify-d1-seed.ts',
-      'scripts/verify-d1-seed-import.ts',
-      'scripts/verify-d1-seed-workerd.ts',
-      'scripts/verify-data-manifest.ts',
-      'scripts/historical-section-compatibility-evidence.ts',
-      'scripts/historical-section-key-plan.ts',
-      'data/data-manifest.json',
-      'package.json',
-      'package-lock.json',
-      'wrangler.toml',
-      'wrangler.release.toml',
-      'wrangler.ccel-coordinator.toml',
-      'test/worker-runtime/wrangler.test.toml',
-      'test/ccel-coordinator-runtime/wrangler.test.toml',
+  it('binds the former fixture authority to the manifest and keeps public/runtime surfaces inert', () => {
+    const manifest = JSON.parse(readFileSync('data/data-manifest.json', 'utf8')) as {
+      schemaVersion: string;
+      materializations: { d1: { transformVersion: number; inputs: string[] } };
+    };
+    expect(manifest.schemaVersion).toBe('0005_historical_section_identity_delivery');
+    expect(manifest.materializations.d1.transformVersion).toBe(8);
+    expect(manifest.materializations.d1.inputs).toEqual(expect.arrayContaining([
+      'data/historical-section-key-plan.json',
+      'data/historical-section-compatibility-evidence.json',
+      'data/historical-section-compatibility-attestation.json',
     ]));
-    for (const allowed of allowedPreparationScripts) expect(surfaces).not.toContain(allowed);
-    for (const path of surfaces) {
-      const source = readFileSync(path, 'utf8');
-      for (const reference of forbiddenReferences) expect(source, path).not.toContain(reference);
+    const builder = readFileSync('scripts/build-database.ts', 'utf8');
+    expect(builder).toContain('sourceRegistry.read(\'data/historical-section-key-plan.json\'');
+    expect(builder).toContain('sourceRegistry.read(\'data/historical-section-compatibility-evidence.json\'');
+    expect(builder).toContain('sourceRegistry.read(\'data/historical-section-compatibility-attestation.json\'');
+    for (const publicSurface of [
+      'src/server.ts',
+      'src/worker-server.ts',
+      'src/mcp/tools.ts',
+      'src/mcp/schemas/classicTexts.ts',
+      'src/presenters/classicTextsStructured.ts',
+    ]) {
+      const source = readFileSync(publicSurface, 'utf8');
+      expect(source, publicSurface).not.toContain('historical_section_identities');
+      expect(source, publicSurface).not.toContain('historical_section_aliases');
+      expect(source, publicSurface).not.toContain('historical_document_delivery_profiles');
     }
-    expect(readdirSync('migrations').some(path => path.startsWith('0005'))).toBe(false);
   });
 });
 
@@ -260,11 +224,4 @@ function syntheticMap(): HistoricalSectionCompatibilityMap {
       }],
     }],
   };
-}
-
-function walkFiles(directory: string): string[] {
-  return readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
-    const path = join(directory, entry.name);
-    return entry.isDirectory() ? walkFiles(path) : [path];
-  });
 }

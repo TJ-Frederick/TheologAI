@@ -198,15 +198,15 @@ describe('prompt-recommended tool-call contracts', () => {
     ['lower bound only', { startYear: '500' }, { startYear: 500 }],
     ['upper bound only', { endYear: '1500' }, { endYear: 1500 }],
     ['both bounds', { startYear: '500', endYear: '1500' }, { startYear: 500, endYear: 1500 }],
-  ])('keeps %s on local calls while making one unbounded, sequential v5 external discovery call', (_label, dateArgs, expectedLocalDates) => {
-    const v5 = {
+  ])('keeps %s on local calls while making one unbounded, sequential v7 external discovery call', (_label, dateArgs, expectedLocalDates) => {
+    const v7 = {
       exposeCcelDiscovery: true, ccelLiveSearch: false, ccelCoordinator: false,
-      contractVersion: '5' as const, liveCcelEnabled: false,
+      contractVersion: '7' as const, liveCcelEnabled: false,
     };
     const calls = recommendedToolCallsForPrompt('primary-source-research', {
       topic: 'eucharist', authors: 'Erasmus of Rotterdam, Martin Luther',
       ...dateArgs,
-    }, v5);
+    }, v7);
     const localQueries = calls[0]!.arguments.queries as Array<Record<string, unknown>>;
     expect(localQueries.every(query => (query.providers as string[])[0] === 'local')).toBe(true);
     expect(localQueries).toHaveLength(2);
@@ -217,24 +217,24 @@ describe('prompt-recommended tool-call contracts', () => {
     expect(externalQueries[0]).toMatchObject({ providers: ['ccel'], author: 'Erasmus of Rotterdam' });
     expect(externalQueries[0]).not.toHaveProperty('startYear');
     expect(externalQueries[0]).not.toHaveProperty('endYear');
-    const validateV5 = validatorFor(createPrimarySourceSearchHandler(unused, v5).inputSchema);
-    for (const call of calls) expect(validateV5(call.arguments).valid).toBe(true);
+    const validateV7 = validatorFor(createPrimarySourceSearchHandler(unused, v7).inputSchema);
+    for (const call of calls) expect(validateV7(call.arguments).valid).toBe(true);
   });
 
   it('retains the optional work restriction in both guided scopes without copying date bounds to CCEL', () => {
-    const v5 = {
+    const v7 = {
       exposeCcelDiscovery: true, ccelLiveSearch: false, ccelCoordinator: false,
-      contractVersion: '5' as const, liveCcelEnabled: false,
+      contractVersion: '7' as const, liveCcelEnabled: false,
     };
     const calls = recommendedToolCallsForPrompt('primary-source-research', {
       topic: 'sacraments', work: 'Institutes', startYear: '1536', endYear: '1559',
-    }, v5);
+    }, v7);
     expect(calls[0]!.arguments).toMatchObject({ queries: [{ work: 'Institutes', startYear: 1536, endYear: 1559 }] });
     expect(calls[1]!.arguments).toEqual({ queries: [{
       id: 'external-topic', text: 'sacraments', providers: ['ccel'], match: 'all_terms',
       selection: 'relevance', work: 'Institutes', limit: 3,
     }] });
-    expect(recommendedToolCallsForPrompt('confession-study', { topic: 'justification' }, v5)[0]!.arguments)
+    expect(recommendedToolCallsForPrompt('confession-study', { topic: 'justification' }, v7)[0]!.arguments)
       .toMatchObject({ queries: [{ providers: ['local', 'ccel'] }] });
   });
 });

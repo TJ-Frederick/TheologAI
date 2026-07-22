@@ -17,6 +17,7 @@ import {
   parseHistoricalDocumentCatalog,
   parseHistoricalDocumentCatalogProvenance,
 } from './historical-document-catalog.js';
+import { verifyHistoricalSectionCompatibilityAttestationFromDisk } from './historical-section-compatibility-compiler.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -34,6 +35,9 @@ function discoverCanonicalFiles(): string[] {
     'data/cross-references/cross_references.txt',
     'data/historical-document-catalog.json',
     'data/historical-document-catalog-provenance.json',
+    'data/historical-section-compatibility-attestation.json',
+    'data/historical-section-compatibility-evidence.json',
+    'data/historical-section-key-plan.json',
     'data/biblical-languages/SOURCE.json',
     'data/biblical-languages/UNICODE-CORRECTION.json',
     'data/biblical-languages/strongs-greek.json',
@@ -88,6 +92,7 @@ parseHistoricalDocumentCatalogProvenance(JSON.parse(readFileSync(
   join(ROOT, 'data/historical-document-catalog-provenance.json'),
   'utf8',
 )), historicalCatalog);
+verifyHistoricalSectionCompatibilityAttestationFromDisk(ROOT);
 
 const schemaPath = join(ROOT, 'migrations', `${manifest.schemaVersion}.sql`);
 if (!existsSync(schemaPath)) {

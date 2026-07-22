@@ -37,8 +37,10 @@ const CURSOR_BINDINGS = [
   'contractVersion',
   'documentId',
   'editionId',
-  'packageSha256',
+  'immutableCorpusIdentity',
+  'pageSize',
   'lastSourceOrdinal',
+  'lastSectionKey',
 ] as const;
 const BROWSE_ENTRY_FIELDS = [
   'sourceOrdinal',

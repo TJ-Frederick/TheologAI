@@ -142,23 +142,23 @@ describe('Worker MCP endpoint in workerd', () => {
     expect(previewRequest.status).toBe(200);
   });
 
-  it('executes the checked-in preview v5 contract without enabling live CCEL', async () => {
+  it('executes the checked-in preview v7 contract without enabling live CCEL', async () => {
     expect(env.THEOLOGAI_EXPOSE_CCEL_DISCOVERY).toBe('true');
     expect(env.THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH).toBe('false');
     expect(env.THEOLOGAI_ENABLE_CCEL_COORDINATOR).toBe('false');
     const root = createWorkerCompositionRoot(env as unknown as Env);
     expect(root.primarySourceContract).toMatchObject({
-      contractVersion: '5',
+      contractVersion: '7',
       liveCcelEnabled: false,
     });
     const tool = root.tools.find(candidate => candidate.name === 'primary_source_search')!;
-    expect(tool.outputSchema?.properties?.schemaVersion).toEqual({ const: '5' });
+    expect(tool.outputSchema?.properties?.schemaVersion).toEqual({ const: '7' });
     expect(tool.annotations).toMatchObject({ openWorldHint: true });
     const result = await tool.handler({ queries: [{ id: 'external', text: 'grace', providers: ['ccel'] }] });
     expect(result).toMatchObject({
       isError: true,
       structuredContent: {
-        schemaVersion: '5', planStatus: 'unavailable',
+        schemaVersion: '7', planStatus: 'unavailable',
         coverage: { ccelAttempted: false, ccelStatus: 'disabled', ccelHitCount: 0 },
       },
     });
@@ -290,7 +290,7 @@ describe('Worker MCP endpoint in workerd', () => {
       .find(tool => tool.name === 'primary_source_search')!;
     expect(primarySourceTool).toMatchObject({
       annotations: { openWorldHint: true },
-      outputSchema: { properties: { schemaVersion: { const: '5' } } },
+        outputSchema: { properties: { schemaVersion: { const: '7' } } },
     });
     expect((((primarySourceTool.inputSchema as any).properties.queries.items)
       .properties.providers.items.enum)).toEqual(['local', 'ccel']);
@@ -471,7 +471,7 @@ describe('Worker MCP endpoint in workerd', () => {
       expect.objectContaining({
         uri: 'theologai://documents/apostles-creed',
         name: "Apostles' Creed",
-        description: 'Creed (c. 390)',
+        description: 'Creed (c. 390); complete document with canonical exact-section children',
       }),
     ]));
 
@@ -524,6 +524,21 @@ describe('Worker MCP endpoint in workerd', () => {
         mimeType: 'text/markdown',
         text: expect.stringMatching(/Apostles' Creed[\s\S]*The First Article[\s\S]*maker of heaven and earth/),
       }),
+    ]);
+    const exactContent = (exact.message.result?.contents as Array<Record<string, unknown>>)[0]!;
+    expect(exactContent._meta).toMatchObject({
+      'theologai/canonicalUri': 'theologai://documents/apostles-creed#section-source-0001',
+      'theologai/sectionKey': 'source-0001', 'theologai/sourceOrdinal': 1,
+      'theologai/sectionResolution': 'legacy_alias',
+    });
+
+    const canonicalUri = 'theologai://documents/apostles-creed#section-source-0001';
+    const canonical = await rpc('resources/read', { uri: canonicalUri }, 43);
+    expect(canonical.message.result?.contents).toEqual([
+      expect.objectContaining({ uri: canonicalUri, _meta: expect.objectContaining({
+        'theologai/canonicalUri': canonicalUri,
+        'theologai/sectionResolution': 'canonical',
+      }) }),
     ]);
   });
 
@@ -926,13 +941,13 @@ describe('Worker MCP endpoint in workerd', () => {
         }),
         expect.objectContaining({
           type: 'resource_link',
-          uri: 'theologai://documents/apostles-creed#section-1',
+          uri: 'theologai://documents/apostles-creed#section-source-0001',
           mimeType: 'text/markdown', size: expect.any(Number),
           annotations: { audience: ['assistant'] },
         }),
       ],
       structuredContent: expect.objectContaining({
-        schemaVersion: '1', kind: 'classic_text_lookup', mode: 'search',
+        schemaVersion: '2', kind: 'classic_text_lookup', mode: 'search',
         search: expect.objectContaining({
           status: 'ok',
           hits: [expect.objectContaining({ snippetOnly: true })],
@@ -954,13 +969,13 @@ describe('Worker MCP endpoint in workerd', () => {
         expect.objectContaining({ type: 'text', text: expect.any(String) }),
         expect.objectContaining({
           type: 'resource_link',
-          uri: 'theologai://documents/apostles-creed#section-1',
+          uri: 'theologai://documents/apostles-creed#section-source-0001',
           mimeType: 'text/markdown', size: expect.any(Number),
           annotations: { audience: ['assistant'] },
         }),
       ],
       structuredContent: {
-        schemaVersion: '5', kind: 'primary_source_search', planStatus: 'complete',
+        schemaVersion: '7', kind: 'primary_source_search', planStatus: 'complete',
         responseWindow: { unit: 'utf8_bytes', maximum: 32768, truncated: false },
         queries: [expect.objectContaining({
           normalizedSelection: 'relevance',

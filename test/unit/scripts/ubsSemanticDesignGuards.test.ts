@@ -22,17 +22,19 @@ describe('UBS semantic local materialization guards', () => {
       '0002_ubs_parallel_passages.sql',
       '0003_original_language_usage.sql',
       '0004_ubs_hebrew_semantics.sql',
+      '0005_historical_section_identity_delivery.sql',
     ]);
   });
 
-  it('advances only the local data schema and materialization transform', () => {
+  it('retains transform-7 semantic storage under the transform-8 historical successor', () => {
     const manifest = JSON.parse(readFileSync(new URL('data/data-manifest.json', repo), 'utf8')) as {
       schemaVersion: string;
       materializations: { d1: { transformVersion: number; migrations: Array<{ path: string }> } };
     };
-    expect(manifest.schemaVersion).toBe('0004_ubs_hebrew_semantics');
-    expect(manifest.materializations.d1.transformVersion).toBe(7);
+    expect(manifest.schemaVersion).toBe('0005_historical_section_identity_delivery');
+    expect(manifest.materializations.d1.transformVersion).toBe(8);
     expect(manifest.materializations.d1.migrations.map(item => item.path)).toContain('migrations/0004_ubs_hebrew_semantics.sql');
+    expect(manifest.materializations.d1.migrations.map(item => item.path)).toContain('migrations/0005_historical_section_identity_delivery.sql');
   });
 
   it('keeps the executable relational layer strict in an in-memory fixture', () => {

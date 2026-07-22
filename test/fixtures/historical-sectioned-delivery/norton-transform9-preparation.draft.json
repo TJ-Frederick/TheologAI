@@ -35,8 +35,10 @@
           "contractVersion",
           "documentId",
           "editionId",
-          "packageSha256",
-          "lastSourceOrdinal"
+          "immutableCorpusIdentity",
+          "pageSize",
+          "lastSourceOrdinal",
+          "lastSectionKey"
         ]
       }
     },

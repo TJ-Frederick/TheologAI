@@ -2,15 +2,15 @@ import type { ToolHandler } from '../../kernel/types.js';
 import { handleToolError } from '../../kernel/errors.js';
 import type { PrimarySourceSearchService } from '../../services/historical/PrimarySourceSearchService.js';
 import { formatPrimarySourceSearchFallback, PRIMARY_SOURCE_FALLBACK_MAX_BYTES } from '../../formatters/primarySourceFormatter.js';
-import { primarySourceSearchV4OutputSchema, primarySourceSearchV5OutputSchema } from '../../mcp/schemas/primarySourceSearchV4.js';
+import { primarySourceSearchV6OutputSchema, primarySourceSearchV7OutputSchema } from '../../mcp/schemas/primarySourceSearchV4.js';
 import { buildLocalDocumentResourceUri } from '../../kernel/documentResource.js';
 import type { ResourceLink } from '@modelcontextprotocol/sdk/types.js';
 import type { PrimarySourceContractConfig } from '../../kernel/featureFlags.js';
 import { DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG } from '../../kernel/featureFlags.js';
 import {
-  presentPrimarySourceSearchV4,
+  presentPrimarySourceSearchV6,
   type PresentedPrimarySourceSearchV4,
-  presentPrimarySourceSearchV5,
+  presentPrimarySourceSearchV7,
   type PresentedPrimarySourceSearchV5,
   PRIMARY_SOURCE_V4_MAX_BYTES,
 } from '../../presenters/primarySourceSearchV4Structured.js';
@@ -19,7 +19,7 @@ export function createPrimarySourceSearchHandler(
   service: Pick<PrimarySourceSearchService, 'search'>,
   contract: PrimarySourceContractConfig = DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG,
 ): ToolHandler {
-  const v5 = contract.contractVersion === '5';
+  const v5 = contract.contractVersion === '7';
   return {
     name: 'primary_source_search',
     description: v5
@@ -92,7 +92,7 @@ export function createPrimarySourceSearchHandler(
       required: ['queries'],
       additionalProperties: false,
     },
-    outputSchema: v5 ? primarySourceSearchV5OutputSchema : primarySourceSearchV4OutputSchema,
+    outputSchema: v5 ? primarySourceSearchV7OutputSchema : primarySourceSearchV6OutputSchema,
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: v5 },
     handler: async params => {
       try {
@@ -103,7 +103,7 @@ export function createPrimarySourceSearchHandler(
             }))
           : params.queries;
         const result = await service.search({ ...params, queries });
-        const presented = v5 ? presentPrimarySourceSearchV5(result) : presentPrimarySourceSearchV4(result);
+        const presented = v5 ? presentPrimarySourceSearchV7(result) : presentPrimarySourceSearchV6(result);
         const links = localSectionResourceLinks(presented);
         const fallback = formatPrimarySourceSearchFallback(presented);
         const unavailable = presented.planStatus === 'unavailable';
@@ -139,7 +139,7 @@ function localSectionResourceLinks(presented: PresentedPrimarySourceSearchV4 | P
       for (const candidate of provider.hits) {
         if (candidate.provider !== 'local') continue;
         const { locator } = candidate;
-        const canonical = buildLocalDocumentResourceUri(locator.documentId, locator.sectionId);
+        const canonical = buildLocalDocumentResourceUri(locator.documentId, locator.sectionKey);
         if (!canonical || canonical !== locator.uri || seen.has(canonical)) continue;
         seen.add(canonical);
         const section = candidate.sectionLabel ? ` — ${candidate.sectionLabel}` : '';
@@ -150,7 +150,7 @@ function localSectionResourceLinks(presented: PresentedPrimarySourceSearchV4 | P
         links.push({
           type: 'resource_link',
           uri: canonical,
-          name: clip(`local-primary-source/${locator.documentId}/${locator.sectionId}`, 180),
+          name: clip(`local-primary-source/${locator.documentId}/${locator.sectionKey}`, 180),
           title: clip(`${candidate.title}${section}`, 180),
           description: clip(`${metadata ? `${metadata}. ` : ''}Exact local section selected by primary-source discovery.`, 180),
           mimeType: 'text/markdown',

@@ -251,6 +251,8 @@ describe('D1HistoricalDocumentRepository', () => {
         document_type: sampleDocRow.type,
         document_date: sampleDocRow.date,
         document_metadata: sampleDocRow.metadata,
+        section_key: 'source-0001',
+        source_ordinal: 1,
       };
       const db = createSimpleD1([row]);
       const result = await new D1HistoricalDocumentRepository(db as any).searchPrimarySources({
@@ -262,6 +264,7 @@ describe('D1HistoricalDocumentRepository', () => {
       expect(result[0]).toMatchObject({
         document: { id: 'nicene-creed', title: 'Nicene Creed', topics: ['trinity', 'christology'] },
         section: { section_number: '1', content: 'We believe in one God...' },
+        sectionKey: 'source-0001', sourceOrdinal: 1,
       });
     });
 

@@ -2,7 +2,9 @@
 
 /**
  * Compile the reviewed source-first compatibility map for the 17 current local
- * historical works without changing a database, seed, manifest, or runtime.
+ * historical works. Transform 8 consumes its manifest-bound plan, evidence,
+ * and attestation during deterministic local materialization; it does not
+ * activate a public repository or resource behavior.
  *
  * The checked-in attestation is evidence about a reproducible output, never an
  * input from which section data may be reconstructed. A future reviewed
@@ -65,9 +67,9 @@ export {
 } from './historical-section-compatibility-schema.js';
 
 export const HISTORICAL_SECTION_COMPATIBILITY_ATTESTATION_PATH =
-  'test/fixtures/historical-section-compatibility/source-first-compiler-attestation.json';
+  'data/historical-section-compatibility-attestation.json';
 export const HISTORICAL_SECTION_COMPATIBILITY_EVIDENCE_PATH =
-  'test/fixtures/historical-section-compatibility/real-local-evidence.json';
+  'data/historical-section-compatibility-evidence.json';
 
 export interface HistoricalSectionCompatibilityCompilation {
   map: HistoricalSectionCompatibilityMap;

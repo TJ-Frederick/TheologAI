@@ -8,9 +8,9 @@ import type { ToolHandler } from '../../kernel/types.js';
 import type { HistoricalDocumentService } from '../../services/historical/HistoricalDocumentService.js';
 import {
   formatDocumentList,
-  formatDocumentSectionIndex,
   formatDocumentSections,
   formatSearchResults,
+  formatCompleteDocumentSectionIndex,
 } from '../../formatters/historicalFormatter.js';
 import { handleToolError, ValidationError } from '../../kernel/errors.js';
 import { classicTextsOutputSchema } from '../../mcp/schemas/classicTexts.js';
@@ -18,16 +18,25 @@ import {
   presentClassicTextCatalog,
   presentClassicTextDirectory,
   presentClassicTextSearch,
+  presentClassicTextSectionedLanding,
   presentClassicTextWork,
   validateClassicTextsOutputSemantics,
 } from '../../presenters/classicTextsStructured.js';
 import type { ResourceLink } from '@modelcontextprotocol/sdk/types.js';
 import { CLASSIC_TEXT_LIMITS } from '../../kernel/classicTextContract.js';
+import {
+  decodeHistoricalSectionedOnlyCursor,
+  encodeHistoricalSectionedOnlyCursor,
+  HistoricalSectionedOnlyCursorError,
+  HISTORICAL_SECTIONED_ONLY_LOOKAHEAD,
+  HISTORICAL_SECTIONED_ONLY_PAGE_SIZE,
+} from '../../kernel/historicalSectionedDelivery.js';
+import { formatSectionedDocumentDirectory, formatSectionedDocumentLanding } from '../../formatters/historicalFormatter.js';
 
 export function createClassicTextsHandler(historicalService: HistoricalDocumentService): ToolHandler {
   return {
     name: 'classic_text_lookup',
-    description: 'Search and browse the locally indexed historical-document collection. Search returns discovery-only snippets with canonical exact-section resource links; browseSections returns a compact section index; work alone preserves full-document lookup. Use exactly one mode: listWorks, query, work, or work with browseSections=true. Remote CCEL document bodies are not retrieved or republished.',
+      description: 'Search and browse the locally indexed historical-document collection. Every public section locator uses its canonical Transform-8 section key and source ordinal. A future reviewed sectioned-only edition would return a bounded landing or 32-entry metadata directory; only exact-section resources deliver bodies. Remote CCEL document bodies are not retrieved or republished.',
     inputSchema: {
       type: 'object',
       description: 'Flat mode fields are intentionally shown together for client discoverability; choose exactly one mode, with cross-field validity enforced strictly by the handler.',
@@ -37,6 +46,7 @@ export function createClassicTextsHandler(historicalService: HistoricalDocumentS
         query: { type: 'string', minLength: 1, maxLength: 500, description: 'Literal all-term search across the local historical-document collection. Use alone; returned snippets are discovery-only.' },
         listWorks: { type: 'boolean', const: true, description: 'List locally indexed historical documents. Use alone and set true.' },
         browseSections: { type: 'boolean', const: true, description: 'List a compact exact-section resource index for a local work. Use with a work identifier and no section or query.' },
+        cursor: { type: 'string', minLength: 1, maxLength: 2048, pattern: '^[A-Za-z0-9_-]+$', description: 'Opaque continuation cursor for a sectioned-only directory page. Use only with work and browseSections=true; preserve it unchanged.' },
       },
       additionalProperties: false,
     },
@@ -52,7 +62,10 @@ export function createClassicTextsHandler(historicalService: HistoricalDocumentS
         // List works
         if (params.listWorks) {
           const docs = await historicalService.listDocuments();
-          const presented = presentClassicTextCatalog(docs);
+          const profiles = await Promise.all(docs.map(async document => ({
+            document, profile: await historicalService.getDeliveryProfile(document.id),
+          })));
+          const presented = presentClassicTextCatalog(profiles);
           return {
             content: [{ type: 'text', text: formatDocumentList(docs) }],
             structuredContent: presented,
@@ -62,11 +75,45 @@ export function createClassicTextsHandler(historicalService: HistoricalDocumentS
         // Browse a specific document
         if (params.work && params.browseSections) {
           const doc = await historicalService.getDocument(params.work as string);
-          const sections = await historicalService.getSections(doc.id);
-          const presented = presentClassicTextDirectory({ document: doc, sections });
+          const profile = await historicalService.getDeliveryProfile(doc.id);
+          if (profile.deliveryMode === 'sectioned_only') {
+            let after;
+            if (params.cursor !== undefined) {
+              try {
+                after = decodeHistoricalSectionedOnlyCursor(params.cursor as string, profile);
+              } catch (error) {
+                if (error instanceof HistoricalSectionedOnlyCursorError) {
+                  throw new ValidationError('cursor', 'Historical section browse cursor is malformed, stale, or non-canonical.');
+                }
+                throw error;
+              }
+            }
+            if (after && !await historicalService.hasHistoricalSectionBoundary(doc.id, after)) {
+              throw new ValidationError('cursor', 'Historical section browse cursor does not name a current section boundary.');
+            }
+            const rows = await historicalService.browseHistoricalSectionSummaries(doc.id, after, HISTORICAL_SECTIONED_ONLY_LOOKAHEAD);
+            const page = rows.slice(0, HISTORICAL_SECTIONED_ONLY_PAGE_SIZE);
+            const last = page.at(-1);
+            const nextCursor = rows.length > page.length && last
+              ? encodeHistoricalSectionedOnlyCursor(profile, last)
+              : undefined;
+            const presented = presentClassicTextDirectory({ document: doc, profile, sections: page, nextCursor });
+            return {
+              content: [
+                { type: 'text', text: formatSectionedDocumentDirectory(doc, page, nextCursor) },
+                ...sectionResourceLinks(presented.directory.sections),
+              ],
+              structuredContent: presented,
+            };
+          }
+          if (params.cursor !== undefined) {
+            throw new ValidationError('cursor', 'cursor is available only for sectioned-only browsing.');
+          }
+          const sections = await historicalService.browseHistoricalSectionSummaries(doc.id, undefined, CLASSIC_TEXT_LIMITS.sectionsPerWork + 1);
+          const presented = presentClassicTextDirectory({ document: doc, profile, sections });
           return {
             content: [
-              { type: 'text', text: formatDocumentSectionIndex(doc, sections) },
+              { type: 'text', text: formatCompleteDocumentSectionIndex(doc, sections) },
               ...sectionResourceLinks(presented.directory.sections),
             ],
             structuredContent: presented,
@@ -78,6 +125,17 @@ export function createClassicTextsHandler(historicalService: HistoricalDocumentS
           const doc = await historicalService.findDocument(params.work as string);
           if (!doc) {
             throw new ValidationError('work', `No locally indexed historical document matches "${params.work}".`);
+          }
+          const profile = await historicalService.getDeliveryProfile(doc.id);
+          if (profile.deliveryMode === 'sectioned_only') {
+            const presented = presentClassicTextSectionedLanding(doc, profile);
+            return {
+              content: [
+                { type: 'text', text: formatSectionedDocumentLanding(doc, profile) },
+                resourceLink(presented.landing.work.resource, doc.title, 'Bounded historical-document landing metadata.'),
+              ],
+              structuredContent: presented,
+            };
           }
           const sections = await historicalService.getSections(doc.id);
           const presented = presentClassicTextWork({ document: doc, sections });
@@ -94,9 +152,10 @@ export function createClassicTextsHandler(historicalService: HistoricalDocumentS
         if (params.query) {
           // Search local docs first
           const query = params.query as string;
-          const localResults = await historicalService.search(query, CLASSIC_TEXT_LIMITS.searchLookahead);
-          const documents = localResults.length > 0 ? await historicalService.listDocuments() : [];
-          const presented = presentClassicTextSearch(query, localResults, documents);
+          const localResults = await historicalService.searchResolvedSections(query, CLASSIC_TEXT_LIMITS.searchLookahead);
+          const profiles = new Map(await Promise.all([...new Set(localResults.map(result => result.document.id))]
+            .map(async id => [id, await historicalService.getDeliveryProfile(id)] as const)));
+          const presented = presentClassicTextSearch(query, localResults, profiles);
           if (localResults.length > 0) {
             return {
               content: [
@@ -105,7 +164,7 @@ export function createClassicTextsHandler(historicalService: HistoricalDocumentS
                   text: formatSearchResults(
                     query,
                     localResults,
-                    documents,
+                    [],
                     presented.search.hits.map(hit => hit.discoverySnippet),
                   ),
                 },
@@ -130,12 +189,12 @@ export function createClassicTextsHandler(historicalService: HistoricalDocumentS
 }
 
 type Locator = { uri: string; resourceSizeBytes?: number };
-type SectionWithResource = { sectionNumber: string; title: string; resource: Locator };
+type SectionWithResource = { sectionKey: string; sourceOrdinal: number; legacyDisplayLabel: string; heading: string; resource: Locator };
 
 function sectionResourceLinks(sections: SectionWithResource[]): ResourceLink[] {
   return sections.slice(0, CLASSIC_TEXT_LIMITS.nativeDirectoryLinks).map(section => resourceLink(
     section.resource,
-    section.title || `Section ${section.sectionNumber}`,
+    section.heading || section.legacyDisplayLabel || `Section ${section.sourceOrdinal}`,
     'Exact locally hosted historical-document section.',
   ));
 }
@@ -143,7 +202,7 @@ function sectionResourceLinks(sections: SectionWithResource[]): ResourceLink[] {
 function searchResourceLinks(hits: Array<{ section: SectionWithResource }>): ResourceLink[] {
   return hits.map(hit => resourceLink(
     hit.section.resource,
-    hit.section.title || `Section ${hit.section.sectionNumber}`,
+    hit.section.heading || hit.section.legacyDisplayLabel || `Section ${hit.section.sourceOrdinal}`,
     'Exact local section selected by classic-text discovery.',
   ));
 }
@@ -168,7 +227,7 @@ function resourceLink(locator: Locator, title: string, description: string): Res
 
 function validateMode(params: Record<string, unknown>): void {
   const keys = Object.keys(params);
-  const allowed = new Set(['work', 'query', 'listWorks', 'browseSections']);
+  const allowed = new Set(['work', 'query', 'listWorks', 'browseSections', 'cursor']);
   const unknown = keys.find(key => !allowed.has(key));
   if (unknown) {
     throw new ValidationError(unknown, `Unknown argument "${unknown}". Choose one of the advertised classic-text modes.`);
@@ -177,6 +236,10 @@ function validateMode(params: Record<string, unknown>): void {
   const has = (key: string): boolean => Object.prototype.hasOwnProperty.call(params, key);
   if (keys.length === 0) {
     throw new ValidationError('mode', 'Choose a classic-text lookup mode.');
+  }
+
+  if (has('cursor') && (!has('work') || params.browseSections !== true)) {
+    throw new ValidationError('cursor', 'cursor requires work and browseSections=true.');
   }
 
   if (has('listWorks')) {
@@ -197,8 +260,13 @@ function validateMode(params: Record<string, unknown>): void {
   }
 
   if (has('browseSections')) {
-    if (params.browseSections !== true || typeof params.work !== 'string' || params.work.trim().length < 1 || keys.length !== 2 || !has('work')) {
-      throw new ValidationError('browseSections', 'browseSections=true requires only a non-empty local work identifier.');
+    if (params.browseSections !== true || typeof params.work !== 'string' || params.work.trim().length < 1
+      || !has('work') || keys.length < 2 || keys.length > 3
+      || (has('cursor') && (typeof params.cursor !== 'string' || !/^[A-Za-z0-9_-]{1,2048}$/.test(params.cursor)))) {
+      throw new ValidationError('browseSections', 'browseSections=true requires a local work identifier and optional opaque cursor only.');
+    }
+    if (params.work.length > 256) {
+      throw new ValidationError('work', 'work must be a non-empty named local document slug or title.');
     }
     return;
   }

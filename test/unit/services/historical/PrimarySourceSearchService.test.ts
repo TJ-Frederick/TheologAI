@@ -12,7 +12,7 @@ function providerResult(provider: 'local' | 'ccel_live', status: PrimarySourcePr
     hits: Array.from({ length: count }, (_, index) => ({
       provider, title: `${provider} ${index}`, snippet: 'evidence',
       locator: provider === 'local'
-        ? { kind: 'local_section', documentId: 'doc', sectionId: String(index), url: `theologai://documents/doc#section-${index}` }
+        ? { kind: 'local_section', documentId: 'doc', sectionKey: `source-${String(index + 1).padStart(4, '0')}`, sourceOrdinal: index + 1, url: `theologai://documents/doc#section-source-${String(index + 1).padStart(4, '0')}` }
         : { kind: 'ccel_section', work: 'calvin/institutes', section: String(index), url: `https://ccel.org/ccel/calvin/institutes/${index}.html` },
       ...(provider === 'local' ? { resourceSizeBytes: 100 + index } : {}),
       rankWithinProvider: index + 1, page: 1, snippetOnly: true, attribution: provider,
@@ -23,8 +23,8 @@ function providerResult(provider: 'local' | 'ccel_live', status: PrimarySourcePr
 
 const plan = (queries: unknown[]) => ({ queries });
 const query = (overrides: Record<string, unknown> = {}) => ({ id: 'q1', text: 'union with Christ', providers: ['local'], ...overrides });
-const dormant = { exposeCcelDiscovery: false, ccelLiveSearch: false, ccelCoordinator: false, contractVersion: '4' as const, liveCcelEnabled: false };
-const live = { exposeCcelDiscovery: true, ccelLiveSearch: true, ccelCoordinator: true, contractVersion: '5' as const, liveCcelEnabled: true };
+const dormant = { exposeCcelDiscovery: false, ccelLiveSearch: false, ccelCoordinator: false, contractVersion: '6' as const, liveCcelEnabled: false };
+const live = { exposeCcelDiscovery: true, ccelLiveSearch: true, ccelCoordinator: true, contractVersion: '7' as const, liveCcelEnabled: true };
 const coordinator = { admit: vi.fn(), recordOutcome: vi.fn(), snapshot: vi.fn() } as any;
 
 describe('PrimarySourceSearchService', () => {

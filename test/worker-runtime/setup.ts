@@ -156,6 +156,25 @@ beforeAll(async () => {
     ),
   ]);
 
+  // Transform-8 source-first sidecars: the fixture intentionally contains a
+  // canonical key distinct from its legacy display/routing alias.
+  await env.THEOLOGAI_DB.batch([
+    env.THEOLOGAI_DB.prepare(`INSERT INTO historical_document_delivery_profiles (
+      document_id, work_id, edition_id, immutable_corpus_identity, section_package_identity,
+      delivery_mode, section_count, landing_max_bytes, browse_page_size, cursor_version,
+      provenance_json, rights_json
+    ) VALUES (?, NULL, NULL, ?, NULL, 'complete_document', 1, 0, 0, 0, '{}', '{}')`)
+      .bind('apostles-creed', 'f'.repeat(64)),
+    env.THEOLOGAI_DB.prepare(`INSERT INTO historical_section_identities (
+      document_id, section_key, source_ordinal, document_section_id
+    ) VALUES (?, ?, ?, ?)`)
+      .bind('apostles-creed', 'source-0001', 1, 1),
+    env.THEOLOGAI_DB.prepare(`INSERT INTO historical_section_aliases (
+      document_id, legacy_section_id, section_key, source_ordinal
+    ) VALUES (?, ?, ?, ?)`)
+      .bind('apostles-creed', '1', 'source-0001', 1),
+  ]);
+
   const source = UBS_PARALLEL_PASSAGE_PROVENANCE;
   await env.THEOLOGAI_DB.batch([
     env.THEOLOGAI_DB.prepare(`INSERT INTO ubs_parallel_sources VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(

@@ -17,7 +17,8 @@ import { createDeterministicMcpFixture } from '../../fixtures/mcpCompositionRoot
 import { DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG } from '../../../src/kernel/featureFlags.js';
 import { classicTextsOutputSchema } from '../../../src/mcp/schemas/classicTexts.js';
 import { validateClassicTextsOutputSemantics } from '../../../src/presenters/classicTextsStructured.js';
-import { primarySourceSearchV4OutputSchema, primarySourceSearchV5OutputSchema } from '../../../src/mcp/schemas/primarySourceSearchV4.js';
+import { primarySourceSearchV6OutputSchema, primarySourceSearchV7OutputSchema } from '../../../src/mcp/schemas/primarySourceSearchV4.js';
+import { validatorFor } from '../../../src/mcp/validation.js';
 
 const connected: Array<{ client: Client; server: Server }> = [];
 type LogMessage = { level: string; logger?: string; data: unknown };
@@ -63,15 +64,15 @@ describe('MCP structured output validation', () => {
   it('keeps the classic-text schema compact after moving cross-field search algebra to semantic validation', () => {
     const bytes = new TextEncoder().encode(JSON.stringify(classicTextsOutputSchema)).byteLength;
     expect(bytes).toBeGreaterThan(15_000);
-    expect(bytes).toBeLessThanOrEqual(16_384);
+    expect(bytes).toBeLessThanOrEqual(24_576);
   });
 
   it.each([
-    ['v4', primarySourceSearchV4OutputSchema],
-    ['v5', primarySourceSearchV5OutputSchema],
+    ['v6', primarySourceSearchV6OutputSchema],
+    ['v7', primarySourceSearchV7OutputSchema],
   ] as const)('accepts 100 eligible works and rejects 101 at the %s output-schema boundary', async (version, outputSchema) => {
     const structuredContent = (eligibleDocumentCount: number) => ({
-      schemaVersion: version === 'v4' ? '4' : '5',
+      schemaVersion: version === 'v6' ? '6' : '7',
       kind: 'primary_source_search',
       planStatus: 'complete',
       responseWindow: { unit: 'utf8_bytes', maximum: 32768, truncated: false },
@@ -89,11 +90,11 @@ describe('MCP structured output validation', () => {
       }],
       coverage: {
         localAttempted: true, localStatus: 'no_results', localHitCount: 0,
-        ...(version === 'v5' ? { ccelAttempted: false, ccelHitCount: 0 } : {}),
+        ...(version === 'v7' ? { ccelAttempted: false, ccelHitCount: 0 } : {}),
         notices: [],
         serverObserved: { searched: [{ queryId: 'q', provider: 'local', status: 'no_results', returnedHitCount: 0 }], notSearched: [] },
       },
-      evidencePolicy: version === 'v5'
+      evidencePolicy: version === 'v7'
         ? {
           snippetUse: 'discovery_only', localSectionAccess: 'mcp_resource_read', externalSectionAccess: 'direct_url_only',
           coverageScope: 'bounded_non_exhaustive', externalRightsStatus: 'not_determined',
@@ -153,9 +154,13 @@ describe('MCP structured output validation', () => {
       const schema = listed.tools.find(tool => tool.name === toolName)?.outputSchema;
       expect(schema).toMatchObject({ type: 'object', additionalProperties: false });
       expect(schema).not.toHaveProperty('$ref');
-      const expectedVersion = toolName === 'primary_source_search' || toolName === 'parallel_passages'
-        ? '4'
-        : '1';
+      const expectedVersion = toolName === 'primary_source_search'
+        ? '6'
+        : toolName === 'parallel_passages'
+          ? '4'
+          : toolName === 'classic_text_lookup'
+            ? '2'
+            : '1';
       expect(schema?.properties?.schemaVersion).toMatchObject({ const: expectedVersion });
     }
   });
@@ -379,7 +384,7 @@ describe('MCP structured output validation', () => {
       handler: async () => ({
         content: [{ type: 'text' as const, text: 'safe fallback' }],
         structuredContent: {
-          schemaVersion: '1', kind: 'classic_text_lookup', mode: 'search',
+          schemaVersion: '2', kind: 'classic_text_lookup', mode: 'search',
           evidencePolicy: {
             providerScope: 'local_only', remoteDocumentBodies: 'disabled',
             editionProvenance: 'incomplete', rightsStatus: 'not_established',
@@ -399,7 +404,7 @@ describe('MCP structured output validation', () => {
 
   it.each([
     ['catalog count', {
-      schemaVersion: '1', kind: 'classic_text_lookup', mode: 'list_works',
+      schemaVersion: '2', kind: 'classic_text_lookup', mode: 'list_works',
       evidencePolicy: {
         providerScope: 'local_only', remoteDocumentBodies: 'disabled',
         editionProvenance: 'incomplete', rightsStatus: 'not_established',
@@ -408,14 +413,14 @@ describe('MCP structured output validation', () => {
       catalog: {
         coverage: 'complete_local_work_inventory', delivery: 'metadata_summary', nativeResourceLinks: 'not_emitted',
         works: [{
-          id: 'doc', title: 'Document', type: 'confession', date: null, topics: [],
+          id: 'doc', title: 'Document', type: 'confession', date: null, topics: [], deliveryMode: 'complete_document',
           resource: { kind: 'mcp_resource', uri: 'theologai://documents/doc' },
         }],
         resultWindow: { returnedCount: 0, additionalMatchStatus: 'no_additional_match_observed' },
       },
     }],
     ['directory link count', {
-      schemaVersion: '1', kind: 'classic_text_lookup', mode: 'browse_sections',
+      schemaVersion: '2', kind: 'classic_text_lookup', mode: 'browse_sections',
       evidencePolicy: {
         providerScope: 'local_only', remoteDocumentBodies: 'disabled',
         editionProvenance: 'incomplete', rightsStatus: 'not_established',
@@ -424,12 +429,12 @@ describe('MCP structured output validation', () => {
       directory: {
         coverage: 'complete_section_directory',
         work: {
-          id: 'doc', title: 'Document', type: 'confession', date: null, topics: [],
+          id: 'doc', title: 'Document', type: 'confession', date: null, topics: [], deliveryMode: 'complete_document',
           resource: { kind: 'mcp_resource', uri: 'theologai://documents/doc' },
         },
         sections: [{
-          id: 1, sectionNumber: '1', title: 'One',
-          resource: { kind: 'mcp_resource', uri: 'theologai://documents/doc#section-1' },
+          sectionKey: 'source-0001', sourceOrdinal: 1, legacyDisplayLabel: '1', heading: 'One',
+          resource: { kind: 'mcp_resource', uri: 'theologai://documents/doc#section-source-0001' },
         }],
         resultWindow: { returnedCount: 1, additionalMatchStatus: 'no_additional_match_observed' },
         linkWindow: {
@@ -439,6 +444,10 @@ describe('MCP structured output validation', () => {
       },
     }],
   ])('rejects schema-valid semantic classic-text %s mutations at the MCP boundary', async (_label, structuredContent) => {
+    const validate = validatorFor(classicTextsOutputSchema);
+    const validation = validate(structuredContent);
+    expect(validation.valid, validation.errorMessage).toBe(true);
+    expect(validateClassicTextsOutputSemantics(structuredContent)).toBe(false);
     const client = await connect([{
       name: `classic_semantic_${_label.replaceAll(' ', '_')}`,
       description: 'Semantic classic-text failure fixture',
@@ -456,10 +465,10 @@ describe('MCP structured output validation', () => {
     })).rejects.toMatchObject({ code: -32603, message: expect.stringContaining('Internal server error') });
   });
 
-  it('accepts a v4 primary-source result after control-only optional metadata is omitted', async () => {
+  it('accepts a v7 primary-source result after control-only optional metadata is omitted', async () => {
     const contract = {
       exposeCcelDiscovery: true, ccelLiveSearch: false, ccelCoordinator: false,
-      contractVersion: '5' as const, liveCcelEnabled: false,
+      contractVersion: '7' as const, liveCcelEnabled: false,
     };
     const handler = createPrimarySourceSearchHandler({
       search: async () => ({
@@ -481,7 +490,7 @@ describe('MCP structured output validation', () => {
               snippet: 'Discovery lead', rankWithinProvider: 1, page: 1, snippetOnly: true as const,
               attribution: 'Local', resourceSizeBytes: 10,
               locator: {
-                kind: 'local_section' as const, documentId: 'doc', sectionId: '1',
+                kind: 'local_section' as const, documentId: 'doc', sectionKey: '1', sourceOrdinal: 1,
                 url: 'theologai://documents/doc#section-1',
               },
             }],

@@ -105,6 +105,8 @@ describe('published project contract', () => {
     nodeDatabase.exec(await readProjectFile('migrations/0001_initial_schema.sql'));
     nodeDatabase.exec(await readProjectFile('migrations/0002_ubs_parallel_passages.sql'));
     nodeDatabase.exec(await readProjectFile('migrations/0003_original_language_usage.sql'));
+    nodeDatabase.exec(await readProjectFile('migrations/0004_ubs_hebrew_semantics.sql'));
+    nodeDatabase.exec(await readProjectFile('migrations/0005_historical_section_identity_delivery.sql'));
     const nodeTools = createCompositionRoot({ database: nodeDatabase }).tools;
     nodeDatabase.close();
     const workerTools = createWorkerCompositionRoot({
@@ -160,7 +162,7 @@ describe('published project contract', () => {
     expect(developerGuide).toContain(`${documents} historical documents`);
     expect(confessionSkill).toContain(`includes ${documents} historical documents`);
     expect(confessionSkill).toContain('Call `primary_source_search` with one bounded local query plan');
-    expect(confessionSkill).toContain('Follow each selected canonical `resource_link` with MCP `resources/read`');
+    expect(confessionSkill).toContain('each selected canonical `resource_link` with MCP `resources/read`');
     expect(confessionSkill).toContain('Never relabel an issuing, drafting, revising, or');
     expect(confessionSkill).toContain('Never infer a tradition or author attribution');
     expect(confessionSkill).not.toContain('spanning the major Christian traditions');
@@ -183,23 +185,23 @@ describe('published project contract', () => {
     expect(readme).not.toMatch(/eighteen locally indexed|18 locally indexed/i);
     expect(readme).not.toMatch(/six public-domain commentar/i);
     expect(readme).toContain('do **not** currently fetch CCEL search results or document bodies');
-    expect(readme).toContain('production v4 schema remains strictly local-only');
-    expect(readme).toContain('Preview stages a hard v5');
+    expect(readme).toContain('This build’s local-only configuration exposes v6');
+    expect(readme).toContain('v7 while CCEL execution remains disabled');
     expect(readme).toContain('live search and coordinator execution remain disabled');
     expect(readme).toContain('before adapter');
     expect(readme).toContain('Durable Object lookup/RPC, or fetch');
     expect(readme).toContain('reconnect');
     expect(readme).toContain('reinitialize');
     expect(readme).toMatch(/keeps any requested year bounds on its local\s+queries/);
-    expect(readme).toMatch(/Direct v5 queries that combine CCEL with\s+either year field/);
+    expect(readme).toMatch(/Direct v7 queries that combine CCEL with\s+either year field/);
     expect(coordinatorGuide).toContain('Every executable unbounded CCEL provider result begins');
     expect(coordinatorGuide).toContain('A direct CCEL-bearing query with either');
     expect(roadmap).toContain('guided broad topical fallback');
     expect(roadmap).toContain('Direct CCEL-plus-year tool input remains fail-closed');
     const primarySourceToolRow = readme.split('\n')
       .find(line => line.startsWith('| `primary_source_search` |'));
-    expect(primarySourceToolRow).toContain('Production is v4/local-only');
-    expect(primarySourceToolRow).toContain('preview exposes the v5 local-plus-CCEL discovery contract');
+    expect(primarySourceToolRow).toContain('local-only configuration exposes v6');
+    expect(primarySourceToolRow).toContain('configured CCEL-discovery profile exposes v7');
     expect(primarySourceToolRow).toContain('execution remains disabled before adapter, coordinator, or fetch');
     const previewStart = workerConfig.indexOf('[env.preview]');
     expect(previewStart).toBeGreaterThan(0);

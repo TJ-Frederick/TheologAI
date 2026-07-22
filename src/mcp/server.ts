@@ -14,8 +14,8 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { NotFoundError } from '../kernel/errors.js';
 import { parseStrongsIdentity } from '../kernel/strongs.js';
-import { parseLocalDocumentResourceUri } from '../kernel/documentResource.js';
-import { formatLocalDocumentResource, formatLocalDocumentSectionResource } from '../formatters/historicalFormatter.js';
+import { buildLocalDocumentResourceUri, parseLocalDocumentResourceUri } from '../kernel/documentResource.js';
+import { formatLocalDocumentResource, formatLocalDocumentSectionResourceWithIdentity, formatSectionedDocumentLanding } from '../formatters/historicalFormatter.js';
 import type { ToolHandler } from '../kernel/types.js';
 import type { BibleService } from '../services/bible/BibleService.js';
 import type { CommentaryService } from '../services/commentary/CommentaryService.js';
@@ -32,7 +32,7 @@ import type { PrimarySourceContractConfig } from '../kernel/featureFlags.js';
 export interface McpServerServices {
   bibleService: Pick<BibleService, 'getSupportedTranslations'>;
   commentaryService: Pick<CommentaryService, 'getAvailableCommentators'>;
-  historicalService: Pick<HistoricalDocumentService, 'listDocuments' | 'getDocument' | 'getSections' | 'getSection'>;
+  historicalService: Pick<HistoricalDocumentService, 'listDocuments' | 'getDocument' | 'getSections' | 'getDeliveryProfile' | 'resolveSection'>;
   strongsService: Pick<StrongsService, 'lookup'>;
 }
 
@@ -109,10 +109,13 @@ export function createTheologAiMcpServer(
         mimeType: 'application/json',
       });
       for (const doc of docs) {
+        const profile = await services.historicalService.getDeliveryProfile(doc.id);
         resources.push({
           uri: `theologai://documents/${doc.id}`,
           name: doc.title,
-          description: `${doc.type} (${doc.date || 'undated'})`,
+          description: profile.deliveryMode === 'sectioned_only'
+            ? `${doc.type} (${doc.date || 'undated'}); bounded landing, exact canonical sections carry bodies`
+            : `${doc.type} (${doc.date || 'undated'}); complete document with canonical exact-section children`,
           mimeType: 'text/markdown',
         });
       }
@@ -138,7 +141,7 @@ export function createTheologAiMcpServer(
       {
         uriTemplate: 'theologai://documents/{slug}',
         name: 'Historical Document',
-        description: 'A creed, confession, or catechism from the TheologAI collection',
+        description: 'Historical document landing or complete work; canonical #section-{sectionKey} resources resolve one exact section',
         mimeType: 'text/markdown',
       },
       {
@@ -200,14 +203,35 @@ export function createTheologAiMcpServer(
           throw new NotFoundError('document', 'Exact document resource identity did not match.');
         }
 
+        const profile = await services.historicalService.getDeliveryProfile(doc.id);
         if (documentResource.sectionId !== undefined) {
-          const section = await services.historicalService.getSection(doc.id, documentResource.sectionId);
+          const resolved = await services.historicalService.resolveSection(doc.id, documentResource.sectionId);
+          const canonicalUri = buildLocalDocumentResourceUri(doc.id, resolved.sectionKey);
+          if (!canonicalUri) throw new NotFoundError('section', 'Canonical section resource identity was invalid.');
           return {
             contents: [{
               uri,
               mimeType: 'text/markdown',
-              text: formatLocalDocumentSectionResource(doc, section),
+              text: formatLocalDocumentSectionResourceWithIdentity(doc, resolved.section, {
+                sectionKey: resolved.sectionKey,
+                sourceOrdinal: resolved.sourceOrdinal,
+                resolution: resolved.resolution,
+                canonicalUri,
+                ...(resolved.resolution === 'legacy_alias' ? { requestedUri: uri } : {}),
+              }),
+              _meta: {
+                'theologai/canonicalUri': canonicalUri,
+                'theologai/sectionKey': resolved.sectionKey,
+                'theologai/sourceOrdinal': resolved.sourceOrdinal,
+                'theologai/sectionResolution': resolved.resolution,
+              },
             }],
+          };
+        }
+
+        if (profile.deliveryMode === 'sectioned_only') {
+          return {
+            contents: [{ uri, mimeType: 'text/markdown', text: formatSectionedDocumentLanding(doc, profile) }],
           };
         }
 
@@ -282,7 +306,7 @@ function assertPrimarySourceContractParity(root: McpCompositionRoot): void {
   const tool = root.tools.find(candidate => candidate.name === 'primary_source_search');
   if (!tool) return;
   const advertisedVersion = (tool.outputSchema?.properties?.schemaVersion as { const?: unknown } | undefined)?.const;
-  const expectedOpenWorld = root.primarySourceContract.contractVersion === '5';
+  const expectedOpenWorld = root.primarySourceContract.contractVersion === '7';
   if (advertisedVersion !== root.primarySourceContract.contractVersion
     || tool.annotations?.openWorldHint !== expectedOpenWorld) {
     throw new Error('primary_source_search tool and guided-prompt contracts must use the same configuration.');

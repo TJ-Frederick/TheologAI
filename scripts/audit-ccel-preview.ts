@@ -134,12 +134,12 @@ export async function runCcelPreviewAudit(options: CcelAuditOptions, dependencie
     const previewTools = await preview.listTools();
     const productionSchema = toolSchema(productionTools.tools, 'primary_source_search');
     const previewSchema = toolSchema(previewTools.tools, 'primary_source_search');
-    assert(schemaVersionIs(productionSchema, '4')
+    assert(schemaVersionIs(productionSchema, '6')
       && !schemaContainsConst(productionSchema, 'ccel_live')
-      && !schemaContainsProperty(productionSchema, 'retryAfterSeconds'), 'production v4 local-only control');
-    assert(schemaVersionIs(previewSchema, '5')
+      && !schemaContainsProperty(productionSchema, 'retryAfterSeconds'), 'production v6 local-only control');
+    assert(schemaVersionIs(previewSchema, '7')
       && schemaContainsConst(previewSchema, 'ccel_live')
-      && schemaContainsProperty(previewSchema, 'retryAfterSeconds'), 'preview v5 CCEL contract');
+      && schemaContainsProperty(previewSchema, 'retryAfterSeconds'), 'preview v7 CCEL contract');
 
     // These are public-contract proofs before any tool call. The protected
     // snapshot adds only content-free coordinator evidence; it never reserves
@@ -173,11 +173,11 @@ export async function runCcelPreviewAudit(options: CcelAuditOptions, dependencie
     return {
       schemaVersion: '1', audit: 'ccel-live-preview', passed: true,
       productionControl: {
-        contractVersionObserved: '4', discoverySchemaObserved: 'local_only', toolsListCalls: 1,
+        contractVersionObserved: '6', discoverySchemaObserved: 'local_only', toolsListCalls: 1,
         protectedSnapshotReads: 2, toolCallInvocations: 0,
       },
       preview: {
-        contractVersionObserved: '5', discoverySchemaObserved: 'ccel_exposed', ccelBearingToolCallMaximum: 2,
+        contractVersionObserved: '7', discoverySchemaObserved: 'ccel_exposed', ccelBearingToolCallMaximum: 2,
         upstreamOriginAdmissionObserved: coordinator.delta.admissionCount,
         statuses: [...contenders, local].map(summarize),
       },
@@ -296,7 +296,7 @@ function assertValidRateLimited(external: Provider): void {
 }
 
 function assertValidV5Envelope(output: SearchOutput): void {
-  assert(output.schemaVersion === '5'
+  assert(output.schemaVersion === '7'
     && output.responseWindow?.unit === 'utf8_bytes'
     && output.responseWindow.maximum === 32_768
     && typeof output.responseWindow.truncated === 'boolean'
@@ -307,11 +307,11 @@ function assertValidV5Envelope(output: SearchOutput): void {
     && output.evidencePolicy.externalRightsStatus === 'not_determined'
     && output.evidencePolicy.lookupAliasUse === 'exact_routing_only_not_metadata_evidence'
     && matchesExactRecord(output.evidencePolicy.coverageLedger, COVERAGE_LEDGER)
-    && !JSON.stringify(output).includes('resource_link'), 'compact v5 discovery semantics');
+    && !JSON.stringify(output).includes('resource_link'), 'compact v7 discovery semantics');
 
   const searched = output.coverage?.serverObserved?.searched;
   const notSearched = output.coverage?.serverObserved?.notSearched;
-  assert(Array.isArray(searched) && Array.isArray(notSearched), 'v5 server-observed coverage ledger');
+  assert(Array.isArray(searched) && Array.isArray(notSearched), 'v7 server-observed coverage ledger');
   const providers = output.queries?.flatMap(query => (query.providers ?? []).map(item => ({ queryId: query.id, item }))) ?? [];
   const providerKeys = providers.map(({ queryId, item }) => `${String(queryId)}\u0000${String(item.provider)}`);
   assert(providerKeys.length > 0
@@ -343,7 +343,7 @@ function assertValidV5Envelope(output: SearchOutput): void {
     && output.coverage.localHitCount === local.reduce((count, item) => count + (item.hitCount ?? 0), 0)
     && output.coverage.ccelAttempted === external.some(item => item.searched === true)
     && output.coverage.ccelHitCount === external.reduce((count, item) => count + (item.hitCount ?? 0), 0),
-  'v5 aggregate coverage');
+  'v7 aggregate coverage');
 }
 
 function assertValidLocalEditionReadiness(local: Provider): void {

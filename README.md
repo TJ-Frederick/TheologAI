@@ -85,8 +85,8 @@ fresh server and transport.
 | `bible_cross_references` | Query locally indexed OpenBible.info cross references with raw vote ranking, explicit discovery-only semantics, threshold-scoped result windows, and pinned snapshot provenance. |
 | `parallel_passages` | Return complete UBS source-attested parallel groups by default; legacy curated edges and OpenBible.info cross references require explicit selectors and remain separate. |
 | `commentary_lookup` | Retrieve Matthew Henry, JFB, Adam Clarke, John Gill, Keil-Delitzsch (OT), or Tyndale notes. |
-| `classic_text_lookup` | Search and browse the 17 locally indexed historical documents. Remote CCEL document bodies are not retrieved or republished. |
-| `primary_source_search` | Execute bounded primary-source query plans. Production is v4/local-only; preview exposes the v5 local-plus-CCEL discovery contract while CCEL execution remains disabled before adapter, coordinator, or fetch. Snippets remain discovery-only, selected local sections are readable resources, and research workflows maintain explicit searched/read/deferred/not-searched coverage ledgers. |
+| `classic_text_lookup` | Search and browse the 17 locally indexed historical documents with canonical source-first section keys. The runtime also supports the bounded landing/cursor-directory contract for future reviewed sectioned editions; exact sections are the only body route. Remote CCEL document bodies are not retrieved or republished. |
+| `primary_source_search` | Execute bounded primary-source query plans. This build’s local-only configuration exposes v6; an explicitly configured CCEL-discovery profile exposes v7 while CCEL execution remains disabled before adapter, coordinator, or fetch. Local locators use canonical section keys plus source ordinals; snippets remain discovery-only and research workflows maintain explicit searched/read/deferred/not-searched coverage ledgers. |
 | `original_language_lookup` | Look up or search Strong's entries, with opt-in rights-reviewed STEPBible metadata, exact corrected-corpus usage, and bounded occurrence pages for exact identities. The Online-Bible-derived TBESH Hebrew `Meaning` field is withheld. |
 | `bible_verse_morphology` | Return bounded word-by-word morphology for one exact verse, with raw codes, nullable expansions, and separate pinned STEPBible morphology/lemma provenance. |
 | `original_language_study` | Resolve and study one Greek or Hebrew token in one verse with contextual morphology, source-separated lexical evidence, and explicit interpretive limits. |
@@ -175,14 +175,18 @@ exposed. Each response validates the requested work, book, and chapter against
 the provider container and reports HelloAO's corpus SHA-256 as the provider
 revision; that fingerprint identifies provider corpus bytes, not an edition or
 transcription source.
-`classic_text_lookup` preserves its Markdown result in all four modes and also
+`classic_text_lookup` preserves its Markdown result for complete documents and also
 returns a closed versioned structured contract. Catalog mode is a metadata
 summary of the complete local work inventory: it exposes validated, unsized
 structured resource locators, emits no native links, and never reads document
 bodies. The work-inventory contract is intentionally bounded at 100 works;
 the server fails rather than truncating if the inventory exceeds that ceiling.
-Section-directory mode exposes its complete index with unsized locators, caps
-native links at 32, and similarly fails above 2,000 sections. Search exposes at
+Complete-document directory mode exposes its complete index with unsized canonical
+source-first locators, caps native links at 32, and similarly fails above 2,000
+sections. The runtime contract reserves a distinct landing plus fixed-32,
+opaque-cursor metadata directory for a future reviewed `sectioned_only` edition;
+it has no whole body or directory on the landing and exact canonical sections are
+the sole body route. Search exposes at
 most ten discovery-only snippets plus one private lookahead; selected work and
 search resources retain exact UTF-8 sizes. Read a selected exact resource
 before quotation. Invalid stored resource identities fail closed as integrity
@@ -265,11 +269,11 @@ remote data-layer gate. Norton is a later transform-9,
 reliable translator attribution.
 
 The production tools search and retrieve only the locally indexed collection.
-They do **not** currently fetch CCEL search results or document bodies, and the
-production v4 schema remains strictly local-only. The former release-plan
-wording, “Preview stages a hard v5 contract cutover,” is historical: the
-deployed preview now serves the v5 discovery-only schema and advertises
-external CCEL discovery inputs and guided workflows. In this deployed state,
+They do **not** currently fetch CCEL search results or document bodies. This
+unpublished Transform-8 runtime changes the configured public primary-source
+profiles to v6 local-only and v7 CCEL-discovery shape; it does not claim that a
+remote Worker has that code. A separately configured v7 preview may advertise
+external CCEL discovery inputs and guided workflows. In either configuration,
 live search and coordinator execution remain disabled; external preview queries
 therefore return a disabled provider result before adapter
 invocation, Durable Object lookup/RPC, or fetch. MCP clients should reconnect
@@ -286,11 +290,11 @@ link to a canonical allowlisted CCEL exact-section path; tracking query and hash
 values are discarded. Balanced-card parsing uses explicit title/author roles,
 and a no-results marker is accepted only when no competing result structure is
 present. These safeguards do not authorize or enable live use.
-CCEL does not provide reviewed composition-year filtering. The v5 guided
+CCEL does not provide reviewed composition-year filtering. The v7 guided
 primary-source workflow therefore keeps any requested year bounds on its local
 queries, sends its single external discovery query without year fields, and
 repeats an explicit warning that CCEL results cannot establish membership in
-the requested historical period. Direct v5 queries that combine CCEL with
+the requested historical period. Direct v7 queries that combine CCEL with
 either year field remain `unsupported_filter` before adapter or coordinator
 admission; the public tool schema documents that strict boundary.
 Any future external provider rollout must remain discovery-only until
@@ -465,8 +469,10 @@ per-request D1 repositories. Both targets share one MCP registry.
 
 - The current tracked roadmap is [docs/ROADMAP.md](docs/ROADMAP.md), beginning
   after the PR #10 production baseline.
-- Live CCEL discovery and search remain gated future work; preview currently
-  exposes only the non-executing v5 contract while production remains v4/local-only.
+- Live CCEL discovery and search remain gated future work; the checked-in,
+  unpublished candidate exposes only the non-executing v7 contract while its
+  local production profile remains v6/local-only. The deployed PR #72 baseline
+  remains preview v5 and production v4/local-only.
   The legacy CCEL body reader is retired; the retained discovery adapter is
   bounded, does not fetch until separately authorized, and must never become
   CCEL body mirroring or republication.

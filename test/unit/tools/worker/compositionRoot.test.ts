@@ -144,13 +144,13 @@ describe('createWorkerCompositionRoot', () => {
   });
 
   describe('primary-source public provider contract', () => {
-    it('keeps the production-default contract at v4 with CCEL unadvertised', () => {
+    it('keeps the production-default contract at v6 with CCEL unadvertised', () => {
       const root = createWorkerCompositionRoot(makeEnv());
       expect(root.primarySourceContract).toEqual({
         exposeCcelDiscovery: false,
         ccelLiveSearch: false,
         ccelCoordinator: false,
-        contractVersion: '4',
+        contractVersion: '6',
         liveCcelEnabled: false,
       });
       const tool = root.tools.find(candidate => candidate.name === 'primary_source_search')!;
@@ -160,7 +160,7 @@ describe('createWorkerCompositionRoot', () => {
       expect(item.properties.page.description).toContain('only page 1');
     });
 
-    it('exposes preview v5 while adapter and Durable Object lookup remain unreachable at 100', async () => {
+    it('exposes preview v7 while adapter and Durable Object lookup remain unreachable at 100', async () => {
       const getByName = vi.fn();
       const root = createWorkerCompositionRoot(makeEnv({
         THEOLOGAI_EXPOSE_CCEL_DISCOVERY: 'true',
@@ -168,9 +168,9 @@ describe('createWorkerCompositionRoot', () => {
         THEOLOGAI_ENABLE_CCEL_COORDINATOR: 'false',
         THEOLOGAI_CCEL_COORDINATOR: { getByName } as any,
       }));
-      expect(root.primarySourceContract).toMatchObject({ contractVersion: '5', liveCcelEnabled: false });
+      expect(root.primarySourceContract).toMatchObject({ contractVersion: '7', liveCcelEnabled: false });
       const tool = root.tools.find(candidate => candidate.name === 'primary_source_search')!;
-      expect(tool.outputSchema?.properties?.schemaVersion).toEqual({ const: '5' });
+      expect(tool.outputSchema?.properties?.schemaVersion).toEqual({ const: '7' });
       expect(tool.annotations?.openWorldHint).toBe(true);
       await tool.handler({ queries: [{ id: 'remote', text: 'grace', providers: ['ccel'] }] });
       // Fetch is owned by the adapter. Proving the adapter and namespace lookup
