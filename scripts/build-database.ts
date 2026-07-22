@@ -750,7 +750,13 @@ renameSync(TEMP_DB_PATH, DB_PATH);
 
 log(`Database build complete at ${DB_PATH}`);
 } catch (error) {
-  captureTransform8FailureSnapshot(db, error);
+  // The snapshot is test instrumentation only. A bad snapshot destination
+  // must never mask the build failure or skip the close/temporary cleanup.
+  try {
+    captureTransform8FailureSnapshot(db, error);
+  } catch {
+    // Best effort only; preserve the original error below.
+  }
   if (db?.open) db.close();
   cleanupTemporaryDatabase();
   throw error;

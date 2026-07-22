@@ -54,16 +54,18 @@ function remoteAuthorityExecutor(): {
       row.browsePageSize, row.cursorVersion, row.provenanceJson, row.rightsJson);
   }
   const insertIdentity = db.prepare('INSERT INTO historical_section_identities VALUES (?, ?, ?, ?)');
-  for (const [index, row] of expected.identities.entries()) {
-    insertIdentity.run(row.documentId, row.sectionKey, row.sourceOrdinal, index + 1);
+  for (const row of expected.identities) {
+    insertIdentity.run(row.documentId, row.sectionKey, row.sourceOrdinal, row.documentSectionId);
   }
   const insertAlias = db.prepare('INSERT INTO historical_section_aliases VALUES (?, ?, ?, ?)');
   for (const row of expected.aliases) insertAlias.run(row.documentId, row.legacySectionId, row.sectionKey, row.sourceOrdinal);
   const insertSection = db.prepare('INSERT INTO document_sections VALUES (?, ?, ?, ?, ?, ?)');
   const insertFts = db.prepare('INSERT INTO sections_fts(rowid, title, content, topics) VALUES (?, ?, ?, ?)');
-  for (const [index, row] of expected.bodyFtsSample.entries()) {
-    insertSection.run(index + 1, row.documentId, row.legacySectionId, row.title, row.content, row.topics);
-    insertFts.run(index + 1, row.ftsTitle, row.ftsContent, row.ftsTopics);
+  for (const row of expected.bodyFtsSample) {
+    const identity = expected.identities.find(candidate => candidate.documentId === row.documentId
+      && candidate.sectionKey === row.sectionKey && candidate.sourceOrdinal === row.sourceOrdinal)!;
+    insertSection.run(identity.documentSectionId, row.documentId, row.legacySectionId, row.title, row.content, row.topics);
+    insertFts.run(identity.documentSectionId, row.ftsTitle, row.ftsContent, row.ftsTopics);
   }
   const calls: string[][] = [];
   return {

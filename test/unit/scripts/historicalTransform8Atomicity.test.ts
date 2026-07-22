@@ -85,6 +85,38 @@ describe('Transform 8 historical materialization atomicity', () => {
       rmSync(workspace, { recursive: true, force: true });
     }
   }, 30_000);
+
+  it('keeps the forced build error primary when the optional failure snapshot cannot be written', () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'theologai-transform8-snapshot-failure-'));
+    const output = join(workspace, 'target.db');
+    const invalidSnapshot = join(workspace, 'missing-parent', 'snapshot.json');
+    try {
+      let failure: { stderr?: unknown } | undefined;
+      try {
+        execFileSync(process.execPath, [
+          TSX,
+          join(ROOT, 'scripts', 'build-database.ts'),
+          '--output', output,
+        ], {
+          cwd: ROOT,
+          env: {
+            ...process.env,
+            THEOLOGAI_TRANSFORM8_TEST_FAIL_AFTER_SIDECARS: '1',
+            THEOLOGAI_TRANSFORM8_TEST_FAILURE_SNAPSHOT: invalidSnapshot,
+          },
+          stdio: ['ignore', 'pipe', 'pipe'],
+        });
+      } catch (error) {
+        failure = error as { stderr?: unknown };
+      }
+      expect(failure).toBeDefined();
+      expect(String(failure?.stderr)).toContain('Forced Transform 8 late failure after historical sidecar assertions');
+      expect(existsSync(output)).toBe(false);
+      expect(readdirSync(workspace).filter(name => name.includes('.tmp-'))).toEqual([]);
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  }, 30_000);
 });
 
 function requireMigration(filename: string): string {

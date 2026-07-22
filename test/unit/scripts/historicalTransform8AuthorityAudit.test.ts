@@ -38,16 +38,18 @@ function authorityDatabase(expected: HistoricalTransform8ExpectedAuthority): Dat
       row.browsePageSize, row.cursorVersion, row.provenanceJson, row.rightsJson);
   }
   const insertIdentity = database.prepare('INSERT INTO historical_section_identities VALUES (?, ?, ?, ?)');
-  for (const [index, row] of expected.identities.entries()) {
-    insertIdentity.run(row.documentId, row.sectionKey, row.sourceOrdinal, index + 1);
+  for (const row of expected.identities) {
+    insertIdentity.run(row.documentId, row.sectionKey, row.sourceOrdinal, row.documentSectionId);
   }
   const insertAlias = database.prepare('INSERT INTO historical_section_aliases VALUES (?, ?, ?, ?)');
   for (const row of expected.aliases) insertAlias.run(row.documentId, row.legacySectionId, row.sectionKey, row.sourceOrdinal);
   const insertSection = database.prepare('INSERT INTO document_sections VALUES (?, ?, ?, ?, ?, ?)');
   const insertFts = database.prepare('INSERT INTO sections_fts(rowid, title, content, topics) VALUES (?, ?, ?, ?)');
-  for (const [index, row] of expected.bodyFtsSample.entries()) {
-    insertSection.run(index + 1, row.documentId, row.legacySectionId, row.title, row.content, row.topics);
-    insertFts.run(index + 1, row.ftsTitle, row.ftsContent, row.ftsTopics);
+  for (const row of expected.bodyFtsSample) {
+    const identity = expected.identities.find(candidate => candidate.documentId === row.documentId
+      && candidate.sectionKey === row.sectionKey && candidate.sourceOrdinal === row.sourceOrdinal)!;
+    insertSection.run(identity.documentSectionId, row.documentId, row.legacySectionId, row.title, row.content, row.topics);
+    insertFts.run(identity.documentSectionId, row.ftsTitle, row.ftsContent, row.ftsTopics);
   }
   return database;
 }
@@ -101,6 +103,29 @@ describe('Transform 8 ordered authority audit', () => {
         database.prepare(`UPDATE historical_section_identities SET section_key = ?
           WHERE document_id = ? AND section_key = ?`)
           .run('audit-unaliased-canonical-rename', canonical.documentId, canonical.sectionKey);
+        expect(() => audit(database, expected)).toThrow('identities authority projection');
+      });
+
+      withinSavepoint(database, () => {
+        const sampled = new Set(expected.bodyFtsSample.map(row => `${row.documentId}\u0000${row.sectionKey}`));
+        const pair = [...expected.identities.reduce((groups, identity) => {
+          if (sampled.has(`${identity.documentId}\u0000${identity.sectionKey}`)) return groups;
+          const group = groups.get(identity.documentId) ?? [];
+          group.push(identity);
+          groups.set(identity.documentId, group);
+          return groups;
+        }, new Map<string, typeof expected.identities>()).values()]
+          .find(candidates => candidates.length >= 2)!;
+        const [first, second] = pair;
+        // Simulate an out-of-band storage-link swap after import. It is outside
+        // the 32-row parity sample, so only the full identity authority hash
+        // can detect that the canonical keys would now resolve to wrong bodies.
+        database.prepare(`UPDATE historical_section_identities SET document_section_id = ?
+          WHERE document_id = ? AND section_key = ?`)
+          .run(second!.documentSectionId, first!.documentId, first!.sectionKey);
+        database.prepare(`UPDATE historical_section_identities SET document_section_id = ?
+          WHERE document_id = ? AND section_key = ?`)
+          .run(first!.documentSectionId, second!.documentId, second!.sectionKey);
         expect(() => audit(database, expected)).toThrow('identities authority projection');
       });
 

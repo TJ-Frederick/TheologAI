@@ -42,6 +42,8 @@ export interface HistoricalTransform8IdentityProjection {
   documentId: string;
   sectionKey: string;
   sourceOrdinal: number;
+  /** Internal storage link, bound to this exact source ordinal by Transform 8. */
+  documentSectionId: number;
 }
 
 export interface HistoricalTransform8AliasProjection {
@@ -110,6 +112,19 @@ export function buildHistoricalTransform8ExpectedAuthority(root: string): Histor
   const aliases: HistoricalTransform8AliasProjection[] = [];
   const bodyFts: HistoricalTransform8BodyFtsParityProjection[] = [];
 
+  // Build-database materializes the 17 source files in the same bytewise
+  // filename order used by readHistoricalSectionSources, into an otherwise
+  // empty document_sections table. The resulting storage link is internal,
+  // but it must remain bound to this exact source row so a canonical key can
+  // never be redirected to a different section body.
+  const storageIdBySourceRow = new Map<string, number>();
+  let nextDocumentSectionId = 1;
+  for (const source of sourcesByDocument.values()) {
+    for (let sourceOrdinal = 1; sourceOrdinal <= source.value.sections.length; sourceOrdinal++) {
+      storageIdBySourceRow.set(`${source.documentId}\u0000${sourceOrdinal}`, nextDocumentSectionId++);
+    }
+  }
+
   for (const document of compilation.map.documents) {
     const source = sourcesByDocument.get(document.documentId);
     if (!source || source.value.sections.length !== document.sections.length) {
@@ -144,10 +159,15 @@ export function buildHistoricalTransform8ExpectedAuthority(root: string): Histor
       const title = String(raw.title || raw.question || raw.chapter || raw.q || '');
       const content = String(raw.content || raw.answer || raw.a || '');
       const topics = JSON.stringify(raw.topics || []);
+      const documentSectionId = storageIdBySourceRow.get(`${document.documentId}\u0000${section.sourceOrdinal}`);
+      if (!Number.isSafeInteger(documentSectionId) || documentSectionId < 1) {
+        throw new Error(`Transform 8 has no deterministic storage link for ${document.documentId} source ordinal ${section.sourceOrdinal}`);
+      }
       identities.push({
         documentId: document.documentId,
         sectionKey: section.sectionKey,
         sourceOrdinal: section.sourceOrdinal,
+        documentSectionId,
       });
       bodyFts.push({
         documentId: document.documentId,
@@ -219,7 +239,8 @@ export function auditHistoricalTransform8Authority(
   const identities = readPaged(readPage, {
     name: 'identities',
     expected: expected.identities,
-    sql: last => `SELECT document_id AS documentId, section_key AS sectionKey, source_ordinal AS sourceOrdinal
+    sql: last => `SELECT document_id AS documentId, section_key AS sectionKey, source_ordinal AS sourceOrdinal,
+      document_section_id AS documentSectionId
       FROM historical_section_identities${last ? ` WHERE document_id > ${sqlLiteral(last.documentId)}
         OR (document_id = ${sqlLiteral(last.documentId)} AND (source_ordinal > ${last.sourceOrdinal}
           OR (source_ordinal = ${last.sourceOrdinal} AND section_key > ${sqlLiteral(last.sectionKey)})))` : ''}
@@ -383,11 +404,12 @@ function parseProfile(value: unknown): HistoricalTransform8ProfileProjection {
 }
 
 function parseIdentity(value: unknown): HistoricalTransform8IdentityProjection {
-  const row = exactRecord(value, ['documentId', 'sectionKey', 'sourceOrdinal'], 'identity');
+  const row = exactRecord(value, ['documentId', 'sectionKey', 'sourceOrdinal', 'documentSectionId'], 'identity');
   return {
     documentId: stringValue(row.documentId, 'identity.documentId'),
     sectionKey: stringValue(row.sectionKey, 'identity.sectionKey'),
     sourceOrdinal: positiveInteger(row.sourceOrdinal, 'identity.sourceOrdinal'),
+    documentSectionId: positiveInteger(row.documentSectionId, 'identity.documentSectionId'),
   };
 }
 
