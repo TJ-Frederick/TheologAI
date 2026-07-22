@@ -125,9 +125,15 @@ function catalogHtml(artifact: AquinasGutenbergCatalogIdentityArtifact, siteCoun
 <table id="about_book_table">
 <tr><th>Author</th><td><a href="${identity.author.agentPath}" about="${identity.author.agentAboutPath}" itemprop="creator">${identity.author.name}</a></td></tr>
 <tr><th>Title</th><td>${identity.titleLines[0]}<br>${identity.titleLines[1]}</td></tr>
+<tr><th>Note</th><td>Wikipedia page about this book</td></tr>
 <tr><th>Credits</th><td>${identity.credits}</td></tr>
+<tr><th>Reading Level</th><td>Computed presentation metadata</td></tr>
 <tr content="${identity.language.code}"><th>Language</th><td>${identity.language.label}</td></tr>
 <tr content="${identity.locClass}"><th>LoC Class</th><td>${identity.locClass}</td></tr>
+<tr><th>Subject</th><td>Subject one</td></tr>
+<tr><th>Subject</th><td>Subject two</td></tr>
+<tr><th>Subject</th><td>Subject three</td></tr>
+<tr><th>Subject</th><td>Subject four</td></tr>
 <tr><th>Category</th><td>${identity.category}</td></tr>
 <tr><th>eBook-No.</th><td>${artifact.ebookId}</td></tr>
 <tr content="${identity.release.machineDate}"><th>Release Date</th><td>${identity.release.displayDate}</td></tr>
@@ -277,6 +283,26 @@ describe('Aquinas Gutenberg local acquisition/source-rights lock', () => {
     const identity = catalogLock.artifacts[0]!;
     const mismatched = Buffer.from(catalogHtml(identity).toString('utf8').replace(identity.semanticIdentity.credits, 'Unreviewed credits'));
     expect(() => extractAndVerifyCatalogSemanticIdentity(source.artifacts[0]!, identity, mismatched, source)).toThrow('catalog semantic identity drifted');
+  });
+
+  it('rejects an unknown Edition row instead of treating it as out-of-projection presentation', () => {
+    const source = readAquinasGutenbergSourceLock(process.cwd());
+    const identity = readAquinasGutenbergCatalogIdentityLock(process.cwd()).artifacts[0]!;
+    const injected = Buffer.from(catalogHtml(identity).toString('utf8').replace(
+      '</table>',
+      '<tr><th>Edition</th><td>Hostile replacement edition</td></tr></table>',
+    ));
+    expect(() => extractAndVerifyCatalogSemanticIdentity(source.artifacts[0]!, identity, injected, source)).toThrow('unknown row label: Edition');
+  });
+
+  it('rejects extra coauthor text outside the single reviewed creator link', () => {
+    const source = readAquinasGutenbergSourceLock(process.cwd());
+    const identity = readAquinasGutenbergCatalogIdentityLock(process.cwd()).artifacts[0]!;
+    const injected = Buffer.from(catalogHtml(identity).toString('utf8').replace(
+      `${identity.semanticIdentity.author.name}</a></td>`,
+      `${identity.semanticIdentity.author.name}</a>; Hostile Coauthor</td>`,
+    ));
+    expect(() => extractAndVerifyCatalogSemanticIdentity(source.artifacts[0]!, identity, injected, source)).toThrow('Author cell must contain only');
   });
 
   it('rejects topology, provenance, rights, member, URL, and comparison-witness drift', () => {

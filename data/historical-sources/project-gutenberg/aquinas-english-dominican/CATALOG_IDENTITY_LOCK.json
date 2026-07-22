@@ -41,6 +41,23 @@
       "locator": "unique Downloads row in table#about_book_table"
     }
   ],
+  "permittedOutOfProjectionRows": [
+    {
+      "label": "Note",
+      "expectedCount": 1,
+      "rationale": "The Wikipedia pointer is contextual navigation, not edition identity or provenance evidence."
+    },
+    {
+      "label": "Reading Level",
+      "expectedCount": 1,
+      "rationale": "The computed readability estimate is presentation metadata and is not source identity."
+    },
+    {
+      "label": "Subject",
+      "expectedCount": 4,
+      "rationale": "The four catalog subject classifications aid discovery but do not select this electronic edition."
+    }
+  ],
   "outOfProjectionPresentation": [
     "descriptive summary",
     "reading-level estimate",

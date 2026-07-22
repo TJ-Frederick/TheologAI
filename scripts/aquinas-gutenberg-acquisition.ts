@@ -33,7 +33,7 @@ export const AQUINAS_GUTENBERG_GENERATED_RECEIPT_VERSION = 'theologai-aquinas-gu
 // both the JSON and this executable guard; a receipt alone cannot redefine it.
 const EXPECTED_SOURCE_LOCK_SHA256 = 'c5cfdd1edd132bf59968cbabe4c7de2180c42d205735ca6c06aec626104a180b';
 const EXPECTED_REVIEWED_RECEIPT_SHA256 = 'bc0dab9ce5dc3672ccf2a81182655c75eaf6ef4f280584a40e079bf82a11719d';
-const EXPECTED_CATALOG_IDENTITY_LOCK_SHA256 = 'f3ac77059cf8a4da57d97f0d3ac9f3a52fc323102ccfa8fee540ce89c28d7068';
+const EXPECTED_CATALOG_IDENTITY_LOCK_SHA256 = '42e19c59e1907560148fd68316c9426eeaf664d8bcab358726b78b497df18c7c';
 const GUTENBERG_HOST = 'www.gutenberg.org';
 const MAX_ARCHIVE_BYTES = 2_000_000;
 const MAX_CATALOG_BYTES = 128_000;
@@ -436,7 +436,7 @@ function parseCatalogSemanticIdentity(value: unknown, ebookId: number, label: st
 
 export function parseAquinasGutenbergCatalogIdentityLock(value: unknown): AquinasGutenbergCatalogIdentityLock {
   const lock = record(value, 'catalog identity lock');
-  exactKeys(lock, ['schemaVersion', 'sourceLockSha256', 'reviewedReceiptSha256', 'normalization', 'invariantFields', 'allowedVolatility', 'outOfProjectionPresentation', 'artifacts'], 'catalog identity lock');
+  exactKeys(lock, ['schemaVersion', 'sourceLockSha256', 'reviewedReceiptSha256', 'normalization', 'invariantFields', 'allowedVolatility', 'permittedOutOfProjectionRows', 'outOfProjectionPresentation', 'artifacts'], 'catalog identity lock');
   if (lock.schemaVersion !== AQUINAS_GUTENBERG_CATALOG_IDENTITY_LOCK_VERSION) fail('unsupported catalog identity lock schema');
   const normalization = record(lock.normalization, 'catalog identity normalization');
   exactKeys(normalization, ['parser', 'text', 'projection', 'rawSnapshot'], 'catalog identity normalization');
@@ -452,6 +452,19 @@ export function parseAquinasGutenbergCatalogIdentityLock(value: unknown): Aquina
     const entry = record(value, `catalog identity allowedVolatility[${index}]`);
     exactKeys(entry, ['field', 'syntax', 'locator'], `catalog identity allowedVolatility[${index}]`);
     if (entry.field !== expectedVolatility[index]![0] || entry.syntax !== expectedVolatility[index]![1] || entry.locator !== expectedVolatility[index]![2]) fail(`catalog identity allowedVolatility[${index}] drifted`);
+  });
+  const permittedRows = array(lock.permittedOutOfProjectionRows, 'catalog identity permittedOutOfProjectionRows');
+  const expectedPermittedRows = [
+    ['Note', 1, 'The Wikipedia pointer is contextual navigation, not edition identity or provenance evidence.'],
+    ['Reading Level', 1, 'The computed readability estimate is presentation metadata and is not source identity.'],
+    ['Subject', 4, 'The four catalog subject classifications aid discovery but do not select this electronic edition.'],
+  ] as const;
+  if (permittedRows.length !== expectedPermittedRows.length) fail('catalog identity permittedOutOfProjectionRows drifted');
+  permittedRows.forEach((value, index) => {
+    const entry = record(value, `catalog identity permittedOutOfProjectionRows[${index}]`);
+    exactKeys(entry, ['label', 'expectedCount', 'rationale'], `catalog identity permittedOutOfProjectionRows[${index}]`);
+    const expected = expectedPermittedRows[index]!;
+    if (entry.label !== expected[0] || entry.expectedCount !== expected[1] || entry.rationale !== expected[2]) fail(`catalog identity permittedOutOfProjectionRows[${index}] drifted`);
   });
   exactStringArray(lock.outOfProjectionPresentation, ['descriptive summary', 'reading-level estimate', 'site navigation and styling', 'non-archive download-format presentation'], 'catalog identity outOfProjectionPresentation');
   const artifacts = array(lock.artifacts, 'catalog identity artifacts').map((value, index) => {
@@ -727,6 +740,29 @@ export function extractAndVerifyCatalogSemanticIdentity(
     if (headings.length !== 1 || values.length !== 1) fail(`eBook ${sourceArtifact.ebookId} catalog row is structurally ambiguous`);
     return { row, value: values[0]!, label: normalizedHtmlText(headings[0]!) };
   });
+  const expectedRowCounts: Readonly<Record<string, number>> = {
+    Author: 1,
+    Title: 1,
+    Note: 1,
+    Credits: 1,
+    'Reading Level': 1,
+    Language: 1,
+    'LoC Class': 1,
+    Subject: 4,
+    Category: 1,
+    'eBook-No.': 1,
+    'Release Date': 1,
+    'Last Update': identityArtifact.semanticIdentity.lastUpdate ? 1 : 0,
+    Copyright: 1,
+    Downloads: 1,
+  };
+  for (const candidate of rows) {
+    if (!(candidate.label in expectedRowCounts)) fail(`eBook ${sourceArtifact.ebookId} catalog has unknown row label: ${candidate.label || '(empty)'}`);
+  }
+  for (const [label, expectedCount] of Object.entries(expectedRowCounts)) {
+    const observedCount = rows.filter(candidate => candidate.label === label).length;
+    if (observedCount !== expectedCount) fail(`eBook ${sourceArtifact.ebookId} catalog ${label} row count drifted: expected ${expectedCount}, observed ${observedCount}`);
+  }
   const requiredRow = (label: string, optional = false): { row: HtmlElement; value: HtmlElement } | null => {
     const matches = rows.filter(candidate => candidate.label === label);
     if (matches.length > 1 || (!optional && matches.length !== 1)) fail(`eBook ${sourceArtifact.ebookId} catalog ${label} row must occur exactly once`);
@@ -734,6 +770,10 @@ export function extractAndVerifyCatalogSemanticIdentity(
   };
   const authorRow = requiredRow('Author')!;
   const authorLink = uniqueHtmlElement(authorRow.value, element => element.tagName === 'a' && htmlAttribute(element, 'itemprop') === 'creator', `eBook ${sourceArtifact.ebookId} catalog author link`);
+  const authorCellContent = htmlChildren(authorRow.value).filter(child => isHtmlElement(child) || normalizedHtmlText(child).length > 0);
+  if (authorCellContent.length !== 1 || authorCellContent[0] !== authorLink || htmlElements(authorLink, element => element !== authorLink).length !== 0 || normalizedHtmlText(authorRow.value) !== normalizedHtmlText(authorLink)) {
+    fail(`eBook ${sourceArtifact.ebookId} Author cell must contain only the single reviewed creator link and text`);
+  }
   const titleRow = requiredRow('Title')!;
   const creditsRow = requiredRow('Credits')!;
   const languageRow = requiredRow('Language')!;
