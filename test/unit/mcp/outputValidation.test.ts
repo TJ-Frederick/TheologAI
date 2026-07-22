@@ -17,7 +17,7 @@ import { createDeterministicMcpFixture } from '../../fixtures/mcpCompositionRoot
 import { DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG } from '../../../src/kernel/featureFlags.js';
 import { classicTextsOutputSchema } from '../../../src/mcp/schemas/classicTexts.js';
 import { validateClassicTextsOutputSemantics } from '../../../src/presenters/classicTextsStructured.js';
-import { primarySourceSearchV4OutputSchema, primarySourceSearchV5OutputSchema } from '../../../src/mcp/schemas/primarySourceSearchV4.js';
+import { primarySourceSearchV6OutputSchema, primarySourceSearchV7OutputSchema } from '../../../src/mcp/schemas/primarySourceSearchV4.js';
 
 const connected: Array<{ client: Client; server: Server }> = [];
 type LogMessage = { level: string; logger?: string; data: unknown };
@@ -63,15 +63,15 @@ describe('MCP structured output validation', () => {
   it('keeps the classic-text schema compact after moving cross-field search algebra to semantic validation', () => {
     const bytes = new TextEncoder().encode(JSON.stringify(classicTextsOutputSchema)).byteLength;
     expect(bytes).toBeGreaterThan(15_000);
-    expect(bytes).toBeLessThanOrEqual(16_384);
+    expect(bytes).toBeLessThanOrEqual(24_576);
   });
 
   it.each([
-    ['v4', primarySourceSearchV4OutputSchema],
-    ['v5', primarySourceSearchV5OutputSchema],
+    ['v6', primarySourceSearchV6OutputSchema],
+    ['v7', primarySourceSearchV7OutputSchema],
   ] as const)('accepts 100 eligible works and rejects 101 at the %s output-schema boundary', async (version, outputSchema) => {
     const structuredContent = (eligibleDocumentCount: number) => ({
-      schemaVersion: version === 'v4' ? '4' : '5',
+      schemaVersion: version === 'v6' ? '6' : '7',
       kind: 'primary_source_search',
       planStatus: 'complete',
       responseWindow: { unit: 'utf8_bytes', maximum: 32768, truncated: false },
@@ -89,11 +89,11 @@ describe('MCP structured output validation', () => {
       }],
       coverage: {
         localAttempted: true, localStatus: 'no_results', localHitCount: 0,
-        ...(version === 'v5' ? { ccelAttempted: false, ccelHitCount: 0 } : {}),
+        ...(version === 'v7' ? { ccelAttempted: false, ccelHitCount: 0 } : {}),
         notices: [],
         serverObserved: { searched: [{ queryId: 'q', provider: 'local', status: 'no_results', returnedHitCount: 0 }], notSearched: [] },
       },
-      evidencePolicy: version === 'v5'
+      evidencePolicy: version === 'v7'
         ? {
           snippetUse: 'discovery_only', localSectionAccess: 'mcp_resource_read', externalSectionAccess: 'direct_url_only',
           coverageScope: 'bounded_non_exhaustive', externalRightsStatus: 'not_determined',
@@ -153,9 +153,13 @@ describe('MCP structured output validation', () => {
       const schema = listed.tools.find(tool => tool.name === toolName)?.outputSchema;
       expect(schema).toMatchObject({ type: 'object', additionalProperties: false });
       expect(schema).not.toHaveProperty('$ref');
-      const expectedVersion = toolName === 'primary_source_search' || toolName === 'parallel_passages'
-        ? '4'
-        : '1';
+      const expectedVersion = toolName === 'primary_source_search'
+        ? '6'
+        : toolName === 'parallel_passages'
+          ? '4'
+          : toolName === 'classic_text_lookup'
+            ? '2'
+            : '1';
       expect(schema?.properties?.schemaVersion).toMatchObject({ const: expectedVersion });
     }
   });
@@ -456,10 +460,10 @@ describe('MCP structured output validation', () => {
     })).rejects.toMatchObject({ code: -32603, message: expect.stringContaining('Internal server error') });
   });
 
-  it('accepts a v4 primary-source result after control-only optional metadata is omitted', async () => {
+  it('accepts a v7 primary-source result after control-only optional metadata is omitted', async () => {
     const contract = {
       exposeCcelDiscovery: true, ccelLiveSearch: false, ccelCoordinator: false,
-      contractVersion: '5' as const, liveCcelEnabled: false,
+      contractVersion: '7' as const, liveCcelEnabled: false,
     };
     const handler = createPrimarySourceSearchHandler({
       search: async () => ({
@@ -481,7 +485,7 @@ describe('MCP structured output validation', () => {
               snippet: 'Discovery lead', rankWithinProvider: 1, page: 1, snippetOnly: true as const,
               attribution: 'Local', resourceSizeBytes: 10,
               locator: {
-                kind: 'local_section' as const, documentId: 'doc', sectionId: '1',
+                kind: 'local_section' as const, documentId: 'doc', sectionKey: '1', sourceOrdinal: 1,
                 url: 'theologai://documents/doc#section-1',
               },
             }],

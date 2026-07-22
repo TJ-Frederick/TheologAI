@@ -17,6 +17,7 @@ import { UBS_SEMANTICS_DATABASE_CEILING_BYTES } from './ubs-semantics/capacity.j
 import { verifyHistoricalSectionCompatibilityAttestationFromDisk } from './historical-section-compatibility-compiler.js';
 import { historicalLegacySectionId, readHistoricalSectionSources, sha256Canonical } from './historical-section-key-plan.js';
 import { auditHistoricalTransform8Authority } from './historical-transform8-authority-audit.js';
+import { HistoricalDocumentRepository } from '../src/adapters/data/HistoricalDocumentRepository.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -97,6 +98,83 @@ function assertHistoricalTransform8Materialization(database: Database.Database):
   })));
   if (JSON.stringify(aliases) !== JSON.stringify(expectedAliases)) {
     throw new Error('Transform 8 source-first alias projection drifted');
+  }
+  const resolvedAliases = database.prepare(`SELECT alias.document_id AS documentId,
+    alias.legacy_section_id AS legacySectionId, identity.section_key AS sectionKey,
+    identity.source_ordinal AS sourceOrdinal, section.content AS content
+    FROM historical_section_aliases alias
+    JOIN historical_section_identities identity
+      ON identity.document_id = alias.document_id AND identity.section_key = alias.section_key
+        AND identity.source_ordinal = alias.source_ordinal
+    JOIN document_sections section
+      ON section.id = identity.document_section_id AND section.document_id = identity.document_id
+    ORDER BY alias.document_id, alias.legacy_section_id`).all() as Array<{
+      documentId: string; legacySectionId: string; sectionKey: string; sourceOrdinal: number; content: string;
+    }>;
+  if (resolvedAliases.length !== expectedAliases.length) {
+    throw new Error('Transform 8 aliases failed to resolve every approved canonical target');
+  }
+  for (const alias of resolvedAliases) {
+    const source = sourcesByDocument.get(alias.documentId);
+    const expected = expectedAliases.find(candidate => candidate.documentId === alias.documentId
+      && candidate.legacySectionId === alias.legacySectionId);
+    const body = source?.value.sections[(alias.sourceOrdinal ?? 0) - 1] as Record<string, unknown> | undefined;
+    const expectedContent = body ? String(body.content || body.answer || body.a || '') : undefined;
+    if (!expected || expected.sectionKey !== alias.sectionKey || expected.sourceOrdinal !== alias.sourceOrdinal
+      || expectedContent !== alias.content) {
+      throw new Error(`Transform 8 alias resolved to an unapproved canonical body: ${alias.documentId}#${alias.legacySectionId}`);
+    }
+  }
+  const collisionGroups = compilation.map.documents.flatMap(document => {
+    const counts = new Map<string, number>();
+    for (const section of document.sections) counts.set(section.legacySectionId, (counts.get(section.legacySectionId) ?? 0) + 1);
+    return [...counts.entries()].filter(([, count]) => count > 1).map(([legacySectionId]) => `${document.documentId}\u0000${legacySectionId}`);
+  });
+  if (collisionGroups.length !== 23) throw new Error(`Transform 8 collision-group count mismatch: ${collisionGroups.length}`);
+  const aliasLocatorsLeaked = database.prepare(`SELECT COUNT(*) AS count
+    FROM historical_section_aliases alias
+    JOIN historical_section_identities identity
+      ON identity.document_id = alias.document_id AND identity.section_key = alias.legacy_section_id
+    WHERE alias.legacy_section_id != alias.section_key`).get() as { count: number };
+  if (aliasLocatorsLeaked.count !== 0) throw new Error('Transform 8 browse/search authority can emit a legacy alias as a canonical key');
+  // Exercise the Node repository over every stored canonical identity and
+  // every approved alias. SQL-side joins prove the materialization; these
+  // calls also prove the production Node resolution precedence and mapping.
+  const repository = new HistoricalDocumentRepository(database);
+  const canonicalByIdentity = new Map(identities.map(identity => [
+    `${identity.documentId}\u0000${identity.sectionKey}\u0000${identity.sourceOrdinal}`,
+    identity,
+  ]));
+  for (const identity of identities) {
+    const resolved = repository.resolveSection(identity.documentId, identity.sectionKey);
+    if (!resolved || resolved.resolution !== 'canonical' || resolved.requestedSectionId !== identity.sectionKey
+      || resolved.sectionKey !== identity.sectionKey || resolved.sourceOrdinal !== identity.sourceOrdinal
+      || resolved.section.content !== identity.content) {
+      throw new Error(`Transform 8 Node canonical resolution drifted at ${identity.documentId}#${identity.sectionKey}`);
+    }
+  }
+  for (const alias of expectedAliases) {
+    const canonical = canonicalByIdentity.get(`${alias.documentId}\u0000${alias.sectionKey}\u0000${alias.sourceOrdinal}`);
+    const resolved = repository.resolveSection(alias.documentId, alias.legacySectionId);
+    // A source key that also appears in legacy data must retain source-first
+    // precedence; all other approved aliases must be explicitly identified.
+    const expectedResolution = alias.legacySectionId === alias.sectionKey ? 'canonical' : 'legacy_alias';
+    if (!canonical || !resolved || resolved.resolution !== expectedResolution
+      || resolved.requestedSectionId !== alias.legacySectionId || resolved.sectionKey !== alias.sectionKey
+      || resolved.sourceOrdinal !== alias.sourceOrdinal || resolved.section.content !== canonical.content) {
+      throw new Error(`Transform 8 Node alias resolution drifted at ${alias.documentId}#${alias.legacySectionId}`);
+    }
+  }
+  for (const document of compilation.map.documents) {
+    const expected = identities.filter(identity => identity.documentId === document.documentId);
+    const browsed = repository.browseHistoricalSectionSummaries(document.documentId, undefined, 2001);
+    if (browsed.length !== expected.length || JSON.stringify(browsed.map(section => [section.sectionKey, section.sourceOrdinal]))
+      !== JSON.stringify(expected.map(section => [section.sectionKey, section.sourceOrdinal]))) {
+      throw new Error(`Transform 8 Node browse emitted a non-canonical or unordered identity for ${document.documentId}`);
+    }
+  }
+  if (repository.resolveSection('nicene-creed', 'not-a-reviewed-section-key') !== undefined) {
+    throw new Error('Transform 8 Node unknown-section resolution changed the not-found boundary');
   }
   const profiles = database.prepare(`SELECT document_id AS documentId, work_id AS workId, edition_id AS editionId,
     immutable_corpus_identity AS immutableCorpusIdentity, section_package_identity AS sectionPackageIdentity,

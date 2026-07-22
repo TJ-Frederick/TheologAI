@@ -25,8 +25,8 @@ tuple (`CF-Connecting-IP: 18.192.206.183` plus `User-Agent:
 Go-http-client/2.0`) is rejected rather than redirected; supported browser CORS
 preflight remains local. The preview
 `theologai-preview.tjfrederick.workers.dev` host remains a direct compatibility
-endpoint. The primary-source MCP schema is production v4/local-only and preview
-v5/discovery-only; CCEL execution remains disabled in both environments.
+endpoint. The primary-source MCP schema is production v6/local-only and preview
+v7/discovery-only; CCEL execution remains disabled in both environments.
 
 The later repository changes through merged PR #83
 (`93d5837b05249c15127ab20107f86443cccf4e1e`) are repository-only and have not

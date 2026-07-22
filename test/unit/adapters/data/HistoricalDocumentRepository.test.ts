@@ -23,7 +23,7 @@ describe('HistoricalDocumentRepository', () => {
   it('prepares all reusable document and FTS queries', () => {
     const db = new FakeSqliteDatabase();
     new HistoricalDocumentRepository(db.asDatabase());
-    expect(db.prepare).toHaveBeenCalledTimes(6);
+    expect(db.prepare).toHaveBeenCalledTimes(12);
     expect(db.statement('sections_fts MATCH').sql).toMatch(/ORDER BY rank, ds\.id\s+LIMIT \?/);
   });
 
@@ -116,18 +116,23 @@ describe('HistoricalDocumentRepository', () => {
       document_type: documentRow.type,
       document_date: documentRow.date,
       document_metadata: documentRow.metadata,
+      section_key: 'source-0001',
+      source_ordinal: 1,
     };
     const db = new FakeSqliteDatabase([{ match: 'JOIN documents d', all: [row] }]);
     const repo = new HistoricalDocumentRepository(db.asDatabase());
     expect(repo.searchPrimarySources({ text: 'grace OR faith', match: 'all_terms', documentIds: [documentRow.id], limit: 8 })).toEqual([{
       document: { id: documentRow.id, title: documentRow.title, type: documentRow.type, date: documentRow.date, topics: ['Scripture', 'God'] },
       section: { id: 7, document_id: documentRow.id, section_number: '1.1', title: '', content: sectionRow.content, topics: ['revelation'] },
+      sectionKey: 'source-0001', sourceOrdinal: 1,
     }]);
     expect(db.statement('json_each(?)').all).toHaveBeenCalledWith(
       '"grace" AND "OR" AND "faith"', JSON.stringify([documentRow.id]), 8,
     );
     repo.searchPrimarySources({ text: 'union with Christ', match: 'phrase', limit: 3 });
-    expect(db.statement(/JOIN documents d[\s\S]*ORDER BY rank/).all).toHaveBeenCalledWith('"union with Christ"', 3);
+    expect(db.prepare.mock.results.some(result => result.value.all.mock.calls.some((args: unknown[]) => (
+      JSON.stringify(args) === JSON.stringify(['"union with Christ"', 3])
+    )))).toBe(true);
   });
 
   it('uses deterministic round-robin SQL for work-diverse selection', () => {

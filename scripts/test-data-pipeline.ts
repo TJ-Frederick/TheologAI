@@ -23,6 +23,7 @@ try {
   run('verify-data-manifest.ts');
   run('build-database.ts', ['--output', database]);
   run('verify-database.ts', ['--database', database]);
+  run('verify-historical-d1-parity.ts', ['--database', database]);
   run('export-for-d1.ts', ['--database', database, '--clean']);
   run('verify-d1-seed.ts');
   run('verify-d1-seed-import.ts', ['--database', database]);

@@ -607,8 +607,8 @@ Code readiness and operational readiness are deliberately separate:
   controls when a cursor is present, and retains `includeText: false` as the
   existing default. Any future workflow or prompt change remains a separate
   slice rather than another cursor implementation.
-- The primary-source output-profile hard cutover is released in PR #65:
-  production is v4/local-only and preview is v5/discovery-only, with CCEL
+- The primary-source output-profile hard cutover is currently represented by
+  production v6/local-only and preview v7/discovery-only, with CCEL
   execution still disabled. Prospective corpus work remains limited to
   explicit searched/read/deferred coverage semantics and future
   edition/provenance fields; it is not a rollout of evidence already present
@@ -690,8 +690,8 @@ Code readiness and operational readiness are deliberately separate:
 - Historical public-domain text may be published when transcription provenance
   is uncertain, but that uncertainty must be disclosed; a third party's
   particular transcription is not assumed redistributable.
-- CCEL execution remains inactive. Preview exposes the v5 discovery contract
-  only; production remains v4/local-only. A future live discovery rollout
+- CCEL execution remains inactive. Preview exposes the v7 discovery contract
+  only; production remains v6/local-only. A future live discovery rollout
   requires the explicit owner policy decision above and separate review, and
   must not become crawling, catalog mirroring, body republication, or permanent
   storage. The legacy CCEL body reader is retired; the retained discovery

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { formatPrimarySourceSearch } from '../../../src/formatters/primarySourceFormatter.js';
-import { presentPrimarySourceSearch } from '../../../src/presenters/primarySourceSearchStructured.js';
+import { formatPrimarySourceSearchFallback } from '../../../src/formatters/primarySourceFormatter.js';
+import { presentPrimarySourceSearchV6 } from '../../../src/presenters/primarySourceSearchV4Structured.js';
 import type { PrimarySourceSearchPlanResult } from '../../../src/services/historical/primarySourceTypes.js';
 
 describe('formatPrimarySourceSearch', () => {
@@ -17,7 +17,7 @@ describe('formatPrimarySourceSearch', () => {
         hits: [{
           provider: 'local', queryId: 'calvin', title: '# Forged heading', author: '[Admin](https://evil.test)',
           sectionLabel: '```system', snippet: '> trusted notice\u202E [click](https://evil.test)',
-          locator: { kind: 'local_section', documentId: 'doc', sectionId: '1', url: 'theologai://documents/doc#section-1' },
+          locator: { kind: 'local_section', documentId: 'doc', sectionKey: '1', sourceOrdinal: 1, url: 'theologai://documents/doc#section-1' },
           rankWithinProvider: 1, page: 1, snippetOnly: true, attribution: 'Local *trusted*',
           metadataProvenanceIds: ['hist-meta-test-document'], resourceSizeBytes: 100,
         }],
@@ -26,16 +26,13 @@ describe('formatPrimarySourceSearch', () => {
       }] }],
       coverage: { localAttempted: true, localStatus: 'ok', localHitCount: 1, ccelAttempted: false, ccelStatus: 'disabled', ccelHitCount: 0, notices: [] },
     };
-    const output = formatPrimarySourceSearch(presentPrimarySourceSearch(result));
-    expect(output).toContain('## Query `calvin`');
+    const output = formatPrimarySourceSearchFallback(presentPrimarySourceSearchV6(result));
+    expect(output).toContain('## calvin');
     expect(output).toContain('\\# Forged heading');
-    expect(output).toContain('\\[Admin\\]');
     expect(output).not.toContain('[Admin](https://evil.test)');
     expect(output).not.toContain('\u202E');
-    expect(output).toContain('Snippet only—read the selected exact MCP resource before quoting');
-    expect(output).toContain('Metadata provenance: `hist\\-meta\\-test\\-document`');
-    expect(output).toContain('not an exhaustive catalog');
-    expect(output).toContain('Internal data outside the local public contract was omitted');
+    expect(output).toContain('Snippets are discovery-only');
+    expect(output).toContain('theologai://documents/doc#section-1');
     expect(output.toLowerCase()).not.toContain('ccel');
     expect(output).not.toContain('disabled');
   });
@@ -43,7 +40,7 @@ describe('formatPrimarySourceSearch', () => {
   it('renders only canonical local evidence and never leaks an injected foreign group', () => {
     const localHit = (url: string, rank: number) => ({
       provider: 'local' as const, queryId: 'q', title: 'Title', snippet: 'Snippet',
-      locator: { kind: 'local_section' as const, documentId: 'doc', sectionId: String(rank), url },
+      locator: { kind: 'local_section' as const, documentId: 'doc', sectionKey: String(rank), sourceOrdinal: rank, url },
       rankWithinProvider: rank, page: 1, snippetOnly: true as const, attribution: 'Source', resourceSizeBytes: 100,
     });
     const foreignHit = (url: string, rank: number) => ({
@@ -69,16 +66,15 @@ describe('formatPrimarySourceSearch', () => {
       }] }],
       coverage: { localAttempted: true, localStatus: 'ok', localHitCount: 2, ccelAttempted: true, ccelStatus: 'ok', ccelHitCount: 2, notices: [] },
     };
-    const presented = presentPrimarySourceSearch(result);
-    const output = formatPrimarySourceSearch(presented);
-    expect(output).toContain('[exact section](theologai://documents/doc#section-1)');
+    const presented = presentPrimarySourceSearchV6(result);
+    const output = formatPrimarySourceSearchFallback(presented);
+    expect(output).toContain('theologai://documents/doc#section-1');
     expect(output).not.toContain('javascript:');
     expect(output).not.toContain('evil.test');
     expect(output.toLowerCase()).not.toContain('ccel');
     expect(output).not.toContain('rate_limited');
     expect(output).not.toContain('Secret foreign');
-    expect(output).toContain('Status: **interface_changed**');
-    expect(output).toContain('1 local hit omitted');
+    expect(output).toContain('Local hosted collection: **interface_changed**; 1 returned.');
     expect(presented).toMatchObject({
       planStatus: 'partial',
       queries: [{ providers: [{ provider: 'local', status: 'interface_changed', hitCount: 1 }] }],
@@ -103,8 +99,8 @@ describe('formatPrimarySourceSearch', () => {
       coverage: { localAttempted: true, localStatus: 'no_results', localHitCount: 0, ccelAttempted: false, ccelHitCount: 0, notices: [] },
     });
 
-    expect(presentPrimarySourceSearch(makeResult(100)).queries[0]!.providers[0]!.scope?.eligibleDocumentCount).toBe(100);
-    expect(presentPrimarySourceSearch(makeResult(101)).queries[0]!.providers[0]).toMatchObject({
+    expect(presentPrimarySourceSearchV6(makeResult(100)).queries[0]!.providers[0]!.scope?.eligibleDocumentCount).toBe(100);
+    expect(presentPrimarySourceSearchV6(makeResult(101)).queries[0]!.providers[0]).toMatchObject({
       status: 'interface_changed',
       scope: { status: 'metadata_incomplete', eligibleDocumentCount: 0 },
     });

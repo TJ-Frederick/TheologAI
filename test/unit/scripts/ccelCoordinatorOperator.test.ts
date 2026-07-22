@@ -30,7 +30,7 @@ const externalEditionReadiness = {
   exactArtifactRights: 'not_determined',
 };
 
-function toolSchema(version: '3' | '4' | '5', includeCcel: boolean, retryAfterSeconds = false): { properties: Record<string, unknown> } {
+function toolSchema(version: '3' | '6' | '7', includeCcel: boolean, retryAfterSeconds = false): { properties: Record<string, unknown> } {
   const local = { properties: { provider: { const: 'local' } } };
   const external = { properties: {
     provider: { const: 'ccel_live' }, ...(retryAfterSeconds ? { retryAfterSeconds: { type: 'integer' } } : {}),
@@ -46,7 +46,7 @@ function envelope(searchProvider: ReturnType<typeof provider>, planStatus = 'com
   const kind = searchProvider.provider;
   const observation = { queryId: 'audit', provider: kind, status: searchProvider.status };
   return {
-    schemaVersion: '5', kind: 'primary_source_search', planStatus,
+    schemaVersion: '7', kind: 'primary_source_search', planStatus,
     responseWindow: { unit: 'utf8_bytes', maximum: 32_768, truncated: false },
     queries: [{ id: 'audit', normalizedMode: 'all_terms', normalizedSelection: 'relevance', providers: [searchProvider] }],
     coverage: {
@@ -158,11 +158,11 @@ describe('CCEL operational scripts', () => {
     let ccelCalls = 0;
     let possibleOriginAdmissions = 0;
     const production: CcelAuditClient = {
-      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('4', false) }] }),
+      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('6', false) }] }),
       callTool: vi.fn(), close: vi.fn().mockResolvedValue(undefined),
     };
     const preview: CcelAuditClient = {
-      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('5', true, true) }] }),
+      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('7', true, true) }] }),
       callTool: vi.fn(),
       close: vi.fn().mockResolvedValue(undefined),
     };
@@ -184,11 +184,11 @@ describe('CCEL operational scripts', () => {
     expect(report).toMatchObject({
       passed: true,
       productionControl: {
-        contractVersionObserved: '4', discoverySchemaObserved: 'local_only', toolsListCalls: 1,
+        contractVersionObserved: '6', discoverySchemaObserved: 'local_only', toolsListCalls: 1,
         protectedSnapshotReads: 2, toolCallInvocations: 0,
       },
       preview: {
-        contractVersionObserved: '5', discoverySchemaObserved: 'ccel_exposed', ccelBearingToolCallMaximum: 2,
+        contractVersionObserved: '7', discoverySchemaObserved: 'ccel_exposed', ccelBearingToolCallMaximum: 2,
         upstreamOriginAdmissionObserved: 1,
       },
       coordinator: {
@@ -206,11 +206,11 @@ describe('CCEL operational scripts', () => {
     expect(report.preview).not.toHaveProperty('rolloutContract');
   });
 
-  it('fails closed before any tool call when preview still advertises v4', async () => {
-    const stalePreviewSchema = toolSchema('4', true, true);
-    stalePreviewSchema.properties.unrelatedVersion = { const: '5' };
+  it('fails closed before any tool call when preview still advertises v6', async () => {
+    const stalePreviewSchema = toolSchema('6', true, true);
+    stalePreviewSchema.properties.unrelatedVersion = { const: '7' };
     const production: CcelAuditClient = {
-      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('4', false) }] }),
+      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('6', false) }] }),
       callTool: vi.fn(), close: vi.fn().mockResolvedValue(undefined),
     };
     const preview: CcelAuditClient = {
@@ -218,7 +218,7 @@ describe('CCEL operational scripts', () => {
       callTool: vi.fn(), close: vi.fn().mockResolvedValue(undefined),
     };
     const dependencies = auditDependencies(production, preview);
-    await expect(runCcelPreviewAudit(auditOptions, dependencies)).rejects.toThrow(/preview v5 CCEL contract/);
+    await expect(runCcelPreviewAudit(auditOptions, dependencies)).rejects.toThrow(/preview v7 CCEL contract/);
     expect(production.callTool).not.toHaveBeenCalled();
     expect(preview.callTool).not.toHaveBeenCalled();
     expect(dependencies.snapshotCoordinator).not.toHaveBeenCalled();
@@ -232,11 +232,11 @@ describe('CCEL operational scripts', () => {
       callTool: vi.fn(), close: vi.fn().mockResolvedValue(undefined),
     };
     const preview: CcelAuditClient = {
-      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('5', true, true) }] }),
+      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('7', true, true) }] }),
       callTool: vi.fn(), close: vi.fn().mockResolvedValue(undefined),
     };
     const dependencies = auditDependencies(production, preview);
-    await expect(runCcelPreviewAudit(auditOptions, dependencies)).rejects.toThrow(/production v4 local-only control/);
+    await expect(runCcelPreviewAudit(auditOptions, dependencies)).rejects.toThrow(/production v6 local-only control/);
     expect(production.callTool).not.toHaveBeenCalled();
     expect(preview.callTool).not.toHaveBeenCalled();
     expect(dependencies.snapshotCoordinator).not.toHaveBeenCalled();
@@ -244,11 +244,11 @@ describe('CCEL operational scripts', () => {
 
   it('fails closed on a dirty pre-snapshot before any preview tool call', async () => {
     const production: CcelAuditClient = {
-      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('4', false) }] }),
+      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('6', false) }] }),
       callTool: vi.fn(), close: vi.fn().mockResolvedValue(undefined),
     };
     const preview: CcelAuditClient = {
-      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('5', true, true) }] }),
+      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('7', true, true) }] }),
       callTool: vi.fn(), close: vi.fn().mockResolvedValue(undefined),
     };
     const dependencies = auditDependencies(production, preview, [
@@ -263,11 +263,11 @@ describe('CCEL operational scripts', () => {
 
   it('sanitizes a failed protected pre-snapshot and makes no preview tool call', async () => {
     const production: CcelAuditClient = {
-      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('4', false) }] }),
+      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('6', false) }] }),
       callTool: vi.fn(), close: vi.fn().mockResolvedValue(undefined),
     };
     const preview: CcelAuditClient = {
-      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('5', true, true) }] }),
+      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('7', true, true) }] }),
       callTool: vi.fn(), close: vi.fn().mockResolvedValue(undefined),
     };
     const dependencies = auditDependencies(production, preview);
@@ -288,14 +288,14 @@ describe('CCEL operational scripts', () => {
     ['a missing provider execution flag', (output: ReturnType<typeof envelope>) => {
       Reflect.deleteProperty(output.queries[0]!.providers[0]!, 'searched');
     }],
-  ])('fails closed on %s in the v5 coverage ledger', async (_label, corrupt) => {
+  ])('fails closed on %s in the v7 coverage ledger', async (_label, corrupt) => {
     let ccelCalls = 0;
     const production: CcelAuditClient = {
-      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('4', false) }] }),
+      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('6', false) }] }),
       callTool: vi.fn(), close: vi.fn().mockResolvedValue(undefined),
     };
     const preview: CcelAuditClient = {
-      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('5', true, true) }] }),
+      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('7', true, true) }] }),
       callTool: vi.fn(async () => {
         ccelCalls++;
         if (ccelCalls === 1) {
@@ -315,11 +315,11 @@ describe('CCEL operational scripts', () => {
   it('stops after two possible origin admissions even when the mocked coordinator violates busy policy', async () => {
     let possibleOriginAdmissions = 0;
     const production: CcelAuditClient = {
-      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('4', false) }] }),
+      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('6', false) }] }),
       callTool: vi.fn(), close: vi.fn().mockResolvedValue(undefined),
     };
     const preview: CcelAuditClient = {
-      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('5', true, true) }] }),
+      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('7', true, true) }] }),
       callTool: vi.fn(async () => {
         possibleOriginAdmissions++;
         return { structuredContent: envelope(provider('ccel_live', 'no_results')) };
@@ -334,11 +334,11 @@ describe('CCEL operational scripts', () => {
 
   it('rejects an isError response unless it is the exact CCEL-only rate-limit form', async () => {
     const production: CcelAuditClient = {
-      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('4', false) }] }),
+      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('6', false) }] }),
       callTool: vi.fn(), close: vi.fn().mockResolvedValue(undefined),
     };
     const preview: CcelAuditClient = {
-      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('5', true, true) }] }),
+      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('7', true, true) }] }),
       callTool: vi.fn().mockResolvedValue({ isError: true, structuredContent: envelope(provider('local', 'rate_limited', 3), 'unavailable') }),
       close: vi.fn().mockResolvedValue(undefined),
     };
@@ -349,11 +349,11 @@ describe('CCEL operational scripts', () => {
   it('keeps the full retained terminal window usable and records its bounded eviction', async () => {
     let ccelCalls = 0;
     const production: CcelAuditClient = {
-      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('4', false) }] }),
+      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('6', false) }] }),
       callTool: vi.fn(), close: vi.fn().mockResolvedValue(undefined),
     };
     const preview: CcelAuditClient = {
-      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('5', true, true) }] }),
+      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('7', true, true) }] }),
       callTool: vi.fn(async request => {
         const providers = ((request.arguments.queries as Array<{ providers: string[] }>)[0]?.providers ?? []);
         if (providers.includes('ccel')) {
@@ -387,11 +387,11 @@ describe('CCEL operational scripts', () => {
   it('requires the protected post-snapshot to prove the terminal retirement watermark advanced', async () => {
     let ccelCalls = 0;
     const production: CcelAuditClient = {
-      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('4', false) }] }),
+      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('6', false) }] }),
       callTool: vi.fn(), close: vi.fn().mockResolvedValue(undefined),
     };
     const preview: CcelAuditClient = {
-      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('5', true, true) }] }),
+      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('7', true, true) }] }),
       callTool: vi.fn(async request => {
         const providers = ((request.arguments.queries as Array<{ providers: string[] }>)[0]?.providers ?? []);
         if (providers.includes('ccel')) {

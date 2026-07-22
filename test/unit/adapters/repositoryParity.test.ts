@@ -94,6 +94,20 @@ describe('SQLite and D1 repository parity with identical real data', () => {
         section_number TEXT, title TEXT, content TEXT NOT NULL, topics TEXT
       );
       CREATE VIRTUAL TABLE sections_fts USING fts5(title, content, topics);
+      CREATE TABLE historical_document_delivery_profiles (
+        document_id TEXT PRIMARY KEY, work_id TEXT, edition_id TEXT, immutable_corpus_identity TEXT NOT NULL,
+        section_package_identity TEXT, delivery_mode TEXT NOT NULL, section_count INTEGER NOT NULL,
+        landing_max_bytes INTEGER NOT NULL, browse_page_size INTEGER NOT NULL, cursor_version INTEGER NOT NULL,
+        provenance_json TEXT NOT NULL, rights_json TEXT NOT NULL
+      );
+      CREATE TABLE historical_section_identities (
+        document_id TEXT NOT NULL, section_key TEXT NOT NULL, source_ordinal INTEGER NOT NULL,
+        document_section_id INTEGER NOT NULL, PRIMARY KEY (document_id, section_key)
+      );
+      CREATE TABLE historical_section_aliases (
+        document_id TEXT NOT NULL, legacy_section_id TEXT NOT NULL, section_key TEXT NOT NULL,
+        source_ordinal INTEGER NOT NULL, PRIMARY KEY (document_id, legacy_section_id)
+      );
       CREATE TABLE ubs_parallel_sources (source_id TEXT PRIMARY KEY, schema_version TEXT, transform_version INTEGER, artifact_identity TEXT, title TEXT, publisher TEXT, copyright TEXT, license TEXT, license_url TEXT, source_url TEXT, source_path TEXT, source_commit TEXT, source_commit_date TEXT, source_blob TEXT, source_bytes INTEGER, source_sha256 TEXT, modified INTEGER, modification_note TEXT, label TEXT, directionality TEXT);
       CREATE TABLE ubs_parallel_groups (group_id TEXT PRIMARY KEY, source_id TEXT, source_ordinal INTEGER, label TEXT, directionality TEXT);
       CREATE TABLE ubs_parallel_members (group_id TEXT, source_order INTEGER, source_reference TEXT, normalized_reference TEXT, language_marker TEXT, alignment_basis TEXT, alignment_raw TEXT, PRIMARY KEY(group_id, source_order));
@@ -155,6 +169,15 @@ describe('SQLite and D1 repository parity with identical real data', () => {
         (4, 'augsburg-confession', '2', 'The Son', 'One Christ is true God and true man.', NULL);
       INSERT INTO sections_fts(rowid, title, content, topics)
         SELECT id, title, content, topics FROM document_sections ORDER BY id;
+      INSERT INTO historical_document_delivery_profiles VALUES
+        ('nicene-creed', NULL, NULL, '${'a'.repeat(64)}', NULL, 'complete_document', 2, 0, 0, 0, '{}', '{}'),
+        ('augsburg-confession', NULL, NULL, '${'b'.repeat(64)}', NULL, 'complete_document', 2, 0, 0, 0, '{}', '{}');
+      INSERT INTO historical_section_identities VALUES
+        ('nicene-creed', 'source-0001', 1, 1), ('nicene-creed', 'source-0002', 2, 2),
+        ('augsburg-confession', 'source-0001', 1, 3), ('augsburg-confession', 'source-0002', 2, 4);
+      INSERT INTO historical_section_aliases VALUES
+        ('nicene-creed', '1', 'source-0001', 1), ('nicene-creed', '2', 'source-0002', 2),
+        ('augsburg-confession', '1', 'source-0001', 1), ('augsburg-confession', '2', 'source-0002', 2);
     `);
 
     const artifact = generatedUbsCorpus as any;

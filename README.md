@@ -470,7 +470,7 @@ per-request D1 repositories. Both targets share one MCP registry.
 - The current tracked roadmap is [docs/ROADMAP.md](docs/ROADMAP.md), beginning
   after the PR #10 production baseline.
 - Live CCEL discovery and search remain gated future work; preview currently
-  exposes only the non-executing v5 contract while production remains v4/local-only.
+  exposes only the non-executing v7 contract while production remains v6/local-only.
   The legacy CCEL body reader is retired; the retained discovery adapter is
   bounded, does not fetch until separately authorized, and must never become
   CCEL body mirroring or republication.

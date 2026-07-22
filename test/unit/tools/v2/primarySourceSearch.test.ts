@@ -25,7 +25,7 @@ describe('primary_source_search handler', () => {
     expect(handler.outputSchema).toMatchObject({
       type: 'object', additionalProperties: false,
       properties: {
-        schemaVersion: { const: '4' },
+      schemaVersion: { const: '6' },
         kind: { const: 'primary_source_search' },
       },
     });
@@ -243,7 +243,7 @@ describe('primary_source_search handler', () => {
       queryId: 'q1', provider: 'local', title: 'Institutes', sectionLabel: 'Faith',
       snippet: 'The evidence snippet.',
       locator: {
-        kind: 'local_section', documentId: 'institutes', sectionId: '3.1',
+        kind: 'local_section', documentId: 'institutes', sectionKey: '3.1', sourceOrdinal: 1,
         url: 'theologai://documents/institutes#section-3.1',
       },
       rankWithinProvider: 1, page: 1, snippetOnly: true, attribution: 'Local collection',
@@ -274,7 +274,7 @@ describe('primary_source_search handler', () => {
       annotations: { audience: ['assistant'] },
     }]);
     expect(result.structuredContent).toMatchObject({
-      schemaVersion: '4', kind: 'primary_source_search',
+      schemaVersion: '6', kind: 'primary_source_search',
       evidencePolicy: {
         snippetUse: 'discovery_only', localSectionAccess: 'mcp_resource_read',
         coverageScope: 'bounded_non_exhaustive',
@@ -292,11 +292,11 @@ describe('primary_source_search handler', () => {
         resultWindow: resultWindow(2),
         hits: [{
           queryId: 'q1', provider: 'local', title: 'Forged', snippet: 'snippet',
-          locator: { kind: 'local_section', documentId: '../secret', sectionId: '1', url: 'https://evil.test' },
+          locator: { kind: 'local_section', documentId: '../secret', sectionKey: '1', sourceOrdinal: 1, url: 'https://evil.test' },
           rankWithinProvider: 1, page: 1, snippetOnly: true, attribution: 'Local', resourceSizeBytes: 12,
         }, {
           queryId: 'q1', provider: 'local', title: 'Oversized', snippet: 'snippet',
-          locator: { kind: 'local_section', documentId: 'doc', sectionId: '2', url: 'theologai://documents/doc#section-2' },
+          locator: { kind: 'local_section', documentId: 'doc', sectionKey: '2', sourceOrdinal: 2, url: 'theologai://documents/doc#section-2' },
           rankWithinProvider: 2, page: 1, snippetOnly: true, attribution: 'Local', resourceSizeBytes: Number.MAX_SAFE_INTEGER + 1,
         }],
       }] }],
@@ -323,7 +323,7 @@ describe('primary_source_search handler', () => {
     const validLocalHit = {
       queryId: 'q1', provider: 'local', title: 'Valid local evidence', snippet: 'Kept.',
       locator: {
-        kind: 'local_section', documentId: 'doc', sectionId: '1',
+        kind: 'local_section', documentId: 'doc', sectionKey: '1', sourceOrdinal: 1,
         url: 'theologai://documents/doc#section-1',
       },
       rankWithinProvider: 1, page: 1, snippetOnly: true, attribution: 'Local', resourceSizeBytes: 10,
@@ -388,7 +388,7 @@ describe('primary_source_search handler', () => {
     const omittedHit = {
       queryId: 'q5', provider: 'local', title: 'Omitted fifth-query evidence', snippet: 'Must not leak.',
       locator: {
-        kind: 'local_section', documentId: 'secret', sectionId: '5',
+        kind: 'local_section', documentId: 'secret', sectionKey: '5', sourceOrdinal: 5,
         url: 'theologai://documents/secret#section-5',
       },
       rankWithinProvider: 1, page: 1, snippetOnly: true, attribution: 'Local', resourceSizeBytes: 25,
@@ -429,7 +429,7 @@ describe('primary_source_search handler', () => {
     const omittedHit = {
       queryId: 'q1', provider: 'local', title: 'Omitted third-provider evidence', snippet: 'Must not leak.',
       locator: {
-        kind: 'local_section', documentId: 'secret', sectionId: '3',
+        kind: 'local_section', documentId: 'secret', sectionKey: '3', sourceOrdinal: 3,
         url: 'theologai://documents/secret#section-3',
       },
       rankWithinProvider: 1, page: 1, snippetOnly: true, attribution: 'Local', resourceSizeBytes: 25,
@@ -465,14 +465,14 @@ describe('primary_source_search handler', () => {
     const sectionLabel = 'S'.repeat(300);
     const documentId = `doc-${'d'.repeat(150)}`;
     const hitFor = (queryId: string, rank: number) => {
-      const sectionId = `section-${rank}-${'s'.repeat(145)}`;
+      const sectionKey = `section-${rank}-${'s'.repeat(145)}`;
       return {
         queryId, provider: 'local' as const, title, sectionLabel, snippet: 'N'.repeat(240),
         rankWithinProvider: rank, page: 1, snippetOnly: true as const, attribution: 'A'.repeat(300),
         documentType: 'D'.repeat(100), documentDate: 'Y'.repeat(100), resourceSizeBytes: 123,
         locator: {
-          kind: 'local_section' as const, documentId, sectionId,
-          url: `theologai://documents/${documentId}#section-${sectionId}`,
+          kind: 'local_section' as const, documentId, sectionKey, sourceOrdinal: rank,
+          url: `theologai://documents/${documentId}#section-${sectionKey}`,
         },
       };
     };
@@ -506,12 +506,12 @@ describe('primary_source_search handler', () => {
   });
 });
 
-describe('primary_source_search v5 discovery contract', () => {
-  const v5 = {
+describe('primary_source_search v7 discovery contract', () => {
+  const v7 = {
     exposeCcelDiscovery: true,
     ccelLiveSearch: false,
     ccelCoordinator: false,
-    contractVersion: '5' as const,
+    contractVersion: '7' as const,
     liveCcelEnabled: false,
   };
 
@@ -531,7 +531,7 @@ describe('primary_source_search v5 discovery contract', () => {
           hits: [{
             queryId: 'q1', provider: 'local' as const, title: 'Local section', snippet: 'Local evidence lead',
             rankWithinProvider: 1, page: 1, snippetOnly: true as const, attribution: 'Local', resourceSizeBytes: 42,
-            locator: { kind: 'local_section' as const, url: 'theologai://documents/doc#section-1', documentId: 'doc', sectionId: '1' },
+            locator: { kind: 'local_section' as const, url: 'theologai://documents/doc#section-1', documentId: 'doc', sectionKey: '1', sourceOrdinal: 1 },
           }],
         }, {
           provider: 'ccel_live' as const, status: 'ok' as const, searched: true, page: 1, hitCount: 1,
@@ -547,9 +547,9 @@ describe('primary_source_search v5 discovery contract', () => {
     };
   }
 
-  it('advertises strict v5 providers and open-world behavior', () => {
-    const handler = createPrimarySourceSearchHandler({ search: vi.fn() } as any, v5);
-    expect(handler.outputSchema?.properties?.schemaVersion).toEqual({ const: '5' });
+  it('advertises strict v7 providers and open-world behavior', () => {
+    const handler = createPrimarySourceSearchHandler({ search: vi.fn() } as any, v7);
+    expect(handler.outputSchema?.properties?.schemaVersion).toEqual({ const: '7' });
     expect(handler.annotations).toMatchObject({ openWorldHint: true });
     const query = (handler.inputSchema.properties?.queries as any).items;
     expect(query.properties.providers).toMatchObject({ maxItems: 2, items: { enum: ['local', 'ccel'] } });
@@ -566,13 +566,13 @@ describe('primary_source_search v5 discovery contract', () => {
   });
 
   it('uses exact compact JSON parity and emits native links only for final local hits', async () => {
-    const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue(plan()) } as any, v5);
+    const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue(plan()) } as any, v7);
     const result = await handler.handler({ queries: [{ id: 'q1', text: 'faith', providers: ['local', 'ccel'] }] });
     expect(result.content[0]).toMatchObject({ type: 'text', text: expect.stringContaining('# Primary-source discovery') });
     expect(result.content.filter(item => item.type === 'resource_link')).toHaveLength(1);
     expect(JSON.stringify(result.content.slice(1))).not.toContain('ccel.org');
     expect(result.structuredContent).toMatchObject({
-      schemaVersion: '5', responseWindow: { unit: 'utf8_bytes', maximum: 32768, truncated: false },
+      schemaVersion: '7', responseWindow: { unit: 'utf8_bytes', maximum: 32768, truncated: false },
       queries: [{ providers: [
         { hits: [{ locator: { kind: 'mcp_resource', uri: 'theologai://documents/doc#section-1' } }] },
         { hits: [{ locator: { kind: 'external_url', url: 'https://ccel.org/ccel/calvin/institutes/iv.xvii.html' } }] },
@@ -582,7 +582,7 @@ describe('primary_source_search v5 discovery contract', () => {
     expect(validatorFor(handler.outputSchema!)(result.structuredContent).valid).toBe(true);
   });
 
-  it('omits control-only optional metadata while preserving a schema-valid v5 hit', async () => {
+  it('omits control-only optional metadata while preserving a schema-valid v7 hit', async () => {
     const adversarial = plan();
     const local = adversarial.queries[0]!.providers[0]!;
     const hit = local.hits[0]!;
@@ -593,7 +593,7 @@ describe('primary_source_search v5 discovery contract', () => {
     adversarial.queries[0]!.providers = [local];
     adversarial.coverage.ccelAttempted = false;
     adversarial.coverage.ccelHitCount = 0;
-    const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue(adversarial) } as any, v5);
+    const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue(adversarial) } as any, v7);
 
     const result = await handler.handler({ queries: [{ id: 'q1', text: 'faith', providers: ['local'] }] });
     const structured = result.structuredContent as any;
@@ -617,7 +617,7 @@ describe('primary_source_search v5 discovery contract', () => {
       provider.hits = [] as never;
       provider.resultWindow = { returnedHitCount: 0, additionalMatchStatus: 'not_evaluated' };
     }
-    const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue(unavailable) } as any, v5);
+    const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue(unavailable) } as any, v7);
     const result = await handler.handler({ queries: [{ id: 'q1', text: 'faith', providers: ['local', 'ccel'] }] });
     expect(result.isError).toBe(true);
     expect(result.content[0]).toMatchObject({ type: 'text', text: expect.stringContaining('# Primary-source discovery') });
@@ -633,7 +633,7 @@ describe('primary_source_search v5 discovery contract', () => {
       hits: [], notices: [], retryAfterSeconds: 7,
     }];
     rateLimited.coverage = { localAttempted: false, localHitCount: 0, ccelAttempted: true, ccelHitCount: 0, notices: [] };
-    const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue(rateLimited) } as any, v5);
+    const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue(rateLimited) } as any, v7);
     const result = await handler.handler({ queries: [{ id: 'q1', text: 'faith', providers: ['ccel'] }] });
     const validate = validatorFor(handler.outputSchema!);
     expect(validate(result.structuredContent).valid).toBe(true);
@@ -653,7 +653,7 @@ describe('primary_source_search v5 discovery contract', () => {
     'https://ccel.org/ccel/calvin/institutes/iv.xvii.html?token=secret',
     'https://ccel.org.evil.test/ccel/calvin/institutes/iv.xvii.html',
   ])('omits a malicious external locator without emitting a link (%s)', async externalUrl => {
-    const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue(plan(externalUrl)) } as any, v5);
+    const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue(plan(externalUrl)) } as any, v7);
     const result = await handler.handler({ queries: [{ id: 'q1', text: 'faith', providers: ['local', 'ccel'] }] });
     expect(JSON.stringify(result)).not.toContain(externalUrl);
     expect(result.structuredContent).toMatchObject({ planStatus: 'partial', queries: [{ providers: [{ hitCount: 1 }, { status: 'interface_changed', hitCount: 0 }] }] });
@@ -671,7 +671,7 @@ describe('primary_source_search v5 discovery contract', () => {
         hits: external.hits.map(hit => ({ ...hit, queryId: 'q2' })),
       }],
     });
-    const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue(adversarial) } as any, v5);
+    const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue(adversarial) } as any, v7);
     const result = await handler.handler({ queries: [{ id: 'q1', text: 'faith', providers: ['ccel'] }] });
     const structured = result.structuredContent as any;
     expect(structured.queries.flatMap((query: any) => query.providers)

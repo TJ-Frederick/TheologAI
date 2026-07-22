@@ -137,7 +137,7 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
         },
       });
       expect(listed.tools.find(tool => tool.name === 'primary_source_search')?.outputSchema).toMatchObject({
-        properties: { schemaVersion: { const: '4' } },
+        properties: { schemaVersion: { const: '6' } },
       });
       const primarySourceTool = listed.tools.find(tool => tool.name === 'primary_source_search')!;
       expect(JSON.stringify(primarySourceTool.inputSchema).toLowerCase()).not.toContain('ccel');
@@ -151,7 +151,7 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
       });
       expect(primarySource.isError).not.toBe(true);
       expect(primarySource.structuredContent).toMatchObject({
-        schemaVersion: '4', kind: 'primary_source_search',
+        schemaVersion: '6', kind: 'primary_source_search',
         queries: [{ providers: [{ provider: 'local' }] }],
         coverage: { localAttempted: false, localHitCount: 0 },
       });
@@ -269,7 +269,7 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
           text: expect.stringContaining('Plan status: **complete**'),
         })],
         structuredContent: {
-          schemaVersion: '4',
+          schemaVersion: '6',
           kind: 'primary_source_search',
           planStatus: 'complete',
           queries: [expect.objectContaining({

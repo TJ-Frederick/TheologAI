@@ -48,7 +48,7 @@ describe('inactive sectioned_only historical delivery and Norton transform-9 pre
           nativeResourceLinks: 'exact_section_only',
           cursor: {
             version: HISTORICAL_SECTIONED_DELIVERY_CURSOR_VERSION,
-            bindings: ['contractVersion', 'documentId', 'editionId', 'packageSha256', 'lastSourceOrdinal'],
+            bindings: ['contractVersion', 'documentId', 'editionId', 'immutableCorpusIdentity', 'pageSize', 'lastSourceOrdinal', 'lastSectionKey'],
           },
         },
         exactSectionResource: { body: 'only_body_delivery_route' },
