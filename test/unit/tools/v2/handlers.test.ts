@@ -34,6 +34,8 @@ import type { DocumentInfo, DocumentSection, HistoricalDocumentDeliveryProfile, 
 import { formatMorphologyResult } from '../../../../src/formatters/languagesFormatter.js';
 import { validatorFor } from '../../../../src/mcp/validation.js';
 import { validateClassicTextsOutputSemantics } from '../../../../src/presenters/classicTextsStructured.js';
+import { encodeHistoricalSectionedOnlyCursor } from '../../../../src/kernel/historicalSectionedDelivery.js';
+import { Buffer } from 'node:buffer';
 
 function serviceDouble<T>(methods: Partial<{ [K in keyof T]: T[K] }>): T {
   return methods as unknown as T;
@@ -928,6 +930,70 @@ describe('classic_text_lookup handler', () => {
     expect(result.isError).toBe(true);
     expect(textOf(result)).toContain('query is the local-search mode');
     expect(historical.search).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [{ cursor: 'opaque' }],
+    [{ listWorks: true, cursor: 'opaque' }],
+    [{ query: 'grace', cursor: 'opaque' }],
+    [{ browseSections: true, cursor: 'opaque' }],
+    [{ work: document.id, cursor: 'opaque' }],
+  ])('rejects cursor in every raw mode other than sectioned work browsing: %j', async params => {
+    const { handler, historical } = createServices();
+
+    const result = await handler.handler(params);
+
+    expect(result).toMatchObject({ isError: true });
+    expect(textOf(result)).toBe('Invalid input: cursor requires work and browseSections=true.');
+    expect(historical.listDocuments).not.toHaveBeenCalled();
+    expect(historical.searchResolvedSections).not.toHaveBeenCalled();
+    expect(historical.browseHistoricalSectionSummaries).not.toHaveBeenCalled();
+  });
+
+  it('rejects a cursor for complete-document browsing instead of silently ignoring it', async () => {
+    const { handler, historical } = createServices();
+
+    const result = await handler.handler({ work: document.id, browseSections: true, cursor: 'opaque' });
+
+    expect(result).toMatchObject({ isError: true });
+    expect(textOf(result)).toBe('Invalid input: cursor is available only for sectioned-only browsing.');
+    expect(historical.browseHistoricalSectionSummaries).not.toHaveBeenCalled();
+  });
+
+  it('maps malformed, stale, non-canonical, and boundary-mismatched section cursors to invalid input', async () => {
+    const { handler, historical } = createServices();
+    const sectioned: HistoricalDocumentDeliveryProfile = {
+      ...profile, workId: 'synthetic-work', editionId: 'synthetic-edition',
+      sectionPackageIdentity: 'b'.repeat(64), deliveryMode: 'sectioned_only', sectionCount: 33,
+      landingMaxBytes: 16_384, browsePageSize: 32, cursorVersion: 1,
+    };
+    historical.getDeliveryProfile.mockResolvedValue(sectioned);
+    const position = { sourceOrdinal: 1, sectionKey: 'source-0001' };
+    const validCursor = encodeHistoricalSectionedOnlyCursor(sectioned, position);
+    const staleCursor = encodeHistoricalSectionedOnlyCursor({
+      ...sectioned, sectionPackageIdentity: 'c'.repeat(64),
+    }, position);
+    const nonCanonicalCursor = Buffer.from(JSON.stringify({
+      documentId: sectioned.documentId,
+      contractVersion: 'historical-sectioned-only-cursor-v1',
+      editionId: sectioned.editionId,
+      immutableCorpusIdentity: sectioned.sectionPackageIdentity,
+      pageSize: 32,
+      lastSourceOrdinal: 1,
+      lastSectionKey: 'source-0001',
+    }), 'utf8').toString('base64url');
+
+    for (const cursor of ['not-a-canonical-cursor', staleCursor, nonCanonicalCursor]) {
+      const result = await handler.handler({ work: document.id, browseSections: true, cursor });
+      expect(result).toMatchObject({ isError: true });
+      expect(textOf(result)).toBe('Invalid input: Historical section browse cursor is malformed, stale, or non-canonical.');
+    }
+
+    historical.hasHistoricalSectionBoundary.mockResolvedValueOnce(false);
+    const boundaryMismatch = await handler.handler({ work: document.id, browseSections: true, cursor: validCursor });
+    expect(boundaryMismatch).toMatchObject({ isError: true });
+    expect(textOf(boundaryMismatch)).toBe('Invalid input: Historical section browse cursor does not name a current section boundary.');
+    expect(historical.browseHistoricalSectionSummaries).not.toHaveBeenCalled();
   });
 
   it('distinguishes an empty global search from a missing action', async () => {

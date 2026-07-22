@@ -27,6 +27,7 @@ import { CLASSIC_TEXT_LIMITS } from '../../kernel/classicTextContract.js';
 import {
   decodeHistoricalSectionedOnlyCursor,
   encodeHistoricalSectionedOnlyCursor,
+  HistoricalSectionedOnlyCursorError,
   HISTORICAL_SECTIONED_ONLY_LOOKAHEAD,
   HISTORICAL_SECTIONED_ONLY_PAGE_SIZE,
 } from '../../kernel/historicalSectionedDelivery.js';
@@ -96,6 +97,9 @@ export function createClassicTextsHandler(historicalService: HistoricalDocumentS
               ],
               structuredContent: presented,
             };
+          }
+          if (params.cursor !== undefined) {
+            throw new ValidationError('cursor', 'cursor is available only for sectioned-only browsing.');
           }
           const sections = await historicalService.browseHistoricalSectionSummaries(doc.id, undefined, CLASSIC_TEXT_LIMITS.sectionsPerWork + 1);
           const presented = presentClassicTextDirectory({ document: doc, profile, sections });
@@ -170,7 +174,9 @@ export function createClassicTextsHandler(historicalService: HistoricalDocumentS
 
         throw new ValidationError('mode', 'Choose exactly one mode: list local works, search local documents, or browse a local work.');
       } catch (error) {
-        return handleToolError(error as Error);
+        return handleToolError(error instanceof HistoricalSectionedOnlyCursorError
+          ? new ValidationError('cursor', 'Historical section browse cursor is malformed, stale, or non-canonical.')
+          : error as Error);
       }
     },
   };
@@ -224,6 +230,10 @@ function validateMode(params: Record<string, unknown>): void {
   const has = (key: string): boolean => Object.prototype.hasOwnProperty.call(params, key);
   if (keys.length === 0) {
     throw new ValidationError('mode', 'Choose a classic-text lookup mode.');
+  }
+
+  if (has('cursor') && (!has('work') || params.browseSections !== true)) {
+    throw new ValidationError('cursor', 'cursor requires work and browseSections=true.');
   }
 
   if (has('listWorks')) {

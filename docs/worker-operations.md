@@ -25,8 +25,10 @@ tuple (`CF-Connecting-IP: 18.192.206.183` plus `User-Agent:
 Go-http-client/2.0`) is rejected rather than redirected; supported browser CORS
 preflight remains local. The preview
 `theologai-preview.tjfrederick.workers.dev` host remains a direct compatibility
-endpoint. The primary-source MCP schema is production v6/local-only and preview
-v7/discovery-only; CCEL execution remains disabled in both environments.
+endpoint. The deployed primary-source MCP schema is production v4/local-only
+and preview v5/discovery-only; CCEL execution remains disabled in both
+environments. The checked-in v6/v7 schema pair is an unpublished repository
+candidate, not evidence of a deployed Worker or a changed remote contract.
 
 The later repository changes through merged PR #83
 (`93d5837b05249c15127ab20107f86443cccf4e1e`) are repository-only and have not
@@ -34,10 +36,12 @@ been deployed. U3-T7 adds an inactive in-memory semantic compiler,
 native-to-normalized coordinate bridge, and content-free audit. The later M4A
 local-only slice adds migration `0004`, transform 7, local SQLite
 materialization, deterministic D1 seed/import verification, and inactive
-Node/D1 adapters. Neither slice changes the deployed Workers, remote D1
-databases or bindings, historical catalog, MCP output, UBS semantic runtime, or
-CCEL execution state. No deletion, route replacement, or other destructive
-cleanup is authorized by this record.
+Node/D1 adapters. The unpublished candidate also advances the local
+primary-source schema pair to production v6/local-only and preview
+v7/discovery-only. Neither candidate changes the deployed Workers, remote D1
+databases or bindings, historical catalog, deployed MCP output, UBS semantic
+runtime, or CCEL execution state. No deletion, route replacement, or other
+destructive cleanup is authorized by this record.
 
 Draft-PR publication of M4A is owner-authorized but had not yet occurred when
 this record was authored; no remote migration or deployment is authorized.

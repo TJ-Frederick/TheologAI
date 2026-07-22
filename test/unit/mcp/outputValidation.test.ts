@@ -18,6 +18,7 @@ import { DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG } from '../../../src/kernel/feat
 import { classicTextsOutputSchema } from '../../../src/mcp/schemas/classicTexts.js';
 import { validateClassicTextsOutputSemantics } from '../../../src/presenters/classicTextsStructured.js';
 import { primarySourceSearchV6OutputSchema, primarySourceSearchV7OutputSchema } from '../../../src/mcp/schemas/primarySourceSearchV4.js';
+import { validatorFor } from '../../../src/mcp/validation.js';
 
 const connected: Array<{ client: Client; server: Server }> = [];
 type LogMessage = { level: string; logger?: string; data: unknown };
@@ -383,7 +384,7 @@ describe('MCP structured output validation', () => {
       handler: async () => ({
         content: [{ type: 'text' as const, text: 'safe fallback' }],
         structuredContent: {
-          schemaVersion: '1', kind: 'classic_text_lookup', mode: 'search',
+          schemaVersion: '2', kind: 'classic_text_lookup', mode: 'search',
           evidencePolicy: {
             providerScope: 'local_only', remoteDocumentBodies: 'disabled',
             editionProvenance: 'incomplete', rightsStatus: 'not_established',
@@ -403,7 +404,7 @@ describe('MCP structured output validation', () => {
 
   it.each([
     ['catalog count', {
-      schemaVersion: '1', kind: 'classic_text_lookup', mode: 'list_works',
+      schemaVersion: '2', kind: 'classic_text_lookup', mode: 'list_works',
       evidencePolicy: {
         providerScope: 'local_only', remoteDocumentBodies: 'disabled',
         editionProvenance: 'incomplete', rightsStatus: 'not_established',
@@ -412,14 +413,14 @@ describe('MCP structured output validation', () => {
       catalog: {
         coverage: 'complete_local_work_inventory', delivery: 'metadata_summary', nativeResourceLinks: 'not_emitted',
         works: [{
-          id: 'doc', title: 'Document', type: 'confession', date: null, topics: [],
+          id: 'doc', title: 'Document', type: 'confession', date: null, topics: [], deliveryMode: 'complete_document',
           resource: { kind: 'mcp_resource', uri: 'theologai://documents/doc' },
         }],
         resultWindow: { returnedCount: 0, additionalMatchStatus: 'no_additional_match_observed' },
       },
     }],
     ['directory link count', {
-      schemaVersion: '1', kind: 'classic_text_lookup', mode: 'browse_sections',
+      schemaVersion: '2', kind: 'classic_text_lookup', mode: 'browse_sections',
       evidencePolicy: {
         providerScope: 'local_only', remoteDocumentBodies: 'disabled',
         editionProvenance: 'incomplete', rightsStatus: 'not_established',
@@ -428,12 +429,12 @@ describe('MCP structured output validation', () => {
       directory: {
         coverage: 'complete_section_directory',
         work: {
-          id: 'doc', title: 'Document', type: 'confession', date: null, topics: [],
+          id: 'doc', title: 'Document', type: 'confession', date: null, topics: [], deliveryMode: 'complete_document',
           resource: { kind: 'mcp_resource', uri: 'theologai://documents/doc' },
         },
         sections: [{
-          id: 1, sectionNumber: '1', title: 'One',
-          resource: { kind: 'mcp_resource', uri: 'theologai://documents/doc#section-1' },
+          sectionKey: 'source-0001', sourceOrdinal: 1, legacyDisplayLabel: '1', heading: 'One',
+          resource: { kind: 'mcp_resource', uri: 'theologai://documents/doc#section-source-0001' },
         }],
         resultWindow: { returnedCount: 1, additionalMatchStatus: 'no_additional_match_observed' },
         linkWindow: {
@@ -443,6 +444,10 @@ describe('MCP structured output validation', () => {
       },
     }],
   ])('rejects schema-valid semantic classic-text %s mutations at the MCP boundary', async (_label, structuredContent) => {
+    const validate = validatorFor(classicTextsOutputSchema);
+    const validation = validate(structuredContent);
+    expect(validation.valid, validation.errorMessage).toBe(true);
+    expect(validateClassicTextsOutputSemantics(structuredContent)).toBe(false);
     const client = await connect([{
       name: `classic_semantic_${_label.replaceAll(' ', '_')}`,
       description: 'Semantic classic-text failure fixture',
