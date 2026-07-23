@@ -19,6 +19,7 @@ import {
   assertUbsSemanticStoredContract,
 } from '../../../scripts/ubs-semantics/storageReconstruction.js';
 import { buildHistoricalTransform8ExpectedAuthority } from '../../../scripts/historical-transform8-authority-audit.js';
+import { buildHistoricalTransform9ExpectedAuthority } from '../../../scripts/historical-transform9-authority-audit.js';
 import { CLASSIC_TEXT_LIMITS } from '../../../src/kernel/classicTextContract.js';
 
 const generatedDbPath = process.env.THEOLOGAI_TEST_DATABASE_PATH?.trim();
@@ -29,6 +30,7 @@ function remoteAuthorityExecutor(): {
   close: () => void;
 } {
   const expected = buildHistoricalTransform8ExpectedAuthority(process.cwd());
+  const transform9 = buildHistoricalTransform9ExpectedAuthority(process.cwd());
   const db = new Database(':memory:');
   db.exec(`CREATE TABLE historical_document_delivery_profiles (
       document_id TEXT, work_id TEXT, edition_id TEXT, immutable_corpus_identity TEXT,
@@ -45,7 +47,14 @@ function remoteAuthorityExecutor(): {
     CREATE TABLE document_sections (
       id INTEGER PRIMARY KEY, document_id TEXT, section_number TEXT, title TEXT, content TEXT, topics TEXT
     );
-    CREATE TABLE sections_fts (title TEXT, content TEXT, topics TEXT);`);
+    CREATE TABLE sections_fts (title TEXT, content TEXT, topics TEXT);
+    CREATE TABLE historical_source_packs (pack_id TEXT, revision TEXT, schema_version TEXT, manifest_sha256 TEXT, source_path TEXT);
+    CREATE TABLE historical_works (work_id TEXT, title TEXT, creator_metadata_status TEXT, creators_json TEXT);
+    CREATE TABLE historical_editions (edition_id TEXT, work_id TEXT, pack_id TEXT, language TEXT, contributor_groups_json TEXT, publication TEXT, version TEXT, provenance_status TEXT, provenance_uncertainty TEXT, provenance_reviewed_at TEXT, underlying_work_rights_json TEXT, exact_artifact_rights_json TEXT, normalized_text_rights_json TEXT);
+    CREATE TABLE historical_source_artifacts (artifact_id TEXT, edition_id TEXT, role TEXT, locator TEXT, pin_kind TEXT, pin_value TEXT, sha256 TEXT, bytes INTEGER, acquired_at TEXT);
+    CREATE TABLE documents (id TEXT, title TEXT, type TEXT, date TEXT, metadata TEXT);
+    CREATE TABLE historical_edition_sections (edition_id TEXT, section_key TEXT, source_ordinal INTEGER, display_label TEXT, heading TEXT, content TEXT);
+    CREATE TABLE historical_edition_sections_fts (edition_id TEXT, section_key TEXT, heading TEXT, content TEXT);`);
   const insertProfile = db.prepare(`INSERT INTO historical_document_delivery_profiles VALUES
     (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
   for (const row of expected.profiles) {
@@ -66,6 +75,21 @@ function remoteAuthorityExecutor(): {
       && candidate.sectionKey === row.sectionKey && candidate.sourceOrdinal === row.sourceOrdinal)!;
     insertSection.run(identity.documentSectionId, row.documentId, row.legacySectionId, row.title, row.content, row.topics);
     insertFts.run(identity.documentSectionId, row.ftsTitle, row.ftsContent, row.ftsTopics);
+  }
+  const insert = (sql: string, values: readonly unknown[]) => db.prepare(sql).run(...values);
+  for (const row of transform9.packs) insert('INSERT INTO historical_source_packs VALUES (?, ?, ?, ?, ?)', [row.packId, row.revision, row.schemaVersion, row.manifestSha256, row.sourcePath]);
+  for (const row of transform9.works) insert('INSERT INTO historical_works VALUES (?, ?, ?, ?)', [row.workId, row.title, row.creatorMetadataStatus, row.creatorsJson]);
+  for (const row of transform9.editions) insert('INSERT INTO historical_editions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [row.editionId, row.workId, row.packId, row.language, row.contributorGroupsJson, row.publication, row.version, row.provenanceStatus, row.provenanceUncertainty, row.provenanceReviewedAt, row.underlyingWorkRightsJson, row.exactArtifactRightsJson, row.normalizedTextRightsJson]);
+  for (const row of transform9.artifacts) insert('INSERT INTO historical_source_artifacts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [row.artifactId, row.editionId, row.role, row.locator, row.pinKind, row.pinValue, row.sha256, row.bytes, row.acquiredAt]);
+  for (const row of transform9.documents) insert('INSERT INTO documents VALUES (?, ?, ?, ?, ?)', [row.documentId, row.title, row.type, row.date, row.metadata]);
+  for (const row of transform9.profiles) insert('INSERT INTO historical_document_delivery_profiles VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [row.documentId, row.workId, row.editionId, row.immutableCorpusIdentity, row.sectionPackageIdentity, row.deliveryMode, row.sectionCount, row.landingMaxBytes, row.browsePageSize, row.cursorVersion, row.provenanceJson, row.rightsJson]);
+  for (const row of transform9.sections) insert('INSERT INTO historical_edition_sections VALUES (?, ?, ?, ?, ?, ?)', [row.editionId, row.sectionKey, row.sourceOrdinal, row.displayLabel, row.heading, row.content]);
+  for (const row of transform9.projections) {
+    const section = transform9.sections.find(candidate => candidate.editionId === row.editionId && candidate.sectionKey === row.sectionKey)!;
+    insert('INSERT INTO historical_section_identities VALUES (?, ?, ?, ?)', [row.documentId, row.sectionKey, row.sourceOrdinal, row.documentSectionId]);
+    insert('INSERT INTO document_sections VALUES (?, ?, ?, ?, ?, ?)', [row.documentSectionId, row.documentId, row.sectionKey, section.heading, section.content, '[]']);
+    insert('INSERT INTO historical_edition_sections_fts VALUES (?, ?, ?, ?)', [row.editionId, row.sectionKey, section.heading, section.content]);
+    insert('INSERT INTO sections_fts(rowid, title, content, topics) VALUES (?, ?, ?, ?)', [row.documentSectionId, section.heading, section.content, '[]']);
   }
   const calls: string[][] = [];
   return {
@@ -265,11 +289,11 @@ describe('remote D1 readiness query', () => {
     const remote = remoteAuthorityExecutor();
     try {
       runRemoteD1ReadinessCheck({ database: 'preview', env: 'preview', wrangler: '/tmp/wrangler' }, remote.execute);
-      expect(remote.calls).toHaveLength(27); // production readiness plus 26 bounded audit reads
+      expect(remote.calls).toHaveLength(107); // production readiness plus Transform-8 and Transform-9 bounded reads
       expect(remote.calls[0]).toContain('--json');
       expect(remote.calls[0]).toContain('--env');
       expect(remote.calls[0].join('\n')).toContain('WHERE passed IS 1');
-      expect(remote.calls.slice(1).every(call => call.join('\n').includes('LIMIT 256') || call.join('\n').includes('LIMIT 32'))).toBe(true);
+      expect(remote.calls.slice(1).every(call => call.join('\n').includes('LIMIT 256') || call.join('\n').includes('LIMIT 64') || call.join('\n').includes('LIMIT 32') || call.join('\n').includes('LIMIT 8'))).toBe(true);
       expect(remote.calls.slice(1).every(call => call.join('\n').includes('--remote'))).toBe(true);
     } finally {
       remote.close();

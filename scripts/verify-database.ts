@@ -17,6 +17,7 @@ import { UBS_SEMANTICS_DATABASE_CEILING_BYTES } from './ubs-semantics/capacity.j
 import { verifyHistoricalSectionCompatibilityAttestationFromDisk } from './historical-section-compatibility-compiler.js';
 import { historicalLegacySectionId, readHistoricalSectionSources, sha256Canonical } from './historical-section-key-plan.js';
 import { auditHistoricalTransform8Authority } from './historical-transform8-authority-audit.js';
+import { auditHistoricalTransform9Authority } from './historical-transform9-authority-audit.js';
 import {
   assertCoreEightSourcePackRelease,
   loadHistoricalSourcePacks,
@@ -379,6 +380,10 @@ try {
   assertHistoricalTransform8Materialization(db);
   assertHistoricalTransform9SourcePackMaterialization(db);
   auditHistoricalTransform8Authority(ROOT, sql => {
+    const rows = db.prepare(sql).all();
+    return { rows, responseBytes: Buffer.byteLength(JSON.stringify(rows), 'utf8') };
+  });
+  auditHistoricalTransform9Authority(ROOT, sql => {
     const rows = db.prepare(sql).all();
     return { rows, responseBytes: Buffer.byteLength(JSON.stringify(rows), 'utf8') };
   });

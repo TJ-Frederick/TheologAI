@@ -97,6 +97,16 @@ continues to cover every row declared by the generated seed manifest (currently
 usage aggregates. The exact production readiness query is separately exercised
 against the complete derived SQLite database.
 
+For the reviewed Transform-9 historical source packs, readiness also runs a
+separate read-only authority audit. It regenerates the approved 1/8/8/25/512
+pack/work/edition/artifact/section inventory from checksum-bound source inputs,
+then reads direct normalized section bodies in ordered eight-row pages. A
+separate compact projection audit proves every selected edition/profile,
+canonical identity, document section, edition FTS row, and runtime
+`sections_fts` row agree. This catches an extra normalized section even when it
+has no delivery profile, as well as projection or FTS drift. It performs no
+remote fetch and does not authorize a migration, binding, or deployment.
+
 ### Readiness compatibility and rollback
 
 The deploy readiness query requires the current schema and corpus identity

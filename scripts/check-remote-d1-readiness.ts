@@ -25,6 +25,10 @@ import {
   auditHistoricalTransform8Authority,
   parseHistoricalTransform8D1Page,
 } from './historical-transform8-authority-audit.js';
+import {
+  auditHistoricalTransform9Authority,
+  parseHistoricalTransform9D1Page,
+} from './historical-transform9-authority-audit.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const manifestBytes = readFileSync(join(ROOT, 'data', 'data-manifest.json'));
@@ -612,6 +616,13 @@ export function runRemoteD1ReadinessCheck(
       );
     });
     process.stderr.write(`Transform-8 D1 authority audit passed (${audit.pages.profiles}/${audit.pages.identities}/${audit.pages.aliases} pages).\n`);
+    const transform9Audit = auditHistoricalTransform9Authority(ROOT, sql => {
+      const result = executeSql(sql, true);
+      return parseHistoricalTransform9D1Page(
+        typeof result === 'string' ? result : Buffer.isBuffer(result) ? result.toString('utf8') : String(result),
+      );
+    });
+    process.stderr.write(`Transform-9 D1 authority audit passed (${transform9Audit.pages.packs}/${transform9Audit.pages.works}/${transform9Audit.pages.editions}/${transform9Audit.pages.artifacts}/${transform9Audit.pages.documents}/${transform9Audit.pages.profiles}/${transform9Audit.pages.sections}/${transform9Audit.pages.projections} pages).\n`);
   } catch (primaryError) {
     process.stderr.write('Primary D1 readiness gate failed; requesting failed-check diagnostics.\n');
     try {
