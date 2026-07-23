@@ -616,9 +616,9 @@ Code readiness and operational readiness are deliberately separate:
   controls when a cursor is present, and retains `includeText: false` as the
   existing default. Any future workflow or prompt change remains a separate
   slice rather than another cursor implementation.
-- In the checked-in unpublished candidate, the primary-source output-profile
-  hard cutover is represented by production v6/local-only and preview
-  v7/discovery-only, with CCEL execution still disabled. Prospective corpus work remains limited to
+- The deployed primary-source output-profile hard cutover is production
+  v6/local-only and preview v7/CCEL-discovery, with CCEL execution still
+  disabled. Prospective corpus work remains limited to
   explicit searched/read/deferred coverage semantics and future
   edition/provenance fields; it is not a rollout of evidence already present
   in current schemas. Any corpus release remains a **pending rights and release

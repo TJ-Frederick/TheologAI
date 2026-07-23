@@ -5,10 +5,10 @@
 This remains an exposure-only preview stage, not CCEL enablement. Production
 keeps `THEOLOGAI_EXPOSE_CCEL_DISCOVERY`,
 `THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH`, and
-`THEOLOGAI_ENABLE_CCEL_COORDINATOR` all `false`, so its public contract remains
-v4/local-only. Preview sets only `THEOLOGAI_EXPOSE_CCEL_DISCOVERY` to `true`;
+`THEOLOGAI_ENABLE_CCEL_COORDINATOR` all `false`, so its public contract is
+v6/local-only. Preview sets only `THEOLOGAI_EXPOSE_CCEL_DISCOVERY` to `true`;
 its live-search and coordinator switches remain `false`. Preview therefore
-advertises the v5 discovery contract and guided workflows, but every external
+advertises the v7 discovery contract and guided workflows, but every external
 query returns a disabled provider result without adapter search, Durable Object
 lookup/RPC, or network access. No CCEL request is authorized by this stage.
 
@@ -242,21 +242,21 @@ the sole latch/backoff/circuit authority. Node coordination is process-local;
 multi-process Node deployments must keep live discovery disabled unless they
 provide one shared coordinator.
 
-Checked-in production values select the local-only v4 contract. Checked-in
-preview values select v5 exposure only; because the live-search and coordinator
-values remain false, preview also makes no CCEL request or Durable Object RPC.
+Deployed production values select the local-only v6 contract. Deployed preview
+values select v7 discovery only; because the live-search and coordinator values
+remain false, preview also makes no CCEL request or Durable Object RPC.
 
 MCP clients can cache `tools/list` and `prompts/list` results for the life of a
 connection. This is a hard contract cutover rather than a negotiated opt-in, so
 reconnect and reinitialize a preview client after deployment before auditing
-the v5 schemas and workflows. Do not interpret a stale client schema as the
+the v7 schemas and workflows. Do not interpret a stale client schema as the
 Worker's current contract.
 
 Once Stage B is bound and a later approved slice enables it, the global coordinator is intentionally a bottleneck: the maximum admitted
 CCEL-origin load is 0.1 requests/second across production and preview combined.
 Local corpus search remains independent if the circuit latches.
 
-The adapter returns a bounded integer `retryAfterSeconds` on every v5
+The adapter returns a bounded integer `retryAfterSeconds` on every v7
 `rate_limited` provider result. Guided primary-source research issues at most
 one CCEL-bearing call per prompt materialization and defers additional creator
 scopes to later turns after that interval. CCEL cannot enforce reviewed

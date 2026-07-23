@@ -286,12 +286,13 @@ separately gated. Norton is a future successor,
 reliable translator attribution.
 
 Production tools search and retrieve only the locally indexed collection and
-do **not** currently fetch CCEL search results or document bodies. Preview
-retains the v5 CCEL-discovery profile; live search and coordinator execution remain disabled.
+do **not** currently fetch CCEL search results or document bodies. Production
+uses the v6 local-only profile; preview uses the v7 CCEL-discovery profile;
+live search and coordinator execution remain disabled.
 External preview queries return a disabled provider result before adapter invocation.
 That occurs before Durable Object lookup/RPC, or fetch. Production has neither
 the Transform-9 core-eight materialization nor behavior.
-The checked-in v6/v7 profile candidate remains unpublished. MCP clients should
+These deployed v6/v7 profiles do not enable CCEL execution. MCP clients should
 reconnect and reinitialize after any endpoint/profile change because tool and
 prompt schemas may be cached for an existing connection.
 
@@ -484,12 +485,10 @@ per-request D1 repositories. Both targets share one MCP registry.
 
 - The current tracked roadmap is [docs/ROADMAP.md](docs/ROADMAP.md), beginning
   after the PR #10 production baseline.
-- Live CCEL discovery and search remain gated future work; the checked-in,
-  unpublished candidate exposes only the non-executing v7 contract while its
-  local production profile remains v6/local-only. The current remote schema
-  versions are release-specific and must be verified against the current
-  production/preview baselines above; the PR #72 and PR #92 profiles are
-  historical evidence only.
+- Live CCEL discovery and search remain gated future work. The deployed
+  production profile is v6/local-only and preview is v7/CCEL-discovery; both
+  disable execution before adapter, coordinator, or fetch. The PR #72 and PR
+  #92 profiles are historical evidence only.
   The legacy CCEL body reader is retired; the retained discovery adapter is
   bounded, does not fetch until separately authorized, and must never become
   CCEL body mirroring or republication.

@@ -34,10 +34,9 @@ tuple (`CF-Connecting-IP: 18.192.206.183` plus `User-Agent:
 Go-http-client/2.0`) is rejected rather than redirected; supported browser CORS
 preflight remains local. The preview
 `theologai-preview.tjfrederick.workers.dev` host remains a direct compatibility
-endpoint. The deployed primary-source MCP schema is production v4/local-only
-and preview v5/discovery-only; CCEL execution remains disabled in both
-environments. The checked-in v6/v7 schema pair is an unpublished repository
-candidate, not evidence of a deployed Worker or a changed remote contract.
+endpoint. The deployed primary-source MCP schema is production v6/local-only
+and preview v7/CCEL-discovery; CCEL execution remains disabled in both
+environments before adapter, coordinator, or fetch.
 
 The later repository changes through merged PR #83
 (`93d5837b05249c15127ab20107f86443cccf4e1e`) remain outside production.
@@ -45,10 +44,10 @@ U3-T7 adds an inactive in-memory semantic compiler, native-to-normalized
 coordinate bridge, and content-free audit. The former PR #92 preview Worker
 and D1 are historical release evidence, superseded by the current preview
 release above. Transform 9 remains local-only and unbound, while production UBS
-runtime activation remains unchanged. The unpublished candidate also advances
-the local primary-source schema pair to production v6/local-only and preview
-v7/discovery-only. No deletion, route replacement, or other destructive cleanup
-is authorized by this record.
+runtime activation remains unchanged. The deployed primary-source schema pair
+is production v6/local-only and preview v7/CCEL-discovery, with CCEL execution
+disabled. No deletion, route replacement, or other destructive cleanup is
+authorized by this record.
 
 Any eventual UBS semantic production release must separately authorize a
 production D1 migration/binding/deployment sequence. The preview data layer is
