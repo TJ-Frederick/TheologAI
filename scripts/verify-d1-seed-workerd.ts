@@ -20,6 +20,10 @@ import {
   buildD1ReadinessSql,
   REQUIRED_COLUMNS,
 } from './check-remote-d1-readiness.js';
+import {
+  ensureWranglerLogDirectory,
+  formatWranglerCommandFailure,
+} from './wrangler-command-utils.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SEED_ROOT = join(ROOT, 'scripts', 'd1-seed');
@@ -27,6 +31,8 @@ const manifest = loadAndVerifyD1SeedManifest(ROOT, SEED_ROOT);
 const sourceManifest = parseDataManifest(readFileSync(join(ROOT, 'data', 'data-manifest.json')));
 const state = mkdtempSync(join(tmpdir(), 'theologai-wrangler-d1-'));
 const wrangler = join(ROOT, 'node_modules', 'wrangler', 'bin', 'wrangler.js');
+const wranglerLogDirectory = join(ROOT, 'test-output', 'wrangler', 'logs');
+ensureWranglerLogDirectory(wranglerLogDirectory);
 
 function run(args: string[]): string {
   try {
@@ -35,14 +41,14 @@ function run(args: string[]): string {
       encoding: 'utf8',
       env: {
         ...process.env,
-        WRANGLER_LOG_PATH: join(ROOT, 'test-output', 'wrangler', 'logs'),
+        WRANGLER_LOG_PATH: wranglerLogDirectory,
+        WRANGLER_SEND_METRICS: 'false',
       },
       stdio: ['ignore', 'pipe', 'pipe'],
       maxBuffer: 16 * 1024 * 1024,
     });
   } catch (error) {
-    const failure = error as { stderr?: string; stdout?: string; message?: string };
-    throw new Error(`Wrangler local D1 verification failed:\n${failure.stderr ?? failure.stdout ?? failure.message ?? 'unknown error'}`);
+    throw new Error(`Wrangler local D1 verification failed:\n${formatWranglerCommandFailure(error)}`);
   }
 }
 
