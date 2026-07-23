@@ -48,6 +48,11 @@ import {
   parseHistoricalDocumentCatalogProvenance,
 } from './historical-document-catalog.js';
 import {
+  assertCoreEightSourcePackRelease,
+  loadHistoricalSourcePacks,
+  materializeHistoricalSourcePacks,
+} from './historical-source-packs.js';
+import {
   compileHistoricalSectionCompatibility,
   parseHistoricalSectionCompatibilityAttestation,
 } from './historical-section-compatibility-compiler.js';
@@ -647,6 +652,23 @@ log(`  Inserted ${historicalTransform8Rows.deliveryProfiles.length} delivery pro
   + `${historicalTransform8Rows.legacyAliases.length} legacy aliases`);
 });
 materializeHistoricalTransform8();
+
+// ── Transform 9: reviewed exact-edition source packs ──
+
+// The manifest is the sole release allowlist.  Materialization adds the
+// sectioned-only profiles and canonical identities; it deliberately adds no
+// legacy aliases for the new reviewed packages.
+log('Materializing reviewed historical core-eight source packs...');
+const historicalSourcePacks = loadHistoricalSourcePacks(manifest.materializations.d1.inputs, sourceRegistry);
+assertCoreEightSourcePackRelease(historicalSourcePacks);
+const historicalSourcePackCounts = materializeHistoricalSourcePacks(db, historicalSourcePacks);
+if (JSON.stringify(historicalSourcePackCounts) !== JSON.stringify({
+  packs: 1, works: 8, editions: 8, artifacts: 25, sections: 512,
+  deliveryProfiles: 8, identities: 512, legacyAliases: 0,
+})) {
+  throw new Error('Transform 9 source-pack materialization did not retain the reviewed core-eight inventory');
+}
+log(`  Inserted ${historicalSourcePackCounts.works} reviewed works with ${historicalSourcePackCounts.sections} canonical sections`);
 
 // ── Tier 3: UBS source-attested parallel passages ──
 

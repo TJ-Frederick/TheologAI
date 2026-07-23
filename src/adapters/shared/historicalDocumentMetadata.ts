@@ -1,4 +1,4 @@
-import type { DocumentInfo, DocumentSection, HistoricalDocumentCatalogMetadata } from '../../kernel/repositories.js';
+import type { DocumentInfo, DocumentSection, ExactEditionProvenance, HistoricalDocumentCatalogMetadata } from '../../kernel/repositories.js';
 import {
   assertClassicTextDocumentMetadata,
   assertClassicTextSectionMetadata,
@@ -27,7 +27,40 @@ export function mapDocumentDatabaseRow(row: DocumentDatabaseRow): DocumentInfo {
   return {
     ...document,
     ...(isCatalogMetadata(metadata.catalog) ? { catalog: metadata.catalog } : {}),
+    ...(isExactEditionProvenance(metadata.editionProvenance) ? { editionProvenance: metadata.editionProvenance } : {}),
   };
+}
+
+function isExactEditionProvenance(value: unknown): value is ExactEditionProvenance {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const provenance = value as Record<string, unknown>;
+  if (provenance.foundation !== 'edition-provenance-foundation.v1'
+    || !validId(provenance.sourcePackId) || !validId(provenance.editionId)
+    || typeof provenance.language !== 'string' || typeof provenance.publication !== 'string'
+    || typeof provenance.version !== 'string') return false;
+  const rights = provenance.normalizedTextRights;
+  if (!rights || typeof rights !== 'object' || Array.isArray(rights)) return false;
+  const r = rights as Record<string, unknown>;
+  if (r.status !== 'no_known_conflict' || r.scope !== 'normalized_public_domain_text_only'
+    || typeof r.basis !== 'string' || typeof r.reviewedAt !== 'string') return false;
+  if (!Array.isArray(provenance.sourceArtifacts) || provenance.sourceArtifacts.length < 1
+    || !provenance.sourceArtifacts.every(artifact => {
+      if (!artifact || typeof artifact !== 'object' || Array.isArray(artifact)) return false;
+      const a = artifact as Record<string, unknown>;
+      return validId(a.artifactId) && (a.role === 'authority' || a.role === 'comparator')
+        && typeof a.locator === 'string' && a.locator.startsWith('https://')
+        && typeof a.sha256 === 'string' && /^[a-f0-9]{64}$/.test(a.sha256)
+        && Number.isSafeInteger(a.bytes) && (a.bytes as number) > 0 && typeof a.acquiredAt === 'string';
+    })) return false;
+  if (!provenance.provenance || typeof provenance.provenance !== 'object' || Array.isArray(provenance.provenance)) return false;
+  const review = provenance.provenance as Record<string, unknown>;
+  return (review.status === 'verified' || review.status === 'verified_with_uncertainty')
+    && (typeof review.uncertainty === 'string' || review.uncertainty === null)
+    && typeof review.reviewedAt === 'string';
+}
+
+function validId(value: unknown): value is string {
+  return typeof value === 'string' && /^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$/.test(value);
 }
 
 interface DocumentSectionDatabaseRow {

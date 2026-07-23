@@ -1,11 +1,11 @@
 {
   "manifestVersion": 2,
-  "schemaVersion": "0005_historical_section_identity_delivery",
+  "schemaVersion": "0006_historical_source_packs",
   "algorithm": "sha256",
   "materializations": {
     "d1": {
       "identityVersion": 1,
-      "transformVersion": 8,
+      "transformVersion": 9,
       "migrations": [
         {
           "path": "migrations/0001_initial_schema.sql",
@@ -26,6 +26,10 @@
         {
           "path": "migrations/0005_historical_section_identity_delivery.sql",
           "sha256": "0a002aaab77940d0fa8b9b4fd5c346c7a924e211d91c5d2519ea4882e326a5fa"
+        },
+        {
+          "path": "migrations/0006_historical_source_packs.sql",
+          "sha256": "2e91882207c555ed561cd15c6f0d70cf160d57b484798779e27a2bb681a5196b"
         }
       ],
       "inputs": [
@@ -128,6 +132,16 @@
         "data/historical-documents/westminster-confession.json",
         "data/historical-documents/westminster-larger-catechism.json",
         "data/historical-documents/westminster-shorter-catechism.json",
+        "data/historical-source-packs/core-eight/editions/anselm-proslogion-deane-1903.json",
+        "data/historical-source-packs/core-eight/editions/athanasius-on-incarnation-robertson-npnf2-v4.json",
+        "data/historical-source-packs/core-eight/editions/augustine-confessions-pusey-1838.json",
+        "data/historical-source-packs/core-eight/editions/bunyan-pilgrims-progress-part-1.json",
+        "data/historical-source-packs/core-eight/editions/calvin-institutes-beveridge-1845.json",
+        "data/historical-source-packs/core-eight/editions/irenaeus-against-heresies-anf1-1885.json",
+        "data/historical-source-packs/core-eight/editions/john-damascene-exposition-salmond-npnf2-v9.json",
+        "data/historical-source-packs/core-eight/editions/wesley-standard-sermons-1771.json",
+        "data/historical-source-packs/core-eight/manifest.json",
+        "data/historical-source-packs/core-eight/manifest.sha256",
         "src/data/ubs-parallel-passages.generated.json"
       ]
     }
@@ -580,6 +594,46 @@
       "sha256": "8d051c6b9f519b61bff1ba2b7c0ea718189ff221bdd37df3d6b7139d5e786ef2"
     },
     {
+      "path": "data/historical-source-packs/core-eight/editions/anselm-proslogion-deane-1903.json",
+      "sha256": "ce2e11188799f4efb0d02decece0fc8428ca0e71b632a3f272d9fb2cf6b8928b"
+    },
+    {
+      "path": "data/historical-source-packs/core-eight/editions/athanasius-on-incarnation-robertson-npnf2-v4.json",
+      "sha256": "1c615ec8298463cb98999f67a4f5d92ac6b04f9c942febe2fe841d0a276d5b4a"
+    },
+    {
+      "path": "data/historical-source-packs/core-eight/editions/augustine-confessions-pusey-1838.json",
+      "sha256": "2ae9820815a103bd565824fbfa9441f846d304948c422f51afa9fad35476b60b"
+    },
+    {
+      "path": "data/historical-source-packs/core-eight/editions/bunyan-pilgrims-progress-part-1.json",
+      "sha256": "a83e6c2b5f08e78d5a5352fcae4c28109aa40fd53cc939a10ce488a26e57e7b7"
+    },
+    {
+      "path": "data/historical-source-packs/core-eight/editions/calvin-institutes-beveridge-1845.json",
+      "sha256": "5ba5cde7eecbe02a28b635f91e1eb9603a217a570b8f986c2bd401fe48ea502f"
+    },
+    {
+      "path": "data/historical-source-packs/core-eight/editions/irenaeus-against-heresies-anf1-1885.json",
+      "sha256": "6a5dd9c999e6c335e181dff5deae48469a2123b9c966f02535ce925977cdaea4"
+    },
+    {
+      "path": "data/historical-source-packs/core-eight/editions/john-damascene-exposition-salmond-npnf2-v9.json",
+      "sha256": "f3cc925b8489d2a22679914dabcd1370538f19b6bd4cc8776bdea14c9d042589"
+    },
+    {
+      "path": "data/historical-source-packs/core-eight/editions/wesley-standard-sermons-1771.json",
+      "sha256": "bcdea027a1fe3c9eb219ffe171e0287af778ce201794516ba0de619591868b0f"
+    },
+    {
+      "path": "data/historical-source-packs/core-eight/manifest.json",
+      "sha256": "976c1f82a833d8004f415c9bc6838108f9f9f91ff40e19a2b20af53c70066617"
+    },
+    {
+      "path": "data/historical-source-packs/core-eight/manifest.sha256",
+      "sha256": "89b3f31cf19bc91ea2531b5732d135cfc2dfbba4e0f84940151d12d6a728c88a"
+    },
+    {
       "path": "data/parallel-passages/ubs-paratext/LICENSE.md",
       "sha256": "924513d06ecd19f5abb3d5a41973452983bf2b471347253d07d7cc529a466c8c"
     },
@@ -614,12 +668,18 @@
     "strongs_usage_stats": 13836,
     "morphology": 447748,
     "stepbible_lexicons": 19570,
-    "documents": 17,
-    "document_sections": 3054,
-    "historical_document_delivery_profiles": 17,
-    "historical_section_identities": 3054,
+    "documents": 25,
+    "document_sections": 3566,
+    "historical_document_delivery_profiles": 25,
+    "historical_section_identities": 3566,
     "historical_section_aliases": 2821,
-    "sections_fts": 3054,
+    "historical_source_packs": 1,
+    "historical_works": 8,
+    "historical_editions": 8,
+    "historical_source_artifacts": 25,
+    "historical_edition_sections": 512,
+    "historical_edition_sections_fts": 512,
+    "sections_fts": 3566,
     "morph_codes": 20,
     "ubs_parallel_sources": 1,
     "ubs_parallel_groups": 2193,

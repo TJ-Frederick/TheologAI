@@ -65,6 +65,12 @@ export const REQUIRED_COLUMNS: Readonly<Record<string, readonly string[]>> = {
   historical_document_delivery_profiles: ['document_id', 'work_id', 'edition_id', 'immutable_corpus_identity', 'section_package_identity', 'delivery_mode', 'section_count', 'landing_max_bytes', 'browse_page_size', 'cursor_version', 'provenance_json', 'rights_json'],
   historical_section_identities: ['document_id', 'section_key', 'source_ordinal', 'document_section_id'],
   historical_section_aliases: ['document_id', 'legacy_section_id', 'section_key', 'source_ordinal'],
+  historical_source_packs: ['pack_id', 'revision', 'schema_version', 'manifest_sha256', 'source_path'],
+  historical_works: ['work_id', 'pack_id', 'title', 'creator_metadata_status', 'creators_json'],
+  historical_editions: ['edition_id', 'work_id', 'pack_id', 'language', 'contributor_groups_json', 'publication', 'version', 'provenance_status', 'provenance_uncertainty', 'provenance_reviewed_at', 'underlying_work_rights_json', 'exact_artifact_rights_json', 'normalized_text_rights_json'],
+  historical_source_artifacts: ['artifact_id', 'edition_id', 'role', 'locator', 'pin_kind', 'pin_value', 'sha256', 'bytes', 'acquired_at'],
+  historical_edition_sections: ['edition_id', 'section_key', 'source_ordinal', 'display_label', 'heading', 'content'],
+  historical_edition_sections_fts: ['edition_id', 'section_key', 'heading', 'content'],
   sections_fts: ['title', 'content', 'topics'],
   morph_codes: ['code', 'expansion'],
   ubs_parallel_sources: ['source_id', 'schema_version', 'transform_version', 'artifact_identity', 'title', 'publisher', 'copyright', 'license', 'license_url', 'source_url', 'source_path', 'source_commit', 'source_commit_date', 'source_blob', 'source_bytes', 'source_sha256', 'modified', 'modification_note', 'label', 'directionality'],
@@ -244,6 +250,10 @@ function buildD1ReadinessQueryContract(
     'idx_document_sections_id_document',
     'idx_historical_section_identities_browse',
     'idx_historical_section_aliases_target',
+    'idx_historical_works_pack',
+    'idx_historical_editions_pack',
+    'idx_historical_source_artifacts_edition',
+    'idx_historical_edition_sections_order',
   ];
   const quotedIndexes = requiredIndexes.map(name => `'${name}'`).join(',');
   const indexCheck = `(SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name IN (${quotedIndexes})) = ${requiredIndexes.length}`;
@@ -260,7 +270,7 @@ function buildD1ReadinessQueryContract(
     { id: 'identity.ubs_transform', predicate: `(SELECT transform_version FROM ubs_parallel_sources WHERE source_id = 'ubs_paratext_parallel_passages') = ${UBS_PARALLEL_PASSAGE_PROVENANCE.transformVersion}` },
   ];
   const historicalCatalogChecks: D1ReadinessCheck[] = [
-    { id: 'historical.catalog_count', predicate: `(SELECT COUNT(*) FROM documents WHERE json_type(metadata, '$.catalog') = 'object') = ${HISTORICAL_CATALOG.length}` },
+    { id: 'historical.catalog_count', predicate: `(SELECT COUNT(*) FROM documents WHERE json_type(metadata, '$.catalog') = 'object' AND json_type(metadata, '$.editionProvenance') IS NULL) = ${HISTORICAL_CATALOG.length}` },
     ...HISTORICAL_CATALOG.map(entry => {
       const metadata = JSON.stringify({
         lookupAliases: entry.lookupAliases,
@@ -293,24 +303,32 @@ function buildD1ReadinessQueryContract(
       predicate: classicTextSectionReadinessPredicate(),
     },
     {
-      id: 'historical.transform8.profile_coverage',
+      id: 'historical.transform9.profile_coverage',
       predicate: `(SELECT COUNT(*) FROM historical_document_delivery_profiles) = (SELECT COUNT(*) FROM documents) AND (SELECT COUNT(*) FROM documents d LEFT JOIN historical_document_delivery_profiles p ON p.document_id = d.id WHERE p.document_id IS NULL) = 0`,
     },
     {
       id: 'historical.transform8.legacy_profile_contract',
-      predicate: `(SELECT COUNT(*) FROM historical_document_delivery_profiles WHERE work_id IS NOT NULL OR edition_id IS NOT NULL OR section_package_identity IS NOT NULL OR delivery_mode != 'complete_document' OR landing_max_bytes != 0 OR browse_page_size != 0 OR cursor_version != 0 OR section_count < 1 OR json_valid(provenance_json) != 1 OR json_type(provenance_json) != 'object' OR json_valid(rights_json) != 1 OR json_type(rights_json) != 'object') = 0`,
+      predicate: `(SELECT COUNT(*) FROM historical_document_delivery_profiles WHERE delivery_mode = 'complete_document') = ${HISTORICAL_CATALOG.length} AND (SELECT COUNT(*) FROM historical_document_delivery_profiles WHERE delivery_mode = 'complete_document' AND (work_id IS NOT NULL OR edition_id IS NOT NULL OR section_package_identity IS NOT NULL OR landing_max_bytes != 0 OR browse_page_size != 0 OR cursor_version != 0 OR section_count < 1 OR json_valid(provenance_json) != 1 OR json_type(provenance_json) != 'object' OR json_valid(rights_json) != 1 OR json_type(rights_json) != 'object')) = 0`,
     },
     {
-      id: 'historical.transform8.identity_coverage',
+      id: 'historical.transform9.core_eight_sectioned_profiles',
+      predicate: `(SELECT COUNT(*) FROM historical_document_delivery_profiles p JOIN historical_editions e ON e.edition_id = p.edition_id JOIN historical_works w ON w.work_id = p.work_id WHERE p.delivery_mode = 'sectioned_only' AND p.document_id = p.work_id AND p.work_id = e.work_id AND e.work_id = w.work_id AND e.pack_id = 'theologai-core-eight' AND p.immutable_corpus_identity = p.section_package_identity AND length(p.immutable_corpus_identity) = 64 AND p.section_count > 0 AND p.landing_max_bytes = 16384 AND p.browse_page_size = 32 AND p.cursor_version = 1 AND json_valid(p.provenance_json) = 1 AND json_type(p.provenance_json) = 'object' AND json_valid(p.rights_json) = 1 AND json_type(p.rights_json) = 'object') = 8 AND (SELECT COUNT(*) FROM historical_document_delivery_profiles WHERE delivery_mode = 'sectioned_only') = 8`,
+    },
+    {
+      id: 'historical.transform9.identity_coverage',
       predicate: `(SELECT COUNT(*) FROM historical_section_identities) = (SELECT COUNT(*) FROM document_sections) AND (SELECT COUNT(*) FROM document_sections s LEFT JOIN historical_section_identities i ON i.document_section_id = s.id AND i.document_id = s.document_id WHERE i.document_section_id IS NULL) = 0 AND (SELECT COUNT(*) FROM historical_section_identities i LEFT JOIN document_sections s ON s.id = i.document_section_id AND s.document_id = i.document_id WHERE s.id IS NULL) = 0`,
     },
     {
-      id: 'historical.transform8.source_ordinals',
+      id: 'historical.transform9.source_ordinals',
       predicate: `(SELECT COUNT(*) FROM historical_document_delivery_profiles p WHERE (SELECT MIN(source_ordinal) FROM historical_section_identities i WHERE i.document_id = p.document_id) != 1 OR (SELECT MAX(source_ordinal) FROM historical_section_identities i WHERE i.document_id = p.document_id) != p.section_count OR (SELECT COUNT(*) FROM historical_section_identities i WHERE i.document_id = p.document_id) != p.section_count) = 0`,
     },
     {
       id: 'historical.transform8.alias_coverage_source_first',
-      predicate: `(WITH legacy_groups AS (SELECT s.document_id, s.section_number AS legacy_section_id, MIN(i.source_ordinal) AS source_ordinal, COUNT(*) AS members FROM document_sections s JOIN historical_section_identities i ON i.document_section_id = s.id AND i.document_id = s.document_id GROUP BY s.document_id, s.section_number) SELECT COUNT(*) FROM legacy_groups g LEFT JOIN historical_section_aliases a ON a.document_id = g.document_id AND a.legacy_section_id = g.legacy_section_id AND a.source_ordinal = g.source_ordinal WHERE a.document_id IS NULL) = 0 AND (SELECT COUNT(*) FROM historical_section_aliases) = (SELECT COUNT(*) FROM (SELECT document_id, section_number FROM document_sections GROUP BY document_id, section_number))`,
+      predicate: `(WITH legacy_groups AS (SELECT s.document_id, s.section_number AS legacy_section_id, MIN(i.source_ordinal) AS source_ordinal FROM document_sections s JOIN historical_section_identities i ON i.document_section_id = s.id AND i.document_id = s.document_id JOIN historical_document_delivery_profiles p ON p.document_id = s.document_id WHERE p.delivery_mode = 'complete_document' GROUP BY s.document_id, s.section_number) SELECT COUNT(*) FROM legacy_groups g LEFT JOIN historical_section_aliases a ON a.document_id = g.document_id AND a.legacy_section_id = g.legacy_section_id AND a.source_ordinal = g.source_ordinal WHERE a.document_id IS NULL) = 0 AND (SELECT COUNT(*) FROM historical_section_aliases) = (SELECT COUNT(*) FROM (SELECT s.document_id, s.section_number FROM document_sections s JOIN historical_document_delivery_profiles p ON p.document_id = s.document_id WHERE p.delivery_mode = 'complete_document' GROUP BY s.document_id, s.section_number))`,
+    },
+    {
+      id: 'historical.transform9.no_new_legacy_aliases',
+      predicate: `(SELECT COUNT(*) FROM historical_section_aliases a JOIN historical_document_delivery_profiles p ON p.document_id = a.document_id WHERE p.delivery_mode = 'sectioned_only') = 0`,
     },
     {
       id: 'historical.transform8.alias_non_shadowing',
@@ -321,6 +339,18 @@ function buildD1ReadinessQueryContract(
       // join proves each of those rows still mirrors its source section.
       id: 'historical.transform8.full_fts_parity',
       predicate: `(SELECT COUNT(*) FROM document_sections section LEFT JOIN sections_fts fts ON fts.rowid = section.id WHERE fts.rowid IS NULL OR fts.title IS NOT section.title OR fts.content IS NOT section.content OR fts.topics IS NOT section.topics) = 0`,
+    },
+    {
+      id: 'historical.transform9.source_pack_section_projection',
+      predicate: `(SELECT COUNT(*) FROM historical_edition_sections es JOIN historical_editions e ON e.edition_id = es.edition_id JOIN historical_document_delivery_profiles p ON p.edition_id = es.edition_id JOIN historical_section_identities i ON i.document_id = p.document_id AND i.section_key = es.section_key AND i.source_ordinal = es.source_ordinal JOIN document_sections ds ON ds.id = i.document_section_id AND ds.document_id = p.document_id WHERE ds.content = es.content AND ds.title = es.heading AND ds.section_number = es.section_key) = (SELECT COUNT(*) FROM historical_edition_sections)`,
+    },
+    {
+      id: 'historical.transform9.source_pack_fts_parity',
+      predicate: `(SELECT COUNT(*) FROM historical_edition_sections_fts) = (SELECT COUNT(*) FROM historical_edition_sections) AND (SELECT COUNT(*) FROM historical_edition_sections s WHERE NOT EXISTS (SELECT 1 FROM historical_edition_sections_fts f WHERE f.edition_id = s.edition_id AND f.section_key = s.section_key AND f.heading IS s.heading AND f.content IS s.content)) = 0`,
+    },
+    {
+      id: 'historical.transform9.source_pack_authority',
+      predicate: `(SELECT COUNT(*) FROM historical_editions e WHERE e.pack_id != 'theologai-core-eight' OR json_extract(e.normalized_text_rights_json, '$.status') != 'no_known_conflict' OR json_extract(e.normalized_text_rights_json, '$.scope') != 'normalized_public_domain_text_only' OR NOT EXISTS (SELECT 1 FROM historical_source_artifacts a WHERE a.edition_id = e.edition_id AND a.role = 'authority')) = 0`,
     },
     {
       id: 'historical.transform8.collision_groups',

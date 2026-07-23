@@ -136,6 +136,20 @@ function assertDatabaseHealth(db: Database.Database, expectedCounts: Record<stri
   if (sectionFtsMismatches.count !== 0) {
     throw new Error(`Imported historical FTS has ${sectionFtsMismatches.count} rowid/content mismatches`);
   }
+
+  const sourcePackFtsMismatches = db.prepare(
+    `SELECT COUNT(*) AS count
+       FROM historical_edition_sections s
+       LEFT JOIN historical_edition_sections_fts f
+         ON f.edition_id = s.edition_id
+        AND f.section_key = s.section_key
+      WHERE f.rowid IS NULL
+         OR f.heading IS NOT s.heading
+         OR f.content IS NOT s.content`,
+  ).get() as { count: number };
+  if (sourcePackFtsMismatches.count !== 0) {
+    throw new Error(`Imported source-pack FTS has ${sourcePackFtsMismatches.count} identity/content mismatches`);
+  }
 }
 
 function assertRepresentativeFts(db: Database.Database): void {

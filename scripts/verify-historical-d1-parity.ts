@@ -67,8 +67,8 @@ export async function verifyHistoricalD1Parity(databasePath: string): Promise<vo
     const aliases = database.prepare(`SELECT document_id AS documentId, legacy_section_id AS legacySectionId,
       section_key AS sectionKey, source_ordinal AS sourceOrdinal FROM historical_section_aliases
       ORDER BY document_id, legacy_section_id`).all() as Transform8Alias[];
-    if (identities.length !== 3054 || aliases.length !== 2821) {
-      throw new Error(`Transform 8 D1 parity corpus count drifted: ${identities.length} identities, ${aliases.length} aliases`);
+    if (identities.length !== 3566 || aliases.length !== 2821) {
+      throw new Error(`Transform 9 D1 parity corpus count drifted: ${identities.length} identities, ${aliases.length} aliases`);
     }
 
     const compilation = verifyHistoricalSectionCompatibilityAttestationFromDisk(ROOT);

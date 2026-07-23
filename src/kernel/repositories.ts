@@ -158,6 +158,36 @@ export interface DocumentInfo {
   date: string | null;
   topics: string[];
   catalog?: HistoricalDocumentCatalogMetadata;
+  /** Present only for a reviewed exact-edition source-pack projection. */
+  editionProvenance?: ExactEditionProvenance;
+}
+
+export interface ExactEditionProvenance {
+  foundation: 'edition-provenance-foundation.v1';
+  sourcePackId: string;
+  editionId: string;
+  language: string;
+  publication: string;
+  version: string;
+  sourceArtifacts: Array<{
+    artifactId: string;
+    role: 'authority' | 'comparator';
+    locator: string;
+    sha256: string;
+    bytes: number;
+    acquiredAt: string;
+  }>;
+  normalizedTextRights: {
+    status: 'no_known_conflict';
+    scope: 'normalized_public_domain_text_only';
+    basis: string;
+    reviewedAt: string;
+  };
+  provenance: {
+    status: 'verified' | 'verified_with_uncertainty';
+    uncertainty: string | null;
+    reviewedAt: string;
+  };
 }
 
 export type HistoricalMetadataStatus = 'reviewed' | 'anonymous' | 'collective' | 'unknown';

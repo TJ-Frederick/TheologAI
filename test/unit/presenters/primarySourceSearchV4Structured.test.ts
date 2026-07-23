@@ -87,6 +87,29 @@ function largePlan(): PrimarySourceSearchPlanResult {
 }
 
 describe('primary-source v7 structured presentation', () => {
+  it('preserves reviewed source-pack readiness rather than relabeling it as legacy-incomplete', () => {
+    const plan = largePlan();
+    const provider = plan.queries[0]!.providers[0]!;
+    const readiness = {
+      foundation: 'edition-provenance-foundation.v1' as const,
+      editionIdentity: 'established' as const,
+      provenance: 'verified' as const,
+      exactArtifactRights: 'not_claimed_for_scan_artifacts' as const,
+      normalizedTextRights: 'no_known_conflict' as const,
+    };
+    provider.hits = [{ ...localHit('q1', 1), editionReadiness: readiness }];
+    provider.hitCount = 1;
+    provider.resultWindow.returnedHitCount = 1;
+    provider.scope!.eligibleDocuments = [{
+      id: 'reviewed-work', title: 'Reviewed Work', metadataStatus: 'reviewed', editionReadiness: readiness,
+    }];
+
+    const presented = presentPrimarySourceSearchV7(plan);
+
+    expect(presented.queries[0]!.providers[0]!.hits[0]).toMatchObject({ editionReadiness: readiness });
+    expect(presented.queries[0]!.providers[0]!.scope?.eligibleDocuments[0]).toMatchObject({ editionReadiness: readiness });
+  });
+
   it('defensively prepends the date invariant to every executable external provider result', () => {
     const plan = largePlan();
     const external = externalProvider('external', 1);
