@@ -13,7 +13,8 @@ Use this workflow when the user asks about:
 
 ## Available Documents
 
-TheologAI includes 17 historical documents. Use the catalog and exact resources
+TheologAI includes 25 historical documents and works: 17 legacy documents and
+8 reviewed source-pack editions. Use the catalog and exact resources
 returned by the server to establish what is available and what each document
 says. The workflow must not assign a tradition or author from a title or from a
 prewritten grouping.
@@ -53,9 +54,10 @@ disabled provider did not search or read CCEL.
   confirm the returned URI matches the selected locator.
 - Do not quote, characterize a position, or compare documents from snippets.
   Base those claims only on exact resources actually read.
-- Treat local `editionReadiness` as fail-closed: this contract has not
-  established exact edition identity, transcription provenance, or
-  exact-artifact redistribution rights.
+- Treat local `editionReadiness` as authoritative per result: legacy entries
+  remain fail-closed, while reviewed source-pack entries establish the edition
+  and provenance status only for normalized public-domain text. Neither form
+  authorizes redistribution of source scan artifacts.
 
 ### Step 3b: Close the Coverage Ledger
 

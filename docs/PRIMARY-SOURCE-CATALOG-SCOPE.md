@@ -1,8 +1,10 @@
 # Primary-source catalog scope
 
 The local `primary_source_search` provider uses a reviewed catalog manifest for
-all 17 hosted works. This slice adds no document bodies and grants no new
-rights. It only makes the already-hosted collection's work identities,
+the 17 legacy hosted works. Transform 9 separately projects eight reviewed
+normalized source-pack editions into the same local 25-work collection. This
+slice adds no document bodies and grants no new rights. It only makes the
+already-hosted collection's work identities,
 composition-date scope, and explicitly attributed creators machine-readable.
 
 ## Source and materialization
@@ -15,7 +17,7 @@ composition-date scope, and explicitly attributed creators machine-readable.
 - Every entry has exact lookup-only aliases, a display date, optional paired
   composition-year bounds, explicit creator roles, and one metadata status:
   `reviewed`, `anonymous`, `collective`, or `unknown`.
-- The database builder validates one-to-one coverage of all 17 historical JSON
+- The database builder validates one-to-one coverage of all 17 legacy historical JSON
   files, validates complete provenance-field coverage, and stores the catalog
   object in `documents.metadata.catalog` alongside existing topics. The
   materialized `documents.date` comes from the reviewed catalog label rather
@@ -60,8 +62,10 @@ reviewed work metadata already materialized in `documents.metadata.catalog`:
 identity, title, document type, exact lookup aliases, composition interval,
 creator names and roles, metadata status, and stable provenance IDs. It embeds
 no work body and no provenance URL. Its policy object states that scope is the
-hosted collection only, aliases are routing-only, edition provenance is
-incomplete, and rights status is not established by this inventory.
+hosted collection only and aliases are routing-only. Legacy works retain
+incomplete edition provenance and rights status; reviewed source-pack works
+carry a URL-free edition/provenance summary and a normalized-text-only rights
+screen. The catalog never exposes source artifact locators.
 
 Each query may include one exact `work`, one exact reviewed creator name in
 `author`, and inclusive `startYear`/`endYear` bounds. Date matching uses interval
@@ -113,8 +117,10 @@ partial/fail-closed envelope where applicable.
 
 Search snippets remain discovery-only. Clients must call MCP `resources/read`
 on selected canonical section links before quotation, author/work comparison,
-or substantive conclusions. Edition and transcription provenance remains
-incomplete as stated by the existing evidence policy.
+or substantive conclusions. The per-result evidence policy distinguishes
+legacy incomplete provenance, reviewed normalized source packs, and mixed
+inventories; a reviewed source pack never claims scan-artifact redistribution
+rights.
 
 The `primary-source-research` and `confession-study` prompts read the catalog
 before search. Topic and creator comparisons use work diversity; exact-work

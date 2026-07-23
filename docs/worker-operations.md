@@ -68,6 +68,11 @@ active.
 > sole 100%; identity SHA-256
 > `a6959d24fb7f50a9848fe2d011f425894718471b8a0609e7833780a291721a44`.
 
+PR95's Transform9 historical source-pack work remains local-only and
+unpublished. It adds eight reviewed sectioned-only editions to the local
+25-work corpus but has no Cloudflare migration, binding, deployment, or
+production-runtime claim; Norton and Aquinas assets remain inactive.
+
 PR #92 merged as `cd3d1c38fdf0f939a33a41d4b6d5044eb7f44562`; its exact
 reviewed head `3a2b5a57b322dce525f27cfa91c9f667d080bca9` is the separate
 preview-only release. Exact-head CI attempt 2 run `30017722596` and protected
@@ -99,6 +104,9 @@ activation record. The v2 audit proves the public tool behavior at the exact
 production identity above; it does not authorize deletion, route replacement,
 or other destructive cleanup. The preview D1 remains a separate environment
 with migrations `0004` / transform 7 and `0005` / transform 8 materialized.
+PR95's Transform9 source-pack work remains local-only and unpublished; it
+does not alter that active production identity or claim a production runtime
+activation.
 
 ## Historical PR #50 pre-custom-domain rollback anchor (2026-07-16)
 
