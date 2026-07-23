@@ -679,8 +679,9 @@ Code readiness and operational readiness are deliberately separate:
   source. U3-T7 deterministic compilation and the Transform-7 data layer are
   complete, while its UBS adapters remain runtime-inactive. Preview also has
   active Transform-8 historical compatibility through the existing
-  `classic_text_lookup`; it changes preview output but adds no tool. Production
-  lacks both transforms. A separately owner-gated production data release and
+  `classic_text_lookup`; it changes preview output but adds no tool. The live
+  production Worker and its bound old D1 lack both transforms. A separately
+  owner-gated production data release and
   then a distinct UBS runtime-activation release would be required before
   extending the existing `original_language_study` tool.
   Evaluate MACULA
