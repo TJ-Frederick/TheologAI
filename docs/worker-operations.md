@@ -15,20 +15,21 @@ The checked-in production-binding candidate is
 `theologai-production-20260723-a`
 (`3f7faa0e-689f-47aa-a601-dc662db9a6cf`). It passed migrations `0001`–`0005`,
 deterministic seeding, strict readiness, and the Transform-8 authority audit,
-but no active production Worker uses it. The live deployment, Worker, and old
-D1 above remain the matched rollback pair; checked-in config is not deployment
-evidence.
+but no live production Worker is bound to it. The live deployment, Worker, and
+old D1 above remain the matched rollback pair; checked-in config is not
+deployment evidence.
 
-The exact deployed and audited preview source commit is
-`bb8ed4c8f025f697502a274986205f92bdf520b7` in draft, unmerged PR #92; it is
-the separate preview-only release: CI run `30011028739` passed, Cloudflare
-deployment `44a0858f-75ba-497d-b84b-66c14253234a` serves Worker
-`2b540a47-0937-4c00-9d44-de1199e09e6c`, and its only D1 binding is
+PR #92 merged as `cd3d1c38fdf0f939a33a41d4b6d5044eb7f44562`; its exact
+reviewed head `3a2b5a57b322dce525f27cfa91c9f667d080bca9` is the separate
+preview-only release. Exact-head CI attempt 2 run `30017722596` and protected
+preview run `30039858274` passed. Cloudflare deployment
+`04e7a69a-78d2-447b-ac71-e9fb0bef3695` serves Worker
+`576517dd-84a8-4b5f-a5ea-ed8f124db63d`, and its only D1 binding is
 `theologai-preview-20260722-b`
-(`94c4938b-7800-4d68-9097-0df33c31fdc1`). The preview audits passed 22/22
-cases and 59/59 checks, plus 48/48 rate-counted requests across 11 aggregate
-groups. The `deploy-preview` label was removed and PR #92 returned to draft;
-any later docs-only PR #92 head is not deployed. This state is not a production
+(`94c4938b-7800-4d68-9097-0df33c31fdc1`). The parallel audit passed 22/22
+cases; the Transform-8 audit recorded 48 rate-counted requests, 53 total HTTP
+records, and 11/11 assertion groups. The `deploy-preview` label was removed
+and revocation run `30040550778` passed. This state is not a production
 deployment.
 
 Ordinary requests to the production `theologai.tjfrederick.workers.dev` host
