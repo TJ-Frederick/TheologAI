@@ -2,30 +2,31 @@
 
 ## Current split release state (2026-07-23)
 
-The current production D1 is `theologai-production-20260723-a`, with Transform
-8 active. The earlier PR #72 deployment, Worker, and
-`theologai-production-20260715-a` record are retained as historical rollback
-evidence only; they do not describe the current production binding. Its
-independent audit returned GO with no P0-P3 findings across 22 read-only
-requests and a 22/22 source-attested regression.
+The current production baseline is main merge `7974b15` (tree `f77bca4`),
+released by protected workflow `30046749929` as Cloudflare deployment
+`eb2af3bf-8e37-4373-83c3-233255fb477e`, Worker
+`573e6a08-d28f-442b-9206-42f62c1eaf46`, and D1
+`theologai-production-20260723-a`
+(`3f7faa0e-689f-47aa-a601-dc662db9a6cf`). Its targeted r3 audit recorded 36
+serialized HTTP requests / 31 rate-counted across 7/7 assertion groups; broad
+r2 recorded 34 requests / 29 rate-counted across 10/10 groups. Sol returned GO
+and the 60-minute operational tail was clean.
 
 The checked-in Transform 9 historical source-pack migration is likewise
 local-only: it expands the local corpus to 25 works with eight reviewed
 sectioned-only editions, but makes no claim about a Cloudflare migration,
 binding, or deployment. Norton and Aquinas source assets remain inactive.
 
-PR #92 merged as `cd3d1c38fdf0f939a33a41d4b6d5044eb7f44562`; its exact
-reviewed head `3a2b5a57b322dce525f27cfa91c9f667d080bca9` is the separate
-preview-only release. Exact-head CI attempt 2 run `30017722596` and protected
-preview run `30039858274` passed. Cloudflare deployment
-`04e7a69a-78d2-447b-ac71-e9fb0bef3695` serves Worker
-`576517dd-84a8-4b5f-a5ea-ed8f124db63d`, and its only D1 binding is
+The current preview release is separate: Cloudflare deployment
+`bf4d7603-5b3b-4c6f-8e09-7bae3fe24eb8`, Worker
+`968975cf-8183-446e-852c-b6a8670d56d5`, and preview D1
 `theologai-preview-20260722-b`
-(`94c4938b-7800-4d68-9097-0df33c31fdc1`). The parallel audit passed 22/22
-cases; the Transform-8 audit recorded 48 rate-counted requests, 53 total HTTP
-records, and 11/11 assertion groups. The `deploy-preview` label was removed
-and revocation run `30040550778` passed. This state is not a production
-deployment.
+(`94c4938b-7800-4d68-9097-0df33c31fdc1`). It is not production evidence.
+
+The PR #72 and PR #92 deployment records below are historical rollback and
+audit evidence only. In particular, PR #92's former preview deployment
+`04e7a69a-78d2-447b-ac71-e9fb0bef3695` / Worker
+`576517dd-84a8-4b5f-a5ea-ed8f124db63d` is not the current preview release.
 
 Ordinary requests to the production `theologai.tjfrederick.workers.dev` host
 now return a no-store 308 to `mcp.theologai.xyz`. The exact abusive-poller
@@ -40,19 +41,14 @@ candidate, not evidence of a deployed Worker or a changed remote contract.
 
 The later repository changes through merged PR #83
 (`93d5837b05249c15127ab20107f86443cccf4e1e`) remain outside production.
-U3-T7 adds an inactive in-memory semantic compiler,
-native-to-normalized coordinate bridge, and content-free audit. The PR #92
-preview Worker and D1 above record a separate preview release: its D1 has
-migrations `0004` / transform 7 and `0005` / transform 8 materialized.
-Transform 7's UBS adapters remain runtime-inactive. Transform 8 is active in
-preview's historical repositories: the existing `classic_text_lookup` has the
-Baltimore hard cut and canonical/legacy resolution, changing preview output
-without adding a tool. Current production also has Transform 8 active.
-Transform 9 remains local-only and unbound, while production UBS runtime
-activation remains unchanged. The unpublished candidate also advances the local
-primary-source schema pair to
-production v6/local-only and preview v7/discovery-only. No deletion, route
-replacement, or other destructive cleanup is authorized by this record.
+U3-T7 adds an inactive in-memory semantic compiler, native-to-normalized
+coordinate bridge, and content-free audit. The former PR #92 preview Worker
+and D1 are historical release evidence, superseded by the current preview
+release above. Transform 9 remains local-only and unbound, while production UBS
+runtime activation remains unchanged. The unpublished candidate also advances
+the local primary-source schema pair to production v6/local-only and preview
+v7/discovery-only. No deletion, route replacement, or other destructive cleanup
+is authorized by this record.
 
 Any eventual UBS semantic production release must separately authorize a
 production D1 migration/binding/deployment sequence. The preview data layer is

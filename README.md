@@ -45,22 +45,20 @@ Remote MCP client configuration:
 }
 ```
 
-Use the preview URL only for explicitly authorized release testing. PR #92
-merged as `cd3d1c38fdf0f939a33a41d4b6d5044eb7f44562`; its exact reviewed head
-`3a2b5a57b322dce525f27cfa91c9f667d080bca9` is deployed to preview only as
-Cloudflare deployment `04e7a69a-78d2-447b-ac71-e9fb0bef3695`, Worker
-`576517dd-84a8-4b5f-a5ea-ed8f124db63d`, and D1
+Use the preview URL only for explicitly authorized release testing. The
+current production baseline is main merge `7974b15` (tree `f77bca4`), released
+by protected workflow `30046749929` as Cloudflare deployment
+`eb2af3bf-8e37-4373-83c3-233255fb477e`, Worker
+`573e6a08-d28f-442b-9206-42f62c1eaf46`, and D1
+`theologai-production-20260723-a`
+(`3f7faa0e-689f-47aa-a601-dc662db9a6cf`). Its targeted r3 audit recorded 36
+serialized HTTP requests / 31 rate-counted across 7/7 assertion groups; broad
+r2 recorded 34 requests / 29 rate-counted across 10/10 groups, with a Sol GO
+and clean 60-minute tail. The current preview release is
+separate: Cloudflare deployment `bf4d7603-5b3b-4c6f-8e09-7bae3fe24eb8`, Worker
+`968975cf-8183-446e-852c-b6a8670d56d5`, and preview D1
 `theologai-preview-20260722-b`
-(`94c4938b-7800-4d68-9097-0df33c31fdc1`). Exact-head CI attempt 2 run
-`30017722596` and protected preview run `30039858274` passed. The parallel
-audit passed 22/22 cases; the Transform-8 audit recorded 48 rate-counted
-requests, 53 total HTTP records, and 11/11 assertion groups. The
-`deploy-preview` authorization was removed and revocation run `30040550778`
-passed. It is not a production deployment. The current production D1 is
-`theologai-production-20260723-a`, with Transform 8 active. The PR #72
-deployment, Worker, and `theologai-production-20260715-a` details are retained
-as historical rollback evidence; they do not describe the current production
-binding.
+(`94c4938b-7800-4d68-9097-0df33c31fdc1`).
 
 This branch's Transform 9 source-pack migration remains local-only and
 unbound. It does not change the production D1 binding or make the core-eight
@@ -69,14 +67,8 @@ For a preview-client rollback without changing server state, use the direct prev
 `workers.dev` address above; the production `workers.dev` address intentionally
 redirects rather than serving a separate legacy Worker.
 
-The preview-only data layer has migration `0004` / transform 7 and migration
-`0005` / transform 8 materialized in its bound D1. Transform 7's UBS adapters
-remain runtime-inactive: they register no new MCP surface or output. Transform
-8 is active in preview's historical repositories: the existing
-`classic_text_lookup` has the Baltimore hard cut and canonical/legacy
-resolution. That adds no new tool, but it does change preview output. Transform
-8 is also active in current production. Transform 9 remains local-only and
-unbound; any later UBS runtime activation remains separately gated. The pinned
+Transform 9 remains local-only and unbound; any later UBS runtime activation
+or reviewed historical-source-pack release remains separately gated. The pinned
 packet's `SOURCE.json` remains a historical acquisition-gate snapshot, not
 deployment evidence.
 
@@ -294,15 +286,11 @@ separately gated. Norton is a future successor,
 reliable translator attribution.
 
 Production tools search and retrieve only the locally indexed collection and
-do **not** currently fetch CCEL search results or document bodies. The deployed
-preview source contains Transform-8 code with active historical compatibility:
-its existing `classic_text_lookup` provides the Baltimore hard cut and
-canonical/legacy resolution. This changes preview output without adding a new
-tool. Preview retains the v5 CCEL-discovery profile; live search and coordinator execution remain disabled.
+do **not** currently fetch CCEL search results or document bodies. Preview
+retains the v5 CCEL-discovery profile; live search and coordinator execution remain disabled.
 External preview queries return a disabled provider result before adapter invocation.
 That occurs before Durable Object lookup/RPC, or fetch. Production has neither
-the Transform-9 core-eight materialization nor behavior; Transform 8 is active
-there.
+the Transform-9 core-eight materialization nor behavior.
 The checked-in v6/v7 profile candidate remains unpublished. MCP clients should
 reconnect and reinitialize after any endpoint/profile change because tool and
 prompt schemas may be cached for an existing connection.
@@ -498,9 +486,10 @@ per-request D1 repositories. Both targets share one MCP registry.
   after the PR #10 production baseline.
 - Live CCEL discovery and search remain gated future work; the checked-in,
   unpublished candidate exposes only the non-executing v7 contract while its
-  local production profile remains v6/local-only. The current preview-only
-  PR #92 deployment remains v5/discovery-only, while production remains
-  PR #72 v4/local-only.
+  local production profile remains v6/local-only. The current remote schema
+  versions are release-specific and must be verified against the current
+  production/preview baselines above; the PR #72 and PR #92 profiles are
+  historical evidence only.
   The legacy CCEL body reader is retired; the retained discovery adapter is
   bounded, does not fetch until separately authorized, and must never become
   CCEL body mirroring or republication.

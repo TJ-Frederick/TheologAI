@@ -174,36 +174,28 @@ The SQLite database (`data/theologai.db`) is a derived artifact. Cross-reference
 
 ## Release-state boundary
 
-PR #92 merged as `cd3d1c38fdf0f939a33a41d4b6d5044eb7f44562`; its exact
-reviewed head `3a2b5a57b322dce525f27cfa91c9f667d080bca9` is deployed to
-preview only as Cloudflare deployment `04e7a69a-78d2-447b-ac71-e9fb0bef3695`,
-Worker `576517dd-84a8-4b5f-a5ea-ed8f124db63d`, and D1
+The current production baseline is main merge `7974b15` (tree `f77bca4`),
+released by protected workflow `30046749929` as Cloudflare deployment
+`eb2af3bf-8e37-4373-83c3-233255fb477e`, Worker
+`573e6a08-d28f-442b-9206-42f62c1eaf46`, and D1
+`theologai-production-20260723-a`
+(`3f7faa0e-689f-47aa-a601-dc662db9a6cf`). Targeted r3 recorded 36 serialized
+HTTP requests / 31 rate-counted across 7/7 assertion groups; broad r2 recorded
+34 requests / 29 rate-counted across 10/10 groups, with a Sol GO and clean
+60-minute tail. Preview is separate: deployment
+`bf4d7603-5b3b-4c6f-8e09-7bae3fe24eb8`, Worker
+`968975cf-8183-446e-852c-b6a8670d56d5`, and D1
 `theologai-preview-20260722-b`
-(`94c4938b-7800-4d68-9097-0df33c31fdc1`). Exact-head CI attempt 2 run
-`30017722596` and protected preview run `30039858274` passed. The parallel
-audit passed 22/22 cases; the Transform-8 audit recorded 48 rate-counted
-requests, 53 total HTTP records, and 11/11 assertion groups. The
-`deploy-preview` authorization was removed and revocation run `30040550778`
-passed. This is not a production deployment. The current production D1 is
-`theologai-production-20260723-a`, with Transform 8 active. The older PR #72
-deployment, Worker, and `theologai-production-20260715-a` record are retained
-as historical rollback evidence; they must not be read as the current
-production binding. The production `workers.dev` endpoint redirects ordinary
-requests to the canonical custom domain; the exact abusive-poller tuple is
-rejected instead, while the preview legacy endpoint remains direct.
+(`94c4938b-7800-4d68-9097-0df33c31fdc1`). The production `workers.dev`
+endpoint redirects ordinary requests to the canonical custom domain; the exact
+abusive-poller tuple is rejected instead, while the preview legacy endpoint
+remains direct.
 Repository-only U3-T7/PR #83 work remains outside production.
 
 The Transform 9 historical source-pack migration in this branch remains
 local-only and unbound. It does not alter the production D1 binding or promote
 the core-eight source packs to production.
 
-The preview-only D1 has migrations `0004` / transform 7 and `0005` / transform
-8 materialized. Transform 7's UBS adapters remain runtime-inactive: U3-T7's
-in-memory compiler, native-to-normalized coordinate bridge, and content-free
-audit do not register an MCP surface or alter current output. Transform 8 is
-active in preview's historical repositories: the existing `classic_text_lookup`
-has the Baltimore hard cut and canonical/legacy resolution, changing preview
-output without adding a tool. Current production also has Transform 8 active;
 Transform 9 remains local-only and unbound. A later UBS runtime activation,
 Norton transform 9, and later edition transforms remain separately owner-gated.
 `package.json` is private: npm distribution is unsupported.

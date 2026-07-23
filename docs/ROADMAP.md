@@ -284,34 +284,22 @@ is local source context only and does not define the current product contract.
   `SOURCE.json` remains the historical acquisition-gate snapshot, not a
   release-state record.
 
-Entries through PR #83 describe merged repository state. PR #83 is
-repository-only and undeployed; its merge is not deployment evidence. The M4A
-local-only stage has since merged through PR #92, whose preview-only deployment
-does not establish a production release.
-Deployment state is established only by the relevant protected workflow and
-post-deployment smoke evidence. PR #92 merged as
-`cd3d1c38fdf0f939a33a41d4b6d5044eb7f44562`; its exact reviewed head
-`3a2b5a57b322dce525f27cfa91c9f667d080bca9` is deployed to preview only as
-Cloudflare deployment `04e7a69a-78d2-447b-ac71-e9fb0bef3695`, Worker
-`576517dd-84a8-4b5f-a5ea-ed8f124db63d`, and D1
+Entries through PR #83 describe merged repository state, not necessarily a
+deployment. Deployment state is established only by protected workflow and
+post-deployment evidence. The current production baseline is main merge
+`7974b15` (tree `f77bca4`), protected workflow `30046749929`, Cloudflare
+deployment `eb2af3bf-8e37-4373-83c3-233255fb477e`, Worker
+`573e6a08-d28f-442b-9206-42f62c1eaf46`, and D1
+`theologai-production-20260723-a`
+(`3f7faa0e-689f-47aa-a601-dc662db9a6cf`). Its targeted r3 audit recorded 36
+serialized HTTP requests / 31 rate-counted across 7/7 assertion groups; broad
+r2 recorded 34 requests / 29 rate-counted across 10/10 groups, with Sol GO and
+a clean 60-minute tail. The current preview release is deployment
+`bf4d7603-5b3b-4c6f-8e09-7bae3fe24eb8`, Worker
+`968975cf-8183-446e-852c-b6a8670d56d5`, and preview D1
 `theologai-preview-20260722-b`
-(`94c4938b-7800-4d68-9097-0df33c31fdc1`). Exact-head CI attempt 2 run
-`30017722596` and protected preview run `30039858274` passed. The parallel
-audit passed 22/22 cases; the Transform-8 audit recorded 48 rate-counted
-requests, 53 total HTTP records, and 11/11 assertion groups. The
-`deploy-preview` authorization was removed and revocation run `30040550778`
-passed. No production deployment occurred. Production remains the PR #72
-release: Cloudflare deployment `a4697fd1-deda-4dae-a16c-635454218bc8`, Worker
-`762485da-9e02-46a0-9777-e0d8743b9dbf`, and D1
-`c6535a4a-1953-4279-b277-7368445fc61a`. The checked-in production-binding candidate
-is `theologai-production-20260723-a`
-(`3f7faa0e-689f-47aa-a601-dc662db9a6cf`), which passed migrations `0001`–`0005`,
-deterministic seeding, strict readiness, and the Transform-8 authority audit.
-No live production Worker is bound to it: live production remains the
-deployment, Worker, and old D1 above as a matched rollback pair, and
-checked-in config is not deployment evidence. The live production Worker and
-its bound old D1 still
-lack Transform-7 and Transform-8 data and behavior.
+(`94c4938b-7800-4d68-9097-0df33c31fdc1`). PR #72 and PR #92 records are
+historical rollback evidence only.
 
 ## Shipped Phase 3 release train
 
