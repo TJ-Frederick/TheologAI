@@ -642,8 +642,9 @@ Code readiness and operational readiness are deliberately separate:
   Baltimore hard cut and canonical/legacy resolution: no new tool is
   registered, but preview output changes. `productionObservedTarget` remains
   null and Node `.get()`/D1 `.first()` remain
-  `unordered_no_compatibility_proof`. Production D1 and Worker lack both
-  transforms; production materialization and behavior remain separately gated.
+  `unordered_no_compatibility_proof`. The live production Worker and its bound
+  old D1 lack both transforms; production materialization and behavior remain
+  separately gated.
   Norton is a later transform-9
   `sectioned_only` release; Calvin, Aquinas, and Augustine need later
   per-edition transforms and release approvals. Cyril remains a zero-output
