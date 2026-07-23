@@ -257,6 +257,22 @@ describe('historical exact-edition source packs', () => {
         LEFT JOIN historical_edition_sections_fts f
           ON f.edition_id = s.edition_id AND f.section_key = s.section_key
         WHERE f.rowid IS NULL OR f.heading IS NOT s.heading OR f.content IS NOT s.content`).get()).toEqual({ count: 0 });
+      db.prepare(`INSERT INTO historical_editions (
+        edition_id, work_id, pack_id, language, contributor_groups_json, publication, version,
+        provenance_status, provenance_uncertainty, provenance_reviewed_at, underlying_work_rights_json,
+        exact_artifact_rights_json, normalized_text_rights_json
+      ) SELECT 'anselm-proslogion-alt-test', work_id, pack_id, language, contributor_groups_json,
+        publication, 'test-alternate-edition', provenance_status, provenance_uncertainty,
+        provenance_reviewed_at, underlying_work_rights_json, exact_artifact_rights_json,
+        normalized_text_rights_json FROM historical_editions
+        WHERE edition_id = 'anselm-proslogion-deane-1903'`).run();
+      expect(db.prepare(`SELECT COUNT(*) AS count FROM historical_editions
+        WHERE work_id = 'anselm-proslogion'`).get()).toEqual({ count: 2 });
+      expect(() => db.prepare(`UPDATE historical_document_delivery_profiles
+        SET edition_id = 'bunyan-pilgrims-progress-part-1'
+        WHERE document_id = 'anselm-proslogion'`).run()).toThrow(
+        'sectioned delivery profile must select one matching edition for its work',
+      );
     } finally {
       db.close();
     }

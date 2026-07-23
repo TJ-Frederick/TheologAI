@@ -29,7 +29,7 @@
         },
         {
           "path": "migrations/0006_historical_source_packs.sql",
-          "sha256": "dadbe2ff89190a2aaa0a30da0f9f82fd8a917f09bb2424be00ff0d1eb9e9cf8e"
+          "sha256": "84d9870004d3f4bc28af9a86281f65558fddbf32bb87d88bbd4179594ac6e687"
         }
       ],
       "inputs": [
