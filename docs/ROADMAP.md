@@ -206,7 +206,7 @@ is local source context only and does not define the current product contract.
   an MCP response. The future bounded `sectioned_only` publication remains
   transform 9, not a present feature, merged as
   `f6888fc4dbee03a3ccdd20411d284318ea22a21b`.
-- **Legacy production-host migration / PR #72:** established the current
+- **Legacy production-host migration / PR #72:** established the then-current
   known-good remote baseline. It redirects the production
   `theologai.tjfrederick.workers.dev` host to `mcp.theologai.xyz` for ordinary
   requests (while preserving CORS preflight behavior); the exact documented
@@ -287,13 +287,22 @@ is local source context only and does not define the current product contract.
 
 Entries through PR #83 describe merged repository state. PR #83 is
 repository-only and undeployed; its merge is not deployment evidence. M4A is a
-later local-only draft whose publication is authorized but not yet complete.
+later local-only draft whose publication is authorized but not itself a release.
 Deployment state is established only by the relevant protected workflow and
-post-deployment smoke evidence. No merge after PR #72 through PR #83 at
-`93d5837b05249c15127ab20107f86443cccf4e1e` was deployed.
-Production remains the PR #72 Worker
-`762485da-9e02-46a0-9777-e0d8743b9dbf`, and preview remains the PR #72 Worker
-`8ed4ad1a-f45f-4cdc-a6de-5358f59b6d44`.
+post-deployment smoke evidence. Production remains the PR #72 release:
+Cloudflare deployment `a4697fd1-deda-4dae-a16c-635454218bc8`, Worker
+`762485da-9e02-46a0-9777-e0d8743b9dbf`, and D1
+`c6535a4a-1953-4279-b277-7368445fc61a`. Separately, the exact deployed and
+audited preview source commit is `bb8ed4c8f025f697502a274986205f92bdf520b7`
+in draft, unmerged PR #92; it is deployed to preview only as Cloudflare
+deployment `44a0858f-75ba-497d-b84b-66c14253234a`, Worker
+`2b540a47-0937-4c00-9d44-de1199e09e6c`, and D1
+`theologai-preview-20260722-b`
+(`94c4938b-7800-4d68-9097-0df33c31fdc1`). CI run `30011028739` and the
+two audits passed (22/22 cases, 59/59 checks, and 48/48 rate-counted requests
+across 11 aggregate groups). Its `deploy-preview` authorization was removed
+and the PR returned to draft; any later docs-only PR #92 head is not deployed.
+No production deployment occurred.
 
 ## Shipped Phase 3 release train
 
@@ -403,8 +412,8 @@ catalog scope for primary-source research. The separate `e6f7f7f` commit
 reconciles release documentation for this candidate.
 
 This transform-version-6 release merged through PR #34 and was released to
-production through the reviewed PR #39 binding cutover. Its protected preview
-uses the fresh preview database
+production through the reviewed PR #39 binding cutover. The 2026-07-14
+protected preview used the fresh preview database
 `theologai-preview-20260714-a`, migrated through schema 0003, populated from all
 36 manifest seed files, and verified by the strict read-only remote readiness
 gate. Its whole-D1 identity
@@ -586,14 +595,16 @@ Code readiness and operational readiness are deliberately separate:
 - The migration-free catalog-capacity prerequisite shipped in PR #56; retain
   its centralized 100-work and 2,000-section ceilings and single D1-safe
   JSON/`json_each` scope bind. The approved UBS artifacts, decoder, coordinate
-  evidence, deterministic U3-T7 compiler/bridge/audit, and M4A local
-  materialization/seed verification are now complete. The next gate is a
-  separately owner-authorized remote migration `0004` / transform 7 release;
-  it may not add semantic runtime behavior or reach preview/production without
-  a new review and release gate. This data layer
-  must complete before the dependent historical migration `0005` / transform
-  8. Keep the existing 32-source provenance cap as a required pack-sizing
-  check.
+  evidence, deterministic U3-T7 compiler/bridge/audit, and M4A materialization
+  and seed verification are complete. The exact preview release has migrations
+  `0004` / transform 7 and `0005` / transform 8 materialized in the bound
+  preview D1. Transform 7's UBS adapters remain runtime-inactive. Transform 8
+  is active in preview's historical repositories: the existing
+  `classic_text_lookup` has the Baltimore hard cut and canonical/legacy
+  resolution, changing preview output without adding a tool. Production Worker
+  and D1 lack both transforms. The next gate is a separately owner-authorized
+  production D1 release followed by a distinct UBS runtime-activation decision.
+  Keep the existing 32-source provenance cap as a required pack-sizing check.
 - PRs #61–#64 and #67 complete the planned inactive semantic and provenance
   foundations: source-free semantic contracts, the unregistered Hebrew
   resolution and aggregate seams, edition/provenance contracts, and a
@@ -607,20 +618,23 @@ Code readiness and operational readiness are deliberately separate:
   controls when a cursor is present, and retains `includeText: false` as the
   existing default. Any future workflow or prompt change remains a separate
   slice rather than another cursor implementation.
-- The primary-source output-profile hard cutover is currently represented by
-  production v6/local-only and preview v7/discovery-only, with CCEL
-  execution still disabled. Prospective corpus work remains limited to
+- In the checked-in unpublished candidate, the primary-source output-profile
+  hard cutover is represented by production v6/local-only and preview
+  v7/discovery-only, with CCEL execution still disabled. Prospective corpus work remains limited to
   explicit searched/read/deferred coverage semantics and future
   edition/provenance fields; it is not a rollout of evidence already present
   in current schemas. Any corpus release remains a **pending rights and release
   decision** and must preserve CCEL-disabled behavior during protected audit.
-- The historical source-first aliases are authoritative for a future
-  compatibility release, but the evidence/compiler remains preparatory.
-  `productionObservedTarget` remains null and Node `.get()`/D1 `.first()`
-  remain `unordered_no_compatibility_proof`. Migration `0005` and transform 8
-  depend on the prior migration `0004` / transform 7 data layer and are then
-  separately gated before any deterministic runtime behavior, D1 rows, preview,
-  or production change. Norton is a later transform-9
+- The historical source-first aliases are authoritative. The exact preview
+  release materializes migration `0005` / transform 8 after its `0004` /
+  transform 7 prerequisite and activates historical compatibility in preview
+  repositories. The existing `classic_text_lookup` therefore exposes the
+  Baltimore hard cut and canonical/legacy resolution: no new tool is
+  registered, but preview output changes. `productionObservedTarget` remains
+  null and Node `.get()`/D1 `.first()` remain
+  `unordered_no_compatibility_proof`. Production D1 and Worker lack both
+  transforms; production materialization and behavior remain separately gated.
+  Norton is a later transform-9
   `sectioned_only` release; Calvin, Aquinas, and Augustine need later
   per-edition transforms and release approvals. Cyril remains a zero-output
   blocked source until translator attribution is established.
@@ -651,13 +665,14 @@ Code readiness and operational readiness are deliberately separate:
 - Broaden original-language study for both beginners and readers of Greek or
   Hebrew using the already selected and acquired UBS Hebrew v0.9.2 semantic
   source (PRs #75 and #79), rather than selecting another semantic-domain
-  source. U3-T7 deterministic compilation and M4A local-only materialization
-  are complete and runtime-inert. Next comes the separately owner-gated remote
-  migration `0004` / transform 7 release, which requires explicit
-  authorization; only after that data layer is remotely verified may a separate
-  runtime-activation release extend the existing
-  `original_language_study` tool. This prerequisite comes before migration
-  `0005` / transform 8. Evaluate MACULA
+  source. U3-T7 deterministic compilation and the Transform-7 data layer are
+  complete, while its UBS adapters remain runtime-inactive. Preview also has
+  active Transform-8 historical compatibility through the existing
+  `classic_text_lookup`; it changes preview output but adds no tool. Production
+  lacks both transforms. A separately owner-gated production data release and
+  then a distinct UBS runtime-activation release would be required before
+  extending the existing `original_language_study` tool.
+  Evaluate MACULA
   discourse/context evidence only after that foundation is active and reviewed.
   The owner approved a hard cutover that withholds the TBESH `Meaning` field,
   which derives from Online Bible material whose source notice says permission

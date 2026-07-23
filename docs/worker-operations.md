@@ -1,23 +1,27 @@
 # Worker operations
 
-## Current known-good PR #72 remote baseline (2026-07-17)
+## Current split release state (2026-07-23)
 
-PR #72 merge `72a8ee5eef9b909a373b085d1a4f193484ddfe8a` is the current
-known-good remote baseline. Protected preview run `29621708718` deployed
-preview Worker `8ed4ad1a-f45f-4cdc-a6de-5358f59b6d44`; protected production
-run `29622634088` and Cloudflare deployment
-`a4697fd1-deda-4dae-a16c-635454218bc8` deployed production Worker
-`762485da-9e02-46a0-9777-e0d8743b9dbf`. The release retained production D1
+Production remains the PR #72 known-good release: protected production run
+`29622634088` and Cloudflare deployment
+`a4697fd1-deda-4dae-a16c-635454218bc8` serve Worker
+`762485da-9e02-46a0-9777-e0d8743b9dbf` with D1
 `theologai-production-20260715-a`
-(`c6535a4a-1953-4279-b277-7368445fc61a`), preview D1
-`theologai-preview-20260714-a`
-(`0dab804f-8df0-4727-93bd-299612b6e179`), rate namespaces `361201` and
-`361202` at 120/60, and CCEL flags `000` (production) / `100` (preview).
+(`c6535a4a-1953-4279-b277-7368445fc61a`). Its independent audit returned GO
+with no P0-P3 findings across 22 read-only requests and a 22/22
+source-attested regression.
 
-The independent preview audit returned GO with no P0-P3 findings across 22
-read-only requests, and its source-attested regression passed 22/22. The
-independent production audit likewise returned GO with no P0-P3 findings in no
-more than 22 read-only requests; its source-attested regression passed 22/22.
+The exact deployed and audited preview source commit is
+`bb8ed4c8f025f697502a274986205f92bdf520b7` in draft, unmerged PR #92; it is
+the separate preview-only release: CI run `30011028739` passed, Cloudflare
+deployment `44a0858f-75ba-497d-b84b-66c14253234a` serves Worker
+`2b540a47-0937-4c00-9d44-de1199e09e6c`, and its only D1 binding is
+`theologai-preview-20260722-b`
+(`94c4938b-7800-4d68-9097-0df33c31fdc1`). The preview audits passed 22/22
+cases and 59/59 checks, plus 48/48 rate-counted requests across 11 aggregate
+groups. The `deploy-preview` label was removed and PR #92 returned to draft;
+any later docs-only PR #92 head is not deployed. This state is not a production
+deployment.
 
 Ordinary requests to the production `theologai.tjfrederick.workers.dev` host
 now return a no-store 308 to `mcp.theologai.xyz`. The exact abusive-poller
@@ -31,26 +35,24 @@ environments. The checked-in v6/v7 schema pair is an unpublished repository
 candidate, not evidence of a deployed Worker or a changed remote contract.
 
 The later repository changes through merged PR #83
-(`93d5837b05249c15127ab20107f86443cccf4e1e`) are repository-only and have not
-been deployed. U3-T7 adds an inactive in-memory semantic compiler,
-native-to-normalized coordinate bridge, and content-free audit. The later M4A
-local-only slice adds migration `0004`, transform 7, local SQLite
-materialization, deterministic D1 seed/import verification, and inactive
-Node/D1 adapters. The unpublished candidate also advances the local
-primary-source schema pair to production v6/local-only and preview
-v7/discovery-only. Neither candidate changes the deployed Workers, remote D1
-databases or bindings, historical catalog, deployed MCP output, UBS semantic
-runtime, or CCEL execution state. No deletion, route replacement, or other
-destructive cleanup is authorized by this record.
+(`93d5837b05249c15127ab20107f86443cccf4e1e`) remain outside production.
+U3-T7 adds an inactive in-memory semantic compiler,
+native-to-normalized coordinate bridge, and content-free audit. The exact PR
+#92 preview Worker and D1 above are the sole remote exception: its D1 has
+migrations `0004` / transform 7 and `0005` / transform 8 materialized.
+Transform 7's UBS adapters remain runtime-inactive. Transform 8 is active in
+preview's historical repositories: the existing `classic_text_lookup` has the
+Baltimore hard cut and canonical/legacy resolution, changing preview output
+without adding a tool. Production Worker and D1 lack both transforms and
+production runtime activation remains unchanged. The unpublished candidate also
+advances the local primary-source schema pair to production v6/local-only and
+preview v7/discovery-only. No deletion, route replacement, or other destructive
+cleanup is authorized by this record.
 
-Draft-PR publication of M4A is owner-authorized but had not yet occurred when
-this record was authored; no remote migration or deployment is authorized.
-
-Any eventual UBS semantic D1 release must separately authorize remote migration
-`0004` / transform 7 and a reviewed binding/deployment sequence before the
-dependent historical migration `0005` / transform 8. The completed local
-capacity and seed checks are not remote-release evidence and neither is part of
-this deployed baseline.
+Any eventual UBS semantic production release must separately authorize a
+production D1 migration/binding/deployment sequence. The preview data layer is
+not production-release evidence, and a later runtime-activation release is
+separately gated.
 
 ## Historical PR #50 pre-custom-domain rollback anchor (2026-07-16)
 

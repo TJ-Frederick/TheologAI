@@ -173,23 +173,31 @@ The SQLite database (`data/theologai.db`) is a derived artifact. Cross-reference
 
 ## Release-state boundary
 
-PR #72 is the deployed remote baseline: production Worker
-`762485da-9e02-46a0-9777-e0d8743b9dbf` and preview Worker
-`8ed4ad1a-f45f-4cdc-a6de-5358f59b6d44`. The production `workers.dev` endpoint
-redirects ordinary requests to the canonical custom domain; the exact
+Production remains the deployed PR #72 baseline: Cloudflare deployment
+`a4697fd1-deda-4dae-a16c-635454218bc8`, Worker
+`762485da-9e02-46a0-9777-e0d8743b9dbf`, and D1
+`theologai-production-20260715-a`
+(`c6535a4a-1953-4279-b277-7368445fc61a`). The exact deployed and audited
+preview source commit is `bb8ed4c8f025f697502a274986205f92bdf520b7` in
+unmerged draft PR #92; it is deployed to preview only as
+Cloudflare deployment `44a0858f-75ba-497d-b84b-66c14253234a`, Worker
+`2b540a47-0937-4c00-9d44-de1199e09e6c`, and D1
+`theologai-preview-20260722-b`
+(`94c4938b-7800-4d68-9097-0df33c31fdc1`). CI run `30011028739` and its
+two preview audits passed; `deploy-preview` was removed and the PR returned
+to draft. Any later docs-only PR #92 head is not deployed. This is not a
+production deployment. The production `workers.dev`
+endpoint redirects ordinary requests to the canonical custom domain; the exact
 abusive-poller tuple is rejected instead, while the preview legacy endpoint
-remains direct. The later documentation reconciliation through PR #82
-(`023804681d725e9600f3ff3dbfce347417c23eff`) is repository-only and has not
-been deployed. The U3-T7 compiler work carried by PR #83 is also repository-only
-and undeployed.
+remains direct. Repository-only U3-T7/PR #83 work remains outside production.
 
-The acquired UBS Hebrew and historical public-domain packets are deliberately
-outside the runtime, SQLite/D1 materialization, MCP registry, and hosted
-17-work catalog. U3-T7 adds only an inactive in-memory compiler,
-native-to-normalized coordinate bridge, and content-free audit; it does not
-change SQLite/D1, MCP output, or any deployment. Capacity planning and separate
-owner authorization remain required for migration `0004` / transform 7,
-migration `0005` / transform 8, Norton transform 9, and later edition
-transforms. The `0004` / transform 7 data layer must precede `0005` / transform
-8.
+The preview-only D1 has migrations `0004` / transform 7 and `0005` / transform
+8 materialized. Transform 7's UBS adapters remain runtime-inactive: U3-T7's
+in-memory compiler, native-to-normalized coordinate bridge, and content-free
+audit do not register an MCP surface or alter current output. Transform 8 is
+active in preview's historical repositories: the existing `classic_text_lookup`
+has the Baltimore hard cut and canonical/legacy resolution, changing preview
+output without adding a tool. The production Worker and D1 lack both transforms.
+A production D1 release, later UBS runtime activation, Norton transform 9, and
+later edition transforms remain separately owner-gated.
 `package.json` is private: npm distribution is unsupported.

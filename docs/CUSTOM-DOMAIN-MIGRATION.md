@@ -32,6 +32,24 @@ custom-domain attachment, and the optional `www` redirect may require manual
 Cloudflare dashboard action even though Worker routes are declared in
 `wrangler.toml`.
 
+## Current operational release state (2026-07-23)
+
+Production remains the PR #72 release: Cloudflare deployment
+`a4697fd1-deda-4dae-a16c-635454218bc8`, Worker
+`762485da-9e02-46a0-9777-e0d8743b9dbf`, and D1
+`theologai-production-20260715-a`
+(`c6535a4a-1953-4279-b277-7368445fc61a`). The exact deployed and audited
+preview source commit is `bb8ed4c8f025f697502a274986205f92bdf520b7` in
+draft, unmerged PR #92; it is separately deployed to preview only: Cloudflare
+deployment `44a0858f-75ba-497d-b84b-66c14253234a`,
+Worker `2b540a47-0937-4c00-9d44-de1199e09e6c`, and D1
+`theologai-preview-20260722-b`
+(`94c4938b-7800-4d68-9097-0df33c31fdc1`). CI run `30011028739` and both
+preview audits passed (22/22 cases, 59/59 checks, 48/48 rate-counted requests,
+and 11 aggregate groups). The `deploy-preview` authorization was removed and
+PR #92 returned to draft; any later docs-only PR #92 head is not deployed. It
+is not a production release.
+
 ## Release-time known-good baseline
 
 The rollback anchor is deliberately a release-time record, not a stale version
@@ -58,11 +76,12 @@ not a suitable rollback target. The production D1 remains
 and CCEL flags `000` unless a separately reviewed release changes one of them.
 
 A preview deployment necessarily creates a new Worker version. Record that
-version after each preview deployment; preview must continue to use D1
-`theologai-preview-20260714-a`
-(`0dab804f-8df0-4727-93bd-299612b6e179`), rate namespace `361202`, and CCEL
-flags `100`. Those bindings and environment ownership—not a prior Worker
-version—must remain invariant through this migration.
+version and the reviewed binding current at execution; as of this record the
+preview binding is D1 `theologai-preview-20260722-b`
+(`94c4938b-7800-4d68-9097-0df33c31fdc1`), rate namespace `361202`, and CCEL
+flags `100`. This routing-only migration must preserve whichever reviewed
+binding and environment ownership is current at execution; it must not replace
+that binding merely to satisfy a historical record.
 
 ## Reviewable phase split
 
@@ -125,7 +144,7 @@ the explicit dual-origin Wrangler variables provide hosted migration support.
    under-budget rate behavior; and `/mcp` routing.
 6. Repeat a compatibility smoke test through the preview `workers.dev` alias.
    Confirm both hostnames reach only `theologai-preview`, D1
-   `theologai-preview-20260714-a`, rate namespace `361202`, and CCEL state
+   `theologai-preview-20260722-b`, rate namespace `361202`, and CCEL state
    `100`. Record the new preview Worker version. Remove preview authorization
    after the audit and verify revocation.
 
