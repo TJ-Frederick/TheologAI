@@ -13,6 +13,10 @@ import {
   parseHistoricalTransform8D1Page,
 } from './historical-transform8-authority-audit.js';
 import {
+  auditHistoricalTransform9Authority,
+  parseHistoricalTransform9D1Page,
+} from './historical-transform9-authority-audit.js';
+import {
   buildD1ReadinessSql,
   REQUIRED_COLUMNS,
 } from './check-remote-d1-readiness.js';
@@ -91,7 +95,10 @@ try {
   const authority = auditHistoricalTransform8Authority(ROOT, sql => parseHistoricalTransform8D1Page(run([
     'd1', 'execute', ...common, '--command', sql, '--json',
   ])));
-  console.error(`[verify-d1-seed-workerd] Imported ${manifest.files.length} seed files through local D1; production readiness and Transform-8 authority audit passed (${authority.pages.profiles}/${authority.pages.identities}/${authority.pages.aliases} pages).`);
+  const transform9Authority = auditHistoricalTransform9Authority(ROOT, sql => parseHistoricalTransform9D1Page(run([
+    'd1', 'execute', ...common, '--command', sql, '--json',
+  ])));
+  console.error(`[verify-d1-seed-workerd] Imported ${manifest.files.length} seed files through local D1; production readiness, Transform-8 (${authority.pages.profiles}/${authority.pages.identities}/${authority.pages.aliases} pages), and Transform-9 (${transform9Authority.pages.packs}/${transform9Authority.pages.works}/${transform9Authority.pages.editions}/${transform9Authority.pages.artifacts}/${transform9Authority.pages.documents}/${transform9Authority.pages.profiles}/${transform9Authority.pages.sections}/${transform9Authority.pages.projections} pages) authority audits passed.`);
 } finally {
   rmSync(state, { recursive: true, force: true });
 }
