@@ -223,9 +223,11 @@ Only after preview and the website pass:
 3. Wait for active custom-domain and certificate status.
 4. Run the same fresh-session MCP, CORS, OPTIONS, representative-tool,
    under-budget rate, and isolation checks used for preview.
-5. Confirm production reaches only Worker `theologai`, production D1
-   `theologai-production-20260715-a`, rate namespace `361201`, and CCEL state
-   `000`; confirm preview retains its distinct bindings and state.
+5. Confirm production reaches only Worker `theologai`, the production D1
+   recorded in the release-time known-good baseline (currently
+   `theologai-production-20260723-a` / `3f7faa0e-689f-47aa-a601-dc662db9a6cf`),
+   rate namespace `361201`, and CCEL state `000`; confirm preview retains its
+   distinct bindings and state.
 6. Smoke-test the production `workers.dev` compatibility alias and record exact
    post-migration Worker/Pages versions, DNS/custom-domain state, audit counts,
    and remaining risks.

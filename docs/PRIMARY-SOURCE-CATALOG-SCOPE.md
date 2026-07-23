@@ -1,11 +1,29 @@
 # Primary-source catalog scope
 
-The local `primary_source_search` provider uses a reviewed catalog manifest for
-the 17 legacy hosted works. Transform 9 separately projects eight reviewed
-normalized source-pack editions into the same local 25-work collection. This
-slice adds no document bodies and grants no new rights. It only makes the
-already-hosted collection's work identities,
+## Historical Transform 6 catalog slice
+
+The historical Transform 6 slice materializes the reviewed catalog manifest
+for the 17 legacy hosted works. It adds no document bodies and grants no new
+rights; it makes that already-hosted collection's work identities,
 composition-date scope, and explicitly attributed creators machine-readable.
+
+## Current local-only Transform 9 source-pack extension
+
+The current repository-only Transform 9 materialization is migration
+`0006_historical_source_packs`. It retains the Transform 6 legacy catalog
+slice and adds one checked-in pack (`theologai-core-eight`, revision 1), eight
+works, eight reviewed editions, 25 pinned source artifacts, and 512 normalized
+sections. The current deterministic D1 corpus identity is
+`4e182bfd2953fe06e7c8d7e13a705988e85b5a58001e7fe72440333d34f6d442`; the
+historical Transform 6 catalog identity remains
+`c334b4b91c3a7c334a9425937c7f99473f27014ddae6cea377ee38bd578a6707` for that
+earlier slice. These are checked-in build and seed identities, not Cloudflare
+deployment identifiers.
+
+Transform 9 is local-only and unbound. It makes no claim that migration 0006,
+the core-eight rows, or the 25-work local collection has been migrated, bound,
+or deployed to either remote D1 environment. Any such release remains
+separately gated.
 
 ## Source and materialization
 
@@ -22,10 +40,13 @@ composition-date scope, and explicitly attributed creators machine-readable.
   object in `documents.metadata.catalog` alongside existing topics. The
   materialized `documents.date` comes from the reviewed catalog label rather
   than an unreviewed legacy display value.
-- D1 transform 6 and corpus identity
+- The historical Transform 6 catalog slice and corpus identity
   `c334b4b91c3a7c334a9425937c7f99473f27014ddae6cea377ee38bd578a6707`
-  bind this metadata change. It is not a marker-only transition: build and
-  import a fresh deterministic seed, then run the complete readiness gate.
+  bind the legacy metadata change. It was not a marker-only transition: its
+  release required a fresh deterministic seed and complete readiness gate.
+  Transform 9/migration 0006 is a separate, current local-only materialization
+  with the identities and inventory stated above; it does not revise that
+  historical deployment record.
 
 Creator roles use an exact closed vocabulary: `author`, `issuing_body`,
 `drafting_body`, `revising_body`, and `compiler`. An issuing, drafting,
