@@ -2,22 +2,17 @@
 
 ## Current split release state (2026-07-23)
 
-Production remains the PR #72 known-good release: protected production run
-`29622634088` and Cloudflare deployment
-`a4697fd1-deda-4dae-a16c-635454218bc8` serve Worker
-`762485da-9e02-46a0-9777-e0d8743b9dbf` with D1
-`theologai-production-20260715-a`
-(`c6535a4a-1953-4279-b277-7368445fc61a`). Its independent audit returned GO
-with no P0-P3 findings across 22 read-only requests and a 22/22
-source-attested regression.
+The current production D1 is `theologai-production-20260723-a`, with Transform
+8 active. The earlier PR #72 deployment, Worker, and
+`theologai-production-20260715-a` record are retained as historical rollback
+evidence only; they do not describe the current production binding. Its
+independent audit returned GO with no P0-P3 findings across 22 read-only
+requests and a 22/22 source-attested regression.
 
-The checked-in production-binding candidate is
-`theologai-production-20260723-a`
-(`3f7faa0e-689f-47aa-a601-dc662db9a6cf`). It passed migrations `0001`–`0005`,
-deterministic seeding, strict readiness, and the Transform-8 authority audit,
-but no live production Worker is bound to it. The live deployment, Worker, and
-old D1 above remain the matched rollback pair; checked-in config is not
-deployment evidence.
+The checked-in Transform 9 historical source-pack migration is likewise
+local-only: it expands the local corpus to 25 works with eight reviewed
+sectioned-only editions, but makes no claim about a Cloudflare migration,
+binding, or deployment. Norton and Aquinas source assets remain inactive.
 
 PR #92 merged as `cd3d1c38fdf0f939a33a41d4b6d5044eb7f44562`; its exact
 reviewed head `3a2b5a57b322dce525f27cfa91c9f667d080bca9` is the separate
@@ -46,15 +41,16 @@ candidate, not evidence of a deployed Worker or a changed remote contract.
 The later repository changes through merged PR #83
 (`93d5837b05249c15127ab20107f86443cccf4e1e`) remain outside production.
 U3-T7 adds an inactive in-memory semantic compiler,
-native-to-normalized coordinate bridge, and content-free audit. The exact PR
-#92 preview Worker and D1 above are the sole remote exception: its D1 has
+native-to-normalized coordinate bridge, and content-free audit. The PR #92
+preview Worker and D1 above record a separate preview release: its D1 has
 migrations `0004` / transform 7 and `0005` / transform 8 materialized.
 Transform 7's UBS adapters remain runtime-inactive. Transform 8 is active in
 preview's historical repositories: the existing `classic_text_lookup` has the
 Baltimore hard cut and canonical/legacy resolution, changing preview output
-without adding a tool. The live production Worker and its bound old D1 lack
-both transforms and production runtime activation remains unchanged. The
-unpublished candidate also advances the local primary-source schema pair to
+without adding a tool. Current production also has Transform 8 active.
+Transform 9 remains local-only and unbound, while production UBS runtime
+activation remains unchanged. The unpublished candidate also advances the local
+primary-source schema pair to
 production v6/local-only and preview v7/discovery-only. No deletion, route
 replacement, or other destructive cleanup is authorized by this record.
 
