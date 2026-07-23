@@ -3,7 +3,7 @@
   "sectionKeyPolicy": "frozen_reviewed_v1",
   "contentFormat": "plain_text",
   "work": {
-    "workId": "john-damascene-exposition-salmond-npnf2-v9",
+    "workId": "john-damascene-exact-exposition",
     "title": "An Exact Exposition of the Orthodox Faith",
     "creatorMetadataStatus": "reviewed",
     "creators": [
@@ -15,7 +15,7 @@
   },
   "edition": {
     "editionId": "john-damascene-exposition-salmond-npnf2-v9",
-    "workId": "john-damascene-exposition-salmond-npnf2-v9",
+    "workId": "john-damascene-exact-exposition",
     "language": "en",
     "contributorGroups": {
       "translation": {
@@ -50,8 +50,8 @@
     },
     "underlyingWorkRights": {
       "status": "public_domain",
-      "basis": "1908 historical edition; Salmond died 1905; exact scan is recorded and no contrary ownership or license evidence is known.",
-      "jurisdiction": "US, UK, EU, Canada, and Australia",
+      "basis": "1908 historical edition; Salmond died 1905; exact scan is recorded and no contrary ownership or license evidence is known. This determination is scoped to the United States.",
+      "jurisdiction": "United States",
       "evidenceInstrument": {
         "instrumentId": "historical-term-guidance",
         "kind": "public_domain_statement",

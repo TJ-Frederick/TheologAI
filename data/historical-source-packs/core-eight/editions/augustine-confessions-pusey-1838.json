@@ -3,7 +3,7 @@
   "sectionKeyPolicy": "frozen_reviewed_v1",
   "contentFormat": "plain_text",
   "work": {
-    "workId": "augustine-confessions-pusey-1838",
+    "workId": "augustine-confessions",
     "title": "Confessions",
     "creatorMetadataStatus": "reviewed",
     "creators": [
@@ -15,7 +15,7 @@
   },
   "edition": {
     "editionId": "augustine-confessions-pusey-1838",
-    "workId": "augustine-confessions-pusey-1838",
+    "workId": "augustine-confessions",
     "language": "en",
     "contributorGroups": {
       "translation": {
@@ -50,8 +50,8 @@
     },
     "underlyingWorkRights": {
       "status": "public_domain",
-      "basis": "1838 translation; Pusey died 1882; exact-edition scan and public-domain text witness recorded; no contrary ownership or license evidence is known.",
-      "jurisdiction": "US, UK, EU, Canada, and Australia",
+      "basis": "1838 translation; Pusey died 1882; exact-edition scan and public-domain text witness recorded; no contrary ownership or license evidence is known. This determination is scoped to the United States.",
+      "jurisdiction": "United States",
       "evidenceInstrument": {
         "instrumentId": "historical-term-guidance",
         "kind": "public_domain_statement",

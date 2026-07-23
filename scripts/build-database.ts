@@ -653,7 +653,7 @@ log(`  Inserted ${historicalTransform8Rows.deliveryProfiles.length} delivery pro
 });
 materializeHistoricalTransform8();
 
-// ── Transform 9: reviewed exact-edition source packs ──
+// ── Transform 9: reviewed edition-aligned normalized source packs ──
 
 // The manifest is the sole release allowlist.  Materialization adds the
 // sectioned-only profiles and canonical identities; it deliberately adds no

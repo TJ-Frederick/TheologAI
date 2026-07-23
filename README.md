@@ -325,7 +325,7 @@ audit does not independently establish the runtime status of later transforms.
 PR95's Transform9 core-eight is local-only and unpublished: it is included in
 the local 25-work catalog but has no Cloudflare migration, binding, deployment,
 or production-runtime claim. Norton and Aquinas assets remain inactive. Norton
-is a later transform-9,
+is a future successor,
 `sectioned_only` candidate. Cyril remains blocked with zero output pending
 reliable translator attribution.
 

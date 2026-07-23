@@ -25,7 +25,7 @@ describe('classic-text structured presentation', () => {
     });
 
     expect(presented.evidencePolicy).toMatchObject({
-      editionProvenance: 'reviewed_exact_source_packs',
+      editionProvenance: 'reviewed_source_packs',
       rightsStatus: 'no_known_conflict_normalized_text_only',
     });
     const validation = validatorFor(classicTextsOutputSchema)(presented);
@@ -57,7 +57,7 @@ describe('classic-text structured presentation', () => {
     };
 
     expect(presentClassicTextCatalog([{ document: legacy, profile: complete }]).evidencePolicy.editionProvenance).toBe('incomplete');
-    expect(presentClassicTextCatalog([{ document: reviewed, profile: sectioned }]).evidencePolicy.editionProvenance).toBe('reviewed_exact_source_packs');
+    expect(presentClassicTextCatalog([{ document: reviewed, profile: sectioned }]).evidencePolicy.editionProvenance).toBe('reviewed_source_packs');
     expect(presentClassicTextCatalog([{ document: legacy, profile: complete }, { document: reviewed, profile: sectioned }]).evidencePolicy.editionProvenance)
       .toBe('mixed_legacy_and_reviewed_source_packs');
   });

@@ -3,6 +3,7 @@ import {
   formatDocumentList,
   formatDocumentSectionIndex,
   formatDocumentSections,
+  formatLocalDocumentSectionResourceWithIdentity,
   formatSearchResults,
 } from '../../../src/formatters/historicalFormatter.js';
 import type { DocumentInfo, DocumentSection } from '../../../src/adapters/data/HistoricalDocumentRepository.js';
@@ -103,6 +104,44 @@ describe('formatDocumentSectionIndex', () => {
     expect(out).toContain('Section 1 — Article I');
     expect(out).toContain('[read exact section](theologai://documents/nicene-creed#section-1)');
     expect(out).not.toContain('We believe in one God');
+  });
+});
+
+describe('reviewed source-pack section rendering', () => {
+  it('escapes reviewed normalized text before emitting it as Markdown', () => {
+    const doc = makeDoc({
+      editionProvenance: {
+        foundation: 'edition-provenance-foundation.v1',
+        sourcePackId: 'theologai-core-eight',
+        editionId: 'example-edition',
+        language: 'en',
+        publication: 'Example edition',
+        version: 'v1',
+        sourceArtifacts: [{
+          artifactId: 'example-authority',
+          role: 'authority',
+          locator: 'https://example.invalid/authority',
+          sha256: 'a'.repeat(64),
+          bytes: 1,
+          acquiredAt: '2026-07-23T00:00:00.000Z',
+        }],
+        normalizedTextRights: {
+          status: 'no_known_conflict',
+          scope: 'normalized_public_domain_text_only',
+          basis: 'Test-only.',
+          reviewedAt: '2026-07-23',
+        },
+        provenance: { status: 'verified', uncertainty: null, reviewedAt: '2026-07-23' },
+      },
+    });
+    const text = formatLocalDocumentSectionResourceWithIdentity(
+      doc,
+      makeSection({ content: 'A [link](https://example.invalid) # heading' }),
+      { sectionKey: 'source-0001', sourceOrdinal: 1, resolution: 'canonical' },
+    );
+
+    expect(text).toContain('A \\[link\\]\\(https\\:\\/\\/example\\.invalid\\) \\# heading');
+    expect(text).toContain('reviewed edition-aligned normalized transcription');
   });
 });
 

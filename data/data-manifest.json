@@ -29,7 +29,7 @@
         },
         {
           "path": "migrations/0006_historical_source_packs.sql",
-          "sha256": "2e91882207c555ed561cd15c6f0d70cf160d57b484798779e27a2bb681a5196b"
+          "sha256": "dadbe2ff89190a2aaa0a30da0f9f82fd8a917f09bb2424be00ff0d1eb9e9cf8e"
         }
       ],
       "inputs": [
@@ -595,43 +595,43 @@
     },
     {
       "path": "data/historical-source-packs/core-eight/editions/anselm-proslogion-deane-1903.json",
-      "sha256": "ce2e11188799f4efb0d02decece0fc8428ca0e71b632a3f272d9fb2cf6b8928b"
+      "sha256": "060ec9c8f7cfbde15cfef7cbd2e497bd6413ff19b0e39a02026f61bb8a7c225a"
     },
     {
       "path": "data/historical-source-packs/core-eight/editions/athanasius-on-incarnation-robertson-npnf2-v4.json",
-      "sha256": "1c615ec8298463cb98999f67a4f5d92ac6b04f9c942febe2fe841d0a276d5b4a"
+      "sha256": "5d940ecc90e0838639523b6891af2574a8614876cb0fb7b7e2fe8899aa061913"
     },
     {
       "path": "data/historical-source-packs/core-eight/editions/augustine-confessions-pusey-1838.json",
-      "sha256": "2ae9820815a103bd565824fbfa9441f846d304948c422f51afa9fad35476b60b"
+      "sha256": "c8f2da2a5739029c7e5341e818cb215b338b03adcfa1e4fc47fa2d3c975d9100"
     },
     {
       "path": "data/historical-source-packs/core-eight/editions/bunyan-pilgrims-progress-part-1.json",
-      "sha256": "a83e6c2b5f08e78d5a5352fcae4c28109aa40fd53cc939a10ce488a26e57e7b7"
+      "sha256": "178b145563c6b54be240d6413382417407cb27d64bee0e9cb9c0127d65e47b20"
     },
     {
       "path": "data/historical-source-packs/core-eight/editions/calvin-institutes-beveridge-1845.json",
-      "sha256": "5ba5cde7eecbe02a28b635f91e1eb9603a217a570b8f986c2bd401fe48ea502f"
+      "sha256": "58323aaf2877e1b4de77fa4f55f24c5c85d7840d0b4c52080318ba73c8b56200"
     },
     {
       "path": "data/historical-source-packs/core-eight/editions/irenaeus-against-heresies-anf1-1885.json",
-      "sha256": "6a5dd9c999e6c335e181dff5deae48469a2123b9c966f02535ce925977cdaea4"
+      "sha256": "6a93394726b41e0a6043cb8cfd3fcd6d487d46223c6b13492c00e38cc6fbbbd4"
     },
     {
       "path": "data/historical-source-packs/core-eight/editions/john-damascene-exposition-salmond-npnf2-v9.json",
-      "sha256": "f3cc925b8489d2a22679914dabcd1370538f19b6bd4cc8776bdea14c9d042589"
+      "sha256": "d9ca7608cd430e52413e63801765597457948ca855cc712a14aa0340b6c99ff2"
     },
     {
       "path": "data/historical-source-packs/core-eight/editions/wesley-standard-sermons-1771.json",
-      "sha256": "bcdea027a1fe3c9eb219ffe171e0287af778ce201794516ba0de619591868b0f"
+      "sha256": "c2f26e382ce783ce3a3937d157ead89ca6b4d4ac49939c21a4ccd56cca263391"
     },
     {
       "path": "data/historical-source-packs/core-eight/manifest.json",
-      "sha256": "976c1f82a833d8004f415c9bc6838108f9f9f91ff40e19a2b20af53c70066617"
+      "sha256": "5327c91b1cd497626b5f3f0792b7e956d057c3588f94a3b862e3f74f765ba2ff"
     },
     {
       "path": "data/historical-source-packs/core-eight/manifest.sha256",
-      "sha256": "89b3f31cf19bc91ea2531b5732d135cfc2dfbba4e0f84940151d12d6a728c88a"
+      "sha256": "3be00b7d4bef7c497e51a209da58b713ae6a89f2bbd365623aed8b47a15dbf6c"
     },
     {
       "path": "data/parallel-passages/ubs-paratext/LICENSE.md",

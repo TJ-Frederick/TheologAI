@@ -16,7 +16,7 @@ const EXPECTED_IDENTITIES = Object.freeze({
   6: 'c334b4b91c3a7c334a9425937c7f99473f27014ddae6cea377ee38bd578a6707',
   7: '3708bf7e3ab903c409453fdf4fdac1b68848547f91f0b516855dd21765de4796',
   8: '2db6c370a75ce5818db6c6cdbdb1d80d6333b99e7e4ccf956c9304a78177d77b',
-  9: 'a28a216dfa49283e463edd6057e70b91309fc74fe989647a4c9b277c65dd63f2',
+  9: 'ad2967a2de806a31e2d25b9dd60747d58739bd741ecb315b0e5d83f3a61649fd',
 } as const);
 const HISTORICAL_CATALOG_INPUTS = Object.freeze([
   'data/historical-document-catalog-provenance.json',

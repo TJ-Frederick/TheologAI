@@ -22,24 +22,40 @@ export const CORE_EIGHT_SOURCE_PACK_COUNTS = Object.freeze({
 });
 
 const CORE_EIGHT_WORK_IDS = Object.freeze([
-  'anselm-proslogion-deane-1903',
-  'athanasius-on-incarnation-robertson-npnf2-v4',
-  'augustine-confessions-pusey-1838',
+  'anselm-proslogion',
+  'athanasius-on-incarnation',
+  'augustine-confessions',
   'bunyan-pilgrims-progress-part-1',
-  'calvin-institutes-beveridge-1845',
-  'irenaeus-against-heresies-anf1-1885',
-  'john-damascene-exposition-salmond-npnf2-v9',
-  'wesley-standard-sermons-1771',
+  'calvin-institutes',
+  'irenaeus-against-heresies',
+  'john-damascene-exact-exposition',
+  'wesley-standard-sermons',
 ]);
 
 export interface HistoricalSourcePackRecord {
   packId: string;
   revision: string;
+  /** Schema of the pack manifest, distinct from its member edition package schema. */
+  manifestSchemaVersion: 'historical-source-pack-manifest.v1';
   sourcePath: string;
   compiled: CompiledEditionPackage;
   normalizedTextRights: NormalizedTextRights;
+  catalog: HistoricalSourcePackCatalog;
   artifacts: HistoricalSourcePackArtifact[];
   manifestSha256?: string;
+}
+
+export interface HistoricalSourcePackCatalog {
+  composition: {
+    label: string;
+    startYear?: number;
+    endYear?: number;
+  };
+  compositionProvenanceSources: Array<{
+    sourceId: string;
+    label: string;
+    url: string;
+  }>;
 }
 
 export interface NormalizedTextRights {
@@ -98,7 +114,7 @@ export function loadHistoricalSourcePacks(
   }
 
   const seenPacks = new Map<string, string>();
-  const seenWorks = new Set<string>();
+  const seenWorks = new Map<string, string>();
   const seenEditions = new Set<string>();
   const seenArtifacts = new Set<string>();
   for (const record of records) {
@@ -107,9 +123,13 @@ export function loadHistoricalSourcePacks(
     seenPacks.set(record.packId, record.sourcePath);
     const workId = record.compiled.package.work.workId;
     const editionId = record.compiled.package.edition.editionId;
-    if (seenWorks.has(workId)) throw new Error(`Historical source packs duplicate work: ${workId}`);
+    const serializedWork = JSON.stringify(record.compiled.package.work);
+    const priorWork = seenWorks.get(workId);
+    if (priorWork !== undefined && priorWork !== serializedWork) {
+      throw new Error(`Historical source packs disagree about shared work metadata: ${workId}`);
+    }
     if (seenEditions.has(editionId)) throw new Error(`Historical source packs duplicate edition: ${editionId}`);
-    seenWorks.add(workId);
+    seenWorks.set(workId, serializedWork);
     seenEditions.add(editionId);
     for (const artifact of record.artifacts) {
       if (seenArtifacts.has(artifact.artifactId)) throw new Error(`Historical source packs duplicate artifact: ${artifact.artifactId}`);
@@ -129,7 +149,7 @@ export function assertCoreEightSourcePackRelease(
 ): void {
   const counts = {
     packs: new Set(records.map(record => record.packId)).size,
-    works: records.length,
+    works: new Set(records.map(record => record.compiled.package.work.workId)).size,
     editions: new Set(records.map(record => record.compiled.package.edition.editionId)).size,
     artifacts: records.reduce((total, record) => total + record.artifacts.length, 0),
     sections: records.reduce((total, record) => total + record.compiled.package.sections.length, 0),
@@ -161,24 +181,28 @@ function loadManifestPack(
   }
   const raw = JSON.parse(rawBytes) as unknown;
   const manifest = parseManifest(raw, path);
-  const works = new Set<string>();
+  const works = new Map<string, string>();
   const editions = new Set<string>();
   const records = manifest.members.map(member => {
     const compiled = compileEditionPackage(JSON.parse(sources.read(member.sourcePath, 'utf8')));
     if (compiled.sha256 !== member.packageSha256) throw new Error(`${path} package checksum mismatch: ${member.sourcePath}`);
-    if (member.id !== compiled.package.work.workId || member.id !== compiled.package.edition.editionId) {
-      throw new Error(`${path} member id must equal its compiled workId and editionId: ${member.sourcePath}`);
+    if (member.id !== compiled.package.edition.editionId) {
+      throw new Error(`${path} member id must equal its compiled editionId: ${member.sourcePath}`);
     }
-    if (works.has(compiled.package.work.workId) || editions.has(compiled.package.edition.editionId)) {
-      throw new Error(`${path} members must have distinct work and edition identities`);
+    const workIdentity = JSON.stringify(compiled.package.work);
+    const existingWork = works.get(compiled.package.work.workId);
+    if ((existingWork !== undefined && existingWork !== workIdentity) || editions.has(compiled.package.edition.editionId)) {
+      throw new Error(`${path} members must have consistent work and distinct edition identities`);
     }
-    works.add(compiled.package.work.workId); editions.add(compiled.package.edition.editionId);
+    works.set(compiled.package.work.workId, workIdentity); editions.add(compiled.package.edition.editionId);
     return {
       packId: manifest.packId,
       revision: manifest.revision,
+      manifestSchemaVersion: manifest.schemaVersion,
       sourcePath: path,
       compiled,
       normalizedTextRights: member.normalizedTextRights,
+      catalog: member.catalog,
       artifacts: member.artifacts,
       manifestSha256,
     };
@@ -187,9 +211,10 @@ function loadManifestPack(
 }
 
 interface ParsedManifest {
+  schemaVersion: 'historical-source-pack-manifest.v1';
   packId: string;
   revision: string;
-  members: Array<{ id: string; sourcePath: string; packageSha256: string; normalizedTextRights: NormalizedTextRights; artifacts: HistoricalSourcePackArtifact[] }>;
+  members: Array<{ id: string; sourcePath: string; packageSha256: string; normalizedTextRights: NormalizedTextRights; catalog: HistoricalSourcePackCatalog; artifacts: HistoricalSourcePackArtifact[] }>;
 }
 
 function parseManifest(value: unknown, path: string): ParsedManifest {
@@ -204,12 +229,13 @@ function parseManifest(value: unknown, path: string): ParsedManifest {
   let previous = '';
   const artifactIds = new Set<string>();
   return {
+    schemaVersion: root.schemaVersion,
     packId: root.packId,
     revision: String(root.revision),
     members: root.members.map((entry, index) => {
       if (!entry || typeof entry !== 'object' || Array.isArray(entry)) throw new Error(`${path}.members[${index}] must be an object`);
       const member = entry as Record<string, unknown>;
-      assertKeys(member, ['id', 'sourcePath', 'packageSha256', 'normalizedTextRights', 'artifacts'], `${path}.members[${index}]`);
+      assertKeys(member, ['id', 'sourcePath', 'packageSha256', 'normalizedTextRights', 'catalog', 'artifacts'], `${path}.members[${index}]`);
       if (!isId(member.id) || typeof member.sourcePath !== 'string' || !/^editions\/[a-z][a-z0-9._-]*\.json$/.test(member.sourcePath) || member.sourcePath <= previous) {
         throw new Error(`${path}.members must be strictly sourcePath-sorted packages`);
       }
@@ -225,8 +251,52 @@ function parseManifest(value: unknown, path: string): ParsedManifest {
         return parsed;
       });
       if (!artifacts.some(artifact => artifact.role === 'authority')) throw new Error(`${path}.members[${index}] requires an authority artifact`);
-      return { id: member.id, sourcePath: posix.join(dirname(path), member.sourcePath), packageSha256: member.packageSha256, normalizedTextRights, artifacts };
+      const catalog = parseCatalog(member.catalog, artifacts, `${path}.members[${index}].catalog`);
+      return { id: member.id, sourcePath: posix.join(dirname(path), member.sourcePath), packageSha256: member.packageSha256, normalizedTextRights, catalog, artifacts };
     }),
+  };
+}
+
+function parseCatalog(value: unknown, _artifacts: readonly HistoricalSourcePackArtifact[], path: string): HistoricalSourcePackCatalog {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${path} must be an object`);
+  const catalog = value as Record<string, unknown>;
+  assertKeys(catalog, ['composition', 'compositionProvenanceSources'], path);
+  if (!catalog.composition || typeof catalog.composition !== 'object' || Array.isArray(catalog.composition)) {
+    throw new Error(`${path}.composition must be an object`);
+  }
+  const composition = catalog.composition as Record<string, unknown>;
+  const keys = Object.keys(composition).sort();
+  const expected = ['label', ...(composition.startYear === undefined && composition.endYear === undefined ? [] : ['startYear', 'endYear'])].sort();
+  if (JSON.stringify(keys) !== JSON.stringify(expected)
+    || typeof composition.label !== 'string' || !composition.label.trim()
+    || (composition.startYear !== undefined && (!Number.isSafeInteger(composition.startYear) || !Number.isSafeInteger(composition.endYear)
+      || composition.startYear > composition.endYear))) {
+    throw new Error(`${path}.composition must use a non-empty label and optional inclusive integer bounds`);
+  }
+  if (!Array.isArray(catalog.compositionProvenanceSources) || catalog.compositionProvenanceSources.length < 1) {
+    throw new Error(`${path}.compositionProvenanceSources must be non-empty`);
+  }
+  const sources = catalog.compositionProvenanceSources.map((value, index) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${path}.compositionProvenanceSources[${index}] must be an object`);
+    const source = value as Record<string, unknown>;
+    assertKeys(source, ['sourceId', 'label', 'url'], `${path}.compositionProvenanceSources[${index}]`);
+    if (typeof source.sourceId !== 'string' || !/^hist-meta-[a-z0-9]+(?:-[a-z0-9]+)*$/.test(source.sourceId)
+      || typeof source.label !== 'string' || !source.label.trim()
+      || typeof source.url !== 'string' || !source.url.startsWith('https://')) {
+      throw new Error(`${path}.compositionProvenanceSources[${index}] is invalid`);
+    }
+    return { sourceId: source.sourceId, label: source.label, url: source.url };
+  });
+  if (new Set(sources.map(source => source.sourceId)).size !== sources.length
+    || sources.some((source, index) => index > 0 && sources[index - 1]!.sourceId >= source.sourceId)) {
+    throw new Error(`${path}.compositionProvenanceSources must use sorted unique source IDs`);
+  }
+  return {
+    composition: {
+      label: composition.label,
+      ...(composition.startYear === undefined ? {} : { startYear: composition.startYear as number, endYear: composition.endYear as number }),
+    },
+    compositionProvenanceSources: sources,
   };
 }
 
@@ -265,7 +335,7 @@ export function materializeHistoricalSourcePacks(
   packs: readonly HistoricalSourcePackRecord[],
 ): { packs: number; works: number; editions: number; artifacts: number; sections: number; deliveryProfiles: number; identities: number; legacyAliases: number } {
   const insertPack = db.prepare('INSERT INTO historical_source_packs (pack_id, revision, schema_version, manifest_sha256, source_path) VALUES (?, ?, ?, ?, ?)');
-  const insertWork = db.prepare('INSERT INTO historical_works (work_id, pack_id, title, creator_metadata_status, creators_json) VALUES (?, ?, ?, ?, ?)');
+  const insertWork = db.prepare('INSERT INTO historical_works (work_id, title, creator_metadata_status, creators_json) VALUES (?, ?, ?, ?)');
   const insertEdition = db.prepare(`INSERT INTO historical_editions (
     edition_id, work_id, pack_id, language, contributor_groups_json, publication, version,
     provenance_status, provenance_uncertainty, provenance_reviewed_at, underlying_work_rights_json, exact_artifact_rights_json, normalized_text_rights_json
@@ -288,11 +358,12 @@ export function materializeHistoricalSourcePacks(
   let sections = 0;
   let artifactCount = 0;
   let identities = 0;
+  const workRows = new Map<string, string>();
   const packRows = new Map<string, { revision: string; schemaVersion: string; manifestSha256: string; sourcePath: string }>();
   for (const record of packs) {
     const candidate = {
       revision: record.revision,
-      schemaVersion: record.compiled.package.schemaVersion,
+      schemaVersion: record.manifestSchemaVersion,
       manifestSha256: record.manifestSha256 ?? record.compiled.sha256,
       sourcePath: record.sourcePath,
     };
@@ -301,14 +372,21 @@ export function materializeHistoricalSourcePacks(
       throw new Error(`Historical source-pack members disagree about pack identity: ${record.packId}`);
     }
     packRows.set(record.packId, candidate);
+    const serializedWork = JSON.stringify(record.compiled.package.work);
+    const priorWork = workRows.get(record.compiled.package.work.workId);
+    if (priorWork !== undefined && priorWork !== serializedWork) {
+      throw new Error(`Historical source-pack work metadata was not validated: ${record.compiled.package.work.workId}`);
+    }
+    workRows.set(record.compiled.package.work.workId, serializedWork);
   }
   const insertedPackIds = new Set<string>();
+  const insertedWorkIds = new Set<string>();
   const transaction = db.transaction(() => {
-    for (const { packId, revision, sourcePath, compiled, normalizedTextRights, artifacts, manifestSha256 } of packs) {
-      const { work, edition, sections: editionSections, schemaVersion } = compiled.package;
+    for (const { packId, revision, manifestSchemaVersion, sourcePath, compiled, normalizedTextRights, catalog, artifacts, manifestSha256 } of packs) {
+      const { work, edition, sections: editionSections } = compiled.package;
       const pack = packRows.get(packId);
       if (!pack) throw new Error(`Historical source-pack identity was not validated: ${packId}`);
-      if (pack.schemaVersion !== schemaVersion || pack.revision !== revision || pack.sourcePath !== sourcePath
+      if (pack.schemaVersion !== manifestSchemaVersion || pack.revision !== revision || pack.sourcePath !== sourcePath
         || pack.manifestSha256 !== (manifestSha256 ?? compiled.sha256)) {
         throw new Error(`Historical source-pack member drifted after identity validation: ${packId}`);
       }
@@ -316,7 +394,10 @@ export function materializeHistoricalSourcePacks(
         insertPack.run(packId, pack.revision, pack.schemaVersion, pack.manifestSha256, pack.sourcePath);
         insertedPackIds.add(packId);
       }
-      insertWork.run(work.workId, packId, work.title, work.creatorMetadataStatus, JSON.stringify(work.creators));
+      if (!insertedWorkIds.has(work.workId)) {
+        insertWork.run(work.workId, work.title, work.creatorMetadataStatus, JSON.stringify(work.creators));
+        insertedWorkIds.add(work.workId);
+      }
       insertEdition.run(
         edition.editionId, work.workId, packId, edition.language, JSON.stringify(edition.contributorGroups),
         edition.publication, edition.version, edition.provenance.status, edition.provenance.uncertainty,
@@ -327,7 +408,7 @@ export function materializeHistoricalSourcePacks(
         artifactCount++;
       }
 
-      const metadata = exactEditionDocumentMetadata(packId, compiled, normalizedTextRights, artifacts);
+      const metadata = buildHistoricalSourcePackDocumentMetadata(packId, compiled, normalizedTextRights, catalog, artifacts);
       assertClassicTextDocumentMetadata({
         id: work.workId, title: work.title, type: 'historical_work', date: null, topics: [],
       }, `Historical source-pack work ${work.workId}`);
@@ -360,7 +441,7 @@ export function materializeHistoricalSourcePacks(
         work.workId, work.workId, edition.editionId, compiled.sha256, compiled.sha256,
         editionSections.length,
         JSON.stringify({
-          status: 'reviewed_exact_edition_source_pack',
+          status: 'reviewed_edition_aligned_normalized_transcription',
           sourcePackId: packId,
           revision,
           manifestSha256: manifestSha256 ?? compiled.sha256,
@@ -383,7 +464,7 @@ export function materializeHistoricalSourcePacks(
   transaction();
   return {
     packs: new Set(packs.map(pack => pack.packId)).size,
-    works: packs.length,
+    works: insertedWorkIds.size,
     editions: packs.length,
     artifacts: artifactCount,
     sections,
@@ -393,16 +474,27 @@ export function materializeHistoricalSourcePacks(
   };
 }
 
-function exactEditionDocumentMetadata(packId: string, compiled: CompiledEditionPackage, normalizedTextRights: NormalizedTextRights, artifacts: readonly HistoricalSourcePackArtifact[]): Record<string, unknown> {
+/**
+ * The public document projection is deliberately derived from the immutable
+ * package and manifest rather than copied from a hand-maintained catalog.
+ * Transform-9 authority verification regenerates this exact object.
+ */
+export function buildHistoricalSourcePackDocumentMetadata(
+  packId: string,
+  compiled: CompiledEditionPackage,
+  normalizedTextRights: NormalizedTextRights,
+  catalog: HistoricalSourcePackCatalog,
+  artifacts: readonly HistoricalSourcePackArtifact[],
+): Record<string, unknown> {
   const { work, edition } = compiled.package;
   return {
     topics: [],
     catalog: {
       lookupAliases: [work.workId, work.title],
-      composition: { label: 'n.d.' },
+      composition: catalog.composition,
       creators: work.creators,
       metadataStatus: work.creatorMetadataStatus,
-      metadataProvenanceIds: [`hist-meta-source-pack-${packId}`],
+      metadataProvenanceIds: catalog.compositionProvenanceSources.map(source => source.sourceId),
     },
     editionProvenance: {
       foundation: 'edition-provenance-foundation.v1',
