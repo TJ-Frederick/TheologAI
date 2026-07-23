@@ -95,3 +95,20 @@ WHEN NEW.delivery_mode = 'sectioned_only'
 BEGIN
   SELECT RAISE(ABORT, 'sectioned delivery profile must select one matching edition for its work');
 END;
+
+CREATE TRIGGER historical_sectioned_profile_update_requires_matching_edition
+BEFORE UPDATE OF document_id, work_id, edition_id, delivery_mode
+ON historical_document_delivery_profiles
+WHEN NEW.delivery_mode = 'sectioned_only'
+ AND (
+   NEW.document_id != NEW.work_id
+   OR NEW.work_id IS NULL
+   OR NEW.edition_id IS NULL
+   OR NOT EXISTS (
+     SELECT 1 FROM historical_editions
+     WHERE edition_id = NEW.edition_id AND work_id = NEW.work_id
+   )
+ )
+BEGIN
+  SELECT RAISE(ABORT, 'sectioned delivery profile must select one matching edition for its work');
+END;

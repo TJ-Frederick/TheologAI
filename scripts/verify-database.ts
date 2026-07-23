@@ -51,7 +51,7 @@ if (!existsSync(databasePath)) throw new Error(`Database not found: ${databasePa
 const manifest = parseDataManifest(readFileSync(MANIFEST_PATH));
 verifyD1Migrations(ROOT, manifest);
 const expectedTables = Object.keys(manifest.expectedCounts).sort();
-const expectedIndexes = ['idx_document_sections_id_document', 'idx_historical_edition_sections_order', 'idx_historical_editions_pack', 'idx_historical_section_aliases_target', 'idx_historical_section_identities_browse', 'idx_historical_source_artifacts_edition', 'idx_historical_works_pack', 'idx_morph_strongs', 'idx_morph_strongs_canonical', 'idx_morph_verse', 'idx_strongs_book_stats_order', 'idx_strongs_form_stats_rank', 'idx_ubs_groups_source_order', 'idx_ubs_segments_lookup', 'idx_ubs_semantic_identity_candidate', 'idx_ubs_semantic_sense_candidate_order', 'idx_ubs_semantic_sense_domain_order', 'idx_ubs_semantic_coordinate_lookup', 'idx_ubs_semantic_evidence_sense_order', 'idx_xref_from', 'idx_xref_votes'];
+const expectedIndexes = ['idx_document_sections_id_document', 'idx_historical_edition_sections_order', 'idx_historical_editions_pack', 'idx_historical_editions_work', 'idx_historical_section_aliases_target', 'idx_historical_section_identities_browse', 'idx_historical_source_artifacts_edition', 'idx_morph_strongs', 'idx_morph_strongs_canonical', 'idx_morph_verse', 'idx_strongs_book_stats_order', 'idx_strongs_form_stats_rank', 'idx_ubs_groups_source_order', 'idx_ubs_segments_lookup', 'idx_ubs_semantic_identity_candidate', 'idx_ubs_semantic_sense_candidate_order', 'idx_ubs_semantic_sense_domain_order', 'idx_ubs_semantic_coordinate_lookup', 'idx_ubs_semantic_evidence_sense_order', 'idx_xref_from', 'idx_xref_votes'];
 const db = new Database(databasePath, { readonly: true, fileMustExist: true });
 
 function assertHistoricalTransform8Materialization(database: Database.Database): void {
@@ -229,7 +229,7 @@ function assertHistoricalTransform8Materialization(database: Database.Database):
   if (ftsMismatches.count !== 0) throw new Error('Transform 8 changed the historical FTS projection');
 }
 
-/** Verify the Transform-9 exact-edition projection without changing the frozen Transform-8 ledger. */
+/** Verify the Transform-9 reviewed-edition projection without changing the frozen Transform-8 ledger. */
 function assertHistoricalTransform9SourcePackMaterialization(database: Database.Database): void {
   const packs = loadHistoricalSourcePacks(manifest.materializations.d1.inputs, {
     read: (path: string) => readFileSync(join(ROOT, path), 'utf8'),
@@ -243,7 +243,7 @@ function assertHistoricalTransform9SourcePackMaterialization(database: Database.
   if (packRows.length !== 1 || packRows[0]?.packId !== 'theologai-core-eight'
     || packRows[0].revision !== packs[0]!.revision || packRows[0].sourcePath !== packs[0]!.sourcePath
     || packRows[0].manifestSha256 !== packs[0]!.manifestSha256
-    || packRows[0].schemaVersion !== packs[0]!.compiled.package.schemaVersion) {
+    || packRows[0].schemaVersion !== packs[0]!.manifestSchemaVersion) {
     throw new Error('Transform 9 source-pack identity projection drifted');
   }
 
