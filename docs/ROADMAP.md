@@ -610,8 +610,9 @@ Code readiness and operational readiness are deliberately separate:
   preview D1. Transform 7's UBS adapters remain runtime-inactive. Transform 8
   is active in preview's historical repositories: the existing
   `classic_text_lookup` has the Baltimore hard cut and canonical/legacy
-  resolution, changing preview output without adding a tool. Production Worker
-  and D1 lack both transforms. The next gate is a separately owner-authorized
+  resolution, changing preview output without adding a tool. The live
+  production Worker and its bound old D1 lack both transforms. The next gate is
+  a separately owner-authorized
   production D1 release followed by a distinct UBS runtime-activation decision.
   Keep the existing 32-source provenance cap as a required pack-sizing check.
 - PRs #61–#64 and #67 complete the planned inactive semantic and provenance

@@ -278,8 +278,9 @@ D1 seed, and the preview-only D1. Transform 7's UBS adapters remain inactive
 at runtime. Transform 8 is separately active in preview's historical
 repositories: the existing `classic_text_lookup` exposes the Baltimore hard
 cut and canonical/legacy resolution, changing preview output without adding a
-tool. Production lacks both migrations, materializations, and Transform-8
-behavior. The historical source packets remain outside the local and remote
+tool. The live production Worker and its bound old D1 lack both migrations,
+materializations, and Transform-8 behavior. The historical source packets
+remain outside the local and remote
 17-work catalog and current tool output. U3-T7 provides the in-memory semantic
 compiler, native-to-normalized coordinate bridge, and content-free compilation
 audit; M4A provides capacity and seed verification with inactive adapters. Any
