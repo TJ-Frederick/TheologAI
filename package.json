@@ -90,6 +90,9 @@
   "overrides": {
     "@cloudflare/vitest-pool-workers": {
       "wrangler": "4.107.0"
+    },
+    "@modelcontextprotocol/sdk": {
+      "@hono/node-server": "2.0.11"
     }
   },
   "dependencies": {
