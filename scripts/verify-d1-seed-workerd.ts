@@ -20,6 +20,7 @@ import {
   buildD1ReadinessSql,
   REQUIRED_COLUMNS,
 } from './check-remote-d1-readiness.js';
+import { buildWorkerdSchemaStateSql } from './d1-workerd-verifier-utils.js';
 import {
   ensureWranglerLogDirectory,
   formatWranglerCommandFailure,
@@ -56,20 +57,12 @@ try {
   const common = ['THEOLOGAI_DB', '--local', '--persist-to', state, '--config', 'wrangler.toml'];
   run(['d1', 'migrations', 'apply', ...common]);
   const migrationNames = sourceManifest.materializations.d1.migrations.map(migration => basename(migration.path));
-  const columnChecks = Object.entries(REQUIRED_COLUMNS).map(([table, columns]) =>
-    `(SELECT group_concat(name, ',') FROM (SELECT name FROM pragma_table_info('${table}') ORDER BY cid)) = '${columns.join(',')}'`
-  );
   const schemaState = run([
     'd1',
     'execute',
     ...common,
     '--command',
-    `SELECT CASE WHEN
-      (SELECT COUNT(*) FROM d1_migrations) = ${migrationNames.length}
-      AND (SELECT group_concat(name, ',') FROM (SELECT name FROM d1_migrations ORDER BY id)) = '${migrationNames.join(',')}'
-      AND (SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name IN ('idx_xref_from','idx_xref_votes','idx_morph_verse','idx_morph_strongs','idx_morph_strongs_canonical','idx_strongs_book_stats_order','idx_strongs_form_stats_rank','idx_ubs_groups_source_order','idx_ubs_segments_lookup','idx_ubs_semantic_identity_candidate','idx_ubs_semantic_sense_candidate_order','idx_ubs_semantic_sense_domain_order','idx_ubs_semantic_coordinate_lookup','idx_ubs_semantic_evidence_sense_order','idx_document_sections_id_document','idx_historical_section_identities_browse','idx_historical_section_aliases_target','idx_historical_editions_work','idx_historical_editions_pack','idx_historical_source_artifacts_edition','idx_historical_edition_sections_order')) = 22
-      AND ${columnChecks.join('\n      AND ')}
-      THEN 'schema-ready' ELSE json_extract('Wrangler-applied migration state mismatch', '$') END AS schema_state;`,
+    buildWorkerdSchemaStateSql(migrationNames, REQUIRED_COLUMNS),
     '--json',
   ]);
   if (!schemaState.includes('schema-ready')) throw new Error('Wrangler-applied migration state was not verified');
