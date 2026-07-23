@@ -302,7 +302,14 @@ deployment `44a0858f-75ba-497d-b84b-66c14253234a`, Worker
 two audits passed (22/22 cases, 59/59 checks, and 48/48 rate-counted requests
 across 11 aggregate groups). Its `deploy-preview` authorization was removed
 and the PR returned to draft; any later docs-only PR #92 head is not deployed.
-No production deployment occurred.
+No production deployment occurred. The checked-in production-binding candidate
+is `theologai-production-20260723-a`
+(`3f7faa0e-689f-47aa-a601-dc662db9a6cf`), which passed migrations `0001`–`0005`,
+deterministic seeding, strict readiness, and the Transform-8 authority audit.
+No active production Worker uses it: live production remains the deployment,
+Worker, and old D1 above as a matched rollback pair, and checked-in config is
+not deployment evidence. The live production Worker and its bound old D1 still
+lack Transform-7 and Transform-8 data and behavior.
 
 ## Shipped Phase 3 release train
 

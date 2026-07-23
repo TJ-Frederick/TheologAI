@@ -11,7 +11,7 @@ const reviewedBasePins = {
   'src/tools/worker/index.ts': 'feb1679a520185d11f2b6082b70ea3ef6c2b87652ff49c97c0acedfb76d83b90',
   'src/worker.ts': '619a0a66c30ade7ec8f78f13c59ed0791c67d1ae956eb69e0b126ba20f7dc92d',
   'src/worker-server.ts': '3f65b62179b267ac9b15fe682c69342be7ebee8a09430473b797c113e812782a',
-  'wrangler.toml': '46862ae67027c460a94932a1284e0885bbaf3d1699a11887f235e645fe50b04f',
+  'wrangler.toml': 'e2a395dc97b53f0b8da4786a7076dfde76e377fc79eb2058c3e8601fb624ec16',
   'worker-configuration.d.ts': 'e316f64679951b32417f0c85b02fc92e61dae25d879d28921df15caf8706fe55',
 } as const;
 

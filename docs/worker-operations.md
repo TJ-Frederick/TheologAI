@@ -11,6 +11,14 @@ Production remains the PR #72 known-good release: protected production run
 with no P0-P3 findings across 22 read-only requests and a 22/22
 source-attested regression.
 
+The checked-in production-binding candidate is
+`theologai-production-20260723-a`
+(`3f7faa0e-689f-47aa-a601-dc662db9a6cf`). It passed migrations `0001`–`0005`,
+deterministic seeding, strict readiness, and the Transform-8 authority audit,
+but no active production Worker uses it. The live deployment, Worker, and old
+D1 above remain the matched rollback pair; checked-in config is not deployment
+evidence.
+
 The exact deployed and audited preview source commit is
 `bb8ed4c8f025f697502a274986205f92bdf520b7` in draft, unmerged PR #92; it is
 the separate preview-only release: CI run `30011028739` passed, Cloudflare
@@ -43,11 +51,11 @@ migrations `0004` / transform 7 and `0005` / transform 8 materialized.
 Transform 7's UBS adapters remain runtime-inactive. Transform 8 is active in
 preview's historical repositories: the existing `classic_text_lookup` has the
 Baltimore hard cut and canonical/legacy resolution, changing preview output
-without adding a tool. Production Worker and D1 lack both transforms and
-production runtime activation remains unchanged. The unpublished candidate also
-advances the local primary-source schema pair to production v6/local-only and
-preview v7/discovery-only. No deletion, route replacement, or other destructive
-cleanup is authorized by this record.
+without adding a tool. The live production Worker and its bound old D1 lack
+both transforms and production runtime activation remains unchanged. The
+unpublished candidate also advances the local primary-source schema pair to
+production v6/local-only and preview v7/discovery-only. No deletion, route
+replacement, or other destructive cleanup is authorized by this record.
 
 Any eventual UBS semantic production release must separately authorize a
 production D1 migration/binding/deployment sequence. The preview data layer is

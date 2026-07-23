@@ -50,6 +50,15 @@ and 11 aggregate groups). The `deploy-preview` authorization was removed and
 PR #92 returned to draft; any later docs-only PR #92 head is not deployed. It
 is not a production release.
 
+The checked-in production-binding candidate is
+`theologai-production-20260723-a`
+(`3f7faa0e-689f-47aa-a601-dc662db9a6cf`). It passed migrations `0001`–`0005`,
+deterministic seeding, strict readiness, and the Transform-8 authority audit,
+but no active production Worker uses it. The live production deployment,
+Worker, and old D1 above remain the matched rollback pair; checked-in config is
+not deployment evidence. The live production Worker and its bound old D1 still
+lack Transform-7 and Transform-8 data and behavior.
+
 ## Release-time known-good baseline
 
 The rollback anchor is deliberately a release-time record, not a stale version

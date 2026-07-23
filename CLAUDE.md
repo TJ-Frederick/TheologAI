@@ -191,13 +191,22 @@ endpoint redirects ordinary requests to the canonical custom domain; the exact
 abusive-poller tuple is rejected instead, while the preview legacy endpoint
 remains direct. Repository-only U3-T7/PR #83 work remains outside production.
 
+The checked-in production-binding candidate names
+`theologai-production-20260723-a`
+(`3f7faa0e-689f-47aa-a601-dc662db9a6cf`). It passed migrations `0001`–`0005`,
+deterministic seeding, strict readiness, and the Transform-8 authority audit,
+but no active production Worker uses it. The live production deployment,
+Worker, and old D1 above remain the matched rollback pair; checked-in config is
+not deployment evidence.
+
 The preview-only D1 has migrations `0004` / transform 7 and `0005` / transform
 8 materialized. Transform 7's UBS adapters remain runtime-inactive: U3-T7's
 in-memory compiler, native-to-normalized coordinate bridge, and content-free
 audit do not register an MCP surface or alter current output. Transform 8 is
 active in preview's historical repositories: the existing `classic_text_lookup`
 has the Baltimore hard cut and canonical/legacy resolution, changing preview
-output without adding a tool. The production Worker and D1 lack both transforms.
+output without adding a tool. The live production Worker and its bound old D1
+lack both transforms.
 A production D1 release, later UBS runtime activation, Norton transform 9, and
 later edition transforms remain separately owner-gated.
 `package.json` is private: npm distribution is unsupported.

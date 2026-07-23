@@ -24,6 +24,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   draft. Any later docs-only PR #92 head is not deployed. This did not deploy
   production.
 
+  The checked-in production-binding candidate is
+  `theologai-production-20260723-a`
+  (`3f7faa0e-689f-47aa-a601-dc662db9a6cf`). It passed migrations `0001`–`0005`,
+  deterministic seeding, strict readiness, and the Transform-8 authority audit.
+  No active production Worker uses it: the live deployment, Worker, and old D1
+  above remain the matched rollback pair, and checked-in config is not
+  deployment evidence.
+
 - Completed the runtime-inert UBS Hebrew U3-T7 compiler, canonical
   native-to-normalized bridge, content-free reproducibility audit, embedded
   rights/provenance notice, and full-corpus integrity verification. The full
@@ -35,7 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   alter MCP output. Transform 8 is active in preview's historical repositories:
   the existing `classic_text_lookup` has the Baltimore hard cut and
   canonical/legacy resolution, changing preview output without adding a tool.
-  Production Worker and D1 lack both transforms. `SOURCE.json` remains the
+  The live production Worker and its bound old D1 lack both transforms.
+  `SOURCE.json` remains the
   historical acquisition-gate snapshot rather than deployment evidence;
   production data release and any later UBS runtime activation remain separately
   gated.

@@ -61,6 +61,14 @@ preview audits passed (22/22 cases and 59/59 checks; 48/48 rate-counted
 requests across 11 aggregate groups). The `deploy-preview` authorization was
 then removed and PR #92 returned to draft; it is not a production deployment.
 Any later docs-only PR #92 head is not deployed.
+
+The checked-in production-binding candidate now names
+`theologai-production-20260723-a`
+(`3f7faa0e-689f-47aa-a601-dc662db9a6cf`). It passed migrations `0001`–`0005`,
+deterministic seeding, strict readiness, and the Transform-8 authority audit,
+but no active production Worker uses it yet. The live production deployment,
+Worker, and old D1 above remain the matched rollback pair; checked-in
+configuration is not deployment evidence.
 For a preview-client rollback without changing server state, use the direct preview
 `workers.dev` address above; the production `workers.dev` address intentionally
 redirects rather than serving a separate legacy Worker.
@@ -70,11 +78,11 @@ The preview-only data layer has migration `0004` / transform 7 and migration
 remain runtime-inactive: they register no new MCP surface or output. Transform
 8 is active in preview's historical repositories: the existing
 `classic_text_lookup` has the Baltimore hard cut and canonical/legacy
-resolution. That adds no new tool, but it does change preview output.
-Production lacks both migrations, materialized rows, and this Transform-8
-behavior; a production D1 release and any later UBS runtime activation remain
-separately gated. The pinned packet's `SOURCE.json` remains a historical
-acquisition-gate snapshot, not deployment evidence.
+resolution. That adds no new tool, but it does change preview output. The live
+production Worker and its bound old D1 lack both migrations, materialized rows,
+and this Transform-8 behavior; a production D1 release and any later UBS
+runtime activation remain separately gated. The pinned packet's `SOURCE.json`
+remains a historical acquisition-gate snapshot, not deployment evidence.
 
 ## MCP capabilities
 
