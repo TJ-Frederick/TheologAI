@@ -8,9 +8,9 @@
 export const CCEL_COMPOSITION_DATE_NOTICE = 'CCEL discovery was not composition-date filtered; its results cannot establish membership in a requested historical period.';
 
 /**
- * The current hosted collection predates the per-edition provenance compiler.
- * This intentionally says only what the server has established: it does not
- * turn public-domain underlying works into claims about their transcription,
+ * Legacy hosted documents predate the per-edition provenance compiler. This
+ * intentionally says only what the server has established: it does not turn
+ * public-domain underlying works into claims about their transcription,
  * edition, or redistribution permission.
  */
 export const LOCAL_EDITION_READINESS = Object.freeze({
@@ -19,6 +19,48 @@ export const LOCAL_EDITION_READINESS = Object.freeze({
   provenance: 'incomplete',
   exactArtifactRights: 'not_established_by_this_contract',
 } as const);
+
+/** URL-free readiness facts for a reviewed normalized-text source pack. */
+export interface ReviewedSourcePackEditionReadiness {
+  foundation: 'edition-provenance-foundation.v1';
+  editionIdentity: 'established';
+  provenance: 'verified' | 'verified_with_uncertainty';
+  exactArtifactRights: 'not_claimed_for_scan_artifacts';
+  normalizedTextRights: 'no_known_conflict';
+}
+
+export type LocalEditionReadiness = typeof LOCAL_EDITION_READINESS | ReviewedSourcePackEditionReadiness;
+
+export function localEditionReadiness(
+  edition: { foundation: 'edition-provenance-foundation.v1'; provenance: { status: 'verified' | 'verified_with_uncertainty' } } | undefined,
+): LocalEditionReadiness {
+  return edition
+    ? {
+        foundation: edition.foundation,
+        editionIdentity: 'established',
+        provenance: edition.provenance.status,
+        exactArtifactRights: 'not_claimed_for_scan_artifacts',
+        normalizedTextRights: 'no_known_conflict',
+      }
+    : LOCAL_EDITION_READINESS;
+}
+
+/** Structural guard for a result that may cross an untyped provider boundary. */
+export function isLocalEditionReadiness(value: unknown): value is LocalEditionReadiness {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const readiness = value as Record<string, unknown>;
+  if (readiness.foundation !== 'edition-provenance-foundation.v1') return false;
+  if (readiness.editionIdentity === 'not_established') {
+    return readiness.provenance === 'incomplete'
+      && readiness.exactArtifactRights === 'not_established_by_this_contract'
+      && Object.keys(readiness).length === 4;
+  }
+  return readiness.editionIdentity === 'established'
+    && (readiness.provenance === 'verified' || readiness.provenance === 'verified_with_uncertainty')
+    && readiness.exactArtifactRights === 'not_claimed_for_scan_artifacts'
+    && readiness.normalizedTextRights === 'no_known_conflict'
+    && Object.keys(readiness).length === 5;
+}
 
 /** Provider search results are not reviewed editions or local corpus claims. */
 export const EXTERNAL_EDITION_READINESS = Object.freeze({
@@ -114,6 +156,8 @@ export interface PrimarySourceCatalogScope {
     id: string;
     title: string;
     metadataStatus: 'reviewed' | 'anonymous' | 'collective' | 'unknown';
+    /** Omitted only by an older provider contract; current local provider always sets it. */
+    editionReadiness?: LocalEditionReadiness;
   }>;
   eligibleDocumentsTruncated: boolean;
 }
@@ -123,6 +167,8 @@ export interface LocalPrimarySourceSearchHit extends PrimarySourceSearchHitBase 
   locator: LocalSectionLocator;
   /** Exact UTF-8 byte size of the corresponding MCP resource representation. */
   resourceSizeBytes: number;
+  /** Current local provider always supplies a URL-free readiness summary. */
+  editionReadiness?: LocalEditionReadiness;
 }
 
 export interface CcelPrimarySourceSearchHit extends PrimarySourceSearchHitBase {

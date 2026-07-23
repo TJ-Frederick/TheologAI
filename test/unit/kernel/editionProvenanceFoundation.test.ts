@@ -422,6 +422,15 @@ describe('inactive edition provenance foundation', () => {
     source(queryLocator).locator = 'https://example.invalid/file.txt?moving=latest';
     expectValidationError(queryLocator, '$.edition.source.locator', 'must not contain');
 
+    const contentAddressed = inventedEditionPackageFixture();
+    source(contentAddressed).locator = `urn:sha256:${source(contentAddressed).sha256}`;
+    expect(validateEditionCompilationPackage(contentAddressed).edition.source.locator)
+      .toBe(`urn:sha256:${source(contentAddressed).sha256}`);
+
+    const mismatchedContentAddressed = inventedEditionPackageFixture();
+    source(mismatchedContentAddressed).locator = `urn:sha256:${'b'.repeat(64)}`;
+    expectValidationError(mismatchedContentAddressed, '$.edition.source.locator', 'must equal');
+
     const mismatchedPin = inventedEditionPackageFixture();
     source(mismatchedPin).pin = { kind: 'sha256', value: 'b'.repeat(64) };
     expectValidationError(mismatchedPin, '$.edition.source.pin.value', 'must equal');

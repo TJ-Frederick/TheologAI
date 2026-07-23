@@ -16,6 +16,7 @@ const EXPECTED_IDENTITIES = Object.freeze({
   6: 'c334b4b91c3a7c334a9425937c7f99473f27014ddae6cea377ee38bd578a6707',
   7: '3708bf7e3ab903c409453fdf4fdac1b68848547f91f0b516855dd21765de4796',
   8: '2db6c370a75ce5818db6c6cdbdb1d80d6333b99e7e4ccf956c9304a78177d77b',
+  9: 'a28a216dfa49283e463edd6057e70b91309fc74fe989647a4c9b277c65dd63f2',
 } as const);
 const HISTORICAL_CATALOG_INPUTS = Object.freeze([
   'data/historical-document-catalog-provenance.json',
@@ -25,7 +26,7 @@ const HISTORICAL_CATALOG_INPUTS = Object.freeze([
 export interface UnicodeManifestFinalization {
   manifest: DataManifest;
   identity: string;
-  transformVersion: 5 | 6 | 7 | 8;
+  transformVersion: 5 | 6 | 7 | 8 | 9;
   changedPaths: string[];
 }
 
@@ -44,20 +45,23 @@ export function buildFinalizedBiblicalLanguageUnicodeManifest(
 ): UnicodeManifestFinalization {
   const manifest = structuredClone(sourceManifest);
   const sourceTransformVersion = manifest.materializations.d1.transformVersion;
-  assert([3, 4, 5, 6, 7, 8].includes(sourceTransformVersion), 'Unexpected pre-correction D1 transform version');
+  assert([3, 4, 5, 6, 7, 8, 9].includes(sourceTransformVersion), 'Unexpected pre-correction D1 transform version');
+  const transformNine = sourceTransformVersion === 9;
   const transformEight = sourceTransformVersion === 8;
   const transformSeven = sourceTransformVersion === 7;
-  const expectedSchema = transformEight ? '0005_historical_section_identity_delivery'
+  const expectedSchema = transformNine ? '0006_historical_source_packs'
+    : transformEight ? '0005_historical_section_identity_delivery'
     : transformSeven ? '0004_ubs_hebrew_semantics' : '0003_original_language_usage';
   assert(manifest.schemaVersion === expectedSchema,
     `Unicode correction must retain schema ${expectedSchema.slice(0, 4)}`);
   assert(manifest.materializations.d1.identityVersion === 1, 'Unicode correction must retain identity version 1');
-  assert(manifest.materializations.d1.migrations.length === (transformEight ? 5 : transformSeven ? 4 : 3)
+  assert(manifest.materializations.d1.migrations.length === (transformNine ? 6 : transformEight ? 5 : transformSeven ? 4 : 3)
     && manifest.materializations.d1.migrations[0].path === 'migrations/0001_initial_schema.sql'
     && manifest.materializations.d1.migrations[1].path === 'migrations/0002_ubs_parallel_passages.sql'
     && manifest.materializations.d1.migrations[2].path === 'migrations/0003_original_language_usage.sql'
     && (!transformSeven && !transformEight || manifest.materializations.d1.migrations[3].path === 'migrations/0004_ubs_hebrew_semantics.sql')
-    && (!transformEight || manifest.materializations.d1.migrations[4].path === 'migrations/0005_historical_section_identity_delivery.sql'),
+    && (!(transformEight || transformNine) || manifest.materializations.d1.migrations[4].path === 'migrations/0005_historical_section_identity_delivery.sql')
+    && (!transformNine || manifest.materializations.d1.migrations[5].path === 'migrations/0006_historical_source_packs.sql'),
   'Unicode correction must retain the reviewed migration set');
 
   if (sourceTransformVersion >= 6) {
@@ -101,7 +105,7 @@ export function buildFinalizedBiblicalLanguageUnicodeManifest(
     'Unicode provenance artifacts were not all refreshed');
   }
 
-  const transformVersion = sourceTransformVersion === 8 ? 8 : sourceTransformVersion === 7 ? 7 : sourceTransformVersion === 6 ? 6 : 5;
+  const transformVersion = sourceTransformVersion === 9 ? 9 : sourceTransformVersion === 8 ? 8 : sourceTransformVersion === 7 ? 7 : sourceTransformVersion === 6 ? 6 : 5;
   manifest.materializations.d1.transformVersion = transformVersion;
   const identity = computeD1CorpusIdentity(manifest);
   assert(identity === EXPECTED_IDENTITIES[transformVersion],

@@ -87,7 +87,8 @@ describe('Transform 8 ordered authority audit', () => {
       expect(sql).toHaveLength(26); // 25 complete-sidecar pages plus the parity sample.
       expect(sql.every(query => /^\s*SELECT\b/i.test(query))).toBe(true);
       expect(sql.every(query => !/\bOFFSET\b/i.test(query))).toBe(true);
-      expect(sql.filter(query => /historical_document_delivery_profiles/.test(query))).toHaveLength(1);
+      expect(sql.filter(query => /FROM historical_document_delivery_profiles/.test(query))).toHaveLength(1);
+      expect(sql.filter(query => /JOIN historical_document_delivery_profiles/.test(query))).toHaveLength(13); // 12 identity pages + sample
       expect(sql.filter(query => /historical_section_identities/.test(query))).toHaveLength(13); // 12 identity pages + sample.
       expect(sql.filter(query => /historical_section_aliases/.test(query))).toHaveLength(12);
       expect(sql.every(query => query.includes(`LIMIT ${HISTORICAL_TRANSFORM8_AUTHORITY_PAGE_SIZE}`)

@@ -16,6 +16,12 @@ const TABLE_QUERIES = {
   documents: 'SELECT * FROM documents ORDER BY id',
   document_sections: 'SELECT * FROM document_sections ORDER BY id',
   sections_fts: 'SELECT title, content, topics FROM sections_fts ORDER BY rowid',
+  historical_source_packs: 'SELECT * FROM historical_source_packs ORDER BY pack_id',
+  historical_works: 'SELECT * FROM historical_works ORDER BY work_id',
+  historical_editions: 'SELECT * FROM historical_editions ORDER BY edition_id',
+  historical_source_artifacts: 'SELECT * FROM historical_source_artifacts ORDER BY artifact_id',
+  historical_edition_sections: 'SELECT * FROM historical_edition_sections ORDER BY edition_id, source_ordinal',
+  historical_edition_sections_fts: 'SELECT edition_id, section_key, heading, content FROM historical_edition_sections_fts ORDER BY rowid',
   morph_codes: 'SELECT * FROM morph_codes ORDER BY code',
 } as const;
 
