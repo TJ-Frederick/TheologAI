@@ -81,7 +81,7 @@ describe('CCEL operator-secret staged release policy', () => {
     expect(() => assertReleaseConfig(releaseConfig)).not.toThrow();
     expect(() => assertWorkerConfig(workerConfig.replace('namespace_id = "361203"', 'namespace_id = "361201"')))
       .toThrow('namespace mismatch');
-    expect(() => assertWorkerConfig(workerConfig.replace('database_id = "0dab804f-8df0-4727-93bd-299612b6e179"', `database_id = "${baselineId}"`)))
+    expect(() => assertWorkerConfig(workerConfig.replace('database_id = "94c4938b-7800-4d68-9097-0df33c31fdc1"', `database_id = "${baselineId}"`)))
       .toThrow('D1 binding mismatch');
     expect(() => assertWorkerConfig(workerConfig.replace('THEOLOGAI_REQUEST_LOGS = "true"', 'THEOLOGAI_REQUEST_LOGS = "false"')))
       .toThrow('theologai-preview THEOLOGAI_REQUEST_LOGS mismatch');

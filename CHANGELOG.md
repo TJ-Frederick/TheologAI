@@ -11,26 +11,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Reconciled public release documentation through merged PR #83. PR #72
-  remains the
-  deployed Worker baseline: production serves Worker
-  `762485da-9e02-46a0-9777-e0d8743b9dbf`, preview serves Worker
-  `8ed4ad1a-f45f-4cdc-a6de-5358f59b6d44`, and the later behaviorally inert
-  repository merges through `93d5837b05249c15127ab20107f86443cccf4e1e` are
-  not remote deployments.
+- Reconciled release state after the preview-only PR #92 D1 cutover. Production
+  remains PR #72: Cloudflare deployment `a4697fd1-deda-4dae-a16c-635454218bc8`,
+  Worker `762485da-9e02-46a0-9777-e0d8743b9dbf`, and D1
+  `c6535a4a-1953-4279-b277-7368445fc61a`. The exact deployed and audited
+  preview source commit is `bb8ed4c8f025f697502a274986205f92bdf520b7` in
+  draft, unmerged PR #92: deployment
+  `44a0858f-75ba-497d-b84b-66c14253234a`, Worker
+  `2b540a47-0937-4c00-9d44-de1199e09e6c`, and D1
+  `94c4938b-7800-4d68-9097-0df33c31fdc1`. CI run `30011028739` and both
+  audits passed; its preview authorization was removed and it returned to
+  draft. Any later docs-only PR #92 head is not deployed. This did not deploy
+  production.
 
 - Completed the runtime-inert UBS Hebrew U3-T7 compiler, canonical
   native-to-normalized bridge, content-free reproducibility audit, embedded
   rights/provenance notice, and full-corpus integrity verification. The full
-  semantic artifact remains untracked. The local-only M4A follow-on completes
-  migration `0004`, transform 7, SQLite materialization, deterministic D1
-  seed/import verification, and inactive Node/D1 adapters. None is registered
-  in Worker or Node composition, present in remote D1, bound to a Worker,
-  exposed through MCP, or deployed to preview or production. `SOURCE.json`
-  remains the historical acquisition-gate snapshot rather than deployment
-  evidence. Draft-PR publication of M4A is owner-authorized but had not yet
-  occurred when this entry was authored; remote migration and deployment are
-  still unapproved.
+  semantic artifact remains untracked. M4A completes migration `0004`,
+  transform 7, SQLite materialization, deterministic D1 seed/import
+  verification, and inactive Node/D1 adapters. The exact preview release also
+  materializes migrations `0004` / transform 7 and `0005` / transform 8 in
+  its bound D1. Transform 7's UBS adapters remain runtime-inactive and do not
+  alter MCP output. Transform 8 is active in preview's historical repositories:
+  the existing `classic_text_lookup` has the Baltimore hard cut and
+  canonical/legacy resolution, changing preview output without adding a tool.
+  Production Worker and D1 lack both transforms. `SOURCE.json` remains the
+  historical acquisition-gate snapshot rather than deployment evidence;
+  production data release and any later UBS runtime activation remain separately
+  gated.
 
 - Clarified endpoint migration behavior: ordinary production `workers.dev`
   requests temporarily redirect to the canonical custom domain, while the
@@ -39,12 +47,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   primary-source v4/local-only schema; preview keeps the v5 discovery-only
   schema, with CCEL execution disabled in both environments.
 
-- Recorded that the acquired source packets remain inactive at runtime. M4A
-  adds UBS rows only to derived local SQLite and the deterministic local D1
-  seed; it adds no remote D1 rows or runtime/MCP surface. The remote release of
-  migration `0004`/transform 7, migration `0005`/transform 8, Norton transform
-  9, and subsequent edition transforms remain separately gated; remote
-  `0004`/transform 7 is the required predecessor of `0005`/transform 8.
+- Recorded that the acquired UBS source packet remains inactive at runtime:
+  preview D1 holds its `0004`/transform 7 materialization, but its adapters add
+  no runtime/MCP surface. Preview's separately materialized `0005`/transform 8
+  historical compatibility is active through the existing
+  `classic_text_lookup`, including Baltimore and canonical/legacy behavior;
+  this adds no tool. Production release of both transforms, Norton transform 9,
+  and subsequent edition transforms remain separately gated.
 
 - Retired the unreachable CCEL body reader while retaining the bounded,
   disabled discovery adapter. npm distribution remains unsupported and the

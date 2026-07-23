@@ -26,8 +26,8 @@ describe('custom-domain infrastructure contract', () => {
     expect(preview).toContain('workers_dev = true');
     expect(preview).toContain('{ pattern = "preview-mcp.theologai.xyz", custom_domain = true }');
     expect(preview).not.toContain('{ pattern = "mcp.theologai.xyz", custom_domain = true }');
-    expect(preview).toContain('database_name = "theologai-preview-20260714-a"');
-    expect(preview).toContain('database_id = "0dab804f-8df0-4727-93bd-299612b6e179"');
+    expect(preview).toContain('database_name = "theologai-preview-20260722-b"');
+    expect(preview).toContain('database_id = "94c4938b-7800-4d68-9097-0df33c31fdc1"');
     expect(preview).toContain('namespace_id = "361202"');
 
     for (const environment of [production, preview]) {
@@ -84,8 +84,23 @@ describe('custom-domain infrastructure contract', () => {
     expect(previewWorkflow).toContain('contains(github.event.pull_request.labels.*.name, \'deploy-preview\')');
     expect(previewWorkflow).toContain("if (!labels.includes('deploy-preview')) failures.push('the deploy-preview label is absent')");
     expect(previewWorkflow.match(/github\.rest\.pulls\.get/g)).toHaveLength(2);
+    const previewJob = previewWorkflow.slice(previewWorkflow.indexOf('  preview-deploy:'));
+    const previewCheckoutStart = previewJob.indexOf('- uses: actions/checkout@');
+    const previewCheckoutEnd = previewJob.indexOf('- uses: actions/setup-node@', previewCheckoutStart);
+    const previewCheckout = previewJob.slice(previewCheckoutStart, previewCheckoutEnd);
+    expect(previewCheckout).toContain('ref: ${{ github.event.pull_request.head.sha }}');
+    expect(previewCheckout).toContain('- name: Verify preview checkout identity');
+    expect(previewCheckout).toContain('EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}');
+    expect(previewCheckout).toContain('git rev-parse HEAD');
+    expect(previewCheckout).toContain('git rev-parse HEAD^{tree}');
+    expect(previewCheckout).toContain('Preview checkout does not match the authorized pull-request head');
+    expect(previewCheckout).toContain("printf 'commit=%s\\n' \"$checked_out_commit\" >> \"$GITHUB_OUTPUT\"");
+    expect(previewCheckout).toContain("printf 'tree=%s\\n' \"$checked_out_tree\" >> \"$GITHUB_OUTPUT\"");
     expect(previewWorkflow).toContain('**Canonical MCP Endpoint:** `https://preview-mcp.theologai.xyz/mcp`');
     expect(previewWorkflow).toContain('**Compatibility MCP endpoint:** `https://theologai-preview.tjfrederick.workers.dev/mcp`');
+    expect(previewWorkflow).toContain('CHECKED_OUT_COMMIT: ${{ steps.preview-checkout.outputs.commit }}');
+    expect(previewWorkflow).toContain('CHECKED_OUT_TREE: ${{ steps.preview-checkout.outputs.tree }}');
+    expect(previewWorkflow).toContain('Deployed from checked-out commit \\`${commit}\\` (tree \\`${tree}\\`).');
   });
 
   it('keeps fallback origin behavior on the legacy Pages site during the staged cutover', () => {

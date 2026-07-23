@@ -45,25 +45,36 @@ Remote MCP client configuration:
 }
 ```
 
-Use the preview URL only for explicitly authorized release testing. The current
-known-good remote baseline is PR #72: production Worker
-`762485da-9e02-46a0-9777-e0d8743b9dbf` and preview Worker
-`8ed4ad1a-f45f-4cdc-a6de-5358f59b6d44`. The later repository changes through
-merged PR #83 (`93d5837b05249c15127ab20107f86443cccf4e1e`) are repository-only
-and have not been deployed. For a preview-client rollback without changing
-server state, use the direct preview
+Use the preview URL only for explicitly authorized release testing. Production
+remains the PR #72 known-good baseline: Cloudflare deployment
+`a4697fd1-deda-4dae-a16c-635454218bc8`, Worker
+`762485da-9e02-46a0-9777-e0d8743b9dbf`, and D1
+`theologai-production-20260715-a`
+(`c6535a4a-1953-4279-b277-7368445fc61a`). Separately, the exact deployed and
+audited preview source commit is `bb8ed4c8f025f697502a274986205f92bdf520b7`
+in unmerged draft PR #92; it is deployed to preview only:
+Cloudflare deployment `44a0858f-75ba-497d-b84b-66c14253234a`, Worker
+`2b540a47-0937-4c00-9d44-de1199e09e6c`, and D1
+`theologai-preview-20260722-b`
+(`94c4938b-7800-4d68-9097-0df33c31fdc1`). Its CI run `30011028739` and
+preview audits passed (22/22 cases and 59/59 checks; 48/48 rate-counted
+requests across 11 aggregate groups). The `deploy-preview` authorization was
+then removed and PR #92 returned to draft; it is not a production deployment.
+Any later docs-only PR #92 head is not deployed.
+For a preview-client rollback without changing server state, use the direct preview
 `workers.dev` address above; the production `workers.dev` address intentionally
 redirects rather than serving a separate legacy Worker.
 
-The subsequent UBS Hebrew M4A slice is local-only and inactive: it completes
-migration `0004`, transform 7, local SQLite materialization, deterministic D1
-seed/import verification, and inactive Node/D1 adapters. It is absent from
-both composition roots, remote D1 databases, Worker bindings, preview,
-production, and MCP output. The pinned packet's `SOURCE.json` remains a
-historical acquisition-gate snapshot, not deployment evidence.
-The owner has authorized this M4A branch for draft-PR publication, but at the
-time of this document update it has not yet been published; that authorization
-does not authorize remote D1 work or deployment.
+The preview-only data layer has migration `0004` / transform 7 and migration
+`0005` / transform 8 materialized in its bound D1. Transform 7's UBS adapters
+remain runtime-inactive: they register no new MCP surface or output. Transform
+8 is active in preview's historical repositories: the existing
+`classic_text_lookup` has the Baltimore hard cut and canonical/legacy
+resolution. That adds no new tool, but it does change preview output.
+Production lacks both migrations, materialized rows, and this Transform-8
+behavior; a production D1 release and any later UBS runtime activation remain
+separately gated. The pinned packet's `SOURCE.json` remains a historical
+acquisition-gate snapshot, not deployment evidence.
 
 ## MCP capabilities
 
@@ -253,32 +264,33 @@ catechisms. The exact count is enforced by `data/data-manifest.json`.
 
 Approved UBS Hebrew and public-domain historical-source packets are checked
 into the repository for deterministic verification and future release work.
-M4A now materializes the UBS source pair in the derived local SQLite database
-and deterministic local D1 seed only. Those rows remain absent from remote D1,
-both composition roots, MCP resources, and current tool output. The historical
-source packets remain outside the local and remote 17-work catalog and current
-tool output. U3-T7 provides the in-memory semantic compiler,
-native-to-normalized coordinate bridge, and content-free compilation audit;
-M4A adds local migration `0004` / transform 7, capacity verification, seed
-verification, and inactive adapters. Draft-PR publication of M4A is authorized
-but had not occurred when this text was authored. Any remote migration,
-binding, runtime activation, preview, or production change remains separately
-gated. Historical compatibility migration `0005` / transform 8 follows that
-remote data-layer gate. Norton is a later transform-9,
+M4A materializes the UBS source pair in derived local SQLite, deterministic
+D1 seed, and the preview-only D1. Transform 7's UBS adapters remain inactive
+at runtime. Transform 8 is separately active in preview's historical
+repositories: the existing `classic_text_lookup` exposes the Baltimore hard
+cut and canonical/legacy resolution, changing preview output without adding a
+tool. Production lacks both migrations, materializations, and Transform-8
+behavior. The historical source packets remain outside the local and remote
+17-work catalog and current tool output. U3-T7 provides the in-memory semantic
+compiler, native-to-normalized coordinate bridge, and content-free compilation
+audit; M4A provides capacity and seed verification with inactive adapters. Any
+production migration, binding, or UBS runtime activation remains separately
+gated. Norton is a later transform-9,
 `sectioned_only` candidate. Cyril remains blocked with zero output pending
 reliable translator attribution.
 
-The production tools search and retrieve only the locally indexed collection.
-They do **not** currently fetch CCEL search results or document bodies. This
-unpublished Transform-8 runtime changes the configured public primary-source
-profiles to v6 local-only and v7 CCEL-discovery shape; it does not claim that a
-remote Worker has that code. A separately configured v7 preview may advertise
-external CCEL discovery inputs and guided workflows. In either configuration,
-live search and coordinator execution remain disabled; external preview queries
-therefore return a disabled provider result before adapter
-invocation, Durable Object lookup/RPC, or fetch. MCP clients should reconnect
-and reinitialize after any endpoint/profile change because tool and prompt schemas
-may be cached for an existing connection.
+Production tools search and retrieve only the locally indexed collection and
+do **not** currently fetch CCEL search results or document bodies. The deployed
+preview source contains Transform-8 code with active historical compatibility:
+its existing `classic_text_lookup` provides the Baltimore hard cut and
+canonical/legacy resolution. This changes preview output without adding a new
+tool. Preview retains the v5 CCEL-discovery profile; live search and coordinator execution remain disabled.
+External preview queries return a disabled provider result before adapter invocation.
+That occurs before Durable Object lookup/RPC, or fetch. Production has neither
+the Transform-8 materialization nor behavior.
+The checked-in v6/v7 profile candidate remains unpublished. MCP clients should
+reconnect and reinitialize after any endpoint/profile change because tool and
+prompt schemas may be cached for an existing connection.
 
 The retained `CcelSearchAdapter` remains in the codebase as bounded future
 provider architecture.
@@ -471,8 +483,9 @@ per-request D1 repositories. Both targets share one MCP registry.
   after the PR #10 production baseline.
 - Live CCEL discovery and search remain gated future work; the checked-in,
   unpublished candidate exposes only the non-executing v7 contract while its
-  local production profile remains v6/local-only. The deployed PR #72 baseline
-  remains preview v5 and production v4/local-only.
+  local production profile remains v6/local-only. The current preview-only
+  PR #92 deployment remains v5/discovery-only, while production remains
+  PR #72 v4/local-only.
   The legacy CCEL body reader is retired; the retained discovery adapter is
   bounded, does not fetch until separately authorized, and must never become
   CCEL body mirroring or republication.
