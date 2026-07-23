@@ -72,10 +72,12 @@ deployment comment:
 Do not substitute an historical deployment identifier for this record. If the
 planned predecessor is not yet released or has not passed its audit, capture
 the actual approved predecessor immediately before release and stop if it is
-not a suitable rollback target. The production D1 remains
-`theologai-production-20260715-a`
-(`c6535a4a-1953-4279-b277-7368445fc61a`), rate namespace `361201` at 120/60,
-and CCEL flags `000` unless a separately reviewed release changes one of them.
+not a suitable rollback target. At this document's current baseline, the
+production D1 is `theologai-production-20260723-a`
+(`3f7faa0e-689f-47aa-a601-dc662db9a6cf`), rate namespace `361201` at 120/60,
+and CCEL flags `000`. Re-read `wrangler.toml` and the protected deployment
+record at release time and record their confirmed binding instead if it has
+changed under a separately reviewed release.
 
 A preview deployment necessarily creates a new Worker version. Record that
 version and the reviewed binding current at execution; as of this record the
@@ -179,9 +181,11 @@ Only after preview and the website pass:
 3. Wait for active custom-domain and certificate status.
 4. Run the same fresh-session MCP, CORS, OPTIONS, representative-tool,
    under-budget rate, and isolation checks used for preview.
-5. Confirm production reaches only Worker `theologai`, production D1
-   `theologai-production-20260715-a`, rate namespace `361201`, and CCEL state
-   `000`; confirm preview retains its distinct bindings and state.
+5. Confirm production reaches only Worker `theologai`, the production D1
+   recorded in the release-time known-good baseline (currently
+   `theologai-production-20260723-a` / `3f7faa0e-689f-47aa-a601-dc662db9a6cf`),
+   rate namespace `361201`, and CCEL state `000`; confirm preview retains its
+   distinct bindings and state.
 6. Smoke-test the production `workers.dev` compatibility alias and record exact
    post-migration Worker/Pages versions, DNS/custom-domain state, audit counts,
    and remaining risks.
