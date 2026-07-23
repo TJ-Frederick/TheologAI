@@ -33,6 +33,7 @@ import {
   verifyD1Migrations,
   type DataManifest,
 } from './d1-corpus-identity.js';
+import { D1_SEED_BASE_TABLES, D1_SEED_EXPORT_ORDER } from './d1-seed-order.js';
 
 interface SeedStatement {
   sql: string;
@@ -52,41 +53,6 @@ interface SeedFile {
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUTPUT = join(ROOT, 'scripts', 'd1-seed');
 const SOURCE_MANIFEST_PATH = join(ROOT, 'data', 'data-manifest.json');
-const BASE_TABLES = [
-  'theologai_metadata',
-  'morph_codes',
-  'documents',
-  'document_sections',
-  'historical_document_delivery_profiles',
-  'historical_section_identities',
-  'historical_section_aliases',
-  'historical_source_packs',
-  'historical_works',
-  'historical_editions',
-  'historical_source_artifacts',
-  'historical_edition_sections',
-  'strongs',
-  'stepbible_lexicons',
-  'cross_references',
-  'morphology',
-  'strongs_usage_stats',
-  'strongs_book_stats',
-  'strongs_form_stats',
-  'ubs_parallel_sources',
-  'ubs_parallel_groups',
-  'ubs_parallel_members',
-  'ubs_parallel_segments',
-  'ubs_semantic_artifacts',
-  'ubs_semantic_sources',
-  'ubs_semantic_domains',
-  'ubs_semantic_entries',
-  'ubs_semantic_entry_identities',
-  'ubs_semantic_senses',
-  'ubs_semantic_sense_domains',
-  'ubs_semantic_reference_evidence',
-  'ubs_semantic_normalized_coordinates',
-] as const;
-const EXPORT_ORDER = [...BASE_TABLES, 'fts'] as const;
 const CONTENT_CHARS_PER_STATEMENT = 10_000;
 
 function parseArguments(argv: string[]): { database: string; clean: boolean } {
@@ -286,7 +252,7 @@ function exportTable(database: string, table: string): SeedStatement[] {
 }
 
 function emptyTargetGuard(): SeedStatement {
-  const counts = [...BASE_TABLES, 'strongs_fts', 'sections_fts', 'historical_edition_sections_fts']
+  const counts = [...D1_SEED_BASE_TABLES, 'strongs_fts', 'sections_fts', 'historical_edition_sections_fts']
     .map(table => `(SELECT count(*) FROM ${sqlIdentifier(table)})`)
     .join(' + ');
   return {
@@ -338,7 +304,7 @@ verifyD1Migrations(ROOT, sourceManifest);
 validateCanonicalSources(sourceManifest);
 assertSemanticSource(database);
 
-for (const table of [...BASE_TABLES, 'strongs_fts', 'sections_fts', 'historical_edition_sections_fts']) {
+for (const table of [...D1_SEED_BASE_TABLES, 'strongs_fts', 'sections_fts', 'historical_edition_sections_fts']) {
   const expected = sourceManifest.expectedCounts[table];
   if (!Number.isSafeInteger(expected) || expected < 0) {
     throw new Error(`Source manifest has no valid expected count for ${table}`);
@@ -353,8 +319,8 @@ prepareOutput(clean);
 const files: SeedFile[] = [];
 files.push(...writeChunks('empty-target-check', 0, [emptyTargetGuard()]));
 
-for (let index = 0; index < BASE_TABLES.length; index++) {
-  const table = BASE_TABLES[index];
+for (let index = 0; index < D1_SEED_BASE_TABLES.length; index++) {
+  const table = D1_SEED_BASE_TABLES[index];
   console.error(`[d1-seed] Exporting ${table}...`);
   const statements = exportTable(database, table);
   const rows = statements.reduce((sum, statement) => sum + statement.rows, 0);
@@ -378,7 +344,7 @@ const ftsStatements: SeedStatement[] = [
     rows: sourceManifest.expectedCounts.historical_edition_sections_fts,
   },
 ];
-files.push(...writeChunks('fts', EXPORT_ORDER.length, ftsStatements));
+files.push(...writeChunks('fts', D1_SEED_EXPORT_ORDER.length, ftsStatements));
 
 for (const file of files) {
   const sql = readFileSync(join(OUTPUT, file.path), 'utf8');
@@ -412,9 +378,9 @@ const seedManifest = {
     maximumStatementBytes: D1_MAX_STATEMENT_BYTES,
     targetFileBytes: D1_SEED_FILE_BYTES,
   },
-  tableOrder: EXPORT_ORDER,
+  tableOrder: D1_SEED_EXPORT_ORDER,
   expectedCounts: Object.fromEntries(
-    [...BASE_TABLES, 'strongs_fts', 'sections_fts', 'historical_edition_sections_fts'].map(table => [table, sourceManifest.expectedCounts[table]]),
+    [...D1_SEED_BASE_TABLES, 'strongs_fts', 'sections_fts', 'historical_edition_sections_fts'].map(table => [table, sourceManifest.expectedCounts[table]]),
   ),
   files,
   totals: {
