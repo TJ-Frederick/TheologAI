@@ -7,6 +7,7 @@ import { buildLocalDocumentResourceUri } from '../kernel/documentResource.js';
 import { LOCAL_PRIMARY_SOURCE_ATTRIBUTION } from '../services/historical/primarySourceTypes.js';
 import { CLASSIC_TEXT_LIMITS } from '../kernel/classicTextContract.js';
 import { HISTORICAL_SECTIONED_ONLY_LANDING_MAX_BYTES } from '../kernel/historicalSectionedDelivery.js';
+import { escapeFrozenEditionSectionContentForMarkdown } from '../kernel/editionProvenanceFoundation.js';
 
 /** Provenance label for documents bundled with the server. No edition is implied. */
 export const LOCAL_HISTORICAL_SOURCE = LOCAL_PRIMARY_SOURCE_ATTRIBUTION;
@@ -29,7 +30,7 @@ function editionReadinessDisclosure(doc: DocumentInfo): string {
   return [
     '## Edition and provenance disclosure',
     '',
-    `This exact section is a reviewed normalized transcription from source pack \`${edition.sourcePackId}\`.`,
+    `This section is a reviewed edition-aligned normalized transcription from source pack \`${edition.sourcePackId}\`.`,
     `- Edition: ${edition.publication} (version ${edition.version}; ${edition.language}).`,
     `- Provenance review: ${edition.provenance.status.replaceAll('_', ' ')} (reviewed ${edition.provenance.reviewedAt}).`,
     `- Normalized public-domain text rights: ${edition.normalizedTextRights.status.replaceAll('_', ' ')} (reviewed ${edition.normalizedTextRights.reviewedAt}).`,
@@ -62,7 +63,9 @@ export function formatLocalDocumentSectionResourceWithIdentity(
     '',
     heading,
     '',
-    section.content,
+    doc.editionProvenance
+      ? escapeFrozenEditionSectionContentForMarkdown(section.content)
+      : section.content,
     ...(identity ? [
       '',
       '## Canonical section identity',
@@ -98,7 +101,7 @@ export function formatSectionedDocumentLanding(doc: DocumentInfo, profile: Histo
       '',
       '## Edition and provenance disclosure',
       '',
-      `This work is a reviewed normalized transcription from source pack \`${doc.editionProvenance.sourcePackId}\`.`,
+      `This work is a reviewed edition-aligned normalized transcription from source pack \`${doc.editionProvenance.sourcePackId}\`.`,
       `Edition: ${doc.editionProvenance.publication} (version ${doc.editionProvenance.version}; ${doc.editionProvenance.language}).`,
       'Only normalized public-domain text is delivered; source scan artifacts are not redistributed.',
     ] : []),

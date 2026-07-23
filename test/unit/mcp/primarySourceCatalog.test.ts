@@ -19,8 +19,7 @@ describe('primary-source catalog', () => {
     }]);
 
     expect(catalog.policies).toMatchObject({
-      editionReadinessScope: 'legacy_documents_only',
-      editionProvenance: 'mixed_legacy_and_exact_source_packs',
+      editionProvenance: 'reviewed_source_packs',
     });
     expect(catalog.works[0]).toMatchObject({
       editionReadiness: { editionIdentity: 'established', provenance: 'verified' },

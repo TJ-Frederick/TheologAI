@@ -3,7 +3,7 @@
   "sectionKeyPolicy": "frozen_reviewed_v1",
   "contentFormat": "plain_text",
   "work": {
-    "workId": "wesley-standard-sermons-1771",
+    "workId": "wesley-standard-sermons",
     "title": "Sermons on Several Occasions, I–LIII",
     "creatorMetadataStatus": "reviewed",
     "creators": [
@@ -15,7 +15,7 @@
   },
   "edition": {
     "editionId": "wesley-standard-sermons-1771",
-    "workId": "wesley-standard-sermons-1771",
+    "workId": "wesley-standard-sermons",
     "language": "en",
     "contributorGroups": {
       "translation": {
@@ -45,8 +45,8 @@
     },
     "underlyingWorkRights": {
       "status": "public_domain",
-      "basis": "1771 original English text; Wesley died 1791; authority scans are recorded and no contrary ownership or license evidence is known.",
-      "jurisdiction": "US, UK, EU, Canada, and Australia",
+      "basis": "1771 original English text; Wesley died 1791; authority scans are recorded and no contrary ownership or license evidence is known. This determination is scoped to the United States.",
+      "jurisdiction": "United States",
       "evidenceInstrument": {
         "instrumentId": "historical-term-guidance",
         "kind": "public_domain_statement",

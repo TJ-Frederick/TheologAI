@@ -3,7 +3,7 @@
   "sectionKeyPolicy": "frozen_reviewed_v1",
   "contentFormat": "plain_text",
   "work": {
-    "workId": "calvin-institutes-beveridge-1845",
+    "workId": "calvin-institutes",
     "title": "Institutes of the Christian Religion",
     "creatorMetadataStatus": "reviewed",
     "creators": [
@@ -15,7 +15,7 @@
   },
   "edition": {
     "editionId": "calvin-institutes-beveridge-1845",
-    "workId": "calvin-institutes-beveridge-1845",
+    "workId": "calvin-institutes",
     "language": "en",
     "contributorGroups": {
       "translation": {
@@ -50,8 +50,8 @@
     },
     "underlyingWorkRights": {
       "status": "public_domain",
-      "basis": "1845–46 translation; Beveridge died 1863; exact scans are recorded and no contrary ownership or license evidence is known.",
-      "jurisdiction": "US, UK, EU, Canada, and Australia",
+      "basis": "1845–46 translation; Beveridge died 1863; exact scans are recorded and no contrary ownership or license evidence is known. This determination is scoped to the United States.",
+      "jurisdiction": "United States",
       "evidenceInstrument": {
         "instrumentId": "historical-term-guidance",
         "kind": "public_domain_statement",

@@ -7,7 +7,7 @@
     {
       "id": "anselm-proslogion-deane-1903",
       "sourcePath": "editions/anselm-proslogion-deane-1903.json",
-      "packageSha256": "dea2eaee6aa63e856e30c8be867ea253057a5cd90c2bfea4e9055c1bef4e23e6",
+      "packageSha256": "47b63d6a2d82d6a91106b78f1f3ad30eef829c49b639acca3d1c72aeb20447a4",
       "normalizedTextRights": {
         "status": "no_known_conflict",
         "scope": "normalized_public_domain_text_only",
@@ -31,12 +31,26 @@
           "bytes": 670027,
           "acquiredAt": "2026-07-23T10:30:00.000Z"
         }
-      ]
+      ],
+      "catalog": {
+        "composition": {
+          "label": "composed 1077–1078",
+          "startYear": 1077,
+          "endYear": 1078
+        },
+        "compositionProvenanceSources": [
+          {
+            "sourceId": "hist-meta-anselm-sep",
+            "label": "Stanford Encyclopedia of Philosophy: Anselm",
+            "url": "https://plato.stanford.edu/archives/spr2022/entries/anselm/"
+          }
+        ]
+      }
     },
     {
       "id": "athanasius-on-incarnation-robertson-npnf2-v4",
       "sourcePath": "editions/athanasius-on-incarnation-robertson-npnf2-v4.json",
-      "packageSha256": "f22f5fce823041115da0464f2e1f491d1940c59903aad5dcdb9af4eb5a5cedf5",
+      "packageSha256": "b18788d377d5fae952748f3b801eb46922cd3dc92eb052d4fa0d1d5a0a1ec509",
       "normalizedTextRights": {
         "status": "no_known_conflict",
         "scope": "normalized_public_domain_text_only",
@@ -60,12 +74,31 @@
           "bytes": 5809854,
           "acquiredAt": "2026-07-23T09:24:00.000Z"
         }
-      ]
+      ],
+      "catalog": {
+        "composition": {
+          "label": "composition disputed, c. 318–337",
+          "startYear": 318,
+          "endYear": 337
+        },
+        "compositionProvenanceSources": [
+          {
+            "sourceId": "hist-meta-athanasius-cambridge",
+            "label": "Cambridge Edition of Early Christian Writings: Athanasius",
+            "url": "https://www.cambridge.org/core/books/abs/cambridge-edition-of-early-christian-writings/athanasius-of-alexandria-christological-letters-to-epictetus-adelphius-and-maximus/EFCEBBC7D51CC39BCAC4D65A4967C6C6"
+          },
+          {
+            "sourceId": "hist-meta-athanasius-tandfonline",
+            "label": "Modern scholarly discussion of Athanasian chronology",
+            "url": "https://www.tandfonline.com/doi/full/10.1080/21692327.2025.2564801"
+          }
+        ]
+      }
     },
     {
       "id": "augustine-confessions-pusey-1838",
       "sourcePath": "editions/augustine-confessions-pusey-1838.json",
-      "packageSha256": "59d9364ff3a3a6804e25741d1fe257a7a9a81ab34cd04c1b549451385a901858",
+      "packageSha256": "66d7fa61e250086e28335aff43596c00d571e0156c399924af64c6271a0efcab",
       "normalizedTextRights": {
         "status": "no_known_conflict",
         "scope": "normalized_public_domain_text_only",
@@ -89,12 +122,26 @@
           "bytes": 632167,
           "acquiredAt": "2026-07-22T19:29:11.000Z"
         }
-      ]
+      ],
+      "catalog": {
+        "composition": {
+          "label": "composed c. 396–400",
+          "startYear": 396,
+          "endYear": 400
+        },
+        "compositionProvenanceSources": [
+          {
+            "sourceId": "hist-meta-augustine-sep",
+            "label": "Stanford Encyclopedia of Philosophy: Augustine",
+            "url": "https://plato.stanford.edu/entries/augustine/"
+          }
+        ]
+      }
     },
     {
       "id": "bunyan-pilgrims-progress-part-1",
       "sourcePath": "editions/bunyan-pilgrims-progress-part-1.json",
-      "packageSha256": "6654892c27c45de992db9bdbf3528f4d405cbd332eb43dd762df85a8da2b4311",
+      "packageSha256": "0a45e9107fb966179835194fea894c880669d572f73d75b0c91c1b287293e137",
       "normalizedTextRights": {
         "status": "no_known_conflict",
         "scope": "normalized_public_domain_text_only",
@@ -118,12 +165,31 @@
           "bytes": 331509,
           "acquiredAt": "2026-07-22T19:29:11.000Z"
         }
-      ]
+      ],
+      "catalog": {
+        "composition": {
+          "label": "composition date disputed; drafted during imprisonment(s), completed by 1677, published 1678",
+          "startYear": 1660,
+          "endYear": 1678
+        },
+        "compositionProvenanceSources": [
+          {
+            "sourceId": "hist-meta-bunyan-bedford",
+            "label": "Bedfordshire historical Bunyan timeline",
+            "url": "https://virtual-library.culturalservices.net/webingres/bedfordshire/vlib/0.digitised_resources/bunyan_digitisation_timeline.htm"
+          },
+          {
+            "sourceId": "hist-meta-bunyan-cambridge",
+            "label": "Cambridge: The Pilgrim’s Progress and the Line of Allegory",
+            "url": "https://www.cambridge.org/core/services/aop-cambridge-core/content/view/BEA4D8DB7D162658402A9439DE5F960C/9780511777523c06_p80-94_CBO.pdf/the-pilgrims-progress-and-the-line-of-allegory.pdf"
+          }
+        ]
+      }
     },
     {
       "id": "calvin-institutes-beveridge-1845",
       "sourcePath": "editions/calvin-institutes-beveridge-1845.json",
-      "packageSha256": "54ea3ebd57c823983834cba86596745a785ae445351d25483517286d0b94f16c",
+      "packageSha256": "943e9b8c817ae6c3f665b998ca36a4d52149474706f94630e3bb339229822e91",
       "normalizedTextRights": {
         "status": "no_known_conflict",
         "scope": "normalized_public_domain_text_only",
@@ -171,12 +237,26 @@
           "bytes": 4979278,
           "acquiredAt": "2026-07-23T09:24:00.000Z"
         }
-      ]
+      ],
+      "catalog": {
+        "composition": {
+          "label": "first edition 1536; revised through definitive Latin edition 1559",
+          "startYear": 1536,
+          "endYear": 1559
+        },
+        "compositionProvenanceSources": [
+          {
+            "sourceId": "hist-meta-calvin-bnf",
+            "label": "Bibliothèque nationale de France: Institutes of the Christian Religion",
+            "url": "https://catalogue.bnf.fr/ark:/12148/cb11963198n"
+          }
+        ]
+      }
     },
     {
       "id": "irenaeus-against-heresies-anf1-1885",
       "sourcePath": "editions/irenaeus-against-heresies-anf1-1885.json",
-      "packageSha256": "f8039c8627ea7d20076bfcb4d899cbe63f45cee242d04dcd418420c4506adab9",
+      "packageSha256": "eaa287654119412bb268b02f4703e7d7091834e9b41dda4a3e18c6fbef114ed5",
       "normalizedTextRights": {
         "status": "no_known_conflict",
         "scope": "normalized_public_domain_text_only",
@@ -200,12 +280,26 @@
           "bytes": 4511814,
           "acquiredAt": "2026-07-23T09:24:00.000Z"
         }
-      ]
+      ],
+      "catalog": {
+        "composition": {
+          "label": "composition disputed, c. 180–189",
+          "startYear": 180,
+          "endYear": 189
+        },
+        "compositionProvenanceSources": [
+          {
+            "sourceId": "hist-meta-irenaeus-cambridge",
+            "label": "Cambridge: Irenaeus chronology",
+            "url": "https://assets.cambridge.org/97811070/62030/frontmatter/9781107062030_frontmatter.pdf"
+          }
+        ]
+      }
     },
     {
       "id": "john-damascene-exposition-salmond-npnf2-v9",
       "sourcePath": "editions/john-damascene-exposition-salmond-npnf2-v9.json",
-      "packageSha256": "1d8c9ecec001e479334d379c9e8397e6bc304c5e1be2d41e1dda20b0a83cc267",
+      "packageSha256": "0167dab9a5bf66607fb4160e9bf0db8a235bacbcb5aa40c27a16b333c1a5c976",
       "normalizedTextRights": {
         "status": "no_known_conflict",
         "scope": "normalized_public_domain_text_only",
@@ -229,12 +323,26 @@
           "bytes": 3088610,
           "acquiredAt": "2026-07-23T09:24:00.000Z"
         }
-      ]
+      ],
+      "catalog": {
+        "composition": {
+          "label": "late-life composition/revision of the Fount, c. 728–749; exact part date uncertain",
+          "startYear": 728,
+          "endYear": 749
+        },
+        "compositionProvenanceSources": [
+          {
+            "sourceId": "hist-meta-damascene-encyclopedia",
+            "label": "Encyclopedia.com: John of Damascus",
+            "url": "https://www.encyclopedia.com/environment/encyclopedias-almanacs-transcripts-and-maps/john-damascus"
+          }
+        ]
+      }
     },
     {
       "id": "wesley-standard-sermons-1771",
       "sourcePath": "editions/wesley-standard-sermons-1771.json",
-      "packageSha256": "13eea0d3ce1fc7c5009dfc260df40c4516c94595a80bc580dd3ca7858389f173",
+      "packageSha256": "033df1844d1fb4009296b8739b84d26f087b3affb10b74fe1f6ebd8470542635",
       "normalizedTextRights": {
         "status": "no_known_conflict",
         "scope": "normalized_public_domain_text_only",
@@ -306,7 +414,26 @@
           "bytes": 516421,
           "acquiredAt": "2026-07-22T19:29:11.000Z"
         }
-      ]
+      ],
+      "catalog": {
+        "composition": {
+          "label": "sermons published/assembled 1746–1771; 53-sermon arrangement in 1770–1771 Works",
+          "startYear": 1746,
+          "endYear": 1771
+        },
+        "compositionProvenanceSources": [
+          {
+            "sourceId": "hist-meta-wesley-dmbi",
+            "label": "Dictionary of Methodism in Britain and Ireland: Wesley",
+            "url": "https://dmbi.online/index.php?do=app.entry&id=2439"
+          },
+          {
+            "sourceId": "hist-meta-wesley-pitts",
+            "label": "Pitts Theology Library digital collection: Wesley Works",
+            "url": "https://digital.pitts.emory.edu/s/digital-collections/item/13569"
+          }
+        ]
+      }
     }
   ]
 }

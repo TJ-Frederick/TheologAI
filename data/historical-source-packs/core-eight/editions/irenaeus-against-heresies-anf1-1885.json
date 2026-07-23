@@ -3,7 +3,7 @@
   "sectionKeyPolicy": "frozen_reviewed_v1",
   "contentFormat": "plain_text",
   "work": {
-    "workId": "irenaeus-against-heresies-anf1-1885",
+    "workId": "irenaeus-against-heresies",
     "title": "Against Heresies",
     "creatorMetadataStatus": "reviewed",
     "creators": [
@@ -15,7 +15,7 @@
   },
   "edition": {
     "editionId": "irenaeus-against-heresies-anf1-1885",
-    "workId": "irenaeus-against-heresies-anf1-1885",
+    "workId": "irenaeus-against-heresies",
     "language": "en",
     "contributorGroups": {
       "translation": {
@@ -45,8 +45,8 @@
     },
     "underlyingWorkRights": {
       "status": "public_domain",
-      "basis": "1885 historical ANF edition; named translator record is mixed at volume/work level; exact scan is recorded and no contrary ownership or license evidence is known.",
-      "jurisdiction": "US, UK, EU, Canada, and Australia",
+      "basis": "1885 historical ANF edition; named translator record is mixed at volume/work level; exact scan is recorded and no contrary ownership or license evidence is known. This determination is scoped to the United States.",
+      "jurisdiction": "United States",
       "evidenceInstrument": {
         "instrumentId": "historical-term-guidance",
         "kind": "public_domain_statement",

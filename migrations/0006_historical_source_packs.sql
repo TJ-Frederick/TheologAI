@@ -16,7 +16,6 @@ CREATE TABLE historical_source_packs (
 
 CREATE TABLE historical_works (
   work_id TEXT PRIMARY KEY,
-  pack_id TEXT NOT NULL REFERENCES historical_source_packs(pack_id) ON DELETE RESTRICT,
   title TEXT NOT NULL,
   creator_metadata_status TEXT NOT NULL,
   creators_json TEXT NOT NULL CHECK (json_valid(creators_json) AND json_type(creators_json) = 'array')
@@ -24,7 +23,7 @@ CREATE TABLE historical_works (
 
 CREATE TABLE historical_editions (
   edition_id TEXT PRIMARY KEY,
-  work_id TEXT NOT NULL UNIQUE REFERENCES historical_works(work_id) ON DELETE RESTRICT,
+  work_id TEXT NOT NULL REFERENCES historical_works(work_id) ON DELETE RESTRICT,
   pack_id TEXT NOT NULL REFERENCES historical_source_packs(pack_id) ON DELETE RESTRICT,
   language TEXT NOT NULL,
   contributor_groups_json TEXT NOT NULL CHECK (json_valid(contributor_groups_json) AND json_type(contributor_groups_json) = 'object'),
@@ -69,11 +68,30 @@ CREATE VIRTUAL TABLE historical_edition_sections_fts USING fts5(
   content
 );
 
-CREATE INDEX idx_historical_works_pack
-  ON historical_works(pack_id, work_id);
+CREATE INDEX idx_historical_editions_work
+  ON historical_editions(work_id, edition_id);
 CREATE INDEX idx_historical_editions_pack
   ON historical_editions(pack_id, work_id);
 CREATE INDEX idx_historical_source_artifacts_edition
   ON historical_source_artifacts(edition_id, artifact_id);
 CREATE INDEX idx_historical_edition_sections_order
   ON historical_edition_sections(edition_id, source_ordinal);
+
+-- A currently active source-pack document is exactly one selected edition for
+-- its stable work identity.  Future editions may coexist in historical_editions
+-- without silently becoming another active projection.
+CREATE TRIGGER historical_sectioned_profile_requires_matching_edition
+BEFORE INSERT ON historical_document_delivery_profiles
+WHEN NEW.delivery_mode = 'sectioned_only'
+ AND (
+   NEW.document_id != NEW.work_id
+   OR NEW.work_id IS NULL
+   OR NEW.edition_id IS NULL
+   OR NOT EXISTS (
+     SELECT 1 FROM historical_editions
+     WHERE edition_id = NEW.edition_id AND work_id = NEW.work_id
+   )
+ )
+BEGIN
+  SELECT RAISE(ABORT, 'sectioned delivery profile must select one matching edition for its work');
+END;

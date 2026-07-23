@@ -3,7 +3,7 @@
   "sectionKeyPolicy": "frozen_reviewed_v1",
   "contentFormat": "plain_text",
   "work": {
-    "workId": "anselm-proslogion-deane-1903",
+    "workId": "anselm-proslogion",
     "title": "Proslogion",
     "creatorMetadataStatus": "reviewed",
     "creators": [
@@ -15,7 +15,7 @@
   },
   "edition": {
     "editionId": "anselm-proslogion-deane-1903",
-    "workId": "anselm-proslogion-deane-1903",
+    "workId": "anselm-proslogion",
     "language": "en",
     "contributorGroups": {
       "translation": {
@@ -50,8 +50,8 @@
     },
     "underlyingWorkRights": {
       "status": "public_domain",
-      "basis": "1903 historical translation; Sidney Norton Deane (1878–1943); exact scan is recorded and no contrary ownership or license evidence is known.",
-      "jurisdiction": "US, UK, EU, Canada, and Australia",
+      "basis": "1903 historical translation; Sidney Norton Deane (1878–1943); exact scan is recorded and no contrary ownership or license evidence is known. This determination is scoped to the United States.",
+      "jurisdiction": "United States",
       "evidenceInstrument": {
         "instrumentId": "historical-term-guidance",
         "kind": "public_domain_statement",

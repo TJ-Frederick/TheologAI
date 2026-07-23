@@ -14,7 +14,20 @@ import {
 const sha256 = (value: string) => createHash('sha256').update(value).digest('hex');
 
 function manifestFiles(directory: string, manifest: unknown, editions: Record<string, unknown>): Map<string, string> {
-  const manifestBytes = JSON.stringify(manifest);
+  const withCatalog = structuredClone(manifest) as {
+    members?: Array<Record<string, unknown>>;
+  };
+  for (const member of withCatalog.members ?? []) {
+    member.catalog ??= {
+      composition: { label: 'Test-only composition date unknown.' },
+      compositionProvenanceSources: [{
+        sourceId: 'hist-meta-test-source',
+        label: 'Test-only provenance source',
+        url: 'https://example.invalid/provenance',
+      }],
+    };
+  }
+  const manifestBytes = JSON.stringify(withCatalog);
   return new Map([
     [`${directory}/manifest.json`, manifestBytes],
     [`${directory}/manifest.sha256`, `${sha256(manifestBytes)}  manifest.json\n`],
@@ -89,7 +102,12 @@ describe('historical exact-edition source packs', () => {
     const files = manifestFiles('data/historical-source-packs/core-eight', manifest, { invented: edition });
     const packs = loadHistoricalSourcePacks([...files.keys()], { read: (path: string) => files.get(path)! } as never);
     expect(packs).toHaveLength(1);
-    expect(packs[0]).toMatchObject({ packId: 'test-core', revision: '1', artifacts: [{ role: 'authority' }, { role: 'comparator' }] });
+    expect(packs[0]).toMatchObject({
+      packId: 'test-core',
+      revision: '1',
+      manifestSchemaVersion: 'historical-source-pack-manifest.v1',
+      artifacts: [{ role: 'authority' }, { role: 'comparator' }],
+    });
   });
 
   it('rejects a mismatched package pin before it can be materialized', () => {
@@ -225,7 +243,11 @@ describe('historical exact-edition source packs', () => {
       expect(db.prepare(`SELECT COUNT(*) AS count FROM historical_document_delivery_profiles
         WHERE delivery_mode = 'sectioned_only' AND landing_max_bytes = 16384
           AND browse_page_size = 32 AND cursor_version = 1
-          AND work_id = document_id AND edition_id = document_id
+          AND work_id = document_id AND EXISTS (
+            SELECT 1 FROM historical_editions e
+            WHERE e.edition_id = historical_document_delivery_profiles.edition_id
+              AND e.work_id = historical_document_delivery_profiles.work_id
+          )
           AND immutable_corpus_identity = section_package_identity`).get()).toEqual({ count: 8 });
       expect(db.prepare(`SELECT COUNT(*) AS count FROM historical_section_identities i
         JOIN historical_document_delivery_profiles p ON p.document_id = i.document_id

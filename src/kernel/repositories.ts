@@ -158,7 +158,7 @@ export interface DocumentInfo {
   date: string | null;
   topics: string[];
   catalog?: HistoricalDocumentCatalogMetadata;
-  /** Present only for a reviewed exact-edition source-pack projection. */
+  /** Present only for a reviewed edition-aligned normalized source-pack projection. */
   editionProvenance?: ExactEditionProvenance;
 }
 

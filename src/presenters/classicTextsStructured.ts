@@ -36,7 +36,7 @@ export const MIXED_CLASSIC_TEXT_EVIDENCE_POLICY = {
 export const REVIEWED_SOURCE_PACK_CLASSIC_TEXT_EVIDENCE_POLICY = {
   providerScope: 'local_only',
   remoteDocumentBodies: 'disabled',
-  editionProvenance: 'reviewed_exact_source_packs',
+  editionProvenance: 'reviewed_source_packs',
   rightsStatus: 'no_known_conflict_normalized_text_only',
   searchSnippets: 'discovery_only',
   selectedContentAccess: 'mcp_resource_read',
@@ -367,7 +367,7 @@ function validClassicTextEvidencePolicy(value: unknown): boolean {
   return (policy.editionProvenance === 'incomplete' && policy.rightsStatus === 'not_established')
     || (policy.editionProvenance === 'mixed_legacy_and_reviewed_source_packs'
       && policy.rightsStatus === 'mixed_not_established_and_no_known_conflict')
-    || (policy.editionProvenance === 'reviewed_exact_source_packs'
+    || (policy.editionProvenance === 'reviewed_source_packs'
       && policy.rightsStatus === 'no_known_conflict_normalized_text_only');
 }
 

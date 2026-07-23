@@ -3,7 +3,7 @@
   "sectionKeyPolicy": "frozen_reviewed_v1",
   "contentFormat": "plain_text",
   "work": {
-    "workId": "athanasius-on-incarnation-robertson-npnf2-v4",
+    "workId": "athanasius-on-incarnation",
     "title": "On the Incarnation of the Word",
     "creatorMetadataStatus": "reviewed",
     "creators": [
@@ -15,7 +15,7 @@
   },
   "edition": {
     "editionId": "athanasius-on-incarnation-robertson-npnf2-v4",
-    "workId": "athanasius-on-incarnation-robertson-npnf2-v4",
+    "workId": "athanasius-on-incarnation",
     "language": "en",
     "contributorGroups": {
       "translation": {
@@ -50,8 +50,8 @@
     },
     "underlyingWorkRights": {
       "status": "public_domain",
-      "basis": "Historical NPNF edition (1892 series; pinned scan); translator is recorded; no contrary ownership or license evidence is known.",
-      "jurisdiction": "US, UK, EU, Canada, and Australia",
+      "basis": "Historical NPNF edition (1892 series; pinned scan); translator is recorded; no contrary ownership or license evidence is known. This determination is scoped to the United States.",
+      "jurisdiction": "United States",
       "evidenceInstrument": {
         "instrumentId": "historical-term-guidance",
         "kind": "public_domain_statement",

@@ -289,7 +289,7 @@ Aquinas source assets remain inactive. U3-T7 provides the in-memory semantic
 compiler, native-to-normalized coordinate bridge, and content-free compilation
 audit; M4A provides capacity and seed verification with inactive adapters. Any
 later production migration, binding, or UBS runtime activation remains
-separately gated. Norton is a later transform-9,
+separately gated. Norton is a future successor,
 `sectioned_only` candidate. Cyril remains blocked with zero output pending
 reliable translator attribution.
 
