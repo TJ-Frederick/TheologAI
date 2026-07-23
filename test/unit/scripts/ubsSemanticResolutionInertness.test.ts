@@ -15,7 +15,7 @@ const activeIdentityPins = {
   'src/mcp/schemas/originalLanguageStudy.ts': 'a98e5966d8a2a850487b4882c49f04c48fc697eee308f6e89c67e06af50fefac',
   'src/presenters/originalLanguageStudyStructured.ts': '49818eb62e89980498669442a4bfc1886944d7751fc675940b17368a030995d9',
   'src/formatters/originalLanguageStudyFormatter.ts': '30a10bf826c6c3174f2e0fb00907f6104735b165fdbfd5915a0ff22bc09b2536',
-  'wrangler.toml': '46862ae67027c460a94932a1284e0885bbaf3d1699a11887f235e645fe50b04f',
+  'wrangler.toml': 'e2a395dc97b53f0b8da4786a7076dfde76e377fc79eb2058c3e8601fb624ec16',
   'worker-configuration.d.ts': 'e316f64679951b32417f0c85b02fc92e61dae25d879d28921df15caf8706fe55',
   'test/fixtures/ubs-semantics/structured-output-contract.draft.json': 'c5c11254fc84e1ac75200b5b93cb967dfe17e99150e88525cb95d6f58d05c8f2',
 } as const;

@@ -275,34 +275,43 @@ is local source context only and does not define the current product contract.
   migration `0004` / transform 7 were the next gates; M4A records their
   completed local-only successor below.
 
-- **UBS Hebrew M4A local materialization (draft publication authorized):**
-  completed migration
-  `0004`, transform 7, local SQLite materialization, deterministic D1
-  seed/import verification, and inactive Node/D1 aggregate adapters. This is
-  local-only and runtime-inert: no composition-root registration, remote D1
-  import, binding change, preview/prod deployment, or MCP behavior is present
-  or authorized. The owner authorized draft-PR publication, but the branch had
-  not yet been published when this record was authored. `SOURCE.json` remains
-  the historical acquisition-gate snapshot, not a release-state record.
+- **UBS Hebrew M4A local materialization (merged through PR #92):** completed
+  migration `0004`, transform 7, local SQLite materialization, deterministic D1
+  seed/import verification, and inactive Node/D1 aggregate adapters. The
+  adapters remain runtime-inert: they add no composition-root registration or
+  MCP surface. The exact reviewed PR #92 head later materialized transforms 7
+  and 8 in preview only; that final preview release is recorded below.
+  `SOURCE.json` remains the historical acquisition-gate snapshot, not a
+  release-state record.
 
 Entries through PR #83 describe merged repository state. PR #83 is
-repository-only and undeployed; its merge is not deployment evidence. M4A is a
-later local-only draft whose publication is authorized but not itself a release.
+repository-only and undeployed; its merge is not deployment evidence. The M4A
+local-only stage has since merged through PR #92, whose preview-only deployment
+does not establish a production release.
 Deployment state is established only by the relevant protected workflow and
-post-deployment smoke evidence. Production remains the PR #72 release:
-Cloudflare deployment `a4697fd1-deda-4dae-a16c-635454218bc8`, Worker
-`762485da-9e02-46a0-9777-e0d8743b9dbf`, and D1
-`c6535a4a-1953-4279-b277-7368445fc61a`. Separately, the exact deployed and
-audited preview source commit is `bb8ed4c8f025f697502a274986205f92bdf520b7`
-in draft, unmerged PR #92; it is deployed to preview only as Cloudflare
-deployment `44a0858f-75ba-497d-b84b-66c14253234a`, Worker
-`2b540a47-0937-4c00-9d44-de1199e09e6c`, and D1
+post-deployment smoke evidence. PR #92 merged as
+`cd3d1c38fdf0f939a33a41d4b6d5044eb7f44562`; its exact reviewed head
+`3a2b5a57b322dce525f27cfa91c9f667d080bca9` is deployed to preview only as
+Cloudflare deployment `04e7a69a-78d2-447b-ac71-e9fb0bef3695`, Worker
+`576517dd-84a8-4b5f-a5ea-ed8f124db63d`, and D1
 `theologai-preview-20260722-b`
-(`94c4938b-7800-4d68-9097-0df33c31fdc1`). CI run `30011028739` and the
-two audits passed (22/22 cases, 59/59 checks, and 48/48 rate-counted requests
-across 11 aggregate groups). Its `deploy-preview` authorization was removed
-and the PR returned to draft; any later docs-only PR #92 head is not deployed.
-No production deployment occurred.
+(`94c4938b-7800-4d68-9097-0df33c31fdc1`). Exact-head CI attempt 2 run
+`30017722596` and protected preview run `30039858274` passed. The parallel
+audit passed 22/22 cases; the Transform-8 audit recorded 48 rate-counted
+requests, 53 total HTTP records, and 11/11 assertion groups. The
+`deploy-preview` authorization was removed and revocation run `30040550778`
+passed. No production deployment occurred. Production remains the PR #72
+release: Cloudflare deployment `a4697fd1-deda-4dae-a16c-635454218bc8`, Worker
+`762485da-9e02-46a0-9777-e0d8743b9dbf`, and D1
+`c6535a4a-1953-4279-b277-7368445fc61a`. The checked-in production-binding candidate
+is `theologai-production-20260723-a`
+(`3f7faa0e-689f-47aa-a601-dc662db9a6cf`), which passed migrations `0001`–`0005`,
+deterministic seeding, strict readiness, and the Transform-8 authority audit.
+No live production Worker is bound to it: live production remains the
+deployment, Worker, and old D1 above as a matched rollback pair, and
+checked-in config is not deployment evidence. The live production Worker and
+its bound old D1 still
+lack Transform-7 and Transform-8 data and behavior.
 
 ## Shipped Phase 3 release train
 
@@ -601,8 +610,9 @@ Code readiness and operational readiness are deliberately separate:
   preview D1. Transform 7's UBS adapters remain runtime-inactive. Transform 8
   is active in preview's historical repositories: the existing
   `classic_text_lookup` has the Baltimore hard cut and canonical/legacy
-  resolution, changing preview output without adding a tool. Production Worker
-  and D1 lack both transforms. The next gate is a separately owner-authorized
+  resolution, changing preview output without adding a tool. The live
+  production Worker and its bound old D1 lack both transforms. The next gate is
+  a separately owner-authorized
   production D1 release followed by a distinct UBS runtime-activation decision.
   Keep the existing 32-source provenance cap as a required pack-sizing check.
 - PRs #61–#64 and #67 complete the planned inactive semantic and provenance
@@ -632,8 +642,9 @@ Code readiness and operational readiness are deliberately separate:
   Baltimore hard cut and canonical/legacy resolution: no new tool is
   registered, but preview output changes. `productionObservedTarget` remains
   null and Node `.get()`/D1 `.first()` remain
-  `unordered_no_compatibility_proof`. Production D1 and Worker lack both
-  transforms; production materialization and behavior remain separately gated.
+  `unordered_no_compatibility_proof`. The live production Worker and its bound
+  old D1 lack both transforms; production materialization and behavior remain
+  separately gated.
   Norton is a later transform-9
   `sectioned_only` release; Calvin, Aquinas, and Augustine need later
   per-edition transforms and release approvals. Cyril remains a zero-output
@@ -668,8 +679,9 @@ Code readiness and operational readiness are deliberately separate:
   source. U3-T7 deterministic compilation and the Transform-7 data layer are
   complete, while its UBS adapters remain runtime-inactive. Preview also has
   active Transform-8 historical compatibility through the existing
-  `classic_text_lookup`; it changes preview output but adds no tool. Production
-  lacks both transforms. A separately owner-gated production data release and
+  `classic_text_lookup`; it changes preview output but adds no tool. The live
+  production Worker and its bound old D1 lack both transforms. A separately
+  owner-gated production data release and
   then a distinct UBS runtime-activation release would be required before
   extending the existing `original_language_study` tool.
   Evaluate MACULA

@@ -4,7 +4,7 @@ import { parse as parseToml } from 'smol-toml';
 
 export const CCEL_OPERATOR_SECRET = 'THEOLOGAI_CCEL_OPERATOR_TOKEN';
 export const PRODUCTION_WORKER = 'theologai';
-export const PRODUCTION_D1_ID = 'c6535a4a-1953-4279-b277-7368445fc61a';
+export const PRODUCTION_D1_ID = '3f7faa0e-689f-47aa-a601-dc662db9a6cf';
 export const PREVIEW_D1_ID = '94c4938b-7800-4d68-9097-0df33c31fdc1';
 export const STAGE_CONFIRMATION = 'I AUTHORIZE PROVISIONING THE PROTECTED CCEL OPERATOR SECRET';
 export const PROMOTE_CONFIRMATION = 'PROMOTE THEOLOGAI CCEL OPERATOR SECRET';
@@ -127,7 +127,7 @@ export function assertWorkerConfig(configText: string): void {
   validateEnvironmentConfig(root, {
     worker: PRODUCTION_WORKER,
     d1Id: PRODUCTION_D1_ID,
-    d1Name: 'theologai-production-20260715-a',
+    d1Name: 'theologai-production-20260723-a',
     requestNamespace: '361201',
     operatorNamespace: '361203',
     vars: PRODUCTION_VARS,
