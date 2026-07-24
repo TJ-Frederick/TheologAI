@@ -286,7 +286,7 @@ is local source context only and does not define the current product contract.
 
 Entries through PR #83 describe merged repository state, not necessarily a
 deployment. Deployment state is established only by protected workflow and
-post-deployment evidence. The current production baseline is main merge
+post-deployment evidence. The current production baseline is origin/main merge
 `7974b15` (tree `f77bca4`), protected workflow `30046749929`, Cloudflare
 deployment `eb2af3bf-8e37-4373-83c3-233255fb477e`, Worker
 `573e6a08-d28f-442b-9206-42f62c1eaf46`, and D1
@@ -298,8 +298,11 @@ a clean 60-minute tail. The current preview release is deployment
 `bf4d7603-5b3b-4c6f-8e09-7bae3fe24eb8`, Worker
 `968975cf-8183-446e-852c-b6a8670d56d5`, and preview D1
 `theologai-preview-20260722-b`
-(`94c4938b-7800-4d68-9097-0df33c31fdc1`). PR #72 and PR #92 records are
-historical rollback evidence only.
+(`94c4938b-7800-4d68-9097-0df33c31fdc1`). Read-only readiness passed on both
+current bindings: migrations `0004` / transform 7 and `0005` / transform 8
+are materialized. Transform-7 UBS semantic adapters remain runtime-inactive;
+Transform-8 historical compatibility is active in both environments. PR #72
+and PR #92 records are historical rollback evidence only.
 
 ## Shipped Phase 3 release train
 
@@ -593,15 +596,13 @@ Code readiness and operational readiness are deliberately separate:
   its centralized 100-work and 2,000-section ceilings and single D1-safe
   JSON/`json_each` scope bind. The approved UBS artifacts, decoder, coordinate
   evidence, deterministic U3-T7 compiler/bridge/audit, and M4A materialization
-  and seed verification are complete. The exact preview release has migrations
-  `0004` / transform 7 and `0005` / transform 8 materialized in the bound
-  preview D1. Transform 7's UBS adapters remain runtime-inactive. Transform 8
-  is active in preview's historical repositories: the existing
+  and seed verification are complete. Both current D1 bindings have migrations
+  `0004` / transform 7 and `0005` / transform 8 materialized. Transform 7's
+  UBS adapters remain runtime-inactive. Transform 8 is active in both
+  environments' historical repositories: the existing
   `classic_text_lookup` has the Baltimore hard cut and canonical/legacy
-  resolution, changing preview output without adding a tool. The live
-  production Worker and its bound old D1 lack both transforms. The next gate is
-  a separately owner-authorized
-  production D1 release followed by a distinct UBS runtime-activation decision.
+  resolution, changing output without adding a tool. The next gate is the
+  distinct UBS runtime-activation decision, not a production data release.
   Keep the existing 32-source provenance cap as a required pack-sizing check.
 - PRs #61–#64 and #67 complete the planned inactive semantic and provenance
   foundations: source-free semantic contracts, the unregistered Hebrew
@@ -623,16 +624,14 @@ Code readiness and operational readiness are deliberately separate:
   edition/provenance fields; it is not a rollout of evidence already present
   in current schemas. Any corpus release remains a **pending rights and release
   decision** and must preserve CCEL-disabled behavior during protected audit.
-- The historical source-first aliases are authoritative. The exact preview
-  release materializes migration `0005` / transform 8 after its `0004` /
-  transform 7 prerequisite and activates historical compatibility in preview
-  repositories. The existing `classic_text_lookup` therefore exposes the
+- The historical source-first aliases are authoritative. Both current bindings
+  materialize migration `0005` / transform 8 after its `0004` / transform 7
+  prerequisite and activate historical compatibility. The existing
+  `classic_text_lookup` therefore exposes the
   Baltimore hard cut and canonical/legacy resolution: no new tool is
-  registered, but preview output changes. `productionObservedTarget` remains
+  registered, but output changes. `productionObservedTarget` remains
   null and Node `.get()`/D1 `.first()` remain
-  `unordered_no_compatibility_proof`. The live production Worker and its bound
-  old D1 lack both transforms; production materialization and behavior remain
-  separately gated.
+  `unordered_no_compatibility_proof`.
   Norton is a later transform-9
   `sectioned_only` release; Calvin, Aquinas, and Augustine need later
   per-edition transforms and release approvals. Cyril remains a zero-output
@@ -667,11 +666,9 @@ Code readiness and operational readiness are deliberately separate:
   source. U3-T7 deterministic compilation and the Transform-7 data layer are
   complete, while its UBS adapters remain runtime-inactive. Preview also has
   active Transform-8 historical compatibility through the existing
-  `classic_text_lookup`; it changes preview output but adds no tool. The live
-  production Worker and its bound old D1 lack both transforms. A separately
-  owner-gated production data release and
-  then a distinct UBS runtime-activation release would be required before
-  extending the existing `original_language_study` tool.
+  `classic_text_lookup`; the same compatibility is active in production and
+  adds no tool. The distinct UBS runtime-activation release is the next gate
+  before extending the existing `original_language_study` tool.
   Evaluate MACULA
   discourse/context evidence only after that foundation is active and reviewed.
   The owner approved a hard cutover that withholds the TBESH `Meaning` field,
