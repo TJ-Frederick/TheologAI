@@ -144,7 +144,7 @@ capability.
 - **NET Bible API** — Free, no auth, includes 60k translator notes
 - **CCEL discovery adapter** (`ccel.org`) — bounded future-provider architecture;
   preview exposes only its disabled v5 discovery contract, production remains
-  v4/local-only, and neither environment may execute a CCEL request without a
+  v6/local-only, and neither environment may execute a CCEL request without a
   separate release gate. The legacy body reader has been retired; see `NOTICE.md`.
 
 ## Conventions
@@ -173,41 +173,62 @@ The SQLite database (`data/theologai.db`) is a derived artifact. Cross-reference
 
 ## Release-state boundary
 
-PR #92 merged as `cd3d1c38fdf0f939a33a41d4b6d5044eb7f44562`; its exact
-reviewed head `3a2b5a57b322dce525f27cfa91c9f667d080bca9` is deployed to
-preview only as Cloudflare deployment `04e7a69a-78d2-447b-ac71-e9fb0bef3695`,
-Worker `576517dd-84a8-4b5f-a5ea-ed8f124db63d`, and D1
-`theologai-preview-20260722-b`
-(`94c4938b-7800-4d68-9097-0df33c31fdc1`). Exact-head CI attempt 2 run
-`30017722596` and protected preview run `30039858274` passed. The parallel
-audit passed 22/22 cases; the Transform-8 audit recorded 48 rate-counted
-requests, 53 total HTTP records, and 11/11 assertion groups. The
-`deploy-preview` authorization was removed and revocation run `30040550778`
-passed. This is not a production deployment. Production remains the deployed
-PR #72 baseline: Cloudflare deployment `a4697fd1-deda-4dae-a16c-635454218bc8`,
-Worker `762485da-9e02-46a0-9777-e0d8743b9dbf`, and D1
+PR #96 is the current production release record. The audit checked out source
+commit `ac4b5ed774302fbfc86bf846b6ee77a07beed456` with exact tree
+`adf08edbf6bfcb14b9613354b2b8fb9f62ec8c16`. At the canonical endpoint
+`https://mcp.theologai.xyz/mcp`, it observed server version `3.6.0` and, before
+and after testing, the same sole 100% Cloudflare production assignment:
+deployment `2d10d693-958e-47a6-ae24-81647679c2f6`, Worker
+`7a3f5078-37bc-453e-bac7-a0743afd508a`, and D1
+`theologai-production-20260723-a`
+(`3f7faa0e-689f-47aa-a601-dc662db9a6cf`).
+
+The stateless `original_language_study` v2 production audit passed 11/11 cases
+in 14 exchanges (initialization, initialized notification, `tools/list`, and
+11 calls), capped at 180 seconds end-to-end, 30 seconds per request, 256 KiB
+per response, and 1 MiB aggregate. Fixture SHA-256:
+`dabe124580904c411f11484d2c25fbd30452201f6c6f8927c94c0f3f294204a7`. Stored
+evidence is sanitized metadata and hashes only; it does not retain tool output
+or source text.
+
+PR #72 is the matched rollback record—not the active production binding:
+merge `72a8ee5eef9b909a373b085d1a4f193484ddfe8a`, deployment
+`a4697fd1-deda-4dae-a16c-635454218bc8`, Worker
+`762485da-9e02-46a0-9777-e0d8743b9dbf`, and D1
 `theologai-production-20260715-a`
 (`c6535a4a-1953-4279-b277-7368445fc61a`). The production `workers.dev`
-endpoint redirects ordinary requests to the canonical custom domain; the exact
-abusive-poller tuple is rejected instead, while the preview legacy endpoint
-remains direct. Repository-only U3-T7/PR #83 work remains outside production.
+endpoint still redirects ordinary requests to the canonical custom domain; the
+documented abusive-poller tuple is rejected and the preview legacy endpoint
+remains direct.
 
-The checked-in production-binding candidate names
-`theologai-production-20260723-a`
-(`3f7faa0e-689f-47aa-a601-dc662db9a6cf`). It passed migrations `0001`–`0005`,
-deterministic seeding, strict readiness, and the Transform-8 authority audit,
-but no live production Worker is bound to it. The live production deployment,
-Worker, and old D1 above remain the matched rollback pair; checked-in config is
-not deployment evidence.
+> **PR96 broad MCP smoke — PASS:** Completed in 8.834 seconds. Sanitized
+> `production-mcp-smoke-audit.json` evidence SHA-256:
+> `f33680b7f9f0f2dfbc0df427bcf43d62fb07254d899a9b59a22d483d776a2e26`.
+> It verified 26 MCP operations across 27 HTTP exchanges and 293,466 aggregate
+> MCP response bytes, stateless with no retries or redirects. Pre/post identity
+> was unchanged: deployment `2d10d693-958e-47a6-ae24-81647679c2f6`, Worker
+> `7a3f5078-37bc-453e-bac7-a0743afd508a` (#88), and D1
+> `theologai-production-20260723-a` (`3f7faa0e-689f-47aa-a601-dc662db9a6cf`).
 
-The preview-only D1 has migrations `0004` / transform 7 and `0005` / transform
-8 materialized. Transform 7's UBS adapters remain runtime-inactive: U3-T7's
-in-memory compiler, native-to-normalized coordinate bridge, and content-free
-audit do not register an MCP surface or alter current output. Transform 8 is
-active in preview's historical repositories: the existing `classic_text_lookup`
-has the Baltimore hard cut and canonical/legacy resolution, changing preview
-output without adding a tool. The live production Worker and its bound old D1
-lack both transforms.
-A production D1 release, later UBS runtime activation, Norton transform 9, and
-later edition transforms remain separately owner-gated.
+> **PR96 deployment/audit tail — PASS_WITH_OBSERVATION_LIMITATIONS:** Two
+> post-smoke unfiltered JSON Wrangler 4.107.0 tails were pinned to Worker
+> `7a3f5078-37bc-453e-bac7-a0743afd508a` (#88) at requested sampling `0.999999`.
+> Attempt 1: `2026-07-24T13:03:40Z`–`13:34:06Z`, raw 0600 5,634,265 bytes,
+> SHA-256 `819ab5dbbca47719edb5a9292e41c54cd6c15d21488640023ad7e148a609617b`,
+> 1,324 events. Attempt 2: `13:36:32Z`–`13:56:16Z`, raw 0600 3,603,881 bytes,
+> SHA-256 `a56d25424fdeca4207e9039d0efeec5ee0d272d04fd924f0caa1d8bebd3f83f8`,
+> 848 events. Combined command time was 50m10s; observed event-span 49m29.544s.
+> Two automatic reconnect warnings and a maximum uninterrupted segment of about
+> 19m12s mean this is neither a continuous 30-minute observation nor an
+> exhaustive/global request count. Wrangler tail authoritatively cannot provide
+> a request total: 2,172 observed events = 2,167 ok + 5 separately classified
+> client cancellations; 0 observed 5xx, 0 429, 0 exceptions, 0 error logs, 0
+> truncated events, and 0 unexpected release errors. Raw captures are private
+> and unpublished because they contain request metadata. Final authoritative
+> identity after each: source `ac4b5ed774302fbfc86bf846b6ee77a07beed456`, tree
+> `adf08edbf6bfcb14b9613354b2b8fb9f62ec8c16`, deployment
+> `2d10d693-958e-47a6-ae24-81647679c2f6`, Worker #88 above, D1
+> `theologai-production-20260723-a` (`3f7faa0e-689f-47aa-a601-dc662db9a6cf`),
+> sole 100%; identity SHA-256
+> `a6959d24fb7f50a9848fe2d011f425894718471b8a0609e7833780a291721a44`.
 `package.json` is private: npm distribution is unsupported.

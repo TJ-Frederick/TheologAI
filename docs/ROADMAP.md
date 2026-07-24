@@ -277,41 +277,74 @@ is local source context only and does not define the current product contract.
 
 - **UBS Hebrew M4A local materialization (merged through PR #92):** completed
   migration `0004`, transform 7, local SQLite materialization, deterministic D1
-  seed/import verification, and inactive Node/D1 aggregate adapters. The
-  adapters remain runtime-inert: they add no composition-root registration or
-  MCP surface. The exact reviewed PR #92 head later materialized transforms 7
-  and 8 in preview only; that final preview release is recorded below.
-  `SOURCE.json` remains the historical acquisition-gate snapshot, not a
-  release-state record.
+  seed/import verification, and inactive Node/D1 aggregate adapters at that
+  historical stage. The exact reviewed PR #92 head later materialized transforms
+  7 and 8 in preview; PR #96 later bound the prepared production D1 and passed
+  the public `original_language_study` v2 audit. `SOURCE.json` remains the
+  historical acquisition-gate snapshot, not a release-state record.
 
-Entries through PR #83 describe merged repository state. PR #83 is
-repository-only and undeployed; its merge is not deployment evidence. The M4A
-local-only stage has since merged through PR #92, whose preview-only deployment
-does not establish a production release.
-Deployment state is established only by the relevant protected workflow and
-post-deployment smoke evidence. PR #92 merged as
-`cd3d1c38fdf0f939a33a41d4b6d5044eb7f44562`; its exact reviewed head
-`3a2b5a57b322dce525f27cfa91c9f667d080bca9` is deployed to preview only as
-Cloudflare deployment `04e7a69a-78d2-447b-ac71-e9fb0bef3695`, Worker
-`576517dd-84a8-4b5f-a5ea-ed8f124db63d`, and D1
-`theologai-preview-20260722-b`
-(`94c4938b-7800-4d68-9097-0df33c31fdc1`). Exact-head CI attempt 2 run
-`30017722596` and protected preview run `30039858274` passed. The parallel
-audit passed 22/22 cases; the Transform-8 audit recorded 48 rate-counted
-requests, 53 total HTTP records, and 11/11 assertion groups. The
-`deploy-preview` authorization was removed and revocation run `30040550778`
-passed. No production deployment occurred. Production remains the PR #72
-release: Cloudflare deployment `a4697fd1-deda-4dae-a16c-635454218bc8`, Worker
+Entries through PR #83 describe merged repository state. PR #83 remains a
+foundation record, not by itself deployment evidence. The current deployment
+record is PR #96: audit source commit
+`ac4b5ed774302fbfc86bf846b6ee77a07beed456`, exact tree
+`adf08edbf6bfcb14b9613354b2b8fb9f62ec8c16`, canonical endpoint
+`https://mcp.theologai.xyz/mcp`, and server version `3.6.0`. Cloudflare
+identity checks before and after the audit found the same sole 100% production
+assignment—deployment `2d10d693-958e-47a6-ae24-81647679c2f6`, Worker
+`7a3f5078-37bc-453e-bac7-a0743afd508a`, and D1
+`theologai-production-20260723-a`
+(`3f7faa0e-689f-47aa-a601-dc662db9a6cf`).
+
+Protected production workflow run `30064214043` and GitHub deployment
+`5583281706` link the recorded source/tree to the active Worker; the read-only
+D1 compatibility check passed. Audit-evidence SHA-256:
+`321053d510217c20a79bc4d42505d67623378c2360f30c2f078a150f5a8f39bf`;
+identity-evidence SHA-256:
+`a6959d24fb7f50a9848fe2d011f425894718471b8a0609e7833780a291721a44`.
+
+The stateless `original_language_study` v2 production audit passed 11/11 cases
+in 14 exchanges (initialization, initialized notification, `tools/list`, and
+11 tool calls), with 180 seconds end-to-end, 30 seconds per request, 256 KiB
+per response, and 1 MiB aggregate caps. Fixture SHA-256:
+`dabe124580904c411f11484d2c25fbd30452201f6c6f8927c94c0f3f294204a7`.
+Evidence retains sanitized metadata and hashes only, not tool output or source
+text. PR #72 is the retained matched rollback record—not the active
+binding—at merge `72a8ee5eef9b909a373b085d1a4f193484ddfe8a`, deployment
+`a4697fd1-deda-4dae-a16c-635454218bc8`, Worker
 `762485da-9e02-46a0-9777-e0d8743b9dbf`, and D1
-`c6535a4a-1953-4279-b277-7368445fc61a`. The checked-in production-binding candidate
-is `theologai-production-20260723-a`
-(`3f7faa0e-689f-47aa-a601-dc662db9a6cf`), which passed migrations `0001`–`0005`,
-deterministic seeding, strict readiness, and the Transform-8 authority audit.
-No live production Worker is bound to it: live production remains the
-deployment, Worker, and old D1 above as a matched rollback pair, and
-checked-in config is not deployment evidence. The live production Worker and
-its bound old D1 still
-lack Transform-7 and Transform-8 data and behavior.
+`theologai-production-20260715-a`
+(`c6535a4a-1953-4279-b277-7368445fc61a`).
+
+> **PR96 broad MCP smoke — PASS:** Completed in 8.834 seconds. Sanitized
+> `production-mcp-smoke-audit.json` evidence SHA-256:
+> `f33680b7f9f0f2dfbc0df427bcf43d62fb07254d899a9b59a22d483d776a2e26`.
+> It verified 26 MCP operations across 27 HTTP exchanges and 293,466 aggregate
+> MCP response bytes, stateless with no retries or redirects. Pre/post identity
+> was unchanged: deployment `2d10d693-958e-47a6-ae24-81647679c2f6`, Worker
+> `7a3f5078-37bc-453e-bac7-a0743afd508a` (#88), and D1
+> `theologai-production-20260723-a` (`3f7faa0e-689f-47aa-a601-dc662db9a6cf`).
+
+> **PR96 deployment/audit tail — PASS_WITH_OBSERVATION_LIMITATIONS:** Two
+> post-smoke unfiltered JSON Wrangler 4.107.0 tails were pinned to Worker
+> `7a3f5078-37bc-453e-bac7-a0743afd508a` (#88) at requested sampling `0.999999`.
+> Attempt 1: `2026-07-24T13:03:40Z`–`13:34:06Z`, raw 0600 5,634,265 bytes,
+> SHA-256 `819ab5dbbca47719edb5a9292e41c54cd6c15d21488640023ad7e148a609617b`,
+> 1,324 events. Attempt 2: `13:36:32Z`–`13:56:16Z`, raw 0600 3,603,881 bytes,
+> SHA-256 `a56d25424fdeca4207e9039d0efeec5ee0d272d04fd924f0caa1d8bebd3f83f8`,
+> 848 events. Combined command time was 50m10s; observed event-span 49m29.544s.
+> Two automatic reconnect warnings and a maximum uninterrupted segment of about
+> 19m12s mean this is neither a continuous 30-minute observation nor an
+> exhaustive/global request count. Wrangler tail authoritatively cannot provide
+> a request total: 2,172 observed events = 2,167 ok + 5 separately classified
+> client cancellations; 0 observed 5xx, 0 429, 0 exceptions, 0 error logs, 0
+> truncated events, and 0 unexpected release errors. Raw captures are private
+> and unpublished because they contain request metadata. Final authoritative
+> identity after each: source `ac4b5ed774302fbfc86bf846b6ee77a07beed456`, tree
+> `adf08edbf6bfcb14b9613354b2b8fb9f62ec8c16`, deployment
+> `2d10d693-958e-47a6-ae24-81647679c2f6`, Worker #88 above, D1
+> `theologai-production-20260723-a` (`3f7faa0e-689f-47aa-a601-dc662db9a6cf`),
+> sole 100%; identity SHA-256
+> `a6959d24fb7f50a9848fe2d011f425894718471b8a0609e7833780a291721a44`.
 
 ## Shipped Phase 3 release train
 
@@ -605,16 +638,10 @@ Code readiness and operational readiness are deliberately separate:
   its centralized 100-work and 2,000-section ceilings and single D1-safe
   JSON/`json_each` scope bind. The approved UBS artifacts, decoder, coordinate
   evidence, deterministic U3-T7 compiler/bridge/audit, and M4A materialization
-  and seed verification are complete. The exact preview release has migrations
-  `0004` / transform 7 and `0005` / transform 8 materialized in the bound
-  preview D1. Transform 7's UBS adapters remain runtime-inactive. Transform 8
-  is active in preview's historical repositories: the existing
-  `classic_text_lookup` has the Baltimore hard cut and canonical/legacy
-  resolution, changing preview output without adding a tool. The live
-  production Worker and its bound old D1 lack both transforms. The next gate is
-  a separately owner-authorized
-  production D1 release followed by a distinct UBS runtime-activation decision.
-  Keep the existing 32-source provenance cap as a required pack-sizing check.
+  and seed verification are complete. PR #96 has now deployed the prepared
+  production D1 and passed the `original_language_study` v2 audit recorded
+  above. Preserve the 32-source provenance cap as a pack-sizing check; do not
+  use the historical local-only wording as a claim about the active release.
 - PRs #61–#64 and #67 complete the planned inactive semantic and provenance
   foundations: source-free semantic contracts, the unregistered Hebrew
   resolution and aggregate seams, edition/provenance contracts, and a
@@ -628,9 +655,9 @@ Code readiness and operational readiness are deliberately separate:
   controls when a cursor is present, and retains `includeText: false` as the
   existing default. Any future workflow or prompt change remains a separate
   slice rather than another cursor implementation.
-- In the checked-in unpublished candidate, the primary-source output-profile
-  hard cutover is represented by production v6/local-only and preview
-  v7/discovery-only, with CCEL execution still disabled. Prospective corpus work remains limited to
+- Production v6/local-only is deployed in PR #96. Preview v7/discovery-only is
+  still an unpublished checked-in candidate, with CCEL execution disabled.
+  Prospective corpus work remains limited to
   explicit searched/read/deferred coverage semantics and future
   edition/provenance fields; it is not a rollout of evidence already present
   in current schemas. Any corpus release remains a **pending rights and release
@@ -642,9 +669,9 @@ Code readiness and operational readiness are deliberately separate:
   Baltimore hard cut and canonical/legacy resolution: no new tool is
   registered, but preview output changes. `productionObservedTarget` remains
   null and Node `.get()`/D1 `.first()` remain
-  `unordered_no_compatibility_proof`. The live production Worker and its bound
-  old D1 lack both transforms; production materialization and behavior remain
-  separately gated.
+  `unordered_no_compatibility_proof`. PR #96 supersedes the earlier statement
+  that production lacked the prepared D1; its public v2 audit is bounded to
+  `original_language_study` and does not broaden this historical claim.
   Norton is a later transform-9
   `sectioned_only` release; Calvin, Aquinas, and Augustine need later
   per-edition transforms and release approvals. Cyril remains a zero-output
@@ -673,19 +700,12 @@ Code readiness and operational readiness are deliberately separate:
   until their separately reviewed transforms, D1 preparation, and release
   gates are complete. Do not mirror or republish CCEL transcriptions without
   edition-specific rights.
-- Broaden original-language study for both beginners and readers of Greek or
-  Hebrew using the already selected and acquired UBS Hebrew v0.9.2 semantic
-  source (PRs #75 and #79), rather than selecting another semantic-domain
-  source. U3-T7 deterministic compilation and the Transform-7 data layer are
-  complete, while its UBS adapters remain runtime-inactive. Preview also has
-  active Transform-8 historical compatibility through the existing
-  `classic_text_lookup`; it changes preview output but adds no tool. The live
-  production Worker and its bound old D1 lack both transforms. A separately
-  owner-gated production data release and
-  then a distinct UBS runtime-activation release would be required before
-  extending the existing `original_language_study` tool.
-  Evaluate MACULA
-  discourse/context evidence only after that foundation is active and reviewed.
+- PR #96 has deployed the prepared production D1 and passed the bounded
+  `original_language_study` v2 audit. Future original-language work for
+  beginners and readers of Greek or Hebrew must preserve the existing UBS
+  Hebrew v0.9.2 source boundary (PRs #75 and #79), rather than select another
+  semantic-domain source. Evaluate MACULA discourse/context evidence only after
+  a separately reviewed scope decision.
   The owner approved a hard cutover that withholds the TBESH `Meaning` field,
   which derives from Online Bible material whose source notice says permission
   should be obtained before project use. Exact identities, forms,
