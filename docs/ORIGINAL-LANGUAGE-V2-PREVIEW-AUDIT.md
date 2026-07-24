@@ -62,13 +62,20 @@ workflow group remains in place for normal PR supersession.
 The pinned Wrangler action exposes deploy command stdout but does not expose a
 Worker version ID. The workflow therefore captures that stdout locally, hashes
 it, then uses read-only `wrangler versions list` and `wrangler deployments
-list` calls before the audit. The release gate requires exactly one newly
-uploaded version and requires the newest deployment to assign that exact
-version 100% of preview traffic. Immediately after the complete 14-call audit,
-it takes a second read-only `wrangler deployments list` snapshot and requires
-the exact same deployment ID and version to remain the newest sole 100%
-assignment. The retained sanitized identity record contains only version and
-deployment IDs plus hashes of the pre- and post-audit raw observations.
+list` calls before the audit. It parses exactly one `Current Version ID` from
+the action's command stdout; that command-reported ID must be newly added,
+the highest version number, and the newest deployment's sole 100% assignment.
+The action's `secrets` input can create an intermediate version before the
+final command: at most one newly added intermediate is accepted, only when the
+control plane annotates it `workers/triggered_by=secret`, its number immediately
+follows the highest pre-deploy version, and the final version immediately
+follows it in time and sequence. The final reported version must be annotated
+`workers/triggered_by=version_upload`. The sanitized identity record preserves
+the ordered one- or two-ID delta and hashes the raw observations without
+retaining them. Immediately after the complete
+14-call audit, the workflow takes a second read-only `wrangler deployments
+list` snapshot and requires the exact same deployment ID and version to remain
+the newest sole 100% assignment.
 
 On a successful audit, the workflow hashes the sanitized audit and identity
 records, posts those hashes with the exact checked-out commit/tree and Worker

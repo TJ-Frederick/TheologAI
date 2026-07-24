@@ -15,6 +15,7 @@ interface VersionSummary {
   id: string;
   number: number;
   createdOn: string;
+  annotations?: Record<string, string>;
 }
 
 interface Deployment {
@@ -33,6 +34,10 @@ export interface PreviewWorkerDeploymentIdentity {
   afterVersionsSha256: string;
   deploymentsSha256: string;
   commandOutputSha256: string;
+  /** Exact final deploy ID parsed from pinned Wrangler action stdout. */
+  commandReportedVersionId: string;
+  /** Includes any action-created secret version before the final deploy. */
+  addedVersionIds: string[];
 }
 
 /** The retained record proves the same active deployment on both audit sides. */
@@ -46,6 +51,8 @@ export interface PreviewWorkerAuditedIdentity {
   afterVersionsSha256: string;
   deploymentsSha256: string;
   commandOutputSha256: string;
+  commandReportedVersionId: string;
+  addedVersionIds: string[];
   postAuditDeploymentsSha256: string;
 }
 
@@ -91,11 +98,30 @@ function parseVersions(value: unknown, label: string): VersionSummary[] {
     assert(isUuid(item.id), `${label} version ${index} ID must be a UUID`);
     assert(Number.isSafeInteger(item.number) && (item.number as number) > 0, `${label} version ${index} number is invalid`);
     assert(validTime(metadata.created_on), `${label} version ${index} created_on is invalid`);
-    return { id: item.id, number: item.number as number, createdOn: metadata.created_on };
+    const annotations = item.annotations === undefined ? undefined : record(item.annotations, `${label} version ${index}.annotations`);
+    if (annotations !== undefined) {
+      for (const [key, annotation] of Object.entries(annotations)) {
+        assert(typeof annotation === 'string', `${label} version ${index} annotation ${key} is not text`);
+      }
+    }
+    return {
+      id: item.id, number: item.number as number, createdOn: metadata.created_on,
+      ...(annotations === undefined ? {} : { annotations: annotations as Record<string, string> }),
+    };
   });
   assert(new Set(versions.map(version => version.id)).size === versions.length, `${label} version IDs are not unique`);
   assert(new Set(versions.map(version => version.number)).size === versions.length, `${label} version numbers are not unique`);
   return versions;
+}
+
+function commandReportedVersionId(commandOutput: string): string {
+  assert(typeof commandOutput === 'string' && commandOutput.length > 0,
+    'pinned Wrangler deploy action did not provide command stdout');
+  const idLines = commandOutput.split(/\r?\n/).filter(line => line.trimStart().startsWith('Current Version ID:'));
+  assert(idLines.length === 1, 'Wrangler command stdout must contain exactly one Current Version ID line');
+  const match = /^\s*Current Version ID:\s*([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\s*$/i.exec(idLines[0]!);
+  assert(match !== null, 'Wrangler command stdout Current Version ID is malformed');
+  return match[1]!.toLowerCase();
 }
 
 function parseDeployments(value: unknown): Deployment[] {
@@ -150,17 +176,36 @@ export function verifyPreviewWorkerDeployment(input: {
   afterDeploymentsText: string;
   commandOutput: string;
 }): PreviewWorkerDeploymentIdentity {
-  assert(typeof input.commandOutput === 'string' && input.commandOutput.length > 0,
-    'pinned Wrangler deploy action did not provide command stdout');
+  const reportedVersionId = commandReportedVersionId(input.commandOutput);
   const before = parseVersions(parseJson(input.beforeVersionsText, 'before versions'), 'before versions');
   const after = parseVersions(parseJson(input.afterVersionsText, 'after versions'), 'after versions');
   const deployments = parseDeployments(parseJson(input.afterDeploymentsText, 'after deployments'));
   const beforeIds = new Set(before.map(version => version.id));
   const added = after.filter(version => !beforeIds.has(version.id));
-  assert(added.length === 1, 'deployment must create exactly one new Worker version');
-  const deployed = added[0]!;
+  const orderedAdded = added.slice().sort((left, right) => left.number - right.number);
+  const deployed = after.find(version => version.id.toLowerCase() === reportedVersionId);
+  assert(deployed !== undefined && added.some(version => version.id === deployed.id),
+    'Wrangler command-reported final version is not newly added relative to the pre-deploy snapshot');
+  assert(orderedAdded.length === 1 || orderedAdded.length === 2,
+    'deployment may create only the final version or one secret-update intermediate plus the final version');
   const newest = after.reduce((current, version) => version.number > current.number ? version : current);
   assert(newest.id === deployed.id, 'new version is not the latest uploaded Worker version');
+  assert(deployed.annotations?.['workers/triggered_by'] === 'version_upload',
+    'Wrangler command-reported final version is not annotated as a version_upload');
+  const priorHighest = before.reduce((current, version) => version.number > current.number ? version : current);
+  assert(Date.parse(priorHighest.createdOn) < Date.parse(orderedAdded[0]!.createdOn),
+    'first new Worker version must follow the highest pre-deploy version in time');
+  assert(deployed.number === priorHighest.number + orderedAdded.length,
+    'new version sequence is not continuous from the highest pre-deploy version');
+  if (orderedAdded.length === 2) {
+    const intermediate = orderedAdded[0]!;
+    assert(intermediate.annotations?.['workers/triggered_by'] === 'secret',
+      'the sole intermediate Worker version must be explicitly annotated as a secret update');
+    assert(intermediate.number === priorHighest.number + 1 && intermediate.number + 1 === deployed.number,
+      'secret intermediate and final Worker versions must be consecutive');
+    assert(Date.parse(intermediate.createdOn) < Date.parse(deployed.createdOn),
+      'secret intermediate Worker version must precede the final deploy version');
+  }
   const latestDeployment = latestSoleActiveDeployment(deployments, deployed.id);
   return {
     schemaVersion: 1,
@@ -172,6 +217,8 @@ export function verifyPreviewWorkerDeployment(input: {
     afterVersionsSha256: sha256(input.afterVersionsText),
     deploymentsSha256: sha256(input.afterDeploymentsText),
     commandOutputSha256: sha256(input.commandOutput),
+    commandReportedVersionId: reportedVersionId,
+    addedVersionIds: orderedAdded.map(version => version.id),
   };
 }
 
@@ -184,16 +231,25 @@ function parsePreAuditIdentity(value: unknown): PreviewWorkerDeploymentIdentity 
   const keys = [
     'schemaVersion', 'worker', 'deployedVersionId', 'deployedVersionNumber', 'deploymentId',
     'beforeVersionsSha256', 'afterVersionsSha256', 'deploymentsSha256', 'commandOutputSha256',
+    'commandReportedVersionId', 'addedVersionIds',
   ];
   assert(JSON.stringify(Object.keys(identity).sort()) === JSON.stringify(keys.slice().sort()),
     'pre-audit identity keys are malformed');
   assert(identity.schemaVersion === 1 && identity.worker === 'theologai-preview', 'pre-audit identity is not canonical');
   assert(isUuid(identity.deployedVersionId) && Number.isSafeInteger(identity.deployedVersionNumber)
-    && (identity.deployedVersionNumber as number) > 0 && isUuid(identity.deploymentId),
+    && (identity.deployedVersionNumber as number) > 0 && isUuid(identity.deploymentId)
+    && isUuid(identity.commandReportedVersionId) && identity.commandReportedVersionId === identity.deployedVersionId,
   'pre-audit identity version or deployment fields are malformed');
   for (const key of ['beforeVersionsSha256', 'afterVersionsSha256', 'deploymentsSha256', 'commandOutputSha256']) {
     assert(isSha256(identity[key]), `pre-audit identity ${key} is malformed`);
   }
+  assert(Array.isArray(identity.addedVersionIds)
+    && (identity.addedVersionIds.length === 1 || identity.addedVersionIds.length === 2)
+    && identity.addedVersionIds.every(isUuid)
+    && new Set(identity.addedVersionIds).size === identity.addedVersionIds.length
+    && identity.addedVersionIds.at(-1) === identity.deployedVersionId
+    && identity.addedVersionIds.at(-1) === identity.commandReportedVersionId,
+  'pre-audit identity added-version evidence is malformed');
   return identity as PreviewWorkerDeploymentIdentity;
 }
 
