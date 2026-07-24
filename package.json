@@ -35,6 +35,7 @@
     "benchmark:ubs-runtime": "node --expose-gc --import tsx scripts/benchmark-ubs-runtime.ts",
     "audit:parallel-preview": "tsx scripts/audit-parallel-passages-preview.ts",
     "audit:ccel-preview": "tsx scripts/audit-ccel-preview.ts",
+    "audit:original-language-v2-preview": "tsx scripts/audit-original-language-v2-preview.ts",
     "test:worker-bundle-ubs": "tsx scripts/check-worker-bundle-excludes-ubs.ts",
     "start": "node dist/index.js",
     "clean": "rm -rf dist",
