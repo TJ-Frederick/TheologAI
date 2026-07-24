@@ -669,13 +669,14 @@ Code readiness and operational readiness are deliberately separate:
   Baltimore hard cut and canonical/legacy resolution: no new tool is
   registered, but preview output changes. `productionObservedTarget` remains
   null and Node `.get()`/D1 `.first()` remain
+<<<<<<< HEAD
   `unordered_no_compatibility_proof`. PR #96 supersedes the earlier statement
   that production lacked the prepared D1; its public v2 audit is bounded to
   `original_language_study` and does not broaden this historical claim.
-  Norton is a later transform-9
-  `sectioned_only` release; Calvin, Aquinas, and Augustine need later
-  per-edition transforms and release approvals. Cyril remains a zero-output
-  blocked source until translator attribution is established.
+  Norton and the separate Aquinas acquisition packet need later successor
+  transforms and release approvals; neither is a Transform 9 member. Cyril
+  remains a zero-output blocked source until translator attribution is
+  established.
 - Review a bounded, discovery-only public rollout of the retained CCEL search
   adapter. The owner accepts free, donation-independent discovery with at most
   five short, attributed 240-character provider snippets and clean links, with
