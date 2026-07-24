@@ -279,6 +279,31 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
+      # This is evidence only. It cannot deploy, roll back, bind, seed, or
+      # delete; a later failure/revocation still leaves a manual recovery path.
+      - name: Capture preview predecessor reconciliation anchor (read-only)
+        id: preview-predecessor
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
+        run: |
+          npx --no-install wrangler deployments list --env preview --json > "$RUNNER_TEMP/preview-worker-deployments-predecessor.json"
+          npx --no-install tsx scripts/preview-release-reconciliation.ts capture-predecessor \
+            --deployments "$RUNNER_TEMP/preview-worker-deployments-predecessor.json" \
+            --wrangler-config wrangler.toml \
+            --output "$RUNNER_TEMP/preview-worker-predecessor-anchor.json"
+
+      # Retain the predecessor before mutation so a later job cancellation
+      # cannot discard the exact manual recovery target.
+      - name: Upload preview predecessor reconciliation anchor
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: preview-release-predecessor-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/preview-worker-predecessor-anchor.json
+          retention-days: 7
+          if-no-files-found: error
+
       - name: Capture preview Worker versions before deployment (read-only)
         run: npx --no-install wrangler versions list --env preview --json > "$RUNNER_TEMP/preview-worker-versions-before.json"
         env:
@@ -360,6 +385,24 @@ jobs:
             --output "$RUNNER_TEMP/historical-core-preview-audit.json"
           test -s "$RUNNER_TEMP/historical-core-preview-audit.json"
 
+      # Runs after any post-deploy result (including audit failure or a later
+      # authorization revocation) and is deliberately read-only. It does not
+      # attempt an automatic rollback or destructive cleanup.
+      - name: Capture preview post-mutation reconciliation record (read-only)
+        id: preview-reconciliation
+        if: ${{ always() && steps.preview-worker-deploy.outcome == 'success' && steps.preview-predecessor.outcome == 'success' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
+        run: |
+          npx --no-install wrangler deployments list --env preview --json > "$RUNNER_TEMP/preview-worker-deployments-post-mutation.json"
+          npx --no-install tsx scripts/preview-release-reconciliation.ts reconcile-post-mutation \
+            --predecessor-anchor "$RUNNER_TEMP/preview-worker-predecessor-anchor.json" \
+            --deployments "$RUNNER_TEMP/preview-worker-deployments-post-mutation.json" \
+            --wrangler-config wrangler.toml \
+            --output "$RUNNER_TEMP/preview-worker-post-mutation-reconciliation.json"
+
       - name: Verify preview Worker remained active through audit (read-only)
         id: preview-worker-audit-identity
         env:
@@ -392,6 +435,16 @@ jobs:
             ${{ runner.temp }}/original-language-v2-preview-audit.json
             ${{ runner.temp }}/historical-core-preview-audit.json
             ${{ runner.temp }}/preview-worker-deployment-identity.json
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Upload preview reconciliation evidence
+        if: ${{ always() && steps.preview-reconciliation.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: preview-release-reconciliation-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          path: |
+            ${{ runner.temp }}/preview-worker-post-mutation-reconciliation.json
           retention-days: 7
           if-no-files-found: error
 
