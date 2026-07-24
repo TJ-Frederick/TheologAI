@@ -1,8 +1,13 @@
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { describe, expect, it, vi } from 'vitest';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
 import {
+  AuditDeadline,
   MAX_MCP_RESPONSE_BYTES,
   readBoundedResponseBody,
+  runAuditCli,
   runPreviewAudit,
   validateFixture,
 } from '../../../scripts/audit-historical-core-preview.js';
@@ -24,6 +29,7 @@ type FakeOptions = {
   invalidCursorError?: string;
   directLandingText?: string;
   truncateClassicCatalog?: boolean;
+  primaryLocatorDrift?: boolean;
 };
 
 const V7_CONTRACT = {
@@ -105,6 +111,8 @@ describe('historical core preview audit contract', () => {
     expect(artifact).toBeGreaterThan(identity);
     expect(workflow).toContain('historical-core-preview-audit.json');
     expect(workflow).toContain('historical_audit_sha256');
+    expect(workflow).toContain('wrangler versions view "$predecessor_version" --env preview --json');
+    expect(workflow).toContain('wrangler versions view "$observed_active_version" --env preview --json');
   });
 
   it('runs the exact 55-exchange inventory through a representative fake transport without retaining bodies, locators, snippets, cursors, or error data', async () => {
@@ -154,7 +162,7 @@ describe('historical core preview audit contract', () => {
     }))).rejects.toThrow('open-world annotation drifted');
   });
 
-  it('fails closed for exact resource/template/prompt/catalog/direct-landing contract drift', async () => {
+  it('fails closed for exact resource/template/prompt/catalog/direct-landing/primary-locator contract drift', async () => {
     const parsed = validateFixture(await fixture());
     await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { mutate: (body, response) => {
       if (body.method === 'resources/list') ((response.result as RecordValue).resources as RecordValue[]).pop();
@@ -173,14 +181,20 @@ describe('historical core preview audit contract', () => {
     await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { truncateClassicCatalog: true })))
       .rejects.toThrow('reviewed registration inventory drifted');
     await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { directLandingText: '<img src="scan.png">' }))).rejects.toThrow('direct landing resource is not bounded normalized metadata');
+    await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { primaryLocatorDrift: true })))
+      .rejects.toThrow('primary local evidence identity/readiness drifted');
   });
 
-  it('rejects cursor, URI, and credential-shaped error reflections before evidence is created', async () => {
+  it('rejects cursor, URI, credential, storage, and stack-trace error reflections before evidence is created', async () => {
     const parsed = validateFixture(await fixture());
     await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { invalidCursorError: 'cursor not-a-valid-cursor' })))
       .rejects.toThrow('invalid cursor regression error reflected rejected input');
     await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { invalidResourceError: 'https://private.invalid/secret' })))
-      .rejects.toThrow('invalid resource regression error leaked a URI, credential-shaped value, or secret reflection');
+      .rejects.toThrow('invalid resource regression error leaked a URI, credential-shaped value, storage detail, stack trace, or secret reflection');
+    for (const sensitive of ['SQLite database failure', 'API Key leaked', 'SQL D1 traceback stack']) {
+      await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { invalidResourceError: sensitive })))
+        .rejects.toThrow('invalid resource regression error leaked a URI, credential-shaped value, storage detail, stack trace, or secret reflection');
+    }
   });
 
   it('fails closed when bounded individual responses exceed the aggregate budget or the end-to-end deadline', async () => {
@@ -194,20 +208,57 @@ describe('historical core preview audit contract', () => {
     };
     await expect(runPreviewAudit(parsed, paddedFetch)).rejects.toThrow('aggregate response budget exceeded');
 
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date(0));
+    let now = 0;
+    const deadline = new AuditDeadline(() => now);
     let requests = 0;
     const deadlineFetch: typeof fetch = async (_input, init) => {
       requests += 1;
       const body = JSON.parse(String(init?.body)) as RecordValue;
       const response = responseFor(body, parsed);
-      if (requests === 1) vi.setSystemTime(new Date(300_001));
+      if (requests === 1) now = 300_001;
       return response;
     };
+    await expect(runPreviewAudit(parsed, deadlineFetch, deadline)).rejects.toThrow('exceeded its 300-second total deadline');
+  });
+
+  it('uses one real-filesystem deadline through fixed preflight and true no-clobber evidence publication', async () => {
+    const temporaryRoot = mkdtempSync(join(tmpdir(), 'theologai-historical-preview-audit-'));
     try {
-      await expect(runPreviewAudit(parsed, deadlineFetch)).rejects.toThrow('exceeded total duration budget');
+      const published = join(temporaryRoot, 'published.json');
+      const successful = await runAuditCli(['--output', published], { runAudit: async () => ({ audit: 'safe' }) });
+      expect(successful.output).toBe(published);
+      expect(JSON.parse(readFileSync(published, 'utf8'))).toEqual({ audit: 'safe' });
+
+      const existing = join(temporaryRoot, 'existing.json');
+      writeFileSync(existing, 'original evidence');
+      let auditCalled = false;
+      await expect(runAuditCli(['--output', existing], { runAudit: async () => {
+        auditCalled = true;
+        return { audit: 'safe' };
+      } })).rejects.toThrow('no-clobber policy');
+      expect(auditCalled).toBe(false);
+      expect(readFileSync(existing, 'utf8')).toBe('original evidence');
+
+      const deadlineOutput = join(temporaryRoot, 'deadline.json');
+      let now = 0;
+      await expect(runAuditCli(['--output', deadlineOutput], {
+        now: () => now,
+        runAudit: async () => { now = 300_001; return { audit: 'safe' }; },
+      })).rejects.toThrow('300-second total deadline');
+      expect(existsSync(deadlineOutput)).toBe(false);
+
+      const raced = join(temporaryRoot, 'raced.json');
+      await expect(runAuditCli(['--output', raced], { runAudit: async () => {
+        // This write occurs after CLI output preflight and before its atomic
+        // link publication, reproducing the no-clobber race on the real FS.
+        writeFileSync(raced, 'pre-existing');
+        return { audit: 'safe' };
+      } }))
+        .rejects.toThrow('destination appeared during audit');
+      expect(readFileSync(raced, 'utf8')).toBe('pre-existing');
+      expect(readdirSync(temporaryRoot).filter(name => name.includes('.historical-core-preview-audit-'))).toEqual([]);
     } finally {
-      vi.useRealTimers();
+      rmSync(temporaryRoot, { recursive: true, force: true });
     }
   });
 
@@ -339,7 +390,7 @@ function toolResponse(body: RecordValue, fixtureValue: Audit, options: FakeOptio
   const name = params.name as string;
   const args = params.arguments as RecordValue;
   if (name === 'classic_text_lookup') return classicTool(body, args, fixtureValue, options);
-  if (name === 'primary_source_search') return primaryTool(body, args, fixtureValue);
+  if (name === 'primary_source_search') return primaryTool(body, args, fixtureValue, options);
   throw new Error(`unexpected fake tool ${name}`);
 }
 
@@ -370,12 +421,15 @@ function directory(probe: Audit['probes'][number]): RecordValue {
   return { schemaVersion: '2', kind: 'classic_text_lookup', mode: 'browse_sections', directory: { work: { id: probe.workId }, coverage: 'bounded_section_directory', pagination: { pageSize: 32 }, sections: [{ sectionKey: probe.firstSection.sectionKey, sourceOrdinal: probe.firstSection.sourceOrdinal, resource: { kind: 'mcp_resource', uri: probe.firstSection.resourceUri } }] } };
 }
 
-function primaryTool(body: RecordValue, args: RecordValue, fixtureValue: Audit): Response {
+function primaryTool(body: RecordValue, args: RecordValue, fixtureValue: Audit, options: FakeOptions): Response {
   const query = ((args.queries as RecordValue[])[0])!;
   if ((query.providers as string[])[0] === 'ccel') return toolResult(body, { structuredContent: { schemaVersion: '7', kind: 'primary_source_search', planStatus: 'unavailable', queries: [{ providers: [{ provider: 'ccel_live', status: 'disabled', searched: false, hitCount: 0, hits: [] }] }], coverage: { localAttempted: false, ccelAttempted: false, ccelStatus: 'disabled', ccelHitCount: 0 } } });
   const workId = query.work as string;
   const probe = fixtureValue.probes.find(item => item.workId === workId)!;
-  return toolResult(body, { structuredContent: { schemaVersion: '7', kind: 'primary_source_search', planStatus: 'complete', queries: [{ providers: [{ provider: 'local', status: 'ok', searched: true, hits: [{ locator: { kind: 'mcp_resource', uri: probe.firstSection.resourceUri, documentId: workId }, editionReadiness: { editionIdentity: 'established', normalizedTextRights: 'no_known_conflict' } }] }] }], coverage: { localAttempted: true, localHitCount: 1 }, evidencePolicy: { snippetUse: 'discovery_only', localSectionAccess: 'mcp_resource_read', externalSectionAccess: 'direct_url_only' } } });
+  const uri = options.primaryLocatorDrift
+    ? `${probe.landingResourceUri}#section-noncanonical`
+    : probe.firstSection.resourceUri;
+  return toolResult(body, { structuredContent: { schemaVersion: '7', kind: 'primary_source_search', planStatus: 'complete', queries: [{ providers: [{ provider: 'local', status: 'ok', searched: true, hits: [{ locator: { kind: 'mcp_resource', uri, documentId: workId }, editionReadiness: { editionIdentity: 'established', normalizedTextRights: 'no_known_conflict' } }] }] }], coverage: { localAttempted: true, localHitCount: 1 }, evidencePolicy: { snippetUse: 'discovery_only', localSectionAccess: 'mcp_resource_read', externalSectionAccess: 'direct_url_only' } } });
 }
 
 function toolResult(body: RecordValue, result: RecordValue): Response { return jsonResponse({ jsonrpc: '2.0', id: body.id, result }); }

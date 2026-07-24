@@ -289,8 +289,12 @@ jobs:
           WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
         run: |
           npx --no-install wrangler deployments list --env preview --json > "$RUNNER_TEMP/preview-worker-deployments-predecessor.json"
+          predecessor_version="$(npx --no-install tsx scripts/preview-release-reconciliation.ts active-version-id \
+            --deployments "$RUNNER_TEMP/preview-worker-deployments-predecessor.json")"
+          npx --no-install wrangler versions view "$predecessor_version" --env preview --json > "$RUNNER_TEMP/preview-worker-predecessor-version-view.json"
           npx --no-install tsx scripts/preview-release-reconciliation.ts capture-predecessor \
             --deployments "$RUNNER_TEMP/preview-worker-deployments-predecessor.json" \
+            --predecessor-version-view "$RUNNER_TEMP/preview-worker-predecessor-version-view.json" \
             --wrangler-config wrangler.toml \
             --output "$RUNNER_TEMP/preview-worker-predecessor-anchor.json"
 
@@ -397,9 +401,13 @@ jobs:
           WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
         run: |
           npx --no-install wrangler deployments list --env preview --json > "$RUNNER_TEMP/preview-worker-deployments-post-mutation.json"
+          observed_active_version="$(npx --no-install tsx scripts/preview-release-reconciliation.ts active-version-id \
+            --deployments "$RUNNER_TEMP/preview-worker-deployments-post-mutation.json")"
+          npx --no-install wrangler versions view "$observed_active_version" --env preview --json > "$RUNNER_TEMP/preview-worker-observed-active-version-view.json"
           npx --no-install tsx scripts/preview-release-reconciliation.ts reconcile-post-mutation \
             --predecessor-anchor "$RUNNER_TEMP/preview-worker-predecessor-anchor.json" \
             --deployments "$RUNNER_TEMP/preview-worker-deployments-post-mutation.json" \
+            --observed-active-version-view "$RUNNER_TEMP/preview-worker-observed-active-version-view.json" \
             --wrangler-config wrangler.toml \
             --output "$RUNNER_TEMP/preview-worker-post-mutation-reconciliation.json"
 

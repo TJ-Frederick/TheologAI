@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import {
+  activePreviewVersionId,
   capturePreviewPredecessorAnchor,
   reconcilePreviewPostMutation,
 } from '../../../scripts/preview-release-reconciliation.js';
@@ -17,10 +18,17 @@ function deployments(id = predecessorDeployment, version = predecessorVersion): 
   }]);
 }
 
+function versionView(version = predecessorVersion, d1 = '94c4938b-7800-4d68-9097-0df33c31fdc1'): string {
+  return JSON.stringify({
+    id: version,
+    resources: { bindings: [{ name: 'THEOLOGAI_DB', type: 'd1', id: d1 }] },
+  });
+}
+
 describe('preview release reconciliation evidence', () => {
   it('captures the exact pre-mutation active Worker and checked-out preview D1 binding', async () => {
     const config = await readFile(new URL('wrangler.toml', root), 'utf8');
-    const anchor = capturePreviewPredecessorAnchor({ deploymentsText: deployments(), wranglerConfigText: config });
+    const anchor = capturePreviewPredecessorAnchor({ deploymentsText: deployments(), predecessorVersionViewText: versionView(), wranglerConfigText: config });
     expect(anchor).toMatchObject({
       schemaVersion: 1,
       worker: 'theologai-preview',
@@ -29,14 +37,17 @@ describe('preview release reconciliation evidence', () => {
       previewD1: { binding: 'THEOLOGAI_DB', databaseName: 'theologai-preview-20260722-b', databaseId: '94c4938b-7800-4d68-9097-0df33c31fdc1' },
     });
     expect(anchor.predecessorDeploymentsSha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(anchor.predecessorVersionViewSha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(activePreviewVersionId(deployments())).toBe(predecessorVersion);
   });
 
   it('records candidate state after an unsuccessful release without attempting rollback or cleanup', async () => {
     const config = await readFile(new URL('wrangler.toml', root), 'utf8');
-    const anchor = capturePreviewPredecessorAnchor({ deploymentsText: deployments(), wranglerConfigText: config });
+    const anchor = capturePreviewPredecessorAnchor({ deploymentsText: deployments(), predecessorVersionViewText: versionView(), wranglerConfigText: config });
     const result = reconcilePreviewPostMutation({
       predecessorAnchorText: JSON.stringify(anchor),
       postMutationDeploymentsText: deployments(candidateDeployment, candidateVersion),
+      observedActiveVersionViewText: versionView(candidateVersion),
       wranglerConfigText: config,
     });
     expect(result).toMatchObject({
@@ -46,22 +57,39 @@ describe('preview release reconciliation evidence', () => {
     });
     expect(result.predecessorAnchorSha256).toMatch(/^[0-9a-f]{64}$/);
     expect(result.postMutationDeploymentsSha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(result.observedActiveVersionViewSha256).toMatch(/^[0-9a-f]{64}$/);
   });
 
   it('fails closed for a non-sole deployment, malformed predecessor, or changed D1 binding', async () => {
     const config = await readFile(new URL('wrangler.toml', root), 'utf8');
     expect(() => capturePreviewPredecessorAnchor({
       deploymentsText: JSON.stringify([{ id: predecessorDeployment, created_on: '2026-07-23T12:00:00.000Z', versions: [{ version_id: predecessorVersion, percentage: 99 }] }]),
+      predecessorVersionViewText: versionView(),
       wranglerConfigText: config,
     })).toThrow('not a sole 100% version');
 
-    const anchor = capturePreviewPredecessorAnchor({ deploymentsText: deployments(), wranglerConfigText: config });
+    expect(() => capturePreviewPredecessorAnchor({
+      deploymentsText: deployments(), predecessorVersionViewText: versionView(candidateVersion), wranglerConfigText: config,
+    })).toThrow('identity does not match the active deployment');
+    expect(() => capturePreviewPredecessorAnchor({
+      deploymentsText: deployments(),
+      predecessorVersionViewText: JSON.stringify({ id: predecessorVersion, resources: { bindings: [
+        { name: 'THEOLOGAI_DB', type: 'd1', id: '94c4938b-7800-4d68-9097-0df33c31fdc1' },
+        { name: 'THEOLOGAI_DB', type: 'd1', id: '94c4938b-7800-4d68-9097-0df33c31fdc1' },
+      ] } }), wranglerConfigText: config,
+    })).toThrow('exactly one THEOLOGAI_DB binding');
+
+    const anchor = capturePreviewPredecessorAnchor({ deploymentsText: deployments(), predecessorVersionViewText: versionView(), wranglerConfigText: config });
     expect(() => reconcilePreviewPostMutation({
-      predecessorAnchorText: JSON.stringify({ ...anchor, unexpected: true }), postMutationDeploymentsText: deployments(), wranglerConfigText: config,
+      predecessorAnchorText: JSON.stringify({ ...anchor, unexpected: true }), postMutationDeploymentsText: deployments(), observedActiveVersionViewText: versionView(), wranglerConfigText: config,
     })).toThrow('predecessor anchor keys are malformed');
     expect(() => reconcilePreviewPostMutation({
-      predecessorAnchorText: JSON.stringify(anchor), postMutationDeploymentsText: deployments(),
+      predecessorAnchorText: JSON.stringify(anchor), postMutationDeploymentsText: deployments(), observedActiveVersionViewText: versionView(),
       wranglerConfigText: config.replace('database_name = "theologai-preview-20260722-b"', 'database_name = "different-preview"'),
     })).toThrow('no longer matches the captured predecessor compatibility anchor');
+    expect(() => reconcilePreviewPostMutation({
+      predecessorAnchorText: JSON.stringify(anchor), postMutationDeploymentsText: deployments(),
+      observedActiveVersionViewText: versionView(predecessorVersion, '123e4567-e89b-42d3-a456-426614174000'), wranglerConfigText: config,
+    })).toThrow('does not match the checked-out readiness-tested preview D1');
   });
 });

@@ -1,6 +1,6 @@
 # Preview Release Reconciliation
 
-The protected preview workflow records and uploads a predecessor anchor before it mutates the preview Worker, and records the active deployment again after the release gate. The records capture the exact sole-100% Worker deployment and the checked-out `THEOLOGAI_DB` preview binding. They are evidence, not a deployment mechanism. Uploading the predecessor first preserves a manual recovery target even if a later job cancellation prevents a post-mutation observation.
+The protected preview workflow records and uploads a predecessor anchor before it mutates the preview Worker, and records the active deployment again after the release gate. Each record hashes an authoritative Cloudflare `versions view` response for the exact active Worker version and verifies it contains exactly one `THEOLOGAI_DB` D1 binding equal to the checked-out, readiness-tested preview binding. They are evidence, not a deployment mechanism. Uploading the predecessor first preserves a manual recovery target even if a later job cancellation prevents a post-mutation observation.
 
 This path does not automatically roll back, deploy, bind, delete, or mutate data. It is safe to run after an audit failure, job cancellation, or withdrawn `deploy-preview` authorization because it makes only read-only control-plane observations. It intentionally performs no cleanup.
 

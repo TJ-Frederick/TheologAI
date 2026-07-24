@@ -5,8 +5,8 @@
  * only after every assertion passes.
  */
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { link, lstat, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { basename, dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { classicTextsOutputSchema } from '../src/mcp/schemas/classicTexts.js';
 import { primarySourceSearchV7OutputSchema } from '../src/mcp/schemas/primarySourceSearchV4.js';
@@ -72,6 +72,20 @@ type ObjectRecord = Record<string, unknown>;
 type RawToolResult = { isError: boolean; structuredContent?: ObjectRecord; text: string[]; raw: ObjectRecord };
 type RequestCounters = { logical: number; http: number };
 
+/** One budget owns preflight, transport, evidence construction, and publication. */
+export class AuditDeadline {
+  constructor(private readonly now: () => number = Date.now, private readonly startedAt = now()) {}
+
+  remaining(label: string): number {
+    const remaining = MAX_DURATION_MS - (this.now() - this.startedAt);
+    assert(remaining > 0, `historical preview audit exceeded its 300-second total deadline during ${label}`);
+    return remaining;
+  }
+
+  assertRemaining(label: string): void { this.remaining(label); }
+  elapsed(): number { return this.now() - this.startedAt; }
+}
+
 function fail(message: string): never { throw new Error(message); }
 function assert(value: unknown, message: string): asserts value { if (!value) fail(message); }
 function object(value: unknown): ObjectRecord | undefined {
@@ -104,16 +118,9 @@ class FixedPreviewMcp {
   readonly counters: RequestCounters = { logical: 0, http: 0 };
   private responseBytes = 0;
   private id = 1;
-  private readonly startedAt = Date.now();
   private sessionId: string | undefined;
 
-  constructor(private readonly fetchImpl: FetchLike) {}
-
-  private remaining(): number {
-    const remaining = MAX_DURATION_MS - (Date.now() - this.startedAt);
-    assert(remaining > 0, 'historical preview audit exceeded total duration budget');
-    return remaining;
-  }
+  constructor(private readonly fetchImpl: FetchLike, private readonly deadline: AuditDeadline) {}
 
   private reserve(logical: boolean): void {
     if (logical) {
@@ -130,7 +137,7 @@ class FixedPreviewMcp {
     assert(target.toString() === PREVIEW_ENDPOINT && target.protocol === 'https:' && target.hostname === 'preview-mcp.theologai.xyz'
       && target.pathname === '/mcp' && !target.search && !target.hash, 'preview audit endpoint allowlist drifted');
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), Math.min(MAX_REQUEST_DURATION_MS, this.remaining()));
+    const timeout = setTimeout(() => controller.abort(), Math.min(MAX_REQUEST_DURATION_MS, this.deadline.remaining(`${label} request`)));
     try {
       const response = await this.fetchImpl(target, {
         method: 'POST', redirect: 'error', signal: controller.signal,
@@ -490,7 +497,8 @@ function assertClassicSearch(raw: RawToolResult, workId: string): ObjectRecord {
   return { returnedHitCount: hits.length, matchingWorkObserved: true, snippetsDiscoveryOnly: true };
 }
 
-function assertPrimarySearch(raw: RawToolResult, workId: string): { uri: string; evidence: ObjectRecord } {
+function assertPrimarySearch(raw: RawToolResult, probe: AuditFixture['probes'][number]): { uri: string; evidence: ObjectRecord } {
+  const { workId } = probe;
   const output = structured(raw, `${workId} primary search`);
   const queries = array(output.queries, `${workId} primary queries`).map(object);
   assert(output.schemaVersion === '7' && output.kind === 'primary_source_search' && output.planStatus === 'complete' && queries.length === 1 && queries[0] !== undefined, `${workId} primary envelope drifted`);
@@ -500,7 +508,7 @@ function assertPrimarySearch(raw: RawToolResult, workId: string): { uri: string;
   const hit = hits.find(candidate => object(candidate?.locator)?.documentId === workId);
   assert(hit !== undefined, `${workId} natural local query did not return its exact hosted work`);
   const locator = object(hit.locator); const readiness = object(hit.editionReadiness);
-  assert(locator?.kind === 'mcp_resource' && typeof locator.uri === 'string' && locator.documentId === workId
+  assert(locator?.kind === 'mcp_resource' && locator.uri === probe.firstSection.resourceUri && locator.documentId === workId
     && readiness?.editionIdentity === 'established' && readiness.normalizedTextRights === 'no_known_conflict', `${workId} primary local evidence identity/readiness drifted`);
   const policy = object(output.evidencePolicy); const coverage = object(output.coverage);
   assert(policy?.snippetUse === 'discovery_only' && policy.localSectionAccess === 'mcp_resource_read'
@@ -532,8 +540,8 @@ function assertCcelDisabled(raw: RawToolResult): ObjectRecord {
 
 function assertNoSensitiveErrorReflection(value: unknown, label: string, rejectedValues: readonly string[]): void {
   const serialized = JSON.stringify(value);
-  assert(!/https?:\/\/|theologai:\/\/|\b(?:authorization|bearer|api[_-]?key|secret|token|password|cookie)\b/iu.test(serialized),
-    `${label} error leaked a URI, credential-shaped value, or secret reflection`);
+  assert(!/https?:\/\/|theologai:\/\/|\b(?:authorization|bearer|api[\s_-]?key|secret|token|password|cookie|sqlite|sql|d1|database|stack|traceback)\b/iu.test(serialized),
+    `${label} error leaked a URI, credential-shaped value, storage detail, stack trace, or secret reflection`);
   for (const rejected of rejectedValues) {
     assert(!serialized.includes(rejected), `${label} error reflected rejected input`);
   }
@@ -568,8 +576,8 @@ function evidenceTextIsSafe(value: unknown): void {
   ]);
   const visit = (input: unknown): void => {
     if (typeof input === 'string') {
-      assert(!/https?:\/\/|theologai:\/\/|\b(?:authorization|bearer|api[_-]?key|secret|token|password|cookie)\b/iu.test(input),
-        'sanitized historical evidence leaked a URI, credential-shaped value, or secret reflection');
+      assert(!/https?:\/\/|theologai:\/\/|\b(?:authorization|bearer|api[\s_-]?key|secret|token|password|cookie|sqlite|sql|d1|database|stack|traceback)\b/iu.test(input),
+        'sanitized historical evidence leaked a URI, credential-shaped value, storage detail, stack trace, or secret reflection');
       return;
     }
     if (Array.isArray(input)) { input.forEach(visit); return; }
@@ -582,9 +590,14 @@ function evidenceTextIsSafe(value: unknown): void {
   visit(value);
 }
 
-export async function runPreviewAudit(fixture: AuditFixture, fetchImpl: FetchLike = fetch): Promise<ObjectRecord> {
+export async function runPreviewAudit(
+  fixture: AuditFixture,
+  fetchImpl: FetchLike = fetch,
+  deadline = new AuditDeadline(),
+): Promise<ObjectRecord> {
   validateFixture(fixture);
-  const startedAt = Date.now(); const client = new FixedPreviewMcp(fetchImpl);
+  deadline.assertRemaining('fixed fixture preflight');
+  const client = new FixedPreviewMcp(fetchImpl, deadline);
   const negotiated = assertInitialize(await client.initialize());
   await client.initialized();
   const schemas = assertToolRegistration(await client.toolsList());
@@ -608,7 +621,7 @@ export async function runPreviewAudit(fixture: AuditFixture, fetchImpl: FetchLik
     const classicSearch = assertClassicSearch(await client.callTool('classic_text_lookup', { query: probe.query }), probe.workId);
     const primary = assertPrimarySearch(await client.callTool('primary_source_search', { queries: [{
       id: `core-${probe.workId}`, text: probe.query, providers: ['local'], work: probe.workId, match: 'all_terms', selection: 'relevance', limit: 5,
-    }] }), probe.workId);
+    }] }), probe);
     const section = assertExactSection(await client.readResource(primary.uri), primary.uri, probe.workId);
     records.push({ workId: probe.workId, editionId: probe.editionId, passed: true, durationMs: Date.now() - started, landing, directory, classicSearch, primary: primary.evidence, section });
   }
@@ -620,10 +633,10 @@ export async function runPreviewAudit(fixture: AuditFixture, fetchImpl: FetchLik
   const invalidCursor = 'not-a-valid-cursor';
   assertSafeToolError(await client.callTool('classic_text_lookup', { work: fixture.probes[0].workId, browseSections: true, cursor: invalidCursor }), 'invalid cursor regression', [invalidCursor]);
   client.complete();
-  assert(Date.now() - startedAt <= MAX_DURATION_MS, 'historical preview audit exceeded end-to-end duration budget');
+  deadline.assertRemaining('evidence construction');
   const evidence = {
     schemaVersion: 1, audit: 'historical-core-preview', endpointClass: 'preview-custom',
-    fixtureSha256: sha256(await readFile(FIXTURE_PATH, 'utf8')), durationMs: Date.now() - startedAt,
+    fixtureSha256: sha256(await readFile(FIXTURE_PATH, 'utf8')), durationMs: deadline.elapsed(),
     negotiated, schemas,
     budgets: {
       logicalOperations: client.counters.logical, maximumLogicalOperations: MAX_LOGICAL_OPERATIONS,
@@ -639,18 +652,78 @@ export async function runPreviewAudit(fixture: AuditFixture, fetchImpl: FetchLik
   };
   evidenceTextIsSafe(evidence);
   assert(utf8Bytes(JSON.stringify(evidence)) <= MAX_EVIDENCE_BYTES, 'sanitized historical evidence exceeds 256 KiB ceiling');
+  deadline.assertRemaining('evidence construction');
   return evidence;
 }
 
-async function main(): Promise<void> {
-  const args = process.argv.slice(2);
+async function assertOutputAbsent(output: string): Promise<void> {
+  try {
+    await lstat(output);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
+    throw error;
+  }
+  fail('historical preview audit output violates no-clobber policy: destination already exists');
+}
+
+/**
+ * `link` is an atomic create-only publication on the same filesystem. A
+ * checked output may race into existence after preflight, but it can never be
+ * replaced by this auditor. The temporary directory is owned solely by this
+ * invocation and is always removed after the link attempt.
+ */
+export async function publishAuditEvidence(
+  output: string,
+  evidence: ObjectRecord,
+  deadline: AuditDeadline,
+): Promise<void> {
+  const parent = dirname(output);
+  deadline.assertRemaining('evidence publication preflight');
+  await mkdir(parent, { recursive: true });
+  deadline.assertRemaining('evidence publication staging');
+  const temporaryRoot = await mkdtemp(join(parent, `.${basename(output)}.historical-core-preview-audit-`));
+  const staged = join(temporaryRoot, 'evidence.json');
+  try {
+    await writeFile(staged, `${JSON.stringify(evidence, null, 2)}\n`, { encoding: 'utf8', flag: 'wx', mode: 0o600 });
+    deadline.assertRemaining('true no-clobber evidence publication');
+    try {
+      await link(staged, output);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+        fail('historical preview audit output violates no-clobber policy: destination appeared during audit');
+      }
+      throw error;
+    }
+  } finally {
+    await rm(temporaryRoot, { recursive: true, force: true });
+  }
+}
+
+export interface AuditCliDependencies {
+  now?: () => number;
+  runAudit?: (fixture: AuditFixture, deadline: AuditDeadline) => Promise<ObjectRecord>;
+}
+
+export async function runAuditCli(args: string[], dependencies: AuditCliDependencies = {}): Promise<{ output: string; evidence: ObjectRecord; probeCount: number }> {
+  const deadline = new AuditDeadline(dependencies.now);
   assert(args.length === 0 || (args.length === 2 && args[0] === '--output' && typeof args[1] === 'string' && args[1].length > 0), 'usage: npm run audit:historical-core-preview -- [--output path]');
   const output = resolve(args.length === 0 ? `test-output/historical-core-preview-audit-${new Date().toISOString().replaceAll(':', '-')}.json` : args[1]!);
+  deadline.assertRemaining('fixed output preflight');
+  await assertOutputAbsent(output);
+  deadline.assertRemaining('fixed fixture preflight');
   const fixture = validateFixture(JSON.parse(await readFile(FIXTURE_PATH, 'utf8')));
-  const evidence = await runPreviewAudit(fixture);
-  await mkdir(dirname(output), { recursive: true });
-  await writeFile(output, `${JSON.stringify(evidence, null, 2)}\n`, { encoding: 'utf8', flag: 'wx' });
-  console.log(`PASS: ${fixture.probes.length} reviewed core historical works; evidence: ${output}`);
+  deadline.assertRemaining('fixed fixture preflight');
+  const evidence = await (dependencies.runAudit === undefined
+    ? runPreviewAudit(fixture, fetch, deadline)
+    : dependencies.runAudit(fixture, deadline));
+  deadline.assertRemaining('evidence publication preflight');
+  await publishAuditEvidence(output, evidence, deadline);
+  return { output, evidence, probeCount: fixture.probes.length };
+}
+
+async function main(): Promise<void> {
+  const { output, probeCount } = await runAuditCli(process.argv.slice(2));
+  console.log(`PASS: ${probeCount} reviewed core historical works; evidence: ${output}`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
