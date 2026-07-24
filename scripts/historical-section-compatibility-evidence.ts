@@ -412,6 +412,15 @@ export function verifyHistoricalSectionCompatibilityMaterialization(
       throw new Error(`D1 seed row ${index + 1} does not match the generated SQLite historical row/order`);
     }
   }
+  for (const [index, sqlite] of scopedSqlite.nonLegacyRows.entries()) {
+    const seed = scopedSeed.nonLegacyRows[index]!;
+    if (seed.id !== sqlite.id
+      || seed.documentId !== sqlite.documentId
+      || seed.legacySectionId !== sqlite.legacySectionId
+      || seed.d1SeedOrdinal !== sqlite.id) {
+      throw new Error(`D1 seed non-legacy historical row ${index + 1} does not match the generated SQLite row/order`);
+    }
+  }
 
   const parsed = parseHistoricalSectionCompatibilityEvidence(evidence);
   for (const group of parsed.collisionGroups) {

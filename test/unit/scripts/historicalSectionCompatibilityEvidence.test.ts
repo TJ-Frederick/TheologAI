@@ -181,6 +181,15 @@ describe('historical section compatibility evidence', () => {
       [...sqliteRows, ...transform9Rows],
       [...seedRows, ...transform9SeedRows.slice(1)],
     )).toThrow('D1 seed non-legacy historical section row count mismatch');
+
+    const sameCountIdentityDrift = structuredClone(transform9SeedRows);
+    sameCountIdentityDrift[0]!.documentId = 'transformed-calvin-institutes';
+    expect(() => verifyHistoricalSectionCompatibilityMaterialization(
+      ROOT,
+      evidence,
+      [...sqliteRows, ...transform9Rows],
+      [...seedRows, ...sameCountIdentityDrift],
+    )).toThrow('D1 seed non-legacy historical row 1 does not match');
   });
 
   it('reads only document-section identity columns from a manifest-checked synthetic seed', () => {
