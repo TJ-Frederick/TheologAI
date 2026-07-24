@@ -93,7 +93,7 @@ row and compares deterministic table hashes with the source SQLite database;
 chunk of every large table through Wrangler's isolated local D1 runtime. This
 keeps the D1 syntax/runtime check practical while the full semantic verifier
 continues to cover every row declared by the generated seed manifest (currently
-1,069,506 rows), including the normalized UBS corpus and original-language
+1,627,474 rows across 49 ordered files), including the normalized UBS corpus and original-language
 usage aggregates. The exact production readiness query is separately exercised
 against the complete derived SQLite database.
 
@@ -181,25 +181,30 @@ Before a full remote seed:
 Create each replacement under a unique name and match the current database's
 location or jurisdiction. Do not use `--update-config`: leave the deployed
 Worker bound to the known-good database while the replacement is prepared.
-After recording the old binding for rollback, edit only the local environment's
-`database_name` and `database_id` in `wrangler.toml`. This local edit does not
-change the deployed Worker. Apply migrations and execute every seed file, in
-manifest order, through that environment binding, then validate the same
-binding before committing or deploying it:
+Record the old binding for rollback, then apply migrations and execute every
+seed file in manifest order against the new database's **exact D1 name**. This
+prepares the target without changing the deployed Worker or the checked-in
+binding:
 
 ```bash
-npx wrangler d1 migrations apply THEOLOGAI_DB --remote --env preview
+CANDIDATE_D1_NAME='the-uniquely-created-preview-database'
+npx wrangler d1 migrations apply "$CANDIDATE_D1_NAME" --remote --env preview
 # Execute every manifest-listed seed file with --remote --env preview.
-npm run d1:remote:check -- --database THEOLOGAI_DB --env preview
+npm run d1:remote:check -- --database "$CANDIDATE_D1_NAME" --env preview
 ```
 
-If any migration or seed import fails or is interrupted, do not resume against
-that partial database. Give the next empty replacement a new name and restart
-from migration application. Preserve the previously bound database through the
-cutover and initial verification window; rollback is restoring its name and ID
-in `wrangler.toml` and redeploying through the normal approval gate. Database
-creation, binding edits, rollback deployments, and eventual deletion remain
-separately authorized operations.
+Only after readiness passes should a reviewed PR change the local preview
+`database_name` and `database_id` to that prepared target. The protected
+workflow re-maps that checked-in ID/name through a read-only D1 inventory,
+re-runs readiness by exact name, proves the active predecessor uses a different
+D1, and only then permits a Worker deploy. If any migration or seed import
+fails or is interrupted, do not resume against that partial database. Give the
+next empty replacement a new name and restart from migration application.
+Preserve the previously bound database through the cutover and initial
+verification window; rollback is restoring its name and ID in `wrangler.toml`
+and redeploying through the normal approval gate. Database creation, binding
+edits, rollback deployments, and eventual deletion remain separately authorized
+operations.
 
 Approved deploy jobs perform the last compatibility check read-only:
 

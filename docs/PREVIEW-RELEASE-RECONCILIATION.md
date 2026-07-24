@@ -1,6 +1,15 @@
 # Preview Release Reconciliation
 
-The protected preview workflow records and uploads a predecessor anchor before it mutates the preview Worker, and records the active deployment again after the release gate. Each record hashes an authoritative Cloudflare `versions view` response for the exact active Worker version and verifies it contains exactly one `THEOLOGAI_DB` D1 binding equal to the checked-out, readiness-tested preview binding. They are evidence, not a deployment mechanism. Uploading the predecessor first preserves a manual recovery target even if a later job cancellation prevents a post-mutation observation.
+The protected preview workflow records and uploads a predecessor anchor before it mutates the preview Worker, proves the newly deployed Worker binds the candidate before either black-box audit, and records the active deployment again after the release gate. These are evidence, not a deployment mechanism. Uploading the predecessor first preserves a manual recovery target even if a later job cancellation prevents a post-mutation observation.
+
+The record intentionally distinguishes two D1 identities:
+
+- `predecessorD1` is read only from the sole 100%-active pre-cutover Worker’s authoritative `wrangler versions view` response.
+- `candidateD1` is the checked-in preview configuration, matched against a read-only `wrangler d1 list --json` ID/name inventory and then tested by the readiness gate using its exact D1 database name.
+
+The candidate must be a different D1 ID from the predecessor. Wrangler 4.107.0’s D1 binding response is accepted only when the sole `THEOLOGAI_DB` binding has canonical UUID `id` and `database_id` fields that agree exactly. After deployment, the sole active Worker version must bind that candidate ID before either fixed audit begins; a retained-old-D1 deployment is refused even if its Worker version otherwise looks new.
+
+As of the 2026-07-24 read-only inventory, the retained preview predecessor is deployment `7f00a94b-4ff4-47d6-9bee-2efb99673718`, Worker version `f78d66f1-cefe-46ba-88ba-9ddec259cda4` (#112), bound to `theologai-preview-20260722-b` (`94c4938b-7800-4d68-9097-0df33c31fdc1`). No Transform-9 candidate D1 has been created or approved yet; do not treat the predecessor as a candidate merely because it is currently named in configuration.
 
 This path does not automatically roll back, deploy, bind, delete, or mutate data. It is safe to run after an audit failure, job cancellation, or withdrawn `deploy-preview` authorization because it makes only read-only control-plane observations. It intentionally performs no cleanup.
 
@@ -8,8 +17,9 @@ If a post-mutation audit does not pass, treat the candidate as unverified. An op
 
 1. the retained predecessor anchor’s version and deployment IDs;
 2. the post-mutation record’s active version and deployment IDs;
-3. the captured preview D1 binding still matches the checked-out binding; and
-4. a compatible, separately retained D1 readiness record for the version being restored.
+3. the predecessor and candidate D1 IDs in both reconciliation records, including the exact candidate ID/name inventory mapping;
+4. the candidate’s readiness record and the deployed Worker’s candidate-binding proof; and
+5. a compatible, separately retained D1 readiness record for the version being restored.
 
 Only after those checks may an authorized operator choose a manual Worker rollback to the exact predecessor version, followed by the normal preview audit. No D1 rollback, rebinding, migration, seeding, or deletion is implied by Worker rollback. If D1 compatibility is not proven, stop and obtain a separate data recovery plan and authorization.
 

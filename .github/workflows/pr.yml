@@ -273,8 +273,23 @@ jobs:
 
       - run: npm ci
 
-      - name: Verify preview D1 is compatible (read-only)
-        run: npm run d1:remote:check -- --database THEOLOGAI_DB --env preview
+      # Resolve the checked-out candidate by ID and name before readiness.
+      # The Worker remains bound to the predecessor until the later deploy.
+      - name: Capture checked-out candidate preview D1 mapping (read-only)
+        run: |
+          npx --no-install wrangler d1 list --json > "$RUNNER_TEMP/preview-d1-inventory.json"
+          npx --no-install tsx scripts/preview-release-reconciliation.ts candidate-d1-name \
+            --wrangler-config wrangler.toml \
+            --d1-inventory "$RUNNER_TEMP/preview-d1-inventory.json" \
+            > "$RUNNER_TEMP/preview-candidate-d1-name.txt"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Verify candidate preview D1 is compatible (read-only)
+        run: |
+          candidate_d1_name="$(< "$RUNNER_TEMP/preview-candidate-d1-name.txt")"
+          npm run d1:remote:check -- --database "$candidate_d1_name" --env preview
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -296,6 +311,7 @@ jobs:
             --deployments "$RUNNER_TEMP/preview-worker-deployments-predecessor.json" \
             --predecessor-version-view "$RUNNER_TEMP/preview-worker-predecessor-version-view.json" \
             --wrangler-config wrangler.toml \
+            --d1-inventory "$RUNNER_TEMP/preview-d1-inventory.json" \
             --output "$RUNNER_TEMP/preview-worker-predecessor-anchor.json"
 
       # Retain the predecessor before mutation so a later job cancellation
@@ -375,6 +391,26 @@ jobs:
             --output "$RUNNER_TEMP/preview-worker-deployment-pre-audit-identity.json" \
             --github-output "$GITHUB_OUTPUT"
 
+      # Do this before either fixed black-box audit: a deployed Worker must be
+      # both sole-active and bound to the readiness-tested candidate D1.
+      - name: Require deployed candidate preview D1 binding (read-only)
+        id: preview-worker-candidate-cutover
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
+        run: |
+          observed_active_version="$(npx --no-install tsx scripts/preview-release-reconciliation.ts active-version-id \
+            --deployments "$RUNNER_TEMP/preview-worker-deployments-after.json")"
+          npx --no-install wrangler versions view "$observed_active_version" --env preview --json \
+            > "$RUNNER_TEMP/preview-worker-candidate-version-view.json"
+          npx --no-install tsx scripts/preview-release-reconciliation.ts reconcile-post-mutation \
+            --predecessor-anchor "$RUNNER_TEMP/preview-worker-predecessor-anchor.json" \
+            --deployments "$RUNNER_TEMP/preview-worker-deployments-after.json" \
+            --observed-active-version-view "$RUNNER_TEMP/preview-worker-candidate-version-view.json" \
+            --wrangler-config wrangler.toml \
+            --output "$RUNNER_TEMP/preview-worker-candidate-cutover.json"
+
       # This is deliberately a post-deploy release gate, not an ordinary PR
       # check: the runner is pinned to the canonical preview custom domain.
       - name: Audit original-language v2 contract on preview
@@ -443,6 +479,7 @@ jobs:
             ${{ runner.temp }}/original-language-v2-preview-audit.json
             ${{ runner.temp }}/historical-core-preview-audit.json
             ${{ runner.temp }}/preview-worker-deployment-identity.json
+            ${{ runner.temp }}/preview-worker-candidate-cutover.json
           retention-days: 7
           if-no-files-found: error
 
@@ -452,6 +489,7 @@ jobs:
         with:
           name: preview-release-reconciliation-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
           path: |
+            ${{ runner.temp }}/preview-worker-candidate-cutover.json
             ${{ runner.temp }}/preview-worker-post-mutation-reconciliation.json
           retention-days: 7
           if-no-files-found: error
