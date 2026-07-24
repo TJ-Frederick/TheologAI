@@ -78,6 +78,7 @@ export interface HistoricalSectionCompatibilityEvidence {
 export interface HistoricalSectionCompatibilityVerificationReport {
   documentCount: number;
   sectionCount: number;
+  nonLegacyDocumentSectionCount: number;
   collisionGroups: number;
   affectedSections: number;
   newlyAddressableSections: number;
@@ -380,15 +381,25 @@ export function verifyHistoricalSectionCompatibilityMaterialization(
   seedRows: HistoricalSectionSeedRow[],
 ): HistoricalSectionCompatibilityVerificationReport {
   const derived = verifyHistoricalSectionCompatibilityEvidenceFromSources(root, evidence);
-  if (sqliteRows.length !== derived.allRows.length) {
-    throw new Error(`SQLite historical section row count mismatch: expected ${derived.allRows.length}, received ${sqliteRows.length}`);
+  // Transform 6 compatibility evidence is intentionally limited to the frozen
+  // 17-work legacy projection. Transform 9 adds edition-backed documents to
+  // the same tables; keep those rows visible in the report, but never let
+  // them relax or redefine the reviewed 3,054-row legacy contract.
+  const legacyDocumentIds = new Set(derived.allRows.map(row => row.documentId));
+  const scopedSqlite = scopeLegacyHistoricalSectionRows(sqliteRows, legacyDocumentIds);
+  const scopedSeed = scopeLegacyHistoricalSectionRows(seedRows, legacyDocumentIds);
+  if (scopedSqlite.legacyRows.length !== derived.allRows.length) {
+    throw new Error(`SQLite legacy historical section row count mismatch: expected ${derived.allRows.length}, received ${scopedSqlite.legacyRows.length}`);
   }
-  if (seedRows.length !== sqliteRows.length) {
-    throw new Error(`D1 seed historical section row count mismatch: expected ${sqliteRows.length}, received ${seedRows.length}`);
+  if (scopedSeed.legacyRows.length !== scopedSqlite.legacyRows.length) {
+    throw new Error(`D1 seed legacy historical section row count mismatch: expected ${scopedSqlite.legacyRows.length}, received ${scopedSeed.legacyRows.length}`);
+  }
+  if (scopedSeed.nonLegacyRows.length !== scopedSqlite.nonLegacyRows.length) {
+    throw new Error(`D1 seed non-legacy historical section row count mismatch: expected ${scopedSqlite.nonLegacyRows.length}, received ${scopedSeed.nonLegacyRows.length}`);
   }
   for (const [index, expected] of derived.allRows.entries()) {
-    const sqlite = sqliteRows[index]!;
-    const seed = seedRows[index]!;
+    const sqlite = scopedSqlite.legacyRows[index]!;
+    const seed = scopedSeed.legacyRows[index]!;
     if (sqlite.id !== expected.sqliteBuilderRowId
       || sqlite.documentId !== expected.documentId
       || sqlite.legacySectionId !== expected.legacySectionId) {
@@ -413,6 +424,7 @@ export function verifyHistoricalSectionCompatibilityMaterialization(
   return {
     documentCount: new Set(derived.allRows.map(row => row.documentId)).size,
     sectionCount: derived.allRows.length,
+    nonLegacyDocumentSectionCount: scopedSqlite.nonLegacyRows.length,
     collisionGroups: parsed.expectedCollisionReport.collisionGroups,
     affectedSections: parsed.expectedCollisionReport.affectedSections,
     newlyAddressableSections: parsed.expectedCollisionReport.newlyAddressableSections,
@@ -422,6 +434,19 @@ export function verifyHistoricalSectionCompatibilityMaterialization(
     productionObservedTarget: null,
     decisionStatus: 'approved_source_first',
   };
+}
+
+function scopeLegacyHistoricalSectionRows<T extends HistoricalSectionMaterializedRow>(
+  rows: readonly T[],
+  legacyDocumentIds: ReadonlySet<string>,
+): { legacyRows: T[]; nonLegacyRows: T[] } {
+  const legacyRows: T[] = [];
+  const nonLegacyRows: T[] = [];
+  for (const row of rows) {
+    if (legacyDocumentIds.has(row.documentId)) legacyRows.push(row);
+    else nonLegacyRows.push(row);
+  }
+  return { legacyRows, nonLegacyRows };
 }
 
 /** Verify the exact current no-ORDER-BY runtime state that makes this evidence non-authoritative. */
