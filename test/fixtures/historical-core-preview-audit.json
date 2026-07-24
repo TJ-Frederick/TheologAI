@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "kind": "historical-core-preview-audit-fixture",
+  "baseline": {
+    "manifestSchemaVersion": "0006_historical_source_packs",
+    "d1TransformVersion": 9,
+    "expectedCatalogIdentity": {
+      "workCount": 25,
+      "legacyWorkCount": 17,
+      "coreWorkCount": 8,
+      "coreSectionCount": 512
+    },
+    "sourcePackId": "theologai-core-eight"
+  },
+  "probes": [
+    {
+      "workId": "augustine-confessions",
+      "editionId": "augustine-confessions-pusey-1838",
+      "query": "restless heart"
+    },
+    {
+      "workId": "john-damascene-exact-exposition",
+      "editionId": "john-damascene-exposition-salmond-npnf2-v9",
+      "query": "two natures"
+    },
+    {
+      "workId": "calvin-institutes",
+      "editionId": "calvin-institutes-beveridge-1845",
+      "query": "justification"
+    },
+    {
+      "workId": "wesley-standard-sermons",
+      "editionId": "wesley-standard-sermons-1771",
+      "query": "salvation"
+    },
+    {
+      "workId": "bunyan-pilgrims-progress-part-1",
+      "editionId": "bunyan-pilgrims-progress-part-1",
+      "query": "Christian"
+    },
+    {
+      "workId": "athanasius-on-incarnation",
+      "editionId": "athanasius-on-incarnation-robertson-npnf2-v4",
+      "query": "renewal creation"
+    },
+    {
+      "workId": "irenaeus-against-heresies",
+      "editionId": "irenaeus-against-heresies-anf1-1885",
+      "query": "heresies"
+    },
+    {
+      "workId": "anselm-proslogion",
+      "editionId": "anselm-proslogion-deane-1903",
+      "query": "that than which nothing greater"
+    }
+  ],
+  "legacyRegression": {
+    "workId": "apostles-creed",
+    "deliveryMode": "complete_document"
+  }
+}

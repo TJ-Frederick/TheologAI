@@ -354,6 +354,12 @@ jobs:
             --output "$RUNNER_TEMP/original-language-v2-preview-audit.json"
           test -s "$RUNNER_TEMP/original-language-v2-preview-audit.json"
 
+      - name: Audit Transform-9 historical core contract on preview
+        run: |
+          npm run audit:historical-core-preview -- \
+            --output "$RUNNER_TEMP/historical-core-preview-audit.json"
+          test -s "$RUNNER_TEMP/historical-core-preview-audit.json"
+
       - name: Verify preview Worker remained active through audit (read-only)
         id: preview-worker-audit-identity
         env:
@@ -371,17 +377,20 @@ jobs:
       - name: Hash sanitized preview audit evidence
         id: preview-audit-evidence
         run: |
-          audit_sha256="$(sha256sum "$RUNNER_TEMP/original-language-v2-preview-audit.json" | awk '{print $1}')"
+          original_language_audit_sha256="$(sha256sum "$RUNNER_TEMP/original-language-v2-preview-audit.json" | awk '{print $1}')"
+          historical_audit_sha256="$(sha256sum "$RUNNER_TEMP/historical-core-preview-audit.json" | awk '{print $1}')"
           identity_sha256="$(sha256sum "$RUNNER_TEMP/preview-worker-deployment-identity.json" | awk '{print $1}')"
-          printf 'audit_sha256=%s\n' "$audit_sha256" >> "$GITHUB_OUTPUT"
+          printf 'original_language_audit_sha256=%s\n' "$original_language_audit_sha256" >> "$GITHUB_OUTPUT"
+          printf 'historical_audit_sha256=%s\n' "$historical_audit_sha256" >> "$GITHUB_OUTPUT"
           printf 'identity_record_sha256=%s\n' "$identity_sha256" >> "$GITHUB_OUTPUT"
 
       - name: Upload protected preview audit evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: original-language-v2-preview-audit-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          name: preview-release-audit-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
           path: |
             ${{ runner.temp }}/original-language-v2-preview-audit.json
+            ${{ runner.temp }}/historical-core-preview-audit.json
             ${{ runner.temp }}/preview-worker-deployment-identity.json
           retention-days: 7
           if-no-files-found: error
@@ -394,8 +403,9 @@ jobs:
           WORKER_VERSION_ID: ${{ steps.preview-worker-audit-identity.outputs.version_id }}
           WORKER_DEPLOYMENT_ID: ${{ steps.preview-worker-audit-identity.outputs.deployment_id }}
           WORKER_IDENTITY_SHA256: ${{ steps.preview-audit-evidence.outputs.identity_record_sha256 }}
-          AUDIT_SHA256: ${{ steps.preview-audit-evidence.outputs.audit_sha256 }}
-          AUDIT_ARTIFACT: original-language-v2-preview-audit-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          ORIGINAL_LANGUAGE_AUDIT_SHA256: ${{ steps.preview-audit-evidence.outputs.original_language_audit_sha256 }}
+          HISTORICAL_AUDIT_SHA256: ${{ steps.preview-audit-evidence.outputs.historical_audit_sha256 }}
+          AUDIT_ARTIFACT: preview-release-audit-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
         with:
           script: |
             const commit = process.env.CHECKED_OUT_COMMIT;
@@ -403,13 +413,15 @@ jobs:
             const workerVersion = process.env.WORKER_VERSION_ID;
             const deployment = process.env.WORKER_DEPLOYMENT_ID;
             const workerIdentity = process.env.WORKER_IDENTITY_SHA256;
-            const audit = process.env.AUDIT_SHA256;
+            const originalLanguageAudit = process.env.ORIGINAL_LANGUAGE_AUDIT_SHA256;
+            const historicalAudit = process.env.HISTORICAL_AUDIT_SHA256;
             const artifact = process.env.AUDIT_ARTIFACT;
             if (!/^[0-9a-f]{40}$/i.test(commit) || !/^[0-9a-f]{40}$/i.test(tree)
               || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(workerVersion)
               || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(deployment)
-              || !/^[0-9a-f]{64}$/i.test(workerIdentity) || !/^[0-9a-f]{64}$/i.test(audit)
-              || !/^original-language-v2-preview-audit-\d+-[0-9a-f]{40}$/i.test(artifact)) {
+              || !/^[0-9a-f]{64}$/i.test(workerIdentity) || !/^[0-9a-f]{64}$/i.test(originalLanguageAudit)
+              || !/^[0-9a-f]{64}$/i.test(historicalAudit)
+              || !/^preview-release-audit-\d+-[0-9a-f]{40}$/i.test(artifact)) {
               core.setFailed('Preview release evidence is missing or malformed.');
               return;
             }
@@ -423,7 +435,7 @@ jobs:
               '',
               `Deployed from checked-out commit \`${commit}\` (tree \`${tree}\`).`,
               `Cloudflare confirms Worker version \`${workerVersion}\` at 100% in deployment \`${deployment}\`.`,
-              `Sanitized audit evidence SHA-256: \`${audit}\`; identity record SHA-256: \`${workerIdentity}\`; retained artifact: \`${artifact}\` (7 days).`,
+              `Original-language audit SHA-256: \`${originalLanguageAudit}\`; historical-core audit SHA-256: \`${historicalAudit}\`; identity record SHA-256: \`${workerIdentity}\`; retained artifact: \`${artifact}\` (7 days).`,
             ].join('\n');
 
             const { data: comments } = await github.rest.issues.listComments({
