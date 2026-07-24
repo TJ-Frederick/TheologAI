@@ -23,6 +23,11 @@
         "sectionKey": "book-01",
         "sourceOrdinal": 1,
         "resourceUri": "theologai://documents/augustine-confessions#section-book-01"
+      },
+      "primarySearch": {
+        "sectionKey": "book-02",
+        "sourceOrdinal": 2,
+        "resourceUri": "theologai://documents/augustine-confessions#section-book-02"
       }
     },
     {
@@ -35,6 +40,11 @@
         "sectionKey": "book-1-chapter-01",
         "sourceOrdinal": 1,
         "resourceUri": "theologai://documents/john-damascene-exact-exposition#section-book-1-chapter-01"
+      },
+      "primarySearch": {
+        "sectionKey": "book-3-chapter-16",
+        "sourceOrdinal": 60,
+        "resourceUri": "theologai://documents/john-damascene-exact-exposition#section-book-3-chapter-16"
       }
     },
     {
@@ -47,6 +57,11 @@
         "sectionKey": "book-1-chapter-01",
         "sourceOrdinal": 1,
         "resourceUri": "theologai://documents/calvin-institutes#section-book-1-chapter-01"
+      },
+      "primarySearch": {
+        "sectionKey": "book-3-chapter-17",
+        "sourceOrdinal": 54,
+        "resourceUri": "theologai://documents/calvin-institutes#section-book-3-chapter-17"
       }
     },
     {
@@ -56,6 +71,11 @@
       "sectionCount": 55,
       "landingResourceUri": "theologai://documents/wesley-standard-sermons",
       "firstSection": {
+        "sectionKey": "sermon-01",
+        "sourceOrdinal": 1,
+        "resourceUri": "theologai://documents/wesley-standard-sermons#section-sermon-01"
+      },
+      "primarySearch": {
         "sectionKey": "sermon-01",
         "sourceOrdinal": 1,
         "resourceUri": "theologai://documents/wesley-standard-sermons#section-sermon-01"
@@ -71,6 +91,11 @@
         "sectionKey": "part-01-part-01",
         "sourceOrdinal": 1,
         "resourceUri": "theologai://documents/bunyan-pilgrims-progress-part-1#section-part-01-part-01"
+      },
+      "primarySearch": {
+        "sectionKey": "part-01-part-01",
+        "sourceOrdinal": 1,
+        "resourceUri": "theologai://documents/bunyan-pilgrims-progress-part-1#section-part-01-part-01"
       }
     },
     {
@@ -80,6 +105,11 @@
       "sectionCount": 57,
       "landingResourceUri": "theologai://documents/athanasius-on-incarnation",
       "firstSection": {
+        "sectionKey": "section-001",
+        "sourceOrdinal": 1,
+        "resourceUri": "theologai://documents/athanasius-on-incarnation#section-section-001"
+      },
+      "primarySearch": {
         "sectionKey": "section-001",
         "sourceOrdinal": 1,
         "resourceUri": "theologai://documents/athanasius-on-incarnation#section-section-001"
@@ -95,6 +125,11 @@
         "sectionKey": "book-1-preface",
         "sourceOrdinal": 1,
         "resourceUri": "theologai://documents/irenaeus-against-heresies#section-book-1-preface"
+      },
+      "primarySearch": {
+        "sectionKey": "book-1-chapter-28",
+        "sourceOrdinal": 29,
+        "resourceUri": "theologai://documents/irenaeus-against-heresies#section-book-1-chapter-28"
       }
     },
     {
@@ -107,6 +142,11 @@
         "sectionKey": "preface",
         "sourceOrdinal": 1,
         "resourceUri": "theologai://documents/anselm-proslogion#section-preface"
+      },
+      "primarySearch": {
+        "sectionKey": "chapter-02",
+        "sourceOrdinal": 3,
+        "resourceUri": "theologai://documents/anselm-proslogion#section-chapter-02"
       }
     }
   ],

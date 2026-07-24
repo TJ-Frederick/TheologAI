@@ -5,7 +5,7 @@
  * only after every assertion passes.
  */
 import { createHash } from 'node:crypto';
-import { link, lstat, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { link, lstat, mkdir, mkdtemp, readFile, rm, unlink, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { classicTextsOutputSchema } from '../src/mcp/schemas/classicTexts.js';
@@ -53,14 +53,14 @@ const EXPECTED_FIXTURE = {
     sourcePackId: 'theologai-core-eight',
   },
   probes: [
-    { workId: 'augustine-confessions', editionId: 'augustine-confessions-pusey-1838', query: 'restless heart', sectionCount: 13, landingResourceUri: 'theologai://documents/augustine-confessions', firstSection: { sectionKey: 'book-01', sourceOrdinal: 1, resourceUri: 'theologai://documents/augustine-confessions#section-book-01' } },
-    { workId: 'john-damascene-exact-exposition', editionId: 'john-damascene-exposition-salmond-npnf2-v9', query: 'two natures', sectionCount: 100, landingResourceUri: 'theologai://documents/john-damascene-exact-exposition', firstSection: { sectionKey: 'book-1-chapter-01', sourceOrdinal: 1, resourceUri: 'theologai://documents/john-damascene-exact-exposition#section-book-1-chapter-01' } },
-    { workId: 'calvin-institutes', editionId: 'calvin-institutes-beveridge-1845', query: 'justification', sectionCount: 84, landingResourceUri: 'theologai://documents/calvin-institutes', firstSection: { sectionKey: 'book-1-chapter-01', sourceOrdinal: 1, resourceUri: 'theologai://documents/calvin-institutes#section-book-1-chapter-01' } },
-    { workId: 'wesley-standard-sermons', editionId: 'wesley-standard-sermons-1771', query: 'salvation', sectionCount: 55, landingResourceUri: 'theologai://documents/wesley-standard-sermons', firstSection: { sectionKey: 'sermon-01', sourceOrdinal: 1, resourceUri: 'theologai://documents/wesley-standard-sermons#section-sermon-01' } },
-    { workId: 'bunyan-pilgrims-progress-part-1', editionId: 'bunyan-pilgrims-progress-part-1', query: 'Christian', sectionCount: 3, landingResourceUri: 'theologai://documents/bunyan-pilgrims-progress-part-1', firstSection: { sectionKey: 'part-01-part-01', sourceOrdinal: 1, resourceUri: 'theologai://documents/bunyan-pilgrims-progress-part-1#section-part-01-part-01' } },
-    { workId: 'athanasius-on-incarnation', editionId: 'athanasius-on-incarnation-robertson-npnf2-v4', query: 'renewal creation', sectionCount: 57, landingResourceUri: 'theologai://documents/athanasius-on-incarnation', firstSection: { sectionKey: 'section-001', sourceOrdinal: 1, resourceUri: 'theologai://documents/athanasius-on-incarnation#section-section-001' } },
-    { workId: 'irenaeus-against-heresies', editionId: 'irenaeus-against-heresies-anf1-1885', query: 'heresies', sectionCount: 173, landingResourceUri: 'theologai://documents/irenaeus-against-heresies', firstSection: { sectionKey: 'book-1-preface', sourceOrdinal: 1, resourceUri: 'theologai://documents/irenaeus-against-heresies#section-book-1-preface' } },
-    { workId: 'anselm-proslogion', editionId: 'anselm-proslogion-deane-1903', query: 'that than which nothing greater', sectionCount: 27, landingResourceUri: 'theologai://documents/anselm-proslogion', firstSection: { sectionKey: 'preface', sourceOrdinal: 1, resourceUri: 'theologai://documents/anselm-proslogion#section-preface' } },
+    { workId: 'augustine-confessions', editionId: 'augustine-confessions-pusey-1838', query: 'restless heart', sectionCount: 13, landingResourceUri: 'theologai://documents/augustine-confessions', firstSection: { sectionKey: 'book-01', sourceOrdinal: 1, resourceUri: 'theologai://documents/augustine-confessions#section-book-01' }, primarySearch: { sectionKey: 'book-02', sourceOrdinal: 2, resourceUri: 'theologai://documents/augustine-confessions#section-book-02' } },
+    { workId: 'john-damascene-exact-exposition', editionId: 'john-damascene-exposition-salmond-npnf2-v9', query: 'two natures', sectionCount: 100, landingResourceUri: 'theologai://documents/john-damascene-exact-exposition', firstSection: { sectionKey: 'book-1-chapter-01', sourceOrdinal: 1, resourceUri: 'theologai://documents/john-damascene-exact-exposition#section-book-1-chapter-01' }, primarySearch: { sectionKey: 'book-3-chapter-16', sourceOrdinal: 60, resourceUri: 'theologai://documents/john-damascene-exact-exposition#section-book-3-chapter-16' } },
+    { workId: 'calvin-institutes', editionId: 'calvin-institutes-beveridge-1845', query: 'justification', sectionCount: 84, landingResourceUri: 'theologai://documents/calvin-institutes', firstSection: { sectionKey: 'book-1-chapter-01', sourceOrdinal: 1, resourceUri: 'theologai://documents/calvin-institutes#section-book-1-chapter-01' }, primarySearch: { sectionKey: 'book-3-chapter-17', sourceOrdinal: 54, resourceUri: 'theologai://documents/calvin-institutes#section-book-3-chapter-17' } },
+    { workId: 'wesley-standard-sermons', editionId: 'wesley-standard-sermons-1771', query: 'salvation', sectionCount: 55, landingResourceUri: 'theologai://documents/wesley-standard-sermons', firstSection: { sectionKey: 'sermon-01', sourceOrdinal: 1, resourceUri: 'theologai://documents/wesley-standard-sermons#section-sermon-01' }, primarySearch: { sectionKey: 'sermon-01', sourceOrdinal: 1, resourceUri: 'theologai://documents/wesley-standard-sermons#section-sermon-01' } },
+    { workId: 'bunyan-pilgrims-progress-part-1', editionId: 'bunyan-pilgrims-progress-part-1', query: 'Christian', sectionCount: 3, landingResourceUri: 'theologai://documents/bunyan-pilgrims-progress-part-1', firstSection: { sectionKey: 'part-01-part-01', sourceOrdinal: 1, resourceUri: 'theologai://documents/bunyan-pilgrims-progress-part-1#section-part-01-part-01' }, primarySearch: { sectionKey: 'part-01-part-01', sourceOrdinal: 1, resourceUri: 'theologai://documents/bunyan-pilgrims-progress-part-1#section-part-01-part-01' } },
+    { workId: 'athanasius-on-incarnation', editionId: 'athanasius-on-incarnation-robertson-npnf2-v4', query: 'renewal creation', sectionCount: 57, landingResourceUri: 'theologai://documents/athanasius-on-incarnation', firstSection: { sectionKey: 'section-001', sourceOrdinal: 1, resourceUri: 'theologai://documents/athanasius-on-incarnation#section-section-001' }, primarySearch: { sectionKey: 'section-001', sourceOrdinal: 1, resourceUri: 'theologai://documents/athanasius-on-incarnation#section-section-001' } },
+    { workId: 'irenaeus-against-heresies', editionId: 'irenaeus-against-heresies-anf1-1885', query: 'heresies', sectionCount: 173, landingResourceUri: 'theologai://documents/irenaeus-against-heresies', firstSection: { sectionKey: 'book-1-preface', sourceOrdinal: 1, resourceUri: 'theologai://documents/irenaeus-against-heresies#section-book-1-preface' }, primarySearch: { sectionKey: 'book-1-chapter-28', sourceOrdinal: 29, resourceUri: 'theologai://documents/irenaeus-against-heresies#section-book-1-chapter-28' } },
+    { workId: 'anselm-proslogion', editionId: 'anselm-proslogion-deane-1903', query: 'that than which nothing greater', sectionCount: 27, landingResourceUri: 'theologai://documents/anselm-proslogion', firstSection: { sectionKey: 'preface', sourceOrdinal: 1, resourceUri: 'theologai://documents/anselm-proslogion#section-preface' }, primarySearch: { sectionKey: 'chapter-02', sourceOrdinal: 3, resourceUri: 'theologai://documents/anselm-proslogion#section-chapter-02' } },
   ],
   legacyRegression: { workId: 'apostles-creed', deliveryMode: 'complete_document' },
 } as const;
@@ -505,10 +505,12 @@ function assertPrimarySearch(raw: RawToolResult, probe: AuditFixture['probes'][n
   const providers = array(queries[0]!.providers, `${workId} primary providers`).map(object);
   assert(providers.length === 1 && providers[0]?.provider === 'local' && providers[0]?.status === 'ok' && providers[0]?.searched === true, `${workId} local provider execution drifted`);
   const hits = array(providers[0]!.hits, `${workId} local hits`).map(object);
-  const hit = hits.find(candidate => object(candidate?.locator)?.documentId === workId);
-  assert(hit !== undefined, `${workId} natural local query did not return its exact hosted work`);
+  const hit = hits[0];
+  assert(hit !== undefined, `${workId} natural local query returned no relevance-ranked hit`);
   const locator = object(hit.locator); const readiness = object(hit.editionReadiness);
-  assert(locator?.kind === 'mcp_resource' && locator.uri === probe.firstSection.resourceUri && locator.documentId === workId
+  assert(locator?.kind === 'mcp_resource' && locator.documentId === workId
+    && locator.sectionKey === probe.primarySearch.sectionKey && locator.sourceOrdinal === probe.primarySearch.sourceOrdinal
+    && locator.uri === probe.primarySearch.resourceUri
     && readiness?.editionIdentity === 'established' && readiness.normalizedTextRights === 'no_known_conflict', `${workId} primary local evidence identity/readiness drifted`);
   const policy = object(output.evidencePolicy); const coverage = object(output.coverage);
   assert(policy?.snippetUse === 'discovery_only' && policy.localSectionAccess === 'mcp_resource_read'
@@ -670,7 +672,9 @@ async function assertOutputAbsent(output: string): Promise<void> {
  * `link` is an atomic create-only publication on the same filesystem. A
  * checked output may race into existence after preflight, but it can never be
  * replaced by this auditor. The temporary directory is owned solely by this
- * invocation and is always removed after the link attempt.
+ * invocation and is always removed after the link attempt. If the shared
+ * deadline expires immediately after publication, the final link is removed
+ * only after its inode is proven to still be that invocation's staged file.
  */
 export async function publishAuditEvidence(
   output: string,
@@ -694,9 +698,30 @@ export async function publishAuditEvidence(
       }
       throw error;
     }
+    try {
+      deadline.assertRemaining('true no-clobber evidence publication finalization');
+    } catch (error) {
+      await removeInvocationFinalLink(output, staged);
+      throw error;
+    }
   } finally {
     await rm(temporaryRoot, { recursive: true, force: true });
   }
+}
+
+/** Never delete a post-publication path unless it is still our hard link. */
+async function removeInvocationFinalLink(output: string, staged: string): Promise<void> {
+  let published: import('node:fs').Stats;
+  try {
+    published = await lstat(output);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
+    throw error;
+  }
+  const source = await lstat(staged);
+  assert(published.isFile() && source.isFile() && published.dev === source.dev && published.ino === source.ino,
+    'historical preview audit cannot safely remove a post-expiry output that is no longer its final link');
+  await unlink(output);
 }
 
 export interface AuditCliDependencies {

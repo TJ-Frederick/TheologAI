@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import {
   AuditDeadline,
   MAX_MCP_RESPONSE_BYTES,
+  publishAuditEvidence,
   readBoundedResponseBody,
   runAuditCli,
   runPreviewAudit,
@@ -45,7 +46,7 @@ async function fixture(): Promise<RecordValue> {
 }
 
 describe('historical core preview audit contract', () => {
-  it('accepts only the immutable 25=17+8 Transform-9 fixture, including exact source counts and canonical locators', async () => {
+  it('accepts only the immutable 25=17+8 Transform-9 fixture, including separate directory and relevance locators', async () => {
     const parsed = validateFixture(await fixture());
     expect(parsed.baseline.expectedCatalogIdentity).toEqual({ workCount: 25, legacyWorkCount: 17, coreWorkCount: 8, coreSectionCount: 512 });
     expect(parsed.probes).toHaveLength(8);
@@ -54,13 +55,21 @@ describe('historical core preview audit contract', () => {
       sectionKey: 'book-1-chapter-01', sourceOrdinal: 1,
       resourceUri: 'theologai://documents/calvin-institutes#section-book-1-chapter-01',
     });
+    expect(parsed.probes.find(probe => probe.workId === 'calvin-institutes')?.primarySearch).toEqual({
+      sectionKey: 'book-3-chapter-17', sourceOrdinal: 54,
+      resourceUri: 'theologai://documents/calvin-institutes#section-book-3-chapter-17',
+    });
 
     const changed = structuredClone(parsed) as unknown as RecordValue;
     ((changed.probes as Array<RecordValue>)[0]!).firstSection = { sectionKey: 'wrong', sourceOrdinal: 1, resourceUri: 'theologai://documents/wrong' };
     expect(() => validateFixture(changed)).toThrow('fixture identity or probe inventory drifted');
+
+    const changedPrimary = structuredClone(parsed) as unknown as RecordValue;
+    ((changedPrimary.probes as Array<RecordValue>)[0]!).primarySearch = { sectionKey: 'wrong', sourceOrdinal: 1, resourceUri: 'theologai://documents/wrong' };
+    expect(() => validateFixture(changedPrimary)).toThrow('fixture identity or probe inventory drifted');
   });
 
-  it('keeps every natural probe grounded in its pinned reviewed source-pack edition and first source section', async () => {
+  it('keeps every natural probe grounded in its pinned reviewed source-pack edition, directory section, and actual relevance section', async () => {
     const parsed = validateFixture(await fixture());
     for (const probe of parsed.probes) {
       const edition = JSON.parse(await readFile(new URL(
@@ -70,8 +79,12 @@ describe('historical core preview audit contract', () => {
       expect(edition.work.workId).toBe(probe.workId);
       expect(edition.sections).toHaveLength(probe.sectionCount);
       expect(edition.sections[0]).toMatchObject({ sectionKey: probe.firstSection.sectionKey, sourceOrdinal: probe.firstSection.sourceOrdinal });
+      expect(edition.sections[probe.primarySearch.sourceOrdinal - 1]).toMatchObject({
+        sectionKey: probe.primarySearch.sectionKey, sourceOrdinal: probe.primarySearch.sourceOrdinal,
+      });
       expect(probe.query.toLocaleLowerCase('en-US').split(/\s+/).every(term => text.includes(term))).toBe(true);
     }
+    expect(parsed.probes.filter(probe => probe.primarySearch.sourceOrdinal !== probe.firstSection.sourceOrdinal)).toHaveLength(5);
   });
 
   it('is a fixed-preview, bounded protected release gate wired after D1 readiness and with manual-only reconciliation evidence', async () => {
@@ -134,6 +147,11 @@ describe('historical core preview audit contract', () => {
     }
     expect((evidence.records as unknown[])).toHaveLength(8);
     expect((evidence.regressions as RecordValue).ccel).toMatchObject({ provider: 'ccel_live', status: 'disabled', searched: false });
+    const relevanceReads = calls.filter(call => call.body.method === 'resources/read'
+      && parsed.probes.some(probe => probe.primarySearch.resourceUri === (call.body.params as RecordValue).uri))
+      .map(call => (call.body.params as RecordValue).uri);
+    expect(relevanceReads).toEqual(parsed.probes.map(probe => probe.primarySearch.resourceUri));
+    expect(relevanceReads.filter((uri, index) => uri !== parsed.probes[index]!.firstSection.resourceUri)).toHaveLength(5);
   });
 
   it('fails before probes when a pinned advertised schema or open-world annotation drifts', async () => {
@@ -256,6 +274,16 @@ describe('historical core preview audit contract', () => {
       } }))
         .rejects.toThrow('destination appeared during audit');
       expect(readFileSync(raced, 'utf8')).toBe('pre-existing');
+
+      const postLinkExpiry = join(temporaryRoot, 'post-link-expiry.json');
+      let clockReads = 0;
+      await expect(publishAuditEvidence(postLinkExpiry, { audit: 'safe' }, new AuditDeadline(() => {
+        clockReads += 1;
+        // Construction plus the three pre-link checks return 0; the fifth
+        // clock read is the post-link deadline proof and expires the audit.
+        return clockReads >= 5 ? 300_001 : 0;
+      }))).rejects.toThrow('true no-clobber evidence publication finalization');
+      expect(existsSync(postLinkExpiry)).toBe(false);
       expect(readdirSync(temporaryRoot).filter(name => name.includes('.historical-core-preview-audit-'))).toEqual([]);
     } finally {
       rmSync(temporaryRoot, { recursive: true, force: true });
@@ -428,8 +456,20 @@ function primaryTool(body: RecordValue, args: RecordValue, fixtureValue: Audit, 
   const probe = fixtureValue.probes.find(item => item.workId === workId)!;
   const uri = options.primaryLocatorDrift
     ? `${probe.landingResourceUri}#section-noncanonical`
-    : probe.firstSection.resourceUri;
-  return toolResult(body, { structuredContent: { schemaVersion: '7', kind: 'primary_source_search', planStatus: 'complete', queries: [{ providers: [{ provider: 'local', status: 'ok', searched: true, hits: [{ locator: { kind: 'mcp_resource', uri, documentId: workId }, editionReadiness: { editionIdentity: 'established', normalizedTextRights: 'no_known_conflict' } }] }] }], coverage: { localAttempted: true, localHitCount: 1 }, evidencePolicy: { snippetUse: 'discovery_only', localSectionAccess: 'mcp_resource_read', externalSectionAccess: 'direct_url_only' } } });
+    : probe.primarySearch.resourceUri;
+  const relevanceHit = { locator: {
+    kind: 'mcp_resource', uri, documentId: workId,
+    sectionKey: probe.primarySearch.sectionKey, sourceOrdinal: probe.primarySearch.sourceOrdinal,
+  }, editionReadiness: { editionIdentity: 'established', normalizedTextRights: 'no_known_conflict' } };
+  // Real relevance results need not be the directory's first source section.
+  // Keep a lower-ranked first section when different to prove this gate reads
+  // the pinned relevance hit, not a directory-order surrogate.
+  const lowerRankedDirectoryHit = probe.primarySearch.resourceUri === probe.firstSection.resourceUri ? [] : [{ locator: {
+    kind: 'mcp_resource', uri: probe.firstSection.resourceUri, documentId: workId,
+    sectionKey: probe.firstSection.sectionKey, sourceOrdinal: probe.firstSection.sourceOrdinal,
+  }, editionReadiness: { editionIdentity: 'established', normalizedTextRights: 'no_known_conflict' } }];
+  const hits = [relevanceHit, ...lowerRankedDirectoryHit];
+  return toolResult(body, { structuredContent: { schemaVersion: '7', kind: 'primary_source_search', planStatus: 'complete', queries: [{ providers: [{ provider: 'local', status: 'ok', searched: true, hitCount: hits.length, hits }] }], coverage: { localAttempted: true, localHitCount: hits.length }, evidencePolicy: { snippetUse: 'discovery_only', localSectionAccess: 'mcp_resource_read', externalSectionAccess: 'direct_url_only' } } });
 }
 
 function toolResult(body: RecordValue, result: RecordValue): Response { return jsonResponse({ jsonrpc: '2.0', id: body.id, result }); }
