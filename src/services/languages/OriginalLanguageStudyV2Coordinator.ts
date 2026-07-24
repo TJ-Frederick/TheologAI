@@ -11,7 +11,7 @@ import {
   type UbsPublicHebrewStrongs,
   type UbsSemanticSource,
 } from '../../kernel/ubsSemanticDomain.js';
-import { formatReference, parseReference, referencesEqual, toHelloAO } from '../../kernel/reference.js';
+import { formatReference, parseReference, referencesEqual } from '../../kernel/reference.js';
 import {
   ORIGINAL_LANGUAGE_STUDY_V2_CURSOR_OPERATION,
   ORIGINAL_LANGUAGE_STUDY_V2_RESPONSE_BYTES,
@@ -428,10 +428,7 @@ function canonicalOriginalLanguageStudyReference(
     throw new Error(`${label} must be exactly one Bible verse`);
   }
   const display = formatReference(reference);
-  const semanticKey = requireUbsSemanticNormalizedReference(
-    `${toHelloAO(reference).bookCode} ${reference.chapter}:${reference.startVerse}`,
-    `${label} UBS semantic key`,
-  );
+  const semanticKey = requireUbsSemanticNormalizedReference(display, `${label} UBS semantic key`);
   return {
     display,
     semanticKey,

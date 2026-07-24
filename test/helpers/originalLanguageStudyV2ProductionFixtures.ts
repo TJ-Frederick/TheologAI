@@ -30,7 +30,7 @@ export const SYNTHETIC_ARTIFACT = 'a'.repeat(64);
 export const SYNTHETIC_H0001 = requireUbsInternalLexicalIdentity('H0001') as UbsInternalHebrewLexicalIdentity;
 
 const CANONICAL_DISPLAY_REFERENCE = 'Genesis 1:1';
-const SEMANTIC_REFERENCE = 'GEN 1:1';
+const SEMANTIC_REFERENCE = 'Genesis 1:1';
 
 export function productionCandidate(
   index: number,

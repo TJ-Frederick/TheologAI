@@ -12,7 +12,7 @@ import {
 } from '../../../helpers/originalLanguageStudyV2ProductionFixtures.js';
 
 describe('production original_language_study v2 coordinator', () => {
-  it('canonicalizes an accepted alias for output and queries the authoritative USFM semantic key', async () => {
+  it('canonicalizes an accepted alias for output and queries the canonical display storage key rather than a provider book code', async () => {
     const current = productionCoordinator([productionCandidate(1)]);
     const presentation = await current.coordinator.study(productionRequest());
 
@@ -21,7 +21,8 @@ describe('production original_language_study v2 coordinator', () => {
       request: { reference: 'Genesis 1:1' },
       context: { reference: 'Genesis 1:1', language: 'Hebrew' },
     });
-    expect(current.repository.received).toEqual([expect.objectContaining({ normalizedReference: 'GEN 1:1' })]);
+    expect(current.repository.received).toEqual([expect.objectContaining({ normalizedReference: 'Genesis 1:1' })]);
+    expect(current.repository.received[0]?.normalizedReference).not.toBe('GEN 1:1');
   });
 
   it('accepts semantically equal aliases, but binds a continuation to the raw request spelling and detail level', async () => {
@@ -106,7 +107,7 @@ describe('production original_language_study v2 coordinator', () => {
     const query = {
       artifactIdentity: SYNTHETIC_ARTIFACT,
       sourceIdentity: SYNTHETIC_H0001,
-      normalizedReference: 'GEN 1:1',
+      normalizedReference: 'Genesis 1:1',
     };
     const wrapped = (cursor: string) => createOriginalLanguageStudyV2Cursor(cursor, productionCursorBinding());
     const cursors = [
@@ -128,12 +129,12 @@ describe('production original_language_study v2 coordinator', () => {
       .coordinator.study(productionRequest(undefined, 'detailed'));
     expect(aligned.output.semanticEvidence).toMatchObject({
       status: 'reference_aligned_source_candidate',
-      alignmentEvidence: { normalizedReference: 'GEN 1:1', evidenceId: 'production-reference-01' },
+      alignmentEvidence: { normalizedReference: 'Genesis 1:1', evidenceId: 'production-reference-01' },
     });
     expect(aligned.output.semanticEvidence.plainLanguage).toContain('not an adjudicated contextual meaning');
 
     const mismatched = productionContext('Hebrew', true);
-    mismatched.serverVerifiedAlignment!.morphologyTokenCoordinates.normalizedReference = 'GEN 1:2';
+    mismatched.serverVerifiedAlignment!.morphologyTokenCoordinates.normalizedReference = 'Genesis 1:2';
     await expect(productionCoordinator([productionCandidate(1)], mismatched).coordinator.study(productionRequest()))
       .rejects.toThrow('does not match one complete exact aggregate candidate');
   });
