@@ -1,5 +1,5 @@
 /**
- * Storage-neutral assembly for the inactive transform-7 aggregate repository.
+ * Storage-neutral assembly for the bounded transform-7 aggregate repository.
  *
  * The adapter makes exactly five bounded statements per request.  Each nested
  * collection is selected from the same keyset window, so query count never

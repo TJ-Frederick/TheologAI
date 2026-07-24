@@ -1,40 +1,21 @@
-import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const repo = new URL('../../../', import.meta.url);
 const moduleName = 'ubsSemanticEvidenceBundle';
 
-const reviewedBasePins = {
-  'src/kernel/index.ts': '7df4dc9b32e1a9d4589296d2a32e743eb1e812711e0e4faba8b58066a7b1cde6',
-  'src/tools/v2/index.ts': '2bdf52660313eea971ed51253120288488938812c014c7764d6bb85c233251bd',
-  'src/tools/worker/index.ts': 'feb1679a520185d11f2b6082b70ea3ef6c2b87652ff49c97c0acedfb76d83b90',
-  'src/worker.ts': '619a0a66c30ade7ec8f78f13c59ed0791c67d1ae956eb69e0b126ba20f7dc92d',
-  'src/worker-server.ts': '3f65b62179b267ac9b15fe682c69342be7ebee8a09430473b797c113e812782a',
-  'wrangler.toml': 'e2a395dc97b53f0b8da4786a7076dfde76e377fc79eb2058c3e8601fb624ec16',
-  'worker-configuration.d.ts': 'e316f64679951b32417f0c85b02fc92e61dae25d879d28921df15caf8706fe55',
-} as const;
-
-describe('inactive UBS semantic aggregate bundle contract', () => {
-  it('is absent from Node, Worker, MCP, service, prompt, resource, and tool composition', () => {
-    for (const path of [
-      'src/kernel/index.ts', 'src/tools/v2/index.ts',
-      'src/tools/worker/index.ts', 'src/worker.ts', 'src/worker-server.ts',
-      'src/server.ts', 'src/mcp/prompts.ts', 'src/tools/toolRegistry.ts',
-      'package.json',
-    ]) {
+describe('bounded UBS semantic aggregate bundle activation contract', () => {
+  it('is wired only through the existing original-language-study composition roots', () => {
+    const nodeRoot = readFileSync(new URL('src/tools/v2/index.ts', repo), 'utf8');
+    const workerRoot = readFileSync(new URL('src/tools/worker/index.ts', repo), 'utf8');
+    expect(nodeRoot).toContain(moduleName);
+    expect(workerRoot).toContain(moduleName);
+    for (const path of ['src/server.ts', 'src/worker-server.ts', 'src/mcp/prompts.ts', 'wrangler.toml', 'worker-configuration.d.ts']) {
       expect(readFileSync(new URL(path, repo), 'utf8'), path).not.toContain(moduleName);
     }
   });
 
-  it('preserves reviewed Worker composition and configuration', () => {
-    for (const [path, expected] of Object.entries(reviewedBasePins)) {
-      const actual = createHash('sha256').update(readFileSync(new URL(path, repo))).digest('hex');
-      expect(actual, path).toBe(expected);
-    }
-  });
-
-  it('keeps semantic storage local-only under the transform-8 historical successor', () => {
+  it('keeps the aggregate implementation data-free, fixed-operation, and without a new schema/configuration release', () => {
     const source = readFileSync(new URL('src/kernel/ubsSemanticEvidenceBundle.ts', repo), 'utf8');
     expect(source).not.toMatch(/from ['"][^'"]*(?:data\/|migrations\/|adapters\/d1|adapters\/data)/);
     expect(source).not.toMatch(/\b(?:SELECT|INSERT|CREATE TABLE|D1Database|better-sqlite3)\b/i);
@@ -48,5 +29,14 @@ describe('inactive UBS semantic aggregate bundle contract', () => {
     });
     const adapter = readFileSync(new URL('src/adapters/d1/D1UbsSemanticEvidenceBundleRepository.ts', repo), 'utf8');
     expect(adapter).toContain('exactly five statements');
+  });
+
+  it('retains the generated-UBS Worker exclusion while tightly accounting for reviewed v2 runtime growth', () => {
+    const guard = readFileSync(new URL('scripts/check-worker-bundle-excludes-ubs.ts', repo), 'utf8');
+    expect(guard).toContain("endsWith('ubs-parallel-passages.generated.json')");
+    expect(guard).toContain('3.125 * 1024 * 1024');
+    expect(guard).toContain('active v2 semantic study adds bounded runtime code');
+    expect(guard).toContain('narrow review margin');
+    expect(guard).toContain('multi-megabyte compiled UBS JSON artifact');
   });
 });

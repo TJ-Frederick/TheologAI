@@ -27,7 +27,10 @@ try {
   const bundle = readFileSync(join(output, bundleName));
   const rawBytes = statSync(join(output, bundleName)).size;
   const gzipBytes = gzipSync(bundle).byteLength;
-  if (rawBytes > 3 * 1024 * 1024) throw new Error(`Worker bundle exceeded reviewed 3 MiB raw ceiling: ${rawBytes}`);
+  // The active v2 semantic study adds bounded runtime code but must never add
+  // the multi-megabyte compiled UBS JSON artifact checked above. The 3.125 MiB
+  // ceiling keeps a narrow review margin above the reviewed v2 bundle.
+  if (rawBytes > 3.125 * 1024 * 1024) throw new Error(`Worker bundle exceeded reviewed 3.125 MiB raw ceiling: ${rawBytes}`);
   console.error(`[worker-ubs-bundle] ${inputs.length} inputs; ${rawBytes} raw bytes; ${gzipBytes} gzip bytes; UBS JSON absent.`);
 } finally {
   rmSync(output, { recursive: true, force: true });

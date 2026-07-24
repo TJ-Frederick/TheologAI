@@ -11,7 +11,7 @@ import {
   productionRequest,
 } from '../../../helpers/originalLanguageStudyV2ProductionFixtures.js';
 
-describe('inactive production original_language_study v2 coordinator', () => {
+describe('production original_language_study v2 coordinator', () => {
   it('canonicalizes an accepted alias for output and queries the authoritative USFM semantic key', async () => {
     const current = productionCoordinator([productionCandidate(1)]);
     const presentation = await current.coordinator.study(productionRequest());
@@ -24,7 +24,7 @@ describe('inactive production original_language_study v2 coordinator', () => {
     expect(current.repository.received).toEqual([expect.objectContaining({ normalizedReference: 'GEN 1:1' })]);
   });
 
-  it('accepts semantically equal aliases, but binds a continuation to the raw request spelling', async () => {
+  it('accepts semantically equal aliases, but binds a continuation to the raw request spelling and detail level', async () => {
     const values = Array.from({ length: 10 }, (_, index) => productionCandidate(index + 1));
     const first = await productionCoordinator(values).coordinator.study(productionRequest());
     if (!('resultWindow' in first.output.semanticEvidence) || !first.output.semanticEvidence.resultWindow.continuation) {
@@ -38,6 +38,10 @@ describe('inactive production original_language_study v2 coordinator', () => {
     await expect(productionCoordinator(values).coordinator.study(
       productionRequest(cursor, 'summary', 'Genesis 1:1'),
     )).rejects.toThrow('full selected-token request context');
+    const changedDetail = productionCoordinator(values);
+    await expect(changedDetail.coordinator.study(productionRequest(cursor, 'detailed')))
+      .rejects.toThrow('full selected-token request context');
+    expect(changedDetail.repository.queryCount).toBe(0);
     const second = await productionCoordinator(values).coordinator.study(productionRequest(cursor));
     if (!('resultWindow' in second.output.semanticEvidence)) throw new Error('expected semantic continuation');
     expect(second.output.semanticEvidence.resultWindow).toMatchObject({ priorCount: 8, returnedCount: 2, hasMore: false });

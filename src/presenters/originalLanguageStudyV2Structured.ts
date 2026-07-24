@@ -256,6 +256,7 @@ function validateWindow(
     requestReference: output.request.reference,
     requestTarget: output.request.target,
     requestPosition: output.request.position ?? null,
+    detail: output.detail,
     canonicalReference: objectOf(
       objectOf(output.study, 'output.study').context,
       'output.study.context',

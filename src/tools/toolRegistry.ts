@@ -30,7 +30,7 @@ export interface ToolRegistryDependencies {
   primarySourceContract: PrimarySourceContractConfig;
   strongsService: Parameters<typeof createStrongsLookupHandler>[0];
   morphologyService: Parameters<typeof createVerseMorphologyHandler>[0];
-  originalLanguageStudyService: Parameters<typeof createOriginalLanguageStudyHandler>[0];
+  originalLanguageStudyCoordinator: Parameters<typeof createOriginalLanguageStudyHandler>[0];
   donationService: Parameters<typeof createDonationConfigHandler>[0];
 }
 
@@ -44,7 +44,7 @@ export function createToolRegistry(dependencies: ToolRegistryDependencies): Tool
     createPrimarySourceSearchHandler(dependencies.primarySourceSearchService, dependencies.primarySourceContract),
     createStrongsLookupHandler(dependencies.strongsService),
     createVerseMorphologyHandler(dependencies.morphologyService),
-    createOriginalLanguageStudyHandler(dependencies.originalLanguageStudyService),
+    createOriginalLanguageStudyHandler(dependencies.originalLanguageStudyCoordinator),
     createDonationConfigHandler(dependencies.donationService),
     createVerifyDonationHandler(dependencies.donationService),
   ];

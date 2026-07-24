@@ -1,4 +1,4 @@
-/** Inactive local SQLite adapter for the transform-7 aggregate evidence seam. */
+/** Local SQLite adapter for the bounded transform-7 aggregate evidence seam. */
 import type Database from 'better-sqlite3';
 import { getDatabase } from '../shared/Database.js';
 import {

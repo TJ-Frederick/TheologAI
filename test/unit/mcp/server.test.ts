@@ -758,11 +758,24 @@ describe('shared MCP registration', () => {
       text: expect.stringContaining('Counted morphology tokens are distinct from lexicon occurrence metadata'),
     }));
 
+    const contextualWordStudy = await client.getPrompt({
+      name: 'word-study', arguments: { word: 'love', reference: 'John 3:16' },
+    });
+    const contextualWordStudyText = (contextualWordStudy.messages[0]!.content as { text: string }).text;
+    expect(contextualWordStudyText).toContain('`detail: "summary"`');
+    expect(contextualWordStudyText).toContain('complete prior study under `study`');
+    expect(contextualWordStudyText).toContain('semantic candidates as source evidence, not contextual adjudication');
+    expect(contextualWordStudyText).toContain('pass `semanticEvidence.resultWindow.continuation.cursor` unchanged');
+
     const passageExegesis = await client.getPrompt({
       name: 'passage-exegesis',
       arguments: { reference: 'John 3:16' },
     });
     const passageExegesisText = (passageExegesis.messages[0]!.content as { text: string }).text;
+    expect(passageExegesisText).toContain('`detail: "summary"`');
+    expect(passageExegesisText).toContain('Read the complete prior result from v2 `study`');
+    expect(passageExegesisText).toContain('semantic candidates as source evidence rather than contextual adjudication');
+    expect(passageExegesisText).toContain('pass `semanticEvidence.resultWindow.continuation.cursor` unchanged');
     const initialParallelCall = passageExegesisText.match(/`parallel_passages` with `([^`]+)`/);
     expect(initialParallelCall?.[1]).toBeDefined();
     expect(JSON.parse(initialParallelCall![1]!)).toEqual({

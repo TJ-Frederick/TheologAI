@@ -152,6 +152,19 @@ describe('MCP structured output validation', () => {
     ]);
     for (const toolName of withOutput) {
       const schema = listed.tools.find(tool => tool.name === toolName)?.outputSchema;
+      if (toolName === 'original_language_study') {
+        expect(schema).toMatchObject({
+          type: 'object',
+          oneOf: expect.arrayContaining([
+            expect.objectContaining({
+              type: 'object', additionalProperties: false,
+              properties: expect.objectContaining({ schemaVersion: { const: '2' } }),
+            }),
+          ]),
+        });
+        expect(schema).not.toHaveProperty('$ref');
+        continue;
+      }
       expect(schema).toMatchObject({ type: 'object', additionalProperties: false });
       expect(schema).not.toHaveProperty('$ref');
       const expectedVersion = toolName === 'primary_source_search'

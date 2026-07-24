@@ -10,6 +10,7 @@ import type {
 import type { BibleReference } from '../../src/kernel/reference.js';
 import { DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG } from '../../src/kernel/featureFlags.js';
 import type { ISourceAttestedParallelRepository } from '../../src/kernel/sourceAttestedParallels.js';
+import type { IUbsSemanticEvidenceBundleRepository } from '../../src/kernel/ubsSemanticEvidenceBundle.js';
 import type { McpCompositionRoot } from '../../src/mcp/server.js';
 import { BibleService } from '../../src/services/bible/BibleService.js';
 import { CrossReferenceService } from '../../src/services/bible/CrossReferenceService.js';
@@ -23,6 +24,8 @@ import { PrimarySourceSearchService } from '../../src/services/historical/Primar
 import { MorphologyService } from '../../src/services/languages/MorphologyService.js';
 import { StrongsService } from '../../src/services/languages/StrongsService.js';
 import { OriginalLanguageStudyService } from '../../src/services/languages/OriginalLanguageStudyService.js';
+import { OriginalLanguageStudyV2Coordinator } from '../../src/services/languages/OriginalLanguageStudyV2Coordinator.js';
+import { OriginalLanguageStudyV2ContextProvider } from '../../src/services/languages/OriginalLanguageStudyV2ContextProvider.js';
 import { createToolRegistry } from '../../src/tools/toolRegistry.js';
 import type { WorkerCompositionRoot } from '../../src/tools/worker/index.js';
 
@@ -165,6 +168,15 @@ export function createDeterministicMcpFixture(): DeterministicMcpFixture {
   const strongsService = new StrongsService(strongsRepository, morphologyRepository);
   const morphologyService = new MorphologyService(morphologyRepository);
   const originalLanguageStudyService = new OriginalLanguageStudyService(morphologyRepository, strongsRepository);
+  const ubsSemanticEvidenceBundleRepository: IUbsSemanticEvidenceBundleRepository = {
+    async getSemanticEvidenceBundle() {
+      throw new Error('The deterministic semantic repository must not be reached without an eligible Hebrew token.');
+    },
+  };
+  const originalLanguageStudyCoordinator = new OriginalLanguageStudyV2Coordinator(
+    new OriginalLanguageStudyV2ContextProvider(originalLanguageStudyService),
+    ubsSemanticEvidenceBundleRepository,
+  );
   const donationService = new DonationService(onChainVerifier);
 
   const root = {
@@ -178,7 +190,7 @@ export function createDeterministicMcpFixture(): DeterministicMcpFixture {
       primarySourceContract,
       strongsService,
       morphologyService,
-      originalLanguageStudyService,
+      originalLanguageStudyCoordinator,
       donationService,
     }),
     services: { bibleService, commentaryService, historicalService, strongsService, sourceAttestedParallelService },

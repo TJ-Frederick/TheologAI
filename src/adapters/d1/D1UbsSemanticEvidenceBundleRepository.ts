@@ -1,4 +1,4 @@
-/** Inactive Cloudflare D1 adapter for the transform-7 aggregate evidence seam. */
+/** Cloudflare D1 adapter for the bounded transform-7 aggregate evidence seam. */
 import {
   assembleUbsSemanticAggregatePage,
   buildUbsSemanticAggregateStatements,

@@ -10,8 +10,8 @@ import { formatOriginalLanguageStudy } from './originalLanguageStudyFormatter.js
 import type { OriginalLanguageStudyDomainResult } from '../services/languages/OriginalLanguageStudyService.js';
 
 /**
- * Human-readable presentation of a validated v2 result.  This formatter is
- * deliberately a dormant library seam, not a registered MCP rendering path.
+ * Human-readable presentation of a validated v2 result used by the existing
+ * original_language_study MCP tool.
  */
 export function formatOriginalLanguageStudyV2(
   result: OriginalLanguageStudyV2Result,
@@ -23,7 +23,7 @@ export function formatOriginalLanguageStudyV2(
     throw new Error('original_language_study v2 Markdown must receive the exact v1 result composed into structured output');
   }
   // The current v1 formatting is a complete, byte-for-byte prefix. Its size
-  // is deliberately not capped by this inactive v2 layer.
+  // is deliberately not capped by this v2 layer.
   const v1Markdown = formatOriginalLanguageStudy(v1Result);
   const semanticSections: string[] = [];
 

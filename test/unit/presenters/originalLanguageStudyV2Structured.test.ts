@@ -7,7 +7,7 @@ import {
   productionRequest,
 } from '../../helpers/originalLanguageStudyV2ProductionFixtures.js';
 
-describe('inactive production original_language_study v2 structured presenter', () => {
+describe('production original_language_study v2 structured presenter', () => {
   it('validates coordinator-produced summary and detailed outputs with truthful serialized bytes', async () => {
     for (const detail of ['summary', 'detailed'] as const) {
       const presentation = await productionCoordinator([productionCandidate(1)]).coordinator

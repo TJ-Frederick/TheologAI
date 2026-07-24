@@ -1,4 +1,5 @@
 import { originalLanguageStudyOutputSchema } from './originalLanguageStudy.js';
+import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 import {
   ORIGINAL_LANGUAGE_STUDY_V2_CURSOR_MAX_LENGTH,
   ORIGINAL_LANGUAGE_STUDY_V2_CURSOR_OPERATION,
@@ -6,8 +7,7 @@ import {
 } from '../../kernel/originalLanguageStudyV2Contract.js';
 
 /**
- * Closed v2 input/output schemas.  They are intentionally inert until a
- * separately-reviewed hard cut wires them into the existing MCP tool.
+ * Closed schemas for the active v2 contract of the existing MCP tool.
  */
 export const originalLanguageStudyV2InputSchema = {
   type: 'object',
@@ -23,7 +23,7 @@ export const originalLanguageStudyV2InputSchema = {
   },
   required: ['reference', 'target'],
   additionalProperties: false,
-} as const;
+} satisfies Tool['inputSchema'];
 
 const resultWindow = {
   type: 'object',
@@ -367,5 +367,14 @@ function rootSchema(detail: 'summary' | 'detailed') {
 }
 
 export const originalLanguageStudyV2OutputSchema = {
+  // MCP's output-schema wire contract requires an object root. The mutually
+  // exclusive detail branches below remain individually closed; this envelope
+  // also keeps the union root closed without imposing either detail branch.
+  type: 'object',
+  properties: {
+    schemaVersion: {}, kind: {}, detail: {}, request: {}, study: {},
+    semanticEvidence: {}, responseWindow: {},
+  },
+  additionalProperties: false,
   oneOf: [rootSchema('summary'), rootSchema('detailed')],
 } as const;

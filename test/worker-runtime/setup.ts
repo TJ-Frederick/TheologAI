@@ -3,6 +3,8 @@ import { applyD1Migrations, env } from 'cloudflare:test';
 import type { D1Migration } from '@cloudflare/vitest-pool-workers';
 import { UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY, UBS_PARALLEL_PASSAGE_PROVENANCE } from '../../src/kernel/ubsParallelSource.js';
 import generatedUbsCorpus from '../../src/data/ubs-parallel-passages.generated.json';
+import { UBS_SEMANTIC_AGGREGATE_SOURCE_IDS } from '../../src/adapters/shared/UbsSemanticEvidenceBundleRepository.js';
+import { ORIGINAL_LANGUAGE_STUDY_V2_SEMANTIC_ARTIFACT_IDENTITY } from '../../src/services/languages/OriginalLanguageStudyV2ContextProvider.js';
 
 declare global {
   namespace Cloudflare {
@@ -23,6 +25,52 @@ declare global {
 
 beforeAll(async () => {
   await applyD1Migrations(env.THEOLOGAI_DB, env.TEST_MIGRATIONS);
+
+  // The active v2 contextual-study path makes one aggregate semantic read for
+  // this eligible Hebrew token. Seed provenance only, deliberately without a
+  // candidate, so the Worker fixture exercises that bounded unavailable path
+  // without fabricating a token-to-sense alignment.
+  await env.THEOLOGAI_DB.batch([
+    env.THEOLOGAI_DB.prepare(`INSERT INTO ubs_semantic_artifacts (
+      artifact_identity, schema_version, compiler_version, transform_version,
+      rights_notice_json, provenance_notice_json, transformation_witness_json
+    ) VALUES (?, 'theologai-ubs-hebrew-semantic-compiled.v1', 1, 7, '{}', '{}', '{}')`)
+      .bind(ORIGINAL_LANGUAGE_STUDY_V2_SEMANTIC_ARTIFACT_IDENTITY),
+    env.THEOLOGAI_DB.prepare(`INSERT INTO ubs_semantic_sources (
+      artifact_identity, source_id, source_role, schema_version, transform_version,
+      title, artifact_name, artifact_version, language, source_url, source_commit,
+      source_blob, source_sha256, license, license_url, publisher, modified,
+      modification_description
+    ) VALUES (?, ?, ?, 'ubs-semantics.v1', 7, ?, ?, '0.9.2', 'Hebrew', ?, ?, ?, ?,
+      'CC BY-SA 4.0', 'https://creativecommons.org/licenses/by-sa/4.0/',
+      'United Bible Societies', 1, 'Worker fixture provenance only.')`)
+      .bind(
+        ORIGINAL_LANGUAGE_STUDY_V2_SEMANTIC_ARTIFACT_IDENTITY,
+        UBS_SEMANTIC_AGGREGATE_SOURCE_IDS.dictionary,
+        'dictionary',
+        'UBS Hebrew Dictionary',
+        'UBSHebrewDic-v0.9.2-en.JSON',
+        'https://example.invalid/ubs-hebrew-dictionary',
+        '1'.repeat(40), '2'.repeat(40), '3'.repeat(64),
+      ),
+    env.THEOLOGAI_DB.prepare(`INSERT INTO ubs_semantic_sources (
+      artifact_identity, source_id, source_role, schema_version, transform_version,
+      title, artifact_name, artifact_version, language, source_url, source_commit,
+      source_blob, source_sha256, license, license_url, publisher, modified,
+      modification_description
+    ) VALUES (?, ?, ?, 'ubs-semantics.v1', 7, ?, ?, '0.9.2', 'Hebrew', ?, ?, ?, ?,
+      'CC BY-SA 4.0', 'https://creativecommons.org/licenses/by-sa/4.0/',
+      'United Bible Societies', 1, 'Worker fixture provenance only.')`)
+      .bind(
+        ORIGINAL_LANGUAGE_STUDY_V2_SEMANTIC_ARTIFACT_IDENTITY,
+        UBS_SEMANTIC_AGGREGATE_SOURCE_IDS.lexicalDomains,
+        'lexical_domains',
+        'UBS Hebrew Dictionary Lexical Domains',
+        'UBSHebrewDicLexicalDomains-v0.9.2-en.JSON',
+        'https://example.invalid/ubs-hebrew-domains',
+        '4'.repeat(40), '5'.repeat(40), '6'.repeat(64),
+      ),
+  ]);
 
   await env.THEOLOGAI_DB.batch([
     env.THEOLOGAI_DB.prepare(`

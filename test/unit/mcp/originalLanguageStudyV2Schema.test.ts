@@ -14,7 +14,7 @@ const ajv = new Ajv2020({ strict: true, strictTypes: false, allErrors: true });
 const validateInput = ajv.compile(originalLanguageStudyV2InputSchema);
 const validateOutput = ajv.compile(originalLanguageStudyV2OutputSchema);
 
-describe('inactive production original_language_study v2 schema', () => {
+describe('production original_language_study v2 schema', () => {
   it('accepts only the call boundary and omits all server-owned semantic identities', () => {
     expect(Object.keys(originalLanguageStudyV2InputSchema.properties)).toEqual([
       'reference', 'target', 'position', 'detail', 'cursor',
