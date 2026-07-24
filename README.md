@@ -323,15 +323,17 @@ boundary. Both deployed environments retain the 17-work Transform 8 catalog
 until an explicitly authorized PR95 preview release. The exact local count is
 enforced by `data/data-manifest.json`.
 
-Approved UBS Hebrew and public-domain historical-source packets are checked
-into the repository for deterministic verification and release work. M4A's
-local/preview materialization and inactive-adapter statements are historical;
-PR #96 now records the production D1 binding and bounded public
-`original_language_study` v2 audit. The historical source packets remain
-outside the local and remote 17-work catalog. U3-T7 provides the in-memory
-semantic compiler, native-to-normalized coordinate bridge, and content-free
-compilation audit; M4A provides capacity and seed verification. The PR #96
-audit does not independently establish the runtime status of later transforms.
+Approved UBS Hebrew artifacts plus the separately acquired Norton and Aquinas
+public-domain packets are checked into the repository for deterministic
+verification and release work. Those acquisition packets remain outside both
+deployed 17-work catalogs; the reviewed PR95 core-eight is the separate
+checked-out local 25-work materialization described above. M4A's local/preview
+materialization and inactive-adapter statements are historical; PR #96 now
+records the production D1 binding and bounded public `original_language_study`
+v2 audit. U3-T7 provides the in-memory semantic compiler,
+native-to-normalized coordinate bridge, and content-free compilation audit;
+M4A provides capacity and seed verification. The PR #96 audit does not
+independently establish the runtime status of later transforms.
 PR95's Transform9 core-eight is local-only and unpublished: it is included in
 the local 25-work catalog but has no Cloudflare migration, binding, deployment,
 or production-runtime claim. Norton and Aquinas assets remain inactive. Norton

@@ -144,15 +144,15 @@ binding.
 
 ### Deployed Stage D preview v5 profile (historical release record)
 
-The checked-in Stage D configuration is intentionally asymmetric. Production
-remains `false/false/false` for CCEL exposure, live search, and coordinator
-execution, preserving the v4/local-only public contract. Preview is
-`true/false/false`: it exposes the v5 tool schema and guided workflows while the
-single live predicate remains false. In that state an external query returns a
+The checked-in Stage D configuration was intentionally asymmetric: at that
+historical release, production was v4/local-only and preview was
+`true/false/false`, exposing the v5 tool schema and guided workflows while the
+single live predicate remained false. In that state an external query returned a
 disabled provider result before adapter invocation, Durable Object lookup/RPC,
-or fetch. Protected preview deployment and black-box audit have established
-this as the deployed preview v5 profile. It still does not authorize live CCEL
-access or any production behavior beyond the documented v4/local-only profile.
+or fetch. Protected preview deployment and black-box audit established that as
+the deployed preview v5 profile. It does not authorize live CCEL access. Current
+production is v6/local-only; deployed preview remains v5 until an explicitly
+authorized PR95 deployment selects the checked-in, non-executing v7 candidate.
 
 Because MCP clients may cache tool and prompt schemas within an initialized
 connection, reconnect and reinitialize the audit client after the preview
