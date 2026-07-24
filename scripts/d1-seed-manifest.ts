@@ -9,12 +9,14 @@ import {
   statementBytes,
 } from './d1-seed-utils.js';
 import {
+  D1_EXPECTED_TABLES,
   computeD1CorpusIdentity,
   computeSourceInventoryIdentity,
   parseDataManifest,
   verifyD1Migrations,
   type DataManifest,
 } from './d1-corpus-identity.js';
+import { D1_SEED_EXPORT_ORDER } from './d1-seed-order.js';
 
 export interface SeedManifestFile {
   path: string;
@@ -37,6 +39,109 @@ export interface SeedManifest {
   expectedCounts: Record<string, number>;
   files: SeedManifestFile[];
   totals: { fileCount: number; byteSize: number; statementCount: number; rowCount: number };
+}
+
+const EMPTY_TARGET_GUARD = {
+  path: '00-empty-target-check-000.sql',
+  table: 'empty-target-check',
+  chunk: 0,
+} as const;
+
+const FTS_SEED_TABLES = [
+  'strongs_fts',
+  'sections_fts',
+  'historical_edition_sections_fts',
+] as const;
+
+function canonicalTableOrder(): string[] {
+  return [...D1_SEED_EXPORT_ORDER];
+}
+
+function expectedRows(seed: SeedManifest, table: string): number {
+  const count = seed.expectedCounts[table];
+  if (!Number.isSafeInteger(count) || count < 0) {
+    throw new Error(`D1 seed expected count is invalid for ${table}`);
+  }
+  return count;
+}
+
+function expectedRowsForSeedTable(seed: SeedManifest, table: string): number {
+  if (table !== 'fts') return expectedRows(seed, table);
+  return FTS_SEED_TABLES.reduce((sum, ftsTable) => sum + expectedRows(seed, ftsTable), 0);
+}
+
+function assertSeedManifestRowCountTotals(seed: SeedManifest): void {
+  const rowsBySeedTable = new Map(canonicalTableOrder().map(table => [table, 0]));
+  for (const file of seed.files.slice(1)) {
+    if (!Number.isSafeInteger(file.rowCount) || file.rowCount < 0) {
+      throw new Error(`D1 seed file has an invalid row count: ${file.path}`);
+    }
+    rowsBySeedTable.set(file.table, rowsBySeedTable.get(file.table)! + file.rowCount);
+  }
+  for (const table of canonicalTableOrder()) {
+    const actual = rowsBySeedTable.get(table)!;
+    const expected = expectedRowsForSeedTable(seed, table);
+    if (actual !== expected) {
+      throw new Error(`D1 seed row-count total for ${table} is ${actual}; canonical expected count is ${expected}`);
+    }
+  }
+}
+
+/**
+ * The generated seed is an executable sequence, not a directory of
+ * interchangeable SQL files. Keep that sequence closed over the reviewed
+ * exporter order before any local or remote runner is allowed to consume it.
+ */
+export function assertSeedManifestApplicationOrder(seed: SeedManifest): void {
+  if (!Array.isArray(seed.files) || seed.files.length === 0) {
+    throw new Error('D1 seed manifest must start with the empty-target guard');
+  }
+
+  const guard = seed.files[0];
+  if (guard.path !== EMPTY_TARGET_GUARD.path
+    || guard.table !== EMPTY_TARGET_GUARD.table
+    || guard.chunk !== EMPTY_TARGET_GUARD.chunk) {
+    throw new Error('D1 seed manifest must begin with 00-empty-target-check-000.sql');
+  }
+  if (seed.files.filter(file => file.table === EMPTY_TARGET_GUARD.table).length !== 1) {
+    throw new Error('D1 seed manifest must contain exactly one empty-target guard');
+  }
+  if (!Number.isSafeInteger(guard.rowCount) || guard.rowCount !== 0) {
+    throw new Error('D1 seed empty-target guard must not insert rows');
+  }
+
+  const order = new Map(canonicalTableOrder().map((table, index) => [table, index]));
+  let previousTableIndex = -1;
+  let activeTable: string | undefined;
+  let expectedChunk = 0;
+
+  for (const file of seed.files.slice(1)) {
+    if (!Number.isSafeInteger(file.chunk) || file.chunk < 0) {
+      throw new Error(`D1 seed file has an invalid chunk number: ${file.path}`);
+    }
+    const tableIndex = order.get(file.table);
+    if (tableIndex === undefined) {
+      throw new Error(`D1 seed file has an unexpected table: ${file.table}`);
+    }
+    if (file.table !== activeTable) {
+      if (tableIndex <= previousTableIndex) {
+        throw new Error(`D1 seed table order is not canonical at ${file.path}`);
+      }
+      activeTable = file.table;
+      previousTableIndex = tableIndex;
+      expectedChunk = 0;
+    }
+    if (file.chunk !== expectedChunk) {
+      throw new Error(`D1 seed chunks are not contiguous for ${file.table}`);
+    }
+    const expectedPath =
+      `${String(tableIndex + 1).padStart(2, '0')}-${file.table.replaceAll('_', '-')}-${String(file.chunk).padStart(3, '0')}.sql`;
+    if (file.path !== expectedPath) {
+      throw new Error(`D1 seed file name is not canonical: ${file.path}`);
+    }
+    expectedChunk++;
+  }
+  assertSeedManifestRowCountTotals(seed);
 }
 
 export function assertSeedManifestBinding(
@@ -62,6 +167,12 @@ export function assertSeedManifestBinding(
   if (canonicalCounts(seed.expectedCounts) !== canonicalCounts(source.expectedCounts)) {
     throw new Error('D1 seed expectedCounts differ from the canonical materialization');
   }
+  if (JSON.stringify(seed.tableOrder) !== JSON.stringify(canonicalTableOrder())) {
+    throw new Error('D1 seed table order differs from the canonical export order');
+  }
+  if (JSON.stringify(Object.keys(seed.expectedCounts).sort()) !== JSON.stringify(D1_EXPECTED_TABLES)) {
+    throw new Error('D1 seed expectedCounts registry differs from the canonical table registry');
+  }
 }
 
 export function loadAndVerifyD1SeedManifest(root: string, seedRoot: string): SeedManifest {
@@ -73,6 +184,7 @@ export function loadAndVerifyD1SeedManifest(root: string, seedRoot: string): See
   if (!existsSync(manifestPath)) throw new Error('D1 seed is absent; run npm run d1:seed:export first');
   const seed = JSON.parse(readFileSync(manifestPath, 'utf8')) as SeedManifest;
   assertSeedManifestBinding(seed, sourceBytes, source);
+  assertSeedManifestApplicationOrder(seed);
   if (seed.limits.maximumStatementBytes !== D1_MAX_STATEMENT_BYTES) {
     throw new Error('D1 seed statement limit differs from the reviewed runtime limit');
   }

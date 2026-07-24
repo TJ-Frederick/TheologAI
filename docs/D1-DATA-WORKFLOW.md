@@ -171,8 +171,10 @@ Before a full remote seed:
 2. Name the exact Cloudflare environment and D1 database being changed.
 3. Confirm that the target is new or that every corpus and FTS table is empty.
 4. Apply tracked migrations with an explicit `--remote` and environment.
-5. Execute seed files in `seed-manifest.json` order, again with explicit
-   `--remote` and environment flags.
+5. Run the checked-in preview-only seed runner with the exact candidate name
+   repeated as its confirmation. It validates the complete manifest, hashes,
+   guard, and canonical file order before invoking Wrangler, then executes each
+   file once in order with literal `--remote --env preview`.
 6. Compare remote table counts with the manifest before deploying application
    code that depends on the corpus.
 
@@ -189,9 +191,16 @@ binding:
 ```bash
 CANDIDATE_D1_NAME='the-uniquely-created-preview-database'
 npx wrangler d1 migrations apply "$CANDIDATE_D1_NAME" --remote --env preview
-# Execute every manifest-listed seed file with --remote --env preview.
+npm run d1:seed:apply-preview -- \
+  --remote \
+  --candidate-d1-name "$CANDIDATE_D1_NAME" \
+  --confirm-candidate-d1-name "$CANDIDATE_D1_NAME"
 npm run d1:remote:check -- --database "$CANDIDATE_D1_NAME" --env preview
 ```
+
+`d1:seed:apply-preview` is intentionally a preview-only command. It accepts no
+environment override and always invokes Wrangler with `--remote --env preview`;
+do not use it as a production seeding path.
 
 Only after readiness passes should a reviewed PR change the local preview
 `database_name` and `database_id` to that prepared target. The protected
@@ -201,8 +210,10 @@ binding, and only then permits a Worker deploy. The generic release workflow
 also supports a same-D1 code-only release; Transform-9 freshness is enforced by
 the current readiness contract, which a predecessor lacking migration `0006`
 cannot satisfy. If any migration or seed import fails or is interrupted, do not
-resume against that partial database. Give the next empty replacement a new
-name and restart from migration application.
+resume against that partial database. The runner stops at the first failed seed
+file and intentionally has no retry, resume, or checkpoint mode. Abandon the
+partial target, give the next empty replacement a new name, and restart from
+migration application.
 Preserve the previously bound database through the cutover and initial
 verification window; rollback is restoring its name and ID in `wrangler.toml`
 and redeploying through the normal approval gate. Database creation, binding
