@@ -1,23 +1,72 @@
 # Worker operations
 
-## Current split release state (2026-07-23)
+## Current production release state (PR #96; 2026-07-24)
 
-Production remains the PR #72 known-good release: protected production run
-`29622634088` and Cloudflare deployment
-`a4697fd1-deda-4dae-a16c-635454218bc8` serve Worker
-`762485da-9e02-46a0-9777-e0d8743b9dbf` with D1
+PR #96 production evidence is source-attested to checked-out commit
+`ac4b5ed774302fbfc86bf846b6ee77a07beed456` and exact tree
+`adf08edbf6bfcb14b9613354b2b8fb9f62ec8c16`. At the fixed canonical endpoint
+`https://mcp.theologai.xyz/mcp`, the audit observed server version `3.6.0`.
+Cloudflare version and deployment checks immediately before and after the
+audit found deployment `2d10d693-958e-47a6-ae24-81647679c2f6` serving Worker
+`7a3f5078-37bc-453e-bac7-a0743afd508a` as the sole 100% active production
+version, bound to D1 `theologai-production-20260723-a`
+(`3f7faa0e-689f-47aa-a601-dc662db9a6cf`).
+
+Protected production workflow run `30064214043` and GitHub deployment
+`5583281706` link that exact source/tree to the active Worker. The read-only D1
+compatibility check passed against the bound production database.
+
+The production `original_language_study` v2 audit passed 11/11 cases. It made
+14 stateless HTTP exchanges—initialization, initialized notification,
+`tools/list`, and 11 tool calls—under a 180-second end-to-end cap, 30-second
+per-request cap, 256 KiB per-response cap, and 1 MiB aggregate cap. Its fixed
+fixture SHA-256 is
+`dabe124580904c411f11484d2c25fbd30452201f6c6f8927c94c0f3f294204a7`. The
+evidence records sanitized metadata and hashes, not tool output or live source
+text. Audit-evidence SHA-256:
+`321053d510217c20a79bc4d42505d67623378c2360f30c2f078a150f5a8f39bf`;
+identity-evidence SHA-256:
+`a6959d24fb7f50a9848fe2d011f425894718471b8a0609e7833780a291721a44`.
+
+PR #72 is the retained matched rollback record, not the active release: merge
+`72a8ee5eef9b909a373b085d1a4f193484ddfe8a`, deployment
+`a4697fd1-deda-4dae-a16c-635454218bc8`, Worker
+`762485da-9e02-46a0-9777-e0d8743b9dbf`, and D1
 `theologai-production-20260715-a`
-(`c6535a4a-1953-4279-b277-7368445fc61a`). Its independent audit returned GO
-with no P0-P3 findings across 22 read-only requests and a 22/22
-source-attested regression.
+(`c6535a4a-1953-4279-b277-7368445fc61a`). Roll back code and D1 only as that
+compatible recorded pair; do not infer that the PR #72 Worker is currently
+active.
 
-The checked-in production-binding candidate is
-`theologai-production-20260723-a`
-(`3f7faa0e-689f-47aa-a601-dc662db9a6cf`). It passed migrations `0001`–`0005`,
-deterministic seeding, strict readiness, and the Transform-8 authority audit,
-but no live production Worker is bound to it. The live deployment, Worker, and
-old D1 above remain the matched rollback pair; checked-in config is not
-deployment evidence.
+> **PR96 broad MCP smoke — PASS:** Completed in 8.834 seconds. Sanitized
+> `production-mcp-smoke-audit.json` evidence SHA-256:
+> `f33680b7f9f0f2dfbc0df427bcf43d62fb07254d899a9b59a22d483d776a2e26`.
+> It verified 26 MCP operations across 27 HTTP exchanges and 293,466 aggregate
+> MCP response bytes, stateless with no retries or redirects. Pre/post identity
+> was unchanged: deployment `2d10d693-958e-47a6-ae24-81647679c2f6`, Worker
+> `7a3f5078-37bc-453e-bac7-a0743afd508a` (#88), and D1
+> `theologai-production-20260723-a` (`3f7faa0e-689f-47aa-a601-dc662db9a6cf`).
+
+> **PR96 deployment/audit tail — PASS_WITH_OBSERVATION_LIMITATIONS:** Two
+> post-smoke unfiltered JSON Wrangler 4.107.0 tails were pinned to Worker
+> `7a3f5078-37bc-453e-bac7-a0743afd508a` (#88) at requested sampling `0.999999`.
+> Attempt 1: `2026-07-24T13:03:40Z`–`13:34:06Z`, raw 0600 5,634,265 bytes,
+> SHA-256 `819ab5dbbca47719edb5a9292e41c54cd6c15d21488640023ad7e148a609617b`,
+> 1,324 events. Attempt 2: `13:36:32Z`–`13:56:16Z`, raw 0600 3,603,881 bytes,
+> SHA-256 `a56d25424fdeca4207e9039d0efeec5ee0d272d04fd924f0caa1d8bebd3f83f8`,
+> 848 events. Combined command time was 50m10s; observed event-span 49m29.544s.
+> Two automatic reconnect warnings and a maximum uninterrupted segment of about
+> 19m12s mean this is neither a continuous 30-minute observation nor an
+> exhaustive/global request count. Wrangler tail authoritatively cannot provide
+> a request total: 2,172 observed events = 2,167 ok + 5 separately classified
+> client cancellations; 0 observed 5xx, 0 429, 0 exceptions, 0 error logs, 0
+> truncated events, and 0 unexpected release errors. Raw captures are private
+> and unpublished because they contain request metadata. Final authoritative
+> identity after each: source `ac4b5ed774302fbfc86bf846b6ee77a07beed456`, tree
+> `adf08edbf6bfcb14b9613354b2b8fb9f62ec8c16`, deployment
+> `2d10d693-958e-47a6-ae24-81647679c2f6`, Worker #88 above, D1
+> `theologai-production-20260723-a` (`3f7faa0e-689f-47aa-a601-dc662db9a6cf`),
+> sole 100%; identity SHA-256
+> `a6959d24fb7f50a9848fe2d011f425894718471b8a0609e7833780a291721a44`.
 
 PR #92 merged as `cd3d1c38fdf0f939a33a41d4b6d5044eb7f44562`; its exact
 reviewed head `3a2b5a57b322dce525f27cfa91c9f667d080bca9` is the separate
@@ -29,8 +78,8 @@ preview run `30039858274` passed. Cloudflare deployment
 (`94c4938b-7800-4d68-9097-0df33c31fdc1`). The parallel audit passed 22/22
 cases; the Transform-8 audit recorded 48 rate-counted requests, 53 total HTTP
 records, and 11/11 assertion groups. The `deploy-preview` label was removed
-and revocation run `30040550778` passed. This state is not a production
-deployment.
+and revocation run `30040550778` passed. This remains a separate preview
+release, not evidence about the current production binding.
 
 Ordinary requests to the production `theologai.tjfrederick.workers.dev` host
 now return a no-store 308 to `mcp.theologai.xyz`. The exact abusive-poller
@@ -38,30 +87,18 @@ tuple (`CF-Connecting-IP: 18.192.206.183` plus `User-Agent:
 Go-http-client/2.0`) is rejected rather than redirected; supported browser CORS
 preflight remains local. The preview
 `theologai-preview.tjfrederick.workers.dev` host remains a direct compatibility
-endpoint. The deployed primary-source MCP schema is production v4/local-only
+endpoint. The deployed primary-source MCP schema is production v6/local-only
 and preview v5/discovery-only; CCEL execution remains disabled in both
-environments. The checked-in v6/v7 schema pair is an unpublished repository
-candidate, not evidence of a deployed Worker or a changed remote contract.
+environments. The checked-in v7 schema remains an unpublished repository
+candidate, not evidence of a changed remote contract.
 
-The later repository changes through merged PR #83
-(`93d5837b05249c15127ab20107f86443cccf4e1e`) remain outside production.
-U3-T7 adds an inactive in-memory semantic compiler,
-native-to-normalized coordinate bridge, and content-free audit. The exact PR
-#92 preview Worker and D1 above are the sole remote exception: its D1 has
-migrations `0004` / transform 7 and `0005` / transform 8 materialized.
-Transform 7's UBS adapters remain runtime-inactive. Transform 8 is active in
-preview's historical repositories: the existing `classic_text_lookup` has the
-Baltimore hard cut and canonical/legacy resolution, changing preview output
-without adding a tool. The live production Worker and its bound old D1 lack
-both transforms and production runtime activation remains unchanged. The
-unpublished candidate also advances the local primary-source schema pair to
-production v6/local-only and preview v7/discovery-only. No deletion, route
-replacement, or other destructive cleanup is authorized by this record.
-
-Any eventual UBS semantic production release must separately authorize a
-production D1 migration/binding/deployment sequence. The preview data layer is
-not production-release evidence, and a later runtime-activation release is
-separately gated.
+The historical repository changes through PR #83
+(`93d5837b05249c15127ab20107f86443cccf4e1e`) describe the pre-release
+foundation. PR #96 is the subsequent production binding and audited v2
+activation record. The v2 audit proves the public tool behavior at the exact
+production identity above; it does not authorize deletion, route replacement,
+or other destructive cleanup. The preview D1 remains a separate environment
+with migrations `0004` / transform 7 and `0005` / transform 8 materialized.
 
 ## Historical PR #50 pre-custom-domain rollback anchor (2026-07-16)
 

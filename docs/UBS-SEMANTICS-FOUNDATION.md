@@ -1,17 +1,75 @@
 # UBS Hebrew semantic foundation
 
+## Current production release record (PR #96; 2026-07-24)
+
+This foundation preserves the pre-release M4A design and acquisition record;
+those historical local-only statements are not current production-state claims.
+PR #96 audit evidence fixes source commit
+`ac4b5ed774302fbfc86bf846b6ee77a07beed456`, tree
+`adf08edbf6bfcb14b9613354b2b8fb9f62ec8c16`, canonical endpoint
+`https://mcp.theologai.xyz/mcp`, and server `3.6.0`. Cloudflare checks before
+and after the audit found deployment `2d10d693-958e-47a6-ae24-81647679c2f6`
+and Worker `7a3f5078-37bc-453e-bac7-a0743afd508a` as the sole 100% active
+production version, bound to D1 `theologai-production-20260723-a`
+(`3f7faa0e-689f-47aa-a601-dc662db9a6cf`).
+
+The stateless public `original_language_study` v2 audit passed 11/11 cases in
+14 exchanges under 180-second end-to-end, 30-second per-request, 256 KiB
+per-response, and 1 MiB aggregate caps. Fixture SHA-256:
+`dabe124580904c411f11484d2c25fbd30452201f6c6f8927c94c0f3f294204a7`.
+Evidence retains sanitized metadata and hashes, not tool output or source text.
+This audit establishes observed public behavior, not an assertion that every
+historical internal seam below is the current composition architecture.
+
+PR #72 remains only the compatible rollback record: merge
+`72a8ee5eef9b909a373b085d1a4f193484ddfe8a`, deployment
+`a4697fd1-deda-4dae-a16c-635454218bc8`, Worker
+`762485da-9e02-46a0-9777-e0d8743b9dbf`, and D1
+`theologai-production-20260715-a`
+(`c6535a4a-1953-4279-b277-7368445fc61a`).
+
+> **PR96 broad MCP smoke — PASS:** Completed in 8.834 seconds. Sanitized
+> `production-mcp-smoke-audit.json` evidence SHA-256:
+> `f33680b7f9f0f2dfbc0df427bcf43d62fb07254d899a9b59a22d483d776a2e26`.
+> It verified 26 MCP operations across 27 HTTP exchanges and 293,466 aggregate
+> MCP response bytes, stateless with no retries or redirects. Pre/post identity
+> was unchanged: deployment `2d10d693-958e-47a6-ae24-81647679c2f6`, Worker
+> `7a3f5078-37bc-453e-bac7-a0743afd508a` (#88), and D1
+> `theologai-production-20260723-a` (`3f7faa0e-689f-47aa-a601-dc662db9a6cf`).
+
+> **PR96 deployment/audit tail — PASS_WITH_OBSERVATION_LIMITATIONS:** Two
+> post-smoke unfiltered JSON Wrangler 4.107.0 tails were pinned to Worker
+> `7a3f5078-37bc-453e-bac7-a0743afd508a` (#88) at requested sampling `0.999999`.
+> Attempt 1: `2026-07-24T13:03:40Z`–`13:34:06Z`, raw 0600 5,634,265 bytes,
+> SHA-256 `819ab5dbbca47719edb5a9292e41c54cd6c15d21488640023ad7e148a609617b`,
+> 1,324 events. Attempt 2: `13:36:32Z`–`13:56:16Z`, raw 0600 3,603,881 bytes,
+> SHA-256 `a56d25424fdeca4207e9039d0efeec5ee0d272d04fd924f0caa1d8bebd3f83f8`,
+> 848 events. Combined command time was 50m10s; observed event-span 49m29.544s.
+> Two automatic reconnect warnings and a maximum uninterrupted segment of about
+> 19m12s mean this is neither a continuous 30-minute observation nor an
+> exhaustive/global request count. Wrangler tail authoritatively cannot provide
+> a request total: 2,172 observed events = 2,167 ok + 5 separately classified
+> client cancellations; 0 observed 5xx, 0 429, 0 exceptions, 0 error logs, 0
+> truncated events, and 0 unexpected release errors. Raw captures are private
+> and unpublished because they contain request metadata. Final authoritative
+> identity after each: source `ac4b5ed774302fbfc86bf846b6ee77a07beed456`, tree
+> `adf08edbf6bfcb14b9613354b2b8fb9f62ec8c16`, deployment
+> `2d10d693-958e-47a6-ae24-81647679c2f6`, Worker #88 above, D1
+> `theologai-production-20260723-a` (`3f7faa0e-689f-47aa-a601-dc662db9a6cf`),
+> sole 100%; identity SHA-256
+> `a6959d24fb7f50a9848fe2d011f425894718471b8a0609e7833780a291721a44`.
+
 The approved source acquisition and the M4A local-only materialization are
 complete. The repository contains the exact approved UBS source pair, an
 executable local migration `0004_ubs_hebrew_semantics`, transform 7, a derived
 SQLite build, deterministic D1 seed generation/import verification, and
-inactive Node SQLite and Worker-D1 aggregate adapters. Those local artifacts
-are verification inputs only: no runtime composition root registers them, and
-they cause no tool, prompt, resource, manifest-public-contract, binding,
-remote-D1, preview, production, or deployment change.
+historical Node SQLite and Worker-D1 aggregate adapters. At that M4A stage,
+those artifacts were verification inputs only and did not themselves establish
+a remote binding or deployment.
 
-The owner authorized draft-PR publication of this local M4A slice, but it had
-not yet been published when this state record was authored. That authorization
-does not extend to remote migration, runtime registration, or deployment.
+The earlier authorization for draft-PR publication of the local M4A slice did
+not itself authorize remote migration, runtime registration, or deployment.
+PR #96 is the separately recorded production outcome above.
 
 `SOURCE.json` remains the historical acquisition-gate snapshot for the pinned
 source packet and derived support files. It is not a current release-state
@@ -47,8 +105,9 @@ separately withheld at the rights boundary.
 
 The owner approved vendoring the exact two files above under the scoped CC
 BY-SA 4.0 policy, and separately approved M4A local-only materialization.
-Neither approval authorizes public exposure, a remote D1 import, a binding
-change, or a deployment.
+Those earlier approvals did not themselves authorize public exposure, a remote
+D1 import, a binding change, or a deployment; PR #96 is recorded separately
+above rather than inferred from them.
 
 ### B. Source pins and provenance
 
@@ -84,8 +143,9 @@ transform from 6 to 7, and materialized the full derived projection into local
 SQLite. The migration separates dictionary and lexical-domain sources, retains
 the cross-source sense/domain join, and requires parent domains before children.
 The deterministic local D1 seed/import and Workerd verification use that exact
-schema. This work is complete only locally; no remote D1 database has received
-the migration or seed, and no Worker binding has changed.
+schema. At the M4A stage this work was complete only locally; the subsequent
+PR #96 production release record above supersedes that point-in-time statement
+for the active D1 binding without changing the historical provenance record.
 
 Measure the built database and deterministic seed, not only source size. The
 project gate is at most 350 MiB. The harness also enforces Cloudflare D1's
@@ -111,7 +171,7 @@ gate requires the actual materialized database size.
 
 ### F. Repository and adapter parity
 
-M4A implements inactive Node SQLite and Worker D1 adapters behind the
+M4A implements historical inactive Node SQLite and Worker D1 adapters behind the
 `IUbsSemanticEvidenceBundleRepository` aggregate contract. They preserve the
 shared caps and order identifiers and are verified for parity, query plans,
 bounded result windows with
@@ -124,9 +184,10 @@ contextual token sense. Every page records the count returned by prior pages;
 present if and only if more rows remain. This makes a short terminal page
 honest instead of comparing the global total only with the current page.
 
-An inactive, source-free `HebrewSemanticEvidenceService` now exercises this
-boundary only with invented synthetic fixtures. It is deliberately absent from
-all composition roots and public exports. The seam accepts only the existing
+At that historical stage, an inactive, source-free
+`HebrewSemanticEvidenceService` exercised this boundary only with invented
+synthetic fixtures and was deliberately absent from composition roots and
+public exports. The seam accepts only the existing
 public Hebrew H-number grammar, forwards an internal repository page request,
 and returns candidates or unavailable evidence by default. The stronger
 `reference_aligned_source_candidate` status requires a separately versioned
@@ -185,10 +246,11 @@ acceptable only when it names a genuine boundary; it grants no access beyond
 public source material. No HMAC secret is needed for this read-only continuation
 model.
 
-The public semantic service and aggregate seam remain unregistered in both
-Worker and Node composition. The local adapters name the completed storage
-layout so it can be verified, but no runtime path can call them and no remote
-D1 binding, preview, or production environment has been changed.
+The public semantic service and aggregate seam were unregistered in the
+historical M4A composition. The local adapters name the completed storage layout
+so it can be verified. PR #96's bounded v2 audit establishes the current public
+result only; it must not be read as a claim that this historical seam is the
+current runtime path.
 
 Repository validation also mirrors compiler identity guarantees: lexical
 identities and source ordinals are unique where their schema defines them, and
@@ -217,18 +279,20 @@ reports both the `A####` public-scope withholding and TBESH `Meaning` rights
 withholding; extra or missing entries fail validation. Neither withheld field
 may be blended into UBS definitions or glosses. Markdown remains compatible.
 
-The inactive draft caps the serialized semantic response at 32 KiB UTF-8 and
+The historical inactive draft caps the serialized semantic response at 32 KiB UTF-8 and
 also bounds every definition, gloss, identifier, reference, domain, candidate
 array, and provenance field. Every branch carries an honest result window.
 A continuation is allowed exactly when `hasMore` is true and carries the opaque
 cursor plus its exact operation, artifact identity, public/source identity pair,
 and normalized-reference binding. JSON Schema enforces the structural and field
 bounds only; it cannot enforce relational arithmetic or the total serialized
-byte size. The inactive pure presenter guard separately binds the request,
+byte size. The historical inactive pure presenter guard separately binds the request,
 top-level identity/reference, continuation, and provenance artifact, validates
 status-specific counts and window arithmetic, and returns the exact serialized
-string after enforcing the 32 KiB UTF-8 cap. Runtime registration and actual
-presentation remain later work. The stronger reference-aligned status also
+string after enforcing the 32 KiB UTF-8 cap. PR #96 later observed public v2
+presentation under the bounded audit above; the audit does not prove that the
+historical presenter is its current runtime implementation. The stronger
+reference-aligned status also
 requires the output token identity and verifier version to match a trusted
 caller-supplied alignment assertion. That assertion also binds the exact source,
 sense, and evidence-row identities, so a valid token/verifier pair cannot
@@ -240,13 +304,13 @@ bidirectional, line-separator, noncharacter, and malformed non-scalar Unicode.
 
 ### H. Release and audit
 
-The completed local checks are prerequisites, not release evidence. A future
-release must separately authorize a fresh preview D1, remote migration/seed,
-binding change, protected preview deployment, and black-box audit before any
-production decision. It must cover beginner/expert, ambiguity, missing-data,
-attribution, withheld-evidence, environment-isolation, and rollback paths.
-Code and D1 rollback remain a matched pair; no predecessor database is deleted
-without separate permission.
+The completed local checks were prerequisites, not release evidence. PR #96 is
+the separately recorded production decision and bounded black-box audit above;
+it does not erase the release requirements for any later material change. Later
+releases must cover beginner/expert, ambiguity, missing-data, attribution,
+withheld-evidence, environment-isolation, and rollback paths. Code and D1
+rollback remain a matched pair; no predecessor database is deleted without
+separate permission.
 
 ## Relational boundary
 
