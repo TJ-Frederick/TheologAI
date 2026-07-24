@@ -11,7 +11,7 @@ import {
   type UbsPublicHebrewStrongs,
   type UbsSemanticSource,
 } from '../../kernel/ubsSemanticDomain.js';
-import { formatReference, parseReference, referencesEqual, toHelloAO } from '../../kernel/reference.js';
+import { formatReference, parseReference, referencesEqual } from '../../kernel/reference.js';
 import {
   ORIGINAL_LANGUAGE_STUDY_V2_CURSOR_OPERATION,
   ORIGINAL_LANGUAGE_STUDY_V2_RESPONSE_BYTES,
@@ -46,7 +46,7 @@ export type {
 } from '../../kernel/originalLanguageStudyV2Contract.js';
 
 /**
- * The inactive coordinator returns both the closed structured v2 packet and a
+ * The coordinator returns both the closed structured v2 packet and a
  * textual rendering that begins with the complete existing v1 rendering.  The
  * latter is intentionally composed only after the v2 result has passed its
  * own exact-byte validation; it is not a second, lossy v1 projection.
@@ -65,10 +65,9 @@ const WITHHELD_EVIDENCE = Object.freeze([
 ] as const);
 
 /**
- * Inactive v2 coordinator.  A future composition root may instantiate it only
- * after a separately-approved hard cut.  Eligible Hebrew calls execute one
- * aggregate repository operation; neither source identity nor alignment proof
- * is caller-controlled.
+ * Active v2 coordinator. Eligible Hebrew calls execute one aggregate
+ * repository operation; neither source identity nor alignment proof is
+ * caller-controlled.
  */
 export class OriginalLanguageStudyV2Coordinator {
   constructor(
@@ -144,6 +143,7 @@ export class OriginalLanguageStudyV2Coordinator {
       requestReference: request.reference,
       requestTarget: request.target,
       requestPosition: request.position ?? null,
+      detail: request.detail,
       canonicalReference: canonicalReference.display,
       selectedToken: snapshotSelectedToken(v1.selectedToken),
       publicStrongs: identity.publicStrongs,
@@ -428,10 +428,7 @@ function canonicalOriginalLanguageStudyReference(
     throw new Error(`${label} must be exactly one Bible verse`);
   }
   const display = formatReference(reference);
-  const semanticKey = requireUbsSemanticNormalizedReference(
-    `${toHelloAO(reference).bookCode} ${reference.chapter}:${reference.startVerse}`,
-    `${label} UBS semantic key`,
-  );
+  const semanticKey = requireUbsSemanticNormalizedReference(display, `${label} UBS semantic key`);
   return {
     display,
     semanticKey,

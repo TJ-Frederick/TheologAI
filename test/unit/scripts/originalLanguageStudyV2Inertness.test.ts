@@ -4,123 +4,69 @@ import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import { originalLanguageStudyV2InputSchema } from '../../../src/mcp/schemas/originalLanguageStudyV2.js';
+import {
+  ORIGINAL_LANGUAGE_STUDY_V2_SEMANTIC_ARTIFACT_IDENTITY,
+} from '../../../src/services/languages/OriginalLanguageStudyV2ContextProvider.js';
 
 const repoPath = fileURLToPath(new URL('../../../', import.meta.url));
 const frozenDraftFixtureRoot = 'test/fixtures/original-language-study-v2/';
-const inactiveModules = [
+const activatedModules = [
   'src/kernel/originalLanguageStudyV2Contract.ts',
   'src/mcp/schemas/originalLanguageStudyV2.ts',
   'src/presenters/originalLanguageStudyV2Structured.ts',
   'src/formatters/originalLanguageStudyV2Formatter.ts',
   'src/services/languages/OriginalLanguageStudyV2Coordinator.ts',
+  'src/services/languages/OriginalLanguageStudyV2ContextProvider.ts',
 ] as const;
 const runtimeEntrypoints = [
   'src/index.ts',
   'src/worker.ts',
-  'src/ccel-coordinator-worker.ts',
-] as const;
-const registrationAndCompositionRoots = [
-  'src/server.ts',
-  'src/worker-server.ts',
-  'src/mcp/server.ts',
-  'src/mcp/tools.ts',
-  'src/mcp/prompts.ts',
-  'src/tools/toolRegistry.ts',
-  'src/tools/v2/index.ts',
-  'src/tools/worker/index.ts',
-] as const;
-const productionTestAndFixtureModules = [
-  'test/helpers/originalLanguageStudyV2ProductionFixtures.ts',
-  'test/unit/formatters/originalLanguageStudyV2Formatter.test.ts',
-  'test/unit/mcp/originalLanguageStudyV2Schema.test.ts',
-  'test/unit/presenters/originalLanguageStudyV2Structured.test.ts',
-  'test/unit/services/languages/OriginalLanguageStudyV2Coordinator.test.ts',
-  'test/unit/scripts/originalLanguageStudyV2Inertness.test.ts',
 ] as const;
 
-describe('inactive original_language_study v2 implementation', () => {
-  it('is absent from every Node, Worker, and coordinator runtime import graph', () => {
-    const unreachable = new Set(inactiveModules);
+describe('activated original_language_study v2 runtime seam', () => {
+  it('is reachable from both production runtimes while frozen draft fixtures remain unreachable', () => {
     for (const entrypoint of runtimeEntrypoints) {
       const reachable = reachableModules(entrypoint);
-      expect([...unreachable].filter(path => reachable.has(path)), entrypoint).toEqual([]);
+      expect(activatedModules.filter(path => !reachable.has(path)), entrypoint).toEqual([]);
+      expect([...reachable].filter(path => path.startsWith(frozenDraftFixtureRoot)), entrypoint).toEqual([]);
     }
   });
 
-  it('does not alter public registration, composition, or prompt surfaces', () => {
-    for (const path of registrationAndCompositionRoots) {
-      const source = read(path);
-      expect(source, path).not.toMatch(/originalLanguageStudyV2|OriginalLanguageStudyV2/);
-      expect(source, path).not.toMatch(/semantic_candidates|schemaVersion:\s*['"]2['"]/);
-    }
-  });
-
-  it('keeps the v2 implementation storage-agnostic and rejects test-fixture/runtime backdoors', () => {
-    for (const path of inactiveModules) {
-      const source = read(path);
-      expect(source, path).not.toMatch(/originalLanguageStudyV2Draft|test\/fixtures|D1Database|better-sqlite3|wrangler|THEOLOGAI_|CREATE\s+TABLE|INSERT\s+INTO/i);
-    }
+  it('registers the same public tool with the closed v2 input boundary and no caller-controlled semantic authority', () => {
+    const registry = read('src/tools/toolRegistry.ts');
+    const nodeRoot = read('src/tools/v2/index.ts');
+    const workerRoot = read('src/tools/worker/index.ts');
+    expect(registry).toContain('originalLanguageStudyCoordinator');
+    expect(nodeRoot).toContain('new UbsSemanticEvidenceBundleRepository(db)');
+    expect(workerRoot).toContain('new D1UbsSemanticEvidenceBundleRepository(db)');
     expect(JSON.stringify(originalLanguageStudyV2InputSchema))
       .not.toMatch(/artifactIdentity|sourceIdentity|serverVerifiedAlignment|verifierVersion/);
   });
 
-  it('keeps production behavior tests and helpers independent of the frozen draft fixture graph', () => {
-    const reachable = new Set<string>();
-    for (const path of productionTestAndFixtureModules) {
-      for (const dependency of reachableModules(path)) reachable.add(dependency);
-    }
-    expect([...reachable].filter(isFrozenDraftFixtureModule)).toEqual([]);
-  });
-
-  it('detects a transitive archive import even when its raw relative specifier omits test/fixtures', () => {
-    const entry = 'test/helpers/productionProbe.ts';
-    const intermediate = 'test/helpers/productionProbeIndirect.ts';
-    const archiveSpecifier = '../fixtures/original-language-study-v2/support/syntheticOriginalLanguageStudyV2Fixtures.js';
-    const archive = resolveImport(intermediate, archiveSpecifier);
-    expect(archive).toBe(`${frozenDraftFixtureRoot}support/syntheticOriginalLanguageStudyV2Fixtures.ts`);
-
-    const virtualSources: Record<string, string> = {
-      [entry]: "import './productionProbeIndirect.js';",
-      [intermediate]: `import '${archiveSpecifier}';`,
-    };
-    const reachable = reachableModules(
-      entry,
-      path => virtualSources[path] ?? read(path),
-      (from, specifier) => from === entry && specifier === './productionProbeIndirect.js'
-        ? intermediate : resolveImport(from, specifier),
-    );
-    const archived = [...reachable].filter(isFrozenDraftFixtureModule);
-    expect(archived).toContain(`${frozenDraftFixtureRoot}support/syntheticOriginalLanguageStudyV2Fixtures.ts`);
-    expect(archived.every(isFrozenDraftFixtureModule)).toBe(true);
+  it('keeps the pinned artifact identity and aggregate repository seam runtime-small and storage configuration-free', () => {
+    const provider = read('src/services/languages/OriginalLanguageStudyV2ContextProvider.ts');
+    const coordinator = read('src/services/languages/OriginalLanguageStudyV2Coordinator.ts');
+    expect(ORIGINAL_LANGUAGE_STUDY_V2_SEMANTIC_ARTIFACT_IDENTITY)
+      .toBe('bd19fb99f7bbfd13ad68f2184aaded4a6e5587196ad76b68b0c22bf971fc90f6');
+    expect(provider).not.toMatch(/(?:scripts\/|SEMANTIC-COMPILATION-AUDIT|data\/biblical-languages|D1Database|better-sqlite3|THEOLOGAI_)/);
+    expect(coordinator).toContain('queryUbsSemanticEvidenceBundle(this.evidenceRepository');
+    expect(coordinator).not.toMatch(/originalLanguageStudyV2Draft|test\/fixtures/);
   });
 });
 
-function reachableModules(
-  entrypoint: string,
-  readModule: (path: string) => string = read,
-  resolveModule: (from: string, specifier: string) => string | undefined = resolveImport,
-): Set<string> {
+function reachableModules(entrypoint: string): Set<string> {
   const reached = new Set<string>();
   const visit = (path: string) => {
     if (reached.has(path)) return;
     reached.add(path);
-    for (const dependency of relativeImports(readModule(path))) {
-      const resolved = resolveModule(path, dependency);
+    for (const specifier of ts.preProcessFile(read(path), true, true).importedFiles
+      .map(reference => reference.fileName).filter(value => value.startsWith('.'))) {
+      const resolved = resolveImport(path, specifier);
       if (resolved) visit(resolved);
     }
   };
   visit(entrypoint);
   return reached;
-}
-
-function isFrozenDraftFixtureModule(path: string): boolean {
-  return path.startsWith(frozenDraftFixtureRoot);
-}
-
-function relativeImports(source: string): string[] {
-  return ts.preProcessFile(source, true, true).importedFiles
-    .map(reference => reference.fileName)
-    .filter(specifier => specifier.startsWith('.'));
 }
 
 function resolveImport(from: string, specifier: string): string | undefined {

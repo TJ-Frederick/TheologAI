@@ -1,0 +1,132 @@
+{
+  "schemaVersion": 1,
+  "kind": "original-language-v2-preview-audit-fixture",
+  "baseline": {
+    "cleanMainCommit": "7974b15",
+    "rebuiltDatabase": "npm run build:db",
+    "authorityAnchors": {
+      "semanticReferenceCoordinates": 250393,
+      "providerStyleCoordinateKeys": 0,
+      "h0216": { "entries": 1, "senses": 1, "genesis13Evidence": 2 },
+      "h3027": { "entries": 1, "senses": 78, "genesis322EvidenceSense": 54 },
+      "h1961": { "entries": 0 }
+    },
+    "v1": {
+      "greek": {
+        "prefixUtf8Bytes": 7309,
+        "prefixSha256": "c5e1c33156af529d7227878f8e2a47c88847a3ac87e67f45b5f076c43f90b106",
+        "canonicalStudySha256": "715471433a282c73355d2dd8ebb368c25962b525127d1d89f6ea95c3bbdff50c"
+      },
+      "h0216-unpositioned": {
+        "prefixUtf8Bytes": 243,
+        "prefixSha256": "96a45d9ae4e8d96db9bafc920b844751059074ec5599ef501dedaf72cbcb308e",
+        "canonicalStudySha256": "c7d79ac77d5bfbdd0df604d15fab2f6347ab72706339f7a84e8cfa7c7f7f2309"
+      },
+      "h0216": {
+        "prefixUtf8Bytes": 2170,
+        "prefixSha256": "d03a2b6b3e33738c3f2fed331ca7027a5d865488ac51ce0eaf3112c03a966c2f",
+        "canonicalStudySha256": "af97f801890bd815806f6da01873458d54ea95065566853729e70fc4454b51d1"
+      },
+      "h3027": {
+        "prefixUtf8Bytes": 2304,
+        "prefixSha256": "fef8fcfdd071d229920893f96487b941cd69cbcae9665dd793f2207e690ef3f0",
+        "canonicalStudySha256": "2add04c300f7a9ee0b17ac601999d8aef4ea237a927d982398a32704031adc9f"
+      },
+      "h1961": {
+        "prefixUtf8Bytes": 2585,
+        "prefixSha256": "7e57b3cf0610facdb9da6d0282531dde55d8214c08f761f38280bd35720d9481",
+        "canonicalStudySha256": "f1be1e4c363e6358d437a7b11b207cfa44c5312fd372d78bdbe4e3a5b3ac8a76"
+      }
+    }
+  },
+  "cases": [
+    {
+      "id": "greek-not-applicable",
+      "arguments": { "reference": "John 1:1", "target": "G3056", "position": 5 },
+      "mode": "success",
+      "v1Baseline": "greek",
+      "cursorFrom": null,
+      "cursorMutation": null
+    },
+    {
+      "id": "h0216-position-required",
+      "arguments": { "reference": "Genesis 1:3", "target": "H0216" },
+      "mode": "success",
+      "v1Baseline": "h0216-unpositioned",
+      "cursorFrom": null,
+      "cursorMutation": null
+    },
+    {
+      "id": "h0216-summary",
+      "arguments": { "reference": "Genesis 1:3", "target": "H0216", "position": 4 },
+      "mode": "success",
+      "v1Baseline": "h0216",
+      "cursorFrom": null,
+      "cursorMutation": null
+    },
+    {
+      "id": "h3027-summary",
+      "arguments": { "reference": "Genesis 3:22", "target": "H3027", "position": 15 },
+      "mode": "success",
+      "v1Baseline": "h3027",
+      "cursorFrom": null,
+      "cursorMutation": null
+    },
+    {
+      "id": "h3027-detailed",
+      "arguments": { "reference": "Genesis 3:22", "target": "H3027", "position": 15, "detail": "detailed" },
+      "mode": "success",
+      "v1Baseline": "h3027",
+      "cursorFrom": null,
+      "cursorMutation": null
+    },
+    {
+      "id": "h3027-continuation",
+      "arguments": { "reference": "Genesis 3:22", "target": "H3027", "position": 15 },
+      "mode": "success",
+      "v1Baseline": "h3027",
+      "cursorFrom": "h3027-summary",
+      "cursorMutation": null
+    },
+    {
+      "id": "cursor-wrong-reference",
+      "arguments": { "reference": "Genesis 4:11", "target": "H3027", "position": 14 },
+      "mode": "safe-error",
+      "v1Baseline": null,
+      "cursorFrom": "h3027-summary",
+      "cursorMutation": null
+    },
+    {
+      "id": "cursor-wrong-detail",
+      "arguments": { "reference": "Genesis 3:22", "target": "H3027", "position": 15, "detail": "detailed" },
+      "mode": "safe-error",
+      "v1Baseline": null,
+      "cursorFrom": "h3027-summary",
+      "cursorMutation": null
+    },
+    {
+      "id": "h1961-unavailable",
+      "arguments": { "reference": "Genesis 1:2", "target": "H1961", "position": 2 },
+      "mode": "success",
+      "v1Baseline": "h1961",
+      "cursorFrom": null,
+      "cursorMutation": null
+    },
+    {
+      "id": "forbidden-artifact-identity",
+      "arguments": { "reference": "Genesis 1:3", "target": "H0216", "position": 4, "artifactIdentity": "forged" },
+      "mode": "input-error",
+      "v1Baseline": null,
+      "cursorFrom": null,
+      "cursorMutation": null
+    },
+    {
+      "id": "cursor-corrupt",
+      "arguments": { "reference": "Genesis 3:22", "target": "H3027", "position": 15 },
+      "mode": "safe-error",
+      "v1Baseline": null,
+      "cursorFrom": "h3027-summary",
+      "cursorMutation": "flip-final-hex"
+    }
+  ]
+}

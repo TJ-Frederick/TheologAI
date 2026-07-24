@@ -1,9 +1,9 @@
 /**
- * Inactive aggregate-query contract for future UBS Hebrew semantic evidence.
+ * Aggregate-query contract for the active bounded UBS Hebrew semantic layer.
  *
  * This contract deliberately names no table, index, SQL statement, D1 binding,
- * or source artifact path. A future Node or D1 adapter may satisfy the single
- * repository operation without committing the project to a storage layout.
+ * or source artifact path. The Node and D1 adapters satisfy the single
+ * repository operation without exposing their storage layout to callers.
  */
 import {
   UBS_SEMANTIC_CURSOR_MAX_LENGTH,

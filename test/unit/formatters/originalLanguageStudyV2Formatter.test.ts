@@ -10,7 +10,7 @@ import {
   productionRequest,
 } from '../../helpers/originalLanguageStudyV2ProductionFixtures.js';
 
-describe('inactive production original_language_study v2 Markdown formatter', () => {
+describe('production original_language_study v2 Markdown formatter', () => {
   it('begins with the complete unmodified v1 text, retaining local gloss, transliteration, policy, and pinned source', async () => {
     const context = productionContext();
     context.v1Result.dictionary!.evidencePolicy = {

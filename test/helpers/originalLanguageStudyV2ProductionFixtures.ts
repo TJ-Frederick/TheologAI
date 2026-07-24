@@ -1,5 +1,5 @@
 /**
- * Minimal fixtures for the inactive production v2 modules.
+ * Minimal fixtures for the active production v2 modules.
  *
  * The historic `original-language-study-v2` draft packet remains frozen for
  * provenance review.  These fixtures intentionally live elsewhere so the
@@ -30,7 +30,7 @@ export const SYNTHETIC_ARTIFACT = 'a'.repeat(64);
 export const SYNTHETIC_H0001 = requireUbsInternalLexicalIdentity('H0001') as UbsInternalHebrewLexicalIdentity;
 
 const CANONICAL_DISPLAY_REFERENCE = 'Genesis 1:1';
-const SEMANTIC_REFERENCE = 'GEN 1:1';
+const SEMANTIC_REFERENCE = 'Genesis 1:1';
 
 export function productionCandidate(
   index: number,
@@ -266,12 +266,14 @@ export function productionCursorBinding(
   requestReference = 'Gen 1:1',
   target = 'H1',
   position: number | null = 1,
+  detail: 'summary' | 'detailed' = 'summary',
 ): OriginalLanguageStudyV2CursorBinding {
   const token = productionHebrewV1Result().selectedToken!;
   return {
     requestReference,
     requestTarget: target,
     requestPosition: position,
+    detail,
     canonicalReference: CANONICAL_DISPLAY_REFERENCE,
     selectedToken: {
       position: position ?? token.position,

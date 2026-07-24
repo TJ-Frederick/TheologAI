@@ -15,6 +15,7 @@ import { D1StrongsRepository } from '../../adapters/d1/D1StrongsRepository.js';
 import { D1MorphologyRepository } from '../../adapters/d1/D1MorphologyRepository.js';
 import { D1HistoricalDocumentRepository } from '../../adapters/d1/D1HistoricalDocumentRepository.js';
 import { D1UbsParallelPassageRepository } from '../../adapters/d1/D1UbsParallelPassageRepository.js';
+import { D1UbsSemanticEvidenceBundleRepository } from '../../adapters/d1/D1UbsSemanticEvidenceBundleRepository.js';
 
 // Bible adapters (HTTP-based, Workers-compatible)
 import { EsvAdapter } from '../../adapters/bible/EsvAdapter.js';
@@ -36,6 +37,8 @@ import { PrimarySourceSearchService } from '../../services/historical/PrimarySou
 import { StrongsService } from '../../services/languages/StrongsService.js';
 import { MorphologyService } from '../../services/languages/MorphologyService.js';
 import { OriginalLanguageStudyService } from '../../services/languages/OriginalLanguageStudyService.js';
+import { OriginalLanguageStudyV2Coordinator } from '../../services/languages/OriginalLanguageStudyV2Coordinator.js';
+import { OriginalLanguageStudyV2ContextProvider } from '../../services/languages/OriginalLanguageStudyV2ContextProvider.js';
 import { SourceAttestedParallelService } from '../../services/bible/SourceAttestedParallelService.js';
 
 import { createToolRegistry } from '../toolRegistry.js';
@@ -121,6 +124,7 @@ export function createWorkerCompositionRoot(env: Env): WorkerCompositionRoot {
   const morphRepo = new D1MorphologyRepository(db);
   const historicalRepo = new D1HistoricalDocumentRepository(db);
   const sourceAttestedParallelRepo = new D1UbsParallelPassageRepository(db);
+  const ubsSemanticEvidenceBundleRepo = new D1UbsSemanticEvidenceBundleRepository(db);
 
   // D1-dependent services (per-request)
   const crossRefService = new CrossReferenceService(crossRefRepo);
@@ -144,6 +148,10 @@ export function createWorkerCompositionRoot(env: Env): WorkerCompositionRoot {
   const strongsService = new StrongsService(strongsRepo, morphRepo);
   const morphService = new MorphologyService(morphRepo);
   const originalLanguageStudyService = new OriginalLanguageStudyService(morphRepo, strongsRepo);
+  const originalLanguageStudyCoordinator = new OriginalLanguageStudyV2Coordinator(
+    new OriginalLanguageStudyV2ContextProvider(originalLanguageStudyService),
+    ubsSemanticEvidenceBundleRepo,
+  );
 
   // Module-scope services (cached across requests)
   const donationService = getDonationService(env);
@@ -159,7 +167,7 @@ export function createWorkerCompositionRoot(env: Env): WorkerCompositionRoot {
     primarySourceContract,
     strongsService,
     morphologyService: morphService,
-    originalLanguageStudyService,
+    originalLanguageStudyCoordinator,
     donationService,
   });
 

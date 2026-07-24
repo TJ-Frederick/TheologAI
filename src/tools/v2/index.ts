@@ -22,6 +22,7 @@ import { CrossReferenceRepository } from '../../adapters/data/CrossReferenceRepo
 import { StrongsRepository } from '../../adapters/data/StrongsRepository.js';
 import { MorphologyRepository } from '../../adapters/data/MorphologyRepository.js';
 import { HistoricalDocumentRepository } from '../../adapters/data/HistoricalDocumentRepository.js';
+import { UbsSemanticEvidenceBundleRepository } from '../../adapters/data/UbsSemanticEvidenceBundleRepository.js';
 import { loadUbsParallelPassageRepository } from '../../adapters/data/loadUbsParallelPassages.js';
 
 // Services
@@ -35,6 +36,8 @@ import { PrimarySourceSearchService } from '../../services/historical/PrimarySou
 import { StrongsService } from '../../services/languages/StrongsService.js';
 import { MorphologyService } from '../../services/languages/MorphologyService.js';
 import { OriginalLanguageStudyService } from '../../services/languages/OriginalLanguageStudyService.js';
+import { OriginalLanguageStudyV2Coordinator } from '../../services/languages/OriginalLanguageStudyV2Coordinator.js';
+import { OriginalLanguageStudyV2ContextProvider } from '../../services/languages/OriginalLanguageStudyV2ContextProvider.js';
 import { SourceAttestedParallelService } from '../../services/bible/SourceAttestedParallelService.js';
 
 import { createToolRegistry } from '../toolRegistry.js';
@@ -89,6 +92,7 @@ export function createCompositionRoot(options: CompositionRootOptions = {}): Com
   const strongsRepo = new StrongsRepository(db);
   const morphRepo = new MorphologyRepository(db);
   const historicalRepo = new HistoricalDocumentRepository(db);
+  const ubsSemanticEvidenceBundleRepo = new UbsSemanticEvidenceBundleRepository(db);
   const sourceAttestedParallelRepo = loadUbsParallelPassageRepository();
 
   // Bible adapters
@@ -122,6 +126,10 @@ export function createCompositionRoot(options: CompositionRootOptions = {}): Com
   const strongsService = new StrongsService(strongsRepo, morphRepo);
   const morphService = new MorphologyService(morphRepo);
   const originalLanguageStudyService = new OriginalLanguageStudyService(morphRepo, strongsRepo);
+  const originalLanguageStudyCoordinator = new OriginalLanguageStudyV2Coordinator(
+    new OriginalLanguageStudyV2ContextProvider(originalLanguageStudyService),
+    ubsSemanticEvidenceBundleRepo,
+  );
 
   // Donation (no DB dependency)
   const onChainVerifier = new OnChainVerifier({});
@@ -138,7 +146,7 @@ export function createCompositionRoot(options: CompositionRootOptions = {}): Com
     primarySourceContract,
     strongsService,
     morphologyService: morphService,
-    originalLanguageStudyService,
+    originalLanguageStudyCoordinator,
     donationService,
   });
 

@@ -130,6 +130,23 @@ describe('createWorkerCompositionRoot', () => {
       }
     });
 
+    it('wires original_language_study to the active closed v2 schema', () => {
+      const root = createWorkerCompositionRoot(makeEnv());
+      const tool = root.tools.find(candidate => candidate.name === 'original_language_study');
+      expect(tool?.inputSchema).toMatchObject({
+        additionalProperties: false,
+        properties: {
+          detail: { enum: ['summary', 'detailed'] },
+          cursor: { pattern: '^olsv2c1_(?:[0-9a-f]{2})+$' },
+        },
+      });
+      expect(tool?.outputSchema).toMatchObject({
+        oneOf: expect.arrayContaining([
+          expect.objectContaining({ properties: expect.objectContaining({ schemaVersion: { const: '2' } }) }),
+        ]),
+      });
+    });
+
     it('every tool has readOnlyHint annotation', () => {
       const root = createWorkerCompositionRoot(makeEnv());
       for (const tool of root.tools) {

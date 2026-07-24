@@ -208,6 +208,11 @@ jobs:
       github.event.pull_request.base.ref == 'main' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       contains(github.event.pull_request.labels.*.name, 'deploy-preview')
+    # This deliberately differs from the workflow-wide per-PR group above:
+    # one shared preview Worker cannot safely audit two deploying PRs at once.
+    concurrency:
+      group: theologai-shared-preview-deploy-and-audit
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     environment:
       name: preview
@@ -274,6 +279,13 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
+      - name: Capture preview Worker versions before deployment (read-only)
+        run: npx --no-install wrangler versions list --env preview --json > "$RUNNER_TEMP/preview-worker-versions-before.json"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
+
       - name: Reconfirm live preview authorization immediately before deployment
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
@@ -302,6 +314,7 @@ jobs:
             }
 
       - name: Deploy to Cloudflare Workers (preview)
+        id: preview-worker-deploy
         uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
         with:
           wranglerVersion: '4.107.0'
@@ -314,17 +327,90 @@ jobs:
         env:
           ESV_API_KEY: ${{ secrets.ESV_API_KEY }}
 
+      - name: Verify exact active preview Worker version (read-only)
+        id: preview-worker-pre-audit-identity
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DEPLOY_COMMAND_OUTPUT: ${{ steps.preview-worker-deploy.outputs.command-output }}
+          WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
+        run: |
+          printf '%s' "$DEPLOY_COMMAND_OUTPUT" > "$RUNNER_TEMP/preview-worker-deploy.command-output.txt"
+          npx --no-install wrangler versions list --env preview --json > "$RUNNER_TEMP/preview-worker-versions-after.json"
+          npx --no-install wrangler deployments list --env preview --json > "$RUNNER_TEMP/preview-worker-deployments-after.json"
+          npx --no-install tsx scripts/verify-preview-worker-deployment.ts verify-deploy \
+            --before-versions "$RUNNER_TEMP/preview-worker-versions-before.json" \
+            --after-versions "$RUNNER_TEMP/preview-worker-versions-after.json" \
+            --after-deployments "$RUNNER_TEMP/preview-worker-deployments-after.json" \
+            --command-output "$RUNNER_TEMP/preview-worker-deploy.command-output.txt" \
+            --output "$RUNNER_TEMP/preview-worker-deployment-pre-audit-identity.json" \
+            --github-output "$GITHUB_OUTPUT"
+
+      # This is deliberately a post-deploy release gate, not an ordinary PR
+      # check: the runner is pinned to the canonical preview custom domain.
+      - name: Audit original-language v2 contract on preview
+        run: |
+          npm run audit:original-language-v2-preview -- \
+            --output "$RUNNER_TEMP/original-language-v2-preview-audit.json"
+          test -s "$RUNNER_TEMP/original-language-v2-preview-audit.json"
+
+      - name: Verify preview Worker remained active through audit (read-only)
+        id: preview-worker-audit-identity
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
+        run: |
+          npx --no-install wrangler deployments list --env preview --json > "$RUNNER_TEMP/preview-worker-deployments-post-audit.json"
+          npx --no-install tsx scripts/verify-preview-worker-deployment.ts verify-audit-stability \
+            --pre-audit-identity "$RUNNER_TEMP/preview-worker-deployment-pre-audit-identity.json" \
+            --post-audit-deployments "$RUNNER_TEMP/preview-worker-deployments-post-audit.json" \
+            --output "$RUNNER_TEMP/preview-worker-deployment-identity.json" \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Hash sanitized preview audit evidence
+        id: preview-audit-evidence
+        run: |
+          audit_sha256="$(sha256sum "$RUNNER_TEMP/original-language-v2-preview-audit.json" | awk '{print $1}')"
+          identity_sha256="$(sha256sum "$RUNNER_TEMP/preview-worker-deployment-identity.json" | awk '{print $1}')"
+          printf 'audit_sha256=%s\n' "$audit_sha256" >> "$GITHUB_OUTPUT"
+          printf 'identity_record_sha256=%s\n' "$identity_sha256" >> "$GITHUB_OUTPUT"
+
+      - name: Upload protected preview audit evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: original-language-v2-preview-audit-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          path: |
+            ${{ runner.temp }}/original-language-v2-preview-audit.json
+            ${{ runner.temp }}/preview-worker-deployment-identity.json
+          retention-days: 7
+          if-no-files-found: error
+
       - name: Comment preview URL on PR
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           CHECKED_OUT_COMMIT: ${{ steps.preview-checkout.outputs.commit }}
           CHECKED_OUT_TREE: ${{ steps.preview-checkout.outputs.tree }}
+          WORKER_VERSION_ID: ${{ steps.preview-worker-audit-identity.outputs.version_id }}
+          WORKER_DEPLOYMENT_ID: ${{ steps.preview-worker-audit-identity.outputs.deployment_id }}
+          WORKER_IDENTITY_SHA256: ${{ steps.preview-audit-evidence.outputs.identity_record_sha256 }}
+          AUDIT_SHA256: ${{ steps.preview-audit-evidence.outputs.audit_sha256 }}
+          AUDIT_ARTIFACT: original-language-v2-preview-audit-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
         with:
           script: |
             const commit = process.env.CHECKED_OUT_COMMIT;
             const tree = process.env.CHECKED_OUT_TREE;
-            if (!/^[0-9a-f]{40}$/i.test(commit) || !/^[0-9a-f]{40}$/i.test(tree)) {
-              core.setFailed('Preview checkout identity is missing or malformed.');
+            const workerVersion = process.env.WORKER_VERSION_ID;
+            const deployment = process.env.WORKER_DEPLOYMENT_ID;
+            const workerIdentity = process.env.WORKER_IDENTITY_SHA256;
+            const audit = process.env.AUDIT_SHA256;
+            const artifact = process.env.AUDIT_ARTIFACT;
+            if (!/^[0-9a-f]{40}$/i.test(commit) || !/^[0-9a-f]{40}$/i.test(tree)
+              || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(workerVersion)
+              || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(deployment)
+              || !/^[0-9a-f]{64}$/i.test(workerIdentity) || !/^[0-9a-f]{64}$/i.test(audit)
+              || !/^original-language-v2-preview-audit-\d+-[0-9a-f]{40}$/i.test(artifact)) {
+              core.setFailed('Preview release evidence is missing or malformed.');
               return;
             }
             const body = [
@@ -336,6 +422,8 @@ jobs:
               '**Compatibility MCP endpoint:** `https://theologai-preview.tjfrederick.workers.dev/mcp`',
               '',
               `Deployed from checked-out commit \`${commit}\` (tree \`${tree}\`).`,
+              `Cloudflare confirms Worker version \`${workerVersion}\` at 100% in deployment \`${deployment}\`.`,
+              `Sanitized audit evidence SHA-256: \`${audit}\`; identity record SHA-256: \`${workerIdentity}\`; retained artifact: \`${artifact}\` (7 days).`,
             ].join('\n');
 
             const { data: comments } = await github.rest.issues.listComments({

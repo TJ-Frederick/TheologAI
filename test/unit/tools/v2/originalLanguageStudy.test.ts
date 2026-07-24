@@ -1,95 +1,84 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createOriginalLanguageStudyHandler } from '../../../../src/tools/v2/originalLanguageStudy.js';
-import type { OriginalLanguageStudyService } from '../../../../src/services/languages/OriginalLanguageStudyService.js';
 import { validatorFor } from '../../../../src/mcp/validation.js';
+import {
+  productionCandidate,
+  productionContext,
+  productionCoordinator,
+  productionRequest,
+} from '../../../helpers/originalLanguageStudyV2ProductionFixtures.js';
 
-describe('original_language_study handler', () => {
-  it('advertises a closed bounded schema and emits cautious structured content', async () => {
-    const study = vi.fn<OriginalLanguageStudyService['study']>().mockResolvedValue({
-      status: 'partial', reference: 'John 3:16', language: 'Greek', target: 'love',
-      selectedToken: { position: 3, text: 'ἠγάπησεν', lemma: 'ἀγαπάω', strongsNumber: 'G0025', morphologyCode: 'V-AAI-3S', gloss: 'loved' },
-      warnings: ['No separate lexicon evidence.'],
+describe('original_language_study v2 handler', () => {
+  it('hard-cuts the existing tool to the closed v2 contract with nested complete v1 study and opaque continuation input', async () => {
+    const current = productionCoordinator(Array.from({ length: 10 }, (_, index) => productionCandidate(index + 1)));
+    const handler = createOriginalLanguageStudyHandler(current.coordinator);
+
+    expect(handler.name).toBe('original_language_study');
+    expect(handler.inputSchema).toMatchObject({
+      required: ['reference', 'target'], additionalProperties: false,
+      properties: { detail: { enum: ['summary', 'detailed'] }, cursor: { pattern: '^olsv2c1_(?:[0-9a-f]{2})+$' } },
     });
-    const handler = createOriginalLanguageStudyHandler({ study } as unknown as OriginalLanguageStudyService);
-    expect(handler.inputSchema).toMatchObject({ required: ['reference', 'target'], additionalProperties: false });
-    const result = await handler.handler({ reference: 'John 3:16', target: 'love' });
-    expect(study).toHaveBeenCalledWith({ reference: 'John 3:16', target: 'love' });
-    expect(result.content[0].text).toContain('Contextual evidence (for a plain-English explanation)');
-    expect(result.content[0].text).toContain('0f60797c170f11a1f8dc75c5f7617973e2e66b0d');
-    expect(result.content[0].text).not.toContain('revision is not exposed');
-    expect(result.content[0].text).not.toContain('Meaning here, in plain English');
-    expect(result.structuredContent).toMatchObject({ kind: 'original_language_study', status: 'partial', context: { language: 'Greek' } });
-    expect(result.structuredContent).not.toHaveProperty('corpusUsage');
-    expect(handler.outputSchema?.properties).not.toHaveProperty('corpusUsage');
-    expect(validatorFor(handler.outputSchema!)(result.structuredContent).valid).toBe(true);
-    expect((result.structuredContent?.interpretiveLimits as Array<{ code: string }>).map(x => x.code)).toContain('corpus_scope_limit');
-    expect(result.structuredContent?.provenance).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        id: 'stepbible-morphology',
-        version: '0f60797c170f11a1f8dc75c5f7617973e2e66b0d',
-        url: 'https://github.com/STEPBible/STEPBible-Data/tree/0f60797c170f11a1f8dc75c5f7617973e2e66b0d',
-        attribution: 'Tyndale House, Cambridge / STEP Bible (www.stepbible.org)',
-      }),
-    ]));
-  });
+    const result = await handler.handler(productionRequest(undefined, 'detailed'));
 
-  it('keeps Greek lexicon-only study output unchanged when a separate gloss is present', async () => {
-    const study = vi.fn<OriginalLanguageStudyService['study']>().mockResolvedValue({
-      status: 'complete', reference: 'John 1:1', language: 'Greek', target: 'G6000',
-      selectedToken: { position: 1, text: 'φιξτυρε', lemma: 'φιξτυρε', strongsNumber: 'G6000', morphologyCode: 'G:N-M', gloss: 'token gloss' },
-      dictionary: {
-        strongs_number: 'G6000', testament: null, language: 'Greek', lemma: 'φιξτυρε',
-        definition: 'licensed Greek definition', citation: { source: 'STEPBible lexicon data' },
-        sourceKind: 'stepbible_lexicon', extended: { gloss: 'separate Greek gloss' },
-      },
-      stepBible: { gloss: 'separate Greek gloss' }, warnings: [],
-    });
-    const result = await createOriginalLanguageStudyHandler({ study } as unknown as OriginalLanguageStudyService)
-      .handler({ reference: 'John 1:1', target: 'G6000' });
-
-    expect(result.content[0].text).toContain('### STEPBible lexicon\n\nlicensed Greek definition');
-    expect(result.content[0].text).not.toContain('separate Greek gloss');
-    expect(result.content[0].text).not.toContain('Brief gloss');
-    expect(result.structuredContent?.lexiconEvidence).toEqual([{
-      sourceId: 'stepbible-lexicon', kind: 'stepbible_lexicon', lemma: 'φιξτυρε',
-      definition: 'licensed Greek definition', provenanceIds: ['stepbible-lexicon'],
-    }]);
-  });
-
-  it('labels retained Hebrew brief glosses and enforces the evidence-policy notice bound', async () => {
-    const notice = 'TBESH Meaning is withheld; no replacement definition is inferred.';
-    const study = vi.fn<OriginalLanguageStudyService['study']>().mockResolvedValue({
-      status: 'partial', reference: 'Genesis 1:1', language: 'Hebrew', target: 'H9001',
-      selectedToken: { position: 1, text: 'וַ', lemma: '/וַ', strongsNumber: 'H9001', morphologyCode: 'H:C', gloss: '&' },
-      dictionary: {
-        strongs_number: 'H9001', testament: null, language: 'Hebrew', lemma: '/וַ',
-        definition: null, citation: { source: 'STEPBible lexicon data' }, sourceKind: 'stepbible_lexicon',
-        extended: { gloss: '&', morphologyCode: 'H:C' },
-        evidencePolicy: {
-          code: 'tbesh_meaning_withheld', semanticEvidence: 'unavailable',
-          withheldFields: ['tbesh_meaning'], notice,
-        },
-      },
-      stepBible: { gloss: '&', morphologyCode: 'H:C' }, warnings: [notice],
-    });
-    const handler = createOriginalLanguageStudyHandler({ study } as unknown as OriginalLanguageStudyService);
-    const result = await handler.handler({ reference: 'Genesis 1:1', target: 'H9001' });
-
-    expect(result.content[0].text).toContain('Semantic definition evidence is unavailable.');
-    expect(result.content[0].text).toContain('**Brief gloss (translation cue, not a definition):** &');
-    expect(result.content[0].text).not.toContain('### STEPBible lexicon\n\n&');
+    expect(result.isError).toBeUndefined();
     expect(result.structuredContent).toMatchObject({
-      lexiconEvidence: [{
-        kind: 'stepbible_lexicon', gloss: '&',
-        evidencePolicy: { withheldFields: ['tbesh_meaning'], notice },
-      }],
+      schemaVersion: '2', kind: 'original_language_study', detail: 'detailed',
+      study: { schemaVersion: '1', kind: 'original_language_study', context: { language: 'Hebrew' } },
+      semanticEvidence: { status: 'lexical_candidates' },
     });
+    expect(result.content[0]?.text).toMatch(/^## Contextual evidence \(for a plain-English explanation\)/);
+    expect(result.content[0]?.text).toContain('### Added Hebrew semantic layer');
+    expect(current.repository.queryCount).toBe(1);
     expect(validatorFor(handler.outputSchema!)(result.structuredContent).valid).toBe(true);
+  });
 
-    const evidencePolicySchema = ((handler.outputSchema!.properties!.lexiconEvidence as any).items.properties.evidencePolicy);
-    expect(evidencePolicySchema.properties.notice.maxLength).toBe(1000);
-    const oversized = structuredClone(result.structuredContent) as any;
-    oversized.lexiconEvidence[0].evidencePolicy.notice = 'x'.repeat(1001);
-    expect(validatorFor(handler.outputSchema!)(oversized).valid).toBe(false);
+  it('keeps Greek, ineligible Hebrew, and ambiguous Hebrew semantic reads at zero while preserving their complete v1 study', async () => {
+    const greek = productionCoordinator([productionCandidate(1)], productionContext('Greek'));
+    const greekResult = await createOriginalLanguageStudyHandler(greek.coordinator)
+      .handler({ reference: 'Jn 1:1', target: 'H1', position: 1 });
+    expect(greekResult.structuredContent).toMatchObject({
+      schemaVersion: '2', study: { schemaVersion: '1', context: { language: 'Greek' } },
+      semanticEvidence: { language: 'Greek', status: 'not_applicable' },
+    });
+    expect(greek.repository.queryCount).toBe(0);
+
+    const ineligibleContext = productionContext();
+    ineligibleContext.v1Result.identity = undefined;
+    ineligibleContext.v1Result.selectedToken!.strongsNumber = null;
+    const ineligible = productionCoordinator([productionCandidate(1)], ineligibleContext);
+    const ineligibleResult = await createOriginalLanguageStudyHandler(ineligible.coordinator)
+      .handler(productionRequest());
+    expect(ineligibleResult.structuredContent).toMatchObject({
+      schemaVersion: '2', study: { schemaVersion: '1', context: { language: 'Hebrew' } },
+      semanticEvidence: { language: 'Hebrew', status: 'unavailable', reason: 'no_usable_hebrew_identity' },
+    });
+    expect(ineligible.repository.queryCount).toBe(0);
+
+    const ambiguousContext = productionContext();
+    const candidate = ambiguousContext.v1Result.selectedToken!;
+    ambiguousContext.v1Result = {
+      reference: 'Genesis 1:1', language: 'Hebrew', target: 'H1', status: 'needs_disambiguation',
+      candidates: [candidate, { ...candidate, position: 2 }], warnings: [],
+    };
+    const ambiguous = productionCoordinator([productionCandidate(1)], ambiguousContext);
+    const ambiguousResult = await createOriginalLanguageStudyHandler(ambiguous.coordinator)
+      .handler(productionRequest());
+    expect(ambiguousResult.structuredContent).toMatchObject({
+      schemaVersion: '2', study: { schemaVersion: '1', status: 'needs_disambiguation' },
+      semanticEvidence: { language: 'Hebrew', status: 'unavailable', reason: 'selected_token_required' },
+    });
+    expect(ambiguous.repository.queryCount).toBe(0);
+  });
+
+  it('rejects caller-controlled semantic identities before coordinator access', async () => {
+    const coordinator = { study: vi.fn() } as unknown as Parameters<typeof createOriginalLanguageStudyHandler>[0];
+    const handler = createOriginalLanguageStudyHandler(coordinator);
+    const result = await handler.handler({
+      reference: 'Genesis 1:1', target: 'H1', artifactIdentity: 'forged',
+    });
+
+    expect(result).toMatchObject({ isError: true });
+    expect(result.content[0]?.text).toContain('Unknown argument "artifactIdentity"');
+    expect(coordinator.study).not.toHaveBeenCalled();
   });
 });

@@ -8,9 +8,8 @@ import type {
 } from './ubsSemanticDomain.js';
 
 /**
- * Inactive, server-owned contract for a future hard cut from the current
- * original_language_study response to schema v2.  Nothing in this module
- * registers a tool or gives callers a way to supply semantic identities.
+ * Server-owned contract for the active v2 original_language_study response.
+ * Callers cannot supply semantic identities.
  */
 export const ORIGINAL_LANGUAGE_STUDY_V2_SCHEMA_VERSION = '2' as const;
 export const ORIGINAL_LANGUAGE_STUDY_V2_RESPONSE_BYTES = 32 * 1024;
@@ -33,7 +32,7 @@ export interface OriginalLanguageStudyV2Request {
   reference: string;
   target: string;
   position?: number;
-  /** Summary is the public default once this inactive contract is activated. */
+  /** Summary is the public default. */
   detail?: OriginalLanguageStudyV2Detail;
   cursor?: string;
 }
@@ -77,6 +76,7 @@ export interface OriginalLanguageStudyV2CursorBinding {
   requestReference: string;
   requestTarget: string;
   requestPosition: number | null;
+  detail: OriginalLanguageStudyV2Detail;
   canonicalReference: string;
   selectedToken: OriginalLanguageStudyV2SelectedTokenWitness;
   publicStrongs: UbsPublicHebrewStrongs;
@@ -256,6 +256,7 @@ export function originalLanguageStudyV2ContextDigest(
     binding.requestReference,
     binding.requestTarget,
     binding.requestPosition,
+    binding.detail,
     binding.canonicalReference,
     binding.selectedToken.position,
     binding.selectedToken.text,

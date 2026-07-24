@@ -449,11 +449,30 @@ describe('Worker MCP endpoint in workerd', () => {
     expect(textContent(study.message)).toContain('TBESH Meaning field is withheld');
     expect(study.message.result).toMatchObject({
       structuredContent: {
-        status: 'partial',
-        lexiconEvidence: [{
-          kind: 'stepbible_lexicon', gloss: '&',
-          evidencePolicy: { code: 'tbesh_meaning_withheld', semanticEvidence: 'unavailable' },
-        }],
+        schemaVersion: '2',
+        study: {
+          status: 'partial',
+          lexiconEvidence: [{
+            kind: 'stepbible_lexicon', gloss: '&',
+            evidencePolicy: { code: 'tbesh_meaning_withheld', semanticEvidence: 'unavailable' },
+          }],
+        },
+        semanticEvidence: {
+          language: 'Hebrew', status: 'unavailable', reason: 'no_lexical_entry',
+          provenance: {
+            artifactIdentity: 'bd19fb99f7bbfd13ad68f2184aaded4a6e5587196ad76b68b0c22bf971fc90f6',
+            sources: [
+              expect.objectContaining({
+                sourceId: 'ubs-hebrew-dictionary-en-v0.9.2', sourceRole: 'dictionary',
+                artifactIdentity: 'bd19fb99f7bbfd13ad68f2184aaded4a6e5587196ad76b68b0c22bf971fc90f6',
+              }),
+              expect.objectContaining({
+                sourceId: 'ubs-hebrew-lexical-domains-en-v0.9.2', sourceRole: 'lexical_domains',
+                artifactIdentity: 'bd19fb99f7bbfd13ad68f2184aaded4a6e5587196ad76b68b0c22bf971fc90f6',
+              }),
+            ],
+          },
+        },
       },
     });
   });
