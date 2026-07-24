@@ -196,10 +196,13 @@ npm run d1:remote:check -- --database "$CANDIDATE_D1_NAME" --env preview
 Only after readiness passes should a reviewed PR change the local preview
 `database_name` and `database_id` to that prepared target. The protected
 workflow re-maps that checked-in ID/name through a read-only D1 inventory,
-re-runs readiness by exact name, proves the active predecessor uses a different
-D1, and only then permits a Worker deploy. If any migration or seed import
-fails or is interrupted, do not resume against that partial database. Give the
-next empty replacement a new name and restart from migration application.
+re-runs readiness by exact name, records whether the candidate changes the D1
+binding, and only then permits a Worker deploy. The generic release workflow
+also supports a same-D1 code-only release; Transform-9 freshness is enforced by
+the current readiness contract, which a predecessor lacking migration `0006`
+cannot satisfy. If any migration or seed import fails or is interrupted, do not
+resume against that partial database. Give the next empty replacement a new
+name and restart from migration application.
 Preserve the previously bound database through the cutover and initial
 verification window; rollback is restoring its name and ID in `wrangler.toml`
 and redeploying through the normal approval gate. Database creation, binding

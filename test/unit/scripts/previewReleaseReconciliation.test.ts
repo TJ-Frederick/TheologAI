@@ -4,6 +4,7 @@ import {
   activePreviewVersionId,
   candidatePreviewD1DatabaseName,
   capturePreviewPredecessorAnchor,
+  observePreviewPostMutation,
   reconcilePreviewPostMutation,
 } from '../../../scripts/preview-release-reconciliation.js';
 
@@ -49,12 +50,13 @@ describe('preview release reconciliation evidence', () => {
       deploymentsText: deployments(), predecessorVersionViewText: versionView(), wranglerConfigText: config, d1InventoryText: inventory(),
     });
     expect(anchor).toMatchObject({
-      schemaVersion: 2,
+      schemaVersion: 3,
       worker: 'theologai-preview',
       predecessorVersionId: predecessorVersion,
       predecessorDeploymentId: predecessorDeployment,
       predecessorD1: { binding: 'THEOLOGAI_DB', databaseId: predecessorD1Id },
       candidateD1: { binding: 'THEOLOGAI_DB', databaseName: candidateD1Name, databaseId: candidateD1Id },
+      d1Changed: true,
     });
     expect(anchor.candidateD1InventorySha256).toMatch(/^[0-9a-f]{64}$/);
     expect(anchor.predecessorDeploymentsSha256).toMatch(/^[0-9a-f]{64}$/);
@@ -75,21 +77,25 @@ describe('preview release reconciliation evidence', () => {
       wranglerConfigText: config,
     });
     expect(result).toMatchObject({
-      schemaVersion: 2,
+      schemaVersion: 3,
       worker: 'theologai-preview',
       predecessorVersionId: predecessorVersion,
       predecessorDeploymentId: predecessorDeployment,
       predecessorD1: { binding: 'THEOLOGAI_DB', databaseId: predecessorD1Id },
       observedActiveVersionId: candidateVersion,
       observedActiveDeploymentId: candidateDeployment,
+      observedActiveD1: { binding: 'THEOLOGAI_DB', databaseId: candidateD1Id },
       candidateD1: { binding: 'THEOLOGAI_DB', databaseName: candidateD1Name, databaseId: candidateD1Id },
+      d1Changed: true,
+      candidateConfigMatchesAnchor: true,
+      candidateBindingMatches: true,
     });
     expect(result.predecessorAnchorSha256).toMatch(/^[0-9a-f]{64}$/);
     expect(result.postMutationDeploymentsSha256).toMatch(/^[0-9a-f]{64}$/);
     expect(result.observedActiveVersionViewSha256).toMatch(/^[0-9a-f]{64}$/);
   });
 
-  it('fails closed for malformed, swapped, missing, or non-fresh D1 identities', async () => {
+  it('fails closed for malformed, swapped, or missing D1 identities while allowing a same-D1 release', async () => {
     const originalConfig = await readFile(new URL('wrangler.toml', root), 'utf8');
     const config = candidateConfig(originalConfig);
     expect(() => capturePreviewPredecessorAnchor({
@@ -120,13 +126,32 @@ describe('preview release reconciliation evidence', () => {
     expect(() => candidatePreviewD1DatabaseName({
       wranglerConfigText: config, d1InventoryText: inventory(candidateD1Id, 'swapped-preview-name'),
     })).toThrow('does not match the read-only inventory ID/name mapping');
-    expect(() => capturePreviewPredecessorAnchor({
+    const sameD1Anchor = capturePreviewPredecessorAnchor({
       deploymentsText: deployments(), predecessorVersionViewText: versionView(), wranglerConfigText: originalConfig,
       d1InventoryText: inventory(predecessorD1Id, 'theologai-preview-20260722-b'),
-    })).toThrow('must be a fresh replacement');
+    });
+    expect(sameD1Anchor.d1Changed).toBe(false);
   });
 
-  it('fails closed for a malformed anchor, candidate drift, retained-old-D1 drift, or no cutover', async () => {
+  it('allows a same-D1 code-only deployment when the post-deploy binding still equals its candidate', async () => {
+    const config = await readFile(new URL('wrangler.toml', root), 'utf8');
+    const anchor = capturePreviewPredecessorAnchor({
+      deploymentsText: deployments(), predecessorVersionViewText: versionView(), wranglerConfigText: config,
+      d1InventoryText: inventory(predecessorD1Id, 'theologai-preview-20260722-b'),
+    });
+    const result = reconcilePreviewPostMutation({
+      predecessorAnchorText: JSON.stringify(anchor), postMutationDeploymentsText: deployments(candidateDeployment, candidateVersion),
+      observedActiveVersionViewText: versionView(candidateVersion, predecessorD1Id), wranglerConfigText: config,
+    });
+    expect(result).toMatchObject({
+      d1Changed: false,
+      observedActiveVersionId: candidateVersion,
+      candidateBindingMatches: true,
+      candidateConfigMatchesAnchor: true,
+    });
+  });
+
+  it('fails closed for a malformed anchor, candidate drift, or retained-old-D1 drift while retaining a verdict', async () => {
     const config = candidateConfig(await readFile(new URL('wrangler.toml', root), 'utf8'));
     const anchor = capturePreviewPredecessorAnchor({
       deploymentsText: deployments(), predecessorVersionViewText: versionView(), wranglerConfigText: config, d1InventoryText: inventory(),
@@ -136,17 +161,34 @@ describe('preview release reconciliation evidence', () => {
       observedActiveVersionViewText: versionView(candidateVersion, candidateD1Id), wranglerConfigText: config,
     })).toThrow('predecessor anchor keys are malformed');
     expect(() => reconcilePreviewPostMutation({
+      predecessorAnchorText: JSON.stringify({ ...anchor, d1Changed: false }), postMutationDeploymentsText: deployments(candidateDeployment, candidateVersion),
+      observedActiveVersionViewText: versionView(candidateVersion, candidateD1Id), wranglerConfigText: config,
+    })).toThrow('predecessor anchor is not canonical');
+    const oldD1Observation = observePreviewPostMutation({
+      predecessorAnchorText: JSON.stringify(anchor), postMutationDeploymentsText: deployments(candidateDeployment, candidateVersion),
+      observedActiveVersionViewText: versionView(candidateVersion, predecessorD1Id), wranglerConfigText: config,
+    });
+    expect(oldD1Observation).toMatchObject({
+      observedActiveD1: { binding: 'THEOLOGAI_DB', databaseId: predecessorD1Id },
+      candidateD1: { binding: 'THEOLOGAI_DB', databaseId: candidateD1Id },
+      d1Changed: true,
+      candidateConfigMatchesAnchor: true,
+      candidateBindingMatches: false,
+    });
+    expect(JSON.stringify(oldD1Observation)).not.toContain('resources');
+    expect(() => reconcilePreviewPostMutation({
       predecessorAnchorText: JSON.stringify(anchor), postMutationDeploymentsText: deployments(candidateDeployment, candidateVersion),
       observedActiveVersionViewText: versionView(candidateVersion, predecessorD1Id), wranglerConfigText: config,
     })).toThrow('does not match the checked-out readiness-tested candidate D1');
-    expect(() => reconcilePreviewPostMutation({
-      predecessorAnchorText: JSON.stringify(anchor), postMutationDeploymentsText: deployments(),
-      observedActiveVersionViewText: versionView(), wranglerConfigText: config,
-    })).toThrow('must be a cutover from the retained predecessor');
+    const changedConfig = config.replace(`database_name = "${candidateD1Name}"`, 'database_name = "different-preview"');
+    expect(observePreviewPostMutation({
+      predecessorAnchorText: JSON.stringify(anchor), postMutationDeploymentsText: deployments(candidateDeployment, candidateVersion),
+      observedActiveVersionViewText: versionView(candidateVersion, candidateD1Id), wranglerConfigText: changedConfig,
+    }).candidateConfigMatchesAnchor).toBe(false);
     expect(() => reconcilePreviewPostMutation({
       predecessorAnchorText: JSON.stringify(anchor), postMutationDeploymentsText: deployments(candidateDeployment, candidateVersion),
       observedActiveVersionViewText: versionView(candidateVersion, candidateD1Id),
-      wranglerConfigText: config.replace(`database_name = "${candidateD1Name}"`, 'database_name = "different-preview"'),
+      wranglerConfigText: changedConfig,
     })).toThrow('no longer matches the captured candidate readiness anchor');
   });
 
@@ -166,5 +208,10 @@ describe('preview release reconciliation evidence', () => {
     expect(historicalAudit).toBeGreaterThan(candidateCutover);
     expect(workflow).toContain('npx --no-install wrangler d1 list --json > "$RUNNER_TEMP/preview-d1-inventory.json"');
     expect(workflow).toContain('--database "$candidate_d1_name" --env preview');
+    expect(workflow).toContain('observe-post-mutation');
+    expect(workflow).toContain('Upload preview candidate cutover observation');
+    expect(workflow).toContain('Hash sanitized preview reconciliation evidence');
+    expect(workflow).toContain('candidate_cutover_observation_sha256');
+    expect(workflow).toContain('post_mutation_reconciliation_sha256');
   });
 });

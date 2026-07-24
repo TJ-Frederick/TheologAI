@@ -404,12 +404,29 @@ jobs:
             --deployments "$RUNNER_TEMP/preview-worker-deployments-after.json")"
           npx --no-install wrangler versions view "$observed_active_version" --env preview --json \
             > "$RUNNER_TEMP/preview-worker-candidate-version-view.json"
+          npx --no-install tsx scripts/preview-release-reconciliation.ts observe-post-mutation \
+            --predecessor-anchor "$RUNNER_TEMP/preview-worker-predecessor-anchor.json" \
+            --deployments "$RUNNER_TEMP/preview-worker-deployments-after.json" \
+            --observed-active-version-view "$RUNNER_TEMP/preview-worker-candidate-version-view.json" \
+            --wrangler-config wrangler.toml \
+            --output "$RUNNER_TEMP/preview-worker-candidate-cutover-observation.json"
           npx --no-install tsx scripts/preview-release-reconciliation.ts reconcile-post-mutation \
             --predecessor-anchor "$RUNNER_TEMP/preview-worker-predecessor-anchor.json" \
             --deployments "$RUNNER_TEMP/preview-worker-deployments-after.json" \
             --observed-active-version-view "$RUNNER_TEMP/preview-worker-candidate-version-view.json" \
             --wrangler-config wrangler.toml \
             --output "$RUNNER_TEMP/preview-worker-candidate-cutover.json"
+
+      # The observation is create-only and deliberately retained even when
+      # the following strict candidate-binding gate fails before any audit.
+      - name: Upload preview candidate cutover observation
+        if: ${{ always() && steps.preview-worker-deploy.outcome == 'success' && steps.preview-predecessor.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: preview-candidate-cutover-observation-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/preview-worker-candidate-cutover-observation.json
+          retention-days: 7
+          if-no-files-found: error
 
       # This is deliberately a post-deploy release gate, not an ordinary PR
       # check: the runner is pinned to the canonical preview custom domain.
@@ -440,12 +457,21 @@ jobs:
           observed_active_version="$(npx --no-install tsx scripts/preview-release-reconciliation.ts active-version-id \
             --deployments "$RUNNER_TEMP/preview-worker-deployments-post-mutation.json")"
           npx --no-install wrangler versions view "$observed_active_version" --env preview --json > "$RUNNER_TEMP/preview-worker-observed-active-version-view.json"
-          npx --no-install tsx scripts/preview-release-reconciliation.ts reconcile-post-mutation \
+          npx --no-install tsx scripts/preview-release-reconciliation.ts observe-post-mutation \
             --predecessor-anchor "$RUNNER_TEMP/preview-worker-predecessor-anchor.json" \
             --deployments "$RUNNER_TEMP/preview-worker-deployments-post-mutation.json" \
             --observed-active-version-view "$RUNNER_TEMP/preview-worker-observed-active-version-view.json" \
             --wrangler-config wrangler.toml \
             --output "$RUNNER_TEMP/preview-worker-post-mutation-reconciliation.json"
+
+      - name: Hash sanitized preview reconciliation evidence
+        id: preview-reconciliation-evidence
+        if: ${{ always() && steps.preview-reconciliation.outcome == 'success' }}
+        run: |
+          candidate_cutover_observation_sha256="$(sha256sum "$RUNNER_TEMP/preview-worker-candidate-cutover-observation.json" | awk '{print $1}')"
+          post_mutation_reconciliation_sha256="$(sha256sum "$RUNNER_TEMP/preview-worker-post-mutation-reconciliation.json" | awk '{print $1}')"
+          printf 'candidate_cutover_observation_sha256=%s\n' "$candidate_cutover_observation_sha256" >> "$GITHUB_OUTPUT"
+          printf 'post_mutation_reconciliation_sha256=%s\n' "$post_mutation_reconciliation_sha256" >> "$GITHUB_OUTPUT"
 
       - name: Verify preview Worker remained active through audit (read-only)
         id: preview-worker-audit-identity
@@ -479,6 +505,7 @@ jobs:
             ${{ runner.temp }}/original-language-v2-preview-audit.json
             ${{ runner.temp }}/historical-core-preview-audit.json
             ${{ runner.temp }}/preview-worker-deployment-identity.json
+            ${{ runner.temp }}/preview-worker-candidate-cutover-observation.json
             ${{ runner.temp }}/preview-worker-candidate-cutover.json
           retention-days: 7
           if-no-files-found: error
@@ -489,6 +516,7 @@ jobs:
         with:
           name: preview-release-reconciliation-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
           path: |
+            ${{ runner.temp }}/preview-worker-candidate-cutover-observation.json
             ${{ runner.temp }}/preview-worker-candidate-cutover.json
             ${{ runner.temp }}/preview-worker-post-mutation-reconciliation.json
           retention-days: 7
@@ -504,6 +532,8 @@ jobs:
           WORKER_IDENTITY_SHA256: ${{ steps.preview-audit-evidence.outputs.identity_record_sha256 }}
           ORIGINAL_LANGUAGE_AUDIT_SHA256: ${{ steps.preview-audit-evidence.outputs.original_language_audit_sha256 }}
           HISTORICAL_AUDIT_SHA256: ${{ steps.preview-audit-evidence.outputs.historical_audit_sha256 }}
+          CANDIDATE_CUTOVER_OBSERVATION_SHA256: ${{ steps.preview-reconciliation-evidence.outputs.candidate_cutover_observation_sha256 }}
+          POST_MUTATION_RECONCILIATION_SHA256: ${{ steps.preview-reconciliation-evidence.outputs.post_mutation_reconciliation_sha256 }}
           AUDIT_ARTIFACT: preview-release-audit-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
         with:
           script: |
@@ -514,12 +544,15 @@ jobs:
             const workerIdentity = process.env.WORKER_IDENTITY_SHA256;
             const originalLanguageAudit = process.env.ORIGINAL_LANGUAGE_AUDIT_SHA256;
             const historicalAudit = process.env.HISTORICAL_AUDIT_SHA256;
+            const candidateCutoverObservation = process.env.CANDIDATE_CUTOVER_OBSERVATION_SHA256;
+            const postMutationReconciliation = process.env.POST_MUTATION_RECONCILIATION_SHA256;
             const artifact = process.env.AUDIT_ARTIFACT;
             if (!/^[0-9a-f]{40}$/i.test(commit) || !/^[0-9a-f]{40}$/i.test(tree)
               || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(workerVersion)
               || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(deployment)
               || !/^[0-9a-f]{64}$/i.test(workerIdentity) || !/^[0-9a-f]{64}$/i.test(originalLanguageAudit)
-              || !/^[0-9a-f]{64}$/i.test(historicalAudit)
+              || !/^[0-9a-f]{64}$/i.test(historicalAudit) || !/^[0-9a-f]{64}$/i.test(candidateCutoverObservation)
+              || !/^[0-9a-f]{64}$/i.test(postMutationReconciliation)
               || !/^preview-release-audit-\d+-[0-9a-f]{40}$/i.test(artifact)) {
               core.setFailed('Preview release evidence is missing or malformed.');
               return;
@@ -534,7 +567,7 @@ jobs:
               '',
               `Deployed from checked-out commit \`${commit}\` (tree \`${tree}\`).`,
               `Cloudflare confirms Worker version \`${workerVersion}\` at 100% in deployment \`${deployment}\`.`,
-              `Original-language audit SHA-256: \`${originalLanguageAudit}\`; historical-core audit SHA-256: \`${historicalAudit}\`; identity record SHA-256: \`${workerIdentity}\`; retained artifact: \`${artifact}\` (7 days).`,
+              `Original-language audit SHA-256: \`${originalLanguageAudit}\`; historical-core audit SHA-256: \`${historicalAudit}\`; identity record SHA-256: \`${workerIdentity}\`; candidate-cutover observation SHA-256: \`${candidateCutoverObservation}\`; post-mutation reconciliation SHA-256: \`${postMutationReconciliation}\`; retained artifact: \`${artifact}\` (7 days).`,
             ].join('\n');
 
             const { data: comments } = await github.rest.issues.listComments({

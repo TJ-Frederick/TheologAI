@@ -11,14 +11,14 @@ import { pathToFileURL } from 'node:url';
 import { parse as parseToml } from 'smol-toml';
 
 type RecordValue = Record<string, unknown>;
-/** The checked-in replacement binding that the preceding readiness gate tested. */
+/** The checked-in binding that the preceding readiness gate tested. */
 type CandidateD1Binding = { binding: 'THEOLOGAI_DB'; databaseName: string; databaseId: string };
 /** The binding observed on an immutable Worker version through Wrangler's control plane. */
 type ObservedD1Binding = { binding: 'THEOLOGAI_DB'; databaseId: string };
 type Deployment = { id: string; createdOn: string; versionId: string };
 
 export interface PreviewPredecessorAnchor {
-  schemaVersion: 2;
+  schemaVersion: 3;
   worker: 'theologai-preview';
   predecessorVersionId: string;
   predecessorDeploymentId: string;
@@ -28,23 +28,35 @@ export interface PreviewPredecessorAnchor {
   candidateD1InventorySha256: string;
   /** The D1 attached to the sole active pre-cutover Worker version. */
   predecessorD1: ObservedD1Binding;
-  /** The fresh, checked-in D1 target addressed by the preceding readiness gate. */
+  /** The checked-in D1 target addressed by the preceding readiness gate. */
   candidateD1: CandidateD1Binding;
+  /** Whether this release changes the D1 binding rather than only Worker code. */
+  d1Changed: boolean;
 }
 
-export interface PreviewPostMutationReconciliation {
-  schemaVersion: 2;
+/** Sanitized read-only observation, retained even when the strict gate fails. */
+export interface PreviewPostMutationObservation {
+  schemaVersion: 3;
   worker: 'theologai-preview';
   predecessorVersionId: string;
   predecessorDeploymentId: string;
   predecessorD1: ObservedD1Binding;
   observedActiveVersionId: string;
   observedActiveDeploymentId: string;
+  observedActiveD1: ObservedD1Binding;
   candidateD1: CandidateD1Binding;
+  d1Changed: boolean;
+  /** Detects a checked-out binding change between predecessor capture and observation. */
+  candidateConfigMatchesAnchor: boolean;
+  /** The strict release condition: the observed active Worker binds the expected candidate. */
+  candidateBindingMatches: boolean;
   predecessorAnchorSha256: string;
   postMutationDeploymentsSha256: string;
   observedActiveVersionViewSha256: string;
 }
+
+/** @deprecated Use PreviewPostMutationObservation; strictness is applied by reconcilePreviewPostMutation. */
+export type PreviewPostMutationReconciliation = PreviewPostMutationObservation;
 
 function fail(message: string): never { throw new Error(`Preview release reconciliation refused: ${message}.`); }
 function assert(value: unknown, message: string): asserts value { if (!value) fail(message); }
@@ -175,10 +187,8 @@ export function capturePreviewPredecessorAnchor(input: {
   const candidateD1 = checkedOutCandidateD1(input.wranglerConfigText);
   assertCandidateD1Inventory(candidateD1, input.d1InventoryText);
   const predecessorD1 = observedD1FromAuthoritativeVersionView(input.predecessorVersionViewText, active.versionId, 'predecessor');
-  assert(predecessorD1.databaseId !== candidateD1.databaseId,
-    'checked-out candidate preview D1 must be a fresh replacement, not the active predecessor D1');
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     worker: 'theologai-preview',
     predecessorVersionId: active.versionId,
     predecessorDeploymentId: active.id,
@@ -187,6 +197,7 @@ export function capturePreviewPredecessorAnchor(input: {
     candidateD1InventorySha256: sha256(input.d1InventoryText),
     predecessorD1,
     candidateD1,
+    d1Changed: predecessorD1.databaseId !== candidateD1.databaseId,
   };
 }
 
@@ -195,51 +206,68 @@ function parseAnchor(value: unknown): PreviewPredecessorAnchor {
   exactKeys(anchor, [
     'schemaVersion', 'worker', 'predecessorVersionId', 'predecessorDeploymentId',
     'predecessorDeploymentsSha256', 'predecessorVersionViewSha256', 'candidateD1InventorySha256',
-    'predecessorD1', 'candidateD1',
+    'predecessorD1', 'candidateD1', 'd1Changed',
   ], 'predecessor anchor');
   const predecessorD1 = object(anchor.predecessorD1, 'predecessor anchor predecessorD1');
   const candidateD1 = object(anchor.candidateD1, 'predecessor anchor candidateD1');
   exactKeys(predecessorD1, ['binding', 'databaseId'], 'predecessor anchor predecessorD1');
   exactKeys(candidateD1, ['binding', 'databaseName', 'databaseId'], 'predecessor anchor candidateD1');
-  assert(anchor.schemaVersion === 2 && anchor.worker === 'theologai-preview' && isUuid(anchor.predecessorVersionId)
+  assert(anchor.schemaVersion === 3 && anchor.worker === 'theologai-preview' && isUuid(anchor.predecessorVersionId)
     && isUuid(anchor.predecessorDeploymentId) && isSha256(anchor.predecessorDeploymentsSha256) && isSha256(anchor.predecessorVersionViewSha256)
     && isSha256(anchor.candidateD1InventorySha256)
     && predecessorD1.binding === 'THEOLOGAI_DB' && isUuid(predecessorD1.databaseId)
     && candidateD1.binding === 'THEOLOGAI_DB' && typeof candidateD1.databaseName === 'string' && candidateD1.databaseName.length > 0 && isUuid(candidateD1.databaseId)
-    && predecessorD1.databaseId.toLowerCase() !== candidateD1.databaseId.toLowerCase(),
+    && typeof anchor.d1Changed === 'boolean'
+    && anchor.d1Changed === (predecessorD1.databaseId.toLowerCase() !== candidateD1.databaseId.toLowerCase()),
   'predecessor anchor is not canonical');
   return {
-    schemaVersion: 2, worker: 'theologai-preview', predecessorVersionId: anchor.predecessorVersionId.toLowerCase(),
+    schemaVersion: 3, worker: 'theologai-preview', predecessorVersionId: anchor.predecessorVersionId.toLowerCase(),
     predecessorDeploymentId: anchor.predecessorDeploymentId.toLowerCase(), predecessorDeploymentsSha256: anchor.predecessorDeploymentsSha256.toLowerCase(), predecessorVersionViewSha256: anchor.predecessorVersionViewSha256.toLowerCase(),
     candidateD1InventorySha256: anchor.candidateD1InventorySha256.toLowerCase(),
     predecessorD1: { binding: 'THEOLOGAI_DB', databaseId: predecessorD1.databaseId.toLowerCase() },
     candidateD1: { binding: 'THEOLOGAI_DB', databaseName: candidateD1.databaseName, databaseId: candidateD1.databaseId.toLowerCase() },
+    d1Changed: anchor.d1Changed,
   };
 }
 
+export function observePreviewPostMutation(input: {
+  predecessorAnchorText: string;
+  postMutationDeploymentsText: string;
+  observedActiveVersionViewText: string;
+  wranglerConfigText: string;
+}): PreviewPostMutationObservation {
+  const predecessor = parseAnchor(parseJson(input.predecessorAnchorText, 'predecessor anchor'));
+  const candidateD1 = checkedOutCandidateD1(input.wranglerConfigText);
+  const active = currentSoleDeployment(input.postMutationDeploymentsText, 'post-mutation preview deployments');
+  const observedActiveD1 = observedD1FromAuthoritativeVersionView(input.observedActiveVersionViewText, active.versionId, 'post-mutation active');
+  return {
+    schemaVersion: 3, worker: 'theologai-preview', predecessorVersionId: predecessor.predecessorVersionId,
+    predecessorDeploymentId: predecessor.predecessorDeploymentId, observedActiveVersionId: active.versionId,
+    observedActiveDeploymentId: active.id,
+    predecessorD1: predecessor.predecessorD1,
+    observedActiveD1,
+    candidateD1: predecessor.candidateD1,
+    d1Changed: predecessor.d1Changed,
+    candidateConfigMatchesAnchor: JSON.stringify(candidateD1) === JSON.stringify(predecessor.candidateD1),
+    candidateBindingMatches: observedActiveD1.databaseId === predecessor.candidateD1.databaseId,
+    predecessorAnchorSha256: sha256(input.predecessorAnchorText),
+    postMutationDeploymentsSha256: sha256(input.postMutationDeploymentsText),
+    observedActiveVersionViewSha256: sha256(input.observedActiveVersionViewText),
+  };
+}
+
+/** Strict release gate layered on the persistable observation above. */
 export function reconcilePreviewPostMutation(input: {
   predecessorAnchorText: string;
   postMutationDeploymentsText: string;
   observedActiveVersionViewText: string;
   wranglerConfigText: string;
 }): PreviewPostMutationReconciliation {
-  const predecessor = parseAnchor(parseJson(input.predecessorAnchorText, 'predecessor anchor'));
-  const candidateD1 = checkedOutCandidateD1(input.wranglerConfigText);
-  assert(JSON.stringify(candidateD1) === JSON.stringify(predecessor.candidateD1),
+  const observation = observePreviewPostMutation(input);
+  assert(observation.candidateConfigMatchesAnchor,
     'checked-out candidate preview D1 binding no longer matches the captured candidate readiness anchor');
-  const active = currentSoleDeployment(input.postMutationDeploymentsText, 'post-mutation preview deployments');
-  assert(active.versionId !== predecessor.predecessorVersionId && active.id !== predecessor.predecessorDeploymentId,
-    'post-mutation active preview deployment must be a cutover from the retained predecessor');
-  const observedD1 = observedD1FromAuthoritativeVersionView(input.observedActiveVersionViewText, active.versionId, 'post-mutation active');
-  assertObservedD1MatchesCandidate(observedD1, candidateD1, 'post-mutation active');
-  return {
-    schemaVersion: 2, worker: 'theologai-preview', predecessorVersionId: predecessor.predecessorVersionId,
-    predecessorDeploymentId: predecessor.predecessorDeploymentId, observedActiveVersionId: active.versionId,
-    observedActiveDeploymentId: active.id,
-    predecessorD1: predecessor.predecessorD1, candidateD1, predecessorAnchorSha256: sha256(input.predecessorAnchorText),
-    postMutationDeploymentsSha256: sha256(input.postMutationDeploymentsText),
-    observedActiveVersionViewSha256: sha256(input.observedActiveVersionViewText),
-  };
+  assertObservedD1MatchesCandidate(observation.observedActiveD1, observation.candidateD1, 'post-mutation active');
+  return observation;
 }
 
 function exactArgs(argv: string[], command: string, expected: string[]): Map<string, string> {
@@ -255,7 +283,7 @@ function exactArgs(argv: string[], command: string, expected: string[]): Map<str
   return values;
 }
 
-async function writeRecord(record: PreviewPredecessorAnchor | PreviewPostMutationReconciliation, output: string): Promise<void> {
+async function writeRecord(record: PreviewPredecessorAnchor | PreviewPostMutationObservation, output: string): Promise<void> {
   await writeFile(output, `${JSON.stringify(record, null, 2)}\n`, { encoding: 'utf8', flag: 'wx' });
 }
 
@@ -290,7 +318,15 @@ export async function runCli(argv: string[]): Promise<void> {
     await writeRecord(reconcilePreviewPostMutation({ predecessorAnchorText, postMutationDeploymentsText, observedActiveVersionViewText, wranglerConfigText }), values.get('--output')!);
     return;
   }
-  fail('command must be candidate-d1-name, active-version-id, capture-predecessor, or reconcile-post-mutation');
+  if (command === 'observe-post-mutation') {
+    const values = exactArgs(argv.slice(1), command, ['--predecessor-anchor', '--deployments', '--observed-active-version-view', '--wrangler-config', '--output']);
+    const [predecessorAnchorText, postMutationDeploymentsText, observedActiveVersionViewText, wranglerConfigText] = await Promise.all([
+      readFile(values.get('--predecessor-anchor')!, 'utf8'), readFile(values.get('--deployments')!, 'utf8'), readFile(values.get('--observed-active-version-view')!, 'utf8'), readFile(values.get('--wrangler-config')!, 'utf8'),
+    ]);
+    await writeRecord(observePreviewPostMutation({ predecessorAnchorText, postMutationDeploymentsText, observedActiveVersionViewText, wranglerConfigText }), values.get('--output')!);
+    return;
+  }
+  fail('command must be candidate-d1-name, active-version-id, capture-predecessor, reconcile-post-mutation, or observe-post-mutation');
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
