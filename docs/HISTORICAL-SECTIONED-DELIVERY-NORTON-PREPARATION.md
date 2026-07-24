@@ -1,7 +1,8 @@
 # Historical `sectioned_only` delivery and Norton preparation
 
 Status: migration-free and inactive. This document records a future delivery
-contract and prepares one already-vendored edition for a later transform 9. It
+contract and prepares one already-vendored edition for a later successor
+transform. It
 does not add a migration, change the data manifest or D1 seed, register a
 runtime service/resource/tool, alter a Worker, or authorize preview or
 production deployment.
@@ -24,7 +25,7 @@ Only an exact-section resource may deliver body text. This design prevents a
 1,250-entry directory or the approximately 4 MB Norton body from entering a
 single MCP response.
 
-## Norton transform-9 preparation
+## Norton successor-transform preparation
 
 The checked-in plan at
 `test/fixtures/historical-sectioned-delivery/norton-transform9-preparation.draft.json`
@@ -57,8 +58,8 @@ node --import tsx scripts/historical-sectioned-delivery.ts --verify
 ## Transform ordering and activation gate
 
 Transform 8 remains a separate compatibility release for the existing 17
-historical documents. The plan records transform 9 as a future successor and
-does not make transform 8 depend on Norton. A later activation must first have
+historical documents. The plan records Norton as a later successor-transform
+candidate and does not make Transform 8 depend on Norton. A later activation must first have
 an implemented, transform-8-compatible `sectioned_only` Worker path, then
 separately approve migration, deterministic materialization, catalogue/routing,
 preview, and production. Generic aliases remain dormant until that later

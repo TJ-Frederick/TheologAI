@@ -185,9 +185,9 @@ describe('published project contract', () => {
     expect(readme).not.toMatch(/eighteen locally indexed|18 locally indexed/i);
     expect(readme).not.toMatch(/six public-domain commentar/i);
     expect(readme).toContain('do **not** currently fetch CCEL search results or document bodies');
-    expect(readme).toContain('This build’s local-only configuration exposes v6');
-    expect(readme).toContain('v7 while CCEL execution remains disabled');
-    expect(readme).toContain('live search and coordinator execution remain disabled');
+    expect(readme).toContain('Production v6/local-only is deployed');
+    expect(readme).toContain('Preview remains on deployed\nv5/discovery-only with CCEL execution disabled');
+    expect(readme).toContain('checked-in v7 profile is only a non-executing\ncandidate');
     expect(readme).toContain('before adapter');
     expect(readme).toContain('Durable Object lookup/RPC, or fetch');
     expect(readme).toContain('reconnect');
@@ -200,9 +200,9 @@ describe('published project contract', () => {
     expect(roadmap).toContain('Direct CCEL-plus-year tool input remains fail-closed');
     const primarySourceToolRow = readme.split('\n')
       .find(line => line.startsWith('| `primary_source_search` |'));
-    expect(primarySourceToolRow).toContain('local-only configuration exposes v6');
-    expect(primarySourceToolRow).toContain('configured CCEL-discovery profile exposes v7');
-    expect(primarySourceToolRow).toContain('execution remains disabled before adapter, coordinator, or fetch');
+    expect(primarySourceToolRow).toContain('Production v6/local-only is deployed');
+    expect(primarySourceToolRow).toContain('preview remains deployed v5/discovery-only');
+    expect(primarySourceToolRow).toContain('checked-in v7 CCEL-discovery candidate also disables execution before adapter, coordinator, or fetch');
     const previewStart = workerConfig.indexOf('[env.preview]');
     expect(previewStart).toBeGreaterThan(0);
     expect(workerConfig.slice(0, previewStart)).toContain('THEOLOGAI_EXPOSE_CCEL_DISCOVERY = "false"');

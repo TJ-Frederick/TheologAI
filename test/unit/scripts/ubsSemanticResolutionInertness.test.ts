@@ -21,7 +21,7 @@ describe('uncomposed legacy UBS semantic resolution seam', () => {
     }
   });
 
-  it('keeps semantic resolution uncomposed under the transform-8 historical successor', () => {
+  it('keeps semantic resolution uncomposed alongside Transform 9 and the Transform 8 historical release', () => {
     const service = readFileSync(new URL('src/services/languages/HebrewSemanticEvidenceService.ts', repo), 'utf8');
     expect(service).not.toMatch(/from ['"][^'"]*(?:data\/|migrations\/|adapters\/d1|adapters\/data)/);
     const manifest = JSON.parse(readFileSync(new URL('data/data-manifest.json', repo), 'utf8')) as {
