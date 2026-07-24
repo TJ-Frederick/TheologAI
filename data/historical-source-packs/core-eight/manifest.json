@@ -1,0 +1,439 @@
+{
+  "schemaVersion": "historical-source-pack-manifest.v1",
+  "packId": "theologai-core-eight",
+  "revision": 1,
+  "rightsScope": "normalized_public_domain_text_only",
+  "members": [
+    {
+      "id": "anselm-proslogion-deane-1903",
+      "sourcePath": "editions/anselm-proslogion-deane-1903.json",
+      "packageSha256": "47b63d6a2d82d6a91106b78f1f3ad30eef829c49b639acca3d1c72aeb20447a4",
+      "normalizedTextRights": {
+        "status": "no_known_conflict",
+        "scope": "normalized_public_domain_text_only",
+        "basis": "1903 historical translation; Sidney Norton Deane (1878–1943); exact scan is recorded and no contrary ownership or license evidence is known.",
+        "reviewedAt": "2026-07-23"
+      },
+      "artifacts": [
+        {
+          "artifactId": "anselm-proslogion-deane-1903-authority-open-court-1903",
+          "role": "authority",
+          "locator": "https://archive.org/download/stanselmeproslog00anseuoft/stanselmeproslog00anseuoft.pdf",
+          "sha256": "07060b85613faa2e6b743b326addb3b85a2a9ef2b46190a2a28456e0e6e14bd5",
+          "bytes": 15269883,
+          "acquiredAt": "2026-07-22T19:29:11.000Z"
+        },
+        {
+          "artifactId": "anselm-proslogion-deane-1903-comparison-ccel-basic-works-xml",
+          "role": "comparator",
+          "locator": "https://ccel.org/ccel/anselm/basic_works.xml",
+          "sha256": "7fc7dbf6838c7cc9f395310e130e7f27957b2d52d09ce74ef43facd476f04a22",
+          "bytes": 670027,
+          "acquiredAt": "2026-07-23T10:30:00.000Z"
+        }
+      ],
+      "catalog": {
+        "composition": {
+          "label": "composed 1077–1078",
+          "startYear": 1077,
+          "endYear": 1078
+        },
+        "compositionProvenanceSources": [
+          {
+            "sourceId": "hist-meta-anselm-sep",
+            "label": "Stanford Encyclopedia of Philosophy: Anselm",
+            "url": "https://plato.stanford.edu/archives/spr2022/entries/anselm/"
+          }
+        ]
+      }
+    },
+    {
+      "id": "athanasius-on-incarnation-robertson-npnf2-v4",
+      "sourcePath": "editions/athanasius-on-incarnation-robertson-npnf2-v4.json",
+      "packageSha256": "b18788d377d5fae952748f3b801eb46922cd3dc92eb052d4fa0d1d5a0a1ec509",
+      "normalizedTextRights": {
+        "status": "no_known_conflict",
+        "scope": "normalized_public_domain_text_only",
+        "basis": "Historical NPNF edition (1892 series; pinned scan); translator is recorded; no contrary ownership or license evidence is known.",
+        "reviewedAt": "2026-07-23"
+      },
+      "artifacts": [
+        {
+          "artifactId": "athanasius-on-incarnation-robertson-npnf2-v4-authority-npnf2-v4",
+          "role": "authority",
+          "locator": "https://archive.org/download/selectlibraryofn0004henr/selectlibraryofn0004henr.pdf",
+          "sha256": "fb3f3c4a9e2932b3c2b2c7b9e78866bdef87ff884cbbc26d6faa8156ea785b58",
+          "bytes": 90104711,
+          "acquiredAt": "2026-07-22T19:29:11.000Z"
+        },
+        {
+          "artifactId": "athanasius-on-incarnation-robertson-npnf2-v4-comparison-ccel-npnf204-xml",
+          "role": "comparator",
+          "locator": "https://ccel.org/ccel/schaff/npnf204.xml",
+          "sha256": "bd625a0fa4f5ddd4b2fa13fcee753de8832ea4b316625e0e06454beb81cfa652",
+          "bytes": 5809854,
+          "acquiredAt": "2026-07-23T09:24:00.000Z"
+        }
+      ],
+      "catalog": {
+        "composition": {
+          "label": "composition disputed, c. 318–337",
+          "startYear": 318,
+          "endYear": 337
+        },
+        "compositionProvenanceSources": [
+          {
+            "sourceId": "hist-meta-athanasius-cambridge",
+            "label": "Cambridge Edition of Early Christian Writings: Athanasius",
+            "url": "https://www.cambridge.org/core/books/abs/cambridge-edition-of-early-christian-writings/athanasius-of-alexandria-christological-letters-to-epictetus-adelphius-and-maximus/EFCEBBC7D51CC39BCAC4D65A4967C6C6"
+          },
+          {
+            "sourceId": "hist-meta-athanasius-tandfonline",
+            "label": "Modern scholarly discussion of Athanasian chronology",
+            "url": "https://www.tandfonline.com/doi/full/10.1080/21692327.2025.2564801"
+          }
+        ]
+      }
+    },
+    {
+      "id": "augustine-confessions-pusey-1838",
+      "sourcePath": "editions/augustine-confessions-pusey-1838.json",
+      "packageSha256": "66d7fa61e250086e28335aff43596c00d571e0156c399924af64c6271a0efcab",
+      "normalizedTextRights": {
+        "status": "no_known_conflict",
+        "scope": "normalized_public_domain_text_only",
+        "basis": "1838 translation; Pusey died 1882; exact-edition scan and public-domain text witness recorded; no contrary ownership or license evidence is known.",
+        "reviewedAt": "2026-07-23"
+      },
+      "artifacts": [
+        {
+          "artifactId": "augustine-confessions-pusey-1838-authority-library-of-fathers-v1",
+          "role": "authority",
+          "locator": "https://archive.org/download/01ALibraryOfFathersOfTheHolyCatholicV01/01ALibraryOfFathersOfTheHolyCatholicV01.pdf",
+          "sha256": "870ae44be105dd6b631726231173d896c35544397ad7eda7f3f075de2af659e7",
+          "bytes": 13998447,
+          "acquiredAt": "2026-07-22T22:20:00.000Z"
+        },
+        {
+          "artifactId": "augustine-confessions-pusey-1838-comparison-gutenberg-3296",
+          "role": "comparator",
+          "locator": "https://www.gutenberg.org/cache/epub/3296/pg3296.txt",
+          "sha256": "5a036498dc7c546a98b9e7a31952e030ca74db7dd111b30029354efe12bcd691",
+          "bytes": 632167,
+          "acquiredAt": "2026-07-22T19:29:11.000Z"
+        }
+      ],
+      "catalog": {
+        "composition": {
+          "label": "composed c. 396–400",
+          "startYear": 396,
+          "endYear": 400
+        },
+        "compositionProvenanceSources": [
+          {
+            "sourceId": "hist-meta-augustine-sep",
+            "label": "Stanford Encyclopedia of Philosophy: Augustine",
+            "url": "https://plato.stanford.edu/entries/augustine/"
+          }
+        ]
+      }
+    },
+    {
+      "id": "bunyan-pilgrims-progress-part-1",
+      "sourcePath": "editions/bunyan-pilgrims-progress-part-1.json",
+      "packageSha256": "0a45e9107fb966179835194fea894c880669d572f73d75b0c91c1b287293e137",
+      "normalizedTextRights": {
+        "status": "no_known_conflict",
+        "scope": "normalized_public_domain_text_only",
+        "basis": "1678 original English work; Bunyan died 1688; authority facsimile and text witness are recorded and no contrary ownership or license evidence is known.",
+        "reviewedAt": "2026-07-23"
+      },
+      "artifacts": [
+        {
+          "artifactId": "bunyan-pilgrims-progress-part-1-authority-1877-facsimile",
+          "role": "authority",
+          "locator": "https://archive.org/details/pilgrimsprogress00buny",
+          "sha256": "6a77fd619be67cd2f6cdcf25ee2e37f1c49a96386e11c0caaae8e03d408e782c",
+          "bytes": 4520046,
+          "acquiredAt": "2026-07-22T19:29:11.000Z"
+        },
+        {
+          "artifactId": "bunyan-pilgrims-progress-part-1-comparison-gutenberg-131",
+          "role": "comparator",
+          "locator": "https://www.gutenberg.org/cache/epub/131/pg131.txt",
+          "sha256": "13188e0d8cdc003befb5f70a41234c7b619c142cbbe4871564fd06406bda94bb",
+          "bytes": 331509,
+          "acquiredAt": "2026-07-22T19:29:11.000Z"
+        }
+      ],
+      "catalog": {
+        "composition": {
+          "label": "composition date disputed; drafted during imprisonment(s), completed by 1677, published 1678",
+          "startYear": 1660,
+          "endYear": 1678
+        },
+        "compositionProvenanceSources": [
+          {
+            "sourceId": "hist-meta-bunyan-bedford",
+            "label": "Bedfordshire historical Bunyan timeline",
+            "url": "https://virtual-library.culturalservices.net/webingres/bedfordshire/vlib/0.digitised_resources/bunyan_digitisation_timeline.htm"
+          },
+          {
+            "sourceId": "hist-meta-bunyan-cambridge",
+            "label": "Cambridge: The Pilgrim’s Progress and the Line of Allegory",
+            "url": "https://www.cambridge.org/core/services/aop-cambridge-core/content/view/BEA4D8DB7D162658402A9439DE5F960C/9780511777523c06_p80-94_CBO.pdf/the-pilgrims-progress-and-the-line-of-allegory.pdf"
+          }
+        ]
+      }
+    },
+    {
+      "id": "calvin-institutes-beveridge-1845",
+      "sourcePath": "editions/calvin-institutes-beveridge-1845.json",
+      "packageSha256": "943e9b8c817ae6c3f665b998ca36a4d52149474706f94630e3bb339229822e91",
+      "normalizedTextRights": {
+        "status": "no_known_conflict",
+        "scope": "normalized_public_domain_text_only",
+        "basis": "1845–46 translation; Beveridge died 1863; exact scans are recorded and no contrary ownership or license evidence is known.",
+        "reviewedAt": "2026-07-23"
+      },
+      "artifacts": [
+        {
+          "artifactId": "calvin-institutes-beveridge-1845-authority-volume-1",
+          "role": "authority",
+          "locator": "https://archive.org/download/institutesofchrbeve01calv/institutesofchrbeve01calv.pdf",
+          "sha256": "31e290a073a8d5f5a87de4588db1354899fb9ae802be939084809c90317ac00a",
+          "bytes": 54180531,
+          "acquiredAt": "2026-07-22T19:29:11.000Z"
+        },
+        {
+          "artifactId": "calvin-institutes-beveridge-1845-authority-volume-2",
+          "role": "authority",
+          "locator": "https://archive.org/download/institutesofchribeve02calv/institutesofchribeve02calv.pdf",
+          "sha256": "1dbea943a0b13fedafcb334837e64f1a8c69e61e2e480a4c10f0e8e1c88251b7",
+          "bytes": 42916017,
+          "acquiredAt": "2026-07-22T19:29:11.000Z"
+        },
+        {
+          "artifactId": "calvin-institutes-beveridge-1845-authority-volume-3",
+          "role": "authority",
+          "locator": "https://archive.org/download/institutesofchrbeve03calv/institutesofchrbeve03calv.pdf",
+          "sha256": "81d7d4c40c6caa87d494d5d6d51e4a9f486d123c16ecf71e51729bd8b23d0d5f",
+          "bytes": 41237297,
+          "acquiredAt": "2026-07-22T19:29:11.000Z"
+        },
+        {
+          "artifactId": "calvin-institutes-beveridge-1845-comparator-toronto-volume-3-ocr",
+          "role": "comparator",
+          "locator": "https://archive.org/download/institutesofthec03calvuoft/institutesofthec03calvuoft_djvu.txt",
+          "sha256": "afa37600a09b193bc3b7d066b96ad0badd1300592515892122dd0331c31da4bc",
+          "bytes": 1724563,
+          "acquiredAt": "2026-07-22T22:28:00.000Z"
+        },
+        {
+          "artifactId": "calvin-institutes-beveridge-1845-comparison-ccel-institutes-xml",
+          "role": "comparator",
+          "locator": "https://ccel.org/ccel/calvin/institutes.xml",
+          "sha256": "d7995178c1fe1723d1124126010e430f12d0444239ad7f9a7c8c818aa9766717",
+          "bytes": 4979278,
+          "acquiredAt": "2026-07-23T09:24:00.000Z"
+        }
+      ],
+      "catalog": {
+        "composition": {
+          "label": "first edition 1536; revised through definitive Latin edition 1559",
+          "startYear": 1536,
+          "endYear": 1559
+        },
+        "compositionProvenanceSources": [
+          {
+            "sourceId": "hist-meta-calvin-bnf",
+            "label": "Bibliothèque nationale de France: Institutes of the Christian Religion",
+            "url": "https://catalogue.bnf.fr/ark:/12148/cb11963198n"
+          }
+        ]
+      }
+    },
+    {
+      "id": "irenaeus-against-heresies-anf1-1885",
+      "sourcePath": "editions/irenaeus-against-heresies-anf1-1885.json",
+      "packageSha256": "eaa287654119412bb268b02f4703e7d7091834e9b41dda4a3e18c6fbef114ed5",
+      "normalizedTextRights": {
+        "status": "no_known_conflict",
+        "scope": "normalized_public_domain_text_only",
+        "basis": "1885 historical ANF edition; named translator record is mixed at volume/work level; exact scan is recorded and no contrary ownership or license evidence is known.",
+        "reviewedAt": "2026-07-23"
+      },
+      "artifacts": [
+        {
+          "artifactId": "irenaeus-against-heresies-anf1-1885-authority-anf1",
+          "role": "authority",
+          "locator": "https://archive.org/download/antenicenefather0001reva/antenicenefather0001reva.pdf",
+          "sha256": "992f9284cec2e92172b9eb63a2b3a51c226a4848e362dadd81b570d238721057",
+          "bytes": 60225221,
+          "acquiredAt": "2026-07-22T19:29:11.000Z"
+        },
+        {
+          "artifactId": "irenaeus-against-heresies-anf1-1885-comparison-ccel-anf01-xml",
+          "role": "comparator",
+          "locator": "https://ccel.org/ccel/schaff/anf01.xml",
+          "sha256": "8012ea0e35b497d2fbd783f9d4fd7b3a27d98c6dc66fd427b50d7312e6dd45af",
+          "bytes": 4511814,
+          "acquiredAt": "2026-07-23T09:24:00.000Z"
+        }
+      ],
+      "catalog": {
+        "composition": {
+          "label": "composition disputed, c. 180–189",
+          "startYear": 180,
+          "endYear": 189
+        },
+        "compositionProvenanceSources": [
+          {
+            "sourceId": "hist-meta-irenaeus-cambridge",
+            "label": "Cambridge: Irenaeus chronology",
+            "url": "https://assets.cambridge.org/97811070/62030/frontmatter/9781107062030_frontmatter.pdf"
+          }
+        ]
+      }
+    },
+    {
+      "id": "john-damascene-exposition-salmond-npnf2-v9",
+      "sourcePath": "editions/john-damascene-exposition-salmond-npnf2-v9.json",
+      "packageSha256": "0167dab9a5bf66607fb4160e9bf0db8a235bacbcb5aa40c27a16b333c1a5c976",
+      "normalizedTextRights": {
+        "status": "no_known_conflict",
+        "scope": "normalized_public_domain_text_only",
+        "basis": "1908 historical edition; Salmond died 1905; exact scan is recorded and no contrary ownership or license evidence is known.",
+        "reviewedAt": "2026-07-23"
+      },
+      "artifacts": [
+        {
+          "artifactId": "john-damascene-exposition-salmond-npnf2-v9-authority-npnf2-v9",
+          "role": "authority",
+          "locator": "https://archive.org/download/selectlibraryofn09scha/selectlibraryofn09scha.pdf",
+          "sha256": "49f63e5b4f5698247ebb365fa53095eb81e32143d64658a4918b1c37decfe480",
+          "bytes": 42705358,
+          "acquiredAt": "2026-07-22T19:29:11.000Z"
+        },
+        {
+          "artifactId": "john-damascene-exposition-salmond-npnf2-v9-comparison-ccel-npnf209-xml",
+          "role": "comparator",
+          "locator": "https://ccel.org/ccel/schaff/npnf209.xml",
+          "sha256": "b07e2fac0851444a42d2bbd11d39eb7384c518f6fd79e64b7f7bdc404e8a3cc7",
+          "bytes": 3088610,
+          "acquiredAt": "2026-07-23T09:24:00.000Z"
+        }
+      ],
+      "catalog": {
+        "composition": {
+          "label": "late-life composition/revision of the Fount, c. 728–749; exact part date uncertain",
+          "startYear": 728,
+          "endYear": 749
+        },
+        "compositionProvenanceSources": [
+          {
+            "sourceId": "hist-meta-damascene-encyclopedia",
+            "label": "Encyclopedia.com: John of Damascus",
+            "url": "https://www.encyclopedia.com/environment/encyclopedias-almanacs-transcripts-and-maps/john-damascus"
+          }
+        ]
+      }
+    },
+    {
+      "id": "wesley-standard-sermons-1771",
+      "sourcePath": "editions/wesley-standard-sermons-1771.json",
+      "packageSha256": "033df1844d1fb4009296b8739b84d26f087b3affb10b74fe1f6ebd8470542635",
+      "normalizedTextRights": {
+        "status": "no_known_conflict",
+        "scope": "normalized_public_domain_text_only",
+        "basis": "1771 original English text; Wesley died 1791; authority scans are recorded and no contrary ownership or license evidence is known.",
+        "reviewedAt": "2026-07-23"
+      },
+      "artifacts": [
+        {
+          "artifactId": "wesley-standard-sermons-1771-authority-volume-1",
+          "role": "authority",
+          "locator": "https://archive.org/download/worksofrevjohnwe1wesl/worksofrevjohnwe1wesl_text.pdf",
+          "sha256": "2238aa06df274da4f9d46d16f3c728391e292e7e3ca06cd695b3c4c9d246361d",
+          "bytes": 12338977,
+          "acquiredAt": "2026-07-22T18:20:00.000Z"
+        },
+        {
+          "artifactId": "wesley-standard-sermons-1771-authority-volume-2",
+          "role": "authority",
+          "locator": "https://archive.org/download/worksofrevjohnwe2wesl/worksofrevjohnwe2wesl_text.pdf",
+          "sha256": "967a5c62b4ea8611105964ef7720e5b9f1a5525b82786fbd6fd87e91fcdc025d",
+          "bytes": 12714511,
+          "acquiredAt": "2026-07-22T18:21:00.000Z"
+        },
+        {
+          "artifactId": "wesley-standard-sermons-1771-authority-volume-3",
+          "role": "authority",
+          "locator": "https://archive.org/download/worksofrevjohnwe3wesl/worksofrevjohnwe3wesl_text.pdf",
+          "sha256": "bd667e602629a4a46d8467ea6f2a8d3d1a5f9f95fe5ea63bd8fdf1b9ea955c65",
+          "bytes": 13186487,
+          "acquiredAt": "2026-07-22T18:21:00.000Z"
+        },
+        {
+          "artifactId": "wesley-standard-sermons-1771-authority-volume-4",
+          "role": "authority",
+          "locator": "https://archive.org/download/worksofrevjohnwe4wesl/worksofrevjohnwe4wesl_text.pdf",
+          "sha256": "711fc71e63994bae18ef3d395857f82374de58a30ab7df2dbd7782c268a46a48",
+          "bytes": 13033050,
+          "acquiredAt": "2026-07-22T18:21:00.000Z"
+        },
+        {
+          "artifactId": "wesley-standard-sermons-1771-comparison-gutenberg-volume-1",
+          "role": "comparator",
+          "locator": "https://www.gutenberg.org/cache/epub/59743/pg59743.txt",
+          "sha256": "5b8ca0a9ae0cad6764d778cbba2e268a849faebcae0f4da547f08a793eea2c03",
+          "bytes": 514744,
+          "acquiredAt": "2026-07-22T19:29:11.000Z"
+        },
+        {
+          "artifactId": "wesley-standard-sermons-1771-comparison-gutenberg-volume-2",
+          "role": "comparator",
+          "locator": "https://www.gutenberg.org/cache/epub/63452/pg63452.txt",
+          "sha256": "8fd534e8b301eb160c559e8bf9aeb2532429a52a537fe342d33a492df12e8352",
+          "bytes": 524710,
+          "acquiredAt": "2026-07-22T19:29:11.000Z"
+        },
+        {
+          "artifactId": "wesley-standard-sermons-1771-comparison-gutenberg-volume-3",
+          "role": "comparator",
+          "locator": "https://www.gutenberg.org/cache/epub/63909/pg63909.txt",
+          "sha256": "d7a7e53001b25bc611d098d7083f4bdd0fd202c769f870c10f2a2968c9082323",
+          "bytes": 522812,
+          "acquiredAt": "2026-07-22T19:29:11.000Z"
+        },
+        {
+          "artifactId": "wesley-standard-sermons-1771-comparison-gutenberg-volume-4",
+          "role": "comparator",
+          "locator": "https://www.gutenberg.org/cache/epub/68320/pg68320.txt",
+          "sha256": "82264a615471e8333445c64af8b7dd7b9e42655f63e68d4e92d101cdc17a87b1",
+          "bytes": 516421,
+          "acquiredAt": "2026-07-22T19:29:11.000Z"
+        }
+      ],
+      "catalog": {
+        "composition": {
+          "label": "sermons published/assembled 1746–1771; 53-sermon arrangement in 1770–1771 Works",
+          "startYear": 1746,
+          "endYear": 1771
+        },
+        "compositionProvenanceSources": [
+          {
+            "sourceId": "hist-meta-wesley-dmbi",
+            "label": "Dictionary of Methodism in Britain and Ireland: Wesley",
+            "url": "https://dmbi.online/index.php?do=app.entry&id=2439"
+          },
+          {
+            "sourceId": "hist-meta-wesley-pitts",
+            "label": "Pitts Theology Library digital collection: Wesley Works",
+            "url": "https://digital.pitts.emory.edu/s/digital-collections/item/13569"
+          }
+        ]
+      }
+    }
+  ]
+}

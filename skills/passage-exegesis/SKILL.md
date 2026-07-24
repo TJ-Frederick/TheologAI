@@ -59,8 +59,8 @@ Use this workflow when the user asks for:
 
 - Call `classic_text_lookup` with a query related to the passage's themes. Treat
   snippets as discovery only; read the selected canonical `sectionKey` resource
-  before quotation. A future reviewed sectioned-only work has a landing and
-  bounded cursor directory, and only an exact section resource carries a body.
+  before quotation. A reviewed sectioned-only work has a landing and bounded
+  cursor directory, and only an exact section resource carries a body.
 - Check if any creeds, confessions, or catechisms address the doctrines in the passage
 - This connects the passage to the broader theological tradition
 

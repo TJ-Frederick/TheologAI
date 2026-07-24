@@ -231,7 +231,7 @@ export function auditHistoricalTransform8Authority(
       section_count AS sectionCount, landing_max_bytes AS landingMaxBytes,
       browse_page_size AS browsePageSize, cursor_version AS cursorVersion,
       provenance_json AS provenanceJson, rights_json AS rightsJson
-      FROM historical_document_delivery_profiles${last ? ` WHERE document_id > ${sqlLiteral(last.documentId)}` : ''}
+      FROM historical_document_delivery_profiles WHERE delivery_mode = 'complete_document'${last ? ` AND document_id > ${sqlLiteral(last.documentId)}` : ''}
       ORDER BY document_id LIMIT ${HISTORICAL_TRANSFORM8_AUTHORITY_PAGE_SIZE}`,
     parse: parseProfile,
     compare: compareProfiles,
@@ -239,12 +239,14 @@ export function auditHistoricalTransform8Authority(
   const identities = readPaged(readPage, {
     name: 'identities',
     expected: expected.identities,
-    sql: last => `SELECT document_id AS documentId, section_key AS sectionKey, source_ordinal AS sourceOrdinal,
-      document_section_id AS documentSectionId
-      FROM historical_section_identities${last ? ` WHERE document_id > ${sqlLiteral(last.documentId)}
-        OR (document_id = ${sqlLiteral(last.documentId)} AND (source_ordinal > ${last.sourceOrdinal}
-          OR (source_ordinal = ${last.sourceOrdinal} AND section_key > ${sqlLiteral(last.sectionKey)})))` : ''}
-      ORDER BY document_id, source_ordinal, section_key LIMIT ${HISTORICAL_TRANSFORM8_AUTHORITY_PAGE_SIZE}`,
+    sql: last => `SELECT identity.document_id AS documentId, identity.section_key AS sectionKey, identity.source_ordinal AS sourceOrdinal,
+      identity.document_section_id AS documentSectionId
+      FROM historical_section_identities identity
+      JOIN historical_document_delivery_profiles profile
+        ON profile.document_id = identity.document_id AND profile.delivery_mode = 'complete_document'${last ? ` WHERE identity.document_id > ${sqlLiteral(last.documentId)}
+        OR (identity.document_id = ${sqlLiteral(last.documentId)} AND (identity.source_ordinal > ${last.sourceOrdinal}
+          OR (identity.source_ordinal = ${last.sourceOrdinal} AND identity.section_key > ${sqlLiteral(last.sectionKey)})))` : ''}
+      ORDER BY identity.document_id, identity.source_ordinal, identity.section_key LIMIT ${HISTORICAL_TRANSFORM8_AUTHORITY_PAGE_SIZE}`,
     parse: parseIdentity,
     compare: compareIdentities,
   });
@@ -354,6 +356,8 @@ function readSample(
     FROM historical_section_identities identity
     JOIN document_sections section
       ON section.id = identity.document_section_id AND section.document_id = identity.document_id
+    JOIN historical_document_delivery_profiles profile
+      ON profile.document_id = identity.document_id AND profile.delivery_mode = 'complete_document'
     LEFT JOIN sections_fts fts ON fts.rowid = section.id
     ORDER BY identity.document_id, identity.source_ordinal, identity.section_key
     LIMIT ${HISTORICAL_TRANSFORM8_BODY_FTS_SAMPLE_SIZE}`);

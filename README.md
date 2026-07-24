@@ -4,7 +4,7 @@ TheologAI is an MCP server for Bible study and theological research. It runs
 locally over stdio or Streamable HTTP and on Cloudflare Workers with D1.
 
 The current registry contains eleven tools, six guided prompts, eight English
-Bible translations, six commentary sources, 17 locally indexed
+Bible translations, six commentary sources, 25 locally indexed
 historical documents, Strong's dictionaries, and Greek/Hebrew morphology.
 
 <!-- theologai-public-contract tools=11 structured=bible_cross_references,bible_lookup,bible_verse_morphology,classic_text_lookup,commentary_lookup,donation_config,original_language_lookup,original_language_study,parallel_passages,primary_source_search,verify_donation -->
@@ -45,45 +45,32 @@ Remote MCP client configuration:
 }
 ```
 
-Use the preview URL only for explicitly authorized release testing. PR #92
-merged as `cd3d1c38fdf0f939a33a41d4b6d5044eb7f44562`; its exact reviewed head
-`3a2b5a57b322dce525f27cfa91c9f667d080bca9` is deployed to preview only as
-Cloudflare deployment `04e7a69a-78d2-447b-ac71-e9fb0bef3695`, Worker
-`576517dd-84a8-4b5f-a5ea-ed8f124db63d`, and D1
-`theologai-preview-20260722-b`
-(`94c4938b-7800-4d68-9097-0df33c31fdc1`). Exact-head CI attempt 2 run
-`30017722596` and protected preview run `30039858274` passed. The parallel
-audit passed 22/22 cases; the Transform-8 audit recorded 48 rate-counted
-requests, 53 total HTTP records, and 11/11 assertion groups. The
-`deploy-preview` authorization was removed and revocation run `30040550778`
-passed. It is not a production deployment. Production remains the PR #72
-known-good baseline: Cloudflare deployment
-`a4697fd1-deda-4dae-a16c-635454218bc8`, Worker
-`762485da-9e02-46a0-9777-e0d8743b9dbf`, and D1
-`theologai-production-20260715-a`
-(`c6535a4a-1953-4279-b277-7368445fc61a`).
-
-The checked-in production-binding candidate now names
+Use the preview URL only for explicitly authorized release testing. The
+current production baseline is main merge `7974b15` (tree `f77bca4`), released
+by protected workflow `30046749929` as Cloudflare deployment
+`eb2af3bf-8e37-4373-83c3-233255fb477e`, Worker
+`573e6a08-d28f-442b-9206-42f62c1eaf46`, and D1
 `theologai-production-20260723-a`
-(`3f7faa0e-689f-47aa-a601-dc662db9a6cf`). It passed migrations `0001`–`0005`,
-deterministic seeding, strict readiness, and the Transform-8 authority audit,
-but no live production Worker is bound to it. The live production deployment,
-Worker, and old D1 above remain the matched rollback pair; checked-in
-configuration is not deployment evidence.
+(`3f7faa0e-689f-47aa-a601-dc662db9a6cf`). Its targeted r3 audit recorded 36
+serialized HTTP requests / 31 rate-counted across 7/7 assertion groups; broad
+r2 recorded 34 requests / 29 rate-counted across 10/10 groups, with a Sol GO
+and clean 60-minute tail. The current preview release is
+separate: Cloudflare deployment `bf4d7603-5b3b-4c6f-8e09-7bae3fe24eb8`, Worker
+`968975cf-8183-446e-852c-b6a8670d56d5`, and preview D1
+`theologai-preview-20260722-b`
+(`94c4938b-7800-4d68-9097-0df33c31fdc1`).
+
+This branch's Transform 9 source-pack migration remains local-only and
+unbound. It does not change the production D1 binding or make the core-eight
+source packs available in production.
 For a preview-client rollback without changing server state, use the direct preview
 `workers.dev` address above; the production `workers.dev` address intentionally
 redirects rather than serving a separate legacy Worker.
 
-The preview-only data layer has migration `0004` / transform 7 and migration
-`0005` / transform 8 materialized in its bound D1. Transform 7's UBS adapters
-remain runtime-inactive: they register no new MCP surface or output. Transform
-8 is active in preview's historical repositories: the existing
-`classic_text_lookup` has the Baltimore hard cut and canonical/legacy
-resolution. That adds no new tool, but it does change preview output. The live
-production Worker and its bound old D1 lack both migrations, materialized rows,
-and this Transform-8 behavior; a production D1 release and any later UBS
-runtime activation remain separately gated. The pinned packet's `SOURCE.json`
-remains a historical acquisition-gate snapshot, not deployment evidence.
+Transform 9 remains local-only and unbound; any later UBS runtime activation
+or reviewed historical-source-pack release remains separately gated. The pinned
+packet's `SOURCE.json` remains a historical acquisition-gate snapshot, not
+deployment evidence.
 
 ## MCP capabilities
 
@@ -105,7 +92,7 @@ fresh server and transport.
 | `bible_cross_references` | Query locally indexed OpenBible.info cross references with raw vote ranking, explicit discovery-only semantics, threshold-scoped result windows, and pinned snapshot provenance. |
 | `parallel_passages` | Return complete UBS source-attested parallel groups by default; legacy curated edges and OpenBible.info cross references require explicit selectors and remain separate. |
 | `commentary_lookup` | Retrieve Matthew Henry, JFB, Adam Clarke, John Gill, Keil-Delitzsch (OT), or Tyndale notes. |
-| `classic_text_lookup` | Search and browse the 17 locally indexed historical documents with canonical source-first section keys. The runtime also supports the bounded landing/cursor-directory contract for future reviewed sectioned editions; exact sections are the only body route. Remote CCEL document bodies are not retrieved or republished. |
+| `classic_text_lookup` | Search and browse 25 locally indexed historical works with canonical source-first section keys. Eight reviewed source-pack editions use bounded sectioned delivery; exact sections are the only body route. Remote CCEL document bodies are not retrieved or republished. |
 | `primary_source_search` | Execute bounded primary-source query plans. This build’s local-only configuration exposes v6; an explicitly configured CCEL-discovery profile exposes v7 while CCEL execution remains disabled before adapter, coordinator, or fetch. Local locators use canonical section keys plus source ordinals; snippets remain discovery-only and research workflows maintain explicit searched/read/deferred/not-searched coverage ledgers. |
 | `original_language_lookup` | Look up or search Strong's entries, with opt-in rights-reviewed STEPBible metadata, exact corrected-corpus usage, and bounded occurrence pages for exact identities. The Online-Bible-derived TBESH Hebrew `Meaning` field is withheld. |
 | `bible_verse_morphology` | Return bounded word-by-word morphology for one exact verse, with raw codes, nullable expansions, and separate pinned STEPBible morphology/lemma provenance. |
@@ -172,10 +159,11 @@ advertise versioned object-root `outputSchema` contracts and return matching
 `original_language_lookup`, `original_language_study`, `donation_config`, and
 `verify_donation`. Bible,
 cross-reference, verse-morphology, parallel-passage, and original-language structured results
-include bounded, result-local provenance records. Primary-source results do not
-invent edition provenance records: their evidence policy explicitly marks
-edition provenance incomplete, and they link only canonical local sections with
-exact UTF-8 sizes. Their result windows say only whether one additional match
+include bounded, result-local provenance records. Primary-source results retain
+the legacy fail-closed edition-readiness record for unreviewed local documents
+and use a separate URL-free established-readiness record for the eight reviewed
+normalized source packs; they link only canonical local sections with exact
+UTF-8 sizes. Their result windows say only whether one additional match
 was directly observed through private lookahead; they do not imply exhaustive
 counts. Donation configuration returns
 `assetOrderMeaning: configured_display_order_not_ranking`, preserving its
@@ -203,15 +191,16 @@ bodies. The work-inventory contract is intentionally bounded at 100 works;
 the server fails rather than truncating if the inventory exceeds that ceiling.
 Complete-document directory mode exposes its complete index with unsized canonical
 source-first locators, caps native links at 32, and similarly fails above 2,000
-sections. The runtime contract reserves a distinct landing plus fixed-32,
-opaque-cursor metadata directory for a future reviewed `sectioned_only` edition;
-it has no whole body or directory on the landing and exact canonical sections are
-the sole body route. Search exposes at
+sections. Reviewed source-pack works use a distinct landing plus fixed-32,
+opaque-cursor metadata directory under the `sectioned_only` delivery contract;
+they have no whole body or directory on the landing and exact canonical sections
+are the sole body route. Search exposes at
 most ten discovery-only snippets plus one private lookahead; selected work and
 search resources retain exact UTF-8 sizes. Read a selected exact resource
 before quotation. Invalid stored resource identities fail closed as integrity
-hardening. The contract is local-only: remote document bodies are disabled,
-edition provenance is incomplete, and rights status is not established.
+hardening. The contract is local-only: remote document bodies are disabled.
+Its per-result evidence policy distinguishes legacy incomplete provenance,
+reviewed normalized source packs, and mixed inventories.
 
 ### Resources
 
@@ -220,7 +209,7 @@ edition provenance is incomplete, and rights status is not established.
 | `theologai://translations` | Available Bible translations. |
 | `theologai://commentaries` | Available commentary sources. |
 | `theologai://primary-sources/catalog` | v2 JSON metadata inventory for the hosted primary-source collection; no document bodies, provenance URLs, source hashes, or rights instruments. Each work carries a fail-closed edition-readiness disclosure. |
-| `theologai://documents/{slug}` | A locally indexed creed, confession, or catechism. |
+| `theologai://documents/{slug}` | One of 25 locally indexed historical works: 17 legacy creeds/confessions/catechisms and 8 reviewed source-pack editions. |
 | `theologai://strongs/{number}` | A Strong's dictionary entry such as `G26` or `H430`. |
 
 ### Guided prompts
@@ -268,37 +257,42 @@ transcription uncertainty.
 
 ### Historical documents and external discovery
 
-The local database contains 17 tracked creeds, confessions, and
-catechisms. The exact count is enforced by `data/data-manifest.json`.
+The local database contains 25 historical works: 17 tracked legacy creeds,
+confessions, and catechisms plus eight reviewed, normalized public-domain
+source-pack editions (Anselm, Athanasius, Augustine, Bunyan, Calvin,
+Irenaeus, John of Damascus, and Wesley). The core-eight is sectioned-only,
+contributes 512 canonical sections, and adds no legacy aliases; exact
+resources disclose the reviewed edition and normalized-text rights boundary.
+The exact count is enforced by `data/data-manifest.json`.
 
 Approved UBS Hebrew and public-domain historical-source packets are checked
-into the repository for deterministic verification and future release work.
+into the repository for deterministic verification. The checked-in Transform 9
+source-pack migration is local-only: it has no Cloudflare migration, binding,
+or deployment claim.
 M4A materializes the UBS source pair in derived local SQLite, deterministic
 D1 seed, and the preview-only D1. Transform 7's UBS adapters remain inactive
 at runtime. Transform 8 is separately active in preview's historical
 repositories: the existing `classic_text_lookup` exposes the Baltimore hard
 cut and canonical/legacy resolution, changing preview output without adding a
-tool. The live production Worker and its bound old D1 lack both migrations,
-materializations, and Transform-8 behavior. The historical source packets
-remain outside the local and remote
-17-work catalog and current tool output. U3-T7 provides the in-memory semantic
+tool. The current production D1 also runs Transform 8 and its historical
+behavior. The reviewed core-eight Transform 9 remains local-only and unbound;
+it is included in the local 25-work catalog and tool output, while Norton and
+Aquinas source assets remain inactive. U3-T7 provides the in-memory semantic
 compiler, native-to-normalized coordinate bridge, and content-free compilation
 audit; M4A provides capacity and seed verification with inactive adapters. Any
-production migration, binding, or UBS runtime activation remains separately
-gated. Norton is a later transform-9,
+later production migration, binding, or UBS runtime activation remains
+separately gated. Norton is a future successor,
 `sectioned_only` candidate. Cyril remains blocked with zero output pending
 reliable translator attribution.
 
 Production tools search and retrieve only the locally indexed collection and
-do **not** currently fetch CCEL search results or document bodies. The deployed
-preview source contains Transform-8 code with active historical compatibility:
-its existing `classic_text_lookup` provides the Baltimore hard cut and
-canonical/legacy resolution. This changes preview output without adding a new
-tool. Preview retains the v5 CCEL-discovery profile; live search and coordinator execution remain disabled.
+do **not** currently fetch CCEL search results or document bodies. Production
+uses the v6 local-only profile; preview uses the v7 CCEL-discovery profile;
+live search and coordinator execution remain disabled.
 External preview queries return a disabled provider result before adapter invocation.
 That occurs before Durable Object lookup/RPC, or fetch. Production has neither
-the Transform-8 materialization nor behavior.
-The checked-in v6/v7 profile candidate remains unpublished. MCP clients should
+the Transform-9 core-eight materialization nor behavior.
+These deployed v6/v7 profiles do not enable CCEL execution. MCP clients should
 reconnect and reinitialize after any endpoint/profile change because tool and
 prompt schemas may be cached for an existing connection.
 
@@ -491,11 +485,10 @@ per-request D1 repositories. Both targets share one MCP registry.
 
 - The current tracked roadmap is [docs/ROADMAP.md](docs/ROADMAP.md), beginning
   after the PR #10 production baseline.
-- Live CCEL discovery and search remain gated future work; the checked-in,
-  unpublished candidate exposes only the non-executing v7 contract while its
-  local production profile remains v6/local-only. The current preview-only
-  PR #92 deployment remains v5/discovery-only, while production remains
-  PR #72 v4/local-only.
+- Live CCEL discovery and search remain gated future work. The deployed
+  production profile is v6/local-only and preview is v7/CCEL-discovery; both
+  disable execution before adapter, coordinator, or fetch. The PR #72 and PR
+  #92 profiles are historical evidence only.
   The legacy CCEL body reader is retired; the retained discovery adapter is
   bounded, does not fetch until separately authorized, and must never become
   CCEL body mirroring or republication.

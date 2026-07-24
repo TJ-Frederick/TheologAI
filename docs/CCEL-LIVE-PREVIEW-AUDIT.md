@@ -14,13 +14,13 @@ npm run audit:ccel-preview -- \
 The command is an operator canary, not a normal CI test. Run it only after the
 owner explicitly authorizes live preview and the current robots/interface
 preflight is recorded. It makes no production MCP tool call: production is a
-`tools/list` v4 local-only schema control. Before either preview tool call, the canary
+`tools/list` v6 local-only schema control. Before either preview tool call, the canary
 also uses the already-protected production operator route and exact live Worker
 UUID to read a content-free coordinator snapshot. The token is read only from
 `THEOLOGAI_CCEL_OPERATOR_TOKEN`; it is never accepted as a command argument or
-written to the report. Preview's `tools/list` must advertise the v5 CCEL
+written to the report. Preview's `tools/list` must advertise the v7 CCEL
 discovery schema before the canary proceeds. These schema observations prove
-v4 local-only versus v5 CCEL exposure; they do not attest exact deployed flag
+v6 local-only versus v7 CCEL exposure; they do not attest exact deployed flag
 bits. A successful origin admission separately proves that live execution was
 effective for the canary, which necessarily differs from the checked-in inert
 preview `100` baseline. Preview issues exactly two concurrent,

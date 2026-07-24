@@ -52,8 +52,8 @@ describe('inactive UBS semantic resolution seam', () => {
       materializations: { d1: { transformVersion: number } };
     };
     expect(manifest).toMatchObject({
-      schemaVersion: '0005_historical_section_identity_delivery',
-      materializations: { d1: { transformVersion: 8 } },
+      schemaVersion: '0006_historical_source_packs',
+      materializations: { d1: { transformVersion: 9 } },
     });
   });
 });

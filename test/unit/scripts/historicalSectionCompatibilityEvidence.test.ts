@@ -126,6 +126,7 @@ describe('historical section compatibility evidence', () => {
     expect(verifyHistoricalSectionCompatibilityMaterialization(ROOT, evidence, sqliteRows, seedRows)).toMatchObject({
       documentCount: 17,
       sectionCount: 3054,
+      nonLegacyDocumentSectionCount: 0,
       collisionGroups: 23,
       affectedSections: 256,
       newlyAddressableSections: 233,
@@ -137,6 +138,58 @@ describe('historical section compatibility evidence', () => {
     seedRows[0]!.d1SeedOrdinal = 2;
     expect(() => verifyHistoricalSectionCompatibilityMaterialization(ROOT, evidence, sqliteRows, seedRows))
       .toThrow('D1 seed row 1 does not match');
+  });
+
+  it('keeps the 3,054-row Transform 6 contract strict while accounting for 512 Transform 9 rows', () => {
+    const evidence = realEvidence();
+    const derived = deriveHistoricalSectionCompatibilityEvidence(ROOT);
+    const sqliteRows = derived.allRows.map(row => ({
+      id: row.sqliteBuilderRowId,
+      documentId: row.documentId,
+      legacySectionId: row.legacySectionId,
+    }));
+    const seedRows = derived.allRows.map(row => ({
+      id: row.sqliteBuilderRowId,
+      documentId: row.documentId,
+      legacySectionId: row.legacySectionId,
+      d1SeedOrdinal: row.d1SeedOrdinal,
+    }));
+    const transform9Rows = Array.from({ length: 512 }, (_, index) => ({
+      id: 3055 + index,
+      documentId: 'calvin-institutes',
+      legacySectionId: `transform9-${index + 1}`,
+    }));
+    const transform9SeedRows = transform9Rows.map((row, index) => ({
+      ...row,
+      d1SeedOrdinal: 3055 + index,
+    }));
+
+    expect(verifyHistoricalSectionCompatibilityMaterialization(
+      ROOT,
+      evidence,
+      [...sqliteRows, ...transform9Rows],
+      [...seedRows, ...transform9SeedRows],
+    )).toMatchObject({
+      documentCount: 17,
+      sectionCount: 3054,
+      nonLegacyDocumentSectionCount: 512,
+    });
+
+    expect(() => verifyHistoricalSectionCompatibilityMaterialization(
+      ROOT,
+      evidence,
+      [...sqliteRows, ...transform9Rows],
+      [...seedRows, ...transform9SeedRows.slice(1)],
+    )).toThrow('D1 seed non-legacy historical section row count mismatch');
+
+    const sameCountIdentityDrift = structuredClone(transform9SeedRows);
+    sameCountIdentityDrift[0]!.documentId = 'transformed-calvin-institutes';
+    expect(() => verifyHistoricalSectionCompatibilityMaterialization(
+      ROOT,
+      evidence,
+      [...sqliteRows, ...transform9Rows],
+      [...seedRows, ...sameCountIdentityDrift],
+    )).toThrow('D1 seed non-legacy historical row 1 does not match');
   });
 
   it('reads only document-section identity columns from a manifest-checked synthetic seed', () => {

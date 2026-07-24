@@ -33,6 +33,7 @@ import {
   verifyD1Migrations,
   type DataManifest,
 } from './d1-corpus-identity.js';
+import { D1_SEED_BASE_TABLES, D1_SEED_EXPORT_ORDER } from './d1-seed-order.js';
 
 interface SeedStatement {
   sql: string;
@@ -52,36 +53,6 @@ interface SeedFile {
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUTPUT = join(ROOT, 'scripts', 'd1-seed');
 const SOURCE_MANIFEST_PATH = join(ROOT, 'data', 'data-manifest.json');
-const BASE_TABLES = [
-  'theologai_metadata',
-  'morph_codes',
-  'documents',
-  'document_sections',
-  'historical_document_delivery_profiles',
-  'historical_section_identities',
-  'historical_section_aliases',
-  'strongs',
-  'stepbible_lexicons',
-  'cross_references',
-  'morphology',
-  'strongs_usage_stats',
-  'strongs_book_stats',
-  'strongs_form_stats',
-  'ubs_parallel_sources',
-  'ubs_parallel_groups',
-  'ubs_parallel_members',
-  'ubs_parallel_segments',
-  'ubs_semantic_artifacts',
-  'ubs_semantic_sources',
-  'ubs_semantic_domains',
-  'ubs_semantic_entries',
-  'ubs_semantic_entry_identities',
-  'ubs_semantic_senses',
-  'ubs_semantic_sense_domains',
-  'ubs_semantic_reference_evidence',
-  'ubs_semantic_normalized_coordinates',
-] as const;
-const EXPORT_ORDER = [...BASE_TABLES, 'fts'] as const;
 const CONTENT_CHARS_PER_STATEMENT = 10_000;
 
 function parseArguments(argv: string[]): { database: string; clean: boolean } {
@@ -205,7 +176,8 @@ function exportTable(database: string, table: string): SeedStatement[] {
 
   const columnSql = columns.map(sqlIdentifier).join(',');
   const values = columns.map(column => {
-    if (table === 'document_sections' && column === 'content') {
+    if ((table === 'document_sections' || table === 'historical_edition_sections')
+      && column === 'content') {
       return `quote(substr(${sqlIdentifier(column)},1,${CONTENT_CHARS_PER_STATEMENT}))`;
     }
     return `quote(${sqlIdentifier(column)})`;
@@ -247,11 +219,40 @@ function exportTable(database: string, table: string): SeedStatement[] {
     `;
     statements.push(...splitGeneratedSql(sqlite(database, updates)).map(sql => ({ sql, rows: 0 })));
   }
+  if (table === 'historical_edition_sections') {
+    const content = sqlIdentifier('content');
+    const updates = `
+      WITH RECURSIVE chunks(edition_id, section_key, offset) AS (
+        SELECT edition_id, section_key, ${CONTENT_CHARS_PER_STATEMENT + 1}
+          FROM historical_edition_sections
+         WHERE length(content) > ${CONTENT_CHARS_PER_STATEMENT}
+        UNION ALL
+        SELECT chunks.edition_id, chunks.section_key,
+               chunks.offset + ${CONTENT_CHARS_PER_STATEMENT}
+          FROM chunks
+          JOIN historical_edition_sections
+            ON historical_edition_sections.edition_id = chunks.edition_id
+           AND historical_edition_sections.section_key = chunks.section_key
+         WHERE chunks.offset + ${CONTENT_CHARS_PER_STATEMENT}
+               <= length(historical_edition_sections.content)
+      )
+      SELECT 'UPDATE "historical_edition_sections" SET ${content} = ${content} || ' ||
+             quote(substr(historical_edition_sections.content, chunks.offset, ${CONTENT_CHARS_PER_STATEMENT})) ||
+             ' WHERE "edition_id" = ' || quote(historical_edition_sections.edition_id) ||
+             ' AND "section_key" = ' || quote(historical_edition_sections.section_key) || ';'
+        FROM chunks
+        JOIN historical_edition_sections
+          ON historical_edition_sections.edition_id = chunks.edition_id
+         AND historical_edition_sections.section_key = chunks.section_key
+       ORDER BY chunks.edition_id, chunks.section_key, chunks.offset;
+    `;
+    statements.push(...splitGeneratedSql(sqlite(database, updates)).map(sql => ({ sql, rows: 0 })));
+  }
   return statements;
 }
 
 function emptyTargetGuard(): SeedStatement {
-  const counts = [...BASE_TABLES, 'strongs_fts', 'sections_fts']
+  const counts = [...D1_SEED_BASE_TABLES, 'strongs_fts', 'sections_fts', 'historical_edition_sections_fts']
     .map(table => `(SELECT count(*) FROM ${sqlIdentifier(table)})`)
     .join(' + ');
   return {
@@ -303,7 +304,7 @@ verifyD1Migrations(ROOT, sourceManifest);
 validateCanonicalSources(sourceManifest);
 assertSemanticSource(database);
 
-for (const table of [...BASE_TABLES, 'strongs_fts', 'sections_fts']) {
+for (const table of [...D1_SEED_BASE_TABLES, 'strongs_fts', 'sections_fts', 'historical_edition_sections_fts']) {
   const expected = sourceManifest.expectedCounts[table];
   if (!Number.isSafeInteger(expected) || expected < 0) {
     throw new Error(`Source manifest has no valid expected count for ${table}`);
@@ -318,8 +319,8 @@ prepareOutput(clean);
 const files: SeedFile[] = [];
 files.push(...writeChunks('empty-target-check', 0, [emptyTargetGuard()]));
 
-for (let index = 0; index < BASE_TABLES.length; index++) {
-  const table = BASE_TABLES[index];
+for (let index = 0; index < D1_SEED_BASE_TABLES.length; index++) {
+  const table = D1_SEED_BASE_TABLES[index];
   console.error(`[d1-seed] Exporting ${table}...`);
   const statements = exportTable(database, table);
   const rows = statements.reduce((sum, statement) => sum + statement.rows, 0);
@@ -338,8 +339,12 @@ const ftsStatements: SeedStatement[] = [
     sql: 'INSERT INTO "sections_fts"("title","content","topics") SELECT "title","content","topics" FROM "document_sections" ORDER BY "id";',
     rows: sourceManifest.expectedCounts.sections_fts,
   },
+  {
+    sql: 'INSERT INTO "historical_edition_sections_fts"("edition_id","section_key","heading","content") SELECT "edition_id","section_key","heading","content" FROM "historical_edition_sections" ORDER BY "edition_id", "source_ordinal";',
+    rows: sourceManifest.expectedCounts.historical_edition_sections_fts,
+  },
 ];
-files.push(...writeChunks('fts', EXPORT_ORDER.length, ftsStatements));
+files.push(...writeChunks('fts', D1_SEED_EXPORT_ORDER.length, ftsStatements));
 
 for (const file of files) {
   const sql = readFileSync(join(OUTPUT, file.path), 'utf8');
@@ -373,9 +378,9 @@ const seedManifest = {
     maximumStatementBytes: D1_MAX_STATEMENT_BYTES,
     targetFileBytes: D1_SEED_FILE_BYTES,
   },
-  tableOrder: EXPORT_ORDER,
+  tableOrder: D1_SEED_EXPORT_ORDER,
   expectedCounts: Object.fromEntries(
-    [...BASE_TABLES, 'strongs_fts', 'sections_fts'].map(table => [table, sourceManifest.expectedCounts[table]]),
+    [...D1_SEED_BASE_TABLES, 'strongs_fts', 'sections_fts', 'historical_edition_sections_fts'].map(table => [table, sourceManifest.expectedCounts[table]]),
   ),
   files,
   totals: {

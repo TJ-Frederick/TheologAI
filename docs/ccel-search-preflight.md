@@ -1,7 +1,7 @@
 # CCEL live-search preflight record
 
-> **Current status:** exposure-only preview record. Production remains on the
-> local-only v4 contract. Preview advertises the v5 CCEL discovery shape, but
+> **Current status:** exposure-only preview record. Production uses the
+> local-only v6 contract. Preview advertises the v7 CCEL discovery shape, but
 > both execution switches remain off: no public call can reach the adapter,
 > coordinator lookup/RPC, or upstream fetch. TheologAI does not retrieve or
 > republish CCEL document bodies. Live discovery still requires a fresh

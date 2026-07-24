@@ -23,18 +23,52 @@ export const CLASSIC_TEXT_EVIDENCE_POLICY = {
   selectedContentAccess: 'mcp_resource_read',
 } as const;
 
+/** The collection includes legacy records and reviewed normalized source packs. */
+export const MIXED_CLASSIC_TEXT_EVIDENCE_POLICY = {
+  providerScope: 'local_only',
+  remoteDocumentBodies: 'disabled',
+  editionProvenance: 'mixed_legacy_and_reviewed_source_packs',
+  rightsStatus: 'mixed_not_established_and_no_known_conflict',
+  searchSnippets: 'discovery_only',
+  selectedContentAccess: 'mcp_resource_read',
+} as const;
+
+export const REVIEWED_SOURCE_PACK_CLASSIC_TEXT_EVIDENCE_POLICY = {
+  providerScope: 'local_only',
+  remoteDocumentBodies: 'disabled',
+  editionProvenance: 'reviewed_source_packs',
+  rightsStatus: 'no_known_conflict_normalized_text_only',
+  searchSnippets: 'discovery_only',
+  selectedContentAccess: 'mcp_resource_read',
+} as const;
+
+type ClassicTextEvidencePolicy = typeof CLASSIC_TEXT_EVIDENCE_POLICY
+  | typeof MIXED_CLASSIC_TEXT_EVIDENCE_POLICY
+  | typeof REVIEWED_SOURCE_PACK_CLASSIC_TEXT_EVIDENCE_POLICY;
+
 export interface PreparedClassicTextWork {
   document: DocumentInfo;
   sections: DocumentSection[];
 }
 
-function base(mode: 'list_works' | 'browse_sections' | 'work' | 'landing' | 'search') {
+function base(
+  mode: 'list_works' | 'browse_sections' | 'work' | 'landing' | 'search',
+  documents: readonly DocumentInfo[] = [],
+) {
   return {
     schemaVersion: '2' as const,
     kind: 'classic_text_lookup' as const,
     mode,
-    evidencePolicy: CLASSIC_TEXT_EVIDENCE_POLICY,
+    evidencePolicy: classicTextEvidencePolicy(documents),
   };
+}
+
+function classicTextEvidencePolicy(documents: readonly DocumentInfo[]): ClassicTextEvidencePolicy {
+  const reviewed = documents.filter(document => document.editionProvenance !== undefined).length;
+  if (reviewed === 0) return CLASSIC_TEXT_EVIDENCE_POLICY;
+  return reviewed === documents.length
+    ? REVIEWED_SOURCE_PACK_CLASSIC_TEXT_EVIDENCE_POLICY
+    : MIXED_CLASSIC_TEXT_EVIDENCE_POLICY;
 }
 
 function resourceForDocument(document: DocumentInfo, sections: DocumentSection[]) {
@@ -132,7 +166,7 @@ export function presentClassicTextCatalog(documents: Array<{ document: DocumentI
     );
   }
   return {
-    ...base('list_works'),
+    ...base('list_works', documents.map(({ document }) => document)),
     catalog: {
       coverage: 'complete_local_work_inventory' as const,
       delivery: 'metadata_summary' as const,
@@ -152,7 +186,7 @@ export function presentClassicTextDirectory(input: {
   assertSectionLimit(input.sections.length);
   const sections = input.sections.map(section => directorySectionSummary(input.document, section));
   return {
-    ...base('browse_sections'),
+    ...base('browse_sections', [input.document]),
     directory: {
       coverage: input.profile.deliveryMode === 'sectioned_only' ? 'bounded_section_directory' as const : 'complete_section_directory' as const,
       work: metadataWorkSummary(input.document, input.profile),
@@ -181,7 +215,7 @@ export function presentClassicTextDirectory(input: {
 export function presentClassicTextWork(work: PreparedClassicTextWork) {
   assertSectionLimit(work.sections.length);
   return {
-    ...base('work'),
+    ...base('work', [work.document]),
     document: {
       work: sizedWorkSummary(work),
       deliveryMode: 'complete_document' as const,
@@ -193,7 +227,7 @@ export function presentClassicTextWork(work: PreparedClassicTextWork) {
 
 export function presentClassicTextSectionedLanding(document: DocumentInfo, profile: HistoricalDocumentDeliveryProfile) {
   return {
-    ...base('landing'),
+    ...base('landing', [document]),
     landing: {
       work: {
         ...metadataWorkSummary(document, profile),
@@ -237,7 +271,7 @@ export function presentClassicTextSearch(
     snippetOnly: true as const,
   }));
   return {
-    ...base('search'),
+    ...base('search', candidates.map(candidate => candidate.document)),
     search: {
       query,
       status: hits.length > 0 ? 'ok' as const : 'no_results' as const,
@@ -256,6 +290,7 @@ export function presentClassicTextSearch(
 export function validateClassicTextsOutputSemantics(value: unknown): boolean {
   const root = record(value);
   if (!root || root.kind !== 'classic_text_lookup' || root.schemaVersion !== '2') return false;
+  if (!validClassicTextEvidencePolicy(root.evidencePolicy)) return false;
   const mode = root.mode;
   const branchNames = ['catalog', 'directory', 'document', 'landing', 'search'] as const;
   const expectedBranch = mode === 'list_works' ? 'catalog'
@@ -323,6 +358,17 @@ export function validateClassicTextsOutputSemantics(value: unknown): boolean {
       && browse.pageSize === HISTORICAL_SECTIONED_ONLY_PAGE_SIZE && browse.cursor === 'opaque_keyset_cursor');
   }
   return record(root.document) !== undefined;
+}
+
+function validClassicTextEvidencePolicy(value: unknown): boolean {
+  const policy = record(value);
+  if (!policy || policy.providerScope !== 'local_only' || policy.remoteDocumentBodies !== 'disabled'
+    || policy.searchSnippets !== 'discovery_only' || policy.selectedContentAccess !== 'mcp_resource_read') return false;
+  return (policy.editionProvenance === 'incomplete' && policy.rightsStatus === 'not_established')
+    || (policy.editionProvenance === 'mixed_legacy_and_reviewed_source_packs'
+      && policy.rightsStatus === 'mixed_not_established_and_no_known_conflict')
+    || (policy.editionProvenance === 'reviewed_source_packs'
+      && policy.rightsStatus === 'no_known_conflict_normalized_text_only');
 }
 
 function record(value: unknown): Record<string, unknown> | undefined {

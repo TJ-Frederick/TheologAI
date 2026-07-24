@@ -23,6 +23,7 @@ describe('UBS semantic local materialization guards', () => {
       '0003_original_language_usage.sql',
       '0004_ubs_hebrew_semantics.sql',
       '0005_historical_section_identity_delivery.sql',
+      '0006_historical_source_packs.sql',
     ]);
   });
 
@@ -31,10 +32,11 @@ describe('UBS semantic local materialization guards', () => {
       schemaVersion: string;
       materializations: { d1: { transformVersion: number; migrations: Array<{ path: string }> } };
     };
-    expect(manifest.schemaVersion).toBe('0005_historical_section_identity_delivery');
-    expect(manifest.materializations.d1.transformVersion).toBe(8);
+    expect(manifest.schemaVersion).toBe('0006_historical_source_packs');
+    expect(manifest.materializations.d1.transformVersion).toBe(9);
     expect(manifest.materializations.d1.migrations.map(item => item.path)).toContain('migrations/0004_ubs_hebrew_semantics.sql');
     expect(manifest.materializations.d1.migrations.map(item => item.path)).toContain('migrations/0005_historical_section_identity_delivery.sql');
+    expect(manifest.materializations.d1.migrations.map(item => item.path)).toContain('migrations/0006_historical_source_packs.sql');
   });
 
   it('keeps the executable relational layer strict in an in-memory fixture', () => {

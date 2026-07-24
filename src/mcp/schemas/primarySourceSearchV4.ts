@@ -31,7 +31,7 @@ const commonHit = {
   attribution: { type: 'string', minLength: 1, maxLength: 300 },
 } as const;
 
-const localEditionReadiness = {
+const legacyLocalEditionReadiness = {
   type: 'object',
   properties: {
     foundation: { const: 'edition-provenance-foundation.v1' },
@@ -41,6 +41,23 @@ const localEditionReadiness = {
   },
   required: ['foundation', 'editionIdentity', 'provenance', 'exactArtifactRights'],
   additionalProperties: false,
+} as const;
+
+const reviewedSourcePackEditionReadiness = {
+  type: 'object',
+  properties: {
+    foundation: { const: 'edition-provenance-foundation.v1' },
+    editionIdentity: { const: 'established' },
+    provenance: { type: 'string', enum: ['verified', 'verified_with_uncertainty'] },
+    exactArtifactRights: { const: 'not_claimed_for_scan_artifacts' },
+    normalizedTextRights: { const: 'no_known_conflict' },
+  },
+  required: ['foundation', 'editionIdentity', 'provenance', 'exactArtifactRights', 'normalizedTextRights'],
+  additionalProperties: false,
+} as const;
+
+const localEditionReadiness = {
+  oneOf: [legacyLocalEditionReadiness, reviewedSourcePackEditionReadiness],
 } as const;
 
 const externalEditionReadiness = {

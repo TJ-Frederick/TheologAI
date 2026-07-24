@@ -70,8 +70,8 @@ const evidencePolicy = {
   properties: {
     providerScope: { const: 'local_only' },
     remoteDocumentBodies: { const: 'disabled' },
-    editionProvenance: { const: 'incomplete' },
-    rightsStatus: { const: 'not_established' },
+    editionProvenance: { type: 'string', enum: ['incomplete', 'mixed_legacy_and_reviewed_source_packs', 'reviewed_source_packs'] },
+    rightsStatus: { type: 'string', enum: ['not_established', 'mixed_not_established_and_no_known_conflict', 'no_known_conflict_normalized_text_only'] },
     searchSnippets: { const: 'discovery_only' },
     selectedContentAccess: { const: 'mcp_resource_read' },
   },

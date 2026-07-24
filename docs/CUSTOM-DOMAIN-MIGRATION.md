@@ -34,30 +34,23 @@ Cloudflare dashboard action even though Worker routes are declared in
 
 ## Current operational release state (2026-07-23)
 
-PR #92 merged as `cd3d1c38fdf0f939a33a41d4b6d5044eb7f44562`; its exact
-reviewed head `3a2b5a57b322dce525f27cfa91c9f667d080bca9` is deployed to
-preview only as Cloudflare deployment `04e7a69a-78d2-447b-ac71-e9fb0bef3695`,
-Worker `576517dd-84a8-4b5f-a5ea-ed8f124db63d`, and D1
-`theologai-preview-20260722-b`
-(`94c4938b-7800-4d68-9097-0df33c31fdc1`). Exact-head CI attempt 2 run
-`30017722596` and protected preview run `30039858274` passed. The parallel
-audit passed 22/22 cases; the Transform-8 audit recorded 48 rate-counted
-requests, 53 total HTTP records, and 11/11 assertion groups. The
-`deploy-preview` authorization was removed and revocation run `30040550778`
-passed. It is not a production release. Production remains the PR #72 release:
-Cloudflare deployment `a4697fd1-deda-4dae-a16c-635454218bc8`, Worker
-`762485da-9e02-46a0-9777-e0d8743b9dbf`, and D1
-`theologai-production-20260715-a`
-(`c6535a4a-1953-4279-b277-7368445fc61a`).
-
-The checked-in production-binding candidate is
+The current production baseline is main merge `7974b15` (tree `f77bca4`),
+released by protected workflow `30046749929` as Cloudflare deployment
+`eb2af3bf-8e37-4373-83c3-233255fb477e`, Worker
+`573e6a08-d28f-442b-9206-42f62c1eaf46`, and D1
 `theologai-production-20260723-a`
-(`3f7faa0e-689f-47aa-a601-dc662db9a6cf`). It passed migrations `0001`–`0005`,
-deterministic seeding, strict readiness, and the Transform-8 authority audit,
-but no live production Worker is bound to it. The live production deployment,
-Worker, and old D1 above remain the matched rollback pair; checked-in config is
-not deployment evidence. The live production Worker and its bound old D1 still
-lack Transform-7 and Transform-8 data and behavior.
+(`3f7faa0e-689f-47aa-a601-dc662db9a6cf`). Targeted r3 recorded 36 serialized
+HTTP requests / 31 rate-counted across 7/7 assertion groups; broad r2 recorded
+34 requests / 29 rate-counted across 10/10 groups, with a Sol GO and clean
+60-minute tail.
+
+The current preview release is Cloudflare deployment
+`bf4d7603-5b3b-4c6f-8e09-7bae3fe24eb8`, Worker
+`968975cf-8183-446e-852c-b6a8670d56d5`, and D1
+`theologai-preview-20260722-b`
+(`94c4938b-7800-4d68-9097-0df33c31fdc1`). The older PR #72 and PR #92 release
+records remain rollback history only; they do not describe either current
+binding.
 
 ## Release-time known-good baseline
 
@@ -79,10 +72,12 @@ deployment comment:
 Do not substitute an historical deployment identifier for this record. If the
 planned predecessor is not yet released or has not passed its audit, capture
 the actual approved predecessor immediately before release and stop if it is
-not a suitable rollback target. The production D1 remains
-`theologai-production-20260715-a`
-(`c6535a4a-1953-4279-b277-7368445fc61a`), rate namespace `361201` at 120/60,
-and CCEL flags `000` unless a separately reviewed release changes one of them.
+not a suitable rollback target. At this document's current baseline, the
+production D1 is `theologai-production-20260723-a`
+(`3f7faa0e-689f-47aa-a601-dc662db9a6cf`), rate namespace `361201` at 120/60,
+and CCEL flags `000`. Re-read `wrangler.toml` and the protected deployment
+record at release time and record their confirmed binding instead if it has
+changed under a separately reviewed release.
 
 A preview deployment necessarily creates a new Worker version. Record that
 version and the reviewed binding current at execution; as of this record the
@@ -186,9 +181,11 @@ Only after preview and the website pass:
 3. Wait for active custom-domain and certificate status.
 4. Run the same fresh-session MCP, CORS, OPTIONS, representative-tool,
    under-budget rate, and isolation checks used for preview.
-5. Confirm production reaches only Worker `theologai`, production D1
-   `theologai-production-20260715-a`, rate namespace `361201`, and CCEL state
-   `000`; confirm preview retains its distinct bindings and state.
+5. Confirm production reaches only Worker `theologai`, the production D1
+   recorded in the release-time known-good baseline (currently
+   `theologai-production-20260723-a` / `3f7faa0e-689f-47aa-a601-dc662db9a6cf`),
+   rate namespace `361201`, and CCEL state `000`; confirm preview retains its
+   distinct bindings and state.
 6. Smoke-test the production `workers.dev` compatibility alias and record exact
    post-migration Worker/Pages versions, DNS/custom-domain state, audit counts,
    and remaining risks.

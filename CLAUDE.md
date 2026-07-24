@@ -1,6 +1,6 @@
 # TheologAI — Development Guide
 
-Production MCP server for theological research. Eleven tools, six prompts, eight Bible translations, six commentaries, 17 historical documents, Greek/Hebrew language tools, and on-chain donation support. Tools, resources, and prompts are available on every transport; MCP Logging is stdio-only because HTTP is stateless.
+Production MCP server for theological research. Eleven tools, six prompts, eight Bible translations, six commentaries, 25 historical documents and works, Greek/Hebrew language tools, and on-chain donation support. Tools, resources, and prompts are available on every transport; MCP Logging is stdio-only because HTTP is stateless.
 
 <!-- theologai-public-contract tools=11 structured=bible_cross_references,bible_lookup,bible_verse_morphology,classic_text_lookup,commentary_lookup,donation_config,original_language_lookup,original_language_study,parallel_passages,primary_source_search,verify_donation -->
 
@@ -59,7 +59,8 @@ data/                     # Source data files
 ├── theologai.db          # SQLite database (built from source data)
 ├── biblical-languages/   # Strong's concordance, STEPBible morphology/lexicons
 ├── cross-references/     # OpenBible.info cross-reference TSV
-└── historical-documents/ # 17 creeds, confessions, catechisms (JSON)
+├── historical-documents/ # 17 legacy creeds, confessions, catechisms (JSON)
+└── historical-source-packs/ # 8 reviewed, sectioned-only source-pack editions
 
 skills/                   # Agent skill workflows
 ├── word-study/           # Greek/Hebrew word study methodology
@@ -91,7 +92,7 @@ test/
 | `bible_cross_references` | OpenBible.info discovery leads with raw vote ranking, unspecified relationship semantics, bounded result windows, and pinned snapshot provenance |
 | `parallel_passages` | Complete UBS source-attested groups by default; explicit legacy curated edges and separate OpenBible.info rows |
 | `commentary_lookup` | 6 commentaries (Matthew Henry, JFB, Clarke, Gill, K-D, Tyndale) |
-| `classic_text_lookup` | Search and browse 17 locally indexed historical documents; no remote CCEL body retrieval |
+| `classic_text_lookup` | Search and browse 25 local historical works; 8 reviewed source-pack editions are sectioned-only; no remote CCEL body retrieval |
 | `primary_source_search` | Run bounded local-only primary-source query plans with exact local section locators |
 | `original_language_lookup` | Strong's concordance plus opt-in exact corrected-corpus usage and bounded occurrence pages |
 | `bible_verse_morphology` | Word-by-word grammatical analysis for all 66 books |
@@ -113,7 +114,7 @@ the legacy response.
 |-----|-------------|
 | `theologai://translations` | Available Bible translations |
 | `theologai://commentaries` | Available commentators with coverage info |
-| `theologai://documents/{slug}` | 17 historical documents (browseable) |
+| `theologai://documents/{slug}` | 25 historical works (17 legacy plus 8 reviewed source-pack editions; browseable) |
 | `theologai://strongs/{number}` | Strong's dictionary entries (G####, H####) |
 
 ### Prompts (Guided Workflows)
@@ -143,9 +144,9 @@ capability.
 - **ESV API** — Requires `ESV_API_KEY` env var, 100k/day limit
 - **NET Bible API** — Free, no auth, includes 60k translator notes
 - **CCEL discovery adapter** (`ccel.org`) — bounded future-provider architecture;
-  preview exposes only its disabled v5 discovery contract, production remains
-  v4/local-only, and neither environment may execute a CCEL request without a
-  separate release gate. The legacy body reader has been retired; see `NOTICE.md`.
+  production uses the v6 local-only contract and preview uses v7 discovery,
+  while neither environment may execute a CCEL request without a separate
+  release gate. The legacy body reader has been retired; see `NOTICE.md`.
 
 ## Conventions
 
@@ -173,41 +174,28 @@ The SQLite database (`data/theologai.db`) is a derived artifact. Cross-reference
 
 ## Release-state boundary
 
-PR #92 merged as `cd3d1c38fdf0f939a33a41d4b6d5044eb7f44562`; its exact
-reviewed head `3a2b5a57b322dce525f27cfa91c9f667d080bca9` is deployed to
-preview only as Cloudflare deployment `04e7a69a-78d2-447b-ac71-e9fb0bef3695`,
-Worker `576517dd-84a8-4b5f-a5ea-ed8f124db63d`, and D1
+The current production baseline is main merge `7974b15` (tree `f77bca4`),
+released by protected workflow `30046749929` as Cloudflare deployment
+`eb2af3bf-8e37-4373-83c3-233255fb477e`, Worker
+`573e6a08-d28f-442b-9206-42f62c1eaf46`, and D1
+`theologai-production-20260723-a`
+(`3f7faa0e-689f-47aa-a601-dc662db9a6cf`). Targeted r3 recorded 36 serialized
+HTTP requests / 31 rate-counted across 7/7 assertion groups; broad r2 recorded
+34 requests / 29 rate-counted across 10/10 groups, with a Sol GO and clean
+60-minute tail. Preview is separate: deployment
+`bf4d7603-5b3b-4c6f-8e09-7bae3fe24eb8`, Worker
+`968975cf-8183-446e-852c-b6a8670d56d5`, and D1
 `theologai-preview-20260722-b`
-(`94c4938b-7800-4d68-9097-0df33c31fdc1`). Exact-head CI attempt 2 run
-`30017722596` and protected preview run `30039858274` passed. The parallel
-audit passed 22/22 cases; the Transform-8 audit recorded 48 rate-counted
-requests, 53 total HTTP records, and 11/11 assertion groups. The
-`deploy-preview` authorization was removed and revocation run `30040550778`
-passed. This is not a production deployment. Production remains the deployed
-PR #72 baseline: Cloudflare deployment `a4697fd1-deda-4dae-a16c-635454218bc8`,
-Worker `762485da-9e02-46a0-9777-e0d8743b9dbf`, and D1
-`theologai-production-20260715-a`
-(`c6535a4a-1953-4279-b277-7368445fc61a`). The production `workers.dev`
+(`94c4938b-7800-4d68-9097-0df33c31fdc1`). The production `workers.dev`
 endpoint redirects ordinary requests to the canonical custom domain; the exact
 abusive-poller tuple is rejected instead, while the preview legacy endpoint
-remains direct. Repository-only U3-T7/PR #83 work remains outside production.
+remains direct.
+Repository-only U3-T7/PR #83 work remains outside production.
 
-The checked-in production-binding candidate names
-`theologai-production-20260723-a`
-(`3f7faa0e-689f-47aa-a601-dc662db9a6cf`). It passed migrations `0001`–`0005`,
-deterministic seeding, strict readiness, and the Transform-8 authority audit,
-but no live production Worker is bound to it. The live production deployment,
-Worker, and old D1 above remain the matched rollback pair; checked-in config is
-not deployment evidence.
+The Transform 9 historical source-pack migration in this branch remains
+local-only and unbound. It does not alter the production D1 binding or promote
+the core-eight source packs to production.
 
-The preview-only D1 has migrations `0004` / transform 7 and `0005` / transform
-8 materialized. Transform 7's UBS adapters remain runtime-inactive: U3-T7's
-in-memory compiler, native-to-normalized coordinate bridge, and content-free
-audit do not register an MCP surface or alter current output. Transform 8 is
-active in preview's historical repositories: the existing `classic_text_lookup`
-has the Baltimore hard cut and canonical/legacy resolution, changing preview
-output without adding a tool. The live production Worker and its bound old D1
-lack both transforms.
-A production D1 release, later UBS runtime activation, Norton transform 9, and
-later edition transforms remain separately owner-gated.
+Transform 9 remains local-only and unbound. A later UBS runtime activation,
+Norton transform 9, and later edition transforms remain separately owner-gated.
 `package.json` is private: npm distribution is unsupported.

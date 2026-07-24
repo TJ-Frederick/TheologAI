@@ -7,25 +7,36 @@ import { buildLocalDocumentResourceUri } from '../kernel/documentResource.js';
 import { LOCAL_PRIMARY_SOURCE_ATTRIBUTION } from '../services/historical/primarySourceTypes.js';
 import { CLASSIC_TEXT_LIMITS } from '../kernel/classicTextContract.js';
 import { HISTORICAL_SECTIONED_ONLY_LANDING_MAX_BYTES } from '../kernel/historicalSectionedDelivery.js';
+import { escapeFrozenEditionSectionContentForMarkdown } from '../kernel/editionProvenanceFoundation.js';
 
 /** Provenance label for documents bundled with the server. No edition is implied. */
 export const LOCAL_HISTORICAL_SOURCE = LOCAL_PRIMARY_SOURCE_ATTRIBUTION;
 
 const localSource = `*Source: ${LOCAL_HISTORICAL_SOURCE}*`;
 
-/**
- * Current local bodies are retained for research continuity, but have not yet
- * passed the per-edition review boundary introduced by the provenance
- * foundation. Keep this disclosure with every exact resource a model may read.
- */
-const editionReadinessDisclosure = [
-  '## Edition and provenance disclosure',
-  '',
-  'This hosted text is available for research, but this contract has not established its exact edition or transcription identity.',
-  '- Provenance review: incomplete.',
-  '- Exact-artifact redistribution rights: not established by this contract.',
-  '- Do not infer edition, transcription source, or republication permission from the historical work alone.',
-].join('\n');
+/** Keep the edition/rights boundary visible on every body-bearing resource. */
+function editionReadinessDisclosure(doc: DocumentInfo): string {
+  const edition = doc.editionProvenance;
+  if (!edition) {
+    return [
+      '## Edition and provenance disclosure',
+      '',
+      'This hosted text is available for research, but this contract has not established its exact edition or transcription identity.',
+      '- Provenance review: incomplete.',
+      '- Exact-artifact redistribution rights: not established by this contract.',
+      '- Do not infer edition, transcription source, or republication permission from the historical work alone.',
+    ].join('\n');
+  }
+  return [
+    '## Edition and provenance disclosure',
+    '',
+    `This section is a reviewed edition-aligned normalized transcription from source pack \`${edition.sourcePackId}\`.`,
+    `- Edition: ${edition.publication} (version ${edition.version}; ${edition.language}).`,
+    `- Provenance review: ${edition.provenance.status.replaceAll('_', ' ')} (reviewed ${edition.provenance.reviewedAt}).`,
+    `- Normalized public-domain text rights: ${edition.normalizedTextRights.status.replaceAll('_', ' ')} (reviewed ${edition.normalizedTextRights.reviewedAt}).`,
+    '- Exact-artifact redistribution: this service does not redistribute scan images or claim scan-artifact rights.',
+  ].join('\n');
+}
 
 /** Canonical exact-section representation shared by resources/read and link sizing. */
 export function formatLocalDocumentSectionResource(doc: DocumentInfo, section: DocumentSection): string {
@@ -52,7 +63,9 @@ export function formatLocalDocumentSectionResourceWithIdentity(
     '',
     heading,
     '',
-    section.content,
+    doc.editionProvenance
+      ? escapeFrozenEditionSectionContentForMarkdown(section.content)
+      : section.content,
     ...(identity ? [
       '',
       '## Canonical section identity',
@@ -65,7 +78,7 @@ export function formatLocalDocumentSectionResourceWithIdentity(
         : []),
     ] : []),
     '',
-    editionReadinessDisclosure,
+    editionReadinessDisclosure(doc),
     '',
     localSource,
   ].filter(Boolean).join('\n');
@@ -84,6 +97,14 @@ export function formatSectionedDocumentLanding(doc: DocumentInfo, profile: Histo
     `This edition delivers one exact section at a time (${profile.sectionCount} sections).`,
     'Use `classic_text_lookup` with `browseSections: true` to request a bounded metadata-only directory page.',
     'The whole-work body and section directory are intentionally not included in this landing resource.',
+    ...(doc.editionProvenance ? [
+      '',
+      '## Edition and provenance disclosure',
+      '',
+      `This work is a reviewed edition-aligned normalized transcription from source pack \`${doc.editionProvenance.sourcePackId}\`.`,
+      `Edition: ${doc.editionProvenance.publication} (version ${doc.editionProvenance.version}; ${doc.editionProvenance.language}).`,
+      'Only normalized public-domain text is delivered; source scan artifacts are not redistributed.',
+    ] : []),
     '',
     localSource,
   ].join('\n');
@@ -148,7 +169,7 @@ export function formatLocalDocumentResource(doc: DocumentInfo, sections: Documen
     lines.push(section.content);
     lines.push('');
   }
-  lines.push(editionReadinessDisclosure);
+  lines.push(editionReadinessDisclosure(doc));
   lines.push('');
   lines.push(localSource);
   return lines.filter(Boolean).join('\n');

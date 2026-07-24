@@ -17,6 +17,11 @@ import { UBS_SEMANTICS_DATABASE_CEILING_BYTES } from './ubs-semantics/capacity.j
 import { verifyHistoricalSectionCompatibilityAttestationFromDisk } from './historical-section-compatibility-compiler.js';
 import { historicalLegacySectionId, readHistoricalSectionSources, sha256Canonical } from './historical-section-key-plan.js';
 import { auditHistoricalTransform8Authority } from './historical-transform8-authority-audit.js';
+import { auditHistoricalTransform9Authority } from './historical-transform9-authority-audit.js';
+import {
+  assertCoreEightSourcePackRelease,
+  loadHistoricalSourcePacks,
+} from './historical-source-packs.js';
 import { HistoricalDocumentRepository } from '../src/adapters/data/HistoricalDocumentRepository.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -47,7 +52,7 @@ if (!existsSync(databasePath)) throw new Error(`Database not found: ${databasePa
 const manifest = parseDataManifest(readFileSync(MANIFEST_PATH));
 verifyD1Migrations(ROOT, manifest);
 const expectedTables = Object.keys(manifest.expectedCounts).sort();
-const expectedIndexes = ['idx_document_sections_id_document', 'idx_historical_section_aliases_target', 'idx_historical_section_identities_browse', 'idx_morph_strongs', 'idx_morph_strongs_canonical', 'idx_morph_verse', 'idx_strongs_book_stats_order', 'idx_strongs_form_stats_rank', 'idx_ubs_groups_source_order', 'idx_ubs_segments_lookup', 'idx_ubs_semantic_identity_candidate', 'idx_ubs_semantic_sense_candidate_order', 'idx_ubs_semantic_sense_domain_order', 'idx_ubs_semantic_coordinate_lookup', 'idx_ubs_semantic_evidence_sense_order', 'idx_xref_from', 'idx_xref_votes'];
+const expectedIndexes = ['idx_document_sections_id_document', 'idx_historical_edition_sections_order', 'idx_historical_editions_pack', 'idx_historical_editions_work', 'idx_historical_section_aliases_target', 'idx_historical_section_identities_browse', 'idx_historical_source_artifacts_edition', 'idx_morph_strongs', 'idx_morph_strongs_canonical', 'idx_morph_verse', 'idx_strongs_book_stats_order', 'idx_strongs_form_stats_rank', 'idx_ubs_groups_source_order', 'idx_ubs_segments_lookup', 'idx_ubs_semantic_identity_candidate', 'idx_ubs_semantic_sense_candidate_order', 'idx_ubs_semantic_sense_domain_order', 'idx_ubs_semantic_coordinate_lookup', 'idx_ubs_semantic_evidence_sense_order', 'idx_xref_from', 'idx_xref_votes'];
 const db = new Database(databasePath, { readonly: true, fileMustExist: true });
 
 function assertHistoricalTransform8Materialization(database: Database.Database): void {
@@ -61,6 +66,8 @@ function assertHistoricalTransform8Materialization(database: Database.Database):
     FROM historical_section_identities identity
     JOIN document_sections section
       ON section.id = identity.document_section_id AND section.document_id = identity.document_id
+    JOIN historical_document_delivery_profiles profile
+      ON profile.document_id = identity.document_id AND profile.delivery_mode = 'complete_document'
     ORDER BY identity.document_id, identity.source_ordinal, identity.section_key`).all() as Array<{
       documentId: string; sectionKey: string; sourceOrdinal: number; documentSectionId: number;
       legacySectionId: string; title: string; content: string; topics: string;
@@ -180,7 +187,8 @@ function assertHistoricalTransform8Materialization(database: Database.Database):
     immutable_corpus_identity AS immutableCorpusIdentity, section_package_identity AS sectionPackageIdentity,
     delivery_mode AS deliveryMode, section_count AS sectionCount, landing_max_bytes AS landingMaxBytes,
     browse_page_size AS browsePageSize, cursor_version AS cursorVersion, provenance_json AS provenanceJson,
-    rights_json AS rightsJson FROM historical_document_delivery_profiles ORDER BY document_id`).all() as Array<{
+    rights_json AS rightsJson FROM historical_document_delivery_profiles
+    WHERE delivery_mode = 'complete_document' ORDER BY document_id`).all() as Array<{
       documentId: string; workId: null; editionId: null; immutableCorpusIdentity: string;
       sectionPackageIdentity: null; deliveryMode: string; sectionCount: number; landingMaxBytes: number;
       browsePageSize: number; cursorVersion: number; provenanceJson: string; rightsJson: string;
@@ -220,6 +228,92 @@ function assertHistoricalTransform8Materialization(database: Database.Database):
     WHERE fts.rowid IS NULL OR fts.title IS NOT section.title OR fts.content IS NOT section.content
       OR fts.topics IS NOT section.topics`).get() as { count: number };
   if (ftsMismatches.count !== 0) throw new Error('Transform 8 changed the historical FTS projection');
+}
+
+/** Verify the Transform-9 reviewed-edition projection without changing the frozen Transform-8 ledger. */
+function assertHistoricalTransform9SourcePackMaterialization(database: Database.Database): void {
+  const packs = loadHistoricalSourcePacks(manifest.materializations.d1.inputs, {
+    read: (path: string) => readFileSync(join(ROOT, path), 'utf8'),
+  } as never);
+  assertCoreEightSourcePackRelease(packs);
+  const packRows = database.prepare(`SELECT pack_id AS packId, revision, schema_version AS schemaVersion,
+    manifest_sha256 AS manifestSha256, source_path AS sourcePath
+    FROM historical_source_packs ORDER BY pack_id`).all() as Array<{
+      packId: string; revision: string; schemaVersion: string; manifestSha256: string; sourcePath: string;
+    }>;
+  if (packRows.length !== 1 || packRows[0]?.packId !== 'theologai-core-eight'
+    || packRows[0].revision !== packs[0]!.revision || packRows[0].sourcePath !== packs[0]!.sourcePath
+    || packRows[0].manifestSha256 !== packs[0]!.manifestSha256
+    || packRows[0].schemaVersion !== packs[0]!.manifestSchemaVersion) {
+    throw new Error('Transform 9 source-pack identity projection drifted');
+  }
+
+  const sourceAliasCount = database.prepare(`SELECT COUNT(*) AS count
+    FROM historical_section_aliases alias
+    JOIN historical_document_delivery_profiles profile ON profile.document_id = alias.document_id
+    WHERE profile.delivery_mode = 'sectioned_only'`).get() as { count: number };
+  if (sourceAliasCount.count !== 0) throw new Error('Transform 9 must not add legacy section aliases');
+
+  const repository = new HistoricalDocumentRepository(database);
+  for (const pack of packs) {
+    const { work, edition, sections } = pack.compiled.package;
+    const profile = database.prepare(`SELECT document_id AS documentId, work_id AS workId, edition_id AS editionId,
+      immutable_corpus_identity AS immutableCorpusIdentity, section_package_identity AS sectionPackageIdentity,
+      delivery_mode AS deliveryMode, section_count AS sectionCount, landing_max_bytes AS landingMaxBytes,
+      browse_page_size AS browsePageSize, cursor_version AS cursorVersion
+      FROM historical_document_delivery_profiles WHERE document_id = ?`).get(work.workId) as {
+        documentId: string; workId: string; editionId: string; immutableCorpusIdentity: string;
+        sectionPackageIdentity: string; deliveryMode: string; sectionCount: number;
+        landingMaxBytes: number; browsePageSize: number; cursorVersion: number;
+      } | undefined;
+    if (!profile || profile.documentId !== work.workId || profile.workId !== work.workId
+      || profile.editionId !== edition.editionId || profile.immutableCorpusIdentity !== pack.compiled.sha256
+      || profile.sectionPackageIdentity !== pack.compiled.sha256 || profile.deliveryMode !== 'sectioned_only'
+      || profile.sectionCount !== sections.length || profile.landingMaxBytes !== 16_384
+      || profile.browsePageSize !== 32 || profile.cursorVersion !== 1) {
+      throw new Error(`Transform 9 sectioned delivery profile drifted for ${work.workId}`);
+    }
+    const rows = database.prepare(`SELECT es.section_key AS sectionKey, es.source_ordinal AS sourceOrdinal,
+      es.display_label AS displayLabel, es.heading, es.content,
+      identity.document_section_id AS documentSectionId, section.section_number AS sectionNumber,
+      section.title AS sectionTitle, section.content AS sectionContent
+      FROM historical_edition_sections es
+      JOIN historical_section_identities identity
+        ON identity.document_id = ? AND identity.section_key = es.section_key
+          AND identity.source_ordinal = es.source_ordinal
+      JOIN document_sections section
+        ON section.id = identity.document_section_id AND section.document_id = identity.document_id
+      WHERE es.edition_id = ? ORDER BY es.source_ordinal, es.section_key`).all(work.workId, edition.editionId) as Array<{
+        sectionKey: string; sourceOrdinal: number; displayLabel: string; heading: string; content: string;
+        documentSectionId: number; sectionNumber: string; sectionTitle: string; sectionContent: string;
+      }>;
+    if (rows.length !== sections.length) throw new Error(`Transform 9 section coverage drifted for ${work.workId}`);
+    for (const [index, expected] of sections.entries()) {
+      const stored = rows[index];
+      if (!stored || stored.sectionKey !== expected.sectionKey || stored.sourceOrdinal !== expected.sourceOrdinal
+        || stored.displayLabel !== expected.displayLabel || stored.heading !== expected.heading
+        || stored.content !== expected.content || stored.sectionNumber !== expected.sectionKey
+        || stored.sectionTitle !== expected.heading || stored.sectionContent !== expected.content) {
+        throw new Error(`Transform 9 normalized/canonical section projection drifted for ${work.workId}#${expected.sectionKey}`);
+      }
+      const resolved = repository.resolveSection(work.workId, expected.sectionKey);
+      if (!resolved || resolved.resolution !== 'canonical' || resolved.sourceOrdinal !== expected.sourceOrdinal
+        || resolved.section.content !== expected.content) {
+        throw new Error(`Transform 9 Node canonical section resolution drifted for ${work.workId}#${expected.sectionKey}`);
+      }
+    }
+    const artifactCount = database.prepare(`SELECT COUNT(*) AS count FROM historical_source_artifacts
+      WHERE edition_id = ?`).get(edition.editionId) as { count: number };
+    if (artifactCount.count !== pack.artifacts.length) {
+      throw new Error(`Transform 9 source-artifact projection drifted for ${work.workId}`);
+    }
+  }
+  const ftsMismatch = database.prepare(`SELECT COUNT(*) AS count
+    FROM historical_edition_sections section
+    LEFT JOIN historical_edition_sections_fts fts
+      ON fts.edition_id = section.edition_id AND fts.section_key = section.section_key
+    WHERE fts.rowid IS NULL OR fts.heading IS NOT section.heading OR fts.content IS NOT section.content`).get() as { count: number };
+  if (ftsMismatch.count !== 0) throw new Error('Transform 9 historical source-pack FTS projection drifted');
 }
 
 try {
@@ -284,7 +378,12 @@ try {
   assertHebrewLemmaCoverageDatabase(db, 'Verified SQLite morphology');
   verifyBiblicalLanguageUnicodeD1(ROOT, db, manifest.expectedCounts);
   assertHistoricalTransform8Materialization(db);
+  assertHistoricalTransform9SourcePackMaterialization(db);
   auditHistoricalTransform8Authority(ROOT, sql => {
+    const rows = db.prepare(sql).all();
+    return { rows, responseBytes: Buffer.byteLength(JSON.stringify(rows), 'utf8') };
+  });
+  auditHistoricalTransform9Authority(ROOT, sql => {
     const rows = db.prepare(sql).all();
     return { rows, responseBytes: Buffer.byteLength(JSON.stringify(rows), 'utf8') };
   });

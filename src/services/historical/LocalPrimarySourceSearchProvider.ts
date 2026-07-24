@@ -2,6 +2,7 @@ import type { DocumentInfo, IHistoricalDocumentRepository } from '../../kernel/r
 import { buildLocalDocumentResourceUri } from '../../kernel/documentResource.js';
 import {
   LOCAL_PRIMARY_SOURCE_ATTRIBUTION,
+  localEditionReadiness,
   type PrimarySourceProviderResult,
   type PrimarySourceResultWindow,
   type PrimarySourceSearchQuery,
@@ -53,6 +54,7 @@ export class LocalPrimarySourceSearchProvider {
       ...(row.document.catalog?.creators.length ? { creators: row.document.catalog.creators } : {}),
       ...(row.document.catalog ? { metadataStatus: row.document.catalog.metadataStatus } : {}),
       ...(row.document.catalog ? { metadataProvenanceIds: row.document.catalog.metadataProvenanceIds } : {}),
+      editionReadiness: localEditionReadiness(row.document.editionProvenance),
       resourceSizeBytes: new TextEncoder().encode(
         formatLocalDocumentSectionResourceWithIdentity(row.document, row.section, {
           sectionKey: row.sectionKey,
@@ -141,6 +143,7 @@ function selectCatalogScope(documents: DocumentInfo[], input: PrimarySourceSearc
     id: document.id,
     title: document.title,
     metadataStatus: document.catalog?.metadataStatus ?? ('unknown' as const),
+    editionReadiness: localEditionReadiness(document.editionProvenance),
   }));
   return {
     documents: candidates,

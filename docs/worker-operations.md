@@ -2,35 +2,31 @@
 
 ## Current split release state (2026-07-23)
 
-Production remains the PR #72 known-good release: protected production run
-`29622634088` and Cloudflare deployment
-`a4697fd1-deda-4dae-a16c-635454218bc8` serve Worker
-`762485da-9e02-46a0-9777-e0d8743b9dbf` with D1
-`theologai-production-20260715-a`
-(`c6535a4a-1953-4279-b277-7368445fc61a`). Its independent audit returned GO
-with no P0-P3 findings across 22 read-only requests and a 22/22
-source-attested regression.
-
-The checked-in production-binding candidate is
+The current production baseline is main merge `7974b15` (tree `f77bca4`),
+released by protected workflow `30046749929` as Cloudflare deployment
+`eb2af3bf-8e37-4373-83c3-233255fb477e`, Worker
+`573e6a08-d28f-442b-9206-42f62c1eaf46`, and D1
 `theologai-production-20260723-a`
-(`3f7faa0e-689f-47aa-a601-dc662db9a6cf`). It passed migrations `0001`–`0005`,
-deterministic seeding, strict readiness, and the Transform-8 authority audit,
-but no live production Worker is bound to it. The live deployment, Worker, and
-old D1 above remain the matched rollback pair; checked-in config is not
-deployment evidence.
+(`3f7faa0e-689f-47aa-a601-dc662db9a6cf`). Its targeted r3 audit recorded 36
+serialized HTTP requests / 31 rate-counted across 7/7 assertion groups; broad
+r2 recorded 34 requests / 29 rate-counted across 10/10 groups. Sol returned GO
+and the 60-minute operational tail was clean.
 
-PR #92 merged as `cd3d1c38fdf0f939a33a41d4b6d5044eb7f44562`; its exact
-reviewed head `3a2b5a57b322dce525f27cfa91c9f667d080bca9` is the separate
-preview-only release. Exact-head CI attempt 2 run `30017722596` and protected
-preview run `30039858274` passed. Cloudflare deployment
-`04e7a69a-78d2-447b-ac71-e9fb0bef3695` serves Worker
-`576517dd-84a8-4b5f-a5ea-ed8f124db63d`, and its only D1 binding is
+The checked-in Transform 9 historical source-pack migration is likewise
+local-only: it expands the local corpus to 25 works with eight reviewed
+sectioned-only editions, but makes no claim about a Cloudflare migration,
+binding, or deployment. Norton and Aquinas source assets remain inactive.
+
+The current preview release is separate: Cloudflare deployment
+`bf4d7603-5b3b-4c6f-8e09-7bae3fe24eb8`, Worker
+`968975cf-8183-446e-852c-b6a8670d56d5`, and preview D1
 `theologai-preview-20260722-b`
-(`94c4938b-7800-4d68-9097-0df33c31fdc1`). The parallel audit passed 22/22
-cases; the Transform-8 audit recorded 48 rate-counted requests, 53 total HTTP
-records, and 11/11 assertion groups. The `deploy-preview` label was removed
-and revocation run `30040550778` passed. This state is not a production
-deployment.
+(`94c4938b-7800-4d68-9097-0df33c31fdc1`). It is not production evidence.
+
+The PR #72 and PR #92 deployment records below are historical rollback and
+audit evidence only. In particular, PR #92's former preview deployment
+`04e7a69a-78d2-447b-ac71-e9fb0bef3695` / Worker
+`576517dd-84a8-4b5f-a5ea-ed8f124db63d` is not the current preview release.
 
 Ordinary requests to the production `theologai.tjfrederick.workers.dev` host
 now return a no-store 308 to `mcp.theologai.xyz`. The exact abusive-poller
@@ -38,25 +34,20 @@ tuple (`CF-Connecting-IP: 18.192.206.183` plus `User-Agent:
 Go-http-client/2.0`) is rejected rather than redirected; supported browser CORS
 preflight remains local. The preview
 `theologai-preview.tjfrederick.workers.dev` host remains a direct compatibility
-endpoint. The deployed primary-source MCP schema is production v4/local-only
-and preview v5/discovery-only; CCEL execution remains disabled in both
-environments. The checked-in v6/v7 schema pair is an unpublished repository
-candidate, not evidence of a deployed Worker or a changed remote contract.
+endpoint. The deployed primary-source MCP schema is production v6/local-only
+and preview v7/CCEL-discovery; CCEL execution remains disabled in both
+environments before adapter, coordinator, or fetch.
 
 The later repository changes through merged PR #83
 (`93d5837b05249c15127ab20107f86443cccf4e1e`) remain outside production.
-U3-T7 adds an inactive in-memory semantic compiler,
-native-to-normalized coordinate bridge, and content-free audit. The exact PR
-#92 preview Worker and D1 above are the sole remote exception: its D1 has
-migrations `0004` / transform 7 and `0005` / transform 8 materialized.
-Transform 7's UBS adapters remain runtime-inactive. Transform 8 is active in
-preview's historical repositories: the existing `classic_text_lookup` has the
-Baltimore hard cut and canonical/legacy resolution, changing preview output
-without adding a tool. The live production Worker and its bound old D1 lack
-both transforms and production runtime activation remains unchanged. The
-unpublished candidate also advances the local primary-source schema pair to
-production v6/local-only and preview v7/discovery-only. No deletion, route
-replacement, or other destructive cleanup is authorized by this record.
+U3-T7 adds an inactive in-memory semantic compiler, native-to-normalized
+coordinate bridge, and content-free audit. The former PR #92 preview Worker
+and D1 are historical release evidence, superseded by the current preview
+release above. Transform 9 remains local-only and unbound, while production UBS
+runtime activation remains unchanged. The deployed primary-source schema pair
+is production v6/local-only and preview v7/CCEL-discovery, with CCEL execution
+disabled. No deletion, route replacement, or other destructive cleanup is
+authorized by this record.
 
 Any eventual UBS semantic production release must separately authorize a
 production D1 migration/binding/deployment sequence. The preview data layer is
@@ -515,6 +506,13 @@ After environment approval and before deployment, each job runs a read-only D1
 readiness query that checks integrity, exact manifest row counts, and required
 indexes, column signatures, foreign keys, and schema/corpus identity markers. A
 missing, stale, partial, or incompatible corpus stops deployment.
+
+When Transform 9 is part of an approved future release, the same gate also runs
+its bounded source-pack authority audit: direct eight-row normalized-section
+pages plus compact identity/document/edition-FTS/runtime-FTS parity pages. The
+audit is read-only and catches an orphan or extra normalized section that a
+delivery-profile join alone would miss. This branch remains local-only; this
+paragraph is release-gate documentation, not deployment evidence.
 
 The corpus marker is the scoped D1 materialization identity derived from
 `data/data-manifest.json` `materializations.d1`, not the hash of the complete
