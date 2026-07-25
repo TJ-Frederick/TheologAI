@@ -573,7 +573,7 @@ function assertLegacyRegression(raw: RawToolResult, fixture: AuditFixture): Obje
   return { workId: fixture.legacyRegression.workId, deliveryMode: fixture.legacyRegression.deliveryMode, preserved: true };
 }
 
-function assertCcelDisabled(raw: RawToolResult): ObjectRecord {
+function assertCcelDisabled(raw: RawToolResult, profile: HistoricalCoreAuditProfile): ObjectRecord {
   assert(raw.isError === true && raw.structuredContent !== undefined, 'CCEL disabled regression must be an errored structured response');
   const output = raw.structuredContent; const queries = array(output.queries, 'CCEL queries').map(object);
   const providers = array(queries[0]?.providers, 'CCEL providers').map(object);
@@ -581,7 +581,7 @@ function assertCcelDisabled(raw: RawToolResult): ObjectRecord {
   assert(output.schemaVersion === '7' && output.kind === 'primary_source_search' && output.planStatus === 'unavailable'
     && queries.length === 1 && providers.length === 1 && provider?.provider === 'ccel_live'
     && provider.status === 'disabled' && provider.searched === false && provider.hitCount === 0 && Array.isArray(provider.hits) && provider.hits.length === 0
-    && coverage?.localAttempted === false && coverage.ccelAttempted === false && coverage.ccelStatus === 'disabled' && coverage.ccelHitCount === 0, 'preview CCEL-disabled/local-only execution invariant drifted');
+    && coverage?.localAttempted === false && coverage.ccelAttempted === false && coverage.ccelStatus === 'disabled' && coverage.ccelHitCount === 0, `${profile.label} CCEL-disabled/local-only execution invariant drifted`);
   return { provider: 'ccel_live', status: 'disabled', searched: false, hitCount: 0 };
 }
 
@@ -693,7 +693,7 @@ export async function runHistoricalCoreAudit(
   }
   assert(observedCoreSectionCount === fixture.baseline.expectedCatalogIdentity.coreSectionCount, 'reviewed core section-count identity drifted');
   const legacy = assertLegacyRegression(await client.callTool('classic_text_lookup', { work: fixture.legacyRegression.workId }), fixture);
-  const ccel = assertCcelDisabled(await client.callTool('primary_source_search', { queries: [{ id: 'ccel-disabled', text: 'Lord Supper', providers: ['ccel'], match: 'all_terms', selection: 'relevance', limit: 1 }] }));
+  const ccel = assertCcelDisabled(await client.callTool('primary_source_search', { queries: [{ id: 'ccel-disabled', text: 'Lord Supper', providers: ['ccel'], match: 'all_terms', selection: 'relevance', limit: 1 }] }), profile);
   const invalidResourceUri = 'theologai://documents/does-not-exist#section-not-real';
   assertResourceNotFound(await client.readResource(invalidResourceUri), invalidResourceUri);
   const invalidCursor = 'not-a-valid-cursor';

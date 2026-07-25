@@ -55,8 +55,9 @@ describe('production release guards', () => {
     expect(workflow).not.toContain('d1 delete');
   });
 
-  it('retains a non-strict final routing observation after every attempted deploy, including failed secret or deploy actions', async () => {
+  it('retains a non-strict final routing observation after every attempted deploy, while requiring it for a successful release', async () => {
     const workflow = await readFile(new URL('.github/workflows/deploy.yml', root), 'utf8');
+    const historicalAuditScript = await readFile(new URL('../../../scripts/audit-historical-core-preview.ts', import.meta.url), 'utf8');
     const finalObservation = workflow.indexOf('Capture final production routing/binding observation (read-only)');
     const finalArtifact = workflow.indexOf('Upload final production routing/binding observation');
     const protectedEvidence = workflow.indexOf('Upload protected production audit evidence');
@@ -66,11 +67,18 @@ describe('production release guards', () => {
     expect(finalObservation).toBeGreaterThan(workflow.indexOf('Deploy to Cloudflare Workers'));
     expect(observationBlock).toContain("steps.production-worker-deploy.outcome != 'skipped'");
     expect(observationBlock).toContain("steps.production-predecessor.outcome == 'success'");
-    expect(observationBlock).toContain('continue-on-error: true');
+    expect(observationBlock).not.toContain('continue-on-error');
     expect(observationBlock).toContain('observe-post-mutation');
     expect(observationBlock).not.toContain('reconcile-post-mutation');
     expect(finalArtifactBlock).toContain("steps.production-worker-deploy.outcome != 'skipped'");
     expect(finalArtifactBlock).toContain('if-no-files-found: warn');
+
+    // A failed deploy never becomes green because its action failed. A deploy
+    // that otherwise passed its strict gates is also terminal if final
+    // routing/binding evidence could not be captured or hashed.
+    expect(workflow).toContain("id: production-audit-evidence\n        if: ${{ steps.production-worker-deploy.outcome == 'success' && steps.production-worker-candidate-cutover.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' && steps.production-historical-core-audit.outcome == 'success' && steps.production-worker-audit-identity.outcome == 'success' && steps.production-final-observation.outcome == 'success' }}");
+    expect(historicalAuditScript).toContain('${profile.label} CCEL-disabled/local-only execution invariant drifted');
+    expect(historicalAuditScript).not.toContain('preview CCEL-disabled/local-only execution invariant drifted');
 
     // Strict cutover, fixed audits, audit-stability proof, and protected
     // evidence remain unavailable unless the deploy action itself succeeded.

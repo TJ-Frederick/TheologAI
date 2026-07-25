@@ -336,14 +336,14 @@ jobs:
             --output "$RUNNER_TEMP/production-worker-deployment-identity.json" \
             --github-output "$GITHUB_OUTPUT"
 
-      # This is deliberately non-strict and best-effort: it must run after an
-      # attempted deploy even if a secret pre-command or deploy failed. It
-      # records current routing/binding state for diagnosis but cannot recover,
-      # roll back, bind, or make a failed cutover appear valid.
+      # This non-strict observation must run after an attempted deploy even if
+      # a secret pre-command or deploy failed. It records current
+      # routing/binding state for diagnosis but cannot recover, roll back,
+      # bind, or make a failed cutover appear valid. On an otherwise successful
+      # release, a failed observation is terminal rather than fail-open.
       - name: Capture final production routing/binding observation (read-only)
         id: production-final-observation
         if: ${{ always() && steps.production-predecessor.outcome == 'success' && steps.production-worker-deploy.outcome != 'skipped' }}
-        continue-on-error: true
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
