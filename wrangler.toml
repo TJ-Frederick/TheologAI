@@ -109,8 +109,8 @@ script_name = "theologai-ccel-coordinator"
 
 [[env.preview.d1_databases]]
 binding = "THEOLOGAI_DB"
-database_name = "theologai-preview-20260722-b"
-database_id = "94c4938b-7800-4d68-9097-0df33c31fdc1"
+database_name = "theologai-preview-20260724-a"
+database_id = "414dbda0-ba5b-4ac0-826b-0402d2ed825b"
 migrations_dir = "migrations"
 
 # Preview uses a distinct namespace so load tests and PR validation cannot

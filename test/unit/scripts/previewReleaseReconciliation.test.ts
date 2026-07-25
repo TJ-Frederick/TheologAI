@@ -14,8 +14,8 @@ const candidateVersion = '223e4567-e89b-42d3-a456-426614174000';
 const predecessorDeployment = '323e4567-e89b-42d3-a456-426614174000';
 const candidateDeployment = '423e4567-e89b-42d3-a456-426614174000';
 const predecessorD1Id = '94c4938b-7800-4d68-9097-0df33c31fdc1';
-const candidateD1Id = 'a4c4938b-7800-4d68-9097-0df33c31fdc1';
-const candidateD1Name = 'theologai-preview-pr95-candidate';
+const candidateD1Id = '414dbda0-ba5b-4ac0-826b-0402d2ed825b';
+const candidateD1Name = 'theologai-preview-20260724-a';
 
 function deployments(id = predecessorDeployment, version = predecessorVersion): string {
   return JSON.stringify([{
@@ -37,15 +37,15 @@ function inventory(id = candidateD1Id, name = candidateD1Name): string {
   return JSON.stringify([{ uuid: id, name }]);
 }
 
-function candidateConfig(config: string): string {
+function predecessorConfig(config: string): string {
   return config
-    .replace('database_name = "theologai-preview-20260722-b"', `database_name = "${candidateD1Name}"`)
-    .replace('database_id = "94c4938b-7800-4d68-9097-0df33c31fdc1"', `database_id = "${candidateD1Id}"`);
+    .replace(`database_name = "${candidateD1Name}"`, 'database_name = "theologai-preview-20260722-b"')
+    .replace(`database_id = "${candidateD1Id}"`, `database_id = "${predecessorD1Id}"`);
 }
 
 describe('preview release reconciliation evidence', () => {
   it('captures distinct observed predecessor and readiness-tested candidate D1 identities', async () => {
-    const config = candidateConfig(await readFile(new URL('wrangler.toml', root), 'utf8'));
+    const config = await readFile(new URL('wrangler.toml', root), 'utf8');
     const anchor = capturePreviewPredecessorAnchor({
       deploymentsText: deployments(), predecessorVersionViewText: versionView(), wranglerConfigText: config, d1InventoryText: inventory(),
     });
@@ -66,7 +66,7 @@ describe('preview release reconciliation evidence', () => {
   });
 
   it('records only a sole active candidate-bound cutover without attempting rollback or cleanup', async () => {
-    const config = candidateConfig(await readFile(new URL('wrangler.toml', root), 'utf8'));
+    const config = await readFile(new URL('wrangler.toml', root), 'utf8');
     const anchor = capturePreviewPredecessorAnchor({
       deploymentsText: deployments(), predecessorVersionViewText: versionView(), wranglerConfigText: config, d1InventoryText: inventory(),
     });
@@ -97,7 +97,7 @@ describe('preview release reconciliation evidence', () => {
 
   it('fails closed for malformed, swapped, or missing D1 identities while allowing a same-D1 release', async () => {
     const originalConfig = await readFile(new URL('wrangler.toml', root), 'utf8');
-    const config = candidateConfig(originalConfig);
+    const config = originalConfig;
     expect(() => capturePreviewPredecessorAnchor({
       deploymentsText: JSON.stringify([{ id: predecessorDeployment, created_on: '2026-07-23T12:00:00.000Z', versions: [{ version_id: predecessorVersion, percentage: 99 }] }]),
       predecessorVersionViewText: versionView(), wranglerConfigText: config, d1InventoryText: inventory(),
@@ -127,14 +127,14 @@ describe('preview release reconciliation evidence', () => {
       wranglerConfigText: config, d1InventoryText: inventory(candidateD1Id, 'swapped-preview-name'),
     })).toThrow('does not match the read-only inventory ID/name mapping');
     const sameD1Anchor = capturePreviewPredecessorAnchor({
-      deploymentsText: deployments(), predecessorVersionViewText: versionView(), wranglerConfigText: originalConfig,
+      deploymentsText: deployments(), predecessorVersionViewText: versionView(), wranglerConfigText: predecessorConfig(originalConfig),
       d1InventoryText: inventory(predecessorD1Id, 'theologai-preview-20260722-b'),
     });
     expect(sameD1Anchor.d1Changed).toBe(false);
   });
 
   it('allows a same-D1 code-only deployment when the post-deploy binding still equals its candidate', async () => {
-    const config = await readFile(new URL('wrangler.toml', root), 'utf8');
+    const config = predecessorConfig(await readFile(new URL('wrangler.toml', root), 'utf8'));
     const anchor = capturePreviewPredecessorAnchor({
       deploymentsText: deployments(), predecessorVersionViewText: versionView(), wranglerConfigText: config,
       d1InventoryText: inventory(predecessorD1Id, 'theologai-preview-20260722-b'),
@@ -152,7 +152,7 @@ describe('preview release reconciliation evidence', () => {
   });
 
   it('fails closed for a malformed anchor, candidate drift, or retained-old-D1 drift while retaining a verdict', async () => {
-    const config = candidateConfig(await readFile(new URL('wrangler.toml', root), 'utf8'));
+    const config = await readFile(new URL('wrangler.toml', root), 'utf8');
     const anchor = capturePreviewPredecessorAnchor({
       deploymentsText: deployments(), predecessorVersionViewText: versionView(), wranglerConfigText: config, d1InventoryText: inventory(),
     });

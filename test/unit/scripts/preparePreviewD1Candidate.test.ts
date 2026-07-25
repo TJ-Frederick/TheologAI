@@ -22,10 +22,10 @@ import {
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const candidate: PreviewD1CandidatePreparationOptions = {
   remote: true,
-  candidateD1Name: 'theologai-preview-20260724-a',
-  candidateD1Id: 'b6b24df3-f809-421f-b706-1d4a22e42141',
-  confirmedCandidateD1Name: 'theologai-preview-20260724-a',
-  confirmedCandidateD1Id: 'b6b24df3-f809-421f-b706-1d4a22e42141',
+  candidateD1Name: 'theologai-preview-20260725-a',
+  candidateD1Id: '514dbda0-ba5b-4ac0-826b-0402d2ed825b',
+  confirmedCandidateD1Name: 'theologai-preview-20260725-a',
+  confirmedCandidateD1Id: '514dbda0-ba5b-4ac0-826b-0402d2ed825b',
 };
 
 const PRISTINE_RESULT = JSON.stringify([{ success: true, results: [] }]);
