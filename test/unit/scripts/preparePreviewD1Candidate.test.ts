@@ -30,6 +30,10 @@ const candidate: PreviewD1CandidatePreparationOptions = {
 
 const PRISTINE_RESULT = JSON.stringify([{ success: true, results: [] }]);
 
+function preflightResult(results: unknown[]): string {
+  return JSON.stringify([{ success: true, results }]);
+}
+
 function commandResult(args: readonly string[], d1Inventory = inventory()): string {
   if (args[0] === 'd1' && args[1] === 'list') return d1Inventory;
   if (args.includes('--command')) return PRISTINE_RESULT;
@@ -119,14 +123,32 @@ describe('preview D1 candidate preparation', () => {
       .toThrow('invalid name or UUID');
   });
 
-  it('accepts exactly one successful empty schema result and rejects non-pristine or malformed responses', () => {
+  it('accepts only zero rows or the exact one-row Cloudflare _cf_KV allowance', () => {
     expect(() => parsePristineD1PreflightResult(PRISTINE_RESULT)).not.toThrow();
-    expect(() => parsePristineD1PreflightResult(JSON.stringify([
-      { success: true, results: [{ object_type: 'table', object_name: 'documents', migration_state: 0 }] },
-    ]))).toThrow('not pristine');
-    expect(() => parsePristineD1PreflightResult(JSON.stringify([
-      { success: true, results: [{ object_type: 'table', object_name: 'd1_migrations', migration_state: 1 }] },
-    ]))).toThrow('migration state detected');
+    expect(() => parsePristineD1PreflightResult(preflightResult([
+      { object_type: 'table', object_name: '_cf_KV', migration_state: 0 },
+    ]))).not.toThrow();
+  });
+
+  it('rejects every _cf_KV variant, duplicate, extra row, migration row, and malformed preflight envelope', () => {
+    for (const results of [
+      [{ object_type: 'table', object_name: 'documents', migration_state: 0 }],
+      [{ object_type: 'table', object_name: '_cf_kv', migration_state: 0 }],
+      [{ object_type: 'table', object_name: '_CF_KV', migration_state: 0 }],
+      [{ object_type: 'view', object_name: '_cf_KV', migration_state: 0 }],
+      [{ object_type: 'table', object_name: '_cf_KV', migration_state: 1 }],
+      [{ object_type: 'table', object_name: 'd1_migrations', migration_state: 1 }],
+      [
+        { object_type: 'table', object_name: '_cf_KV', migration_state: 0 },
+        { object_type: 'table', object_name: '_cf_KV', migration_state: 0 },
+      ],
+      [
+        { object_type: 'table', object_name: '_cf_KV', migration_state: 0 },
+        { object_type: 'table', object_name: 'documents', migration_state: 0 },
+      ],
+    ]) {
+      expect(() => parsePristineD1PreflightResult(preflightResult(results))).toThrow('not pristine');
+    }
     expect(() => parsePristineD1PreflightResult(JSON.stringify([{ success: false, results: [] }]))).toThrow('did not succeed');
   });
 
@@ -241,6 +263,51 @@ describe('preview D1 candidate preparation', () => {
       expect(calls.some(call => call.includes('migrations'))).toBe(false);
       expect(state.cleaned).toBe(true);
     }
+  });
+
+  it('permits exactly one _cf_KV preflight row and still uses the generated binding for migration', () => {
+    const { config, state } = temporaryConfig();
+    const calls: string[][] = [];
+    preparePreviewD1Candidate(candidate, {
+      root: ROOT,
+      loadManifest: () => manifest(),
+      createTemporaryConfig: () => config,
+      execute: args => {
+        calls.push(args);
+        if (args[1] === 'list') return inventory();
+        if (args.includes('--command')) return preflightResult([
+          { object_type: 'table', object_name: '_cf_KV', migration_state: 0 },
+        ]);
+        return '';
+      },
+      runReadiness: () => {},
+    });
+    expect(calls[2]).toEqual([
+      'd1', 'migrations', 'apply', 'THEOLOGAI_DB', '--remote', '--env', 'preview', '--config', config.path,
+    ]);
+    expect(state.cleaned).toBe(true);
+  });
+
+  it('rejects _cf_KV plus any extra preflight row before migration', () => {
+    const { config, state } = temporaryConfig();
+    const calls: string[][] = [];
+    expect(() => preparePreviewD1Candidate(candidate, {
+      root: ROOT,
+      loadManifest: () => manifest(),
+      createTemporaryConfig: () => config,
+      execute: args => {
+        calls.push(args);
+        if (args[1] === 'list') return inventory();
+        if (args.includes('--command')) return preflightResult([
+          { object_type: 'table', object_name: '_cf_KV', migration_state: 0 },
+          { object_type: 'table', object_name: 'documents', migration_state: 0 },
+        ]);
+        throw new Error('a migration command must not be issued');
+      },
+    })).toThrow(/pristine target preflight[\s\S]*not pristine/);
+    expect(calls).toHaveLength(2);
+    expect(calls.some(call => call.includes('migrations'))).toBe(false);
+    expect(state.cleaned).toBe(true);
   });
 
   it('cleans a created temporary config after its initial integrity assertion fails', () => {

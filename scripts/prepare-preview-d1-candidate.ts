@@ -364,15 +364,26 @@ export function parsePristineD1PreflightResult(resultText: string): void {
       migrationState: row.migration_state,
     };
   });
-  if (objects.length > 0) {
-    const names = objects.map(object => `${object.objectType}:${object.objectName}`).join(', ');
-    const migrationNames = objects.filter(object => object.migrationState === 1)
-      .map(object => object.objectName);
-    throw new Error(
-      `Candidate D1 is not pristine; found non-internal sqlite_schema object(s): ${names}` +
-      (migrationNames.length > 0 ? `; migration state detected: ${migrationNames.join(', ')}` : ''),
-    );
-  }
+  if (objects.length === 0) return;
+
+  // Cloudflare can create this one empty D1 housekeeping table before the
+  // first user migration. It is the sole allowance: exact spelling/case,
+  // table type, one occurrence, and explicitly no migration state. Keep the
+  // SQL broad so a future platform or schema change is rejected here instead
+  // of silently becoming another implicit exception.
+  const onlyCloudflareHousekeepingTable = objects.length === 1
+    && objects[0]!.objectType === 'table'
+    && objects[0]!.objectName === '_cf_KV'
+    && objects[0]!.migrationState === 0;
+  if (onlyCloudflareHousekeepingTable) return;
+
+  const names = objects.map(object => `${object.objectType}:${object.objectName}`).join(', ');
+  const migrationNames = objects.filter(object => object.migrationState === 1)
+    .map(object => object.objectName);
+  throw new Error(
+    `Candidate D1 is not pristine; found non-internal sqlite_schema object(s): ${names}` +
+    (migrationNames.length > 0 ? `; migration state detected: ${migrationNames.join(', ')}` : ''),
+  );
 }
 
 /** One read-only remote preflight, resolved only through the generated binding. */

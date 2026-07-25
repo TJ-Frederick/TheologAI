@@ -206,14 +206,17 @@ repeated byte-for-byte. Before any mutating target SQL it validates the
 reviewed seed manifest and a fresh inventory in which that name/UUID pair occurs
 exactly once, rejects the D1 currently in the checked-in preview binding, then
 issues one read-only `sqlite_schema` preflight through the generated binding.
-“Pristine” is deliberately conservative: there may be no non-`sqlite_*` schema
-object at all, so any table, migration ledger, index, trigger, view, FTS shadow
-table, or other leftover object causes refusal before migrations. It then
-creates an owner-only temporary config whose only D1 binding is `THEOLOGAI_DB`
-to the resolved candidate; its Worker entrypoint intentionally does not exist
-and it declares neither routes nor Workers.dev exposure. Migration application,
-every manifest-listed seed file, and all readiness/authority queries address
-that binding through the same config. The checked-in `wrangler.toml` remains
+“Pristine” is deliberately conservative: the result must be either no
+non-`sqlite_*` schema objects or exactly one table named `_cf_KV` with no
+migration state. The latter is Cloudflare's empty-D1 housekeeping table; it is
+the only exception, with exact spelling, case, type, and cardinality. Any other
+table, migration ledger, index, trigger, view, FTS shadow table, duplicate, or
+extra object causes refusal before migrations. It then creates an owner-only
+temporary config whose only D1 binding is `THEOLOGAI_DB` to the resolved
+candidate; its Worker entrypoint intentionally does not exist and it declares
+neither routes nor Workers.dev exposure. Migration application, every
+manifest-listed seed file, and all readiness/authority queries address that
+binding through the same config. The checked-in `wrangler.toml` remains
 unchanged.
 
 The old `d1:seed:apply-preview` script is now an internal helper rather than an
