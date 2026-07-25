@@ -600,7 +600,7 @@ function trackedDerivedArtifact(
   const trackedPath = asString(value.trackedPath, `SOURCE ${id} trackedPath`);
   const bytes = value.bytes;
   const sha = asString(value.sha256, `SOURCE ${id} sha256`);
-  if (!Number.isSafeInteger(bytes) || bytes < 1 || !/^[0-9a-f]{64}$/.test(sha)) {
+  if (typeof bytes !== 'number' || !Number.isSafeInteger(bytes) || bytes < 1 || !/^[0-9a-f]{64}$/.test(sha)) {
     throw new Error(`SOURCE ${id} byte pin is malformed`);
   }
   return { id, trackedPath, bytes, sha256: sha };

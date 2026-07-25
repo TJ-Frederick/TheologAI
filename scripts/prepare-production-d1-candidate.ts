@@ -37,6 +37,9 @@ import { ensureWranglerLogDirectory, formatWranglerCommandFailure } from './wran
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CANDIDATE_BINDING = 'THEOLOGAI_DB';
 const WRANGLER_MAX_BUFFER = 16 * 1024 * 1024;
+const MAX_CANDIDATE_AGE_MS = 36 * 60 * 60 * 1000;
+const MAX_FUTURE_CREATION_SKEW_MS = 5 * 60 * 1000;
+const UTC_DAY_MS = 24 * 60 * 60 * 1000;
 
 export interface ProductionD1CandidatePreparationOptions {
   remote: true;
@@ -53,6 +56,8 @@ export interface ProductionD1CandidatePreparationDependencies {
   execute?: CandidatePreparationExecutor;
   createTemporaryConfig?: (input: { root: string; candidateD1Name: string; candidateD1Id: string }) => TemporaryCandidateConfig;
   runReadiness?: (input: { database: typeof CANDIDATE_BINDING; configPath: string; root: string }) => void;
+  /** Injectable only for deterministic freshness tests; production uses wall time. */
+  now?: () => Date;
 }
 
 function isCanonicalUuid(value: string): boolean {
@@ -60,13 +65,71 @@ function isCanonicalUuid(value: string): boolean {
 }
 
 function assertCandidateD1Name(value: string, flag: string): void {
-  if (!/^theologai-production-[0-9]{8}-[a-z0-9][a-z0-9-]{0,31}$/.test(value)) {
+  const match = /^theologai-production-([0-9]{4})([0-9]{2})([0-9]{2})-[a-z0-9][a-z0-9-]{0,31}$/.exec(value);
+  if (!match) {
     throw new Error(`${flag} must be a literal, lowercase theologai-production-YYYYMMDD-suffix candidate name`);
+  }
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const timestamp = Date.UTC(year, month - 1, day);
+  const parsed = new Date(timestamp);
+  if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) {
+    throw new Error(`${flag} must contain a real Gregorian YYYYMMDD calendar date`);
   }
 }
 
 function assertCandidateD1Id(value: string, flag: string): void {
   if (!isCanonicalUuid(value)) throw new Error(`${flag} must be a canonical lowercase D1 UUID`);
+}
+
+function candidateNameUtcDay(value: string): number {
+  const match = /^theologai-production-([0-9]{4})([0-9]{2})([0-9]{2})-/.exec(value);
+  if (!match) throw new Error('Production candidate name lost its validated calendar date');
+  return Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+}
+
+/**
+ * D1 list returns `created_at` as an ISO-8601 timestamp. The candidate label
+ * permits one UTC-day of difference so creation near a local midnight remains
+ * valid in every time zone, while the 36-hour age ceiling prevents a stale
+ * pre-existing database from being selected by an otherwise exact name/UUID.
+ */
+function assertFreshCandidateInventory(
+  inventoryText: string,
+  options: Pick<ProductionD1CandidatePreparationOptions, 'candidateD1Name' | 'candidateD1Id'>,
+  now: Date,
+): CandidateD1InventoryEntry {
+  if (!Number.isFinite(now.getTime())) throw new Error('Production candidate freshness clock is invalid');
+  const resolved = parseUniqueD1Inventory(inventoryText, options);
+  let parsed: unknown;
+  try { parsed = JSON.parse(inventoryText) as unknown; }
+  catch { throw new Error('D1 inventory is not valid JSON'); }
+  if (!Array.isArray(parsed)) throw new Error('D1 inventory must be an array');
+  const matches = parsed.filter(value => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+    const record = value as Record<string, unknown>;
+    return record.name === options.candidateD1Name && record.uuid === options.candidateD1Id;
+  });
+  if (matches.length !== 1) throw new Error('Candidate D1 name/UUID pair does not resolve to exactly one inventory entry');
+  const createdAt = (matches[0] as Record<string, unknown>).created_at;
+  if (typeof createdAt !== 'string' || !Number.isFinite(Date.parse(createdAt))) {
+    throw new Error('Exact production candidate D1 inventory entry must include a valid created_at timestamp');
+  }
+  const createdMs = Date.parse(createdAt);
+  const ageMs = now.getTime() - createdMs;
+  if (ageMs < -MAX_FUTURE_CREATION_SKEW_MS) {
+    throw new Error('Exact production candidate D1 inventory entry has a created_at timestamp too far in the future');
+  }
+  if (ageMs > MAX_CANDIDATE_AGE_MS) {
+    throw new Error('Exact production candidate D1 inventory entry is older than the 36-hour fresh-candidate window');
+  }
+  const created = new Date(createdMs);
+  const createdUtcDay = Date.UTC(created.getUTCFullYear(), created.getUTCMonth(), created.getUTCDate());
+  if (Math.abs(candidateNameUtcDay(options.candidateD1Name) - createdUtcDay) > UTC_DAY_MS) {
+    throw new Error('Exact production candidate D1 name date is not within one UTC day of the authoritative created_at timestamp');
+  }
+  return resolved;
 }
 
 /** Reject every convenience option before the read-only D1 inventory call. */
@@ -200,7 +263,7 @@ function createPinnedWranglerExecutor(root: string): CandidatePreparationExecuto
   });
 }
 
-function partialTargetFailure(stage: 'migration' | 'seed', detail: string, error: unknown): Error {
+function partialTargetFailure(stage: 'migration' | 'seed' | 'readiness', detail: string, error: unknown): Error {
   return new Error(
     `Production D1 candidate preparation stopped after target SQL may have begun during ${stage}${detail}. ` +
     'Do not retry, resume, repair, bind, deploy, or reuse this partial target; abandon it, create a new empty production D1 candidate, and restart from the empty-target guard.\n' +
@@ -257,7 +320,11 @@ export function prepareProductionD1Candidate(
   let inventory: CandidateD1InventoryEntry;
   try {
     const result = execute(['d1', 'list', '--json']);
-    inventory = parseUniqueD1Inventory(Buffer.isBuffer(result) ? result.toString('utf8') : result, options);
+    inventory = assertFreshCandidateInventory(
+      Buffer.isBuffer(result) ? result.toString('utf8') : result,
+      options,
+      (dependencies.now ?? (() => new Date()))(),
+    );
   } catch (error) {
     throw new Error(`Production D1 candidate preparation refused before target SQL may begin:\n${formatWranglerCommandFailure(error)}`);
   }
@@ -299,7 +366,7 @@ export function prepareProductionD1Candidate(
       wrangler: join(input.root, 'node_modules', 'wrangler', 'bin', 'wrangler.js'),
     }));
     try { runReadiness({ database: CANDIDATE_BINDING, configPath: candidateConfig.path, root }); }
-    catch (error) { throw partialTargetFailure('readiness and Transform-8/9 authority audit', '', error); }
+    catch (error) { throw partialTargetFailure('readiness', ' and Transform-8/9 authority audit', error); }
   } catch (error) {
     primaryFailure = error;
   }

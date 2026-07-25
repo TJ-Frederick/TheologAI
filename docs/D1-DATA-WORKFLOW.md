@@ -261,11 +261,12 @@ operations.
 
 `npm run d1:production:candidate:prepare` is the production-only preparation
 path. It requires a literal `--remote`, a fresh
-`theologai-production-YYYYMMDD-suffix` name, the exact canonical UUID, and
-both repeated confirmations. It resolves that exact pair through `d1 list`,
-rejects the active checked-in production binding, creates a temporary
-no-deploy configuration, and verifies the checked-in migration/source/seed
-identity before any remote command.
+`theologai-production-YYYYMMDD-suffix` name with a real calendar date, the
+exact canonical UUID, and both repeated confirmations. It resolves that exact
+pair through `d1 list`, requires its authoritative `created_at` timestamp to
+be within the bounded fresh-candidate window, rejects the active checked-in
+production binding, creates a temporary no-deploy configuration, and verifies
+the checked-in migration/source/seed identity before any target SQL command.
 
 Run it from a checked-out revision whose root production binding still names
 the active predecessor; it deliberately refuses a candidate that is already
@@ -281,13 +282,16 @@ candidate: do not retry, resume, repair, bind, deploy, or reuse it. Create a
 new candidate under a separately authorized operation instead.
 
 This preparer does not change `wrangler.toml`, a Worker binding, deployment,
-database inventory, or a remote corpus. Until a later authorized cutover, the
-checked-out 25-work Transform-9 materialization remains local-only and both
-remote environments remain on their deployed 17-work Transform-8 collections.
-The protected production workflow later re-resolves the checked-in candidate
-name/UUID, reruns readiness by exact name, records the predecessor Worker/D1
-identity, and refuses to start either black-box audit unless the sole active
-deployed Worker is bound to that readiness-tested candidate.
+or database inventory. It does mutate only the separately named, unbound
+production candidate corpus: migrations and deterministic seed files are
+applied there after the pristine-target guard passes. It never mutates the
+active/bound production corpus. The deployed preview corpus is the reviewed
+25-work Transform-9 collection; production remains on its 17-work Transform-8
+collection until a separately authorized production cutover. The protected
+production workflow later re-resolves the checked-in candidate name/UUID,
+reruns readiness by exact name, records the predecessor Worker/D1 identity,
+and refuses to start either black-box audit unless the sole active deployed
+Worker is bound to that readiness-tested candidate.
 
 Approved deploy jobs perform the last compatibility check read-only against
 the candidate name resolved from the checked-in name/UUID pair:

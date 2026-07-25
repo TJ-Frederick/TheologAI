@@ -37,6 +37,8 @@ export interface ExactPinnedBytes {
   readonly sha256: string;
 }
 
+type PinnedByteIdentity = Pick<ExactPinnedBytes, 'id' | 'gitBlobSha1' | 'bytes' | 'sha256'>;
+
 export const USFMTC_REFERENCE_ARTIFACTS = Object.freeze([
   {
     id: 'usfmtc-reference-py', repositoryPath: USFMTC_REFERENCE_PATH,
@@ -460,7 +462,7 @@ export function attestExactUbsTahotCoordinatePair(
   };
 }
 
-export function assertPinnedBytes(pin: ExactPinnedBytes, bytes: Uint8Array): void {
+export function assertPinnedBytes(pin: PinnedByteIdentity, bytes: Uint8Array): void {
   if (bytes.byteLength !== pin.bytes) throw new Error(`Pinned byte length drift for ${pin.id}`);
   if (sha256(bytes) !== pin.sha256) throw new Error(`Pinned SHA-256 drift for ${pin.id}`);
   const blob = createHash('sha1').update(`blob ${bytes.byteLength}\0`).update(bytes).digest('hex');
@@ -627,7 +629,7 @@ function validateUbsTahotNativeToNormalizedBridge(value: unknown): UbsTahotNativ
   if (sha256(canonicalJson(payload)) !== root.bridgeIdentity) {
     throw new Error('Native-to-normalized bridge identity does not match its canonical payload');
   }
-  return { ...payload, bridgeIdentity: root.bridgeIdentity } as UbsTahotNativeToNormalizedBridge;
+  return { ...payload, bridgeIdentity: root.bridgeIdentity } as unknown as UbsTahotNativeToNormalizedBridge;
 }
 
 function bridgeCoordinate(

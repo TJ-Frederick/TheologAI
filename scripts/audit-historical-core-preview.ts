@@ -93,11 +93,14 @@ type RequestCounters = { logical: number; http: number };
 
 /** One budget owns preflight, transport, evidence construction, and publication. */
 export class AuditDeadline {
+  private profileLabel: HistoricalCoreAuditProfile['label'] | 'release' = 'release';
   constructor(private readonly now: () => number = Date.now, private readonly startedAt = now()) {}
+
+  setProfile(profile: HistoricalCoreAuditProfile): void { this.profileLabel = profile.label; }
 
   remaining(label: string): number {
     const remaining = MAX_DURATION_MS - (this.now() - this.startedAt);
-    assert(remaining > 0, `historical preview audit exceeded its 300-second total deadline during ${label}`);
+    assert(remaining > 0, `historical ${this.profileLabel} audit exceeded its 300-second total deadline during ${label}`);
     return remaining;
   }
 
@@ -129,11 +132,11 @@ export function canonicalJson(value: unknown): string {
 
 /** Reject any fixture edit that could silently alter the protected release inventory. */
 export function validateFixture(value: unknown): AuditFixture {
-  assert(canonicalJson(value) === canonicalJson(EXPECTED_FIXTURE), 'historical preview fixture identity or probe inventory drifted');
+  assert(canonicalJson(value) === canonicalJson(EXPECTED_FIXTURE), 'historical core fixture identity or probe inventory drifted');
   return structuredClone(EXPECTED_FIXTURE);
 }
 
-class FixedPreviewMcp {
+class FixedAuditMcp {
   readonly counters: RequestCounters = { logical: 0, http: 0 };
   private responseBytes = 0;
   private id = 1;
@@ -148,10 +151,10 @@ class FixedPreviewMcp {
   private reserve(logical: boolean): void {
     if (logical) {
       this.counters.logical += 1;
-      assert(this.counters.logical <= MAX_LOGICAL_OPERATIONS, 'historical preview audit logical-operation budget exceeded');
+      assert(this.counters.logical <= MAX_LOGICAL_OPERATIONS, `historical ${this.profile.label} audit logical-operation budget exceeded`);
     }
     this.counters.http += 1;
-    assert(this.counters.http <= MAX_HTTP_EXCHANGES, 'historical preview audit HTTP-exchange budget exceeded');
+    assert(this.counters.http <= MAX_HTTP_EXCHANGES, `historical ${this.profile.label} audit HTTP-exchange budget exceeded`);
   }
 
   private async post(payload: ObjectRecord, label: string, logical: boolean): Promise<ObjectRecord | undefined> {
@@ -173,16 +176,16 @@ class FixedPreviewMcp {
       });
       if (response.status === 429) {
         await abortAndCancel(response, controller);
-        fail(`historical preview audit stopped at HTTP 429 during ${label}`);
+        fail(`historical ${this.profile.label} audit stopped at HTTP 429 during ${label}`);
       }
       if (response.status < 200 || response.status >= 300) {
         await abortAndCancel(response, controller);
-        fail(`historical preview audit received non-success HTTP status during ${label}`);
+        fail(`historical ${this.profile.label} audit received non-success HTTP status during ${label}`);
       }
       const body = await readBoundedResponseBody(response, controller, label);
       this.responseBytes += utf8Bytes(body);
       assert(this.responseBytes <= MAX_AGGREGATE_MCP_RESPONSE_BYTES,
-        `historical preview audit aggregate response budget exceeded (${MAX_AGGREGATE_MCP_RESPONSE_BYTES} bytes)`);
+        `historical ${this.profile.label} audit aggregate response budget exceeded (${MAX_AGGREGATE_MCP_RESPONSE_BYTES} bytes)`);
       const session = response.headers.get('Mcp-Session-Id'); if (session) this.sessionId = session;
       if ('method' in payload && !('id' in payload)) {
         assert(response.status === 202 && body === '', `${label} notification contract drifted`);
@@ -234,9 +237,9 @@ class FixedPreviewMcp {
   }
 
   complete(): void {
-    assert(this.counters.logical === MAX_LOGICAL_OPERATIONS, `historical preview logical inventory drifted: ${this.counters.logical}/${MAX_LOGICAL_OPERATIONS}`);
-    assert(this.counters.http === MAX_HTTP_EXCHANGES, `historical preview HTTP inventory drifted: ${this.counters.http}/${MAX_HTTP_EXCHANGES}`);
-    assert(this.responseBytes <= MAX_AGGREGATE_MCP_RESPONSE_BYTES, 'historical preview aggregate response budget drifted');
+    assert(this.counters.logical === MAX_LOGICAL_OPERATIONS, `historical ${this.profile.label} logical inventory drifted: ${this.counters.logical}/${MAX_LOGICAL_OPERATIONS}`);
+    assert(this.counters.http === MAX_HTTP_EXCHANGES, `historical ${this.profile.label} HTTP inventory drifted: ${this.counters.http}/${MAX_HTTP_EXCHANGES}`);
+    assert(this.responseBytes <= MAX_AGGREGATE_MCP_RESPONSE_BYTES, `historical ${this.profile.label} aggregate response budget drifted`);
   }
 
   aggregateResponseBytes(): number { return this.responseBytes; }
@@ -348,9 +351,9 @@ function assertToolRegistration(message: ObjectRecord): ObjectRecord {
     && queries?.minItems === 1 && queries.maxItems === 4 && queryItem?.additionalProperties === false
     && JSON.stringify(Object.keys(properties ?? {})) === JSON.stringify(['id', 'text', 'providers', 'match', 'selection', 'author', 'work', 'startYear', 'endYear', 'page', 'limit']), 'primary-source input contract drifted');
   const providers = object(properties?.providers); const providerItems = object(providers?.items);
-  assert(providers?.minItems === 1 && providers?.maxItems === 2 && JSON.stringify(providerItems?.enum) === JSON.stringify(['local', 'ccel']), 'preview provider contract drifted');
+  assert(providers?.minItems === 1 && providers?.maxItems === 2 && JSON.stringify(providerItems?.enum) === JSON.stringify(['local', 'ccel']), 'primary-source provider contract drifted');
   assert(sha256(canonicalJson(primaryInput)) === EXPECTED_PRIMARY_INPUT_SCHEMA_SHA256, 'primary-source input schema hash drifted');
-  assert(canonicalJson(primaryOutput) === canonicalJson(primarySourceSearchV7OutputSchema), 'advertised preview primary-source output schema differs from the checked-out contract');
+  assert(canonicalJson(primaryOutput) === canonicalJson(primarySourceSearchV7OutputSchema), 'advertised primary-source output schema differs from the checked-out contract');
   assert(sha256(canonicalJson(primarySourceSearchV7OutputSchema)) === EXPECTED_PRIMARY_OUTPUT_SCHEMA_SHA256
     && sha256(canonicalJson(primaryOutput)) === EXPECTED_PRIMARY_OUTPUT_SCHEMA_SHA256, 'primary-source output schema hash drifted');
   return {
@@ -551,8 +554,10 @@ function assertPrimarySearch(raw: RawToolResult, probe: AuditFixture['probes'][n
     && readiness?.editionIdentity === 'established' && readiness.normalizedTextRights === 'no_known_conflict', `${workId} primary local evidence identity/readiness drifted`);
   const policy = object(output.evidencePolicy); const coverage = object(output.coverage);
   assert(policy?.snippetUse === 'discovery_only' && policy.localSectionAccess === 'mcp_resource_read'
-    && policy.externalSectionAccess === 'direct_url_only' && coverage?.localAttempted === true && coverage.localHitCount >= 1, `${workId} primary evidence policy drifted`);
-  return { uri: locator.uri as string, evidence: { localHitCount: coverage.localHitCount, exactWorkObserved: true, localReadiness: 'established' } };
+    && policy.externalSectionAccess === 'direct_url_only' && coverage?.localAttempted === true
+    && typeof coverage.localHitCount === 'number' && Number.isSafeInteger(coverage.localHitCount) && coverage.localHitCount >= 1,
+  `${workId} primary evidence policy drifted`);
+  return { uri: locator.uri as string, evidence: { localHitCount: coverage.localHitCount as number, exactWorkObserved: true, localReadiness: 'established' } };
 }
 
 function assertExactSection(message: ObjectRecord, expectedUri: string, workId: string): ObjectRecord {
@@ -652,9 +657,10 @@ export async function runHistoricalCoreAudit(
   fetchImpl: FetchLike = fetch,
   deadline = new AuditDeadline(),
 ): Promise<ObjectRecord> {
+  deadline.setProfile(profile);
   validateFixture(fixture);
   deadline.assertRemaining('fixed fixture preflight');
-  const client = new FixedPreviewMcp(fetchImpl, deadline, profile);
+  const client = new FixedAuditMcp(fetchImpl, deadline, profile);
   const negotiated = assertInitialize(await client.initialize(), profile);
   await client.initialized();
   const schemas = assertToolRegistration(await client.toolsList());
@@ -739,7 +745,7 @@ async function assertOutputAbsent(output: string): Promise<void> {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
     throw error;
   }
-  fail('historical preview audit output violates no-clobber policy: destination already exists');
+  fail('historical core audit output violates no-clobber policy: destination already exists');
 }
 
 /**
@@ -759,7 +765,7 @@ export async function publishAuditEvidence(
   deadline.assertRemaining('evidence publication preflight');
   await mkdir(parent, { recursive: true });
   deadline.assertRemaining('evidence publication staging');
-  const temporaryRoot = await mkdtemp(join(parent, `.${basename(output)}.historical-core-preview-audit-`));
+  const temporaryRoot = await mkdtemp(join(parent, `.${basename(output)}.historical-core-audit-`));
   const staged = join(temporaryRoot, 'evidence.json');
   try {
     await writeFile(staged, `${JSON.stringify(evidence, null, 2)}\n`, { encoding: 'utf8', flag: 'wx', mode: 0o600 });
@@ -768,7 +774,7 @@ export async function publishAuditEvidence(
       await link(staged, output);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
-        fail('historical preview audit output violates no-clobber policy: destination appeared during audit');
+        fail('historical core audit output violates no-clobber policy: destination appeared during audit');
       }
       throw error;
     }
@@ -794,7 +800,7 @@ async function removeInvocationFinalLink(output: string, staged: string): Promis
   }
   const source = await lstat(staged);
   assert(published.isFile() && source.isFile() && published.dev === source.dev && published.ino === source.ino,
-    'historical preview audit cannot safely remove a post-expiry output that is no longer its final link');
+    'historical core audit cannot safely remove a post-expiry output that is no longer its final link');
   await unlink(output);
 }
 
@@ -809,6 +815,7 @@ export async function runHistoricalCoreAuditCli(
   dependencies: AuditCliDependencies = {},
 ): Promise<{ output: string; evidence: ObjectRecord; probeCount: number }> {
   const deadline = new AuditDeadline(dependencies.now);
+  deadline.setProfile(profile);
   assert(args.length === 0 || (args.length === 2 && args[0] === '--output' && typeof args[1] === 'string' && args[1].length > 0), `usage: audit:historical-core-${profile.label} [--output path]`);
   const output = resolve(args.length === 0 ? `test-output/historical-core-${profile.label}-audit-${new Date().toISOString().replaceAll(':', '-')}.json` : args[1]!);
   deadline.assertRemaining('fixed output preflight');

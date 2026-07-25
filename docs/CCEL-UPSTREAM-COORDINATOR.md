@@ -243,10 +243,10 @@ provide one shared coordinator.
 
 The historical v5 release selected production v4/local-only and preview-v5
 exposure only. Current production is deployed v6/local-only; deployed preview
-remains v5 until an authorized PR95 preview deployment selects the checked-in
-candidate v7 discovery profile. The checked-in v6/v7 candidate profiles keep
-the live-search and coordinator values disabled, so neither authorizes a CCEL
-request or Durable Object RPC.
+remains v5 with CCEL execution disabled. The Transform-9 preview corpus release
+does not select the checked-in v7 discovery profile. The checked-in v6/v7
+candidate profiles keep the live-search and coordinator values disabled, so
+neither authorizes a CCEL request or Durable Object RPC.
 
 MCP clients can cache `tools/list` and `prompts/list` results for the life of a
 connection. This is a hard contract cutover rather than a negotiated opt-in, so

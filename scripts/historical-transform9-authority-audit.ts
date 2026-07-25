@@ -93,8 +93,13 @@ interface PageSpec<Row> {
 /** Regenerate the complete reviewed core-eight projection from pinned inputs. */
 export function buildHistoricalTransform9ExpectedAuthority(root: string): HistoricalTransform9ExpectedAuthority {
   const manifest = parseDataManifest(readFileSync(join(root, 'data', 'data-manifest.json')));
+  function readDeclaredSource(path: string): Buffer;
+  function readDeclaredSource(path: string, encoding: BufferEncoding): string;
+  function readDeclaredSource(path: string, encoding?: BufferEncoding): Buffer | string {
+    return encoding === undefined ? readFileSync(join(root, path)) : readFileSync(join(root, path), encoding);
+  }
   const records = loadHistoricalSourcePacks(manifest.materializations.d1.inputs, {
-    read: path => readFileSync(join(root, path), 'utf8'),
+    read: readDeclaredSource,
   });
   assertCoreEightSourcePackRelease(records);
 

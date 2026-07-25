@@ -46,8 +46,10 @@ function temporaryConfig(): { config: TemporaryCandidateConfig; state: { checks:
   }, state };
 }
 
-function inventory(): string {
-  return JSON.stringify([{ name: candidate.candidateD1Name, uuid: candidate.candidateD1Id }]);
+const fixedNow = (): Date => new Date('2026-07-25T12:00:00.000Z');
+
+function inventory(createdAt = '2026-07-25T11:00:00.000Z', name = candidate.candidateD1Name): string {
+  return JSON.stringify([{ name, uuid: candidate.candidateD1Id, created_at: createdAt }]);
 }
 
 describe('production D1 candidate preparation', () => {
@@ -57,7 +59,8 @@ describe('production D1 candidate preparation', () => {
       '--confirm-candidate-d1-name', candidate.candidateD1Name, '--confirm-candidate-d1-id', candidate.candidateD1Id,
     ])).toEqual(candidate);
     for (const rejected of [['--env', 'preview'], ['--config', 'wrangler.toml'], ['--deploy'], ['--delete'],
-      ['--candidate-d1-name', 'theologai-production'], ['--candidate-d1-id', candidate.candidateD1Id.toUpperCase()]]) {
+      ['--candidate-d1-name', 'theologai-production'], ['--candidate-d1-name', 'theologai-production-20260230-a'],
+      ['--candidate-d1-id', candidate.candidateD1Id.toUpperCase()]]) {
       expect(() => parseProductionD1CandidatePreparationArguments([
         '--remote', '--candidate-d1-name', candidate.candidateD1Name, '--candidate-d1-id', candidate.candidateD1Id,
         '--confirm-candidate-d1-name', candidate.candidateD1Name, '--confirm-candidate-d1-id', candidate.candidateD1Id,
@@ -84,6 +87,7 @@ describe('production D1 candidate preparation', () => {
       root: ROOT, loadManifest: () => manifest(), createTemporaryConfig: () => config,
       execute: args => { calls.push(args); return args[1] === 'list' ? inventory() : args.includes('--command') ? JSON.stringify([{ success: true, results: [] }]) : ''; },
       runReadiness: input => { readiness.push(input); },
+      now: fixedNow,
     });
     expect(calls[0]).toEqual(['d1', 'list', '--json']);
     expect(calls[1]).toEqual(['d1', 'execute', 'THEOLOGAI_DB', '--remote', '--config', config.path, '--command', PRISTINE_D1_PREFLIGHT_SQL, '--json']);
@@ -103,7 +107,8 @@ describe('production D1 candidate preparation', () => {
     let configCreated = false;
     expect(() => prepareProductionD1Candidate(candidate, {
       root: ROOT, loadManifest: () => manifest(), createTemporaryConfig: () => { configCreated = true; return temporaryConfig().config; },
-      execute: args => args[1] === 'list' ? JSON.stringify([{ name: candidate.candidateD1Name, uuid: 'a4c4938b-7800-4d68-9097-0df33c31fdc1' }]) : '',
+      execute: args => args[1] === 'list' ? JSON.stringify([{ name: candidate.candidateD1Name, uuid: 'a4c4938b-7800-4d68-9097-0df33c31fdc1', created_at: '2026-07-25T11:00:00.000Z' }]) : '',
+      now: fixedNow,
     })).toThrow(/before target SQL may begin/);
     expect(configCreated).toBe(false);
   });
@@ -122,6 +127,7 @@ describe('production D1 candidate preparation', () => {
           if (failAt === 'migration' ? args[1] === 'migrations' : args[1] === 'execute' && args.includes('--file')) throw new Error('simulated failure');
           return '';
         }, runReadiness: () => { readiness = true; },
+        now: fixedNow,
       })).toThrow(/Do not retry, resume, repair, bind, deploy, or reuse/);
       expect(readiness).toBe(false);
       expect(state.cleaned).toBe(true);
@@ -149,6 +155,44 @@ describe('production D1 candidate preparation', () => {
         if (args.includes('--command')) return JSON.stringify([{ success: true, results: [] }]);
         throw new Error('migration failed');
       },
+      now: fixedNow,
     })).toThrow(/during migration[\s\S]*Secondary temporary candidate-config cleanup failure[\s\S]*cleanup failed/);
+  });
+
+  it('refuses stale, future, or date-mismatched inventory entries before it creates a config or issues target SQL', () => {
+    const cases = [
+      { name: 'stale', text: inventory('2026-07-23T11:00:00.000Z'), message: /older than the 36-hour/ },
+      { name: 'future', text: inventory('2026-07-25T12:06:00.000Z'), message: /too far in the future/ },
+      { name: 'mismatched candidate date', text: inventory('2026-07-25T11:00:00.000Z', 'theologai-production-20260720-a'), message: /name date is not within one UTC day/ },
+    ];
+    for (const testCase of cases) {
+      let configCreated = false;
+      const options = testCase.name === 'mismatched candidate date'
+        ? { ...candidate, candidateD1Name: 'theologai-production-20260720-a', confirmedCandidateD1Name: 'theologai-production-20260720-a' }
+        : candidate;
+      expect(() => prepareProductionD1Candidate(options, {
+        root: ROOT, loadManifest: () => manifest(), now: fixedNow,
+        createTemporaryConfig: () => { configCreated = true; return temporaryConfig().config; },
+        execute: args => args[1] === 'list' ? testCase.text : '',
+      })).toThrow(testCase.message);
+      expect(configCreated).toBe(false);
+    }
+  });
+
+  it('classifies readiness or authority-audit failure as terminal after target SQL and cleans up without retrying', () => {
+    const { config, state } = temporaryConfig();
+    const calls: string[][] = [];
+    expect(() => prepareProductionD1Candidate(candidate, {
+      root: ROOT, loadManifest: () => manifest(), createTemporaryConfig: () => config, now: fixedNow,
+      execute: args => {
+        calls.push(args);
+        if (args[1] === 'list') return inventory();
+        if (args.includes('--command')) return JSON.stringify([{ success: true, results: [] }]);
+        return '';
+      },
+      runReadiness: () => { throw new Error('authority audit failed'); },
+    })).toThrow(/during readiness and Transform-8\/9 authority audit[\s\S]*Do not retry, resume, repair, bind, deploy, or reuse/);
+    expect(calls.filter(call => call[1] === 'list')).toHaveLength(1);
+    expect(state.cleaned).toBe(true);
   });
 });

@@ -79,13 +79,13 @@ export interface WorkerDeploymentIdentity {
   addedVersionIds: string[];
 }
 
-export interface WorkerAuditedIdentity extends WorkerDeploymentIdentity {
+export type WorkerAuditedIdentity = Omit<WorkerDeploymentIdentity, 'schemaVersion'> & {
   schemaVersion: 2;
   postAuditDeploymentsSha256: string;
-}
+};
 
 function fail(message: string): never {
-  throw new Error(`Preview Worker deployment identity verification refused: ${message}.`);
+  throw new Error(`Worker deployment identity verification refused: ${message}.`);
 }
 
 function assert(value: unknown, message: string): asserts value {
@@ -297,7 +297,7 @@ function parsePreAuditIdentity(value: unknown, target: WorkerReleaseTarget): Wor
     && identity.addedVersionIds.at(-1) === identity.deployedVersionId
     && identity.addedVersionIds.at(-1) === identity.commandReportedVersionId,
   'pre-audit identity added-version evidence is malformed');
-  return identity as WorkerDeploymentIdentity;
+  return identity as unknown as WorkerDeploymentIdentity;
 }
 
 /**

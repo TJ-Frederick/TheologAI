@@ -28,10 +28,11 @@ describe('production release guards', () => {
     const candidateCutover = workflow.indexOf('Require deployed candidate production D1 binding (read-only)');
     const languageAudit = workflow.indexOf('Audit original-language v2 contract on production');
     const historicalAudit = workflow.indexOf('Audit Transform-9 historical core contract on production');
-    const reconciliation = workflow.indexOf('Capture production post-mutation reconciliation record (read-only)');
     const stable = workflow.indexOf('Verify production Worker remained active through audit (read-only)');
+    const finalObservation = workflow.indexOf('Capture final production routing/binding observation (read-only)');
+    const finalArtifact = workflow.indexOf('Upload final production routing/binding observation');
     const artifact = workflow.indexOf('Upload protected production audit evidence');
-    expect([mapping, readiness, predecessor, versions, deploy, identity, candidateCutover, languageAudit, historicalAudit, reconciliation, stable, artifact].every(index => index >= 0)).toBe(true);
+    expect([mapping, readiness, predecessor, versions, deploy, identity, candidateCutover, languageAudit, historicalAudit, stable, finalObservation, finalArtifact, artifact].every(index => index >= 0)).toBe(true);
     expect(readiness).toBeGreaterThan(mapping);
     expect(predecessor).toBeGreaterThan(readiness);
     expect(versions).toBeGreaterThan(predecessor);
@@ -40,9 +41,10 @@ describe('production release guards', () => {
     expect(candidateCutover).toBeGreaterThan(identity);
     expect(languageAudit).toBeGreaterThan(candidateCutover);
     expect(historicalAudit).toBeGreaterThan(languageAudit);
-    expect(reconciliation).toBeGreaterThan(historicalAudit);
-    expect(stable).toBeGreaterThan(reconciliation);
-    expect(artifact).toBeGreaterThan(stable);
+    expect(stable).toBeGreaterThan(historicalAudit);
+    expect(finalObservation).toBeGreaterThan(stable);
+    expect(finalArtifact).toBeGreaterThan(finalObservation);
+    expect(artifact).toBeGreaterThan(finalArtifact);
     expect(workflow).toContain('scripts/production-release-reconciliation.ts candidate-d1-name');
     expect(workflow).toContain('npm run d1:remote:check -- --database "$candidate_d1_name"');
     expect(workflow).toContain('scripts/verify-production-worker-deployment.ts verify-deploy');
@@ -51,5 +53,31 @@ describe('production release guards', () => {
     expect(workflow).toContain('npm run audit:historical-core-production');
     expect(workflow).not.toContain('d1 create');
     expect(workflow).not.toContain('d1 delete');
+  });
+
+  it('retains a non-strict final routing observation after every attempted deploy, including failed secret or deploy actions', async () => {
+    const workflow = await readFile(new URL('.github/workflows/deploy.yml', root), 'utf8');
+    const finalObservation = workflow.indexOf('Capture final production routing/binding observation (read-only)');
+    const finalArtifact = workflow.indexOf('Upload final production routing/binding observation');
+    const protectedEvidence = workflow.indexOf('Upload protected production audit evidence');
+    const observationBlock = workflow.slice(finalObservation, finalArtifact);
+    const finalArtifactBlock = workflow.slice(finalArtifact, protectedEvidence);
+
+    expect(finalObservation).toBeGreaterThan(workflow.indexOf('Deploy to Cloudflare Workers'));
+    expect(observationBlock).toContain("steps.production-worker-deploy.outcome != 'skipped'");
+    expect(observationBlock).toContain("steps.production-predecessor.outcome == 'success'");
+    expect(observationBlock).toContain('continue-on-error: true');
+    expect(observationBlock).toContain('observe-post-mutation');
+    expect(observationBlock).not.toContain('reconcile-post-mutation');
+    expect(finalArtifactBlock).toContain("steps.production-worker-deploy.outcome != 'skipped'");
+    expect(finalArtifactBlock).toContain('if-no-files-found: warn');
+
+    // Strict cutover, fixed audits, audit-stability proof, and protected
+    // evidence remain unavailable unless the deploy action itself succeeded.
+    expect(workflow).toContain("id: production-worker-pre-audit-identity\n        if: ${{ steps.production-worker-deploy.outcome == 'success' }}");
+    expect(workflow).toContain("id: production-worker-candidate-cutover\n        if: ${{ steps.production-worker-deploy.outcome == 'success' && steps.production-worker-pre-audit-identity.outcome == 'success' }}");
+    expect(workflow).toContain("id: production-original-language-v2-audit\n        if: ${{ steps.production-worker-candidate-cutover.outcome == 'success' }}");
+    expect(workflow).toContain("id: production-historical-core-audit\n        if: ${{ steps.production-worker-candidate-cutover.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' }}");
+    expect(workflow).toContain("id: production-worker-audit-identity\n        if: ${{ steps.production-worker-candidate-cutover.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' && steps.production-historical-core-audit.outcome == 'success' }}");
   });
 });

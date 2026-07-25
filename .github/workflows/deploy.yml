@@ -57,6 +57,9 @@ jobs:
       - name: Typecheck Node.js target
         run: npm run typecheck:node
 
+      - name: Typecheck release-critical scripts
+        run: npm run typecheck:release-scripts
+
       - name: Typecheck Workers target
         run: |
           npm run typecheck:worker
@@ -248,6 +251,7 @@ jobs:
 
       - name: Verify exact active production Worker version (read-only)
         id: production-worker-pre-audit-identity
+        if: ${{ steps.production-worker-deploy.outcome == 'success' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -269,6 +273,7 @@ jobs:
       # passed readiness before either production black-box audit can begin.
       - name: Require deployed candidate production D1 binding (read-only)
         id: production-worker-candidate-cutover
+        if: ${{ steps.production-worker-deploy.outcome == 'success' && steps.production-worker-pre-audit-identity.outcome == 'success' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -301,22 +306,44 @@ jobs:
           if-no-files-found: error
 
       - name: Audit original-language v2 contract on production
+        id: production-original-language-v2-audit
+        if: ${{ steps.production-worker-candidate-cutover.outcome == 'success' }}
         run: |
           npm run audit:original-language-v2-production -- \
             --output "$RUNNER_TEMP/original-language-v2-production-audit.json"
           test -s "$RUNNER_TEMP/original-language-v2-production-audit.json"
 
       - name: Audit Transform-9 historical core contract on production
+        id: production-historical-core-audit
+        if: ${{ steps.production-worker-candidate-cutover.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' }}
         run: |
           npm run audit:historical-core-production -- \
             --output "$RUNNER_TEMP/historical-core-production-audit.json"
           test -s "$RUNNER_TEMP/historical-core-production-audit.json"
 
-      # Always observe the final routing state after a completed deploy. This
-      # evidence remains useful if an audit fails; it never rolls back.
-      - name: Capture production post-mutation reconciliation record (read-only)
-        id: production-reconciliation
-        if: ${{ always() && steps.production-worker-deploy.outcome == 'success' && steps.production-predecessor.outcome == 'success' }}
+      - name: Verify production Worker remained active through audit (read-only)
+        id: production-worker-audit-identity
+        if: ${{ steps.production-worker-candidate-cutover.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' && steps.production-historical-core-audit.outcome == 'success' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
+        run: |
+          npx --no-install wrangler deployments list --json > "$RUNNER_TEMP/production-worker-deployments-post-audit.json"
+          npx --no-install tsx scripts/verify-production-worker-deployment.ts verify-audit-stability \
+            --pre-audit-identity "$RUNNER_TEMP/production-worker-deployment-pre-audit-identity.json" \
+            --post-audit-deployments "$RUNNER_TEMP/production-worker-deployments-post-audit.json" \
+            --output "$RUNNER_TEMP/production-worker-deployment-identity.json" \
+            --github-output "$GITHUB_OUTPUT"
+
+      # This is deliberately non-strict and best-effort: it must run after an
+      # attempted deploy even if a secret pre-command or deploy failed. It
+      # records current routing/binding state for diagnosis but cannot recover,
+      # roll back, bind, or make a failed cutover appear valid.
+      - name: Capture final production routing/binding observation (read-only)
+        id: production-final-observation
+        if: ${{ always() && steps.production-predecessor.outcome == 'success' && steps.production-worker-deploy.outcome != 'skipped' }}
+        continue-on-error: true
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -331,50 +358,46 @@ jobs:
             --deployments "$RUNNER_TEMP/production-worker-deployments-post-mutation.json" \
             --observed-active-version-view "$RUNNER_TEMP/production-worker-observed-active-version-view.json" \
             --wrangler-config wrangler.toml \
-            --output "$RUNNER_TEMP/production-worker-post-mutation-reconciliation.json"
+            --output "$RUNNER_TEMP/production-worker-final-routing-observation.json"
 
-      - name: Verify production Worker remained active through audit (read-only)
-        id: production-worker-audit-identity
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
-        run: |
-          npx --no-install wrangler deployments list --json > "$RUNNER_TEMP/production-worker-deployments-post-audit.json"
-          npx --no-install tsx scripts/verify-production-worker-deployment.ts verify-audit-stability \
-            --pre-audit-identity "$RUNNER_TEMP/production-worker-deployment-pre-audit-identity.json" \
-            --post-audit-deployments "$RUNNER_TEMP/production-worker-deployments-post-audit.json" \
-            --output "$RUNNER_TEMP/production-worker-deployment-identity.json" \
-            --github-output "$GITHUB_OUTPUT"
+      - name: Upload final production routing/binding observation
+        if: ${{ always() && steps.production-predecessor.outcome == 'success' && steps.production-worker-deploy.outcome != 'skipped' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: production-final-routing-observation-${{ github.sha }}
+          path: ${{ runner.temp }}/production-worker-final-routing-observation.json
+          retention-days: 30
+          if-no-files-found: warn
 
       - name: Hash sanitized production audit and reconciliation evidence
         id: production-audit-evidence
-        if: ${{ always() && steps.production-reconciliation.outcome == 'success' }}
+        if: ${{ steps.production-worker-deploy.outcome == 'success' && steps.production-worker-candidate-cutover.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' && steps.production-historical-core-audit.outcome == 'success' && steps.production-worker-audit-identity.outcome == 'success' && steps.production-final-observation.outcome == 'success' }}
         run: |
           original_language_audit_sha256="$(sha256sum "$RUNNER_TEMP/original-language-v2-production-audit.json" | awk '{print $1}')"
           historical_audit_sha256="$(sha256sum "$RUNNER_TEMP/historical-core-production-audit.json" | awk '{print $1}')"
           identity_sha256="$(sha256sum "$RUNNER_TEMP/production-worker-deployment-identity.json" | awk '{print $1}')"
           candidate_cutover_observation_sha256="$(sha256sum "$RUNNER_TEMP/production-worker-candidate-cutover-observation.json" | awk '{print $1}')"
-          post_mutation_reconciliation_sha256="$(sha256sum "$RUNNER_TEMP/production-worker-post-mutation-reconciliation.json" | awk '{print $1}')"
+          final_routing_observation_sha256="$(sha256sum "$RUNNER_TEMP/production-worker-final-routing-observation.json" | awk '{print $1}')"
           printf 'original_language_audit_sha256=%s\n' "$original_language_audit_sha256" >> "$GITHUB_OUTPUT"
           printf 'historical_audit_sha256=%s\n' "$historical_audit_sha256" >> "$GITHUB_OUTPUT"
           printf 'identity_record_sha256=%s\n' "$identity_sha256" >> "$GITHUB_OUTPUT"
           printf 'candidate_cutover_observation_sha256=%s\n' "$candidate_cutover_observation_sha256" >> "$GITHUB_OUTPUT"
-          printf 'post_mutation_reconciliation_sha256=%s\n' "$post_mutation_reconciliation_sha256" >> "$GITHUB_OUTPUT"
+          printf 'final_routing_observation_sha256=%s\n' "$final_routing_observation_sha256" >> "$GITHUB_OUTPUT"
 
       - name: Upload production reconciliation evidence
-        if: ${{ always() && steps.production-reconciliation.outcome == 'success' }}
+        if: ${{ steps.production-audit-evidence.outcome == 'success' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: production-release-reconciliation-${{ github.sha }}
           path: |
             ${{ runner.temp }}/production-worker-candidate-cutover-observation.json
             ${{ runner.temp }}/production-worker-candidate-cutover.json
-            ${{ runner.temp }}/production-worker-post-mutation-reconciliation.json
+            ${{ runner.temp }}/production-worker-final-routing-observation.json
           retention-days: 30
           if-no-files-found: error
 
       - name: Upload protected production audit evidence
+        if: ${{ steps.production-audit-evidence.outcome == 'success' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: production-release-audit-${{ github.sha }}
@@ -384,6 +407,6 @@ jobs:
             ${{ runner.temp }}/production-worker-deployment-identity.json
             ${{ runner.temp }}/production-worker-candidate-cutover-observation.json
             ${{ runner.temp }}/production-worker-candidate-cutover.json
-            ${{ runner.temp }}/production-worker-post-mutation-reconciliation.json
+            ${{ runner.temp }}/production-worker-final-routing-observation.json
           retention-days: 30
           if-no-files-found: error
