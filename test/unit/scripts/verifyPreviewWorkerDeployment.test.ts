@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  verifyProductionWorkerAuditStability,
+  verifyProductionWorkerDeployment,
   verifyPreviewWorkerAuditStability,
   verifyPreviewWorkerDeployment,
 } from '../../../scripts/verify-preview-worker-deployment.js';
@@ -32,6 +34,21 @@ function active(versionId = deployed, percentage = 100): string {
 }
 
 describe('preview Worker deployment identity verification', () => {
+  it('uses the same strict identity model for the fixed production target without exposing a target selector', () => {
+    const identity = verifyProductionWorkerDeployment({
+      beforeVersionsText: versions([{ id: baseline, number: 1, triggeredBy: 'version_upload' }]),
+      afterVersionsText: versions([
+        { id: baseline, number: 1, triggeredBy: 'version_upload' },
+        { id: deployed, number: 2, triggeredBy: 'version_upload' },
+      ]),
+      afterDeploymentsText: active(), commandOutput: commandOutput(),
+    });
+    expect(identity.worker).toBe('theologai');
+    expect(verifyProductionWorkerAuditStability(identity, active())).toMatchObject({
+      worker: 'theologai', schemaVersion: 2, deploymentId: deployment,
+    });
+  });
+
   it('requires one new version to become the latest sole 100% preview deployment', () => {
     const identity = verifyPreviewWorkerDeployment({
       beforeVersionsText: versions([{ id: baseline, number: 1, triggeredBy: 'version_upload' }]),

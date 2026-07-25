@@ -56,6 +56,34 @@ export interface PreviewWorkerAuditedIdentity {
   postAuditDeploymentsSha256: string;
 }
 
+/** Fixed target profiles are intentionally internal to release scripts, not CLI input. */
+export type WorkerReleaseTarget = {
+  worker: 'theologai-preview' | 'theologai';
+  label: 'preview' | 'production';
+};
+
+export const PREVIEW_WORKER_RELEASE_TARGET: WorkerReleaseTarget = { worker: 'theologai-preview', label: 'preview' };
+export const PRODUCTION_WORKER_RELEASE_TARGET: WorkerReleaseTarget = { worker: 'theologai', label: 'production' };
+
+export interface WorkerDeploymentIdentity {
+  schemaVersion: 1;
+  worker: WorkerReleaseTarget['worker'];
+  deployedVersionId: string;
+  deployedVersionNumber: number;
+  deploymentId: string;
+  beforeVersionsSha256: string;
+  afterVersionsSha256: string;
+  deploymentsSha256: string;
+  commandOutputSha256: string;
+  commandReportedVersionId: string;
+  addedVersionIds: string[];
+}
+
+export interface WorkerAuditedIdentity extends WorkerDeploymentIdentity {
+  schemaVersion: 2;
+  postAuditDeploymentsSha256: string;
+}
+
 function fail(message: string): never {
   throw new Error(`Preview Worker deployment identity verification refused: ${message}.`);
 }
@@ -148,6 +176,7 @@ function parseDeployments(value: unknown): Deployment[] {
 function latestSoleActiveDeployment(
   deployments: Deployment[],
   expectedVersionId: string,
+  target: WorkerReleaseTarget,
   expectedDeploymentId?: string,
 ): Deployment {
   const latest = deployments.reduce((current, deployment) =>
@@ -156,10 +185,10 @@ function latestSoleActiveDeployment(
   assert(latest.versions.length === 1
     && latest.versions[0]!.percentage === 100
     && latest.versions[0]!.versionId === expectedVersionId,
-  'new Worker version is not the sole 100% active preview deployment');
+  `new Worker version is not the sole 100% active ${target.label} deployment`);
   if (expectedDeploymentId !== undefined) {
     assert(latest.id === expectedDeploymentId,
-      'post-audit latest preview deployment changed even though the version may match');
+      `post-audit latest ${target.label} deployment changed even though the version may match`);
   }
   return latest;
 }
@@ -170,12 +199,12 @@ function latestSoleActiveDeployment(
  * outputs so the returned record can preserve cryptographic evidence without
  * retaining operational stdout or full control-plane JSON as an artifact.
  */
-export function verifyPreviewWorkerDeployment(input: {
+export function verifyWorkerDeployment(input: {
   beforeVersionsText: string;
   afterVersionsText: string;
   afterDeploymentsText: string;
   commandOutput: string;
-}): PreviewWorkerDeploymentIdentity {
+}, target: WorkerReleaseTarget): WorkerDeploymentIdentity {
   const reportedVersionId = commandReportedVersionId(input.commandOutput);
   const before = parseVersions(parseJson(input.beforeVersionsText, 'before versions'), 'before versions');
   const after = parseVersions(parseJson(input.afterVersionsText, 'after versions'), 'after versions');
@@ -206,10 +235,10 @@ export function verifyPreviewWorkerDeployment(input: {
     assert(Date.parse(intermediate.createdOn) < Date.parse(deployed.createdOn),
       'secret intermediate Worker version must precede the final deploy version');
   }
-  const latestDeployment = latestSoleActiveDeployment(deployments, deployed.id);
+  const latestDeployment = latestSoleActiveDeployment(deployments, deployed.id, target);
   return {
     schemaVersion: 1,
-    worker: 'theologai-preview',
+    worker: target.worker,
     deployedVersionId: deployed.id,
     deployedVersionNumber: deployed.number,
     deploymentId: latestDeployment.id,
@@ -222,11 +251,29 @@ export function verifyPreviewWorkerDeployment(input: {
   };
 }
 
+export function verifyPreviewWorkerDeployment(input: {
+  beforeVersionsText: string;
+  afterVersionsText: string;
+  afterDeploymentsText: string;
+  commandOutput: string;
+}): PreviewWorkerDeploymentIdentity {
+  return verifyWorkerDeployment(input, PREVIEW_WORKER_RELEASE_TARGET) as PreviewWorkerDeploymentIdentity;
+}
+
+export function verifyProductionWorkerDeployment(input: {
+  beforeVersionsText: string;
+  afterVersionsText: string;
+  afterDeploymentsText: string;
+  commandOutput: string;
+}): WorkerDeploymentIdentity {
+  return verifyWorkerDeployment(input, PRODUCTION_WORKER_RELEASE_TARGET);
+}
+
 function isSha256(value: unknown): value is string {
   return typeof value === 'string' && /^[0-9a-f]{64}$/.test(value);
 }
 
-function parsePreAuditIdentity(value: unknown): PreviewWorkerDeploymentIdentity {
+function parsePreAuditIdentity(value: unknown, target: WorkerReleaseTarget): WorkerDeploymentIdentity {
   const identity = record(value, 'pre-audit identity');
   const keys = [
     'schemaVersion', 'worker', 'deployedVersionId', 'deployedVersionNumber', 'deploymentId',
@@ -235,7 +282,7 @@ function parsePreAuditIdentity(value: unknown): PreviewWorkerDeploymentIdentity 
   ];
   assert(JSON.stringify(Object.keys(identity).sort()) === JSON.stringify(keys.slice().sort()),
     'pre-audit identity keys are malformed');
-  assert(identity.schemaVersion === 1 && identity.worker === 'theologai-preview', 'pre-audit identity is not canonical');
+  assert(identity.schemaVersion === 1 && identity.worker === target.worker, 'pre-audit identity is not canonical');
   assert(isUuid(identity.deployedVersionId) && Number.isSafeInteger(identity.deployedVersionNumber)
     && (identity.deployedVersionNumber as number) > 0 && isUuid(identity.deploymentId)
     && isUuid(identity.commandReportedVersionId) && identity.commandReportedVersionId === identity.deployedVersionId,
@@ -250,7 +297,7 @@ function parsePreAuditIdentity(value: unknown): PreviewWorkerDeploymentIdentity 
     && identity.addedVersionIds.at(-1) === identity.deployedVersionId
     && identity.addedVersionIds.at(-1) === identity.commandReportedVersionId,
   'pre-audit identity added-version evidence is malformed');
-  return identity as PreviewWorkerDeploymentIdentity;
+  return identity as WorkerDeploymentIdentity;
 }
 
 /**
@@ -259,14 +306,29 @@ function parsePreAuditIdentity(value: unknown): PreviewWorkerDeploymentIdentity 
  * a second observation: it cannot pretend to rule out a writer racing between
  * the two snapshots.
  */
+export function verifyWorkerAuditStability(
+  preAuditIdentity: WorkerDeploymentIdentity,
+  postAuditDeploymentsText: string,
+  target: WorkerReleaseTarget,
+): WorkerAuditedIdentity {
+  const pre = parsePreAuditIdentity(preAuditIdentity, target);
+  const deployments = parseDeployments(parseJson(postAuditDeploymentsText, 'post-audit deployments'));
+  latestSoleActiveDeployment(deployments, pre.deployedVersionId, target, pre.deploymentId);
+  return { ...pre, schemaVersion: 2, postAuditDeploymentsSha256: sha256(postAuditDeploymentsText) };
+}
+
 export function verifyPreviewWorkerAuditStability(
   preAuditIdentity: PreviewWorkerDeploymentIdentity,
   postAuditDeploymentsText: string,
 ): PreviewWorkerAuditedIdentity {
-  const pre = parsePreAuditIdentity(preAuditIdentity);
-  const deployments = parseDeployments(parseJson(postAuditDeploymentsText, 'post-audit deployments'));
-  latestSoleActiveDeployment(deployments, pre.deployedVersionId, pre.deploymentId);
-  return { ...pre, schemaVersion: 2, postAuditDeploymentsSha256: sha256(postAuditDeploymentsText) };
+  return verifyWorkerAuditStability(preAuditIdentity, postAuditDeploymentsText, PREVIEW_WORKER_RELEASE_TARGET) as PreviewWorkerAuditedIdentity;
+}
+
+export function verifyProductionWorkerAuditStability(
+  preAuditIdentity: WorkerDeploymentIdentity,
+  postAuditDeploymentsText: string,
+): WorkerAuditedIdentity {
+  return verifyWorkerAuditStability(preAuditIdentity, postAuditDeploymentsText, PRODUCTION_WORKER_RELEASE_TARGET);
 }
 
 function exactArgs(argv: string[], command: string, expected: string[]): Map<string, string> {
@@ -283,7 +345,7 @@ function exactArgs(argv: string[], command: string, expected: string[]): Map<str
 }
 
 async function writeIdentity(
-  identity: PreviewWorkerDeploymentIdentity | PreviewWorkerAuditedIdentity,
+  identity: WorkerDeploymentIdentity | WorkerAuditedIdentity,
   output: string,
   githubOutput: string,
 ): Promise<void> {
@@ -297,7 +359,7 @@ async function writeIdentity(
   ].join('\n'), { encoding: 'utf8', flag: 'a' });
 }
 
-export async function runCli(argv: string[]): Promise<void> {
+async function runTargetCli(argv: string[], target: WorkerReleaseTarget): Promise<void> {
   const command = argv[0];
   if (command === 'verify-deploy') {
     const values = exactArgs(argv.slice(1), command, ['--before-versions', '--after-versions', '--after-deployments', '--command-output', '--output', '--github-output']);
@@ -307,7 +369,7 @@ export async function runCli(argv: string[]): Promise<void> {
       readFile(values.get('--after-deployments')!, 'utf8'),
       readFile(values.get('--command-output')!, 'utf8'),
     ]);
-    await writeIdentity(verifyPreviewWorkerDeployment({ beforeVersionsText, afterVersionsText, afterDeploymentsText, commandOutput }),
+    await writeIdentity(verifyWorkerDeployment({ beforeVersionsText, afterVersionsText, afterDeploymentsText, commandOutput }, target),
       values.get('--output')!, values.get('--github-output')!);
     return;
   }
@@ -317,12 +379,15 @@ export async function runCli(argv: string[]): Promise<void> {
       readFile(values.get('--pre-audit-identity')!, 'utf8'),
       readFile(values.get('--post-audit-deployments')!, 'utf8'),
     ]);
-    await writeIdentity(verifyPreviewWorkerAuditStability(parsePreAuditIdentity(parseJson(identityText, 'pre-audit identity')),
-      postAuditDeploymentsText), values.get('--output')!, values.get('--github-output')!);
+    await writeIdentity(verifyWorkerAuditStability(parsePreAuditIdentity(parseJson(identityText, 'pre-audit identity'), target),
+      postAuditDeploymentsText, target), values.get('--output')!, values.get('--github-output')!);
     return;
   }
   fail('command must be verify-deploy or verify-audit-stability');
 }
+
+export async function runCli(argv: string[]): Promise<void> { await runTargetCli(argv, PREVIEW_WORKER_RELEASE_TARGET); }
+export async function runProductionCli(argv: string[]): Promise<void> { await runTargetCli(argv, PRODUCTION_WORKER_RELEASE_TARGET); }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   runCli(process.argv.slice(2)).catch(error => {

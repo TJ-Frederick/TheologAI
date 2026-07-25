@@ -13,6 +13,23 @@ import { classicTextsOutputSchema } from '../src/mcp/schemas/classicTexts.js';
 import { primarySourceSearchV7OutputSchema } from '../src/mcp/schemas/primarySourceSearchV4.js';
 
 const PREVIEW_ENDPOINT = 'https://preview-mcp.theologai.xyz/mcp';
+const PRODUCTION_ENDPOINT = 'https://mcp.theologai.xyz/mcp';
+export type HistoricalCoreAuditProfile = {
+  endpoint: string;
+  hostname: string;
+  serverVersion: string;
+  audit: 'historical-core-preview' | 'historical-core-production';
+  endpointClass: 'preview-custom' | 'production-custom';
+  label: 'preview' | 'production';
+};
+const PREVIEW_PROFILE: HistoricalCoreAuditProfile = {
+  endpoint: PREVIEW_ENDPOINT, hostname: 'preview-mcp.theologai.xyz', serverVersion: '3.6.0-preview',
+  audit: 'historical-core-preview', endpointClass: 'preview-custom', label: 'preview',
+};
+export const PRODUCTION_PROFILE: HistoricalCoreAuditProfile = {
+  endpoint: PRODUCTION_ENDPOINT, hostname: 'mcp.theologai.xyz', serverVersion: '3.6.0',
+  audit: 'historical-core-production', endpointClass: 'production-custom', label: 'production',
+};
 const PROTOCOL_VERSION = '2025-11-25';
 const MAX_LOGICAL_OPERATIONS = 54;
 /** initialize + initialized notification + 53 request/response operations. */
@@ -122,7 +139,11 @@ class FixedPreviewMcp {
   private id = 1;
   private sessionId: string | undefined;
 
-  constructor(private readonly fetchImpl: FetchLike, private readonly deadline: AuditDeadline) {}
+  constructor(
+    private readonly fetchImpl: FetchLike,
+    private readonly deadline: AuditDeadline,
+    private readonly profile: HistoricalCoreAuditProfile = PREVIEW_PROFILE,
+  ) {}
 
   private reserve(logical: boolean): void {
     if (logical) {
@@ -135,9 +156,9 @@ class FixedPreviewMcp {
 
   private async post(payload: ObjectRecord, label: string, logical: boolean): Promise<ObjectRecord | undefined> {
     this.reserve(logical);
-    const target = new URL(PREVIEW_ENDPOINT);
-    assert(target.toString() === PREVIEW_ENDPOINT && target.protocol === 'https:' && target.hostname === 'preview-mcp.theologai.xyz'
-      && target.pathname === '/mcp' && !target.search && !target.hash, 'preview audit endpoint allowlist drifted');
+    const target = new URL(this.profile.endpoint);
+    assert(target.toString() === this.profile.endpoint && target.protocol === 'https:' && target.hostname === this.profile.hostname
+      && target.pathname === '/mcp' && !target.search && !target.hash, `${this.profile.label} audit endpoint allowlist drifted`);
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), Math.min(MAX_REQUEST_DURATION_MS, this.deadline.remaining(`${label} request`)));
     try {
@@ -145,7 +166,7 @@ class FixedPreviewMcp {
         method: 'POST', redirect: 'error', signal: controller.signal,
         headers: {
           Accept: 'application/json, text/event-stream', 'Content-Type': 'application/json',
-          'Mcp-Protocol-Version': PROTOCOL_VERSION, 'User-Agent': 'TheologAI-HistoricalCore-Preview-Audit/1.0',
+          'Mcp-Protocol-Version': PROTOCOL_VERSION, 'User-Agent': `TheologAI-HistoricalCore-${this.profile.label}-Audit/1.0`,
           ...(this.sessionId === undefined ? {} : { 'Mcp-Session-Id': this.sessionId }),
         },
         body: JSON.stringify(payload),
@@ -180,7 +201,7 @@ class FixedPreviewMcp {
 
   async initialize(): Promise<ObjectRecord> {
     const message = await this.post({ jsonrpc: '2.0', id: this.id++, method: 'initialize', params: {
-      protocolVersion: PROTOCOL_VERSION, capabilities: {}, clientInfo: { name: 'theologai-historical-core-preview-audit', version: '1.0.0' },
+      protocolVersion: PROTOCOL_VERSION, capabilities: {}, clientInfo: { name: `theologai-historical-core-${this.profile.label}-audit`, version: '1.0.0' },
     } }, 'initialize', true);
     assert(message !== undefined, 'initialize must return a response'); return message;
   }
@@ -285,12 +306,12 @@ function result(message: ObjectRecord, label: string): ObjectRecord {
   const output = object(message.result); assert(output !== undefined, `${label} result missing`); return output;
 }
 
-function assertInitialize(message: ObjectRecord): ObjectRecord {
+function assertInitialize(message: ObjectRecord, profile: HistoricalCoreAuditProfile): ObjectRecord {
   const output = result(message, 'initialize');
   const server = object(output.serverInfo); const capabilities = object(output.capabilities);
-  assert(output.protocolVersion === PROTOCOL_VERSION && server?.name === 'theologai-bible-server' && server?.version === '3.6.0-preview', 'preview initialize identity/version drifted');
-  assert(JSON.stringify(Object.keys(capabilities ?? {}).sort()) === JSON.stringify(['prompts', 'resources', 'tools']), 'preview initialize capabilities drifted');
-  return { protocolVersion: PROTOCOL_VERSION, serverName: 'theologai-bible-server', serverVersion: '3.6.0-preview' };
+  assert(output.protocolVersion === PROTOCOL_VERSION && server?.name === 'theologai-bible-server' && server?.version === profile.serverVersion, `${profile.label} initialize identity/version drifted`);
+  assert(JSON.stringify(Object.keys(capabilities ?? {}).sort()) === JSON.stringify(['prompts', 'resources', 'tools']), `${profile.label} initialize capabilities drifted`);
+  return { protocolVersion: PROTOCOL_VERSION, serverName: 'theologai-bible-server', serverVersion: profile.serverVersion };
 }
 
 function assertToolRegistration(message: ObjectRecord): ObjectRecord {
@@ -625,15 +646,16 @@ function evidenceTextIsSafe(value: unknown): void {
   visit(value);
 }
 
-export async function runPreviewAudit(
+export async function runHistoricalCoreAudit(
   fixture: AuditFixture,
+  profile: HistoricalCoreAuditProfile,
   fetchImpl: FetchLike = fetch,
   deadline = new AuditDeadline(),
 ): Promise<ObjectRecord> {
   validateFixture(fixture);
   deadline.assertRemaining('fixed fixture preflight');
-  const client = new FixedPreviewMcp(fetchImpl, deadline);
-  const negotiated = assertInitialize(await client.initialize());
+  const client = new FixedPreviewMcp(fetchImpl, deadline, profile);
+  const negotiated = assertInitialize(await client.initialize(), profile);
   await client.initialized();
   const schemas = assertToolRegistration(await client.toolsList());
   assertPrompts(await client.promptsList());
@@ -673,7 +695,7 @@ export async function runPreviewAudit(
   client.complete();
   deadline.assertRemaining('evidence construction');
   const evidence = {
-    schemaVersion: 1, audit: 'historical-core-preview', endpointClass: 'preview-custom',
+    schemaVersion: 1, audit: profile.audit, endpointClass: profile.endpointClass,
     fixtureSha256: sha256(await readFile(FIXTURE_PATH, 'utf8')), durationMs: deadline.elapsed(),
     negotiated, schemas,
     budgets: {
@@ -692,6 +714,22 @@ export async function runPreviewAudit(
   assert(utf8Bytes(JSON.stringify(evidence)) <= MAX_EVIDENCE_BYTES, 'sanitized historical evidence exceeds 256 KiB ceiling');
   deadline.assertRemaining('evidence construction');
   return evidence;
+}
+
+export async function runPreviewAudit(
+  fixture: AuditFixture,
+  fetchImpl: FetchLike = fetch,
+  deadline = new AuditDeadline(),
+): Promise<ObjectRecord> {
+  return runHistoricalCoreAudit(fixture, PREVIEW_PROFILE, fetchImpl, deadline);
+}
+
+export async function runProductionAudit(
+  fixture: AuditFixture,
+  fetchImpl: FetchLike = fetch,
+  deadline = new AuditDeadline(),
+): Promise<ObjectRecord> {
+  return runHistoricalCoreAudit(fixture, PRODUCTION_PROFILE, fetchImpl, deadline);
 }
 
 async function assertOutputAbsent(output: string): Promise<void> {
@@ -765,21 +803,29 @@ export interface AuditCliDependencies {
   runAudit?: (fixture: AuditFixture, deadline: AuditDeadline) => Promise<ObjectRecord>;
 }
 
-export async function runAuditCli(args: string[], dependencies: AuditCliDependencies = {}): Promise<{ output: string; evidence: ObjectRecord; probeCount: number }> {
+export async function runHistoricalCoreAuditCli(
+  args: string[],
+  profile: HistoricalCoreAuditProfile,
+  dependencies: AuditCliDependencies = {},
+): Promise<{ output: string; evidence: ObjectRecord; probeCount: number }> {
   const deadline = new AuditDeadline(dependencies.now);
-  assert(args.length === 0 || (args.length === 2 && args[0] === '--output' && typeof args[1] === 'string' && args[1].length > 0), 'usage: npm run audit:historical-core-preview -- [--output path]');
-  const output = resolve(args.length === 0 ? `test-output/historical-core-preview-audit-${new Date().toISOString().replaceAll(':', '-')}.json` : args[1]!);
+  assert(args.length === 0 || (args.length === 2 && args[0] === '--output' && typeof args[1] === 'string' && args[1].length > 0), `usage: audit:historical-core-${profile.label} [--output path]`);
+  const output = resolve(args.length === 0 ? `test-output/historical-core-${profile.label}-audit-${new Date().toISOString().replaceAll(':', '-')}.json` : args[1]!);
   deadline.assertRemaining('fixed output preflight');
   await assertOutputAbsent(output);
   deadline.assertRemaining('fixed fixture preflight');
   const fixture = validateFixture(JSON.parse(await readFile(FIXTURE_PATH, 'utf8')));
   deadline.assertRemaining('fixed fixture preflight');
   const evidence = await (dependencies.runAudit === undefined
-    ? runPreviewAudit(fixture, fetch, deadline)
+    ? runHistoricalCoreAudit(fixture, profile, fetch, deadline)
     : dependencies.runAudit(fixture, deadline));
   deadline.assertRemaining('evidence publication preflight');
   await publishAuditEvidence(output, evidence, deadline);
   return { output, evidence, probeCount: fixture.probes.length };
+}
+
+export async function runAuditCli(args: string[], dependencies: AuditCliDependencies = {}): Promise<{ output: string; evidence: ObjectRecord; probeCount: number }> {
+  return runHistoricalCoreAuditCli(args, PREVIEW_PROFILE, dependencies);
 }
 
 async function main(): Promise<void> {
