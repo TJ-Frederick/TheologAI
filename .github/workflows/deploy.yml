@@ -145,11 +145,63 @@ jobs:
       - name: Audit production dependencies
         run: npm audit --omit=dev
 
-      - name: Verify production D1 is compatible (read-only)
-        run: npm run d1:remote:check -- --database THEOLOGAI_DB
+      # Resolve the checked-out production candidate by both name and UUID.
+      # This is read-only; candidate creation/preparation is a separately
+      # authorized, fail-stop operation and this workflow cannot perform it.
+      - name: Capture checked-out candidate production D1 mapping (read-only)
+        run: |
+          npx --no-install wrangler d1 list --json > "$RUNNER_TEMP/production-d1-inventory.json"
+          npx --no-install tsx scripts/production-release-reconciliation.ts candidate-d1-name \
+            --wrangler-config wrangler.toml \
+            --d1-inventory "$RUNNER_TEMP/production-d1-inventory.json" \
+            > "$RUNNER_TEMP/production-candidate-d1-name.txt"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Verify candidate production D1 is compatible (read-only)
+        run: |
+          candidate_d1_name="$(< "$RUNNER_TEMP/production-candidate-d1-name.txt")"
+          npm run d1:remote:check -- --database "$candidate_d1_name"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      # Retain a read-only predecessor record before deploy. It permits a
+      # manual recovery decision if a later step fails; it cannot roll back,
+      # bind, seed, delete, or otherwise mutate production.
+      - name: Capture production predecessor reconciliation anchor (read-only)
+        id: production-predecessor
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
+        run: |
+          npx --no-install wrangler deployments list --json > "$RUNNER_TEMP/production-worker-deployments-predecessor.json"
+          predecessor_version="$(npx --no-install tsx scripts/production-release-reconciliation.ts active-version-id \
+            --deployments "$RUNNER_TEMP/production-worker-deployments-predecessor.json")"
+          npx --no-install wrangler versions view "$predecessor_version" --json > "$RUNNER_TEMP/production-worker-predecessor-version-view.json"
+          npx --no-install tsx scripts/production-release-reconciliation.ts capture-predecessor \
+            --deployments "$RUNNER_TEMP/production-worker-deployments-predecessor.json" \
+            --predecessor-version-view "$RUNNER_TEMP/production-worker-predecessor-version-view.json" \
+            --wrangler-config wrangler.toml \
+            --d1-inventory "$RUNNER_TEMP/production-d1-inventory.json" \
+            --output "$RUNNER_TEMP/production-worker-predecessor-anchor.json"
+
+      - name: Upload production predecessor reconciliation anchor
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: production-release-predecessor-${{ github.sha }}
+          path: ${{ runner.temp }}/production-worker-predecessor-anchor.json
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Capture production Worker versions before deployment (read-only)
+        run: npx --no-install wrangler versions list --json > "$RUNNER_TEMP/production-worker-versions-before.json"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
 
       - name: Require live website and audited preview custom domain
         if: steps.production-custom-domain-change.outputs.required == 'true'
@@ -182,6 +234,7 @@ jobs:
           test -s "$RUNNER_TEMP/pre-production-preview-mcp-audit.json"
 
       - name: Deploy to Cloudflare Workers
+        id: production-worker-deploy
         uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
         with:
           wranglerVersion: '4.107.0'
@@ -192,3 +245,145 @@ jobs:
           command: deploy --env=
         env:
           ESV_API_KEY: ${{ secrets.ESV_API_KEY }}
+
+      - name: Verify exact active production Worker version (read-only)
+        id: production-worker-pre-audit-identity
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DEPLOY_COMMAND_OUTPUT: ${{ steps.production-worker-deploy.outputs.command-output }}
+          WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
+        run: |
+          printf '%s' "$DEPLOY_COMMAND_OUTPUT" > "$RUNNER_TEMP/production-worker-deploy.command-output.txt"
+          npx --no-install wrangler versions list --json > "$RUNNER_TEMP/production-worker-versions-after.json"
+          npx --no-install wrangler deployments list --json > "$RUNNER_TEMP/production-worker-deployments-after.json"
+          npx --no-install tsx scripts/verify-production-worker-deployment.ts verify-deploy \
+            --before-versions "$RUNNER_TEMP/production-worker-versions-before.json" \
+            --after-versions "$RUNNER_TEMP/production-worker-versions-after.json" \
+            --after-deployments "$RUNNER_TEMP/production-worker-deployments-after.json" \
+            --command-output "$RUNNER_TEMP/production-worker-deploy.command-output.txt" \
+            --output "$RUNNER_TEMP/production-worker-deployment-pre-audit-identity.json" \
+            --github-output "$GITHUB_OUTPUT"
+
+      # A candidate must be sole-active and attached to the exact D1 that
+      # passed readiness before either production black-box audit can begin.
+      - name: Require deployed candidate production D1 binding (read-only)
+        id: production-worker-candidate-cutover
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
+        run: |
+          observed_active_version="$(npx --no-install tsx scripts/production-release-reconciliation.ts active-version-id \
+            --deployments "$RUNNER_TEMP/production-worker-deployments-after.json")"
+          npx --no-install wrangler versions view "$observed_active_version" --json \
+            > "$RUNNER_TEMP/production-worker-candidate-version-view.json"
+          npx --no-install tsx scripts/production-release-reconciliation.ts observe-post-mutation \
+            --predecessor-anchor "$RUNNER_TEMP/production-worker-predecessor-anchor.json" \
+            --deployments "$RUNNER_TEMP/production-worker-deployments-after.json" \
+            --observed-active-version-view "$RUNNER_TEMP/production-worker-candidate-version-view.json" \
+            --wrangler-config wrangler.toml \
+            --output "$RUNNER_TEMP/production-worker-candidate-cutover-observation.json"
+          npx --no-install tsx scripts/production-release-reconciliation.ts reconcile-post-mutation \
+            --predecessor-anchor "$RUNNER_TEMP/production-worker-predecessor-anchor.json" \
+            --deployments "$RUNNER_TEMP/production-worker-deployments-after.json" \
+            --observed-active-version-view "$RUNNER_TEMP/production-worker-candidate-version-view.json" \
+            --wrangler-config wrangler.toml \
+            --output "$RUNNER_TEMP/production-worker-candidate-cutover.json"
+
+      - name: Upload production candidate cutover observation
+        if: ${{ always() && steps.production-worker-deploy.outcome == 'success' && steps.production-predecessor.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: production-candidate-cutover-observation-${{ github.sha }}
+          path: ${{ runner.temp }}/production-worker-candidate-cutover-observation.json
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Audit original-language v2 contract on production
+        run: |
+          npm run audit:original-language-v2-production -- \
+            --output "$RUNNER_TEMP/original-language-v2-production-audit.json"
+          test -s "$RUNNER_TEMP/original-language-v2-production-audit.json"
+
+      - name: Audit Transform-9 historical core contract on production
+        run: |
+          npm run audit:historical-core-production -- \
+            --output "$RUNNER_TEMP/historical-core-production-audit.json"
+          test -s "$RUNNER_TEMP/historical-core-production-audit.json"
+
+      # Always observe the final routing state after a completed deploy. This
+      # evidence remains useful if an audit fails; it never rolls back.
+      - name: Capture production post-mutation reconciliation record (read-only)
+        id: production-reconciliation
+        if: ${{ always() && steps.production-worker-deploy.outcome == 'success' && steps.production-predecessor.outcome == 'success' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
+        run: |
+          npx --no-install wrangler deployments list --json > "$RUNNER_TEMP/production-worker-deployments-post-mutation.json"
+          observed_active_version="$(npx --no-install tsx scripts/production-release-reconciliation.ts active-version-id \
+            --deployments "$RUNNER_TEMP/production-worker-deployments-post-mutation.json")"
+          npx --no-install wrangler versions view "$observed_active_version" --json > "$RUNNER_TEMP/production-worker-observed-active-version-view.json"
+          npx --no-install tsx scripts/production-release-reconciliation.ts observe-post-mutation \
+            --predecessor-anchor "$RUNNER_TEMP/production-worker-predecessor-anchor.json" \
+            --deployments "$RUNNER_TEMP/production-worker-deployments-post-mutation.json" \
+            --observed-active-version-view "$RUNNER_TEMP/production-worker-observed-active-version-view.json" \
+            --wrangler-config wrangler.toml \
+            --output "$RUNNER_TEMP/production-worker-post-mutation-reconciliation.json"
+
+      - name: Verify production Worker remained active through audit (read-only)
+        id: production-worker-audit-identity
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
+        run: |
+          npx --no-install wrangler deployments list --json > "$RUNNER_TEMP/production-worker-deployments-post-audit.json"
+          npx --no-install tsx scripts/verify-production-worker-deployment.ts verify-audit-stability \
+            --pre-audit-identity "$RUNNER_TEMP/production-worker-deployment-pre-audit-identity.json" \
+            --post-audit-deployments "$RUNNER_TEMP/production-worker-deployments-post-audit.json" \
+            --output "$RUNNER_TEMP/production-worker-deployment-identity.json" \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Hash sanitized production audit and reconciliation evidence
+        id: production-audit-evidence
+        if: ${{ always() && steps.production-reconciliation.outcome == 'success' }}
+        run: |
+          original_language_audit_sha256="$(sha256sum "$RUNNER_TEMP/original-language-v2-production-audit.json" | awk '{print $1}')"
+          historical_audit_sha256="$(sha256sum "$RUNNER_TEMP/historical-core-production-audit.json" | awk '{print $1}')"
+          identity_sha256="$(sha256sum "$RUNNER_TEMP/production-worker-deployment-identity.json" | awk '{print $1}')"
+          candidate_cutover_observation_sha256="$(sha256sum "$RUNNER_TEMP/production-worker-candidate-cutover-observation.json" | awk '{print $1}')"
+          post_mutation_reconciliation_sha256="$(sha256sum "$RUNNER_TEMP/production-worker-post-mutation-reconciliation.json" | awk '{print $1}')"
+          printf 'original_language_audit_sha256=%s\n' "$original_language_audit_sha256" >> "$GITHUB_OUTPUT"
+          printf 'historical_audit_sha256=%s\n' "$historical_audit_sha256" >> "$GITHUB_OUTPUT"
+          printf 'identity_record_sha256=%s\n' "$identity_sha256" >> "$GITHUB_OUTPUT"
+          printf 'candidate_cutover_observation_sha256=%s\n' "$candidate_cutover_observation_sha256" >> "$GITHUB_OUTPUT"
+          printf 'post_mutation_reconciliation_sha256=%s\n' "$post_mutation_reconciliation_sha256" >> "$GITHUB_OUTPUT"
+
+      - name: Upload production reconciliation evidence
+        if: ${{ always() && steps.production-reconciliation.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: production-release-reconciliation-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/production-worker-candidate-cutover-observation.json
+            ${{ runner.temp }}/production-worker-candidate-cutover.json
+            ${{ runner.temp }}/production-worker-post-mutation-reconciliation.json
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Upload protected production audit evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: production-release-audit-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/original-language-v2-production-audit.json
+            ${{ runner.temp }}/historical-core-production-audit.json
+            ${{ runner.temp }}/production-worker-deployment-identity.json
+            ${{ runner.temp }}/production-worker-candidate-cutover-observation.json
+            ${{ runner.temp }}/production-worker-candidate-cutover.json
+            ${{ runner.temp }}/production-worker-post-mutation-reconciliation.json
+          retention-days: 30
+          if-no-files-found: error

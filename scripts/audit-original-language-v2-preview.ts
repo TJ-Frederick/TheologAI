@@ -15,6 +15,23 @@ import {
 import { serializeValidatedOriginalLanguageStudyV2Output } from '../src/presenters/originalLanguageStudyV2Structured.js';
 
 const PREVIEW_ENDPOINT = 'https://preview-mcp.theologai.xyz/mcp';
+const PRODUCTION_ENDPOINT = 'https://mcp.theologai.xyz/mcp';
+export type OriginalLanguageV2AuditProfile = {
+  endpoint: string;
+  hostname: string;
+  serverVersion: string;
+  audit: 'original-language-v2-preview' | 'original-language-v2-production';
+  endpointClass: 'preview-custom' | 'production-custom';
+  label: 'preview' | 'production';
+};
+const PREVIEW_PROFILE: OriginalLanguageV2AuditProfile = {
+  endpoint: PREVIEW_ENDPOINT, hostname: 'preview-mcp.theologai.xyz', serverVersion: '3.6.0-preview',
+  audit: 'original-language-v2-preview', endpointClass: 'preview-custom', label: 'preview',
+};
+export const PRODUCTION_PROFILE: OriginalLanguageV2AuditProfile = {
+  endpoint: PRODUCTION_ENDPOINT, hostname: 'mcp.theologai.xyz', serverVersion: '3.6.0',
+  audit: 'original-language-v2-production', endpointClass: 'production-custom', label: 'production',
+};
 const PROTOCOL_VERSION = '2025-11-25';
 const MAX_LOGICAL_OPERATIONS = 13;
 /** initialize + initialized notification + tools/list + eleven tool calls. */
@@ -218,33 +235,35 @@ export function validateFixture(value: unknown): AuditFixture {
 }
 
 class FixedPreviewMcp {
-  private readonly endpoint = new URL(PREVIEW_ENDPOINT);
+  private readonly endpoint: URL;
   private readonly startedAt = Date.now();
   private sessionId: string | undefined;
   private id = 1;
   readonly counters: RequestCounters = { logical: 0, http: 0 };
 
-  constructor(private readonly fetchImpl: FetchLike = fetch) {}
+  constructor(private readonly fetchImpl: FetchLike = fetch, private readonly profile: OriginalLanguageV2AuditProfile = PREVIEW_PROFILE) {
+    this.endpoint = new URL(profile.endpoint);
+  }
 
   private remaining(): number {
     const remaining = MAX_DURATION_MS - (Date.now() - this.startedAt);
-    assert(remaining > 0, 'preview audit exceeded its 180-second total deadline');
+    assert(remaining > 0, `${this.profile.label} audit exceeded its 180-second total deadline`);
     return remaining;
   }
 
   private reserve(logical: boolean): void {
     if (logical) {
       this.counters.logical += 1;
-      assert(this.counters.logical <= MAX_LOGICAL_OPERATIONS, 'preview audit logical-operation budget exceeded');
+      assert(this.counters.logical <= MAX_LOGICAL_OPERATIONS, `${this.profile.label} audit logical-operation budget exceeded`);
     }
     this.counters.http += 1;
-    assert(this.counters.http <= MAX_HTTP_EXCHANGES, 'preview audit HTTP-exchange budget exceeded');
+    assert(this.counters.http <= MAX_HTTP_EXCHANGES, `${this.profile.label} audit HTTP-exchange budget exceeded`);
   }
 
   private async post(payload: Record<string, unknown>, label: string, logical: boolean): Promise<Record<string, unknown> | undefined> {
     this.reserve(logical);
     const target = new URL(this.endpoint);
-    assert(target.toString() === PREVIEW_ENDPOINT && target.protocol === 'https:' && target.hostname === 'preview-mcp.theologai.xyz' && target.pathname === '/mcp' && !target.search && !target.hash, 'preview audit endpoint allowlist drifted');
+    assert(target.toString() === this.profile.endpoint && target.protocol === 'https:' && target.hostname === this.profile.hostname && target.pathname === '/mcp' && !target.search && !target.hash, `${this.profile.label} audit endpoint allowlist drifted`);
     const controller = new AbortController();
     const timeoutMs = Math.min(MAX_REQUEST_DURATION_MS, this.remaining());
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -253,18 +272,18 @@ class FixedPreviewMcp {
         method: 'POST', redirect: 'error', signal: controller.signal,
         headers: {
           Accept: 'application/json, text/event-stream', 'Content-Type': 'application/json',
-          'Mcp-Protocol-Version': PROTOCOL_VERSION, 'User-Agent': 'TheologAI-OriginalLanguageV2-Preview-Audit/1.0',
+          'Mcp-Protocol-Version': PROTOCOL_VERSION, 'User-Agent': `TheologAI-OriginalLanguageV2-${this.profile.label}-Audit/1.0`,
           ...(this.sessionId === undefined ? {} : { 'Mcp-Session-Id': this.sessionId }),
         },
         body: JSON.stringify(payload),
       });
       if (response.status === 429) {
         await abortAndCancel(response, controller);
-        fail(`preview audit stopped at HTTP 429 during ${label}`);
+        fail(`${this.profile.label} audit stopped at HTTP 429 during ${label}`);
       }
       if (response.status < 200 || response.status >= 300) {
         await abortAndCancel(response, controller);
-        fail(`preview audit received non-success HTTP status during ${label}`);
+        fail(`${this.profile.label} audit received non-success HTTP status during ${label}`);
       }
       const body = await readBoundedResponseBody(response, controller, label);
       const session = response.headers.get('Mcp-Session-Id'); if (session) this.sessionId = session;
@@ -283,7 +302,7 @@ class FixedPreviewMcp {
   }
 
   async initialize(): Promise<Record<string, unknown>> {
-    const message = await this.post({ jsonrpc: '2.0', id: this.id++, method: 'initialize', params: { protocolVersion: PROTOCOL_VERSION, capabilities: {}, clientInfo: { name: 'theologai-original-language-v2-preview-audit', version: '1.0.0' } } }, 'initialize', true);
+    const message = await this.post({ jsonrpc: '2.0', id: this.id++, method: 'initialize', params: { protocolVersion: PROTOCOL_VERSION, capabilities: {}, clientInfo: { name: `theologai-original-language-v2-${this.profile.label}-audit`, version: '1.0.0' } } }, 'initialize', true);
     assert(message !== undefined, 'initialize must return a response'); return message;
   }
 
@@ -385,16 +404,16 @@ function result(message: Record<string, unknown>, label: string): Record<string,
   const output = object(message.result); assert(output !== undefined, `${label} result missing`); return output;
 }
 
-function assertInitialize(message: Record<string, unknown>): {
+function assertInitialize(message: Record<string, unknown>, profile: OriginalLanguageV2AuditProfile): {
   protocolVersion: typeof PROTOCOL_VERSION;
   serverName: 'theologai-bible-server';
-  serverVersion: '3.6.0-preview';
+  serverVersion: string;
 } {
   const output = result(message, 'initialize');
   const server = object(output.serverInfo); const capabilities = object(output.capabilities);
-  assert(output.protocolVersion === PROTOCOL_VERSION && server?.name === 'theologai-bible-server' && server?.version === '3.6.0-preview', 'preview initialize identity/version drifted');
-  assert(JSON.stringify(Object.keys(capabilities ?? {}).sort()) === JSON.stringify(['prompts', 'resources', 'tools']), 'preview initialize capabilities drifted');
-  return { protocolVersion: PROTOCOL_VERSION, serverName: 'theologai-bible-server', serverVersion: '3.6.0-preview' };
+  assert(output.protocolVersion === PROTOCOL_VERSION && server?.name === 'theologai-bible-server' && server?.version === profile.serverVersion, `${profile.label} initialize identity/version drifted`);
+  assert(JSON.stringify(Object.keys(capabilities ?? {}).sort()) === JSON.stringify(['prompts', 'resources', 'tools']), `${profile.label} initialize capabilities drifted`);
+  return { protocolVersion: PROTOCOL_VERSION, serverName: 'theologai-bible-server', serverVersion: profile.serverVersion };
 }
 
 function assertToolRegistration(message: Record<string, unknown>): SchemaHashes {
@@ -598,12 +617,13 @@ function evidenceTextIsSafe(value: unknown): void {
   visit(value);
 }
 
-export async function runPreviewAudit(
+export async function runOriginalLanguageV2Audit(
   fixture: AuditFixture,
+  profile: OriginalLanguageV2AuditProfile,
   fetchImpl: FetchLike = fetch,
 ): Promise<Record<string, unknown>> {
-  const startedAt = Date.now(); const client = new FixedPreviewMcp(fetchImpl);
-  const negotiated = assertInitialize(await client.initialize()); await client.initialized(); const schemas = assertToolRegistration(await client.toolsList());
+  const startedAt = Date.now(); const client = new FixedPreviewMcp(fetchImpl, profile);
+  const negotiated = assertInitialize(await client.initialize(), profile); await client.initialized(); const schemas = assertToolRegistration(await client.toolsList());
   const cursorHistory = new Map<string, string>(); const priorCandidates = new Map<string, string[]>(); const records: SanitizedRecord[] = [];
   for (const item of fixture.cases) {
     const args = structuredClone(item.arguments);
@@ -621,7 +641,7 @@ export async function runPreviewAudit(
   }
   client.complete();
   const evidence = {
-    schemaVersion: 1, audit: 'original-language-v2-preview', endpointClass: 'preview-custom',
+    schemaVersion: 1, audit: profile.audit, endpointClass: profile.endpointClass,
     fixtureSha256: sha256(await readFile(FIXTURE_PATH, 'utf8')), durationMs: Date.now() - startedAt,
     negotiated,
     schemas,
@@ -633,14 +653,35 @@ export async function runPreviewAudit(
   return evidence;
 }
 
-async function main(): Promise<void> {
-  const args = process.argv.slice(2);
-  assert(args.length === 0 || (args.length === 2 && args[0] === '--output' && typeof args[1] === 'string' && args[1].length > 0), 'usage: npm run audit:original-language-v2-preview -- [--output path]');
-  const output = resolve(args.length === 0 ? `test-output/original-language-v2-preview-audit-${new Date().toISOString().replaceAll(':', '-')}.json` : args[1]!);
+export async function runPreviewAudit(
+  fixture: AuditFixture,
+  fetchImpl: FetchLike = fetch,
+): Promise<Record<string, unknown>> {
+  return runOriginalLanguageV2Audit(fixture, PREVIEW_PROFILE, fetchImpl);
+}
+
+export async function runProductionAudit(
+  fixture: AuditFixture,
+  fetchImpl: FetchLike = fetch,
+): Promise<Record<string, unknown>> {
+  return runOriginalLanguageV2Audit(fixture, PRODUCTION_PROFILE, fetchImpl);
+}
+
+export async function runOriginalLanguageV2AuditCli(
+  args: string[],
+  profile: OriginalLanguageV2AuditProfile,
+): Promise<{ output: string; caseCount: number }> {
+  assert(args.length === 0 || (args.length === 2 && args[0] === '--output' && typeof args[1] === 'string' && args[1].length > 0), `usage: audit:original-language-v2-${profile.label} [--output path]`);
+  const output = resolve(args.length === 0 ? `test-output/original-language-v2-${profile.label}-audit-${new Date().toISOString().replaceAll(':', '-')}.json` : args[1]!);
   const fixture = validateFixture(JSON.parse(await readFile(FIXTURE_PATH, 'utf8')));
-  const evidence = await runPreviewAudit(fixture);
+  const evidence = await runOriginalLanguageV2Audit(fixture, profile);
   await mkdir(dirname(output), { recursive: true }); await writeFile(output, `${JSON.stringify(evidence, null, 2)}\n`, { encoding: 'utf8', flag: 'wx' });
-  console.log(`PASS: ${fixture.cases.length}/${fixture.cases.length} original_language_study v2 preview cases; evidence: ${output}`);
+  return { output, caseCount: fixture.cases.length };
+}
+
+async function main(): Promise<void> {
+  const { output, caseCount } = await runOriginalLanguageV2AuditCli(process.argv.slice(2), PREVIEW_PROFILE);
+  console.log(`PASS: ${caseCount}/${caseCount} original_language_study v2 preview cases; evidence: ${output}`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

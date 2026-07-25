@@ -257,11 +257,44 @@ and redeploying through the normal approval gate. Database creation, binding
 edits, rollback deployments, and eventual deletion remain separately authorized
 operations.
 
-Approved deploy jobs perform the last compatibility check read-only:
+### Future production candidates
+
+`npm run d1:production:candidate:prepare` is the production-only preparation
+path. It requires a literal `--remote`, a fresh
+`theologai-production-YYYYMMDD-suffix` name, the exact canonical UUID, and
+both repeated confirmations. It resolves that exact pair through `d1 list`,
+rejects the active checked-in production binding, creates a temporary
+no-deploy configuration, and verifies the checked-in migration/source/seed
+identity before any remote command.
+
+Run it from a checked-out revision whose root production binding still names
+the active predecessor; it deliberately refuses a candidate that is already
+the checked-in root binding. The binding update belongs to the later reviewed
+cutover change, after preparation evidence is retained.
+
+It then permits exactly one pristine-schema preflight, one migration pass, one
+manifest-ordered pass through every deterministic seed file, and the complete
+read-only readiness check. The readiness check includes the Transform-8 and
+Transform-9 authority audits derived from the checked-in corpus identity. A
+failure after migration or seed SQL may have started is terminal for that
+candidate: do not retry, resume, repair, bind, deploy, or reuse it. Create a
+new candidate under a separately authorized operation instead.
+
+This preparer does not change `wrangler.toml`, a Worker binding, deployment,
+database inventory, or a remote corpus. Until a later authorized cutover, the
+checked-out 25-work Transform-9 materialization remains local-only and both
+remote environments remain on their deployed 17-work Transform-8 collections.
+The protected production workflow later re-resolves the checked-in candidate
+name/UUID, reruns readiness by exact name, records the predecessor Worker/D1
+identity, and refuses to start either black-box audit unless the sole active
+deployed Worker is bound to that readiness-tested candidate.
+
+Approved deploy jobs perform the last compatibility check read-only against
+the candidate name resolved from the checked-in name/UUID pair:
 
 ```bash
-npm run d1:remote:check -- --database THEOLOGAI_DB
-npm run d1:remote:check -- --database THEOLOGAI_DB --env preview
+npm run d1:remote:check -- --database "$candidate_d1_name"
+npm run d1:remote:check -- --database "$candidate_d1_name" --env preview
 ```
 
 The check requires normal Wrangler Cloudflare credentials and verifies database

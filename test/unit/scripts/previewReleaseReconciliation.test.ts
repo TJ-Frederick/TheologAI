@@ -1,6 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import {
+  activeProductionVersionId,
+  candidateProductionD1DatabaseName,
+  captureProductionPredecessorAnchor,
+  reconcileProductionPostMutation,
   activePreviewVersionId,
   candidatePreviewD1DatabaseName,
   capturePreviewPredecessorAnchor,
@@ -16,6 +20,8 @@ const candidateDeployment = '423e4567-e89b-42d3-a456-426614174000';
 const predecessorD1Id = '94c4938b-7800-4d68-9097-0df33c31fdc1';
 const candidateD1Id = '414dbda0-ba5b-4ac0-826b-0402d2ed825b';
 const candidateD1Name = 'theologai-preview-20260724-a';
+const productionCandidateD1Id = '3f7faa0e-689f-47aa-a601-dc662db9a6cf';
+const productionCandidateD1Name = 'theologai-production-20260723-a';
 
 function deployments(id = predecessorDeployment, version = predecessorVersion): string {
   return JSON.stringify([{
@@ -44,6 +50,29 @@ function predecessorConfig(config: string): string {
 }
 
 describe('preview release reconciliation evidence', () => {
+  it('uses an independently fixed production root binding for exact candidate reconciliation', async () => {
+    const config = await readFile(new URL('wrangler.toml', root), 'utf8');
+    const productionInventory = JSON.stringify([{ uuid: productionCandidateD1Id, name: productionCandidateD1Name }]);
+    const anchor = captureProductionPredecessorAnchor({
+      deploymentsText: deployments(), predecessorVersionViewText: versionView(predecessorVersion, predecessorD1Id),
+      wranglerConfigText: config, d1InventoryText: productionInventory,
+    });
+    expect(anchor).toMatchObject({
+      worker: 'theologai', candidateD1: { binding: 'THEOLOGAI_DB', databaseName: productionCandidateD1Name, databaseId: productionCandidateD1Id },
+      predecessorD1: { binding: 'THEOLOGAI_DB', databaseId: predecessorD1Id }, d1Changed: true,
+    });
+    expect(candidateProductionD1DatabaseName({ wranglerConfigText: config, d1InventoryText: productionInventory })).toBe(productionCandidateD1Name);
+    expect(activeProductionVersionId(deployments())).toBe(predecessorVersion);
+    expect(reconcileProductionPostMutation({
+      predecessorAnchorText: JSON.stringify(anchor), postMutationDeploymentsText: deployments(candidateDeployment, candidateVersion),
+      observedActiveVersionViewText: versionView(candidateVersion, productionCandidateD1Id), wranglerConfigText: config,
+    })).toMatchObject({ worker: 'theologai', candidateBindingMatches: true, candidateConfigMatchesAnchor: true });
+    expect(() => reconcileProductionPostMutation({
+      predecessorAnchorText: JSON.stringify(anchor), postMutationDeploymentsText: deployments(candidateDeployment, candidateVersion),
+      observedActiveVersionViewText: versionView(candidateVersion, predecessorD1Id), wranglerConfigText: config,
+    })).toThrow('does not match the checked-out readiness-tested candidate D1');
+  });
+
   it('captures distinct observed predecessor and readiness-tested candidate D1 identities', async () => {
     const config = await readFile(new URL('wrangler.toml', root), 'utf8');
     const anchor = capturePreviewPredecessorAnchor({
