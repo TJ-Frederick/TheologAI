@@ -12,6 +12,7 @@
     "build:strongs": "tsx scripts/build-strongs-json.ts",
     "build:stepbible": "tsx scripts/build-stepbible-json.ts",
     "build:stepbible:lexicons": "tsx scripts/build-stepbible-lexicons.ts",
+    "audit:aquinas-source-pack-capacity": "tsx scripts/aquinas-source-pack-capacity-comparison.ts",
     "build:db": "tsx scripts/build-database.ts",
     "data:verify-sources": "tsx scripts/verify-data-manifest.ts",
     "data:verify-section-keys": "tsx scripts/historical-section-key-plan.ts",

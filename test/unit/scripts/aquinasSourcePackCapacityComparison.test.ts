@@ -41,6 +41,14 @@ function adversarialFixture(mutate: (root: string, packageDirectory: string) => 
 }
 
 describe('Aquinas source-pack capacity comparison derivation', () => {
+  it('keeps the documented no-argument capacity audit command bound to its reviewed script', () => {
+    const packageJson = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')) as {
+      scripts?: Record<string, string>;
+    };
+    expect(packageJson.scripts?.['audit:aquinas-source-pack-capacity'])
+      .toBe('tsx scripts/aquinas-source-pack-capacity-comparison.ts');
+  });
+
   it('attests the exact inactive five-shard package and child inventory', () => {
     const input = loadAquinasCapacityInput(ROOT);
     expect(input.identity).toEqual(AQUINAS_CAPACITY_EXPECTED.identity);
