@@ -10,7 +10,8 @@
       "coreWorkCount": 8,
       "coreSectionCount": 512
     },
-    "sourcePackId": "theologai-core-eight"
+    "sourcePackId": "theologai-core-eight",
+    "expectedCoreEditionProvenanceStatus": "verified_with_uncertainty"
   },
   "probes": [
     {
@@ -50,7 +51,7 @@
     {
       "workId": "calvin-institutes",
       "editionId": "calvin-institutes-beveridge-1845",
-      "query": "justification",
+      "query": "promises law gospel reconciled",
       "sectionCount": 84,
       "landingResourceUri": "theologai://documents/calvin-institutes",
       "firstSection": {
@@ -67,7 +68,7 @@
     {
       "workId": "wesley-standard-sermons",
       "editionId": "wesley-standard-sermons-1771",
-      "query": "salvation",
+      "query": "salvation by faith",
       "sectionCount": 55,
       "landingResourceUri": "theologai://documents/wesley-standard-sermons",
       "firstSection": {

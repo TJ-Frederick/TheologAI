@@ -27,11 +27,22 @@ type Audit = ReturnType<typeof validateFixture>;
 type FakeOptions = {
   mutate?: (body: RecordValue, response: RecordValue) => RecordValue;
   invalidResourceError?: string;
+  invalidResourceCode?: number;
+  invalidResourceData?: RecordValue;
+  omitInvalidResourceData?: boolean;
+  invalidResourceExtra?: RecordValue;
+  invalidResourceResult?: RecordValue;
   invalidCursorError?: string;
   directLandingText?: string;
   truncateClassicCatalog?: boolean;
   primaryLocatorDrift?: boolean;
+  catalogProvenanceStatus?: string | null;
+  landingResourceSizeBytes?: number | null;
+  ccelIsError?: boolean;
+  ccelStructuredContent?: boolean;
 };
+
+const FAKE_LANDING_TEXT = '# Work record\nMetadata only.';
 
 const V7_CONTRACT = {
   exposeCcelDiscovery: true,
@@ -49,6 +60,7 @@ describe('historical core preview audit contract', () => {
   it('accepts only the immutable 25=17+8 Transform-9 fixture, including separate directory and relevance locators', async () => {
     const parsed = validateFixture(await fixture());
     expect(parsed.baseline.expectedCatalogIdentity).toEqual({ workCount: 25, legacyWorkCount: 17, coreWorkCount: 8, coreSectionCount: 512 });
+    expect(parsed.baseline.expectedCoreEditionProvenanceStatus).toBe('verified_with_uncertainty');
     expect(parsed.probes).toHaveLength(8);
     expect(parsed.probes.map(probe => probe.sectionCount).reduce((sum, count) => sum + count, 0)).toBe(512);
     expect(parsed.probes.find(probe => probe.workId === 'calvin-institutes')?.firstSection).toEqual({
@@ -58,6 +70,21 @@ describe('historical core preview audit contract', () => {
     expect(parsed.probes.find(probe => probe.workId === 'calvin-institutes')?.primarySearch).toEqual({
       sectionKey: 'book-3-chapter-17', sourceOrdinal: 54,
       resourceUri: 'theologai://documents/calvin-institutes#section-book-3-chapter-17',
+    });
+
+    const calvin = parsed.probes.find(probe => probe.workId === 'calvin-institutes')!;
+    const wesley = parsed.probes.find(probe => probe.workId === 'wesley-standard-sermons')!;
+    expect(calvin.query).toBe('promises law gospel reconciled');
+    expect(calvin.query).not.toBe('justification');
+    expect(calvin.primarySearch).toEqual({
+      sectionKey: 'book-3-chapter-17', sourceOrdinal: 54,
+      resourceUri: 'theologai://documents/calvin-institutes#section-book-3-chapter-17',
+    });
+    expect(wesley.query).toBe('salvation by faith');
+    expect(wesley.query).not.toBe('salvation');
+    expect(wesley.primarySearch).toEqual({
+      sectionKey: 'sermon-01', sourceOrdinal: 1,
+      resourceUri: 'theologai://documents/wesley-standard-sermons#section-sermon-01',
     });
 
     const changed = structuredClone(parsed) as unknown as RecordValue;
@@ -74,9 +101,14 @@ describe('historical core preview audit contract', () => {
     for (const probe of parsed.probes) {
       const edition = JSON.parse(await readFile(new URL(
         `data/historical-source-packs/core-eight/editions/${probe.editionId}.json`, root,
-      ), 'utf8')) as { work: { workId: string }; sections: Array<{ sectionKey: string; sourceOrdinal: number; content: string }> };
+      ), 'utf8')) as {
+        work: { workId: string };
+        edition: { provenance: { status: string } };
+        sections: Array<{ sectionKey: string; sourceOrdinal: number; content: string }>;
+      };
       const text = edition.sections.map(section => section.content).join(' ').toLocaleLowerCase('en-US');
       expect(edition.work.workId).toBe(probe.workId);
+      expect(edition.edition.provenance.status).toBe(parsed.baseline.expectedCoreEditionProvenanceStatus);
       expect(edition.sections).toHaveLength(probe.sectionCount);
       expect(edition.sections[0]).toMatchObject({ sectionKey: probe.firstSection.sectionKey, sourceOrdinal: probe.firstSection.sourceOrdinal });
       expect(edition.sections[probe.primarySearch.sourceOrdinal - 1]).toMatchObject({
@@ -207,15 +239,115 @@ describe('historical core preview audit contract', () => {
       .rejects.toThrow('primary local evidence identity/readiness drifted');
   });
 
+  it('requires the reviewed core-eight provenance status, rather than treating a stronger-looking status as interchangeable', async () => {
+    const parsed = validateFixture(await fixture());
+    await expect(runPreviewAudit(parsed, fakeFetchWith(parsed)))
+      .resolves.toMatchObject({ records: expect.any(Array) });
+    for (const provenance of ['verified', 'incomplete', null]) {
+      await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { catalogProvenanceStatus: provenance })))
+        .rejects.toThrow('edition readiness drifted');
+    }
+  });
+
+  it('requires an exact positive bounded size only for a sectioned landing resource', async () => {
+    const parsed = validateFixture(await fixture());
+    for (const resourceSizeBytes of [null, 0, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+      await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { landingResourceSizeBytes: resourceSizeBytes })))
+        .rejects.toThrow('landing canonical locator/byte contract drifted');
+    }
+    await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { landingResourceSizeBytes: 1 })))
+      .rejects.toThrow('landing resource byte size drifted');
+  });
+
+  it('enforces the 16,384-byte landing ceiling and measures direct landing resources as UTF-8', async () => {
+    const parsed = validateFixture(await fixture());
+    await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { landingResourceSizeBytes: 16_385 })))
+      .rejects.toThrow('landing canonical locator/byte contract drifted');
+
+    const ceilingText = 'x'.repeat(16_384);
+    await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, {
+      directLandingText: ceilingText, landingResourceSizeBytes: 16_384,
+    }))).resolves.toMatchObject({ records: expect.any(Array) });
+
+    const multibyteText = 'é'.repeat(100);
+    const multibyteBytes = new TextEncoder().encode(multibyteText).byteLength;
+    expect(multibyteBytes).not.toBe(multibyteText.length);
+    await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, {
+      directLandingText: multibyteText, landingResourceSizeBytes: multibyteBytes,
+    }))).resolves.toMatchObject({ records: expect.any(Array) });
+    await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, {
+      directLandingText: multibyteText, landingResourceSizeBytes: multibyteText.length,
+    }))).rejects.toThrow('landing resource byte size drifted');
+  });
+
+  it('keeps catalog and directory locators intentionally unsized', () => {
+    const properties = (classicTextsOutputSchema as unknown as RecordValue).properties as RecordValue;
+    const catalog = properties.catalog as RecordValue;
+    const catalogProperties = catalog.properties as RecordValue;
+    const catalogWorks = catalogProperties.works as RecordValue;
+    const catalogWork = catalogWorks.items as RecordValue;
+    const catalogLocator = (catalogWork.properties as RecordValue).resource as RecordValue;
+    const directory = properties.directory as RecordValue;
+    const directorySections = (directory.properties as RecordValue).sections as RecordValue;
+    const directoryEntry = directorySections.items as RecordValue;
+    const directoryLocator = (directoryEntry.properties as RecordValue).resource as RecordValue;
+    const landing = properties.landing as RecordValue;
+    const landingWork = (landing.properties as RecordValue).work as RecordValue;
+    const landingLocator = (landingWork.properties as RecordValue).resource as RecordValue;
+
+    expect(catalogLocator.required).toEqual(['kind', 'uri']);
+    expect(directoryLocator.required).toEqual(['kind', 'uri']);
+    expect((catalogLocator.properties as RecordValue)).not.toHaveProperty('resourceSizeBytes');
+    expect((directoryLocator.properties as RecordValue)).not.toHaveProperty('resourceSizeBytes');
+    expect(landingLocator.required).toEqual(['kind', 'uri', 'resourceSizeBytes']);
+  });
+
+  it('requires CCEL-disabled to remain an errored structured diagnostic response', async () => {
+    const parsed = validateFixture(await fixture());
+    await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { ccelIsError: false })))
+      .rejects.toThrow('CCEL disabled regression must be an errored structured response');
+    await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { ccelStructuredContent: false })))
+      .rejects.toThrow('CCEL disabled regression must be an errored structured response');
+  });
+
+  it('requires the exact safe resource-not-found diagnostic envelope without retaining it in evidence', async () => {
+    const parsed = validateFixture(await fixture());
+    const invalidResourceUri = 'theologai://documents/does-not-exist#section-not-real';
+    await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { invalidResourceError: 'Resource not found' })))
+      .resolves.toMatchObject({ regressions: { invalidResourceRejected: true } });
+    await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { invalidResourceCode: -32001 })))
+      .rejects.toThrow('invalid resource regression must return exact resource-not-found code -32002');
+    await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { invalidResourceError: `MCP error -32002: Resource not found: ${invalidResourceUri}` })))
+      .rejects.toThrow('invalid resource regression must return an exact safe resource-not-found message');
+    await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { invalidResourceError: 'MCP error -32002: Resource not found: file:///private/tmp/internal' })))
+      .rejects.toThrow('invalid resource regression must return an exact safe resource-not-found message');
+    for (const invalidResourceExtra of [
+      { stack: 'Error: not found' }, { debug: 'internal' }, { source: 'file:///private/tmp/internal' },
+    ]) {
+      await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { invalidResourceExtra })))
+        .rejects.toThrow('invalid resource regression error envelope keys drifted');
+    }
+    await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { invalidResourceResult: { unexpected: true } })))
+      .rejects.toThrow('invalid resource regression must not return result alongside error');
+    await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { omitInvalidResourceData: true })))
+      .rejects.toThrow('invalid resource regression error envelope keys drifted');
+    await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { invalidResourceData: { uri: 'theologai://documents/a-different-resource' } })))
+      .rejects.toThrow('invalid resource regression must return only the requested URI in error data');
+    await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { invalidResourceData: { uri: invalidResourceUri, relatedUri: 'theologai://documents/another-resource' } })))
+      .rejects.toThrow('invalid resource regression must return only the requested URI in error data');
+    await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { invalidResourceData: { uri: invalidResourceUri, token: 'not-a-real-token' } })))
+      .rejects.toThrow('invalid resource regression must return only the requested URI in error data');
+  });
+
   it('rejects cursor, URI, credential, storage, and stack-trace error reflections before evidence is created', async () => {
     const parsed = validateFixture(await fixture());
     await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { invalidCursorError: 'cursor not-a-valid-cursor' })))
       .rejects.toThrow('invalid cursor regression error reflected rejected input');
     await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { invalidResourceError: 'https://private.invalid/secret' })))
-      .rejects.toThrow('invalid resource regression error leaked a URI, credential-shaped value, storage detail, stack trace, or secret reflection');
-    for (const sensitive of ['SQLite database failure', 'API Key leaked', 'SQL D1 traceback stack']) {
-      await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { invalidResourceError: sensitive })))
-        .rejects.toThrow('invalid resource regression error leaked a URI, credential-shaped value, storage detail, stack trace, or secret reflection');
+      .rejects.toThrow('invalid resource regression must return an exact safe resource-not-found message');
+    for (const sensitive of ['SQLite database failure', 'API Key leaked', 'SQL D1 traceback stack', 'Internal implementation detail']) {
+      await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { invalidResourceError: `MCP error -32002: Resource not found; ${sensitive}` })))
+        .rejects.toThrow('invalid resource regression must return an exact safe resource-not-found message');
     }
   });
 
@@ -398,20 +530,35 @@ function fakeResourceTemplates(): RecordValue[] {
 
 function resourceResponse(body: RecordValue, fixtureValue: Audit, options: FakeOptions): Response {
   const uri = (body.params as RecordValue).uri as string;
-  if (uri === 'theologai://primary-sources/catalog') return jsonResponse({ jsonrpc: '2.0', id: body.id, result: { contents: [{ uri, mimeType: 'application/json', text: JSON.stringify(fakeCatalog(fixtureValue)) }] } });
-  if (uri.includes('does-not-exist')) return jsonResponse({ jsonrpc: '2.0', id: body.id, error: { code: -32002, message: options.invalidResourceError ?? 'not found' } });
+  if (uri === 'theologai://primary-sources/catalog') return jsonResponse({ jsonrpc: '2.0', id: body.id, result: { contents: [{ uri, mimeType: 'application/json', text: JSON.stringify(fakeCatalog(fixtureValue, options)) }] } });
+  if (uri.includes('does-not-exist')) return jsonResponse({
+    jsonrpc: '2.0', id: body.id,
+    ...(options.invalidResourceResult === undefined ? {} : { result: options.invalidResourceResult }),
+    error: {
+      code: options.invalidResourceCode ?? -32002,
+      message: options.invalidResourceError ?? 'MCP error -32002: Resource not found',
+      ...(options.omitInvalidResourceData ? {} : { data: options.invalidResourceData ?? { uri } }),
+      ...(options.invalidResourceExtra ?? {}),
+    },
+  });
   const firstLanding = fixtureValue.probes[0]!.landingResourceUri;
-  const text = uri === firstLanding ? options.directLandingText ?? '# Work record\nMetadata only.' : '# Exact section\nPRIVATE HISTORICAL BODY';
+  const text = uri === firstLanding ? options.directLandingText ?? FAKE_LANDING_TEXT : '# Exact section\nPRIVATE HISTORICAL BODY';
   return jsonResponse({ jsonrpc: '2.0', id: body.id, result: { contents: [{ uri, mimeType: 'text/markdown', text }] } });
 }
 
-function fakeCatalog(fixtureValue: Audit): RecordValue {
+function fakeCatalog(fixtureValue: Audit, options: FakeOptions = {}): RecordValue {
   const legacy = [
     '39-articles', 'apostles-creed', 'athanasian-creed', 'augsburg-confession', 'baltimore-catechism', 'belgic-confession', 'canons-of-dort', 'chalcedonian-definition', 'confession-of-dositheus', 'council-of-trent', 'heidelberg-catechism', 'london-baptist-1689', 'nicene-creed', 'philaret-catechism', 'westminster-confession', 'westminster-larger-catechism', 'westminster-shorter-catechism',
   ].map(id => ({ id, editionReadiness: { editionIdentity: 'not_established' } }));
   const core = fixtureValue.probes.map(probe => ({ id: probe.workId,
     editionProvenance: { sourcePackId: fixtureValue.baseline.sourcePackId, editionId: probe.editionId },
-    editionReadiness: { editionIdentity: 'established', provenance: 'verified', normalizedTextRights: 'no_known_conflict' },
+    editionReadiness: {
+      editionIdentity: 'established',
+      ...(options.catalogProvenanceStatus === null ? {} : {
+        provenance: options.catalogProvenanceStatus ?? fixtureValue.baseline.expectedCoreEditionProvenanceStatus,
+      }),
+      normalizedTextRights: 'no_known_conflict',
+    },
   }));
   return { schemaVersion: '2', kind: 'local_primary_source_catalog', workCount: 25, works: [...legacy, ...core],
     policies: { scope: 'hosted_collection_only', editionProvenance: 'mixed_legacy_and_reviewed_source_packs', rightsStatus: 'mixed_not_established_and_no_known_conflict' } };
@@ -435,7 +582,7 @@ function classicTool(body: RecordValue, args: RecordValue, fixtureValue: Audit, 
     : fixtureValue.probes.find(item => item.workId === args.work)!;
   if (args.browseSections) return toolResult(body, { structuredContent: directory(probe) });
   if (args.query) return toolResult(body, { structuredContent: { schemaVersion: '2', kind: 'classic_text_lookup', mode: 'search', search: { status: 'ok', hits: [{ work: { id: probe.workId }, snippetOnly: true }] } } });
-  return toolResult(body, { structuredContent: landing(probe) });
+  return toolResult(body, { structuredContent: landing(probe, options) });
 }
 
 function fakeClassicWorks(fixtureValue: Audit): RecordValue[] {
@@ -443,10 +590,15 @@ function fakeClassicWorks(fixtureValue: Audit): RecordValue[] {
   return works.map(work => ({ id: work.id, deliveryMode: fixtureValue.probes.some(probe => probe.workId === work.id) ? 'sectioned_only' : 'complete_document' }));
 }
 
-function landing(probe: Audit['probes'][number]): RecordValue {
+function landing(probe: Audit['probes'][number], options: FakeOptions): RecordValue {
   return { schemaVersion: '2', kind: 'classic_text_lookup', mode: 'landing',
     evidencePolicy: { providerScope: 'local_only', remoteDocumentBodies: 'disabled', selectedContentAccess: 'mcp_resource_read' },
-    landing: { work: { id: probe.workId, deliveryMode: 'sectioned_only', resource: { kind: 'mcp_resource', uri: probe.landingResourceUri } }, sectionCount: probe.sectionCount, bodyDelivery: 'exact_section_resource_only', browse: { pageSize: 32 } } };
+    landing: { work: { id: probe.workId, deliveryMode: 'sectioned_only', resource: {
+      kind: 'mcp_resource', uri: probe.landingResourceUri,
+      ...(options.landingResourceSizeBytes === null ? {} : {
+        resourceSizeBytes: options.landingResourceSizeBytes ?? new TextEncoder().encode(FAKE_LANDING_TEXT).byteLength,
+      }),
+    } }, sectionCount: probe.sectionCount, bodyDelivery: 'exact_section_resource_only', browse: { pageSize: 32 } } };
 }
 
 function directory(probe: Audit['probes'][number]): RecordValue {
@@ -455,7 +607,14 @@ function directory(probe: Audit['probes'][number]): RecordValue {
 
 function primaryTool(body: RecordValue, args: RecordValue, fixtureValue: Audit, options: FakeOptions): Response {
   const query = ((args.queries as RecordValue[])[0])!;
-  if ((query.providers as string[])[0] === 'ccel') return toolResult(body, { structuredContent: { schemaVersion: '7', kind: 'primary_source_search', planStatus: 'unavailable', queries: [{ providers: [{ provider: 'ccel_live', status: 'disabled', searched: false, hitCount: 0, hits: [] }] }], coverage: { localAttempted: false, ccelAttempted: false, ccelStatus: 'disabled', ccelHitCount: 0 } } });
+  if ((query.providers as string[])[0] === 'ccel') return toolResult(body, {
+    isError: options.ccelIsError ?? true,
+    ...(options.ccelStructuredContent === false ? {} : { structuredContent: {
+      schemaVersion: '7', kind: 'primary_source_search', planStatus: 'unavailable',
+      queries: [{ providers: [{ provider: 'ccel_live', status: 'disabled', searched: false, hitCount: 0, hits: [] }] }],
+      coverage: { localAttempted: false, ccelAttempted: false, ccelStatus: 'disabled', ccelHitCount: 0 },
+    } }),
+  });
   const workId = query.work as string;
   const probe = fixtureValue.probes.find(item => item.workId === workId)!;
   const uri = options.primaryLocatorDrift

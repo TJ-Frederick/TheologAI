@@ -8,6 +8,7 @@ import { createHash } from 'node:crypto';
 import { link, lstat, mkdir, mkdtemp, readFile, rm, unlink, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { HISTORICAL_SECTIONED_ONLY_LANDING_MAX_BYTES } from '../src/kernel/historicalSectionedDelivery.js';
 import { classicTextsOutputSchema } from '../src/mcp/schemas/classicTexts.js';
 import { primarySourceSearchV7OutputSchema } from '../src/mcp/schemas/primarySourceSearchV4.js';
 
@@ -51,12 +52,13 @@ const EXPECTED_FIXTURE = {
     d1TransformVersion: 9,
     expectedCatalogIdentity: { workCount: 25, legacyWorkCount: 17, coreWorkCount: 8, coreSectionCount: 512 },
     sourcePackId: 'theologai-core-eight',
+    expectedCoreEditionProvenanceStatus: 'verified_with_uncertainty',
   },
   probes: [
     { workId: 'augustine-confessions', editionId: 'augustine-confessions-pusey-1838', query: 'restless heart', sectionCount: 13, landingResourceUri: 'theologai://documents/augustine-confessions', firstSection: { sectionKey: 'book-01', sourceOrdinal: 1, resourceUri: 'theologai://documents/augustine-confessions#section-book-01' }, primarySearch: { sectionKey: 'book-02', sourceOrdinal: 2, resourceUri: 'theologai://documents/augustine-confessions#section-book-02' } },
     { workId: 'john-damascene-exact-exposition', editionId: 'john-damascene-exposition-salmond-npnf2-v9', query: 'two natures', sectionCount: 100, landingResourceUri: 'theologai://documents/john-damascene-exact-exposition', firstSection: { sectionKey: 'book-1-chapter-01', sourceOrdinal: 1, resourceUri: 'theologai://documents/john-damascene-exact-exposition#section-book-1-chapter-01' }, primarySearch: { sectionKey: 'book-3-chapter-16', sourceOrdinal: 60, resourceUri: 'theologai://documents/john-damascene-exact-exposition#section-book-3-chapter-16' } },
-    { workId: 'calvin-institutes', editionId: 'calvin-institutes-beveridge-1845', query: 'justification', sectionCount: 84, landingResourceUri: 'theologai://documents/calvin-institutes', firstSection: { sectionKey: 'book-1-chapter-01', sourceOrdinal: 1, resourceUri: 'theologai://documents/calvin-institutes#section-book-1-chapter-01' }, primarySearch: { sectionKey: 'book-3-chapter-17', sourceOrdinal: 54, resourceUri: 'theologai://documents/calvin-institutes#section-book-3-chapter-17' } },
-    { workId: 'wesley-standard-sermons', editionId: 'wesley-standard-sermons-1771', query: 'salvation', sectionCount: 55, landingResourceUri: 'theologai://documents/wesley-standard-sermons', firstSection: { sectionKey: 'sermon-01', sourceOrdinal: 1, resourceUri: 'theologai://documents/wesley-standard-sermons#section-sermon-01' }, primarySearch: { sectionKey: 'sermon-01', sourceOrdinal: 1, resourceUri: 'theologai://documents/wesley-standard-sermons#section-sermon-01' } },
+    { workId: 'calvin-institutes', editionId: 'calvin-institutes-beveridge-1845', query: 'promises law gospel reconciled', sectionCount: 84, landingResourceUri: 'theologai://documents/calvin-institutes', firstSection: { sectionKey: 'book-1-chapter-01', sourceOrdinal: 1, resourceUri: 'theologai://documents/calvin-institutes#section-book-1-chapter-01' }, primarySearch: { sectionKey: 'book-3-chapter-17', sourceOrdinal: 54, resourceUri: 'theologai://documents/calvin-institutes#section-book-3-chapter-17' } },
+    { workId: 'wesley-standard-sermons', editionId: 'wesley-standard-sermons-1771', query: 'salvation by faith', sectionCount: 55, landingResourceUri: 'theologai://documents/wesley-standard-sermons', firstSection: { sectionKey: 'sermon-01', sourceOrdinal: 1, resourceUri: 'theologai://documents/wesley-standard-sermons#section-sermon-01' }, primarySearch: { sectionKey: 'sermon-01', sourceOrdinal: 1, resourceUri: 'theologai://documents/wesley-standard-sermons#section-sermon-01' } },
     { workId: 'bunyan-pilgrims-progress-part-1', editionId: 'bunyan-pilgrims-progress-part-1', query: 'Christian', sectionCount: 3, landingResourceUri: 'theologai://documents/bunyan-pilgrims-progress-part-1', firstSection: { sectionKey: 'part-01-part-01', sourceOrdinal: 1, resourceUri: 'theologai://documents/bunyan-pilgrims-progress-part-1#section-part-01-part-01' }, primarySearch: { sectionKey: 'part-01-part-01', sourceOrdinal: 1, resourceUri: 'theologai://documents/bunyan-pilgrims-progress-part-1#section-part-01-part-01' } },
     { workId: 'athanasius-on-incarnation', editionId: 'athanasius-on-incarnation-robertson-npnf2-v4', query: 'renewal creation', sectionCount: 57, landingResourceUri: 'theologai://documents/athanasius-on-incarnation', firstSection: { sectionKey: 'section-001', sourceOrdinal: 1, resourceUri: 'theologai://documents/athanasius-on-incarnation#section-section-001' }, primarySearch: { sectionKey: 'section-001', sourceOrdinal: 1, resourceUri: 'theologai://documents/athanasius-on-incarnation#section-section-001' } },
     { workId: 'irenaeus-against-heresies', editionId: 'irenaeus-against-heresies-anf1-1885', query: 'heresies', sectionCount: 173, landingResourceUri: 'theologai://documents/irenaeus-against-heresies', firstSection: { sectionKey: 'book-1-preface', sourceOrdinal: 1, resourceUri: 'theologai://documents/irenaeus-against-heresies#section-book-1-preface' }, primarySearch: { sectionKey: 'book-1-chapter-28', sourceOrdinal: 29, resourceUri: 'theologai://documents/irenaeus-against-heresies#section-book-1-chapter-28' } },
@@ -422,7 +424,9 @@ function assertCatalog(message: ObjectRecord, fixture: AuditFixture): ObjectReco
     const probe = fixture.probes[index]!;
     const provenance = object(work!.editionProvenance); const readiness = object(work!.editionReadiness);
     assert(provenance?.sourcePackId === fixture.baseline.sourcePackId && provenance.editionId === probe.editionId, `${probe.workId} source-pack provenance drifted`);
-    assert(readiness?.editionIdentity === 'established' && readiness.provenance === 'verified' && readiness.normalizedTextRights === 'no_known_conflict', `${probe.workId} edition readiness drifted`);
+    assert(readiness?.editionIdentity === 'established'
+      && readiness.provenance === fixture.baseline.expectedCoreEditionProvenanceStatus
+      && readiness.normalizedTextRights === 'no_known_conflict', `${probe.workId} edition readiness drifted`);
   }
   const policies = object(catalog.policies);
   assert(policies?.scope === 'hosted_collection_only' && policies.editionProvenance === 'mixed_legacy_and_reviewed_source_packs'
@@ -450,7 +454,11 @@ function structured(raw: RawToolResult, label: string): ObjectRecord {
   return raw.structuredContent;
 }
 
-function assertClassicLanding(raw: RawToolResult, probe: AuditFixture['probes'][number]): ObjectRecord {
+function assertClassicLanding(
+  raw: RawToolResult,
+  probe: AuditFixture['probes'][number],
+  directLandingResourceBytes?: number,
+): ObjectRecord {
   const { workId } = probe;
   const output = structured(raw, `${workId} landing`); const landing = object(output.landing); const work = object(landing?.work);
   const policy = object(output.evidencePolicy);
@@ -459,7 +467,13 @@ function assertClassicLanding(raw: RawToolResult, probe: AuditFixture['probes'][
     && object(landing?.browse)?.pageSize === 32 && policy?.providerScope === 'local_only' && policy.remoteDocumentBodies === 'disabled'
     && policy.selectedContentAccess === 'mcp_resource_read', `${workId} sectioned landing/privacy contract drifted`);
   const locator = object(work.resource);
-  assert(locator?.kind === 'mcp_resource' && locator.uri === probe.landingResourceUri && !Object.hasOwn(locator, 'resourceSizeBytes'), `${workId} landing canonical locator/byte contract drifted`);
+  const resourceSizeBytes = locator?.resourceSizeBytes;
+  assert(locator?.kind === 'mcp_resource' && locator.uri === probe.landingResourceUri
+    && typeof resourceSizeBytes === 'number' && Number.isSafeInteger(resourceSizeBytes) && resourceSizeBytes > 0
+    && resourceSizeBytes <= HISTORICAL_SECTIONED_ONLY_LANDING_MAX_BYTES,
+  `${workId} landing canonical locator/byte contract drifted`);
+  assert(directLandingResourceBytes === undefined || resourceSizeBytes === directLandingResourceBytes,
+    `${workId} landing resource byte size drifted`);
   assert(landing?.sectionCount === probe.sectionCount, `${workId} exact landing section count drifted`);
   return { sectionCount: probe.sectionCount, canonicalLandingConfirmed: true };
 }
@@ -482,11 +496,13 @@ function assertClassicDirectory(raw: RawToolResult, probe: AuditFixture['probes'
   return { firstPageEntryCount: sections.length, pageSize: 32 };
 }
 
-function assertDirectLandingResource(message: ObjectRecord, probe: AuditFixture['probes'][number]): void {
+function assertDirectLandingResource(message: ObjectRecord, probe: AuditFixture['probes'][number]): number {
   const text = contentText(message, probe.landingResourceUri, 'text/markdown', `${probe.workId} direct landing resource`);
-  assert(text.length > 0 && utf8Bytes(text) <= 16 * 1024
+  const bytes = utf8Bytes(text);
+  assert(text.length > 0 && bytes <= HISTORICAL_SECTIONED_ONLY_LANDING_MAX_BYTES
     && !/data:(?:image|application)\//iu.test(text) && !/<img\b|<!doctype\b|\.(?:jpe?g|png|gif|webp|pdf)\b/iu.test(text),
   `${probe.workId} direct landing resource is not bounded normalized metadata`);
+  return bytes;
 }
 
 function assertClassicSearch(raw: RawToolResult, workId: string): ObjectRecord {
@@ -532,18 +548,25 @@ function assertLegacyRegression(raw: RawToolResult, fixture: AuditFixture): Obje
 }
 
 function assertCcelDisabled(raw: RawToolResult): ObjectRecord {
-  const output = structured(raw, 'CCEL disabled regression'); const queries = array(output.queries, 'CCEL queries').map(object);
-  const provider = object(queries[0]?.providers && array(queries[0]!.providers, 'CCEL providers')[0]); const coverage = object(output.coverage);
-  assert(output.schemaVersion === '7' && output.planStatus === 'unavailable' && queries.length === 1 && provider?.provider === 'ccel_live'
+  assert(raw.isError === true && raw.structuredContent !== undefined, 'CCEL disabled regression must be an errored structured response');
+  const output = raw.structuredContent; const queries = array(output.queries, 'CCEL queries').map(object);
+  const providers = array(queries[0]?.providers, 'CCEL providers').map(object);
+  const provider = providers[0]; const coverage = object(output.coverage);
+  assert(output.schemaVersion === '7' && output.kind === 'primary_source_search' && output.planStatus === 'unavailable'
+    && queries.length === 1 && providers.length === 1 && provider?.provider === 'ccel_live'
     && provider.status === 'disabled' && provider.searched === false && provider.hitCount === 0 && Array.isArray(provider.hits) && provider.hits.length === 0
     && coverage?.localAttempted === false && coverage.ccelAttempted === false && coverage.ccelStatus === 'disabled' && coverage.ccelHitCount === 0, 'preview CCEL-disabled/local-only execution invariant drifted');
   return { provider: 'ccel_live', status: 'disabled', searched: false, hitCount: 0 };
 }
 
+function assertNoSensitiveErrorText(value: string, label: string): void {
+  assert(!/https?:\/\/|theologai:\/\/|\b(?:authorization|bearer|api[\s_-]?key|secret|token|password|cookie|sqlite|sql|d1|database|stack|traceback|internal)\b/iu.test(value),
+    `${label} error leaked a URI, credential-shaped value, storage detail, stack trace, or secret reflection`);
+}
+
 function assertNoSensitiveErrorReflection(value: unknown, label: string, rejectedValues: readonly string[]): void {
   const serialized = JSON.stringify(value);
-  assert(!/https?:\/\/|theologai:\/\/|\b(?:authorization|bearer|api[\s_-]?key|secret|token|password|cookie|sqlite|sql|d1|database|stack|traceback)\b/iu.test(serialized),
-    `${label} error leaked a URI, credential-shaped value, storage detail, stack trace, or secret reflection`);
+  assertNoSensitiveErrorText(serialized, label);
   for (const rejected of rejectedValues) {
     assert(!serialized.includes(rejected), `${label} error reflected rejected input`);
   }
@@ -555,10 +578,20 @@ function assertSafeToolError(raw: RawToolResult, label: string, rejectedValues: 
   assertNoSensitiveErrorReflection(raw.raw, label, rejectedValues);
 }
 
-function assertRpcError(message: ObjectRecord, label: string, rejectedValues: readonly string[]): void {
+function assertResourceNotFound(message: ObjectRecord, expectedUri: string): void {
+  const label = 'invalid resource regression';
+  assert(message.result === undefined, `${label} must not return result alongside error`);
   const error = object(message.error);
-  assert(error !== undefined && typeof error.message === 'string', `${label} must return a JSON-RPC error`);
-  assertNoSensitiveErrorReflection(error, label, rejectedValues);
+  assert(error !== undefined && JSON.stringify(Object.keys(error).sort()) === JSON.stringify(['code', 'data', 'message']),
+    `${label} error envelope keys drifted`);
+  assert(error.code === -32002, `${label} must return exact resource-not-found code -32002`);
+  const errorMessage = requireString(error.message, `${label} error message`);
+  assert(errorMessage === 'Resource not found' || errorMessage === 'MCP error -32002: Resource not found',
+    `${label} must return an exact safe resource-not-found message`);
+  assertNoSensitiveErrorText(errorMessage, label);
+  const data = object(error.data);
+  assert(data !== undefined && Object.keys(data).length === 1 && Object.hasOwn(data, 'uri') && data.uri === expectedUri,
+    `${label} must return only the requested URI in error data`);
 }
 
 function evidenceTextIsSafe(value: unknown): void {
@@ -612,12 +645,15 @@ export async function runPreviewAudit(
   assertConfessionStudyPrompt(await client.getPrompt('confession-study', { topic: 'justification' }));
   const catalog = assertCatalog(await client.readResource('theologai://primary-sources/catalog'), fixture);
   const classicCatalog = assertClassicCatalog(await client.callTool('classic_text_lookup', { listWorks: true }), fixture);
-  assertDirectLandingResource(await client.readResource(fixture.probes[0].landingResourceUri), fixture.probes[0]);
+  const directLandingResourceBytes = assertDirectLandingResource(
+    await client.readResource(fixture.probes[0].landingResourceUri), fixture.probes[0],
+  );
   const records: ObjectRecord[] = [];
   let observedCoreSectionCount = 0;
-  for (const probe of fixture.probes) {
+  for (const [index, probe] of fixture.probes.entries()) {
     const started = Date.now();
-    const landing = assertClassicLanding(await client.callTool('classic_text_lookup', { work: probe.workId }), probe);
+    const landing = assertClassicLanding(await client.callTool('classic_text_lookup', { work: probe.workId }), probe,
+      index === 0 ? directLandingResourceBytes : undefined);
     observedCoreSectionCount += probe.sectionCount;
     const directory = assertClassicDirectory(await client.callTool('classic_text_lookup', { work: probe.workId, browseSections: true }), probe);
     const classicSearch = assertClassicSearch(await client.callTool('classic_text_lookup', { query: probe.query }), probe.workId);
@@ -631,7 +667,7 @@ export async function runPreviewAudit(
   const legacy = assertLegacyRegression(await client.callTool('classic_text_lookup', { work: fixture.legacyRegression.workId }), fixture);
   const ccel = assertCcelDisabled(await client.callTool('primary_source_search', { queries: [{ id: 'ccel-disabled', text: 'Lord Supper', providers: ['ccel'], match: 'all_terms', selection: 'relevance', limit: 1 }] }));
   const invalidResourceUri = 'theologai://documents/does-not-exist#section-not-real';
-  assertRpcError(await client.readResource(invalidResourceUri), 'invalid resource regression', [invalidResourceUri]);
+  assertResourceNotFound(await client.readResource(invalidResourceUri), invalidResourceUri);
   const invalidCursor = 'not-a-valid-cursor';
   assertSafeToolError(await client.callTool('classic_text_lookup', { work: fixture.probes[0].workId, browseSections: true, cursor: invalidCursor }), 'invalid cursor regression', [invalidCursor]);
   client.complete();
