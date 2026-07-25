@@ -1,11 +1,11 @@
 {
   "manifestVersion": 2,
-  "schemaVersion": "0006_historical_source_packs",
+  "schemaVersion": "0007_historical_hierarchy",
   "algorithm": "sha256",
   "materializations": {
     "d1": {
       "identityVersion": 1,
-      "transformVersion": 9,
+      "transformVersion": 10,
       "migrations": [
         {
           "path": "migrations/0001_initial_schema.sql",
@@ -30,6 +30,10 @@
         {
           "path": "migrations/0006_historical_source_packs.sql",
           "sha256": "84d9870004d3f4bc28af9a86281f65558fddbf32bb87d88bbd4179594ac6e687"
+        },
+        {
+          "path": "migrations/0007_historical_hierarchy.sql",
+          "sha256": "f09c4ad494a7783f22bad3b852fd192d61f25d61fe2309c659474cac6b0fa383"
         }
       ],
       "inputs": [
@@ -142,6 +146,16 @@
         "data/historical-source-packs/core-eight/editions/wesley-standard-sermons-1771.json",
         "data/historical-source-packs/core-eight/manifest.json",
         "data/historical-source-packs/core-eight/manifest.sha256",
+        "data/historical-sources/project-gutenberg/aquinas-english-dominican/LOCAL_ACQUISITION_RECEIPT.json",
+        "data/historical-sources/project-gutenberg/aquinas-english-dominican/SOURCE_LOCK.json",
+        "data/historical-sources/project-gutenberg/aquinas-english-dominican/TOPOLOGY_DISCREPANCY_LEDGER.json",
+        "data/historical-sources/project-gutenberg/aquinas-english-dominican/TOPOLOGY_LOCK.json",
+        "data/historical-sources/project-gutenberg/aquinas-english-dominican/packages/aquinas-summa-pg-v1/aquinas-summa-pg-v1.prima-secundae.shard-0001.json",
+        "data/historical-sources/project-gutenberg/aquinas-english-dominican/packages/aquinas-summa-pg-v1/aquinas-summa-pg-v1.prima.shard-0001.json",
+        "data/historical-sources/project-gutenberg/aquinas-english-dominican/packages/aquinas-summa-pg-v1/aquinas-summa-pg-v1.secunda-secundae.shard-0001.json",
+        "data/historical-sources/project-gutenberg/aquinas-english-dominican/packages/aquinas-summa-pg-v1/aquinas-summa-pg-v1.secunda-secundae.shard-0002.json",
+        "data/historical-sources/project-gutenberg/aquinas-english-dominican/packages/aquinas-summa-pg-v1/aquinas-summa-pg-v1.tertia.shard-0001.json",
+        "data/historical-sources/project-gutenberg/aquinas-english-dominican/packages/aquinas-summa-pg-v1/manifest.json",
         "src/data/ubs-parallel-passages.generated.json"
       ]
     }
@@ -634,6 +648,46 @@
       "sha256": "3be00b7d4bef7c497e51a209da58b713ae6a89f2bbd365623aed8b47a15dbf6c"
     },
     {
+      "path": "data/historical-sources/project-gutenberg/aquinas-english-dominican/LOCAL_ACQUISITION_RECEIPT.json",
+      "sha256": "bc0dab9ce5dc3672ccf2a81182655c75eaf6ef4f280584a40e079bf82a11719d"
+    },
+    {
+      "path": "data/historical-sources/project-gutenberg/aquinas-english-dominican/SOURCE_LOCK.json",
+      "sha256": "c5cfdd1edd132bf59968cbabe4c7de2180c42d205735ca6c06aec626104a180b"
+    },
+    {
+      "path": "data/historical-sources/project-gutenberg/aquinas-english-dominican/TOPOLOGY_DISCREPANCY_LEDGER.json",
+      "sha256": "c8e10cbf29d710b89fe48aa91d18f25489c96039116e53254d0592dfb0b68120"
+    },
+    {
+      "path": "data/historical-sources/project-gutenberg/aquinas-english-dominican/TOPOLOGY_LOCK.json",
+      "sha256": "ce6197ba036ec7200f43513f9e6676ccfd5cb5a4727077a440770416bdf6978b"
+    },
+    {
+      "path": "data/historical-sources/project-gutenberg/aquinas-english-dominican/packages/aquinas-summa-pg-v1/aquinas-summa-pg-v1.prima-secundae.shard-0001.json",
+      "sha256": "fb7e3e65c80ce48abeaaa503c8f897f8a30d61ba2d93de8ce4b6eed439cbe28b"
+    },
+    {
+      "path": "data/historical-sources/project-gutenberg/aquinas-english-dominican/packages/aquinas-summa-pg-v1/aquinas-summa-pg-v1.prima.shard-0001.json",
+      "sha256": "addf649546ef65ad124c9f819aa8e134ba24f986592a61b8d58d3f4c189afaa5"
+    },
+    {
+      "path": "data/historical-sources/project-gutenberg/aquinas-english-dominican/packages/aquinas-summa-pg-v1/aquinas-summa-pg-v1.secunda-secundae.shard-0001.json",
+      "sha256": "ab03a9d2cfc454dcf700504c1e7b6da39665ab417ebf5a2c95354a721a23bb89"
+    },
+    {
+      "path": "data/historical-sources/project-gutenberg/aquinas-english-dominican/packages/aquinas-summa-pg-v1/aquinas-summa-pg-v1.secunda-secundae.shard-0002.json",
+      "sha256": "3e355644c03013f6cd238babd017a64ab5a5b888723bd3a0160448656efd8084"
+    },
+    {
+      "path": "data/historical-sources/project-gutenberg/aquinas-english-dominican/packages/aquinas-summa-pg-v1/aquinas-summa-pg-v1.tertia.shard-0001.json",
+      "sha256": "6282c7e744a8844d2fc4b8c946ac8f9a35ecad15069c79f70d51d83443f50153"
+    },
+    {
+      "path": "data/historical-sources/project-gutenberg/aquinas-english-dominican/packages/aquinas-summa-pg-v1/manifest.json",
+      "sha256": "b9d25c13ec6e59312ff8ecbf8d630a1875b8b253baac0d816cc9b9daf9618215"
+    },
+    {
       "path": "data/parallel-passages/ubs-paratext/LICENSE.md",
       "sha256": "924513d06ecd19f5abb3d5a41973452983bf2b471347253d07d7cc529a466c8c"
     },
@@ -673,12 +727,16 @@
     "historical_document_delivery_profiles": 25,
     "historical_section_identities": 3566,
     "historical_section_aliases": 2821,
-    "historical_source_packs": 1,
-    "historical_works": 8,
-    "historical_editions": 8,
-    "historical_source_artifacts": 25,
+    "historical_source_packs": 2,
+    "historical_works": 9,
+    "historical_editions": 9,
+    "historical_source_artifacts": 29,
     "historical_edition_sections": 512,
     "historical_edition_sections_fts": 512,
+    "historical_edition_hierarchies": 1,
+    "historical_edition_hierarchy_bodies": 3184,
+    "historical_edition_hierarchy_nodes": 3185,
+    "historical_edition_hierarchy_bodies_fts": 3184,
     "sections_fts": 3566,
     "morph_codes": 20,
     "ubs_parallel_sources": 1,

@@ -29,8 +29,8 @@ describe('uncomposed legacy UBS semantic resolution seam', () => {
       materializations: { d1: { transformVersion: number } };
     };
     expect(manifest).toMatchObject({
-      schemaVersion: '0006_historical_source_packs',
-      materializations: { d1: { transformVersion: 9 } },
+      schemaVersion: '0007_historical_hierarchy',
+      materializations: { d1: { transformVersion: 10 } },
     });
   });
 });

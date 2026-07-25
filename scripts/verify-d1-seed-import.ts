@@ -150,6 +150,18 @@ function assertDatabaseHealth(db: Database.Database, expectedCounts: Record<stri
   if (sourcePackFtsMismatches.count !== 0) {
     throw new Error(`Imported source-pack FTS has ${sourcePackFtsMismatches.count} identity/content mismatches`);
   }
+
+  const hierarchyFtsMismatches = db.prepare(
+    `SELECT COUNT(*) AS count
+       FROM historical_edition_hierarchy_bodies b
+       LEFT JOIN historical_edition_hierarchy_bodies_fts f ON f.rowid = b.rowid
+      WHERE f.rowid IS NULL OR f.hierarchy_id IS NOT b.hierarchy_id
+         OR f.body_key IS NOT b.body_key OR f.heading IS NOT b.heading
+         OR f.content IS NOT b.content`,
+  ).get() as { count: number };
+  if (hierarchyFtsMismatches.count !== 0) {
+    throw new Error(`Imported hierarchy external-content FTS has ${hierarchyFtsMismatches.count} rowid/content mismatches`);
+  }
 }
 
 function assertRepresentativeFts(db: Database.Database): void {
@@ -392,6 +404,19 @@ try {
   }
   if (!longestTarget || longestTarget.content !== longestSource.content) {
     throw new Error(`Long historical section ${longestSource.id} was not reconstructed exactly`);
+  }
+
+  const longestHierarchySource = source.prepare(
+    'SELECT hierarchy_id, body_key, content FROM historical_edition_hierarchy_bodies ORDER BY length(content) DESC, source_ordinal LIMIT 1',
+  ).get() as { hierarchy_id: string; body_key: string; content: string };
+  const longestHierarchyTarget = target.prepare(
+    'SELECT content FROM historical_edition_hierarchy_bodies WHERE hierarchy_id = ? AND body_key = ?',
+  ).get(longestHierarchySource.hierarchy_id, longestHierarchySource.body_key) as { content: string } | undefined;
+  if (longestHierarchySource.content.length <= 10_000) {
+    throw new Error('Source fixture has no long hierarchy body to exercise bounded D1 statement reconstruction');
+  }
+  if (!longestHierarchyTarget || longestHierarchyTarget.content !== longestHierarchySource.content) {
+    throw new Error(`Long hierarchy body ${longestHierarchySource.body_key} was not reconstructed exactly`);
   }
 
   const guard = manifest.files.find(file => file.table === 'empty-target-check');
