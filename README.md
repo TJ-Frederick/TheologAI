@@ -9,6 +9,10 @@ historical works, Strong's dictionaries, and Greek/Hebrew morphology. Preview
 serves the 25-work Transform 9 catalog; production remains on the 17-work
 Transform 8 catalog until its separately authorized cutover.
 
+The integrated Transform 10 candidate is local-only and unpublished. It
+materializes an inactive Aquinas authority hierarchy, but adds no document or
+catalog projection and is not wired into runtime or MCP surfaces.
+
 <!-- theologai-public-contract tools=11 structured=bible_cross_references,bible_lookup,bible_verse_morphology,classic_text_lookup,commentary_lookup,donation_config,original_language_lookup,original_language_study,parallel_passages,primary_source_search,verify_donation -->
 
 ## Public website and remote endpoints
@@ -106,9 +110,12 @@ binding.
 > `a6959d24fb7f50a9848fe2d011f425894718471b8a0609e7833780a291721a44`.
 
 PR95's Transform9 source-pack work is deployed to preview only. The reviewed
-core-eight makes the checked-out local and preview inventories 25 works;
-production remains on the 17-work Transform 8 catalog. It makes no production
-Cloudflare migration, binding, deployment, or runtime-activation claim.
+core-eight makes the checked-out local catalog and preview inventories 25
+works; production remains on the 17-work Transform 8 catalog. The integrated
+Transform 10 Aquinas hierarchy is a separate local-only, unpublished candidate
+with no document/catalog projection or runtime activation. It makes no
+production Cloudflare migration, binding, deployment, or runtime-activation
+claim.
 For a preview-client rollback without changing server state, use the direct preview
 `workers.dev` address above; the production `workers.dev` address intentionally
 redirects rather than serving a separate legacy Worker.
@@ -312,7 +319,7 @@ transcription uncertainty.
 
 ### Historical documents and external discovery
 
-The checked-out local database contains 25 historical works: 17 tracked legacy
+The checked-out local catalog contains 25 historical works: 17 tracked legacy
 creeds, confessions, and catechisms plus eight reviewed, normalized
 public-domain source-pack editions (Anselm, Athanasius, Augustine, Bunyan,
 Calvin, Irenaeus, John of Damascus, and Wesley). The core-eight is
@@ -325,11 +332,13 @@ cutover. The exact local count is enforced by `data/data-manifest.json`.
 Approved UBS Hebrew artifacts plus the separately acquired Norton and Aquinas
 public-domain packets are checked into the repository for deterministic
 verification and release work. Those acquisition packets remain outside the
-production 17-work catalog; the reviewed PR95 core-eight is the preview-bound
-and checked-out local 25-work materialization described above. M4A's local/preview
-materialization and inactive-adapter statements are historical; PR #96 now
-records the production D1 binding and bounded public `original_language_study`
-v2 audit. U3-T7 provides the in-memory semantic compiler,
+production 17-work catalog. Transform 10 locally and unpublished materializes
+the Aquinas hierarchy only; it adds neither a document/catalog projection nor a
+runtime or MCP surface. The reviewed PR95 core-eight remains the preview-bound
+and checked-out local 25-work catalog materialization described above. M4A's
+local/preview materialization and inactive-adapter statements are historical;
+PR #96 now records the production D1 binding and bounded public
+`original_language_study` v2 audit. U3-T7 provides the in-memory semantic compiler,
 native-to-normalized coordinate bridge, and content-free compilation audit;
 M4A provides capacity and seed verification. The PR #96 audit does not
 independently establish the runtime status of later transforms.

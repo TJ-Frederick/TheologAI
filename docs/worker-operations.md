@@ -2,6 +2,11 @@
 
 ## Current production release state (PR #96; 2026-07-24)
 
+The integrated checked-out candidate is Transform 10, local-only and
+unpublished: its Aquinas hierarchy is inactive and has no catalog, runtime, or
+MCP projection. The live preview remains the Transform 9 25-work catalog, and
+production remains the Transform 8 17-work catalog.
+
 PR #96 production evidence is source-attested to checked-out commit
 `ac4b5ed774302fbfc86bf846b6ee77a07beed456` and exact tree
 `adf08edbf6bfcb14b9613354b2b8fb9f62ec8c16`. At the fixed canonical endpoint
@@ -69,9 +74,10 @@ active.
 > `a6959d24fb7f50a9848fe2d011f425894718471b8a0609e7833780a291721a44`.
 
 PR95's Transform9 historical source-pack work is deployed to preview only. It
-adds eight reviewed sectioned-only editions to the local and preview 25-work
-corpus but has no production Cloudflare migration, binding, deployment, or
-runtime claim; Norton and Aquinas assets remain inactive.
+adds eight reviewed sectioned-only editions to the local catalog and preview
+25-work corpus but has no production Cloudflare migration, binding, deployment,
+or runtime claim. The separate Transform 10 Aquinas hierarchy remains
+local-only, unpublished, and inactive.
 
 PR #92 merged as `cd3d1c38fdf0f939a33a41d4b6d5044eb7f44562`; its exact
 reviewed head `3a2b5a57b322dce525f27cfa91c9f667d080bca9` is the separate
@@ -566,8 +572,9 @@ source-pack authority audit: direct eight-row normalized-section pages plus
 compact identity/document/edition-FTS/runtime-FTS parity pages. The audit is
 read-only and catches an orphan or extra normalized section that a
 delivery-profile join alone would miss. Production remains on its Transform 8
-17-work corpus; any separately authorized production Transform 9 cutover must
-rerun this gate and audit against its exact candidate.
+17-work corpus. Transform 10 is only a local, unpublished hierarchy candidate;
+any separately authorized production Transform 9 cutover must rerun this gate
+and audit against its exact candidate.
 
 The corpus marker is the scoped D1 materialization identity derived from
 `data/data-manifest.json` `materializations.d1`, not the hash of the complete

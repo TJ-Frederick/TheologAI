@@ -696,12 +696,14 @@ Code readiness and operational readiness are deliberately separate:
   `100`, production stays `000`, and neither environment may make a CCEL
   request.
 - Expand the local primary-source corpus with rights-reviewed, freely
-  redistributable editions and explicit edition provenance. The Transform 9
-  core-eight makes the checked-out and preview collection 25 works, while
-  production remains on the 17-work Transform 8 catalog. Norton, Aquinas, and
-  other acquired public-domain packets require separately reviewed successor
-  transforms, D1 preparation, and release gates. Do not mirror or republish
-  CCEL transcriptions without edition-specific rights.
+  redistributable editions and explicit edition provenance. The preview-bound
+  Transform 9 core-eight makes the checked-out local catalog and preview
+  collection 25 works, while production remains on the 17-work Transform 8
+  catalog. The integrated Transform 10 Aquinas hierarchy is local-only and
+  unpublished, with no catalog/runtime/MCP activation; any successor catalog
+  projection still requires separately reviewed transforms, D1 preparation,
+  and release gates. Do not mirror or republish CCEL transcriptions without
+  edition-specific rights.
 - PR #96 has deployed the prepared production D1 and passed the bounded
   `original_language_study` v2 audit. Future original-language work for
   beginners and readers of Greek or Hebrew must preserve the existing UBS
