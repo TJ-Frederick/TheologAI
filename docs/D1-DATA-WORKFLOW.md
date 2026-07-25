@@ -276,10 +276,12 @@ cutover change, after preparation evidence is retained.
 It then permits exactly one pristine-schema preflight, one migration pass, one
 manifest-ordered pass through every deterministic seed file, and the complete
 read-only readiness check. The readiness check includes the Transform-8 and
-Transform-9 authority audits derived from the checked-in corpus identity. A
-failure after migration or seed SQL may have started is terminal for that
-candidate: do not retry, resume, repair, bind, deploy, or reuse it. Create a
-new candidate under a separately authorized operation instead.
+Transform-9 authority audits plus the Transform-10 inactive-hierarchy
+lineage, profile/artifact, topology, and FTS integrity checks derived from the
+checked-in corpus identity. A failure after migration or seed SQL may have
+started is terminal for that candidate: do not retry, resume, repair, bind,
+deploy, or reuse it. Create a new candidate under a separately authorized
+operation instead.
 
 This preparer does not change `wrangler.toml`, a Worker binding, deployment,
 or database inventory. It does mutate only the separately named, unbound
@@ -287,11 +289,14 @@ production candidate corpus: migrations and deterministic seed files are
 applied there after the pristine-target guard passes. It never mutates the
 active/bound production corpus. The deployed preview corpus is the reviewed
 25-work Transform-9 collection; production remains on its 17-work Transform-8
-collection until a separately authorized production cutover. The protected
-production workflow later re-resolves the checked-in candidate name/UUID,
-reruns readiness by exact name, records the predecessor Worker/D1 identity,
-and refuses to start either black-box audit unless the sole active deployed
-Worker is bound to that readiness-tested candidate.
+collection until a separately authorized production cutover. The checked-out
+Transform-10 Aquinas hierarchy is a local-only, unpublished candidate with no
+catalog, runtime, or MCP projection; it does not assert that a remote candidate
+D1 has been prepared. The protected production workflow later re-resolves the
+checked-in candidate name/UUID, reruns readiness by exact name, records the
+predecessor Worker/D1 identity, and refuses to start either black-box audit
+unless the sole active deployed Worker is bound to that readiness-tested
+candidate.
 
 Approved deploy jobs perform the last compatibility check read-only against
 the candidate name resolved from the checked-in name/UUID pair:

@@ -7,12 +7,19 @@ for the 17 legacy hosted works. It adds no document bodies and grants no new
 rights; it makes that already-hosted collection's work identities,
 composition-date scope, and explicitly attributed creators machine-readable.
 
-## Current preview-bound Transform 9 source-pack extension
+## Current local Transform 10 candidate and preview-bound Transform 9 extension
 
-The current repository and preview Transform 9 materialization is migration
-`0006_historical_source_packs`. It retains the Transform 6 legacy catalog
-slice and adds one checked-in pack (`theologai-core-eight`, revision 1), eight
-works, eight reviewed editions, 25 pinned source artifacts, and 512 normalized
+The checked-out Transform 10 candidate locally materializes an inactive Aquinas
+edition-scoped authority hierarchy. It is unpublished and has no document or
+catalog projection, runtime composition dependency, or MCP surface. It leaves
+the active historical catalog boundary unchanged: preview remains the
+Transform-9 25-work collection and production remains the Transform-8 17-work
+collection.
+
+The current preview Transform 9 catalog materialization is migration
+`0006_historical_source_packs`. It retains the Transform 6 legacy catalog slice
+and adds one checked-in pack (`theologai-core-eight`, revision 1), eight works,
+eight reviewed editions, 25 pinned source artifacts, and 512 normalized
 sections. The current deterministic D1 corpus identity is
 `4e182bfd2953fe06e7c8d7e13a705988e85b5a58001e7fe72440333d34f6d442`; the
 historical Transform 6 catalog identity remains

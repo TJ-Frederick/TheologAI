@@ -318,15 +318,17 @@ function loadAquinasSourceArtifacts(root: string, reader?: AquinasPackageReader)
   if (sha256(receiptBytes) !== AQUINAS_CAPACITY_EXPECTED.localReceiptSha256) fail('local-receipt SHA-256 differs from the reviewed acquisition');
   const sourceLock = record(JSON.parse(sourceLockBytes.toString('utf8')), 'source lock');
   const receipt = record(JSON.parse(receiptBytes.toString('utf8')), 'local receipt');
+  const sourceArtifacts = sourceLock.artifacts;
+  const receiptArtifacts = receipt.artifacts;
   if (receipt.sourceLockSha256 !== AQUINAS_CAPACITY_EXPECTED.sourceLockSha256
-    || !Array.isArray(sourceLock.artifacts) || !Array.isArray(receipt.artifacts)
-    || sourceLock.artifacts.length !== 4 || receipt.artifacts.length !== 4) {
+    || !Array.isArray(sourceArtifacts) || !Array.isArray(receiptArtifacts)
+    || sourceArtifacts.length !== 4 || receiptArtifacts.length !== 4) {
     fail('source lock and receipt must retain the exact four-artifact acquisition');
   }
   const acquiredAt = text(receipt.acquiredAt, 'local receipt acquiredAt');
-  return sourceLock.artifacts.map((artifactValue, index) => {
+  return sourceArtifacts.map((artifactValue, index) => {
     const artifact = record(artifactValue, `source lock artifacts[${index}]`);
-    const receiptArtifact = record(receipt.artifacts[index], `local receipt artifacts[${index}]`);
+    const receiptArtifact = record(receiptArtifacts[index], `local receipt artifacts[${index}]`);
     const ebookId = integer(artifact.ebookId, `source lock artifacts[${index}].ebookId`);
     const partKey = text(artifact.partKey, `source lock artifacts[${index}].partKey`);
     const archive = record(artifact.archive, `source lock artifacts[${index}].archive`);
@@ -766,18 +768,19 @@ function insertCandidateAIntoMigratedSchema(database: Database.Database, input: 
     }
   })();
   const expectedQuestionHash = questionProjectionHash(layout.questionBodies.map(body => ({ bodyId: body.bodyId, content: body.content })));
-  const projections = [
+  const projectionRows: Array<Iterable<{ bodyId: string; content: string }>> = [
     database.prepare(`SELECT 'question-body:' || section_key AS bodyId, content FROM historical_edition_sections
-      WHERE edition_id = ? ORDER BY source_ordinal`).iterate(input.identity.editionId),
+      WHERE edition_id = ? ORDER BY source_ordinal`).iterate(input.identity.editionId) as Iterable<{ bodyId: string; content: string }>,
     database.prepare(`SELECT 'question-body:' || section_key AS bodyId, content FROM historical_edition_sections_fts
-      WHERE edition_id = ? ORDER BY rowid`).iterate(input.identity.editionId),
+      WHERE edition_id = ? ORDER BY rowid`).iterate(input.identity.editionId) as Iterable<{ bodyId: string; content: string }>,
     database.prepare(`SELECT 'question-body:' || identity.section_key AS bodyId, section.content AS content
       FROM historical_section_identities identity JOIN document_sections section ON section.id = identity.document_section_id
-      WHERE identity.document_id = ? ORDER BY identity.source_ordinal`).iterate(input.identity.workId),
+      WHERE identity.document_id = ? ORDER BY identity.source_ordinal`).iterate(input.identity.workId) as Iterable<{ bodyId: string; content: string }>,
     database.prepare(`SELECT 'question-body:' || identity.section_key AS bodyId, fts.content AS content
       FROM historical_section_identities identity JOIN sections_fts fts ON fts.rowid = identity.document_section_id
-      WHERE identity.document_id = ? ORDER BY identity.source_ordinal`).iterate(input.identity.workId),
-  ].map(questionProjectionHash);
+      WHERE identity.document_id = ? ORDER BY identity.source_ordinal`).iterate(input.identity.workId) as Iterable<{ bodyId: string; content: string }>,
+  ];
+  const projections = projectionRows.map(rows => questionProjectionHash(rows));
   if (new Set([expectedQuestionHash, ...projections]).size !== 1) fail('candidate A migrated-schema projections do not retain four equal question bodies');
   return expectedQuestionHash;
 }
@@ -807,7 +810,7 @@ function runCandidateAFullCopy(path: string, input: AquinasCapacityInput, layout
 function candidateBFtsCheck(
   database: Database.Database,
   layout: CandidateBLayout,
-): Omit<CandidateBReport['fts'], 'candidateContentShadowTables'> {
+): CandidateBReport['fts'] {
   database.prepare("INSERT INTO b_authority_fts(b_authority_fts) VALUES ('integrity-check')").run();
   const sample = layout.authorityBodies.find(body => /[A-Za-z]{6,}/.test(body.content));
   if (!sample) fail('candidate B has no representative FTS token');
@@ -815,14 +818,20 @@ function candidateBFtsCheck(
   const query = `"${token}"`;
   const expected = database.prepare('SELECT rowid FROM b_authority_bodies WHERE body_id = ?').get(sample.bodyId) as { rowid?: unknown } | undefined;
   const rows = database.prepare('SELECT rowid FROM b_authority_fts WHERE b_authority_fts MATCH ? ORDER BY rowid').all(query) as Array<{ rowid: number }>;
-  if (!Number.isSafeInteger(expected?.rowid) || rows.length === 0 || !rows.some(row => row.rowid === expected.rowid)) fail('candidate B representative FTS MATCH did not preserve the authority rowid');
+  const expectedRowId = expected?.rowid;
+  if (!Number.isSafeInteger(expectedRowId) || rows.length === 0 || !rows.some(row => row.rowid === expectedRowId)) fail('candidate B representative FTS MATCH did not preserve the authority rowid');
   const parity = database.prepare(`SELECT COUNT(*) AS count FROM b_authority_fts fts
     LEFT JOIN b_authority_bodies body ON body.rowid = fts.rowid
     WHERE b_authority_fts MATCH ? AND body.rowid IS NULL`).get(query) as { count: number };
   if (parity.count !== 0) fail('candidate B representative FTS MATCH has rowid parity drift');
   const indexBytes = (database.prepare(`SELECT COALESCE(SUM(pgsize), 0) AS bytes FROM dbstat
     WHERE name IN ('b_authority_fts_config', 'b_authority_fts_data', 'b_authority_fts_docsize', 'b_authority_fts_idx')`).get() as { bytes: number }).bytes;
-  return { integrityCheck: 'ok', representativeMatch: { querySha256: sha256(query), matchCount: rows.length, rowIdParity: true }, indexBytes };
+  return {
+    integrityCheck: 'ok',
+    representativeMatch: { querySha256: sha256(query), matchCount: rows.length, rowIdParity: true },
+    indexBytes,
+    candidateContentShadowTables: [],
+  };
 }
 
 function insertCandidateB(database: Database.Database, layout: CandidateBLayout, canonicalAuthorityBodies: string): { storedAuthorityBodies: string; navigation: { flat: string; hierarchical: string }; fts: CandidateBReport['fts'] } {
@@ -880,7 +889,7 @@ function runCandidateBFullCopy(path: string, layout: CandidateBLayout, canonical
       shape: '3184 authority bodies with implicit work root, 4 part landings, 512 question landings, 2669 article nodes, and external-content FTS',
       logicalHashes: { canonicalAuthorityBodies, storedAuthorityBodies: inserted.storedAuthorityBodies, flatNavigation: inserted.navigation.flat, hierarchicalNavigation: inserted.navigation.hierarchical },
       externalContentFtsHasNoBodyBearingContentCopy: true,
-      fts: { ...inserted.fts, candidateContentShadowTables: [] },
+      fts: inserted.fts,
       preVacuumFullCopy,
       postVacuumDiagnostic,
     };

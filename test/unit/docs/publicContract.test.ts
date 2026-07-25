@@ -189,6 +189,8 @@ describe('published project contract', () => {
     expect(readme).toContain('Preview remains on deployed\nv5/discovery-only with CCEL execution disabled');
     expect(readme).toContain('Transform-9 preview corpus\nrelease does not activate the checked-in v7 profile, which remains a\nnon-executing candidate');
     expect(readme).toContain('preview serves the 25-work Transform 9 collection');
+    expect(readme).toContain('The integrated Transform 10 candidate is local-only and unpublished');
+    expect(readme).toContain('not wired into runtime or MCP surfaces');
     expect(readme).toContain('before adapter');
     expect(readme).toContain('Durable Object lookup/RPC, or fetch');
     expect(readme).toContain('reconnect');
