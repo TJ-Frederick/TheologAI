@@ -79,18 +79,31 @@ adds eight reviewed sectioned-only editions to the local catalog and preview
 or runtime claim. The separate Transform 10 Aquinas hierarchy remains
 local-only, unpublished, and inactive.
 
+At approximately 2026-07-25T19:13Z, fresh read-only Cloudflare evidence found
+preview deployment `4148bfb5-dd03-447f-b656-9daa0aee4380` as the sole 100%
+active deployment, serving Worker version `ca1376bb-05cc-403b-a396-d2e89403abec`
+and bound to `theologai-preview-20260724-a`
+(`414dbda0-ba5b-4ac0-826b-0402d2ed825b`). This is the current Transform 9
+25-work preview release. Its immediate retained predecessor is deployment
+`7f00a94b-4ff4-47d6-9bee-2efb99673718`, Worker version
+`f78d66f1-cefe-46ba-88ba-9ddec259cda4`, and D1
+`theologai-preview-20260722-b` (`94c4938b-7800-4d68-9097-0df33c31fdc1`).
+This point-in-time observation is read-only and does not imply a rollback,
+binding change, or any production change.
+
 PR #92 merged as `cd3d1c38fdf0f939a33a41d4b6d5044eb7f44562`; its exact
 reviewed head `3a2b5a57b322dce525f27cfa91c9f667d080bca9` is the separate
 preview-only release. Exact-head CI attempt 2 run `30017722596` and protected
-preview run `30039858274` passed. Cloudflare deployment
-`04e7a69a-78d2-447b-ac71-e9fb0bef3695` serves Worker
+preview run `30039858274` passed. Its historical Cloudflare deployment
+`04e7a69a-78d2-447b-ac71-e9fb0bef3695` served Worker
 `576517dd-84a8-4b5f-a5ea-ed8f124db63d`, and its only D1 binding is
 `theologai-preview-20260722-b`
 (`94c4938b-7800-4d68-9097-0df33c31fdc1`). The parallel audit passed 22/22
 cases; the Transform-8 audit recorded 48 rate-counted requests, 53 total HTTP
 records, and 11/11 assertion groups. The `deploy-preview` label was removed
-and revocation run `30040550778` passed. This remains a separate preview
-release, not evidence about the current production binding.
+and revocation run `30040550778` passed. This historical release is neither
+the current preview identity nor the immediate retained predecessor; it is not
+evidence about the current production binding.
 
 Ordinary requests to the production `theologai.tjfrederick.workers.dev` host
 now return a no-store 308 to `mcp.theologai.xyz`. The exact abusive-poller

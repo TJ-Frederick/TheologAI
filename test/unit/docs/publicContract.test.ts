@@ -218,4 +218,33 @@ describe('published project contract', () => {
     expect(historicalArchitecture.slice(0, 700)).toContain('Historical architecture plan');
     expect(historicalDevelopment.slice(0, 700)).toContain('Historical development plan');
   });
+
+  it('keeps current preview evidence distinct from historical preview releases', async () => {
+    const [reconciliation, operations] = await Promise.all([
+      readProjectFile('docs/PREVIEW-RELEASE-RECONCILIATION.md'),
+      readProjectFile('docs/worker-operations.md'),
+    ]);
+    const activeDeployment = '4148bfb5-dd03-447f-b656-9daa0aee4380';
+    const activeVersion = 'ca1376bb-05cc-403b-a396-d2e89403abec';
+    const activeD1 = 'theologai-preview-20260724-a';
+    const predecessorDeployment = '7f00a94b-4ff4-47d6-9bee-2efb99673718';
+    const predecessorVersion = 'f78d66f1-cefe-46ba-88ba-9ddec259cda4';
+    const predecessorD1 = 'theologai-preview-20260722-b';
+    const historicalDeployment = '04e7a69a-78d2-447b-ac71-e9fb0bef3695';
+
+    for (const document of [reconciliation, operations]) {
+      expect(document).toContain(activeDeployment);
+      expect(document).toContain(activeVersion);
+      expect(document).toContain(activeD1);
+      expect(document).toContain(predecessorDeployment);
+      expect(document).toContain(predecessorVersion);
+      expect(document).toContain(predecessorD1);
+    }
+    expect(reconciliation).toContain('live Transform-9\n25-work preview collection');
+    expect(operations).toContain('This is the current Transform 9\n25-work preview release');
+    expect(operations).toContain(`Its historical Cloudflare deployment\n\`${historicalDeployment}\` served Worker`);
+    expect(operations).toContain('This historical release is neither\nthe current preview identity nor the immediate retained predecessor');
+    expect(reconciliation).toContain('does not alter the local Transform-10 unpublished boundary');
+    expect(reconciliation).not.toContain('which the checked-in preview binding now names for the next protected preview deployment');
+  });
 });
