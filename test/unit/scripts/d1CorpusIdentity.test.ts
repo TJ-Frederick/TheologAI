@@ -40,7 +40,7 @@ describe('D1 corpus identity', () => {
   it('pins the catalog-scope D1 identity and includes the generated UBS artifact', () => {
     const current = parseDataManifest(readFileSync('data/data-manifest.json'));
     expect(computeD1CorpusIdentity(current))
-      .toBe('4e182bfd2953fe06e7c8d7e13a705988e85b5a58001e7fe72440333d34f6d442');
+      .toBe('224138e3dfa434eb2165186cf3322c58a46bd4168482e6b73576b0c6c8d683be');
     const changedUbs = structuredClone(current);
     const ubs = changedUbs.files.find(file => file.path === 'src/data/ubs-parallel-passages.generated.json');
     expect(ubs).toBeDefined();

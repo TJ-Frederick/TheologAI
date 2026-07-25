@@ -232,7 +232,7 @@ function packSpec(expected: readonly PackProjection[]): PageSpec<PackProjection>
       packId: string, revision: string, schemaVersion: string, manifestSha256: string, sourcePath: string,
     }),
     sql: last => `SELECT pack_id AS packId, revision, schema_version AS schemaVersion, manifest_sha256 AS manifestSha256, source_path AS sourcePath
-      FROM historical_source_packs${last ? ` WHERE pack_id > ${literal(last.packId)}` : ''} ORDER BY pack_id LIMIT ${HISTORICAL_TRANSFORM9_AUTHORITY_PAGE_SIZE}`,
+      FROM historical_source_packs WHERE pack_id = 'theologai-core-eight'${last ? ` AND pack_id > ${literal(last.packId)}` : ''} ORDER BY pack_id LIMIT ${HISTORICAL_TRANSFORM9_AUTHORITY_PAGE_SIZE}`,
   };
 }
 
@@ -242,7 +242,7 @@ function workSpec(expected: readonly WorkProjection[]): PageSpec<WorkProjection>
       workId: string, title: string, creatorMetadataStatus: string, creatorsJson: string,
     }),
     sql: last => `SELECT work_id AS workId, title, creator_metadata_status AS creatorMetadataStatus, creators_json AS creatorsJson
-      FROM historical_works${last ? ` WHERE work_id > ${literal(last.workId)}` : ''} ORDER BY work_id LIMIT ${HISTORICAL_TRANSFORM9_AUTHORITY_PAGE_SIZE}`,
+      FROM historical_works WHERE EXISTS (SELECT 1 FROM historical_editions edition WHERE edition.work_id = historical_works.work_id AND edition.pack_id = 'theologai-core-eight')${last ? ` AND work_id > ${literal(last.workId)}` : ''} ORDER BY work_id LIMIT ${HISTORICAL_TRANSFORM9_AUTHORITY_PAGE_SIZE}`,
   };
 }
 
@@ -254,16 +254,17 @@ function editionSpec(expected: readonly EditionProjection[]): PageSpec<EditionPr
       provenance_uncertainty AS provenanceUncertainty, provenance_reviewed_at AS provenanceReviewedAt,
       underlying_work_rights_json AS underlyingWorkRightsJson, exact_artifact_rights_json AS exactArtifactRightsJson,
       normalized_text_rights_json AS normalizedTextRightsJson
-      FROM historical_editions${last ? ` WHERE edition_id > ${literal(last.editionId)}` : ''} ORDER BY edition_id LIMIT ${HISTORICAL_TRANSFORM9_AUTHORITY_PAGE_SIZE}`,
+      FROM historical_editions WHERE pack_id = 'theologai-core-eight'${last ? ` AND edition_id > ${literal(last.editionId)}` : ''} ORDER BY edition_id LIMIT ${HISTORICAL_TRANSFORM9_AUTHORITY_PAGE_SIZE}`,
   };
 }
 
 function artifactSpec(expected: readonly ArtifactProjection[]): PageSpec<ArtifactProjection> {
   return {
     name: 'artifacts', expected, compare: compareArtifact, parse: value => parseRow(value, artifactKeys, 'artifact', artifactParsers),
-    sql: last => `SELECT artifact_id AS artifactId, edition_id AS editionId, role, locator, pin_kind AS pinKind,
-      pin_value AS pinValue, sha256, bytes, acquired_at AS acquiredAt
-      FROM historical_source_artifacts${last ? ` WHERE artifact_id > ${literal(last.artifactId)}` : ''} ORDER BY artifact_id LIMIT ${HISTORICAL_TRANSFORM9_AUTHORITY_PAGE_SIZE}`,
+    sql: last => `SELECT artifact.artifact_id AS artifactId, artifact.edition_id AS editionId, artifact.role, artifact.locator, artifact.pin_kind AS pinKind,
+      artifact.pin_value AS pinValue, artifact.sha256, artifact.bytes, artifact.acquired_at AS acquiredAt
+      FROM historical_source_artifacts artifact JOIN historical_editions edition ON edition.edition_id = artifact.edition_id
+      WHERE edition.pack_id = 'theologai-core-eight'${last ? ` AND artifact.artifact_id > ${literal(last.artifactId)}` : ''} ORDER BY artifact.artifact_id LIMIT ${HISTORICAL_TRANSFORM9_AUTHORITY_PAGE_SIZE}`,
   };
 }
 

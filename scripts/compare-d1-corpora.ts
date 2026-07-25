@@ -22,6 +22,10 @@ const TABLE_QUERIES = {
   historical_source_artifacts: 'SELECT * FROM historical_source_artifacts ORDER BY artifact_id',
   historical_edition_sections: 'SELECT * FROM historical_edition_sections ORDER BY edition_id, source_ordinal',
   historical_edition_sections_fts: 'SELECT edition_id, section_key, heading, content FROM historical_edition_sections_fts ORDER BY rowid',
+  historical_edition_hierarchies: 'SELECT * FROM historical_edition_hierarchies ORDER BY hierarchy_id',
+  historical_edition_hierarchy_bodies: 'SELECT * FROM historical_edition_hierarchy_bodies ORDER BY hierarchy_id, source_ordinal',
+  historical_edition_hierarchy_nodes: 'SELECT * FROM historical_edition_hierarchy_nodes ORDER BY hierarchy_id, flat_ordinal',
+  historical_edition_hierarchy_bodies_fts: 'SELECT hierarchy_id, body_key, heading, content FROM historical_edition_hierarchy_bodies_fts ORDER BY rowid',
   morph_codes: 'SELECT * FROM morph_codes ORDER BY code',
 } as const;
 

@@ -5,7 +5,6 @@ import Database from 'better-sqlite3';
 import { existsSync, readFileSync, statSync } from 'fs';
 import { dirname, isAbsolute, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
-import { buildD1ReadinessSql } from './check-remote-d1-readiness.js';
 import {
   assertGenesisOneOneDatabase,
   assertHebrewLemmaCoverageDatabase,
@@ -22,7 +21,12 @@ import {
   assertCoreEightSourcePackRelease,
   loadHistoricalSourcePacks,
 } from './historical-source-packs.js';
+import {
+  assertHistoricalHierarchyStoredIntegrity,
+  loadApprovedAquinasHierarchy,
+} from './historical-hierarchy.js';
 import { HistoricalDocumentRepository } from '../src/adapters/data/HistoricalDocumentRepository.js';
+import { buildD1ReadinessSql } from './check-remote-d1-readiness.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -52,7 +56,7 @@ if (!existsSync(databasePath)) throw new Error(`Database not found: ${databasePa
 const manifest = parseDataManifest(readFileSync(MANIFEST_PATH));
 verifyD1Migrations(ROOT, manifest);
 const expectedTables = Object.keys(manifest.expectedCounts).sort();
-const expectedIndexes = ['idx_document_sections_id_document', 'idx_historical_edition_sections_order', 'idx_historical_editions_pack', 'idx_historical_editions_work', 'idx_historical_section_aliases_target', 'idx_historical_section_identities_browse', 'idx_historical_source_artifacts_edition', 'idx_morph_strongs', 'idx_morph_strongs_canonical', 'idx_morph_verse', 'idx_strongs_book_stats_order', 'idx_strongs_form_stats_rank', 'idx_ubs_groups_source_order', 'idx_ubs_segments_lookup', 'idx_ubs_semantic_identity_candidate', 'idx_ubs_semantic_sense_candidate_order', 'idx_ubs_semantic_sense_domain_order', 'idx_ubs_semantic_coordinate_lookup', 'idx_ubs_semantic_evidence_sense_order', 'idx_xref_from', 'idx_xref_votes'];
+const expectedIndexes = ['idx_document_sections_id_document', 'idx_historical_edition_hierarchy_bodies_order', 'idx_historical_edition_hierarchy_child_siblings', 'idx_historical_edition_hierarchy_nodes_flat', 'idx_historical_edition_hierarchy_nodes_parent', 'idx_historical_edition_hierarchy_root_siblings', 'idx_historical_edition_sections_order', 'idx_historical_editions_pack', 'idx_historical_editions_work', 'idx_historical_section_aliases_target', 'idx_historical_section_identities_browse', 'idx_historical_source_artifacts_edition', 'idx_morph_strongs', 'idx_morph_strongs_canonical', 'idx_morph_verse', 'idx_strongs_book_stats_order', 'idx_strongs_form_stats_rank', 'idx_ubs_groups_source_order', 'idx_ubs_segments_lookup', 'idx_ubs_semantic_identity_candidate', 'idx_ubs_semantic_sense_candidate_order', 'idx_ubs_semantic_sense_domain_order', 'idx_ubs_semantic_coordinate_lookup', 'idx_ubs_semantic_evidence_sense_order', 'idx_xref_from', 'idx_xref_votes'];
 const db = new Database(databasePath, { readonly: true, fileMustExist: true });
 
 function assertHistoricalTransform8Materialization(database: Database.Database): void {
@@ -238,7 +242,7 @@ function assertHistoricalTransform9SourcePackMaterialization(database: Database.
   assertCoreEightSourcePackRelease(packs);
   const packRows = database.prepare(`SELECT pack_id AS packId, revision, schema_version AS schemaVersion,
     manifest_sha256 AS manifestSha256, source_path AS sourcePath
-    FROM historical_source_packs ORDER BY pack_id`).all() as Array<{
+    FROM historical_source_packs WHERE pack_id = 'theologai-core-eight' ORDER BY pack_id`).all() as Array<{
       packId: string; revision: string; schemaVersion: string; manifestSha256: string; sourcePath: string;
     }>;
   if (packRows.length !== 1 || packRows[0]?.packId !== 'theologai-core-eight'
@@ -367,11 +371,9 @@ try {
   if (metadata.corpus_manifest_sha256 !== d1CorpusIdentity) {
     throw new Error('D1 corpus identity marker mismatch');
   }
-  const readiness = db.prepare(
-    buildD1ReadinessSql(manifest.expectedCounts, manifest.schemaVersion, d1CorpusIdentity),
-  ).get() as { readiness?: string } | undefined;
-  if (readiness?.readiness !== 'ready') {
-    throw new Error('Production D1 readiness SQL did not accept the complete derived database');
+  const readiness = db.prepare(buildD1ReadinessSql(manifest.expectedCounts)).get() as { readiness?: unknown };
+  if (readiness.readiness !== 'ready') {
+    throw new Error('Generated database failed the standard D1 readiness contract');
   }
   assertJohnOneOneDatabase(db, 'Verified SQLite morphology');
   assertGenesisOneOneDatabase(db, 'Verified SQLite morphology');
@@ -379,6 +381,9 @@ try {
   verifyBiblicalLanguageUnicodeD1(ROOT, db, manifest.expectedCounts);
   assertHistoricalTransform8Materialization(db);
   assertHistoricalTransform9SourcePackMaterialization(db);
+  assertHistoricalHierarchyStoredIntegrity(db, loadApprovedAquinasHierarchy({
+    read: path => readFileSync(join(ROOT, path)),
+  }), { ftsIntegrity: false });
   auditHistoricalTransform8Authority(ROOT, sql => {
     const rows = db.prepare(sql).all();
     return { rows, responseBytes: Buffer.byteLength(JSON.stringify(rows), 'utf8') };

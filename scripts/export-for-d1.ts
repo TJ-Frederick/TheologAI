@@ -184,7 +184,11 @@ function exportTable(database: string, table: string): SeedStatement[] {
   }).join(` || ',' || `);
   const order = table === 'historical_section_identities'
     ? ['document_id', 'source_ordinal', 'section_key'].map(sqlIdentifier).join(',')
-    : primaryKey.map(column => sqlIdentifier(column.name)).join(',');
+    : table === 'historical_edition_hierarchy_nodes'
+      // Parent-first flat preorder is required by the hierarchy FK/trigger;
+      // lexical node keys would put article leaves before their question.
+      ? ['hierarchy_id', 'flat_ordinal', 'node_key'].map(sqlIdentifier).join(',')
+      : primaryKey.map(column => sqlIdentifier(column.name)).join(',');
   const insertPrefix = `INSERT INTO ${sqlIdentifier(table)}(${columnSql}) VALUES`;
   const query =
     `SELECT '(' || ${values} || ');' ` +
@@ -193,7 +197,12 @@ function exportTable(database: string, table: string): SeedStatement[] {
   // Historical section identity proof reads the exact one-row statement
   // shape, including its deterministic ordinal. All other ordinary tables use
   // bounded multi-row INSERTs so full local Workerd imports remain practical.
-  const statements: SeedStatement[] = table === 'document_sections'
+  // Existing document sections use continuation updates for historic bodies
+  // that can exceed the local Workerd batch threshold. Transform-10 hierarchy
+  // bodies are immutable: every reviewed body is currently below D1's 100KB
+  // statement ceiling, so preserve authority immutability by emitting one
+  // complete, checked INSERT per body rather than an INSERT + UPDATE sequence.
+  const statements: SeedStatement[] = table === 'document_sections' || table === 'historical_edition_hierarchy_bodies'
     ? tuples.map(tuple => ({ sql: `${insertPrefix}${tuple};`, rows: 1 }))
     : batchInsertValueTuples(insertPrefix, tuples);
 
@@ -252,7 +261,7 @@ function exportTable(database: string, table: string): SeedStatement[] {
 }
 
 function emptyTargetGuard(): SeedStatement {
-  const counts = [...D1_SEED_BASE_TABLES, 'strongs_fts', 'sections_fts', 'historical_edition_sections_fts']
+  const counts = [...D1_SEED_BASE_TABLES, 'strongs_fts', 'sections_fts', 'historical_edition_sections_fts', 'historical_edition_hierarchy_bodies_fts']
     .map(table => `(SELECT count(*) FROM ${sqlIdentifier(table)})`)
     .join(' + ');
   return {
@@ -304,7 +313,7 @@ verifyD1Migrations(ROOT, sourceManifest);
 validateCanonicalSources(sourceManifest);
 assertSemanticSource(database);
 
-for (const table of [...D1_SEED_BASE_TABLES, 'strongs_fts', 'sections_fts', 'historical_edition_sections_fts']) {
+for (const table of [...D1_SEED_BASE_TABLES, 'strongs_fts', 'sections_fts', 'historical_edition_sections_fts', 'historical_edition_hierarchy_bodies_fts']) {
   const expected = sourceManifest.expectedCounts[table];
   if (!Number.isSafeInteger(expected) || expected < 0) {
     throw new Error(`Source manifest has no valid expected count for ${table}`);
@@ -343,6 +352,10 @@ const ftsStatements: SeedStatement[] = [
     sql: 'INSERT INTO "historical_edition_sections_fts"("edition_id","section_key","heading","content") SELECT "edition_id","section_key","heading","content" FROM "historical_edition_sections" ORDER BY "edition_id", "source_ordinal";',
     rows: sourceManifest.expectedCounts.historical_edition_sections_fts,
   },
+  {
+    sql: 'INSERT INTO "historical_edition_hierarchy_bodies_fts"("rowid","hierarchy_id","body_key","heading","content") SELECT "rowid","hierarchy_id","body_key","heading","content" FROM "historical_edition_hierarchy_bodies" ORDER BY "hierarchy_id", "source_ordinal";',
+    rows: sourceManifest.expectedCounts.historical_edition_hierarchy_bodies_fts,
+  },
 ];
 files.push(...writeChunks('fts', D1_SEED_EXPORT_ORDER.length, ftsStatements));
 
@@ -380,7 +393,7 @@ const seedManifest = {
   },
   tableOrder: D1_SEED_EXPORT_ORDER,
   expectedCounts: Object.fromEntries(
-    [...D1_SEED_BASE_TABLES, 'strongs_fts', 'sections_fts', 'historical_edition_sections_fts'].map(table => [table, sourceManifest.expectedCounts[table]]),
+    [...D1_SEED_BASE_TABLES, 'strongs_fts', 'sections_fts', 'historical_edition_sections_fts', 'historical_edition_hierarchy_bodies_fts'].map(table => [table, sourceManifest.expectedCounts[table]]),
   ),
   files,
   totals: {

@@ -53,6 +53,10 @@ import {
   materializeHistoricalSourcePacks,
 } from './historical-source-packs.js';
 import {
+  loadApprovedAquinasHierarchy,
+  materializeHistoricalHierarchy,
+} from './historical-hierarchy.js';
+import {
   compileHistoricalSectionCompatibility,
   parseHistoricalSectionCompatibilityAttestation,
 } from './historical-section-compatibility-compiler.js';
@@ -669,6 +673,21 @@ if (JSON.stringify(historicalSourcePackCounts) !== JSON.stringify({
   throw new Error('Transform 9 source-pack materialization did not retain the reviewed core-eight inventory');
 }
 log(`  Inserted ${historicalSourcePackCounts.works} reviewed works with ${historicalSourcePackCounts.sections} canonical sections`);
+
+// ── Transform 10: local-only generic hierarchical authority storage ──
+//
+// This deliberately has no document/catalog/runtime/MCP projection. The
+// manifest-bound reader still consumes the exact approved packet so a local
+// seed can reproduce and audit the dormant authority facts deterministically.
+log('Materializing inactive Aquinas edition hierarchy authority...');
+const aquinasHierarchy = loadApprovedAquinasHierarchy(sourceRegistry);
+const aquinasHierarchyCounts = materializeHistoricalHierarchy(db, aquinasHierarchy);
+if (JSON.stringify(aquinasHierarchyCounts) !== JSON.stringify({
+  hierarchies: 1, artifacts: 4, bodies: 3184, nodes: 3185, ftsRows: 3184,
+})) {
+  throw new Error('Transform 10 hierarchy materialization did not retain the approved inactive Aquinas inventory');
+}
+log(`  Inserted ${aquinasHierarchyCounts.bodies} inactive authority bodies with ${aquinasHierarchyCounts.nodes} navigation nodes`);
 
 // ── Tier 3: UBS source-attested parallel passages ──
 
