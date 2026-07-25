@@ -24,6 +24,12 @@ export interface PreviewD1SeedOptions {
   remote: true;
   candidateD1Name: string;
   confirmedCandidateD1Name: string;
+  /**
+   * An internally generated, candidate-only Wrangler configuration. This is
+   * deliberately not an accepted command-line argument: callers must not be
+   * able to point a seed at an arbitrary checked-in or user-supplied config.
+   */
+  candidateConfigPath?: string;
 }
 
 export type PreviewD1SeedExecutor = (args: string[]) => string | Buffer;
@@ -112,6 +118,16 @@ function partialTargetFailure(filePath: string, error: unknown): Error {
   );
 }
 
+function requireCandidateConfigPath(value: string | undefined): string {
+  if (!value || !value.startsWith('/')) {
+    throw new Error(
+      'Preview D1 seed requires an internally generated absolute candidate config; ' +
+      'run the candidate-preparation orchestrator instead of this helper directly',
+    );
+  }
+  return value;
+}
+
 /**
  * Validation happens before the executor is constructed or called. The
  * synchronous executor is deliberately invoked exactly once per manifest file
@@ -129,7 +145,7 @@ export function applyPreviewD1Seed(
 
   const root = resolve(dependencies.root ?? ROOT);
   const seedRoot = resolve(dependencies.seedRoot ?? join(root, 'scripts', 'd1-seed'));
-  const configPath = join(root, 'wrangler.toml');
+  const configPath = requireCandidateConfigPath(options.candidateConfigPath);
   let manifest: SeedManifest;
   try {
     manifest = (dependencies.loadManifest ?? loadAndVerifyD1SeedManifest)(root, seedRoot);
@@ -143,7 +159,7 @@ export function applyPreviewD1Seed(
     const args = [
       'd1',
       'execute',
-      options.candidateD1Name,
+      'THEOLOGAI_DB',
       '--remote',
       '--env',
       PREVIEW_D1_ENV,
@@ -169,7 +185,14 @@ export function applyPreviewD1Seed(
 }
 
 export function main(argv: string[]): void {
-  applyPreviewD1Seed(parsePreviewD1SeedArguments(argv));
+  // Preserve strict CLI validation for callers/tests, but never expose a
+  // direct remote seed path. The only operational entrypoint is the
+  // candidate-preparation orchestrator, which creates and owns the temporary
+  // candidate-only config used by every SQL phase.
+  parsePreviewD1SeedArguments(argv);
+  throw new Error(
+    'd1:seed:apply-preview is an internal helper; use d1:preview:candidate:prepare',
+  );
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

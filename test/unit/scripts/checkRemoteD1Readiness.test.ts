@@ -288,10 +288,14 @@ describe('remote D1 readiness query', () => {
   it('runs primary readiness, then bounded authority pages, and requests diagnostics only after failure', () => {
     const remote = remoteAuthorityExecutor();
     try {
-      runRemoteD1ReadinessCheck({ database: 'preview', env: 'preview', wrangler: '/tmp/wrangler' }, remote.execute);
+      runRemoteD1ReadinessCheck({
+        database: 'preview', env: 'preview', wrangler: '/tmp/wrangler',
+        configPath: '/tmp/generated-candidate/wrangler.candidate.toml',
+      }, remote.execute);
       expect(remote.calls).toHaveLength(107); // production readiness plus Transform-8 and Transform-9 bounded reads
       expect(remote.calls[0]).toContain('--json');
       expect(remote.calls[0]).toContain('--env');
+      expect(remote.calls.every(call => call.includes('/tmp/generated-candidate/wrangler.candidate.toml'))).toBe(true);
       expect(remote.calls[0].join('\n')).toContain('WHERE passed IS 1');
       expect(remote.calls.slice(1).every(call => call.join('\n').includes('LIMIT 256') || call.join('\n').includes('LIMIT 64') || call.join('\n').includes('LIMIT 32') || call.join('\n').includes('LIMIT 8'))).toBe(true);
       expect(remote.calls.slice(1).every(call => call.join('\n').includes('--remote'))).toBe(true);

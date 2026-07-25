@@ -117,6 +117,12 @@ interface RemoteD1ReadinessOptions {
   env?: string;
   wrangler?: string;
   cwd?: string;
+  /**
+   * Candidate preparation supplies a generated, candidate-only config here.
+   * The public CLI intentionally has no --config option; checked-in release
+   * workflows continue to use their reviewed configuration.
+   */
+  configPath?: string;
 }
 
 type ReadinessCommandExecutor = (
@@ -604,6 +610,7 @@ export function runRemoteD1ReadinessCheck(
   const executeSql = (sql: string, capture = false): unknown => {
     const args = [wrangler, 'd1', 'execute', options.database, '--remote', '--command', sql, '--json'];
     if (options.env) args.push('--env', options.env);
+    if (options.configPath) args.push('--config', options.configPath);
     return execute(process.execPath, args, capture ? { cwd, stdio: 'pipe', encoding: 'utf8' } : { cwd, stdio: 'inherit' });
   };
 

@@ -170,12 +170,13 @@ Before a full remote seed:
 1. Verify `data/data-manifest.json`, the SQLite database, and the generated seed.
 2. Name the exact Cloudflare environment and D1 database being changed.
 3. Confirm that the target is new or that every corpus and FTS table is empty.
-4. Apply tracked migrations with an explicit `--remote` and environment.
-5. Run the checked-in preview-only seed runner with the exact candidate name
-   repeated as its confirmation. It validates the complete manifest, hashes,
-   guard, and canonical file order before invoking Wrangler, then executes each
-   file once in order with literal `--remote --env preview`.
-6. Compare remote table counts with the manifest before deploying application
+4. Use the checked-in candidate-preparation orchestrator. It resolves the
+   candidate from a fresh Cloudflare inventory by both exact name and UUID,
+   generates a temporary non-deployable preview-only Wrangler config pinned to
+   that one D1 binding and this repository's migrations directory, then applies
+   migrations, the manifest-ordered seed, and read-only readiness through that
+   same config.
+5. Compare remote table counts with the manifest before deploying application
    code that depends on the corpus.
 
 ### Fresh-database replacement and cutover
@@ -183,24 +184,56 @@ Before a full remote seed:
 Create each replacement under a unique name and match the current database's
 location or jurisdiction. Do not use `--update-config`: leave the deployed
 Worker bound to the known-good database while the replacement is prepared.
-Record the old binding for rollback, then apply migrations and execute every
-seed file in manifest order against the new database's **exact D1 name**. This
+Record the old binding for rollback, then use the candidate orchestrator. This
 prepares the target without changing the deployed Worker or the checked-in
 binding:
 
 ```bash
-CANDIDATE_D1_NAME='the-uniquely-created-preview-database'
-npx wrangler d1 migrations apply "$CANDIDATE_D1_NAME" --remote --env preview
-npm run d1:seed:apply-preview -- \
+CANDIDATE_D1_NAME='theologai-preview-YYYYMMDD-unique-suffix'
+CANDIDATE_D1_ID='exact-cloudflare-d1-uuid-in-canonical-lowercase'
+npm run d1:preview:candidate:prepare -- \
   --remote \
   --candidate-d1-name "$CANDIDATE_D1_NAME" \
-  --confirm-candidate-d1-name "$CANDIDATE_D1_NAME"
-npm run d1:remote:check -- --database "$CANDIDATE_D1_NAME" --env preview
+  --candidate-d1-id "$CANDIDATE_D1_ID" \
+  --confirm-candidate-d1-name "$CANDIDATE_D1_NAME" \
+  --confirm-candidate-d1-id "$CANDIDATE_D1_ID"
 ```
 
-`d1:seed:apply-preview` is intentionally a preview-only command. It accepts no
-environment override and always invokes Wrangler with `--remote --env preview`;
-do not use it as a production seeding path.
+`d1:preview:candidate:prepare` is intentionally a preview-only command. It
+accepts no environment, config, deploy, binding, delete, retry, resume, or
+repair override. The candidate name and **canonical lowercase UUID** are each
+repeated byte-for-byte. Before any mutating target SQL it validates the
+reviewed seed manifest and a fresh inventory in which that name/UUID pair occurs
+exactly once, rejects the D1 currently in the checked-in preview binding, then
+issues one read-only `sqlite_schema` preflight through the generated binding.
+“Pristine” is deliberately conservative: there may be no non-`sqlite_*` schema
+object at all, so any table, migration ledger, index, trigger, view, FTS shadow
+table, or other leftover object causes refusal before migrations. It then
+creates an owner-only temporary config whose only D1 binding is `THEOLOGAI_DB`
+to the resolved candidate; its Worker entrypoint intentionally does not exist
+and it declares neither routes nor Workers.dev exposure. Migration application,
+every manifest-listed seed file, and all readiness/authority queries address
+that binding through the same config. The checked-in `wrangler.toml` remains
+unchanged.
+
+The old `d1:seed:apply-preview` script is now an internal helper rather than an
+operational entrypoint; it refuses a direct remote invocation. Do not recreate
+the former three-command sequence with hand-written `wrangler` calls.
+
+Failures are intentionally classified differently:
+
+- **Pre-mutation resolution failure:** local manifest/config validation, the
+  read-only D1 inventory, or the pristine-schema preflight cannot prove one
+  exact candidate name/UUID pair and empty target. No migration or seed command
+  was issued, so the candidate is untouched apart from the read-only preflight.
+  Correct the local invocation or resolution evidence before starting again.
+- **Partial-target failure:** a migration or seed command fails after target
+  SQL may have begun. Do not retry, resume, repair, bind, or deploy that
+  candidate. Abandon it and begin again only with a new empty D1 target and
+  explicit authorization.
+- **Post-seed readiness failure:** the candidate is not ready for binding or
+  deployment. Do not repair or retry it in place; preserve the diagnostics and
+  use a separately approved replacement plan.
 
 Only after readiness passes should a reviewed PR change the local preview
 `database_name` and `database_id` to that prepared target. The protected
@@ -210,10 +243,11 @@ binding, and only then permits a Worker deploy. The generic release workflow
 also supports a same-D1 code-only release; Transform-9 freshness is enforced by
 the current readiness contract, which a predecessor lacking migration `0006`
 cannot satisfy. If any migration or seed import fails or is interrupted, do not
-resume against that partial database. The runner stops at the first failed seed
-file and intentionally has no retry, resume, or checkpoint mode. Abandon the
-partial target, give the next empty replacement a new name, and restart from
-migration application.
+resume against that partial database. The orchestrator stops at the first
+failed phase and intentionally has no retry, resume, checkpoint, repair,
+binding, or deployment mode. Abandon the partial target, give the next empty
+replacement a new name, and restart only under the next approved
+candidate-preparation operation.
 Preserve the previously bound database through the cutover and initial
 verification window; rollback is restoring its name and ID in `wrangler.toml`
 and redeploying through the normal approval gate. Database creation, binding

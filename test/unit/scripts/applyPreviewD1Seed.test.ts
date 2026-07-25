@@ -12,6 +12,7 @@ const options: PreviewD1SeedOptions = {
   remote: true,
   candidateD1Name: 'theologai-preview-candidate-123',
   confirmedCandidateD1Name: 'theologai-preview-candidate-123',
+  candidateConfigPath: '/reviewed-root/test-output/candidate/wrangler.candidate.toml',
 };
 
 function manifest(): SeedManifest {
@@ -60,13 +61,14 @@ function manifest(): SeedManifest {
 
 describe('preview D1 seed runner', () => {
   it('requires literal remote execution and an exact repeated candidate name', () => {
+    const { candidateConfigPath: _candidateConfigPath, ...parsedOptions } = options;
     expect(parsePreviewD1SeedArguments([
       '--remote',
       '--candidate-d1-name',
       options.candidateD1Name,
       '--confirm-candidate-d1-name',
       options.candidateD1Name,
-    ])).toEqual(options);
+    ])).toEqual(parsedOptions);
 
     expect(() => parsePreviewD1SeedArguments([
       '--candidate-d1-name', options.candidateD1Name,
@@ -107,18 +109,18 @@ describe('preview D1 seed runner', () => {
 
     expect(calls).toEqual([
       [
-        'd1', 'execute', options.candidateD1Name, '--remote', '--env', 'preview',
-        '--config', '/reviewed-root/wrangler.toml',
+        'd1', 'execute', 'THEOLOGAI_DB', '--remote', '--env', 'preview',
+        '--config', options.candidateConfigPath,
         '--file', '/reviewed-root/scripts/d1-seed/00-empty-target-check-000.sql',
       ],
       [
-        'd1', 'execute', options.candidateD1Name, '--remote', '--env', 'preview',
-        '--config', '/reviewed-root/wrangler.toml',
+        'd1', 'execute', 'THEOLOGAI_DB', '--remote', '--env', 'preview',
+        '--config', options.candidateConfigPath,
         '--file', '/reviewed-root/scripts/d1-seed/01-theologai-metadata-000.sql',
       ],
       [
-        'd1', 'execute', options.candidateD1Name, '--remote', '--env', 'preview',
-        '--config', '/reviewed-root/wrangler.toml',
+        'd1', 'execute', 'THEOLOGAI_DB', '--remote', '--env', 'preview',
+        '--config', options.candidateConfigPath,
         '--file', `/reviewed-root/scripts/d1-seed/${String(D1_SEED_EXPORT_ORDER.length).padStart(2, '0')}-fts-000.sql`,
       ],
     ]);
@@ -144,6 +146,19 @@ describe('preview D1 seed runner', () => {
     expect((failure as Error).message).toContain('refused before any remote command');
     expect((failure as Error).message).toContain('[REDACTED]');
     expect((failure as Error).message).not.toContain('do-not-leak');
+    expect(executed).toBe(false);
+  });
+
+  it('refuses a direct seed without the orchestrator-owned candidate config', () => {
+    const { candidateConfigPath: _candidateConfigPath, ...withoutConfig } = options;
+    let executed = false;
+    expect(() => applyPreviewD1Seed(withoutConfig, {
+      loadManifest: () => manifest(),
+      execute: () => {
+        executed = true;
+        return '';
+      },
+    })).toThrow('internally generated absolute candidate config');
     expect(executed).toBe(false);
   });
 

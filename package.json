@@ -31,6 +31,7 @@
     "d1:seed:verify-import": "tsx scripts/verify-d1-seed-import.ts",
     "d1:seed:verify-workerd": "tsx scripts/verify-d1-seed-workerd.ts",
     "d1:seed:apply-preview": "tsx scripts/apply-preview-d1-seed.ts",
+    "d1:preview:candidate:prepare": "tsx scripts/prepare-preview-d1-candidate.ts",
     "d1:corpus:compare": "tsx scripts/compare-d1-corpora.ts",
     "d1:remote:check": "tsx scripts/check-remote-d1-readiness.ts",
     "benchmark:ubs-runtime": "node --expose-gc --import tsx scripts/benchmark-ubs-runtime.ts",
