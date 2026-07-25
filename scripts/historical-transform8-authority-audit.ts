@@ -160,7 +160,7 @@ export function buildHistoricalTransform8ExpectedAuthority(root: string): Histor
       const content = String(raw.content || raw.answer || raw.a || '');
       const topics = JSON.stringify(raw.topics || []);
       const documentSectionId = storageIdBySourceRow.get(`${document.documentId}\u0000${section.sourceOrdinal}`);
-      if (!Number.isSafeInteger(documentSectionId) || documentSectionId < 1) {
+      if (typeof documentSectionId !== 'number' || !Number.isSafeInteger(documentSectionId) || documentSectionId < 1) {
         throw new Error(`Transform 8 has no deterministic storage link for ${document.documentId} source ordinal ${section.sourceOrdinal}`);
       }
       identities.push({
@@ -197,7 +197,7 @@ export function buildHistoricalTransform8ExpectedAuthority(root: string): Histor
     profiles: profiles.sort(compareProfiles),
     identities: identities.sort(compareIdentities),
     aliases: aliases.sort(compareAliases),
-    bodyFtsSample: bodyFts.sort(compareIdentities).slice(0, HISTORICAL_TRANSFORM8_BODY_FTS_SAMPLE_SIZE),
+    bodyFtsSample: bodyFts.sort(compareBodyFts).slice(0, HISTORICAL_TRANSFORM8_BODY_FTS_SAMPLE_SIZE),
   };
   if (expected.profiles.length !== HISTORICAL_SECTION_TRANSFORM_8_COUNTS.historical_document_delivery_profiles
     || expected.identities.length !== HISTORICAL_SECTION_TRANSFORM_8_COUNTS.historical_section_identities
@@ -490,6 +490,12 @@ function compareProfiles(left: HistoricalTransform8ProfileProjection, right: His
 }
 
 function compareIdentities(left: HistoricalTransform8IdentityProjection, right: HistoricalTransform8IdentityProjection): number {
+  return compareStrings(left.documentId, right.documentId)
+    || left.sourceOrdinal - right.sourceOrdinal
+    || compareStrings(left.sectionKey, right.sectionKey);
+}
+
+function compareBodyFts(left: HistoricalTransform8BodyFtsParityProjection, right: HistoricalTransform8BodyFtsParityProjection): number {
   return compareStrings(left.documentId, right.documentId)
     || left.sourceOrdinal - right.sourceOrdinal
     || compareStrings(left.sectionKey, right.sectionKey);

@@ -265,12 +265,14 @@ function parseCatalog(value: unknown, _artifacts: readonly HistoricalSourcePackA
     throw new Error(`${path}.composition must be an object`);
   }
   const composition = catalog.composition as Record<string, unknown>;
+  const startYear = composition.startYear;
+  const endYear = composition.endYear;
   const keys = Object.keys(composition).sort();
-  const expected = ['label', ...(composition.startYear === undefined && composition.endYear === undefined ? [] : ['startYear', 'endYear'])].sort();
+  const expected = ['label', ...(startYear === undefined && endYear === undefined ? [] : ['startYear', 'endYear'])].sort();
   if (JSON.stringify(keys) !== JSON.stringify(expected)
     || typeof composition.label !== 'string' || !composition.label.trim()
-    || (composition.startYear !== undefined && (!Number.isSafeInteger(composition.startYear) || !Number.isSafeInteger(composition.endYear)
-      || composition.startYear > composition.endYear))) {
+    || (startYear !== undefined && (typeof startYear !== 'number' || typeof endYear !== 'number'
+      || !Number.isSafeInteger(startYear) || !Number.isSafeInteger(endYear) || startYear > endYear))) {
     throw new Error(`${path}.composition must use a non-empty label and optional inclusive integer bounds`);
   }
   if (!Array.isArray(catalog.compositionProvenanceSources) || catalog.compositionProvenanceSources.length < 1) {

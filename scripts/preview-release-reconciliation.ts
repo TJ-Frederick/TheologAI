@@ -145,22 +145,27 @@ function checkedOutProductionCandidateD1(configText: string): CandidateD1Binding
  * Worker binding is deployed. Validate that mapping from a fresh read-only
  * Wrangler inventory instead of trusting a name or ID in isolation.
  */
-function assertCandidateD1Inventory(candidate: CandidateD1Binding, inventoryText: string): void {
-  const values = parseJson(inventoryText, 'preview D1 inventory');
-  assert(Array.isArray(values) && values.length > 0, 'preview D1 inventory must be a nonempty array');
+function assertCandidateD1Inventory(
+  candidate: CandidateD1Binding,
+  inventoryText: string,
+  environment: 'preview' | 'production',
+): void {
+  const inventoryLabel = `${environment} D1 inventory`;
+  const values = parseJson(inventoryText, inventoryLabel);
+  assert(Array.isArray(values) && values.length > 0, `${inventoryLabel} must be a nonempty array`);
   const entries = values.map((value, index) => {
-    const entry = object(value, `preview D1 inventory entry ${index}`);
+    const entry = object(value, `${inventoryLabel} entry ${index}`);
     assert(isUuid(entry.uuid) && typeof entry.name === 'string' && entry.name.length > 0,
-      `preview D1 inventory entry ${index} identity is invalid`);
+      `${inventoryLabel} entry ${index} identity is invalid`);
     return { databaseId: entry.uuid.toLowerCase(), databaseName: entry.name };
   });
   assert(new Set(entries.map(entry => entry.databaseId)).size === entries.length,
-    'preview D1 inventory database IDs are not unique');
+    `${inventoryLabel} database IDs are not unique`);
   assert(new Set(entries.map(entry => entry.databaseName)).size === entries.length,
-    'preview D1 inventory database names are not unique');
+    `${inventoryLabel} database names are not unique`);
   const match = entries.filter(entry => entry.databaseId === candidate.databaseId);
   assert(match.length === 1 && match[0]!.databaseName === candidate.databaseName,
-    'checked-out candidate preview D1 does not match the read-only inventory ID/name mapping');
+    `checked-out candidate ${environment} D1 does not match the read-only inventory ID/name mapping`);
 }
 
 /** Print-safe selector used by the release workflow before it probes candidate readiness by exact D1 name. */
@@ -169,7 +174,7 @@ export function candidatePreviewD1DatabaseName(input: {
   d1InventoryText: string;
 }): string {
   const candidate = checkedOutCandidateD1(input.wranglerConfigText);
-  assertCandidateD1Inventory(candidate, input.d1InventoryText);
+  assertCandidateD1Inventory(candidate, input.d1InventoryText, 'preview');
   return candidate.databaseName;
 }
 
@@ -179,7 +184,7 @@ export function candidateProductionD1DatabaseName(input: {
   d1InventoryText: string;
 }): string {
   const candidate = checkedOutProductionCandidateD1(input.wranglerConfigText);
-  assertCandidateD1Inventory(candidate, input.d1InventoryText);
+  assertCandidateD1Inventory(candidate, input.d1InventoryText, 'production');
   return candidate.databaseName;
 }
 
@@ -247,7 +252,7 @@ export function capturePreviewPredecessorAnchor(input: {
 }): PreviewPredecessorAnchor {
   const active = currentSoleDeployment(input.deploymentsText, 'pre-deploy preview deployments');
   const candidateD1 = checkedOutCandidateD1(input.wranglerConfigText);
-  assertCandidateD1Inventory(candidateD1, input.d1InventoryText);
+  assertCandidateD1Inventory(candidateD1, input.d1InventoryText, 'preview');
   const predecessorD1 = observedD1FromAuthoritativeVersionView(input.predecessorVersionViewText, active.versionId, 'predecessor');
   return {
     schemaVersion: 3,
@@ -271,7 +276,7 @@ export function captureProductionPredecessorAnchor(input: {
 }): ProductionPredecessorAnchor {
   const active = currentSoleDeployment(input.deploymentsText, 'pre-deploy production deployments');
   const candidateD1 = checkedOutProductionCandidateD1(input.wranglerConfigText);
-  assertCandidateD1Inventory(candidateD1, input.d1InventoryText);
+  assertCandidateD1Inventory(candidateD1, input.d1InventoryText, 'production');
   const predecessorD1 = observedD1FromAuthoritativeVersionView(input.predecessorVersionViewText, active.versionId, 'production predecessor');
   return {
     schemaVersion: 3, worker: 'theologai', predecessorVersionId: active.versionId, predecessorDeploymentId: active.id,

@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "."
+  },
+  "files": [
+    "scripts/prepare-production-d1-candidate.ts",
+    "scripts/check-remote-d1-readiness.ts",
+    "scripts/preview-release-reconciliation.ts",
+    "scripts/production-release-reconciliation.ts",
+    "scripts/verify-preview-worker-deployment.ts",
+    "scripts/verify-production-worker-deployment.ts",
+    "scripts/audit-original-language-v2-preview.ts",
+    "scripts/audit-original-language-v2-production.ts",
+    "scripts/audit-historical-core-preview.ts",
+    "scripts/audit-historical-core-production.ts"
+  ]
+}

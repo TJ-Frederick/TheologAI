@@ -2,10 +2,11 @@
 
 This document describes a future protected production cutover. It records
 release safeguards only; it does not claim that PR95's 25-work Transform-9
-materialization is deployed. At this revision, the checked-out local corpus has
-25 works (the legacy 17 plus the reviewed core eight), while production remains
-on its existing 17-work Transform-8 D1 collection until a separately authorized
-candidate is prepared, bound, deployed, and audited.
+materialization is deployed to production. At this revision, the checked-out
+local corpus and deployed preview corpus have 25 works (the legacy 17 plus the
+reviewed core eight), while production remains on its existing 17-work
+Transform-8 D1 collection until a separately authorized candidate is prepared,
+bound, deployed, and audited.
 
 The production workflow is intentionally derived from checked-in identity:
 

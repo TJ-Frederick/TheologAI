@@ -326,8 +326,8 @@ class FixedPreviewMcp {
   }
 
   complete(): void {
-    assert(this.counters.logical === MAX_LOGICAL_OPERATIONS, `preview audit logical inventory drifted: ${this.counters.logical}/${MAX_LOGICAL_OPERATIONS}`);
-    assert(this.counters.http === MAX_HTTP_EXCHANGES, `preview audit HTTP inventory drifted: ${this.counters.http}/${MAX_HTTP_EXCHANGES}`);
+    assert(this.counters.logical === MAX_LOGICAL_OPERATIONS, `${this.profile.label} audit logical inventory drifted: ${this.counters.logical}/${MAX_LOGICAL_OPERATIONS}`);
+    assert(this.counters.http === MAX_HTTP_EXCHANGES, `${this.profile.label} audit HTTP inventory drifted: ${this.counters.http}/${MAX_HTTP_EXCHANGES}`);
   }
 }
 

@@ -696,9 +696,9 @@ Code readiness and operational readiness are deliberately separate:
   `100`, production stays `000`, and neither environment may make a CCEL
   request.
 - Expand the local primary-source corpus with rights-reviewed, freely
-  redistributable editions and explicit edition provenance. The local Transform
-  9 core-eight makes the checked-out collection 25 works, while both deployed
-  environments remain on the 17-work Transform 8 catalog. Norton, Aquinas, and
+  redistributable editions and explicit edition provenance. The Transform 9
+  core-eight makes the checked-out and preview collection 25 works, while
+  production remains on the 17-work Transform 8 catalog. Norton, Aquinas, and
   other acquired public-domain packets require separately reviewed successor
   transforms, D1 preparation, and release gates. Do not mirror or republish
   CCEL transcriptions without edition-specific rights.
@@ -740,8 +740,9 @@ Code readiness and operational readiness are deliberately separate:
   is uncertain, but that uncertainty must be disclosed; a third party's
   particular transcription is not assumed redistributable.
 - CCEL execution remains inactive. Production is deployed v6/local-only;
-  deployed preview remains v5/discovery-only until an authorized PR95 preview
-  deployment selects the checked-in v7 discovery candidate. A future live discovery rollout
+  deployed preview remains v5/discovery-only with CCEL execution disabled. The
+  Transform-9 preview corpus release does not select the checked-in v7
+  discovery candidate. A future live discovery rollout
   requires the explicit owner policy decision above and separate review, and
   must not become crawling, catalog mirroring, body republication, or permanent
   storage. The legacy CCEL body reader is retired; the retained discovery

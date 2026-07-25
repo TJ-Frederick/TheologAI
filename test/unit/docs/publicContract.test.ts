@@ -187,7 +187,8 @@ describe('published project contract', () => {
     expect(readme).toContain('do **not** currently fetch CCEL search results or document bodies');
     expect(readme).toContain('Production v6/local-only is deployed');
     expect(readme).toContain('Preview remains on deployed\nv5/discovery-only with CCEL execution disabled');
-    expect(readme).toContain('checked-in v7 profile is only a non-executing\ncandidate');
+    expect(readme).toContain('Transform-9 preview corpus\nrelease does not activate the checked-in v7 profile, which remains a\nnon-executing candidate');
+    expect(readme).toContain('preview serves the 25-work Transform 9 collection');
     expect(readme).toContain('before adapter');
     expect(readme).toContain('Durable Object lookup/RPC, or fetch');
     expect(readme).toContain('reconnect');
