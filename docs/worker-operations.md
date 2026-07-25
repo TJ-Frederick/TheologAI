@@ -561,12 +561,13 @@ readiness query that checks integrity, exact manifest row counts, and required
 indexes, column signatures, foreign keys, and schema/corpus identity markers. A
 missing, stale, partial, or incompatible corpus stops deployment.
 
-When Transform 9 is part of an approved future release, the same gate also runs
-its bounded source-pack authority audit: direct eight-row normalized-section
-pages plus compact identity/document/edition-FTS/runtime-FTS parity pages. The
-audit is read-only and catches an orphan or extra normalized section that a
-delivery-profile join alone would miss. This branch remains local-only; this
-paragraph is release-gate documentation, not deployment evidence.
+The deployed preview Transform 9 / 25-work release runs the same gate's bounded
+source-pack authority audit: direct eight-row normalized-section pages plus
+compact identity/document/edition-FTS/runtime-FTS parity pages. The audit is
+read-only and catches an orphan or extra normalized section that a
+delivery-profile join alone would miss. Production remains on its Transform 8
+17-work corpus; any separately authorized production Transform 9 cutover must
+rerun this gate and audit against its exact candidate.
 
 The corpus marker is the scoped D1 materialization identity derived from
 `data/data-manifest.json` `materializations.d1`, not the hash of the complete
