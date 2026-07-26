@@ -37,6 +37,7 @@
     "d1:corpus:compare": "tsx scripts/compare-d1-corpora.ts",
     "d1:remote:check": "tsx scripts/check-remote-d1-readiness.ts",
     "benchmark:ubs-runtime": "node --expose-gc --import tsx scripts/benchmark-ubs-runtime.ts",
+    "audit:dependencies:high": "npm audit --package-lock-only --include=dev --audit-level=high",
     "audit:parallel-preview": "tsx scripts/audit-parallel-passages-preview.ts",
     "audit:ccel-preview": "tsx scripts/audit-ccel-preview.ts",
     "audit:original-language-v2-preview": "tsx scripts/audit-original-language-v2-preview.ts",
@@ -97,9 +98,6 @@
     "node": ">=22.18.0 <23"
   },
   "overrides": {
-    "@cloudflare/vitest-pool-workers": {
-      "wrangler": "4.107.0"
-    },
     "@modelcontextprotocol/sdk": {
       "@hono/node-server": "2.0.11"
     }
@@ -115,8 +113,8 @@
     "zod": "4.3.6"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "4.20260702.1",
-    "@cloudflare/vitest-pool-workers": "^0.18.4",
+    "@cloudflare/workers-types": "5.20260722.1",
+    "@cloudflare/vitest-pool-workers": "^0.18.8",
     "@modelcontextprotocol/conformance": "0.1.16",
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^24.5.2",
@@ -125,13 +123,13 @@
     "@vitest/ui": "4.1.10",
     "ajv": "8.20.0",
     "happy-dom": "^20.0.4",
-    "miniflare": "4.20260708.1",
-    "nodemon": "^3.1.10",
+    "miniflare": "4.20260722.0",
+    "nodemon": "^3.1.14",
     "smol-toml": "^1.6.1",
     "tsx": "^4.20.6",
-    "vite": "8.1.4",
+    "vite": "8.1.5",
     "vitest": "4.1.10",
-    "wrangler": "4.107.0",
+    "wrangler": "4.114.0",
     "xml2js": "^0.6.2"
   }
 }
