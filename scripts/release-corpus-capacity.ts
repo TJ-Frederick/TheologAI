@@ -12,6 +12,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
 import { computeD1CorpusIdentity, parseDataManifest } from './d1-corpus-identity.js';
+import { VERIFY_DATABASE_DEFER_CAPACITY_FLAG } from './release-corpus-capacity-policy.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const BUILD_SCRIPT = 'scripts/build-database.ts';
@@ -106,7 +107,15 @@ export interface ReleaseCorpusCapacityRunOptions {
   verifyDatabase?: (context: ReleaseCorpusCapacityBuilderContext) => void;
   /** Test-only injection. The public command always uses the checked-in release baseline. */
   baseline?: RecordedCapacityBaseline;
+  /** Test-only injection for proving the default build/verify command path. */
+  commandRunner?: ReleaseCorpusCapacityCommandRunner;
+  /** Test-only injection for physical threshold boundary coverage. */
+  measurePreVacuum?: (path: string) => DatabaseCapacityMeasurement;
+  /** Test-only injection for physical threshold boundary coverage. */
+  measurePostVacuum?: (path: string) => DatabaseCapacityMeasurement;
 }
+
+export type ReleaseCorpusCapacityCommandRunner = (root: string, script: string, args: string[]) => void;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -396,9 +405,14 @@ function runCurrentCheckoutCommand(root: string, script: string, args: string[])
 }
 
 /** Build and verify the normal SQLite/D1 materialization at a temporary output path. */
-export function buildFreshReleaseCorpusCapacityDatabase(context: ReleaseCorpusCapacityBuilderContext): void {
-  runCurrentCheckoutCommand(context.root, BUILD_SCRIPT, ['--output', context.outputPath]);
-  runCurrentCheckoutCommand(context.root, VERIFY_SCRIPT, ['--database', context.outputPath]);
+export function buildFreshReleaseCorpusCapacityDatabase(
+  context: ReleaseCorpusCapacityBuilderContext,
+  runCommand: ReleaseCorpusCapacityCommandRunner = runCurrentCheckoutCommand,
+): void {
+  runCommand(context.root, BUILD_SCRIPT, ['--output', context.outputPath]);
+  runCommand(context.root, VERIFY_SCRIPT, [
+    '--database', context.outputPath, VERIFY_DATABASE_DEFER_CAPACITY_FLAG,
+  ]);
 }
 
 function expectedCorpusIdentity(root: string): string {
@@ -421,14 +435,20 @@ export function runReleaseCorpusCapacityReport(root = ROOT, options: ReleaseCorp
   try {
     const databasePath = join(temporaryDirectory, 'theologai.sqlite');
     const context = { root, outputPath: databasePath };
-    (options.buildDatabase ?? buildFreshReleaseCorpusCapacityDatabase)(context);
+    if (options.buildDatabase === undefined) {
+      buildFreshReleaseCorpusCapacityDatabase(context, options.commandRunner);
+    } else {
+      options.buildDatabase(context);
+    }
     if (options.verifyDatabase !== undefined) options.verifyDatabase(context);
     const corpusIdentity = expectedCorpusIdentity(root);
     assertStoredCorpusIdentity(databasePath, corpusIdentity);
-    const preVacuum = measurePreVacuumDatabase(databasePath);
+    const preVacuum = (options.measurePreVacuum ?? measurePreVacuumDatabase)(databasePath);
+    assertDatabaseCapacityMeasurement(preVacuum, 'current pre-VACUUM measurement');
     const vacuumDiagnosticPath = join(temporaryDirectory, 'theologai-vacuum-diagnostic.sqlite');
     copyFileSync(databasePath, vacuumDiagnosticPath);
-    const postVacuumDiagnostic = measurePostVacuumDiagnostic(vacuumDiagnosticPath);
+    const postVacuumDiagnostic = (options.measurePostVacuum ?? measurePostVacuumDiagnostic)(vacuumDiagnosticPath);
+    assertDatabaseCapacityMeasurement(postVacuumDiagnostic, 'current post-VACUUM diagnostic');
     return buildReleaseCorpusCapacityReport(
       corpusIdentity, preVacuum, postVacuumDiagnostic, options.baseline ?? readRecordedCapacityBaseline(root),
     );
@@ -445,6 +465,15 @@ export function releaseCorpusCapacityExitCode(report: ReleaseCorpusCapacityRepor
   return report.capacity.withinLimit ? 0 : 1;
 }
 
+/** Print the complete structured report before returning its public process status. */
+export function emitReleaseCorpusCapacityReport(
+  report: ReleaseCorpusCapacityReport,
+  write: (value: string) => void = value => { process.stdout.write(value); },
+): 0 | 1 {
+  write(`${JSON.stringify(report, null, 2)}\n`);
+  return releaseCorpusCapacityExitCode(report);
+}
+
 function assertNode22(): void {
   if (process.versions.node.split('.')[0] !== '22') fail(`requires Node 22; received ${process.version}`);
 }
@@ -453,8 +482,7 @@ function main(argv: readonly string[]): void {
   parseReleaseCorpusCapacityArguments(argv);
   assertNode22();
   const report = runReleaseCorpusCapacityReport();
-  process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
-  process.exitCode = releaseCorpusCapacityExitCode(report);
+  process.exitCode = emitReleaseCorpusCapacityReport(report);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

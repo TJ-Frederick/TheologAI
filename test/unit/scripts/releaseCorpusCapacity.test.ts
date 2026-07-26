@@ -11,6 +11,7 @@ import {
   assertDatabaseCapacityMeasurement,
   buildReleaseCorpusCapacityReport,
   compareDbstatGrowth,
+  emitReleaseCorpusCapacityReport,
   measurePreVacuumDatabase,
   parseReleaseCorpusCapacityArguments,
   readRecordedCapacityBaseline,
@@ -20,6 +21,7 @@ import {
   type RecordedCapacityBaseline,
 } from '../../../scripts/release-corpus-capacity.js';
 import { computeD1CorpusIdentity, parseDataManifest } from '../../../scripts/d1-corpus-identity.js';
+import { VERIFY_DATABASE_DEFER_CAPACITY_FLAG } from '../../../scripts/release-corpus-capacity-policy.js';
 
 const ROOT = process.cwd();
 
@@ -157,6 +159,41 @@ describe('release-wide SQLite/D1 corpus capacity report', () => {
     expect(report.growthSinceBaseline.dbstat).toHaveLength(1);
     expect(JSON.parse(JSON.stringify(report))).toMatchObject({ baseline: { id: 'fixture' } });
     expect(releaseCorpusCapacityExitCode(report)).toBe(1);
+  });
+
+  it('defers only the default verifier size abort, emits over-limit JSON, then exits 1', () => {
+    const corpusIdentity = computeD1CorpusIdentity(parseDataManifest(readFileSync(join(ROOT, 'data', 'data-manifest.json'))));
+    const overLimitBytes = D1_CORPUS_CAPACITY_LIMIT_BYTES + 4_096;
+    const overLimitMeasurement = measurement(overLimitBytes, [
+      { name: 'all_pages', kind: 'table', pages: overLimitBytes / 4_096, bytes: overLimitBytes },
+    ]);
+    const commands: Array<{ script: string; args: string[] }> = [];
+    const report = runReleaseCorpusCapacityReport(ROOT, {
+      commandRunner: (_root, script, args) => {
+        commands.push({ script, args: [...args] });
+        if (script === 'scripts/build-database.ts') fixtureDatabase(args[1]!, corpusIdentity);
+      },
+      measurePreVacuum: () => structuredClone(overLimitMeasurement),
+      measurePostVacuum: () => structuredClone(overLimitMeasurement),
+      baseline: baseline(measurement(4_096, [
+        { name: 'all_pages', kind: 'table', pages: 1, bytes: 4_096 },
+      ])),
+    });
+    expect(commands).toHaveLength(2);
+    expect(commands[0]).toMatchObject({ script: 'scripts/build-database.ts', args: ['--output', expect.any(String)] });
+    expect(commands[1]).toMatchObject({
+      script: 'scripts/verify-database.ts',
+      args: ['--database', expect.any(String), VERIFY_DATABASE_DEFER_CAPACITY_FLAG],
+    });
+
+    let stdout = '';
+    const exitCode = emitReleaseCorpusCapacityReport(report, value => { stdout += value; });
+    expect(JSON.parse(stdout)).toMatchObject({
+      schemaVersion: 'theologai-release-corpus-capacity-report.v1',
+      capacity: { status: 'exceeds_350_mib', withinLimit: false },
+      growthSinceBaseline: { dbstat: [expect.objectContaining({ name: 'all_pages' })] },
+    });
+    expect(exitCode).toBe(1);
   });
 
   it('reads the checked-in Transform 9 baseline and refuses public arguments', () => {

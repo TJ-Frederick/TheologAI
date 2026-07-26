@@ -17,6 +17,14 @@ below the operating system temporary directory, checks that the stored D1
 corpus identity agrees with `data/data-manifest.json`, and removes all temporary
 files. Tests alone can inject a fixture builder or baseline.
 
+The audit runs the normal full database verifier. For this one call, the
+verifier defers only its duplicate early 350 MiB abort to the audit; integrity,
+foreign keys, schema, row counts, corpus identity, D1 readiness, source
+authority, hierarchy, and language checks still run normally. The audit then
+prints the complete structured capacity/growth report and returns exit 1 when
+the measured database is over the ceiling. Running `data:verify-db` directly
+retains its existing early size guard.
+
 ## Controlling measurement and thresholds
 
 The controlling value is `capacity.preVacuumBytes`: the direct fresh database
@@ -58,10 +66,12 @@ Output contains no timestamps, temporary paths, or unordered collections. The
 same checkout and SQLite build therefore produce stable, reviewable JSON.
 
 The `Fresh Checkout & Data` pull-request job runs this command as a
-non-mutating capacity check. It builds only below runner temporary storage,
-prints the warning and complete growth report, and blocks the check above the
-350 MiB ceiling. Operators should also run the same command manually when
-preparing release evidence; CI does not update the recorded baseline.
+non-mutating capacity check before its generic verifier step. It builds only
+below runner temporary storage, prints the warning and complete growth report,
+and blocks the check above the 350 MiB ceiling. This order ensures capacity
+evidence is retained before the generic verifier can issue its terse early
+size error. Operators should also run the same command manually when preparing
+release evidence; CI does not update the recorded baseline.
 
 ## Transform 10 release interpretation
 

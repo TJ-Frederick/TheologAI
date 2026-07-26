@@ -27,6 +27,7 @@ import {
 } from './historical-hierarchy.js';
 import { HistoricalDocumentRepository } from '../src/adapters/data/HistoricalDocumentRepository.js';
 import { buildD1ReadinessSql } from './check-remote-d1-readiness.js';
+import { VERIFY_DATABASE_DEFER_CAPACITY_FLAG } from './release-corpus-capacity-policy.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -50,7 +51,9 @@ function getDatabasePath(argv: string[]): string {
   return join(ROOT, 'data', 'theologai.db');
 }
 
-const databasePath = getDatabasePath(process.argv.slice(2));
+const verifyArguments = process.argv.slice(2);
+const databasePath = getDatabasePath(verifyArguments);
+const deferCapacityToReleaseReport = verifyArguments.includes(VERIFY_DATABASE_DEFER_CAPACITY_FLAG);
 if (!existsSync(databasePath)) throw new Error(`Database not found: ${databasePath}`);
 
 const manifest = parseDataManifest(readFileSync(MANIFEST_PATH));
@@ -322,7 +325,7 @@ function assertHistoricalTransform9SourcePackMaterialization(database: Database.
 
 try {
   const databaseBytes = statSync(databasePath).size;
-  if (databaseBytes > UBS_SEMANTICS_DATABASE_CEILING_BYTES) {
+  if (!deferCapacityToReleaseReport && databaseBytes > UBS_SEMANTICS_DATABASE_CEILING_BYTES) {
     throw new Error(`SQLite database exceeds the 350 MiB UBS semantic capacity gate: ${databaseBytes} bytes`);
   }
   const integrityRows = db.pragma('integrity_check') as Array<Record<string, string>>;
