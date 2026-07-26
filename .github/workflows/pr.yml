@@ -25,7 +25,10 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'npm'
 
-      - run: npm ci
+      - run: npm ci --no-audit
+
+      - name: Audit full dependency lockfile for high-severity vulnerabilities
+        run: npm run audit:dependencies:high
 
       - name: Verify generated Worker binding types
         run: |
@@ -75,7 +78,7 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'npm'
 
-      - run: npm ci
+      - run: npm ci --no-audit
 
       - name: Confirm derived database is absent
         run: test ! -e data/theologai.db
@@ -144,7 +147,7 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'npm'
 
-      - run: npm ci
+      - run: npm ci --no-audit
 
       - name: Typecheck Worker runtime tests
         run: npm run typecheck:worker-runtime
@@ -169,7 +172,7 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'npm'
 
-      - run: npm ci
+      - run: npm ci --no-audit
 
       - name: Exercise compiled Node HTTP MCP server
         run: npm run test:e2e
@@ -186,7 +189,7 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'npm'
 
-      - run: npm ci
+      - run: npm ci --no-audit
 
       - name: Run applicable official MCP server scenarios
         run: npm run test:conformance
@@ -271,7 +274,7 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'npm'
 
-      - run: npm ci
+      - run: npm ci --no-audit
 
       # Resolve the checked-out candidate by ID and name before readiness.
       # The Worker remains bound to the predecessor until the later deploy.
@@ -362,7 +365,7 @@ jobs:
         id: preview-worker-deploy
         uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
         with:
-          wranglerVersion: '4.107.0'
+          wranglerVersion: '4.114.0'
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           environment: preview

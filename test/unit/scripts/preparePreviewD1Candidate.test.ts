@@ -378,10 +378,10 @@ describe('preview D1 candidate preparation', () => {
     expect(state.cleaned).toBe(true);
   });
 
-  it('uses pinned Wrangler 4.107 locally to resolve the generated env.preview binding and absolute migrations directory', () => {
+  it('uses pinned Wrangler 4.114 locally to resolve the generated env.preview binding and absolute migrations directory', () => {
     const wrangler = join(ROOT, 'node_modules', 'wrangler', 'bin', 'wrangler.js');
     const version = JSON.parse(readFileSync(join(ROOT, 'node_modules', 'wrangler', 'package.json'), 'utf8')) as { version: string };
-    expect(version.version).toBe('4.107.0');
+    expect(version.version).toBe('4.114.0');
     const config = createTemporaryPreviewCandidateConfig({
       root: ROOT,
       candidateD1Name: candidate.candidateD1Name,

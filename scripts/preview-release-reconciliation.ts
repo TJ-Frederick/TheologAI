@@ -218,8 +218,8 @@ function observedD1FromAuthoritativeVersionView(
     .filter(binding => binding.name === 'THEOLOGAI_DB');
   assert(d1Bindings.length === 1, `${label} version must expose exactly one THEOLOGAI_DB binding`);
   const d1 = d1Bindings[0]!;
-  // Wrangler 4.107.0 emits the authoritative D1 UUID twice. Requiring both
-  // fields catches a response-shape change or a swapped control-plane value.
+  // The authoritative D1 binding response includes the UUID twice. Requiring
+  // both fields catches a response-shape change or a swapped control-plane value.
   exactKeys(d1, ['name', 'type', 'id', 'database_id'], `${label} version D1 binding`);
   assert(d1.name === 'THEOLOGAI_DB' && d1.type === 'd1' && isUuid(d1.id) && isUuid(d1.database_id)
     && d1.id.toLowerCase() === d1.database_id.toLowerCase(),

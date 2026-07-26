@@ -102,7 +102,7 @@ jobs:
       - name: Create non-public coordinator owner and SQLite namespace
         uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
         with:
-          wranglerVersion: '4.107.0'
+          wranglerVersion: '4.114.0'
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy --config wrangler.ccel-coordinator.toml
