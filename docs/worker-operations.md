@@ -3,9 +3,11 @@
 ## Current production release state (PR #96; 2026-07-24)
 
 The integrated checked-out candidate is Transform 10, local-only and
-unpublished: its Aquinas hierarchy is inactive and has no catalog, runtime, or
-MCP projection. The live preview remains the Transform 9 25-work catalog, and
-production remains the Transform 8 17-work catalog.
+unpublished in its public behavior: its Aquinas hierarchy is inactive and has
+no catalog, runtime, or MCP projection. The prepared but unbound preview
+candidate retains that inactive authority data without changing the live
+preview, which remains the Transform 9 25-work catalog; production remains the
+Transform 8 17-work catalog.
 
 PR #96 production evidence is source-attested to checked-out commit
 `ac4b5ed774302fbfc86bf846b6ee77a07beed456` and exact tree
@@ -77,7 +79,8 @@ PR95's Transform9 historical source-pack work is deployed to preview only. It
 adds eight reviewed sectioned-only editions to the local catalog and preview
 25-work corpus but has no production Cloudflare migration, binding, deployment,
 or runtime claim. The separate Transform 10 Aquinas hierarchy remains
-local-only, unpublished, and inactive.
+unpublished and inactive; its prepared preview candidate has no catalog or
+runtime activation.
 
 At approximately 2026-07-25T19:13Z, fresh read-only Cloudflare evidence found
 preview deployment `4148bfb5-dd03-447f-b656-9daa0aee4380` as the sole 100%
@@ -90,6 +93,18 @@ and bound to `theologai-preview-20260724-a`
 `theologai-preview-20260722-b` (`94c4938b-7800-4d68-9097-0df33c31fdc1`).
 This point-in-time observation is read-only and does not imply a rollback,
 binding change, or any production change.
+
+The checked-in preview binding now names prepared but not-yet-deployed D1
+`theologai-preview-20260725-t10-a`
+(`fbd1a492-fbc2-4061-a431-181a9632d4de`). Its one-time preparation from
+`6cf8c00bece98865b8891fba1fc5805a9322e031` applied deterministic seed
+manifest SHA-256
+`86bd2bad5ee455dea46dd845efe6239039c2a7ef14e06b3b37754f7c70c59b67` (53
+files, 1,637,035 rows) and passed readiness plus Transform-8, Transform-9, and
+inactive Transform-10 predicates. No preview Worker deployment or binding
+change is recorded for this candidate: the live Transform-9 deployment above
+remains current until a separately authorized protected deployment proves the
+candidate binding before its black-box audits.
 
 PR #92 merged as `cd3d1c38fdf0f939a33a41d4b6d5044eb7f44562`; its exact
 reviewed head `3a2b5a57b322dce525f27cfa91c9f667d080bca9` is the separate
@@ -585,8 +600,9 @@ source-pack authority audit: direct eight-row normalized-section pages plus
 compact identity/document/edition-FTS/runtime-FTS parity pages. The audit is
 read-only and catches an orphan or extra normalized section that a
 delivery-profile join alone would miss. Production remains on its Transform 8
-17-work corpus. Transform 10 is only a local, unpublished hierarchy candidate;
-any separately authorized production Transform 9 cutover must rerun this gate
+17-work corpus. Transform 10 is an unpublished, inactive hierarchy candidate;
+its prepared but unbound preview D1 does not authorize production activation.
+Any separately authorized production Transform 9 cutover must rerun this gate
 and audit against its exact candidate.
 
 The corpus marker is the scoped D1 materialization identity derived from

@@ -227,6 +227,8 @@ describe('published project contract', () => {
     const activeDeployment = '4148bfb5-dd03-447f-b656-9daa0aee4380';
     const activeVersion = 'ca1376bb-05cc-403b-a396-d2e89403abec';
     const activeD1 = 'theologai-preview-20260724-a';
+    const preparedCandidateD1 = 'theologai-preview-20260725-t10-a';
+    const preparedCandidateD1Id = 'fbd1a492-fbc2-4061-a431-181a9632d4de';
     const predecessorDeployment = '7f00a94b-4ff4-47d6-9bee-2efb99673718';
     const predecessorVersion = 'f78d66f1-cefe-46ba-88ba-9ddec259cda4';
     const predecessorD1 = 'theologai-preview-20260722-b';
@@ -239,12 +241,18 @@ describe('published project contract', () => {
       expect(document).toContain(predecessorDeployment);
       expect(document).toContain(predecessorVersion);
       expect(document).toContain(predecessorD1);
+      expect(document).toContain(preparedCandidateD1);
+      expect(document).toContain(preparedCandidateD1Id);
     }
     expect(reconciliation).toContain('live Transform-9\n25-work preview collection');
+    expect(reconciliation).toContain('separately prepared but\nnot-yet-deployed candidate');
+    expect(reconciliation).toContain('This candidate remains unbound from\nthe active Worker');
     expect(operations).toContain('This is the current Transform 9\n25-work preview release');
+    expect(operations).toContain('prepared but not-yet-deployed D1');
+    expect(operations).toContain('No preview Worker deployment or binding\nchange is recorded for this candidate');
     expect(operations).toContain(`Its historical Cloudflare deployment\n\`${historicalDeployment}\` served Worker`);
     expect(operations).toContain('This historical release is neither\nthe current preview identity nor the immediate retained predecessor');
-    expect(reconciliation).toContain('does not alter the local Transform-10 unpublished boundary');
+    expect(reconciliation).toContain('does not alter the Transform-10 unpublished, non-runtime boundary');
     expect(reconciliation).not.toContain('which the checked-in preview binding now names for the next protected preview deployment');
   });
 });
