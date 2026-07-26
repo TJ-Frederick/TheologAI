@@ -36,7 +36,7 @@ import { formatSectionedDocumentDirectory, formatSectionedDocumentLanding } from
 export function createClassicTextsHandler(historicalService: HistoricalDocumentService): ToolHandler {
   return {
     name: 'classic_text_lookup',
-      description: 'Search and browse the locally indexed historical-document collection. Every public section locator uses its canonical Transform-8 section key and source ordinal. A future reviewed sectioned-only edition would return a bounded landing or 32-entry metadata directory; only exact-section resources deliver bodies. Remote CCEL document bodies are not retrieved or republished.',
+      description: 'Search and browse the locally indexed historical-document collection. Every public section locator uses its canonical source-first section key and source ordinal. Reviewed sectioned-only editions return a bounded landing or 32-entry metadata directory; only exact-section resources deliver bodies. Remote CCEL document bodies are not retrieved or republished.',
     inputSchema: {
       type: 'object',
       description: 'Flat mode fields are intentionally shown together for client discoverability; choose exactly one mode, with cross-field validity enforced strictly by the handler.',

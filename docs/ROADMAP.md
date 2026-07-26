@@ -203,8 +203,8 @@ is local source context only and does not define the current product contract.
 - **EEBO-TCP Norton acquisition / PR #71:** acquired and byte-locked the CC0
   1561 Norton translation source plus a normalization report and Gate 1
   evidence. It is not in SQLite, D1, the historical catalog, a resource, or
-  an MCP response. The future bounded `sectioned_only` publication remains
-  transform 9, not a present feature, merged as
+  an MCP response. Its future bounded `sectioned_only` publication requires a
+  later successor transform and is not a present feature, merged as
   `f6888fc4dbee03a3ccdd20411d284318ea22a21b`.
 - **Legacy production-host migration / PR #72:** established the then-current
   known-good remote baseline. It redirects the production
@@ -240,7 +240,7 @@ is local source context only and does not define the current product contract.
   `0005`, transform 8, D1 changes, runtime registration, or deployment,
   merged as `ba171c0b2247aef55b92398546180770ddcaffc5`.
 - **Norton sectioned-delivery preparation / PR #78:** prepared a bounded
-  `sectioned_only` transform-9 contract for the acquired Norton source. It
+  `sectioned_only` successor-transform contract for the acquired Norton source. It
   emits no catalog record, SQLite/D1 row, resource, or MCP output, merged as
   `bf59fa3b1ab19d5243ce1c5ee7bb08095badbf08`.
 - **UBS Hebrew U2 preparation / PR #79:** added raw decoding and
@@ -655,8 +655,9 @@ Code readiness and operational readiness are deliberately separate:
   controls when a cursor is present, and retains `includeText: false` as the
   existing default. Any future workflow or prompt change remains a separate
   slice rather than another cursor implementation.
-- Production v6/local-only is deployed in PR #96. Preview v7/discovery-only is
-  still an unpublished checked-in candidate, with CCEL execution disabled.
+- Production v6/local-only is deployed in PR #96. Deployed preview remains
+  v5/discovery-only; v7/discovery-only is still an unpublished checked-in
+  candidate, with CCEL execution disabled.
   Prospective corpus work remains limited to
   explicit searched/read/deferred coverage semantics and future
   edition/provenance fields; it is not a rollout of evidence already present
@@ -672,10 +673,10 @@ Code readiness and operational readiness are deliberately separate:
   `unordered_no_compatibility_proof`. PR #96 supersedes the earlier statement
   that production lacked the prepared D1; its public v2 audit is bounded to
   `original_language_study` and does not broaden this historical claim.
-  Norton is a later transform-9
-  `sectioned_only` release; Calvin, Aquinas, and Augustine need later
-  per-edition transforms and release approvals. Cyril remains a zero-output
-  blocked source until translator attribution is established.
+  Norton and the separate Aquinas acquisition packet need later successor
+  transforms and release approvals; neither is a Transform 9 member. Cyril
+  remains a zero-output blocked source until translator attribution is
+  established.
 - Review a bounded, discovery-only public rollout of the retained CCEL search
   adapter. The owner accepts free, donation-independent discovery with at most
   five short, attributed 240-character provider snippets and clean links, with
@@ -695,10 +696,13 @@ Code readiness and operational readiness are deliberately separate:
   `100`, production stays `000`, and neither environment may make a CCEL
   request.
 - Expand the local primary-source corpus with rights-reviewed, freely
-  redistributable editions and explicit edition provenance. The acquired Norton
-  and other public-domain packets do not count as the 17-work hosted corpus
-  until their separately reviewed transforms, D1 preparation, and release
-  gates are complete. Do not mirror or republish CCEL transcriptions without
+  redistributable editions and explicit edition provenance. The preview-bound
+  Transform 9 core-eight makes the checked-out local catalog and preview
+  collection 25 works, while production remains on the 17-work Transform 8
+  catalog. The integrated Transform 10 Aquinas hierarchy is local-only and
+  unpublished, with no catalog/runtime/MCP activation; any successor catalog
+  projection still requires separately reviewed transforms, D1 preparation,
+  and release gates. Do not mirror or republish CCEL transcriptions without
   edition-specific rights.
 - PR #96 has deployed the prepared production D1 and passed the bounded
   `original_language_study` v2 audit. Future original-language work for
@@ -737,8 +741,10 @@ Code readiness and operational readiness are deliberately separate:
 - Historical public-domain text may be published when transcription provenance
   is uncertain, but that uncertainty must be disclosed; a third party's
   particular transcription is not assumed redistributable.
-- CCEL execution remains inactive. Preview exposes the v7 discovery contract
-  only; production remains v6/local-only. A future live discovery rollout
+- CCEL execution remains inactive. Production is deployed v6/local-only;
+  deployed preview remains v5/discovery-only with CCEL execution disabled. The
+  Transform-9 preview corpus release does not select the checked-in v7
+  discovery candidate. A future live discovery rollout
   requires the explicit owner policy decision above and separate review, and
   must not become crawling, catalog mirroring, body republication, or permanent
   storage. The legacy CCEL body reader is retired; the retained discovery

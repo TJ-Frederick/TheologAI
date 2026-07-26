@@ -1,0 +1,158 @@
+{
+  "schemaVersion": 1,
+  "kind": "historical-core-preview-audit-fixture",
+  "baseline": {
+    "manifestSchemaVersion": "0006_historical_source_packs",
+    "d1TransformVersion": 9,
+    "expectedCatalogIdentity": {
+      "workCount": 25,
+      "legacyWorkCount": 17,
+      "coreWorkCount": 8,
+      "coreSectionCount": 512
+    },
+    "sourcePackId": "theologai-core-eight",
+    "expectedCoreEditionProvenanceStatus": "verified_with_uncertainty"
+  },
+  "probes": [
+    {
+      "workId": "augustine-confessions",
+      "editionId": "augustine-confessions-pusey-1838",
+      "query": "restless heart",
+      "sectionCount": 13,
+      "landingResourceUri": "theologai://documents/augustine-confessions",
+      "firstSection": {
+        "sectionKey": "book-01",
+        "sourceOrdinal": 1,
+        "resourceUri": "theologai://documents/augustine-confessions#section-book-01"
+      },
+      "primarySearch": {
+        "sectionKey": "book-02",
+        "sourceOrdinal": 2,
+        "resourceUri": "theologai://documents/augustine-confessions#section-book-02"
+      }
+    },
+    {
+      "workId": "john-damascene-exact-exposition",
+      "editionId": "john-damascene-exposition-salmond-npnf2-v9",
+      "query": "two natures",
+      "sectionCount": 100,
+      "landingResourceUri": "theologai://documents/john-damascene-exact-exposition",
+      "firstSection": {
+        "sectionKey": "book-1-chapter-01",
+        "sourceOrdinal": 1,
+        "resourceUri": "theologai://documents/john-damascene-exact-exposition#section-book-1-chapter-01"
+      },
+      "primarySearch": {
+        "sectionKey": "book-3-chapter-16",
+        "sourceOrdinal": 60,
+        "resourceUri": "theologai://documents/john-damascene-exact-exposition#section-book-3-chapter-16"
+      }
+    },
+    {
+      "workId": "calvin-institutes",
+      "editionId": "calvin-institutes-beveridge-1845",
+      "query": "promises law gospel reconciled",
+      "sectionCount": 84,
+      "landingResourceUri": "theologai://documents/calvin-institutes",
+      "firstSection": {
+        "sectionKey": "book-1-chapter-01",
+        "sourceOrdinal": 1,
+        "resourceUri": "theologai://documents/calvin-institutes#section-book-1-chapter-01"
+      },
+      "primarySearch": {
+        "sectionKey": "book-3-chapter-17",
+        "sourceOrdinal": 54,
+        "resourceUri": "theologai://documents/calvin-institutes#section-book-3-chapter-17"
+      }
+    },
+    {
+      "workId": "wesley-standard-sermons",
+      "editionId": "wesley-standard-sermons-1771",
+      "query": "salvation by faith",
+      "sectionCount": 55,
+      "landingResourceUri": "theologai://documents/wesley-standard-sermons",
+      "firstSection": {
+        "sectionKey": "sermon-01",
+        "sourceOrdinal": 1,
+        "resourceUri": "theologai://documents/wesley-standard-sermons#section-sermon-01"
+      },
+      "primarySearch": {
+        "sectionKey": "sermon-01",
+        "sourceOrdinal": 1,
+        "resourceUri": "theologai://documents/wesley-standard-sermons#section-sermon-01"
+      }
+    },
+    {
+      "workId": "bunyan-pilgrims-progress-part-1",
+      "editionId": "bunyan-pilgrims-progress-part-1",
+      "query": "Christian",
+      "sectionCount": 3,
+      "landingResourceUri": "theologai://documents/bunyan-pilgrims-progress-part-1",
+      "firstSection": {
+        "sectionKey": "part-01-part-01",
+        "sourceOrdinal": 1,
+        "resourceUri": "theologai://documents/bunyan-pilgrims-progress-part-1#section-part-01-part-01"
+      },
+      "primarySearch": {
+        "sectionKey": "part-01-part-01",
+        "sourceOrdinal": 1,
+        "resourceUri": "theologai://documents/bunyan-pilgrims-progress-part-1#section-part-01-part-01"
+      }
+    },
+    {
+      "workId": "athanasius-on-incarnation",
+      "editionId": "athanasius-on-incarnation-robertson-npnf2-v4",
+      "query": "renewal creation",
+      "sectionCount": 57,
+      "landingResourceUri": "theologai://documents/athanasius-on-incarnation",
+      "firstSection": {
+        "sectionKey": "section-001",
+        "sourceOrdinal": 1,
+        "resourceUri": "theologai://documents/athanasius-on-incarnation#section-section-001"
+      },
+      "primarySearch": {
+        "sectionKey": "section-001",
+        "sourceOrdinal": 1,
+        "resourceUri": "theologai://documents/athanasius-on-incarnation#section-section-001"
+      }
+    },
+    {
+      "workId": "irenaeus-against-heresies",
+      "editionId": "irenaeus-against-heresies-anf1-1885",
+      "query": "heresies",
+      "sectionCount": 173,
+      "landingResourceUri": "theologai://documents/irenaeus-against-heresies",
+      "firstSection": {
+        "sectionKey": "book-1-preface",
+        "sourceOrdinal": 1,
+        "resourceUri": "theologai://documents/irenaeus-against-heresies#section-book-1-preface"
+      },
+      "primarySearch": {
+        "sectionKey": "book-1-chapter-28",
+        "sourceOrdinal": 29,
+        "resourceUri": "theologai://documents/irenaeus-against-heresies#section-book-1-chapter-28"
+      }
+    },
+    {
+      "workId": "anselm-proslogion",
+      "editionId": "anselm-proslogion-deane-1903",
+      "query": "that than which nothing greater",
+      "sectionCount": 27,
+      "landingResourceUri": "theologai://documents/anselm-proslogion",
+      "firstSection": {
+        "sectionKey": "preface",
+        "sourceOrdinal": 1,
+        "resourceUri": "theologai://documents/anselm-proslogion#section-preface"
+      },
+      "primarySearch": {
+        "sectionKey": "chapter-02",
+        "sourceOrdinal": 3,
+        "resourceUri": "theologai://documents/anselm-proslogion#section-chapter-02"
+      }
+    }
+  ],
+  "legacyRegression": {
+    "workId": "apostles-creed",
+    "deliveryMode": "complete_document"
+  }
+}

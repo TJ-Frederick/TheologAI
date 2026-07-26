@@ -2,15 +2,14 @@
 
 ## Status
 
-This remains an exposure-only preview stage, not CCEL enablement. Production
-keeps `THEOLOGAI_EXPOSE_CCEL_DISCOVERY`,
+This remains an exposure-only preview stage, not CCEL enablement. Production is
+deployed v6/local-only, while deployed preview remains v5/discovery-only until
+an explicitly authorized PR95 preview deployment. The checked-in v6/v7
+candidate profiles keep `THEOLOGAI_EXPOSE_CCEL_DISCOVERY`,
 `THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH`, and
-`THEOLOGAI_ENABLE_CCEL_COORDINATOR` all `false`, so its public contract remains
-v4/local-only. Preview sets only `THEOLOGAI_EXPOSE_CCEL_DISCOVERY` to `true`;
-its live-search and coordinator switches remain `false`. Preview therefore
-advertises the v5 discovery contract and guided workflows, but every external
-query returns a disabled provider result without adapter search, Durable Object
-lookup/RPC, or network access. No CCEL request is authorized by this stage.
+`THEOLOGAI_ENABLE_CCEL_COORDINATOR` non-executing: the candidate v7 discovery
+surface does not authorize adapter search, Durable Object lookup/RPC, or network
+access. No CCEL request is authorized by this stage.
 
 ## One-origin architecture
 
@@ -225,7 +224,7 @@ not coordinated. A multi-process local deployment must use one process, route
 CCEL discovery through a single coordinator service, or keep live discovery
 disabled.
 
-## Staged v5 contract wiring
+## Staged contract wiring
 
 The public Worker and Node composition roots share one contract configuration.
 The v5 discovery application contract is exposed only by
@@ -242,15 +241,18 @@ the sole latch/backoff/circuit authority. Node coordination is process-local;
 multi-process Node deployments must keep live discovery disabled unless they
 provide one shared coordinator.
 
-Checked-in production values select the local-only v4 contract. Checked-in
-preview values select v5 exposure only; because the live-search and coordinator
-values remain false, preview also makes no CCEL request or Durable Object RPC.
+The historical v5 release selected production v4/local-only and preview-v5
+exposure only. Current production is deployed v6/local-only; deployed preview
+remains v5 with CCEL execution disabled. The Transform-9 preview corpus release
+does not select the checked-in v7 discovery profile. The checked-in v6/v7
+candidate profiles keep the live-search and coordinator values disabled, so
+neither authorizes a CCEL request or Durable Object RPC.
 
 MCP clients can cache `tools/list` and `prompts/list` results for the life of a
 connection. This is a hard contract cutover rather than a negotiated opt-in, so
-reconnect and reinitialize a preview client after deployment before auditing
-the v5 schemas and workflows. Do not interpret a stale client schema as the
-Worker's current contract.
+reconnect and reinitialize a preview client after an authorized PR95 deployment
+before auditing the candidate-v7 schemas and workflows. Do not interpret a
+stale client schema as the Worker's current contract.
 
 Once Stage B is bound and a later approved slice enables it, the global coordinator is intentionally a bottleneck: the maximum admitted
 CCEL-origin load is 0.1 requests/second across production and preview combined.

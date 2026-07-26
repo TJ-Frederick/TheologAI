@@ -64,6 +64,41 @@ describe('LocalPrimarySourceSearchProvider', () => {
     expect(result.resultWindow).toEqual({ returnedHitCount: 1, additionalMatchStatus: 'additional_match_observed' });
   });
 
+  it('preserves reviewed source-pack readiness on both a local hit and its eligible work', async () => {
+    const editionProvenance = {
+      foundation: 'edition-provenance-foundation.v1' as const,
+      sourcePackId: 'theologai-core-eight', editionId: 'calvin-institutes-beveridge-1845',
+      language: 'en', publication: '1845', version: 'beveridge-1845', sourceArtifacts: [{
+        artifactId: 'calvin-authority', role: 'authority' as const, locator: 'https://example.invalid/calvin.pdf',
+        sha256: 'a'.repeat(64), bytes: 1, acquiredAt: '2026-07-23T00:00:00.000Z',
+      }],
+      normalizedTextRights: {
+        status: 'no_known_conflict' as const, scope: 'normalized_public_domain_text_only' as const,
+        basis: 'Test screen.', reviewedAt: '2026-07-23',
+      },
+      provenance: { status: 'verified' as const, uncertainty: null, reviewedAt: '2026-07-23' },
+    };
+    const base = repository();
+    const document = {
+      id: 'institutes', title: 'Institutes', type: 'treatise', date: '1559', topics: [],
+      catalog: (await base.listDocuments())[0]!.catalog!, editionProvenance,
+    };
+    const row = (await base.searchPrimarySources({ text: 'grace', match: 'all_terms', limit: 1 }))[0]!;
+    const repo = repository({
+      listDocuments: vi.fn().mockReturnValue([document]),
+      searchPrimarySources: vi.fn().mockReturnValue([{ ...row, document }]),
+    });
+
+    const result = await new LocalPrimarySourceSearchProvider(repo).search({ text: 'grace', work: 'institutes' });
+
+    const expected = {
+      foundation: 'edition-provenance-foundation.v1', editionIdentity: 'established', provenance: 'verified',
+      exactArtifactRights: 'not_claimed_for_scan_artifacts', normalizedTextRights: 'no_known_conflict',
+    };
+    expect(result.hits[0]).toMatchObject({ editionReadiness: expected });
+    expect(result.scope?.eligibleDocuments).toEqual([expect.objectContaining({ editionReadiness: expected })]);
+  });
+
   it('applies exact reviewed creator scope and never ignores unsupported pagination', async () => {
     const repo = repository();
     const provider = new LocalPrimarySourceSearchProvider(repo);

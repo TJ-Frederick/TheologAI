@@ -185,9 +185,12 @@ describe('published project contract', () => {
     expect(readme).not.toMatch(/eighteen locally indexed|18 locally indexed/i);
     expect(readme).not.toMatch(/six public-domain commentar/i);
     expect(readme).toContain('do **not** currently fetch CCEL search results or document bodies');
-    expect(readme).toContain('This build’s local-only configuration exposes v6');
-    expect(readme).toContain('v7 while CCEL execution remains disabled');
-    expect(readme).toContain('live search and coordinator execution remain disabled');
+    expect(readme).toContain('Production v6/local-only is deployed');
+    expect(readme).toContain('Preview remains on deployed\nv5/discovery-only with CCEL execution disabled');
+    expect(readme).toContain('Transform-9 preview corpus\nrelease does not activate the checked-in v7 profile, which remains a\nnon-executing candidate');
+    expect(readme).toContain('preview serves the 25-work Transform 9 collection');
+    expect(readme).toContain('The integrated Transform 10 candidate is local-only and unpublished');
+    expect(readme).toContain('not wired into runtime or MCP surfaces');
     expect(readme).toContain('before adapter');
     expect(readme).toContain('Durable Object lookup/RPC, or fetch');
     expect(readme).toContain('reconnect');
@@ -200,9 +203,9 @@ describe('published project contract', () => {
     expect(roadmap).toContain('Direct CCEL-plus-year tool input remains fail-closed');
     const primarySourceToolRow = readme.split('\n')
       .find(line => line.startsWith('| `primary_source_search` |'));
-    expect(primarySourceToolRow).toContain('local-only configuration exposes v6');
-    expect(primarySourceToolRow).toContain('configured CCEL-discovery profile exposes v7');
-    expect(primarySourceToolRow).toContain('execution remains disabled before adapter, coordinator, or fetch');
+    expect(primarySourceToolRow).toContain('Production v6/local-only is deployed');
+    expect(primarySourceToolRow).toContain('preview remains deployed v5/discovery-only');
+    expect(primarySourceToolRow).toContain('checked-in v7 CCEL-discovery candidate also disables execution before adapter, coordinator, or fetch');
     const previewStart = workerConfig.indexOf('[env.preview]');
     expect(previewStart).toBeGreaterThan(0);
     expect(workerConfig.slice(0, previewStart)).toContain('THEOLOGAI_EXPOSE_CCEL_DISCOVERY = "false"');
@@ -214,5 +217,42 @@ describe('published project contract', () => {
     expect(historicalTestReport.slice(0, 500)).toContain('not the current product contract');
     expect(historicalArchitecture.slice(0, 700)).toContain('Historical architecture plan');
     expect(historicalDevelopment.slice(0, 700)).toContain('Historical development plan');
+  });
+
+  it('keeps current preview evidence distinct from historical preview releases', async () => {
+    const [reconciliation, operations] = await Promise.all([
+      readProjectFile('docs/PREVIEW-RELEASE-RECONCILIATION.md'),
+      readProjectFile('docs/worker-operations.md'),
+    ]);
+    const activeDeployment = '4148bfb5-dd03-447f-b656-9daa0aee4380';
+    const activeVersion = 'ca1376bb-05cc-403b-a396-d2e89403abec';
+    const activeD1 = 'theologai-preview-20260724-a';
+    const preparedCandidateD1 = 'theologai-preview-20260725-t10-a';
+    const preparedCandidateD1Id = 'fbd1a492-fbc2-4061-a431-181a9632d4de';
+    const predecessorDeployment = '7f00a94b-4ff4-47d6-9bee-2efb99673718';
+    const predecessorVersion = 'f78d66f1-cefe-46ba-88ba-9ddec259cda4';
+    const predecessorD1 = 'theologai-preview-20260722-b';
+    const historicalDeployment = '04e7a69a-78d2-447b-ac71-e9fb0bef3695';
+
+    for (const document of [reconciliation, operations]) {
+      expect(document).toContain(activeDeployment);
+      expect(document).toContain(activeVersion);
+      expect(document).toContain(activeD1);
+      expect(document).toContain(predecessorDeployment);
+      expect(document).toContain(predecessorVersion);
+      expect(document).toContain(predecessorD1);
+      expect(document).toContain(preparedCandidateD1);
+      expect(document).toContain(preparedCandidateD1Id);
+    }
+    expect(reconciliation).toContain('live Transform-9\n25-work preview collection');
+    expect(reconciliation).toContain('separately prepared but\nnot-yet-deployed candidate');
+    expect(reconciliation).toContain('This candidate remains unbound from\nthe active Worker');
+    expect(operations).toContain('This is the current Transform 9\n25-work preview release');
+    expect(operations).toContain('prepared but not-yet-deployed D1');
+    expect(operations).toContain('No preview Worker deployment or binding\nchange is recorded for this candidate');
+    expect(operations).toContain(`Its historical Cloudflare deployment\n\`${historicalDeployment}\` served Worker`);
+    expect(operations).toContain('This historical release is neither\nthe current preview identity nor the immediate retained predecessor');
+    expect(reconciliation).toContain('does not alter the Transform-10 unpublished, non-runtime boundary');
+    expect(reconciliation).not.toContain('which the checked-in preview binding now names for the next protected preview deployment');
   });
 });

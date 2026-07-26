@@ -367,13 +367,17 @@ function validateSource(input: unknown): ImmutableSourceArtifact {
   const pin = objectAt(record.pin, `${path}.pin`, ['kind', 'value']);
   const kind = enumAt(pin.kind, `${path}.pin.kind`, ['sha256', 'git_commit'] as const);
   const sha256 = sha256At(record.sha256, `${path}.sha256`);
+  const locator = immutableLocatorAt(record.locator, `${path}.locator`);
+  if (locator.startsWith('urn:sha256:') && locator !== `urn:sha256:${sha256}`) {
+    fail(`${path}.locator`, 'content-addressed URN must equal the source artifact hash');
+  }
   const pinValue = stringAt(pin.value, `${path}.pin.value`);
   if (kind === 'sha256' && pinValue !== sha256) fail(`${path}.pin.value`, 'sha256 pin must equal the source artifact hash');
   if (kind === 'git_commit' && !/^[0-9a-f]{40}$/.test(pinValue)) {
     fail(`${path}.pin.value`, 'git_commit pin must be a lowercase 40-character commit identity');
   }
   return {
-    locator: immutableLocatorAt(record.locator, `${path}.locator`),
+    locator,
     pin: { kind, value: pinValue },
     sha256,
     bytes: integerAt(record.bytes, `${path}.bytes`, 1, EDITION_PROVENANCE_LIMITS.sourceArtifactBytes),
@@ -781,7 +785,9 @@ function sha256At(input: unknown, path: string): string {
 }
 
 function immutableLocatorAt(input: unknown, path: string): string {
-  const value = httpsUrlAt(input, path);
+  const raw = safeTextAt(input, path, EDITION_PROVENANCE_LIMITS.longTextCharacters);
+  if (/^urn:sha256:[0-9a-f]{64}$/.test(raw)) return raw;
+  const value = httpsUrlAt(raw, path);
   const url = new URL(value);
   if (url.username || url.password || url.search || url.hash) {
     fail(path, 'must not contain credentials, a query, or a fragment');

@@ -48,6 +48,15 @@ import {
   parseHistoricalDocumentCatalogProvenance,
 } from './historical-document-catalog.js';
 import {
+  assertCoreEightSourcePackRelease,
+  loadHistoricalSourcePacks,
+  materializeHistoricalSourcePacks,
+} from './historical-source-packs.js';
+import {
+  loadApprovedAquinasHierarchy,
+  materializeHistoricalHierarchy,
+} from './historical-hierarchy.js';
+import {
   compileHistoricalSectionCompatibility,
   parseHistoricalSectionCompatibilityAttestation,
 } from './historical-section-compatibility-compiler.js';
@@ -647,6 +656,38 @@ log(`  Inserted ${historicalTransform8Rows.deliveryProfiles.length} delivery pro
   + `${historicalTransform8Rows.legacyAliases.length} legacy aliases`);
 });
 materializeHistoricalTransform8();
+
+// ── Transform 9: reviewed edition-aligned normalized source packs ──
+
+// The manifest is the sole release allowlist.  Materialization adds the
+// sectioned-only profiles and canonical identities; it deliberately adds no
+// legacy aliases for the new reviewed packages.
+log('Materializing reviewed historical core-eight source packs...');
+const historicalSourcePacks = loadHistoricalSourcePacks(manifest.materializations.d1.inputs, sourceRegistry);
+assertCoreEightSourcePackRelease(historicalSourcePacks);
+const historicalSourcePackCounts = materializeHistoricalSourcePacks(db, historicalSourcePacks);
+if (JSON.stringify(historicalSourcePackCounts) !== JSON.stringify({
+  packs: 1, works: 8, editions: 8, artifacts: 25, sections: 512,
+  deliveryProfiles: 8, identities: 512, legacyAliases: 0,
+})) {
+  throw new Error('Transform 9 source-pack materialization did not retain the reviewed core-eight inventory');
+}
+log(`  Inserted ${historicalSourcePackCounts.works} reviewed works with ${historicalSourcePackCounts.sections} canonical sections`);
+
+// ── Transform 10: local-only generic hierarchical authority storage ──
+//
+// This deliberately has no document/catalog/runtime/MCP projection. The
+// manifest-bound reader still consumes the exact approved packet so a local
+// seed can reproduce and audit the dormant authority facts deterministically.
+log('Materializing inactive Aquinas edition hierarchy authority...');
+const aquinasHierarchy = loadApprovedAquinasHierarchy(sourceRegistry);
+const aquinasHierarchyCounts = materializeHistoricalHierarchy(db, aquinasHierarchy);
+if (JSON.stringify(aquinasHierarchyCounts) !== JSON.stringify({
+  hierarchies: 1, artifacts: 4, bodies: 3184, nodes: 3185, ftsRows: 3184,
+})) {
+  throw new Error('Transform 10 hierarchy materialization did not retain the approved inactive Aquinas inventory');
+}
+log(`  Inserted ${aquinasHierarchyCounts.bodies} inactive authority bodies with ${aquinasHierarchyCounts.nodes} navigation nodes`);
 
 // ── Tier 3: UBS source-attested parallel passages ──
 

@@ -37,7 +37,8 @@ export function resolveBiblicalLanguageReproductionOwnership(
     .filter(path => path.startsWith('data/biblical-languages/'))
     .sort();
   const ubsInputs = new Set(UBS_HEBREW_V092_SEMANTIC_MATERIALIZATION_INPUTS);
-  const actualUbsInputs = materializedLanguageInputs.filter(path => ubsInputs.has(path));
+  const actualUbsInputs = materializedLanguageInputs.filter(path =>
+    ubsInputs.has(path as (typeof UBS_HEBREW_V092_SEMANTIC_MATERIALIZATION_INPUTS)[number]));
   const missingUbsInputs = UBS_HEBREW_V092_SEMANTIC_MATERIALIZATION_INPUTS
     .filter(path => !actualUbsInputs.includes(path));
   if (missingUbsInputs.length > 0) {

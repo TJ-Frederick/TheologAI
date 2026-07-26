@@ -273,11 +273,56 @@ jobs:
 
       - run: npm ci
 
-      - name: Verify preview D1 is compatible (read-only)
-        run: npm run d1:remote:check -- --database THEOLOGAI_DB --env preview
+      # Resolve the checked-out candidate by ID and name before readiness.
+      # The Worker remains bound to the predecessor until the later deploy.
+      - name: Capture checked-out candidate preview D1 mapping (read-only)
+        run: |
+          npx --no-install wrangler d1 list --json > "$RUNNER_TEMP/preview-d1-inventory.json"
+          npx --no-install tsx scripts/preview-release-reconciliation.ts candidate-d1-name \
+            --wrangler-config wrangler.toml \
+            --d1-inventory "$RUNNER_TEMP/preview-d1-inventory.json" \
+            > "$RUNNER_TEMP/preview-candidate-d1-name.txt"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Verify candidate preview D1 is compatible (read-only)
+        run: |
+          candidate_d1_name="$(< "$RUNNER_TEMP/preview-candidate-d1-name.txt")"
+          npm run d1:remote:check -- --database "$candidate_d1_name" --env preview
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      # This is evidence only. It cannot deploy, roll back, bind, seed, or
+      # delete; a later failure/revocation still leaves a manual recovery path.
+      - name: Capture preview predecessor reconciliation anchor (read-only)
+        id: preview-predecessor
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
+        run: |
+          npx --no-install wrangler deployments list --env preview --json > "$RUNNER_TEMP/preview-worker-deployments-predecessor.json"
+          predecessor_version="$(npx --no-install tsx scripts/preview-release-reconciliation.ts active-version-id \
+            --deployments "$RUNNER_TEMP/preview-worker-deployments-predecessor.json")"
+          npx --no-install wrangler versions view "$predecessor_version" --env preview --json > "$RUNNER_TEMP/preview-worker-predecessor-version-view.json"
+          npx --no-install tsx scripts/preview-release-reconciliation.ts capture-predecessor \
+            --deployments "$RUNNER_TEMP/preview-worker-deployments-predecessor.json" \
+            --predecessor-version-view "$RUNNER_TEMP/preview-worker-predecessor-version-view.json" \
+            --wrangler-config wrangler.toml \
+            --d1-inventory "$RUNNER_TEMP/preview-d1-inventory.json" \
+            --output "$RUNNER_TEMP/preview-worker-predecessor-anchor.json"
+
+      # Retain the predecessor before mutation so a later job cancellation
+      # cannot discard the exact manual recovery target.
+      - name: Upload preview predecessor reconciliation anchor
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: preview-release-predecessor-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/preview-worker-predecessor-anchor.json
+          retention-days: 7
+          if-no-files-found: error
 
       - name: Capture preview Worker versions before deployment (read-only)
         run: npx --no-install wrangler versions list --env preview --json > "$RUNNER_TEMP/preview-worker-versions-before.json"
@@ -346,6 +391,43 @@ jobs:
             --output "$RUNNER_TEMP/preview-worker-deployment-pre-audit-identity.json" \
             --github-output "$GITHUB_OUTPUT"
 
+      # Do this before either fixed black-box audit: a deployed Worker must be
+      # both sole-active and bound to the readiness-tested candidate D1.
+      - name: Require deployed candidate preview D1 binding (read-only)
+        id: preview-worker-candidate-cutover
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
+        run: |
+          observed_active_version="$(npx --no-install tsx scripts/preview-release-reconciliation.ts active-version-id \
+            --deployments "$RUNNER_TEMP/preview-worker-deployments-after.json")"
+          npx --no-install wrangler versions view "$observed_active_version" --env preview --json \
+            > "$RUNNER_TEMP/preview-worker-candidate-version-view.json"
+          npx --no-install tsx scripts/preview-release-reconciliation.ts observe-post-mutation \
+            --predecessor-anchor "$RUNNER_TEMP/preview-worker-predecessor-anchor.json" \
+            --deployments "$RUNNER_TEMP/preview-worker-deployments-after.json" \
+            --observed-active-version-view "$RUNNER_TEMP/preview-worker-candidate-version-view.json" \
+            --wrangler-config wrangler.toml \
+            --output "$RUNNER_TEMP/preview-worker-candidate-cutover-observation.json"
+          npx --no-install tsx scripts/preview-release-reconciliation.ts reconcile-post-mutation \
+            --predecessor-anchor "$RUNNER_TEMP/preview-worker-predecessor-anchor.json" \
+            --deployments "$RUNNER_TEMP/preview-worker-deployments-after.json" \
+            --observed-active-version-view "$RUNNER_TEMP/preview-worker-candidate-version-view.json" \
+            --wrangler-config wrangler.toml \
+            --output "$RUNNER_TEMP/preview-worker-candidate-cutover.json"
+
+      # The observation is create-only and deliberately retained even when
+      # the following strict candidate-binding gate fails before any audit.
+      - name: Upload preview candidate cutover observation
+        if: ${{ always() && steps.preview-worker-deploy.outcome == 'success' && steps.preview-predecessor.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: preview-candidate-cutover-observation-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/preview-worker-candidate-cutover-observation.json
+          retention-days: 7
+          if-no-files-found: error
+
       # This is deliberately a post-deploy release gate, not an ordinary PR
       # check: the runner is pinned to the canonical preview custom domain.
       - name: Audit original-language v2 contract on preview
@@ -353,6 +435,43 @@ jobs:
           npm run audit:original-language-v2-preview -- \
             --output "$RUNNER_TEMP/original-language-v2-preview-audit.json"
           test -s "$RUNNER_TEMP/original-language-v2-preview-audit.json"
+
+      - name: Audit Transform-9 historical core contract on preview
+        run: |
+          npm run audit:historical-core-preview -- \
+            --output "$RUNNER_TEMP/historical-core-preview-audit.json"
+          test -s "$RUNNER_TEMP/historical-core-preview-audit.json"
+
+      # Runs after any post-deploy result (including audit failure or a later
+      # authorization revocation) and is deliberately read-only. It does not
+      # attempt an automatic rollback or destructive cleanup.
+      - name: Capture preview post-mutation reconciliation record (read-only)
+        id: preview-reconciliation
+        if: ${{ always() && steps.preview-worker-deploy.outcome == 'success' && steps.preview-predecessor.outcome == 'success' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
+        run: |
+          npx --no-install wrangler deployments list --env preview --json > "$RUNNER_TEMP/preview-worker-deployments-post-mutation.json"
+          observed_active_version="$(npx --no-install tsx scripts/preview-release-reconciliation.ts active-version-id \
+            --deployments "$RUNNER_TEMP/preview-worker-deployments-post-mutation.json")"
+          npx --no-install wrangler versions view "$observed_active_version" --env preview --json > "$RUNNER_TEMP/preview-worker-observed-active-version-view.json"
+          npx --no-install tsx scripts/preview-release-reconciliation.ts observe-post-mutation \
+            --predecessor-anchor "$RUNNER_TEMP/preview-worker-predecessor-anchor.json" \
+            --deployments "$RUNNER_TEMP/preview-worker-deployments-post-mutation.json" \
+            --observed-active-version-view "$RUNNER_TEMP/preview-worker-observed-active-version-view.json" \
+            --wrangler-config wrangler.toml \
+            --output "$RUNNER_TEMP/preview-worker-post-mutation-reconciliation.json"
+
+      - name: Hash sanitized preview reconciliation evidence
+        id: preview-reconciliation-evidence
+        if: ${{ always() && steps.preview-reconciliation.outcome == 'success' }}
+        run: |
+          candidate_cutover_observation_sha256="$(sha256sum "$RUNNER_TEMP/preview-worker-candidate-cutover-observation.json" | awk '{print $1}')"
+          post_mutation_reconciliation_sha256="$(sha256sum "$RUNNER_TEMP/preview-worker-post-mutation-reconciliation.json" | awk '{print $1}')"
+          printf 'candidate_cutover_observation_sha256=%s\n' "$candidate_cutover_observation_sha256" >> "$GITHUB_OUTPUT"
+          printf 'post_mutation_reconciliation_sha256=%s\n' "$post_mutation_reconciliation_sha256" >> "$GITHUB_OUTPUT"
 
       - name: Verify preview Worker remained active through audit (read-only)
         id: preview-worker-audit-identity
@@ -371,18 +490,35 @@ jobs:
       - name: Hash sanitized preview audit evidence
         id: preview-audit-evidence
         run: |
-          audit_sha256="$(sha256sum "$RUNNER_TEMP/original-language-v2-preview-audit.json" | awk '{print $1}')"
+          original_language_audit_sha256="$(sha256sum "$RUNNER_TEMP/original-language-v2-preview-audit.json" | awk '{print $1}')"
+          historical_audit_sha256="$(sha256sum "$RUNNER_TEMP/historical-core-preview-audit.json" | awk '{print $1}')"
           identity_sha256="$(sha256sum "$RUNNER_TEMP/preview-worker-deployment-identity.json" | awk '{print $1}')"
-          printf 'audit_sha256=%s\n' "$audit_sha256" >> "$GITHUB_OUTPUT"
+          printf 'original_language_audit_sha256=%s\n' "$original_language_audit_sha256" >> "$GITHUB_OUTPUT"
+          printf 'historical_audit_sha256=%s\n' "$historical_audit_sha256" >> "$GITHUB_OUTPUT"
           printf 'identity_record_sha256=%s\n' "$identity_sha256" >> "$GITHUB_OUTPUT"
 
       - name: Upload protected preview audit evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: original-language-v2-preview-audit-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          name: preview-release-audit-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
           path: |
             ${{ runner.temp }}/original-language-v2-preview-audit.json
+            ${{ runner.temp }}/historical-core-preview-audit.json
             ${{ runner.temp }}/preview-worker-deployment-identity.json
+            ${{ runner.temp }}/preview-worker-candidate-cutover-observation.json
+            ${{ runner.temp }}/preview-worker-candidate-cutover.json
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Upload preview reconciliation evidence
+        if: ${{ always() && steps.preview-reconciliation.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: preview-release-reconciliation-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          path: |
+            ${{ runner.temp }}/preview-worker-candidate-cutover-observation.json
+            ${{ runner.temp }}/preview-worker-candidate-cutover.json
+            ${{ runner.temp }}/preview-worker-post-mutation-reconciliation.json
           retention-days: 7
           if-no-files-found: error
 
@@ -394,8 +530,11 @@ jobs:
           WORKER_VERSION_ID: ${{ steps.preview-worker-audit-identity.outputs.version_id }}
           WORKER_DEPLOYMENT_ID: ${{ steps.preview-worker-audit-identity.outputs.deployment_id }}
           WORKER_IDENTITY_SHA256: ${{ steps.preview-audit-evidence.outputs.identity_record_sha256 }}
-          AUDIT_SHA256: ${{ steps.preview-audit-evidence.outputs.audit_sha256 }}
-          AUDIT_ARTIFACT: original-language-v2-preview-audit-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          ORIGINAL_LANGUAGE_AUDIT_SHA256: ${{ steps.preview-audit-evidence.outputs.original_language_audit_sha256 }}
+          HISTORICAL_AUDIT_SHA256: ${{ steps.preview-audit-evidence.outputs.historical_audit_sha256 }}
+          CANDIDATE_CUTOVER_OBSERVATION_SHA256: ${{ steps.preview-reconciliation-evidence.outputs.candidate_cutover_observation_sha256 }}
+          POST_MUTATION_RECONCILIATION_SHA256: ${{ steps.preview-reconciliation-evidence.outputs.post_mutation_reconciliation_sha256 }}
+          AUDIT_ARTIFACT: preview-release-audit-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
         with:
           script: |
             const commit = process.env.CHECKED_OUT_COMMIT;
@@ -403,13 +542,18 @@ jobs:
             const workerVersion = process.env.WORKER_VERSION_ID;
             const deployment = process.env.WORKER_DEPLOYMENT_ID;
             const workerIdentity = process.env.WORKER_IDENTITY_SHA256;
-            const audit = process.env.AUDIT_SHA256;
+            const originalLanguageAudit = process.env.ORIGINAL_LANGUAGE_AUDIT_SHA256;
+            const historicalAudit = process.env.HISTORICAL_AUDIT_SHA256;
+            const candidateCutoverObservation = process.env.CANDIDATE_CUTOVER_OBSERVATION_SHA256;
+            const postMutationReconciliation = process.env.POST_MUTATION_RECONCILIATION_SHA256;
             const artifact = process.env.AUDIT_ARTIFACT;
             if (!/^[0-9a-f]{40}$/i.test(commit) || !/^[0-9a-f]{40}$/i.test(tree)
               || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(workerVersion)
               || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(deployment)
-              || !/^[0-9a-f]{64}$/i.test(workerIdentity) || !/^[0-9a-f]{64}$/i.test(audit)
-              || !/^original-language-v2-preview-audit-\d+-[0-9a-f]{40}$/i.test(artifact)) {
+              || !/^[0-9a-f]{64}$/i.test(workerIdentity) || !/^[0-9a-f]{64}$/i.test(originalLanguageAudit)
+              || !/^[0-9a-f]{64}$/i.test(historicalAudit) || !/^[0-9a-f]{64}$/i.test(candidateCutoverObservation)
+              || !/^[0-9a-f]{64}$/i.test(postMutationReconciliation)
+              || !/^preview-release-audit-\d+-[0-9a-f]{40}$/i.test(artifact)) {
               core.setFailed('Preview release evidence is missing or malformed.');
               return;
             }
@@ -423,7 +567,7 @@ jobs:
               '',
               `Deployed from checked-out commit \`${commit}\` (tree \`${tree}\`).`,
               `Cloudflare confirms Worker version \`${workerVersion}\` at 100% in deployment \`${deployment}\`.`,
-              `Sanitized audit evidence SHA-256: \`${audit}\`; identity record SHA-256: \`${workerIdentity}\`; retained artifact: \`${artifact}\` (7 days).`,
+              `Original-language audit SHA-256: \`${originalLanguageAudit}\`; historical-core audit SHA-256: \`${historicalAudit}\`; identity record SHA-256: \`${workerIdentity}\`; candidate-cutover observation SHA-256: \`${candidateCutoverObservation}\`; post-mutation reconciliation SHA-256: \`${postMutationReconciliation}\`; retained artifact: \`${artifact}\` (7 days).`,
             ].join('\n');
 
             const { data: comments } = await github.rest.issues.listComments({

@@ -3,11 +3,13 @@ import { CLASSIC_TEXT_LIMITS } from '../kernel/classicTextContract.js';
 import {
   CCEL_COMPOSITION_DATE_NOTICE,
   EXTERNAL_EDITION_READINESS,
+  isLocalEditionReadiness,
   LOCAL_EDITION_READINESS,
   PRIMARY_SOURCE_COVERAGE_POLICY,
   type PrimarySourcePlanHit,
   type PrimarySourceProviderStatus,
   type PrimarySourceSearchPlanResult,
+  type LocalEditionReadiness,
 } from '../services/historical/primarySourceTypes.js';
 
 /** Total MCP delivery allowance: structured model, fallback text, and links. */
@@ -47,7 +49,7 @@ type LocalHit = {
   provider: 'local';
   locator: { kind: 'mcp_resource'; uri: string; documentId: string; sectionKey: string; sourceOrdinal: number };
   resourceSizeBytes: number;
-  editionReadiness: typeof LOCAL_EDITION_READINESS;
+  editionReadiness: LocalEditionReadiness;
   documentType?: string; documentDate?: string;
   creators?: Array<{ name: string; role: 'author' | 'issuing_body' | 'drafting_body' | 'revising_body' | 'compiler' }>;
   metadataStatus?: 'reviewed' | 'anonymous' | 'collective' | 'unknown';
@@ -80,7 +82,7 @@ type PresentedProvider = {
     eligibleDocumentCount: number;
     eligibleDocuments: Array<{
       id: string; title: string; metadataStatus: 'reviewed' | 'anonymous' | 'collective' | 'unknown';
-      editionReadiness: typeof LOCAL_EDITION_READINESS;
+      editionReadiness: LocalEditionReadiness;
     }>;
     eligibleDocumentsTruncated: boolean;
   };
@@ -468,6 +470,9 @@ function presentHit(
     .filter(id => /^hist-meta-[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id)))].slice(0, 4);
   const documentType = hit.documentType === undefined ? undefined : boundedText(hit.documentType, 100);
   const documentDate = hit.documentDate === undefined ? undefined : boundedText(hit.documentDate, 100);
+  const editionReadiness = isLocalEditionReadiness(hit.editionReadiness)
+    ? hit.editionReadiness
+    : LOCAL_EDITION_READINESS;
   optionalMetadataInvalid ||= (hit.documentType !== undefined && !documentType)
     || (hit.documentDate !== undefined && !documentDate);
   return {
@@ -479,7 +484,7 @@ function presentHit(
         sectionKey: hit.locator.sectionKey, sourceOrdinal: hit.locator.sourceOrdinal,
       },
       resourceSizeBytes: hit.resourceSizeBytes,
-      editionReadiness: LOCAL_EDITION_READINESS,
+      editionReadiness,
       ...(documentType ? { documentType } : {}),
       ...(documentDate ? { documentDate } : {}),
       ...(creators?.length ? { creators } : {}),
@@ -512,7 +517,14 @@ function presentScope(scope: PrimarySourceSearchPlanResult['queries'][number]['p
     const id = boundedText(document.id, 160);
     const title = boundedText(document.title, 300);
     return id && title && ['reviewed', 'anonymous', 'collective', 'unknown'].includes(document.metadataStatus)
-      ? [{ id, title, metadataStatus: document.metadataStatus, editionReadiness: LOCAL_EDITION_READINESS }]
+      ? [{
+          id,
+          title,
+          metadataStatus: document.metadataStatus,
+          editionReadiness: isLocalEditionReadiness(document.editionReadiness)
+            ? document.editionReadiness
+            : LOCAL_EDITION_READINESS,
+        }]
       : [];
   });
   const work = scope.requested.work ? boundedText(scope.requested.work, 160) : undefined;

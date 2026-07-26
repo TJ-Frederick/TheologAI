@@ -8,13 +8,14 @@
  */
 
 import Database from 'better-sqlite3';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { HistoricalDocumentRepository } from '../src/adapters/data/HistoricalDocumentRepository.js';
 import { D1HistoricalDocumentRepository } from '../src/adapters/d1/D1HistoricalDocumentRepository.js';
 import { verifyHistoricalSectionCompatibilityAttestationFromDisk } from './historical-section-compatibility-compiler.js';
 import { EXPECTED_HISTORICAL_SECTION_COLLISIONS } from './historical-section-key-plan.js';
+import { buildLocalDocumentResourceUri } from '../src/kernel/documentResource.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -27,6 +28,12 @@ interface Transform8Identity {
 interface Transform8Alias extends Transform8Identity {
   legacySectionId: string;
 }
+
+type CorePreviewProbe = {
+  workId: string;
+  query: string;
+  primarySearch: { sectionKey: string; sourceOrdinal: number; resourceUri: string };
+};
 
 function sqliteAsD1(database: Database.Database): D1Database {
   return {
@@ -57,6 +64,38 @@ function assertEqual(actual: unknown, expected: unknown, label: string): void {
   }
 }
 
+/**
+ * The release audit pins primary search separately from directory order. This
+ * validates each all-terms relevance winner in the exact built corpus through
+ * both repository implementations before a remote preview audit can run.
+ */
+async function assertCorePreviewPrimarySearchLocators(
+  node: HistoricalDocumentRepository,
+  d1: D1HistoricalDocumentRepository,
+): Promise<void> {
+  const fixture = JSON.parse(readFileSync(join(ROOT, 'test', 'fixtures', 'historical-core-preview-audit.json'), 'utf8')) as {
+    probes: CorePreviewProbe[];
+  };
+  if (!Array.isArray(fixture.probes) || fixture.probes.length !== 8) {
+    throw new Error('Historical core preview fixture is malformed');
+  }
+  for (const probe of fixture.probes) {
+    const options = {
+      text: probe.query, match: 'all_terms' as const, selection: 'relevance' as const,
+      documentIds: [probe.workId], limit: 6,
+    };
+    const nodeRows = node.searchPrimarySources(options);
+    const d1Rows = await d1.searchPrimarySources(options);
+    assertEqual(d1Rows, nodeRows, `Transform 9 all-terms primary-search parity for ${probe.workId}`);
+    const first = nodeRows[0];
+    const expectedUri = buildLocalDocumentResourceUri(probe.workId, probe.primarySearch.sectionKey);
+    if (!first || first.document.id !== probe.workId || first.sectionKey !== probe.primarySearch.sectionKey
+      || first.sourceOrdinal !== probe.primarySearch.sourceOrdinal || expectedUri !== probe.primarySearch.resourceUri) {
+      throw new Error(`Transform 9 primary-search relevance locator drifted for ${probe.workId}`);
+    }
+  }
+}
+
 export async function verifyHistoricalD1Parity(databasePath: string): Promise<void> {
   if (!existsSync(databasePath)) throw new Error(`Database not found: ${databasePath}`);
   const database = new Database(databasePath, { readonly: true, fileMustExist: true });
@@ -67,8 +106,8 @@ export async function verifyHistoricalD1Parity(databasePath: string): Promise<vo
     const aliases = database.prepare(`SELECT document_id AS documentId, legacy_section_id AS legacySectionId,
       section_key AS sectionKey, source_ordinal AS sourceOrdinal FROM historical_section_aliases
       ORDER BY document_id, legacy_section_id`).all() as Transform8Alias[];
-    if (identities.length !== 3054 || aliases.length !== 2821) {
-      throw new Error(`Transform 8 D1 parity corpus count drifted: ${identities.length} identities, ${aliases.length} aliases`);
+    if (identities.length !== 3566 || aliases.length !== 2821) {
+      throw new Error(`Transform 9 D1 parity corpus count drifted: ${identities.length} identities, ${aliases.length} aliases`);
     }
 
     const compilation = verifyHistoricalSectionCompatibilityAttestationFromDisk(ROOT);
@@ -92,6 +131,7 @@ export async function verifyHistoricalD1Parity(databasePath: string): Promise<vo
 
     const node = new HistoricalDocumentRepository(database);
     const d1 = new D1HistoricalDocumentRepository(sqliteAsD1(database));
+    await assertCorePreviewPrimarySearchLocators(node, d1);
     for (const identity of identities) {
       const nodeResolved = node.resolveSection(identity.documentId, identity.sectionKey);
       const d1Resolved = await d1.resolveSection(identity.documentId, identity.sectionKey);

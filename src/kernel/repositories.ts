@@ -158,6 +158,36 @@ export interface DocumentInfo {
   date: string | null;
   topics: string[];
   catalog?: HistoricalDocumentCatalogMetadata;
+  /** Present only for a reviewed edition-aligned normalized source-pack projection. */
+  editionProvenance?: ExactEditionProvenance;
+}
+
+export interface ExactEditionProvenance {
+  foundation: 'edition-provenance-foundation.v1';
+  sourcePackId: string;
+  editionId: string;
+  language: string;
+  publication: string;
+  version: string;
+  sourceArtifacts: Array<{
+    artifactId: string;
+    role: 'authority' | 'comparator';
+    locator: string;
+    sha256: string;
+    bytes: number;
+    acquiredAt: string;
+  }>;
+  normalizedTextRights: {
+    status: 'no_known_conflict';
+    scope: 'normalized_public_domain_text_only';
+    basis: string;
+    reviewedAt: string;
+  };
+  provenance: {
+    status: 'verified' | 'verified_with_uncertainty';
+    uncertainty: string | null;
+    reviewedAt: string;
+  };
 }
 
 export type HistoricalMetadataStatus = 'reviewed' | 'anonymous' | 'collective' | 'unknown';
@@ -263,4 +293,129 @@ export interface IHistoricalDocumentRepository {
   searchResolvedSections(query: string, limit?: number): RepositoryResult<ResolvedHistoricalSection[]>;
   searchPrimarySources(options: PrimarySourceLocalSearchOptions): RepositoryResult<PrimarySourceLocalSearchRow[]>;
   findDocumentByName(name: string): RepositoryResult<DocumentInfo | undefined>;
+}
+
+// ── Inactive edition-scoped hierarchical authority (Transform 10) ──
+//
+// This repository is intentionally not part of the historical-document
+// runtime composition. Search is discovery-only; exact authority text appears
+// only in a direct node landing, never in a search result or descendant bundle.
+
+export interface HistoricalHierarchyProfile {
+  hierarchyId: string;
+  packId: string;
+  workId: string;
+  editionId: string;
+  availability: string;
+  hierarchySchemaVersion: string;
+  levelSpec: Record<string, unknown>;
+  sourceManifestSha256: string;
+  aggregateSha256: string;
+  orderedQuestionKeysSha256: string;
+  orderedArticleKeysSha256: string;
+  sourceLockSha256: string;
+  localReceiptSha256: string;
+  topologyLockSha256: string;
+  discrepancyLedgerSha256: string;
+  authorityBodiesSha256: string;
+  navigationPreorderSha256: string;
+  bodyCount: number;
+  nodeCount: number;
+  coverage: Record<string, unknown>;
+  provenance: Record<string, unknown>;
+}
+
+export interface HistoricalHierarchyArtifact {
+  artifactId: string;
+  editionId: string;
+  role: 'authority' | 'comparator';
+  locator: string;
+  sha256: string;
+  bytes: number;
+  acquiredAt: string;
+}
+
+export interface HistoricalHierarchyBody {
+  hierarchyId: string;
+  bodyKey: string;
+  bodyKind: string;
+  sourceOrdinal: number;
+  heading: string;
+  contentSha256: string;
+  contentUtf8Bytes: number;
+  /** Present only on direct retrieval, never on search results. */
+  content: string;
+}
+
+export interface HistoricalHierarchyBodySummary {
+  hierarchyId: string;
+  bodyKey: string;
+  bodyKind: string;
+  sourceOrdinal: number;
+  heading: string;
+  contentSha256: string;
+  contentUtf8Bytes: number;
+}
+
+export interface HistoricalHierarchyNode {
+  hierarchyId: string;
+  nodeKey: string;
+  parentNodeKey: string | null;
+  nodeKind: string;
+  bodyKey: string | null;
+  depth: number;
+  flatOrdinal: number;
+  siblingOrdinal: number;
+  label: string;
+  heading: string;
+}
+
+/** Direct node body plus bounded root-to-parent ancestry; never descendants. */
+export interface HistoricalHierarchyNodeContext {
+  node: HistoricalHierarchyNode;
+  body: HistoricalHierarchyBody | undefined;
+  ancestors: HistoricalHierarchyNode[];
+}
+
+export interface HistoricalHierarchyNeighbors {
+  previous: HistoricalHierarchyNode | undefined;
+  next: HistoricalHierarchyNode | undefined;
+}
+
+export interface HistoricalHierarchyCursor {
+  siblingOrdinal: number;
+  nodeKey: string;
+}
+
+export interface HistoricalHierarchyPage {
+  nodes: HistoricalHierarchyNode[];
+  hasMore: boolean;
+  nextAfter: HistoricalHierarchyCursor | undefined;
+}
+
+export interface HistoricalHierarchySearchOptions {
+  hierarchyId: string;
+  text: string;
+  match: 'all_terms' | 'phrase';
+  limit: number;
+}
+
+export interface HistoricalHierarchySearchResult {
+  node: HistoricalHierarchyNode;
+  body: HistoricalHierarchyBodySummary;
+  rank: number;
+  snippet: string;
+  breadcrumb: HistoricalHierarchyNode[];
+}
+
+export interface IHistoricalHierarchyRepository {
+  getHierarchyProfile(hierarchyId: string): RepositoryResult<HistoricalHierarchyProfile | undefined>;
+  listHierarchyArtifacts(hierarchyId: string): RepositoryResult<HistoricalHierarchyArtifact[]>;
+  /** Exact body + bounded ancestors only; implementations must not concatenate children. */
+  getHierarchyNodeContext(hierarchyId: string, nodeKey: string): RepositoryResult<HistoricalHierarchyNodeContext | undefined>;
+  /** Roots use parentNodeKey=null. Cursors are validated and pages use one-row lookahead. */
+  listHierarchyChildren(hierarchyId: string, parentNodeKey: string | null, after: HistoricalHierarchyCursor | undefined, limit: number): RepositoryResult<HistoricalHierarchyPage>;
+  getHierarchyNeighbors(hierarchyId: string, nodeKey: string): RepositoryResult<HistoricalHierarchyNeighbors | undefined>;
+  /** Bounded discovery metadata/snippet only; exact authority text requires direct retrieval. */
+  searchHierarchyBodies(options: HistoricalHierarchySearchOptions): RepositoryResult<HistoricalHierarchySearchResult[]>;
 }

@@ -2,6 +2,13 @@
 
 ## Current production release state (PR #96; 2026-07-24)
 
+The integrated checked-out candidate is Transform 10, local-only and
+unpublished in its public behavior: its Aquinas hierarchy is inactive and has
+no catalog, runtime, or MCP projection. The prepared but unbound preview
+candidate retains that inactive authority data without changing the live
+preview, which remains the Transform 9 25-work catalog; production remains the
+Transform 8 17-work catalog.
+
 PR #96 production evidence is source-attested to checked-out commit
 `ac4b5ed774302fbfc86bf846b6ee77a07beed456` and exact tree
 `adf08edbf6bfcb14b9613354b2b8fb9f62ec8c16`. At the fixed canonical endpoint
@@ -68,18 +75,50 @@ active.
 > sole 100%; identity SHA-256
 > `a6959d24fb7f50a9848fe2d011f425894718471b8a0609e7833780a291721a44`.
 
+PR95's Transform9 historical source-pack work is deployed to preview only. It
+adds eight reviewed sectioned-only editions to the local catalog and preview
+25-work corpus but has no production Cloudflare migration, binding, deployment,
+or runtime claim. The separate Transform 10 Aquinas hierarchy remains
+unpublished and inactive; its prepared preview candidate has no catalog or
+runtime activation.
+
+At approximately 2026-07-25T19:13Z, fresh read-only Cloudflare evidence found
+preview deployment `4148bfb5-dd03-447f-b656-9daa0aee4380` as the sole 100%
+active deployment, serving Worker version `ca1376bb-05cc-403b-a396-d2e89403abec`
+and bound to `theologai-preview-20260724-a`
+(`414dbda0-ba5b-4ac0-826b-0402d2ed825b`). This is the current Transform 9
+25-work preview release. Its immediate retained predecessor is deployment
+`7f00a94b-4ff4-47d6-9bee-2efb99673718`, Worker version
+`f78d66f1-cefe-46ba-88ba-9ddec259cda4`, and D1
+`theologai-preview-20260722-b` (`94c4938b-7800-4d68-9097-0df33c31fdc1`).
+This point-in-time observation is read-only and does not imply a rollback,
+binding change, or any production change.
+
+The checked-in preview binding now names prepared but not-yet-deployed D1
+`theologai-preview-20260725-t10-a`
+(`fbd1a492-fbc2-4061-a431-181a9632d4de`). Its one-time preparation from
+`6cf8c00bece98865b8891fba1fc5805a9322e031` applied deterministic seed
+manifest SHA-256
+`86bd2bad5ee455dea46dd845efe6239039c2a7ef14e06b3b37754f7c70c59b67` (53
+files, 1,637,035 rows) and passed readiness plus Transform-8, Transform-9, and
+inactive Transform-10 predicates. No preview Worker deployment or binding
+change is recorded for this candidate: the live Transform-9 deployment above
+remains current until a separately authorized protected deployment proves the
+candidate binding before its black-box audits.
+
 PR #92 merged as `cd3d1c38fdf0f939a33a41d4b6d5044eb7f44562`; its exact
 reviewed head `3a2b5a57b322dce525f27cfa91c9f667d080bca9` is the separate
 preview-only release. Exact-head CI attempt 2 run `30017722596` and protected
-preview run `30039858274` passed. Cloudflare deployment
-`04e7a69a-78d2-447b-ac71-e9fb0bef3695` serves Worker
+preview run `30039858274` passed. Its historical Cloudflare deployment
+`04e7a69a-78d2-447b-ac71-e9fb0bef3695` served Worker
 `576517dd-84a8-4b5f-a5ea-ed8f124db63d`, and its only D1 binding is
 `theologai-preview-20260722-b`
 (`94c4938b-7800-4d68-9097-0df33c31fdc1`). The parallel audit passed 22/22
 cases; the Transform-8 audit recorded 48 rate-counted requests, 53 total HTTP
 records, and 11/11 assertion groups. The `deploy-preview` label was removed
-and revocation run `30040550778` passed. This remains a separate preview
-release, not evidence about the current production binding.
+and revocation run `30040550778` passed. This historical release is neither
+the current preview identity nor the immediate retained predecessor; it is not
+evidence about the current production binding.
 
 Ordinary requests to the production `theologai.tjfrederick.workers.dev` host
 now return a no-store 308 to `mcp.theologai.xyz`. The exact abusive-poller
@@ -98,7 +137,10 @@ foundation. PR #96 is the subsequent production binding and audited v2
 activation record. The v2 audit proves the public tool behavior at the exact
 production identity above; it does not authorize deletion, route replacement,
 or other destructive cleanup. The preview D1 remains a separate environment
-with migrations `0004` / transform 7 and `0005` / transform 8 materialized.
+with migrations `0004` / transform 7, `0005` / transform 8, and `0006` /
+Transform 9 materialized. PR95's Transform9 source-pack work is preview-bound;
+it does not alter that active production identity or claim a production runtime
+activation.
 
 ## Historical PR #50 pre-custom-domain rollback anchor (2026-07-16)
 
@@ -136,15 +178,15 @@ binding.
 
 ### Deployed Stage D preview v5 profile (historical release record)
 
-The checked-in Stage D configuration is intentionally asymmetric. Production
-remains `false/false/false` for CCEL exposure, live search, and coordinator
-execution, preserving the v4/local-only public contract. Preview is
-`true/false/false`: it exposes the v5 tool schema and guided workflows while the
-single live predicate remains false. In that state an external query returns a
+The checked-in Stage D configuration was intentionally asymmetric: at that
+historical release, production was v4/local-only and preview was
+`true/false/false`, exposing the v5 tool schema and guided workflows while the
+single live predicate remained false. In that state an external query returned a
 disabled provider result before adapter invocation, Durable Object lookup/RPC,
-or fetch. Protected preview deployment and black-box audit have established
-this as the deployed preview v5 profile. It still does not authorize live CCEL
-access or any production behavior beyond the documented v4/local-only profile.
+or fetch. Protected preview deployment and black-box audit established that as
+the deployed preview v5 profile. It does not authorize live CCEL access. Current
+production is v6/local-only; deployed preview remains v5 until an explicitly
+authorized PR95 deployment selects the checked-in, non-executing v7 candidate.
 
 Because MCP clients may cache tool and prompt schemas within an initialized
 connection, reconnect and reinitialize the audit client after the preview
@@ -552,6 +594,16 @@ After environment approval and before deployment, each job runs a read-only D1
 readiness query that checks integrity, exact manifest row counts, and required
 indexes, column signatures, foreign keys, and schema/corpus identity markers. A
 missing, stale, partial, or incompatible corpus stops deployment.
+
+The deployed preview Transform 9 / 25-work release runs the same gate's bounded
+source-pack authority audit: direct eight-row normalized-section pages plus
+compact identity/document/edition-FTS/runtime-FTS parity pages. The audit is
+read-only and catches an orphan or extra normalized section that a
+delivery-profile join alone would miss. Production remains on its Transform 8
+17-work corpus. Transform 10 is an unpublished, inactive hierarchy candidate;
+its prepared but unbound preview D1 does not authorize production activation.
+Any separately authorized production Transform 9 cutover must rerun this gate
+and audit against its exact candidate.
 
 The corpus marker is the scoped D1 materialization identity derived from
 `data/data-manifest.json` `materializations.d1`, not the hash of the complete

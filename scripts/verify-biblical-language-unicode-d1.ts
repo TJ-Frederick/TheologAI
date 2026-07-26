@@ -68,14 +68,27 @@ export function verifyBiblicalLanguageUnicodeD1(
     'ubs_semantic_sense_domains', 'ubs_semantic_reference_evidence',
     'ubs_semantic_normalized_coordinates',
   ].reduce((sum, table) => sum + (expectedCounts[table] ?? 0), 0);
-  const historicalTransform8Rows = [
+  const historicalSourceRows = [
     'historical_document_delivery_profiles',
     'historical_section_identities',
     'historical_section_aliases',
+    'historical_source_packs',
+    'historical_works',
+    'historical_editions',
+    'historical_source_artifacts',
+    'historical_edition_sections',
+    'historical_edition_sections_fts',
+  ].reduce((sum, table) => sum + (expectedCounts[table] ?? 0), 0);
+  const historicalTransform10Rows = [
+    'historical_edition_hierarchies',
+    'historical_edition_hierarchy_bodies',
+    'historical_edition_hierarchy_nodes',
+    'historical_edition_hierarchy_bodies_fts',
   ].reduce((sum, table) => sum + (expectedCounts[table] ?? 0), 0);
   assert(ubsSemanticRows === 549_458, `UBS semantic canonical-source row-count drift: ${ubsSemanticRows}`);
-  assert(historicalTransform8Rows === 5_892, `Historical Transform 8 canonical-source row-count drift: ${historicalTransform8Rows}`);
-  assert(rows - derivedUsageRows === 859_596 + ubsSemanticRows + historicalTransform8Rows,
+  assert(historicalSourceRows === 7_485, `Historical source-lineage row-count drift: ${historicalSourceRows}`);
+  assert(historicalTransform10Rows === 9_554, `Historical Transform 10 canonical-source row-count drift: ${historicalTransform10Rows}`);
+  assert(rows - derivedUsageRows === 860_628 + ubsSemanticRows + historicalSourceRows + historicalTransform10Rows,
     `Unicode D1 canonical-source row-count drift: ${rows - derivedUsageRows}`);
   return { sourceCells: ledger.contract.sourceCells, d1Cells, rows };
 }

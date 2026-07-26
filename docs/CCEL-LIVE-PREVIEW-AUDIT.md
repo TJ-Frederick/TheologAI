@@ -12,18 +12,21 @@ npm run audit:ccel-preview -- \
 ```
 
 The command is an operator canary, not a normal CI test. Run it only after the
-owner explicitly authorizes live preview and the current robots/interface
-preflight is recorded. It makes no production MCP tool call: production is a
-`tools/list` v4 local-only schema control. Before either preview tool call, the canary
-also uses the already-protected production operator route and exact live Worker
-UUID to read a content-free coordinator snapshot. The token is read only from
-`THEOLOGAI_CCEL_OPERATOR_TOKEN`; it is never accepted as a command argument or
-written to the report. Preview's `tools/list` must advertise the v5 CCEL
-discovery schema before the canary proceeds. These schema observations prove
-v4 local-only versus v5 CCEL exposure; they do not attest exact deployed flag
-bits. A successful origin admission separately proves that live execution was
-effective for the canary, which necessarily differs from the checked-in inert
-preview `100` baseline. Preview issues exactly two concurrent,
+owner separately authorizes a PR95 preview v7 deployment and a live canary, and
+after the current robots/interface preflight is recorded. Until that deployment,
+the deployed preview remains v5/discovery-only; the checked-in v6/v7 candidate
+profiles keep CCEL execution disabled. It makes no production MCP tool call:
+production is a `tools/list` v6 local-only schema control. Before either
+preview tool call, the canary also uses the already-protected production
+operator route and exact live Worker UUID to read a content-free coordinator
+snapshot. The token is read only from `THEOLOGAI_CCEL_OPERATOR_TOKEN`; it is
+never accepted as a command argument or written to the report. Preview's
+`tools/list` must advertise the candidate v7 CCEL discovery schema before the
+canary proceeds. These schema observations prove v6 local-only versus candidate
+v7 CCEL exposure; they do not attest exact deployed flag bits. A successful
+origin admission separately proves that the separately authorized canary's live
+execution was effective, which differs from the checked-in inert candidate
+baseline. Preview issues exactly two concurrent,
 CCEL-only contenders and requires one bounded discovery result plus one
 structured globally busy result. A separate local-only search verifies usable
 fallback without touching CCEL. A checked audit-side budget refuses any third
