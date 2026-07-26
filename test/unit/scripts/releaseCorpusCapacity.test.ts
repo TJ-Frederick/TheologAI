@@ -1,0 +1,140 @@
+import Database from 'better-sqlite3';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
+import {
+  D1_CORPUS_CAPACITY_LIMIT_BYTES,
+  D1_CORPUS_CAPACITY_WARNING_BYTES,
+  assessCorpusCapacity,
+  assertCorpusCapacity,
+  buildReleaseCorpusCapacityReport,
+  compareDbstatGrowth,
+  measurePreVacuumDatabase,
+  parseReleaseCorpusCapacityArguments,
+  readRecordedCapacityBaseline,
+  runReleaseCorpusCapacityReport,
+  type DatabaseCapacityMeasurement,
+  type RecordedCapacityBaseline,
+} from '../../../scripts/release-corpus-capacity.js';
+import { computeD1CorpusIdentity, parseDataManifest } from '../../../scripts/d1-corpus-identity.js';
+
+const ROOT = process.cwd();
+
+function fixtureDatabase(path: string, corpusIdentity = 'a'.repeat(64)): void {
+  const database = new Database(path);
+  try {
+    database.exec(`
+      PRAGMA foreign_keys = ON;
+      CREATE TABLE theologai_metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+      CREATE TABLE capacity_rows (id INTEGER PRIMARY KEY, content TEXT NOT NULL);
+      CREATE INDEX idx_capacity_rows_content ON capacity_rows(content);
+    `);
+    database.prepare("INSERT INTO theologai_metadata VALUES ('corpus_manifest_sha256', ?)").run(corpusIdentity);
+    const insert = database.prepare('INSERT INTO capacity_rows(content) VALUES (?)');
+    database.transaction(() => {
+      for (let index = 0; index < 40; index++) insert.run(`row-${String(index).padStart(3, '0')}`);
+    })();
+  } finally {
+    database.close();
+  }
+}
+
+function measurement(fileBytes: number, dbstat: DatabaseCapacityMeasurement['dbstat']): DatabaseCapacityMeasurement {
+  return {
+    fileBytes, pageSize: 4_096, pageCount: fileBytes / 4_096, pageCountBytes: fileBytes,
+    freelistPages: 0, dbstat, integrityCheck: 'ok', foreignKeyViolations: 0,
+  };
+}
+
+function baseline(value: DatabaseCapacityMeasurement): RecordedCapacityBaseline {
+  return {
+    schemaVersion: 'theologai-release-corpus-capacity-baseline.v1',
+    release: { id: 'fixture', commit: 'b'.repeat(40), corpusIdentity: 'c'.repeat(64), measuredWith: { node: 'v22.fixture', sqlite: 'fixture' } },
+    measurement: value,
+  };
+}
+
+describe('release-wide SQLite/D1 corpus capacity report', () => {
+  it('measures pre-VACUUM dbstat allocations and classifies table/index growth deterministically', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'theologai-release-capacity-test-'));
+    const path = join(directory, 'fixture.sqlite');
+    try {
+      fixtureDatabase(path);
+      const result = measurePreVacuumDatabase(path);
+      expect(result.fileBytes).toBe(result.pageCountBytes);
+      expect(result.integrityCheck).toBe('ok');
+      expect(result.foreignKeyViolations).toBe(0);
+      expect(result.dbstat.map(entry => entry.name)).toEqual([...result.dbstat.map(entry => entry.name)].sort());
+      expect(result.dbstat).toEqual(expect.arrayContaining([
+        expect.objectContaining({ name: 'capacity_rows', kind: 'table' }),
+        expect.objectContaining({ name: 'idx_capacity_rows_content', kind: 'index' }),
+      ]));
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('uses the documented 90% warning and inclusive 350 MiB hard ceiling', () => {
+    expect(assessCorpusCapacity(D1_CORPUS_CAPACITY_WARNING_BYTES - 1)).toMatchObject({
+      status: 'within_capacity', warning: false, withinLimit: true,
+    });
+    expect(assessCorpusCapacity(D1_CORPUS_CAPACITY_WARNING_BYTES)).toMatchObject({
+      status: 'warning_at_or_above_90_percent', warning: true, withinLimit: true,
+    });
+    expect(assertCorpusCapacity(D1_CORPUS_CAPACITY_LIMIT_BYTES)).toMatchObject({ withinLimit: true });
+    expect(assessCorpusCapacity(D1_CORPUS_CAPACITY_LIMIT_BYTES + 1)).toMatchObject({
+      status: 'exceeds_350_mib', warning: true, withinLimit: false, headroomBytes: -1,
+    });
+    expect(() => assertCorpusCapacity(D1_CORPUS_CAPACITY_LIMIT_BYTES + 1)).toThrow('350 MiB');
+  });
+
+  it('includes new and removed dbstat objects with zero-sided growth, in lexical order', () => {
+    const growth = compareDbstatGrowth(
+      [{ name: 'alpha', kind: 'table', pages: 3, bytes: 12_288 }, { name: 'removed_idx', kind: 'index', pages: 2, bytes: 8_192 }],
+      [{ name: 'alpha', kind: 'table', pages: 5, bytes: 20_480 }, { name: 'new_fts_data', kind: 'table', pages: 4, bytes: 16_384 }],
+    );
+    expect(growth).toEqual([
+      { name: 'alpha', kind: 'table', baselinePages: 3, currentPages: 5, pageGrowth: 2, baselineBytes: 12_288, currentBytes: 20_480, byteGrowth: 8_192 },
+      { name: 'new_fts_data', kind: 'table', baselinePages: 0, currentPages: 4, pageGrowth: 4, baselineBytes: 0, currentBytes: 16_384, byteGrowth: 16_384 },
+      { name: 'removed_idx', kind: 'index', baselinePages: 2, currentPages: 0, pageGrowth: -2, baselineBytes: 8_192, currentBytes: 0, byteGrowth: -8_192 },
+    ]);
+  });
+
+  it('uses a previous recorded release and has deterministic report ordering', () => {
+    const current = measurement(16_384, [
+      { name: 'alpha', kind: 'table', pages: 2, bytes: 8_192 },
+      { name: 'beta', kind: 'index', pages: 2, bytes: 8_192 },
+    ]);
+    const prior = baseline(measurement(8_192, [
+      { name: 'alpha', kind: 'table', pages: 1, bytes: 4_096 },
+      { name: 'legacy', kind: 'table', pages: 1, bytes: 4_096 },
+    ]));
+    const report = buildReleaseCorpusCapacityReport('a'.repeat(64), current, current, prior);
+    expect(report.baseline).toMatchObject({ id: 'fixture', preVacuumBytes: 8_192 });
+    expect(report.growthSinceBaseline.databaseBytes).toBe(8_192);
+    expect(report.growthSinceBaseline.databaseBasisPoints).toBe(10_000);
+    expect(report.growthSinceBaseline.dbstat.map(row => row.name)).toEqual(['alpha', 'beta', 'legacy']);
+    expect(JSON.stringify(report)).toBe(JSON.stringify(buildReleaseCorpusCapacityReport('a'.repeat(64), current, current, prior)));
+  });
+
+  it('reads the checked-in Transform 9 baseline and refuses public arguments', () => {
+    const prior = readRecordedCapacityBaseline(ROOT);
+    expect(prior.release.id).toBe('transform-9');
+    expect(prior.measurement.fileBytes).toBeGreaterThan(0);
+    expect(prior.measurement.dbstat).not.toEqual([]);
+    expect(() => parseReleaseCorpusCapacityArguments([])).not.toThrow();
+    expect(() => parseReleaseCorpusCapacityArguments(['--database', 'data/theologai.db'])).toThrow('accepts no arguments');
+  });
+
+  it('builds only a disposable fresh fixture when dependencies are injected for tests', () => {
+    const corpusIdentity = computeD1CorpusIdentity(parseDataManifest(readFileSync(join(ROOT, 'data', 'data-manifest.json'))));
+    const report = runReleaseCorpusCapacityReport(ROOT, {
+      buildDatabase: ({ outputPath }) => fixtureDatabase(outputPath, corpusIdentity),
+      baseline: baseline(measurement(4_096, [{ name: 'sqlite_schema', kind: 'internal', pages: 1, bytes: 4_096 }])),
+    });
+    expect(report.corpus).toMatchObject({ storage: 'sqlite_d1_materialized', freshBuildVerified: true });
+    expect(report.current.preVacuum.fileBytes).toBeGreaterThan(0);
+    expect(report.capacity.withinLimit).toBe(true);
+  });
+});

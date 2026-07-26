@@ -1,0 +1,725 @@
+{
+  "schemaVersion": "theologai-release-corpus-capacity-baseline.v1",
+  "release": {
+    "id": "transform-9",
+    "commit": "e797b466d641146ff58f473bbb21a7ee920c7eaf",
+    "corpusIdentity": "ad2967a2de806a31e2d25b9dd60747d58739bd741ecb315b0e5d83f3a61649fd",
+    "measuredWith": {
+      "node": "v22.23.1",
+      "sqlite": "3.51.2"
+    }
+  },
+  "measurement": {
+    "fileBytes": 315211776,
+    "pageSize": 4096,
+    "pageCount": 76956,
+    "pageCountBytes": 315211776,
+    "freelistPages": 0,
+    "dbstat": [
+      {
+        "name": "cross_references",
+        "pages": 2620,
+        "bytes": 10731520,
+        "kind": "table"
+      },
+      {
+        "name": "document_sections",
+        "pages": 2669,
+        "bytes": 10932224,
+        "kind": "table"
+      },
+      {
+        "name": "documents",
+        "pages": 14,
+        "bytes": 57344,
+        "kind": "table"
+      },
+      {
+        "name": "historical_document_delivery_profiles",
+        "pages": 12,
+        "bytes": 49152,
+        "kind": "table"
+      },
+      {
+        "name": "historical_edition_sections",
+        "pages": 2146,
+        "bytes": 8790016,
+        "kind": "table"
+      },
+      {
+        "name": "historical_edition_sections_fts_config",
+        "pages": 1,
+        "bytes": 4096,
+        "kind": "table"
+      },
+      {
+        "name": "historical_edition_sections_fts_content",
+        "pages": 2144,
+        "bytes": 8781824,
+        "kind": "table"
+      },
+      {
+        "name": "historical_edition_sections_fts_data",
+        "pages": 956,
+        "bytes": 3915776,
+        "kind": "table"
+      },
+      {
+        "name": "historical_edition_sections_fts_docsize",
+        "pages": 3,
+        "bytes": 12288,
+        "kind": "table"
+      },
+      {
+        "name": "historical_edition_sections_fts_idx",
+        "pages": 6,
+        "bytes": 24576,
+        "kind": "table"
+      },
+      {
+        "name": "historical_editions",
+        "pages": 9,
+        "bytes": 36864,
+        "kind": "table"
+      },
+      {
+        "name": "historical_section_aliases",
+        "pages": 26,
+        "bytes": 106496,
+        "kind": "table"
+      },
+      {
+        "name": "historical_section_identities",
+        "pages": 35,
+        "bytes": 143360,
+        "kind": "table"
+      },
+      {
+        "name": "historical_source_artifacts",
+        "pages": 4,
+        "bytes": 16384,
+        "kind": "table"
+      },
+      {
+        "name": "historical_source_packs",
+        "pages": 1,
+        "bytes": 4096,
+        "kind": "table"
+      },
+      {
+        "name": "historical_works",
+        "pages": 1,
+        "bytes": 4096,
+        "kind": "table"
+      },
+      {
+        "name": "idx_document_sections_id_document",
+        "pages": 31,
+        "bytes": 126976,
+        "kind": "index"
+      },
+      {
+        "name": "idx_historical_edition_sections_order",
+        "pages": 8,
+        "bytes": 32768,
+        "kind": "index"
+      },
+      {
+        "name": "idx_historical_editions_pack",
+        "pages": 1,
+        "bytes": 4096,
+        "kind": "index"
+      },
+      {
+        "name": "idx_historical_editions_work",
+        "pages": 1,
+        "bytes": 4096,
+        "kind": "index"
+      },
+      {
+        "name": "idx_historical_section_aliases_target",
+        "pages": 27,
+        "bytes": 110592,
+        "kind": "index"
+      },
+      {
+        "name": "idx_historical_section_identities_browse",
+        "pages": 38,
+        "bytes": 155648,
+        "kind": "index"
+      },
+      {
+        "name": "idx_historical_source_artifacts_edition",
+        "pages": 1,
+        "bytes": 4096,
+        "kind": "index"
+      },
+      {
+        "name": "idx_morph_strongs",
+        "pages": 1721,
+        "bytes": 7049216,
+        "kind": "index"
+      },
+      {
+        "name": "idx_morph_strongs_canonical",
+        "pages": 2703,
+        "bytes": 11071488,
+        "kind": "index"
+      },
+      {
+        "name": "idx_morph_verse",
+        "pages": 2460,
+        "bytes": 10076160,
+        "kind": "index"
+      },
+      {
+        "name": "idx_strongs_book_stats_order",
+        "pages": 251,
+        "bytes": 1028096,
+        "kind": "index"
+      },
+      {
+        "name": "idx_strongs_form_stats_rank",
+        "pages": 1436,
+        "bytes": 5881856,
+        "kind": "index"
+      },
+      {
+        "name": "idx_ubs_groups_source_order",
+        "pages": 72,
+        "bytes": 294912,
+        "kind": "index"
+      },
+      {
+        "name": "idx_ubs_segments_lookup",
+        "pages": 126,
+        "bytes": 516096,
+        "kind": "index"
+      },
+      {
+        "name": "idx_ubs_semantic_coordinate_lookup",
+        "pages": 1733,
+        "bytes": 7098368,
+        "kind": "index"
+      },
+      {
+        "name": "idx_ubs_semantic_evidence_sense_order",
+        "pages": 2801,
+        "bytes": 11472896,
+        "kind": "index"
+      },
+      {
+        "name": "idx_ubs_semantic_identity_candidate",
+        "pages": 293,
+        "bytes": 1200128,
+        "kind": "index"
+      },
+      {
+        "name": "idx_ubs_semantic_sense_candidate_order",
+        "pages": 525,
+        "bytes": 2150400,
+        "kind": "index"
+      },
+      {
+        "name": "idx_ubs_semantic_sense_domain_order",
+        "pages": 520,
+        "bytes": 2129920,
+        "kind": "index"
+      },
+      {
+        "name": "idx_xref_from",
+        "pages": 1682,
+        "bytes": 6889472,
+        "kind": "index"
+      },
+      {
+        "name": "idx_xref_votes",
+        "pages": 937,
+        "bytes": 3837952,
+        "kind": "index"
+      },
+      {
+        "name": "morph_codes",
+        "pages": 1,
+        "bytes": 4096,
+        "kind": "table"
+      },
+      {
+        "name": "morphology",
+        "pages": 8284,
+        "bytes": 33931264,
+        "kind": "table"
+      },
+      {
+        "name": "sections_fts_config",
+        "pages": 1,
+        "bytes": 4096,
+        "kind": "table"
+      },
+      {
+        "name": "sections_fts_content",
+        "pages": 2643,
+        "bytes": 10825728,
+        "kind": "table"
+      },
+      {
+        "name": "sections_fts_data",
+        "pages": 1229,
+        "bytes": 5033984,
+        "kind": "table"
+      },
+      {
+        "name": "sections_fts_docsize",
+        "pages": 11,
+        "bytes": 45056,
+        "kind": "table"
+      },
+      {
+        "name": "sections_fts_idx",
+        "pages": 7,
+        "bytes": 28672,
+        "kind": "table"
+      },
+      {
+        "name": "sqlite_autoindex_cross_references_1",
+        "pages": 2841,
+        "bytes": 11636736,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_documents_1",
+        "pages": 1,
+        "bytes": 4096,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_historical_document_delivery_profiles_1",
+        "pages": 1,
+        "bytes": 4096,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_historical_document_delivery_profiles_2",
+        "pages": 1,
+        "bytes": 4096,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_historical_edition_sections_1",
+        "pages": 9,
+        "bytes": 36864,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_historical_edition_sections_2",
+        "pages": 8,
+        "bytes": 32768,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_historical_editions_1",
+        "pages": 1,
+        "bytes": 4096,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_historical_section_aliases_1",
+        "pages": 25,
+        "bytes": 102400,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_historical_section_identities_1",
+        "pages": 11,
+        "bytes": 45056,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_historical_section_identities_2",
+        "pages": 36,
+        "bytes": 147456,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_historical_section_identities_3",
+        "pages": 32,
+        "bytes": 131072,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_historical_section_identities_4",
+        "pages": 38,
+        "bytes": 155648,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_historical_source_artifacts_1",
+        "pages": 1,
+        "bytes": 4096,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_historical_source_packs_1",
+        "pages": 1,
+        "bytes": 4096,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_historical_source_packs_2",
+        "pages": 1,
+        "bytes": 4096,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_historical_works_1",
+        "pages": 1,
+        "bytes": 4096,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_morph_codes_1",
+        "pages": 1,
+        "bytes": 4096,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_morphology_1",
+        "pages": 2691,
+        "bytes": 11022336,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_stepbible_lexicons_1",
+        "pages": 73,
+        "bytes": 299008,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_strongs_1",
+        "pages": 51,
+        "bytes": 208896,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_strongs_book_stats_1",
+        "pages": 348,
+        "bytes": 1425408,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_strongs_form_stats_1",
+        "pages": 1343,
+        "bytes": 5500928,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_strongs_usage_stats_1",
+        "pages": 51,
+        "bytes": 208896,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_theologai_metadata_1",
+        "pages": 1,
+        "bytes": 4096,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_ubs_parallel_groups_1",
+        "pages": 48,
+        "bytes": 196608,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_ubs_parallel_groups_2",
+        "pages": 26,
+        "bytes": 106496,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_ubs_parallel_members_1",
+        "pages": 123,
+        "bytes": 503808,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_ubs_parallel_segments_1",
+        "pages": 123,
+        "bytes": 503808,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_ubs_parallel_sources_1",
+        "pages": 1,
+        "bytes": 4096,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_ubs_parallel_sources_2",
+        "pages": 1,
+        "bytes": 4096,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_ubs_semantic_artifacts_1",
+        "pages": 1,
+        "bytes": 4096,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_ubs_semantic_domains_1",
+        "pages": 12,
+        "bytes": 49152,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_ubs_semantic_domains_2",
+        "pages": 14,
+        "bytes": 57344,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_ubs_semantic_entries_1",
+        "pages": 231,
+        "bytes": 946176,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_ubs_semantic_entries_2",
+        "pages": 253,
+        "bytes": 1036288,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_ubs_semantic_entries_3",
+        "pages": 308,
+        "bytes": 1261568,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_ubs_semantic_entry_identities_1",
+        "pages": 295,
+        "bytes": 1208320,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_ubs_semantic_normalized_coordinates_1",
+        "pages": 893,
+        "bytes": 3657728,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_ubs_semantic_sense_domains_1",
+        "pages": 517,
+        "bytes": 2117632,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_ubs_semantic_sense_domains_2",
+        "pages": 433,
+        "bytes": 1773568,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_ubs_semantic_senses_1",
+        "pages": 422,
+        "bytes": 1728512,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_ubs_semantic_senses_2",
+        "pages": 561,
+        "bytes": 2297856,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_ubs_semantic_senses_3",
+        "pages": 560,
+        "bytes": 2293760,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_ubs_semantic_sources_1",
+        "pages": 1,
+        "bytes": 4096,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_autoindex_ubs_semantic_sources_2",
+        "pages": 1,
+        "bytes": 4096,
+        "kind": "index"
+      },
+      {
+        "name": "sqlite_schema",
+        "pages": 11,
+        "bytes": 45056,
+        "kind": "internal"
+      },
+      {
+        "name": "sqlite_sequence",
+        "pages": 1,
+        "bytes": 4096,
+        "kind": "table"
+      },
+      {
+        "name": "sqlite_stat1",
+        "pages": 3,
+        "bytes": 12288,
+        "kind": "table"
+      },
+      {
+        "name": "sqlite_stat4",
+        "pages": 55,
+        "bytes": 225280,
+        "kind": "table"
+      },
+      {
+        "name": "stepbible_lexicons",
+        "pages": 2404,
+        "bytes": 9846784,
+        "kind": "table"
+      },
+      {
+        "name": "strongs",
+        "pages": 694,
+        "bytes": 2842624,
+        "kind": "table"
+      },
+      {
+        "name": "strongs_book_stats",
+        "pages": 368,
+        "bytes": 1507328,
+        "kind": "table"
+      },
+      {
+        "name": "strongs_form_stats",
+        "pages": 1786,
+        "bytes": 7315456,
+        "kind": "table"
+      },
+      {
+        "name": "strongs_fts_config",
+        "pages": 1,
+        "bytes": 4096,
+        "kind": "table"
+      },
+      {
+        "name": "strongs_fts_content",
+        "pages": 438,
+        "bytes": 1794048,
+        "kind": "table"
+      },
+      {
+        "name": "strongs_fts_data",
+        "pages": 368,
+        "bytes": 1507328,
+        "kind": "table"
+      },
+      {
+        "name": "strongs_fts_docsize",
+        "pages": 44,
+        "bytes": 180224,
+        "kind": "table"
+      },
+      {
+        "name": "strongs_fts_idx",
+        "pages": 3,
+        "bytes": 12288,
+        "kind": "table"
+      },
+      {
+        "name": "strongs_usage_stats",
+        "pages": 65,
+        "bytes": 266240,
+        "kind": "table"
+      },
+      {
+        "name": "theologai_metadata",
+        "pages": 1,
+        "bytes": 4096,
+        "kind": "table"
+      },
+      {
+        "name": "ubs_parallel_groups",
+        "pages": 83,
+        "bytes": 339968,
+        "kind": "table"
+      },
+      {
+        "name": "ubs_parallel_members",
+        "pages": 176,
+        "bytes": 720896,
+        "kind": "table"
+      },
+      {
+        "name": "ubs_parallel_segments",
+        "pages": 119,
+        "bytes": 487424,
+        "kind": "table"
+      },
+      {
+        "name": "ubs_parallel_sources",
+        "pages": 1,
+        "bytes": 4096,
+        "kind": "table"
+      },
+      {
+        "name": "ubs_semantic_artifacts",
+        "pages": 2,
+        "bytes": 8192,
+        "kind": "table"
+      },
+      {
+        "name": "ubs_semantic_domains",
+        "pages": 25,
+        "bytes": 102400,
+        "kind": "table"
+      },
+      {
+        "name": "ubs_semantic_entries",
+        "pages": 362,
+        "bytes": 1482752,
+        "kind": "table"
+      },
+      {
+        "name": "ubs_semantic_entry_identities",
+        "pages": 257,
+        "bytes": 1052672,
+        "kind": "table"
+      },
+      {
+        "name": "ubs_semantic_normalized_coordinates",
+        "pages": 2253,
+        "bytes": 9228288,
+        "kind": "table"
+      },
+      {
+        "name": "ubs_semantic_reference_evidence",
+        "pages": 13189,
+        "bytes": 54022144,
+        "kind": "table"
+      },
+      {
+        "name": "ubs_semantic_sense_domains",
+        "pages": 467,
+        "bytes": 1912832,
+        "kind": "table"
+      },
+      {
+        "name": "ubs_semantic_senses",
+        "pages": 1198,
+        "bytes": 4907008,
+        "kind": "table"
+      },
+      {
+        "name": "ubs_semantic_sources",
+        "pages": 1,
+        "bytes": 4096,
+        "kind": "table"
+      }
+    ],
+    "integrityCheck": "ok",
+    "foreignKeyViolations": 0
+  }
+}
