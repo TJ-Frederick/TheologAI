@@ -112,6 +112,55 @@ type UnknownRecord = Record<string, unknown>;
 
 function fail(message: string): never { throw new Error(`[release-corpus-capacity] ${message}`); }
 
+/** Fail closed unless dbstat plus the freelist accounts for every database page. */
+export function assertDatabaseCapacityMeasurement(
+  measurement: DatabaseCapacityMeasurement,
+  label = 'database capacity measurement',
+): void {
+  for (const [field, value] of Object.entries({
+    fileBytes: measurement.fileBytes,
+    pageSize: measurement.pageSize,
+    pageCount: measurement.pageCount,
+    pageCountBytes: measurement.pageCountBytes,
+    freelistPages: measurement.freelistPages,
+  })) {
+    if (!Number.isSafeInteger(value) || value < 0) fail(`${label}.${field} must be a non-negative safe integer`);
+  }
+  if (measurement.pageSize === 0 || measurement.pageCount === 0
+    || measurement.pageCountBytes !== measurement.pageSize * measurement.pageCount
+    || measurement.fileBytes !== measurement.pageCountBytes) {
+    fail(`${label} must retain matching non-zero page and file byte measurements`);
+  }
+  if (measurement.integrityCheck !== 'ok' || measurement.foreignKeyViolations !== 0) {
+    fail(`${label} must retain clean integrity checks`);
+  }
+  if (measurement.dbstat.length === 0) fail(`${label}.dbstat must not be empty`);
+
+  const names = measurement.dbstat.map(entry => entry.name);
+  if (new Set(names).size !== names.length || JSON.stringify(names) !== JSON.stringify([...names].sort())) {
+    fail(`${label}.dbstat must have unique, lexically ordered names`);
+  }
+
+  let allocatedPages = 0;
+  let allocatedBytes = 0;
+  for (const entry of measurement.dbstat) {
+    if (!entry.name || !Number.isSafeInteger(entry.pages) || entry.pages <= 0
+      || !Number.isSafeInteger(entry.bytes) || entry.bytes <= 0) {
+      fail(`${label}.dbstat entry ${entry.name || '<unnamed>'} must have positive safe page and byte measurements`);
+    }
+    if (entry.bytes !== entry.pages * measurement.pageSize) {
+      fail(`${label}.dbstat entry ${entry.name} bytes must equal pages multiplied by pageSize`);
+    }
+    allocatedPages += entry.pages;
+    allocatedBytes += entry.bytes;
+  }
+  if (!Number.isSafeInteger(allocatedPages) || !Number.isSafeInteger(allocatedBytes)
+    || allocatedPages + measurement.freelistPages !== measurement.pageCount
+    || allocatedBytes + measurement.freelistPages * measurement.pageSize !== measurement.fileBytes) {
+    fail(`${label} dbstat allocations plus freelist pages must conserve the complete database file`);
+  }
+}
+
 function asRecord(value: unknown, label: string): UnknownRecord {
   if (!value || typeof value !== 'object' || Array.isArray(value)) fail(`${label} must be an object`);
   return value as UnknownRecord;
@@ -164,7 +213,7 @@ export function measureDatabaseCapacity(database: Database.Database, path: strin
   const fileBytes = statSync(path).size;
   if (fileBytes !== pageCountBytes) fail('SQLite file size differs from its page count');
 
-  return {
+  const measurement: DatabaseCapacityMeasurement = {
     fileBytes,
     pageSize,
     pageCount,
@@ -174,6 +223,8 @@ export function measureDatabaseCapacity(database: Database.Database, path: strin
     integrityCheck: 'ok',
     foreignKeyViolations: 0,
   };
+  assertDatabaseCapacityMeasurement(measurement);
+  return measurement;
 }
 
 /** The authoritative measurement: fresh database after ANALYZE and before VACUUM. */
@@ -222,11 +273,13 @@ function parseMeasurement(value: unknown, label: string): DatabaseCapacityMeasur
   if (new Set(names).size !== names.length || JSON.stringify(names) !== JSON.stringify([...names].sort())) {
     fail(`${label}.dbstat must have unique, lexically ordered names`);
   }
-  return {
+  const measurement: DatabaseCapacityMeasurement = {
     fileBytes, pageSize, pageCount, pageCountBytes,
     freelistPages: asInteger(raw.freelistPages, `${label}.freelistPages`), dbstat,
     integrityCheck: 'ok', foreignKeyViolations: 0,
   };
+  assertDatabaseCapacityMeasurement(measurement, label);
+  return measurement;
 }
 
 /** Load and validate the prior, checked-in release measurement. */
@@ -273,7 +326,10 @@ export function assertCorpusCapacity(preVacuumBytes: number): ReturnType<typeof 
   return assessment;
 }
 
-/** Compare every table, index, FTS shadow, and SQLite-internal dbstat object in lexical order. */
+/**
+ * Compare every table, index, FTS shadow, and SQLite-internal dbstat object.
+ * Largest byte growth is first; lexical name order breaks ties deterministically.
+ */
 export function compareDbstatGrowth(
   baseline: readonly DbstatObjectMeasurement[],
   current: readonly DbstatObjectMeasurement[],
@@ -293,7 +349,8 @@ export function compareDbstatGrowth(
       name, kind, baselinePages, currentPages, pageGrowth: currentPages - baselinePages,
       baselineBytes, currentBytes, byteGrowth: currentBytes - baselineBytes,
     };
-  });
+  }).sort((left, right) => right.byteGrowth - left.byteGrowth
+    || (left.name < right.name ? -1 : left.name > right.name ? 1 : 0));
 }
 
 export function buildReleaseCorpusCapacityReport(
@@ -384,6 +441,10 @@ export function parseReleaseCorpusCapacityArguments(argv: readonly string[]): vo
   if (argv.length !== 0) fail('this release-wide capacity command accepts no arguments and always uses a disposable fresh database');
 }
 
+export function releaseCorpusCapacityExitCode(report: ReleaseCorpusCapacityReport): 0 | 1 {
+  return report.capacity.withinLimit ? 0 : 1;
+}
+
 function assertNode22(): void {
   if (process.versions.node.split('.')[0] !== '22') fail(`requires Node 22; received ${process.version}`);
 }
@@ -393,7 +454,7 @@ function main(argv: readonly string[]): void {
   assertNode22();
   const report = runReleaseCorpusCapacityReport();
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
-  if (!report.capacity.withinLimit) process.exitCode = 1;
+  process.exitCode = releaseCorpusCapacityExitCode(report);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

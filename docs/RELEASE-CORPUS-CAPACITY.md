@@ -27,7 +27,7 @@ size after `ANALYZE` and before `VACUUM`. `capacity.headroomBytes` is exactly
 |---|---|
 | Below 315 MiB (90%) | `within_capacity` |
 | 315 MiB through 350 MiB inclusive | `warning_at_or_above_90_percent`; report succeeds |
-| Above 350 MiB | `exceeds_350_mib`; command exits nonzero |
+| Above 350 MiB | Full `exceeds_350_mib` report is printed, then the command exits nonzero |
 
 The 350 MiB ceiling is the existing conservative D1 database limit used by the
 UBS and Aquinas capacity gates. The report’s `postVacuumDiagnostic` is useful
@@ -36,16 +36,32 @@ pre-`VACUUM` value.
 
 ## Growth evidence and baseline
 
-`docs/release-corpus-capacity-baseline-transform9.json` records the prior
-Transform 9 release measurement. Its commit, D1 corpus identity, Node/SQLite
-versions, database size, and sorted `dbstat` inventory are immutable release
-evidence. The new report compares every named `dbstat` object—tables, explicit
-and automatic indexes, FTS tables/shadows, and SQLite internals—against that
-baseline. Added and removed objects appear with a zero value on the absent
-side, so a storage change cannot disappear from the comparison.
+`docs/release-corpus-capacity-baseline-transform9.json` records the exact
+reviewed PR95 pre-Transform-10 head
+`9f8c2f16ae81bcdcf684840b91e920481c18430c`, with corpus identity
+`4e182bfd2953fe06e7c8d7e13a705988e85b5a58001e7fe72440333d34f6d442`.
+This is source-controlled release evidence; it does not independently claim a
+remote deployment. The record includes its Node/SQLite versions, database
+size, and complete sorted `dbstat` inventory. The report compares every named
+`dbstat` object—tables, explicit and automatic indexes, FTS tables/shadows, and
+SQLite internals—against that baseline. Added and removed objects appear with
+a zero value on the absent side. Growth rows are ordered by descending byte
+growth, with lexical object names breaking ties.
+
+Every baseline and current `dbstat` row must satisfy
+`bytes == pages * pageSize`. The sum of all `dbstat` pages plus
+`freelistPages` must equal `pageCount` and the corresponding bytes must equal
+the complete file size. A stale, truncated, or tampered baseline therefore
+fails before comparison.
 
 Output contains no timestamps, temporary paths, or unordered collections. The
 same checkout and SQLite build therefore produce stable, reviewable JSON.
+
+The `Fresh Checkout & Data` pull-request job runs this command as a
+non-mutating capacity check. It builds only below runner temporary storage,
+prints the warning and complete growth report, and blocks the check above the
+350 MiB ceiling. Operators should also run the same command manually when
+preparing release evidence; CI does not update the recorded baseline.
 
 ## Transform 10 release interpretation
 

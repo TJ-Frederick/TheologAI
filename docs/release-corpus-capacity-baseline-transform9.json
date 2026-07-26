@@ -1,9 +1,9 @@
 {
   "schemaVersion": "theologai-release-corpus-capacity-baseline.v1",
   "release": {
-    "id": "transform-9",
-    "commit": "e797b466d641146ff58f473bbb21a7ee920c7eaf",
-    "corpusIdentity": "ad2967a2de806a31e2d25b9dd60747d58739bd741ecb315b0e5d83f3a61649fd",
+    "id": "transform-9-reviewed-pre-transform-10",
+    "commit": "9f8c2f16ae81bcdcf684840b91e920481c18430c",
+    "corpusIdentity": "4e182bfd2953fe06e7c8d7e13a705988e85b5a58001e7fe72440333d34f6d442",
     "measuredWith": {
       "node": "v22.23.1",
       "sqlite": "3.51.2"
