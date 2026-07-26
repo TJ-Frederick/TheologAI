@@ -19,8 +19,19 @@ serving Worker version `ca1376bb-05cc-403b-a396-d2e89403abec` and bound to
 `f78d66f1-cefe-46ba-88ba-9ddec259cda4`, bound to
 `theologai-preview-20260722-b` (`94c4938b-7800-4d68-9097-0df33c31fdc1`).
 The observation is read-only evidence of the active identity at that time; it
-does not alter the local Transform-10 unpublished boundary, authorize a
+does not alter the Transform-10 unpublished, non-runtime boundary, authorize a
 rollback, or prove that no later concurrent Cloudflare change occurred.
+
+The checked-in preview binding now names the separately prepared but
+not-yet-deployed candidate `theologai-preview-20260725-t10-a`
+(`fbd1a492-fbc2-4061-a431-181a9632d4de`). Preparation completed exactly once
+from `6cf8c00bece98865b8891fba1fc5805a9322e031`, applying seed manifest
+SHA-256 `86bd2bad5ee455dea46dd845efe6239039c2a7ef14e06b3b37754f7c70c59b67`
+(53 files, 1,637,035 rows); readiness and Transform-8, Transform-9, and
+inactive Transform-10 predicates passed. This candidate remains unbound from
+the active Worker: the live preview identity above continues to serve the
+Transform-9 25-work catalog. A separate protected deployment must prove the
+new active Worker binds this exact `candidateD1` before either black-box audit.
 
 The candidate-binding observation is written before the strict gate and is uploaded through `always()` handling. It contains only version/deployment IDs, predecessor/active/candidate D1 IDs, the `d1Changed` value, and boolean configuration/binding verdicts; it excludes raw Wrangler JSON, headers, requests, sessions, and secrets. The final post-mutation observation is likewise retained and hashed even if the strict candidate-binding gate blocks both audits.
 
