@@ -1,10 +1,12 @@
 # Aquinas hierarchy — Transform 10
 
-Transform 10 stores one locally materialized, inactive, generic
-edition-scoped authority hierarchy. It is not registered as a historical
-document, catalogue item, runtime composition dependency, MCP tool, prompt, or
-resource. It creates no remote D1 operation, binding, deployment, publication,
-or CCEL dependency.
+Transform 10 retains one local-only, generic edition-scoped authority hierarchy
+packet and standalone materializer. Normal release builds intentionally store
+zero hierarchy rows and no Aquinas shared lineage. The standalone capacity
+rehearsal materializes it only in a disposable copy. It is not registered as a
+historical document, catalogue item, runtime composition dependency, MCP tool,
+prompt, or resource. It creates no remote D1 operation, binding, deployment,
+publication, or CCEL dependency.
 
 ## Approved edition scope
 
@@ -71,7 +73,8 @@ rebuilding the external-content FTS. Fresh local builds are verified for exact b
 packet coverage, hierarchy constraints, FTS parity, and no document
 projection.
 
-The controlling capacity measurement is the direct fresh Transform-10 database
-before `VACUUM`, after `ANALYZE`, against the 350 MiB ceiling. The existing
-capacity comparison reports that actual schema measurement separately from its
-older disposable A/B projections.
+The controlling future-capacity rehearsal is the disposable standalone
+Transform-10 copy before `VACUUM`, after `ANALYZE`, against the 350 MiB ceiling.
+Normal release capacity is measured separately from a zero-row build. The
+capacity comparison reports the standalone schema measurement separately from
+the normal-release baseline and older disposable A/B projections.

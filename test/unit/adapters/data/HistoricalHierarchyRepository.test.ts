@@ -3,7 +3,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { HistoricalHierarchyRepository } from '../../../../src/adapters/data/HistoricalHierarchyRepository.js';
-import { AQUINAS_HIERARCHY_ID, loadApprovedAquinasHierarchy, materializeHistoricalHierarchy } from '../../../../scripts/historical-hierarchy.js';
+import { AQUINAS_HIERARCHY_ID, materializeHistoricalHierarchy } from '../../../../scripts/historical-hierarchy.js';
+import { loadApprovedAquinasHierarchy } from '../../../../scripts/aquinas-source-pack-capacity-comparison.js';
 
 const ROOT = process.cwd();
 function repository(): { db: Database.Database; repo: HistoricalHierarchyRepository } {

@@ -14,6 +14,14 @@ import { tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { computeD1CorpusIdentity, parseDataManifest } from './d1-corpus-identity.js';
+import {
+  buildApprovedAquinasHierarchy,
+  assertHistoricalHierarchyStoredIntegrity,
+  assertNormalAquinasHierarchyExclusion,
+  materializeHistoricalHierarchy,
+  type HistoricalEditionHierarchyMaterialization,
+  type HistoricalHierarchyMaterializationCounts,
+} from './historical-hierarchy.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PACKAGE_DIRECTORY = 'data/historical-sources/project-gutenberg/aquinas-english-dominican/packages/aquinas-summa-pg-v1';
@@ -203,8 +211,8 @@ export interface AquinasCapacityRunOptions {
 }
 
 export interface AquinasCapacityComparisonReport {
-  schemaVersion: 'aquinas-source-pack-capacity-comparison.v3';
-  status: 'local_only_inactive_materialized';
+  schemaVersion: 'aquinas-source-pack-capacity-comparison.v4';
+  status: 'normal_release_baseline_with_standalone_aquinas_rehearsal';
   temporaryStorage: 'os-temp-disposed';
   source: {
     identity: Readonly<typeof AQUINAS_CAPACITY_EXPECTED.identity>;
@@ -212,6 +220,7 @@ export interface AquinasCapacityComparisonReport {
     counts: { shards: number; questions: number; articles: number; preambles: number; prologues: number; authorityBodies: number; navigationNodes: number };
   };
   baseline: {
+    kind: 'normal_release_zero_hierarchy_baseline';
     builtFreshFromCurrentCheckout: boolean;
     sha256: string;
     corpusIdentity: string;
@@ -219,13 +228,16 @@ export interface AquinasCapacityComparisonReport {
     postVacuumDiagnostic: DatabaseMeasure;
   };
   /**
-   * Transform 10 is now a real local-only materialization. Its controlling
-   * capacity evidence is the freshly built, fully populated baseline before
-   * VACUUM—not a synthetic baseline-plus estimate or the old B scratch table.
+   * The reviewed packet is materialized only in a disposable copy of the
+   * normal release baseline. This is a capacity rehearsal, not a release
+   * corpus identity or a runtime/publication activation.
    */
-  actualTransform10: {
+  standaloneAquinasRehearsal: {
     shape: 'generic edition-scoped hierarchy with external-content FTS';
+    materialization: HistoricalHierarchyMaterializationCounts;
+    storedIntegrityVerified: true;
     preVacuumFullCopy: DatabaseMeasure;
+    postVacuumDiagnostic: DatabaseMeasure;
     capacityGate: CapacityGate;
   };
   capacityLimitBytes: number;
@@ -567,6 +579,18 @@ export function buildCandidateB(input: AquinasCapacityInput): CandidateBLayout {
   return { authorityBodies: [...input.authorityBodies], navigationNodes: nodes };
 }
 
+/**
+ * Load an exact packet and inject its verified facts into the generic hierarchy
+ * materializer. The dependency direction intentionally remains capacity →
+ * hierarchy; the hierarchy module imports these types only.
+ */
+export function loadApprovedAquinasHierarchy(
+  reader: AquinasPackageReader,
+): HistoricalEditionHierarchyMaterialization {
+  const input = loadAquinasCapacityInput(undefined, reader);
+  return buildApprovedAquinasHierarchy(reader, input, buildCandidateB(input));
+}
+
 function navigationIdentity(node: AquinasNavigationNode): Omit<AquinasNavigationNode, 'flatOrdinal'> {
   const { flatOrdinal: _flatOrdinal, ...identity } = node;
   return identity;
@@ -701,6 +725,7 @@ function attestBaseline(root: string, path: string): { sha256: string; corpusIde
   const preVacuum = closeAfter(new Database(path, { readonly: true, fileMustExist: true }), database => {
     const stored = database.prepare("SELECT value FROM theologai_metadata WHERE key = 'corpus_manifest_sha256'").get() as { value?: unknown } | undefined;
     if (stored?.value !== corpusIdentity) fail('fresh baseline corpus identity does not match the current checkout');
+    assertNormalAquinasHierarchyExclusion(database);
     return databaseMeasure(database, path);
   });
   return { sha256: sha256(readFileSync(path)), corpusIdentity, preVacuum };
@@ -713,6 +738,39 @@ function capacityGate(preVacuumFullCopy: DatabaseMeasure): CapacityGate {
     limitBytes: CAPACITY_LIMIT_BYTES,
     withinLimit: preVacuumFullCopy.fileBytes <= CAPACITY_LIMIT_BYTES,
   };
+}
+
+/**
+ * Materialize the immutable Aquinas packet only after copying the verified
+ * zero-row normal baseline. The resulting database is confined to OS temp and
+ * disposed by the caller; it must never be treated as a normal release seed.
+ */
+function runStandaloneAquinasRehearsal(
+  root: string,
+  path: string,
+): AquinasCapacityComparisonReport['standaloneAquinasRehearsal'] {
+  return closeAfter(new Database(path), database => {
+    database.pragma('foreign_keys = ON');
+    const packet = loadApprovedAquinasHierarchy({
+      read: relativePath => readFileSync(join(root, relativePath)),
+    });
+    const materialization = materializeHistoricalHierarchy(database, packet);
+    const stored = assertHistoricalHierarchyStoredIntegrity(database, packet);
+    if (JSON.stringify(stored) !== JSON.stringify(materialization)) {
+      fail('standalone Aquinas rehearsal stored-integrity inventory drifted');
+    }
+    database.exec('ANALYZE');
+    const preVacuumFullCopy = databaseMeasure(database, path);
+    const postVacuumDiagnostic = vacuumDiagnostic(database, path);
+    return {
+      shape: 'generic edition-scoped hierarchy with external-content FTS',
+      materialization,
+      storedIntegrityVerified: true,
+      preVacuumFullCopy,
+      postVacuumDiagnostic,
+      capacityGate: capacityGate(preVacuumFullCopy),
+    };
+  });
 }
 
 function questionProjectionHash(rows: Iterable<{ bodyId: string; content: string }>): string { return hashRecords(rows); }
@@ -932,14 +990,14 @@ function runIsolatedCandidateB(path: string, layout: CandidateBLayout, canonical
 }
 
 const CURRENT_CONTRACT_INCOMPATIBILITIES = [
-  'Transform 10 materializes a local-only authority hierarchy, but does not register a document, catalogue entry, runtime composition, resource, or MCP tool.',
-  'This local audit does not authorize a D1 binding, remote D1 operation, deployment, publication, or runtime activation.',
+  'A normal release corpus excludes the dormant Aquinas hierarchy and its shared source lineage; this report materializes it only in a disposable standalone rehearsal.',
+  'This local rehearsal does not authorize a D1 binding, remote D1 operation, deployment, publication, runtime activation, or a release corpus identity containing Aquinas rows.',
 ] as const;
 
 /**
- * Build the real Transform-10 schema beneath OS temp and measure it before
- * VACUUM. Earlier A/B scratch layouts remain exported derivation helpers, but
- * must not replace the actual materialized capacity gate.
+ * Build a zero-row normal release baseline, then rehearse the standalone
+ * dormant materialization only in a copy. Earlier A/B scratch layouts remain
+ * derivation helpers and cannot substitute for the actual schema rehearsal.
  */
 export function runAquinasSourcePackCapacityComparison(root = ROOT, options: AquinasCapacityRunOptions = {}): AquinasCapacityComparisonReport {
   const input = loadAquinasCapacityInput(root);
@@ -957,13 +1015,12 @@ export function runAquinasSourcePackCapacityComparison(root = ROOT, options: Aqu
     const baselinePostVacuum = closeAfter(new Database(baselineVacuumPath), database => vacuumDiagnostic(database, baselineVacuumPath));
     rmSync(baselineVacuumPath, { force: true });
 
-    const actualTransform10 = {
-      shape: 'generic edition-scoped hierarchy with external-content FTS' as const,
-      preVacuumFullCopy: baselineAttestation.preVacuum,
-      capacityGate: capacityGate(baselineAttestation.preVacuum),
-    };
+    const rehearsalPath = join(temporaryDirectory, 'standalone-aquinas-rehearsal.sqlite');
+    copyFileSync(baselinePath, rehearsalPath);
+    const standaloneAquinasRehearsal = runStandaloneAquinasRehearsal(root, rehearsalPath);
+    rmSync(rehearsalPath, { force: true });
     return {
-      schemaVersion: 'aquinas-source-pack-capacity-comparison.v3', status: 'local_only_inactive_materialized', temporaryStorage: 'os-temp-disposed',
+      schemaVersion: 'aquinas-source-pack-capacity-comparison.v4', status: 'normal_release_baseline_with_standalone_aquinas_rehearsal', temporaryStorage: 'os-temp-disposed',
       source: {
         identity: input.identity, hashes: input.sourceHashes,
         counts: {
@@ -974,9 +1031,9 @@ export function runAquinasSourcePackCapacityComparison(root = ROOT, options: Aqu
           authorityBodies: input.authorityBodies.length, navigationNodes: candidateB.navigationNodes.length,
         },
       },
-      baseline: { builtFreshFromCurrentCheckout: suppliedBaseline === undefined, sha256: baselineAttestation.sha256, corpusIdentity: baselineAttestation.corpusIdentity, preVacuum: baselineAttestation.preVacuum, postVacuumDiagnostic: baselinePostVacuum },
-      actualTransform10, capacityLimitBytes: CAPACITY_LIMIT_BYTES,
-      capacityStatus: actualTransform10.capacityGate.withinLimit ? 'within_350_mib' : 'exceeds_350_mib',
+      baseline: { kind: 'normal_release_zero_hierarchy_baseline', builtFreshFromCurrentCheckout: suppliedBaseline === undefined, sha256: baselineAttestation.sha256, corpusIdentity: baselineAttestation.corpusIdentity, preVacuum: baselineAttestation.preVacuum, postVacuumDiagnostic: baselinePostVacuum },
+      standaloneAquinasRehearsal, capacityLimitBytes: CAPACITY_LIMIT_BYTES,
+      capacityStatus: standaloneAquinasRehearsal.capacityGate.withinLimit ? 'within_350_mib' : 'exceeds_350_mib',
       currentContractIncompatibilities: [...CURRENT_CONTRACT_INCOMPATIBILITIES],
     };
   } finally {

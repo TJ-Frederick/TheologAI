@@ -40,7 +40,7 @@ describe('D1 corpus identity', () => {
   it('pins the catalog-scope D1 identity and includes the generated UBS artifact', () => {
     const current = parseDataManifest(readFileSync('data/data-manifest.json'));
     expect(computeD1CorpusIdentity(current))
-      .toBe('224138e3dfa434eb2165186cf3322c58a46bd4168482e6b73576b0c6c8d683be');
+      .toBe('e9362cf0ba6cc0efbc7ea663f418dcf2775d4abe1989f1e2774e16b14d5010db');
     const changedUbs = structuredClone(current);
     const ubs = changedUbs.files.find(file => file.path === 'src/data/ubs-parallel-passages.generated.json');
     expect(ubs).toBeDefined();
@@ -48,6 +48,28 @@ describe('D1 corpus identity', () => {
     expect(computeD1CorpusIdentity(changedUbs)).not.toBe(computeD1CorpusIdentity(current));
     expect(current.materializations.d1.inputs).toContain('src/data/ubs-parallel-passages.generated.json');
     expect(current.materializations.d1.inputs).not.toContain('data/parallel-passages/ubs-paratext/ParallelPassages.xml');
+  });
+
+  it('excludes every tracked Aquinas source hash from the current D1 identity', () => {
+    const current = parseDataManifest(readFileSync('data/data-manifest.json'));
+    const identity = computeD1CorpusIdentity(current);
+    const aquinasPrefix = 'data/historical-sources/project-gutenberg/aquinas-english-dominican/';
+    const aquinasFiles = current.files.filter(file => file.path.startsWith(aquinasPrefix));
+    expect(aquinasFiles.length).toBeGreaterThan(0);
+    expect(current.materializations.d1.inputs.some(path => path.startsWith(aquinasPrefix))).toBe(false);
+
+    const changedAquinas = structuredClone(current);
+    const aquinasManifest = changedAquinas.files.find(file => file.path === `${aquinasPrefix}packages/aquinas-summa-pg-v1/manifest.json`);
+    expect(aquinasManifest).toBeDefined();
+    aquinasManifest!.sha256 = '0'.repeat(64);
+    expect(computeD1CorpusIdentity(changedAquinas)).toBe(identity);
+
+    const changedD1Input = structuredClone(current);
+    const coreEightManifest = changedD1Input.files.find(file => file.path === 'data/historical-source-packs/core-eight/manifest.json');
+    expect(coreEightManifest).toBeDefined();
+    expect(current.materializations.d1.inputs).toContain(coreEightManifest!.path);
+    coreEightManifest!.sha256 = '0'.repeat(64);
+    expect(computeD1CorpusIdentity(changedD1Input)).not.toBe(identity);
   });
 
   it('is stable across non-D1 inventory/provenance and serialization changes', () => {

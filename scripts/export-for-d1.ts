@@ -35,7 +35,7 @@ import {
 } from './d1-corpus-identity.js';
 import { D1_SEED_BASE_TABLES, D1_SEED_EXPORT_ORDER } from './d1-seed-order.js';
 
-interface SeedStatement {
+export interface SeedStatement {
   sql: string;
   rows: number;
 }
@@ -168,7 +168,8 @@ function tableInfo(database: string, table: string): Array<{ name: string; pk: n
   return rows;
 }
 
-function exportTable(database: string, table: string): SeedStatement[] {
+/** Export one deterministic table seed; used by the narrow long-body regression. */
+export function exportTable(database: string, table: string): SeedStatement[] {
   const info = tableInfo(database, table);
   const columns = info.map(column => column.name);
   const primaryKey = info.filter(column => column.pk > 0).sort((a, b) => a.pk - b.pk);
@@ -305,6 +306,7 @@ function writeChunks(table: string, ordinal: number, statements: SeedStatement[]
   return files;
 }
 
+function main(): void {
 const { database, clean } = parseArguments(process.argv.slice(2));
 const sourceManifestBytes = readFileSync(SOURCE_MANIFEST_PATH);
 const sourceManifest = parseDataManifest(sourceManifestBytes);
@@ -408,3 +410,8 @@ console.error(
   `[d1-seed] Wrote ${files.length} files (${seedManifest.totals.rowCount.toLocaleString()} rows) to ` +
   `${relative(ROOT, OUTPUT)}/`,
 );
+}
+
+if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main();
+}

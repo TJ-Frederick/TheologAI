@@ -22,8 +22,7 @@ import {
   loadHistoricalSourcePacks,
 } from './historical-source-packs.js';
 import {
-  assertHistoricalHierarchyStoredIntegrity,
-  loadApprovedAquinasHierarchy,
+  assertNormalAquinasHierarchyExclusion,
 } from './historical-hierarchy.js';
 import { HistoricalDocumentRepository } from '../src/adapters/data/HistoricalDocumentRepository.js';
 import { buildD1ReadinessSql } from './check-remote-d1-readiness.js';
@@ -384,9 +383,7 @@ try {
   verifyBiblicalLanguageUnicodeD1(ROOT, db, manifest.expectedCounts);
   assertHistoricalTransform8Materialization(db);
   assertHistoricalTransform9SourcePackMaterialization(db);
-  assertHistoricalHierarchyStoredIntegrity(db, loadApprovedAquinasHierarchy({
-    read: path => readFileSync(join(ROOT, path)),
-  }), { ftsIntegrity: false });
+  assertNormalAquinasHierarchyExclusion(db);
   auditHistoricalTransform8Authority(ROOT, sql => {
     const rows = db.prepare(sql).all();
     return { rows, responseBytes: Buffer.byteLength(JSON.stringify(rows), 'utf8') };

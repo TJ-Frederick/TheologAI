@@ -7,9 +7,10 @@ import { buildD1ReadinessDiagnosticSql } from '../../../scripts/check-remote-d1-
 import {
   AQUINAS_HIERARCHY_EXPECTED,
   AQUINAS_HIERARCHY_ID,
-  loadApprovedAquinasHierarchy,
+  assertNormalAquinasHierarchyExclusion,
   materializeHistoricalHierarchy,
 } from '../../../scripts/historical-hierarchy.js';
+import { loadApprovedAquinasHierarchy } from '../../../scripts/aquinas-source-pack-capacity-comparison.js';
 
 const ROOT = process.cwd();
 
@@ -187,14 +188,23 @@ describe('Transform 10 generic edition hierarchy', () => {
     } finally { db.close(); }
   });
 
-  it('keeps the exact core-eight authority gate pack-scoped and requires the reviewed inactive Aquinas authority', () => {
+  it('keeps the exact core-eight authority gate pack-scoped and excludes dormant Aquinas materialization from normal readiness', () => {
     const db = database();
     try {
       materializeCoreEightAuthorityFixture(db);
       expect(readinessFailures(db, 'historical.transform9.source_pack_authority')).toEqual([]);
-      expect(readinessFailures(db, 'historical.transform10.exact_profile_and_artifacts')).toEqual([
-        'historical.transform10.exact_profile_and_artifacts',
-      ]);
+      const normalTransform10Checks = [
+        'historical.transform10.normal.hierarchies_empty',
+        'historical.transform10.normal.bodies_empty',
+        'historical.transform10.normal.nodes_empty',
+        'historical.transform10.normal.fts_empty',
+        'historical.transform10.normal.pack_absent',
+        'historical.transform10.normal.work_absent',
+        'historical.transform10.normal.edition_absent',
+        'historical.transform10.normal.artifacts_absent',
+      ] as const;
+      for (const check of normalTransform10Checks) expect(readinessFailures(db, check)).toEqual([]);
+      expect(() => assertNormalAquinasHierarchyExclusion(db)).not.toThrow();
 
       db.exec('SAVEPOINT core_eight_extra');
       try {
@@ -218,8 +228,9 @@ describe('Transform 10 generic edition hierarchy', () => {
       } finally { db.exec('ROLLBACK TO core_eight_wrong; RELEASE core_eight_wrong'); }
 
       materializeHistoricalHierarchy(db, packet());
-      expect(readinessFailures(db, 'historical.transform10.exact_profile_and_artifacts')).toEqual([]);
-      expect(readinessFailures(db, 'historical.transform10.authority_topology_and_fts')).toEqual([]);
+      for (const check of normalTransform10Checks) expect(readinessFailures(db, check)).toEqual([check]);
+      expect(() => assertNormalAquinasHierarchyExclusion(db))
+        .toThrow('Normal release database materialized excluded Transform 10 authority');
     } finally { db.close(); }
   });
 });

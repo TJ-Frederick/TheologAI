@@ -9,9 +9,10 @@ historical works, Strong's dictionaries, and Greek/Hebrew morphology. Preview
 serves the 25-work Transform 9 catalog; production remains on the 17-work
 Transform 8 catalog until its separately authorized cutover.
 
-The integrated Transform 10 candidate is local-only and unpublished. It
-materializes an inactive Aquinas authority hierarchy, but adds no document or
-catalog projection and is not wired into runtime or MCP surfaces.
+The integrated Transform 10 candidate is local-only and unpublished. Its
+Aquinas packet, schema, and standalone materializer are retained for future
+work, while normal release builds prove its hierarchy and shared lineage are
+absent; it adds no document or catalog projection and is not wired into runtime or MCP surfaces.
 
 <!-- theologai-public-contract tools=11 structured=bible_cross_references,bible_lookup,bible_verse_morphology,classic_text_lookup,commentary_lookup,donation_config,original_language_lookup,original_language_study,parallel_passages,primary_source_search,verify_donation -->
 
@@ -112,10 +113,10 @@ binding.
 PR95's Transform9 source-pack work is deployed to preview only. The reviewed
 core-eight makes the checked-out local catalog and preview inventories 25
 works; production remains on the 17-work Transform 8 catalog. The integrated
-Transform 10 Aquinas hierarchy is a separate local-only, unpublished candidate
-with no document/catalog projection or runtime activation. It makes no
-production Cloudflare migration, binding, deployment, or runtime-activation
-claim.
+Transform 10 Aquinas work is a separate local-only, unpublished candidate:
+normal release builds exclude its hierarchy and shared lineage, and it has no
+document/catalog projection or runtime activation. It makes no production
+Cloudflare migration, binding, deployment, or runtime-activation claim.
 For a preview-client rollback without changing server state, use the direct preview
 `workers.dev` address above; the production `workers.dev` address intentionally
 redirects rather than serving a separate legacy Worker.
@@ -332,9 +333,10 @@ cutover. The exact local count is enforced by `data/data-manifest.json`.
 Approved UBS Hebrew artifacts plus the separately acquired Norton and Aquinas
 public-domain packets are checked into the repository for deterministic
 verification and release work. Those acquisition packets remain outside the
-production 17-work catalog. Transform 10 locally and unpublished materializes
-the Aquinas hierarchy only; it adds neither a document/catalog projection nor a
-runtime or MCP surface. The reviewed PR95 core-eight remains the preview-bound
+production 17-work catalog. Transform 10 retains an Aquinas packet, schema, and
+standalone materializer only; normal builds exclude its hierarchy and lineage,
+and it adds neither a document/catalog projection nor a runtime or MCP surface.
+The reviewed PR95 core-eight remains the preview-bound
 and checked-out local 25-work catalog materialization described above. M4A's
 local/preview materialization and inactive-adapter statements are historical;
 PR #96 now records the production D1 binding and bounded public

@@ -9,10 +9,11 @@ composition-date scope, and explicitly attributed creators machine-readable.
 
 ## Current local Transform 10 candidate and preview-bound Transform 9 extension
 
-The checked-out Transform 10 candidate locally materializes an inactive Aquinas
-edition-scoped authority hierarchy. It is unpublished and has no document or
-catalog projection, runtime composition dependency, or MCP surface. It leaves
-the active historical catalog boundary unchanged: preview remains the
+The checked-out Transform 10 candidate retains an inactive Aquinas
+edition-scoped authority hierarchy packet and standalone materializer. Normal
+release builds deliberately exclude its hierarchy rows and shared lineage. It
+is unpublished and has no document or catalog projection, runtime composition
+dependency, or MCP surface. It leaves the active historical catalog boundary unchanged: preview remains the
 Transform-9 25-work collection and production remains the Transform-8 17-work
 collection.
 
