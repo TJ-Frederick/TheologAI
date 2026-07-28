@@ -74,7 +74,7 @@ describe('formatPrimarySourceSearch', () => {
     expect(output.toLowerCase()).not.toContain('ccel');
     expect(output).not.toContain('rate_limited');
     expect(output).not.toContain('Secret foreign');
-    expect(output).toContain('Local hosted collection: **interface_changed**; 1 returned.');
+    expect(output).toContain('Curated catalog results: **interface_changed**; 1 returned.');
     expect(presented).toMatchObject({
       planStatus: 'partial',
       queries: [{ providers: [{ provider: 'local', status: 'interface_changed', hitCount: 1 }] }],

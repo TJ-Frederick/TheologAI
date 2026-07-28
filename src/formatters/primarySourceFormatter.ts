@@ -85,7 +85,7 @@ export function formatPrimarySourceSearchFallback(
   for (const query of result.queries) {
     lines.push('', `## ${safe(query.id)}`);
     for (const provider of query.providers) {
-      const label = provider.provider === 'local' ? 'Local hosted collection' : 'CCEL discovery lead';
+      const label = provider.provider === 'local' ? 'Curated catalog results' : 'Expanded discovery results';
       lines.push(`- ${label}: **${provider.status}**; ${provider.hitCount} returned.`);
       for (const hit of provider.hits) {
         const location = hit.provider === 'local' ? hit.locator.uri : hit.locator.url;

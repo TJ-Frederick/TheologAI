@@ -433,12 +433,12 @@ describe('historical core preview audit contract', () => {
     expect(landingLocator.required).toEqual(['kind', 'uri', 'resourceSizeBytes']);
   });
 
-  it('requires CCEL-disabled to remain an errored structured diagnostic response', async () => {
+  it('requires disabled expanded discovery to preserve the catalog result and structured diagnostic', async () => {
     const parsed = validateFixture(await fixture());
-    await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { ccelIsError: false })))
-      .rejects.toThrow('CCEL disabled regression must be an errored structured response');
+    await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { ccelIsError: true })))
+      .rejects.toThrow('expanded discovery disabled regression must preserve a successful catalog result and structured diagnostic');
     await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { ccelStructuredContent: false })))
-      .rejects.toThrow('CCEL disabled regression must be an errored structured response');
+      .rejects.toThrow('expanded discovery disabled regression must preserve a successful catalog result and structured diagnostic');
   });
 
   it('requires the exact safe resource-not-found diagnostic envelope without retaining it in evidence', async () => {
@@ -649,8 +649,8 @@ function promptResponse(body: RecordValue, profile: AuditProfile): RecordValue {
   const name = (body.params as RecordValue).name;
   const text = profile.primarySource.contractVersion === '7'
     ? name === 'primary-source-research'
-      ? 'Search local evidence. Search one external scope now. Use the v7 contract. {"providers":["local"]} {"providers":["ccel"]}. This prompt authorizes at most one CCEL-bearing call. The external CCEL call deliberately omits the requested local composition-year bounds; any returned CCEL hit cannot establish membership in that requested local range. Use MCP `resources/read` only for local `mcp_resource` URIs. Open external `external_url` pages directly and name disabled, unavailable, or unsupported searches.'
-      : 'Use {"providers":["local","ccel"]}. An external `external_url` locator exists; it is not an MCP resource and rights status is not determined. Name any disabled, unavailable, or unsupported provider.'
+      ? 'Inspect catalog scope. Run one provider-neutral search plan. {"searchDepth":"expanded"} {"searchDepth":"standard"}. At most one query may be expanded per call. Expanded discovery deliberately omits the requested catalog composition-year bounds; any returned broader hit cannot establish membership in that requested range. Use MCP `resources/read` for `mcp_resource` URIs. Open external `external_url` pages directly and name disabled, unavailable, or unsupported searches.'
+      : 'The provider-neutral expanded depth is bounded. For an `external_url` locator, it is not an MCP resource and rights status is not determined. Name any disabled, unavailable, or unsupported provider.'
     : name === 'primary-source-research'
       ? 'Run bounded discovery. This workflow is local-only. Use the v6 structured result. Read an exact MCP resource before quotation. This workflow supports a topic survey.'
       : 'Run bounded local discovery across the hosted collection. Follow canonical `resource_link` blocks with resources/read.';
@@ -763,7 +763,27 @@ function primaryTool(
   profile: AuditProfile,
 ): Response {
   const query = ((args.queries as RecordValue[])[0])!;
-  if ((query.providers as string[])[0] === 'ccel') {
+  if (profile.primarySource.contractVersion === '7' && query.searchDepth === 'expanded') {
+    const local = {
+      provider: 'local', status: 'no_results', searched: true, page: 1, hitCount: 0,
+      resultWindow: { returnedHitCount: 0, additionalMatchStatus: 'no_additional_match_observed' }, hits: [], notices: [],
+    };
+    const external = {
+      provider: 'ccel_live', status: 'disabled', searched: false, page: 1, hitCount: 0,
+      resultWindow: { returnedHitCount: 0, additionalMatchStatus: 'not_evaluated' }, hits: [], notices: [],
+    };
+    return toolResult(body, {
+      isError: options.ccelIsError ?? false,
+      ...(options.ccelStructuredContent === false ? {} : { structuredContent: {
+        schemaVersion: '7', kind: 'primary_source_search', planStatus: 'partial',
+        queries: [{ id: query.id, normalizedMode: 'all_terms', normalizedSelection: 'relevance', providers: [local, external] }],
+        responseWindow: { unit: 'utf8_bytes', maximum: 32768, truncated: false },
+        coverage: { localAttempted: true, localStatus: 'no_results', localHitCount: 0, ccelAttempted: false, ccelStatus: 'disabled', ccelHitCount: 0, notices: [], serverObserved: { searched: [{ queryId: query.id, provider: 'local', status: 'no_results', returnedHitCount: 0 }], notSearched: [{ queryId: query.id, provider: 'ccel_live', status: 'disabled' }] } },
+        evidencePolicy: { snippetUse: 'discovery_only', localSectionAccess: 'mcp_resource_read', externalSectionAccess: 'direct_url_only', coverageScope: 'bounded_non_exhaustive', externalRightsStatus: 'not_determined', lookupAliasUse: 'exact_routing_only_not_metadata_evidence', coverageLedger: { searched: 'server_observed_provider_execution', read: 'host_observed_successful_exact_resource_or_page_read', deferred: 'host_recorded_intentional_deferral', notSearched: 'server_observed_provider_non_execution' } },
+      } }),
+    });
+  }
+  if ((query.providers as string[] | undefined)?.[0] === 'ccel') {
     if (profile.primarySource.externalDiscoveryBoundary === 'rejected_at_input_schema') {
       return toolResult(body, {
         isError: true,

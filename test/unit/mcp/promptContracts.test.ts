@@ -198,7 +198,7 @@ describe('prompt-recommended tool-call contracts', () => {
     ['lower bound only', { startYear: '500' }, { startYear: 500 }],
     ['upper bound only', { endYear: '1500' }, { endYear: 1500 }],
     ['both bounds', { startYear: '500', endYear: '1500' }, { startYear: 500, endYear: 1500 }],
-  ])('keeps %s on local calls while making one unbounded, sequential v7 external discovery call', (_label, dateArgs, expectedLocalDates) => {
+  ])('keeps %s on catalog queries while requesting at most one provider-neutral expansion', (_label, dateArgs, expectedLocalDates) => {
     const v7 = {
       exposeCcelDiscovery: true, ccelLiveSearch: false, ccelCoordinator: false,
       contractVersion: '7' as const, liveCcelEnabled: false,
@@ -207,21 +207,22 @@ describe('prompt-recommended tool-call contracts', () => {
       topic: 'eucharist', authors: 'Erasmus of Rotterdam, Martin Luther',
       ...dateArgs,
     }, v7);
-    const localQueries = calls[0]!.arguments.queries as Array<Record<string, unknown>>;
-    expect(localQueries.every(query => (query.providers as string[])[0] === 'local')).toBe(true);
-    expect(localQueries).toHaveLength(2);
-    for (const localQuery of localQueries) expect(localQuery).toMatchObject(expectedLocalDates);
-    expect(calls.slice(1)).toHaveLength(1);
-    const externalQueries = calls[1]!.arguments.queries as Array<Record<string, unknown>>;
-    expect(externalQueries).toHaveLength(1);
-    expect(externalQueries[0]).toMatchObject({ providers: ['ccel'], author: 'Erasmus of Rotterdam' });
-    expect(externalQueries[0]).not.toHaveProperty('startYear');
-    expect(externalQueries[0]).not.toHaveProperty('endYear');
+    expect(calls).toHaveLength(1);
+    const queries = calls[0]!.arguments.queries as Array<Record<string, unknown>>;
+    expect(queries).toHaveLength(2);
+    expect(queries[0]).toMatchObject({
+      searchDepth: 'expanded', expandedLimit: 3, author: 'Erasmus of Rotterdam', ...expectedLocalDates,
+    });
+    expect(queries[1]).toMatchObject({
+      searchDepth: 'standard', author: 'Martin Luther', ...expectedLocalDates,
+    });
+    expect(queries.filter(query => query.searchDepth === 'expanded')).toHaveLength(1);
+    expect(JSON.stringify(calls)).not.toContain('"providers"');
     const validateV7 = validatorFor(createPrimarySourceSearchHandler(unused, v7).inputSchema);
     for (const call of calls) expect(validateV7(call.arguments).valid).toBe(true);
   });
 
-  it('retains the optional work restriction in both guided scopes without copying date bounds to CCEL', () => {
+  it('retains the optional work and catalog-date restrictions in one expanded guided query', () => {
     const v7 = {
       exposeCcelDiscovery: true, ccelLiveSearch: false, ccelCoordinator: false,
       contractVersion: '7' as const, liveCcelEnabled: false,
@@ -229,12 +230,13 @@ describe('prompt-recommended tool-call contracts', () => {
     const calls = recommendedToolCallsForPrompt('primary-source-research', {
       topic: 'sacraments', work: 'Institutes', startYear: '1536', endYear: '1559',
     }, v7);
-    expect(calls[0]!.arguments).toMatchObject({ queries: [{ work: 'Institutes', startYear: 1536, endYear: 1559 }] });
-    expect(calls[1]!.arguments).toEqual({ queries: [{
-      id: 'external-topic', text: 'sacraments', providers: ['ccel'], match: 'all_terms',
-      selection: 'relevance', work: 'Institutes', limit: 3,
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.arguments).toEqual({ queries: [{
+      id: 'exact-local-work', text: 'sacraments', searchDepth: 'expanded', match: 'all_terms',
+      selection: 'relevance', work: 'Institutes', startYear: 1536, endYear: 1559,
+      expandedLimit: 3, limit: 3,
     }] });
     expect(recommendedToolCallsForPrompt('confession-study', { topic: 'justification' }, v7)[0]!.arguments)
-      .toMatchObject({ queries: [{ providers: ['local', 'ccel'] }] });
+      .toMatchObject({ queries: [{ searchDepth: 'expanded', expandedLimit: 3 }] });
   });
 });
