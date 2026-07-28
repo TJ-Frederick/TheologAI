@@ -301,7 +301,7 @@ describe('remote D1 readiness query', () => {
         database: 'preview', env: 'preview', wrangler: '/tmp/wrangler',
         configPath: '/tmp/generated-candidate/wrangler.candidate.toml',
       }, remote.execute);
-      expect(remote.calls).toHaveLength(107); // production readiness plus Transform-8 and Transform-9 bounded reads
+      expect(remote.calls).toHaveLength(183); // readiness plus Transform 8 and complete three-pack authority pages
       expect(remote.calls[0]).toContain('--json');
       expect(remote.calls[0]).toContain('--env');
       expect(remote.calls.every(call => call.includes('/tmp/generated-candidate/wrangler.candidate.toml'))).toBe(true);

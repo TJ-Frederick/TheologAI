@@ -32,6 +32,7 @@ import {
 import {
   normalAquinasHierarchyExclusionChecks,
 } from './historical-hierarchy.js';
+import { REVIEWED_SOURCE_PACK_RELEASE } from './historical-source-packs.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const manifestBytes = readFileSync(join(ROOT, 'data', 'data-manifest.json'));
@@ -340,7 +341,7 @@ function buildD1ReadinessQueryContract(
     },
     {
       id: 'historical.transform9.core_eight_sectioned_profiles',
-      predicate: `(SELECT COUNT(*) FROM historical_document_delivery_profiles p JOIN historical_editions e ON e.edition_id = p.edition_id JOIN historical_works w ON w.work_id = p.work_id WHERE p.delivery_mode = 'sectioned_only' AND p.document_id = p.work_id AND p.work_id = e.work_id AND e.work_id = w.work_id AND e.pack_id = 'theologai-core-eight' AND p.immutable_corpus_identity = p.section_package_identity AND length(p.immutable_corpus_identity) = 64 AND p.section_count > 0 AND p.landing_max_bytes = 16384 AND p.browse_page_size = 32 AND p.cursor_version = 1 AND json_valid(p.provenance_json) = 1 AND json_type(p.provenance_json) = 'object' AND json_valid(p.rights_json) = 1 AND json_type(p.rights_json) = 'object') = 8 AND (SELECT COUNT(*) FROM historical_document_delivery_profiles WHERE delivery_mode = 'sectioned_only') = 8`,
+      predicate: `(SELECT COUNT(*) FROM historical_document_delivery_profiles p JOIN historical_editions e ON e.edition_id = p.edition_id JOIN historical_works w ON w.work_id = p.work_id WHERE p.delivery_mode = 'sectioned_only' AND p.document_id = p.work_id AND p.work_id = e.work_id AND e.work_id = w.work_id AND e.pack_id IN (${REVIEWED_SOURCE_PACK_RELEASE.packIds.map(sqlLiteral).join(', ')}) AND p.immutable_corpus_identity = p.section_package_identity AND length(p.immutable_corpus_identity) = 64 AND p.section_count > 0 AND p.landing_max_bytes = 16384 AND p.browse_page_size = 32 AND p.cursor_version = 1 AND json_valid(p.provenance_json) = 1 AND json_type(p.provenance_json) = 'object' AND json_valid(p.rights_json) = 1 AND json_type(p.rights_json) = 'object') = ${REVIEWED_SOURCE_PACK_RELEASE.counts.deliveryProfiles} AND (SELECT COUNT(*) FROM historical_document_delivery_profiles WHERE delivery_mode = 'sectioned_only') = ${REVIEWED_SOURCE_PACK_RELEASE.counts.deliveryProfiles}`,
     },
     {
       id: 'historical.transform9.identity_coverage',
@@ -378,9 +379,9 @@ function buildD1ReadinessQueryContract(
     },
     {
       id: 'historical.transform9.source_pack_authority',
-      predicate: `(SELECT COUNT(*) FROM historical_editions WHERE pack_id = 'theologai-core-eight') = 8
+      predicate: `(SELECT COUNT(*) FROM historical_editions WHERE pack_id IN (${REVIEWED_SOURCE_PACK_RELEASE.packIds.map(sqlLiteral).join(', ')})) = ${REVIEWED_SOURCE_PACK_RELEASE.counts.editions}
         AND (SELECT COUNT(*) FROM historical_editions e
-          WHERE e.pack_id = 'theologai-core-eight' AND (
+          WHERE e.pack_id IN (${REVIEWED_SOURCE_PACK_RELEASE.packIds.map(sqlLiteral).join(', ')}) AND (
             json_extract(e.normalized_text_rights_json, '$.status') IS NOT 'no_known_conflict'
             OR json_extract(e.normalized_text_rights_json, '$.scope') IS NOT 'normalized_public_domain_text_only'
             OR NOT EXISTS (SELECT 1 FROM historical_source_artifacts a WHERE a.edition_id = e.edition_id AND a.role = 'authority')

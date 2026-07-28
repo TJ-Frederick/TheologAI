@@ -48,7 +48,7 @@ import {
   parseHistoricalDocumentCatalogProvenance,
 } from './historical-document-catalog.js';
 import {
-  assertCoreEightSourcePackRelease,
+  assertReviewedSourcePackRelease,
   loadHistoricalSourcePacks,
   materializeHistoricalSourcePacks,
 } from './historical-source-packs.js';
@@ -654,20 +654,20 @@ log(`  Inserted ${historicalTransform8Rows.deliveryProfiles.length} delivery pro
 });
 materializeHistoricalTransform8();
 
-// ── Transform 9: reviewed edition-aligned normalized source packs ──
+// ── Transform 11: reviewed edition-aligned normalized source packs ──
 
 // The manifest is the sole release allowlist.  Materialization adds the
 // sectioned-only profiles and canonical identities; it deliberately adds no
 // legacy aliases for the new reviewed packages.
-log('Materializing reviewed historical core-eight source packs...');
+log('Materializing the exact reviewed historical source-pack release...');
 const historicalSourcePacks = loadHistoricalSourcePacks(manifest.materializations.d1.inputs, sourceRegistry);
-assertCoreEightSourcePackRelease(historicalSourcePacks);
+assertReviewedSourcePackRelease(historicalSourcePacks);
 const historicalSourcePackCounts = materializeHistoricalSourcePacks(db, historicalSourcePacks);
 if (JSON.stringify(historicalSourcePackCounts) !== JSON.stringify({
-  packs: 1, works: 8, editions: 8, artifacts: 25, sections: 512,
-  deliveryProfiles: 8, identities: 512, legacyAliases: 0,
+  packs: 3, works: 18, editions: 18, artifacts: 43, sections: 1057,
+  deliveryProfiles: 18, identities: 1057, legacyAliases: 0,
 })) {
-  throw new Error('Transform 9 source-pack materialization did not retain the reviewed core-eight inventory');
+  throw new Error('Transform 11 source-pack materialization did not retain the exact reviewed inventory');
 }
 log(`  Inserted ${historicalSourcePackCounts.works} reviewed works with ${historicalSourcePackCounts.sections} canonical sections`);
 

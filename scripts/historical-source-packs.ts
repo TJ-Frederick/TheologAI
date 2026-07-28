@@ -21,16 +21,47 @@ export const CORE_EIGHT_SOURCE_PACK_COUNTS = Object.freeze({
   legacyAliases: 0,
 });
 
-const CORE_EIGHT_WORK_IDS = Object.freeze([
-  'anselm-proslogion',
-  'athanasius-on-incarnation',
-  'augustine-confessions',
+const CORE_EIGHT_EDITION_IDS = Object.freeze([
+  'anselm-proslogion-deane-1903',
+  'athanasius-on-incarnation-robertson-npnf2-v4',
+  'augustine-confessions-pusey-1838',
   'bunyan-pilgrims-progress-part-1',
-  'calvin-institutes',
-  'irenaeus-against-heresies',
-  'john-damascene-exact-exposition',
-  'wesley-standard-sermons',
+  'calvin-institutes-beveridge-1845',
+  'irenaeus-against-heresies-anf1-1885',
+  'john-damascene-exposition-salmond-npnf2-v9',
+  'wesley-standard-sermons-1771',
 ]);
+
+export const REVIEWED_SOURCE_PACK_RELEASE = Object.freeze({
+  packIds: [
+    'theologai-core-eight',
+    'theologai-historical-spine-early',
+    'theologai-historical-spine-later',
+  ].sort(),
+  editionIds: [
+    ...CORE_EIGHT_EDITION_IDS,
+    'augustine-on-christian-doctrine-shaw-npnf1-v2-1887',
+    'basil-on-the-holy-spirit-jackson-npnf2-v8-1895',
+    'gregory-nazianzen-five-theological-orations-browne-swallow-npnf2-v7-1894',
+    'gregory-nyssa-great-catechism-moore-wilson-npnf2-v5-1893',
+    'justin-martyr-apologies-dods-reith-anf1-1885',
+    'origen-de-principiis-crombie-anf4-1885',
+    'hooker-laws-of-ecclesiastical-polity-book-1-keble-1888',
+    'julian-revelations-of-divine-love-warrack-1901-gutenberg',
+    'kempis-imitation-of-christ-benham-gutenberg',
+    'pascal-pensees-trotter-1910',
+  ].sort(),
+  counts: {
+    packs: 3,
+    works: 18,
+    editions: 18,
+    artifacts: 43,
+    sections: 1057,
+    deliveryProfiles: 18,
+    identities: 1057,
+    legacyAliases: 0,
+  },
+});
 
 export interface HistoricalSourcePackRecord {
   packId: string;
@@ -139,11 +170,33 @@ export function loadHistoricalSourcePacks(
   return records;
 }
 
-/**
- * Transform 9 has one explicitly approved source-pack release.  Keep this
- * check at the build boundary so adding a future pack needs a new reviewed
- * migration and cannot silently change the active corpus.
- */
+/** Keep the active Transform-11 source-pack release exact and fail closed. */
+export function assertReviewedSourcePackRelease(
+  records: readonly HistoricalSourcePackRecord[],
+): void {
+  const counts = {
+    packs: new Set(records.map(record => record.packId)).size,
+    works: new Set(records.map(record => record.compiled.package.work.workId)).size,
+    editions: new Set(records.map(record => record.compiled.package.edition.editionId)).size,
+    artifacts: records.reduce((total, record) => total + record.artifacts.length, 0),
+    sections: records.reduce((total, record) => total + record.compiled.package.sections.length, 0),
+  };
+  if (JSON.stringify([...new Set(records.map(record => record.packId))].sort())
+      !== JSON.stringify(REVIEWED_SOURCE_PACK_RELEASE.packIds)
+    || JSON.stringify(counts) !== JSON.stringify({
+      packs: REVIEWED_SOURCE_PACK_RELEASE.counts.packs,
+      works: REVIEWED_SOURCE_PACK_RELEASE.counts.works,
+      editions: REVIEWED_SOURCE_PACK_RELEASE.counts.editions,
+      artifacts: REVIEWED_SOURCE_PACK_RELEASE.counts.artifacts,
+      sections: REVIEWED_SOURCE_PACK_RELEASE.counts.sections,
+    })
+    || JSON.stringify(records.map(record => record.compiled.package.edition.editionId).sort())
+      !== JSON.stringify(REVIEWED_SOURCE_PACK_RELEASE.editionIds)) {
+    throw new Error('Transform 11 source-pack release must retain the reviewed 3/18/18/43/1057 inventory');
+  }
+}
+
+/** Compatibility gate retained for the standalone Transform-9 core-eight audit. */
 export function assertCoreEightSourcePackRelease(
   records: readonly HistoricalSourcePackRecord[],
 ): void {
@@ -162,9 +215,9 @@ export function assertCoreEightSourcePackRelease(
       artifacts: CORE_EIGHT_SOURCE_PACK_COUNTS.artifacts,
       sections: CORE_EIGHT_SOURCE_PACK_COUNTS.sections,
     })
-    || JSON.stringify(records.map(record => record.compiled.package.work.workId).sort())
-      !== JSON.stringify(CORE_EIGHT_WORK_IDS)) {
-    throw new Error('Transform 9 source-pack release must retain the reviewed core-eight 1/8/8/25/512 inventory');
+    || JSON.stringify(records.map(record => record.compiled.package.edition.editionId).sort())
+      !== JSON.stringify(CORE_EIGHT_EDITION_IDS)) {
+    throw new Error('Transform 9 core-eight audit must retain the reviewed 1/8/8/25/512 inventory');
   }
 }
 

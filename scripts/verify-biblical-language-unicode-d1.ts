@@ -87,10 +87,10 @@ export function verifyBiblicalLanguageUnicodeD1(
   ].reduce((sum, table) => sum + (expectedCounts[table] ?? 0), 0);
   const historicalPublicationRows = expectedCounts.historical_hierarchy_publications ?? 0;
   assert(ubsSemanticRows === 549_458, `UBS semantic canonical-source row-count drift: ${ubsSemanticRows}`);
-  assert(historicalSourceRows === 7_478, `Historical core-eight source-lineage row-count drift: ${historicalSourceRows}`);
+  assert(historicalSourceRows === 9_163, `Historical reviewed-source-pack lineage row-count drift: ${historicalSourceRows}`);
   assert(historicalTransform10Rows === 0, `Normal release Transform 10 hierarchy rows must be zero: ${historicalTransform10Rows}`);
   assert(historicalPublicationRows === 0, `Normal release Transform 10 publication rows must be zero: ${historicalPublicationRows}`);
-  assert(rows - derivedUsageRows === 860_628 + ubsSemanticRows + historicalSourceRows + historicalTransform10Rows + historicalPublicationRows,
+  assert(rows - derivedUsageRows === 861_728 + ubsSemanticRows + historicalSourceRows + historicalTransform10Rows + historicalPublicationRows,
     `Unicode D1 canonical-source row-count drift: ${rows - derivedUsageRows}`);
   return { sourceCells: ledger.contract.sourceCells, d1Cells, rows };
 }

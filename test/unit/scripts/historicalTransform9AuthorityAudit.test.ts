@@ -69,16 +69,16 @@ describe('Transform 9 ordered authority audit', () => {
     try {
       const sql: string[] = [];
       const result = audit(database, expected, sql);
-      expect(result.pages.sections).toBe(65); // 512 full bodies at 8 rows plus a terminating empty page.
-      expect(result.pages.projections).toBe(9); // 512 compact rows at 64 plus a terminating empty page.
+      expect(result.pages.sections).toBe(133); // 1,057 full bodies at 8 rows per bounded page.
+      expect(result.pages.projections).toBe(17); // 1,057 compact rows at 64 rows per bounded page.
       expect(sql.every(query => /^\s*SELECT\b/i.test(query) && !/\bOFFSET\b/i.test(query))).toBe(true);
       const authorityQueries = sql.filter(query => query.includes('FROM historical_edition_sections')
         && !query.includes('LEFT JOIN historical_editions'));
-      expect(authorityQueries).toHaveLength(65);
+      expect(authorityQueries).toHaveLength(133);
       expect(authorityQueries.every(query => query.includes(`LIMIT ${HISTORICAL_TRANSFORM9_SECTION_PAGE_SIZE}`))).toBe(true);
       expect(authorityQueries.every(query => !query.includes('historical_document_delivery_profiles'))).toBe(true);
       const projectionQueries = sql.filter(query => query.includes('profileSelectionValid'));
-      expect(projectionQueries).toHaveLength(9);
+      expect(projectionQueries).toHaveLength(17);
       expect(projectionQueries.every(query => query.includes(`LIMIT ${HISTORICAL_TRANSFORM9_AUTHORITY_PAGE_SIZE}`))).toBe(true);
       expect(projectionQueries.every(query => query.includes('LEFT JOIN sections_fts runtime_fts'))).toBe(true);
 

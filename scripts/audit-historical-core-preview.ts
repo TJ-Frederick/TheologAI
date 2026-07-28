@@ -156,6 +156,18 @@ const LEGACY_WORK_IDS = [
   'heidelberg-catechism', 'london-baptist-1689', 'nicene-creed', 'philaret-catechism', 'westminster-confession',
   'westminster-larger-catechism', 'westminster-shorter-catechism',
 ] as const;
+const TRANSFORM11_WORK_IDS = [
+  'augustine-on-christian-doctrine',
+  'basil-on-the-holy-spirit',
+  'gregory-nazianzen-five-theological-orations',
+  'gregory-nyssa-great-catechism',
+  'justin-martyr-apologies',
+  'origen-de-principiis',
+  'hooker-laws-of-ecclesiastical-polity-book-1',
+  'julian-revelations-of-divine-love',
+  'kempis-imitation-of-christ',
+  'pascal-pensees',
+] as const;
 const EXPECTED_CLASSIC_INPUT_SCHEMA_SHA256 = '45124e704b5e0009b5bc3672c52b0d7ed6e8193063b621a7ccf766d1d2ad00d4';
 const EXPECTED_CLASSIC_OUTPUT_SCHEMA_SHA256 = 'b8a6af9dff44cf8ad9d964661ca76cbe4ab9bcbdc97d9aca85df4edea73a9a7c';
 
@@ -165,7 +177,7 @@ const EXPECTED_FIXTURE = {
   baseline: {
     manifestSchemaVersion: '0006_historical_source_packs',
     d1TransformVersion: 9,
-    expectedCatalogIdentity: { workCount: 25, legacyWorkCount: 17, coreWorkCount: 8, coreSectionCount: 512 },
+    expectedCatalogIdentity: { workCount: 35, legacyWorkCount: 17, coreWorkCount: 8, coreSectionCount: 512 },
     sourcePackId: 'theologai-core-eight',
     expectedCoreEditionProvenanceStatus: 'verified_with_uncertainty',
   },
@@ -523,12 +535,13 @@ function expectedResourceUris(fixture: AuditFixture): string[] {
     'theologai://translations', 'theologai://commentaries', 'theologai://primary-sources/catalog',
     ...LEGACY_WORK_IDS.map(id => `theologai://documents/${id}`),
     ...fixture.probes.map(probe => probe.landingResourceUri),
+    ...TRANSFORM11_WORK_IDS.map(id => `theologai://documents/${id}`),
   ].sort();
 }
 
 function assertResources(message: ObjectRecord, fixture: AuditFixture): void {
   const resources = array(result(message, 'resources/list').resources, 'resources/list.resources').map(object);
-  assert(resources.length === 28 && resources.every(Boolean), 'resources/list must expose exactly 28 resources');
+  assert(resources.length === 38 && resources.every(Boolean), 'resources/list must expose exactly 38 resources');
   assert(new Set(resources.map(resource => resource!.uri)).size === resources.length, 'resources/list resource URIs are not unique');
   assert(JSON.stringify(resources.map(resource => requireString(resource!.uri, 'resource URI')).sort()) === JSON.stringify(expectedResourceUris(fixture)), 'resources/list exact resource identity drifted');
   for (const resource of resources) {
@@ -566,7 +579,10 @@ function assertCatalog(message: ObjectRecord, fixture: AuditFixture): ObjectReco
   const ids = works.map(work => requireString(work!.id, 'catalog work id'));
   assert(LEGACY_WORK_IDS.every(id => ids.includes(id)), 'catalog no longer contains the complete 17-work legacy identity');
   const core = fixture.probes.map(probe => works.find(work => work?.id === probe.workId));
-  assert(core.every(Boolean) && works.length === LEGACY_WORK_IDS.length + core.length, 'catalog no longer has the exact 25=17+8 historical identity');
+  const transform11 = TRANSFORM11_WORK_IDS.map(id => works.find(work => work?.id === id));
+  assert(core.every(Boolean) && transform11.every(Boolean)
+    && works.length === LEGACY_WORK_IDS.length + core.length + transform11.length,
+  'catalog no longer has the exact 35=17+8+10 historical identity');
   for (const [index, work] of core.entries()) {
     const probe = fixture.probes[index]!;
     const provenance = object(work!.editionProvenance); const readiness = object(work!.editionReadiness);
@@ -575,10 +591,22 @@ function assertCatalog(message: ObjectRecord, fixture: AuditFixture): ObjectReco
       && readiness.provenance === fixture.baseline.expectedCoreEditionProvenanceStatus
       && readiness.normalizedTextRights === 'no_known_conflict', `${probe.workId} edition readiness drifted`);
   }
+  for (const [index, work] of transform11.entries()) {
+    const readiness = object(work!.editionReadiness);
+    assert(readiness?.editionIdentity === 'established'
+      && readiness.provenance === fixture.baseline.expectedCoreEditionProvenanceStatus
+      && readiness.normalizedTextRights === 'no_known_conflict',
+    `${TRANSFORM11_WORK_IDS[index]} Transform 11 edition readiness drifted`);
+  }
   const policies = object(catalog.policies);
   assert(policies?.scope === 'hosted_collection_only' && policies.editionProvenance === 'mixed_legacy_and_reviewed_source_packs'
     && policies.rightsStatus === 'mixed_not_established_and_no_known_conflict', 'catalog mixed-inventory provenance policy drifted');
-  return { workCount: works.length, legacyWorkCount: LEGACY_WORK_IDS.length, coreWorkCount: core.length, sourcePackId: fixture.baseline.sourcePackId };
+  return {
+    workCount: works.length,
+    legacyWorkCount: LEGACY_WORK_IDS.length,
+    coreWorkCount: core.length,
+    sourcePackId: fixture.baseline.sourcePackId,
+  };
 }
 
 function assertClassicCatalog(raw: RawToolResult, fixture: AuditFixture): ObjectRecord {

@@ -198,11 +198,12 @@ describe('Transform 10 generic edition hierarchy', () => {
     } finally { db.close(); }
   });
 
-  it('keeps the exact core-eight authority gate pack-scoped and excludes dormant Aquinas materialization from normal readiness', () => {
+  it('rejects the superseded core-eight-only release while excluding dormant Aquinas materialization', () => {
     const db = database();
     try {
       materializeCoreEightAuthorityFixture(db);
-      expect(readinessFailures(db, 'historical.transform9.source_pack_authority')).toEqual([]);
+      expect(readinessFailures(db, 'historical.transform9.source_pack_authority'))
+        .toEqual(['historical.transform9.source_pack_authority']);
       const normalTransform10Checks = [
         'historical.transform10.normal.hierarchies_empty',
         'historical.transform10.normal.bodies_empty',

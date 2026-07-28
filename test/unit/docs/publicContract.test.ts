@@ -187,7 +187,9 @@ describe('published project contract', () => {
     expect(readme).toContain('do **not** currently fetch CCEL search results or document bodies');
     expect(readme).toContain('Production v6/local-only is deployed');
     expect(readme).toContain('preview runs the audited v7/discovery-only contract with CCEL execution disabled');
-    expect(readme).toMatch(/Preview\s+and production both serve the 25-work Transform 9 catalog/);
+    expect(readme).toMatch(/deployed preview and production baselines remain the prior 25-work catalog/);
+    expect(readme).toContain('35 locally indexed');
+    expect(readme).toContain('18 reviewed source-pack editions');
     expect(readme).toContain('The integrated Transform 10 candidate is local-only and unpublished');
     expect(readme).toContain('not wired into runtime or MCP surfaces');
     expect(readme).toContain('before adapter');

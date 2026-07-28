@@ -711,19 +711,24 @@ Code readiness and operational readiness are deliberately separate:
   `100`, production stays `000`, and neither environment may make a CCEL
   request.
 - Expand the local primary-source corpus with rights-reviewed, freely
-  redistributable editions and explicit edition provenance. The deployed
-  Transform 9 core-eight makes the checked-out local catalog and preview
-  collection 25 works, and the current PR #101 schema-`0008` D1 baseline is
-  likewise the 25-work production corpus: deployment
+  redistributable editions and explicit edition provenance. Transform 11 is
+  the current checked-out candidate: it activates the two PR #105 historical
+  spine packs alongside the core eight for an exact 35-work catalog
+  (17 legacy plus 18 reviewed editions), 43 source artifacts, and 1,057
+  reviewed sectioned sections. It adds no migration, hierarchy, publication,
+  alias, CCEL, or MCP-tool change. The deployed PR #101 preview and production
+  baselines remain the 25-work corpus until separately protected releases:
+  production deployment
   `71b76d24-bf5f-490e-adc4-31cf63fb046e`, Worker
   `bae58cd3-cad7-4663-879d-408accf061b0` (#96), and D1
   `theologai-production-20260728-hierarchy-a`
   (`f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395`). The integrated Transform 10 Aquinas
-  hierarchy is local-only and unpublished, with no catalog/runtime/MCP
-  activation; normal candidate D1 corpora exclude its hierarchy and shared
-  lineage. Any successor catalog projection still requires separately reviewed
-  transforms, D1 preparation, and release gates. Do not mirror or republish
-  CCEL transcriptions without edition-specific rights.
+  hierarchy is local-only and unpublished. Its present packet ends at Tertia
+  question 90 and contains no Supplement, so Transform 11 gives it no
+  document/catalog/search/resource/runtime/D1 projection. A future Aquinas
+  release requires a separate coverage decision and must re-prove conservation,
+  search quality, compatibility, and headroom. Do not mirror or republish CCEL
+  transcriptions without edition-specific rights.
 - PR #96 historically deployed a prepared production D1 and passed the bounded
   `original_language_study` v2 audit. Future original-language work for
   beginners and readers of Greek or Hebrew must preserve the existing UBS

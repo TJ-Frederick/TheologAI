@@ -52,15 +52,27 @@ type FakeOptions = {
 };
 
 const FAKE_LANDING_TEXT = '# Work record\nMetadata only.';
+const transform11WorkIds = [
+  'augustine-on-christian-doctrine',
+  'basil-on-the-holy-spirit',
+  'gregory-nazianzen-five-theological-orations',
+  'gregory-nyssa-great-catechism',
+  'justin-martyr-apologies',
+  'origen-de-principiis',
+  'hooker-laws-of-ecclesiastical-polity-book-1',
+  'julian-revelations-of-divine-love',
+  'kempis-imitation-of-christ',
+  'pascal-pensees',
+] as const;
 
 async function fixture(): Promise<RecordValue> {
   return JSON.parse(await readFile(fixtureUrl, 'utf8')) as RecordValue;
 }
 
 describe('historical core preview audit contract', () => {
-  it('accepts only the immutable 25=17+8 Transform-9 fixture, including separate directory and relevance locators', async () => {
+  it('accepts the 35-work Transform-11 catalog while retaining deep core-eight probes', async () => {
     const parsed = validateFixture(await fixture());
-    expect(parsed.baseline.expectedCatalogIdentity).toEqual({ workCount: 25, legacyWorkCount: 17, coreWorkCount: 8, coreSectionCount: 512 });
+    expect(parsed.baseline.expectedCatalogIdentity).toEqual({ workCount: 35, legacyWorkCount: 17, coreWorkCount: 8, coreSectionCount: 512 });
     expect(parsed.baseline.expectedCoreEditionProvenanceStatus).toBe('verified_with_uncertainty');
     expect(parsed.probes).toHaveLength(8);
     expect(parsed.probes.map(probe => probe.sectionCount).reduce((sum, count) => sum + count, 0)).toBe(512);
@@ -348,7 +360,7 @@ describe('historical core preview audit contract', () => {
     await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { mutate: (body, response) => {
       if (body.method === 'resources/list') ((response.result as RecordValue).resources as RecordValue[]).pop();
       return response;
-    } }))).rejects.toThrow('resources/list must expose exactly 28 resources');
+    } }))).rejects.toThrow('resources/list must expose exactly 38 resources');
     await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { mutate: (body, response) => {
       if (body.method === 'resources/templates/list') ((response.result as RecordValue).resourceTemplates as RecordValue[])[0]!.name = 'changed';
       return response;
@@ -668,6 +680,7 @@ function fakeResources(fixtureValue: Audit): RecordValue[] {
     { uri: 'theologai://translations', mimeType: 'text/markdown' }, { uri: 'theologai://commentaries', mimeType: 'text/markdown' },
     { uri: 'theologai://primary-sources/catalog', mimeType: 'application/json' }, ...legacy,
     ...fixtureValue.probes.map(probe => ({ uri: probe.landingResourceUri, mimeType: 'text/markdown' })),
+    ...transform11WorkIds.map(id => ({ uri: `theologai://documents/${id}`, mimeType: 'text/markdown' })),
   ];
 }
 
@@ -710,7 +723,15 @@ function fakeCatalog(fixtureValue: Audit, options: FakeOptions = {}): RecordValu
       normalizedTextRights: 'no_known_conflict',
     },
   }));
-  return { schemaVersion: '2', kind: 'local_primary_source_catalog', workCount: 25, works: [...legacy, ...core],
+  const transform11 = transform11WorkIds.map(id => ({
+    id,
+    editionReadiness: {
+      editionIdentity: 'established',
+      provenance: fixtureValue.baseline.expectedCoreEditionProvenanceStatus,
+      normalizedTextRights: 'no_known_conflict',
+    },
+  }));
+  return { schemaVersion: '2', kind: 'local_primary_source_catalog', workCount: 35, works: [...legacy, ...core, ...transform11],
     policies: { scope: 'hosted_collection_only', editionProvenance: 'mixed_legacy_and_reviewed_source_packs', rightsStatus: 'mixed_not_established_and_no_known_conflict' } };
 }
 
@@ -737,7 +758,13 @@ function classicTool(body: RecordValue, args: RecordValue, fixtureValue: Audit, 
 
 function fakeClassicWorks(fixtureValue: Audit): RecordValue[] {
   const works = fakeCatalog(fixtureValue).works as RecordValue[];
-  return works.map(work => ({ id: work.id, deliveryMode: fixtureValue.probes.some(probe => probe.workId === work.id) ? 'sectioned_only' : 'complete_document' }));
+  return works.map(work => ({
+    id: work.id,
+    deliveryMode: fixtureValue.probes.some(probe => probe.workId === work.id)
+      || transform11WorkIds.includes(work.id as typeof transform11WorkIds[number])
+      ? 'sectioned_only'
+      : 'complete_document',
+  }));
 }
 
 function landing(probe: Audit['probes'][number], options: FakeOptions): RecordValue {

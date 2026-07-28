@@ -17,12 +17,17 @@ const packs = [
   'historical-spine-later',
 ] as const;
 
-describe('inactive historical-spine local source preparation', () => {
-  it('keeps ten reviewed packages outside the active D1 input contract', () => {
+describe('reviewed historical-spine source preparation', () => {
+  it('activates only the ten reviewed package, manifest, and sidecar inputs', () => {
     const dataManifest = JSON.parse(readFileSync('data/data-manifest.json', 'utf8')) as {
       materializations: { d1: { inputs: string[] } };
     };
-    expect(dataManifest.materializations.d1.inputs.some(path => path.includes('historical-spine-'))).toBe(false);
+    const activeSpineInputs = dataManifest.materializations.d1.inputs
+      .filter(path => path.includes('historical-spine-'));
+    expect(activeSpineInputs).toHaveLength(14);
+    expect(activeSpineInputs.every(path => path.endsWith('.json') || path.endsWith('.sha256'))).toBe(true);
+    expect(activeSpineInputs.some(path => path.includes('source-preparation')
+      || path.includes('replay-readiness') || path.includes('replay-receipt'))).toBe(false);
 
     for (const pack of packs) {
       const root = resolve(process.cwd(), 'data/historical-source-packs', pack);

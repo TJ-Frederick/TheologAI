@@ -7,21 +7,24 @@ for the 17 legacy hosted works. It adds no document bodies and grants no new
 rights; it makes that already-hosted collection's work identities,
 composition-date scope, and explicitly attributed creators machine-readable.
 
-## Current local Transform 10 candidate and preview-bound Transform 9 extension
+## Checked-out Transform 11 candidate and deployed Transform 9 baseline
 
 The checked-out Transform 10 candidate retains an inactive Aquinas
 edition-scoped authority hierarchy packet and standalone materializer. Normal
 release builds deliberately exclude its hierarchy rows and shared lineage. It
 is unpublished and has no document or catalog projection, runtime composition
 dependency, or MCP surface. It leaves the active historical catalog boundary
-unchanged: preview remains the Transform-9 25-work collection and production
-uses the normal 25-work corpus.
+unchanged in deployed environments: preview and production remain on the
+Transform-9 25-work corpus until a protected Transform 11 preview release.
 
-The current preview Transform 9 catalog materialization is migration
-`0006_historical_source_packs`. It retains the Transform 6 legacy catalog slice
-and adds one checked-in pack (`theologai-core-eight`, revision 1), eight works,
-eight reviewed editions, 25 pinned source artifacts, and 512 normalized
-sections. The current deterministic D1 corpus identity is
+Transform 11 retains migration `0006_historical_source_packs` and schema
+`0008`, but expands the manifest allowlist to three checked-in packs, 18 works,
+18 reviewed editions, 43 pinned source artifacts, and 1,057 normalized
+sections. Together with the 17 legacy documents, the checked-out catalog has
+35 works and 4,111 sections. It adds no migration, aliases, hierarchy rows, or
+publication rows. Its deterministic D1 corpus identity is
+`29a4a7faec2a960f06bfc026a319df8c08b495bb7ad82831fb62d3a3586643a4`.
+The Transform-9 deterministic D1 corpus identity was
 `4e182bfd2953fe06e7c8d7e13a705988e85b5a58001e7fe72440333d34f6d442`; the
 historical Transform 6 catalog identity remains
 `c334b4b91c3a7c334a9425937c7f99473f27014ddae6cea377ee38bd578a6707` for that
@@ -76,9 +79,9 @@ activation remains absent.
   `c334b4b91c3a7c334a9425937c7f99473f27014ddae6cea377ee38bd578a6707`
   bind the legacy metadata change. It was not a marker-only transition: its
   release required a fresh deterministic seed and complete readiness gate.
-  Transform 9/migration 0006 is a separate, current preview-bound
-  materialization with the identities and inventory stated above; it does not
-  revise that historical production deployment record.
+Transform 11 reuses migration 0006's generic source-pack tables with a new exact
+manifest identity and inventory; it does not revise any historical deployment
+record until a protected release succeeds.
 
 Creator roles use an exact closed vocabulary: `author`, `issuing_body`,
 `drafting_body`, `revising_body`, and `compiler`. An issuing, drafting,

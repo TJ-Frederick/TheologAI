@@ -2,9 +2,21 @@
 
 `npm run audit:historical-core-preview` is the protected post-authorized-PR95-preview-deployment audit for the reviewed Transform-9 historical core. It is intentionally a fixed release gate rather than a general MCP test client.
 
-It can contact only `https://preview-mcp.theologai.xyz/mcp`; it accepts no endpoint, fixture, retry, or pagination override. Its immutable fixture asserts the exact 25-work preview identity: 17 legacy documents plus the eight reviewed source-pack works, with 512 reviewed-core sections.
+It can contact only `https://preview-mcp.theologai.xyz/mcp`; it accepts no
+endpoint, fixture, retry, or pagination override. Its immutable Transform 11
+fixture asserts the exact 35-work preview identity: 17 legacy documents, the
+eight deeply probed core works, and ten additional reviewed source-pack works.
+The full D1 authority audit separately conserves all 1,057 reviewed sections.
 
-The audit performs a fixed 54 logical operations (55 HTTP exchanges including initialization notification): MCP negotiation; exact tool, prompt, resource (28), and resource-template (2) registration; two candidate-v7 guided-prompt probes; catalog and classic-work inventory identity; a direct landing-resource check; five bounded probes per reviewed work; and legacy, malformed-cursor, invalid-resource, and disabled-CCEL regressions. Core probes verify the pinned per-work section count, directory-first canonical locator, all-terms/relevance-ranked primary-search locator, sectioned landings, 32-entry directories, natural local discovery, and exact-section resource reads.
+The audit performs a fixed 54 logical operations (55 HTTP exchanges including
+initialization notification): MCP negotiation; exact tool, prompt, resource
+(38), and resource-template (2) registration; two candidate-v7 guided-prompt
+probes; exact 35-work catalog and classic-work inventory identity; a direct
+landing-resource check; five bounded probes per core work; and legacy,
+malformed-cursor, invalid-resource, and disabled-CCEL regressions. Core probes
+verify the pinned per-work section count, directory-first canonical locator,
+all-terms/relevance-ranked primary-search locator, sectioned landings, 32-entry
+directories, natural local discovery, and exact-section resource reads.
 
 One five-minute deadline starts before fixed output and fixture preflight and remains in force through true no-clobber evidence publication. Each MCP response has a 256 KiB ceiling and the aggregate-response ceiling is 2 MiB. Evidence is written only after every assertion passes, through an audit-owned temporary directory and atomic create-only publication; an existing or racing destination is never replaced. If the final post-link deadline check expires, the auditor removes only the output link it can still prove belongs to its staged file, then removes its own staging directory. It is capped at 256 KiB and contains hashes, counts, identifiers, schema hashes, and statuses only. It must not contain document bodies, snippets, resource locators, cursors, headers, session data, URLs, database details, stack traces, or reflected error input.
 
