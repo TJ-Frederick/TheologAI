@@ -187,7 +187,7 @@ describe('published project contract', () => {
     expect(readme).toContain('do **not** currently fetch CCEL search results or document bodies');
     expect(readme).toContain('Production v6/local-only is deployed');
     expect(readme).toContain('preview runs the audited v7/discovery-only contract with CCEL execution disabled');
-    expect(readme).toMatch(/Preview\s+serves the 25-work Transform 9 catalog/);
+    expect(readme).toMatch(/Preview\s+and production both serve the 25-work Transform 9 catalog/);
     expect(readme).toContain('The integrated Transform 10 candidate is local-only and unpublished');
     expect(readme).toContain('not wired into runtime or MCP surfaces');
     expect(readme).toContain('before adapter');
@@ -262,7 +262,7 @@ describe('published project contract', () => {
     expect(operations).toContain('protected PR95 preview release deployed Cloudflare deployment');
     expect(operations).toContain('black-box audit passed with no P0-P3 findings');
     expect(operations).toContain('Transform-10 Aquinas\nhierarchy from all normal D1 corpora');
-    expect(operations).toContain('The deployed normal-build preview D1 excludes inactive Aquinas');
+    expect(operations).toContain('both contain the 25-work corpus and exclude inactive\nAquinas');
     expect(operations).not.toContain('prepared but unbound preview\ncandidate retains that inactive authority data');
     expect(operations).toContain(`Its historical Cloudflare deployment\n\`${historicalDeployment}\` served Worker`);
     expect(operations).toContain('This historical release is neither\nthe current preview identity nor the immediate retained predecessor');
@@ -274,7 +274,7 @@ describe('published project contract', () => {
     expect(operations).toContain('Protected release evidence proves\nthis exact current binding');
   });
 
-  it('documents the checked-in production candidate as a release target, not live-state evidence', async () => {
+  it('documents the completed PR #101 production cutover without implying hierarchy activation', async () => {
     const [readme, dataWorkflow, catalogScope, reconciliation, operations, roadmap] = await Promise.all([
       readProjectFile('README.md'),
       readProjectFile('docs/D1-DATA-WORKFLOW.md'),
@@ -286,10 +286,10 @@ describe('published project contract', () => {
     const candidateD1 = 'theologai-production-20260728-hierarchy-a';
     const candidateD1Id = 'f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395';
     const liveProduction = {
-      deployment: '07bbd8aa-5c69-4b0c-a9df-c756f537bb97',
-      worker: '09fa6471-eb50-480e-85b2-bc04b742dcb3',
-      d1: 'theologai-production-20260728-normal-a',
-      d1Id: 'a3d26bba-7adc-44b0-86d0-562b2ced6bd3',
+      deployment: '71b76d24-bf5f-490e-adc4-31cf63fb046e',
+      worker: 'bae58cd3-cad7-4663-879d-408accf061b0',
+      d1: 'theologai-production-20260728-hierarchy-a',
+      d1Id: 'f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395',
     };
     const livePreview = {
       deployment: '070b292b-0bae-400a-b983-3d72157b5a96',
@@ -301,17 +301,16 @@ describe('published project contract', () => {
     for (const document of [readme, dataWorkflow, catalogScope, reconciliation, operations]) {
       expect(document).toContain(candidateD1);
       expect(document).toContain(candidateD1Id);
-      expect(document).toContain('was unbound when');
     }
     for (const document of [readme, dataWorkflow, catalogScope, reconciliation, operations, roadmap]) {
       for (const value of Object.values(liveProduction)) expect(document).toContain(value);
       for (const value of Object.values(livePreview)) expect(document).toContain(value);
     }
-    expect(reconciliation).toContain('not evidence of\na current live Worker binding');
-    expect(dataWorkflow).toContain('does not\nitself bind or deploy it');
-    expect(catalogScope).toContain('not as evidence of\na current live Worker binding');
-    expect(operations).toContain('not evidence of a current live\nproduction binding');
-    expect(roadmap).toContain('future-candidate selector rather than evidence of a current live Worker\n  binding');
+    expect(reconciliation).toContain('completed PR #101 protected production cutover');
+    expect(dataWorkflow).toContain('proved the candidate binding before and after its black-box');
+    expect(catalogScope).toContain('proved it as the sole active production');
+    expect(operations).toContain('proved the exact binding before and after its bounded black-box audits');
+    expect(roadmap).toContain('later proved that exact binding and passed the production');
     for (const document of [readme, dataWorkflow, catalogScope, reconciliation, operations, roadmap]) {
       expect(document).not.toContain('Transform-8/9/10 authority');
       expect(document.replace(/\s+/g, ' ')).toContain('Transform-10 normal-corpus exclusion predicates');
