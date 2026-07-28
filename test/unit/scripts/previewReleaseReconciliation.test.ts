@@ -18,8 +18,8 @@ const candidateVersion = '223e4567-e89b-42d3-a456-426614174000';
 const predecessorDeployment = '323e4567-e89b-42d3-a456-426614174000';
 const candidateDeployment = '423e4567-e89b-42d3-a456-426614174000';
 const predecessorD1Id = '94c4938b-7800-4d68-9097-0df33c31fdc1';
-const candidateD1Id = 'fbd1a492-fbc2-4061-a431-181a9632d4de';
-const candidateD1Name = 'theologai-preview-20260725-t10-a';
+const candidateD1Id = '776944d4-60d1-457f-b13e-b4e7898971ca';
+const candidateD1Name = 'theologai-preview-20260727-normal-a';
 const productionCandidateD1Id = '3f7faa0e-689f-47aa-a601-dc662db9a6cf';
 const productionCandidateD1Name = 'theologai-production-20260723-a';
 
