@@ -19,7 +19,8 @@ const MAX_QUERIES = 4;
 export const MAX_CCEL_QUERIES = 1;
 const MAX_TOTAL_HITS = 32;
 const QUERY_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$/;
-const QUERY_KEYS = new Set(['id', 'text', 'providers', 'match', 'selection', 'author', 'work', 'startYear', 'endYear', 'page', 'limit']);
+const V6_QUERY_KEYS = new Set(['id', 'text', 'providers', 'match', 'selection', 'author', 'work', 'startYear', 'endYear', 'page', 'limit']);
+const V7_QUERY_KEYS = new Set(['id', 'text', 'searchDepth', 'expandedLimit', 'match', 'selection', 'author', 'work', 'startYear', 'endYear', 'page', 'limit']);
 const COMPLETE_STATUSES = new Set<PrimarySourceProviderStatus>(['ok', 'no_results', 'catalog_miss']);
 const UNAVAILABLE_STATUSES = new Set<PrimarySourceProviderStatus>(['unavailable', 'disabled', 'rate_limited', 'interface_changed']);
 
@@ -34,7 +35,7 @@ export class PrimarySourceSearchService {
   ) {}
 
   async search(input: unknown): Promise<PrimarySourceSearchPlanResult> {
-    const queries = validatePlan(input);
+    const queries = validatePlan(input, this.options.contractVersion);
     const queryResults = await Promise.all(queries.map(query => this.executeQuery(query)));
     const aggregateTruncated = enforceAggregateHitBudget(queryResults);
     const providerResults = queryResults.flatMap(query => query.providers);
@@ -77,12 +78,13 @@ export class PrimarySourceSearchService {
   }
 
   private async executeQuery(query: NormalizedPlanQuery): Promise<PrimarySourcePlanQueryResult> {
-    const providers = await Promise.all(query.providers.map(provider => this.executeProvider(query, provider)));
+    const providers: PrimarySourcePlanProviderResult[] = [];
+    for (const provider of query.providers) providers.push(await this.executeProvider(query, provider));
     return { id: query.id, normalizedMode: query.match, normalizedSelection: query.selection, providers };
   }
 
   private async executeProvider(query: NormalizedPlanQuery, provider: PrimarySourceRequestedProvider): Promise<PrimarySourcePlanProviderResult> {
-    const providerQuery = {
+    const localProviderQuery = {
       text: query.text,
       match: query.match,
       page: query.page,
@@ -93,11 +95,19 @@ export class PrimarySourceSearchService {
       ...(query.endYear !== undefined ? { endYear: query.endYear } : {}),
     };
     let result: PrimarySourceProviderResult;
-    if (provider === 'ccel' && (query.page > 1 || query.startYear !== undefined || query.endYear !== undefined)) {
+    const externalProviderQuery = {
+      text: query.text,
+      match: query.match,
+      page: 1,
+      limit: query.expandedLimit,
+      ...(query.author ? { author: query.author } : {}),
+      ...(query.work ? { work: query.work } : {}),
+    };
+    if (provider === 'ccel' && this.options.contractVersion === '6' && (query.page > 1 || query.startYear !== undefined || query.endYear !== undefined)) {
       result = {
         provider: 'ccel_live', status: 'unsupported_filter', searched: false, page: query.page,
         hitCount: 0, hits: [], notices: [query.page > 1
-          ? 'Live CCEL discovery supports page 1 only; the requested page was not silently changed.'
+          ? 'Live CCEL discovery supports page 1 only; the requested external page was not silently changed.'
           : 'Live CCEL discovery does not expose reviewed composition-date bounds; the date restriction was not ignored.'],
         resultWindow: { returnedHitCount: 0, additionalMatchStatus: 'not_evaluated' },
       };
@@ -110,8 +120,8 @@ export class PrimarySourceSearchService {
     } else {
       try {
         result = provider === 'local'
-          ? await this.local.search({ ...providerQuery, selection: query.selection })
-          : await this.ccel.search(providerQuery, this.coordinator!);
+          ? await this.local.search({ ...localProviderQuery, selection: query.selection })
+          : await this.ccel.search(externalProviderQuery, this.coordinator!);
       } catch {
         result = {
           provider: provider === 'local' ? 'local' : 'ccel_live',
@@ -121,8 +131,8 @@ export class PrimarySourceSearchService {
         };
       }
     }
-    if (provider === 'ccel' && result.status !== 'disabled' && query.page === 1
-      && query.startYear === undefined && query.endYear === undefined) {
+    if (provider === 'ccel' && result.status !== 'disabled' && (this.options.contractVersion === '7' || (query.page === 1
+      && query.startYear === undefined && query.endYear === undefined))) {
       result = {
         ...result,
         notices: [
@@ -147,32 +157,36 @@ interface NormalizedPlanQuery extends Required<Pick<PrimarySourceSearchPlanQuery
   work?: string;
   startYear?: number;
   endYear?: number;
+  expandedLimit: number;
 }
 
-function validatePlan(input: unknown): NormalizedPlanQuery[] {
+function validatePlan(input: unknown, contractVersion: '6' | '7'): NormalizedPlanQuery[] {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new ValidationError('queries', 'A primary-source query plan object is required.');
   const plan = input as Record<string, unknown>;
   if (Object.keys(plan).length !== 1 || !Object.hasOwn(plan, 'queries')) throw new ValidationError('queries', 'The plan must contain only queries.');
   if (!Array.isArray(plan.queries) || plan.queries.length < 1 || plan.queries.length > MAX_QUERIES) {
     throw new ValidationError('queries', `queries must contain 1 to ${MAX_QUERIES} items.`);
   }
-  const normalized = plan.queries.map((query, index) => validateQuery(query, index));
+  const normalized = plan.queries.map((query, index) => validateQuery(query, index, contractVersion));
   const ids = new Set<string>();
   for (const query of normalized) {
     if (ids.has(query.id)) throw new ValidationError('queries.id', `Duplicate query id "${query.id}".`);
     ids.add(query.id);
   }
   if (normalized.filter(query => query.providers.includes('ccel')).length > MAX_CCEL_QUERIES) {
-    throw new ValidationError('queries.providers', `At most ${MAX_CCEL_QUERIES} queries may request CCEL.`);
+    throw new ValidationError(
+      contractVersion === '7' ? 'queries.searchDepth' : 'queries.providers',
+      `At most ${MAX_CCEL_QUERIES} queries may request ${contractVersion === '7' ? 'expanded discovery' : 'CCEL'}.`,
+    );
   }
   return normalized;
 }
 
-function validateQuery(input: unknown, index: number): NormalizedPlanQuery {
+function validateQuery(input: unknown, index: number, contractVersion: '6' | '7'): NormalizedPlanQuery {
   const path = `queries.${index}`;
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new ValidationError(path, 'Each query must be an object.');
   const query = input as Record<string, unknown>;
-  const unknown = Object.keys(query).find(key => !QUERY_KEYS.has(key));
+  const unknown = Object.keys(query).find(key => !(contractVersion === '7' ? V7_QUERY_KEYS : V6_QUERY_KEYS).has(key));
   if (unknown) throw new ValidationError(`${path}.${unknown}`, 'Unknown query field.');
   if (typeof query.id !== 'string' || !QUERY_ID.test(query.id)) throw new ValidationError(`${path}.id`, 'id must be a 1 to 40 character plan identifier.');
   const text = normalizeLiteral(query.text, `${path}.text`, 200);
@@ -181,14 +195,23 @@ function validateQuery(input: unknown, index: number): NormalizedPlanQuery {
   if (match === 'all_terms' && text.split(' ').length > 12) throw new ValidationError(`${path}.text`, 'all_terms text may contain at most 12 terms.');
   const selection = query.selection ?? 'relevance';
   if (selection !== 'relevance' && selection !== 'work_diversity') throw new ValidationError(`${path}.selection`, 'selection must be relevance or work_diversity.');
-  if (!Array.isArray(query.providers) || query.providers.length < 1 || query.providers.length > 2) throw new ValidationError(`${path}.providers`, 'providers must contain local, ccel, or both.');
-  const providers = query.providers as unknown[];
-  if (providers.some(provider => provider !== 'local' && provider !== 'ccel') || new Set(providers).size !== providers.length) {
-    throw new ValidationError(`${path}.providers`, 'providers must be unique values from local and ccel.');
+  const searchDepth = query.searchDepth ?? 'standard';
+  if (contractVersion === '7' && searchDepth !== 'standard' && searchDepth !== 'expanded') throw new ValidationError(`${path}.searchDepth`, 'searchDepth must be standard or expanded.');
+  const expandedLimit = query.expandedLimit ?? 3;
+  if (contractVersion === '7' && (!Number.isSafeInteger(expandedLimit) || (expandedLimit as number) < 1 || (expandedLimit as number) > 5)) throw new ValidationError(`${path}.expandedLimit`, 'expandedLimit must be an integer from 1 to 5.');
+  if (contractVersion === '7' && query.expandedLimit !== undefined && searchDepth !== 'expanded') throw new ValidationError(`${path}.expandedLimit`, 'expandedLimit is valid only when searchDepth is expanded.');
+  let providers: PrimarySourceRequestedProvider[];
+  if (contractVersion === '7') providers = searchDepth === 'expanded' ? ['local', 'ccel'] : ['local'];
+  else {
+    if (!Array.isArray(query.providers) || query.providers.length < 1 || query.providers.length > 2) throw new ValidationError(`${path}.providers`, 'providers must contain local, ccel, or both.');
+    const requested = query.providers as unknown[];
+    if (requested.some(provider => provider !== 'local' && provider !== 'ccel') || new Set(requested).size !== requested.length) throw new ValidationError(`${path}.providers`, 'providers must be unique values from local and ccel.');
+    providers = requested as PrimarySourceRequestedProvider[];
   }
   const page = query.page ?? 1;
   const limit = query.limit ?? 5;
   if (!Number.isSafeInteger(page) || (page as number) < 1 || (page as number) > 3) throw new ValidationError(`${path}.page`, 'page must be an integer from 1 to 3.');
+  if (contractVersion === '7' && searchDepth === 'expanded' && page !== 1) throw new ValidationError(`${path}.page`, 'expanded searchDepth supports page 1 only.');
   if (!Number.isSafeInteger(limit) || (limit as number) < 1 || (limit as number) > 8) throw new ValidationError(`${path}.limit`, 'limit must be an integer from 1 to 8.');
   const author = query.author === undefined ? undefined : normalizeLiteral(query.author, `${path}.author`, 100);
   const work = query.work === undefined ? undefined : normalizeLiteral(query.work, `${path}.work`, 160);
@@ -200,11 +223,12 @@ function validateQuery(input: unknown, index: number): NormalizedPlanQuery {
   return {
     id: query.id,
     text,
-    providers: providers as PrimarySourceRequestedProvider[],
+    providers,
     match: match as PrimarySourceSearchMatch,
     selection,
     page: page as number,
     limit: limit as number,
+    expandedLimit: contractVersion === '7' ? expandedLimit as number : limit as number,
     ...(author ? { author } : {}),
     ...(work ? { work } : {}),
     ...(startYear !== undefined ? { startYear } : {}),

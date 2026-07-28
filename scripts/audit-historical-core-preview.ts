@@ -27,16 +27,19 @@ type PrimarySourceAuditContract = Readonly<{
   contractVersion: '6' | '7';
   schemaVersion: '6' | '7';
   openWorldHint: boolean;
-  providerEnum: readonly ('local' | 'ccel')[];
-  providerMaximum: 1 | 2;
+  inputPropertyOrder: readonly string[];
+  providerEnum?: readonly ('local' | 'ccel')[];
+  providerMaximum?: 1 | 2;
+  searchDepthEnum?: readonly ('standard' | 'expanded')[];
+  expandedLimitMaximum?: number;
   inputSchema: ObjectRecord;
   outputSchema: ObjectRecord;
   inputSchemaSha256: string;
   outputSchemaSha256: string;
   primarySourceResearchPrompt: Readonly<{ required: readonly string[]; absent: readonly string[] }>;
   confessionStudyPrompt: Readonly<{ required: readonly string[]; absent: readonly string[] }>;
-  /** Preview owns a disabled structured CCEL probe; production rejects CCEL at input validation. */
-  externalDiscoveryBoundary: 'disabled_structured_ccel' | 'rejected_at_input_schema';
+  /** Preview keeps a catalog result plus a disabled external group; production rejects external input. */
+  externalDiscoveryBoundary: 'catalog_plus_disabled_expansion' | 'rejected_at_input_schema';
 }>;
 
 function primaryInputSchemaFor(contractVersion: '6' | '7'): ObjectRecord {
@@ -51,37 +54,39 @@ function primaryInputSchemaFor(contractVersion: '6' | '7'): ObjectRecord {
 
 const PRIMARY_SOURCE_V7_AUDIT_CONTRACT: PrimarySourceAuditContract = {
   contractVersion: '7', schemaVersion: '7', openWorldHint: true,
-  providerEnum: ['local', 'ccel'], providerMaximum: 2,
+  inputPropertyOrder: ['id', 'text', 'searchDepth', 'expandedLimit', 'match', 'selection', 'author', 'work', 'startYear', 'endYear', 'page', 'limit'],
+  searchDepthEnum: ['standard', 'expanded'], expandedLimitMaximum: 5,
   inputSchema: primaryInputSchemaFor('7'), outputSchema: primarySourceSearchV7OutputSchema as ObjectRecord,
-  inputSchemaSha256: '5ee3fbbcee8ae6956d154c1b84eccbf0a984011fed7076e2bf3e9c6d03c74d90',
+  inputSchemaSha256: '708666a36a04cfccc0306360c022bdd52e893dc1e6a8954395b08b1c45e980e0',
   outputSchemaSha256: '005977f15f3db2d661314055f61ee61d27aee1ae153c86f3a844d199bb477cef',
   primarySourceResearchPrompt: {
     required: [
-      'Search local evidence', 'Search one external scope now', 'Use the v7 contract',
-      '"providers":["local"]', '"providers":["ccel"]',
-      'This prompt authorizes at most one CCEL-bearing call.',
-      'The external CCEL call deliberately omits the requested local composition-year bounds; any returned CCEL hit cannot establish membership in that requested local range.',
-      'Use MCP `resources/read` only for local `mcp_resource` URIs.',
+      'Inspect catalog scope', 'Run one provider-neutral search plan',
+      '"searchDepth":"expanded"', '"searchDepth":"standard"',
+      'At most one query may be expanded per call.',
+      'Expanded discovery deliberately omits the requested catalog composition-year bounds; any returned broader hit cannot establish membership in that requested range.',
+      'Use MCP `resources/read` for `mcp_resource` URIs.',
       'Open external `external_url` pages directly', 'name disabled, unavailable, or unsupported searches',
     ],
     absent: [
       'This workflow is local-only', 'Use the v6 structured result',
-      'This workflow supports a topic survey',
+      'This workflow supports a topic survey', '"providers"',
     ],
   },
   confessionStudyPrompt: {
     required: [
-      '"providers":["local","ccel"]', 'external `external_url` locator',
+      'provider-neutral expanded depth', 'For an `external_url` locator',
       'it is not an MCP resource', 'rights status is not determined',
       'Name any disabled, unavailable, or unsupported provider',
     ],
-    absent: ['Run bounded local discovery', 'canonical `resource_link` blocks'],
+    absent: ['Run bounded local discovery', 'canonical `resource_link` blocks', '"providers"'],
   },
-  externalDiscoveryBoundary: 'disabled_structured_ccel',
+  externalDiscoveryBoundary: 'catalog_plus_disabled_expansion',
 };
 
 const PRIMARY_SOURCE_V6_AUDIT_CONTRACT: PrimarySourceAuditContract = {
   contractVersion: '6', schemaVersion: '6', openWorldHint: false,
+  inputPropertyOrder: ['id', 'text', 'providers', 'match', 'selection', 'author', 'work', 'startYear', 'endYear', 'page', 'limit'],
   providerEnum: ['local'], providerMaximum: 1,
   inputSchema: primaryInputSchemaFor('6'), outputSchema: primarySourceSearchV6OutputSchema as ObjectRecord,
   inputSchemaSha256: '37849624bac2e884106050fcff39851e40cac31969b4f7511f516f78348fea87',
@@ -442,10 +447,21 @@ function assertToolRegistration(message: ObjectRecord, profile: HistoricalCoreAu
   const queryItem = object(queries?.items); const properties = object(queryItem?.properties);
   assert(primaryInput.type === 'object' && primaryInput.additionalProperties === false && JSON.stringify(primaryInput.required) === JSON.stringify(['queries'])
     && queries?.minItems === 1 && queries.maxItems === 4 && queryItem?.additionalProperties === false
-    && JSON.stringify(Object.keys(properties ?? {})) === JSON.stringify(['id', 'text', 'providers', 'match', 'selection', 'author', 'work', 'startYear', 'endYear', 'page', 'limit']), 'primary-source input contract drifted');
-  const providers = object(properties?.providers); const providerItems = object(providers?.items);
-  assert(providers?.minItems === 1 && providers?.maxItems === profile.primarySource.providerMaximum
-    && JSON.stringify(providerItems?.enum) === JSON.stringify(profile.primarySource.providerEnum), 'primary-source provider contract drifted');
+    && JSON.stringify(Object.keys(properties ?? {})) === JSON.stringify(profile.primarySource.inputPropertyOrder), 'primary-source input contract drifted');
+  if (profile.primarySource.contractVersion === '7') {
+    const searchDepth = object(properties?.searchDepth); const expandedLimit = object(properties?.expandedLimit);
+    const allOf = queryItem?.allOf;
+    assert(JSON.stringify(queryItem?.required) === JSON.stringify(['id', 'text']) && !Object.hasOwn(properties ?? {}, 'providers')
+      && JSON.stringify(searchDepth?.enum) === JSON.stringify(profile.primarySource.searchDepthEnum)
+      && searchDepth?.default === 'standard'
+      && expandedLimit?.minimum === 1 && expandedLimit?.maximum === profile.primarySource.expandedLimitMaximum && expandedLimit?.default === 3
+      && Array.isArray(allOf) && allOf.length === 2, 'primary-source expanded-depth contract drifted');
+  } else {
+    const providers = object(properties?.providers); const providerItems = object(providers?.items);
+    assert(JSON.stringify(queryItem?.required) === JSON.stringify(['id', 'text', 'providers'])
+      && providers?.minItems === 1 && providers?.maxItems === profile.primarySource.providerMaximum
+      && JSON.stringify(providerItems?.enum) === JSON.stringify(profile.primarySource.providerEnum), 'primary-source provider contract drifted');
+  }
   assert(canonicalJson(primaryInput) === canonicalJson(profile.primarySource.inputSchema), 'advertised primary-source input schema differs from the checked-out contract');
   assert(sha256(canonicalJson(profile.primarySource.inputSchema)) === profile.primarySource.inputSchemaSha256
     && sha256(canonicalJson(primaryInput)) === profile.primarySource.inputSchemaSha256, 'primary-source input schema hash drifted');
@@ -457,7 +473,7 @@ function assertToolRegistration(message: ObjectRecord, profile: HistoricalCoreAu
     classicTextOutputSchemaSha256: EXPECTED_CLASSIC_OUTPUT_SCHEMA_SHA256,
     primarySourceContractVersion: profile.primarySource.contractVersion,
     primarySourceOpenWorldHint: profile.primarySource.openWorldHint,
-    primarySourceProviderMaximum: profile.primarySource.providerMaximum,
+    ...(profile.primarySource.providerMaximum === undefined ? {} : { primarySourceProviderMaximum: profile.primarySource.providerMaximum }),
     primarySourceExternalDiscoveryBoundary: profile.primarySource.externalDiscoveryBoundary,
     primarySourceInputSchemaSha256: profile.primarySource.inputSchemaSha256,
     primarySourceOutputSchemaSha256: profile.primarySource.outputSchemaSha256,
@@ -735,15 +751,19 @@ function assertLegacyRegression(raw: RawToolResult, fixture: AuditFixture): Obje
   return { workId: fixture.legacyRegression.workId, deliveryMode: fixture.legacyRegression.deliveryMode, preserved: true };
 }
 
-function assertCcelDisabled(raw: RawToolResult, profile: HistoricalCoreAuditProfile): ObjectRecord {
-  assert(raw.isError === true && raw.structuredContent !== undefined, 'CCEL disabled regression must be an errored structured response');
-  const output = raw.structuredContent; const queries = array(output.queries, 'CCEL queries').map(object);
-  const providers = array(queries[0]?.providers, 'CCEL providers').map(object);
-  const provider = providers[0]; const coverage = object(output.coverage);
-  assert(output.schemaVersion === '7' && output.kind === 'primary_source_search' && output.planStatus === 'unavailable'
-    && queries.length === 1 && providers.length === 1 && provider?.provider === 'ccel_live'
-    && provider.status === 'disabled' && provider.searched === false && provider.hitCount === 0 && Array.isArray(provider.hits) && provider.hits.length === 0
-    && coverage?.localAttempted === false && coverage.ccelAttempted === false && coverage.ccelStatus === 'disabled' && coverage.ccelHitCount === 0, `${profile.label} CCEL-disabled/local-only execution invariant drifted`);
+function assertExpandedDiscoveryDisabled(raw: RawToolResult, profile: HistoricalCoreAuditProfile): ObjectRecord {
+  assert(raw.isError === false && raw.structuredContent !== undefined,
+    'expanded discovery disabled regression must preserve a successful catalog result and structured diagnostic');
+  const output = raw.structuredContent; const queries = array(output.queries, 'expanded-discovery queries').map(object);
+  const providers = array(queries[0]?.providers, 'expanded-discovery providers').map(object);
+  const local = providers[0]; const external = providers[1]; const coverage = object(output.coverage);
+  assert(output.schemaVersion === '7' && output.kind === 'primary_source_search' && output.planStatus === 'partial'
+    && queries.length === 1 && providers.length === 2
+    && local?.provider === 'local' && local.searched === true && typeof local.hitCount === 'number' && Array.isArray(local.hits)
+    && external?.provider === 'ccel_live' && external.status === 'disabled' && external.searched === false
+    && external.hitCount === 0 && Array.isArray(external.hits) && external.hits.length === 0
+    && coverage?.localAttempted === true && coverage.ccelAttempted === false && coverage.ccelStatus === 'disabled' && coverage.ccelHitCount === 0,
+  `${profile.label} expanded-discovery/catalog execution invariant drifted`);
   return { provider: 'ccel_live', status: 'disabled', searched: false, hitCount: 0 };
 }
 
@@ -862,7 +882,9 @@ export async function runHistoricalCoreAudit(
     const directory = assertClassicDirectory(await client.callTool('classic_text_lookup', { work: probe.workId, browseSections: true }), probe);
     const classicSearch = assertClassicSearch(await client.callTool('classic_text_lookup', { query: probe.query }), probe.workId);
     const primary = assertPrimarySearch(await client.callTool('primary_source_search', { queries: [{
-      id: `core-${probe.workId}`, text: probe.query, providers: ['local'], work: probe.workId, match: 'all_terms', selection: 'relevance', limit: 5,
+      id: `core-${probe.workId}`, text: probe.query,
+      ...(profile.primarySource.contractVersion === '7' ? { searchDepth: 'standard' } : { providers: ['local'] }),
+      work: probe.workId, match: 'all_terms', selection: 'relevance', limit: 5,
     }] }), probe, profile);
     const section = assertExactSection(await client.readResource(primary.uri), primary.uri, probe.workId);
     records.push({ workId: probe.workId, editionId: probe.editionId, passed: true, durationMs: Date.now() - started, landing, directory, classicSearch, primary: primary.evidence, section });
@@ -870,10 +892,14 @@ export async function runHistoricalCoreAudit(
   assert(observedCoreSectionCount === fixture.baseline.expectedCatalogIdentity.coreSectionCount, 'reviewed core section-count identity drifted');
   const legacy = assertLegacyRegression(await client.callTool('classic_text_lookup', { work: fixture.legacyRegression.workId }), fixture);
   const ccelRaw = await client.callTool('primary_source_search', {
-    queries: [{ id: 'ccel-disabled', text: 'Lord Supper', providers: ['ccel'], match: 'all_terms', selection: 'relevance', limit: 1 }],
+    queries: [{
+      id: 'ccel-disabled', text: 'Lord Supper',
+      ...(profile.primarySource.contractVersion === '7' ? { searchDepth: 'expanded', expandedLimit: 1 } : { providers: ['ccel'] }),
+      match: 'all_terms', selection: 'relevance', limit: 1,
+    }],
   });
-  const ccel = profile.primarySource.externalDiscoveryBoundary === 'disabled_structured_ccel'
-    ? assertCcelDisabled(ccelRaw, profile)
+  const ccel = profile.primarySource.externalDiscoveryBoundary === 'catalog_plus_disabled_expansion'
+    ? assertExpandedDiscoveryDisabled(ccelRaw, profile)
     : assertCcelRejectedAtInputSchema(ccelRaw, profile);
   const invalidResourceUri = 'theologai://documents/does-not-exist#section-not-real';
   assertResourceNotFound(await client.readResource(invalidResourceUri), invalidResourceUri);

@@ -547,27 +547,35 @@ describe('primary_source_search v7 discovery contract', () => {
     };
   }
 
-  it('advertises strict v7 providers and open-world behavior', () => {
+  it('advertises provider-neutral v7 search depth and open-world behavior', () => {
     const handler = createPrimarySourceSearchHandler({ search: vi.fn() } as any, v7);
     expect(handler.outputSchema?.properties?.schemaVersion).toEqual({ const: '7' });
     expect(handler.annotations).toMatchObject({ openWorldHint: true });
     const query = (handler.inputSchema.properties?.queries as any).items;
-    expect(query.properties.providers).toMatchObject({ maxItems: 2, items: { enum: ['local', 'ccel'] } });
-    expect(query.properties.selection.description).toContain('CCEL discovery');
-    expect(query.properties.author.description).toContain('unreviewed provider search restriction');
-    expect(query.properties.work.description).toContain('unreviewed provider');
-    expect(query.properties.startYear.description).toContain('direct query whose providers include ccel');
-    expect(query.properties.startYear.description).toContain('before adapter or coordinator admission');
-    expect(query.properties.endYear.description).toContain('direct query whose providers include ccel');
-    expect(query.properties.endYear.description).toContain('before adapter or coordinator admission');
-    expect(query.properties.page.description).toContain('page 1 only');
-    expect(query.properties.limit.description).toContain('capped at 5');
-    expect(validatorFor(handler.inputSchema)({ queries: [{ id: 'q', text: 'faith', providers: ['ccel'] }] }).valid).toBe(true);
+    expect(query.properties).not.toHaveProperty('providers');
+    expect(query.required).toEqual(['id', 'text']);
+    expect(query.properties.searchDepth).toMatchObject({ enum: ['standard', 'expanded'], default: 'standard' });
+    expect(query.properties.expandedLimit).toMatchObject({ minimum: 1, maximum: 5, default: 3 });
+    expect(query.properties.selection.description).toContain('curated-catalog');
+    expect(query.properties.author.description).toContain('reviewed external metadata');
+    expect(query.properties.work.description).toContain('reviewed external metadata');
+    expect(query.properties.startYear.description).toContain('Expanded discovery deliberately omits it');
+    expect(query.properties.endYear.description).toContain('Expanded discovery deliberately omits it');
+    expect(query.properties.page.description).toContain('Expanded searchDepth supports page 1 only');
+    expect(query.properties.limit.description).toContain('expandedLimit');
+    const validate = validatorFor(handler.inputSchema);
+    expect(validate({ queries: [{ id: 'q', text: 'faith' }] }).valid).toBe(true);
+    expect(validate({ queries: [{ id: 'q', text: 'faith', searchDepth: 'expanded', expandedLimit: 5 }] }).valid).toBe(true);
+    expect(validate({ queries: [{ id: 'q', text: 'faith', expandedLimit: 3 }] }).valid).toBe(false);
+    expect(validate({ queries: [{ id: 'q', text: 'faith', searchDepth: 'expanded', page: 2 }] }).valid).toBe(false);
+    expect(validate({ queries: [{ id: 'q', text: 'faith', searchDepth: 'expanded', expandedLimit: 0 }] }).valid).toBe(false);
+    expect(validate({ queries: [{ id: 'q', text: 'faith', searchDepth: 'expanded', expandedLimit: 6 }] }).valid).toBe(false);
+    expect(validate({ queries: [{ id: 'q', text: 'faith', providers: ['ccel'] }] }).valid).toBe(false);
   });
 
   it('uses exact compact JSON parity and emits native links only for final local hits', async () => {
     const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue(plan()) } as any, v7);
-    const result = await handler.handler({ queries: [{ id: 'q1', text: 'faith', providers: ['local', 'ccel'] }] });
+    const result = await handler.handler({ queries: [{ id: 'q1', text: 'faith', searchDepth: 'expanded' }] });
     expect(result.content[0]).toMatchObject({ type: 'text', text: expect.stringContaining('# Primary-source discovery') });
     expect(result.content.filter(item => item.type === 'resource_link')).toHaveLength(1);
     expect(JSON.stringify(result.content.slice(1))).not.toContain('ccel.org');
@@ -595,7 +603,7 @@ describe('primary_source_search v7 discovery contract', () => {
     adversarial.coverage.ccelHitCount = 0;
     const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue(adversarial) } as any, v7);
 
-    const result = await handler.handler({ queries: [{ id: 'q1', text: 'faith', providers: ['local'] }] });
+    const result = await handler.handler({ queries: [{ id: 'q1', text: 'faith' }] });
     const structured = result.structuredContent as any;
     const sanitized = structured.queries[0].providers[0].hits[0];
     expect(sanitized).not.toHaveProperty('author');
@@ -618,7 +626,7 @@ describe('primary_source_search v7 discovery contract', () => {
       provider.resultWindow = { returnedHitCount: 0, additionalMatchStatus: 'not_evaluated' };
     }
     const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue(unavailable) } as any, v7);
-    const result = await handler.handler({ queries: [{ id: 'q1', text: 'faith', providers: ['local', 'ccel'] }] });
+    const result = await handler.handler({ queries: [{ id: 'q1', text: 'faith', searchDepth: 'expanded' }] });
     expect(result.isError).toBe(true);
     expect(result.content[0]).toMatchObject({ type: 'text', text: expect.stringContaining('# Primary-source discovery') });
     expect(validatorFor(handler.outputSchema!)(result.structuredContent).valid).toBe(true);
@@ -634,7 +642,7 @@ describe('primary_source_search v7 discovery contract', () => {
     }];
     rateLimited.coverage = { localAttempted: false, localHitCount: 0, ccelAttempted: true, ccelHitCount: 0, notices: [] };
     const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue(rateLimited) } as any, v7);
-    const result = await handler.handler({ queries: [{ id: 'q1', text: 'faith', providers: ['ccel'] }] });
+    const result = await handler.handler({ queries: [{ id: 'q1', text: 'faith', searchDepth: 'expanded' }] });
     const validate = validatorFor(handler.outputSchema!);
     expect(validate(result.structuredContent).valid).toBe(true);
 
@@ -654,7 +662,7 @@ describe('primary_source_search v7 discovery contract', () => {
     'https://ccel.org.evil.test/ccel/calvin/institutes/iv.xvii.html',
   ])('omits a malicious external locator without emitting a link (%s)', async externalUrl => {
     const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue(plan(externalUrl)) } as any, v7);
-    const result = await handler.handler({ queries: [{ id: 'q1', text: 'faith', providers: ['local', 'ccel'] }] });
+    const result = await handler.handler({ queries: [{ id: 'q1', text: 'faith', searchDepth: 'expanded' }] });
     expect(JSON.stringify(result)).not.toContain(externalUrl);
     expect(result.structuredContent).toMatchObject({ planStatus: 'partial', queries: [{ providers: [{ hitCount: 1 }, { status: 'interface_changed', hitCount: 0 }] }] });
     expect(result.content.filter(item => item.type === 'resource_link')).toHaveLength(1);
@@ -672,7 +680,7 @@ describe('primary_source_search v7 discovery contract', () => {
       }],
     });
     const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue(adversarial) } as any, v7);
-    const result = await handler.handler({ queries: [{ id: 'q1', text: 'faith', providers: ['ccel'] }] });
+    const result = await handler.handler({ queries: [{ id: 'q1', text: 'faith', searchDepth: 'expanded' }] });
     const structured = result.structuredContent as any;
     expect(structured.queries.flatMap((query: any) => query.providers)
       .filter((provider: any) => provider.provider === 'ccel_live')).toHaveLength(1);

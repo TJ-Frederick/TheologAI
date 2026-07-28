@@ -154,17 +154,17 @@ describe('Worker MCP endpoint in workerd', () => {
     const tool = root.tools.find(candidate => candidate.name === 'primary_source_search')!;
     expect(tool.outputSchema?.properties?.schemaVersion).toEqual({ const: '7' });
     expect(tool.annotations).toMatchObject({ openWorldHint: true });
-    const result = await tool.handler({ queries: [{ id: 'external', text: 'grace', providers: ['ccel'] }] });
+    const result = await tool.handler({ queries: [{ id: 'external', text: 'grace', searchDepth: 'expanded' }] });
     expect(result).toMatchObject({
-      isError: true,
       structuredContent: {
-        schemaVersion: '7', planStatus: 'unavailable',
-        coverage: { ccelAttempted: false, ccelStatus: 'disabled', ccelHitCount: 0 },
+        schemaVersion: '7', planStatus: 'partial',
+        coverage: { localAttempted: true, ccelAttempted: false, ccelStatus: 'disabled', ccelHitCount: 0 },
       },
     });
+    expect(result.isError).not.toBe(true);
     expect(result.content[0]).toMatchObject({
       type: 'text',
-      text: expect.stringContaining('CCEL discovery lead: **disabled**'),
+      text: expect.stringContaining('Expanded discovery results: **disabled**'),
     });
   });
 
@@ -292,8 +292,10 @@ describe('Worker MCP endpoint in workerd', () => {
       annotations: { openWorldHint: true },
         outputSchema: { properties: { schemaVersion: { const: '7' } } },
     });
-    expect((((primarySourceTool.inputSchema as any).properties.queries.items)
-      .properties.providers.items.enum)).toEqual(['local', 'ccel']);
+    const primarySourceQuery = ((primarySourceTool.inputSchema as any).properties.queries.items);
+    expect(primarySourceQuery.properties).not.toHaveProperty('providers');
+    expect(primarySourceQuery.properties.searchDepth).toMatchObject({ enum: ['standard', 'expanded'], default: 'standard' });
+    expect(primarySourceQuery.properties.expandedLimit).toMatchObject({ minimum: 1, maximum: 5, default: 3 });
   });
 
   it('returns structured Bible content alongside the legacy Markdown result', async () => {
@@ -978,7 +980,7 @@ describe('Worker MCP endpoint in workerd', () => {
   it('returns structured primary-source evidence and an exact readable D1 resource link', async () => {
     const result = await rpc('tools/call', {
       name: 'primary_source_search',
-      arguments: { queries: [{ id: 'creed', text: 'almighty', providers: ['local'], limit: 1 }] },
+      arguments: { queries: [{ id: 'creed', text: 'almighty', searchDepth: 'standard', limit: 1 }] },
     }, 42);
 
     expect(result.response.status).toBe(200);
@@ -1049,7 +1051,7 @@ describe('Worker MCP endpoint in workerd', () => {
       expect.objectContaining({ name: 'word-study' }),
       expect.objectContaining({
         name: 'primary-source-research',
-        description: expect.stringContaining('optional external discovery leads'),
+        description: expect.stringContaining('optionally broaden discovery'),
       }),
     ]));
 
@@ -1059,7 +1061,7 @@ describe('Worker MCP endpoint in workerd', () => {
     }, 801);
     expect(primarySourcePrompt.message.error).toBeUndefined();
     expect(JSON.stringify(primarySourcePrompt.message.result?.messages)).toContain(
-      'Each call contains at most one CCEL-bearing query',
+      'At most one query may be expanded per call',
     );
     expect(JSON.stringify(primarySourcePrompt.message.result?.messages)).toContain(
       'Never quote, compare creators or works, or draw substantive conclusions from any search snippet alone',
@@ -1070,7 +1072,7 @@ describe('Worker MCP endpoint in workerd', () => {
     }, 802);
     expect(confessionPrompt.message.error).toBeUndefined();
     expect(JSON.stringify(confessionPrompt.message.result?.messages)).toContain(
-      'external `external_url` locator',
+      'For an `external_url` locator',
     );
     expect(JSON.stringify(confessionPrompt.message.result?.messages)).toContain(
       'rights status is not determined',

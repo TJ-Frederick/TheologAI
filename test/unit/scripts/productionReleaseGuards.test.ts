@@ -84,8 +84,8 @@ describe('production release guards', () => {
     // that otherwise passed its strict gates is also terminal if final
     // routing/binding evidence could not be captured or hashed.
     expect(workflow).toContain("id: production-audit-evidence\n        if: ${{ steps.production-worker-deploy.outcome == 'success' && steps.production-worker-candidate-cutover.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' && steps.production-historical-core-audit.outcome == 'success' && steps.production-worker-audit-identity.outcome == 'success' && steps.production-final-observation.outcome == 'success' }}");
-    expect(historicalAuditScript).toContain('${profile.label} CCEL-disabled/local-only execution invariant drifted');
-    expect(historicalAuditScript).not.toContain('preview CCEL-disabled/local-only execution invariant drifted');
+    expect(historicalAuditScript).toContain('${profile.label} expanded-discovery/catalog execution invariant drifted');
+    expect(historicalAuditScript).not.toContain('preview expanded-discovery/catalog execution invariant drifted');
 
     // Strict cutover, fixed audits, audit-stability proof, and protected
     // evidence remain unavailable unless the deploy action itself succeeded.

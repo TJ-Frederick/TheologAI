@@ -23,7 +23,7 @@ export function createPrimarySourceSearchHandler(
   return {
     name: 'primary_source_search',
     description: v5
-      ? 'Execute a bounded primary-source discovery plan across the local collection and optional CCEL discovery metadata. Local hits are readable MCP resources; external snippets are unreviewed discovery leads with direct URLs only and must not be quoted or compared as evidence.'
+      ? 'Search the curated 35-work historical catalog first. Use searchDepth expanded only when a bounded, separately labeled external-discovery set could help; its unreviewed direct-URL snippets are discovery leads, not evidence. Per-hit edition readiness states the available provenance.'
       : 'Execute an explicit, bounded query plan against the locally indexed historical-document collection. Supports exact catalog work aliases, exact reviewed creator names, and inclusive overlapping composition-year ranges. Returns catalog scope, snippets, and exact local section locators only; read selected exact resources before quotation or comparison.',
     inputSchema: {
       type: 'object',
@@ -35,56 +35,73 @@ export function createPrimarySourceSearchHandler(
             properties: {
               id: { type: 'string', minLength: 1, maxLength: 40, pattern: '^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$' },
               text: { type: 'string', minLength: 1, maxLength: 200 },
-              providers: {
-                type: 'array', minItems: 1, maxItems: v5 ? 2 : 1, uniqueItems: true,
-                items: { type: 'string', enum: v5 ? ['local', 'ccel'] : ['local'] },
-                description: v5
-                  ? 'Unique providers from local and ccel. At most one query in a tool call may include ccel.'
-                  : 'Current public provider contract. Only the locally indexed collection is available.',
-              },
+              ...(v5 ? {
+                searchDepth: { type: 'string', enum: ['standard', 'expanded'], default: 'standard', description: 'standard searches the curated 35-work catalog. expanded keeps that search and adds one separately labeled bounded external-discovery group; at most one query per call may be expanded.' },
+                expandedLimit: { type: 'integer', minimum: 1, maximum: 5, default: 3, description: 'Expanded-discovery result cap. Valid only with searchDepth expanded.' },
+              } : {
+                providers: { type: 'array', minItems: 1, maxItems: 1, uniqueItems: true, items: { type: 'string', enum: ['local'] }, description: 'Current public provider contract. Only the locally indexed collection is available.' },
+              }),
               match: { type: 'string', enum: ['all_terms', 'phrase'], default: 'all_terms' },
               selection: {
                 type: 'string', enum: ['relevance', 'work_diversity'], default: 'relevance',
                 description: v5
-                  ? 'Local provider: relevance locates within a work; work_diversity round-robins across hosted works. CCEL discovery preserves the field but uses provider result order.'
+                  ? 'Use relevance for within-work location; use work_diversity for a deterministic curated-catalog survey.'
                   : 'Use relevance for within-work location; use work_diversity for deterministic research bundles that round-robin across matching hosted works.',
               },
               author: {
                 type: 'string', minLength: 1, maxLength: 100,
                 description: v5
-                  ? 'Local: one exact reviewed creator name. CCEL: an unreviewed provider search restriction. Use sequential tool calls for different external creators.'
+                  ? 'One exact reviewed creator name for the catalog search; expanded discovery uses the same literal restriction without treating it as reviewed external metadata.'
                   : 'One exact reviewed creator name. Use separate query-plan items for different creators; creator roles are not relabeled as authorship.',
               },
               work: {
                 type: 'string', minLength: 1, maxLength: 160,
                 description: v5
-                  ? 'Local: exact hosted slug, title, or routing alias. CCEL: an unreviewed provider title/work restriction, not reviewed metadata.'
+                  ? 'Exact catalog slug, title, or routing alias; expanded discovery uses the same literal restriction without treating it as reviewed external metadata.'
                   : 'Exact hosted work slug, title, or lookup-only alias.',
               },
               startYear: {
                 type: 'integer', minimum: -5000, maximum: 3000,
                 description: v5
-                  ? 'Hosted-local inclusive composition-overlap lower bound. A direct query whose providers include ccel cannot use this field: it returns unsupported_filter before adapter or coordinator admission.'
+                  ? 'Inclusive catalog composition-overlap lower bound when reviewed dates are available. Expanded discovery deliberately omits it and warns that broader results are not date-filtered.'
                   : 'Inclusive lower bound. A work is eligible when its reviewed composition interval overlaps the requested interval.',
               },
               endYear: {
                 type: 'integer', minimum: -5000, maximum: 3000,
                 description: v5
-                  ? 'Hosted-local inclusive composition-overlap upper bound; must be >= startYear. A direct query whose providers include ccel cannot use this field: it returns unsupported_filter before adapter or coordinator admission.'
+                  ? 'Inclusive catalog composition-overlap upper bound when reviewed dates are available; must be >= startYear. Expanded discovery deliberately omits it and warns that broader results are not date-filtered.'
                   : 'Inclusive upper bound. Must be greater than or equal to startYear when both are provided.',
               },
               page: {
                 type: 'integer', minimum: 1, maximum: 3, default: 1,
                 description: v5
-                  ? 'Both providers support page 1 only in this contract; values above 1 return unsupported_filter without CCEL admission.'
+                  ? 'Curated-catalog page (1–3). Expanded searchDepth supports page 1 only.'
                   : 'Preserved planner field. The local provider supports only page 1 and reports unsupported_filter otherwise.',
               },
               limit: {
                 type: 'integer', minimum: 1, maximum: 8, default: 5,
-                ...(v5 ? { description: 'Local maximum is 8; external CCEL results are always capped at 5.' } : {}),
+                ...(v5 ? { description: 'Curated-catalog maximum is 8. Use expandedLimit for the separately bounded expanded-discovery group.' } : {}),
               },
             },
-            required: ['id', 'text', 'providers'],
+            required: v5 ? ['id', 'text'] : ['id', 'text', 'providers'],
+            ...(v5 ? {
+              allOf: [
+                {
+                  if: { required: ['expandedLimit'] },
+                  then: {
+                    required: ['searchDepth'],
+                    properties: { searchDepth: { const: 'expanded' } },
+                  },
+                },
+                {
+                  if: {
+                    required: ['searchDepth'],
+                    properties: { searchDepth: { const: 'expanded' } },
+                  },
+                  then: { properties: { page: { const: 1 } } },
+                },
+              ],
+            } : {}),
             additionalProperties: false,
           },
         },
