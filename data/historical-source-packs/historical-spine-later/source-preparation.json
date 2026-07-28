@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "historical-source-preparation.v1",
+  "packId": "theologai-historical-spine-later",
+  "status": "inactive_local_preparation_only",
+  "sourceRootLayout": "<source-root>/historical-spine-later/{authorities,comparators}",
+  "normalizationGates": [
+    {
+      "editionId": "pascal-pensees-trotter-1910",
+      "kind": "exclude_prefatory_contributor",
+      "contributor": "T. S. Eliot",
+      "requiredIntroMarker": "INTRODUCTION BY T. S. ELIOT",
+      "bodyStartMarker": "SECTION I",
+      "bodyEndMarker": "NOTES"
+    }
+  ],
+  "inputs": [
+    { "editionId": "hooker-laws-of-ecclesiastical-polity-book-1-keble-1888", "role": "authority", "path": "authorities/hooker.pdf", "sha256": "cc6874fd24c1d86ffb73b2a10a2e8f616827b831ccf5c4532b7fb63aa145856d", "bytes": 2365406 },
+    { "editionId": "hooker-laws-of-ecclesiastical-polity-book-1-keble-1888", "role": "comparator", "path": "comparators/hooker-the-works-of-richard-hooker-vol-1.epub", "sha256": "c6ec69aaddc67c0e3f4a10fcc34241e83cfab5dded736ad3a87e9797cfd1b8c4", "bytes": 852534 },
+    { "editionId": "hooker-laws-of-ecclesiastical-polity-book-1-keble-1888", "role": "derived", "path": "derived/hooker-book-1.txt", "sha256": "6e269829edd2d030f6409e11d40da4ceed3e322b6ab6b71539b507b78061d44e", "bytes": 181926 },
+    { "editionId": "julian-revelations-of-divine-love-warrack-1901-gutenberg", "role": "authority", "path": "comparators/pg52958.txt", "sha256": "2e01d1a44b27b001b51053053fe69db771a6609edbbbc5a7fb31da9d4b3cc4b9", "bytes": 476062 },
+    { "editionId": "kempis-imitation-of-christ-benham-gutenberg", "role": "authority", "path": "comparators/pg1653.txt", "sha256": "7631799607b0ede62f1bd7ed2a8eb62d89524451a3c41e9ad2b5cbf4c2aa5383", "bytes": 374954 },
+    { "editionId": "pascal-pensees-trotter-1910", "role": "authority", "path": "authorities/thoughts00trotgoog.pdf", "sha256": "88ac08b1da08f6e8bfd2f6e5cc819626d41f29a8f59155074dbc6794638b9bfa", "bytes": 24226421 },
+    { "editionId": "pascal-pensees-trotter-1910", "role": "comparator", "path": "comparators/pg18269.txt", "sha256": "be863330cafa658e6ab10f79c1fdb89502fb13561699c1a6b31745289ae674fd", "bytes": 663179 }
+  ]
+}

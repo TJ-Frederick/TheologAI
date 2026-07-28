@@ -1,0 +1,271 @@
+{
+  "schemaVersion": "historical-source-pack-manifest.v1",
+  "packId": "theologai-historical-spine-early",
+  "revision": 1,
+  "rightsScope": "normalized_public_domain_text_only",
+  "members": [
+    {
+      "id": "augustine-on-christian-doctrine-shaw-npnf1-v2-1887",
+      "sourcePath": "editions/augustine-on-christian-doctrine-shaw-npnf1-v2-1887.json",
+      "packageSha256": "ebb2892a9dd4b25b3a1f9fa1dd6fc974614eb8e7aa0edff6d47e03481e3464f6",
+      "normalizedTextRights": {
+        "status": "no_known_conflict",
+        "scope": "normalized_public_domain_text_only",
+        "basis": "Historical NPNF, first series, volume II, 1887 translation; no contrary ownership evidence is known.",
+        "reviewedAt": "2026-07-27"
+      },
+      "artifacts": [
+        {
+          "artifactId": "augustine-on-christian-doctrine-shaw-npnf1-v2-1887-authority-scan",
+          "role": "authority",
+          "locator": "https://archive.org/download/aselectlibraryn02augugoog/aselectlibraryn02augugoog.pdf",
+          "sha256": "9a9e6449cab5eaa67063bff35e2dca87a02b47ddc81a1c172ea08dd4179a6322",
+          "bytes": 47046039,
+          "acquiredAt": "2026-07-27T00:00:00.000Z"
+        },
+        {
+          "artifactId": "augustine-on-christian-doctrine-shaw-npnf1-v2-1887-comparator-ccel-xml",
+          "role": "comparator",
+          "locator": "https://ccel.org/ccel/schaff/npnf102.xml",
+          "sha256": "b8ca21dfa7d553681651f85197064b0fe52ae6c17e5e17252df9301536a4ae2a",
+          "bytes": 4137798,
+          "acquiredAt": "2026-07-27T00:00:00.000Z"
+        }
+      ],
+      "catalog": {
+        "composition": {
+          "label": "397–426",
+          "startYear": 397,
+          "endYear": 426
+        },
+        "compositionProvenanceSources": [
+          {
+            "sourceId": "hist-meta-augustine-christian-doctrine-ccel",
+            "label": "CCEL: first three books dated 397 and fourth book dated 426",
+            "url": "https://ccel.org/ccel/augustine/doctrine.ii.html"
+          }
+        ]
+      }
+    },
+    {
+      "id": "basil-on-the-holy-spirit-jackson-npnf2-v8-1895",
+      "sourcePath": "editions/basil-on-the-holy-spirit-jackson-npnf2-v8-1895.json",
+      "packageSha256": "cba24ed2f2d3d262c53f464734cc0816a25c788930ef823872689804da95099d",
+      "normalizedTextRights": {
+        "status": "no_known_conflict",
+        "scope": "normalized_public_domain_text_only",
+        "basis": "Historical NPNF, second series, volume VIII, 1895 translation; no contrary ownership evidence is known.",
+        "reviewedAt": "2026-07-27"
+      },
+      "artifacts": [
+        {
+          "artifactId": "basil-on-the-holy-spirit-jackson-npnf2-v8-1895-authority-scan",
+          "role": "authority",
+          "locator": "https://books.google.com/books/download?id=kIAXAAAAYAAJ&output=pdf",
+          "sha256": "469f5a890ebf6a7d69e9ffe2312cf9a350f3c8d610346d94bf527bae8e66fe2d",
+          "bytes": 32755973,
+          "acquiredAt": "2026-07-27T00:00:00.000Z"
+        },
+        {
+          "artifactId": "basil-on-the-holy-spirit-jackson-npnf2-v8-1895-comparator-ccel-xml",
+          "role": "comparator",
+          "locator": "https://ccel.org/ccel/schaff/npnf208.xml",
+          "sha256": "95cf3dafefccec80e0949a03c7f1f605da293302d0dc7a8bd62a4e711a0c5532",
+          "bytes": 3303323,
+          "acquiredAt": "2026-07-27T00:00:00.000Z"
+        }
+      ],
+      "catalog": {
+        "composition": {
+          "label": "c. 375",
+          "startYear": 375,
+          "endYear": 375
+        },
+        "compositionProvenanceSources": [
+          {
+            "sourceId": "hist-meta-basil-holy-spirit-catholic-culture",
+            "label": "Catholic Culture: On the Holy Spirit dated c. 375",
+            "url": "https://www.catholicculture.org/culture/library/fathers/view.cfm?recnum=2544"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gregory-nazianzen-five-theological-orations-browne-swallow-npnf2-v7-1894",
+      "sourcePath": "editions/gregory-nazianzen-five-theological-orations-browne-swallow-npnf2-v7-1894.json",
+      "packageSha256": "c04c18ffd8dd72a58792caaf9b8f18a654f08445293780301f55c043faee3718",
+      "normalizedTextRights": {
+        "status": "no_known_conflict",
+        "scope": "normalized_public_domain_text_only",
+        "basis": "Historical NPNF, second series, volume VII, 1894 translation; no contrary ownership evidence is known.",
+        "reviewedAt": "2026-07-27"
+      },
+      "artifacts": [
+        {
+          "artifactId": "gregory-nazianzen-five-theological-orations-browne-swallow-npnf2-v7-1894-authority-scan",
+          "role": "authority",
+          "locator": "https://archive.org/download/aselectlibraryn07wacegoog/aselectlibraryn07wacegoog.pdf",
+          "sha256": "5dedda6b928776b6171531f65832f32237568cb4e7a3e40e3f506ee8665788a0",
+          "bytes": 71633290,
+          "acquiredAt": "2026-07-27T00:00:00.000Z"
+        },
+        {
+          "artifactId": "gregory-nazianzen-five-theological-orations-browne-swallow-npnf2-v7-1894-comparator-ccel-xml",
+          "role": "comparator",
+          "locator": "https://ccel.org/ccel/schaff/npnf207.xml",
+          "sha256": "3ac73f4179c0b7d6e66e6fea04ae572e64c0e4a80e8fa38980b40366c8a13928",
+          "bytes": 4247548,
+          "acquiredAt": "2026-07-27T00:00:00.000Z"
+        }
+      ],
+      "catalog": {
+        "composition": {
+          "label": "380",
+          "startYear": 380,
+          "endYear": 380
+        },
+        "compositionProvenanceSources": [
+          {
+            "sourceId": "hist-meta-nazianzen-theological-orations-catholic-culture",
+            "label": "Catholic Culture: Five Theological Orations dated 380",
+            "url": "https://www.catholicculture.org/culture/library/fathers/view.cfm?recnum=2440"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gregory-nyssa-great-catechism-moore-wilson-npnf2-v5-1893",
+      "sourcePath": "editions/gregory-nyssa-great-catechism-moore-wilson-npnf2-v5-1893.json",
+      "packageSha256": "641dac27b2d7a932f86b0d54afdc665a68e82ed1451284f41044ed2ff9f94e67",
+      "normalizedTextRights": {
+        "status": "no_known_conflict",
+        "scope": "normalized_public_domain_text_only",
+        "basis": "Historical NPNF, second series, volume V, 1893 translation; no contrary ownership evidence is known.",
+        "reviewedAt": "2026-07-27"
+      },
+      "artifacts": [
+        {
+          "artifactId": "gregory-nyssa-great-catechism-moore-wilson-npnf2-v5-1893-authority-scan",
+          "role": "authority",
+          "locator": "https://archive.org/download/aselectlibraryn05wacegoog/aselectlibraryn05wacegoog.pdf",
+          "sha256": "5a2d4fd8d20e5b5542f4f214710c4f97345e47abb7b39b30cdd76d357a00cf37",
+          "bytes": 62056477,
+          "acquiredAt": "2026-07-27T00:00:00.000Z"
+        },
+        {
+          "artifactId": "gregory-nyssa-great-catechism-moore-wilson-npnf2-v5-1893-comparator-ccel-xml",
+          "role": "comparator",
+          "locator": "https://ccel.org/ccel/schaff/npnf205.xml",
+          "sha256": "43e87ed232457fd2d5862f72dd2d5d84fe1e8b69f4c3eec839bad04579327bf3",
+          "bytes": 4225695,
+          "acquiredAt": "2026-07-27T00:00:00.000Z"
+        }
+      ],
+      "catalog": {
+        "composition": {
+          "label": "c. 385",
+          "startYear": 385,
+          "endYear": 385
+        },
+        "compositionProvenanceSources": [
+          {
+            "sourceId": "hist-meta-nyssa-great-catechism-catholic-culture",
+            "label": "Catholic Culture: The Great Catechism dated c. 385",
+            "url": "https://www.catholicculture.org/culture/library/fathers/view.cfm?recnum=2277"
+          }
+        ]
+      }
+    },
+    {
+      "id": "justin-martyr-apologies-dods-reith-anf1-1885",
+      "sourcePath": "editions/justin-martyr-apologies-dods-reith-anf1-1885.json",
+      "packageSha256": "c341fded602845c2d7d72345b86585b952831b1dd695868dbcd2ef18f9189ea7",
+      "normalizedTextRights": {
+        "status": "no_known_conflict",
+        "scope": "normalized_public_domain_text_only",
+        "basis": "Historical ANF, volume I, 1885 translation; no contrary ownership evidence is known.",
+        "reviewedAt": "2026-07-27"
+      },
+      "artifacts": [
+        {
+          "artifactId": "justin-martyr-apologies-dods-reith-anf1-1885-authority-scan",
+          "role": "authority",
+          "locator": "https://archive.org/download/antenicenefathers01robe/antenicenefathers01robe.pdf",
+          "sha256": "b50e358eebf85f06794c4dba16777eb6d27a35688a6c7a828b46c9d2190be8cc",
+          "bytes": 58025655,
+          "acquiredAt": "2026-07-27T00:00:00.000Z"
+        },
+        {
+          "artifactId": "justin-martyr-apologies-dods-reith-anf1-1885-comparator-ccel-xml",
+          "role": "comparator",
+          "locator": "https://ccel.org/ccel/schaff/anf01.xml",
+          "sha256": "8012ea0e35b497d2fbd783f9d4fd7b3a27d98c6dc66fd427b50d7312e6dd45af",
+          "bytes": 4511814,
+          "acquiredAt": "2026-07-27T00:00:00.000Z"
+        }
+      ],
+      "catalog": {
+        "composition": {
+          "label": "c. 150–161",
+          "startYear": 150,
+          "endYear": 161
+        },
+        "compositionProvenanceSources": [
+          {
+            "sourceId": "hist-meta-justin-apologies-bloomsbury",
+            "label": "Bloomsbury primary source: First Apology dated 155–157",
+            "url": "https://media.bloomsbury.com/rep/files/primary-source-31-justin-martyr.pdf"
+          },
+          {
+            "sourceId": "hist-meta-justin-apologies-newadvent",
+            "label": "New Advent: Justin Martyr chronology for the two Apologies",
+            "url": "https://www.newadvent.org/cathen/08580c.htm"
+          }
+        ]
+      }
+    },
+    {
+      "id": "origen-de-principiis-crombie-anf4-1885",
+      "sourcePath": "editions/origen-de-principiis-crombie-anf4-1885.json",
+      "packageSha256": "7422273ceaff071d1c61d9b89a36bc822a8c8544c669ba544851fd1f2982f441",
+      "normalizedTextRights": {
+        "status": "no_known_conflict",
+        "scope": "normalized_public_domain_text_only",
+        "basis": "Historical ANF, volume IV, 1885 translation; no contrary ownership evidence is known.",
+        "reviewedAt": "2026-07-27"
+      },
+      "artifacts": [
+        {
+          "artifactId": "origen-de-principiis-crombie-anf4-1885-authority-scan",
+          "role": "authority",
+          "locator": "https://archive.org/download/antenicenefather04robe/antenicenefather04robe.pdf",
+          "sha256": "56d6574093b481ed4d4aab4a878da8d06ee60829a4d8339f84221e04ef3a79b4",
+          "bytes": 63946176,
+          "acquiredAt": "2026-07-27T00:00:00.000Z"
+        },
+        {
+          "artifactId": "origen-de-principiis-crombie-anf4-1885-comparator-ccel-xml",
+          "role": "comparator",
+          "locator": "https://ccel.org/ccel/schaff/anf04.xml",
+          "sha256": "240b26390c16fb0a7683b6ce6076e86f0d387c4e43fa88f079d9600f385acaf0",
+          "bytes": 5759964,
+          "acquiredAt": "2026-07-27T00:00:00.000Z"
+        }
+      ],
+      "catalog": {
+        "composition": {
+          "label": "229–230",
+          "startYear": 229,
+          "endYear": 230
+        },
+        "compositionProvenanceSources": [
+          {
+            "sourceId": "hist-meta-origen-de-principiis-biblindex",
+            "label": "BiblIndex: De Principiis period 229–230",
+            "url": "https://www.biblindex.org/en/work-editions/de-principiis/patrologia-graeca-11"
+          }
+        ]
+      }
+    }
+  ]
+}

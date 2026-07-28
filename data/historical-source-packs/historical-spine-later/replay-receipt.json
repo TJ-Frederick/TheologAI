@@ -1,0 +1,73 @@
+{
+  "schemaVersion": "historical-source-replay-receipt.v1",
+  "packId": "theologai-historical-spine-later",
+  "completedAt": "2026-07-28T15:58:23.029Z",
+  "script": {
+    "path": "scripts/replay-historical-spine-source-packs.ts",
+    "sha256": "9778534d0fc52547576086454e8e8d7dba5f04f6adb2572624f462daa4f18e37"
+  },
+  "preparationManifestSha256": "dc8bf2c389436f512d8a5e1a48da9b9b248fcbf6940181cb5dcabcbe53cad292",
+  "reviewedManifestSha256": "5a7e865706f0dc3ea494e92a525491d7eff70c01b8973ed96b37027e3250676b",
+  "inputs": [
+    {
+      "editionId": "hooker-laws-of-ecclesiastical-polity-book-1-keble-1888",
+      "role": "authority",
+      "sha256": "cc6874fd24c1d86ffb73b2a10a2e8f616827b831ccf5c4532b7fb63aa145856d",
+      "bytes": 2365406
+    },
+    {
+      "editionId": "hooker-laws-of-ecclesiastical-polity-book-1-keble-1888",
+      "role": "comparator",
+      "sha256": "c6ec69aaddc67c0e3f4a10fcc34241e83cfab5dded736ad3a87e9797cfd1b8c4",
+      "bytes": 852534
+    },
+    {
+      "editionId": "hooker-laws-of-ecclesiastical-polity-book-1-keble-1888",
+      "role": "derived",
+      "sha256": "6e269829edd2d030f6409e11d40da4ceed3e322b6ab6b71539b507b78061d44e",
+      "bytes": 181926
+    },
+    {
+      "editionId": "julian-revelations-of-divine-love-warrack-1901-gutenberg",
+      "role": "authority",
+      "sha256": "2e01d1a44b27b001b51053053fe69db771a6609edbbbc5a7fb31da9d4b3cc4b9",
+      "bytes": 476062
+    },
+    {
+      "editionId": "kempis-imitation-of-christ-benham-gutenberg",
+      "role": "authority",
+      "sha256": "7631799607b0ede62f1bd7ed2a8eb62d89524451a3c41e9ad2b5cbf4c2aa5383",
+      "bytes": 374954
+    },
+    {
+      "editionId": "pascal-pensees-trotter-1910",
+      "role": "authority",
+      "sha256": "88ac08b1da08f6e8bfd2f6e5cc819626d41f29a8f59155074dbc6794638b9bfa",
+      "bytes": 24226421
+    },
+    {
+      "editionId": "pascal-pensees-trotter-1910",
+      "role": "comparator",
+      "sha256": "be863330cafa658e6ab10f79c1fdb89502fb13561699c1a6b31745289ae674fd",
+      "bytes": 663179
+    }
+  ],
+  "outputs": [
+    {
+      "editionId": "hooker-laws-of-ecclesiastical-polity-book-1-keble-1888",
+      "packageSha256": "282619f3343eb60ebf274d6226b0a604081d597eb32f13dcd210c33736e5c291"
+    },
+    {
+      "editionId": "julian-revelations-of-divine-love-warrack-1901-gutenberg",
+      "packageSha256": "bcdecbf2a93eb7db0a8e36fd4b2c5f1719f5a5e60b1ae2db3612807b100a4fff"
+    },
+    {
+      "editionId": "kempis-imitation-of-christ-benham-gutenberg",
+      "packageSha256": "4373c1c03f43ede7784ad6195af1ae33ab009da71b6a03f73b8ec3d742fbf9d6"
+    },
+    {
+      "editionId": "pascal-pensees-trotter-1910",
+      "packageSha256": "3c644c513e57d62f9e75dea0fcc4ca125a8bcb73bd7f20d672a48379068551ad"
+    }
+  ]
+}
