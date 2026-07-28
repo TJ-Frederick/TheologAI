@@ -52,10 +52,7 @@ import {
   loadHistoricalSourcePacks,
   materializeHistoricalSourcePacks,
 } from './historical-source-packs.js';
-import {
-  loadApprovedAquinasHierarchy,
-  materializeHistoricalHierarchy,
-} from './historical-hierarchy.js';
+import { assertNormalAquinasHierarchyExclusion } from './historical-hierarchy.js';
 import {
   compileHistoricalSectionCompatibility,
   parseHistoricalSectionCompatibilityAttestation,
@@ -674,20 +671,13 @@ if (JSON.stringify(historicalSourcePackCounts) !== JSON.stringify({
 }
 log(`  Inserted ${historicalSourcePackCounts.works} reviewed works with ${historicalSourcePackCounts.sections} canonical sections`);
 
-// ── Transform 10: local-only generic hierarchical authority storage ──
+// ── Transform 10: dormant generic hierarchical authority foundation ──
 //
-// This deliberately has no document/catalog/runtime/MCP projection. The
-// manifest-bound reader still consumes the exact approved packet so a local
-// seed can reproduce and audit the dormant authority facts deterministically.
-log('Materializing inactive Aquinas edition hierarchy authority...');
-const aquinasHierarchy = loadApprovedAquinasHierarchy(sourceRegistry);
-const aquinasHierarchyCounts = materializeHistoricalHierarchy(db, aquinasHierarchy);
-if (JSON.stringify(aquinasHierarchyCounts) !== JSON.stringify({
-  hierarchies: 1, artifacts: 4, bodies: 3184, nodes: 3185, ftsRows: 3184,
-})) {
-  throw new Error('Transform 10 hierarchy materialization did not retain the approved inactive Aquinas inventory');
-}
-log(`  Inserted ${aquinasHierarchyCounts.bodies} inactive authority bodies with ${aquinasHierarchyCounts.nodes} navigation nodes`);
+// The reviewed Aquinas packet, migration, and standalone materializer remain
+// local-only groundwork. A normal release build intentionally does not read or
+// materialize the packet: all four hierarchy tables and its shared source
+// lineage must remain empty. The capacity rehearsal is the only code path that
+// materializes the packet, into a disposable temporary database.
 
 // ── Tier 3: UBS source-attested parallel passages ──
 
@@ -775,6 +765,11 @@ for (const [table, expected] of Object.entries(manifest.expectedCounts)) {
 if (countMismatches.length > 0) {
   throw new Error(`Unexpected table counts: ${countMismatches.join('; ')}`);
 }
+
+// Count checks alone cannot prove that no Aquinas shared-lineage row leaked
+// into a similarly sized normal corpus. Enforce the exact exclusion boundary
+// immediately before this database becomes a releasable artifact.
+assertNormalAquinasHierarchyExclusion(db);
 
 db.close();
 db = undefined;

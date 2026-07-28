@@ -19,14 +19,17 @@ describe('Transform 10 hierarchy inertness', () => {
     }
   });
 
-  it('keeps Transform 10 out of document projections while retaining its inactive authority readiness gate', () => {
+  it('keeps Transform 10 out of normal materialization, document projections, and active runtime paths', () => {
     const build = readFileSync(join(ROOT, 'scripts/build-database.ts'), 'utf8');
-    expect(build).toMatch(/Materializing inactive Aquinas edition hierarchy authority/);
+    expect(build).toMatch(/dormant generic hierarchical authority foundation/);
     const transform10 = build.slice(build.indexOf('// ── Transform 10'), build.indexOf('// ── Tier 3'));
-    expect(transform10).not.toMatch(/insertDocument|insertSection|insertProfile/);
+    expect(transform10).not.toMatch(/loadApprovedAquinasHierarchy|materializeHistoricalHierarchy|insertDocument|insertSection|insertProfile/);
+    expect(build).toMatch(/assertNormalAquinasHierarchyExclusion\(db\);/);
+    expect(build.indexOf('assertNormalAquinasHierarchyExclusion(db);')).toBeGreaterThan(build.indexOf('Unexpected table counts'));
     const remoteReadiness = readFileSync(join(ROOT, 'scripts/check-remote-d1-readiness.ts'), 'utf8');
-    expect(remoteReadiness).toMatch(/historical\.transform10\.exact_profile_and_artifacts/);
-    expect(remoteReadiness).toMatch(/transform10ReadinessChecks/);
+    expect(remoteReadiness).toMatch(/normalAquinasHierarchyExclusionChecks/);
+    expect(remoteReadiness).toMatch(/normalTransform10ExclusionReadinessChecks/);
+    expect(remoteReadiness).not.toMatch(/historical\.transform10\.exact_profile_and_artifacts/);
     expect(remoteReadiness).not.toMatch(/MCP tool|runtime composition/i);
   });
 });

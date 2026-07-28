@@ -8,13 +8,11 @@
 
 import { createHash } from 'node:crypto';
 import type Database from 'better-sqlite3';
-import {
-  AQUINAS_CAPACITY_EXPECTED,
-  buildCandidateB,
-  loadAquinasCapacityInput,
-  type AquinasAuthorityBody,
-  type AquinasNavigationNode,
-  type AquinasPackageReader,
+import type {
+  AquinasAuthorityBody,
+  AquinasCapacityInput,
+  AquinasNavigationNode,
+  AquinasPackageReader,
 } from './aquinas-source-pack-capacity-comparison.js';
 
 const ACQUISITION_DIRECTORY = 'data/historical-sources/project-gutenberg/aquinas-english-dominican';
@@ -35,6 +33,14 @@ export const AQUINAS_HIERARCHY_EXPECTED = Object.freeze({
   questions: 512,
   articles: 2669,
   artifacts: 4,
+  sourceManifestSha256: 'b9d25c13ec6e59312ff8ecbf8d630a1875b8b253baac0d816cc9b9daf9618215',
+  aggregateSha256: '76be93e0af83df8e46bbc84aadee07d8c27f2324b024b7338a44cf922e5507fa',
+  orderedQuestionKeysSha256: '1c3cfe11af52a7e29a09aae6ce64e854eac18bc96e5b05c55f8200e407022049',
+  orderedArticleKeysSha256: '6cfcf13360da2d30464ab48268c71b4d1b8408d7971ba497b41ddcce30ed79bd',
+  sourceLockSha256: 'c5cfdd1edd132bf59968cbabe4c7de2180c42d205735ca6c06aec626104a180b',
+  localReceiptSha256: 'bc0dab9ce5dc3672ccf2a81182655c75eaf6ef4f280584a40e079bf82a11719d',
+  topologyLockSha256: 'ce6197ba036ec7200f43513f9e6676ccfd5cb5a4727077a440770416bdf6978b',
+  discrepancyLedgerSha256: 'c8e10cbf29d710b89fe48aa91d18f25489c96039116e53254d0592dfb0b68120',
   rightsStatus: 'public_domain_in_usa',
   territoryCaveat: 'The catalog statement and internal notice support a United States position only; this lock makes no worldwide public-domain conclusion.',
   artifactPins: [
@@ -185,9 +191,9 @@ function sourceFacts(reader: HierarchySourceReader): {
   const sourceLock = object(JSON.parse(reader.read(`${ACQUISITION_DIRECTORY}/SOURCE_LOCK.json`).toString('utf8')), 'Aquinas source lock');
   const receipt = object(JSON.parse(reader.read(`${ACQUISITION_DIRECTORY}/LOCAL_ACQUISITION_RECEIPT.json`).toString('utf8')), 'Aquinas receipt');
   const manifest = object(JSON.parse(reader.read(`${PACKAGE_DIRECTORY}/manifest.json`).toString('utf8')), 'Aquinas package manifest');
-  if (sha256(reader.read(`${ACQUISITION_DIRECTORY}/SOURCE_LOCK.json`)) !== AQUINAS_CAPACITY_EXPECTED.sourceLockSha256
-    || sha256(reader.read(`${ACQUISITION_DIRECTORY}/LOCAL_ACQUISITION_RECEIPT.json`)) !== AQUINAS_CAPACITY_EXPECTED.localReceiptSha256
-    || sha256(reader.read(`${PACKAGE_DIRECTORY}/manifest.json`)) !== AQUINAS_CAPACITY_EXPECTED.manifestSha256) {
+  if (sha256(reader.read(`${ACQUISITION_DIRECTORY}/SOURCE_LOCK.json`)) !== AQUINAS_HIERARCHY_EXPECTED.sourceLockSha256
+    || sha256(reader.read(`${ACQUISITION_DIRECTORY}/LOCAL_ACQUISITION_RECEIPT.json`)) !== AQUINAS_HIERARCHY_EXPECTED.localReceiptSha256
+    || sha256(reader.read(`${PACKAGE_DIRECTORY}/manifest.json`)) !== AQUINAS_HIERARCHY_EXPECTED.sourceManifestSha256) {
     throw new Error('Transform 10 source facts differ from the reviewed Aquinas locks');
   }
   const acquiredAt = string(receipt.acquiredAt, 'Aquinas receipt acquiredAt');
@@ -276,10 +282,16 @@ function assertGenericPreorder(nodes: readonly HistoricalEditionHierarchyNodeRec
   }
 }
 
-/** Load the exact five-shard approved packet through the manifest-bound reader. */
-export function loadApprovedAquinasHierarchy(reader: HierarchySourceReader): HistoricalEditionHierarchyMaterialization {
-  const input = loadAquinasCapacityInput(undefined, reader);
-  const layout = buildCandidateB(input);
+/**
+ * Build the exact hierarchy record from an already attested packet input.
+ * Keeping packet loading in the capacity module prevents a runtime ESM cycle:
+ * this materializer consumes dependency-injected facts and exposes no loader.
+ */
+export function buildApprovedAquinasHierarchy(
+  reader: HierarchySourceReader,
+  input: AquinasCapacityInput,
+  layout: { authorityBodies: readonly AquinasAuthorityBody[]; navigationNodes: readonly AquinasNavigationNode[] },
+): HistoricalEditionHierarchyMaterialization {
   const facts = sourceFacts(reader);
   const hierarchyProvenance = provenance(facts.sourceLock);
   const bodies = layout.authorityBodies.map(bodyRecord);
@@ -378,14 +390,14 @@ export function assertApprovedAquinasHierarchy(materialization: HistoricalEditio
     hierarchy.navigationPreorderSha256,
   ];
   if (fixedHashes.some(value => !/^[0-9a-f]{64}$/.test(value))
-    || hierarchy.sourceManifestSha256 !== AQUINAS_CAPACITY_EXPECTED.manifestSha256
-    || hierarchy.aggregateSha256 !== AQUINAS_CAPACITY_EXPECTED.aggregateSha256
-    || hierarchy.orderedQuestionKeysSha256 !== AQUINAS_CAPACITY_EXPECTED.orderedQuestionKeysSha256
-    || hierarchy.orderedArticleKeysSha256 !== AQUINAS_CAPACITY_EXPECTED.orderedArticleKeysSha256
-    || hierarchy.sourceLockSha256 !== AQUINAS_CAPACITY_EXPECTED.sourceLockSha256
-    || hierarchy.localReceiptSha256 !== AQUINAS_CAPACITY_EXPECTED.localReceiptSha256
-    || hierarchy.topologyLockSha256 !== AQUINAS_CAPACITY_EXPECTED.topologyLockSha256
-    || hierarchy.discrepancyLedgerSha256 !== AQUINAS_CAPACITY_EXPECTED.discrepancyLedgerSha256) {
+    || hierarchy.sourceManifestSha256 !== AQUINAS_HIERARCHY_EXPECTED.sourceManifestSha256
+    || hierarchy.aggregateSha256 !== AQUINAS_HIERARCHY_EXPECTED.aggregateSha256
+    || hierarchy.orderedQuestionKeysSha256 !== AQUINAS_HIERARCHY_EXPECTED.orderedQuestionKeysSha256
+    || hierarchy.orderedArticleKeysSha256 !== AQUINAS_HIERARCHY_EXPECTED.orderedArticleKeysSha256
+    || hierarchy.sourceLockSha256 !== AQUINAS_HIERARCHY_EXPECTED.sourceLockSha256
+    || hierarchy.localReceiptSha256 !== AQUINAS_HIERARCHY_EXPECTED.localReceiptSha256
+    || hierarchy.topologyLockSha256 !== AQUINAS_HIERARCHY_EXPECTED.topologyLockSha256
+    || hierarchy.discrepancyLedgerSha256 !== AQUINAS_HIERARCHY_EXPECTED.discrepancyLedgerSha256) {
     throw new Error('Transform 10 fixed profile hashes drifted from the reviewed packet');
   }
   const expectedArtifacts = AQUINAS_HIERARCHY_EXPECTED.artifactPins;
@@ -564,4 +576,73 @@ export function assertHistoricalHierarchyStoredIntegrity(
   const documentProjection = db.prepare('SELECT COUNT(*) AS count FROM documents WHERE id = ?').get(expected.work.workId) as { count: number };
   if (!match || documentProjection.count !== 0) throw new Error('Transform 10 FTS parity or inactive projection boundary drifted');
   return { hierarchies: hierarchyRows.count, artifacts: storedArtifacts.length, bodies: bodies.length, nodes: nodes.length, ftsRows: ftsRows.count };
+}
+
+/**
+ * The Transform-10 tables and packet remain part of the dormant local
+ * foundation, but a normal release corpus must not materialize any of it.
+ * Keep this inventory beside the materializer so local SQLite verification,
+ * Workerd, and remote-D1 readiness all use the same fail-closed boundary.
+ */
+export interface NormalAquinasHierarchyExclusionCheck {
+  id: string;
+  predicate: string;
+}
+
+function sqlLiteral(value: string): string {
+  return `'${value.replaceAll("'", "''")}'`;
+}
+
+export function normalAquinasHierarchyExclusionChecks(): readonly NormalAquinasHierarchyExclusionCheck[] {
+  const artifactIds = AQUINAS_HIERARCHY_EXPECTED.artifactPins.map(([artifactId]) => sqlLiteral(artifactId)).join(', ');
+  const packId = sqlLiteral(AQUINAS_HIERARCHY_EXPECTED.packId);
+  const workId = sqlLiteral(AQUINAS_HIERARCHY_EXPECTED.workId);
+  const editionId = sqlLiteral(AQUINAS_HIERARCHY_EXPECTED.editionId);
+  return Object.freeze([
+    {
+      id: 'historical.transform10.normal.hierarchies_empty',
+      predicate: '(SELECT COUNT(*) FROM historical_edition_hierarchies) = 0',
+    },
+    {
+      id: 'historical.transform10.normal.bodies_empty',
+      predicate: '(SELECT COUNT(*) FROM historical_edition_hierarchy_bodies) = 0',
+    },
+    {
+      id: 'historical.transform10.normal.nodes_empty',
+      predicate: '(SELECT COUNT(*) FROM historical_edition_hierarchy_nodes) = 0',
+    },
+    {
+      id: 'historical.transform10.normal.fts_empty',
+      predicate: '(SELECT COUNT(*) FROM historical_edition_hierarchy_bodies_fts) = 0',
+    },
+    {
+      id: 'historical.transform10.normal.pack_absent',
+      predicate: `(SELECT COUNT(*) FROM historical_source_packs WHERE pack_id = ${packId}) = 0`,
+    },
+    {
+      id: 'historical.transform10.normal.work_absent',
+      predicate: `(SELECT COUNT(*) FROM historical_works WHERE work_id = ${workId}) = 0`,
+    },
+    {
+      id: 'historical.transform10.normal.edition_absent',
+      predicate: `(SELECT COUNT(*) FROM historical_editions WHERE edition_id = ${editionId}
+        OR work_id = ${workId} OR pack_id = ${packId}) = 0`,
+    },
+    {
+      id: 'historical.transform10.normal.artifacts_absent',
+      predicate: `(SELECT COUNT(*) FROM historical_source_artifacts WHERE edition_id = ${editionId}
+        OR artifact_id IN (${artifactIds})) = 0`,
+    },
+  ]);
+}
+
+/** Fail closed when a normal release database carries any dormant Aquinas row. */
+export function assertNormalAquinasHierarchyExclusion(db: Database.Database): void {
+  const failed = normalAquinasHierarchyExclusionChecks().flatMap(check => {
+    const row = db.prepare(`SELECT CASE WHEN ${check.predicate} THEN 1 ELSE 0 END AS passed`).get() as { passed?: unknown };
+    return row.passed === 1 ? [] : [check.id];
+  });
+  if (failed.length > 0) {
+    throw new Error(`Normal release database materialized excluded Transform 10 authority: ${failed.join(', ')}`);
+  }
 }

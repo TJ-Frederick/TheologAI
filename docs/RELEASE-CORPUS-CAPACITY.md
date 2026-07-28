@@ -20,7 +20,7 @@ files. Tests alone can inject a fixture builder or baseline.
 The audit runs the normal full database verifier. For this one call, the
 verifier defers only its duplicate early 350 MiB abort to the audit; integrity,
 foreign keys, schema, row counts, corpus identity, D1 readiness, source
-authority, hierarchy, and language checks still run normally. The audit then
+authority, normal hierarchy-exclusion, and language checks still run normally. The audit then
 prints the complete structured capacity/growth report and returns exit 1 when
 the measured database is over the ceiling. Running `data:verify-db` directly
 retains its existing early size guard.
@@ -75,15 +75,14 @@ release evidence; CI does not update the recorded baseline.
 
 ## Transform 10 release interpretation
 
-Transform 10 is measured through the complete normal database build, rather
-than through the older Aquinas candidate-layout experiment. This makes its
-3,184 authority bodies, 3,185 hierarchy nodes, and external-content FTS part
-of the one release-wide SQLite/D1 measurement. Current checked-in release
-evidence puts Transform 10 at 339,603,456 bytes pre-`VACUUM`: it is above the
-315 MiB warning threshold but below the 350 MiB hard ceiling, leaving
-27,398,144 bytes of headroom. Re-run the command with Node 22 before any
-release decision because physical SQLite page packing can vary with the bundled
-SQLite build.
+The normal release corpus intentionally excludes all Transform-10 hierarchy
+rows and Aquinas shared lineage. Its capacity is therefore measured only by
+this normal-release gate. The separate
+`audit:aquinas-source-pack-capacity` command starts from that verified normal
+baseline and materializes the dormant packet only in a disposable copy; its
+measurement is a future-capacity rehearsal, not release corpus evidence.
+Re-run both commands with Node 22 before a release decision because physical
+SQLite page packing can vary with the bundled SQLite build.
 
 ## Operator response
 

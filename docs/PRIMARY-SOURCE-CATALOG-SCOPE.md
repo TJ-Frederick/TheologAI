@@ -9,10 +9,11 @@ composition-date scope, and explicitly attributed creators machine-readable.
 
 ## Current local Transform 10 candidate and preview-bound Transform 9 extension
 
-The checked-out Transform 10 candidate locally materializes an inactive Aquinas
-edition-scoped authority hierarchy. It is unpublished and has no document or
-catalog projection, runtime composition dependency, or MCP surface. It leaves
-the active historical catalog boundary unchanged: preview remains the
+The checked-out Transform 10 candidate retains an inactive Aquinas
+edition-scoped authority hierarchy packet and standalone materializer. Normal
+release builds deliberately exclude its hierarchy rows and shared lineage. It
+is unpublished and has no document or catalog projection, runtime composition
+dependency, or MCP surface. It leaves the active historical catalog boundary unchanged: preview remains the
 Transform-9 25-work collection and production remains the Transform-8 17-work
 collection.
 
@@ -27,10 +28,14 @@ historical Transform 6 catalog identity remains
 earlier slice. These are checked-in build and seed identities, not Cloudflare
 deployment identifiers.
 
-Transform 9 is bound and deployed in preview only. It makes no claim that
-migration 0006, the core-eight rows, or the 25-work collection has been
-migrated, bound, or deployed to the production D1 environment. Production
-release remains separately gated.
+Transform 9 is bound and deployed in preview only, on
+`theologai-preview-20260727-normal-a`
+(`776944d4-60d1-457f-b13e-b4e7898971ca`), and its bounded black-box audit
+passed. It makes no claim that migration 0006, the core-eight rows, or the
+25-work collection has been migrated, bound, or deployed to the production D1
+environment. The separately prepared normal production candidate is unbound;
+the checked-in root binding names it for protected verification, not as evidence
+of live traffic. Production release remains separately gated.
 
 ## Source and materialization
 

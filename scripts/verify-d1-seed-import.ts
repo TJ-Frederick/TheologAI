@@ -406,17 +406,28 @@ try {
     throw new Error(`Long historical section ${longestSource.id} was not reconstructed exactly`);
   }
 
-  const longestHierarchySource = source.prepare(
-    'SELECT hierarchy_id, body_key, content FROM historical_edition_hierarchy_bodies ORDER BY length(content) DESC, source_ordinal LIMIT 1',
-  ).get() as { hierarchy_id: string; body_key: string; content: string };
-  const longestHierarchyTarget = target.prepare(
-    'SELECT content FROM historical_edition_hierarchy_bodies WHERE hierarchy_id = ? AND body_key = ?',
-  ).get(longestHierarchySource.hierarchy_id, longestHierarchySource.body_key) as { content: string } | undefined;
-  if (longestHierarchySource.content.length <= 10_000) {
-    throw new Error('Source fixture has no long hierarchy body to exercise bounded D1 statement reconstruction');
+  const hierarchySourceCount = source.prepare(
+    'SELECT COUNT(*) AS count FROM historical_edition_hierarchy_bodies',
+  ).get() as { count: number };
+  const hierarchyTargetCount = target.prepare(
+    'SELECT COUNT(*) AS count FROM historical_edition_hierarchy_bodies',
+  ).get() as { count: number };
+  if (hierarchySourceCount.count !== hierarchyTargetCount.count) {
+    throw new Error(`Hierarchy body reconstruction count drifted: source ${hierarchySourceCount.count}, target ${hierarchyTargetCount.count}`);
   }
-  if (!longestHierarchyTarget || longestHierarchyTarget.content !== longestHierarchySource.content) {
-    throw new Error(`Long hierarchy body ${longestHierarchySource.body_key} was not reconstructed exactly`);
+  if (hierarchySourceCount.count > 0) {
+    const longestHierarchySource = source.prepare(
+      'SELECT hierarchy_id, body_key, content FROM historical_edition_hierarchy_bodies ORDER BY length(content) DESC, source_ordinal LIMIT 1',
+    ).get() as { hierarchy_id: string; body_key: string; content: string } | undefined;
+    if (!longestHierarchySource || longestHierarchySource.content.length <= 10_000) {
+      throw new Error('Non-empty hierarchy fixture has no long body to exercise bounded D1 statement reconstruction');
+    }
+    const longestHierarchyTarget = target.prepare(
+      'SELECT content FROM historical_edition_hierarchy_bodies WHERE hierarchy_id = ? AND body_key = ?',
+    ).get(longestHierarchySource.hierarchy_id, longestHierarchySource.body_key) as { content: string } | undefined;
+    if (!longestHierarchyTarget || longestHierarchyTarget.content !== longestHierarchySource.content) {
+      throw new Error(`Long hierarchy body ${longestHierarchySource.body_key} was not reconstructed exactly`);
+    }
   }
 
   const guard = manifest.files.find(file => file.table === 'empty-target-check');

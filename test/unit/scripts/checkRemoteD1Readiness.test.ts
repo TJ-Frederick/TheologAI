@@ -141,6 +141,15 @@ describe('remote D1 readiness query', () => {
     expect(sql).toContain("('historical.transform8.collision_affected_sections', (");
     expect(sql).toContain("('historical.transform8.collision_newly_addressable_sections', (");
     expect(sql).toContain("('historical.transform8.full_fts_parity', (");
+    expect(sql).toContain("('historical.transform10.normal.hierarchies_empty', (");
+    expect(sql).toContain("('historical.transform10.normal.bodies_empty', (");
+    expect(sql).toContain("('historical.transform10.normal.nodes_empty', (");
+    expect(sql).toContain("('historical.transform10.normal.fts_empty', (");
+    expect(sql).toContain("('historical.transform10.normal.pack_absent', (");
+    expect(sql).toContain("('historical.transform10.normal.work_absent', (");
+    expect(sql).toContain("('historical.transform10.normal.edition_absent', (");
+    expect(sql).toContain("('historical.transform10.normal.artifacts_absent', (");
+    expect(sql).not.toContain("historical.transform10.exact_profile_and_artifacts");
     expect(sql).toContain('LEFT JOIN sections_fts fts ON fts.rowid = section.id');
     expect(sql).toContain(') = 23');
     expect(sql).toContain(') = 256');

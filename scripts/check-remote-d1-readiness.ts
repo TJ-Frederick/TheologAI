@@ -30,8 +30,7 @@ import {
   parseHistoricalTransform9D1Page,
 } from './historical-transform9-authority-audit.js';
 import {
-  AQUINAS_HIERARCHY_EXPECTED,
-  loadApprovedAquinasHierarchy,
+  normalAquinasHierarchyExclusionChecks,
 } from './historical-hierarchy.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -54,12 +53,6 @@ const UBS_SEMANTIC_AUDIT = JSON.parse(readFileSync(
   projection: { normalizedCoordinateRows: number; sourceEvidenceWithAmbiguousNormalizedCoordinates: number };
 };
 const UBS_SEMANTIC_STORAGE = createUbsSemanticStorageContract(UBS_SEMANTIC_AUDIT);
-// This stays local to the readiness compiler: it converts the immutable
-// Transform-10 source packet into exact, compact SQL predicates. It does not
-// activate the hierarchy in any runtime path or contact a remote system.
-const AQUINAS_HIERARCHY = loadApprovedAquinasHierarchy({
-  read: path => readFileSync(join(ROOT, path)),
-});
 
 /** D1's command interface is deliberately kept below its request-size ceiling. */
 export const MAX_D1_READINESS_SQL_BYTES = 100_000;
@@ -149,91 +142,9 @@ function sqlLiteral(value: string): string {
   return `'${value.replaceAll("'", "''")}'`;
 }
 
-function exactText(column: string, value: string): string {
-  return `${column} = ${sqlLiteral(value)}`;
-}
-
-/**
- * The active Transform-9 pack remains an exact, eight-edition release.  The
- * inactive Transform-10 edition has its own authority contract below, so it
- * must not be treated as malformed Transform-9 data merely because it shares
- * the source-lineage tables.
- */
-function transform10ReadinessChecks(): D1ReadinessCheck[] {
-  const { hierarchy, sourcePack, work, edition, artifacts } = AQUINAS_HIERARCHY;
-  const exactProfile = [
-    exactText('hierarchy_id', hierarchy.hierarchyId), exactText('pack_id', hierarchy.packId),
-    exactText('work_id', hierarchy.workId), exactText('edition_id', hierarchy.editionId),
-    exactText('availability', hierarchy.availability), exactText('hierarchy_schema_version', hierarchy.hierarchySchemaVersion),
-    exactText('level_spec_json', JSON.stringify(hierarchy.levelSpec)),
-    exactText('source_manifest_sha256', hierarchy.sourceManifestSha256), exactText('aggregate_sha256', hierarchy.aggregateSha256),
-    exactText('ordered_question_keys_sha256', hierarchy.orderedQuestionKeysSha256),
-    exactText('ordered_article_keys_sha256', hierarchy.orderedArticleKeysSha256),
-    exactText('source_lock_sha256', hierarchy.sourceLockSha256), exactText('local_receipt_sha256', hierarchy.localReceiptSha256),
-    exactText('topology_lock_sha256', hierarchy.topologyLockSha256), exactText('discrepancy_ledger_sha256', hierarchy.discrepancyLedgerSha256),
-    exactText('authority_bodies_sha256', hierarchy.authorityBodiesSha256),
-    exactText('navigation_preorder_sha256', hierarchy.navigationPreorderSha256),
-    `body_count = ${hierarchy.bodyCount}`, `node_count = ${hierarchy.nodeCount}`,
-    exactText('coverage_json', JSON.stringify(hierarchy.coverage)), exactText('provenance_json', JSON.stringify(hierarchy.provenance)),
-  ].join(' AND ');
-  const exactPack = [
-    exactText('pack_id', sourcePack.packId), exactText('revision', sourcePack.revision),
-    exactText('schema_version', sourcePack.schemaVersion), exactText('manifest_sha256', sourcePack.manifestSha256),
-    exactText('source_path', sourcePack.sourcePath),
-  ].join(' AND ');
-  const exactWork = [
-    exactText('work_id', work.workId), exactText('title', work.title),
-    exactText('creator_metadata_status', work.creatorMetadataStatus), exactText('creators_json', JSON.stringify(work.creators)),
-  ].join(' AND ');
-  const exactEdition = [
-    exactText('edition_id', edition.editionId), exactText('work_id', edition.workId), exactText('pack_id', edition.packId),
-    exactText('language', edition.language), exactText('contributor_groups_json', JSON.stringify(edition.contributorGroups)),
-    exactText('publication', edition.publication), exactText('version', edition.version),
-    exactText('provenance_status', edition.provenanceStatus),
-    edition.provenanceUncertainty === null ? 'provenance_uncertainty IS NULL' : exactText('provenance_uncertainty', edition.provenanceUncertainty),
-    exactText('provenance_reviewed_at', edition.provenanceReviewedAt),
-    exactText('underlying_work_rights_json', JSON.stringify(edition.underlyingWorkRights)),
-    exactText('exact_artifact_rights_json', JSON.stringify(edition.exactArtifactRights)),
-    exactText('normalized_text_rights_json', JSON.stringify(edition.normalizedTextRights)),
-  ].join(' AND ');
-  const artifactPredicate = artifacts.map(artifact => `(
-    ${exactText('artifact_id', artifact.artifactId)} AND ${exactText('edition_id', artifact.editionId)}
-    AND ${exactText('role', artifact.role)} AND ${exactText('locator', artifact.locator)}
-    AND pin_kind = 'sha256' AND ${exactText('pin_value', artifact.sha256)}
-    AND ${exactText('sha256', artifact.sha256)} AND bytes = ${artifact.bytes}
-    AND ${exactText('acquired_at', artifact.acquiredAt)}
-  )`).join(' OR ');
-  const hierarchyId = sqlLiteral(AQUINAS_HIERARCHY_EXPECTED.hierarchyId);
-  const editionId = sqlLiteral(AQUINAS_HIERARCHY_EXPECTED.editionId);
-  return [
-    {
-      id: 'historical.transform10.exact_lineage',
-      predicate: `(SELECT COUNT(*) FROM historical_source_packs WHERE ${exactPack}) = 1
-        AND (SELECT COUNT(*) FROM historical_source_packs WHERE pack_id = ${sqlLiteral(sourcePack.packId)}) = 1
-        AND (SELECT COUNT(*) FROM historical_works WHERE ${exactWork}) = 1
-        AND (SELECT COUNT(*) FROM historical_works WHERE work_id = ${sqlLiteral(work.workId)}) = 1
-        AND (SELECT COUNT(*) FROM historical_editions WHERE ${exactEdition}) = 1
-        AND (SELECT COUNT(*) FROM historical_editions WHERE edition_id = ${editionId}) = 1`,
-    },
-    {
-      id: 'historical.transform10.exact_profile_and_artifacts',
-      predicate: `(SELECT COUNT(*) FROM historical_edition_hierarchies WHERE ${exactProfile}) = 1
-        AND (SELECT COUNT(*) FROM historical_edition_hierarchies WHERE hierarchy_id = ${hierarchyId}) = 1
-        AND (SELECT COUNT(*) FROM historical_source_artifacts WHERE edition_id = ${editionId}) = ${artifacts.length}
-        AND (SELECT COUNT(*) FROM historical_source_artifacts WHERE edition_id = ${editionId} AND (${artifactPredicate})) = ${artifacts.length}`,
-    },
-    {
-      id: 'historical.transform10.authority_topology_and_fts',
-      predicate: `(SELECT COUNT(*) FROM historical_edition_hierarchy_bodies WHERE hierarchy_id = ${hierarchyId}) = ${hierarchy.bodyCount}
-        AND (SELECT MIN(source_ordinal) FROM historical_edition_hierarchy_bodies WHERE hierarchy_id = ${hierarchyId}) = 1
-        AND (SELECT MAX(source_ordinal) FROM historical_edition_hierarchy_bodies WHERE hierarchy_id = ${hierarchyId}) = ${hierarchy.bodyCount}
-        AND (SELECT COUNT(*) FROM historical_edition_hierarchy_nodes WHERE hierarchy_id = ${hierarchyId}) = ${hierarchy.nodeCount}
-        AND (SELECT MIN(flat_ordinal) FROM historical_edition_hierarchy_nodes WHERE hierarchy_id = ${hierarchyId}) = 1
-        AND (SELECT MAX(flat_ordinal) FROM historical_edition_hierarchy_nodes WHERE hierarchy_id = ${hierarchyId}) = ${hierarchy.nodeCount}
-        AND (SELECT COUNT(*) FROM historical_edition_hierarchy_bodies body LEFT JOIN historical_edition_hierarchy_bodies_fts fts ON fts.rowid = body.rowid
-          WHERE body.hierarchy_id = ${hierarchyId} AND (fts.rowid IS NULL OR fts.hierarchy_id IS NOT body.hierarchy_id OR fts.body_key IS NOT body.body_key OR fts.heading IS NOT body.heading OR fts.content IS NOT body.content)) = 0`,
-    },
-  ];
+/** The normal release contract fails closed if dormant Transform-10 rows leak in. */
+function normalTransform10ExclusionReadinessChecks(): D1ReadinessCheck[] {
+  return normalAquinasHierarchyExclusionChecks().map(check => ({ ...check }));
 }
 
 /**
@@ -592,7 +503,7 @@ function buildD1ReadinessQueryContract(
     ...identityChecks,
     ...historicalCatalogChecks,
     ...historicalOutputChecks,
-    ...transform10ReadinessChecks(),
+    ...normalTransform10ExclusionReadinessChecks(),
     ...columnChecks,
     ...countChecks,
     { id: 'schema.required_indexes', predicate: indexCheck },

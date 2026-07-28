@@ -45,8 +45,8 @@ script_name = "theologai-ccel-coordinator"
 # For multi-environment setups, use [env.staging] / [env.production] sections.
 [[d1_databases]]
 binding = "THEOLOGAI_DB"
-database_name = "theologai-production-20260723-a"
-database_id = "3f7faa0e-689f-47aa-a601-dc662db9a6cf"
+database_name = "theologai-production-20260728-normal-a"
+database_id = "a3d26bba-7adc-44b0-86d0-562b2ced6bd3"
 migrations_dir = "migrations"
 
 # Anonymous abuse control. Counters are intentionally local to each Cloudflare
@@ -109,8 +109,8 @@ script_name = "theologai-ccel-coordinator"
 
 [[env.preview.d1_databases]]
 binding = "THEOLOGAI_DB"
-database_name = "theologai-preview-20260725-t10-a"
-database_id = "fbd1a492-fbc2-4061-a431-181a9632d4de"
+database_name = "theologai-preview-20260727-normal-a"
+database_id = "776944d4-60d1-457f-b13e-b4e7898971ca"
 migrations_dir = "migrations"
 
 # Preview uses a distinct namespace so load tests and PR validation cannot

@@ -2,14 +2,14 @@
 
 ## Status
 
-This remains an exposure-only preview stage, not CCEL enablement. Production is
-deployed v6/local-only, while deployed preview remains v5/discovery-only until
-an explicitly authorized PR95 preview deployment. The checked-in v6/v7
-candidate profiles keep `THEOLOGAI_EXPOSE_CCEL_DISCOVERY`,
-`THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH`, and
-`THEOLOGAI_ENABLE_CCEL_COORDINATOR` non-executing: the candidate v7 discovery
-surface does not authorize adapter search, Durable Object lookup/RPC, or network
-access. No CCEL request is authorized by this stage.
+This remains an exposure-only preview stage, not CCEL enablement. Production
+remains deployed v6/local-only. Preview is deployed and audited on the
+v7/discovery-only contract, with CCEL execution disabled before adapter,
+coordinator, or fetch. Its rollout flags keep
+`THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH` and
+`THEOLOGAI_ENABLE_CCEL_COORDINATOR` false: the v7 discovery surface does not
+authorize adapter search, Durable Object lookup/RPC, or network access. No CCEL
+request is authorized by this stage.
 
 ## One-origin architecture
 
@@ -242,17 +242,16 @@ multi-process Node deployments must keep live discovery disabled unless they
 provide one shared coordinator.
 
 The historical v5 release selected production v4/local-only and preview-v5
-exposure only. Current production is deployed v6/local-only; deployed preview
-remains v5 with CCEL execution disabled. The Transform-9 preview corpus release
-does not select the checked-in v7 discovery profile. The checked-in v6/v7
-candidate profiles keep the live-search and coordinator values disabled, so
-neither authorizes a CCEL request or Durable Object RPC.
+exposure only. Current production is deployed v6/local-only; preview is now
+deployed and audited on v7/discovery-only with the live-search and coordinator
+values disabled. Neither environment authorizes a CCEL request or Durable
+Object RPC.
 
 MCP clients can cache `tools/list` and `prompts/list` results for the life of a
 connection. This is a hard contract cutover rather than a negotiated opt-in, so
-reconnect and reinitialize a preview client after an authorized PR95 deployment
-before auditing the candidate-v7 schemas and workflows. Do not interpret a
-stale client schema as the Worker's current contract.
+reconnect and reinitialize a preview client after any deployment before
+auditing the v7 schemas and workflows. Do not interpret a stale client schema
+as the Worker's current contract.
 
 Once Stage B is bound and a later approved slice enables it, the global coordinator is intentionally a bottleneck: the maximum admitted
 CCEL-origin load is 0.1 requests/second across production and preview combined.
