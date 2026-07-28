@@ -8,6 +8,7 @@
 
 import { createHash } from 'node:crypto';
 import type Database from 'better-sqlite3';
+import type { HistoricalHierarchyAuthorityProvenance } from '../src/kernel/repositories.js';
 import type {
   AquinasAuthorityBody,
   AquinasCapacityInput,
@@ -72,7 +73,7 @@ export interface HistoricalEditionHierarchyRecord {
   bodyCount: number;
   nodeCount: number;
   coverage: Record<string, unknown>;
-  provenance: Record<string, unknown>;
+  provenance: HistoricalHierarchyAuthorityProvenance;
 }
 
 export interface HistoricalEditionHierarchyBodyRecord {
@@ -200,7 +201,7 @@ function sourceFacts(reader: HierarchySourceReader): {
   return { acquiredAt, sourceLock, receipt, manifest };
 }
 
-function provenance(sourceLock: Record<string, unknown>): Record<string, unknown> {
+function provenance(sourceLock: Record<string, unknown>): HistoricalHierarchyAuthorityProvenance {
   const rights = object(sourceLock.rightsAndProvenance, 'Aquinas rights and provenance');
   const edition = object(rights.electronicEditionProvenance, 'Aquinas electronic edition provenance');
   const rightsStatus = string(rights.rightsStatus, 'Aquinas rights status');
@@ -208,20 +209,24 @@ function provenance(sourceLock: Record<string, unknown>): Record<string, unknown
   if (rightsStatus !== AQUINAS_HIERARCHY_EXPECTED.rightsStatus || territoryCaveat !== AQUINAS_HIERARCHY_EXPECTED.territoryCaveat) {
     throw new Error('Transform 10 must preserve the reviewed US-only public-domain caveat');
   }
+  const disclosedEditorActions = edition.disclosedEditorActions;
+  if (!Array.isArray(disclosedEditorActions) || disclosedEditorActions.some(value => typeof value !== 'string' || value.length === 0)) {
+    throw new Error('Aquinas disclosed editor actions must be non-empty text');
+  }
   return {
     status: 'local_only_inactive',
     rightsStatus,
     territoryCaveat,
     catalogStatement: string(rights.catalogStatement, 'Aquinas catalog statement'),
-    edition: {
-      translator: string(edition.translator, 'Aquinas translator'),
-      printedTranslationPublisher: string(edition.printedTranslationPublisher, 'Aquinas publisher'),
-      sourceEtextCreator: string(edition.sourceEtextCreator, 'Aquinas source e-text creator'),
-      sourceEtextAvailability: string(edition.sourceEtextAvailability, 'Aquinas source e-text availability'),
-      electronicEditionEditor: string(edition.electronicEditionEditor, 'Aquinas electronic edition editor'),
-      disclosedEditorActions: edition.disclosedEditorActions,
-      ccelBoundary: string(edition.ccelBoundary, 'Aquinas CCEL boundary'),
-    },
+    sourceLabel: string(edition.sourceEtextCreator, 'Aquinas source e-text creator'),
+    disclosures: [
+      { label: 'translator', values: [string(edition.translator, 'Aquinas translator')] },
+      { label: 'printed_translation_publisher', values: [string(edition.printedTranslationPublisher, 'Aquinas publisher')] },
+      { label: 'source_etext_availability', values: [string(edition.sourceEtextAvailability, 'Aquinas source e-text availability')] },
+      { label: 'electronic_edition_editor', values: [string(edition.electronicEditionEditor, 'Aquinas electronic edition editor')] },
+      { label: 'disclosed_editor_actions', values: disclosedEditorActions },
+      { label: 'ccel_boundary', values: [string(edition.ccelBoundary, 'Aquinas CCEL boundary')] },
+    ],
     activation: 'No document projection, catalogue registration, runtime composition, resource, or MCP tool is authorized by this materialization.',
   };
 }
@@ -316,7 +321,10 @@ export function buildApprovedAquinasHierarchy(
     workId: work.workId,
     packId: sourcePack.packId,
     language: 'English',
-    contributorGroups: hierarchyProvenance.edition as Record<string, unknown>,
+    contributorGroups: {
+      sourceLabel: hierarchyProvenance.sourceLabel,
+      disclosures: hierarchyProvenance.disclosures,
+    },
     publication: 'Benziger Brothers',
     version: 'Project Gutenberg electronic edition of the English Dominican Province/Benziger translation',
     provenanceStatus: 'verified' as const,
@@ -614,6 +622,10 @@ export function normalAquinasHierarchyExclusionChecks(): readonly NormalAquinasH
     {
       id: 'historical.transform10.normal.fts_empty',
       predicate: '(SELECT COUNT(*) FROM historical_edition_hierarchy_bodies_fts) = 0',
+    },
+    {
+      id: 'historical.transform10.normal.publications_empty',
+      predicate: '(SELECT COUNT(*) FROM historical_hierarchy_publications) = 0',
     },
     {
       id: 'historical.transform10.normal.pack_absent',

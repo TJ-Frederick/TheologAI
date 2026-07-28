@@ -10,6 +10,7 @@ import type {
   HistoricalHierarchyNodeContext,
   HistoricalHierarchyPage,
   HistoricalHierarchyProfile,
+  HistoricalHierarchyPublication,
   HistoricalHierarchySearchOptions,
   HistoricalHierarchySearchResult,
   IHistoricalHierarchyRepository,
@@ -26,6 +27,12 @@ const PROFILE_COLUMNS = `hierarchy_id AS hierarchyId, pack_id AS packId, work_id
 const NODE_COLUMNS = `hierarchy_id AS hierarchyId, node_key AS nodeKey, parent_node_key AS parentNodeKey,
   node_kind AS nodeKind, body_key AS bodyKey, depth, flat_ordinal AS flatOrdinal,
   sibling_ordinal AS siblingOrdinal, label, heading`;
+const PUBLICATION_COLUMNS = `publication_id AS publicationId, hierarchy_id AS hierarchyId, public_slug AS publicSlug,
+  title, metadata_json AS metadataJson, delivery_kind AS deliveryKind, coverage_json AS coverageJson,
+  cursor_contract AS cursorContract, cursor_identity AS cursorIdentity, browse_page_size AS browsePageSize,
+  landing_max_bytes AS landingMaxBytes, directory_max_bytes AS directoryMaxBytes,
+  node_max_bytes AS nodeMaxBytes, search_max_bytes AS searchMaxBytes,
+  canonical_uri AS canonicalUri, activation_state AS activationState`;
 
 function parseObject(value: string, label: string): Record<string, unknown> {
   const parsed: unknown = JSON.parse(value);
@@ -40,7 +47,25 @@ function profile(row: Record<string, unknown>): HistoricalHierarchyProfile {
     orderedQuestionKeysSha256: String(row.orderedQuestionKeysSha256), orderedArticleKeysSha256: String(row.orderedArticleKeysSha256),
     sourceLockSha256: String(row.sourceLockSha256), localReceiptSha256: String(row.localReceiptSha256), topologyLockSha256: String(row.topologyLockSha256),
     discrepancyLedgerSha256: String(row.discrepancyLedgerSha256), authorityBodiesSha256: String(row.authorityBodiesSha256), navigationPreorderSha256: String(row.navigationPreorderSha256),
-    bodyCount: Number(row.bodyCount), nodeCount: Number(row.nodeCount), coverage: parseObject(String(row.coverageJson), 'hierarchy coverage'), provenance: parseObject(String(row.provenanceJson), 'hierarchy provenance'),
+    bodyCount: Number(row.bodyCount), nodeCount: Number(row.nodeCount), coverage: parseObject(String(row.coverageJson), 'hierarchy coverage'),
+    provenance: parseObject(String(row.provenanceJson), 'hierarchy provenance') as unknown as HistoricalHierarchyProfile['provenance'],
+  };
+}
+function publication(row: Record<string, unknown>): HistoricalHierarchyPublication {
+  const deliveryKind = String(row.deliveryKind);
+  const cursorContract = String(row.cursorContract);
+  const activationState = String(row.activationState);
+  if (deliveryKind !== 'hierarchy_nodes_v1'
+    || cursorContract !== 'historical-hierarchy-browse-cursor-v1'
+    || activationState !== 'dormant') throw new Error('Historical hierarchy publication contract is invalid');
+  return {
+    publicationId: String(row.publicationId), hierarchyId: String(row.hierarchyId), publicSlug: String(row.publicSlug),
+    title: String(row.title), metadata: parseObject(String(row.metadataJson), 'hierarchy publication metadata') as unknown as HistoricalHierarchyPublication['metadata'],
+    deliveryKind, coverage: parseObject(String(row.coverageJson), 'hierarchy publication coverage') as unknown as HistoricalHierarchyPublication['coverage'],
+    cursorContract, cursorIdentity: String(row.cursorIdentity), browsePageSize: Number(row.browsePageSize),
+    landingMaxBytes: Number(row.landingMaxBytes), directoryMaxBytes: Number(row.directoryMaxBytes),
+    nodeMaxBytes: Number(row.nodeMaxBytes), searchMaxBytes: Number(row.searchMaxBytes),
+    canonicalUri: String(row.canonicalUri), activationState,
   };
 }
 function node(row: Record<string, unknown>, prefix = ''): HistoricalHierarchyNode {
@@ -59,6 +84,14 @@ function bodySummary(row: Record<string, unknown>, prefix = ''): HistoricalHiera
   const field = (name: string) => row[`${prefix}${name}`];
   return { hierarchyId: String(field('hierarchyId')), bodyKey: String(field('bodyKey')), bodyKind: String(field('bodyKind')), sourceOrdinal: Number(field('sourceOrdinal')),
     heading: String(field('heading')), contentSha256: String(field('contentSha256')), contentUtf8Bytes: Number(field('contentUtf8Bytes')) };
+}
+function assertNodeHierarchy(nodeValue: HistoricalHierarchyNode, hierarchyId: string): HistoricalHierarchyNode {
+  if (nodeValue.hierarchyId !== hierarchyId) throw new Error('Historical hierarchy repository received a cross-hierarchy node');
+  return nodeValue;
+}
+function assertBodyHierarchy<T extends HistoricalHierarchyBody | HistoricalHierarchyBodySummary>(bodyValue: T, hierarchyId: string): T {
+  if (bodyValue.hierarchyId !== hierarchyId) throw new Error('Historical hierarchy repository received a cross-hierarchy body');
+  return bodyValue;
 }
 function navigationLimit(limit: number): number { if (!Number.isSafeInteger(limit) || limit < 1 || limit > 32) throw new Error('Historical hierarchy navigation limit must be 1..32'); return limit; }
 function searchLimit(limit: number): number { if (!Number.isSafeInteger(limit) || limit < 1 || limit > 9) throw new Error('Historical hierarchy search limit must be 1..9'); return limit; }
@@ -90,6 +123,18 @@ export class D1HistoricalHierarchyRepository implements IHistoricalHierarchyRepo
     return row ? profile(row) : undefined;
   }
 
+  async getHierarchyPublication(publicationId: string): Promise<HistoricalHierarchyPublication | undefined> {
+    const row = await this.db.prepare(`SELECT ${PUBLICATION_COLUMNS} FROM historical_hierarchy_publications WHERE publication_id = ?`)
+      .bind(publicationId).first<Record<string, unknown>>();
+    return row ? publication(row) : undefined;
+  }
+
+  async getHierarchyPublicationBySlug(publicSlug: string): Promise<HistoricalHierarchyPublication | undefined> {
+    const row = await this.db.prepare(`SELECT ${PUBLICATION_COLUMNS} FROM historical_hierarchy_publications WHERE public_slug = ?`)
+      .bind(publicSlug).first<Record<string, unknown>>();
+    return row ? publication(row) : undefined;
+  }
+
   async listHierarchyArtifacts(hierarchyId: string): Promise<HistoricalHierarchyArtifact[]> {
     const { results } = await this.db.prepare(`SELECT artifact_id AS artifactId, edition_id AS editionId, role, locator, sha256, bytes, acquired_at AS acquiredAt
       FROM historical_source_artifacts WHERE edition_id = (SELECT edition_id FROM historical_edition_hierarchies WHERE hierarchy_id = ?) ORDER BY artifact_id`).bind(hierarchyId).all<HistoricalHierarchyArtifact>();
@@ -98,19 +143,71 @@ export class D1HistoricalHierarchyRepository implements IHistoricalHierarchyRepo
 
   private async getNode(hierarchyId: string, nodeKey: string): Promise<HistoricalHierarchyNode | undefined> {
     const row = await this.db.prepare(`SELECT ${NODE_COLUMNS} FROM historical_edition_hierarchy_nodes WHERE hierarchy_id = ? AND node_key = ?`).bind(hierarchyId, nodeKey).first<Record<string, unknown>>();
-    return row ? node(row) : undefined;
+    return row ? assertNodeHierarchy(node(row), hierarchyId) : undefined;
   }
 
-  private async ancestors(hierarchyId: string, current: HistoricalHierarchyNode, profileValue: HistoricalHierarchyProfile): Promise<HistoricalHierarchyNode[]> {
-    const result: HistoricalHierarchyNode[] = [];
-    let parentKey = current.parentNodeKey;
-    for (let remaining = maxDepth(profileValue) - 1; parentKey !== null && remaining > 0; remaining--) {
-      const parent = await this.getNode(hierarchyId, parentKey);
-      if (!parent) throw new Error('Historical hierarchy ancestor chain is broken');
-      result.push(parent); parentKey = parent.parentNodeKey;
+  /**
+   * Retrieve every requested breadcrumb in one bounded recursive statement.
+   * Search has at most nine rows, so this avoids a D1 request per ancestor and
+   * keeps direct retrieval to one additional request regardless of depth.
+   */
+  private async ancestorsForNodes(
+    hierarchyId: string,
+    nodeKeys: readonly string[],
+    maximumDepth: number,
+  ): Promise<Map<string, HistoricalHierarchyNode[]>> {
+    const unique = [...new Set(nodeKeys)];
+    if (unique.length === 0) return new Map();
+    const values = unique.map(() => '(?)').join(', ');
+    const { results } = await this.db.prepare(`WITH RECURSIVE hierarchy_chain (
+      seedNodeKey, hierarchyId, nodeKey, parentNodeKey, nodeKind, bodyKey,
+      depth, flatOrdinal, siblingOrdinal, label, heading, hops
+    ) AS (
+      SELECT node_key, hierarchy_id, node_key, parent_node_key, node_kind, body_key,
+        depth, flat_ordinal, sibling_ordinal, label, heading, 0
+      FROM historical_edition_hierarchy_nodes
+      WHERE hierarchy_id = ? AND node_key IN (${values})
+      UNION ALL
+      SELECT chain.seedNodeKey, parent.hierarchy_id, parent.node_key, parent.parent_node_key,
+        parent.node_kind, parent.body_key, parent.depth, parent.flat_ordinal,
+        parent.sibling_ordinal, parent.label, parent.heading, chain.hops + 1
+      FROM hierarchy_chain chain
+      JOIN historical_edition_hierarchy_nodes parent
+        ON parent.hierarchy_id = chain.hierarchyId AND parent.node_key = chain.parentNodeKey
+      WHERE chain.parentNodeKey IS NOT NULL AND chain.hops < ?
+    )
+    SELECT seedNodeKey, hierarchyId, nodeKey, parentNodeKey, nodeKind, bodyKey,
+      depth, flatOrdinal, siblingOrdinal, label, heading
+    FROM hierarchy_chain ORDER BY seedNodeKey, depth`).bind(
+      hierarchyId, ...unique, maximumDepth - 1,
+    ).all<Record<string, unknown>>();
+    const chains = new Map<string, HistoricalHierarchyNode[]>();
+    for (const row of results) {
+      const seedNodeKey = String(row.seedNodeKey);
+      const chain = chains.get(seedNodeKey) ?? [];
+      chain.push(assertNodeHierarchy(node(row), hierarchyId));
+      chains.set(seedNodeKey, chain);
     }
-    if (parentKey !== null) throw new Error('Historical hierarchy ancestor depth exceeds profile maxDepth');
-    return result.reverse();
+    const ancestors = new Map<string, HistoricalHierarchyNode[]>();
+    for (const key of unique) {
+      const chain = chains.get(key);
+      const root = chain?.[0];
+      const current = chain?.at(-1);
+      if (!chain || chain.length === 0 || chain.length > maximumDepth
+        || root?.parentNodeKey !== null
+        || current?.nodeKey !== key
+        || current.depth > maximumDepth
+        || chain.length !== current.depth
+        || chain.some((nodeValue, index) => index > 0
+          && (nodeValue.depth !== index + 1 || nodeValue.parentNodeKey !== chain[index - 1]?.nodeKey))) {
+        throw new Error(chain ? 'Historical hierarchy ancestor chain is broken' : 'Historical hierarchy ancestor node is missing');
+      }
+      // Query order is root-to-leaf by validated depth; omit the seed itself.
+      const path = chain.slice(0, -1);
+      if (path.length !== current.depth - 1) throw new Error('Historical hierarchy ancestor chain is broken');
+      ancestors.set(key, path);
+    }
+    return ancestors;
   }
 
   async getHierarchyNodeContext(hierarchyId: string, nodeKey: string): Promise<HistoricalHierarchyNodeContext | undefined> {
@@ -126,8 +223,12 @@ export class D1HistoricalHierarchyRepository implements IHistoricalHierarchyRepo
     if (!row) return undefined;
     const profileValue = await this.getHierarchyProfile(hierarchyId);
     if (!profileValue) throw new Error('Historical hierarchy profile is missing');
-    const current = node(row, 'node_');
-    return { node: current, body: body(row, 'body_'), ancestors: await this.ancestors(hierarchyId, current, profileValue) };
+    const current = assertNodeHierarchy(node(row, 'node_'), hierarchyId);
+    const ancestors = await this.ancestorsForNodes(hierarchyId, [current.nodeKey], maxDepth(profileValue));
+    const directBody = body(row, 'body_');
+    if (directBody) assertBodyHierarchy(directBody, hierarchyId);
+    if (directBody && directBody.bodyKey !== current.bodyKey) throw new Error('Historical hierarchy repository received a mismatched direct body');
+    return { node: current, body: directBody, ancestors: ancestors.get(current.nodeKey) ?? [] };
   }
 
   async listHierarchyChildren(hierarchyId: string, parentNodeKey: string | null, after: HistoricalHierarchyCursor | undefined, limit: number): Promise<HistoricalHierarchyPage> {
@@ -141,7 +242,7 @@ export class D1HistoricalHierarchyRepository implements IHistoricalHierarchyRepo
       ? this.db.prepare(`SELECT ${NODE_COLUMNS} FROM historical_edition_hierarchy_nodes WHERE hierarchy_id = ? AND parent_node_key IS ? ORDER BY sibling_ordinal, node_key LIMIT ?`).bind(hierarchyId, parentNodeKey, bounded + 1)
       : this.db.prepare(`SELECT ${NODE_COLUMNS} FROM historical_edition_hierarchy_nodes WHERE hierarchy_id = ? AND parent_node_key IS ? AND (sibling_ordinal > ? OR (sibling_ordinal = ? AND node_key > ?)) ORDER BY sibling_ordinal, node_key LIMIT ?`).bind(hierarchyId, parentNodeKey, boundary.siblingOrdinal, boundary.siblingOrdinal, boundary.nodeKey, bounded + 1);
     const { results } = await query.all<Record<string, unknown>>();
-    const values = results.map(row => node(row)); const hasMore = values.length > bounded; const nodes = hasMore ? values.slice(0, bounded) : values; const last = nodes.at(-1);
+    const values = results.map(row => assertNodeHierarchy(node(row), hierarchyId)); const hasMore = values.length > bounded; const nodes = hasMore ? values.slice(0, bounded) : values; const last = nodes.at(-1);
     return { nodes, hasMore, nextAfter: hasMore && last ? { siblingOrdinal: last.siblingOrdinal, nodeKey: last.nodeKey } : undefined };
   }
 
@@ -149,7 +250,9 @@ export class D1HistoricalHierarchyRepository implements IHistoricalHierarchyRepo
     const current = await this.getNode(hierarchyId, nodeKey); if (!current) return undefined;
     const previous = await this.db.prepare(`SELECT ${NODE_COLUMNS} FROM historical_edition_hierarchy_nodes WHERE hierarchy_id = ? AND parent_node_key IS ? AND sibling_ordinal < ? ORDER BY sibling_ordinal DESC, node_key DESC LIMIT 1`).bind(hierarchyId, current.parentNodeKey, current.siblingOrdinal).first<Record<string, unknown>>();
     const next = await this.db.prepare(`SELECT ${NODE_COLUMNS} FROM historical_edition_hierarchy_nodes WHERE hierarchy_id = ? AND parent_node_key IS ? AND sibling_ordinal > ? ORDER BY sibling_ordinal, node_key LIMIT 1`).bind(hierarchyId, current.parentNodeKey, current.siblingOrdinal).first<Record<string, unknown>>();
-    return { previous: previous ? node(previous) : undefined, next: next ? node(next) : undefined };
+    const previousNode = previous ? assertNodeHierarchy(node(previous), hierarchyId) : undefined;
+    const nextNode = next ? assertNodeHierarchy(node(next), hierarchyId) : undefined;
+    return { previous: previousNode, next: nextNode };
   }
 
   async searchHierarchyBodies(options: HistoricalHierarchySearchOptions): Promise<HistoricalHierarchySearchResult[]> {
@@ -165,9 +268,14 @@ export class D1HistoricalHierarchyRepository implements IHistoricalHierarchyRepo
       JOIN historical_edition_hierarchy_nodes n ON n.hierarchy_id = b.hierarchy_id AND n.body_key = b.body_key
       WHERE historical_edition_hierarchy_bodies_fts MATCH ? AND b.hierarchy_id = ? ORDER BY rank, b.source_ordinal LIMIT ?`)
       .bind(ftsQuery(options.text, options.match), options.hierarchyId, searchLimit(options.limit)).all<Record<string, unknown>>();
-    return Promise.all(results.map(async row => {
-      const resultNode = node(row, 'node_');
-      return { node: resultNode, body: bodySummary(row, 'body_'), rank: Number(row.rank), snippet: String(row.snippet), breadcrumb: [...await this.ancestors(options.hierarchyId, resultNode, profileValue), resultNode] };
-    }));
+    const nodes = results.map(row => assertNodeHierarchy(node(row, 'node_'), options.hierarchyId));
+    const ancestors = await this.ancestorsForNodes(options.hierarchyId, nodes.map(resultNode => resultNode.nodeKey), maxDepth(profileValue));
+    return results.map((row, index) => {
+      const resultNode = nodes[index]!;
+      return {
+        node: resultNode, body: assertBodyHierarchy(bodySummary(row, 'body_'), options.hierarchyId), rank: Number(row.rank), snippet: String(row.snippet),
+        breadcrumb: [...(ancestors.get(resultNode.nodeKey) ?? []), resultNode],
+      };
+    });
   }
 }

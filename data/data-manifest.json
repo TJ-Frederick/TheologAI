@@ -1,6 +1,6 @@
 {
   "manifestVersion": 2,
-  "schemaVersion": "0007_historical_hierarchy",
+  "schemaVersion": "0008_historical_hierarchy_publications",
   "algorithm": "sha256",
   "materializations": {
     "d1": {
@@ -34,6 +34,10 @@
         {
           "path": "migrations/0007_historical_hierarchy.sql",
           "sha256": "f09c4ad494a7783f22bad3b852fd192d61f25d61fe2309c659474cac6b0fa383"
+        },
+        {
+          "path": "migrations/0008_historical_hierarchy_publications.sql",
+          "sha256": "c3082a469bf5970b36f27ba25882d96db1a3e29f7ccd81b4fab1461bccd7d37e"
         }
       ],
       "inputs": [
@@ -727,6 +731,7 @@
     "historical_edition_hierarchy_bodies": 0,
     "historical_edition_hierarchy_nodes": 0,
     "historical_edition_hierarchy_bodies_fts": 0,
+    "historical_hierarchy_publications": 0,
     "sections_fts": 3566,
     "morph_codes": 20,
     "ubs_parallel_sources": 1,
