@@ -7,7 +7,9 @@ export const PRODUCTION_WORKER = 'theologai';
 /** The reviewed future production candidate; config alone does not prove live traffic. */
 export const PRODUCTION_D1_NAME = 'theologai-production-20260728-normal-a';
 export const PRODUCTION_D1_ID = 'a3d26bba-7adc-44b0-86d0-562b2ced6bd3';
-export const PREVIEW_D1_ID = '776944d4-60d1-457f-b13e-b4e7898971ca';
+/** The reviewed, prepared preview candidate; config alone does not bind it. */
+export const PREVIEW_D1_NAME = 'theologai-preview-20260728-hierarchy-a';
+export const PREVIEW_D1_ID = '51890e12-1c3f-421f-b661-9a5ea9637e43';
 export const STAGE_CONFIRMATION = 'I AUTHORIZE PROVISIONING THE PROTECTED CCEL OPERATOR SECRET';
 export const PROMOTE_CONFIRMATION = 'PROMOTE THEOLOGAI CCEL OPERATOR SECRET';
 export const ROLLBACK_CONFIRMATION = 'ROLL BACK THEOLOGAI TO THE EXACT SECRETLESS BASELINE';
@@ -139,7 +141,7 @@ export function assertWorkerConfig(configText: string): void {
   validateEnvironmentConfig(preview, {
     worker: 'theologai-preview',
     d1Id: PREVIEW_D1_ID,
-    d1Name: 'theologai-preview-20260727-normal-a',
+    d1Name: PREVIEW_D1_NAME,
     requestNamespace: '361202',
     operatorNamespace: '361204',
     vars: PREVIEW_VARS,

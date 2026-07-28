@@ -230,6 +230,8 @@ describe('published project contract', () => {
     const deployedPreviewWorker = '8d516c26-6cfe-451c-889a-7dd580b1f4ca';
     const deployedPreviewD1 = 'theologai-preview-20260727-normal-a';
     const deployedPreviewD1Id = '776944d4-60d1-457f-b13e-b4e7898971ca';
+    const preparedCandidateD1 = 'theologai-preview-20260728-hierarchy-a';
+    const preparedCandidateD1Id = '51890e12-1c3f-421f-b661-9a5ea9637e43';
     const predecessorDeployment = '7f00a94b-4ff4-47d6-9bee-2efb99673718';
     const predecessorVersion = 'f78d66f1-cefe-46ba-88ba-9ddec259cda4';
     const predecessorD1 = 'theologai-preview-20260722-b';
@@ -246,6 +248,8 @@ describe('published project contract', () => {
       expect(document).toContain(deployedPreviewWorker);
       expect(document).toContain(deployedPreviewD1);
       expect(document).toContain(deployedPreviewD1Id);
+      expect(document).toContain(preparedCandidateD1);
+      expect(document).toContain(preparedCandidateD1Id);
     }
     expect(reconciliation).toContain('historical read-only observation');
     expect(reconciliation).toContain('protected preview release deployed the normal 25-work build');
@@ -259,7 +263,12 @@ describe('published project contract', () => {
     expect(operations).toContain(`Its historical Cloudflare deployment\n\`${historicalDeployment}\` served Worker`);
     expect(operations).toContain('This historical release is neither\nthe current preview identity nor the immediate retained predecessor');
     expect(reconciliation).toContain('it makes no production claim');
-    expect(reconciliation).not.toContain('which the checked-in preview binding now names for the next protected preview deployment');
+    expect(reconciliation).toContain('PR #101\'s checked-in preview candidate was unbound when prepared and audited');
+    expect(reconciliation).toContain('does not establish a\ncurrent live Worker binding');
+    expect(reconciliation).toContain('its release evidence is authoritative');
+    expect(operations).toContain('PR #101\'s checked-in preview target is the separately prepared candidate');
+    expect(operations).toContain('does not\nestablish a current live binding or activate it');
+    expect(operations).toContain('its evidence is\nauthoritative');
   });
 
   it('keeps current CCEL rollout status aligned across operator documents', async () => {

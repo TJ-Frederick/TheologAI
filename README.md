@@ -121,6 +121,16 @@ remains the PR #96 17-work Transform 8 predecessor. The integrated Transform
 release builds exclude its hierarchy and shared lineage, and it has no
 document/catalog projection or runtime activation. It makes no production
 Cloudflare migration, binding, deployment, or runtime-activation claim.
+
+PR #101's checked-in preview target is
+`theologai-preview-20260728-hierarchy-a`
+(`51890e12-1c3f-421f-b661-9a5ea9637e43`). It was unbound when prepared and
+audited from the reviewed 49-file, 1,627,474-row deterministic seed for schema
+`0008`; readiness and Transform-8/9/10 authority audits passed, while the
+dormant hierarchy and publication rows were empty. The checked-in target alone
+does not establish a current live Worker binding or activate that runtime. The
+protected workflow proves the active binding, and its release evidence is the
+authoritative preview record; this makes no production claim.
 For a preview-client rollback without changing server state, use the direct preview
 `workers.dev` address above; the production `workers.dev` address intentionally
 redirects rather than serving a separate legacy Worker.

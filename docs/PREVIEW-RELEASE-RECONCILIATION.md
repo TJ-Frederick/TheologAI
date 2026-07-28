@@ -34,6 +34,16 @@ black-box audit passed with no P0-P3 findings. The deployed preview profile is
 v7/discovery-only with CCEL execution disabled before adapter, coordinator, or
 fetch. This is preview evidence only; it makes no production claim.
 
+PR #101's checked-in preview candidate was unbound when prepared and audited:
+`theologai-preview-20260728-hierarchy-a`
+(`51890e12-1c3f-421f-b661-9a5ea9637e43`). Its one-time preparation applied the
+reviewed 49-file, 1,627,474-row deterministic seed through schema `0008` and
+passed readiness plus Transform-8/9/10 authority audits. The dormant hierarchy
+and publication tables were empty. The checked-in target does not establish a
+current live Worker binding or activate the dormant hierarchy/publication
+runtime. The protected workflow must prove its exact `candidateD1` binding
+before either black-box audit; its release evidence is authoritative.
+
 The candidate-binding observation is written before the strict gate and is uploaded through `always()` handling. It contains only version/deployment IDs, predecessor/active/candidate D1 IDs, the `d1Changed` value, and boolean configuration/binding verdicts; it excludes raw Wrangler JSON, headers, requests, sessions, and secrets. The final post-mutation observation is likewise retained and hashed even if the strict candidate-binding gate blocks both audits.
 
 This path does not automatically roll back, deploy, bind, delete, or mutate data. It is safe to run after an audit failure, job cancellation, or withdrawn `deploy-preview` authorization because it makes only read-only control-plane observations. It intentionally performs no cleanup.

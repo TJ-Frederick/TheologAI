@@ -11,6 +11,15 @@ Transform-8 17-work catalog. The checked-in root production binding instead
 names a separately prepared, unbound future candidate and is not evidence of
 live production traffic.
 
+PR #101's checked-in preview target is the separately prepared candidate
+`theologai-preview-20260728-hierarchy-a`
+(`51890e12-1c3f-421f-b661-9a5ea9637e43`). It was unbound when seeded once
+through schema `0008`, passed readiness and Transform-8/9/10 authority audits,
+and had zero dormant hierarchy/publication rows. The declaration alone does not
+establish current preview traffic or activate a hierarchy/publication runtime;
+the protected workflow proves the exact active binding and its release evidence
+is authoritative.
+
 PR #96 production evidence is source-attested to checked-out commit
 `ac4b5ed774302fbfc86bf846b6ee77a07beed456` and exact tree
 `adf08edbf6bfcb14b9613354b2b8fb9f62ec8c16`. At the fixed canonical endpoint
@@ -106,6 +115,16 @@ reviewed 49-file, 1,627,474-row deterministic seed with corpus identity
 passed readiness plus Transform-8/9 authority checks; all inactive Aquinas
 hierarchy tables are empty. The protected release and independent bounded
 black-box audit passed with no P0-P3 findings. Production remains unchanged.
+
+The checked-in PR #101 preview target is instead
+`theologai-preview-20260728-hierarchy-a`
+(`51890e12-1c3f-421f-b661-9a5ea9637e43`), which was unbound when prepared once
+from the reviewed 49-file, 1,627,474-row deterministic seed through schema
+`0008`. Its readiness and Transform-8/9/10 authority audits passed with
+dormant hierarchy and publication rows empty. This configuration does not
+establish a current live binding or activate it; the protected release gate
+must prove the candidate binding before black-box audit, and its evidence is
+authoritative.
 
 PR #92 merged as `cd3d1c38fdf0f939a33a41d4b6d5044eb7f44562`; its exact
 reviewed head `3a2b5a57b322dce525f27cfa91c9f667d080bca9` is the separate

@@ -26,8 +26,8 @@ describe('custom-domain infrastructure contract', () => {
     expect(preview).toContain('workers_dev = true');
     expect(preview).toContain('{ pattern = "preview-mcp.theologai.xyz", custom_domain = true }');
     expect(preview).not.toContain('{ pattern = "mcp.theologai.xyz", custom_domain = true }');
-    expect(preview).toContain('database_name = "theologai-preview-20260727-normal-a"');
-    expect(preview).toContain('database_id = "776944d4-60d1-457f-b13e-b4e7898971ca"');
+    expect(preview).toContain('database_name = "theologai-preview-20260728-hierarchy-a"');
+    expect(preview).toContain('database_id = "51890e12-1c3f-421f-b661-9a5ea9637e43"');
     expect(preview).toContain('namespace_id = "361202"');
 
     for (const environment of [production, preview]) {

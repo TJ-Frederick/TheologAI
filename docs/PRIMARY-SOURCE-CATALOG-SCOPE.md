@@ -37,6 +37,16 @@ environment. The separately prepared normal production candidate is unbound;
 the checked-in root binding names it for protected verification, not as evidence
 of live traffic. Production release remains separately gated.
 
+PR #101's checked-in preview target is the schema-`0008` candidate
+`theologai-preview-20260728-hierarchy-a`
+(`51890e12-1c3f-421f-b661-9a5ea9637e43`), with deterministic D1 corpus identity
+`c43bfa2f5e7ff04c3641a228092bdc91d597edc60dc7d596507e8ca6c0ac90fe`. It was
+unbound when its one-time 49-file, 1,627,474-row preparation passed readiness
+and Transform-8/9/10 authority audits; dormant hierarchy/publication rows were
+empty. A checked-in target alone does not establish a current live binding or
+activate a hierarchy/publication runtime. Protected workflow evidence is
+authoritative; preview release remains separately gated.
+
 ## Source and materialization
 
 - `data/historical-document-catalog.json` is the reviewed machine-readable
