@@ -189,7 +189,7 @@ describe('createWorkerCompositionRoot', () => {
       const tool = root.tools.find(candidate => candidate.name === 'primary_source_search')!;
       expect(tool.outputSchema?.properties?.schemaVersion).toEqual({ const: '7' });
       expect(tool.annotations?.openWorldHint).toBe(true);
-      await tool.handler({ queries: [{ id: 'remote', text: 'grace', providers: ['ccel'] }] });
+      await tool.handler({ queries: [{ id: 'remote', text: 'grace', searchDepth: 'expanded' }] });
       // Fetch is owned by the adapter. Proving the adapter and namespace lookup
       // are untouched also proves no upstream fetch can begin in this state.
       expect(primarySourceMocks.search).not.toHaveBeenCalled();
@@ -215,7 +215,7 @@ describe('createWorkerCompositionRoot', () => {
         THEOLOGAI_CCEL_COORDINATOR: { getByName } as any,
       }));
       const tool = root.tools.find(candidate => candidate.name === 'primary_source_search')!;
-      await tool.handler({ queries: [{ id: 'remote', text: 'grace', providers: ['ccel'] }] });
+      await tool.handler({ queries: [{ id: 'remote', text: 'grace', searchDepth: 'expanded' }] });
       expect(primarySourceMocks.search).not.toHaveBeenCalled();
       expect(getByName).not.toHaveBeenCalled();
     });
@@ -229,7 +229,7 @@ describe('createWorkerCompositionRoot', () => {
         THEOLOGAI_CCEL_COORDINATOR: { getByName } as any,
       }));
       const tool = root.tools.find(candidate => candidate.name === 'primary_source_search')!;
-      await tool.handler({ queries: [{ id: 'remote', text: 'grace', providers: ['ccel'] }] });
+      await tool.handler({ queries: [{ id: 'remote', text: 'grace', searchDepth: 'expanded' }] });
       expect(primarySourceMocks.search).toHaveBeenCalledOnce();
       expect(primarySourceMocks.search.mock.calls[0]?.[1]).toBeDefined();
       // The adapter mock does not invoke the coordinator, proving composition
@@ -241,7 +241,7 @@ describe('createWorkerCompositionRoot', () => {
       { startYear: 500 },
       { endYear: 1500 },
       { startYear: 500, endYear: 1500 },
-    ])('rejects direct date-filtered CCEL input before Worker adapter or coordinator admission (%o)', async dateBounds => {
+    ])('keeps catalog date filters while omitting them from the expanded request (%o)', async dateBounds => {
       const getByName = vi.fn();
       const root = createWorkerCompositionRoot(makeEnv({
         THEOLOGAI_EXPOSE_CCEL_DISCOVERY: 'true',
@@ -252,14 +252,19 @@ describe('createWorkerCompositionRoot', () => {
       const tool = root.tools.find(candidate => candidate.name === 'primary_source_search')!;
 
       const result = await tool.handler({
-        queries: [{ id: 'remote', text: 'grace', providers: ['ccel'], ...dateBounds }],
+        queries: [{ id: 'remote', text: 'grace', searchDepth: 'expanded', ...dateBounds }],
       });
 
       expect(result.structuredContent).toMatchObject({
-        queries: [{ providers: [{ provider: 'ccel_live', status: 'unsupported_filter', searched: false }] }],
+        queries: [{ providers: [
+          { provider: 'local' },
+          { provider: 'ccel_live', status: 'no_results', searched: true },
+        ] }],
       });
-      expect(JSON.stringify(result)).not.toContain('CCEL discovery was not composition-date filtered');
-      expect(primarySourceMocks.search).not.toHaveBeenCalled();
+      expect(primarySourceMocks.search).toHaveBeenCalledOnce();
+      expect(primarySourceMocks.search.mock.calls[0]?.[0]).toMatchObject({ page: 1 });
+      expect(primarySourceMocks.search.mock.calls[0]?.[0]).not.toHaveProperty('startYear');
+      expect(primarySourceMocks.search.mock.calls[0]?.[0]).not.toHaveProperty('endYear');
       expect(getByName).not.toHaveBeenCalled();
     });
   });
