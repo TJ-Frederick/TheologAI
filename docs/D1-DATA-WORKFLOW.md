@@ -287,16 +287,22 @@ This preparer does not change `wrangler.toml`, a Worker binding, deployment,
 or database inventory. It does mutate only the separately named, unbound
 production candidate corpus: migrations and deterministic seed files are
 applied there after the pristine-target guard passes. It never mutates the
-active/bound production corpus. The deployed preview corpus is the reviewed
-25-work Transform-9 collection; production remains on its 17-work Transform-8
-collection until a separately authorized production cutover. The checked-out
-Transform-10 Aquinas hierarchy is a local-only, unpublished candidate with no
-catalog, runtime, or MCP projection; it does not assert that a remote candidate
-D1 has been prepared. The protected production workflow later re-resolves the
-checked-in candidate name/UUID, reruns readiness by exact name, records the
-predecessor Worker/D1 identity, and refuses to start either black-box audit
-unless the sole active deployed Worker is bound to that readiness-tested
-candidate.
+active/bound production corpus. The current candidate
+`theologai-production-20260728-normal-a`
+(`a3d26bba-7adc-44b0-86d0-562b2ced6bd3`) completed that one-use operation with
+49/49 seed files, 1,627,474 rows, readiness `ready`, and passed Transform-8/9
+authority audits. The preparer ran from the predecessor-bound revision; the
+later reviewed root-binding update names this candidate but does not bind or
+deploy it. The deployed preview corpus is the reviewed 25-work Transform-9
+collection; live production remains the PR #96 17-work Transform-8 collection
+until a separately authorized production cutover. The checked-out Transform-10
+Aquinas hierarchy is a local-only, unpublished candidate with no catalog,
+runtime, or MCP projection; the normal production candidate excludes its
+hierarchy and shared lineage. The protected production workflow later
+re-resolves the checked-in candidate name/UUID, reruns readiness by exact name,
+records the predecessor Worker/D1 identity, and refuses to start either
+black-box audit unless the sole active deployed Worker is bound to that
+readiness-tested candidate.
 
 Approved deploy jobs perform the last compatibility check read-only against
 the candidate name resolved from the checked-in name/UUID pair:

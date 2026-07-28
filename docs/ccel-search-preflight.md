@@ -1,10 +1,9 @@
 # CCEL live-search preflight record
 
-> **Current status:** exposure-only preview record. Production is deployed
-> v6/local-only. Deployed preview remains v5/discovery-only until an explicitly
-> authorized PR95 preview deployment; the checked-in v7 candidate keeps CCEL
-> execution disabled, so no public call can reach the adapter, coordinator
-> lookup/RPC, or upstream fetch. TheologAI does not retrieve or republish CCEL
+> **Current status:** exposure-only preview record. Production remains deployed
+> v6/local-only. Preview is deployed and audited on the v7/discovery-only
+> contract, with CCEL execution disabled before adapter, coordinator, or fetch.
+> TheologAI does not retrieve or republish CCEL
 > document bodies. Live discovery still requires a fresh operational preflight
 > and separate explicit release review.
 

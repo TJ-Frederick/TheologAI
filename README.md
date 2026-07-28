@@ -110,11 +110,15 @@ binding.
 > sole 100%; identity SHA-256
 > `a6959d24fb7f50a9848fe2d011f425894718471b8a0609e7833780a291721a44`.
 
-PR95's Transform9 source-pack work is deployed to preview only. The reviewed
-core-eight makes the checked-out local catalog and preview inventories 25
-works; production remains on the 17-work Transform 8 catalog. The integrated
-Transform 10 Aquinas work is a separate local-only, unpublished candidate:
-normal release builds exclude its hierarchy and shared lineage, and it has no
+PR95's Transform9 source-pack work is deployed and audited in preview only:
+Cloudflare deployment `3467d062-9097-4ffe-9ff1-db900838f538` serves Worker
+`8d516c26-6cfe-451c-889a-7dd580b1f4ca` at 100% with
+`theologai-preview-20260727-normal-a`
+(`776944d4-60d1-457f-b13e-b4e7898971ca`). The reviewed core-eight makes the
+checked-out local catalog and preview inventories 25 works; live production
+remains the PR #96 17-work Transform 8 predecessor. The integrated Transform
+10 Aquinas work is a separate local-only, unpublished candidate: normal
+release builds exclude its hierarchy and shared lineage, and it has no
 document/catalog projection or runtime activation. It makes no production
 Cloudflare migration, binding, deployment, or runtime-activation claim.
 For a preview-client rollback without changing server state, use the direct preview
@@ -129,11 +133,10 @@ preview-only activation statements are historical. PR #96 now binds
 independently establish the runtime path for every historical transform. The
 pinned packet's `SOURCE.json` remains a historical acquisition-gate snapshot,
 not deployment evidence. PR95's Transform9 source-pack work is bound only in
-preview; it makes no production binding or runtime claim.
-Production v6/local-only is deployed. Preview remains on deployed
-v5/discovery-only with CCEL execution disabled; the Transform-9 preview corpus
-release does not activate the checked-in v7 profile, which remains a
-non-executing candidate.
+preview; it makes no production binding or runtime claim. Production
+v6/local-only is deployed. Preview now runs the audited v7/discovery-only
+contract with CCEL execution disabled; its checked-in and deployed profiles
+reject execution before adapter, coordinator, or fetch.
 
 ## MCP capabilities
 
@@ -156,7 +159,7 @@ fresh server and transport.
 | `parallel_passages` | Return complete UBS source-attested parallel groups by default; legacy curated edges and OpenBible.info cross references require explicit selectors and remain separate. |
 | `commentary_lookup` | Retrieve Matthew Henry, JFB, Adam Clarke, John Gill, Keil-Delitzsch (OT), or Tyndale notes. |
 | `classic_text_lookup` | The checked-out local catalog searches and browses 25 historical works with canonical source-first section keys; eight reviewed source-pack editions use bounded sectioned delivery. Preview serves the 25-work Transform-9 catalog; production remains on 17 Transform-8 works until its authorized cutover. Exact sections are the only body route, and remote CCEL document bodies are not retrieved or republished. |
-| `primary_source_search` | Execute bounded primary-source query plans. Production v6/local-only is deployed; preview remains deployed v5/discovery-only with CCEL execution disabled. The checked-in v7 CCEL-discovery candidate also disables execution before adapter, coordinator, or fetch. The Transform-9 preview corpus release does not change that CCEL policy. Local locators use canonical section keys plus source ordinals; snippets remain discovery-only and research workflows maintain explicit searched/read/deferred/not-searched coverage ledgers. |
+| `primary_source_search` | Execute bounded primary-source query plans. Production v6/local-only is deployed; preview runs the audited v7/discovery-only contract with CCEL execution disabled before adapter, coordinator, or fetch. The Transform-9 preview corpus release does not change that CCEL policy. Local locators use canonical section keys plus source ordinals; snippets remain discovery-only and research workflows maintain explicit searched/read/deferred/not-searched coverage ledgers. |
 | `original_language_lookup` | Look up or search Strong's entries, with opt-in rights-reviewed STEPBible metadata, exact corrected-corpus usage, and bounded occurrence pages for exact identities. The Online-Bible-derived TBESH Hebrew `Meaning` field is withheld. |
 | `bible_verse_morphology` | Return bounded word-by-word morphology for one exact verse, with raw codes, nullable expansions, and separate pinned STEPBible morphology/lemma provenance. |
 | `original_language_study` | Resolve and study one Greek or Hebrew token in one verse with contextual morphology and source-separated lexical evidence. Schema v2 preserves the complete prior study under `study` and adds bounded Hebrew semantic candidates with summary/detailed views and opaque continuation cursors. |
@@ -354,13 +357,12 @@ reliable translator attribution.
 Production v6/local-only searches and retrieves its 17-work Transform 8
 collection; preview serves the 25-work Transform 9 collection. Both deployed
 environments do **not** currently fetch CCEL search results or document bodies.
-Preview's existing
-`classic_text_lookup` provides the Baltimore hard cut and canonical/legacy
-resolution without adding a tool. Its v5 CCEL-discovery profile returns a
-disabled provider result before adapter invocation. That happens before adapter,
-Durable Object lookup/RPC, or fetch. The checked-in v7 profile remains a
-non-executing candidate. Production has neither the Transform-9 core-eight
-materialization nor behavior. MCP clients should
+Preview's existing `classic_text_lookup` provides the Baltimore hard cut and
+canonical/legacy resolution without adding a tool. Its deployed v7
+CCEL-discovery profile returns a disabled provider result before adapter
+invocation. That happens before adapter, Durable Object lookup/RPC, or fetch.
+Production has neither the Transform-9 core-eight materialization nor that
+preview-only behavior. MCP clients should
 reconnect and reinitialize after any endpoint/profile change because tool and
 prompt schemas may be cached for an existing connection.
 
@@ -554,10 +556,9 @@ per-request D1 repositories. Both targets share one MCP registry.
 - The current tracked roadmap is [docs/ROADMAP.md](docs/ROADMAP.md), beginning
   after the PR #10 production baseline.
 - Live CCEL discovery and search remain gated future work. PR #96 production
-  is deployed v6/local-only, and the deployed preview remains v5/discovery-only
-  with CCEL execution disabled. The Transform-9 preview corpus release does not
-  change that policy; the checked-in v7 candidate is non-executing before
-  adapter, coordinator, or fetch.
+  is deployed v6/local-only, and preview is deployed v7/discovery-only with
+  CCEL execution disabled before adapter, coordinator, or fetch. The
+  Transform-9 preview corpus release does not change that policy.
   The legacy CCEL body reader is retired; the retained discovery adapter is
   bounded, does not fetch until separately authorized, and must never become
   CCEL body mirroring or republication.

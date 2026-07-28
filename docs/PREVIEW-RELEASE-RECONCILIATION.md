@@ -21,19 +21,18 @@ at that time was deployment
 That point-in-time record does not describe the current live identity or prove
 that no later concurrent Cloudflare change occurred.
 
-The currently live preview Worker still uses the older Transform-10-era D1
-`theologai-preview-20260725-t10-a`
-(`fbd1a492-fbc2-4061-a431-181a9632d4de`). The checked-in preview binding now
-names the separately prepared but not-yet-deployed normal-build candidate
+The protected preview release deployed the normal 25-work build as Cloudflare
+deployment `3467d062-9097-4ffe-9ff1-db900838f538`, serving Worker
+`8d516c26-6cfe-451c-889a-7dd580b1f4ca` at 100% with
 `theologai-preview-20260727-normal-a`
-(`776944d4-60d1-457f-b13e-b4e7898971ca`). It was prepared once from the
-reviewed 49-file, 1,627,474-row deterministic seed with corpus identity
-`e9362cf0ba6cc0efbc7ea663f418dcf2775d4abe1989f1e2774e16b14d5010db`;
+(`776944d4-60d1-457f-b13e-b4e7898971ca`). That database was prepared once from
+the reviewed 49-file, 1,627,474-row deterministic seed with corpus identity
+`e9362cf0ba6cc0efbc7ea663f418dcf2775d4abe1989f1e2774e16b14d5010db`; its
 readiness and Transform-8/9 authority checks passed, and the inactive Aquinas
-hierarchy tables remain empty. This candidate is unbound from the active Worker.
-Its preparation does not deploy, rebind, or alter preview traffic, and it makes
-no production claim. A separate protected deployment must prove the new active
-Worker binds this exact `candidateD1` before either black-box audit.
+hierarchy tables are empty. The protected release and independent bounded
+black-box audit passed with no P0-P3 findings. The deployed preview profile is
+v7/discovery-only with CCEL execution disabled before adapter, coordinator, or
+fetch. This is preview evidence only; it makes no production claim.
 
 The candidate-binding observation is written before the strict gate and is uploaded through `always()` handling. It contains only version/deployment IDs, predecessor/active/candidate D1 IDs, the `d1Changed` value, and boolean configuration/binding verdicts; it excludes raw Wrangler JSON, headers, requests, sessions, and secrets. The final post-mutation observation is likewise retained and hashed even if the strict candidate-binding gate blocks both audits.
 

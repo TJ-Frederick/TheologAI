@@ -186,8 +186,7 @@ describe('published project contract', () => {
     expect(readme).not.toMatch(/six public-domain commentar/i);
     expect(readme).toContain('do **not** currently fetch CCEL search results or document bodies');
     expect(readme).toContain('Production v6/local-only is deployed');
-    expect(readme).toContain('Preview remains on deployed\nv5/discovery-only with CCEL execution disabled');
-    expect(readme).toContain('Transform-9 preview corpus\nrelease does not activate the checked-in v7 profile, which remains a\nnon-executing candidate');
+    expect(readme).toContain('Preview now runs the audited v7/discovery-only\ncontract with CCEL execution disabled');
     expect(readme).toContain('preview serves the 25-work Transform 9 collection');
     expect(readme).toContain('The integrated Transform 10 candidate is local-only and unpublished');
     expect(readme).toContain('not wired into runtime or MCP surfaces');
@@ -204,8 +203,8 @@ describe('published project contract', () => {
     const primarySourceToolRow = readme.split('\n')
       .find(line => line.startsWith('| `primary_source_search` |'));
     expect(primarySourceToolRow).toContain('Production v6/local-only is deployed');
-    expect(primarySourceToolRow).toContain('preview remains deployed v5/discovery-only');
-    expect(primarySourceToolRow).toContain('checked-in v7 CCEL-discovery candidate also disables execution before adapter, coordinator, or fetch');
+    expect(primarySourceToolRow).toContain('preview runs the audited v7/discovery-only contract');
+    expect(primarySourceToolRow).toContain('CCEL execution disabled before adapter, coordinator, or fetch');
     const previewStart = workerConfig.indexOf('[env.preview]');
     expect(previewStart).toBeGreaterThan(0);
     expect(workerConfig.slice(0, previewStart)).toContain('THEOLOGAI_EXPOSE_CCEL_DISCOVERY = "false"');
@@ -227,10 +226,10 @@ describe('published project contract', () => {
     const activeDeployment = '4148bfb5-dd03-447f-b656-9daa0aee4380';
     const activeVersion = 'ca1376bb-05cc-403b-a396-d2e89403abec';
     const activeD1 = 'theologai-preview-20260724-a';
-    const currentPreviewD1 = 'theologai-preview-20260725-t10-a';
-    const currentPreviewD1Id = 'fbd1a492-fbc2-4061-a431-181a9632d4de';
-    const preparedCandidateD1 = 'theologai-preview-20260727-normal-a';
-    const preparedCandidateD1Id = '776944d4-60d1-457f-b13e-b4e7898971ca';
+    const deployedPreview = '3467d062-9097-4ffe-9ff1-db900838f538';
+    const deployedPreviewWorker = '8d516c26-6cfe-451c-889a-7dd580b1f4ca';
+    const deployedPreviewD1 = 'theologai-preview-20260727-normal-a';
+    const deployedPreviewD1Id = '776944d4-60d1-457f-b13e-b4e7898971ca';
     const predecessorDeployment = '7f00a94b-4ff4-47d6-9bee-2efb99673718';
     const predecessorVersion = 'f78d66f1-cefe-46ba-88ba-9ddec259cda4';
     const predecessorD1 = 'theologai-preview-20260722-b';
@@ -243,28 +242,43 @@ describe('published project contract', () => {
       expect(document).toContain(predecessorDeployment);
       expect(document).toContain(predecessorVersion);
       expect(document).toContain(predecessorD1);
-      expect(document).toContain(preparedCandidateD1);
-      expect(document).toContain(preparedCandidateD1Id);
-      expect(document).toContain(currentPreviewD1);
-      expect(document).toContain(currentPreviewD1Id);
+      expect(document).toContain(deployedPreview);
+      expect(document).toContain(deployedPreviewWorker);
+      expect(document).toContain(deployedPreviewD1);
+      expect(document).toContain(deployedPreviewD1Id);
     }
     expect(reconciliation).toContain('historical read-only observation');
-    expect(reconciliation).toContain('currently live preview Worker still uses the older Transform-10-era D1');
-    expect(reconciliation).toContain('separately prepared but not-yet-deployed normal-build candidate');
-    expect(reconciliation).toContain('This candidate is unbound from the active Worker');
+    expect(reconciliation).toContain('protected preview release deployed the normal 25-work build');
+    expect(reconciliation).toContain('black-box audit passed with no P0-P3 findings');
     expect(operations).toContain('historical, read-only Cloudflare snapshot');
-    expect(operations).toContain('currently live preview Worker still uses the older Transform-10-era D1');
-    expect(operations).toContain('prepared but not-yet-deployed normal-build D1');
-    expect(operations).toContain('No preview Worker deployment or binding change is\nrecorded for this candidate');
-    expect(operations).toContain('new\nnormal-build candidate is prepared but unbound, excludes the inactive Aquinas\nhierarchy rows');
-    expect(operations).toContain('live older Transform-10-era preview D1 remains active until\ncutover; the prepared but unbound normal-build candidate excludes inactive\nAquinas hierarchy rows');
-    expect(operations).toContain('Transform-10 Aquinas hierarchy remains\nlocal-only and inactive; the prepared normal-build candidate excludes its\nhierarchy and lineage');
-    expect(operations).not.toContain('The prepared but unbound preview\ncandidate retains that inactive authority data');
-    expect(operations).not.toContain('its prepared preview candidate');
-    expect(operations).not.toContain('Transform 10 is an unpublished, inactive hierarchy candidate;\nits prepared but unbound preview D1');
+    expect(operations).toContain('protected preview release deployed Cloudflare deployment');
+    expect(operations).toContain('black-box audit passed with no P0-P3 findings');
+    expect(operations).toContain('Transform-10 Aquinas\nhierarchy from all normal D1 corpora');
+    expect(operations).toContain('The deployed normal-build preview D1 excludes inactive Aquinas');
+    expect(operations).not.toContain('prepared but unbound preview\ncandidate retains that inactive authority data');
     expect(operations).toContain(`Its historical Cloudflare deployment\n\`${historicalDeployment}\` served Worker`);
     expect(operations).toContain('This historical release is neither\nthe current preview identity nor the immediate retained predecessor');
-    expect(reconciliation).toContain('it makes\nno production claim');
+    expect(reconciliation).toContain('it makes no production claim');
     expect(reconciliation).not.toContain('which the checked-in preview binding now names for the next protected preview deployment');
+  });
+
+  it('keeps current CCEL rollout status aligned across operator documents', async () => {
+    const documents = await Promise.all([
+      readProjectFile('docs/CCEL-LIVE-PREVIEW-AUDIT.md'),
+      readProjectFile('docs/CCEL-UPSTREAM-COORDINATOR.md'),
+      readProjectFile('docs/ccel-search-preflight.md'),
+    ]);
+    for (const document of documents) {
+      const normalized = document.replace(/^>\s?/gm, '').replace(/\s+/g, ' ');
+
+      expect(normalized).toContain('Production remains deployed v6/local-only');
+      expect(normalized).toContain(
+        'Preview is deployed and audited on the v7/discovery-only contract',
+      );
+      expect(normalized).toContain(
+        'CCEL execution disabled before adapter, coordinator, or fetch',
+      );
+      expect(normalized).not.toMatch(/deployed preview remains v5\/discovery-only/i);
+    }
   });
 });

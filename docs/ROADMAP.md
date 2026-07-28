@@ -655,9 +655,11 @@ Code readiness and operational readiness are deliberately separate:
   controls when a cursor is present, and retains `includeText: false` as the
   existing default. Any future workflow or prompt change remains a separate
   slice rather than another cursor implementation.
-- Production v6/local-only is deployed in PR #96. Deployed preview remains
-  v5/discovery-only; v7/discovery-only is still an unpublished checked-in
-  candidate, with CCEL execution disabled.
+- Production v6/local-only is deployed in PR #96. Preview is deployed and
+  audited on its normal 25-work D1 with the v7/discovery-only contract; CCEL
+  execution remains disabled before adapter, coordinator, or fetch. The
+  separately prepared production normal D1 is unbound, and its checked-in root
+  binding is a future-candidate selector rather than evidence of live traffic.
   Prospective corpus work remains limited to
   explicit searched/read/deferred coverage semantics and future
   edition/provenance fields; it is not a rollout of evidence already present
@@ -696,11 +698,13 @@ Code readiness and operational readiness are deliberately separate:
   `100`, production stays `000`, and neither environment may make a CCEL
   request.
 - Expand the local primary-source corpus with rights-reviewed, freely
-  redistributable editions and explicit edition provenance. The preview-bound
+  redistributable editions and explicit edition provenance. The deployed
   Transform 9 core-eight makes the checked-out local catalog and preview
-  collection 25 works, while production remains on the 17-work Transform 8
-  catalog. The integrated Transform 10 Aquinas hierarchy is local-only and
-  unpublished, with no catalog/runtime/MCP activation; any successor catalog
+  collection 25 works, while live production remains on the PR #96 17-work
+  Transform 8 catalog pending its separately prepared candidate's protected
+  release. The integrated Transform 10 Aquinas hierarchy is local-only and
+  unpublished, with no catalog/runtime/MCP activation; normal candidate D1
+  corpora exclude its hierarchy and shared lineage. Any successor catalog
   projection still requires separately reviewed transforms, D1 preparation,
   and release gates. Do not mirror or republish CCEL transcriptions without
   edition-specific rights.
@@ -742,9 +746,8 @@ Code readiness and operational readiness are deliberately separate:
   is uncertain, but that uncertainty must be disclosed; a third party's
   particular transcription is not assumed redistributable.
 - CCEL execution remains inactive. Production is deployed v6/local-only;
-  deployed preview remains v5/discovery-only with CCEL execution disabled. The
-  Transform-9 preview corpus release does not select the checked-in v7
-  discovery candidate. A future live discovery rollout
+  preview is deployed v7/discovery-only with CCEL execution disabled before
+  adapter, coordinator, or fetch. A future live discovery rollout
   requires the explicit owner policy decision above and separate review, and
   must not become crawling, catalog mirroring, body republication, or permanent
   storage. The legacy CCEL body reader is retired; the retained discovery

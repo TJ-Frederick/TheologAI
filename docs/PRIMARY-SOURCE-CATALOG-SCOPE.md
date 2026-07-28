@@ -28,10 +28,14 @@ historical Transform 6 catalog identity remains
 earlier slice. These are checked-in build and seed identities, not Cloudflare
 deployment identifiers.
 
-Transform 9 is bound and deployed in preview only. It makes no claim that
-migration 0006, the core-eight rows, or the 25-work collection has been
-migrated, bound, or deployed to the production D1 environment. Production
-release remains separately gated.
+Transform 9 is bound and deployed in preview only, on
+`theologai-preview-20260727-normal-a`
+(`776944d4-60d1-457f-b13e-b4e7898971ca`), and its bounded black-box audit
+passed. It makes no claim that migration 0006, the core-eight rows, or the
+25-work collection has been migrated, bound, or deployed to the production D1
+environment. The separately prepared normal production candidate is unbound;
+the checked-in root binding names it for protected verification, not as evidence
+of live traffic. Production release remains separately gated.
 
 ## Source and materialization
 

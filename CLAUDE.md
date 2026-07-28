@@ -144,7 +144,7 @@ capability.
 - **ESV API** — Requires `ESV_API_KEY` env var, 100k/day limit
 - **NET Bible API** — Free, no auth, includes 60k translator notes
 - **CCEL discovery adapter** (`ccel.org`) — bounded future-provider architecture;
-  preview exposes only its disabled v5 discovery contract, production remains
+  preview exposes its disabled v7 discovery contract, production remains
   v6/local-only, and neither environment may execute a CCEL request without a
   separate release gate. The legacy body reader has been retired; see `NOTICE.md`.
 

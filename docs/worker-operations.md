@@ -2,14 +2,14 @@
 
 ## Current production release state (PR #96; 2026-07-24)
 
-The integrated checked-out candidate is the Transform-10 normal build: its
-Aquinas hierarchy has no catalog, runtime, or MCP projection. The live preview
-Worker still uses the older Transform-10-era D1
-`theologai-preview-20260725-t10-a`
-(`fbd1a492-fbc2-4061-a431-181a9632d4de`) until the protected cutover. The new
-normal-build candidate is prepared but unbound, excludes the inactive Aquinas
-hierarchy rows, and does not change that live preview state; production remains
-the Transform-8 17-work catalog.
+The integrated checked-out normal build excludes the Transform-10 Aquinas
+hierarchy from all normal D1 corpora: it has no catalog, runtime, or MCP
+projection. Preview is deployed and audited on the 25-work normal D1
+`theologai-preview-20260727-normal-a`
+(`776944d4-60d1-457f-b13e-b4e7898971ca`); production remains the PR #96
+Transform-8 17-work catalog. The checked-in root production binding instead
+names a separately prepared, unbound future candidate and is not evidence of
+live production traffic.
 
 PR #96 production evidence is source-attested to checked-out commit
 `ac4b5ed774302fbfc86bf846b6ee77a07beed456` and exact tree
@@ -96,19 +96,16 @@ at that time was deployment
 This historical observation does not identify the current preview binding and
 does not imply a rollback, binding change, or production change.
 
-The currently live preview Worker still uses the older Transform-10-era D1
-`theologai-preview-20260725-t10-a`
-(`fbd1a492-fbc2-4061-a431-181a9632d4de`). The checked-in preview binding now
-names prepared but not-yet-deployed normal-build D1
+The protected preview release deployed Cloudflare deployment
+`3467d062-9097-4ffe-9ff1-db900838f538`, serving Worker
+`8d516c26-6cfe-451c-889a-7dd580b1f4ca` at 100% with normal-build D1
 `theologai-preview-20260727-normal-a`
 (`776944d4-60d1-457f-b13e-b4e7898971ca`). Its one-time preparation applied the
 reviewed 49-file, 1,627,474-row deterministic seed with corpus identity
 `e9362cf0ba6cc0efbc7ea663f418dcf2775d4abe1989f1e2774e16b14d5010db` and
 passed readiness plus Transform-8/9 authority checks; all inactive Aquinas
-hierarchy tables are empty. No preview Worker deployment or binding change is
-recorded for this candidate. It remains unbound until a separately authorized
-protected deployment proves the candidate binding before its black-box audits;
-production remains unchanged.
+hierarchy tables are empty. The protected release and independent bounded
+black-box audit passed with no P0-P3 findings. Production remains unchanged.
 
 PR #92 merged as `cd3d1c38fdf0f939a33a41d4b6d5044eb7f44562`; its exact
 reviewed head `3a2b5a57b322dce525f27cfa91c9f667d080bca9` is the separate
@@ -131,9 +128,8 @@ Go-http-client/2.0`) is rejected rather than redirected; supported browser CORS
 preflight remains local. The preview
 `theologai-preview.tjfrederick.workers.dev` host remains a direct compatibility
 endpoint. The deployed primary-source MCP schema is production v6/local-only
-and preview v5/discovery-only; CCEL execution remains disabled in both
-environments. The checked-in v7 schema remains an unpublished repository
-candidate, not evidence of a changed remote contract.
+and preview v7/discovery-only; CCEL execution remains disabled in both
+environments before adapter, coordinator, or fetch.
 
 The historical repository changes through PR #83
 (`93d5837b05249c15127ab20107f86443cccf4e1e`) describe the pre-release
@@ -188,9 +184,10 @@ historical release, production was v4/local-only and preview was
 single live predicate remained false. In that state an external query returned a
 disabled provider result before adapter invocation, Durable Object lookup/RPC,
 or fetch. Protected preview deployment and black-box audit established that as
-the deployed preview v5 profile. It does not authorize live CCEL access. Current
-production is v6/local-only; deployed preview remains v5 until an explicitly
-authorized PR95 deployment selects the checked-in, non-executing v7 candidate.
+the deployed preview v5 profile. It does not authorize live CCEL access. That
+historical profile is superseded by the current deployed v7/discovery-only
+preview profile; production remains v6/local-only and neither environment may
+execute a CCEL request.
 
 Because MCP clients may cache tool and prompt schemas within an initialized
 connection, reconnect and reinitialize the audit client after the preview
@@ -604,10 +601,9 @@ source-pack authority audit: direct eight-row normalized-section pages plus
 compact identity/document/edition-FTS/runtime-FTS parity pages. The audit is
 read-only and catches an orphan or extra normalized section that a
 delivery-profile join alone would miss. Production remains on its Transform 8
-17-work corpus. The live older Transform-10-era preview D1 remains active until
-cutover; the prepared but unbound normal-build candidate excludes inactive
-Aquinas hierarchy rows and does not authorize production activation. Any
-separately authorized production Transform 9 cutover must rerun this gate and
+17-work corpus. The deployed normal-build preview D1 excludes inactive Aquinas
+hierarchy rows and does not authorize production activation. Any separately
+authorized production Transform 9 cutover must rerun this gate and
 audit against its exact candidate.
 
 The corpus marker is the scoped D1 materialization identity derived from

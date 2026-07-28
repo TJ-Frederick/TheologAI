@@ -3,6 +3,8 @@ import { Buffer } from 'node:buffer';
 import { describe, expect, it } from 'vitest';
 import {
   CCEL_OPERATOR_SECRET,
+  PRODUCTION_D1_ID,
+  PRODUCTION_D1_NAME,
   PROMOTE_CONFIRMATION,
   ROLLBACK_CONFIRMATION,
   STAGE_CONFIRMATION,
@@ -81,6 +83,10 @@ describe('CCEL operator-secret staged release policy', () => {
     expect(() => assertReleaseConfig(releaseConfig)).not.toThrow();
     expect(() => assertWorkerConfig(workerConfig.replace('namespace_id = "361203"', 'namespace_id = "361201"')))
       .toThrow('namespace mismatch');
+    expect(() => assertWorkerConfig(workerConfig.replace(`database_name = "${PRODUCTION_D1_NAME}"`, 'database_name = "other-production"')))
+      .toThrow('D1 binding mismatch');
+    expect(() => assertWorkerConfig(workerConfig.replace(`database_id = "${PRODUCTION_D1_ID}"`, `database_id = "${baselineId}"`)))
+      .toThrow('D1 binding mismatch');
     expect(() => assertWorkerConfig(workerConfig.replace('database_id = "776944d4-60d1-457f-b13e-b4e7898971ca"', `database_id = "${baselineId}"`)))
       .toThrow('D1 binding mismatch');
     expect(() => assertWorkerConfig(workerConfig.replace('THEOLOGAI_REQUEST_LOGS = "true"', 'THEOLOGAI_REQUEST_LOGS = "false"')))

@@ -20,8 +20,8 @@ const candidateDeployment = '423e4567-e89b-42d3-a456-426614174000';
 const predecessorD1Id = '94c4938b-7800-4d68-9097-0df33c31fdc1';
 const candidateD1Id = '776944d4-60d1-457f-b13e-b4e7898971ca';
 const candidateD1Name = 'theologai-preview-20260727-normal-a';
-const productionCandidateD1Id = '3f7faa0e-689f-47aa-a601-dc662db9a6cf';
-const productionCandidateD1Name = 'theologai-production-20260723-a';
+const productionCandidateD1Id = 'a3d26bba-7adc-44b0-86d0-562b2ced6bd3';
+const productionCandidateD1Name = 'theologai-production-20260728-normal-a';
 
 function deployments(id = predecessorDeployment, version = predecessorVersion): string {
   return JSON.stringify([{
