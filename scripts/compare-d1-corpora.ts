@@ -26,6 +26,7 @@ const TABLE_QUERIES = {
   historical_edition_hierarchy_bodies: 'SELECT * FROM historical_edition_hierarchy_bodies ORDER BY hierarchy_id, source_ordinal',
   historical_edition_hierarchy_nodes: 'SELECT * FROM historical_edition_hierarchy_nodes ORDER BY hierarchy_id, flat_ordinal',
   historical_edition_hierarchy_bodies_fts: 'SELECT hierarchy_id, body_key, heading, content FROM historical_edition_hierarchy_bodies_fts ORDER BY rowid',
+  historical_hierarchy_publications: 'SELECT * FROM historical_hierarchy_publications ORDER BY publication_id',
   morph_codes: 'SELECT * FROM morph_codes ORDER BY code',
 } as const;
 

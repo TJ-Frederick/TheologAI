@@ -186,8 +186,8 @@ describe('published project contract', () => {
     expect(readme).not.toMatch(/six public-domain commentar/i);
     expect(readme).toContain('do **not** currently fetch CCEL search results or document bodies');
     expect(readme).toContain('Production v6/local-only is deployed');
-    expect(readme).toContain('Preview now runs the audited v7/discovery-only\ncontract with CCEL execution disabled');
-    expect(readme).toContain('preview serves the 25-work Transform 9 collection');
+    expect(readme).toContain('preview runs the audited v7/discovery-only contract with CCEL execution disabled');
+    expect(readme).toMatch(/Preview\s+and production both serve the 25-work Transform 9 catalog/);
     expect(readme).toContain('The integrated Transform 10 candidate is local-only and unpublished');
     expect(readme).toContain('not wired into runtime or MCP surfaces');
     expect(readme).toContain('before adapter');
@@ -218,7 +218,7 @@ describe('published project contract', () => {
     expect(historicalDevelopment.slice(0, 700)).toContain('Historical development plan');
   });
 
-  it('keeps current preview evidence distinct from historical preview releases', async () => {
+  it('keeps the current PR #101 preview baseline distinct from historical preview releases', async () => {
     const [reconciliation, operations] = await Promise.all([
       readProjectFile('docs/PREVIEW-RELEASE-RECONCILIATION.md'),
       readProjectFile('docs/worker-operations.md'),
@@ -230,6 +230,10 @@ describe('published project contract', () => {
     const deployedPreviewWorker = '8d516c26-6cfe-451c-889a-7dd580b1f4ca';
     const deployedPreviewD1 = 'theologai-preview-20260727-normal-a';
     const deployedPreviewD1Id = '776944d4-60d1-457f-b13e-b4e7898971ca';
+    const preparedCandidateD1 = 'theologai-preview-20260728-hierarchy-a';
+    const preparedCandidateD1Id = '51890e12-1c3f-421f-b661-9a5ea9637e43';
+    const currentPreviewDeployment = '070b292b-0bae-400a-b983-3d72157b5a96';
+    const currentPreviewWorker = 'bd722b69-2e2c-4d8d-b42b-617e8caba13d';
     const predecessorDeployment = '7f00a94b-4ff4-47d6-9bee-2efb99673718';
     const predecessorVersion = 'f78d66f1-cefe-46ba-88ba-9ddec259cda4';
     const predecessorD1 = 'theologai-preview-20260722-b';
@@ -246,20 +250,71 @@ describe('published project contract', () => {
       expect(document).toContain(deployedPreviewWorker);
       expect(document).toContain(deployedPreviewD1);
       expect(document).toContain(deployedPreviewD1Id);
+      expect(document).toContain(preparedCandidateD1);
+      expect(document).toContain(preparedCandidateD1Id);
+      expect(document).toContain(currentPreviewDeployment);
+      expect(document).toContain(currentPreviewWorker);
     }
     expect(reconciliation).toContain('historical read-only observation');
     expect(reconciliation).toContain('protected preview release deployed the normal 25-work build');
     expect(reconciliation).toContain('black-box audit passed with no P0-P3 findings');
     expect(operations).toContain('historical, read-only Cloudflare snapshot');
-    expect(operations).toContain('protected preview release deployed Cloudflare deployment');
+    expect(operations).toContain('protected PR95 preview release deployed Cloudflare deployment');
     expect(operations).toContain('black-box audit passed with no P0-P3 findings');
     expect(operations).toContain('Transform-10 Aquinas\nhierarchy from all normal D1 corpora');
-    expect(operations).toContain('The deployed normal-build preview D1 excludes inactive Aquinas');
+    expect(operations).toContain('both contain the 25-work corpus and exclude inactive\nAquinas');
     expect(operations).not.toContain('prepared but unbound preview\ncandidate retains that inactive authority data');
     expect(operations).toContain(`Its historical Cloudflare deployment\n\`${historicalDeployment}\` served Worker`);
     expect(operations).toContain('This historical release is neither\nthe current preview identity nor the immediate retained predecessor');
     expect(reconciliation).toContain('it makes no production claim');
-    expect(reconciliation).not.toContain('which the checked-in preview binding now names for the next protected preview deployment');
+    expect(reconciliation).toContain('PR #101\'s checked-in preview candidate was unbound when prepared');
+    expect(reconciliation).toContain('This is the current preview binding');
+    expect(reconciliation).toContain('protected release evidence is authoritative');
+    expect(operations).toContain('The current preview baseline is PR #101 deployment');
+    expect(operations).toContain('Protected release evidence proves\nthis exact current binding');
+  });
+
+  it('documents the completed PR #101 production cutover without implying hierarchy activation', async () => {
+    const [readme, dataWorkflow, catalogScope, reconciliation, operations, roadmap] = await Promise.all([
+      readProjectFile('README.md'),
+      readProjectFile('docs/D1-DATA-WORKFLOW.md'),
+      readProjectFile('docs/PRIMARY-SOURCE-CATALOG-SCOPE.md'),
+      readProjectFile('docs/PRODUCTION-RELEASE-RECONCILIATION.md'),
+      readProjectFile('docs/worker-operations.md'),
+      readProjectFile('docs/ROADMAP.md'),
+    ]);
+    const candidateD1 = 'theologai-production-20260728-hierarchy-a';
+    const candidateD1Id = 'f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395';
+    const liveProduction = {
+      deployment: '71b76d24-bf5f-490e-adc4-31cf63fb046e',
+      worker: 'bae58cd3-cad7-4663-879d-408accf061b0',
+      d1: 'theologai-production-20260728-hierarchy-a',
+      d1Id: 'f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395',
+    };
+    const livePreview = {
+      deployment: '070b292b-0bae-400a-b983-3d72157b5a96',
+      worker: 'bd722b69-2e2c-4d8d-b42b-617e8caba13d',
+      d1: 'theologai-preview-20260728-hierarchy-a',
+      d1Id: '51890e12-1c3f-421f-b661-9a5ea9637e43',
+    };
+
+    for (const document of [readme, dataWorkflow, catalogScope, reconciliation, operations]) {
+      expect(document).toContain(candidateD1);
+      expect(document).toContain(candidateD1Id);
+    }
+    for (const document of [readme, dataWorkflow, catalogScope, reconciliation, operations, roadmap]) {
+      for (const value of Object.values(liveProduction)) expect(document).toContain(value);
+      for (const value of Object.values(livePreview)) expect(document).toContain(value);
+    }
+    expect(reconciliation).toContain('completed PR #101 protected production cutover');
+    expect(dataWorkflow).toContain('proved the candidate binding before and after its black-box');
+    expect(catalogScope).toContain('proved it as the sole active production');
+    expect(operations).toContain('proved the exact binding before and after its bounded black-box audits');
+    expect(roadmap).toContain('later proved that exact binding and passed the production');
+    for (const document of [readme, dataWorkflow, catalogScope, reconciliation, operations, roadmap]) {
+      expect(document).not.toContain('Transform-8/9/10 authority');
+      expect(document.replace(/\s+/g, ' ')).toContain('Transform-10 normal-corpus exclusion predicates');
+    }
   });
 
   it('keeps current CCEL rollout status aligned across operator documents', async () => {

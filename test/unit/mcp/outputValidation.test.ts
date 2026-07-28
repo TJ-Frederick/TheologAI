@@ -519,7 +519,7 @@ describe('MCP structured output validation', () => {
 
     const result = await client.callTool({
       name: 'primary_source_search',
-      arguments: { queries: [{ id: 'local', text: 'grace', providers: ['local'] }] },
+      arguments: { queries: [{ id: 'catalog', text: 'grace', searchDepth: 'standard' }] },
     });
     expect(result.isError).not.toBe(true);
     const structured = result.structuredContent as any;

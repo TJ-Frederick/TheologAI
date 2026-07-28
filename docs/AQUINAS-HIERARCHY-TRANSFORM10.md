@@ -8,6 +8,13 @@ historical document, catalogue item, runtime composition dependency, MCP tool,
 prompt, or resource. It creates no remote D1 operation, binding, deployment,
 publication, or CCEL dependency.
 
+Migration `0008_historical_hierarchy_publications` is schema-only in a normal
+build: its publication table remains empty. It still changes the deterministic
+whole-D1 identity, so any separately authorized release using this checkout
+must use the reviewed fresh-D1 preparation and readiness gates rather than
+claiming continuity with a prior D1 identity. Binding or deployment remains a
+separate authorization.
+
 ## Approved edition scope
 
 The profile is the English Dominican / Project Gutenberg electronic packet

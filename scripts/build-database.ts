@@ -679,6 +679,11 @@ log(`  Inserted ${historicalSourcePackCounts.works} reviewed works with ${histor
 // lineage must remain empty. The capacity rehearsal is the only code path that
 // materializes the packet, into a disposable temporary database.
 
+// The PR-A delivery-projection schema and materializer are likewise dormant.
+// A normal build must not write a publication row: the reviewed projection is
+// exercised only in isolated in-memory authority tests until a separately
+// approved activation/release prepares it.
+
 // ── Tier 3: UBS source-attested parallel passages ──
 
 log('Loading UBS parallel passages...');

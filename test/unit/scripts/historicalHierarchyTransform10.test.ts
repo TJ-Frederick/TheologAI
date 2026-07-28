@@ -10,6 +10,10 @@ import {
   assertNormalAquinasHierarchyExclusion,
   materializeHistoricalHierarchy,
 } from '../../../scripts/historical-hierarchy.js';
+import {
+  loadApprovedAquinasHierarchyPublication,
+  materializeHistoricalHierarchyPublication,
+} from '../../../scripts/historical-hierarchy-publication.js';
 import { loadApprovedAquinasHierarchy } from '../../../scripts/aquinas-source-pack-capacity-comparison.js';
 
 const ROOT = process.cwd();
@@ -20,7 +24,7 @@ function database(): Database.Database {
   for (const migration of [
     '0001_initial_schema.sql', '0002_ubs_parallel_passages.sql', '0003_original_language_usage.sql',
     '0004_ubs_hebrew_semantics.sql', '0005_historical_section_identity_delivery.sql',
-    '0006_historical_source_packs.sql', '0007_historical_hierarchy.sql',
+    '0006_historical_source_packs.sql', '0007_historical_hierarchy.sql', '0008_historical_hierarchy_publications.sql',
   ]) db.exec(readFileSync(join(ROOT, 'migrations', migration), 'utf8'));
   return db;
 }
@@ -141,7 +145,13 @@ describe('Transform 10 generic edition hierarchy', () => {
   it('returns search discovery metadata only, with controlled all-terms and phrase matching', () => {
     const db = database();
     try {
-      materializeHistoricalHierarchy(db, packet());
+      const materialization = packet();
+      materializeHistoricalHierarchy(db, materialization);
+      materializeHistoricalHierarchyPublication(
+        db,
+        loadApprovedAquinasHierarchyPublication(materialization),
+        materialization,
+      );
       const repository = new HistoricalHierarchyRepository(db);
       const allTerms = repository.searchHierarchyBodies({ hierarchyId: AQUINAS_HIERARCHY_ID, text: 'Sacred Doctrine', match: 'all_terms', limit: 9 });
       const phrase = repository.searchHierarchyBodies({ hierarchyId: AQUINAS_HIERARCHY_ID, text: 'Sacred Doctrine', match: 'phrase', limit: 9 });
@@ -198,6 +208,7 @@ describe('Transform 10 generic edition hierarchy', () => {
         'historical.transform10.normal.bodies_empty',
         'historical.transform10.normal.nodes_empty',
         'historical.transform10.normal.fts_empty',
+        'historical.transform10.normal.publications_empty',
         'historical.transform10.normal.pack_absent',
         'historical.transform10.normal.work_absent',
         'historical.transform10.normal.edition_absent',
@@ -227,7 +238,13 @@ describe('Transform 10 generic edition hierarchy', () => {
         ]);
       } finally { db.exec('ROLLBACK TO core_eight_wrong; RELEASE core_eight_wrong'); }
 
-      materializeHistoricalHierarchy(db, packet());
+      const materialization = packet();
+      materializeHistoricalHierarchy(db, materialization);
+      materializeHistoricalHierarchyPublication(
+        db,
+        loadApprovedAquinasHierarchyPublication(materialization),
+        materialization,
+      );
       for (const check of normalTransform10Checks) expect(readinessFailures(db, check)).toEqual([check]);
       expect(() => assertNormalAquinasHierarchyExclusion(db))
         .toThrow('Normal release database materialized excluded Transform 10 authority');

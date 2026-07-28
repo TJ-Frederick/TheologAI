@@ -108,6 +108,10 @@ export interface PrimarySourceSearchQuery {
   page?: number;
   limit?: number;
   selection?: PrimarySourceSelection;
+  /** Candidate v7 only: reviewed catalog first, with optional bounded discovery expansion. */
+  searchDepth?: 'standard' | 'expanded';
+  /** Candidate v7 only; valid only with searchDepth: expanded. */
+  expandedLimit?: number;
 }
 
 export interface CcelSectionLocator {

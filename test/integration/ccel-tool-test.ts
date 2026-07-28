@@ -12,7 +12,10 @@ export function assertRetiredCcelToolContractGuard(): void {
     exposeCcelDiscovery: true, ccelLiveSearch: false, ccelCoordinator: false,
     contractVersion: '7', liveCcelEnabled: false,
   });
-  if (JSON.stringify(v3).includes('"ccel"') || v7.slice(1).length !== 1) {
+  const v7Calls = JSON.stringify(v7);
+  if (JSON.stringify(v3).includes('"ccel"') || v7.length !== 1
+    || v7Calls.includes('"providers"') || !v7Calls.includes('"searchDepth":"expanded"')
+    || !v7Calls.includes('"expandedLimit":3')) {
     throw new Error('Primary-source CCEL contract guard failed.');
   }
 }

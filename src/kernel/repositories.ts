@@ -322,7 +322,25 @@ export interface HistoricalHierarchyProfile {
   bodyCount: number;
   nodeCount: number;
   coverage: Record<string, unknown>;
-  provenance: Record<string, unknown>;
+  provenance: HistoricalHierarchyAuthorityProvenance;
+}
+
+/** A closed, work-neutral provenance disclosure for a hierarchy authority. */
+export interface HistoricalHierarchyProvenanceDisclosure {
+  label: string;
+  values: string[];
+}
+
+export interface HistoricalHierarchyAuthorityProvenance {
+  status: 'local_only_inactive';
+  rightsStatus: string;
+  territoryCaveat: string;
+  catalogStatement: string;
+  /** Human-readable edition/source label; it is not a provider endpoint. */
+  sourceLabel: string;
+  /** Edition-specific facts expressed as closed generic disclosures. */
+  disclosures: HistoricalHierarchyProvenanceDisclosure[];
+  activation: string;
 }
 
 export interface HistoricalHierarchyArtifact {
@@ -408,8 +426,60 @@ export interface HistoricalHierarchySearchResult {
   breadcrumb: HistoricalHierarchyNode[];
 }
 
+/**
+ * A dormant future-delivery projection. It is deliberately separate from the
+ * immutable hierarchy authority profile and is not a documents projection.
+ */
+export interface HistoricalHierarchyPublication {
+  publicationId: string;
+  hierarchyId: string;
+  publicSlug: string;
+  title: string;
+  metadata: HistoricalHierarchyPublicationMetadata;
+  deliveryKind: 'hierarchy_nodes_v1';
+  coverage: HistoricalHierarchyPublicationCoverage;
+  cursorContract: 'historical-hierarchy-browse-cursor-v1';
+  cursorIdentity: string;
+  browsePageSize: number;
+  landingMaxBytes: number;
+  directoryMaxBytes: number;
+  nodeMaxBytes: number;
+  searchMaxBytes: number;
+  canonicalUri: string;
+  activationState: 'dormant';
+}
+
+/** Work-neutral publication metadata; individual works choose the values. */
+export interface HistoricalHierarchyPublicationMetadata {
+  creators: Array<{ name: string; role: string }>;
+  documentType: string;
+  language: string;
+  editionLabel: string;
+  rightsStatus: string;
+  territoryCaveat: string;
+}
+
+/** A generic, addressable statement about included or excluded hierarchy scope. */
+export interface HistoricalHierarchyCoverageDescriptor {
+  relationship: 'included' | 'excluded';
+  label: string;
+  address: {
+    scheme: string;
+    start: string;
+    end: string | null;
+  };
+}
+
+export interface HistoricalHierarchyPublicationCoverage {
+  statement: string;
+  completeness: string;
+  descriptors: HistoricalHierarchyCoverageDescriptor[];
+}
+
 export interface IHistoricalHierarchyRepository {
   getHierarchyProfile(hierarchyId: string): RepositoryResult<HistoricalHierarchyProfile | undefined>;
+  getHierarchyPublication(publicationId: string): RepositoryResult<HistoricalHierarchyPublication | undefined>;
+  getHierarchyPublicationBySlug(publicSlug: string): RepositoryResult<HistoricalHierarchyPublication | undefined>;
   listHierarchyArtifacts(hierarchyId: string): RepositoryResult<HistoricalHierarchyArtifact[]>;
   /** Exact body + bounded ancestors only; implementations must not concatenate children. */
   getHierarchyNodeContext(hierarchyId: string, nodeKey: string): RepositoryResult<HistoricalHierarchyNodeContext | undefined>;

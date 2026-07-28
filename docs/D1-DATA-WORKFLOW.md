@@ -288,20 +288,30 @@ or database inventory. It does mutate only the separately named, unbound
 production candidate corpus: migrations and deterministic seed files are
 applied there after the pristine-target guard passes. It never mutates the
 active/bound production corpus. The current candidate
-`theologai-production-20260728-normal-a`
-(`a3d26bba-7adc-44b0-86d0-562b2ced6bd3`) completed that one-use operation with
-49/49 seed files, 1,627,474 rows, readiness `ready`, and passed Transform-8/9
-authority audits. The preparer ran from the predecessor-bound revision; the
-later reviewed root-binding update names this candidate but does not bind or
-deploy it. The deployed preview corpus is the reviewed 25-work Transform-9
-collection; live production remains the PR #96 17-work Transform-8 collection
-until a separately authorized production cutover. The checked-out Transform-10
-Aquinas hierarchy is a local-only, unpublished candidate with no catalog,
-runtime, or MCP projection; the normal production candidate excludes its
-hierarchy and shared lineage. The protected production workflow later
-re-resolves the checked-in candidate name/UUID, reruns readiness by exact name,
-records the predecessor Worker/D1 identity, and refuses to start either
-black-box audit unless the sole active deployed Worker is bound to that
+`theologai-production-20260728-hierarchy-a`
+(`f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395`) was unbound when its one-use operation
+completed with 49/49 seed files, 1,627,474 rows, schema `0008`, corpus identity
+`c43bfa2f5e7ff04c3641a228092bdc91d597edc60dc7d596507e8ca6c0ac90fe`,
+remote readiness `ready`, passed Transform-8/9 authority audits, and satisfied
+Transform-10 normal-corpus exclusion predicates proving hierarchy, publication,
+and Aquinas-lineage rows empty. The preparer ran from the predecessor-bound
+revision. PR #101 subsequently merged as
+`e2d351a11fce9c2cb1f72add0bcf365332737f3c`, and protected production workflow
+`30401732957` proved the candidate binding before and after its black-box
+audits. The current production baseline is deployment
+`71b76d24-bf5f-490e-adc4-31cf63fb046e`, Worker
+`bae58cd3-cad7-4663-879d-408accf061b0` (#96), and D1
+`theologai-production-20260728-hierarchy-a`
+(`f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395`). The current preview baseline is PR
+#101 deployment `070b292b-0bae-400a-b983-3d72157b5a96`, Worker
+`bd722b69-2e2c-4d8d-b42b-617e8caba13d` (#130), and D1
+`theologai-preview-20260728-hierarchy-a`
+(`51890e12-1c3f-421f-b661-9a5ea9637e43`). The checked-out Transform-10 Aquinas
+hierarchy remains local-only and unpublished, with no catalog, runtime, or MCP
+projection. Future production workflows retain the same reconciliation
+contract: re-resolve the checked-in candidate name/UUID, rerun readiness by
+exact name, record the predecessor Worker/D1 identity, and refuse to start
+black-box audits unless the sole active deployed Worker is bound to the
 readiness-tested candidate.
 
 Approved deploy jobs perform the last compatibility check read-only against

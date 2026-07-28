@@ -1,17 +1,34 @@
 # Worker operations
 
-## Current production release state (PR #96; 2026-07-24)
+## Current live baseline
 
 The integrated checked-out normal build excludes the Transform-10 Aquinas
 hierarchy from all normal D1 corpora: it has no catalog, runtime, or MCP
-projection. Preview is deployed and audited on the 25-work normal D1
-`theologai-preview-20260727-normal-a`
-(`776944d4-60d1-457f-b13e-b4e7898971ca`); production remains the PR #96
-Transform-8 17-work catalog. The checked-in root production binding instead
-names a separately prepared, unbound future candidate and is not evidence of
-live production traffic.
+projection. Production is PR #101 merge
+`e2d351a11fce9c2cb1f72add0bcf365332737f3c`, deployment
+`71b76d24-bf5f-490e-adc4-31cf63fb046e`, serving Worker
+`bae58cd3-cad7-4663-879d-408accf061b0` (#96) as the sole 100% assignment,
+bound to
+`theologai-production-20260728-hierarchy-a`
+(`f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395`). That database was unbound when preparation,
+remote readiness, and Transform-8/9 authority audits completed, and whose
+Transform-10 normal-corpus exclusion predicates proved hierarchy, publication,
+and Aquinas-lineage rows empty. Protected workflow `30401732957` subsequently
+proved the exact binding before and after its bounded black-box audits. This is
+not a hierarchy/publication activation.
 
-PR #96 production evidence is source-attested to checked-out commit
+The current preview baseline is PR #101 deployment
+`070b292b-0bae-400a-b983-3d72157b5a96`, serving Worker
+`bd722b69-2e2c-4d8d-b42b-617e8caba13d` (#130), bound to
+`theologai-preview-20260728-hierarchy-a`
+(`51890e12-1c3f-421f-b661-9a5ea9637e43`). It was unbound when seeded once
+through schema `0008`: remote readiness and Transform-8/9 authority audits
+passed, and Transform-10 normal-corpus exclusion predicates proved hierarchy,
+publication, and Aquinas-lineage rows empty. Protected release evidence proves
+this exact current binding; dormant hierarchy/publication runtime activation
+remains absent.
+
+Historical PR #96 production evidence is source-attested to checked-out commit
 `ac4b5ed774302fbfc86bf846b6ee77a07beed456` and exact tree
 `adf08edbf6bfcb14b9613354b2b8fb9f62ec8c16`. At the fixed canonical endpoint
 `https://mcp.theologai.xyz/mcp`, the audit observed server version `3.6.0`.
@@ -96,7 +113,7 @@ at that time was deployment
 This historical observation does not identify the current preview binding and
 does not imply a rollback, binding change, or production change.
 
-The protected preview release deployed Cloudflare deployment
+The protected PR95 preview release deployed Cloudflare deployment
 `3467d062-9097-4ffe-9ff1-db900838f538`, serving Worker
 `8d516c26-6cfe-451c-889a-7dd580b1f4ca` at 100% with normal-build D1
 `theologai-preview-20260727-normal-a`
@@ -106,6 +123,18 @@ reviewed 49-file, 1,627,474-row deterministic seed with corpus identity
 passed readiness plus Transform-8/9 authority checks; all inactive Aquinas
 hierarchy tables are empty. The protected release and independent bounded
 black-box audit passed with no P0-P3 findings. Production remains unchanged.
+
+The protected PR #101 preview release subsequently deployed Cloudflare
+deployment `070b292b-0bae-400a-b983-3d72157b5a96`, serving Worker
+`bd722b69-2e2c-4d8d-b42b-617e8caba13d` (#130) at 100% with D1
+`theologai-preview-20260728-hierarchy-a`
+(`51890e12-1c3f-421f-b661-9a5ea9637e43`), which was unbound when prepared once
+from the reviewed 49-file, 1,627,474-row deterministic seed through schema
+`0008`. Remote readiness and Transform-8/9 authority audits passed, and
+Transform-10 normal-corpus exclusion predicates proved hierarchy, publication,
+and Aquinas-lineage rows empty. Protected release evidence establishes this
+current live binding; dormant hierarchy/publication runtime activation remains
+absent.
 
 PR #92 merged as `cd3d1c38fdf0f939a33a41d4b6d5044eb7f44562`; its exact
 reviewed head `3a2b5a57b322dce525f27cfa91c9f667d080bca9` is the separate
@@ -600,11 +629,11 @@ The deployed preview Transform 9 / 25-work release runs the same gate's bounded
 source-pack authority audit: direct eight-row normalized-section pages plus
 compact identity/document/edition-FTS/runtime-FTS parity pages. The audit is
 read-only and catches an orphan or extra normalized section that a
-delivery-profile join alone would miss. Production remains on its Transform 8
-17-work corpus. The deployed normal-build preview D1 excludes inactive Aquinas
-hierarchy rows and does not authorize production activation. Any separately
-authorized production Transform 9 cutover must rerun this gate and
-audit against its exact candidate.
+delivery-profile join alone would miss. The current PR #101 preview and
+production D1 databases both contain the 25-work corpus and exclude inactive
+Aquinas hierarchy and publication rows. This does not authorize Aquinas
+activation. Any later corpus cutover must rerun this gate and audit against its
+exact candidate.
 
 The corpus marker is the scoped D1 materialization identity derived from
 `data/data-manifest.json` `materializations.d1`, not the hash of the complete
