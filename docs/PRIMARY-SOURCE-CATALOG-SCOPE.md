@@ -34,19 +34,17 @@ PR95's Transform-9 normal preview release is historical, having used
 #101 deployment `070b292b-0bae-400a-b983-3d72157b5a96`, Worker
 `bd722b69-2e2c-4d8d-b42b-617e8caba13d` (#130), and D1
 `theologai-preview-20260728-hierarchy-a`
-(`51890e12-1c3f-421f-b661-9a5ea9637e43`). Before the proposed cutover, the
-current production baseline is PR #104 deployment
-`07bbd8aa-5c69-4b0c-a9df-c756f537bb97`, Worker
-`09fa6471-eb50-480e-85b2-bc04b742dcb3` (#94), and D1
-`theologai-production-20260728-normal-a`
-(`a3d26bba-7adc-44b0-86d0-562b2ced6bd3`). The separately prepared schema-`0008` production candidate
+(`51890e12-1c3f-421f-b661-9a5ea9637e43`). The current production baseline is
+PR #101 deployment `71b76d24-bf5f-490e-adc4-31cf63fb046e`, Worker
+`bae58cd3-cad7-4663-879d-408accf061b0` (#96), and D1
 `theologai-production-20260728-hierarchy-a`
-(`f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395`) was unbound when remote readiness and
+(`f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395`). This schema-`0008` database was
+unbound when remote readiness and
 Transform-8/9 authority audits passed and Transform-10 normal-corpus exclusion
 predicates proved hierarchy, publication, and Aquinas-lineage rows empty. The
-checked-in root target names it for protected verification, not as evidence of
-a current live Worker binding or hierarchy/publication activation. Production
-release remains separately gated.
+protected workflow subsequently proved it as the sole active production
+binding before and after bounded black-box audits. No hierarchy or publication
+activation occurred.
 
 PR #101's checked-in preview target is the schema-`0008` candidate
 `theologai-preview-20260728-hierarchy-a`

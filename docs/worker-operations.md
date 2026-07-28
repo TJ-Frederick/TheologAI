@@ -1,21 +1,21 @@
 # Worker operations
 
-## Current live baseline before the proposed production cutover
+## Current live baseline
 
 The integrated checked-out normal build excludes the Transform-10 Aquinas
 hierarchy from all normal D1 corpora: it has no catalog, runtime, or MCP
-projection. Before the proposed cutover, production is PR #104 deployment
-`07bbd8aa-5c69-4b0c-a9df-c756f537bb97`, serving Worker
-`09fa6471-eb50-480e-85b2-bc04b742dcb3` (#94), bound to
-`theologai-production-20260728-normal-a`
-(`a3d26bba-7adc-44b0-86d0-562b2ced6bd3`). The checked-in root production target
-is the separately prepared schema-`0008` candidate
+projection. Production is PR #101 merge
+`e2d351a11fce9c2cb1f72add0bcf365332737f3c`, deployment
+`71b76d24-bf5f-490e-adc4-31cf63fb046e`, serving Worker
+`bae58cd3-cad7-4663-879d-408accf061b0` (#96) as the sole 100% assignment,
+bound to
 `theologai-production-20260728-hierarchy-a`
-(`f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395`), which was unbound when preparation,
+(`f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395`). That database was unbound when preparation,
 remote readiness, and Transform-8/9 authority audits completed, and whose
 Transform-10 normal-corpus exclusion predicates proved hierarchy, publication,
-and Aquinas-lineage rows empty. That target is not evidence of a current live
-production binding or hierarchy/publication activation.
+and Aquinas-lineage rows empty. Protected workflow `30401732957` subsequently
+proved the exact binding before and after its bounded black-box audits. This is
+not a hierarchy/publication activation.
 
 The current preview baseline is PR #101 deployment
 `070b292b-0bae-400a-b983-3d72157b5a96`, serving Worker
@@ -629,11 +629,11 @@ The deployed preview Transform 9 / 25-work release runs the same gate's bounded
 source-pack authority audit: direct eight-row normalized-section pages plus
 compact identity/document/edition-FTS/runtime-FTS parity pages. The audit is
 read-only and catches an orphan or extra normalized section that a
-delivery-profile join alone would miss. The current PR #104 normal production
-D1 is the 25-work corpus. The deployed normal-build preview D1 excludes inactive Aquinas
-hierarchy rows and does not authorize production activation. Any separately
-authorized production Transform 9 cutover must rerun this gate and
-audit against its exact candidate.
+delivery-profile join alone would miss. The current PR #101 preview and
+production D1 databases both contain the 25-work corpus and exclude inactive
+Aquinas hierarchy and publication rows. This does not authorize Aquinas
+activation. Any later corpus cutover must rerun this gate and audit against its
+exact candidate.
 
 The corpus marker is the scoped D1 materialization identity derived from
 `data/data-manifest.json` `materializations.d1`, not the hash of the complete

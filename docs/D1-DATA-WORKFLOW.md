@@ -295,21 +295,24 @@ completed with 49/49 seed files, 1,627,474 rows, schema `0008`, corpus identity
 remote readiness `ready`, passed Transform-8/9 authority audits, and satisfied
 Transform-10 normal-corpus exclusion predicates proving hierarchy, publication,
 and Aquinas-lineage rows empty. The preparer ran from the predecessor-bound
-revision; the later reviewed root target names this candidate but does not
-itself bind or deploy it. Before that production cutover, the current live
-production baseline is PR #104 deployment `07bbd8aa-5c69-4b0c-a9df-c756f537bb97`,
-Worker `09fa6471-eb50-480e-85b2-bc04b742dcb3` (#94), and D1
-`theologai-production-20260728-normal-a`
-(`a3d26bba-7adc-44b0-86d0-562b2ced6bd3`). The current preview baseline is PR
+revision. PR #101 subsequently merged as
+`e2d351a11fce9c2cb1f72add0bcf365332737f3c`, and protected production workflow
+`30401732957` proved the candidate binding before and after its black-box
+audits. The current production baseline is deployment
+`71b76d24-bf5f-490e-adc4-31cf63fb046e`, Worker
+`bae58cd3-cad7-4663-879d-408accf061b0` (#96), and D1
+`theologai-production-20260728-hierarchy-a`
+(`f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395`). The current preview baseline is PR
 #101 deployment `070b292b-0bae-400a-b983-3d72157b5a96`, Worker
 `bd722b69-2e2c-4d8d-b42b-617e8caba13d` (#130), and D1
 `theologai-preview-20260728-hierarchy-a`
 (`51890e12-1c3f-421f-b661-9a5ea9637e43`). The checked-out Transform-10 Aquinas
 hierarchy remains local-only and unpublished, with no catalog, runtime, or MCP
-projection. The protected production workflow later re-resolves the checked-in
-candidate name/UUID, reruns readiness by exact name, records the predecessor
-Worker/D1 identity, and refuses to start either black-box audit unless the sole
-active deployed Worker is bound to that readiness-tested candidate.
+projection. Future production workflows retain the same reconciliation
+contract: re-resolve the checked-in candidate name/UUID, rerun readiness by
+exact name, record the predecessor Worker/D1 identity, and refuse to start
+black-box audits unless the sole active deployed Worker is bound to the
+readiness-tested candidate.
 
 Approved deploy jobs perform the last compatibility check read-only against
 the candidate name resolved from the checked-in name/UUID pair:

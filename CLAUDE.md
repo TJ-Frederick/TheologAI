@@ -174,15 +174,18 @@ The SQLite database (`data/theologai.db`) is a derived artifact. Cross-reference
 
 ## Release-state boundary
 
-PR #96 is the current production release record. The audit checked out source
-commit `ac4b5ed774302fbfc86bf846b6ee77a07beed456` with exact tree
-`adf08edbf6bfcb14b9613354b2b8fb9f62ec8c16`. At the canonical endpoint
-`https://mcp.theologai.xyz/mcp`, it observed server version `3.6.0` and, before
-and after testing, the same sole 100% Cloudflare production assignment:
-deployment `2d10d693-958e-47a6-ae24-81647679c2f6`, Worker
-`7a3f5078-37bc-453e-bac7-a0743afd508a`, and D1
-`theologai-production-20260723-a`
-(`3f7faa0e-689f-47aa-a601-dc662db9a6cf`).
+PR #101 is the current production release record. It merged as source commit
+`e2d351a11fce9c2cb1f72add0bcf365332737f3c` with exact tree
+`b9807ea1980326b5faf0a8a595c9606c67abfce5`. At the canonical endpoint
+`https://mcp.theologai.xyz/mcp`, protected workflow `30401732957` observed
+server version `3.6.0` and, before and after testing, the same sole 100%
+Cloudflare production assignment: deployment
+`71b76d24-bf5f-490e-adc4-31cf63fb046e`, Worker
+`bae58cd3-cad7-4663-879d-408accf061b0` (#96), and D1
+`theologai-production-20260728-hierarchy-a`
+(`f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395`). Primary-source stabilization passed
+on attempt 1, `original_language_study` v2 passed 11/11 cases, and the eight
+reviewed Transform-9 historical works passed.
 
 The stateless `original_language_study` v2 production audit passed 11/11 cases
 in 14 exchanges (initialization, initialized notification, `tools/list`, and
