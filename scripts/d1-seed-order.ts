@@ -16,6 +16,7 @@ export const D1_SEED_BASE_TABLES = [
   'historical_edition_hierarchies',
   'historical_edition_hierarchy_bodies',
   'historical_edition_hierarchy_nodes',
+  'historical_hierarchy_publications',
   'historical_document_delivery_profiles',
   'historical_section_identities',
   'historical_section_aliases',

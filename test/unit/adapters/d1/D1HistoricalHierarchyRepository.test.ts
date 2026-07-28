@@ -16,6 +16,17 @@ const contextRow = {
   body_hierarchyId: 'hierarchy', body_bodyKey: 'preamble', body_bodyKind: 'preamble', body_sourceOrdinal: 2, body_heading: 'Question', body_contentSha256: '5'.repeat(64), body_contentUtf8Bytes: 4, body_content: 'body',
 };
 const searchRow = { ...contextRow, body_content: undefined, rank: -1.25, snippet: '<mark>Sacred</mark> Doctrine' };
+const publication = {
+  publicationId: 'publication', hierarchyId: 'hierarchy', publicSlug: 'summa-theologiae', title: 'Summa Theologiae',
+  metadataJson: '{"language":"English"}', deliveryKind: 'hierarchy_nodes_v1', coverageJson: '{"statement":"covered"}',
+  cursorContract: 'historical-hierarchy-browse-cursor-v1', cursorIdentity: 'f'.repeat(64), browsePageSize: 32,
+  landingMaxBytes: 8192, directoryMaxBytes: 16384, nodeMaxBytes: 65536, searchMaxBytes: 16384,
+  canonicalUri: 'theologai://documents/summa-theologiae', activationState: 'dormant',
+};
+const questionChain = [
+  { ...part, seedNodeKey: 'question' },
+  { ...question, seedNodeKey: 'question' },
+];
 
 describe('D1HistoricalHierarchyRepository', () => {
   it('maps the generic anchored profile and exact source artifacts', async () => {
@@ -28,14 +39,34 @@ describe('D1HistoricalHierarchyRepository', () => {
     await expect(repo.listHierarchyArtifacts('hierarchy')).resolves.toHaveLength(1);
   });
 
+  it('maps the dormant publication projection without implying runtime activation', async () => {
+    const db = createMockD1([{ sql: 'historical_hierarchy_publications', first: publication }]);
+    const repo = new D1HistoricalHierarchyRepository(db as any);
+    await expect(repo.getHierarchyPublication('publication')).resolves.toMatchObject({
+      publicSlug: 'summa-theologiae', deliveryKind: 'hierarchy_nodes_v1', activationState: 'dormant',
+    });
+    await expect(repo.getHierarchyPublicationBySlug('summa-theologiae')).resolves.toMatchObject({
+      canonicalUri: 'theologai://documents/summa-theologiae', cursorIdentity: 'f'.repeat(64),
+    });
+  });
+
   it('maps direct body/context ancestors without descendants', async () => {
     const db = createMockD1([
       { sql: 'LEFT JOIN historical_edition_hierarchy_bodies', first: contextRow },
       { sql: 'historical_edition_hierarchies', first: profile },
-      { sql: 'FROM historical_edition_hierarchy_nodes WHERE hierarchy_id', first: part },
+      { sql: 'WITH RECURSIVE hierarchy_chain', all: { results: questionChain } },
     ]);
     const result = await new D1HistoricalHierarchyRepository(db as any).getHierarchyNodeContext('hierarchy', 'question');
     expect(result).toMatchObject({ node: { nodeKey: 'question' }, body: { content: 'body' }, ancestors: [{ nodeKey: 'part' }] });
+  });
+
+  it('rejects a repository row whose node hierarchy differs from the requested authority', async () => {
+    const db = createMockD1([
+      { sql: 'LEFT JOIN historical_edition_hierarchy_bodies', first: { ...contextRow, node_hierarchyId: 'other-hierarchy' } },
+      { sql: 'historical_edition_hierarchies', first: profile },
+    ]);
+    await expect(new D1HistoricalHierarchyRepository(db as any).getHierarchyNodeContext('hierarchy', 'question'))
+      .rejects.toThrow('cross-hierarchy node');
   });
 
   it('uses validated cursor/lookahead root navigation and sibling neighbors', async () => {
@@ -56,6 +87,7 @@ describe('D1HistoricalHierarchyRepository', () => {
     const db = createMockD1([
       { sql: 'historical_edition_hierarchy_bodies_fts', all: { results: [{ ...searchRow, node_parentNodeKey: null }] } },
       { sql: 'historical_edition_hierarchies', first: profile },
+      { sql: 'WITH RECURSIVE hierarchy_chain', all: { results: [{ ...question, parentNodeKey: null, depth: 1, seedNodeKey: 'question' }] } },
     ]);
     const repo = new D1HistoricalHierarchyRepository(db as any);
     const result = await repo.searchHierarchyBodies({ hierarchyId: 'hierarchy', text: 'Sacred Doctrine', match: 'phrase', limit: 9 });
@@ -68,5 +100,6 @@ describe('D1HistoricalHierarchyRepository', () => {
     const ftsBind = db.prepare.mock.results.find((entry: any) => String(entry.value.bind?.mock?.calls?.[0]?.[0] ?? '').includes('Sacred'))?.value.bind;
     expect(ftsBind).toBeDefined();
     await expect(repo.searchHierarchyBodies({ hierarchyId: 'hierarchy', text: 'one', match: 'all_terms', limit: 10 })).rejects.toThrow('1..9');
+    expect(db.prepare.mock.calls.filter(([sql]: [unknown]) => String(sql).includes('WITH RECURSIVE hierarchy_chain'))).toHaveLength(1);
   });
 });

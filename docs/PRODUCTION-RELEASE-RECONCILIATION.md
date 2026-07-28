@@ -8,18 +8,25 @@ reviewed core eight). The Transform-10 Aquinas packet is local-only and
 unpublished; normal D1 corpora prove that its hierarchy rows and shared lineage
 are absent. It has no document/catalog, runtime, or MCP projection.
 
-The fresh normal production candidate
+The fresh schema-`0008` production candidate
+`theologai-production-20260728-hierarchy-a`
+(`f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395`) was unbound when it was prepared
+exactly once in ENAM. Its reviewed 49-file, 1,627,474-row deterministic seed
+has corpus identity `c43bfa2f5e7ff04c3641a228092bdc91d597edc60dc7d596507e8ca6c0ac90fe`;
+remote readiness and Transform-8/9 authority audits passed, and Transform-10
+normal-corpus exclusion predicates proved hierarchy, publication, and
+Aquinas-lineage rows empty. The checked-in root target lets the protected
+workflow re-resolve and verify that candidate, but it alone is not evidence of
+a current live Worker binding or hierarchy/publication activation. Before a
+separately authorized merge, deployment, and audit complete, live production
+is PR #104 deployment `07bbd8aa-5c69-4b0c-a9df-c756f537bb97`, serving Worker
+`09fa6471-eb50-480e-85b2-bc04b742dcb3` (#94), bound to D1
 `theologai-production-20260728-normal-a`
-(`a3d26bba-7adc-44b0-86d0-562b2ced6bd3`) was prepared exactly once in ENAM.
-Its reviewed 49-file deterministic seed imported 1,627,474 rows, and readiness
-plus Transform-8/9 authority audits passed. The checked-in root binding names
-that future candidate so the protected workflow can re-resolve and verify it;
-that configuration is not evidence of live traffic. Live production remains
-the PR #96 17-work Transform-8 Worker/D1 assignment
-`7a3f5078-37bc-453e-bac7-a0743afd508a` /
-`theologai-production-20260723-a`
-(`3f7faa0e-689f-47aa-a601-dc662db9a6cf`) until a separately authorized merge,
-deployment, and audit complete.
+(`a3d26bba-7adc-44b0-86d0-562b2ced6bd3`). The current preview baseline is PR
+#101 deployment `070b292b-0bae-400a-b983-3d72157b5a96`, Worker
+`bd722b69-2e2c-4d8d-b42b-617e8caba13d` (#130), and D1
+`theologai-preview-20260728-hierarchy-a`
+(`51890e12-1c3f-421f-b661-9a5ea9637e43`).
 
 The production workflow is intentionally derived from checked-in identity:
 

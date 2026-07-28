@@ -82,6 +82,7 @@ export const REQUIRED_COLUMNS: Readonly<Record<string, readonly string[]>> = {
   historical_edition_hierarchy_bodies: ['hierarchy_id', 'body_key', 'body_kind', 'source_ordinal', 'heading', 'content_sha256', 'content_utf8_bytes', 'content'],
   historical_edition_hierarchy_nodes: ['hierarchy_id', 'node_key', 'parent_node_key', 'node_kind', 'body_key', 'depth', 'flat_ordinal', 'sibling_ordinal', 'label', 'heading'],
   historical_edition_hierarchy_bodies_fts: ['hierarchy_id', 'body_key', 'heading', 'content'],
+  historical_hierarchy_publications: ['publication_id', 'hierarchy_id', 'public_slug', 'title', 'metadata_json', 'delivery_kind', 'coverage_json', 'cursor_contract', 'cursor_identity', 'browse_page_size', 'landing_max_bytes', 'directory_max_bytes', 'node_max_bytes', 'search_max_bytes', 'canonical_uri', 'activation_state'],
   sections_fts: ['title', 'content', 'topics'],
   morph_codes: ['code', 'expansion'],
   ubs_parallel_sources: ['source_id', 'schema_version', 'transform_version', 'artifact_identity', 'title', 'publisher', 'copyright', 'license', 'license_url', 'source_url', 'source_path', 'source_commit', 'source_commit_date', 'source_blob', 'source_bytes', 'source_sha256', 'modified', 'modification_note', 'label', 'directionality'],

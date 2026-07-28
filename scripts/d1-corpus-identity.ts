@@ -51,6 +51,7 @@ export const D1_EXPECTED_TABLES = Object.freeze([
   'historical_edition_sections',
   'historical_edition_sections_fts',
   'historical_editions',
+  'historical_hierarchy_publications',
   'historical_section_aliases',
   'historical_section_identities',
   'historical_source_artifacts',

@@ -17,7 +17,7 @@ const EXPECTED_IDENTITIES = Object.freeze({
   7: '3708bf7e3ab903c409453fdf4fdac1b68848547f91f0b516855dd21765de4796',
   8: '2db6c370a75ce5818db6c6cdbdb1d80d6333b99e7e4ccf956c9304a78177d77b',
   9: '4e182bfd2953fe06e7c8d7e13a705988e85b5a58001e7fe72440333d34f6d442',
-  10: 'e9362cf0ba6cc0efbc7ea663f418dcf2775d4abe1989f1e2774e16b14d5010db',
+  10: 'c43bfa2f5e7ff04c3641a228092bdc91d597edc60dc7d596507e8ca6c0ac90fe',
 } as const);
 const HISTORICAL_CATALOG_INPUTS = Object.freeze([
   'data/historical-document-catalog-provenance.json',
@@ -51,20 +51,21 @@ export function buildFinalizedBiblicalLanguageUnicodeManifest(
   const transformNine = sourceTransformVersion === 9 || transformTen;
   const transformEight = sourceTransformVersion === 8;
   const transformSeven = sourceTransformVersion === 7;
-  const expectedSchema = transformTen ? '0007_historical_hierarchy' : transformNine ? '0006_historical_source_packs'
+  const expectedSchema = transformTen ? '0008_historical_hierarchy_publications' : transformNine ? '0006_historical_source_packs'
     : transformEight ? '0005_historical_section_identity_delivery'
     : transformSeven ? '0004_ubs_hebrew_semantics' : '0003_original_language_usage';
   assert(manifest.schemaVersion === expectedSchema,
     `Unicode correction must retain schema ${expectedSchema.slice(0, 4)}`);
   assert(manifest.materializations.d1.identityVersion === 1, 'Unicode correction must retain identity version 1');
-  assert(manifest.materializations.d1.migrations.length === (transformTen ? 7 : transformNine ? 6 : transformEight ? 5 : transformSeven ? 4 : 3)
+  assert(manifest.materializations.d1.migrations.length === (transformTen ? 8 : transformNine ? 6 : transformEight ? 5 : transformSeven ? 4 : 3)
     && manifest.materializations.d1.migrations[0].path === 'migrations/0001_initial_schema.sql'
     && manifest.materializations.d1.migrations[1].path === 'migrations/0002_ubs_parallel_passages.sql'
     && manifest.materializations.d1.migrations[2].path === 'migrations/0003_original_language_usage.sql'
     && (!transformSeven && !transformEight || manifest.materializations.d1.migrations[3].path === 'migrations/0004_ubs_hebrew_semantics.sql')
     && (!(transformEight || transformNine) || manifest.materializations.d1.migrations[4].path === 'migrations/0005_historical_section_identity_delivery.sql')
     && (!transformNine || manifest.materializations.d1.migrations[5].path === 'migrations/0006_historical_source_packs.sql')
-    && (!transformTen || manifest.materializations.d1.migrations[6].path === 'migrations/0007_historical_hierarchy.sql'),
+    && (!transformTen || manifest.materializations.d1.migrations[6].path === 'migrations/0007_historical_hierarchy.sql')
+    && (!transformTen || manifest.materializations.d1.migrations[7].path === 'migrations/0008_historical_hierarchy_publications.sql'),
   'Unicode correction must retain the reviewed migration set');
 
   if (sourceTransformVersion >= 6) {

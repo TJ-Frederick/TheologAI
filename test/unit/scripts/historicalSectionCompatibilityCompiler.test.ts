@@ -176,7 +176,7 @@ describe('historical section source-first compatibility compiler', () => {
       schemaVersion: string;
       materializations: { d1: { transformVersion: number; inputs: string[] } };
     };
-    expect(manifest.schemaVersion).toBe('0007_historical_hierarchy');
+    expect(manifest.schemaVersion).toBe('0008_historical_hierarchy_publications');
     expect(manifest.materializations.d1.transformVersion).toBe(10);
     expect(manifest.materializations.d1.inputs).toEqual(expect.arrayContaining([
       'data/historical-section-key-plan.json',
