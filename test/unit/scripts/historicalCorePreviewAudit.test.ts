@@ -2,18 +2,25 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSy
 import { readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import {
   AuditDeadline,
   MAX_MCP_RESPONSE_BYTES,
+  PREVIEW_PROFILE,
+  PRODUCTION_PROFILE,
   publishAuditEvidence,
   readBoundedResponseBody,
   runAuditCli,
   runPreviewAudit,
+  runProductionAudit,
   validateFixture,
 } from '../../../scripts/audit-historical-core-preview.js';
 import { classicTextsOutputSchema } from '../../../src/mcp/schemas/classicTexts.js';
-import { primarySourceSearchV7OutputSchema } from '../../../src/mcp/schemas/primarySourceSearchV4.js';
+import { primarySourceSearchV6OutputSchema, primarySourceSearchV7OutputSchema } from '../../../src/mcp/schemas/primarySourceSearchV4.js';
+import { registerToolHandlers } from '../../../src/mcp/tools.js';
 import { createClassicTextsHandler } from '../../../src/tools/v2/classicTexts.js';
 import { createPrimarySourceSearchHandler } from '../../../src/tools/v2/primarySourceSearch.js';
 
@@ -36,6 +43,8 @@ type FakeOptions = {
   directLandingText?: string;
   truncateClassicCatalog?: boolean;
   primaryLocatorDrift?: boolean;
+  laterExternalPrimaryHit?: boolean;
+  laterNoncanonicalPrimaryHit?: boolean;
   catalogProvenanceStatus?: string | null;
   landingResourceSizeBytes?: number | null;
   ccelIsError?: boolean;
@@ -43,14 +52,6 @@ type FakeOptions = {
 };
 
 const FAKE_LANDING_TEXT = '# Work record\nMetadata only.';
-
-const V7_CONTRACT = {
-  exposeCcelDiscovery: true,
-  ccelLiveSearch: false,
-  ccelCoordinator: false,
-  contractVersion: '7' as const,
-  liveCcelEnabled: false,
-};
 
 async function fixture(): Promise<RecordValue> {
   return JSON.parse(await readFile(fixtureUrl, 'utf8')) as RecordValue;
@@ -190,15 +191,141 @@ describe('historical core preview audit contract', () => {
     expect(relevanceReads.filter((uri, index) => uri !== parsed.probes[index]!.firstSection.resourceUri)).toHaveLength(5);
   });
 
+  it('runs the same exact 55-exchange inventory against the production v6 profile and retains only local-only evidence', async () => {
+    const parsed = validateFixture(await fixture());
+    const calls: Array<{ url: string; body: RecordValue }> = [];
+    const fakeFetch: typeof fetch = async (input, init) => {
+      const body = JSON.parse(String(init?.body)) as RecordValue;
+      calls.push({ url: String(input), body });
+      return responseFor(body, parsed, {}, PRODUCTION_PROFILE);
+    };
+
+    const evidence = await runProductionAudit(parsed, fakeFetch);
+    expect(calls).toHaveLength(55);
+    expect(calls.every(call => call.url === 'https://mcp.theologai.xyz/mcp')).toBe(true);
+    expect(evidence.schemas).toMatchObject({
+      primarySourceContractVersion: '6', primarySourceOpenWorldHint: false,
+      primarySourceProviderMaximum: 1, primarySourceExternalDiscoveryBoundary: 'rejected_at_input_schema',
+      primarySourceInputSchemaSha256: '37849624bac2e884106050fcff39851e40cac31969b4f7511f516f78348fea87',
+      primarySourceOutputSchemaSha256: '25758f8d06c43c3f2961fa7b35ba1d62a548df923589b391c65204813a6511b8',
+    });
+    expect((evidence.regressions as RecordValue).ccel).toEqual({
+      provider: 'ccel', status: 'rejected_at_input_schema', searched: false, hitCount: 0,
+    });
+    const serialized = JSON.stringify(evidence);
+    expect(serialized).not.toContain('ccel_live');
+    expect(serialized).not.toContain('external_url');
+    expect(serialized).not.toContain('theologai://documents/');
+    expect(calls.filter(call => call.body.method === 'tools/call'
+      && (call.body.params as RecordValue).name === 'primary_source_search')).toHaveLength(9);
+  });
+
+  it('fails closed when production v6 registration, prompts, or local-only evidence drift toward preview discovery behavior', async () => {
+    const parsed = validateFixture(await fixture());
+    await expect(runProductionAudit(parsed, fakeFetchWith(parsed, {
+      mutate: (body, response) => {
+        if (body.method === 'tools/list') {
+          const primary = ((response.result as RecordValue).tools as RecordValue[])
+            .find(tool => tool.name === 'primary_source_search')!;
+          (primary.annotations as RecordValue).openWorldHint = true;
+        }
+        return response;
+      },
+    }, PRODUCTION_PROFILE))).rejects.toThrow('open-world annotation drifted');
+
+    await expect(runProductionAudit(parsed, fakeFetchWith(parsed, {
+      mutate: (body, response) => {
+        if (body.method === 'tools/list') {
+          const primary = ((response.result as RecordValue).tools as RecordValue[])
+            .find(tool => tool.name === 'primary_source_search')!;
+          const providers = ((((primary.inputSchema as RecordValue).properties as RecordValue).queries as RecordValue).items as RecordValue).properties as RecordValue;
+          const providerArray = providers.providers as RecordValue;
+          providerArray.maxItems = 2;
+          ((providerArray.items as RecordValue).enum as unknown[])!.push('ccel');
+        }
+        return response;
+      },
+    }, PRODUCTION_PROFILE))).rejects.toThrow('primary-source provider contract drifted');
+
+    await expect(runProductionAudit(parsed, fakeFetchWith(parsed, {
+      mutate: (body, response) => {
+        if (body.method === 'tools/list') {
+          const primary = ((response.result as RecordValue).tools as RecordValue[])
+            .find(tool => tool.name === 'primary_source_search')!;
+          (((primary.outputSchema as RecordValue).properties as RecordValue).schemaVersion as RecordValue).const = '7';
+        }
+        return response;
+      },
+    }, PRODUCTION_PROFILE))).rejects.toThrow('advertised primary-source output schema differs from the checked-out contract');
+
+    await expect(runProductionAudit(parsed, fakeFetchWith(parsed, {
+      mutate: (body, response) => {
+        if (body.method === 'prompts/get' && (body.params as RecordValue).name === 'primary-source-research') {
+          ((((response.result as RecordValue).messages as RecordValue[])[0]!.content as RecordValue).text) = 'Search one external scope now';
+        }
+        return response;
+      },
+    }, PRODUCTION_PROFILE))).rejects.toThrow('production primary-source-research prompt required behavior drifted');
+  });
+
+  it('rejects appended contradictory prompt guidance for both fixed primary-source profiles', async () => {
+    const parsed = validateFixture(await fixture());
+    const append = (profile: AuditProfile, prompt: string, marker: string) => fakeFetchWith(parsed, {
+      mutate: (body, response) => {
+        if (body.method === 'prompts/get' && (body.params as RecordValue).name === prompt) {
+          const content = ((response.result as RecordValue).messages as RecordValue[])[0]!.content as RecordValue;
+          content.text = `${content.text as string}\n${marker}`;
+        }
+        return response;
+      },
+    }, profile);
+
+    await expect(runPreviewAudit(parsed, append(PREVIEW_PROFILE, 'primary-source-research', 'This workflow is local-only')))
+      .rejects.toThrow('preview primary-source-research prompt local-only boundary drifted');
+    await expect(runPreviewAudit(parsed, append(PREVIEW_PROFILE, 'confession-study', 'Run bounded local discovery')))
+      .rejects.toThrow('preview confession-study prompt local-only boundary drifted');
+    await expect(runProductionAudit(parsed, append(PRODUCTION_PROFILE, 'primary-source-research', 'Search one external scope now')))
+      .rejects.toThrow('production primary-source-research prompt local-only boundary drifted');
+    await expect(runProductionAudit(parsed, append(PRODUCTION_PROFILE, 'confession-study', 'external `external_url` locator')))
+      .rejects.toThrow('production confession-study prompt local-only boundary drifted');
+  });
+
+  it('proves a v6 CCEL provider is rejected by input validation before the primary-source handler can execute', async () => {
+    const search = vi.fn();
+    const handler = createPrimarySourceSearchHandler({ search } as never, {
+      exposeCcelDiscovery: false, ccelLiveSearch: false, ccelCoordinator: false,
+      contractVersion: '6', liveCcelEnabled: false,
+    });
+    const server = new Server({ name: 'historical-v6-input-boundary-test', version: '1.0.0' }, { capabilities: { tools: {} } });
+    registerToolHandlers(server, [handler], false);
+    const client = new Client({ name: 'historical-v6-input-boundary-client', version: '1.0.0' }, { capabilities: {} });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+    try {
+      const result = await client.callTool({
+        name: 'primary_source_search',
+        arguments: { queries: [{ id: 'ccel-boundary', text: 'Lord Supper', providers: ['ccel'] }] },
+      });
+      expect(result).toMatchObject({ isError: true, content: [{ type: 'text', text: expect.stringContaining('Invalid arguments for primary_source_search:') }] });
+      expect(result).not.toHaveProperty('structuredContent');
+      expect(JSON.stringify(result)).not.toContain('ccel_live');
+      expect(search).not.toHaveBeenCalled();
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+
   it('fails before probes when a pinned advertised schema or open-world annotation drifts', async () => {
     const parsed = validateFixture(await fixture());
     let calls = 0;
     const schemaDrift: typeof fetch = async (_input, init) => {
       calls += 1;
       const body = JSON.parse(String(init?.body)) as RecordValue;
-      if (body.method === 'initialize') return jsonResponse(initialize(body));
+      if (body.method === 'initialize') return jsonResponse(initialize(body, PREVIEW_PROFILE));
       if (body.method === 'notifications/initialized') return new Response('', { status: 202 });
-      const tools = fakeTools();
+      const tools = fakeTools(PREVIEW_PROFILE);
       ((tools.find(tool => tool.name === 'classic_text_lookup')!.outputSchema as RecordValue).properties as RecordValue).schemaVersion = { const: 'wrong' };
       return jsonResponse({ jsonrpc: '2.0', id: body.id, result: { tools } });
     };
@@ -231,12 +358,16 @@ describe('historical core preview audit contract', () => {
         ((((response.result as RecordValue).messages as RecordValue[])[0]!.content as RecordValue).text) = 'old prompt';
       }
       return response;
-    } }))).rejects.toThrow('current v7 prompt behavior drifted');
+    } }))).rejects.toThrow('preview primary-source-research prompt required behavior drifted');
     await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { truncateClassicCatalog: true })))
       .rejects.toThrow('reviewed registration inventory drifted');
     await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { directLandingText: '<img src="scan.png">' }))).rejects.toThrow('direct landing resource is not bounded normalized metadata');
     await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { primaryLocatorDrift: true })))
-      .rejects.toThrow('primary local evidence identity/readiness drifted');
+      .rejects.toThrow('primary local provider canonical locator drifted');
+    await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { laterExternalPrimaryHit: true })))
+      .rejects.toThrow('primary local provider hit-scope drifted');
+    await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { laterNoncanonicalPrimaryHit: true })))
+      .rejects.toThrow('primary local provider canonical locator drifted');
   });
 
   it('requires the reviewed core-eight provenance status, rather than treating a stronger-looking status as interchangeable', async () => {
@@ -448,33 +579,44 @@ describe('historical core preview audit contract', () => {
   });
 });
 
-function fakeFetchWith(fixtureValue: Audit, options: FakeOptions): typeof fetch {
-  return async (_input, init) => responseFor(JSON.parse(String(init?.body)) as RecordValue, fixtureValue, options);
+type AuditProfile = typeof PREVIEW_PROFILE;
+
+function fakeFetchWith(
+  fixtureValue: Audit,
+  options: FakeOptions = {},
+  profile: AuditProfile = PREVIEW_PROFILE,
+): typeof fetch {
+  return async (_input, init) => responseFor(JSON.parse(String(init?.body)) as RecordValue, fixtureValue, options, profile);
 }
 
-function responseFor(body: RecordValue, fixtureValue: Audit, options: FakeOptions = {}): Response {
+function responseFor(
+  body: RecordValue,
+  fixtureValue: Audit,
+  options: FakeOptions = {},
+  profile: AuditProfile = PREVIEW_PROFILE,
+): Response {
   let payload: RecordValue;
-  if (body.method === 'initialize') return jsonResponse(initialize(body));
+  if (body.method === 'initialize') return jsonResponse(initialize(body, profile));
   if (body.method === 'notifications/initialized') return new Response('', { status: 202 });
-  if (body.method === 'tools/list') payload = { jsonrpc: '2.0', id: body.id, result: { tools: fakeTools() } };
+  if (body.method === 'tools/list') payload = { jsonrpc: '2.0', id: body.id, result: { tools: fakeTools(profile) } };
   else if (body.method === 'prompts/list') payload = { jsonrpc: '2.0', id: body.id, result: { prompts: fakePrompts() } };
-  else if (body.method === 'prompts/get') payload = promptResponse(body);
+  else if (body.method === 'prompts/get') payload = promptResponse(body, profile);
   else if (body.method === 'resources/list') payload = { jsonrpc: '2.0', id: body.id, result: { resources: fakeResources(fixtureValue) } };
   else if (body.method === 'resources/templates/list') payload = { jsonrpc: '2.0', id: body.id, result: { resourceTemplates: fakeResourceTemplates() } };
   else if (body.method === 'resources/read') return resourceResponse(body, fixtureValue, options);
-  else if (body.method === 'tools/call') return toolResponse(body, fixtureValue, options);
+  else if (body.method === 'tools/call') return toolResponse(body, fixtureValue, options, profile);
   else throw new Error(`unexpected fake method ${body.method}`);
   return jsonResponse(options.mutate ? options.mutate(body, payload) : payload);
 }
 
-function initialize(body: RecordValue): RecordValue {
+function initialize(body: RecordValue, profile: AuditProfile): RecordValue {
   return { jsonrpc: '2.0', id: body.id, result: {
     protocolVersion: '2025-11-25', capabilities: { tools: {}, resources: {}, prompts: {} },
-    serverInfo: { name: 'theologai-bible-server', version: '3.6.0-preview' },
+    serverInfo: { name: 'theologai-bible-server', version: profile.serverVersion },
   } };
 }
 
-function fakeTools(): RecordValue[] {
+function fakeTools(profile: AuditProfile): RecordValue[] {
   const base = { readOnlyHint: true, destructiveHint: false, idempotentHint: true };
   return [
     'bible_lookup', 'bible_cross_references', 'parallel_passages', 'commentary_lookup',
@@ -482,7 +624,11 @@ function fakeTools(): RecordValue[] {
     'bible_verse_morphology', 'original_language_study', 'donation_config', 'verify_donation',
   ].map(name => {
     if (name === 'classic_text_lookup') return { name, annotations: { ...base, openWorldHint: false }, inputSchema: classicInput(), outputSchema: structuredClone(classicTextsOutputSchema) };
-    if (name === 'primary_source_search') return { name, annotations: { ...base, openWorldHint: true }, inputSchema: primaryInput(), outputSchema: structuredClone(primarySourceSearchV7OutputSchema) };
+    if (name === 'primary_source_search') return {
+      name, annotations: { ...base, openWorldHint: profile.primarySource.openWorldHint },
+      inputSchema: primaryInput(profile),
+      outputSchema: structuredClone(profile.primarySource.contractVersion === '7' ? primarySourceSearchV7OutputSchema : primarySourceSearchV6OutputSchema),
+    };
     return { name, annotations: { ...base } };
   });
 }
@@ -491,19 +637,23 @@ function classicInput(): RecordValue {
   return structuredClone(createClassicTextsHandler({} as never).inputSchema) as RecordValue;
 }
 
-function primaryInput(): RecordValue {
-  return structuredClone(createPrimarySourceSearchHandler({} as never, V7_CONTRACT).inputSchema) as RecordValue;
+function primaryInput(profile: AuditProfile): RecordValue {
+  return structuredClone(profile.primarySource.inputSchema) as RecordValue;
 }
 
 function fakePrompts(): RecordValue[] {
   return ['word-study', 'passage-exegesis', 'compare-translations', 'confession-study', 'primary-source-research', 'donate'].map(name => ({ name }));
 }
 
-function promptResponse(body: RecordValue): RecordValue {
+function promptResponse(body: RecordValue, profile: AuditProfile): RecordValue {
   const name = (body.params as RecordValue).name;
-  const text = name === 'primary-source-research'
-    ? 'Search local evidence. Search one external scope now. Use the v7 contract. {"providers":["local"]} {"providers":["ccel"]}. This prompt authorizes at most one CCEL-bearing call. The external CCEL call deliberately omits the requested local composition-year bounds; any returned CCEL hit cannot establish membership in that requested local range. Use MCP `resources/read` only for local `mcp_resource` URIs. Open external `external_url` pages directly and name disabled, unavailable, or unsupported searches.'
-    : 'Use {"providers":["local","ccel"]}. An external `external_url` locator exists; it is not an MCP resource and rights status is not determined. Name any disabled, unavailable, or unsupported provider.';
+  const text = profile.primarySource.contractVersion === '7'
+    ? name === 'primary-source-research'
+      ? 'Search local evidence. Search one external scope now. Use the v7 contract. {"providers":["local"]} {"providers":["ccel"]}. This prompt authorizes at most one CCEL-bearing call. The external CCEL call deliberately omits the requested local composition-year bounds; any returned CCEL hit cannot establish membership in that requested local range. Use MCP `resources/read` only for local `mcp_resource` URIs. Open external `external_url` pages directly and name disabled, unavailable, or unsupported searches.'
+      : 'Use {"providers":["local","ccel"]}. An external `external_url` locator exists; it is not an MCP resource and rights status is not determined. Name any disabled, unavailable, or unsupported provider.'
+    : name === 'primary-source-research'
+      ? 'Run bounded discovery. This workflow is local-only. Use the v6 structured result. Read an exact MCP resource before quotation. This workflow supports a topic survey.'
+      : 'Run bounded local discovery across the hosted collection. Follow canonical `resource_link` blocks with resources/read.';
   return { jsonrpc: '2.0', id: body.id, result: { messages: [{ role: 'user', content: { type: 'text', text } }] } };
 }
 
@@ -564,12 +714,12 @@ function fakeCatalog(fixtureValue: Audit, options: FakeOptions = {}): RecordValu
     policies: { scope: 'hosted_collection_only', editionProvenance: 'mixed_legacy_and_reviewed_source_packs', rightsStatus: 'mixed_not_established_and_no_known_conflict' } };
 }
 
-function toolResponse(body: RecordValue, fixtureValue: Audit, options: FakeOptions): Response {
+function toolResponse(body: RecordValue, fixtureValue: Audit, options: FakeOptions, profile: AuditProfile): Response {
   const params = body.params as RecordValue;
   const name = params.name as string;
   const args = params.arguments as RecordValue;
   if (name === 'classic_text_lookup') return classicTool(body, args, fixtureValue, options);
-  if (name === 'primary_source_search') return primaryTool(body, args, fixtureValue, options);
+  if (name === 'primary_source_search') return primaryTool(body, args, fixtureValue, options, profile);
   throw new Error(`unexpected fake tool ${name}`);
 }
 
@@ -605,34 +755,88 @@ function directory(probe: Audit['probes'][number]): RecordValue {
   return { schemaVersion: '2', kind: 'classic_text_lookup', mode: 'browse_sections', directory: { work: { id: probe.workId }, coverage: 'bounded_section_directory', pagination: { pageSize: 32 }, sections: [{ sectionKey: probe.firstSection.sectionKey, sourceOrdinal: probe.firstSection.sourceOrdinal, resource: { kind: 'mcp_resource', uri: probe.firstSection.resourceUri } }] } };
 }
 
-function primaryTool(body: RecordValue, args: RecordValue, fixtureValue: Audit, options: FakeOptions): Response {
+function primaryTool(
+  body: RecordValue,
+  args: RecordValue,
+  fixtureValue: Audit,
+  options: FakeOptions,
+  profile: AuditProfile,
+): Response {
   const query = ((args.queries as RecordValue[])[0])!;
-  if ((query.providers as string[])[0] === 'ccel') return toolResult(body, {
-    isError: options.ccelIsError ?? true,
-    ...(options.ccelStructuredContent === false ? {} : { structuredContent: {
-      schemaVersion: '7', kind: 'primary_source_search', planStatus: 'unavailable',
-      queries: [{ providers: [{ provider: 'ccel_live', status: 'disabled', searched: false, hitCount: 0, hits: [] }] }],
-      coverage: { localAttempted: false, ccelAttempted: false, ccelStatus: 'disabled', ccelHitCount: 0 },
-    } }),
-  });
+  if ((query.providers as string[])[0] === 'ccel') {
+    if (profile.primarySource.externalDiscoveryBoundary === 'rejected_at_input_schema') {
+      return toolResult(body, {
+        isError: true,
+        content: [{ type: 'text', text: 'Invalid arguments for primary_source_search: argument "queries.0.providers.0" must be equal to "local"' }],
+      });
+    }
+    return toolResult(body, {
+      isError: options.ccelIsError ?? true,
+      ...(options.ccelStructuredContent === false ? {} : { structuredContent: {
+        schemaVersion: '7', kind: 'primary_source_search', planStatus: 'unavailable',
+        queries: [{ id: 'ccel-disabled', normalizedMode: 'all_terms', normalizedSelection: 'relevance', providers: [{
+          provider: 'ccel_live', status: 'disabled', searched: false, page: 1, hitCount: 0,
+          resultWindow: { returnedHitCount: 0, additionalMatchStatus: 'not_evaluated' }, hits: [], notices: [],
+        }] }],
+        responseWindow: { unit: 'utf8_bytes', maximum: 32768, truncated: false },
+        coverage: { localAttempted: false, localHitCount: 0, ccelAttempted: false, ccelStatus: 'disabled', ccelHitCount: 0, notices: [], serverObserved: { searched: [], notSearched: [{ queryId: 'ccel-disabled', provider: 'ccel_live', status: 'disabled' }] } },
+        evidencePolicy: { snippetUse: 'discovery_only', localSectionAccess: 'mcp_resource_read', externalSectionAccess: 'direct_url_only', coverageScope: 'bounded_non_exhaustive', externalRightsStatus: 'not_determined', lookupAliasUse: 'exact_routing_only_not_metadata_evidence', coverageLedger: { searched: 'server_observed_provider_execution', read: 'host_observed_successful_exact_resource_or_page_read', deferred: 'host_recorded_intentional_deferral', notSearched: 'server_observed_provider_non_execution' } },
+      } }),
+    });
+  }
   const workId = query.work as string;
   const probe = fixtureValue.probes.find(item => item.workId === workId)!;
   const uri = options.primaryLocatorDrift
     ? `${probe.landingResourceUri}#section-noncanonical`
     : probe.primarySearch.resourceUri;
-  const relevanceHit = { locator: {
+  const relevanceHit = { queryId: query.id, title: workId, snippet: 'discovery snippet', rankWithinProvider: 1, page: 1, snippetOnly: true, attribution: 'TheologAI local historical-document collection', provider: 'local', resourceSizeBytes: 42, locator: {
     kind: 'mcp_resource', uri, documentId: workId,
     sectionKey: probe.primarySearch.sectionKey, sourceOrdinal: probe.primarySearch.sourceOrdinal,
-  }, editionReadiness: { editionIdentity: 'established', normalizedTextRights: 'no_known_conflict' } };
+  }, editionReadiness: { foundation: 'edition-provenance-foundation.v1', editionIdentity: 'established', provenance: 'verified_with_uncertainty', exactArtifactRights: 'not_claimed_for_scan_artifacts', normalizedTextRights: 'no_known_conflict' } };
   // Real relevance results need not be the directory's first source section.
   // Keep a lower-ranked first section when different to prove this gate reads
   // the pinned relevance hit, not a directory-order surrogate.
-  const lowerRankedDirectoryHit = probe.primarySearch.resourceUri === probe.firstSection.resourceUri ? [] : [{ locator: {
+  const lowerRankedDirectoryHit = probe.primarySearch.resourceUri === probe.firstSection.resourceUri ? [] : [{ queryId: query.id, title: workId, snippet: 'discovery snippet', rankWithinProvider: 2, page: 1, snippetOnly: true, attribution: 'TheologAI local historical-document collection', provider: 'local', resourceSizeBytes: 42, locator: {
     kind: 'mcp_resource', uri: probe.firstSection.resourceUri, documentId: workId,
     sectionKey: probe.firstSection.sectionKey, sourceOrdinal: probe.firstSection.sourceOrdinal,
-  }, editionReadiness: { editionIdentity: 'established', normalizedTextRights: 'no_known_conflict' } }];
-  const hits = [relevanceHit, ...lowerRankedDirectoryHit];
-  return toolResult(body, { structuredContent: { schemaVersion: '7', kind: 'primary_source_search', planStatus: 'complete', queries: [{ providers: [{ provider: 'local', status: 'ok', searched: true, hitCount: hits.length, hits }] }], coverage: { localAttempted: true, localHitCount: hits.length }, evidencePolicy: { snippetUse: 'discovery_only', localSectionAccess: 'mcp_resource_read', externalSectionAccess: 'direct_url_only' } } });
+  }, editionReadiness: { foundation: 'edition-provenance-foundation.v1', editionIdentity: 'established', provenance: 'verified_with_uncertainty', exactArtifactRights: 'not_claimed_for_scan_artifacts', normalizedTextRights: 'no_known_conflict' } }];
+  const laterExternalHit = options.laterExternalPrimaryHit ? [{
+    queryId: query.id, title: 'Unreviewed external result', snippet: 'discovery snippet', rankWithinProvider: 3, page: 1,
+    snippetOnly: true, attribution: 'Unreviewed provider', provider: 'ccel_live',
+    locator: { kind: 'external_url', url: 'https://ccel.org/ccel/example/work.html' },
+    editionReadiness: { editionIdentity: 'provider_unreviewed', provenance: 'provider_unreviewed', exactArtifactRights: 'not_determined' },
+  }] : [];
+  const laterNoncanonicalLocalHit = options.laterNoncanonicalPrimaryHit ? [{
+    queryId: query.id, title: workId, snippet: 'discovery snippet', rankWithinProvider: 4, page: 1,
+    snippetOnly: true, attribution: 'TheologAI local historical-document collection', provider: 'local', resourceSizeBytes: 42,
+    locator: {
+      kind: 'mcp_resource', uri: `${probe.landingResourceUri}#section-not-the-returned-section`, documentId: workId,
+      sectionKey: probe.primarySearch.sectionKey, sourceOrdinal: probe.primarySearch.sourceOrdinal,
+    },
+    editionReadiness: { foundation: 'edition-provenance-foundation.v1', editionIdentity: 'established', provenance: 'verified_with_uncertainty', exactArtifactRights: 'not_claimed_for_scan_artifacts', normalizedTextRights: 'no_known_conflict' },
+  }] : [];
+  const hits = [relevanceHit, ...lowerRankedDirectoryHit, ...laterExternalHit, ...laterNoncanonicalLocalHit];
+  const provider = {
+    provider: 'local', status: 'ok', searched: true, page: 1, hitCount: hits.length,
+    resultWindow: { returnedHitCount: hits.length, additionalMatchStatus: 'no_additional_match_observed' }, hits, notices: [],
+    scope: { status: 'matched', requested: { work: workId }, eligibleDocumentCount: 1, eligibleDocuments: [], eligibleDocumentsTruncated: false },
+  };
+  const output = profile.primarySource.contractVersion === '7'
+    ? {
+      schemaVersion: '7', kind: 'primary_source_search', planStatus: 'complete',
+      responseWindow: { unit: 'utf8_bytes', maximum: 32768, truncated: false },
+      queries: [{ id: query.id, normalizedMode: 'all_terms', normalizedSelection: 'relevance', providers: [provider] }],
+      coverage: { localAttempted: true, localStatus: 'ok', localHitCount: hits.length, ccelAttempted: false, ccelHitCount: 0, notices: [], serverObserved: { searched: [{ queryId: query.id, provider: 'local', status: 'ok', returnedHitCount: hits.length }], notSearched: [] } },
+      evidencePolicy: { snippetUse: 'discovery_only', localSectionAccess: 'mcp_resource_read', externalSectionAccess: 'direct_url_only', coverageScope: 'bounded_non_exhaustive', externalRightsStatus: 'not_determined', lookupAliasUse: 'exact_routing_only_not_metadata_evidence', coverageLedger: { searched: 'server_observed_provider_execution', read: 'host_observed_successful_exact_resource_or_page_read', deferred: 'host_recorded_intentional_deferral', notSearched: 'server_observed_provider_non_execution' } },
+    }
+    : {
+      schemaVersion: '6', kind: 'primary_source_search', planStatus: 'complete',
+      responseWindow: { unit: 'utf8_bytes', maximum: 32768, truncated: false },
+      queries: [{ id: query.id, normalizedMode: 'all_terms', normalizedSelection: 'relevance', providers: [provider] }],
+      coverage: { localAttempted: true, localStatus: 'ok', localHitCount: hits.length, notices: [], serverObserved: { searched: [{ queryId: query.id, provider: 'local', status: 'ok', returnedHitCount: hits.length }], notSearched: [] } },
+      evidencePolicy: { snippetUse: 'discovery_only', localSectionAccess: 'mcp_resource_read', coverageScope: 'bounded_non_exhaustive', lookupAliasUse: 'exact_routing_only_not_metadata_evidence', coverageLedger: { searched: 'server_observed_provider_execution', read: 'host_observed_successful_exact_resource_or_page_read', deferred: 'host_recorded_intentional_deferral', notSearched: 'server_observed_provider_non_execution' } },
+    };
+  return toolResult(body, { structuredContent: output });
 }
 
 function toolResult(body: RecordValue, result: RecordValue): Response { return jsonResponse({ jsonrpc: '2.0', id: body.id, result }); }

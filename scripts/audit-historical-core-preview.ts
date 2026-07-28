@@ -9,11 +9,105 @@ import { link, lstat, mkdir, mkdtemp, readFile, rm, unlink, writeFile } from 'no
 import { basename, dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { HISTORICAL_SECTIONED_ONLY_LANDING_MAX_BYTES } from '../src/kernel/historicalSectionedDelivery.js';
+import { buildLocalDocumentResourceUri } from '../src/kernel/documentResource.js';
 import { classicTextsOutputSchema } from '../src/mcp/schemas/classicTexts.js';
-import { primarySourceSearchV7OutputSchema } from '../src/mcp/schemas/primarySourceSearchV4.js';
+import { primarySourceSearchV6OutputSchema, primarySourceSearchV7OutputSchema } from '../src/mcp/schemas/primarySourceSearchV4.js';
+import { createPrimarySourceSearchHandler } from '../src/tools/v2/primarySourceSearch.js';
 
 const PREVIEW_ENDPOINT = 'https://preview-mcp.theologai.xyz/mcp';
 const PRODUCTION_ENDPOINT = 'https://mcp.theologai.xyz/mcp';
+
+/**
+ * The Transform-9 fixture is shared, but primary-source search has two
+ * intentionally different public contracts. Keep every difference explicit
+ * here so an audit cannot accidentally project the preview discovery shape on
+ * to the production local-only release (or vice versa).
+ */
+type PrimarySourceAuditContract = Readonly<{
+  contractVersion: '6' | '7';
+  schemaVersion: '6' | '7';
+  openWorldHint: boolean;
+  providerEnum: readonly ('local' | 'ccel')[];
+  providerMaximum: 1 | 2;
+  inputSchema: ObjectRecord;
+  outputSchema: ObjectRecord;
+  inputSchemaSha256: string;
+  outputSchemaSha256: string;
+  primarySourceResearchPrompt: Readonly<{ required: readonly string[]; absent: readonly string[] }>;
+  confessionStudyPrompt: Readonly<{ required: readonly string[]; absent: readonly string[] }>;
+  /** Preview owns a disabled structured CCEL probe; production rejects CCEL at input validation. */
+  externalDiscoveryBoundary: 'disabled_structured_ccel' | 'rejected_at_input_schema';
+}>;
+
+function primaryInputSchemaFor(contractVersion: '6' | '7'): ObjectRecord {
+  const contract = contractVersion === '7'
+    ? { exposeCcelDiscovery: true, ccelLiveSearch: false, ccelCoordinator: false, contractVersion: '7' as const, liveCcelEnabled: false }
+    : { exposeCcelDiscovery: false, ccelLiveSearch: false, ccelCoordinator: false, contractVersion: '6' as const, liveCcelEnabled: false };
+  const schema = createPrimarySourceSearchHandler({} as never, contract).inputSchema;
+  const record = schema !== null && typeof schema === 'object' && !Array.isArray(schema) ? schema as ObjectRecord : undefined;
+  if (!record) throw new Error(`primary-source v${contractVersion} input schema is not an object`);
+  return record;
+}
+
+const PRIMARY_SOURCE_V7_AUDIT_CONTRACT: PrimarySourceAuditContract = {
+  contractVersion: '7', schemaVersion: '7', openWorldHint: true,
+  providerEnum: ['local', 'ccel'], providerMaximum: 2,
+  inputSchema: primaryInputSchemaFor('7'), outputSchema: primarySourceSearchV7OutputSchema as ObjectRecord,
+  inputSchemaSha256: '5ee3fbbcee8ae6956d154c1b84eccbf0a984011fed7076e2bf3e9c6d03c74d90',
+  outputSchemaSha256: '005977f15f3db2d661314055f61ee61d27aee1ae153c86f3a844d199bb477cef',
+  primarySourceResearchPrompt: {
+    required: [
+      'Search local evidence', 'Search one external scope now', 'Use the v7 contract',
+      '"providers":["local"]', '"providers":["ccel"]',
+      'This prompt authorizes at most one CCEL-bearing call.',
+      'The external CCEL call deliberately omits the requested local composition-year bounds; any returned CCEL hit cannot establish membership in that requested local range.',
+      'Use MCP `resources/read` only for local `mcp_resource` URIs.',
+      'Open external `external_url` pages directly', 'name disabled, unavailable, or unsupported searches',
+    ],
+    absent: [
+      'This workflow is local-only', 'Use the v6 structured result',
+      'This workflow supports a topic survey',
+    ],
+  },
+  confessionStudyPrompt: {
+    required: [
+      '"providers":["local","ccel"]', 'external `external_url` locator',
+      'it is not an MCP resource', 'rights status is not determined',
+      'Name any disabled, unavailable, or unsupported provider',
+    ],
+    absent: ['Run bounded local discovery', 'canonical `resource_link` blocks'],
+  },
+  externalDiscoveryBoundary: 'disabled_structured_ccel',
+};
+
+const PRIMARY_SOURCE_V6_AUDIT_CONTRACT: PrimarySourceAuditContract = {
+  contractVersion: '6', schemaVersion: '6', openWorldHint: false,
+  providerEnum: ['local'], providerMaximum: 1,
+  inputSchema: primaryInputSchemaFor('6'), outputSchema: primarySourceSearchV6OutputSchema as ObjectRecord,
+  inputSchemaSha256: '37849624bac2e884106050fcff39851e40cac31969b4f7511f516f78348fea87',
+  outputSchemaSha256: '25758f8d06c43c3f2961fa7b35ba1d62a548df923589b391c65204813a6511b8',
+  primarySourceResearchPrompt: {
+    required: [
+      'Run bounded discovery', 'This workflow is local-only', 'Use the v6 structured result',
+      'exact MCP resource', 'This workflow supports a topic survey',
+    ],
+    absent: [
+      'Search one external scope now', 'Use the v7 contract', '"providers":["ccel"]',
+      'This prompt authorizes at most one CCEL-bearing call.', 'external `external_url` pages',
+    ],
+  },
+  confessionStudyPrompt: {
+    required: [
+      'Run bounded local discovery', 'hosted collection', 'canonical `resource_link` blocks', 'resources/read',
+    ],
+    absent: [
+      '"providers":["local","ccel"]', 'external `external_url` locator',
+      'rights status is not determined', 'Name any disabled, unavailable, or unsupported provider',
+    ],
+  },
+  externalDiscoveryBoundary: 'rejected_at_input_schema',
+};
+
 export type HistoricalCoreAuditProfile = {
   endpoint: string;
   hostname: string;
@@ -21,14 +115,15 @@ export type HistoricalCoreAuditProfile = {
   audit: 'historical-core-preview' | 'historical-core-production';
   endpointClass: 'preview-custom' | 'production-custom';
   label: 'preview' | 'production';
+  primarySource: PrimarySourceAuditContract;
 };
-const PREVIEW_PROFILE: HistoricalCoreAuditProfile = {
+export const PREVIEW_PROFILE: HistoricalCoreAuditProfile = {
   endpoint: PREVIEW_ENDPOINT, hostname: 'preview-mcp.theologai.xyz', serverVersion: '3.6.0-preview',
-  audit: 'historical-core-preview', endpointClass: 'preview-custom', label: 'preview',
+  audit: 'historical-core-preview', endpointClass: 'preview-custom', label: 'preview', primarySource: PRIMARY_SOURCE_V7_AUDIT_CONTRACT,
 };
 export const PRODUCTION_PROFILE: HistoricalCoreAuditProfile = {
   endpoint: PRODUCTION_ENDPOINT, hostname: 'mcp.theologai.xyz', serverVersion: '3.6.0',
-  audit: 'historical-core-production', endpointClass: 'production-custom', label: 'production',
+  audit: 'historical-core-production', endpointClass: 'production-custom', label: 'production', primarySource: PRIMARY_SOURCE_V6_AUDIT_CONTRACT,
 };
 const PROTOCOL_VERSION = '2025-11-25';
 const MAX_LOGICAL_OPERATIONS = 54;
@@ -58,8 +153,6 @@ const LEGACY_WORK_IDS = [
 ] as const;
 const EXPECTED_CLASSIC_INPUT_SCHEMA_SHA256 = '45124e704b5e0009b5bc3672c52b0d7ed6e8193063b621a7ccf766d1d2ad00d4';
 const EXPECTED_CLASSIC_OUTPUT_SCHEMA_SHA256 = 'b8a6af9dff44cf8ad9d964661ca76cbe4ab9bcbdc97d9aca85df4edea73a9a7c';
-const EXPECTED_PRIMARY_INPUT_SCHEMA_SHA256 = '5ee3fbbcee8ae6956d154c1b84eccbf0a984011fed7076e2bf3e9c6d03c74d90';
-const EXPECTED_PRIMARY_OUTPUT_SCHEMA_SHA256 = '005977f15f3db2d661314055f61ee61d27aee1ae153c86f3a844d199bb477cef';
 
 const EXPECTED_FIXTURE = {
   schemaVersion: 1,
@@ -317,13 +410,13 @@ function assertInitialize(message: ObjectRecord, profile: HistoricalCoreAuditPro
   return { protocolVersion: PROTOCOL_VERSION, serverName: 'theologai-bible-server', serverVersion: profile.serverVersion };
 }
 
-function assertToolRegistration(message: ObjectRecord): ObjectRecord {
+function assertToolRegistration(message: ObjectRecord, profile: HistoricalCoreAuditProfile): ObjectRecord {
   const listed = array(result(message, 'tools/list').tools, 'tools/list.tools').map(object);
   assert(listed.every(Boolean) && JSON.stringify(listed.map(tool => tool!.name)) === JSON.stringify(TOOL_NAMES), 'exact 11-tool registration/order drifted');
   for (const tool of listed) {
     const annotations = object(tool!.annotations);
     assert(annotations?.readOnlyHint === true && annotations.destructiveHint === false && annotations.idempotentHint === true, `${tool!.name} annotations drifted`);
-    const expectedOpenWorld = tool!.name === 'primary_source_search' ? true : tool!.name === 'classic_text_lookup' ? false : undefined;
+    const expectedOpenWorld = tool!.name === 'primary_source_search' ? profile.primarySource.openWorldHint : tool!.name === 'classic_text_lookup' ? false : undefined;
     assert(annotations?.openWorldHint === expectedOpenWorld
       && (expectedOpenWorld === undefined ? !Object.hasOwn(annotations!, 'openWorldHint') : Object.hasOwn(annotations!, 'openWorldHint')),
     `${tool!.name} open-world annotation drifted`);
@@ -351,16 +444,23 @@ function assertToolRegistration(message: ObjectRecord): ObjectRecord {
     && queries?.minItems === 1 && queries.maxItems === 4 && queryItem?.additionalProperties === false
     && JSON.stringify(Object.keys(properties ?? {})) === JSON.stringify(['id', 'text', 'providers', 'match', 'selection', 'author', 'work', 'startYear', 'endYear', 'page', 'limit']), 'primary-source input contract drifted');
   const providers = object(properties?.providers); const providerItems = object(providers?.items);
-  assert(providers?.minItems === 1 && providers?.maxItems === 2 && JSON.stringify(providerItems?.enum) === JSON.stringify(['local', 'ccel']), 'primary-source provider contract drifted');
-  assert(sha256(canonicalJson(primaryInput)) === EXPECTED_PRIMARY_INPUT_SCHEMA_SHA256, 'primary-source input schema hash drifted');
-  assert(canonicalJson(primaryOutput) === canonicalJson(primarySourceSearchV7OutputSchema), 'advertised primary-source output schema differs from the checked-out contract');
-  assert(sha256(canonicalJson(primarySourceSearchV7OutputSchema)) === EXPECTED_PRIMARY_OUTPUT_SCHEMA_SHA256
-    && sha256(canonicalJson(primaryOutput)) === EXPECTED_PRIMARY_OUTPUT_SCHEMA_SHA256, 'primary-source output schema hash drifted');
+  assert(providers?.minItems === 1 && providers?.maxItems === profile.primarySource.providerMaximum
+    && JSON.stringify(providerItems?.enum) === JSON.stringify(profile.primarySource.providerEnum), 'primary-source provider contract drifted');
+  assert(canonicalJson(primaryInput) === canonicalJson(profile.primarySource.inputSchema), 'advertised primary-source input schema differs from the checked-out contract');
+  assert(sha256(canonicalJson(profile.primarySource.inputSchema)) === profile.primarySource.inputSchemaSha256
+    && sha256(canonicalJson(primaryInput)) === profile.primarySource.inputSchemaSha256, 'primary-source input schema hash drifted');
+  assert(canonicalJson(primaryOutput) === canonicalJson(profile.primarySource.outputSchema), 'advertised primary-source output schema differs from the checked-out contract');
+  assert(sha256(canonicalJson(profile.primarySource.outputSchema)) === profile.primarySource.outputSchemaSha256
+    && sha256(canonicalJson(primaryOutput)) === profile.primarySource.outputSchemaSha256, 'primary-source output schema hash drifted');
   return {
     classicTextInputSchemaSha256: EXPECTED_CLASSIC_INPUT_SCHEMA_SHA256,
     classicTextOutputSchemaSha256: EXPECTED_CLASSIC_OUTPUT_SCHEMA_SHA256,
-    primarySourceInputSchemaSha256: EXPECTED_PRIMARY_INPUT_SCHEMA_SHA256,
-    primarySourceOutputSchemaSha256: EXPECTED_PRIMARY_OUTPUT_SCHEMA_SHA256,
+    primarySourceContractVersion: profile.primarySource.contractVersion,
+    primarySourceOpenWorldHint: profile.primarySource.openWorldHint,
+    primarySourceProviderMaximum: profile.primarySource.providerMaximum,
+    primarySourceExternalDiscoveryBoundary: profile.primarySource.externalDiscoveryBoundary,
+    primarySourceInputSchemaSha256: profile.primarySource.inputSchemaSha256,
+    primarySourceOutputSchemaSha256: profile.primarySource.outputSchemaSha256,
   };
 }
 
@@ -377,22 +477,27 @@ function promptText(message: ObjectRecord, label: string): string {
   return requireString(content.text, `${label} content text`);
 }
 
-function assertPrimarySourceResearchPrompt(message: ObjectRecord): void {
-  const text = promptText(message, 'primary-source-research prompt');
-  assert(text.includes('Search local evidence') && text.includes('Search one external scope now') && text.includes('Use the v7 contract')
-    && text.includes('"providers":["local"]') && text.includes('"providers":["ccel"]')
-    && text.includes('This prompt authorizes at most one CCEL-bearing call.')
-    && text.includes('The external CCEL call deliberately omits the requested local composition-year bounds; any returned CCEL hit cannot establish membership in that requested local range.')
-    && text.includes('Use MCP `resources/read` only for local `mcp_resource` URIs.')
-    && text.includes('Open external `external_url` pages directly')
-    && text.includes('name disabled, unavailable, or unsupported searches'), 'primary-source-research current v7 prompt behavior drifted');
+function assertPromptContract(
+  message: ObjectRecord,
+  label: string,
+  expected: PrimarySourceAuditContract['primarySourceResearchPrompt'],
+  profile: HistoricalCoreAuditProfile,
+): void {
+  const text = promptText(message, label);
+  for (const required of expected.required) {
+    assert(text.includes(required), `${profile.label} ${label} required behavior drifted`);
+  }
+  for (const absent of expected.absent) {
+    assert(!text.includes(absent), `${profile.label} ${label} local-only boundary drifted`);
+  }
 }
 
-function assertConfessionStudyPrompt(message: ObjectRecord): void {
-  const text = promptText(message, 'confession-study prompt');
-  assert(text.includes('"providers":["local","ccel"]') && text.includes('external `external_url` locator')
-    && text.includes('it is not an MCP resource') && text.includes('rights status is not determined')
-    && text.includes('Name any disabled, unavailable, or unsupported provider'), 'confession-study current v7 prompt behavior drifted');
+function assertPrimarySourceResearchPrompt(message: ObjectRecord, profile: HistoricalCoreAuditProfile): void {
+  assertPromptContract(message, 'primary-source-research prompt', profile.primarySource.primarySourceResearchPrompt, profile);
+}
+
+function assertConfessionStudyPrompt(message: ObjectRecord, profile: HistoricalCoreAuditProfile): void {
+  assertPromptContract(message, 'confession-study prompt', profile.primarySource.confessionStudyPrompt, profile);
 }
 
 function expectedResourceUris(fixture: AuditFixture): string[] {
@@ -537,27 +642,84 @@ function assertClassicSearch(raw: RawToolResult, workId: string): ObjectRecord {
   return { returnedHitCount: hits.length, matchingWorkObserved: true, snippetsDiscoveryOnly: true };
 }
 
-function assertPrimarySearch(raw: RawToolResult, probe: AuditFixture['probes'][number]): { uri: string; evidence: ObjectRecord } {
+function assertPrimarySearch(
+  raw: RawToolResult,
+  probe: AuditFixture['probes'][number],
+  profile: HistoricalCoreAuditProfile,
+): { uri: string; evidence: ObjectRecord } {
   const { workId } = probe;
   const output = structured(raw, `${workId} primary search`);
   const queries = array(output.queries, `${workId} primary queries`).map(object);
-  assert(output.schemaVersion === '7' && output.kind === 'primary_source_search' && output.planStatus === 'complete' && queries.length === 1 && queries[0] !== undefined, `${workId} primary envelope drifted`);
+  assert(output.schemaVersion === profile.primarySource.schemaVersion && output.kind === 'primary_source_search'
+    && output.planStatus === 'complete' && queries.length === 1 && queries[0] !== undefined,
+  `${workId} primary v${profile.primarySource.contractVersion} envelope drifted`);
+  const responseWindow = object(output.responseWindow);
+  assert(responseWindow?.unit === 'utf8_bytes' && responseWindow.maximum === 32768 && typeof responseWindow.truncated === 'boolean',
+    `${workId} primary response-window evidence drifted`);
+  assert(queries[0]!.normalizedMode === 'all_terms' && queries[0]!.normalizedSelection === 'relevance',
+    `${workId} primary local query-normalization drifted`);
   const providers = array(queries[0]!.providers, `${workId} primary providers`).map(object);
-  assert(providers.length === 1 && providers[0]?.provider === 'local' && providers[0]?.status === 'ok' && providers[0]?.searched === true, `${workId} local provider execution drifted`);
+  assert(providers.length === 1 && providers[0]?.provider === 'local' && providers[0]?.status === 'ok'
+    && providers[0]?.searched === true && providers[0]?.page === 1 && Array.isArray(providers[0]?.notices),
+  `${workId} local provider execution drifted`);
+  const resultWindow = object(providers[0]?.resultWindow);
+  assert(resultWindow !== undefined && typeof resultWindow.returnedHitCount === 'number'
+    && ['additional_match_observed', 'no_additional_match_observed', 'not_evaluated'].includes(resultWindow.additionalMatchStatus as string),
+  `${workId} local provider result-window evidence drifted`);
   const hits = array(providers[0]!.hits, `${workId} local hits`).map(object);
   const hit = hits[0];
   assert(hit !== undefined, `${workId} natural local query returned no relevance-ranked hit`);
+  for (const candidate of hits) {
+    const candidateLocator = object(candidate?.locator);
+    assert(candidate?.provider === 'local' && candidateLocator?.kind === 'mcp_resource'
+      && typeof candidateLocator.uri === 'string' && candidateLocator.uri.startsWith('theologai://documents/'),
+    `${workId} primary local provider hit-scope drifted`);
+    const documentId = candidateLocator.documentId;
+    const sectionKey = candidateLocator.sectionKey;
+    const canonicalUri = typeof documentId === 'string' && typeof sectionKey === 'string'
+      ? buildLocalDocumentResourceUri(documentId, sectionKey)
+      : undefined;
+    assert(canonicalUri !== undefined && candidateLocator.uri === canonicalUri,
+      `${workId} primary local provider canonical locator drifted`);
+  }
   const locator = object(hit.locator); const readiness = object(hit.editionReadiness);
   assert(locator?.kind === 'mcp_resource' && locator.documentId === workId
     && locator.sectionKey === probe.primarySearch.sectionKey && locator.sourceOrdinal === probe.primarySearch.sourceOrdinal
     && locator.uri === probe.primarySearch.resourceUri
     && readiness?.editionIdentity === 'established' && readiness.normalizedTextRights === 'no_known_conflict', `${workId} primary local evidence identity/readiness drifted`);
   const policy = object(output.evidencePolicy); const coverage = object(output.coverage);
+  const serverObserved = object(coverage?.serverObserved);
+  const searched = array(serverObserved?.searched, `${workId} primary searched ledger`).map(object);
+  const notSearched = array(serverObserved?.notSearched, `${workId} primary not-searched ledger`).map(object);
   assert(policy?.snippetUse === 'discovery_only' && policy.localSectionAccess === 'mcp_resource_read'
-    && policy.externalSectionAccess === 'direct_url_only' && coverage?.localAttempted === true
-    && typeof coverage.localHitCount === 'number' && Number.isSafeInteger(coverage.localHitCount) && coverage.localHitCount >= 1,
+    && policy.coverageScope === 'bounded_non_exhaustive'
+    && policy.lookupAliasUse === 'exact_routing_only_not_metadata_evidence'
+    && coverage?.localAttempted === true && coverage.localStatus === 'ok'
+    && typeof coverage.localHitCount === 'number' && Number.isSafeInteger(coverage.localHitCount) && coverage.localHitCount >= 1
+    && Array.isArray(coverage.notices)
+    && searched.length === 1 && searched[0]?.provider === 'local' && searched[0]?.status === 'ok'
+    && typeof searched[0]?.returnedHitCount === 'number' && notSearched.length === 0,
   `${workId} primary evidence policy drifted`);
-  return { uri: locator.uri as string, evidence: { localHitCount: coverage.localHitCount as number, exactWorkObserved: true, localReadiness: 'established' } };
+  if (profile.primarySource.contractVersion === '7') {
+    assert(policy.externalSectionAccess === 'direct_url_only' && policy.externalRightsStatus === 'not_determined'
+      && coverage.ccelAttempted === false && coverage.ccelHitCount === 0 && !Object.hasOwn(coverage, 'ccelStatus')
+      && searched.every(entry => entry?.provider === 'local') && notSearched.every(entry => entry?.provider === 'local'),
+    `${workId} preview external-discovery evidence boundary drifted`);
+  } else {
+    assert(!Object.hasOwn(policy, 'externalSectionAccess') && !Object.hasOwn(policy, 'externalRightsStatus')
+      && !Object.hasOwn(coverage, 'ccelAttempted') && !Object.hasOwn(coverage, 'ccelHitCount') && !Object.hasOwn(coverage, 'ccelStatus')
+      && searched.every(entry => entry?.provider === 'local') && notSearched.every(entry => entry?.provider === 'local'),
+    `${workId} production local-only evidence boundary drifted`);
+  }
+  return {
+    uri: locator.uri as string,
+    evidence: {
+      localHitCount: coverage.localHitCount as number,
+      exactWorkObserved: true,
+      localReadiness: 'established',
+      primarySourceContractVersion: profile.primarySource.contractVersion,
+    },
+  };
 }
 
 function assertExactSection(message: ObjectRecord, expectedUri: string, workId: string): ObjectRecord {
@@ -583,6 +745,19 @@ function assertCcelDisabled(raw: RawToolResult, profile: HistoricalCoreAuditProf
     && provider.status === 'disabled' && provider.searched === false && provider.hitCount === 0 && Array.isArray(provider.hits) && provider.hits.length === 0
     && coverage?.localAttempted === false && coverage.ccelAttempted === false && coverage.ccelStatus === 'disabled' && coverage.ccelHitCount === 0, `${profile.label} CCEL-disabled/local-only execution invariant drifted`);
   return { provider: 'ccel_live', status: 'disabled', searched: false, hitCount: 0 };
+}
+
+/** Production must reject an external provider in JSON Schema before any provider can execute. */
+function assertCcelRejectedAtInputSchema(raw: RawToolResult, profile: HistoricalCoreAuditProfile): ObjectRecord {
+  assert(raw.isError === true && raw.structuredContent === undefined,
+    `${profile.label} CCEL input-boundary regression must be a safe unstructured validation error`);
+  assert(raw.text.length === 1 && raw.text[0]!.startsWith('Invalid arguments for primary_source_search:'),
+    `${profile.label} CCEL input-boundary regression must be classified by schema validation`);
+  const serialized = JSON.stringify(raw.raw);
+  assertNoSensitiveErrorText(serialized, `${profile.label} CCEL input-boundary regression`);
+  assert(!serialized.includes('ccel_live') && !serialized.includes('"searched"') && !serialized.includes('"providers"'),
+    `${profile.label} CCEL input-boundary regression exposed provider execution`);
+  return { provider: 'ccel', status: 'rejected_at_input_schema', searched: false, hitCount: 0 };
 }
 
 function assertNoSensitiveErrorText(value: string, label: string): void {
@@ -628,6 +803,7 @@ function evidenceTextIsSafe(value: unknown): void {
     'schemaVersion', 'audit', 'endpointClass', 'fixtureSha256', 'durationMs', 'negotiated', 'schemas', 'budgets', 'catalog', 'classicCatalog', 'records', 'regressions',
     'protocolVersion', 'serverName', 'serverVersion',
     'classicTextInputSchemaSha256', 'classicTextOutputSchemaSha256', 'primarySourceInputSchemaSha256', 'primarySourceOutputSchemaSha256',
+    'primarySourceContractVersion', 'primarySourceOpenWorldHint', 'primarySourceProviderMaximum', 'primarySourceExternalDiscoveryBoundary',
     'logicalOperations', 'maximumLogicalOperations', 'httpExchanges', 'maximumHttpExchanges', 'retryCount', 'perRequestMaximumDurationMs', 'maximumDurationMs', 'maximumMcpResponseBytes', 'aggregateMcpResponseBytes', 'maximumAggregateMcpResponseBytes',
     'workCount', 'legacyWorkCount', 'coreWorkCount', 'sourcePackId', 'coreSectionCount', 'reviewedSectionedWorkCount', 'legacyCompleteWorkCount',
     'workId', 'editionId', 'passed', 'landing', 'directory', 'classicSearch', 'primary', 'section',
@@ -663,14 +839,14 @@ export async function runHistoricalCoreAudit(
   const client = new FixedAuditMcp(fetchImpl, deadline, profile);
   const negotiated = assertInitialize(await client.initialize(), profile);
   await client.initialized();
-  const schemas = assertToolRegistration(await client.toolsList());
+  const schemas = assertToolRegistration(await client.toolsList(), profile);
   assertPrompts(await client.promptsList());
   assertResources(await client.resourcesList(), fixture);
   assertResourceTemplates(await client.resourceTemplatesList());
   assertPrimarySourceResearchPrompt(await client.getPrompt('primary-source-research', {
     topic: 'eucharist', authors: 'Erasmus of Rotterdam,Martin Luther', startYear: '500', endYear: '1500', maxSections: '2',
-  }));
-  assertConfessionStudyPrompt(await client.getPrompt('confession-study', { topic: 'justification' }));
+  }), profile);
+  assertConfessionStudyPrompt(await client.getPrompt('confession-study', { topic: 'justification' }), profile);
   const catalog = assertCatalog(await client.readResource('theologai://primary-sources/catalog'), fixture);
   const classicCatalog = assertClassicCatalog(await client.callTool('classic_text_lookup', { listWorks: true }), fixture);
   const directLandingResourceBytes = assertDirectLandingResource(
@@ -687,13 +863,18 @@ export async function runHistoricalCoreAudit(
     const classicSearch = assertClassicSearch(await client.callTool('classic_text_lookup', { query: probe.query }), probe.workId);
     const primary = assertPrimarySearch(await client.callTool('primary_source_search', { queries: [{
       id: `core-${probe.workId}`, text: probe.query, providers: ['local'], work: probe.workId, match: 'all_terms', selection: 'relevance', limit: 5,
-    }] }), probe);
+    }] }), probe, profile);
     const section = assertExactSection(await client.readResource(primary.uri), primary.uri, probe.workId);
     records.push({ workId: probe.workId, editionId: probe.editionId, passed: true, durationMs: Date.now() - started, landing, directory, classicSearch, primary: primary.evidence, section });
   }
   assert(observedCoreSectionCount === fixture.baseline.expectedCatalogIdentity.coreSectionCount, 'reviewed core section-count identity drifted');
   const legacy = assertLegacyRegression(await client.callTool('classic_text_lookup', { work: fixture.legacyRegression.workId }), fixture);
-  const ccel = assertCcelDisabled(await client.callTool('primary_source_search', { queries: [{ id: 'ccel-disabled', text: 'Lord Supper', providers: ['ccel'], match: 'all_terms', selection: 'relevance', limit: 1 }] }), profile);
+  const ccelRaw = await client.callTool('primary_source_search', {
+    queries: [{ id: 'ccel-disabled', text: 'Lord Supper', providers: ['ccel'], match: 'all_terms', selection: 'relevance', limit: 1 }],
+  });
+  const ccel = profile.primarySource.externalDiscoveryBoundary === 'disabled_structured_ccel'
+    ? assertCcelDisabled(ccelRaw, profile)
+    : assertCcelRejectedAtInputSchema(ccelRaw, profile);
   const invalidResourceUri = 'theologai://documents/does-not-exist#section-not-real';
   assertResourceNotFound(await client.readResource(invalidResourceUri), invalidResourceUri);
   const invalidCursor = 'not-a-valid-cursor';
