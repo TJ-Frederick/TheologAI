@@ -72,12 +72,15 @@ export function createPrimarySourceSearchHandler(
                   ? 'Inclusive catalog composition-overlap upper bound when reviewed dates are available; must be >= startYear. Expanded discovery deliberately omits it and warns that broader results are not date-filtered.'
                   : 'Inclusive upper bound. Must be greater than or equal to startYear when both are provided.',
               },
-              page: {
-                type: 'integer', minimum: 1, maximum: 3, default: 1,
-                description: v5
-                  ? 'Curated-catalog page (1–3). Expanded searchDepth supports page 1 only.'
-                  : 'Preserved planner field. The local provider supports only page 1 and reports unsupported_filter otherwise.',
-              },
+              page: v5
+                ? {
+                  type: 'integer', const: 1, default: 1,
+                  description: 'Curated-catalog page. Page 1 only.',
+                }
+                : {
+                  type: 'integer', minimum: 1, maximum: 3, default: 1,
+                  description: 'Preserved planner field. The local provider supports only page 1 and reports unsupported_filter otherwise.',
+                },
               limit: {
                 type: 'integer', minimum: 1, maximum: 8, default: 5,
                 ...(v5 ? { description: 'Curated-catalog maximum is 8. Use expandedLimit for the separately bounded expanded-discovery group.' } : {}),

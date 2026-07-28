@@ -296,6 +296,7 @@ describe('Worker MCP endpoint in workerd', () => {
     expect(primarySourceQuery.properties).not.toHaveProperty('providers');
     expect(primarySourceQuery.properties.searchDepth).toMatchObject({ enum: ['standard', 'expanded'], default: 'standard' });
     expect(primarySourceQuery.properties.expandedLimit).toMatchObject({ minimum: 1, maximum: 5, default: 3 });
+    expect(primarySourceQuery.properties.page).toMatchObject({ const: 1, default: 1 });
   });
 
   it('returns structured Bible content alongside the legacy Markdown result', async () => {

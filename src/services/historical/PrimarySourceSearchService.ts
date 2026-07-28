@@ -211,7 +211,7 @@ function validateQuery(input: unknown, index: number, contractVersion: '6' | '7'
   const page = query.page ?? 1;
   const limit = query.limit ?? 5;
   if (!Number.isSafeInteger(page) || (page as number) < 1 || (page as number) > 3) throw new ValidationError(`${path}.page`, 'page must be an integer from 1 to 3.');
-  if (contractVersion === '7' && searchDepth === 'expanded' && page !== 1) throw new ValidationError(`${path}.page`, 'expanded searchDepth supports page 1 only.');
+  if (contractVersion === '7' && page !== 1) throw new ValidationError(`${path}.page`, 'v7 primary-source search supports page 1 only.');
   if (!Number.isSafeInteger(limit) || (limit as number) < 1 || (limit as number) > 8) throw new ValidationError(`${path}.limit`, 'limit must be an integer from 1 to 8.');
   const author = query.author === undefined ? undefined : normalizeLiteral(query.author, `${path}.author`, 100);
   const work = query.work === undefined ? undefined : normalizeLiteral(query.work, `${path}.work`, 160);

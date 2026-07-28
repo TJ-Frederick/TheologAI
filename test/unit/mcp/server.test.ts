@@ -1054,7 +1054,7 @@ describe('shared MCP registration', () => {
       exposeCcelDiscovery: true, ccelLiveSearch: false, ccelCoordinator: false,
       contractVersion: '7' as const, liveCcelEnabled: false,
     };
-    const handler = createPrimarySourceSearchHandler({ search: vi.fn().mockResolvedValue({
+    const search = vi.fn().mockResolvedValue({
       planStatus: 'partial',
       queries: [{
         id: 'external', normalizedMode: 'all_terms', normalizedSelection: 'relevance',
@@ -1067,7 +1067,8 @@ describe('shared MCP registration', () => {
         }],
       }],
       coverage: { localAttempted: true, localStatus: 'no_results', localHitCount: 0, ccelAttempted: false, ccelStatus: 'disabled', ccelHitCount: 0, notices: [] },
-    }) } as any, contract);
+    });
+    const handler = createPrimarySourceSearchHandler({ search } as any, contract);
     const root = makeMockRoot();
     root.primarySourceContract = contract;
     root.tools = root.tools.map(tool => tool.name === 'primary_source_search' ? handler : tool);
@@ -1081,6 +1082,7 @@ describe('shared MCP registration', () => {
     expect(inputItem.properties).not.toHaveProperty('providers');
     expect(inputItem.properties.searchDepth.enum).toEqual(['standard', 'expanded']);
     expect(inputItem.properties.expandedLimit).toMatchObject({ minimum: 1, maximum: 5, default: 3 });
+    expect(inputItem.properties.page).toMatchObject({ const: 1, default: 1 });
 
     const called = await client.callTool({
       name: 'primary_source_search',
@@ -1089,6 +1091,14 @@ describe('shared MCP registration', () => {
     expect(called).toMatchObject({ structuredContent: { schemaVersion: '7', planStatus: 'partial' } });
     expect(called).not.toHaveProperty('isError');
     expect(called.content[0]).toMatchObject({ type: 'text', text: expect.stringContaining('# Primary-source discovery') });
+    expect(search).toHaveBeenCalledOnce();
+
+    const rejectedStandardPage = await client.callTool({
+      name: 'primary_source_search',
+      arguments: { queries: [{ id: 'catalog-page-two', text: 'grace', page: 2 }] },
+    });
+    expect(rejectedStandardPage).toMatchObject({ isError: true });
+    expect(search).toHaveBeenCalledOnce();
   });
 
   it('uses InvalidParams for unknown prompts and missing prompt arguments', async () => {

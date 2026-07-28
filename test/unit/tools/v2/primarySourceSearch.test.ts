@@ -561,11 +561,13 @@ describe('primary_source_search v7 discovery contract', () => {
     expect(query.properties.work.description).toContain('reviewed external metadata');
     expect(query.properties.startYear.description).toContain('Expanded discovery deliberately omits it');
     expect(query.properties.endYear.description).toContain('Expanded discovery deliberately omits it');
-    expect(query.properties.page.description).toContain('Expanded searchDepth supports page 1 only');
+    expect(query.properties.page).toMatchObject({ const: 1, default: 1 });
+    expect(query.properties.page.description).toContain('Page 1 only');
     expect(query.properties.limit.description).toContain('expandedLimit');
     const validate = validatorFor(handler.inputSchema);
     expect(validate({ queries: [{ id: 'q', text: 'faith' }] }).valid).toBe(true);
     expect(validate({ queries: [{ id: 'q', text: 'faith', searchDepth: 'expanded', expandedLimit: 5 }] }).valid).toBe(true);
+    expect(validate({ queries: [{ id: 'q', text: 'faith', page: 2 }] }).valid).toBe(false);
     expect(validate({ queries: [{ id: 'q', text: 'faith', expandedLimit: 3 }] }).valid).toBe(false);
     expect(validate({ queries: [{ id: 'q', text: 'faith', searchDepth: 'expanded', page: 2 }] }).valid).toBe(false);
     expect(validate({ queries: [{ id: 'q', text: 'faith', searchDepth: 'expanded', expandedLimit: 0 }] }).valid).toBe(false);

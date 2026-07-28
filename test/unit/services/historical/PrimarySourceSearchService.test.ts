@@ -165,12 +165,15 @@ describe('PrimarySourceSearchService', () => {
     expect(ccel.search).not.toHaveBeenCalled();
   });
 
-  it('rejects expanded discovery beyond page one before any catalog or external work', async () => {
+  it.each([
+    ['standard catalog search', {}],
+    ['expanded discovery', { searchDepth: 'expanded' }],
+  ])('rejects v7 %s beyond page one before any catalog or external work', async (_label, queryOverrides) => {
     const local = { search: vi.fn() };
     const ccel = { search: vi.fn() };
     const gate = { admit: vi.fn(), recordOutcome: vi.fn(), snapshot: vi.fn() } as any;
     const service = new PrimarySourceSearchService(local as any, ccel as any, live, gate);
-    await expect(service.search(plan([v7Query({ searchDepth: 'expanded', page: 2 })]))).rejects.toThrow('page 1');
+    await expect(service.search(plan([v7Query({ ...queryOverrides, page: 2 })]))).rejects.toThrow('page 1');
     expect(local.search).not.toHaveBeenCalled();
     expect(ccel.search).not.toHaveBeenCalled();
     expect(gate.admit).not.toHaveBeenCalled();

@@ -57,7 +57,7 @@ const PRIMARY_SOURCE_V7_AUDIT_CONTRACT: PrimarySourceAuditContract = {
   inputPropertyOrder: ['id', 'text', 'searchDepth', 'expandedLimit', 'match', 'selection', 'author', 'work', 'startYear', 'endYear', 'page', 'limit'],
   searchDepthEnum: ['standard', 'expanded'], expandedLimitMaximum: 5,
   inputSchema: primaryInputSchemaFor('7'), outputSchema: primarySourceSearchV7OutputSchema as ObjectRecord,
-  inputSchemaSha256: '708666a36a04cfccc0306360c022bdd52e893dc1e6a8954395b08b1c45e980e0',
+  inputSchemaSha256: '14a5a782e951fc0814092e90f0e1b78ab955cbb42a4242e818c0c03e188b47a5',
   outputSchemaSha256: '005977f15f3db2d661314055f61ee61d27aee1ae153c86f3a844d199bb477cef',
   primarySourceResearchPrompt: {
     required: [
@@ -450,11 +450,13 @@ function assertToolRegistration(message: ObjectRecord, profile: HistoricalCoreAu
     && JSON.stringify(Object.keys(properties ?? {})) === JSON.stringify(profile.primarySource.inputPropertyOrder), 'primary-source input contract drifted');
   if (profile.primarySource.contractVersion === '7') {
     const searchDepth = object(properties?.searchDepth); const expandedLimit = object(properties?.expandedLimit);
+    const page = object(properties?.page);
     const allOf = queryItem?.allOf;
     assert(JSON.stringify(queryItem?.required) === JSON.stringify(['id', 'text']) && !Object.hasOwn(properties ?? {}, 'providers')
       && JSON.stringify(searchDepth?.enum) === JSON.stringify(profile.primarySource.searchDepthEnum)
       && searchDepth?.default === 'standard'
       && expandedLimit?.minimum === 1 && expandedLimit?.maximum === profile.primarySource.expandedLimitMaximum && expandedLimit?.default === 3
+      && page?.const === 1 && page?.default === 1
       && Array.isArray(allOf) && allOf.length === 2, 'primary-source expanded-depth contract drifted');
   } else {
     const providers = object(properties?.providers); const providerItems = object(providers?.items);
