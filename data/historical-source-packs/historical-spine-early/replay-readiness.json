@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "historical-source-replay-readiness.v1",
+  "packId": "theologai-historical-spine-early",
+  "normalizedPackageReview": {
+    "status": "reviewed_normalized_package_only",
+    "manifestSha256": "c993fdeb186e9febf6f73f03e33fe27086e8f9c13d4010fb7206ef2f2fbd8c9f"
+  },
+  "authorityComparatorReplay": {
+    "status": "completed",
+    "receiptPath": "replay-receipt.json"
+  },
+  "activation": {
+    "status": "blocked_separate_transform11_release"
+  }
+}

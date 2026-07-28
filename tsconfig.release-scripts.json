@@ -15,6 +15,7 @@
     "scripts/audit-original-language-v2-production.ts",
     "scripts/audit-historical-core-preview.ts",
     "scripts/audit-historical-core-production.ts",
+    "scripts/replay-historical-spine-source-packs.ts",
     "scripts/release-corpus-capacity-policy.ts",
     "scripts/release-corpus-capacity.ts",
     "scripts/verify-database.ts"

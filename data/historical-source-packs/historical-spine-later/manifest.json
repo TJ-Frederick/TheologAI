@@ -1,0 +1,164 @@
+{
+  "schemaVersion": "historical-source-pack-manifest.v1",
+  "packId": "theologai-historical-spine-later",
+  "revision": 2,
+  "rightsScope": "normalized_public_domain_text_only",
+  "members": [
+    {
+      "id": "hooker-laws-of-ecclesiastical-polity-book-1-keble-1888",
+      "sourcePath": "editions/hooker-laws-of-ecclesiastical-polity-book-1-keble-1888.json",
+      "packageSha256": "282619f3343eb60ebf274d6226b0a604081d597eb32f13dcd210c33736e5c291",
+      "normalizedTextRights": {
+        "status": "no_known_conflict",
+        "scope": "normalized_public_domain_text_only",
+        "basis": "Historical Keble, Church, and Paget edition, 1888 text; no contrary ownership evidence is known.",
+        "reviewedAt": "2026-07-27"
+      },
+      "artifacts": [
+        {
+          "artifactId": "hooker-laws-of-ecclesiastical-polity-book-1-keble-1888-authority-scan",
+          "role": "authority",
+          "locator": "https://oll-resources.s3.us-east-2.amazonaws.com/oll3/store/titles/921/Hooker_0172-01_EBk_v6.0.pdf",
+          "sha256": "cc6874fd24c1d86ffb73b2a10a2e8f616827b831ccf5c4532b7fb63aa145856d",
+          "bytes": 2365406,
+          "acquiredAt": "2026-07-27T00:00:00.000Z"
+        },
+        {
+          "artifactId": "hooker-laws-of-ecclesiastical-polity-book-1-keble-1888-machine-readable-comparator",
+          "role": "comparator",
+          "locator": "https://oll-resources.s3.us-east-2.amazonaws.com/oll3/store/titles/921/hooker-the-works-of-richard-hooker-vol-1.epub",
+          "sha256": "c6ec69aaddc67c0e3f4a10fcc34241e83cfab5dded736ad3a87e9797cfd1b8c4",
+          "bytes": 852534,
+          "acquiredAt": "2026-07-27T00:00:00.000Z"
+        }
+      ],
+      "catalog": {
+        "composition": {
+          "label": "1593",
+          "startYear": 1593,
+          "endYear": 1593
+        },
+        "compositionProvenanceSources": [
+          {
+            "sourceId": "hist-meta-hooker-folger",
+            "label": "Folger catalog: Of the Lawes of Ecclesiastical Politie, 1593",
+            "url": "https://catalog.folger.edu/record/424484"
+          }
+        ]
+      }
+    },
+    {
+      "id": "julian-revelations-of-divine-love-warrack-1901-gutenberg",
+      "sourcePath": "editions/julian-revelations-of-divine-love-warrack-1901-gutenberg.json",
+      "packageSha256": "bcdecbf2a93eb7db0a8e36fd4b2c5f1719f5a5e60b1ae2db3612807b100a4fff",
+      "normalizedTextRights": {
+        "status": "no_known_conflict",
+        "scope": "normalized_public_domain_text_only",
+        "basis": "Source-first Project Gutenberg no. 52958 text, identifying Grace Warrack's Methuen 1901 first edition; no contrary ownership evidence is known.",
+        "reviewedAt": "2026-07-27"
+      },
+      "artifacts": [
+        {
+          "artifactId": "julian-revelations-of-divine-love-warrack-1901-gutenberg-authority",
+          "role": "authority",
+          "locator": "https://www.gutenberg.org/cache/epub/52958/pg52958.txt",
+          "sha256": "2e01d1a44b27b001b51053053fe69db771a6609edbbbc5a7fb31da9d4b3cc4b9",
+          "bytes": 476062,
+          "acquiredAt": "2026-07-27T00:00:00.000Z"
+        }
+      ],
+      "catalog": {
+        "composition": {
+          "label": "c. 1373",
+          "startYear": 1373,
+          "endYear": 1373
+        },
+        "compositionProvenanceSources": [
+          {
+            "sourceId": "hist-meta-julian-british-library",
+            "label": "British Library archives: Julian of Norwich visions/text witness, 1373",
+            "url": "https://searcharchives.bl.uk/catalog/040-002114866"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kempis-imitation-of-christ-benham-gutenberg",
+      "sourcePath": "editions/kempis-imitation-of-christ-benham-gutenberg.json",
+      "packageSha256": "4373c1c03f43ede7784ad6195af1ae33ab009da71b6a03f73b8ec3d742fbf9d6",
+      "normalizedTextRights": {
+        "status": "no_known_conflict",
+        "scope": "normalized_public_domain_text_only",
+        "basis": "Source-first Project Gutenberg no. 1653 William Benham text; no contrary ownership evidence is known.",
+        "reviewedAt": "2026-07-27"
+      },
+      "artifacts": [
+        {
+          "artifactId": "kempis-imitation-of-christ-benham-gutenberg-authority",
+          "role": "authority",
+          "locator": "https://www.gutenberg.org/cache/epub/1653/pg1653.txt",
+          "sha256": "7631799607b0ede62f1bd7ed2a8eb62d89524451a3c41e9ad2b5cbf4c2aa5383",
+          "bytes": 374954,
+          "acquiredAt": "2026-07-27T00:00:00.000Z"
+        }
+      ],
+      "catalog": {
+        "composition": {
+          "label": "c. 1418–1427",
+          "startYear": 1418,
+          "endYear": 1427
+        },
+        "compositionProvenanceSources": [
+          {
+            "sourceId": "hist-meta-kempis-imitation-wikipedia",
+            "label": "Wikipedia: The Imitation of Christ chronology (c. 1418–1427)",
+            "url": "https://en.wikipedia.org/wiki/The_Imitation_of_Christ"
+          }
+        ]
+      }
+    },
+    {
+      "id": "pascal-pensees-trotter-1910",
+      "sourcePath": "editions/pascal-pensees-trotter-1910.json",
+      "packageSha256": "3c644c513e57d62f9e75dea0fcc4ca125a8bcb73bd7f20d672a48379068551ad",
+      "normalizedTextRights": {
+        "status": "no_known_conflict",
+        "scope": "normalized_public_domain_text_only",
+        "basis": "Historical W. F. Trotter translation, 1910 witness text; no contrary ownership evidence is known.",
+        "reviewedAt": "2026-07-27"
+      },
+      "artifacts": [
+        {
+          "artifactId": "pascal-pensees-trotter-1910-authority-scan",
+          "role": "authority",
+          "locator": "https://archive.org/download/thoughts00trotgoog/thoughts00trotgoog.pdf",
+          "sha256": "88ac08b1da08f6e8bfd2f6e5cc819626d41f29a8f59155074dbc6794638b9bfa",
+          "bytes": 24226421,
+          "acquiredAt": "2026-07-27T00:00:00.000Z"
+        },
+        {
+          "artifactId": "pascal-pensees-trotter-1910-machine-readable-comparator",
+          "role": "comparator",
+          "locator": "https://www.gutenberg.org/cache/epub/18269/pg18269.txt",
+          "sha256": "be863330cafa658e6ab10f79c1fdb89502fb13561699c1a6b31745289ae674fd",
+          "bytes": 663179,
+          "acquiredAt": "2026-07-27T00:00:00.000Z"
+        }
+      ],
+      "catalog": {
+        "composition": {
+          "label": "c. 1656–1662",
+          "startYear": 1656,
+          "endYear": 1662
+        },
+        "compositionProvenanceSources": [
+          {
+            "sourceId": "hist-meta-pascal-bnf",
+            "label": "BnF exposition: Pensées chronology, 1656–1662",
+            "url": "https://expositions.bnf.fr/pascal/grand/bla_164_4.htm"
+          }
+        ]
+      }
+    }
+  ]
+}

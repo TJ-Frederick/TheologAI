@@ -1,0 +1,111 @@
+{
+  "schemaVersion": "historical-source-replay-receipt.v1",
+  "packId": "theologai-historical-spine-early",
+  "completedAt": "2026-07-28T15:58:21.354Z",
+  "script": {
+    "path": "scripts/replay-historical-spine-source-packs.ts",
+    "sha256": "9778534d0fc52547576086454e8e8d7dba5f04f6adb2572624f462daa4f18e37"
+  },
+  "preparationManifestSha256": "1068ad93ddb9264c68a0be0ed2e392cd7f4fd3cf6264a381bb388984ff787755",
+  "reviewedManifestSha256": "c993fdeb186e9febf6f73f03e33fe27086e8f9c13d4010fb7206ef2f2fbd8c9f",
+  "inputs": [
+    {
+      "editionId": "augustine-on-christian-doctrine-shaw-npnf1-v2-1887",
+      "role": "authority",
+      "sha256": "9a9e6449cab5eaa67063bff35e2dca87a02b47ddc81a1c172ea08dd4179a6322",
+      "bytes": 47046039
+    },
+    {
+      "editionId": "augustine-on-christian-doctrine-shaw-npnf1-v2-1887",
+      "role": "comparator",
+      "sha256": "b8ca21dfa7d553681651f85197064b0fe52ae6c17e5e17252df9301536a4ae2a",
+      "bytes": 4137798
+    },
+    {
+      "editionId": "basil-on-the-holy-spirit-jackson-npnf2-v8-1895",
+      "role": "authority",
+      "sha256": "469f5a890ebf6a7d69e9ffe2312cf9a350f3c8d610346d94bf527bae8e66fe2d",
+      "bytes": 32755973
+    },
+    {
+      "editionId": "basil-on-the-holy-spirit-jackson-npnf2-v8-1895",
+      "role": "comparator",
+      "sha256": "95cf3dafefccec80e0949a03c7f1f605da293302d0dc7a8bd62a4e711a0c5532",
+      "bytes": 3303323
+    },
+    {
+      "editionId": "gregory-nazianzen-five-theological-orations-browne-swallow-npnf2-v7-1894",
+      "role": "authority",
+      "sha256": "5dedda6b928776b6171531f65832f32237568cb4e7a3e40e3f506ee8665788a0",
+      "bytes": 71633290
+    },
+    {
+      "editionId": "gregory-nazianzen-five-theological-orations-browne-swallow-npnf2-v7-1894",
+      "role": "comparator",
+      "sha256": "3ac73f4179c0b7d6e66e6fea04ae572e64c0e4a80e8fa38980b40366c8a13928",
+      "bytes": 4247548
+    },
+    {
+      "editionId": "gregory-nyssa-great-catechism-moore-wilson-npnf2-v5-1893",
+      "role": "authority",
+      "sha256": "5a2d4fd8d20e5b5542f4f214710c4f97345e47abb7b39b30cdd76d357a00cf37",
+      "bytes": 62056477
+    },
+    {
+      "editionId": "gregory-nyssa-great-catechism-moore-wilson-npnf2-v5-1893",
+      "role": "comparator",
+      "sha256": "43e87ed232457fd2d5862f72dd2d5d84fe1e8b69f4c3eec839bad04579327bf3",
+      "bytes": 4225695
+    },
+    {
+      "editionId": "justin-martyr-apologies-dods-reith-anf1-1885",
+      "role": "authority",
+      "sha256": "b50e358eebf85f06794c4dba16777eb6d27a35688a6c7a828b46c9d2190be8cc",
+      "bytes": 58025655
+    },
+    {
+      "editionId": "justin-martyr-apologies-dods-reith-anf1-1885",
+      "role": "comparator",
+      "sha256": "8012ea0e35b497d2fbd783f9d4fd7b3a27d98c6dc66fd427b50d7312e6dd45af",
+      "bytes": 4511814
+    },
+    {
+      "editionId": "origen-de-principiis-crombie-anf4-1885",
+      "role": "authority",
+      "sha256": "56d6574093b481ed4d4aab4a878da8d06ee60829a4d8339f84221e04ef3a79b4",
+      "bytes": 63946176
+    },
+    {
+      "editionId": "origen-de-principiis-crombie-anf4-1885",
+      "role": "comparator",
+      "sha256": "240b26390c16fb0a7683b6ce6076e86f0d387c4e43fa88f079d9600f385acaf0",
+      "bytes": 5759964
+    }
+  ],
+  "outputs": [
+    {
+      "editionId": "augustine-on-christian-doctrine-shaw-npnf1-v2-1887",
+      "packageSha256": "ebb2892a9dd4b25b3a1f9fa1dd6fc974614eb8e7aa0edff6d47e03481e3464f6"
+    },
+    {
+      "editionId": "basil-on-the-holy-spirit-jackson-npnf2-v8-1895",
+      "packageSha256": "cba24ed2f2d3d262c53f464734cc0816a25c788930ef823872689804da95099d"
+    },
+    {
+      "editionId": "gregory-nazianzen-five-theological-orations-browne-swallow-npnf2-v7-1894",
+      "packageSha256": "c04c18ffd8dd72a58792caaf9b8f18a654f08445293780301f55c043faee3718"
+    },
+    {
+      "editionId": "gregory-nyssa-great-catechism-moore-wilson-npnf2-v5-1893",
+      "packageSha256": "641dac27b2d7a932f86b0d54afdc665a68e82ed1451284f41044ed2ff9f94e67"
+    },
+    {
+      "editionId": "justin-martyr-apologies-dods-reith-anf1-1885",
+      "packageSha256": "c341fded602845c2d7d72345b86585b952831b1dd695868dbcd2ef18f9189ea7"
+    },
+    {
+      "editionId": "origen-de-principiis-crombie-anf4-1885",
+      "packageSha256": "7422273ceaff071d1c61d9b89a36bc822a8c8544c669ba544851fd1f2982f441"
+    }
+  ]
+}
