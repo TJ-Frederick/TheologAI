@@ -13,9 +13,9 @@ The checked-out Transform 10 candidate retains an inactive Aquinas
 edition-scoped authority hierarchy packet and standalone materializer. Normal
 release builds deliberately exclude its hierarchy rows and shared lineage. It
 is unpublished and has no document or catalog projection, runtime composition
-dependency, or MCP surface. It leaves the active historical catalog boundary unchanged: preview remains the
-Transform-9 25-work collection and production remains the Transform-8 17-work
-collection.
+dependency, or MCP surface. It leaves the active historical catalog boundary
+unchanged: preview remains the Transform-9 25-work collection and production
+uses the normal 25-work corpus.
 
 The current preview Transform 9 catalog materialization is migration
 `0006_historical_source_packs`. It retains the Transform 6 legacy catalog slice
@@ -28,24 +28,36 @@ historical Transform 6 catalog identity remains
 earlier slice. These are checked-in build and seed identities, not Cloudflare
 deployment identifiers.
 
-Transform 9 is bound and deployed in preview only, on
+PR95's Transform-9 normal preview release is historical, having used
 `theologai-preview-20260727-normal-a`
-(`776944d4-60d1-457f-b13e-b4e7898971ca`), and its bounded black-box audit
-passed. It makes no claim that migration 0006, the core-eight rows, or the
-25-work collection has been migrated, bound, or deployed to the production D1
-environment. The separately prepared normal production candidate is unbound;
-the checked-in root binding names it for protected verification, not as evidence
-of live traffic. Production release remains separately gated.
+(`776944d4-60d1-457f-b13e-b4e7898971ca`). The current preview baseline is PR
+#101 deployment `070b292b-0bae-400a-b983-3d72157b5a96`, Worker
+`bd722b69-2e2c-4d8d-b42b-617e8caba13d` (#130), and D1
+`theologai-preview-20260728-hierarchy-a`
+(`51890e12-1c3f-421f-b661-9a5ea9637e43`). Before the proposed cutover, the
+current production baseline is PR #104 deployment
+`07bbd8aa-5c69-4b0c-a9df-c756f537bb97`, Worker
+`09fa6471-eb50-480e-85b2-bc04b742dcb3` (#94), and D1
+`theologai-production-20260728-normal-a`
+(`a3d26bba-7adc-44b0-86d0-562b2ced6bd3`). The separately prepared schema-`0008` production candidate
+`theologai-production-20260728-hierarchy-a`
+(`f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395`) was unbound when remote readiness and
+Transform-8/9 authority audits passed and Transform-10 normal-corpus exclusion
+predicates proved hierarchy, publication, and Aquinas-lineage rows empty. The
+checked-in root target names it for protected verification, not as evidence of
+a current live Worker binding or hierarchy/publication activation. Production
+release remains separately gated.
 
 PR #101's checked-in preview target is the schema-`0008` candidate
 `theologai-preview-20260728-hierarchy-a`
 (`51890e12-1c3f-421f-b661-9a5ea9637e43`), with deterministic D1 corpus identity
 `c43bfa2f5e7ff04c3641a228092bdc91d597edc60dc7d596507e8ca6c0ac90fe`. It was
-unbound when its one-time 49-file, 1,627,474-row preparation passed readiness
-and Transform-8/9/10 authority audits; dormant hierarchy/publication rows were
-empty. A checked-in target alone does not establish a current live binding or
-activate a hierarchy/publication runtime. Protected workflow evidence is
-authoritative; preview release remains separately gated.
+unbound when its one-time 49-file, 1,627,474-row preparation completed: remote
+readiness and Transform-8/9 authority audits passed, and Transform-10
+normal-corpus exclusion predicates proved hierarchy, publication, and
+Aquinas-lineage rows empty. Protected PR #101 release evidence subsequently
+proved the exact current preview binding; dormant hierarchy/publication runtime
+activation remains absent.
 
 ## Source and materialization
 

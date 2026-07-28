@@ -655,11 +655,22 @@ Code readiness and operational readiness are deliberately separate:
   controls when a cursor is present, and retains `includeText: false` as the
   existing default. Any future workflow or prompt change remains a separate
   slice rather than another cursor implementation.
-- Production v6/local-only is deployed in PR #96. Preview is deployed and
-  audited on its normal 25-work D1 with the v7/discovery-only contract; CCEL
-  execution remains disabled before adapter, coordinator, or fetch. The
-  separately prepared production normal D1 is unbound, and its checked-in root
-  binding is a future-candidate selector rather than evidence of live traffic.
+- Production v6/local-only is deployed in PR #104 as deployment
+  `07bbd8aa-5c69-4b0c-a9df-c756f537bb97`, Worker
+  `09fa6471-eb50-480e-85b2-bc04b742dcb3` (#94), and D1
+  `theologai-production-20260728-normal-a`
+  (`a3d26bba-7adc-44b0-86d0-562b2ced6bd3`). Preview is deployed in PR #101 as
+  deployment `070b292b-0bae-400a-b983-3d72157b5a96`, Worker
+  `bd722b69-2e2c-4d8d-b42b-617e8caba13d` (#130), and D1
+  `theologai-preview-20260728-hierarchy-a`
+  (`51890e12-1c3f-421f-b661-9a5ea9637e43`) with the v7/discovery-only
+  contract; CCEL execution remains disabled before adapter, coordinator, or
+  fetch. The separately prepared schema-`0008` production candidate was
+  unbound when remote readiness and Transform-8/9 authority audits passed and
+  Transform-10 normal-corpus exclusion predicates proved hierarchy,
+  publication, and Aquinas-lineage rows empty. Its checked-in root target is a
+  future-candidate selector rather than evidence of a current live Worker
+  binding or hierarchy/publication activation.
   Prospective corpus work remains limited to
   explicit searched/read/deferred coverage semantics and future
   edition/provenance fields; it is not a rollout of evidence already present
@@ -700,15 +711,18 @@ Code readiness and operational readiness are deliberately separate:
 - Expand the local primary-source corpus with rights-reviewed, freely
   redistributable editions and explicit edition provenance. The deployed
   Transform 9 core-eight makes the checked-out local catalog and preview
-  collection 25 works, while live production remains on the PR #96 17-work
-  Transform 8 catalog pending its separately prepared candidate's protected
-  release. The integrated Transform 10 Aquinas hierarchy is local-only and
-  unpublished, with no catalog/runtime/MCP activation; normal candidate D1
-  corpora exclude its hierarchy and shared lineage. Any successor catalog
-  projection still requires separately reviewed transforms, D1 preparation,
-  and release gates. Do not mirror or republish CCEL transcriptions without
-  edition-specific rights.
-- PR #96 has deployed the prepared production D1 and passed the bounded
+  collection 25 works, and the current PR #104 normal D1 baseline is likewise
+  the 25-work production corpus: deployment
+  `07bbd8aa-5c69-4b0c-a9df-c756f537bb97`, Worker
+  `09fa6471-eb50-480e-85b2-bc04b742dcb3` (#94), and D1
+  `theologai-production-20260728-normal-a`
+  (`a3d26bba-7adc-44b0-86d0-562b2ced6bd3`). The integrated Transform 10 Aquinas
+  hierarchy is local-only and unpublished, with no catalog/runtime/MCP
+  activation; normal candidate D1 corpora exclude its hierarchy and shared
+  lineage. Any successor catalog projection still requires separately reviewed
+  transforms, D1 preparation, and release gates. Do not mirror or republish
+  CCEL transcriptions without edition-specific rights.
+- PR #96 historically deployed a prepared production D1 and passed the bounded
   `original_language_study` v2 audit. Future original-language work for
   beginners and readers of Greek or Hebrew must preserve the existing UBS
   Hebrew v0.9.2 source boundary (PRs #75 and #79), rather than select another
