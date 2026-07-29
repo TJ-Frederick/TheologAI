@@ -287,8 +287,8 @@ This preparer does not change `wrangler.toml`, a Worker binding, deployment,
 or database inventory. It does mutate only the separately named, unbound
 production candidate corpus: migrations and deterministic seed files are
 applied there after the pristine-target guard passes. It never mutates the
-active/bound production corpus. The PR #101 candidate, now the live production
-baseline,
+active/bound production corpus. The PR #101 candidate, now the retained
+production rollback,
 `theologai-production-20260728-hierarchy-a`
 (`f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395`) was unbound when its one-use operation
 completed with 49/49 seed files, 1,627,474 rows, schema `0008`, corpus identity
@@ -299,11 +299,12 @@ and Aquinas-lineage rows empty. The preparer ran from the predecessor-bound
 revision. PR #101 subsequently merged as
 `e2d351a11fce9c2cb1f72add0bcf365332737f3c`, and protected production workflow
 `30401732957` proved the candidate binding before and after its black-box
-audits. The current production baseline is deployment
+audits. That PR #101 production assignment—deployment
 `71b76d24-bf5f-490e-adc4-31cf63fb046e`, Worker
 `bae58cd3-cad7-4663-879d-408accf061b0` (#96), and D1
 `theologai-production-20260728-hierarchy-a`
-(`f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395`). The retained PR #101 preview
+(`f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395`)—is now the matched rollback pair.
+The retained PR #101 preview
 predecessor was deployment `070b292b-0bae-400a-b983-3d72157b5a96`, Worker
 `bd722b69-2e2c-4d8d-b42b-617e8caba13d` (#130), and D1
 `theologai-preview-20260728-hierarchy-a`
@@ -330,11 +331,11 @@ An authorized read-only audit rerun followed one transient Cloudflare
 authentication failure; migration and seed application were not retried,
 resumed, or repaired. Protected preview deployment
 `5e812152-355b-4a5f-a123-2485e89f1550` now serves Worker
-`06b9a603-8339-42b6-a246-ef9238563043` (#140) with that exact D1; production
-remains unchanged.
+`06b9a603-8339-42b6-a246-ef9238563043` (#140) with that exact D1; this preview
+assignment remained unchanged during the later PR #108 production release.
 
-The checked-in root production binding now selects the separately prepared,
-unbound Transform-11 candidate
+The checked-in root production binding selected the separately prepared,
+initially unbound Transform-11 candidate
 `theologai-production-20260729-transform11-a`
 (`53211f50-a893-4b4c-be1e-bc625a595dc7`). It was created once in ENAM from
 merge `501ae7840a71ceb589dc3b1ae9863aef83e3586f`, exact tree
@@ -343,16 +344,15 @@ merge `501ae7840a71ceb589dc3b1ae9863aef83e3586f`, exact tree
 `29a4a7faec2a960f06bfc026a319df8c08b495bb7ad82831fb62d3a3586643a4`.
 Primary readiness, Transform-8 authority (`1/12/12` pages), and complete
 Transform-11 source-pack authority (`1/1/1/1/1/1/133/17` pages) passed. Do not
-retry, resume, repair, re-seed, or directly mutate this prepared candidate. Its
-single intended binding is the protected deployment after that deployment
-re-proves the exact readiness-tested assignment and completes its audits. The
-checked-in name/UUID pair is a release target, not a live binding claim:
-production remains on Worker `bae58cd3-cad7-4663-879d-408accf061b0`, deployment
-`71b76d24-bf5f-490e-adc4-31cf63fb046e`, and D1
-`theologai-production-20260728-hierarchy-a`
-(`f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395`) until the protected release proves
-the new assignment and audits. Retain the latter matched Worker/D1 pair for
-rollback.
+retry, resume, repair, re-seed, or directly mutate this prepared database.
+Protected workflow `30496350408` later deployed merge
+`8da99fd0a161b90a4bd90ab29bde1abf796b3bf6` as deployment
+`3d7489d9-7b48-4ad0-bdc6-95ffbda53bd8`, Worker
+`291f3292-3fa9-44fc-bf6f-b68fd2f4cef6` (#98), bound to that exact D1.
+Historical core passed 8/8, Transform-11 spine passed 10/10,
+original-language passed 11/11, primary-source edge stabilization matched on
+attempt 4 and remained stable, and independent post-release review returned
+`SHIP`. Retain the PR #101 matched Worker/D1 pair above for rollback.
 
 Approved deploy jobs perform the last compatibility check read-only against
 the candidate name resolved from the checked-in name/UUID pair:

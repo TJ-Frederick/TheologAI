@@ -170,19 +170,18 @@ describe('published project contract', () => {
     expect(`${developerGuide}\n${confessionSkill}`).not.toMatch(/18 historical documents/i);
   });
 
-  it('keeps current Transform 11 preview and PR #101 production release states distinct', async () => {
+  it('records the current Transform 11 preview and production release states', async () => {
     const [readme, operations, developerGuide] = await Promise.all([
       readProjectFile('README.md'),
       readProjectFile('docs/worker-operations.md'),
       readProjectFile('CLAUDE.md'),
     ]);
 
-    expect(readme).toContain('Preview v7/discovery-only currently serves the 35-work Transform-11\ncollection');
-    expect(readme).toContain('Production v6/local-only currently searches and retrieves the 25-work PR #101\ncollection');
+    expect(readme).toContain('Production v6/local-only and preview v7/discovery-only currently search and\nretrieve the 35-work Transform-11 collection');
     expect(operations).toContain('current preview Transform-11 / 35-work release');
-    expect(operations).toContain('Production remains on the PR #101 25-work D1');
-    expect(developerGuide).toContain('current preview 35-work catalog');
-    expect(developerGuide).toContain('Production\nremains on the 25-work PR #101 baseline');
+    expect(operations).toContain('Production is PR #108 merge');
+    expect(developerGuide).toContain('both deployed 35-work catalogs');
+    expect(developerGuide).toContain('PR #108 is the current production release record');
   });
 
   it('does not reintroduce retired scope claims', async () => {
@@ -202,7 +201,7 @@ describe('published project contract', () => {
     expect(readme).toMatch(/Both deployed environments do \*\*not\*\* currently fetch CCEL search\s+results or document bodies/);
     expect(readme).toContain('Production v6/local-only is deployed');
     expect(readme).toContain('preview runs the audited v7/discovery-only contract with CCEL execution disabled');
-    expect(readme).toMatch(/Preview serves the 35-work catalog; production remains on\s+the 25-work baseline/);
+    expect(readme).toMatch(/Preview and production now serve the 35-work\s+catalog/);
     expect(readme).toContain('35 locally indexed');
     expect(readme).toContain('18 reviewed source-pack editions');
     expect(readme).toContain('The integrated Transform 10 candidate is local-only and unpublished');
@@ -279,7 +278,7 @@ describe('published project contract', () => {
     expect(operations).toContain('protected PR95 preview release deployed Cloudflare deployment');
     expect(operations).toContain('black-box audit passed with no P0-P3 findings');
     expect(operations).toContain('Transform-10 Aquinas\nhierarchy from all normal D1 corpora');
-    expect(operations).toContain('Production remains on the PR #101 25-work D1, which excludes\ninactive Aquinas');
+    expect(operations).toContain('CCEL execution remains disabled and Aquinas\nremains inactive');
     expect(operations).not.toContain('prepared but unbound preview\ncandidate retains that inactive authority data');
     expect(operations).toContain(`Its historical Cloudflare deployment\n\`${historicalDeployment}\` served Worker`);
     expect(operations).toContain('This historical release is neither\nthe current preview identity nor the immediate retained predecessor');
@@ -320,11 +319,11 @@ describe('published project contract', () => {
     expect(documents[4]).toContain('theologai-production-20260729-transform11-a');
     expect(documents[6]).toContain('30419373527');
     expect(documents[6]).toContain('30420256210');
-    expect(documents[6]).toContain('PR #101 production baseline remains unchanged');
-    expect(documents[5]).toContain('Production remains unchanged');
+    expect(documents[6]).toContain('Production was unchanged by that preview release');
+    expect(documents[5]).toContain('preview assignment\nremained unchanged during the PR #108 production release');
   });
 
-  it('documents the completed PR #101 production cutover without implying hierarchy activation', async () => {
+  it('documents the completed PR #108 Transform 11 production cutover and rollback', async () => {
     const [readme, dataWorkflow, catalogScope, reconciliation, operations, roadmap] = await Promise.all([
       readProjectFile('README.md'),
       readProjectFile('docs/D1-DATA-WORKFLOW.md'),
@@ -333,37 +332,52 @@ describe('published project contract', () => {
       readProjectFile('docs/worker-operations.md'),
       readProjectFile('docs/ROADMAP.md'),
     ]);
-    const preparedCandidateD1 = 'theologai-production-20260729-transform11-a';
-    const preparedCandidateD1Id = '53211f50-a893-4b4c-be1e-bc625a595dc7';
     const liveProduction = {
+      deployment: '3d7489d9-7b48-4ad0-bdc6-95ffbda53bd8',
+      worker: '291f3292-3fa9-44fc-bf6f-b68fd2f4cef6',
+      d1: 'theologai-production-20260729-transform11-a',
+      d1Id: '53211f50-a893-4b4c-be1e-bc625a595dc7',
+    };
+    const rollbackProduction = {
       deployment: '71b76d24-bf5f-490e-adc4-31cf63fb046e',
       worker: 'bae58cd3-cad7-4663-879d-408accf061b0',
       d1: 'theologai-production-20260728-hierarchy-a',
       d1Id: 'f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395',
     };
     const livePreview = {
-      deployment: '070b292b-0bae-400a-b983-3d72157b5a96',
-      worker: 'bd722b69-2e2c-4d8d-b42b-617e8caba13d',
-      d1: 'theologai-preview-20260728-hierarchy-a',
-      d1Id: '51890e12-1c3f-421f-b661-9a5ea9637e43',
+      deployment: '5e812152-355b-4a5f-a123-2485e89f1550',
+      worker: '06b9a603-8339-42b6-a246-ef9238563043',
+      d1: 'theologai-preview-20260728-transform11-a',
+      d1Id: '62b871a6-5b4d-4d9b-8f52-301f6c878f48',
     };
 
     for (const document of [readme, dataWorkflow, catalogScope, reconciliation, operations, roadmap]) {
-      expect(document).toContain(preparedCandidateD1);
-      expect(document).toContain(preparedCandidateD1Id);
-    }
-    for (const document of [readme, dataWorkflow, catalogScope, reconciliation, operations, roadmap]) {
       for (const value of Object.values(liveProduction)) expect(document).toContain(value);
+      for (const value of Object.values(rollbackProduction)) expect(document).toContain(value);
       for (const value of Object.values(livePreview)) expect(document).toContain(value);
+      expect(document).toContain('30496350408');
+      expect(document).toContain('8da99fd0a161b90a4bd90ab29bde1abf796b3bf6');
     }
-    expect(reconciliation).toContain('completed PR #101 protected production cutover');
-    expect(dataWorkflow).toContain('proved the candidate binding before and after its black-box');
-    expect(catalogScope).toContain('proved it as the sole active production');
-    expect(operations).toContain('proved the exact binding before and after its bounded black-box audits');
-    expect(roadmap).toContain('later proved that exact binding and passed the production');
+    expect(reconciliation).toContain('completed PR #108 protected production cutover');
+    expect(reconciliation).toContain('a59d9a062b2e6c7884de97fd97309878e1cbdc23');
+    expect(reconciliation).toContain('5665940735');
+    expect(reconciliation).toContain('8742223883');
+    expect(reconciliation).toContain('f7bb0275e53a9fe8801ecb3af68f9b74f5df44cab6f20c19cba9b1357d72afd5');
+    expect(reconciliation).toContain('b1ceb8f02ef210b5fb2212a9b212108411630efcc28ad3248a51c19c7bb0e1c0');
+    expect(reconciliation).toContain('604ce2dee6e14559a1a26c7d0d42e572469ce0e7cf4595be22f1085b9bc9ea05');
+    expect(reconciliation).toContain('e74999ea97a78a4fe4a6233be18b6a71cb03a9e2207f5b0fe34f71db09fafb0f');
+    expect(reconciliation).toContain('636b09fcd9bb41add56e99b001c41d7ad878594f2d77df8f7b41b51621c32c97');
+    expect(reconciliation).toContain('77da8832ab4139a769aae7d87716a3d581407cc2d036b6f7939e306d9b865de5');
+    expect(dataWorkflow).toContain('Historical core passed 8/8');
+    expect(catalogScope).toContain('Transform-11 spine passed 10/10');
+    expect(operations).toContain('primary-source edge stabilization matched on attempt 4');
+    expect(roadmap).toContain('independent post-release review returned `SHIP`');
+    expect(reconciliation).toContain('primary-source edge stabilization');
+    expect(reconciliation).toContain('Transform-11 historical-spine audit');
     for (const document of [readme, dataWorkflow, catalogScope, reconciliation, operations, roadmap]) {
       expect(document).not.toContain('Transform-8/9/10 authority');
-      expect(document.replace(/\s+/g, ' ')).toContain('Transform-10 normal-corpus exclusion predicates');
+      expect(document).toContain('Aquinas');
+      expect(document).toMatch(/inactive|local-only|exclusion/);
     }
   });
 

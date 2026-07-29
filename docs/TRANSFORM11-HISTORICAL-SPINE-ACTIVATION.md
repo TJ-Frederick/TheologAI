@@ -82,12 +82,8 @@ pagination/cursor audit also passed. Sanitized evidence hashes are
 `1b56d093b298f41a7845b6c328dbf63ade72ca8fdf8cf82bc68004defaa09a05` and
 `aedef2ffffe6d3de04a5c341a09f137df7abc0d90cee11929ee988fb90f95080`.
 
-Production did not change: it remains the PR #101 production baseline on
-Worker `bae58cd3-cad7-4663-879d-408accf061b0` (#96), deployment
-`71b76d24-bf5f-490e-adc4-31cf63fb046e`, and D1
-`theologai-production-20260728-hierarchy-a`
-(`f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395`). The checked-in root binding selects
-the separately prepared but unbound ENAM candidate
+Production did not change during the preview release. The checked-in root
+binding selected the separately prepared, initially unbound ENAM candidate
 `theologai-production-20260729-transform11-a`
 (`53211f50-a893-4b4c-be1e-bc625a595dc7`), prepared once from merge
 `501ae7840a71ceb589dc3b1ae9863aef83e3586f`, exact tree
@@ -95,10 +91,19 @@ the separately prepared but unbound ENAM candidate
 1,630,259-row seed with corpus identity
 `29a4a7faec2a960f06bfc026a319df8c08b495bb7ad82831fb62d3a3586643a4`.
 Primary readiness, Transform-8 authority (`1/12/12` pages), and full
-Transform-11 source-pack authority (`1/1/1/1/1/1/133/17` pages) passed. The
-configuration choice is not a deployment claim: preserve the current PR #101
-Worker/D1 pair for rollback until a protected release proves the new binding
-and completes production audits.
+Transform-11 source-pack authority (`1/1/1/1/1/1/133/17` pages) passed.
+Protected PR #108 workflow `30496350408` then deployed merge
+`8da99fd0a161b90a4bd90ab29bde1abf796b3bf6` as deployment
+`3d7489d9-7b48-4ad0-bdc6-95ffbda53bd8`, Worker
+`291f3292-3fa9-44fc-bf6f-b68fd2f4cef6` (#98), bound to that exact D1.
+Historical core passed 8/8, Transform-11 spine passed 10/10,
+original-language passed 11/11, primary-source edge stabilization matched on
+attempt 4 and remained stable, and independent post-release review returned
+`SHIP`. Preserve the former PR #101 assignment for rollback: Worker
+`bae58cd3-cad7-4663-879d-408accf061b0` (#96), deployment
+`71b76d24-bf5f-490e-adc4-31cf63fb046e`, and D1
+`theologai-production-20260728-hierarchy-a`
+(`f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395`).
 
 The exact ten-work audit added after this activation is documented in
 [Transform-11 Historical-Spine Release Audit](HISTORICAL-SPINE-RELEASE-AUDIT.md).
