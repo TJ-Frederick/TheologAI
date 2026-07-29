@@ -135,6 +135,18 @@ Aquinas-lineage rows empty. The protected release subsequently proved this
 exact binding; it is the current preview baseline and makes no production
 claim.
 
+PR #107's checked-in preview target is the separately prepared, currently
+unbound Transform-11 candidate `theologai-preview-20260728-transform11-a`
+(`62b871a6-5b4d-4d9b-8f52-301f6c878f48`). Its one-use schema-`0008` import
+applied the exact reviewed 49-file, 1,630,259-row seed with corpus identity
+`29a4a7faec2a960f06bfc026a319df8c08b495bb7ad82831fb62d3a3586643a4`.
+Primary readiness, Transform-8 authority (`1/12/12` pages), and the complete
+Transform-11 source-pack authority audit (`1/1/1/1/1/1/133/17` pages) passed.
+The checked-in declaration is not a live binding or deployment; preview remains
+on the PR #101 baseline until the protected workflow proves the exact cutover.
+Production is unchanged. Transform-10 hierarchy, publication, and Aquinas
+material remain excluded.
+
 PR #101's current production target is
 `theologai-production-20260728-hierarchy-a`
 (`f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395`). It was unbound when its reviewed

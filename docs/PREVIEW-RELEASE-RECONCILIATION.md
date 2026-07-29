@@ -49,6 +49,20 @@ the exact `candidateD1` binding as deployment
 the checked-in target alone would not establish it or activate the dormant
 hierarchy/publication runtime. Its protected release evidence is authoritative.
 
+PR #107's checked-in preview target is instead the unbound Transform-11
+candidate `theologai-preview-20260728-transform11-a`
+(`62b871a6-5b4d-4d9b-8f52-301f6c878f48`). Its one-use schema-`0008` import
+applied all 49 reviewed seed files and 1,630,259 rows with corpus identity
+`29a4a7faec2a960f06bfc026a319df8c08b495bb7ad82831fb62d3a3586643a4`.
+Primary readiness and Transform-8 authority passed during preparation. A
+transient Cloudflare authentication failure interrupted the first
+Transform-11 authority read; an explicitly authorized read-only rerun then
+passed primary readiness, Transform-8 (`1/12/12` pages), and the complete
+Transform-11 audit (`1/1/1/1/1/1/133/17` pages). No seed, migration, repair, or
+resume was repeated. This record neither binds nor deploys the candidate; the
+PR #101 deployment above remains live until a protected release proves this
+exact candidate binding. Production remains unchanged.
+
 The candidate-binding observation is written before the strict gate and is uploaded through `always()` handling. It contains only version/deployment IDs, predecessor/active/candidate D1 IDs, the `d1Changed` value, and boolean configuration/binding verdicts; it excludes raw Wrangler JSON, headers, requests, sessions, and secrets. The final post-mutation observation is likewise retained and hashed even if the strict candidate-binding gate blocks both audits.
 
 This path does not automatically roll back, deploy, bind, delete, or mutate data. It is safe to run after an audit failure, job cancellation, or withdrawn `deploy-preview` authorization because it makes only read-only control-plane observations. It intentionally performs no cleanup.

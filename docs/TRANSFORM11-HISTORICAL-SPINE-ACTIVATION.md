@@ -44,8 +44,13 @@ quality, compatibility, and database headroom.
 
 ## Release sequence
 
-The checked-out activation does not itself change Cloudflare. A fresh,
-unbound preview D1 must be created from this exact reviewed seed, pass remote
-readiness and authority audits, then be bound and deployed through the protected
-preview workflow. Production remains on the PR #101 baseline until a separate
-production authorization.
+The activation implementation did not itself change Cloudflare. The fresh ENAM
+candidate `theologai-preview-20260728-transform11-a`
+(`62b871a6-5b4d-4d9b-8f52-301f6c878f48`) was then created unbound and imported
+once from the exact 49-file, 1,630,259-row reviewed seed with corpus identity
+`29a4a7faec2a960f06bfc026a319df8c08b495bb7ad82831fb62d3a3586643a4`.
+Primary readiness, Transform-8 authority (`1/12/12` pages), and complete
+Transform-11 source-pack authority (`1/1/1/1/1/1/133/17` pages) passed. The
+checked-in preview target does not bind or deploy it; the protected workflow
+must prove that exact cutover before black-box audit. Production remains on the
+PR #101 baseline until a separate production authorization.

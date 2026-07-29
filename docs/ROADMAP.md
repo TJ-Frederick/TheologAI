@@ -717,8 +717,14 @@ Code readiness and operational readiness are deliberately separate:
   (17 legacy plus 18 reviewed editions), 43 source artifacts, and 1,057
   reviewed sectioned sections. It adds no migration, hierarchy, publication,
   alias, CCEL, or MCP-tool change. The deployed PR #101 preview and production
-  baselines remain the 25-work corpus until separately protected releases:
-  production deployment
+  baselines remain the 25-work corpus until separately protected releases.
+  PR #107's checked-in preview target is the prepared, unbound ENAM candidate
+  `theologai-preview-20260728-transform11-a`
+  (`62b871a6-5b4d-4d9b-8f52-301f6c878f48`): its exact 49-file,
+  1,630,259-row seed, readiness, Transform-8 authority, and complete
+  Transform-11 authority audit passed. A checked-in target does not establish
+  live traffic; protected preview deployment and black-box audit remain
+  pending. The current production deployment is
   `71b76d24-bf5f-490e-adc4-31cf63fb046e`, Worker
   `bae58cd3-cad7-4663-879d-408accf061b0` (#96), and D1
   `theologai-production-20260728-hierarchy-a`

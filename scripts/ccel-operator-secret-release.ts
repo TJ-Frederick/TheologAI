@@ -8,8 +8,8 @@ export const PRODUCTION_WORKER = 'theologai';
 export const PRODUCTION_D1_NAME = 'theologai-production-20260728-hierarchy-a';
 export const PRODUCTION_D1_ID = 'f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395';
 /** The reviewed, prepared preview candidate; config alone does not bind it. */
-export const PREVIEW_D1_NAME = 'theologai-preview-20260728-hierarchy-a';
-export const PREVIEW_D1_ID = '51890e12-1c3f-421f-b661-9a5ea9637e43';
+export const PREVIEW_D1_NAME = 'theologai-preview-20260728-transform11-a';
+export const PREVIEW_D1_ID = '62b871a6-5b4d-4d9b-8f52-301f6c878f48';
 export const STAGE_CONFIRMATION = 'I AUTHORIZE PROVISIONING THE PROTECTED CCEL OPERATOR SECRET';
 export const PROMOTE_CONFIRMATION = 'PROMOTE THEOLOGAI CCEL OPERATOR SECRET';
 export const ROLLBACK_CONFIRMATION = 'ROLL BACK THEOLOGAI TO THE EXACT SECRETLESS BASELINE';

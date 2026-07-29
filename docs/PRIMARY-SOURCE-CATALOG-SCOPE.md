@@ -60,6 +60,17 @@ Aquinas-lineage rows empty. Protected PR #101 release evidence subsequently
 proved the exact current preview binding; dormant hierarchy/publication runtime
 activation remains absent.
 
+PR #107's checked-in preview target is now the separately prepared Transform-11
+candidate `theologai-preview-20260728-transform11-a`
+(`62b871a6-5b4d-4d9b-8f52-301f6c878f48`). Its exact reviewed 49-file,
+1,630,259-row seed has corpus identity
+`29a4a7faec2a960f06bfc026a319df8c08b495bb7ad82831fb62d3a3586643a4`.
+Primary readiness, Transform-8 authority (`1/12/12` pages), and complete
+Transform-11 source-pack authority (`1/1/1/1/1/1/133/17` pages) passed. The
+candidate remains unbound: preview still serves the PR #101 25-work baseline,
+production is unchanged, and Transform-10 hierarchy/publication/Aquinas rows
+remain excluded.
+
 ## Source and materialization
 
 - `data/historical-document-catalog.json` is the reviewed machine-readable

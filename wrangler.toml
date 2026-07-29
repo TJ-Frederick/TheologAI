@@ -112,11 +112,11 @@ script_name = "theologai-ccel-coordinator"
 
 [[env.preview.d1_databases]]
 binding = "THEOLOGAI_DB"
-# PR #101's prepared candidate. This checked-in declaration is not a remote
+# PR #107's prepared Transform-11 candidate. This checked-in declaration is not a remote
 # binding change; protected preview deployment must prove the active Worker
 # binds this exact D1 before it may run release audits.
-database_name = "theologai-preview-20260728-hierarchy-a"
-database_id = "51890e12-1c3f-421f-b661-9a5ea9637e43"
+database_name = "theologai-preview-20260728-transform11-a"
+database_id = "62b871a6-5b4d-4d9b-8f52-301f6c878f48"
 migrations_dir = "migrations"
 
 # Preview uses a distinct namespace so load tests and PR validation cannot

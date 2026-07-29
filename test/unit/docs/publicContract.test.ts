@@ -276,6 +276,32 @@ describe('published project contract', () => {
     expect(operations).toContain('Protected release evidence proves\nthis exact current binding');
   });
 
+  it('records the prepared Transform 11 preview candidate without claiming a live cutover', async () => {
+    const documents = await Promise.all([
+      readProjectFile('README.md'),
+      readProjectFile('docs/D1-DATA-WORKFLOW.md'),
+      readProjectFile('docs/PREVIEW-RELEASE-RECONCILIATION.md'),
+      readProjectFile('docs/PRIMARY-SOURCE-CATALOG-SCOPE.md'),
+      readProjectFile('docs/TRANSFORM11-HISTORICAL-SPINE-ACTIVATION.md'),
+      readProjectFile('docs/worker-operations.md'),
+      readProjectFile('docs/ROADMAP.md'),
+    ]);
+    const candidateName = 'theologai-preview-20260728-transform11-a';
+    const candidateId = '62b871a6-5b4d-4d9b-8f52-301f6c878f48';
+    const corpusIdentity = '29a4a7faec2a960f06bfc026a319df8c08b495bb7ad82831fb62d3a3586643a4';
+
+    for (const document of documents) {
+      expect(document).toContain(candidateName);
+      expect(document).toContain(candidateId);
+      expect(document).toContain('unbound');
+    }
+    for (const document of documents.slice(0, 6)) expect(document).toContain(corpusIdentity);
+    expect(documents[2]).toContain('No seed, migration, repair, or\nresume was repeated');
+    expect(documents[4]).toContain('does not bind or deploy it');
+    expect(documents[4]).toContain('must prove that exact cutover');
+    expect(documents[5]).toContain('production remains unchanged');
+  });
+
   it('documents the completed PR #101 production cutover without implying hierarchy activation', async () => {
     const [readme, dataWorkflow, catalogScope, reconciliation, operations, roadmap] = await Promise.all([
       readProjectFile('README.md'),
