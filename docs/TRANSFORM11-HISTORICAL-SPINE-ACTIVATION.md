@@ -54,3 +54,16 @@ Transform-11 source-pack authority (`1/1/1/1/1/1/133/17` pages) passed. The
 checked-in preview target does not bind or deploy it; the protected workflow
 must prove that exact cutover before black-box audit. Production remains on the
 PR #101 baseline until a separate production authorization.
+
+The first protected PR #107 attempt (`30418227263`) proved the candidate
+binding and passed the original-language audit, but the zero-retry historical
+audit reached one edge whose `resources/list` inventory had not yet converged
+and failed before reading historical bodies. A subsequent bounded read-only
+diagnostic observed the exact 38-resource identity, and the complete fixed
+historical audit then passed without an application or D1 repair. The release
+gate now stabilizes both the primary-source tool schemas and a hash of the
+exact checked-out resource URI inventory before either protected audit. It
+records only hashes and booleans, retains bounded attempts, and does not turn
+an audit into a retry loop. A fresh protected run must still prove the repair
+head, exact candidate binding, and both zero-retry audits; its workflow evidence
+is authoritative.

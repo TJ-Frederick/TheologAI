@@ -439,8 +439,8 @@ jobs:
       # This is deliberately a post-deploy release gate, not an ordinary PR
       # check: the runner is pinned to the canonical preview custom domain.
       # The deployment control plane can settle before every edge has the new
-      # tool registration. This bounded, explicit probe is not an audit retry.
-      - name: Stabilize preview primary-source contract at edge (read-only)
+      # tool and resource registrations. This bounded, explicit probe is not an audit retry.
+      - name: Stabilize preview release registrations at edge (read-only)
         id: preview-primary-source-edge-stabilization
         if: ${{ steps.preview-worker-candidate-cutover.outcome == 'success' }}
         continue-on-error: true
@@ -459,7 +459,7 @@ jobs:
 
       # Keep the failed probe observable above, then fail closed before either
       # fixed audit can start. The audits themselves retain zero retries.
-      - name: Require stable preview primary-source contract before audits
+      - name: Require stable preview release registrations before audits
         id: preview-primary-source-edge-stabilization-gate
         if: ${{ always() && steps.preview-worker-candidate-cutover.outcome == 'success' }}
         run: test "${{ steps.preview-primary-source-edge-stabilization.outcome }}" = success

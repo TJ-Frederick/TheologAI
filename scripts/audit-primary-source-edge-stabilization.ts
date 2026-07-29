@@ -2,9 +2,10 @@
  * Fixed-endpoint, bounded pre-audit edge-stabilization gate.
  *
  * A Workers deployment can be authoritative in the control plane a few
- * seconds before every edge observes the new tool registration. This gate is
- * intentionally separate from either protected audit: it makes its limited
- * attempts explicit, records only schema hashes, and never retries an audit.
+ * seconds before every edge observes the new tool and resource registrations.
+ * This gate is intentionally separate from either protected audit: it makes
+ * its limited attempts explicit, records only schema/identity hashes, and
+ * never retries an audit.
  */
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -14,6 +15,7 @@ import {
   canonicalJson,
   PREVIEW_PROFILE,
   PRODUCTION_PROFILE,
+  HISTORICAL_CORE_EXPECTED_RESOURCE_URIS,
   type HistoricalCoreAuditProfile,
 } from './audit-historical-core-preview.js';
 
@@ -45,6 +47,8 @@ export type StabilizationAttempt = Readonly<{
     outputSchemaSha256?: string;
     annotationsMatch?: boolean;
     initializeIdentityMatch?: boolean;
+    resourceUrisSha256?: string;
+    resourcesMatch?: boolean;
   }>;
 }>;
 export type StabilizationEvidence = Readonly<{
@@ -56,6 +60,7 @@ export type StabilizationEvidence = Readonly<{
     inputSchemaSha256: string;
     outputSchemaSha256: string;
     openWorldHint: boolean;
+    resourceUrisSha256: string;
   }>;
   bounds: Readonly<{
     maximumAttempts: number;
@@ -175,6 +180,8 @@ type ProbeResult = Readonly<{
   inputSchemaSha256: string;
   outputSchemaSha256: string;
   annotationsMatch: boolean;
+  resourceUrisSha256: string;
+  resourcesMatch: boolean;
   matched: boolean;
 }> | Readonly<{
   terminalFailure: true;
@@ -197,7 +204,7 @@ async function probeContract(
   let requestCount = 0;
   const post = async (payload: ObjectRecord, label: string, notification = false): Promise<ObjectRecord | undefined> => {
     requestCount += 1;
-    assert(requestCount <= 3, 'edge-stabilization request inventory drifted');
+    assert(requestCount <= 4, 'edge-stabilization request inventory drifted');
     const remaining = MAX_DURATION_MS - (now() - startedAt);
     assert(remaining > 0, `edge-stabilization exceeded its ${MAX_DURATION_MS}-ms total deadline during ${label}`);
     const controller = new AbortController();
@@ -276,20 +283,37 @@ async function probeContract(
     const annotationsMatch = annotations?.readOnlyHint === true && annotations.destructiveHint === false && annotations.idempotentHint === true
       && annotations.openWorldHint === profile.primarySource.openWorldHint
       && JSON.stringify(Object.keys(annotations).sort()) === JSON.stringify(['readOnlyHint', 'destructiveHint', 'idempotentHint', 'openWorldHint'].sort());
+    const resourcesResponse = await post({ jsonrpc: '2.0', id: id++, method: 'resources/list' }, 'resources/list');
+    assert(resourcesResponse !== undefined, 'resources/list must return a response');
+    const resources = array(result(resourcesResponse, 'resources/list').resources, 'resources/list.resources').map(object);
+    const resourceUris = resources.map(resource => {
+      assert(typeof resource?.uri === 'string', 'resource URI missing');
+      return resource.uri;
+    }).sort();
+    const resourceUrisSha256 = sha256(canonicalJson(resourceUris));
+    const expectedResourceUrisSha256 = sha256(canonicalJson(HISTORICAL_CORE_EXPECTED_RESOURCE_URIS));
+    const resourcesMatch = resourceUris.length === HISTORICAL_CORE_EXPECTED_RESOURCE_URIS.length
+      && new Set(resourceUris).size === resourceUris.length
+      && canonicalJson(resourceUris) === canonicalJson(HISTORICAL_CORE_EXPECTED_RESOURCE_URIS)
+      && resourceUrisSha256 === expectedResourceUrisSha256;
     const matched = initializeIdentityMatch
       && canonicalJson(inputSchema) === canonicalJson(profile.primarySource.inputSchema)
       && canonicalJson(outputSchema) === canonicalJson(profile.primarySource.outputSchema)
       && inputSchemaSha256 === profile.primarySource.inputSchemaSha256
       && outputSchemaSha256 === profile.primarySource.outputSchemaSha256
-      && annotationsMatch;
-    return { requestCount, responseBytes, initializeIdentityMatch, inputSchemaSha256, outputSchemaSha256, annotationsMatch, matched };
+      && annotationsMatch
+      && resourcesMatch;
+    return {
+      requestCount, responseBytes, initializeIdentityMatch, inputSchemaSha256, outputSchemaSha256,
+      annotationsMatch, resourceUrisSha256, resourcesMatch, matched,
+    };
   } catch {
     return { terminalFailure: true, requestCount, responseBytes };
   }
 }
 
 /**
- * Probe only the edge convergence boundary. Its attempts are intentionally
+ * Probe only the tool/resource edge convergence boundary. Its attempts are intentionally
  * recorded and bounded; successful protected audits still have zero retries.
  */
 export async function runPrimarySourceEdgeStabilization(
@@ -322,6 +346,7 @@ export async function runPrimarySourceEdgeStabilization(
         observed: {
           inputSchemaSha256: probe.inputSchemaSha256, outputSchemaSha256: probe.outputSchemaSha256,
           annotationsMatch: probe.annotationsMatch, initializeIdentityMatch: probe.initializeIdentityMatch,
+          resourceUrisSha256: probe.resourceUrisSha256, resourcesMatch: probe.resourcesMatch,
         },
       };
       attempts.push(record);
@@ -348,6 +373,7 @@ function evidence(
     contract: {
       version: profile.primarySource.contractVersion, inputSchemaSha256: profile.primarySource.inputSchemaSha256,
       outputSchemaSha256: profile.primarySource.outputSchemaSha256, openWorldHint: profile.primarySource.openWorldHint,
+      resourceUrisSha256: sha256(canonicalJson(HISTORICAL_CORE_EXPECTED_RESOURCE_URIS)),
     },
     bounds: {
       maximumAttempts: MAX_ATTEMPTS, maximumDurationMs: MAX_DURATION_MS, retryDelayMs: RETRY_DELAY_MS,
@@ -381,13 +407,14 @@ export async function runPrimarySourceEdgeStabilizationCli(
   const evidence = await runPrimarySourceEdgeStabilization(profile, dependencies);
   await mkdir(dirname(output), { recursive: true });
   await writeFile(output, `${JSON.stringify(evidence, null, 2)}\n`, { encoding: 'utf8', flag: 'wx', mode: 0o600 });
-  assert(evidence.passed, `edge-stabilization did not observe the checked-out ${profile.label} primary-source contract within bounded attempts`);
+  assert(evidence.passed,
+    `edge-stabilization did not observe the checked-out ${profile.label} primary-source/resource contracts within bounded attempts`);
   return { output, evidence };
 }
 
 async function main(): Promise<void> {
   const { output, evidence } = await runPrimarySourceEdgeStabilizationCli(process.argv.slice(2), PREVIEW_PROFILE);
-  console.log(`PASS: preview primary-source contract stabilized on attempt ${evidence.matchedAttempt}; evidence: ${output}`);
+  console.log(`PASS: preview primary-source/resource contracts stabilized on attempt ${evidence.matchedAttempt}; evidence: ${output}`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

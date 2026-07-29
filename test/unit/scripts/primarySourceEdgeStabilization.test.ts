@@ -11,7 +11,12 @@ import {
   runPrimarySourceEdgeStabilization,
   runPrimarySourceEdgeStabilizationCli,
 } from '../../../scripts/audit-primary-source-edge-stabilization.js';
-import { PREVIEW_PROFILE, PRODUCTION_PROFILE, type HistoricalCoreAuditProfile } from '../../../scripts/audit-historical-core-preview.js';
+import {
+  HISTORICAL_CORE_EXPECTED_RESOURCE_URIS,
+  PREVIEW_PROFILE,
+  PRODUCTION_PROFILE,
+  type HistoricalCoreAuditProfile,
+} from '../../../scripts/audit-historical-core-preview.js';
 
 const root = new URL('../../../', import.meta.url);
 
@@ -44,6 +49,14 @@ function fetchFor(profile: HistoricalCoreAuditProfile, staleAttempts = 0, paddin
         },
       }] } }, 200, paddingBytes);
     }
+    if (request.method === 'resources/list') {
+      const uris = toolsLists <= staleAttempts
+        ? HISTORICAL_CORE_EXPECTED_RESOURCE_URIS.slice(0, -1)
+        : HISTORICAL_CORE_EXPECTED_RESOURCE_URIS;
+      return json({ jsonrpc: '2.0', id: request.id, result: {
+        resources: uris.map(uri => ({ uri })),
+      } }, 200, paddingBytes);
+    }
     throw new Error('unexpected fixed edge-stabilization request');
   }) as typeof fetch;
 }
@@ -63,12 +76,19 @@ describe('primary-source edge-stabilization gate', () => {
     });
     expect(evidence).toMatchObject({
       audit: 'primary-source-edge-stabilization-preview', passed: true, matchedAttempt: 2,
-      contract: { version: '7', inputSchemaSha256: PREVIEW_PROFILE.primarySource.inputSchemaSha256 },
+      contract: {
+        version: '7', inputSchemaSha256: PREVIEW_PROFILE.primarySource.inputSchemaSha256,
+        resourceUrisSha256: expect.stringMatching(/^[0-9a-f]{64}$/),
+      },
       bounds: { auditRetries: 0, maximumAttempts: 6 },
     });
     expect(evidence.attempts).toHaveLength(2);
-    expect(evidence.attempts[0]).toMatchObject({ outcome: 'contract_mismatch', requestCount: 3 });
-    expect(evidence.attempts[1]).toMatchObject({ outcome: 'matched', requestCount: 3 });
+    expect(evidence.attempts[0]).toMatchObject({
+      outcome: 'contract_mismatch', requestCount: 4, observed: { resourcesMatch: false },
+    });
+    expect(evidence.attempts[1]).toMatchObject({
+      outcome: 'matched', requestCount: 4, observed: { resourcesMatch: true },
+    });
     expect(JSON.stringify(evidence)).not.toContain('providers');
   });
 
@@ -89,7 +109,7 @@ describe('primary-source edge-stabilization gate', () => {
     try {
       await expect(runPrimarySourceEdgeStabilizationCli(['--output', output], PREVIEW_PROFILE, {
         fetchImpl: fetchFor(PREVIEW_PROFILE, MAX_ATTEMPTS), sleep: async () => undefined,
-      })).rejects.toThrow('did not observe the checked-out preview primary-source contract');
+      })).rejects.toThrow('did not observe the checked-out preview primary-source/resource contracts');
       const evidence = JSON.parse(await readFile(output, 'utf8')) as RecordValue;
       expect(evidence).toMatchObject({ passed: false, matchedAttempt: null });
       expect(evidence.attempts).toHaveLength(MAX_ATTEMPTS);
@@ -143,9 +163,9 @@ describe('primary-source edge-stabilization gate', () => {
 
   it('wires explicit preview evidence and a strict gate before either protected preview audit', async () => {
     const workflow = await readFile(new URL('.github/workflows/pr.yml', root), 'utf8');
-    const stabilize = workflow.indexOf('Stabilize preview primary-source contract at edge (read-only)');
+    const stabilize = workflow.indexOf('Stabilize preview release registrations at edge (read-only)');
     const upload = workflow.indexOf('Upload preview edge-stabilization evidence');
-    const gate = workflow.indexOf('Require stable preview primary-source contract before audits');
+    const gate = workflow.indexOf('Require stable preview release registrations before audits');
     const language = workflow.indexOf('Audit original-language v2 contract on preview');
     const historical = workflow.indexOf('Audit Transform-9 historical core contract on preview');
     expect(stabilize).toBeGreaterThan(-1);

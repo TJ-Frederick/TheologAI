@@ -195,6 +195,10 @@ const EXPECTED_FIXTURE = {
 } as const;
 
 export type AuditFixture = typeof EXPECTED_FIXTURE;
+/** Exact release resource identity shared with the pre-audit edge-convergence gate. */
+export const HISTORICAL_CORE_EXPECTED_RESOURCE_URIS = Object.freeze(
+  expectedResourceUris(EXPECTED_FIXTURE),
+);
 type FetchLike = typeof fetch;
 type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 type ObjectRecord = Record<string, unknown>;
@@ -541,7 +545,8 @@ function expectedResourceUris(fixture: AuditFixture): string[] {
 
 function assertResources(message: ObjectRecord, fixture: AuditFixture): void {
   const resources = array(result(message, 'resources/list').resources, 'resources/list.resources').map(object);
-  assert(resources.length === 38 && resources.every(Boolean), 'resources/list must expose exactly 38 resources');
+  assert(resources.length === HISTORICAL_CORE_EXPECTED_RESOURCE_URIS.length && resources.every(Boolean),
+    `resources/list must expose exactly ${HISTORICAL_CORE_EXPECTED_RESOURCE_URIS.length} resources`);
   assert(new Set(resources.map(resource => resource!.uri)).size === resources.length, 'resources/list resource URIs are not unique');
   assert(JSON.stringify(resources.map(resource => requireString(resource!.uri, 'resource URI')).sort()) === JSON.stringify(expectedResourceUris(fixture)), 'resources/list exact resource identity drifted');
   for (const resource of resources) {

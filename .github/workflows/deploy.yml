@@ -306,8 +306,9 @@ jobs:
           if-no-files-found: error
 
       # This is a bounded edge-convergence check, not a retry of either
-      # protected audit. It proves the exact production v6 contract first.
-      - name: Stabilize production primary-source contract at edge (read-only)
+      # protected audit. It proves the exact production v6 tool contract and
+      # checked-out resource identity first.
+      - name: Stabilize production release registrations at edge (read-only)
         id: production-primary-source-edge-stabilization
         if: ${{ steps.production-worker-candidate-cutover.outcome == 'success' }}
         continue-on-error: true
@@ -324,7 +325,7 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
-      - name: Require stable production primary-source contract before audits
+      - name: Require stable production release registrations before audits
         id: production-primary-source-edge-stabilization-gate
         if: ${{ always() && steps.production-worker-candidate-cutover.outcome == 'success' }}
         run: test "${{ steps.production-primary-source-edge-stabilization.outcome }}" = success
