@@ -157,6 +157,24 @@ function resourceText(contents: Array<{ text?: string }>): string {
   return contents.map(item => item.text ?? '').join('\n');
 }
 
+function providerNeutralPrimarySourceArguments(inputSchema: object): Record<string, unknown> {
+  const properties = (inputSchema as {
+    properties?: { queries?: { items?: { properties?: Record<string, unknown> } } };
+  }).properties?.queries?.items?.properties;
+  assert(properties, 'primary_source_search must advertise query properties');
+  const query = {
+    id: 'node-e2e-topic',
+    text: 'justification',
+    match: 'all_terms',
+    selection: 'work_diversity',
+    limit: 2,
+    ...(Object.hasOwn(properties, 'searchDepth')
+      ? { searchDepth: 'standard' }
+      : { providers: ['local'] }),
+  };
+  return { queries: [query] };
+}
+
 async function main(): Promise<void> {
   const nodeMajor = Number(process.versions.node.split('.')[0]);
   assert.equal(nodeMajor, 22, `Node HTTP E2E requires Node 22; received ${process.version}. Run with .nvmrc.`);
@@ -212,6 +230,8 @@ async function main(): Promise<void> {
 
     const tools = await withTimeout(client.listTools(), MCP_TIMEOUT_MS, 'tools/list');
     assert(tools.tools.some(tool => tool.name === 'original_language_lookup'));
+    const primarySourceSearch = tools.tools.find(tool => tool.name === 'primary_source_search');
+    assert(primarySourceSearch, 'tools/list must include primary_source_search');
     const resources = await withTimeout(client.listResources(), MCP_TIMEOUT_MS, 'resources/list');
     assert(resources.resources.some(resource => resource.uri === 'theologai://translations'));
     const prompts = await withTimeout(client.listPrompts(), MCP_TIMEOUT_MS, 'prompts/list');
@@ -238,6 +258,26 @@ async function main(): Promise<void> {
     const lookupText = resultText(lookup.content as Array<{ type: string; text?: string }>);
     assert.match(lookupText, /G25/);
     assert.match(lookupText, /agap/i);
+
+    const primarySources = await withTimeout(
+      client.callTool({
+        name: 'primary_source_search',
+        arguments: providerNeutralPrimarySourceArguments(primarySourceSearch.inputSchema),
+      }),
+      MCP_TIMEOUT_MS,
+      'provider-neutral primary_source_search',
+    );
+    assert.equal(primarySources.isError, undefined);
+    const primaryStructured = primarySources.structuredContent as {
+      schemaVersion?: string;
+      queries?: Array<{ providers?: Array<{ provider?: string }> }>;
+    } | undefined;
+    assert(primaryStructured?.schemaVersion === '6' || primaryStructured?.schemaVersion === '7');
+    assert.deepEqual(
+      primaryStructured.queries?.flatMap(query => query.providers ?? []).map(provider => provider.provider),
+      ['local'],
+      'provider-neutral local search must retain one local provider group',
+    );
 
     console.error('[node-http-e2e] Compiled Node HTTP MCP server passed process-boundary checks.');
   } catch (error) {
