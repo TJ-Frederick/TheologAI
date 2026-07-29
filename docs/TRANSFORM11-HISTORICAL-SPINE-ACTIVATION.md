@@ -63,7 +63,8 @@ diagnostic observed the exact 38-resource identity, and the complete fixed
 historical audit then passed without an application or D1 repair. The release
 gate now stabilizes both the primary-source tool schemas and a hash of the
 exact checked-out resource URI inventory before either protected audit. It
-records only hashes and booleans, retains bounded attempts, and does not turn
-an audit into a retry loop. A fresh protected run must still prove the repair
-head, exact candidate binding, and both zero-retry audits; its workflow evidence
-is authoritative.
+requires two consecutive matching probes separated by the fixed four-second
+convergence delay, records only hashes and booleans, retains bounded attempts,
+and does not turn an audit into a retry loop. A fresh protected run must still
+prove the repair head, exact candidate binding, and both zero-retry audits; its
+workflow evidence is authoritative.

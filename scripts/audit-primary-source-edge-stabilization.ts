@@ -24,6 +24,8 @@ const PROTOCOL_VERSION = '2025-11-25';
 export const MAX_ATTEMPTS = 6;
 export const MAX_DURATION_MS = 55_000;
 export const RETRY_DELAY_MS = 4_000;
+/** A single matching edge can be transient during propagation; two delayed matches prove stabilization. */
+export const REQUIRED_CONSECUTIVE_MATCHES = 2;
 export const MAX_REQUEST_DURATION_MS = 10_000;
 /** tools/list is the largest stabilization response; retain the same strict per-response ceiling as the protected audit. */
 export const MAX_RESPONSE_BYTES = 256 * 1024;
@@ -69,6 +71,7 @@ export type StabilizationEvidence = Readonly<{
     maximumRequestDurationMs: number;
     maximumResponseBytes: number;
     maximumAggregateResponseBytes: number;
+    requiredConsecutiveMatchingProbes: 2;
     auditRetries: 0;
   }>;
   durationMs: number;
@@ -326,6 +329,7 @@ export async function runPrimarySourceEdgeStabilization(
   const startedAt = now();
   const attempts: StabilizationAttempt[] = [];
   const responseBudget: ResponseBudget = { aggregateResponseBytes: 0 };
+  let consecutiveMatches = 0;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     const elapsedMs = now() - startedAt;
     if (elapsedMs >= MAX_DURATION_MS) break;
@@ -350,10 +354,18 @@ export async function runPrimarySourceEdgeStabilization(
         },
       };
       attempts.push(record);
-      console.log(`edge-stabilization ${profile.label} attempt ${attempt}/${MAX_ATTEMPTS}: ${record.outcome}`);
-      if (probe.matched) return evidence(profile, startedAt, now, responseBudget.aggregateResponseBytes, attempts, attempt);
+      consecutiveMatches = probe.matched ? consecutiveMatches + 1 : 0;
+      console.log(`edge-stabilization ${profile.label} attempt ${attempt}/${MAX_ATTEMPTS}: ${record.outcome}${probe.matched ? ` (${consecutiveMatches}/${REQUIRED_CONSECUTIVE_MATCHES})` : ''}`);
+      if (consecutiveMatches === REQUIRED_CONSECUTIVE_MATCHES) {
+        return evidence(profile, startedAt, now, responseBudget.aggregateResponseBytes, attempts, attempt);
+      }
     }
-    if (attempt < MAX_ATTEMPTS && now() - startedAt + RETRY_DELAY_MS < MAX_DURATION_MS) await sleep(RETRY_DELAY_MS);
+    if (attempt === MAX_ATTEMPTS) break;
+    // A second matching observation is meaningful only after the fixed
+    // convergence delay. Do not accept a back-to-back final probe just
+    // because the deadline leaves too little time to sleep first.
+    if (MAX_DURATION_MS - (now() - startedAt) <= RETRY_DELAY_MS) break;
+    await sleep(RETRY_DELAY_MS);
   }
   return evidence(profile, startedAt, now, responseBudget.aggregateResponseBytes, attempts, null);
 }
@@ -378,7 +390,9 @@ function evidence(
     bounds: {
       maximumAttempts: MAX_ATTEMPTS, maximumDurationMs: MAX_DURATION_MS, retryDelayMs: RETRY_DELAY_MS,
       maximumRequestDurationMs: MAX_REQUEST_DURATION_MS, maximumResponseBytes: MAX_RESPONSE_BYTES,
-      maximumAggregateResponseBytes: MAX_AGGREGATE_RESPONSE_BYTES, auditRetries: 0,
+      maximumAggregateResponseBytes: MAX_AGGREGATE_RESPONSE_BYTES,
+      requiredConsecutiveMatchingProbes: REQUIRED_CONSECUTIVE_MATCHES,
+      auditRetries: 0,
     },
     durationMs: now() - startedAt, aggregateResponseBytes, attempts, passed: matchedAttempt !== null, matchedAttempt,
   };
