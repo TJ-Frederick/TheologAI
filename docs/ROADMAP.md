@@ -655,8 +655,17 @@ Code readiness and operational readiness are deliberately separate:
   controls when a cursor is present, and retains `includeText: false` as the
   existing default. Any future workflow or prompt change remains a separate
   slice rather than another cursor implementation.
-- Production v6/local-only is deployed from PR #101 merge
-  `e2d351a11fce9c2cb1f72add0bcf365332737f3c` as deployment
+- Production v6/local-only is deployed from PR #108 merge
+  `8da99fd0a161b90a4bd90ab29bde1abf796b3bf6` by protected workflow
+  `30496350408` as deployment
+  `3d7489d9-7b48-4ad0-bdc6-95ffbda53bd8`, Worker
+  `291f3292-3fa9-44fc-bf6f-b68fd2f4cef6` (#98), and D1
+  `theologai-production-20260729-transform11-a`
+  (`53211f50-a893-4b4c-be1e-bc625a595dc7`). Historical core passed 8/8,
+  Transform-11 spine passed 10/10, original-language passed 11/11,
+  primary-source edge stabilization matched on attempt 4 and remained stable,
+  and the independent post-release review returned `SHIP`. The PR #101
+  production assignment is retained for rollback: deployment
   `71b76d24-bf5f-490e-adc4-31cf63fb046e`, Worker
   `bae58cd3-cad7-4663-879d-408accf061b0` (#96), and D1
   `theologai-production-20260728-hierarchy-a`
@@ -736,12 +745,9 @@ Code readiness and operational readiness are deliberately separate:
   `1b56d093b298f41a7845b6c328dbf63ade72ca8fdf8cf82bc68004defaa09a05` and
   `aedef2ffffe6d3de04a5c341a09f137df7abc0d90cee11929ee988fb90f95080`.
   Revocation run `30420256210` then passed after removal of the
-  `deploy-preview` label. The PR #101 production baseline remains unchanged:
-  `71b76d24-bf5f-490e-adc4-31cf63fb046e`, Worker
-  `bae58cd3-cad7-4663-879d-408accf061b0` (#96), and D1
-  `theologai-production-20260728-hierarchy-a`
-  (`f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395`). The checked-in root production
-  binding now selects the prepared but unbound ENAM Transform-11 candidate
+  `deploy-preview` label. Production was unchanged by that preview release.
+  The checked-in root production binding selected the initially unbound ENAM
+  Transform-11 candidate
   `theologai-production-20260729-transform11-a`
   (`53211f50-a893-4b4c-be1e-bc625a595dc7`), prepared once from merge
   `501ae7840a71ceb589dc3b1ae9863aef83e3586f`, exact tree
@@ -749,10 +755,15 @@ Code readiness and operational readiness are deliberately separate:
   1,630,259-row seed with corpus identity
   `29a4a7faec2a960f06bfc026a319df8c08b495bb7ad82831fb62d3a3586643a4`.
   Primary readiness, Transform-8 authority (`1/12/12` pages), and full
-  Transform-11 source-pack authority (`1/1/1/1/1/1/133/17` pages) passed. The
-  binding declaration alone is not a release or live-traffic claim; preserve
-  the PR #101 Worker/D1 pair for rollback until protected deployment and
-  audits prove the successor. The integrated Transform 10 Aquinas
+  Transform-11 source-pack authority (`1/1/1/1/1/1/133/17` pages) passed.
+  Protected PR #108 workflow `30496350408` subsequently deployed
+  `3d7489d9-7b48-4ad0-bdc6-95ffbda53bd8`, Worker
+  `291f3292-3fa9-44fc-bf6f-b68fd2f4cef6` (#98), bound to that exact D1.
+  Historical core passed 8/8, Transform-11 spine passed 10/10,
+  original-language passed 11/11, edge stabilization matched attempt 4 and
+  remained stable, and independent post-release review returned `SHIP`.
+  Preserve the PR #101 Worker/D1 pair above for rollback. The integrated
+  Transform 10 Aquinas
   hierarchy is local-only and unpublished. Its present packet ends at Tertia
   question 90 and contains no Supplement, so Transform 11 gives it no
   document/catalog/search/resource/runtime/D1 projection. A future Aquinas

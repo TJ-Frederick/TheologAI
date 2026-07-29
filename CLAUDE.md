@@ -174,18 +174,23 @@ The SQLite database (`data/theologai.db`) is a derived artifact. Cross-reference
 
 ## Release-state boundary
 
-PR #101 is the current production release record. It merged as source commit
-`e2d351a11fce9c2cb1f72add0bcf365332737f3c` with exact tree
-`b9807ea1980326b5faf0a8a595c9606c67abfce5`. At the canonical endpoint
-`https://mcp.theologai.xyz/mcp`, protected workflow `30401732957` observed
-server version `3.6.0` and, before and after testing, the same sole 100%
-Cloudflare production assignment: deployment
-`71b76d24-bf5f-490e-adc4-31cf63fb046e`, Worker
+PR #108 is the current production release record. It merged as source commit
+`8da99fd0a161b90a4bd90ab29bde1abf796b3bf6`. At the canonical endpoint
+`https://mcp.theologai.xyz/mcp`, protected workflow `30496350408` proved the
+same sole 100% Cloudflare production assignment before and after testing:
+deployment `3d7489d9-7b48-4ad0-bdc6-95ffbda53bd8`, Worker
+`291f3292-3fa9-44fc-bf6f-b68fd2f4cef6` (#98), and D1
+`theologai-production-20260729-transform11-a`
+(`53211f50-a893-4b4c-be1e-bc625a595dc7`). The historical core passed 8/8,
+Transform-11 spine passed 10/10, `original_language_study` v2 passed 11/11,
+primary-source edge stabilization matched on attempt 4 and remained stable,
+and the independent post-release review returned `SHIP`.
+
+PR #101 is the matched rollback record—not the active production binding:
+deployment `71b76d24-bf5f-490e-adc4-31cf63fb046e`, Worker
 `bae58cd3-cad7-4663-879d-408accf061b0` (#96), and D1
 `theologai-production-20260728-hierarchy-a`
-(`f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395`). Primary-source stabilization passed
-on attempt 1, `original_language_study` v2 passed 11/11 cases, and the eight
-reviewed Transform-9 historical works passed.
+(`f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395`).
 
 The stateless `original_language_study` v2 production audit passed 11/11 cases
 in 14 exchanges (initialization, initialized notification, `tools/list`, and
@@ -237,9 +242,8 @@ remains direct.
 > `a6959d24fb7f50a9848fe2d011f425894718471b8a0609e7833780a291721a44`.
 
 Transform 11 activates 18 reviewed sectioned-only source-pack editions in the
-checked-out local corpus and the current preview 35-work catalog. Production
-remains on the 25-work PR #101 baseline until its separately protected D1
-cutover completes. Norton and Aquinas assets remain inactive; the incomplete
+checked-out local corpus and both deployed 35-work catalogs. Norton and Aquinas
+assets remain inactive; the incomplete
 Aquinas hierarchy has no document, catalog, search, resource, runtime, or D1
 projection.
 `package.json` is private: npm distribution is unsupported.
