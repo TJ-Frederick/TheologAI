@@ -45,12 +45,13 @@ the exact `candidateD1` binding as deployment
 `070b292b-0bae-400a-b983-3d72157b5a96`, Worker
 `bd722b69-2e2c-4d8d-b42b-617e8caba13d` (#130), and D1
 `theologai-preview-20260728-hierarchy-a`
-(`51890e12-1c3f-421f-b661-9a5ea9637e43`). This is the current preview binding;
-the checked-in target alone would not establish it or activate the dormant
-hierarchy/publication runtime. Its protected release evidence is authoritative.
+(`51890e12-1c3f-421f-b661-9a5ea9637e43`). This is the retained compatible
+preview predecessor; the checked-in target alone did not establish it or
+activate the dormant hierarchy/publication runtime. Its protected release
+evidence remains authoritative for that predecessor.
 
-PR #107's checked-in preview target is instead the unbound Transform-11
-candidate `theologai-preview-20260728-transform11-a`
+PR #107's Transform-11 candidate
+`theologai-preview-20260728-transform11-a`
 (`62b871a6-5b4d-4d9b-8f52-301f6c878f48`). Its one-use schema-`0008` import
 applied all 49 reviewed seed files and 1,630,259 rows with corpus identity
 `29a4a7faec2a960f06bfc026a319df8c08b495bb7ad82831fb62d3a3586643a4`.
@@ -59,9 +60,11 @@ transient Cloudflare authentication failure interrupted the first
 Transform-11 authority read; an explicitly authorized read-only rerun then
 passed primary readiness, Transform-8 (`1/12/12` pages), and the complete
 Transform-11 audit (`1/1/1/1/1/1/133/17` pages). No seed, migration, repair, or
-resume was repeated. This record neither binds nor deploys the candidate; the
-PR #101 deployment above remains live until a protected release proves this
-exact candidate binding. Production remains unchanged.
+resume was repeated. The candidate was unbound during that preparation.
+Protected preview deployment `5e812152-355b-4a5f-a123-2485e89f1550` now
+serves Worker `06b9a603-8339-42b6-a246-ef9238563043` (#140) as the sole active
+preview assignment bound to that exact candidate D1. Production remains
+unchanged.
 
 The candidate-binding observation is written before the strict gate and is uploaded through `always()` handling. It contains only version/deployment IDs, predecessor/active/candidate D1 IDs, the `d1Changed` value, and boolean configuration/binding verdicts; it excludes raw Wrangler JSON, headers, requests, sessions, and secrets. The final post-mutation observation is likewise retained and hashed even if the strict candidate-binding gate blocks both audits.
 

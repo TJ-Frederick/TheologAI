@@ -69,6 +69,12 @@ historical-core audits passed. Preview authorization was then removed; the
 revocation workflow `30420256210` passed and PR #107 has no `deploy-preview`
 label.
 
+The retained deployment above is historical release evidence. The current
+preview baseline is deployment `5e812152-355b-4a5f-a123-2485e89f1550`, Worker
+`06b9a603-8339-42b6-a246-ef9238563043` (#140), and the same
+`theologai-preview-20260728-transform11-a`
+(`62b871a6-5b4d-4d9b-8f52-301f6c878f48`) D1.
+
 A separate, zero-retry targeted audit of the ten newly activated works also
 passed. Its 84-exchange main audit checked landing, browse, natural search,
 scoped local primary-source search, and direct reads; its separate 12-exchange
@@ -77,11 +83,22 @@ pagination/cursor audit also passed. Sanitized evidence hashes are
 `aedef2ffffe6d3de04a5c341a09f137df7abc0d90cee11929ee988fb90f95080`.
 
 Production did not change: it remains the PR #101 production baseline on
-Worker #96 and D1 `f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395`. The later local-only convergence
-hardening commit `5346be93237086a541d7bb1982b96752807878be` and the current
-durable historical-spine audit work are unpublished. They require a fresh
-push, exact-head CI, and protected same-D1 preview release before any
-production-D1 preparation, merge, or production deployment is considered.
+Worker `bae58cd3-cad7-4663-879d-408accf061b0` (#96), deployment
+`71b76d24-bf5f-490e-adc4-31cf63fb046e`, and D1
+`theologai-production-20260728-hierarchy-a`
+(`f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395`). The checked-in root binding selects
+the separately prepared but unbound ENAM candidate
+`theologai-production-20260729-transform11-a`
+(`53211f50-a893-4b4c-be1e-bc625a595dc7`), prepared once from merge
+`501ae7840a71ceb589dc3b1ae9863aef83e3586f`, exact tree
+`dec0f2d66779e6126b3ddb02e74304b97293c67f`, and the exact 49-file,
+1,630,259-row seed with corpus identity
+`29a4a7faec2a960f06bfc026a319df8c08b495bb7ad82831fb62d3a3586643a4`.
+Primary readiness, Transform-8 authority (`1/12/12` pages), and full
+Transform-11 source-pack authority (`1/1/1/1/1/1/133/17` pages) passed. The
+configuration choice is not a deployment claim: preserve the current PR #101
+Worker/D1 pair for rollback until a protected release proves the new binding
+and completes production audits.
 
 The exact ten-work audit added after this activation is documented in
 [Transform-11 Historical-Spine Release Audit](HISTORICAL-SPINE-RELEASE-AUDIT.md).

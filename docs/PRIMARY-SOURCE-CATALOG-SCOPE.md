@@ -14,8 +14,9 @@ edition-scoped authority hierarchy packet and standalone materializer. Normal
 release builds deliberately exclude its hierarchy rows and shared lineage. It
 is unpublished and has no document or catalog projection, runtime composition
 dependency, or MCP surface. It leaves the active historical catalog boundary
-unchanged in deployed environments: preview and production remain on the
-Transform-9 25-work corpus until a protected Transform 11 preview release.
+unchanged in production: preview serves the Transform-11 35-work corpus while
+production remains on the Transform-9 25-work corpus until its protected D1
+release proves cutover.
 
 Transform 11 retains migration `0006_historical_source_packs` and schema
 `0008`, but expands the manifest allowlist to three checked-in packs, 18 works,
@@ -33,11 +34,15 @@ deployment identifiers.
 
 PR95's Transform-9 normal preview release is historical, having used
 `theologai-preview-20260727-normal-a`
-(`776944d4-60d1-457f-b13e-b4e7898971ca`). The current preview baseline is PR
-#101 deployment `070b292b-0bae-400a-b983-3d72157b5a96`, Worker
+(`776944d4-60d1-457f-b13e-b4e7898971ca`). The retained PR #101 preview
+predecessor was deployment `070b292b-0bae-400a-b983-3d72157b5a96`, Worker
 `bd722b69-2e2c-4d8d-b42b-617e8caba13d` (#130), and D1
 `theologai-preview-20260728-hierarchy-a`
-(`51890e12-1c3f-421f-b661-9a5ea9637e43`). The current production baseline is
+(`51890e12-1c3f-421f-b661-9a5ea9637e43`). The current preview baseline is
+deployment `5e812152-355b-4a5f-a123-2485e89f1550`, Worker
+`06b9a603-8339-42b6-a246-ef9238563043` (#140), and D1
+`theologai-preview-20260728-transform11-a`
+(`62b871a6-5b4d-4d9b-8f52-301f6c878f48`). The current production baseline is
 PR #101 deployment `71b76d24-bf5f-490e-adc4-31cf63fb046e`, Worker
 `bae58cd3-cad7-4663-879d-408accf061b0` (#96), and D1
 `theologai-production-20260728-hierarchy-a`
@@ -57,19 +62,32 @@ unbound when its one-time 49-file, 1,627,474-row preparation completed: remote
 readiness and Transform-8/9 authority audits passed, and Transform-10
 normal-corpus exclusion predicates proved hierarchy, publication, and
 Aquinas-lineage rows empty. Protected PR #101 release evidence subsequently
-proved the exact current preview binding; dormant hierarchy/publication runtime
-activation remains absent.
+proved the exact retained preview predecessor binding; dormant
+hierarchy/publication runtime activation remained absent.
 
-PR #107's checked-in preview target is now the separately prepared Transform-11
-candidate `theologai-preview-20260728-transform11-a`
+PR #107's Transform-11 preview candidate
+`theologai-preview-20260728-transform11-a`
 (`62b871a6-5b4d-4d9b-8f52-301f6c878f48`). Its exact reviewed 49-file,
 1,630,259-row seed has corpus identity
 `29a4a7faec2a960f06bfc026a319df8c08b495bb7ad82831fb62d3a3586643a4`.
 Primary readiness, Transform-8 authority (`1/12/12` pages), and complete
-Transform-11 source-pack authority (`1/1/1/1/1/1/133/17` pages) passed. The
-candidate remains unbound: preview still serves the PR #101 25-work baseline,
+Transform-11 source-pack authority (`1/1/1/1/1/1/133/17` pages) passed while
+unbound. Protected preview deployment now proves the current binding above;
 production is unchanged, and Transform-10 hierarchy/publication/Aquinas rows
 remain excluded.
+
+The checked-in root production target is the prepared but unbound Transform-11
+candidate `theologai-production-20260729-transform11-a`
+(`53211f50-a893-4b4c-be1e-bc625a595dc7`). Its one-use ENAM preparation from
+merge `501ae7840a71ceb589dc3b1ae9863aef83e3586f`, exact tree
+`dec0f2d66779e6126b3ddb02e74304b97293c67f`, imported the exact 49-file,
+1,630,259-row seed with corpus identity
+`29a4a7faec2a960f06bfc026a319df8c08b495bb7ad82831fb62d3a3586643a4`.
+Primary readiness, Transform-8 authority (`1/12/12` pages), and complete
+Transform-11 source-pack authority (`1/1/1/1/1/1/133/17` pages) passed. The
+configuration declaration is not a production binding or deployment; retain
+the PR #101 Worker/D1 baseline above until the protected release proves the
+candidate assignment and audits.
 
 ## Source and materialization
 

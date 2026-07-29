@@ -237,8 +237,9 @@ remains direct.
 > `a6959d24fb7f50a9848fe2d011f425894718471b8a0609e7833780a291721a44`.
 
 Transform 11 activates 18 reviewed sectioned-only source-pack editions in the
-checked-out local corpus. Until its protected preview release completes, both
-deployed environments remain on the 25-work PR #101 baseline. Norton and
-Aquinas assets remain inactive; the incomplete Aquinas hierarchy has no
-document, catalog, search, resource, runtime, or D1 projection.
+checked-out local corpus and the current preview 35-work catalog. Production
+remains on the 25-work PR #101 baseline until its separately protected D1
+cutover completes. Norton and Aquinas assets remain inactive; the incomplete
+Aquinas hierarchy has no document, catalog, search, resource, runtime, or D1
+projection.
 `package.json` is private: npm distribution is unsupported.
