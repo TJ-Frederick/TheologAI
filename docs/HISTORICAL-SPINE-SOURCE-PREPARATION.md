@@ -52,7 +52,8 @@ the receipt until a new exact replay is completed.
 Both packs carry the separate
 `blocked_separate_transform11_release` activation state. A successful local
 replay does not authorize Transform 11, D1 materialization, preview, production,
-or any runtime use.
+or any runtime use. The reviewed Transform 11 release record is the separate
+authorization boundary; source-preparation evidence never self-authorizes.
 
 The source-first corrections are deliberately narrow. *The Imitation of
 Christ* is normalized only from the pinned Project Gutenberg no. 1653 text,
