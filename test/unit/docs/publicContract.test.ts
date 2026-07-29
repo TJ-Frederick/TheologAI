@@ -404,5 +404,11 @@ describe('published project contract', () => {
       );
       expect(normalized).not.toMatch(/deployed preview remains v5\/discovery-only/i);
     }
+
+    const liveAudit = documents[0]!;
+    expect(liveAudit).toContain('exactly two concurrent `searchDepth: "expanded"` contenders');
+    expect(liveAudit).toContain('`searchDepth: "standard"` call');
+    expect(liveAudit).toContain('partial, non-error response');
+    expect(liveAudit).not.toMatch(/CCEL-only contenders/i);
   });
 });
