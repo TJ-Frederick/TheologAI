@@ -122,6 +122,8 @@ export type HistoricalCoreAuditProfile = {
   label: 'preview' | 'production';
   primarySource: PrimarySourceAuditContract;
 };
+/** The shared transport needs only routing identity, not an audit's schema contract. */
+export type FixedAuditMcpProfile = Pick<HistoricalCoreAuditProfile, 'endpoint' | 'hostname' | 'label'>;
 export const PREVIEW_PROFILE: HistoricalCoreAuditProfile = {
   endpoint: PREVIEW_ENDPOINT, hostname: 'preview-mcp.theologai.xyz', serverVersion: '3.6.0-preview',
   audit: 'historical-core-preview', endpointClass: 'preview-custom', label: 'preview', primarySource: PRIMARY_SOURCE_V7_AUDIT_CONTRACT,
@@ -140,6 +142,22 @@ const MAX_EVIDENCE_BYTES = 256 * 1024;
 const MAX_AGGREGATE_MCP_RESPONSE_BYTES = 2 * 1024 * 1024;
 /** A tool inventory is currently the largest response; all reads are bounded too. */
 export const MAX_MCP_RESPONSE_BYTES = 256 * 1024;
+/**
+ * Transport ceilings for fixed release audits.  The historical-spine audit
+ * intentionally shares this implementation rather than growing a second MCP
+ * HTTP client with subtly different cancellation or response-boundary rules.
+ */
+export type FixedAuditTransportLimits = Readonly<{
+  maxLogicalOperations: number;
+  maxHttpExchanges: number;
+  /** A reviewed, audit-specific identity prevents independent release gates sharing a rate-limit tuple. */
+  userAgent: string;
+}>;
+const HISTORICAL_CORE_TRANSPORT_LIMITS: FixedAuditTransportLimits = Object.freeze({
+  maxLogicalOperations: MAX_LOGICAL_OPERATIONS,
+  maxHttpExchanges: MAX_HTTP_EXCHANGES,
+  userAgent: 'TheologAI-HistoricalCore-{profile}-Audit/1.0',
+});
 const FIXTURE_PATH = new URL('../test/fixtures/historical-core-preview-audit.json', import.meta.url);
 
 const TOOL_NAMES = [
@@ -156,6 +174,18 @@ const LEGACY_WORK_IDS = [
   'heidelberg-catechism', 'london-baptist-1689', 'nicene-creed', 'philaret-catechism', 'westminster-confession',
   'westminster-larger-catechism', 'westminster-shorter-catechism',
 ] as const;
+const TRANSFORM11_WORK_IDS = [
+  'augustine-on-christian-doctrine',
+  'basil-on-the-holy-spirit',
+  'gregory-nazianzen-five-theological-orations',
+  'gregory-nyssa-great-catechism',
+  'justin-martyr-apologies',
+  'origen-de-principiis',
+  'hooker-laws-of-ecclesiastical-polity-book-1',
+  'julian-revelations-of-divine-love',
+  'kempis-imitation-of-christ',
+  'pascal-pensees',
+] as const;
 const EXPECTED_CLASSIC_INPUT_SCHEMA_SHA256 = '45124e704b5e0009b5bc3672c52b0d7ed6e8193063b621a7ccf766d1d2ad00d4';
 const EXPECTED_CLASSIC_OUTPUT_SCHEMA_SHA256 = 'b8a6af9dff44cf8ad9d964661ca76cbe4ab9bcbdc97d9aca85df4edea73a9a7c';
 
@@ -165,7 +195,7 @@ const EXPECTED_FIXTURE = {
   baseline: {
     manifestSchemaVersion: '0006_historical_source_packs',
     d1TransformVersion: 9,
-    expectedCatalogIdentity: { workCount: 25, legacyWorkCount: 17, coreWorkCount: 8, coreSectionCount: 512 },
+    expectedCatalogIdentity: { workCount: 35, legacyWorkCount: 17, coreWorkCount: 8, coreSectionCount: 512 },
     sourcePackId: 'theologai-core-eight',
     expectedCoreEditionProvenanceStatus: 'verified_with_uncertainty',
   },
@@ -183,6 +213,10 @@ const EXPECTED_FIXTURE = {
 } as const;
 
 export type AuditFixture = typeof EXPECTED_FIXTURE;
+/** Exact release resource identity shared with the pre-audit edge-convergence gate. */
+export const HISTORICAL_CORE_EXPECTED_RESOURCE_URIS = Object.freeze(
+  expectedResourceUris(EXPECTED_FIXTURE),
+);
 type FetchLike = typeof fetch;
 type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 type ObjectRecord = Record<string, unknown>;
@@ -192,13 +226,17 @@ type RequestCounters = { logical: number; http: number };
 /** One budget owns preflight, transport, evidence construction, and publication. */
 export class AuditDeadline {
   private profileLabel: HistoricalCoreAuditProfile['label'] | 'release' = 'release';
-  constructor(private readonly now: () => number = Date.now, private readonly startedAt = now()) {}
+  constructor(
+    private readonly now: () => number = Date.now,
+    private readonly startedAt = now(),
+    private readonly maximumDurationMs = MAX_DURATION_MS,
+  ) {}
 
-  setProfile(profile: HistoricalCoreAuditProfile): void { this.profileLabel = profile.label; }
+  setProfile(profile: Pick<HistoricalCoreAuditProfile, 'label'>): void { this.profileLabel = profile.label; }
 
   remaining(label: string): number {
-    const remaining = MAX_DURATION_MS - (this.now() - this.startedAt);
-    assert(remaining > 0, `historical ${this.profileLabel} audit exceeded its 300-second total deadline during ${label}`);
+    const remaining = this.maximumDurationMs - (this.now() - this.startedAt);
+    assert(remaining > 0, `historical ${this.profileLabel} audit exceeded its ${this.maximumDurationMs / 1_000}-second total deadline during ${label}`);
     return remaining;
   }
 
@@ -234,7 +272,7 @@ export function validateFixture(value: unknown): AuditFixture {
   return structuredClone(EXPECTED_FIXTURE);
 }
 
-class FixedAuditMcp {
+export class FixedAuditMcp {
   readonly counters: RequestCounters = { logical: 0, http: 0 };
   private responseBytes = 0;
   private id = 1;
@@ -243,16 +281,17 @@ class FixedAuditMcp {
   constructor(
     private readonly fetchImpl: FetchLike,
     private readonly deadline: AuditDeadline,
-    private readonly profile: HistoricalCoreAuditProfile = PREVIEW_PROFILE,
+    private readonly profile: FixedAuditMcpProfile = PREVIEW_PROFILE,
+    private readonly limits: FixedAuditTransportLimits = HISTORICAL_CORE_TRANSPORT_LIMITS,
   ) {}
 
   private reserve(logical: boolean): void {
     if (logical) {
       this.counters.logical += 1;
-      assert(this.counters.logical <= MAX_LOGICAL_OPERATIONS, `historical ${this.profile.label} audit logical-operation budget exceeded`);
+      assert(this.counters.logical <= this.limits.maxLogicalOperations, `historical ${this.profile.label} audit logical-operation budget exceeded`);
     }
     this.counters.http += 1;
-    assert(this.counters.http <= MAX_HTTP_EXCHANGES, `historical ${this.profile.label} audit HTTP-exchange budget exceeded`);
+    assert(this.counters.http <= this.limits.maxHttpExchanges, `historical ${this.profile.label} audit HTTP-exchange budget exceeded`);
   }
 
   private async post(payload: ObjectRecord, label: string, logical: boolean): Promise<ObjectRecord | undefined> {
@@ -267,7 +306,8 @@ class FixedAuditMcp {
         method: 'POST', redirect: 'error', signal: controller.signal,
         headers: {
           Accept: 'application/json, text/event-stream', 'Content-Type': 'application/json',
-          'Mcp-Protocol-Version': PROTOCOL_VERSION, 'User-Agent': `TheologAI-HistoricalCore-${this.profile.label}-Audit/1.0`,
+          'Mcp-Protocol-Version': PROTOCOL_VERSION,
+          'User-Agent': this.limits.userAgent.replace('{profile}', this.profile.label),
           ...(this.sessionId === undefined ? {} : { 'Mcp-Session-Id': this.sessionId }),
         },
         body: JSON.stringify(payload),
@@ -335,8 +375,8 @@ class FixedAuditMcp {
   }
 
   complete(): void {
-    assert(this.counters.logical === MAX_LOGICAL_OPERATIONS, `historical ${this.profile.label} logical inventory drifted: ${this.counters.logical}/${MAX_LOGICAL_OPERATIONS}`);
-    assert(this.counters.http === MAX_HTTP_EXCHANGES, `historical ${this.profile.label} HTTP inventory drifted: ${this.counters.http}/${MAX_HTTP_EXCHANGES}`);
+    assert(this.counters.logical === this.limits.maxLogicalOperations, `historical ${this.profile.label} logical inventory drifted: ${this.counters.logical}/${this.limits.maxLogicalOperations}`);
+    assert(this.counters.http === this.limits.maxHttpExchanges, `historical ${this.profile.label} HTTP inventory drifted: ${this.counters.http}/${this.limits.maxHttpExchanges}`);
     assert(this.responseBytes <= MAX_AGGREGATE_MCP_RESPONSE_BYTES, `historical ${this.profile.label} aggregate response budget drifted`);
   }
 
@@ -523,12 +563,14 @@ function expectedResourceUris(fixture: AuditFixture): string[] {
     'theologai://translations', 'theologai://commentaries', 'theologai://primary-sources/catalog',
     ...LEGACY_WORK_IDS.map(id => `theologai://documents/${id}`),
     ...fixture.probes.map(probe => probe.landingResourceUri),
+    ...TRANSFORM11_WORK_IDS.map(id => `theologai://documents/${id}`),
   ].sort();
 }
 
 function assertResources(message: ObjectRecord, fixture: AuditFixture): void {
   const resources = array(result(message, 'resources/list').resources, 'resources/list.resources').map(object);
-  assert(resources.length === 28 && resources.every(Boolean), 'resources/list must expose exactly 28 resources');
+  assert(resources.length === HISTORICAL_CORE_EXPECTED_RESOURCE_URIS.length && resources.every(Boolean),
+    `resources/list must expose exactly ${HISTORICAL_CORE_EXPECTED_RESOURCE_URIS.length} resources`);
   assert(new Set(resources.map(resource => resource!.uri)).size === resources.length, 'resources/list resource URIs are not unique');
   assert(JSON.stringify(resources.map(resource => requireString(resource!.uri, 'resource URI')).sort()) === JSON.stringify(expectedResourceUris(fixture)), 'resources/list exact resource identity drifted');
   for (const resource of resources) {
@@ -566,7 +608,10 @@ function assertCatalog(message: ObjectRecord, fixture: AuditFixture): ObjectReco
   const ids = works.map(work => requireString(work!.id, 'catalog work id'));
   assert(LEGACY_WORK_IDS.every(id => ids.includes(id)), 'catalog no longer contains the complete 17-work legacy identity');
   const core = fixture.probes.map(probe => works.find(work => work?.id === probe.workId));
-  assert(core.every(Boolean) && works.length === LEGACY_WORK_IDS.length + core.length, 'catalog no longer has the exact 25=17+8 historical identity');
+  const transform11 = TRANSFORM11_WORK_IDS.map(id => works.find(work => work?.id === id));
+  assert(core.every(Boolean) && transform11.every(Boolean)
+    && works.length === LEGACY_WORK_IDS.length + core.length + transform11.length,
+  'catalog no longer has the exact 35=17+8+10 historical identity');
   for (const [index, work] of core.entries()) {
     const probe = fixture.probes[index]!;
     const provenance = object(work!.editionProvenance); const readiness = object(work!.editionReadiness);
@@ -575,10 +620,22 @@ function assertCatalog(message: ObjectRecord, fixture: AuditFixture): ObjectReco
       && readiness.provenance === fixture.baseline.expectedCoreEditionProvenanceStatus
       && readiness.normalizedTextRights === 'no_known_conflict', `${probe.workId} edition readiness drifted`);
   }
+  for (const [index, work] of transform11.entries()) {
+    const readiness = object(work!.editionReadiness);
+    assert(readiness?.editionIdentity === 'established'
+      && readiness.provenance === fixture.baseline.expectedCoreEditionProvenanceStatus
+      && readiness.normalizedTextRights === 'no_known_conflict',
+    `${TRANSFORM11_WORK_IDS[index]} Transform 11 edition readiness drifted`);
+  }
   const policies = object(catalog.policies);
   assert(policies?.scope === 'hosted_collection_only' && policies.editionProvenance === 'mixed_legacy_and_reviewed_source_packs'
     && policies.rightsStatus === 'mixed_not_established_and_no_known_conflict', 'catalog mixed-inventory provenance policy drifted');
-  return { workCount: works.length, legacyWorkCount: LEGACY_WORK_IDS.length, coreWorkCount: core.length, sourcePackId: fixture.baseline.sourcePackId };
+  return {
+    workCount: works.length,
+    legacyWorkCount: LEGACY_WORK_IDS.length,
+    coreWorkCount: core.length,
+    sourcePackId: fixture.baseline.sourcePackId,
+  };
 }
 
 function assertClassicCatalog(raw: RawToolResult, fixture: AuditFixture): ObjectRecord {
@@ -947,7 +1004,7 @@ export async function runProductionAudit(
   return runHistoricalCoreAudit(fixture, PRODUCTION_PROFILE, fetchImpl, deadline);
 }
 
-async function assertOutputAbsent(output: string): Promise<void> {
+export async function assertAuditOutputAbsent(output: string): Promise<void> {
   try {
     await lstat(output);
   } catch (error) {
@@ -1028,7 +1085,7 @@ export async function runHistoricalCoreAuditCli(
   assert(args.length === 0 || (args.length === 2 && args[0] === '--output' && typeof args[1] === 'string' && args[1].length > 0), `usage: audit:historical-core-${profile.label} [--output path]`);
   const output = resolve(args.length === 0 ? `test-output/historical-core-${profile.label}-audit-${new Date().toISOString().replaceAll(':', '-')}.json` : args[1]!);
   deadline.assertRemaining('fixed output preflight');
-  await assertOutputAbsent(output);
+  await assertAuditOutputAbsent(output);
   deadline.assertRemaining('fixed fixture preflight');
   const fixture = validateFixture(JSON.parse(await readFile(FIXTURE_PATH, 'utf8')));
   deadline.assertRemaining('fixed fixture preflight');

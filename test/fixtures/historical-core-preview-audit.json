@@ -5,7 +5,7 @@
     "manifestSchemaVersion": "0006_historical_source_packs",
     "d1TransformVersion": 9,
     "expectedCatalogIdentity": {
-      "workCount": 25,
+      "workCount": 35,
       "legacyWorkCount": 17,
       "coreWorkCount": 8,
       "coreSectionCount": 512

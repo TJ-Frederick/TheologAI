@@ -314,6 +314,18 @@ exact name, record the predecessor Worker/D1 identity, and refuse to start
 black-box audits unless the sole active deployed Worker is bound to the
 readiness-tested candidate.
 
+PR #107's replacement preview candidate
+`theologai-preview-20260728-transform11-a`
+(`62b871a6-5b4d-4d9b-8f52-301f6c878f48`) was prepared unbound from the exact
+reviewed 49-file, 1,630,259-row schema-`0008` seed with corpus identity
+`29a4a7faec2a960f06bfc026a319df8c08b495bb7ad82831fb62d3a3586643a4`.
+Primary readiness, Transform-8 authority (`1/12/12` pages), and the complete
+Transform-11 source-pack authority audit (`1/1/1/1/1/1/133/17` pages) passed.
+An authorized read-only audit rerun followed one transient Cloudflare
+authentication failure; migration and seed application were not retried,
+resumed, or repaired. The candidate is not a live preview binding until the
+protected workflow proves it; production remains unchanged.
+
 Approved deploy jobs perform the last compatibility check read-only against
 the candidate name resolved from the checked-in name/UUID pair:
 

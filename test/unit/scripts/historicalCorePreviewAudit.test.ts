@@ -52,15 +52,27 @@ type FakeOptions = {
 };
 
 const FAKE_LANDING_TEXT = '# Work record\nMetadata only.';
+const transform11WorkIds = [
+  'augustine-on-christian-doctrine',
+  'basil-on-the-holy-spirit',
+  'gregory-nazianzen-five-theological-orations',
+  'gregory-nyssa-great-catechism',
+  'justin-martyr-apologies',
+  'origen-de-principiis',
+  'hooker-laws-of-ecclesiastical-polity-book-1',
+  'julian-revelations-of-divine-love',
+  'kempis-imitation-of-christ',
+  'pascal-pensees',
+] as const;
 
 async function fixture(): Promise<RecordValue> {
   return JSON.parse(await readFile(fixtureUrl, 'utf8')) as RecordValue;
 }
 
 describe('historical core preview audit contract', () => {
-  it('accepts only the immutable 25=17+8 Transform-9 fixture, including separate directory and relevance locators', async () => {
+  it('accepts the 35-work Transform-11 catalog while retaining deep core-eight probes', async () => {
     const parsed = validateFixture(await fixture());
-    expect(parsed.baseline.expectedCatalogIdentity).toEqual({ workCount: 25, legacyWorkCount: 17, coreWorkCount: 8, coreSectionCount: 512 });
+    expect(parsed.baseline.expectedCatalogIdentity).toEqual({ workCount: 35, legacyWorkCount: 17, coreWorkCount: 8, coreSectionCount: 512 });
     expect(parsed.baseline.expectedCoreEditionProvenanceStatus).toBe('verified_with_uncertainty');
     expect(parsed.probes).toHaveLength(8);
     expect(parsed.probes.map(probe => probe.sectionCount).reduce((sum, count) => sum + count, 0)).toBe(512);
@@ -145,6 +157,7 @@ describe('historical core preview audit contract', () => {
     const candidateCutover = workflow.indexOf('- name: Require deployed candidate preview D1 binding (read-only)');
     const v2 = workflow.indexOf('- name: Audit original-language v2 contract on preview');
     const historical = workflow.indexOf('- name: Audit Transform-9 historical core contract on preview');
+    const spine = workflow.indexOf('- name: Audit Transform-11 historical spine contract on preview');
     const reconciliationStep = workflow.indexOf('- name: Capture preview post-mutation reconciliation record (read-only)');
     const identity = workflow.indexOf('- name: Verify preview Worker remained active through audit (read-only)');
     const artifact = workflow.indexOf('name: preview-release-audit-');
@@ -156,27 +169,31 @@ describe('historical core preview audit contract', () => {
     expect(candidateCutover).toBeGreaterThan(deploy);
     expect(v2).toBeGreaterThan(candidateCutover);
     expect(historical).toBeGreaterThan(v2);
-    expect(reconciliationStep).toBeGreaterThan(historical);
-    expect(identity).toBeGreaterThan(historical);
+    expect(spine).toBeGreaterThan(historical);
+    expect(reconciliationStep).toBeGreaterThan(spine);
+    expect(identity).toBeGreaterThan(spine);
     expect(artifact).toBeGreaterThan(identity);
     expect(workflow).toContain('historical-core-preview-audit.json');
     expect(workflow).toContain('historical_audit_sha256');
+    expect(workflow).toContain('historical-spine-preview-audit.json');
+    expect(workflow).toContain('historical_spine_audit_sha256');
     expect(workflow).toContain('wrangler versions view "$predecessor_version" --env preview --json');
     expect(workflow).toContain('wrangler versions view "$observed_active_version" --env preview --json');
   });
 
   it('runs the exact 55-exchange inventory through a representative fake transport without retaining bodies, locators, snippets, cursors, or error data', async () => {
     const parsed = validateFixture(await fixture());
-    const calls: Array<{ url: string; body: RecordValue }> = [];
+    const calls: Array<{ url: string; body: RecordValue; userAgent: string | null }> = [];
     const fakeFetch: typeof fetch = async (input, init) => {
       const body = JSON.parse(String(init?.body)) as RecordValue;
-      calls.push({ url: String(input), body });
+      calls.push({ url: String(input), body, userAgent: new Headers(init?.headers).get('user-agent') });
       return responseFor(body, parsed);
     };
 
     const evidence = await runPreviewAudit(parsed, fakeFetch);
     expect(calls).toHaveLength(55);
     expect(calls.every(call => call.url === 'https://preview-mcp.theologai.xyz/mcp')).toBe(true);
+    expect(new Set(calls.map(call => call.userAgent))).toEqual(new Set(['TheologAI-HistoricalCore-preview-Audit/1.0']));
     expect(evidence.budgets).toMatchObject({ logicalOperations: 54, maximumLogicalOperations: 54, httpExchanges: 55, maximumHttpExchanges: 55, retryCount: 0, maximumAggregateMcpResponseBytes: 2 * 1024 * 1024 });
     const serialized = JSON.stringify(evidence);
     for (const forbidden of ['PRIVATE HISTORICAL BODY', 'theologai://documents/', 'discovery snippet', 'not-a-valid-cursor', 'not found']) {
@@ -193,16 +210,17 @@ describe('historical core preview audit contract', () => {
 
   it('runs the same exact 55-exchange inventory against the production v6 profile and retains only local-only evidence', async () => {
     const parsed = validateFixture(await fixture());
-    const calls: Array<{ url: string; body: RecordValue }> = [];
+    const calls: Array<{ url: string; body: RecordValue; userAgent: string | null }> = [];
     const fakeFetch: typeof fetch = async (input, init) => {
       const body = JSON.parse(String(init?.body)) as RecordValue;
-      calls.push({ url: String(input), body });
+      calls.push({ url: String(input), body, userAgent: new Headers(init?.headers).get('user-agent') });
       return responseFor(body, parsed, {}, PRODUCTION_PROFILE);
     };
 
     const evidence = await runProductionAudit(parsed, fakeFetch);
     expect(calls).toHaveLength(55);
     expect(calls.every(call => call.url === 'https://mcp.theologai.xyz/mcp')).toBe(true);
+    expect(new Set(calls.map(call => call.userAgent))).toEqual(new Set(['TheologAI-HistoricalCore-production-Audit/1.0']));
     expect(evidence.schemas).toMatchObject({
       primarySourceContractVersion: '6', primarySourceOpenWorldHint: false,
       primarySourceProviderMaximum: 1, primarySourceExternalDiscoveryBoundary: 'rejected_at_input_schema',
@@ -348,7 +366,7 @@ describe('historical core preview audit contract', () => {
     await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { mutate: (body, response) => {
       if (body.method === 'resources/list') ((response.result as RecordValue).resources as RecordValue[]).pop();
       return response;
-    } }))).rejects.toThrow('resources/list must expose exactly 28 resources');
+    } }))).rejects.toThrow('resources/list must expose exactly 38 resources');
     await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { mutate: (body, response) => {
       if (body.method === 'resources/templates/list') ((response.result as RecordValue).resourceTemplates as RecordValue[])[0]!.name = 'changed';
       return response;
@@ -668,6 +686,7 @@ function fakeResources(fixtureValue: Audit): RecordValue[] {
     { uri: 'theologai://translations', mimeType: 'text/markdown' }, { uri: 'theologai://commentaries', mimeType: 'text/markdown' },
     { uri: 'theologai://primary-sources/catalog', mimeType: 'application/json' }, ...legacy,
     ...fixtureValue.probes.map(probe => ({ uri: probe.landingResourceUri, mimeType: 'text/markdown' })),
+    ...transform11WorkIds.map(id => ({ uri: `theologai://documents/${id}`, mimeType: 'text/markdown' })),
   ];
 }
 
@@ -710,7 +729,15 @@ function fakeCatalog(fixtureValue: Audit, options: FakeOptions = {}): RecordValu
       normalizedTextRights: 'no_known_conflict',
     },
   }));
-  return { schemaVersion: '2', kind: 'local_primary_source_catalog', workCount: 25, works: [...legacy, ...core],
+  const transform11 = transform11WorkIds.map(id => ({
+    id,
+    editionReadiness: {
+      editionIdentity: 'established',
+      provenance: fixtureValue.baseline.expectedCoreEditionProvenanceStatus,
+      normalizedTextRights: 'no_known_conflict',
+    },
+  }));
+  return { schemaVersion: '2', kind: 'local_primary_source_catalog', workCount: 35, works: [...legacy, ...core, ...transform11],
     policies: { scope: 'hosted_collection_only', editionProvenance: 'mixed_legacy_and_reviewed_source_packs', rightsStatus: 'mixed_not_established_and_no_known_conflict' } };
 }
 
@@ -737,7 +764,13 @@ function classicTool(body: RecordValue, args: RecordValue, fixtureValue: Audit, 
 
 function fakeClassicWorks(fixtureValue: Audit): RecordValue[] {
   const works = fakeCatalog(fixtureValue).works as RecordValue[];
-  return works.map(work => ({ id: work.id, deliveryMode: fixtureValue.probes.some(probe => probe.workId === work.id) ? 'sectioned_only' : 'complete_document' }));
+  return works.map(work => ({
+    id: work.id,
+    deliveryMode: fixtureValue.probes.some(probe => probe.workId === work.id)
+      || transform11WorkIds.includes(work.id as typeof transform11WorkIds[number])
+      ? 'sectioned_only'
+      : 'complete_document',
+  }));
 }
 
 function landing(probe: Audit['probes'][number], options: FakeOptions): RecordValue {

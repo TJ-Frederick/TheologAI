@@ -15,6 +15,9 @@ operation, and deadline ceilings are the same as the preview release gate.
 
 Run it only after the protected workflow has proved that the sole-active
 production Worker is attached to the exact readiness-tested production D1
-candidate. It writes create-only sanitized evidence and does not deploy, bind,
-seed, fetch CCEL, or change production state. A passing local test or checked-in
-fixture is not evidence of a remote cutover.
+candidate. Before either fixed audit, the workflow's bounded convergence gate
+must match both the checked-out primary-source tool schemas and the exact
+resource-URI inventory hash; the audits themselves retain zero retries. It
+writes create-only sanitized evidence and does not deploy, bind, seed, fetch
+CCEL, or change production state. A passing local test or checked-in fixture is
+not evidence of a remote cutover.

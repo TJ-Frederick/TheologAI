@@ -439,8 +439,8 @@ jobs:
       # This is deliberately a post-deploy release gate, not an ordinary PR
       # check: the runner is pinned to the canonical preview custom domain.
       # The deployment control plane can settle before every edge has the new
-      # tool registration. This bounded, explicit probe is not an audit retry.
-      - name: Stabilize preview primary-source contract at edge (read-only)
+      # tool and resource registrations. This bounded, explicit probe is not an audit retry.
+      - name: Stabilize preview release registrations at edge (read-only)
         id: preview-primary-source-edge-stabilization
         if: ${{ steps.preview-worker-candidate-cutover.outcome == 'success' }}
         continue-on-error: true
@@ -459,7 +459,7 @@ jobs:
 
       # Keep the failed probe observable above, then fail closed before either
       # fixed audit can start. The audits themselves retain zero retries.
-      - name: Require stable preview primary-source contract before audits
+      - name: Require stable preview release registrations before audits
         id: preview-primary-source-edge-stabilization-gate
         if: ${{ always() && steps.preview-worker-candidate-cutover.outcome == 'success' }}
         run: test "${{ steps.preview-primary-source-edge-stabilization.outcome }}" = success
@@ -473,11 +473,23 @@ jobs:
           test -s "$RUNNER_TEMP/original-language-v2-preview-audit.json"
 
       - name: Audit Transform-9 historical core contract on preview
+        id: preview-historical-core-audit
         if: ${{ steps.preview-primary-source-edge-stabilization-gate.outcome == 'success' && steps.preview-original-language-v2-audit.outcome == 'success' }}
         run: |
           npm run audit:historical-core-preview -- \
             --output "$RUNNER_TEMP/historical-core-preview-audit.json"
           test -s "$RUNNER_TEMP/historical-core-preview-audit.json"
+
+      # Fixed Transform-11 coverage stays separate from the Transform-9 core
+      # audit: each of the ten newly activated works must pass its own bounded
+      # landing, browse, search, primary-source, read, and pagination probes.
+      - name: Audit Transform-11 historical spine contract on preview
+        id: preview-historical-spine-audit
+        if: ${{ steps.preview-primary-source-edge-stabilization-gate.outcome == 'success' && steps.preview-original-language-v2-audit.outcome == 'success' && steps.preview-historical-core-audit.outcome == 'success' }}
+        run: |
+          npm run audit:historical-spine-preview -- \
+            --output "$RUNNER_TEMP/historical-spine-preview-audit.json"
+          test -s "$RUNNER_TEMP/historical-spine-preview-audit.json"
 
       # Runs after any post-deploy result (including audit failure or a later
       # authorization revocation) and is deliberately read-only. It does not
@@ -512,6 +524,7 @@ jobs:
 
       - name: Verify preview Worker remained active through audit (read-only)
         id: preview-worker-audit-identity
+        if: ${{ steps.preview-primary-source-edge-stabilization-gate.outcome == 'success' && steps.preview-original-language-v2-audit.outcome == 'success' && steps.preview-historical-core-audit.outcome == 'success' && steps.preview-historical-spine-audit.outcome == 'success' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -526,14 +539,17 @@ jobs:
 
       - name: Hash sanitized preview audit evidence
         id: preview-audit-evidence
+        if: ${{ steps.preview-primary-source-edge-stabilization-gate.outcome == 'success' && steps.preview-original-language-v2-audit.outcome == 'success' && steps.preview-historical-core-audit.outcome == 'success' && steps.preview-historical-spine-audit.outcome == 'success' && steps.preview-worker-audit-identity.outcome == 'success' }}
         run: |
           edge_stabilization_sha256="$(sha256sum "$RUNNER_TEMP/preview-primary-source-edge-stabilization.json" | awk '{print $1}')"
           original_language_audit_sha256="$(sha256sum "$RUNNER_TEMP/original-language-v2-preview-audit.json" | awk '{print $1}')"
           historical_audit_sha256="$(sha256sum "$RUNNER_TEMP/historical-core-preview-audit.json" | awk '{print $1}')"
+          historical_spine_audit_sha256="$(sha256sum "$RUNNER_TEMP/historical-spine-preview-audit.json" | awk '{print $1}')"
           identity_sha256="$(sha256sum "$RUNNER_TEMP/preview-worker-deployment-identity.json" | awk '{print $1}')"
           printf 'edge_stabilization_sha256=%s\n' "$edge_stabilization_sha256" >> "$GITHUB_OUTPUT"
           printf 'original_language_audit_sha256=%s\n' "$original_language_audit_sha256" >> "$GITHUB_OUTPUT"
           printf 'historical_audit_sha256=%s\n' "$historical_audit_sha256" >> "$GITHUB_OUTPUT"
+          printf 'historical_spine_audit_sha256=%s\n' "$historical_spine_audit_sha256" >> "$GITHUB_OUTPUT"
           printf 'identity_record_sha256=%s\n' "$identity_sha256" >> "$GITHUB_OUTPUT"
 
       - name: Upload protected preview audit evidence
@@ -544,6 +560,7 @@ jobs:
             ${{ runner.temp }}/preview-primary-source-edge-stabilization.json
             ${{ runner.temp }}/original-language-v2-preview-audit.json
             ${{ runner.temp }}/historical-core-preview-audit.json
+            ${{ runner.temp }}/historical-spine-preview-audit.json
             ${{ runner.temp }}/preview-worker-deployment-identity.json
             ${{ runner.temp }}/preview-worker-candidate-cutover-observation.json
             ${{ runner.temp }}/preview-worker-candidate-cutover.json
@@ -573,6 +590,7 @@ jobs:
           EDGE_STABILIZATION_SHA256: ${{ steps.preview-audit-evidence.outputs.edge_stabilization_sha256 }}
           ORIGINAL_LANGUAGE_AUDIT_SHA256: ${{ steps.preview-audit-evidence.outputs.original_language_audit_sha256 }}
           HISTORICAL_AUDIT_SHA256: ${{ steps.preview-audit-evidence.outputs.historical_audit_sha256 }}
+          HISTORICAL_SPINE_AUDIT_SHA256: ${{ steps.preview-audit-evidence.outputs.historical_spine_audit_sha256 }}
           CANDIDATE_CUTOVER_OBSERVATION_SHA256: ${{ steps.preview-reconciliation-evidence.outputs.candidate_cutover_observation_sha256 }}
           POST_MUTATION_RECONCILIATION_SHA256: ${{ steps.preview-reconciliation-evidence.outputs.post_mutation_reconciliation_sha256 }}
           AUDIT_ARTIFACT: preview-release-audit-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
@@ -586,6 +604,7 @@ jobs:
             const edgeStabilization = process.env.EDGE_STABILIZATION_SHA256;
             const originalLanguageAudit = process.env.ORIGINAL_LANGUAGE_AUDIT_SHA256;
             const historicalAudit = process.env.HISTORICAL_AUDIT_SHA256;
+            const historicalSpineAudit = process.env.HISTORICAL_SPINE_AUDIT_SHA256;
             const candidateCutoverObservation = process.env.CANDIDATE_CUTOVER_OBSERVATION_SHA256;
             const postMutationReconciliation = process.env.POST_MUTATION_RECONCILIATION_SHA256;
             const artifact = process.env.AUDIT_ARTIFACT;
@@ -594,7 +613,7 @@ jobs:
               || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(deployment)
               || !/^[0-9a-f]{64}$/i.test(workerIdentity) || !/^[0-9a-f]{64}$/i.test(edgeStabilization)
               || !/^[0-9a-f]{64}$/i.test(originalLanguageAudit)
-              || !/^[0-9a-f]{64}$/i.test(historicalAudit) || !/^[0-9a-f]{64}$/i.test(candidateCutoverObservation)
+              || !/^[0-9a-f]{64}$/i.test(historicalAudit) || !/^[0-9a-f]{64}$/i.test(historicalSpineAudit) || !/^[0-9a-f]{64}$/i.test(candidateCutoverObservation)
               || !/^[0-9a-f]{64}$/i.test(postMutationReconciliation)
               || !/^preview-release-audit-\d+-[0-9a-f]{40}$/i.test(artifact)) {
               core.setFailed('Preview release evidence is missing or malformed.');
@@ -610,7 +629,7 @@ jobs:
               '',
               `Deployed from checked-out commit \`${commit}\` (tree \`${tree}\`).`,
               `Cloudflare confirms Worker version \`${workerVersion}\` at 100% in deployment \`${deployment}\`.`,
-              `Edge-stabilization SHA-256: \`${edgeStabilization}\`; original-language audit SHA-256: \`${originalLanguageAudit}\`; historical-core audit SHA-256: \`${historicalAudit}\`; identity record SHA-256: \`${workerIdentity}\`; candidate-cutover observation SHA-256: \`${candidateCutoverObservation}\`; post-mutation reconciliation SHA-256: \`${postMutationReconciliation}\`; retained artifact: \`${artifact}\` (7 days).`,
+              `Edge-stabilization SHA-256: \`${edgeStabilization}\`; original-language audit SHA-256: \`${originalLanguageAudit}\`; historical-core audit SHA-256: \`${historicalAudit}\`; Transform-11 historical-spine audit SHA-256: \`${historicalSpineAudit}\`; identity record SHA-256: \`${workerIdentity}\`; candidate-cutover observation SHA-256: \`${candidateCutoverObservation}\`; post-mutation reconciliation SHA-256: \`${postMutationReconciliation}\`; retained artifact: \`${artifact}\` (7 days).`,
             ].join('\n');
 
             const { data: comments } = await github.rest.issues.listComments({

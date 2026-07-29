@@ -28,6 +28,17 @@ publication, and Aquinas-lineage rows empty. Protected release evidence proves
 this exact current binding; dormant hierarchy/publication runtime activation
 remains absent.
 
+PR #107's checked-in preview target is the prepared but unbound Transform-11
+candidate `theologai-preview-20260728-transform11-a`
+(`62b871a6-5b4d-4d9b-8f52-301f6c878f48`). Its one-use schema-`0008` operation
+applied the reviewed 49-file, 1,630,259-row deterministic seed with corpus
+identity `29a4a7faec2a960f06bfc026a319df8c08b495bb7ad82831fb62d3a3586643a4`.
+Primary readiness, Transform-8 authority (`1/12/12` pages), and complete
+Transform-11 source-pack authority (`1/1/1/1/1/1/133/17` pages) passed. The
+configuration change alone is not a remote binding: the PR #101 preview
+deployment above remains live until the protected workflow proves this exact
+candidate, and production remains unchanged.
+
 Historical PR #96 production evidence is source-attested to checked-out commit
 `ac4b5ed774302fbfc86bf846b6ee77a07beed456` and exact tree
 `adf08edbf6bfcb14b9613354b2b8fb9f62ec8c16`. At the fixed canonical endpoint

@@ -13,8 +13,8 @@ Use this workflow when the user asks about:
 
 ## Available Documents
 
-TheologAI includes 25 historical documents and works: 17 legacy documents and
-8 reviewed source-pack editions. Use the catalog and exact resources
+The checked-out TheologAI catalog includes 35 historical documents and works:
+17 legacy documents and 18 reviewed source-pack editions. Use the catalog and exact resources
 returned by the server to establish what is available and what each document
 says. The workflow must not assign a tradition or author from a title or from a
 prewritten grouping.

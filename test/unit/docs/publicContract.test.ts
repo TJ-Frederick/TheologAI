@@ -187,7 +187,9 @@ describe('published project contract', () => {
     expect(readme).toContain('do **not** currently fetch CCEL search results or document bodies');
     expect(readme).toContain('Production v6/local-only is deployed');
     expect(readme).toContain('preview runs the audited v7/discovery-only contract with CCEL execution disabled');
-    expect(readme).toMatch(/Preview\s+and production both serve the 25-work Transform 9 catalog/);
+    expect(readme).toMatch(/deployed preview and production baselines remain the prior 25-work catalog/);
+    expect(readme).toContain('35 locally indexed');
+    expect(readme).toContain('18 reviewed source-pack editions');
     expect(readme).toContain('The integrated Transform 10 candidate is local-only and unpublished');
     expect(readme).toContain('not wired into runtime or MCP surfaces');
     expect(readme).toContain('before adapter');
@@ -272,6 +274,39 @@ describe('published project contract', () => {
     expect(reconciliation).toContain('protected release evidence is authoritative');
     expect(operations).toContain('The current preview baseline is PR #101 deployment');
     expect(operations).toContain('Protected release evidence proves\nthis exact current binding');
+  });
+
+  it('records the completed Transform 11 preview release and unpublished hardening boundary', async () => {
+    const documents = await Promise.all([
+      readProjectFile('README.md'),
+      readProjectFile('docs/D1-DATA-WORKFLOW.md'),
+      readProjectFile('docs/PREVIEW-RELEASE-RECONCILIATION.md'),
+      readProjectFile('docs/PRIMARY-SOURCE-CATALOG-SCOPE.md'),
+      readProjectFile('docs/TRANSFORM11-HISTORICAL-SPINE-ACTIVATION.md'),
+      readProjectFile('docs/worker-operations.md'),
+      readProjectFile('docs/ROADMAP.md'),
+    ]);
+    const candidateName = 'theologai-preview-20260728-transform11-a';
+    const candidateId = '62b871a6-5b4d-4d9b-8f52-301f6c878f48';
+    const corpusIdentity = '29a4a7faec2a960f06bfc026a319df8c08b495bb7ad82831fb62d3a3586643a4';
+
+    for (const document of documents) {
+      expect(document).toContain(candidateName);
+      expect(document).toContain(candidateId);
+      expect(document).toContain('unbound');
+    }
+    for (const document of documents.slice(0, 6)) expect(document).toContain(corpusIdentity);
+    expect(documents[2]).toContain('No seed, migration, repair, or\nresume was repeated');
+    expect(documents[4]).toContain('30419373527');
+    expect(documents[4]).toContain('f5ef7a40-1b4b-4120-a1bb-70b33630b4a6');
+    expect(documents[4]).toContain('30420256210');
+    expect(documents[4]).toContain('no `deploy-preview`\nlabel');
+    expect(documents[4]).toContain('PR #101 production baseline on\nWorker #96');
+    expect(documents[4]).toContain('5346be93237086a541d7bb1982b96752807878be');
+    expect(documents[6]).toContain('30419373527');
+    expect(documents[6]).toContain('30420256210');
+    expect(documents[6]).toContain('PR #101 production baseline remains unchanged');
+    expect(documents[5]).toContain('production remains unchanged');
   });
 
   it('documents the completed PR #101 production cutover without implying hierarchy activation', async () => {

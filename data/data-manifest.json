@@ -150,6 +150,20 @@
         "data/historical-source-packs/core-eight/editions/wesley-standard-sermons-1771.json",
         "data/historical-source-packs/core-eight/manifest.json",
         "data/historical-source-packs/core-eight/manifest.sha256",
+        "data/historical-source-packs/historical-spine-early/editions/augustine-on-christian-doctrine-shaw-npnf1-v2-1887.json",
+        "data/historical-source-packs/historical-spine-early/editions/basil-on-the-holy-spirit-jackson-npnf2-v8-1895.json",
+        "data/historical-source-packs/historical-spine-early/editions/gregory-nazianzen-five-theological-orations-browne-swallow-npnf2-v7-1894.json",
+        "data/historical-source-packs/historical-spine-early/editions/gregory-nyssa-great-catechism-moore-wilson-npnf2-v5-1893.json",
+        "data/historical-source-packs/historical-spine-early/editions/justin-martyr-apologies-dods-reith-anf1-1885.json",
+        "data/historical-source-packs/historical-spine-early/editions/origen-de-principiis-crombie-anf4-1885.json",
+        "data/historical-source-packs/historical-spine-early/manifest.json",
+        "data/historical-source-packs/historical-spine-early/manifest.sha256",
+        "data/historical-source-packs/historical-spine-later/editions/hooker-laws-of-ecclesiastical-polity-book-1-keble-1888.json",
+        "data/historical-source-packs/historical-spine-later/editions/julian-revelations-of-divine-love-warrack-1901-gutenberg.json",
+        "data/historical-source-packs/historical-spine-later/editions/kempis-imitation-of-christ-benham-gutenberg.json",
+        "data/historical-source-packs/historical-spine-later/editions/pascal-pensees-trotter-1910.json",
+        "data/historical-source-packs/historical-spine-later/manifest.json",
+        "data/historical-source-packs/historical-spine-later/manifest.sha256",
         "src/data/ubs-parallel-passages.generated.json"
       ]
     }
@@ -642,6 +656,62 @@
       "sha256": "3be00b7d4bef7c497e51a209da58b713ae6a89f2bbd365623aed8b47a15dbf6c"
     },
     {
+      "path": "data/historical-source-packs/historical-spine-early/editions/augustine-on-christian-doctrine-shaw-npnf1-v2-1887.json",
+      "sha256": "112b6d628a40eb83366d5ff1350dfe9d2b20e77dc12de4e38070878c69f891b3"
+    },
+    {
+      "path": "data/historical-source-packs/historical-spine-early/editions/basil-on-the-holy-spirit-jackson-npnf2-v8-1895.json",
+      "sha256": "b84e9bcaa099352f0380c9026d8e86f6ec2ed4e26bd7dbafc16459fc61c85b09"
+    },
+    {
+      "path": "data/historical-source-packs/historical-spine-early/editions/gregory-nazianzen-five-theological-orations-browne-swallow-npnf2-v7-1894.json",
+      "sha256": "edb0905536f2967317b778bf27a304b5c51bdcf456af42447f8efafee9dd1f35"
+    },
+    {
+      "path": "data/historical-source-packs/historical-spine-early/editions/gregory-nyssa-great-catechism-moore-wilson-npnf2-v5-1893.json",
+      "sha256": "7f941e15b1c58c7c3be4fe5612d7359bb73a8c007618f61f2485ee2a51fbe1e1"
+    },
+    {
+      "path": "data/historical-source-packs/historical-spine-early/editions/justin-martyr-apologies-dods-reith-anf1-1885.json",
+      "sha256": "a78923bf9a5ad25347fc28a565fd7845ffaf61d27d30972d528c2c45f3f85d7d"
+    },
+    {
+      "path": "data/historical-source-packs/historical-spine-early/editions/origen-de-principiis-crombie-anf4-1885.json",
+      "sha256": "2baf4c5e9e7e30a3c0d86b05b5c6b359bddbfc98900fe12a2f315c9e027b5d44"
+    },
+    {
+      "path": "data/historical-source-packs/historical-spine-early/manifest.json",
+      "sha256": "c993fdeb186e9febf6f73f03e33fe27086e8f9c13d4010fb7206ef2f2fbd8c9f"
+    },
+    {
+      "path": "data/historical-source-packs/historical-spine-early/manifest.sha256",
+      "sha256": "eae44e1dcb93537a258a52b2e1f5c13bbd10082bd333bca049d37076865b2f0e"
+    },
+    {
+      "path": "data/historical-source-packs/historical-spine-later/editions/hooker-laws-of-ecclesiastical-polity-book-1-keble-1888.json",
+      "sha256": "f607b7a03c8e9e4519734b51ad3ab002fd8578c869216a9c87e7ecc0a9b9dc23"
+    },
+    {
+      "path": "data/historical-source-packs/historical-spine-later/editions/julian-revelations-of-divine-love-warrack-1901-gutenberg.json",
+      "sha256": "8757d57393b144d06bb7e6a1ea0061b0de4a1a8944ad5b5bc08f2e480846a9de"
+    },
+    {
+      "path": "data/historical-source-packs/historical-spine-later/editions/kempis-imitation-of-christ-benham-gutenberg.json",
+      "sha256": "c8e1bf6d91c318b5e5e7220a5b61d88f5bd0635ff67207592a0bf1dd27b9c8b4"
+    },
+    {
+      "path": "data/historical-source-packs/historical-spine-later/editions/pascal-pensees-trotter-1910.json",
+      "sha256": "6781c69ba996cc5ceb622f2620afc15f828d6bd1a40111ed205fc9ccd447311c"
+    },
+    {
+      "path": "data/historical-source-packs/historical-spine-later/manifest.json",
+      "sha256": "5a7e865706f0dc3ea494e92a525491d7eff70c01b8973ed96b37027e3250676b"
+    },
+    {
+      "path": "data/historical-source-packs/historical-spine-later/manifest.sha256",
+      "sha256": "d2a32cc3ba174244ee3b11f2de27e2d7decfc247a1287e52a40983a3bd941adb"
+    },
+    {
       "path": "data/historical-sources/project-gutenberg/aquinas-english-dominican/LOCAL_ACQUISITION_RECEIPT.json",
       "sha256": "bc0dab9ce5dc3672ccf2a81182655c75eaf6ef4f280584a40e079bf82a11719d"
     },
@@ -716,23 +786,23 @@
     "strongs_usage_stats": 13836,
     "morphology": 447748,
     "stepbible_lexicons": 19570,
-    "documents": 25,
-    "document_sections": 3566,
-    "historical_document_delivery_profiles": 25,
-    "historical_section_identities": 3566,
+    "documents": 35,
+    "document_sections": 4111,
+    "historical_document_delivery_profiles": 35,
+    "historical_section_identities": 4111,
     "historical_section_aliases": 2821,
-    "historical_source_packs": 1,
-    "historical_works": 8,
-    "historical_editions": 8,
-    "historical_source_artifacts": 25,
-    "historical_edition_sections": 512,
-    "historical_edition_sections_fts": 512,
+    "historical_source_packs": 3,
+    "historical_works": 18,
+    "historical_editions": 18,
+    "historical_source_artifacts": 43,
+    "historical_edition_sections": 1057,
+    "historical_edition_sections_fts": 1057,
     "historical_edition_hierarchies": 0,
     "historical_edition_hierarchy_bodies": 0,
     "historical_edition_hierarchy_nodes": 0,
     "historical_edition_hierarchy_bodies_fts": 0,
     "historical_hierarchy_publications": 0,
-    "sections_fts": 3566,
+    "sections_fts": 4111,
     "morph_codes": 20,
     "ubs_parallel_sources": 1,
     "ubs_parallel_groups": 2193,

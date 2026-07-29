@@ -6,6 +6,6 @@ import { runPrimarySourceEdgeStabilizationCli } from './audit-primary-source-edg
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   runPrimarySourceEdgeStabilizationCli(process.argv.slice(2), PRODUCTION_PROFILE).then(({ output, evidence }) => {
-    console.log(`PASS: production primary-source contract stabilized on attempt ${evidence.matchedAttempt}; evidence: ${output}`);
+    console.log(`PASS: production primary-source/resource contracts stabilized on attempt ${evidence.matchedAttempt}; evidence: ${output}`);
   }).catch(error => { console.error(error instanceof Error ? error.message : String(error)); process.exitCode = 1; });
 }

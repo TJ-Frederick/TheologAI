@@ -219,7 +219,7 @@ describe('biblical-language source revisions', () => {
   it('pins the transform-10 D1 materialization while preserving transform-7 semantic source locks', () => {
     const manifest = parseDataManifest(readFileSync('data/data-manifest.json'));
     const d1Identity = computeD1CorpusIdentity(manifest);
-    expect(d1Identity).toBe('c43bfa2f5e7ff04c3641a228092bdc91d597edc60dc7d596507e8ca6c0ac90fe');
+    expect(d1Identity).toBe('29a4a7faec2a960f06bfc026a319df8c08b495bb7ad82831fb62d3a3586643a4');
     // This lock documents the earlier language-source reproduction transform.
     // The new semantic corpus has its own checked manifest and must not be
     // retroactively folded into that historical reproduction identity.

@@ -18,7 +18,7 @@ import { historicalLegacySectionId, readHistoricalSectionSources, sha256Canonica
 import { auditHistoricalTransform8Authority } from './historical-transform8-authority-audit.js';
 import { auditHistoricalTransform9Authority } from './historical-transform9-authority-audit.js';
 import {
-  assertCoreEightSourcePackRelease,
+  assertReviewedSourcePackRelease,
   loadHistoricalSourcePacks,
 } from './historical-source-packs.js';
 import {
@@ -236,29 +236,35 @@ function assertHistoricalTransform8Materialization(database: Database.Database):
   if (ftsMismatches.count !== 0) throw new Error('Transform 8 changed the historical FTS projection');
 }
 
-/** Verify the Transform-9 reviewed-edition projection without changing the frozen Transform-8 ledger. */
-function assertHistoricalTransform9SourcePackMaterialization(database: Database.Database): void {
+/** Verify the Transform-11 reviewed-edition projection without changing the frozen Transform-8 ledger. */
+function assertHistoricalTransform11SourcePackMaterialization(database: Database.Database): void {
   const packs = loadHistoricalSourcePacks(manifest.materializations.d1.inputs, {
     read: (path: string) => readFileSync(join(ROOT, path), 'utf8'),
   } as never);
-  assertCoreEightSourcePackRelease(packs);
+  assertReviewedSourcePackRelease(packs);
   const packRows = database.prepare(`SELECT pack_id AS packId, revision, schema_version AS schemaVersion,
     manifest_sha256 AS manifestSha256, source_path AS sourcePath
-    FROM historical_source_packs WHERE pack_id = 'theologai-core-eight' ORDER BY pack_id`).all() as Array<{
+    FROM historical_source_packs ORDER BY pack_id`).all() as Array<{
       packId: string; revision: string; schemaVersion: string; manifestSha256: string; sourcePath: string;
     }>;
-  if (packRows.length !== 1 || packRows[0]?.packId !== 'theologai-core-eight'
-    || packRows[0].revision !== packs[0]!.revision || packRows[0].sourcePath !== packs[0]!.sourcePath
-    || packRows[0].manifestSha256 !== packs[0]!.manifestSha256
-    || packRows[0].schemaVersion !== packs[0]!.manifestSchemaVersion) {
-    throw new Error('Transform 9 source-pack identity projection drifted');
+  const expectedPackRows = [...new Map(packs.map(pack => [pack.packId, pack])).values()]
+    .map(pack => ({
+      packId: pack.packId,
+      revision: pack.revision,
+      schemaVersion: pack.manifestSchemaVersion,
+      manifestSha256: pack.manifestSha256,
+      sourcePath: pack.sourcePath,
+    }))
+    .sort((left, right) => left.packId.localeCompare(right.packId));
+  if (JSON.stringify(packRows) !== JSON.stringify(expectedPackRows)) {
+    throw new Error('Transform 11 source-pack identity projection drifted');
   }
 
   const sourceAliasCount = database.prepare(`SELECT COUNT(*) AS count
     FROM historical_section_aliases alias
     JOIN historical_document_delivery_profiles profile ON profile.document_id = alias.document_id
     WHERE profile.delivery_mode = 'sectioned_only'`).get() as { count: number };
-  if (sourceAliasCount.count !== 0) throw new Error('Transform 9 must not add legacy section aliases');
+  if (sourceAliasCount.count !== 0) throw new Error('Transform 11 must not add legacy section aliases');
 
   const repository = new HistoricalDocumentRepository(database);
   for (const pack of packs) {
@@ -277,7 +283,7 @@ function assertHistoricalTransform9SourcePackMaterialization(database: Database.
       || profile.sectionPackageIdentity !== pack.compiled.sha256 || profile.deliveryMode !== 'sectioned_only'
       || profile.sectionCount !== sections.length || profile.landingMaxBytes !== 16_384
       || profile.browsePageSize !== 32 || profile.cursorVersion !== 1) {
-      throw new Error(`Transform 9 sectioned delivery profile drifted for ${work.workId}`);
+      throw new Error(`Transform 11 sectioned delivery profile drifted for ${work.workId}`);
     }
     const rows = database.prepare(`SELECT es.section_key AS sectionKey, es.source_ordinal AS sourceOrdinal,
       es.display_label AS displayLabel, es.heading, es.content,
@@ -293,25 +299,25 @@ function assertHistoricalTransform9SourcePackMaterialization(database: Database.
         sectionKey: string; sourceOrdinal: number; displayLabel: string; heading: string; content: string;
         documentSectionId: number; sectionNumber: string; sectionTitle: string; sectionContent: string;
       }>;
-    if (rows.length !== sections.length) throw new Error(`Transform 9 section coverage drifted for ${work.workId}`);
+    if (rows.length !== sections.length) throw new Error(`Transform 11 section coverage drifted for ${work.workId}`);
     for (const [index, expected] of sections.entries()) {
       const stored = rows[index];
       if (!stored || stored.sectionKey !== expected.sectionKey || stored.sourceOrdinal !== expected.sourceOrdinal
         || stored.displayLabel !== expected.displayLabel || stored.heading !== expected.heading
         || stored.content !== expected.content || stored.sectionNumber !== expected.sectionKey
         || stored.sectionTitle !== expected.heading || stored.sectionContent !== expected.content) {
-        throw new Error(`Transform 9 normalized/canonical section projection drifted for ${work.workId}#${expected.sectionKey}`);
+        throw new Error(`Transform 11 normalized/canonical section projection drifted for ${work.workId}#${expected.sectionKey}`);
       }
       const resolved = repository.resolveSection(work.workId, expected.sectionKey);
       if (!resolved || resolved.resolution !== 'canonical' || resolved.sourceOrdinal !== expected.sourceOrdinal
         || resolved.section.content !== expected.content) {
-        throw new Error(`Transform 9 Node canonical section resolution drifted for ${work.workId}#${expected.sectionKey}`);
+        throw new Error(`Transform 11 Node canonical section resolution drifted for ${work.workId}#${expected.sectionKey}`);
       }
     }
     const artifactCount = database.prepare(`SELECT COUNT(*) AS count FROM historical_source_artifacts
       WHERE edition_id = ?`).get(edition.editionId) as { count: number };
     if (artifactCount.count !== pack.artifacts.length) {
-      throw new Error(`Transform 9 source-artifact projection drifted for ${work.workId}`);
+      throw new Error(`Transform 11 source-artifact projection drifted for ${work.workId}`);
     }
   }
   const ftsMismatch = database.prepare(`SELECT COUNT(*) AS count
@@ -319,7 +325,7 @@ function assertHistoricalTransform9SourcePackMaterialization(database: Database.
     LEFT JOIN historical_edition_sections_fts fts
       ON fts.edition_id = section.edition_id AND fts.section_key = section.section_key
     WHERE fts.rowid IS NULL OR fts.heading IS NOT section.heading OR fts.content IS NOT section.content`).get() as { count: number };
-  if (ftsMismatch.count !== 0) throw new Error('Transform 9 historical source-pack FTS projection drifted');
+  if (ftsMismatch.count !== 0) throw new Error('Transform 11 historical source-pack FTS projection drifted');
 }
 
 try {
@@ -382,7 +388,7 @@ try {
   assertHebrewLemmaCoverageDatabase(db, 'Verified SQLite morphology');
   verifyBiblicalLanguageUnicodeD1(ROOT, db, manifest.expectedCounts);
   assertHistoricalTransform8Materialization(db);
-  assertHistoricalTransform9SourcePackMaterialization(db);
+  assertHistoricalTransform11SourcePackMaterialization(db);
   assertNormalAquinasHierarchyExclusion(db);
   auditHistoricalTransform8Authority(ROOT, sql => {
     const rows = db.prepare(sql).all();
