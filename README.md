@@ -6,9 +6,9 @@ locally over stdio or Streamable HTTP and on Cloudflare Workers with D1.
 The checked-out local registry contains eleven tools, six guided prompts, eight
 English Bible translations, six commentary sources, 35 locally indexed
 historical works, Strong's dictionaries, and Greek/Hebrew morphology. The
-checked-out Transform 11 candidate adds ten reviewed editions to the 25-work
-deployed baseline; preview and production remain unchanged until separately
-protected D1 releases.
+checked-out Transform 11 release adds ten reviewed editions to the 25-work
+production baseline. Preview serves the 35-work catalog; production remains on
+the 25-work baseline until its separately protected D1 release proves cutover.
 
 The integrated Transform 10 candidate is local-only and unpublished. Its
 Aquinas packet, schema, and standalone materializer are retained for future
@@ -132,22 +132,21 @@ reviewed 49-file, 1,627,474-row deterministic seed for schema `0008`; remote
 readiness passed, Transform-8/9 authority audits passed, and Transform-10
 normal-corpus exclusion predicates proved hierarchy, publication, and
 Aquinas-lineage rows empty. The protected release subsequently proved this
-exact binding; it is the current preview baseline and makes no production
-claim.
+exact binding; it is the retained compatible preview predecessor and makes no
+production claim.
 
-PR #107's checked-in preview target is the separately prepared, currently
-unbound Transform-11 candidate `theologai-preview-20260728-transform11-a`
+PR #107's preview candidate `theologai-preview-20260728-transform11-a`
 (`62b871a6-5b4d-4d9b-8f52-301f6c878f48`). Its one-use schema-`0008` import
 applied the exact reviewed 49-file, 1,630,259-row seed with corpus identity
 `29a4a7faec2a960f06bfc026a319df8c08b495bb7ad82831fb62d3a3586643a4`.
 Primary readiness, Transform-8 authority (`1/12/12` pages), and the complete
 Transform-11 source-pack authority audit (`1/1/1/1/1/1/133/17` pages) passed.
-The checked-in declaration is not a live binding or deployment; preview remains
-on the PR #101 baseline until the protected workflow proves the exact cutover.
-Production is unchanged. Transform-10 hierarchy, publication, and Aquinas
+Protected preview deployment `5e812152-355b-4a5f-a123-2485e89f1550` now
+serves Worker `06b9a603-8339-42b6-a246-ef9238563043` (#140) with that exact
+D1. Production is unchanged. Transform-10 hierarchy, publication, and Aquinas
 material remain excluded.
 
-PR #101's current production target is
+PR #101's live production D1 is
 `theologai-production-20260728-hierarchy-a`
 (`f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395`). It was unbound when its reviewed
 49-file, 1,627,474-row schema-`0008` preparation completed: remote readiness
@@ -158,6 +157,19 @@ before and after its black-box audits. Production primary-source stabilization
 matched on attempt 1, `original_language_study` v2 passed 11/11 cases, and all
 eight reviewed Transform-9 core works passed. This release activates no
 Transform-10 hierarchy or publication rows.
+
+The checked-in production target is the separately prepared, still unbound
+Transform-11 candidate `theologai-production-20260729-transform11-a`
+(`53211f50-a893-4b4c-be1e-bc625a595dc7`). It was created once in ENAM from
+merge `501ae7840a71ceb589dc3b1ae9863aef83e3586f`, exact tree
+`dec0f2d66779e6126b3ddb02e74304b97293c67f`, and the reviewed 49-file,
+1,630,259-row seed with corpus identity
+`29a4a7faec2a960f06bfc026a319df8c08b495bb7ad82831fb62d3a3586643a4`.
+Primary readiness, Transform-8 authority (`1/12/12` pages), and complete
+Transform-11 source-pack authority (`1/1/1/1/1/1/133/17` pages) passed. The
+configuration selection alone is not a production binding or deployment; the
+PR #101 production D1 above is retained as the rollback pair until the
+protected release proves the new Worker/D1 assignment and audits.
 For a preview-client rollback without changing server state, use the direct preview
 `workers.dev` address above; the production `workers.dev` address intentionally
 redirects rather than serving a separate legacy Worker.
@@ -192,7 +204,7 @@ fresh server and transport.
 | `bible_cross_references` | Query locally indexed OpenBible.info cross references with raw vote ranking, explicit discovery-only semantics, threshold-scoped result windows, and pinned snapshot provenance. |
 | `parallel_passages` | Return complete UBS source-attested parallel groups by default; legacy curated edges and OpenBible.info cross references require explicit selectors and remain separate. |
 | `commentary_lookup` | Retrieve Matthew Henry, JFB, Adam Clarke, John Gill, Keil-Delitzsch (OT), or Tyndale notes. |
-| `classic_text_lookup` | The checked-out Transform 11 catalog searches and browses 35 historical works with canonical source-first section keys; 18 reviewed source-pack editions use bounded sectioned delivery. The deployed preview and production baselines remain the prior 25-work catalog until separately protected releases. Exact sections are the only body route, and remote CCEL document bodies are not retrieved or republished. |
+| `classic_text_lookup` | The checked-out Transform 11 catalog searches and browses 35 historical works with canonical source-first section keys; 18 reviewed source-pack editions use bounded sectioned delivery. Preview serves the 35-work Transform-11 catalog; production remains on the 25-work baseline until its separately protected release proves cutover. Exact sections are the only body route, and remote CCEL document bodies are not retrieved or republished. |
 | `primary_source_search` | Execute bounded primary-source query plans. Production v6/local-only is deployed; preview runs the audited v7/discovery-only contract with CCEL execution disabled before adapter, coordinator, or fetch. The Transform-9 preview corpus release does not change that CCEL policy. Local locators use canonical section keys plus source ordinals; snippets remain discovery-only and research workflows maintain explicit searched/read/deferred/not-searched coverage ledgers. |
 | `original_language_lookup` | Look up or search Strong's entries, with opt-in rights-reviewed STEPBible metadata, exact corrected-corpus usage, and bounded occurrence pages for exact identities. The Online-Bible-derived TBESH Hebrew `Meaning` field is withheld. |
 | `bible_verse_morphology` | Return bounded word-by-word morphology for one exact verse, with raw codes, nullable expansions, and separate pinned STEPBible morphology/lemma provenance. |
@@ -364,9 +376,10 @@ adds Augustine's *On Christian Doctrine*, Basil, both Gregories, Justin Martyr,
 Origen, Hooker Book I, Julian of Norwich, *The Imitation of Christ*, and
 Pascal's *Pensées*. The three packs are sectioned-only, contribute 1,057
 canonical sections, and add no legacy aliases; exact resources disclose the
-reviewed edition and normalized-text rights boundary. The deployed preview and
-production baselines remain the 25-work PR #101 corpus until protected release.
-The exact checked-out count is enforced by `data/data-manifest.json`.
+reviewed edition and normalized-text rights boundary. Preview serves the
+35-work Transform-11 catalog; production remains on the 25-work PR #101 corpus
+until its protected release proves cutover. The exact checked-out count is
+enforced by `data/data-manifest.json`.
 
 Approved UBS Hebrew artifacts plus the separately acquired Norton and Aquinas
 public-domain packets are checked into the repository for deterministic
@@ -387,9 +400,10 @@ catalogs. Norton and Aquinas assets remain inactive. Norton is a future successo
 `sectioned_only` candidate. Cyril remains blocked with zero output pending
 reliable translator attribution.
 
-Production v6/local-only and preview v7/discovery-only both currently search
-and retrieve the deployed 25-work Transform 9 collection. Both deployed
-environments do **not** currently fetch CCEL search results or document bodies.
+Production v6/local-only currently searches and retrieves the 25-work PR #101
+collection. Preview v7/discovery-only currently serves the 35-work Transform-11
+collection. Both deployed environments do **not** currently fetch CCEL search
+results or document bodies.
 Preview's existing `classic_text_lookup` provides the Baltimore hard cut and
 canonical/legacy resolution without adding a tool. Its deployed v7
 CCEL-discovery profile returns a disabled provider result before adapter

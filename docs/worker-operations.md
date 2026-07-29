@@ -17,27 +17,39 @@ and Aquinas-lineage rows empty. Protected workflow `30401732957` subsequently
 proved the exact binding before and after its bounded black-box audits. This is
 not a hierarchy/publication activation.
 
-The current preview baseline is PR #101 deployment
+The retained PR #101 preview predecessor was deployment
 `070b292b-0bae-400a-b983-3d72157b5a96`, serving Worker
 `bd722b69-2e2c-4d8d-b42b-617e8caba13d` (#130), bound to
 `theologai-preview-20260728-hierarchy-a`
 (`51890e12-1c3f-421f-b661-9a5ea9637e43`). It was unbound when seeded once
 through schema `0008`: remote readiness and Transform-8/9 authority audits
 passed, and Transform-10 normal-corpus exclusion predicates proved hierarchy,
-publication, and Aquinas-lineage rows empty. Protected release evidence proves
-this exact current binding; dormant hierarchy/publication runtime activation
-remains absent.
+publication, and Aquinas-lineage rows empty. Its release evidence remains the
+compatible predecessor record; dormant hierarchy/publication runtime activation
+remained absent.
 
-PR #107's checked-in preview target is the prepared but unbound Transform-11
-candidate `theologai-preview-20260728-transform11-a`
+PR #107's Transform-11 candidate `theologai-preview-20260728-transform11-a`
 (`62b871a6-5b4d-4d9b-8f52-301f6c878f48`). Its one-use schema-`0008` operation
 applied the reviewed 49-file, 1,630,259-row deterministic seed with corpus
 identity `29a4a7faec2a960f06bfc026a319df8c08b495bb7ad82831fb62d3a3586643a4`.
 Primary readiness, Transform-8 authority (`1/12/12` pages), and complete
+Transform-11 source-pack authority (`1/1/1/1/1/1/133/17` pages) passed while
+unbound. Protected preview deployment `5e812152-355b-4a5f-a123-2485e89f1550`
+now serves Worker `06b9a603-8339-42b6-a246-ef9238563043` (#140) as the sole
+active preview assignment bound to that exact D1. Production remains unchanged.
+
+The checked-in root production target is the prepared but unbound Transform-11
+candidate `theologai-production-20260729-transform11-a`
+(`53211f50-a893-4b4c-be1e-bc625a595dc7`). It was created once in ENAM from
+merge `501ae7840a71ceb589dc3b1ae9863aef83e3586f`, exact tree
+`dec0f2d66779e6126b3ddb02e74304b97293c67f`, and the reviewed 49-file,
+1,630,259-row seed with corpus identity
+`29a4a7faec2a960f06bfc026a319df8c08b495bb7ad82831fb62d3a3586643a4`.
+Primary readiness, Transform-8 authority (`1/12/12` pages), and complete
 Transform-11 source-pack authority (`1/1/1/1/1/1/133/17` pages) passed. The
-configuration change alone is not a remote binding: the PR #101 preview
-deployment above remains live until the protected workflow proves this exact
-candidate, and production remains unchanged.
+checked-in declaration is not a live production binding or deployment; retain
+the PR #101 Worker/D1 pair above as the current production baseline and rollback
+pair until the protected release proves the new assignment and audits.
 
 Historical PR #96 production evidence is source-attested to checked-out commit
 `ac4b5ed774302fbfc86bf846b6ee77a07beed456` and exact tree
@@ -636,15 +648,14 @@ readiness query that checks integrity, exact manifest row counts, and required
 indexes, column signatures, foreign keys, and schema/corpus identity markers. A
 missing, stale, partial, or incompatible corpus stops deployment.
 
-The deployed preview Transform 9 / 25-work release runs the same gate's bounded
-source-pack authority audit: direct eight-row normalized-section pages plus
-compact identity/document/edition-FTS/runtime-FTS parity pages. The audit is
-read-only and catches an orphan or extra normalized section that a
-delivery-profile join alone would miss. The current PR #101 preview and
-production D1 databases both contain the 25-work corpus and exclude inactive
-Aquinas hierarchy and publication rows. This does not authorize Aquinas
-activation. Any later corpus cutover must rerun this gate and audit against its
-exact candidate.
+The current preview Transform-11 / 35-work release ran the same gate's complete
+source-pack authority audit, including direct normalized-section pages and
+identity/document/edition-FTS/runtime-FTS parity pages. The audit is read-only
+and catches an orphan or extra normalized section that a delivery-profile join
+alone would miss. Production remains on the PR #101 25-work D1, which excludes
+inactive Aquinas hierarchy and publication rows; its separately prepared
+Transform-11 candidate must pass its protected cutover and audits before that
+state changes. This does not authorize Aquinas activation.
 
 The corpus marker is the scoped D1 materialization identity derived from
 `data/data-manifest.json` `materializations.d1`, not the hash of the complete
