@@ -113,9 +113,15 @@ describe('Transform-11 historical-spine fixed audit', () => {
     expect((evidence.records as unknown[])).toHaveLength(10);
     const serialized = JSON.stringify(evidence);
     for (const forbidden of ['PRIVATE HISTORICAL BODY', 'theologai://', 'cursor-', 'not-a-valid-cursor']) expect(serialized).not.toContain(forbidden);
-    expect(calls.filter(call => call.body.method === 'tools/call' && ((call.body.params as RecordValue).name === 'primary_source_search')).every(call => {
+    const primaryCalls = calls.filter(call => call.body.method === 'tools/call' && ((call.body.params as RecordValue).name === 'primary_source_search'));
+    expect(primaryCalls.map(call => {
       const query = (((call.body.params as RecordValue).arguments as RecordValue).queries as RecordValue[])[0]!;
-      return query.searchDepth === 'standard' && !Object.hasOwn(query, 'providers');
+      return query.id;
+    })).toEqual(['spine-01', 'spine-02', 'spine-03', 'spine-04', 'spine-05', 'spine-06', 'spine-07', 'spine-08', 'spine-09', 'spine-10']);
+    expect(primaryCalls.every(call => {
+      const query = (((call.body.params as RecordValue).arguments as RecordValue).queries as RecordValue[])[0]!;
+      return typeof query.id === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$/u.test(query.id)
+        && query.searchDepth === 'standard' && !Object.hasOwn(query, 'providers');
     })).toBe(true);
     const resourceReads = calls.filter(call => call.body.method === 'resources/read');
     expect(resourceReads).toHaveLength(32); // catalog + 10 landings + 10 global-search locators + 10 primary locators + invalid regression

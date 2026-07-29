@@ -313,7 +313,7 @@ export async function runHistoricalSpineAudit(
   const authoritative = assertAuthoritativeCatalog(await client.readResource('theologai://primary-sources/catalog'), fixture);
   assertCatalog(await client.callTool('classic_text_lookup', { listWorks: true }), fixture, authoritative);
   const records: ObjectRecord[] = [];
-  for (const probe of fixture.probes) {
+  for (const [probeIndex, probe] of fixture.probes.entries()) {
     const resourceBytes = assertLanding(await client.callTool('classic_text_lookup', { work: probe.workId }), probe);
     assertLandingRead(await client.readResource(landingUri(probe.workId)), probe, resourceBytes);
     const directory = assertDirectory(await client.callTool('classic_text_lookup', { work: probe.workId, browseSections: true }), probe);
@@ -321,7 +321,9 @@ export async function runHistoricalSpineAudit(
     const globalSearchUri = assertClassicSearch(await client.callTool('classic_text_lookup', { query: probe.query }), probe, authoritative.get(probe.workId)!);
     assertSectionRead(await client.readResource(globalSearchUri), globalSearchUri, probe.workId);
     const sectionUri = assertPrimary(await client.callTool('primary_source_search', { queries: [{
-      id: `spine-${probe.workId}`, text: probe.query, work: probe.workId, match: 'all_terms', selection: 'relevance', limit: 5,
+      // Query IDs are transport identifiers, not work identifiers.  Keep the
+      // fixed audit inventory independent of arbitrary catalog-slug length.
+      id: `spine-${String(probeIndex + 1).padStart(2, '0')}`, text: probe.query, work: probe.workId, match: 'all_terms', selection: 'relevance', limit: 5,
       ...(profile.primarySource.contractVersion === '7' ? { searchDepth: 'standard' } : { providers: ['local'] }),
     }] }), probe, profile, authoritative.get(probe.workId)!);
     assertSectionRead(await client.readResource(sectionUri), sectionUri, probe.workId);
