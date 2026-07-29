@@ -50,21 +50,38 @@ candidate `theologai-preview-20260728-transform11-a`
 once from the exact 49-file, 1,630,259-row reviewed seed with corpus identity
 `29a4a7faec2a960f06bfc026a319df8c08b495bb7ad82831fb62d3a3586643a4`.
 Primary readiness, Transform-8 authority (`1/12/12` pages), and complete
-Transform-11 source-pack authority (`1/1/1/1/1/1/133/17` pages) passed. The
-checked-in preview target does not bind or deploy it; the protected workflow
-must prove that exact cutover before black-box audit. Production remains on the
-PR #101 baseline until a separate production authorization.
+Transform-11 source-pack authority (`1/1/1/1/1/1/133/17` pages) passed.
 
 The first protected PR #107 attempt (`30418227263`) proved the candidate
 binding and passed the original-language audit, but the zero-retry historical
 audit reached one edge whose `resources/list` inventory had not yet converged
 and failed before reading historical bodies. A subsequent bounded read-only
 diagnostic observed the exact 38-resource identity, and the complete fixed
-historical audit then passed without an application or D1 repair. The release
-gate now stabilizes both the primary-source tool schemas and a hash of the
-exact checked-out resource URI inventory before either protected audit. It
-requires two consecutive matching probes separated by the fixed four-second
-convergence delay, records only hashes and booleans, retains bounded attempts,
-and does not turn an audit into a retry loop. A fresh protected run must still
-prove the repair head, exact candidate binding, and both zero-retry audits; its
-workflow evidence is authoritative.
+historical audit then passed without an application or D1 repair.
+
+The repaired exact PR #107 head `8dd6b4fa306b8f9412c1a08207261ea34d477f37`
+then passed protected preview run `30419373527`. It deployed
+`f5ef7a40-1b4b-4120-a1bb-70b33630b4a6` as sole 100% assignment of Worker
+`83b1ec5f-3b0d-4388-8c0b-e017076442dd` (#134), bound to
+`theologai-preview-20260728-transform11-a`
+(`62b871a6-5b4d-4d9b-8f52-301f6c878f48`). The protected original-language and
+historical-core audits passed. Preview authorization was then removed; the
+revocation workflow `30420256210` passed and PR #107 has no `deploy-preview`
+label.
+
+A separate, zero-retry targeted audit of the ten newly activated works also
+passed. Its 84-exchange main audit checked landing, browse, natural search,
+scoped local primary-source search, and direct reads; its separate 12-exchange
+pagination/cursor audit also passed. Sanitized evidence hashes are
+`1b56d093b298f41a7845b6c328dbf63ade72ca8fdf8cf82bc68004defaa09a05` and
+`aedef2ffffe6d3de04a5c341a09f137df7abc0d90cee11929ee988fb90f95080`.
+
+Production did not change: it remains the PR #101 production baseline on
+Worker #96 and D1 `f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395`. The later local-only convergence
+hardening commit `5346be93237086a541d7bb1982b96752807878be` and the current
+durable historical-spine audit work are unpublished. They require a fresh
+push, exact-head CI, and protected same-D1 preview release before any
+production-D1 preparation, merge, or production deployment is considered.
+
+The exact ten-work audit added after this activation is documented in
+[Transform-11 Historical-Spine Release Audit](HISTORICAL-SPINE-RELEASE-AUDIT.md).

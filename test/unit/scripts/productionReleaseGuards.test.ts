@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { PRODUCTION_PROFILE as historicalProfile } from '../../../scripts/audit-historical-core-preview.js';
+import { SPINE_PRODUCTION_PROFILE } from '../../../scripts/audit-historical-spine-preview.js';
 import { PRODUCTION_PROFILE as languageProfile } from '../../../scripts/audit-original-language-v2-preview.js';
 
 const root = new URL('../../../', import.meta.url);
@@ -22,6 +23,10 @@ describe('production release guards', () => {
         externalDiscoveryBoundary: 'rejected_at_input_schema',
       },
     });
+    expect(SPINE_PRODUCTION_PROFILE).toMatchObject({
+      endpoint: 'https://mcp.theologai.xyz/mcp', hostname: 'mcp.theologai.xyz', serverVersion: '3.6.0',
+      audit: 'historical-spine-production', endpointClass: 'production-custom', label: 'production',
+    });
   });
 
   it('requires exact checked-in candidate readiness and Worker/D1 proof before fixed audits', async () => {
@@ -35,11 +40,12 @@ describe('production release guards', () => {
     const candidateCutover = workflow.indexOf('Require deployed candidate production D1 binding (read-only)');
     const languageAudit = workflow.indexOf('Audit original-language v2 contract on production');
     const historicalAudit = workflow.indexOf('Audit Transform-9 historical core contract on production');
+    const spineAudit = workflow.indexOf('Audit Transform-11 historical spine contract on production');
     const stable = workflow.indexOf('Verify production Worker remained active through audit (read-only)');
     const finalObservation = workflow.indexOf('Capture final production routing/binding observation (read-only)');
     const finalArtifact = workflow.indexOf('Upload final production routing/binding observation');
     const artifact = workflow.indexOf('Upload protected production audit evidence');
-    expect([mapping, readiness, predecessor, versions, deploy, identity, candidateCutover, languageAudit, historicalAudit, stable, finalObservation, finalArtifact, artifact].every(index => index >= 0)).toBe(true);
+    expect([mapping, readiness, predecessor, versions, deploy, identity, candidateCutover, languageAudit, historicalAudit, spineAudit, stable, finalObservation, finalArtifact, artifact].every(index => index >= 0)).toBe(true);
     expect(readiness).toBeGreaterThan(mapping);
     expect(predecessor).toBeGreaterThan(readiness);
     expect(versions).toBeGreaterThan(predecessor);
@@ -48,7 +54,8 @@ describe('production release guards', () => {
     expect(candidateCutover).toBeGreaterThan(identity);
     expect(languageAudit).toBeGreaterThan(candidateCutover);
     expect(historicalAudit).toBeGreaterThan(languageAudit);
-    expect(stable).toBeGreaterThan(historicalAudit);
+    expect(spineAudit).toBeGreaterThan(historicalAudit);
+    expect(stable).toBeGreaterThan(spineAudit);
     expect(finalObservation).toBeGreaterThan(stable);
     expect(finalArtifact).toBeGreaterThan(finalObservation);
     expect(artifact).toBeGreaterThan(finalArtifact);
@@ -58,6 +65,7 @@ describe('production release guards', () => {
     expect(workflow).toContain('scripts/verify-production-worker-deployment.ts verify-audit-stability');
     expect(workflow).toContain('npm run audit:original-language-v2-production');
     expect(workflow).toContain('npm run audit:historical-core-production');
+    expect(workflow).toContain('npm run audit:historical-spine-production');
     expect(workflow).not.toContain('d1 create');
     expect(workflow).not.toContain('d1 delete');
   });
@@ -83,7 +91,7 @@ describe('production release guards', () => {
     // A failed deploy never becomes green because its action failed. A deploy
     // that otherwise passed its strict gates is also terminal if final
     // routing/binding evidence could not be captured or hashed.
-    expect(workflow).toContain("id: production-audit-evidence\n        if: ${{ steps.production-worker-deploy.outcome == 'success' && steps.production-worker-candidate-cutover.outcome == 'success' && steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' && steps.production-historical-core-audit.outcome == 'success' && steps.production-worker-audit-identity.outcome == 'success' && steps.production-final-observation.outcome == 'success' }}");
+    expect(workflow).toContain("id: production-audit-evidence\n        if: ${{ steps.production-worker-deploy.outcome == 'success' && steps.production-worker-candidate-cutover.outcome == 'success' && steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' && steps.production-historical-core-audit.outcome == 'success' && steps.production-historical-spine-audit.outcome == 'success' && steps.production-worker-audit-identity.outcome == 'success' && steps.production-final-observation.outcome == 'success' }}");
     expect(historicalAuditScript).toContain('${profile.label} expanded-discovery/catalog execution invariant drifted');
     expect(historicalAuditScript).not.toContain('preview expanded-discovery/catalog execution invariant drifted');
 
@@ -94,6 +102,7 @@ describe('production release guards', () => {
     expect(workflow).toContain("id: production-primary-source-edge-stabilization-gate\n        if: ${{ always() && steps.production-worker-candidate-cutover.outcome == 'success' }}");
     expect(workflow).toContain("id: production-original-language-v2-audit\n        if: ${{ steps.production-primary-source-edge-stabilization-gate.outcome == 'success' }}");
     expect(workflow).toContain("id: production-historical-core-audit\n        if: ${{ steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' }}");
-    expect(workflow).toContain("id: production-worker-audit-identity\n        if: ${{ steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' && steps.production-historical-core-audit.outcome == 'success' }}");
+    expect(workflow).toContain("id: production-historical-spine-audit\n        if: ${{ steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' && steps.production-historical-core-audit.outcome == 'success' }}");
+    expect(workflow).toContain("id: production-worker-audit-identity\n        if: ${{ steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' && steps.production-historical-core-audit.outcome == 'success' && steps.production-historical-spine-audit.outcome == 'success' }}");
   });
 });

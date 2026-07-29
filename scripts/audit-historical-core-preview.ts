@@ -122,6 +122,8 @@ export type HistoricalCoreAuditProfile = {
   label: 'preview' | 'production';
   primarySource: PrimarySourceAuditContract;
 };
+/** The shared transport needs only routing identity, not an audit's schema contract. */
+export type FixedAuditMcpProfile = Pick<HistoricalCoreAuditProfile, 'endpoint' | 'hostname' | 'label'>;
 export const PREVIEW_PROFILE: HistoricalCoreAuditProfile = {
   endpoint: PREVIEW_ENDPOINT, hostname: 'preview-mcp.theologai.xyz', serverVersion: '3.6.0-preview',
   audit: 'historical-core-preview', endpointClass: 'preview-custom', label: 'preview', primarySource: PRIMARY_SOURCE_V7_AUDIT_CONTRACT,
@@ -140,6 +142,22 @@ const MAX_EVIDENCE_BYTES = 256 * 1024;
 const MAX_AGGREGATE_MCP_RESPONSE_BYTES = 2 * 1024 * 1024;
 /** A tool inventory is currently the largest response; all reads are bounded too. */
 export const MAX_MCP_RESPONSE_BYTES = 256 * 1024;
+/**
+ * Transport ceilings for fixed release audits.  The historical-spine audit
+ * intentionally shares this implementation rather than growing a second MCP
+ * HTTP client with subtly different cancellation or response-boundary rules.
+ */
+export type FixedAuditTransportLimits = Readonly<{
+  maxLogicalOperations: number;
+  maxHttpExchanges: number;
+  /** A reviewed, audit-specific identity prevents independent release gates sharing a rate-limit tuple. */
+  userAgent: string;
+}>;
+const HISTORICAL_CORE_TRANSPORT_LIMITS: FixedAuditTransportLimits = Object.freeze({
+  maxLogicalOperations: MAX_LOGICAL_OPERATIONS,
+  maxHttpExchanges: MAX_HTTP_EXCHANGES,
+  userAgent: 'TheologAI-HistoricalCore-{profile}-Audit/1.0',
+});
 const FIXTURE_PATH = new URL('../test/fixtures/historical-core-preview-audit.json', import.meta.url);
 
 const TOOL_NAMES = [
@@ -208,13 +226,17 @@ type RequestCounters = { logical: number; http: number };
 /** One budget owns preflight, transport, evidence construction, and publication. */
 export class AuditDeadline {
   private profileLabel: HistoricalCoreAuditProfile['label'] | 'release' = 'release';
-  constructor(private readonly now: () => number = Date.now, private readonly startedAt = now()) {}
+  constructor(
+    private readonly now: () => number = Date.now,
+    private readonly startedAt = now(),
+    private readonly maximumDurationMs = MAX_DURATION_MS,
+  ) {}
 
-  setProfile(profile: HistoricalCoreAuditProfile): void { this.profileLabel = profile.label; }
+  setProfile(profile: Pick<HistoricalCoreAuditProfile, 'label'>): void { this.profileLabel = profile.label; }
 
   remaining(label: string): number {
-    const remaining = MAX_DURATION_MS - (this.now() - this.startedAt);
-    assert(remaining > 0, `historical ${this.profileLabel} audit exceeded its 300-second total deadline during ${label}`);
+    const remaining = this.maximumDurationMs - (this.now() - this.startedAt);
+    assert(remaining > 0, `historical ${this.profileLabel} audit exceeded its ${this.maximumDurationMs / 1_000}-second total deadline during ${label}`);
     return remaining;
   }
 
@@ -250,7 +272,7 @@ export function validateFixture(value: unknown): AuditFixture {
   return structuredClone(EXPECTED_FIXTURE);
 }
 
-class FixedAuditMcp {
+export class FixedAuditMcp {
   readonly counters: RequestCounters = { logical: 0, http: 0 };
   private responseBytes = 0;
   private id = 1;
@@ -259,16 +281,17 @@ class FixedAuditMcp {
   constructor(
     private readonly fetchImpl: FetchLike,
     private readonly deadline: AuditDeadline,
-    private readonly profile: HistoricalCoreAuditProfile = PREVIEW_PROFILE,
+    private readonly profile: FixedAuditMcpProfile = PREVIEW_PROFILE,
+    private readonly limits: FixedAuditTransportLimits = HISTORICAL_CORE_TRANSPORT_LIMITS,
   ) {}
 
   private reserve(logical: boolean): void {
     if (logical) {
       this.counters.logical += 1;
-      assert(this.counters.logical <= MAX_LOGICAL_OPERATIONS, `historical ${this.profile.label} audit logical-operation budget exceeded`);
+      assert(this.counters.logical <= this.limits.maxLogicalOperations, `historical ${this.profile.label} audit logical-operation budget exceeded`);
     }
     this.counters.http += 1;
-    assert(this.counters.http <= MAX_HTTP_EXCHANGES, `historical ${this.profile.label} audit HTTP-exchange budget exceeded`);
+    assert(this.counters.http <= this.limits.maxHttpExchanges, `historical ${this.profile.label} audit HTTP-exchange budget exceeded`);
   }
 
   private async post(payload: ObjectRecord, label: string, logical: boolean): Promise<ObjectRecord | undefined> {
@@ -283,7 +306,8 @@ class FixedAuditMcp {
         method: 'POST', redirect: 'error', signal: controller.signal,
         headers: {
           Accept: 'application/json, text/event-stream', 'Content-Type': 'application/json',
-          'Mcp-Protocol-Version': PROTOCOL_VERSION, 'User-Agent': `TheologAI-HistoricalCore-${this.profile.label}-Audit/1.0`,
+          'Mcp-Protocol-Version': PROTOCOL_VERSION,
+          'User-Agent': this.limits.userAgent.replace('{profile}', this.profile.label),
           ...(this.sessionId === undefined ? {} : { 'Mcp-Session-Id': this.sessionId }),
         },
         body: JSON.stringify(payload),
@@ -351,8 +375,8 @@ class FixedAuditMcp {
   }
 
   complete(): void {
-    assert(this.counters.logical === MAX_LOGICAL_OPERATIONS, `historical ${this.profile.label} logical inventory drifted: ${this.counters.logical}/${MAX_LOGICAL_OPERATIONS}`);
-    assert(this.counters.http === MAX_HTTP_EXCHANGES, `historical ${this.profile.label} HTTP inventory drifted: ${this.counters.http}/${MAX_HTTP_EXCHANGES}`);
+    assert(this.counters.logical === this.limits.maxLogicalOperations, `historical ${this.profile.label} logical inventory drifted: ${this.counters.logical}/${this.limits.maxLogicalOperations}`);
+    assert(this.counters.http === this.limits.maxHttpExchanges, `historical ${this.profile.label} HTTP inventory drifted: ${this.counters.http}/${this.limits.maxHttpExchanges}`);
     assert(this.responseBytes <= MAX_AGGREGATE_MCP_RESPONSE_BYTES, `historical ${this.profile.label} aggregate response budget drifted`);
   }
 
@@ -980,7 +1004,7 @@ export async function runProductionAudit(
   return runHistoricalCoreAudit(fixture, PRODUCTION_PROFILE, fetchImpl, deadline);
 }
 
-async function assertOutputAbsent(output: string): Promise<void> {
+export async function assertAuditOutputAbsent(output: string): Promise<void> {
   try {
     await lstat(output);
   } catch (error) {
@@ -1061,7 +1085,7 @@ export async function runHistoricalCoreAuditCli(
   assert(args.length === 0 || (args.length === 2 && args[0] === '--output' && typeof args[1] === 'string' && args[1].length > 0), `usage: audit:historical-core-${profile.label} [--output path]`);
   const output = resolve(args.length === 0 ? `test-output/historical-core-${profile.label}-audit-${new Date().toISOString().replaceAll(':', '-')}.json` : args[1]!);
   deadline.assertRemaining('fixed output preflight');
-  await assertOutputAbsent(output);
+  await assertAuditOutputAbsent(output);
   deadline.assertRemaining('fixed fixture preflight');
   const fixture = validateFixture(JSON.parse(await readFile(FIXTURE_PATH, 'utf8')));
   deadline.assertRemaining('fixed fixture preflight');

@@ -276,7 +276,7 @@ describe('published project contract', () => {
     expect(operations).toContain('Protected release evidence proves\nthis exact current binding');
   });
 
-  it('records the prepared Transform 11 preview candidate without claiming a live cutover', async () => {
+  it('records the completed Transform 11 preview release and unpublished hardening boundary', async () => {
     const documents = await Promise.all([
       readProjectFile('README.md'),
       readProjectFile('docs/D1-DATA-WORKFLOW.md'),
@@ -297,8 +297,15 @@ describe('published project contract', () => {
     }
     for (const document of documents.slice(0, 6)) expect(document).toContain(corpusIdentity);
     expect(documents[2]).toContain('No seed, migration, repair, or\nresume was repeated');
-    expect(documents[4]).toContain('does not bind or deploy it');
-    expect(documents[4]).toContain('must prove that exact cutover');
+    expect(documents[4]).toContain('30419373527');
+    expect(documents[4]).toContain('f5ef7a40-1b4b-4120-a1bb-70b33630b4a6');
+    expect(documents[4]).toContain('30420256210');
+    expect(documents[4]).toContain('no `deploy-preview`\nlabel');
+    expect(documents[4]).toContain('PR #101 production baseline on\nWorker #96');
+    expect(documents[4]).toContain('5346be93237086a541d7bb1982b96752807878be');
+    expect(documents[6]).toContain('30419373527');
+    expect(documents[6]).toContain('30420256210');
+    expect(documents[6]).toContain('PR #101 production baseline remains unchanged');
     expect(documents[5]).toContain('production remains unchanged');
   });
 

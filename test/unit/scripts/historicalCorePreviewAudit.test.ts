@@ -157,6 +157,7 @@ describe('historical core preview audit contract', () => {
     const candidateCutover = workflow.indexOf('- name: Require deployed candidate preview D1 binding (read-only)');
     const v2 = workflow.indexOf('- name: Audit original-language v2 contract on preview');
     const historical = workflow.indexOf('- name: Audit Transform-9 historical core contract on preview');
+    const spine = workflow.indexOf('- name: Audit Transform-11 historical spine contract on preview');
     const reconciliationStep = workflow.indexOf('- name: Capture preview post-mutation reconciliation record (read-only)');
     const identity = workflow.indexOf('- name: Verify preview Worker remained active through audit (read-only)');
     const artifact = workflow.indexOf('name: preview-release-audit-');
@@ -168,27 +169,31 @@ describe('historical core preview audit contract', () => {
     expect(candidateCutover).toBeGreaterThan(deploy);
     expect(v2).toBeGreaterThan(candidateCutover);
     expect(historical).toBeGreaterThan(v2);
-    expect(reconciliationStep).toBeGreaterThan(historical);
-    expect(identity).toBeGreaterThan(historical);
+    expect(spine).toBeGreaterThan(historical);
+    expect(reconciliationStep).toBeGreaterThan(spine);
+    expect(identity).toBeGreaterThan(spine);
     expect(artifact).toBeGreaterThan(identity);
     expect(workflow).toContain('historical-core-preview-audit.json');
     expect(workflow).toContain('historical_audit_sha256');
+    expect(workflow).toContain('historical-spine-preview-audit.json');
+    expect(workflow).toContain('historical_spine_audit_sha256');
     expect(workflow).toContain('wrangler versions view "$predecessor_version" --env preview --json');
     expect(workflow).toContain('wrangler versions view "$observed_active_version" --env preview --json');
   });
 
   it('runs the exact 55-exchange inventory through a representative fake transport without retaining bodies, locators, snippets, cursors, or error data', async () => {
     const parsed = validateFixture(await fixture());
-    const calls: Array<{ url: string; body: RecordValue }> = [];
+    const calls: Array<{ url: string; body: RecordValue; userAgent: string | null }> = [];
     const fakeFetch: typeof fetch = async (input, init) => {
       const body = JSON.parse(String(init?.body)) as RecordValue;
-      calls.push({ url: String(input), body });
+      calls.push({ url: String(input), body, userAgent: new Headers(init?.headers).get('user-agent') });
       return responseFor(body, parsed);
     };
 
     const evidence = await runPreviewAudit(parsed, fakeFetch);
     expect(calls).toHaveLength(55);
     expect(calls.every(call => call.url === 'https://preview-mcp.theologai.xyz/mcp')).toBe(true);
+    expect(new Set(calls.map(call => call.userAgent))).toEqual(new Set(['TheologAI-HistoricalCore-preview-Audit/1.0']));
     expect(evidence.budgets).toMatchObject({ logicalOperations: 54, maximumLogicalOperations: 54, httpExchanges: 55, maximumHttpExchanges: 55, retryCount: 0, maximumAggregateMcpResponseBytes: 2 * 1024 * 1024 });
     const serialized = JSON.stringify(evidence);
     for (const forbidden of ['PRIVATE HISTORICAL BODY', 'theologai://documents/', 'discovery snippet', 'not-a-valid-cursor', 'not found']) {
@@ -205,16 +210,17 @@ describe('historical core preview audit contract', () => {
 
   it('runs the same exact 55-exchange inventory against the production v6 profile and retains only local-only evidence', async () => {
     const parsed = validateFixture(await fixture());
-    const calls: Array<{ url: string; body: RecordValue }> = [];
+    const calls: Array<{ url: string; body: RecordValue; userAgent: string | null }> = [];
     const fakeFetch: typeof fetch = async (input, init) => {
       const body = JSON.parse(String(init?.body)) as RecordValue;
-      calls.push({ url: String(input), body });
+      calls.push({ url: String(input), body, userAgent: new Headers(init?.headers).get('user-agent') });
       return responseFor(body, parsed, {}, PRODUCTION_PROFILE);
     };
 
     const evidence = await runProductionAudit(parsed, fakeFetch);
     expect(calls).toHaveLength(55);
     expect(calls.every(call => call.url === 'https://mcp.theologai.xyz/mcp')).toBe(true);
+    expect(new Set(calls.map(call => call.userAgent))).toEqual(new Set(['TheologAI-HistoricalCore-production-Audit/1.0']));
     expect(evidence.schemas).toMatchObject({
       primarySourceContractVersion: '6', primarySourceOpenWorldHint: false,
       primarySourceProviderMaximum: 1, primarySourceExternalDiscoveryBoundary: 'rejected_at_input_schema',

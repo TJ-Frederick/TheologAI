@@ -346,9 +346,17 @@ jobs:
             --output "$RUNNER_TEMP/historical-core-production-audit.json"
           test -s "$RUNNER_TEMP/historical-core-production-audit.json"
 
+      - name: Audit Transform-11 historical spine contract on production
+        id: production-historical-spine-audit
+        if: ${{ steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' && steps.production-historical-core-audit.outcome == 'success' }}
+        run: |
+          npm run audit:historical-spine-production -- \
+            --output "$RUNNER_TEMP/historical-spine-production-audit.json"
+          test -s "$RUNNER_TEMP/historical-spine-production-audit.json"
+
       - name: Verify production Worker remained active through audit (read-only)
         id: production-worker-audit-identity
-        if: ${{ steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' && steps.production-historical-core-audit.outcome == 'success' }}
+        if: ${{ steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' && steps.production-historical-core-audit.outcome == 'success' && steps.production-historical-spine-audit.outcome == 'success' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -396,17 +404,20 @@ jobs:
 
       - name: Hash sanitized production audit and reconciliation evidence
         id: production-audit-evidence
-        if: ${{ steps.production-worker-deploy.outcome == 'success' && steps.production-worker-candidate-cutover.outcome == 'success' && steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' && steps.production-historical-core-audit.outcome == 'success' && steps.production-worker-audit-identity.outcome == 'success' && steps.production-final-observation.outcome == 'success' }}
+        if: ${{ steps.production-worker-deploy.outcome == 'success' && steps.production-worker-candidate-cutover.outcome == 'success' && steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' && steps.production-historical-core-audit.outcome == 'success' && steps.production-historical-spine-audit.outcome == 'success' && steps.production-worker-audit-identity.outcome == 'success' && steps.production-final-observation.outcome == 'success' }}
         run: |
           edge_stabilization_sha256="$(sha256sum "$RUNNER_TEMP/production-primary-source-edge-stabilization.json" | awk '{print $1}')"
           original_language_audit_sha256="$(sha256sum "$RUNNER_TEMP/original-language-v2-production-audit.json" | awk '{print $1}')"
           historical_audit_sha256="$(sha256sum "$RUNNER_TEMP/historical-core-production-audit.json" | awk '{print $1}')"
+          historical_spine_audit_sha256="$(sha256sum "$RUNNER_TEMP/historical-spine-production-audit.json" | awk '{print $1}')"
           identity_sha256="$(sha256sum "$RUNNER_TEMP/production-worker-deployment-identity.json" | awk '{print $1}')"
           candidate_cutover_observation_sha256="$(sha256sum "$RUNNER_TEMP/production-worker-candidate-cutover-observation.json" | awk '{print $1}')"
           final_routing_observation_sha256="$(sha256sum "$RUNNER_TEMP/production-worker-final-routing-observation.json" | awk '{print $1}')"
           printf 'edge_stabilization_sha256=%s\n' "$edge_stabilization_sha256" >> "$GITHUB_OUTPUT"
           printf 'original_language_audit_sha256=%s\n' "$original_language_audit_sha256" >> "$GITHUB_OUTPUT"
           printf 'historical_audit_sha256=%s\n' "$historical_audit_sha256" >> "$GITHUB_OUTPUT"
+          printf 'historical_spine_audit_sha256=%s\n' "$historical_spine_audit_sha256" >> "$GITHUB_OUTPUT"
+          printf 'Transform-11 historical-spine audit SHA-256: `%s`\n' "$historical_spine_audit_sha256" >> "$GITHUB_STEP_SUMMARY"
           printf 'identity_record_sha256=%s\n' "$identity_sha256" >> "$GITHUB_OUTPUT"
           printf 'candidate_cutover_observation_sha256=%s\n' "$candidate_cutover_observation_sha256" >> "$GITHUB_OUTPUT"
           printf 'final_routing_observation_sha256=%s\n' "$final_routing_observation_sha256" >> "$GITHUB_OUTPUT"
@@ -432,6 +443,7 @@ jobs:
             ${{ runner.temp }}/production-primary-source-edge-stabilization.json
             ${{ runner.temp }}/original-language-v2-production-audit.json
             ${{ runner.temp }}/historical-core-production-audit.json
+            ${{ runner.temp }}/historical-spine-production-audit.json
             ${{ runner.temp }}/production-worker-deployment-identity.json
             ${{ runner.temp }}/production-worker-candidate-cutover-observation.json
             ${{ runner.temp }}/production-worker-candidate-cutover.json

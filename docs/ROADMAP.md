@@ -716,19 +716,31 @@ Code readiness and operational readiness are deliberately separate:
   spine packs alongside the core eight for an exact 35-work catalog
   (17 legacy plus 18 reviewed editions), 43 source artifacts, and 1,057
   reviewed sectioned sections. It adds no migration, hierarchy, publication,
-  alias, CCEL, or MCP-tool change. The deployed PR #101 preview and production
-  baselines remain the 25-work corpus until separately protected releases.
-  PR #107's checked-in preview target is the prepared, unbound ENAM candidate
+  alias, CCEL, or MCP-tool change. PR #107's checked-in preview target was the
+  prepared ENAM candidate
   `theologai-preview-20260728-transform11-a`
   (`62b871a6-5b4d-4d9b-8f52-301f6c878f48`): its exact 49-file,
   1,630,259-row seed, readiness, Transform-8 authority, and complete
-  Transform-11 authority audit passed. A checked-in target does not establish
-  live traffic; protected preview deployment and black-box audit remain
-  pending. The current production deployment is
+  Transform-11 authority audit passed. Protected preview run `30419373527`
+  then deployed exact PR #107 head
+  `8dd6b4fa306b8f9412c1a08207261ea34d477f37` as deployment
+  `f5ef7a40-1b4b-4120-a1bb-70b33630b4a6`, Worker
+  `83b1ec5f-3b0d-4388-8c0b-e017076442dd` (#134), with that exact preview D1
+  at 100%. Its protected original-language and historical-core audits passed;
+  the 84-exchange ten-work black-box audit and its separate 12-exchange
+  pagination/cursor audit passed, with evidence hashes
+  `1b56d093b298f41a7845b6c328dbf63ade72ca8fdf8cf82bc68004defaa09a05` and
+  `aedef2ffffe6d3de04a5c341a09f137df7abc0d90cee11929ee988fb90f95080`.
+  Revocation run `30420256210` then passed after removal of the
+  `deploy-preview` label. The PR #101 production baseline remains unchanged:
   `71b76d24-bf5f-490e-adc4-31cf63fb046e`, Worker
   `bae58cd3-cad7-4663-879d-408accf061b0` (#96), and D1
   `theologai-production-20260728-hierarchy-a`
-  (`f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395`). The integrated Transform 10 Aquinas
+  (`f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395`). Local-only hardening commit
+  `5346be93237086a541d7bb1982b96752807878be` and the subsequent durable
+  historical-spine audit work are unpublished; they require fresh push, CI,
+  and a protected same-D1 preview release before production preparation. The
+  integrated Transform 10 Aquinas
   hierarchy is local-only and unpublished. Its present packet ends at Tertia
   question 90 and contains no Supplement, so Transform 11 gives it no
   document/catalog/search/resource/runtime/D1 projection. A future Aquinas
