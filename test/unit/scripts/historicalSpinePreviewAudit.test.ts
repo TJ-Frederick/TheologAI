@@ -18,7 +18,7 @@ type RecordValue = Record<string, unknown>;
 async function fixture(): Promise<HistoricalSpineAuditFixture> {
   return validateHistoricalSpineFixture(JSON.parse(await readFile(fixtureUrl, 'utf8')));
 }
-type FakeOptions = Readonly<{ production?: boolean; catalogEditionDrift?: boolean; paginationOrdinalDrift?: boolean; paginationCursorDrift?: boolean; globalLocatorDrift?: boolean }>;
+type FakeOptions = Readonly<{ production?: boolean; catalogEditionDrift?: boolean; paginationOrdinalDrift?: boolean; paginationCursorDrift?: boolean; globalLocatorDrift?: boolean; globalOrigenTargetOmitted?: boolean }>;
 function response(body: RecordValue, fixtureValue: HistoricalSpineAuditFixture, options: FakeOptions = {}): Response {
   const production = options.production === true;
   const id = body.id;
@@ -66,10 +66,13 @@ function response(body: RecordValue, fixtureValue: HistoricalSpineAuditFixture, 
     }
     if (name === 'classic_text_lookup' && typeof args.query === 'string') {
       const matching = fixtureValue.probes.find(value => value.query === args.query)!;
-      const sectionKey = matching.firstSection.sectionKey;
+      const returned = options.globalOrigenTargetOmitted === true && matching.workId === 'origen-de-principiis'
+        ? fixtureValue.probes[0]!
+        : matching;
+      const sectionKey = returned.firstSection.sectionKey;
       return tool({ schemaVersion: '2', kind: 'classic_text_lookup', mode: 'search', search: { status: 'ok', hits: [{
-        work: { id: matching.workId, deliveryMode: 'sectioned_only' },
-        section: { sectionKey, sourceOrdinal: 1, resource: { kind: 'mcp_resource', uri: options.globalLocatorDrift ? 'theologai://documents/wrong#section-001' : buildLocalDocumentResourceUri(matching.workId, sectionKey) } },
+        work: { id: returned.workId, deliveryMode: 'sectioned_only' },
+        section: { sectionKey, sourceOrdinal: 1, resource: { kind: 'mcp_resource', uri: options.globalLocatorDrift ? 'theologai://documents/wrong#section-001' : buildLocalDocumentResourceUri(returned.workId, sectionKey) } },
         snippetOnly: true,
       }] } });
     }
@@ -154,6 +157,21 @@ describe('Transform-11 historical-spine fixed audit', () => {
     expect(() => validateHistoricalSpineFixture(changed)).toThrow('fixture identity or probe inventory drifted');
   });
 
+  it('pins the Origen global-discovery probe to its distinctive source-attested phrase', async () => {
+    const value = await fixture();
+    const origen = value.probes.find(probe => probe.workId === 'origen-de-principiis');
+    expect(origen?.query).toBe('uncompounded intellectual nature');
+    const edition = JSON.parse(await readFile(new URL(
+      'data/historical-source-packs/historical-spine-early/editions/origen-de-principiis-crombie-anf4-1885.json', root), 'utf8')) as {
+        sections: Array<{ sectionKey: string; content: string }>;
+      };
+    const canonicalSection = edition.sections.find(section => section.sectionKey === 'section-on-god-001');
+    expect(canonicalSection).toBeDefined();
+    const source = canonicalSection!.content
+      .normalize('NFC').replace(/\s+/gu, ' ');
+    expect(source).toContain(origen!.query);
+  });
+
   it('fails closed on authoritative edition drift, continuation ordinal drift, and a global-search locator drift', async () => {
     const value = await fixture();
     for (const [options, message] of [
@@ -161,6 +179,7 @@ describe('Transform-11 historical-spine fixed audit', () => {
       [{ paginationOrdinalDrift: true }, 'continuation locator drifted'],
       [{ paginationCursorDrift: true }, 'continuation page count/cursor contract drifted'],
       [{ globalLocatorDrift: true }, 'global classic search locator/readiness coherence drifted'],
+      [{ globalOrigenTargetOmitted: true }, 'natural global classic search omitted the work'],
     ] as const) {
       const fakeFetch: typeof fetch = async (_input, init) => response(JSON.parse(String(init?.body)) as RecordValue, value, options);
       await expect(runHistoricalSpinePreviewAudit(value, fakeFetch)).rejects.toThrow(message);
