@@ -87,7 +87,7 @@ describe('original-language v2 preview audit contract', () => {
     expect(audit).toBeGreaterThan(preAuditIdentity);
     expect(postAuditIdentity).toBeGreaterThan(audit);
     expect(comment).toBeGreaterThan(postAuditIdentity);
-    expect(workflow).toContain('group: theologai-shared-preview-deploy-and-audit');
+    expect(workflow).toContain('group: theologai-shared-preview-mutation');
     expect(workflow).toContain('Verify exact active preview Worker version (read-only)');
     expect(workflow).toContain('wrangler deployments list --env preview --json > "$RUNNER_TEMP/preview-worker-deployments-post-audit.json"');
     expect(workflow).toContain('Upload protected preview audit evidence');
