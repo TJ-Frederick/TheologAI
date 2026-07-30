@@ -53,3 +53,7 @@ phrase or canonical URL, or supplying a malformed production Worker UUID, fails
 before any connection. A different but syntactically valid UUID is rejected by
 the signed operator route after the production and preview `tools/list` checks
 but before any preview `tools/call` invocation.
+
+For the main-only, temporary preview 111 deployment and exact-predecessor
+recovery procedure that may invoke this audit, see
+[CCEL live-preview canary transaction](CCEL-LIVE-PREVIEW-CANARY-TRANSACTION.md).

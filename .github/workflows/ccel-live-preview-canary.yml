@@ -1,0 +1,262 @@
+name: CCEL Live Preview Canary
+
+# Manual only. This path never reuses ordinary PR preview authorization.
+on:
+  workflow_dispatch:
+    inputs:
+      expected_main_sha:
+        description: 'Exact current main commit SHA'
+        required: true
+        type: string
+      expected_preview_predecessor_version_id:
+        description: 'Exact preview 100 predecessor Worker version UUID'
+        required: true
+        type: string
+      expected_production_control_version_id:
+        description: 'Exact production v6 / 000 Worker version UUID (read-only control)'
+        required: true
+        type: string
+      confirmation:
+        description: 'Type I AUTHORIZE THE TEMPORARY CCEL LIVE PREVIEW CANARY'
+        required: true
+        type: string
+
+# This is deliberately the same repository-wide lock used by the ordinary PR
+# preview deployment and the emergency restore workflow.
+concurrency:
+  group: theologai-shared-preview-mutation
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # This environment must be provisioned manually. GitHub environments only
+    # gate secret availability; the least-privilege Cloudflare token scope is an
+    # external prerequisite documented in CCEL-LIVE-PREVIEW-CANARY-TRANSACTION.
+    environment: ccel-canary
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+
+      - run: npm ci --no-audit
+
+      # No Wrangler command may run until all dispatch IDs and the dedicated
+      # externally-provisioned credentials have passed local validation.
+      - name: Require exact main authorization, IDs, and dedicated credentials
+        env:
+          DISPATCH_REF: ${{ github.ref }}
+          DISPATCH_SHA: ${{ github.sha }}
+          EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+          PREDECESSOR: ${{ inputs.expected_preview_predecessor_version_id }}
+          PRODUCTION_CONTROL: ${{ inputs.expected_production_control_version_id }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+          CCEL_CANARY_CREDENTIALS_CONFIGURED: ${{ secrets.CCEL_CANARY_CREDENTIALS_CONFIGURED }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CCEL_CANARY_CLOUDFLARE_API_TOKEN }}
+          THEOLOGAI_CCEL_OPERATOR_TOKEN: ${{ secrets.CCEL_CANARY_OPERATOR_TOKEN }}
+        run: |
+          set -euo pipefail
+          git fetch origin main --depth=1
+          LIVE_MAIN_SHA="$(git rev-parse origin/main)"
+          npx tsx scripts/ccel-live-preview-canary.ts validate-dispatch \
+            --ref "$DISPATCH_REF" --sha "$DISPATCH_SHA" --expected-sha "$EXPECTED_MAIN_SHA" \
+            --live-main-sha "$LIVE_MAIN_SHA" --confirmation "$CONFIRMATION" --config wrangler.toml
+          npx tsx scripts/ccel-live-preview-canary.ts validate-canary-inputs \
+            --preview-predecessor "$PREDECESSOR" --production-control "$PRODUCTION_CONTROL"
+          npx tsx scripts/ccel-live-preview-canary.ts validate-canary-credentials
+
+      - name: Prove production is only the v6 / 000 read-only control
+        id: production-control
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CCEL_CANARY_CLOUDFLARE_API_TOKEN }}
+          EXPECTED: ${{ inputs.expected_production_control_version_id }}
+        run: |
+          set -euo pipefail
+          npx wrangler deployments list --json > "$RUNNER_TEMP/production-deployments.json"
+          npx wrangler versions view "$EXPECTED" --json > "$RUNNER_TEMP/production-version.json"
+          npx tsx scripts/ccel-live-preview-canary.ts validate-production-control \
+            --config wrangler.toml --deployments "$RUNNER_TEMP/production-deployments.json" \
+            --version-view "$RUNNER_TEMP/production-version.json" --expected-version "$EXPECTED"
+
+      - name: Capture and validate exact preview 100 predecessor
+        id: preview-baseline
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CCEL_CANARY_CLOUDFLARE_API_TOKEN }}
+          EXPECTED: ${{ inputs.expected_preview_predecessor_version_id }}
+        run: |
+          set -euo pipefail
+          npx wrangler versions list --env preview --json > "$RUNNER_TEMP/preview-versions-before.json"
+          npx wrangler deployments list --env preview --json > "$RUNNER_TEMP/preview-deployments-before.json"
+          npx wrangler versions view "$EXPECTED" --env preview --json > "$RUNNER_TEMP/preview-predecessor.json"
+          npx tsx scripts/ccel-live-preview-canary.ts validate-preview-baseline \
+            --config wrangler.toml --deployments "$RUNNER_TEMP/preview-deployments-before.json" \
+            --version-view "$RUNNER_TEMP/preview-predecessor.json" --expected-version "$EXPECTED"
+          printf '%s' "$EXPECTED" > "$RUNNER_TEMP/ccel-canary-predecessor-version.txt"
+          echo "predecessor_version=$EXPECTED" >> "$GITHUB_OUTPUT"
+
+      - name: Retain the private predecessor recovery anchor
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ccel-canary-predecessor-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/preview-predecessor.json
+            ${{ runner.temp }}/ccel-canary-predecessor-version.txt
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Render undeployed preview-only 111 configuration
+        id: render
+        run: >-
+          npx tsx scripts/ccel-live-preview-canary.ts render-preview-config
+          --config wrangler.toml --output "$GITHUB_WORKSPACE/.wrangler.ccel-live-preview-canary.toml"
+
+      # Failure remains non-terminal until the in-job restore step below has
+      # checked the active deployment and re-proved the predecessor.
+      - name: Upload exactly one undeployed candidate and validate its exact state
+        id: stage
+        continue-on-error: true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CCEL_CANARY_CLOUDFLARE_API_TOKEN }}
+          PREDECESSOR: ${{ steps.preview-baseline.outputs.predecessor_version }}
+        run: |
+          set -euo pipefail
+          npx wrangler versions upload --config "$GITHUB_WORKSPACE/.wrangler.ccel-live-preview-canary.toml" --env preview \
+            --message 'Temporary preview-only CCEL live canary; always restore exact predecessor' --tag ccel-live-preview-canary
+          npx wrangler versions list --env preview --json > "$RUNNER_TEMP/preview-versions-after.json"
+          npx wrangler deployments list --env preview --json > "$RUNNER_TEMP/preview-deployments-after-upload.json"
+          CANARY="$(npx tsx scripts/ccel-live-preview-canary.ts identify-upload \
+            --before-versions "$RUNNER_TEMP/preview-versions-before.json" --after-versions "$RUNNER_TEMP/preview-versions-after.json" \
+            --before-deployments "$RUNNER_TEMP/preview-deployments-before.json" --after-deployments "$RUNNER_TEMP/preview-deployments-after-upload.json" \
+            --expected-baseline "$PREDECESSOR")"
+          npx wrangler versions view "$CANARY" --env preview --json > "$RUNNER_TEMP/preview-canary.json"
+          npx tsx scripts/ccel-live-preview-canary.ts validate-canary-version \
+            --config wrangler.toml --baseline-view "$RUNNER_TEMP/preview-predecessor.json" --canary-view "$RUNNER_TEMP/preview-canary.json" \
+            --expected-baseline "$PREDECESSOR" --expected-canary "$CANARY"
+          echo "canary_version=$CANARY" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy the reviewed canary to preview only
+        id: deploy
+        if: steps.stage.outcome == 'success'
+        continue-on-error: true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CCEL_CANARY_CLOUDFLARE_API_TOKEN }}
+          CANARY: ${{ steps.stage.outputs.canary_version }}
+        run: |
+          set -euo pipefail
+          npx wrangler versions deploy "$CANARY@100" --env preview --yes
+          npx wrangler deployments list --env preview --json > "$RUNNER_TEMP/preview-deployments-canary.json"
+          npx wrangler versions view "$CANARY" --env preview --json > "$RUNNER_TEMP/preview-canary-deployed.json"
+          npx tsx scripts/ccel-live-preview-canary.ts validate-canary-deployment \
+            --config wrangler.toml --deployments "$RUNNER_TEMP/preview-deployments-canary.json" \
+            --version-view "$RUNNER_TEMP/preview-canary-deployed.json" --expected-canary "$CANARY"
+
+      - name: Run the existing authorized two-attempt audit exactly once
+        id: audit
+        if: steps.deploy.outcome == 'success'
+        continue-on-error: true
+        env:
+          THEOLOGAI_CCEL_OPERATOR_TOKEN: ${{ secrets.CCEL_CANARY_OPERATOR_TOKEN }}
+          PRODUCTION_CONTROL: ${{ inputs.expected_production_control_version_id }}
+        run: >-
+          npm run audit:ccel-preview --
+          --preview-url https://preview-mcp.theologai.xyz/mcp
+          --production-url https://mcp.theologai.xyz/mcp
+          --production-worker-version-id "$PRODUCTION_CONTROL"
+          --authorize-live-ccel 'I AUTHORIZE TWO LIVE CCEL PREVIEW REQUESTS'
+          > "$RUNNER_TEMP/ccel-live-preview-audit.json"
+
+      - name: Always restore the exact preview predecessor before job exit
+        id: restore
+        if: always() && steps.preview-baseline.outcome == 'success'
+        continue-on-error: true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CCEL_CANARY_CLOUDFLARE_API_TOKEN }}
+          PREDECESSOR: ${{ steps.preview-baseline.outputs.predecessor_version }}
+          CANARY: ${{ steps.stage.outputs.canary_version }}
+        run: |
+          set -euo pipefail
+          npx wrangler deployments list --env preview --json > "$RUNNER_TEMP/preview-deployments-before-restore.json"
+          CURRENT="$(jq -er 'sort_by(.created_on) | last | .versions | select(length == 1) | .[0] | select(.percentage == 100) | .version_id' "$RUNNER_TEMP/preview-deployments-before-restore.json")"
+          CANARY="${CANARY:-$CURRENT}"
+          npx wrangler versions view "$CURRENT" --env preview --json > "$RUNNER_TEMP/preview-current.json"
+          npx wrangler versions view "$PREDECESSOR" --env preview --json > "$RUNNER_TEMP/preview-predecessor-recheck.json"
+          PLAN="$(npx tsx scripts/ccel-live-preview-canary.ts restore-plan \
+            --config wrangler.toml --deployments "$RUNNER_TEMP/preview-deployments-before-restore.json" \
+            --current-view "$RUNNER_TEMP/preview-current.json" --target-view "$RUNNER_TEMP/preview-predecessor-recheck.json" \
+            --expected-current "$CANARY" --expected-target "$PREDECESSOR")"
+          if [ "$PLAN" = deploy ]; then npx wrangler versions deploy "$PREDECESSOR@100" --env preview --yes; fi
+          npx wrangler deployments list --env preview --json > "$RUNNER_TEMP/preview-deployments-restored.json"
+          npx tsx scripts/ccel-live-preview-canary.ts validate-restore-result \
+            --config wrangler.toml --deployments "$RUNNER_TEMP/preview-deployments-restored.json" \
+            --target-view "$RUNNER_TEMP/preview-predecessor-recheck.json" --expected-target "$PREDECESSOR"
+
+      - name: Write identifier-and-hash-only evidence after restoration
+        id: evidence
+        if: always() && steps.restore.outcome == 'success' && steps.stage.outputs.canary_version != ''
+        env:
+          PREDECESSOR: ${{ steps.preview-baseline.outputs.predecessor_version }}
+          CANARY: ${{ steps.stage.outputs.canary_version }}
+          PRODUCTION_CONTROL: ${{ inputs.expected_production_control_version_id }}
+          AUDIT_OUTCOME: ${{ steps.audit.outcome }}
+        run: |
+          set -euo pipefail
+          if [ "$AUDIT_OUTCOME" = success ]; then
+            AUDIT_SHA256="$(sha256sum "$RUNNER_TEMP/ccel-live-preview-audit.json" | awk '{print $1}')"
+            AUDIT_STATUS=success
+          else
+            AUDIT_SHA256="$(printf '%s' audit-step-failed | sha256sum | awk '{print $1}')"
+            AUDIT_STATUS=failure
+          fi
+          npx tsx scripts/ccel-live-preview-canary.ts emit-evidence \
+            --commit "$GITHUB_SHA" --predecessor "$PREDECESSOR" --canary "$CANARY" \
+            --production-control "$PRODUCTION_CONTROL" --audit-sha256 "$AUDIT_SHA256" \
+            --audit-outcome "$AUDIT_STATUS" --restored true \
+            > "$RUNNER_TEMP/ccel-live-preview-transaction-evidence.json"
+
+      - name: Retain audit output when it passed
+        if: always() && steps.audit.outcome == 'success'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ccel-live-preview-audit-${{ github.run_id }}
+          path: ${{ runner.temp }}/ccel-live-preview-audit.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Retain sanitized transaction evidence after every recoverable audit outcome
+        if: always() && steps.evidence.outcome == 'success'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ccel-live-preview-transaction-evidence-${{ github.run_id }}
+          path: ${{ runner.temp }}/ccel-live-preview-transaction-evidence.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Fail only after recovery and evidence are complete
+        if: always()
+        env:
+          PRODUCTION_CONTROL_OUTCOME: ${{ steps.production-control.outcome }}
+          PREVIEW_BASELINE_OUTCOME: ${{ steps.preview-baseline.outcome }}
+          RENDER_OUTCOME: ${{ steps.render.outcome }}
+          STAGE_OUTCOME: ${{ steps.stage.outcome }}
+          DEPLOY_OUTCOME: ${{ steps.deploy.outcome }}
+          AUDIT_OUTCOME: ${{ steps.audit.outcome }}
+          RESTORE_OUTCOME: ${{ steps.restore.outcome }}
+        run: |
+          set -euo pipefail
+          test "$PRODUCTION_CONTROL_OUTCOME" = success
+          test "$PREVIEW_BASELINE_OUTCOME" = success
+          test "$RENDER_OUTCOME" = success
+          test "$STAGE_OUTCOME" = success
+          test "$DEPLOY_OUTCOME" = success
+          test "$AUDIT_OUTCOME" = success
+          test "$RESTORE_OUTCOME" = success
