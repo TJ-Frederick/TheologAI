@@ -42,15 +42,28 @@ paste it into chat, save it in a repository file, or leave it in shell history.
 The workflow reads it only from a protected environment secret and pipes it to
 Wrangler over standard input with command tracing disabled.
 
-The identical value belongs in exactly two places:
+The identical value belongs in exactly three approved places:
 
 1. GitHub environment `production`, secret
-   `THEOLOGAI_CCEL_OPERATOR_TOKEN`; and
-2. Cloudflare Worker `theologai`, secret binding with the same name.
+   `THEOLOGAI_CCEL_OPERATOR_TOKEN`;
+2. GitHub environment `ccel-canary`, secret
+   `CCEL_CANARY_OPERATOR_TOKEN`; and
+3. Cloudflare Worker `theologai`, secret binding
+   `THEOLOGAI_CCEL_OPERATOR_TOKEN`.
 
 Do not provision it on `theologai-preview` or
 `theologai-ccel-coordinator`. The production route observes the shared
 coordinator Durable Object without modifying its owner Worker.
+
+The two GitHub copies and the Cloudflare binding do not synchronize
+automatically. An authorized rotation must replace all three with the same new
+value before the canary is run again; rotating only one copy intentionally
+causes authentication or equality checks to fail closed. Each copy also has an
+independent custody and deletion boundary. Removing
+`CCEL_CANARY_OPERATOR_TOKEN` only disables the canary's authenticated audit; it
+does not revoke the production Worker credential. Full revocation must address
+all three copies, with separately authorized deletion for each storage
+location.
 
 ## Cloudflare credential boundary
 
@@ -66,8 +79,9 @@ needed. Cloudflare API tokens are account-resource scoped rather than
 single-Worker scoped for these operations, so `wrangler.release.toml`, the
 literal `--name theologai`, exact account-ID equality, and postcondition checks
 provide the additional script boundary. Keep `CLOUDFLARE_API_TOKEN`,
-`CLOUDFLARE_ACCOUNT_ID`, and the operator token only in the protected GitHub
-environment. Rotate the Cloudflare token independently if exposure is
+`CLOUDFLARE_ACCOUNT_ID` only in the protected `production` GitHub environment,
+and keep the operator token only in the two exact protected GitHub locations
+listed above. Rotate the Cloudflare token independently if exposure is
 suspected.
 
 ## Why staging and promotion are separate
@@ -170,15 +184,15 @@ require the changed-secret force path when moving to the older secretless
 version; `--yes` is safe here only because the tested preflight proved the sole
 changed secret is `THEOLOGAI_CCEL_OPERATOR_TOKEN`. The `if: always()` verifier
 requires the exact baseline at 100% and the exact baseline secret-name set with
-the operator token absent. The GitHub copy remains until separately approved
+the operator token absent. Both GitHub copies remain until separately approved
 for deletion.
 
 A planned forward revocation is distinct from rollback: stage
 `wrangler versions secret delete THEOLOGAI_CCEL_OPERATOR_TOKEN`, independently
 review the resulting secretless version, and promote that exact version. This
 repository intentionally provides no deletion workflow. Running the command or
-removing either stored copy requires separate deletion authorization; none is
-granted by staging, promotion, rollback, or generic approval. Never use plain
+removing any of the three stored copies requires separate deletion authorization;
+none is granted by staging, promotion, rollback, or generic approval. Never use plain
 `wrangler secret delete`, which deploys immediately.
 
 No procedure here deletes or replaces D1, the shared Durable Object, the

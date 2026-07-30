@@ -1,0 +1,83 @@
+name: Restore CCEL Live Preview Canary
+
+# Standalone recovery path for a cancelled workflow or any ambiguous canary
+# state. It is manual, main-only, preview-scoped, and has no operator secret.
+on:
+  workflow_dispatch:
+    inputs:
+      expected_current_version_id:
+        description: 'Exact active preview Worker version UUID (canary or already-restored predecessor)'
+        required: true
+        type: string
+      expected_target_version_id:
+        description: 'Exact reviewed preview 100 predecessor Worker version UUID'
+        required: true
+        type: string
+      confirmation:
+        description: 'Type RESTORE THE EXACT CCEL PREVIEW PREDECESSOR'
+        required: true
+        type: string
+
+concurrency:
+  group: theologai-shared-preview-mutation
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # This is the same manually provisioned environment used by the canary.
+    # Recovery never references or injects its operator-token secret.
+    environment: ccel-canary
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+
+      - run: npm ci --no-audit
+
+      - name: Validate dedicated credentials and every recovery input before any Wrangler invocation
+        env:
+          DISPATCH_REF: ${{ github.ref }}
+          CURRENT: ${{ inputs.expected_current_version_id }}
+          TARGET: ${{ inputs.expected_target_version_id }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+          CCEL_CANARY_CREDENTIALS_CONFIGURED: ${{ secrets.CCEL_CANARY_CREDENTIALS_CONFIGURED }}
+          CCEL_CANARY_ACCOUNT_WIDE_WORKERS_WRITE_ACK: ${{ secrets.CCEL_CANARY_ACCOUNT_WIDE_WORKERS_WRITE_ACK }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CCEL_CANARY_CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          npx tsx scripts/ccel-live-preview-canary.ts validate-emergency-credentials
+          npx tsx scripts/ccel-live-preview-canary.ts validate-emergency-inputs \
+            --ref "$DISPATCH_REF" --current "$CURRENT" --target "$TARGET" \
+            --confirmation "$CONFIRMATION" --config wrangler.toml
+
+      - name: Validate, restore if necessary, and re-prove exact preview 100
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CCEL_CANARY_CLOUDFLARE_API_TOKEN }}
+          CURRENT: ${{ inputs.expected_current_version_id }}
+          TARGET: ${{ inputs.expected_target_version_id }}
+        run: |
+          set -euo pipefail
+          npx wrangler deployments list --env preview --json > "$RUNNER_TEMP/preview-deployments.json"
+          OBSERVED="$(jq -er 'sort_by(.created_on) | last | .versions | select(length == 1) | .[0] | select(.percentage == 100) | .version_id' "$RUNNER_TEMP/preview-deployments.json")"
+          test "$OBSERVED" = "$CURRENT"
+          npx wrangler versions view "$CURRENT" --env preview --json > "$RUNNER_TEMP/preview-current.json"
+          npx wrangler versions view "$TARGET" --env preview --json > "$RUNNER_TEMP/preview-target.json"
+          PLAN="$(npx tsx scripts/ccel-live-preview-canary.ts restore-plan \
+            --config wrangler.toml --deployments "$RUNNER_TEMP/preview-deployments.json" \
+            --current-view "$RUNNER_TEMP/preview-current.json" --target-view "$RUNNER_TEMP/preview-target.json" \
+            --expected-current "$CURRENT" --expected-target "$TARGET")"
+          if [ "$PLAN" = deploy ]; then npx wrangler versions deploy "$TARGET@100" --env preview --yes; fi
+          npx wrangler deployments list --env preview --json > "$RUNNER_TEMP/preview-deployments-restored.json"
+          npx tsx scripts/ccel-live-preview-canary.ts validate-restore-result \
+            --config wrangler.toml --deployments "$RUNNER_TEMP/preview-deployments-restored.json" \
+            --target-view "$RUNNER_TEMP/preview-target.json" --expected-target "$TARGET"

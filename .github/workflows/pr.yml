@@ -216,10 +216,11 @@ jobs:
       github.event.pull_request.base.ref == 'main' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       contains(github.event.pull_request.labels.*.name, 'deploy-preview')
-    # This deliberately differs from the workflow-wide per-PR group above:
-    # one shared preview Worker cannot safely audit two deploying PRs at once.
+    # Repository-wide serialization: this exact group is also held by the
+    # manual CCEL canary and emergency restore, so neither can observe or
+    # overwrite an ordinary preview deployment mid-transaction.
     concurrency:
-      group: theologai-shared-preview-deploy-and-audit
+      group: theologai-shared-preview-mutation
       cancel-in-progress: false
     runs-on: ubuntu-latest
     environment:
