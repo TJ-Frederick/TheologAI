@@ -161,7 +161,12 @@ describe('published project contract', () => {
     expect(readme).toContain(`${strongs.toLocaleString('en-US')} Strong's entries`);
     expect(developerGuide).toContain(`${documents} historical documents`);
     expect(confessionSkill).toContain(`includes ${documents} historical documents`);
-    expect(confessionSkill).toContain('Call `primary_source_search` with one bounded local query plan');
+    expect(confessionSkill).toContain('Call `primary_source_search` with one bounded, version-appropriate query');
+    expect(confessionSkill).toContain('Version 6 uses the explicit local-only `providers: ["local"]` input');
+    expect(confessionSkill).toContain('Version 7 is provider-neutral');
+    expect(confessionSkill).toContain('`searchDepth: "standard"`');
+    expect(confessionSkill).toContain('`searchDepth: "expanded"`');
+    expect(confessionSkill).toContain('expanded discovery omitted those bounds');
     expect(confessionSkill).toContain('each selected canonical `resource_link` with MCP `resources/read`');
     expect(confessionSkill).toContain('Never relabel an issuing, drafting, revising, or');
     expect(confessionSkill).toContain('Never infer a tradition or author attribution');
@@ -399,5 +404,11 @@ describe('published project contract', () => {
       );
       expect(normalized).not.toMatch(/deployed preview remains v5\/discovery-only/i);
     }
+
+    const liveAudit = documents[0]!;
+    expect(liveAudit).toContain('exactly two concurrent `searchDepth: "expanded"` contenders');
+    expect(liveAudit).toContain('`searchDepth: "standard"` call');
+    expect(liveAudit).toContain('partial, non-error response');
+    expect(liveAudit).not.toMatch(/CCEL-only contenders/i);
   });
 });

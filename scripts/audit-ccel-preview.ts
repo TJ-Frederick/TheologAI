@@ -2,6 +2,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { normalizeCcelSectionLocator } from '../src/adapters/commentary/CcelSearchAdapter.js';
 import { CCEL_UPSTREAM_TERMINAL_ATTEMPT_LIMIT, type CcelCoordinatorSnapshot } from '../src/services/historical/CcelUpstreamCoordinator.js';
+import { CCEL_COMPOSITION_DATE_NOTICE } from '../src/services/historical/primarySourceTypes.js';
 import { runOperatorRequest } from './ccel-coordinator-operator.js';
 
 export const LIVE_AUDIT_CONFIRMATION = 'I AUTHORIZE TWO LIVE CCEL PREVIEW REQUESTS';
@@ -43,6 +44,7 @@ export function parseCcelAuditArgs(argv: string[]): CcelAuditOptions {
 
 type Provider = {
   provider?: string; status?: string; searched?: boolean; retryAfterSeconds?: number; hitCount?: number;
+  notices?: string[];
   scope?: { eligibleDocuments?: Array<{ editionReadiness?: EditionReadiness }> };
   hits?: Array<{
     snippet?: string; metadataStatus?: string; editionReadiness?: EditionReadiness;
@@ -60,6 +62,7 @@ type SearchOutput = {
   responseWindow?: { unit?: string; maximum?: number; truncated?: boolean };
   coverage?: {
     localAttempted?: boolean; localHitCount?: number; ccelAttempted?: boolean; ccelHitCount?: number;
+    notices?: string[];
     serverObserved?: { searched?: CoverageObservation[]; notSearched?: CoverageObservation[] };
   };
   evidencePolicy?: {
@@ -110,8 +113,8 @@ class CcelCallBudget {
   private used = 0;
   constructor(readonly maximum: number) {}
 
-  authorize(providers: string[]): void {
-    if (!providers.includes('ccel')) return;
+  authorize(searchDepth: 'standard' | 'expanded'): void {
+    if (searchDepth !== 'expanded') return;
     if (this.used >= this.maximum) {
       throw new Error(`Audit refused a CCEL-bearing call beyond its hard maximum of ${this.maximum}.`);
     }
@@ -147,25 +150,38 @@ export async function runCcelPreviewAudit(options: CcelAuditOptions, dependencie
     const preSnapshot = await readAuditSnapshot(snapshotCoordinator, 'pre');
     assertCanaryReady(preSnapshot, now());
 
-    // Exactly two concurrent CCEL-only calls exercise the one global Durable
+    // Exactly two concurrent expanded calls exercise the one global Durable
     // Object budget without relying on process-local cache affinity or elapsed
-    // wall time. One may be admitted; the other must receive structured busy.
+    // wall time. Both retain the curated local group first; one external group
+    // may be admitted while the other must report structured busy as partial.
     const runId = crypto.randomUUID().replaceAll('-', '');
     const contenders = await Promise.all([
-      search(preview, ccelBudget, 'audit-contender-a', `theologai audit ${runId} alpha`, ['ccel'], true),
-      search(preview, ccelBudget, 'audit-contender-b', `theologai audit ${runId} beta`, ['ccel'], true),
+      search(preview, ccelBudget, 'audit-contender-a', `theologai audit ${runId} alpha`, 'expanded', {
+        startYear: 1500, endYear: 1700,
+      }),
+      search(preview, ccelBudget, 'audit-contender-b', `theologai audit ${runId} beta`, 'expanded', {
+        startYear: 1500, endYear: 1700,
+      }),
     ]);
+    for (const output of contenders) {
+      assertProviderOrder(output, ['local', 'ccel_live']);
+      assert(['ok', 'no_results', 'catalog_miss'].includes(provider(output, 'local')?.status ?? ''),
+        'expanded search retains a usable curated local group first');
+    }
     const cold = contenders.filter(output => ['ok', 'no_results'].includes(provider(output, 'ccel_live')?.status ?? ''));
     const busy = contenders.filter(output => provider(output, 'ccel_live')?.status === 'rate_limited');
     assert(cold.length === 1 && busy.length === 1, 'one admitted discovery and one globally rate-limited contender');
     for (const output of contenders) assertValidV5Envelope(output);
     assertValidExternalDiscovery(provider(cold[0]!, 'ccel_live')!);
+    assertDateOmissionNotice(cold[0]!);
+    assert(busy[0]!.planStatus === 'partial', 'busy expanded search remains a partial result');
     assertValidRateLimited(provider(busy[0]!, 'ccel_live')!);
     const postSnapshot = await readAuditSnapshot(snapshotCoordinator, 'post');
     const coordinator = assertCanaryDelta(preSnapshot, postSnapshot);
 
     // Local search is deliberately separate and cannot consume an origin slot.
-    const local = await search(preview, ccelBudget, 'audit-local-fallback', 'justification', ['local']);
+    const local = await search(preview, ccelBudget, 'audit-local-fallback', 'justification', 'standard');
+    assertProviderOrder(local, ['local']);
     assert(['ok', 'no_results', 'catalog_miss'].includes(provider(local, 'local')?.status ?? ''), 'usable local fallback independent of CCEL');
     assertValidV5Envelope(local);
     assert(ccelBudget.snapshot() === 2, 'exactly two CCEL-bearing tool calls');
@@ -389,6 +405,13 @@ function assertValidExternalDiscovery(external: Provider): void {
   }
 }
 
+function assertDateOmissionNotice(output: SearchOutput): void {
+  const external = provider(output, 'ccel_live');
+  assert(external?.notices?.[0] === CCEL_COMPOSITION_DATE_NOTICE
+    && output.coverage?.notices?.includes(CCEL_COMPOSITION_DATE_NOTICE),
+  'expanded external discovery discloses omitted composition-date filtering');
+}
+
 async function connect(url: string, name: string): Promise<CcelAuditClient> {
   const client = new Client({ name, version: '1.0.0' }, { capabilities: {} });
   await client.connect(new StreamableHTTPClientTransport(new URL(url)));
@@ -400,29 +423,27 @@ async function search(
   budget: CcelCallBudget,
   id: string,
   text: string,
-  providers: string[],
-  allowRateLimitedError = false,
+  searchDepth: 'standard' | 'expanded',
+  dates: { startYear?: number; endYear?: number } = {},
 ): Promise<SearchOutput> {
-  budget.authorize(providers);
+  budget.authorize(searchDepth);
   const response = await client.callTool({ name: 'primary_source_search', arguments: {
-    queries: [{ id, text, providers, match: 'all_terms', selection: 'relevance', limit: 2 }],
+    queries: [{
+      id, text, searchDepth, match: 'all_terms', selection: 'relevance', limit: 2,
+      ...(searchDepth === 'expanded' ? { expandedLimit: 2 } : {}),
+      ...dates,
+    }],
   } });
+  if (response.isError) throw new Error('Primary-source call returned an unexpected tool error form.');
   const output = (response.structuredContent ?? {}) as SearchOutput;
-  const providersReturned = output.queries?.flatMap(query => query.providers ?? []) ?? [];
-  const ccelOnlyRateLimited = output.planStatus === 'unavailable'
-    && providersReturned.length === 1
-    && providersReturned[0]?.provider === 'ccel_live'
-    && providersReturned[0].status === 'rate_limited';
-  if (!response.isError) {
-    if (allowRateLimitedError && ccelOnlyRateLimited) {
-      throw new Error('Primary-source CCEL-only rate limit was not marked as a tool error.');
-    }
-    return output;
-  }
-  const expectedRateLimit = allowRateLimitedError
-    && ccelOnlyRateLimited;
-  if (!expectedRateLimit) throw new Error('Primary-source call returned an unexpected tool error form.');
   return output;
+}
+
+function assertProviderOrder(output: SearchOutput, expected: string[]): void {
+  const queries = output.queries ?? [];
+  assert(queries.length === 1
+    && JSON.stringify(queries[0]?.providers?.map(item => item.provider)) === JSON.stringify(expected),
+  `provider groups retain ordered ${expected.join(', ')} execution`);
 }
 
 function provider(output: SearchOutput, name: string): Provider | undefined {

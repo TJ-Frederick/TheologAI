@@ -19,10 +19,13 @@ returned by the server to establish what is available and what each document
 says. The workflow must not assign a tradition or author from a title or from a
 prewritten grouping.
 
-Production advertises the v6 local-only `primary_source_search` contract.
-Preview may advertise v7, which adds a separately reported CCEL discovery
-provider. Preserve that provider's state and unreviewed metadata separately; a
-disabled provider did not search or read CCEL.
+Inspect the advertised `primary_source_search` contract before building the
+plan. Version 6 uses the explicit local-only `providers: ["local"]` input.
+Version 7 is provider-neutral: `searchDepth: "standard"` searches the curated
+catalog, while one materially useful `searchDepth: "expanded"` query may add a
+separately grouped broader-discovery result. Preserve every returned group's
+state and unreviewed external metadata separately; a disabled or busy external
+group did not search or read an external page.
 
 ## Methodology
 
@@ -36,10 +39,16 @@ disabled provider did not search or read CCEL.
 
 ### Step 2: Search Across Traditions
 
-- Call `primary_source_search` with one bounded local query plan, for example
+- Call `primary_source_search` with one bounded, version-appropriate query
+  plan. For v6 use
   `{ "queries": [{ "id": "confession-topic", "text": "the doctrinal topic", "providers": ["local"], "match": "all_terms", "selection": "work_diversity", "limit": 5 }] }`.
-- On a v7 endpoint, request the separate `ccel` provider only when a discovery
-  lead is materially useful. It is never local catalog evidence.
+  For v7 use the same query with `searchDepth: "standard"` instead of
+  `providers`; change at most one query to `searchDepth: "expanded"` only when
+  broader discovery is materially useful.
+- Keep v7's ordered curated and external groups distinct. An expanded external
+  group is never local catalog evidence. If composition-year bounds were
+  requested, preserve the notice that expanded discovery omitted those bounds
+  and cannot establish membership in the requested historical period.
 - Treat returned snippets as discovery-only. Preserve document metadata, creator
   names, and creator roles exactly as returned.
 - Do not claim the search covered sources outside the hosted collection, and do

@@ -16,7 +16,7 @@ owner separately authorizes a live canary and the current robots/interface
 preflight is recorded. Production remains deployed v6/local-only. Preview is
 deployed and audited on the v7/discovery-only contract, with CCEL execution
 disabled before adapter, coordinator, or fetch. It makes no production MCP tool
-call: production is a `tools/list` v6 local-only schema control. Before either
+call: production is a `tools/list` v6 local-only schema control. Before any
 preview tool call, the canary also uses the already-protected production
 operator route and exact live Worker UUID to read a content-free coordinator
 snapshot. The token is read only from `THEOLOGAI_CCEL_OPERATOR_TOKEN`; it is
@@ -26,12 +26,14 @@ proceeds. These schema observations prove v6 local-only versus v7 CCEL
 exposure; they do not attest exact deployed flag bits. A successful
 origin admission separately proves that the separately authorized canary's live
 execution was effective, which differs from the deployed inert baseline.
-Preview issues exactly two concurrent,
-CCEL-only contenders and requires one bounded discovery result plus one
-structured globally busy result. A separate local-only search verifies usable
-fallback without touching CCEL. A checked audit-side budget refuses any third
-CCEL-bearing call, so isolate/cache changes or elapsed coordinator intervals
-cannot raise the mechanical maximum above two possible CCEL-origin admissions.
+Preview issues exactly two concurrent `searchDepth: "expanded"` contenders.
+Each must retain its curated local result group first; one external group must
+report a bounded discovery result and the other must report structured global
+busy state as a partial, non-error response. A separate
+`searchDepth: "standard"` call verifies usable catalog search without touching
+CCEL. A checked audit-side budget refuses any third expanded call, so
+isolate/cache changes or elapsed coordinator intervals cannot raise the
+mechanical maximum above two possible CCEL-origin admissions.
 
 The pre-snapshot must show a clean closed circuit with every prior admission
 retired. The post-snapshot must show the same operator epoch, exactly one
