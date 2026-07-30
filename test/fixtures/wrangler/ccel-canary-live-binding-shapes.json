@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1",
+  "capturedAt": "2026-07-29",
+  "privacy": "worker_version_ids_and_binding_names_types_only",
+  "production": {
+    "versionId": "291f3292-3fa9-44fc-bf6f-b68fd2f4cef6",
+    "flags": "000",
+    "secretTextBindingNames": [
+      "AUTH_TOKEN",
+      "ESV_API_KEY",
+      "SBC_FACILITATOR_API_KEY"
+    ],
+    "operatorReady": false
+  },
+  "preview": {
+    "versionId": "06b9a603-8339-42b6-a246-ef9238563043",
+    "flags": "100",
+    "secretTextBindingNames": [
+      "ESV_API_KEY"
+    ],
+    "operatorReady": false
+  }
+}

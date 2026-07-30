@@ -121,6 +121,13 @@ describe('protected CCEL operator-secret provisioning', () => {
       'Do not dispatch `reset`',
       'versions secret delete',
       'separate deletion authorization',
+      'identical value belongs in exactly three approved places',
+      'GitHub environment `ccel-canary`',
+      '`CCEL_CANARY_OPERATOR_TOKEN`',
     ]) expect(guide).toContain(text);
+    expect(guide).toMatch(/do not synchronize\s+automatically/);
+    expect(guide).toMatch(/Full revocation must address\s+all three copies/);
+    expect(guide).toContain('Do not provision it on `theologai-preview`');
+    expect(guide).toContain('`theologai-ccel-coordinator`');
   });
 });

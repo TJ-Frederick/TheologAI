@@ -1,9 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
+  ACCOUNT_WIDE_WORKERS_WRITE_ACK,
   CANARY_CONFIRMATION,
   CANARY_MESSAGE,
   CANARY_TAG,
+  PRODUCTION_BASE_SECRET_BINDINGS,
   assertCommittedConfig,
   identifyCanaryUpload,
   planRestore,
@@ -17,6 +19,7 @@ import {
   validateEmergencyCredentials,
   validateEmergencyInputs,
   validatePreviewBaseline,
+  validateProductionBindingInventory,
   validateProductionControl,
   validateRestoreResult,
 } from '../../../scripts/ccel-live-preview-canary.js';
@@ -29,6 +32,15 @@ const config = readFileSync(new URL('../../../wrangler.toml', import.meta.url), 
 const workflow = readFileSync(new URL('../../../.github/workflows/ccel-live-preview-canary.yml', import.meta.url), 'utf8');
 const emergencyWorkflow = readFileSync(new URL('../../../.github/workflows/restore-ccel-live-preview-canary.yml', import.meta.url), 'utf8');
 const prWorkflow = readFileSync(new URL('../../../.github/workflows/pr.yml', import.meta.url), 'utf8');
+const liveBindingShapes = JSON.parse(readFileSync(
+  new URL('../../fixtures/wrangler/ccel-canary-live-binding-shapes.json', import.meta.url), 'utf8',
+)) as {
+  schemaVersion: string;
+  capturedAt: string;
+  privacy: string;
+  production: { versionId: string; flags: string; secretTextBindingNames: string[]; operatorReady: boolean };
+  preview: { versionId: string; flags: string; secretTextBindingNames: string[]; operatorReady: boolean };
+};
 
 function bindings(mode: '100' | '111' | '000', includeOperatorSecret = false) {
   const productionMode = mode === '000';
@@ -46,6 +58,10 @@ function bindings(mode: '100' | '111' | '000', includeOperatorSecret = false) {
     { name: 'THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH', type: 'plain_text', text: mode === '111' ? 'true' : 'false' },
     { name: 'THEOLOGAI_ENABLE_CCEL_COORDINATOR', type: 'plain_text', text: mode === '111' ? 'true' : 'false' },
     { name: 'ESV_API_KEY', type: 'secret_text' },
+    ...(productionMode ? [
+      { name: 'AUTH_TOKEN', type: 'secret_text' },
+      { name: 'SBC_FACILITATOR_API_KEY', type: 'secret_text' },
+    ] : []),
     ...(includeOperatorSecret ? [{ name: 'THEOLOGAI_CCEL_OPERATOR_TOKEN', type: 'secret_text' }] : []),
   ];
 }
@@ -103,12 +119,18 @@ describe('CCEL live preview canary transaction', () => {
     expect(() => validateCanaryInputs({ previewPredecessor: predecessor, productionControl: predecessor })).toThrow(/differ/);
     expect(() => validateEmergencyInputs('refs/heads/main', canary, predecessor, 'RESTORE THE EXACT CCEL PREVIEW PREDECESSOR', config)).not.toThrow();
     expect(() => validateEmergencyInputs('refs/heads/main', '--env', predecessor, 'RESTORE THE EXACT CCEL PREVIEW PREDECESSOR', config)).toThrow(/UUID/);
-    expect(() => validateCanaryCredentials('missing', 'cf-token', 'a'.repeat(43))).toThrow(/provisioned/);
-    expect(() => validateCanaryCredentials('CCEL_CANARY_CREDENTIALS_CONFIGURED', '', 'a'.repeat(43))).toThrow(/Cloudflare/);
-    expect(() => validateCanaryCredentials('CCEL_CANARY_CREDENTIALS_CONFIGURED', 'cf-token', 'bad')).toThrow(/operator/);
-    expect(() => validateCanaryCredentials('CCEL_CANARY_CREDENTIALS_CONFIGURED', 'cf-token', 'a'.repeat(43))).not.toThrow();
-    expect(() => validateEmergencyCredentials('CCEL_CANARY_CREDENTIALS_CONFIGURED', 'cf-token')).not.toThrow();
-    expect(() => validateEmergencyCredentials('missing', 'cf-token')).toThrow(/provisioned/);
+    expect(() => validateCanaryCredentials('missing', ACCOUNT_WIDE_WORKERS_WRITE_ACK, 'cf-token', 'a'.repeat(43))).toThrow(/provisioned/);
+    expect(() => validateCanaryCredentials('CCEL_CANARY_CREDENTIALS_CONFIGURED', 'missing', 'cf-token', 'a'.repeat(43))).toThrow(/account-wide/);
+    expect(() => validateCanaryCredentials('CCEL_CANARY_CREDENTIALS_CONFIGURED', ACCOUNT_WIDE_WORKERS_WRITE_ACK, '', 'a'.repeat(43))).toThrow(/Cloudflare/);
+    expect(() => validateCanaryCredentials('CCEL_CANARY_CREDENTIALS_CONFIGURED', ACCOUNT_WIDE_WORKERS_WRITE_ACK, 'cf-token', 'bad')).toThrow(/operator/);
+    expect(() => validateCanaryCredentials(
+      'CCEL_CANARY_CREDENTIALS_CONFIGURED', ACCOUNT_WIDE_WORKERS_WRITE_ACK, 'cf-token', 'a'.repeat(43),
+    )).not.toThrow();
+    expect(() => validateEmergencyCredentials(
+      'CCEL_CANARY_CREDENTIALS_CONFIGURED', ACCOUNT_WIDE_WORKERS_WRITE_ACK, 'cf-token',
+    )).not.toThrow();
+    expect(() => validateEmergencyCredentials('CCEL_CANARY_CREDENTIALS_CONFIGURED', 'missing', 'cf-token')).toThrow(/account-wide/);
+    expect(() => validateEmergencyCredentials('missing', ACCOUNT_WIDE_WORKERS_WRITE_ACK, 'cf-token')).toThrow(/provisioned/);
   });
 
   it('requires a sole predecessor, stages one undeployed candidate, validates exact 111, and never accepts the operator token in preview', () => {
@@ -136,17 +158,62 @@ describe('CCEL live preview canary transaction', () => {
     expect(() => validateCanaryVersion(config, baseline, missingSecret, predecessor, canary)).toThrow(/exact authorized set/);
   });
 
-  it('requires ESV plus exactly one correctly typed production-only operator secret before preview upload', () => {
+  it('pins the sanitized live binding shapes and requires the separately staged operator secret before preview mutation', () => {
+    expect(liveBindingShapes).toEqual({
+      schemaVersion: '1',
+      capturedAt: '2026-07-29',
+      privacy: 'worker_version_ids_and_binding_names_types_only',
+      production: {
+        versionId: '291f3292-3fa9-44fc-bf6f-b68fd2f4cef6',
+        flags: '000',
+        secretTextBindingNames: [...PRODUCTION_BASE_SECRET_BINDINGS],
+        operatorReady: false,
+      },
+      preview: {
+        versionId: '06b9a603-8339-42b6-a246-ef9238563043',
+        flags: '100',
+        secretTextBindingNames: ['ESV_API_KEY'],
+        operatorReady: false,
+      },
+    });
+    const currentLiveShape = view(liveBindingShapes.production.versionId, 9, '000');
+    expect(validateProductionBindingInventory(currentLiveShape)).toEqual({ operatorReady: false });
+    expect(() => validateProductionControl(
+      config, deployments(liveBindingShapes.production.versionId), currentLiveShape, liveBindingShapes.production.versionId,
+    )).toThrow(/production operator prerequisite is missing.*before any preview mutation/);
+
     const control = view(production, 9, '000', { secret: true });
     expect(() => validateProductionControl(config, deployments(production), control, production)).not.toThrow();
-    const absent = view(production, 9, '000');
-    expect(() => validateProductionControl(config, deployments(production), absent, production)).toThrow(/operator secret_text/);
+    expect(validateProductionBindingInventory(control)).toEqual({ operatorReady: true });
     const duplicate = view(production, 9, '000', { secret: true });
     duplicate.resources.bindings.push({ name: 'THEOLOGAI_CCEL_OPERATOR_TOKEN', type: 'secret_text' });
-    expect(() => validateProductionControl(config, deployments(production), duplicate, production)).toThrow(/operator secret_text/);
+    expect(() => validateProductionControl(config, deployments(production), duplicate, production)).toThrow(/unique/);
     const wrongType = view(production, 9, '000', { secret: true });
     (wrongType.resources.bindings.find(binding => binding.name === 'THEOLOGAI_CCEL_OPERATOR_TOKEN') as { type: string }).type = 'plain_text';
-    expect(() => validateProductionControl(config, deployments(production), wrongType, production)).toThrow(/operator secret_text/);
+    expect(() => validateProductionControl(config, deployments(production), wrongType, production)).toThrow(/type mismatch/);
+    for (const requiredSecret of PRODUCTION_BASE_SECRET_BINDINGS) {
+      const missing = view(production, 9, '000', { secret: true });
+      missing.resources.bindings.splice(missing.resources.bindings.findIndex(binding => binding.name === requiredSecret), 1);
+      expect(() => validateProductionBindingInventory(missing)).toThrow(/exact authorized set/);
+      const wrongBaseType = view(production, 9, '000', { secret: true });
+      (wrongBaseType.resources.bindings.find(binding => binding.name === requiredSecret) as { type: string }).type = 'plain_text';
+      expect(() => validateProductionBindingInventory(wrongBaseType)).toThrow(/type mismatch/);
+    }
+    const extra = view(production, 9, '000', { secret: true });
+    extra.resources.bindings.push({ name: 'UNAUTHORIZED_SECRET', type: 'secret_text' });
+    expect(() => validateProductionBindingInventory(extra)).toThrow(/exact authorized set/);
+  });
+
+  it('accepts only ESV in preview and rejects every production-only or unknown secret', () => {
+    const previewLiveShape = view(liveBindingShapes.preview.versionId, 10, '100');
+    expect(() => validatePreviewBaseline(
+      config, deployments(liveBindingShapes.preview.versionId), previewLiveShape, liveBindingShapes.preview.versionId,
+    )).not.toThrow();
+    for (const forbiddenSecret of ['AUTH_TOKEN', 'SBC_FACILITATOR_API_KEY', 'THEOLOGAI_CCEL_OPERATOR_TOKEN', 'UNKNOWN_SECRET']) {
+      const forbidden = view(predecessor, 10, '100');
+      forbidden.resources.bindings.push({ name: forbiddenSecret, type: 'secret_text' });
+      expect(() => validatePreviewBaseline(config, deployments(predecessor), forbidden, predecessor)).toThrow(/exact authorized set/);
+    }
   });
 
   it('restores only the exact captured predecessor and makes a second restore idempotent', () => {
@@ -177,7 +244,10 @@ describe('CCEL live preview canary transaction', () => {
     expect(workflow).not.toContain('environment: production');
     expect(workflow).not.toContain('secrets.CLOUDFLARE_API_TOKEN');
     expect(workflow).toContain('secrets.CCEL_CANARY_CLOUDFLARE_API_TOKEN');
+    expect(workflow).toContain('secrets.CCEL_CANARY_ACCOUNT_WIDE_WORKERS_WRITE_ACK');
     expect(workflow).toContain('validate-canary-credentials');
+    expect(workflow.indexOf('validate-canary-credentials')).toBeLessThan(workflow.indexOf('npx wrangler'));
+    expect(workflow.indexOf('validate-production-control')).toBeLessThan(workflow.indexOf('npx wrangler versions upload'));
     expect(workflow.indexOf('Run the existing authorized two-attempt audit exactly once'))
       .toBeLessThan(workflow.indexOf('Always restore the exact preview predecessor before job exit'));
     expect(workflow).toMatch(/id: restore\n        if: always\(\)/);
@@ -188,7 +258,9 @@ describe('CCEL live preview canary transaction', () => {
     }
     expect(emergencyWorkflow).toMatch(/^on:\n  workflow_dispatch:/m);
     expect(emergencyWorkflow).not.toContain('THEOLOGAI_CCEL_OPERATOR_TOKEN');
+    expect(emergencyWorkflow).not.toContain('CCEL_CANARY_OPERATOR_TOKEN');
     expect(emergencyWorkflow).toContain('environment: ccel-canary');
+    expect(emergencyWorkflow).toContain('secrets.CCEL_CANARY_ACCOUNT_WIDE_WORKERS_WRITE_ACK');
     expect(emergencyWorkflow).toContain('validate-emergency-inputs');
     expect(emergencyWorkflow).toContain('validate-restore-result');
     for (const source of [prWorkflow, workflow, emergencyWorkflow]) {

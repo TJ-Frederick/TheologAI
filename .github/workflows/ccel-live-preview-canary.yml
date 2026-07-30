@@ -34,9 +34,9 @@ jobs:
   canary:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # This environment must be provisioned manually. GitHub environments only
-    # gate secret availability; the least-privilege Cloudflare token scope is an
-    # external prerequisite documented in CCEL-LIVE-PREVIEW-CANARY-TRANSACTION.
+    # This environment must be provisioned manually. GitHub gates secret
+    # availability, but Cloudflare Workers Script Write is account-scoped. The
+    # separate exact owner acknowledgment is required before any Wrangler call.
     environment: ccel-canary
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -62,6 +62,7 @@ jobs:
           PRODUCTION_CONTROL: ${{ inputs.expected_production_control_version_id }}
           CONFIRMATION: ${{ inputs.confirmation }}
           CCEL_CANARY_CREDENTIALS_CONFIGURED: ${{ secrets.CCEL_CANARY_CREDENTIALS_CONFIGURED }}
+          CCEL_CANARY_ACCOUNT_WIDE_WORKERS_WRITE_ACK: ${{ secrets.CCEL_CANARY_ACCOUNT_WIDE_WORKERS_WRITE_ACK }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CCEL_CANARY_CLOUDFLARE_API_TOKEN }}
           THEOLOGAI_CCEL_OPERATOR_TOKEN: ${{ secrets.CCEL_CANARY_OPERATOR_TOKEN }}
         run: |

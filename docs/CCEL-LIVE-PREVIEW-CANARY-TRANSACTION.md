@@ -35,34 +35,63 @@ The only way to create the third row is the main-only, manually dispatched
    `ccel-canary` environment. It must contain only these dedicated names:
    `CCEL_CANARY_CREDENTIALS_CONFIGURED` (with the exact sentinel value
    `CCEL_CANARY_CREDENTIALS_CONFIGURED`),
+   `CCEL_CANARY_ACCOUNT_WIDE_WORKERS_WRITE_ACK` (with the exact value
+   `I ACCEPT ACCOUNT-WIDE WORKERS SCRIPT WRITE FOR THIS CCEL CANARY TRANSACTION`),
    `CCEL_CANARY_CLOUDFLARE_API_TOKEN`, and `CCEL_CANARY_OPERATOR_TOKEN`.
    The workflow fails before any Wrangler command if any is absent or malformed.
    It never falls back to the `production` or ordinary `preview` environment
    credentials.
 
 The dedicated Cloudflare token is an external configuration prerequisite, not
-a security boundary this repository can prove. Before enabling the environment,
-an administrator must verify in Cloudflare that this distinct token permits the
-read operations needed on the production Worker (deployment/version views and
-the protected audit snapshot) and the read/write version operations needed on
-the preview Worker, with no D1 deletion, secret mutation, route mutation, or
-production deployment permission. Cloudflare's available resource-scoping
-granularity is authoritative; GitHub environment selection merely controls
-secret availability and cannot attest the token's effective permissions. If
-that least-privilege scope cannot be configured, do not set the sentinel and
-do not run the canary workflow.
+a Worker-level security boundary. Cloudflare documents Workers Scripts
+Read/Write as [account permissions](https://developers.cloudflare.com/fundamentals/api/reference/permissions/),
+and API-token resource policies support
+[User, Account, and Zone resources](https://developers.cloudflare.com/fundamentals/api/how-to/create-via-api/),
+not an individual Worker script. Consequently, a token that can upload and
+deploy a preview Worker version in the same Cloudflare account also has
+Cloudflare-authorized Workers Script Write scope across that selected account.
+It cannot be Cloudflare-enforced as preview-write/production-read-only.
+
+The exact acknowledgment above is deliberately separate from the generic
+credentials sentinel. It records the owner's acceptance of that account-wide
+scope for this bounded transaction; this source change does not set it. The
+repository workflow then supplies narrower procedural controls: every mutation
+command includes `--env preview`, production is read only, exact version and
+binding guards run before the first preview mutation, and no command mutates a
+secret, route, D1 database, or production deployment. Those are repository
+constraints, not Cloudflare credential isolation. A preview Worker in a
+separate Cloudflare account, using a token selected only for that account, is
+the only route to hard credential isolation between preview and production.
 
 The workflow renders a temporary file in the runner, not a repository change.
 It changes precisely the two preview values
 `THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH` and
 `THEOLOGAI_ENABLE_CCEL_COORDINATOR` from `false` to `true`. Version validation
-requires the complete authorized binding set: the shared `ESV_API_KEY` secret,
-the D1/DO/rate/version metadata bindings, and exactly the declared plain-text
-variables. Production must additionally contain exactly one
-`THEOLOGAI_CCEL_OPERATOR_TOKEN` `secret_text` binding; preview must not contain
-it. No extra binding of any type is accepted. The dedicated job-only operator
-credential is never passed to Wrangler, stored in preview, written to a command
-line, or retained as evidence.
+requires the complete authorized binding set: the D1/DO/rate/version metadata
+bindings, exactly the declared plain-text variables, and an exact secret-name
+allowlist. The sanitized read-only inventory captured on 2026-07-29 observed:
+
+| Surface | Worker version | Exact `secret_text` binding names |
+| --- | --- | --- |
+| Production 000 | `291f3292-3fa9-44fc-bf6f-b68fd2f4cef6` | `AUTH_TOKEN`, `ESV_API_KEY`, `SBC_FACILITATOR_API_KEY` |
+| Preview 100 | `06b9a603-8339-42b6-a246-ef9238563043` | `ESV_API_KEY` |
+
+`AUTH_TOKEN` and `SBC_FACILITATOR_API_KEY` are absent from current tracked
+source and Worker configuration. This transaction therefore preserves them as
+exact production-only legacy compatibility binding names and types; it makes
+no claim about their values, consumers, or purpose. Preview and the canary
+reject both names, the operator token, and every other extra binding.
+
+The observed production inventory is valid as a 000 control inventory but is
+not canary-ready because it lacks
+`THEOLOGAI_CCEL_OPERATOR_TOKEN`. Before any preview upload, production must
+separately have been staged and promoted to the exact same allowlist plus
+exactly one correctly typed operator binding. The validator reports this as an
+explicit missing-operator prerequisite on the current state. This PR does not
+authorize or perform that staging, promotion, secret creation, or any other
+remote change. The dedicated job-only operator credential is never passed to
+Wrangler, stored in preview, written to a command line, or retained as
+evidence.
 
 ## Transaction sequence
 
@@ -126,6 +155,10 @@ version is a tagged/equivalent 111 candidate, and re-proves a sole preview 100
 deployment. If it is already restored, it is deliberately idempotent. Neither
 workflow deletes a version, route, database, deployment, secret, or artifact
 outside its normal short retention period.
+
+Because emergency restoration also performs a preview Worker deployment with
+the same same-account token, it requires the same exact account-wide Workers
+write acknowledgment before its first Wrangler command.
 
 ## Explicitly out of scope
 

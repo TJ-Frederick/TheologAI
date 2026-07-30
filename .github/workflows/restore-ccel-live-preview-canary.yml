@@ -30,7 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # This is the same manually provisioned environment used by the canary.
-    # It intentionally contains no operator token because recovery is preview-only.
+    # Recovery never references or injects its operator-token secret.
     environment: ccel-canary
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -51,6 +51,7 @@ jobs:
           TARGET: ${{ inputs.expected_target_version_id }}
           CONFIRMATION: ${{ inputs.confirmation }}
           CCEL_CANARY_CREDENTIALS_CONFIGURED: ${{ secrets.CCEL_CANARY_CREDENTIALS_CONFIGURED }}
+          CCEL_CANARY_ACCOUNT_WIDE_WORKERS_WRITE_ACK: ${{ secrets.CCEL_CANARY_ACCOUNT_WIDE_WORKERS_WRITE_ACK }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CCEL_CANARY_CLOUDFLARE_API_TOKEN }}
         run: |
           set -euo pipefail

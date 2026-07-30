@@ -11,6 +11,10 @@ export const CANARY_CONFIRMATION = 'I AUTHORIZE THE TEMPORARY CCEL LIVE PREVIEW 
 export const CANARY_MESSAGE = 'Temporary preview-only CCEL live canary; always restore exact predecessor';
 export const CANARY_TAG = 'ccel-live-preview-canary';
 export const OPERATOR_TOKEN = 'THEOLOGAI_CCEL_OPERATOR_TOKEN';
+export const ACCOUNT_WIDE_WORKERS_WRITE_ACK =
+  'I ACCEPT ACCOUNT-WIDE WORKERS SCRIPT WRITE FOR THIS CCEL CANARY TRANSACTION';
+export const PRODUCTION_BASE_SECRET_BINDINGS =
+  ['AUTH_TOKEN', 'ESV_API_KEY', 'SBC_FACILITATOR_API_KEY'] as const;
 
 const PRODUCTION = {
   worker: 'theologai', route: 'mcp.theologai.xyz', d1: '53211f50-a893-4b4c-be1e-bc625a595dc7',
@@ -63,15 +67,21 @@ export function validateCanaryInputs(input: CanaryInputs): void {
 }
 
 /** The dedicated environment must be explicitly provisioned outside this repo. */
-export function validateCanaryCredentials(marker: unknown, cloudflareToken: unknown, operatorToken: unknown): void {
+export function validateCanaryCredentials(
+  marker: unknown, accountWideWriteAck: unknown, cloudflareToken: unknown, operatorToken: unknown,
+): void {
   refuse(marker === 'CCEL_CANARY_CREDENTIALS_CONFIGURED', 'dedicated ccel-canary credentials are not provisioned');
+  refuse(accountWideWriteAck === ACCOUNT_WIDE_WORKERS_WRITE_ACK,
+    'account-wide Workers Script Write scope has not been explicitly acknowledged for this transaction');
   refuse(typeof cloudflareToken === 'string' && cloudflareToken.length > 0, 'dedicated Cloudflare token is absent');
   refuse(typeof operatorToken === 'string' && operatorToken.length === 43 && /^[A-Za-z0-9_-]{43}$/.test(operatorToken),
     'dedicated operator token is absent or malformed');
 }
 
-export function validateEmergencyCredentials(marker: unknown, cloudflareToken: unknown): void {
+export function validateEmergencyCredentials(marker: unknown, accountWideWriteAck: unknown, cloudflareToken: unknown): void {
   refuse(marker === 'CCEL_CANARY_CREDENTIALS_CONFIGURED', 'dedicated ccel-canary credentials are not provisioned');
+  refuse(accountWideWriteAck === ACCOUNT_WIDE_WORKERS_WRITE_ACK,
+    'account-wide Workers Script Write scope has not been explicitly acknowledged for this transaction');
   refuse(typeof cloudflareToken === 'string' && cloudflareToken.length > 0, 'dedicated Cloudflare token is absent');
 }
 
@@ -126,8 +136,14 @@ export function validateProductionControl(
   const version = parseFullVersion(versionValue);
   refuse(version.id === expectedVersion, 'production control view identity mismatch');
   refuse(activeVersion(parseDeployments(deploymentsValue)) === expectedVersion, 'production control is not the sole 100% deployment');
-  assertVersion(version, '000');
+  assertVersion(version, '000', true);
   return version;
+}
+
+/** Validate the exact sanitized production binding inventory independently of canary readiness. */
+export function validateProductionBindingInventory(versionValue: unknown): { operatorReady: boolean } {
+  const version = parseFullVersion(versionValue);
+  return { operatorReady: assertVersion(version, '000', false) };
 }
 
 /** Uploading must add exactly one undeployed immediately-next version. */
@@ -298,23 +314,21 @@ function assertEnvironment(config: JsonRecord, expected: typeof PREVIEW, mode: M
   if (mode === '000') refuse(expected.live === 'false' && expected.coordinator === 'false' && expected.discovery === 'false', 'production flags must remain 000');
 }
 
-function assertVersion(version: FullVersion, mode: Mode): void {
+function assertVersion(version: FullVersion, mode: Mode, requireProductionOperator = false): boolean {
   const runtime = recordAt(version.resources, 'script_runtime');
   refuse(runtime.compatibility_date === COMPATIBILITY_DATE && stableJson(runtime.compatibility_flags) === stableJson(COMPATIBILITY_FLAGS),
     'version compatibility settings mismatch');
   const bindings = version.resources.bindings;
-  if (mode === '000') {
-    const operatorSecrets = bindings.filter(binding => binding.name === OPERATOR_TOKEN);
-    refuse(operatorSecrets.length === 1 && operatorSecrets[0]?.type === 'secret_text',
-      'production version must contain exactly one operator secret_text binding');
-  }
   uniqueNames(bindings, 'version bindings');
+  const operatorBindings = bindings.filter(binding => binding.name === OPERATOR_TOKEN);
+  const operatorReady = mode === '000' && operatorBindings.length === 1;
+  if (operatorReady) assertVersionBinding(bindings, OPERATOR_TOKEN, 'secret_text', {});
   const expectedNames = new Set([
     'THEOLOGAI_DB', DO.name, 'THEOLOGAI_RATE_LIMITER', 'THEOLOGAI_CCEL_OPERATOR_AUTH_LIMITER', 'CF_VERSION_METADATA',
     'THEOLOGAI_VERSION', 'THEOLOGAI_ALLOWED_ORIGINS', 'THEOLOGAI_MAX_REQUEST_BYTES', 'THEOLOGAI_REQUEST_LOGS',
     'THEOLOGAI_EXPOSE_CCEL_DISCOVERY', 'THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH', 'THEOLOGAI_ENABLE_CCEL_COORDINATOR',
-    'ESV_API_KEY',
-    ...(mode === '000' ? [OPERATOR_TOKEN] : []),
+    ...(mode === '000' ? PRODUCTION_BASE_SECRET_BINDINGS : ['ESV_API_KEY']),
+    ...(operatorReady ? [OPERATOR_TOKEN] : []),
   ]);
   refuse(bindings.length === expectedNames.size && bindings.every(binding => expectedNames.has(String(binding.name))),
     'version bindings must be the exact authorized set');
@@ -324,8 +338,9 @@ function assertVersion(version: FullVersion, mode: Mode): void {
   assertVersionRate(bindings, 'THEOLOGAI_RATE_LIMITER', values.requestNamespace, 120);
   assertVersionRate(bindings, 'THEOLOGAI_CCEL_OPERATOR_AUTH_LIMITER', values.operatorNamespace, 12);
   assertVersionBinding(bindings, 'CF_VERSION_METADATA', 'version_metadata', {});
-  assertVersionBinding(bindings, 'ESV_API_KEY', 'secret_text', {});
-  if (mode === '000') assertVersionBinding(bindings, OPERATOR_TOKEN, 'secret_text', {});
+  if (mode === '000') {
+    for (const name of PRODUCTION_BASE_SECRET_BINDINGS) assertVersionBinding(bindings, name, 'secret_text', {});
+  } else assertVersionBinding(bindings, 'ESV_API_KEY', 'secret_text', {});
   const flags = mode === '111' ? { discovery: 'true', live: 'true', coordinator: 'true' } : values;
   const expected: Record<string, string> = {
     THEOLOGAI_VERSION: values.version,
@@ -336,6 +351,9 @@ function assertVersion(version: FullVersion, mode: Mode): void {
     THEOLOGAI_ENABLE_CCEL_COORDINATOR: flags.coordinator,
   };
   for (const [name, text] of Object.entries(expected)) assertVersionBinding(bindings, name, 'plain_text', { text });
+  refuse(mode !== '000' || !requireProductionOperator || operatorReady,
+    `production operator prerequisite is missing: active 000 version must contain exactly one ${OPERATOR_TOKEN} secret_text binding before any preview mutation`);
+  return operatorReady;
 }
 
 function assertConfigRate(bindings: JsonRecord[], name: string, namespace: string, limit: number): void {
@@ -453,11 +471,17 @@ export function runCli(argv: string[]): void {
   }
   if (command === 'validate-canary-credentials') {
     exactArgs(args, []);
-    validateCanaryCredentials(process.env.CCEL_CANARY_CREDENTIALS_CONFIGURED, process.env.CLOUDFLARE_API_TOKEN, process.env[OPERATOR_TOKEN]); return;
+    validateCanaryCredentials(
+      process.env.CCEL_CANARY_CREDENTIALS_CONFIGURED, process.env.CCEL_CANARY_ACCOUNT_WIDE_WORKERS_WRITE_ACK,
+      process.env.CLOUDFLARE_API_TOKEN, process.env[OPERATOR_TOKEN],
+    ); return;
   }
   if (command === 'validate-emergency-credentials') {
     exactArgs(args, []);
-    validateEmergencyCredentials(process.env.CCEL_CANARY_CREDENTIALS_CONFIGURED, process.env.CLOUDFLARE_API_TOKEN); return;
+    validateEmergencyCredentials(
+      process.env.CCEL_CANARY_CREDENTIALS_CONFIGURED, process.env.CCEL_CANARY_ACCOUNT_WIDE_WORKERS_WRITE_ACK,
+      process.env.CLOUDFLARE_API_TOKEN,
+    ); return;
   }
   if (command === 'validate-emergency-inputs') {
     exactArgs(args, ['--ref', '--current', '--target', '--confirmation', '--config']);
