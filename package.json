@@ -13,6 +13,8 @@
     "build:stepbible": "tsx scripts/build-stepbible-json.ts",
     "build:stepbible:lexicons": "tsx scripts/build-stepbible-lexicons.ts",
     "audit:aquinas-source-pack-capacity": "tsx scripts/aquinas-source-pack-capacity-comparison.ts",
+    "audit:original-language-context-capacity": "tsx scripts/original-language-context-capacity.ts",
+    "audit:original-language-context-capacity:write-evidence": "tsx scripts/write-original-language-context-capacity-evidence.ts",
     "audit:release-corpus-capacity": "tsx scripts/release-corpus-capacity.ts",
     "build:db": "tsx scripts/build-database.ts",
     "data:verify-sources": "tsx scripts/verify-data-manifest.ts",
