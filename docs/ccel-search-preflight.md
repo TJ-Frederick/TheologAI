@@ -9,11 +9,19 @@
 
 Originally recorded 2026-07-11, updated 2026-07-15 for dormant parser-policy
 hardening, and reconciled 2026-07-16 for preview-only v4 exposure. Updated
-2026-07-17 for preview-only v5 exposure. This is an architecture record, not
-an enablement approval. The live-search and coordinator flags remain off in
-production and preview.
+2026-07-17 for preview-only v5 exposure, and 2026-07-31 to pin the observed
+canary endpoint. This is an architecture record, not an enablement approval.
+The live-search and coordinator flags remain off in production and preview.
 
-- Search surface reviewed: `https://ccel.org/?page=1&text=...`
+- Observed canary hypothesis: the search interface was fetched at
+  `https://www.ccel.org/search`, where the observed form declared `GET` and
+  the relative action `/home3/search`. The dormant adapter therefore has one
+  fixed candidate endpoint, `https://www.ccel.org/home3/search`, and encodes
+  only its bounded `page=1` and `text` query parameters. This observation is
+  not proof that a result query succeeds, permission to query it, or a durable
+  interface guarantee. No HTML, query, result, or snippet evidence is retained.
+  There is no endpoint configuration, root/alternate-path probing, or fallback
+  host/path in the adapter.
 - Search contract reviewed: [CCEL Search Help](https://www.ccel.org/help/search), including the documented `author`, `authorID`, `title`, and `bookID` fields.
 - Exact locator shape reviewed: `https://ccel.org/ccel/{author}/{work}/{section}.html`.
 - Product boundary approved by the owner on 2026-07-16: retain the existing

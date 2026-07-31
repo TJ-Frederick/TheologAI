@@ -406,9 +406,14 @@ describe('published project contract', () => {
     }
 
     const liveAudit = documents[0]!;
+    const preflight = documents[2]!;
     expect(liveAudit).toContain('exactly two concurrent `searchDepth: "expanded"` contenders');
     expect(liveAudit).toContain('`searchDepth: "standard"` call');
     expect(liveAudit).toContain('partial, non-error response');
     expect(liveAudit).not.toMatch(/CCEL-only contenders/i);
+    expect(preflight).toContain('https://www.ccel.org/home3/search');
+    expect(preflight).toContain('Observed canary hypothesis');
+    expect(preflight).toContain('not proof that a result query succeeds');
+    expect(preflight).toContain('No HTML, query, result, or snippet evidence is retained.');
   });
 });

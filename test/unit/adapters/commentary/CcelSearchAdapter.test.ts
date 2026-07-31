@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { Window } from 'happy-dom';
 import {
+  CCEL_SEARCH_URL,
   CCEL_SEARCH_LIMITS,
   CcelSearchAdapter,
   composeCcelSearchRequest,
@@ -285,8 +286,10 @@ describe('composeCcelSearchRequest', () => {
   it('uses URLSearchParams encoding and escapes Lucene syntax as literals', () => {
     const composed = composeCcelSearchRequest({ text: '  (grace) + truth  ', match: 'all_terms', page: 1, limit: 5 });
     const url = new URL(composed.url);
-    expect(url.origin).toBe('https://ccel.org');
-    expect(url.pathname).toBe('/');
+    expect(CCEL_SEARCH_URL).toBe('https://www.ccel.org/home3/search');
+    expect(url.origin).toBe('https://www.ccel.org');
+    expect(url.pathname).toBe('/home3/search');
+    expect([...url.searchParams.keys()].sort()).toEqual(['page', 'text']);
     expect(url.searchParams.get('page')).toBe('1');
     expect(url.searchParams.get('text')).toBe('\\(grace\\) AND \\+ AND truth');
     expect(composed.url).not.toContain('(grace)');
@@ -368,6 +371,38 @@ describe('CcelSearchAdapter', () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
+  it('accepts only the fixed observed GET action and does not make endpoint overrides active', async () => {
+    const fetchImpl = vi.fn<typeof fetch>();
+    const adapter = new CcelSearchAdapter({ enabled: true, fetchImpl });
+    const internals = adapter as unknown as {
+      fetchSearchHtml(url: string, deadline: number): Promise<string>;
+    };
+    const deadline = Date.now() + CCEL_SEARCH_LIMITS.totalRequestMs;
+    const rejectedUrls = [
+      'https://www.ccel.org/?page=1&text=grace',
+      'https://ccel.org/home3/search?page=1&text=grace',
+      'https://www.ccel.org/search?page=1&text=grace',
+      'https://www.ccel.org/home3/search?page=1&text=grace&fallback=root',
+    ];
+
+    for (const url of rejectedUrls) {
+      await expect(internals.fetchSearchHtml(url, deadline)).rejects.toThrow('policy');
+    }
+    expect(fetchImpl).not.toHaveBeenCalled();
+
+    const configuredFetch = vi.fn<typeof fetch>().mockResolvedValue(htmlResponse(noResultsFixture));
+    const configuredAtRuntime = testAdapter({
+      enabled: true,
+      fetchImpl: configuredFetch,
+      // `baseUrl` is deliberately absent from the public options type and
+      // ignored if a JavaScript caller still supplies an obsolete key.
+      baseUrl: 'https://ccel.org/',
+    } as never);
+    await configuredAtRuntime.search(query({ text: 'obsolete endpoint key' }));
+    expect(configuredFetch).toHaveBeenCalledOnce();
+    expect(configuredFetch.mock.calls[0]![0]).toMatch(/^https:\/\/www\.ccel\.org\/home3\/search\?page=1&text=/);
+  });
+
   it('locks the dormant rollout to page 1, five hits, 240 Unicode snippet characters, and zero retries or redirects', () => {
     expect(CCEL_SEARCH_LIMITS).toMatchObject({
       maxPage: 1,
@@ -394,7 +429,7 @@ describe('CcelSearchAdapter', () => {
     expect(result.hits[0].snippet).not.toContain('<');
     expect(JSON.stringify(result)).not.toMatch(/token|queryID|resultID|synthetic-redacted/);
     expect(fetchImpl).toHaveBeenCalledOnce();
-    expect(fetchImpl.mock.calls[0][0]).toMatch(/^https:\/\/ccel\.org\/\?page=1&text=/);
+    expect(fetchImpl.mock.calls[0][0]).toMatch(/^https:\/\/www\.ccel\.org\/home3\/search\?page=1&text=/);
     expect(fetchImpl.mock.calls[0][1]).toMatchObject({ method: 'GET', redirect: 'manual', signal: expect.any(AbortSignal) });
   });
 
@@ -735,7 +770,7 @@ describe('CcelSearchAdapter', () => {
     await testAdapter({ enabled: true, fetchImpl: vi.fn<typeof fetch>().mockResolvedValue(wrongType.response) }).search(query({ text: 'wrong type body' }));
     expect(wrongType.cancel).toHaveBeenCalled();
 
-    const redirect = discardableResponse(302, { location: 'https://ccel.org/?page=1&text=redirected' });
+    const redirect = discardableResponse(302, { location: 'https://www.ccel.org/home3/search?page=1&text=redirected' });
     const redirectFetch = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(redirect.response)
       .mockImplementationOnce(async () => htmlResponse(resultsFixture));
@@ -747,7 +782,7 @@ describe('CcelSearchAdapter', () => {
   it('never follows same-host redirects', async () => {
     const cancels: Array<ReturnType<typeof vi.spyOn>> = [];
     const fetchImpl = vi.fn<typeof fetch>().mockImplementation(async () => {
-      const redirect = discardableResponse(302, { location: 'https://ccel.org/?page=1&text=redirect' });
+      const redirect = discardableResponse(302, { location: 'https://www.ccel.org/home3/search?page=1&text=redirect' });
       cancels.push(redirect.cancel);
       return redirect.response;
     });
