@@ -20,6 +20,21 @@ repository. Any later acquisition must happen in a reviewed, separate local
 workflow and must verify the exact commit, tree, selected-path count, and
 source-file evidence before a materializer reads anything.
 
+## Snapshot maturity is reproducibility evidence only
+
+The Greek pin is 29 reachable commits after baseline tag `24.06.17` (peeled
+commit `b5b7ecec0882a3e9a609ecac99e157391e5d9b46`); all 27 selected lowfat
+files differ from that tag. The Hebrew pin is three reachable commits after
+baseline tag `26.04.13` (peeled commit
+`09f8ea9e25025841ec45e2b6e7fc01595a080568`). Its repository-level changes
+cover CGJ stripping, NFC normalization, and merge work, while zero selected
+`WLC/lowfat` files and zero selected notices differ from the tag.
+
+Both pins are untagged snapshots. Exact pins prove reproducibility only: they
+do not establish independent scholarly QA, product acceptance, full
+reproduction, rights review, or resolution-or-exclusion of the nine dangling
+relationships. Those remain independent publication gates.
+
 ## Authoritative evidence and compatibility
 
 Only `/private/tmp/theologai-macula-source-audit/audit-output/final-replay-2`
@@ -46,22 +61,40 @@ npm run data:verify-macula-source-contract -- --audit-dir \
 ```
 
 It checks the source lock, the local historical commit/tree object, the two
-compact audited JSON artifacts, and their recorded relationship to the final
-replay. It does not fetch, move, or otherwise modify a Git ref.
+compact audited JSON artifacts, and every field of the unhashed final
+`run-summary.json`. Material evidence is exact; timestamps, absolute paths,
+host tooling, and benchmark timing are bounded non-authoritative diagnostics
+with closed shapes. Unknown nested fields fail closed. `pass: true` records
+structural projection checks, while `releaseEligible: false` is the separate
+publication result. It does not fetch, move, or otherwise modify a Git ref.
 It deliberately does not open the 197 MiB SQLite projection, source XML, any
 source checkout, or a superseded replay. Full projection reproduction is a
 separate, future gate.
 
 ## Field and publication boundary
 
-The only candidate retained source attributes are stable word coordinates and
-structural fields (`xml:id`, `ref`, `class`, `role`, `lang`), syntax-group
-fields (`class`, `role`, `rule`, `Rule`, `head`), and participant relationship
-fields (`subjref`, `referent`, `participantref`). Word-element text is
-alignment-only and must never be retained. Glosses, translations, semantic
-domains and senses, frames, Cherith/SILHA material, morphology, Strong's,
-lemmas, normalized forms, transliteration, Unicode duplicate data, synonyms,
-mappings, nodes, TSV, TEI, and aggregate lowfat files are excluded.
+The executable capability matrix is corpus-specific:
+
+| Corpus | Word | Group | Participant |
+| --- | --- | --- | --- |
+| Greek | `xml:id`, `ref`, `class`, `role` | `class`, `role`, `rule`, `Rule` | `referent`, `subjref` |
+| Hebrew | `xml:id`, `ref`, `class`, `role`, `lang` | `class`, `role`, `rule`, `head` | `subjref`, `participantref` |
+
+Word-element text is alignment-only and must never be retained. Glosses,
+translations, semantic domains and senses, frames, Cherith/SILHA material,
+morphology, Strong's, lemmas, normalized forms, transliteration, Unicode
+duplicate data, synonyms, mappings, nodes, TSV, TEI, and aggregate lowfat
+files are excluded.
+
+`lang` is retained only in MACULA Hebrew as raw OSHB-derived H/A language
+evidence. It is not morphology, an ISO code, an independently adjudicated
+language conclusion, a general classifier, a Greek capability, or permission
+to retain other OSHB morphology. The candidate records local pipeline evidence:
+the MACULA Hebrew notice says its trees combine Westminster syntax with OSHB
+morphology; the selected source is derivative/reorganized/corrected OSHB
+material; the selected source README records that provenance; and the selected
+XQuery copies node `@lang`. The audit observed `lang` on all 475,911 selected
+Hebrew tokens (H 468,362; A 7,549) and absent from the Greek source.
 
 The contract is closed: a materializer must reject every explicitly excluded
 attribute and fail closed on every unknown attribute until review updates the
@@ -83,13 +116,30 @@ distributed, the future change must provide the required attribution and CC BY
 upstream endorsement, and avoid additional restrictions. The selected fields
 and exclusions reduce scope; they do not erase source-specific obligations.
 
-MACULA Greek's selected SBLGNT lowfat inputs are SBLGNT-derived. That is
-different from the separately audited Faithlife SBLGNT checkout: the latter is
-a standalone notice-only provenance record at
+For Hebrew `lang`, the operational record identifies Open Scriptures Hebrew
+Bible, its [source URI](https://github.com/openscriptures/morphhb), and the
+[CC BY 4.0 license](https://creativecommons.org/licenses/by/4.0/). A future
+distribution must retain the supplied attribution, notices, and source URI;
+mark modifications; and avoid endorsement claims or additional restrictions.
+The contract deliberately does not invent an attribution phrase. This is not a
+legal conclusion or publication authorization.
+
+SBLGNT has two separate executable records. The standalone Faithlife checkout
+is notice-only provenance evidence at
 `c4d241a9c1c479a55b989ba35a4976c1d0b8052c` /
-`1237db9d579eb13457157ca266a6f822dd4353b9`, never an alignment, projection,
-deterministic-hash, or public-output input. The standalone XML and license
-content are neither copied nor read by the contract verifier.
+`1237db9d579eb13457157ca266a6f822dd4353b9`; it is never a selected corpus
+input and is prohibited from selection, materialization, alignment, projection,
+deterministic identity, and public output. Its XML and notices are neither
+copied nor read by this verifier.
+
+Separately, the selected MACULA Greek lowfat input is SBLGNT-derived. A future
+projection must carry the SBL Greek New Testament’s CC BY 4.0 obligations,
+including `Copyright 2010 Society of Biblical Literature and Logos Bible
+Software`, supplied source/link/license/copyright/disclaimer notices,
+modification marking, and no endorsement or additional restrictions. This does
+not claim that the standalone Faithlife checkout supplied the selected XML.
+Obligations may attach to future projection; source-by-source and legal review
+remain mandatory before publication.
 
 This is an operational rights record, not a legal opinion. Before any public
 use, separate review must settle rights/provenance, source acquisition,

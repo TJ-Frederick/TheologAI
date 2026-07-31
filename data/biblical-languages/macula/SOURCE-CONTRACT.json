@@ -19,7 +19,28 @@
       "noticePaths": [
         "README.md",
         "LICENSE.md"
-      ]
+      ],
+      "maturity": {
+        "baselineTag": "24.06.17",
+        "baselinePeeledCommit": "b5b7ecec0882a3e9a609ecac99e157391e5d9b46",
+        "selectedPinStatus": "untagged_snapshot",
+        "selectedPinDescendsFromBaseline": true,
+        "reachableCommitDistance": 29,
+        "selectedPathComparison": {
+          "selectedLowfatFileCount": 27,
+          "differingSelectedLowfatFileCount": 27,
+          "status": "all_selected_lowfat_files_differ_from_baseline_tag"
+        },
+        "repositoryLevelChangeSummary": "The selected pin is a later untagged snapshot; this lock records reproducibility, not a release or quality conclusion.",
+        "independentPublicationGates": [
+          "independent scholarly QA",
+          "product acceptance",
+          "full reproduction",
+          "rights review",
+          "nine-dangling relationship resolution-or-exclusion gate"
+        ],
+        "reproducibilityBoundary": "Exact pins prove reproducibility only."
+      }
     },
     {
       "id": "macula-hebrew",
@@ -40,29 +61,71 @@
         "LICENSE.md",
         "sources/README.md",
         "sources/GrovesCenter/README.md"
-      ]
+      ],
+      "maturity": {
+        "baselineTag": "26.04.13",
+        "baselinePeeledCommit": "09f8ea9e25025841ec45e2b6e7fc01595a080568",
+        "selectedPinStatus": "untagged_snapshot",
+        "selectedPinDescendsFromBaseline": true,
+        "reachableCommitDistance": 3,
+        "selectedPathComparison": {
+          "selectedLowfatFileCount": 929,
+          "differingSelectedLowfatFileCount": 0,
+          "differingSelectedNoticeCount": 0,
+          "status": "no_selected_WLC_lowfat_files_or_selected_notices_differ_from_baseline_tag"
+        },
+        "repositoryLevelChangeSummary": "Repository changes from the baseline tag cover CGJ stripping, NFC normalization, and merge work; they change zero selected WLC/lowfat files and zero selected notices.",
+        "independentPublicationGates": [
+          "independent scholarly QA",
+          "product acceptance",
+          "full reproduction",
+          "rights review",
+          "nine-dangling relationship resolution-or-exclusion gate"
+        ],
+        "reproducibilityBoundary": "Exact pins prove reproducibility only."
+      }
     }
   ],
   "fieldPolicy": {
-    "retainedWordAttributes": [
-      "xml:id",
-      "ref",
-      "class",
-      "role",
-      "lang"
-    ],
-    "retainedGroupAttributes": [
-      "class",
-      "role",
-      "rule",
-      "Rule",
-      "head"
-    ],
-    "retainedParticipantAttributes": [
-      "subjref",
-      "referent",
-      "participantref"
-    ],
+    "capabilityMatrix": {
+      "greek": {
+        "word": [
+          "xml:id",
+          "ref",
+          "class",
+          "role"
+        ],
+        "group": [
+          "class",
+          "role",
+          "rule",
+          "Rule"
+        ],
+        "participant": [
+          "referent",
+          "subjref"
+        ]
+      },
+      "hebrew": {
+        "word": [
+          "xml:id",
+          "ref",
+          "class",
+          "role",
+          "lang"
+        ],
+        "group": [
+          "class",
+          "role",
+          "rule",
+          "head"
+        ],
+        "participant": [
+          "subjref",
+          "participantref"
+        ]
+      }
+    },
     "alignmentOnlyEphemeral": [
       "word element text"
     ],
@@ -188,8 +251,44 @@
         "Identify modifications and do not imply upstream endorsement or impose additional restrictions."
       ]
     },
-    "faithlifeSblgntStandaloneNotice": {
-      "role": "notice_only_not_materializer_input",
+    "langRetention": {
+      "attribute": "lang",
+      "corpus": "hebrew",
+      "retainedAs": "raw OSHB-derived H/A language evidence",
+      "notA": [
+        "morphology",
+        "an ISO code",
+        "an independently adjudicated language conclusion",
+        "a general classifier",
+        "a Greek capability",
+        "authorization to retain other OSHB morphology"
+      ],
+      "pipelineEvidence": {
+        "maculaHebrewNotice": "MACULA Hebrew trees combine Westminster syntax with OSHB morphology.",
+        "selectedSource": "The selected source is derivative, reorganized, and corrected OSHB material.",
+        "sourceReadme": "The selected source README records the selected source provenance.",
+        "selectedXquery": "The selected XQuery copies node @lang.",
+        "observedTokenLanguages": {
+          "allSelectedHebrewTokensHaveLang": true,
+          "total": 475911,
+          "H": 468362,
+          "A": 7549,
+          "absentFromGreekSource": true
+        }
+      },
+      "openScripturesHebrewBible": {
+        "name": "Open Scriptures Hebrew Bible",
+        "sourceUri": "https://github.com/openscriptures/morphhb",
+        "license": "CC BY 4.0",
+        "licenseUri": "https://creativecommons.org/licenses/by/4.0/",
+        "noticeAndAttributionRequirement": "Retain the supplied attribution, notices, and source URI; do not invent a replacement attribution phrase.",
+        "modificationRequirement": "Identify modifications.",
+        "restrictionsRequirement": "Do not imply endorsement or impose additional restrictions."
+      },
+      "operationalBoundary": "This is an operational provenance record, not a legal conclusion or publication authorization."
+    },
+    "standaloneFaithlifeNotice": {
+      "role": "notice_only_provenance_evidence_not_selected_corpus_input",
       "repository": "https://github.com/Faithlife/SBLGNT.git",
       "commit": "c4d241a9c1c479a55b989ba35a4976c1d0b8052c",
       "tree": "1237db9d579eb13457157ca266a6f822dd4353b9",
@@ -197,7 +296,32 @@
         "README.md",
         "LICENSE"
       ],
-      "prohibition": "Do not use the standalone Faithlife checkout or its XML as an alignment input, projection input, deterministic-hash input, or public-output source."
+      "selectedCorpusInput": false,
+      "prohibitedUses": [
+        "selection",
+        "materialization",
+        "alignment",
+        "projection",
+        "deterministic identity",
+        "public output"
+      ]
+    },
+    "sblgntRightsForMaculaGreekDerivedInput": {
+      "selectedInput": "MACULA Greek SBLGNT/lowfat XML",
+      "derivation": "The selected MACULA Greek lowfat input is SBLGNT-derived.",
+      "upstream": "SBL Greek New Testament",
+      "license": "CC BY 4.0",
+      "licenseUri": "https://creativecommons.org/licenses/by/4.0/",
+      "copyrightNotice": "Copyright 2010 Society of Biblical Literature and Logos Bible Software",
+      "upstreamSourceUri": "https://sblgnt.com/",
+      "futureDistributionObligations": [
+        "Retain supplied source, link, license, copyright, and disclaimer notices.",
+        "Identify modifications.",
+        "Do not imply endorsement or impose additional restrictions."
+      ],
+      "standaloneCheckoutBoundary": "The standalone Faithlife checkout did not supply the selected XML.",
+      "publicationGate": "Obligations may attach to a future projection; mandatory source-by-source and legal review is required before publication.",
+      "operationalBoundary": "This is an operational rights record, not a legal conclusion or publication authorization."
     },
     "legalReviewGate": "This contract records source notices and operational obligations; it is not a legal opinion and does not authorize publication."
   },

@@ -11,6 +11,7 @@ export const MACULA_SOURCE_CONTRACT_PATH = 'data/biblical-languages/macula/SOURC
 export const MACULA_AUDIT_IDENTITY = '2d5e770ee05260fbbf4f6810153f815e55b86b602ca301e30b7274c3637124b7';
 
 type RecordValue = Record<string, unknown>;
+export type MaculaCorpus = 'greek' | 'hebrew';
 export type MaculaSourceAttributeScope = 'word' | 'group' | 'participant';
 
 export interface MaculaSourceContract {
@@ -37,6 +38,27 @@ const expectedSources = [
     },
     selection: { xmlPathPattern: 'SBLGNT/lowfat/*.xml', xmlFileCount: 27, selectedPathCount: 29 },
     noticePaths: ['README.md', 'LICENSE.md'],
+    maturity: {
+      baselineTag: '24.06.17',
+      baselinePeeledCommit: 'b5b7ecec0882a3e9a609ecac99e157391e5d9b46',
+      selectedPinStatus: 'untagged_snapshot',
+      selectedPinDescendsFromBaseline: true,
+      reachableCommitDistance: 29,
+      selectedPathComparison: {
+        selectedLowfatFileCount: 27,
+        differingSelectedLowfatFileCount: 27,
+        status: 'all_selected_lowfat_files_differ_from_baseline_tag',
+      },
+      repositoryLevelChangeSummary: 'The selected pin is a later untagged snapshot; this lock records reproducibility, not a release or quality conclusion.',
+      independentPublicationGates: [
+        'independent scholarly QA',
+        'product acceptance',
+        'full reproduction',
+        'rights review',
+        'nine-dangling relationship resolution-or-exclusion gate',
+      ],
+      reproducibilityBoundary: 'Exact pins prove reproducibility only.',
+    },
   },
   {
     id: 'macula-hebrew',
@@ -49,13 +71,44 @@ const expectedSources = [
     },
     selection: { xmlPathPattern: 'WLC/lowfat/*-lowfat.xml', xmlFileCount: 929, selectedPathCount: 933 },
     noticePaths: ['README.md', 'LICENSE.md', 'sources/README.md', 'sources/GrovesCenter/README.md'],
+    maturity: {
+      baselineTag: '26.04.13',
+      baselinePeeledCommit: '09f8ea9e25025841ec45e2b6e7fc01595a080568',
+      selectedPinStatus: 'untagged_snapshot',
+      selectedPinDescendsFromBaseline: true,
+      reachableCommitDistance: 3,
+      selectedPathComparison: {
+        selectedLowfatFileCount: 929,
+        differingSelectedLowfatFileCount: 0,
+        differingSelectedNoticeCount: 0,
+        status: 'no_selected_WLC_lowfat_files_or_selected_notices_differ_from_baseline_tag',
+      },
+      repositoryLevelChangeSummary: 'Repository changes from the baseline tag cover CGJ stripping, NFC normalization, and merge work; they change zero selected WLC/lowfat files and zero selected notices.',
+      independentPublicationGates: [
+        'independent scholarly QA',
+        'product acceptance',
+        'full reproduction',
+        'rights review',
+        'nine-dangling relationship resolution-or-exclusion gate',
+      ],
+      reproducibilityBoundary: 'Exact pins prove reproducibility only.',
+    },
   },
 ] as const;
 
 const expectedFieldPolicy = {
-  retainedWordAttributes: ['xml:id', 'ref', 'class', 'role', 'lang'],
-  retainedGroupAttributes: ['class', 'role', 'rule', 'Rule', 'head'],
-  retainedParticipantAttributes: ['subjref', 'referent', 'participantref'],
+  capabilityMatrix: {
+    greek: {
+      word: ['xml:id', 'ref', 'class', 'role'],
+      group: ['class', 'role', 'rule', 'Rule'],
+      participant: ['referent', 'subjref'],
+    },
+    hebrew: {
+      word: ['xml:id', 'ref', 'class', 'role', 'lang'],
+      group: ['class', 'role', 'rule', 'head'],
+      participant: ['subjref', 'participantref'],
+    },
+  },
   alignmentOnlyEphemeral: ['word element text'],
   knownRejectedWordAttributes: [
     'after', 'case', 'coredomain', 'degree', 'discontinuous', 'domain', 'english', 'frame', 'gender',
@@ -151,13 +204,67 @@ const expectedRightsAndProvenance = {
       'Identify modifications and do not imply upstream endorsement or impose additional restrictions.',
     ],
   },
-  faithlifeSblgntStandaloneNotice: {
-    role: 'notice_only_not_materializer_input',
+  langRetention: {
+    attribute: 'lang',
+    corpus: 'hebrew',
+    retainedAs: 'raw OSHB-derived H/A language evidence',
+    notA: [
+      'morphology',
+      'an ISO code',
+      'an independently adjudicated language conclusion',
+      'a general classifier',
+      'a Greek capability',
+      'authorization to retain other OSHB morphology',
+    ],
+    pipelineEvidence: {
+      maculaHebrewNotice: 'MACULA Hebrew trees combine Westminster syntax with OSHB morphology.',
+      selectedSource: 'The selected source is derivative, reorganized, and corrected OSHB material.',
+      sourceReadme: 'The selected source README records the selected source provenance.',
+      selectedXquery: 'The selected XQuery copies node @lang.',
+      observedTokenLanguages: {
+        allSelectedHebrewTokensHaveLang: true,
+        total: 475_911,
+        H: 468_362,
+        A: 7_549,
+        absentFromGreekSource: true,
+      },
+    },
+    openScripturesHebrewBible: {
+      name: 'Open Scriptures Hebrew Bible',
+      sourceUri: 'https://github.com/openscriptures/morphhb',
+      license: 'CC BY 4.0',
+      licenseUri: 'https://creativecommons.org/licenses/by/4.0/',
+      noticeAndAttributionRequirement: 'Retain the supplied attribution, notices, and source URI; do not invent a replacement attribution phrase.',
+      modificationRequirement: 'Identify modifications.',
+      restrictionsRequirement: 'Do not imply endorsement or impose additional restrictions.',
+    },
+    operationalBoundary: 'This is an operational provenance record, not a legal conclusion or publication authorization.',
+  },
+  standaloneFaithlifeNotice: {
+    role: 'notice_only_provenance_evidence_not_selected_corpus_input',
     repository: 'https://github.com/Faithlife/SBLGNT.git',
     commit: 'c4d241a9c1c479a55b989ba35a4976c1d0b8052c',
     tree: '1237db9d579eb13457157ca266a6f822dd4353b9',
     noticePaths: ['README.md', 'LICENSE'],
-    prohibition: 'Do not use the standalone Faithlife checkout or its XML as an alignment input, projection input, deterministic-hash input, or public-output source.',
+    selectedCorpusInput: false,
+    prohibitedUses: ['selection', 'materialization', 'alignment', 'projection', 'deterministic identity', 'public output'],
+  },
+  sblgntRightsForMaculaGreekDerivedInput: {
+    selectedInput: 'MACULA Greek SBLGNT/lowfat XML',
+    derivation: 'The selected MACULA Greek lowfat input is SBLGNT-derived.',
+    upstream: 'SBL Greek New Testament',
+    license: 'CC BY 4.0',
+    licenseUri: 'https://creativecommons.org/licenses/by/4.0/',
+    copyrightNotice: 'Copyright 2010 Society of Biblical Literature and Logos Bible Software',
+    upstreamSourceUri: 'https://sblgnt.com/',
+    futureDistributionObligations: [
+      'Retain supplied source, link, license, copyright, and disclaimer notices.',
+      'Identify modifications.',
+      'Do not imply endorsement or impose additional restrictions.',
+    ],
+    standaloneCheckoutBoundary: 'The standalone Faithlife checkout did not supply the selected XML.',
+    publicationGate: 'Obligations may attach to a future projection; mandatory source-by-source and legal review is required before publication.',
+    operationalBoundary: 'This is an operational rights record, not a legal conclusion or publication authorization.',
   },
   legalReviewGate: 'This contract records source notices and operational obligations; it is not a legal opinion and does not authorize publication.',
 } as const;
@@ -176,6 +283,92 @@ const expectedInertness = {
     'preview, deployment, or Cloudflare workflow',
   ],
   verifierBoundary: 'The verifier is local, read-only, and deterministic. It performs no network request, source acquisition, mutation, database access, or runtime binding.',
+} as const;
+
+const expectedRunSummaryAttestations = {
+  maculaGreek: {
+    head: '8423afe47b9e8f24b7772e808af45c7159a6fe7e',
+    tree: 'eea78df4b0f1efb857f1575243a1ec4548267a11',
+    clean: true,
+    selectedPathCount: 29,
+    everySelectedPathTracked: true,
+    branch: '(detached)',
+  },
+  maculaHebrew: {
+    head: '47db250bd55d0d8577f2a94fba114ef16c35b23c',
+    tree: '594f395cf473795d6984003800b4bf86ca691a26',
+    clean: true,
+    selectedPathCount: 933,
+    everySelectedPathTracked: true,
+    branch: '(detached)',
+  },
+  theologaiMain: {
+    head: '2f12262c9a37d3588bee9b5071954823c15cbd12',
+    tree: '9922aedb74c690e7a3fcb926b3d621f28fa44535',
+    clean: true,
+    selectedPathCount: 68,
+    everySelectedPathTracked: true,
+    branch: 'main',
+    originMain: '2f12262c9a37d3588bee9b5071954823c15cbd12',
+  },
+  theologaiPreflight: {
+    head: '2f12262c9a37d3588bee9b5071954823c15cbd12',
+    tree: '9922aedb74c690e7a3fcb926b3d621f28fa44535',
+    clean: true,
+    selectedPathCount: 0,
+    everySelectedPathTracked: true,
+    branch: 'main',
+    originMain: '2f12262c9a37d3588bee9b5071954823c15cbd12',
+  },
+} as const;
+
+const expectedRunSummaryCompatibilityDerivation = {
+  d1CorpusIdentity: 'computeD1CorpusIdentity(parseDataManifest(data/data-manifest.json)) from the exact audit checkout',
+  morphologyUsageIdentity: 'computeMorphologyUsageIdentity(parseDataManifest(data/data-manifest.json)) from the exact audit checkout',
+  runtimeContentInventory: 'canonical content identity over the repository-owned 72-artifact OpenScriptures/STEPBible runtime inventory',
+} as const;
+
+const expectedRunSummaryReplayScript = {
+  path: 'scripts/inspect-macula-v2.mjs',
+  sha256: '0ce62ee220cd49893c59f23c0b32d00a02ccbe8f1f1c6373ebead010a94f6149',
+  requiredNode: '22.23.1',
+} as const;
+
+const expectedRunSummaryFaithlifeNotice = {
+  status: 'notice_only_excluded_from_alignment_projection_and_deterministic_identity',
+  output: 'provenance-license-notice.json',
+} as const;
+
+const expectedRunSummaryInventoryAssertions = {
+  selectedMaculaGreekFiles: 29,
+  selectedMaculaHebrewFiles: 933,
+  runtimeCorpusFiles: 66,
+  runtimeContentInventoryArtifacts: 72,
+  faithlifeSblgntAlignmentInput: false,
+  allSelectedPathsTracked: true,
+} as const;
+
+const expectedRunSummaryWorkerdD1 = {
+  status: 'not_run',
+  reason: 'A full D1/Workerd probe requires a reviewed D1 materializer/import path. Native SQLite was run against the complete projection; D1 rows_read and remote-equivalent latency remain deliberately unclaimed.',
+} as const;
+
+const expectedRunSummaryIntegrity = {
+  foreignKeyViolations: 0,
+  tokensWithoutImmediateGroup: 0,
+  tokensWithMissingGroup: 0,
+  groupsWithMissingParent: 0,
+  totalGroups: 441_272,
+  reachableGroups: 441_272,
+  unreachableGroups: 0,
+  groupCycleMembers: 0,
+  tokenMembershipRows: 613_652,
+  groupReferenceRows: 1_965_769,
+  referencesWithoutGroupContext: 0,
+  duplicateTokenIds: 0,
+  releaseGateDanglingParticipantReferences: 9,
+  pass: true,
+  releaseEligible: false,
 } as const;
 
 function fail(message: string): never {
@@ -203,6 +396,36 @@ function stringArray(value: unknown, label: string): string[] {
   if (!Array.isArray(value) || value.some(item => typeof item !== 'string')) fail(`${label} must be a string array`);
   if (new Set(value).size !== value.length) fail(`${label} must not contain duplicates`);
   return value;
+}
+
+function nonEmptyString(value: unknown, label: string): string {
+  if (typeof value !== 'string' || value.length === 0 || value.includes('\0')) fail(`${label} must be a non-empty string`);
+  return value;
+}
+
+function safeNonNegativeInteger(value: unknown, label: string): number {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) fail(`${label} must be a non-negative safe integer`);
+  return value;
+}
+
+function sha256String(value: unknown, label: string): string {
+  const hash = nonEmptyString(value, label);
+  if (!/^[0-9a-f]{64}$/.test(hash)) fail(`${label} must be a lower-case SHA-256`);
+  return hash;
+}
+
+function absolutePathDiagnostic(value: unknown, label: string): string {
+  const path = nonEmptyString(value, label);
+  if (!path.startsWith('/')) fail(`${label} must be an absolute path diagnostic`);
+  return path;
+}
+
+function isoTimestampDiagnostic(value: unknown, label: string): string {
+  const timestamp = nonEmptyString(value, label);
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(timestamp) || Number.isNaN(Date.parse(timestamp))) {
+    fail(`${label} must be an ISO-8601 UTC timestamp diagnostic`);
+  }
+  return timestamp;
 }
 
 function sha256(bytes: Buffer): string {
@@ -235,6 +458,15 @@ export function parseMaculaSourceContract(value: unknown): MaculaSourceContract 
   for (const [name, value] of Object.entries(policy)) {
     if (name.endsWith('Attributes') || name === 'alignmentOnlyEphemeral') stringArray(value, `fieldPolicy.${name}`);
   }
+  const matrix = record(policy.capabilityMatrix, 'fieldPolicy capability matrix');
+  exactKeys(matrix, ['greek', 'hebrew'], 'fieldPolicy capability matrix');
+  for (const corpus of ['greek', 'hebrew'] as const) {
+    const capabilities = record(matrix[corpus], `fieldPolicy ${corpus} capabilities`);
+    exactKeys(capabilities, ['word', 'group', 'participant'], `fieldPolicy ${corpus} capabilities`);
+    for (const scope of ['word', 'group', 'participant'] as const) {
+      stringArray(capabilities[scope], `fieldPolicy ${corpus}.${scope}`);
+    }
+  }
 
   const ledger = record(root.danglingParticipantExclusionLedger, 'dangling participant exclusion ledger');
   exactKeys(ledger, Object.keys(expectedDanglingLedger), 'dangling participant exclusion ledger');
@@ -249,17 +481,23 @@ export function parseMaculaSourceContract(value: unknown): MaculaSourceContract 
   exactValue(currentMain, expectedCurrentMain, 'current main attestation');
 
   const rights = record(root.rightsAndProvenance, 'rights and provenance');
-  exactKeys(rights, ['maculaGreek', 'maculaHebrew', 'faithlifeSblgntStandaloneNotice', 'legalReviewGate'], 'rights and provenance');
+  exactKeys(rights, [
+    'maculaGreek', 'maculaHebrew', 'langRetention', 'standaloneFaithlifeNotice',
+    'sblgntRightsForMaculaGreekDerivedInput', 'legalReviewGate',
+  ], 'rights and provenance');
   exactValue(rights, expectedRightsAndProvenance, 'rights and provenance');
   for (const key of ['maculaGreek', 'maculaHebrew'] as const) {
     const source = record(rights[key], `rights and provenance.${key}`);
     exactKeys(source, ['license', 'requiredAttribution', 'selectedInputProvenance', 'modificationNoticeRequirements'], `rights and provenance.${key}`);
     stringArray(source.modificationNoticeRequirements, `rights and provenance.${key}.modificationNoticeRequirements`);
   }
-  const faithlife = record(rights.faithlifeSblgntStandaloneNotice, 'Faithlife SBLGNT notice');
-  exactKeys(faithlife, ['role', 'repository', 'commit', 'tree', 'noticePaths', 'prohibition'], 'Faithlife SBLGNT notice');
+  const faithlife = record(rights.standaloneFaithlifeNotice, 'Faithlife SBLGNT notice');
+  exactKeys(faithlife, ['role', 'repository', 'commit', 'tree', 'noticePaths', 'selectedCorpusInput', 'prohibitedUses'], 'Faithlife SBLGNT notice');
   stringArray(faithlife.noticePaths, 'Faithlife SBLGNT notice paths');
-  if (faithlife.role !== 'notice_only_not_materializer_input') fail('Faithlife SBLGNT must remain notice-only');
+  stringArray(faithlife.prohibitedUses, 'Faithlife SBLGNT prohibited uses');
+  if (faithlife.role !== 'notice_only_provenance_evidence_not_selected_corpus_input' || faithlife.selectedCorpusInput !== false) {
+    fail('Faithlife SBLGNT must remain notice-only and outside selected corpus inputs');
+  }
 
   const inertness = record(root.inertness, 'inertness');
   exactKeys(inertness, ['contractDoesNotActivate', 'verifierBoundary'], 'inertness');
@@ -273,23 +511,26 @@ export function readMaculaSourceContract(root: string): MaculaSourceContract {
 }
 
 /** Reject both known non-retained fields and novel schema fields before materialization. */
-export function assertMaculaSourceAttribute(scope: MaculaSourceAttributeScope, attribute: string): void {
+export function assertMaculaSourceAttribute(corpus: MaculaCorpus, scope: MaculaSourceAttributeScope, attribute: string): void {
+  if (corpus !== 'greek' && corpus !== 'hebrew') {
+    fail(`invalid source attribute corpus ${JSON.stringify(corpus)}`);
+  }
   if (scope !== 'word' && scope !== 'group' && scope !== 'participant') {
     fail(`invalid source attribute scope ${JSON.stringify(scope)}`);
   }
-  const allowed = scope === 'word'
-    ? expectedFieldPolicy.retainedWordAttributes
-    : scope === 'group'
-      ? expectedFieldPolicy.retainedGroupAttributes
-      : expectedFieldPolicy.retainedParticipantAttributes;
+  const allowed = expectedFieldPolicy.capabilityMatrix[corpus][scope];
   const rejected = scope === 'word'
     ? expectedFieldPolicy.knownRejectedWordAttributes
     : scope === 'group'
       ? expectedFieldPolicy.knownRejectedGroupAttributes
       : [];
   if (allowed.includes(attribute as never)) return;
+  if ((corpus === 'greek' ? expectedFieldPolicy.capabilityMatrix.hebrew : expectedFieldPolicy.capabilityMatrix.greek)[scope]
+    .includes(attribute as never)) {
+    fail(`${corpus} ${scope} attribute ${attribute} is not approved for that corpus`);
+  }
   if (rejected.includes(attribute as never)) fail(`${scope} attribute ${attribute} is explicitly excluded`);
-  fail(`${scope} attribute ${attribute} is unknown schema drift and requires review`);
+  fail(`${corpus} ${scope} attribute ${attribute} is unknown schema drift and requires review`);
 }
 
 /** Verify an exact local commit/tree pair without fetching or moving a ref. */
@@ -362,25 +603,65 @@ function assertAuditSchema(schema: RecordValue, expected: typeof expectedSources
     'roots', 'selectedXmlBytes', 'syntheticUngroupedGroups', 'tokens', 'wordAttributesObserved',
   ], `audit ${expected.id} schema`);
   if (schema.corpus !== expected.corpus || schema.files !== expected.selection.xmlFileCount) fail(`audit ${expected.id} schema identity drifted`);
+  const capabilities = expectedFieldPolicy.capabilityMatrix[expected.corpus];
   const knownWord = new Set<string>([
-    ...expectedFieldPolicy.retainedWordAttributes,
-    ...expectedFieldPolicy.retainedParticipantAttributes,
+    ...capabilities.word,
+    ...capabilities.participant,
     ...expectedFieldPolicy.knownRejectedWordAttributes,
   ]);
   const knownGroup = new Set<string>([
-    ...expectedFieldPolicy.retainedGroupAttributes,
+    ...capabilities.group,
     ...expectedFieldPolicy.knownRejectedGroupAttributes,
   ]);
   const unknownWord = auditAttributeKeys(schema, 'wordAttributesObserved', `audit ${expected.id} word attributes`).filter(attribute => !knownWord.has(attribute));
   const unknownGroup = auditAttributeKeys(schema, 'groupAttributesObserved', `audit ${expected.id} group attributes`).filter(attribute => !knownGroup.has(attribute));
   const unknownParticipant = auditAttributeKeys(schema, 'participantAttributesObserved', `audit ${expected.id} participant attributes`)
-    .filter(attribute => !expectedFieldPolicy.retainedParticipantAttributes.includes(attribute as never));
+    .filter(attribute => !capabilities.participant.includes(attribute as never));
   if (unknownWord.length || unknownGroup.length || unknownParticipant.length) {
     fail(`audit ${expected.id} source schema contains unknown attributes`);
   }
 }
 
-/** Validate the content-free deterministic replay metadata without opening any corpus artifact. */
+function verifyRunSummaryBenchmark(value: unknown): void {
+  const benchmark = record(value, 'run summary benchmark');
+  exactKeys(benchmark, [
+    'contextQueryPlan', 'd1RowsRead', 'engine', 'iterations', 'medianMilliseconds', 'p95Milliseconds',
+    'qualification', 'representativeReferences', 'returnedContextRows',
+  ], 'run summary benchmark');
+  if (benchmark.engine !== 'node:sqlite/native-SQLite' || benchmark.qualification !== 'This is a full-projection local SQLite benchmark. It is not a Workerd/D1 billing or latency claim.'
+    || benchmark.d1RowsRead !== null) fail('run summary benchmark diagnostic drifted');
+  if (!Array.isArray(benchmark.representativeReferences) || benchmark.representativeReferences.length < 1 || benchmark.representativeReferences.length > 12) {
+    fail('run summary benchmark representative references have an invalid diagnostic shape');
+  }
+  for (const candidate of benchmark.representativeReferences) {
+    const reference = record(candidate, 'run summary benchmark representative reference');
+    exactKeys(reference, ['corpus', 'group_count', 'reference_id', 'source_reference', 'token_count'], 'run summary benchmark representative reference');
+    if (safeNonNegativeInteger(reference.reference_id, 'run summary benchmark reference id') < 1
+      || reference.corpus !== 'hebrew'
+      || !/^[1-3]?[A-Z][A-Z0-9]* \d+:\d+!\d+$/.test(nonEmptyString(reference.source_reference, 'run summary benchmark source reference'))
+      || safeNonNegativeInteger(reference.token_count, 'run summary benchmark token count') < 1
+      || safeNonNegativeInteger(reference.group_count, 'run summary benchmark group count') < 1) {
+      fail('run summary benchmark representative reference drifted');
+    }
+  }
+  if (safeNonNegativeInteger(benchmark.iterations, 'run summary benchmark iterations') < 1
+    || safeNonNegativeInteger(benchmark.returnedContextRows, 'run summary benchmark returned context rows') < 1
+    || typeof benchmark.medianMilliseconds !== 'number' || !Number.isFinite(benchmark.medianMilliseconds) || benchmark.medianMilliseconds < 0
+    || typeof benchmark.p95Milliseconds !== 'number' || !Number.isFinite(benchmark.p95Milliseconds) || benchmark.p95Milliseconds < 0) {
+    fail('run summary benchmark timing diagnostic drifted');
+  }
+  if (!Array.isArray(benchmark.contextQueryPlan) || benchmark.contextQueryPlan.length < 1) fail('run summary benchmark query plan has an invalid diagnostic shape');
+  for (const candidate of benchmark.contextQueryPlan) {
+    const plan = record(candidate, 'run summary benchmark query plan row');
+    exactKeys(plan, ['detail', 'id', 'notused', 'parent'], 'run summary benchmark query plan row');
+    safeNonNegativeInteger(plan.id, 'run summary benchmark query plan id');
+    safeNonNegativeInteger(plan.parent, 'run summary benchmark query plan parent');
+    safeNonNegativeInteger(plan.notused, 'run summary benchmark query plan notused');
+    nonEmptyString(plan.detail, 'run summary benchmark query plan detail');
+  }
+}
+
+/** Validate all unhashed run-summary metadata without opening any corpus artifact. */
 export function verifyMaculaAuditRunSummary(value: unknown): void {
   const summary = record(value, 'run summary');
   exactKeys(summary, [
@@ -389,38 +670,75 @@ export function verifyMaculaAuditRunSummary(value: unknown): void {
     'replayScript', 'schemaVersion', 'workerdD1',
   ], 'run summary');
   if (summary.schemaVersion !== 2) fail('run summary schema version drifted');
+  isoTimestampDiagnostic(summary.executedAt, 'run summary execution timestamp');
+  absolutePathDiagnostic(summary.auditRoot, 'run summary audit root');
+  const command = nonEmptyString(summary.command, 'run summary command');
+  if (!command.includes('scripts/inspect-macula-v2.mjs') || !command.includes('--output audit-output/final-replay-2') || !command.includes('--compare audit-output/final-replay-1')) {
+    fail('run summary command diagnostic drifted');
+  }
+
+  const environment = record(summary.environment, 'run summary environment');
+  exactKeys(environment, ['git', 'node', 'sqlite'], 'run summary environment');
+  if (!/^v\d+\.\d+\.\d+$/.test(nonEmptyString(environment.node, 'run summary Node diagnostic'))
+    || !/^\d+\.\d+(?:\.\d+)?$/.test(nonEmptyString(environment.sqlite, 'run summary SQLite diagnostic'))
+    || !/^git version .+$/.test(nonEmptyString(environment.git, 'run summary Git diagnostic'))) {
+    fail('run summary host tooling diagnostic drifted');
+  }
+  const replayScript = record(summary.replayScript, 'run summary replay script');
+  exactKeys(replayScript, Object.keys(expectedRunSummaryReplayScript), 'run summary replay script');
+  exactValue(replayScript, expectedRunSummaryReplayScript, 'run summary replay script');
+
   const attestations = record(summary.attestations, 'run summary attestations');
-  for (const [key, expected] of [
-    ['maculaGreek', expectedSources[0]], ['maculaHebrew', expectedSources[1]],
-  ] as const) {
+  exactKeys(attestations, Object.keys(expectedRunSummaryAttestations), 'run summary attestations');
+  for (const [key, expected] of Object.entries(expectedRunSummaryAttestations)) {
     const attestation = record(attestations[key], `run summary ${key}`);
-    if (attestation.head !== expected.revision.commit || attestation.tree !== expected.revision.tree
-      || attestation.clean !== true || attestation.everySelectedPathTracked !== true
-      || attestation.selectedPathCount !== expected.selection.selectedPathCount) fail(`run summary ${key} attestation drifted`);
+    exactKeys(attestation, Object.keys(expected), `run summary ${key}`);
+    exactValue(attestation, expected, `run summary ${key}`);
   }
-  for (const key of ['theologaiMain', 'theologaiPreflight'] as const) {
-    const attestation = record(attestations[key], `run summary ${key}`);
-    if (attestation.head !== expectedCurrentMain.commit || attestation.tree !== expectedCurrentMain.tree
-      || attestation.originMain !== expectedCurrentMain.commit || attestation.clean !== true) {
-      fail(`run summary ${key} current-main attestation drifted`);
-    }
+
+  const compatibility = record(summary.canonicalRuntimeCompatibility, 'run summary compatibility');
+  exactKeys(compatibility, ['d1CorpusIdentity', 'derivation', 'loader', 'morphologyUsageIdentity', 'runtimeContentInventory'], 'run summary compatibility');
+  exactValue(compatibility.d1CorpusIdentity, expectedCurrentMain.d1CorpusIdentity, 'run summary D1 corpus identity');
+  exactValue(compatibility.morphologyUsageIdentity, expectedCurrentMain.morphologyUsageIdentity, 'run summary morphology usage identity');
+  exactValue(compatibility.runtimeContentInventory, expectedCurrentMain.runtimeContentInventory, 'run summary runtime content inventory');
+  const derivation = record(compatibility.derivation, 'run summary compatibility derivation');
+  exactKeys(derivation, Object.keys(expectedRunSummaryCompatibilityDerivation), 'run summary compatibility derivation');
+  exactValue(derivation, expectedRunSummaryCompatibilityDerivation, 'run summary compatibility derivation');
+  const loader = record(compatibility.loader, 'run summary compatibility loader');
+  exactKeys(loader, ['executable', 'tsxCliSha256', 'tsxVersion'], 'run summary compatibility loader');
+  absolutePathDiagnostic(loader.executable, 'run summary loader executable');
+  sha256String(loader.tsxCliSha256, 'run summary loader tsx CLI SHA-256');
+  if (!/^\d+\.\d+\.\d+$/.test(nonEmptyString(loader.tsxVersion, 'run summary loader tsx version'))) {
+    fail('run summary loader diagnostic drifted');
   }
+
+  const faithlife = record(summary.faithlifeSblgntNotice, 'run summary Faithlife notice');
+  exactKeys(faithlife, Object.keys(expectedRunSummaryFaithlifeNotice), 'run summary Faithlife notice');
+  exactValue(faithlife, expectedRunSummaryFaithlifeNotice, 'run summary Faithlife notice');
   const hashDomain = record(summary.deterministicHashDomain, 'run summary deterministic hash domain');
   exactKeys(hashDomain, ['artifacts', 'excludes', 'sha256'], 'run summary deterministic hash domain');
   exactValue(hashDomain, expectedDeterministicHashDomain, 'run summary deterministic hash domain');
+  const inventory = record(summary.inventoryAssertions, 'run summary inventory assertions');
+  exactKeys(inventory, Object.keys(expectedRunSummaryInventoryAssertions), 'run summary inventory assertions');
+  exactValue(inventory, expectedRunSummaryInventoryAssertions, 'run summary inventory assertions');
   const replayComparison = record(summary.replayComparison, 'run summary replay comparison');
   exactKeys(replayComparison, ['artifacts', 'assertion', 'deterministicIdentity', 'priorOutput', 'status'], 'run summary replay comparison');
   exactValue(replayComparison, expectedReplayComparison, 'run summary replay comparison');
   if (JSON.stringify(replayComparison.artifacts) !== JSON.stringify(hashDomain.artifacts)) {
     fail('replay comparison artifacts differ from deterministic hash-domain artifacts');
   }
-  const compatibility = record(summary.canonicalRuntimeCompatibility, 'run summary compatibility');
-  exactValue(compatibility.d1CorpusIdentity, expectedCurrentMain.d1CorpusIdentity, 'D1 corpus identity');
-  exactValue(compatibility.morphologyUsageIdentity, expectedCurrentMain.morphologyUsageIdentity, 'morphology usage identity');
-  exactValue(compatibility.runtimeContentInventory, expectedCurrentMain.runtimeContentInventory, 'runtime content inventory');
-  const faithlife = record(summary.faithlifeSblgntNotice, 'run summary Faithlife notice');
-  if (faithlife.status !== 'notice_only_excluded_from_alignment_projection_and_deterministic_identity') {
-    fail('standalone Faithlife checkout must remain notice-only');
+  verifyRunSummaryBenchmark(summary.benchmark);
+  const workerdD1 = record(summary.workerdD1, 'run summary Workerd/D1');
+  exactKeys(workerdD1, Object.keys(expectedRunSummaryWorkerdD1), 'run summary Workerd/D1');
+  exactValue(workerdD1, expectedRunSummaryWorkerdD1, 'run summary Workerd/D1');
+  const integrity = record(summary.integrity, 'run summary integrity');
+  exactKeys(integrity, Object.keys(expectedRunSummaryIntegrity), 'run summary integrity');
+  exactValue(integrity, expectedRunSummaryIntegrity, 'run summary integrity');
+  if (safeNonNegativeInteger(integrity.totalGroups, 'run summary total groups')
+      !== safeNonNegativeInteger(integrity.reachableGroups, 'run summary reachable groups') + safeNonNegativeInteger(integrity.unreachableGroups, 'run summary unreachable groups')
+    || integrity.releaseGateDanglingParticipantReferences !== expectedDanglingLedger.total
+    || integrity.pass !== true || integrity.releaseEligible !== false) {
+    fail('run summary integrity arithmetic or publication gate drifted');
   }
 }
 

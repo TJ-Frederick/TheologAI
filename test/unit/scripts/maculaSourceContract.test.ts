@@ -48,40 +48,52 @@ function runSummaryFixture(): Record<string, unknown> {
     { path: 'inspection.json', bytes: 54_523, sha256: '505e715901635db876539358f9456830ff51b17445cd372045d665834c9896b9' },
     { path: 'macula-structural-projection.sqlite', bytes: 207_106_048, sha256: 'c5a61cf047e662a6d2238093edefa7dc540ce8f2b2bbeb49115cb94329fab414' },
   ];
-  const currentMain = {
-    head: '2f12262c9a37d3588bee9b5071954823c15cbd12',
-    tree: '9922aedb74c690e7a3fcb926b3d621f28fa44535',
-    originMain: '2f12262c9a37d3588bee9b5071954823c15cbd12',
-    clean: true,
-  };
   return {
     schemaVersion: 2,
     auditRoot: '/synthetic/local-only-audit',
-    command: 'synthetic',
-    environment: {},
-    executedAt: 'synthetic',
-    replayScript: {},
-    integrity: {},
-    inventoryAssertions: {},
-    benchmark: {},
-    workerdD1: {},
+    command: 'node scripts/inspect-macula-v2.mjs --output audit-output/final-replay-2 --compare audit-output/final-replay-1',
+    environment: { node: 'v22.0.0', sqlite: '3.0.0', git: 'git version synthetic' },
+    executedAt: '2026-01-01T00:00:00.000Z',
+    replayScript: {
+      path: 'scripts/inspect-macula-v2.mjs',
+      sha256: '0ce62ee220cd49893c59f23c0b32d00a02ccbe8f1f1c6373ebead010a94f6149',
+      requiredNode: '22.23.1',
+    },
     attestations: {
       maculaGreek: {
         head: '8423afe47b9e8f24b7772e808af45c7159a6fe7e',
         tree: 'eea78df4b0f1efb857f1575243a1ec4548267a11',
         clean: true,
-        everySelectedPathTracked: true,
         selectedPathCount: 29,
+        everySelectedPathTracked: true,
+        branch: '(detached)',
       },
       maculaHebrew: {
         head: '47db250bd55d0d8577f2a94fba114ef16c35b23c',
         tree: '594f395cf473795d6984003800b4bf86ca691a26',
         clean: true,
-        everySelectedPathTracked: true,
         selectedPathCount: 933,
+        everySelectedPathTracked: true,
+        branch: '(detached)',
       },
-      theologaiMain: currentMain,
-      theologaiPreflight: currentMain,
+      theologaiMain: {
+        head: '2f12262c9a37d3588bee9b5071954823c15cbd12',
+        tree: '9922aedb74c690e7a3fcb926b3d621f28fa44535',
+        clean: true,
+        selectedPathCount: 68,
+        everySelectedPathTracked: true,
+        branch: 'main',
+        originMain: '2f12262c9a37d3588bee9b5071954823c15cbd12',
+      },
+      theologaiPreflight: {
+        head: '2f12262c9a37d3588bee9b5071954823c15cbd12',
+        tree: '9922aedb74c690e7a3fcb926b3d621f28fa44535',
+        clean: true,
+        selectedPathCount: 0,
+        everySelectedPathTracked: true,
+        branch: 'main',
+        originMain: '2f12262c9a37d3588bee9b5071954823c15cbd12',
+      },
     },
     canonicalRuntimeCompatibility: {
       d1CorpusIdentity: '29a4a7faec2a960f06bfc026a319df8c08b495bb7ad82831fb62d3a3586643a4',
@@ -90,6 +102,16 @@ function runSummaryFixture(): Record<string, unknown> {
         artifactCount: 72,
         identityPolicy: 'canonical_decompressed_json_v1_sha256_for_json_gz_else_raw_sha256',
         sha256: 'caf58814f24cc72837586c901c42f3556b59e45ec81bb0af7f5cfb9fa1629dcd',
+      },
+      derivation: {
+        d1CorpusIdentity: 'computeD1CorpusIdentity(parseDataManifest(data/data-manifest.json)) from the exact audit checkout',
+        morphologyUsageIdentity: 'computeMorphologyUsageIdentity(parseDataManifest(data/data-manifest.json)) from the exact audit checkout',
+        runtimeContentInventory: 'canonical content identity over the repository-owned 72-artifact OpenScriptures/STEPBible runtime inventory',
+      },
+      loader: {
+        executable: '/synthetic/node',
+        tsxCliSha256: '293360f3bf5826200d31375aea1267ccdad675d2a9cd1ad832e00b9f16509a7a',
+        tsxVersion: '4.20.6',
       },
     },
     deterministicHashDomain: {
@@ -106,6 +128,47 @@ function runSummaryFixture(): Record<string, unknown> {
     },
     faithlifeSblgntNotice: {
       status: 'notice_only_excluded_from_alignment_projection_and_deterministic_identity',
+      output: 'provenance-license-notice.json',
+    },
+    inventoryAssertions: {
+      selectedMaculaGreekFiles: 29,
+      selectedMaculaHebrewFiles: 933,
+      runtimeCorpusFiles: 66,
+      runtimeContentInventoryArtifacts: 72,
+      faithlifeSblgntAlignmentInput: false,
+      allSelectedPathsTracked: true,
+    },
+    benchmark: {
+      engine: 'node:sqlite/native-SQLite',
+      representativeReferences: [{ reference_id: 1, corpus: 'hebrew', source_reference: 'GEN 1:1!1', token_count: 1, group_count: 1 }],
+      iterations: 1,
+      medianMilliseconds: 0,
+      p95Milliseconds: 0,
+      returnedContextRows: 1,
+      contextQueryPlan: [{ id: 0, parent: 0, notused: 0, detail: 'synthetic diagnostic' }],
+      d1RowsRead: null,
+      qualification: 'This is a full-projection local SQLite benchmark. It is not a Workerd/D1 billing or latency claim.',
+    },
+    workerdD1: {
+      status: 'not_run',
+      reason: 'A full D1/Workerd probe requires a reviewed D1 materializer/import path. Native SQLite was run against the complete projection; D1 rows_read and remote-equivalent latency remain deliberately unclaimed.',
+    },
+    integrity: {
+      foreignKeyViolations: 0,
+      tokensWithoutImmediateGroup: 0,
+      tokensWithMissingGroup: 0,
+      groupsWithMissingParent: 0,
+      totalGroups: 441_272,
+      reachableGroups: 441_272,
+      unreachableGroups: 0,
+      groupCycleMembers: 0,
+      tokenMembershipRows: 613_652,
+      groupReferenceRows: 1_965_769,
+      referencesWithoutGroupContext: 0,
+      duplicateTokenIds: 0,
+      releaseGateDanglingParticipantReferences: 9,
+      pass: true,
+      releaseEligible: false,
     },
   };
 }
@@ -177,13 +240,20 @@ describe('MACULA local-only source contract', () => {
   });
 
   it('allows only the reviewed structural attributes and fails closed for excluded or unknown fields', () => {
-    expect(() => assertMaculaSourceAttribute('word', 'xml:id')).not.toThrow();
-    expect(() => assertMaculaSourceAttribute('group', 'Rule')).not.toThrow();
-    expect(() => assertMaculaSourceAttribute('participant', 'participantref')).not.toThrow();
-    expect(() => assertMaculaSourceAttribute('word', 'lemma')).toThrow('explicitly excluded');
-    expect(() => assertMaculaSourceAttribute('group', 'unreviewed-field')).toThrow('unknown schema drift');
-    expect(() => assertMaculaSourceAttribute('participant', 'unreviewed-field')).toThrow('unknown schema drift');
-    expect(() => assertMaculaSourceAttribute('invalid-scope' as never, 'participantref')).toThrow('invalid source attribute scope');
+    expect(() => assertMaculaSourceAttribute('greek', 'word', 'xml:id')).not.toThrow();
+    expect(() => assertMaculaSourceAttribute('greek', 'group', 'Rule')).not.toThrow();
+    expect(() => assertMaculaSourceAttribute('hebrew', 'participant', 'participantref')).not.toThrow();
+    expect(() => assertMaculaSourceAttribute('hebrew', 'word', 'lang')).not.toThrow();
+    expect(() => assertMaculaSourceAttribute('greek', 'word', 'lemma')).toThrow('explicitly excluded');
+    expect(() => assertMaculaSourceAttribute('greek', 'group', 'unreviewed-field')).toThrow('unknown schema drift');
+    expect(() => assertMaculaSourceAttribute('hebrew', 'participant', 'unreviewed-field')).toThrow('unknown schema drift');
+    expect(() => assertMaculaSourceAttribute('greek', 'word', 'lang')).toThrow('not approved for that corpus');
+    expect(() => assertMaculaSourceAttribute('greek', 'group', 'head')).toThrow('not approved for that corpus');
+    expect(() => assertMaculaSourceAttribute('greek', 'participant', 'participantref')).toThrow('not approved for that corpus');
+    expect(() => assertMaculaSourceAttribute('hebrew', 'participant', 'referent')).toThrow('not approved for that corpus');
+    expect(() => assertMaculaSourceAttribute('hebrew', 'group', 'Rule')).toThrow('not approved for that corpus');
+    expect(() => assertMaculaSourceAttribute('greek', 'invalid-scope' as never, 'participantref')).toThrow('invalid source attribute scope');
+    expect(() => assertMaculaSourceAttribute('invalid-corpus' as never, 'word', 'xml:id')).toThrow('invalid source attribute corpus');
   });
 
   it('rejects unknown contract fields, dangling-ledger changes, and every reviewed rights or inertness mutation', () => {
@@ -199,9 +269,11 @@ describe('MACULA local-only source contract', () => {
     const rightsMutations: Array<readonly [string, (value: Record<string, unknown>) => void]> = [
       ['Greek license', value => { ((value.rightsAndProvenance as Record<string, unknown>).maculaGreek as Record<string, unknown>).license = 'unreviewed'; }],
       ['Greek attribution', value => { ((value.rightsAndProvenance as Record<string, unknown>).maculaGreek as Record<string, unknown>).requiredAttribution = 'unreviewed'; }],
-      ['Faithlife commit', value => { ((value.rightsAndProvenance as Record<string, unknown>).faithlifeSblgntStandaloneNotice as Record<string, unknown>).commit = 'unreviewed'; }],
-      ['Faithlife tree', value => { ((value.rightsAndProvenance as Record<string, unknown>).faithlifeSblgntStandaloneNotice as Record<string, unknown>).tree = 'unreviewed'; }],
-      ['Faithlife role', value => { ((value.rightsAndProvenance as Record<string, unknown>).faithlifeSblgntStandaloneNotice as Record<string, unknown>).role = 'unreviewed'; }],
+      ['lang evidence', value => { (((value.rightsAndProvenance as Record<string, unknown>).langRetention as Record<string, unknown>).pipelineEvidence as Record<string, unknown>).observedTokenLanguages = 'unreviewed'; }],
+      ['Faithlife commit', value => { ((value.rightsAndProvenance as Record<string, unknown>).standaloneFaithlifeNotice as Record<string, unknown>).commit = 'unreviewed'; }],
+      ['Faithlife tree', value => { ((value.rightsAndProvenance as Record<string, unknown>).standaloneFaithlifeNotice as Record<string, unknown>).tree = 'unreviewed'; }],
+      ['Faithlife role', value => { ((value.rightsAndProvenance as Record<string, unknown>).standaloneFaithlifeNotice as Record<string, unknown>).role = 'unreviewed'; }],
+      ['SBLGNT derived-input notice', value => { ((value.rightsAndProvenance as Record<string, unknown>).sblgntRightsForMaculaGreekDerivedInput as Record<string, unknown>).copyrightNotice = 'unreviewed'; }],
       ['legal gate', value => { (value.rightsAndProvenance as Record<string, unknown>).legalReviewGate = 'unreviewed'; }],
     ];
     for (const [label, mutate] of rightsMutations) {
@@ -216,6 +288,10 @@ describe('MACULA local-only source contract', () => {
     const boundaryMutation = contractFixture();
     (boundaryMutation.inertness as Record<string, unknown>).verifierBoundary = 'unreviewed';
     expect(() => parseMaculaSourceContract(boundaryMutation)).toThrow('inertness drifted');
+
+    const maturityMutation = contractFixture();
+    (((maturityMutation.sources as Array<Record<string, unknown>>)[0]!.maturity as Record<string, unknown>).selectedPathComparison as Record<string, unknown>).differingSelectedLowfatFileCount = 0;
+    expect(() => parseMaculaSourceContract(maturityMutation)).toThrow('source pins drifted');
   });
 
   it('accepts only the exact local verifier CLI forms', () => {
@@ -253,16 +329,33 @@ describe('MACULA local-only source contract', () => {
     expect(() => verifyAuthoritativeMaculaAudit(authoritativeFinalReplay, process.cwd())).not.toThrow();
   });
 
-  it.skipIf(!hasAuthoritativeAudit)('fails closed when replay metadata contradicts the deterministic replay evidence', () => {
+  it.skipIf(!hasAuthoritativeAudit)('recursively fails closed for individual and combined unhashed run-summary contradictions', () => {
+    const mutations: Array<readonly [string, (summary: Record<string, unknown>) => void]> = [
+      ['replay artifact', summary => { ((summary.replayComparison as Record<string, unknown>).artifacts as Array<Record<string, unknown>>)[0]!.sha256 = '0'.repeat(64); }],
+      ['hash-domain artifact', summary => { ((summary.deterministicHashDomain as Record<string, unknown>).artifacts as Array<Record<string, unknown>>)[2]!.bytes = 1; }],
+      ['replay status', summary => { (summary.replayComparison as Record<string, unknown>).status = 'not_identical'; }],
+      ['publication eligibility', summary => { (summary.integrity as Record<string, unknown>).releaseEligible = true; }],
+      ['Workerd pass claim', summary => { (summary.workerdD1 as Record<string, unknown>).status = 'passed'; }],
+      ['Faithlife contradiction', summary => { (summary.faithlifeSblgntNotice as Record<string, unknown>).status = 'selected_alignment_input'; }],
+      ['Faithlife unknown field', summary => { (summary.faithlifeSblgntNotice as Record<string, unknown>).unreviewed = true; }],
+      ['inventory boolean', summary => { (summary.inventoryAssertions as Record<string, unknown>).allSelectedPathsTracked = false; }],
+      ['inventory count', summary => { (summary.inventoryAssertions as Record<string, unknown>).runtimeContentInventoryArtifacts = 71; }],
+      ['compatibility identity', summary => { (summary.canonicalRuntimeCompatibility as Record<string, unknown>).d1CorpusIdentity = '0'.repeat(64); }],
+      ['source attestation', summary => { ((summary.attestations as Record<string, unknown>).maculaGreek as Record<string, unknown>).clean = false; }],
+      ['unknown nested field', summary => { (summary.environment as Record<string, unknown>).unreviewed = true; }],
+    ];
+    for (const [label, mutate] of mutations) {
+      expect(() => withAuditCopy(mutate), label).toThrow('MACULA source contract violation');
+    }
     expect(() => withAuditCopy(summary => {
-      ((summary.replayComparison as Record<string, unknown>).artifacts as Array<Record<string, unknown>>)[0]!.sha256 = '0'.repeat(64);
-    })).toThrow('run summary replay comparison drifted');
-    expect(() => withAuditCopy(summary => {
-      ((summary.deterministicHashDomain as Record<string, unknown>).artifacts as Array<Record<string, unknown>>)[2]!.bytes = 1;
-    })).toThrow('run summary deterministic hash domain drifted');
-    expect(() => withAuditCopy(summary => {
-      (summary.replayComparison as Record<string, unknown>).status = 'not_identical';
-    })).toThrow('run summary replay comparison drifted');
+      (summary.integrity as Record<string, unknown>).releaseEligible = true;
+      (summary.workerdD1 as Record<string, unknown>).status = 'passed';
+      (summary.faithlifeSblgntNotice as Record<string, unknown>).unreviewed = true;
+      (summary.inventoryAssertions as Record<string, unknown>).allSelectedPathsTracked = false;
+      (summary.canonicalRuntimeCompatibility as Record<string, unknown>).d1CorpusIdentity = '0'.repeat(64);
+      ((summary.attestations as Record<string, unknown>).maculaHebrew as Record<string, unknown>).clean = false;
+      (summary.environment as Record<string, unknown>).unreviewed = true;
+    })).toThrow('MACULA source contract violation');
   });
 
   it('keeps the packet content-free and completely outside runtime, migration, manifest, and public-surface wiring', () => {
