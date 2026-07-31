@@ -93,6 +93,31 @@ const expectedAuditEvidence = {
   },
 } as const;
 
+const expectedDeterministicArtifacts = [
+  { path: 'source-manifest.json', bytes: 240_952, sha256: 'b9dbd2ca6353fa76740650ffa85247b449e0e2f687fc1f40e227a7677f571988' },
+  { path: 'inspection.json', bytes: 54_523, sha256: '505e715901635db876539358f9456830ff51b17445cd372045d665834c9896b9' },
+  { path: 'macula-structural-projection.sqlite', bytes: 207_106_048, sha256: 'c5a61cf047e662a6d2238093edefa7dc540ce8f2b2bbeb49115cb94329fab414' },
+] as const;
+
+const expectedDeterministicHashDomain = {
+  excludes: [
+    'run-summary.json',
+    'timestamps',
+    'absolute paths',
+    'host-specific tool versions and benchmark timing',
+  ],
+  artifacts: expectedDeterministicArtifacts,
+  sha256: MACULA_AUDIT_IDENTITY,
+} as const;
+
+const expectedReplayComparison = {
+  status: 'identical',
+  priorOutput: 'audit-output/final-replay-1',
+  deterministicIdentity: MACULA_AUDIT_IDENTITY,
+  artifacts: expectedDeterministicArtifacts,
+  assertion: 'The complete projection was independently regenerated twice from the same clean, pinned local inputs and every deterministic artifact hash and byte count matched.',
+} as const;
+
 const expectedCurrentMain = {
   commit: '2f12262c9a37d3588bee9b5071954823c15cbd12',
   tree: '9922aedb74c690e7a3fcb926b3d621f28fa44535',
@@ -105,6 +130,52 @@ const expectedCurrentMain = {
   stepBibleCommit: '0f60797c170f11a1f8dc75c5f7617973e2e66b0d',
   d1CorpusIdentity: '29a4a7faec2a960f06bfc026a319df8c08b495bb7ad82831fb62d3a3586643a4',
   d1CorpusIdentityDerivation: 'computeD1CorpusIdentity(parseDataManifest(data/data-manifest.json))',
+} as const;
+
+const expectedRightsAndProvenance = {
+  maculaGreek: {
+    license: 'CC BY 4.0 per the pinned MACULA Greek notice',
+    requiredAttribution: 'MACULA Greek Linguistic Datasets, available at https://github.com/Clear-Bible/macula-greek/',
+    selectedInputProvenance: 'MACULA SBLGNT lowfat inputs are SBLGNT-derived and may contain data migrated or persisted from the upstream edition; excluded fields do not erase applicable upstream notices.',
+    modificationNoticeRequirements: [
+      'Before any distribution, provide the required attribution, a link to CC BY 4.0, and applicable copyright or license notices.',
+      'Identify modifications and do not imply upstream endorsement or impose additional restrictions.',
+    ],
+  },
+  maculaHebrew: {
+    license: 'CC BY 4.0 per the pinned MACULA Hebrew notice',
+    requiredAttribution: 'MACULA Hebrew Linguistic Datasets, available at https://github.com/Clear-Bible/macula-hebrew/',
+    selectedInputProvenance: 'The selected lowfat inputs have composite provenance. The source contract excludes morphology, semantic data, glosses, and Cherith/SILHA material, but future publication still requires a source-by-source rights review.',
+    modificationNoticeRequirements: [
+      'Before any distribution, provide the required attribution, a link to CC BY 4.0, and applicable copyright or license notices.',
+      'Identify modifications and do not imply upstream endorsement or impose additional restrictions.',
+    ],
+  },
+  faithlifeSblgntStandaloneNotice: {
+    role: 'notice_only_not_materializer_input',
+    repository: 'https://github.com/Faithlife/SBLGNT.git',
+    commit: 'c4d241a9c1c479a55b989ba35a4976c1d0b8052c',
+    tree: '1237db9d579eb13457157ca266a6f822dd4353b9',
+    noticePaths: ['README.md', 'LICENSE'],
+    prohibition: 'Do not use the standalone Faithlife checkout or its XML as an alignment input, projection input, deterministic-hash input, or public-output source.',
+  },
+  legalReviewGate: 'This contract records source notices and operational obligations; it is not a legal opinion and does not authorize publication.',
+} as const;
+
+const expectedInertness = {
+  contractDoesNotActivate: [
+    'corpus acquisition',
+    'corpus storage',
+    'SQLite or D1 projection',
+    'migration',
+    'data-manifest activation',
+    'repository adapter',
+    'MCP schema, tool, output, catalog, or resource',
+    'composition-root binding',
+    'runtime reachability',
+    'preview, deployment, or Cloudflare workflow',
+  ],
+  verifierBoundary: 'The verifier is local, read-only, and deterministic. It performs no network request, source acquisition, mutation, database access, or runtime binding.',
 } as const;
 
 function fail(message: string): never {
@@ -179,6 +250,7 @@ export function parseMaculaSourceContract(value: unknown): MaculaSourceContract 
 
   const rights = record(root.rightsAndProvenance, 'rights and provenance');
   exactKeys(rights, ['maculaGreek', 'maculaHebrew', 'faithlifeSblgntStandaloneNotice', 'legalReviewGate'], 'rights and provenance');
+  exactValue(rights, expectedRightsAndProvenance, 'rights and provenance');
   for (const key of ['maculaGreek', 'maculaHebrew'] as const) {
     const source = record(rights[key], `rights and provenance.${key}`);
     exactKeys(source, ['license', 'requiredAttribution', 'selectedInputProvenance', 'modificationNoticeRequirements'], `rights and provenance.${key}`);
@@ -191,6 +263,7 @@ export function parseMaculaSourceContract(value: unknown): MaculaSourceContract 
 
   const inertness = record(root.inertness, 'inertness');
   exactKeys(inertness, ['contractDoesNotActivate', 'verifierBoundary'], 'inertness');
+  exactValue(inertness, expectedInertness, 'inertness');
   stringArray(inertness.contractDoesNotActivate, 'inertness.contractDoesNotActivate');
   return root as unknown as MaculaSourceContract;
 }
@@ -201,6 +274,9 @@ export function readMaculaSourceContract(root: string): MaculaSourceContract {
 
 /** Reject both known non-retained fields and novel schema fields before materialization. */
 export function assertMaculaSourceAttribute(scope: MaculaSourceAttributeScope, attribute: string): void {
+  if (scope !== 'word' && scope !== 'group' && scope !== 'participant') {
+    fail(`invalid source attribute scope ${JSON.stringify(scope)}`);
+  }
   const allowed = scope === 'word'
     ? expectedFieldPolicy.retainedWordAttributes
     : scope === 'group'
@@ -216,12 +292,21 @@ export function assertMaculaSourceAttribute(scope: MaculaSourceAttributeScope, a
   fail(`${scope} attribute ${attribute} is unknown schema drift and requires review`);
 }
 
-/** Verify the pinned origin/main object locally without fetching or changing a checkout. */
-export function verifyCurrentMainAttestation(root: string): void {
-  const revision = (args: string[]) => execFileSync('git', ['-C', root, ...args], { encoding: 'utf8' }).trim();
-  if (revision(['rev-parse', 'origin/main']) !== expectedCurrentMain.commit) fail('origin/main commit differs from audited current main');
+/**
+ * Verify the historical Git object used by the audit. It intentionally does
+ * not compare `origin/main`: main is expected to advance after the audit.
+ */
+export function verifyHistoricalCurrentMainAttestation(root: string): void {
+  const revision = (args: string[]) => {
+    try {
+      return execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+    } catch {
+      fail(`pinned historical current-main Git object is unavailable for ${args.join(' ')}`);
+    }
+  };
+  revision(['cat-file', '-e', `${expectedCurrentMain.commit}^{commit}`]);
   if (revision(['rev-parse', `${expectedCurrentMain.commit}^{tree}`]) !== expectedCurrentMain.tree) {
-    fail('audited current-main tree differs from source lock');
+    fail('pinned historical current-main tree differs from source lock');
   }
 }
 
@@ -282,6 +367,49 @@ function assertAuditSchema(schema: RecordValue, expected: typeof expectedSources
     .filter(attribute => !expectedFieldPolicy.retainedParticipantAttributes.includes(attribute as never));
   if (unknownWord.length || unknownGroup.length || unknownParticipant.length) {
     fail(`audit ${expected.id} source schema contains unknown attributes`);
+  }
+}
+
+/** Validate the content-free deterministic replay metadata without opening any corpus artifact. */
+export function verifyMaculaAuditRunSummary(value: unknown): void {
+  const summary = record(value, 'run summary');
+  exactKeys(summary, [
+    'attestations', 'auditRoot', 'benchmark', 'canonicalRuntimeCompatibility', 'command', 'deterministicHashDomain',
+    'environment', 'executedAt', 'faithlifeSblgntNotice', 'integrity', 'inventoryAssertions', 'replayComparison',
+    'replayScript', 'schemaVersion', 'workerdD1',
+  ], 'run summary');
+  const attestations = record(summary.attestations, 'run summary attestations');
+  for (const [key, expected] of [
+    ['maculaGreek', expectedSources[0]], ['maculaHebrew', expectedSources[1]],
+  ] as const) {
+    const attestation = record(attestations[key], `run summary ${key}`);
+    if (attestation.head !== expected.revision.commit || attestation.tree !== expected.revision.tree
+      || attestation.clean !== true || attestation.everySelectedPathTracked !== true
+      || attestation.selectedPathCount !== expected.selection.selectedPathCount) fail(`run summary ${key} attestation drifted`);
+  }
+  for (const key of ['theologaiMain', 'theologaiPreflight'] as const) {
+    const attestation = record(attestations[key], `run summary ${key}`);
+    if (attestation.head !== expectedCurrentMain.commit || attestation.tree !== expectedCurrentMain.tree
+      || attestation.originMain !== expectedCurrentMain.commit || attestation.clean !== true) {
+      fail(`run summary ${key} current-main attestation drifted`);
+    }
+  }
+  const hashDomain = record(summary.deterministicHashDomain, 'run summary deterministic hash domain');
+  exactKeys(hashDomain, ['artifacts', 'excludes', 'sha256'], 'run summary deterministic hash domain');
+  exactValue(hashDomain, expectedDeterministicHashDomain, 'run summary deterministic hash domain');
+  const replayComparison = record(summary.replayComparison, 'run summary replay comparison');
+  exactKeys(replayComparison, ['artifacts', 'assertion', 'deterministicIdentity', 'priorOutput', 'status'], 'run summary replay comparison');
+  exactValue(replayComparison, expectedReplayComparison, 'run summary replay comparison');
+  if (JSON.stringify(replayComparison.artifacts) !== JSON.stringify(hashDomain.artifacts)) {
+    fail('replay comparison artifacts differ from deterministic hash-domain artifacts');
+  }
+  const compatibility = record(summary.canonicalRuntimeCompatibility, 'run summary compatibility');
+  exactValue(compatibility.d1CorpusIdentity, expectedCurrentMain.d1CorpusIdentity, 'D1 corpus identity');
+  exactValue(compatibility.morphologyUsageIdentity, expectedCurrentMain.morphologyUsageIdentity, 'morphology usage identity');
+  exactValue(compatibility.runtimeContentInventory, expectedCurrentMain.runtimeContentInventory, 'runtime content inventory');
+  const faithlife = record(summary.faithlifeSblgntNotice, 'run summary Faithlife notice');
+  if (faithlife.status !== 'notice_only_excluded_from_alignment_projection_and_deterministic_identity') {
+    fail('standalone Faithlife checkout must remain notice-only');
   }
 }
 
@@ -350,49 +478,26 @@ export function verifyAuthoritativeMaculaAudit(finalReplayDirectory: string, con
   if (integrity.releaseEligible !== false || integrity.releaseGateDanglingParticipantReferences !== 9
     || decision.eligibleForPublication !== false) fail('audit must remain publication-ineligible');
 
-  const summary = record(parseJson(readFileSync(join(finalDirectory, 'run-summary.json')), 'run-summary.json'), 'run summary');
-  exactKeys(summary, [
-    'attestations', 'auditRoot', 'benchmark', 'canonicalRuntimeCompatibility', 'command', 'deterministicHashDomain',
-    'environment', 'executedAt', 'faithlifeSblgntNotice', 'integrity', 'inventoryAssertions', 'replayComparison',
-    'replayScript', 'schemaVersion', 'workerdD1',
-  ], 'run summary');
-  const attestations = record(summary.attestations, 'run summary attestations');
-  for (const [key, expected] of [
-    ['maculaGreek', expectedSources[0]], ['maculaHebrew', expectedSources[1]],
-  ] as const) {
-    const attestation = record(attestations[key], `run summary ${key}`);
-    if (attestation.head !== expected.revision.commit || attestation.tree !== expected.revision.tree
-      || attestation.clean !== true || attestation.everySelectedPathTracked !== true
-      || attestation.selectedPathCount !== expected.selection.selectedPathCount) fail(`run summary ${key} attestation drifted`);
+  verifyMaculaAuditRunSummary(parseJson(readFileSync(join(finalDirectory, 'run-summary.json')), 'run-summary.json'));
+}
+
+/** Accept only no arguments or one exact local audit-directory option. */
+export function parseMaculaSourceContractCliArgs(argumentsAfterScript: readonly string[]): string | undefined {
+  if (argumentsAfterScript.length === 0) return undefined;
+  if (argumentsAfterScript.length === 2
+    && argumentsAfterScript[0] === '--audit-dir'
+    && argumentsAfterScript[1]
+    && !argumentsAfterScript[1].startsWith('-')) {
+    return resolve(argumentsAfterScript[1]);
   }
-  for (const key of ['theologaiMain', 'theologaiPreflight'] as const) {
-    const attestation = record(attestations[key], `run summary ${key}`);
-    if (attestation.head !== expectedCurrentMain.commit || attestation.tree !== expectedCurrentMain.tree
-      || attestation.originMain !== expectedCurrentMain.commit || attestation.clean !== true) {
-      fail(`run summary ${key} current-main attestation drifted`);
-    }
-  }
-  const hashDomain = record(summary.deterministicHashDomain, 'run summary deterministic hash domain');
-  if (hashDomain.sha256 !== MACULA_AUDIT_IDENTITY) fail('run summary deterministic identity drifted');
-  const compatibility = record(summary.canonicalRuntimeCompatibility, 'run summary compatibility');
-  exactValue(compatibility.d1CorpusIdentity, expectedCurrentMain.d1CorpusIdentity, 'D1 corpus identity');
-  exactValue(compatibility.morphologyUsageIdentity, expectedCurrentMain.morphologyUsageIdentity, 'morphology usage identity');
-  exactValue(compatibility.runtimeContentInventory, expectedCurrentMain.runtimeContentInventory, 'runtime content inventory');
-  const faithlife = record(summary.faithlifeSblgntNotice, 'run summary Faithlife notice');
-  if (faithlife.status !== 'notice_only_excluded_from_alignment_projection_and_deterministic_identity') {
-    fail('standalone Faithlife checkout must remain notice-only');
-  }
+  fail('usage: tsx scripts/macula-source-contract.ts [--audit-dir /absolute/or/resolved/path/to/final-replay-2]');
 }
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  const argumentsAfterScript = process.argv.slice(2);
-  const auditIndex = argumentsAfterScript.indexOf('--audit-dir');
-  if (auditIndex >= 0 && (auditIndex !== 0 || argumentsAfterScript.length !== 2 || !argumentsAfterScript[1])) {
-    fail('usage: tsx scripts/macula-source-contract.ts [--audit-dir /absolute/path/to/final-replay-2]');
-  }
+  const auditDirectory = parseMaculaSourceContractCliArgs(process.argv.slice(2));
   readMaculaSourceContract(ROOT);
-  verifyCurrentMainAttestation(ROOT);
-  if (auditIndex >= 0) verifyAuthoritativeMaculaAudit(argumentsAfterScript[1]!, ROOT);
-  console.error('[macula-source-contract] Verified local-only pins, field policy, inertness, and current-main attestation.');
+  verifyHistoricalCurrentMainAttestation(ROOT);
+  if (auditDirectory) verifyAuthoritativeMaculaAudit(auditDirectory, ROOT);
+  console.error('[macula-source-contract] Verified local-only pins, field policy, inertness, and historical current-main attestation.');
 }

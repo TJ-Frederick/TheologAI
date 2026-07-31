@@ -28,12 +28,15 @@ is the present local audit authority. Its deterministic identity is
 The root diagnostics and `replay-1`/`replay-2` are superseded and must not be
 cited, copied, packaged, or used as authority.
 
-The lock records the audited current-main source identity
+The lock records the historical source identity that was current-main when the
+audit ran:
 `2f12262c9a37d3588bee9b5071954823c15cbd12` /
 `9922aedb74c690e7a3fcb926b3d621f28fa44535`, plus the exact morphology-usage,
 72-artifact runtime-inventory, STEPBible, and D1 corpus identities. These are
 compatibility gates, not activation or a claim that any MACULA artifact exists
-in the runtime.
+in the runtime. The verifier checks that this pinned commit object and tree are
+available locally; it intentionally does not require `origin/main` to remain
+at the historical commit, because later main advancement is expected.
 
 Run the compact verifier without network access:
 
@@ -42,8 +45,9 @@ npm run data:verify-macula-source-contract -- --audit-dir \
   /private/tmp/theologai-macula-source-audit/audit-output/final-replay-2
 ```
 
-It checks the source lock, the local `origin/main` object, the two compact
-audited JSON artifacts, and their recorded relationship to the final replay.
+It checks the source lock, the local historical commit/tree object, the two
+compact audited JSON artifacts, and their recorded relationship to the final
+replay. It does not fetch, move, or otherwise modify a Git ref.
 It deliberately does not open the 197 MiB SQLite projection, source XML, any
 source checkout, or a superseded replay. Full projection reproduction is a
 separate, future gate.
