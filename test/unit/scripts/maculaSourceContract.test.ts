@@ -244,6 +244,9 @@ describe('MACULA local-only source contract', () => {
     const statusMutation = runSummaryFixture();
     (statusMutation.replayComparison as Record<string, unknown>).status = 'not_identical';
     expect(() => verifyMaculaAuditRunSummary(statusMutation)).toThrow('run summary replay comparison drifted');
+    const schemaVersionMutation = runSummaryFixture();
+    schemaVersionMutation.schemaVersion = 999;
+    expect(() => verifyMaculaAuditRunSummary(schemaVersionMutation)).toThrow('run summary schema version drifted');
   });
 
   it.skipIf(!hasAuthoritativeAudit)('directly verifies the authoritative final replay without opening its projection', () => {

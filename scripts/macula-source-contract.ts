@@ -388,6 +388,7 @@ export function verifyMaculaAuditRunSummary(value: unknown): void {
     'environment', 'executedAt', 'faithlifeSblgntNotice', 'integrity', 'inventoryAssertions', 'replayComparison',
     'replayScript', 'schemaVersion', 'workerdD1',
   ], 'run summary');
+  if (summary.schemaVersion !== 2) fail('run summary schema version drifted');
   const attestations = record(summary.attestations, 'run summary attestations');
   for (const [key, expected] of [
     ['maculaGreek', expectedSources[0]], ['maculaHebrew', expectedSources[1]],
