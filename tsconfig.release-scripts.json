@@ -18,6 +18,7 @@
     "scripts/replay-historical-spine-source-packs.ts",
     "scripts/release-corpus-capacity-policy.ts",
     "scripts/release-corpus-capacity.ts",
+    "scripts/macula-source-contract.ts",
     "scripts/verify-database.ts",
     "scripts/ccel-live-preview-canary.ts"
   ]
