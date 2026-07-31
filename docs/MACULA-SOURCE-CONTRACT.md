@@ -80,21 +80,25 @@ The executable capability matrix is corpus-specific:
 | Greek | `xml:id`, `ref`, `class`, `role` | `class`, `role`, `rule`, `Rule` | `referent`, `subjref` |
 | Hebrew | `xml:id`, `ref`, `class`, `role`, `lang` | `class`, `role`, `rule`, `head` | `subjref`, `participantref` |
 
-Word-element text is alignment-only and must never be retained. Glosses,
-translations, semantic domains and senses, frames, Cherith/SILHA material,
-morphology, Strong's, lemmas, normalized forms, transliteration, Unicode
-duplicate data, synonyms, mappings, nodes, TSV, TEI, and aggregate lowfat
-files are excluded.
+Word-element text is alignment-only and must never be retained. All morphology
+and morphological-analysis fields are excluded except the Hebrew-only raw
+`lang` evidence expressly identified below. Glosses, translations, semantic
+domains and senses, frames, Cherith/SILHA material, Strong's, lemmas,
+normalized forms, transliteration, Unicode duplicate data, synonyms, mappings,
+nodes, TSV, TEI, and aggregate lowfat files are excluded.
 
 `lang` is retained only in MACULA Hebrew as raw OSHB-derived H/A language
-evidence. It is not morphology, an ISO code, an independently adjudicated
-language conclusion, a general classifier, a Greek capability, or permission
-to retain other OSHB morphology. The candidate records local pipeline evidence:
-the MACULA Hebrew notice says its trees combine Westminster syntax with OSHB
-morphology; the selected source is derivative/reorganized/corrected OSHB
-material; the selected source README records that provenance; and the selected
-XQuery copies node `@lang`. The audit observed `lang` on all 475,911 selected
-Hebrew tokens (H 468,362; A 7,549) and absent from the Greek source.
+evidence only. It is not morphological analysis, an ISO code, an independently
+adjudicated language conclusion, a general classifier, a Greek capability, or
+authorization to retain any other OSHB morphology field. The candidate records
+local pipeline evidence: the MACULA Hebrew notice says its trees combine
+Westminster syntax with OSHB morphology; the retained `lang` attribute is
+copied from MACULA's derivative/reorganized/corrected OSHB source layer; and
+the selected WLC lowfat input otherwise has composite provenance. The pinned
+repository source README records the MACULA source layer provenance, while its
+XQuery copies node `@lang`; that XQuery is provenance evidence, not one of the 933 selected
+paths. The audit observed `lang` on all 475,911 selected Hebrew tokens (H
+468,362; A 7,549) and absent from the Greek source.
 
 The contract is closed: a materializer must reject every explicitly excluded
 attribute and fail closed on every unknown attribute until review updates the

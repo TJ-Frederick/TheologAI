@@ -192,6 +192,53 @@ function withAuditCopy(mutateRunSummary: (summary: Record<string, unknown>) => v
   }
 }
 
+type RunSummaryMutation = readonly [label: string, mutate: (summary: Record<string, unknown>) => void];
+
+/**
+ * Every summary boundary is exercised against the content-free fixture in normal
+ * CI. The conditional copied-audit replay below provides separate local
+ * end-to-end evidence without making those semantic checks conditional.
+ */
+const runSummaryMutations: readonly RunSummaryMutation[] = [
+  ['unknown top-level field', summary => { summary.unreviewed = true; }],
+  ['schema version', summary => { summary.schemaVersion = 999; }],
+  ['replay artifact', summary => { ((summary.replayComparison as Record<string, unknown>).artifacts as Array<Record<string, unknown>>)[0]!.sha256 = '0'.repeat(64); }],
+  ['hash-domain artifact', summary => { ((summary.deterministicHashDomain as Record<string, unknown>).artifacts as Array<Record<string, unknown>>)[2]!.bytes = 1; }],
+  ['replay status', summary => { (summary.replayComparison as Record<string, unknown>).status = 'not_identical'; }],
+  ['source attestation', summary => { ((summary.attestations as Record<string, unknown>).maculaGreek as Record<string, unknown>).clean = false; }],
+  ['compatibility identity', summary => { (summary.canonicalRuntimeCompatibility as Record<string, unknown>).d1CorpusIdentity = '0'.repeat(64); }],
+  ['compatibility unknown nested field', summary => { (summary.canonicalRuntimeCompatibility as Record<string, unknown>).unreviewed = true; }],
+  ['Faithlife contradiction', summary => { (summary.faithlifeSblgntNotice as Record<string, unknown>).status = 'selected_alignment_input'; }],
+  ['Faithlife unknown field', summary => { (summary.faithlifeSblgntNotice as Record<string, unknown>).unreviewed = true; }],
+  ['inventory boolean', summary => { (summary.inventoryAssertions as Record<string, unknown>).allSelectedPathsTracked = false; }],
+  ['inventory count', summary => { (summary.inventoryAssertions as Record<string, unknown>).runtimeContentInventoryArtifacts = 71; }],
+  ['benchmark unknown nested field', summary => { (summary.benchmark as Record<string, unknown>).unreviewed = true; }],
+  ['Workerd pass claim', summary => { (summary.workerdD1 as Record<string, unknown>).status = 'passed'; }],
+  ['integrity foreign-key count', summary => { (summary.integrity as Record<string, unknown>).foreignKeyViolations = 1; }],
+  ['publication eligibility', summary => { (summary.integrity as Record<string, unknown>).releaseEligible = true; }],
+  ['dangling participant count', summary => { (summary.integrity as Record<string, unknown>).releaseGateDanglingParticipantReferences = 8; }],
+  ['integrity pass claim', summary => { (summary.integrity as Record<string, unknown>).pass = false; }],
+  ['integrity group count', summary => { (summary.integrity as Record<string, unknown>).totalGroups = 1; }],
+  ['integrity unknown nested field', summary => { (summary.integrity as Record<string, unknown>).unreviewed = true; }],
+  ['environment unknown nested field', summary => { (summary.environment as Record<string, unknown>).unreviewed = true; }],
+];
+
+function applyCombinedRunSummaryMutation(summary: Record<string, unknown>): void {
+  summary.unreviewed = true;
+  (summary.replayComparison as Record<string, unknown>).status = 'not_identical';
+  ((summary.attestations as Record<string, unknown>).maculaHebrew as Record<string, unknown>).clean = false;
+  (summary.canonicalRuntimeCompatibility as Record<string, unknown>).d1CorpusIdentity = '0'.repeat(64);
+  (summary.faithlifeSblgntNotice as Record<string, unknown>).unreviewed = true;
+  (summary.inventoryAssertions as Record<string, unknown>).allSelectedPathsTracked = false;
+  (summary.benchmark as Record<string, unknown>).unreviewed = true;
+  (summary.workerdD1 as Record<string, unknown>).status = 'passed';
+  (summary.integrity as Record<string, unknown>).releaseEligible = true;
+  (summary.integrity as Record<string, unknown>).releaseGateDanglingParticipantReferences = 8;
+  (summary.integrity as Record<string, unknown>).pass = false;
+  (summary.integrity as Record<string, unknown>).totalGroups = 1;
+  (summary.environment as Record<string, unknown>).unreviewed = true;
+}
+
 describe('MACULA local-only source contract', () => {
   it('pins the approved untagged revisions, final audit identity, and historical current-main compatibility values', () => {
     const contract = readMaculaSourceContract(process.cwd());
@@ -270,6 +317,9 @@ describe('MACULA local-only source contract', () => {
       ['Greek license', value => { ((value.rightsAndProvenance as Record<string, unknown>).maculaGreek as Record<string, unknown>).license = 'unreviewed'; }],
       ['Greek attribution', value => { ((value.rightsAndProvenance as Record<string, unknown>).maculaGreek as Record<string, unknown>).requiredAttribution = 'unreviewed'; }],
       ['lang evidence', value => { (((value.rightsAndProvenance as Record<string, unknown>).langRetention as Record<string, unknown>).pipelineEvidence as Record<string, unknown>).observedTokenLanguages = 'unreviewed'; }],
+      ['pinned repository README provenance', value => { (((value.rightsAndProvenance as Record<string, unknown>).langRetention as Record<string, unknown>).pipelineEvidence as Record<string, unknown>).sourceReadme = 'unreviewed'; }],
+      ['pinned repository XQuery provenance', value => { (((value.rightsAndProvenance as Record<string, unknown>).langRetention as Record<string, unknown>).pipelineEvidence as Record<string, unknown>).pinnedRepositoryXquery = 'unreviewed'; }],
+      ['legacy selected XQuery provenance key', value => { (((value.rightsAndProvenance as Record<string, unknown>).langRetention as Record<string, unknown>).pipelineEvidence as Record<string, unknown>).selectedXquery = 'unreviewed'; }],
       ['Faithlife commit', value => { ((value.rightsAndProvenance as Record<string, unknown>).standaloneFaithlifeNotice as Record<string, unknown>).commit = 'unreviewed'; }],
       ['Faithlife tree', value => { ((value.rightsAndProvenance as Record<string, unknown>).standaloneFaithlifeNotice as Record<string, unknown>).tree = 'unreviewed'; }],
       ['Faithlife role', value => { ((value.rightsAndProvenance as Record<string, unknown>).standaloneFaithlifeNotice as Record<string, unknown>).role = 'unreviewed'; }],
@@ -309,53 +359,27 @@ describe('MACULA local-only source contract', () => {
     }
   });
 
-  it('validates deterministic replay metadata in a fresh checkout and fails closed on contradictions', () => {
+  it('validates every deterministic and semantic summary boundary in normal CI', () => {
     expect(() => verifyMaculaAuditRunSummary(runSummaryFixture())).not.toThrow();
-    const replayArtifactMutation = runSummaryFixture();
-    ((replayArtifactMutation.replayComparison as Record<string, unknown>).artifacts as Array<Record<string, unknown>>)[0]!.sha256 = '0'.repeat(64);
-    expect(() => verifyMaculaAuditRunSummary(replayArtifactMutation)).toThrow('run summary replay comparison drifted');
-    const hashDomainMutation = runSummaryFixture();
-    ((hashDomainMutation.deterministicHashDomain as Record<string, unknown>).artifacts as Array<Record<string, unknown>>)[2]!.bytes = 1;
-    expect(() => verifyMaculaAuditRunSummary(hashDomainMutation)).toThrow('run summary deterministic hash domain drifted');
-    const statusMutation = runSummaryFixture();
-    (statusMutation.replayComparison as Record<string, unknown>).status = 'not_identical';
-    expect(() => verifyMaculaAuditRunSummary(statusMutation)).toThrow('run summary replay comparison drifted');
-    const schemaVersionMutation = runSummaryFixture();
-    schemaVersionMutation.schemaVersion = 999;
-    expect(() => verifyMaculaAuditRunSummary(schemaVersionMutation)).toThrow('run summary schema version drifted');
+    for (const [label, mutate] of runSummaryMutations) {
+      const mutated = runSummaryFixture();
+      mutate(mutated);
+      expect(() => verifyMaculaAuditRunSummary(mutated), label).toThrow('run summary');
+    }
+    const combined = runSummaryFixture();
+    applyCombinedRunSummaryMutation(combined);
+    expect(() => verifyMaculaAuditRunSummary(combined)).toThrow('run summary');
   });
 
   it.skipIf(!hasAuthoritativeAudit)('directly verifies the authoritative final replay without opening its projection', () => {
     expect(() => verifyAuthoritativeMaculaAudit(authoritativeFinalReplay, process.cwd())).not.toThrow();
   });
 
-  it.skipIf(!hasAuthoritativeAudit)('recursively fails closed for individual and combined unhashed run-summary contradictions', () => {
-    const mutations: Array<readonly [string, (summary: Record<string, unknown>) => void]> = [
-      ['replay artifact', summary => { ((summary.replayComparison as Record<string, unknown>).artifacts as Array<Record<string, unknown>>)[0]!.sha256 = '0'.repeat(64); }],
-      ['hash-domain artifact', summary => { ((summary.deterministicHashDomain as Record<string, unknown>).artifacts as Array<Record<string, unknown>>)[2]!.bytes = 1; }],
-      ['replay status', summary => { (summary.replayComparison as Record<string, unknown>).status = 'not_identical'; }],
-      ['publication eligibility', summary => { (summary.integrity as Record<string, unknown>).releaseEligible = true; }],
-      ['Workerd pass claim', summary => { (summary.workerdD1 as Record<string, unknown>).status = 'passed'; }],
-      ['Faithlife contradiction', summary => { (summary.faithlifeSblgntNotice as Record<string, unknown>).status = 'selected_alignment_input'; }],
-      ['Faithlife unknown field', summary => { (summary.faithlifeSblgntNotice as Record<string, unknown>).unreviewed = true; }],
-      ['inventory boolean', summary => { (summary.inventoryAssertions as Record<string, unknown>).allSelectedPathsTracked = false; }],
-      ['inventory count', summary => { (summary.inventoryAssertions as Record<string, unknown>).runtimeContentInventoryArtifacts = 71; }],
-      ['compatibility identity', summary => { (summary.canonicalRuntimeCompatibility as Record<string, unknown>).d1CorpusIdentity = '0'.repeat(64); }],
-      ['source attestation', summary => { ((summary.attestations as Record<string, unknown>).maculaGreek as Record<string, unknown>).clean = false; }],
-      ['unknown nested field', summary => { (summary.environment as Record<string, unknown>).unreviewed = true; }],
-    ];
-    for (const [label, mutate] of mutations) {
+  it.skipIf(!hasAuthoritativeAudit)('replays the complete summary mutation suite against the copied authoritative evidence', () => {
+    for (const [label, mutate] of runSummaryMutations) {
       expect(() => withAuditCopy(mutate), label).toThrow('MACULA source contract violation');
     }
-    expect(() => withAuditCopy(summary => {
-      (summary.integrity as Record<string, unknown>).releaseEligible = true;
-      (summary.workerdD1 as Record<string, unknown>).status = 'passed';
-      (summary.faithlifeSblgntNotice as Record<string, unknown>).unreviewed = true;
-      (summary.inventoryAssertions as Record<string, unknown>).allSelectedPathsTracked = false;
-      (summary.canonicalRuntimeCompatibility as Record<string, unknown>).d1CorpusIdentity = '0'.repeat(64);
-      ((summary.attestations as Record<string, unknown>).maculaHebrew as Record<string, unknown>).clean = false;
-      (summary.environment as Record<string, unknown>).unreviewed = true;
-    })).toThrow('MACULA source contract violation');
+    expect(() => withAuditCopy(applyCombinedRunSummaryMutation)).toThrow('MACULA source contract violation');
   });
 
   it('keeps the packet content-free and completely outside runtime, migration, manifest, and public-surface wiring', () => {

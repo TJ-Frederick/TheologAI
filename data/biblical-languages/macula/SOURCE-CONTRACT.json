@@ -245,7 +245,7 @@
     "maculaHebrew": {
       "license": "CC BY 4.0 per the pinned MACULA Hebrew notice",
       "requiredAttribution": "MACULA Hebrew Linguistic Datasets, available at https://github.com/Clear-Bible/macula-hebrew/",
-      "selectedInputProvenance": "The selected lowfat inputs have composite provenance. The source contract excludes morphology, semantic data, glosses, and Cherith/SILHA material, but future publication still requires a source-by-source rights review.",
+      "selectedInputProvenance": "The selected WLC lowfat input otherwise has composite provenance. All morphology and morphological-analysis fields are excluded except the Hebrew-only raw lang evidence expressly identified below; future publication still requires a source-by-source rights review.",
       "modificationNoticeRequirements": [
         "Before any distribution, provide the required attribution, a link to CC BY 4.0, and applicable copyright or license notices.",
         "Identify modifications and do not imply upstream endorsement or impose additional restrictions."
@@ -254,20 +254,20 @@
     "langRetention": {
       "attribute": "lang",
       "corpus": "hebrew",
-      "retainedAs": "raw OSHB-derived H/A language evidence",
+      "retainedAs": "raw OSHB-derived H/A language evidence only",
       "notA": [
-        "morphology",
+        "morphological analysis",
         "an ISO code",
         "an independently adjudicated language conclusion",
         "a general classifier",
         "a Greek capability",
-        "authorization to retain other OSHB morphology"
+        "authorization to retain any other OSHB morphology field"
       ],
       "pipelineEvidence": {
         "maculaHebrewNotice": "MACULA Hebrew trees combine Westminster syntax with OSHB morphology.",
-        "selectedSource": "The selected source is derivative, reorganized, and corrected OSHB material.",
-        "sourceReadme": "The selected source README records the selected source provenance.",
-        "selectedXquery": "The selected XQuery copies node @lang.",
+        "selectedSource": "The retained lang attribute is copied from MACULA's derivative, reorganized, and corrected OSHB source layer; the selected WLC lowfat input otherwise has composite provenance.",
+        "sourceReadme": "The pinned repository source README records the MACULA source layer provenance.",
+        "pinnedRepositoryXquery": "The pinned repository XQuery copies node @lang; it is provenance evidence and not one of the 933 selected paths.",
         "observedTokenLanguages": {
           "allSelectedHebrewTokensHaveLang": true,
           "total": 475911,
