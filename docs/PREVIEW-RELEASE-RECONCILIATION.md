@@ -62,9 +62,29 @@ passed primary readiness, Transform-8 (`1/12/12` pages), and the complete
 Transform-11 audit (`1/1/1/1/1/1/133/17` pages). No seed, migration, repair, or
 resume was repeated. The candidate was unbound during that preparation.
 Protected preview deployment `5e812152-355b-4a5f-a123-2485e89f1550` now
-serves Worker `06b9a603-8339-42b6-a246-ef9238563043` (#140) as the sole active
-preview assignment bound to that exact candidate D1. Production remains
-unchanged.
+serves PR #107 head `1105b75cd8537632bdb20e598092f6ba94a6adc0` as Worker
+`06b9a603-8339-42b6-a246-ef9238563043` (#140), the sole active preview
+assignment bound to that exact candidate D1. It remains v7/discovery-only with
+CCEL execution disabled before adapter, coordinator, or fetch. Production
+remains unchanged.
+
+At the reconciliation cutoff immediately after PR #113, `main` was
+`2f12262c9a37d3588bee9b5071954823c15cbd12` (tree
+`9922aedb74c690e7a3fcb926b3d621f28fa44535`), and that revision was not
+deployed. PRs #109–#113 are completed repository-only milestones: PR #109
+records the PR #108 production cutover, PR #110 aligns provider-neutral CCEL
+audit readiness, PR #111 adds inert canary transaction infrastructure, PR #112
+records synthetic original-language context-capacity evidence, and PR #113 records
+provisional Norton capacity evidence that remains subject to local and release
+gates. Production runs for PRs #109–#113 were cancelled and preview jobs
+skipped, so they make no runtime, Worker, deployment, binding, remote-D1, or
+corpus claim.
+Preview therefore remains the PR #107 assignment above. Production remains PR
+#108 merge `8da99fd0a161b90a4bd90ab29bde1abf796b3bf6`, deployment
+`3d7489d9-7b48-4ad0-bdc6-95ffbda53bd8`, Worker
+`291f3292-3fa9-44fc-bf6f-b68fd2f4cef6`, and D1
+`53211f50-a893-4b4c-be1e-bc625a595dc7`, with v6/local-only behavior and CCEL
+execution disabled before adapter, coordinator, or fetch.
 
 The candidate-binding observation is written before the strict gate and is uploaded through `always()` handling. It contains only version/deployment IDs, predecessor/active/candidate D1 IDs, the `d1Changed` value, and boolean configuration/binding verdicts; it excludes raw Wrangler JSON, headers, requests, sessions, and secrets. The final post-mutation observation is likewise retained and hashed even if the strict candidate-binding gate blocks both audits.
 
