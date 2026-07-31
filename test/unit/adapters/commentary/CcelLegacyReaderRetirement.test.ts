@@ -3,8 +3,8 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import ts from 'typescript';
 import {
+  CCEL_SEARCH_URL,
   CCEL_SEARCH_LIMITS,
-  CcelSearchAdapter,
   composeCcelSearchRequest,
   normalizeCcelSectionLocator,
 } from '../../../../src/adapters/commentary/CcelSearchAdapter.js';
@@ -55,27 +55,25 @@ describe('retired direct CCEL body-reader architecture', () => {
     expect(directFetchInvocations(source, 'synthetic.ts')).toHaveLength(1);
   });
 
-  it('locks the sole CCEL fetch to a bounded root search and never dereferences result locators', () => {
+  it('locks the sole CCEL fetch to the fixed observed GET action and never dereferences result locators', () => {
     const request = composeCcelSearchRequest({
       text: 'grace and truth',
       page: 1,
       limit: CCEL_SEARCH_LIMITS.maxHitsPerResponse,
     });
     const url = new URL(request.url);
-    expect(url).toMatchObject({ protocol: 'https:', hostname: 'ccel.org', pathname: '/' });
+    expect(CCEL_SEARCH_URL).toBe('https://www.ccel.org/home3/search');
+    expect(url).toMatchObject({ protocol: 'https:', hostname: 'www.ccel.org', pathname: '/home3/search' });
     expect([...url.searchParams.keys()].sort()).toEqual(['page', 'text']);
     expect(url.searchParams.get('page')).toBe('1');
-
-    expect(() => new CcelSearchAdapter({ baseUrl: 'https://ccel.org/ccel/author/work/' }))
-      .toThrow('not an approved HTTPS origin');
-    expect(() => new CcelSearchAdapter({ baseUrl: 'https://ccel.org/?text=grace' }))
-      .toThrow('not an approved HTTPS origin');
 
     const searchSource = readFileSync(SEARCH_ADAPTER_PATH, 'utf8');
     expect(directFetchInvocations(searchSource, SEARCH_ADAPTER_PATH)).toEqual(['this.fetchImpl(validated, {']);
     expect(searchSource.match(/this\.fetchImpl\s*\(/g)).toHaveLength(1);
     expect(searchSource).toContain('this.fetchImpl(validated, {');
-    expect(searchSource).toContain("url.pathname !== '/'");
+    expect(searchSource).toContain("url.hostname !== 'www.ccel.org'");
+    expect(searchSource).toContain("url.pathname !== '/home3/search'");
+    expect(searchSource).not.toContain('baseUrl');
     expect(searchSource).toContain('class MetadataCache');
 
     const locator = normalizeCcelSectionLocator('/ccel/augustine/confessions/confessions.i.html?tracking=discarded');
