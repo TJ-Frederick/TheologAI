@@ -292,22 +292,32 @@ export function assertMaculaSourceAttribute(scope: MaculaSourceAttributeScope, a
   fail(`${scope} attribute ${attribute} is unknown schema drift and requires review`);
 }
 
+/** Verify an exact local commit/tree pair without fetching or moving a ref. */
+export function verifyPinnedGitCommitTree(root: string, commit: string, tree: string, label: string): void {
+  const revision = (args: string[]) => {
+    try {
+      return execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+    } catch {
+      fail(`${label} Git object is unavailable for ${args.join(' ')}`);
+    }
+  };
+  revision(['cat-file', '-e', `${commit}^{commit}`]);
+  if (revision(['rev-parse', `${commit}^{tree}`]) !== tree) {
+    fail(`${label} tree differs from the source lock`);
+  }
+}
+
 /**
  * Verify the historical Git object used by the audit. It intentionally does
  * not compare `origin/main`: main is expected to advance after the audit.
  */
 export function verifyHistoricalCurrentMainAttestation(root: string): void {
-  const revision = (args: string[]) => {
-    try {
-      return execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-    } catch {
-      fail(`pinned historical current-main Git object is unavailable for ${args.join(' ')}`);
-    }
-  };
-  revision(['cat-file', '-e', `${expectedCurrentMain.commit}^{commit}`]);
-  if (revision(['rev-parse', `${expectedCurrentMain.commit}^{tree}`]) !== expectedCurrentMain.tree) {
-    fail('pinned historical current-main tree differs from source lock');
-  }
+  verifyPinnedGitCommitTree(
+    root,
+    expectedCurrentMain.commit,
+    expectedCurrentMain.tree,
+    'pinned historical current-main',
+  );
 }
 
 function assertAuditSelectedFiles(source: RecordValue, expected: typeof expectedSources[number]): void {

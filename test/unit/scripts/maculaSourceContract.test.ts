@@ -12,6 +12,7 @@ import {
   verifyAuthoritativeMaculaAudit,
   verifyHistoricalCurrentMainAttestation,
   verifyMaculaAuditRunSummary,
+  verifyPinnedGitCommitTree,
 } from '../../../scripts/macula-source-contract.js';
 
 const repo = new URL('../../../', import.meta.url);
@@ -24,6 +25,17 @@ const expectedMaculaPaths = [
 const authoritativeAuditOutput = '/private/tmp/theologai-macula-source-audit/audit-output';
 const authoritativeFinalReplay = join(authoritativeAuditOutput, 'final-replay-2');
 const hasAuthoritativeAudit = existsSync(authoritativeFinalReplay);
+const hasHistoricalCurrentMainObject = (() => {
+  try {
+    execFileSync('git', ['cat-file', '-e', '2f12262c9a37d3588bee9b5071954823c15cbd12^{commit}'], {
+      cwd: new URL('.', repo),
+      stdio: 'ignore',
+    });
+    return true;
+  } catch {
+    return false;
+  }
+})();
 
 function contractFixture(): Record<string, unknown> {
   return JSON.parse(readFileSync(new URL('data/biblical-languages/macula/SOURCE-CONTRACT.json', repo), 'utf8'));
@@ -144,6 +156,23 @@ describe('MACULA local-only source contract', () => {
       morphologyUsageIdentity: 'c3600bb55da75aa600f8c97885efa7d58a3e8c29c3fcc6445a553091011beabd',
       d1CorpusIdentity: '29a4a7faec2a960f06bfc026a319df8c08b495bb7ad82831fb62d3a3586643a4',
     });
+  });
+
+  it('verifies an exact Git commit/tree pair available in every checkout and rejects mismatches', () => {
+    const revision = (args: string[]) => execFileSync('git', args, {
+      cwd: new URL('.', repo),
+      encoding: 'utf8',
+    }).trim();
+    const head = revision(['rev-parse', 'HEAD']);
+    const tree = revision(['rev-parse', 'HEAD^{tree}']);
+    expect(() => verifyPinnedGitCommitTree(process.cwd(), head, tree, 'test checkout HEAD')).not.toThrow();
+    expect(() => verifyPinnedGitCommitTree(process.cwd(), head, '0'.repeat(40), 'test checkout HEAD'))
+      .toThrow('test checkout HEAD tree differs from the source lock');
+    expect(() => verifyPinnedGitCommitTree(process.cwd(), '0'.repeat(40), tree, 'test checkout missing'))
+      .toThrow('test checkout missing Git object is unavailable');
+  });
+
+  it.skipIf(!hasHistoricalCurrentMainObject)('verifies the historical current-main object when this checkout contains it', () => {
     expect(() => verifyHistoricalCurrentMainAttestation(process.cwd())).not.toThrow();
   });
 
