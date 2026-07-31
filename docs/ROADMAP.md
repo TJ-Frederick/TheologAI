@@ -151,11 +151,14 @@ is local source context only and does not define the current product contract.
   behavior. Its normal protected production run `29578634873` deployed the
   behaviorally inactive code as Worker
   `96adff83-dd42-4604-b253-f135dbb7120c` against the existing production D1.
-- **Inactive UBS semantic aggregate / PR #64:** added a source-free,
+- **UBS semantic aggregate foundation / PR #64:** added a then-source-free,
   unregistered aggregate contract, merged as
-  `e20132f63cf22fa54d3a4821807efbce93879ae8`. This is a foundation only, not
-  a public feature or deployment: it did not add semantic artifacts, migration
-  `0004`, transform 7, D1 rows, runtime wiring, or an MCP surface.
+  `e20132f63cf22fa54d3a4821807efbce93879ae8`. At that point it was a foundation
+  only, not a public feature or deployment: it did not add semantic artifacts,
+  migration `0004`, transform 7, D1 rows, runtime wiring, or an MCP surface.
+  PR #96 later activated the released `original_language_study` v2 surface, so
+  this entry records its historical foundation state, not a claim that the
+  aggregate remains inactive today.
   Its GitHub deployment record `5490679777` moved from waiting to error when
   production run `29587993437` was cancelled before protected approval; the
   run had no steps, no Worker was deployed, and no Worker version was created.
@@ -345,6 +348,28 @@ binding—at merge `72a8ee5eef9b909a373b085d1a4f193484ddfe8a`, deployment
 > `theologai-production-20260723-a` (`3f7faa0e-689f-47aa-a601-dc662db9a6cf`),
 > sole 100%; identity SHA-256
 > `a6959d24fb7f50a9848fe2d011f425894718471b8a0609e7833780a291721a44`.
+
+- **Phase 3 release-state reconciliation / PRs #109–#113:** completed
+  repository-only milestones after the PR #108 cutover. PR #109 records that
+  cutover; PR #110 aligns provider-neutral CCEL audit readiness; PR #111 adds
+  inert canary transaction infrastructure; PR #112 records synthetic
+  original-language context-capacity evidence; and PR #113 records provisional
+  Norton capacity evidence, still subject to local and release gates. Production
+  runs for PRs #109–#113 were cancelled and preview jobs skipped, so none makes
+  a Worker, deployment, remote-D1, binding, corpus, or runtime claim. Current
+  `main` at `2f12262c9a37d3588bee9b5071954823c15cbd12` (tree
+  `9922aedb74c690e7a3fcb926b3d621f28fa44535`) is not deployed. Preview remains
+  PR #107 head `1105b75cd8537632bdb20e598092f6ba94a6adc0`, deployment
+  `5e812152-355b-4a5f-a123-2485e89f1550`, Worker
+  `06b9a603-8339-42b6-a246-ef9238563043`, and D1
+  `62b871a6-5b4d-4d9b-8f52-301f6c878f48`, with v7/discovery-only behavior and
+  CCEL execution disabled before adapter, coordinator, or fetch. Production
+  remains PR #108 merge `8da99fd0a161b90a4bd90ab29bde1abf796b3bf6`, deployment
+  `3d7489d9-7b48-4ad0-bdc6-95ffbda53bd8`, Worker
+  `291f3292-3fa9-44fc-bf6f-b68fd2f4cef6`, and D1
+  `53211f50-a893-4b4c-be1e-bc625a595dc7`, with v6/local-only behavior and
+  CCEL execution disabled. The retained PR #101 rollback identities remain
+  unchanged.
 
 ## Shipped Phase 3 release train
 

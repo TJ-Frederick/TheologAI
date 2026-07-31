@@ -386,6 +386,38 @@ describe('published project contract', () => {
     }
   });
 
+  it('keeps post-PR #108 repository milestones distinct from deployed release state', async () => {
+    const [roadmap, production, preview] = await Promise.all([
+      readProjectFile('docs/ROADMAP.md'),
+      readProjectFile('docs/PRODUCTION-RELEASE-RECONCILIATION.md'),
+      readProjectFile('docs/PREVIEW-RELEASE-RECONCILIATION.md'),
+    ]);
+    const currentMain = '2f12262c9a37d3588bee9b5071954823c15cbd12';
+    const currentTree = '9922aedb74c690e7a3fcb926b3d621f28fa44535';
+    const previewHead = '1105b75cd8537632bdb20e598092f6ba94a6adc0';
+
+    for (const document of [roadmap, production, preview]) {
+      const normalized = document.replace(/\s+/g, ' ');
+      expect(document).toContain(currentMain);
+      expect(document).toContain(currentTree);
+      expect(document).toContain('not deployed');
+      expect(normalized).toContain('Production runs for PRs #109–#113 were cancelled and preview jobs skipped');
+      expect(document).toContain('PR #109');
+      expect(document).toContain('PR #110');
+      expect(document).toContain('PR #111');
+      expect(document).toContain('PR #112');
+      expect(document).toContain('PR #113');
+      expect(normalized).toContain('inert canary transaction infrastructure');
+      expect(normalized).toContain('synthetic original-language context-capacity evidence');
+      expect(normalized).toContain('provisional Norton capacity evidence');
+    }
+    expect(roadmap).toContain('UBS semantic aggregate foundation / PR #64');
+    expect(roadmap).toContain('historical foundation state, not a claim that the\n  aggregate remains inactive today');
+    expect(preview).toContain(previewHead);
+    expect(preview).toContain('CCEL execution disabled before adapter, coordinator, or fetch');
+    expect(production).toContain('PR #108 v6/local-only release');
+  });
+
   it('keeps current CCEL rollout status aligned across operator documents', async () => {
     const documents = await Promise.all([
       readProjectFile('docs/CCEL-LIVE-PREVIEW-AUDIT.md'),
