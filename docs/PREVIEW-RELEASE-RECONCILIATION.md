@@ -68,12 +68,13 @@ assignment bound to that exact candidate D1. It remains v7/discovery-only with
 CCEL execution disabled before adapter, coordinator, or fetch. Production
 remains unchanged.
 
-Current `main` is `2f12262c9a37d3588bee9b5071954823c15cbd12` (tree
-`9922aedb74c690e7a3fcb926b3d621f28fa44535`) and is not deployed. PRs #109–#113
-are completed repository-only milestones: PR #109 records the PR #108
-production cutover, PR #110 aligns provider-neutral CCEL audit readiness,
-PR #111 adds inert canary transaction infrastructure, PR #112 records
-synthetic original-language context-capacity evidence, and PR #113 records
+At the reconciliation cutoff immediately after PR #113, `main` was
+`2f12262c9a37d3588bee9b5071954823c15cbd12` (tree
+`9922aedb74c690e7a3fcb926b3d621f28fa44535`), and that revision was not
+deployed. PRs #109–#113 are completed repository-only milestones: PR #109
+records the PR #108 production cutover, PR #110 aligns provider-neutral CCEL
+audit readiness, PR #111 adds inert canary transaction infrastructure, PR #112
+records synthetic original-language context-capacity evidence, and PR #113 records
 provisional Norton capacity evidence that remains subject to local and release
 gates. Production runs for PRs #109–#113 were cancelled and preview jobs
 skipped, so they make no runtime, Worker, deployment, binding, remote-D1, or

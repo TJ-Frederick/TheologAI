@@ -386,21 +386,33 @@ describe('published project contract', () => {
     }
   });
 
-  it('keeps post-PR #108 repository milestones distinct from deployed release state', async () => {
+  it('keeps the PR #113 reconciliation cutoff distinct from durable deployed release state', async () => {
     const [roadmap, production, preview] = await Promise.all([
       readProjectFile('docs/ROADMAP.md'),
       readProjectFile('docs/PRODUCTION-RELEASE-RECONCILIATION.md'),
       readProjectFile('docs/PREVIEW-RELEASE-RECONCILIATION.md'),
     ]);
-    const currentMain = '2f12262c9a37d3588bee9b5071954823c15cbd12';
-    const currentTree = '9922aedb74c690e7a3fcb926b3d621f28fa44535';
-    const previewHead = '1105b75cd8537632bdb20e598092f6ba94a6adc0';
+    const reconciliationCutoffCommit = '2f12262c9a37d3588bee9b5071954823c15cbd12';
+    const reconciliationCutoffTree = '9922aedb74c690e7a3fcb926b3d621f28fa44535';
+    const durablePreview = {
+      head: '1105b75cd8537632bdb20e598092f6ba94a6adc0',
+      deployment: '5e812152-355b-4a5f-a123-2485e89f1550',
+      worker: '06b9a603-8339-42b6-a246-ef9238563043',
+      d1: '62b871a6-5b4d-4d9b-8f52-301f6c878f48',
+    };
+    const durableProduction = {
+      merge: '8da99fd0a161b90a4bd90ab29bde1abf796b3bf6',
+      deployment: '3d7489d9-7b48-4ad0-bdc6-95ffbda53bd8',
+      worker: '291f3292-3fa9-44fc-bf6f-b68fd2f4cef6',
+      d1: '53211f50-a893-4b4c-be1e-bc625a595dc7',
+    };
 
     for (const document of [roadmap, production, preview]) {
       const normalized = document.replace(/\s+/g, ' ');
-      expect(document).toContain(currentMain);
-      expect(document).toContain(currentTree);
-      expect(document).toContain('not deployed');
+      expect(document).toContain(reconciliationCutoffCommit);
+      expect(document).toContain(reconciliationCutoffTree);
+      expect(normalized).toContain('At the reconciliation cutoff immediately after PR #113');
+      expect(normalized).toContain('and that revision was not deployed');
       expect(normalized).toContain('Production runs for PRs #109–#113 were cancelled and preview jobs skipped');
       expect(document).toContain('PR #109');
       expect(document).toContain('PR #110');
@@ -413,7 +425,12 @@ describe('published project contract', () => {
     }
     expect(roadmap).toContain('UBS semantic aggregate foundation / PR #64');
     expect(roadmap).toContain('historical foundation state, not a claim that the\n  aggregate remains inactive today');
-    expect(preview).toContain(previewHead);
+    for (const document of [roadmap, preview]) {
+      for (const value of Object.values(durablePreview)) expect(document).toContain(value);
+    }
+    for (const document of [roadmap, production, preview]) {
+      for (const value of Object.values(durableProduction)) expect(document).toContain(value);
+    }
     expect(preview).toContain('CCEL execution disabled before adapter, coordinator, or fetch');
     expect(production).toContain('PR #108 v6/local-only release');
   });

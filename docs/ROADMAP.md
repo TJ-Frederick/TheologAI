@@ -356,9 +356,11 @@ binding—at merge `72a8ee5eef9b909a373b085d1a4f193484ddfe8a`, deployment
   original-language context-capacity evidence; and PR #113 records provisional
   Norton capacity evidence, still subject to local and release gates. Production
   runs for PRs #109–#113 were cancelled and preview jobs skipped, so none makes
-  a Worker, deployment, remote-D1, binding, corpus, or runtime claim. Current
-  `main` at `2f12262c9a37d3588bee9b5071954823c15cbd12` (tree
-  `9922aedb74c690e7a3fcb926b3d621f28fa44535`) is not deployed. Preview remains
+  a Worker, deployment, remote-D1, binding, corpus, or runtime claim. At the
+  reconciliation cutoff immediately after PR #113, `main` was
+  `2f12262c9a37d3588bee9b5071954823c15cbd12` (tree
+  `9922aedb74c690e7a3fcb926b3d621f28fa44535`), and that revision was not
+  deployed. Preview remains
   PR #107 head `1105b75cd8537632bdb20e598092f6ba94a6adc0`, deployment
   `5e812152-355b-4a5f-a123-2485e89f1550`, Worker
   `06b9a603-8339-42b6-a246-ef9238563043`, and D1
