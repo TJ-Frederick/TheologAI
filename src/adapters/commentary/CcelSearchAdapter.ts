@@ -24,7 +24,11 @@ import type {
 } from '../../services/historical/CcelUpstreamCoordinator.js';
 
 export const CCEL_SEARCH_ATTRIBUTION = 'CCEL (Christian Classics Ethereal Library)' as const;
-export const CCEL_SEARCH_URL = 'https://ccel.org/';
+/**
+ * The one observed CCEL form action retained for a separately authorized
+ * canary. This is not evidence that a result query succeeds.
+ */
+export const CCEL_SEARCH_URL = 'https://www.ccel.org/home3/search';
 
 export const CCEL_SEARCH_LIMITS = Object.freeze({
   maxTextCharacters: 200,
@@ -79,8 +83,6 @@ export interface CcelSearchAdapterOptions {
   featureFlags?: Partial<PrimarySourceFeatureFlags>;
   fetchImpl?: FetchImplementation;
   now?: Clock;
-  /** Only the verified CCEL origin and root search path are accepted. */
-  baseUrl?: string;
   /** Lower test/deployment budgets are allowed; the locked maxima cannot be raised. */
   cacheMaxEntries?: number;
   cacheMaxBytes?: number;
@@ -334,7 +336,6 @@ export class CcelSearchAdapter {
   private readonly enabled: boolean;
   private readonly fetchImpl: FetchImplementation;
   private readonly now: Clock;
-  private readonly baseUrl: string;
   private readonly cache: MetadataCache;
   private readonly telemetry: (event: CcelCoordinatorEvent) => void | Promise<void>;
   private activeRequests = 0;
@@ -343,7 +344,6 @@ export class CcelSearchAdapter {
     this.enabled = options.enabled ?? options.featureFlags?.ccelLiveSearch ?? false;
     this.fetchImpl = options.fetchImpl ?? globalThis.fetch;
     this.now = options.now ?? Date.now;
-    this.baseUrl = validateSearchOrigin(options.baseUrl ?? CCEL_SEARCH_URL);
     this.telemetry = options.telemetry ?? (() => undefined);
     const cacheMaxEntries = options.cacheMaxEntries ?? CCEL_SEARCH_LIMITS.cacheMaxEntries;
     const cacheMaxBytes = options.cacheMaxBytes ?? CCEL_SEARCH_LIMITS.cacheMaxBytes;
@@ -499,7 +499,7 @@ export class CcelSearchAdapter {
 
   private async fetchSearchHtml(url: string, deadline: number): Promise<string> {
     if (this.now() >= deadline) throw new CcelSearchFailure('network');
-    const validated = validateSearchUrl(url, this.baseUrl);
+    const validated = validateSearchUrl(url);
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(TIMEOUT_ABORT_REASON), Math.min(CCEL_SEARCH_LIMITS.timeoutMs, Math.max(1, deadline - this.now())));
     let response: Response;
@@ -1158,25 +1158,31 @@ export function normalizeCcelSectionLocator(input: string): { kind: 'ccel_sectio
   return { kind: 'ccel_section', url: canonicalUrl, work, section };
 }
 
-function validateSearchOrigin(input: string): string {
+function validateSearchUrl(input: string): string {
   let url: URL;
   try {
     url = new URL(input);
   } catch {
-    throw new Error('CCEL search origin is invalid');
+    throw new CcelSearchFailure('policy');
   }
-  if (url.protocol !== 'https:' || !['ccel.org', 'www.ccel.org'].includes(url.hostname.toLowerCase()) || url.username || url.password || url.port || url.pathname !== '/' || url.search || url.hash) {
-    throw new Error('CCEL search origin is not an approved HTTPS origin');
+  const pageValues = url.searchParams.getAll('page');
+  const textValues = url.searchParams.getAll('text');
+  // The observed interface names one GET form action. Do not probe root,
+  // alternate hosts, alternate paths, or unreviewed query variants.
+  if (url.protocol !== 'https:'
+    || url.hostname !== 'www.ccel.org'
+    || url.port
+    || url.username
+    || url.password
+    || url.pathname !== '/home3/search'
+    || url.hash
+    || url.searchParams.size !== 2
+    || pageValues.length !== 1
+    || pageValues[0] !== '1'
+    || textValues.length !== 1
+    || textValues[0] === '') {
+    throw new CcelSearchFailure('policy');
   }
-  return CCEL_SEARCH_URL;
-}
-
-function validateSearchUrl(input: string, baseUrl: string): string {
-  const url = new URL(input);
-  // Redirects may normalize between the two documented CCEL hostnames, but
-  // may not leave the approved origin family or search path.
-  void baseUrl;
-  if (url.protocol !== 'https:' || !['ccel.org', 'www.ccel.org'].includes(url.hostname.toLowerCase()) || url.port || url.username || url.password || url.pathname !== '/') throw new CcelSearchFailure('policy');
   return url.toString();
 }
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CCEL_UPSTREAM_MIN_INTERVAL_MS,
   CCEL_UPSTREAM_MAX_RETRY_AFTER_SECONDS,
   ProcessLocalCcelUpstreamCoordinator,
   initialCcelCoordinatorState,
@@ -9,7 +10,8 @@ import {
 } from '../../../../src/services/historical/CcelUpstreamCoordinator.js';
 
 describe('CCEL upstream coordinator policy', () => {
-  it('admits exactly one of simultaneous process-local requests', async () => {
+  it('locks the global ten-second admission interval and admits exactly one simultaneous process-local request', async () => {
+    expect(CCEL_UPSTREAM_MIN_INTERVAL_MS).toBe(10_000);
     let now = 100_000;
     const coordinator = new ProcessLocalCcelUpstreamCoordinator({ enabled: true, now: () => now });
     const decisions = await Promise.all(Array.from({ length: 20 }, () => coordinator.admit()));
@@ -22,7 +24,7 @@ describe('CCEL upstream coordinator policy', () => {
         retryAfterSeconds: 10,
       }))));
 
-    now += 10_000;
+    now += CCEL_UPSTREAM_MIN_INTERVAL_MS;
     await expect(coordinator.admit()).resolves.toMatchObject({ kind: 'admitted' });
   });
 

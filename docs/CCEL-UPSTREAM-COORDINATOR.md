@@ -44,7 +44,9 @@ authoritative for this brand-new owner and for the local test namespace.
 
 An admitted cache miss reserves the origin synchronously **before** its single
 upstream GET begins. The minimum interval is 10,000 ms between admitted
-attempts globally. A busy response exposes only a bounded integer
+attempts globally. This applies to the sole fixed observed-canary hypothesis
+endpoint, not a claim that any result query succeeds. A busy response exposes
+only a bounded integer
 `retryAfterSeconds`—never queue position, request metadata, or another caller's
 identity.
 
