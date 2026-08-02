@@ -121,8 +121,10 @@ jobs:
           npx tsx scripts/ccel-live-preview-canary.ts render-preview-config
           --config wrangler.toml --output "$GITHUB_WORKSPACE/.wrangler.ccel-live-preview-canary.toml"
 
+      # This transaction assumes a separately authorized safe-100 refresh has
+      # made the predecessor exact-current-main and code/resource-equivalent.
       # Failure remains non-terminal until the in-job restore step below has
-      # checked the active deployment and re-proved the predecessor.
+      # checked the active deployment and re-proved that predecessor.
       - name: Upload exactly one undeployed candidate and validate its exact state
         id: stage
         continue-on-error: true

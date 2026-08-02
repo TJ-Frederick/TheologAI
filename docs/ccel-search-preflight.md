@@ -3,6 +3,7 @@
 > **Current status:** exposure-only preview record. Production remains deployed
 > v6/local-only. Preview is deployed and audited on the v7/discovery-only
 > contract, with CCEL execution disabled before adapter, coordinator, or fetch.
+> The active PR #107 Worker predates the current-main endpoint pin below.
 > TheologAI does not retrieve or republish CCEL
 > document bodies. Live discovery still requires a fresh operational preflight
 > and separate explicit release review.
@@ -16,12 +17,16 @@ The live-search and coordinator flags remain off in production and preview.
 - Observed canary hypothesis: the search interface was fetched at
   `https://www.ccel.org/search`, where the observed form declared `GET` and
   the relative action `/home3/search`. The dormant adapter therefore has one
-  fixed candidate endpoint, `https://www.ccel.org/home3/search`, and encodes
+  fixed current-main candidate endpoint, `https://www.ccel.org/home3/search`, and encodes
   only its bounded `page=1` and `text` query parameters. This observation is
   not proof that a result query succeeds, permission to query it, or a durable
   interface guarantee. No HTML, query, result, or snippet evidence is retained.
   There is no endpoint configuration, root/alternate-path probing, or fallback
   host/path in the adapter.
+  PR #115 introduced this pin in repository code only and was not deployed;
+  the active PR #107 preview predecessor is not evidence that `/home3/search`
+  is deployed. A protected safe-`100` current-main preview refresh and audit is
+  required before it can become a canary predecessor.
 - Search contract reviewed: [CCEL Search Help](https://www.ccel.org/help/search), including the documented `author`, `authorID`, `title`, and `bookID` fields.
 - Exact locator shape reviewed: `https://ccel.org/ccel/{author}/{work}/{section}.html`.
 - Product boundary approved by the owner on 2026-07-16: retain the existing
@@ -101,6 +106,6 @@ execution, or remote mutation is authorized by this record. The preview-only
 exposure flag changes an MCP contract, not the upstream execution policy.
 
 The content-free admission/circuit design and staged gates are documented in
-[CCEL-UPSTREAM-COORDINATOR.md](./CCEL-UPSTREAM-COORDINATOR.md). Preview v5
-exposure does not supersede this preflight's operational, robots, terms, or
-interface-review gates.
+[CCEL-UPSTREAM-COORDINATOR.md](./CCEL-UPSTREAM-COORDINATOR.md). The v7
+candidate contract does not supersede this preflight's operational, robots,
+terms, or interface-review gates.

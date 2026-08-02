@@ -114,7 +114,11 @@ export function renderCanaryPreviewConfig(configText: string): string {
   return rendered;
 }
 
-/** Check that the deployed preview predecessor is an exact 100 baseline. */
+/**
+ * Check the exact 100 baseline. Operations must separately establish that this
+ * predecessor was refreshed from current main; version JSON cannot prove Git
+ * revision identity by itself.
+ */
 export function validatePreviewBaseline(
   configText: string, deploymentsValue: unknown, versionValue: unknown, expectedVersion: string,
 ): FullVersion {
@@ -167,7 +171,10 @@ export function identifyCanaryUpload(
   return canary.id;
 }
 
-/** The uploaded candidate may differ from the predecessor in exactly two flags. */
+/**
+ * The uploaded candidate may differ from the separately refreshed current-main
+ * predecessor in exactly two flags; code/resource drift remains forbidden.
+ */
 export function validateCanaryVersion(
   configText: string, baselineValue: unknown, canaryValue: unknown, expectedBaseline: string, expectedCanary: string,
 ): void {

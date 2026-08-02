@@ -146,6 +146,13 @@ serves Worker `06b9a603-8339-42b6-a246-ef9238563043` (#140) with that exact
 D1. Production was unchanged by that preview release. Transform-10 hierarchy,
 publication, and Aquinas material remain excluded.
 
+This active PR #107 preview Worker predates PR #115's repository-only,
+unpublished pin to `https://www.ccel.org/home3/search`. It is not a valid
+code/resource-equivalent `100` predecessor for a `111` canary built from
+current `main`. A separately authorized protected preview release must first
+refresh exact-current-`main` code and resources under the safe `100` flags and
+pass its audit; that refresh does not authorize credential work or a canary.
+
 PR #101's former production assignment, retained as the rollback pair, is
 deployment `71b76d24-bf5f-490e-adc4-31cf63fb046e`, Worker
 `bae58cd3-cad7-4663-879d-408accf061b0` (#96), and D1

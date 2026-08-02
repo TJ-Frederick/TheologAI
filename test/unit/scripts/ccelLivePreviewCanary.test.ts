@@ -30,6 +30,7 @@ const production = '123e4567-e89b-42d3-a456-426614174002';
 const deployment = '223e4567-e89b-42d3-a456-426614174000';
 const config = readFileSync(new URL('../../../wrangler.toml', import.meta.url), 'utf8');
 const workflow = readFileSync(new URL('../../../.github/workflows/ccel-live-preview-canary.yml', import.meta.url), 'utf8');
+const canarySource = readFileSync(new URL('../../../scripts/ccel-live-preview-canary.ts', import.meta.url), 'utf8');
 const emergencyWorkflow = readFileSync(new URL('../../../.github/workflows/restore-ccel-live-preview-canary.yml', import.meta.url), 'utf8');
 const prWorkflow = readFileSync(new URL('../../../.github/workflows/pr.yml', import.meta.url), 'utf8');
 const liveBindingShapes = JSON.parse(readFileSync(
@@ -145,6 +146,10 @@ describe('CCEL live preview canary transaction', () => {
     const candidate = view(canary, 11, '111', { message: CANARY_MESSAGE, tag: CANARY_TAG });
     expect(() => validateCanaryVersion(config, baseline, candidate, predecessor, canary)).not.toThrow();
     expect(() => validateCanaryDeployment(config, deployments(canary), candidate, canary)).not.toThrow();
+    const codeResourceDrift = view(canary, 11, '111', { message: CANARY_MESSAGE, tag: CANARY_TAG });
+    codeResourceDrift.resources.script_runtime.compatibility_date = '2026-07-10';
+    expect(() => validateCanaryVersion(config, baseline, codeResourceDrift, predecessor, canary))
+      .toThrow(/compatibility settings mismatch/);
     const withPreviewToken = view(canary, 11, '111', { message: CANARY_MESSAGE, tag: CANARY_TAG, secret: true });
     expect(() => validateCanaryVersion(config, baseline, withPreviewToken, predecessor, canary)).toThrow(/exact authorized set/);
     const wrongNamespace = view(canary, 11, '111', { message: CANARY_MESSAGE, tag: CANARY_TAG });
@@ -248,6 +253,9 @@ describe('CCEL live preview canary transaction', () => {
     expect(workflow).toContain('validate-canary-credentials');
     expect(workflow.indexOf('validate-canary-credentials')).toBeLessThan(workflow.indexOf('npx wrangler'));
     expect(workflow.indexOf('validate-production-control')).toBeLessThan(workflow.indexOf('npx wrangler versions upload'));
+    expect(workflow).toContain('made the predecessor exact-current-main and code/resource-equivalent');
+    expect(canarySource).toContain('separately refreshed current-main');
+    expect(canarySource).toContain('code/resource drift remains forbidden');
     expect(workflow.indexOf('Run the existing authorized two-attempt audit exactly once'))
       .toBeLessThan(workflow.indexOf('Always restore the exact preview predecessor before job exit'));
     expect(workflow).toMatch(/id: restore\n        if: always\(\)/);

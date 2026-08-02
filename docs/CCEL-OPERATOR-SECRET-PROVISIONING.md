@@ -16,6 +16,12 @@ Promotion is a separate protected decision requiring:
 
 > `PROMOTE THEOLOGAI CCEL OPERATOR SECRET`
 
+Executing staging is a production Worker-version upload mutation even though
+the new version remains undeployed and traffic does not move. Promotion is an
+actual production Worker deployment and traffic mutation. Neither staging nor
+promotion authorizes the separate safe-`100` preview refresh or the temporary
+`111` canary, and preview refresh does not authorize either credential stage.
+
 Emergency rollback is also separate and requires:
 
 > `ROLL BACK THEOLOGAI TO THE EXACT SECRETLESS BASELINE`
@@ -88,8 +94,10 @@ suspected.
 
 Plain `wrangler secret put` creates and immediately deploys a version. Staging
 therefore uses `wrangler versions secret put`, which copies the newest uploaded
-version and creates an undeployed version. Promotion later deploys one reviewed
-UUID at 100%. Both workflows share `deploy-production` concurrency.
+version and creates an undeployed version. That upload is still a production
+Worker mutation, although it does not change traffic. Promotion later deploys
+one reviewed UUID at 100% and is therefore a production deployment/traffic
+mutation. Both workflows share `deploy-production` concurrency.
 
 Every Wrangler release command uses checked-in `wrangler.release.toml`. It
 contains only the production script name, entry point, compatibility date, and

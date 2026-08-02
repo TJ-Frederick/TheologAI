@@ -1,9 +1,11 @@
 # CCEL live-preview canary transaction
 
-This is the release procedure for the one deliberately temporary state in
-which preview may execute CCEL discovery. It is infrastructure only: it does
-not change a corpus, D1 schema, MCP behavior, rate-limit policy, production
-deployment, secret value, or the ordinary PR preview workflow.
+This is the transaction procedure for the one deliberately temporary state in
+which preview may execute CCEL discovery. The canary transaction itself does
+not change a corpus, D1 schema, rate-limit policy, production deployment, or
+secret value. Its preview and production prerequisites are separate, real
+Worker mutations with separate authorization; this procedure does not perform
+or authorize them.
 
 ## Fixed baseline and authorization gates
 
@@ -15,14 +17,37 @@ Tracked `wrangler.toml` is always the safe baseline:
 | Preview | 1 | 0 | 0 | v7 discovery-contract baseline |
 | Ephemeral canary | 1 | 1 | 1 | preview-only audit candidate; never committed |
 
+The active PR #107 preview Worker
+`06b9a603-8339-42b6-a246-ef9238563043` predates PR #115's repository-only,
+unpublished pin to `https://www.ccel.org/home3/search`. It remains valid
+point-in-time evidence, but it is not a code/resource-equivalent `100`
+predecessor for a `111` candidate built from current `main`. The exact-delta
+validator would correctly reject that pairing.
+
+Operational readiness therefore has three separately authorized stages, in
+this order:
+
+1. Safely refresh preview to an exact-current-`main` `100` Worker and complete
+   its protected preview audit. The refreshed predecessor must be equivalent
+   to the future current-`main` canary in code and resources; only the two
+   canary flags may later differ.
+2. Stage the operator credential as an undeployed production Worker version,
+   then separately promote the reviewed version. Promotion is a real
+   production Worker deployment and traffic mutation.
+3. Run this temporary `111` two-request preview canary transaction and restore
+   the exact refreshed `100` predecessor.
+
+Completion or authorization of any stage does not authorize the next stage.
+
 The only way to create the third row is the main-only, manually dispatched
 `CCEL Live Preview Canary` workflow. It requires all of the following:
 
 1. The workflow is dispatched from `refs/heads/main`, its checked-out SHA,
    supplied SHA, and freshly fetched `origin/main` SHA are the same exact full
    commit ID.
-2. The operator supplies the exact active preview predecessor UUID and exact
-   production control UUID. Both must be the sole 100% deployments. Full Worker
+2. The operator supplies the exact refreshed, current-`main` preview predecessor
+   UUID and exact production control UUID. Both must be the sole 100%
+   deployments. Full Worker
    version views re-prove their D1 identities, Durable Object identity,
    rate-limit namespaces, compatibility settings, flags, and exact binding
    sets. The canonical custom-domain routes are validated from committed
@@ -95,8 +120,8 @@ evidence.
 
 ## Transaction sequence
 
-1. Capture the current preview 100 predecessor and retain a short-lived,
-   private recovery anchor.
+1. Capture the separately refreshed, current-`main`, code/resource-equivalent
+   preview 100 predecessor and retain a short-lived private recovery anchor.
 2. Generate the 111 runner-local config and run `wrangler versions upload`.
    The version must be exactly one new, immediately-next version and must leave
    preview traffic unchanged.

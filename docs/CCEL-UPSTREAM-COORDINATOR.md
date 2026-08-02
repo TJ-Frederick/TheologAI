@@ -229,7 +229,7 @@ disabled.
 ## Staged contract wiring
 
 The public Worker and Node composition roots share one contract configuration.
-The v5 discovery application contract is exposed only by
+The current v7 discovery application contract is exposed only by
 `THEOLOGAI_EXPOSE_CCEL_DISCOVERY`; an origin attempt additionally requires both
 live-search and coordinator switches. The sole live predicate is therefore all
 three switches together. Any false switch leaves the external adapter,
