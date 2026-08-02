@@ -465,4 +465,48 @@ describe('published project contract', () => {
     expect(preflight).toContain('not proof that a result query succeeds');
     expect(preflight).toContain('No HTML, query, result, or snippet evidence is retained.');
   });
+
+  it('separates the current-main CCEL canary prerequisites from active PR107 evidence', async () => {
+    const [canary, reconciliation, readme, preflight, secret, audit, coordinator] = await Promise.all([
+      readProjectFile('docs/CCEL-LIVE-PREVIEW-CANARY-TRANSACTION.md'),
+      readProjectFile('docs/PREVIEW-RELEASE-RECONCILIATION.md'),
+      readProjectFile('README.md'),
+      readProjectFile('docs/ccel-search-preflight.md'),
+      readProjectFile('docs/CCEL-OPERATOR-SECRET-PROVISIONING.md'),
+      readProjectFile('docs/CCEL-LIVE-PREVIEW-AUDIT.md'),
+      readProjectFile('docs/CCEL-UPSTREAM-COORDINATOR.md'),
+    ]);
+    for (const document of [canary, reconciliation, readme]) {
+      const normalized = document.replace(/\s+/g, ' ');
+      expect(normalized).toContain('06b9a603-8339-42b6-a246-ef9238563043');
+      expect(normalized).toContain("PR #115's repository-only");
+      expect(normalized).toContain('https://www.ccel.org/home3/search');
+      expect(normalized).toContain('code/resource-equivalent `100` predecessor');
+    }
+    expect(canary).toContain('four separately authorized stages');
+    expect(canary).toContain('Completion or authorization of any stage does not authorize the next stage.');
+    expect(canary).toContain('fresh, separate preview and production D1 candidates');
+    expect(canary).toContain('schema `0009`');
+    expect(canary).toContain('remote readiness and authority audit');
+    expect(canary).toContain('read-only environment-isolation\n   verification');
+    expect(canary).toContain('resources.script.etag');
+    expect(canary).toContain('temporary `111` two-request preview canary transaction');
+    expect(reconciliation).toContain('protected preview release must safely refresh exact');
+    expect(preflight).toContain('fixed current-main candidate endpoint');
+    expect(preflight).toContain('PR #115 introduced this pin in repository code only and was not deployed');
+    expect(preflight).toContain('The v7\ncandidate contract does not supersede');
+    expect(secret).toContain('Executing staging is a production Worker-version upload mutation');
+    expect(secret).toContain('actual production Worker deployment and traffic mutation');
+    expect(secret).toContain('Neither staging nor\npromotion authorizes');
+    expect(secret).toContain('separate schema-`0009` D1 gate must have completed for **both** environments');
+    expect(secret).toContain('read-only environment-isolation\nverification');
+    expect(readme).toContain("Current `main` also includes PR #117's Transform-12 schema\n`0009` contract");
+    expect(readme).toContain('The deployed preview and production D1 layers remain schema `0008`; current\nmain\'s PR #117 schema `0009` Candidate-C contract is checked out only');
+    const normalizedAudit = audit.replace(/\s+/g, ' ');
+    expect(normalizedAudit).toContain('schema observations prove v6 local-only versus v7 CCEL exposure; they do not prove which endpoint-bearing code revision is deployed');
+    expect(normalizedAudit).toContain("does not prove PR #115's repository-only `/home3/search` pin is active");
+    expect(coordinator).toContain('The current v7 discovery application contract');
+    expect(coordinator).toContain('The historical v5 release selected production v4/local-only');
+    expect(coordinator).not.toContain('The v5 discovery application contract is exposed only by');
+  });
 });

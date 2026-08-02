@@ -68,6 +68,14 @@ assignment bound to that exact candidate D1. It remains v7/discovery-only with
 CCEL execution disabled before adapter, coordinator, or fetch. Production
 remains unchanged.
 
+That active PR #107 Worker predates PR #115's repository-only, unpublished
+change pinning the candidate CCEL endpoint to
+`https://www.ccel.org/home3/search`. It is not a code/resource-equivalent `100`
+predecessor for a `111` canary built from current `main`. Before any canary is
+authorized, a separate protected preview release must safely refresh exact
+current-`main` code and resources with the `100` flags and pass its preview
+audit. That refresh does not authorize credential provisioning or the canary.
+
 At the reconciliation cutoff immediately after PR #113, `main` was
 `2f12262c9a37d3588bee9b5071954823c15cbd12` (tree
 `9922aedb74c690e7a3fcb926b3d621f28fa44535`), and that revision was not

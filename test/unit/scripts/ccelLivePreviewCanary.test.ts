@@ -30,6 +30,7 @@ const production = '123e4567-e89b-42d3-a456-426614174002';
 const deployment = '223e4567-e89b-42d3-a456-426614174000';
 const config = readFileSync(new URL('../../../wrangler.toml', import.meta.url), 'utf8');
 const workflow = readFileSync(new URL('../../../.github/workflows/ccel-live-preview-canary.yml', import.meta.url), 'utf8');
+const canarySource = readFileSync(new URL('../../../scripts/ccel-live-preview-canary.ts', import.meta.url), 'utf8');
 const emergencyWorkflow = readFileSync(new URL('../../../.github/workflows/restore-ccel-live-preview-canary.yml', import.meta.url), 'utf8');
 const prWorkflow = readFileSync(new URL('../../../.github/workflows/pr.yml', import.meta.url), 'utf8');
 const liveBindingShapes = JSON.parse(readFileSync(
@@ -66,11 +67,15 @@ function bindings(mode: '100' | '111' | '000', includeOperatorSecret = false) {
   ];
 }
 
-function view(id: string, number: number, mode: '100' | '111' | '000' = '100', options: { message?: string; tag?: string; secret?: boolean } = {}) {
+function view(
+  id: string, number: number, mode: '100' | '111' | '000' = '100',
+  options: { message?: string; tag?: string; secret?: boolean; scriptEtag?: string } = {},
+) {
   return {
     id, number, metadata: { created_on: '2026-07-29T00:00:00.000Z' },
     ...(options.message === undefined ? {} : { annotations: { 'workers/message': options.message, 'workers/tag': options.tag ?? '' } }),
     resources: {
+      script: { etag: options.scriptEtag ?? '4f8e2a', handlers: ['fetch'], last_deployed_from: 'wrangler' },
       script_runtime: { compatibility_date: '2026-07-09', compatibility_flags: ['nodejs_compat'] },
       bindings: bindings(mode, options.secret),
     },
@@ -145,6 +150,21 @@ describe('CCEL live preview canary transaction', () => {
     const candidate = view(canary, 11, '111', { message: CANARY_MESSAGE, tag: CANARY_TAG });
     expect(() => validateCanaryVersion(config, baseline, candidate, predecessor, canary)).not.toThrow();
     expect(() => validateCanaryDeployment(config, deployments(canary), candidate, canary)).not.toThrow();
+    const missingBaselineScript = view(predecessor, 10);
+    delete missingBaselineScript.resources.script;
+    expect(() => validatePreviewBaseline(config, deployments(predecessor), missingBaselineScript, predecessor))
+      .toThrow(/preview predecessor authoritative resources\.script\.etag is missing or empty/);
+    expect(() => validateCanaryVersion(config, missingBaselineScript, candidate, predecessor, canary))
+      .toThrow(/preview predecessor authoritative resources\.script\.etag is missing or empty/);
+    const missingCandidateScript = view(canary, 11, '111', { message: CANARY_MESSAGE, tag: CANARY_TAG });
+    delete missingCandidateScript.resources.script;
+    expect(() => validateCanaryVersion(config, baseline, missingCandidateScript, predecessor, canary))
+      .toThrow(/canary authoritative resources\.script\.etag is missing or empty/);
+    const codeResourceDrift = view(canary, 11, '111', {
+      message: CANARY_MESSAGE, tag: CANARY_TAG, scriptEtag: '9d71bc',
+    });
+    expect(() => validateCanaryVersion(config, baseline, codeResourceDrift, predecessor, canary))
+      .toThrow(/authoritative resources\.script\.etag mismatch/);
     const withPreviewToken = view(canary, 11, '111', { message: CANARY_MESSAGE, tag: CANARY_TAG, secret: true });
     expect(() => validateCanaryVersion(config, baseline, withPreviewToken, predecessor, canary)).toThrow(/exact authorized set/);
     const wrongNamespace = view(canary, 11, '111', { message: CANARY_MESSAGE, tag: CANARY_TAG });
@@ -217,12 +237,47 @@ describe('CCEL live preview canary transaction', () => {
   });
 
   it('restores only the exact captured predecessor and makes a second restore idempotent', () => {
-    const baseline = view(predecessor, 10);
-    const candidate = view(canary, 11, '111', { message: CANARY_MESSAGE, tag: CANARY_TAG });
+    const baseline = view(predecessor, 10, '100', { scriptEtag: 'restore-equal' });
+    const candidate = view(canary, 11, '111', {
+      message: CANARY_MESSAGE, tag: CANARY_TAG, scriptEtag: 'restore-equal',
+    });
     expect(planRestore(config, deployments(canary), candidate, baseline, canary, predecessor)).toBe('deploy');
     expect(() => validateRestoreResult(config, deployments(predecessor), baseline, predecessor)).not.toThrow();
     expect(planRestore(config, deployments(predecessor), baseline, baseline, predecessor, predecessor)).toBe('already');
     expect(() => planRestore(config, deployments(production), view(production, 99, '000', { secret: true }), baseline, canary, predecessor)).toThrow(/authorized canary/);
+  });
+
+  it('fails restoration closed without matching authoritative script etags', () => {
+    const target = view(predecessor, 10, '100', { scriptEtag: 'restore-target' });
+    const activeCanary = view(canary, 11, '111', {
+      message: CANARY_MESSAGE, tag: CANARY_TAG, scriptEtag: 'restore-target',
+    });
+
+    const missingActiveCanary = structuredClone(activeCanary);
+    delete missingActiveCanary.resources.script;
+    expect(() => planRestore(config, deployments(canary), missingActiveCanary, target, canary, predecessor))
+      .toThrow(/active canary authoritative resources\.script\.etag is missing or empty/);
+
+    const missingTarget = structuredClone(target);
+    delete missingTarget.resources.script;
+    expect(() => planRestore(config, deployments(canary), activeCanary, missingTarget, canary, predecessor))
+      .toThrow(/restore target authoritative resources\.script\.etag is missing or empty/);
+
+    const changedCanary = view(canary, 11, '111', {
+      message: CANARY_MESSAGE, tag: CANARY_TAG, scriptEtag: 'changed-canary',
+    });
+    expect(() => planRestore(config, deployments(canary), changedCanary, target, canary, predecessor))
+      .toThrow(/restore would overwrite a preview code change/);
+
+    const activeBaseline = view(predecessor, 10, '100', { scriptEtag: 'restore-target' });
+    const missingActiveBaseline = structuredClone(activeBaseline);
+    delete missingActiveBaseline.resources.script;
+    expect(() => planRestore(config, deployments(predecessor), missingActiveBaseline, target, predecessor, predecessor))
+      .toThrow(/active restore baseline authoritative resources\.script\.etag is missing or empty/);
+
+    const changedActiveBaseline = view(predecessor, 10, '100', { scriptEtag: 'changed-baseline' });
+    expect(() => planRestore(config, deployments(predecessor), changedActiveBaseline, target, predecessor, predecessor))
+      .toThrow(/restore baseline code identity mismatch/);
   });
 
   it('retains only sanitized canary evidence and invokes the existing two-call audit exactly once', () => {
@@ -248,6 +303,9 @@ describe('CCEL live preview canary transaction', () => {
     expect(workflow).toContain('validate-canary-credentials');
     expect(workflow.indexOf('validate-canary-credentials')).toBeLessThan(workflow.indexOf('npx wrangler'));
     expect(workflow.indexOf('validate-production-control')).toBeLessThan(workflow.indexOf('npx wrangler versions upload'));
+    expect(workflow).toContain('made the predecessor exact-current-main and code/resource-equivalent');
+    expect(canarySource).toContain('separately refreshed current-main');
+    expect(canarySource).toContain('code/resource drift remains forbidden');
     expect(workflow.indexOf('Run the existing authorized two-attempt audit exactly once'))
       .toBeLessThan(workflow.indexOf('Always restore the exact preview predecessor before job exit'));
     expect(workflow).toMatch(/id: restore\n        if: always\(\)/);

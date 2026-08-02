@@ -1,9 +1,11 @@
 # CCEL live-preview canary transaction
 
-This is the release procedure for the one deliberately temporary state in
-which preview may execute CCEL discovery. It is infrastructure only: it does
-not change a corpus, D1 schema, MCP behavior, rate-limit policy, production
-deployment, secret value, or the ordinary PR preview workflow.
+This is the transaction procedure for the one deliberately temporary state in
+which preview may execute CCEL discovery. The canary transaction itself does
+not change a corpus, D1 schema, rate-limit policy, production deployment, or
+secret value. Its preview and production prerequisites are separate, real
+Worker mutations with separate authorization; this procedure does not perform
+or authorize them.
 
 ## Fixed baseline and authorization gates
 
@@ -15,20 +17,67 @@ Tracked `wrangler.toml` is always the safe baseline:
 | Preview | 1 | 0 | 0 | v7 discovery-contract baseline |
 | Ephemeral canary | 1 | 1 | 1 | preview-only audit candidate; never committed |
 
+The active PR #107 preview Worker
+`06b9a603-8339-42b6-a246-ef9238563043` predates PR #115's repository-only,
+unpublished pin to `https://www.ccel.org/home3/search`. It remains valid
+point-in-time evidence, but it is not a code/resource-equivalent `100`
+predecessor for a `111` candidate built from current `main`. The exact-delta
+validator would correctly reject that pairing.
+
+Current `main` also includes PR #117's Transform-12 schema `0009` contract.
+The retained PR #107 preview and PR #108 production D1 records were prepared
+against schema `0008`; neither is a current-main-compatible D1 baseline. The
+historical `0008` readiness records remain evidence for those releases only.
+
+Operational readiness therefore has four separately authorized stages, in this
+order:
+
+1. Prepare **fresh, separate preview and production D1 candidates** compatible
+   with schema `0009`. Each preparation needs its own authorization and must
+   complete the remote readiness and authority audit for the checked-out
+   schema/seed before any candidate binding. Then, through its separately
+   approved environment release path, bind the exact prepared candidate and
+   record the authoritative Worker/D1 binding. A read-only environment-isolation
+   verification must prove distinct preview and production D1 name/UUID pairs,
+   that each active Worker is bound only to its matching environment candidate,
+   and that neither retained schema-`0008` D1 was silently reused or crossed.
+   Failure or missing evidence is a stop condition; do not reuse, repair, or
+   bind a failed candidate.
+2. Safely refresh preview to an exact-current-`main` `100` Worker and complete
+   its protected preview audit. The refreshed predecessor must be equivalent
+   to the future current-`main` canary in code and resources; only the two
+   canary flags may later differ.
+3. Stage the operator credential as an undeployed production Worker version,
+   then separately promote the reviewed version. Promotion is a real
+   production Worker deployment and traffic mutation.
+4. Run this temporary `111` two-request preview canary transaction and restore
+   the exact refreshed `100` predecessor.
+
+Completion or authorization of any stage does not authorize the next stage.
+In particular, the stage-1 D1 release evidence is a prerequisite—not
+authorization—for the safe preview refresh or production credential staging;
+those two stage-2/3 operations remain independent gates.
+
 The only way to create the third row is the main-only, manually dispatched
 `CCEL Live Preview Canary` workflow. It requires all of the following:
 
 1. The workflow is dispatched from `refs/heads/main`, its checked-out SHA,
    supplied SHA, and freshly fetched `origin/main` SHA are the same exact full
    commit ID.
-2. The operator supplies the exact active preview predecessor UUID and exact
-   production control UUID. Both must be the sole 100% deployments. Full Worker
+2. The operator supplies the exact refreshed, current-`main` preview predecessor
+   UUID and exact production control UUID. Both must be the sole 100%
+   deployments. Full Worker
    version views re-prove their D1 identities, Durable Object identity,
    rate-limit namespaces, compatibility settings, flags, and exact binding
-   sets. The canonical custom-domain routes are validated from committed
-   `wrangler.toml`; the audit then exercises both canonical MCP endpoints. That
-   endpoint exercise proves reachability for this transaction, not an
-   independent inventory of Cloudflare zone-route ownership.
+   sets. Canary code/resource equivalence also requires a non-empty exact
+   `resources.script.etag` from both Worker version views; a missing or
+   mismatched authoritative script identity is refused. The canonical
+   custom-domain routes are validated from committed `wrangler.toml`; the audit
+   then exercises both canonical MCP endpoints. Existing `workers.dev`
+   compatibility endpoints retain their separately documented behavior and are
+   not D1, route-ownership, or canary authorization evidence. That endpoint
+   exercise proves reachability for this transaction, not an independent
+   inventory of Cloudflare zone-route ownership.
 3. The exact confirmation text is entered:
    `I AUTHORIZE THE TEMPORARY CCEL LIVE PREVIEW CANARY`.
 4. A repository administrator has first provisioned the dedicated GitHub
@@ -95,15 +144,20 @@ evidence.
 
 ## Transaction sequence
 
-1. Capture the current preview 100 predecessor and retain a short-lived,
+1. Confirm the separately retained stage-1 schema-`0009` preview/production
+   preparation, readiness/authority, binding, and environment-isolation
+   evidence. Capture the separately refreshed, current-`main`,
+   code/resource-equivalent preview 100 predecessor and retain a short-lived
    private recovery anchor.
 2. Generate the 111 runner-local config and run `wrangler versions upload`.
    The version must be exactly one new, immediately-next version and must leave
    preview traffic unchanged.
-3. Compare the uploaded version with the predecessor. Only the two authorized
-   plain-text flags may differ; code, compatibility settings, bindings, D1,
-   Durable Object, rate namespaces, routes, and all other variables must be
-   identical. The candidate must bear the fixed message and tag.
+3. Compare the uploaded version with the predecessor. Both full version views
+   must contain the same non-empty authoritative `resources.script.etag`; only
+   the two authorized plain-text flags may differ. Code, compatibility settings,
+   bindings, D1, Durable Object, rate namespaces, routes, and all other
+   variables must be identical. The candidate must bear the fixed message and
+   tag.
 4. Deploy that exact candidate to **preview only** at 100%, then re-prove its
    full 111 state.
 5. Invoke the existing `audit:ccel-preview` command once. That command itself

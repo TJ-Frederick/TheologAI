@@ -23,7 +23,12 @@ snapshot. The token is read only from `THEOLOGAI_CCEL_OPERATOR_TOKEN`; it is
 never accepted as a command argument or written to the report. Preview's
 `tools/list` must advertise the v7 CCEL discovery schema before the canary
 proceeds. These schema observations prove v6 local-only versus v7 CCEL
-exposure; they do not attest exact deployed flag bits. A successful
+exposure; they do not prove which endpoint-bearing code revision is deployed
+or attest exact deployed flag bits. In particular, observing the v7 schema does
+not prove PR #115's repository-only `/home3/search` pin is active. The safe
+current-main `100` refresh prerequisite is documented in
+[CCEL live-preview canary transaction](CCEL-LIVE-PREVIEW-CANARY-TRANSACTION.md).
+A successful
 origin admission separately proves that the separately authorized canary's live
 execution was effective, which differs from the deployed inert baseline.
 Preview issues exactly two concurrent `searchDepth: "expanded"` contenders.
