@@ -23,6 +23,8 @@
     "data:verify-section-keys": "tsx scripts/historical-section-key-plan.ts",
     "data:verify-language-sources": "tsx scripts/verify-biblical-language-sources.ts",
     "data:verify-macula-source-contract": "tsx scripts/macula-source-contract.ts",
+    "data:verify-macula-gate1": "tsx scripts/macula-gate1.ts",
+    "test:macula-gate1-workerd": "tsx scripts/macula-gate1.ts --workerd",
     "data:verify-ubs-hebrew-coordinate-audit": "tsx scripts/reproduce-ubs-hebrew-v092-coordinate-audit.ts",
     "data:build-ubs-hebrew-coordinate-bridge": "tsx scripts/build-ubs-hebrew-v092-coordinate-bridge.ts --write",
     "data:verify-ubs-hebrew-coordinate-bridge": "tsx scripts/build-ubs-hebrew-v092-coordinate-bridge.ts",

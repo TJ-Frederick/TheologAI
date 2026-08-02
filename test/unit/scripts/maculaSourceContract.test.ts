@@ -17,9 +17,16 @@ import {
 
 const repo = new URL('../../../', import.meta.url);
 const expectedMaculaPaths = [
+  'data/biblical-languages/macula/GATE1-SYNTHETIC-PLAN.json',
   'data/biblical-languages/macula/SOURCE-CONTRACT.json',
+  'docs/MACULA-GATE1-SYNTHETIC.md',
   'docs/MACULA-SOURCE-CONTRACT.md',
+  'scripts/macula-gate1.ts',
+  'scripts/macula-gate1/sidecar-schema.sql',
   'scripts/macula-source-contract.ts',
+  'test/fixtures/macula-gate1/greek.synthetic.xml',
+  'test/fixtures/macula-gate1/hebrew.synthetic.xml',
+  'test/unit/scripts/maculaGate1.test.ts',
   'test/unit/scripts/maculaSourceContract.test.ts',
 ].sort();
 const authoritativeAuditOutput = '/private/tmp/theologai-macula-source-audit/audit-output';
@@ -448,6 +455,10 @@ describe('MACULA local-only source contract', () => {
     expect(packageJson.scripts['data:verify-macula-source-contract'])
       .toBe('tsx scripts/macula-source-contract.ts');
     expect(Object.values(packageJson.scripts).filter(command => /macula/i.test(command)))
-      .toEqual(['tsx scripts/macula-source-contract.ts']);
+      .toEqual([
+        'tsx scripts/macula-source-contract.ts',
+        'tsx scripts/macula-gate1.ts',
+        'tsx scripts/macula-gate1.ts --workerd',
+      ]);
   });
 });
