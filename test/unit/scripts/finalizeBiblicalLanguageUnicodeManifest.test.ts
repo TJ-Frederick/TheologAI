@@ -7,7 +7,7 @@ import {
   finalizeBiblicalLanguageUnicodeManifest,
 } from '../../../scripts/finalize-biblical-language-unicode-manifest.js';
 
-const TRANSFORM_12_IDENTITY = 'ffae6c61a86b89bea8f3605236c4ac4f19a0c40e6e49a3d74ca6057ca3bc1609';
+const TRANSFORM_12_IDENTITY = '22ad33125c118a61956232f41c4234840de8b63acb494caf29b252b83e6b1e65';
 const CATALOG_INPUTS = [
   'data/historical-document-catalog-provenance.json',
   'data/historical-document-catalog.json',

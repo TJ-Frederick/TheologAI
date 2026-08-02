@@ -54,12 +54,8 @@ import {
 } from './historical-source-packs.js';
 import { assertNormalAquinasHierarchyExclusion } from './historical-hierarchy.js';
 import {
-  assertStoredNortonTransform12Authority,
-  loadNortonTransform12Authority,
-  materializeNortonTransform12Authority,
-} from './historical-transform12-norton.js';
-import {
   assertTransform12CandidateCSchema,
+  assertCanonicalTransform12FtsMatchSentinels,
   isExternalContentFts,
   rebuildIntegrityCheckAndSealTransform12,
 } from './transform12-candidate-c-storage.js';
@@ -677,14 +673,6 @@ if (JSON.stringify(historicalSourcePackCounts) !== JSON.stringify({
 }
 log(`  Inserted ${historicalSourcePackCounts.works} reviewed works with ${historicalSourcePackCounts.sections} canonical sections`);
 
-// ── Transform 12: inactive Norton authority and dormant publication seam ──
-
-log('Materializing the inactive Transform-12 Norton authority...');
-const nortonTransform12 = loadNortonTransform12Authority(sourceRegistry);
-materializeNortonTransform12Authority(db, nortonTransform12);
-assertStoredNortonTransform12Authority(db, nortonTransform12);
-log(`  Inserted ${nortonTransform12.sections.length} inactive Norton authority sections; public projection remains zero`);
-
 // ── Transform 10: dormant generic hierarchical authority foundation ──
 //
 // The reviewed Aquinas packet, migration, and standalone materializer remain
@@ -762,7 +750,7 @@ sourceRegistry.assertAllConsumed();
 // ── Validate and finalize ──
 
 rebuildIntegrityCheckAndSealTransform12(db);
-assertStoredNortonTransform12Authority(db, nortonTransform12);
+assertCanonicalTransform12FtsMatchSentinels(db);
 db.exec('ANALYZE');
 
 const integrityRows = db.pragma('integrity_check') as Array<Record<string, string>>;

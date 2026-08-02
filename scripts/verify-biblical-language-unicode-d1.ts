@@ -89,10 +89,10 @@ export function verifyBiblicalLanguageUnicodeD1(
   const historicalSectionedPublicationRows = expectedCounts.historical_sectioned_publications ?? 0;
   const historicalCorpusSealRows = expectedCounts.historical_corpus_seal ?? 0;
   assert(ubsSemanticRows === 549_458, `UBS semantic canonical-source row-count drift: ${ubsSemanticRows}`);
-  assert(historicalSourceRows === 11_667, `Historical reviewed-plus-inactive-authority lineage row-count drift: ${historicalSourceRows}`);
+  assert(historicalSourceRows === 9_163, `Historical reviewed-source-pack lineage row-count drift: ${historicalSourceRows}`);
   assert(historicalTransform10Rows === 0, `Normal release Transform 10 hierarchy rows must be zero: ${historicalTransform10Rows}`);
   assert(historicalPublicationRows === 0, `Normal release Transform 10 publication rows must be zero: ${historicalPublicationRows}`);
-  assert(historicalSectionedPublicationRows === 1,
+  assert(historicalSectionedPublicationRows === 0,
     `Transform 12 dormant sectioned-publication seam row-count drift: ${historicalSectionedPublicationRows}`);
   assert(historicalCorpusSealRows === 1, `Transform 12 corpus seal row-count drift: ${historicalCorpusSealRows}`);
   assert(rows - derivedUsageRows === 861_728 + ubsSemanticRows + historicalSourceRows

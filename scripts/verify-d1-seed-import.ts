@@ -25,7 +25,6 @@ import {
   type UbsSemanticStorageAudit,
 } from './ubs-semantics/storageContract.js';
 import { assertUbsSemanticStoredArtifactIdentity } from './ubs-semantics/storageReconstruction.js';
-import { auditNortonTransform12Authority } from './historical-transform12-authority-audit.js';
 import { assertTransform12CandidateCSchema, assertTransform12CorpusSealed } from './transform12-candidate-c-storage.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -180,6 +179,17 @@ function assertRepresentativeFts(db: Database.Database): void {
      ORDER BY rowid LIMIT 1`,
   ).get();
   if (!sections) throw new Error("Imported historical FTS has no representative 'almighty' result");
+
+  const historical = db.prepare(`SELECT COUNT(*) AS count FROM historical_edition_sections_fts
+    WHERE historical_edition_sections_fts MATCH '"grace"'`).get() as { count: number };
+  const hierarchy = db.prepare(`SELECT
+    (SELECT COUNT(*) FROM historical_edition_hierarchy_bodies) AS baseCount,
+    (SELECT COUNT(*) FROM historical_edition_hierarchy_bodies_fts) AS backingCount`).get() as {
+      baseCount: number; backingCount: number;
+    };
+  if (historical.count !== 391 || hierarchy.baseCount !== 0 || hierarchy.backingCount !== 0) {
+    throw new Error('Imported external-content FTS MATCH/empty-hierarchy sentinel drifted');
+  }
 }
 
 function assertUbsReconstruction(db: Database.Database, expectedCounts: Record<string, number>): void {
@@ -376,13 +386,6 @@ try {
   assertTransform12CandidateCSchema(target);
   assertTransform12CorpusSealed(source);
   assertTransform12CorpusSealed(target);
-  for (const database of [source, target]) {
-    const nortonAuthority = auditNortonTransform12Authority(ROOT, sql => {
-      const rows = database.prepare(sql).all();
-      return { rows, responseBytes: Buffer.byteLength(JSON.stringify(rows), 'utf8') };
-    });
-    if (nortonAuthority.pages !== 157) throw new Error('Imported Norton Transform 12 page count drifted');
-  }
   assertJohnOneOneDatabase(source, 'Source SQLite morphology');
   assertJohnOneOneDatabase(target, 'Imported D1 morphology');
   assertGenesisOneOneDatabase(source, 'Source SQLite morphology');

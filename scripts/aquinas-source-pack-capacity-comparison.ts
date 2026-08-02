@@ -710,9 +710,14 @@ function runCurrentCheckoutCommand(root: string, script: string, args: string[])
   }
 }
 
-/** Build and normally verify a fresh baseline from this checkout at an OS-temporary path. */
+/** Build, compact, and normally verify a fresh baseline at an OS-temporary path. */
 export function buildFreshAquinasCapacityBaseline({ root, outputPath }: AquinasBaselineBuilderContext): void {
   runCurrentCheckoutCommand(root, BASELINE_BUILD_SCRIPT, ['--output', outputPath]);
+  // Transform 12 removes two content-bearing FTS shadow tables. With no
+  // excluded packet present, their released pages would otherwise become
+  // accidental headroom for the standalone comparison. Compact this disposable
+  // baseline once so both sides start from a zero-freelist physical corpus.
+  closeAfter(new Database(outputPath), database => database.exec('VACUUM'));
   runCurrentCheckoutCommand(root, BASELINE_VERIFY_SCRIPT, ['--database', outputPath]);
 }
 

@@ -59,7 +59,7 @@ function assertCountParity(db: Database.Database, fts: string, base: string): vo
     base_count: number;
   };
   if (row.fts_count !== row.base_count) {
-    throw new Error(`Transform 12 ${fts} count ${row.fts_count} differs from ${base} count ${row.base_count}`);
+    throw new Error(`Transform 12 ${fts} backing-content count ${row.fts_count} differs from ${base} count ${row.base_count}`);
   }
 }
 
@@ -108,7 +108,7 @@ export function rebuildIntegrityCheckAndSealTransform12(db: Database.Database): 
       OR fts.section_key IS NOT section.section_key OR fts.heading IS NOT section.heading
       OR fts.content IS NOT section.content`).get() as { count: number };
   if (runtimeMismatch.count !== 0 || editionMismatch.count !== 0) {
-    throw new Error(`Transform 12 external-content FTS parity failed: runtime=${runtimeMismatch.count}, edition=${editionMismatch.count}`);
+    throw new Error(`Transform 12 external-content backing-content parity failed: runtime=${runtimeMismatch.count}, edition=${editionMismatch.count}`);
   }
 
   db.prepare(`INSERT INTO historical_corpus_seal (seal_id, transform_version, storage_contract)
@@ -130,4 +130,23 @@ export function assertTransform12CorpusSealed(db: Database.Database): void {
     throw new Error('Transform 12 corpus seal is absent or drifted');
   }
   assertTransform12CandidateCSchema(db);
+}
+
+/** Read-only MATCH sentinels prove the actual canonical indexes contain terms. */
+export function assertCanonicalTransform12FtsMatchSentinels(db: Database.Database): void {
+  const sentinels = db.prepare(`SELECT
+    (SELECT COUNT(*) FROM strongs_fts
+      WHERE strongs_fts MATCH '"love"' AND strongs_number = 'G25') AS strongsMatch,
+    (SELECT COUNT(*) FROM sections_fts
+      WHERE sections_fts MATCH '"almighty"' AND rowid = 1962) AS sectionMatch,
+    (SELECT COUNT(*) FROM historical_edition_sections_fts
+      WHERE historical_edition_sections_fts MATCH '"grace"') AS historicalMatches,
+    (SELECT COUNT(*) FROM historical_edition_hierarchy_bodies) AS hierarchyBase,
+    (SELECT COUNT(*) FROM historical_edition_hierarchy_bodies_fts) AS hierarchyBacking
+  `).get() as Record<string, number>;
+  if (sentinels.strongsMatch !== 1 || sentinels.sectionMatch !== 1
+    || sentinels.historicalMatches !== 391 || sentinels.hierarchyBase !== 0
+    || sentinels.hierarchyBacking !== 0) {
+    throw new Error(`Transform 12 canonical FTS MATCH sentinel drift: ${JSON.stringify(sentinels)}`);
+  }
 }
