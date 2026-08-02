@@ -180,7 +180,14 @@ function withAuditCopy(mutateRunSummary: (summary: Record<string, unknown>) => v
   mkdirSync(finalReplay, { recursive: true });
   try {
     copyFileSync(join(authoritativeAuditOutput, 'EVIDENCE-STATUS.md'), join(auditOutput, 'EVIDENCE-STATUS.md'));
-    for (const path of ['source-manifest.json', 'inspection.json', 'run-summary.json']) {
+    for (const path of [
+      'source-manifest.json',
+      'inspection.json',
+      'run-summary.json',
+      'REPORT.md',
+      'provenance-license-notice.json',
+      'replay-comparison.json',
+    ]) {
       copyFileSync(join(authoritativeFinalReplay, path), join(finalReplay, path));
     }
     const runSummary = JSON.parse(readFileSync(join(finalReplay, 'run-summary.json'), 'utf8')) as Record<string, unknown>;
@@ -196,8 +203,9 @@ type RunSummaryMutation = readonly [label: string, mutate: (summary: Record<stri
 
 /**
  * Every summary boundary is exercised against the content-free fixture in normal
- * CI. The conditional copied-audit replay below provides separate local
- * end-to-end evidence without making those semantic checks conditional.
+ * CI. The conditional copied-audit checks below prove that the exact historical
+ * packet passes and that any mutation is rejected at either the semantic or
+ * byte-identity boundary without making the semantic checks conditional.
  */
 const runSummaryMutations: readonly RunSummaryMutation[] = [
   ['unknown top-level field', summary => { summary.unreviewed = true; }],
@@ -375,7 +383,42 @@ describe('MACULA local-only source contract', () => {
     expect(() => verifyAuthoritativeMaculaAudit(authoritativeFinalReplay, process.cwd())).not.toThrow();
   });
 
-  it.skipIf(!hasAuthoritativeAudit)('replays the complete summary mutation suite against the copied authoritative evidence', () => {
+  it.skipIf(!hasAuthoritativeAudit)('rejects drift in every authority-bearing metadata file', () => {
+    const root = mkdtempSync(join(tmpdir(), 'theologai-macula-authority-'));
+    const auditOutput = join(root, 'audit-output');
+    const finalReplay = join(auditOutput, 'final-replay-2');
+    mkdirSync(finalReplay, { recursive: true });
+    try {
+      copyFileSync(join(authoritativeAuditOutput, 'EVIDENCE-STATUS.md'), join(auditOutput, 'EVIDENCE-STATUS.md'));
+      for (const path of [
+        'source-manifest.json',
+        'inspection.json',
+        'run-summary.json',
+        'REPORT.md',
+        'provenance-license-notice.json',
+        'replay-comparison.json',
+      ]) copyFileSync(join(authoritativeFinalReplay, path), join(finalReplay, path));
+
+      for (const [base, path] of [
+        [auditOutput, 'EVIDENCE-STATUS.md'],
+        [finalReplay, 'run-summary.json'],
+        [finalReplay, 'REPORT.md'],
+        [finalReplay, 'provenance-license-notice.json'],
+        [finalReplay, 'replay-comparison.json'],
+      ] as const) {
+        const target = join(base, path);
+        const original = readFileSync(target);
+        writeFileSync(target, Buffer.concat([original, Buffer.from('\ncontradictory unreviewed claim\n')]));
+        expect(() => verifyAuthoritativeMaculaAudit(finalReplay, process.cwd()), path)
+          .toThrow(`authority artifact ${path} drifted`);
+        writeFileSync(target, original);
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it.skipIf(!hasAuthoritativeAudit)('rejects the complete summary mutation suite against the copied authoritative packet', () => {
     for (const [label, mutate] of runSummaryMutations) {
       expect(() => withAuditCopy(mutate), label).toThrow('MACULA source contract violation');
     }

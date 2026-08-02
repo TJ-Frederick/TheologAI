@@ -217,7 +217,39 @@
       "bytes": 207106048,
       "sha256": "c5a61cf047e662a6d2238093edefa7dc540ce8f2b2bbeb49115cb94329fab414",
       "verificationPolicy": "recorded_only_not_opened_by_compact_verifier"
-    }
+    },
+    "authorityArtifacts": [
+      {
+        "base": "audit-output",
+        "path": "EVIDENCE-STATUS.md",
+        "bytes": 1150,
+        "sha256": "c40d6a96945ef15bd56363bbcd06c8d76c97058b5980e42b7707a128c6adf0f8"
+      },
+      {
+        "base": "final-replay-2",
+        "path": "run-summary.json",
+        "bytes": 8779,
+        "sha256": "e46fbf33ce0b15a5db0dde0f3212b33d8a9204c8a3449e549dea6ac7cf179959"
+      },
+      {
+        "base": "final-replay-2",
+        "path": "REPORT.md",
+        "bytes": 6545,
+        "sha256": "d27aaf26496568023617cf7d8470442ca5a321d3e52e15e568adba1767a12a52"
+      },
+      {
+        "base": "final-replay-2",
+        "path": "provenance-license-notice.json",
+        "bytes": 1823,
+        "sha256": "d81d2ccfef76bc682ed2c147f47dc6bcc3fb7ae2cc3bab150686191d30ca320f"
+      },
+      {
+        "base": "final-replay-2",
+        "path": "replay-comparison.json",
+        "bytes": 856,
+        "sha256": "c20858d3d10fa95f9bc86013089a9ab206e2ef7f97c919a9c55dd61d40848d34"
+      }
+    ]
   },
   "currentMainAttestation": {
     "commit": "2f12262c9a37d3588bee9b5071954823c15cbd12",

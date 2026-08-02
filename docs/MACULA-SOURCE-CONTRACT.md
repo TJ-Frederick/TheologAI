@@ -61,15 +61,20 @@ npm run data:verify-macula-source-contract -- --audit-dir \
 ```
 
 It checks the source lock, the local historical commit/tree object, the two
-compact audited JSON artifacts, and every field of the unhashed final
-`run-summary.json`. Material evidence is exact; timestamps, absolute paths,
-host tooling, and benchmark timing are bounded non-authoritative diagnostics
-with closed shapes. Unknown nested fields fail closed. `pass: true` records
-structural projection checks, while `releaseEligible: false` is the separate
-publication result. It does not fetch, move, or otherwise modify a Git ref.
-It deliberately does not open the 197 MiB SQLite projection, source XML, any
-source checkout, or a superseded replay. Full projection reproduction is a
-separate, future gate.
+compact audited JSON artifacts, and every field of the final
+`run-summary.json`. It also byte-pins the complete authority-bearing metadata
+packet: `EVIDENCE-STATUS.md`, `run-summary.json`, `REPORT.md`,
+`provenance-license-notice.json`, and `replay-comparison.json`. This prevents
+an otherwise well-shaped diagnostic edit or an appended contradictory claim
+from silently changing the reviewed evidence. Material evidence is exact;
+timestamps, absolute paths, host tooling, and benchmark timing remain
+non-authoritative diagnostics, but their observed values are preserved as part
+of this exact historical packet. Unknown nested fields fail closed. A `pass: true`
+result is never sufficient by itself: it records structural projection checks,
+while `releaseEligible: false` is the separate publication result. It does not
+fetch, move, or otherwise modify a Git ref. It deliberately does not open the
+197 MiB SQLite projection, source XML, any source checkout, or a superseded
+replay. Full projection reproduction is a separate, future gate.
 
 ## Field and publication boundary
 

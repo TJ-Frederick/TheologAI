@@ -144,6 +144,38 @@ const expectedAuditEvidence = {
     sha256: 'c5a61cf047e662a6d2238093edefa7dc540ce8f2b2bbeb49115cb94329fab414',
     verificationPolicy: 'recorded_only_not_opened_by_compact_verifier',
   },
+  authorityArtifacts: [
+    {
+      base: 'audit-output',
+      path: 'EVIDENCE-STATUS.md',
+      bytes: 1_150,
+      sha256: 'c40d6a96945ef15bd56363bbcd06c8d76c97058b5980e42b7707a128c6adf0f8',
+    },
+    {
+      base: 'final-replay-2',
+      path: 'run-summary.json',
+      bytes: 8_779,
+      sha256: 'e46fbf33ce0b15a5db0dde0f3212b33d8a9204c8a3449e549dea6ac7cf179959',
+    },
+    {
+      base: 'final-replay-2',
+      path: 'REPORT.md',
+      bytes: 6_545,
+      sha256: 'd27aaf26496568023617cf7d8470442ca5a321d3e52e15e568adba1767a12a52',
+    },
+    {
+      base: 'final-replay-2',
+      path: 'provenance-license-notice.json',
+      bytes: 1_823,
+      sha256: 'd81d2ccfef76bc682ed2c147f47dc6bcc3fb7ae2cc3bab150686191d30ca320f',
+    },
+    {
+      base: 'final-replay-2',
+      path: 'replay-comparison.json',
+      bytes: 856,
+      sha256: 'c20858d3d10fa95f9bc86013089a9ab206e2ef7f97c919a9c55dd61d40848d34',
+    },
+  ],
 } as const;
 
 const expectedDeterministicArtifacts = [
@@ -751,6 +783,24 @@ export function verifyAuthoritativeMaculaAudit(finalReplayDirectory: string, con
   const finalDirectory = resolve(finalReplayDirectory);
   if (basename(finalDirectory) !== 'final-replay-2') fail('only final-replay-2 is authoritative');
   const auditOutput = dirname(finalDirectory);
+  const contract = readMaculaSourceContract(contractRoot);
+  const evidence = record(contract.auditEvidence, 'audit evidence');
+  const authorityArtifacts = evidence.authorityArtifacts as readonly RecordValue[];
+  for (const artifact of authorityArtifacts) {
+    const base = artifact.base === 'audit-output'
+      ? auditOutput
+      : artifact.base === 'final-replay-2'
+        ? finalDirectory
+        : fail('authority artifact has an unknown base');
+    if (typeof artifact.path !== 'string' || typeof artifact.bytes !== 'number' || typeof artifact.sha256 !== 'string') {
+      fail('malformed authority artifact lock');
+    }
+    const bytes = readFileSync(join(base, artifact.path));
+    if (bytes.length !== artifact.bytes || sha256(bytes) !== artifact.sha256) {
+      fail(`authority artifact ${artifact.path} drifted`);
+    }
+  }
+
   const status = readFileSync(join(auditOutput, 'EVIDENCE-STATUS.md'), 'utf8');
   for (const phrase of [
     'The only authoritative Gate-0 candidate in this directory is:',
@@ -759,8 +809,7 @@ export function verifyAuthoritativeMaculaAudit(finalReplayDirectory: string, con
     'not publication-eligible: nine Hebrew participant relationships remain dangling',
   ]) if (!status.includes(phrase)) fail(`EVIDENCE-STATUS.md does not establish ${phrase}`);
 
-  const contract = readMaculaSourceContract(contractRoot);
-  const compact = record(contract.auditEvidence, 'audit evidence').compactArtifacts as readonly RecordValue[];
+  const compact = evidence.compactArtifacts as readonly RecordValue[];
   const audit = new Map<string, RecordValue>();
   for (const artifact of compact) {
     const path = artifact.path;
