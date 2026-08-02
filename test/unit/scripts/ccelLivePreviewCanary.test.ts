@@ -146,10 +146,16 @@ describe('CCEL live preview canary transaction', () => {
     const candidate = view(canary, 11, '111', { message: CANARY_MESSAGE, tag: CANARY_TAG });
     expect(() => validateCanaryVersion(config, baseline, candidate, predecessor, canary)).not.toThrow();
     expect(() => validateCanaryDeployment(config, deployments(canary), candidate, canary)).not.toThrow();
+    const codeBaseline = view(predecessor, 10);
     const codeResourceDrift = view(canary, 11, '111', { message: CANARY_MESSAGE, tag: CANARY_TAG });
-    codeResourceDrift.resources.script_runtime.compatibility_date = '2026-07-10';
-    expect(() => validateCanaryVersion(config, baseline, codeResourceDrift, predecessor, canary))
-      .toThrow(/compatibility settings mismatch/);
+    Object.assign(codeBaseline.resources, {
+      script: { etag: '4f8e2a', handlers: ['fetch'], last_deployed_from: 'wrangler' },
+    });
+    Object.assign(codeResourceDrift.resources, {
+      script: { etag: '9d71bc', handlers: ['fetch'], last_deployed_from: 'wrangler' },
+    });
+    expect(() => validateCanaryVersion(config, codeBaseline, codeResourceDrift, predecessor, canary))
+      .toThrow(/canary changed code/);
     const withPreviewToken = view(canary, 11, '111', { message: CANARY_MESSAGE, tag: CANARY_TAG, secret: true });
     expect(() => validateCanaryVersion(config, baseline, withPreviewToken, predecessor, canary)).toThrow(/exact authorized set/);
     const wrongNamespace = view(canary, 11, '111', { message: CANARY_MESSAGE, tag: CANARY_TAG });
