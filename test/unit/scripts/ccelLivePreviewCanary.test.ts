@@ -237,12 +237,47 @@ describe('CCEL live preview canary transaction', () => {
   });
 
   it('restores only the exact captured predecessor and makes a second restore idempotent', () => {
-    const baseline = view(predecessor, 10);
-    const candidate = view(canary, 11, '111', { message: CANARY_MESSAGE, tag: CANARY_TAG });
+    const baseline = view(predecessor, 10, '100', { scriptEtag: 'restore-equal' });
+    const candidate = view(canary, 11, '111', {
+      message: CANARY_MESSAGE, tag: CANARY_TAG, scriptEtag: 'restore-equal',
+    });
     expect(planRestore(config, deployments(canary), candidate, baseline, canary, predecessor)).toBe('deploy');
     expect(() => validateRestoreResult(config, deployments(predecessor), baseline, predecessor)).not.toThrow();
     expect(planRestore(config, deployments(predecessor), baseline, baseline, predecessor, predecessor)).toBe('already');
     expect(() => planRestore(config, deployments(production), view(production, 99, '000', { secret: true }), baseline, canary, predecessor)).toThrow(/authorized canary/);
+  });
+
+  it('fails restoration closed without matching authoritative script etags', () => {
+    const target = view(predecessor, 10, '100', { scriptEtag: 'restore-target' });
+    const activeCanary = view(canary, 11, '111', {
+      message: CANARY_MESSAGE, tag: CANARY_TAG, scriptEtag: 'restore-target',
+    });
+
+    const missingActiveCanary = structuredClone(activeCanary);
+    delete missingActiveCanary.resources.script;
+    expect(() => planRestore(config, deployments(canary), missingActiveCanary, target, canary, predecessor))
+      .toThrow(/active canary authoritative resources\.script\.etag is missing or empty/);
+
+    const missingTarget = structuredClone(target);
+    delete missingTarget.resources.script;
+    expect(() => planRestore(config, deployments(canary), activeCanary, missingTarget, canary, predecessor))
+      .toThrow(/restore target authoritative resources\.script\.etag is missing or empty/);
+
+    const changedCanary = view(canary, 11, '111', {
+      message: CANARY_MESSAGE, tag: CANARY_TAG, scriptEtag: 'changed-canary',
+    });
+    expect(() => planRestore(config, deployments(canary), changedCanary, target, canary, predecessor))
+      .toThrow(/restore would overwrite a preview code change/);
+
+    const activeBaseline = view(predecessor, 10, '100', { scriptEtag: 'restore-target' });
+    const missingActiveBaseline = structuredClone(activeBaseline);
+    delete missingActiveBaseline.resources.script;
+    expect(() => planRestore(config, deployments(predecessor), missingActiveBaseline, target, predecessor, predecessor))
+      .toThrow(/active restore baseline authoritative resources\.script\.etag is missing or empty/);
+
+    const changedActiveBaseline = view(predecessor, 10, '100', { scriptEtag: 'changed-baseline' });
+    expect(() => planRestore(config, deployments(predecessor), changedActiveBaseline, target, predecessor, predecessor))
+      .toThrow(/restore baseline code identity mismatch/);
   });
 
   it('retains only sanitized canary evidence and invokes the existing two-call audit exactly once', () => {
