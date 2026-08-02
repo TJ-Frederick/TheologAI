@@ -403,8 +403,11 @@ native-to-normalized coordinate bridge, and content-free compilation audit;
 M4A provides capacity and seed verification. The PR #96 audit does not
 independently establish the runtime status of later transforms.
 PR95's Transform9 core-eight remains included in the checked-out and deployed
-catalogs. Norton and Aquinas assets remain inactive. Norton is a future successor,
-`sectioned_only` candidate. Cyril remains blocked with zero output pending
+catalogs. Norton and Aquinas assets remain inactive. The checked-out local
+Transform 12 successor deterministically stores Norton's 1,250 authority
+sections behind a dormant `sectioned_only` seam with explicitly unreviewed
+normalized-text rights; it adds zero catalog/runtime rows and makes no
+deployment claim. Cyril remains blocked with zero output pending
 reliable translator attribution.
 
 Production v6/local-only and preview v7/discovery-only currently search and

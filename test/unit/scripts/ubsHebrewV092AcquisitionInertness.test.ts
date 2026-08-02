@@ -106,8 +106,8 @@ describe('UBS Hebrew v0.9.2 acquisition remains globally inactive', () => {
       materializations: { d1: { transformVersion: number; inputs: string[] } };
     };
     expect(manifest).toMatchObject({
-      schemaVersion: '0008_historical_hierarchy_publications',
-      materializations: { d1: { transformVersion: 10 } },
+      schemaVersion: '0009_norton_transform12_inactive',
+      materializations: { d1: { transformVersion: 12 } },
     });
     expect(manifest.materializations.d1.inputs.filter(path => path.startsWith(sourceRoot))).toEqual([
       `${sourceRoot}/NATIVE-TO-NORMALIZED-BRIDGE.json`,

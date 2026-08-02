@@ -63,6 +63,13 @@ The seed SQL and generated seed manifest are intentionally ignored by Git. The
 tracked exporter, verifier, canonical source manifest, schema migrations, and
 this runbook are the reproducibility contract.
 
+Transform 12 uses the Candidate C lifecycle: seed base tables, populate the
+unchanged content-bearing Strong's FTS once, rebuild the three external-content
+indexes once, integrity-check all four FTS indexes, then insert the corpus seal.
+The converted historical indexes do not have body-bearing `*_fts_content`
+tables. A sealed database rejects later mutation of all four FTS base tables;
+an interrupted or partial import must be discarded and replayed from empty.
+
 ### Corpus revisions and deployed metadata
 
 When a canonical source changes, update its checksum in `data/data-manifest.json`
@@ -93,7 +100,7 @@ row and compares deterministic table hashes with the source SQLite database;
 chunk of every large table through Wrangler's isolated local D1 runtime. This
 keeps the D1 syntax/runtime check practical while the full semantic verifier
 continues to cover every row declared by the generated seed manifest (currently
-1,627,474 rows across 49 ordered files), including the normalized UBS corpus and original-language
+1,632,765 rows across 50 ordered files), including the normalized UBS corpus and original-language
 usage aggregates. The exact production readiness query is separately exercised
 against the complete derived SQLite database.
 
@@ -106,6 +113,12 @@ canonical identity, document section, edition FTS row, and runtime
 `sections_fts` row agree. This catches an extra normalized section even when it
 has no delivery profile, as well as projection or FTS drift. It performs no
 remote fetch and does not authorize a migration, binding, or deployment.
+
+The separate inactive Norton Transform-12 audit regenerates the exact pinned
+A17662 package and reads all 1,250 authority bodies in exactly 157 ordered
+eight-body pages. It proves lineage, pending rights, dormant cursor identity,
+external-content FTS parity, seed reconstruction, and zero public/runtime
+projection. It does not authorize activation or deployment.
 
 ### Readiness compatibility and rollback
 

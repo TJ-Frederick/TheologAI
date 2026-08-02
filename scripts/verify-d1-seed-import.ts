@@ -25,6 +25,8 @@ import {
   type UbsSemanticStorageAudit,
 } from './ubs-semantics/storageContract.js';
 import { assertUbsSemanticStoredArtifactIdentity } from './ubs-semantics/storageReconstruction.js';
+import { auditNortonTransform12Authority } from './historical-transform12-authority-audit.js';
+import { assertTransform12CandidateCSchema, assertTransform12CorpusSealed } from './transform12-candidate-c-storage.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SEED_DIRECTORY = join(ROOT, 'scripts', 'd1-seed');
@@ -370,6 +372,17 @@ try {
   }
 
   assertDatabaseHealth(target, manifest.expectedCounts);
+  assertTransform12CandidateCSchema(source);
+  assertTransform12CandidateCSchema(target);
+  assertTransform12CorpusSealed(source);
+  assertTransform12CorpusSealed(target);
+  for (const database of [source, target]) {
+    const nortonAuthority = auditNortonTransform12Authority(ROOT, sql => {
+      const rows = database.prepare(sql).all();
+      return { rows, responseBytes: Buffer.byteLength(JSON.stringify(rows), 'utf8') };
+    });
+    if (nortonAuthority.pages !== 157) throw new Error('Imported Norton Transform 12 page count drifted');
+  }
   assertJohnOneOneDatabase(source, 'Source SQLite morphology');
   assertJohnOneOneDatabase(target, 'Imported D1 morphology');
   assertGenesisOneOneDatabase(source, 'Source SQLite morphology');

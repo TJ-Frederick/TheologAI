@@ -33,6 +33,12 @@ import {
   normalAquinasHierarchyExclusionChecks,
 } from './historical-hierarchy.js';
 import { REVIEWED_SOURCE_PACK_RELEASE } from './historical-source-packs.js';
+import {
+  NORTON_NORMALIZED_TEXT_RIGHTS_PENDING,
+  NORTON_TRANSFORM12,
+} from './historical-transform12-norton.js';
+import { TRANSFORM12_STORAGE_CONTRACT } from './transform12-candidate-c-storage.js';
+import { auditNortonTransform12Authority } from './historical-transform12-authority-audit.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const manifestBytes = readFileSync(join(ROOT, 'data', 'data-manifest.json'));
@@ -71,6 +77,7 @@ export const REQUIRED_COLUMNS: Readonly<Record<string, readonly string[]>> = {
   documents: ['id', 'title', 'type', 'date', 'metadata'],
   document_sections: ['id', 'document_id', 'section_number', 'title', 'content', 'topics'],
   historical_document_delivery_profiles: ['document_id', 'work_id', 'edition_id', 'immutable_corpus_identity', 'section_package_identity', 'delivery_mode', 'section_count', 'landing_max_bytes', 'browse_page_size', 'cursor_version', 'provenance_json', 'rights_json'],
+  historical_corpus_seal: ['seal_id', 'transform_version', 'storage_contract'],
   historical_section_identities: ['document_id', 'section_key', 'source_ordinal', 'document_section_id'],
   historical_section_aliases: ['document_id', 'legacy_section_id', 'section_key', 'source_ordinal'],
   historical_source_packs: ['pack_id', 'revision', 'schema_version', 'manifest_sha256', 'source_path'],
@@ -84,6 +91,7 @@ export const REQUIRED_COLUMNS: Readonly<Record<string, readonly string[]>> = {
   historical_edition_hierarchy_nodes: ['hierarchy_id', 'node_key', 'parent_node_key', 'node_kind', 'body_key', 'depth', 'flat_ordinal', 'sibling_ordinal', 'label', 'heading'],
   historical_edition_hierarchy_bodies_fts: ['hierarchy_id', 'body_key', 'heading', 'content'],
   historical_hierarchy_publications: ['publication_id', 'hierarchy_id', 'public_slug', 'title', 'metadata_json', 'delivery_kind', 'coverage_json', 'cursor_contract', 'cursor_identity', 'browse_page_size', 'landing_max_bytes', 'directory_max_bytes', 'node_max_bytes', 'search_max_bytes', 'canonical_uri', 'activation_state'],
+  historical_sectioned_publications: ['publication_id', 'document_id', 'pack_id', 'work_id', 'edition_id', 'title', 'metadata_json', 'immutable_corpus_identity', 'section_package_identity', 'delivery_kind', 'section_count', 'landing_max_bytes', 'browse_page_size', 'cursor_contract', 'cursor_version', 'cursor_identity', 'body_delivery', 'canonical_uri', 'activation_state'],
   sections_fts: ['title', 'content', 'topics'],
   morph_codes: ['code', 'expansion'],
   ubs_parallel_sources: ['source_id', 'schema_version', 'transform_version', 'artifact_identity', 'title', 'publisher', 'copyright', 'license', 'license_url', 'source_url', 'source_path', 'source_commit', 'source_commit_date', 'source_blob', 'source_bytes', 'source_sha256', 'modified', 'modification_note', 'label', 'directionality'],
@@ -371,7 +379,7 @@ function buildD1ReadinessQueryContract(
     },
     {
       id: 'historical.transform9.source_pack_section_projection',
-      predicate: `(SELECT COUNT(*) FROM historical_edition_sections es JOIN historical_editions e ON e.edition_id = es.edition_id JOIN historical_document_delivery_profiles p ON p.edition_id = es.edition_id JOIN historical_section_identities i ON i.document_id = p.document_id AND i.section_key = es.section_key AND i.source_ordinal = es.source_ordinal JOIN document_sections ds ON ds.id = i.document_section_id AND ds.document_id = p.document_id WHERE ds.content = es.content AND ds.title = es.heading AND ds.section_number = es.section_key) = (SELECT COUNT(*) FROM historical_edition_sections)`,
+      predicate: `(SELECT COUNT(*) FROM historical_edition_sections es JOIN historical_editions e ON e.edition_id = es.edition_id JOIN historical_document_delivery_profiles p ON p.edition_id = es.edition_id JOIN historical_section_identities i ON i.document_id = p.document_id AND i.section_key = es.section_key AND i.source_ordinal = es.source_ordinal JOIN document_sections ds ON ds.id = i.document_section_id AND ds.document_id = p.document_id WHERE e.pack_id IN (${REVIEWED_SOURCE_PACK_RELEASE.packIds.map(sqlLiteral).join(', ')}) AND ds.content = es.content AND ds.title = es.heading AND ds.section_number = es.section_key) = ${REVIEWED_SOURCE_PACK_RELEASE.counts.sections}`,
     },
     {
       id: 'historical.transform9.source_pack_fts_parity',
@@ -386,6 +394,35 @@ function buildD1ReadinessQueryContract(
             OR json_extract(e.normalized_text_rights_json, '$.scope') IS NOT 'normalized_public_domain_text_only'
             OR NOT EXISTS (SELECT 1 FROM historical_source_artifacts a WHERE a.edition_id = e.edition_id AND a.role = 'authority')
           )) = 0`,
+    },
+    {
+      id: 'historical.transform12.candidate_c_schema',
+      predicate: `(SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('sections_fts_content', 'historical_edition_sections_fts_content')) = 0
+        AND (SELECT sql LIKE '%content=''document_sections''%' AND sql LIKE '%content_rowid=''id''%' FROM sqlite_master WHERE type = 'table' AND name = 'sections_fts')
+        AND (SELECT sql LIKE '%content=''historical_edition_sections''%' AND sql LIKE '%content_rowid=''rowid''%' FROM sqlite_master WHERE type = 'table' AND name = 'historical_edition_sections_fts')`,
+    },
+    {
+      id: 'historical.transform12.lifecycle_seal',
+      predicate: `(SELECT COUNT(*) FROM historical_corpus_seal WHERE seal_id = 1 AND transform_version = 12 AND storage_contract = ${sqlLiteral(TRANSFORM12_STORAGE_CONTRACT)}) = 1
+        AND (SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger' AND name GLOB 'transform12_*_sealed_*') = 12`,
+    },
+    {
+      id: 'historical.transform12.norton_authority',
+      predicate: `(SELECT COUNT(*) FROM historical_source_packs WHERE pack_id = ${sqlLiteral(NORTON_TRANSFORM12.packId)} AND manifest_sha256 = ${sqlLiteral(NORTON_TRANSFORM12.packageSha256)}) = 1
+        AND (SELECT COUNT(*) FROM historical_works WHERE work_id = ${sqlLiteral(NORTON_TRANSFORM12.workId)}) = 1
+        AND (SELECT COUNT(*) FROM historical_editions WHERE edition_id = ${sqlLiteral(NORTON_TRANSFORM12.editionId)} AND work_id = ${sqlLiteral(NORTON_TRANSFORM12.workId)} AND pack_id = ${sqlLiteral(NORTON_TRANSFORM12.packId)} AND normalized_text_rights_json = ${sqlLiteral(JSON.stringify(NORTON_NORMALIZED_TEXT_RIGHTS_PENDING))}) = 1
+        AND (SELECT COUNT(*) FROM historical_source_artifacts WHERE artifact_id = ${sqlLiteral(NORTON_TRANSFORM12.artifactId)} AND edition_id = ${sqlLiteral(NORTON_TRANSFORM12.editionId)} AND sha256 = ${sqlLiteral(NORTON_TRANSFORM12.sourceXmlSha256)} AND bytes = ${NORTON_TRANSFORM12.sourceXmlBytes}) = 1
+        AND (SELECT COUNT(*) FROM historical_edition_sections WHERE edition_id = ${sqlLiteral(NORTON_TRANSFORM12.editionId)}) = ${NORTON_TRANSFORM12.sectionCount}
+        AND (SELECT MIN(source_ordinal) = 1 AND MAX(source_ordinal) = ${NORTON_TRANSFORM12.sectionCount} FROM historical_edition_sections WHERE edition_id = ${sqlLiteral(NORTON_TRANSFORM12.editionId)})`,
+    },
+    {
+      id: 'historical.transform12.norton_dormant_only',
+      predicate: `(SELECT COUNT(*) FROM historical_sectioned_publications WHERE publication_id = ${sqlLiteral(NORTON_TRANSFORM12.publicationId)} AND document_id = ${sqlLiteral(NORTON_TRANSFORM12.editionId)} AND pack_id = ${sqlLiteral(NORTON_TRANSFORM12.packId)} AND work_id = ${sqlLiteral(NORTON_TRANSFORM12.workId)} AND edition_id = ${sqlLiteral(NORTON_TRANSFORM12.editionId)} AND immutable_corpus_identity = ${sqlLiteral(NORTON_TRANSFORM12.orderedTextSha256)} AND section_package_identity = ${sqlLiteral(NORTON_TRANSFORM12.packageSha256)} AND section_count = ${NORTON_TRANSFORM12.sectionCount} AND landing_max_bytes = 16384 AND browse_page_size = 32 AND cursor_contract = 'historical-sectioned-only-cursor-v1' AND cursor_version = 1 AND body_delivery = 'exact_section_only' AND activation_state = 'dormant') = 1
+        AND (SELECT COUNT(*) FROM documents WHERE id = ${sqlLiteral(NORTON_TRANSFORM12.editionId)}) = 0
+        AND (SELECT COUNT(*) FROM document_sections WHERE document_id = ${sqlLiteral(NORTON_TRANSFORM12.editionId)}) = 0
+        AND (SELECT COUNT(*) FROM historical_document_delivery_profiles WHERE document_id = ${sqlLiteral(NORTON_TRANSFORM12.editionId)} OR edition_id = ${sqlLiteral(NORTON_TRANSFORM12.editionId)}) = 0
+        AND (SELECT COUNT(*) FROM historical_section_identities WHERE document_id = ${sqlLiteral(NORTON_TRANSFORM12.editionId)}) = 0
+        AND (SELECT COUNT(*) FROM historical_section_aliases WHERE document_id = ${sqlLiteral(NORTON_TRANSFORM12.editionId)}) = 0`,
     },
     {
       id: 'historical.transform8.collision_groups',
@@ -656,6 +693,13 @@ export function runRemoteD1ReadinessCheck(
       );
     });
     process.stderr.write(`Transform-9 D1 authority audit passed (${transform9Audit.pages.packs}/${transform9Audit.pages.works}/${transform9Audit.pages.editions}/${transform9Audit.pages.artifacts}/${transform9Audit.pages.documents}/${transform9Audit.pages.profiles}/${transform9Audit.pages.sections}/${transform9Audit.pages.projections} pages).\n`);
+    const nortonAudit = auditNortonTransform12Authority(ROOT, sql => {
+      const result = executeSql(sql, true);
+      return parseHistoricalTransform8D1Page(
+        typeof result === 'string' ? result : Buffer.isBuffer(result) ? result.toString('utf8') : String(result),
+      );
+    });
+    process.stderr.write(`Inactive Norton Transform-12 D1 authority audit passed (${nortonAudit.pages} exact eight-body pages).\n`);
   } catch (primaryError) {
     process.stderr.write('Primary D1 readiness gate failed; requesting failed-check diagnostics.\n');
     try {

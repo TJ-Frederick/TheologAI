@@ -125,8 +125,10 @@ ending in `ElapsedMs`, or ending in `Meta`; its exact domain string is stored
 beside the hash. The compact record has its own complete and deterministic
 envelope hashes.
 
-Candidate C is the provisional capacity leader because it retains the most
-fresh pre-`VACUUM` headroom. It is not a final architecture or release
-decision. A real migration, normalized-text rights review, manifest/transform
-identity, complete release verification, and separately authorized preview
-preparation/deployment remain mandatory gates.
+Candidate C was the provisional capacity leader because it retained the most
+fresh pre-`VACUUM` headroom. Transform 12 now implements that storage shape in
+a real local migration and deterministic seed lifecycle. It was not a final architecture
+decision at experiment time. Norton remains
+inactive and its normalized-text rights remain explicitly unreviewed; catalog
+activation, rights approval, and any preview/production preparation or
+deployment remain separate mandatory gates.

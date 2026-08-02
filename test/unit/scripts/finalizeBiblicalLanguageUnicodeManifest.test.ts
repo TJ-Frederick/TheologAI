@@ -7,7 +7,7 @@ import {
   finalizeBiblicalLanguageUnicodeManifest,
 } from '../../../scripts/finalize-biblical-language-unicode-manifest.js';
 
-const TRANSFORM_10_IDENTITY = '29a4a7faec2a960f06bfc026a319df8c08b495bb7ad82831fb62d3a3586643a4';
+const TRANSFORM_12_IDENTITY = 'ffae6c61a86b89bea8f3605236c4ac4f19a0c40e6e49a3d74ca6057ca3bc1609';
 const CATALOG_INPUTS = [
   'data/historical-document-catalog-provenance.json',
   'data/historical-document-catalog.json',
@@ -24,30 +24,30 @@ function currentInputs(): { manifest: DataManifest; ledger: BiblicalLanguageUnic
 }
 
 describe('biblical-language Unicode manifest finalizer', () => {
-  it('is read-only-idempotent for the checked-in transform-10 historical manifest', () => {
+  it('is read-only-idempotent for the checked-in transform-12 historical manifest', () => {
     const before = readFileSync('data/data-manifest.json', 'utf8');
     const result = finalizeBiblicalLanguageUnicodeManifest(process.cwd(), false);
 
     expect(result).toMatchObject({
-      identity: TRANSFORM_10_IDENTITY,
-      transformVersion: 10,
+      identity: TRANSFORM_12_IDENTITY,
+      transformVersion: 12,
       changedPaths: [],
     });
     expect(`${JSON.stringify(result.manifest, null, 2)}\n`).toBe(before);
     expect(readFileSync('data/data-manifest.json', 'utf8')).toBe(before);
   });
 
-  it('does not downgrade the approved transform-10 materialization', () => {
+  it('does not downgrade the approved transform-12 materialization', () => {
     const { manifest, ledger } = currentInputs();
     const result = buildFinalizedBiblicalLanguageUnicodeManifest(process.cwd(), manifest, ledger);
     expect(result).toMatchObject({
-      identity: TRANSFORM_10_IDENTITY,
-      transformVersion: 10,
+      identity: TRANSFORM_12_IDENTITY,
+      transformVersion: 12,
       changedPaths: [],
     });
   });
 
-  it.each(CATALOG_INPUTS)('rejects transform 10 without required catalog input %s', path => {
+  it.each(CATALOG_INPUTS)('rejects transform 12 without required catalog input %s', path => {
     const { manifest, ledger } = currentInputs();
     manifest.materializations.d1.inputs = manifest.materializations.d1.inputs
       .filter(input => input !== path);

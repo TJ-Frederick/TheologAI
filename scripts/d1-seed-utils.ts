@@ -116,6 +116,12 @@ export function insertedRows(
   const insert = statement.match(/^INSERT INTO "?([a-z_]+)"?/i);
   if (!insert) return 0;
   const table = insert[1];
+  const ftsControl = statement.match(/^INSERT INTO "?([a-z_]+)"?\s*\(\s*"?\1"?(?:\s*,\s*"?rank"?)?\s*\)\s*VALUES\s*\(\s*'(rebuild|integrity-check)'/i);
+  if (ftsControl?.[2]?.toLowerCase() === 'rebuild') {
+    if (!(table in expectedCounts)) throw new Error(`No expected count for FTS rebuild: ${table}`);
+    return expectedCounts[table]!;
+  }
+  if (ftsControl?.[2]?.toLowerCase() === 'integrity-check') return 0;
   if (/\bVALUES\s*\(/i.test(statement)) return countValuesTuples(statement);
   if (/\bSELECT\b/i.test(statement) && table in expectedCounts) return expectedCounts[table];
   throw new Error(`Cannot determine row count for generated INSERT into ${table}`);

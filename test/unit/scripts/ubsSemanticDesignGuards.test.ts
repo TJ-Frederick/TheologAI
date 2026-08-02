@@ -26,6 +26,7 @@ describe('UBS semantic local materialization guards', () => {
       '0006_historical_source_packs.sql',
       '0007_historical_hierarchy.sql',
       '0008_historical_hierarchy_publications.sql',
+      '0009_norton_transform12_inactive.sql',
     ]);
   });
 
@@ -34,13 +35,14 @@ describe('UBS semantic local materialization guards', () => {
       schemaVersion: string;
       materializations: { d1: { transformVersion: number; migrations: Array<{ path: string }> } };
     };
-    expect(manifest.schemaVersion).toBe('0008_historical_hierarchy_publications');
-    expect(manifest.materializations.d1.transformVersion).toBe(10);
+    expect(manifest.schemaVersion).toBe('0009_norton_transform12_inactive');
+    expect(manifest.materializations.d1.transformVersion).toBe(12);
     expect(manifest.materializations.d1.migrations.map(item => item.path)).toContain('migrations/0004_ubs_hebrew_semantics.sql');
     expect(manifest.materializations.d1.migrations.map(item => item.path)).toContain('migrations/0005_historical_section_identity_delivery.sql');
     expect(manifest.materializations.d1.migrations.map(item => item.path)).toContain('migrations/0006_historical_source_packs.sql');
     expect(manifest.materializations.d1.migrations.map(item => item.path)).toContain('migrations/0007_historical_hierarchy.sql');
     expect(manifest.materializations.d1.migrations.map(item => item.path)).toContain('migrations/0008_historical_hierarchy_publications.sql');
+    expect(manifest.materializations.d1.migrations.map(item => item.path)).toContain('migrations/0009_norton_transform12_inactive.sql');
   });
 
   it('keeps the executable relational layer strict in an in-memory fixture', () => {

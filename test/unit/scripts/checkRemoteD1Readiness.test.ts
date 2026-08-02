@@ -20,6 +20,11 @@ import {
 } from '../../../scripts/ubs-semantics/storageReconstruction.js';
 import { buildHistoricalTransform8ExpectedAuthority } from '../../../scripts/historical-transform8-authority-audit.js';
 import { buildHistoricalTransform9ExpectedAuthority } from '../../../scripts/historical-transform9-authority-audit.js';
+import {
+  NORTON_NORMALIZED_TEXT_RIGHTS_PENDING,
+  NORTON_TRANSFORM12,
+  loadNortonTransform12Authority,
+} from '../../../scripts/historical-transform12-norton.js';
 import { CLASSIC_TEXT_LIMITS } from '../../../src/kernel/classicTextContract.js';
 
 const generatedDbPath = process.env.THEOLOGAI_TEST_DATABASE_PATH?.trim();
@@ -31,6 +36,11 @@ function remoteAuthorityExecutor(): {
 } {
   const expected = buildHistoricalTransform8ExpectedAuthority(process.cwd());
   const transform9 = buildHistoricalTransform9ExpectedAuthority(process.cwd());
+  const norton = loadNortonTransform12Authority({
+    read(path: string, encoding?: BufferEncoding): Buffer | string {
+      return encoding === undefined ? readFileSync(path) : readFileSync(path, encoding);
+    },
+  } as never);
   const db = new Database(':memory:');
   db.exec(`CREATE TABLE historical_document_delivery_profiles (
       document_id TEXT, work_id TEXT, edition_id TEXT, immutable_corpus_identity TEXT,
@@ -54,7 +64,14 @@ function remoteAuthorityExecutor(): {
     CREATE TABLE historical_source_artifacts (artifact_id TEXT, edition_id TEXT, role TEXT, locator TEXT, pin_kind TEXT, pin_value TEXT, sha256 TEXT, bytes INTEGER, acquired_at TEXT);
     CREATE TABLE documents (id TEXT, title TEXT, type TEXT, date TEXT, metadata TEXT);
     CREATE TABLE historical_edition_sections (edition_id TEXT, section_key TEXT, source_ordinal INTEGER, display_label TEXT, heading TEXT, content TEXT);
-    CREATE TABLE historical_edition_sections_fts (edition_id TEXT, section_key TEXT, heading TEXT, content TEXT);`);
+    CREATE TABLE historical_edition_sections_fts (edition_id TEXT, section_key TEXT, heading TEXT, content TEXT);
+    CREATE TABLE historical_sectioned_publications (
+      publication_id TEXT, document_id TEXT, pack_id TEXT, work_id TEXT, edition_id TEXT,
+      title TEXT, metadata_json TEXT, immutable_corpus_identity TEXT, section_package_identity TEXT,
+      delivery_kind TEXT, section_count INTEGER, landing_max_bytes INTEGER, browse_page_size INTEGER,
+      cursor_contract TEXT, cursor_version INTEGER, cursor_identity TEXT, body_delivery TEXT,
+      canonical_uri TEXT, activation_state TEXT
+    );`);
   const insertProfile = db.prepare(`INSERT INTO historical_document_delivery_profiles VALUES
     (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
   for (const row of expected.profiles) {
@@ -91,6 +108,43 @@ function remoteAuthorityExecutor(): {
     insert('INSERT INTO historical_edition_sections_fts VALUES (?, ?, ?, ?)', [row.editionId, row.sectionKey, section.heading, section.content]);
     insert('INSERT INTO sections_fts(rowid, title, content, topics) VALUES (?, ?, ?, ?)', [row.documentSectionId, section.heading, section.content, '[]']);
   }
+  insert('INSERT INTO historical_source_packs VALUES (?, ?, ?, ?, ?)', [
+    NORTON_TRANSFORM12.packId, '1', 'norton-transform12-inactive.v1',
+    NORTON_TRANSFORM12.packageSha256, NORTON_TRANSFORM12.packagePath,
+  ]);
+  insert('INSERT INTO historical_works VALUES (?, ?, ?, ?)', [
+    norton.work.workId, norton.work.title, norton.work.creatorMetadataStatus, JSON.stringify(norton.work.creators),
+  ]);
+  insert('INSERT INTO historical_editions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [
+    NORTON_TRANSFORM12.editionId, NORTON_TRANSFORM12.workId, NORTON_TRANSFORM12.packId,
+    norton.edition.language, JSON.stringify(norton.edition.contributorGroups), norton.edition.publication,
+    norton.edition.version, norton.edition.provenance.status, norton.edition.provenance.uncertainty,
+    norton.edition.provenance.reviewedAt, JSON.stringify(norton.edition.underlyingWorkRights),
+    JSON.stringify(norton.edition.exactArtifactRights), JSON.stringify(NORTON_NORMALIZED_TEXT_RIGHTS_PENDING),
+  ]);
+  insert('INSERT INTO historical_source_artifacts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [
+    NORTON_TRANSFORM12.artifactId, NORTON_TRANSFORM12.editionId, 'authority', norton.edition.source.locator,
+    'sha256', NORTON_TRANSFORM12.sourceXmlSha256, NORTON_TRANSFORM12.sourceXmlSha256,
+    NORTON_TRANSFORM12.sourceXmlBytes, norton.edition.source.acquiredAt,
+  ]);
+  for (const section of norton.sections) {
+    insert('INSERT INTO historical_edition_sections VALUES (?, ?, ?, ?, ?, ?)', [
+      NORTON_TRANSFORM12.editionId, section.sectionKey, section.sourceOrdinal,
+      section.displayLabel, section.heading, section.content,
+    ]);
+    insert('INSERT INTO historical_edition_sections_fts VALUES (?, ?, ?, ?)', [
+      NORTON_TRANSFORM12.editionId, section.sectionKey, section.heading, section.content,
+    ]);
+  }
+  const publication = norton.publication;
+  insert('INSERT INTO historical_sectioned_publications VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [
+    publication.publicationId, publication.documentId, publication.packId, publication.workId,
+    publication.editionId, publication.title, JSON.stringify(publication.metadata),
+    publication.immutableCorpusIdentity, publication.sectionPackageIdentity, publication.deliveryKind,
+    publication.sectionCount, publication.landingMaxBytes, publication.browsePageSize,
+    publication.cursorContract, publication.cursorVersion, publication.cursorIdentity,
+    publication.bodyDelivery, publication.canonicalUri, publication.activationState,
+  ]);
   const calls: string[][] = [];
   return {
     calls,
@@ -301,12 +355,12 @@ describe('remote D1 readiness query', () => {
         database: 'preview', env: 'preview', wrangler: '/tmp/wrangler',
         configPath: '/tmp/generated-candidate/wrangler.candidate.toml',
       }, remote.execute);
-      expect(remote.calls).toHaveLength(183); // readiness plus Transform 8 and complete three-pack authority pages
+      expect(remote.calls).toHaveLength(341); // readiness, released authorities, and 157 Norton body pages plus metadata
       expect(remote.calls[0]).toContain('--json');
       expect(remote.calls[0]).toContain('--env');
       expect(remote.calls.every(call => call.includes('/tmp/generated-candidate/wrangler.candidate.toml'))).toBe(true);
       expect(remote.calls[0].join('\n')).toContain('WHERE passed IS 1');
-      expect(remote.calls.slice(1).every(call => call.join('\n').includes('LIMIT 256') || call.join('\n').includes('LIMIT 64') || call.join('\n').includes('LIMIT 32') || call.join('\n').includes('LIMIT 8'))).toBe(true);
+      expect(remote.calls.slice(1).every(call => call.join('\n').includes('LIMIT 256') || call.join('\n').includes('LIMIT 64') || call.join('\n').includes('LIMIT 32') || call.join('\n').includes('LIMIT 8') || call.join('\n').includes('LIMIT 1'))).toBe(true);
       expect(remote.calls.slice(1).every(call => call.join('\n').includes('--remote'))).toBe(true);
     } finally {
       remote.close();

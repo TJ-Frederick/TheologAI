@@ -54,6 +54,16 @@ import {
 } from './historical-source-packs.js';
 import { assertNormalAquinasHierarchyExclusion } from './historical-hierarchy.js';
 import {
+  assertStoredNortonTransform12Authority,
+  loadNortonTransform12Authority,
+  materializeNortonTransform12Authority,
+} from './historical-transform12-norton.js';
+import {
+  assertTransform12CandidateCSchema,
+  isExternalContentFts,
+  rebuildIntegrityCheckAndSealTransform12,
+} from './transform12-candidate-c-storage.js';
+import {
   compileHistoricalSectionCompatibility,
   parseHistoricalSectionCompatibilityAttestation,
 } from './historical-section-compatibility-compiler.js';
@@ -159,6 +169,7 @@ db.pragma('foreign_keys = ON');
 // ── Schema ──
 
 for (const bytes of migrationBytes) db.exec(bytes.toString('utf-8'));
+assertTransform12CandidateCSchema(db);
 const insertMetadata = db.prepare('INSERT INTO theologai_metadata (key, value) VALUES (?, ?)');
 insertMetadata.run('schema_version', manifest.schemaVersion);
 insertMetadata.run('corpus_manifest_sha256', d1CorpusIdentity);
@@ -195,10 +206,6 @@ log("Loading Strong's concordance...");
 const insertStrongs = db.prepare(
   'INSERT OR IGNORE INTO strongs (strongs_number, testament, lemma, transliteration, pronunciation, definition, derivation) VALUES (?, ?, ?, ?, ?, ?, ?)'
 );
-const insertStrongsFTS = db.prepare(
-  'INSERT INTO strongs_fts (strongs_number, lemma, transliteration, definition) VALUES (?, ?, ?, ?)'
-);
-
 const strongsTx = db.transaction(() => {
   let count = 0;
 
@@ -220,7 +227,6 @@ const strongsTx = db.transaction(() => {
         ? entry.derivation
         : entry.derivation ? JSON.stringify(entry.derivation) : null;
       insertStrongs.run(key, testament, entry.lemma, entry.translit || null, entry.pronunciation || null, def, derivation);
-      insertStrongsFTS.run(key, entry.lemma, entry.translit || null, def);
       count++;
     }
   }
@@ -444,9 +450,9 @@ const insertDoc = db.prepare(
 const insertSection = db.prepare(
   'INSERT INTO document_sections (document_id, section_number, title, content, topics) VALUES (?, ?, ?, ?, ?)'
 );
-const insertSectionFTS = db.prepare(
-  'INSERT INTO sections_fts (title, content, topics) VALUES (?, ?, ?)'
-);
+const insertSectionFTS = isExternalContentFts(db, 'sections_fts')
+  ? undefined
+  : db.prepare('INSERT INTO sections_fts (title, content, topics) VALUES (?, ?, ?)');
 
 const materializeHistoricalDocuments = () => {
   let docCount = 0;
@@ -529,7 +535,7 @@ const materializeHistoricalDocuments = () => {
         content,
         topics,
       });
-      insertSectionFTS.run(title, content, topics);
+      insertSectionFTS?.run(title, content, topics);
       sectionCount++;
     }
   }
@@ -671,6 +677,14 @@ if (JSON.stringify(historicalSourcePackCounts) !== JSON.stringify({
 }
 log(`  Inserted ${historicalSourcePackCounts.works} reviewed works with ${historicalSourcePackCounts.sections} canonical sections`);
 
+// ── Transform 12: inactive Norton authority and dormant publication seam ──
+
+log('Materializing the inactive Transform-12 Norton authority...');
+const nortonTransform12 = loadNortonTransform12Authority(sourceRegistry);
+materializeNortonTransform12Authority(db, nortonTransform12);
+assertStoredNortonTransform12Authority(db, nortonTransform12);
+log(`  Inserted ${nortonTransform12.sections.length} inactive Norton authority sections; public projection remains zero`);
+
 // ── Transform 10: dormant generic hierarchical authority foundation ──
 //
 // The reviewed Aquinas packet, migration, and standalone materializer remain
@@ -747,6 +761,8 @@ sourceRegistry.assertAllConsumed();
 
 // ── Validate and finalize ──
 
+rebuildIntegrityCheckAndSealTransform12(db);
+assertStoredNortonTransform12Authority(db, nortonTransform12);
 db.exec('ANALYZE');
 
 const integrityRows = db.pragma('integrity_check') as Array<Record<string, string>>;

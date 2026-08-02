@@ -1,11 +1,11 @@
 {
   "manifestVersion": 2,
-  "schemaVersion": "0008_historical_hierarchy_publications",
+  "schemaVersion": "0009_norton_transform12_inactive",
   "algorithm": "sha256",
   "materializations": {
     "d1": {
       "identityVersion": 1,
-      "transformVersion": 10,
+      "transformVersion": 12,
       "migrations": [
         {
           "path": "migrations/0001_initial_schema.sql",
@@ -38,6 +38,10 @@
         {
           "path": "migrations/0008_historical_hierarchy_publications.sql",
           "sha256": "c3082a469bf5970b36f27ba25882d96db1a3e29f7ccd81b4fab1461bccd7d37e"
+        },
+        {
+          "path": "migrations/0009_norton_transform12_inactive.sql",
+          "sha256": "e12dc58a84345684f089a1c1537b02883827dfaeea7c598231081649a656f663"
         }
       ],
       "inputs": [
@@ -164,6 +168,11 @@
         "data/historical-source-packs/historical-spine-later/editions/pascal-pensees-trotter-1910.json",
         "data/historical-source-packs/historical-spine-later/manifest.json",
         "data/historical-source-packs/historical-spine-later/manifest.sha256",
+        "data/historical-sources/eebo-tcp/A17662/A17662.xml",
+        "data/historical-sources/eebo-tcp/A17662/NORMALIZATION_REPORT.json",
+        "data/historical-sources/eebo-tcp/A17662/README.md",
+        "data/historical-sources/eebo-tcp/A17662/SOURCE.json",
+        "data/historical-sources/eebo-tcp/A17662/norton-1561.edition.json",
         "src/data/ubs-parallel-passages.generated.json"
       ]
     }
@@ -712,6 +721,26 @@
       "sha256": "d2a32cc3ba174244ee3b11f2de27e2d7decfc247a1287e52a40983a3bd941adb"
     },
     {
+      "path": "data/historical-sources/eebo-tcp/A17662/A17662.xml",
+      "sha256": "90124aa3bf17f7dcb5cab40719ed362c91c0018194b7397884b58f6b10daf5a4"
+    },
+    {
+      "path": "data/historical-sources/eebo-tcp/A17662/NORMALIZATION_REPORT.json",
+      "sha256": "cb05d856e41cdea5cddc83f6ff9e8395d68201401a7196f970c0fde40b99b3c6"
+    },
+    {
+      "path": "data/historical-sources/eebo-tcp/A17662/README.md",
+      "sha256": "79287eb13717149ec5d3fdbf461b21ebd83aa211745c87c41b23260d5ff87b8a"
+    },
+    {
+      "path": "data/historical-sources/eebo-tcp/A17662/SOURCE.json",
+      "sha256": "7df49da996d09d1282521e51c8a6fa29d4bd2d73b691228fd79083b1799f57df"
+    },
+    {
+      "path": "data/historical-sources/eebo-tcp/A17662/norton-1561.edition.json",
+      "sha256": "3054f4446b2e92af87c1713ee1c44d6745bca42a32aed7c67890d25fedbdff33"
+    },
+    {
       "path": "data/historical-sources/project-gutenberg/aquinas-english-dominican/LOCAL_ACQUISITION_RECEIPT.json",
       "sha256": "bc0dab9ce5dc3672ccf2a81182655c75eaf6ef4f280584a40e079bf82a11719d"
     },
@@ -791,18 +820,20 @@
     "historical_document_delivery_profiles": 35,
     "historical_section_identities": 4111,
     "historical_section_aliases": 2821,
-    "historical_source_packs": 3,
-    "historical_works": 18,
-    "historical_editions": 18,
-    "historical_source_artifacts": 43,
-    "historical_edition_sections": 1057,
-    "historical_edition_sections_fts": 1057,
+    "historical_source_packs": 4,
+    "historical_works": 19,
+    "historical_editions": 19,
+    "historical_source_artifacts": 44,
+    "historical_edition_sections": 2307,
+    "historical_edition_sections_fts": 2307,
     "historical_edition_hierarchies": 0,
     "historical_edition_hierarchy_bodies": 0,
     "historical_edition_hierarchy_nodes": 0,
     "historical_edition_hierarchy_bodies_fts": 0,
     "historical_hierarchy_publications": 0,
+    "historical_sectioned_publications": 1,
     "sections_fts": 4111,
+    "historical_corpus_seal": 1,
     "morph_codes": 20,
     "ubs_parallel_sources": 1,
     "ubs_parallel_groups": 2193,

@@ -7,6 +7,7 @@ import {
   assertClassicTextSectionMetadata,
 } from '../src/kernel/classicTextContract.js';
 import type { D1SourceConsumptionRegistry } from './d1-corpus-identity.js';
+import { isExternalContentFts } from './transform12-candidate-c-storage.js';
 
 export const HISTORICAL_SOURCE_PACK_PREFIX = 'data/historical-source-packs/';
 export const CORE_EIGHT_SOURCE_PACK_ID = 'theologai-core-eight';
@@ -397,10 +398,14 @@ export function materializeHistoricalSourcePacks(
   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
   const insertArtifact = db.prepare('INSERT INTO historical_source_artifacts (artifact_id, edition_id, role, locator, pin_kind, pin_value, sha256, bytes, acquired_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
   const insertNormalizedSection = db.prepare('INSERT INTO historical_edition_sections (edition_id, section_key, source_ordinal, display_label, heading, content) VALUES (?, ?, ?, ?, ?, ?)');
-  const insertNormalizedFts = db.prepare('INSERT INTO historical_edition_sections_fts (edition_id, section_key, heading, content) VALUES (?, ?, ?, ?)');
+  const insertNormalizedFts = isExternalContentFts(db, 'historical_edition_sections_fts')
+    ? undefined
+    : db.prepare('INSERT INTO historical_edition_sections_fts (edition_id, section_key, heading, content) VALUES (?, ?, ?, ?)');
   const insertDocument = db.prepare('INSERT INTO documents (id, title, type, date, metadata) VALUES (?, ?, ?, ?, ?)');
   const insertSection = db.prepare('INSERT INTO document_sections (document_id, section_number, title, content, topics) VALUES (?, ?, ?, ?, ?)');
-  const insertFts = db.prepare('INSERT INTO sections_fts (title, content, topics) VALUES (?, ?, ?)');
+  const insertFts = isExternalContentFts(db, 'sections_fts')
+    ? undefined
+    : db.prepare('INSERT INTO sections_fts (title, content, topics) VALUES (?, ?, ?)');
   const insertProfile = db.prepare(`INSERT INTO historical_document_delivery_profiles (
     document_id, work_id, edition_id, immutable_corpus_identity, section_package_identity,
     delivery_mode, section_count, landing_max_bytes, browse_page_size, cursor_version,
@@ -475,7 +480,7 @@ export function materializeHistoricalSourcePacks(
           content: section.content, topics: '[]',
         }, `Historical source-pack work ${work.workId} section ${section.sectionKey}`);
         insertNormalizedSection.run(edition.editionId, section.sectionKey, section.sourceOrdinal, section.displayLabel, section.heading, section.content);
-        insertNormalizedFts.run(edition.editionId, section.sectionKey, section.heading, section.content);
+        insertNormalizedFts?.run(edition.editionId, section.sectionKey, section.heading, section.content);
         const inserted = insertSection.run(work.workId, section.sectionKey, section.heading, section.content, '[]');
         const documentSectionId = Number(inserted.lastInsertRowid);
         if (!Number.isSafeInteger(documentSectionId) || documentSectionId < 1) {
@@ -486,7 +491,7 @@ export function materializeHistoricalSourcePacks(
           sourceOrdinal: section.sourceOrdinal,
           documentSectionId,
         });
-        insertFts.run(section.heading, section.content, '[]');
+        insertFts?.run(section.heading, section.content, '[]');
         sections++;
       }
       if (identityRows.length !== editionSections.length) {

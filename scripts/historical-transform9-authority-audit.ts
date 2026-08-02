@@ -232,26 +232,29 @@ export function auditHistoricalTransform9Authority(
 export const parseHistoricalTransform9D1Page = parseHistoricalTransform8D1Page;
 
 function packSpec(expected: readonly PackProjection[]): PageSpec<PackProjection> {
+  const scope = inList(expected.map(row => row.packId));
   return {
     name: 'packs', expected, compare: comparePack, parse: value => parseRow(value, ['packId', 'revision', 'schemaVersion', 'manifestSha256', 'sourcePath'], 'pack', {
       packId: string, revision: string, schemaVersion: string, manifestSha256: string, sourcePath: string,
     }),
     sql: last => `SELECT pack_id AS packId, revision, schema_version AS schemaVersion, manifest_sha256 AS manifestSha256, source_path AS sourcePath
-      FROM historical_source_packs${last ? ` WHERE pack_id > ${literal(last.packId)}` : ''} ORDER BY pack_id LIMIT ${HISTORICAL_TRANSFORM9_AUTHORITY_PAGE_SIZE}`,
+      FROM historical_source_packs WHERE pack_id IN (${scope})${last ? ` AND pack_id > ${literal(last.packId)}` : ''} ORDER BY pack_id LIMIT ${HISTORICAL_TRANSFORM9_AUTHORITY_PAGE_SIZE}`,
   };
 }
 
 function workSpec(expected: readonly WorkProjection[]): PageSpec<WorkProjection> {
+  const scope = inList(expected.map(row => row.workId));
   return {
     name: 'works', expected, compare: compareWork, parse: value => parseRow(value, ['workId', 'title', 'creatorMetadataStatus', 'creatorsJson'], 'work', {
       workId: string, title: string, creatorMetadataStatus: string, creatorsJson: string,
     }),
     sql: last => `SELECT work_id AS workId, title, creator_metadata_status AS creatorMetadataStatus, creators_json AS creatorsJson
-      FROM historical_works${last ? ` WHERE work_id > ${literal(last.workId)}` : ''} ORDER BY work_id LIMIT ${HISTORICAL_TRANSFORM9_AUTHORITY_PAGE_SIZE}`,
+      FROM historical_works WHERE work_id IN (${scope})${last ? ` AND work_id > ${literal(last.workId)}` : ''} ORDER BY work_id LIMIT ${HISTORICAL_TRANSFORM9_AUTHORITY_PAGE_SIZE}`,
   };
 }
 
 function editionSpec(expected: readonly EditionProjection[]): PageSpec<EditionProjection> {
+  const scope = inList(expected.map(row => row.editionId));
   return {
     name: 'editions', expected, compare: compareEdition, parse: value => parseRow(value, editionKeys, 'edition', editionParsers),
     sql: last => `SELECT edition_id AS editionId, work_id AS workId, pack_id AS packId, language,
@@ -259,30 +262,34 @@ function editionSpec(expected: readonly EditionProjection[]): PageSpec<EditionPr
       provenance_uncertainty AS provenanceUncertainty, provenance_reviewed_at AS provenanceReviewedAt,
       underlying_work_rights_json AS underlyingWorkRightsJson, exact_artifact_rights_json AS exactArtifactRightsJson,
       normalized_text_rights_json AS normalizedTextRightsJson
-      FROM historical_editions${last ? ` WHERE edition_id > ${literal(last.editionId)}` : ''} ORDER BY edition_id LIMIT ${HISTORICAL_TRANSFORM9_AUTHORITY_PAGE_SIZE}`,
+      FROM historical_editions WHERE edition_id IN (${scope})${last ? ` AND edition_id > ${literal(last.editionId)}` : ''} ORDER BY edition_id LIMIT ${HISTORICAL_TRANSFORM9_AUTHORITY_PAGE_SIZE}`,
   };
 }
 
 function artifactSpec(expected: readonly ArtifactProjection[]): PageSpec<ArtifactProjection> {
+  const scope = inList(expected.map(row => row.artifactId));
   return {
     name: 'artifacts', expected, compare: compareArtifact, parse: value => parseRow(value, artifactKeys, 'artifact', artifactParsers),
     sql: last => `SELECT artifact.artifact_id AS artifactId, artifact.edition_id AS editionId, artifact.role, artifact.locator, artifact.pin_kind AS pinKind,
       artifact.pin_value AS pinValue, artifact.sha256, artifact.bytes, artifact.acquired_at AS acquiredAt
-      FROM historical_source_artifacts artifact${last ? ` WHERE artifact.artifact_id > ${literal(last.artifactId)}` : ''} ORDER BY artifact.artifact_id LIMIT ${HISTORICAL_TRANSFORM9_AUTHORITY_PAGE_SIZE}`,
+      FROM historical_source_artifacts artifact WHERE artifact.artifact_id IN (${scope})${last ? ` AND artifact.artifact_id > ${literal(last.artifactId)}` : ''} ORDER BY artifact.artifact_id LIMIT ${HISTORICAL_TRANSFORM9_AUTHORITY_PAGE_SIZE}`,
   };
 }
 
 function documentSpec(expected: readonly DocumentProjection[]): PageSpec<DocumentProjection> {
+  const scope = inList(expected.map(row => row.documentId));
   return {
     name: 'documents', expected, compare: compareDocument, parse: value => parseRow(value, documentKeys, 'document', documentParsers),
     sql: last => `SELECT document.id AS documentId, document.title, document.type, document.date, document.metadata
       FROM documents document JOIN historical_document_delivery_profiles profile
-        ON profile.document_id = document.id AND profile.delivery_mode = 'sectioned_only'${last ? ` WHERE document.id > ${literal(last.documentId)}` : ''}
+        ON profile.document_id = document.id AND profile.delivery_mode = 'sectioned_only'
+      WHERE document.id IN (${scope})${last ? ` AND document.id > ${literal(last.documentId)}` : ''}
       ORDER BY document.id LIMIT ${HISTORICAL_TRANSFORM9_AUTHORITY_PAGE_SIZE}`,
   };
 }
 
 function profileSpec(expected: readonly ProfileProjection[]): PageSpec<ProfileProjection> {
+  const scope = inList(expected.map(row => row.documentId));
   return {
     name: 'profiles', expected, compare: compareProfile, parse: value => parseRow(value, profileKeys, 'profile', profileParsers),
     sql: last => `SELECT document_id AS documentId, work_id AS workId, edition_id AS editionId,
@@ -290,25 +297,27 @@ function profileSpec(expected: readonly ProfileProjection[]): PageSpec<ProfilePr
       delivery_mode AS deliveryMode, section_count AS sectionCount, landing_max_bytes AS landingMaxBytes,
       browse_page_size AS browsePageSize, cursor_version AS cursorVersion, provenance_json AS provenanceJson,
       rights_json AS rightsJson
-      FROM historical_document_delivery_profiles WHERE delivery_mode = 'sectioned_only'${last ? ` AND document_id > ${literal(last.documentId)}` : ''}
+      FROM historical_document_delivery_profiles WHERE delivery_mode = 'sectioned_only' AND document_id IN (${scope})${last ? ` AND document_id > ${literal(last.documentId)}` : ''}
       ORDER BY document_id LIMIT ${HISTORICAL_TRANSFORM9_AUTHORITY_PAGE_SIZE}`,
   };
 }
 
 function sectionSpec(expected: readonly SectionProjection[]): PageSpec<SectionProjection> {
+  const scope = inList([...new Set(expected.map(row => row.editionId))]);
   return {
     name: 'sections', expected, compare: compareSection, parse: value => parseRow(value, sectionKeys, 'section', sectionParsers),
     pageSize: HISTORICAL_TRANSFORM9_SECTION_PAGE_SIZE,
     sql: last => `SELECT edition_id AS editionId, section_key AS sectionKey, source_ordinal AS sourceOrdinal,
       display_label AS displayLabel, heading, content
-      FROM historical_edition_sections${last ? ` WHERE edition_id > ${literal(last.editionId)}
+      FROM historical_edition_sections WHERE edition_id IN (${scope})${last ? ` AND (edition_id > ${literal(last.editionId)}
         OR (edition_id = ${literal(last.editionId)} AND (source_ordinal > ${last.sourceOrdinal}
-          OR (source_ordinal = ${last.sourceOrdinal} AND section_key > ${literal(last.sectionKey)})))` : ''}
+          OR (source_ordinal = ${last.sourceOrdinal} AND section_key > ${literal(last.sectionKey)}))))` : ''}
       ORDER BY edition_id, source_ordinal, section_key LIMIT ${HISTORICAL_TRANSFORM9_SECTION_PAGE_SIZE}`,
   };
 }
 
 function projectionSpec(expected: readonly ProjectionProjection[]): PageSpec<ProjectionProjection> {
+  const scope = inList([...new Set(expected.map(row => row.editionId))]);
   return {
     name: 'projections', expected, compare: compareProjection,
     parse: value => parseRow(value, projectionKeys, 'projection', projectionParsers),
@@ -339,9 +348,10 @@ function projectionSpec(expected: readonly ProjectionProjection[]): PageSpec<Pro
       LEFT JOIN document_sections section ON section.id = identity.document_section_id
       LEFT JOIN historical_edition_sections_fts edition_fts
         ON edition_fts.edition_id = edition.edition_id AND edition_fts.section_key = edition.section_key
-      LEFT JOIN sections_fts runtime_fts ON runtime_fts.rowid = section.id${last ? ` WHERE edition.edition_id > ${literal(last.editionId)}
+      LEFT JOIN sections_fts runtime_fts ON runtime_fts.rowid = section.id
+      WHERE edition.edition_id IN (${scope})${last ? ` AND (edition.edition_id > ${literal(last.editionId)}
         OR (edition.edition_id = ${literal(last.editionId)} AND (edition.source_ordinal > ${last.sourceOrdinal}
-          OR (edition.source_ordinal = ${last.sourceOrdinal} AND edition.section_key > ${literal(last.sectionKey)})))` : ''}
+          OR (edition.source_ordinal = ${last.sourceOrdinal} AND edition.section_key > ${literal(last.sectionKey)}))))` : ''}
       ORDER BY edition.edition_id, edition.source_ordinal, edition.section_key LIMIT ${HISTORICAL_TRANSFORM9_AUTHORITY_PAGE_SIZE}`,
   };
 }
@@ -443,3 +453,7 @@ function compareProjection(left: ProjectionProjection, right: ProjectionProjecti
 }
 function compareString(left: string, right: string): number { return left < right ? -1 : left > right ? 1 : 0; }
 function literal(value: string): string { return `'${value.replaceAll("'", "''")}'`; }
+function inList(values: readonly string[]): string {
+  if (values.length === 0) throw new Error('Transform 11 authority scope must not be empty');
+  return values.map(literal).join(', ');
+}

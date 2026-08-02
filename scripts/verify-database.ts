@@ -17,6 +17,8 @@ import { verifyHistoricalSectionCompatibilityAttestationFromDisk } from './histo
 import { historicalLegacySectionId, readHistoricalSectionSources, sha256Canonical } from './historical-section-key-plan.js';
 import { auditHistoricalTransform8Authority } from './historical-transform8-authority-audit.js';
 import { auditHistoricalTransform9Authority } from './historical-transform9-authority-audit.js';
+import { auditNortonTransform12Authority } from './historical-transform12-authority-audit.js';
+import { assertTransform12CandidateCSchema, assertTransform12CorpusSealed } from './transform12-candidate-c-storage.js';
 import {
   assertReviewedSourcePackRelease,
   loadHistoricalSourcePacks,
@@ -242,9 +244,11 @@ function assertHistoricalTransform11SourcePackMaterialization(database: Database
     read: (path: string) => readFileSync(join(ROOT, path), 'utf8'),
   } as never);
   assertReviewedSourcePackRelease(packs);
+  const activePackIds = [...new Set(packs.map(pack => pack.packId))].sort();
+  const activePackPlaceholders = activePackIds.map(() => '?').join(', ');
   const packRows = database.prepare(`SELECT pack_id AS packId, revision, schema_version AS schemaVersion,
     manifest_sha256 AS manifestSha256, source_path AS sourcePath
-    FROM historical_source_packs ORDER BY pack_id`).all() as Array<{
+    FROM historical_source_packs WHERE pack_id IN (${activePackPlaceholders}) ORDER BY pack_id`).all(...activePackIds) as Array<{
       packId: string; revision: string; schemaVersion: string; manifestSha256: string; sourcePath: string;
     }>;
   const expectedPackRows = [...new Map(packs.map(pack => [pack.packId, pack])).values()]
@@ -387,6 +391,8 @@ try {
   assertGenesisOneOneDatabase(db, 'Verified SQLite morphology');
   assertHebrewLemmaCoverageDatabase(db, 'Verified SQLite morphology');
   verifyBiblicalLanguageUnicodeD1(ROOT, db, manifest.expectedCounts);
+  assertTransform12CandidateCSchema(db);
+  assertTransform12CorpusSealed(db);
   assertHistoricalTransform8Materialization(db);
   assertHistoricalTransform11SourcePackMaterialization(db);
   assertNormalAquinasHierarchyExclusion(db);
@@ -398,6 +404,13 @@ try {
     const rows = db.prepare(sql).all();
     return { rows, responseBytes: Buffer.byteLength(JSON.stringify(rows), 'utf8') };
   });
+  const nortonAuthority = auditNortonTransform12Authority(ROOT, sql => {
+    const rows = db.prepare(sql).all();
+    return { rows, responseBytes: Buffer.byteLength(JSON.stringify(rows), 'utf8') };
+  });
+  if (nortonAuthority.pages !== 157 || nortonAuthority.rows !== 1_250) {
+    throw new Error('Transform 12 Norton exact authority pagination drifted');
+  }
 
   const representativeQueries = [
     ["SELECT 1 FROM cross_references WHERE from_verse = 'John.3.16' LIMIT 1", 'John 3:16 cross-references'],
