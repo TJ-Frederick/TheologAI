@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sentence>
+  <wg class="cl" role="clause" rule="synthetic-rule" head="h-1">
+    <w xml:id="h-1" ref="GEN 1:1!1" class="noun" role="subject" lang="H">שָׁלוֹם</w>
+    <w xml:id="h-2" ref="GEN 1:1!2" class="noun" role="object" lang="A" participantref="missing-synthetic">synthetic</w>
+  </wg>
+</sentence>

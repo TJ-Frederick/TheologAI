@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sentence>
+  <wg class="cl" role="clause" rule="synthetic-rule" Rule="synthetic-Rule">
+    <w xml:id="g-1" ref="MAT 1:1!1" class="noun" role="subject">λόγος</w>
+    <w xml:id="g-2" ref="MAT 1:1!2" class="verb" role="predicate" subjref="g-1">synthetic</w>
+  </wg>
+</sentence>
