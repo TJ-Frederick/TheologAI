@@ -318,29 +318,82 @@ export function assertStoredNortonTransform12Authority(
   })) {
     throw new Error(`Transform 12 Norton inactive boundary drifted: ${canonical(identity)}`);
   }
-  const storedEdition = db.prepare(`SELECT normalized_text_rights_json AS normalizedRights,
-    provenance_uncertainty AS uncertainty FROM historical_editions WHERE edition_id = ?`)
-    .get(NORTON_TRANSFORM12.editionId) as { normalizedRights: string; uncertainty: string | null };
-  if (storedEdition.normalizedRights !== JSON.stringify(NORTON_NORMALIZED_TEXT_RIGHTS_PENDING)
-    || storedEdition.uncertainty !== expected.edition.provenance.uncertainty) {
-    throw new Error('Transform 12 Norton pending rights or provenance uncertainty drifted');
+  const storedEdition = db.prepare(`SELECT edition_id AS editionId, work_id AS workId,
+    pack_id AS packId, language, contributor_groups_json AS contributorGroupsJson,
+    publication, version, provenance_status AS provenanceStatus,
+    provenance_uncertainty AS provenanceUncertainty,
+    provenance_reviewed_at AS provenanceReviewedAt,
+    underlying_work_rights_json AS underlyingWorkRightsJson,
+    exact_artifact_rights_json AS exactArtifactRightsJson,
+    normalized_text_rights_json AS normalizedTextRightsJson
+    FROM historical_editions WHERE edition_id = ?`).get(NORTON_TRANSFORM12.editionId);
+  if (canonical(storedEdition) !== canonical({
+    editionId: NORTON_TRANSFORM12.editionId,
+    workId: NORTON_TRANSFORM12.workId,
+    packId: NORTON_TRANSFORM12.packId,
+    language: expected.edition.language,
+    contributorGroupsJson: JSON.stringify(expected.edition.contributorGroups),
+    publication: expected.edition.publication,
+    version: expected.edition.version,
+    provenanceStatus: expected.edition.provenance.status,
+    provenanceUncertainty: expected.edition.provenance.uncertainty,
+    provenanceReviewedAt: expected.edition.provenance.reviewedAt,
+    underlyingWorkRightsJson: JSON.stringify(expected.edition.underlyingWorkRights),
+    exactArtifactRightsJson: JSON.stringify(expected.edition.exactArtifactRights),
+    normalizedTextRightsJson: JSON.stringify(NORTON_NORMALIZED_TEXT_RIGHTS_PENDING),
+  })) {
+    throw new Error('Transform 12 Norton complete edition authority drifted');
   }
-  const storedPublication = db.prepare(`SELECT cursor_identity AS cursorIdentity,
+  const storedArtifact = db.prepare(`SELECT artifact_id AS artifactId, edition_id AS editionId,
+    role, locator, pin_kind AS pinKind, pin_value AS pinValue, sha256, bytes,
+    acquired_at AS acquiredAt FROM historical_source_artifacts WHERE artifact_id = ?`)
+    .get(NORTON_TRANSFORM12.artifactId);
+  if (canonical(storedArtifact) !== canonical({
+    artifactId: NORTON_TRANSFORM12.artifactId,
+    editionId: NORTON_TRANSFORM12.editionId,
+    role: 'authority',
+    locator: expected.edition.source.locator,
+    pinKind: 'sha256',
+    pinValue: NORTON_TRANSFORM12.sourceXmlSha256,
+    sha256: NORTON_TRANSFORM12.sourceXmlSha256,
+    bytes: NORTON_TRANSFORM12.sourceXmlBytes,
+    acquiredAt: expected.edition.source.acquiredAt,
+  })) {
+    throw new Error('Transform 12 Norton complete artifact authority drifted');
+  }
+  const storedPublication = db.prepare(`SELECT publication_id AS publicationId,
+    document_id AS documentId, pack_id AS packId, work_id AS workId,
+    edition_id AS editionId, title, metadata_json AS metadataJson,
     immutable_corpus_identity AS immutableCorpusIdentity,
-    section_package_identity AS sectionPackageIdentity, landing_max_bytes AS landingMaxBytes,
-    browse_page_size AS browsePageSize, body_delivery AS bodyDelivery,
+    section_package_identity AS sectionPackageIdentity, delivery_kind AS deliveryKind,
+    section_count AS sectionCount, landing_max_bytes AS landingMaxBytes,
+    browse_page_size AS browsePageSize, cursor_contract AS cursorContract,
+    cursor_version AS cursorVersion, cursor_identity AS cursorIdentity,
+    body_delivery AS bodyDelivery, canonical_uri AS canonicalUri,
     activation_state AS activationState FROM historical_sectioned_publications
     WHERE publication_id = ?`).get(NORTON_TRANSFORM12.publicationId) as Record<string, unknown>;
   if (canonical(storedPublication) !== canonical({
+    publicationId: expected.publication.publicationId,
+    documentId: expected.publication.documentId,
+    packId: expected.publication.packId,
+    workId: expected.publication.workId,
+    editionId: expected.publication.editionId,
+    title: expected.publication.title,
+    metadataJson: JSON.stringify(expected.publication.metadata),
     cursorIdentity: expected.publication.cursorIdentity,
     immutableCorpusIdentity: NORTON_TRANSFORM12.orderedTextSha256,
     sectionPackageIdentity: NORTON_TRANSFORM12.packageSha256,
+    deliveryKind: expected.publication.deliveryKind,
+    sectionCount: expected.publication.sectionCount,
     landingMaxBytes: 16_384,
     browsePageSize: 32,
+    cursorContract: expected.publication.cursorContract,
+    cursorVersion: expected.publication.cursorVersion,
     bodyDelivery: 'exact_section_only',
+    canonicalUri: expected.publication.canonicalUri,
     activationState: 'dormant',
   })) {
-    throw new Error('Transform 12 Norton dormant publication contract drifted');
+    throw new Error('Transform 12 Norton complete dormant publication authority drifted');
   }
 }
 

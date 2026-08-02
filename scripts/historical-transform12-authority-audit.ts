@@ -24,6 +24,7 @@ export interface NortonTransform12AuthorityAuditResult {
   packageSha256: string;
   orderedTextSha256: string;
   sectionsSha256: string;
+  matchCoverageSha256: string;
   boundaryHashes: ReturnType<typeof nortonTransform12BoundaryHashes>;
 }
 
@@ -144,15 +145,64 @@ export function auditNortonTransform12Authority(
     throw new Error('Transform 12 Norton complete ordered body authority drifted');
   }
 
+  const matchCoverage: Array<{ sectionKey: string; sourceOrdinal: number }> = [];
+  let matchAfter = 0;
+  let firstMatchRowid: number | undefined;
+  while (matchCoverage.length < NORTON_TRANSFORM12.sectionCount) {
+    const rows = readBounded(reader, `SELECT fts.rowid, section.section_key AS sectionKey,
+      section.source_ordinal AS sourceOrdinal
+      FROM historical_edition_sections_fts fts
+      JOIN historical_edition_sections section ON section.rowid = fts.rowid
+      WHERE historical_edition_sections_fts MATCH '"the"'
+        AND section.edition_id = ${literal(NORTON_TRANSFORM12.editionId)}
+        AND section.source_ordinal > ${matchAfter}
+      ORDER BY section.source_ordinal, section.section_key LIMIT 256`, 256) as Array<Record<string, unknown>>;
+    if (rows.length === 0) throw new Error('Transform 12 Norton MATCH the coverage ended early');
+    for (const row of rows) {
+      if (!Number.isSafeInteger(row.rowid) || !Number.isSafeInteger(row.sourceOrdinal)
+        || typeof row.sectionKey !== 'string') {
+        throw new Error('Transform 12 Norton MATCH the coverage row shape drifted');
+      }
+      const ordinal = row.sourceOrdinal as number;
+      const rowid = row.rowid as number;
+      firstMatchRowid ??= rowid;
+      if (ordinal !== matchCoverage.length + 1 || rowid !== firstMatchRowid + ordinal - 1
+        || row.sectionKey !== expected.sections[ordinal - 1]?.sectionKey) {
+        throw new Error('Transform 12 Norton MATCH the rowid/ordinal coverage drifted');
+      }
+      matchCoverage.push({ sectionKey: row.sectionKey, sourceOrdinal: ordinal });
+      matchAfter = ordinal;
+    }
+  }
+  const expectedCoverage = expected.sections.map(({ sectionKey, sourceOrdinal }) => ({ sectionKey, sourceOrdinal }));
+  if (matchCoverage.length !== NORTON_TRANSFORM12.sectionCount
+    || hash(canonical(matchCoverage)) !== hash(canonical(expectedCoverage))) {
+    throw new Error('Transform 12 Norton MATCH the did not cover all 1,250 exact identities');
+  }
+
   const metadataRows = readBounded(reader, `SELECT
     pack.revision, pack.schema_version AS schemaVersion, pack.manifest_sha256 AS packageSha256,
     pack.source_path AS packagePath, work.title, work.creator_metadata_status AS creatorMetadataStatus,
     work.creators_json AS creatorsJson, edition.work_id AS workId, edition.pack_id AS packId,
+    edition.edition_id AS editionId, edition.language,
+    edition.contributor_groups_json AS contributorGroupsJson, edition.publication,
+    edition.version, edition.provenance_status AS provenanceStatus,
     edition.provenance_uncertainty AS provenanceUncertainty,
+    edition.provenance_reviewed_at AS provenanceReviewedAt,
+    edition.underlying_work_rights_json AS underlyingWorkRightsJson,
+    edition.exact_artifact_rights_json AS exactArtifactRightsJson,
     edition.normalized_text_rights_json AS normalizedTextRightsJson,
-    artifact.locator, artifact.pin_value AS sourceXmlSha256, artifact.bytes AS sourceXmlBytes,
-    publication.document_id AS documentId, publication.immutable_corpus_identity AS immutableCorpusIdentity,
+    artifact.artifact_id AS artifactId, artifact.edition_id AS artifactEditionId,
+    artifact.role AS artifactRole, artifact.locator, artifact.pin_kind AS pinKind,
+    artifact.pin_value AS pinValue, artifact.sha256 AS sourceXmlSha256,
+    artifact.bytes AS sourceXmlBytes, artifact.acquired_at AS acquiredAt,
+    publication.publication_id AS publicationId, publication.document_id AS documentId,
+    publication.pack_id AS publicationPackId, publication.work_id AS publicationWorkId,
+    publication.edition_id AS publicationEditionId, publication.title AS publicationTitle,
+    publication.metadata_json AS metadataJson,
+    publication.immutable_corpus_identity AS immutableCorpusIdentity,
     publication.section_package_identity AS sectionPackageIdentity,
+    publication.delivery_kind AS deliveryKind,
     publication.section_count AS sectionCount, publication.landing_max_bytes AS landingMaxBytes,
     publication.browse_page_size AS browsePageSize, publication.cursor_contract AS cursorContract,
     publication.cursor_version AS cursorVersion, publication.cursor_identity AS cursorIdentity,
@@ -180,13 +230,27 @@ export function auditNortonTransform12Authority(
     packageSha256: NORTON_TRANSFORM12.packageSha256, packagePath: NORTON_TRANSFORM12.packagePath,
     title: expected.work.title, creatorMetadataStatus: expected.work.creatorMetadataStatus,
     creatorsJson: JSON.stringify(expected.work.creators), workId: NORTON_TRANSFORM12.workId,
-    packId: NORTON_TRANSFORM12.packId,
+    packId: NORTON_TRANSFORM12.packId, editionId: NORTON_TRANSFORM12.editionId,
+    language: expected.edition.language,
+    contributorGroupsJson: JSON.stringify(expected.edition.contributorGroups),
+    publication: expected.edition.publication, version: expected.edition.version,
+    provenanceStatus: expected.edition.provenance.status,
     provenanceUncertainty: expected.edition.provenance.uncertainty,
+    provenanceReviewedAt: expected.edition.provenance.reviewedAt,
+    underlyingWorkRightsJson: JSON.stringify(expected.edition.underlyingWorkRights),
+    exactArtifactRightsJson: JSON.stringify(expected.edition.exactArtifactRights),
     normalizedTextRightsJson: JSON.stringify(NORTON_NORMALIZED_TEXT_RIGHTS_PENDING),
-    locator: expected.edition.source.locator, sourceXmlSha256: NORTON_TRANSFORM12.sourceXmlSha256,
-    sourceXmlBytes: NORTON_TRANSFORM12.sourceXmlBytes, documentId: NORTON_TRANSFORM12.editionId,
+    artifactId: NORTON_TRANSFORM12.artifactId, artifactEditionId: NORTON_TRANSFORM12.editionId,
+    artifactRole: 'authority', locator: expected.edition.source.locator, pinKind: 'sha256',
+    pinValue: NORTON_TRANSFORM12.sourceXmlSha256, sourceXmlSha256: NORTON_TRANSFORM12.sourceXmlSha256,
+    sourceXmlBytes: NORTON_TRANSFORM12.sourceXmlBytes, acquiredAt: expected.edition.source.acquiredAt,
+    publicationId: NORTON_TRANSFORM12.publicationId, documentId: NORTON_TRANSFORM12.editionId,
+    publicationPackId: NORTON_TRANSFORM12.packId, publicationWorkId: NORTON_TRANSFORM12.workId,
+    publicationEditionId: NORTON_TRANSFORM12.editionId, publicationTitle: expected.publication.title,
+    metadataJson: JSON.stringify(expected.publication.metadata),
     immutableCorpusIdentity: NORTON_TRANSFORM12.orderedTextSha256,
     sectionPackageIdentity: NORTON_TRANSFORM12.packageSha256,
+    deliveryKind: expected.publication.deliveryKind,
     sectionCount: NORTON_TRANSFORM12.sectionCount, landingMaxBytes: NORTON_TRANSFORM12.landingMaxBytes,
     browsePageSize: NORTON_TRANSFORM12.browsePageSize, cursorContract: NORTON_TRANSFORM12.cursorContract,
     cursorVersion: NORTON_TRANSFORM12.cursorVersion, cursorIdentity: expected.publication.cursorIdentity,
@@ -205,6 +269,7 @@ export function auditNortonTransform12Authority(
     packageSha256: expected.packageSha256,
     orderedTextSha256: expected.orderedTextSha256,
     sectionsSha256: hash(canonical(actual)),
+    matchCoverageSha256: hash(canonical(matchCoverage)),
     boundaryHashes: nortonTransform12BoundaryHashes(expected),
   };
 }

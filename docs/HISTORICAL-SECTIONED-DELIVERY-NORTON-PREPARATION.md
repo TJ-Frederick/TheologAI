@@ -1,11 +1,12 @@
 # Historical `sectioned_only` delivery and Norton preparation
 
-Status: superseded as an architecture preparation by the local-only inactive
-Transform 12 implementation documented in
+Status: superseded as an architecture preparation by the disposable local-only
+Transform 12 proof documented in
 `docs/NORTON-TRANSFORM12-INACTIVE.md`. This historical preparation remains the
 record of the earlier proposed contract; its old Transform-9 fixture name is
 not the name or identity of the implemented successor. Neither document
-authorizes runtime activation, preview, production, or normalized-text release.
+authorizes canonical D1 materialization, runtime activation, preview,
+production, or normalized-text release.
 
 ## Delivery boundary
 
