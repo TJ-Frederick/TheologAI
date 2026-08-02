@@ -20,7 +20,7 @@ beforeAll(() => {
   execFileSync(process.execPath, ['--import', 'tsx', 'scripts/build-database.ts', '--output', canonicalPath], {
     cwd: ROOT, stdio: 'pipe', maxBuffer: 32 * 1024 * 1024,
   });
-}, 30_000);
+}, 120_000);
 
 afterAll(() => rmSync(workspace, { recursive: true, force: true }));
 
