@@ -1,0 +1,83 @@
+{
+  "schemaVersion": "theologai-macula-gate1-synthetic-plan.v2",
+  "status": "pre_acquisition_synthetic_local_only",
+  "schema": {
+    "path": "scripts/macula-gate1/sidecar-schema.sql",
+    "sha256": "b03a7d2812dc3a1babf66858ea4293237fa354ef7a3d7e25fe8fbda4398126ac"
+  },
+  "tables": [
+    "source_file",
+    "reference_context",
+    "syntax_group",
+    "token",
+    "participant_ref",
+    "group_reference"
+  ],
+  "canonicalCoordinates": [
+    "corpus",
+    "book",
+    "chapter",
+    "verse",
+    "orthographic_word_ordinal",
+    "source_morph_ordinal"
+  ],
+  "alignmentClassifications": [
+    "validated_normalized_alignment",
+    "missing_runtime",
+    "ambiguous_runtime",
+    "segmentation_conflict",
+    "text_conflict",
+    "runtime_only"
+  ],
+  "displayTextJoinPolicy": "validated_normalized_alignment_context_only_no_text_stored",
+  "ambiguousRuntimeSegmentCountPolicy": "null_until_one_runtime_candidate_is_selected",
+  "contextTokenInvariant": "pre_seal_token_count_equals_source_segment_count_for_every_context",
+  "participantTargetResolutions": [
+    "exact_token",
+    "orthographic_word",
+    null,
+    "dangling"
+  ],
+  "danglingParticipantPolicy": {
+    "privateRetention": true,
+    "publicRowPolicy": "exact_token_or_orthographic_word_only",
+    "aggregateOnly": [
+      { "relationship": "participantref", "count": 4 },
+      { "relationship": "subjref", "count": 5 }
+    ],
+    "releaseEligible": false,
+    "guessedTargets": "prohibited",
+    "futureAuthoritativeTotals": {
+      "exact_token": 144418,
+      "orthographic_word": 2380,
+      "null": 6,
+      "dangling": 9,
+      "reproductionStatus": "future_only_not_claimed_by_synthetic_evidence"
+    }
+  },
+  "capacityPolicy": {
+    "ceilingBytes": 367001600,
+    "ceilingMiB": 350,
+    "scope": "project_planning_policy_not_a_cloudflare_limit",
+    "onExceed": "fail"
+  },
+  "rightsTemplates": {
+    "maculaGreek": "Retain the pinned MACULA Greek attribution and CC BY 4.0 link; identify modifications; retain applicable notices; do not imply endorsement or add restrictions.",
+    "maculaHebrew": "Retain the pinned MACULA Hebrew attribution and CC BY 4.0 link; identify modifications; retain applicable notices; do not imply endorsement or add restrictions.",
+    "sblgntDerivedGreek": "Retain the SBLGNT source, link, license, copyright, and disclaimer notices; identify modifications; do not imply endorsement or add restrictions.",
+    "oshbDerivedLang": "Retain supplied Open Scriptures Hebrew Bible attribution, notices, source URI, and CC BY 4.0 link; identify modifications; do not invent a replacement attribution phrase."
+  },
+  "futureReproductionLocks": {
+    "historicalAuditIdentity": "2d5e770ee05260fbbf4f6810153f815e55b86b602ca301e30b7274c3637124b7",
+    "projectionSha256": "c5a61cf047e662a6d2238093edefa7dc540ce8f2b2bbeb49115cb94329fab414",
+    "execution": "not_executed_or_opened_by_gate1"
+  },
+  "inertness": {
+    "fixtures": "synthetic_only",
+    "network": "prohibited",
+    "repositoryCorpusArtifacts": "prohibited",
+    "canonicalMigrationOrManifest": "prohibited",
+    "runtimeOrPublicSurfaceActivation": "prohibited",
+    "remoteD1OrCloudflare": "prohibited"
+  }
+}

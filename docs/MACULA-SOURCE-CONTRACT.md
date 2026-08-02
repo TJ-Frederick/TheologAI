@@ -6,6 +6,10 @@ acquisition, a projection, a migration, D1 work, a repository adapter, an MCP
 surface, a composition-root binding, runtime reachability, a catalog entry, or
 a preview or production deployment.
 
+The separate pre-acquisition synthetic schema/parser experiment is documented
+in [`MACULA-GATE1-SYNTHETIC.md`](MACULA-GATE1-SYNTHETIC.md). It uses no corpus
+bytes and does not change this source contract or authorize acquisition.
+
 The executable lock is
 [`data/biblical-languages/macula/SOURCE-CONTRACT.json`](../data/biblical-languages/macula/SOURCE-CONTRACT.json).
 It pins untagged source commits and trees instead of tracking a branch:
