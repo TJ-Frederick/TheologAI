@@ -21,7 +21,7 @@ const MIGRATIONS = [
   '0001_initial_schema.sql', '0002_ubs_parallel_passages.sql', '0003_original_language_usage.sql',
   '0004_ubs_hebrew_semantics.sql', '0005_historical_section_identity_delivery.sql',
   '0006_historical_source_packs.sql', '0007_historical_hierarchy.sql',
-  '0008_historical_hierarchy_publications.sql', '0009_norton_transform12_inactive.sql',
+  '0008_historical_hierarchy_publications.sql', '0009_candidate_c_sectioned_publications.sql',
 ] as const;
 
 function database(): Database.Database {

@@ -29,7 +29,7 @@ describe('uncomposed legacy UBS semantic resolution seam', () => {
       materializations: { d1: { transformVersion: number } };
     };
     expect(manifest).toMatchObject({
-      schemaVersion: '0009_norton_transform12_inactive',
+      schemaVersion: '0009_candidate_c_sectioned_publications',
       materializations: { d1: { transformVersion: 12 } },
     });
   });

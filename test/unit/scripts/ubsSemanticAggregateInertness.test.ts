@@ -24,7 +24,7 @@ describe('bounded UBS semantic aggregate bundle activation contract', () => {
       materializations: { d1: { transformVersion: number } };
     };
     expect(manifest).toMatchObject({
-      schemaVersion: '0009_norton_transform12_inactive',
+      schemaVersion: '0009_candidate_c_sectioned_publications',
       materializations: { d1: { transformVersion: 12 } },
     });
     const adapter = readFileSync(new URL('src/adapters/d1/D1UbsSemanticEvidenceBundleRepository.ts', repo), 'utf8');

@@ -1,6 +1,6 @@
 {
   "manifestVersion": 2,
-  "schemaVersion": "0009_norton_transform12_inactive",
+  "schemaVersion": "0009_candidate_c_sectioned_publications",
   "algorithm": "sha256",
   "materializations": {
     "d1": {
@@ -40,8 +40,8 @@
           "sha256": "c3082a469bf5970b36f27ba25882d96db1a3e29f7ccd81b4fab1461bccd7d37e"
         },
         {
-          "path": "migrations/0009_norton_transform12_inactive.sql",
-          "sha256": "e12dc58a84345684f089a1c1537b02883827dfaeea7c598231081649a656f663"
+          "path": "migrations/0009_candidate_c_sectioned_publications.sql",
+          "sha256": "989dd945ac633ecb1ba83cc80a1b88234cac31d78b3d905ae0242eb66c533eb3"
         }
       ],
       "inputs": [

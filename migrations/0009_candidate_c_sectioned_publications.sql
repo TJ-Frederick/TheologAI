@@ -1,8 +1,9 @@
--- Transform 12: Candidate-C corpus storage plus dormant sectioned-publication authority.
+-- Transform 12: Candidate-C corpus storage plus dormant sectioned-publication infrastructure.
 --
 -- This migration is a local storage/materialization successor to machine D1
--- transform version 10. It does not activate Norton, create a document or
--- delivery profile, or authorize publication.
+-- transform version 10. It is corpus-neutral: it creates no source pack,
+-- edition, section, publication, document, or delivery-profile rows and does
+-- not authorize any historical work for publication.
 
 -- Candidate C removes the body-bearing FTS shadow copies for the two section
 -- indexes. Base rows are seeded first; the deterministic seed lifecycle then

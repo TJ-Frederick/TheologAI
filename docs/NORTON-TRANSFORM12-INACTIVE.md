@@ -28,7 +28,7 @@ part of this transform.
 
 ## Dormant delivery seam
 
-Migration `0009_norton_transform12_inactive.sql` adds a generic, immutable
+Migration `0009_candidate_c_sectioned_publications.sql` adds a generic, immutable
 `historical_sectioned_publications` seam. Canonical builds leave that seam
 empty. Only the disposable proof binds the Norton document/edition ID
 `calvin-institutes-norton-1561-eebo-tcp-a17662`, a 16,384-byte landing cap,
@@ -76,7 +76,7 @@ and 1,250, exact lineage and dormant cursor identity, pending rights, and zero
 Norton rows in public documents, runtime sections, delivery profiles,
 identities, or aliases. SQLite and isolated Workerd run the same full authority
 audit. The current disposable evidence identity is
-`adc1a0b60a3597ee37324f8d74622c63daf6fbe37d614ee4c19c07d5e3ecdfd1`;
+`8808d38b0ca7b8185dd642c3046a2b107b30458fc008e93bb2634ddd3b55e9ad`;
 it is not a canonical corpus identity or release seed identity.
 
 Activation remains a later, separately reviewed transform requiring an explicit

@@ -18,7 +18,7 @@ const EXPECTED_IDENTITIES = Object.freeze({
   8: '2db6c370a75ce5818db6c6cdbdb1d80d6333b99e7e4ccf956c9304a78177d77b',
   9: '4e182bfd2953fe06e7c8d7e13a705988e85b5a58001e7fe72440333d34f6d442',
   10: '29a4a7faec2a960f06bfc026a319df8c08b495bb7ad82831fb62d3a3586643a4',
-  12: '22ad33125c118a61956232f41c4234840de8b63acb494caf29b252b83e6b1e65',
+  12: '66c148a206b9b0eb1bf7552572570c42dabfd0ba591b63e0cf0d02adda35aa07',
 } as const);
 const HISTORICAL_CATALOG_INPUTS = Object.freeze([
   'data/historical-document-catalog-provenance.json',
@@ -53,7 +53,7 @@ export function buildFinalizedBiblicalLanguageUnicodeManifest(
   const transformNine = sourceTransformVersion === 9 || transformTen;
   const transformEight = sourceTransformVersion === 8;
   const transformSeven = sourceTransformVersion === 7;
-  const expectedSchema = transformTwelve ? '0009_norton_transform12_inactive' : transformTen ? '0008_historical_hierarchy_publications' : transformNine ? '0006_historical_source_packs'
+  const expectedSchema = transformTwelve ? '0009_candidate_c_sectioned_publications' : transformTen ? '0008_historical_hierarchy_publications' : transformNine ? '0006_historical_source_packs'
     : transformEight ? '0005_historical_section_identity_delivery'
     : transformSeven ? '0004_ubs_hebrew_semantics' : '0003_original_language_usage';
   assert(manifest.schemaVersion === expectedSchema,
@@ -68,7 +68,7 @@ export function buildFinalizedBiblicalLanguageUnicodeManifest(
     && (!transformNine || manifest.materializations.d1.migrations[5].path === 'migrations/0006_historical_source_packs.sql')
     && (!transformTen || manifest.materializations.d1.migrations[6].path === 'migrations/0007_historical_hierarchy.sql')
     && (!transformTen || manifest.materializations.d1.migrations[7].path === 'migrations/0008_historical_hierarchy_publications.sql')
-    && (!transformTwelve || manifest.materializations.d1.migrations[8].path === 'migrations/0009_norton_transform12_inactive.sql'),
+    && (!transformTwelve || manifest.materializations.d1.migrations[8].path === 'migrations/0009_candidate_c_sectioned_publications.sql'),
   'Unicode correction must retain the reviewed migration set');
 
   if (sourceTransformVersion >= 6) {
