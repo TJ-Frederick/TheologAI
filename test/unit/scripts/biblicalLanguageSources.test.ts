@@ -216,16 +216,16 @@ describe('biblical-language source revisions', () => {
     expect(() => assertPinnedSourceBytes(file, changed)).toThrow('Pinned source drift');
   });
 
-  it('pins the transform-10 D1 materialization while preserving transform-7 semantic source locks', () => {
+  it('pins the transform-12 D1 successor while preserving transform-7 semantic source locks', () => {
     const manifest = parseDataManifest(readFileSync('data/data-manifest.json'));
     const d1Identity = computeD1CorpusIdentity(manifest);
-    expect(d1Identity).toBe('29a4a7faec2a960f06bfc026a319df8c08b495bb7ad82831fb62d3a3586643a4');
+    expect(d1Identity).toBe('66c148a206b9b0eb1bf7552572570c42dabfd0ba591b63e0cf0d02adda35aa07');
     // This lock documents the earlier language-source reproduction transform.
     // The new semantic corpus has its own checked manifest and must not be
     // retroactively folded into that historical reproduction identity.
     expect(sourceLockProjection().derived_artifacts.d1_materialization_identity)
       .toBe('c334b4b91c3a7c334a9425937c7f99473f27014ddae6cea377ee38bd578a6707');
-    expect(manifest.materializations.d1.transformVersion).toBe(10);
+    expect(manifest.materializations.d1.transformVersion).toBe(12);
     for (const provenanceOnly of [
       'data/biblical-languages/SOURCE.json',
       'data/biblical-languages/UNICODE-CORRECTION.json',

@@ -1,11 +1,12 @@
 # Historical `sectioned_only` delivery and Norton preparation
 
-Status: migration-free and inactive. This document records a future delivery
-contract and prepares one already-vendored edition for a later successor
-transform. It
-does not add a migration, change the data manifest or D1 seed, register a
-runtime service/resource/tool, alter a Worker, or authorize preview or
-production deployment.
+Status: superseded as an architecture preparation by the disposable local-only
+Transform 12 proof documented in
+`docs/NORTON-TRANSFORM12-INACTIVE.md`. This historical preparation remains the
+record of the earlier proposed contract; its old Transform-9 fixture name is
+not the name or identity of the implemented successor. Neither document
+authorizes canonical D1 materialization, runtime activation, preview,
+production, or normalized-text release.
 
 ## Delivery boundary
 

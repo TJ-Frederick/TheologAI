@@ -54,6 +54,12 @@ import {
 } from './historical-source-packs.js';
 import { assertNormalAquinasHierarchyExclusion } from './historical-hierarchy.js';
 import {
+  assertTransform12CandidateCSchema,
+  assertCanonicalTransform12FtsMatchSentinels,
+  isExternalContentFts,
+  rebuildIntegrityCheckAndSealTransform12,
+} from './transform12-candidate-c-storage.js';
+import {
   compileHistoricalSectionCompatibility,
   parseHistoricalSectionCompatibilityAttestation,
 } from './historical-section-compatibility-compiler.js';
@@ -159,6 +165,7 @@ db.pragma('foreign_keys = ON');
 // ── Schema ──
 
 for (const bytes of migrationBytes) db.exec(bytes.toString('utf-8'));
+assertTransform12CandidateCSchema(db);
 const insertMetadata = db.prepare('INSERT INTO theologai_metadata (key, value) VALUES (?, ?)');
 insertMetadata.run('schema_version', manifest.schemaVersion);
 insertMetadata.run('corpus_manifest_sha256', d1CorpusIdentity);
@@ -195,10 +202,6 @@ log("Loading Strong's concordance...");
 const insertStrongs = db.prepare(
   'INSERT OR IGNORE INTO strongs (strongs_number, testament, lemma, transliteration, pronunciation, definition, derivation) VALUES (?, ?, ?, ?, ?, ?, ?)'
 );
-const insertStrongsFTS = db.prepare(
-  'INSERT INTO strongs_fts (strongs_number, lemma, transliteration, definition) VALUES (?, ?, ?, ?)'
-);
-
 const strongsTx = db.transaction(() => {
   let count = 0;
 
@@ -220,7 +223,6 @@ const strongsTx = db.transaction(() => {
         ? entry.derivation
         : entry.derivation ? JSON.stringify(entry.derivation) : null;
       insertStrongs.run(key, testament, entry.lemma, entry.translit || null, entry.pronunciation || null, def, derivation);
-      insertStrongsFTS.run(key, entry.lemma, entry.translit || null, def);
       count++;
     }
   }
@@ -444,9 +446,9 @@ const insertDoc = db.prepare(
 const insertSection = db.prepare(
   'INSERT INTO document_sections (document_id, section_number, title, content, topics) VALUES (?, ?, ?, ?, ?)'
 );
-const insertSectionFTS = db.prepare(
-  'INSERT INTO sections_fts (title, content, topics) VALUES (?, ?, ?)'
-);
+const insertSectionFTS = isExternalContentFts(db, 'sections_fts')
+  ? undefined
+  : db.prepare('INSERT INTO sections_fts (title, content, topics) VALUES (?, ?, ?)');
 
 const materializeHistoricalDocuments = () => {
   let docCount = 0;
@@ -529,7 +531,7 @@ const materializeHistoricalDocuments = () => {
         content,
         topics,
       });
-      insertSectionFTS.run(title, content, topics);
+      insertSectionFTS?.run(title, content, topics);
       sectionCount++;
     }
   }
@@ -747,6 +749,8 @@ sourceRegistry.assertAllConsumed();
 
 // ── Validate and finalize ──
 
+rebuildIntegrityCheckAndSealTransform12(db);
+assertCanonicalTransform12FtsMatchSentinels(db);
 db.exec('ANALYZE');
 
 const integrityRows = db.pragma('integrity_check') as Array<Record<string, string>>;

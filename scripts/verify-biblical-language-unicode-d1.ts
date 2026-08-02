@@ -86,11 +86,18 @@ export function verifyBiblicalLanguageUnicodeD1(
     'historical_edition_hierarchy_bodies_fts',
   ].reduce((sum, table) => sum + (expectedCounts[table] ?? 0), 0);
   const historicalPublicationRows = expectedCounts.historical_hierarchy_publications ?? 0;
+  const historicalSectionedPublicationRows = expectedCounts.historical_sectioned_publications ?? 0;
+  const historicalCorpusSealRows = expectedCounts.historical_corpus_seal ?? 0;
   assert(ubsSemanticRows === 549_458, `UBS semantic canonical-source row-count drift: ${ubsSemanticRows}`);
   assert(historicalSourceRows === 9_163, `Historical reviewed-source-pack lineage row-count drift: ${historicalSourceRows}`);
   assert(historicalTransform10Rows === 0, `Normal release Transform 10 hierarchy rows must be zero: ${historicalTransform10Rows}`);
   assert(historicalPublicationRows === 0, `Normal release Transform 10 publication rows must be zero: ${historicalPublicationRows}`);
-  assert(rows - derivedUsageRows === 861_728 + ubsSemanticRows + historicalSourceRows + historicalTransform10Rows + historicalPublicationRows,
+  assert(historicalSectionedPublicationRows === 0,
+    `Transform 12 dormant sectioned-publication seam row-count drift: ${historicalSectionedPublicationRows}`);
+  assert(historicalCorpusSealRows === 1, `Transform 12 corpus seal row-count drift: ${historicalCorpusSealRows}`);
+  assert(rows - derivedUsageRows === 861_728 + ubsSemanticRows + historicalSourceRows
+    + historicalTransform10Rows + historicalPublicationRows
+    + historicalSectionedPublicationRows + historicalCorpusSealRows,
     `Unicode D1 canonical-source row-count drift: ${rows - derivedUsageRows}`);
   return { sourceCells: ledger.contract.sourceCells, d1Cells, rows };
 }
