@@ -52,6 +52,7 @@ const FTS_SEED_TABLES = [
   'sections_fts',
   'historical_edition_sections_fts',
   'historical_edition_hierarchy_bodies_fts',
+  'historical_corpus_seal',
 ] as const;
 
 function canonicalTableOrder(): string[] {

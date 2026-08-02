@@ -410,9 +410,13 @@ native-to-normalized coordinate bridge, and content-free compilation audit;
 M4A provides capacity and seed verification. The PR #96 audit does not
 independently establish the runtime status of later transforms.
 PR95's Transform9 core-eight remains included in the checked-out and deployed
-catalogs. Norton and Aquinas assets remain inactive. Norton is a future successor,
-`sectioned_only` candidate. Cyril remains blocked with zero output pending
-reliable translator attribution.
+catalogs. Norton and Aquinas assets remain inactive. Transform 12 adds the
+generic Candidate-C storage lifecycle, seal, and dormant `sectioned_only`
+schema seam, but the canonical build, generated D1 seed, and readiness contract
+contain zero Norton rows. A separate disposable local-only command proves the
+1,250-row Norton authority in copied SQLite and isolated Workerd databases; it
+cannot write the canonical seed or use a remote binding. Cyril remains blocked
+with zero output pending reliable translator attribution.
 
 Production v6/local-only and preview v7/discovery-only currently search and
 retrieve the 35-work Transform-11 collection.

@@ -63,6 +63,14 @@ The seed SQL and generated seed manifest are intentionally ignored by Git. The
 tracked exporter, verifier, canonical source manifest, schema migrations, and
 this runbook are the reproducibility contract.
 
+Transform 12 uses the Candidate C lifecycle: seed canonical base tables,
+which contain zero Norton rows; populate the
+unchanged content-bearing Strong's FTS once, rebuild the three external-content
+indexes once, integrity-check all four FTS indexes, then insert the corpus seal.
+The converted historical indexes do not have body-bearing `*_fts_content`
+tables. A sealed database rejects later mutation of all four FTS base tables;
+an interrupted or partial import must be discarded and replayed from empty.
+
 ### Corpus revisions and deployed metadata
 
 When a canonical source changes, update its checksum in `data/data-manifest.json`
@@ -92,8 +100,9 @@ row and compares deterministic table hashes with the source SQLite database;
 `verify-workerd` applies complete metadata/document/FTS chunks plus a generated
 chunk of every large table through Wrangler's isolated local D1 runtime. This
 keeps the D1 syntax/runtime check practical while the full semantic verifier
-continues to cover every row declared by the generated seed manifest (currently
-1,627,474 rows across 49 ordered files), including the normalized UBS corpus and original-language
+continues to cover every row declared by the generated canonical seed manifest
+(currently 1,630,260 rows across 49 ordered files, with zero Norton rows),
+including the normalized UBS corpus and original-language
 usage aggregates. The exact production readiness query is separately exercised
 against the complete derived SQLite database.
 
@@ -106,6 +115,15 @@ canonical identity, document section, edition FTS row, and runtime
 `sections_fts` row agree. This catches an extra normalized section even when it
 has no delivery profile, as well as projection or FTS drift. It performs no
 remote fetch and does not authorize a migration, binding, or deployment.
+
+The separate disposable Norton Transform-12 audit regenerates the exact pinned
+A17662 package and reads all 1,250 authority bodies in exactly 157 ordered
+eight-body pages. It proves every authority field, full FTS MATCH coverage,
+pending rights, dormant cursor identity, temporary seed reconstruction, and
+zero public/runtime projection in copied SQLite and isolated Workerd databases.
+The command accepts no arguments, cannot write the canonical seed, and refuses
+remote D1. It does not authorize canonical materialization, activation, or
+deployment.
 
 ### Readiness compatibility and rollback
 

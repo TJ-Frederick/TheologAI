@@ -710,9 +710,14 @@ function runCurrentCheckoutCommand(root: string, script: string, args: string[])
   }
 }
 
-/** Build and normally verify a fresh baseline from this checkout at an OS-temporary path. */
+/** Build, compact, and normally verify a fresh baseline at an OS-temporary path. */
 export function buildFreshAquinasCapacityBaseline({ root, outputPath }: AquinasBaselineBuilderContext): void {
   runCurrentCheckoutCommand(root, BASELINE_BUILD_SCRIPT, ['--output', outputPath]);
+  // Transform 12 removes two content-bearing FTS shadow tables. With no
+  // excluded packet present, their released pages would otherwise become
+  // accidental headroom for the standalone comparison. Compact this disposable
+  // baseline once so both sides start from a zero-freelist physical corpus.
+  closeAfter(new Database(outputPath), database => database.exec('VACUUM'));
   runCurrentCheckoutCommand(root, BASELINE_VERIFY_SCRIPT, ['--database', outputPath]);
 }
 
@@ -751,10 +756,21 @@ function runStandaloneAquinasRehearsal(
 ): AquinasCapacityComparisonReport['standaloneAquinasRehearsal'] {
   return closeAfter(new Database(path), database => {
     database.pragma('foreign_keys = ON');
+    // This disposable excluded-packet rehearsal starts from a sealed normal
+    // release copy. Temporarily remove that singleton only inside the OS-temp
+    // copy, add Aquinas, integrity-check its external FTS, then reseal it.
+    database.prepare('DELETE FROM historical_corpus_seal WHERE seal_id = 1').run();
     const packet = loadApprovedAquinasHierarchy({
       read: relativePath => readFileSync(join(root, relativePath)),
     });
     const materialization = materializeHistoricalHierarchy(database, packet);
+    database.exec(`
+      INSERT INTO historical_edition_hierarchy_bodies_fts(
+        historical_edition_hierarchy_bodies_fts, rank
+      ) VALUES ('integrity-check', 1);
+      INSERT INTO historical_corpus_seal(seal_id, transform_version, storage_contract)
+      VALUES (1, 12, 'candidate_c_seed_base_rebuild_all_fts_integrity_check_then_seal_v1');
+    `);
     const stored = assertHistoricalHierarchyStoredIntegrity(database, packet);
     if (JSON.stringify(stored) !== JSON.stringify(materialization)) {
       fail('standalone Aquinas rehearsal stored-integrity inventory drifted');

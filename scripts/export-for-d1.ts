@@ -14,6 +14,7 @@ import {
 } from 'fs';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'path';
 import { fileURLToPath } from 'url';
+import Database from 'better-sqlite3';
 import {
   D1_MAX_STATEMENT_BYTES,
   D1_SEED_FILE_BYTES,
@@ -34,6 +35,7 @@ import {
   type DataManifest,
 } from './d1-corpus-identity.js';
 import { D1_SEED_BASE_TABLES, D1_SEED_EXPORT_ORDER } from './d1-seed-order.js';
+import { assertCanonicalTransform12FtsMatchSentinels } from './transform12-candidate-c-storage.js';
 
 export interface SeedStatement {
   sql: string;
@@ -262,7 +264,7 @@ export function exportTable(database: string, table: string): SeedStatement[] {
 }
 
 function emptyTargetGuard(): SeedStatement {
-  const counts = [...D1_SEED_BASE_TABLES, 'strongs_fts', 'sections_fts', 'historical_edition_sections_fts', 'historical_edition_hierarchy_bodies_fts']
+  const counts = [...D1_SEED_BASE_TABLES, 'strongs_fts', 'sections_fts', 'historical_edition_sections_fts', 'historical_edition_hierarchy_bodies_fts', 'historical_corpus_seal']
     .map(table => `(SELECT count(*) FROM ${sqlIdentifier(table)})`)
     .join(' + ');
   return {
@@ -314,8 +316,14 @@ const d1CorpusIdentity = computeD1CorpusIdentity(sourceManifest);
 verifyD1Migrations(ROOT, sourceManifest);
 validateCanonicalSources(sourceManifest);
 assertSemanticSource(database);
+const sentinelDatabase = new Database(database, { readonly: true, fileMustExist: true });
+try {
+  assertCanonicalTransform12FtsMatchSentinels(sentinelDatabase);
+} finally {
+  sentinelDatabase.close();
+}
 
-for (const table of [...D1_SEED_BASE_TABLES, 'strongs_fts', 'sections_fts', 'historical_edition_sections_fts', 'historical_edition_hierarchy_bodies_fts']) {
+for (const table of [...D1_SEED_BASE_TABLES, 'strongs_fts', 'sections_fts', 'historical_edition_sections_fts', 'historical_edition_hierarchy_bodies_fts', 'historical_corpus_seal']) {
   const expected = sourceManifest.expectedCounts[table];
   if (!Number.isSafeInteger(expected) || expected < 0) {
     throw new Error(`Source manifest has no valid expected count for ${table}`);
@@ -347,16 +355,24 @@ const ftsStatements: SeedStatement[] = [
     rows: sourceManifest.expectedCounts.strongs_fts,
   },
   {
-    sql: 'INSERT INTO "sections_fts"("title","content","topics") SELECT "title","content","topics" FROM "document_sections" ORDER BY "id";',
+    sql: 'INSERT INTO "sections_fts"("sections_fts") VALUES (\'rebuild\');',
     rows: sourceManifest.expectedCounts.sections_fts,
   },
   {
-    sql: 'INSERT INTO "historical_edition_sections_fts"("edition_id","section_key","heading","content") SELECT "edition_id","section_key","heading","content" FROM "historical_edition_sections" ORDER BY "edition_id", "source_ordinal";',
+    sql: 'INSERT INTO "historical_edition_sections_fts"("historical_edition_sections_fts") VALUES (\'rebuild\');',
     rows: sourceManifest.expectedCounts.historical_edition_sections_fts,
   },
   {
-    sql: 'INSERT INTO "historical_edition_hierarchy_bodies_fts"("rowid","hierarchy_id","body_key","heading","content") SELECT "rowid","hierarchy_id","body_key","heading","content" FROM "historical_edition_hierarchy_bodies" ORDER BY "hierarchy_id", "source_ordinal";',
+    sql: 'INSERT INTO "historical_edition_hierarchy_bodies_fts"("historical_edition_hierarchy_bodies_fts") VALUES (\'rebuild\');',
     rows: sourceManifest.expectedCounts.historical_edition_hierarchy_bodies_fts,
+  },
+  ...['strongs_fts', 'sections_fts', 'historical_edition_sections_fts', 'historical_edition_hierarchy_bodies_fts'].map(table => ({
+    sql: `INSERT INTO "${table}"("${table}","rank") VALUES ('integrity-check',1);`,
+    rows: 0,
+  })),
+  {
+    sql: 'INSERT INTO "historical_corpus_seal"("seal_id","transform_version","storage_contract") VALUES (1,12,\'candidate_c_seed_base_rebuild_all_fts_integrity_check_then_seal_v1\');',
+    rows: sourceManifest.expectedCounts.historical_corpus_seal,
   },
 ];
 files.push(...writeChunks('fts', D1_SEED_EXPORT_ORDER.length, ftsStatements));
@@ -395,7 +411,7 @@ const seedManifest = {
   },
   tableOrder: D1_SEED_EXPORT_ORDER,
   expectedCounts: Object.fromEntries(
-    [...D1_SEED_BASE_TABLES, 'strongs_fts', 'sections_fts', 'historical_edition_sections_fts', 'historical_edition_hierarchy_bodies_fts'].map(table => [table, sourceManifest.expectedCounts[table]]),
+    [...D1_SEED_BASE_TABLES, 'strongs_fts', 'sections_fts', 'historical_edition_sections_fts', 'historical_edition_hierarchy_bodies_fts', 'historical_corpus_seal'].map(table => [table, sourceManifest.expectedCounts[table]]),
   ),
   files,
   totals: {
