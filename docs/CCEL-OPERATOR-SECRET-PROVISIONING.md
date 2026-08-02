@@ -22,6 +22,14 @@ actual production Worker deployment and traffic mutation. Neither staging nor
 promotion authorizes the separate safe-`100` preview refresh or the temporary
 `111` canary, and preview refresh does not authorize either credential stage.
 
+Before staging or promotion can be authorized, the CCEL canary transaction's
+separate schema-`0009` D1 gate must have completed for **both** environments:
+fresh preview and production candidates, remote readiness/authority audits,
+their approved Worker bindings, and a read-only environment-isolation
+verification. The PR #107/#108 schema-`0008` D1 evidence does not satisfy this
+current-main prerequisite. Completing it still does not authorize this
+credential operation; see [the canary transaction](CCEL-LIVE-PREVIEW-CANARY-TRANSACTION.md).
+
 Emergency rollback is also separate and requires:
 
 > `ROLL BACK THEOLOGAI TO THE EXACT SECRETLESS BASELINE`

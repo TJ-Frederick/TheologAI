@@ -149,9 +149,14 @@ publication, and Aquinas material remain excluded.
 This active PR #107 preview Worker predates PR #115's repository-only,
 unpublished pin to `https://www.ccel.org/home3/search`. It is not a valid
 code/resource-equivalent `100` predecessor for a `111` canary built from
-current `main`. A separately authorized protected preview release must first
-refresh exact-current-`main` code and resources under the safe `100` flags and
-pass its audit; that refresh does not authorize credential work or a canary.
+current `main`. Current `main` also includes PR #117's Transform-12 schema
+`0009` contract, while the retained PR #107/PR #108 D1 records are schema
+`0008`. Before the safe `100` current-main preview refresh or production
+credential staging, separately authorized fresh schema-`0009` preview and
+production D1 preparation, remote readiness/authority audit, binding, and
+environment-isolation verification are required. Those D1 gates do not
+authorize the refresh, credential work, or canary; see the
+[CCEL canary transaction](docs/CCEL-LIVE-PREVIEW-CANARY-TRANSACTION.md).
 
 PR #101's former production assignment, retained as the rollback pair, is
 deployment `71b76d24-bf5f-490e-adc4-31cf63fb046e`, Worker
@@ -188,10 +193,11 @@ For a preview-client rollback without changing server state, use the direct prev
 `workers.dev` address above; the production `workers.dev` address intentionally
 redirects rather than serving a separate legacy Worker.
 
-The preview and production data layers now include schema `0008`; earlier
-local-only and preview-only activation statements are historical. PR #101
-bound the separate preview and production D1 databases recorded above. The
-historical PR #96 public
+The deployed preview and production D1 layers remain schema `0008`; current
+main's PR #117 schema `0009` Candidate-C contract is checked out only and has
+no prepared, bound, or deployed remote-D1 claim. Earlier local-only and
+preview-only activation statements are historical. PR #101 bound the separate
+preview and production D1 databases recorded above. The historical PR #96 public
 `original_language_study` v2 audit does not independently establish the runtime
 path for every later historical transform. The pinned packet's `SOURCE.json`
 remains a historical acquisition-gate snapshot, not deployment evidence.

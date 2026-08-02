@@ -117,7 +117,8 @@ export function renderCanaryPreviewConfig(configText: string): string {
 /**
  * Check the exact 100 baseline. Operations must separately establish that this
  * predecessor was refreshed from current main; version JSON cannot prove Git
- * revision identity by itself.
+ * revision identity by itself. Its authoritative script etag is also required
+ * before the transaction can upload a candidate.
  */
 export function validatePreviewBaseline(
   configText: string, deploymentsValue: unknown, versionValue: unknown, expectedVersion: string,
@@ -128,6 +129,7 @@ export function validatePreviewBaseline(
   refuse(version.id === expectedVersion, 'preview predecessor view identity mismatch');
   refuse(activeVersion(parseDeployments(deploymentsValue)) === expectedVersion, 'preview predecessor is not the sole 100% deployment');
   assertVersion(version, '100');
+  scriptEtag(version, 'preview predecessor');
   return version;
 }
 
@@ -186,6 +188,10 @@ export function validateCanaryVersion(
   refuse(canary.number > baseline.number, 'canary version sequence is invalid');
   assertVersion(baseline, '100');
   assertVersion(canary, '111');
+  const baselineScriptEtag = scriptEtag(baseline, 'preview predecessor');
+  const canaryScriptEtag = scriptEtag(canary, 'canary');
+  refuse(baselineScriptEtag === canaryScriptEtag,
+    'canary changed code: authoritative resources.script.etag mismatch');
   refuse(canary.annotations?.['workers/message'] === CANARY_MESSAGE, 'canary version message mismatch');
   refuse(canary.annotations?.['workers/tag'] === CANARY_TAG, 'canary version tag mismatch');
   refuse(stableJson(resourcesWithoutCanaryFlags(baseline)) === stableJson(resourcesWithoutCanaryFlags(canary)),
@@ -200,6 +206,7 @@ export function validateCanaryDeployment(
   refuse(canary.id === expectedCanary && isUuid(expectedCanary), 'canary deployment identity is invalid');
   refuse(activeVersion(parseDeployments(deploymentsValue)) === expectedCanary, 'canary is not the sole 100% preview deployment');
   assertVersion(canary, '111');
+  scriptEtag(canary, 'canary');
 }
 
 /**
@@ -218,14 +225,19 @@ export function planRestore(
   refuse(target.id === expectedTarget, 'restore target view identity mismatch');
   const active = activeVersion(parseDeployments(deploymentsValue));
   assertVersion(target, '100');
+  const targetScriptEtag = scriptEtag(target, 'restore target');
   if (active === expectedTarget) {
     refuse(expectedCurrent === expectedTarget && current.id === expectedTarget, 'active baseline view identity mismatch');
     assertVersion(current, '100');
+    refuse(scriptEtag(current, 'active restore baseline') === targetScriptEtag,
+      'restore baseline code identity mismatch');
     return 'already';
   }
   refuse(expectedCurrent !== expectedTarget, 'restore candidate and target IDs must differ');
   refuse(active === expectedCurrent && current.id === expectedCurrent, 'active preview version is not the authorized canary');
   assertVersion(current, '111');
+  refuse(scriptEtag(current, 'active canary') === targetScriptEtag,
+    'restore would overwrite a preview code change');
   refuse(current.annotations?.['workers/tag'] === CANARY_TAG, 'active preview version is not the tagged canary');
   refuse(stableJson(resourcesWithoutCanaryFlags(target)) === stableJson(resourcesWithoutCanaryFlags(current)),
     'restore would overwrite a preview change beyond the two canary flags');
@@ -240,6 +252,7 @@ export function validateRestoreResult(
   refuse(target.id === expectedTarget && isUuid(expectedTarget), 'restore target identity is invalid');
   refuse(activeVersion(parseDeployments(deploymentsValue)) === expectedTarget, 'exact preview predecessor was not restored to 100%');
   assertVersion(target, '100');
+  scriptEtag(target, 'restored preview predecessor');
 }
 
 /** Sanitized evidence deliberately permits only identifiers, booleans and hashes. */
@@ -394,6 +407,20 @@ function resourcesWithoutCanaryFlags(version: FullVersion): JsonRecord {
       .filter(binding => !['THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH', 'THEOLOGAI_ENABLE_CCEL_COORDINATOR'].includes(String(binding.name)))
       .sort((left, right) => String(left.name).localeCompare(String(right.name))),
   };
+}
+
+/**
+ * Wrangler full-version JSON exposes the authoritative Worker script identity
+ * at resources.script.etag. Do not infer it from another response shape: an
+ * absent or blank etag cannot prove code equivalence.
+ */
+function scriptEtag(version: FullVersion, label: string): string {
+  const script = version.resources.script;
+  refuse(isRecord(script), `${label} authoritative resources.script.etag is missing or empty`);
+  const etag = script.etag;
+  refuse(typeof etag === 'string' && etag.trim().length > 0,
+    `${label} authoritative resources.script.etag is missing or empty`);
+  return etag;
 }
 
 function parseVersionSummaries(value: unknown): VersionSummary[] {

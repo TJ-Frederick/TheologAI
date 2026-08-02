@@ -67,11 +67,15 @@ function bindings(mode: '100' | '111' | '000', includeOperatorSecret = false) {
   ];
 }
 
-function view(id: string, number: number, mode: '100' | '111' | '000' = '100', options: { message?: string; tag?: string; secret?: boolean } = {}) {
+function view(
+  id: string, number: number, mode: '100' | '111' | '000' = '100',
+  options: { message?: string; tag?: string; secret?: boolean; scriptEtag?: string } = {},
+) {
   return {
     id, number, metadata: { created_on: '2026-07-29T00:00:00.000Z' },
     ...(options.message === undefined ? {} : { annotations: { 'workers/message': options.message, 'workers/tag': options.tag ?? '' } }),
     resources: {
+      script: { etag: options.scriptEtag ?? '4f8e2a', handlers: ['fetch'], last_deployed_from: 'wrangler' },
       script_runtime: { compatibility_date: '2026-07-09', compatibility_flags: ['nodejs_compat'] },
       bindings: bindings(mode, options.secret),
     },
@@ -146,16 +150,21 @@ describe('CCEL live preview canary transaction', () => {
     const candidate = view(canary, 11, '111', { message: CANARY_MESSAGE, tag: CANARY_TAG });
     expect(() => validateCanaryVersion(config, baseline, candidate, predecessor, canary)).not.toThrow();
     expect(() => validateCanaryDeployment(config, deployments(canary), candidate, canary)).not.toThrow();
-    const codeBaseline = view(predecessor, 10);
-    const codeResourceDrift = view(canary, 11, '111', { message: CANARY_MESSAGE, tag: CANARY_TAG });
-    Object.assign(codeBaseline.resources, {
-      script: { etag: '4f8e2a', handlers: ['fetch'], last_deployed_from: 'wrangler' },
+    const missingBaselineScript = view(predecessor, 10);
+    delete missingBaselineScript.resources.script;
+    expect(() => validatePreviewBaseline(config, deployments(predecessor), missingBaselineScript, predecessor))
+      .toThrow(/preview predecessor authoritative resources\.script\.etag is missing or empty/);
+    expect(() => validateCanaryVersion(config, missingBaselineScript, candidate, predecessor, canary))
+      .toThrow(/preview predecessor authoritative resources\.script\.etag is missing or empty/);
+    const missingCandidateScript = view(canary, 11, '111', { message: CANARY_MESSAGE, tag: CANARY_TAG });
+    delete missingCandidateScript.resources.script;
+    expect(() => validateCanaryVersion(config, baseline, missingCandidateScript, predecessor, canary))
+      .toThrow(/canary authoritative resources\.script\.etag is missing or empty/);
+    const codeResourceDrift = view(canary, 11, '111', {
+      message: CANARY_MESSAGE, tag: CANARY_TAG, scriptEtag: '9d71bc',
     });
-    Object.assign(codeResourceDrift.resources, {
-      script: { etag: '9d71bc', handlers: ['fetch'], last_deployed_from: 'wrangler' },
-    });
-    expect(() => validateCanaryVersion(config, codeBaseline, codeResourceDrift, predecessor, canary))
-      .toThrow(/canary changed code/);
+    expect(() => validateCanaryVersion(config, baseline, codeResourceDrift, predecessor, canary))
+      .toThrow(/authoritative resources\.script\.etag mismatch/);
     const withPreviewToken = view(canary, 11, '111', { message: CANARY_MESSAGE, tag: CANARY_TAG, secret: true });
     expect(() => validateCanaryVersion(config, baseline, withPreviewToken, predecessor, canary)).toThrow(/exact authorized set/);
     const wrongNamespace = view(canary, 11, '111', { message: CANARY_MESSAGE, tag: CANARY_TAG });
