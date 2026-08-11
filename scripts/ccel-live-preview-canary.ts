@@ -37,26 +37,49 @@ export const LEGACY_SCHEMA_0008_D1 = {
  * No schema-0009 candidates have been prepared and audited yet.  The canary
  * workflow calls this local gate before its first Wrangler command, so an
  * accidental dispatch cannot turn the historical schema-0008 pair into a
- * live canary baseline.  A future release must replace this sentinel with an
- * exact reviewed candidate pair and readiness/authority evidence contract.
+ * live canary baseline. A future release must replace this sentinel with a
+ * `ready` branch containing exact candidate identities and pinned evidence.
  */
-interface Schema0009CanaryGate {
-  state: 'unrecorded' | 'ready';
-  requiredSchema: '0009_candidate_c_sectioned_publications';
+export interface Schema0009Evidence {
+  identity: string;
+  sha256: string;
 }
+
+export interface Schema0009CanaryEnvironmentGate {
+  databaseName: string;
+  databaseId: string;
+  readinessEvidence: Schema0009Evidence;
+  authorityEvidence: Schema0009Evidence;
+}
+
+export type Schema0009CanaryGate =
+  | {
+    state: 'unrecorded';
+    requiredSchema: '0009_candidate_c_sectioned_publications';
+  }
+  | {
+    state: 'ready';
+    requiredSchema: '0009_candidate_c_sectioned_publications';
+    preview: Schema0009CanaryEnvironmentGate;
+    production: Schema0009CanaryEnvironmentGate;
+  };
+
+const SCHEMA_0009 = '0009_candidate_c_sectioned_publications';
 
 export const SCHEMA_0009_CANARY_GATE: Schema0009CanaryGate = {
   state: 'unrecorded',
-  requiredSchema: '0009_candidate_c_sectioned_publications',
+  requiredSchema: SCHEMA_0009,
 };
 
 const PRODUCTION = {
-  worker: 'theologai', route: 'mcp.theologai.xyz', d1: '53211f50-a893-4b4c-be1e-bc625a595dc7',
+  worker: 'theologai', route: 'mcp.theologai.xyz',
+  d1Name: 'theologai-production-20260729-transform11-a', d1: '53211f50-a893-4b4c-be1e-bc625a595dc7',
   requestNamespace: '361201', operatorNamespace: '361203', version: '3.6.0',
   discovery: 'false', live: 'false', coordinator: 'false', logs: 'false',
 };
 const PREVIEW = {
-  worker: 'theologai-preview', route: 'preview-mcp.theologai.xyz', d1: '62b871a6-5b4d-4d9b-8f52-301f6c878f48',
+  worker: 'theologai-preview', route: 'preview-mcp.theologai.xyz',
+  d1Name: 'theologai-preview-20260728-transform11-a', d1: '62b871a6-5b4d-4d9b-8f52-301f6c878f48',
   requestNamespace: '361202', operatorNamespace: '361204', version: '3.6.0-preview',
   discovery: 'true', live: 'false', coordinator: 'false', logs: 'true',
 };
@@ -90,8 +113,9 @@ export function validateCanaryDispatch(input: DispatchInput): void {
   refuse(isSha(input.sha) && input.sha === input.expectedSha, 'expected main SHA must equal the dispatched SHA');
   refuse(isSha(input.liveMainSha) && input.liveMainSha === input.sha, 'dispatched SHA must still be the live main SHA');
   refuse(input.confirmation === CANARY_CONFIRMATION, 'confirmation must match exactly');
-  assertCommittedConfig(input.configText);
-  assertSchema0009CanaryPrerequisite(input.configText);
+  const gate = validateSchema0009CanaryGate(SCHEMA_0009_CANARY_GATE);
+  assertCommittedConfig(input.configText, gate);
+  assertSchema0009CanaryPrerequisite(input.configText, gate);
 }
 
 /**
@@ -99,7 +123,8 @@ export function validateCanaryDispatch(input: DispatchInput): void {
  * separate from general config validation so recovery can still inspect a
  * historical config, while a new canary upload cannot begin from one.
  */
-export function assertSchema0009CanaryPrerequisite(configText: string): void {
+export function assertSchema0009CanaryPrerequisite(configText: string, gate: unknown = SCHEMA_0009_CANARY_GATE): void {
+  const reviewedGate = validateSchema0009CanaryGate(gate);
   const root = parseConfig(configText);
   const preview = recordAt(recordAt(root, 'env'), 'preview');
   const productionD1 = configuredD1(root, 'production');
@@ -116,9 +141,34 @@ export function assertSchema0009CanaryPrerequisite(configText: string): void {
     'recorded schema-0008 preview D1 identity is not a canary baseline',
   );
   refuse(
-    SCHEMA_0009_CANARY_GATE.state === 'ready',
-    `schema-${SCHEMA_0009_CANARY_GATE.requiredSchema.slice(0, 4)} canary gate is unrecorded: prepare and audit separate preview and production candidates before enabling this workflow`,
+    reviewedGate.state === 'ready',
+    'schema-0009 canary gate is unrecorded: prepare and audit separate preview and production candidates before enabling this workflow',
   );
+  assertSchema0009EnvironmentMatch(productionD1, reviewedGate.production, 'production');
+  assertSchema0009EnvironmentMatch(previewD1, reviewedGate.preview, 'preview');
+}
+
+/**
+ * Parse the future release record defensively even though checked-in TypeScript
+ * makes incomplete `ready` literals a compile error. This also protects the
+ * command boundary from a malformed JavaScript import or future refactor.
+ */
+export function validateSchema0009CanaryGate(value: unknown): Schema0009CanaryGate {
+  const gate = asRecord(value, 'schema-0009 canary gate');
+  refuse(gate.requiredSchema === SCHEMA_0009, 'schema-0009 canary gate schema mismatch');
+  if (gate.state === 'unrecorded') {
+    exactKeys(gate, ['state', 'requiredSchema'], 'unrecorded schema-0009 canary gate');
+    return gate as Schema0009CanaryGate;
+  }
+  refuse(gate.state === 'ready', 'schema-0009 canary gate state is invalid');
+  exactKeys(gate, ['state', 'requiredSchema', 'preview', 'production'], 'ready schema-0009 canary gate');
+  const preview = parseSchema0009EnvironmentGate(gate.preview, 'preview');
+  const production = parseSchema0009EnvironmentGate(gate.production, 'production');
+  refuse(
+    preview.databaseName !== production.databaseName && preview.databaseId !== production.databaseId,
+    'ready schema-0009 canary gate must use distinct preview and production D1 identities',
+  );
+  return { state: 'ready', requiredSchema: SCHEMA_0009, preview, production };
 }
 
 /** Reject all user-supplied Worker IDs before a workflow calls Wrangler. */
@@ -159,8 +209,8 @@ export function validateEmergencyInputs(ref: string, current: string, target: st
  * Produces a throwaway config with only preview live/coordinator flags changed.
  * It is deliberately an output file, never a tracked configuration edit.
  */
-export function renderCanaryPreviewConfig(configText: string): string {
-  assertCommittedConfig(configText);
+export function renderCanaryPreviewConfig(configText: string, gate: unknown = SCHEMA_0009_CANARY_GATE): string {
+  assertCommittedConfig(configText, gate);
   const start = configText.indexOf('[env.preview.vars]');
   const end = configText.indexOf('\n[', start + 1);
   refuse(start >= 0 && end > start, 'preview vars section is missing or ambiguous');
@@ -172,7 +222,7 @@ export function renderCanaryPreviewConfig(configText: string): string {
     .replace('THEOLOGAI_ENABLE_CCEL_COORDINATOR = "false"', 'THEOLOGAI_ENABLE_CCEL_COORDINATOR = "true"');
   refuse(changed !== section, 'canary flags were not found exactly once');
   const rendered = `${before}${changed}${after}`;
-  assertCanaryConfig(rendered);
+  assertCanaryConfig(rendered, gate);
   return rendered;
 }
 
@@ -336,23 +386,38 @@ export function sanitizedCanaryEvidence(input: {
   };
 }
 
-export function assertCommittedConfig(configText: string): void {
+export function assertCommittedConfig(configText: string, gate: unknown = SCHEMA_0009_CANARY_GATE): void {
+  const reviewedGate = validateSchema0009CanaryGate(gate);
+  const { production, preview } = expectedSchema0009Environments(reviewedGate);
   refuse(!configText.includes(OPERATOR_TOKEN), 'operator token must never be stored in Wrangler config');
   const root = parseConfig(configText);
-  assertEnvironment(root, PRODUCTION, '000');
-  const preview = recordAt(recordAt(root, 'env'), 'preview');
-  assertEnvironment(preview, PREVIEW, '100');
-  refuse(PREVIEW.d1 !== PRODUCTION.d1, 'preview and production D1 identities must differ');
+  assertEnvironment(root, production, '000');
+  const previewConfig = recordAt(recordAt(root, 'env'), 'preview');
+  assertEnvironment(previewConfig, preview, '100');
+  refuse(preview.d1 !== production.d1 && preview.d1Name !== production.d1Name,
+    'preview and production D1 identities must differ');
   refuse(PREVIEW.requestNamespace !== PRODUCTION.requestNamespace && PREVIEW.operatorNamespace !== PRODUCTION.operatorNamespace,
     'preview and production rate-limit namespaces must differ');
 }
 
-export function assertCanaryConfig(configText: string): void {
+export function assertCanaryConfig(configText: string, gate: unknown = SCHEMA_0009_CANARY_GATE): void {
+  const reviewedGate = validateSchema0009CanaryGate(gate);
+  const { production, preview } = expectedSchema0009Environments(reviewedGate);
   refuse(!configText.includes(OPERATOR_TOKEN), 'operator token must never be stored in canary config');
   const root = parseConfig(configText);
-  assertEnvironment(root, PRODUCTION, '000');
-  const preview = recordAt(recordAt(root, 'env'), 'preview');
-  assertEnvironment(preview, { ...PREVIEW, live: 'true', coordinator: 'true' }, '111');
+  assertEnvironment(root, production, '000');
+  const previewConfig = recordAt(recordAt(root, 'env'), 'preview');
+  assertEnvironment(previewConfig, { ...preview, live: 'true', coordinator: 'true' }, '111');
+}
+
+function expectedSchema0009Environments(gate: Schema0009CanaryGate): { production: typeof PRODUCTION; preview: typeof PREVIEW } {
+  if (gate.state === 'ready') {
+    return {
+      production: { ...PRODUCTION, d1Name: gate.production.databaseName, d1: gate.production.databaseId },
+      preview: { ...PREVIEW, d1Name: gate.preview.databaseName, d1: gate.preview.databaseId },
+    };
+  }
+  return { production: PRODUCTION, preview: PREVIEW };
 }
 
 function assertEnvironment(config: JsonRecord, expected: typeof PREVIEW, mode: Mode): void {
@@ -382,7 +447,8 @@ function assertEnvironment(config: JsonRecord, expected: typeof PREVIEW, mode: M
   for (const [key, value] of Object.entries(expectedVars)) refuse(vars[key] === value, `${expected.worker} ${key} mismatch`);
   const d1 = configuredD1(config, expected.worker);
   exactKeys(d1, ['binding', 'database_name', 'database_id', 'migrations_dir'], `${expected.worker} D1 binding`);
-  refuse(d1.binding === 'THEOLOGAI_DB' && d1.database_id === expected.d1 && d1.migrations_dir === 'migrations', `${expected.worker} D1 binding mismatch`);
+  refuse(d1.binding === 'THEOLOGAI_DB' && d1.database_name === expected.d1Name
+    && d1.database_id === expected.d1 && d1.migrations_dir === 'migrations', `${expected.worker} D1 binding mismatch`);
   const durable = only(arrayAt(recordAt(config, 'durable_objects'), 'bindings').map((entry, index) => asRecord(entry, `DO ${index}`)), `${expected.worker} DO binding`);
   exactKeys(durable, ['name', 'class_name', 'script_name'], `${expected.worker} DO binding`);
   for (const [key, value] of Object.entries({ name: DO.name, class_name: DO.class_name, script_name: DO.script_name })) {
@@ -401,6 +467,34 @@ function configuredD1(config: JsonRecord, label: string): JsonRecord & { databas
   exactKeys(d1, ['binding', 'database_name', 'database_id', 'migrations_dir'], `${label} D1 binding`);
   refuse(typeof d1.database_name === 'string' && typeof d1.database_id === 'string', `${label} D1 identity is invalid`);
   return d1 as JsonRecord & { database_name: string; database_id: string };
+}
+
+function parseSchema0009EnvironmentGate(value: unknown, label: string): Schema0009CanaryEnvironmentGate {
+  const environment = asRecord(value, `${label} schema-0009 canary gate`);
+  exactKeys(environment, ['databaseName', 'databaseId', 'readinessEvidence', 'authorityEvidence'], `${label} schema-0009 canary gate`);
+  refuse(isD1Name(environment.databaseName) && isUuid(environment.databaseId), `${label} schema-0009 D1 identity is invalid`);
+  return {
+    databaseName: environment.databaseName,
+    databaseId: environment.databaseId,
+    readinessEvidence: parseSchema0009Evidence(environment.readinessEvidence, `${label} readiness`),
+    authorityEvidence: parseSchema0009Evidence(environment.authorityEvidence, `${label} authority`),
+  };
+}
+
+function parseSchema0009Evidence(value: unknown, label: string): Schema0009Evidence {
+  const evidence = asRecord(value, `${label} evidence`);
+  exactKeys(evidence, ['identity', 'sha256'], `${label} evidence`);
+  refuse(isEvidenceIdentity(evidence.identity) && isSha256(evidence.sha256), `${label} evidence identity or SHA-256 is invalid`);
+  return { identity: evidence.identity, sha256: evidence.sha256 };
+}
+
+function assertSchema0009EnvironmentMatch(
+  configured: JsonRecord & { database_name: string; database_id: string }, reviewed: Schema0009CanaryEnvironmentGate, label: string,
+): void {
+  refuse(
+    configured.database_name === reviewed.databaseName && configured.database_id === reviewed.databaseId,
+    `${label} D1 identity does not match the reviewed schema-0009 canary gate`,
+  );
 }
 
 function assertVersion(version: FullVersion, mode: Mode, requireProductionOperator = false): boolean {
@@ -549,6 +643,9 @@ function exactKeys(value: JsonRecord, keys: string[], label: string): void { ref
 function isRecord(value: unknown): value is JsonRecord { return typeof value === 'object' && value !== null && !Array.isArray(value); }
 function isUuid(value: unknown): value is string { return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value); }
 function isSha(value: unknown): value is string { return typeof value === 'string' && /^[0-9a-f]{40}$/.test(value); }
+function isSha256(value: unknown): value is string { return typeof value === 'string' && /^[a-f0-9]{64}$/.test(value); }
+function isD1Name(value: unknown): value is string { return typeof value === 'string' && /^theologai-(?:preview|production)-[a-z0-9-]+$/.test(value); }
+function isEvidenceIdentity(value: unknown): value is string { return typeof value === 'string' && /^[a-z0-9][a-z0-9._:-]{2,127}$/.test(value); }
 function stableJson(value: unknown): string { return JSON.stringify(value, (_, nested) => isRecord(nested) ? Object.fromEntries(Object.entries(nested).sort(([a], [b]) => a.localeCompare(b))) : nested); }
 function refuse(condition: unknown, message: string): asserts condition { if (!condition) throw new Error(`CCEL canary refused: ${message}.`); }
 

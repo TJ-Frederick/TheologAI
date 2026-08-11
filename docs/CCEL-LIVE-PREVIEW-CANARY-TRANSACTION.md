@@ -66,8 +66,12 @@ its readiness/authority evidence. Until a separate reviewed release replaces the
 hard inert schema-`0009` canary gate, the canary workflow rejects both retained
 schema-`0008` D1 identities during its first local validation, before any
 Wrangler command or Cloudflare read. Changing only a D1 ID is insufficient: the
-future change must update the reviewed identity/evidence gate and the committed
-configuration together.
+future change must replace the `unrecorded` gate with a reviewed `ready` record
+for each environment: exact D1 name/UUID plus separately pinned readiness and
+authority evidence identities and SHA-256 values. The local validator rejects
+unknown or incomplete `ready` records, malformed evidence, any shared
+preview/production identity, and any mismatch between those reviewed D1 pairs
+and committed configuration.
 
 The only way to create the third row is the main-only, manually dispatched
 `CCEL Live Preview Canary` workflow. It requires all of the following:
