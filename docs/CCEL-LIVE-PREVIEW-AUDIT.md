@@ -26,7 +26,10 @@ proceeds. These schema observations prove v6 local-only versus v7 CCEL
 exposure; they do not prove which endpoint-bearing code revision is deployed
 or attest exact deployed flag bits. In particular, observing the v7 schema does
 not prove PR #115's repository-only `/home3/search` pin is active. The safe
-current-main `100` refresh prerequisite is documented in
+current-main `100` prerequisite is the one separately approved preview
+bind/deploy/audit after both schema-`0009` candidates were prepared unbound and
+before the production bind/deploy/audit; it is not a second refresh. The full
+ordering is documented in
 [CCEL live-preview canary transaction](CCEL-LIVE-PREVIEW-CANARY-TRANSACTION.md).
 A successful
 origin admission separately proves that the separately authorized canary's live
