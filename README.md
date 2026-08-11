@@ -151,11 +151,13 @@ unpublished pin to `https://www.ccel.org/home3/search`. It is not a valid
 code/resource-equivalent `100` predecessor for a `111` canary built from
 current `main`. Current `main` also includes PR #117's Transform-12 schema
 `0009` contract, while the retained PR #107/PR #108 D1 records are schema
-`0008`. Before the safe `100` current-main preview refresh or production
-credential staging, separately authorized fresh schema-`0009` preview and
-production D1 preparation, remote readiness/authority audit, binding, and
-environment-isolation verification are required. Those D1 gates do not
-authorize the refresh, credential work, or canary; see the
+`0008`. Before credential staging, separately authorized fresh schema-`0009`
+preview and production D1 preparation and remote readiness/authority audit are
+required while both candidates remain unbound. The reviewed release sequence is
+then preview bind/deploy/audit, production bind/deploy/audit, and read-only
+environment-isolation verification. The preview release is the sole safe
+current-main `100` refresh; it is not repeated later. Those D1 gates do not
+authorize credential work or the canary; see the
 [CCEL canary transaction](docs/CCEL-LIVE-PREVIEW-CANARY-TRANSACTION.md).
 
 PR #101's former production assignment, retained as the rollback pair, is

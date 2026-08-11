@@ -483,12 +483,27 @@ describe('published project contract', () => {
       expect(normalized).toContain('https://www.ccel.org/home3/search');
       expect(normalized).toContain('code/resource-equivalent `100` predecessor');
     }
-    expect(canary).toContain('four separately authorized stages');
+    expect(canary).toContain('five separately authorized stages');
     expect(canary).toContain('Completion or authorization of any stage does not authorize the next stage.');
     expect(canary).toContain('fresh, separate preview and production D1 candidates');
     expect(canary).toContain('schema `0009`');
     expect(canary).toContain('remote readiness and authority audit');
-    expect(canary).toContain('read-only environment-isolation\n   verification');
+    expect(canary).toContain('while both candidates remain unbound');
+    expect(canary).toContain('prepared preview candidate with current-`main` `100` flags');
+    expect(canary).toContain('Only after the preview audit passes');
+    expect(canary).toContain('Then perform a read-only environment-isolation\n   verification');
+    expect(canary).toContain('hard inert schema-`0009` canary gate');
+    expect(canary).toContain('before any\nWrangler command or Cloudflare read');
+    const canaryOrder = [
+      'while both candidates remain unbound',
+      'prepared preview candidate with current-`main` `100` flags',
+      'Only after the preview audit passes',
+      'Then perform a read-only environment-isolation',
+      'Stage the operator credential',
+      'Run this temporary `111` two-request preview canary transaction',
+    ].map(marker => canary.indexOf(marker));
+    expect(canaryOrder.every(index => index >= 0)).toBe(true);
+    expect(canaryOrder).toEqual([...canaryOrder].sort((left, right) => left - right));
     expect(canary).toContain('resources.script.etag');
     expect(canary).toContain('temporary `111` two-request preview canary transaction');
     expect(reconciliation).toContain('protected preview release must safely refresh exact');
@@ -498,8 +513,8 @@ describe('published project contract', () => {
     expect(secret).toContain('Executing staging is a production Worker-version upload mutation');
     expect(secret).toContain('actual production Worker deployment and traffic mutation');
     expect(secret).toContain('Neither staging nor\npromotion authorizes');
-    expect(secret).toContain('separate schema-`0009` D1 gate must have completed for **both** environments');
-    expect(secret).toContain('read-only environment-isolation\nverification');
+    expect(secret).toContain('separate schema-`0009` D1 sequence must have completed in order');
+    expect(secret).toContain('while unbound; the preview candidate bound, deployed, and audited; then the\nproduction candidate bound, deployed, and audited; then a read-only\nenvironment-isolation verification');
     expect(readme).toContain("Current `main` also includes PR #117's Transform-12 schema\n`0009` contract");
     expect(readme).toContain('The deployed preview and production D1 layers remain schema `0008`; current\nmain\'s PR #117 schema `0009` Candidate-C contract is checked out only');
     const normalizedAudit = audit.replace(/\s+/g, ' ');

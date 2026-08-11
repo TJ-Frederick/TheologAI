@@ -19,16 +19,18 @@ Promotion is a separate protected decision requiring:
 Executing staging is a production Worker-version upload mutation even though
 the new version remains undeployed and traffic does not move. Promotion is an
 actual production Worker deployment and traffic mutation. Neither staging nor
-promotion authorizes the separate safe-`100` preview refresh or the temporary
-`111` canary, and preview refresh does not authorize either credential stage.
+promotion authorizes the temporary `111` canary. The one safe current-main
+preview `100` release occurs earlier in the D1 release sequence; it must not be
+repeated as a second refresh after credential work.
 
 Before staging or promotion can be authorized, the CCEL canary transaction's
-separate schema-`0009` D1 gate must have completed for **both** environments:
-fresh preview and production candidates, remote readiness/authority audits,
-their approved Worker bindings, and a read-only environment-isolation
-verification. The PR #107/#108 schema-`0008` D1 evidence does not satisfy this
-current-main prerequisite. Completing it still does not authorize this
-credential operation; see [the canary transaction](CCEL-LIVE-PREVIEW-CANARY-TRANSACTION.md).
+separate schema-`0009` D1 sequence must have completed in order: fresh preview
+and production candidates prepared and remotely readiness/authority-audited
+while unbound; the preview candidate bound, deployed, and audited; then the
+production candidate bound, deployed, and audited; then a read-only
+environment-isolation verification. The PR #107/#108 schema-`0008` D1 evidence
+does not satisfy this current-main prerequisite. Completing the sequence still
+does not authorize this credential operation; see [the canary transaction](CCEL-LIVE-PREVIEW-CANARY-TRANSACTION.md).
 
 Emergency rollback is also separate and requires:
 

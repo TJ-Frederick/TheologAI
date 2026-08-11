@@ -16,6 +16,40 @@ export const ACCOUNT_WIDE_WORKERS_WRITE_ACK =
 export const PRODUCTION_BASE_SECRET_BINDINGS =
   ['AUTH_TOKEN', 'ESV_API_KEY', 'SBC_FACILITATOR_API_KEY'] as const;
 
+/**
+ * These are the retained Transform-11 / schema-0008 D1 identities.  They are
+ * deployment history, not current-main canary baselines.  Keep the rejection
+ * literal: a later schema-0009 release must deliberately replace this hard
+ * inert gate with reviewed candidate identities and retained readiness evidence.
+ */
+export const LEGACY_SCHEMA_0008_D1 = {
+  production: {
+    name: 'theologai-production-20260729-transform11-a',
+    id: '53211f50-a893-4b4c-be1e-bc625a595dc7',
+  },
+  preview: {
+    name: 'theologai-preview-20260728-transform11-a',
+    id: '62b871a6-5b4d-4d9b-8f52-301f6c878f48',
+  },
+} as const;
+
+/**
+ * No schema-0009 candidates have been prepared and audited yet.  The canary
+ * workflow calls this local gate before its first Wrangler command, so an
+ * accidental dispatch cannot turn the historical schema-0008 pair into a
+ * live canary baseline.  A future release must replace this sentinel with an
+ * exact reviewed candidate pair and readiness/authority evidence contract.
+ */
+interface Schema0009CanaryGate {
+  state: 'unrecorded' | 'ready';
+  requiredSchema: '0009_candidate_c_sectioned_publications';
+}
+
+export const SCHEMA_0009_CANARY_GATE: Schema0009CanaryGate = {
+  state: 'unrecorded',
+  requiredSchema: '0009_candidate_c_sectioned_publications',
+};
+
 const PRODUCTION = {
   worker: 'theologai', route: 'mcp.theologai.xyz', d1: '53211f50-a893-4b4c-be1e-bc625a595dc7',
   requestNamespace: '361201', operatorNamespace: '361203', version: '3.6.0',
@@ -57,6 +91,34 @@ export function validateCanaryDispatch(input: DispatchInput): void {
   refuse(isSha(input.liveMainSha) && input.liveMainSha === input.sha, 'dispatched SHA must still be the live main SHA');
   refuse(input.confirmation === CANARY_CONFIRMATION, 'confirmation must match exactly');
   assertCommittedConfig(input.configText);
+  assertSchema0009CanaryPrerequisite(input.configText);
+}
+
+/**
+ * The deliberately inert schema-0009 release gate.  It is intentionally
+ * separate from general config validation so recovery can still inspect a
+ * historical config, while a new canary upload cannot begin from one.
+ */
+export function assertSchema0009CanaryPrerequisite(configText: string): void {
+  const root = parseConfig(configText);
+  const preview = recordAt(recordAt(root, 'env'), 'preview');
+  const productionD1 = configuredD1(root, 'production');
+  const previewD1 = configuredD1(preview, 'preview');
+
+  refuse(
+    productionD1.database_name !== LEGACY_SCHEMA_0008_D1.production.name
+      || productionD1.database_id !== LEGACY_SCHEMA_0008_D1.production.id,
+    'recorded schema-0008 production D1 identity is not a canary baseline',
+  );
+  refuse(
+    previewD1.database_name !== LEGACY_SCHEMA_0008_D1.preview.name
+      || previewD1.database_id !== LEGACY_SCHEMA_0008_D1.preview.id,
+    'recorded schema-0008 preview D1 identity is not a canary baseline',
+  );
+  refuse(
+    SCHEMA_0009_CANARY_GATE.state === 'ready',
+    `schema-${SCHEMA_0009_CANARY_GATE.requiredSchema.slice(0, 4)} canary gate is unrecorded: prepare and audit separate preview and production candidates before enabling this workflow`,
+  );
 }
 
 /** Reject all user-supplied Worker IDs before a workflow calls Wrangler. */
@@ -318,7 +380,7 @@ function assertEnvironment(config: JsonRecord, expected: typeof PREVIEW, mode: M
   };
   exactKeys(vars, Object.keys(expectedVars), `${expected.worker} vars`);
   for (const [key, value] of Object.entries(expectedVars)) refuse(vars[key] === value, `${expected.worker} ${key} mismatch`);
-  const d1 = only(arrayAt(config, 'd1_databases').map((entry, index) => asRecord(entry, `D1 ${index}`)), `${expected.worker} D1 binding`);
+  const d1 = configuredD1(config, expected.worker);
   exactKeys(d1, ['binding', 'database_name', 'database_id', 'migrations_dir'], `${expected.worker} D1 binding`);
   refuse(d1.binding === 'THEOLOGAI_DB' && d1.database_id === expected.d1 && d1.migrations_dir === 'migrations', `${expected.worker} D1 binding mismatch`);
   const durable = only(arrayAt(recordAt(config, 'durable_objects'), 'bindings').map((entry, index) => asRecord(entry, `DO ${index}`)), `${expected.worker} DO binding`);
@@ -332,6 +394,13 @@ function assertEnvironment(config: JsonRecord, expected: typeof PREVIEW, mode: M
   assertConfigRate(limits, 'THEOLOGAI_CCEL_OPERATOR_AUTH_LIMITER', expected.operatorNamespace, 12);
   uniqueNames([{ name: d1.binding }, durable, ...limits, { name: metadata.binding }], `${expected.worker} critical bindings`);
   if (mode === '000') refuse(expected.live === 'false' && expected.coordinator === 'false' && expected.discovery === 'false', 'production flags must remain 000');
+}
+
+function configuredD1(config: JsonRecord, label: string): JsonRecord & { database_name: string; database_id: string } {
+  const d1 = only(arrayAt(config, 'd1_databases').map((entry, index) => asRecord(entry, `D1 ${index}`)), `${label} D1 binding`);
+  exactKeys(d1, ['binding', 'database_name', 'database_id', 'migrations_dir'], `${label} D1 binding`);
+  refuse(typeof d1.database_name === 'string' && typeof d1.database_id === 'string', `${label} D1 identity is invalid`);
+  return d1 as JsonRecord & { database_name: string; database_id: string };
 }
 
 function assertVersion(version: FullVersion, mode: Mode, requireProductionOperator = false): boolean {

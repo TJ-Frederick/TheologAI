@@ -5,8 +5,11 @@ import {
   CANARY_CONFIRMATION,
   CANARY_MESSAGE,
   CANARY_TAG,
+  LEGACY_SCHEMA_0008_D1,
   PRODUCTION_BASE_SECRET_BINDINGS,
+  SCHEMA_0009_CANARY_GATE,
   assertCommittedConfig,
+  assertSchema0009CanaryPrerequisite,
   identifyCanaryUpload,
   planRestore,
   renderCanaryPreviewConfig,
@@ -33,6 +36,8 @@ const workflow = readFileSync(new URL('../../../.github/workflows/ccel-live-prev
 const canarySource = readFileSync(new URL('../../../scripts/ccel-live-preview-canary.ts', import.meta.url), 'utf8');
 const emergencyWorkflow = readFileSync(new URL('../../../.github/workflows/restore-ccel-live-preview-canary.yml', import.meta.url), 'utf8');
 const prWorkflow = readFileSync(new URL('../../../.github/workflows/pr.yml', import.meta.url), 'utf8');
+const canaryTransaction = readFileSync(new URL('../../../docs/CCEL-LIVE-PREVIEW-CANARY-TRANSACTION.md', import.meta.url), 'utf8');
+const operatorProvisioning = readFileSync(new URL('../../../docs/CCEL-OPERATOR-SECRET-PROVISIONING.md', import.meta.url), 'utf8');
 const liveBindingShapes = JSON.parse(readFileSync(
   new URL('../../fixtures/wrangler/ccel-canary-live-binding-shapes.json', import.meta.url), 'utf8',
 )) as {
@@ -101,7 +106,7 @@ describe('CCEL live preview canary transaction', () => {
     expect(() => validateCanaryDispatch({
       ref: 'refs/heads/main', sha: 'a'.repeat(40), expectedSha: 'a'.repeat(40), liveMainSha: 'a'.repeat(40),
       confirmation: CANARY_CONFIRMATION, configText: config,
-    })).not.toThrow();
+    })).toThrow(/recorded schema-0008 production D1 identity is not a canary baseline/);
     expect(() => validateCanaryDispatch({
       ref: 'refs/heads/feature', sha: 'a'.repeat(40), expectedSha: 'a'.repeat(40), liveMainSha: 'a'.repeat(40),
       confirmation: CANARY_CONFIRMATION, configText: config,
@@ -116,6 +121,51 @@ describe('CCEL live preview canary transaction', () => {
       config.replace('class_name = "CcelGlobalCoordinator"', 'class_name = "WrongCoordinator"'),
       config.replace('namespace_id = "361204"', 'namespace_id = "999999"'),
     ]) expect(() => assertCommittedConfig(tampered)).toThrow();
+  });
+
+  it('keeps the current canary mechanically inert until separately reviewed schema-0009 candidates are recorded', () => {
+    expect(LEGACY_SCHEMA_0008_D1).toEqual({
+      production: {
+        name: 'theologai-production-20260729-transform11-a',
+        id: '53211f50-a893-4b4c-be1e-bc625a595dc7',
+      },
+      preview: {
+        name: 'theologai-preview-20260728-transform11-a',
+        id: '62b871a6-5b4d-4d9b-8f52-301f6c878f48',
+      },
+    });
+    expect(SCHEMA_0009_CANARY_GATE).toEqual({
+      state: 'unrecorded',
+      requiredSchema: '0009_candidate_c_sectioned_publications',
+    });
+    expect(() => assertSchema0009CanaryPrerequisite(config))
+      .toThrow(/recorded schema-0008 production D1 identity is not a canary baseline/);
+    const onlyLegacyPreviewRemaining = config
+      .replace('theologai-production-20260729-transform11-a', 'theologai-production-schema0009-candidate')
+      .replace('53211f50-a893-4b4c-be1e-bc625a595dc7', '323e4567-e89b-42d3-a456-426614174003');
+    expect(() => assertSchema0009CanaryPrerequisite(onlyLegacyPreviewRemaining))
+      .toThrow(/recorded schema-0008 preview D1 identity is not a canary baseline/);
+    const noLegacyIdentityRemaining = onlyLegacyPreviewRemaining
+      .replace('theologai-preview-20260728-transform11-a', 'theologai-preview-schema0009-candidate')
+      .replace('62b871a6-5b4d-4d9b-8f52-301f6c878f48', '423e4567-e89b-42d3-a456-426614174003');
+    expect(() => assertSchema0009CanaryPrerequisite(noLegacyIdentityRemaining))
+      .toThrow(/schema-0009 canary gate is unrecorded/);
+    expect(workflow.indexOf('validate-dispatch')).toBeLessThan(workflow.indexOf('npx wrangler'));
+  });
+
+  it('documents the single preview-release sequence before production, isolation, credentials, and canary', () => {
+    const unbound = 'while both candidates remain unbound';
+    const preview = 'preview candidate with current-`main` `100` flags';
+    const production = 'Only after the preview audit passes';
+    const isolation = 'Then perform a read-only environment-isolation';
+    const credentials = 'Stage the operator credential';
+    const canary = 'Run this temporary `111` two-request preview canary';
+    const ordered = [unbound, preview, production, isolation, credentials, canary]
+      .map(marker => canaryTransaction.indexOf(marker));
+    expect(ordered.every(index => index >= 0)).toBe(true);
+    expect(ordered).toEqual([...ordered].sort((left, right) => left - right));
+    expect(canaryTransaction).toContain('Do not perform a second preview refresh here.');
+    expect(operatorProvisioning).toContain('it must not be\nrepeated as a second refresh after credential work.');
   });
 
   it('rejects option-like, malformed, or duplicate user IDs and unprovisioned dedicated credentials before Wrangler', () => {

@@ -29,34 +29,45 @@ The retained PR #107 preview and PR #108 production D1 records were prepared
 against schema `0008`; neither is a current-main-compatible D1 baseline. The
 historical `0008` readiness records remain evidence for those releases only.
 
-Operational readiness therefore has four separately authorized stages, in this
+Operational readiness therefore has five separately authorized stages, in this
 order:
 
 1. Prepare **fresh, separate preview and production D1 candidates** compatible
    with schema `0009`. Each preparation needs its own authorization and must
    complete the remote readiness and authority audit for the checked-out
-   schema/seed before any candidate binding. Then, through its separately
-   approved environment release path, bind the exact prepared candidate and
-   record the authoritative Worker/D1 binding. A read-only environment-isolation
-   verification must prove distinct preview and production D1 name/UUID pairs,
-   that each active Worker is bound only to its matching environment candidate,
-   and that neither retained schema-`0008` D1 was silently reused or crossed.
-   Failure or missing evidence is a stop condition; do not reuse, repair, or
-   bind a failed candidate.
-2. Safely refresh preview to an exact-current-`main` `100` Worker and complete
-   its protected preview audit. The refreshed predecessor must be equivalent
-   to the future current-`main` canary in code and resources; only the two
-   canary flags may later differ.
-3. Stage the operator credential as an undeployed production Worker version,
+   schema/seed **while both candidates remain unbound**. Failure or missing
+   evidence is a stop condition; do not reuse, repair, or bind a failed
+   candidate.
+2. Through a separately approved preview release, bind and deploy the exact
+   prepared preview candidate with current-`main` `100` flags, then complete
+   its protected preview audit. This one release creates the exact-current-main,
+   code/resource-equivalent preview predecessor for the later `111` candidate;
+   it is the safe preview refresh, not a prerequisite for a second refresh.
+3. Only after the preview audit passes, through a separately approved production
+   release, bind and deploy the exact prepared production candidate and complete
+   its protected production audit. Then perform a read-only environment-isolation
+   verification proving distinct preview and production D1 name/UUID pairs, each
+   active Worker is bound only to its matching environment candidate, and neither
+   retained schema-`0008` D1 was silently reused or crossed.
+4. Stage the operator credential as an undeployed production Worker version,
    then separately promote the reviewed version. Promotion is a real
    production Worker deployment and traffic mutation.
-4. Run this temporary `111` two-request preview canary transaction and restore
+5. Run this temporary `111` two-request preview canary transaction and restore
    the exact refreshed `100` predecessor.
 
 Completion or authorization of any stage does not authorize the next stage.
-In particular, the stage-1 D1 release evidence is a prerequisite—not
-authorization—for the safe preview refresh or production credential staging;
-those two stage-2/3 operations remain independent gates.
+In particular, the two unbound stage-1 preparations do not authorize either
+environment binding; the preview audit does not authorize the production release;
+and the completed releases/isolation evidence do not authorize credential staging
+or the canary.
+
+The repository currently records neither schema-`0009` candidate identity nor
+its readiness/authority evidence. Until a separate reviewed release replaces the
+hard inert schema-`0009` canary gate, the canary workflow rejects both retained
+schema-`0008` D1 identities during its first local validation, before any
+Wrangler command or Cloudflare read. Changing only a D1 ID is insufficient: the
+future change must update the reviewed identity/evidence gate and the committed
+configuration together.
 
 The only way to create the third row is the main-only, manually dispatched
 `CCEL Live Preview Canary` workflow. It requires all of the following:
@@ -144,11 +155,12 @@ evidence.
 
 ## Transaction sequence
 
-1. Confirm the separately retained stage-1 schema-`0009` preview/production
-   preparation, readiness/authority, binding, and environment-isolation
-   evidence. Capture the separately refreshed, current-`main`,
-   code/resource-equivalent preview 100 predecessor and retain a short-lived
-   private recovery anchor.
+1. Confirm the separately retained schema-`0009` evidence in order: both
+   candidates prepared and audited while unbound; the one safe current-`main`
+   preview `100` bind/deploy/audit; then the production bind/deploy/audit and
+   environment-isolation verification. Capture that already-refreshed,
+   code/resource-equivalent preview `100` predecessor and retain a short-lived
+   private recovery anchor. Do not perform a second preview refresh here.
 2. Generate the 111 runner-local config and run `wrangler versions upload`.
    The version must be exactly one new, immediately-next version and must leave
    preview traffic unchanged.
