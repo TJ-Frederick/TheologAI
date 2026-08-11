@@ -62,9 +62,14 @@ export type Schema0009CanaryGate =
     requiredSchema: '0009_candidate_c_sectioned_publications';
     preview: Schema0009CanaryEnvironmentGate;
     production: Schema0009CanaryEnvironmentGate;
+    environmentIsolationEvidence: Schema0009Evidence;
   };
 
 const SCHEMA_0009 = '0009_candidate_c_sectioned_publications';
+const LEGACY_SCHEMA_0008_D1_IDS = new Set<string>([
+  LEGACY_SCHEMA_0008_D1.production.id,
+  LEGACY_SCHEMA_0008_D1.preview.id,
+]);
 
 export const SCHEMA_0009_CANARY_GATE: Schema0009CanaryGate = {
   state: 'unrecorded',
@@ -130,16 +135,8 @@ export function assertSchema0009CanaryPrerequisite(configText: string, gate: unk
   const productionD1 = configuredD1(root, 'production');
   const previewD1 = configuredD1(preview, 'preview');
 
-  refuse(
-    productionD1.database_name !== LEGACY_SCHEMA_0008_D1.production.name
-      || productionD1.database_id !== LEGACY_SCHEMA_0008_D1.production.id,
-    'recorded schema-0008 production D1 identity is not a canary baseline',
-  );
-  refuse(
-    previewD1.database_name !== LEGACY_SCHEMA_0008_D1.preview.name
-      || previewD1.database_id !== LEGACY_SCHEMA_0008_D1.preview.id,
-    'recorded schema-0008 preview D1 identity is not a canary baseline',
-  );
+  assertNotLegacySchema0008D1(productionD1.database_id, 'production');
+  assertNotLegacySchema0008D1(previewD1.database_id, 'preview');
   refuse(
     reviewedGate.state === 'ready',
     'schema-0009 canary gate is unrecorded: prepare and audit separate preview and production candidates before enabling this workflow',
@@ -161,14 +158,17 @@ export function validateSchema0009CanaryGate(value: unknown): Schema0009CanaryGa
     return gate as Schema0009CanaryGate;
   }
   refuse(gate.state === 'ready', 'schema-0009 canary gate state is invalid');
-  exactKeys(gate, ['state', 'requiredSchema', 'preview', 'production'], 'ready schema-0009 canary gate');
+  exactKeys(gate, ['state', 'requiredSchema', 'preview', 'production', 'environmentIsolationEvidence'], 'ready schema-0009 canary gate');
   const preview = parseSchema0009EnvironmentGate(gate.preview, 'preview');
   const production = parseSchema0009EnvironmentGate(gate.production, 'production');
+  const environmentIsolationEvidence = parseSchema0009Evidence(gate.environmentIsolationEvidence, 'environment isolation');
+  assertNotLegacySchema0008D1(preview.databaseId, 'ready preview');
+  assertNotLegacySchema0008D1(production.databaseId, 'ready production');
   refuse(
     preview.databaseName !== production.databaseName && preview.databaseId !== production.databaseId,
     'ready schema-0009 canary gate must use distinct preview and production D1 identities',
   );
-  return { state: 'ready', requiredSchema: SCHEMA_0009, preview, production };
+  return { state: 'ready', requiredSchema: SCHEMA_0009, preview, production, environmentIsolationEvidence };
 }
 
 /** Reject all user-supplied Worker IDs before a workflow calls Wrangler. */
@@ -233,35 +233,38 @@ export function renderCanaryPreviewConfig(configText: string, gate: unknown = SC
  * before the transaction can upload a candidate.
  */
 export function validatePreviewBaseline(
-  configText: string, deploymentsValue: unknown, versionValue: unknown, expectedVersion: string,
+  configText: string, deploymentsValue: unknown, versionValue: unknown, expectedVersion: string, gate: unknown = SCHEMA_0009_CANARY_GATE,
 ): FullVersion {
-  assertCommittedConfig(configText);
+  const reviewedGate = validateSchema0009CanaryGate(gate);
+  assertCommittedConfig(configText, reviewedGate);
   refuse(isUuid(expectedVersion), 'expected preview predecessor must be an exact UUID');
   const version = parseFullVersion(versionValue);
   refuse(version.id === expectedVersion, 'preview predecessor view identity mismatch');
   refuse(activeVersion(parseDeployments(deploymentsValue)) === expectedVersion, 'preview predecessor is not the sole 100% deployment');
-  assertVersion(version, '100');
+  assertVersion(version, '100', false, reviewedGate);
   scriptEtag(version, 'preview predecessor');
   return version;
 }
 
 /** Production is read-only control evidence and must remain v6 / flags 000. */
 export function validateProductionControl(
-  configText: string, deploymentsValue: unknown, versionValue: unknown, expectedVersion: string,
+  configText: string, deploymentsValue: unknown, versionValue: unknown, expectedVersion: string, gate: unknown = SCHEMA_0009_CANARY_GATE,
 ): FullVersion {
-  assertCommittedConfig(configText);
+  const reviewedGate = validateSchema0009CanaryGate(gate);
+  assertCommittedConfig(configText, reviewedGate);
   refuse(isUuid(expectedVersion), 'expected production control must be an exact UUID');
   const version = parseFullVersion(versionValue);
   refuse(version.id === expectedVersion, 'production control view identity mismatch');
   refuse(activeVersion(parseDeployments(deploymentsValue)) === expectedVersion, 'production control is not the sole 100% deployment');
-  assertVersion(version, '000', true);
+  assertVersion(version, '000', true, reviewedGate);
   return version;
 }
 
 /** Validate the exact sanitized production binding inventory independently of canary readiness. */
-export function validateProductionBindingInventory(versionValue: unknown): { operatorReady: boolean } {
+export function validateProductionBindingInventory(versionValue: unknown, gate: unknown = SCHEMA_0009_CANARY_GATE): { operatorReady: boolean } {
+  const reviewedGate = validateSchema0009CanaryGate(gate);
   const version = parseFullVersion(versionValue);
-  return { operatorReady: assertVersion(version, '000', false) };
+  return { operatorReady: assertVersion(version, '000', false, reviewedGate) };
 }
 
 /** Uploading must add exactly one undeployed immediately-next version. */
@@ -290,16 +293,17 @@ export function identifyCanaryUpload(
  * predecessor in exactly two flags; code/resource drift remains forbidden.
  */
 export function validateCanaryVersion(
-  configText: string, baselineValue: unknown, canaryValue: unknown, expectedBaseline: string, expectedCanary: string,
+  configText: string, baselineValue: unknown, canaryValue: unknown, expectedBaseline: string, expectedCanary: string, gate: unknown = SCHEMA_0009_CANARY_GATE,
 ): void {
-  assertCommittedConfig(configText);
+  const reviewedGate = validateSchema0009CanaryGate(gate);
+  assertCommittedConfig(configText, reviewedGate);
   const baseline = parseFullVersion(baselineValue);
   const canary = parseFullVersion(canaryValue);
   refuse(baseline.id === expectedBaseline && canary.id === expectedCanary, 'canary version identity mismatch');
   refuse(isUuid(expectedBaseline) && isUuid(expectedCanary) && expectedBaseline !== expectedCanary, 'canary and predecessor IDs must be distinct UUIDs');
   refuse(canary.number > baseline.number, 'canary version sequence is invalid');
-  assertVersion(baseline, '100');
-  assertVersion(canary, '111');
+  assertVersion(baseline, '100', false, reviewedGate);
+  assertVersion(canary, '111', false, reviewedGate);
   const baselineScriptEtag = scriptEtag(baseline, 'preview predecessor');
   const canaryScriptEtag = scriptEtag(canary, 'canary');
   refuse(baselineScriptEtag === canaryScriptEtag,
@@ -311,13 +315,14 @@ export function validateCanaryVersion(
 }
 
 export function validateCanaryDeployment(
-  configText: string, deploymentsValue: unknown, canaryValue: unknown, expectedCanary: string,
+  configText: string, deploymentsValue: unknown, canaryValue: unknown, expectedCanary: string, gate: unknown = SCHEMA_0009_CANARY_GATE,
 ): void {
-  assertCommittedConfig(configText);
+  const reviewedGate = validateSchema0009CanaryGate(gate);
+  assertCommittedConfig(configText, reviewedGate);
   const canary = parseFullVersion(canaryValue);
   refuse(canary.id === expectedCanary && isUuid(expectedCanary), 'canary deployment identity is invalid');
   refuse(activeVersion(parseDeployments(deploymentsValue)) === expectedCanary, 'canary is not the sole 100% preview deployment');
-  assertVersion(canary, '111');
+  assertVersion(canary, '111', false, reviewedGate);
   scriptEtag(canary, 'canary');
 }
 
@@ -328,26 +333,27 @@ export function validateCanaryDeployment(
  */
 export function planRestore(
   configText: string, deploymentsValue: unknown, currentValue: unknown, targetValue: unknown,
-  expectedCurrent: string, expectedTarget: string,
+  expectedCurrent: string, expectedTarget: string, gate: unknown = SCHEMA_0009_CANARY_GATE,
 ): 'already' | 'deploy' {
-  assertCommittedConfig(configText);
+  const reviewedGate = validateSchema0009CanaryGate(gate);
+  assertCommittedConfig(configText, reviewedGate);
   refuse(isUuid(expectedCurrent) && isUuid(expectedTarget), 'restore IDs must be exact UUIDs');
   const current = parseFullVersion(currentValue);
   const target = parseFullVersion(targetValue);
   refuse(target.id === expectedTarget, 'restore target view identity mismatch');
   const active = activeVersion(parseDeployments(deploymentsValue));
-  assertVersion(target, '100');
+  assertVersion(target, '100', false, reviewedGate);
   const targetScriptEtag = scriptEtag(target, 'restore target');
   if (active === expectedTarget) {
     refuse(expectedCurrent === expectedTarget && current.id === expectedTarget, 'active baseline view identity mismatch');
-    assertVersion(current, '100');
+    assertVersion(current, '100', false, reviewedGate);
     refuse(scriptEtag(current, 'active restore baseline') === targetScriptEtag,
       'restore baseline code identity mismatch');
     return 'already';
   }
   refuse(expectedCurrent !== expectedTarget, 'restore candidate and target IDs must differ');
   refuse(active === expectedCurrent && current.id === expectedCurrent, 'active preview version is not the authorized canary');
-  assertVersion(current, '111');
+  assertVersion(current, '111', false, reviewedGate);
   refuse(scriptEtag(current, 'active canary') === targetScriptEtag,
     'restore would overwrite a preview code change');
   refuse(current.annotations?.['workers/tag'] === CANARY_TAG, 'active preview version is not the tagged canary');
@@ -357,13 +363,14 @@ export function planRestore(
 }
 
 export function validateRestoreResult(
-  configText: string, deploymentsValue: unknown, targetValue: unknown, expectedTarget: string,
+  configText: string, deploymentsValue: unknown, targetValue: unknown, expectedTarget: string, gate: unknown = SCHEMA_0009_CANARY_GATE,
 ): void {
-  assertCommittedConfig(configText);
+  const reviewedGate = validateSchema0009CanaryGate(gate);
+  assertCommittedConfig(configText, reviewedGate);
   const target = parseFullVersion(targetValue);
   refuse(target.id === expectedTarget && isUuid(expectedTarget), 'restore target identity is invalid');
   refuse(activeVersion(parseDeployments(deploymentsValue)) === expectedTarget, 'exact preview predecessor was not restored to 100%');
-  assertVersion(target, '100');
+  assertVersion(target, '100', false, reviewedGate);
   scriptEtag(target, 'restored preview predecessor');
 }
 
@@ -472,7 +479,7 @@ function configuredD1(config: JsonRecord, label: string): JsonRecord & { databas
 function parseSchema0009EnvironmentGate(value: unknown, label: string): Schema0009CanaryEnvironmentGate {
   const environment = asRecord(value, `${label} schema-0009 canary gate`);
   exactKeys(environment, ['databaseName', 'databaseId', 'readinessEvidence', 'authorityEvidence'], `${label} schema-0009 canary gate`);
-  refuse(isD1Name(environment.databaseName) && isUuid(environment.databaseId), `${label} schema-0009 D1 identity is invalid`);
+  refuse(isEnvironmentD1Name(environment.databaseName, label) && isUuid(environment.databaseId), `${label} schema-0009 D1 identity is invalid`);
   return {
     databaseName: environment.databaseName,
     databaseId: environment.databaseId,
@@ -497,7 +504,11 @@ function assertSchema0009EnvironmentMatch(
   );
 }
 
-function assertVersion(version: FullVersion, mode: Mode, requireProductionOperator = false): boolean {
+function assertNotLegacySchema0008D1(databaseId: string, label: string): void {
+  refuse(!LEGACY_SCHEMA_0008_D1_IDS.has(databaseId), `${label} D1 identity uses a recorded schema-0008 UUID`);
+}
+
+function assertVersion(version: FullVersion, mode: Mode, requireProductionOperator = false, gate: Schema0009CanaryGate = SCHEMA_0009_CANARY_GATE): boolean {
   const runtime = recordAt(version.resources, 'script_runtime');
   refuse(runtime.compatibility_date === COMPATIBILITY_DATE && stableJson(runtime.compatibility_flags) === stableJson(COMPATIBILITY_FLAGS),
     'version compatibility settings mismatch');
@@ -515,7 +526,8 @@ function assertVersion(version: FullVersion, mode: Mode, requireProductionOperat
   ]);
   refuse(bindings.length === expectedNames.size && bindings.every(binding => expectedNames.has(String(binding.name))),
     'version bindings must be the exact authorized set');
-  const values = mode === '000' ? PRODUCTION : PREVIEW;
+  const environments = expectedSchema0009Environments(gate);
+  const values = mode === '000' ? environments.production : environments.preview;
   assertVersionBinding(bindings, 'THEOLOGAI_DB', 'd1', { id: values.d1 });
   assertVersionBinding(bindings, DO.name, DO.type, { class_name: DO.class_name, script_name: DO.script_name });
   assertVersionRate(bindings, 'THEOLOGAI_RATE_LIMITER', values.requestNamespace, 120);
@@ -644,7 +656,11 @@ function isRecord(value: unknown): value is JsonRecord { return typeof value ===
 function isUuid(value: unknown): value is string { return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value); }
 function isSha(value: unknown): value is string { return typeof value === 'string' && /^[0-9a-f]{40}$/.test(value); }
 function isSha256(value: unknown): value is string { return typeof value === 'string' && /^[a-f0-9]{64}$/.test(value); }
-function isD1Name(value: unknown): value is string { return typeof value === 'string' && /^theologai-(?:preview|production)-[a-z0-9-]+$/.test(value); }
+function isEnvironmentD1Name(value: unknown, environment: string): value is string {
+  return typeof value === 'string'
+    && (environment === 'preview' || environment === 'production')
+    && new RegExp(`^theologai-${environment}-[a-z0-9-]+$`).test(value);
+}
 function isEvidenceIdentity(value: unknown): value is string { return typeof value === 'string' && /^[a-z0-9][a-z0-9._:-]{2,127}$/.test(value); }
 function stableJson(value: unknown): string { return JSON.stringify(value, (_, nested) => isRecord(nested) ? Object.fromEntries(Object.entries(nested).sort(([a], [b]) => a.localeCompare(b))) : nested); }
 function refuse(condition: unknown, message: string): asserts condition { if (!condition) throw new Error(`CCEL canary refused: ${message}.`); }

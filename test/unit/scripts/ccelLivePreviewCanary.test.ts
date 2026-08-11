@@ -50,10 +50,20 @@ const liveBindingShapes = JSON.parse(readFileSync(
   preview: { versionId: string; flags: string; secretTextBindingNames: string[]; operatorReady: boolean };
 };
 
-function bindings(mode: '100' | '111' | '000', includeOperatorSecret = false) {
+interface WorkerD1Ids {
+  preview: string;
+  production: string;
+}
+
+const legacyD1Ids: WorkerD1Ids = {
+  preview: '62b871a6-5b4d-4d9b-8f52-301f6c878f48',
+  production: '53211f50-a893-4b4c-be1e-bc625a595dc7',
+};
+
+function bindings(mode: '100' | '111' | '000', includeOperatorSecret = false, d1Ids: WorkerD1Ids = legacyD1Ids) {
   const productionMode = mode === '000';
   return [
-    { name: 'THEOLOGAI_DB', type: 'd1', id: productionMode ? '53211f50-a893-4b4c-be1e-bc625a595dc7' : '62b871a6-5b4d-4d9b-8f52-301f6c878f48' },
+    { name: 'THEOLOGAI_DB', type: 'd1', id: productionMode ? d1Ids.production : d1Ids.preview },
     { name: 'THEOLOGAI_CCEL_COORDINATOR', type: 'durable_object_namespace', class_name: 'CcelGlobalCoordinator', script_name: 'theologai-ccel-coordinator' },
     { name: 'THEOLOGAI_RATE_LIMITER', type: 'ratelimit', namespace_id: productionMode ? '361201' : '361202', simple: { limit: 120, period: 60 } },
     { name: 'THEOLOGAI_CCEL_OPERATOR_AUTH_LIMITER', type: 'ratelimit', namespace_id: productionMode ? '361203' : '361204', simple: { limit: 12, period: 60 } },
@@ -76,7 +86,7 @@ function bindings(mode: '100' | '111' | '000', includeOperatorSecret = false) {
 
 function view(
   id: string, number: number, mode: '100' | '111' | '000' = '100',
-  options: { message?: string; tag?: string; secret?: boolean; scriptEtag?: string } = {},
+  options: { message?: string; tag?: string; secret?: boolean; scriptEtag?: string; d1Ids?: WorkerD1Ids } = {},
 ) {
   return {
     id, number, metadata: { created_on: '2026-07-29T00:00:00.000Z' },
@@ -84,7 +94,7 @@ function view(
     resources: {
       script: { etag: options.scriptEtag ?? '4f8e2a', handlers: ['fetch'], last_deployed_from: 'wrangler' },
       script_runtime: { compatibility_date: '2026-07-09', compatibility_flags: ['nodejs_compat'] },
-      bindings: bindings(mode, options.secret),
+      bindings: bindings(mode, options.secret, options.d1Ids),
     },
   };
 }
@@ -108,7 +118,7 @@ describe('CCEL live preview canary transaction', () => {
     expect(() => validateCanaryDispatch({
       ref: 'refs/heads/main', sha: 'a'.repeat(40), expectedSha: 'a'.repeat(40), liveMainSha: 'a'.repeat(40),
       confirmation: CANARY_CONFIRMATION, configText: config,
-    })).toThrow(/recorded schema-0008 production D1 identity is not a canary baseline/);
+    })).toThrow(/production D1 identity uses a recorded schema-0008 UUID/);
     expect(() => validateCanaryDispatch({
       ref: 'refs/heads/feature', sha: 'a'.repeat(40), expectedSha: 'a'.repeat(40), liveMainSha: 'a'.repeat(40),
       confirmation: CANARY_CONFIRMATION, configText: config,
@@ -141,12 +151,12 @@ describe('CCEL live preview canary transaction', () => {
       requiredSchema: '0009_candidate_c_sectioned_publications',
     });
     expect(() => assertSchema0009CanaryPrerequisite(config))
-      .toThrow(/recorded schema-0008 production D1 identity is not a canary baseline/);
+      .toThrow(/production D1 identity uses a recorded schema-0008 UUID/);
     const onlyLegacyPreviewRemaining = config
       .replace('theologai-production-20260729-transform11-a', 'theologai-production-schema0009-candidate')
       .replace('53211f50-a893-4b4c-be1e-bc625a595dc7', '323e4567-e89b-42d3-a456-426614174003');
     expect(() => assertSchema0009CanaryPrerequisite(onlyLegacyPreviewRemaining))
-      .toThrow(/recorded schema-0008 preview D1 identity is not a canary baseline/);
+      .toThrow(/preview D1 identity uses a recorded schema-0008 UUID/);
     const noLegacyIdentityRemaining = onlyLegacyPreviewRemaining
       .replace('theologai-preview-20260728-transform11-a', 'theologai-preview-schema0009-candidate')
       .replace('62b871a6-5b4d-4d9b-8f52-301f6c878f48', '423e4567-e89b-42d3-a456-426614174003');
@@ -168,6 +178,7 @@ describe('CCEL live preview canary transaction', () => {
         readinessEvidence: { identity: 'remote-d1-readiness.v1', sha256: 'c'.repeat(64) },
         authorityEvidence: { identity: 'transform-8-9-11-12-authority.v1', sha256: 'd'.repeat(64) },
       },
+      environmentIsolationEvidence: { identity: 'environment-isolation.v1', sha256: 'e'.repeat(64) },
     };
     expect(() => validateSchema0009CanaryGate(readyGate)).not.toThrow();
     expect(() => assertCommittedConfig(noLegacyIdentityRemaining, readyGate)).not.toThrow();
@@ -181,6 +192,14 @@ describe('CCEL live preview canary transaction', () => {
       noLegacyIdentityRemaining.replace('theologai-preview-schema0009-candidate', 'theologai-preview-wrong-candidate'),
       readyGate,
     )).toThrow(/preview D1 identity does not match the reviewed schema-0009 canary gate/);
+    expect(() => assertSchema0009CanaryPrerequisite(
+      noLegacyIdentityRemaining.replace('423e4567-e89b-42d3-a456-426614174003', LEGACY_SCHEMA_0008_D1.preview.id),
+      readyGate,
+    )).toThrow(/preview D1 identity uses a recorded schema-0008 UUID/);
+    expect(() => validateSchema0009CanaryGate({
+      ...readyGate,
+      preview: { ...readyGate.preview, databaseId: LEGACY_SCHEMA_0008_D1.preview.id },
+    })).toThrow(/ready preview D1 identity uses a recorded schema-0008 UUID/);
     expect(() => validateSchema0009CanaryGate({
       state: 'ready', requiredSchema: '0009_candidate_c_sectioned_publications', preview: readyGate.preview,
     })).toThrow(/ready schema-0009 canary gate must contain exactly authorized keys/);
@@ -191,6 +210,50 @@ describe('CCEL live preview canary transaction', () => {
         readinessEvidence: { ...readyGate.production.readinessEvidence, sha256: 'not-a-sha256' },
       },
     })).toThrow(/production readiness evidence identity or SHA-256 is invalid/);
+    const { environmentIsolationEvidence: _isolation, ...missingIsolation } = readyGate;
+    expect(() => validateSchema0009CanaryGate(missingIsolation))
+      .toThrow(/ready schema-0009 canary gate must contain exactly authorized keys/);
+    expect(() => validateSchema0009CanaryGate({
+      ...readyGate,
+      environmentIsolationEvidence: { ...readyGate.environmentIsolationEvidence, sha256: 'not-a-sha256' },
+    })).toThrow(/environment isolation evidence identity or SHA-256 is invalid/);
+    expect(() => validateSchema0009CanaryGate({
+      ...readyGate,
+      preview: { ...readyGate.preview, databaseName: 'theologai-production-crossed-candidate' },
+    })).toThrow(/preview schema-0009 D1 identity is invalid/);
+    expect(() => validateSchema0009CanaryGate({
+      ...readyGate,
+      production: { ...readyGate.production, databaseName: 'theologai-preview-crossed-candidate' },
+    })).toThrow(/production schema-0009 D1 identity is invalid/);
+
+    const readyD1Ids: WorkerD1Ids = {
+      preview: readyGate.preview.databaseId,
+      production: readyGate.production.databaseId,
+    };
+    const readyBaseline = view(predecessor, 10, '100', { scriptEtag: 'ready-schema0009', d1Ids: readyD1Ids });
+    const readyCanary = view(canary, 11, '111', {
+      message: CANARY_MESSAGE, tag: CANARY_TAG, scriptEtag: 'ready-schema0009', d1Ids: readyD1Ids,
+    });
+    const readyProduction = view(production, 9, '000', { secret: true, d1Ids: readyD1Ids });
+    expect(() => validatePreviewBaseline(
+      noLegacyIdentityRemaining, deployments(predecessor), readyBaseline, predecessor, readyGate,
+    )).not.toThrow();
+    expect(() => validateProductionControl(
+      noLegacyIdentityRemaining, deployments(production), readyProduction, production, readyGate,
+    )).not.toThrow();
+    expect(validateProductionBindingInventory(readyProduction, readyGate)).toEqual({ operatorReady: true });
+    expect(() => validateCanaryVersion(
+      noLegacyIdentityRemaining, readyBaseline, readyCanary, predecessor, canary, readyGate,
+    )).not.toThrow();
+    expect(() => validateCanaryDeployment(
+      noLegacyIdentityRemaining, deployments(canary), readyCanary, canary, readyGate,
+    )).not.toThrow();
+    expect(planRestore(
+      noLegacyIdentityRemaining, deployments(canary), readyCanary, readyBaseline, canary, predecessor, readyGate,
+    )).toBe('deploy');
+    expect(() => validateRestoreResult(
+      noLegacyIdentityRemaining, deployments(predecessor), readyBaseline, predecessor, readyGate,
+    )).not.toThrow();
     expect(workflow.indexOf('validate-dispatch')).toBeLessThan(workflow.indexOf('npx wrangler'));
   });
 
@@ -206,7 +269,7 @@ describe('CCEL live preview canary transaction', () => {
     expect(ordered.every(index => index >= 0)).toBe(true);
     expect(ordered).toEqual([...ordered].sort((left, right) => left - right));
     expect(canaryTransaction).toContain('Do not perform a second preview refresh here.');
-    expect(canaryTransaction).toContain('reviewed `ready` record\nfor each environment: exact D1 name/UUID plus separately pinned readiness and\nauthority evidence identities and SHA-256 values');
+    expect(canaryTransaction).toContain('reviewed `ready` record\nfor each environment: exact D1 name/UUID plus separately pinned readiness and\nauthority evidence identities and SHA-256 values, plus one separately pinned\nenvironment-isolation evidence identity and SHA-256');
     expect(operatorProvisioning).toContain('it must not be\nrepeated as a second refresh after credential work.');
   });
 

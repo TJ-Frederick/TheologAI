@@ -68,10 +68,12 @@ schema-`0008` D1 identities during its first local validation, before any
 Wrangler command or Cloudflare read. Changing only a D1 ID is insufficient: the
 future change must replace the `unrecorded` gate with a reviewed `ready` record
 for each environment: exact D1 name/UUID plus separately pinned readiness and
-authority evidence identities and SHA-256 values. The local validator rejects
-unknown or incomplete `ready` records, malformed evidence, any shared
-preview/production identity, and any mismatch between those reviewed D1 pairs
-and committed configuration.
+authority evidence identities and SHA-256 values, plus one separately pinned
+environment-isolation evidence identity and SHA-256. The local validator rejects
+unknown or incomplete `ready` records, malformed evidence, any recorded
+schema-`0008` UUID regardless of database name, any shared preview/production
+identity, and any mismatch between those reviewed D1 pairs and committed
+configuration.
 
 The only way to create the third row is the main-only, manually dispatched
 `CCEL Live Preview Canary` workflow. It requires all of the following:
