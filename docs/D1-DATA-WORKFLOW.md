@@ -151,6 +151,37 @@ read-only inventory/check. If retention or compatibility has not been verified,
 document the target as candidate/unverified. Database deletion remains a later,
 separately authorized operation after the retention window and rollback review.
 
+### Schema-0009 preview-release preparation record
+
+The reviewed pre-release baseline is commit
+`e1baa04fecbb066860d06f262142e3450823b7d0`, tree
+`673af4a75c770c541a8be3c84e77d8f91033bd07`. Both schema-`0009` candidates
+were prepared and audited while unbound. The preview candidate is
+`theologai-preview-20260811-schema0009-a`
+(`74f456e2-6951-4003-bb6f-91951342bf8f`); the separately prepared production
+candidate is `9bc79346-338b-439e-a2a5-424f4418eb21` and is not this release's
+binding target.
+
+The deterministic seed identity was manifest
+`ecbd23bb3c692665c7031a8c1fa7733e17a56fbc7e3a167ba4011f6c1cca62d8`, sourced
+from data manifest `14e30a32f316f1c7a954a9641f7d1b8bd6608d8e0f4bdc2eaba4c565f472f83d`,
+with D1 materialization identity
+`66c148a206b9b0eb1bf7552572570c42dabfd0ba591b63e0cf0d02adda35aa07` and
+migration-`0009` identity
+`989dd945ac633ecb1ba83cc80a1b88234cac31d78b3d905ae0242eb66c533eb3`. It
+contained 49 ordered files, 1,630,260 rows, and 177,923,082 bytes. Each
+candidate passed the read-only readiness plus Transform-8 and Transform-9
+authority audits with 60 tables, 307,617,792 bytes, 35 documents, 4,111
+sections, zero `historical_sectioned_publications` rows, and one corpus seal.
+
+This commit changes only the checked-in preview binding. It does not bind or
+deploy either Worker, change the root production binding, or activate the
+production candidate. Its protected preview workflow writes a minimal
+sanitized readiness receipt with independently hashable readiness and authority
+outcomes, then captures and compares production deployment, Worker, and D1
+identities around the preview mutation. Any production identity drift fails the
+preview release before black-box audits.
+
 ## Optional local D1 rehearsal
 
 Wrangler defaults D1 commands to local state, but specify `--local` explicitly

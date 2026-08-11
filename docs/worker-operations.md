@@ -16,6 +16,19 @@ and the independent post-release review returned `SHIP`. This is not a
 hierarchy/publication activation; CCEL execution remains disabled and Aquinas
 remains inactive.
 
+### Schema-0009 preview-release pre-state
+
+The checked-in preview configuration now targets the separately prepared,
+unbound schema-`0009` D1 `theologai-preview-20260811-schema0009-a`
+(`74f456e2-6951-4003-bb6f-91951342bf8f`). This is a release candidate, not a
+claim that preview traffic has changed: the protected preview workflow must
+prove the candidate binding and complete its audit. It also captures production
+before and after the preview mutation and fails if its deployment, Worker, or
+D1 UUID changes. Production remains configured and live on
+`theologai-production-20260729-transform11-a`
+(`53211f50-a893-4b4c-be1e-bc625a595dc7`); prepared candidate
+`9bc79346-338b-439e-a2a5-424f4418eb21` is unbound and is not configured here.
+
 The former PR #101 production assignment is the matched rollback pair:
 deployment `71b76d24-bf5f-490e-adc4-31cf63fb046e`, Worker
 `bae58cd3-cad7-4663-879d-408accf061b0` (#96), and D1

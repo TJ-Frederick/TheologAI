@@ -92,6 +92,18 @@ export interface ProductionPostMutationObservation {
 
 export type ProductionPostMutationReconciliation = ProductionPostMutationObservation;
 
+/**
+ * A fixed production control snapshot used to prove an ordinary preview
+ * release did not alter production. It has no caller-selected Worker target.
+ */
+export interface ProductionControlIdentity {
+  schemaVersion: 1;
+  worker: 'theologai';
+  deploymentId: string;
+  workerVersionId: string;
+  d1: ObservedD1Binding;
+}
+
 function fail(message: string): never { throw new Error(`Worker release reconciliation refused: ${message}.`); }
 function assert(value: unknown, message: string): asserts value { if (!value) fail(message); }
 function object(value: unknown, label: string): RecordValue {
@@ -242,6 +254,54 @@ export function activePreviewVersionId(deploymentsText: string): string {
 
 export function activeProductionVersionId(deploymentsText: string): string {
   return currentSoleDeployment(deploymentsText, 'production deployments').versionId;
+}
+
+export function captureProductionControlIdentity(input: {
+  deploymentsText: string;
+  activeVersionViewText: string;
+}): ProductionControlIdentity {
+  const active = currentSoleDeployment(input.deploymentsText, 'production control deployments');
+  const d1 = observedD1FromAuthoritativeVersionView(input.activeVersionViewText, active.versionId, 'production control');
+  return {
+    schemaVersion: 1,
+    worker: 'theologai',
+    deploymentId: active.id,
+    workerVersionId: active.versionId,
+    d1,
+  };
+}
+
+function parseProductionControlIdentity(value: unknown): ProductionControlIdentity {
+  const control = object(value, 'production control identity');
+  exactKeys(control, ['schemaVersion', 'worker', 'deploymentId', 'workerVersionId', 'd1'], 'production control identity');
+  const d1 = object(control.d1, 'production control D1');
+  exactKeys(d1, ['binding', 'databaseId'], 'production control D1');
+  assert(control.schemaVersion === 1 && control.worker === 'theologai'
+    && isUuid(control.deploymentId) && isUuid(control.workerVersionId)
+    && d1.binding === 'THEOLOGAI_DB' && isUuid(d1.databaseId),
+  'production control identity is not canonical');
+  return {
+    schemaVersion: 1, worker: 'theologai', deploymentId: control.deploymentId.toLowerCase(),
+    workerVersionId: control.workerVersionId.toLowerCase(),
+    d1: { binding: 'THEOLOGAI_DB', databaseId: d1.databaseId.toLowerCase() },
+  };
+}
+
+/** Fail closed if an ordinary preview release observed any production identity drift. */
+export function verifyProductionControlUnchanged(input: {
+  controlText: string;
+  deploymentsText: string;
+  activeVersionViewText: string;
+}): ProductionControlIdentity {
+  const control = parseProductionControlIdentity(parseJson(input.controlText, 'production control identity'));
+  const observed = captureProductionControlIdentity({
+    deploymentsText: input.deploymentsText,
+    activeVersionViewText: input.activeVersionViewText,
+  });
+  assert(observed.deploymentId === control.deploymentId, 'production deployment changed during preview release');
+  assert(observed.workerVersionId === control.workerVersionId, 'production Worker version changed during preview release');
+  assert(observed.d1.databaseId === control.d1.databaseId, 'production D1 binding changed during preview release');
+  return observed;
 }
 
 export function capturePreviewPredecessorAnchor(input: {
@@ -431,7 +491,7 @@ function exactArgs(argv: string[], command: string, expected: string[]): Map<str
   return values;
 }
 
-async function writeRecord(record: PreviewPredecessorAnchor | PreviewPostMutationObservation | ProductionPredecessorAnchor | ProductionPostMutationObservation, output: string): Promise<void> {
+async function writeRecord(record: PreviewPredecessorAnchor | PreviewPostMutationObservation | ProductionPredecessorAnchor | ProductionPostMutationObservation | ProductionControlIdentity, output: string): Promise<void> {
   await writeFile(output, `${JSON.stringify(record, null, 2)}\n`, { encoding: 'utf8', flag: 'wx' });
 }
 
@@ -489,6 +549,21 @@ export async function runProductionCli(argv: string[]): Promise<void> {
     const values = exactArgs(argv.slice(1), command, ['--deployments']);
     process.stdout.write(`${activeProductionVersionId(await readFile(values.get('--deployments')!, 'utf8'))}\n`); return;
   }
+  if (command === 'capture-control') {
+    const values = exactArgs(argv.slice(1), command, ['--deployments', '--active-version-view', '--output']);
+    const [deploymentsText, activeVersionViewText] = await Promise.all([
+      readFile(values.get('--deployments')!, 'utf8'), readFile(values.get('--active-version-view')!, 'utf8'),
+    ]);
+    await writeRecord(captureProductionControlIdentity({ deploymentsText, activeVersionViewText }), values.get('--output')!); return;
+  }
+  if (command === 'verify-control') {
+    const values = exactArgs(argv.slice(1), command, ['--control', '--deployments', '--active-version-view', '--output']);
+    const [controlText, deploymentsText, activeVersionViewText] = await Promise.all([
+      readFile(values.get('--control')!, 'utf8'), readFile(values.get('--deployments')!, 'utf8'),
+      readFile(values.get('--active-version-view')!, 'utf8'),
+    ]);
+    await writeRecord(verifyProductionControlUnchanged({ controlText, deploymentsText, activeVersionViewText }), values.get('--output')!); return;
+  }
   if (command === 'capture-predecessor') {
     const values = exactArgs(argv.slice(1), command, ['--deployments', '--predecessor-version-view', '--wrangler-config', '--d1-inventory', '--output']);
     const [deploymentsText, predecessorVersionViewText, wranglerConfigText, d1InventoryText] = await Promise.all([
@@ -506,7 +581,7 @@ export async function runProductionCli(argv: string[]): Promise<void> {
     const input = { predecessorAnchorText, postMutationDeploymentsText, observedActiveVersionViewText, wranglerConfigText };
     await writeRecord(command === 'observe-post-mutation' ? observeProductionPostMutation(input) : reconcileProductionPostMutation(input), values.get('--output')!); return;
   }
-  fail('production command must be candidate-d1-name, active-version-id, capture-predecessor, reconcile-post-mutation, or observe-post-mutation');
+  fail('production command must be candidate-d1-name, active-version-id, capture-control, verify-control, capture-predecessor, reconcile-post-mutation, or observe-post-mutation');
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

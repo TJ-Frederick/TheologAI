@@ -2,7 +2,8 @@
 /** Read-only remote D1 compatibility gate used only inside approved deploy jobs. */
 
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { genesisOneOneLemmaReadinessPredicate, johnOneOneReadinessPredicate } from './data-integrity.js';
@@ -24,10 +25,12 @@ import {
 import {
   auditHistoricalTransform8Authority,
   parseHistoricalTransform8D1Page,
+  type HistoricalTransform8AuthorityAuditResult,
 } from './historical-transform8-authority-audit.js';
 import {
   auditHistoricalTransform9Authority,
   parseHistoricalTransform9D1Page,
+  type HistoricalTransform9AuthorityAuditResult,
 } from './historical-transform9-authority-audit.js';
 import {
   normalAquinasHierarchyExclusionChecks,
@@ -135,6 +138,24 @@ interface RemoteD1ReadinessOptions {
    * workflows continue to use their reviewed configuration.
    */
   configPath?: string;
+}
+
+interface ReadinessReceiptComponent {
+  identitySha256: string;
+  result: 'passed';
+  resultSha256: string;
+}
+
+/**
+ * Minimal, publishable result of a successful remote gate. It deliberately
+ * excludes SQL, Wrangler JSON, diagnostics, request metadata, and source text.
+ */
+export interface RemoteD1ReadinessReceipt {
+  schemaVersion: 'theologai-remote-d1-readiness-receipt.v1';
+  database: string;
+  environment: string | null;
+  readiness: ReadinessReceiptComponent;
+  authority: ReadinessReceiptComponent;
 }
 
 type ReadinessCommandExecutor = (
@@ -633,26 +654,73 @@ function assertD1ReadinessSqlByteBound(kind: 'primary' | 'diagnostic', sql: stri
   return sql;
 }
 
-function parseArguments(argv: string[]): { database: string; env?: string; printOnly: boolean } {
+function parseArguments(argv: string[]): { database: string; env?: string; output?: string; printOnly: boolean } {
   let database: string | undefined;
   let env: string | undefined;
+  let output: string | undefined;
   let printOnly = false;
   for (let index = 0; index < argv.length; index++) {
     const argument = argv[index];
     if (argument === '--database') database = argv[++index];
     else if (argument === '--env') env = argv[++index];
+    else if (argument === '--output') output = argv[++index];
     else if (argument === '--print') printOnly = true;
     else throw new Error(`Unknown argument: ${argument}`);
   }
   if (!database || database.startsWith('--')) throw new Error('--database is required');
   if (env?.startsWith('--')) throw new Error('--env requires a value');
-  return { database, env, printOnly };
+  if (output?.startsWith('--')) throw new Error('--output requires a path');
+  if (printOnly && output) throw new Error('--print and --output cannot be combined');
+  return { database, env, output, printOnly };
+}
+
+function sha256(value: string): string {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+function receiptComponent(identity: unknown): ReadinessReceiptComponent {
+  const identitySha256 = sha256(JSON.stringify(identity));
+  const result = 'passed' as const;
+  return { identitySha256, result, resultSha256: sha256(JSON.stringify({ identitySha256, result })) };
+}
+
+export function createRemoteD1ReadinessReceipt(input: {
+  database: string;
+  env?: string;
+  transform8: HistoricalTransform8AuthorityAuditResult;
+  transform9: HistoricalTransform9AuthorityAuditResult;
+}): RemoteD1ReadinessReceipt {
+  return {
+    schemaVersion: 'theologai-remote-d1-readiness-receipt.v1',
+    database: input.database,
+    environment: input.env ?? null,
+    readiness: receiptComponent({
+      kind: 'd1-readiness.v1', schemaVersion: MANIFEST.schemaVersion,
+      corpusIdentity: D1_CORPUS_IDENTITY,
+      checkCount: buildD1ReadinessQueryContract(MANIFEST.expectedCounts).checks.length,
+    }),
+    authority: receiptComponent({
+      kind: 'historical-transform8-9-authority.v1',
+      transform8: {
+        attestationSha256: input.transform8.attestationSha256,
+        profilesSha256: input.transform8.profilesSha256,
+        identitiesSha256: input.transform8.identitiesSha256,
+        aliasesSha256: input.transform8.aliasesSha256,
+        bodyFtsSampleSha256: input.transform8.bodyFtsSampleSha256,
+      },
+      transform9: input.transform9.hashes,
+    }),
+  };
+}
+
+function writeReadinessReceipt(path: string, receipt: RemoteD1ReadinessReceipt): void {
+  writeFileSync(path, `${JSON.stringify(receipt, null, 2)}\n`, { encoding: 'utf8', flag: 'wx', mode: 0o600 });
 }
 
 export function runRemoteD1ReadinessCheck(
   options: RemoteD1ReadinessOptions,
   execute: ReadinessCommandExecutor = execFileSync,
-): void {
+): RemoteD1ReadinessReceipt {
   const wrangler = options.wrangler ?? join(ROOT, 'node_modules', 'wrangler', 'bin', 'wrangler.js');
   const cwd = options.cwd ?? ROOT;
   const executeSql = (sql: string, capture = false): unknown => {
@@ -678,6 +746,9 @@ export function runRemoteD1ReadinessCheck(
       );
     });
     process.stderr.write(`Transform-9 D1 authority audit passed (${transform9Audit.pages.packs}/${transform9Audit.pages.works}/${transform9Audit.pages.editions}/${transform9Audit.pages.artifacts}/${transform9Audit.pages.documents}/${transform9Audit.pages.profiles}/${transform9Audit.pages.sections}/${transform9Audit.pages.projections} pages).\n`);
+    return createRemoteD1ReadinessReceipt({
+      database: options.database, env: options.env, transform8: audit, transform9: transform9Audit,
+    });
   } catch (primaryError) {
     process.stderr.write('Primary D1 readiness gate failed; requesting failed-check diagnostics.\n');
     try {
@@ -690,14 +761,15 @@ export function runRemoteD1ReadinessCheck(
 }
 
 function main(): void {
-  const { database, env, printOnly } = parseArguments(process.argv.slice(2));
+  const { database, env, output, printOnly } = parseArguments(process.argv.slice(2));
   const sql = buildD1ReadinessSql(MANIFEST.expectedCounts);
   if (printOnly) {
     process.stdout.write(`${sql}\n`);
     return;
   }
 
-  runRemoteD1ReadinessCheck({ database, env });
+  const receipt = runRemoteD1ReadinessCheck({ database, env });
+  if (output) writeReadinessReceipt(output, receipt);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

@@ -297,10 +297,20 @@ describe('remote D1 readiness query', () => {
   it('runs primary readiness, then bounded authority pages, and requests diagnostics only after failure', () => {
     const remote = remoteAuthorityExecutor();
     try {
-      runRemoteD1ReadinessCheck({
+      const receipt = runRemoteD1ReadinessCheck({
         database: 'preview', env: 'preview', wrangler: '/tmp/wrangler',
         configPath: '/tmp/generated-candidate/wrangler.candidate.toml',
       }, remote.execute);
+      expect(receipt).toMatchObject({
+        schemaVersion: 'theologai-remote-d1-readiness-receipt.v1',
+        database: 'preview', environment: 'preview',
+        readiness: { result: 'passed' }, authority: { result: 'passed' },
+      });
+      for (const component of [receipt.readiness, receipt.authority]) {
+        expect(component.identitySha256).toMatch(/^[a-f0-9]{64}$/);
+        expect(component.resultSha256).toMatch(/^[a-f0-9]{64}$/);
+      }
+      expect(JSON.stringify(receipt)).not.toMatch(/(?:sql|resources|diagnostic|content)/i);
       expect(remote.calls).toHaveLength(183); // readiness plus Transform 8 and complete three-pack authority pages
       expect(remote.calls[0]).toContain('--json');
       expect(remote.calls[0]).toContain('--env');

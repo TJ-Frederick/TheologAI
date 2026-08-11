@@ -196,15 +196,30 @@ For a preview-client rollback without changing server state, use the direct prev
 redirects rather than serving a separate legacy Worker.
 
 The deployed preview and production D1 layers remain schema `0008`; current
-main's PR #117 schema `0009` Candidate-C contract is checked out only and has
-no prepared, bound, or deployed remote-D1 claim. Earlier local-only and
-preview-only activation statements are historical. PR #101 bound the separate
+main's PR #117 schema `0009` Candidate-C contract has prepared, unbound
+candidates but makes no bound or deployed remote-D1 claim. Earlier local-only
+and preview-only activation statements are historical. PR #101 bound the separate
 preview and production D1 databases recorded above. The historical PR #96 public
 `original_language_study` v2 audit does not independently establish the runtime
 path for every later historical transform. The pinned packet's `SOURCE.json`
 remains a historical acquisition-gate snapshot, not deployment evidence.
 Production v6/local-only and preview v7/discovery-only remain deployed with
 CCEL execution disabled before adapter, coordinator, or fetch.
+
+### Schema-0009 preview release pre-state
+
+This checked-out release commit targets only the prepared preview D1
+`theologai-preview-20260811-schema0009-a`
+(`74f456e2-6951-4003-bb6f-91951342bf8f`). It is not itself a Cloudflare
+binding or deployment claim: the protected preview workflow must re-check the
+candidate, deploy it, prove the active preview binding, and complete its audit.
+Production remains configured and live on schema-`0008`
+`theologai-production-20260729-transform11-a`
+(`53211f50-a893-4b4c-be1e-bc625a595dc7`); its separately prepared schema-`0009`
+candidate is `9bc79346-338b-439e-a2a5-424f4418eb21` and remains unbound. The
+CCEL canary gate remains unrecorded and inert. The exact preparation identity,
+seed evidence, and release boundary are recorded in
+[docs/D1-DATA-WORKFLOW.md](docs/D1-DATA-WORKFLOW.md).
 
 ## MCP capabilities
 

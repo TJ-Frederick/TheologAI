@@ -61,14 +61,18 @@ environment binding; the preview audit does not authorize the production release
 and the completed releases/isolation evidence do not authorize credential staging
 or the canary.
 
-The repository currently records neither schema-`0009` candidate identity nor
-its readiness/authority evidence. Until a separate reviewed release replaces the
-hard inert schema-`0009` canary gate, the canary workflow rejects both retained
-schema-`0008` D1 identities during its first local validation, before any
-Wrangler command or Cloudflare read. Changing only a D1 ID is insufficient: the
-future change must replace the `unrecorded` gate with a reviewed `ready` record
-for each environment: exact D1 name/UUID plus separately pinned readiness and
-authority evidence identities and SHA-256 values, plus one separately pinned
+The schema-`0009` candidates now have retained unbound preparation evidence:
+the checked-in preview release target is
+`theologai-preview-20260811-schema0009-a`
+(`74f456e2-6951-4003-bb6f-91951342bf8f`), and the production candidate
+`9bc79346-338b-439e-a2a5-424f4418eb21` remains unbound. This does not make the
+canary ready. Until a separate reviewed release replaces the hard inert
+schema-`0009` canary gate, the canary workflow rejects both retained schema-`0008`
+D1 identities during its first local validation, before any Wrangler command or
+Cloudflare read. Changing only a D1 ID is insufficient: the future change must
+replace the `unrecorded` gate with a reviewed `ready` record for each
+environment: exact D1 name/UUID plus separately pinned readiness and authority
+evidence identities and SHA-256 values, plus one separately pinned
 environment-isolation evidence identity and SHA-256. The local validator rejects
 unknown or incomplete `ready` records, malformed evidence, any recorded
 schema-`0008` D1 name or UUID regardless of pairing, any shared

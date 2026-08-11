@@ -298,10 +298,19 @@ jobs:
       - name: Verify candidate preview D1 is compatible (read-only)
         run: |
           candidate_d1_name="$(< "$RUNNER_TEMP/preview-candidate-d1-name.txt")"
-          npm run d1:remote:check -- --database "$candidate_d1_name" --env preview
+          npm run d1:remote:check -- --database "$candidate_d1_name" --env preview \
+            --output "$RUNNER_TEMP/preview-d1-readiness-receipt.json"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Upload sanitized preview D1 readiness receipt
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: preview-d1-readiness-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/preview-d1-readiness-receipt.json
+          retention-days: 7
+          if-no-files-found: error
 
       # This is evidence only. It cannot deploy, roll back, bind, seed, or
       # delete; a later failure/revocation still leaves a manual recovery path.
@@ -330,6 +339,34 @@ jobs:
         with:
           name: preview-release-predecessor-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
           path: ${{ runner.temp }}/preview-worker-predecessor-anchor.json
+          retention-days: 7
+          if-no-files-found: error
+
+      # An ordinary preview release may not change production. Capture a fixed
+      # read-only production control before the preview mutation and compare it
+      # again after deployment, before any preview audit can begin.
+      - name: Capture production control before preview deployment (read-only)
+        id: production-control-before
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
+        run: |
+          npx --no-install wrangler deployments list --json > "$RUNNER_TEMP/production-control-deployments-before.json"
+          production_control_version="$(npx --no-install tsx scripts/production-release-reconciliation.ts active-version-id \
+            --deployments "$RUNNER_TEMP/production-control-deployments-before.json")"
+          npx --no-install wrangler versions view "$production_control_version" --json \
+            > "$RUNNER_TEMP/production-control-version-before.json"
+          npx --no-install tsx scripts/production-release-reconciliation.ts capture-control \
+            --deployments "$RUNNER_TEMP/production-control-deployments-before.json" \
+            --active-version-view "$RUNNER_TEMP/production-control-version-before.json" \
+            --output "$RUNNER_TEMP/production-control-before.json"
+
+      - name: Upload production control before preview deployment
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: preview-production-control-before-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/production-control-before.json
           retention-days: 7
           if-no-files-found: error
 
@@ -400,10 +437,30 @@ jobs:
             --output "$RUNNER_TEMP/preview-worker-deployment-pre-audit-identity.json" \
             --github-output "$GITHUB_OUTPUT"
 
+      - name: Verify production control remained unchanged (read-only)
+        id: production-control-after
+        if: ${{ always() && steps.preview-worker-deploy.outcome == 'success' && steps.production-control-before.outcome == 'success' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
+        run: |
+          npx --no-install wrangler deployments list --json > "$RUNNER_TEMP/production-control-deployments-after.json"
+          production_control_version="$(npx --no-install tsx scripts/production-release-reconciliation.ts active-version-id \
+            --deployments "$RUNNER_TEMP/production-control-deployments-after.json")"
+          npx --no-install wrangler versions view "$production_control_version" --json \
+            > "$RUNNER_TEMP/production-control-version-after.json"
+          npx --no-install tsx scripts/production-release-reconciliation.ts verify-control \
+            --control "$RUNNER_TEMP/production-control-before.json" \
+            --deployments "$RUNNER_TEMP/production-control-deployments-after.json" \
+            --active-version-view "$RUNNER_TEMP/production-control-version-after.json" \
+            --output "$RUNNER_TEMP/production-control-after.json"
+
       # Do this before either fixed black-box audit: a deployed Worker must be
       # both sole-active and bound to the readiness-tested candidate D1.
       - name: Require deployed candidate preview D1 binding (read-only)
         id: preview-worker-candidate-cutover
+        if: ${{ steps.production-control-after.outcome == 'success' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -429,7 +486,7 @@ jobs:
       # The observation is create-only and deliberately retained even when
       # the following strict candidate-binding gate fails before any audit.
       - name: Upload preview candidate cutover observation
-        if: ${{ always() && steps.preview-worker-deploy.outcome == 'success' && steps.preview-predecessor.outcome == 'success' }}
+        if: ${{ always() && steps.preview-worker-deploy.outcome == 'success' && steps.preview-predecessor.outcome == 'success' && steps.preview-worker-candidate-cutover.outcome != 'skipped' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: preview-candidate-cutover-observation-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
@@ -565,6 +622,9 @@ jobs:
             ${{ runner.temp }}/preview-worker-deployment-identity.json
             ${{ runner.temp }}/preview-worker-candidate-cutover-observation.json
             ${{ runner.temp }}/preview-worker-candidate-cutover.json
+            ${{ runner.temp }}/preview-d1-readiness-receipt.json
+            ${{ runner.temp }}/production-control-before.json
+            ${{ runner.temp }}/production-control-after.json
           retention-days: 7
           if-no-files-found: error
 

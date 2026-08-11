@@ -492,8 +492,8 @@ describe('published project contract', () => {
     expect(canary).toContain('prepared preview candidate with current-`main` `100` flags');
     expect(canary).toContain('Only after the preview audit passes');
     expect(canary).toContain('Then perform a read-only environment-isolation\n   verification');
-    expect(canary).toContain('hard inert schema-`0009` canary gate');
-    expect(canary).toContain('before any\nWrangler command or Cloudflare read');
+    expect(canary).toMatch(/hard inert\s+schema-`0009` canary gate/);
+    expect(canary).toMatch(/before any\s+Wrangler command or\s+Cloudflare read/);
     const canaryOrder = [
       'while both candidates remain unbound',
       'prepared preview candidate with current-`main` `100` flags',
@@ -516,12 +516,56 @@ describe('published project contract', () => {
     expect(secret).toContain('separate schema-`0009` D1 sequence must have completed in order');
     expect(secret).toContain('while unbound; the preview candidate bound, deployed, and audited; then the\nproduction candidate bound, deployed, and audited; then a read-only\nenvironment-isolation verification');
     expect(readme).toContain("Current `main` also includes PR #117's Transform-12 schema\n`0009` contract");
-    expect(readme).toContain('The deployed preview and production D1 layers remain schema `0008`; current\nmain\'s PR #117 schema `0009` Candidate-C contract is checked out only');
+    expect(readme).toContain('This checked-out release commit targets only the prepared preview D1');
     const normalizedAudit = audit.replace(/\s+/g, ' ');
     expect(normalizedAudit).toContain('schema observations prove v6 local-only versus v7 CCEL exposure; they do not prove which endpoint-bearing code revision is deployed');
     expect(normalizedAudit).toContain("does not prove PR #115's repository-only `/home3/search` pin is active");
     expect(coordinator).toContain('The current v7 discovery application contract');
     expect(coordinator).toContain('The historical v5 release selected production v4/local-only');
     expect(coordinator).not.toContain('The v5 discovery application contract is exposed only by');
+  });
+
+  it('records the schema-0009 preview-only release boundary and production control', async () => {
+    const [readme, workflow, reconciliation, canary, operations, config, dataWorkflow, canaryScript] = await Promise.all([
+      readProjectFile('README.md'),
+      readProjectFile('.github/workflows/pr.yml'),
+      readProjectFile('docs/PREVIEW-RELEASE-RECONCILIATION.md'),
+      readProjectFile('docs/CCEL-LIVE-PREVIEW-CANARY-TRANSACTION.md'),
+      readProjectFile('docs/worker-operations.md'),
+      readProjectFile('wrangler.toml'),
+      readProjectFile('docs/D1-DATA-WORKFLOW.md'),
+      readProjectFile('scripts/ccel-live-preview-canary.ts'),
+    ]);
+    const previewName = 'theologai-preview-20260811-schema0009-a';
+    const previewId = '74f456e2-6951-4003-bb6f-91951342bf8f';
+    const productionId = '53211f50-a893-4b4c-be1e-bc625a595dc7';
+    const productionCandidateId = '9bc79346-338b-439e-a2a5-424f4418eb21';
+
+    for (const document of [readme, reconciliation, canary, operations, dataWorkflow]) {
+      expect(document).toContain(previewName);
+      expect(document).toContain(previewId);
+      expect(document).toContain(productionCandidateId);
+      expect(document).toContain('unbound');
+    }
+    expect(config).toContain(`database_name = "${previewName}"`);
+    expect(config).toContain(`database_id = "${previewId}"`);
+    expect(config).toContain(`database_id = "${productionId}"`);
+    expect(config).not.toContain(productionCandidateId);
+    expect(dataWorkflow).toContain('e1baa04fecbb066860d06f262142e3450823b7d0');
+    expect(dataWorkflow).toContain('673af4a75c770c541a8be3c84e77d8f91033bd07');
+    expect(dataWorkflow).toContain('ecbd23bb3c692665c7031a8c1fa7733e17a56fbc7e3a167ba4011f6c1cca62d8');
+    expect(dataWorkflow).toContain('14e30a32f316f1c7a954a9641f7d1b8bd6608d8e0f4bdc2eaba4c565f472f83d');
+    expect(dataWorkflow).toContain('66c148a206b9b0eb1bf7552572570c42dabfd0ba591b63e0cf0d02adda35aa07');
+    expect(dataWorkflow).toContain('989dd945ac633ecb1ba83cc80a1b88234cac31d78b3d905ae0242eb66c533eb3');
+    expect(dataWorkflow).toContain('49 ordered files, 1,630,260 rows, and 177,923,082 bytes');
+    expect(dataWorkflow).toContain('60 tables, 307,617,792 bytes, 35 documents, 4,111');
+    expect(dataWorkflow).toContain('zero `historical_sectioned_publications` rows, and one corpus seal');
+    expect(canaryScript).toContain("state: 'unrecorded'");
+    expect(workflow).toContain('preview-d1-readiness-receipt.json');
+    expect(workflow).toContain('Capture production control before preview deployment (read-only)');
+    expect(workflow).toContain('Verify production control remained unchanged (read-only)');
+    expect(workflow).toContain('production-control-after.outcome == \'success\'');
+    expect(workflow).toContain('scripts/production-release-reconciliation.ts capture-control');
+    expect(workflow).toContain('scripts/production-release-reconciliation.ts verify-control');
   });
 });

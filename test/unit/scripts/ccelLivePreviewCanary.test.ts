@@ -55,12 +55,12 @@ interface WorkerD1Ids {
   production: string;
 }
 
-const legacyD1Ids: WorkerD1Ids = {
-  preview: '62b871a6-5b4d-4d9b-8f52-301f6c878f48',
+const currentD1Ids: WorkerD1Ids = {
+  preview: '74f456e2-6951-4003-bb6f-91951342bf8f',
   production: '53211f50-a893-4b4c-be1e-bc625a595dc7',
 };
 
-function bindings(mode: '100' | '111' | '000', includeOperatorSecret = false, d1Ids: WorkerD1Ids = legacyD1Ids) {
+function bindings(mode: '100' | '111' | '000', includeOperatorSecret = false, d1Ids: WorkerD1Ids = currentD1Ids) {
   const productionMode = mode === '000';
   return [
     { name: 'THEOLOGAI_DB', type: 'd1', id: productionMode ? d1Ids.production : d1Ids.preview },
@@ -129,7 +129,7 @@ describe('CCEL live preview canary transaction', () => {
     })).toThrow();
     for (const tampered of [
       config.replace('preview-mcp.theologai.xyz', 'wrong.example'),
-      config.replace('62b871a6-5b4d-4d9b-8f52-301f6c878f48', '11111111-1111-4111-8111-111111111111'),
+      config.replace('74f456e2-6951-4003-bb6f-91951342bf8f', '11111111-1111-4111-8111-111111111111'),
       config.replace('class_name = "CcelGlobalCoordinator"', 'class_name = "WrongCoordinator"'),
       config.replace('namespace_id = "361204"', 'namespace_id = "999999"'),
     ]) expect(() => assertCommittedConfig(tampered)).toThrow();
@@ -150,9 +150,12 @@ describe('CCEL live preview canary transaction', () => {
       state: 'unrecorded',
       requiredSchema: '0009_candidate_c_sectioned_publications',
     });
-    expect(() => assertSchema0009CanaryPrerequisite(config))
+    const legacyConfig = config
+      .replace('theologai-preview-20260811-schema0009-a', LEGACY_SCHEMA_0008_D1.preview.name)
+      .replace('74f456e2-6951-4003-bb6f-91951342bf8f', LEGACY_SCHEMA_0008_D1.preview.id);
+    expect(() => assertSchema0009CanaryPrerequisite(legacyConfig))
       .toThrow(/production D1 identity uses a recorded schema-0008 name or UUID/);
-    const onlyLegacyPreviewRemaining = config
+    const onlyLegacyPreviewRemaining = legacyConfig
       .replace('theologai-production-20260729-transform11-a', 'theologai-production-schema0009-candidate')
       .replace('53211f50-a893-4b4c-be1e-bc625a595dc7', '323e4567-e89b-42d3-a456-426614174003');
     expect(() => assertSchema0009CanaryPrerequisite(onlyLegacyPreviewRemaining))
@@ -283,7 +286,7 @@ describe('CCEL live preview canary transaction', () => {
     expect(ordered.every(index => index >= 0)).toBe(true);
     expect(ordered).toEqual([...ordered].sort((left, right) => left - right));
     expect(canaryTransaction).toContain('Do not perform a second preview refresh here.');
-    expect(canaryTransaction).toContain('reviewed `ready` record\nfor each environment: exact D1 name/UUID plus separately pinned readiness and\nauthority evidence identities and SHA-256 values, plus one separately pinned\nenvironment-isolation evidence identity and SHA-256');
+    expect(canaryTransaction.replace(/\s+/g, ' ')).toContain('reviewed `ready` record for each environment: exact D1 name/UUID plus separately pinned readiness and authority evidence identities and SHA-256 values, plus one separately pinned environment-isolation evidence identity and SHA-256');
     expect(canaryTransaction).toContain('any recorded\nschema-`0008` D1 name or UUID regardless of pairing');
     expect(operatorProvisioning).toContain('it must not be\nrepeated as a second refresh after credential work.');
   });

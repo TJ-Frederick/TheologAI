@@ -9,6 +9,20 @@ The record intentionally distinguishes two D1 identities:
 
 The generic release workflow permits both code-only releases (`d1Changed: false`) and data cutovers (`d1Changed: true`); it never infers freshness from a different ID alone. Wrangler 4.107.0’s D1 binding response is accepted only when the sole `THEOLOGAI_DB` binding has canonical UUID `id` and `database_id` fields that agree exactly. After deployment, the sole active Worker version must bind the candidate ID before either fixed audit begins; a retained-old-D1 deployment is refused even if its Worker version otherwise looks new.
 
+The schema-`0009` preview release pre-state targets
+`theologai-preview-20260811-schema0009-a`
+(`74f456e2-6951-4003-bb6f-91951342bf8f`) in checked-in configuration only.
+It has no live binding or deployment claim until this protected workflow passes.
+Before the preview deployment, the workflow captures a fixed read-only
+production control snapshot; after the deployment it must prove the same
+production deployment UUID, Worker UUID, and D1 UUID before any preview audit.
+The separately prepared production candidate
+`9bc79346-338b-439e-a2a5-424f4418eb21` remains unbound, while production stays
+on `theologai-production-20260729-transform11-a`
+(`53211f50-a893-4b4c-be1e-bc625a595dc7`). The readiness artifact retains only
+database/environment identifiers and independently hashable readiness and
+authority results—never raw Wrangler output or diagnostics.
+
 The historical read-only observation from approximately 2026-07-25T19:13Z
 recorded preview deployment `4148bfb5-dd03-447f-b656-9daa0aee4380`, serving
 Worker version `ca1376bb-05cc-403b-a396-d2e89403abec` and bound to

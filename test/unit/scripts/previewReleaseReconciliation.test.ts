@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   activeProductionVersionId,
   candidateProductionD1DatabaseName,
+  captureProductionControlIdentity,
   captureProductionPredecessorAnchor,
   reconcileProductionPostMutation,
   activePreviewVersionId,
@@ -10,6 +11,7 @@ import {
   capturePreviewPredecessorAnchor,
   observePreviewPostMutation,
   reconcilePreviewPostMutation,
+  verifyProductionControlUnchanged,
 } from '../../../scripts/preview-release-reconciliation.js';
 
 const root = new URL('../../../', import.meta.url);
@@ -18,8 +20,8 @@ const candidateVersion = '223e4567-e89b-42d3-a456-426614174000';
 const predecessorDeployment = '323e4567-e89b-42d3-a456-426614174000';
 const candidateDeployment = '423e4567-e89b-42d3-a456-426614174000';
 const predecessorD1Id = '94c4938b-7800-4d68-9097-0df33c31fdc1';
-const candidateD1Id = '62b871a6-5b4d-4d9b-8f52-301f6c878f48';
-const candidateD1Name = 'theologai-preview-20260728-transform11-a';
+const candidateD1Id = '74f456e2-6951-4003-bb6f-91951342bf8f';
+const candidateD1Name = 'theologai-preview-20260811-schema0009-a';
 const productionCandidateD1Id = '53211f50-a893-4b4c-be1e-bc625a595dc7';
 const productionCandidateD1Name = 'theologai-production-20260729-transform11-a';
 
@@ -71,6 +73,40 @@ describe('preview release reconciliation evidence', () => {
       predecessorAnchorText: JSON.stringify(anchor), postMutationDeploymentsText: deployments(candidateDeployment, candidateVersion),
       observedActiveVersionViewText: versionView(candidateVersion, predecessorD1Id), wranglerConfigText: config,
     })).toThrow('does not match the checked-out readiness-tested candidate D1');
+  });
+
+  it('fails closed when a preview release changes any production control identity', () => {
+    const productionControl = captureProductionControlIdentity({
+      deploymentsText: deployments(predecessorDeployment, predecessorVersion),
+      activeVersionViewText: versionView(predecessorVersion, productionCandidateD1Id),
+    });
+    expect(productionControl).toEqual({
+      schemaVersion: 1,
+      worker: 'theologai',
+      deploymentId: predecessorDeployment,
+      workerVersionId: predecessorVersion,
+      d1: { binding: 'THEOLOGAI_DB', databaseId: productionCandidateD1Id },
+    });
+    expect(verifyProductionControlUnchanged({
+      controlText: JSON.stringify(productionControl),
+      deploymentsText: deployments(predecessorDeployment, predecessorVersion),
+      activeVersionViewText: versionView(predecessorVersion, productionCandidateD1Id),
+    })).toEqual(productionControl);
+    expect(() => verifyProductionControlUnchanged({
+      controlText: JSON.stringify(productionControl),
+      deploymentsText: deployments(candidateDeployment, predecessorVersion),
+      activeVersionViewText: versionView(predecessorVersion, productionCandidateD1Id),
+    })).toThrow('production deployment changed during preview release');
+    expect(() => verifyProductionControlUnchanged({
+      controlText: JSON.stringify(productionControl),
+      deploymentsText: deployments(predecessorDeployment, candidateVersion),
+      activeVersionViewText: versionView(candidateVersion, productionCandidateD1Id),
+    })).toThrow('production Worker version changed during preview release');
+    expect(() => verifyProductionControlUnchanged({
+      controlText: JSON.stringify(productionControl),
+      deploymentsText: deployments(predecessorDeployment, predecessorVersion),
+      activeVersionViewText: versionView(predecessorVersion, predecessorD1Id),
+    })).toThrow('production D1 binding changed during preview release');
   });
 
   it('captures distinct observed predecessor and readiness-tested candidate D1 identities', async () => {

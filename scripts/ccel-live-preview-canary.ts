@@ -88,7 +88,7 @@ const PRODUCTION = {
 };
 const PREVIEW = {
   worker: 'theologai-preview', route: 'preview-mcp.theologai.xyz',
-  d1Name: 'theologai-preview-20260728-transform11-a', d1: '62b871a6-5b4d-4d9b-8f52-301f6c878f48',
+  d1Name: 'theologai-preview-20260811-schema0009-a', d1: '74f456e2-6951-4003-bb6f-91951342bf8f',
   requestNamespace: '361202', operatorNamespace: '361204', version: '3.6.0-preview',
   discovery: 'true', live: 'false', coordinator: 'false', logs: 'true',
 };
