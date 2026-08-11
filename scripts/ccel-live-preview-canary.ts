@@ -70,6 +70,10 @@ const LEGACY_SCHEMA_0008_D1_IDS = new Set<string>([
   LEGACY_SCHEMA_0008_D1.production.id,
   LEGACY_SCHEMA_0008_D1.preview.id,
 ]);
+const LEGACY_SCHEMA_0008_D1_NAMES = new Set<string>([
+  LEGACY_SCHEMA_0008_D1.production.name,
+  LEGACY_SCHEMA_0008_D1.preview.name,
+]);
 
 export const SCHEMA_0009_CANARY_GATE: Schema0009CanaryGate = {
   state: 'unrecorded',
@@ -135,8 +139,8 @@ export function assertSchema0009CanaryPrerequisite(configText: string, gate: unk
   const productionD1 = configuredD1(root, 'production');
   const previewD1 = configuredD1(preview, 'preview');
 
-  assertNotLegacySchema0008D1(productionD1.database_id, 'production');
-  assertNotLegacySchema0008D1(previewD1.database_id, 'preview');
+  assertNotLegacySchema0008D1(productionD1.database_name, productionD1.database_id, 'production');
+  assertNotLegacySchema0008D1(previewD1.database_name, previewD1.database_id, 'preview');
   refuse(
     reviewedGate.state === 'ready',
     'schema-0009 canary gate is unrecorded: prepare and audit separate preview and production candidates before enabling this workflow',
@@ -162,8 +166,8 @@ export function validateSchema0009CanaryGate(value: unknown): Schema0009CanaryGa
   const preview = parseSchema0009EnvironmentGate(gate.preview, 'preview');
   const production = parseSchema0009EnvironmentGate(gate.production, 'production');
   const environmentIsolationEvidence = parseSchema0009Evidence(gate.environmentIsolationEvidence, 'environment isolation');
-  assertNotLegacySchema0008D1(preview.databaseId, 'ready preview');
-  assertNotLegacySchema0008D1(production.databaseId, 'ready production');
+  assertNotLegacySchema0008D1(preview.databaseName, preview.databaseId, 'ready preview');
+  assertNotLegacySchema0008D1(production.databaseName, production.databaseId, 'ready production');
   refuse(
     preview.databaseName !== production.databaseName && preview.databaseId !== production.databaseId,
     'ready schema-0009 canary gate must use distinct preview and production D1 identities',
@@ -504,8 +508,9 @@ function assertSchema0009EnvironmentMatch(
   );
 }
 
-function assertNotLegacySchema0008D1(databaseId: string, label: string): void {
-  refuse(!LEGACY_SCHEMA_0008_D1_IDS.has(databaseId), `${label} D1 identity uses a recorded schema-0008 UUID`);
+function assertNotLegacySchema0008D1(databaseName: string, databaseId: string, label: string): void {
+  refuse(!LEGACY_SCHEMA_0008_D1_NAMES.has(databaseName) && !LEGACY_SCHEMA_0008_D1_IDS.has(databaseId),
+    `${label} D1 identity uses a recorded schema-0008 name or UUID`);
 }
 
 function assertVersion(version: FullVersion, mode: Mode, requireProductionOperator = false, gate: Schema0009CanaryGate = SCHEMA_0009_CANARY_GATE): boolean {

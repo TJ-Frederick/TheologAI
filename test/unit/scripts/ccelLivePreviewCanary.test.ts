@@ -118,7 +118,7 @@ describe('CCEL live preview canary transaction', () => {
     expect(() => validateCanaryDispatch({
       ref: 'refs/heads/main', sha: 'a'.repeat(40), expectedSha: 'a'.repeat(40), liveMainSha: 'a'.repeat(40),
       confirmation: CANARY_CONFIRMATION, configText: config,
-    })).toThrow(/production D1 identity uses a recorded schema-0008 UUID/);
+    })).toThrow(/production D1 identity uses a recorded schema-0008 name or UUID/);
     expect(() => validateCanaryDispatch({
       ref: 'refs/heads/feature', sha: 'a'.repeat(40), expectedSha: 'a'.repeat(40), liveMainSha: 'a'.repeat(40),
       confirmation: CANARY_CONFIRMATION, configText: config,
@@ -151,12 +151,12 @@ describe('CCEL live preview canary transaction', () => {
       requiredSchema: '0009_candidate_c_sectioned_publications',
     });
     expect(() => assertSchema0009CanaryPrerequisite(config))
-      .toThrow(/production D1 identity uses a recorded schema-0008 UUID/);
+      .toThrow(/production D1 identity uses a recorded schema-0008 name or UUID/);
     const onlyLegacyPreviewRemaining = config
       .replace('theologai-production-20260729-transform11-a', 'theologai-production-schema0009-candidate')
       .replace('53211f50-a893-4b4c-be1e-bc625a595dc7', '323e4567-e89b-42d3-a456-426614174003');
     expect(() => assertSchema0009CanaryPrerequisite(onlyLegacyPreviewRemaining))
-      .toThrow(/preview D1 identity uses a recorded schema-0008 UUID/);
+      .toThrow(/preview D1 identity uses a recorded schema-0008 name or UUID/);
     const noLegacyIdentityRemaining = onlyLegacyPreviewRemaining
       .replace('theologai-preview-20260728-transform11-a', 'theologai-preview-schema0009-candidate')
       .replace('62b871a6-5b4d-4d9b-8f52-301f6c878f48', '423e4567-e89b-42d3-a456-426614174003');
@@ -195,11 +195,25 @@ describe('CCEL live preview canary transaction', () => {
     expect(() => assertSchema0009CanaryPrerequisite(
       noLegacyIdentityRemaining.replace('423e4567-e89b-42d3-a456-426614174003', LEGACY_SCHEMA_0008_D1.preview.id),
       readyGate,
-    )).toThrow(/preview D1 identity uses a recorded schema-0008 UUID/);
+    )).toThrow(/preview D1 identity uses a recorded schema-0008 name or UUID/);
+    expect(() => assertSchema0009CanaryPrerequisite(
+      noLegacyIdentityRemaining.replace(
+        'theologai-production-schema0009-candidate', LEGACY_SCHEMA_0008_D1.production.name,
+      ),
+      readyGate,
+    )).toThrow(/production D1 identity uses a recorded schema-0008 name or UUID/);
     expect(() => validateSchema0009CanaryGate({
       ...readyGate,
       preview: { ...readyGate.preview, databaseId: LEGACY_SCHEMA_0008_D1.preview.id },
-    })).toThrow(/ready preview D1 identity uses a recorded schema-0008 UUID/);
+    })).toThrow(/ready preview D1 identity uses a recorded schema-0008 name or UUID/);
+    expect(() => validateSchema0009CanaryGate({
+      ...readyGate,
+      production: { ...readyGate.production, databaseName: LEGACY_SCHEMA_0008_D1.production.name },
+    })).toThrow(/ready production D1 identity uses a recorded schema-0008 name or UUID/);
+    expect(() => validateSchema0009CanaryGate({
+      ...readyGate,
+      preview: { ...readyGate.preview, databaseName: LEGACY_SCHEMA_0008_D1.preview.name },
+    })).toThrow(/ready preview D1 identity uses a recorded schema-0008 name or UUID/);
     expect(() => validateSchema0009CanaryGate({
       state: 'ready', requiredSchema: '0009_candidate_c_sectioned_publications', preview: readyGate.preview,
     })).toThrow(/ready schema-0009 canary gate must contain exactly authorized keys/);
@@ -270,6 +284,7 @@ describe('CCEL live preview canary transaction', () => {
     expect(ordered).toEqual([...ordered].sort((left, right) => left - right));
     expect(canaryTransaction).toContain('Do not perform a second preview refresh here.');
     expect(canaryTransaction).toContain('reviewed `ready` record\nfor each environment: exact D1 name/UUID plus separately pinned readiness and\nauthority evidence identities and SHA-256 values, plus one separately pinned\nenvironment-isolation evidence identity and SHA-256');
+    expect(canaryTransaction).toContain('any recorded\nschema-`0008` D1 name or UUID regardless of pairing');
     expect(operatorProvisioning).toContain('it must not be\nrepeated as a second refresh after credential work.');
   });
 
