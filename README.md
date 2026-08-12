@@ -206,16 +206,25 @@ remains a historical acquisition-gate snapshot, not deployment evidence.
 Production v6/local-only and preview v7/discovery-only remain deployed with
 CCEL execution disabled before adapter, coordinator, or fetch.
 
-### Schema-0009 preview release pre-state
+### Schema-0009 preview release state
 
-This checked-out release commit targets only the prepared preview D1
+The protected release targeted the prepared preview D1
 `theologai-preview-20260811-schema0009-a`
-(`74f456e2-6951-4003-bb6f-91951342bf8f`). It is not itself a Cloudflare
-binding or deployment claim: the protected preview workflow must re-check the
-candidate, deploy it, prove the active preview binding, and complete its audit.
-It validates the fixed production control against the checked-in production D1
-name/UUID and fresh inventory before deployment, immediately afterward, and
-again after the final preview audit.
+(`74f456e2-6951-4003-bb6f-91951342bf8f`). The workflow re-checked the
+candidate, deployed it, proved the active preview binding, and completed its
+audit. It validated the fixed production control against the checked-in
+production D1 name/UUID and fresh inventory before deployment, immediately
+afterward, and again after the final preview audit.
+PR #122 has now completed that protected preview release: source
+`a0f13b5bdbf3ca071dbb7524dea9c6ce80770404` (tree
+`660c06ff31e7d0e2ccbc6fe12204e66c4e793233`) is served solely by preview
+Worker `b2c62527-5759-4c1d-a9a3-8c1d43dddabe` on deployment
+`13393917-fa91-4afc-aeaf-2809db6701a2`; all fixed audits and three production
+control observations passed. The authorization label was removed and revocation
+run `31572924302` succeeded. The detailed sanitized evidence is in
+[docs/PREVIEW-RELEASE-RECONCILIATION.md](docs/PREVIEW-RELEASE-RECONCILIATION.md).
+This evidence-only commit postdates the deployed source and makes no new
+runtime claim.
 Production remains configured and live on schema-`0008`
 `theologai-production-20260729-transform11-a`
 (`53211f50-a893-4b4c-be1e-bc625a595dc7`); its separately prepared schema-`0009`

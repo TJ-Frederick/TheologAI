@@ -79,6 +79,13 @@ schema-`0008` D1 name or UUID regardless of pairing, any shared
 preview/production identity, and any mismatch between those reviewed D1 pairs
 and committed configuration.
 
+PR #122 completed the one approved schema-`0009` preview bind/deploy/audit
+stage with its production control unchanged; its release evidence is recorded
+in `PREVIEW-RELEASE-RECONCILIATION.md`. That completion does not authorize the
+production candidate (still unbound), credential staging, or this canary. The
+gate remains `unrecorded` and inert, and the release made no CCEL request or
+secret change.
+
 The only way to create the third row is the main-only, manually dispatched
 `CCEL Live Preview Canary` workflow. It requires all of the following:
 

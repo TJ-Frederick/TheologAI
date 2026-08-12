@@ -516,7 +516,7 @@ describe('published project contract', () => {
     expect(secret).toContain('separate schema-`0009` D1 sequence must have completed in order');
     expect(secret).toContain('while unbound; the preview candidate bound, deployed, and audited; then the\nproduction candidate bound, deployed, and audited; then a read-only\nenvironment-isolation verification');
     expect(readme).toContain("Current `main` also includes PR #117's Transform-12 schema\n`0009` contract");
-    expect(readme).toContain('This checked-out release commit targets only the prepared preview D1');
+    expect(readme).toContain('The protected release targeted the prepared preview D1');
     const normalizedAudit = audit.replace(/\s+/g, ' ');
     expect(normalizedAudit).toContain('schema observations prove v6 local-only versus v7 CCEL exposure; they do not prove which endpoint-bearing code revision is deployed');
     expect(normalizedAudit).toContain("does not prove PR #115's repository-only `/home3/search` pin is active");
@@ -573,5 +573,19 @@ describe('published project contract', () => {
     expect(workflow).toContain('scripts/production-release-reconciliation.ts verify-control');
     expect(reconciliation).toContain('checked-in production name/UUID and a fresh read-only D1 inventory');
     expect(reconciliation).toContain('again after every fixed preview\naudit and the final preview Worker identity check');
+    expect(reconciliation).toContain('a0f13b5bdbf3ca071dbb7524dea9c6ce80770404');
+    expect(reconciliation).toContain('660c06ff31e7d0e2ccbc6fe12204e66c4e793233');
+    expect(reconciliation).toContain('31568581322');
+    expect(reconciliation).toContain('5864161923');
+    expect(reconciliation).toContain('13393917-fa91-4afc-aeaf-2809db6701a2');
+    expect(reconciliation).toContain('b2c62527-5759-4c1d-a9a3-8c1d43dddabe');
+    expect(reconciliation).toContain('06b9a603-8339-42b6-a246-ef9238563043');
+    expect(reconciliation).toContain('5e812152-355b-4a5f-a123-2485e89f1550');
+    expect(reconciliation).toContain('481900a3eec516fe06d3252175b63e318783c7230f70311235e4a1dd73198889');
+    expect(reconciliation).toContain('31572924302');
+    expect(reconciliation).toContain('This evidence-only documentation commit postdates the deployed head.');
+    expect(readme).toContain('This evidence-only commit postdates the deployed source');
+    expect(operations).toContain('This evidence-only commit postdates that deployment');
+    expect(canary).toMatch(/The\s+gate remains `unrecorded` and inert/);
   });
 });

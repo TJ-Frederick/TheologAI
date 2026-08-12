@@ -16,19 +16,28 @@ and the independent post-release review returned `SHIP`. This is not a
 hierarchy/publication activation; CCEL execution remains disabled and Aquinas
 remains inactive.
 
-### Schema-0009 preview-release pre-state
+### Schema-0009 preview release state
 
-The checked-in preview configuration now targets the separately prepared,
-unbound schema-`0009` D1 `theologai-preview-20260811-schema0009-a`
-(`74f456e2-6951-4003-bb6f-91951342bf8f`). This is a release candidate, not a
-claim that preview traffic has changed: the protected preview workflow must
-prove the candidate binding and complete its audit. It also captures production
-against its checked-in D1 name/UUID and fresh inventory before preview mutation,
-immediately after deployment, and again after final preview audit; it fails if
-its deployment, Worker, or D1 UUID changes. Production remains configured and live on
+The checked-in preview configuration targets schema-`0009` D1
+`theologai-preview-20260811-schema0009-a`
+(`74f456e2-6951-4003-bb6f-91951342bf8f`). The protected preview workflow
+proved that binding and completed its audit. It captured production against its
+checked-in D1 name/UUID and fresh inventory before preview mutation,
+immediately after deployment, and again after final preview audit. Production
+remains configured and live on
 `theologai-production-20260729-transform11-a`
 (`53211f50-a893-4b4c-be1e-bc625a595dc7`); prepared candidate
 `9bc79346-338b-439e-a2a5-424f4418eb21` is unbound and is not configured here.
+
+PR #122 completed the protected preview release from
+`a0f13b5bdbf3ca071dbb7524dea9c6ce80770404` (tree
+`660c06ff31e7d0e2ccbc6fe12204e66c4e793233`): Cloudflare deployment
+`13393917-fa91-4afc-aeaf-2809db6701a2` assigns Worker
+`b2c62527-5759-4c1d-a9a3-8c1d43dddabe` solely to the schema-`0009` preview D1.
+All bounded audits and production-control comparisons passed. The preview
+authorization has been revoked (run `31572924302`); PR #122 remains open and
+unmerged. This evidence-only commit postdates that deployment and does not
+change production, CCEL execution, or secrets.
 
 The former PR #101 production assignment is the matched rollback pair:
 deployment `71b76d24-bf5f-490e-adc4-31cf63fb046e`, Worker
