@@ -63,9 +63,9 @@ identity `29a4a7faec2a960f06bfc026a319df8c08b495bb7ad82831fb62d3a3586643a4`.
 Primary readiness, Transform-8 authority (`1/12/12` pages), and complete
 Transform-11 source-pack authority (`1/1/1/1/1/1/133/17` pages) passed while
 unbound. Protected preview deployment `5e812152-355b-4a5f-a123-2485e89f1550`
-now serves Worker `06b9a603-8339-42b6-a246-ef9238563043` (#140) as the sole
-active preview assignment bound to that exact D1. This preview assignment
-remained unchanged during the PR #108 production release.
+historically served Worker `06b9a603-8339-42b6-a246-ef9238563043` (#140) with
+that exact D1. It remained unchanged during the PR #108 production release and
+is now PR #122's retained immediate predecessor, not the active preview.
 
 The checked-in root production target was prepared unbound as the Transform-11
 candidate `theologai-production-20260729-transform11-a`

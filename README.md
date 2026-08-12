@@ -141,23 +141,20 @@ applied the exact reviewed 49-file, 1,630,259-row seed with corpus identity
 `29a4a7faec2a960f06bfc026a319df8c08b495bb7ad82831fb62d3a3586643a4`.
 Primary readiness, Transform-8 authority (`1/12/12` pages), and the complete
 Transform-11 source-pack authority audit (`1/1/1/1/1/1/133/17` pages) passed.
-Protected preview deployment `5e812152-355b-4a5f-a123-2485e89f1550` now
-serves Worker `06b9a603-8339-42b6-a246-ef9238563043` (#140) with that exact
-D1. Production was unchanged by that preview release. Transform-10 hierarchy,
+Protected preview deployment `5e812152-355b-4a5f-a123-2485e89f1550`
+historically served Worker `06b9a603-8339-42b6-a246-ef9238563043` (#140) with
+that exact D1 and is the immediate predecessor to PR #122. Production was
+unchanged by that preview release. Transform-10 hierarchy,
 publication, and Aquinas material remain excluded.
 
-This active PR #107 preview Worker predates PR #115's repository-only,
+That historical PR #107 preview Worker predates PR #115's repository-only,
 unpublished pin to `https://www.ccel.org/home3/search`. It is not a valid
 code/resource-equivalent `100` predecessor for a `111` canary built from
-current `main`. Current `main` also includes PR #117's Transform-12 schema
-`0009` contract, while the retained PR #107/PR #108 D1 records are schema
-`0008`. Before credential staging, separately authorized fresh schema-`0009`
-preview and production D1 preparation and remote readiness/authority audit are
-required while both candidates remain unbound. The reviewed release sequence is
-then preview bind/deploy/audit, production bind/deploy/audit, and read-only
-environment-isolation verification. The preview release is the sole safe
-current-main `100` refresh; it is not repeated later. Those D1 gates do not
-authorize credential work or the canary; see the
+current `main`. PR #122 has since completed the schema-`0009` preview
+bind/deploy/audit stage. The separately prepared schema-`0009` production
+candidate remains unbound; production bind/deploy/audit and read-only
+environment-isolation verification remain separately gated. Completion of the
+preview stage does not authorize credential work or the canary; see the
 [CCEL canary transaction](docs/CCEL-LIVE-PREVIEW-CANARY-TRANSACTION.md).
 
 PR #101's former production assignment, retained as the rollback pair, is
@@ -195,11 +192,9 @@ For a preview-client rollback without changing server state, use the direct prev
 `workers.dev` address above; the production `workers.dev` address intentionally
 redirects rather than serving a separate legacy Worker.
 
-The deployed preview and production D1 layers remain schema `0008`; current
-main's PR #117 schema `0009` Candidate-C contract has prepared, unbound
-candidates but makes no bound or deployed remote-D1 claim. Earlier local-only
-and preview-only activation statements are historical. PR #101 bound the separate
-preview and production D1 databases recorded above. The historical PR #96 public
+Production remains on schema `0008`; preview now uses the audited PR #122
+schema-`0009` Candidate-C D1. Earlier local-only and preview-only activation
+statements are historical. The historical PR #96 public
 `original_language_study` v2 audit does not independently establish the runtime
 path for every later historical transform. The pinned packet's `SOURCE.json`
 remains a historical acquisition-gate snapshot, not deployment evidence.

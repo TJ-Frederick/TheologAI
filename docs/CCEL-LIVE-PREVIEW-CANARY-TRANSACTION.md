@@ -17,17 +17,18 @@ Tracked `wrangler.toml` is always the safe baseline:
 | Preview | 1 | 0 | 0 | v7 discovery-contract baseline |
 | Ephemeral canary | 1 | 1 | 1 | preview-only audit candidate; never committed |
 
-The active PR #107 preview Worker
+The retained historical PR #107 preview Worker
 `06b9a603-8339-42b6-a246-ef9238563043` predates PR #115's repository-only,
 unpublished pin to `https://www.ccel.org/home3/search`. It remains valid
-point-in-time evidence, but it is not a code/resource-equivalent `100`
-predecessor for a `111` candidate built from current `main`. The exact-delta
-validator would correctly reject that pairing.
+point-in-time predecessor evidence, but it is no longer active. PR #122's
+schema-`0009` Worker `b2c62527-5759-4c1d-a9a3-8c1d43dddabe` is the audited
+current preview `100` baseline.
 
 Current `main` also includes PR #117's Transform-12 schema `0009` contract.
 The retained PR #107 preview and PR #108 production D1 records were prepared
-against schema `0008`; neither is a current-main-compatible D1 baseline. The
-historical `0008` readiness records remain evidence for those releases only.
+against schema `0008`. PR #107 is predecessor evidence only; PR #108 remains
+the live production control. The historical `0008` readiness records remain
+evidence for those releases only.
 
 Operational readiness therefore has five separately authorized stages, in this
 order:
@@ -38,7 +39,7 @@ order:
    schema/seed **while both candidates remain unbound**. Failure or missing
    evidence is a stop condition; do not reuse, repair, or bind a failed
    candidate.
-2. Through a separately approved preview release, bind and deploy the exact
+2. **Completed by PR #122:** through a separately approved preview release, bind and deploy the exact
    prepared preview candidate with current-`main` `100` flags, then complete
    its protected preview audit. This one release creates the exact-current-main,
    code/resource-equivalent preview predecessor for the later `111` candidate;

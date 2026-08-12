@@ -123,20 +123,18 @@ Transform-11 authority read; an explicitly authorized read-only rerun then
 passed primary readiness, Transform-8 (`1/12/12` pages), and the complete
 Transform-11 audit (`1/1/1/1/1/1/133/17` pages). No seed, migration, repair, or
 resume was repeated. The candidate was unbound during that preparation.
-Protected preview deployment `5e812152-355b-4a5f-a123-2485e89f1550` now
-serves PR #107 head `1105b75cd8537632bdb20e598092f6ba94a6adc0` as Worker
-`06b9a603-8339-42b6-a246-ef9238563043` (#140), the sole active preview
-assignment bound to that exact candidate D1. It remains v7/discovery-only with
-CCEL execution disabled before adapter, coordinator, or fetch. Production
-remains unchanged.
+Protected preview deployment `5e812152-355b-4a5f-a123-2485e89f1550`
+historically served PR #107 head `1105b75cd8537632bdb20e598092f6ba94a6adc0` as
+Worker `06b9a603-8339-42b6-a246-ef9238563043` (#140), bound to that exact
+candidate D1. It is PR #122's retained immediate predecessor, not the current
+preview assignment.
 
-That active PR #107 Worker predates PR #115's repository-only, unpublished
+That historical PR #107 Worker predates PR #115's repository-only, unpublished
 change pinning the candidate CCEL endpoint to
 `https://www.ccel.org/home3/search`. It is not a code/resource-equivalent `100`
-predecessor for a `111` canary built from current `main`. Before any canary is
-authorized, a separate protected preview release must safely refresh exact
-current-`main` code and resources with the `100` flags and pass its preview
-audit. That refresh does not authorize credential provisioning or the canary.
+predecessor for a `111` canary built from current `main`. PR #122 completed the
+required current-main schema-`0009` preview refresh and audit. That completion
+does not authorize production release, credential provisioning, or the canary.
 
 At the reconciliation cutoff immediately after PR #113, `main` was
 `2f12262c9a37d3588bee9b5071954823c15cbd12` (tree
@@ -149,8 +147,10 @@ provisional Norton capacity evidence that remains subject to local and release
 gates. Production runs for PRs #109–#113 were cancelled and preview jobs
 skipped, so they make no runtime, Worker, deployment, binding, remote-D1, or
 corpus claim.
-Preview therefore remains the PR #107 assignment above. Production remains PR
-#108 merge `8da99fd0a161b90a4bd90ab29bde1abf796b3bf6`, deployment
+At that cutoff, preview remained the PR #107 assignment above; PR #122 has
+since superseded it with the audited schema-`0009` preview assignment. CCEL
+execution remains disabled before adapter, coordinator, or fetch. Production
+remains PR #108 merge `8da99fd0a161b90a4bd90ab29bde1abf796b3bf6`, deployment
 `3d7489d9-7b48-4ad0-bdc6-95ffbda53bd8`, Worker
 `291f3292-3fa9-44fc-bf6f-b68fd2f4cef6`, and D1
 `53211f50-a893-4b4c-be1e-bc625a595dc7`, with v6/local-only behavior and CCEL
