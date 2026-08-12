@@ -464,6 +464,7 @@ jobs:
             --production-active-version-view "$RUNNER_TEMP/final-environment-production-version.json" \
             --preview-deployments "$RUNNER_TEMP/final-environment-preview-deployments.json" \
             --preview-active-version-view "$RUNNER_TEMP/final-environment-preview-version.json" \
+            --production-audited-identity "$RUNNER_TEMP/production-worker-deployment-identity.json" \
             --wrangler-config wrangler.toml \
             --d1-inventory "$RUNNER_TEMP/final-environment-d1-inventory.json" \
             --output "$RUNNER_TEMP/final-environment-isolation-receipt.json"
@@ -485,10 +486,11 @@ jobs:
           observed_active_version="$(npx --no-install tsx scripts/production-release-reconciliation.ts active-version-id \
             --deployments "$RUNNER_TEMP/production-worker-deployments-post-mutation.json")"
           npx --no-install wrangler versions view "$observed_active_version" --json > "$RUNNER_TEMP/production-worker-observed-active-version-view.json"
-          npx --no-install tsx scripts/production-release-reconciliation.ts observe-post-mutation \
+          npx --no-install tsx scripts/production-release-reconciliation.ts observe-final-post-audit \
             --predecessor-anchor "$RUNNER_TEMP/production-worker-predecessor-anchor.json" \
             --deployments "$RUNNER_TEMP/production-worker-deployments-post-mutation.json" \
             --observed-active-version-view "$RUNNER_TEMP/production-worker-observed-active-version-view.json" \
+            --production-audited-identity "$RUNNER_TEMP/production-worker-deployment-identity.json" \
             --wrangler-config wrangler.toml \
             --output "$RUNNER_TEMP/production-worker-final-routing-observation.json"
 

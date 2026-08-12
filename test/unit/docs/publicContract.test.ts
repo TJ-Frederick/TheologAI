@@ -356,12 +356,15 @@ describe('published project contract', () => {
       d1Id: '62b871a6-5b4d-4d9b-8f52-301f6c878f48',
     };
 
-    for (const document of [readme, dataWorkflow, catalogScope, reconciliation, operations, roadmap]) {
+    const productionCutoverDocuments = [readme, dataWorkflow, catalogScope, reconciliation, operations, roadmap];
+    for (const document of productionCutoverDocuments) {
       for (const value of Object.values(liveProduction)) expect(document).toContain(value);
       for (const value of Object.values(rollbackProduction)) expect(document).toContain(value);
-      for (const value of Object.values(livePreview)) expect(document).toContain(value);
       expect(document).toContain('30496350408');
       expect(document).toContain('8da99fd0a161b90a4bd90ab29bde1abf796b3bf6');
+    }
+    for (const document of [readme, dataWorkflow, reconciliation, operations, roadmap]) {
+      for (const value of Object.values(livePreview)) expect(document).toContain(value);
     }
     expect(reconciliation).toContain('completed PR #108 protected production cutover');
     expect(reconciliation).toContain('a59d9a062b2e6c7884de97fd97309878e1cbdc23');
@@ -379,6 +382,14 @@ describe('published project contract', () => {
     expect(roadmap).toContain('independent post-release review returned `SHIP`');
     expect(reconciliation).toContain('primary-source edge stabilization');
     expect(reconciliation).toContain('Transform-11 historical-spine audit');
+    expect(dataWorkflow).toContain('PR #122 deployment\n`13393917-fa91-4afc-aeaf-2809db6701a2`, Worker');
+    expect(catalogScope).toContain('PR #122 deployment\n`13393917-fa91-4afc-aeaf-2809db6701a2`, Worker');
+    expect(dataWorkflow).toContain('immediately preceding primary rollback unit');
+    expect(catalogScope).toContain('immediately preceding primary rollback\nunit');
+    expect(dataWorkflow).not.toContain('The current preview baseline is\ndeployment `5e812152');
+    expect(catalogScope).not.toContain('The current preview baseline is\ndeployment `5e812152');
+    expect(dataWorkflow).not.toContain('Retain the PR #101 matched Worker/D1 pair above for rollback.');
+    expect(catalogScope).not.toContain('Retain the PR #101 Worker/D1\npair above as rollback.');
     for (const document of [readme, dataWorkflow, catalogScope, reconciliation, operations, roadmap]) {
       expect(document).not.toContain('Transform-8/9/10 authority');
       expect(document).toContain('Aquinas');

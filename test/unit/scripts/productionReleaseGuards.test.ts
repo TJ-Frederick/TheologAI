@@ -83,7 +83,7 @@ describe('production release guards', () => {
     expect(observationBlock).toContain("steps.production-worker-deploy.outcome != 'skipped'");
     expect(observationBlock).toContain("steps.production-predecessor.outcome == 'success'");
     expect(observationBlock).not.toContain('continue-on-error');
-    expect(observationBlock).toContain('observe-post-mutation');
+    expect(observationBlock).toContain('observe-final-post-audit');
     expect(observationBlock).not.toContain('reconcile-post-mutation');
     expect(finalArtifactBlock).toContain("steps.production-worker-deploy.outcome != 'skipped'");
     expect(finalArtifactBlock).toContain('if-no-files-found: warn');
@@ -97,6 +97,8 @@ describe('production release guards', () => {
     expect(workflow).toContain('Verify preview control remained unchanged after production audits (read-only)');
     expect(workflow).toContain('Capture final schema-0009 environment isolation receipt (read-only)');
     expect(workflow).toContain('production-d1-readiness-receipt.json');
+    expect(workflow).toContain('--production-audited-identity "$RUNNER_TEMP/production-worker-deployment-identity.json"');
+    expect(workflow).toContain('scripts/production-release-reconciliation.ts observe-final-post-audit');
     expect(historicalAuditScript).toContain('${profile.label} expanded-discovery/catalog execution invariant drifted');
     expect(historicalAuditScript).not.toContain('preview expanded-discovery/catalog execution invariant drifted');
 

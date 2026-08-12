@@ -130,6 +130,22 @@ export interface EnvironmentIsolationReceipt {
   d1InventorySha256: string;
 }
 
+/** The post-audit production identity emitted by the fixed Worker verifier. */
+interface AuditedProductionWorkerIdentity {
+  schemaVersion: 2;
+  worker: 'theologai';
+  deployedVersionId: string;
+  deployedVersionNumber: number;
+  deploymentId: string;
+  beforeVersionsSha256: string;
+  afterVersionsSha256: string;
+  deploymentsSha256: string;
+  commandOutputSha256: string;
+  commandReportedVersionId: string;
+  addedVersionIds: string[];
+  postAuditDeploymentsSha256: string;
+}
+
 function fail(message: string): never { throw new Error(`Worker release reconciliation refused: ${message}.`); }
 function assert(value: unknown, message: string): asserts value { if (!value) fail(message); }
 function object(value: unknown, label: string): RecordValue {
@@ -334,6 +350,45 @@ function parseProductionControlIdentity(value: unknown): ProductionControlIdenti
   };
 }
 
+function parseAuditedProductionWorkerIdentity(value: unknown): AuditedProductionWorkerIdentity {
+  const identity = object(value, 'audited production Worker identity');
+  exactKeys(identity, [
+    'schemaVersion', 'worker', 'deployedVersionId', 'deployedVersionNumber', 'deploymentId',
+    'beforeVersionsSha256', 'afterVersionsSha256', 'deploymentsSha256', 'commandOutputSha256',
+    'commandReportedVersionId', 'addedVersionIds', 'postAuditDeploymentsSha256',
+  ], 'audited production Worker identity');
+  assert(identity.schemaVersion === 2 && identity.worker === 'theologai'
+    && isUuid(identity.deployedVersionId) && Number.isSafeInteger(identity.deployedVersionNumber)
+    && (identity.deployedVersionNumber as number) > 0 && isUuid(identity.deploymentId)
+    && isUuid(identity.commandReportedVersionId)
+    && identity.commandReportedVersionId.toLowerCase() === identity.deployedVersionId.toLowerCase()
+    && Array.isArray(identity.addedVersionIds) && (identity.addedVersionIds.length === 1 || identity.addedVersionIds.length === 2)
+    && identity.addedVersionIds.every(isUuid) && new Set(identity.addedVersionIds.map(value => value.toLowerCase())).size === identity.addedVersionIds.length
+    && identity.addedVersionIds.at(-1)?.toLowerCase() === identity.deployedVersionId.toLowerCase()
+    && ['beforeVersionsSha256', 'afterVersionsSha256', 'deploymentsSha256', 'commandOutputSha256', 'postAuditDeploymentsSha256']
+      .every(key => isSha256(identity[key])),
+  'audited production Worker identity is not canonical');
+  return {
+    schemaVersion: 2, worker: 'theologai', deployedVersionId: identity.deployedVersionId.toLowerCase(),
+    deployedVersionNumber: identity.deployedVersionNumber as number, deploymentId: identity.deploymentId.toLowerCase(),
+    beforeVersionsSha256: (identity.beforeVersionsSha256 as string).toLowerCase(), afterVersionsSha256: (identity.afterVersionsSha256 as string).toLowerCase(),
+    deploymentsSha256: (identity.deploymentsSha256 as string).toLowerCase(), commandOutputSha256: (identity.commandOutputSha256 as string).toLowerCase(),
+    commandReportedVersionId: identity.commandReportedVersionId.toLowerCase(),
+    addedVersionIds: identity.addedVersionIds.map(value => value.toLowerCase()),
+    postAuditDeploymentsSha256: (identity.postAuditDeploymentsSha256 as string).toLowerCase(),
+  };
+}
+
+function assertProductionMatchesAuditedIdentity(
+  production: Deployment,
+  auditedProduction: AuditedProductionWorkerIdentity,
+): void {
+  assert(production.id === auditedProduction.deploymentId,
+    'production deployment changed after audited production identity');
+  assert(production.versionId === auditedProduction.deployedVersionId,
+    'production Worker version changed after audited production identity');
+}
+
 /** Fail closed if an ordinary preview release observed any production identity drift. */
 export function verifyProductionControlUnchanged(input: {
   controlText: string;
@@ -439,11 +494,15 @@ function assertCurrentSchema0009D1(candidate: CandidateD1Binding, environment: '
 export function captureEnvironmentIsolationReceipt(input: {
   productionDeploymentsText: string;
   productionActiveVersionViewText: string;
+  productionAuditedIdentityText: string;
   previewDeploymentsText: string;
   previewActiveVersionViewText: string;
   wranglerConfigText: string;
   d1InventoryText: string;
 }): EnvironmentIsolationReceipt {
+  const auditedProduction = parseAuditedProductionWorkerIdentity(
+    parseJson(input.productionAuditedIdentityText, 'audited production Worker identity'),
+  );
   const productionD1 = checkedOutProductionCandidateD1(input.wranglerConfigText);
   const previewD1 = checkedOutCandidateD1(input.wranglerConfigText);
   assertCurrentSchema0009D1(productionD1, 'production');
@@ -456,6 +515,7 @@ export function captureEnvironmentIsolationReceipt(input: {
   const preview = currentSoleDeployment(input.previewDeploymentsText, 'environment isolation preview deployments');
   const observedProductionD1 = observedD1FromAuthoritativeVersionView(input.productionActiveVersionViewText, production.versionId, 'environment isolation production');
   const observedPreviewD1 = observedD1FromAuthoritativeVersionView(input.previewActiveVersionViewText, preview.versionId, 'environment isolation preview');
+  assertProductionMatchesAuditedIdentity(production, auditedProduction);
   assertObservedD1MatchesCandidate(observedProductionD1, productionD1, 'environment isolation production');
   assertObservedD1MatchesCandidate(observedPreviewD1, previewD1, 'environment isolation preview');
   return {
@@ -610,10 +670,16 @@ export function observeProductionPostMutation(input: {
   postMutationDeploymentsText: string;
   observedActiveVersionViewText: string;
   wranglerConfigText: string;
+  auditedProductionIdentityText?: string;
 }): ProductionPostMutationObservation {
   const predecessor = parseProductionAnchor(parseJson(input.predecessorAnchorText, 'production predecessor anchor'));
   const candidateD1 = checkedOutProductionCandidateD1(input.wranglerConfigText);
   const active = currentSoleDeployment(input.postMutationDeploymentsText, 'post-mutation production deployments');
+  if (input.auditedProductionIdentityText !== undefined) {
+    assertProductionMatchesAuditedIdentity(active, parseAuditedProductionWorkerIdentity(
+      parseJson(input.auditedProductionIdentityText, 'audited production Worker identity'),
+    ));
+  }
   const observedActiveD1 = observedD1FromAuthoritativeVersionView(input.observedActiveVersionViewText, active.versionId, 'post-mutation production active');
   return {
     schemaVersion: 3, worker: 'theologai', predecessorVersionId: predecessor.predecessorVersionId,
@@ -749,16 +815,17 @@ export async function runProductionCli(argv: string[]): Promise<void> {
   if (command === 'capture-environment-isolation') {
     const values = exactArgs(argv.slice(1), command, [
       '--production-deployments', '--production-active-version-view', '--preview-deployments', '--preview-active-version-view',
-      '--wrangler-config', '--d1-inventory', '--output',
+      '--production-audited-identity', '--wrangler-config', '--d1-inventory', '--output',
     ]);
-    const [productionDeploymentsText, productionActiveVersionViewText, previewDeploymentsText, previewActiveVersionViewText, wranglerConfigText, d1InventoryText] = await Promise.all([
+    const [productionDeploymentsText, productionActiveVersionViewText, previewDeploymentsText, previewActiveVersionViewText, productionAuditedIdentityText, wranglerConfigText, d1InventoryText] = await Promise.all([
       readFile(values.get('--production-deployments')!, 'utf8'), readFile(values.get('--production-active-version-view')!, 'utf8'),
       readFile(values.get('--preview-deployments')!, 'utf8'), readFile(values.get('--preview-active-version-view')!, 'utf8'),
+      readFile(values.get('--production-audited-identity')!, 'utf8'),
       readFile(values.get('--wrangler-config')!, 'utf8'), readFile(values.get('--d1-inventory')!, 'utf8'),
     ]);
     await writeRecord(captureEnvironmentIsolationReceipt({
       productionDeploymentsText, productionActiveVersionViewText, previewDeploymentsText, previewActiveVersionViewText,
-      wranglerConfigText, d1InventoryText,
+      productionAuditedIdentityText, wranglerConfigText, d1InventoryText,
     }), values.get('--output')!);
     return;
   }
@@ -779,7 +846,19 @@ export async function runProductionCli(argv: string[]): Promise<void> {
     const input = { predecessorAnchorText, postMutationDeploymentsText, observedActiveVersionViewText, wranglerConfigText };
     await writeRecord(command === 'observe-post-mutation' ? observeProductionPostMutation(input) : reconcileProductionPostMutation(input), values.get('--output')!); return;
   }
-  fail('production command must be candidate-d1-name, active-version-id, capture-control, verify-control, capture-environment-isolation, capture-predecessor, reconcile-post-mutation, or observe-post-mutation');
+  if (command === 'observe-final-post-audit') {
+    const values = exactArgs(argv.slice(1), command, ['--predecessor-anchor', '--deployments', '--observed-active-version-view', '--production-audited-identity', '--wrangler-config', '--output']);
+    const [predecessorAnchorText, postMutationDeploymentsText, observedActiveVersionViewText, auditedProductionIdentityText, wranglerConfigText] = await Promise.all([
+      readFile(values.get('--predecessor-anchor')!, 'utf8'), readFile(values.get('--deployments')!, 'utf8'),
+      readFile(values.get('--observed-active-version-view')!, 'utf8'), readFile(values.get('--production-audited-identity')!, 'utf8'),
+      readFile(values.get('--wrangler-config')!, 'utf8'),
+    ]);
+    await writeRecord(observeProductionPostMutation({
+      predecessorAnchorText, postMutationDeploymentsText, observedActiveVersionViewText, auditedProductionIdentityText, wranglerConfigText,
+    }), values.get('--output')!);
+    return;
+  }
+  fail('production command must be candidate-d1-name, active-version-id, capture-control, verify-control, capture-environment-isolation, capture-predecessor, reconcile-post-mutation, observe-post-mutation, or observe-final-post-audit');
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

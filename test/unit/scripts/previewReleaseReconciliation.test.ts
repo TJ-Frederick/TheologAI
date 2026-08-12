@@ -7,6 +7,7 @@ import {
   capturePreviewControlIdentity,
   captureProductionControlIdentity,
   captureProductionPredecessorAnchor,
+  observeProductionPostMutation,
   reconcileProductionPostMutation,
   activePreviewVersionId,
   candidatePreviewD1DatabaseName,
@@ -48,6 +49,18 @@ function inventory(id = candidateD1Id, name = candidateD1Name): string {
   return JSON.stringify([{ uuid: id, name }]);
 }
 
+function auditedProductionIdentity(
+  deploymentId = predecessorDeployment,
+  deployedVersionId = predecessorVersion,
+): string {
+  return JSON.stringify({
+    schemaVersion: 2, worker: 'theologai', deploymentId, deployedVersionId, deployedVersionNumber: 42,
+    beforeVersionsSha256: 'a'.repeat(64), afterVersionsSha256: 'b'.repeat(64), deploymentsSha256: 'c'.repeat(64),
+    commandOutputSha256: 'd'.repeat(64), commandReportedVersionId: deployedVersionId, addedVersionIds: [deployedVersionId],
+    postAuditDeploymentsSha256: 'e'.repeat(64),
+  });
+}
+
 function predecessorConfig(config: string): string {
   return config
     .replace(`database_name = "${candidateD1Name}"`, 'database_name = "theologai-preview-20260722-b"')
@@ -76,6 +89,11 @@ describe('preview release reconciliation evidence', () => {
       predecessorAnchorText: JSON.stringify(anchor), postMutationDeploymentsText: deployments(candidateDeployment, candidateVersion),
       observedActiveVersionViewText: versionView(candidateVersion, predecessorD1Id), wranglerConfigText: config,
     })).toThrow('does not match the checked-out readiness-tested candidate D1');
+    expect(() => observeProductionPostMutation({
+      predecessorAnchorText: JSON.stringify(anchor), postMutationDeploymentsText: deployments(predecessorDeployment, candidateVersion),
+      observedActiveVersionViewText: versionView(candidateVersion, productionCandidateD1Id), wranglerConfigText: config,
+      auditedProductionIdentityText: auditedProductionIdentity(candidateDeployment, candidateVersion),
+    })).toThrow('production deployment changed after audited production identity');
   });
 
   it('proves the initial production control against config and fresh name/UUID inventory, then fails closed for post-audit drift', async () => {
@@ -163,6 +181,7 @@ describe('preview release reconciliation evidence', () => {
       productionActiveVersionViewText: versionView(predecessorVersion, productionCandidateD1Id),
       previewDeploymentsText: deployments(candidateDeployment, candidateVersion),
       previewActiveVersionViewText: versionView(candidateVersion, candidateD1Id),
+      productionAuditedIdentityText: auditedProductionIdentity(),
       wranglerConfigText: config, d1InventoryText: allInventory,
     })).toMatchObject({
       production: { worker: 'theologai', d1: { databaseName: productionCandidateD1Name, databaseId: productionCandidateD1Id } },
@@ -173,6 +192,7 @@ describe('preview release reconciliation evidence', () => {
       productionActiveVersionViewText: versionView(predecessorVersion, productionCandidateD1Id),
       previewDeploymentsText: deployments(candidateDeployment, candidateVersion),
       previewActiveVersionViewText: versionView(candidateVersion, candidateD1Id),
+      productionAuditedIdentityText: auditedProductionIdentity(),
       wranglerConfigText: config.replace(`database_name = "${productionCandidateD1Name}"`, 'database_name = "theologai-production-20260729-transform11-a"'),
       d1InventoryText: allInventory,
     })).toThrow('production D1 uses a recorded schema-0008 name or UUID');
@@ -181,6 +201,7 @@ describe('preview release reconciliation evidence', () => {
       productionActiveVersionViewText: versionView(predecessorVersion, productionCandidateD1Id),
       previewDeploymentsText: deployments(candidateDeployment, candidateVersion),
       previewActiveVersionViewText: versionView(candidateVersion, candidateD1Id),
+      productionAuditedIdentityText: auditedProductionIdentity(),
       wranglerConfigText: config.replace(`database_id = "${candidateD1Id}"`, `database_id = "${productionCandidateD1Id}"`),
       d1InventoryText: allInventory,
     })).toThrow('production and preview D1 identities must be distinct');
@@ -189,9 +210,26 @@ describe('preview release reconciliation evidence', () => {
       productionActiveVersionViewText: versionView(predecessorVersion, productionCandidateD1Id),
       previewDeploymentsText: deployments(candidateDeployment, candidateVersion),
       previewActiveVersionViewText: versionView(candidateVersion, candidateD1Id),
+      productionAuditedIdentityText: auditedProductionIdentity(),
       wranglerConfigText: config.replace(`database_id = "${productionCandidateD1Id}"`, 'database_id = "62b871a6-5b4d-4d9b-8f52-301f6c878f48"'),
       d1InventoryText: allInventory,
     })).toThrow('production D1 uses a recorded schema-0008 name or UUID');
+    expect(() => captureEnvironmentIsolationReceipt({
+      productionDeploymentsText: deployments(candidateDeployment, candidateVersion),
+      productionActiveVersionViewText: versionView(candidateVersion, productionCandidateD1Id),
+      previewDeploymentsText: deployments(candidateDeployment, candidateVersion),
+      previewActiveVersionViewText: versionView(candidateVersion, candidateD1Id),
+      productionAuditedIdentityText: auditedProductionIdentity(),
+      wranglerConfigText: config, d1InventoryText: allInventory,
+    })).toThrow('production deployment changed after audited production identity');
+    expect(() => captureEnvironmentIsolationReceipt({
+      productionDeploymentsText: deployments(predecessorDeployment, candidateVersion),
+      productionActiveVersionViewText: versionView(candidateVersion, productionCandidateD1Id),
+      previewDeploymentsText: deployments(candidateDeployment, candidateVersion),
+      previewActiveVersionViewText: versionView(candidateVersion, candidateD1Id),
+      productionAuditedIdentityText: auditedProductionIdentity(),
+      wranglerConfigText: config, d1InventoryText: allInventory,
+    })).toThrow('production Worker version changed after audited production identity');
   });
 
   it('captures distinct observed predecessor and readiness-tested candidate D1 identities', async () => {

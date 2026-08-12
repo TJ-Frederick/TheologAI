@@ -37,12 +37,13 @@ PR95's Transform-9 normal preview release is historical, having used
 predecessor was deployment `070b292b-0bae-400a-b983-3d72157b5a96`, Worker
 `bd722b69-2e2c-4d8d-b42b-617e8caba13d` (#130), and D1
 `theologai-preview-20260728-hierarchy-a`
-(`51890e12-1c3f-421f-b661-9a5ea9637e43`). The current preview baseline is
-deployment `5e812152-355b-4a5f-a123-2485e89f1550`, Worker
-`06b9a603-8339-42b6-a246-ef9238563043` (#140), and D1
-`theologai-preview-20260728-transform11-a`
-(`62b871a6-5b4d-4d9b-8f52-301f6c878f48`). The retained PR #101 production
-rollback is deployment `71b76d24-bf5f-490e-adc4-31cf63fb046e`, Worker
+(`51890e12-1c3f-421f-b661-9a5ea9637e43`). That former Transform-11 preview
+binding is historical. The current preview baseline is PR #122 deployment
+`13393917-fa91-4afc-aeaf-2809db6701a2`, Worker
+`b2c62527-5759-4c1d-a9a3-8c1d43dddabe`, and schema-`0009` D1
+`theologai-preview-20260811-schema0009-a`
+(`74f456e2-6951-4003-bb6f-91951342bf8f`). The retained PR #101 production
+rollback is older history: deployment `71b76d24-bf5f-490e-adc4-31cf63fb046e`, Worker
 `bae58cd3-cad7-4663-879d-408accf061b0` (#96), and D1
 `theologai-production-20260728-hierarchy-a`
 (`f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395`). This schema-`0008` database was
@@ -90,8 +91,13 @@ protected workflow `30496350408` subsequently deployed merge
 `291f3292-3fa9-44fc-bf6f-b68fd2f4cef6` (#98), bound to this D1. Historical
 core passed 8/8, Transform-11 spine passed 10/10, original-language passed
 11/11, edge stabilization matched attempt 4 and remained stable, and the
-independent post-release review returned `SHIP`. Retain the PR #101 Worker/D1
-pair above as rollback.
+independent post-release review returned `SHIP`. For this schema-`0009`
+cutover, the exact PR #108 pair is the immediately preceding primary rollback
+unit: deployment `3d7489d9-7b48-4ad0-bdc6-95ffbda53bd8`, Worker
+`291f3292-3fa9-44fc-bf6f-b68fd2f4cef6`, and D1
+`theologai-production-20260729-transform11-a`
+(`53211f50-a893-4b4c-be1e-bc625a595dc7`). PR #101 is older rollback history,
+not the immediate rollback claim for this cutover.
 
 ## Source and materialization
 
