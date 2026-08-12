@@ -486,11 +486,10 @@ jobs:
           observed_active_version="$(npx --no-install tsx scripts/production-release-reconciliation.ts active-version-id \
             --deployments "$RUNNER_TEMP/production-worker-deployments-post-mutation.json")"
           npx --no-install wrangler versions view "$observed_active_version" --json > "$RUNNER_TEMP/production-worker-observed-active-version-view.json"
-          npx --no-install tsx scripts/production-release-reconciliation.ts observe-final-post-audit \
+          npx --no-install tsx scripts/production-release-reconciliation.ts observe-post-mutation \
             --predecessor-anchor "$RUNNER_TEMP/production-worker-predecessor-anchor.json" \
             --deployments "$RUNNER_TEMP/production-worker-deployments-post-mutation.json" \
             --observed-active-version-view "$RUNNER_TEMP/production-worker-observed-active-version-view.json" \
-            --production-audited-identity "$RUNNER_TEMP/production-worker-deployment-identity.json" \
             --wrangler-config wrangler.toml \
             --output "$RUNNER_TEMP/production-worker-final-routing-observation.json"
 
@@ -503,9 +502,32 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
 
+      # The diagnostic observation above remains available after every attempted
+      # deploy. A successful release additionally takes a fresh, strict
+      # post-observation identity record that must match the audited Worker.
+      - name: Verify final production identity after audited release (read-only)
+        id: production-final-post-audit-identity
+        if: ${{ steps.production-worker-audit-identity.outcome == 'success' && steps.preview-control-after-production-audits.outcome == 'success' && steps.final-environment-isolation.outcome == 'success' && steps.production-final-observation.outcome == 'success' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
+        run: |
+          npx --no-install wrangler deployments list --json > "$RUNNER_TEMP/production-worker-deployments-final-post-audit.json"
+          final_version="$(npx --no-install tsx scripts/production-release-reconciliation.ts active-version-id \
+            --deployments "$RUNNER_TEMP/production-worker-deployments-final-post-audit.json")"
+          npx --no-install wrangler versions view "$final_version" --json > "$RUNNER_TEMP/production-worker-final-post-audit-version-view.json"
+          npx --no-install tsx scripts/production-release-reconciliation.ts observe-final-post-audit \
+            --predecessor-anchor "$RUNNER_TEMP/production-worker-predecessor-anchor.json" \
+            --deployments "$RUNNER_TEMP/production-worker-deployments-final-post-audit.json" \
+            --observed-active-version-view "$RUNNER_TEMP/production-worker-final-post-audit-version-view.json" \
+            --production-audited-identity "$RUNNER_TEMP/production-worker-deployment-identity.json" \
+            --wrangler-config wrangler.toml \
+            --output "$RUNNER_TEMP/production-worker-final-post-audit-identity.json"
+
       - name: Hash sanitized production audit and reconciliation evidence
         id: production-audit-evidence
-        if: ${{ steps.production-worker-deploy.outcome == 'success' && steps.production-worker-candidate-cutover.outcome == 'success' && steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' && steps.production-historical-core-audit.outcome == 'success' && steps.production-historical-spine-audit.outcome == 'success' && steps.production-worker-audit-identity.outcome == 'success' && steps.preview-control-after-production-audits.outcome == 'success' && steps.final-environment-isolation.outcome == 'success' && steps.production-final-observation.outcome == 'success' }}
+        if: ${{ steps.production-worker-deploy.outcome == 'success' && steps.production-worker-candidate-cutover.outcome == 'success' && steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' && steps.production-historical-core-audit.outcome == 'success' && steps.production-historical-spine-audit.outcome == 'success' && steps.production-worker-audit-identity.outcome == 'success' && steps.preview-control-after-production-audits.outcome == 'success' && steps.final-environment-isolation.outcome == 'success' && steps.production-final-observation.outcome == 'success' && steps.production-final-post-audit-identity.outcome == 'success' }}
         run: |
           edge_stabilization_sha256="$(sha256sum "$RUNNER_TEMP/production-primary-source-edge-stabilization.json" | awk '{print $1}')"
           original_language_audit_sha256="$(sha256sum "$RUNNER_TEMP/original-language-v2-production-audit.json" | awk '{print $1}')"
@@ -514,6 +536,7 @@ jobs:
           identity_sha256="$(sha256sum "$RUNNER_TEMP/production-worker-deployment-identity.json" | awk '{print $1}')"
           candidate_cutover_observation_sha256="$(sha256sum "$RUNNER_TEMP/production-worker-candidate-cutover-observation.json" | awk '{print $1}')"
           final_routing_observation_sha256="$(sha256sum "$RUNNER_TEMP/production-worker-final-routing-observation.json" | awk '{print $1}')"
+          final_post_audit_identity_sha256="$(sha256sum "$RUNNER_TEMP/production-worker-final-post-audit-identity.json" | awk '{print $1}')"
           readiness_receipt_sha256="$(sha256sum "$RUNNER_TEMP/production-d1-readiness-receipt.json" | awk '{print $1}')"
           preview_control_sha256="$(sha256sum "$RUNNER_TEMP/preview-control-after-production-audits.json" | awk '{print $1}')"
           environment_isolation_sha256="$(sha256sum "$RUNNER_TEMP/final-environment-isolation-receipt.json" | awk '{print $1}')"
@@ -525,6 +548,7 @@ jobs:
           printf 'identity_record_sha256=%s\n' "$identity_sha256" >> "$GITHUB_OUTPUT"
           printf 'candidate_cutover_observation_sha256=%s\n' "$candidate_cutover_observation_sha256" >> "$GITHUB_OUTPUT"
           printf 'final_routing_observation_sha256=%s\n' "$final_routing_observation_sha256" >> "$GITHUB_OUTPUT"
+          printf 'final_post_audit_identity_sha256=%s\n' "$final_post_audit_identity_sha256" >> "$GITHUB_OUTPUT"
           printf 'readiness_receipt_sha256=%s\n' "$readiness_receipt_sha256" >> "$GITHUB_OUTPUT"
           printf 'preview_control_sha256=%s\n' "$preview_control_sha256" >> "$GITHUB_OUTPUT"
           printf 'environment_isolation_sha256=%s\n' "$environment_isolation_sha256" >> "$GITHUB_OUTPUT"
@@ -538,6 +562,7 @@ jobs:
             ${{ runner.temp }}/production-worker-candidate-cutover-observation.json
             ${{ runner.temp }}/production-worker-candidate-cutover.json
             ${{ runner.temp }}/production-worker-final-routing-observation.json
+            ${{ runner.temp }}/production-worker-final-post-audit-identity.json
             ${{ runner.temp }}/preview-control-before-production.json
             ${{ runner.temp }}/preview-control-after-production-deploy.json
             ${{ runner.temp }}/preview-control-after-production-audits.json
@@ -559,6 +584,7 @@ jobs:
             ${{ runner.temp }}/production-worker-candidate-cutover-observation.json
             ${{ runner.temp }}/production-worker-candidate-cutover.json
             ${{ runner.temp }}/production-worker-final-routing-observation.json
+            ${{ runner.temp }}/production-worker-final-post-audit-identity.json
             ${{ runner.temp }}/production-d1-readiness-receipt.json
             ${{ runner.temp }}/preview-control-before-production.json
             ${{ runner.temp }}/preview-control-after-production-deploy.json

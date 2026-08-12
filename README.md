@@ -64,7 +64,9 @@ bound to D1 `theologai-production-20260729-transform11-a`
 8/8, the Transform-11 spine audit passed 10/10, the original-language audit
 passed 11/11, primary-source edge stabilization matched on attempt 4 and
 remained stable, and the independent post-release review returned `SHIP`.
-The PR #101 production assignment is retained as the matched rollback pair.
+For this schema-`0009` cutover, the exact captured PR #108 Worker/D1 pair
+above is the immediately preceding primary rollback unit. PR #101 is older
+retained rollback history, not the immediate rollback claim.
 
 The historical PR #96 `original_language_study` schema-v2 audit passed 11/11
 cases.
@@ -157,7 +159,7 @@ environment-isolation verification remain separately gated. Completion of the
 preview stage does not authorize credential work or the canary; see the
 [CCEL canary transaction](docs/CCEL-LIVE-PREVIEW-CANARY-TRANSACTION.md).
 
-PR #101's former production assignment, retained as the rollback pair, is
+PR #101's former production assignment is older retained rollback history:
 deployment `71b76d24-bf5f-490e-adc4-31cf63fb046e`, Worker
 `bae58cd3-cad7-4663-879d-408accf061b0` (#96), and D1
 `theologai-production-20260728-hierarchy-a`
@@ -187,7 +189,9 @@ Protected workflow `30496350408` then deployed
 Historical core passed 8/8, Transform-11 spine passed 10/10,
 `original_language_study` passed 11/11, primary-source edge stabilization
 matched on attempt 4 and remained stable, and independent post-release review
-returned `SHIP`. The PR #101 Worker/D1 pair above remains the rollback record.
+returned `SHIP`. The exact PR #108 Worker/D1 pair above is the primary
+immediate rollback unit for this schema-`0009` cutover; PR #101 remains older
+retained rollback history only.
 For a preview-client rollback without changing server state, use the direct preview
 `workers.dev` address above; the production `workers.dev` address intentionally
 redirects rather than serving a separate legacy Worker.

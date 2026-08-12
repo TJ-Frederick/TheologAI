@@ -353,7 +353,7 @@ audits. That PR #101 production assignment—deployment
 `71b76d24-bf5f-490e-adc4-31cf63fb046e`, Worker
 `bae58cd3-cad7-4663-879d-408accf061b0` (#96), and D1
 `theologai-production-20260728-hierarchy-a`
-(`f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395`)—is now the matched rollback pair.
+(`f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395`)—is older retained rollback history.
 The retained PR #101 preview
 predecessor was deployment `070b292b-0bae-400a-b983-3d72157b5a96`, Worker
 `bd722b69-2e2c-4d8d-b42b-617e8caba13d` (#130), and D1

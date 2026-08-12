@@ -16,6 +16,10 @@ and the independent post-release review returned `SHIP`. This is not a
 hierarchy/publication activation; CCEL execution remains disabled and Aquinas
 remains inactive.
 
+For the schema-`0009` cutover, the exact captured PR #108 Worker/D1 pair above
+is the immediately preceding primary rollback unit. PR #101 is older retained
+rollback history, not the immediate rollback claim.
+
 ### Schema-0009 preview release state
 
 The checked-in preview configuration targets schema-`0009` D1
@@ -41,7 +45,7 @@ authorization has been revoked (run `31572924302`); PR #122 remains open and
 unmerged. This evidence-only commit postdates that deployment and does not
 change production, CCEL execution, or secrets.
 
-The former PR #101 production assignment is the matched rollback pair:
+The former PR #101 production assignment is older retained rollback history:
 deployment `71b76d24-bf5f-490e-adc4-31cf63fb046e`, Worker
 `bae58cd3-cad7-4663-879d-408accf061b0` (#96), and D1
 `theologai-production-20260728-hierarchy-a`
@@ -79,8 +83,9 @@ merge `501ae7840a71ceb589dc3b1ae9863aef83e3586f`, exact tree
 Primary readiness, Transform-8 authority (`1/12/12` pages), and complete
 Transform-11 source-pack authority (`1/1/1/1/1/1/133/17` pages) passed. The
 protected PR #108 workflow `30496350408` subsequently proved and activated its
-exact Worker/D1 assignment. The PR #101 Worker/D1 pair above is retained as
-rollback.
+exact Worker/D1 assignment. That PR #108 pair is the immediate primary rollback
+unit for the schema-`0009` cutover; the PR #101 pair above is older retained
+rollback history only.
 
 Historical PR #96 production evidence is source-attested to checked-out commit
 `ac4b5ed774302fbfc86bf846b6ee77a07beed456` and exact tree
