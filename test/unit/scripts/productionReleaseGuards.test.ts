@@ -75,6 +75,7 @@ describe('production release guards', () => {
     const historicalAuditScript = await readFile(new URL('../../../scripts/audit-historical-core-preview.ts', import.meta.url), 'utf8');
     const finalObservation = workflow.indexOf('Capture final production routing/binding observation (read-only)');
     const finalArtifact = workflow.indexOf('Upload final production routing/binding observation');
+    const finalPostAuditIdentity = workflow.indexOf('Verify final production identity after audited release (read-only)');
     const protectedEvidence = workflow.indexOf('Upload protected production audit evidence');
     const observationBlock = workflow.slice(finalObservation, finalArtifact);
     const finalArtifactBlock = workflow.slice(finalArtifact, protectedEvidence);
@@ -88,6 +89,8 @@ describe('production release guards', () => {
     expect(observationBlock).not.toContain('reconcile-post-mutation');
     expect(finalArtifactBlock).toContain("steps.production-worker-deploy.outcome != 'skipped'");
     expect(finalArtifactBlock).toContain('if-no-files-found: warn');
+    expect(finalPostAuditIdentity).toBeGreaterThan(finalArtifact);
+    expect(finalPostAuditIdentity).toBeLessThan(protectedEvidence);
 
     // A failed deploy never becomes green because its action failed. A deploy
     // that otherwise passed its strict gates is also terminal if final
@@ -102,6 +105,7 @@ describe('production release guards', () => {
     expect(workflow).toContain('Verify final production identity after audited release (read-only)');
     expect(workflow).toContain('scripts/production-release-reconciliation.ts observe-final-post-audit');
     expect(workflow).toContain("steps.production-final-post-audit-identity.outcome == 'success'");
+    expect(workflow).toContain('production-worker-final-post-audit-identity.json');
     expect(historicalAuditScript).toContain('${profile.label} expanded-discovery/catalog execution invariant drifted');
     expect(historicalAuditScript).not.toContain('preview expanded-discovery/catalog execution invariant drifted');
 

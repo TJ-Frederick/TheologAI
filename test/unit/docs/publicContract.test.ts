@@ -390,6 +390,20 @@ describe('published project contract', () => {
     expect(catalogScope).not.toContain('The current preview baseline is\ndeployment `5e812152');
     expect(dataWorkflow).not.toContain('Retain the PR #101 matched Worker/D1 pair above for rollback.');
     expect(catalogScope).not.toContain('Retain the PR #101 Worker/D1\npair above as rollback.');
+    for (const document of [readme, dataWorkflow, operations]) {
+      const normalized = document.replace(/\s+/g, ' ');
+      expect(normalized).toContain('immediately preceding primary rollback unit');
+    }
+    expect(readme.replace(/\s+/g, ' ')).toContain('PR #101 is older retained rollback history');
+    expect(operations.replace(/\s+/g, ' ')).toContain('PR #101 is older retained rollback history');
+    expect(dataWorkflow).toContain('older retained rollback history');
+    expect(readme).not.toContain('The PR #101 production assignment is retained as the matched rollback pair.');
+    expect(readme).not.toContain("PR #101's former production assignment, retained as the rollback pair");
+    expect(readme).not.toContain('The PR #101 Worker/D1 pair above remains the rollback record.');
+    expect(operations).not.toContain('The former PR #101 production assignment is the matched rollback pair:');
+    expect(operations).not.toContain('The PR #101 Worker/D1 pair above is retained as\nrollback.');
+    expect(dataWorkflow).not.toContain('—is now the matched rollback pair.');
+    expect(dataWorkflow).not.toContain('The PR #101 candidate, now the retained\nproduction rollback,');
     for (const document of [readme, dataWorkflow, catalogScope, reconciliation, operations, roadmap]) {
       expect(document).not.toContain('Transform-8/9/10 authority');
       expect(document).toContain('Aquinas');

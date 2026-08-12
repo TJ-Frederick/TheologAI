@@ -337,8 +337,8 @@ This preparer does not change `wrangler.toml`, a Worker binding, deployment,
 or database inventory. It does mutate only the separately named, unbound
 production candidate corpus: migrations and deterministic seed files are
 applied there after the pristine-target guard passes. It never mutates the
-active/bound production corpus. The PR #101 candidate, now the retained
-production rollback,
+active/bound production corpus. The PR #101 candidate is older retained
+rollback history:
 `theologai-production-20260728-hierarchy-a`
 (`f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395`) was unbound when its one-use operation
 completed with 49/49 seed files, 1,627,474 rows, schema `0008`, corpus identity
