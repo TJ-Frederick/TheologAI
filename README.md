@@ -205,8 +205,8 @@ For a preview-client rollback without changing server state, use the direct prev
 `workers.dev` address above; the production `workers.dev` address intentionally
 redirects rather than serving a separate legacy Worker.
 
-Production remains on schema `0008`; preview now uses the audited PR #122
-schema-`0009` Candidate-C D1. Earlier local-only and preview-only activation
+Production and preview now use their distinct audited PR #122 schema-`0009`
+Candidate-C D1 databases. Earlier local-only and preview-only activation
 statements are historical. The historical PR #96 public
 `original_language_study` v2 audit does not independently establish the runtime
 path for every later historical transform. The pinned packet's `SOURCE.json`
@@ -223,24 +223,24 @@ candidate, deployed it, proved the active preview binding, and completed its
 audit. It validated the fixed production control against the checked-in
 production D1 name/UUID and fresh inventory before deployment, immediately
 afterward, and again after the final preview audit.
-PR #122 has now completed that protected preview release: source
-`a0f13b5bdbf3ca071dbb7524dea9c6ce80770404` (tree
-`660c06ff31e7d0e2ccbc6fe12204e66c4e793233`) is served solely by preview
-Worker `b2c62527-5759-4c1d-a9a3-8c1d43dddabe` on deployment
-`13393917-fa91-4afc-aeaf-2809db6701a2`; all fixed audits and three production
-control observations passed. The authorization label was removed and revocation
-run `31572924302` succeeded. The detailed sanitized evidence is in
+PR #123 subsequently deployed exact source
+`7fb3ec5113a16ed86bfc4a403a3ec3678d4d4dd0` (tree
+`28e555808ad3840d145a7ddd7e57934dc30e45c2`) as preview Worker
+`70bbbecf-3fe6-4a04-8c34-babc3df09ad0` (#144) through deployment
+`4108d59a-4092-4389-824c-fa3820ab66f6`, retaining the same schema-`0009` D1.
+All fixed audits and three production-control observations passed. The
+authorization label was removed and revocation run `31645546905` succeeded.
+PR #122 deployment `13393917-fa91-4afc-aeaf-2809db6701a2` and Worker
+`b2c62527-5759-4c1d-a9a3-8c1d43dddabe` (#142) are the immediate retained
+same-D1 predecessor. The detailed sanitized evidence is in
 [docs/PREVIEW-RELEASE-RECONCILIATION.md](docs/PREVIEW-RELEASE-RECONCILIATION.md).
-This evidence-only commit postdates the deployed source and makes no new
+This post-release evidence commit postdates the deployed source and makes no new
 runtime claim.
-The checked-in production release target is the separately prepared schema-`0009`
-candidate `theologai-production-20260811-schema0009-a`
-(`9bc79346-338b-439e-a2a5-424f4418eb21`). It remains unbound until the
-protected production workflow proves readiness, the exact active binding,
-post-audit preview control, and final environment isolation. Live production
-remains on its recorded schema-`0008` predecessor until then. The CCEL canary
-gate remains unrecorded and inert. The exact preparation identity, seed
-evidence, and release boundary are recorded in
+Production is separately bound to schema-`0009` D1
+`theologai-production-20260811-schema0009-a`
+(`9bc79346-338b-439e-a2a5-424f4418eb21`) by the protected PR #122 release. The
+CCEL canary gate remains unrecorded and inert. The exact preparation identity,
+seed evidence, and release boundary are recorded in
 [docs/D1-DATA-WORKFLOW.md](docs/D1-DATA-WORKFLOW.md).
 
 ## MCP capabilities

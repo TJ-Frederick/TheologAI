@@ -292,7 +292,8 @@ describe('published project contract', () => {
     expect(reconciliation).toContain('This is the retained compatible\npreview predecessor');
     expect(reconciliation).toContain('evidence remains authoritative for that predecessor');
     expect(operations).toContain('The retained PR #101 preview predecessor was deployment');
-    expect(operations).toContain("PR #122's retained immediate predecessor, not the active preview");
+    expect(operations).toContain('is an earlier retained predecessor, not the active preview');
+    expect(operations).toContain("PR #122's\nschema-`0009` Worker above is the immediate same-D1 predecessor to PR #123");
   });
 
   it('records the completed Transform 11 preview release and unpublished hardening boundary', async () => {
@@ -325,17 +326,19 @@ describe('published project contract', () => {
     expect(documents[6]).toContain('30419373527');
     expect(documents[6]).toContain('30420256210');
     expect(documents[6]).toContain('Production was unchanged by that preview release');
-    expect(documents[5]).toContain('remained unchanged during the PR #108 production release and\nis now PR #122');
+    expect(documents[5]).toContain('remained unchanged during the PR #108 production release and\nis an earlier retained predecessor');
+    expect(documents[5]).toContain('immediate same-D1 predecessor to PR #123');
   });
 
   it('documents the current PR #122 schema-0009 production release and PR #108 rollback', async () => {
-    const [readme, dataWorkflow, catalogScope, reconciliation, operations, roadmap] = await Promise.all([
+    const [readme, dataWorkflow, catalogScope, reconciliation, operations, roadmap, phasePlan] = await Promise.all([
       readProjectFile('README.md'),
       readProjectFile('docs/D1-DATA-WORKFLOW.md'),
       readProjectFile('docs/PRIMARY-SOURCE-CATALOG-SCOPE.md'),
       readProjectFile('docs/PRODUCTION-RELEASE-RECONCILIATION.md'),
       readProjectFile('docs/worker-operations.md'),
       readProjectFile('docs/ROADMAP.md'),
+      readProjectFile('docs/PHASE-3B-PLAN.md'),
     ]);
     const immediateRollback = {
       deployment: '3d7489d9-7b48-4ad0-bdc6-95ffbda53bd8',
@@ -356,8 +359,8 @@ describe('published project contract', () => {
       d1Id: '9bc79346-338b-439e-a2a5-424f4418eb21',
     };
     const livePreview = {
-      deployment: '13393917-fa91-4afc-aeaf-2809db6701a2',
-      worker: 'b2c62527-5759-4c1d-a9a3-8c1d43dddabe',
+      deployment: '4108d59a-4092-4389-824c-fa3820ab66f6',
+      worker: '70bbbecf-3fe6-4a04-8c34-babc3df09ad0',
       d1: 'theologai-preview-20260811-schema0009-a',
       d1Id: '74f456e2-6951-4003-bb6f-91951342bf8f',
     };
@@ -380,6 +383,13 @@ describe('published project contract', () => {
     for (const document of [readme, dataWorkflow, reconciliation, operations, roadmap]) {
       for (const value of Object.values(livePreview)) expect(document).toContain(value);
     }
+    for (const value of Object.values(livePreview)) expect(phasePlan).toContain(value);
+    expect(phasePlan).toContain('7fb3ec5113a16ed86bfc4a403a3ec3678d4d4dd0');
+    expect(phasePlan).toContain('28e555808ad3840d145a7ddd7e57934dc30e45c2');
+    for (const document of [dataWorkflow, catalogScope, reconciliation, operations, roadmap, phasePlan]) {
+      expect(document).not.toContain('current preview baseline is PR #122');
+      expect(document).not.toContain('Preview now serves PR #122');
+    }
     expect(reconciliation).toContain('Current PR #122 production release');
     expect(reconciliation).toContain('a59d9a062b2e6c7884de97fd97309878e1cbdc23');
     expect(reconciliation).toContain('5665940735');
@@ -396,8 +406,8 @@ describe('published project contract', () => {
     expect(roadmap).toContain('independent post-release review returned `SHIP`');
     expect(reconciliation).toContain('primary-source edge stabilization');
     expect(reconciliation).toContain('Transform-11 historical-spine audit');
-    expect(dataWorkflow).toContain('PR #122 deployment\n`13393917-fa91-4afc-aeaf-2809db6701a2`, Worker');
-    expect(catalogScope).toContain('PR #122 deployment\n`13393917-fa91-4afc-aeaf-2809db6701a2`, Worker');
+    expect(dataWorkflow).toContain('same-D1 PR #122 predecessor');
+    expect(catalogScope).toContain('same-D1 PR #122 predecessor');
     expect(dataWorkflow).toContain('immediately preceding primary rollback unit');
     expect(catalogScope).toContain('immediately preceding primary rollback\nunit');
     expect(dataWorkflow).not.toContain('The current preview baseline is\ndeployment `5e812152');
@@ -633,9 +643,16 @@ describe('published project contract', () => {
     expect(reconciliation).toContain('5e812152-355b-4a5f-a123-2485e89f1550');
     expect(reconciliation).toContain('481900a3eec516fe06d3252175b63e318783c7230f70311235e4a1dd73198889');
     expect(reconciliation).toContain('31572924302');
-    expect(reconciliation).toContain('This evidence-only documentation commit postdates the deployed head.');
-    expect(readme).toContain('This evidence-only commit postdates the deployed source');
-    expect(operations).toContain("PR #122 later merged and\ncompleted the separately protected production release");
+    expect(reconciliation).toContain('PR #123 current schema-0009 preview release');
+    expect(reconciliation).toContain('31644218683');
+    expect(reconciliation).toContain('5878053561');
+    expect(reconciliation).toContain('4108d59a-4092-4389-824c-fa3820ab66f6');
+    expect(reconciliation).toContain('70bbbecf-3fe6-4a04-8c34-babc3df09ad0');
+    expect(reconciliation).toContain('31645546905');
+    expect(reconciliation).toContain('This post-release documentation update is not\nitself deployed');
+    expect(readme).toContain('This post-release evidence commit postdates the deployed source');
+    expect(operations).toContain('PR #123 completed the current protected preview release');
+    expect(operations).toContain('immediate retained\nsame-D1 predecessor is PR #122');
     expect(canary.replace(/\s+/g, ' ')).toContain('The gate remains `unrecorded` and inert');
   });
 });

@@ -368,11 +368,13 @@ binding—at merge `72a8ee5eef9b909a373b085d1a4f193484ddfe8a`, deployment
   `5e812152-355b-4a5f-a123-2485e89f1550`, Worker
   `06b9a603-8339-42b6-a246-ef9238563043`, and D1
   `62b871a6-5b4d-4d9b-8f52-301f6c878f48`, with v7/discovery-only behavior and
-  CCEL execution disabled before adapter, coordinator, or fetch. PR #122 has
+  CCEL execution disabled before adapter, coordinator, or fetch. PR #123 has
   since superseded that preview assignment with deployment
-  `13393917-fa91-4afc-aeaf-2809db6701a2`, Worker
-  `b2c62527-5759-4c1d-a9a3-8c1d43dddabe`, and schema-`0009` D1
-  `74f456e2-6951-4003-bb6f-91951342bf8f`. Production
+  `4108d59a-4092-4389-824c-fa3820ab66f6`, Worker
+  `70bbbecf-3fe6-4a04-8c34-babc3df09ad0` (#144), and schema-`0009` D1
+  `74f456e2-6951-4003-bb6f-91951342bf8f`. Its immediate same-D1 predecessor
+  is PR #122 deployment `13393917-fa91-4afc-aeaf-2809db6701a2`, Worker
+  `b2c62527-5759-4c1d-a9a3-8c1d43dddabe` (#142). Production
   remains PR #108 merge `8da99fd0a161b90a4bd90ab29bde1abf796b3bf6`, deployment
   `3d7489d9-7b48-4ad0-bdc6-95ffbda53bd8`, Worker
   `291f3292-3fa9-44fc-bf6f-b68fd2f4cef6`, and D1
@@ -711,14 +713,16 @@ Code readiness and operational readiness are deliberately separate:
   `5e812152-355b-4a5f-a123-2485e89f1550`, Worker
   `06b9a603-8339-42b6-a246-ef9238563043` (#140), and D1
   `theologai-preview-20260728-transform11-a`
-  (`62b871a6-5b4d-4d9b-8f52-301f6c878f48`) are the immediate retained
-  predecessor. Preview now serves PR #122 deployment
-  `13393917-fa91-4afc-aeaf-2809db6701a2`, Worker
-  `b2c62527-5759-4c1d-a9a3-8c1d43dddabe` (#142), and schema-`0009` D1
+  (`62b871a6-5b4d-4d9b-8f52-301f6c878f48`) are an earlier retained
+  predecessor. Preview now serves PR #123 deployment
+  `4108d59a-4092-4389-824c-fa3820ab66f6`, Worker
+  `70bbbecf-3fe6-4a04-8c34-babc3df09ad0` (#144), and schema-`0009` D1
   `theologai-preview-20260811-schema0009-a`
   (`74f456e2-6951-4003-bb6f-91951342bf8f`) with the v7/discovery-only
-  contract; CCEL execution remains disabled before adapter, coordinator, or
-  fetch. The schema-`0008` production database was
+  contract; its immediate same-D1 predecessor is PR #122 deployment
+  `13393917-fa91-4afc-aeaf-2809db6701a2`, Worker
+  `b2c62527-5759-4c1d-a9a3-8c1d43dddabe` (#142). CCEL execution remains
+  disabled before adapter, coordinator, or fetch. The schema-`0008` production database was
   unbound when remote readiness and Transform-8/9 authority audits passed and
   Transform-10 normal-corpus exclusion predicates proved hierarchy,
   publication, and Aquinas-lineage rows empty. Protected workflow

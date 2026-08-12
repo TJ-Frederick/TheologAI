@@ -38,17 +38,17 @@ schema-`0009` candidate `theologai-production-20260811-schema0009-a`
 workflow proved the active binding, re-proved preview control after deployment
 and audits, and emitted the final environment-isolation receipt.
 
-PR #122 completed the protected preview release from
-`a0f13b5bdbf3ca071dbb7524dea9c6ce80770404` (tree
-`660c06ff31e7d0e2ccbc6fe12204e66c4e793233`): Cloudflare deployment
-`13393917-fa91-4afc-aeaf-2809db6701a2` assigns Worker
-`b2c62527-5759-4c1d-a9a3-8c1d43dddabe` solely to the schema-`0009` preview D1.
-All bounded audits and production-control comparisons passed. The preview
-authorization has been revoked (run `31572924302`); PR #122 later merged and
-completed the separately protected production release above. Preview's
-executable Worker inputs remain equivalent to current `main`; the later commits
-change documentation, release evidence and guards, and the production-only D1
-binding, not preview application behavior.
+PR #123 completed the current protected preview release from
+`7fb3ec5113a16ed86bfc4a403a3ec3678d4d4dd0` (tree
+`28e555808ad3840d145a7ddd7e57934dc30e45c2`): Cloudflare deployment
+`4108d59a-4092-4389-824c-fa3820ab66f6` assigns Worker
+`70bbbecf-3fe6-4a04-8c34-babc3df09ad0` (#144) solely to the schema-`0009`
+preview D1. All bounded audits and production-control comparisons passed. The
+preview authorization was revoked by run `31645546905`. The immediate retained
+same-D1 predecessor is PR #122 deployment
+`13393917-fa91-4afc-aeaf-2809db6701a2`, Worker
+`b2c62527-5759-4c1d-a9a3-8c1d43dddabe` (#142). This post-release evidence
+update makes no new runtime claim.
 
 The former PR #101 production assignment is older retained rollback history:
 deployment `71b76d24-bf5f-490e-adc4-31cf63fb046e`, Worker
@@ -76,7 +76,8 @@ Transform-11 source-pack authority (`1/1/1/1/1/1/133/17` pages) passed while
 unbound. Protected preview deployment `5e812152-355b-4a5f-a123-2485e89f1550`
 historically served Worker `06b9a603-8339-42b6-a246-ef9238563043` (#140) with
 that exact D1. It remained unchanged during the PR #108 production release and
-is now PR #122's retained immediate predecessor, not the active preview.
+is an earlier retained predecessor, not the active preview. PR #122's
+schema-`0009` Worker above is the immediate same-D1 predecessor to PR #123.
 
 The checked-in root production target was prepared unbound as the Transform-11
 candidate `theologai-production-20260729-transform11-a`

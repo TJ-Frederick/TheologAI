@@ -21,8 +21,10 @@ The retained historical PR #107 preview Worker
 `06b9a603-8339-42b6-a246-ef9238563043` predates PR #115's repository-only,
 unpublished pin to `https://www.ccel.org/home3/search`. It remains valid
 point-in-time predecessor evidence, but it is no longer active. PR #122's
-schema-`0009` Worker `b2c62527-5759-4c1d-a9a3-8c1d43dddabe` is the audited
-current preview `100` baseline.
+schema-`0009` Worker `b2c62527-5759-4c1d-a9a3-8c1d43dddabe` is the retained
+same-D1 predecessor to PR #123. The audited current preview `100` baseline is
+PR #123 Worker `70bbbecf-3fe6-4a04-8c34-babc3df09ad0` (#144), deployment
+`4108d59a-4092-4389-824c-fa3820ab66f6`.
 
 Current `main` also includes PR #117's Transform-12 schema `0009` contract.
 PR #107 preview and PR #108 production are retained schema-`0008` predecessor

@@ -38,11 +38,13 @@ predecessor was deployment `070b292b-0bae-400a-b983-3d72157b5a96`, Worker
 `bd722b69-2e2c-4d8d-b42b-617e8caba13d` (#130), and D1
 `theologai-preview-20260728-hierarchy-a`
 (`51890e12-1c3f-421f-b661-9a5ea9637e43`). That former Transform-11 preview
-binding is historical. The current preview baseline is PR #122 deployment
-`13393917-fa91-4afc-aeaf-2809db6701a2`, Worker
-`b2c62527-5759-4c1d-a9a3-8c1d43dddabe`, and schema-`0009` D1
+binding is historical. The current preview baseline is PR #123 deployment
+`4108d59a-4092-4389-824c-fa3820ab66f6`, Worker
+`70bbbecf-3fe6-4a04-8c34-babc3df09ad0` (#144), and schema-`0009` D1
 `theologai-preview-20260811-schema0009-a`
-(`74f456e2-6951-4003-bb6f-91951342bf8f`). The retained PR #101 production
+(`74f456e2-6951-4003-bb6f-91951342bf8f`). Its same-D1 PR #122 predecessor was
+deployment `13393917-fa91-4afc-aeaf-2809db6701a2`, Worker
+`b2c62527-5759-4c1d-a9a3-8c1d43dddabe` (#142). The retained PR #101 production
 rollback is older history: deployment `71b76d24-bf5f-490e-adc4-31cf63fb046e`, Worker
 `bae58cd3-cad7-4663-879d-408accf061b0` (#96), and D1
 `theologai-production-20260728-hierarchy-a`

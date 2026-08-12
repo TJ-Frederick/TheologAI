@@ -15,7 +15,7 @@ passed. Protected production workflow `31631924636` completed successfully.
 | Surface | Active release | D1 | Product profile |
 | --- | --- | --- | --- |
 | Production | deployment `e62698f3-f6b0-4145-97bf-28abdeae0e3a`; Worker `02174f95-abe2-480b-84bf-3e8c1a3a0320` (#100) | `theologai-production-20260811-schema0009-a` (`9bc79346-338b-439e-a2a5-424f4418eb21`) | v6 local-only; CCEL execution disabled |
-| Preview | deployment `13393917-fa91-4afc-aeaf-2809db6701a2`; Worker `b2c62527-5759-4c1d-a9a3-8c1d43dddabe` (#142) | `theologai-preview-20260811-schema0009-a` (`74f456e2-6951-4003-bb6f-91951342bf8f`) | v7 discovery-aware; CCEL execution disabled |
+| Preview | deployment `4108d59a-4092-4389-824c-fa3820ab66f6`; Worker `70bbbecf-3fe6-4a04-8c34-babc3df09ad0` (#144) | `theologai-preview-20260811-schema0009-a` (`74f456e2-6951-4003-bb6f-91951342bf8f`) | v7 discovery-aware; CCEL execution disabled |
 
 Production readiness, Transform-8/9 authority, edge stabilization,
 original-language v2, historical-core, and Transform-11 historical-spine
@@ -30,11 +30,13 @@ deployment `3d7489d9-7b48-4ad0-bdc6-95ffbda53bd8`, Worker
 (`53211f50-a893-4b4c-be1e-bc625a595dc7`). Retain both databases. Any rollback
 or deletion remains separately authorized.
 
-The production Worker is the exact `main` merge. Preview predates the
-documentation, release-evidence, production-guard, and production-binding
-commits in PR #122, but its executable Worker source, data, packages, and
-preview configuration are equivalent to `main`. No application refresh is
-currently required in either environment.
+The production Worker is the exact PR #122 `main` merge. PR #123 subsequently
+deployed its exact reviewed head `7fb3ec5113a16ed86bfc4a403a3ec3678d4d4dd0`
+(tree `28e555808ad3840d145a7ddd7e57934dc30e45c2`) to preview without changing
+the D1 binding. Its readiness, edge, original-language, historical-core, and
+historical-spine audits passed; production remained unchanged. This
+post-release evidence update is documentation-only and is not itself a new
+runtime claim.
 
 ## Current product boundary
 
