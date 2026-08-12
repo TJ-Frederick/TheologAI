@@ -360,12 +360,16 @@ binding—at merge `72a8ee5eef9b909a373b085d1a4f193484ddfe8a`, deployment
   reconciliation cutoff immediately after PR #113, `main` was
   `2f12262c9a37d3588bee9b5071954823c15cbd12` (tree
   `9922aedb74c690e7a3fcb926b3d621f28fa44535`), and that revision was not
-  deployed. Preview remains
+  deployed. At that cutoff, preview remained
   PR #107 head `1105b75cd8537632bdb20e598092f6ba94a6adc0`, deployment
   `5e812152-355b-4a5f-a123-2485e89f1550`, Worker
   `06b9a603-8339-42b6-a246-ef9238563043`, and D1
   `62b871a6-5b4d-4d9b-8f52-301f6c878f48`, with v7/discovery-only behavior and
-  CCEL execution disabled before adapter, coordinator, or fetch. Production
+  CCEL execution disabled before adapter, coordinator, or fetch. PR #122 has
+  since superseded that preview assignment with deployment
+  `13393917-fa91-4afc-aeaf-2809db6701a2`, Worker
+  `b2c62527-5759-4c1d-a9a3-8c1d43dddabe`, and schema-`0009` D1
+  `74f456e2-6951-4003-bb6f-91951342bf8f`. Production
   remains PR #108 merge `8da99fd0a161b90a4bd90ab29bde1abf796b3bf6`, deployment
   `3d7489d9-7b48-4ad0-bdc6-95ffbda53bd8`, Worker
   `291f3292-3fa9-44fc-bf6f-b68fd2f4cef6`, and D1
@@ -700,11 +704,16 @@ Code readiness and operational readiness are deliberately separate:
   predecessor was deployment `070b292b-0bae-400a-b983-3d72157b5a96`, Worker
   `bd722b69-2e2c-4d8d-b42b-617e8caba13d` (#130), and D1
   `theologai-preview-20260728-hierarchy-a`
-  (`51890e12-1c3f-421f-b661-9a5ea9637e43`). Preview now serves deployment
+  (`51890e12-1c3f-421f-b661-9a5ea9637e43`). PR #107 deployment
   `5e812152-355b-4a5f-a123-2485e89f1550`, Worker
   `06b9a603-8339-42b6-a246-ef9238563043` (#140), and D1
   `theologai-preview-20260728-transform11-a`
-  (`62b871a6-5b4d-4d9b-8f52-301f6c878f48`) with the v7/discovery-only
+  (`62b871a6-5b4d-4d9b-8f52-301f6c878f48`) are the immediate retained
+  predecessor. Preview now serves PR #122 deployment
+  `13393917-fa91-4afc-aeaf-2809db6701a2`, Worker
+  `b2c62527-5759-4c1d-a9a3-8c1d43dddabe` (#142), and schema-`0009` D1
+  `theologai-preview-20260811-schema0009-a`
+  (`74f456e2-6951-4003-bb6f-91951342bf8f`) with the v7/discovery-only
   contract; CCEL execution remains disabled before adapter, coordinator, or
   fetch. The schema-`0008` production database was
   unbound when remote readiness and Transform-8/9 authority audits passed and

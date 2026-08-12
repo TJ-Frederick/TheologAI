@@ -467,7 +467,7 @@ describe('published project contract', () => {
   });
 
   it('separates the current schema-0009 preview from historical PR107 evidence', async () => {
-    const [canary, reconciliation, readme, preflight, secret, audit, coordinator, operations] = await Promise.all([
+    const [canary, reconciliation, readme, preflight, secret, audit, coordinator, operations, productionReconciliation, roadmap] = await Promise.all([
       readProjectFile('docs/CCEL-LIVE-PREVIEW-CANARY-TRANSACTION.md'),
       readProjectFile('docs/PREVIEW-RELEASE-RECONCILIATION.md'),
       readProjectFile('README.md'),
@@ -476,6 +476,8 @@ describe('published project contract', () => {
       readProjectFile('docs/CCEL-LIVE-PREVIEW-AUDIT.md'),
       readProjectFile('docs/CCEL-UPSTREAM-COORDINATOR.md'),
       readProjectFile('docs/worker-operations.md'),
+      readProjectFile('docs/PRODUCTION-RELEASE-RECONCILIATION.md'),
+      readProjectFile('docs/ROADMAP.md'),
     ]);
     for (const document of [canary, reconciliation, readme]) {
       const normalized = document.replace(/\s+/g, ' ');
@@ -509,7 +511,7 @@ describe('published project contract', () => {
     expect(canary).toContain('temporary `111` two-request preview canary transaction');
     expect(reconciliation).toContain('PR #122 completed the\nrequired current-main schema-`0009` preview refresh and audit');
     expect(preflight).toContain('fixed current-main candidate endpoint');
-    expect(preflight).toContain('PR #115 introduced this pin in repository code only and was not deployed');
+    expect(preflight).toContain('PR #115 introduced this pin in repository code only. PR #122 subsequently');
     expect(preflight).toContain('The v7\ncandidate contract does not supersede');
     expect(secret).toContain('Executing staging is a production Worker-version upload mutation');
     expect(secret).toContain('actual production Worker deployment and traffic mutation');
@@ -528,6 +530,11 @@ describe('published project contract', () => {
     expect(readme).not.toContain('The deployed preview and production D1 layers remain schema `0008`');
     expect(reconciliation).not.toContain('the sole active preview\nassignment bound to that exact candidate D1');
     expect(operations).not.toContain('as the sole\nactive preview assignment bound to that exact D1');
+    expect(preflight).not.toContain('The active PR #107 Worker');
+    expect(preflight).not.toContain('current-main preview refresh and audit is\n  required');
+    expect(productionReconciliation).not.toContain('The current preview baseline is\ndeployment `5e812152');
+    expect(roadmap).not.toContain('Preview remains\n  PR #107');
+    expect(roadmap).not.toContain('Preview now serves deployment\n  `5e812152');
   });
 
   it('records the schema-0009 preview-only release boundary and production control', async () => {

@@ -3,7 +3,8 @@
 > **Current status:** exposure-only preview record. Production remains deployed
 > v6/local-only. Preview is deployed and audited on the v7/discovery-only
 > contract, with CCEL execution disabled before adapter, coordinator, or fetch.
-> The active PR #107 Worker predates the current-main endpoint pin below.
+> PR #122's audited schema-`0009` preview Worker now contains the current-main
+> endpoint pin below; the retained PR #107 Worker is historical predecessor evidence.
 > TheologAI does not retrieve or republish CCEL
 > document bodies. Live discovery still requires a fresh operational preflight
 > and separate explicit release review.
@@ -23,10 +24,10 @@ The live-search and coordinator flags remain off in production and preview.
   interface guarantee. No HTML, query, result, or snippet evidence is retained.
   There is no endpoint configuration, root/alternate-path probing, or fallback
   host/path in the adapter.
-  PR #115 introduced this pin in repository code only and was not deployed;
-  the active PR #107 preview predecessor is not evidence that `/home3/search`
-  is deployed. A protected safe-`100` current-main preview refresh and audit is
-  required before it can become a canary predecessor.
+  PR #115 introduced this pin in repository code only. PR #122 subsequently
+  deployed and audited it in the safe-`100` schema-`0009` preview baseline;
+  this proves the configured endpoint-bearing code is deployed, not that a
+  live CCEL result query succeeds or is authorized.
 - Search contract reviewed: [CCEL Search Help](https://www.ccel.org/help/search), including the documented `author`, `authorID`, `title`, and `bookID` fields.
 - Exact locator shape reviewed: `https://ccel.org/ccel/{author}/{work}/{section}.html`.
 - Product boundary approved by the owner on 2026-07-16: retain the existing
