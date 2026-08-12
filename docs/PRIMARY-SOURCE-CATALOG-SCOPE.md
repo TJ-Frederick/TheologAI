@@ -14,8 +14,8 @@ edition-scoped authority hierarchy packet and standalone materializer. Normal
 release builds deliberately exclude its hierarchy rows and shared lineage. It
 is unpublished and has no document or catalog projection, runtime composition
 dependency, or MCP surface. It leaves the active historical catalog boundary
-unchanged through preparation: preview and production now serve the
-Transform-11 35-work corpus after the protected PR #108 D1 cutover.
+unchanged through preparation: preview and production serve the Transform-11
+35-work corpus, now on their distinct schema-`0009` PR #122 D1 releases.
 
 Transform 11 retains migration `0006_historical_source_packs` and schema
 `0008`, but expands the manifest allowlist to three checked-in packs, 18 works,

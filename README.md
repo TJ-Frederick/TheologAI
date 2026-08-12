@@ -54,19 +54,28 @@ Remote MCP client configuration:
 ```
 
 Use the preview URL only for explicitly authorized release testing. The current
-live production baseline is PR #108 merge
-`8da99fd0a161b90a4bd90ab29bde1abf796b3bf6`: protected workflow
-`30496350408` deployed Cloudflare deployment
-`3d7489d9-7b48-4ad0-bdc6-95ffbda53bd8`, serving Worker
-`291f3292-3fa9-44fc-bf6f-b68fd2f4cef6` (#98) as the sole 100% assignment,
-bound to D1 `theologai-production-20260729-transform11-a`
-(`53211f50-a893-4b4c-be1e-bc625a595dc7`). The historical-core audit passed
-8/8, the Transform-11 spine audit passed 10/10, the original-language audit
-passed 11/11, primary-source edge stabilization matched on attempt 4 and
-remained stable, and the independent post-release review returned `SHIP`.
-For this schema-`0009` cutover, the exact captured PR #108 Worker/D1 pair
-above is the immediately preceding primary rollback unit. PR #101 is older
-retained rollback history, not the immediate rollback claim.
+live production baseline is PR #122 merge
+`86475ecf8288cb0ebcb6467c77c0fd0998a8f1c2` (tree
+`8150aa29e7e4a22141edbfc9ab568df933f9c9b3`). Protected workflow
+`31631924636` deployed Cloudflare deployment
+`e62698f3-f6b0-4145-97bf-28abdeae0e3a`, serving Worker
+`02174f95-abe2-480b-84bf-3e8c1a3a0320` (#100) as the sole active assignment,
+bound to schema-`0009` D1 `theologai-production-20260811-schema0009-a`
+(`9bc79346-338b-439e-a2a5-424f4418eb21`). Remote readiness and authority,
+historical core, Transform-11 spine, original-language, edge stabilization,
+final Worker identity, preview-control, and environment-isolation checks all
+passed. CCEL execution remains disabled.
+
+The exact captured PR #108 Worker/D1 pair is the immediately preceding primary
+rollback unit: deployment `3d7489d9-7b48-4ad0-bdc6-95ffbda53bd8`, Worker
+`291f3292-3fa9-44fc-bf6f-b68fd2f4cef6`, and D1
+`theologai-production-20260729-transform11-a`
+(`53211f50-a893-4b4c-be1e-bc625a595dc7`). PR #101 is older retained rollback
+history, not the immediate rollback claim.
+
+The successor delivery program is tracked in
+[Phase 3B](docs/PHASE-3B-PLAN.md). It begins with release hygiene and dual-era
+MCP modernization before the separate historical-research project.
 
 The historical PR #96 `original_language_study` schema-v2 audit passed 11/11
 cases.

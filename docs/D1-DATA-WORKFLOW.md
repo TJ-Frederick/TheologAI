@@ -411,14 +411,16 @@ immediately preceding primary rollback unit: deployment
 (`53211f50-a893-4b4c-be1e-bc625a595dc7`). PR #101 remains older rollback
 history only and is not the immediate cutover rollback claim.
 
-The next checked-in production target is the separately prepared schema-`0009`
-candidate `theologai-production-20260811-schema0009-a`
-(`9bc79346-338b-439e-a2a5-424f4418eb21`). This local configuration change makes
-no remote binding or deployment claim. Before a protected production deployment,
-the workflow must emit a sanitized readiness receipt; then it must prove the
-preview control unchanged before deployment, after deployment, and after every
-production audit, followed by a final receipt proving the distinct exact
-schema-`0009` preview/production bindings against fresh inventory.
+PR #122 promoted the separately prepared schema-`0009` candidate
+`theologai-production-20260811-schema0009-a`
+(`9bc79346-338b-439e-a2a5-424f4418eb21`). Protected workflow `31631924636`
+deployed Worker `02174f95-abe2-480b-84bf-3e8c1a3a0320` through deployment
+`e62698f3-f6b0-4145-97bf-28abdeae0e3a`. It emitted the sanitized readiness
+receipt, proved preview unchanged before deployment, after deployment, and
+after every production audit, pinned the final production Worker to the exact
+audited identity, and emitted the final receipt proving the distinct exact
+schema-`0009` preview/production bindings against fresh inventory. The PR #108
+pair above is retained as the immediate matched rollback unit.
 
 Approved deploy jobs perform the last compatibility check read-only against
 the candidate name resolved from the checked-in name/UUID pair:

@@ -3,6 +3,9 @@
 This is the tracked source of truth for delivery status and sequencing. The
 ignored [dated architecture and roadmap assessment](../test-output/ARCHITECTURE_AND_ROADMAP_ASSESSMENT.md)
 is local source context only and does not define the current product contract.
+The successor program after PR #122 is defined in
+[Phase 3B](./PHASE-3B-PLAN.md); earlier uses of "Phase 3" below are historical
+names for already-shipped work.
 
 ## Shipped baseline
 

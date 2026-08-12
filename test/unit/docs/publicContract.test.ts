@@ -184,7 +184,7 @@ describe('published project contract', () => {
 
     expect(readme).toContain('Production v6/local-only and preview v7/discovery-only currently search and\nretrieve the 35-work Transform-11 collection');
     expect(operations).toContain('current preview Transform-11 / 35-work release');
-    expect(operations).toContain('Production is PR #108 merge');
+    expect(operations).toContain('Production is PR #122 merge');
     expect(developerGuide).toContain('both deployed 35-work catalogs');
     expect(developerGuide).toContain('PR #108 is the current production release record');
   });
@@ -283,7 +283,7 @@ describe('published project contract', () => {
     expect(operations).toContain('protected PR95 preview release deployed Cloudflare deployment');
     expect(operations).toContain('black-box audit passed with no P0-P3 findings');
     expect(operations).toContain('Transform-10 Aquinas\nhierarchy from all normal D1 corpora');
-    expect(operations).toContain('CCEL execution remains disabled and Aquinas\nremains inactive');
+    expect(operations.replace(/\s+/g, ' ')).toContain('CCEL execution remains disabled and Aquinas remains inactive');
     expect(operations).not.toContain('prepared but unbound preview\ncandidate retains that inactive authority data');
     expect(operations).toContain(`Its historical Cloudflare deployment\n\`${historicalDeployment}\` served Worker`);
     expect(operations).toContain('This historical release is neither\nthe current preview identity nor the immediate retained predecessor');
@@ -328,7 +328,7 @@ describe('published project contract', () => {
     expect(documents[5]).toContain('remained unchanged during the PR #108 production release and\nis now PR #122');
   });
 
-  it('documents the completed PR #108 Transform 11 production cutover and rollback', async () => {
+  it('documents the current PR #122 schema-0009 production release and PR #108 rollback', async () => {
     const [readme, dataWorkflow, catalogScope, reconciliation, operations, roadmap] = await Promise.all([
       readProjectFile('README.md'),
       readProjectFile('docs/D1-DATA-WORKFLOW.md'),
@@ -337,36 +337,50 @@ describe('published project contract', () => {
       readProjectFile('docs/worker-operations.md'),
       readProjectFile('docs/ROADMAP.md'),
     ]);
-    const liveProduction = {
+    const immediateRollback = {
       deployment: '3d7489d9-7b48-4ad0-bdc6-95ffbda53bd8',
       worker: '291f3292-3fa9-44fc-bf6f-b68fd2f4cef6',
       d1: 'theologai-production-20260729-transform11-a',
       d1Id: '53211f50-a893-4b4c-be1e-bc625a595dc7',
     };
-    const rollbackProduction = {
+    const olderProduction = {
       deployment: '71b76d24-bf5f-490e-adc4-31cf63fb046e',
       worker: 'bae58cd3-cad7-4663-879d-408accf061b0',
       d1: 'theologai-production-20260728-hierarchy-a',
       d1Id: 'f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395',
     };
+    const liveProduction = {
+      deployment: 'e62698f3-f6b0-4145-97bf-28abdeae0e3a',
+      worker: '02174f95-abe2-480b-84bf-3e8c1a3a0320',
+      d1: 'theologai-production-20260811-schema0009-a',
+      d1Id: '9bc79346-338b-439e-a2a5-424f4418eb21',
+    };
     const livePreview = {
-      deployment: '5e812152-355b-4a5f-a123-2485e89f1550',
-      worker: '06b9a603-8339-42b6-a246-ef9238563043',
-      d1: 'theologai-preview-20260728-transform11-a',
-      d1Id: '62b871a6-5b4d-4d9b-8f52-301f6c878f48',
+      deployment: '13393917-fa91-4afc-aeaf-2809db6701a2',
+      worker: 'b2c62527-5759-4c1d-a9a3-8c1d43dddabe',
+      d1: 'theologai-preview-20260811-schema0009-a',
+      d1Id: '74f456e2-6951-4003-bb6f-91951342bf8f',
     };
 
     const productionCutoverDocuments = [readme, dataWorkflow, catalogScope, reconciliation, operations, roadmap];
     for (const document of productionCutoverDocuments) {
-      for (const value of Object.values(liveProduction)) expect(document).toContain(value);
-      for (const value of Object.values(rollbackProduction)) expect(document).toContain(value);
+      for (const value of Object.values(immediateRollback)) expect(document).toContain(value);
+      for (const value of Object.values(olderProduction)) expect(document).toContain(value);
       expect(document).toContain('30496350408');
+    }
+    for (const document of [readme, dataWorkflow, catalogScope, reconciliation, roadmap]) {
       expect(document).toContain('8da99fd0a161b90a4bd90ab29bde1abf796b3bf6');
+    }
+    for (const document of [readme, dataWorkflow, reconciliation, operations]) {
+      for (const value of Object.values(liveProduction)) expect(document).toContain(value);
+    }
+    for (const document of [readme, reconciliation, operations]) {
+      expect(document).toContain('86475ecf8288cb0ebcb6467c77c0fd0998a8f1c2');
     }
     for (const document of [readme, dataWorkflow, reconciliation, operations, roadmap]) {
       for (const value of Object.values(livePreview)) expect(document).toContain(value);
     }
-    expect(reconciliation).toContain('completed PR #108 protected production cutover');
+    expect(reconciliation).toContain('Current PR #122 production release');
     expect(reconciliation).toContain('a59d9a062b2e6c7884de97fd97309878e1cbdc23');
     expect(reconciliation).toContain('5665940735');
     expect(reconciliation).toContain('8742223883');
@@ -378,7 +392,7 @@ describe('published project contract', () => {
     expect(reconciliation).toContain('77da8832ab4139a769aae7d87716a3d581407cc2d036b6f7939e306d9b865de5');
     expect(dataWorkflow).toContain('Historical core passed 8/8');
     expect(catalogScope).toContain('Transform-11 spine passed 10/10');
-    expect(operations).toContain('primary-source edge stabilization matched on attempt 4');
+    expect(operations).toContain('edge stabilization');
     expect(roadmap).toContain('independent post-release review returned `SHIP`');
     expect(reconciliation).toContain('primary-source edge stabilization');
     expect(reconciliation).toContain('Transform-11 historical-spine audit');
@@ -518,15 +532,15 @@ describe('published project contract', () => {
     expect(canary).toContain('remote readiness and authority audit');
     expect(canary).toContain('while both candidates remain unbound');
     expect(canary).toContain('prepared preview candidate with current-`main` `100` flags');
-    expect(canary).toContain('Only after the preview audit passes');
-    expect(canary).toContain('Then perform a read-only environment-isolation\n   verification');
+    expect(canary).toContain('Completed by PR #122');
+    expect(canary).toContain('no retained schema-`0008` reuse or crossing');
     expect(canary).toMatch(/hard inert\s+schema-`0009` canary gate/);
     expect(canary).toMatch(/before any\s+Wrangler command or\s+Cloudflare read/);
     const canaryOrder = [
       'while both candidates remain unbound',
       'prepared preview candidate with current-`main` `100` flags',
-      'Only after the preview audit passes',
-      'Then perform a read-only environment-isolation',
+      '3. **Completed by PR #122',
+      'no retained schema-`0008` reuse or crossing',
       'Stage the operator credential',
       'Run this temporary `111` two-request preview canary transaction',
     ].map(marker => canary.indexOf(marker));
@@ -562,7 +576,7 @@ describe('published project contract', () => {
     expect(roadmap).not.toContain('Preview now serves deployment\n  `5e812152');
   });
 
-  it('records the schema-0009 preview-only release boundary and production control', async () => {
+  it('records the completed schema-0009 preview and production releases', async () => {
     const [readme, workflow, reconciliation, canary, operations, config, dataWorkflow, canaryScript] = await Promise.all([
       readProjectFile('README.md'),
       readProjectFile('.github/workflows/pr.yml'),
@@ -582,7 +596,6 @@ describe('published project contract', () => {
       expect(document).toContain(previewName);
       expect(document).toContain(previewId);
       expect(document).toContain(productionId);
-      expect(document).toContain('unbound');
     }
     expect(config).toContain(`database_name = "${previewName}"`);
     expect(config).toContain(`database_id = "${previewId}"`);
@@ -622,7 +635,7 @@ describe('published project contract', () => {
     expect(reconciliation).toContain('31572924302');
     expect(reconciliation).toContain('This evidence-only documentation commit postdates the deployed head.');
     expect(readme).toContain('This evidence-only commit postdates the deployed source');
-    expect(operations).toContain('This evidence-only commit postdates that deployment');
-    expect(canary).toMatch(/The\s+gate remains `unrecorded` and inert/);
+    expect(operations).toContain("PR #122 later merged and\ncompleted the separately protected production release");
+    expect(canary.replace(/\s+/g, ' ')).toContain('The gate remains `unrecorded` and inert');
   });
 });

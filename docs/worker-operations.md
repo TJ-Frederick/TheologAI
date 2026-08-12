@@ -4,23 +4,27 @@
 
 The integrated checked-out normal build excludes the Transform-10 Aquinas
 hierarchy from all normal D1 corpora: it has no catalog, runtime, or MCP
-projection. Production is PR #108 merge
-`8da99fd0a161b90a4bd90ab29bde1abf796b3bf6`. Protected workflow
-`30496350408` deployed `3d7489d9-7b48-4ad0-bdc6-95ffbda53bd8`, serving
-Worker `291f3292-3fa9-44fc-bf6f-b68fd2f4cef6` (#98) as the sole 100%
-assignment, bound to `theologai-production-20260729-transform11-a`
-(`53211f50-a893-4b4c-be1e-bc625a595dc7`). Historical core passed 8/8,
-Transform-11 spine passed 10/10, original-language passed 11/11,
-primary-source edge stabilization matched on attempt 4 and remained stable,
-and the independent post-release review returned `SHIP`. This is not a
-hierarchy/publication activation; CCEL execution remains disabled and Aquinas
-remains inactive.
+projection. Production is PR #122 merge
+`86475ecf8288cb0ebcb6467c77c0fd0998a8f1c2` (tree
+`8150aa29e7e4a22141edbfc9ab568df933f9c9b3`). Protected workflow
+`31631924636` deployed `e62698f3-f6b0-4145-97bf-28abdeae0e3a`, serving Worker
+`02174f95-abe2-480b-84bf-3e8c1a3a0320` (#100) as the sole active assignment,
+bound to `theologai-production-20260811-schema0009-a`
+(`9bc79346-338b-439e-a2a5-424f4418eb21`). Readiness, authority, historical
+core, Transform-11 spine, original-language, edge stabilization, final Worker
+identity, preview-control, and environment-isolation checks passed. This is not
+a hierarchy/publication activation; CCEL execution remains disabled and
+Aquinas remains inactive.
 
-For the schema-`0009` cutover, the exact captured PR #108 Worker/D1 pair above
-is the immediately preceding primary rollback unit. PR #101 is older retained
-rollback history, not the immediate rollback claim.
+For the schema-`0009` cutover, the exact captured PR #108 pair is the
+immediately preceding primary rollback unit: deployment
+`3d7489d9-7b48-4ad0-bdc6-95ffbda53bd8`, Worker
+`291f3292-3fa9-44fc-bf6f-b68fd2f4cef6`, and D1
+`theologai-production-20260729-transform11-a`
+(`53211f50-a893-4b4c-be1e-bc625a595dc7`). PR #101 is older retained rollback
+history, not the immediate rollback claim.
 
-### Schema-0009 preview release state
+### Schema-0009 release state
 
 The checked-in preview configuration targets schema-`0009` D1
 `theologai-preview-20260811-schema0009-a`
@@ -28,12 +32,11 @@ The checked-in preview configuration targets schema-`0009` D1
 proved that binding and completed its audit. It captured production against its
 checked-in D1 name/UUID and fresh inventory before preview mutation,
 immediately after deployment, and again after final preview audit. The
-checked-in production target is now the separately prepared schema-`0009`
-candidate `theologai-production-20260811-schema0009-a`
-(`9bc79346-338b-439e-a2a5-424f4418eb21`), which remains unbound. Live
-production stays on its recorded schema-`0008` predecessor until the protected
-production workflow proves the active binding, re-proves preview control after
-deployment and audits, and emits the final environment-isolation receipt.
+checked-in and active production target is the separately prepared
+schema-`0009` candidate `theologai-production-20260811-schema0009-a`
+(`9bc79346-338b-439e-a2a5-424f4418eb21`). PR #122's protected production
+workflow proved the active binding, re-proved preview control after deployment
+and audits, and emitted the final environment-isolation receipt.
 
 PR #122 completed the protected preview release from
 `a0f13b5bdbf3ca071dbb7524dea9c6ce80770404` (tree
@@ -41,9 +44,11 @@ PR #122 completed the protected preview release from
 `13393917-fa91-4afc-aeaf-2809db6701a2` assigns Worker
 `b2c62527-5759-4c1d-a9a3-8c1d43dddabe` solely to the schema-`0009` preview D1.
 All bounded audits and production-control comparisons passed. The preview
-authorization has been revoked (run `31572924302`); PR #122 remains open and
-unmerged. This evidence-only commit postdates that deployment and does not
-change production, CCEL execution, or secrets.
+authorization has been revoked (run `31572924302`); PR #122 later merged and
+completed the separately protected production release above. Preview's
+executable Worker inputs remain equivalent to current `main`; the later commits
+change documentation, release evidence and guards, and the production-only D1
+binding, not preview application behavior.
 
 The former PR #101 production assignment is older retained rollback history:
 deployment `71b76d24-bf5f-490e-adc4-31cf63fb046e`, Worker
