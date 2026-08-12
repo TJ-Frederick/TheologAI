@@ -4,9 +4,9 @@ import { parse as parseToml } from 'smol-toml';
 
 export const CCEL_OPERATOR_SECRET = 'THEOLOGAI_CCEL_OPERATOR_TOKEN';
 export const PRODUCTION_WORKER = 'theologai';
-/** Prepared Transform-11 candidate; it was unbound during readiness and config alone does not prove live traffic. */
-export const PRODUCTION_D1_NAME = 'theologai-production-20260729-transform11-a';
-export const PRODUCTION_D1_ID = '53211f50-a893-4b4c-be1e-bc625a595dc7';
+/** Reviewed schema-0009 production candidate; config alone does not bind it. */
+export const PRODUCTION_D1_NAME = 'theologai-production-20260811-schema0009-a';
+export const PRODUCTION_D1_ID = '9bc79346-338b-439e-a2a5-424f4418eb21';
 /** The reviewed schema-0009 preview candidate; config alone does not bind it. */
 export const PREVIEW_D1_NAME = 'theologai-preview-20260811-schema0009-a';
 export const PREVIEW_D1_ID = '74f456e2-6951-4003-bb6f-91951342bf8f';

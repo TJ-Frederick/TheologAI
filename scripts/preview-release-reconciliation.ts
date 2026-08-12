@@ -9,6 +9,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parse as parseToml } from 'smol-toml';
+import { LEGACY_SCHEMA_0008_D1 } from './ccel-live-preview-canary.js';
 
 type RecordValue = Record<string, unknown>;
 /** The checked-in binding that the preceding readiness gate tested. */
@@ -104,6 +105,27 @@ export interface ProductionControlIdentity {
   d1: ObservedD1Binding;
   /** Exact checked-in production binding proved against a fresh D1 inventory. */
   configuredD1: CandidateD1Binding;
+  wranglerConfigSha256: string;
+  d1InventorySha256: string;
+}
+
+/** A fixed preview snapshot used to prove a production release did not touch preview. */
+export interface PreviewControlIdentity {
+  schemaVersion: 1;
+  worker: 'theologai-preview';
+  deploymentId: string;
+  workerVersionId: string;
+  d1: ObservedD1Binding;
+  configuredD1: CandidateD1Binding;
+  wranglerConfigSha256: string;
+  d1InventorySha256: string;
+}
+
+/** Final read-only proof that both current environments are distinct schema-0009 targets. */
+export interface EnvironmentIsolationReceipt {
+  schemaVersion: 1;
+  production: { worker: 'theologai'; deploymentId: string; workerVersionId: string; d1: CandidateD1Binding };
+  preview: { worker: 'theologai-preview'; deploymentId: string; workerVersionId: string; d1: CandidateD1Binding };
   wranglerConfigSha256: string;
   d1InventorySha256: string;
 }
@@ -340,6 +362,110 @@ export function verifyProductionControlUnchanged(input: {
   return observed;
 }
 
+export function capturePreviewControlIdentity(input: {
+  deploymentsText: string;
+  activeVersionViewText: string;
+  wranglerConfigText: string;
+  d1InventoryText: string;
+}): PreviewControlIdentity {
+  const configuredD1 = checkedOutCandidateD1(input.wranglerConfigText);
+  assertCandidateD1Inventory(configuredD1, input.d1InventoryText, 'preview');
+  const active = currentSoleDeployment(input.deploymentsText, 'preview control deployments');
+  const d1 = observedD1FromAuthoritativeVersionView(input.activeVersionViewText, active.versionId, 'preview control');
+  assertObservedD1MatchesCandidate(d1, configuredD1, 'preview control');
+  return {
+    schemaVersion: 1, worker: 'theologai-preview', deploymentId: active.id, workerVersionId: active.versionId, d1, configuredD1,
+    wranglerConfigSha256: sha256(input.wranglerConfigText), d1InventorySha256: sha256(input.d1InventoryText),
+  };
+}
+
+function parsePreviewControlIdentity(value: unknown): PreviewControlIdentity {
+  const control = object(value, 'preview control identity');
+  exactKeys(control, ['schemaVersion', 'worker', 'deploymentId', 'workerVersionId', 'd1', 'configuredD1', 'wranglerConfigSha256', 'd1InventorySha256'], 'preview control identity');
+  const d1 = object(control.d1, 'preview control D1');
+  const configuredD1 = object(control.configuredD1, 'preview control configured D1');
+  exactKeys(d1, ['binding', 'databaseId'], 'preview control D1');
+  exactKeys(configuredD1, ['binding', 'databaseName', 'databaseId'], 'preview control configured D1');
+  assert(control.schemaVersion === 1 && control.worker === 'theologai-preview'
+    && isUuid(control.deploymentId) && isUuid(control.workerVersionId)
+    && d1.binding === 'THEOLOGAI_DB' && isUuid(d1.databaseId)
+    && configuredD1.binding === 'THEOLOGAI_DB' && typeof configuredD1.databaseName === 'string'
+    && configuredD1.databaseName.length > 0 && isUuid(configuredD1.databaseId)
+    && d1.databaseId.toLowerCase() === configuredD1.databaseId.toLowerCase()
+    && isSha256(control.wranglerConfigSha256) && isSha256(control.d1InventorySha256),
+  'preview control identity is not canonical');
+  return {
+    schemaVersion: 1, worker: 'theologai-preview', deploymentId: control.deploymentId.toLowerCase(), workerVersionId: control.workerVersionId.toLowerCase(),
+    d1: { binding: 'THEOLOGAI_DB', databaseId: d1.databaseId.toLowerCase() },
+    configuredD1: { binding: 'THEOLOGAI_DB', databaseName: configuredD1.databaseName, databaseId: configuredD1.databaseId.toLowerCase() },
+    wranglerConfigSha256: control.wranglerConfigSha256.toLowerCase(), d1InventorySha256: control.d1InventorySha256.toLowerCase(),
+  };
+}
+
+/** Fail closed if a production release changes any preview routing, version, or binding identity. */
+export function verifyPreviewControlUnchanged(input: {
+  controlText: string;
+  deploymentsText: string;
+  activeVersionViewText: string;
+  wranglerConfigText: string;
+  d1InventoryText: string;
+}): PreviewControlIdentity {
+  const control = parsePreviewControlIdentity(parseJson(input.controlText, 'preview control identity'));
+  const observed = capturePreviewControlIdentity({
+    deploymentsText: input.deploymentsText, activeVersionViewText: input.activeVersionViewText,
+    wranglerConfigText: input.wranglerConfigText, d1InventoryText: input.d1InventoryText,
+  });
+  assert(observed.deploymentId === control.deploymentId, 'preview deployment changed during production release');
+  assert(observed.workerVersionId === control.workerVersionId, 'preview Worker version changed during production release');
+  assert(observed.d1.databaseId === control.d1.databaseId, 'preview D1 binding changed during production release');
+  assert(observed.configuredD1.databaseName === control.configuredD1.databaseName
+    && observed.configuredD1.databaseId === control.configuredD1.databaseId
+    && observed.wranglerConfigSha256 === control.wranglerConfigSha256,
+  'checked-out preview D1 configuration changed during production release');
+  return observed;
+}
+
+function assertCurrentSchema0009D1(candidate: CandidateD1Binding, environment: 'preview' | 'production'): void {
+  const retained = Object.values(LEGACY_SCHEMA_0008_D1);
+  assert(!retained.some(legacy => candidate.databaseId === legacy.id || candidate.databaseName === legacy.name),
+    `${environment} D1 uses a recorded schema-0008 name or UUID`);
+}
+
+/**
+ * Capture a sanitized final receipt. It proves each active Worker binds its
+ * exact checked-in D1, both mappings exist in one fresh inventory, and neither
+ * environment crosses into the other or retained schema-0008 identities.
+ */
+export function captureEnvironmentIsolationReceipt(input: {
+  productionDeploymentsText: string;
+  productionActiveVersionViewText: string;
+  previewDeploymentsText: string;
+  previewActiveVersionViewText: string;
+  wranglerConfigText: string;
+  d1InventoryText: string;
+}): EnvironmentIsolationReceipt {
+  const productionD1 = checkedOutProductionCandidateD1(input.wranglerConfigText);
+  const previewD1 = checkedOutCandidateD1(input.wranglerConfigText);
+  assertCurrentSchema0009D1(productionD1, 'production');
+  assertCurrentSchema0009D1(previewD1, 'preview');
+  assert(productionD1.databaseId !== previewD1.databaseId && productionD1.databaseName !== previewD1.databaseName,
+    'production and preview D1 identities must be distinct');
+  assertCandidateD1Inventory(productionD1, input.d1InventoryText, 'production');
+  assertCandidateD1Inventory(previewD1, input.d1InventoryText, 'preview');
+  const production = currentSoleDeployment(input.productionDeploymentsText, 'environment isolation production deployments');
+  const preview = currentSoleDeployment(input.previewDeploymentsText, 'environment isolation preview deployments');
+  const observedProductionD1 = observedD1FromAuthoritativeVersionView(input.productionActiveVersionViewText, production.versionId, 'environment isolation production');
+  const observedPreviewD1 = observedD1FromAuthoritativeVersionView(input.previewActiveVersionViewText, preview.versionId, 'environment isolation preview');
+  assertObservedD1MatchesCandidate(observedProductionD1, productionD1, 'environment isolation production');
+  assertObservedD1MatchesCandidate(observedPreviewD1, previewD1, 'environment isolation preview');
+  return {
+    schemaVersion: 1,
+    production: { worker: 'theologai', deploymentId: production.id, workerVersionId: production.versionId, d1: productionD1 },
+    preview: { worker: 'theologai-preview', deploymentId: preview.id, workerVersionId: preview.versionId, d1: previewD1 },
+    wranglerConfigSha256: sha256(input.wranglerConfigText), d1InventorySha256: sha256(input.d1InventoryText),
+  };
+}
+
 export function capturePreviewPredecessorAnchor(input: {
   deploymentsText: string;
   predecessorVersionViewText: string;
@@ -527,7 +653,7 @@ function exactArgs(argv: string[], command: string, expected: string[]): Map<str
   return values;
 }
 
-async function writeRecord(record: PreviewPredecessorAnchor | PreviewPostMutationObservation | ProductionPredecessorAnchor | ProductionPostMutationObservation | ProductionControlIdentity, output: string): Promise<void> {
+async function writeRecord(record: PreviewPredecessorAnchor | PreviewPostMutationObservation | ProductionPredecessorAnchor | ProductionPostMutationObservation | ProductionControlIdentity | PreviewControlIdentity | EnvironmentIsolationReceipt, output: string): Promise<void> {
   await writeFile(output, `${JSON.stringify(record, null, 2)}\n`, { encoding: 'utf8', flag: 'wx' });
 }
 
@@ -544,6 +670,24 @@ export async function runCli(argv: string[]): Promise<void> {
   if (command === 'active-version-id') {
     const values = exactArgs(argv.slice(1), command, ['--deployments']);
     process.stdout.write(`${activePreviewVersionId(await readFile(values.get('--deployments')!, 'utf8'))}\n`);
+    return;
+  }
+  if (command === 'capture-control') {
+    const values = exactArgs(argv.slice(1), command, ['--deployments', '--active-version-view', '--wrangler-config', '--d1-inventory', '--output']);
+    const [deploymentsText, activeVersionViewText, wranglerConfigText, d1InventoryText] = await Promise.all([
+      readFile(values.get('--deployments')!, 'utf8'), readFile(values.get('--active-version-view')!, 'utf8'),
+      readFile(values.get('--wrangler-config')!, 'utf8'), readFile(values.get('--d1-inventory')!, 'utf8'),
+    ]);
+    await writeRecord(capturePreviewControlIdentity({ deploymentsText, activeVersionViewText, wranglerConfigText, d1InventoryText }), values.get('--output')!);
+    return;
+  }
+  if (command === 'verify-control') {
+    const values = exactArgs(argv.slice(1), command, ['--control', '--deployments', '--active-version-view', '--wrangler-config', '--d1-inventory', '--output']);
+    const [controlText, deploymentsText, activeVersionViewText, wranglerConfigText, d1InventoryText] = await Promise.all([
+      readFile(values.get('--control')!, 'utf8'), readFile(values.get('--deployments')!, 'utf8'),
+      readFile(values.get('--active-version-view')!, 'utf8'), readFile(values.get('--wrangler-config')!, 'utf8'), readFile(values.get('--d1-inventory')!, 'utf8'),
+    ]);
+    await writeRecord(verifyPreviewControlUnchanged({ controlText, deploymentsText, activeVersionViewText, wranglerConfigText, d1InventoryText }), values.get('--output')!);
     return;
   }
   if (command === 'capture-predecessor') {
@@ -570,7 +714,7 @@ export async function runCli(argv: string[]): Promise<void> {
     await writeRecord(observePreviewPostMutation({ predecessorAnchorText, postMutationDeploymentsText, observedActiveVersionViewText, wranglerConfigText }), values.get('--output')!);
     return;
   }
-  fail('command must be candidate-d1-name, active-version-id, capture-predecessor, reconcile-post-mutation, or observe-post-mutation');
+  fail('command must be candidate-d1-name, active-version-id, capture-control, verify-control, capture-predecessor, reconcile-post-mutation, or observe-post-mutation');
 }
 
 /** Fixed production CLI wrapper: it has no environment or Worker-name option. */
@@ -602,6 +746,22 @@ export async function runProductionCli(argv: string[]): Promise<void> {
     ]);
     await writeRecord(verifyProductionControlUnchanged({ controlText, deploymentsText, activeVersionViewText, wranglerConfigText, d1InventoryText }), values.get('--output')!); return;
   }
+  if (command === 'capture-environment-isolation') {
+    const values = exactArgs(argv.slice(1), command, [
+      '--production-deployments', '--production-active-version-view', '--preview-deployments', '--preview-active-version-view',
+      '--wrangler-config', '--d1-inventory', '--output',
+    ]);
+    const [productionDeploymentsText, productionActiveVersionViewText, previewDeploymentsText, previewActiveVersionViewText, wranglerConfigText, d1InventoryText] = await Promise.all([
+      readFile(values.get('--production-deployments')!, 'utf8'), readFile(values.get('--production-active-version-view')!, 'utf8'),
+      readFile(values.get('--preview-deployments')!, 'utf8'), readFile(values.get('--preview-active-version-view')!, 'utf8'),
+      readFile(values.get('--wrangler-config')!, 'utf8'), readFile(values.get('--d1-inventory')!, 'utf8'),
+    ]);
+    await writeRecord(captureEnvironmentIsolationReceipt({
+      productionDeploymentsText, productionActiveVersionViewText, previewDeploymentsText, previewActiveVersionViewText,
+      wranglerConfigText, d1InventoryText,
+    }), values.get('--output')!);
+    return;
+  }
   if (command === 'capture-predecessor') {
     const values = exactArgs(argv.slice(1), command, ['--deployments', '--predecessor-version-view', '--wrangler-config', '--d1-inventory', '--output']);
     const [deploymentsText, predecessorVersionViewText, wranglerConfigText, d1InventoryText] = await Promise.all([
@@ -619,7 +779,7 @@ export async function runProductionCli(argv: string[]): Promise<void> {
     const input = { predecessorAnchorText, postMutationDeploymentsText, observedActiveVersionViewText, wranglerConfigText };
     await writeRecord(command === 'observe-post-mutation' ? observeProductionPostMutation(input) : reconcileProductionPostMutation(input), values.get('--output')!); return;
   }
-  fail('production command must be candidate-d1-name, active-version-id, capture-control, verify-control, capture-predecessor, reconcile-post-mutation, or observe-post-mutation');
+  fail('production command must be candidate-d1-name, active-version-id, capture-control, verify-control, capture-environment-isolation, capture-predecessor, reconcile-post-mutation, or observe-post-mutation');
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

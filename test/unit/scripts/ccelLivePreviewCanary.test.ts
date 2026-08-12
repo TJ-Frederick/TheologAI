@@ -57,7 +57,7 @@ interface WorkerD1Ids {
 
 const currentD1Ids: WorkerD1Ids = {
   preview: '74f456e2-6951-4003-bb6f-91951342bf8f',
-  production: '53211f50-a893-4b4c-be1e-bc625a595dc7',
+  production: '9bc79346-338b-439e-a2a5-424f4418eb21',
 };
 
 function bindings(mode: '100' | '111' | '000', includeOperatorSecret = false, d1Ids: WorkerD1Ids = currentD1Ids) {
@@ -118,7 +118,7 @@ describe('CCEL live preview canary transaction', () => {
     expect(() => validateCanaryDispatch({
       ref: 'refs/heads/main', sha: 'a'.repeat(40), expectedSha: 'a'.repeat(40), liveMainSha: 'a'.repeat(40),
       confirmation: CANARY_CONFIRMATION, configText: config,
-    })).toThrow(/production D1 identity uses a recorded schema-0008 name or UUID/);
+    })).toThrow(/schema-0009 canary gate is unrecorded/);
     expect(() => validateCanaryDispatch({
       ref: 'refs/heads/feature', sha: 'a'.repeat(40), expectedSha: 'a'.repeat(40), liveMainSha: 'a'.repeat(40),
       confirmation: CANARY_CONFIRMATION, configText: config,
@@ -154,15 +154,15 @@ describe('CCEL live preview canary transaction', () => {
       .replace('theologai-preview-20260811-schema0009-a', LEGACY_SCHEMA_0008_D1.preview.name)
       .replace('74f456e2-6951-4003-bb6f-91951342bf8f', LEGACY_SCHEMA_0008_D1.preview.id);
     expect(() => assertSchema0009CanaryPrerequisite(legacyConfig))
-      .toThrow(/production D1 identity uses a recorded schema-0008 name or UUID/);
+      .toThrow(/preview D1 identity uses a recorded schema-0008 name or UUID/);
     const onlyLegacyPreviewRemaining = legacyConfig
-      .replace('theologai-production-20260729-transform11-a', 'theologai-production-schema0009-candidate')
-      .replace('53211f50-a893-4b4c-be1e-bc625a595dc7', '323e4567-e89b-42d3-a456-426614174003');
+      .replace('theologai-production-20260811-schema0009-a', 'theologai-production-schema0009-candidate')
+      .replace('9bc79346-338b-439e-a2a5-424f4418eb21', '323e4567-e89b-42d3-a456-426614174003');
     expect(() => assertSchema0009CanaryPrerequisite(onlyLegacyPreviewRemaining))
       .toThrow(/preview D1 identity uses a recorded schema-0008 name or UUID/);
     const noLegacyIdentityRemaining = onlyLegacyPreviewRemaining
-      .replace('theologai-preview-20260728-transform11-a', 'theologai-preview-schema0009-candidate')
-      .replace('62b871a6-5b4d-4d9b-8f52-301f6c878f48', '423e4567-e89b-42d3-a456-426614174003');
+      .replace(LEGACY_SCHEMA_0008_D1.preview.name, 'theologai-preview-schema0009-candidate')
+      .replace(LEGACY_SCHEMA_0008_D1.preview.id, '423e4567-e89b-42d3-a456-426614174003');
     expect(() => assertSchema0009CanaryPrerequisite(noLegacyIdentityRemaining))
       .toThrow(/schema-0009 canary gate is unrecorded/);
 

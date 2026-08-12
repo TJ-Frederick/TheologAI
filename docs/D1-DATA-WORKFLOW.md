@@ -384,7 +384,7 @@ resumed, or repaired. Protected preview deployment
 `06b9a603-8339-42b6-a246-ef9238563043` (#140) with that exact D1; this preview
 assignment remained unchanged during the later PR #108 production release.
 
-The checked-in root production binding selected the separately prepared,
+The historical checked-in root production binding selected the separately prepared,
 initially unbound Transform-11 candidate
 `theologai-production-20260729-transform11-a`
 (`53211f50-a893-4b4c-be1e-bc625a595dc7`). It was created once in ENAM from
@@ -403,6 +403,15 @@ Historical core passed 8/8, Transform-11 spine passed 10/10,
 original-language passed 11/11, primary-source edge stabilization matched on
 attempt 4 and remained stable, and independent post-release review returned
 `SHIP`. Retain the PR #101 matched Worker/D1 pair above for rollback.
+
+The next checked-in production target is the separately prepared schema-`0009`
+candidate `theologai-production-20260811-schema0009-a`
+(`9bc79346-338b-439e-a2a5-424f4418eb21`). This local configuration change makes
+no remote binding or deployment claim. Before a protected production deployment,
+the workflow must emit a sanitized readiness receipt; then it must prove the
+preview control unchanged before deployment, after deployment, and after every
+production audit, followed by a final receipt proving the distinct exact
+schema-`0009` preview/production bindings against fresh inventory.
 
 Approved deploy jobs perform the last compatibility check read-only against
 the candidate name resolved from the checked-in name/UUID pair:

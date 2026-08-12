@@ -165,10 +165,19 @@ jobs:
       - name: Verify candidate production D1 is compatible (read-only)
         run: |
           candidate_d1_name="$(< "$RUNNER_TEMP/production-candidate-d1-name.txt")"
-          npm run d1:remote:check -- --database "$candidate_d1_name"
+          npm run d1:remote:check -- --database "$candidate_d1_name" \
+            --output "$RUNNER_TEMP/production-d1-readiness-receipt.json"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Upload sanitized production D1 readiness receipt
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: production-d1-readiness-${{ github.sha }}
+          path: ${{ runner.temp }}/production-d1-readiness-receipt.json
+          retention-days: 30
+          if-no-files-found: error
 
       # Retain a read-only predecessor record before deploy. It permits a
       # manual recovery decision if a later step fails; it cannot roll back,
@@ -236,6 +245,28 @@ jobs:
             --output "$RUNNER_TEMP/pre-production-preview-mcp-audit.json"
           test -s "$RUNNER_TEMP/pre-production-preview-mcp-audit.json"
 
+      # A production deploy must leave the independently deployed preview
+      # Worker untouched. Capture its exact sole-active version and binding
+      # before the first mutating step; later verification reuses this record.
+      - name: Capture preview control before production deployment (read-only)
+        id: preview-control-before-production
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
+        run: |
+          npx --no-install wrangler d1 list --json > "$RUNNER_TEMP/preview-control-d1-inventory-before.json"
+          npx --no-install wrangler deployments list --env preview --json > "$RUNNER_TEMP/preview-control-deployments-before.json"
+          preview_version="$(npx --no-install tsx scripts/preview-release-reconciliation.ts active-version-id \
+            --deployments "$RUNNER_TEMP/preview-control-deployments-before.json")"
+          npx --no-install wrangler versions view "$preview_version" --env preview --json > "$RUNNER_TEMP/preview-control-version-before.json"
+          npx --no-install tsx scripts/preview-release-reconciliation.ts capture-control \
+            --deployments "$RUNNER_TEMP/preview-control-deployments-before.json" \
+            --active-version-view "$RUNNER_TEMP/preview-control-version-before.json" \
+            --wrangler-config wrangler.toml \
+            --d1-inventory "$RUNNER_TEMP/preview-control-d1-inventory-before.json" \
+            --output "$RUNNER_TEMP/preview-control-before-production.json"
+
       - name: Deploy to Cloudflare Workers
         id: production-worker-deploy
         uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
@@ -269,11 +300,32 @@ jobs:
             --output "$RUNNER_TEMP/production-worker-deployment-pre-audit-identity.json" \
             --github-output "$GITHUB_OUTPUT"
 
+      - name: Verify preview control remained unchanged after production deployment (read-only)
+        id: preview-control-after-production-deploy
+        if: ${{ steps.production-worker-deploy.outcome == 'success' && steps.preview-control-before-production.outcome == 'success' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
+        run: |
+          npx --no-install wrangler d1 list --json > "$RUNNER_TEMP/preview-control-d1-inventory-after-deploy.json"
+          npx --no-install wrangler deployments list --env preview --json > "$RUNNER_TEMP/preview-control-deployments-after-deploy.json"
+          preview_version="$(npx --no-install tsx scripts/preview-release-reconciliation.ts active-version-id \
+            --deployments "$RUNNER_TEMP/preview-control-deployments-after-deploy.json")"
+          npx --no-install wrangler versions view "$preview_version" --env preview --json > "$RUNNER_TEMP/preview-control-version-after-deploy.json"
+          npx --no-install tsx scripts/preview-release-reconciliation.ts verify-control \
+            --control "$RUNNER_TEMP/preview-control-before-production.json" \
+            --deployments "$RUNNER_TEMP/preview-control-deployments-after-deploy.json" \
+            --active-version-view "$RUNNER_TEMP/preview-control-version-after-deploy.json" \
+            --wrangler-config wrangler.toml \
+            --d1-inventory "$RUNNER_TEMP/preview-control-d1-inventory-after-deploy.json" \
+            --output "$RUNNER_TEMP/preview-control-after-production-deploy.json"
+
       # A candidate must be sole-active and attached to the exact D1 that
       # passed readiness before either production black-box audit can begin.
       - name: Require deployed candidate production D1 binding (read-only)
         id: production-worker-candidate-cutover
-        if: ${{ steps.production-worker-deploy.outcome == 'success' && steps.production-worker-pre-audit-identity.outcome == 'success' }}
+        if: ${{ steps.production-worker-deploy.outcome == 'success' && steps.production-worker-pre-audit-identity.outcome == 'success' && steps.preview-control-after-production-deploy.outcome == 'success' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -297,7 +349,7 @@ jobs:
             --output "$RUNNER_TEMP/production-worker-candidate-cutover.json"
 
       - name: Upload production candidate cutover observation
-        if: ${{ always() && steps.production-worker-deploy.outcome == 'success' && steps.production-predecessor.outcome == 'success' }}
+        if: ${{ always() && steps.production-worker-deploy.outcome == 'success' && steps.production-predecessor.outcome == 'success' && steps.production-worker-candidate-cutover.outcome != 'skipped' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: production-candidate-cutover-observation-${{ github.sha }}
@@ -369,6 +421,53 @@ jobs:
             --output "$RUNNER_TEMP/production-worker-deployment-identity.json" \
             --github-output "$GITHUB_OUTPUT"
 
+      - name: Verify preview control remained unchanged after production audits (read-only)
+        id: preview-control-after-production-audits
+        if: ${{ steps.production-worker-audit-identity.outcome == 'success' && steps.preview-control-after-production-deploy.outcome == 'success' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
+        run: |
+          npx --no-install wrangler d1 list --json > "$RUNNER_TEMP/preview-control-d1-inventory-after-audits.json"
+          npx --no-install wrangler deployments list --env preview --json > "$RUNNER_TEMP/preview-control-deployments-after-audits.json"
+          preview_version="$(npx --no-install tsx scripts/preview-release-reconciliation.ts active-version-id \
+            --deployments "$RUNNER_TEMP/preview-control-deployments-after-audits.json")"
+          npx --no-install wrangler versions view "$preview_version" --env preview --json > "$RUNNER_TEMP/preview-control-version-after-audits.json"
+          npx --no-install tsx scripts/preview-release-reconciliation.ts verify-control \
+            --control "$RUNNER_TEMP/preview-control-before-production.json" \
+            --deployments "$RUNNER_TEMP/preview-control-deployments-after-audits.json" \
+            --active-version-view "$RUNNER_TEMP/preview-control-version-after-audits.json" \
+            --wrangler-config wrangler.toml \
+            --d1-inventory "$RUNNER_TEMP/preview-control-d1-inventory-after-audits.json" \
+            --output "$RUNNER_TEMP/preview-control-after-production-audits.json"
+
+      - name: Capture final schema-0009 environment isolation receipt (read-only)
+        id: final-environment-isolation
+        if: ${{ steps.production-worker-audit-identity.outcome == 'success' && steps.preview-control-after-production-audits.outcome == 'success' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
+        run: |
+          npx --no-install wrangler d1 list --json > "$RUNNER_TEMP/final-environment-d1-inventory.json"
+          npx --no-install wrangler deployments list --json > "$RUNNER_TEMP/final-environment-production-deployments.json"
+          npx --no-install wrangler deployments list --env preview --json > "$RUNNER_TEMP/final-environment-preview-deployments.json"
+          production_version="$(npx --no-install tsx scripts/production-release-reconciliation.ts active-version-id \
+            --deployments "$RUNNER_TEMP/final-environment-production-deployments.json")"
+          preview_version="$(npx --no-install tsx scripts/preview-release-reconciliation.ts active-version-id \
+            --deployments "$RUNNER_TEMP/final-environment-preview-deployments.json")"
+          npx --no-install wrangler versions view "$production_version" --json > "$RUNNER_TEMP/final-environment-production-version.json"
+          npx --no-install wrangler versions view "$preview_version" --env preview --json > "$RUNNER_TEMP/final-environment-preview-version.json"
+          npx --no-install tsx scripts/production-release-reconciliation.ts capture-environment-isolation \
+            --production-deployments "$RUNNER_TEMP/final-environment-production-deployments.json" \
+            --production-active-version-view "$RUNNER_TEMP/final-environment-production-version.json" \
+            --preview-deployments "$RUNNER_TEMP/final-environment-preview-deployments.json" \
+            --preview-active-version-view "$RUNNER_TEMP/final-environment-preview-version.json" \
+            --wrangler-config wrangler.toml \
+            --d1-inventory "$RUNNER_TEMP/final-environment-d1-inventory.json" \
+            --output "$RUNNER_TEMP/final-environment-isolation-receipt.json"
+
       # This non-strict observation must run after an attempted deploy even if
       # a secret pre-command or deploy failed. It records current
       # routing/binding state for diagnosis but cannot recover, roll back,
@@ -404,7 +503,7 @@ jobs:
 
       - name: Hash sanitized production audit and reconciliation evidence
         id: production-audit-evidence
-        if: ${{ steps.production-worker-deploy.outcome == 'success' && steps.production-worker-candidate-cutover.outcome == 'success' && steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' && steps.production-historical-core-audit.outcome == 'success' && steps.production-historical-spine-audit.outcome == 'success' && steps.production-worker-audit-identity.outcome == 'success' && steps.production-final-observation.outcome == 'success' }}
+        if: ${{ steps.production-worker-deploy.outcome == 'success' && steps.production-worker-candidate-cutover.outcome == 'success' && steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' && steps.production-historical-core-audit.outcome == 'success' && steps.production-historical-spine-audit.outcome == 'success' && steps.production-worker-audit-identity.outcome == 'success' && steps.preview-control-after-production-audits.outcome == 'success' && steps.final-environment-isolation.outcome == 'success' && steps.production-final-observation.outcome == 'success' }}
         run: |
           edge_stabilization_sha256="$(sha256sum "$RUNNER_TEMP/production-primary-source-edge-stabilization.json" | awk '{print $1}')"
           original_language_audit_sha256="$(sha256sum "$RUNNER_TEMP/original-language-v2-production-audit.json" | awk '{print $1}')"
@@ -413,6 +512,9 @@ jobs:
           identity_sha256="$(sha256sum "$RUNNER_TEMP/production-worker-deployment-identity.json" | awk '{print $1}')"
           candidate_cutover_observation_sha256="$(sha256sum "$RUNNER_TEMP/production-worker-candidate-cutover-observation.json" | awk '{print $1}')"
           final_routing_observation_sha256="$(sha256sum "$RUNNER_TEMP/production-worker-final-routing-observation.json" | awk '{print $1}')"
+          readiness_receipt_sha256="$(sha256sum "$RUNNER_TEMP/production-d1-readiness-receipt.json" | awk '{print $1}')"
+          preview_control_sha256="$(sha256sum "$RUNNER_TEMP/preview-control-after-production-audits.json" | awk '{print $1}')"
+          environment_isolation_sha256="$(sha256sum "$RUNNER_TEMP/final-environment-isolation-receipt.json" | awk '{print $1}')"
           printf 'edge_stabilization_sha256=%s\n' "$edge_stabilization_sha256" >> "$GITHUB_OUTPUT"
           printf 'original_language_audit_sha256=%s\n' "$original_language_audit_sha256" >> "$GITHUB_OUTPUT"
           printf 'historical_audit_sha256=%s\n' "$historical_audit_sha256" >> "$GITHUB_OUTPUT"
@@ -421,6 +523,9 @@ jobs:
           printf 'identity_record_sha256=%s\n' "$identity_sha256" >> "$GITHUB_OUTPUT"
           printf 'candidate_cutover_observation_sha256=%s\n' "$candidate_cutover_observation_sha256" >> "$GITHUB_OUTPUT"
           printf 'final_routing_observation_sha256=%s\n' "$final_routing_observation_sha256" >> "$GITHUB_OUTPUT"
+          printf 'readiness_receipt_sha256=%s\n' "$readiness_receipt_sha256" >> "$GITHUB_OUTPUT"
+          printf 'preview_control_sha256=%s\n' "$preview_control_sha256" >> "$GITHUB_OUTPUT"
+          printf 'environment_isolation_sha256=%s\n' "$environment_isolation_sha256" >> "$GITHUB_OUTPUT"
 
       - name: Upload production reconciliation evidence
         if: ${{ steps.production-audit-evidence.outcome == 'success' }}
@@ -431,6 +536,10 @@ jobs:
             ${{ runner.temp }}/production-worker-candidate-cutover-observation.json
             ${{ runner.temp }}/production-worker-candidate-cutover.json
             ${{ runner.temp }}/production-worker-final-routing-observation.json
+            ${{ runner.temp }}/preview-control-before-production.json
+            ${{ runner.temp }}/preview-control-after-production-deploy.json
+            ${{ runner.temp }}/preview-control-after-production-audits.json
+            ${{ runner.temp }}/final-environment-isolation-receipt.json
           retention-days: 30
           if-no-files-found: error
 
@@ -448,5 +557,10 @@ jobs:
             ${{ runner.temp }}/production-worker-candidate-cutover-observation.json
             ${{ runner.temp }}/production-worker-candidate-cutover.json
             ${{ runner.temp }}/production-worker-final-routing-observation.json
+            ${{ runner.temp }}/production-d1-readiness-receipt.json
+            ${{ runner.temp }}/preview-control-before-production.json
+            ${{ runner.temp }}/preview-control-after-production-deploy.json
+            ${{ runner.temp }}/preview-control-after-production-audits.json
+            ${{ runner.temp }}/final-environment-isolation-receipt.json
           retention-days: 30
           if-no-files-found: error

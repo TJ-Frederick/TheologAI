@@ -65,8 +65,9 @@ or the canary.
 The schema-`0009` candidates now have retained unbound preparation evidence:
 the checked-in preview release target is
 `theologai-preview-20260811-schema0009-a`
-(`74f456e2-6951-4003-bb6f-91951342bf8f`), and the production candidate
-`9bc79346-338b-439e-a2a5-424f4418eb21` remains unbound. This does not make the
+(`74f456e2-6951-4003-bb6f-91951342bf8f`), and the checked-in production target
+`theologai-production-20260811-schema0009-a`
+(`9bc79346-338b-439e-a2a5-424f4418eb21`) remains unbound. This does not make the
 canary ready. Until a separate reviewed release replaces the hard inert
 schema-`0009` canary gate, the canary workflow rejects both retained schema-`0008`
 D1 identities during its first local validation, before any Wrangler command or

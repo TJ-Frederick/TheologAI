@@ -45,11 +45,11 @@ script_name = "theologai-ccel-coordinator"
 # For multi-environment setups, use [env.staging] / [env.production] sections.
 [[d1_databases]]
 binding = "THEOLOGAI_DB"
-# PR #107's prepared Transform-11 candidate. This declaration selects the
+# Prepared schema-0009 candidate. This declaration selects the
 # release target only; the protected production workflow must prove the active
 # Worker binding before audits establish any live-state claim.
-database_name = "theologai-production-20260729-transform11-a"
-database_id = "53211f50-a893-4b4c-be1e-bc625a595dc7"
+database_name = "theologai-production-20260811-schema0009-a"
+database_id = "9bc79346-338b-439e-a2a5-424f4418eb21"
 migrations_dir = "migrations"
 
 # Anonymous abuse control. Counters are intentionally local to each Cloudflare

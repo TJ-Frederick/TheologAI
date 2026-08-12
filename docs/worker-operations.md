@@ -23,11 +23,13 @@ The checked-in preview configuration targets schema-`0009` D1
 (`74f456e2-6951-4003-bb6f-91951342bf8f`). The protected preview workflow
 proved that binding and completed its audit. It captured production against its
 checked-in D1 name/UUID and fresh inventory before preview mutation,
-immediately after deployment, and again after final preview audit. Production
-remains configured and live on
-`theologai-production-20260729-transform11-a`
-(`53211f50-a893-4b4c-be1e-bc625a595dc7`); prepared candidate
-`9bc79346-338b-439e-a2a5-424f4418eb21` is unbound and is not configured here.
+immediately after deployment, and again after final preview audit. The
+checked-in production target is now the separately prepared schema-`0009`
+candidate `theologai-production-20260811-schema0009-a`
+(`9bc79346-338b-439e-a2a5-424f4418eb21`), which remains unbound. Live
+production stays on its recorded schema-`0008` predecessor until the protected
+production workflow proves the active binding, re-proves preview control after
+deployment and audits, and emits the final environment-isolation receipt.
 
 PR #122 completed the protected preview release from
 `a0f13b5bdbf3ca071dbb7524dea9c6ce80770404` (tree

@@ -65,11 +65,13 @@ after deployment before any preview audit, then again after every fixed preview
 audit and the final preview Worker identity check. The hash-only final control
 record is retained with the preview audit evidence.
 The separately prepared production candidate
-`9bc79346-338b-439e-a2a5-424f4418eb21` remains unbound, while production stays
-on `theologai-production-20260729-transform11-a`
-(`53211f50-a893-4b4c-be1e-bc625a595dc7`). The readiness artifact retains only
-database/environment identifiers and independently hashable readiness and
-authority results—never raw Wrangler output or diagnostics.
+`theologai-production-20260811-schema0009-a`
+(`9bc79346-338b-439e-a2a5-424f4418eb21`) is now the checked-in production
+target but remains unbound. Live production stays on its recorded schema-`0008`
+predecessor until the separate protected production workflow succeeds. Its
+sanitized readiness receipt, pre/post/post-audit preview-control records, and
+final environment-isolation receipt retain only independently hashable
+identities and results—never raw Wrangler output or diagnostics.
 
 The historical read-only observation from approximately 2026-07-25T19:13Z
 recorded preview deployment `4148bfb5-dd03-447f-b656-9daa0aee4380`, serving

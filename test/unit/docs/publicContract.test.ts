@@ -550,19 +550,19 @@ describe('published project contract', () => {
     ]);
     const previewName = 'theologai-preview-20260811-schema0009-a';
     const previewId = '74f456e2-6951-4003-bb6f-91951342bf8f';
-    const productionId = '53211f50-a893-4b4c-be1e-bc625a595dc7';
-    const productionCandidateId = '9bc79346-338b-439e-a2a5-424f4418eb21';
+    const productionId = '9bc79346-338b-439e-a2a5-424f4418eb21';
+    const productionName = 'theologai-production-20260811-schema0009-a';
 
     for (const document of [readme, reconciliation, canary, operations, dataWorkflow]) {
       expect(document).toContain(previewName);
       expect(document).toContain(previewId);
-      expect(document).toContain(productionCandidateId);
+      expect(document).toContain(productionId);
       expect(document).toContain('unbound');
     }
     expect(config).toContain(`database_name = "${previewName}"`);
     expect(config).toContain(`database_id = "${previewId}"`);
+    expect(config).toContain(`database_name = "${productionName}"`);
     expect(config).toContain(`database_id = "${productionId}"`);
-    expect(config).not.toContain(productionCandidateId);
     expect(dataWorkflow).toContain('e1baa04fecbb066860d06f262142e3450823b7d0');
     expect(dataWorkflow).toContain('673af4a75c770c541a8be3c84e77d8f91033bd07');
     expect(dataWorkflow).toContain('ecbd23bb3c692665c7031a8c1fa7733e17a56fbc7e3a167ba4011f6c1cca62d8');

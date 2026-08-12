@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   activeProductionVersionId,
   candidateProductionD1DatabaseName,
+  captureEnvironmentIsolationReceipt,
+  capturePreviewControlIdentity,
   captureProductionControlIdentity,
   captureProductionPredecessorAnchor,
   reconcileProductionPostMutation,
@@ -11,6 +13,7 @@ import {
   capturePreviewPredecessorAnchor,
   observePreviewPostMutation,
   reconcilePreviewPostMutation,
+  verifyPreviewControlUnchanged,
   verifyProductionControlUnchanged,
 } from '../../../scripts/preview-release-reconciliation.js';
 
@@ -22,8 +25,8 @@ const candidateDeployment = '423e4567-e89b-42d3-a456-426614174000';
 const predecessorD1Id = '94c4938b-7800-4d68-9097-0df33c31fdc1';
 const candidateD1Id = '74f456e2-6951-4003-bb6f-91951342bf8f';
 const candidateD1Name = 'theologai-preview-20260811-schema0009-a';
-const productionCandidateD1Id = '53211f50-a893-4b4c-be1e-bc625a595dc7';
-const productionCandidateD1Name = 'theologai-production-20260729-transform11-a';
+const productionCandidateD1Id = '9bc79346-338b-439e-a2a5-424f4418eb21';
+const productionCandidateD1Name = 'theologai-production-20260811-schema0009-a';
 
 function deployments(id = predecessorDeployment, version = predecessorVersion): string {
   return JSON.stringify([{
@@ -134,6 +137,61 @@ describe('preview release reconciliation evidence', () => {
       wranglerConfigText: config,
       d1InventoryText: productionInventory,
     })).toThrow('production D1 binding changed during preview release');
+  });
+
+  it('proves preview remains exact and distinct throughout a production release', async () => {
+    const config = await readFile(new URL('wrangler.toml', root), 'utf8');
+    const allInventory = JSON.stringify([
+      { uuid: candidateD1Id, name: candidateD1Name },
+      { uuid: productionCandidateD1Id, name: productionCandidateD1Name },
+    ]);
+    const previewControl = capturePreviewControlIdentity({
+      deploymentsText: deployments(candidateDeployment, candidateVersion),
+      activeVersionViewText: versionView(candidateVersion, candidateD1Id),
+      wranglerConfigText: config, d1InventoryText: allInventory,
+    });
+    expect(verifyPreviewControlUnchanged({
+      controlText: JSON.stringify(previewControl), deploymentsText: deployments(candidateDeployment, candidateVersion),
+      activeVersionViewText: versionView(candidateVersion, candidateD1Id), wranglerConfigText: config, d1InventoryText: allInventory,
+    })).toEqual(previewControl);
+    expect(() => verifyPreviewControlUnchanged({
+      controlText: JSON.stringify(previewControl), deploymentsText: deployments(predecessorDeployment, candidateVersion),
+      activeVersionViewText: versionView(candidateVersion, candidateD1Id), wranglerConfigText: config, d1InventoryText: allInventory,
+    })).toThrow('preview deployment changed during production release');
+    expect(captureEnvironmentIsolationReceipt({
+      productionDeploymentsText: deployments(predecessorDeployment, predecessorVersion),
+      productionActiveVersionViewText: versionView(predecessorVersion, productionCandidateD1Id),
+      previewDeploymentsText: deployments(candidateDeployment, candidateVersion),
+      previewActiveVersionViewText: versionView(candidateVersion, candidateD1Id),
+      wranglerConfigText: config, d1InventoryText: allInventory,
+    })).toMatchObject({
+      production: { worker: 'theologai', d1: { databaseName: productionCandidateD1Name, databaseId: productionCandidateD1Id } },
+      preview: { worker: 'theologai-preview', d1: { databaseName: candidateD1Name, databaseId: candidateD1Id } },
+    });
+    expect(() => captureEnvironmentIsolationReceipt({
+      productionDeploymentsText: deployments(predecessorDeployment, predecessorVersion),
+      productionActiveVersionViewText: versionView(predecessorVersion, productionCandidateD1Id),
+      previewDeploymentsText: deployments(candidateDeployment, candidateVersion),
+      previewActiveVersionViewText: versionView(candidateVersion, candidateD1Id),
+      wranglerConfigText: config.replace(`database_name = "${productionCandidateD1Name}"`, 'database_name = "theologai-production-20260729-transform11-a"'),
+      d1InventoryText: allInventory,
+    })).toThrow('production D1 uses a recorded schema-0008 name or UUID');
+    expect(() => captureEnvironmentIsolationReceipt({
+      productionDeploymentsText: deployments(predecessorDeployment, predecessorVersion),
+      productionActiveVersionViewText: versionView(predecessorVersion, productionCandidateD1Id),
+      previewDeploymentsText: deployments(candidateDeployment, candidateVersion),
+      previewActiveVersionViewText: versionView(candidateVersion, candidateD1Id),
+      wranglerConfigText: config.replace(`database_id = "${candidateD1Id}"`, `database_id = "${productionCandidateD1Id}"`),
+      d1InventoryText: allInventory,
+    })).toThrow('production and preview D1 identities must be distinct');
+    expect(() => captureEnvironmentIsolationReceipt({
+      productionDeploymentsText: deployments(predecessorDeployment, predecessorVersion),
+      productionActiveVersionViewText: versionView(predecessorVersion, productionCandidateD1Id),
+      previewDeploymentsText: deployments(candidateDeployment, candidateVersion),
+      previewActiveVersionViewText: versionView(candidateVersion, candidateD1Id),
+      wranglerConfigText: config.replace(`database_id = "${productionCandidateD1Id}"`, 'database_id = "62b871a6-5b4d-4d9b-8f52-301f6c878f48"'),
+      d1InventoryText: allInventory,
+    })).toThrow('production D1 uses a recorded schema-0008 name or UUID');
   });
 
   it('captures distinct observed predecessor and readiness-tested candidate D1 identities', async () => {

@@ -82,7 +82,7 @@ export const SCHEMA_0009_CANARY_GATE: Schema0009CanaryGate = {
 
 const PRODUCTION = {
   worker: 'theologai', route: 'mcp.theologai.xyz',
-  d1Name: 'theologai-production-20260729-transform11-a', d1: '53211f50-a893-4b4c-be1e-bc625a595dc7',
+  d1Name: 'theologai-production-20260811-schema0009-a', d1: '9bc79346-338b-439e-a2a5-424f4418eb21',
   requestNamespace: '361201', operatorNamespace: '361203', version: '3.6.0',
   discovery: 'false', live: 'false', coordinator: 'false', logs: 'false',
 };

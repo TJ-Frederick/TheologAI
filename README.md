@@ -220,12 +220,14 @@ run `31572924302` succeeded. The detailed sanitized evidence is in
 [docs/PREVIEW-RELEASE-RECONCILIATION.md](docs/PREVIEW-RELEASE-RECONCILIATION.md).
 This evidence-only commit postdates the deployed source and makes no new
 runtime claim.
-Production remains configured and live on schema-`0008`
-`theologai-production-20260729-transform11-a`
-(`53211f50-a893-4b4c-be1e-bc625a595dc7`); its separately prepared schema-`0009`
-candidate is `9bc79346-338b-439e-a2a5-424f4418eb21` and remains unbound. The
-CCEL canary gate remains unrecorded and inert. The exact preparation identity,
-seed evidence, and release boundary are recorded in
+The checked-in production release target is the separately prepared schema-`0009`
+candidate `theologai-production-20260811-schema0009-a`
+(`9bc79346-338b-439e-a2a5-424f4418eb21`). It remains unbound until the
+protected production workflow proves readiness, the exact active binding,
+post-audit preview control, and final environment isolation. Live production
+remains on its recorded schema-`0008` predecessor until then. The CCEL canary
+gate remains unrecorded and inert. The exact preparation identity, seed
+evidence, and release boundary are recorded in
 [docs/D1-DATA-WORKFLOW.md](docs/D1-DATA-WORKFLOW.md).
 
 ## MCP capabilities
