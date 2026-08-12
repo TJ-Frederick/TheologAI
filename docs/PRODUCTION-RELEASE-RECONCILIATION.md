@@ -42,11 +42,12 @@ audit all passed. The retained PR #101 preview predecessor was
 deployment `070b292b-0bae-400a-b983-3d72157b5a96`, Worker
 `bd722b69-2e2c-4d8d-b42b-617e8caba13d` (#130), and D1
 `theologai-preview-20260728-hierarchy-a`
-(`51890e12-1c3f-421f-b661-9a5ea9637e43`). The current preview baseline is
-deployment `5e812152-355b-4a5f-a123-2485e89f1550`, Worker
-`06b9a603-8339-42b6-a246-ef9238563043` (#140), and D1
-`theologai-preview-20260728-transform11-a`
-(`62b871a6-5b4d-4d9b-8f52-301f6c878f48`).
+(`51890e12-1c3f-421f-b661-9a5ea9637e43`). The PR #107 preview assignment is
+the immediate retained predecessor. The current preview baseline is PR #122
+deployment `13393917-fa91-4afc-aeaf-2809db6701a2`, Worker
+`b2c62527-5759-4c1d-a9a3-8c1d43dddabe` (#142), and schema-`0009` D1
+`theologai-preview-20260811-schema0009-a`
+(`74f456e2-6951-4003-bb6f-91951342bf8f`).
 
 The checked-in root production target was separately prepared unbound as
 Transform-11 candidate `theologai-production-20260729-transform11-a`

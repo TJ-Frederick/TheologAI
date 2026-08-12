@@ -19,15 +19,15 @@ describe('custom-domain infrastructure contract', () => {
     expect(production).toContain('workers_dev = true');
     expect(production).toContain('{ pattern = "mcp.theologai.xyz", custom_domain = true }');
     expect(production).not.toContain('preview-mcp.theologai.xyz');
-    expect(production).toContain('database_name = "theologai-production-20260729-transform11-a"');
-    expect(production).toContain('database_id = "53211f50-a893-4b4c-be1e-bc625a595dc7"');
+    expect(production).toContain('database_name = "theologai-production-20260811-schema0009-a"');
+    expect(production).toContain('database_id = "9bc79346-338b-439e-a2a5-424f4418eb21"');
     expect(production).toContain('namespace_id = "361201"');
 
     expect(preview).toContain('workers_dev = true');
     expect(preview).toContain('{ pattern = "preview-mcp.theologai.xyz", custom_domain = true }');
     expect(preview).not.toContain('{ pattern = "mcp.theologai.xyz", custom_domain = true }');
-    expect(preview).toContain('database_name = "theologai-preview-20260728-transform11-a"');
-    expect(preview).toContain('database_id = "62b871a6-5b4d-4d9b-8f52-301f6c878f48"');
+    expect(preview).toContain('database_name = "theologai-preview-20260811-schema0009-a"');
+    expect(preview).toContain('database_id = "74f456e2-6951-4003-bb6f-91951342bf8f"');
     expect(preview).toContain('namespace_id = "361202"');
 
     for (const environment of [production, preview]) {

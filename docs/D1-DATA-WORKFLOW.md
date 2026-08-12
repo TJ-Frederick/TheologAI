@@ -151,6 +151,38 @@ read-only inventory/check. If retention or compatibility has not been verified,
 document the target as candidate/unverified. Database deletion remains a later,
 separately authorized operation after the retention window and rollback review.
 
+### Schema-0009 preview-release preparation record
+
+The reviewed pre-release baseline is commit
+`e1baa04fecbb066860d06f262142e3450823b7d0`, tree
+`673af4a75c770c541a8be3c84e77d8f91033bd07`. Both schema-`0009` candidates
+were prepared and audited while unbound. The preview candidate is
+`theologai-preview-20260811-schema0009-a`
+(`74f456e2-6951-4003-bb6f-91951342bf8f`); the separately prepared production
+candidate is `9bc79346-338b-439e-a2a5-424f4418eb21` and is not this release's
+binding target.
+
+The deterministic seed identity was manifest
+`ecbd23bb3c692665c7031a8c1fa7733e17a56fbc7e3a167ba4011f6c1cca62d8`, sourced
+from data manifest `14e30a32f316f1c7a954a9641f7d1b8bd6608d8e0f4bdc2eaba4c565f472f83d`,
+with D1 materialization identity
+`66c148a206b9b0eb1bf7552572570c42dabfd0ba591b63e0cf0d02adda35aa07` and
+migration-`0009` identity
+`989dd945ac633ecb1ba83cc80a1b88234cac31d78b3d905ae0242eb66c533eb3`. It
+contained 49 ordered files, 1,630,260 rows, and 177,923,082 bytes. Each
+candidate passed the read-only readiness plus Transform-8 and Transform-9
+authority audits with 60 tables, 307,617,792 bytes, 35 documents, 4,111
+sections, zero `historical_sectioned_publications` rows, and one corpus seal.
+
+This commit changes only the checked-in preview binding. It does not bind or
+deploy either Worker, change the root production binding, or activate the
+production candidate. Its protected preview workflow writes a minimal
+sanitized readiness receipt with independently hashable readiness and authority
+outcomes, then captures and compares production deployment, Worker, and D1
+identities against the checked-in production D1 name/UUID and fresh inventory.
+It re-proves that control immediately after deployment and after the final
+preview audit; any drift blocks release evidence.
+
 ## Optional local D1 rehearsal
 
 Wrangler defaults D1 commands to local state, but specify `--local` explicitly
@@ -305,8 +337,8 @@ This preparer does not change `wrangler.toml`, a Worker binding, deployment,
 or database inventory. It does mutate only the separately named, unbound
 production candidate corpus: migrations and deterministic seed files are
 applied there after the pristine-target guard passes. It never mutates the
-active/bound production corpus. The PR #101 candidate, now the retained
-production rollback,
+active/bound production corpus. The PR #101 candidate is older retained
+rollback history:
 `theologai-production-20260728-hierarchy-a`
 (`f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395`) was unbound when its one-use operation
 completed with 49/49 seed files, 1,627,474 rows, schema `0008`, corpus identity
@@ -321,16 +353,17 @@ audits. That PR #101 production assignment—deployment
 `71b76d24-bf5f-490e-adc4-31cf63fb046e`, Worker
 `bae58cd3-cad7-4663-879d-408accf061b0` (#96), and D1
 `theologai-production-20260728-hierarchy-a`
-(`f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395`)—is now the matched rollback pair.
+(`f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395`)—is older retained rollback history.
 The retained PR #101 preview
 predecessor was deployment `070b292b-0bae-400a-b983-3d72157b5a96`, Worker
 `bd722b69-2e2c-4d8d-b42b-617e8caba13d` (#130), and D1
 `theologai-preview-20260728-hierarchy-a`
-(`51890e12-1c3f-421f-b661-9a5ea9637e43`). The current preview baseline is
-deployment `5e812152-355b-4a5f-a123-2485e89f1550`, Worker
-`06b9a603-8339-42b6-a246-ef9238563043` (#140), and D1
-`theologai-preview-20260728-transform11-a`
-(`62b871a6-5b4d-4d9b-8f52-301f6c878f48`). The checked-out Transform-10 Aquinas
+(`51890e12-1c3f-421f-b661-9a5ea9637e43`). That former Transform-11 preview
+binding is historical. The current preview baseline is PR #122 deployment
+`13393917-fa91-4afc-aeaf-2809db6701a2`, Worker
+`b2c62527-5759-4c1d-a9a3-8c1d43dddabe`, and schema-`0009` D1
+`theologai-preview-20260811-schema0009-a`
+(`74f456e2-6951-4003-bb6f-91951342bf8f`). The checked-out Transform-10 Aquinas
 hierarchy remains local-only and unpublished, with no catalog, runtime, or MCP
 projection. Future production workflows retain the same reconciliation
 contract: re-resolve the checked-in candidate name/UUID, rerun readiness by
@@ -352,7 +385,7 @@ resumed, or repaired. Protected preview deployment
 `06b9a603-8339-42b6-a246-ef9238563043` (#140) with that exact D1; this preview
 assignment remained unchanged during the later PR #108 production release.
 
-The checked-in root production binding selected the separately prepared,
+The historical checked-in root production binding selected the separately prepared,
 initially unbound Transform-11 candidate
 `theologai-production-20260729-transform11-a`
 (`53211f50-a893-4b4c-be1e-bc625a595dc7`). It was created once in ENAM from
@@ -370,7 +403,22 @@ Protected workflow `30496350408` later deployed merge
 Historical core passed 8/8, Transform-11 spine passed 10/10,
 original-language passed 11/11, primary-source edge stabilization matched on
 attempt 4 and remained stable, and independent post-release review returned
-`SHIP`. Retain the PR #101 matched Worker/D1 pair above for rollback.
+`SHIP`. For this schema-`0009` cutover, the exact PR #108 pair is the
+immediately preceding primary rollback unit: deployment
+`3d7489d9-7b48-4ad0-bdc6-95ffbda53bd8`, Worker
+`291f3292-3fa9-44fc-bf6f-b68fd2f4cef6`, and D1
+`theologai-production-20260729-transform11-a`
+(`53211f50-a893-4b4c-be1e-bc625a595dc7`). PR #101 remains older rollback
+history only and is not the immediate cutover rollback claim.
+
+The next checked-in production target is the separately prepared schema-`0009`
+candidate `theologai-production-20260811-schema0009-a`
+(`9bc79346-338b-439e-a2a5-424f4418eb21`). This local configuration change makes
+no remote binding or deployment claim. Before a protected production deployment,
+the workflow must emit a sanitized readiness receipt; then it must prove the
+preview control unchanged before deployment, after deployment, and after every
+production audit, followed by a final receipt proving the distinct exact
+schema-`0009` preview/production bindings against fresh inventory.
 
 Approved deploy jobs perform the last compatibility check read-only against
 the candidate name resolved from the checked-in name/UUID pair:

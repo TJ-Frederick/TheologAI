@@ -64,7 +64,9 @@ bound to D1 `theologai-production-20260729-transform11-a`
 8/8, the Transform-11 spine audit passed 10/10, the original-language audit
 passed 11/11, primary-source edge stabilization matched on attempt 4 and
 remained stable, and the independent post-release review returned `SHIP`.
-The PR #101 production assignment is retained as the matched rollback pair.
+For this schema-`0009` cutover, the exact captured PR #108 Worker/D1 pair
+above is the immediately preceding primary rollback unit. PR #101 is older
+retained rollback history, not the immediate rollback claim.
 
 The historical PR #96 `original_language_study` schema-v2 audit passed 11/11
 cases.
@@ -141,26 +143,23 @@ applied the exact reviewed 49-file, 1,630,259-row seed with corpus identity
 `29a4a7faec2a960f06bfc026a319df8c08b495bb7ad82831fb62d3a3586643a4`.
 Primary readiness, Transform-8 authority (`1/12/12` pages), and the complete
 Transform-11 source-pack authority audit (`1/1/1/1/1/1/133/17` pages) passed.
-Protected preview deployment `5e812152-355b-4a5f-a123-2485e89f1550` now
-serves Worker `06b9a603-8339-42b6-a246-ef9238563043` (#140) with that exact
-D1. Production was unchanged by that preview release. Transform-10 hierarchy,
+Protected preview deployment `5e812152-355b-4a5f-a123-2485e89f1550`
+historically served Worker `06b9a603-8339-42b6-a246-ef9238563043` (#140) with
+that exact D1 and is the immediate predecessor to PR #122. Production was
+unchanged by that preview release. Transform-10 hierarchy,
 publication, and Aquinas material remain excluded.
 
-This active PR #107 preview Worker predates PR #115's repository-only,
+That historical PR #107 preview Worker predates PR #115's repository-only,
 unpublished pin to `https://www.ccel.org/home3/search`. It is not a valid
 code/resource-equivalent `100` predecessor for a `111` canary built from
-current `main`. Current `main` also includes PR #117's Transform-12 schema
-`0009` contract, while the retained PR #107/PR #108 D1 records are schema
-`0008`. Before credential staging, separately authorized fresh schema-`0009`
-preview and production D1 preparation and remote readiness/authority audit are
-required while both candidates remain unbound. The reviewed release sequence is
-then preview bind/deploy/audit, production bind/deploy/audit, and read-only
-environment-isolation verification. The preview release is the sole safe
-current-main `100` refresh; it is not repeated later. Those D1 gates do not
-authorize credential work or the canary; see the
+current `main`. PR #122 has since completed the schema-`0009` preview
+bind/deploy/audit stage. The separately prepared schema-`0009` production
+candidate remains unbound; production bind/deploy/audit and read-only
+environment-isolation verification remain separately gated. Completion of the
+preview stage does not authorize credential work or the canary; see the
 [CCEL canary transaction](docs/CCEL-LIVE-PREVIEW-CANARY-TRANSACTION.md).
 
-PR #101's former production assignment, retained as the rollback pair, is
+PR #101's former production assignment is older retained rollback history:
 deployment `71b76d24-bf5f-490e-adc4-31cf63fb046e`, Worker
 `bae58cd3-cad7-4663-879d-408accf061b0` (#96), and D1
 `theologai-production-20260728-hierarchy-a`
@@ -190,21 +189,50 @@ Protected workflow `30496350408` then deployed
 Historical core passed 8/8, Transform-11 spine passed 10/10,
 `original_language_study` passed 11/11, primary-source edge stabilization
 matched on attempt 4 and remained stable, and independent post-release review
-returned `SHIP`. The PR #101 Worker/D1 pair above remains the rollback record.
+returned `SHIP`. The exact PR #108 Worker/D1 pair above is the primary
+immediate rollback unit for this schema-`0009` cutover; PR #101 remains older
+retained rollback history only.
 For a preview-client rollback without changing server state, use the direct preview
 `workers.dev` address above; the production `workers.dev` address intentionally
 redirects rather than serving a separate legacy Worker.
 
-The deployed preview and production D1 layers remain schema `0008`; current
-main's PR #117 schema `0009` Candidate-C contract is checked out only and has
-no prepared, bound, or deployed remote-D1 claim. Earlier local-only and
-preview-only activation statements are historical. PR #101 bound the separate
-preview and production D1 databases recorded above. The historical PR #96 public
+Production remains on schema `0008`; preview now uses the audited PR #122
+schema-`0009` Candidate-C D1. Earlier local-only and preview-only activation
+statements are historical. The historical PR #96 public
 `original_language_study` v2 audit does not independently establish the runtime
 path for every later historical transform. The pinned packet's `SOURCE.json`
 remains a historical acquisition-gate snapshot, not deployment evidence.
 Production v6/local-only and preview v7/discovery-only remain deployed with
 CCEL execution disabled before adapter, coordinator, or fetch.
+
+### Schema-0009 preview release state
+
+The protected release targeted the prepared preview D1
+`theologai-preview-20260811-schema0009-a`
+(`74f456e2-6951-4003-bb6f-91951342bf8f`). The workflow re-checked the
+candidate, deployed it, proved the active preview binding, and completed its
+audit. It validated the fixed production control against the checked-in
+production D1 name/UUID and fresh inventory before deployment, immediately
+afterward, and again after the final preview audit.
+PR #122 has now completed that protected preview release: source
+`a0f13b5bdbf3ca071dbb7524dea9c6ce80770404` (tree
+`660c06ff31e7d0e2ccbc6fe12204e66c4e793233`) is served solely by preview
+Worker `b2c62527-5759-4c1d-a9a3-8c1d43dddabe` on deployment
+`13393917-fa91-4afc-aeaf-2809db6701a2`; all fixed audits and three production
+control observations passed. The authorization label was removed and revocation
+run `31572924302` succeeded. The detailed sanitized evidence is in
+[docs/PREVIEW-RELEASE-RECONCILIATION.md](docs/PREVIEW-RELEASE-RECONCILIATION.md).
+This evidence-only commit postdates the deployed source and makes no new
+runtime claim.
+The checked-in production release target is the separately prepared schema-`0009`
+candidate `theologai-production-20260811-schema0009-a`
+(`9bc79346-338b-439e-a2a5-424f4418eb21`). It remains unbound until the
+protected production workflow proves readiness, the exact active binding,
+post-audit preview control, and final environment isolation. Live production
+remains on its recorded schema-`0008` predecessor until then. The CCEL canary
+gate remains unrecorded and inert. The exact preparation identity, seed
+evidence, and release boundary are recorded in
+[docs/D1-DATA-WORKFLOW.md](docs/D1-DATA-WORKFLOW.md).
 
 ## MCP capabilities
 

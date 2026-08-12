@@ -9,6 +9,70 @@ The record intentionally distinguishes two D1 identities:
 
 The generic release workflow permits both code-only releases (`d1Changed: false`) and data cutovers (`d1Changed: true`); it never infers freshness from a different ID alone. Wrangler 4.107.0’s D1 binding response is accepted only when the sole `THEOLOGAI_DB` binding has canonical UUID `id` and `database_id` fields that agree exactly. After deployment, the sole active Worker version must bind the candidate ID before either fixed audit begins; a retained-old-D1 deployment is refused even if its Worker version otherwise looks new.
 
+## PR #122 schema-0009 preview release — passed
+
+The protected preview release deployed source
+`a0f13b5bdbf3ca071dbb7524dea9c6ce80770404` (tree
+`660c06ff31e7d0e2ccbc6fe12204e66c4e793233`) through Actions run
+`31568581322` and GitHub deployment `5864161923`. Cloudflare deployment
+`13393917-fa91-4afc-aeaf-2809db6701a2` now serves Worker
+`b2c62527-5759-4c1d-a9a3-8c1d43dddabe` (#142) as the sole 100% preview
+assignment, bound to `theologai-preview-20260811-schema0009-a`
+(`74f456e2-6951-4003-bb6f-91951342bf8f`). Its retained predecessor is
+deployment `5e812152-355b-4a5f-a123-2485e89f1550`, Worker
+`06b9a603-8339-42b6-a246-ef9238563043`, and D1
+`theologai-preview-20260728-transform11-a`
+(`62b871a6-5b4d-4d9b-8f52-301f6c878f48`).
+
+Edge stabilization, original-language v2, historical core, and the complete
+Transform-11 spine passed. Their sanitized evidence SHA-256 values are,
+respectively, `efa907bc99f05d4a9bbc7800caa3502f52774101bd131a01fb53ec588d98f49d`,
+`9d3f0fe27f3129f0955d42ddcd5aebd9f8d89de96a752a14eeff3418d9031651`,
+`7832ff8e6cff3492664ada1851e01536e1897226720c9e1e9bec6bc4f6af2ad6`, and
+`bd2851f4623ea2e919d2296986e862bab8fd0e316e027f31e0cc3324a723602e`.
+The final preview identity hash is
+`6c3b717562c8fc2bcb8c5f5374a0827bba2391ee105d86ed1d492a3e8bef5a82`;
+the readiness receipt hash is
+`24e6cf53ac8de7d2e17903faf56a145d8dd7ef7c49b27e628878353484cfaee2`;
+and the candidate reconciliation hash is
+`2765288114abf37b3ea78879d5e62e3e6df44dd3d10af466bd5ed65286d1b557`.
+
+The pre-deploy, immediate post-deploy, and post-audit controls proved production
+unchanged at deployment `3d7489d9-7b48-4ad0-bdc6-95ffbda53bd8`, Worker
+`291f3292-3fa9-44fc-bf6f-b68fd2f4cef6`, and D1
+`theologai-production-20260729-transform11-a`
+(`53211f50-a893-4b4c-be1e-bc625a595dc7`). The final production-control hash is
+`481900a3eec516fe06d3252175b63e318783c7230f70311235e4a1dd73198889`.
+The `deploy-preview` label was removed immediately afterward; Preview Revocation
+run `31572924302` passed and the PR remains open and unmerged. The separately
+prepared production candidate `9bc79346-338b-439e-a2a5-424f4418eb21` remains
+unbound. The schema-0009 canary gate remains `unrecorded` and inert; no CCEL
+request, credential staging, canary, or production mutation was authorized.
+This evidence-only documentation commit postdates the deployed head. It does
+not claim that a later documentation commit was deployed.
+
+### Pre-release record
+
+The schema-`0009` preview release pre-state targeted
+`theologai-preview-20260811-schema0009-a`
+(`74f456e2-6951-4003-bb6f-91951342bf8f`) in checked-in configuration only.
+It has no live binding or deployment claim until this protected workflow passes.
+Before the preview deployment, the workflow captures a fixed read-only
+production control snapshot, proving its observed D1 UUID against the exact
+checked-in production name/UUID and a fresh read-only D1 inventory. It proves
+the same production deployment UUID, Worker UUID, and D1 UUID immediately
+after deployment before any preview audit, then again after every fixed preview
+audit and the final preview Worker identity check. The hash-only final control
+record is retained with the preview audit evidence.
+The separately prepared production candidate
+`theologai-production-20260811-schema0009-a`
+(`9bc79346-338b-439e-a2a5-424f4418eb21`) is now the checked-in production
+target but remains unbound. Live production stays on its recorded schema-`0008`
+predecessor until the separate protected production workflow succeeds. Its
+sanitized readiness receipt, pre/post/post-audit preview-control records, and
+final environment-isolation receipt retain only independently hashable
+identities and results—never raw Wrangler output or diagnostics.
+
 The historical read-only observation from approximately 2026-07-25T19:13Z
 recorded preview deployment `4148bfb5-dd03-447f-b656-9daa0aee4380`, serving
 Worker version `ca1376bb-05cc-403b-a396-d2e89403abec` and bound to
@@ -61,20 +125,18 @@ Transform-11 authority read; an explicitly authorized read-only rerun then
 passed primary readiness, Transform-8 (`1/12/12` pages), and the complete
 Transform-11 audit (`1/1/1/1/1/1/133/17` pages). No seed, migration, repair, or
 resume was repeated. The candidate was unbound during that preparation.
-Protected preview deployment `5e812152-355b-4a5f-a123-2485e89f1550` now
-serves PR #107 head `1105b75cd8537632bdb20e598092f6ba94a6adc0` as Worker
-`06b9a603-8339-42b6-a246-ef9238563043` (#140), the sole active preview
-assignment bound to that exact candidate D1. It remains v7/discovery-only with
-CCEL execution disabled before adapter, coordinator, or fetch. Production
-remains unchanged.
+Protected preview deployment `5e812152-355b-4a5f-a123-2485e89f1550`
+historically served PR #107 head `1105b75cd8537632bdb20e598092f6ba94a6adc0` as
+Worker `06b9a603-8339-42b6-a246-ef9238563043` (#140), bound to that exact
+candidate D1. It is PR #122's retained immediate predecessor, not the current
+preview assignment.
 
-That active PR #107 Worker predates PR #115's repository-only, unpublished
+That historical PR #107 Worker predates PR #115's repository-only, unpublished
 change pinning the candidate CCEL endpoint to
 `https://www.ccel.org/home3/search`. It is not a code/resource-equivalent `100`
-predecessor for a `111` canary built from current `main`. Before any canary is
-authorized, a separate protected preview release must safely refresh exact
-current-`main` code and resources with the `100` flags and pass its preview
-audit. That refresh does not authorize credential provisioning or the canary.
+predecessor for a `111` canary built from current `main`. PR #122 completed the
+required current-main schema-`0009` preview refresh and audit. That completion
+does not authorize production release, credential provisioning, or the canary.
 
 At the reconciliation cutoff immediately after PR #113, `main` was
 `2f12262c9a37d3588bee9b5071954823c15cbd12` (tree
@@ -87,8 +149,10 @@ provisional Norton capacity evidence that remains subject to local and release
 gates. Production runs for PRs #109–#113 were cancelled and preview jobs
 skipped, so they make no runtime, Worker, deployment, binding, remote-D1, or
 corpus claim.
-Preview therefore remains the PR #107 assignment above. Production remains PR
-#108 merge `8da99fd0a161b90a4bd90ab29bde1abf796b3bf6`, deployment
+At that cutoff, preview remained the PR #107 assignment above; PR #122 has
+since superseded it with the audited schema-`0009` preview assignment. CCEL
+execution remains disabled before adapter, coordinator, or fetch. Production
+remains PR #108 merge `8da99fd0a161b90a4bd90ab29bde1abf796b3bf6`, deployment
 `3d7489d9-7b48-4ad0-bdc6-95ffbda53bd8`, Worker
 `291f3292-3fa9-44fc-bf6f-b68fd2f4cef6`, and D1
 `53211f50-a893-4b4c-be1e-bc625a595dc7`, with v6/local-only behavior and CCEL

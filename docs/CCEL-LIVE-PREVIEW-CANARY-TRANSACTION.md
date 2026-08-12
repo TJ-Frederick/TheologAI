@@ -17,17 +17,18 @@ Tracked `wrangler.toml` is always the safe baseline:
 | Preview | 1 | 0 | 0 | v7 discovery-contract baseline |
 | Ephemeral canary | 1 | 1 | 1 | preview-only audit candidate; never committed |
 
-The active PR #107 preview Worker
+The retained historical PR #107 preview Worker
 `06b9a603-8339-42b6-a246-ef9238563043` predates PR #115's repository-only,
 unpublished pin to `https://www.ccel.org/home3/search`. It remains valid
-point-in-time evidence, but it is not a code/resource-equivalent `100`
-predecessor for a `111` candidate built from current `main`. The exact-delta
-validator would correctly reject that pairing.
+point-in-time predecessor evidence, but it is no longer active. PR #122's
+schema-`0009` Worker `b2c62527-5759-4c1d-a9a3-8c1d43dddabe` is the audited
+current preview `100` baseline.
 
 Current `main` also includes PR #117's Transform-12 schema `0009` contract.
 The retained PR #107 preview and PR #108 production D1 records were prepared
-against schema `0008`; neither is a current-main-compatible D1 baseline. The
-historical `0008` readiness records remain evidence for those releases only.
+against schema `0008`. PR #107 is predecessor evidence only; PR #108 remains
+the live production control. The historical `0008` readiness records remain
+evidence for those releases only.
 
 Operational readiness therefore has five separately authorized stages, in this
 order:
@@ -38,7 +39,7 @@ order:
    schema/seed **while both candidates remain unbound**. Failure or missing
    evidence is a stop condition; do not reuse, repair, or bind a failed
    candidate.
-2. Through a separately approved preview release, bind and deploy the exact
+2. **Completed by PR #122:** through a separately approved preview release, bind and deploy the exact
    prepared preview candidate with current-`main` `100` flags, then complete
    its protected preview audit. This one release creates the exact-current-main,
    code/resource-equivalent preview predecessor for the later `111` candidate;
@@ -61,19 +62,31 @@ environment binding; the preview audit does not authorize the production release
 and the completed releases/isolation evidence do not authorize credential staging
 or the canary.
 
-The repository currently records neither schema-`0009` candidate identity nor
-its readiness/authority evidence. Until a separate reviewed release replaces the
-hard inert schema-`0009` canary gate, the canary workflow rejects both retained
-schema-`0008` D1 identities during its first local validation, before any
-Wrangler command or Cloudflare read. Changing only a D1 ID is insufficient: the
-future change must replace the `unrecorded` gate with a reviewed `ready` record
-for each environment: exact D1 name/UUID plus separately pinned readiness and
-authority evidence identities and SHA-256 values, plus one separately pinned
+The schema-`0009` candidates now have retained unbound preparation evidence:
+the checked-in preview release target is
+`theologai-preview-20260811-schema0009-a`
+(`74f456e2-6951-4003-bb6f-91951342bf8f`), and the checked-in production target
+`theologai-production-20260811-schema0009-a`
+(`9bc79346-338b-439e-a2a5-424f4418eb21`) remains unbound. This does not make the
+canary ready. Until a separate reviewed release replaces the hard inert
+schema-`0009` canary gate, the canary workflow rejects both retained schema-`0008`
+D1 identities during its first local validation, before any Wrangler command or
+Cloudflare read. Changing only a D1 ID is insufficient: the future change must
+replace the `unrecorded` gate with a reviewed `ready` record for each
+environment: exact D1 name/UUID plus separately pinned readiness and authority
+evidence identities and SHA-256 values, plus one separately pinned
 environment-isolation evidence identity and SHA-256. The local validator rejects
 unknown or incomplete `ready` records, malformed evidence, any recorded
 schema-`0008` D1 name or UUID regardless of pairing, any shared
 preview/production identity, and any mismatch between those reviewed D1 pairs
 and committed configuration.
+
+PR #122 completed the one approved schema-`0009` preview bind/deploy/audit
+stage with its production control unchanged; its release evidence is recorded
+in `PREVIEW-RELEASE-RECONCILIATION.md`. That completion does not authorize the
+production candidate (still unbound), credential staging, or this canary. The
+gate remains `unrecorded` and inert, and the release made no CCEL request or
+secret change.
 
 The only way to create the third row is the main-only, manually dispatched
 `CCEL Live Preview Canary` workflow. It requires all of the following:

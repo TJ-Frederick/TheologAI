@@ -82,13 +82,13 @@ export const SCHEMA_0009_CANARY_GATE: Schema0009CanaryGate = {
 
 const PRODUCTION = {
   worker: 'theologai', route: 'mcp.theologai.xyz',
-  d1Name: 'theologai-production-20260729-transform11-a', d1: '53211f50-a893-4b4c-be1e-bc625a595dc7',
+  d1Name: 'theologai-production-20260811-schema0009-a', d1: '9bc79346-338b-439e-a2a5-424f4418eb21',
   requestNamespace: '361201', operatorNamespace: '361203', version: '3.6.0',
   discovery: 'false', live: 'false', coordinator: 'false', logs: 'false',
 };
 const PREVIEW = {
   worker: 'theologai-preview', route: 'preview-mcp.theologai.xyz',
-  d1Name: 'theologai-preview-20260728-transform11-a', d1: '62b871a6-5b4d-4d9b-8f52-301f6c878f48',
+  d1Name: 'theologai-preview-20260811-schema0009-a', d1: '74f456e2-6951-4003-bb6f-91951342bf8f',
   requestNamespace: '361202', operatorNamespace: '361204', version: '3.6.0-preview',
   discovery: 'true', live: 'false', coordinator: 'false', logs: 'true',
 };
