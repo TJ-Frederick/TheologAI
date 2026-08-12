@@ -75,37 +75,64 @@ describe('preview release reconciliation evidence', () => {
     })).toThrow('does not match the checked-out readiness-tested candidate D1');
   });
 
-  it('fails closed when a preview release changes any production control identity', () => {
+  it('proves the initial production control against config and fresh name/UUID inventory, then fails closed for post-audit drift', async () => {
+    const config = await readFile(new URL('wrangler.toml', root), 'utf8');
+    const productionInventory = inventory(productionCandidateD1Id, productionCandidateD1Name);
     const productionControl = captureProductionControlIdentity({
       deploymentsText: deployments(predecessorDeployment, predecessorVersion),
       activeVersionViewText: versionView(predecessorVersion, productionCandidateD1Id),
+      wranglerConfigText: config,
+      d1InventoryText: productionInventory,
     });
-    expect(productionControl).toEqual({
-      schemaVersion: 1,
+    expect(productionControl).toMatchObject({
+      schemaVersion: 2,
       worker: 'theologai',
       deploymentId: predecessorDeployment,
       workerVersionId: predecessorVersion,
       d1: { binding: 'THEOLOGAI_DB', databaseId: productionCandidateD1Id },
+      configuredD1: { binding: 'THEOLOGAI_DB', databaseName: productionCandidateD1Name, databaseId: productionCandidateD1Id },
     });
+    expect(productionControl.wranglerConfigSha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(productionControl.d1InventorySha256).toMatch(/^[0-9a-f]{64}$/);
     expect(verifyProductionControlUnchanged({
       controlText: JSON.stringify(productionControl),
       deploymentsText: deployments(predecessorDeployment, predecessorVersion),
       activeVersionViewText: versionView(predecessorVersion, productionCandidateD1Id),
+      wranglerConfigText: config,
+      d1InventoryText: productionInventory,
     })).toEqual(productionControl);
+    expect(() => captureProductionControlIdentity({
+      deploymentsText: deployments(predecessorDeployment, predecessorVersion),
+      activeVersionViewText: versionView(predecessorVersion, predecessorD1Id),
+      wranglerConfigText: config,
+      d1InventoryText: productionInventory,
+    })).toThrow('does not match the checked-out readiness-tested candidate D1');
+    expect(() => captureProductionControlIdentity({
+      deploymentsText: deployments(predecessorDeployment, predecessorVersion),
+      activeVersionViewText: versionView(predecessorVersion, productionCandidateD1Id),
+      wranglerConfigText: config,
+      d1InventoryText: inventory(productionCandidateD1Id, 'unexpected-production-name'),
+    })).toThrow('does not match the read-only inventory ID/name mapping');
     expect(() => verifyProductionControlUnchanged({
       controlText: JSON.stringify(productionControl),
       deploymentsText: deployments(candidateDeployment, predecessorVersion),
       activeVersionViewText: versionView(predecessorVersion, productionCandidateD1Id),
+      wranglerConfigText: config,
+      d1InventoryText: productionInventory,
     })).toThrow('production deployment changed during preview release');
     expect(() => verifyProductionControlUnchanged({
       controlText: JSON.stringify(productionControl),
       deploymentsText: deployments(predecessorDeployment, candidateVersion),
       activeVersionViewText: versionView(candidateVersion, productionCandidateD1Id),
+      wranglerConfigText: config,
+      d1InventoryText: productionInventory,
     })).toThrow('production Worker version changed during preview release');
     expect(() => verifyProductionControlUnchanged({
       controlText: JSON.stringify(productionControl),
       deploymentsText: deployments(predecessorDeployment, predecessorVersion),
       activeVersionViewText: versionView(predecessorVersion, predecessorD1Id),
+      wranglerConfigText: config,
+      d1InventoryText: productionInventory,
     })).toThrow('production D1 binding changed during preview release');
   });
 
@@ -265,12 +292,18 @@ describe('preview release reconciliation evidence', () => {
     const candidateCutover = workflow.indexOf('Require deployed candidate preview D1 binding (read-only)');
     const originalLanguageAudit = workflow.indexOf('Audit original-language v2 contract on preview');
     const historicalAudit = workflow.indexOf('Audit Transform-9 historical core contract on preview');
+    const previewAuditIdentity = workflow.indexOf('Verify preview Worker remained active through audit (read-only)');
+    const postAuditProductionControl = workflow.indexOf('Verify production control remained unchanged after preview audits (read-only)');
+    const evidenceHash = workflow.indexOf('Hash sanitized preview audit evidence');
     expect(mapping).toBeGreaterThan(-1);
     expect(readiness).toBeGreaterThan(mapping);
     expect(predecessor).toBeGreaterThan(readiness);
     expect(candidateCutover).toBeGreaterThan(predecessor);
     expect(originalLanguageAudit).toBeGreaterThan(candidateCutover);
     expect(historicalAudit).toBeGreaterThan(candidateCutover);
+    expect(previewAuditIdentity).toBeGreaterThan(historicalAudit);
+    expect(postAuditProductionControl).toBeGreaterThan(previewAuditIdentity);
+    expect(evidenceHash).toBeGreaterThan(postAuditProductionControl);
     expect(workflow).toContain('npx --no-install wrangler d1 list --json > "$RUNNER_TEMP/preview-d1-inventory.json"');
     expect(workflow).toContain('--database "$candidate_d1_name" --env preview');
     expect(workflow).toContain('observe-post-mutation');
@@ -278,5 +311,11 @@ describe('preview release reconciliation evidence', () => {
     expect(workflow).toContain('Hash sanitized preview reconciliation evidence');
     expect(workflow).toContain('candidate_cutover_observation_sha256');
     expect(workflow).toContain('post_mutation_reconciliation_sha256');
+    expect(workflow).toContain('production-control-d1-inventory-before.json');
+    expect(workflow).toContain('production-control-d1-inventory-after-deploy.json');
+    expect(workflow).toContain('production-control-d1-inventory-post-audit.json');
+    expect(workflow).toContain('--wrangler-config wrangler.toml');
+    expect(workflow).toContain('production_control_post_audit_sha256');
+    expect(workflow).toContain('production-control-post-audit.json');
   });
 });

@@ -14,8 +14,12 @@ The schema-`0009` preview release pre-state targets
 (`74f456e2-6951-4003-bb6f-91951342bf8f`) in checked-in configuration only.
 It has no live binding or deployment claim until this protected workflow passes.
 Before the preview deployment, the workflow captures a fixed read-only
-production control snapshot; after the deployment it must prove the same
-production deployment UUID, Worker UUID, and D1 UUID before any preview audit.
+production control snapshot, proving its observed D1 UUID against the exact
+checked-in production name/UUID and a fresh read-only D1 inventory. It proves
+the same production deployment UUID, Worker UUID, and D1 UUID immediately
+after deployment before any preview audit, then again after every fixed preview
+audit and the final preview Worker identity check. The hash-only final control
+record is retained with the preview audit evidence.
 The separately prepared production candidate
 `9bc79346-338b-439e-a2a5-424f4418eb21` remains unbound, while production stays
 on `theologai-production-20260729-transform11-a`

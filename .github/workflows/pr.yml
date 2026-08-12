@@ -352,6 +352,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
         run: |
+          npx --no-install wrangler d1 list --json > "$RUNNER_TEMP/production-control-d1-inventory-before.json"
           npx --no-install wrangler deployments list --json > "$RUNNER_TEMP/production-control-deployments-before.json"
           production_control_version="$(npx --no-install tsx scripts/production-release-reconciliation.ts active-version-id \
             --deployments "$RUNNER_TEMP/production-control-deployments-before.json")"
@@ -360,6 +361,8 @@ jobs:
           npx --no-install tsx scripts/production-release-reconciliation.ts capture-control \
             --deployments "$RUNNER_TEMP/production-control-deployments-before.json" \
             --active-version-view "$RUNNER_TEMP/production-control-version-before.json" \
+            --wrangler-config wrangler.toml \
+            --d1-inventory "$RUNNER_TEMP/production-control-d1-inventory-before.json" \
             --output "$RUNNER_TEMP/production-control-before.json"
 
       - name: Upload production control before preview deployment
@@ -445,6 +448,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
         run: |
+          npx --no-install wrangler d1 list --json > "$RUNNER_TEMP/production-control-d1-inventory-after-deploy.json"
           npx --no-install wrangler deployments list --json > "$RUNNER_TEMP/production-control-deployments-after.json"
           production_control_version="$(npx --no-install tsx scripts/production-release-reconciliation.ts active-version-id \
             --deployments "$RUNNER_TEMP/production-control-deployments-after.json")"
@@ -454,6 +458,8 @@ jobs:
             --control "$RUNNER_TEMP/production-control-before.json" \
             --deployments "$RUNNER_TEMP/production-control-deployments-after.json" \
             --active-version-view "$RUNNER_TEMP/production-control-version-after.json" \
+            --wrangler-config wrangler.toml \
+            --d1-inventory "$RUNNER_TEMP/production-control-d1-inventory-after-deploy.json" \
             --output "$RUNNER_TEMP/production-control-after.json"
 
       # Do this before either fixed black-box audit: a deployed Worker must be
@@ -595,20 +601,47 @@ jobs:
             --output "$RUNNER_TEMP/preview-worker-deployment-identity.json" \
             --github-output "$GITHUB_OUTPUT"
 
+      # Re-prove the fixed production control after all preview probes and the
+      # final preview Worker identity check. This remains read-only and catches
+      # a production change that happened during the black-box audit window.
+      - name: Verify production control remained unchanged after preview audits (read-only)
+        id: production-control-post-audit
+        if: ${{ steps.preview-primary-source-edge-stabilization-gate.outcome == 'success' && steps.preview-original-language-v2-audit.outcome == 'success' && steps.preview-historical-core-audit.outcome == 'success' && steps.preview-historical-spine-audit.outcome == 'success' && steps.preview-worker-audit-identity.outcome == 'success' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
+        run: |
+          npx --no-install wrangler d1 list --json > "$RUNNER_TEMP/production-control-d1-inventory-post-audit.json"
+          npx --no-install wrangler deployments list --json > "$RUNNER_TEMP/production-control-deployments-post-audit.json"
+          production_control_version="$(npx --no-install tsx scripts/production-release-reconciliation.ts active-version-id \
+            --deployments "$RUNNER_TEMP/production-control-deployments-post-audit.json")"
+          npx --no-install wrangler versions view "$production_control_version" --json \
+            > "$RUNNER_TEMP/production-control-version-post-audit.json"
+          npx --no-install tsx scripts/production-release-reconciliation.ts verify-control \
+            --control "$RUNNER_TEMP/production-control-before.json" \
+            --deployments "$RUNNER_TEMP/production-control-deployments-post-audit.json" \
+            --active-version-view "$RUNNER_TEMP/production-control-version-post-audit.json" \
+            --wrangler-config wrangler.toml \
+            --d1-inventory "$RUNNER_TEMP/production-control-d1-inventory-post-audit.json" \
+            --output "$RUNNER_TEMP/production-control-post-audit.json"
+
       - name: Hash sanitized preview audit evidence
         id: preview-audit-evidence
-        if: ${{ steps.preview-primary-source-edge-stabilization-gate.outcome == 'success' && steps.preview-original-language-v2-audit.outcome == 'success' && steps.preview-historical-core-audit.outcome == 'success' && steps.preview-historical-spine-audit.outcome == 'success' && steps.preview-worker-audit-identity.outcome == 'success' }}
+        if: ${{ steps.production-control-post-audit.outcome == 'success' }}
         run: |
           edge_stabilization_sha256="$(sha256sum "$RUNNER_TEMP/preview-primary-source-edge-stabilization.json" | awk '{print $1}')"
           original_language_audit_sha256="$(sha256sum "$RUNNER_TEMP/original-language-v2-preview-audit.json" | awk '{print $1}')"
           historical_audit_sha256="$(sha256sum "$RUNNER_TEMP/historical-core-preview-audit.json" | awk '{print $1}')"
           historical_spine_audit_sha256="$(sha256sum "$RUNNER_TEMP/historical-spine-preview-audit.json" | awk '{print $1}')"
           identity_sha256="$(sha256sum "$RUNNER_TEMP/preview-worker-deployment-identity.json" | awk '{print $1}')"
+          production_control_post_audit_sha256="$(sha256sum "$RUNNER_TEMP/production-control-post-audit.json" | awk '{print $1}')"
           printf 'edge_stabilization_sha256=%s\n' "$edge_stabilization_sha256" >> "$GITHUB_OUTPUT"
           printf 'original_language_audit_sha256=%s\n' "$original_language_audit_sha256" >> "$GITHUB_OUTPUT"
           printf 'historical_audit_sha256=%s\n' "$historical_audit_sha256" >> "$GITHUB_OUTPUT"
           printf 'historical_spine_audit_sha256=%s\n' "$historical_spine_audit_sha256" >> "$GITHUB_OUTPUT"
           printf 'identity_record_sha256=%s\n' "$identity_sha256" >> "$GITHUB_OUTPUT"
+          printf 'production_control_post_audit_sha256=%s\n' "$production_control_post_audit_sha256" >> "$GITHUB_OUTPUT"
 
       - name: Upload protected preview audit evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -625,6 +658,7 @@ jobs:
             ${{ runner.temp }}/preview-d1-readiness-receipt.json
             ${{ runner.temp }}/production-control-before.json
             ${{ runner.temp }}/production-control-after.json
+            ${{ runner.temp }}/production-control-post-audit.json
           retention-days: 7
           if-no-files-found: error
 
@@ -652,6 +686,7 @@ jobs:
           ORIGINAL_LANGUAGE_AUDIT_SHA256: ${{ steps.preview-audit-evidence.outputs.original_language_audit_sha256 }}
           HISTORICAL_AUDIT_SHA256: ${{ steps.preview-audit-evidence.outputs.historical_audit_sha256 }}
           HISTORICAL_SPINE_AUDIT_SHA256: ${{ steps.preview-audit-evidence.outputs.historical_spine_audit_sha256 }}
+          PRODUCTION_CONTROL_POST_AUDIT_SHA256: ${{ steps.preview-audit-evidence.outputs.production_control_post_audit_sha256 }}
           CANDIDATE_CUTOVER_OBSERVATION_SHA256: ${{ steps.preview-reconciliation-evidence.outputs.candidate_cutover_observation_sha256 }}
           POST_MUTATION_RECONCILIATION_SHA256: ${{ steps.preview-reconciliation-evidence.outputs.post_mutation_reconciliation_sha256 }}
           AUDIT_ARTIFACT: preview-release-audit-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
@@ -666,6 +701,7 @@ jobs:
             const originalLanguageAudit = process.env.ORIGINAL_LANGUAGE_AUDIT_SHA256;
             const historicalAudit = process.env.HISTORICAL_AUDIT_SHA256;
             const historicalSpineAudit = process.env.HISTORICAL_SPINE_AUDIT_SHA256;
+            const productionControlPostAudit = process.env.PRODUCTION_CONTROL_POST_AUDIT_SHA256;
             const candidateCutoverObservation = process.env.CANDIDATE_CUTOVER_OBSERVATION_SHA256;
             const postMutationReconciliation = process.env.POST_MUTATION_RECONCILIATION_SHA256;
             const artifact = process.env.AUDIT_ARTIFACT;
@@ -674,7 +710,8 @@ jobs:
               || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(deployment)
               || !/^[0-9a-f]{64}$/i.test(workerIdentity) || !/^[0-9a-f]{64}$/i.test(edgeStabilization)
               || !/^[0-9a-f]{64}$/i.test(originalLanguageAudit)
-              || !/^[0-9a-f]{64}$/i.test(historicalAudit) || !/^[0-9a-f]{64}$/i.test(historicalSpineAudit) || !/^[0-9a-f]{64}$/i.test(candidateCutoverObservation)
+              || !/^[0-9a-f]{64}$/i.test(historicalAudit) || !/^[0-9a-f]{64}$/i.test(historicalSpineAudit)
+              || !/^[0-9a-f]{64}$/i.test(productionControlPostAudit) || !/^[0-9a-f]{64}$/i.test(candidateCutoverObservation)
               || !/^[0-9a-f]{64}$/i.test(postMutationReconciliation)
               || !/^preview-release-audit-\d+-[0-9a-f]{40}$/i.test(artifact)) {
               core.setFailed('Preview release evidence is missing or malformed.');
@@ -690,7 +727,7 @@ jobs:
               '',
               `Deployed from checked-out commit \`${commit}\` (tree \`${tree}\`).`,
               `Cloudflare confirms Worker version \`${workerVersion}\` at 100% in deployment \`${deployment}\`.`,
-              `Edge-stabilization SHA-256: \`${edgeStabilization}\`; original-language audit SHA-256: \`${originalLanguageAudit}\`; historical-core audit SHA-256: \`${historicalAudit}\`; Transform-11 historical-spine audit SHA-256: \`${historicalSpineAudit}\`; identity record SHA-256: \`${workerIdentity}\`; candidate-cutover observation SHA-256: \`${candidateCutoverObservation}\`; post-mutation reconciliation SHA-256: \`${postMutationReconciliation}\`; retained artifact: \`${artifact}\` (7 days).`,
+              `Edge-stabilization SHA-256: \`${edgeStabilization}\`; original-language audit SHA-256: \`${originalLanguageAudit}\`; historical-core audit SHA-256: \`${historicalAudit}\`; Transform-11 historical-spine audit SHA-256: \`${historicalSpineAudit}\`; identity record SHA-256: \`${workerIdentity}\`; post-audit production-control SHA-256: \`${productionControlPostAudit}\`; candidate-cutover observation SHA-256: \`${candidateCutoverObservation}\`; post-mutation reconciliation SHA-256: \`${postMutationReconciliation}\`; retained artifact: \`${artifact}\` (7 days).`,
             ].join('\n');
 
             const { data: comments } = await github.rest.issues.listComments({

@@ -23,8 +23,9 @@ unbound schema-`0009` D1 `theologai-preview-20260811-schema0009-a`
 (`74f456e2-6951-4003-bb6f-91951342bf8f`). This is a release candidate, not a
 claim that preview traffic has changed: the protected preview workflow must
 prove the candidate binding and complete its audit. It also captures production
-before and after the preview mutation and fails if its deployment, Worker, or
-D1 UUID changes. Production remains configured and live on
+against its checked-in D1 name/UUID and fresh inventory before preview mutation,
+immediately after deployment, and again after final preview audit; it fails if
+its deployment, Worker, or D1 UUID changes. Production remains configured and live on
 `theologai-production-20260729-transform11-a`
 (`53211f50-a893-4b4c-be1e-bc625a595dc7`); prepared candidate
 `9bc79346-338b-439e-a2a5-424f4418eb21` is unbound and is not configured here.

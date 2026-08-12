@@ -213,6 +213,9 @@ This checked-out release commit targets only the prepared preview D1
 (`74f456e2-6951-4003-bb6f-91951342bf8f`). It is not itself a Cloudflare
 binding or deployment claim: the protected preview workflow must re-check the
 candidate, deploy it, prove the active preview binding, and complete its audit.
+It validates the fixed production control against the checked-in production D1
+name/UUID and fresh inventory before deployment, immediately afterward, and
+again after the final preview audit.
 Production remains configured and live on schema-`0008`
 `theologai-production-20260729-transform11-a`
 (`53211f50-a893-4b4c-be1e-bc625a595dc7`); its separately prepared schema-`0009`

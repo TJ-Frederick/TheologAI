@@ -97,11 +97,15 @@ export type ProductionPostMutationReconciliation = ProductionPostMutationObserva
  * release did not alter production. It has no caller-selected Worker target.
  */
 export interface ProductionControlIdentity {
-  schemaVersion: 1;
+  schemaVersion: 2;
   worker: 'theologai';
   deploymentId: string;
   workerVersionId: string;
   d1: ObservedD1Binding;
+  /** Exact checked-in production binding proved against a fresh D1 inventory. */
+  configuredD1: CandidateD1Binding;
+  wranglerConfigSha256: string;
+  d1InventorySha256: string;
 }
 
 function fail(message: string): never { throw new Error(`Worker release reconciliation refused: ${message}.`); }
@@ -259,31 +263,52 @@ export function activeProductionVersionId(deploymentsText: string): string {
 export function captureProductionControlIdentity(input: {
   deploymentsText: string;
   activeVersionViewText: string;
+  wranglerConfigText: string;
+  d1InventoryText: string;
 }): ProductionControlIdentity {
+  const configuredD1 = checkedOutProductionCandidateD1(input.wranglerConfigText);
+  assertCandidateD1Inventory(configuredD1, input.d1InventoryText, 'production');
   const active = currentSoleDeployment(input.deploymentsText, 'production control deployments');
   const d1 = observedD1FromAuthoritativeVersionView(input.activeVersionViewText, active.versionId, 'production control');
+  assertObservedD1MatchesCandidate(d1, configuredD1, 'production control');
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     worker: 'theologai',
     deploymentId: active.id,
     workerVersionId: active.versionId,
     d1,
+    configuredD1,
+    wranglerConfigSha256: sha256(input.wranglerConfigText),
+    d1InventorySha256: sha256(input.d1InventoryText),
   };
 }
 
 function parseProductionControlIdentity(value: unknown): ProductionControlIdentity {
   const control = object(value, 'production control identity');
-  exactKeys(control, ['schemaVersion', 'worker', 'deploymentId', 'workerVersionId', 'd1'], 'production control identity');
+  exactKeys(control, ['schemaVersion', 'worker', 'deploymentId', 'workerVersionId', 'd1', 'configuredD1', 'wranglerConfigSha256', 'd1InventorySha256'], 'production control identity');
   const d1 = object(control.d1, 'production control D1');
+  const configuredD1 = object(control.configuredD1, 'production control configured D1');
   exactKeys(d1, ['binding', 'databaseId'], 'production control D1');
-  assert(control.schemaVersion === 1 && control.worker === 'theologai'
+  exactKeys(configuredD1, ['binding', 'databaseName', 'databaseId'], 'production control configured D1');
+  assert(control.schemaVersion === 2 && control.worker === 'theologai'
     && isUuid(control.deploymentId) && isUuid(control.workerVersionId)
     && d1.binding === 'THEOLOGAI_DB' && isUuid(d1.databaseId),
   'production control identity is not canonical');
+  assert(configuredD1.binding === 'THEOLOGAI_DB' && typeof configuredD1.databaseName === 'string'
+    && configuredD1.databaseName.length > 0 && isUuid(configuredD1.databaseId)
+    && d1.databaseId.toLowerCase() === configuredD1.databaseId.toLowerCase()
+    && isSha256(control.wranglerConfigSha256) && isSha256(control.d1InventorySha256),
+  'production control configured D1 proof is not canonical');
   return {
-    schemaVersion: 1, worker: 'theologai', deploymentId: control.deploymentId.toLowerCase(),
+    schemaVersion: 2, worker: 'theologai', deploymentId: control.deploymentId.toLowerCase(),
     workerVersionId: control.workerVersionId.toLowerCase(),
     d1: { binding: 'THEOLOGAI_DB', databaseId: d1.databaseId.toLowerCase() },
+    configuredD1: {
+      binding: 'THEOLOGAI_DB', databaseName: configuredD1.databaseName,
+      databaseId: configuredD1.databaseId.toLowerCase(),
+    },
+    wranglerConfigSha256: control.wranglerConfigSha256.toLowerCase(),
+    d1InventorySha256: control.d1InventorySha256.toLowerCase(),
   };
 }
 
@@ -292,15 +317,26 @@ export function verifyProductionControlUnchanged(input: {
   controlText: string;
   deploymentsText: string;
   activeVersionViewText: string;
+  wranglerConfigText: string;
+  d1InventoryText: string;
 }): ProductionControlIdentity {
   const control = parseProductionControlIdentity(parseJson(input.controlText, 'production control identity'));
+  const active = currentSoleDeployment(input.deploymentsText, 'production control deployments');
+  const observedD1 = observedD1FromAuthoritativeVersionView(input.activeVersionViewText, active.versionId, 'production control');
+  assert(active.id === control.deploymentId, 'production deployment changed during preview release');
+  assert(active.versionId === control.workerVersionId, 'production Worker version changed during preview release');
+  assert(observedD1.databaseId === control.d1.databaseId, 'production D1 binding changed during preview release');
   const observed = captureProductionControlIdentity({
-    deploymentsText: input.deploymentsText,
-    activeVersionViewText: input.activeVersionViewText,
+    deploymentsText: input.deploymentsText, activeVersionViewText: input.activeVersionViewText,
+    wranglerConfigText: input.wranglerConfigText, d1InventoryText: input.d1InventoryText,
   });
   assert(observed.deploymentId === control.deploymentId, 'production deployment changed during preview release');
   assert(observed.workerVersionId === control.workerVersionId, 'production Worker version changed during preview release');
   assert(observed.d1.databaseId === control.d1.databaseId, 'production D1 binding changed during preview release');
+  assert(observed.configuredD1.databaseName === control.configuredD1.databaseName
+    && observed.configuredD1.databaseId === control.configuredD1.databaseId
+    && observed.wranglerConfigSha256 === control.wranglerConfigSha256,
+  'checked-out production D1 configuration changed during preview release');
   return observed;
 }
 
@@ -550,19 +586,21 @@ export async function runProductionCli(argv: string[]): Promise<void> {
     process.stdout.write(`${activeProductionVersionId(await readFile(values.get('--deployments')!, 'utf8'))}\n`); return;
   }
   if (command === 'capture-control') {
-    const values = exactArgs(argv.slice(1), command, ['--deployments', '--active-version-view', '--output']);
-    const [deploymentsText, activeVersionViewText] = await Promise.all([
+    const values = exactArgs(argv.slice(1), command, ['--deployments', '--active-version-view', '--wrangler-config', '--d1-inventory', '--output']);
+    const [deploymentsText, activeVersionViewText, wranglerConfigText, d1InventoryText] = await Promise.all([
       readFile(values.get('--deployments')!, 'utf8'), readFile(values.get('--active-version-view')!, 'utf8'),
+      readFile(values.get('--wrangler-config')!, 'utf8'), readFile(values.get('--d1-inventory')!, 'utf8'),
     ]);
-    await writeRecord(captureProductionControlIdentity({ deploymentsText, activeVersionViewText }), values.get('--output')!); return;
+    await writeRecord(captureProductionControlIdentity({ deploymentsText, activeVersionViewText, wranglerConfigText, d1InventoryText }), values.get('--output')!); return;
   }
   if (command === 'verify-control') {
-    const values = exactArgs(argv.slice(1), command, ['--control', '--deployments', '--active-version-view', '--output']);
-    const [controlText, deploymentsText, activeVersionViewText] = await Promise.all([
+    const values = exactArgs(argv.slice(1), command, ['--control', '--deployments', '--active-version-view', '--wrangler-config', '--d1-inventory', '--output']);
+    const [controlText, deploymentsText, activeVersionViewText, wranglerConfigText, d1InventoryText] = await Promise.all([
       readFile(values.get('--control')!, 'utf8'), readFile(values.get('--deployments')!, 'utf8'),
       readFile(values.get('--active-version-view')!, 'utf8'),
+      readFile(values.get('--wrangler-config')!, 'utf8'), readFile(values.get('--d1-inventory')!, 'utf8'),
     ]);
-    await writeRecord(verifyProductionControlUnchanged({ controlText, deploymentsText, activeVersionViewText }), values.get('--output')!); return;
+    await writeRecord(verifyProductionControlUnchanged({ controlText, deploymentsText, activeVersionViewText, wranglerConfigText, d1InventoryText }), values.get('--output')!); return;
   }
   if (command === 'capture-predecessor') {
     const values = exactArgs(argv.slice(1), command, ['--deployments', '--predecessor-version-view', '--wrangler-config', '--d1-inventory', '--output']);

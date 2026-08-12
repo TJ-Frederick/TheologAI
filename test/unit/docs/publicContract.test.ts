@@ -564,8 +564,14 @@ describe('published project contract', () => {
     expect(workflow).toContain('preview-d1-readiness-receipt.json');
     expect(workflow).toContain('Capture production control before preview deployment (read-only)');
     expect(workflow).toContain('Verify production control remained unchanged (read-only)');
+    expect(workflow).toContain('Verify production control remained unchanged after preview audits (read-only)');
     expect(workflow).toContain('production-control-after.outcome == \'success\'');
+    expect(workflow).toContain('production-control-d1-inventory-before.json');
+    expect(workflow).toContain('production-control-d1-inventory-post-audit.json');
+    expect(workflow).toContain('production_control_post_audit_sha256');
     expect(workflow).toContain('scripts/production-release-reconciliation.ts capture-control');
     expect(workflow).toContain('scripts/production-release-reconciliation.ts verify-control');
+    expect(reconciliation).toContain('checked-in production name/UUID and a fresh read-only D1 inventory');
+    expect(reconciliation).toContain('again after every fixed preview\naudit and the final preview Worker identity check');
   });
 });

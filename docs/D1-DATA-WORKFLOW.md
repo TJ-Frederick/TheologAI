@@ -179,8 +179,9 @@ deploy either Worker, change the root production binding, or activate the
 production candidate. Its protected preview workflow writes a minimal
 sanitized readiness receipt with independently hashable readiness and authority
 outcomes, then captures and compares production deployment, Worker, and D1
-identities around the preview mutation. Any production identity drift fails the
-preview release before black-box audits.
+identities against the checked-in production D1 name/UUID and fresh inventory.
+It re-proves that control immediately after deployment and after the final
+preview audit; any drift blocks release evidence.
 
 ## Optional local D1 rehearsal
 
