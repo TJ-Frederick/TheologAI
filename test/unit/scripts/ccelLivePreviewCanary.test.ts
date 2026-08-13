@@ -274,11 +274,11 @@ describe('CCEL live preview canary transaction', () => {
     expect(workflow.indexOf('validate-dispatch')).toBeLessThan(workflow.indexOf('npx wrangler'));
   });
 
-  it('documents the single preview-release sequence before production, isolation, credentials, and canary', () => {
+  it('documents the completed preview-production sequence before gated credentials and canary', () => {
     const unbound = 'while both candidates remain unbound';
-    const preview = 'preview candidate with current-`main` `100` flags';
-    const production = 'Only after the preview audit passes';
-    const isolation = 'Then perform a read-only environment-isolation';
+    const preview = 'prepared preview candidate with current-`main` `100` flags';
+    const production = 'through the separately approved production release';
+    const isolation = 'prove distinct preview and production D1';
     const credentials = 'Stage the operator credential';
     const canary = 'Run this temporary `111` two-request preview canary';
     const ordered = [unbound, preview, production, isolation, credentials, canary]

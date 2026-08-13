@@ -9,13 +9,51 @@ The record intentionally distinguishes two D1 identities:
 
 The generic release workflow permits both code-only releases (`d1Changed: false`) and data cutovers (`d1Changed: true`); it never infers freshness from a different ID alone. Wrangler 4.107.0’s D1 binding response is accepted only when the sole `THEOLOGAI_DB` binding has canonical UUID `id` and `database_id` fields that agree exactly. After deployment, the sole active Worker version must bind the candidate ID before either fixed audit begins; a retained-old-D1 deployment is refused even if its Worker version otherwise looks new.
 
-## PR #122 schema-0009 preview release — passed
+## PR #123 current schema-0009 preview release — passed
+
+The protected preview workflow deployed exact source
+`7fb3ec5113a16ed86bfc4a403a3ec3678d4d4dd0` (tree
+`28e555808ad3840d145a7ddd7e57934dc30e45c2`) through Actions run
+`31644218683` and GitHub deployment `5878053561`. Cloudflare deployment
+`4108d59a-4092-4389-824c-fa3820ab66f6` serves Worker
+`70bbbecf-3fe6-4a04-8c34-babc3df09ad0` (#144) as the sole 100% preview
+assignment, bound to `theologai-preview-20260811-schema0009-a`
+(`74f456e2-6951-4003-bb6f-91951342bf8f`). Its immediate retained predecessor
+is the same-D1 PR #122 deployment `13393917-fa91-4afc-aeaf-2809db6701a2`,
+Worker `b2c62527-5759-4c1d-a9a3-8c1d43dddabe` (#142).
+
+Edge stabilization passed on attempt 2; original-language v2 passed 11/11,
+historical core passed 8/8, and the Transform-11 spine passed 10/10. Sanitized
+evidence SHA-256 values are respectively
+`fcdb34bd0327969faa3d6d15d315aa9e69c3800b9dd4821205bed617742301d2`,
+`c1652a64075e4087ac2c1a02e6ccd177ca8a6ad48749d5e5407dd03acd3842b9`,
+`5a79ecd9baed504209d79c4bddc067d31f5d8b1f0c9611792dbadebe134dbe52`, and
+`f02d387b60b898793c1868f4d4716863af75c7e9130c8f3603c1a9f4c9f12e58`.
+The readiness receipt hash is
+`24e6cf53ac8de7d2e17903faf56a145d8dd7ef7c49b27e628878353484cfaee2`;
+the final Worker identity hash is
+`514dfbb6f0a15aa30560990c2d4f7850424c17d40c3afa951848cb04679e906e`;
+and candidate reconciliation is
+`4bf0d0f463738f61a27f6b0fcf72c357a53ee148e261a17a8daa448e1f6f456c`.
+
+Production remained deployment `e62698f3-f6b0-4145-97bf-28abdeae0e3a`,
+Worker `02174f95-abe2-480b-84bf-3e8c1a3a0320`, and D1
+`theologai-production-20260811-schema0009-a`
+(`9bc79346-338b-439e-a2a5-424f4418eb21`) before deployment, immediately after
+deployment, and after all preview audits. The final production-control hash is
+`584652da1316af9862e381e8bef2cc2944c6c2dc66559d28dd299e01c35a8aff`.
+The `deploy-preview` label was removed and Preview Revocation run `31645546905`
+passed. No production mutation, CCEL request, credential staging, canary, D1
+write, or deletion occurred. This post-release documentation update is not
+itself deployed and makes no later runtime claim.
+
+## Historical PR #122 schema-0009 preview release — passed
 
 The protected preview release deployed source
 `a0f13b5bdbf3ca071dbb7524dea9c6ce80770404` (tree
 `660c06ff31e7d0e2ccbc6fe12204e66c4e793233`) through Actions run
 `31568581322` and GitHub deployment `5864161923`. Cloudflare deployment
-`13393917-fa91-4afc-aeaf-2809db6701a2` now serves Worker
+`13393917-fa91-4afc-aeaf-2809db6701a2` historically served Worker
 `b2c62527-5759-4c1d-a9a3-8c1d43dddabe` (#142) as the sole 100% preview
 assignment, bound to `theologai-preview-20260811-schema0009-a`
 (`74f456e2-6951-4003-bb6f-91951342bf8f`). Its retained predecessor is
@@ -44,12 +82,11 @@ unchanged at deployment `3d7489d9-7b48-4ad0-bdc6-95ffbda53bd8`, Worker
 (`53211f50-a893-4b4c-be1e-bc625a595dc7`). The final production-control hash is
 `481900a3eec516fe06d3252175b63e318783c7230f70311235e4a1dd73198889`.
 The `deploy-preview` label was removed immediately afterward; Preview Revocation
-run `31572924302` passed and the PR remains open and unmerged. The separately
-prepared production candidate `9bc79346-338b-439e-a2a5-424f4418eb21` remains
-unbound. The schema-0009 canary gate remains `unrecorded` and inert; no CCEL
-request, credential staging, canary, or production mutation was authorized.
-This evidence-only documentation commit postdates the deployed head. It does
-not claim that a later documentation commit was deployed.
+run `31572924302` passed. PR #122 later merged and completed its separately
+protected production release. The schema-0009 canary gate remained `unrecorded`
+and inert; no CCEL request, credential staging, or canary was authorized by the
+preview release. This section is historical evidence superseded for current
+preview identity by the PR #123 record above.
 
 ### Pre-release record
 

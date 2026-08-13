@@ -1,7 +1,55 @@
 # Production Release Reconciliation
 
-This document records the completed PR #108 protected production cutover, its
-PR #101 rollback pair, and the safeguards required for later releases.
+This document records the completed PR #122 schema-`0009` production cutover,
+its immediate PR #108 rollback pair, older PR #101 history, and the safeguards
+required for later releases.
+
+## Current PR #122 production release
+
+PR #122 merged as `86475ecf8288cb0ebcb6467c77c0fd0998a8f1c2` with exact tree
+`8150aa29e7e4a22141edbfc9ab568df933f9c9b3`. Protected production workflow
+`31631924636` deployed `e62698f3-f6b0-4145-97bf-28abdeae0e3a`, Worker
+`02174f95-abe2-480b-84bf-3e8c1a3a0320` (#100), as the sole active production
+assignment bound to schema-`0009` D1
+`theologai-production-20260811-schema0009-a`
+(`9bc79346-338b-439e-a2a5-424f4418eb21`).
+
+Remote readiness and Transform authority passed. Edge stabilization matched
+twice, original-language v2 passed all 13 logical operations, historical core
+passed all 54 logical operations across eight works, and Transform-11
+historical spine passed all 82 logical operations across ten works, with zero
+audit retries. Final production identity remained the exact audited deployment
+and Worker. Preview remained deployment
+`13393917-fa91-4afc-aeaf-2809db6701a2`, Worker
+`b2c62527-5759-4c1d-a9a3-8c1d43dddabe`, and D1
+`theologai-preview-20260811-schema0009-a`
+(`74f456e2-6951-4003-bb6f-91951342bf8f`) before deployment, after deployment,
+and after the audits. The final environment-isolation receipt proved the two
+exact distinct Worker/D1 pairs.
+
+Sanitized authoritative workflow evidence includes these SHA-256 identities:
+
+- production D1 readiness receipt:
+  `f112b33785a6c1953625c395954bd952db6f0224ad389c52996881b76973d112`;
+- edge stabilization:
+  `552f455683eb67ef1cd20a4355c338e448f6a6df3f2eff972987fc6f26b07b82`;
+- original-language v2 audit:
+  `30781505a0b1e26417e7d018fdea1060e490a53aab71ad295886c3291333bcc9`;
+- historical-core audit:
+  `7c397cd7ce73f11a151aff25fba3026764fc4981f51dd4d19fd40a3d2a38106c`;
+- Transform-11 historical-spine audit:
+  `a25a01b87e65ce3f391e4a131edc277411ba52a59a366313c622628351fd74a4`;
+- final environment-isolation receipt:
+  `a2daa145b6e4cbf6545fdcacb38f7e9939ba9c7b33db2141c86e7a8a54b834a5`.
+
+The immediate rollback unit is PR #108 deployment
+`3d7489d9-7b48-4ad0-bdc6-95ffbda53bd8`, Worker
+`291f3292-3fa9-44fc-bf6f-b68fd2f4cef6`, and D1
+`theologai-production-20260729-transform11-a`
+(`53211f50-a893-4b4c-be1e-bc625a595dc7`). No rollback, database cleanup,
+credential operation, or CCEL request was part of PR #122.
+
+## Historical PR #108 and PR #101 records
 At the reconciliation cutoff immediately after PR #113, `main` was
 `2f12262c9a37d3588bee9b5071954823c15cbd12` (tree
 `9922aedb74c690e7a3fcb926b3d621f28fa44535`), and that revision was not
@@ -42,12 +90,14 @@ audit all passed. The retained PR #101 preview predecessor was
 deployment `070b292b-0bae-400a-b983-3d72157b5a96`, Worker
 `bd722b69-2e2c-4d8d-b42b-617e8caba13d` (#130), and D1
 `theologai-preview-20260728-hierarchy-a`
-(`51890e12-1c3f-421f-b661-9a5ea9637e43`). The PR #107 preview assignment is
-the immediate retained predecessor. The current preview baseline is PR #122
-deployment `13393917-fa91-4afc-aeaf-2809db6701a2`, Worker
-`b2c62527-5759-4c1d-a9a3-8c1d43dddabe` (#142), and schema-`0009` D1
+(`51890e12-1c3f-421f-b661-9a5ea9637e43`). The current preview baseline is PR #123
+deployment `4108d59a-4092-4389-824c-fa3820ab66f6`, Worker
+`70bbbecf-3fe6-4a04-8c34-babc3df09ad0` (#144), and schema-`0009` D1
 `theologai-preview-20260811-schema0009-a`
-(`74f456e2-6951-4003-bb6f-91951342bf8f`).
+(`74f456e2-6951-4003-bb6f-91951342bf8f`). Its immediate retained predecessor
+is the same-D1 PR #122 deployment `13393917-fa91-4afc-aeaf-2809db6701a2`,
+Worker `b2c62527-5759-4c1d-a9a3-8c1d43dddabe` (#142); PR #107 is the earlier
+schema-`0008` predecessor.
 
 The checked-in root production target was separately prepared unbound as
 Transform-11 candidate `theologai-production-20260729-transform11-a`

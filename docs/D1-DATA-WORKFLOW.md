@@ -359,11 +359,13 @@ predecessor was deployment `070b292b-0bae-400a-b983-3d72157b5a96`, Worker
 `bd722b69-2e2c-4d8d-b42b-617e8caba13d` (#130), and D1
 `theologai-preview-20260728-hierarchy-a`
 (`51890e12-1c3f-421f-b661-9a5ea9637e43`). That former Transform-11 preview
-binding is historical. The current preview baseline is PR #122 deployment
-`13393917-fa91-4afc-aeaf-2809db6701a2`, Worker
-`b2c62527-5759-4c1d-a9a3-8c1d43dddabe`, and schema-`0009` D1
+binding is historical. The current preview baseline is PR #123 deployment
+`4108d59a-4092-4389-824c-fa3820ab66f6`, Worker
+`70bbbecf-3fe6-4a04-8c34-babc3df09ad0` (#144), and schema-`0009` D1
 `theologai-preview-20260811-schema0009-a`
-(`74f456e2-6951-4003-bb6f-91951342bf8f`). The checked-out Transform-10 Aquinas
+(`74f456e2-6951-4003-bb6f-91951342bf8f`). Its same-D1 PR #122 predecessor was
+deployment `13393917-fa91-4afc-aeaf-2809db6701a2`, Worker
+`b2c62527-5759-4c1d-a9a3-8c1d43dddabe` (#142). The checked-out Transform-10 Aquinas
 hierarchy remains local-only and unpublished, with no catalog, runtime, or MCP
 projection. Future production workflows retain the same reconciliation
 contract: re-resolve the checked-in candidate name/UUID, rerun readiness by
@@ -411,14 +413,16 @@ immediately preceding primary rollback unit: deployment
 (`53211f50-a893-4b4c-be1e-bc625a595dc7`). PR #101 remains older rollback
 history only and is not the immediate cutover rollback claim.
 
-The next checked-in production target is the separately prepared schema-`0009`
-candidate `theologai-production-20260811-schema0009-a`
-(`9bc79346-338b-439e-a2a5-424f4418eb21`). This local configuration change makes
-no remote binding or deployment claim. Before a protected production deployment,
-the workflow must emit a sanitized readiness receipt; then it must prove the
-preview control unchanged before deployment, after deployment, and after every
-production audit, followed by a final receipt proving the distinct exact
-schema-`0009` preview/production bindings against fresh inventory.
+PR #122 promoted the separately prepared schema-`0009` candidate
+`theologai-production-20260811-schema0009-a`
+(`9bc79346-338b-439e-a2a5-424f4418eb21`). Protected workflow `31631924636`
+deployed Worker `02174f95-abe2-480b-84bf-3e8c1a3a0320` through deployment
+`e62698f3-f6b0-4145-97bf-28abdeae0e3a`. It emitted the sanitized readiness
+receipt, proved preview unchanged before deployment, after deployment, and
+after every production audit, pinned the final production Worker to the exact
+audited identity, and emitted the final receipt proving the distinct exact
+schema-`0009` preview/production bindings against fresh inventory. The PR #108
+pair above is retained as the immediate matched rollback unit.
 
 Approved deploy jobs perform the last compatibility check read-only against
 the candidate name resolved from the checked-in name/UUID pair:
