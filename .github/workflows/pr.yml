@@ -88,9 +88,28 @@ jobs:
 
       - name: Verify historical section-key lineage
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          EXPECTED_MERGE_SHA: ${{ github.sha }}
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          test "$(git rev-parse HEAD^1)" = "$BASE_SHA"
+          for sha in "$EXPECTED_MERGE_SHA" "$EXPECTED_HEAD_SHA"; do
+            printf '%s\n' "$sha" | grep -Eq '^[0-9a-fA-F]{40}$'
+            git cat-file -e "$sha^{commit}"
+          done
+
+          checked_out_sha="$(git rev-parse HEAD)"
+          test "$checked_out_sha" = "$EXPECTED_MERGE_SHA"
+          set -- $(git rev-list --parents -n 1 HEAD)
+          test "$#" -eq 3
+          test "$1" = "$checked_out_sha"
+          BASE_SHA="$2"
+          CANDIDATE_HEAD_SHA="$3"
+
+          for sha in "$BASE_SHA" "$CANDIDATE_HEAD_SHA"; do
+            printf '%s\n' "$sha" | grep -Eq '^[0-9a-fA-F]{40}$'
+            git cat-file -e "$sha^{commit}"
+          done
+          test "$CANDIDATE_HEAD_SHA" = "$EXPECTED_HEAD_SHA"
+
           if git cat-file -e "$BASE_SHA:data/historical-section-key-plan.json"; then
             git show "$BASE_SHA:data/historical-section-key-plan.json" > "$RUNNER_TEMP/historical-section-key-plan.previous.json"
             npm run data:verify-section-keys -- --previous-plan "$RUNNER_TEMP/historical-section-key-plan.previous.json"

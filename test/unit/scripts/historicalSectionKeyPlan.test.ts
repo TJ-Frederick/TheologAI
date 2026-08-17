@@ -394,12 +394,32 @@ describe('migration-free historical section-key plan', () => {
     expect(exactSuccessor.status, exactSuccessor.stderr).toBe(0);
   });
 
-  it('keeps production ancestry and PR merge-parent lineage gates distinct', () => {
+  it('keeps production ancestry and exact PR merge-ref lineage gates distinct', () => {
+    const lineageStart = prWorkflow.indexOf('      - name: Verify historical section-key lineage');
+    const lineageEnd = prWorkflow.indexOf('      - name: Build SQLite database from tracked sources');
+    const lineageStep = prWorkflow.slice(lineageStart, lineageEnd);
+
+    expect(lineageStart).toBeGreaterThanOrEqual(0);
+    expect(lineageEnd).toBeGreaterThan(lineageStart);
     expect(deployWorkflow).toContain('fetch-depth: 0');
     expect(deployWorkflow).toContain('git merge-base --is-ancestor "$PREVIOUS_MAIN_SHA" HEAD');
     expect(deployWorkflow).toContain('git show "$PREVIOUS_MAIN_SHA:data/historical-section-key-plan.json"');
     expect(deployWorkflow).not.toContain('git rev-parse HEAD^1)" = "$PREVIOUS_MAIN_SHA"');
     expect(prWorkflow).toContain('fetch-depth: 2');
-    expect(prWorkflow).toContain('test "$(git rev-parse HEAD^1)" = "$BASE_SHA"');
+    expect(lineageStep).not.toContain('github.event.pull_request.base.sha');
+    expect(lineageStep).toContain('EXPECTED_MERGE_SHA: ${{ github.sha }}');
+    expect(lineageStep).toContain('EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}');
+    expect(lineageStep).not.toMatch(/run:\s*\|[\s\S]*github\.(?:sha|event\.pull_request\.head\.sha)/);
+    expect(lineageStep).toContain('for sha in "$EXPECTED_MERGE_SHA" "$EXPECTED_HEAD_SHA"; do');
+    expect(lineageStep).toContain('git cat-file -e "$sha^{commit}"');
+    expect(lineageStep).toContain('checked_out_sha="$(git rev-parse HEAD)"');
+    expect(lineageStep).toContain('test "$checked_out_sha" = "$EXPECTED_MERGE_SHA"');
+    expect(lineageStep).toContain('set -- $(git rev-list --parents -n 1 HEAD)');
+    expect(lineageStep).toContain('test "$#" -eq 3');
+    expect(lineageStep).toContain('BASE_SHA="$2"');
+    expect(lineageStep).toContain('CANDIDATE_HEAD_SHA="$3"');
+    expect(lineageStep).toContain('for sha in "$BASE_SHA" "$CANDIDATE_HEAD_SHA"; do');
+    expect(lineageStep).toContain('test "$CANDIDATE_HEAD_SHA" = "$EXPECTED_HEAD_SHA"');
+    expect(lineageStep).toContain('git show "$BASE_SHA:data/historical-section-key-plan.json"');
   });
 });
