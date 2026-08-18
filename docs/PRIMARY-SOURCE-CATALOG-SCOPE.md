@@ -1,5 +1,9 @@
 # Primary-source catalog scope
 
+For the active assignment in these entry/reconciliation documents, see the
+[designated current snapshot](CURRENT-RELEASE.md). The release bindings below
+are historical catalog and audit evidence, not current identity authority.
+
 ## Historical Transform 6 catalog slice
 
 The historical Transform 6 slice materializes the reviewed catalog manifest
@@ -7,7 +11,7 @@ for the 17 legacy hosted works. It adds no document bodies and grants no new
 rights; it makes that already-hosted collection's work identities,
 composition-date scope, and explicitly attributed creators machine-readable.
 
-## Checked-out Transform 11 candidate and deployed Transform 9 baseline
+## Historical checked-out Transform 11 candidate and deployed Transform 9 baseline
 
 The checked-out Transform 10 candidate retains an inactive Aquinas
 edition-scoped authority hierarchy packet and standalone materializer. Normal
@@ -38,7 +42,7 @@ predecessor was deployment `070b292b-0bae-400a-b983-3d72157b5a96`, Worker
 `bd722b69-2e2c-4d8d-b42b-617e8caba13d` (#130), and D1
 `theologai-preview-20260728-hierarchy-a`
 (`51890e12-1c3f-421f-b661-9a5ea9637e43`). That former Transform-11 preview
-binding is historical. The current preview baseline is PR #123 deployment
+binding is historical. The historical PR #123 preview baseline is deployment
 `4108d59a-4092-4389-824c-fa3820ab66f6`, Worker
 `70bbbecf-3fe6-4a04-8c34-babc3df09ad0` (#144), and schema-`0009` D1
 `theologai-preview-20260811-schema0009-a`
@@ -74,7 +78,8 @@ PR #107's Transform-11 preview candidate
 `29a4a7faec2a960f06bfc026a319df8c08b495bb7ad82831fb62d3a3586643a4`.
 Primary readiness, Transform-8 authority (`1/12/12` pages), and complete
 Transform-11 source-pack authority (`1/1/1/1/1/1/133/17` pages) passed while
-unbound. Protected preview deployment now proves the current binding above;
+unbound. The protected preview deployment proved the binding described above at
+that historical release;
 production was unchanged by that preview release, and Transform-10
 hierarchy/publication/Aquinas rows remain excluded.
 

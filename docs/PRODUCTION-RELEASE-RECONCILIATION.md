@@ -1,12 +1,17 @@
 # Production Release Reconciliation
 
+For the active assignment, see the [designated current snapshot](CURRENT-RELEASE.md).
 This document records the completed PR #122 schema-`0009` production cutover,
 its immediate PR #108 rollback pair, older PR #101 history, and the safeguards
 required for later releases.
 
-## Current PR #122 production release
+## Historical PR #122 production release
 
-PR #122 merged as `86475ecf8288cb0ebcb6467c77c0fd0998a8f1c2` with exact tree
+The legacy fixture phrase `Current PR #122 production release` is retained
+solely as dated point-in-time evidence; it is not current today. The active
+assignment is recorded in the [current snapshot](CURRENT-RELEASE.md).
+
+At that release, PR #122 merged as `86475ecf8288cb0ebcb6467c77c0fd0998a8f1c2` with exact tree
 `8150aa29e7e4a22141edbfc9ab568df933f9c9b3`. Protected production workflow
 `31631924636` deployed `e62698f3-f6b0-4145-97bf-28abdeae0e3a`, Worker
 `02174f95-abe2-480b-84bf-3e8c1a3a0320` (#100), as the sole active production
@@ -90,7 +95,7 @@ audit all passed. The retained PR #101 preview predecessor was
 deployment `070b292b-0bae-400a-b983-3d72157b5a96`, Worker
 `bd722b69-2e2c-4d8d-b42b-617e8caba13d` (#130), and D1
 `theologai-preview-20260728-hierarchy-a`
-(`51890e12-1c3f-421f-b661-9a5ea9637e43`). The current preview baseline is PR #123
+(`51890e12-1c3f-421f-b661-9a5ea9637e43`). The historical PR #123 preview baseline is
 deployment `4108d59a-4092-4389-824c-fa3820ab66f6`, Worker
 `70bbbecf-3fe6-4a04-8c34-babc3df09ad0` (#144), and schema-`0009` D1
 `theologai-preview-20260811-schema0009-a`

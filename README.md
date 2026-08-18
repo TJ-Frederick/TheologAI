@@ -17,6 +17,13 @@ absent; it adds no document or catalog projection and is not wired into runtime 
 
 <!-- theologai-public-contract tools=11 structured=bible_cross_references,bible_lookup,bible_verse_morphology,classic_text_lookup,commentary_lookup,donation_config,original_language_lookup,original_language_study,parallel_passages,primary_source_search,verify_donation -->
 
+## Current release snapshot
+
+The [current release snapshot](docs/CURRENT-RELEASE.md) is the designated
+current snapshot for this entry document and the named reconciliation documents.
+The historical release records below preserve point-in-time evidence; they are
+not current identity authority.
+
 ## Public website and remote endpoints
 
 The public website is [theologai.xyz](https://theologai.xyz). The hosted
@@ -53,8 +60,8 @@ Remote MCP client configuration:
 }
 ```
 
-Use the preview URL only for explicitly authorized release testing. The current
-live production baseline is PR #122 merge
+Use the preview URL only for explicitly authorized release testing. The
+following is the historical PR #122 production baseline, not current today:
 `86475ecf8288cb0ebcb6467c77c0fd0998a8f1c2` (tree
 `8150aa29e7e4a22141edbfc9ab568df933f9c9b3`). Protected workflow
 `31631924636` deployed Cloudflare deployment
@@ -67,7 +74,8 @@ final Worker identity, preview-control, and environment-isolation checks all
 passed. CCEL execution remains disabled.
 
 The exact captured PR #108 Worker/D1 pair is the immediately preceding primary
-rollback unit: deployment `3d7489d9-7b48-4ad0-bdc6-95ffbda53bd8`, Worker
+rollback unit in that dated release record; it is not current today: deployment
+`3d7489d9-7b48-4ad0-bdc6-95ffbda53bd8`, Worker
 `291f3292-3fa9-44fc-bf6f-b68fd2f4cef6`, and D1
 `theologai-production-20260729-transform11-a`
 (`53211f50-a893-4b4c-be1e-bc625a595dc7`). PR #101 is older retained rollback

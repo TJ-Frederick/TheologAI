@@ -1,5 +1,9 @@
 # Preview Release Reconciliation
 
+For the active assignment in these entry/reconciliation documents, see the
+[designated current snapshot](CURRENT-RELEASE.md). The records below retain
+dated release evidence and are not current identity authority.
+
 The protected preview workflow records and uploads a predecessor anchor before it mutates the preview Worker, proves the newly deployed Worker binds the candidate before either black-box audit, and records the active deployment again after the release gate. These are evidence, not a deployment mechanism. Uploading the predecessor first preserves a manual recovery target even if a later job cancellation prevents a post-mutation observation.
 
 The record intentionally distinguishes two D1 identities:
@@ -9,9 +13,13 @@ The record intentionally distinguishes two D1 identities:
 
 The generic release workflow permits both code-only releases (`d1Changed: false`) and data cutovers (`d1Changed: true`); it never infers freshness from a different ID alone. Wrangler 4.107.0’s D1 binding response is accepted only when the sole `THEOLOGAI_DB` binding has canonical UUID `id` and `database_id` fields that agree exactly. After deployment, the sole active Worker version must bind the candidate ID before either fixed audit begins; a retained-old-D1 deployment is refused even if its Worker version otherwise looks new.
 
-## PR #123 current schema-0009 preview release — passed
+## Historical PR #123 schema-0009 preview release — passed
 
-The protected preview workflow deployed exact source
+The legacy fixture phrase `PR #123 current schema-0009 preview release` labels
+this dated record only; it is not current today. The active assignment is in
+the [current snapshot](CURRENT-RELEASE.md).
+
+At that protected preview release, the workflow deployed exact source
 `7fb3ec5113a16ed86bfc4a403a3ec3678d4d4dd0` (tree
 `28e555808ad3840d145a7ddd7e57934dc30e45c2`) through Actions run
 `31644218683` and GitHub deployment `5878053561`. Cloudflare deployment
