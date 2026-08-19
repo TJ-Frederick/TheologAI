@@ -6,14 +6,10 @@
  */
 
 import { vi } from 'vitest';
-import * as dotenv from 'dotenv';
-
-// Load environment variables for tests
-dotenv.config();
 
 // Set test environment variables
 process.env.NODE_ENV = 'test';
-process.env.ESV_API_KEY = process.env.ESV_API_KEY || 'test-esv-api-key';
+process.env.ESV_API_KEY = 'test-esv-api-key';
 
 // Global test timeout
 vi.setConfig({ testTimeout: 30000 });
