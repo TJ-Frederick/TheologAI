@@ -1,10 +1,14 @@
 # Worker operations
 
-## Current live baseline
+The [current release snapshot](CURRENT-RELEASE.md) is the designated current
+snapshot for this operations document. The dated records below retain release
+evidence and are not current identity authority.
+
+## Historical PR #122 live baseline
 
 The integrated checked-out normal build excludes the Transform-10 Aquinas
 hierarchy from all normal D1 corpora: it has no catalog, runtime, or MCP
-projection. Production is PR #122 merge
+projection. In this dated record, Production is PR #122 merge
 `86475ecf8288cb0ebcb6467c77c0fd0998a8f1c2` (tree
 `8150aa29e7e4a22141edbfc9ab568df933f9c9b3`). Protected workflow
 `31631924636` deployed `e62698f3-f6b0-4145-97bf-28abdeae0e3a`, serving Worker
@@ -32,15 +36,17 @@ The checked-in preview configuration targets schema-`0009` D1
 proved that binding and completed its audit. It captured production against its
 checked-in D1 name/UUID and fresh inventory before preview mutation,
 immediately after deployment, and again after final preview audit. The
-checked-in and active production target is the separately prepared
-schema-`0009` candidate `theologai-production-20260811-schema0009-a`
-(`9bc79346-338b-439e-a2a5-424f4418eb21`). PR #122's protected production
-workflow proved the active binding, re-proved preview control after deployment
-and audits, and emitted the final environment-isolation receipt.
+separately prepared schema-`0009` candidate
+`theologai-production-20260811-schema0009-a`
+(`9bc79346-338b-439e-a2a5-424f4418eb21`) is the production D1 also recorded in
+today's [current release snapshot](CURRENT-RELEASE.md). PR #122's protected
+production binding observation is dated historical evidence, not current today;
+it proved the active binding, re-proved preview control after deployment and
+audits, and emitted the final environment-isolation receipt.
 
-PR #123 completed the current protected preview release from
+In the dated release record, PR #123 completed the current protected preview release from
 `7fb3ec5113a16ed86bfc4a403a3ec3678d4d4dd0` (tree
-`28e555808ad3840d145a7ddd7e57934dc30e45c2`): Cloudflare deployment
+`28e555808ad3840d145a7ddd7e57934dc30e45c2`); it is not current today. Cloudflare deployment
 `4108d59a-4092-4389-824c-fa3820ab66f6` assigns Worker
 `70bbbecf-3fe6-4a04-8c34-babc3df09ad0` (#144) solely to the schema-`0009`
 preview D1. All bounded audits and production-control comparisons passed. The

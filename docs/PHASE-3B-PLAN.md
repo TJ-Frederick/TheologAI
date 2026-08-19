@@ -5,7 +5,11 @@ schema-`0009` preview and production releases completed by PR #122. Earlier
 roadmap sections use "Phase 3" for already-shipped work; **Phase 3B** is the
 unambiguous name for this successor program.
 
-## Known-good starting point
+For the active assignment in these entry/reconciliation documents, see the
+[current release snapshot](CURRENT-RELEASE.md). The release facts in this plan
+are historical planning baselines, not current identity authority.
+
+## Historical known-good starting point
 
 GitHub `main` is PR #122 merge
 `86475ecf8288cb0ebcb6467c77c0fd0998a8f1c2`, exact tree
@@ -67,8 +71,9 @@ The following boundaries remain deliberate:
 3. Add a narrowly reviewed mechanism that prevents evidence-only or
    documentation-only merges from causing an unnecessary production deploy.
 4. Merge the post-PR-#122 evidence record only after that mechanism is proven.
-5. Consolidate current release identity into one authoritative record and keep
-   historical records explicitly time-scoped.
+5. Establish a designated current snapshot for entry/reconciliation documents
+   and keep historical records explicitly time-scoped; repository-wide
+   authority cleanup remains separate work.
 6. Rehearse the matched PR #108 Worker/D1 rollback without changing live
    traffic, then define a retention policy before any predecessor cleanup.
 
