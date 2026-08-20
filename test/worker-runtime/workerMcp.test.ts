@@ -4,6 +4,11 @@ import { createWorkerCompositionRoot } from '../../src/tools/worker/index.js';
 import type { Env } from '../../src/worker-env.js';
 import { encodeParallelGroupCursor } from '../../src/kernel/parallelGroupCursor.js';
 import { parseSourceAttestedLookupReference } from '../../src/kernel/sourceAttestedReference.js';
+import {
+  assertMcpTransportContract,
+  captureMcpTransportSnapshot,
+  type JsonRecord,
+} from '../helpers/mcpTransportContract.js';
 
 const MCP_URL = 'https://worker.test/mcp';
 const ALLOWED_ORIGIN = 'https://allowed.example';
@@ -217,6 +222,18 @@ describe('Worker MCP endpoint in workerd', () => {
       serverInfo: { name: 'theologai-bible-server', version: '3.6.0-test' },
     });
 
+    const contractClient = {
+      getServerVersion: () => initialized.message.result?.serverInfo as { name?: string; version?: string },
+      getServerCapabilities: () => initialized.message.result?.capabilities as JsonRecord,
+      listTools: async () => (await rpc('tools/list', undefined, 201)).message.result as { tools: JsonRecord[] },
+      listPrompts: async () => (await rpc('prompts/list', undefined, 202)).message.result as { prompts: JsonRecord[] },
+      listResourceTemplates: async () => (
+        (await rpc('resources/templates/list', undefined, 203)).message.result as { resourceTemplates: JsonRecord[] }
+      ),
+      listResources: async () => (await rpc('resources/list', undefined, 204)).message.result as { resources: JsonRecord[] },
+    };
+    const contract = await captureMcpTransportSnapshot(contractClient);
+    await assertMcpTransportContract(contract, { contractVersion: '7', logging: false });
     const listed = await rpc('tools/list', undefined, 2);
     expect(listed.response.status).toBe(200);
     expect(listed.message.error).toBeUndefined();
