@@ -109,11 +109,12 @@ describe('test topology manifest', () => {
     expect(packageJson.scripts['test:conformance']).toBe('tsx test/conformance/run-server-conformance.ts');
   });
 
-  it('owns exactly five maintained TypeScript entrypoints outside test', () => {
+  it('owns exactly six maintained TypeScript entrypoints outside test', () => {
     expect(manifest.maintainedTypeScriptEntrypointsOutsideTest).toEqual([
       { path: 'scripts/check-worker-bundle-excludes-ubs.ts', packageScript: 'test:worker-bundle-ubs' },
       { path: 'scripts/test-data-pipeline.ts', packageScript: 'test:data' },
       { path: 'scripts/test-node-http-e2e.ts', packageScript: 'test:e2e:compiled' },
+      { path: 'scripts/test-node-stdio-e2e.ts', packageScript: 'test:e2e:stdio' },
       { path: 'scripts/test-worker-production-runtime.ts', packageScript: 'test:worker-production-runtime' },
       { path: 'scripts/verify-d1-seed-workerd.ts', packageScript: 'd1:seed:verify-workerd' },
     ]);

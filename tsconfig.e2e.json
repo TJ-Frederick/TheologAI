@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "."
+  },
+  "files": [
+    "scripts/test-node-http-e2e.ts",
+    "scripts/test-node-stdio-e2e.ts",
+    "scripts/test-worker-production-runtime.ts",
+    "test/helpers/mcpTransportContract.ts"
+  ]
+}

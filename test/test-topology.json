@@ -10,9 +10,9 @@
     "conformance": 1
   },
   "current": {
-    "totalTestTypeScript": 272,
-    "activeVitest": 196,
-    "support": 21,
+    "totalTestTypeScript": 274,
+    "activeVitest": 197,
+    "support": 22,
     "manual": 4,
     "legacyOrphan": 50,
     "conformance": 1
@@ -65,6 +65,7 @@
       "test/unit/formatters/originalLanguageStudyV2DraftFormatter.test.ts",
       "test/unit/formatters/originalLanguageStudyV2Formatter.test.ts",
       "test/unit/formatters/primarySourceFormatter.test.ts",
+      "test/unit/helpers/mcpTransportContract.test.ts",
       "test/unit/http/legacyRedirectTransport.test.ts",
       "test/unit/http/mcpErrors.test.ts",
       "test/unit/http/nodeHttpServer.test.ts",
@@ -232,6 +233,7 @@
       "test/fixtures/original-language-study-v2/support/syntheticOriginalLanguageStudyV2Fixtures.ts",
       "test/fixtures/ubsParallelCorpus.ts",
       "test/helpers/cloudflareWorkersShim.ts",
+      "test/helpers/mcpTransportContract.ts",
       "test/helpers/mockD1.ts",
       "test/helpers/originalLanguageStudyV2ProductionFixtures.ts",
       "test/helpers/testHelpers.ts",
@@ -315,6 +317,10 @@
       "packageScript": "test:e2e:compiled"
     },
     {
+      "path": "scripts/test-node-stdio-e2e.ts",
+      "packageScript": "test:e2e:stdio"
+    },
+    {
       "path": "scripts/test-worker-production-runtime.ts",
       "packageScript": "test:worker-production-runtime"
     },
@@ -358,4 +364,3 @@
     }
   ]
 }
-

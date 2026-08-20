@@ -2,14 +2,19 @@
 /** Deterministic process-boundary smoke test for the compiled Node HTTP server. */
 
 import assert from 'node:assert/strict';
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { spawn, type ChildProcessByStdio } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { createServer } from 'node:net';
+import type { Readable } from 'node:stream';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import {
+  assertMcpTransportContract,
+  captureMcpTransportSnapshot,
+} from '../test/helpers/mcpTransportContract.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const TSX_CLI = join(ROOT, 'node_modules', 'tsx', 'dist', 'cli.mjs');
@@ -21,7 +26,7 @@ const MCP_TIMEOUT_MS = 10_000;
 const TEST_ORIGIN = 'http://e2e.local';
 
 interface CapturedProcess {
-  child: ChildProcessWithoutNullStreams;
+  child: ChildProcessByStdio<null, Readable, Readable>;
   logs(): string;
 }
 
@@ -68,7 +73,7 @@ function spawnCaptured(
   return { child, logs: () => output };
 }
 
-async function waitForExit(child: ChildProcessWithoutNullStreams, timeoutMs: number): Promise<number | null> {
+async function waitForExit(child: ChildProcessByStdio<null, Readable, Readable>, timeoutMs: number): Promise<number | null> {
   if (child.exitCode !== null) return child.exitCode;
   return await new Promise<number | null>((resolve, reject) => {
     const timer = setTimeout(() => {
@@ -228,14 +233,18 @@ async function main(): Promise<void> {
       'prompts', 'resources', 'tools',
     ]);
 
-    const tools = await withTimeout(client.listTools(), MCP_TIMEOUT_MS, 'tools/list');
+    const contract = await withTimeout(
+      captureMcpTransportSnapshot(client),
+      MCP_TIMEOUT_MS,
+      'MCP transport contract',
+    );
+    await assertMcpTransportContract(contract, { contractVersion: '6', logging: false });
+    const tools = { tools: contract.tools };
     assert(tools.tools.some(tool => tool.name === 'original_language_lookup'));
     const primarySourceSearch = tools.tools.find(tool => tool.name === 'primary_source_search');
     assert(primarySourceSearch, 'tools/list must include primary_source_search');
-    const resources = await withTimeout(client.listResources(), MCP_TIMEOUT_MS, 'resources/list');
-    assert(resources.resources.some(resource => resource.uri === 'theologai://translations'));
-    const prompts = await withTimeout(client.listPrompts(), MCP_TIMEOUT_MS, 'prompts/list');
-    assert(prompts.prompts.some(prompt => prompt.name === 'word-study'));
+    assert(contract.staticResources.some(resource => resource.uri === 'theologai://translations'));
+    assert(contract.prompts.some(prompt => prompt.name === 'word-study'));
 
     const strongsResource = await withTimeout(
       client.readResource({ uri: 'theologai://strongs/G25' }),
@@ -262,7 +271,7 @@ async function main(): Promise<void> {
     const primarySources = await withTimeout(
       client.callTool({
         name: 'primary_source_search',
-        arguments: providerNeutralPrimarySourceArguments(primarySourceSearch.inputSchema),
+        arguments: providerNeutralPrimarySourceArguments(primarySourceSearch.inputSchema as object),
       }),
       MCP_TIMEOUT_MS,
       'provider-neutral primary_source_search',
@@ -272,7 +281,7 @@ async function main(): Promise<void> {
       schemaVersion?: string;
       queries?: Array<{ providers?: Array<{ provider?: string }> }>;
     } | undefined;
-    assert(primaryStructured?.schemaVersion === '6' || primaryStructured?.schemaVersion === '7');
+    assert.equal(primaryStructured?.schemaVersion, '6');
     assert.deepEqual(
       primaryStructured.queries?.flatMap(query => query.providers ?? []).map(provider => provider.provider),
       ['local'],

@@ -14,12 +14,19 @@ npm run test:worker-runtime
 npm run test:ccel-coordinator-runtime
 npm run test:worker-production-runtime
 npm run test:e2e:compiled
+npm run test:e2e:stdio
 npm run test:conformance
 ```
 
-The manifest also records five maintained TypeScript entrypoints outside the
+The manifest also records six maintained TypeScript entrypoints outside the
 `test/` tree. MACULA Gate-1 remains separately owned and is not counted as a
-sixth general test entrypoint.
+seventh general test entrypoint.
+
+The compiled MCP parity matrix covers Node stdio v6 with logging, Node HTTP v6
+without logging, a production-like Worker v6 bundle, and the real preview
+Workerd v7 contract. It compares complete public tool, prompt, resource-template,
+static-resource, ordering, and capability metadata while leaving dynamic local
+document resources runtime-specific.
 
 ## Quarantined and manual files
 
