@@ -10,8 +10,8 @@
     "conformance": 1
   },
   "current": {
-    "totalTestTypeScript": 275,
-    "activeVitest": 198,
+    "totalTestTypeScript": 276,
+    "activeVitest": 199,
     "support": 22,
     "manual": 4,
     "legacyOrphan": 50,
@@ -176,6 +176,7 @@
       "test/unit/scripts/productionReleaseGuards.test.ts",
       "test/unit/scripts/publicDomainHistoricalSources.test.ts",
       "test/unit/scripts/releaseCorpusCapacity.test.ts",
+      "test/unit/scripts/resolveProductionReleaseContext.test.ts",
       "test/unit/scripts/transform12FtsCorruption.test.ts",
       "test/unit/scripts/ubsHebrewV092AcquisitionInertness.test.ts",
       "test/unit/scripts/ubsHebrewV092SemanticCompiler.test.ts",
