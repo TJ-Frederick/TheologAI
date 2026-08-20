@@ -23,6 +23,7 @@ import { primarySourceSearchV6OutputSchema, primarySourceSearchV7OutputSchema } 
 import { registerToolHandlers } from '../../../src/mcp/tools.js';
 import { createClassicTextsHandler } from '../../../src/tools/v2/classicTexts.js';
 import { createPrimarySourceSearchHandler } from '../../../src/tools/v2/primarySourceSearch.js';
+import { createPrimarySourceSearchDescriptor } from '../../../src/mcp/primarySourceSearchDescriptor.js';
 
 const root = new URL('../../../', import.meta.url);
 const fixtureUrl = new URL('test/fixtures/historical-core-preview-audit.json', root);
@@ -310,10 +311,7 @@ describe('historical core preview audit contract', () => {
 
   it('proves a v6 CCEL provider is rejected by input validation before the primary-source handler can execute', async () => {
     const search = vi.fn();
-    const handler = createPrimarySourceSearchHandler({ search } as never, {
-      exposeCcelDiscovery: false, ccelLiveSearch: false, ccelCoordinator: false,
-      contractVersion: '6', liveCcelEnabled: false,
-    });
+    const handler = createPrimarySourceSearchHandler({ search } as never, createPrimarySourceSearchDescriptor());
     const server = new Server({ name: 'historical-v6-input-boundary-test', version: '1.0.0' }, { capabilities: { tools: {} } });
     registerToolHandlers(server, [handler], false);
     const client = new Client({ name: 'historical-v6-input-boundary-client', version: '1.0.0' }, { capabilities: {} });

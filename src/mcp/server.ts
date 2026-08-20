@@ -28,6 +28,7 @@ import { jsonSchemaValidator } from './validation.js';
 import { buildPrimarySourceCatalog, PRIMARY_SOURCE_CATALOG_URI } from './primarySourceCatalog.js';
 import { COMMENTARY_CATALOG } from '../kernel/commentaryCatalog.js';
 import type { PrimarySourceContractConfig } from '../kernel/featureFlags.js';
+import type { PrimarySourceSearchBinding } from '../tools/v2/primarySourceSearch.js';
 
 export interface McpServerServices {
   bibleService: Pick<BibleService, 'getSupportedTranslations'>;
@@ -40,6 +41,7 @@ export interface McpCompositionRoot {
   tools: ToolHandler[];
   services: McpServerServices;
   primarySourceContract: PrimarySourceContractConfig;
+  primarySourceSearch: PrimarySourceSearchBinding;
 }
 
 export interface McpCapabilityProfile {
@@ -297,18 +299,16 @@ export function createTheologAiMcpServer(
     throw resourceNotFound(uri);
   });
 
-  registerPromptHandlers(server, root.primarySourceContract);
+  registerPromptHandlers(server, root.primarySourceSearch.descriptor);
 
   return mcpServer;
 }
 
 function assertPrimarySourceContractParity(root: McpCompositionRoot): void {
-  const tool = root.tools.find(candidate => candidate.name === 'primary_source_search');
-  if (!tool) return;
-  const advertisedVersion = (tool.outputSchema?.properties?.schemaVersion as { const?: unknown } | undefined)?.const;
-  const expectedOpenWorld = root.primarySourceContract.contractVersion === '7';
-  if (advertisedVersion !== root.primarySourceContract.contractVersion
-    || tool.annotations?.openWorldHint !== expectedOpenWorld) {
-    throw new Error('primary_source_search tool and guided-prompt contracts must use the same configuration.');
+  const { descriptor, tool } = root.primarySourceSearch;
+  const named = root.tools.filter(candidate => candidate.name === descriptor.name);
+  if (descriptor.name !== 'primary_source_search' || tool.name !== descriptor.name
+    || named.length !== 1 || named[0] !== tool) {
+    throw new Error('primary_source_search binding must expose its exact named tool exactly once.');
   }
 }

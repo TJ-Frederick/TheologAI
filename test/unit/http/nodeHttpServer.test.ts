@@ -18,6 +18,8 @@ import { DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG } from '../../../src/kernel/feat
 import { BibleMCPServer } from '../../../src/server.js';
 import { BibleService } from '../../../src/services/bible/BibleService.js';
 import { createBibleLookupHandler } from '../../../src/tools/v2/bibleLookup.js';
+import { createPrimarySourceSearchHandler } from '../../../src/tools/v2/primarySourceSearch.js';
+import { createPrimarySourceSearchDescriptor } from '../../../src/mcp/primarySourceSearchDescriptor.js';
 
 const TEST_MAX_BODY_BYTES = 1024;
 
@@ -335,9 +337,11 @@ function makeRoot(): McpCompositionRoot {
     getCopyright: () => 'Test fixture',
   };
   const bibleService = new BibleService([adapter]);
+  const descriptor = createPrimarySourceSearchDescriptor();
+  const primarySourceSearchTool = createPrimarySourceSearchHandler({ search: vi.fn() } as never, descriptor);
 
   return {
-    tools: [createBibleLookupHandler(bibleService)],
+    tools: [createBibleLookupHandler(bibleService), primarySourceSearchTool],
     services: {
       bibleService,
       commentaryService: { getAvailableCommentators: () => [] },
@@ -357,6 +361,7 @@ function makeRoot(): McpCompositionRoot {
       },
     },
     primarySourceContract: DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG,
+    primarySourceSearch: { descriptor, tool: primarySourceSearchTool },
   };
 }
 

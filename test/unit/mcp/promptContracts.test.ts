@@ -12,6 +12,7 @@ import { createStrongsLookupHandler } from '../../../src/tools/v2/strongsLookup.
 import { createVerseMorphologyHandler } from '../../../src/tools/v2/verseMorphology.js';
 import { createOriginalLanguageStudyHandler } from '../../../src/tools/v2/originalLanguageStudy.js';
 import { createPrimarySourceSearchHandler } from '../../../src/tools/v2/primarySourceSearch.js';
+import { createPrimarySourceSearchDescriptor } from '../../../src/mcp/primarySourceSearchDescriptor.js';
 
 const unused = {} as never;
 const tools: ToolHandler[] = [
@@ -30,6 +31,11 @@ const tools: ToolHandler[] = [
 const toolByName = new Map(tools.map(tool => [tool.name, tool]));
 
 describe('prompt-recommended tool-call contracts', () => {
+  it('derives guided primary-source calls from descriptor facts', () => {
+    const descriptor = createPrimarySourceSearchDescriptor('7');
+    expect(recommendedToolCallsForPrompt('confession-study', { topic: 'justification' }, descriptor)[0]!.arguments)
+      .toMatchObject({ queries: [{ searchDepth: 'expanded', expandedLimit: 3 }] });
+  });
   it.each([
     ['word-study', { word: 'G26' }],
     ['word-study', { word: 'love', testament: 'NT' }],

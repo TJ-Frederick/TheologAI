@@ -41,6 +41,7 @@ import { OriginalLanguageStudyV2ContextProvider } from '../../services/languages
 import { SourceAttestedParallelService } from '../../services/bible/SourceAttestedParallelService.js';
 
 import { createToolRegistry } from '../toolRegistry.js';
+import { bindPrimarySourceSearch, type PrimarySourceSearchBinding } from './primarySourceSearch.js';
 
 // Donation
 import { OnChainVerifier } from '../../adapters/donation/OnChainVerifier.js';
@@ -64,6 +65,7 @@ export interface CompositionRoot {
   tools: ToolHandler[];
   services: ServerServices;
   primarySourceContract: ReturnType<typeof readPrimarySourceFeatureFlags>;
+  primarySourceSearch: PrimarySourceSearchBinding;
 }
 
 export interface CompositionRootOptions {
@@ -123,6 +125,7 @@ export function createCompositionRoot(options: CompositionRootOptions = {}): Com
     primarySourceContract,
     primarySourceContract.liveCcelEnabled ? nodeCcelCoordinator : undefined,
   );
+  const primarySourceSearch = bindPrimarySourceSearch(primarySourceSearchService, primarySourceContract);
   const strongsService = new StrongsService(strongsRepo, morphRepo);
   const morphService = new MorphologyService(morphRepo);
   const originalLanguageStudyService = new OriginalLanguageStudyService(morphRepo, strongsRepo);
@@ -142,8 +145,7 @@ export function createCompositionRoot(options: CompositionRootOptions = {}): Com
     parallelPassageService: parallelService,
     commentaryService,
     historicalService,
-    primarySourceSearchService,
-    primarySourceContract,
+    primarySourceSearchTool: primarySourceSearch.tool,
     strongsService,
     morphologyService: morphService,
     originalLanguageStudyCoordinator,
@@ -154,6 +156,7 @@ export function createCompositionRoot(options: CompositionRootOptions = {}): Com
     tools,
     services: { bibleService, commentaryService, historicalService, strongsService, sourceAttestedParallelService },
     primarySourceContract,
+    primarySourceSearch,
   };
 }
 

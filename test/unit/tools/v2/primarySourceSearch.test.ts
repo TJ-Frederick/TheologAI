@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createPrimarySourceSearchHandler } from '../../../../src/tools/v2/primarySourceSearch.js';
+import { createPrimarySourceSearchDescriptor } from '../../../../src/mcp/primarySourceSearchDescriptor.js';
 import { validatorFor } from '../../../../src/mcp/validation.js';
 import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv';
 
@@ -11,6 +12,10 @@ function schemaTerms(value: unknown): string[] {
 }
 
 describe('primary_source_search handler', () => {
+  it('uses the runtime-neutral descriptor for isolated v6 handler construction', () => {
+    const handler = createPrimarySourceSearchHandler({ search: vi.fn() } as any, createPrimarySourceSearchDescriptor());
+    expect(handler.name).toBe('primary_source_search');
+  });
   const scope = {
     status: 'matched' as const, requested: {}, eligibleDocumentCount: 1,
     eligibleDocuments: [{ id: 'institutes', title: 'Institutes', metadataStatus: 'reviewed' as const }],

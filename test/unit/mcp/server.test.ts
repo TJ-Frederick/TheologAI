@@ -17,6 +17,7 @@ import { createParallelPassagesHandler } from '../../../src/tools/v2/parallelPas
 import { formatLocalDocumentResource, formatLocalDocumentSectionResourceWithIdentity } from '../../../src/formatters/historicalFormatter.js';
 import { DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG } from '../../../src/kernel/featureFlags.js';
 import { primarySourceSearchV6OutputSchema } from '../../../src/mcp/schemas/primarySourceSearchV4.js';
+import { createPrimarySourceSearchDescriptor } from '../../../src/mcp/primarySourceSearchDescriptor.js';
 
 const TOOL_NAMES = [
   'bible_lookup',
@@ -54,8 +55,9 @@ function makeMockTool(name: string): ToolHandler {
 }
 
 function makeMockRoot(): McpCompositionRoot {
+  const tools = TOOL_NAMES.map(makeMockTool);
   return {
-    tools: TOOL_NAMES.map(makeMockTool),
+    tools,
     services: {
       bibleService: {
         getSupportedTranslations: () => ['ESV', 'KJV', 'NET'],
@@ -130,6 +132,7 @@ function makeMockRoot(): McpCompositionRoot {
       },
     },
     primarySourceContract: DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG,
+    primarySourceSearch: { descriptor: createPrimarySourceSearchDescriptor(), tool: tools[5]! },
   };
 }
 
@@ -181,6 +184,37 @@ afterEach(async () => {
 });
 
 describe('shared MCP registration', () => {
+  it('requires the exact bound primary-source tool exactly once', () => {
+    const root = makeMockRoot();
+    root.tools = root.tools.filter(tool => tool.name !== 'primary_source_search');
+    expect(() => createTheologAiMcpServer(root, 'binding-test')).toThrow('exact named tool exactly once');
+
+    const duplicate = makeMockRoot();
+    duplicate.tools = [...duplicate.tools, duplicate.primarySourceSearch.tool];
+    expect(() => createTheologAiMcpServer(duplicate, 'binding-test')).toThrow('exact named tool exactly once');
+
+    const structuralClone = makeMockRoot();
+    const cloned = { ...structuralClone.primarySourceSearch.tool };
+    structuralClone.tools = structuralClone.tools.map(tool => tool.name === 'primary_source_search' ? cloned : tool);
+    expect(() => createTheologAiMcpServer(structuralClone, 'binding-test')).toThrow('exact named tool exactly once');
+
+    const wrongName = makeMockRoot();
+    wrongName.primarySourceSearch = {
+      ...wrongName.primarySourceSearch,
+      descriptor: { ...wrongName.primarySourceSearch.descriptor, name: 'wrong_name' } as never,
+    };
+    expect(() => createTheologAiMcpServer(wrongName, 'binding-test')).toThrow('exact named tool exactly once');
+
+    const secondNamedClone = makeMockRoot();
+    secondNamedClone.tools = [...secondNamedClone.tools, { ...secondNamedClone.primarySourceSearch.tool }];
+    expect(() => createTheologAiMcpServer(secondNamedClone, 'binding-test')).toThrow('exact named tool exactly once');
+
+    const rootWithClone = makeMockRoot();
+    const replacementClone = { ...rootWithClone.primarySourceSearch.tool };
+    rootWithClone.tools = [...rootWithClone.tools.filter(tool => tool.name !== 'primary_source_search'), replacementClone];
+    expect(() => createTheologAiMcpServer(rootWithClone, 'binding-test')).toThrow('exact named tool exactly once');
+  });
+
   it('advertises the stable server identity and four capabilities', async () => {
     const client = await connect(createTheologAiMcpServer(makeMockRoot(), '1.0.0-test').server);
 
@@ -590,6 +624,7 @@ describe('shared MCP registration', () => {
         coverage: { localAttempted: true, localStatus: 'ok', localHitCount: 1, ccelAttempted: false, ccelHitCount: 0, notices: [] },
       }) } as any)
       : tool);
+    root.primarySourceSearch = { descriptor: createPrimarySourceSearchDescriptor(), tool: root.tools.find(tool => tool.name === 'primary_source_search')! };
     const client = await connect(createTheologAiMcpServer(root, '1.0.0-test').server);
 
     const result = await client.callTool({
@@ -979,6 +1014,7 @@ describe('shared MCP registration', () => {
     root.tools = root.tools.map(tool => tool.name === 'primary_source_search'
       ? createPrimarySourceSearchHandler({ search: vi.fn() } as any, root.primarySourceContract)
       : tool);
+    root.primarySourceSearch = { descriptor: createPrimarySourceSearchDescriptor('7'), tool: root.tools.find(tool => tool.name === 'primary_source_search')! };
     const client = await connect(createTheologAiMcpServer(root, '1.0.0-v7-test').server);
     const listed = await client.listPrompts();
     const primaryDefinition = listed.prompts.find(prompt => prompt.name === 'primary-source-research')!;
@@ -1039,14 +1075,13 @@ describe('shared MCP registration', () => {
     expect(confessionText).toContain('Name any disabled, unavailable, or unsupported provider');
   });
 
-  it('rejects tool/prompt contract divergence at server construction', () => {
+  it('requires the bound descriptor rather than probing mutable tool metadata', () => {
     const root = makeMockRoot();
     root.primarySourceContract = {
       exposeCcelDiscovery: true, ccelLiveSearch: false, ccelCoordinator: false,
       contractVersion: '7', liveCcelEnabled: false,
     };
-    expect(() => createTheologAiMcpServer(root, 'mismatched-contract-test'))
-      .toThrow('tool and guided-prompt contracts must use the same configuration');
+    expect(() => createTheologAiMcpServer(root, 'mismatched-contract-test')).not.toThrow();
   });
 
   it('advertises and executes the exact v7 tool contract through MCP', async () => {
@@ -1072,6 +1107,7 @@ describe('shared MCP registration', () => {
     const root = makeMockRoot();
     root.primarySourceContract = contract;
     root.tools = root.tools.map(tool => tool.name === 'primary_source_search' ? handler : tool);
+    root.primarySourceSearch = { descriptor: createPrimarySourceSearchDescriptor('7'), tool: handler };
     const client = await connect(createTheologAiMcpServer(root, '1.0.0-v7-tool-test').server);
 
     const listed = await client.listTools();
