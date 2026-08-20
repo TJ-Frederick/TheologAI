@@ -10,8 +10,8 @@
     "conformance": 1
   },
   "current": {
-    "totalTestTypeScript": 274,
-    "activeVitest": 197,
+    "totalTestTypeScript": 275,
+    "activeVitest": 198,
     "support": 22,
     "manual": 4,
     "legacyOrphan": 50,
@@ -56,6 +56,7 @@
       "test/unit/config/npmPublicationPolicy.test.ts",
       "test/unit/config/testTopology.test.ts",
       "test/unit/config/unitTestEnvironmentIsolation.test.ts",
+      "test/unit/config/workflowTopology.test.ts",
       "test/unit/docs/publicContract.test.ts",
       "test/unit/formatters/bibleFormatter.test.ts",
       "test/unit/formatters/commentaryFormatter.test.ts",
