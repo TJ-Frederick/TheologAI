@@ -80,13 +80,21 @@ describe('workflow topology', () => {
         head: \${{ steps.classify.outputs.head }}
         changed_path_evidence_json: \${{ steps.classify.outputs.changed_path_evidence_json }}
     `));
-    expect(classifier).toContain('if [ "$GITHUB_EVENT_NAME" = \'workflow_dispatch\' ]; then');
-    expect(classifier).toContain('if [ "$GITHUB_REF" != \'refs/heads/main\' ]; then');
-    expect(classifier).toContain('before="$(git rev-parse HEAD^1)"');
-    expect(classifier).toContain("grep -Eq '^[0-9a-fA-F]{40}$'");
+    expect(classifier).toContain('PRODUCTION_RELEASE_EVENT_NAME: ${{ github.event_name }}');
+    expect(classifier).toContain('PRODUCTION_RELEASE_REF: ${{ github.ref }}');
+    expect(classifier).toContain('PRODUCTION_RELEASE_PUSH_BEFORE: ${{ github.event.before }}');
+    expect(classifier).toContain('PRODUCTION_RELEASE_HEAD: ${{ github.sha }}');
+    expect(classifier).toContain('PRODUCTION_RELEASE_FIRST_PARENT="$(git rev-parse HEAD^1)"');
+    expect(classifier).toContain('release_context="$(node scripts/resolve-production-release-context.mjs)"');
+    expect(classifier).toContain('Object.keys(value).length !== keys.length');
+    expect(classifier).toContain('process.stdout.write(value.before);');
+    expect(classifier).toContain("grep -Eq '^[0-9a-f]{40}$'");
     expect(classifier).toContain('git cat-file -e "${before}^{commit}"');
     expect(classifier).toContain('git merge-base --is-ancestor "$before" HEAD');
-    expect(classifier).not.toMatch(/run:\s*\|[\s\S]*?\$\{\{\s*github\.ref\s*\}\}/);
+    expect(classifier).toContain('echo "reason=$selection_reason"');
+    expect(classifier).toContain('--before "$before"');
+    expect(classifier).toContain('--after "$PRODUCTION_RELEASE_HEAD"');
+    expect(classifier).not.toMatch(/run:\s*\|[\s\S]*?\$\{\{\s*github\./);
     expect(classifier).not.toContain('${{ inputs.reason }}');
 
     expect(deploy).toContain('needs: classify-deployment');

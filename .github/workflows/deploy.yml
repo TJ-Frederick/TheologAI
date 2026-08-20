@@ -40,22 +40,51 @@ jobs:
 
       - name: Classify exact production change set
         id: classify
+        env:
+          PRODUCTION_RELEASE_EVENT_NAME: ${{ github.event_name }}
+          PRODUCTION_RELEASE_REF: ${{ github.ref }}
+          PRODUCTION_RELEASE_PUSH_BEFORE: ${{ github.event.before }}
+          PRODUCTION_RELEASE_HEAD: ${{ github.sha }}
         run: |
-          if [ "$GITHUB_EVENT_NAME" = 'workflow_dispatch' ]; then
-            if [ "$GITHUB_REF" != 'refs/heads/main' ]; then
-              echo 'Manual production deployment is restricted to refs/heads/main.' >&2
-              exit 1
-            fi
-            before="$(git rev-parse HEAD^1)"
-            printf '%s' "$before" | grep -Eq '^[0-9a-fA-F]{40}$'
-            git cat-file -e "${before}^{commit}"
-            git merge-base --is-ancestor "$before" HEAD
+          PRODUCTION_RELEASE_FIRST_PARENT=''
+          if [ "$PRODUCTION_RELEASE_EVENT_NAME" = 'workflow_dispatch' ]; then
+            PRODUCTION_RELEASE_FIRST_PARENT="$(git rev-parse HEAD^1)"
+          fi
+          export PRODUCTION_RELEASE_FIRST_PARENT
+          release_context="$(node scripts/resolve-production-release-context.mjs)"
+          node --input-type=module -e '
+            const value = JSON.parse(process.argv[1]);
+            const keys = ["before", "mode", "forceDeploy", "customDomainRequired", "reason"];
+            if (
+              typeof value !== "object" || value === null || Array.isArray(value) ||
+              Object.keys(value).length !== keys.length ||
+              keys.some(key => !Object.hasOwn(value, key)) ||
+              typeof value.before !== "string" ||
+              !["push", "manual"].includes(value.mode) ||
+              typeof value.forceDeploy !== "boolean" ||
+              typeof value.customDomainRequired !== "boolean" ||
+              typeof value.reason !== "string"
+            ) throw new Error("invalid production release context record");
+          ' "$release_context"
+          before="$(node --input-type=module -e 'const value = JSON.parse(process.argv[1]); process.stdout.write(value.before);' "$release_context")"
+          mode="$(node --input-type=module -e 'const value = JSON.parse(process.argv[1]); process.stdout.write(value.mode);' "$release_context")"
+          force_deploy="$(node --input-type=module -e 'const value = JSON.parse(process.argv[1]); process.stdout.write(String(value.forceDeploy));' "$release_context")"
+          custom_domain_required="$(node --input-type=module -e 'const value = JSON.parse(process.argv[1]); process.stdout.write(String(value.customDomainRequired));' "$release_context")"
+          selection_reason="$(node --input-type=module -e 'const value = JSON.parse(process.argv[1]); process.stdout.write(value.reason);' "$release_context")"
+          printf '%s' "$before" | grep -Eq '^[0-9a-f]{40}$'
+          git cat-file -e "${before}^{commit}"
+          git merge-base --is-ancestor "$before" HEAD
+          if [ "$mode" = 'manual' ]; then
+            test "$PRODUCTION_RELEASE_EVENT_NAME" = 'workflow_dispatch'
+            test "$force_deploy" = 'true'
+            test "$custom_domain_required" = 'true'
+            test "$selection_reason" = 'manual-main-dispatch'
             head="$(git rev-parse HEAD)"
             {
               echo 'classification_succeeded=true'
               echo 'deploy_required=true'
               echo 'decision=deploy'
-              echo 'reason=manual-main-dispatch'
+              echo "reason=$selection_reason"
               echo "base=$before"
               echo "head=$head"
               echo 'changed_path_evidence_json=[]'
@@ -65,7 +94,7 @@ jobs:
               echo
               echo '- Decision: **deploy required**'
               echo '- Classification succeeded: `true`'
-              echo '- Reason: `manual-main-dispatch`'
+              echo "- Reason: \`$selection_reason\`"
               echo "- Base: \`$before\`"
               echo "- Head: \`$head\`"
               echo
@@ -74,9 +103,14 @@ jobs:
             } >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
+          test "$mode" = 'push'
+          test "$PRODUCTION_RELEASE_EVENT_NAME" = 'push'
+          test "$force_deploy" = 'false'
+          test "$custom_domain_required" = 'false'
+          test "$selection_reason" = 'push-before'
           node scripts/classify-production-deployment.mjs \
-            --before '${{ github.event.before }}' \
-            --after '${{ github.sha }}' \
+            --before "$before" \
+            --after "$PRODUCTION_RELEASE_HEAD" \
             --head "$(git rev-parse HEAD)"
 
   deploy:
@@ -104,15 +138,34 @@ jobs:
 
       - name: Resolve production release comparison context
         id: production-release-context
+        env:
+          PRODUCTION_RELEASE_EVENT_NAME: ${{ github.event_name }}
+          PRODUCTION_RELEASE_REF: ${{ github.ref }}
+          PRODUCTION_RELEASE_PUSH_BEFORE: ${{ github.event.before }}
         run: |
-          if [ '${{ github.event_name }}' = 'workflow_dispatch' ]; then
-            before="$(git rev-parse HEAD^1)"
-            custom_domain_required=true
-          else
-            before='${{ github.event.before }}'
-            custom_domain_required=false
+          PRODUCTION_RELEASE_FIRST_PARENT=''
+          if [ "$PRODUCTION_RELEASE_EVENT_NAME" = 'workflow_dispatch' ]; then
+            PRODUCTION_RELEASE_FIRST_PARENT="$(git rev-parse HEAD^1)"
           fi
-          printf '%s' "$before" | grep -Eq '^[0-9a-fA-F]{40}$'
+          export PRODUCTION_RELEASE_FIRST_PARENT
+          release_context="$(node scripts/resolve-production-release-context.mjs)"
+          node --input-type=module -e '
+            const value = JSON.parse(process.argv[1]);
+            const keys = ["before", "mode", "forceDeploy", "customDomainRequired", "reason"];
+            if (
+              typeof value !== "object" || value === null || Array.isArray(value) ||
+              Object.keys(value).length !== keys.length ||
+              keys.some(key => !Object.hasOwn(value, key)) ||
+              typeof value.before !== "string" ||
+              !["push", "manual"].includes(value.mode) ||
+              typeof value.forceDeploy !== "boolean" ||
+              typeof value.customDomainRequired !== "boolean" ||
+              typeof value.reason !== "string"
+            ) throw new Error("invalid production release context record");
+          ' "$release_context"
+          before="$(node --input-type=module -e 'const value = JSON.parse(process.argv[1]); process.stdout.write(value.before);' "$release_context")"
+          custom_domain_required="$(node --input-type=module -e 'const value = JSON.parse(process.argv[1]); process.stdout.write(String(value.customDomainRequired));' "$release_context")"
+          printf '%s' "$before" | grep -Eq '^[0-9a-f]{40}$'
           git cat-file -e "${before}^{commit}"
           git merge-base --is-ancestor "$before" HEAD
           {
