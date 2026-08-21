@@ -94,12 +94,7 @@
     "test:e2e:compiled": "tsx scripts/test-node-http-e2e.ts",
     "test:e2e:stdio": "tsx scripts/test-node-stdio-e2e.ts",
     "test:coverage": "vitest run --coverage",
-    "test:ccel": "vitest run test/unit/adapters/commentary/CcelSearchAdapter.test.ts test/unit/services/historical/CcelUpstreamCoordinator.test.ts test/unit/presenters/primarySourceSearchV4Structured.test.ts test/unit/http/worker/ccelOperator.test.ts test/unit/scripts/ccelCoordinatorOperator.test.ts test/unit/scripts/ccelLivePreviewCanary.test.ts",
-    "test:netbible": "tsx test/adapters/netbible-test.ts",
-    "test:bibleapi": "tsx test/adapters/bibleapi-test.ts",
-    "test:commentary": "tsx test/integration/public-commentary-test.ts",
-    "test:all-books": "tsx test/integration/all-books-mapping-test.ts",
-    "test:helloao-bible": "tsx test/adapters/helloao-bible-test.ts"
+    "test:ccel": "vitest run test/unit/adapters/commentary/CcelSearchAdapter.test.ts test/unit/services/historical/CcelUpstreamCoordinator.test.ts test/unit/presenters/primarySourceSearchV4Structured.test.ts test/unit/http/worker/ccelOperator.test.ts test/unit/scripts/ccelCoordinatorOperator.test.ts test/unit/scripts/ccelLivePreviewCanary.test.ts"
   },
   "keywords": [
     "bible",

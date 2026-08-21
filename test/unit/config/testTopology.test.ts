@@ -12,7 +12,12 @@ interface TopologyManifest {
   partitions: Record<PartitionName, string[]>;
   maintainedTypeScriptEntrypointsOutsideTest: Array<{ path: string; packageScript: string }>;
   separatelyOwnedEntrypoints: Array<{ path: string; packageScript: string; owner: string }>;
-  knownBrokenCommands: Array<{ name: string; target: string; failureCause: string }>;
+  retiredCommands: Array<{
+    name: string;
+    formerTarget: string;
+    failureCause: string;
+    status: 'retired';
+  }>;
 }
 
 const repoRoot = path.resolve(fileURLToPath(new URL('../../../', import.meta.url)));
@@ -127,8 +132,8 @@ describe('test topology manifest', () => {
     ]);
   });
 
-  it('documents exactly five unsupported broken commands without executing legacy targets', () => {
-    expect(manifest.knownBrokenCommands.map(({ name }) => name)).toEqual([
+  it('retires exactly five former commands without executing legacy targets', () => {
+    expect(manifest.retiredCommands.map(({ name }) => name)).toEqual([
       'test:all-books',
       'test:bibleapi',
       'test:commentary',
@@ -136,23 +141,34 @@ describe('test topology manifest', () => {
       'test:netbible',
     ]);
 
-    const expectedCommands: Record<string, string> = {
-      'test:all-books': 'tsx test/integration/all-books-mapping-test.ts',
-      'test:bibleapi': 'tsx test/adapters/bibleapi-test.ts',
-      'test:commentary': 'tsx test/integration/public-commentary-test.ts',
-      'test:helloao-bible': 'tsx test/adapters/helloao-bible-test.ts',
-      'test:netbible': 'tsx test/adapters/netbible-test.ts',
+    const expectedFormerTargets: Record<string, string> = {
+      'test:all-books': 'test/integration/all-books-mapping-test.ts',
+      'test:bibleapi': 'test/adapters/bibleapi-test.ts',
+      'test:commentary': 'test/integration/public-commentary-test.ts',
+      'test:helloao-bible': 'test/adapters/helloao-bible-test.ts',
+      'test:netbible': 'test/adapters/netbible-test.ts',
     };
-    for (const entry of manifest.knownBrokenCommands) {
-      expect(packageJson.scripts[entry.name]).toBe(expectedCommands[entry.name]);
+    for (const entry of manifest.retiredCommands) {
+      expect(Object.keys(entry).sort()).toEqual(['failureCause', 'formerTarget', 'name', 'status']);
+      expect(packageJson.scripts).not.toHaveProperty(entry.name);
+      expect(entry.formerTarget).toBe(expectedFormerTargets[entry.name]);
       expect(entry.failureCause.length).toBeGreaterThan(0);
+      expect(entry.status).toBe('retired');
     }
+
+    const extantFormerTargets = [
+      'test:all-books',
+      'test:commentary',
+      'test:helloao-bible',
+      'test:netbible',
+    ].map((name) => expectedFormerTargets[name]);
+    expect(extantFormerTargets.every((target) => manifest.partitions.legacyOrphan.includes(target))).toBe(true);
+    expect(fs.existsSync(path.join(repoRoot, expectedFormerTargets['test:bibleapi']))).toBe(false);
 
     const allowedTestTargets = new Set([
       ...manifest.partitions.activeVitest,
       ...manifest.partitions.manual,
       ...manifest.partitions.conformance,
-      ...manifest.knownBrokenCommands.map(({ target }) => target),
     ]);
     const scriptedTestTargets = Object.values(packageJson.scripts)
       .flatMap((command) => command.match(/test\/[A-Za-z0-9_./-]+\.ts/g) ?? []);
