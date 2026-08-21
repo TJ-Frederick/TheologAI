@@ -339,31 +339,36 @@
       "owner": "MACULA Gate-1"
     }
   ],
-  "knownBrokenCommands": [
+  "retiredCommands": [
     {
       "name": "test:all-books",
-      "target": "test/integration/all-books-mapping-test.ts",
-      "failureCause": "imports removed src/utils/commentaryMapper.js"
+      "formerTarget": "test/integration/all-books-mapping-test.ts",
+      "failureCause": "imports removed src/utils/commentaryMapper.js",
+      "status": "retired"
     },
     {
       "name": "test:bibleapi",
-      "target": "test/adapters/bibleapi-test.ts",
-      "failureCause": "target file is absent"
+      "formerTarget": "test/adapters/bibleapi-test.ts",
+      "failureCause": "target file is absent",
+      "status": "retired"
     },
     {
       "name": "test:commentary",
-      "target": "test/integration/public-commentary-test.ts",
-      "failureCause": "imports removed commentary adapter, service, and mapper modules"
+      "formerTarget": "test/integration/public-commentary-test.ts",
+      "failureCause": "imports removed commentary adapter, service, and mapper modules",
+      "status": "retired"
     },
     {
       "name": "test:helloao-bible",
-      "target": "test/adapters/helloao-bible-test.ts",
-      "failureCause": "imports removed src/adapters/helloaoBibleAdapter.js"
+      "formerTarget": "test/adapters/helloao-bible-test.ts",
+      "failureCause": "imports removed src/adapters/helloaoBibleAdapter.js",
+      "status": "retired"
     },
     {
       "name": "test:netbible",
-      "target": "test/adapters/netbible-test.ts",
-      "failureCause": "imports removed src/adapters/netBibleApi.js"
+      "formerTarget": "test/adapters/netbible-test.ts",
+      "failureCause": "imports removed src/adapters/netBibleApi.js",
+      "status": "retired"
     }
   ]
 }

@@ -42,11 +42,11 @@ The legacy inventory is a quarantine ledger, not deletion authority. Moving,
 executing, migrating, or deleting one of those paths requires a separate
 reviewed change that updates the manifest in the same slice.
 
-## Known unsupported commands
+## Retired legacy commands
 
-The following package scripts are retained temporarily as explicit broken
-compatibility records. They are not supported commands and must not be run or
-silently repointed to tests with different semantics:
+The following former package commands have been removed. They are not runnable
+aliases and must not be reintroduced or silently repointed to maintained tests
+with different semantics:
 
 - `test:bibleapi`
 - `test:netbible`
@@ -54,7 +54,7 @@ silently repointed to tests with different semantics:
 - `test:all-books`
 - `test:helloao-bible`
 
-Their exact targets and failure causes are recorded in
-`test/test-topology.json`. A later command-honesty slice will retire or
-quarantine them explicitly without activating provider, credential, network,
-or legacy code paths.
+Their exact former targets, failure causes, and `retired` status are retained
+as closed provenance in `test/test-topology.json`. The four surviving former
+targets remain quarantined under `legacyOrphan`; the former Bible API target
+is absent. None may be executed, imported, or repointed through this record.
