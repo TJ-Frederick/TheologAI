@@ -42,6 +42,7 @@ import { OriginalLanguageStudyV2ContextProvider } from '../../services/languages
 import { SourceAttestedParallelService } from '../../services/bible/SourceAttestedParallelService.js';
 
 import { createToolRegistry } from '../toolRegistry.js';
+import { bindPrimarySourceSearch, type PrimarySourceSearchBinding } from '../v2/primarySourceSearch.js';
 
 // Donation
 import { OnChainVerifier } from '../../adapters/donation/OnChainVerifier.js';
@@ -66,6 +67,7 @@ export interface WorkerCompositionRoot {
   tools: ToolHandler[];
   services: WorkerServices;
   primarySourceContract: ReturnType<typeof readPrimarySourceFeatureFlags>;
+  primarySourceSearch: PrimarySourceSearchBinding;
 }
 
 // ── Module-scope singletons (created once per isolate) ──
@@ -145,6 +147,7 @@ export function createWorkerCompositionRoot(env: Env): WorkerCompositionRoot {
     primarySourceContract,
     primarySourceContract.liveCcelEnabled ? createWorkerCcelUpstreamCoordinator(env, primarySourceContract) : undefined,
   );
+  const primarySourceSearch = bindPrimarySourceSearch(primarySourceSearchService, primarySourceContract);
   const strongsService = new StrongsService(strongsRepo, morphRepo);
   const morphService = new MorphologyService(morphRepo);
   const originalLanguageStudyService = new OriginalLanguageStudyService(morphRepo, strongsRepo);
@@ -163,8 +166,7 @@ export function createWorkerCompositionRoot(env: Env): WorkerCompositionRoot {
     parallelPassageService: parallelService,
     commentaryService,
     historicalService,
-    primarySourceSearchService,
-    primarySourceContract,
+    primarySourceSearchTool: primarySourceSearch.tool,
     strongsService,
     morphologyService: morphService,
     originalLanguageStudyCoordinator,
@@ -175,5 +177,6 @@ export function createWorkerCompositionRoot(env: Env): WorkerCompositionRoot {
     tools,
     services: { bibleService, commentaryService, historicalService, strongsService, sourceAttestedParallelService },
     primarySourceContract,
+    primarySourceSearch,
   };
 }

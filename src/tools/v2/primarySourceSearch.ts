@@ -2,11 +2,11 @@ import type { ToolHandler } from '../../kernel/types.js';
 import { handleToolError } from '../../kernel/errors.js';
 import type { PrimarySourceSearchService } from '../../services/historical/PrimarySourceSearchService.js';
 import { formatPrimarySourceSearchFallback, PRIMARY_SOURCE_FALLBACK_MAX_BYTES } from '../../formatters/primarySourceFormatter.js';
-import { primarySourceSearchV6OutputSchema, primarySourceSearchV7OutputSchema } from '../../mcp/schemas/primarySourceSearchV4.js';
 import { buildLocalDocumentResourceUri } from '../../kernel/documentResource.js';
 import type { ResourceLink } from '@modelcontextprotocol/sdk/types.js';
-import type { PrimarySourceContractConfig } from '../../kernel/featureFlags.js';
 import { DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG } from '../../kernel/featureFlags.js';
+import type { PrimarySourceContractConfig } from '../../kernel/featureFlags.js';
+import { createPrimarySourceSearchDescriptor, type PrimarySourceSearchDescriptor } from '../../mcp/primarySourceSearchDescriptor.js';
 import {
   presentPrimarySourceSearchV6,
   type PresentedPrimarySourceSearchV4,
@@ -15,115 +15,37 @@ import {
   PRIMARY_SOURCE_V4_MAX_BYTES,
 } from '../../presenters/primarySourceSearchV4Structured.js';
 
+export interface PrimarySourceSearchBinding {
+  readonly descriptor: PrimarySourceSearchDescriptor;
+  readonly tool: ToolHandler;
+}
+
+export function bindPrimarySourceSearch(
+  service: Pick<PrimarySourceSearchService, 'search'>,
+  contract: Pick<PrimarySourceContractConfig, 'contractVersion'> = DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG,
+): PrimarySourceSearchBinding {
+  const descriptor = createPrimarySourceSearchDescriptor(contract.contractVersion);
+  return { descriptor, tool: createPrimarySourceSearchHandler(service, descriptor) };
+}
+
 export function createPrimarySourceSearchHandler(
   service: Pick<PrimarySourceSearchService, 'search'>,
-  contract: PrimarySourceContractConfig = DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG,
+  descriptorOrContract: PrimarySourceSearchDescriptor | Pick<PrimarySourceContractConfig, 'contractVersion'> = createPrimarySourceSearchDescriptor(DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG.contractVersion),
 ): ToolHandler {
-  const v5 = contract.contractVersion === '7';
+  const descriptor = 'inputSchema' in descriptorOrContract
+    ? descriptorOrContract
+    : createPrimarySourceSearchDescriptor(descriptorOrContract.contractVersion);
   return {
-    name: 'primary_source_search',
-    description: v5
-      ? 'Search the curated 35-work historical catalog first. Use searchDepth expanded only when a bounded, separately labeled external-discovery set could help; its unreviewed direct-URL snippets are discovery leads, not evidence. Per-hit edition readiness states the available provenance.'
-      : 'Execute an explicit, bounded query plan against the locally indexed historical-document collection. Supports exact catalog work aliases, exact reviewed creator names, and inclusive overlapping composition-year ranges. Returns catalog scope, snippets, and exact local section locators only; read selected exact resources before quotation or comparison.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        queries: {
-          type: 'array', minItems: 1, maxItems: 4,
-          items: {
-            type: 'object',
-            properties: {
-              id: { type: 'string', minLength: 1, maxLength: 40, pattern: '^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$' },
-              text: { type: 'string', minLength: 1, maxLength: 200 },
-              ...(v5 ? {
-                searchDepth: { type: 'string', enum: ['standard', 'expanded'], default: 'standard', description: 'standard searches the curated 35-work catalog. expanded keeps that search and adds one separately labeled bounded external-discovery group; at most one query per call may be expanded.' },
-                expandedLimit: { type: 'integer', minimum: 1, maximum: 5, default: 3, description: 'Expanded-discovery result cap. Valid only with searchDepth expanded.' },
-              } : {
-                providers: { type: 'array', minItems: 1, maxItems: 1, uniqueItems: true, items: { type: 'string', enum: ['local'] }, description: 'Current public provider contract. Only the locally indexed collection is available.' },
-              }),
-              match: { type: 'string', enum: ['all_terms', 'phrase'], default: 'all_terms' },
-              selection: {
-                type: 'string', enum: ['relevance', 'work_diversity'], default: 'relevance',
-                description: v5
-                  ? 'Use relevance for within-work location; use work_diversity for a deterministic curated-catalog survey.'
-                  : 'Use relevance for within-work location; use work_diversity for deterministic research bundles that round-robin across matching hosted works.',
-              },
-              author: {
-                type: 'string', minLength: 1, maxLength: 100,
-                description: v5
-                  ? 'One exact reviewed creator name for the catalog search; expanded discovery uses the same literal restriction without treating it as reviewed external metadata.'
-                  : 'One exact reviewed creator name. Use separate query-plan items for different creators; creator roles are not relabeled as authorship.',
-              },
-              work: {
-                type: 'string', minLength: 1, maxLength: 160,
-                description: v5
-                  ? 'Exact catalog slug, title, or routing alias; expanded discovery uses the same literal restriction without treating it as reviewed external metadata.'
-                  : 'Exact hosted work slug, title, or lookup-only alias.',
-              },
-              startYear: {
-                type: 'integer', minimum: -5000, maximum: 3000,
-                description: v5
-                  ? 'Inclusive catalog composition-overlap lower bound when reviewed dates are available. Expanded discovery deliberately omits it and warns that broader results are not date-filtered.'
-                  : 'Inclusive lower bound. A work is eligible when its reviewed composition interval overlaps the requested interval.',
-              },
-              endYear: {
-                type: 'integer', minimum: -5000, maximum: 3000,
-                description: v5
-                  ? 'Inclusive catalog composition-overlap upper bound when reviewed dates are available; must be >= startYear. Expanded discovery deliberately omits it and warns that broader results are not date-filtered.'
-                  : 'Inclusive upper bound. Must be greater than or equal to startYear when both are provided.',
-              },
-              page: v5
-                ? {
-                  type: 'integer', const: 1, default: 1,
-                  description: 'Curated-catalog page. Page 1 only.',
-                }
-                : {
-                  type: 'integer', minimum: 1, maximum: 3, default: 1,
-                  description: 'Preserved planner field. The local provider supports only page 1 and reports unsupported_filter otherwise.',
-                },
-              limit: {
-                type: 'integer', minimum: 1, maximum: 8, default: 5,
-                ...(v5 ? { description: 'Curated-catalog maximum is 8. Use expandedLimit for the separately bounded expanded-discovery group.' } : {}),
-              },
-            },
-            required: v5 ? ['id', 'text'] : ['id', 'text', 'providers'],
-            ...(v5 ? {
-              allOf: [
-                {
-                  if: { required: ['expandedLimit'] },
-                  then: {
-                    required: ['searchDepth'],
-                    properties: { searchDepth: { const: 'expanded' } },
-                  },
-                },
-                {
-                  if: {
-                    required: ['searchDepth'],
-                    properties: { searchDepth: { const: 'expanded' } },
-                  },
-                  then: { properties: { page: { const: 1 } } },
-                },
-              ],
-            } : {}),
-            additionalProperties: false,
-          },
-        },
-      },
-      required: ['queries'],
-      additionalProperties: false,
-    },
-    outputSchema: v5 ? primarySourceSearchV7OutputSchema : primarySourceSearchV6OutputSchema,
-    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: v5 },
+    name: descriptor.name, description: descriptor.description, inputSchema: descriptor.inputSchema,
+    outputSchema: descriptor.outputSchema, annotations: descriptor.annotations,
     handler: async params => {
       try {
-        const queries = !v5 && Array.isArray(params.queries)
-          ? params.queries.map(query => ({
-              ...(query as Record<string, unknown>),
-              providers: ['local'],
-            }))
+        const v7 = descriptor.contractVersion === '7';
+        const queries = !v7 && Array.isArray(params.queries)
+          ? params.queries.map(query => ({ ...(query as Record<string, unknown>), providers: ['local'] }))
           : params.queries;
         const result = await service.search({ ...params, queries });
-        const presented = v5 ? presentPrimarySourceSearchV7(result) : presentPrimarySourceSearchV6(result);
+        const presented = v7 ? presentPrimarySourceSearchV7(result) : presentPrimarySourceSearchV6(result);
         const links = localSectionResourceLinks(presented);
         const fallback = formatPrimarySourceSearchFallback(presented);
         const unavailable = presented.planStatus === 'unavailable';

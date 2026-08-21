@@ -27,6 +27,7 @@ import { OriginalLanguageStudyService } from '../../src/services/languages/Origi
 import { OriginalLanguageStudyV2Coordinator } from '../../src/services/languages/OriginalLanguageStudyV2Coordinator.js';
 import { OriginalLanguageStudyV2ContextProvider } from '../../src/services/languages/OriginalLanguageStudyV2ContextProvider.js';
 import { createToolRegistry } from '../../src/tools/toolRegistry.js';
+import { bindPrimarySourceSearch } from '../../src/tools/v2/primarySourceSearch.js';
 import type { WorkerCompositionRoot } from '../../src/tools/worker/index.js';
 
 export type DeterministicMcpRoot = McpCompositionRoot & WorkerCompositionRoot;
@@ -178,6 +179,7 @@ export function createDeterministicMcpFixture(): DeterministicMcpFixture {
     ubsSemanticEvidenceBundleRepository,
   );
   const donationService = new DonationService(onChainVerifier);
+  const primarySourceSearch = bindPrimarySourceSearch(primarySourceSearchService, primarySourceContract);
 
   const root = {
     tools: createToolRegistry({
@@ -186,8 +188,7 @@ export function createDeterministicMcpFixture(): DeterministicMcpFixture {
       parallelPassageService,
       commentaryService,
       historicalService,
-      primarySourceSearchService,
-      primarySourceContract,
+      primarySourceSearchTool: primarySourceSearch.tool,
       strongsService,
       morphologyService,
       originalLanguageStudyCoordinator,
@@ -195,6 +196,7 @@ export function createDeterministicMcpFixture(): DeterministicMcpFixture {
     }),
     services: { bibleService, commentaryService, historicalService, strongsService, sourceAttestedParallelService },
     primarySourceContract,
+    primarySourceSearch,
   } satisfies DeterministicMcpRoot;
 
   return { root, biblePassageCalls };

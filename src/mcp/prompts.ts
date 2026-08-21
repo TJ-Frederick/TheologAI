@@ -5,8 +5,7 @@ import { parseReference } from '../kernel/reference.js';
 import { parseStrongsIdentity } from '../kernel/strongs.js';
 import { PUBLIC_DONATION_URL } from '../kernel/publicUrls.js';
 import { validatePromptArguments } from './validation.js';
-import type { PrimarySourceContractConfig } from '../kernel/featureFlags.js';
-import { DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG } from '../kernel/featureFlags.js';
+import { createPrimarySourceSearchDescriptor, type PrimarySourceSearchDescriptor } from './primarySourceSearchDescriptor.js';
 
 export interface RecommendedToolCall {
   tool: string;
@@ -59,7 +58,7 @@ function containingChapterReference(value: string): string {
 export function recommendedToolCallsForPrompt(
   name: string,
   args: Record<string, string> | undefined,
-  contract: PrimarySourceContractConfig = DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG,
+  descriptor: PrimarySourceSearchDescriptor = createPrimarySourceSearchDescriptor(),
 ): RecommendedToolCall[] {
   switch (name) {
     case 'word-study': {
@@ -122,7 +121,7 @@ export function recommendedToolCallsForPrompt(
           queries: [{
             id: 'confession-topic',
             text: topic,
-            ...(contract.contractVersion === '7' ? { searchDepth: 'expanded', expandedLimit: 3 } : { providers: ['local'] }),
+            ...(descriptor.contractVersion === '7' ? { searchDepth: 'expanded', expandedLimit: 3 } : { providers: ['local'] }),
             match: 'all_terms',
             selection: 'work_diversity',
             limit: 5,
@@ -151,17 +150,17 @@ export function recommendedToolCallsForPrompt(
           queries: (authors.length ? authors : [undefined]).map((author, index) => ({
             id: author ? `creator-${index + 1}` : work ? 'exact-local-work' : 'topic-survey',
             text: topic,
-            ...(contract.contractVersion === '7' ? { searchDepth: 'standard' } : { providers: ['local'] }),
+            ...(descriptor.contractVersion === '7' ? { searchDepth: 'standard' } : { providers: ['local'] }),
             match: 'all_terms',
             selection: work ? 'relevance' : 'work_diversity',
             ...scoped,
             ...(author ? { author } : {}),
-            ...(contract.contractVersion === '7' && index === 0 ? { searchDepth: 'expanded', expandedLimit: 3 } : {}),
+            ...(descriptor.contractVersion === '7' && index === 0 ? { searchDepth: 'expanded', expandedLimit: 3 } : {}),
             limit,
           })),
         },
       };
-      if (contract.contractVersion !== '7') return [localCall];
+      if (descriptor.contractVersion !== '7') return [localCall];
       // A prompt materialization may authorize only one expanded-discovery
       // attempt. Additional creator scopes remain standard catalog searches.
       return [localCall];
@@ -179,7 +178,7 @@ function callText(call: RecommendedToolCall): string {
 
 export function registerPromptHandlers(
   server: Server,
-  contract: PrimarySourceContractConfig = DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG,
+  descriptor: PrimarySourceSearchDescriptor = createPrimarySourceSearchDescriptor(),
 ): void {
   server.setRequestHandler(ListPromptsRequestSchema, async () => ({
     prompts: [
@@ -218,41 +217,41 @@ export function registerPromptHandlers(
       },
       {
         name: 'primary-source-research',
-        description: contract.contractVersion === '7'
+        description: descriptor.contractVersion === '7'
           ? 'Find curated primary-source evidence and optionally broaden discovery without treating snippets as evidence'
           : 'Find and read bounded evidence from the locally indexed historical collection',
         arguments: [
           {
             name: 'topic',
-            description: contract.contractVersion === '7'
+            description: descriptor.contractVersion === '7'
               ? 'Topic or terms for standard catalog research and optional expanded discovery.'
               : 'Topic or terms to find in the local historical collection',
             required: true,
           },
           {
             name: 'work',
-            description: contract.contractVersion === '7'
+            description: descriptor.contractVersion === '7'
               ? 'Optional exact catalog work title/slug. Expanded discovery reuses the literal text as an unreviewed search restriction, not shared reviewed metadata or an author name.'
               : 'Optional exact local work title or slug; not an author name',
             required: false,
           },
           {
             name: 'authors',
-            description: contract.contractVersion === '7'
+            description: descriptor.contractVersion === '7'
               ? 'Optional comma-separated creators. Each becomes a separate exact catalog creator query; only the first scope is broadened immediately, while later scopes remain standard searches. Creator roles remain explicit.'
               : 'Optional comma-separated canonical creator names. Each creator becomes a separate query; creator roles remain explicit.',
             required: false,
           },
           {
             name: 'startYear',
-            description: contract.contractVersion === '7'
+            description: descriptor.contractVersion === '7'
               ? 'Optional inclusive catalog composition-year lower bound as an integer string. Expanded discovery deliberately omits this bound and warns that broader results are not date-filtered.'
               : 'Optional inclusive composition-year lower bound as an integer string.',
             required: false,
           },
           {
             name: 'endYear',
-            description: contract.contractVersion === '7'
+            description: descriptor.contractVersion === '7'
               ? 'Optional inclusive catalog composition-year upper bound as an integer string. Expanded discovery deliberately omits this bound and warns that broader results are not date-filtered.'
               : 'Optional inclusive composition-year upper bound as an integer string.',
             required: false,
@@ -269,7 +268,7 @@ export function registerPromptHandlers(
     validatePromptArguments(name, args);
     // validatePromptArguments narrows both values after the permissive wire boundary.
     if (typeof name !== 'string') throw new Error('Unreachable prompt-name validation state');
-    const calls = recommendedToolCallsForPrompt(name, args, contract);
+    const calls = recommendedToolCallsForPrompt(name, args, descriptor);
 
     let text: string;
     switch (name) {
@@ -328,7 +327,7 @@ Use structured \`passages[]\` when available, compare by its \`translation\`, re
         const topic = args?.topic ?? '';
         const traditions = args?.traditions;
         const hint = traditions ? ` Focus on: ${traditions.split(',').map(item => item.trim()).join(', ')}.` : '';
-        text = contract.contractVersion === '7'
+        text = descriptor.contractVersion === '7'
           ? `Cross-tradition doctrinal comparison on "${topic}".${hint}
 
 1. **Inspect the curated catalog** — Read \`theologai://primary-sources/catalog\` with MCP \`resources/read\`. Use each work's returned readiness metadata; do not assume every edition has the same review state.
@@ -369,7 +368,7 @@ Use structured \`passages[]\` when available, compare by its \`translation\`, re
         const externalDateCallInstruction = startYear !== undefined || endYear !== undefined
           ? 'The service retains both year fields for catalog scope and omits them from expanded discovery; do not split or rewrite the plan.'
           : 'Do not add separate date assumptions to expanded results; the broader source cannot enforce reviewed composition years.';
-        text = contract.contractVersion === '7'
+        text = descriptor.contractVersion === '7'
           ? `Research primary-source evidence about "${topic}"${work ? ` within the requested work "${work}"` : ''}${authors.length ? ` for the separately scoped creators ${authors.map(value => `"${value}"`).join(', ')}` : ''}.
 
 1. **Inspect catalog scope** — Read \`theologai://primary-sources/catalog\` with MCP \`resources/read\`. Use its per-work and per-edition readiness metadata as returned; an absent creator is a catalog gap, not evidence that no other source exists.

@@ -19,6 +19,7 @@ import { classicTextsOutputSchema } from '../../../src/mcp/schemas/classicTexts.
 import { validateClassicTextsOutputSemantics } from '../../../src/presenters/classicTextsStructured.js';
 import { primarySourceSearchV6OutputSchema, primarySourceSearchV7OutputSchema } from '../../../src/mcp/schemas/primarySourceSearchV4.js';
 import { validatorFor } from '../../../src/mcp/validation.js';
+import { createPrimarySourceSearchDescriptor } from '../../../src/mcp/primarySourceSearchDescriptor.js';
 
 const connected: Array<{ client: Client; server: Server }> = [];
 type LogMessage = { level: string; logger?: string; data: unknown };
@@ -28,8 +29,11 @@ async function connect(
   logs?: LogMessage[],
   primarySourceContract = DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG,
 ): Promise<Client> {
+  const descriptor = createPrimarySourceSearchDescriptor(primarySourceContract.contractVersion);
+  const primarySourceSearchTool = tools.find(tool => tool.name === 'primary_source_search')
+    ?? createPrimarySourceSearchHandler({ search: vi.fn() } as never, descriptor);
   const root = {
-    tools,
+    tools: tools.includes(primarySourceSearchTool) ? tools : [...tools, primarySourceSearchTool],
     services: {
       bibleService: { getSupportedTranslations: () => ['ESV'] },
       commentaryService: { getAvailableCommentators: () => ['Test'] },
@@ -41,6 +45,7 @@ async function connect(
       strongsService: { lookup: async () => undefined },
     },
     primarySourceContract,
+    primarySourceSearch: { descriptor, tool: primarySourceSearchTool },
   };
   const server = createTheologAiMcpServer(root, 'output-validation-test').server;
   const client = new Client({ name: 'output-validation-client', version: '1.0.0' }, { capabilities: {} });

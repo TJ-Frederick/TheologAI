@@ -14,11 +14,9 @@ import { createCrossReferencesHandler } from './v2/crossReferences.js';
 import { createDonationConfigHandler } from './v2/donationConfig.js';
 import { createOriginalLanguageStudyHandler } from './v2/originalLanguageStudy.js';
 import { createParallelPassagesHandler } from './v2/parallelPassages.js';
-import { createPrimarySourceSearchHandler } from './v2/primarySourceSearch.js';
 import { createStrongsLookupHandler } from './v2/strongsLookup.js';
 import { createVerifyDonationHandler } from './v2/verifyDonation.js';
 import { createVerseMorphologyHandler } from './v2/verseMorphology.js';
-import type { PrimarySourceContractConfig } from '../kernel/featureFlags.js';
 
 export interface ToolRegistryDependencies {
   bibleService: Parameters<typeof createBibleLookupHandler>[0];
@@ -26,8 +24,7 @@ export interface ToolRegistryDependencies {
   parallelPassageService: Parameters<typeof createParallelPassagesHandler>[0];
   commentaryService: Parameters<typeof createCommentaryHandler>[0];
   historicalService: Parameters<typeof createClassicTextsHandler>[0];
-  primarySourceSearchService: Parameters<typeof createPrimarySourceSearchHandler>[0];
-  primarySourceContract: PrimarySourceContractConfig;
+  primarySourceSearchTool: ToolHandler;
   strongsService: Parameters<typeof createStrongsLookupHandler>[0];
   morphologyService: Parameters<typeof createVerseMorphologyHandler>[0];
   originalLanguageStudyCoordinator: Parameters<typeof createOriginalLanguageStudyHandler>[0];
@@ -41,7 +38,7 @@ export function createToolRegistry(dependencies: ToolRegistryDependencies): Tool
     createParallelPassagesHandler(dependencies.parallelPassageService),
     createCommentaryHandler(dependencies.commentaryService),
     createClassicTextsHandler(dependencies.historicalService),
-    createPrimarySourceSearchHandler(dependencies.primarySourceSearchService, dependencies.primarySourceContract),
+    dependencies.primarySourceSearchTool,
     createStrongsLookupHandler(dependencies.strongsService),
     createVerseMorphologyHandler(dependencies.morphologyService),
     createOriginalLanguageStudyHandler(dependencies.originalLanguageStudyCoordinator),
