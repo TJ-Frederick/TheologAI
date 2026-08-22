@@ -43,13 +43,16 @@ const REVOCATION_PREDICATE = normalized(`
 `);
 
 describe('workflow topology', () => {
-  it('keeps production classification isolated and deployment fail-open behind production', async () => {
+  it('publishes and verifies one fail-closed production plan before the sole environment job', async () => {
     const workflow = await readWorkflow('deploy.yml');
     const trigger = uniqueBlock(workflow, 'on:');
     const concurrency = uniqueBlock(workflow, 'concurrency:');
+    const jobs = uniqueBlock(workflow, 'jobs:');
     const classifier = uniqueBlock(workflow, '  classify-deployment:');
+    const verifier = uniqueBlock(workflow, '  verify-deployment-plan:');
     const deploy = uniqueBlock(workflow, '  deploy:');
-    const outputs = uniqueBlock(classifier, '    outputs:');
+    const classifierOutputs = uniqueBlock(classifier, '    outputs:');
+    const verifierOutputs = uniqueBlock(verifier, '    outputs:');
 
     expect(normalized(trigger)).toBe(normalized(`
       on:
@@ -64,21 +67,20 @@ describe('workflow topology', () => {
     `));
     expect(normalized(concurrency)).toBe('concurrency: group: deploy-production cancel-in-progress: false');
     expect(occurrences(workflow, '  classify-deployment:')).toBe(1);
+    expect(occurrences(workflow, '  verify-deployment-plan:')).toBe(1);
     expect(occurrences(workflow, '  deploy:')).toBe(1);
+    expect([...jobs.matchAll(/^  ([a-z][a-z0-9-]+):$/gm)].map(match => match[1])).toEqual([
+      'classify-deployment', 'verify-deployment-plan', 'deploy',
+    ]);
 
     expect(classifier).toContain('name: Classify Production Deployment');
     expect(classifier).toContain('permissions:\n      contents: read');
     expect(classifier).toContain('fetch-depth: 0');
-    expect(classifier).not.toMatch(/\n\s+environment:|secrets\.|wrangler|cloudflare/i);
-    expect(normalized(outputs)).toBe(normalized(`
+    expect(classifier).not.toMatch(/\n\s+environment:|secrets\.|wrangler|cloudflare|checks:\s*write/i);
+    expect(normalized(classifierOutputs)).toBe(normalized(`
       outputs:
-        classification_succeeded: \${{ steps.classify.outputs.classification_succeeded }}
-        deploy_required: \${{ steps.classify.outputs.deploy_required }}
-        decision: \${{ steps.classify.outputs.decision }}
-        reason: \${{ steps.classify.outputs.reason }}
-        base: \${{ steps.classify.outputs.base }}
-        head: \${{ steps.classify.outputs.head }}
-        changed_path_evidence_json: \${{ steps.classify.outputs.changed_path_evidence_json }}
+        artifact_name: \${{ steps.production-deployment-plan.outputs.artifact_name }}
+        plan_sha256: \${{ steps.production-deployment-plan.outputs.plan_sha256 }}
     `));
     expect(classifier).toContain('PRODUCTION_RELEASE_EVENT_NAME: ${{ github.event_name }}');
     expect(classifier).toContain('PRODUCTION_RELEASE_REF: ${{ github.ref }}');
@@ -94,14 +96,46 @@ describe('workflow topology', () => {
     expect(classifier).toContain('echo "reason=$selection_reason"');
     expect(classifier).toContain('--before "$before"');
     expect(classifier).toContain('--after "$PRODUCTION_RELEASE_HEAD"');
-    expect(classifier).not.toMatch(/run:\s*\|[\s\S]*?\$\{\{\s*github\./);
+    const classifierRunSources = [...classifier.matchAll(/        run: \|\n([\s\S]*?)(?=\n      - |$)/g)].map(match => match[1]);
+    expect(classifierRunSources.length).toBeGreaterThan(0);
+    for (const runSource of classifierRunSources) expect(runSource).not.toMatch(/\$\{\{\s*github\./);
     expect(classifier).not.toContain('${{ inputs.reason }}');
+    expect(classifier).toContain("GITHUB_STEP_SUMMARY='' node scripts/classify-production-deployment.mjs");
+    expect(classifier).toContain('node scripts/production-deployment-plan.mjs create');
+    expect(classifier).toContain('production-deployment-plan-${{ github.run_id }}-attempt-${{ github.run_attempt }}');
+    expect(occurrences(classifier, '        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1')).toBe(1);
+    expect(classifier).toContain('retention-days: 1');
+    expect(classifier).toContain('compression-level: 0');
+    expect(classifier).toContain('overwrite: false');
+    expect(classifier).toContain('include-hidden-files: false');
 
-    expect(deploy).toContain('needs: classify-deployment');
-    expect(deploy).toContain("if: ${{ always() && github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || needs.classify-deployment.result != 'success' || needs.classify-deployment.outputs.classification_succeeded != 'true' || needs.classify-deployment.outputs.deploy_required != 'false') }}");
+    expect(verifier).toContain('name: Verify Production Deployment Plan');
+    expect(verifier).toContain('needs: classify-deployment');
+    expect(verifier).toContain('permissions:\n      contents: read');
+    expect(verifier).toContain('fetch-depth: 0');
+    expect(verifier).not.toMatch(/\n\s+environment:|secrets\.|upload-artifact|wrangler|cloudflare|checks:\s*write/i);
+    expect(normalized(verifierOutputs)).toBe(normalized(`
+      outputs:
+        artifact_name: \${{ steps.verify.outputs.artifact_name }}
+        plan_sha256: \${{ steps.verify.outputs.plan_sha256 }}
+        deploy_required: \${{ steps.verify.outputs.deploy_required }}
+        decision: \${{ steps.verify.outputs.decision }}
+    `));
+    expect(verifier).toContain('actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1');
+    expect(verifier).toContain('name: ${{ needs.classify-deployment.outputs.artifact_name }}');
+    expect(verifier).toContain('digest-mismatch: error');
+    expect(verifier).toContain('node scripts/production-deployment-plan.mjs verify');
+    expect(verifier).toContain('value.classificationSucceeded !== true');
+
+    expect(deploy).toContain('needs: verify-deployment-plan');
+    expect(deploy).toContain("if: ${{ github.ref == 'refs/heads/main' && needs.verify-deployment-plan.outputs.deploy_required == 'true' && needs.verify-deployment-plan.outputs.decision == 'deploy' }}");
+    expect(deploy.slice(0, deploy.indexOf('    runs-on:'))).not.toContain('always()');
+    expect(deploy).not.toContain('needs.classify-deployment');
     expect(deploy).toContain('environment:\n      name: production\n      url: https://mcp.theologai.xyz/mcp');
     expect(deploy).toContain('permissions:\n      contents: read');
     expect(occurrences(workflow, '      name: production')).toBe(1);
+    expect(occurrences(workflow, '        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1')).toBe(2);
+    expect(workflow).not.toMatch(/checks:\s*write|github-token:|artifact-ids:|merge-multiple:\s*true|repository:|run-id:|pattern:/);
   });
 
   it('keeps the five PR checks and preview authorization boundary exact', async () => {

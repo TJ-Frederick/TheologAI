@@ -693,6 +693,29 @@ Production deployment is assigned to the GitHub `production` environment.
 Configure required reviewers there as a release gate. Both workflows pin the
 same Wrangler version used for local configuration validation.
 
+Before that environment can be queued, the unprivileged classifier writes one
+canonical `production-deployment-plan.json` plus its SHA-256 sidecar and uploads
+them as the run-attempt-specific
+`production-deployment-plan-<run-id>-attempt-<attempt>` gate artifact. The gate
+artifact is retained for one day and is API-visible independently of the
+protected job. A separate unprivileged job downloads that exact current-run
+artifact, checks its closed schema, digest, run identity, release context, Git
+identity, decision, and complete changed-path evidence, and independently
+reproduces the classifier result. A documentation-only push therefore completes
+verification and skips the protected job. A deploy-required push or main-only
+manual dispatch can queue the protected job only after verification succeeds;
+missing, malformed, stale, failed, or inconsistent evidence fails before the
+environment rather than falling through to deployment.
+
+After approval, the protected job downloads and revalidates the same gate
+artifact before `npm ci`, production secrets, Wrangler, Cloudflare, or D1 are
+used. If the one-day gate artifact expires while approval is pending, do not
+bypass this check: rerun the workflow to produce a new run-attempt-bound plan.
+The plan is one short-lived pre-deployment gate artifact, distinct from the
+seven 30-day post-deployment release-evidence artifacts. Successful protected
+releases continue to require all seven existing readiness, predecessor,
+cutover, edge-stabilization, final-routing, reconciliation, and audit artifacts.
+
 After environment approval and before deployment, each job runs a read-only D1
 readiness query that checks integrity, exact manifest row counts, and required
 indexes, column signatures, foreign keys, and schema/corpus identity markers. A

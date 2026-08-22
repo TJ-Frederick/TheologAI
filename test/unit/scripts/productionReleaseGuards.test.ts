@@ -70,6 +70,44 @@ describe('production release guards', () => {
     expect(workflow).not.toContain('d1 delete');
   });
 
+  it('revalidates the exact gate artifact before dependencies, secrets, Cloudflare, or D1 and retains seven release artifacts', async () => {
+    const workflow = await readFile(new URL('.github/workflows/deploy.yml', root), 'utf8');
+    const deployStart = workflow.indexOf('  deploy:');
+    const resolveContext = workflow.indexOf('Resolve production release comparison context', deployStart);
+    const downloadPlan = workflow.indexOf('Download verified production deployment plan gate', deployStart);
+    const revalidatePlan = workflow.indexOf('Revalidate production deployment plan after approval', deployStart);
+    const npmInstall = workflow.indexOf('- run: npm ci --no-audit', deployStart);
+    const customDomain = workflow.indexOf('Detect production custom-domain declaration change', deployStart);
+    const firstCloudflareRead = workflow.indexOf('Capture checked-out candidate production D1 mapping (read-only)', deployStart);
+    const deployMutation = workflow.indexOf('Deploy to Cloudflare Workers', deployStart);
+    expect([deployStart, resolveContext, downloadPlan, revalidatePlan, npmInstall, customDomain, firstCloudflareRead, deployMutation].every(index => index >= 0)).toBe(true);
+    expect(resolveContext).toBeLessThan(downloadPlan);
+    expect(downloadPlan).toBeLessThan(revalidatePlan);
+    expect(revalidatePlan).toBeLessThan(npmInstall);
+    expect(npmInstall).toBeLessThan(customDomain);
+    expect(customDomain).toBeLessThan(firstCloudflareRead);
+    expect(firstCloudflareRead).toBeLessThan(deployMutation);
+
+    const preRevalidation = workflow.slice(deployStart, revalidatePlan);
+    expect(preRevalidation).not.toMatch(/npm ci|secrets\.|wrangler|cloudflare|d1\b/i);
+    const revalidationToInstall = workflow.slice(revalidatePlan, npmInstall);
+    expect(revalidationToInstall).toContain('production-deployment-plan.mjs verify');
+    expect(revalidationToInstall).toContain('value.classificationSucceeded !== true');
+    expect(revalidationToInstall).toContain('value.deployRequired !== true');
+    expect(revalidationToInstall).not.toMatch(/secrets\.|wrangler|cloudflare|d1\b/i);
+
+    const deployJob = workflow.slice(deployStart);
+    expect((deployJob.match(/uses: actions\/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7\.0\.1/g) ?? [])).toHaveLength(7);
+    expect((deployJob.match(/retention-days: 30/g) ?? [])).toHaveLength(7);
+    const releaseUploads = [...deployJob.matchAll(/      - name: Upload [^\n]+[\s\S]*?(?=\n      - name:|$)/g)].map(match => match[0]);
+    expect(releaseUploads).toHaveLength(7);
+    for (const upload of releaseUploads) {
+      expect(upload).not.toContain('production-deployment-plan.json');
+      expect(upload).not.toContain('production-deployment-plan.sha256');
+      expect(upload).not.toContain('retention-days: 1\n');
+    }
+  });
+
   it('retains a non-strict final routing observation after every attempted deploy, while requiring it for a successful release', async () => {
     const workflow = await readFile(new URL('.github/workflows/deploy.yml', root), 'utf8');
     const historicalAuditScript = await readFile(new URL('../../../scripts/audit-historical-core-preview.ts', import.meta.url), 'utf8');
