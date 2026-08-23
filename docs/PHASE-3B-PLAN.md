@@ -1,5 +1,7 @@
 # Phase 3B plan
 
+<!-- theologai-release-authority v1 role=delivery-plan current=docs/CURRENT-RELEASE.md -->
+
 This document defines the next TheologAI delivery program after the protected
 schema-`0009` preview and production releases completed by PR #122. Earlier
 roadmap sections use "Phase 3" for already-shipped work; **Phase 3B** is the
@@ -11,12 +13,12 @@ are historical planning baselines, not current identity authority.
 
 ## Historical known-good starting point
 
-GitHub `main` is PR #122 merge
+At this plan's historical starting point, GitHub `main` was PR #122 merge
 `86475ecf8288cb0ebcb6467c77c0fd0998a8f1c2`, exact tree
 `8150aa29e7e4a22141edbfc9ab568df933f9c9b3`. Its five required CI checks
 passed. Protected production workflow `31631924636` completed successfully.
 
-| Surface | Active release | D1 | Product profile |
+| Surface | Historical starting release | D1 | Product profile |
 | --- | --- | --- | --- |
 | Production | deployment `e62698f3-f6b0-4145-97bf-28abdeae0e3a`; Worker `02174f95-abe2-480b-84bf-3e8c1a3a0320` (#100) | `theologai-production-20260811-schema0009-a` (`9bc79346-338b-439e-a2a5-424f4418eb21`) | v6 local-only; CCEL execution disabled |
 | Preview | deployment `4108d59a-4092-4389-824c-fa3820ab66f6`; Worker `70bbbecf-3fe6-4a04-8c34-babc3df09ad0` (#144) | `theologai-preview-20260811-schema0009-a` (`74f456e2-6951-4003-bb6f-91951342bf8f`) | v7 discovery-aware; CCEL execution disabled |
@@ -34,7 +36,8 @@ deployment `3d7489d9-7b48-4ad0-bdc6-95ffbda53bd8`, Worker
 (`53211f50-a893-4b4c-be1e-bc625a595dc7`). Retain both databases. Any rollback
 or deletion remains separately authorized.
 
-The production Worker is the exact PR #122 `main` merge. PR #123 subsequently
+At this plan's starting point, the production Worker was the exact PR #122
+`main` merge. PR #123 subsequently
 deployed its exact reviewed head `7fb3ec5113a16ed86bfc4a403a3ec3678d4d4dd0`
 (tree `28e555808ad3840d145a7ddd7e57934dc30e45c2`) to preview without changing
 the D1 binding. Its readiness, edge, original-language, historical-core, and

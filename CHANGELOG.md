@@ -1,5 +1,11 @@
 # Changelog
 
+<!-- theologai-release-authority v1 role=historical-changelog current=docs/CURRENT-RELEASE.md -->
+
+This changelog preserves dated change and release evidence; it is not the
+active assignment authority. See the
+[current release snapshot](docs/CURRENT-RELEASE.md) for present-tense identity.
+
 All notable changes to TheologAI will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
@@ -11,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Recorded the PR #96 production identity: source commit
+- Historically recorded the PR #96 production identity: source commit
   `ac4b5ed774302fbfc86bf846b6ee77a07beed456`, tree
   `adf08edbf6bfcb14b9613354b2b8fb9f62ec8c16`, canonical endpoint
   `https://mcp.theologai.xyz/mcp` (server `3.6.0`), deployment

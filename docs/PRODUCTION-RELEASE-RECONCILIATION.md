@@ -1,5 +1,7 @@
 # Production Release Reconciliation
 
+<!-- theologai-release-authority v1 role=historical-reconciliation current=docs/CURRENT-RELEASE.md -->
+
 For the active assignment, see the [designated current snapshot](CURRENT-RELEASE.md).
 This document records the completed PR #122 schema-`0009` production cutover,
 its immediate PR #108 rollback pair, older PR #101 history, and the safeguards

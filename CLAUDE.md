@@ -1,5 +1,12 @@
 # TheologAI — Development Guide
 
+<!-- theologai-release-authority v1 role=developer-guide current=docs/CURRENT-RELEASE.md -->
+
+This developer guide is not release-identity authority. For the sole active
+production and preview-control snapshot, see
+[`docs/CURRENT-RELEASE.md`](docs/CURRENT-RELEASE.md); release identities below
+are dated historical evidence.
+
 Production MCP server for theological research. Eleven tools, six prompts, eight Bible translations, six commentaries, 35 historical documents and works, Greek/Hebrew language tools, and on-chain donation support. Tools, resources, and prompts are available on every transport; MCP Logging is stdio-only because HTTP is stateless.
 
 <!-- theologai-public-contract tools=11 structured=bible_cross_references,bible_lookup,bible_verse_morphology,classic_text_lookup,commentary_lookup,donation_config,original_language_lookup,original_language_study,parallel_passages,primary_source_search,verify_donation -->
@@ -172,9 +179,10 @@ npm run build:stepbible:lexicons # STEPBible lexicons → src/data/
 
 The SQLite database (`data/theologai.db`) is a derived artifact. Cross-references, Strong's, morphology, and historical documents are all queried via FTS5-indexed SQLite.
 
-## Release-state boundary
+## Historical release-state evidence
 
-PR #108 is the current production release record. It merged as source commit
+The PR #108 record below is dated historical release evidence, not current
+today. It merged as source commit
 `8da99fd0a161b90a4bd90ab29bde1abf796b3bf6`. At the canonical endpoint
 `https://mcp.theologai.xyz/mcp`, protected workflow `30496350408` proved the
 same sole 100% Cloudflare production assignment before and after testing:
