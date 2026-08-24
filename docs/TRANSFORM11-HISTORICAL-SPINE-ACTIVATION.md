@@ -1,5 +1,10 @@
 # Transform 11 historical-spine activation
 
+<!-- theologai-release-authority v1 role=historical-activation current=docs/CURRENT-RELEASE.md -->
+
+This document records the dated Transform 11 activation and is not current
+release-identity authority. See the [current release snapshot](CURRENT-RELEASE.md).
+
 Transform 11 activates the two reviewed historical-spine source packs prepared
 in PR #105. The normal local build now has an exact allowlist of three packs,
 18 reviewed editions, 43 pinned source artifacts, and 1,057 sectioned sections.
@@ -99,7 +104,8 @@ Protected PR #108 workflow `30496350408` then deployed merge
 Historical core passed 8/8, Transform-11 spine passed 10/10,
 original-language passed 11/11, primary-source edge stabilization matched on
 attempt 4 and remained stable, and independent post-release review returned
-`SHIP`. Preserve the former PR #101 assignment for rollback: Worker
+`SHIP`. The former PR #101 assignment is retained as historical matched-pair
+evidence only; this record does not authorize rollback: Worker
 `bae58cd3-cad7-4663-879d-408accf061b0` (#96), deployment
 `71b76d24-bf5f-490e-adc4-31cf63fb046e`, and D1
 `theologai-production-20260728-hierarchy-a`

@@ -1,6 +1,12 @@
 # UBS Hebrew semantic foundation
 
-## Current production release record (PR #96; 2026-07-24)
+<!-- theologai-release-authority v1 role=historical-foundation current=docs/CURRENT-RELEASE.md -->
+
+This foundation records historical design, acquisition, and release evidence;
+it is not active deployment authority. See the
+[current release snapshot](CURRENT-RELEASE.md).
+
+## Historical production release record (PR #96; 2026-07-24)
 
 This foundation preserves the pre-release M4A design and acquisition record;
 those historical local-only statements are not current production-state claims.
@@ -248,7 +254,7 @@ model.
 
 The public semantic service and aggregate seam were unregistered in the
 historical M4A composition. The local adapters name the completed storage layout
-so it can be verified. PR #96's bounded v2 audit establishes the current public
+so it can be verified. PR #96's bounded v2 audit established the public
 result only; it must not be read as a claim that this historical seam is the
 current runtime path.
 

@@ -1,5 +1,7 @@
 # Worker operations
 
+<!-- theologai-release-authority v1 role=operations-runbook current=docs/CURRENT-RELEASE.md -->
+
 The [current release snapshot](CURRENT-RELEASE.md) is the designated current
 snapshot for this operations document. The dated records below retain release
 evidence and are not current identity authority.
@@ -8,7 +10,7 @@ evidence and are not current identity authority.
 
 The integrated checked-out normal build excludes the Transform-10 Aquinas
 hierarchy from all normal D1 corpora: it has no catalog, runtime, or MCP
-projection. In this dated record, Production is PR #122 merge
+projection. In this dated record, production was PR #122 merge
 `86475ecf8288cb0ebcb6467c77c0fd0998a8f1c2` (tree
 `8150aa29e7e4a22141edbfc9ab568df933f9c9b3`). Protected workflow
 `31631924636` deployed `e62698f3-f6b0-4145-97bf-28abdeae0e3a`, serving Worker
@@ -44,7 +46,7 @@ production binding observation is dated historical evidence, not current today;
 it proved the active binding, re-proved preview control after deployment and
 audits, and emitted the final environment-isolation receipt.
 
-In the dated release record, PR #123 completed the current protected preview release from
+In the dated release record, PR #123 completed that protected preview release from
 `7fb3ec5113a16ed86bfc4a403a3ec3678d4d4dd0` (tree
 `28e555808ad3840d145a7ddd7e57934dc30e45c2`); it is not current today. Cloudflare deployment
 `4108d59a-4092-4389-824c-fa3820ab66f6` assigns Worker
@@ -110,7 +112,7 @@ version, bound to D1 `theologai-production-20260723-a`
 (`3f7faa0e-689f-47aa-a601-dc662db9a6cf`).
 
 Protected production workflow run `30064214043` and GitHub deployment
-`5583281706` link that exact source/tree to the active Worker. The read-only D1
+`5583281706` historically linked that exact source/tree to the observed Worker. The read-only D1
 compatibility check passed against the bound production database.
 
 The production `original_language_study` v2 audit passed 11/11 cases. It made
@@ -721,12 +723,12 @@ readiness query that checks integrity, exact manifest row counts, and required
 indexes, column signatures, foreign keys, and schema/corpus identity markers. A
 missing, stale, partial, or incompatible corpus stops deployment.
 
-The current preview Transform-11 / 35-work release ran the same gate's complete
+The dated preview Transform-11 / 35-work release ran the same gate's complete
 source-pack authority audit, including direct normalized-section pages and
 identity/document/edition-FTS/runtime-FTS parity pages. The audit is read-only
 and catches an orphan or extra normalized section that a delivery-profile join
-alone would miss. Production now serves the same Transform-11 35-work corpus
-after its protected PR #108 cutover and audits. The normal corpus continues to
+alone would miss. In the historical PR #108 record, production served the same
+Transform-11 35-work corpus after its protected cutover and audits. The normal corpus continues to
 exclude inactive Aquinas hierarchy and publication rows; this does not
 authorize Aquinas activation.
 

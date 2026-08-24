@@ -1,5 +1,7 @@
 # Preview Release Reconciliation
 
+<!-- theologai-release-authority v1 role=historical-reconciliation current=docs/CURRENT-RELEASE.md -->
+
 For the active assignment in these entry/reconciliation documents, see the
 [designated current snapshot](CURRENT-RELEASE.md). The records below retain
 dated release evidence and are not current identity authority.

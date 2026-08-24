@@ -1,5 +1,11 @@
 # UBS Hebrew v0.9.2 derived-material notice
 
+<!-- theologai-release-authority v1 role=historical-rights-notice current=docs/CURRENT-RELEASE.md -->
+
+This notice owns rights and provenance for the described historical derived
+material, not active deployment identity. See the
+[current release snapshot](CURRENT-RELEASE.md).
+
 This notice applies only to the historical U3-T7 coordinate bridge and the
 transform-7 derived semantic layer reproducible from the exact pinned inputs.
 It does not apply CC BY-SA to TheologAI code or unrelated datasets. The
@@ -65,7 +71,7 @@ native-to-normalized mapping. It proves coordinate conversion only. It does
 not prove a UBS anchor identifies a particular morphology token, nor does it
 adjudicate a contextual word sense.
 
-## Current release state (PR #96; 2026-07-24)
+## Historical release state (PR #96; 2026-07-24)
 
 The historical local-only status above is superseded for deployment state by
 PR #96. Its production audit fixed source commit

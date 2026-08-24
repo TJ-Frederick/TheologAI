@@ -21,6 +21,35 @@ interface DataManifest {
 
 const openConnections: Array<{ client: Client; server: Server }> = [];
 const PUBLIC_CONTRACT_MARKER = /<!-- theologai-public-contract tools=(\d+) structured=([a-z_,]+) -->/;
+const RELEASE_AUTHORITY_MARKER = /<!-- theologai-release-authority v1 role=([a-z-]+) current=([A-Za-z0-9./-]+) -->/;
+
+const releaseAuthorityDocuments = {
+  'CLAUDE.md': ['developer-guide', 'docs/CURRENT-RELEASE.md'],
+  'CHANGELOG.md': ['historical-changelog', 'docs/CURRENT-RELEASE.md'],
+  'README.md': ['project-entrypoint', 'docs/CURRENT-RELEASE.md'],
+  'docs/CURRENT-RELEASE.md': ['current-snapshot', 'self'],
+  'docs/CUSTOM-DOMAIN-MIGRATION.md': ['operations-runbook', 'docs/CURRENT-RELEASE.md'],
+  'docs/D1-DATA-WORKFLOW.md': ['data-runbook', 'docs/CURRENT-RELEASE.md'],
+  'docs/PHASE-3B-PLAN.md': ['delivery-plan', 'docs/CURRENT-RELEASE.md'],
+  'docs/PREVIEW-RELEASE-RECONCILIATION.md': ['historical-reconciliation', 'docs/CURRENT-RELEASE.md'],
+  'docs/PRIMARY-SOURCE-CATALOG-SCOPE.md': ['catalog-history', 'docs/CURRENT-RELEASE.md'],
+  'docs/PRODUCTION-RELEASE-RECONCILIATION.md': ['historical-reconciliation', 'docs/CURRENT-RELEASE.md'],
+  'docs/ROADMAP.md': ['delivery-roadmap', 'docs/CURRENT-RELEASE.md'],
+  'docs/TRANSFORM11-HISTORICAL-SPINE-ACTIVATION.md': ['historical-activation', 'docs/CURRENT-RELEASE.md'],
+  'docs/UBS-HEBREW-V0.9.2-DERIVED-NOTICE.md': ['historical-rights-notice', 'docs/CURRENT-RELEASE.md'],
+  'docs/UBS-SEMANTICS-FOUNDATION.md': ['historical-foundation', 'docs/CURRENT-RELEASE.md'],
+  'docs/worker-operations.md': ['operations-runbook', 'docs/CURRENT-RELEASE.md'],
+} as const;
+
+function parseReleaseAuthorityMarker(document: string, path: string) {
+  expect(
+    document.match(/<!-- theologai-release-authority/g),
+    `${path} must contain one authority marker`,
+  ).toHaveLength(1);
+  const matches = [...document.matchAll(new RegExp(RELEASE_AUTHORITY_MARKER, 'g'))];
+  expect(matches, `${path} must contain exactly one closed release-authority marker`).toHaveLength(1);
+  return [matches[0][1], matches[0][2]];
+}
 
 function parsePublicContractMarker(document: string, path: string) {
   const matches = [...document.matchAll(new RegExp(PUBLIC_CONTRACT_MARKER, 'g'))];
@@ -42,6 +71,42 @@ afterAll(async () => {
 });
 
 describe('published project contract', () => {
+  it('routes one closed release-authority graph to the current snapshot', async () => {
+    const entries = Object.entries(releaseAuthorityDocuments);
+    const documents = await Promise.all(entries.map(([path]) => readProjectFile(path)));
+
+    for (const [index, [path, expectedMarker]] of entries.entries()) {
+      expect(parseReleaseAuthorityMarker(documents[index], path)).toEqual(expectedMarker);
+    }
+
+    const current = documents[entries.findIndex(([path]) => path === 'docs/CURRENT-RELEASE.md')];
+    expect(current).toContain("repository's sole present-tense release\nidentity authority");
+    expect(current).toContain('## Active production assignment');
+    expect(current).toContain('## Preview control');
+    expect(current).toContain('## Deployment gate and release evidence');
+    expect(current).toContain('## Rollback and custody boundary');
+    expect(current.match(/\| (?:D1 readiness|release predecessor|candidate cutover|edge stabilization|final routing|release reconciliation|release audit) \|/g)).toHaveLength(7);
+    expect(current.replace(/\s+/g, ' ')).toContain(
+      'The gate artifact is not one of the seven release artifacts.',
+    );
+    expect(current).toContain('Rollback requires a separate owner decision');
+
+    const historical = documents.filter((_, index) => entries[index][0] !== 'docs/CURRENT-RELEASE.md');
+    const competingAuthority = [
+      'PR #108 is the current production release record',
+      'Production is PR #122 merge',
+      'current protected preview release',
+      'The current preview baseline is PR #123',
+      'The current deployment record is PR #96',
+      'Production v6/local-only is deployed from PR #108',
+      'Preview now serves PR #123',
+      'Production and preview now use their distinct audited PR #122',
+    ];
+    for (const document of historical) {
+      for (const staleClaim of competingAuthority) expect(document).not.toContain(staleClaim);
+    }
+  });
+
   it('links the current roadmap and quarantines known historical artifacts', async () => {
     const historicalArtifacts = [
       'TEST_REPORT.md',
@@ -175,7 +240,7 @@ describe('published project contract', () => {
     expect(`${developerGuide}\n${confessionSkill}`).not.toMatch(/18 historical documents/i);
   });
 
-  it('records the current Transform 11 preview and production release states', async () => {
+  it('routes current corpus and transport behavior through the release snapshot', async () => {
     const [readme, operations, developerGuide] = await Promise.all([
       readProjectFile('README.md'),
       readProjectFile('docs/worker-operations.md'),
@@ -183,10 +248,12 @@ describe('published project contract', () => {
     ]);
 
     expect(readme).toContain('Production v6/local-only and preview v7/discovery-only currently search and\nretrieve the 35-work Transform-11 collection');
-    expect(operations).toContain('current preview Transform-11 / 35-work release');
-    expect(operations).toContain('Production is PR #122 merge');
+    expect(operations).toContain('[current release snapshot](CURRENT-RELEASE.md)');
+    expect(operations).toContain('dated preview Transform-11 / 35-work release');
+    expect(operations).toContain('In the historical PR #108 record, production served');
     expect(developerGuide).toContain('both deployed 35-work catalogs');
-    expect(developerGuide).toContain('PR #108 is the current production release record');
+    expect(developerGuide).toContain('[`docs/CURRENT-RELEASE.md`](docs/CURRENT-RELEASE.md)');
+    expect(developerGuide).toContain('PR #108 record below is dated historical release evidence');
   });
 
   it('does not reintroduce retired scope claims', async () => {
@@ -206,7 +273,7 @@ describe('published project contract', () => {
     expect(readme).toMatch(/Both deployed environments do \*\*not\*\* currently fetch CCEL search\s+results or document bodies/);
     expect(readme).toContain('Production v6/local-only is deployed');
     expect(readme).toContain('preview runs the audited v7/discovery-only contract with CCEL execution disabled');
-    expect(readme).toMatch(/Preview and production now serve the 35-work\s+catalog/);
+    expect(readme).toContain('current release snapshot records the active 35-work\nassignment');
     expect(readme).toContain('35 locally indexed');
     expect(readme).toContain('18 reviewed source-pack editions');
     expect(readme).toContain('The integrated Transform 10 candidate is local-only and unpublished');
@@ -651,7 +718,7 @@ describe('published project contract', () => {
     expect(reconciliation).toContain('31645546905');
     expect(reconciliation).toContain('This post-release documentation update is not\nitself deployed');
     expect(readme).toContain('This post-release evidence commit postdates the deployed source');
-    expect(operations).toContain('PR #123 completed the current protected preview release');
+    expect(operations).toContain('PR #123 completed that protected preview release');
     expect(operations).toContain('immediate retained\nsame-D1 predecessor is PR #122');
     expect(canary.replace(/\s+/g, ' ')).toContain('The gate remains `unrecorded` and inert');
   });

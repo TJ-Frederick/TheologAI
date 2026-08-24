@@ -1,5 +1,11 @@
 # D1 schema and corpus workflow
 
+<!-- theologai-release-authority v1 role=data-runbook current=docs/CURRENT-RELEASE.md -->
+
+This runbook owns schema and corpus procedure, not the active deployment
+identity. See the [current release snapshot](CURRENT-RELEASE.md); release
+assignments below are dated evidence.
+
 TheologAI treats database structure and corpus data as separate artifacts:
 
 - `migrations/*.sql` is the tracked, reviewable D1/SQLite schema history.
@@ -359,7 +365,7 @@ predecessor was deployment `070b292b-0bae-400a-b983-3d72157b5a96`, Worker
 `bd722b69-2e2c-4d8d-b42b-617e8caba13d` (#130), and D1
 `theologai-preview-20260728-hierarchy-a`
 (`51890e12-1c3f-421f-b661-9a5ea9637e43`). That former Transform-11 preview
-binding is historical. The current preview baseline is PR #123 deployment
+binding is historical. The dated PR #123 preview baseline was deployment
 `4108d59a-4092-4389-824c-fa3820ab66f6`, Worker
 `70bbbecf-3fe6-4a04-8c34-babc3df09ad0` (#144), and schema-`0009` D1
 `theologai-preview-20260811-schema0009-a`
@@ -383,7 +389,7 @@ Transform-11 source-pack authority audit (`1/1/1/1/1/1/133/17` pages) passed.
 An authorized read-only audit rerun followed one transient Cloudflare
 authentication failure; migration and seed application were not retried,
 resumed, or repaired. Protected preview deployment
-`5e812152-355b-4a5f-a123-2485e89f1550` now serves Worker
+`5e812152-355b-4a5f-a123-2485e89f1550` historically served Worker
 `06b9a603-8339-42b6-a246-ef9238563043` (#140) with that exact D1; this preview
 assignment remained unchanged during the later PR #108 production release.
 

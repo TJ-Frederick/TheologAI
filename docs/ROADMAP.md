@@ -1,5 +1,11 @@
 # TheologAI roadmap
 
+<!-- theologai-release-authority v1 role=delivery-roadmap current=docs/CURRENT-RELEASE.md -->
+
+This roadmap owns delivery status and sequencing, not active deployment
+identity. See the [current release snapshot](CURRENT-RELEASE.md); deployment
+identities below are time-scoped milestone evidence.
+
 This is the tracked source of truth for delivery status and sequencing. The
 ignored [dated architecture and roadmap assessment](../test-output/ARCHITECTURE_AND_ROADMAP_ASSESSMENT.md)
 is local source context only and does not define the current product contract.
@@ -290,8 +296,8 @@ names for already-shipped work.
   historical acquisition-gate snapshot, not a release-state record.
 
 Entries through PR #83 describe merged repository state. PR #83 remains a
-foundation record, not by itself deployment evidence. The current deployment
-record is PR #96: audit source commit
+foundation record, not by itself deployment evidence. The dated PR #96
+deployment record used audit source commit
 `ac4b5ed774302fbfc86bf846b6ee77a07beed456`, exact tree
 `adf08edbf6bfcb14b9613354b2b8fb9f62ec8c16`, canonical endpoint
 `https://mcp.theologai.xyz/mcp`, and server version `3.6.0`. Cloudflare
@@ -302,7 +308,7 @@ assignment—deployment `2d10d693-958e-47a6-ae24-81647679c2f6`, Worker
 (`3f7faa0e-689f-47aa-a601-dc662db9a6cf`).
 
 Protected production workflow run `30064214043` and GitHub deployment
-`5583281706` link the recorded source/tree to the active Worker; the read-only
+`5583281706` historically linked the recorded source/tree to that Worker; the read-only
 D1 compatibility check passed. Audit-evidence SHA-256:
 `321053d510217c20a79bc4d42505d67623378c2360f30c2f078a150f5a8f39bf`;
 identity-evidence SHA-256:
@@ -691,7 +697,7 @@ Code readiness and operational readiness are deliberately separate:
   controls when a cursor is present, and retains `includeText: false` as the
   existing default. Any future workflow or prompt change remains a separate
   slice rather than another cursor implementation.
-- Production v6/local-only is deployed from PR #108 merge
+- Historical PR #108 production v6/local-only was deployed from merge
   `8da99fd0a161b90a4bd90ab29bde1abf796b3bf6` by protected workflow
   `30496350408` as deployment
   `3d7489d9-7b48-4ad0-bdc6-95ffbda53bd8`, Worker
@@ -714,7 +720,7 @@ Code readiness and operational readiness are deliberately separate:
   `06b9a603-8339-42b6-a246-ef9238563043` (#140), and D1
   `theologai-preview-20260728-transform11-a`
   (`62b871a6-5b4d-4d9b-8f52-301f6c878f48`) are an earlier retained
-  predecessor. Preview now serves PR #123 deployment
+  predecessor. In the dated PR #123 record, preview served deployment
   `4108d59a-4092-4389-824c-fa3820ab66f6`, Worker
   `70bbbecf-3fe6-4a04-8c34-babc3df09ad0` (#144), and schema-`0009` D1
   `theologai-preview-20260811-schema0009-a`

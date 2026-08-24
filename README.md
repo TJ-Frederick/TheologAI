@@ -1,5 +1,7 @@
 # TheologAI
 
+<!-- theologai-release-authority v1 role=project-entrypoint current=docs/CURRENT-RELEASE.md -->
+
 TheologAI is an MCP server for Bible study and theological research. It runs
 locally over stdio or Streamable HTTP and on Cloudflare Workers with D1.
 
@@ -7,8 +9,8 @@ The checked-out local registry contains eleven tools, six guided prompts, eight
 English Bible translations, six commentary sources, 35 locally indexed
 historical works, Strong's dictionaries, and Greek/Hebrew morphology. The
 checked-out Transform 11 release adds ten reviewed editions to the former
-25-work production baseline. Preview and production now serve the 35-work
-catalog after the separately protected PR #108 D1 cutover.
+25-work baseline. The current release snapshot records the active 35-work
+assignment; the separately protected PR #108 D1 cutover is historical evidence.
 
 The integrated Transform 10 candidate is local-only and unpublished. Its
 Aquinas packet, schema, and standalone materializer are retained for future
@@ -213,8 +215,8 @@ For a preview-client rollback without changing server state, use the direct prev
 `workers.dev` address above; the production `workers.dev` address intentionally
 redirects rather than serving a separate legacy Worker.
 
-Production and preview now use their distinct audited PR #122 schema-`0009`
-Candidate-C D1 databases. Earlier local-only and preview-only activation
+In the historical PR #122 record, production and preview used their distinct
+audited schema-`0009` Candidate-C D1 databases. Earlier local-only and preview-only activation
 statements are historical. The historical PR #96 public
 `original_language_study` v2 audit does not independently establish the runtime
 path for every later historical transform. The pinned packet's `SOURCE.json`

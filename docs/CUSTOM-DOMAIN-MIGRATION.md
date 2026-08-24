@@ -1,5 +1,10 @@
 # Custom-domain migration and rollback
 
+<!-- theologai-release-authority v1 role=operations-runbook current=docs/CURRENT-RELEASE.md -->
+
+This runbook defines routing operations; it is not release-identity authority.
+For the active assignment, see the [current release snapshot](CURRENT-RELEASE.md).
+
 This runbook governs the infrastructure-only migration to `theologai.xyz` and
 the separately reviewed, post-migration legacy-host redirect window. The
 initial domain migration must not be combined with application behavior,
@@ -32,9 +37,10 @@ custom-domain attachment, and the optional `www` redirect may require manual
 Cloudflare dashboard action even though Worker routes are declared in
 `wrangler.toml`.
 
-## Current operational release state (PR #96; 2026-07-24)
+## Historical operational release state (PR #96; 2026-07-24)
 
-The current production endpoint is `https://mcp.theologai.xyz/mcp`. PR #96
+The canonical production endpoint is `https://mcp.theologai.xyz/mcp`. In the
+dated PR #96 migration record, PR #96
 audit evidence fixed source commit
 `ac4b5ed774302fbfc86bf846b6ee77a07beed456` and tree
 `adf08edbf6bfcb14b9613354b2b8fb9f62ec8c16`; the endpoint reported server
@@ -50,7 +56,7 @@ per-response, and 1 MiB aggregate limits. Its fixture SHA-256 is
 `dabe124580904c411f11484d2c25fbd30452201f6c6f8927c94c0f3f294204a7`; retained
 evidence is sanitized metadata and hashes, not tool output or source text.
 Protected production workflow run `30064214043` and GitHub deployment
-`5583281706` link the recorded source/tree to the active Worker, and the
+`5583281706` historically linked the recorded source/tree to that Worker, and the
 read-only D1 compatibility check passed. Audit-evidence SHA-256:
 `321053d510217c20a79bc4d42505d67623378c2360f30c2f078a150f5a8f39bf`;
 identity-evidence SHA-256:
@@ -114,8 +120,8 @@ deployment comment:
 Do not substitute an historical deployment identifier for this record. If the
 planned predecessor is not yet released or has not passed its audit, capture
 the actual approved predecessor immediately before release and stop if it is
-not a suitable rollback target. For the documented PR #96 release, the current
-D1 is `theologai-production-20260723-a`
+not a suitable rollback target. For the documented PR #96 release, the recorded
+D1 was `theologai-production-20260723-a`
 (`3f7faa0e-689f-47aa-a601-dc662db9a6cf`) and PR #72's
 `theologai-production-20260715-a`
 (`c6535a4a-1953-4279-b277-7368445fc61a`) is the retained rollback D1. This
