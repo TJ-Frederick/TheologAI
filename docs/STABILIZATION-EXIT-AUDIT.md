@@ -146,10 +146,13 @@ This audit and the current snapshot are the exact two documentation paths in the
 terminal reconciliation. Its post-merge proof must independently show a valid
 documentation-only plan, `classification_succeeded=true`,
 `deploy_required=false`, `decision=skip`, `reason=markdown-documentation-only`,
-and the exact two changed paths. The production job must skip before environment
-entry; GitHub deployments and production artifacts for that merge must remain
-zero; and the bounded closed-event Preview Revocation acknowledgement must pass
-without environment, secrets, artifacts, or Cloudflare action.
+and the exact two changed paths. The classifier must upload exactly one
+short-lived deployment-plan gate artifact containing only the plan and SHA-256
+sidecar, and the unprivileged verifier must validate it successfully. The
+production job must skip before environment entry; GitHub deployments and the
+seven-artifact post-deployment release cohort must remain zero. The bounded
+closed-event Preview Revocation acknowledgement must pass without environment,
+secrets, artifacts, or Cloudflare action.
 
 Until that evidence exists, this document claims only the audited PR #138 source
 and release identity above. Any third-path correction or substantive finding is a
