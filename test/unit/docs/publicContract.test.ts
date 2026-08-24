@@ -27,6 +27,8 @@ const releaseAuthorityDocuments = {
   'CLAUDE.md': ['developer-guide', 'docs/CURRENT-RELEASE.md'],
   'CHANGELOG.md': ['historical-changelog', 'docs/CURRENT-RELEASE.md'],
   'README.md': ['project-entrypoint', 'docs/CURRENT-RELEASE.md'],
+  'docs/CCEL-LIVE-PREVIEW-CANARY-TRANSACTION.md': ['canary-runbook', 'docs/CURRENT-RELEASE.md'],
+  'docs/ccel-search-preflight.md': ['architecture-record', 'docs/CURRENT-RELEASE.md'],
   'docs/CURRENT-RELEASE.md': ['current-snapshot', 'self'],
   'docs/CUSTOM-DOMAIN-MIGRATION.md': ['operations-runbook', 'docs/CURRENT-RELEASE.md'],
   'docs/D1-DATA-WORKFLOW.md': ['data-runbook', 'docs/CURRENT-RELEASE.md'],
@@ -101,6 +103,11 @@ describe('published project contract', () => {
       'Production v6/local-only is deployed from PR #108',
       'Preview now serves PR #123',
       'Production and preview now use their distinct audited PR #122',
+      'The audited current preview `100` baseline is',
+      'The active preview target is',
+      'the active production target is',
+      '**Current status:** exposure-only preview record',
+      "PR #122's audited schema-`0009` preview Worker now contains the current-main",
     ];
     for (const document of historical) {
       for (const staleClaim of competingAuthority) expect(document).not.toContain(staleClaim);
@@ -557,7 +564,7 @@ describe('published project contract', () => {
       readProjectFile('docs/CCEL-UPSTREAM-COORDINATOR.md'),
       readProjectFile('docs/ccel-search-preflight.md'),
     ]);
-    for (const document of documents) {
+    for (const document of documents.slice(0, 2)) {
       const normalized = document.replace(/^>\s?/gm, '').replace(/\s+/g, ' ');
 
       expect(normalized).toContain('Production remains deployed v6/local-only');
@@ -572,6 +579,15 @@ describe('published project contract', () => {
 
     const liveAudit = documents[0]!;
     const preflight = documents[2]!;
+    const normalizedPreflight = preflight.replace(/^>\s?/gm, '').replace(/\s+/g, ' ');
+    expect(normalizedPreflight).toContain('Dated PR #123 status');
+    expect(normalizedPreflight).toContain('production remained deployed v6/local-only');
+    expect(normalizedPreflight).toContain(
+      'preview was deployed and audited on the v7/discovery-only contract',
+    );
+    expect(normalizedPreflight).toContain(
+      'CCEL execution disabled before adapter, coordinator, or fetch',
+    );
     expect(liveAudit).toContain('exactly two concurrent `searchDepth: "expanded"` contenders');
     expect(liveAudit).toContain('`searchDepth: "standard"` call');
     expect(liveAudit).toContain('partial, non-error response');
@@ -603,6 +619,8 @@ describe('published project contract', () => {
       expect(normalized).toMatch(/code\/resource-equivalent (?:`100` )?preview predecessor|code\/resource-equivalent `100` predecessor/);
     }
     expect(canary).toContain('five separately authorized stages');
+    expect(canary).toContain('[current release snapshot](CURRENT-RELEASE.md)');
+    expect(canary).toContain('must be freshly resolved there and from live control-plane reads before any\noperation');
     expect(canary).toContain('Completion or authorization of any stage does not authorize the next stage.');
     expect(canary).toContain('fresh, separate preview and production D1 candidates');
     expect(canary).toContain('schema `0009`');
@@ -627,6 +645,8 @@ describe('published project contract', () => {
     expect(canary).toContain('temporary `111` two-request preview canary transaction');
     expect(reconciliation).toContain('PR #122 completed the\nrequired current-main schema-`0009` preview refresh and audit');
     expect(preflight).toContain('fixed current-main candidate endpoint');
+    expect(preflight).toContain('[current release snapshot](CURRENT-RELEASE.md)');
+    expect(preflight).toContain('must be freshly resolved there and from live control-plane reads before');
     expect(preflight).toContain('PR #115 introduced this pin in repository code only. PR #122 subsequently');
     expect(preflight).toContain('The v7\ncandidate contract does not supersede');
     expect(secret).toContain('Executing staging is a production Worker-version upload mutation');

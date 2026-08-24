@@ -1,10 +1,16 @@
 # CCEL live-search preflight record
 
-> **Current status:** exposure-only preview record. Production remains deployed
-> v6/local-only. Preview is deployed and audited on the v7/discovery-only
+<!-- theologai-release-authority v1 role=architecture-record current=docs/CURRENT-RELEASE.md -->
+
+> **Dated PR #123 status:** exposure-only preview record. At that observation,
+> production remained deployed v6/local-only and preview was deployed and
+> audited on the v7/discovery-only
 > contract, with CCEL execution disabled before adapter, coordinator, or fetch.
-> PR #122's audited schema-`0009` preview Worker now contains the current-main
+> PR #122's audited schema-`0009` preview Worker contained the then-current-main
 > endpoint pin below; the retained PR #107 Worker is historical predecessor evidence.
+> Current release identity is owned by the [current release snapshot](CURRENT-RELEASE.md)
+> and must be freshly resolved there and from live control-plane reads before
+> any operation.
 > TheologAI does not retrieve or republish CCEL
 > document bodies. Live discovery still requires a fresh operational preflight
 > and separate explicit release review.
