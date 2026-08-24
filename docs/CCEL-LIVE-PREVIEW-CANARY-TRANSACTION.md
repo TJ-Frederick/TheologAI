@@ -1,5 +1,7 @@
 # CCEL live-preview canary transaction
 
+<!-- theologai-release-authority v1 role=canary-runbook current=docs/CURRENT-RELEASE.md -->
+
 This is the transaction procedure for the one deliberately temporary state in
 which preview may execute CCEL discovery. The canary transaction itself does
 not change a corpus, D1 schema, rate-limit policy, production deployment, or
@@ -22,9 +24,13 @@ The retained historical PR #107 preview Worker
 unpublished pin to `https://www.ccel.org/home3/search`. It remains valid
 point-in-time predecessor evidence, but it is no longer active. PR #122's
 schema-`0009` Worker `b2c62527-5759-4c1d-a9a3-8c1d43dddabe` is the retained
-same-D1 predecessor to PR #123. The audited current preview `100` baseline is
-PR #123 Worker `70bbbecf-3fe6-4a04-8c34-babc3df09ad0` (#144), deployment
-`4108d59a-4092-4389-824c-fa3820ab66f6`.
+same-D1 predecessor to PR #123. This runbook does not establish current preview
+identity. At the dated PR #123 observation, the audited preview `100` baseline
+was Worker `70bbbecf-3fe6-4a04-8c34-babc3df09ad0`
+(#144), deployment `4108d59a-4092-4389-824c-fa3820ab66f6`. Current release
+identity is owned by the [current release snapshot](CURRENT-RELEASE.md) and
+must be freshly resolved there and from live control-plane reads before any
+operation.
 
 Current `main` also includes PR #117's Transform-12 schema `0009` contract.
 PR #107 preview and PR #108 production are retained schema-`0008` predecessor
@@ -63,11 +69,14 @@ and the completed releases/isolation evidence do not authorize credential stagin
 or the canary.
 
 The schema-`0009` candidates have retained preparation and release evidence.
-The active preview target is
+In that dated release evidence, the preview target was
 `theologai-preview-20260811-schema0009-a`
-(`74f456e2-6951-4003-bb6f-91951342bf8f`), and the active production target is
+(`74f456e2-6951-4003-bb6f-91951342bf8f`), and the production target was
 `theologai-production-20260811-schema0009-a`
-(`9bc79346-338b-439e-a2a5-424f4418eb21`). This does not make the canary ready.
+(`9bc79346-338b-439e-a2a5-424f4418eb21`). These are historical evidence
+anchors, not current identity; before any operation, resolve current identity
+from the [current release snapshot](CURRENT-RELEASE.md) and fresh live reads.
+This does not make the canary ready.
 Until a separate reviewed release replaces the hard inert
 schema-`0009` canary gate, the canary workflow rejects both retained schema-`0008`
 D1 identities during its first local validation, before any Wrangler command or
