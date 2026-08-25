@@ -43,6 +43,13 @@ For original-language study v2, the authoritative application context and its
 request, result, cursor, and proof primitives, while application composition
 provides the context through the service port.
 
+The language-service presentation edge is separately zero-allowlist: language
+services return application results, and `src/presenters/` owns the closed v2
+packet, byte accounting, and Markdown assembly. This is a scoped boundary, not
+a claim that every service is presentation-free. The historical
+`LocalPrimarySourceSearchProvider` formatter dependency remains an explicit
+exception because it preserves exact local-resource sizing and identity.
+
 
 **Current Status: Production Ready - Beta Launch (v3.4.1)**
 

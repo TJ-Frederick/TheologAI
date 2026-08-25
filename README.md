@@ -706,6 +706,13 @@ context live under `src/services/languages/`. The kernel retains only the
 target-independent v2 request, result, cursor, and proof primitives used by
 that port; it does not own the application context provider.
 
+The language-service presentation boundary is also zero-allowlist: language
+services return application results, and the public v2 packet and Markdown are
+assembled by `src/presenters/` after the service call. This guard is scoped to
+the language-service edge and does not claim that every service is presentation
+free. `LocalPrimarySourceSearchProvider` retains its historical formatter call
+to preserve exact local-resource sizing and identity behavior.
+
 Business services depend on shared repository ports. Node uses synchronous
 SQLite repositories through async-compatible service boundaries; Workers uses
 per-request D1 repositories. Both targets share one MCP registry.

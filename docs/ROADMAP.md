@@ -892,6 +892,21 @@ implementation preserves existing shapes and runtime behavior; it does not
 change schemas, output bytes, formatting, errors, tool registration, corpus,
 migrations, generated data, runtime configuration, or release identity.
 
+### Architecture integrity program — Train 0 / PR 5 service presentation boundary complete
+
+Train 0 / PR 5 separates the original-language study v2 application result
+from its public presentation. The language service now returns the resolved
+request, complete v1 domain result, and completed semantic evidence; a
+stateless presenter owns the existing closed packet, truthful byte accounting,
+and Markdown assembly. A zero-allowlist compiler-API guard covers every
+maintained `src/services/languages/` import form resolving into presenters or
+formatters. This is intentionally scoped to the language-service edge, not a
+claim that every service is presentation-free: the historical
+`LocalPrimarySourceSearchProvider` formatter call remains to preserve exact
+local-resource sizing and identity behavior. Runtime behavior, public schemas,
+output bytes, corpus, migrations, generated data, runtime configuration, and
+release identity remain unchanged.
+
 - Production and preview D1 bindings are distinct and managed through protected
   workflows. Deployment never migrates or seeds remote D1.
 - Readiness requires schema and exact corpus/materialization identity. Do not

@@ -79,6 +79,13 @@ The same guard enforces the kernel half of the boundary: every resolved local
 allowlist. Synthetic `.ts`, `.tsx`, `.mts`, and `.cts` cases cover the same
 static, type-only, dynamic, import-equals, and literal-`require` forms.
 
+Its language-service half is likewise zero-allowlist: every maintained file
+under `src/services/languages/` is checked against both `src/presenters/` and
+`src/formatters/` across those syntax forms. The guard is intentionally scoped
+to the V2 service/presentation edge; the historical
+`LocalPrimarySourceSearchProvider` resource-sizing formatter exception remains
+outside this claim.
+
 ## Retired legacy commands
 
 The following former package commands have been removed. They are not runnable
