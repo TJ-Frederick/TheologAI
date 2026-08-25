@@ -5,6 +5,25 @@ TypeScript file under `test/`. `test/unit/config/testTopology.test.ts` requires
 that each path belongs to exactly one partition and that the inventory stays
 in sync with the maintained runners.
 
+## Static typecheck ownership
+
+The manifest's `maintainedTestTypecheckProjects` is the compiler ownership
+matrix. Configured roots (the files selected by each project's `include`/`files`)
+are counted exactly once; imported dependencies are not reassigned as roots.
+
+| Owner | Project | Roots |
+|---|---|---|
+| `node-vitest` | `tsconfig.test-node.json` | unit tests except script tests, current integration, fixtures, helpers, Node setup, and the generated Worker declaration |
+| `node-script-vitest` | `tsconfig.test-scripts.json` | `test/unit/scripts/**/*.test.ts` except the frozen context-capacity evidence test |
+| `node-script-frozen-context-vitest` | `tsconfig.test-frozen-context-capacity.json` | `test/unit/scripts/originalLanguageContextCapacity.test.ts` (strict; pinned script bytes are preserved by the `.mjs` wrapper and checked `.d.mts` facade) |
+| `worker-workerd` | `test/worker-runtime/tsconfig.json` | Worker runtime setup and tests |
+| `ccel-coordinator-workerd` | `tsconfig.ccel-coordinator-test.json` | coordinator runtime setup and tests |
+
+The Node projects are strict noEmit checks and may statically include inactive
+test packets. Emit-capable Node/Worker builds and Workerd runtime projects remain
+packet-free. Manual, legacy-orphan, and conformance paths have no maintained
+test typecheck owner.
+
 ## Supported suites
 
 ```bash
