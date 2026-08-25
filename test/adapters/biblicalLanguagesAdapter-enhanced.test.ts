@@ -6,7 +6,7 @@
  */
 
 import { BiblicalLanguagesAdapter } from '../../src/adapters/biblicalLanguagesAdapter.js';
-import { BookData, VerseData } from '../../src/types/index.js';
+import type { BookData, VerseData } from '../../src/kernel/types.js';
 
 describe('BiblicalLanguagesAdapter - STEPBible Features', () => {
   let adapter: BiblicalLanguagesAdapter;

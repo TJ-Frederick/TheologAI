@@ -7,7 +7,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { strongsLookupHandler } from '../../src/tools/biblicalLanguages.js';
-import type { StrongsLookupParams } from '../../src/types/index.js';
+import type { StrongsLookupParams } from '../../src/kernel/types.js';
 
 describe('Biblical Languages Tool - E2E', () => {
   describe('Valid Strong\'s Number Formats', () => {

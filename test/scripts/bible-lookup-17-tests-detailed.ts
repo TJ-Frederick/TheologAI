@@ -6,7 +6,7 @@
  */
 
 import { bibleLookupHandler } from '../../src/tools/bibleLookup.js';
-import type { BibleLookupParams } from '../../src/types/index.js';
+import type { BibleLookupParams } from '../../src/kernel/types.js';
 
 interface TestCase {
   category: string;

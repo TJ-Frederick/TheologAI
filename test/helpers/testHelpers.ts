@@ -4,7 +4,7 @@
  * Shared utilities for writing cleaner, more maintainable tests
  */
 
-import type { BibleResult, CommentaryResult, Footnote } from '../../src/types/index.js';
+import type { BibleResult, CommentaryResult, Footnote } from '../../src/kernel/types.js';
 
 /**
  * Create a mock BibleResult for testing

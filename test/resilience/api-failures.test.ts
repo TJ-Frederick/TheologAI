@@ -13,7 +13,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { bibleLookupHandler } from '../../src/tools/bibleLookup.js';
-import type { BibleLookupParams } from '../../src/types/index.js';
+import type { BibleLookupParams } from '../../src/kernel/types.js';
 
 describe('API Resilience - ESV API', () => {
   it('should handle invalid reference gracefully with ESV', async () => {

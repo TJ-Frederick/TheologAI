@@ -1,7 +1,12 @@
 /**
  * Kernel — shared domain primitives.
  *
- * Public API: everything downstream should import from here.
+ * Convenience re-export barrel for kernel primitives and contract families.
+ *
+ * Contract authority remains with the specialized files (`types.ts`,
+ * `repositories.ts`, `donation-types.ts`, and versioned contract modules).
+ * Importing from this barrel is supported for grouped kernel APIs; it does not
+ * create a second type-definition source.
  */
 
 // Books
