@@ -1,21 +1,21 @@
 /**
- * Bible lookup service with adapter routing.
+ * Bible lookup service with provider routing.
  *
- * Receives BibleAdapter[] via constructor and routes by translation.
+ * Receives application-owned provider ports via constructor and routes by translation.
  */
 
-import type { BibleAdapter } from '../../adapters/bible/BibleAdapter.js';
+import type { BibleProviderPort } from './BibleProviderPort.js';
 import type { BibleResult, BibleLookupMultipleResult, BibleLookupParams } from '../../kernel/types.js';
 import { parseReference, formatReference, referencesEqual } from '../../kernel/reference.js';
 import { APIError, ValidationError, NotFoundError } from '../../kernel/errors.js';
 
 export class BibleService {
-  private adaptersByTranslation = new Map<string, BibleAdapter>();
+  private providersByTranslation = new Map<string, BibleProviderPort>();
 
-  constructor(adapters: BibleAdapter[]) {
-    for (const adapter of adapters) {
-      for (const t of adapter.supportedTranslations) {
-        this.adaptersByTranslation.set(t.toUpperCase(), adapter);
+  constructor(providers: BibleProviderPort[]) {
+    for (const provider of providers) {
+      for (const t of provider.supportedTranslations) {
+        this.providersByTranslation.set(t.toUpperCase(), provider);
       }
     }
   }
@@ -24,19 +24,19 @@ export class BibleService {
     const translation = this.resolveTranslation(params.translation);
     const ref = parseReference(params.reference);
 
-    const adapter = this.adaptersByTranslation.get(translation);
-    if (!adapter) {
+    const provider = this.providersByTranslation.get(translation);
+    if (!provider) {
       throw new ValidationError(
         'translation',
         `Unsupported translation: "${translation}". Available: ${this.getSupportedTranslations().join(', ')}`
       );
     }
 
-    if (!adapter.isConfigured()) {
+    if (!provider.isConfigured()) {
       throw new NotFoundError('adapter', `${translation} adapter is not configured`);
     }
 
-    const result = await adapter.getPassage(ref, translation, {
+    const result = await provider.getPassage(ref, translation, {
       includeFootnotes: params.includeFootnotes,
     });
     this.assertResultConsistency(ref, translation, result);
@@ -51,17 +51,17 @@ export class BibleService {
 
     for (const t of translations) {
       const upper = t.toUpperCase();
-      const adapter = this.adaptersByTranslation.get(upper);
-      if (!adapter) {
+      const provider = this.providersByTranslation.get(upper);
+      if (!provider) {
         failures.push({ translation: upper, reason: 'Translation is not supported by this server.' });
         continue;
       }
-      if (!adapter.isConfigured()) {
+      if (!provider.isConfigured()) {
         failures.push({ translation: upper, reason: 'Translation provider is not configured.' });
         continue;
       }
       try {
-        const result = await adapter.getPassage(ref, upper);
+        const result = await provider.getPassage(ref, upper);
         this.assertResultConsistency(ref, upper, result);
         results.push(result);
       } catch {
@@ -73,7 +73,7 @@ export class BibleService {
   }
 
   getSupportedTranslations(): string[] {
-    return [...this.adaptersByTranslation.keys()];
+    return [...this.providersByTranslation.keys()];
   }
 
   private resolveTranslation(input?: string | string[]): string {

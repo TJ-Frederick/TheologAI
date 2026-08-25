@@ -598,7 +598,6 @@ describe('commentary_lookup handler', () => {
     const service = new CommentaryServiceClass([{
       supportedCommentators: ['John Gill'],
       getCommentary,
-      supportsBook: vi.fn().mockReturnValue(true),
     }]);
     const handler = createCommentaryHandler(service);
 

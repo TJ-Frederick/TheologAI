@@ -1,6 +1,6 @@
 import { Agent, request, type IncomingHttpHeaders } from 'node:http';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { BibleAdapter } from '../../../src/adapters/bible/BibleAdapter.js';
+import type { BibleProviderPort } from '../../../src/services/bible/BibleProviderPort.js';
 import {
   DEFAULT_ALLOWED_ORIGIN,
   DEFAULT_HTTP_HOST,
@@ -338,7 +338,7 @@ describe('Node stateless HTTP MCP server', () => {
 });
 
 function makeRoot(): McpCompositionRoot {
-  const adapter: BibleAdapter = {
+  const adapter: BibleProviderPort = {
     supportedTranslations: ['ESV'],
     getPassage: vi.fn(async () => ({
       reference: 'John 3:16',
@@ -347,7 +347,6 @@ function makeRoot(): McpCompositionRoot {
       citation: { source: 'HTTP test fixture' },
     })),
     isConfigured: () => true,
-    getCopyright: () => 'Test fixture',
   };
   const bibleService = new BibleService([adapter]);
   const descriptor = createPrimarySourceSearchDescriptor();

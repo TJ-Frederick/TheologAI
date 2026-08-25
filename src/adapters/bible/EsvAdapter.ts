@@ -2,7 +2,7 @@
  * ESV Bible adapter using shared HttpClient + kernel reference.
  */
 
-import type { BibleAdapter } from './BibleAdapter.js';
+import type { BibleProviderPort } from '../../services/bible/BibleProviderPort.js';
 import type { BibleResult } from '../../kernel/types.js';
 import type { BibleReference } from '../../kernel/reference.js';
 import { formatReference, parseReference, referencesEqual } from '../../kernel/reference.js';
@@ -12,7 +12,7 @@ import { APIError } from '../../kernel/errors.js';
 
 const COPYRIGHT = 'ESV® Bible (English Standard Version®), copyright © 2001 by Crossway';
 
-export class EsvAdapter implements BibleAdapter {
+export class EsvAdapter implements BibleProviderPort {
   readonly supportedTranslations = ['ESV'];
   private client: HttpClient;
   private apiKey: string;

@@ -10,8 +10,8 @@
     "conformance": 1
   },
   "current": {
-    "totalTestTypeScript": 280,
-    "activeVitest": 201,
+    "totalTestTypeScript": 281,
+    "activeVitest": 202,
     "support": 24,
     "manual": 4,
     "legacyOrphan": 50,
@@ -49,6 +49,7 @@
       "test/unit/adapters/shared/hebrewMorphExpander.test.ts",
       "test/unit/adapters/shared/morphologyUsage.test.ts",
       "test/unit/adapters/shared/primarySourceSearchSql.test.ts",
+      "test/unit/config/applicationBoundaries.test.ts",
       "test/unit/config/ccelCoordinatorConfig.test.ts",
       "test/unit/config/ccelOperatorSecretProvisioning.test.ts",
       "test/unit/config/customDomainConfig.test.ts",

@@ -869,6 +869,17 @@ convenience barrel only. PR 2 does not change runtime behavior, schemas, corpus,
 migrations, generated data, runtime configuration, or release identity, and it
 does not activate, repair, execute, or typecheck quarantined tests.
 
+### Architecture integrity program — Train 0 / PR 3 application-owned provider ports complete
+
+Train 0 / PR 3 establishes application-owned provider ports for Bible,
+commentary, and primary-source search, removes adapter-owned service contracts,
+and enforces a zero-allowlist service-to-adapter dependency guard. The current
+implementation is complete and preserves provider behavior, error strings,
+CCEL gates, ordering, notices, and public contracts. It does not change runtime
+behavior, schemas, corpus, migrations, generated data, runtime configuration,
+or release identity, and it does not activate, repair, execute, or typecheck
+quarantined tests.
+
 - Production and preview D1 bindings are distinct and managed through protected
   workflows. Deployment never migrates or seeds remote D1.
 - Readiness requires schema and exact corpus/materialization identity. Do not

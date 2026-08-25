@@ -8,8 +8,9 @@ import {
   type PrimarySourceSearchQuery,
 } from './primarySourceTypes.js';
 import { formatLocalDocumentSectionResourceWithIdentity } from '../../formatters/historicalFormatter.js';
+import type { LocalPrimarySourceSearchPort } from './PrimarySourceSearchPorts.js';
 
-export class LocalPrimarySourceSearchProvider {
+export class LocalPrimarySourceSearchProvider implements LocalPrimarySourceSearchPort {
   constructor(private readonly repository: IHistoricalDocumentRepository) {}
 
   async search(input: PrimarySourceSearchQuery): Promise<PrimarySourceProviderResult> {

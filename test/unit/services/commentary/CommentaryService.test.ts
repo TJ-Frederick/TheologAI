@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CommentaryService } from '../../../../src/services/commentary/CommentaryService.js';
-import type { CommentaryAdapter } from '../../../../src/adapters/commentary/CommentaryAdapter.js';
-import type { CommentaryAdapterResult } from '../../../../src/kernel/types.js';
+import type { CommentaryProviderPort } from '../../../../src/services/commentary/CommentaryProviderPort.js';
+import type { CommentaryProviderResult } from '../../../../src/kernel/types.js';
 import { APIError, NotFoundError, ValidationError } from '../../../../src/kernel/errors.js';
 
 const PROVIDER_REVISION = `sha256:${'a'.repeat(64)}` as const;
 
-const exactJfb = (overrides: Partial<CommentaryAdapterResult> = {}): CommentaryAdapterResult => ({
+const exactJfb = (overrides: Partial<CommentaryProviderResult> = {}): CommentaryProviderResult => ({
   reference: 'John 3:16',
   commentator: 'Jamieson-Fausset-Brown',
   text: 'Commentary text here.',
@@ -20,17 +20,16 @@ const exactJfb = (overrides: Partial<CommentaryAdapterResult> = {}): CommentaryA
   ...overrides,
 });
 
-function makeAdapter(overrides: Partial<CommentaryAdapter> = {}): CommentaryAdapter {
+function makeAdapter(overrides: Partial<CommentaryProviderPort> = {}): CommentaryProviderPort {
   return {
     supportedCommentators: ['Matthew Henry', 'Jamieson-Fausset-Brown', 'John Gill'],
     getCommentary: vi.fn().mockResolvedValue(exactJfb()),
-    supportsBook: vi.fn().mockReturnValue(true),
     ...overrides,
   };
 }
 
 describe('CommentaryService', () => {
-  let adapter: CommentaryAdapter;
+  let adapter: CommentaryProviderPort;
   let service: CommentaryService;
 
   beforeEach(() => {

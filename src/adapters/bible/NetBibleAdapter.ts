@@ -2,7 +2,7 @@
  * NET Bible adapter using shared HttpClient + kernel reference.
  */
 
-import type { BibleAdapter } from './BibleAdapter.js';
+import type { BibleProviderPort } from '../../services/bible/BibleProviderPort.js';
 import type { BibleResult } from '../../kernel/types.js';
 import type { BibleReference } from '../../kernel/reference.js';
 import { formatReference, parseReference } from '../../kernel/reference.js';
@@ -13,7 +13,7 @@ import { stripHtml } from '../shared/HtmlParser.js';
 
 const COPYRIGHT = 'NET Bible® copyright ©1996, 2019 by Biblical Studies Press, L.L.C.';
 
-export class NetBibleAdapter implements BibleAdapter {
+export class NetBibleAdapter implements BibleProviderPort {
   readonly supportedTranslations = ['NET'];
   private client: HttpClient;
 

@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BibleService } from '../../../../src/services/bible/BibleService.js';
-import type { BibleAdapter } from '../../../../src/adapters/bible/BibleAdapter.js';
+import type { BibleProviderPort } from '../../../../src/services/bible/BibleProviderPort.js';
 import type { BibleResult } from '../../../../src/kernel/types.js';
 import { APIError, ValidationError, NotFoundError } from '../../../../src/kernel/errors.js';
 
 // ── Mock adapter factory ──
 
-function makeAdapter(overrides: Partial<BibleAdapter> = {}): BibleAdapter {
+function makeAdapter(overrides: Partial<BibleProviderPort> = {}): BibleProviderPort {
   return {
     supportedTranslations: ['ESV'],
     getPassage: vi.fn().mockResolvedValue({
@@ -16,7 +16,6 @@ function makeAdapter(overrides: Partial<BibleAdapter> = {}): BibleAdapter {
       citation: { source: 'ESV API' },
     } satisfies BibleResult),
     isConfigured: vi.fn().mockReturnValue(true),
-    getCopyright: vi.fn().mockReturnValue('Test'),
     ...overrides,
   };
 }
@@ -44,8 +43,8 @@ describe('BibleService', () => {
   });
 
   describe('lookup', () => {
-    let esvAdapter: BibleAdapter;
-    let kjvAdapter: BibleAdapter;
+    let esvAdapter: BibleProviderPort;
+    let kjvAdapter: BibleProviderPort;
     let service: BibleService;
 
     beforeEach(() => {
@@ -107,8 +106,8 @@ describe('BibleService', () => {
   });
 
   describe('lookupMultiple', () => {
-    let esvAdapter: BibleAdapter;
-    let kjvAdapter: BibleAdapter;
+    let esvAdapter: BibleProviderPort;
+    let kjvAdapter: BibleProviderPort;
     let service: BibleService;
 
     beforeEach(() => {

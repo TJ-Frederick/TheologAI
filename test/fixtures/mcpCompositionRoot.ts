@@ -1,5 +1,5 @@
-import type { BibleAdapter } from '../../src/adapters/bible/BibleAdapter.js';
-import type { CommentaryAdapter } from '../../src/adapters/commentary/CommentaryAdapter.js';
+import type { BibleProviderPort } from '../../src/services/bible/BibleProviderPort.js';
+import type { CommentaryProviderPort } from '../../src/services/commentary/CommentaryProviderPort.js';
 import type { OnChainVerifier } from '../../src/adapters/donation/OnChainVerifier.js';
 import type {
   ICrossReferenceRepository,
@@ -52,7 +52,7 @@ export interface DeterministicMcpFixture {
  */
 export function createDeterministicMcpFixture(): DeterministicMcpFixture {
   const biblePassageCalls: BiblePassageCall[] = [];
-  const bibleAdapter: BibleAdapter = {
+  const bibleAdapter: BibleProviderPort = {
     supportedTranslations: ['ESV'],
     async getPassage(reference, translation, options) {
       biblePassageCalls.push({ reference, translation, options });
@@ -64,10 +64,9 @@ export function createDeterministicMcpFixture(): DeterministicMcpFixture {
       };
     },
     isConfigured: () => true,
-    getCopyright: () => 'Deterministic test fixture',
   };
 
-  const commentaryAdapter: CommentaryAdapter = {
+  const commentaryAdapter: CommentaryProviderPort = {
     supportedCommentators: ['Jamieson-Fausset-Brown'],
     async getCommentary(_reference, commentator) {
       return {
@@ -83,7 +82,6 @@ export function createDeterministicMcpFixture(): DeterministicMcpFixture {
         providerRevision: `sha256:${'a'.repeat(64)}`,
       };
     },
-    supportsBook: () => true,
   };
 
   const crossReferenceRepository: ICrossReferenceRepository = {

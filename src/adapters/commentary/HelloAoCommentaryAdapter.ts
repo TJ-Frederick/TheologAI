@@ -5,9 +5,9 @@
  * Matthew Henry, JFB, Adam Clarke, John Gill, Keil-Delitzsch, Tyndale.
  */
 
-import type { CommentaryAdapter } from './CommentaryAdapter.js';
+import type { CommentaryProviderPort } from '../../services/commentary/CommentaryProviderPort.js';
 import type {
-  CommentaryAdapterResult,
+  CommentaryProviderResult,
   CommentaryCoverageEvidence,
 } from '../../kernel/types.js';
 import type { BibleReference } from '../../kernel/reference.js';
@@ -52,7 +52,7 @@ const MAX_CONTENT_FRAGMENT_LENGTH = 100_000;
 const MAX_ENTRY_TEXT_LENGTH = 200_000;
 const MAX_CHAPTER_TEXT_LENGTH = 1_000_000;
 
-export class HelloAoCommentaryAdapter implements CommentaryAdapter {
+export class HelloAoCommentaryAdapter implements CommentaryProviderPort {
   readonly supportedCommentators = CANONICAL_COMMENTATORS;
 
   private client: HttpClient;
@@ -66,7 +66,7 @@ export class HelloAoCommentaryAdapter implements CommentaryAdapter {
     });
   }
 
-  async getCommentary(ref: BibleReference, commentator: string): Promise<CommentaryAdapterResult> {
+  async getCommentary(ref: BibleReference, commentator: string): Promise<CommentaryProviderResult> {
     if (ref.endVerse != null) {
       throw new ValidationError(
         'reference',

@@ -68,6 +68,12 @@ The legacy inventory is a quarantine ledger, not deletion authority. Moving,
 executing, migrating, or deleting one of those paths requires a separate
 reviewed change that updates the manifest in the same slice.
 
+`test/unit/config/applicationBoundaries.test.ts` is the corresponding
+zero-allowlist service-boundary guard. It resolves all static, type-only,
+dynamic, import-equals, and literal CommonJS module specifiers under
+`src/services/`; no adapter allowlist exists. The synthetic cases prove the
+detector remains non-vacuous while quarantined tests remain untouched.
+
 ## Retired legacy commands
 
 The following former package commands have been removed. They are not runnable

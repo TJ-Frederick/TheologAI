@@ -24,6 +24,14 @@ retired `src/types/` directory is intentionally absent. The type-authority
 guard scans source, scripts, and every test partition for retired imports
 without executing quarantined files.
 
+The service layer owns its provider ports under `src/services/`.
+Outward/external provider implementations remain under `src/adapters/`, while
+service-local providers such as `LocalPrimarySourceSearchProvider` may remain
+application-side and implement service-owned ports. A zero-allowlist
+compiler-API guard resolves every static, type-only, dynamic, import-equals,
+and literal CommonJS specifier in `src/services/` and rejects any dependency
+resolving under `src/adapters/`.
+
 
 **Current Status: Production Ready - Beta Launch (v3.4.1)**
 

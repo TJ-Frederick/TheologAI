@@ -1,6 +1,5 @@
 import { ValidationError } from '../../kernel/errors.js';
-import type { CcelSearchAdapter } from '../../adapters/commentary/CcelSearchAdapter.js';
-import type { LocalPrimarySourceSearchProvider } from './LocalPrimarySourceSearchProvider.js';
+import type { CcelPrimarySourceSearchPort, LocalPrimarySourceSearchPort } from './PrimarySourceSearchPorts.js';
 import type { PrimarySourceContractConfig } from '../../kernel/featureFlags.js';
 import type { CcelUpstreamCoordinator } from './CcelUpstreamCoordinator.js';
 import {
@@ -28,8 +27,8 @@ export type PrimarySourceSearchServiceOptions = PrimarySourceContractConfig;
 
 export class PrimarySourceSearchService {
   constructor(
-    private readonly local: Pick<LocalPrimarySourceSearchProvider, 'search'>,
-    private readonly ccel: Pick<CcelSearchAdapter, 'search'>,
+    private readonly local: LocalPrimarySourceSearchPort,
+    private readonly ccel: CcelPrimarySourceSearchPort,
     private readonly options: PrimarySourceSearchServiceOptions,
     private readonly coordinator?: CcelUpstreamCoordinator,
   ) {}
