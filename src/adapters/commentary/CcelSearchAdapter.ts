@@ -22,6 +22,7 @@ import type {
   CcelCoordinatorEvent,
   CcelUpstreamCoordinator,
 } from '../../services/historical/CcelUpstreamCoordinator.js';
+import type { CcelPrimarySourceSearchPort } from '../../services/historical/PrimarySourceSearchPorts.js';
 
 export const CCEL_SEARCH_ATTRIBUTION = 'CCEL (Christian Classics Ethereal Library)' as const;
 /**
@@ -332,7 +333,7 @@ function resultFor(
  * Search adapter. The only network operation it performs is the one bounded
  * GET represented by a single caller-supplied query object.
  */
-export class CcelSearchAdapter {
+export class CcelSearchAdapter implements CcelPrimarySourceSearchPort {
   private readonly enabled: boolean;
   private readonly fetchImpl: FetchImplementation;
   private readonly now: Clock;

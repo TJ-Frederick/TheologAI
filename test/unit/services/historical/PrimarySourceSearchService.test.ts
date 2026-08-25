@@ -4,6 +4,8 @@ import type { PrimarySourceProviderResult } from '../../../../src/services/histo
 import type { PrimarySourceSearchHit } from '../../../../src/services/historical/primarySourceTypes.js';
 import { CCEL_COMPOSITION_DATE_NOTICE } from '../../../../src/services/historical/primarySourceTypes.js';
 import { readPrimarySourceContractConfig } from '../../../../src/kernel/featureFlags.js';
+import type { CcelUpstreamCoordinator } from '../../../../src/services/historical/CcelUpstreamCoordinator.js';
+import type { CcelPrimarySourceSearchPort, LocalPrimarySourceSearchPort } from '../../../../src/services/historical/PrimarySourceSearchPorts.js';
 
 function providerResult(provider: 'local' | 'ccel_live', status: PrimarySourceProviderResult['status'] = 'ok', count = 1): PrimarySourceProviderResult {
   const hits: PrimarySourceSearchHit[] = Array.from({ length: count }, (_, index) => provider === 'local'
@@ -31,7 +33,7 @@ const query = (overrides: Record<string, unknown> = {}) => ({ id: 'q1', text: 'u
 const v7Query = (overrides: Record<string, unknown> = {}) => ({ id: 'q1', text: 'union with Christ', ...overrides });
 const dormant = { exposeCcelDiscovery: false, ccelLiveSearch: false, ccelCoordinator: false, contractVersion: '6' as const, liveCcelEnabled: false };
 const live = { exposeCcelDiscovery: true, ccelLiveSearch: true, ccelCoordinator: true, contractVersion: '7' as const, liveCcelEnabled: true };
-const coordinator = { admit: vi.fn(), recordOutcome: vi.fn(), snapshot: vi.fn() } as any;
+const coordinator = { admit: vi.fn(), recordOutcome: vi.fn(), snapshot: vi.fn() } satisfies CcelUpstreamCoordinator;
 
 describe('PrimarySourceSearchService', () => {
   it.each([
@@ -48,14 +50,15 @@ describe('PrimarySourceSearchService', () => {
       getByName('ccel-public-search-origin-v1');
       return { kind: 'admitted' as const, token: { attemptId: 1, operatorEpoch: 0 }, admittedAtMs: 1, nextAllowedAtMs: 2, probe: false };
     });
-    const gate = { admit: rpcAdmit, recordOutcome: vi.fn(), snapshot: vi.fn() } as any;
+    const gate = { admit: rpcAdmit, recordOutcome: vi.fn(), snapshot: vi.fn() } satisfies CcelUpstreamCoordinator;
     const config = readPrimarySourceContractConfig({
       THEOLOGAI_EXPOSE_CCEL_DISCOVERY: String(exposure),
       THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH: String(liveSearch),
       THEOLOGAI_ENABLE_CCEL_COORDINATOR: String(coordinatorEnabled),
     });
-    const local = { search: vi.fn().mockResolvedValue(providerResult('local', 'no_results', 0)) };
-    const service = new PrimarySourceSearchService(local as any, { search: adapterSearch } as any, config, gate);
+    const local = { search: vi.fn().mockResolvedValue(providerResult('local', 'no_results', 0)) } satisfies LocalPrimarySourceSearchPort;
+    const ccel = { search: adapterSearch } satisfies CcelPrimarySourceSearchPort;
+    const service = new PrimarySourceSearchService(local, ccel, config, gate);
     await service.search(plan([
       exposure ? v7Query({ searchDepth: 'expanded' }) : query(),
     ]));
@@ -73,7 +76,7 @@ describe('PrimarySourceSearchService', () => {
   it('validates the complete plan atomically before any provider call', async () => {
     const local = { search: vi.fn().mockResolvedValue(providerResult('local')) };
     const ccel = { search: vi.fn().mockResolvedValue(providerResult('ccel_live')) };
-    const service = new PrimarySourceSearchService(local as any, ccel as any, live, coordinator);
+    const service = new PrimarySourceSearchService(local, ccel, live, coordinator);
     await expect(service.search(plan([v7Query(), v7Query({ id: 'q1' })]))).rejects.toThrow('Duplicate');
     await expect(service.search(plan([0, 1].map(index => v7Query({ id: `q${index}`, searchDepth: 'expanded' }))))).rejects.toThrow('At most 1');
     expect(local.search).not.toHaveBeenCalled();
@@ -83,7 +86,7 @@ describe('PrimarySourceSearchService', () => {
   it('normalizes literals, preserves query/provider order, and makes local-only zero network calls', async () => {
     const local = { search: vi.fn().mockResolvedValue(providerResult('local')) };
     const ccel = { search: vi.fn() };
-    const service = new PrimarySourceSearchService(local as any, ccel as any, dormant);
+    const service = new PrimarySourceSearchService(local, ccel, dormant);
     const result = await service.search(plan([query({ text: '  union\n with   Christ  ', providers: ['local'] })]));
     expect(result.planStatus).toBe('complete');
     expect(result.queries[0]).toMatchObject({ normalizedMode: 'all_terms', normalizedSelection: 'relevance' });
@@ -104,7 +107,7 @@ describe('PrimarySourceSearchService', () => {
       events.push('expanded');
       return providerResult('ccel_live', 'no_results', 0);
     }) };
-    const service = new PrimarySourceSearchService(local as any, ccel as any, live, coordinator);
+    const service = new PrimarySourceSearchService(local, ccel, live, coordinator);
     const result = await service.search(plan([{
       id: 'expanded', text: 'grace', searchDepth: 'expanded', expandedLimit: 4, startYear: 500, endYear: 1500,
     }]));
@@ -121,14 +124,19 @@ describe('PrimarySourceSearchService', () => {
   it.each([0, 6, 1.5])('rejects invalid v7 expandedLimit %s before provider work', async expandedLimit => {
     const local = { search: vi.fn() };
     const ccel = { search: vi.fn() };
-    const service = new PrimarySourceSearchService(local as any, ccel as any, live, coordinator);
+    const service = new PrimarySourceSearchService(local, ccel, live, coordinator);
     await expect(service.search(plan([v7Query({ searchDepth: 'expanded', expandedLimit })]))).rejects.toThrow('expandedLimit');
     expect(local.search).not.toHaveBeenCalled();
     expect(ccel.search).not.toHaveBeenCalled();
   });
 
   it('rejects v7 expandedLimit without expanded searchDepth and more than one expanded query', async () => {
-    const service = new PrimarySourceSearchService({ search: vi.fn() } as any, { search: vi.fn() } as any, live, coordinator);
+    const service = new PrimarySourceSearchService(
+      { search: vi.fn() } satisfies LocalPrimarySourceSearchPort,
+      { search: vi.fn() } satisfies CcelPrimarySourceSearchPort,
+      live,
+      coordinator,
+    );
     await expect(service.search(plan([{ id: 'q1', text: 'grace', expandedLimit: 3 }]))).rejects.toThrow('expandedLimit');
     await expect(service.search(plan([
       { id: 'q1', text: 'grace', searchDepth: 'expanded' }, { id: 'q2', text: 'faith', searchDepth: 'expanded' },
@@ -137,7 +145,7 @@ describe('PrimarySourceSearchService', () => {
 
   it('preserves separate creator scopes and mixed unfiltered/date/work plans', async () => {
     const local = { search: vi.fn().mockResolvedValue(providerResult('local', 'catalog_miss', 0)) };
-    const service = new PrimarySourceSearchService(local as any, { search: vi.fn() } as any, dormant);
+    const service = new PrimarySourceSearchService(local, { search: vi.fn() } satisfies CcelPrimarySourceSearchPort, dormant);
     const result = await service.search(plan([
       query({ id: 'erasmus', author: 'Erasmus of Rotterdam' }),
       query({ id: 'luther', author: 'Martin Luther' }),
@@ -157,7 +165,7 @@ describe('PrimarySourceSearchService', () => {
     const local = { search: vi.fn().mockResolvedValue(providerResult('local', 'no_results', 0)) };
     const ccel = { search: vi.fn() };
     const exposedDisabled = { ...live, ccelLiveSearch: false, ccelCoordinator: false, liveCcelEnabled: false };
-    const service = new PrimarySourceSearchService(local as any, ccel as any, exposedDisabled);
+    const service = new PrimarySourceSearchService(local, ccel, exposedDisabled);
     const result = await service.search(plan([v7Query({ searchDepth: 'expanded' })]));
     expect(result).toMatchObject({
       planStatus: 'partial',
@@ -177,8 +185,8 @@ describe('PrimarySourceSearchService', () => {
   ])('rejects v7 %s beyond page one before any catalog or external work', async (_label, queryOverrides) => {
     const local = { search: vi.fn() };
     const ccel = { search: vi.fn() };
-    const gate = { admit: vi.fn(), recordOutcome: vi.fn(), snapshot: vi.fn() } as any;
-    const service = new PrimarySourceSearchService(local as any, ccel as any, live, gate);
+    const gate = { admit: vi.fn(), recordOutcome: vi.fn(), snapshot: vi.fn() } satisfies CcelUpstreamCoordinator;
+    const service = new PrimarySourceSearchService(local, ccel, live, gate);
     await expect(service.search(plan([v7Query({ ...queryOverrides, page: 2 })]))).rejects.toThrow('page 1');
     expect(local.search).not.toHaveBeenCalled();
     expect(ccel.search).not.toHaveBeenCalled();
@@ -188,8 +196,8 @@ describe('PrimarySourceSearchService', () => {
   it('applies date bounds to the catalog while deliberately omitting them from expanded discovery', async () => {
     const local = { search: vi.fn().mockResolvedValue(providerResult('local', 'no_results', 0)) };
     const ccel = { search: vi.fn().mockResolvedValue(providerResult('ccel_live', 'no_results', 0)) };
-    const gate = { admit: vi.fn(), recordOutcome: vi.fn(), snapshot: vi.fn() } as any;
-    const service = new PrimarySourceSearchService(local as any, ccel as any, live, gate);
+    const gate = { admit: vi.fn(), recordOutcome: vi.fn(), snapshot: vi.fn() } satisfies CcelUpstreamCoordinator;
+    const service = new PrimarySourceSearchService(local, ccel, live, gate);
 
     const result = await service.search(plan([v7Query({
       searchDepth: 'expanded', startYear: 500, endYear: 1500,
@@ -212,7 +220,7 @@ describe('PrimarySourceSearchService', () => {
       if (status === 'rate_limited') returned.retryAfterSeconds = 10;
       const ccel = { search: vi.fn().mockResolvedValue(returned) };
       const local = { search: vi.fn().mockResolvedValue(providerResult('local', 'no_results', 0)) };
-      const service = new PrimarySourceSearchService(local as any, ccel as any, live, coordinator);
+      const service = new PrimarySourceSearchService(local, ccel, live, coordinator);
 
       const result = await service.search(plan([v7Query({ searchDepth: 'expanded' })]));
 
@@ -231,7 +239,7 @@ describe('PrimarySourceSearchService', () => {
   it('isolates failures and never turns local no-results plus CCEL failure into complete no-results', async () => {
     const local = { search: vi.fn().mockResolvedValue(providerResult('local', 'no_results', 0)) };
     const ccel = { search: vi.fn().mockResolvedValue(providerResult('ccel_live', 'unavailable', 0)) };
-    const result = await new PrimarySourceSearchService(local as any, ccel as any, live, coordinator)
+    const result = await new PrimarySourceSearchService(local, ccel, live, coordinator)
       .search(plan([v7Query({ searchDepth: 'expanded' })]));
     expect(result.planStatus).toBe('partial');
     expect(result.queries[0].providers.map(item => item.status)).toEqual(['no_results', 'unavailable']);
@@ -243,7 +251,7 @@ describe('PrimarySourceSearchService', () => {
     const queries = [0, 1, 2, 3].map(index => v7Query({
       id: `q${index}`, ...(index === 0 ? { searchDepth: 'expanded' } : {}), limit: 8,
     }));
-    const result = await new PrimarySourceSearchService(local as any, ccel as any, live, coordinator).search(plan(queries));
+    const result = await new PrimarySourceSearchService(local, ccel, live, coordinator).search(plan(queries));
     expect(result.planStatus).toBe('partial');
     expect(result.queries.flatMap(item => item.providers).flatMap(item => item.hits)).toHaveLength(32);
     expect(result.queries[0].providers[0].hits[0].rankWithinProvider).toBe(1);
@@ -262,7 +270,11 @@ describe('PrimarySourceSearchService', () => {
     plan([query({ selection: 'random' })]),
     { queries: [query()], extra: true },
   ])('rejects invalid bounded plans %#', async invalid => {
-    const service = new PrimarySourceSearchService({ search: vi.fn() } as any, { search: vi.fn() } as any, dormant);
+    const service = new PrimarySourceSearchService(
+      { search: vi.fn() } satisfies LocalPrimarySourceSearchPort,
+      { search: vi.fn() } satisfies CcelPrimarySourceSearchPort,
+      dormant,
+    );
     await expect(service.search(invalid)).rejects.toThrow();
   });
 });
