@@ -687,6 +687,14 @@ must remain absent. The maintained type-authority guard scans `src/`, `scripts/`
 and all `test/` partitions—including quarantined files—without executing those
 files.
 
+Service application boundaries are zero-allowlist: services depend on
+application-owned provider ports under `src/services/`. Outward/external
+provider implementations remain under `src/adapters/`, while service-local
+providers such as `LocalPrimarySourceSearchProvider` may remain application-side
+and implement service-owned ports. The application-boundary guard resolves
+every static, type-only, dynamic, import-equals, and literal CommonJS import in
+`src/services/` and rejects any adapter dependency.
+
 Business services depend on shared repository ports. Node uses synchronous
 SQLite repositories through async-compatible service boundaries; Workers uses
 per-request D1 repositories. Both targets share one MCP registry.
