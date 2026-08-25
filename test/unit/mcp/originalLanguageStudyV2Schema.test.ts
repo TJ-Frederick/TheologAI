@@ -9,6 +9,7 @@ import {
   productionCoordinator,
   productionRequest,
 } from '../../helpers/originalLanguageStudyV2ProductionFixtures.js';
+import { presentOriginalLanguageStudyV2 } from '../../../src/presenters/originalLanguageStudyV2Presentation.js';
 
 const ajv = new Ajv2020({ strict: true, strictTypes: false, allErrors: true });
 const validateInput = ajv.compile(originalLanguageStudyV2InputSchema);
@@ -39,11 +40,11 @@ describe('production original_language_study v2 schema', () => {
 
   it('accepts production coordinator output and rejects a mismatched status/detail relationship', async () => {
     for (const detail of ['summary', 'detailed'] as const) {
-      const output = (await productionCoordinator([productionCandidate(1)]).coordinator
+      const output = presentOriginalLanguageStudyV2(await productionCoordinator([productionCandidate(1)]).coordinator
         .study(productionRequest(undefined, detail))).output;
       expect(validateOutput(output), JSON.stringify(validateOutput.errors)).toBe(true);
     }
-    const output = (await productionCoordinator([productionCandidate(1)]).coordinator.study(productionRequest())).output;
+    const output = presentOriginalLanguageStudyV2(await productionCoordinator([productionCandidate(1)]).coordinator.study(productionRequest())).output;
     if (output.semanticEvidence.status !== 'lexical_candidates') throw new Error('expected candidate evidence');
     const invalid = structuredClone(output) as typeof output;
     if (invalid.semanticEvidence.status !== 'lexical_candidates') throw new Error('expected candidate evidence');

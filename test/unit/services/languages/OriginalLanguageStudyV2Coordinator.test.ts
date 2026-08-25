@@ -14,13 +14,11 @@ import {
 describe('production original_language_study v2 coordinator', () => {
   it('canonicalizes an accepted alias for output and queries the canonical display storage key rather than a provider book code', async () => {
     const current = productionCoordinator([productionCandidate(1)]);
-    const presentation = await current.coordinator.study(productionRequest());
+    const result = await current.coordinator.study(productionRequest());
 
-    expect(presentation.output.request.reference).toBe('Gen 1:1');
-    expect(presentation.output.study).toMatchObject({
-      request: { reference: 'Genesis 1:1' },
-      context: { reference: 'Genesis 1:1', language: 'Hebrew' },
-    });
+    expect(result.request.reference).toBe('Gen 1:1');
+    expect(result.v1Result).toMatchObject({ reference: 'Genesis 1:1', language: 'Hebrew' });
+    expect(result.semanticEvidence).toMatchObject({ language: 'Hebrew', status: 'lexical_candidates' });
     expect(current.repository.received).toEqual([expect.objectContaining({ normalizedReference: 'Genesis 1:1' })]);
     expect(current.repository.received[0]?.normalizedReference).not.toBe('GEN 1:1');
   });
@@ -28,13 +26,13 @@ describe('production original_language_study v2 coordinator', () => {
   it('accepts semantically equal aliases, but binds a continuation to the raw request spelling and detail level', async () => {
     const values = Array.from({ length: 10 }, (_, index) => productionCandidate(index + 1));
     const first = await productionCoordinator(values).coordinator.study(productionRequest());
-    if (!('resultWindow' in first.output.semanticEvidence) || !first.output.semanticEvidence.resultWindow.continuation) {
+    if (!('resultWindow' in first.semanticEvidence) || !first.semanticEvidence.resultWindow.continuation) {
       throw new Error('expected a first-page continuation');
     }
-    const cursor = first.output.semanticEvidence.resultWindow.continuation.cursor;
+    const cursor = first.semanticEvidence.resultWindow.continuation.cursor;
 
     const sameAlias = await productionCoordinator(values).coordinator.study(productionRequest(undefined, 'summary', 'Genesis 1:1'));
-    expect(sameAlias.output.request.reference).toBe('Genesis 1:1');
+    expect(sameAlias.request.reference).toBe('Genesis 1:1');
 
     await expect(productionCoordinator(values).coordinator.study(
       productionRequest(cursor, 'summary', 'Genesis 1:1'),
@@ -44,8 +42,8 @@ describe('production original_language_study v2 coordinator', () => {
       .rejects.toThrow('full selected-token request context');
     expect(changedDetail.repository.queryCount).toBe(0);
     const second = await productionCoordinator(values).coordinator.study(productionRequest(cursor));
-    if (!('resultWindow' in second.output.semanticEvidence)) throw new Error('expected semantic continuation');
-    expect(second.output.semanticEvidence.resultWindow).toMatchObject({ priorCount: 8, returnedCount: 2, hasMore: false });
+    if (!('resultWindow' in second.semanticEvidence)) throw new Error('expected semantic continuation');
+    expect(second.semanticEvidence.resultWindow).toMatchObject({ priorCount: 8, returnedCount: 2, hasMore: false });
   });
 
   it('rejects an authoritative result that is semantically different or noncanonical before querying evidence', async () => {
@@ -64,23 +62,22 @@ describe('production original_language_study v2 coordinator', () => {
 
   it('keeps the complete existing Greek study and does not query Hebrew semantic evidence', async () => {
     const current = productionCoordinator([productionCandidate(1)], productionContext('Greek'));
-    const presentation = await current.coordinator.study({
+    const result = await current.coordinator.study({
       reference: 'Jn 1:1', target: 'H1', position: 1, detail: 'summary',
     });
-    expect(presentation.output.study).toMatchObject({
-      context: { reference: 'John 1:1', language: 'Greek', selectedToken: { text: 'PRODUCTION GREEK TOKEN' } },
-      lexiconEvidence: [{ definition: 'PRODUCTION EXISTING GREEK DEFINITION' }],
+    expect(result.v1Result).toMatchObject({
+      reference: 'John 1:1', language: 'Greek',
+      selectedToken: { text: 'PRODUCTION GREEK TOKEN' },
+      dictionary: { definition: 'PRODUCTION EXISTING GREEK DEFINITION' },
     });
-    expect(presentation.output.semanticEvidence).toMatchObject({ language: 'Greek', status: 'not_applicable' });
+    expect(result.semanticEvidence).toMatchObject({ language: 'Greek', status: 'not_applicable' });
     expect(current.repository.queryCount).toBe(0);
   });
 
-  it('uses detail only for candidate volume and preserves honest byte accounting', async () => {
-    // The structured packet must omit details deterministically before the
-    // added text suffix reaches its separate 16 KiB cap.
+  it('uses detail only for application candidate volume without presentation concerns', async () => {
     const values = [productionCandidate(1, 14_000), productionCandidate(2, 14_000)];
-    const summary = (await productionCoordinator(values).coordinator.study(productionRequest(undefined, 'summary'))).output;
-    const detailed = (await productionCoordinator(values).coordinator.study(productionRequest(undefined, 'detailed'))).output;
+    const summary = await productionCoordinator(values).coordinator.study(productionRequest(undefined, 'summary'));
+    const detailed = await productionCoordinator(values).coordinator.study(productionRequest(undefined, 'detailed'));
     expect(summary.semanticEvidence.status).toBe(detailed.semanticEvidence.status);
     if (!('candidates' in summary.semanticEvidence) || !('candidates' in detailed.semanticEvidence)) {
       throw new Error('expected candidate evidence');
@@ -88,8 +85,7 @@ describe('production original_language_study v2 coordinator', () => {
     expect(summary.semanticEvidence.candidates.map(candidate => candidate.senseId))
       .toEqual(detailed.semanticEvidence.candidates.map(candidate => candidate.senseId));
     expect(detailed.semanticEvidence.candidates.map(candidate => candidate.detailStatus))
-      .toContain('omitted_response_byte_budget');
-    expect(detailed.responseWindow.used).toBeLessThanOrEqual(32 * 1024);
+      .toContain('detailed');
   });
 
   it('rejects caller-supplied source and proof identities before provider or repository access', async () => {
@@ -127,11 +123,11 @@ describe('production original_language_study v2 coordinator', () => {
   it('requires the entire current server proof before exposing a reference-aligned source candidate', async () => {
     const aligned = await productionCoordinator([productionCandidate(1)], productionContext('Hebrew', true))
       .coordinator.study(productionRequest(undefined, 'detailed'));
-    expect(aligned.output.semanticEvidence).toMatchObject({
+    expect(aligned.semanticEvidence).toMatchObject({
       status: 'reference_aligned_source_candidate',
       alignmentEvidence: { normalizedReference: 'Genesis 1:1', evidenceId: 'production-reference-01' },
     });
-    expect(aligned.output.semanticEvidence.plainLanguage).toContain('not an adjudicated contextual meaning');
+    expect(aligned.semanticEvidence.plainLanguage).toContain('not an adjudicated contextual meaning');
 
     const mismatched = productionContext('Hebrew', true);
     mismatched.serverVerifiedAlignment!.morphologyTokenCoordinates.normalizedReference = 'Genesis 1:2';

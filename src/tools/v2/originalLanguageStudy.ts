@@ -1,5 +1,6 @@
 import type { ToolHandler } from '../../kernel/types.js';
 import type { OriginalLanguageStudyV2Coordinator } from '../../services/languages/OriginalLanguageStudyV2Coordinator.js';
+import { presentOriginalLanguageStudyV2 } from '../../presenters/originalLanguageStudyV2Presentation.js';
 import { handleToolError, ValidationError } from '../../kernel/errors.js';
 import {
   originalLanguageStudyV2InputSchema,
@@ -26,13 +27,14 @@ export function createOriginalLanguageStudyHandler(coordinator: OriginalLanguage
           throw new ValidationError('cursor', `cursor must be an opaque string from 1 to ${ORIGINAL_LANGUAGE_STUDY_V2_CURSOR_MAX_LENGTH} characters.`);
         }
         const position = params.position as number | undefined;
-        const presentation = await coordinator.study({
+        const applicationResult = await coordinator.study({
           reference: params.reference,
           target: params.target,
           ...(position === undefined ? {} : { position }),
           ...(params.detail === undefined ? {} : { detail: params.detail }),
           ...(params.cursor === undefined ? {} : { cursor: params.cursor }),
         });
+        const presentation = presentOriginalLanguageStudyV2(applicationResult);
         return { content: [{ type: 'text', text: presentation.markdown }], structuredContent: presentation.output };
       } catch (error) { return handleToolError(error as Error); }
     },

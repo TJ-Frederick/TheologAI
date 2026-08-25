@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { formatOriginalLanguageStudy } from '../../../src/formatters/originalLanguageStudyFormatter.js';
 import { formatOriginalLanguageStudyV2 } from '../../../src/formatters/originalLanguageStudyV2Formatter.js';
-import { ORIGINAL_LANGUAGE_STUDY_V2_ADDED_SEMANTIC_MARKDOWN_BYTES } from '../../../src/kernel/originalLanguageStudyV2Contract.js';
+import {
+  ORIGINAL_LANGUAGE_STUDY_V2_ADDED_SEMANTIC_MARKDOWN_BYTES,
+  type OriginalLanguageStudyV2Result,
+} from '../../../src/kernel/originalLanguageStudyV2Contract.js';
 import { finalizeOriginalLanguageStudyV2Output } from '../../../src/presenters/originalLanguageStudyV2Structured.js';
+import { presentOriginalLanguageStudyV2 } from '../../../src/presenters/originalLanguageStudyV2Presentation.js';
 import {
   productionCandidate,
   productionContext,
@@ -19,8 +23,8 @@ describe('production original_language_study v2 Markdown formatter', () => {
       withheldFields: ['tbesh_meaning'],
       notice: 'PRODUCTION EVIDENCE POLICY NOTICE',
     };
-    const presentation = await productionCoordinator([productionCandidate(1)], context)
-      .coordinator.study(productionRequest());
+    const presentation = presentOriginalLanguageStudyV2(await productionCoordinator([productionCandidate(1)], context)
+      .coordinator.study(productionRequest()));
     const existingV1 = formatOriginalLanguageStudy(context.v1Result);
 
     expect(presentation.markdown.startsWith(existingV1)).toBe(true);
@@ -37,9 +41,9 @@ describe('production original_language_study v2 Markdown formatter', () => {
     const candidate = productionCandidate(1);
     candidate.sense.definition = 'PRODUCTION **DEFINITION** [link](https://evil.invalid)';
     candidate.domains[0]!.label = 'PRODUCTION <DOMAIN>';
-    const presentation = await productionCoordinator([candidate], context).coordinator.study(
+    const presentation = presentOriginalLanguageStudyV2(await productionCoordinator([candidate], context).coordinator.study(
       productionRequest(undefined, 'detailed'),
-    );
+    ));
 
     expect(presentation.markdown).toContain('PRODUCTION *[TOKEN](https://evil.invalid)');
     expect(presentation.markdown).toContain('PRODUCTION \\*\\*DEFINITION\\*\\*');
@@ -48,7 +52,7 @@ describe('production original_language_study v2 Markdown formatter', () => {
   });
 
   it('fails closed if a caller tries to render v2 with a different v1 result', async () => {
-    const presentation = await productionCoordinator([productionCandidate(1)]).coordinator.study(productionRequest());
+    const presentation = presentOriginalLanguageStudyV2(await productionCoordinator([productionCandidate(1)]).coordinator.study(productionRequest()));
     const different = productionContext().v1Result;
     different.reference = 'Genesis 1:2';
     expect(() => formatOriginalLanguageStudyV2(presentation.output, different))
@@ -56,8 +60,8 @@ describe('production original_language_study v2 Markdown formatter', () => {
   });
 
   it('enforces the exact additive semantic-suffix boundary without changing the complete v1 prefix', async () => {
-    const regular = await productionCoordinator([productionCandidate(1)]).coordinator
-      .study(productionRequest(undefined, 'detailed'));
+    const regular = presentOriginalLanguageStudyV2(await productionCoordinator([productionCandidate(1)]).coordinator
+      .study(productionRequest(undefined, 'detailed')));
     const boundaryDefinition = semanticBoundaryDefinition(regular.output);
     const exactBoundary = outputWithEscapedDefinition(regular.output, boundaryDefinition);
     const exactMarkdown = formatOriginalLanguageStudyV2(exactBoundary, productionContext().v1Result);
@@ -72,7 +76,7 @@ describe('production original_language_study v2 Markdown formatter', () => {
 });
 
 function outputWithEscapedDefinition(
-  baseline: Awaited<ReturnType<ReturnType<typeof productionCoordinator>['coordinator']['study']>>['output'],
+  baseline: OriginalLanguageStudyV2Result,
   definition: string,
 ) {
   const output = structuredClone(baseline);
@@ -88,7 +92,7 @@ function outputWithEscapedDefinition(
 }
 
 function semanticBoundaryDefinition(
-  baseline: Awaited<ReturnType<ReturnType<typeof productionCoordinator>['coordinator']['study']>>['output'],
+  baseline: OriginalLanguageStudyV2Result,
 ): string {
   const fits = (definition: string): string | undefined => {
     try {

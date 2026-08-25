@@ -14,6 +14,7 @@ const activatedModules = [
   'src/kernel/originalLanguageStudyV2Contract.ts',
   'src/mcp/schemas/originalLanguageStudyV2.ts',
   'src/presenters/originalLanguageStudyV2Structured.ts',
+  'src/presenters/originalLanguageStudyV2Presentation.ts',
   'src/formatters/originalLanguageStudyV2Formatter.ts',
   'src/services/languages/OriginalLanguageStudyV2Coordinator.ts',
   'src/services/languages/OriginalLanguageStudyV2ContextProvider.ts',

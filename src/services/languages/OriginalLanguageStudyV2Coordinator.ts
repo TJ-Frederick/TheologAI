@@ -14,8 +14,6 @@ import {
 import { formatReference, parseReference, referencesEqual } from '../../kernel/reference.js';
 import {
   ORIGINAL_LANGUAGE_STUDY_V2_CURSOR_OPERATION,
-  ORIGINAL_LANGUAGE_STUDY_V2_RESPONSE_BYTES,
-  ORIGINAL_LANGUAGE_STUDY_V2_SCHEMA_VERSION,
   createOriginalLanguageStudyV2Cursor,
   deriveOriginalLanguageStudyV2MorphologyTokenIdentity,
   parseOriginalLanguageStudyV2Cursor,
@@ -24,7 +22,6 @@ import {
   type OriginalLanguageStudyV2Detail,
   type OriginalLanguageStudyV2ProvenanceSource,
   type OriginalLanguageStudyV2ResolvedRequest,
-  type OriginalLanguageStudyV2Result,
   type OriginalLanguageStudyV2ResultWindow,
   type OriginalLanguageStudyV2SemanticEvidence,
   type ServerVerifiedHebrewSemanticAlignment,
@@ -33,23 +30,8 @@ import type {
   OriginalLanguageStudyV2AuthoritativeContext,
   OriginalLanguageStudyV2ContextPort,
 } from './OriginalLanguageStudyV2ContextPort.js';
-import { presentOriginalLanguageStudy } from '../../presenters/originalLanguageStudyStructured.js';
-import {
-  finalizeOriginalLanguageStudyV2Output,
-  type OriginalLanguageStudyV2StructuredPresentation,
-} from '../../presenters/originalLanguageStudyV2Structured.js';
-import { formatOriginalLanguageStudyV2 } from '../../formatters/originalLanguageStudyV2Formatter.js';
+import type { OriginalLanguageStudyV2ApplicationResult } from './OriginalLanguageStudyV2ApplicationResult.js';
 import type { OriginalLanguageStudyDomainResult } from './OriginalLanguageStudyService.js';
-
-/**
- * The coordinator returns both the closed structured v2 packet and a
- * textual rendering that begins with the complete existing v1 rendering.  The
- * latter is intentionally composed only after the v2 result has passed its
- * own exact-byte validation; it is not a second, lossy v1 projection.
- */
-export interface OriginalLanguageStudyV2Presentation extends OriginalLanguageStudyV2StructuredPresentation {
-  markdown: string;
-}
 
 const WITHHELD_EVIDENCE = Object.freeze([
   Object.freeze({ source: 'TBESH' as const, field: 'Meaning' as const, status: 'withheld_rights_boundary' as const }),
@@ -71,36 +53,12 @@ export class OriginalLanguageStudyV2Coordinator {
     private readonly evidenceRepository: IUbsSemanticEvidenceBundleRepository,
   ) {}
 
-  async study(input: unknown): Promise<OriginalLanguageStudyV2Presentation> {
+  async study(input: unknown): Promise<OriginalLanguageStudyV2ApplicationResult> {
     const request = snapshotRequest(input);
     const authoritative = snapshotAuthoritativeContext(await this.contextProvider.resolve(request));
     const canonicalReference = validateV1ResultAgainstRequest(authoritative.v1Result, request);
-    const study = presentOriginalLanguageStudy(authoritative.v1Result, request.position);
     const semanticEvidence = await this.semanticEvidence(request, authoritative, canonicalReference);
-    const output: OriginalLanguageStudyV2Result = {
-      schemaVersion: ORIGINAL_LANGUAGE_STUDY_V2_SCHEMA_VERSION,
-      kind: 'original_language_study',
-      detail: request.detail,
-      request: {
-        // Keep the supplied spelling as an auditable request record. The
-        // composed v1 study and semantic reference are canonical, while this
-        // raw value remains part of the continuation binding.
-        reference: request.reference,
-        target: request.target,
-        ...(request.position === undefined ? {} : { position: request.position }),
-      },
-      study,
-      semanticEvidence,
-      responseWindow: {
-        unit: 'utf8_bytes', maximum: ORIGINAL_LANGUAGE_STUDY_V2_RESPONSE_BYTES,
-        used: 0, truncated: false,
-      },
-    };
-    const presentation = finalizeOriginalLanguageStudyV2Output(output);
-    return {
-      ...presentation,
-      markdown: formatOriginalLanguageStudyV2(presentation.output, authoritative.v1Result),
-    };
+    return Object.freeze({ request, v1Result: authoritative.v1Result, semanticEvidence });
   }
 
   private async semanticEvidence(
