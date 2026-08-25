@@ -1,4 +1,3 @@
-import type { OriginalLanguageStudyDomainResult } from '../services/languages/OriginalLanguageStudyService.js';
 import { sha256Hex } from './sha256.js';
 import type {
   FutureExactHebrewTokenAlignmentProof,
@@ -39,21 +38,6 @@ export interface OriginalLanguageStudyV2Request {
 
 /** A proof may only be copied from a future server-owned verifier. */
 export interface ServerVerifiedHebrewSemanticAlignment extends FutureExactHebrewTokenAlignmentProof {}
-
-/**
- * Server-owned context.  The coordinator snapshots it before composition so
- * callers cannot inject source IDs, artifact identities, or alignment proofs.
- */
-export interface OriginalLanguageStudyV2AuthoritativeContext {
-  v1Result: OriginalLanguageStudyDomainResult;
-  semanticArtifactIdentity?: string;
-  serverVerifiedAlignment?: ServerVerifiedHebrewSemanticAlignment;
-}
-
-export interface IOriginalLanguageStudyV2ContextProvider {
-  resolve(request: Readonly<OriginalLanguageStudyV2ResolvedRequest>):
-    Promise<OriginalLanguageStudyV2AuthoritativeContext>;
-}
 
 export interface OriginalLanguageStudyV2ResolvedRequest {
   reference: string;

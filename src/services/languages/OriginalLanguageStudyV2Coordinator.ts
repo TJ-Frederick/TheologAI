@@ -19,8 +19,6 @@ import {
   createOriginalLanguageStudyV2Cursor,
   deriveOriginalLanguageStudyV2MorphologyTokenIdentity,
   parseOriginalLanguageStudyV2Cursor,
-  type IOriginalLanguageStudyV2ContextProvider,
-  type OriginalLanguageStudyV2AuthoritativeContext,
   type OriginalLanguageStudyV2Candidate,
   type OriginalLanguageStudyV2CursorBinding,
   type OriginalLanguageStudyV2Detail,
@@ -31,6 +29,10 @@ import {
   type OriginalLanguageStudyV2SemanticEvidence,
   type ServerVerifiedHebrewSemanticAlignment,
 } from '../../kernel/originalLanguageStudyV2Contract.js';
+import type {
+  OriginalLanguageStudyV2AuthoritativeContext,
+  OriginalLanguageStudyV2ContextPort,
+} from './OriginalLanguageStudyV2ContextPort.js';
 import { presentOriginalLanguageStudy } from '../../presenters/originalLanguageStudyStructured.js';
 import {
   finalizeOriginalLanguageStudyV2Output,
@@ -38,12 +40,6 @@ import {
 } from '../../presenters/originalLanguageStudyV2Structured.js';
 import { formatOriginalLanguageStudyV2 } from '../../formatters/originalLanguageStudyV2Formatter.js';
 import type { OriginalLanguageStudyDomainResult } from './OriginalLanguageStudyService.js';
-
-export type {
-  IOriginalLanguageStudyV2ContextProvider,
-  OriginalLanguageStudyV2AuthoritativeContext,
-  OriginalLanguageStudyV2ResolvedRequest,
-} from '../../kernel/originalLanguageStudyV2Contract.js';
 
 /**
  * The coordinator returns both the closed structured v2 packet and a
@@ -71,7 +67,7 @@ const WITHHELD_EVIDENCE = Object.freeze([
  */
 export class OriginalLanguageStudyV2Coordinator {
   constructor(
-    private readonly contextProvider: IOriginalLanguageStudyV2ContextProvider,
+    private readonly contextProvider: OriginalLanguageStudyV2ContextPort,
     private readonly evidenceRepository: IUbsSemanticEvidenceBundleRepository,
   ) {}
 

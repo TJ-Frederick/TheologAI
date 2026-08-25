@@ -1,8 +1,10 @@
 import type {
-  IOriginalLanguageStudyV2ContextProvider,
-  OriginalLanguageStudyV2AuthoritativeContext,
   OriginalLanguageStudyV2ResolvedRequest,
 } from '../../kernel/originalLanguageStudyV2Contract.js';
+import type {
+  OriginalLanguageStudyV2AuthoritativeContext,
+  OriginalLanguageStudyV2ContextPort,
+} from './OriginalLanguageStudyV2ContextPort.js';
 import type { OriginalLanguageStudyService } from './OriginalLanguageStudyService.js';
 
 /**
@@ -18,7 +20,7 @@ export const ORIGINAL_LANGUAGE_STUDY_V2_SEMANTIC_ARTIFACT_IDENTITY =
  * coordinator.  It intentionally supplies no alignment proof: the current
  * runtime has no exact morphology-token-to-sense verifier.
  */
-export class OriginalLanguageStudyV2ContextProvider implements IOriginalLanguageStudyV2ContextProvider {
+export class OriginalLanguageStudyV2ContextProvider implements OriginalLanguageStudyV2ContextPort {
   constructor(private readonly v1StudyService: Pick<OriginalLanguageStudyService, 'study'>) {}
 
   async resolve(

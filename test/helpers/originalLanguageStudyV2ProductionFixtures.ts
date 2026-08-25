@@ -13,8 +13,6 @@ import {
   type UbsSemanticEvidenceBundleRepositoryQuery,
 } from '../../src/kernel/ubsSemanticEvidenceBundle.js';
 import {
-  type IOriginalLanguageStudyV2ContextProvider,
-  type OriginalLanguageStudyV2AuthoritativeContext,
   type OriginalLanguageStudyV2CursorBinding,
   deriveOriginalLanguageStudyV2MorphologyTokenIdentity,
 } from '../../src/kernel/originalLanguageStudyV2Contract.js';
@@ -24,6 +22,10 @@ import {
   type UbsSemanticSource,
 } from '../../src/kernel/ubsSemanticDomain.js';
 import { OriginalLanguageStudyV2Coordinator } from '../../src/services/languages/OriginalLanguageStudyV2Coordinator.js';
+import type {
+  OriginalLanguageStudyV2AuthoritativeContext,
+  OriginalLanguageStudyV2ContextPort,
+} from '../../src/services/languages/OriginalLanguageStudyV2ContextPort.js';
 import type { OriginalLanguageStudyDomainResult } from '../../src/services/languages/OriginalLanguageStudyService.js';
 
 export const SYNTHETIC_ARTIFACT = 'a'.repeat(64);
@@ -228,7 +230,7 @@ export class ProductionAggregateRepository implements IUbsSemanticEvidenceBundle
   }
 }
 
-export class ProductionContextProvider implements IOriginalLanguageStudyV2ContextProvider {
+export class ProductionContextProvider implements OriginalLanguageStudyV2ContextPort {
   calls = 0;
 
   constructor(private readonly context: OriginalLanguageStudyV2AuthoritativeContext) {}
