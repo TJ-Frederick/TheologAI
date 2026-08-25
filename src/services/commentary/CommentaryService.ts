@@ -1,12 +1,12 @@
 /**
- * Commentary service with adapter routing.
+ * Commentary service with provider routing.
  *
- * Routes commentary requests to HelloAO or CCEL adapters.
+ * Routes commentary requests to configured commentary providers.
  */
 
-import type { CommentaryAdapter } from '../../adapters/commentary/CommentaryAdapter.js';
+import type { CommentaryProviderPort } from './CommentaryProviderPort.js';
 import type {
-  CommentaryAdapterResult,
+  CommentaryProviderResult,
   CommentaryCoverageEvidence,
   CommentaryLookupParams,
   CommentaryLookupResult,
@@ -22,7 +22,7 @@ import {
 const MAX_COMMENTARY_TEXT_CODE_POINTS = 2 * 1024 * 1024;
 
 export class CommentaryService {
-  constructor(private adapters: CommentaryAdapter[]) {}
+  constructor(private providers: CommentaryProviderPort[]) {}
 
   async lookup(params: CommentaryLookupParams): Promise<CommentaryLookupResult> {
     const commentator = params.commentator || 'Matthew Henry';
@@ -34,12 +34,12 @@ export class CommentaryService {
       );
     }
 
-    for (const adapter of this.adapters) {
-      const supported = adapter.supportedCommentators.some(
+    for (const provider of this.providers) {
+      const supported = provider.supportedCommentators.some(
         c => c.toLowerCase() === commentator.toLowerCase()
       );
       if (supported) {
-        const result = await adapter.getCommentary(ref, commentator);
+        const result = await provider.getCommentary(ref, commentator);
         this.assertResultConsistency(ref, result);
         const catalogEntry = resolveCommentaryCatalogEntry(commentator);
         const returnedCatalogEntry = resolveCommentaryCatalogEntry(result.commentator);
@@ -117,7 +117,7 @@ export class CommentaryService {
   /** Reject forged or request-derived coverage that is not allowed by the source catalog. */
   private assertCoverageEvidence(
     ref: ReturnType<typeof parseReference>,
-    coverage: CommentaryAdapterResult['coverage'],
+    coverage: CommentaryProviderResult['coverage'],
     catalogEntry: CommentaryCatalogEntry,
   ): void {
     if (!coverage || typeof coverage !== 'object' || !coverage.providerIdentity) {
@@ -158,8 +158,8 @@ export class CommentaryService {
 
   getAvailableCommentators(): string[] {
     const all: string[] = [];
-    for (const adapter of this.adapters) {
-      all.push(...adapter.supportedCommentators);
+    for (const provider of this.providers) {
+      all.push(...provider.supportedCommentators);
     }
     return all;
   }

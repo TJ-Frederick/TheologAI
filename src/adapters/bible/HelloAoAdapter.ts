@@ -5,7 +5,7 @@
  * Uses kernel reference for book resolution; shared HttpClient for caching.
  */
 
-import type { BibleAdapter } from './BibleAdapter.js';
+import type { BibleProviderPort } from '../../services/bible/BibleProviderPort.js';
 import type { BibleResult, Footnote } from '../../kernel/types.js';
 import type { BibleReference } from '../../kernel/reference.js';
 import { formatReference, toHelloAO } from '../../kernel/reference.js';
@@ -31,7 +31,7 @@ const TRANSLATIONS: Record<string, TranslationMeta> = {
 
 type VerseContent = string | { lineBreak: true } | { noteId: number } | { text: string; wordsOfJesus?: boolean };
 
-export class HelloAoAdapter implements BibleAdapter {
+export class HelloAoAdapter implements BibleProviderPort {
   readonly supportedTranslations = Object.keys(TRANSLATIONS);
   private client: HttpClient;
 

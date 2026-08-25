@@ -183,7 +183,6 @@ describe('ParallelPassageService hard-cutover contract', () => {
     const bible = new BibleService([{
       supportedTranslations: ['WEB'],
       isConfigured: () => true,
-      getCopyright: () => 'Public Domain',
       getPassage: async (reference, translation) => {
         const formatted = formatReference(reference);
         requested.push(formatted);

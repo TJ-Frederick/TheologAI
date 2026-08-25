@@ -122,8 +122,8 @@ export type CommentaryCoverageEvidence =
     providerIdentity: { field: 'number'; value: number; entryType: 'verse' };
   };
 
-/** Adapter output carries its evidence rather than leaving the service to infer it. */
-export interface CommentaryAdapterResult extends CommentaryResult {
+/** Provider output carries its evidence rather than leaving the service to infer it. */
+export interface CommentaryProviderResult extends CommentaryResult {
   coverage: CommentaryCoverageEvidence;
   /** Validated provider corpus fingerprint reported by the response container. */
   providerRevision: `sha256:${string}`;

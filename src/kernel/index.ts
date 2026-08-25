@@ -166,7 +166,7 @@ export type {
   CommentaryResult,
   CanonicalCommentator,
   CommentaryCoverageEvidence,
-  CommentaryAdapterResult,
+  CommentaryProviderResult,
   CommentaryLookupResult,
   HistoricalSearchParams,
   HistoricalResult,
