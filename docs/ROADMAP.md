@@ -880,6 +880,18 @@ behavior, schemas, corpus, migrations, generated data, runtime configuration,
 or release identity, and it does not activate, repair, execute, or typecheck
 quarantined tests.
 
+### Architecture integrity program — Train 0 / PR 4 service-owned v2 context port complete
+
+Train 0 / PR 4 makes the original-language study v2 application context
+service-owned: `OriginalLanguageStudyV2ContextPort` and its authoritative
+context live under `src/services/languages/`, while the kernel retains the
+target-independent v2 request, result, cursor, and proof primitives. It also
+enforces an inward-only local kernel dependency boundary, preventing kernel
+imports from resolving into services, adapters, or composition roots. The
+implementation preserves existing shapes and runtime behavior; it does not
+change schemas, output bytes, formatting, errors, tool registration, corpus,
+migrations, generated data, runtime configuration, or release identity.
+
 - Production and preview D1 bindings are distinct and managed through protected
   workflows. Deployment never migrates or seeds remote D1.
 - Readiness requires schema and exact corpus/materialization identity. Do not

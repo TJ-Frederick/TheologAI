@@ -74,6 +74,11 @@ dynamic, import-equals, and literal CommonJS module specifiers under
 `src/services/`; no adapter allowlist exists. The synthetic cases prove the
 detector remains non-vacuous while quarantined tests remain untouched.
 
+The same guard enforces the kernel half of the boundary: every resolved local
+`src/` import from `src/kernel/` must remain within that directory, with no
+allowlist. Synthetic `.ts`, `.tsx`, `.mts`, and `.cts` cases cover the same
+static, type-only, dynamic, import-equals, and literal-`require` forms.
+
 ## Retired legacy commands
 
 The following former package commands have been removed. They are not runnable

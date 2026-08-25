@@ -695,6 +695,17 @@ and implement service-owned ports. The application-boundary guard resolves
 every static, type-only, dynamic, import-equals, and literal CommonJS import in
 `src/services/` and rejects any adapter dependency.
 
+The kernel dependency boundary is inward-only: local imports resolved from
+`src/kernel/` must remain within `src/kernel/`. Application services and
+adapters may depend on kernel contracts, but the kernel does not depend on
+application services, adapters, or composition roots.
+
+The original-language study v2 context is an application concern: the
+service-owned `OriginalLanguageStudyV2ContextPort` and its authoritative
+context live under `src/services/languages/`. The kernel retains only the
+target-independent v2 request, result, cursor, and proof primitives used by
+that port; it does not own the application context provider.
+
 Business services depend on shared repository ports. Node uses synchronous
 SQLite repositories through async-compatible service boundaries; Workers uses
 per-request D1 repositories. Both targets share one MCP registry.
