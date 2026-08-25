@@ -1,9 +1,12 @@
 /**
  * Shared TypeScript interfaces for TheologAI.
  *
- * Migrated from src/types/index.ts with cleanup:
- *   - ToolHandler.inputSchema properly typed
- *   - Removed unimplemented params (includeCrossRefs, include_cross_references)
+ * Canonical authority for general shared request, result, and tool contracts.
+ *
+ * Runtime code, maintained tests, and static architecture guards import shared
+ * interfaces from this module. Persistence, donation, and specialized/versioned
+ * contracts have their own kernel authority files. The historical src/types
+ * directory is retired; use src/kernel/index.ts only as a convenience barrel.
  */
 
 import type { CallToolResult, ContentBlock, TextContent, Tool } from '@modelcontextprotocol/sdk/types.js';

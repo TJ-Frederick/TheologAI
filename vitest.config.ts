@@ -29,7 +29,6 @@ export default defineConfig({
         'scripts/',
         '**/*.test.ts',
         '**/*.config.ts',
-        'src/types/index.ts',
         'src/index.ts',
       ],
       thresholds: {

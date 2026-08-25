@@ -14,6 +14,16 @@ projects. Configured roots are owned exactly once; imported dependencies do not
 become additional test roots. Production/runtime code and public MCP contracts
 remain outside this test-only boundary.
 
+The current type authority is split by contract family: `src/kernel/types.ts`
+owns general shared request, result, and tool contracts;
+`src/kernel/repositories.ts` owns persistence ports and records;
+`src/kernel/donation-types.ts` owns donation contracts; and specialized or
+versioned kernel contract files own bounded contracts. `src/kernel/index.ts` is
+a convenience re-export barrel only, not an alternate definition source; the
+retired `src/types/` directory is intentionally absent. The type-authority
+guard scans source, scripts, and every test partition for retired imports
+without executing quarantined files.
+
 
 **Current Status: Production Ready - Beta Launch (v3.4.1)**
 

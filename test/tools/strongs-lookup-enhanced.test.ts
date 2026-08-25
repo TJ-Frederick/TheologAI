@@ -6,7 +6,7 @@
  */
 
 import { originalLanguageLookupHandler } from '../../src/tools/biblicalLanguages.js';
-import { EnhancedStrongsResult } from '../../src/types/index.js';
+import type { EnhancedStrongsResult } from '../../src/kernel/types.js';
 
 describe('original_language_lookup - Enhanced Features (STEPBible)', () => {
   describe('backward compatibility', () => {

@@ -7,7 +7,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { bibleLookupHandler } from '../../src/tools/bibleLookup.js';
-import type { BibleLookupParams } from '../../src/types/index.js';
+import type { BibleLookupParams } from '../../src/kernel/types.js';
 
 describe('Bible Lookup Tool - E2E', () => {
   describe('Single Translation Requests', () => {

@@ -847,15 +847,27 @@ Code readiness and operational readiness are deliberately separate:
 
 ## Durable guardrails
 
-### Architecture integrity program — Train 0 / PR 1 active
+### Architecture integrity program — Train 0 / PR 1 compiler ownership complete
 
 Train 0 / PR 1 establishes compiler-boundary and test-topology ownership only:
 strict noEmit projects cover maintained Node/Vitest, script-test, Worker
 Workerd, and coordinator Workerd roots exactly once, while runtime and release
 projects retain their existing owners. This train does not change `src/**`,
 schemas, corpus, migrations, generated data, runtime configuration, or public
-MCP contracts. Later trains are sequencing notes only until separately
-reviewed; they are not active release work.
+MCP contracts. Its compiler-ownership work is complete; later trains are
+sequencing notes only until separately reviewed and are not active release work.
+
+### Architecture integrity program — Train 0 / PR 2 canonical type authority complete
+
+Train 0 / PR 2 owns the canonical-type slice: deletion of the retired
+`src/types/index.ts`, cleanup of canonical imports, the static authority guard,
+and the corresponding documentation and topology record. The current
+implementation is complete and guardrail-only: `src/kernel/types.ts` owns
+general shared request/result/tool contracts, specialized kernel files retain
+their bounded contract families, and `src/kernel/index.ts` remains a
+convenience barrel only. PR 2 does not change runtime behavior, schemas, corpus,
+migrations, generated data, runtime configuration, or release identity, and it
+does not activate, repair, execute, or typecheck quarantined tests.
 
 - Production and preview D1 bindings are distinct and managed through protected
   workflows. Deployment never migrates or seeds remote D1.

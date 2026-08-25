@@ -10,8 +10,8 @@
     "conformance": 1
   },
   "current": {
-    "totalTestTypeScript": 279,
-    "activeVitest": 200,
+    "totalTestTypeScript": 280,
+    "activeVitest": 201,
     "support": 24,
     "manual": 4,
     "legacyOrphan": 50,
@@ -55,6 +55,7 @@
       "test/unit/config/customDomainEndpointMetadata.test.ts",
       "test/unit/config/npmPublicationPolicy.test.ts",
       "test/unit/config/testTopology.test.ts",
+      "test/unit/config/typeAuthority.test.ts",
       "test/unit/config/unitTestEnvironmentIsolation.test.ts",
       "test/unit/config/workflowTopology.test.ts",
       "test/unit/docs/publicContract.test.ts",

@@ -16,7 +16,7 @@ import { describe, it, expect } from 'vitest';
 import { bibleLookupHandler } from '../../src/tools/bibleLookup.js';
 import { strongsLookupHandler } from '../../src/tools/biblicalLanguages.js';
 import { classicTextLookupHandler } from '../../src/tools/classicTextLookup.js';
-import type { BibleLookupParams, StrongsLookupParams, ClassicTextLookupParams } from '../../src/types/index.js';
+import type { BibleLookupParams, StrongsLookupParams, ClassicTextLookupParams } from '../../src/kernel/types.js';
 
 describe('Security - XSS Prevention', () => {
   it('should escape script tags in verse reference input', async () => {

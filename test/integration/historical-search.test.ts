@@ -7,7 +7,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { historicalSearchHandler } from '../../src/tools/historicalSearch.js';
-import type { HistoricalSearchParams } from '../../src/types/index.js';
+import type { HistoricalSearchParams } from '../../src/kernel/types.js';
 
 describe('Historical Search Integration Tests', () => {
   describe('Basic Document Search', () => {

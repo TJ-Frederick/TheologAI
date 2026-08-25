@@ -16,7 +16,7 @@ import { bibleLookupHandler } from '../../src/tools/bibleLookup.js';
 import { bibleCrossReferencesHandler } from '../../src/tools/bibleCrossReferences.js';
 import { strongsLookupHandler, bibleVerseMorphologyHandler } from '../../src/tools/biblicalLanguages.js';
 import { classicTextLookupHandler } from '../../src/tools/classicTextLookup.js';
-import type { BibleLookupParams, CrossReferenceLookupParams, StrongsLookupParams, BibleVerseMorphologyParams, ClassicTextLookupParams } from '../../src/types/index.js';
+import type { BibleLookupParams, CrossReferenceLookupParams, StrongsLookupParams, BibleVerseMorphologyParams, ClassicTextLookupParams } from '../../src/kernel/types.js';
 
 describe('User Workflows - Basic Study Sessions', () => {
   it('should handle complete workflow: lookup verse → get cross-refs → lookup cross-ref', async () => {
