@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { Env } from '../../../src/worker-env.js';
 import {
   WorkerCcelUpstreamCoordinator,
   createWorkerCcelUpstreamCoordinator,
@@ -41,13 +42,29 @@ function createFactoryHarness(
     terminalAttemptCount: 0,
     terminalRetiredThroughAttemptId: 0,
   }));
-  const getByName = vi.fn(() => ({ admit, recordOutcome, snapshot }));
+  const getByName = vi.fn(() => ({ admit, recordOutcome, snapshot }) as never);
+  const namespace = {
+    newUniqueId: () => undefined as never,
+    idFromName: () => undefined as never,
+    idFromString: () => undefined as never,
+    get: () => undefined as never,
+    getByName,
+    jurisdiction: () => undefined as never,
+  };
   const env = {
+    THEOLOGAI_DB: {} as D1Database,
+    THEOLOGAI_RATE_LIMITER: {} as RateLimit,
+    THEOLOGAI_CCEL_OPERATOR_AUTH_LIMITER: {} as RateLimit,
+    CF_VERSION_METADATA: {} as WorkerVersionMetadata,
+    THEOLOGAI_VERSION: '3.6.0',
+    THEOLOGAI_ALLOWED_ORIGINS: 'https://theologai.xyz,https://theologai.pages.dev',
+    THEOLOGAI_MAX_REQUEST_BYTES: '1048576',
+    THEOLOGAI_REQUEST_LOGS: 'false',
     THEOLOGAI_EXPOSE_CCEL_DISCOVERY: exposureEnabled ? 'true' : 'false',
     THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH: liveSearchEnabled ? 'true' : 'false',
     THEOLOGAI_ENABLE_CCEL_COORDINATOR: coordinatorEnabled ? 'true' : 'false',
-    THEOLOGAI_CCEL_COORDINATOR: { getByName },
-  } as Parameters<typeof createWorkerCcelUpstreamCoordinator>[0];
+    THEOLOGAI_CCEL_COORDINATOR: namespace,
+  } as Env & Record<string, unknown>;
 
   return {
     coordinator: createWorkerCcelUpstreamCoordinator(env),

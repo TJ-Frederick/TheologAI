@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { IHistoricalDocumentRepository } from '../../../../src/kernel/repositories.js';
+import type { LocalPrimarySourceSearchHit } from '../../../../src/services/historical/primarySourceTypes.js';
 import { LocalPrimarySourceSearchProvider } from '../../../../src/services/historical/LocalPrimarySourceSearchProvider.js';
 import { formatLocalDocumentSectionResourceWithIdentity } from '../../../../src/formatters/historicalFormatter.js';
 
@@ -14,6 +15,8 @@ function repository(overrides: Partial<IHistoricalDocumentRepository> = {}): IHi
   return {
     listDocuments: vi.fn().mockReturnValue([{ id: 'institutes', title: 'Institutes', type: 'treatise', date: '1559', topics: [], catalog }]),
     getDocument: vi.fn(), getSections: vi.fn(), getSection: vi.fn(), search: vi.fn(), findDocumentByName: vi.fn(),
+    getDeliveryProfile: vi.fn(), resolveSection: vi.fn(), browseHistoricalSectionSummaries: vi.fn(),
+    hasHistoricalSectionBoundary: vi.fn(), searchResolvedSections: vi.fn(),
     searchPrimarySources: vi.fn().mockReturnValue([{
       document: { id: 'institutes', title: 'Institutes', type: 'treatise', date: '1559', topics: [], catalog },
       section: { id: 1, document_id: 'institutes', section_number: '3.1', title: 'Union', content: 'Grace\n\nwith [forged](https://evil.test) # heading', topics: [] },
@@ -38,7 +41,8 @@ describe('LocalPrimarySourceSearchProvider', () => {
       documentType: 'treatise', documentDate: '1559', metadataProvenanceIds: ['hist-meta-test-calvin'], resourceSizeBytes: expect.any(Number),
     });
     const row = await repo.searchPrimarySources({ text: 'grace', match: 'all_terms', documentIds: ['institutes'], limit: 3 });
-    expect(result.hits[0].resourceSizeBytes).toBe(new TextEncoder().encode(
+    const localHit = result.hits[0] as LocalPrimarySourceSearchHit;
+    expect(localHit.resourceSizeBytes).toBe(new TextEncoder().encode(
       formatLocalDocumentSectionResourceWithIdentity(row[0].document, row[0].section, {
         sectionKey: row[0].sectionKey, sourceOrdinal: row[0].sourceOrdinal,
         resolution: 'canonical', canonicalUri: 'theologai://documents/institutes#section-source-0001',

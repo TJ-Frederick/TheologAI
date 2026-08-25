@@ -11,8 +11,10 @@ import {
 } from '../../../src/services/historical/CcelUpstreamCoordinator.js';
 import { CCEL_COMPOSITION_DATE_NOTICE } from '../../../src/services/historical/primarySourceTypes.js';
 import { parseOperatorCli, runOperatorRequest } from '../../../scripts/ccel-coordinator-operator.js';
-import { assertRetiredCcelScriptIsNetworkInert } from '../../adapters/ccel-test.js';
-import { assertRetiredCcelToolContractGuard } from '../../integration/ccel-tool-test.js';
+import {
+  assertRetiredCcelScriptIsNetworkInert,
+  assertRetiredCcelToolContractGuard,
+} from '../../helpers/ccelRetiredContractGuards.js';
 
 const version = '123e4567-e89b-42d3-a456-426614174000';
 const auditOptions = {
@@ -177,8 +179,11 @@ function auditDependencies(
 }
 
 describe('CCEL operational scripts', () => {
-  it('keeps both retired command paths as executable no-network contract guards', async () => {
+  it('keeps the retired command path as an executable no-network contract guard', async () => {
     await expect(assertRetiredCcelScriptIsNetworkInert()).resolves.toBeUndefined();
+  });
+
+  it('keeps the retired classic-text prompt contract guard executable', () => {
     expect(() => assertRetiredCcelToolContractGuard()).not.toThrow();
   });
 
@@ -205,17 +210,17 @@ describe('CCEL operational scripts', () => {
   it('runs the full mocked audit path and mechanically makes only two CCEL-bearing calls', async () => {
     let ccelCalls = 0;
     let possibleOriginAdmissions = 0;
-    const production: CcelAuditClient = {
+    const production = {
       listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('6', false) }] }),
       callTool: vi.fn(), close: vi.fn().mockResolvedValue(undefined),
     };
-    const preview: CcelAuditClient = {
+    const preview = {
       listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'primary_source_search', outputSchema: toolSchema('7', true, true) }] }),
       callTool: vi.fn(),
       close: vi.fn().mockResolvedValue(undefined),
     };
     const privateMarker = 'never-report-this-private-snippet';
-    preview.callTool.mockImplementation(async request => {
+    preview.callTool.mockImplementation(async (request: { arguments: Record<string, unknown> }) => {
       const query = auditQuery(request);
       if (query.searchDepth === 'expanded') {
         ccelCalls++;
@@ -248,8 +253,8 @@ describe('CCEL operational scripts', () => {
     expect(possibleOriginAdmissions).toBeLessThanOrEqual(2);
     expect(production.callTool).not.toHaveBeenCalled();
     expect(preview.callTool).toHaveBeenCalledTimes(3);
-    const requestedQueries = preview.callTool.mock.calls
-      .map(([request]) => (request.arguments.queries as Array<Record<string, unknown>>)[0]!);
+    const requestedQueries = (preview.callTool.mock.calls as Array<[{ arguments: Record<string, unknown> }]>).map(([request]) =>
+      (request.arguments.queries as Array<Record<string, unknown>>)[0]!);
     expect(requestedQueries.filter(query => query.searchDepth === 'expanded')).toHaveLength(2);
     expect(requestedQueries.filter(query => query.searchDepth === 'standard')).toHaveLength(1);
     expect(dependencies.snapshotCoordinator).toHaveBeenCalledTimes(2);

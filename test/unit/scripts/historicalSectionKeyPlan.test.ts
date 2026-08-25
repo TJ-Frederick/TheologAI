@@ -1,7 +1,7 @@
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawnSync, type SpawnSyncReturns } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 import {
   EXPECTED_HISTORICAL_SECTION_COLLISIONS,
@@ -77,7 +77,7 @@ function successor(previous: HistoricalSectionKeyPlan, raw: any): any {
   return raw;
 }
 
-function runCli(currentRaw: any, previousRaw: any): ReturnType<typeof spawnSync> {
+function runCli(currentRaw: any, previousRaw: any): SpawnSyncReturns<string> {
   const directory = mkdtempSync(join(tmpdir(), 'theologai-section-key-cli-'));
   const previousPath = join(directory, 'previous.json');
   const currentPath = join(directory, 'current.json');

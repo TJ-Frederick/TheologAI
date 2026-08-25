@@ -82,13 +82,31 @@ const EXPECTED_TOOL_NAMES = [
   'verify_donation',
 ];
 
-function makeEnv(overrides: Partial<Env> = {}): Env {
+function makeEnv(overrides: Record<string, unknown> = {}): Env {
+  const namespace = {
+    newUniqueId: () => undefined as never,
+    idFromName: () => undefined as never,
+    idFromString: () => undefined as never,
+    get: () => undefined as never,
+    getByName: () => undefined as never,
+    jurisdiction: () => undefined as never,
+  };
   return {
     THEOLOGAI_DB: createSimpleD1() as any,
-    THEOLOGAI_VERSION: '1.0.0-test',
+    THEOLOGAI_RATE_LIMITER: {} as RateLimit,
+    THEOLOGAI_CCEL_OPERATOR_AUTH_LIMITER: {} as RateLimit,
+    CF_VERSION_METADATA: {} as WorkerVersionMetadata,
+    THEOLOGAI_VERSION: '3.6.0',
+    THEOLOGAI_ALLOWED_ORIGINS: 'https://theologai.xyz,https://theologai.pages.dev',
+    THEOLOGAI_MAX_REQUEST_BYTES: '1048576',
+    THEOLOGAI_REQUEST_LOGS: 'false',
+    THEOLOGAI_EXPOSE_CCEL_DISCOVERY: 'false',
+    THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH: 'false',
+    THEOLOGAI_ENABLE_CCEL_COORDINATOR: 'false',
+    THEOLOGAI_CCEL_COORDINATOR: namespace,
     ESV_API_KEY: 'test-key',
     ...overrides,
-  };
+  } as Env;
 }
 
 describe('createWorkerCompositionRoot', () => {

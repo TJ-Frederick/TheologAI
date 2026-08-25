@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 type PartitionName = 'activeVitest' | 'support' | 'manual' | 'legacyOrphan' | 'conformance';
@@ -12,6 +13,7 @@ interface TopologyManifest {
   partitions: Record<PartitionName, string[]>;
   maintainedTypeScriptEntrypointsOutsideTest: Array<{ path: string; packageScript: string }>;
   separatelyOwnedEntrypoints: Array<{ path: string; packageScript: string; owner: string }>;
+  maintainedTestTypecheckProjects: Array<{ owner: string; project: string; packageScript: string }>;
   retiredCommands: Array<{
     name: string;
     formerTarget: string;
@@ -34,11 +36,11 @@ function walk(relativeDirectory: string): string[] {
 }
 
 const sorted = (values: Iterable<string>): string[] => [...values].sort();
-const testTypeScriptFiles = sorted(walk('test').filter((file) => file.endsWith('.ts')));
+const testTypeScriptFiles = sorted(walk('test').filter((file) => /\.(?:[cm]?ts|d\.[cm]?ts)$/.test(file)));
 
 describe('test topology manifest', () => {
   it('preserves the immutable D4 source baseline and validates current arithmetic', () => {
-    expect(manifest.schemaVersion).toBe(1);
+    expect(manifest.schemaVersion).toBe(2);
     expect(manifest.sourceBaseline).toEqual({
       commit: '56c73fac50cc42a990e376452b8c2375087a5a82',
       totalTestTypeScript: 271,
@@ -94,11 +96,49 @@ describe('test topology manifest', () => {
     );
   });
 
+  it('gives every maintained test root exactly one strict noEmit owner', () => {
+    const expectedProjects = [
+      { owner: 'node-vitest', project: 'tsconfig.test-node.json', packageScript: 'typecheck:test-node' },
+      { owner: 'node-script-vitest', project: 'tsconfig.test-scripts.json', packageScript: 'typecheck:test-scripts' },
+      { owner: 'node-script-frozen-context-vitest', project: 'tsconfig.test-frozen-context-capacity.json', packageScript: 'typecheck:test-frozen-context-capacity' },
+      { owner: 'worker-workerd', project: 'test/worker-runtime/tsconfig.json', packageScript: 'typecheck:worker-runtime' },
+      { owner: 'ccel-coordinator-workerd', project: 'tsconfig.ccel-coordinator-test.json', packageScript: 'typecheck:ccel-coordinator-test' },
+    ];
+    expect(manifest.maintainedTestTypecheckProjects).toEqual(expectedProjects);
+
+    const rootsByProject = new Map<string, string[]>();
+    for (const entry of expectedProjects) {
+      expect(packageJson.scripts[entry.packageScript]).toBe(`tsc --noEmit -p ${entry.project}`);
+      const configPath = path.resolve(repoRoot, entry.project);
+      const loaded = ts.readConfigFile(configPath, ts.sys.readFile);
+      expect(loaded.error, entry.project).toBeUndefined();
+      const parsed = ts.parseJsonConfigFileContent(loaded.config, ts.sys, path.dirname(configPath), undefined, configPath);
+      expect(parsed.errors, entry.project).toEqual([]);
+      expect(parsed.options.strict, entry.project).toBe(true);
+      const command = packageJson.scripts[entry.packageScript]!;
+      expect(parsed.options.noEmit === true || /\btsc\s+--noEmit\b/.test(command), entry.project).toBe(true);
+      rootsByProject.set(entry.project, parsed.fileNames
+        .map(file => path.relative(repoRoot, file).split(path.sep).join('/'))
+        .filter(file => file.startsWith('test/') && /\.(?:[cm]?ts|d\.[cm]?ts)$/.test(file))
+        .sort());
+    }
+
+    const expectedRoots = new Set([...manifest.partitions.activeVitest, ...manifest.partitions.support]);
+    const ownedRoots = rootsByProject.get('tsconfig.test-node.json')!
+      .concat(rootsByProject.get('tsconfig.test-scripts.json')!, rootsByProject.get('tsconfig.test-frozen-context-capacity.json')!, rootsByProject.get('test/worker-runtime/tsconfig.json')!, rootsByProject.get('tsconfig.ccel-coordinator-test.json')!);
+    expect(new Set(ownedRoots).size).toBe(ownedRoots.length);
+    expect(new Set(ownedRoots)).toEqual(expectedRoots);
+    expect(ownedRoots.some(file => manifest.partitions.manual.includes(file))).toBe(false);
+    expect(ownedRoots.some(file => manifest.partitions.legacyOrphan.includes(file))).toBe(false);
+    expect(ownedRoots.some(file => manifest.partitions.conformance.includes(file))).toBe(false);
+  });
+
   it('keeps support, manual, and conformance ownership closed and explicit', () => {
     const expectedSupport = testTypeScriptFiles.filter((file) =>
       file.startsWith('test/fixtures/') ||
       file.startsWith('test/helpers/') ||
       file === 'test/setup.ts' ||
+      file === 'test/unit/scripts/originalLanguageContextCapacityRuntime.d.mts' ||
       file === 'test/ccel-coordinator-runtime/setup.ts' ||
       file === 'test/worker-runtime/setup.ts' ||
       file === 'test/unit/adapters/data/fakeSqlite.ts'

@@ -163,11 +163,12 @@ describe('CCEL upstream coordinator policy', () => {
   }) => {
     const admission = transitionCcelAdmission(initialCcelCoordinatorState(), 0);
     if (admission.decision.kind !== 'admitted') throw new Error('expected admission');
+    const token = admission.decision.token;
     const nearMaximum = { ...admission.state, lastObservedAtMs: floor };
 
     const failedClosed = transitionCcelOutcome(
       nearMaximum,
-      admission.decision.token,
+      token,
       outcome,
       0,
     );
@@ -187,7 +188,7 @@ describe('CCEL upstream coordinator policy', () => {
 
     const duplicate = transitionCcelOutcome(
       failedClosed.state,
-      admission.decision.token,
+      token,
       outcome,
       Number.MAX_SAFE_INTEGER,
     );
@@ -199,10 +200,11 @@ describe('CCEL upstream coordinator policy', () => {
     const admission = transitionCcelAdmission(initialCcelCoordinatorState(), 1_000);
     expect(admission.decision.kind).toBe('admitted');
     if (admission.decision.kind !== 'admitted') throw new Error('expected admission');
+    const token = admission.decision.token;
 
     const limited = transitionCcelOutcome(
       admission.state,
-      admission.decision.token,
+      token,
       { kind: 'rate_limited', retryAfterSeconds: 65 },
       2_000,
     );
@@ -231,17 +233,18 @@ describe('CCEL upstream coordinator policy', () => {
   it('caps Retry-After input and output', () => {
     const admission = transitionCcelAdmission(initialCcelCoordinatorState(), 0);
     if (admission.decision.kind !== 'admitted') throw new Error('expected admission');
+    const token = admission.decision.token;
 
     expect(() => transitionCcelOutcome(
       admission.state,
-      admission.decision.token,
+      token,
       { kind: 'rate_limited', retryAfterSeconds: CCEL_UPSTREAM_MAX_RETRY_AFTER_SECONDS + 1 },
       0,
     )).toThrow('Invalid CCEL Retry-After value');
 
     const limited = transitionCcelOutcome(
       admission.state,
-      admission.decision.token,
+      token,
       { kind: 'rate_limited', retryAfterSeconds: CCEL_UPSTREAM_MAX_RETRY_AFTER_SECONDS },
       0,
     );
@@ -459,10 +462,11 @@ describe('CCEL upstream coordinator policy', () => {
   it('rejects outcome objects that could smuggle arbitrary content', () => {
     const admission = transitionCcelAdmission(initialCcelCoordinatorState(), 1);
     if (admission.decision.kind !== 'admitted') throw new Error('expected admission');
+    const token = admission.decision.token;
     const invalid = { kind: 'success', query: 'not-storable' };
     expect(() => transitionCcelOutcome(
       admission.state,
-      admission.decision.token,
+      token,
       invalid as { kind: 'success' },
       2,
     )).toThrow('Invalid CCEL attempt outcome');

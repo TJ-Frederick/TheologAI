@@ -205,10 +205,7 @@ describe('prompt-recommended tool-call contracts', () => {
     ['upper bound only', { endYear: '1500' }, { endYear: 1500 }],
     ['both bounds', { startYear: '500', endYear: '1500' }, { startYear: 500, endYear: 1500 }],
   ])('keeps %s on catalog queries while requesting at most one provider-neutral expansion', (_label, dateArgs, expectedLocalDates) => {
-    const v7 = {
-      exposeCcelDiscovery: true, ccelLiveSearch: false, ccelCoordinator: false,
-      contractVersion: '7' as const, liveCcelEnabled: false,
-    };
+    const v7 = createPrimarySourceSearchDescriptor('7');
     const calls = recommendedToolCallsForPrompt('primary-source-research', {
       topic: 'eucharist', authors: 'Erasmus of Rotterdam, Martin Luther',
       ...dateArgs,
@@ -229,10 +226,7 @@ describe('prompt-recommended tool-call contracts', () => {
   });
 
   it('retains the optional work and catalog-date restrictions in one expanded guided query', () => {
-    const v7 = {
-      exposeCcelDiscovery: true, ccelLiveSearch: false, ccelCoordinator: false,
-      contractVersion: '7' as const, liveCcelEnabled: false,
-    };
+    const v7 = createPrimarySourceSearchDescriptor('7');
     const calls = recommendedToolCallsForPrompt('primary-source-research', {
       topic: 'sacraments', work: 'Institutes', startYear: '1536', endYear: '1559',
     }, v7);

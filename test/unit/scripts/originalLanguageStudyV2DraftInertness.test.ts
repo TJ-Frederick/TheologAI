@@ -138,7 +138,13 @@ describe('globally inactive original_language_study v2 fixture packet', () => {
 
     for (const path of configPaths) {
       const compilerInputs = compilerInputPaths(path);
-      expect(compilerInputs.filter(isDraftPacketPath), path).toEqual([]);
+      const packetInputs = compilerInputs.filter(isDraftPacketPath);
+      const expectedStaticInputs = path === 'tsconfig.test-node.json'
+        ? expectedPacketPaths.filter(input => input.endsWith('.ts') && input !== inertnessTestPath)
+        : path === 'tsconfig.test-scripts.json'
+          ? [inertnessTestPath]
+          : [];
+      expect(packetInputs, path).toEqual(expectedStaticInputs);
     }
 
     // The one intentional compiler is a test-only design check. It is not

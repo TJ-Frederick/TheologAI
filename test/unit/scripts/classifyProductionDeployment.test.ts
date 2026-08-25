@@ -67,7 +67,7 @@ describe('production deployment classifier', () => {
   it('provides a dependency-free CLI seam that fails safe when a Git command fails', () => {
     const calls: string[][] = [];
     const result = collectGitClassification(before, after, after, {
-      succeeds: (...args) => { calls.push(args); return args[0] !== 'merge-base'; },
+      succeeds: (...args: string[]) => { calls.push(args); return args[0] !== 'merge-base'; },
       diff: () => ({ ok: true, output: 'M\0docs/PLAN.md\0' }),
     });
     expect(result).toMatchObject({ classificationSucceeded: false, deployRequired: true, reason: 'before-is-not-ancestor' });

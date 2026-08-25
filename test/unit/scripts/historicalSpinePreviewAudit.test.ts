@@ -153,7 +153,8 @@ describe('Transform-11 historical-spine fixed audit', () => {
   it('rejects fixture drift, including adding an unreviewed work or changing a natural query', async () => {
     const value = await fixture();
     await expect(runHistoricalSpinePreviewAudit({ ...value, probes: [...value.probes, value.probes[0]!] } as never, fetch)).rejects.toThrow('fixture identity or probe inventory drifted');
-    const changed = structuredClone(value); (changed.probes as Array<{ query: string }>)[0]!.query = 'changed';
+    const changed = { ...structuredClone(value), probes: value.probes.map(probe => ({ ...probe, query: String(probe.query) })) };
+    changed.probes[0]!.query = 'changed';
     expect(() => validateHistoricalSpineFixture(changed)).toThrow('fixture identity or probe inventory drifted');
   });
 

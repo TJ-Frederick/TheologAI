@@ -1,22 +1,27 @@
 import { describe, expect, it, vi } from 'vitest';
 import { PrimarySourceSearchService } from '../../../../src/services/historical/PrimarySourceSearchService.js';
 import type { PrimarySourceProviderResult } from '../../../../src/services/historical/primarySourceTypes.js';
+import type { PrimarySourceSearchHit } from '../../../../src/services/historical/primarySourceTypes.js';
 import { CCEL_COMPOSITION_DATE_NOTICE } from '../../../../src/services/historical/primarySourceTypes.js';
 import { readPrimarySourceContractConfig } from '../../../../src/kernel/featureFlags.js';
 
 function providerResult(provider: 'local' | 'ccel_live', status: PrimarySourceProviderResult['status'] = 'ok', count = 1): PrimarySourceProviderResult {
+  const hits: PrimarySourceSearchHit[] = Array.from({ length: count }, (_, index) => provider === 'local'
+    ? {
+      provider: 'local' as const, title: `${provider} ${index}`, snippet: 'evidence',
+      locator: { kind: 'local_section' as const, documentId: 'doc', sectionKey: `source-${String(index + 1).padStart(4, '0')}`, sourceOrdinal: index + 1, url: `theologai://documents/doc#section-source-${String(index + 1).padStart(4, '0')}` },
+      resourceSizeBytes: 100 + index, rankWithinProvider: index + 1, page: 1, snippetOnly: true as const, attribution: provider,
+    }
+    : {
+      provider: 'ccel_live' as const, title: `${provider} ${index}`, snippet: 'evidence',
+      locator: { kind: 'ccel_section' as const, work: 'calvin/institutes', section: String(index), url: `https://ccel.org/ccel/calvin/institutes/${index}.html` },
+      rankWithinProvider: index + 1, page: 1, snippetOnly: true as const, attribution: provider,
+    });
   return {
     provider, status, searched: status !== 'disabled', page: 1,
     hitCount: count,
     resultWindow: { returnedHitCount: count, additionalMatchStatus: 'not_evaluated' },
-    hits: Array.from({ length: count }, (_, index) => ({
-      provider, title: `${provider} ${index}`, snippet: 'evidence',
-      locator: provider === 'local'
-        ? { kind: 'local_section', documentId: 'doc', sectionKey: `source-${String(index + 1).padStart(4, '0')}`, sourceOrdinal: index + 1, url: `theologai://documents/doc#section-source-${String(index + 1).padStart(4, '0')}` }
-        : { kind: 'ccel_section', work: 'calvin/institutes', section: String(index), url: `https://ccel.org/ccel/calvin/institutes/${index}.html` },
-      ...(provider === 'local' ? { resourceSizeBytes: 100 + index } : {}),
-      rankWithinProvider: index + 1, page: 1, snippetOnly: true, attribution: provider,
-    })),
+    hits,
     notices: [],
   };
 }
@@ -106,8 +111,9 @@ describe('PrimarySourceSearchService', () => {
     expect(result.queries[0]!.providers.map(provider => provider.provider)).toEqual(['local', 'ccel_live']);
     expect(local.search).toHaveBeenCalledWith(expect.objectContaining({ startYear: 500, endYear: 1500 }));
     expect(ccel.search).toHaveBeenCalledWith(expect.objectContaining({ limit: 4, page: 1 }), coordinator);
-    expect(ccel.search.mock.calls[0]![0]).not.toHaveProperty('startYear');
-    expect(ccel.search.mock.calls[0]![0]).not.toHaveProperty('endYear');
+    expect(ccel.search).toHaveBeenCalledWith(expect.objectContaining({ limit: 4, page: 1 }), coordinator);
+    expect(ccel.search).not.toHaveBeenCalledWith(expect.objectContaining({ startYear: 500 }), coordinator);
+    expect(ccel.search).not.toHaveBeenCalledWith(expect.objectContaining({ endYear: 1500 }), coordinator);
     expect(result.queries[0]!.providers[1]!.notices[0]).toBe(CCEL_COMPOSITION_DATE_NOTICE);
     expect(events).toEqual(['catalog', 'expanded']);
   });

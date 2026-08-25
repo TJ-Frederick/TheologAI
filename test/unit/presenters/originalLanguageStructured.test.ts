@@ -40,6 +40,7 @@ describe('original-language structured presenter', () => {
   it('maps detailed and extended exact fields to linked provenance', () => {
     const result = presentOriginalLanguageEntry({
       strongs_number: 'G25',
+      testament: 'NT',
       lemma: 'ἀγαπάω',
       transliteration: 'agapaō',
       pronunciation: 'ag-ap-ah-o',
@@ -90,7 +91,6 @@ describe('original-language structured presenter', () => {
   it('uses STEPBible as the sole base provenance for a lexicon-only identity', () => {
     const result = presentOriginalLanguageEntry({
       strongs_number: 'G21502',
-      testament: 'NT',
       lemma: 'Ηνια',
       transliteration: 'Henia',
       definition: 'Heneia, man occurring at LXX in 1Ch.25.9',

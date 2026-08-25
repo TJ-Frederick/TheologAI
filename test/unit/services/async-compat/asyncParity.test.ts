@@ -82,7 +82,6 @@ describe('Async/Sync Repository Parity', () => {
       const repo: IStrongsRepository = {
         lookup: vi.fn().mockReturnValue(strongsEntry),
         search: vi.fn().mockReturnValue([]),
-        searchPrimarySources: vi.fn().mockReturnValue([]),
         getLexiconEntry: vi.fn().mockReturnValue(undefined),
         getStats: vi.fn().mockReturnValue({ greek: 0, hebrew: 0, total: 0 }),
       };
@@ -95,7 +94,6 @@ describe('Async/Sync Repository Parity', () => {
       const repo: IStrongsRepository = {
         lookup: vi.fn().mockResolvedValue(strongsEntry),
         search: vi.fn().mockResolvedValue([]),
-        searchPrimarySources: vi.fn().mockResolvedValue([]),
         getLexiconEntry: vi.fn().mockResolvedValue(undefined),
         getStats: vi.fn().mockResolvedValue({ greek: 0, hebrew: 0, total: 0 }),
       };
@@ -154,6 +152,12 @@ describe('Async/Sync Repository Parity', () => {
         getSection: vi.fn().mockReturnValue(undefined),
         search: vi.fn().mockReturnValue([]),
         findDocumentByName: vi.fn().mockReturnValue(documents[0]),
+        getDeliveryProfile: vi.fn().mockReturnValue(undefined),
+        resolveSection: vi.fn().mockReturnValue(undefined),
+        browseHistoricalSectionSummaries: vi.fn().mockReturnValue([]),
+        hasHistoricalSectionBoundary: vi.fn().mockReturnValue(false),
+        searchResolvedSections: vi.fn().mockReturnValue([]),
+        searchPrimarySources: vi.fn().mockReturnValue([]),
       };
       const service = new HistoricalDocumentService(repo);
       const result = await service.listDocuments();
@@ -169,6 +173,12 @@ describe('Async/Sync Repository Parity', () => {
         getSection: vi.fn().mockResolvedValue(undefined),
         search: vi.fn().mockResolvedValue([]),
         findDocumentByName: vi.fn().mockResolvedValue(documents[0]),
+        getDeliveryProfile: vi.fn().mockResolvedValue(undefined),
+        resolveSection: vi.fn().mockResolvedValue(undefined),
+        browseHistoricalSectionSummaries: vi.fn().mockResolvedValue([]),
+        hasHistoricalSectionBoundary: vi.fn().mockResolvedValue(false),
+        searchResolvedSections: vi.fn().mockResolvedValue([]),
+        searchPrimarySources: vi.fn().mockResolvedValue([]),
       };
       const service = new HistoricalDocumentService(repo);
       const result = await service.listDocuments();

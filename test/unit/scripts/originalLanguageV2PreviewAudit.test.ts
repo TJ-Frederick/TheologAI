@@ -270,11 +270,12 @@ function fakeOutput(argumentsValue: Record<string, unknown>, continuation = fals
     : target === 'H0216' && position === undefined
       ? { language: 'Hebrew', status: 'unavailable', reason: 'selected_token_required', plainLanguage: 'PRIVATE' }
       : fakeHebrewEvidence({ reference, target, position: position!, detail, study, continuation });
-  return finalizeOriginalLanguageStudyV2Output({
+  const output = finalizeOriginalLanguageStudyV2Output({
     schemaVersion: '2', kind: 'original_language_study', detail,
     request: { reference, target, ...(position === undefined ? {} : { position }) },
     study, semanticEvidence, responseWindow: { unit: 'utf8_bytes', maximum: 32 * 1024, used: 0, truncated: false },
-  } as never).output as Record<string, unknown>;
+  } as never).output;
+  return { ...output };
 }
 
 function studyToken(position: number, strongsNumber: string) {

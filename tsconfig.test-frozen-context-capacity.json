@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.test-scripts.json",
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true
+  },
+  "include": [
+    "test/unit/scripts/originalLanguageContextCapacity.test.ts",
+    "test/unit/scripts/originalLanguageContextCapacityRuntime.d.mts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "dist-worker",
+    "test/worker-runtime/**/*",
+    "test/ccel-coordinator-runtime/**/*",
+    "test/manual/**/*",
+    "test/conformance/**/*",
+    "test/legacy-orphan/**/*"
+  ]
+}

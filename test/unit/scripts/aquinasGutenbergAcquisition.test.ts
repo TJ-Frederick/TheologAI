@@ -242,7 +242,10 @@ function syntheticAcquisitionScenario(root: string): {
 }
 
 function fakeFetch(responses: Map<string, Buffer>): (input: string) => Promise<Response> {
-  return async input => new Response(responses.get(input) ?? 'missing fixture', { status: responses.has(input) ? 200 : 404 });
+  return async input => {
+    const body = responses.get(input);
+    return new Response(body === undefined ? 'missing fixture' : new Uint8Array(body), { status: body === undefined ? 404 : 200 });
+  };
 }
 
 describe('Aquinas Gutenberg local acquisition/source-rights lock', () => {

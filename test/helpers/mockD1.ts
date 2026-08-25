@@ -30,7 +30,7 @@ export interface QueryConfig {
  *   ]);
  *   const repo = new D1SomeRepository(db as any);
  */
-export function createMockD1(configs: QueryConfig[] = {}) {
+export function createMockD1(configs: QueryConfig[] = []) {
   const db = {
     prepare: vi.fn().mockImplementation((sql: string) => {
       const config = configs.find(c =>

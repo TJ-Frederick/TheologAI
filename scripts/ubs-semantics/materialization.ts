@@ -102,7 +102,7 @@ export function insertUbsSemanticMaterialization(
     normalized_chapter, normalized_verse, normalized_reference
   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
   const identity = artifact.artifactIdentity;
-  const counts = { ...UBS_SEMANTIC_EXPECTED_COUNTS };
+  const counts: { -readonly [K in keyof typeof UBS_SEMANTIC_EXPECTED_COUNTS]: number } = { ...UBS_SEMANTIC_EXPECTED_COUNTS };
   for (const key of Object.keys(counts) as Array<keyof typeof counts>) counts[key] = 0;
   let evidenceKey = 0;
   let coordinateKey = 0;

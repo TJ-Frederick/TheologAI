@@ -3,6 +3,7 @@ import { createPrimarySourceSearchHandler } from '../../../../src/tools/v2/prima
 import { createPrimarySourceSearchDescriptor } from '../../../../src/mcp/primarySourceSearchDescriptor.js';
 import { validatorFor } from '../../../../src/mcp/validation.js';
 import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv';
+import type { PrimarySourceSearchPlanResult } from '../../../../src/services/historical/primarySourceTypes.js';
 
 function schemaTerms(value: unknown): string[] {
   if (typeof value === 'string') return [value];
@@ -49,15 +50,17 @@ describe('primary_source_search handler', () => {
     expect(outputText).not.toContain('ccel');
     expect(outputText).not.toContain('ccel_section');
     expect(schemaTerms(handler.outputSchema).filter(term => /ccel/i.test(term))).toEqual([]);
-    const outputQuery = (handler.outputSchema!.properties!.queries as any).items;
-    expect(outputQuery.properties.providers).toMatchObject({ minItems: 1, maxItems: 1 });
-    expect(outputQuery.properties.providers.items).toMatchObject({
+    const outputQuery = (handler.outputSchema!.properties!.queries as { items: { properties: Record<string, unknown> } }).items;
+    const providers = outputQuery.properties.providers as { items: Record<string, unknown> };
+    expect(providers).toMatchObject({ minItems: 1, maxItems: 1 });
+    expect(providers.items).toMatchObject({
       type: 'object', additionalProperties: false, properties: { provider: { const: 'local' } },
     });
-    expect(outputQuery.properties.providers.items).not.toHaveProperty('oneOf');
-    expect(handler.outputSchema!.properties!.coverage.properties).not.toHaveProperty('ccelAttempted');
-    expect(handler.outputSchema!.properties!.coverage.properties).not.toHaveProperty('ccelStatus');
-    expect(handler.outputSchema!.properties!.coverage.properties).not.toHaveProperty('ccelHitCount');
+    expect(providers.items).not.toHaveProperty('oneOf');
+    const coverage = handler.outputSchema!.properties!.coverage as { properties: Record<string, unknown> };
+    expect(coverage.properties).not.toHaveProperty('ccelAttempted');
+    expect(coverage.properties).not.toHaveProperty('ccelStatus');
+    expect(coverage.properties).not.toHaveProperty('ccelHitCount');
     const validate = validatorFor(handler.inputSchema);
     expect(validate({ queries: [{ id: 'local', text: 'faith', providers: ['local'], author: 'Calvin', page: 2 }] }).valid).toBe(true);
     expect(validate({ queries: [{ id: 'remote', text: 'faith', providers: ['ccel'] }] }).valid).toBe(false);
@@ -512,15 +515,9 @@ describe('primary_source_search handler', () => {
 });
 
 describe('primary_source_search v7 discovery contract', () => {
-  const v7 = {
-    exposeCcelDiscovery: true,
-    ccelLiveSearch: false,
-    ccelCoordinator: false,
-    contractVersion: '7' as const,
-    liveCcelEnabled: false,
-  };
+  const v7 = createPrimarySourceSearchDescriptor('7');
 
-  function plan(externalUrl = 'https://ccel.org/ccel/calvin/institutes/iv.xvii.html') {
+  function plan(externalUrl = 'https://ccel.org/ccel/calvin/institutes/iv.xvii.html'): PrimarySourceSearchPlanResult {
     return {
       planStatus: 'complete' as const,
       queries: [{
@@ -600,6 +597,7 @@ describe('primary_source_search v7 discovery contract', () => {
   it('omits control-only optional metadata while preserving a schema-valid v7 hit', async () => {
     const adversarial = plan();
     const local = adversarial.queries[0]!.providers[0]!;
+    if (local.provider !== 'local') throw new Error('expected local provider');
     const hit = local.hits[0]!;
     hit.author = '\u0001';
     hit.sectionLabel = '\u0002';

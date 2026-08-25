@@ -4,7 +4,23 @@
  * Sample historical documents for testing LocalDataAdapter
  */
 
-import type { HistoricalDocument, DocumentSection } from '../../src/adapters/localData.js';
+interface DocumentSection {
+  question_number?: string;
+  question?: string;
+  answer?: string;
+  scripture?: string[];
+  chapter?: string;
+  title?: string;
+  content?: string;
+  topics: string[];
+}
+interface HistoricalDocument {
+  title: string;
+  type: string;
+  date: string;
+  topics: string[];
+  sections: DocumentSection[];
+}
 
 export const SAMPLE_CATECHISM_QUESTION: DocumentSection = {
   question_number: '1',

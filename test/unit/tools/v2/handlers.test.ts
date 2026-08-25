@@ -131,7 +131,7 @@ describe('bible_lookup handler', () => {
       citation,
     });
     const lookupMultiple = vi.fn<BibleService['lookupMultiple']>();
-    const handler = createBibleLookupHandler(serviceDouble({ lookup, lookupMultiple }));
+    const handler = createBibleLookupHandler(serviceDouble<BibleService>({ lookup, lookupMultiple }));
 
     const result = await handler.handler({ reference: 'John 3:16', includeFootnotes: true });
 
@@ -161,7 +161,7 @@ describe('bible_lookup handler', () => {
       ],
       failures: [],
     });
-    const handler = createBibleLookupHandler(serviceDouble({ lookup, lookupMultiple }));
+    const handler = createBibleLookupHandler(serviceDouble<BibleService>({ lookup, lookupMultiple }));
 
     const result = await handler.handler({
       reference: 'John 3:16',
@@ -266,7 +266,7 @@ describe('bible_cross_references handler', () => {
       showing: 1,
       hasMore: true,
     });
-    const handler = createCrossReferencesHandler(serviceDouble({ getCrossReferences }));
+    const handler = createCrossReferencesHandler(serviceDouble<CrossReferenceService>({ getCrossReferences }));
 
     const result = await handler.handler({
       reference: 'John 3:16',
@@ -315,7 +315,7 @@ describe('bible_cross_references handler', () => {
     const getCrossReferences = vi.fn<CrossReferenceService['getCrossReferences']>().mockResolvedValue({
       resolvedReference: 'John 3:16', references: [], total: 0, showing: 0, hasMore: false,
     });
-    const handler = createCrossReferencesHandler(serviceDouble({ getCrossReferences }));
+    const handler = createCrossReferencesHandler(serviceDouble<CrossReferenceService>({ getCrossReferences }));
 
     const result = await handler.handler({ reference: 'Jn 3.16' });
 
@@ -337,7 +337,7 @@ describe('bible_cross_references handler', () => {
   it('returns service failures as MCP tool errors', async () => {
     const getCrossReferences = vi.fn<CrossReferenceService['getCrossReferences']>()
       .mockRejectedValue(new Error('database unavailable'));
-    const handler = createCrossReferencesHandler(serviceDouble({ getCrossReferences }));
+    const handler = createCrossReferencesHandler(serviceDouble<CrossReferenceService>({ getCrossReferences }));
 
     const result = await handler.handler({ reference: 'John 3:16' });
 
@@ -348,7 +348,7 @@ describe('bible_cross_references handler', () => {
 
 describe('parallel_passages handler', () => {
   it('advertises bounded UBS survey navigation for clients that do not retrieve guided prompts', () => {
-    const { description } = createParallelPassagesHandler(serviceDouble({ lookup: vi.fn() }));
+    const { description } = createParallelPassagesHandler(serviceDouble<ParallelPassageService>({ lookup: vi.fn() }));
 
     expect(description).toContain('full requested chapter/range, not a representative verse');
     expect(description).toContain('corpora: ["ubs_source_attested"], maxGroups: 5, includeText: false');
@@ -360,7 +360,7 @@ describe('parallel_passages handler', () => {
   });
 
   it('does not advertise defaults for source-specific legacy compatibility fields', () => {
-    const handler = createParallelPassagesHandler(serviceDouble({ lookup: vi.fn() }));
+    const handler = createParallelPassagesHandler(serviceDouble<ParallelPassageService>({ lookup: vi.fn() }));
     const properties = handler.inputSchema.properties as Record<string, Record<string, unknown>>;
     expect(properties.mode).not.toHaveProperty('default');
     expect(properties.maxParallels).not.toHaveProperty('default');
@@ -369,7 +369,7 @@ describe('parallel_passages handler', () => {
   });
 
   it('advertises the same 200-code-point bound used for structured excerpts', () => {
-    const handler = createParallelPassagesHandler(serviceDouble({ lookup: vi.fn() }));
+    const handler = createParallelPassagesHandler(serviceDouble<ParallelPassageService>({ lookup: vi.fn() }));
     const output = handler.outputSchema as any;
     const member = output.properties.sourceAttestedGroups.items.properties.members.items.properties;
     expect(member.text.maxLength).toBe(200);
@@ -378,7 +378,7 @@ describe('parallel_passages handler', () => {
   });
 
   it('advertises the required v4 navigable UBS result-window and text-enrichment contracts', () => {
-    const output = createParallelPassagesHandler(serviceDouble({ lookup: vi.fn() })).outputSchema as any;
+    const output = createParallelPassagesHandler(serviceDouble<ParallelPassageService>({ lookup: vi.fn() })).outputSchema as any;
     expect(output.properties.schemaVersion).toEqual({ type: 'string', const: '4' });
     expect(output.required).toContain('sourceAttestedResultWindow');
     expect(output.properties.sourceAttestedResultWindow).toMatchObject({
@@ -419,7 +419,7 @@ describe('parallel_passages handler', () => {
         failedLookupCount: 0, omittedLookupCount: 0, completionStatus: 'not_requested',
       },
     });
-    const handler = createParallelPassagesHandler(serviceDouble({ lookup }));
+    const handler = createParallelPassagesHandler(serviceDouble<ParallelPassageService>({ lookup }));
     const properties = handler.inputSchema.properties as Record<string, Record<string, unknown>>;
     const materialized = Object.fromEntries(Object.entries(properties)
       .filter(([, schema]) => 'default' in schema)
@@ -454,7 +454,7 @@ describe('parallel_passages handler', () => {
         failedLookupCount: 0, omittedLookupCount: 0, completionStatus: 'complete',
       },
     });
-    const handler = createParallelPassagesHandler(serviceDouble({ lookup }));
+    const handler = createParallelPassagesHandler(serviceDouble<ParallelPassageService>({ lookup }));
 
     const result = await handler.handler({
       reference: 'Matthew 26:26-28',
@@ -493,7 +493,7 @@ describe('parallel_passages handler', () => {
   it('returns service failures as tool errors', async () => {
     const lookup = vi.fn<ParallelPassageService['lookup']>()
       .mockRejectedValue(new ValidationError('reference', 'Invalid reference'));
-    const handler = createParallelPassagesHandler(serviceDouble({ lookup }));
+    const handler = createParallelPassagesHandler(serviceDouble<ParallelPassageService>({ lookup }));
 
     const result = await handler.handler({ reference: 'invalid' });
 
@@ -515,7 +515,7 @@ describe('commentary_lookup handler', () => {
       providerRevision: `sha256:${'a'.repeat(64)}`,
       textWindow: { unit: 'unicode_code_points', returnedCharacters: 15, sourceCharacters: 15, truncated: false },
     });
-    const handler = createCommentaryHandler(serviceDouble({ lookup }));
+    const handler = createCommentaryHandler(serviceDouble<CommentaryService>({ lookup }));
 
     const result = await handler.handler({
       reference: 'John 1:1',
@@ -555,7 +555,7 @@ describe('commentary_lookup handler', () => {
       providerRevision: `sha256:${'a'.repeat(64)}`,
       textWindow: { unit: 'unicode_code_points', returnedCharacters: 500, sourceCharacters: 500, truncated: false },
     });
-    const handler = createCommentaryHandler(serviceDouble({ lookup }));
+    const handler = createCommentaryHandler(serviceDouble<CommentaryService>({ lookup }));
 
     const result = await handler.handler({ reference: 'John 1:1', maxLength: 64 });
 
@@ -565,7 +565,7 @@ describe('commentary_lookup handler', () => {
 
   it('returns service failures as tool errors', async () => {
     const lookup = vi.fn<CommentaryService['lookup']>().mockRejectedValue(new Error('failure'));
-    const handler = createCommentaryHandler(serviceDouble({ lookup }));
+    const handler = createCommentaryHandler(serviceDouble<CommentaryService>({ lookup }));
 
     const result = await handler.handler({ reference: 'John 1:1' });
 
@@ -581,7 +581,7 @@ describe('commentary_lookup handler', () => {
         'No exact commentary match for John 3:16 in Matthew Henry',
       ),
     );
-    const handler = createCommentaryHandler(serviceDouble({ lookup }));
+    const handler = createCommentaryHandler(serviceDouble<CommentaryService>({ lookup }));
 
     const result = await handler.handler({ reference: 'John 3:16', commentator: 'Matthew Henry' });
 
@@ -660,7 +660,7 @@ describe('classic_text_lookup handler', () => {
     };
     return {
       historical,
-      handler: createClassicTextsHandler(serviceDouble(historical)),
+      handler: createClassicTextsHandler(serviceDouble<HistoricalDocumentService>(historical)),
     };
   }
 
@@ -1174,7 +1174,7 @@ describe('original_language_lookup handler', () => {
       extended: { occurrences: 143 },
       citation,
     });
-    const handler = createStrongsLookupHandler(serviceDouble({ lookup }));
+    const handler = createStrongsLookupHandler(serviceDouble<StrongsService>({ lookup }));
 
     const result = await handler.handler({
       strongs_number: 'G25',
@@ -1203,7 +1203,7 @@ describe('original_language_lookup handler', () => {
       attested: true, totals: { tokenCount: 17, verseCount: 15, bookCount: 4, sourceSurfaceVariantCount: 6 },
       bookDistribution: [], sourceSurfaceVariants: [], occurrences: [], cautions: ['one', 'two', 'three'],
     });
-    const result = await createStrongsLookupHandler(serviceDouble({ lookup, getCorpusUsage })).handler({
+    const result = await createStrongsLookupHandler(serviceDouble<StrongsService>({ lookup, getCorpusUsage })).handler({
       strongs_number: 'g0025', include_extended: true, usage_level: 'study', occurrence_limit: 7,
     });
     expect(lookup).toHaveBeenCalledWith('G25', true);
@@ -1227,7 +1227,7 @@ describe('original_language_lookup handler', () => {
       derivation: null,
     }]);
     const lookup = vi.fn<StrongsService['lookup']>();
-    const handler = createStrongsLookupHandler(serviceDouble({ search, lookup }));
+    const handler = createStrongsLookupHandler(serviceDouble<StrongsService>({ search, lookup }));
 
     const result = await handler.handler({ query: 'love', limit: 5 });
 
@@ -1281,7 +1281,7 @@ describe('original_language_lookup handler', () => {
       definition: 'love',
       citation,
     });
-    const handler = createStrongsLookupHandler(serviceDouble({ search, lookup }));
+    const handler = createStrongsLookupHandler(serviceDouble<StrongsService>({ search, lookup }));
 
     const queryResult = await handler.handler({ query: 'love', limit: 10 });
     const exactResult = await handler.handler({
@@ -1305,7 +1305,7 @@ describe('original_language_lookup handler', () => {
   it('keeps exact/search mode validation strict in the handler', async () => {
     const search = vi.fn<StrongsService['search']>();
     const lookup = vi.fn<StrongsService['lookup']>();
-    const handler = createStrongsLookupHandler(serviceDouble({ search, lookup }));
+    const handler = createStrongsLookupHandler(serviceDouble<StrongsService>({ search, lookup }));
 
     const result = await handler.handler({ strongs_number: 'G26', limit: 5 });
 
@@ -1336,7 +1336,7 @@ describe('original_language_lookup handler', () => {
       definition: 'in',
       citation,
     });
-    const handler = createStrongsLookupHandler(serviceDouble({ lookup }));
+    const handler = createStrongsLookupHandler(serviceDouble<StrongsService>({ lookup }));
 
     const suffixed = await handler.handler({ strongs_number: 'g2385i' });
     const spaced = await handler.handler({ strongs_number: ' G2385I ' });
@@ -1355,7 +1355,7 @@ describe('original_language_lookup handler', () => {
       definition: 'fixture',
       citation,
     });
-    const result = await createStrongsLookupHandler(serviceDouble({ lookup })).handler({ strongs_number: identity });
+    const result = await createStrongsLookupHandler(serviceDouble<StrongsService>({ lookup })).handler({ strongs_number: identity });
     expect(result.isError).not.toBe(true);
     expect(lookup).toHaveBeenCalledWith(identity, false);
   });
@@ -1410,7 +1410,7 @@ describe('original_language_lookup handler', () => {
     const lookup = vi.fn<StrongsService['lookup']>().mockRejectedValue(
       new ValidationError('strongs_number', 'Expected G#### or H####'),
     );
-    const handler = createStrongsLookupHandler(serviceDouble({ lookup }));
+    const handler = createStrongsLookupHandler(serviceDouble<StrongsService>({ lookup }));
 
     const result = await handler.handler({ strongs_number: 'G26' });
 
@@ -1439,7 +1439,7 @@ describe('bible_verse_morphology handler', () => {
       citation,
     };
     const getVerseMorphology = vi.fn<MorphologyService['getVerseMorphology']>().mockResolvedValue(serviceResult);
-    const handler = createVerseMorphologyHandler(serviceDouble({ getVerseMorphology }));
+    const handler = createVerseMorphologyHandler(serviceDouble<MorphologyService>({ getVerseMorphology }));
 
     const result = await handler.handler({ reference: 'John 1:1', expand_morphology: true });
 
@@ -1461,7 +1461,7 @@ describe('bible_verse_morphology handler', () => {
   it('returns service failures as tool errors', async () => {
     const getVerseMorphology = vi.fn<MorphologyService['getVerseMorphology']>()
       .mockRejectedValue(new Error('missing'));
-    const handler = createVerseMorphologyHandler(serviceDouble({ getVerseMorphology }));
+    const handler = createVerseMorphologyHandler(serviceDouble<MorphologyService>({ getVerseMorphology }));
 
     const result = await handler.handler({ reference: 'John 1' });
 
@@ -1474,7 +1474,7 @@ describe('bible_verse_morphology handler', () => {
         'reference',
         'Morphology accepts one verse at a time; ranges are not supported',
       ));
-    const handler = createVerseMorphologyHandler(serviceDouble({ getVerseMorphology }));
+    const handler = createVerseMorphologyHandler(serviceDouble<MorphologyService>({ getVerseMorphology }));
 
     const result = await handler.handler({ reference: 'John 1:1-2' });
 
@@ -1494,7 +1494,7 @@ describe('donation handlers', () => {
         network: 'eip155:8453', asset: tokenAddress, decimals: 6, isNative: false,
       }],
     });
-    const handler = createDonationConfigHandler(serviceDouble({ getConfig }));
+    const handler = createDonationConfigHandler(serviceDouble<DonationService>({ getConfig }));
 
     const result = await handler.handler({});
 
@@ -1519,7 +1519,7 @@ describe('donation handlers', () => {
     const getConfig = vi.fn<DonationService['getConfig']>().mockImplementation(() => {
       throw new Error('misconfigured');
     });
-    const handler = createDonationConfigHandler(serviceDouble({ getConfig }));
+    const handler = createDonationConfigHandler(serviceDouble<DonationService>({ getConfig }));
 
     const result = await handler.handler({});
 
@@ -1548,7 +1548,7 @@ describe('donation handlers', () => {
       ],
       classifiedTransferCount: 1,
     });
-    const handler = createVerifyDonationHandler(serviceDouble({ verifyDonation }));
+    const handler = createVerifyDonationHandler(serviceDouble<DonationService>({ verifyDonation }));
     const txHash = `0x${'a'.repeat(64)}`;
 
     const result = await handler.handler({ tx_hash: txHash });
@@ -1621,7 +1621,7 @@ describe('donation handlers', () => {
   it('returns verification failures as tool errors', async () => {
     const verifyDonation = vi.fn<DonationService['verifyDonation']>()
       .mockRejectedValue(new Error('RPC unavailable'));
-    const handler = createVerifyDonationHandler(serviceDouble({ verifyDonation }));
+    const handler = createVerifyDonationHandler(serviceDouble<DonationService>({ verifyDonation }));
 
     const result = await handler.handler({ tx_hash: `0x${'b'.repeat(64)}` });
 

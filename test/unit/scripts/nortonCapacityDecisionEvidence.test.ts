@@ -298,7 +298,22 @@ describe('Norton capacity decision evidence', () => {
       : [];
     expect(keys(compact)).not.toContain('elapsedMs');
     expect(serialized).toContain('normalizedTextRights');
-    const changedTiming = structuredClone(full);
+    type TimingMutableEnvelope = Omit<typeof full, 'completeArtifactSha256' | 'workerd'> & {
+      completeArtifactSha256?: string;
+      workerd: typeof full.workerd & {
+        B: typeof full.workerd.B & {
+          schemaImportMs?: number;
+          ftsRebuildAndSealMs?: number;
+          queryProof: typeof full.workerd.B.queryProof & {
+            phrase: typeof full.workerd.B.queryProof.phrase & {
+              historicalElapsedMs?: number;
+              runtimeElapsedMs?: number;
+            };
+          };
+        };
+      };
+    };
+    const changedTiming = structuredClone(full) as TimingMutableEnvelope;
     changedTiming.elapsedMs = 12345;
     changedTiming.workerd.B.schemaImportMs = 12346;
     changedTiming.workerd.B.ftsRebuildAndSealMs = 12347;

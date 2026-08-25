@@ -8,7 +8,7 @@ import type { HistoricalHierarchyPublication } from '../../../src/kernel/reposit
 
 const publication: HistoricalHierarchyPublication = {
   publicationId: 'summa-theologiae-english-dominican-v1', hierarchyId: 'aquinas-hierarchy', publicSlug: 'summa-theologiae',
-  title: 'Summa Theologiae', metadata: {}, deliveryKind: 'hierarchy_nodes_v1', coverage: {},
+  title: 'Summa Theologiae', metadata: { creators: [], documentType: 'treatise', language: 'English', editionLabel: 'Synthetic', rightsStatus: 'synthetic', territoryCaveat: 'synthetic' }, deliveryKind: 'hierarchy_nodes_v1', coverage: { statement: 'Synthetic', completeness: 'complete', descriptors: [] },
   cursorContract: 'historical-hierarchy-browse-cursor-v1', cursorIdentity: 'a'.repeat(64), browsePageSize: 32,
   landingMaxBytes: 8192, directoryMaxBytes: 16384, nodeMaxBytes: 65536, searchMaxBytes: 16384,
   canonicalUri: 'theologai://documents/summa-theologiae', activationState: 'dormant',

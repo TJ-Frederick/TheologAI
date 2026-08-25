@@ -4,29 +4,49 @@
  * Sample Strong's concordance and morphology data for testing
  */
 
-import type { StrongsEntry, StrongsMetadata } from '../../src/adapters/biblicalLanguagesAdapter.js';
-import type { BookData, VerseData, StepBibleIndex, StepBibleMetadata } from '../../src/types/index.js';
+interface StrongsEntry {
+  lemma: string;
+  translit: string;
+  pronunciation: string;
+  def: string;
+  derivation: string;
+}
+
+interface StrongsMetadata {
+  version: string;
+  source: string;
+  source_url: string;
+  license: string;
+  attribution: string;
+  build_date: string;
+  entries: { greek: number; hebrew: number; total: number };
+}
+
+interface VerseData { text: string; words: Array<{ text: string; strong: string; morph: string; lemma: string }>; }
+interface BookData { book: string; chapters: Record<string, Record<string, VerseData>>; }
+interface StepBibleIndex { books: Record<string, { file: string; chapters: number; verses: number }>; }
+interface StepBibleMetadata { version: string; source: string; source_url: string; license: string; attribution?: string; build_date: string; books: number; chapters: number; verses: number; }
 
 // Sample Greek Strong's entries
 export const SAMPLE_GREEK_ENTRIES: Record<string, StrongsEntry> = {
   G25: {
     lemma: 'ἀγαπάω',
     translit: 'agapaō',
-    pronunciation: 'ag-ap-ah'-o',
+    pronunciation: "ag-ap-ah'-o",
     def: 'to love (in a social or moral sense)',
     derivation: 'perhaps from ἄγαν (much)'
   },
   G3056: {
     lemma: 'λόγος',
     translit: 'logos',
-    pronunciation: 'log'-os',
+    pronunciation: "log'-os",
     def: 'something said (including the thought); by implication, a topic (subject of discourse), also reasoning (the mental faculty) or motive',
     derivation: 'from λέγω (to lay forth)'
   },
   G2316: {
     lemma: 'θεός',
     translit: 'theos',
-    pronunciation: 'theh'-os',
+    pronunciation: "theh'-os",
     def: 'a deity, especially (with ὁ) the supreme Divinity',
     derivation: 'of uncertain affinity'
   }

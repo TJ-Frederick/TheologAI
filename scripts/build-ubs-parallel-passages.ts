@@ -486,7 +486,7 @@ export function compileUbsParallelPassages(xml: string | Buffer, metadata: Sourc
   const referenceIndex: Record<string, ReferenceIndexEntry[]> = {};
   for (const key of [...index.keys()].sort()) referenceIndex[key] = index.get(key)!;
 
-  const identityProjection = {
+  const identityProjection: Omit<GeneratedUbsCorpus, 'artifactIdentity'> = {
     schemaVersion: 'ubs-parallel-passages.v2' as const,
     transformVersion: TRANSFORM_VERSION,
     label: LABEL,

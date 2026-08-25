@@ -204,7 +204,7 @@ function groupStrings(rows: readonly Record<string, unknown>[], key: string, val
   return grouped;
 }
 
-function parseObject(value: string): Record<string, unknown> {
+function parseObject(value: string, _label?: string): Record<string, unknown> {
   const parsed = JSON.parse(value) as unknown;
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('UBS semantic stored notice is not an object');
   return parsed as Record<string, unknown>;

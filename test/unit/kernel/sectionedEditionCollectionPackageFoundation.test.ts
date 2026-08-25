@@ -32,6 +32,8 @@ import {
 import { sha256Hex } from '../../../src/kernel/sha256.js';
 
 describe('inactive sectioned edition collection package contract', () => {
+  type Mutable<T> = { -readonly [K in keyof T]: T[K] extends readonly (infer U)[] ? U[] : T[K] extends object ? Mutable<T[K]> : T[K] };
+  const mutableClone = <T>(value: T): Mutable<T> => structuredClone(value) as Mutable<T>;
   let fixtureDraft: TransientSectionedEditionCollectionDraft;
   let fixtureCompiled: ReturnType<typeof compileSectionedEditionCollectionPackage>;
 
@@ -59,16 +61,16 @@ describe('inactive sectioned edition collection package contract', () => {
     expect(fixtureDraft.partPrologues.map(value => value.partKey)).toEqual(['prima', 'prima-secundae', 'tertia']);
     expect(fixtureDraft.typedRangeCount).toBe(3_184);
 
-    const typedRangeDrift = structuredClone(AQUINAS_A1_SOURCE_TYPED_RANGES);
-    typedRangeDrift[0]!.typedRangesSha256 = sha256Hex('changed-native-source-range');
+    const typedRangeDrift = mutableClone(AQUINAS_A1_SOURCE_TYPED_RANGES);
+    Reflect.set(typedRangeDrift[0], 'typedRangesSha256', sha256Hex('changed-native-source-range'));
     expect(() => validateA1SourceTypedRangeProjection(typedRangeDrift)).toThrow(/sourceTypedRanges/);
     for (const mutate of [
-      (value: typeof AQUINAS_A1_DISCREPANCY_INVENTORY) => { value[0]!.codes[0] = 'changed_code'; },
-      (value: typeof AQUINAS_A1_DISCREPANCY_INVENTORY) => { value[0]!.resolutionBasis = 'ledgered_missing_question_heading_scope'; },
-      (value: typeof AQUINAS_A1_DISCREPANCY_INVENTORY) => { value[0]!.evidenceEndByte += 1; },
-      (value: typeof AQUINAS_A1_DISCREPANCY_INVENTORY) => { value[0]!.resolvedArticleCount = 1; },
+      (value: Mutable<typeof AQUINAS_A1_DISCREPANCY_INVENTORY>) => { Reflect.set(value[0]!.codes, 0, 'changed_code'); },
+      (value: Mutable<typeof AQUINAS_A1_DISCREPANCY_INVENTORY>) => { Reflect.set(value[0]!, 'resolutionBasis', 'ledgered_missing_question_heading_scope'); },
+      (value: Mutable<typeof AQUINAS_A1_DISCREPANCY_INVENTORY>) => { Reflect.set(value[0]!, 'evidenceEndByte', value[0]!.evidenceEndByte + 1); },
+      (value: Mutable<typeof AQUINAS_A1_DISCREPANCY_INVENTORY>) => { Reflect.set(value[0]!, 'resolvedArticleCount', 1); },
     ]) {
-      const drift = structuredClone(AQUINAS_A1_DISCREPANCY_INVENTORY);
+      const drift = mutableClone(AQUINAS_A1_DISCREPANCY_INVENTORY);
       mutate(drift);
       expect(() => validateA1DiscrepancyProjection(drift)).toThrow(/A1\.discrepancies/);
     }
