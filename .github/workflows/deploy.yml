@@ -366,7 +366,11 @@ jobs:
           npm run validate:ccel-coordinator-test-config
 
       - name: Typecheck Node.js target
-        run: npm run typecheck:node
+        run: |
+          npm run typecheck:node
+          npm run typecheck:test-node
+          npm run typecheck:test-scripts
+          npm run typecheck:test-frozen-context-capacity
 
       - name: Typecheck release-critical scripts
         run: npm run typecheck:release-scripts
@@ -380,7 +384,6 @@ jobs:
         run: |
           npm run typecheck:worker-runtime
           npm run typecheck:ccel-coordinator-test
-          npm run typecheck:test-fixtures
 
       - name: Verify canonical data sources
         run: npm run data:verify-sources

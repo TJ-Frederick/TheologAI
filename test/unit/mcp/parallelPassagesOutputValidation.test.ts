@@ -153,7 +153,7 @@ describe('parallel-passage structured semantic validation', () => {
     [{ requestedLimit: 5, returnedGroupCount: 0, additionalMatchStatus: 'not_evaluated' }, ['ubs_source_attested'], true, 'selected UBS marked not evaluated'],
     [{ requestedLimit: 5, returnedGroupCount: 0, additionalMatchStatus: 'no_additional_match_observed' }, ['theologai_legacy'], true, 'unselected UBS marked evaluated'],
     [{ requestedLimit: 5, returnedGroupCount: 0, additionalMatchStatus: 'additional_match_observed' }, ['ubs_source_attested'], false, 'additional match without a full window or cursor'],
-  ] as const)('rejects invalid result-window protocol state: %s', (sourceAttestedResultWindow, corpora, schemaValid) => {
+  ] as const)('rejects invalid result-window protocol state: %s', (sourceAttestedResultWindow, corpora, schemaValid, _reason) => {
     const invalid = output({
       requested: false, translation: null, budget, uniqueTargetCount: 0,
       scheduledLookupCount: 0, succeededLookupCount: 0, failedLookupCount: 0,
@@ -207,7 +207,7 @@ describe('parallel-passage structured semantic validation', () => {
     [{ requested: false, translation: 'WEB', budget, uniqueTargetCount: 0, scheduledLookupCount: 0, succeededLookupCount: 0, failedLookupCount: 0, omittedLookupCount: 0, completionStatus: 'not_requested' }, 'not-requested translation'],
     [{ requested: true, translation: 'WEB', budget, uniqueTargetCount: 13, scheduledLookupCount: 13, succeededLookupCount: 13, failedLookupCount: 0, omittedLookupCount: 0, completionStatus: 'complete' }, 'removed budget'],
     [{ requested: true, translation: 'WEB', budget, uniqueTargetCount: 1, scheduledLookupCount: 1, succeededLookupCount: 1, failedLookupCount: 0, omittedLookupCount: 0, completionStatus: 'incomplete' }, 'false incomplete state'],
-  ] as const)('rejects %s through the advertised schema', (enrichment) => {
+  ] as const)('rejects %s through the advertised schema', (enrichment, _reason) => {
     expect(validateSchema(output(enrichment as Record<string, unknown>)).valid).toBe(false);
   });
 

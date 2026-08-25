@@ -1,0 +1,24 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "moduleResolution": "Bundler",
+    "rootDir": ".",
+    "declaration": false,
+    "sourceMap": false,
+    "resolveJsonModule": true,
+    "types": ["node", "vitest", "vitest/globals"]
+  },
+  "include": ["test/unit/scripts/**/*.test.ts"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "dist-worker",
+    "test/worker-runtime/**/*",
+    "test/ccel-coordinator-runtime/**/*",
+    "test/manual/**/*",
+    "test/conformance/**/*",
+    "test/legacy-orphan/**/*",
+    "test/unit/scripts/originalLanguageContextCapacity.test.ts"
+  ]
+}

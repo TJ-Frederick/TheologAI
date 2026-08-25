@@ -393,14 +393,16 @@ function assertValidExternalDiscovery(external: Provider): void {
   assert(Number.isSafeInteger(external.hitCount) && external.hitCount === hits.length && hits.length <= 5, 'bounded external hits');
   for (const hit of hits) {
     const url = hit.locator?.url;
+    const locator = hit.locator;
     let parsed: URL;
     try { parsed = new URL(url ?? ''); } catch { throw new Error('Audit failed: invalid external locator.'); }
     assert(typeof hit.snippet === 'string' && Array.from(hit.snippet).length <= 240
-      && hit.locator?.kind === 'external_url'
+      && locator !== undefined
+      && locator.kind === 'external_url'
       && typeof url === 'string'
       && parsed.protocol === 'https:' && parsed.hostname === 'ccel.org' && parsed.port === ''
       && parsed.search === '' && parsed.hash === ''
-      && normalizeCcelSectionLocator(url!)?.url === url,
+      && normalizeCcelSectionLocator(url)?.url === url,
     'clean bounded external discovery hit');
   }
 }
@@ -408,14 +410,30 @@ function assertValidExternalDiscovery(external: Provider): void {
 function assertDateOmissionNotice(output: SearchOutput): void {
   const external = provider(output, 'ccel_live');
   assert(external?.notices?.[0] === CCEL_COMPOSITION_DATE_NOTICE
-    && output.coverage?.notices?.includes(CCEL_COMPOSITION_DATE_NOTICE),
+    && output.coverage?.notices?.includes(CCEL_COMPOSITION_DATE_NOTICE) === true,
   'expanded external discovery discloses omitted composition-date filtering');
 }
 
 async function connect(url: string, name: string): Promise<CcelAuditClient> {
   const client = new Client({ name, version: '1.0.0' }, { capabilities: {} });
   await client.connect(new StreamableHTTPClientTransport(new URL(url)));
-  return client;
+  return {
+    listTools: async () => {
+      const result = await client.listTools();
+      return { tools: result.tools.map(tool => ({ name: tool.name, outputSchema: tool.outputSchema })) };
+    },
+    callTool: async request => {
+      const result = await client.callTool(request);
+      const structuredContent = result.structuredContent;
+      return {
+        ...(typeof result.isError === 'boolean' ? { isError: result.isError } : {}),
+        ...(structuredContent && typeof structuredContent === 'object' && !Array.isArray(structuredContent)
+          ? { structuredContent: structuredContent as Record<string, unknown> }
+          : {}),
+      };
+    },
+    close: () => client.close(),
+  };
 }
 
 async function search(

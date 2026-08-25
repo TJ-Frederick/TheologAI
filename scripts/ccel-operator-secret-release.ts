@@ -146,7 +146,7 @@ export function assertWorkerConfig(configText: string): void {
     operatorNamespace: '361204',
     vars: PREVIEW_VARS,
   });
-  assert(PRODUCTION_D1_ID !== PREVIEW_D1_ID, 'preview and production D1 identities must differ');
+  assert(String(PRODUCTION_D1_ID) !== String(PREVIEW_D1_ID), 'preview and production D1 identities must differ');
 }
 
 export const assertProductionConfig = assertWorkerConfig;

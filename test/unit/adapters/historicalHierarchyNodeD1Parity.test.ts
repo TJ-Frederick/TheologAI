@@ -17,7 +17,7 @@ function sqliteD1(db: Database.Database, statements: string[]): D1Database {
       return {
         bind(...values: unknown[]) {
           return {
-            async all<T>(): Promise<D1Result<T>> { return { results: db.prepare(sql).all(...values) as T[], success: true, meta: {} }; },
+          async all<T>(): Promise<D1Result<T>> { return { results: db.prepare(sql).all(...values) as T[], success: true, meta: { duration: 0, size_after: 0, rows_read: 0, rows_written: 0, last_row_id: 0, changed_db: false, changes: 0 } }; },
             async first<T>(): Promise<T | null> { return (db.prepare(sql).get(...values) as T | undefined) ?? null; },
           };
         },

@@ -2,11 +2,14 @@ import { describe, expect, it, vi } from 'vitest';
 import type { BibleService } from '../../../../src/services/bible/BibleService.js';
 import type { ICrossReferenceRepository } from '../../../../src/kernel/repositories.js';
 import { ParallelPassageService as PublicParallelPassageService } from '../../../../src/services/bible/ParallelPassageService.js';
-import type { ParallelPassageLookupParams } from '../../../../src/kernel/types.js';
+import type { ParallelPassageLookupParams, ParallelPassageResearchResult } from '../../../../src/kernel/types.js';
 
 /** Exercise the retained legacy algorithm through its now-required selector. */
 class ParallelPassageService extends PublicParallelPassageService {
-  override async lookup(params: ParallelPassageLookupParams): Promise<any> {
+  override async lookup(params: ParallelPassageLookupParams): Promise<ParallelPassageResearchResult & {
+    primary: { reference: string };
+    parallels: ParallelPassageResearchResult['legacyParallels'];
+  }> {
     const result = await super.lookup({ corpora: ['theologai_legacy'], ...params });
     return {
       ...result,

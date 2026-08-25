@@ -847,6 +847,16 @@ Code readiness and operational readiness are deliberately separate:
 
 ## Durable guardrails
 
+### Architecture integrity program — Train 0 / PR 1 active
+
+Train 0 / PR 1 establishes compiler-boundary and test-topology ownership only:
+strict noEmit projects cover maintained Node/Vitest, script-test, Worker
+Workerd, and coordinator Workerd roots exactly once, while runtime and release
+projects retain their existing owners. This train does not change `src/**`,
+schemas, corpus, migrations, generated data, runtime configuration, or public
+MCP contracts. Later trains are sequencing notes only until separately
+reviewed; they are not active release work.
+
 - Production and preview D1 bindings are distinct and managed through protected
   workflows. Deployment never migrates or seeds remote D1.
 - Readiness requires schema and exact corpus/materialization identity. Do not

@@ -128,7 +128,7 @@ describe('CcelSearchAdapter coordinated execution', () => {
     ['maximum', '86400', 86_400],
   ])('bounds Retry-After for %s values', async (_name, retryAfter, expectedSeconds) => {
     const gate = coordinator();
-    const headers = retryAfter === undefined ? {} : { 'retry-after': retryAfter };
+    const headers: Record<string, string> = retryAfter === undefined ? {} : { 'retry-after': retryAfter };
     const adapter = testAdapter({
       enabled: true,
       now: () => Date.parse('2026-07-16T00:00:00Z'),
@@ -157,7 +157,7 @@ describe('CcelSearchAdapter coordinated execution', () => {
     const adapter = testAdapter({
       enabled: true,
       fetchImpl: vi.fn<typeof fetch>().mockResolvedValue(htmlResponse(noResultsFixture)),
-      telemetry: event => events.push(event),
+      telemetry: event => { events.push(event); },
     });
     await expect(adapter.search(query({ author: 'Private Author', work: 'Private Work' }), gate))
       .resolves.toMatchObject({ status: 'no_results' });

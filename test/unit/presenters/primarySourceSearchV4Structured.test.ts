@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { presentPrimarySourceSearchV7 } from '../../../src/presenters/primarySourceSearchV4Structured.js';
-import type { PrimarySourceSearchPlanResult } from '../../../src/services/historical/primarySourceTypes.js';
+import type { PrimarySourcePlanProviderResult, PrimarySourceSearchPlanResult } from '../../../src/services/historical/primarySourceTypes.js';
 import { CCEL_COMPOSITION_DATE_NOTICE } from '../../../src/services/historical/primarySourceTypes.js';
 
 function localHit(queryId: string, rank: number, marker = '') {
@@ -26,7 +26,7 @@ function localHit(queryId: string, rank: number, marker = '') {
   };
 }
 
-function externalProvider(queryId: string, count: number) {
+function externalProvider(queryId: string, count: number): PrimarySourcePlanProviderResult {
   return {
     provider: 'ccel_live' as const,
     status: 'ok' as const,
@@ -141,7 +141,7 @@ describe('primary-source v7 structured presentation', () => {
   it('does not imply an unbounded search occurred when the external provider is disabled', () => {
     const plan = largePlan();
     const external = externalProvider('external', 0);
-    external.status = 'disabled' as never;
+    external.status = 'disabled';
     external.searched = false;
     external.notices = ['Live CCEL search is disabled. No remote request was made.'];
     plan.queries = [{ id: 'external', normalizedMode: 'all_terms', normalizedSelection: 'relevance', providers: [external] }];

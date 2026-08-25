@@ -608,9 +608,19 @@ npm run test:conformance    # applicable official MCP server scenarios
 npm run test:data           # fresh SQLite and deterministic D1 reconstruction
 npm run d1:seed:verify-workerd # representative seed import through local D1
 npm run test:all            # every deterministic local suite
-npm run typecheck           # Node and Worker targets
+npm run typecheck           # Node, Worker, coordinator, release scripts, and maintained tests
+npm run typecheck:test-node # strict noEmit Node/Vitest tests, fixtures, and helpers
+npm run typecheck:test-scripts # strict noEmit unit script tests
+npm run typecheck:test-frozen-context-capacity # frozen context-capacity test; preserves evidence bytes
 npm run validate:worker-config
 ```
+
+The maintained Node test project is a static `tsc --noEmit` boundary. It uses
+the generated Worker binding declarations where tests inspect Worker-shaped
+types and maps `cloudflare:workers` to the inert Node-only shim in
+`test/helpers/cloudflareWorkersShim.ts`; Durable Object behavior remains owned
+by the Workerd runtime project. Workerd and coordinator test projects retain
+their native environment owners and are checked separately.
 
 Some of these aggregate scripts are established by the current hardening work;
 CI continues to call the named suites explicitly so failures remain diagnosable.

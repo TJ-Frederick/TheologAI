@@ -45,6 +45,7 @@ describe('production original_language_study v2 structured presenter', () => {
       throw new Error('expected aligned production output');
     }
     const forged = structuredClone(aligned);
+    if (forged.semanticEvidence.status !== 'reference_aligned_source_candidate') throw new Error('expected aligned evidence');
     forged.semanticEvidence.alignmentEvidence.evidenceId = 'synthetic-reference-forged';
     expect(() => serializeValidatedOriginalLanguageStudyV2Output(forged)).toThrow('alignment must bind');
 

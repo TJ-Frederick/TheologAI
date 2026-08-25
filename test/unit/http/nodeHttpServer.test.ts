@@ -22,10 +22,15 @@ import { createPrimarySourceSearchHandler } from '../../../src/tools/v2/primaryS
 import { createPrimarySourceSearchDescriptor } from '../../../src/mcp/primarySourceSearchDescriptor.js';
 
 const TEST_MAX_BODY_BYTES = 1024;
+type NodeHttpTestEnvironment = Partial<Record<
+  'PORT' | 'HOST' | 'MCP_ALLOWED_HOSTS' | 'MCP_ALLOWED_ORIGINS' | 'MCP_MAX_BODY_BYTES',
+  string
+>>;
+const withProcessEnv = (values: NodeHttpTestEnvironment): NodeJS.ProcessEnv => values as NodeJS.ProcessEnv;
 
 describe('readNodeHttpConfig', () => {
   it('binds to loopback with the production web origin by default', () => {
-    const config = readNodeHttpConfig({ PORT: '3000' });
+    const config = readNodeHttpConfig(withProcessEnv({ PORT: '3000' }));
 
     expect(config).toEqual({
       host: DEFAULT_HTTP_HOST,
@@ -37,13 +42,13 @@ describe('readNodeHttpConfig', () => {
   });
 
   it('parses explicit bind, host, and exact origin allowlists', () => {
-    const config = readNodeHttpConfig({
+    const config = readNodeHttpConfig(withProcessEnv({
       PORT: '8080',
       HOST: '0.0.0.0',
       MCP_ALLOWED_HOSTS: 'api.internal, Example.COM.',
       MCP_ALLOWED_ORIGINS: 'https://app.example.com,http://localhost:5173',
       MCP_MAX_BODY_BYTES: '2048',
-    });
+    }));
 
     expect(config.host).toBe('0.0.0.0');
     expect(config.port).toBe(8080);
@@ -55,17 +60,25 @@ describe('readNodeHttpConfig', () => {
     expect(config.maxBodyBytes).toBe(2048);
   });
 
+  it('does not inherit hostile host or MCP values from the test runner', () => {
+    const config = readNodeHttpConfig(withProcessEnv({ PORT: '3000' }));
+    expect(config.host).toBe(DEFAULT_HTTP_HOST);
+    expect(config.allowedHosts).toEqual(['127.0.0.1', 'localhost', '::1']);
+    expect(config.allowedOrigins).toEqual([DEFAULT_ALLOWED_ORIGIN]);
+    expect(config.maxBodyBytes).toBe(DEFAULT_MAX_BODY_BYTES);
+  });
+
   it('rejects invalid ports and non-origin URLs', () => {
-    expect(() => readNodeHttpConfig({ PORT: '0' })).toThrow('Invalid PORT');
-    expect(() => readNodeHttpConfig({ PORT: '70000' })).toThrow('Invalid PORT');
-    expect(() => readNodeHttpConfig({
+    expect(() => readNodeHttpConfig(withProcessEnv({ PORT: '0' }))).toThrow('Invalid PORT');
+    expect(() => readNodeHttpConfig(withProcessEnv({ PORT: '70000' }))).toThrow('Invalid PORT');
+    expect(() => readNodeHttpConfig(withProcessEnv({
       PORT: '3000',
       MCP_ALLOWED_ORIGINS: 'https://app.example.com/path',
-    })).toThrow('exact HTTP origins');
-    expect(() => readNodeHttpConfig({
+    }))).toThrow('exact HTTP origins');
+    expect(() => readNodeHttpConfig(withProcessEnv({
       PORT: '3000',
       MCP_MAX_BODY_BYTES: '0',
-    })).toThrow('Invalid MCP_MAX_BODY_BYTES');
+    }))).toThrow('Invalid MCP_MAX_BODY_BYTES');
   });
 });
 
@@ -349,6 +362,16 @@ function makeRoot(): McpCompositionRoot {
         listDocuments: async () => [],
         getDocument: async id => ({ id, title: id, type: 'test', date: null, topics: [] }),
         getSections: async () => [],
+        getDeliveryProfile: async () => ({
+          documentId: 'test', workId: null, editionId: null, immutableCorpusIdentity: 'a'.repeat(64), sectionPackageIdentity: null,
+          deliveryMode: 'complete_document' as const, sectionCount: 0, landingMaxBytes: 0 as const, browsePageSize: 0 as const,
+          cursorVersion: 0 as const, provenance: {}, rights: {},
+        }),
+        resolveSection: async () => ({
+          document: { id: 'test', title: 'test', type: 'test', date: null, topics: [] },
+          section: { id: 1, document_id: 'test', section_number: '1', title: 'Test', content: '', topics: [] },
+          sectionKey: 'source-0001', sourceOrdinal: 1, requestedSectionId: '1', resolution: 'canonical' as const,
+        }),
       },
       strongsService: {
         lookup: async strongsNumber => ({

@@ -5,6 +5,15 @@
 > status. See [README.md](../README.md) and [docs/ROADMAP.md](ROADMAP.md) for
 > the current capabilities and sequence.
 
+### Current compiler-boundary addendum
+
+The historical plan above is not a source-layout authority. Current test
+ownership is declared by `test/test-topology.json` and enforced by strict
+noEmit Node/Vitest, script-test, Worker Workerd, and coordinator Workerd
+projects. Configured roots are owned exactly once; imported dependencies do not
+become additional test roots. Production/runtime code and public MCP contracts
+remain outside this test-only boundary.
+
 
 **Current Status: Production Ready - Beta Launch (v3.4.1)**
 

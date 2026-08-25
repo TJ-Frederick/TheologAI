@@ -36,7 +36,7 @@ import {
 
 function unicodeCorrectionFixture(): {
   ledger: BiblicalLanguageUnicodeCorrectionLedger;
-  comparedPaths: string[];
+  comparedPaths: readonly string[];
 } {
   const manifest = parseDataManifest(readFileSync('data/data-manifest.json'));
   const ledger = JSON.parse(readFileSync(

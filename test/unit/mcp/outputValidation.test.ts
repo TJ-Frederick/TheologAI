@@ -39,10 +39,22 @@ async function connect(
       commentaryService: { getAvailableCommentators: () => ['Test'] },
       historicalService: {
         listDocuments: async () => [],
-        getDocument: async () => undefined,
+        getDocument: async (id: string) => ({ id, title: id, type: 'test', date: null, topics: [] }),
         getSections: async () => [],
+        getDeliveryProfile: async () => ({
+          documentId: 'test', workId: null, editionId: null, immutableCorpusIdentity: 'a'.repeat(64), sectionPackageIdentity: null,
+          deliveryMode: 'complete_document' as const, sectionCount: 0, landingMaxBytes: 0 as const, browsePageSize: 0 as const,
+          cursorVersion: 0 as const, provenance: {}, rights: {},
+        }),
+        resolveSection: async (_documentId: string, requestedSectionId: string) => ({
+          document: { id: 'test', title: 'test', type: 'test', date: null, topics: [] },
+          section: { id: 1, document_id: 'test', section_number: '1', title: 'Test', content: '', topics: [] },
+          sectionKey: 'source-0001', sourceOrdinal: 1, requestedSectionId, resolution: 'canonical' as const,
+        }),
       },
-      strongsService: { lookup: async () => undefined },
+      strongsService: { lookup: async (strongsNumber: string) => ({
+        strongs_number: strongsNumber, testament: 'NT' as const, lemma: 'fixture', definition: 'fixture', citation: { source: 'fixture' },
+      }) },
     },
     primarySourceContract,
     primarySourceSearch: { descriptor, tool: primarySourceSearchTool },
@@ -655,7 +667,8 @@ describe('MCP structured output validation', () => {
 
     for (const result of [bibleSingle, biblePartial, search, simple, detailed, extended, usage, morphology]) {
       expect(result.isError).not.toBe(true);
-      expect(result.content[0]).toMatchObject({ type: 'text', text: expect.any(String) });
+      const firstContent = Array.isArray(result.content) ? result.content[0] : undefined;
+      expect(firstContent).toMatchObject({ type: 'text', text: expect.any(String) });
       expect(result.structuredContent).toMatchObject({ schemaVersion: '1' });
     }
     expect(biblePartial.structuredContent).toMatchObject({

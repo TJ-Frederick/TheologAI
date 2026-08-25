@@ -46,6 +46,7 @@ describe('production original_language_study v2 schema', () => {
     const output = (await productionCoordinator([productionCandidate(1)]).coordinator.study(productionRequest())).output;
     if (output.semanticEvidence.status !== 'lexical_candidates') throw new Error('expected candidate evidence');
     const invalid = structuredClone(output) as typeof output;
+    if (invalid.semanticEvidence.status !== 'lexical_candidates') throw new Error('expected candidate evidence');
     invalid.semanticEvidence.reason = 'no_lexical_entry' as never;
     expect(validateOutput(invalid)).toBe(false);
   });

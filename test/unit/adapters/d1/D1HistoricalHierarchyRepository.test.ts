@@ -93,13 +93,13 @@ describe('D1HistoricalHierarchyRepository', () => {
     const result = await repo.searchHierarchyBodies({ hierarchyId: 'hierarchy', text: 'Sacred Doctrine', match: 'phrase', limit: 9 });
     expect(result).toMatchObject([{ body: { bodyKey: 'preamble', contentUtf8Bytes: 4 }, snippet: '<mark>Sacred</mark> Doctrine', breadcrumb: [{ nodeKey: 'question' }] }]);
     expect('content' in result[0]!.body).toBe(false);
-    const ftsSql = db.prepare.mock.calls.map(([sql]: [unknown]) => String(sql))
+    const ftsSql = db.prepare.mock.calls.map(args => String(args[0]))
       .find(sql => sql.includes('historical_edition_hierarchy_bodies_fts'));
     expect(ftsSql).toContain('bm25(historical_edition_hierarchy_bodies_fts, 0.0, 0.0, 8.0, 1.0)');
     expect(ftsSql).toContain("snippet(historical_edition_hierarchy_bodies_fts, 3, '<mark>', '</mark>', '…', 18)");
     const ftsBind = db.prepare.mock.results.find((entry: any) => String(entry.value.bind?.mock?.calls?.[0]?.[0] ?? '').includes('Sacred'))?.value.bind;
     expect(ftsBind).toBeDefined();
     await expect(repo.searchHierarchyBodies({ hierarchyId: 'hierarchy', text: 'one', match: 'all_terms', limit: 10 })).rejects.toThrow('1..9');
-    expect(db.prepare.mock.calls.filter(([sql]: [unknown]) => String(sql).includes('WITH RECURSIVE hierarchy_chain'))).toHaveLength(1);
+    expect(db.prepare.mock.calls.filter(args => String(args[0]).includes('WITH RECURSIVE hierarchy_chain'))).toHaveLength(1);
   });
 });

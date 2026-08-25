@@ -33,6 +33,16 @@ const TOOL_NAMES = [
   'verify_donation',
 ];
 
+function textContent(value: unknown): string {
+  if (typeof value !== 'object' || value === null || !('text' in value) || typeof value.text !== 'string') return '';
+  return value.text;
+}
+
+function contentBlocks(value: unknown): Array<Record<string, unknown>> {
+  if (!Array.isArray(value)) return [];
+  return value.filter((entry): entry is Record<string, unknown> => typeof entry === 'object' && entry !== null);
+}
+
 function makeMockTool(name: string): ToolHandler {
   return {
     name,
@@ -108,25 +118,15 @@ function makeMockRoot(): McpCompositionRoot {
           sectionKey: 'source-0001', sourceOrdinal: 1, requestedSectionId,
           resolution: requestedSectionId === 'source-0001' ? 'canonical' as const : 'legacy_alias' as const,
         })),
-        getSection: vi.fn(async (_documentId: string, sectionNumber: string) => ({
-          id: 1,
-          document_id: 'nicene-creed',
-          section_number: sectionNumber,
-          title: 'Article I',
-          content: 'We believe...',
-          topics: [],
-        })),
       },
       strongsService: {
         lookup: async () => ({
           strongs_number: 'G0026',
           lemma: 'ἀγάπη',
           transliteration: 'agapē',
-          pronunciation: null,
           testament: 'NT' as const,
           definition: 'love',
-          derivation: null,
-          extended: null,
+          extended: undefined,
           citation: { source: "Strong's Concordance" },
         }),
       },
@@ -420,7 +420,7 @@ describe('shared MCP registration', () => {
 
     const catalog = await client.readResource({ uri: 'theologai://primary-sources/catalog' });
     expect(catalog.contents[0]).toMatchObject({ mimeType: 'application/json' });
-    expect(JSON.parse(String(catalog.contents[0].text))).toEqual({
+    expect(JSON.parse(textContent(catalog.contents[0]))).toEqual({
       schemaVersion: '2', kind: 'local_primary_source_catalog', workCount: 1,
       works: [{
         id: 'nicene-creed', title: 'Nicene Creed', documentType: 'creed',
@@ -534,11 +534,11 @@ describe('shared MCP registration', () => {
       uri: 'theologai://strongs/H9001',
       text: expect.stringContaining('# H9001 — /וַ'),
     });
-    expect(String(result.contents[0].text)).not.toContain('Verbal vav');
-    expect(String(result.contents[0].text)).toContain('Semantic evidence unavailable');
-    expect(String(result.contents[0].text)).toContain('## Brief gloss\n\n&');
-    expect(String(result.contents[0].text)).toContain('## Evidence policy');
-    expect(String(result.contents[0].text)).toContain('Not classified (source-language lexicon identity)');
+    expect(textContent(result.contents[0])).not.toContain('Verbal vav');
+    expect(textContent(result.contents[0])).toContain('Semantic evidence unavailable');
+    expect(textContent(result.contents[0])).toContain('## Brief gloss\n\n&');
+    expect(textContent(result.contents[0])).toContain('## Evidence policy');
+    expect(textContent(result.contents[0])).toContain('Not classified (source-language lexicon identity)');
   });
 
   it('keeps a Greek Strong\'s resource byte-compatible when extended data includes a gloss', async () => {
@@ -554,23 +554,23 @@ describe('shared MCP registration', () => {
 
     const result = await client.readResource({ uri: 'theologai://strongs/G6000' });
 
-    expect(String(result.contents[0].text)).toBe(
+    expect(textContent(result.contents[0])).toBe(
       '# G6000 — φιξτυρε\n\n**Transliteration:** fixture\n**Testament:** Not classified (source-language lexicon identity)\n\n## Definition\n\nlicensed Greek definition',
     );
-    expect(String(result.contents[0].text)).not.toContain('fixture gloss');
-    expect(String(result.contents[0].text)).not.toContain('Evidence policy');
+    expect(textContent(result.contents[0])).not.toContain('fixture gloss');
+    expect(textContent(result.contents[0])).not.toContain('Evidence policy');
   });
 
   it('resolves an exact document section without changing whole-document resources', async () => {
     const root = makeMockRoot();
     const client = await connect(createTheologAiMcpServer(root, '1.0.0-test').server);
     const whole = await client.readResource({ uri: 'theologai://documents/nicene-creed' });
-    expect(String(whole.contents[0].text)).toContain('We believe...');
+    expect(textContent(whole.contents[0])).toContain('We believe...');
 
     const exactUri = 'theologai://documents/nicene-creed#section-source-0001';
     const exact = await client.readResource({ uri: exactUri });
     expect(exact.contents[0]).toMatchObject({ uri: exactUri, mimeType: 'text/markdown' });
-    expect(String(exact.contents[0].text)).toMatch(/Nicene Creed[\s\S]*Article I[\s\S]*We believe/);
+    expect(textContent(exact.contents[0])).toMatch(/Nicene Creed[\s\S]*Article I[\s\S]*We believe/);
     expect(root.services.historicalService.resolveSection).toHaveBeenCalledWith('nicene-creed', 'source-0001');
   });
 
@@ -583,7 +583,7 @@ describe('shared MCP registration', () => {
     const exactUri = 'theologai://documents/nicene-creed';
     const exact = await client.readResource({ uri: exactUri });
     expect(exact.contents[0]).toMatchObject({ uri: exactUri, mimeType: 'text/markdown' });
-    expect(String(exact.contents[0].text)).toContain('We believe...');
+    expect(textContent(exact.contents[0])).toContain('We believe...');
     getSections.mockClear();
 
     const fuzzyUri = 'theologai://documents/nicene';
@@ -597,7 +597,7 @@ describe('shared MCP registration', () => {
   it('returns a native primary-source link whose exact byte size matches resources/read', async () => {
     const root = makeMockRoot();
     const doc = await root.services.historicalService.getDocument('nicene-creed');
-    const section = await root.services.historicalService.getSection('nicene-creed', '1');
+    const section = (await root.services.historicalService.getSections('nicene-creed'))[0];
     const resourceText = formatLocalDocumentSectionResourceWithIdentity(doc!, section, {
       sectionKey: 'source-0001', sourceOrdinal: 1, resolution: 'canonical',
       canonicalUri: 'theologai://documents/nicene-creed#section-source-0001',
@@ -631,15 +631,16 @@ describe('shared MCP registration', () => {
       name: 'primary_source_search',
       arguments: { queries: [{ id: 'topic', text: 'belief', providers: ['local'] }] },
     });
-    const link = result.content.find(block => block.type === 'resource_link');
+    const link = contentBlocks(result.content).find(block => block.type === 'resource_link');
     expect(link).toMatchObject({
       type: 'resource_link', uri: 'theologai://documents/nicene-creed#section-source-0001',
       mimeType: 'text/markdown', _meta: { 'theologai/resourceSizeBytes': resourceSizeBytes },
       annotations: { audience: ['assistant'] },
     });
     if (!link || link.type !== 'resource_link') throw new Error('Expected resource link');
+    if (typeof link.uri !== 'string') throw new Error('Expected resource URI');
     const read = await client.readResource({ uri: link.uri });
-    const readText = String(read.contents[0].text);
+    const readText = textContent(read.contents[0]);
     expect(new TextEncoder().encode(readText).byteLength).toBe((link._meta as any)?.['theologai/resourceSizeBytes']);
     expect(readText).toBe(resourceText);
   });
@@ -656,7 +657,6 @@ describe('shared MCP registration', () => {
       browseHistoricalSectionSummaries: async () => [{ documentId: 'nicene-creed', sectionKey: 'source-0001', sourceOrdinal: 1, legacyDisplayLabel: '1', heading: 'Article I' }],
       hasHistoricalSectionBoundary: async () => true,
       resolveSection: root.services.historicalService.resolveSection,
-      getSection: root.services.historicalService.getSection,
       findDocument: async () => document,
       search: async () => sections,
       searchResolvedSections: async () => [{ document: document!, section: sections[0]!, sectionKey: 'source-0001', sourceOrdinal: 1, requestedSectionId: 'source-0001', resolution: 'canonical' as const }],
@@ -669,10 +669,11 @@ describe('shared MCP registration', () => {
     const workResult = await client.callTool({
       name: 'classic_text_lookup', arguments: { work: 'nicene-creed' },
     });
-    const workLink = workResult.content.find(block => block.type === 'resource_link');
+    const workLink = contentBlocks(workResult.content).find(block => block.type === 'resource_link');
     if (!workLink || workLink.type !== 'resource_link') throw new Error('Expected whole-document link');
+    if (typeof workLink.uri !== 'string') throw new Error('Expected whole-document URI');
     const workRead = await client.readResource({ uri: workLink.uri });
-    const workText = String(workRead.contents[0].text);
+    const workText = textContent(workRead.contents[0]);
     expect(workText).toBe(formatLocalDocumentResource(document!, sections));
     expect(new TextEncoder().encode(workText).byteLength).toBe((workLink._meta as any)?.['theologai/resourceSizeBytes']);
     expect(JSON.stringify(workResult.structuredContent)).not.toContain('We believe...');
@@ -680,10 +681,11 @@ describe('shared MCP registration', () => {
     const searchResult = await client.callTool({
       name: 'classic_text_lookup', arguments: { query: 'believe' },
     });
-    const sectionLink = searchResult.content.find(block => block.type === 'resource_link');
+    const sectionLink = contentBlocks(searchResult.content).find(block => block.type === 'resource_link');
     if (!sectionLink || sectionLink.type !== 'resource_link') throw new Error('Expected exact-section link');
+    if (typeof sectionLink.uri !== 'string') throw new Error('Expected exact-section URI');
     const sectionRead = await client.readResource({ uri: sectionLink.uri });
-    const sectionText = String(sectionRead.contents[0].text);
+    const sectionText = textContent(sectionRead.contents[0]);
     expect(sectionText).toBe(formatLocalDocumentSectionResourceWithIdentity(document!, sections[0], {
       sectionKey: 'source-0001', sourceOrdinal: 1, resolution: 'canonical',
       canonicalUri: 'theologai://documents/nicene-creed#section-source-0001',
@@ -726,11 +728,11 @@ describe('shared MCP registration', () => {
       uri: 'theologai://strongs/H9001',
       text: expect.stringContaining('# H9001 — /וַ'),
     });
-    expect(String(result.contents[0].text)).not.toContain('Verbal vav');
-    expect(String(result.contents[0].text)).toContain('Semantic evidence unavailable');
-    expect(String(result.contents[0].text)).toContain('## Brief gloss\n\n&');
-    expect(String(result.contents[0].text)).toContain('## Evidence policy');
-    expect(String(result.contents[0].text)).toContain('Not classified (source-language lexicon identity)');
+    expect(textContent(result.contents[0])).not.toContain('Verbal vav');
+    expect(textContent(result.contents[0])).toContain('Semantic evidence unavailable');
+    expect(textContent(result.contents[0])).toContain('## Brief gloss\n\n&');
+    expect(textContent(result.contents[0])).toContain('## Evidence policy');
+    expect(textContent(result.contents[0])).toContain('Not classified (source-language lexicon identity)');
   });
 
   it.each([
@@ -1126,7 +1128,7 @@ describe('shared MCP registration', () => {
     });
     expect(called).toMatchObject({ structuredContent: { schemaVersion: '7', planStatus: 'partial' } });
     expect(called).not.toHaveProperty('isError');
-    expect(called.content[0]).toMatchObject({ type: 'text', text: expect.stringContaining('# Primary-source discovery') });
+    expect(contentBlocks(called.content)[0]).toMatchObject({ type: 'text', text: expect.stringContaining('# Primary-source discovery') });
     expect(search).toHaveBeenCalledOnce();
 
     const rejectedStandardPage = await client.callTool({

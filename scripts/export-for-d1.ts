@@ -207,7 +207,7 @@ export function exportTable(database: string, table: string): SeedStatement[] {
   // complete, checked INSERT per body rather than an INSERT + UPDATE sequence.
   const statements: SeedStatement[] = table === 'document_sections' || table === 'historical_edition_hierarchy_bodies'
     ? tuples.map(tuple => ({ sql: `${insertPrefix}${tuple};`, rows: 1 }))
-    : batchInsertValueTuples(insertPrefix, tuples);
+    : [...batchInsertValueTuples(insertPrefix, tuples)];
 
   if (table === 'document_sections') {
     const content = sqlIdentifier('content');

@@ -133,6 +133,18 @@ describe('workflow topology', () => {
     expect(deploy).not.toContain('needs.classify-deployment');
     expect(deploy).toContain('environment:\n      name: production\n      url: https://mcp.theologai.xyz/mcp');
     expect(deploy).toContain('permissions:\n      contents: read');
+    for (const command of [
+      'npm run typecheck:node',
+      'npm run typecheck:test-node',
+      'npm run typecheck:test-scripts',
+      'npm run typecheck:test-frozen-context-capacity',
+      'npm run typecheck:release-scripts',
+      'npm run typecheck:worker',
+      'npm run typecheck:ccel-coordinator',
+      'npm run typecheck:worker-runtime',
+      'npm run typecheck:ccel-coordinator-test',
+    ]) expect(deploy).toContain(command);
+    expect(deploy).not.toContain('typecheck:test-fixtures');
     expect(occurrences(workflow, '      name: production')).toBe(1);
     expect(occurrences(workflow, '        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1')).toBe(2);
     expect(workflow).not.toMatch(/checks:\s*write|github-token:|artifact-ids:|merge-multiple:\s*true|repository:|run-id:|pattern:/);
@@ -149,6 +161,7 @@ describe('workflow topology', () => {
       ['  node-http-e2e:', 'Node HTTP E2E'],
       ['  mcp-conformance:', 'Applicable MCP Conformance'],
     ] as const;
+    const testAndBuild = uniqueBlock(workflow, '  test-and-build:');
 
     expect(normalized(trigger)).toBe(normalized(`
       on:
@@ -163,6 +176,17 @@ describe('workflow topology', () => {
     for (const [anchor, name] of expectedJobs) {
       expect(uniqueBlock(workflow, anchor)).toContain(`name: ${name}`);
     }
+    for (const command of [
+      'npm run typecheck:test-node',
+      'npm run typecheck:test-scripts',
+      'npm run typecheck:test-frozen-context-capacity',
+      'npm run typecheck:release-scripts',
+      'npm run typecheck:worker-runtime',
+      'npm run typecheck:ccel-coordinator-test',
+    ]) {
+      expect(testAndBuild).toContain(command);
+    }
+    expect(workflow).not.toContain('typecheck:test-fixtures');
 
     const freshCheckout = uniqueBlock(workflow, '  fresh-checkout-data:');
     expect(freshCheckout).toContain('fetch-depth: 2');

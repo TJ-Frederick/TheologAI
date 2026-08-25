@@ -324,13 +324,13 @@ describe('CCEL live preview canary transaction', () => {
     expect(() => validateCanaryVersion(config, baseline, candidate, predecessor, canary)).not.toThrow();
     expect(() => validateCanaryDeployment(config, deployments(canary), candidate, canary)).not.toThrow();
     const missingBaselineScript = view(predecessor, 10);
-    delete missingBaselineScript.resources.script;
+    Reflect.deleteProperty(missingBaselineScript.resources, 'script');
     expect(() => validatePreviewBaseline(config, deployments(predecessor), missingBaselineScript, predecessor))
       .toThrow(/preview predecessor authoritative resources\.script\.etag is missing or empty/);
     expect(() => validateCanaryVersion(config, missingBaselineScript, candidate, predecessor, canary))
       .toThrow(/preview predecessor authoritative resources\.script\.etag is missing or empty/);
     const missingCandidateScript = view(canary, 11, '111', { message: CANARY_MESSAGE, tag: CANARY_TAG });
-    delete missingCandidateScript.resources.script;
+    Reflect.deleteProperty(missingCandidateScript.resources, 'script');
     expect(() => validateCanaryVersion(config, baseline, missingCandidateScript, predecessor, canary))
       .toThrow(/canary authoritative resources\.script\.etag is missing or empty/);
     const codeResourceDrift = view(canary, 11, '111', {
@@ -427,12 +427,12 @@ describe('CCEL live preview canary transaction', () => {
     });
 
     const missingActiveCanary = structuredClone(activeCanary);
-    delete missingActiveCanary.resources.script;
+    Reflect.deleteProperty(missingActiveCanary.resources, 'script');
     expect(() => planRestore(config, deployments(canary), missingActiveCanary, target, canary, predecessor))
       .toThrow(/active canary authoritative resources\.script\.etag is missing or empty/);
 
     const missingTarget = structuredClone(target);
-    delete missingTarget.resources.script;
+    Reflect.deleteProperty(missingTarget.resources, 'script');
     expect(() => planRestore(config, deployments(canary), activeCanary, missingTarget, canary, predecessor))
       .toThrow(/restore target authoritative resources\.script\.etag is missing or empty/);
 
@@ -444,7 +444,7 @@ describe('CCEL live preview canary transaction', () => {
 
     const activeBaseline = view(predecessor, 10, '100', { scriptEtag: 'restore-target' });
     const missingActiveBaseline = structuredClone(activeBaseline);
-    delete missingActiveBaseline.resources.script;
+    Reflect.deleteProperty(missingActiveBaseline.resources, 'script');
     expect(() => planRestore(config, deployments(predecessor), missingActiveBaseline, target, predecessor, predecessor))
       .toThrow(/active restore baseline authoritative resources\.script\.etag is missing or empty/);
 

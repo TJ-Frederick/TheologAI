@@ -162,7 +162,8 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
         arguments: { reference: 'John 3:16', commentator: 'Jamieson-Fausset-Brown' },
       });
       expect(commentary.isError).not.toBe(true);
-      expect(commentary.content[0]).toMatchObject({
+      const commentaryContent = Array.isArray(commentary.content) ? commentary.content : [];
+      expect(commentaryContent[0]).toMatchObject({
         type: 'text', text: expect.stringContaining('Jamieson-Fausset-Brown Commentary on John 3:16'),
       });
       expect(commentary.structuredContent).toMatchObject({
@@ -193,7 +194,8 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
         uri: 'theologai://primary-sources/catalog', mimeType: 'application/json',
       }));
       const catalog = await client.readResource({ uri: 'theologai://primary-sources/catalog' });
-      expect(JSON.parse(String(catalog.contents[0].text))).toMatchObject({
+      const catalogContent = catalog.contents[0];
+      expect('text' in catalogContent ? JSON.parse(catalogContent.text) : undefined).toMatchObject({
         schemaVersion: '2', kind: 'local_primary_source_catalog', workCount: 0,
         policies: { scope: 'hosted_collection_only', rightsStatus: 'not_established' },
       });

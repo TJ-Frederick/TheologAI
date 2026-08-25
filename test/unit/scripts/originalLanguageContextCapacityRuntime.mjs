@@ -1,0 +1,18 @@
+export {
+  assertOriginalLanguageCorpusCompatibility,
+  assertOriginalLanguageProjectionParity,
+  assessOriginalLanguageCapacity,
+  attachOriginalLanguageEvidenceHashes,
+  canonicalOriginalLanguageEvidence,
+  ORIGINAL_LANGUAGE_COMPLETE_HASH_DOMAIN,
+  ORIGINAL_LANGUAGE_DETERMINISTIC_HASH_DOMAIN,
+  originalLanguageSlotAccounting,
+  parseOriginalLanguageCapacityArguments,
+  resolveOriginalLanguageContextBinding,
+  storedOriginalLanguageProjectionSha256,
+  stripOriginalLanguageVolatileMeasurements,
+  SYNTHETIC_PROFILE,
+  validateSyntheticReference,
+  verifyOriginalLanguageCompleteHash,
+  withOriginalLanguageTemporaryDirectory,
+} from '../../../scripts/original-language-context-capacity.ts';

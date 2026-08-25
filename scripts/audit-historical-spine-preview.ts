@@ -181,7 +181,7 @@ function assertDirectory(raw: RawToolResult, probe: HistoricalSpineAuditFixture[
   assert(output.mode === 'browse_sections' && work?.id === probe.workId && directory?.coverage === 'bounded_section_directory'
     && pagination?.pageSize === PAGE_SIZE && sections.length === Math.min(PAGE_SIZE, probe.sectionCount) && sections.every(Boolean),
   `${probe.workId} first browse page drifted`);
-  const first = sections[0]!; const locator = object(first.resource); const expectedUri = buildLocalDocumentResourceUri(probe.workId, probe.firstSection.sectionKey);
+  const first = sections[0]!; const locator = object(first.resource); const expectedUri = buildLocalDocumentResourceUri(probe.workId, probe.firstSection.sectionKey)!;
   assert(first.sectionKey === probe.firstSection.sectionKey && first.sourceOrdinal === probe.firstSection.sourceOrdinal
     && locator?.kind === 'mcp_resource' && locator.uri === expectedUri, `${probe.workId} first directory locator drifted`);
   const firstKeys = sections.map(section => string(section!.sectionKey, `${probe.workId} section key`));
@@ -221,11 +221,12 @@ function assertClassicSearch(raw: RawToolResult, probe: HistoricalSpineAuditFixt
   assert(output.mode === 'search' && search?.status === 'ok' && hits.length > 0 && hit !== undefined,
     `${probe.workId} natural global classic search omitted the work`);
   assert(hits.every(hit => hit?.snippetOnly === true), `${probe.workId} global classic search leaked selected text`);
+  const uri = locator?.uri;
   assert(authoritative.editionId === probe.editionId && work?.deliveryMode === 'sectioned_only'
-    && typeof sectionKey === 'string' && Number.isSafeInteger(section?.sourceOrdinal) && (section.sourceOrdinal as number) >= 1
+    && typeof sectionKey === 'string' && Number.isSafeInteger(section?.sourceOrdinal) && (section?.sourceOrdinal as number) >= 1
     && locator?.kind === 'mcp_resource' && locator.uri === buildLocalDocumentResourceUri(probe.workId, sectionKey),
   `${probe.workId} global classic search locator/readiness coherence drifted`);
-  return locator.uri as string;
+  return uri as string;
 }
 
 function assertPrimary(raw: RawToolResult, probe: HistoricalSpineAuditFixture['probes'][number], profile: SpineProfile, authoritative: AuthoritativeWork): string {
@@ -236,7 +237,8 @@ function assertPrimary(raw: RawToolResult, probe: HistoricalSpineAuditFixture['p
   assert(providers.length === 1 && providers[0]?.provider === 'local' && providers[0]?.searched === true && providers[0]?.status === 'ok',
     `${probe.workId} primary search left local-only scope`);
   const hits = array(providers[0]?.hits, `${probe.workId} primary hits`).map(object); const hit = hits[0]; const locator = object(hit?.locator);
-  const documentId = locator?.documentId; const sectionKey = locator?.sectionKey;
+  const documentId = locator?.documentId as string; const sectionKey = locator?.sectionKey as string;
+  const uri = locator?.uri;
   const readiness = object(hit?.editionReadiness);
   assert(hit !== undefined && locator?.kind === 'mcp_resource' && documentId === probe.workId && typeof sectionKey === 'string'
     && locator.uri === buildLocalDocumentResourceUri(documentId, sectionKey)
@@ -250,7 +252,7 @@ function assertPrimary(raw: RawToolResult, probe: HistoricalSpineAuditFixture['p
     assert(!Object.hasOwn(coverage ?? {}, 'ccelAttempted') && !Object.hasOwn(coverage ?? {}, 'ccelHitCount') && !Object.hasOwn(coverage ?? {}, 'ccelStatus'),
       `${probe.workId} production primary search exposed CCEL execution`);
   }
-  return locator.uri as string;
+  return uri as string;
 }
 
 function assertSectionRead(message: ObjectRecord, expectedUri: string, workId: string): void {

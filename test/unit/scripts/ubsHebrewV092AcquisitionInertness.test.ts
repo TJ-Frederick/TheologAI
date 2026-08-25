@@ -54,7 +54,7 @@ describe('UBS Hebrew v0.9.2 acquisition remains globally inactive', () => {
     }
   });
 
-  it('derives compiler projects from package and workflow commands and excludes the packet from every one', () => {
+  it('allows only the exact reviewed packet roots in strict noEmit test projects', () => {
     const projects = compilerProjectsFromReleaseCommands();
     expect(projects).toEqual(expect.arrayContaining([
       'tsconfig.json',
@@ -63,7 +63,11 @@ describe('UBS Hebrew v0.9.2 acquisition remains globally inactive', () => {
       'test/worker-runtime/tsconfig.json',
     ]));
     for (const project of projects) {
-      expect(compilerInputs(project).filter(isPacketCandidate), project).toEqual([]);
+      const packetInputs = compilerInputs(project).filter(isPacketCandidate);
+      const expectedStaticInputs = project === 'tsconfig.test-scripts.json'
+        ? packetPaths.filter(path => path.startsWith('test/unit/scripts/') && path.endsWith('.ts'))
+        : [];
+      expect(packetInputs, project).toEqual(expectedStaticInputs);
     }
   });
 
@@ -180,7 +184,10 @@ function compilerProjectsFromReleaseCommands(): string[] {
 
 function compilerInputs(configPath: string): string[] {
   const absolute = resolve(repoPath, configPath);
-  if (!existsSync(absolute)) throw new Error(`Compiler project does not resolve: ${configPath}`);
+  const tracked = new Set(indexEntries().map(entry => entry.path));
+  if (!tracked.has(configPath) || !existsSync(absolute)) {
+    throw new Error(`Compiler project does not resolve: ${configPath}`);
+  }
   const loaded = ts.readConfigFile(absolute, ts.sys.readFile);
   if (loaded.error) throw new Error(ts.flattenDiagnosticMessageText(loaded.error.messageText, '\n'));
   const parsed = ts.parseJsonConfigFileContent(loaded.config, ts.sys, dirname(absolute), undefined, absolute);

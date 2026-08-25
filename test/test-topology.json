@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "sourceBaseline": {
     "commit": "56c73fac50cc42a990e376452b8c2375087a5a82",
     "totalTestTypeScript": 271,
@@ -10,9 +10,9 @@
     "conformance": 1
   },
   "current": {
-    "totalTestTypeScript": 277,
+    "totalTestTypeScript": 279,
     "activeVitest": 200,
-    "support": 22,
+    "support": 24,
     "manual": 4,
     "legacyOrphan": 50,
     "conformance": 1
@@ -234,14 +234,16 @@
       "test/fixtures/original-language-study-v2/support/originalLanguageStudyV2DraftSchema.ts",
       "test/fixtures/original-language-study-v2/support/originalLanguageStudyV2DraftStructured.ts",
       "test/fixtures/original-language-study-v2/support/syntheticOriginalLanguageStudyV2Fixtures.ts",
-      "test/fixtures/ubsParallelCorpus.ts",
-      "test/helpers/cloudflareWorkersShim.ts",
+    "test/fixtures/ubsParallelCorpus.ts",
+    "test/helpers/ccelRetiredContractGuards.ts",
+    "test/helpers/cloudflareWorkersShim.ts",
       "test/helpers/mcpTransportContract.ts",
       "test/helpers/mockD1.ts",
-      "test/helpers/originalLanguageStudyV2ProductionFixtures.ts",
-      "test/helpers/testHelpers.ts",
-      "test/setup.ts",
-      "test/unit/adapters/data/fakeSqlite.ts",
+    "test/helpers/originalLanguageStudyV2ProductionFixtures.ts",
+    "test/helpers/testHelpers.ts",
+    "test/setup.ts",
+    "test/unit/adapters/data/fakeSqlite.ts",
+    "test/unit/scripts/originalLanguageContextCapacityRuntime.d.mts",
       "test/worker-runtime/setup.ts"
     ],
     "manual": [
@@ -306,6 +308,33 @@
       "test/conformance/run-server-conformance.ts"
     ]
   },
+  "maintainedTestTypecheckProjects": [
+    {
+      "owner": "node-vitest",
+      "project": "tsconfig.test-node.json",
+      "packageScript": "typecheck:test-node"
+    },
+    {
+      "owner": "node-script-vitest",
+      "project": "tsconfig.test-scripts.json",
+      "packageScript": "typecheck:test-scripts"
+    },
+    {
+      "owner": "node-script-frozen-context-vitest",
+      "project": "tsconfig.test-frozen-context-capacity.json",
+      "packageScript": "typecheck:test-frozen-context-capacity"
+    },
+    {
+      "owner": "worker-workerd",
+      "project": "test/worker-runtime/tsconfig.json",
+      "packageScript": "typecheck:worker-runtime"
+    },
+    {
+      "owner": "ccel-coordinator-workerd",
+      "project": "tsconfig.ccel-coordinator-test.json",
+      "packageScript": "typecheck:ccel-coordinator-test"
+    }
+  ],
   "maintainedTypeScriptEntrypointsOutsideTest": [
     {
       "path": "scripts/check-worker-bundle-excludes-ubs.ts",

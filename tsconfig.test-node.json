@@ -1,0 +1,48 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "moduleResolution": "Bundler",
+    "rootDir": ".",
+    "declaration": false,
+    "sourceMap": false,
+    "resolveJsonModule": true,
+    "baseUrl": ".",
+    "types": [
+      "node",
+      "vitest",
+      "vitest/globals",
+      "@cloudflare/workers-types"
+    ],
+    "paths": {
+      "cloudflare:workers": ["test/helpers/cloudflareWorkersShim.ts"]
+    }
+  },
+  "include": [
+    "test/unit/**/*.test.ts",
+    "test/integration/current/**/*.test.ts",
+    "test/fixtures/**/*.ts",
+    "test/helpers/**/*.ts",
+    "test/setup.ts",
+    "test/unit/adapters/data/fakeSqlite.ts",
+    "worker-configuration.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "dist-worker",
+    "test/unit/scripts/**/*.test.ts",
+    "test/worker-runtime/**/*",
+    "test/ccel-coordinator-runtime/**/*",
+    "test/manual/**/*",
+    "test/conformance/**/*",
+    "test/scripts/**/*",
+    "test/legacy-orphan/**/*",
+    "test/adapters/**/*",
+    "test/data-integrity/**/*",
+    "test/e2e/**/*",
+    "test/resilience/**/*",
+    "test/security/**/*",
+    "test/tools/**/*"
+  ]
+}

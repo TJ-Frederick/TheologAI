@@ -36,15 +36,24 @@ function boundedChildFailureCode(output: string): ChildResult {
   return 'child-exit';
 }
 
+type ChildEnvironment = {
+  PATH?: string;
+  HOME?: string;
+  TMPDIR?: string;
+  ESV_API_KEY?: string;
+};
+
 function minimalChildEnvironment(inheritedEsv: boolean): NodeJS.ProcessEnv {
-  const environment: NodeJS.ProcessEnv = {
+  const environment: ChildEnvironment = {
     PATH: process.env.PATH,
     HOME: process.env.HOME,
     TMPDIR: process.env.TMPDIR,
   };
 
   if (inheritedEsv) environment.ESV_API_KEY = 'inherited-synthetic-esv';
-  return environment;
+  // The child-process API uses the generated, required ProcessEnv facade;
+  // this narrow boundary intentionally carries only the hermetic allowlist.
+  return environment as unknown as NodeJS.ProcessEnv;
 }
 
 async function runHostileDotenvCase(name: string, inheritedEsv: boolean): Promise<ChildResult> {

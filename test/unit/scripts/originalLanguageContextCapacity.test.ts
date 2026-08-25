@@ -29,7 +29,18 @@ import {
   verifyOriginalLanguageCompleteHash,
   withOriginalLanguageTemporaryDirectory,
   type SyntheticReferenceModel,
-} from '../../../scripts/original-language-context-capacity.js';
+} from './originalLanguageContextCapacityRuntime.mjs';
+
+function declaredExportNames(source: string): Set<string> {
+  const names = new Set<string>();
+  for (const match of source.matchAll(/export\s+(?:async\s+)?(?:function|const|let|class|interface|type)\s+([A-Za-z_$][\w$]*)/g)) {
+    names.add(match[1]!);
+  }
+  for (const block of source.matchAll(/export\s*\{([\s\S]*?)\}(?:\s*from\s*['"][^'"]+['"])?\s*;?/g)) {
+    for (const name of block[1]!.split(',').map(value => value.trim().split(/\s+as\s+/)[0]).filter(Boolean)) names.add(name!);
+  }
+  return names;
+}
 
 const root = resolve(import.meta.dirname, '../../..');
 const gate = 350 * 1024 * 1024;
@@ -40,6 +51,15 @@ function hash(value: unknown): string {
 }
 
 describe('source-free original-language context capacity experiment', () => {
+  it('keeps the checked declaration facade and wrapper export surface aligned', () => {
+    const wrapper = readFileSync(join(root, 'test/unit/scripts/originalLanguageContextCapacityRuntime.mjs'), 'utf8');
+    const declaration = readFileSync(join(root, 'test/unit/scripts/originalLanguageContextCapacityRuntime.d.mts'), 'utf8');
+    const source = readFileSync(join(root, 'scripts/original-language-context-capacity.ts'), 'utf8');
+    const wrapperExports = declaredExportNames(wrapper);
+    expect(declaredExportNames(declaration)).toEqual(wrapperExports);
+    for (const name of wrapperExports) expect(declaredExportNames(source), name).toContain(name);
+  });
+
   it('accepts no arguments and has no remote/corpus acquisition mode', () => {
     expect(() => parseOriginalLanguageCapacityArguments([])).not.toThrow();
     expect(() => parseOriginalLanguageCapacityArguments(['--remote'])).toThrow('accepts no arguments');

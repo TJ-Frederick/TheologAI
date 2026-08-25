@@ -38,8 +38,8 @@ function manifestFiles(directory: string, manifest: unknown, editions: Record<st
 
 function sourcePackEditionFixture(id = 'invented-clockwork-treatise') {
   const fixture = inventedEditionPackageFixture() as {
-    work: { workId: string };
-    edition: { editionId: string; workId: string };
+    work: { workId: string; title: string };
+    edition: { editionId: string; workId: string; version: string };
   } & Record<string, unknown>;
   fixture.work.workId = id;
   fixture.edition.workId = id;
