@@ -7,7 +7,10 @@ const repoRoot = resolve(import.meta.dirname, '../../..');
 const srcRoot = resolve(repoRoot, 'src');
 const kernelRoot = resolve(repoRoot, 'src/kernel');
 const servicesRoot = resolve(repoRoot, 'src/services');
+const languageServicesRoot = resolve(repoRoot, 'src/services/languages');
 const adaptersRoot = resolve(repoRoot, 'src/adapters');
+const presentersRoot = resolve(repoRoot, 'src/presenters');
+const formattersRoot = resolve(repoRoot, 'src/formatters');
 const typeScriptFile = /\.(?:ts|tsx|mts|cts)$/;
 const compilerOptions: ts.CompilerOptions = {
   allowJs: false,
@@ -117,6 +120,15 @@ describe('application-owned service boundaries', () => {
     expect(references).toEqual([]);
   });
 
+  it('forbids every language service import that resolves under presentation layers', () => {
+    const references = walk(languageServicesRoot).flatMap((fileName) => [presentersRoot, formattersRoot].flatMap((forbiddenRoot) =>
+      resolvedReferences(fileName, forbiddenRoot).map((specifier) => ({
+        file: relative(repoRoot, fileName).replaceAll('\\', '/'),
+        specifier,
+      }))));
+    expect(references).toEqual([]);
+  });
+
   it('detects static, import-type, dynamic, import-equals, and literal require boundaries', () => {
     const syntheticDirectory = join(repoRoot, 'src/services');
     const specifier = '../adapters/bible/EsvAdapter.js';
@@ -130,6 +142,23 @@ describe('application-owned service boundaries', () => {
     for (const { name, source } of cases) {
       const fileName = join(syntheticDirectory, `application-boundary-regression-${name}`);
       expect(resolvedReferencesInSource(fileName, source, adaptersRoot), name).toEqual([specifier]);
+    }
+  });
+
+  it('detects every syntax form that would make a language service depend on presentation', () => {
+    const syntheticDirectory = join(repoRoot, 'src/services/languages');
+    const cases = [
+      { name: 'static.ts', target: 'presenters/originalLanguageStudyStructured.js', root: presentersRoot, source: (specifier: string) => `import type { Presentation } from '${specifier}';` },
+      { name: 'import-type.mts', target: 'formatters/originalLanguageStudyV2Formatter.js', root: formattersRoot, source: (specifier: string) => `type Formatter = import('${specifier}').formatOriginalLanguageStudyV2;` },
+      { name: 'dynamic.tsx', target: 'presenters/originalLanguageStudyStructured.js', root: presentersRoot, source: (specifier: string) => `void import('${specifier}'); const view = <div />;` },
+      { name: 'import-equals.cts', target: 'formatters/originalLanguageStudyV2Formatter.js', root: formattersRoot, source: (specifier: string) => `import legacy = require('${specifier}');` },
+      { name: 'require.cts', target: 'presenters/originalLanguageStudyStructured.js', root: presentersRoot, source: (specifier: string) => `const legacy = require('${specifier}');` },
+      { name: 'export-type.ts', target: 'presenters/originalLanguageStudyStructured.js', root: presentersRoot, source: (specifier: string) => `export type { OriginalLanguageStudyStructured } from '${specifier}';` },
+    ];
+    for (const { name, target, root, source } of cases) {
+      const specifier = `../../${target}`;
+      const fileName = join(syntheticDirectory, `language-presentation-boundary-regression-${name}`);
+      expect(resolvedReferencesInSource(fileName, source(specifier), root), name).toEqual([specifier]);
     }
   });
 
