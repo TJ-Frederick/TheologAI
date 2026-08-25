@@ -4,6 +4,8 @@ import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 const repoRoot = resolve(import.meta.dirname, '../../..');
+const srcRoot = resolve(repoRoot, 'src');
+const kernelRoot = resolve(repoRoot, 'src/kernel');
 const servicesRoot = resolve(repoRoot, 'src/services');
 const adaptersRoot = resolve(repoRoot, 'src/adapters');
 const typeScriptFile = /\.(?:ts|tsx|mts|cts)$/;
@@ -32,19 +34,21 @@ function literalText(node: ts.Node): string | undefined {
   return undefined;
 }
 
-function resolvesUnderAdapters(fileName: string, specifier: string): boolean {
-  const resolved = ts.resolveModuleName(
+function resolveSpecifier(fileName: string, specifier: string): string | undefined {
+  return ts.resolveModuleName(
     specifier,
     fileName,
     compilerOptions,
     resolutionHost,
   ).resolvedModule?.resolvedFileName;
-  if (!resolved) return false;
-  const pathFromAdapters = relative(adaptersRoot, resolve(resolved));
-  return pathFromAdapters !== '' && !pathFromAdapters.startsWith('..') && !pathFromAdapters.startsWith('/');
 }
 
-function adapterReferencesInSource(fileName: string, sourceText: string): string[] {
+function pathWithin(fileName: string, root: string): boolean {
+  const pathFromRoot = relative(root, resolve(fileName));
+  return pathFromRoot !== '' && !pathFromRoot.startsWith('..') && !pathFromRoot.startsWith('/');
+}
+
+function moduleSpecifiersInSource(fileName: string, sourceText: string): string[] {
   const sourceFile = ts.createSourceFile(
     fileName,
     sourceText,
@@ -72,15 +76,26 @@ function adapterReferencesInSource(fileName: string, sourceText: string): string
     ) {
       specifier = literalText(node.arguments[0]!);
     }
-    if (specifier !== undefined && resolvesUnderAdapters(fileName, specifier)) references.push(specifier);
+    if (specifier !== undefined) references.push(specifier);
     ts.forEachChild(node, visit);
   };
   visit(sourceFile);
   return references;
 }
 
-function adapterReferences(fileName: string): string[] {
-  return adapterReferencesInSource(fileName, readFileSync(fileName, 'utf8'));
+function resolvedReferencesInSource(
+  fileName: string,
+  sourceText: string,
+  forbiddenRoot: string,
+): string[] {
+  return moduleSpecifiersInSource(fileName, sourceText).filter((specifier) => {
+    const resolved = resolveSpecifier(fileName, specifier);
+    return resolved !== undefined && pathWithin(resolved, forbiddenRoot);
+  });
+}
+
+function resolvedReferences(fileName: string, forbiddenRoot: string): string[] {
+  return resolvedReferencesInSource(fileName, readFileSync(fileName, 'utf8'), forbiddenRoot);
 }
 
 describe('application-owned service boundaries', () => {
@@ -95,7 +110,7 @@ describe('application-owned service boundaries', () => {
   });
 
   it('forbids every service import that resolves under src/adapters', () => {
-    const references = walk(servicesRoot).flatMap((fileName) => adapterReferences(fileName).map((specifier) => ({
+    const references = walk(servicesRoot).flatMap((fileName) => resolvedReferences(fileName, adaptersRoot).map((specifier) => ({
       file: relative(repoRoot, fileName).replaceAll('\\', '/'),
       specifier,
     })));
@@ -114,7 +129,36 @@ describe('application-owned service boundaries', () => {
     ];
     for (const { name, source } of cases) {
       const fileName = join(syntheticDirectory, `application-boundary-regression-${name}`);
-      expect(adapterReferencesInSource(fileName, source), name).toEqual([specifier]);
+      expect(resolvedReferencesInSource(fileName, source, adaptersRoot), name).toEqual([specifier]);
+    }
+  });
+
+  it('keeps every resolved kernel-local src dependency inside src/kernel', () => {
+    const references = walk(kernelRoot).flatMap((fileName) => moduleSpecifiersInSource(
+      fileName,
+      readFileSync(fileName, 'utf8'),
+    ).flatMap((specifier) => {
+      const resolved = resolveSpecifier(fileName, specifier);
+      return resolved !== undefined && pathWithin(resolved, srcRoot) && !pathWithin(resolved, kernelRoot)
+        ? [{ file: relative(repoRoot, fileName).replaceAll('\\', '/'), specifier }]
+        : [];
+    }));
+    expect(references).toEqual([]);
+  });
+
+  it('detects all import forms that would make a kernel file depend on a service', () => {
+    const syntheticDirectory = join(repoRoot, 'src/kernel');
+    const specifier = '../services/bible/BibleProviderPort.js';
+    const cases = [
+      { name: 'static.ts', source: `import type { BibleProviderPort } from '${specifier}';` },
+      { name: 'import-type.mts', source: `type Port = import('${specifier}').BibleProviderPort;` },
+      { name: 'dynamic.tsx', source: `void import('${specifier}'); const view = <div />;` },
+      { name: 'import-equals.cts', source: `import legacy = require('${specifier}');` },
+      { name: 'require.cts', source: `const legacy = require('${specifier}');` },
+    ];
+    for (const { name, source } of cases) {
+      const fileName = join(syntheticDirectory, `kernel-boundary-regression-${name}`);
+      expect(resolvedReferencesInSource(fileName, source, servicesRoot), name).toEqual([specifier]);
     }
   });
 });

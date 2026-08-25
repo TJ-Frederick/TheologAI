@@ -32,6 +32,17 @@ compiler-API guard resolves every static, type-only, dynamic, import-equals,
 and literal CommonJS specifier in `src/services/` and rejects any dependency
 resolving under `src/adapters/`.
 
+The kernel boundary is inward-only: every local `src/` dependency resolved from
+`src/kernel/` must remain inside `src/kernel/`. Services, adapters, and
+composition roots may depend on kernel contracts; the kernel does not depend
+on those application layers.
+
+For original-language study v2, the authoritative application context and its
+`OriginalLanguageStudyV2ContextPort` are service-owned under
+`src/services/languages/`. The kernel retains the target-independent v2
+request, result, cursor, and proof primitives, while application composition
+provides the context through the service port.
+
 
 **Current Status: Production Ready - Beta Launch (v3.4.1)**
 
