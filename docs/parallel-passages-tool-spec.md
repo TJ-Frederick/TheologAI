@@ -357,7 +357,9 @@ Data sources: Synoptic Parallel Database, OpenBible.info cross-references
 
 1. **Use existing services** - Import BibleService, CrossReferenceService
 2. **Follow existing patterns** - Match the style of other tools (see bibleLookup.ts, crossReferences.ts)
-3. **TypeScript types** - Create proper interfaces in types/index.ts
+3. **TypeScript types** - Add shared interfaces to the canonical
+   `src/kernel/types.ts` authority; use `src/kernel/index.ts` only as its
+   convenience re-export barrel.
 4. **Error handling** - Use existing error utilities (handleToolError)
 5. **Formatting** - Use existing formatters (formatToolResponse, formatMarkdown)
 

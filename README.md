@@ -675,6 +675,18 @@ src/
 └── formatters/              pure Markdown formatting
 ```
 
+### Type authority
+
+The type authority is split by contract family: `src/kernel/types.ts` owns
+general shared request, result, and tool contracts; `src/kernel/repositories.ts`
+owns persistence ports and records; `src/kernel/donation-types.ts` owns
+donation contracts; and specialized or versioned kernel contract files own
+their bounded contracts. `src/kernel/index.ts` is a convenience re-export
+barrel only, not a second definition source. The retired `src/types/` directory
+must remain absent. The maintained type-authority guard scans `src/`, `scripts/`,
+and all `test/` partitions—including quarantined files—without executing those
+files.
+
 Business services depend on shared repository ports. Node uses synchronous
 SQLite repositories through async-compatible service boundaries; Workers uses
 per-request D1 repositories. Both targets share one MCP registry.

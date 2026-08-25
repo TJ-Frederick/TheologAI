@@ -5,6 +5,13 @@ TypeScript file under `test/`. `test/unit/config/testTopology.test.ts` requires
 that each path belongs to exactly one partition and that the inventory stays
 in sync with the maintained runners.
 
+`test/unit/config/typeAuthority.test.ts` is a static compiler-API guard for the
+shared type boundary. It verifies that the retired `src/types/` module remains
+absent and scans maintained, manual, conformance, and legacy-quarantine source
+files for imports or exports that target it. The guard does not execute or
+typecheck quarantined files, and changing their ownership remains a separate
+reviewed decision.
+
 ## Static typecheck ownership
 
 The manifest's `maintainedTestTypecheckProjects` is the compiler ownership
