@@ -92,7 +92,10 @@ jobs:
           cache: npm
 
       - name: Install verifier dependencies
-        run: npm ci --no-audit
+        run: |
+          set -euo pipefail
+          npm ci --no-audit > "$RUNNER_TEMP/verifier-npm-ci.out" 2>&1
+          test "$(wc -c < "$RUNNER_TEMP/verifier-npm-ci.out")" -le 8388608
 
       - name: Verify pinned Wrangler version
         env:
