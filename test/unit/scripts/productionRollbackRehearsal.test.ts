@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   ROLLBACK_REHEARSAL_CONFIRMATION,
+  ROLLBACK_REHEARSAL_COMMAND,
   ROLLBACK_REHEARSAL_TARGET,
   createRollbackRehearsalReceipt,
   parseRollbackRehearsalReceipt,
@@ -13,6 +14,7 @@ const productionVersion = '623e4567-e89b-42d3-a456-426614174000';
 const previewVersion = '723e4567-e89b-42d3-a456-426614174000';
 const productionD1 = '823e4567-e89b-42d3-a456-426614174000';
 const previewD1 = '923e4567-e89b-42d3-a456-426614174000';
+const headSha = 'a'.repeat(40);
 
 function deployments(deploymentId: string, versionId: string): string {
   return JSON.stringify([
@@ -44,9 +46,19 @@ const inventory = JSON.stringify([
   { name: 'theologai-preview-20260811-schema0009-a', uuid: previewD1 },
 ]);
 
+const targetDeployment = JSON.stringify({
+  errors: [], messages: [], success: true,
+  result: {
+    id: ROLLBACK_REHEARSAL_TARGET.deploymentId,
+    versions: [{ version_id: ROLLBACK_REHEARSAL_TARGET.workerVersionId, percentage: 100 }],
+  },
+});
+
 function input(overrides: Partial<Parameters<typeof createRollbackRehearsalReceipt>[0]> = {}) {
   return {
     confirmation: ROLLBACK_REHEARSAL_CONFIRMATION,
+    repository: 'TJ-Frederick/TheologAI', workflow: 'Production Rollback Rehearsal', headSha,
+    ref: 'refs/heads/main', runId: '123', runAttempt: '1', wranglerVersion: '4.114.0',
     sourceCommit: ROLLBACK_REHEARSAL_TARGET.sourceCommit,
     sourceTree: ROLLBACK_REHEARSAL_TARGET.sourceTree,
     expectedProductionDeploymentId: productionDeployment,
@@ -66,15 +78,22 @@ function input(overrides: Partial<Parameters<typeof createRollbackRehearsalRecei
     targetVersionText: versionView(ROLLBACK_REHEARSAL_TARGET.workerVersionId, ROLLBACK_REHEARSAL_TARGET.d1Id),
     readinessOutputText: '{"status":"passed"}\n',
     runtimeOutputText: 'worker runtime passed\n',
-    dryRunOutputText: 'dry run completed\n',
+    dryRunOutputText: 'DRY_RUN_SENTINEL: fixed-pr108-dry-run\ndry run completed\n',
+    npmInstallOutputText: 'npm ci passed\n', workerdOutputText: 'workerd passed\n', targetDeploymentText: targetDeployment,
     ...overrides,
   };
 }
 
 describe('production rollback rehearsal verifier', () => {
+  it('owns the only permitted recovery command and requires its dry-run flags', () => {
+    expect(ROLLBACK_REHEARSAL_COMMAND).toBe('wrangler versions deploy 291f3292-3fa9-44fc-bf6f-b68fd2f4cef6@100 --config wrangler.release.toml --name theologai --dry-run --yes');
+    expect(ROLLBACK_REHEARSAL_COMMAND).toContain('--dry-run --yes');
+  });
+
   it('emits a bounded sanitized receipt for an unchanged control plane', () => {
     const receipt = createRollbackRehearsalReceipt(input());
     expect(receipt.status).toBe('passed');
+    expect(receipt.provenance.headSha).toBe(headSha);
     expect(receipt.target).toEqual({
       deploymentId: ROLLBACK_REHEARSAL_TARGET.deploymentId,
       workerVersionId: ROLLBACK_REHEARSAL_TARGET.workerVersionId,
@@ -91,11 +110,19 @@ describe('production rollback rehearsal verifier', () => {
     ['wrong confirmation', { confirmation: 'REHEARSE' }],
     ['wrong source commit', { sourceCommit: 'a'.repeat(40) }],
     ['wrong source tree', { sourceTree: 'b'.repeat(40) }],
+    ['wrong repository', { repository: 'attacker/repo' }],
+    ['wrong workflow', { workflow: 'Other Workflow' }],
+    ['wrong ref', { ref: 'refs/heads/feature' }],
+    ['wrong Wrangler', { wranglerVersion: '4.113.0' }],
+    ['wrong run ID', { runId: '0' }],
     ['wrong target version', { targetVersionText: versionView(productionVersion, ROLLBACK_REHEARSAL_TARGET.d1Id) }],
     ['wrong target D1', { targetVersionText: versionView(ROLLBACK_REHEARSAL_TARGET.workerVersionId, productionD1) }],
+    ['wrong target deployment', { targetDeploymentText: targetDeployment.replace(ROLLBACK_REHEARSAL_TARGET.deploymentId, productionDeployment) }],
     ['wrong D1 inventory', { d1InventoryBeforeText: JSON.stringify([{ name: 'other', uuid: productionD1 }]) }],
+    ['non-distinct active D1 identities', { previewVersionBeforeText: versionView(previewVersion, productionD1), previewVersionAfterText: versionView(previewVersion, productionD1) }],
     ['production traffic drift', { productionAfterText: deployments(productionDeployment, 'a23e4567-e89b-42d3-a456-426614174000') }],
     ['preview D1 drift', { previewVersionAfterText: versionView(previewVersion, productionD1) }],
+    ['oversized output', { runtimeOutputText: 'é'.repeat(5 * 1024 * 1024) }],
   ])('fails closed for %s', (_label, override) => {
     expect(() => createRollbackRehearsalReceipt(input(override))).toThrow(/refused/);
   });
