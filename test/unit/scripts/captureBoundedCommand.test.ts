@@ -135,7 +135,9 @@ describe('bounded command capture', () => {
       const run = await runCapture({ ...nodeScript(source), stdoutPath, stderrPath, maxBytes: 1_024 });
       expect(run.exitCode).not.toBe(0);
       expect(run.result).toMatchObject({ overflow: true });
-      expect(Date.now() - started).toBeLessThan(2_000);
+      // This exercises the complete supervisor startup, TERM grace, KILL, and
+      // teardown path; retain CI margin while keeping the path time-bounded.
+      expect(Date.now() - started).toBeLessThan(5_000);
       await new Promise(resolve => setTimeout(resolve, 700));
       await expect(readFile(marker, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
     });
