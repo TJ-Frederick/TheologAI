@@ -8,6 +8,7 @@ export interface BoundedCommandOptions {
   maxBytes?: number;
   stdoutPrefix?: string;
   openCapture?: (path: string) => Promise<{ write: (value: Buffer) => Promise<unknown>; close: () => Promise<unknown> }>;
+  /** Receives the positive process-group ID; the default sends to -processGroupId. */
   signalGroup?: (processGroupId: number, signal: NodeJS.Signals) => void;
   signalChild?: (child: unknown, signal: NodeJS.Signals) => boolean;
 }

@@ -61,12 +61,16 @@ function alive(child) {
   return child.exitCode === null && child.signalCode === null;
 }
 
-function signalProcessGroup(child, processGroupId, signal, signalGroup = process.kill) {
+function defaultSignalGroup(processGroupId, signal) {
+  process.kill(-processGroupId, signal);
+}
+
+function signalProcessGroup(child, processGroupId, signal, signalGroup = defaultSignalGroup) {
   if (!processGroupId) return;
   try {
     // Detached children form their own group, so descendants cannot survive
     // an output overflow. A negative PID targets the complete process group.
-    signalGroup(-processGroupId, signal);
+    signalGroup(processGroupId, signal);
     return true;
   } catch (error) {
     return false;
@@ -86,7 +90,7 @@ function destroy(stream) {
   try { stream?.destroy(); } catch { /* cleanup must remain best-effort */ }
 }
 
-async function terminate(child, processGroupId, signalGroup = process.kill, signaler = (target, signal) => {
+async function terminate(child, processGroupId, signalGroup = defaultSignalGroup, signaler = (target, signal) => {
   if (!alive(target)) return false;
   try { return target.kill(signal); } catch { return false; }
 }) {
@@ -136,6 +140,34 @@ function sendAck(child) {
       reject(error);
     }
   });
+}
+
+function sendAbort(child) {
+  return new Promise((resolve, reject) => {
+    if (!child.connected || typeof child.send !== 'function') {
+      resolve(false);
+      return;
+    }
+    try {
+      child.send({ type: 'abort' }, error => error ? reject(error) : resolve(true));
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
+async function abortSupervisor(child, exitPromise) {
+  try {
+    await boundedAwait(sendAbort(child), TERMINATION_TIMEOUT_MS, 'bounded command supervisor abort send timed out');
+  } catch {
+    return;
+  }
+  try {
+    await boundedAwait(exitPromise, TERMINATION_TIMEOUT_MS, 'bounded command supervisor abort exit timed out');
+  } catch {
+    // The outer runner remains bounded even if the supervisor cannot report
+    // its final OS-level exit after self-terminating the stable group.
+  }
 }
 
 function captureState(initial = Buffer.alloc(0)) {
@@ -192,6 +224,16 @@ async function supervisor(argv) {
   // its grace interval if output overflow is still being handled.
   process.on('SIGTERM', keepAliveAfterTermination);
   process.on('SIGINT', keepAliveAfterTermination);
+  process.on('message', message => {
+    if (message?.type !== 'abort') return;
+    // This signal originates inside the still-live supervisor, so its own
+    // process group identity is stable and cannot refer to a reused PGID.
+    try {
+      process.kill(-process.pid, 'SIGKILL');
+    } catch {
+      try { process.kill(process.pid, 'SIGKILL'); } catch { /* best effort */ }
+    }
+  });
   process.stdout.on('error', () => undefined);
   process.stderr.on('error', () => undefined);
 
@@ -234,12 +276,15 @@ async function supervisor(argv) {
   });
   if (signalRequested) await new Promise(() => undefined);
   if (signal) {
-    process.removeAllListeners('SIGTERM');
-    process.removeAllListeners('SIGINT');
-    process.kill(process.pid, signal);
+    // The child outcome is authoritative. The supervisor is only a control
+    // process; replaying the child's signal can be ignored or reserved by
+    // Node (for example SIGPIPE), so exit neutrally after the ACK.
+    process.disconnect();
+    process.exit(0);
     return;
   }
-  process.exitCode = exitStatus ?? 0;
+  process.disconnect();
+  process.exit(exitStatus ?? 0);
 }
 
 async function waitForCompletionOrTermination(completionPromise, exitPromise, isTerminating) {
@@ -317,6 +362,7 @@ export async function runBoundedCommand(options) {
     throw error;
   }
   let child;
+  let childExitPromise;
   let processGroupId;
   let overflow = false;
   let termination;
@@ -325,10 +371,16 @@ export async function runBoundedCommand(options) {
   const requestTermination = (isOverflow) => {
     if (isOverflow) overflow = true;
     if (!termination && child && processGroupId) {
-      termination = terminate(child, processGroupId, options.signalGroup, options.signalChild);
-      termination.then(result => { groupIdentityLost ||= result.groupIdentityLost; }, () => {
-        groupIdentityLost = true;
-      });
+      termination = terminate(child, processGroupId, options.signalGroup, options.signalChild)
+        .then(async result => {
+          groupIdentityLost ||= result.groupIdentityLost;
+          if (result.groupIdentityLost && childExitPromise) await abortSupervisor(child, childExitPromise);
+          return result;
+        }, async error => {
+          groupIdentityLost = true;
+          if (childExitPromise) await abortSupervisor(child, childExitPromise);
+          throw error;
+        });
     }
     return termination ?? Promise.resolve();
   };
@@ -356,6 +408,7 @@ export async function runBoundedCommand(options) {
       childProcess.once('exit', (code, signal) => resolve([code, signal]));
       childProcess.once('error', reject);
     });
+    childExitPromise = exitPromise;
     let observedOutcome = [null, 'SIGTERM'];
     exitPromise.then(outcome => { observedOutcome = outcome; }, () => undefined);
     const completionPromise = new Promise((resolve, reject) => {
@@ -403,10 +456,7 @@ export async function runBoundedCommand(options) {
     let signal;
     if (completion) {
       await boundedAwait(sendAck(childProcess), TERMINATION_TIMEOUT_MS, 'bounded command supervisor acknowledgement timed out');
-      const outcome = await boundedAwait(exitPromise, TERMINATION_TIMEOUT_MS, 'bounded command supervisor exit timed out');
-      if (outcome[0] !== completion.exitStatus || outcome[1] !== completion.signal) {
-        throw new Error('bounded command supervisor exit status did not match completion');
-      }
+      await boundedAwait(exitPromise, TERMINATION_TIMEOUT_MS, 'bounded command supervisor exit timed out');
       [exitStatus, signal] = [completion.exitStatus, completion.signal];
     } else {
       [exitStatus, signal] = observedOutcome;

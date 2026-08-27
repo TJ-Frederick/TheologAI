@@ -92,6 +92,18 @@ describe('bounded command capture', () => {
     });
   });
 
+  it('preserves a SIGPIPE child outcome without replaying it on the supervisor', async () => {
+    await withCapture(async directory => {
+      const stdoutPath = join(directory, 'stdout');
+      const stderrPath = join(directory, 'stderr');
+      const run = await runCapture({
+        command: '/bin/sh', args: ['-c', 'kill -PIPE $$'], stdoutPath, stderrPath,
+      });
+      expect(run.exitCode).toBe(1);
+      expect(run.result).toMatchObject({ exitStatus: null, signal: 'SIGPIPE', overflow: false });
+    });
+  });
+
   it.each([
     ['stdout', "setInterval(() => process.stdout.write('é'.repeat(1024)), 0);"],
     ['stderr', "setInterval(() => process.stderr.write('ß'.repeat(1024)), 0);"],
@@ -280,26 +292,36 @@ describe('bounded command capture', () => {
 
   it('returns boundedly when group and direct termination callbacks fail without stale PGID retries', async () => {
     await withCapture(async directory => {
+      const supervisorPidPath = join(directory, 'failed-signal-supervisor.pid');
+      const marker = join(directory, 'failed-signal-descendant-survived');
       const calls: string[] = [];
       const run = captureModule.runBoundedCommand({
-        ...nodeScript("process.stdout.write('x'.repeat(2048)); setInterval(() => {}, 1000);"),
+        ...nodeScript([
+          `require('node:fs').writeFileSync(${JSON.stringify(supervisorPidPath)}, String(process.ppid));`,
+          `require('node:child_process').spawn(process.execPath, ['-e', ${JSON.stringify(`setTimeout(() => require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'alive'), 700)`) }], {stdio: 'ignore'});`,
+          "process.stdout.write('x'.repeat(2048)); setInterval(() => {}, 1000);",
+        ].join('')),
         stdoutPath: join(directory, 'stdout'),
         stderrPath: join(directory, 'stderr'),
         maxBytes: 1,
-        signalGroup: (_pid: number, signal: NodeJS.Signals) => {
+        signalGroup: (pid: number, signal: NodeJS.Signals) => {
+          expect(pid).toBeGreaterThan(0);
           calls.push(`group:${signal}`);
           throw Object.assign(new Error('ESRCH'), { code: 'ESRCH' });
         },
         signalChild: (child: unknown, signal: NodeJS.Signals) => {
           calls.push(`direct:${signal}`);
-          (child as { kill: (value: NodeJS.Signals) => boolean }).kill('SIGKILL');
+          expect(child).toBeTruthy();
           throw new Error('EPERM');
         },
       });
       const started = Date.now();
       await expect(run).rejects.toBeInstanceOf(captureModule.BoundedCommandError);
-      expect(Date.now() - started).toBeLessThan(2_000);
+      expect(Date.now() - started).toBeLessThan(5_000);
       expect(calls).toEqual(['group:SIGTERM', 'direct:SIGTERM']);
+      const supervisorPid = Number(await readFile(supervisorPidPath, 'utf8'));
+      expect(() => process.kill(supervisorPid, 0)).toThrow();
+      await expect(readFile(marker, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
     });
   });
 });
