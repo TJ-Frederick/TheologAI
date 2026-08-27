@@ -237,4 +237,69 @@ describe('bounded command capture', () => {
       await expect(readFile(marker, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
     });
   });
+
+  it('pins the supervisor while a finite oversized write is blocked by a slow sink', async () => {
+    await withCapture(async directory => {
+      const supervisorPidPath = join(directory, 'slow-sink-supervisor.pid');
+      const marker = join(directory, 'slow-sink-marker');
+      const source = [
+        `require('node:fs').writeFileSync(${JSON.stringify(supervisorPidPath)}, String(process.ppid));`,
+        `setTimeout(() => require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'alive'), 700);`,
+        "process.stdout.write('x'.repeat(1024));",
+      ].join('');
+      let sinkStartedResolve!: () => void;
+      const sinkStarted = new Promise<void>(resolve => { sinkStartedResolve = resolve; });
+      let started = false;
+      const slowSink = {
+        write: async (_value: Buffer) => {
+          if (!started) {
+            started = true;
+            sinkStartedResolve();
+          }
+          await new Promise(resolve => setTimeout(resolve, 200));
+        },
+        close: async () => undefined,
+      };
+      const quietSink = { write: async () => undefined, close: async () => undefined };
+      const run = captureModule.runBoundedCommand({
+        ...nodeScript(source),
+        stdoutPath: join(directory, 'stdout'),
+        stderrPath: join(directory, 'stderr'),
+        maxBytes: 1,
+        openCapture: async (path: string) => path.endsWith('/stdout') ? slowSink : quietSink,
+      });
+      await sinkStarted;
+      const supervisorPid = Number(await readFile(supervisorPidPath, 'utf8'));
+      expect(() => process.kill(supervisorPid, 0)).not.toThrow();
+      await expect(run).rejects.toBeInstanceOf(captureModule.BoundedCommandError);
+      await new Promise(resolve => setTimeout(resolve, 50));
+      expect(() => process.kill(supervisorPid, 0)).toThrow();
+      await expect(readFile(marker, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+    });
+  });
+
+  it('returns boundedly when group and direct termination callbacks fail without stale PGID retries', async () => {
+    await withCapture(async directory => {
+      const calls: string[] = [];
+      const run = captureModule.runBoundedCommand({
+        ...nodeScript("process.stdout.write('x'.repeat(2048)); setInterval(() => {}, 1000);"),
+        stdoutPath: join(directory, 'stdout'),
+        stderrPath: join(directory, 'stderr'),
+        maxBytes: 1,
+        signalGroup: (_pid: number, signal: NodeJS.Signals) => {
+          calls.push(`group:${signal}`);
+          throw Object.assign(new Error('ESRCH'), { code: 'ESRCH' });
+        },
+        signalChild: (child: unknown, signal: NodeJS.Signals) => {
+          calls.push(`direct:${signal}`);
+          (child as { kill: (value: NodeJS.Signals) => boolean }).kill('SIGKILL');
+          throw new Error('EPERM');
+        },
+      });
+      const started = Date.now();
+      await expect(run).rejects.toBeInstanceOf(captureModule.BoundedCommandError);
+      expect(Date.now() - started).toBeLessThan(2_000);
+      expect(calls).toEqual(['group:SIGTERM', 'direct:SIGTERM']);
+    });
+  });
 });

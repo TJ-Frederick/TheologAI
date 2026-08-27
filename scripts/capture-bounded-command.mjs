@@ -8,12 +8,13 @@
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { open, writeFile } from 'node:fs/promises';
+import { constants as osConstants } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 export const DEFAULT_MAX_CAPTURE_BYTES = 8 * 1024 * 1024;
 const TERMINATION_GRACE_MS = 250;
 const TERMINATION_TIMEOUT_MS = 2_000;
-const SHA256 = /^[0-9a-f]{64}$/;
+const SIGNAL_NAMES = new Set(Object.keys(osConstants.signals));
 
 export class BoundedCommandError extends Error {
   constructor(result) {
@@ -25,6 +26,33 @@ export class BoundedCommandError extends Error {
   }
 }
 
+function isSignal(value) {
+  return value === null || (typeof value === 'string' && SIGNAL_NAMES.has(value));
+}
+
+function isOutcome(exitStatus, signal) {
+  return (Number.isSafeInteger(exitStatus) && exitStatus >= 0 && signal === null)
+    || (exitStatus === null && typeof signal === 'string' && isSignal(signal));
+}
+
+function wait(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function boundedAwait(promise, timeoutMs, message) {
+  let timeout;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timeout = setTimeout(() => reject(new Error(message)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
 function assert(condition, message) {
   if (!condition) throw new Error(`Bounded command refused: ${message}.`);
 }
@@ -33,16 +61,24 @@ function alive(child) {
   return child.exitCode === null && child.signalCode === null;
 }
 
-function signalProcessGroup(child, processGroupId, signal) {
+function signalProcessGroup(child, processGroupId, signal, signalGroup = process.kill) {
   if (!processGroupId) return;
   try {
     // Detached children form their own group, so descendants cannot survive
     // an output overflow. A negative PID targets the complete process group.
-    process.kill(-processGroupId, signal);
+    signalGroup(-processGroupId, signal);
+    return true;
   } catch (error) {
-    if (error?.code !== 'ESRCH' && alive(child)) {
-      try { child.kill(signal); } catch { /* the process may have exited */ }
-    }
+    return false;
+  }
+}
+
+function signalChild(child, signal, signaler) {
+  if (!alive(child)) return false;
+  try {
+    return signaler(child, signal) === true;
+  } catch {
+    return false;
   }
 }
 
@@ -50,17 +86,66 @@ function destroy(stream) {
   try { stream?.destroy(); } catch { /* cleanup must remain best-effort */ }
 }
 
-async function terminate(child, processGroupId) {
-  // The leader may have exited while a descendant still owns a pipe. Always
-  // signal the saved process group so that descendant cannot survive overflow.
-  signalProcessGroup(child, processGroupId, 'SIGTERM');
-  await new Promise(resolve => setTimeout(resolve, TERMINATION_GRACE_MS));
-  signalProcessGroup(child, processGroupId, 'SIGKILL');
-  // A descendant that inherited a pipe must not hold the parent close event
-  // open indefinitely after the process group has been signalled.
-  destroy(child.stdout);
-  destroy(child.stderr);
-  await new Promise(resolve => setTimeout(resolve, 25));
+async function terminate(child, processGroupId, signalGroup = process.kill, signaler = (target, signal) => {
+  if (!alive(target)) return false;
+  try { return target.kill(signal); } catch { return false; }
+}) {
+  try {
+    // The supervisor remains alive until the parent acknowledges completion,
+    // so this PGID cannot be reused during TERM -> KILL escalation.
+    const termGroup = signalProcessGroup(child, processGroupId, 'SIGTERM', signalGroup);
+    if (!termGroup) {
+      // The group identity is no longer trustworthy. Use only the direct
+      // supervisor handle and never send a delayed signal to that stale PGID.
+      signalChild(child, 'SIGTERM', signaler);
+      return { groupIdentityLost: true };
+    }
+    await wait(TERMINATION_GRACE_MS);
+    const killGroup = signalProcessGroup(child, processGroupId, 'SIGKILL', signalGroup);
+    if (!killGroup) {
+      // Do not retry the saved PGID after this point: it may be stale. A direct
+      // handle is safe to attempt once, and failure remains bounded.
+      signalChild(child, 'SIGKILL', signaler);
+    }
+    return { groupIdentityLost: !killGroup };
+  } finally {
+    // A descendant that inherited a pipe must not hold the parent close event
+    // open indefinitely after the process group has been signalled.
+    destroy(child.stdout);
+    destroy(child.stderr);
+  }
+}
+
+async function settleWithin(promises, timeoutMs = TERMINATION_TIMEOUT_MS) {
+  try {
+    await boundedAwait(Promise.allSettled(promises), timeoutMs, 'bounded command cleanup timed out');
+  } catch {
+    // Cleanup is deliberately best effort after the bounded deadline.
+  }
+}
+
+function sendAck(child) {
+  return new Promise((resolve, reject) => {
+    if (!child.connected || typeof child.send !== 'function') {
+      reject(new Error('bounded command supervisor IPC channel is unavailable'));
+      return;
+    }
+    try {
+      child.send({ type: 'ack' }, error => error ? reject(error) : resolve());
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
+function captureState(initial = Buffer.alloc(0)) {
+  const digest = createHash('sha256');
+  digest.update(initial);
+  return { digest, bytes: initial.byteLength, overflow: false };
+}
+
+function captureSnapshot(state) {
+  return { bytes: state.bytes, hash: state.digest.copy().digest('hex'), overflow: state.overflow };
 }
 
 function relay(source, destination) {
@@ -119,70 +204,90 @@ async function supervisor(argv) {
     commandProcess.once('error', reject);
     commandProcess.once('close', (code, childSignal) => resolve([code, childSignal]));
   });
+  assert(isOutcome(exitStatus, signal), 'supervisor exit outcome is malformed');
   // ChildProcess close is emitted only after its pipe-backed stdio closes, so
   // a descendant that inherited either pipe pins this supervisor in the same
   // process group until the outer runner can observe all output.
   await Promise.all([stdoutRelay, stderrRelay]);
+  process.stdout.end();
+  process.stderr.end();
+  assert(typeof process.send === 'function', 'supervisor IPC channel is unavailable');
+  await new Promise((resolve, reject) => {
+    try {
+      process.send({ type: 'completion', exitStatus, signal }, error => error ? reject(error) : resolve());
+    } catch (error) {
+      reject(error);
+    }
+  });
+  await new Promise((resolve, reject) => {
+    const onMessage = message => {
+      process.off('disconnect', onDisconnect);
+      if (message?.type === 'ack') resolve();
+      else reject(new Error('bounded command supervisor received malformed acknowledgement'));
+    };
+    const onDisconnect = () => {
+      process.off('message', onMessage);
+      reject(new Error('bounded command supervisor IPC channel disconnected'));
+    };
+    process.once('message', onMessage);
+    process.once('disconnect', onDisconnect);
+  });
+  if (signalRequested) await new Promise(() => undefined);
   if (signal) {
-    if (signalRequested) await new Promise(() => undefined);
     process.removeAllListeners('SIGTERM');
     process.removeAllListeners('SIGINT');
     process.kill(process.pid, signal);
     return;
   }
-  if (signalRequested) await new Promise(() => undefined);
   process.exitCode = exitStatus ?? 0;
 }
 
-async function exitAfterTermination(exitPromise, termination) {
-  let closed = false;
-  exitPromise.then(() => { closed = true; }, () => { closed = true; });
-  const waitForTermination = async () => {
-    while (!closed && !termination()) await new Promise(resolve => setTimeout(resolve, 10));
-    if (closed) throw new Error('bounded command close race was lost');
-    const terminated = termination();
-    if (!terminated) throw new Error('bounded command termination state was lost');
-    await terminated;
-    return Promise.race([
-      exitPromise,
-      new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('bounded command did not close after termination')), TERMINATION_TIMEOUT_MS);
-      }),
-    ]);
-  };
-  return Promise.race([exitPromise, waitForTermination()]);
+async function waitForCompletionOrTermination(completionPromise, exitPromise, isTerminating) {
+  let completion;
+  let completionFailure;
+  let complete = false;
+  let exited = false;
+  completionPromise.then(value => { completion = value; complete = true; }, error => {
+    completionFailure = error;
+    complete = true;
+  });
+  exitPromise.then(() => { exited = true; }, error => {
+    completionFailure = error;
+    exited = true;
+  });
+  while (!isTerminating() && !complete && !exited) await wait(10);
+  if (isTerminating()) return undefined;
+  if (completionFailure) throw completionFailure;
+  if (!complete) throw new Error('bounded command supervisor exited without completion');
+  return completion;
 }
 
-async function consume(stream, handle, maxBytes, onOverflow, onCaptureFailure, isTerminating, initial = Buffer.alloc(0)) {
-  const digest = createHash('sha256');
-  digest.update(initial);
-  let bytes = initial.byteLength;
-  let overflow = false;
+async function consume(stream, handle, maxBytes, onOverflow, onCaptureFailure, isTerminating, state) {
   try {
     for await (const value of stream) {
       const chunk = Buffer.isBuffer(value) ? value : Buffer.from(value);
-      const remaining = maxBytes - bytes;
+      const remaining = maxBytes - state.bytes;
       if (chunk.byteLength > remaining) {
         if (remaining > 0) {
           const prefix = chunk.subarray(0, remaining);
           await handle.write(prefix);
-          digest.update(prefix);
-          bytes += prefix.byteLength;
+          state.digest.update(prefix);
+          state.bytes += prefix.byteLength;
         }
-        overflow = true;
+        state.overflow = true;
         await onOverflow();
         break;
       }
       await handle.write(chunk);
-      digest.update(chunk);
-      bytes += chunk.byteLength;
+      state.digest.update(chunk);
+      state.bytes += chunk.byteLength;
     }
   } catch (error) {
     // The peer stream is destroyed when the other stream overflows. This is
     // expected cleanup, not a successful uncapped command.
     if (!isTerminating()) await onCaptureFailure(error);
   }
-  return { bytes, hash: digest.digest('hex'), overflow };
+  return captureSnapshot(state);
 }
 
 export async function runBoundedCommand(options) {
@@ -198,7 +303,7 @@ export async function runBoundedCommand(options) {
   try {
     stderr = await openCapture(options.stderrPath);
   } catch (error) {
-    await stdout.close();
+    await boundedAwait(stdout.close(), TERMINATION_TIMEOUT_MS, 'bounded command stdout capture close timed out').catch(() => undefined);
     throw error;
   }
   let child;
@@ -206,9 +311,15 @@ export async function runBoundedCommand(options) {
   let overflow = false;
   let termination;
   let captureFailure;
+  let groupIdentityLost = false;
   const requestTermination = (isOverflow) => {
     if (isOverflow) overflow = true;
-    if (!termination && child && processGroupId) termination = terminate(child, processGroupId);
+    if (!termination && child && processGroupId) {
+      termination = terminate(child, processGroupId, options.signalGroup, options.signalChild);
+      termination.then(result => { groupIdentityLost ||= result.groupIdentityLost; }, () => {
+        groupIdentityLost = true;
+      });
+    }
     return termination ?? Promise.resolve();
   };
   const stop = () => requestTermination(true);
@@ -226,7 +337,7 @@ export async function runBoundedCommand(options) {
     ], {
       cwd: options.cwd,
       env: options.env ?? process.env,
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
       detached: true,
     });
     const childProcess = child;
@@ -235,25 +346,61 @@ export async function runBoundedCommand(options) {
       childProcess.once('exit', (code, signal) => resolve([code, signal]));
       childProcess.once('error', reject);
     });
-    const stdoutPromise = consume(childProcess.stdout, stdout, maxBytes, stop, onCaptureFailure, () => overflow, prefix);
-    const stderrPromise = consume(childProcess.stderr, stderr, maxBytes, stop, onCaptureFailure, () => overflow);
+    let observedOutcome = [null, 'SIGTERM'];
+    exitPromise.then(outcome => { observedOutcome = outcome; }, () => undefined);
+    const completionPromise = new Promise((resolve, reject) => {
+      const onMessage = message => {
+        if (!message || message.type !== 'completion'
+          || !isOutcome(message.exitStatus, message.signal)) {
+          reject(new Error('bounded command supervisor completion is malformed'));
+          return;
+        }
+        resolve({ exitStatus: message.exitStatus, signal: message.signal });
+      };
+      const onDisconnect = () => reject(new Error('bounded command supervisor IPC channel disconnected'));
+      childProcess.once('message', onMessage);
+      childProcess.once('disconnect', onDisconnect);
+    });
+    const stdoutState = captureState(prefix);
+    const stderrState = captureState();
+    const stdoutPromise = consume(childProcess.stdout, stdout, maxBytes, stop, onCaptureFailure, () => overflow, stdoutState);
+    const stderrPromise = consume(childProcess.stderr, stderr, maxBytes, stop, onCaptureFailure, () => overflow, stderrState);
     const capturesPromise = Promise.all([stdoutPromise, stderrPromise]);
-    let outcome;
+    let completion;
     let captures;
     try {
-      [outcome, captures] = await Promise.all([
-        exitAfterTermination(exitPromise, () => termination),
-        capturesPromise,
-      ]);
+      completion = await waitForCompletionOrTermination(completionPromise, exitPromise, () => Boolean(termination));
+      if (termination) {
+        await boundedAwait(termination, TERMINATION_TIMEOUT_MS, 'bounded command termination timed out');
+        try {
+          captures = await boundedAwait(capturesPromise, TERMINATION_TIMEOUT_MS, 'bounded command capture settle timed out');
+        } catch {
+          captures = [captureSnapshot(stdoutState), captureSnapshot(stderrState)];
+        }
+      } else {
+        captures = await capturesPromise;
+      }
     } catch (error) {
       await requestTermination(false);
-      await Promise.allSettled([exitPromise, capturesPromise]);
+      await settleWithin([exitPromise, completionPromise, capturesPromise]);
       throw error;
     }
-    await termination;
-    const [exitStatus, signal] = outcome;
+    if (termination) await termination;
     const [stdoutResult, stderrResult] = captures;
     if (captureFailure) throw captureFailure;
+    if (groupIdentityLost && !overflow) throw new Error('bounded command process-group identity was lost during cleanup');
+    let exitStatus;
+    let signal;
+    if (completion) {
+      await boundedAwait(sendAck(childProcess), TERMINATION_TIMEOUT_MS, 'bounded command supervisor acknowledgement timed out');
+      const outcome = await boundedAwait(exitPromise, TERMINATION_TIMEOUT_MS, 'bounded command supervisor exit timed out');
+      if (outcome[0] !== completion.exitStatus || outcome[1] !== completion.signal) {
+        throw new Error('bounded command supervisor exit status did not match completion');
+      }
+      [exitStatus, signal] = [completion.exitStatus, completion.signal];
+    } else {
+      [exitStatus, signal] = observedOutcome;
+    }
     const result = {
       schemaVersion: 'theologai-bounded-command.v1',
       exitStatus,
@@ -268,9 +415,18 @@ export async function runBoundedCommand(options) {
     return result;
   } catch (error) {
     await requestTermination(false);
+    if (child) {
+      await settleWithin([new Promise(resolve => {
+        if (!alive(child)) {
+          resolve();
+          return;
+        }
+        child.once('exit', resolve);
+      })]);
+    }
     throw error;
   } finally {
-    await Promise.allSettled([stdout.close(), stderr.close()]);
+    await settleWithin([stdout.close(), stderr.close()]);
   }
 }
 
@@ -333,17 +489,4 @@ if (process.argv[2] === '--supervise') {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
     process.exitCode = 1;
   });
-}
-
-export function isBoundedCommandResult(value) {
-  if (!value || typeof value !== 'object') return false;
-  const result = value;
-  return result.schemaVersion === 'theologai-bounded-command.v1'
-    && (result.exitStatus === null || Number.isSafeInteger(result.exitStatus))
-    && (result.signal === null || typeof result.signal === 'string')
-    && typeof result.overflow === 'boolean'
-    && Number.isSafeInteger(result.stdoutBytes) && result.stdoutBytes >= 0
-    && Number.isSafeInteger(result.stderrBytes) && result.stderrBytes >= 0
-    && typeof result.stdoutSha256 === 'string' && SHA256.test(result.stdoutSha256)
-    && typeof result.stderrSha256 === 'string' && SHA256.test(result.stderrSha256);
 }

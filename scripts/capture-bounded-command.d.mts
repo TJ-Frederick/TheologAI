@@ -1,6 +1,6 @@
 export interface BoundedCommandOptions {
   command: string;
-  args: string[];
+  args?: string[];
   cwd?: string;
   env?: NodeJS.ProcessEnv;
   stdoutPath: string;
@@ -8,6 +8,8 @@ export interface BoundedCommandOptions {
   maxBytes?: number;
   stdoutPrefix?: string;
   openCapture?: (path: string) => Promise<{ write: (value: Buffer) => Promise<unknown>; close: () => Promise<unknown> }>;
+  signalGroup?: (processGroupId: number, signal: NodeJS.Signals) => void;
+  signalChild?: (child: unknown, signal: NodeJS.Signals) => boolean;
 }
 
 export interface BoundedCommandResult {
@@ -22,9 +24,9 @@ export interface BoundedCommandResult {
 }
 
 export declare class BoundedCommandError extends Error {
+  constructor(result: BoundedCommandResult);
   readonly result: BoundedCommandResult;
 }
 
 export declare const DEFAULT_MAX_CAPTURE_BYTES: number;
 export declare function runBoundedCommand(options: BoundedCommandOptions): Promise<BoundedCommandResult>;
-export declare function isBoundedCommandResult(value: unknown): value is BoundedCommandResult;

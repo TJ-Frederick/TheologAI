@@ -56,7 +56,12 @@ historical `npm ci`, local Workerd seed/readiness, production-like Worker
 runtime, and remote D1 readiness checks. Raw Wrangler output stays in runner
 temporary storage. The committed dependency-free `scripts/capture-bounded-command.mjs`
 runner is used before and after dependency installation, so output capture does
-not depend on `node_modules`. Only the bounded, hash-only receipt is uploaded.
+not depend on `node_modules`. The runner uses a detached, dependency-free
+supervisor with a parent acknowledgement handshake: it closes both capture
+streams and reports the child status before the supervisor exits, while an
+overflow or capture failure leaves the supervisor pinned in its process group
+for bounded TERM-to-KILL cleanup. Only the bounded, hash-only receipt is
+uploaded.
 
 The sole recovery command is:
 
