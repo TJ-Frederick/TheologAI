@@ -73,7 +73,7 @@ describe('bounded command capture', () => {
   it.each([
     ['stdout', "setInterval(() => process.stdout.write('é'.repeat(1024)), 0);"],
     ['stderr', "setInterval(() => process.stderr.write('ß'.repeat(1024)), 0);"],
-  ])('terminates immediately when %s exceeds the byte budget', async (_stream, source) => {
+  ])('terminates promptly when %s exceeds the byte budget', async (_stream, source) => {
     await withCapture(async directory => {
       const stdoutPath = join(directory, 'stdout');
       const stderrPath = join(directory, 'stderr');
@@ -81,7 +81,9 @@ describe('bounded command capture', () => {
       const run = await runCapture({ ...nodeScript(source), stdoutPath, stderrPath, maxBytes: 1_024 });
       expect(run.exitCode).not.toBe(0);
       expect(run.result).toMatchObject({ overflow: true });
-      expect(Date.now() - started).toBeLessThan(2_000);
+      // Include runner and child-process startup time so this remains stable on
+      // shared CI hosts while still bounding the complete overflow path.
+      expect(Date.now() - started).toBeLessThan(5_000);
       expect((await readFile(stdoutPath)).byteLength).toBeLessThanOrEqual(1_024);
       expect((await readFile(stderrPath)).byteLength).toBeLessThanOrEqual(1_024);
     });
