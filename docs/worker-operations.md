@@ -6,6 +6,37 @@ The [current release snapshot](CURRENT-RELEASE.md) is the designated current
 snapshot for this operations document. The dated records below retain release
 evidence and are not current identity authority.
 
+## Production rollback rehearsal capability
+
+The protected `Production Rollback Rehearsal` workflow is manual, main-only,
+serialized with `deploy-production`, and bound to the protected `production`
+environment. Its fixed PR #108 target is Worker version
+`291f3292-3fa9-44fc-bf6f-b68fd2f4cef6` and D1
+`theologai-production-20260729-transform11-a`
+(`53211f50-a893-4b4c-be1e-bc625a595dc7`). The rehearsal execution remains
+pending. It captures both environments before and after, runs the historical
+readiness/runtime gates, and permits only
+`versions deploy <fixed>@100 --config wrangler.release.toml --name theologai --dry-run --yes`; no rollback, D1, binding,
+route, secret, or deletion command is present. Only a bounded hash-only receipt
+is uploaded. See [the full runbook](PRODUCTION-ROLLBACK-REHEARSAL.md).
+
+Provision the dedicated `CLOUDFLARE_READ_ONLY_API_TOKEN` in the protected
+environment before execution with exactly the account-scoped `Workers Scripts
+Read` and `D1 Read` permissions; no additional permissions or account grants
+are allowed. The workflow aliases it to Wrangler's `CLOUDFLARE_API_TOKEN` variable only in
+authenticated read-only steps. Historical checkout and local gates receive no
+Cloudflare credential.
+
+Retain the active D1, immediate same-D1 Worker predecessor, and two newest
+cross-schema matched generations. Deletion is never automatic and is only
+review-eligible after two newer matched generations, a fresh rehearsal, 30
+stable days, no active bindings, reconstruction/compatibility proof, and exact
+owner authorization. Review quarterly with the `2026-11-15` H1 reassessment;
+H1 artifact expiry is separate.
+
+Schema-`0009` is active; the two retained older cross-schema matched
+generations are PR #108 Transform-11 and PR #101 hierarchy.
+
 ## Historical PR #122 live baseline
 
 The integrated checked-out normal build excludes the Transform-10 Aquinas

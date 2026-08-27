@@ -133,6 +133,13 @@ deployment.
 
 ### Readiness compatibility and rollback
 
+The protected [production rollback rehearsal](PRODUCTION-ROLLBACK-REHEARSAL.md)
+is the required read-only proof for the retained PR #108 matched pair. It
+checks the fixed Worker version and D1 name/UUID independently, plus unchanged
+production and preview control identities before and after a dry-run recovery
+command. It does not mutate traffic or D1 and does not replace the normal
+production approval gate.
+
 The deploy readiness query requires the current schema and corpus identity
 markers, including `theologai_metadata`, in addition to integrity, foreign-key,
 index, column-signature, and exact manifest-count checks. A predecessor D1
@@ -156,6 +163,16 @@ retention, exact Worker revision, and readiness compatibility through a
 read-only inventory/check. If retention or compatibility has not been verified,
 document the target as candidate/unverified. Database deletion remains a later,
 separately authorized operation after the retention window and rollback review.
+
+Retention is conservative and review-only: keep the active D1, the immediate
+same-D1 Worker predecessor, and the two newest cross-schema matched
+generations. No automatic deletion is permitted. A database becomes only
+review-eligible after two newer matched generations, a fresh successful
+rehearsal, 30 days of current-release stability, no active bindings, proven
+reconstruction/compatibility, and exact owner authorization naming the database
+name and UUID. Review quarterly, initially with the `2026-11-15` H1
+reassessment; delete at most one explicitly authorized database per operation.
+H1 GitHub artifact expiry remains a separate policy.
 
 ### Schema-0009 preview-release preparation record
 

@@ -174,6 +174,24 @@ review.
 
 ## Release order
 
+### 3B.0 closure implementation — C1
+
+The remaining closure implementation adds the protected, read-only production
+rollback rehearsal in [the rollback runbook](PRODUCTION-ROLLBACK-REHEARSAL.md).
+It is workflow-dispatch-only from `main`, uses the `production` environment
+and `deploy-production` concurrency group, pins the PR #108 source/tree and
+Worker/D1 target, and records only sanitized hashes. The rehearsal itself is
+pending and must be executed after the consolidated production release. A
+later Markdown-only reconciliation (C2) records the actual run; this section
+does not update `CURRENT-RELEASE`.
+
+The retention decision is conservative: active D1, immediate same-D1 Worker
+predecessor, and two newest cross-schema matched generations are retained; no
+automatic deletion. Review eligibility requires two newer matched generations,
+a fresh rehearsal, 30 days of stability, no active binding, reconstruction and
+compatibility proof, and exact owner authorization. Quarterly review begins
+with the `2026-11-15` H1 reassessment, independently of H1 artifact expiry.
+
 The default critical path is:
 
 ```text

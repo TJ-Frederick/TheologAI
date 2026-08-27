@@ -838,6 +838,12 @@ Code readiness and operational readiness are deliberately separate:
   contract materially helps agents, retaining backward-compatible Markdown.
 - Rehearse matched Worker/D1 rollback and define retention policy before any
   predecessor database cleanup.
+- C1 implements the protected, read-only [production rollback rehearsal](PRODUCTION-ROLLBACK-REHEARSAL.md)
+  for the fixed PR #108 matched pair. Execution remains pending; only a
+  sanitized hash receipt may be retained. The active D1, immediate same-D1
+  Worker predecessor, and two newest cross-schema generations remain retained;
+  deletion is never automatic and requires the documented 30-day, fresh-
+  rehearsal, no-binding, reconstruction, compatibility, and exact-owner gates.
 - Revisit the parked public-edge traffic issue: a Frankfurt/AWS client has
   generated sustained anonymous production invocations. The custom domain and
   ordinary-request PR #72 legacy-host redirect are already deployed. Any

@@ -10,8 +10,8 @@
     "conformance": 1
   },
   "current": {
-    "totalTestTypeScript": 281,
-    "activeVitest": 202,
+    "totalTestTypeScript": 283,
+    "activeVitest": 204,
     "support": 24,
     "manual": 4,
     "legacyOrphan": 50,
@@ -127,6 +127,7 @@
       "test/unit/scripts/augustinePuseyStrictPackage.test.ts",
       "test/unit/scripts/biblicalLanguageSources.test.ts",
       "test/unit/scripts/buildUbsParallelPassages.test.ts",
+      "test/unit/scripts/captureBoundedCommand.test.ts",
       "test/unit/scripts/ccelCoordinatorOperator.test.ts",
       "test/unit/scripts/ccelLivePreviewCanary.test.ts",
       "test/unit/scripts/ccelOperatorSecretRelease.test.ts",
@@ -177,6 +178,7 @@
       "test/unit/scripts/previewReleaseReconciliation.test.ts",
       "test/unit/scripts/primarySourceEdgeStabilization.test.ts",
       "test/unit/scripts/productionReleaseGuards.test.ts",
+      "test/unit/scripts/productionRollbackRehearsal.test.ts",
       "test/unit/scripts/publicDomainHistoricalSources.test.ts",
       "test/unit/scripts/releaseCorpusCapacity.test.ts",
       "test/unit/scripts/resolveProductionReleaseContext.test.ts",

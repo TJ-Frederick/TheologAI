@@ -1,0 +1,308 @@
+name: Production Rollback Rehearsal
+
+# This workflow is a protected, read-only rehearsal. It never changes Worker
+# traffic, uploads a version, changes a binding, mutates D1, or deletes data.
+# Fixed PR108 deployment target: 3d7489d9-7b48-4ad0-bdc6-95ffbda53bd8.
+# Fixed PR108 Worker version: 291f3292-3fa9-44fc-bf6f-b68fd2f4cef6; D1:
+# theologai-production-20260729-transform11-a / 53211f50-a893-4b4c-be1e-bc625a595dc7.
+on:
+  workflow_dispatch:
+    inputs:
+      expected_production_deployment_id:
+        description: Exact active production deployment UUID captured immediately before dispatch
+        required: true
+        type: string
+      expected_production_version_id:
+        description: Exact active production Worker version UUID captured immediately before dispatch
+        required: true
+        type: string
+      expected_preview_deployment_id:
+        description: Exact active preview deployment UUID captured immediately before dispatch
+        required: true
+        type: string
+      expected_preview_version_id:
+        description: Exact active preview Worker version UUID captured immediately before dispatch
+        required: true
+        type: string
+      confirmation:
+        description: 'Type REHEARSE THE EXACT PR108 ROLLBACK WITHOUT TRAFFIC'
+        required: true
+        type: string
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    name: Validate dispatch inputs (unprotected)
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      contents: read
+    steps:
+      - name: Reject non-main, wrong confirmation, or malformed UUID inputs
+        env:
+          DISPATCH_REF: ${{ github.ref }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+          PRODUCTION_DEPLOYMENT: ${{ inputs.expected_production_deployment_id }}
+          PRODUCTION_VERSION: ${{ inputs.expected_production_version_id }}
+          PREVIEW_DEPLOYMENT: ${{ inputs.expected_preview_deployment_id }}
+          PREVIEW_VERSION: ${{ inputs.expected_preview_version_id }}
+        run: |
+          set -euo pipefail
+          test "$DISPATCH_REF" = 'refs/heads/main'
+          test "$CONFIRMATION" = 'REHEARSE THE EXACT PR108 ROLLBACK WITHOUT TRAFFIC'
+          for value in "$PRODUCTION_DEPLOYMENT" "$PRODUCTION_VERSION" "$PREVIEW_DEPLOYMENT" "$PREVIEW_VERSION"; do
+            printf '%s' "$value" | grep -Eiq '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+          done
+
+  rehearse:
+    name: Rehearse PR108 rollback without traffic
+    needs: preflight
+    if: ${{ needs.preflight.result == 'success' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: production
+      deployment: false
+    permissions:
+      contents: read
+    steps:
+      - name: Confirm main-only dispatch and exact confirmation
+        env:
+          DISPATCH_REF: ${{ github.ref }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          set -euo pipefail
+          test "$DISPATCH_REF" = 'refs/heads/main'
+          test "$CONFIRMATION" = 'REHEARSE THE EXACT PR108 ROLLBACK WITHOUT TRAFFIC'
+
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+
+      - name: Install verifier dependencies
+        run: |
+          set -euo pipefail
+          node "$GITHUB_WORKSPACE/scripts/capture-bounded-command.mjs" \
+            --stdout "$RUNNER_TEMP/verifier-npm-ci.out" --stderr "$RUNNER_TEMP/verifier-npm-ci.err" \
+            --result "$RUNNER_TEMP/verifier-npm-ci.result.json" --max-bytes 8388608 -- npm ci --no-audit
+          jq -e '(.schemaVersion == "theologai-bounded-command.v1") and (.exitStatus == 0) and (.overflow == false)' \
+            "$RUNNER_TEMP/verifier-npm-ci.result.json"
+
+      - name: Verify pinned Wrangler version
+        run: |
+          set -euo pipefail
+          node "$GITHUB_WORKSPACE/scripts/capture-bounded-command.mjs" \
+            --stdout "$RUNNER_TEMP/wrangler-version.out" --stderr "$RUNNER_TEMP/wrangler-version.err" \
+            --result "$RUNNER_TEMP/wrangler-version.result.json" --max-bytes 65536 -- \
+            npx --no-install wrangler --version
+          jq -e '(.schemaVersion == "theologai-bounded-command.v1") and (.exitStatus == 0) and (.overflow == false)' \
+            "$RUNNER_TEMP/wrangler-version.result.json"
+          test "$(sed -n '1p' "$RUNNER_TEMP/wrangler-version.out")" = '4.114.0'
+
+      - name: Check out exact historical PR108 source separately
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: 8da99fd0a161b90a4bd90ab29bde1abf796b3bf6
+          path: pr108-source
+          fetch-depth: 1
+
+      - name: Verify exact historical source identity
+        env:
+          PR108_COMMIT: 8da99fd0a161b90a4bd90ab29bde1abf796b3bf6
+          PR108_TREE: a59d9a062b2e6c7884de97fd97309878e1cbdc23
+        run: |
+          set -euo pipefail
+          test "$(git -C pr108-source rev-parse HEAD)" = "$PR108_COMMIT"
+          test "$(git -C pr108-source rev-parse HEAD^{tree})" = "$PR108_TREE"
+
+      - name: Capture production and preview controls before rehearsal (read-only)
+        env:
+          CLOUDFLARE_READ_ONLY_API_TOKEN: ${{ secrets.CLOUDFLARE_READ_ONLY_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_READ_ONLY_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          EXPECTED_PRODUCTION_VERSION: ${{ inputs.expected_production_version_id }}
+          EXPECTED_PREVIEW_VERSION: ${{ inputs.expected_preview_version_id }}
+        run: |
+          set -euo pipefail
+          MAX_CAPTURE_BYTES=8388608
+          bounded_json() {
+            stdout="$1"; stderr="$2"; shift 2
+            node "$GITHUB_WORKSPACE/scripts/capture-bounded-command.mjs" \
+              --stdout "$stdout" --stderr "$stderr" --result "$stdout.result.json" --max-bytes "$MAX_CAPTURE_BYTES" -- "$@"
+            jq -e '(.schemaVersion == "theologai-bounded-command.v1") and (.exitStatus == 0) and (.overflow == false)' "$stdout.result.json"
+          }
+          bounded_json "$RUNNER_TEMP/d1-before.json" "$RUNNER_TEMP/d1-before.stderr" npx --no-install wrangler d1 list --json
+          bounded_json "$RUNNER_TEMP/production-before.json" "$RUNNER_TEMP/production-before.stderr" npx --no-install wrangler deployments list --json
+          bounded_json "$RUNNER_TEMP/production-version-before.json" "$RUNNER_TEMP/production-version-before.stderr" npx --no-install wrangler versions view "$EXPECTED_PRODUCTION_VERSION" --name theologai --json
+          bounded_json "$RUNNER_TEMP/preview-before.json" "$RUNNER_TEMP/preview-before.stderr" npx --no-install wrangler deployments list --env preview --json
+          bounded_json "$RUNNER_TEMP/preview-version-before.json" "$RUNNER_TEMP/preview-version-before.stderr" npx --no-install wrangler versions view "$EXPECTED_PREVIEW_VERSION" --name theologai-preview --env preview --json
+
+      - name: Run historical PR108 local gates without credentials
+        run: |
+          set -euo pipefail
+          capture() {
+            stdout="$1"; stderr="$2"; result="$3"; shift 3
+            node "$GITHUB_WORKSPACE/scripts/capture-bounded-command.mjs" \
+              --stdout "$stdout" --stderr "$stderr" --result "$result" --cwd "$GITHUB_WORKSPACE/pr108-source" \
+              --max-bytes 8388608 -- "$@"
+            jq -e '(.schemaVersion == "theologai-bounded-command.v1") and (.exitStatus == 0) and (.overflow == false)' "$result"
+          }
+          capture "$RUNNER_TEMP/pr108-npm-ci.out" "$RUNNER_TEMP/pr108-npm-ci.err" "$RUNNER_TEMP/pr108-npm-ci.result.json" npm ci --no-audit
+          capture "$RUNNER_TEMP/pr108-workerd.out" "$RUNNER_TEMP/pr108-workerd.err" "$RUNNER_TEMP/pr108-workerd.result.json" npm run d1:seed:verify-workerd
+          capture "$RUNNER_TEMP/pr108-runtime.out" "$RUNNER_TEMP/pr108-runtime.err" "$RUNNER_TEMP/pr108-runtime.result.json" npm run test:worker-production-runtime
+
+      - name: Capture fixed PR108 Worker/version and deployment proof (read-only)
+        env:
+          CLOUDFLARE_READ_ONLY_API_TOKEN: ${{ secrets.CLOUDFLARE_READ_ONLY_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_READ_ONLY_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          EXPECTED_PRODUCTION_VERSION: ${{ inputs.expected_production_version_id }}
+          EXPECTED_PREVIEW_VERSION: ${{ inputs.expected_preview_version_id }}
+        run: |
+          set -euo pipefail
+          MAX_CAPTURE_BYTES=8388608
+          bounded_json() {
+            stdout="$1"; stderr="$2"; shift 2
+            node "$GITHUB_WORKSPACE/scripts/capture-bounded-command.mjs" \
+              --stdout "$stdout" --stderr "$stderr" --result "$stdout.result.json" --max-bytes "$MAX_CAPTURE_BYTES" -- "$@"
+            jq -e '(.schemaVersion == "theologai-bounded-command.v1") and (.exitStatus == 0) and (.overflow == false)' "$stdout.result.json"
+          }
+          bounded_json "$RUNNER_TEMP/target-version.json" "$RUNNER_TEMP/target-version.stderr" \
+            npx --no-install wrangler versions view 291f3292-3fa9-44fc-bf6f-b68fd2f4cef6 --name theologai --json
+          bounded_json "$RUNNER_TEMP/target-deployment.json" "$RUNNER_TEMP/target-deployment.stderr" \
+            curl --fail --silent --show-error --location --max-time 30 --proto '=https' --tlsv1.2 \
+              -H "Authorization: Bearer $CLOUDFLARE_READ_ONLY_API_TOKEN" -H 'Accept: application/json' \
+              "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/theologai/deployments/3d7489d9-7b48-4ad0-bdc6-95ffbda53bd8"
+
+      - name: Run fixed PR108 remote readiness (read-only token only)
+        env:
+          CLOUDFLARE_READ_ONLY_API_TOKEN: ${{ secrets.CLOUDFLARE_READ_ONLY_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_READ_ONLY_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          node "$GITHUB_WORKSPACE/scripts/capture-bounded-command.mjs" \
+            --stdout "$RUNNER_TEMP/pr108-remote-d1.out" --stderr "$RUNNER_TEMP/pr108-remote-d1.err" \
+            --result "$RUNNER_TEMP/pr108-remote-d1.result.json" --cwd "$GITHUB_WORKSPACE/pr108-source" \
+            --max-bytes 8388608 -- npm run d1:remote:check -- --database theologai-production-20260729-transform11-a
+          jq -e '(.schemaVersion == "theologai-bounded-command.v1") and (.exitStatus == 0) and (.overflow == false)' \
+            "$RUNNER_TEMP/pr108-remote-d1.result.json"
+
+      - name: Run exact PR108 recovery command in dry-run mode only
+        env:
+          CLOUDFLARE_READ_ONLY_API_TOKEN: ${{ secrets.CLOUDFLARE_READ_ONLY_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_READ_ONLY_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          node "$GITHUB_WORKSPACE/scripts/capture-bounded-command.mjs" \
+            --stdout "$RUNNER_TEMP/dry-run.out" --stderr "$RUNNER_TEMP/dry-run.err" \
+            --stdout-prefix 'DRY_RUN_SENTINEL: fixed-pr108-dry-run' \
+            --result "$RUNNER_TEMP/dry-run.result.json" --max-bytes 8388608 -- \
+            npx --no-install wrangler versions deploy 291f3292-3fa9-44fc-bf6f-b68fd2f4cef6@100 --config wrangler.release.toml --name theologai --dry-run --yes
+          jq -e '(.schemaVersion == "theologai-bounded-command.v1") and (.exitStatus == 0) and (.overflow == false)' \
+            "$RUNNER_TEMP/dry-run.result.json"
+
+      - name: Capture production and preview controls after rehearsal (read-only)
+        env:
+          CLOUDFLARE_READ_ONLY_API_TOKEN: ${{ secrets.CLOUDFLARE_READ_ONLY_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_READ_ONLY_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          EXPECTED_PRODUCTION_VERSION: ${{ inputs.expected_production_version_id }}
+          EXPECTED_PREVIEW_VERSION: ${{ inputs.expected_preview_version_id }}
+        run: |
+          set -euo pipefail
+          MAX_CAPTURE_BYTES=8388608
+          bounded_json() {
+            stdout="$1"; stderr="$2"; shift 2
+            node "$GITHUB_WORKSPACE/scripts/capture-bounded-command.mjs" \
+              --stdout "$stdout" --stderr "$stderr" --result "$stdout.result.json" --max-bytes "$MAX_CAPTURE_BYTES" -- "$@"
+            jq -e '(.schemaVersion == "theologai-bounded-command.v1") and (.exitStatus == 0) and (.overflow == false)' "$stdout.result.json"
+          }
+          bounded_json "$RUNNER_TEMP/d1-after.json" "$RUNNER_TEMP/d1-after.stderr" npx --no-install wrangler d1 list --json
+          bounded_json "$RUNNER_TEMP/production-after.json" "$RUNNER_TEMP/production-after.stderr" npx --no-install wrangler deployments list --json
+          bounded_json "$RUNNER_TEMP/production-version-after.json" "$RUNNER_TEMP/production-version-after.stderr" npx --no-install wrangler versions view "$EXPECTED_PRODUCTION_VERSION" --name theologai --json
+          bounded_json "$RUNNER_TEMP/preview-after.json" "$RUNNER_TEMP/preview-after.stderr" npx --no-install wrangler deployments list --env preview --json
+          bounded_json "$RUNNER_TEMP/preview-version-after.json" "$RUNNER_TEMP/preview-version-after.stderr" npx --no-install wrangler versions view "$EXPECTED_PREVIEW_VERSION" --name theologai-preview --env preview --json
+
+      - name: Create bounded sanitized rehearsal receipt
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+          REPOSITORY: ${{ github.repository }}
+          WORKFLOW: Production Rollback Rehearsal
+          HEAD_SHA: ${{ github.sha }}
+          REF: ${{ github.ref }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          WRANGLER_VERSION: 4.114.0
+          SOURCE_COMMIT: 8da99fd0a161b90a4bd90ab29bde1abf796b3bf6
+          SOURCE_TREE: a59d9a062b2e6c7884de97fd97309878e1cbdc23
+          EXPECTED_PRODUCTION_DEPLOYMENT: ${{ inputs.expected_production_deployment_id }}
+          EXPECTED_PRODUCTION_VERSION: ${{ inputs.expected_production_version_id }}
+          EXPECTED_PREVIEW_DEPLOYMENT: ${{ inputs.expected_preview_deployment_id }}
+          EXPECTED_PREVIEW_VERSION: ${{ inputs.expected_preview_version_id }}
+        run: |
+          set -euo pipefail
+          node "$GITHUB_WORKSPACE/scripts/capture-bounded-command.mjs" \
+            --stdout "$RUNNER_TEMP/receipt.stdout" --stderr "$RUNNER_TEMP/receipt.stderr" \
+            --result "$RUNNER_TEMP/receipt.result.json" --max-bytes 65536 -- \
+            npx --no-install tsx scripts/production-rollback-rehearsal.ts create \
+            --confirmation "$CONFIRMATION" \
+            --repository "$REPOSITORY" \
+            --workflow "$WORKFLOW" \
+            --head-sha "$HEAD_SHA" \
+            --ref "$REF" \
+            --run-id "$RUN_ID" \
+            --run-attempt "$RUN_ATTEMPT" \
+            --wrangler-version "$WRANGLER_VERSION" \
+            --source-commit "$SOURCE_COMMIT" \
+            --source-tree "$SOURCE_TREE" \
+            --expected-production-deployment "$EXPECTED_PRODUCTION_DEPLOYMENT" \
+            --expected-production-version "$EXPECTED_PRODUCTION_VERSION" \
+            --expected-preview-deployment "$EXPECTED_PREVIEW_DEPLOYMENT" \
+            --expected-preview-version "$EXPECTED_PREVIEW_VERSION" \
+            --production-before "$RUNNER_TEMP/production-before.json" \
+            --production-after "$RUNNER_TEMP/production-after.json" \
+            --production-version-before "$RUNNER_TEMP/production-version-before.json" \
+            --production-version-after "$RUNNER_TEMP/production-version-after.json" \
+            --preview-before "$RUNNER_TEMP/preview-before.json" \
+            --preview-after "$RUNNER_TEMP/preview-after.json" \
+            --preview-version-before "$RUNNER_TEMP/preview-version-before.json" \
+            --preview-version-after "$RUNNER_TEMP/preview-version-after.json" \
+            --d1-before "$RUNNER_TEMP/d1-before.json" \
+            --d1-after "$RUNNER_TEMP/d1-after.json" \
+            --target-version "$RUNNER_TEMP/target-version.json" \
+            --target-deployment "$RUNNER_TEMP/target-deployment.json" \
+            --readiness-output "$RUNNER_TEMP/pr108-remote-d1.out" \
+            --readiness-stderr "$RUNNER_TEMP/pr108-remote-d1.err" \
+            --runtime-output "$RUNNER_TEMP/pr108-runtime.out" --runtime-stderr "$RUNNER_TEMP/pr108-runtime.err" \
+            --dry-run-output "$RUNNER_TEMP/dry-run.out" --dry-run-stderr "$RUNNER_TEMP/dry-run.err" \
+            --npm-install-output "$RUNNER_TEMP/pr108-npm-ci.out" --npm-install-stderr "$RUNNER_TEMP/pr108-npm-ci.err" \
+            --workerd-output "$RUNNER_TEMP/pr108-workerd.out" --workerd-stderr "$RUNNER_TEMP/pr108-workerd.err" \
+            --output "$RUNNER_TEMP/production-rollback-rehearsal.json"
+          jq -e '(.schemaVersion == "theologai-bounded-command.v1") and (.exitStatus == 0) and (.overflow == false)' \
+            "$RUNNER_TEMP/receipt.result.json"
+          jq -e 'type == "object" and .schemaVersion == "theologai-production-rollback-rehearsal.v1" and .status == "passed" and .trafficMutation == false and .d1Mutation == false and .previewMutation == false and .targetInactiveBefore == true and .targetInactiveAfter == true and (.exitStatuses | to_entries | all(.value == 0))' "$RUNNER_TEMP/production-rollback-rehearsal.json"
+
+      - name: Upload sanitized rehearsal receipt only
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: production-rollback-rehearsal-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/production-rollback-rehearsal.json
+          retention-days: 30
+          if-no-files-found: error
+          compression-level: 0
+          overwrite: false
+          include-hidden-files: false

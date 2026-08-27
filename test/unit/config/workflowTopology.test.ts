@@ -242,4 +242,76 @@ describe('workflow topology', () => {
     expect(occurrences(job, '      - name: Confirm active preview cancellation')).toBe(1);
     expect(job).toContain('run: echo "Preview authorization was revoked; matching in-flight PR Checks runs were canceled."');
   });
+
+  it('keeps the production rollback rehearsal manual, protected, fixed-target, and read-only', async () => {
+    const workflow = await readWorkflow('production-rollback-rehearsal.yml');
+    const trigger = uniqueBlock(workflow, 'on:');
+    const concurrency = uniqueBlock(workflow, 'concurrency:');
+    const job = uniqueBlock(workflow, '  rehearse:');
+    expect(normalized(trigger)).toContain('on: workflow_dispatch: inputs:');
+    expect(trigger).not.toMatch(/\n\s+(push|pull_request):/);
+    expect(normalized(concurrency)).toBe('concurrency: group: deploy-production cancel-in-progress: false');
+    expect(workflow).toContain('permissions:\n  contents: read');
+    const preflight = uniqueBlock(workflow, '  preflight:');
+    expect(preflight).toContain('name: Validate dispatch inputs (unprotected)');
+    expect(preflight).toContain("test \"$DISPATCH_REF\" = 'refs/heads/main'");
+    expect(preflight).toContain('grep -Eiq');
+    expect(job).toContain('needs: preflight');
+    expect(job).toContain("if: ${{ needs.preflight.result == 'success' && github.ref == 'refs/heads/main' }}");
+    expect(job).toContain('environment:\n      name: production\n      deployment: false');
+    expect(job).not.toContain('url:');
+    expect(job).toContain('contents: read');
+    for (const value of [
+      '8da99fd0a161b90a4bd90ab29bde1abf796b3bf6',
+      'a59d9a062b2e6c7884de97fd97309878e1cbdc23',
+      '3d7489d9-7b48-4ad0-bdc6-95ffbda53bd8',
+      '291f3292-3fa9-44fc-bf6f-b68fd2f4cef6',
+      'theologai-production-20260729-transform11-a',
+      '53211f50-a893-4b4c-be1e-bc625a595dc7',
+      'REHEARSE THE EXACT PR108 ROLLBACK WITHOUT TRAFFIC',
+    ]) expect(workflow).toContain(value);
+    expect(workflow).toContain('workflow_dispatch:');
+    expect(workflow).toContain('Capture production and preview controls before rehearsal (read-only)');
+    expect(workflow).toContain('Capture production and preview controls after rehearsal (read-only)');
+    expect(workflow).toContain('Upload sanitized rehearsal receipt only');
+    expect(workflow).toContain('--config wrangler.release.toml --name theologai --dry-run --yes');
+    expect([...workflow.matchAll(/wrangler versions deploy/g)]).toHaveLength(1);
+    expect(workflow).toContain('CLOUDFLARE_READ_ONLY_API_TOKEN');
+    expect(workflow).not.toContain('secrets.CLOUDFLARE_API_TOKEN');
+    expect(workflow.match(/^\s+CLOUDFLARE_READ_ONLY_API_TOKEN: \$\{\{ secrets\.CLOUDFLARE_READ_ONLY_API_TOKEN \}\}$/gm)).toHaveLength(5);
+    expect(workflow.match(/^\s+CLOUDFLARE_API_TOKEN: \$\{\{ secrets\.CLOUDFLARE_READ_ONLY_API_TOKEN \}\}$/gm)).toHaveLength(5);
+    expect(workflow).toContain('capture-bounded-command.mjs');
+    expect(workflow).not.toContain('node_modules/.bin/tsx" "$GITHUB_WORKSPACE/scripts/capture-bounded-command');
+    const installVerifier = uniqueBlock(job, '      - name: Install verifier dependencies');
+    expect(installVerifier).toContain('node "$GITHUB_WORKSPACE/scripts/capture-bounded-command.mjs"');
+    expect(workflow).not.toContain('WRANGLER_LOG_PATH');
+    expect(workflow).not.toMatch(/^\s*[^#\n]*>\s*["']?\$RUNNER_TEMP/m);
+    for (const step of workflow.split('\n      - ')) {
+      if (!/\bwrangler(?:\s|$)/.test(step)) continue;
+      if (step.includes('name: Verify pinned Wrangler version')) continue;
+      expect(step).toContain('CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_READ_ONLY_API_TOKEN }}');
+    }
+    expect(workflow).toContain('target-deployment.json');
+    expect(workflow).toContain('/workers/scripts/theologai/deployments/3d7489d9-7b48-4ad0-bdc6-95ffbda53bd8');
+    expect(workflow).toContain('all(.value == 0)');
+    expect(workflow).toContain('deployment: false');
+    expect(workflow).toContain('wrangler-version');
+    const localGateStart = workflow.indexOf('      - name: Run historical PR108 local gates without credentials');
+    const localGateEnd = workflow.indexOf('\n      - name:', localGateStart + 1);
+    expect(localGateStart).toBeGreaterThan(0);
+    expect(workflow.slice(localGateStart, localGateEnd)).not.toMatch(/CLOUDFLARE|secrets\./);
+    expect(workflow).not.toMatch(/wrangler\s+rollback|versions\s+upload|wrangler\s+deploy(?!ments)/i);
+    expect(workflow).not.toMatch(/d1\s+(execute|migrations|delete|create|update)|secret\s+(put|delete)|triggers\s+deploy/i);
+    expect(workflow).not.toContain('github-token:');
+  });
+
+  it('documents the exact least-privilege token permissions and matched retention baseline', async () => {
+    const runbook = await readFile(new URL('../../../docs/PRODUCTION-ROLLBACK-REHEARSAL.md', import.meta.url), 'utf8');
+    expect(runbook).toContain('Workers Scripts Read');
+    expect(runbook).toContain('D1 Read');
+    expect(runbook).toContain('no additional permissions');
+    expect(runbook).toContain('schema-`0009` is active');
+    expect(runbook).toContain('PR #108 Transform-11');
+    expect(runbook).toContain('PR #101 hierarchy');
+  });
 });
