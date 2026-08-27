@@ -1,9 +1,11 @@
 import { spawn } from 'node:child_process';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+
+const captureModule = await import('../../../scripts/capture-bounded-command.mjs');
 
 const runner = fileURLToPath(new URL('../../../scripts/capture-bounded-command.mjs', import.meta.url));
 
@@ -67,6 +69,26 @@ describe('bounded command capture', () => {
       expect(run).toMatchObject({ exitCode: 0, result: { exitStatus: 0, signal: null, overflow: false, stdoutBytes: 407, stderrBytes: 200 } });
       expect(await readFile(stdoutPath, 'utf8')).toBe(`prefix:${'é'.repeat(200)}`);
       expect(await readFile(stderrPath, 'utf8')).toBe('ß'.repeat(100));
+    });
+  });
+
+  it('preserves a normal nonzero child exit status in the bounded result', async () => {
+    await withCapture(async directory => {
+      const stdoutPath = join(directory, 'stdout');
+      const stderrPath = join(directory, 'stderr');
+      const run = await runCapture({ ...nodeScript("process.stdout.write('failed'); process.exit(7);"), stdoutPath, stderrPath });
+      expect(run.exitCode).toBe(1);
+      expect(run.result).toMatchObject({ exitStatus: 7, signal: null, overflow: false });
+    });
+  });
+
+  it('preserves a normal child signal in the bounded result', async () => {
+    await withCapture(async directory => {
+      const stdoutPath = join(directory, 'stdout');
+      const stderrPath = join(directory, 'stderr');
+      const run = await runCapture({ ...nodeScript("process.kill(process.pid, 'SIGTERM');"), stdoutPath, stderrPath });
+      expect(run.exitCode).toBe(1);
+      expect(run.result).toMatchObject({ exitStatus: null, signal: 'SIGTERM', overflow: false });
     });
   });
 
@@ -138,6 +160,79 @@ describe('bounded command capture', () => {
       // This exercises the complete supervisor startup, TERM grace, KILL, and
       // teardown path; retain CI margin while keeping the path time-bounded.
       expect(Date.now() - started).toBeLessThan(5_000);
+      await new Promise(resolve => setTimeout(resolve, 700));
+      await expect(readFile(marker, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+    });
+  });
+
+  it('keeps the supervisor alive through TERM grace after capture overflow', async () => {
+    await withCapture(async directory => {
+      const stdoutPath = join(directory, 'stdout');
+      const stderrPath = join(directory, 'stderr');
+      const resultPath = `${stdoutPath}.result.json`;
+      const supervisorPidPath = join(directory, 'supervisor.pid');
+      const marker = join(directory, 'keeper-survived');
+      const descendant = `setTimeout(() => { process.stdout.write('z'.repeat(2048)); setTimeout(() => require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'alive'), 500); }, 100);`;
+      const source = [
+        "const {spawn}=require('node:child_process');",
+        `require('node:fs').writeFileSync(${JSON.stringify(supervisorPidPath)}, String(process.ppid));`,
+        `spawn(process.execPath, ['-e', ${JSON.stringify(descendant)}], {stdio: ['ignore', 'inherit', 'inherit']});`,
+      ].join('');
+      const args = [
+        runner, '--stdout', stdoutPath, '--stderr', stderrPath, '--result', resultPath,
+        '--max-bytes', '1024', '--', process.execPath, '-e', source,
+      ];
+      const outer = spawn(process.execPath, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+      outer.stdout.resume();
+      outer.stderr.resume();
+      const done = new Promise<number | null>((resolve, reject) => {
+        outer.once('close', (code, signal) => resolve(code ?? (signal ? 1 : null)));
+        outer.once('error', reject);
+      });
+      let supervisorPid: number | undefined;
+      for (let attempt = 0; attempt < 30 && supervisorPid === undefined; attempt += 1) {
+        try {
+          supervisorPid = Number(await readFile(supervisorPidPath, 'utf8'));
+        } catch {
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+      }
+      expect(supervisorPid).toSatisfy(value => Number.isSafeInteger(value) && value > 0);
+      for (let attempt = 0; attempt < 100; attempt += 1) {
+        try {
+          if ((await stat(stdoutPath)).size >= 1_024) break;
+        } catch { /* wait for the first bounded write */ }
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+      expect((await stat(stdoutPath)).size).toBe(1_024);
+      // The runner has started TERM cleanup; the keeper must still be alive
+      // inside the configured grace interval before outer SIGKILL.
+      await new Promise(resolve => setTimeout(resolve, 100));
+      expect(() => process.kill(supervisorPid!, 0)).not.toThrow();
+      expect(await done).not.toBe(0);
+      await expect(readFile(marker, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+      expect(() => process.kill(supervisorPid!, 0)).toThrow();
+    });
+  });
+
+  it('terminates the process group when an output sink fails unexpectedly', async () => {
+    await withCapture(async directory => {
+      const marker = join(directory, 'capture-failure-descendant-survived');
+      const descendant = `setTimeout(() => require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'alive'), 500);`;
+      const source = [
+        "const {spawn}=require('node:child_process');",
+        `spawn(process.execPath, ['-e', ${JSON.stringify(descendant)}], {stdio: 'ignore'});`,
+        "setInterval(() => process.stdout.write('x'.repeat(2048)), 0);",
+      ].join('');
+      const failingSink = {
+        write: async () => { throw new Error('injected capture failure'); },
+        close: async () => undefined,
+      };
+      const quietSink = { write: async () => undefined, close: async () => undefined };
+      await expect(captureModule.runBoundedCommand({
+        ...nodeScript(source), stdoutPath: join(directory, 'stdout'), stderrPath: join(directory, 'stderr'), maxBytes: 1_024,
+        openCapture: async (path: string) => path.endsWith('/stdout') ? failingSink : quietSink,
+      })).rejects.toThrow('injected capture failure');
       await new Promise(resolve => setTimeout(resolve, 700));
       await expect(readFile(marker, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
     });

@@ -40,8 +40,14 @@ function signalProcessGroup(child, processGroupId, signal) {
     // an output overflow. A negative PID targets the complete process group.
     process.kill(-processGroupId, signal);
   } catch (error) {
-    if (error?.code !== 'ESRCH' && alive(child)) child.kill(signal);
+    if (error?.code !== 'ESRCH' && alive(child)) {
+      try { child.kill(signal); } catch { /* the process may have exited */ }
+    }
   }
+}
+
+function destroy(stream) {
+  try { stream?.destroy(); } catch { /* cleanup must remain best-effort */ }
 }
 
 async function terminate(child, processGroupId) {
@@ -52,8 +58,8 @@ async function terminate(child, processGroupId) {
   signalProcessGroup(child, processGroupId, 'SIGKILL');
   // A descendant that inherited a pipe must not hold the parent close event
   // open indefinitely after the process group has been signalled.
-  child.stdout?.destroy();
-  child.stderr?.destroy();
+  destroy(child.stdout);
+  destroy(child.stderr);
   await new Promise(resolve => setTimeout(resolve, 25));
 }
 
@@ -88,11 +94,19 @@ async function supervisor(argv) {
   assert(typeof command === 'string' && command.length > 0, 'supervisor command is required');
 
   let signalRequested = false;
+  let keeper;
+  const keepAliveAfterTermination = () => {
+    signalRequested = true;
+    // This referenced handle deliberately remains alive until the outer
+    // runner's SIGKILL. It pins the supervisor's process group after the
+    // requested command and its relays have closed.
+    keeper ??= setInterval(() => undefined, 1_000_000_000);
+  };
   // The supervisor is the stable process-group leader. It must not exit when
   // the group receives SIGTERM; the outer runner escalates to SIGKILL after
   // its grace interval if output overflow is still being handled.
-  process.on('SIGTERM', () => { signalRequested = true; });
-  process.on('SIGINT', () => { signalRequested = true; });
+  process.on('SIGTERM', keepAliveAfterTermination);
+  process.on('SIGINT', keepAliveAfterTermination);
   process.stdout.on('error', () => undefined);
   process.stderr.on('error', () => undefined);
 
@@ -110,12 +124,14 @@ async function supervisor(argv) {
   // process group until the outer runner can observe all output.
   await Promise.all([stdoutRelay, stderrRelay]);
   if (signal) {
+    if (signalRequested) await new Promise(() => undefined);
     process.removeAllListeners('SIGTERM');
     process.removeAllListeners('SIGINT');
     process.kill(process.pid, signal);
     return;
   }
-  process.exit(exitStatus ?? (signalRequested ? 1 : 0));
+  if (signalRequested) await new Promise(() => undefined);
+  process.exitCode = exitStatus ?? 0;
 }
 
 async function exitAfterTermination(exitPromise, termination) {
@@ -137,7 +153,7 @@ async function exitAfterTermination(exitPromise, termination) {
   return Promise.race([exitPromise, waitForTermination()]);
 }
 
-async function consume(stream, handle, maxBytes, onOverflow, isTerminating, initial = Buffer.alloc(0)) {
+async function consume(stream, handle, maxBytes, onOverflow, onCaptureFailure, isTerminating, initial = Buffer.alloc(0)) {
   const digest = createHash('sha256');
   digest.update(initial);
   let bytes = initial.byteLength;
@@ -164,7 +180,7 @@ async function consume(stream, handle, maxBytes, onOverflow, isTerminating, init
   } catch (error) {
     // The peer stream is destroyed when the other stream overflows. This is
     // expected cleanup, not a successful uncapped command.
-    if (!isTerminating()) throw error;
+    if (!isTerminating()) await onCaptureFailure(error);
   }
   return { bytes, hash: digest.digest('hex'), overflow };
 }
@@ -176,26 +192,33 @@ export async function runBoundedCommand(options) {
   const prefix = Buffer.from(options.stdoutPrefix ?? '', 'utf8');
   assert(prefix.byteLength <= maxBytes, 'stdout prefix exceeds maxBytes');
 
-  const stdout = await open(options.stdoutPath, 'wx');
+  const openCapture = options.openCapture ?? (path => open(path, 'wx'));
+  const stdout = await openCapture(options.stdoutPath);
   let stderr;
   try {
-    stderr = await open(options.stderrPath, 'wx');
+    stderr = await openCapture(options.stderrPath);
   } catch (error) {
     await stdout.close();
     throw error;
   }
-  if (prefix.byteLength > 0) await stdout.write(prefix);
   let child;
   let processGroupId;
   let overflow = false;
   let termination;
-  const stop = async () => {
-    overflow = true;
+  let captureFailure;
+  const requestTermination = (isOverflow) => {
+    if (isOverflow) overflow = true;
     if (!termination && child && processGroupId) termination = terminate(child, processGroupId);
-    await termination;
+    return termination ?? Promise.resolve();
+  };
+  const stop = () => requestTermination(true);
+  const onCaptureFailure = error => {
+    captureFailure ??= error;
+    return requestTermination(false);
   };
 
   try {
+    if (prefix.byteLength > 0) await stdout.write(prefix);
     child = spawn(process.execPath, [
       fileURLToPath(import.meta.url),
       '--supervise',
@@ -212,12 +235,25 @@ export async function runBoundedCommand(options) {
       childProcess.once('exit', (code, signal) => resolve([code, signal]));
       childProcess.once('error', reject);
     });
-    const stdoutPromise = consume(childProcess.stdout, stdout, maxBytes, stop, () => overflow, prefix);
-    const stderrPromise = consume(childProcess.stderr, stderr, maxBytes, stop, () => overflow);
-    const [exitStatus, signal] = await exitAfterTermination(exitPromise, () => termination);
+    const stdoutPromise = consume(childProcess.stdout, stdout, maxBytes, stop, onCaptureFailure, () => overflow, prefix);
+    const stderrPromise = consume(childProcess.stderr, stderr, maxBytes, stop, onCaptureFailure, () => overflow);
+    const capturesPromise = Promise.all([stdoutPromise, stderrPromise]);
+    let outcome;
+    let captures;
+    try {
+      [outcome, captures] = await Promise.all([
+        exitAfterTermination(exitPromise, () => termination),
+        capturesPromise,
+      ]);
+    } catch (error) {
+      await requestTermination(false);
+      await Promise.allSettled([exitPromise, capturesPromise]);
+      throw error;
+    }
     await termination;
-    const stdoutResult = await stdoutPromise;
-    const stderrResult = await stderrPromise;
+    const [exitStatus, signal] = outcome;
+    const [stdoutResult, stderrResult] = captures;
+    if (captureFailure) throw captureFailure;
     const result = {
       schemaVersion: 'theologai-bounded-command.v1',
       exitStatus,
@@ -230,6 +266,9 @@ export async function runBoundedCommand(options) {
     };
     if (result.overflow || result.exitStatus !== 0) throw new BoundedCommandError(result);
     return result;
+  } catch (error) {
+    await requestTermination(false);
+    throw error;
   } finally {
     await Promise.allSettled([stdout.close(), stderr.close()]);
   }
