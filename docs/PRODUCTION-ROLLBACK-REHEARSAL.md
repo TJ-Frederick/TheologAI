@@ -7,6 +7,13 @@ This runbook defines the protected, read-only rehearsal for the matched PR
 document records the capability and its acceptance criteria, not a claim that
 the rehearsal has passed.
 
+Before execution, the protected `production` environment must provision a
+dedicated `CLOUDFLARE_READ_ONLY_API_TOKEN` with only the read permissions
+needed for Worker versions/deployments and D1 inventory. The protected job is
+marked `deployment: false` because it must not create a deployment record. The
+workflow never uses the normal deployment token, and credential-free historical
+checkout and local gates receive no Cloudflare credential.
+
 ## Fixed recovery target
 
 The target is code-owned and cannot be selected by a workflow input:
@@ -40,7 +47,9 @@ REHEARSE THE EXACT PR108 ROLLBACK WITHOUT TRAFFIC
 
 The workflow captures production and preview deployments and authoritative
 version views before and after the rehearsal, plus a D1 inventory before and
-after. It checks out the fixed source in a separate directory and runs its
+after. It retrieves the fixed historical deployment through the exact
+read-only Cloudflare deployment-ID endpoint rather than relying on a truncated
+deployment list. It checks out the fixed source in a separate directory and runs its
 historical `npm ci`, local Workerd seed/readiness, production-like Worker
 runtime, and remote D1 readiness checks. Raw Wrangler output stays in runner
 temporary storage. Only the bounded, hash-only receipt is uploaded.
@@ -48,7 +57,7 @@ temporary storage. Only the bounded, hash-only receipt is uploaded.
 The sole recovery command is:
 
 ```text
-wrangler versions deploy 291f3292-3fa9-44fc-bf6f-b68fd2f4cef6@100 --dry-run --yes
+wrangler versions deploy 291f3292-3fa9-44fc-bf6f-b68fd2f4cef6@100 --config wrangler.release.toml --name theologai --dry-run --yes
 ```
 
 The workflow has no `rollback`, version upload, ordinary deploy, trigger,
@@ -101,4 +110,3 @@ The remote retention policy is conservative and review-only:
 5. Review quarterly, initially aligned to the `2026-11-15` H1 reassessment.
    Delete at most one explicitly authorized database at a time; never use a
    glob or batch cleanup.
-

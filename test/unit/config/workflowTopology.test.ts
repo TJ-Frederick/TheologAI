@@ -252,8 +252,14 @@ describe('workflow topology', () => {
     expect(trigger).not.toMatch(/\n\s+(push|pull_request):/);
     expect(normalized(concurrency)).toBe('concurrency: group: deploy-production cancel-in-progress: false');
     expect(workflow).toContain('permissions:\n  contents: read');
-    expect(job).toContain("if: ${{ github.ref == 'refs/heads/main' }}");
-    expect(job).toContain('environment:\n      name: production');
+    const preflight = uniqueBlock(workflow, '  preflight:');
+    expect(preflight).toContain('name: Validate dispatch inputs (unprotected)');
+    expect(preflight).toContain("test \"$DISPATCH_REF\" = 'refs/heads/main'");
+    expect(preflight).toContain('grep -Eiq');
+    expect(job).toContain('needs: preflight');
+    expect(job).toContain("if: ${{ needs.preflight.result == 'success' && github.ref == 'refs/heads/main' }}");
+    expect(job).toContain('environment:\n      name: production\n      deployment: false');
+    expect(job).not.toContain('url:');
     expect(job).toContain('contents: read');
     for (const value of [
       '8da99fd0a161b90a4bd90ab29bde1abf796b3bf6',
@@ -268,7 +274,19 @@ describe('workflow topology', () => {
     expect(workflow).toContain('Capture production and preview controls before rehearsal (read-only)');
     expect(workflow).toContain('Capture production and preview controls after rehearsal (read-only)');
     expect(workflow).toContain('Upload sanitized rehearsal receipt only');
-    expect(workflow).toContain('--dry-run --yes');
+    expect(workflow).toContain('--config wrangler.release.toml --name theologai --dry-run --yes');
+    expect([...workflow.matchAll(/wrangler versions deploy/g)]).toHaveLength(1);
+    expect(workflow).toContain('CLOUDFLARE_READ_ONLY_API_TOKEN');
+    expect(workflow).not.toContain('secrets.CLOUDFLARE_API_TOKEN');
+    expect(workflow).toContain('target-deployment.json');
+    expect(workflow).toContain('/workers/scripts/theologai/deployments/3d7489d9-7b48-4ad0-bdc6-95ffbda53bd8');
+    expect(workflow).toContain('all(.value == 0)');
+    expect(workflow).toContain('deployment: false');
+    expect(workflow).toContain('wrangler-version');
+    const localGateStart = workflow.indexOf('      - name: Run historical PR108 local gates without credentials');
+    const localGateEnd = workflow.indexOf('\n      - name:', localGateStart + 1);
+    expect(localGateStart).toBeGreaterThan(0);
+    expect(workflow.slice(localGateStart, localGateEnd)).not.toMatch(/CLOUDFLARE|secrets\./);
     expect(workflow).not.toMatch(/wrangler\s+rollback|versions\s+upload|wrangler\s+deploy(?!ments)/i);
     expect(workflow).not.toMatch(/d1\s+(execute|migrations|delete|create|update)|secret\s+(put|delete)|triggers\s+deploy/i);
     expect(workflow).not.toContain('github-token:');
