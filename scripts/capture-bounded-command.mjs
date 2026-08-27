@@ -8,6 +8,7 @@
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { open, writeFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 
 export const DEFAULT_MAX_CAPTURE_BYTES = 8 * 1024 * 1024;
 const TERMINATION_GRACE_MS = 250;
@@ -54,6 +55,67 @@ async function terminate(child, processGroupId) {
   child.stdout?.destroy();
   child.stderr?.destroy();
   await new Promise(resolve => setTimeout(resolve, 25));
+}
+
+function relay(source, destination) {
+  return new Promise(resolve => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    source.once('end', finish);
+    source.once('error', () => {
+      source.destroy();
+      finish();
+    });
+    destination.once('error', () => {
+      source.destroy();
+      finish();
+    });
+    source.pipe(destination, { end: false });
+  });
+}
+
+async function supervisor(argv) {
+  const separator = argv.indexOf('--');
+  assert(separator >= 0, 'supervisor command separator -- is required');
+  const flags = argv.slice(0, separator);
+  assert(flags.length === 0, 'supervisor arguments are malformed');
+  const command = argv[separator + 1];
+  const args = argv.slice(separator + 2);
+  assert(typeof command === 'string' && command.length > 0, 'supervisor command is required');
+
+  let signalRequested = false;
+  // The supervisor is the stable process-group leader. It must not exit when
+  // the group receives SIGTERM; the outer runner escalates to SIGKILL after
+  // its grace interval if output overflow is still being handled.
+  process.on('SIGTERM', () => { signalRequested = true; });
+  process.on('SIGINT', () => { signalRequested = true; });
+  process.stdout.on('error', () => undefined);
+  process.stderr.on('error', () => undefined);
+
+  const commandProcess = spawn(command, args, {
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  const stdoutRelay = relay(commandProcess.stdout, process.stdout);
+  const stderrRelay = relay(commandProcess.stderr, process.stderr);
+  const [exitStatus, signal] = await new Promise((resolve, reject) => {
+    commandProcess.once('error', reject);
+    commandProcess.once('close', (code, childSignal) => resolve([code, childSignal]));
+  });
+  // ChildProcess close is emitted only after its pipe-backed stdio closes, so
+  // a descendant that inherited either pipe pins this supervisor in the same
+  // process group until the outer runner can observe all output.
+  await Promise.all([stdoutRelay, stderrRelay]);
+  if (signal) {
+    process.removeAllListeners('SIGTERM');
+    process.removeAllListeners('SIGINT');
+    process.kill(process.pid, signal);
+    return;
+  }
+  process.exit(exitStatus ?? (signalRequested ? 1 : 0));
 }
 
 async function exitAfterTermination(exitPromise, termination) {
@@ -134,7 +196,11 @@ export async function runBoundedCommand(options) {
   };
 
   try {
-    child = spawn(options.command, options.args ?? [], {
+    child = spawn(process.execPath, [
+      fileURLToPath(import.meta.url),
+      '--supervise',
+      '--', options.command, ...(options.args ?? []),
+    ], {
       cwd: options.cwd,
       env: options.env ?? process.env,
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -218,7 +284,12 @@ async function cli(argv) {
   }
 }
 
-if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').href) {
+if (process.argv[2] === '--supervise') {
+  supervisor(process.argv.slice(3)).catch(error => {
+    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+    process.exitCode = 1;
+  });
+} else if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').href) {
   cli(process.argv.slice(2)).catch(error => {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
     process.exitCode = 1;
