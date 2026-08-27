@@ -32,22 +32,23 @@ function alive(child) {
   return child.exitCode === null && child.signalCode === null;
 }
 
-function signalProcessGroup(child, signal) {
-  if (!child.pid) return;
+function signalProcessGroup(child, processGroupId, signal) {
+  if (!processGroupId) return;
   try {
     // Detached children form their own group, so descendants cannot survive
     // an output overflow. A negative PID targets the complete process group.
-    process.kill(-child.pid, signal);
+    process.kill(-processGroupId, signal);
   } catch (error) {
-    if (error?.code !== 'ESRCH') child.kill(signal);
+    if (error?.code !== 'ESRCH' && alive(child)) child.kill(signal);
   }
 }
 
-async function terminate(child) {
-  if (!alive(child)) return;
-  signalProcessGroup(child, 'SIGTERM');
+async function terminate(child, processGroupId) {
+  // The leader may have exited while a descendant still owns a pipe. Always
+  // signal the saved process group so that descendant cannot survive overflow.
+  signalProcessGroup(child, processGroupId, 'SIGTERM');
   await new Promise(resolve => setTimeout(resolve, TERMINATION_GRACE_MS));
-  if (alive(child)) signalProcessGroup(child, 'SIGKILL');
+  signalProcessGroup(child, processGroupId, 'SIGKILL');
   // A descendant that inherited a pipe must not hold the parent close event
   // open indefinitely after the process group has been signalled.
   child.stdout?.destroy();
@@ -123,11 +124,12 @@ export async function runBoundedCommand(options) {
   }
   if (prefix.byteLength > 0) await stdout.write(prefix);
   let child;
+  let processGroupId;
   let overflow = false;
   let termination;
   const stop = async () => {
     overflow = true;
-    if (!termination && child) termination = terminate(child);
+    if (!termination && child && processGroupId) termination = terminate(child, processGroupId);
     await termination;
   };
 
@@ -139,6 +141,7 @@ export async function runBoundedCommand(options) {
       detached: true,
     });
     const childProcess = child;
+    processGroupId = childProcess.pid;
     const exitPromise = new Promise((resolve, reject) => {
       childProcess.once('exit', (code, signal) => resolve([code, signal]));
       childProcess.once('error', reject);

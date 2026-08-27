@@ -120,4 +120,24 @@ describe('bounded command capture', () => {
       await expect(readFile(marker, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
     });
   });
+
+  it('kills a pipe-inheriting descendant when the leader exits before overflow', async () => {
+    await withCapture(async directory => {
+      const stdoutPath = join(directory, 'stdout');
+      const stderrPath = join(directory, 'stderr');
+      const marker = join(directory, 'leader-exited-descendant-survived');
+      const descendant = `setTimeout(() => { process.stdout.write('z'.repeat(2048)); setTimeout(() => require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'alive'), 500); }, 50);`;
+      const source = [
+        "const {spawn}=require('node:child_process');",
+        `spawn(process.execPath, ['-e', ${JSON.stringify(descendant)}], {stdio: ['ignore', 'inherit', 'inherit']});`,
+      ].join('');
+      const started = Date.now();
+      const run = await runCapture({ ...nodeScript(source), stdoutPath, stderrPath, maxBytes: 1_024 });
+      expect(run.exitCode).not.toBe(0);
+      expect(run.result).toMatchObject({ overflow: true });
+      expect(Date.now() - started).toBeLessThan(2_000);
+      await new Promise(resolve => setTimeout(resolve, 700));
+      await expect(readFile(marker, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+    });
+  });
 });
