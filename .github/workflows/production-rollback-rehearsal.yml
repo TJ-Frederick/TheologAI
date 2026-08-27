@@ -1,0 +1,189 @@
+name: Production Rollback Rehearsal
+
+# This workflow is a protected, read-only rehearsal. It never changes Worker
+# traffic, uploads a version, changes a binding, mutates D1, or deletes data.
+# Fixed PR108 deployment target: 3d7489d9-7b48-4ad0-bdc6-95ffbda53bd8.
+# Fixed PR108 Worker version: 291f3292-3fa9-44fc-bf6f-b68fd2f4cef6; D1:
+# theologai-production-20260729-transform11-a / 53211f50-a893-4b4c-be1e-bc625a595dc7.
+on:
+  workflow_dispatch:
+    inputs:
+      expected_production_deployment_id:
+        description: Exact active production deployment UUID captured immediately before dispatch
+        required: true
+        type: string
+      expected_production_version_id:
+        description: Exact active production Worker version UUID captured immediately before dispatch
+        required: true
+        type: string
+      expected_preview_deployment_id:
+        description: Exact active preview deployment UUID captured immediately before dispatch
+        required: true
+        type: string
+      expected_preview_version_id:
+        description: Exact active preview Worker version UUID captured immediately before dispatch
+        required: true
+        type: string
+      confirmation:
+        description: 'Type REHEARSE THE EXACT PR108 ROLLBACK WITHOUT TRAFFIC'
+        required: true
+        type: string
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  rehearse:
+    name: Rehearse PR108 rollback without traffic
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: production
+      url: https://mcp.theologai.xyz/mcp
+    permissions:
+      contents: read
+    steps:
+      - name: Confirm main-only dispatch and exact confirmation
+        env:
+          DISPATCH_REF: ${{ github.ref }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          set -euo pipefail
+          test "$DISPATCH_REF" = 'refs/heads/main'
+          test "$CONFIRMATION" = 'REHEARSE THE EXACT PR108 ROLLBACK WITHOUT TRAFFIC'
+
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+
+      - name: Install verifier dependencies
+        run: npm ci --no-audit
+
+      - name: Check out exact historical PR108 source separately
+        env:
+          PR108_COMMIT: 8da99fd0a161b90a4bd90ab29bde1abf796b3bf6
+          PR108_TREE: a59d9a062b2e6c7884de97fd97309878e1cbdc23
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: 8da99fd0a161b90a4bd90ab29bde1abf796b3bf6
+          path: pr108-source
+          fetch-depth: 1
+
+      - name: Verify exact historical source identity
+        env:
+          PR108_COMMIT: 8da99fd0a161b90a4bd90ab29bde1abf796b3bf6
+          PR108_TREE: a59d9a062b2e6c7884de97fd97309878e1cbdc23
+        run: |
+          set -euo pipefail
+          test "$(git -C pr108-source rev-parse HEAD)" = "$PR108_COMMIT"
+          test "$(git -C pr108-source rev-parse HEAD^{tree})" = "$PR108_TREE"
+
+      - name: Capture production and preview controls before rehearsal (read-only)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          EXPECTED_PRODUCTION_VERSION: ${{ inputs.expected_production_version_id }}
+          EXPECTED_PREVIEW_VERSION: ${{ inputs.expected_preview_version_id }}
+        run: |
+          set -euo pipefail
+          npx --no-install wrangler d1 list --json > "$RUNNER_TEMP/d1-before.json"
+          npx --no-install wrangler deployments list --json > "$RUNNER_TEMP/production-before.json"
+          npx --no-install wrangler versions view "$EXPECTED_PRODUCTION_VERSION" --name theologai --json > "$RUNNER_TEMP/production-version-before.json"
+          npx --no-install wrangler deployments list --env preview --json > "$RUNNER_TEMP/preview-before.json"
+          npx --no-install wrangler versions view "$EXPECTED_PREVIEW_VERSION" --name theologai-preview --env preview --json > "$RUNNER_TEMP/preview-version-before.json"
+
+      - name: Validate fixed PR108 target and historical local gates (read-only)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npx --no-install wrangler versions view 291f3292-3fa9-44fc-bf6f-b68fd2f4cef6 --name theologai --json > "$RUNNER_TEMP/target-version.json"
+          (
+            cd pr108-source
+            npm ci --no-audit > "$RUNNER_TEMP/pr108-npm-ci.out" 2>&1
+            npm run d1:seed:verify-workerd > "$RUNNER_TEMP/pr108-workerd.out" 2>&1
+            npm run test:worker-production-runtime > "$RUNNER_TEMP/pr108-runtime.out" 2>&1
+            npm run d1:remote:check -- --database theologai-production-20260729-transform11-a > "$RUNNER_TEMP/pr108-remote-d1.out" 2>&1
+          )
+
+      - name: Run exact PR108 recovery command in dry-run mode only
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npx --no-install wrangler versions deploy 291f3292-3fa9-44fc-bf6f-b68fd2f4cef6@100 --dry-run --yes > "$RUNNER_TEMP/dry-run.out" 2>&1
+
+      - name: Capture production and preview controls after rehearsal (read-only)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          EXPECTED_PRODUCTION_VERSION: ${{ inputs.expected_production_version_id }}
+          EXPECTED_PREVIEW_VERSION: ${{ inputs.expected_preview_version_id }}
+        run: |
+          set -euo pipefail
+          npx --no-install wrangler d1 list --json > "$RUNNER_TEMP/d1-after.json"
+          npx --no-install wrangler deployments list --json > "$RUNNER_TEMP/production-after.json"
+          npx --no-install wrangler versions view "$EXPECTED_PRODUCTION_VERSION" --name theologai --json > "$RUNNER_TEMP/production-version-after.json"
+          npx --no-install wrangler deployments list --env preview --json > "$RUNNER_TEMP/preview-after.json"
+          npx --no-install wrangler versions view "$EXPECTED_PREVIEW_VERSION" --name theologai-preview --env preview --json > "$RUNNER_TEMP/preview-version-after.json"
+
+      - name: Create bounded sanitized rehearsal receipt
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+          SOURCE_COMMIT: 8da99fd0a161b90a4bd90ab29bde1abf796b3bf6
+          SOURCE_TREE: a59d9a062b2e6c7884de97fd97309878e1cbdc23
+          EXPECTED_PRODUCTION_DEPLOYMENT: ${{ inputs.expected_production_deployment_id }}
+          EXPECTED_PRODUCTION_VERSION: ${{ inputs.expected_production_version_id }}
+          EXPECTED_PREVIEW_DEPLOYMENT: ${{ inputs.expected_preview_deployment_id }}
+          EXPECTED_PREVIEW_VERSION: ${{ inputs.expected_preview_version_id }}
+        run: |
+          set -euo pipefail
+          npx --no-install tsx scripts/production-rollback-rehearsal.ts create \
+            --confirmation "$CONFIRMATION" \
+            --source-commit "$SOURCE_COMMIT" \
+            --source-tree "$SOURCE_TREE" \
+            --expected-production-deployment "$EXPECTED_PRODUCTION_DEPLOYMENT" \
+            --expected-production-version "$EXPECTED_PRODUCTION_VERSION" \
+            --expected-preview-deployment "$EXPECTED_PREVIEW_DEPLOYMENT" \
+            --expected-preview-version "$EXPECTED_PREVIEW_VERSION" \
+            --production-before "$RUNNER_TEMP/production-before.json" \
+            --production-after "$RUNNER_TEMP/production-after.json" \
+            --production-version-before "$RUNNER_TEMP/production-version-before.json" \
+            --production-version-after "$RUNNER_TEMP/production-version-after.json" \
+            --preview-before "$RUNNER_TEMP/preview-before.json" \
+            --preview-after "$RUNNER_TEMP/preview-after.json" \
+            --preview-version-before "$RUNNER_TEMP/preview-version-before.json" \
+            --preview-version-after "$RUNNER_TEMP/preview-version-after.json" \
+            --d1-before "$RUNNER_TEMP/d1-before.json" \
+            --d1-after "$RUNNER_TEMP/d1-after.json" \
+            --target-version "$RUNNER_TEMP/target-version.json" \
+            --readiness-output "$RUNNER_TEMP/pr108-remote-d1.out" \
+            --runtime-output "$RUNNER_TEMP/pr108-runtime.out" \
+            --dry-run-output "$RUNNER_TEMP/dry-run.out" \
+            --output "$RUNNER_TEMP/production-rollback-rehearsal.json" \
+            > "$RUNNER_TEMP/receipt.stdout"
+          jq -e 'type == "object" and .schemaVersion == "theologai-production-rollback-rehearsal.v1" and .status == "passed" and .trafficMutation == false and .d1Mutation == false and .previewMutation == false and .targetInactiveBefore == true and .targetInactiveAfter == true' "$RUNNER_TEMP/production-rollback-rehearsal.json"
+
+      - name: Upload sanitized rehearsal receipt only
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: production-rollback-rehearsal-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/production-rollback-rehearsal.json
+          retention-days: 30
+          if-no-files-found: error
+          compression-level: 0
+          overwrite: false
+          include-hidden-files: false
