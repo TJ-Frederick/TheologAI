@@ -157,9 +157,14 @@ function sendAbort(child) {
 }
 
 async function abortSupervisor(child, exitPromise) {
+  let sent = false;
   try {
-    await boundedAwait(sendAbort(child), TERMINATION_TIMEOUT_MS, 'bounded command supervisor abort send timed out');
+    sent = await boundedAwait(sendAbort(child), TERMINATION_TIMEOUT_MS, 'bounded command supervisor abort send timed out');
   } catch {
+    sent = false;
+  }
+  if (!sent) {
+    detachChild(child);
     return;
   }
   try {
@@ -167,7 +172,16 @@ async function abortSupervisor(child, exitPromise) {
   } catch {
     // The outer runner remains bounded even if the supervisor cannot report
     // its final OS-level exit after self-terminating the stable group.
+    detachChild(child);
   }
+}
+
+function detachChild(child) {
+  destroy(child.stdout);
+  destroy(child.stderr);
+  try { child.disconnect?.(); } catch { /* IPC cleanup is best effort */ }
+  try { child.removeAllListeners(); } catch { /* listener cleanup is best effort */ }
+  try { child.unref?.(); } catch { /* handle detachment is best effort */ }
 }
 
 function captureState(initial = Buffer.alloc(0)) {

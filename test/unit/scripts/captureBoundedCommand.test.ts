@@ -324,4 +324,71 @@ describe('bounded command capture', () => {
       await expect(readFile(marker, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
     });
   });
+
+  it('lets a containing CLI exit when abort IPC is unavailable after signaling failures', async () => {
+    await withCapture(async directory => {
+      const supervisorPidPath = join(directory, 'unavailable-abort-supervisor.pid');
+      const marker = join(directory, 'unavailable-abort-descendant-survived');
+      const signalLogPath = join(directory, 'unavailable-abort-signals.log');
+      const outcomePath = join(directory, 'unavailable-abort-outcome');
+      const descendant = `setTimeout(() => require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'alive'), 10_000);`;
+      const actualSource = [
+        `require('node:fs').writeFileSync(${JSON.stringify(supervisorPidPath)}, String(process.ppid));`,
+        `require('node:child_process').spawn(process.execPath, ['-e', ${JSON.stringify(descendant)}], {stdio: 'ignore'});`,
+        "process.stdout.write('x'.repeat(2048)); setInterval(() => {}, 1000);",
+      ].join('');
+      const harnessSource = `
+        import { runBoundedCommand } from ${JSON.stringify(runner)};
+        import { writeFileSync } from 'node:fs';
+        try {
+          await runBoundedCommand({
+            command: process.execPath,
+            args: ['-e', ${JSON.stringify(actualSource)}],
+            stdoutPath: ${JSON.stringify(join(directory, 'stdout'))},
+            stderrPath: ${JSON.stringify(join(directory, 'stderr'))},
+            maxBytes: 1,
+            signalGroup: (pid, signal) => {
+              writeFileSync(${JSON.stringify(signalLogPath)}, JSON.stringify({ kind: 'group', pid, signal }) + '\\n', { flag: 'a' });
+              throw Object.assign(new Error('ESRCH'), { code: 'ESRCH' });
+            },
+            signalChild: (child, signal) => {
+              writeFileSync(${JSON.stringify(signalLogPath)}, JSON.stringify({ kind: 'direct', signal }) + '\\n', { flag: 'a' });
+              child.disconnect();
+              throw new Error('EPERM');
+            },
+          });
+        } catch (error) {
+          writeFileSync(${JSON.stringify(outcomePath)}, error?.constructor?.name ?? String(error));
+        }
+      `;
+      const containing = spawn(process.execPath, ['--input-type=module', '-e', harnessSource], { stdio: 'ignore' });
+      const started = Date.now();
+      let supervisorPid: number | undefined;
+      try {
+        const exitCode = await new Promise<number | null>((resolve, reject) => {
+          containing.once('close', code => resolve(code));
+          containing.once('error', reject);
+        });
+        expect(Date.now() - started).toBeLessThan(5_000);
+        expect(exitCode).toBe(0);
+        expect(await readFile(outcomePath, 'utf8')).toBe('BoundedCommandError');
+        const exactSupervisorPid = Number(await readFile(supervisorPidPath, 'utf8'));
+        supervisorPid = exactSupervisorPid;
+        expect(() => process.kill(exactSupervisorPid, 0)).not.toThrow();
+        const calls = (await readFile(signalLogPath, 'utf8')).trim().split('\n').map(line => JSON.parse(line) as { kind: string; pid?: number; signal: string });
+        expect(calls).toEqual([
+          { kind: 'group', pid: exactSupervisorPid, signal: 'SIGTERM' },
+          { kind: 'direct', signal: 'SIGTERM' },
+        ]);
+        await expect(readFile(marker, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+      } finally {
+        // The injected hooks intentionally make cleanup impossible from the
+        // caller. Remove the deliberately orphaned fixture group only after
+        // proving the containing process exited without doing so.
+        if (supervisorPid) {
+          try { process.kill(-supervisorPid, 'SIGKILL'); } catch { /* already gone */ }
+        }
+      }
+    });
+  });
 });
