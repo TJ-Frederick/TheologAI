@@ -94,7 +94,7 @@ jobs:
       - name: Install verifier dependencies
         run: |
           set -euo pipefail
-          "$GITHUB_WORKSPACE/node_modules/.bin/tsx" "$GITHUB_WORKSPACE/scripts/capture-bounded-command.ts" \
+          node "$GITHUB_WORKSPACE/scripts/capture-bounded-command.mjs" \
             --stdout "$RUNNER_TEMP/verifier-npm-ci.out" --stderr "$RUNNER_TEMP/verifier-npm-ci.err" \
             --result "$RUNNER_TEMP/verifier-npm-ci.result.json" --max-bytes 8388608 -- npm ci --no-audit
           jq -e '(.schemaVersion == "theologai-bounded-command.v1") and (.exitStatus == 0) and (.overflow == false)' \
@@ -103,7 +103,7 @@ jobs:
       - name: Verify pinned Wrangler version
         run: |
           set -euo pipefail
-          "$GITHUB_WORKSPACE/node_modules/.bin/tsx" "$GITHUB_WORKSPACE/scripts/capture-bounded-command.ts" \
+          node "$GITHUB_WORKSPACE/scripts/capture-bounded-command.mjs" \
             --stdout "$RUNNER_TEMP/wrangler-version.out" --stderr "$RUNNER_TEMP/wrangler-version.err" \
             --result "$RUNNER_TEMP/wrangler-version.result.json" --max-bytes 65536 -- \
             npx --no-install wrangler --version
@@ -139,7 +139,7 @@ jobs:
           MAX_CAPTURE_BYTES=8388608
           bounded_json() {
             stdout="$1"; stderr="$2"; shift 2
-            "$GITHUB_WORKSPACE/node_modules/.bin/tsx" "$GITHUB_WORKSPACE/scripts/capture-bounded-command.ts" \
+            node "$GITHUB_WORKSPACE/scripts/capture-bounded-command.mjs" \
               --stdout "$stdout" --stderr "$stderr" --result "$stdout.result.json" --max-bytes "$MAX_CAPTURE_BYTES" -- "$@"
             jq -e '(.schemaVersion == "theologai-bounded-command.v1") and (.exitStatus == 0) and (.overflow == false)' "$stdout.result.json"
           }
@@ -154,7 +154,7 @@ jobs:
           set -euo pipefail
           capture() {
             stdout="$1"; stderr="$2"; result="$3"; shift 3
-            "$GITHUB_WORKSPACE/node_modules/.bin/tsx" "$GITHUB_WORKSPACE/scripts/capture-bounded-command.ts" \
+            node "$GITHUB_WORKSPACE/scripts/capture-bounded-command.mjs" \
               --stdout "$stdout" --stderr "$stderr" --result "$result" --cwd "$GITHUB_WORKSPACE/pr108-source" \
               --max-bytes 8388608 -- "$@"
             jq -e '(.schemaVersion == "theologai-bounded-command.v1") and (.exitStatus == 0) and (.overflow == false)' "$result"
@@ -175,7 +175,7 @@ jobs:
           MAX_CAPTURE_BYTES=8388608
           bounded_json() {
             stdout="$1"; stderr="$2"; shift 2
-            "$GITHUB_WORKSPACE/node_modules/.bin/tsx" "$GITHUB_WORKSPACE/scripts/capture-bounded-command.ts" \
+            node "$GITHUB_WORKSPACE/scripts/capture-bounded-command.mjs" \
               --stdout "$stdout" --stderr "$stderr" --result "$stdout.result.json" --max-bytes "$MAX_CAPTURE_BYTES" -- "$@"
             jq -e '(.schemaVersion == "theologai-bounded-command.v1") and (.exitStatus == 0) and (.overflow == false)' "$stdout.result.json"
           }
@@ -193,7 +193,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          "$GITHUB_WORKSPACE/node_modules/.bin/tsx" "$GITHUB_WORKSPACE/scripts/capture-bounded-command.ts" \
+          node "$GITHUB_WORKSPACE/scripts/capture-bounded-command.mjs" \
             --stdout "$RUNNER_TEMP/pr108-remote-d1.out" --stderr "$RUNNER_TEMP/pr108-remote-d1.err" \
             --result "$RUNNER_TEMP/pr108-remote-d1.result.json" --cwd "$GITHUB_WORKSPACE/pr108-source" \
             --max-bytes 8388608 -- npm run d1:remote:check -- --database theologai-production-20260729-transform11-a
@@ -207,7 +207,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          "$GITHUB_WORKSPACE/node_modules/.bin/tsx" "$GITHUB_WORKSPACE/scripts/capture-bounded-command.ts" \
+          node "$GITHUB_WORKSPACE/scripts/capture-bounded-command.mjs" \
             --stdout "$RUNNER_TEMP/dry-run.out" --stderr "$RUNNER_TEMP/dry-run.err" \
             --stdout-prefix 'DRY_RUN_SENTINEL: fixed-pr108-dry-run' \
             --result "$RUNNER_TEMP/dry-run.result.json" --max-bytes 8388608 -- \
@@ -227,7 +227,7 @@ jobs:
           MAX_CAPTURE_BYTES=8388608
           bounded_json() {
             stdout="$1"; stderr="$2"; shift 2
-            "$GITHUB_WORKSPACE/node_modules/.bin/tsx" "$GITHUB_WORKSPACE/scripts/capture-bounded-command.ts" \
+            node "$GITHUB_WORKSPACE/scripts/capture-bounded-command.mjs" \
               --stdout "$stdout" --stderr "$stderr" --result "$stdout.result.json" --max-bytes "$MAX_CAPTURE_BYTES" -- "$@"
             jq -e '(.schemaVersion == "theologai-bounded-command.v1") and (.exitStatus == 0) and (.overflow == false)' "$stdout.result.json"
           }
@@ -255,7 +255,7 @@ jobs:
           EXPECTED_PREVIEW_VERSION: ${{ inputs.expected_preview_version_id }}
         run: |
           set -euo pipefail
-          "$GITHUB_WORKSPACE/node_modules/.bin/tsx" "$GITHUB_WORKSPACE/scripts/capture-bounded-command.ts" \
+          node "$GITHUB_WORKSPACE/scripts/capture-bounded-command.mjs" \
             --stdout "$RUNNER_TEMP/receipt.stdout" --stderr "$RUNNER_TEMP/receipt.stderr" \
             --result "$RUNNER_TEMP/receipt.result.json" --max-bytes 65536 -- \
             npx --no-install tsx scripts/production-rollback-rehearsal.ts create \

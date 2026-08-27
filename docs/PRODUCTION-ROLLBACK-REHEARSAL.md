@@ -54,7 +54,9 @@ read-only Cloudflare deployment-ID endpoint rather than relying on a truncated
 deployment list. It checks out the fixed source in a separate directory and runs its
 historical `npm ci`, local Workerd seed/readiness, production-like Worker
 runtime, and remote D1 readiness checks. Raw Wrangler output stays in runner
-temporary storage. Only the bounded, hash-only receipt is uploaded.
+temporary storage. The committed dependency-free `scripts/capture-bounded-command.mjs`
+runner is used before and after dependency installation, so output capture does
+not depend on `node_modules`. Only the bounded, hash-only receipt is uploaded.
 
 The sole recovery command is:
 

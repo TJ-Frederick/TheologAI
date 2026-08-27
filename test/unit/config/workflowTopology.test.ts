@@ -280,7 +280,10 @@ describe('workflow topology', () => {
     expect(workflow).not.toContain('secrets.CLOUDFLARE_API_TOKEN');
     expect(workflow.match(/^\s+CLOUDFLARE_READ_ONLY_API_TOKEN: \$\{\{ secrets\.CLOUDFLARE_READ_ONLY_API_TOKEN \}\}$/gm)).toHaveLength(5);
     expect(workflow.match(/^\s+CLOUDFLARE_API_TOKEN: \$\{\{ secrets\.CLOUDFLARE_READ_ONLY_API_TOKEN \}\}$/gm)).toHaveLength(5);
-    expect(workflow).toContain('capture-bounded-command.ts');
+    expect(workflow).toContain('capture-bounded-command.mjs');
+    expect(workflow).not.toContain('node_modules/.bin/tsx" "$GITHUB_WORKSPACE/scripts/capture-bounded-command');
+    const installVerifier = uniqueBlock(job, '      - name: Install verifier dependencies');
+    expect(installVerifier).toContain('node "$GITHUB_WORKSPACE/scripts/capture-bounded-command.mjs"');
     expect(workflow).not.toContain('WRANGLER_LOG_PATH');
     expect(workflow).not.toMatch(/^\s*[^#\n]*>\s*["']?\$RUNNER_TEMP/m);
     for (const step of workflow.split('\n      - ')) {

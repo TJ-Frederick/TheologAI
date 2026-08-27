@@ -1,11 +1,11 @@
+import { spawn } from 'node:child_process';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import {
-  BoundedCommandError,
-  runBoundedCommand,
-} from '../../../scripts/capture-bounded-command.js';
+
+const runner = fileURLToPath(new URL('../../../scripts/capture-bounded-command.mjs', import.meta.url));
 
 async function withCapture<T>(fn: (directory: string) => Promise<T>): Promise<T> {
   const directory = await mkdtemp(join(tmpdir(), 'theologai-bounded-command-'));
@@ -20,16 +20,51 @@ function nodeScript(source: string): { command: string; args: string[] } {
   return { command: process.execPath, args: ['-e', source] };
 }
 
+async function runCapture(options: {
+  command: string;
+  args: string[];
+  stdoutPath: string;
+  stderrPath: string;
+  maxBytes?: number;
+  stdoutPrefix?: string;
+}): Promise<{ exitCode: number | null; result: Record<string, unknown> }> {
+  const args = [
+    runner,
+    '--stdout', options.stdoutPath,
+    '--stderr', options.stderrPath,
+    '--result', `${options.stdoutPath}.result.json`,
+    ...(options.maxBytes === undefined ? [] : ['--max-bytes', String(options.maxBytes)]),
+    ...(options.stdoutPrefix === undefined ? [] : ['--stdout-prefix', options.stdoutPrefix]),
+    '--', options.command, ...options.args,
+  ];
+  const child = spawn(process.execPath, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+  let stdout = '';
+  let stderr = '';
+  child.stdout.setEncoding('utf8');
+  child.stderr.setEncoding('utf8');
+  child.stdout.on('data', chunk => { stdout += chunk; });
+  child.stderr.on('data', chunk => { stderr += chunk; });
+  const [exitCode] = await new Promise<[number | null, NodeJS.Signals | null]>((resolve, reject) => {
+    child.once('close', (code, signal) => resolve([code, signal]));
+    child.once('error', reject);
+  });
+  expect(`${stdout}${stderr}`).toContain('theologai-bounded-command.v1');
+  return {
+    exitCode,
+    result: JSON.parse(await readFile(`${options.stdoutPath}.result.json`, 'utf8')) as Record<string, unknown>,
+  };
+}
+
 describe('bounded command capture', () => {
   it('streams both outputs, hashes exact UTF-8 bytes, and preserves exit status', async () => {
     await withCapture(async directory => {
       const stdoutPath = join(directory, 'stdout');
       const stderrPath = join(directory, 'stderr');
-      const result = await runBoundedCommand({
+      const run = await runCapture({
         ...nodeScript("process.stdout.write('é'.repeat(200)); process.stderr.write('ß'.repeat(100));"),
         stdoutPath, stderrPath, stdoutPrefix: 'prefix:', maxBytes: 1_000,
       });
-      expect(result).toMatchObject({ exitStatus: 0, signal: null, overflow: false, stdoutBytes: 407, stderrBytes: 200 });
+      expect(run).toMatchObject({ exitCode: 0, result: { exitStatus: 0, signal: null, overflow: false, stdoutBytes: 407, stderrBytes: 200 } });
       expect(await readFile(stdoutPath, 'utf8')).toBe(`prefix:${'é'.repeat(200)}`);
       expect(await readFile(stderrPath, 'utf8')).toBe('ß'.repeat(100));
     });
@@ -43,14 +78,9 @@ describe('bounded command capture', () => {
       const stdoutPath = join(directory, 'stdout');
       const stderrPath = join(directory, 'stderr');
       const started = Date.now();
-      await expect(runBoundedCommand({
-        ...nodeScript(source), stdoutPath, stderrPath, maxBytes: 1_024,
-      })).rejects.toSatisfy(error => {
-        expect(error).toBeInstanceOf(BoundedCommandError);
-        expect((error as BoundedCommandError).result.overflow).toBe(true);
-        expect((error as BoundedCommandError).result.exitStatus).not.toBe(0);
-        return true;
-      });
+      const run = await runCapture({ ...nodeScript(source), stdoutPath, stderrPath, maxBytes: 1_024 });
+      expect(run.exitCode).not.toBe(0);
+      expect(run.result).toMatchObject({ overflow: true });
       expect(Date.now() - started).toBeLessThan(2_000);
       expect((await readFile(stdoutPath)).byteLength).toBeLessThanOrEqual(1_024);
       expect((await readFile(stderrPath)).byteLength).toBeLessThanOrEqual(1_024);
@@ -61,10 +91,12 @@ describe('bounded command capture', () => {
     await withCapture(async directory => {
       const stdoutPath = join(directory, 'stdout');
       const stderrPath = join(directory, 'stderr');
-      const source = "process.on('SIGTERM', () => {}); setInterval(() => process.stdout.write('x'.repeat(2048)), 0);";
-      await expect(runBoundedCommand({
-        ...nodeScript(source), stdoutPath, stderrPath, maxBytes: 1_024,
-      })).rejects.toBeInstanceOf(BoundedCommandError);
+      const run = await runCapture({
+        ...nodeScript("process.on('SIGTERM', () => {}); setInterval(() => process.stdout.write('x'.repeat(2048)), 0);"),
+        stdoutPath, stderrPath, maxBytes: 1_024,
+      });
+      expect(run.exitCode).not.toBe(0);
+      expect(run.result).toMatchObject({ overflow: true });
       expect((await readFile(stdoutPath)).byteLength).toBeLessThanOrEqual(1_024);
     });
   });
@@ -79,9 +111,9 @@ describe('bounded command capture', () => {
         `spawn(process.execPath, ['-e', ${JSON.stringify(`setTimeout(() => require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'alive'), 500)`) }], {stdio: 'ignore'});`,
         "setInterval(() => process.stdout.write('x'.repeat(2048)), 0);",
       ].join('');
-      await expect(runBoundedCommand({
-        ...nodeScript(source), stdoutPath, stderrPath, maxBytes: 1_024,
-      })).rejects.toBeInstanceOf(BoundedCommandError);
+      const run = await runCapture({ ...nodeScript(source), stdoutPath, stderrPath, maxBytes: 1_024 });
+      expect(run.exitCode).not.toBe(0);
+      expect(run.result).toMatchObject({ overflow: true });
       await new Promise(resolve => setTimeout(resolve, 700));
       await expect(readFile(marker, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
     });
