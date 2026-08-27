@@ -194,6 +194,18 @@ function captureSnapshot(state) {
   return { bytes: state.bytes, hash: state.digest.copy().digest('hex'), overflow: state.overflow };
 }
 
+async function sendSupervisorMessage(message) {
+  if (typeof process.send !== 'function' || !process.connected) return false;
+  try {
+    await boundedAwait(new Promise((resolve, reject) => {
+      process.send(message, error => error ? reject(error) : resolve());
+    }), TERMINATION_TIMEOUT_MS, 'bounded command supervisor message timed out');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function relay(source, destination) {
   return new Promise(resolve => {
     let settled = false;
@@ -203,6 +215,7 @@ function relay(source, destination) {
       resolve();
     };
     source.once('end', finish);
+    source.once('close', finish);
     source.once('error', () => {
       source.destroy();
       finish();
@@ -216,6 +229,10 @@ function relay(source, destination) {
 }
 
 async function supervisor(argv) {
+  let commandProcess;
+  let stdoutRelay;
+  let stderrRelay;
+  try {
   const separator = argv.indexOf('--');
   assert(separator >= 0, 'supervisor command separator -- is required');
   const flags = argv.slice(0, separator);
@@ -251,11 +268,11 @@ async function supervisor(argv) {
   process.stdout.on('error', () => undefined);
   process.stderr.on('error', () => undefined);
 
-  const commandProcess = spawn(command, args, {
+  commandProcess = spawn(command, args, {
     stdio: ['ignore', 'pipe', 'pipe'],
   });
-  const stdoutRelay = relay(commandProcess.stdout, process.stdout);
-  const stderrRelay = relay(commandProcess.stderr, process.stderr);
+  stdoutRelay = relay(commandProcess.stdout, process.stdout);
+  stderrRelay = relay(commandProcess.stderr, process.stderr);
   const [exitStatus, signal] = await new Promise((resolve, reject) => {
     commandProcess.once('error', reject);
     commandProcess.once('close', (code, childSignal) => resolve([code, childSignal]));
@@ -299,6 +316,20 @@ async function supervisor(argv) {
   }
   process.disconnect();
   process.exit(exitStatus ?? 0);
+  } catch (error) {
+    destroy(commandProcess?.stdout);
+    destroy(commandProcess?.stderr);
+    await settleWithin([stdoutRelay, stderrRelay].filter(Boolean));
+    try { process.stdout.end(); } catch { /* failure cleanup is best effort */ }
+    try { process.stderr.end(); } catch { /* failure cleanup is best effort */ }
+    await sendSupervisorMessage({
+      type: 'failure',
+      message: error instanceof Error ? error.message : String(error),
+    });
+    process.removeAllListeners('message');
+    try { process.disconnect(); } catch { /* IPC cleanup is best effort */ }
+    process.exit(1);
+  }
 }
 
 async function waitForCompletionOrTermination(completionPromise, exitPromise, isTerminating) {
@@ -427,6 +458,12 @@ export async function runBoundedCommand(options) {
     exitPromise.then(outcome => { observedOutcome = outcome; }, () => undefined);
     const completionPromise = new Promise((resolve, reject) => {
       const onMessage = message => {
+        if (message?.type === 'failure' && typeof message.message === 'string' && message.message.length > 0) {
+          const failure = new Error(`bounded command supervisor failed: ${message.message}`);
+          failure.controlledSupervisorFailure = true;
+          reject(failure);
+          return;
+        }
         if (!message || message.type !== 'completion'
           || !isOutcome(message.exitStatus, message.signal)) {
           reject(new Error('bounded command supervisor completion is malformed'));
@@ -458,7 +495,7 @@ export async function runBoundedCommand(options) {
         captures = await capturesPromise;
       }
     } catch (error) {
-      await requestTermination(false);
+      if (!error?.controlledSupervisorFailure) await requestTermination(false);
       await settleWithin([exitPromise, completionPromise, capturesPromise]);
       throw error;
     }
@@ -488,7 +525,7 @@ export async function runBoundedCommand(options) {
     if (result.overflow || result.exitStatus !== 0) throw new BoundedCommandError(result);
     return result;
   } catch (error) {
-    await requestTermination(false);
+    if (!error?.controlledSupervisorFailure) await requestTermination(false);
     if (child) {
       await settleWithin([new Promise(resolve => {
         if (!alive(child)) {
@@ -497,6 +534,7 @@ export async function runBoundedCommand(options) {
         }
         child.once('exit', resolve);
       })]);
+      if (error?.controlledSupervisorFailure && alive(child)) detachChild(child);
     }
     throw error;
   } finally {

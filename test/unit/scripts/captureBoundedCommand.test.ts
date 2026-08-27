@@ -104,6 +104,42 @@ describe('bounded command capture', () => {
     });
   });
 
+  it('fails promptly when the requested executable cannot be spawned', async () => {
+    await withCapture(async directory => {
+      const stdoutPath = join(directory, 'stdout');
+      const stderrPath = join(directory, 'stderr');
+      const resultPath = join(directory, 'result.json');
+      const child = spawn(process.execPath, [
+        runner, '--stdout', stdoutPath, '--stderr', stderrPath, '--result', resultPath,
+        '--', '/definitely/not-a-real-theologai-command',
+      ], { stdio: ['ignore', 'pipe', 'pipe'] });
+      let stderr = '';
+      child.stderr.setEncoding('utf8');
+      child.stderr.on('data', chunk => { stderr += chunk; });
+      const started = Date.now();
+      let timedOut = false;
+      let timeout: ReturnType<typeof setTimeout> | undefined;
+      try {
+        const exitCode = await Promise.race([
+          new Promise<number | null>((resolve, reject) => {
+            child.once('close', code => resolve(code));
+            child.once('error', reject);
+          }),
+          new Promise<null>(resolve => { timeout = setTimeout(() => { timedOut = true; resolve(null); }, 5_000); }),
+        ]);
+        if (timeout) clearTimeout(timeout);
+        expect(timedOut).toBe(false);
+        expect(exitCode).not.toBe(0);
+        expect(Date.now() - started).toBeLessThan(5_000);
+        expect(stderr).toContain('bounded command supervisor failed');
+        expect(stderr).toContain('not-a-real-theologai-command');
+        await expect(readFile(resultPath, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+      } finally {
+        if (timedOut) child.kill('SIGKILL');
+      }
+    });
+  });
+
   it.each([
     ['stdout', "setInterval(() => process.stdout.write('é'.repeat(1024)), 0);"],
     ['stderr', "setInterval(() => process.stderr.write('ß'.repeat(1024)), 0);"],
