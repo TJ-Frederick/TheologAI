@@ -242,4 +242,35 @@ describe('workflow topology', () => {
     expect(occurrences(job, '      - name: Confirm active preview cancellation')).toBe(1);
     expect(job).toContain('run: echo "Preview authorization was revoked; matching in-flight PR Checks runs were canceled."');
   });
+
+  it('keeps the production rollback rehearsal manual, protected, fixed-target, and read-only', async () => {
+    const workflow = await readWorkflow('production-rollback-rehearsal.yml');
+    const trigger = uniqueBlock(workflow, 'on:');
+    const concurrency = uniqueBlock(workflow, 'concurrency:');
+    const job = uniqueBlock(workflow, '  rehearse:');
+    expect(normalized(trigger)).toContain('on: workflow_dispatch: inputs:');
+    expect(trigger).not.toMatch(/\n\s+(push|pull_request):/);
+    expect(normalized(concurrency)).toBe('concurrency: group: deploy-production cancel-in-progress: false');
+    expect(workflow).toContain('permissions:\n  contents: read');
+    expect(job).toContain("if: ${{ github.ref == 'refs/heads/main' }}");
+    expect(job).toContain('environment:\n      name: production');
+    expect(job).toContain('contents: read');
+    for (const value of [
+      '8da99fd0a161b90a4bd90ab29bde1abf796b3bf6',
+      'a59d9a062b2e6c7884de97fd97309878e1cbdc23',
+      '3d7489d9-7b48-4ad0-bdc6-95ffbda53bd8',
+      '291f3292-3fa9-44fc-bf6f-b68fd2f4cef6',
+      'theologai-production-20260729-transform11-a',
+      '53211f50-a893-4b4c-be1e-bc625a595dc7',
+      'REHEARSE THE EXACT PR108 ROLLBACK WITHOUT TRAFFIC',
+    ]) expect(workflow).toContain(value);
+    expect(workflow).toContain('workflow_dispatch:');
+    expect(workflow).toContain('Capture production and preview controls before rehearsal (read-only)');
+    expect(workflow).toContain('Capture production and preview controls after rehearsal (read-only)');
+    expect(workflow).toContain('Upload sanitized rehearsal receipt only');
+    expect(workflow).toContain('--dry-run --yes');
+    expect(workflow).not.toMatch(/wrangler\s+rollback|versions\s+upload|wrangler\s+deploy(?!ments)/i);
+    expect(workflow).not.toMatch(/d1\s+(execute|migrations|delete|create|update)|secret\s+(put|delete)|triggers\s+deploy/i);
+    expect(workflow).not.toContain('github-token:');
+  });
 });

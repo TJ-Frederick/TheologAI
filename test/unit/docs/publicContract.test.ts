@@ -36,6 +36,7 @@ const releaseAuthorityDocuments = {
   'docs/PREVIEW-RELEASE-RECONCILIATION.md': ['historical-reconciliation', 'docs/CURRENT-RELEASE.md'],
   'docs/PRIMARY-SOURCE-CATALOG-SCOPE.md': ['catalog-history', 'docs/CURRENT-RELEASE.md'],
   'docs/PRODUCTION-RELEASE-RECONCILIATION.md': ['historical-reconciliation', 'docs/CURRENT-RELEASE.md'],
+  'docs/PRODUCTION-ROLLBACK-REHEARSAL.md': ['rollback-rehearsal-runbook', 'docs/CURRENT-RELEASE.md'],
   'docs/ROADMAP.md': ['delivery-roadmap', 'docs/CURRENT-RELEASE.md'],
   'docs/TRANSFORM11-HISTORICAL-SPINE-ACTIVATION.md': ['historical-activation', 'docs/CURRENT-RELEASE.md'],
   'docs/UBS-HEBREW-V0.9.2-DERIVED-NOTICE.md': ['historical-rights-notice', 'docs/CURRENT-RELEASE.md'],
