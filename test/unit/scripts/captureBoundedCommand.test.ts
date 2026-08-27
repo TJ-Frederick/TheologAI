@@ -230,7 +230,7 @@ describe('bounded command capture', () => {
       };
       const quietSink = { write: async () => undefined, close: async () => undefined };
       await expect(captureModule.runBoundedCommand({
-        ...nodeScript(source), stdoutPath: join(directory, 'stdout'), stderrPath: join(directory, 'stderr'), maxBytes: 1_024,
+        ...nodeScript(source), stdoutPath: join(directory, 'stdout'), stderrPath: join(directory, 'stderr'), maxBytes: 1_000_000,
         openCapture: async (path: string) => path.endsWith('/stdout') ? failingSink : quietSink,
       })).rejects.toThrow('injected capture failure');
       await new Promise(resolve => setTimeout(resolve, 700));

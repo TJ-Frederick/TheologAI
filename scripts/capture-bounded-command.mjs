@@ -268,14 +268,24 @@ async function consume(stream, handle, maxBytes, onOverflow, onCaptureFailure, i
       const chunk = Buffer.isBuffer(value) ? value : Buffer.from(value);
       const remaining = maxBytes - state.bytes;
       if (chunk.byteLength > remaining) {
+        state.overflow = true;
+        // Start group termination before waiting on the final bounded write;
+        // a slow or wedged sink must not postpone killing an overflowing
+        // producer. The write is still given a bounded chance to preserve the
+        // deterministic prefix already within the byte budget.
+        const terminationPromise = onOverflow();
         if (remaining > 0) {
           const prefix = chunk.subarray(0, remaining);
-          await handle.write(prefix);
-          state.digest.update(prefix);
-          state.bytes += prefix.byteLength;
+          try {
+            await boundedAwait(handle.write(prefix), TERMINATION_TIMEOUT_MS, 'bounded command overflow prefix write timed out');
+            state.digest.update(prefix);
+            state.bytes += prefix.byteLength;
+          } catch {
+            // Overflow remains the primary result; termination and stream
+            // cleanup are handled by the outer runner.
+          }
         }
-        state.overflow = true;
-        await onOverflow();
+        await terminationPromise;
         break;
       }
       await handle.write(chunk);
