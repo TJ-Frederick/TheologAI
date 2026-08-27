@@ -76,10 +76,11 @@ function input(overrides: Partial<Parameters<typeof createRollbackRehearsalRecei
     d1InventoryBeforeText: inventory,
     d1InventoryAfterText: inventory,
     targetVersionText: versionView(ROLLBACK_REHEARSAL_TARGET.workerVersionId, ROLLBACK_REHEARSAL_TARGET.d1Id),
-    readinessOutputText: '{"status":"passed"}\n',
-    runtimeOutputText: 'worker runtime passed\n',
-    dryRunOutputText: 'DRY_RUN_SENTINEL: fixed-pr108-dry-run\ndry run completed\n',
-    npmInstallOutputText: 'npm ci passed\n', workerdOutputText: 'workerd passed\n', targetDeploymentText: targetDeployment,
+    readinessOutputText: '{"status":"passed"}\n', readinessStderrText: '',
+    runtimeOutputText: 'worker runtime passed\n', runtimeStderrText: '',
+    dryRunOutputText: 'DRY_RUN_SENTINEL: fixed-pr108-dry-run\ndry run completed\n', dryRunStderrText: '',
+    npmInstallOutputText: 'npm ci passed\n', npmInstallStderrText: '',
+    workerdOutputText: 'workerd passed\n', workerdStderrText: '', targetDeploymentText: targetDeployment,
     ...overrides,
   };
 }

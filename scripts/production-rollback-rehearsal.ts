@@ -71,10 +71,15 @@ export interface RollbackRehearsalReceipt {
     targetVersionSha256: string;
     targetDeploymentSha256: string;
     npmInstallSha256: string;
+    npmInstallStderrSha256: string;
     workerdSha256: string;
+    workerdStderrSha256: string;
     readinessOutputSha256: string;
+    readinessStderrSha256: string;
     runtimeOutputSha256: string;
+    runtimeStderrSha256: string;
     dryRunOutputSha256: string;
+    dryRunStderrSha256: string;
   };
   exitStatuses: { npmInstall: 0; workerd: 0; readiness: 0; runtime: 0; dryRun: 0 };
   trafficMutation: false;
@@ -154,7 +159,10 @@ export function parseRollbackRehearsalReceipt(value: unknown): RollbackRehearsal
   exactKeys(evidence, [
     'productionBeforeSha256', 'productionAfterSha256', 'productionVersionBeforeSha256', 'productionVersionAfterSha256',
     'previewBeforeSha256', 'previewAfterSha256', 'previewVersionBeforeSha256', 'previewVersionAfterSha256',
-    'd1InventoryBeforeSha256', 'd1InventoryAfterSha256', 'targetVersionSha256', 'targetDeploymentSha256', 'npmInstallSha256', 'workerdSha256', 'readinessOutputSha256', 'runtimeOutputSha256', 'dryRunOutputSha256',
+    'd1InventoryBeforeSha256', 'd1InventoryAfterSha256', 'targetVersionSha256', 'targetDeploymentSha256',
+    'npmInstallSha256', 'npmInstallStderrSha256', 'workerdSha256', 'workerdStderrSha256',
+    'readinessOutputSha256', 'readinessStderrSha256', 'runtimeOutputSha256', 'runtimeStderrSha256',
+    'dryRunOutputSha256', 'dryRunStderrSha256',
   ], 'rehearsal evidence');
   for (const [key, value] of Object.entries(evidence)) assert(typeof value === 'string' && SHA256.test(value), `rehearsal evidence ${key} is not SHA-256`);
   const exitStatuses = record(receipt.exitStatuses, 'rehearsal exit statuses');
@@ -318,10 +326,15 @@ export interface CreateRollbackRehearsalInput {
   d1InventoryAfterText: string;
   targetVersionText: string;
   readinessOutputText: string;
+  readinessStderrText: string;
   runtimeOutputText: string;
+  runtimeStderrText: string;
   dryRunOutputText: string;
+  dryRunStderrText: string;
   npmInstallOutputText: string;
+  npmInstallStderrText: string;
   workerdOutputText: string;
+  workerdStderrText: string;
   targetDeploymentText: string;
 }
 
@@ -368,7 +381,13 @@ export function createRollbackRehearsalReceipt(input: CreateRollbackRehearsalInp
     'active D1 names changed during rehearsal');
   assert(productionD1Before !== previewD1Before && productionD1NameBefore !== previewD1NameBefore,
     'production and preview D1 identities must be distinct');
-  for (const [text, label] of [[input.npmInstallOutputText, 'npm install'], [input.workerdOutputText, 'Workerd'], [input.readinessOutputText, 'readiness'], [input.runtimeOutputText, 'runtime'], [input.dryRunOutputText, 'dry-run']] as const) {
+  for (const [text, label] of [
+    [input.npmInstallOutputText, 'npm install stdout'], [input.npmInstallStderrText, 'npm install stderr'],
+    [input.workerdOutputText, 'Workerd stdout'], [input.workerdStderrText, 'Workerd stderr'],
+    [input.readinessOutputText, 'readiness stdout'], [input.readinessStderrText, 'readiness stderr'],
+    [input.runtimeOutputText, 'runtime stdout'], [input.runtimeStderrText, 'runtime stderr'],
+    [input.dryRunOutputText, 'dry-run stdout'], [input.dryRunStderrText, 'dry-run stderr'],
+  ] as const) {
     assert(Buffer.byteLength(text, 'utf8') <= MAX_INPUT_BYTES, `${label} output exceeds the bounded input size`);
   }
   return {
@@ -397,8 +416,11 @@ export function createRollbackRehearsalReceipt(input: CreateRollbackRehearsalInp
       previewVersionBeforeSha256: sha256(input.previewVersionBeforeText), previewVersionAfterSha256: sha256(input.previewVersionAfterText),
       d1InventoryBeforeSha256: sha256(input.d1InventoryBeforeText), d1InventoryAfterSha256: sha256(input.d1InventoryAfterText),
       targetVersionSha256: sha256(input.targetVersionText), targetDeploymentSha256: sha256(input.targetDeploymentText),
-      npmInstallSha256: sha256(input.npmInstallOutputText), workerdSha256: sha256(input.workerdOutputText), readinessOutputSha256: sha256(input.readinessOutputText),
-      runtimeOutputSha256: sha256(input.runtimeOutputText), dryRunOutputSha256: sha256(input.dryRunOutputText),
+      npmInstallSha256: sha256(input.npmInstallOutputText), npmInstallStderrSha256: sha256(input.npmInstallStderrText),
+      workerdSha256: sha256(input.workerdOutputText), workerdStderrSha256: sha256(input.workerdStderrText),
+      readinessOutputSha256: sha256(input.readinessOutputText), readinessStderrSha256: sha256(input.readinessStderrText),
+      runtimeOutputSha256: sha256(input.runtimeOutputText), runtimeStderrSha256: sha256(input.runtimeStderrText),
+      dryRunOutputSha256: sha256(input.dryRunOutputText), dryRunStderrSha256: sha256(input.dryRunStderrText),
     },
     exitStatuses: { npmInstall: 0, workerd: 0, readiness: 0, runtime: 0, dryRun: 0 },
     trafficMutation: false, d1Mutation: false, previewMutation: false,
@@ -418,7 +440,8 @@ function exactArgs(argv: string[]): Map<string, string> {
     '--expected-preview-deployment', '--expected-preview-version', '--production-before', '--production-after',
     '--production-version-before', '--production-version-after', '--preview-before', '--preview-after',
     '--preview-version-before', '--preview-version-after', '--d1-before', '--d1-after', '--target-version',
-    '--readiness-output', '--runtime-output', '--dry-run-output', '--npm-install-output', '--workerd-output', '--target-deployment', '--output',
+    '--readiness-output', '--readiness-stderr', '--runtime-output', '--runtime-stderr', '--dry-run-output', '--dry-run-stderr',
+    '--npm-install-output', '--npm-install-stderr', '--workerd-output', '--workerd-stderr', '--target-deployment', '--output',
   ];
   assert(argv.length === expected.length * 2, 'create expects exactly the reviewed option pairs');
   const values = new Map<string, string>();
@@ -446,9 +469,10 @@ async function cli(argv: string[]): Promise<void> {
     previewBeforeText: await read('--preview-before'), previewAfterText: await read('--preview-after'),
     previewVersionBeforeText: await read('--preview-version-before'), previewVersionAfterText: await read('--preview-version-after'),
     d1InventoryBeforeText: await read('--d1-before'), d1InventoryAfterText: await read('--d1-after'),
-    targetVersionText: await read('--target-version'), readinessOutputText: await read('--readiness-output'),
-    runtimeOutputText: await read('--runtime-output'), dryRunOutputText: await read('--dry-run-output'),
-    npmInstallOutputText: await read('--npm-install-output'), workerdOutputText: await read('--workerd-output'),
+    targetVersionText: await read('--target-version'), readinessOutputText: await read('--readiness-output'), readinessStderrText: await read('--readiness-stderr'),
+    runtimeOutputText: await read('--runtime-output'), runtimeStderrText: await read('--runtime-stderr'), dryRunOutputText: await read('--dry-run-output'), dryRunStderrText: await read('--dry-run-stderr'),
+    npmInstallOutputText: await read('--npm-install-output'), npmInstallStderrText: await read('--npm-install-stderr'),
+    workerdOutputText: await read('--workerd-output'), workerdStderrText: await read('--workerd-stderr'),
     targetDeploymentText: await read('--target-deployment'),
   });
   await writeFile(values.get('--output')!, receipt, { encoding: 'utf8', flag: 'wx' });

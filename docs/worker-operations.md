@@ -21,7 +21,10 @@ route, secret, or deletion command is present. Only a bounded hash-only receipt
 is uploaded. See [the full runbook](PRODUCTION-ROLLBACK-REHEARSAL.md).
 
 Provision the dedicated `CLOUDFLARE_READ_ONLY_API_TOKEN` in the protected
-environment before execution; historical checkout and local gates receive no
+environment before execution with exactly the account-scoped `Workers Scripts
+Read` and `D1 Read` permissions; no additional permissions or account grants
+are allowed. The workflow aliases it to Wrangler's `CLOUDFLARE_API_TOKEN` variable only in
+authenticated read-only steps. Historical checkout and local gates receive no
 Cloudflare credential.
 
 Retain the active D1, immediate same-D1 Worker predecessor, and two newest
@@ -30,6 +33,9 @@ review-eligible after two newer matched generations, a fresh rehearsal, 30
 stable days, no active bindings, reconstruction/compatibility proof, and exact
 owner authorization. Review quarterly with the `2026-11-15` H1 reassessment;
 H1 artifact expiry is separate.
+
+Schema-`0009` is active; the two retained older cross-schema matched
+generations are PR #108 Transform-11 and PR #101 hierarchy.
 
 ## Historical PR #122 live baseline
 

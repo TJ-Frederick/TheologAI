@@ -94,13 +94,22 @@ jobs:
       - name: Install verifier dependencies
         run: |
           set -euo pipefail
-          npm ci --no-audit > "$RUNNER_TEMP/verifier-npm-ci.out" 2>&1
-          test "$(wc -c < "$RUNNER_TEMP/verifier-npm-ci.out")" -le 8388608
+          "$GITHUB_WORKSPACE/node_modules/.bin/tsx" "$GITHUB_WORKSPACE/scripts/capture-bounded-command.ts" \
+            --stdout "$RUNNER_TEMP/verifier-npm-ci.out" --stderr "$RUNNER_TEMP/verifier-npm-ci.err" \
+            --result "$RUNNER_TEMP/verifier-npm-ci.result.json" --max-bytes 8388608 -- npm ci --no-audit
+          jq -e '(.schemaVersion == "theologai-bounded-command.v1") and (.exitStatus == 0) and (.overflow == false)' \
+            "$RUNNER_TEMP/verifier-npm-ci.result.json"
 
       - name: Verify pinned Wrangler version
-        env:
-          WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-version-logs
-        run: test "$(npx --no-install wrangler --version)" = '4.114.0'
+        run: |
+          set -euo pipefail
+          "$GITHUB_WORKSPACE/node_modules/.bin/tsx" "$GITHUB_WORKSPACE/scripts/capture-bounded-command.ts" \
+            --stdout "$RUNNER_TEMP/wrangler-version.out" --stderr "$RUNNER_TEMP/wrangler-version.err" \
+            --result "$RUNNER_TEMP/wrangler-version.result.json" --max-bytes 65536 -- \
+            npx --no-install wrangler --version
+          jq -e '(.schemaVersion == "theologai-bounded-command.v1") and (.exitStatus == 0) and (.overflow == false)' \
+            "$RUNNER_TEMP/wrangler-version.result.json"
+          test "$(sed -n '1p' "$RUNNER_TEMP/wrangler-version.out")" = '4.114.0'
 
       - name: Check out exact historical PR108 source separately
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -121,8 +130,8 @@ jobs:
       - name: Capture production and preview controls before rehearsal (read-only)
         env:
           CLOUDFLARE_READ_ONLY_API_TOKEN: ${{ secrets.CLOUDFLARE_READ_ONLY_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_READ_ONLY_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
           EXPECTED_PRODUCTION_VERSION: ${{ inputs.expected_production_version_id }}
           EXPECTED_PREVIEW_VERSION: ${{ inputs.expected_preview_version_id }}
         run: |
@@ -130,9 +139,9 @@ jobs:
           MAX_CAPTURE_BYTES=8388608
           bounded_json() {
             stdout="$1"; stderr="$2"; shift 2
-            "$@" > "$stdout" 2> "$stderr"
-            test "$(wc -c < "$stdout")" -le "$MAX_CAPTURE_BYTES"
-            test "$(wc -c < "$stderr")" -le "$MAX_CAPTURE_BYTES"
+            "$GITHUB_WORKSPACE/node_modules/.bin/tsx" "$GITHUB_WORKSPACE/scripts/capture-bounded-command.ts" \
+              --stdout "$stdout" --stderr "$stderr" --result "$stdout.result.json" --max-bytes "$MAX_CAPTURE_BYTES" -- "$@"
+            jq -e '(.schemaVersion == "theologai-bounded-command.v1") and (.exitStatus == 0) and (.overflow == false)' "$stdout.result.json"
           }
           bounded_json "$RUNNER_TEMP/d1-before.json" "$RUNNER_TEMP/d1-before.stderr" npx --no-install wrangler d1 list --json
           bounded_json "$RUNNER_TEMP/production-before.json" "$RUNNER_TEMP/production-before.stderr" npx --no-install wrangler deployments list --json
@@ -143,24 +152,22 @@ jobs:
       - name: Run historical PR108 local gates without credentials
         run: |
           set -euo pipefail
-          MAX_CAPTURE_BYTES=8388608
-          bounded() {
-            output="$1"; shift
-            "$@" > "$output" 2>&1
-            test "$(wc -c < "$output")" -le "$MAX_CAPTURE_BYTES"
+          capture() {
+            stdout="$1"; stderr="$2"; result="$3"; shift 3
+            "$GITHUB_WORKSPACE/node_modules/.bin/tsx" "$GITHUB_WORKSPACE/scripts/capture-bounded-command.ts" \
+              --stdout "$stdout" --stderr "$stderr" --result "$result" --cwd "$GITHUB_WORKSPACE/pr108-source" \
+              --max-bytes 8388608 -- "$@"
+            jq -e '(.schemaVersion == "theologai-bounded-command.v1") and (.exitStatus == 0) and (.overflow == false)' "$result"
           }
-          (
-            cd pr108-source
-            bounded "$RUNNER_TEMP/pr108-npm-ci.out" npm ci --no-audit
-            bounded "$RUNNER_TEMP/pr108-workerd.out" npm run d1:seed:verify-workerd
-            bounded "$RUNNER_TEMP/pr108-runtime.out" npm run test:worker-production-runtime
-          )
+          capture "$RUNNER_TEMP/pr108-npm-ci.out" "$RUNNER_TEMP/pr108-npm-ci.err" "$RUNNER_TEMP/pr108-npm-ci.result.json" npm ci --no-audit
+          capture "$RUNNER_TEMP/pr108-workerd.out" "$RUNNER_TEMP/pr108-workerd.err" "$RUNNER_TEMP/pr108-workerd.result.json" npm run d1:seed:verify-workerd
+          capture "$RUNNER_TEMP/pr108-runtime.out" "$RUNNER_TEMP/pr108-runtime.err" "$RUNNER_TEMP/pr108-runtime.result.json" npm run test:worker-production-runtime
 
       - name: Capture fixed PR108 Worker/version and deployment proof (read-only)
         env:
           CLOUDFLARE_READ_ONLY_API_TOKEN: ${{ secrets.CLOUDFLARE_READ_ONLY_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_READ_ONLY_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
           EXPECTED_PRODUCTION_VERSION: ${{ inputs.expected_production_version_id }}
           EXPECTED_PREVIEW_VERSION: ${{ inputs.expected_preview_version_id }}
         run: |
@@ -168,50 +175,51 @@ jobs:
           MAX_CAPTURE_BYTES=8388608
           bounded_json() {
             stdout="$1"; stderr="$2"; shift 2
-            "$@" > "$stdout" 2> "$stderr"
-            test "$(wc -c < "$stdout")" -le "$MAX_CAPTURE_BYTES"
-            test "$(wc -c < "$stderr")" -le "$MAX_CAPTURE_BYTES"
+            "$GITHUB_WORKSPACE/node_modules/.bin/tsx" "$GITHUB_WORKSPACE/scripts/capture-bounded-command.ts" \
+              --stdout "$stdout" --stderr "$stderr" --result "$stdout.result.json" --max-bytes "$MAX_CAPTURE_BYTES" -- "$@"
+            jq -e '(.schemaVersion == "theologai-bounded-command.v1") and (.exitStatus == 0) and (.overflow == false)' "$stdout.result.json"
           }
           bounded_json "$RUNNER_TEMP/target-version.json" "$RUNNER_TEMP/target-version.stderr" \
             npx --no-install wrangler versions view 291f3292-3fa9-44fc-bf6f-b68fd2f4cef6 --name theologai --json
-          curl --fail --silent --show-error --location --max-time 30 --proto '=https' --tlsv1.2 \
-            -H "Authorization: Bearer $CLOUDFLARE_READ_ONLY_API_TOKEN" -H 'Accept: application/json' \
-            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/theologai/deployments/3d7489d9-7b48-4ad0-bdc6-95ffbda53bd8" \
-            > "$RUNNER_TEMP/target-deployment.json"
-          test "$(wc -c < "$RUNNER_TEMP/target-deployment.json")" -le "$MAX_CAPTURE_BYTES"
+          bounded_json "$RUNNER_TEMP/target-deployment.json" "$RUNNER_TEMP/target-deployment.stderr" \
+            curl --fail --silent --show-error --location --max-time 30 --proto '=https' --tlsv1.2 \
+              -H "Authorization: Bearer $CLOUDFLARE_READ_ONLY_API_TOKEN" -H 'Accept: application/json' \
+              "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/theologai/deployments/3d7489d9-7b48-4ad0-bdc6-95ffbda53bd8"
 
       - name: Run fixed PR108 remote readiness (read-only token only)
         env:
           CLOUDFLARE_READ_ONLY_API_TOKEN: ${{ secrets.CLOUDFLARE_READ_ONLY_API_TOKEN }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_READ_ONLY_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
         run: |
           set -euo pipefail
-          MAX_CAPTURE_BYTES=8388608
-          cd pr108-source
-          npm run d1:remote:check -- --database theologai-production-20260729-transform11-a \
-            > "$RUNNER_TEMP/pr108-remote-d1.out" 2>&1
-          test "$(wc -c < "$RUNNER_TEMP/pr108-remote-d1.out")" -le "$MAX_CAPTURE_BYTES"
+          "$GITHUB_WORKSPACE/node_modules/.bin/tsx" "$GITHUB_WORKSPACE/scripts/capture-bounded-command.ts" \
+            --stdout "$RUNNER_TEMP/pr108-remote-d1.out" --stderr "$RUNNER_TEMP/pr108-remote-d1.err" \
+            --result "$RUNNER_TEMP/pr108-remote-d1.result.json" --cwd "$GITHUB_WORKSPACE/pr108-source" \
+            --max-bytes 8388608 -- npm run d1:remote:check -- --database theologai-production-20260729-transform11-a
+          jq -e '(.schemaVersion == "theologai-bounded-command.v1") and (.exitStatus == 0) and (.overflow == false)' \
+            "$RUNNER_TEMP/pr108-remote-d1.result.json"
 
       - name: Run exact PR108 recovery command in dry-run mode only
         env:
           CLOUDFLARE_READ_ONLY_API_TOKEN: ${{ secrets.CLOUDFLARE_READ_ONLY_API_TOKEN }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_READ_ONLY_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
         run: |
           set -euo pipefail
-          MAX_CAPTURE_BYTES=8388608
-          printf 'DRY_RUN_SENTINEL: fixed-pr108-dry-run\n' > "$RUNNER_TEMP/dry-run.out"
-          npx --no-install wrangler versions deploy 291f3292-3fa9-44fc-bf6f-b68fd2f4cef6@100 --config wrangler.release.toml --name theologai --dry-run --yes >> "$RUNNER_TEMP/dry-run.out" 2>&1
-          test "$(wc -c < "$RUNNER_TEMP/dry-run.out")" -le "$MAX_CAPTURE_BYTES"
+          "$GITHUB_WORKSPACE/node_modules/.bin/tsx" "$GITHUB_WORKSPACE/scripts/capture-bounded-command.ts" \
+            --stdout "$RUNNER_TEMP/dry-run.out" --stderr "$RUNNER_TEMP/dry-run.err" \
+            --stdout-prefix 'DRY_RUN_SENTINEL: fixed-pr108-dry-run' \
+            --result "$RUNNER_TEMP/dry-run.result.json" --max-bytes 8388608 -- \
+            npx --no-install wrangler versions deploy 291f3292-3fa9-44fc-bf6f-b68fd2f4cef6@100 --config wrangler.release.toml --name theologai --dry-run --yes
+          jq -e '(.schemaVersion == "theologai-bounded-command.v1") and (.exitStatus == 0) and (.overflow == false)' \
+            "$RUNNER_TEMP/dry-run.result.json"
 
       - name: Capture production and preview controls after rehearsal (read-only)
         env:
           CLOUDFLARE_READ_ONLY_API_TOKEN: ${{ secrets.CLOUDFLARE_READ_ONLY_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_READ_ONLY_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
           EXPECTED_PRODUCTION_VERSION: ${{ inputs.expected_production_version_id }}
           EXPECTED_PREVIEW_VERSION: ${{ inputs.expected_preview_version_id }}
         run: |
@@ -219,9 +227,9 @@ jobs:
           MAX_CAPTURE_BYTES=8388608
           bounded_json() {
             stdout="$1"; stderr="$2"; shift 2
-            "$@" > "$stdout" 2> "$stderr"
-            test "$(wc -c < "$stdout")" -le "$MAX_CAPTURE_BYTES"
-            test "$(wc -c < "$stderr")" -le "$MAX_CAPTURE_BYTES"
+            "$GITHUB_WORKSPACE/node_modules/.bin/tsx" "$GITHUB_WORKSPACE/scripts/capture-bounded-command.ts" \
+              --stdout "$stdout" --stderr "$stderr" --result "$stdout.result.json" --max-bytes "$MAX_CAPTURE_BYTES" -- "$@"
+            jq -e '(.schemaVersion == "theologai-bounded-command.v1") and (.exitStatus == 0) and (.overflow == false)' "$stdout.result.json"
           }
           bounded_json "$RUNNER_TEMP/d1-after.json" "$RUNNER_TEMP/d1-after.stderr" npx --no-install wrangler d1 list --json
           bounded_json "$RUNNER_TEMP/production-after.json" "$RUNNER_TEMP/production-after.stderr" npx --no-install wrangler deployments list --json
@@ -247,7 +255,10 @@ jobs:
           EXPECTED_PREVIEW_VERSION: ${{ inputs.expected_preview_version_id }}
         run: |
           set -euo pipefail
-          npx --no-install tsx scripts/production-rollback-rehearsal.ts create \
+          "$GITHUB_WORKSPACE/node_modules/.bin/tsx" "$GITHUB_WORKSPACE/scripts/capture-bounded-command.ts" \
+            --stdout "$RUNNER_TEMP/receipt.stdout" --stderr "$RUNNER_TEMP/receipt.stderr" \
+            --result "$RUNNER_TEMP/receipt.result.json" --max-bytes 65536 -- \
+            npx --no-install tsx scripts/production-rollback-rehearsal.ts create \
             --confirmation "$CONFIRMATION" \
             --repository "$REPOSITORY" \
             --workflow "$WORKFLOW" \
@@ -275,12 +286,14 @@ jobs:
             --target-version "$RUNNER_TEMP/target-version.json" \
             --target-deployment "$RUNNER_TEMP/target-deployment.json" \
             --readiness-output "$RUNNER_TEMP/pr108-remote-d1.out" \
-            --runtime-output "$RUNNER_TEMP/pr108-runtime.out" \
-            --dry-run-output "$RUNNER_TEMP/dry-run.out" \
-            --npm-install-output "$RUNNER_TEMP/pr108-npm-ci.out" \
-            --workerd-output "$RUNNER_TEMP/pr108-workerd.out" \
-            --output "$RUNNER_TEMP/production-rollback-rehearsal.json" \
-            > "$RUNNER_TEMP/receipt.stdout"
+            --readiness-stderr "$RUNNER_TEMP/pr108-remote-d1.err" \
+            --runtime-output "$RUNNER_TEMP/pr108-runtime.out" --runtime-stderr "$RUNNER_TEMP/pr108-runtime.err" \
+            --dry-run-output "$RUNNER_TEMP/dry-run.out" --dry-run-stderr "$RUNNER_TEMP/dry-run.err" \
+            --npm-install-output "$RUNNER_TEMP/pr108-npm-ci.out" --npm-install-stderr "$RUNNER_TEMP/pr108-npm-ci.err" \
+            --workerd-output "$RUNNER_TEMP/pr108-workerd.out" --workerd-stderr "$RUNNER_TEMP/pr108-workerd.err" \
+            --output "$RUNNER_TEMP/production-rollback-rehearsal.json"
+          jq -e '(.schemaVersion == "theologai-bounded-command.v1") and (.exitStatus == 0) and (.overflow == false)' \
+            "$RUNNER_TEMP/receipt.result.json"
           jq -e 'type == "object" and .schemaVersion == "theologai-production-rollback-rehearsal.v1" and .status == "passed" and .trafficMutation == false and .d1Mutation == false and .previewMutation == false and .targetInactiveBefore == true and .targetInactiveAfter == true and (.exitStatuses | to_entries | all(.value == 0))' "$RUNNER_TEMP/production-rollback-rehearsal.json"
 
       - name: Upload sanitized rehearsal receipt only

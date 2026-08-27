@@ -8,11 +8,13 @@ document records the capability and its acceptance criteria, not a claim that
 the rehearsal has passed.
 
 Before execution, the protected `production` environment must provision a
-dedicated `CLOUDFLARE_READ_ONLY_API_TOKEN` with only the read permissions
-needed for Worker versions/deployments and D1 inventory. The protected job is
-marked `deployment: false` because it must not create a deployment record. The
-workflow never uses the normal deployment token, and credential-free historical
-checkout and local gates receive no Cloudflare credential.
+dedicated `CLOUDFLARE_READ_ONLY_API_TOKEN` with exactly these account-scoped
+permissions: `Workers Scripts Read` and `D1 Read`; no additional permissions
+or account grants are allowed. The protected job is marked `deployment: false`
+because it must not create a deployment record. Wrangler receives this secret only through its
+`CLOUDFLARE_API_TOKEN` environment variable in authenticated read-only steps.
+The workflow never uses the normal deployment token, and credential-free
+historical checkout and local gates receive no Cloudflare credential.
 
 ## Fixed recovery target
 
@@ -99,9 +101,9 @@ The remote retention policy is conservative and review-only:
 
 1. Retain the active production D1.
 2. Retain the immediate same-D1 Worker predecessor.
-3. Retain the two newest cross-schema matched generations. At this baseline,
-   those are schema-`0009`, PR #108 Transform-11, and the PR #101 hierarchy
-   generation as the older matched record.
+3. Retain the two newest older cross-schema matched generations. schema-`0009` is active;
+   the two retained older cross-schema matched generations are PR #108 Transform-11
+   and PR #101 hierarchy.
 4. Never delete automatically. A D1 is only review-eligible after two newer
    matched generations exist, the newest fallback has passed a fresh
    rehearsal, the current release has been stable for at least 30 days, fresh

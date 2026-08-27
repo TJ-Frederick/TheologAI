@@ -278,6 +278,16 @@ describe('workflow topology', () => {
     expect([...workflow.matchAll(/wrangler versions deploy/g)]).toHaveLength(1);
     expect(workflow).toContain('CLOUDFLARE_READ_ONLY_API_TOKEN');
     expect(workflow).not.toContain('secrets.CLOUDFLARE_API_TOKEN');
+    expect(workflow.match(/^\s+CLOUDFLARE_READ_ONLY_API_TOKEN: \$\{\{ secrets\.CLOUDFLARE_READ_ONLY_API_TOKEN \}\}$/gm)).toHaveLength(5);
+    expect(workflow.match(/^\s+CLOUDFLARE_API_TOKEN: \$\{\{ secrets\.CLOUDFLARE_READ_ONLY_API_TOKEN \}\}$/gm)).toHaveLength(5);
+    expect(workflow).toContain('capture-bounded-command.ts');
+    expect(workflow).not.toContain('WRANGLER_LOG_PATH');
+    expect(workflow).not.toMatch(/^\s*[^#\n]*>\s*["']?\$RUNNER_TEMP/m);
+    for (const step of workflow.split('\n      - ')) {
+      if (!/\bwrangler(?:\s|$)/.test(step)) continue;
+      if (step.includes('name: Verify pinned Wrangler version')) continue;
+      expect(step).toContain('CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_READ_ONLY_API_TOKEN }}');
+    }
     expect(workflow).toContain('target-deployment.json');
     expect(workflow).toContain('/workers/scripts/theologai/deployments/3d7489d9-7b48-4ad0-bdc6-95ffbda53bd8');
     expect(workflow).toContain('all(.value == 0)');
@@ -290,5 +300,15 @@ describe('workflow topology', () => {
     expect(workflow).not.toMatch(/wrangler\s+rollback|versions\s+upload|wrangler\s+deploy(?!ments)/i);
     expect(workflow).not.toMatch(/d1\s+(execute|migrations|delete|create|update)|secret\s+(put|delete)|triggers\s+deploy/i);
     expect(workflow).not.toContain('github-token:');
+  });
+
+  it('documents the exact least-privilege token permissions and matched retention baseline', async () => {
+    const runbook = await readFile(new URL('../../../docs/PRODUCTION-ROLLBACK-REHEARSAL.md', import.meta.url), 'utf8');
+    expect(runbook).toContain('Workers Scripts Read');
+    expect(runbook).toContain('D1 Read');
+    expect(runbook).toContain('no additional permissions');
+    expect(runbook).toContain('schema-`0009` is active');
+    expect(runbook).toContain('PR #108 Transform-11');
+    expect(runbook).toContain('PR #101 hierarchy');
   });
 });
