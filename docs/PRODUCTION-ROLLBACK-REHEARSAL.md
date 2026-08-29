@@ -53,7 +53,11 @@ after. It retrieves the fixed historical deployment through the exact
 read-only Cloudflare deployment-ID endpoint rather than relying on a truncated
 deployment list. It checks out the fixed source in a separate directory and runs its
 historical `npm ci`, local Workerd seed/readiness, production-like Worker
-runtime, and remote D1 readiness checks. Raw Wrangler output stays in runner
+runtime, and remote D1 readiness checks. Because the historical checkout omits
+ignored/generated artifacts, its SQLite database is rebuilt into runner
+temporary storage and its D1 seed is regenerated in the source checkout before
+the Workerd and runtime gates; those temporary/generated artifacts are
+discarded with the runner. Raw Wrangler output stays in runner
 temporary storage. The committed dependency-free `scripts/capture-bounded-command.mjs`
 runner is used before and after dependency installation, so output capture does
 not depend on `node_modules`. The runner uses a detached, dependency-free

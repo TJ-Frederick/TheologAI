@@ -85,6 +85,7 @@ jobs:
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
+          persist-credentials: false
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
@@ -117,6 +118,7 @@ jobs:
           ref: 8da99fd0a161b90a4bd90ab29bde1abf796b3bf6
           path: pr108-source
           fetch-depth: 1
+          persist-credentials: false
 
       - name: Verify exact historical source identity
         env:
@@ -160,6 +162,10 @@ jobs:
             jq -e '(.schemaVersion == "theologai-bounded-command.v1") and (.exitStatus == 0) and (.overflow == false)' "$result"
           }
           capture "$RUNNER_TEMP/pr108-npm-ci.out" "$RUNNER_TEMP/pr108-npm-ci.err" "$RUNNER_TEMP/pr108-npm-ci.result.json" npm ci --no-audit
+          capture "$RUNNER_TEMP/pr108-build-db.out" "$RUNNER_TEMP/pr108-build-db.err" "$RUNNER_TEMP/pr108-build-db.result.json" npm run build:db -- --output "$RUNNER_TEMP/pr108-theologai.db"
+          capture "$RUNNER_TEMP/pr108-verify-db.out" "$RUNNER_TEMP/pr108-verify-db.err" "$RUNNER_TEMP/pr108-verify-db.result.json" npm run data:verify-db -- --database "$RUNNER_TEMP/pr108-theologai.db"
+          capture "$RUNNER_TEMP/pr108-seed-export.out" "$RUNNER_TEMP/pr108-seed-export.err" "$RUNNER_TEMP/pr108-seed-export.result.json" npm run d1:seed:export -- --database "$RUNNER_TEMP/pr108-theologai.db" --clean
+          capture "$RUNNER_TEMP/pr108-seed-verify.out" "$RUNNER_TEMP/pr108-seed-verify.err" "$RUNNER_TEMP/pr108-seed-verify.result.json" npm run d1:seed:verify
           capture "$RUNNER_TEMP/pr108-workerd.out" "$RUNNER_TEMP/pr108-workerd.err" "$RUNNER_TEMP/pr108-workerd.result.json" npm run d1:seed:verify-workerd
           capture "$RUNNER_TEMP/pr108-runtime.out" "$RUNNER_TEMP/pr108-runtime.err" "$RUNNER_TEMP/pr108-runtime.result.json" npm run test:worker-production-runtime
 
