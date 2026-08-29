@@ -299,7 +299,27 @@ describe('workflow topology', () => {
     const localGateStart = workflow.indexOf('      - name: Run historical PR108 local gates without credentials');
     const localGateEnd = workflow.indexOf('\n      - name:', localGateStart + 1);
     expect(localGateStart).toBeGreaterThan(0);
-    expect(workflow.slice(localGateStart, localGateEnd)).not.toMatch(/CLOUDFLARE|secrets\./);
+    const localGate = workflow.slice(localGateStart, localGateEnd);
+    expect(localGate).not.toMatch(/CLOUDFLARE|secrets\.|--remote\b|d1:remote/i);
+    const historicalCommands = [
+      'npm ci --no-audit',
+      'npm run build:db -- --output "$RUNNER_TEMP/pr108-theologai.db"',
+      'npm run data:verify-db -- --database "$RUNNER_TEMP/pr108-theologai.db"',
+      'npm run d1:seed:export -- --database "$RUNNER_TEMP/pr108-theologai.db" --clean',
+      'npm run d1:seed:verify',
+      'npm run d1:seed:verify-workerd',
+      'npm run test:worker-production-runtime',
+    ];
+    let previousCommandIndex = -1;
+    for (const command of historicalCommands) {
+      expect(localGate).toContain(command);
+      const commandIndex = localGate.indexOf(command);
+      expect(commandIndex).toBeGreaterThan(previousCommandIndex);
+      previousCommandIndex = commandIndex;
+    }
+    expect(localGate.match(/\$RUNNER_TEMP\/pr108-theologai\.db/g)).toHaveLength(3);
+    expect(localGate).toContain('--clean');
+    expect(workflow.match(/^          persist-credentials: false$/gm)).toHaveLength(2);
     expect(workflow).not.toMatch(/wrangler\s+rollback|versions\s+upload|wrangler\s+deploy(?!ments)/i);
     expect(workflow).not.toMatch(/d1\s+(execute|migrations|delete|create|update)|secret\s+(put|delete)|triggers\s+deploy/i);
     expect(workflow).not.toContain('github-token:');
