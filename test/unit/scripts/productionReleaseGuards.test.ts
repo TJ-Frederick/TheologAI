@@ -70,6 +70,14 @@ describe('production release guards', () => {
     expect(workflow).not.toContain('d1 delete');
   });
 
+  it('verifies the protected receipt against the preview-suffixed server identity', async () => {
+    const workflow = await readFile(new URL('.github/workflows/deploy.yml', root), 'utf8');
+    expect((workflow.match(/process\.stdout\.write\(packageJson\.version \+ '-preview'\)/g) ?? [])).toHaveLength(2);
+    expect((workflow.match(/--expected-server-version "\$preview_server_version"/g) ?? [])).toHaveLength(2);
+    expect(workflow).not.toContain('process.stdout.write(packageJson.version)');
+    expect(workflow).not.toContain('--expected-server-version "$server_version"');
+  });
+
   it('revalidates the exact gate artifact before dependencies, secrets, Cloudflare, or D1 and retains seven release artifacts', async () => {
     const workflow = await readFile(new URL('.github/workflows/deploy.yml', root), 'utf8');
     const deployStart = workflow.indexOf('  deploy:');

@@ -337,13 +337,13 @@ jobs:
           SOURCE_COMMIT: ${{ steps.evidence.outputs.source_commit }}
         run: |
           source_tree="$(git rev-parse 'HEAD^{tree}')"
-          server_version="$(node --input-type=module -e "import packageJson from './package.json' with { type: 'json' }; process.stdout.write(packageJson.version)")"
+          preview_server_version="$(node --input-type=module -e "import packageJson from './package.json' with { type: 'json' }; process.stdout.write(packageJson.version + '-preview')")"
           npx --no-install tsx scripts/dual-era-preview-release-receipt.ts verify \
             --receipt "$RUNNER_TEMP/protected-dual-era-preview/dual-era-preview-release-receipt.json" \
             --expected-repository "$GITHUB_REPOSITORY" \
             --expected-source-commit "$SOURCE_COMMIT" \
             --expected-source-tree "$source_tree" \
-            --expected-server-version "$server_version"
+            --expected-server-version "$preview_server_version"
 
   deploy:
     name: Test, Build & Deploy
@@ -458,13 +458,13 @@ jobs:
           SOURCE_COMMIT: ${{ needs.verify-dual-era-preview.outputs.source_commit }}
         run: |
           source_tree="$(git rev-parse 'HEAD^{tree}')"
-          server_version="$(node --input-type=module -e "import packageJson from './package.json' with { type: 'json' }; process.stdout.write(packageJson.version)")"
+          preview_server_version="$(node --input-type=module -e "import packageJson from './package.json' with { type: 'json' }; process.stdout.write(packageJson.version + '-preview')")"
           npx --no-install tsx scripts/dual-era-preview-release-receipt.ts verify \
             --receipt "$RUNNER_TEMP/protected-dual-era-preview/dual-era-preview-release-receipt.json" \
             --expected-repository "$GITHUB_REPOSITORY" \
             --expected-source-commit "$SOURCE_COMMIT" \
             --expected-source-tree "$source_tree" \
-            --expected-server-version "$server_version"
+            --expected-server-version "$preview_server_version"
 
       - name: Detect production custom-domain declaration change
         id: production-custom-domain-change
