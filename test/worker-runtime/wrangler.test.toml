@@ -3,9 +3,6 @@ main = "../../src/worker.ts"
 compatibility_date = "2026-07-09"
 compatibility_flags = ["nodejs_compat"]
 
-[alias]
-ai = "../../src/shims/ai-stub.ts"
-
 [vars]
 THEOLOGAI_VERSION = "3.6.0-test"
 THEOLOGAI_REQUEST_LOGS = "false"

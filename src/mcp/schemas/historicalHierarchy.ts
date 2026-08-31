@@ -6,7 +6,7 @@
  * by historicalHierarchyStructured.ts, not an open-ended metadata envelope.
  */
 
-import type { Tool } from '@modelcontextprotocol/sdk/types.js';
+import type { Tool } from '@modelcontextprotocol/server';
 import { HISTORICAL_HIERARCHY_RESOURCE_URI_MAX_LENGTH } from '../../kernel/historicalHierarchyResource.js';
 
 const SAFE_SLUG = '^[A-Za-z0-9][A-Za-z0-9._-]{0,159}$';

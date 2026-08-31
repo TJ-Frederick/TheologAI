@@ -1,4 +1,4 @@
-import type { Tool } from '@modelcontextprotocol/sdk/types.js';
+import type { Tool } from '@modelcontextprotocol/server';
 import {
   DONATION_CONFIG_LIMITS,
   RECIPIENT_ADDRESS,

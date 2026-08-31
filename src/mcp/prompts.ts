@@ -1,5 +1,4 @@
-import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { GetPromptRequestSchema, ListPromptsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import type { Server } from '@modelcontextprotocol/server';
 import { z } from 'zod/v4';
 import { parseReference } from '../kernel/reference.js';
 import { parseStrongsIdentity } from '../kernel/strongs.js';
@@ -16,17 +15,10 @@ const TRANSLATIONS = new Set(['ESV', 'NET', 'KJV', 'WEB', 'BSB', 'ASV', 'YLT', '
 const CCEL_DATE_CAPABILITY_NOTICE = 'Expanded discovery does not provide reviewed composition-date filtering; any returned broader hit is not composition-date evidence.';
 const CCEL_DATED_FALLBACK_NOTICE = 'Expanded discovery deliberately omits the requested catalog composition-year bounds; any returned broader hit cannot establish membership in that requested range.';
 
-/**
- * The upstream SDK's strict string record throws an unclassified ZodError before
- * our handler can return MCP InvalidParams. Accept unknown values at the wire
- * boundary, then classify them explicitly with validatePromptArguments.
- */
-const ClassifiedGetPromptRequestSchema = GetPromptRequestSchema.extend({
-  params: GetPromptRequestSchema.shape.params.extend({
-    name: z.unknown(),
-    arguments: z.unknown().optional(),
-  }),
-});
+const classifiedPromptParams = z.object({
+  name: z.unknown(),
+  arguments: z.unknown().optional(),
+}).passthrough();
 
 function translation(value: string | undefined): string {
   const normalized = value?.trim().toUpperCase();
@@ -180,7 +172,7 @@ export function registerPromptHandlers(
   server: Server,
   descriptor: PrimarySourceSearchDescriptor = createPrimarySourceSearchDescriptor(),
 ): void {
-  server.setRequestHandler(ListPromptsRequestSchema, async () => ({
+  server.setRequestHandler('prompts/list', async () => ({
     prompts: [
       {
         name: 'word-study',
@@ -263,8 +255,8 @@ export function registerPromptHandlers(
     ],
   }));
 
-  server.setRequestHandler(ClassifiedGetPromptRequestSchema, async (request) => {
-    const { name, arguments: args } = request.params;
+  server.setRequestHandler('prompts/get', { params: classifiedPromptParams }, async (params) => {
+    const { name, arguments: args } = params;
     validatePromptArguments(name, args);
     // validatePromptArguments narrows both values after the permissive wire boundary.
     if (typeof name !== 'string') throw new Error('Unreachable prompt-name validation state');

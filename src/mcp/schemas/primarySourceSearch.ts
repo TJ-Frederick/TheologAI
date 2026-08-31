@@ -1,4 +1,4 @@
-import type { Tool } from '@modelcontextprotocol/sdk/types.js';
+import type { Tool } from '@modelcontextprotocol/server';
 import { CLASSIC_TEXT_LIMITS } from '../../kernel/classicTextContract.js';
 
 const status = {

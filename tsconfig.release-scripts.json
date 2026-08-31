@@ -11,6 +11,8 @@
     "scripts/production-release-reconciliation.ts",
     "scripts/verify-preview-worker-deployment.ts",
     "scripts/verify-production-worker-deployment.ts",
+    "scripts/audit-dual-era-mcp-preview.ts",
+    "scripts/dual-era-preview-release-receipt.ts",
     "scripts/audit-original-language-v2-preview.ts",
     "scripts/audit-original-language-v2-production.ts",
     "scripts/audit-historical-core-preview.ts",

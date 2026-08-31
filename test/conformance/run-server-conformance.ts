@@ -8,7 +8,7 @@ import { createDeterministicMcpFixture } from '../fixtures/mcpCompositionRoot.js
 // The official runner's default server suite targets its fixture-only
 // "everything" server. These are the protocol-generic scenarios that apply to
 // TheologAI's advertised capabilities and anonymous, stateless HTTP transport.
-const APPLICABLE_SCENARIOS = [
+const LEGACY_SCENARIOS = [
   'server-initialize',
   'ping',
   'tools-list',
@@ -17,15 +17,39 @@ const APPLICABLE_SCENARIOS = [
   'dns-rebinding-protection',
 ] as const;
 
-const conformanceEntrypoint = fileURLToPath(new URL(
+const MODERN_SCENARIOS = [
+  'server-stateless',
+  'tools-list',
+  'resources-list',
+  'prompts-list',
+  'sep-2164-resource-not-found',
+  'dns-rebinding-protection',
+  'caching',
+  'http-header-validation',
+] as const;
+
+const legacyConformanceEntrypoint = fileURLToPath(new URL(
   '../../node_modules/@modelcontextprotocol/conformance/dist/index.js',
   import.meta.url,
 ));
-const outputDirectory = resolve('test-output/mcp-conformance');
+const modernConformanceEntrypoint = fileURLToPath(new URL(
+  '../../node_modules/@modelcontextprotocol/conformance-modern/dist/index.js',
+  import.meta.url,
+));
+const legacyOutputDirectory = resolve('test-output/mcp-conformance/legacy');
+const modernOutputDirectory = resolve('test-output/mcp-conformance/modern');
+const modernExpectedFailures = resolve('test/conformance/modern-expected-failures.yml');
 
-async function runScenario(url: string, scenario: string): Promise<void> {
+async function runScenario(
+  entrypoint: string,
+  url: string,
+  scenario: string,
+  outputDirectory: string,
+  specVersion?: string,
+  expectedFailures?: string,
+): Promise<void> {
   const args = [
-    conformanceEntrypoint,
+    entrypoint,
     'server',
     '--url',
     url,
@@ -34,6 +58,9 @@ async function runScenario(url: string, scenario: string): Promise<void> {
     '--output-dir',
     outputDirectory,
   ];
+  if (specVersion) args.push('--spec-version', specVersion);
+  if (expectedFailures) args.push('--expected-failures', expectedFailures);
+  if (scenario === 'http-header-validation') args.push('--force');
 
   await new Promise<void>((resolveRun, rejectRun) => {
     const child = spawn(process.execPath, args, { stdio: 'inherit' });
@@ -80,8 +107,23 @@ async function main(): Promise<void> {
     config.allowedOrigins.push(origin);
     const url = `${origin}/mcp`;
 
-    for (const scenario of APPLICABLE_SCENARIOS) {
-      await runScenario(url, scenario);
+    for (const scenario of LEGACY_SCENARIOS) {
+      await runScenario(
+        legacyConformanceEntrypoint,
+        url,
+        scenario,
+        legacyOutputDirectory,
+      );
+    }
+    for (const scenario of MODERN_SCENARIOS) {
+      await runScenario(
+        modernConformanceEntrypoint,
+        url,
+        scenario,
+        modernOutputDirectory,
+        '2026-07-28',
+        modernExpectedFailures,
+      );
     }
 
     if (biblePassageCalls.length !== 0) {

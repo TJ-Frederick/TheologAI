@@ -1,9 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import Database from 'better-sqlite3';
 import { afterAll, describe, expect, it } from 'vitest';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
+import type { Server } from '@modelcontextprotocol/server';
 import { createTheologAiMcpServer } from '../../../src/mcp/server.js';
 import { createWorkerCompositionRoot } from '../../../src/tools/worker/index.js';
 import { createCompositionRoot } from '../../../src/tools/v2/index.js';

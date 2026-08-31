@@ -1,8 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { LoggingMessageNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
+import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
+import type { Server } from '@modelcontextprotocol/server';
 import type { ToolHandler } from '../../../src/kernel/types.js';
 import { createTheologAiMcpServer } from '../../../src/mcp/server.js';
 import { createBibleLookupHandler } from '../../../src/tools/v2/bibleLookup.js';
@@ -62,7 +60,7 @@ async function connect(
   const server = createTheologAiMcpServer(root, 'output-validation-test').server;
   const client = new Client({ name: 'output-validation-client', version: '1.0.0' }, { capabilities: {} });
   if (logs) {
-    client.setNotificationHandler(LoggingMessageNotificationSchema, notification => {
+    client.setNotificationHandler('notifications/message', notification => {
       logs.push(notification.params);
     });
   }
@@ -191,7 +189,7 @@ describe('MCP structured output validation', () => {
           : toolName === 'classic_text_lookup'
             ? '2'
             : '1';
-      expect(schema?.properties?.schemaVersion).toMatchObject({ const: expectedVersion });
+      expect((schema as any)?.properties?.schemaVersion).toMatchObject({ const: expectedVersion });
     }
   });
 

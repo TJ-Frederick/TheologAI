@@ -65,9 +65,9 @@ The following boundaries remain deliberate:
 
 ## Phase 3B sequencing
 
-Status: **3B.0 complete (C1 + C2)**. The next work item is 3B.1; this plan
-does not authorize its deployment, binding changes, cleanup, or any other
-operational mutation.
+Status: **3B.0 complete (C1 + C2); 3B.1 implementation release-ready locally,
+protected preview proof pending**. This plan does not authorize deployment,
+binding changes, cleanup, or any other operational mutation.
 
 ### 3B.0 — Rebaseline and simplify
 
@@ -86,9 +86,10 @@ operational mutation.
 
 ### 3B.1 — Dual-era MCP modernization
 
-The current server uses `@modelcontextprotocol/sdk` v1 and negotiates the
-legacy `2025-11-25` protocol. The current MCP specification is `2026-07-28`,
-and the official TypeScript v2 packages support both legacy and modern eras.
+The deployed historical baseline uses `@modelcontextprotocol/sdk` v1 and
+negotiates the legacy `2025-11-25` protocol. The checked-out 3B.1 candidate
+uses the exact official TypeScript v2 server, client, and Node packages and
+supports both legacy and modern eras; that candidate is not a deployed claim.
 
 Implement this as a behavior-neutral infrastructure release:
 
@@ -106,6 +107,19 @@ Implement this as a behavior-neutral infrastructure release:
    retain only the compatibility behavior required by legacy clients.
 6. Add separate legacy and modern protocol fixtures, conformance coverage, and
    black-box audits. Preview must prove both eras before production.
+
+Implementation findings: the official v2 packages can own stdio, Node HTTP,
+and Worker HTTP directly, so the prior Agents transport dependency and local
+AI shim are unnecessary. The candidate preserves the eleven-tool/six-prompt
+contract and deterministic resource ordering, limits Logging to legacy stdio,
+adds modern discovery/header/metadata and private zero-TTL cache behavior, and
+sanitizes unexpected protocol failures. The reviewed Worker bundle is about
+2.40 MB raw and 470 KB gzip, with local Workerd startup around 58 ms under a
+1,000 ms fail-closed gate. Legacy and modern conformance, process-boundary,
+and real Workerd coverage are separate. A protected preview run must create a
+seven-day source/tree/Worker/D1-bound dual-era receipt; production must retrieve
+that exact successful artifact with digest validation and fail closed before
+any deployment if it is absent, stale, or mismatched.
 
 Do not add Tasks, MCP Apps, or Skills-over-MCP merely because they exist. Add
 an extension only when it solves a defined product workflow. Tasks are not

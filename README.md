@@ -84,8 +84,9 @@ rollback unit in that dated release record; it is not current today: deployment
 history, not the immediate rollback claim.
 
 The successor delivery program is tracked in
-[Phase 3B](docs/PHASE-3B-PLAN.md). It begins with release hygiene and dual-era
-MCP modernization before the separate historical-research project.
+[Phase 3B](docs/PHASE-3B-PLAN.md). The 3B.1 dual-era implementation is locally
+release-ready and awaits its separately authorized protected preview proof;
+it makes no claim about the currently deployed runtime.
 
 The historical PR #96 `original_language_study` schema-v2 audit passed 11/11
 cases.
@@ -257,13 +258,16 @@ seed evidence, and release boundary are recorded in
 
 | Transport | Tools | Resources | Prompts | MCP Logging |
 |---|---:|---:|---:|---:|
-| stdio | Yes | Yes | Yes | Yes |
+| stdio | Yes | Yes | Yes | Legacy era only |
 | Node Streamable HTTP | Yes | Yes | Yes | No |
 | Cloudflare Streamable HTTP | Yes | Yes | Yes | No |
 
-HTTP is intentionally anonymous and stateless. MCP Logging is limited to stdio
-because `logging/setLevel` state cannot persist when each HTTP POST receives a
-fresh server and transport.
+The same endpoints serve legacy `2025-11-25` and modern `2026-07-28` clients.
+Modern requests use stateless discovery, explicit request metadata and modern
+HTTP headers; list and resource results carry private, zero-TTL cache hints.
+HTTP is intentionally anonymous and stateless. MCP Logging is retained only
+for legacy stdio compatibility; modern clients and both HTTP transports use
+stderr or privacy-safe telemetry instead.
 
 ### Tools
 
@@ -713,7 +717,9 @@ the language-service edge and does not claim that every service is presentation
 free. `LocalPrimarySourceSearchProvider` retains its historical formatter call
 to preserve exact local-resource sizing and identity behavior.
 
-Business services depend on shared repository ports. Node uses synchronous
+Business services depend on shared repository ports. The shared MCP registry
+uses the official v2 server and Node transport packages directly; the former
+Agents transport wrapper and local AI module shim are retired. Node uses synchronous
 SQLite repositories through async-compatible service boundaries; Workers uses
 per-request D1 repositories. Both targets share one MCP registry.
 

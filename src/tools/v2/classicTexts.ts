@@ -22,7 +22,7 @@ import {
   presentClassicTextWork,
   validateClassicTextsOutputSemantics,
 } from '../../presenters/classicTextsStructured.js';
-import type { ResourceLink } from '@modelcontextprotocol/sdk/types.js';
+import type { ResourceLink } from '@modelcontextprotocol/server';
 import { CLASSIC_TEXT_LIMITS } from '../../kernel/classicTextContract.js';
 import {
   decodeHistoricalSectionedOnlyCursor,

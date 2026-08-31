@@ -82,6 +82,43 @@ async function rpc(
   return { response, message: await parseMcpResponse(response) };
 }
 
+async function modernRpc(
+  method: string,
+  params: Record<string, unknown> = {},
+  id: number | string = 1,
+  nameHeader?: string,
+): Promise<{ response: Response; message: JsonRpcResponse }> {
+  const headers = new Headers({
+    Accept: 'application/json, text/event-stream',
+    'Content-Type': 'application/json',
+    Origin: ALLOWED_ORIGIN,
+    'Mcp-Method': method,
+    'Mcp-Protocol-Version': '2026-07-28',
+  });
+  if (nameHeader) headers.set('Mcp-Name', nameHeader);
+  const response = await SELF.fetch(MCP_URL, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id,
+      method,
+      params: {
+        ...params,
+        _meta: {
+          'io.modelcontextprotocol/protocolVersion': '2026-07-28',
+          'io.modelcontextprotocol/clientInfo': {
+            name: 'worker-runtime-modern-test',
+            version: '1.0.0',
+          },
+          'io.modelcontextprotocol/clientCapabilities': {},
+        },
+      },
+    }),
+  });
+  return { response, message: await parseMcpResponse(response) };
+}
+
 async function rateLimitKey(ip: string, userAgent: string): Promise<string> {
   const input = new TextEncoder().encode(`theologai-rate-limit-v1\0${ip}\0${userAgent}`);
   const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', input));
@@ -101,6 +138,8 @@ describe('Worker MCP endpoint in workerd', () => {
     expect(browserPreflight.status).toBe(204);
     expect(browserPreflight.headers.get('Location')).toBeNull();
     expect(browserPreflight.headers.get('Access-Control-Allow-Origin')).toBe(ALLOWED_ORIGIN);
+    expect(browserPreflight.headers.get('Access-Control-Allow-Headers')).toContain('Mcp-Method');
+    expect(browserPreflight.headers.get('Access-Control-Allow-Headers')).toContain('Mcp-Name');
 
     const browserRequest = await SELF.fetch(LEGACY_PRODUCTION_MCP_URL, {
       method: 'POST',
@@ -314,6 +353,65 @@ describe('Worker MCP endpoint in workerd', () => {
     expect(primarySourceQuery.properties.searchDepth).toMatchObject({ enum: ['standard', 'expanded'], default: 'standard' });
     expect(primarySourceQuery.properties.expandedLimit).toMatchObject({ minimum: 1, maximum: 5, default: 3 });
     expect(primarySourceQuery.properties.page).toMatchObject({ const: 1, default: 1 });
+  });
+
+  it('discovers and serves the modern protocol with explicit private zero-TTL metadata', async () => {
+    const discovered = await modernRpc('server/discover', {}, 'modern-discover');
+    expect(discovered.response.status).toBe(200);
+    expect(discovered.message.error).toBeUndefined();
+    expect(discovered.message.result).toMatchObject({
+      supportedVersions: ['2026-07-28'],
+      capabilities: { tools: {}, resources: {}, prompts: {} },
+      resultType: 'complete',
+      ttlMs: 0,
+      cacheScope: 'private',
+      _meta: {
+        'io.modelcontextprotocol/serverInfo': {
+          name: 'theologai-bible-server',
+          version: '3.6.0-test',
+        },
+      },
+    });
+
+    const listed = await modernRpc('tools/list', {}, 'modern-tools');
+    expect(listed.response.status).toBe(200);
+    expect(listed.message.result).toMatchObject({
+      resultType: 'complete',
+      ttlMs: 0,
+      cacheScope: 'private',
+    });
+    expect((listed.message.result?.tools as Array<{ name: string }>).map(tool => tool.name)).toEqual([
+      'bible_lookup',
+      'bible_cross_references',
+      'parallel_passages',
+      'commentary_lookup',
+      'classic_text_lookup',
+      'primary_source_search',
+      'original_language_lookup',
+      'bible_verse_morphology',
+      'original_language_study',
+      'donation_config',
+      'verify_donation',
+    ]);
+
+    const mismatch = await modernRpc(
+      'tools/call',
+      { name: 'donation_config', arguments: {} },
+      'modern-mismatch',
+      'bible_lookup',
+    );
+    expect(mismatch.response.status).toBe(400);
+    expect(mismatch.message.error).toMatchObject({ code: -32020 });
+
+    const called = await modernRpc(
+      'tools/call',
+      { name: 'donation_config', arguments: {} },
+      'modern-call',
+      'donation_config',
+    );
+    expect(called.response.status).toBe(200);
+    expect(called.message.error).toBeUndefined();
+    expect(called.message.result?.structuredContent).toMatchObject({ kind: 'donation_config' });
   });
 
   it('returns structured Bible content alongside the legacy Markdown result', async () => {
@@ -1220,7 +1318,7 @@ describe('Worker MCP endpoint in workerd', () => {
     expect(result.response.status).toBe(200);
     expect(result.message.result).toBeUndefined();
     expect(result.message.error).toMatchObject({
-      code: -32002,
+      code: -32602,
       data: { uri: 'theologai://documents/not-in-the-fixture' },
     });
     expect(result.message.error?.message).toContain('Resource not found');

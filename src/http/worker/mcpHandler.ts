@@ -1,22 +1,17 @@
-import { WorkerTransport } from 'agents/mcp';
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
-import { INTERNAL_MCP_ERROR, sanitizeMcpMessage } from '../mcpErrors.js';
+import {
+  createMcpHandler,
+  type McpRequestContext,
+  type Server,
+} from '@modelcontextprotocol/server';
+import { INTERNAL_MCP_ERROR } from '../mcpErrors.js';
 import { safeErrorName } from './telemetry.js';
-
-class SanitizingWorkerTransport extends WorkerTransport {
-  override async send(
-    message: JSONRPCMessage,
-    options?: Parameters<WorkerTransport['send']>[1],
-  ): Promise<void> {
-    await super.send(sanitizeMcpMessage(message), options);
-  }
-}
 
 export interface WorkerMcpResult {
   response: Response;
   errorName?: string;
 }
+
+export type WorkerMcpServerFactory = (era: McpRequestContext['era']) => Server;
 
 export function createInternalMcpErrorResponse(): Response {
   return new Response(JSON.stringify({
@@ -33,18 +28,39 @@ export function createInternalMcpErrorResponse(): Response {
 }
 
 export async function handleWorkerMcpRequest(
-  server: McpServer,
+  createServer: WorkerMcpServerFactory,
   request: Request,
 ): Promise<WorkerMcpResult> {
-  const transport = new SanitizingWorkerTransport({ sessionIdGenerator: undefined });
+  let errorName: string | undefined;
+  const handler = createMcpHandler(
+    ({ era }) => createServer(era),
+    {
+      legacy: 'stateless',
+      responseMode: 'auto',
+      onerror(error) {
+        errorName = safeErrorName(error);
+      },
+    },
+  );
 
   try {
-    await server.connect(transport);
-    return { response: await transport.handleRequest(request) };
+    const response = await handler.fetch(request);
+    return { response: withPrivateErrorCaching(response), errorName };
   } catch (error) {
     return {
       response: createInternalMcpErrorResponse(),
       errorName: safeErrorName(error),
     };
   }
+}
+
+function withPrivateErrorCaching(response: Response): Response {
+  if (response.status < 500 || response.headers.has('Cache-Control')) return response;
+  const headers = new Headers(response.headers);
+  headers.set('Cache-Control', 'no-store');
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }

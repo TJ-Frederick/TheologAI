@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createPrimarySourceSearchHandler } from '../../../../src/tools/v2/primarySourceSearch.js';
 import { createPrimarySourceSearchDescriptor } from '../../../../src/mcp/primarySourceSearchDescriptor.js';
 import { validatorFor } from '../../../../src/mcp/validation.js';
-import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv';
+import { AjvJsonSchemaValidator } from '@modelcontextprotocol/client/validators/ajv';
 import type { PrimarySourceSearchPlanResult } from '../../../../src/services/historical/primarySourceTypes.js';
 
 function schemaTerms(value: unknown): string[] {

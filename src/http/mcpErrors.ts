@@ -1,17 +1,17 @@
 import {
-  ErrorCode,
+  ProtocolErrorCode,
   isJSONRPCErrorResponse,
   type JSONRPCMessage,
-} from '@modelcontextprotocol/sdk/types.js';
+} from '@modelcontextprotocol/server';
 
 export const INTERNAL_MCP_ERROR = {
-  code: ErrorCode.InternalError,
+  code: ProtocolErrorCode.InternalError,
   message: 'Internal server error',
 } as const;
 
 /** Remove exception text and data from unexpected MCP handler failures. */
 export function sanitizeMcpMessage(message: JSONRPCMessage): JSONRPCMessage {
-  if (!isJSONRPCErrorResponse(message) || message.error.code !== ErrorCode.InternalError) {
+  if (!isJSONRPCErrorResponse(message) || message.error.code !== ProtocolErrorCode.InternalError) {
     return message;
   }
 

@@ -1,7 +1,7 @@
 import { once } from 'node:events';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 interface ListeningServer {

@@ -1,4 +1,4 @@
-import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv';
+import { AjvJsonSchemaValidator } from '@modelcontextprotocol/client/validators/ajv';
 import Ajv2020 from 'ajv/dist/2020.js';
 import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';

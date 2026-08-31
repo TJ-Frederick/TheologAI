@@ -9,8 +9,7 @@ import type { Readable } from 'node:stream';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import {
   assertMcpTransportContract,
   captureMcpTransportSnapshot,
@@ -288,7 +287,35 @@ async function main(): Promise<void> {
       'provider-neutral local search must retain one local provider group',
     );
 
-    console.error('[node-http-e2e] Compiled Node HTTP MCP server passed process-boundary checks.');
+    await withTimeout(client.close(), SHUTDOWN_TIMEOUT_MS, 'legacy MCP client close');
+    client = undefined;
+
+    client = new Client(
+      { name: 'theologai-node-e2e-modern', version: '1.0.0' },
+      { versionNegotiation: { mode: { pin: '2026-07-28' } } },
+    );
+    const modernTransport = new StreamableHTTPClientTransport(endpoint, {
+      requestInit: { headers: { Origin: TEST_ORIGIN } },
+    });
+    await withTimeout(client.connect(modernTransport), MCP_TIMEOUT_MS, 'modern MCP discovery');
+    assert.equal(client.getProtocolEra(), 'modern');
+    assert.equal(client.getNegotiatedProtocolVersion(), '2026-07-28');
+    assert.deepEqual(client.getDiscoverResult(), expectModernDiscovery());
+    const modernContract = await withTimeout(
+      captureMcpTransportSnapshot(client),
+      MCP_TIMEOUT_MS,
+      'modern MCP transport contract',
+    );
+    await assertMcpTransportContract(modernContract, { contractVersion: '6', logging: false });
+    const modernDonation = await withTimeout(
+      client.callTool({ name: 'donation_config', arguments: {} }),
+      MCP_TIMEOUT_MS,
+      'modern tools/call',
+    );
+    assert.equal(modernDonation.isError, undefined);
+    assert.equal((modernDonation.structuredContent as { kind?: string } | undefined)?.kind, 'donation_config');
+
+    console.error('[node-http-e2e] Compiled Node HTTP MCP server passed legacy and modern process-boundary checks.');
   } catch (error) {
     if (server) console.error(server.logs());
     throw error;
@@ -299,6 +326,22 @@ async function main(): Promise<void> {
     await stopServer(server);
     await rm(workspace, { recursive: true, force: true });
   }
+}
+
+function expectModernDiscovery(): Record<string, unknown> {
+  return {
+    supportedVersions: ['2026-07-28'],
+    capabilities: { tools: {}, resources: {}, prompts: {} },
+    resultType: 'complete',
+    ttlMs: 0,
+    cacheScope: 'private',
+    _meta: {
+      'io.modelcontextprotocol/serverInfo': {
+        name: 'theologai-bible-server',
+        version: '3.6.0',
+      },
+    },
+  };
 }
 
 main().catch(error => {

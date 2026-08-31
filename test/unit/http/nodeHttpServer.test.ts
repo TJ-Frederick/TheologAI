@@ -1,5 +1,6 @@
 import { Agent, request, type IncomingHttpHeaders } from 'node:http';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createMcpHandler as createSdkMcpHandler } from '@modelcontextprotocol/server';
 import type { BibleProviderPort } from '../../../src/services/bible/BibleProviderPort.js';
 import {
   DEFAULT_ALLOWED_ORIGIN,
@@ -102,11 +103,11 @@ describe('Node stateless HTTP MCP server', () => {
       root: makeRoot(),
       config,
       telemetry: event => telemetry.push(event),
-      createMcpServer: root => {
-        const server = new BibleMCPServer(root, 'http-integration-test');
+      createMcpHandler: root => createSdkMcpHandler(({ era }) => {
+        const server = new BibleMCPServer(root, 'http-integration-test', undefined, era);
         createdServers.push(server);
-        return server;
-      },
+        return server.getServer();
+      }),
     });
     port = (await runtime.listen()).port;
   });
@@ -264,6 +265,8 @@ describe('Node stateless HTTP MCP server', () => {
     expect(response.status).toBe(204);
     expect(response.headers['access-control-allow-origin']).toBe(DEFAULT_ALLOWED_ORIGIN);
     expect(response.headers['access-control-allow-methods']).toBe('POST, OPTIONS');
+    expect(response.headers['access-control-allow-headers']).toContain('Mcp-Method');
+    expect(response.headers['access-control-allow-headers']).toContain('Mcp-Name');
     expect(createdServers).toHaveLength(0);
   });
 
@@ -281,10 +284,10 @@ describe('Node stateless HTTP MCP server', () => {
         maxBodyBytes: TEST_MAX_BODY_BYTES,
       },
       telemetry: event => telemetry.push(event),
-      createMcpServer: () => ({
-        connect: vi.fn().mockRejectedValue(new Error(privateDetail)),
-        getServer: () => ({ close: vi.fn().mockResolvedValue(undefined) }),
-      }) as never,
+      createMcpHandler: () => ({
+        fetch: vi.fn().mockRejectedValue(new Error(privateDetail)),
+        close: vi.fn().mockResolvedValue(undefined),
+      }),
     });
     port = (await runtime.listen()).port;
 
@@ -293,7 +296,7 @@ describe('Node stateless HTTP MCP server', () => {
     expect(response.json).toEqual({
       jsonrpc: '2.0',
       error: { code: -32603, message: 'Internal server error' },
-      id: null,
+      id: 1,
     });
     expect(response.headers['cache-control']).toBe('no-store');
     expect(telemetry).toContainEqual(expect.objectContaining({

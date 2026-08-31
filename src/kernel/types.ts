@@ -9,24 +9,25 @@
  * directory is retired; use src/kernel/index.ts only as a convenience barrel.
  */
 
-import type { CallToolResult, ContentBlock, TextContent, Tool } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult, ContentBlock, TextContent, Tool } from '@modelcontextprotocol/server';
 
 // ── Tool infrastructure ──
 
 export interface ToolHandler {
   name: string;
   description: string;
-  inputSchema: Tool['inputSchema'];
-  outputSchema?: Tool['outputSchema'];
+  inputSchema: Tool['inputSchema'] & { properties?: Record<string, any> };
+  outputSchema?: Tool['outputSchema'] & { properties?: Record<string, any> };
   /** Optional cross-field validation that JSON Schema cannot fully express. */
   validateStructuredOutput?: (value: Record<string, unknown>) => boolean;
   annotations?: Tool['annotations'];
   handler: (params: Record<string, unknown>) => Promise<ToolResult>;
 }
 
-export type ToolResult = Omit<CallToolResult, 'content'> & {
+export type ToolResult = Omit<CallToolResult, 'content' | 'structuredContent'> & {
   /** A text fallback is always first; later blocks may use the native MCP union. */
   content: [TextContent, ...ContentBlock[]];
+  structuredContent?: Record<string, any>;
 };
 
 // ── Bible types ──

@@ -1,17 +1,19 @@
 /**
  * Shared MCP protocol registration for both Node.js and Cloudflare Workers.
  *
- * The high-level McpServer is the transport-facing object. Its underlying
- * low-level server is used here so the advertised JSON Schemas, dynamic
- * resource listing, and protocol error taxonomy remain under one registry.
+ * The low-level v2 Server keeps the advertised JSON Schemas, deterministic
+ * lists, and error taxonomy under one dual-era registry without implicitly
+ * advertising list-change notifications that this stateless service cannot
+ * deliver.
  */
 
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import {
-  ListResourcesRequestSchema,
-  ListResourceTemplatesRequestSchema,
-  ReadResourceRequestSchema,
-} from '@modelcontextprotocol/sdk/types.js';
+  ProtocolError,
+  Server,
+  type JSONRPCRequest,
+  type Result,
+  type ServerContext,
+} from '@modelcontextprotocol/server';
 import { NotFoundError } from '../kernel/errors.js';
 import { parseStrongsIdentity } from '../kernel/strongs.js';
 import { buildLocalDocumentResourceUri, parseLocalDocumentResourceUri } from '../kernel/documentResource.js';
@@ -29,6 +31,28 @@ import { buildPrimarySourceCatalog, PRIMARY_SOURCE_CATALOG_URI } from './primary
 import { COMMENTARY_CATALOG } from '../kernel/commentaryCatalog.js';
 import type { PrimarySourceContractConfig } from '../kernel/featureFlags.js';
 import type { PrimarySourceSearchBinding } from '../tools/v2/primarySourceSearch.js';
+
+export class TheologAiMcpServer extends Server {
+  /** Temporary source-compatible view for callers that previously received McpServer. */
+  get server(): Server {
+    return this;
+  }
+
+  protected override _wrapHandler(
+    method: string,
+    handler: (request: JSONRPCRequest, ctx: ServerContext) => Promise<Result>,
+  ): (request: JSONRPCRequest, ctx: ServerContext) => Promise<Result> {
+    const wrapped = super._wrapHandler(method, handler);
+    return async (request, ctx) => {
+      try {
+        return await wrapped(request, ctx);
+      } catch (error) {
+        if (error instanceof ProtocolError) throw error;
+        throw internalError();
+      }
+    };
+  }
+}
 
 export interface McpServerServices {
   bibleService: Pick<BibleService, 'getSupportedTranslations'>;
@@ -56,28 +80,37 @@ export function createTheologAiMcpServer(
   root: McpCompositionRoot,
   version: string,
   profile: McpCapabilityProfile = STDIO_CAPABILITIES,
-): McpServer {
+  era: 'legacy' | 'modern' = 'legacy',
+): TheologAiMcpServer {
   assertPrimarySourceContractParity(root);
-  const mcpServer = new McpServer(
+  const legacyLogging = profile.logging && era === 'legacy';
+  const server = new TheologAiMcpServer(
     { name: 'theologai-bible-server', version },
     {
       capabilities: {
         tools: {},
         resources: {},
         prompts: {},
-        ...(profile.logging ? { logging: {} } : {}),
+        ...(legacyLogging ? { logging: {} } : {}),
       },
       jsonSchemaValidator,
+      cacheHints: {
+        'server/discover': { ttlMs: 0, cacheScope: 'private' },
+        'tools/list': { ttlMs: 0, cacheScope: 'private' },
+        'prompts/list': { ttlMs: 0, cacheScope: 'private' },
+        'resources/list': { ttlMs: 0, cacheScope: 'private' },
+        'resources/templates/list': { ttlMs: 0, cacheScope: 'private' },
+        'resources/read': { ttlMs: 0, cacheScope: 'private' },
+      },
     },
   );
-  const server = mcpServer.server;
 
   const { tools, services } = root;
-  registerToolHandlers(server, tools, profile.logging);
+  registerToolHandlers(server, tools, legacyLogging);
 
   // ── Resources ──
 
-  server.setRequestHandler(ListResourcesRequestSchema, async () => {
+  server.setRequestHandler('resources/list', async () => {
     const resources: Array<{
       uri: string;
       name: string;
@@ -122,7 +155,7 @@ export function createTheologAiMcpServer(
         });
       }
     } catch {
-      if (profile.logging) {
+      if (legacyLogging) {
         await server.sendLoggingMessage({
           level: 'warning',
           logger: 'theologai.resources',
@@ -138,7 +171,7 @@ export function createTheologAiMcpServer(
     return { resources };
   });
 
-  server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => ({
+  server.setRequestHandler('resources/templates/list', async () => ({
     resourceTemplates: [
       {
         uriTemplate: 'theologai://documents/{slug}',
@@ -155,7 +188,7 @@ export function createTheologAiMcpServer(
     ],
   }));
 
-  server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+  server.setRequestHandler('resources/read', async (request) => {
     const { uri } = request.params;
 
     // theologai://translations
@@ -243,7 +276,7 @@ export function createTheologAiMcpServer(
           contents: [{ uri, mimeType: 'text/markdown', text: formatLocalDocumentResource(doc, sections) }],
         };
       } catch (error) {
-        if (error instanceof NotFoundError) throw resourceNotFound(uri);
+        if (error instanceof NotFoundError) throw resourceNotFound(uri, era);
         throw internalError('Unable to read resource');
       }
     }
@@ -291,17 +324,17 @@ export function createTheologAiMcpServer(
           contents: [{ uri, mimeType: 'text/markdown', text: lines.filter(Boolean).join('\n') }],
         };
       } catch (error) {
-        if (error instanceof NotFoundError) throw resourceNotFound(uri);
+        if (error instanceof NotFoundError) throw resourceNotFound(uri, era);
         throw internalError('Unable to read resource');
       }
     }
 
-    throw resourceNotFound(uri);
+    throw resourceNotFound(uri, era);
   });
 
   registerPromptHandlers(server, root.primarySourceSearch.descriptor);
 
-  return mcpServer;
+  return server;
 }
 
 function assertPrimarySourceContractParity(root: McpCompositionRoot): void {
