@@ -65,7 +65,7 @@ The following boundaries remain deliberate:
 
 ## Phase 3B sequencing
 
-Status: **3B.0 complete (C1 + C2); 3B.1 implementation release-ready locally,
+Status: **3B.0 complete (C1 + C2); 3B.1 implementation merged in PR #148,
 protected preview proof pending**. This plan does not authorize deployment,
 binding changes, cleanup, or any other operational mutation.
 
@@ -86,10 +86,20 @@ binding changes, cleanup, or any other operational mutation.
 
 ### 3B.1 — Dual-era MCP modernization
 
-The deployed historical baseline uses `@modelcontextprotocol/sdk` v1 and
-negotiates the legacy `2025-11-25` protocol. The checked-out 3B.1 candidate
-uses the exact official TypeScript v2 server, client, and Node packages and
-supports both legacy and modern eras; that candidate is not a deployed claim.
+The deployed production baseline uses `@modelcontextprotocol/sdk` v1 and
+negotiates the legacy `2025-11-25` protocol. PR #148 merged the 3B.1 candidate
+as `c59ecbf278cd8ea473a9f524002ccc7968f51905`; it uses the exact official
+TypeScript v2 server, client, and Node packages and supports both legacy and
+modern eras. That merge is repository state only, not a deployed claim.
+
+The first merge-triggered production run, `33432068547`, correctly failed
+closed before the protected production environment: classification and plan
+verification passed, but the source/tree-bound protected preview artifact did
+not yet exist, so `Verify Protected Dual-Era Preview` failed and `Test, Build &
+Deploy` was skipped. No Worker deployment or D1 mutation occurred. The next
+release candidate must remain open while its exact head is deployed to the
+protected preview and audited, then merge only if `main` has not advanced so
+the receipt's source tree remains identical to the production merge tree.
 
 Implement this as a behavior-neutral infrastructure release:
 
