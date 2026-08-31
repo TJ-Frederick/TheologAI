@@ -65,6 +65,10 @@ The following boundaries remain deliberate:
 
 ## Phase 3B sequencing
 
+Status: **3B.0 complete (C1 + C2)**. The next work item is 3B.1; this plan
+does not authorize its deployment, binding changes, cleanup, or any other
+operational mutation.
+
 ### 3B.0 — Rebaseline and simplify
 
 1. Use a clean branch from `origin/main`; do not treat the dirty historical
@@ -174,16 +178,52 @@ review.
 
 ## Release order
 
-### 3B.0 closure implementation — C1
+### 3B.0 closure — C1 + C2 complete
 
-The remaining closure implementation adds the protected, read-only production
+The C1 closure implementation added the protected, read-only production
 rollback rehearsal in [the rollback runbook](PRODUCTION-ROLLBACK-REHEARSAL.md).
 It is workflow-dispatch-only from `main`, uses the `production` environment
 and `deploy-production` concurrency group, pins the PR #108 source/tree and
-Worker/D1 target, and records only sanitized hashes. The rehearsal itself is
-pending and must be executed after the consolidated production release. A
-later Markdown-only reconciliation (C2) records the actual run; this section
-does not update `CURRENT-RELEASE`.
+Worker/D1 target, and records only sanitized hashes. C2 reconciled the
+successful dated rehearsal and current release identity in the permitted
+Markdown authority documents.
+
+The active production release is PR #145 source
+`e5c39c5e113454b264fa1eb1dceab6512899cb2e`, tree
+`e1e02c7280e7737b7a66d9ceed9a9cb6acfbb0de`, deployed as Cloudflare
+`8cefbaf9-1c0f-4565-b1a4-bd4be2ec86a7`, Worker
+`387953b4-a0b1-42b3-998c-67afef01e936` (#134), on
+`theologai-production-20260811-schema0009-a`
+(`9bc79346-338b-439e-a2a5-424f4418eb21`). The immediate same-D1 predecessor
+is PR #138 deployment `e8108f56-ae2e-4598-8324-f8b17a131f6a`, Worker
+`a481b2f7-ce75-4d55-8804-48dc7fccb4a3` (#132); preview remains deployment
+`4108d59a-4092-4389-824c-fa3820ab66f6`, Worker
+`70bbbecf-3fe6-4a04-8c34-babc3df09ad0` (#144), on
+`theologai-preview-20260811-schema0009-a`
+(`74f456e2-6951-4003-bb6f-91951342bf8f`).
+
+Repository/runtime reconciliation also records the pre-C2, then-`main` PR #146
+repository state used for the rehearsal:
+`833c0b1902adb65a91929e1b2acc7ac7c0901a60`, parents
+`e5c39c5e113454b264fa1eb1dceab6512899cb2e` and
+`fe7ecfb75cc1aa9b032f59159d8b4d559cd970ae`, tree
+`0ba3949ad3acee6100890f07d4f9bcf0cc968f65`. Classifier run `33274343385`
+correctly returned `deploy_required=true`, `decision=deploy`, and
+`reason=non-documentation-path` for three records; classifier and verifier
+passed, while the protected Test, Build & Deploy job was cancelled before any
+steps. GitHub deployment `6159929842` moved waiting to error; no Cloudflare
+deployment, release artifact, or mutation occurred.
+
+The successful rehearsal was run `33274529784`, attempt `1`, completed
+`2026-08-29T21:06:51Z`, with Wrangler `4.114.0`, `deployment:false`, and no
+GitHub deployment. Receipt artifact `9721279150` expires
+`2026-09-28T21:06:45Z`; all exit statuses were zero,
+`trafficMutation=false`, `d1Mutation=false`, and `previewMutation=false`, and
+the fixed target was inactive before and after. This is dry-run compatibility
+evidence only, not failover evidence. The receipt and runbook preserve the
+before/after identity hashes and target proofs; remaining 30-day/no-binding/
+reconstruction/compatibility/exact-owner gates still apply, and no cleanup is
+authorized.
 
 The retention decision is conservative: active D1, immediate same-D1 Worker
 predecessor, and two newest cross-schema matched generations are retained; no

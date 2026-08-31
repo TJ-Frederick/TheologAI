@@ -13,12 +13,25 @@ serialized with `deploy-production`, and bound to the protected `production`
 environment. Its fixed PR #108 target is Worker version
 `291f3292-3fa9-44fc-bf6f-b68fd2f4cef6` and D1
 `theologai-production-20260729-transform11-a`
-(`53211f50-a893-4b4c-be1e-bc625a595dc7`). The rehearsal execution remains
-pending. It captures both environments before and after, runs the historical
+(`53211f50-a893-4b4c-be1e-bc625a595dc7`). The last successful execution was
+run `33274529784`, attempt `1`, from `main` at `833c0b1`, completed
+`2026-08-29T21:06:51Z` with Wrangler `4.114.0`. It was explicitly
+`deployment:false`, created no GitHub deployment, and all exit statuses were
+zero. It captures both environments before and after, runs the historical
 readiness/runtime gates, and permits only
 `versions deploy <fixed>@100 --config wrangler.release.toml --name theologai --dry-run --yes`; no rollback, D1, binding,
 route, secret, or deletion command is present. Only a bounded hash-only receipt
-is uploaded. See [the full runbook](PRODUCTION-ROLLBACK-REHEARSAL.md).
+is uploaded. The receipt reported `trafficMutation=false`,
+`d1Mutation=false`, and `previewMutation=false`, with the target inactive
+before and after. Receipt artifact `9721279150` expires
+`2026-09-28T21:06:45Z`. See [the full runbook](PRODUCTION-ROLLBACK-REHEARSAL.md).
+
+This fresh rehearsal is satisfied only for that dated execution. A future
+rerun remains manual, main-only, protected-environment approved, and
+serialized with `deploy-production`; it must preserve the fixed target and
+re-prove all identity, readiness, compatibility, no-mutation, and hash-only
+receipt checks. The 30-day/no-active-binding/reconstruction/compatibility and
+exact-owner gates still apply, and no cleanup is authorized.
 
 Provision the dedicated `CLOUDFLARE_READ_ONLY_API_TOKEN` in the protected
 environment before execution with exactly the account-scoped `Workers Scripts

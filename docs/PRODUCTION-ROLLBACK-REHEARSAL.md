@@ -3,11 +3,12 @@
 <!-- theologai-release-authority v1 role=rollback-rehearsal-runbook current=docs/CURRENT-RELEASE.md -->
 
 This runbook defines the protected, read-only rehearsal for the matched PR
-#108 Worker/D1 rollback pair. The rehearsal execution is **pending**; this
-document records the capability and its acceptance criteria, not a claim that
-the rehearsal has passed.
+#108 Worker/D1 rollback pair. The dated rehearsal execution is complete for
+run `33274529784`, attempt `1`; this records dry-run compatibility evidence,
+not a live failover or rollback.
 
-Before execution, the protected `production` environment must provision a
+Before any future execution/rerun, the protected `production` environment must
+provision a
 dedicated `CLOUDFLARE_READ_ONLY_API_TOKEN` with exactly these account-scoped
 permissions: `Workers Scripts Read` and `D1 Read`; no additional permissions
 or account grants are allowed. The protected job is marked `deployment: false`
@@ -79,6 +80,31 @@ required by both the workflow topology test and the receipt verifier. A
 successful rehearsal proves target availability, compatibility, binding
 integrity, and recovery-command validity; it does not test live failover.
 
+## Last successful execution
+
+Run `33274529784`, attempt `1`, ran from `main` at head `833c0b1` and
+completed `2026-08-29T21:06:51Z` with Wrangler `4.114.0`. It was explicitly
+`deployment:false` and created no GitHub deployment. All exit statuses were
+zero; the receipt reported `trafficMutation=false`, `d1Mutation=false`, and
+`previewMutation=false`, with the fixed target inactive before and after.
+
+The retained receipt artifact is `9721279150`, named
+`production-rollback-rehearsal-33274529784-attempt-1`. Its ZIP SHA-256 is
+`d679b73e57c210d92b9033585cf77a13dd433ffd84d12f974665168609d75acc` and its
+receipt JSON SHA-256 is
+`4c1def9b6e5450212b521c3c5d09512ed1d97aa60cbba51d86bf5205e35cbca6`; it
+expires `2026-09-28T21:06:45Z`. Before/after hashes were unchanged for the
+production deployment
+`aff4d2aca359cdf75bdd37c450d3606f3addb70dd0556fb2e070e52f56f04675`, production
+version `37b5babca5d505ca3281b29848509e3a4d37dda961ca2dc1344bf8be967f5d1c`,
+preview deployment `9f9a9e3c4fa975036653cb3748a738ca949b33d46039507c62be6fbdde24e8f0`,
+preview version `1b1b711f8d83e98c191fb84b7a3feda015249b34ac501d1f5022ebfe8f7beac1`,
+and D1 inventory `69f0bf4be8f30b4a06759a309a074a04db500a3b72afce170b5deb21170fcbb5`.
+Target version proof is
+`d709dd5189677c399277591f7ebdd2cde0faa32610a739277a763f795786db70`; target
+deployment proof is
+`d93caa62799e52d77ad0b7be9e1a9b64233f1bf830fababd20aab7149d42418f`.
+
 ## Fail-closed acceptance criteria
 
 The receipt is accepted only when all of the following remain true:
@@ -106,7 +132,10 @@ The uploaded receipt contains exact target/current identities, boolean safety
 claims, and SHA-256 hashes of private captures and command output. It does not
 contain source text, SQL, Wrangler JSON, request metadata, or credentials.
 The receipt artifact is retained for 30 days; the H1 deployment-plan artifact
-expiry policy remains separate.
+expiry policy remains separate. The successful rehearsal satisfies freshness
+only for this dated execution. The 30-day stability, no-active-binding,
+reconstruction, compatibility, and exact-owner gates remain required before
+any cleanup review; no cleanup is authorized by this runbook or receipt.
 
 The remote retention policy is conservative and review-only:
 
