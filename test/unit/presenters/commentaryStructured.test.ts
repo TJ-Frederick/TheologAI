@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv';
+import { AjvJsonSchemaValidator } from '@modelcontextprotocol/client/validators/ajv';
 import type { CommentaryLookupResult } from '../../../src/kernel/types.js';
 import {
   CANONICAL_COMMENTATORS,

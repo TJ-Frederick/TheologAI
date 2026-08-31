@@ -107,8 +107,11 @@ export default {
       }
 
       const root = createWorkerCompositionRoot(env);
-      const mcpServer = createWorkerMcpServer(root, env.THEOLOGAI_VERSION || '0.0.0');
-      const result = await handleWorkerMcpRequest(mcpServer, boundedRequest);
+      const version = env.THEOLOGAI_VERSION || '0.0.0';
+      const result = await handleWorkerMcpRequest(
+        era => createWorkerMcpServer(root, version, era),
+        boundedRequest,
+      );
       const response = applyCors(result.response, origin);
 
       if (result.errorName) {

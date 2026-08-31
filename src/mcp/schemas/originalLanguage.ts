@@ -1,5 +1,5 @@
 import type { Schema } from '@cfworker/json-schema';
-import type { Tool } from '@modelcontextprotocol/sdk/types.js';
+import type { Tool } from '@modelcontextprotocol/server';
 import type { ProvenanceRecord } from '../../kernel/provenance.js';
 
 export const ORIGINAL_LANGUAGE_EVIDENCE_NOTICE_MAX_LENGTH = 1000;

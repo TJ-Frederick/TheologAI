@@ -1,5 +1,4 @@
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { normalizeCcelSectionLocator } from '../src/adapters/commentary/CcelSearchAdapter.js';
 import { CCEL_UPSTREAM_TERMINAL_ATTEMPT_LIMIT, type CcelCoordinatorSnapshot } from '../src/services/historical/CcelUpstreamCoordinator.js';
 import { CCEL_COMPOSITION_DATE_NOTICE } from '../src/services/historical/primarySourceTypes.js';

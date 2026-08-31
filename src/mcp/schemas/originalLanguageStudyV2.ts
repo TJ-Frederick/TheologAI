@@ -1,5 +1,5 @@
 import { originalLanguageStudyOutputSchema } from './originalLanguageStudy.js';
-import type { Tool } from '@modelcontextprotocol/sdk/types.js';
+import type { Tool } from '@modelcontextprotocol/server';
 import {
   ORIGINAL_LANGUAGE_STUDY_V2_CURSOR_MAX_LENGTH,
   ORIGINAL_LANGUAGE_STUDY_V2_CURSOR_OPERATION,

@@ -262,7 +262,7 @@ describe('Worker Entry Point', () => {
       const response = await worker.fetch(request, env as never, ctx);
 
       expect(response.status).toBe(200);
-      expect(mockHandleMcp).toHaveBeenCalledWith(mockServer, request);
+      expect(mockHandleMcp).toHaveBeenCalledWith(expect.any(Function), request);
     });
 
     it.each([
@@ -283,7 +283,7 @@ describe('Worker Entry Point', () => {
       const response = await worker.fetch(request, env as never, ctx);
 
       expect(response.status).toBe(200);
-      expect(mockHandleMcp).toHaveBeenCalledWith(mockServer, request);
+      expect(mockHandleMcp).toHaveBeenCalledWith(expect.any(Function), request);
     });
   });
 
@@ -292,8 +292,10 @@ describe('Worker Entry Point', () => {
     await worker.fetch(request, env as never, ctx);
 
     expect(mockCreateRoot).toHaveBeenCalledWith(env);
-    expect(mockCreateServer).toHaveBeenCalledWith(mockRoot, '1.0.0-test');
-    expect(mockHandleMcp).toHaveBeenCalledWith(mockServer, request);
+    expect(mockHandleMcp).toHaveBeenCalledWith(expect.any(Function), request);
+    const factory = mockHandleMcp.mock.calls[0]![0] as (era: 'legacy' | 'modern') => unknown;
+    expect(factory('modern')).toBe(mockServer);
+    expect(mockCreateServer).toHaveBeenCalledWith(mockRoot, '1.0.0-test', 'modern');
   });
 
   it('allows native clients without emitting an allow-origin header', async () => {

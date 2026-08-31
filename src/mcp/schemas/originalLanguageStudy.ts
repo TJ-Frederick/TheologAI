@@ -1,4 +1,4 @@
-import type { Tool } from '@modelcontextprotocol/sdk/types.js';
+import type { Tool } from '@modelcontextprotocol/server';
 import { createProvenanceRecordSchema } from './provenance.js';
 import { ORIGINAL_LANGUAGE_EVIDENCE_NOTICE_MAX_LENGTH } from './originalLanguage.js';
 

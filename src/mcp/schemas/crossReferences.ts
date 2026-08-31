@@ -1,4 +1,4 @@
-import type { Tool } from '@modelcontextprotocol/sdk/types.js';
+import type { Tool } from '@modelcontextprotocol/server';
 import type { ProvenanceRecord } from '../../kernel/provenance.js';
 import {
   OPENBIBLE_CROSS_REFERENCE_PROVENANCE,

@@ -8,7 +8,7 @@ const ALLOWED_METHODS = new Set(['POST', 'OPTIONS']);
 const ALLOWED_PATHS = new Set(['/', '/mcp']);
 const CORS_HEADERS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Accept, Content-Type, Authorization, Mcp-Session-Id, Mcp-Protocol-Version, Last-Event-ID',
+  'Access-Control-Allow-Headers': 'Accept, Content-Type, Authorization, Mcp-Method, Mcp-Name, Mcp-Session-Id, Mcp-Protocol-Version, Last-Event-ID',
   'Access-Control-Expose-Headers': 'Mcp-Session-Id',
   'Access-Control-Max-Age': '86400',
 };

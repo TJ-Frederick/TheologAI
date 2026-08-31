@@ -48,6 +48,7 @@ describe('custom-domain infrastructure contract', () => {
     expect(productionWorkflow).toContain('name: production');
     expect(productionWorkflow).toContain('url: https://mcp.theologai.xyz/mcp');
     const releaseContextStart = productionWorkflow.indexOf('- name: Resolve production release comparison context');
+    const releaseContextEnd = productionWorkflow.indexOf('- name: Download verified production deployment plan gate');
     const detectorStart = productionWorkflow.indexOf('- name: Detect production custom-domain declaration change');
     const prerequisiteStart = productionWorkflow.indexOf('- name: Require live website and audited preview custom domain');
     const deployStart = productionWorkflow.indexOf('- name: Deploy to Cloudflare Workers');
@@ -56,7 +57,8 @@ describe('custom-domain infrastructure contract', () => {
     expect(prerequisiteStart).toBeGreaterThan(detectorStart);
     expect(prerequisiteStart).toBeGreaterThan(0);
     expect(deployStart).toBeGreaterThan(prerequisiteStart);
-    const releaseContext = productionWorkflow.slice(releaseContextStart, detectorStart);
+    expect(releaseContextEnd).toBeGreaterThan(releaseContextStart);
+    const releaseContext = productionWorkflow.slice(releaseContextStart, releaseContextEnd);
     expect(releaseContext).toContain('PRODUCTION_RELEASE_EVENT_NAME: ${{ github.event_name }}');
     expect(releaseContext).toContain('PRODUCTION_RELEASE_REF: ${{ github.ref }}');
     expect(releaseContext).toContain('PRODUCTION_RELEASE_PUSH_BEFORE: ${{ github.event.before }}');

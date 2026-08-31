@@ -53,6 +53,7 @@
     "audit:original-language-v2-preview": "tsx scripts/audit-original-language-v2-preview.ts",
     "audit:historical-core-preview": "tsx scripts/audit-historical-core-preview.ts",
     "audit:historical-spine-preview": "tsx scripts/audit-historical-spine-preview.ts",
+    "audit:dual-era-preview": "tsx scripts/audit-dual-era-mcp-preview.ts",
     "audit:primary-source-edge-stabilization-production": "tsx scripts/audit-primary-source-edge-stabilization-production.ts",
     "audit:original-language-v2-production": "tsx scripts/audit-original-language-v2-production.ts",
     "audit:historical-core-production": "tsx scripts/audit-historical-core-production.ts",
@@ -111,9 +112,6 @@
     "node": ">=22.18.0 <23"
   },
   "overrides": {
-    "@modelcontextprotocol/sdk": {
-      "@hono/node-server": "2.0.11"
-    },
     "brace-expansion": "5.0.9",
     "fast-uri": "3.1.5",
     "hono": "4.12.34",
@@ -125,11 +123,12 @@
   },
   "dependencies": {
     "@cfworker/json-schema": "4.1.1",
-    "@modelcontextprotocol/sdk": "1.29.0",
-    "agents": "0.17.3",
+    "@modelcontextprotocol/node": "2.0.0",
+    "@modelcontextprotocol/server": "2.0.0",
     "ajv": "8.20.0",
     "better-sqlite3": "^12.6.2",
     "dotenv": "^17.2.3",
+    "hono": "4.12.34",
     "parse5": "8.0.1",
     "typescript": "^5.9.2",
     "zod": "4.3.6"
@@ -137,7 +136,9 @@
   "devDependencies": {
     "@cloudflare/workers-types": "5.20260722.1",
     "@cloudflare/vitest-pool-workers": "^0.18.8",
+    "@modelcontextprotocol/client": "2.0.0",
     "@modelcontextprotocol/conformance": "0.1.16",
+    "@modelcontextprotocol/conformance-modern": "npm:@modelcontextprotocol/conformance@0.2.0-alpha.11",
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^24.5.2",
     "@types/xml2js": "^0.4.14",

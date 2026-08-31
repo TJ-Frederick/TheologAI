@@ -1,20 +1,16 @@
 import { createServer, type IncomingMessage, type Server as HttpServer, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { ErrorCode, type JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
+import {
+  createMcpHandler as createSdkMcpHandler,
+  ProtocolErrorCode,
+  type McpHttpHandler,
+} from '@modelcontextprotocol/server';
+import { toNodeHandler } from '@modelcontextprotocol/node';
 import { STATELESS_HTTP_CAPABILITIES, type McpCompositionRoot } from '../mcp/server.js';
-import { BibleMCPServer } from '../server.js';
+import { createTheologAiMcpServer } from '../mcp/server.js';
+import { THEOLOGAI_VERSION } from '../server.js';
 import { normalizeHostname, type NodeHttpConfig } from './config.js';
-import { INTERNAL_MCP_ERROR, sanitizeMcpMessage } from './mcpErrors.js';
-
-class SanitizingNodeHttpTransport extends StreamableHTTPServerTransport {
-  override async send(
-    message: JSONRPCMessage,
-    options?: Parameters<StreamableHTTPServerTransport['send']>[1],
-  ): Promise<void> {
-    await super.send(sanitizeMcpMessage(message), options);
-  }
-}
+import { INTERNAL_MCP_ERROR } from './mcpErrors.js';
 
 export interface HttpTelemetryEvent {
   event: string;
@@ -30,27 +26,17 @@ export interface HttpTelemetryEvent {
 
 export type HttpTelemetry = (event: HttpTelemetryEvent) => void;
 
-interface McpRequestServer {
-  connect(transport: StreamableHTTPServerTransport): Promise<void>;
-  getServer(): { close(): Promise<void> };
-}
-
 export interface NodeHttpServerOptions {
   root: McpCompositionRoot;
   config: NodeHttpConfig;
   telemetry?: HttpTelemetry;
-  createMcpServer?: (root: McpCompositionRoot) => McpRequestServer;
+  createMcpHandler?: (root: McpCompositionRoot) => Pick<McpHttpHandler, 'fetch' | 'close'>;
 }
 
 export interface NodeHttpRuntime {
   readonly server: HttpServer;
   listen(): Promise<AddressInfo>;
   close(): Promise<void>;
-}
-
-interface ActiveRequest {
-  server: McpRequestServer;
-  transport: StreamableHTTPServerTransport;
 }
 
 type BodyResult =
@@ -60,10 +46,45 @@ type BodyResult =
 export function createNodeHttpServer(options: NodeHttpServerOptions): NodeHttpRuntime {
   const { root, config } = options;
   const telemetry = options.telemetry ?? defaultTelemetry;
-  const createMcpServer = options.createMcpServer ?? (
-    sharedRoot => new BibleMCPServer(sharedRoot, undefined, STATELESS_HTTP_CAPABILITIES)
-  );
-  const activeRequests = new Set<ActiveRequest>();
+  const createHandler = options.createMcpHandler ?? (sharedRoot => createSdkMcpHandler(
+    ({ era }) => createTheologAiMcpServer(
+      sharedRoot,
+      THEOLOGAI_VERSION,
+      STATELESS_HTTP_CAPABILITIES,
+      era,
+    ),
+    { legacy: 'stateless', responseMode: 'auto' },
+  ));
+  const mcpHandler = createHandler(root);
+  const reportMcpError = (error: Error) => {
+    telemetry({
+      event: 'http.request.error',
+      level: 'error',
+      timestamp: new Date().toISOString(),
+      status: 500,
+      errorName: safeErrorName(error),
+    });
+  };
+  const safeMcpHandler = {
+    async fetch(
+      request: Request,
+      requestOptions?: Parameters<McpHttpHandler['fetch']>[1],
+    ): Promise<Response> {
+      try {
+        const response = await mcpHandler.fetch(request, requestOptions);
+        return withPrivateErrorCaching(response);
+      } catch (error) {
+        reportMcpError(error instanceof Error ? error : new Error('Unknown MCP handler failure'));
+        return internalMcpErrorResponse(requestOptions?.parsedBody);
+      }
+    },
+  };
+  const nodeMcpHandler = toNodeHandler(safeMcpHandler, {
+    onerror(error) {
+      reportMcpError(error);
+    },
+  });
+  const activeRequests = new Set<Promise<void>>();
   let listening = false;
   let closing = false;
   let closePromise: Promise<void> | undefined;
@@ -118,7 +139,7 @@ export function createNodeHttpServer(options: NodeHttpServerOptions): NodeHttpRu
       res.writeHead(204, {
         Allow: 'POST, OPTIONS',
         'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Accept, MCP-Protocol-Version, MCP-Session-Id, Last-Event-ID',
+        'Access-Control-Allow-Headers': 'Content-Type, Accept, Mcp-Method, Mcp-Name, MCP-Protocol-Version, MCP-Session-Id, Last-Event-ID',
       });
       res.end();
       return;
@@ -148,17 +169,13 @@ export function createNodeHttpServer(options: NodeHttpServerOptions): NodeHttpRu
       return;
     }
 
-    const transport = new SanitizingNodeHttpTransport({ sessionIdGenerator: undefined });
-    const mcpServer = createMcpServer(root);
-    const active = { server: mcpServer, transport };
+    const active = nodeMcpHandler(req, res, bodyResult.body);
     activeRequests.add(active);
 
     try {
-      await mcpServer.connect(transport);
-      await transport.handleRequest(req, res, bodyResult.body);
+      await active;
     } finally {
       activeRequests.delete(active);
-      await Promise.allSettled([mcpServer.getServer().close(), transport.close()]);
     }
   }
 
@@ -192,13 +209,8 @@ export function createNodeHttpServer(options: NodeHttpServerOptions): NodeHttpRu
               server.closeIdleConnections();
             })
           : Promise.resolve();
-        const closeActive = Promise.allSettled(
-          [...activeRequests].flatMap(active => [
-            active.server.getServer().close(),
-            active.transport.close(),
-          ]),
-        );
-        await closeActive;
+        await mcpHandler.close();
+        await Promise.allSettled([...activeRequests]);
         // Active MCP transports have had a chance to finish. End any remaining
         // pre-dispatch or idle HTTP connections so shutdown cannot be held open
         // indefinitely by a slow request body.
@@ -312,6 +324,35 @@ function sendMcpInternalError(res: ServerResponse): void {
   }));
 }
 
+function internalMcpErrorResponse(parsedBody: unknown): Response {
+  const id = parsedBody && typeof parsedBody === 'object' && !Array.isArray(parsedBody)
+    && 'id' in parsedBody
+    ? (parsedBody as { id?: unknown }).id ?? null
+    : null;
+  return new Response(JSON.stringify({
+    jsonrpc: '2.0',
+    error: INTERNAL_MCP_ERROR,
+    id,
+  }), {
+    status: 500,
+    headers: {
+      'Cache-Control': 'no-store',
+      'Content-Type': 'application/json; charset=utf-8',
+    },
+  });
+}
+
+function withPrivateErrorCaching(response: Response): Response {
+  if (response.status < 500 || response.headers.has('Cache-Control')) return response;
+  const headers = new Headers(response.headers);
+  headers.set('Cache-Control', 'no-store');
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 function sendMcpParseError(res: ServerResponse): void {
   if (res.writableEnded) return;
   res.writeHead(400, {
@@ -320,7 +361,7 @@ function sendMcpParseError(res: ServerResponse): void {
   });
   res.end(JSON.stringify({
     jsonrpc: '2.0',
-    error: { code: ErrorCode.ParseError, message: 'Parse error' },
+    error: { code: ProtocolErrorCode.ParseError, message: 'Parse error' },
     id: null,
   }));
 }

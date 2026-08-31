@@ -1,8 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { LoggingMessageNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
+import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
+import type { Server } from '@modelcontextprotocol/server';
 import type { ToolHandler, ToolResult } from '../../../src/kernel/types.js';
 import type { McpCompositionRoot } from '../../../src/mcp/server.js';
 import { createTheologAiMcpServer, STATELESS_HTTP_CAPABILITIES } from '../../../src/mcp/server.js';
@@ -282,7 +280,7 @@ describe('shared MCP registration', () => {
       { name: 'theologai-logging-client', version: '1.0.0' },
       { capabilities: {} },
     );
-    client.setNotificationHandler(LoggingMessageNotificationSchema, notification => {
+    client.setNotificationHandler('notifications/message', notification => {
       messages.push(notification.params);
     });
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -452,7 +450,7 @@ describe('shared MCP registration', () => {
       { name: 'theologai-resource-client', version: '1.0.0' },
       { capabilities: {} },
     );
-    client.setNotificationHandler(LoggingMessageNotificationSchema, notification => {
+    client.setNotificationHandler('notifications/message', notification => {
       messages.push(notification.params);
     });
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -493,7 +491,7 @@ describe('shared MCP registration', () => {
     const uri = 'theologai://unknown/item';
 
     await expect(client.readResource({ uri })).rejects.toMatchObject({
-      code: -32002,
+      code: -32602,
       message: expect.stringContaining('Resource not found'),
       data: { uri },
     });
@@ -514,7 +512,7 @@ describe('shared MCP registration', () => {
     }
 
     for (const uri of ['theologai://strongs/G0', 'theologai://strongs/G100000', 'theologai://strongs/H999999']) {
-      await expect(client.readResource({ uri })).rejects.toMatchObject({ code: -32002, data: { uri } });
+      await expect(client.readResource({ uri })).rejects.toMatchObject({ code: -32602, data: { uri } });
     }
     expect(lookup).toHaveBeenCalledTimes(5);
   });
@@ -588,7 +586,7 @@ describe('shared MCP registration', () => {
 
     const fuzzyUri = 'theologai://documents/nicene';
     await expect(client.readResource({ uri: fuzzyUri })).rejects.toMatchObject({
-      code: -32002,
+      code: -32602,
       data: { uri: fuzzyUri },
     });
     expect(getSections).not.toHaveBeenCalled();
@@ -708,7 +706,7 @@ describe('shared MCP registration', () => {
     }
 
     for (const uri of ['theologai://strongs/G0', 'theologai://strongs/G100000', 'theologai://strongs/H999999']) {
-      await expect(client.readResource({ uri })).rejects.toMatchObject({ code: -32002, data: { uri } });
+      await expect(client.readResource({ uri })).rejects.toMatchObject({ code: -32602, data: { uri } });
     }
     expect(lookup).toHaveBeenCalledTimes(5);
   });
@@ -742,7 +740,7 @@ describe('shared MCP registration', () => {
     'theologai://documents/Nicene-Creed#section-1',
   ])('rejects malformed exact-section resource %s', async uri => {
     const client = await connect(createTheologAiMcpServer(makeMockRoot(), '1.0.0-test').server);
-    await expect(client.readResource({ uri })).rejects.toMatchObject({ code: -32002, data: { uri } });
+    await expect(client.readResource({ uri })).rejects.toMatchObject({ code: -32602, data: { uri } });
   });
 
   it.each([
@@ -1114,7 +1112,7 @@ describe('shared MCP registration', () => {
 
     const listed = await client.listTools();
     const advertised = listed.tools.find(tool => tool.name === 'primary_source_search')!;
-    expect(advertised.outputSchema?.properties?.schemaVersion).toEqual({ const: '7' });
+    expect((advertised.outputSchema as any)?.properties?.schemaVersion).toEqual({ const: '7' });
     expect(advertised.annotations).toMatchObject({ openWorldHint: true });
     const inputItem = (advertised.inputSchema.properties?.queries as any).items;
     expect(inputItem.properties).not.toHaveProperty('providers');

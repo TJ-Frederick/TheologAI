@@ -1,6 +1,9 @@
 import { Validator, type Schema } from '@cfworker/json-schema';
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
-import type { JsonSchemaType } from '@modelcontextprotocol/sdk/validation/types.js';
+import {
+  ProtocolError,
+  ProtocolErrorCode,
+  type JsonSchemaType,
+} from '@modelcontextprotocol/server';
 import { parseReference } from '../kernel/reference.js';
 
 export type SchemaValidationResult<T> = {
@@ -36,7 +39,7 @@ export const jsonSchemaValidator = {
 const validatorCache = new Map<string, SchemaValidator<Record<string, unknown>>>();
 
 export function validatorFor(
-  schema: JsonSchemaType,
+  schema: Record<string, unknown>,
 ): SchemaValidator<Record<string, unknown>> {
   const serializedSchema = JSON.stringify(schema);
   const cached = validatorCache.get(serializedSchema);
@@ -119,26 +122,26 @@ export function validatePromptArguments(
   args: unknown,
 ): asserts args is Record<string, string> | undefined {
   if (typeof name !== 'string') {
-    throw new McpError(ErrorCode.InvalidParams, 'Prompt name must be a string');
+    throw new ProtocolError(ProtocolErrorCode.InvalidParams, 'Prompt name must be a string');
   }
   const definition = PROMPT_ARGUMENTS[name as keyof typeof PROMPT_ARGUMENTS];
   if (!definition) {
-    throw new McpError(ErrorCode.InvalidParams, `Unknown prompt: ${name}`);
+    throw new ProtocolError(ProtocolErrorCode.InvalidParams, `Unknown prompt: ${name}`);
   }
 
   if (args !== undefined && (args === null || typeof args !== 'object' || Array.isArray(args))) {
-    throw new McpError(ErrorCode.InvalidParams, `Arguments for prompt "${name}" must be an object`);
+    throw new ProtocolError(ProtocolErrorCode.InvalidParams, `Arguments for prompt "${name}" must be an object`);
   }
   const values = (args ?? {}) as Record<string, unknown>;
   const unknown = Object.keys(values).find(key => !(definition.allowed as readonly string[]).includes(key));
   if (unknown) {
-    throw new McpError(ErrorCode.InvalidParams, `Unknown argument "${unknown}" for prompt "${name}"`);
+    throw new ProtocolError(ProtocolErrorCode.InvalidParams, `Unknown argument "${unknown}" for prompt "${name}"`);
   }
 
   const wrongType = Object.entries(values).find(([, value]) => typeof value !== 'string');
   if (wrongType) {
-    throw new McpError(
-      ErrorCode.InvalidParams,
+    throw new ProtocolError(
+      ProtocolErrorCode.InvalidParams,
       `Argument "${wrongType[0]}" for prompt "${name}" must be a string`,
     );
   }
@@ -147,24 +150,24 @@ export function validatePromptArguments(
 
   const missing = (definition.required as readonly string[]).find(key => !stringValues[key]?.trim());
   if (missing) {
-    throw new McpError(ErrorCode.InvalidParams, `Missing required argument "${missing}" for prompt "${name}"`);
+    throw new ProtocolError(ProtocolErrorCode.InvalidParams, `Missing required argument "${missing}" for prompt "${name}"`);
   }
 
   const oversized = Object.entries(stringValues).find(([, value]) => value.length > 500);
   if (oversized) {
-    throw new McpError(ErrorCode.InvalidParams, `Argument "${oversized[0]}" for prompt "${name}" exceeds 500 characters`);
+    throw new ProtocolError(ProtocolErrorCode.InvalidParams, `Argument "${oversized[0]}" for prompt "${name}" exceeds 500 characters`);
   }
 
   if (name === 'word-study') {
     const word = stringValues.word?.trim() ?? '';
     if (word.length < 2 || word.length > 100) {
-      throw new McpError(ErrorCode.InvalidParams, 'Argument "word" for prompt "word-study" must be between 2 and 100 characters');
+      throw new ProtocolError(ProtocolErrorCode.InvalidParams, 'Argument "word" for prompt "word-study" must be between 2 and 100 characters');
     }
     if (stringValues.testament && !['OT', 'NT'].includes(stringValues.testament.toUpperCase())) {
-      throw new McpError(ErrorCode.InvalidParams, 'Argument "testament" for prompt "word-study" must be OT or NT');
+      throw new ProtocolError(ProtocolErrorCode.InvalidParams, 'Argument "testament" for prompt "word-study" must be OT or NT');
     }
     if ((stringValues.reference?.length ?? 0) > 100) {
-      throw new McpError(ErrorCode.InvalidParams, 'Argument "reference" for prompt "word-study" exceeds 100 characters');
+      throw new ProtocolError(ProtocolErrorCode.InvalidParams, 'Argument "reference" for prompt "word-study" exceeds 100 characters');
     }
     const reference = stringValues.reference?.trim();
     if (reference) {
@@ -174,8 +177,8 @@ export function validatePromptArguments(
           throw new Error('not one verse');
         }
       } catch {
-        throw new McpError(
-          ErrorCode.InvalidParams,
+        throw new ProtocolError(
+          ProtocolErrorCode.InvalidParams,
           'Argument "reference" for prompt "word-study" must be exactly one valid Bible verse',
         );
       }
@@ -183,33 +186,33 @@ export function validatePromptArguments(
   }
 
   if (['passage-exegesis', 'compare-translations'].includes(name) && (stringValues.reference?.length ?? 0) > 100) {
-    throw new McpError(ErrorCode.InvalidParams, `Argument "reference" for prompt "${name}" exceeds 100 characters`);
+    throw new ProtocolError(ProtocolErrorCode.InvalidParams, `Argument "reference" for prompt "${name}" exceeds 100 characters`);
   }
 
   if (name === 'primary-source-research') {
     const topicLength = Array.from(stringValues.topic.trim()).length;
     if (topicLength < 1 || topicLength > 200) {
-      throw new McpError(ErrorCode.InvalidParams, 'Argument "topic" for prompt "primary-source-research" must be between 1 and 200 characters');
+      throw new ProtocolError(ProtocolErrorCode.InvalidParams, 'Argument "topic" for prompt "primary-source-research" must be between 1 and 200 characters');
     }
     if (stringValues.work !== undefined) {
       const workLength = Array.from(stringValues.work.trim()).length;
       if (workLength < 1 || workLength > 160) {
-        throw new McpError(ErrorCode.InvalidParams, 'Argument "work" for prompt "primary-source-research" must be between 1 and 160 characters');
+        throw new ProtocolError(ProtocolErrorCode.InvalidParams, 'Argument "work" for prompt "primary-source-research" must be between 1 and 160 characters');
       }
     }
     if (stringValues.authors !== undefined) {
       const authors = stringValues.authors.split(',').map(value => value.trim()).filter(Boolean);
       if (authors.length < 1 || authors.length > 4 || authors.some(value => Array.from(value).length > 100)) {
-        throw new McpError(ErrorCode.InvalidParams, 'Argument "authors" for prompt "primary-source-research" must contain 1 to 4 comma-separated canonical creator names');
+        throw new ProtocolError(ProtocolErrorCode.InvalidParams, 'Argument "authors" for prompt "primary-source-research" must contain 1 to 4 comma-separated canonical creator names');
       }
     }
     const startYear = promptYear(stringValues.startYear, 'startYear');
     const endYear = promptYear(stringValues.endYear, 'endYear');
     if (startYear !== undefined && endYear !== undefined && startYear > endYear) {
-      throw new McpError(ErrorCode.InvalidParams, 'Argument "startYear" for prompt "primary-source-research" must be less than or equal to endYear');
+      throw new ProtocolError(ProtocolErrorCode.InvalidParams, 'Argument "startYear" for prompt "primary-source-research" must be less than or equal to endYear');
     }
     if (stringValues.maxSections !== undefined && !/^[1-5]$/.test(stringValues.maxSections.trim())) {
-      throw new McpError(ErrorCode.InvalidParams, 'Argument "maxSections" for prompt "primary-source-research" must be a string integer from 1 to 5');
+      throw new ProtocolError(ProtocolErrorCode.InvalidParams, 'Argument "maxSections" for prompt "primary-source-research" must be a string integer from 1 to 5');
     }
   }
 }
@@ -218,11 +221,11 @@ function promptYear(value: string | undefined, name: string): number | undefined
   if (value === undefined) return undefined;
   const normalized = value.trim();
   if (!/^-?\d{1,4}$/.test(normalized)) {
-    throw new McpError(ErrorCode.InvalidParams, `Argument "${name}" for prompt "primary-source-research" must be an integer year`);
+    throw new ProtocolError(ProtocolErrorCode.InvalidParams, `Argument "${name}" for prompt "primary-source-research" must be an integer year`);
   }
   const year = Number(normalized);
   if (!Number.isSafeInteger(year) || year < -5000 || year > 3000) {
-    throw new McpError(ErrorCode.InvalidParams, `Argument "${name}" for prompt "primary-source-research" must be from -5000 to 3000`);
+    throw new ProtocolError(ProtocolErrorCode.InvalidParams, `Argument "${name}" for prompt "primary-source-research" must be from -5000 to 3000`);
   }
   return year;
 }

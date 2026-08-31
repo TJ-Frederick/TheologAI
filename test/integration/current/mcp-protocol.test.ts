@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
+import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
+import type { Server, Transport } from '@modelcontextprotocol/server';
 import { createTheologAiMcpServer } from '../../../src/mcp/server.js';
 import { BibleMCPServer } from '../../../src/server.js';
 import { createWorkerMcpServer } from '../../../src/worker-server.js';
@@ -142,7 +140,7 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
       const primarySourceTool = listed.tools.find(tool => tool.name === 'primary_source_search')!;
       expect(JSON.stringify(primarySourceTool.inputSchema).toLowerCase()).not.toContain('ccel');
       expect(JSON.stringify(primarySourceTool.outputSchema).toLowerCase()).not.toContain('ccel');
-      expect((primarySourceTool.outputSchema!.properties!.queries as any).items.properties.providers)
+      expect(((primarySourceTool.outputSchema as any).properties.queries as any).items.properties.providers)
         .toMatchObject({ minItems: 1, maxItems: 1 });
 
       const primarySource = await client.callTool({

@@ -8,7 +8,7 @@
  */
 
 import { commentaryLookupHandler } from '../../src/tools/commentaryLookup.js';
-import type { TextContent } from '@modelcontextprotocol/sdk/types.js';
+import type { TextContent } from '@modelcontextprotocol/server';
 
 console.log('================================================================================');
 console.log('PHASE 3.2 INTEGRATION TESTS - HELLOAO COMMENTARY');

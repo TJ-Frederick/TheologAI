@@ -203,7 +203,8 @@ describe('globally inactive original_language_study v2 fixture packet', () => {
     expect([...reachableRuntimeFiles].filter(path => hasDraftReference(readRepoFile(path)))).toEqual([]);
 
     const wiringPaths = trackedIndexEntries().map(entry => entry.path)
-      .filter(path => isRuntimeWiringPath(path) && !isDraftPacketPath(path));
+      .filter(path => isRuntimeWiringPath(path) && !isDraftPacketPath(path)
+        && existsSync(resolve(repoPath, path)));
     const offenders = wiringPaths.filter(path => hasDraftReference(readRepoFile(path))).sort();
     expect(offenders).toEqual([]);
   });

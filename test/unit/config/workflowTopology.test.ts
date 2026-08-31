@@ -50,6 +50,7 @@ describe('workflow topology', () => {
     const jobs = uniqueBlock(workflow, 'jobs:');
     const classifier = uniqueBlock(workflow, '  classify-deployment:');
     const verifier = uniqueBlock(workflow, '  verify-deployment-plan:');
+    const previewVerifier = uniqueBlock(workflow, '  verify-dual-era-preview:');
     const deploy = uniqueBlock(workflow, '  deploy:');
     const classifierOutputs = uniqueBlock(classifier, '    outputs:');
     const verifierOutputs = uniqueBlock(verifier, '    outputs:');
@@ -68,9 +69,10 @@ describe('workflow topology', () => {
     expect(normalized(concurrency)).toBe('concurrency: group: deploy-production cancel-in-progress: false');
     expect(occurrences(workflow, '  classify-deployment:')).toBe(1);
     expect(occurrences(workflow, '  verify-deployment-plan:')).toBe(1);
+    expect(occurrences(workflow, '  verify-dual-era-preview:')).toBe(1);
     expect(occurrences(workflow, '  deploy:')).toBe(1);
     expect([...jobs.matchAll(/^  ([a-z][a-z0-9-]+):$/gm)].map(match => match[1])).toEqual([
-      'classify-deployment', 'verify-deployment-plan', 'deploy',
+      'classify-deployment', 'verify-deployment-plan', 'verify-dual-era-preview', 'deploy',
     ]);
 
     expect(classifier).toContain('name: Classify Production Deployment');
@@ -127,12 +129,24 @@ describe('workflow topology', () => {
     expect(verifier).toContain('node scripts/production-deployment-plan.mjs verify');
     expect(verifier).toContain('value.classificationSucceeded !== true');
 
-    expect(deploy).toContain('needs: verify-deployment-plan');
+    expect(previewVerifier).toContain('needs: verify-deployment-plan');
+    expect(previewVerifier).not.toContain('environment:');
+    expect(previewVerifier).toContain('permissions:\n      actions: read\n      contents: read\n      pull-requests: read');
+    expect(previewVerifier).toContain('name: Resolve fresh protected dual-era preview evidence');
+    expect(previewVerifier).toContain("run.event === 'pull_request' && run.status === 'completed' && run.conclusion === 'success'");
+    expect(previewVerifier).toContain('Date.now() - 7 * 24 * 60 * 60 * 1000');
+    expect(previewVerifier).toContain('name: Download exact protected preview evidence with digest validation');
+    expect(previewVerifier).toContain('run-id: ${{ steps.evidence.outputs.run_id }}');
+    expect(previewVerifier).toContain('github-token: ${{ github.token }}');
+    expect(previewVerifier).toContain('digest-mismatch: error');
+    expect(previewVerifier).toContain('scripts/dual-era-preview-release-receipt.ts verify');
+
+    expect(deploy).toContain('needs: [verify-deployment-plan, verify-dual-era-preview]');
     expect(deploy).toContain("if: ${{ github.ref == 'refs/heads/main' && needs.verify-deployment-plan.outputs.deploy_required == 'true' && needs.verify-deployment-plan.outputs.decision == 'deploy' }}");
     expect(deploy.slice(0, deploy.indexOf('    runs-on:'))).not.toContain('always()');
     expect(deploy).not.toContain('needs.classify-deployment');
     expect(deploy).toContain('environment:\n      name: production\n      url: https://mcp.theologai.xyz/mcp');
-    expect(deploy).toContain('permissions:\n      contents: read');
+    expect(deploy).toContain('permissions:\n      actions: read\n      contents: read');
     for (const command of [
       'npm run typecheck:node',
       'npm run typecheck:test-node',
@@ -146,8 +160,13 @@ describe('workflow topology', () => {
     ]) expect(deploy).toContain(command);
     expect(deploy).not.toContain('typecheck:test-fixtures');
     expect(occurrences(workflow, '      name: production')).toBe(1);
-    expect(occurrences(workflow, '        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1')).toBe(2);
-    expect(workflow).not.toMatch(/checks:\s*write|github-token:|artifact-ids:|merge-multiple:\s*true|repository:|run-id:|pattern:/);
+    expect(occurrences(workflow, '        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1')).toBe(4);
+    expect(deploy).toContain('name: Download exact protected preview evidence with digest validation');
+    expect(deploy).toContain('run-id: ${{ needs.verify-dual-era-preview.outputs.run_id }}');
+    expect(deploy).toContain('github-token: ${{ github.token }}');
+    expect(deploy).toContain('digest-mismatch: error');
+    expect(deploy).toContain('scripts/dual-era-preview-release-receipt.ts verify');
+    expect(workflow).not.toMatch(/checks:\s*write|artifact-ids:|merge-multiple:\s*true|repository:|pattern:/);
   });
 
   it('keeps the five PR checks and preview authorization boundary exact', async () => {

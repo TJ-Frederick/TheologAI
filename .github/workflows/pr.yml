@@ -186,7 +186,9 @@ jobs:
           npm run test:ccel-coordinator-runtime
 
       - name: Exercise production-like Worker bundle without test-only globals
-        run: npm run test:worker-production-runtime
+        run: |
+          npm run test:worker-bundle-ubs
+          npm run test:worker-production-runtime
 
   node-http-e2e:
     name: Node HTTP E2E
@@ -578,6 +580,13 @@ jobs:
             --output "$RUNNER_TEMP/historical-spine-preview-audit.json"
           test -s "$RUNNER_TEMP/historical-spine-preview-audit.json"
 
+      - name: Prove legacy and modern MCP eras on the protected preview
+        id: preview-dual-era-audit
+        if: ${{ steps.preview-historical-spine-audit.outcome == 'success' }}
+        run: |
+          npm run audit:dual-era-preview -- --output "$RUNNER_TEMP/dual-era-mcp-preview-audit.json"
+          test -s "$RUNNER_TEMP/dual-era-mcp-preview-audit.json"
+
       # Runs after any post-deploy result (including audit failure or a later
       # authorization revocation) and is deliberately read-only. It does not
       # attempt an automatic rollback or destructive cleanup.
@@ -611,7 +620,7 @@ jobs:
 
       - name: Verify preview Worker remained active through audit (read-only)
         id: preview-worker-audit-identity
-        if: ${{ steps.preview-primary-source-edge-stabilization-gate.outcome == 'success' && steps.preview-original-language-v2-audit.outcome == 'success' && steps.preview-historical-core-audit.outcome == 'success' && steps.preview-historical-spine-audit.outcome == 'success' }}
+        if: ${{ steps.preview-primary-source-edge-stabilization-gate.outcome == 'success' && steps.preview-original-language-v2-audit.outcome == 'success' && steps.preview-historical-core-audit.outcome == 'success' && steps.preview-historical-spine-audit.outcome == 'success' && steps.preview-dual-era-audit.outcome == 'success' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -629,7 +638,7 @@ jobs:
       # a production change that happened during the black-box audit window.
       - name: Verify production control remained unchanged after preview audits (read-only)
         id: production-control-post-audit
-        if: ${{ steps.preview-primary-source-edge-stabilization-gate.outcome == 'success' && steps.preview-original-language-v2-audit.outcome == 'success' && steps.preview-historical-core-audit.outcome == 'success' && steps.preview-historical-spine-audit.outcome == 'success' && steps.preview-worker-audit-identity.outcome == 'success' }}
+        if: ${{ steps.preview-primary-source-edge-stabilization-gate.outcome == 'success' && steps.preview-original-language-v2-audit.outcome == 'success' && steps.preview-historical-core-audit.outcome == 'success' && steps.preview-historical-spine-audit.outcome == 'success' && steps.preview-dual-era-audit.outcome == 'success' && steps.preview-worker-audit-identity.outcome == 'success' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -648,6 +657,24 @@ jobs:
             --wrangler-config wrangler.toml \
             --d1-inventory "$RUNNER_TEMP/production-control-d1-inventory-post-audit.json" \
             --output "$RUNNER_TEMP/production-control-post-audit.json"
+
+      - name: Create source-bound dual-era preview release receipt
+        if: ${{ steps.production-control-post-audit.outcome == 'success' }}
+        env:
+          SOURCE_COMMIT: ${{ github.event.pull_request.head.sha }}
+          PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          source_tree="$(git rev-parse "$SOURCE_COMMIT^{tree}")"
+          npx --no-install tsx scripts/dual-era-preview-release-receipt.ts create \
+            --repository "$GITHUB_REPOSITORY" \
+            --pull-request "$PULL_REQUEST_NUMBER" \
+            --source-commit "$SOURCE_COMMIT" \
+            --source-tree "$source_tree" \
+            --audit "$RUNNER_TEMP/dual-era-mcp-preview-audit.json" \
+            --worker-identity "$RUNNER_TEMP/preview-worker-deployment-identity.json" \
+            --cutover "$RUNNER_TEMP/preview-worker-candidate-cutover.json" \
+            --d1-readiness "$RUNNER_TEMP/preview-d1-readiness-receipt.json" \
+            --output "$RUNNER_TEMP/dual-era-preview-release-receipt.json"
 
       - name: Hash sanitized preview audit evidence
         id: preview-audit-evidence
@@ -675,6 +702,8 @@ jobs:
             ${{ runner.temp }}/original-language-v2-preview-audit.json
             ${{ runner.temp }}/historical-core-preview-audit.json
             ${{ runner.temp }}/historical-spine-preview-audit.json
+            ${{ runner.temp }}/dual-era-mcp-preview-audit.json
+            ${{ runner.temp }}/dual-era-preview-release-receipt.json
             ${{ runner.temp }}/preview-worker-deployment-identity.json
             ${{ runner.temp }}/preview-worker-candidate-cutover-observation.json
             ${{ runner.temp }}/preview-worker-candidate-cutover.json

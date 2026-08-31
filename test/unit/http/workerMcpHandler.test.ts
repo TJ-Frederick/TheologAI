@@ -1,49 +1,35 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-
-const { mockHandleRequest, mockWorkerTransport } = vi.hoisted(() => {
-  const mockHandleRequest = vi.fn();
-  const mockWorkerTransport = vi.fn(function MockWorkerTransport() {
-    return { handleRequest: mockHandleRequest };
-  });
-  return { mockHandleRequest, mockWorkerTransport };
-});
-
-vi.mock('agents/mcp', () => ({ WorkerTransport: mockWorkerTransport }));
+import { describe, expect, it, vi } from 'vitest';
+import { Server } from '@modelcontextprotocol/server';
 
 import { handleWorkerMcpRequest } from '../../../src/http/worker/mcpHandler.js';
 
 describe('handleWorkerMcpRequest', () => {
-  const request = new Request('https://example.com/mcp', { method: 'POST' });
+  it('serves a legacy request with a fresh stateless v2 server', async () => {
+    const createServer = vi.fn(() => new Server(
+      { name: 'worker-test', version: '1.0.0' },
+      { capabilities: {} },
+    ));
+    const result = await handleWorkerMcpRequest(createServer, initializeRequest());
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockHandleRequest.mockResolvedValue(new Response('ok'));
-  });
-
-  it('connects a stateless WorkerTransport and returns its response', async () => {
-    const server = { connect: vi.fn().mockResolvedValue(undefined) } as unknown as McpServer;
-    const result = await handleWorkerMcpRequest(server, request);
-
-    expect(mockWorkerTransport).toHaveBeenCalledWith({ sessionIdGenerator: undefined });
-    expect(server.connect).toHaveBeenCalledWith(expect.objectContaining({
-      handleRequest: mockHandleRequest,
-    }));
-    expect(mockHandleRequest).toHaveBeenCalledWith(request);
+    expect(createServer).toHaveBeenCalledWith('legacy');
     expect(result.errorName).toBeUndefined();
-    await expect(result.response.text()).resolves.toBe('ok');
+    expect(result.response.status).toBe(200);
+    expect(await responsePayload(result.response)).toMatchObject({
+      jsonrpc: '2.0',
+      id: 1,
+      result: {
+        protocolVersion: '2025-11-25',
+        serverInfo: { name: 'worker-test', version: '1.0.0' },
+      },
+    });
   });
 
-  it.each(['connect', 'handle'])('sanitizes a private %s failure', async failurePoint => {
+  it('sanitizes a private handler setup failure', async () => {
     const secret = 'rpc-key=private&sql=SELECT-private';
-    const server = {
-      connect: failurePoint === 'connect'
-        ? vi.fn().mockRejectedValue(new Error(secret))
-        : vi.fn().mockResolvedValue(undefined),
-    } as unknown as McpServer;
-    if (failurePoint === 'handle') mockHandleRequest.mockRejectedValueOnce(new Error(secret));
-
-    const result = await handleWorkerMcpRequest(server, request);
+    const result = await handleWorkerMcpRequest(
+      () => { throw new Error(secret); },
+      initializeRequest(),
+    );
     expect(result.errorName).toBe('Error');
     expect(result.response.status).toBe(500);
     expect(result.response.headers.get('Cache-Control')).toBe('no-store');
@@ -53,7 +39,37 @@ describe('handleWorkerMcpRequest', () => {
     expect(JSON.parse(body)).toEqual({
       jsonrpc: '2.0',
       error: { code: -32603, message: 'Internal server error' },
-      id: null,
+      id: 1,
     });
   });
 });
+
+function initializeRequest(): Request {
+  return new Request('https://example.com/mcp', {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json, text/event-stream',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'initialize',
+      params: {
+        protocolVersion: '2025-11-25',
+        capabilities: {},
+        clientInfo: { name: 'worker-test-client', version: '1.0.0' },
+      },
+    }),
+  });
+}
+
+async function responsePayload(response: Response): Promise<Record<string, unknown>> {
+  const text = await response.text();
+  if (response.headers.get('Content-Type')?.includes('text/event-stream')) {
+    const data = text.split('\n').find(line => line.startsWith('data: '));
+    if (!data) throw new Error('SSE response omitted a data event');
+    return JSON.parse(data.slice('data: '.length)) as Record<string, unknown>;
+  }
+  return JSON.parse(text) as Record<string, unknown>;
+}

@@ -1,11 +1,9 @@
-import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import {
-  CallToolRequestSchema,
-  ErrorCode,
-  ListToolsRequestSchema,
-  McpError,
-} from '@modelcontextprotocol/sdk/types.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+  ProtocolError,
+  ProtocolErrorCode,
+  type CallToolResult,
+  type Server,
+} from '@modelcontextprotocol/server';
 import type { ToolHandler } from '../kernel/types.js';
 import { internalError } from './errors.js';
 import { formatValidationError, type SchemaValidator, validatorFor } from './validation.js';
@@ -24,7 +22,7 @@ export function registerToolHandlers(
       .map(tool => [tool.name, validatorFor(tool.outputSchema!)]),
   );
 
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({
+  server.setRequestHandler('tools/list', async () => ({
     tools: tools.map(tool => ({
       name: tool.name,
       description: tool.description,
@@ -34,24 +32,24 @@ export function registerToolHandlers(
     })),
   }));
 
-  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  server.setRequestHandler('tools/call', async (request) => {
     const { name, arguments: args } = request.params;
     const tool = tools.find(candidate => candidate.name === name);
     if (!tool) {
-      throw new McpError(ErrorCode.InvalidParams, `Unknown tool: ${name}`);
+      throw new ProtocolError(ProtocolErrorCode.InvalidParams, `Unknown tool: ${name}`);
     }
 
     const validate = validators.get(name);
     const toolArguments = args ?? {};
     const validation = validate?.(toolArguments);
     if (!validation?.valid) {
-      return {
+      return server.projectCallToolResult({
         content: [{
           type: 'text',
           text: `Invalid arguments for ${name}: ${formatValidationError(validation?.errorMessage)}`,
         }],
         isError: true,
-      };
+      }, tool.outputSchema);
     }
 
     if (logging) {
@@ -76,7 +74,7 @@ export function registerToolHandlers(
         // Generic sanitized tool errors may omit structured output. Whenever a
         // handler does provide it (including partial/unavailable isError
         // results), it must validate against the advertised schema.
-        if (result.isError) return result as CallToolResult;
+        if (result.isError) return server.projectCallToolResult(result as CallToolResult, tool.outputSchema);
         await reportOutputValidationFailure(server, logging, name);
         throw internalError();
       }
@@ -93,7 +91,7 @@ export function registerToolHandlers(
       }
     }
 
-    return result as CallToolResult;
+    return server.projectCallToolResult(result as CallToolResult, tool.outputSchema);
   });
 }
 

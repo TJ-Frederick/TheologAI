@@ -113,12 +113,23 @@ class WorkerRpcContractClient implements McpContractClient {
   private serverVersion: { name?: string; version?: string } | undefined;
   private capabilities: JsonRecord | undefined;
 
-  constructor(private readonly worker: Miniflare) {}
+  constructor(
+    private readonly worker: Miniflare,
+    private readonly protocolVersion: '2025-11-25' | '2026-07-28',
+  ) {}
 
   async initialize(): Promise<void> {
+    if (this.protocolVersion === '2026-07-28') {
+      const result = await this.request('server/discover');
+      this.serverVersion = (result._meta as JsonRecord | undefined)?.['io.modelcontextprotocol/serverInfo'] as {
+        name?: string; version?: string;
+      };
+      this.capabilities = result.capabilities as JsonRecord;
+      return;
+    }
     const result = await this.request('initialize', {
-      protocolVersion: '2025-11-25', capabilities: {},
-      clientInfo: { name: 'production-runtime-contract', version: '1.0.0' },
+      protocolVersion: this.protocolVersion, capabilities: {},
+      clientInfo: { name: `production-runtime-contract-${this.protocolVersion}`, version: '1.0.0' },
     });
     this.serverVersion = result.serverInfo as { name?: string; version?: string };
     this.capabilities = result.capabilities as JsonRecord;
@@ -134,15 +145,32 @@ class WorkerRpcContractClient implements McpContractClient {
   async listResources() { return await this.request('resources/list') as { resources: JsonRecord[] }; }
 
   private async request(method: string, params?: JsonRecord): Promise<JsonRecord> {
+    const headers: Record<string, string> = {
+      Accept: 'application/json, text/event-stream',
+      'Content-Type': 'application/json',
+      Origin: 'https://allowed.example',
+      'MCP-Protocol-Version': this.protocolVersion,
+    };
+    if (this.protocolVersion === '2026-07-28') {
+      headers['Mcp-Method'] = method;
+      if (method === 'tools/call' && typeof params?.name === 'string') headers['Mcp-Name'] = params.name;
+    }
+    const requestParams = this.protocolVersion === '2026-07-28'
+      ? {
+          ...(params ?? {}),
+          _meta: {
+            'io.modelcontextprotocol/protocolVersion': this.protocolVersion,
+            'io.modelcontextprotocol/clientInfo': {
+              name: 'production-runtime-contract-modern', version: '1.0.0',
+            },
+            'io.modelcontextprotocol/clientCapabilities': {},
+          },
+        }
+      : params;
     const response = await this.worker.dispatchFetch('https://worker.test/mcp', {
       method: 'POST',
-      headers: {
-        Accept: 'application/json, text/event-stream',
-        'Content-Type': 'application/json',
-        Origin: 'https://allowed.example',
-        'MCP-Protocol-Version': '2025-11-25',
-      },
-      body: JSON.stringify({ jsonrpc: '2.0', id: this.nextId++, method, ...(params ? { params } : {}) }),
+      headers,
+      body: JSON.stringify({ jsonrpc: '2.0', id: this.nextId++, method, ...(requestParams ? { params: requestParams } : {}) }),
     });
     const message = parseMessage(response, await response.text());
     if (response.status !== 200 || message.error || !message.result) {
@@ -153,11 +181,13 @@ class WorkerRpcContractClient implements McpContractClient {
 }
 
 try {
-  const client = new WorkerRpcContractClient(miniflare);
-  await client.initialize();
-  const contract = await captureMcpTransportSnapshot(client);
-  await assertMcpTransportContract(contract, { contractVersion: '6', logging: false });
-  console.log('Production-like Worker bundle passed the full v6 MCP transport contract.');
+  for (const era of ['2025-11-25', '2026-07-28'] as const) {
+    const client = new WorkerRpcContractClient(miniflare, era);
+    await client.initialize();
+    const contract = await captureMcpTransportSnapshot(client);
+    await assertMcpTransportContract(contract, { contractVersion: '6', logging: false });
+    console.log(`Production-like Worker bundle passed the full v6 MCP transport contract for ${era}.`);
+  }
 } finally {
   await miniflare.dispose();
 }

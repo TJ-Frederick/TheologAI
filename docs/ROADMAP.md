@@ -846,8 +846,10 @@ Code readiness and operational readiness are deliberately separate:
   cross-schema generations remain retained; deletion is never automatic and
   requires the documented 30-day, fresh-rehearsal, no-binding,
   reconstruction, compatibility, and exact-owner gates. No cleanup is
-  authorized. The next item is 3B.1 dual-era MCP modernization, which this
-  roadmap does not authorize to deploy.
+  authorized. The 3B.1 dual-era MCP modernization implementation is locally
+  release-ready; its source-bound protected preview proof and a separate
+  production approval remain required. This roadmap does not authorize either
+  deployment.
 - Revisit the parked public-edge traffic issue: a Frankfurt/AWS client has
   generated sustained anonymous production invocations. The custom domain and
   ordinary-request PR #72 legacy-host redirect are already deployed. Any

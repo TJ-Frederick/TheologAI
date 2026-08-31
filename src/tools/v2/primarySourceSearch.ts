@@ -3,7 +3,7 @@ import { handleToolError } from '../../kernel/errors.js';
 import type { PrimarySourceSearchService } from '../../services/historical/PrimarySourceSearchService.js';
 import { formatPrimarySourceSearchFallback, PRIMARY_SOURCE_FALLBACK_MAX_BYTES } from '../../formatters/primarySourceFormatter.js';
 import { buildLocalDocumentResourceUri } from '../../kernel/documentResource.js';
-import type { ResourceLink } from '@modelcontextprotocol/sdk/types.js';
+import type { ResourceLink } from '@modelcontextprotocol/server';
 import { DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG } from '../../kernel/featureFlags.js';
 import type { PrimarySourceContractConfig } from '../../kernel/featureFlags.js';
 import { createPrimarySourceSearchDescriptor, type PrimarySourceSearchDescriptor } from '../../mcp/primarySourceSearchDescriptor.js';

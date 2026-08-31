@@ -1,0 +1,9 @@
+# The server-stateless scenario uses three public diagnostic tools to exercise
+# capabilities that TheologAI deliberately does not expose. Baselining only
+# those untestable checks keeps the other 24 structural checks enforceable
+# without adding conformance-only names to the eleven-tool product contract.
+server:
+  - server-stateless:sep-2575-server-rejects-undeclared-capability
+  - server-stateless:sep-2575-missing-capability-http-400
+  - server-stateless:sep-2575-http-server-no-independent-requests-on-stream
+  - server-stateless:sep-2575-server-no-log-without-loglevel

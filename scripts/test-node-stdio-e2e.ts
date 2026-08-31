@@ -8,12 +8,12 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { Client } from '@modelcontextprotocol/client';
 import {
   DEFAULT_INHERITED_ENV_VARS,
   StdioClientTransport,
   getDefaultEnvironment,
-} from '@modelcontextprotocol/sdk/client/stdio.js';
+} from '@modelcontextprotocol/client/stdio';
 import {
   assertMcpTransportContract,
   captureMcpTransportSnapshot,
@@ -89,7 +89,48 @@ async function main(): Promise<void> {
     const contract = await withTimeout(captureMcpTransportSnapshot(client), 'MCP transport contract');
     await assertMcpTransportContract(contract, { contractVersion: '6', logging: true });
     assert(stderr.length <= MAX_STDERR_CHARS, 'stdio stderr capture exceeded its bound');
-    console.error('[node-stdio-e2e] Compiled Node stdio MCP server passed public transport checks.');
+    await withTimeout(client.close(), 'legacy MCP client close');
+    client = undefined;
+
+    const modernTransport = new StdioClientTransport({
+      command: process.execPath,
+      args: [join(ROOT, 'dist', 'index.js')],
+      cwd: workspace,
+      env: {
+        NODE_ENV: 'test',
+        THEOLOGAI_DATABASE_PATH: databasePath,
+      },
+      stderr: 'pipe',
+    });
+    client = new Client(
+      { name: 'theologai-node-stdio-e2e-modern', version: '1.0.0' },
+      { versionNegotiation: { mode: { pin: '2026-07-28' } } },
+    );
+    await withTimeout(client.connect(modernTransport), 'modern MCP discovery');
+    assert.equal(client.getProtocolEra(), 'modern');
+    assert.equal(client.getNegotiatedProtocolVersion(), '2026-07-28');
+    assert.deepEqual(client.getDiscoverResult()?.capabilities, {
+      tools: {}, resources: {}, prompts: {},
+    });
+    assert.equal(client.getDiscoverResult()?.ttlMs, 0);
+    assert.equal(client.getDiscoverResult()?.cacheScope, 'private');
+    const modernContract = await withTimeout(
+      captureMcpTransportSnapshot(client),
+      'modern MCP transport contract',
+    );
+    await assertMcpTransportContract(modernContract, { contractVersion: '6', logging: false });
+    const modernDonation = await withTimeout(
+      client.callTool({ name: 'donation_config', arguments: {} }),
+      'modern tools/call',
+    );
+    assert.equal(modernDonation.isError, undefined);
+    assert.equal((modernDonation.structuredContent as { kind?: string } | undefined)?.kind, 'donation_config');
+    await assert.rejects(
+      client.setLoggingLevel('warning'),
+      /logging/i,
+      'modern clients must not be offered deprecated MCP Logging',
+    );
+    console.error('[node-stdio-e2e] Compiled Node stdio MCP server passed legacy and modern public transport checks.');
   } finally {
     if (client) await withTimeout(client.close(), 'MCP client close').catch(() => undefined);
     await rm(workspace, { recursive: true, force: true });

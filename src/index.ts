@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 
 import 'dotenv/config';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { BibleMCPServer } from './server.js';
+import { serveStdio } from '@modelcontextprotocol/server/stdio';
+import { createTheologAiMcpServer, STDIO_CAPABILITIES } from './mcp/server.js';
+import { THEOLOGAI_VERSION } from './server.js';
 import { createCompositionRoot } from './tools/v2/index.js';
 import { readNodeHttpConfig } from './http/config.js';
 import { createNodeHttpServer } from './http/nodeHttpServer.js';
@@ -47,12 +48,25 @@ async function main() {
     process.once('SIGTERM', shutdown);
 
   } else {
-    // Stdio mode - original behavior
-    const server = new BibleMCPServer(root);
-    const transport = new StdioServerTransport();
-
     try {
-      await server.connect(transport);
+      serveStdio(
+        ({ era }) => createTheologAiMcpServer(
+          root,
+          THEOLOGAI_VERSION,
+          STDIO_CAPABILITIES,
+          era,
+        ),
+        {
+          onerror(error) {
+            console.error(JSON.stringify({
+              event: 'stdio.server.protocol_error',
+              level: 'error',
+              errorName: error.name,
+              timestamp: new Date().toISOString(),
+            }));
+          },
+        },
+      );
       console.error('TheologAI Bible MCP Server running on stdio');
     } catch (error) {
       console.error(JSON.stringify({
