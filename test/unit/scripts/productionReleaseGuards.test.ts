@@ -70,6 +70,17 @@ describe('production release guards', () => {
     expect(workflow).not.toContain('d1 delete');
   });
 
+  it('verifies the protected receipt against the preview-suffixed server identity', async () => {
+    const workflow = await readFile(new URL('.github/workflows/deploy.yml', root), 'utf8');
+    const verifyStart = workflow.indexOf('Verify source-bound dual-era preview release receipt');
+    const deployStart = workflow.indexOf('  deploy:', verifyStart);
+    const verifyBlock = workflow.slice(verifyStart, deployStart);
+
+    expect(verifyBlock).toContain("process.stdout.write(packageJson.version + '-preview')");
+    expect(verifyBlock).toContain('--expected-server-version "$preview_server_version"');
+    expect(verifyBlock).not.toContain('process.stdout.write(packageJson.version)');
+  });
+
   it('revalidates the exact gate artifact before dependencies, secrets, Cloudflare, or D1 and retains seven release artifacts', async () => {
     const workflow = await readFile(new URL('.github/workflows/deploy.yml', root), 'utf8');
     const deployStart = workflow.indexOf('  deploy:');
