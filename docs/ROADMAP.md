@@ -15,6 +15,21 @@ names for already-shipped work.
 
 ## Shipped baseline
 
+- **Phase 3B.1 dual-era MCP modernization / PRs #148–#151:** replaced the
+  deployed MCP SDK v1 transport with the exact official TypeScript v2 server,
+  client, and Node packages while preserving legacy `2025-11-25` and adding
+  modern `2026-07-28` negotiation on the same endpoints. Exact PR #151 tree
+  `e73599eb50cd4a6beb6d756a587118407fc548e2` passed protected preview run
+  `33441596793` and protected production run `33443530427`. Production source
+  `50fcc5ea1d460a7869d5c0b5bf29aa26a37cbfc5` deployed as Cloudflare
+  `e44c5732-7203-4ac8-87db-f50cbd6761f0`, Worker
+  `a04644c3-c49b-46e0-a42a-b8489e1f7a99` (#136), on unchanged schema-`0009`
+  D1 `9bc79346-338b-439e-a2a5-424f4418eb21`. Preview remained the distinct
+  PR #151 control: deployment `a430e3f5-d634-4c8a-a639-ea04794b7796`, Worker
+  `38ecbb40-ded3-462e-b264-0a8786c8a4d5` (#150), and D1
+  `74f456e2-6951-4003-bb6f-91951342bf8f`. Both eras, all eleven tools and six
+  prompts, original-language 11/11, historical-core 8/8, historical-spine
+  10/10, edge stability, final routing, and environment isolation passed.
 - **Phases 1–2 / PR #10:** MCP architecture and release-pipeline hardening,
   merged as `71a3f0d120ffd31c09424ba2a7caef88961d21e3`.
 - **Phase 3 cleanup / PR #11:** current roadmap, honest public documentation,
@@ -846,9 +861,10 @@ Code readiness and operational readiness are deliberately separate:
   cross-schema generations remain retained; deletion is never automatic and
   requires the documented 30-day, fresh-rehearsal, no-binding,
   reconstruction, compatibility, and exact-owner gates. No cleanup is
-  authorized. The 3B.1 dual-era MCP modernization implementation is locally
-  release-ready; its source-bound protected preview proof and a separate
-  production approval remain required. This roadmap does not authorize either
+  authorized. The 3B.1 dual-era MCP modernization is complete: protected
+  preview run `33441596793` and production run `33443530427` passed against the
+  same tree, with no D1 binding, schema, or data mutation. Phase 3B.2 historical
+  research specification is next. This roadmap does not authorize any further
   deployment.
 - Revisit the parked public-edge traffic issue: a Frankfurt/AWS client has
   generated sustained anonymous production invocations. The custom domain and
