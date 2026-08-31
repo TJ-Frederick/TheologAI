@@ -864,9 +864,9 @@ function assertResourceNotFound(message: ObjectRecord, expectedUri: string): voi
   const error = object(message.error);
   assert(error !== undefined && JSON.stringify(Object.keys(error).sort()) === JSON.stringify(['code', 'data', 'message']),
     `${label} error envelope keys drifted`);
-  assert(error.code === -32002, `${label} must return exact resource-not-found code -32002`);
+  assert(error.code === -32602, `${label} must return exact resource-not-found code -32602`);
   const errorMessage = requireString(error.message, `${label} error message`);
-  assert(errorMessage === 'Resource not found' || errorMessage === 'MCP error -32002: Resource not found',
+  assert(errorMessage === 'Resource not found' || errorMessage === 'MCP error -32602: Resource not found',
     `${label} must return an exact safe resource-not-found message`);
   assertNoSensitiveErrorText(errorMessage, label);
   const data = object(error.data);

@@ -36,7 +36,7 @@ function response(body: RecordValue, fixtureValue: HistoricalSpineAuditFixture, 
   if (body.method === 'resources/list') return rpc({ resources: HISTORICAL_CORE_EXPECTED_RESOURCE_URIS.map(uri => ({ uri })) });
   if (body.method === 'resources/read') {
     const uri = (body.params as RecordValue).uri as string;
-    if (uri === 'theologai://documents/does-not-exist#section-not-real') return error({ code: -32002, message: 'Resource not found', data: { uri } });
+    if (uri === 'theologai://documents/does-not-exist#section-not-real') return error({ code: -32602, message: 'Resource not found', data: { uri } });
     if (uri === 'theologai://primary-sources/catalog') {
       const works = [...fixtureValue.probes.map((probe, index) => ({
         id: probe.workId,
