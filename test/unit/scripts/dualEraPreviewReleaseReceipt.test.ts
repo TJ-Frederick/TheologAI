@@ -14,7 +14,7 @@ const auditText = `${JSON.stringify({
   schemaVersion: 'theologai-dual-era-mcp-preview-audit.v1', capturedAt,
   endpoint: 'https://preview-mcp.theologai.xyz/mcp', productProfile: '7',
   eras: ['2025-11-25', '2026-07-28'].map(protocolVersion => ({
-    protocolVersion, serverName: 'theologai-bible-server', serverVersion: '3.6.0', counts, fingerprints,
+    protocolVersion, serverName: 'theologai-bible-server', serverVersion: '3.6.0-preview', counts, fingerprints,
   })),
   crossEraContractSha256: '6'.repeat(64),
 })}\n`;
@@ -50,21 +50,25 @@ describe('dual-era protected preview receipt', () => {
     const value = receipt();
     expect(verifyDualEraPreviewReleaseReceipt(value, {
       repository: 'owner/TheologAI', sourceCommit: 'a'.repeat(40), sourceTree: 'b'.repeat(40),
-      serverVersion: '3.6.0', now: new Date('2026-09-07T11:59:59.000Z'),
+      serverVersion: '3.6.0-preview', now: new Date('2026-09-07T11:59:59.000Z'),
     })).toEqual(value);
     expect(value.protocols).toEqual(['2025-11-25', '2026-07-28']);
     expect(value.worker.versionNumber).toBe(151);
+    expect(() => verifyDualEraPreviewReleaseReceipt(value, {
+      repository: 'owner/TheologAI', sourceCommit: 'a'.repeat(40), sourceTree: 'b'.repeat(40),
+      serverVersion: '3.6.0', now: new Date(capturedAt),
+    })).toThrow(/contract evidence/);
   });
 
   it('fails closed when evidence is stale or belongs to another source tree', () => {
     const value = receipt();
     expect(() => verifyDualEraPreviewReleaseReceipt(value, {
       repository: 'owner/TheologAI', sourceCommit: 'a'.repeat(40), sourceTree: 'b'.repeat(40),
-      serverVersion: '3.6.0', now: new Date('2026-09-07T12:00:01.000Z'),
+      serverVersion: '3.6.0-preview', now: new Date('2026-09-07T12:00:01.000Z'),
     })).toThrow(/seven-day freshness/);
     expect(() => verifyDualEraPreviewReleaseReceipt(value, {
       repository: 'owner/TheologAI', sourceCommit: 'a'.repeat(40), sourceTree: 'c'.repeat(40),
-      serverVersion: '3.6.0', now: new Date(capturedAt),
+      serverVersion: '3.6.0-preview', now: new Date(capturedAt),
     })).toThrow(/identity/);
   });
 
