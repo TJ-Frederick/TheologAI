@@ -65,9 +65,9 @@ The following boundaries remain deliberate:
 
 ## Phase 3B sequencing
 
-Status: **3B.0 complete (C1 + C2); 3B.1 implementation merged in PR #148,
-protected preview proof pending**. This plan does not authorize deployment,
-binding changes, cleanup, or any other operational mutation.
+Status: **3B.0 complete (C1 + C2); 3B.1 complete in PR #151 after protected
+preview and production proof; 3B.2 is next**. This plan does not authorize any
+additional deployment, binding change, cleanup, or other operational mutation.
 
 ### 3B.0 — Rebaseline and simplify
 
@@ -86,20 +86,22 @@ binding changes, cleanup, or any other operational mutation.
 
 ### 3B.1 — Dual-era MCP modernization
 
-The deployed production baseline uses `@modelcontextprotocol/sdk` v1 and
-negotiates the legacy `2025-11-25` protocol. PR #148 merged the 3B.1 candidate
-as `c59ecbf278cd8ea473a9f524002ccc7968f51905`; it uses the exact official
+PR #148 merged the 3B.1 candidate as
+`c59ecbf278cd8ea473a9f524002ccc7968f51905`; it uses the exact official
 TypeScript v2 server, client, and Node packages and supports both legacy and
-modern eras. That merge is repository state only, not a deployed claim.
+modern eras. PR #151 completed its protected release as production source
+`50fcc5ea1d460a7869d5c0b5bf29aa26a37cbfc5`, tree
+`e73599eb50cd4a6beb6d756a587118407fc548e2`.
 
 The first merge-triggered production run, `33432068547`, correctly failed
 closed before the protected production environment: classification and plan
 verification passed, but the source/tree-bound protected preview artifact did
 not yet exist, so `Verify Protected Dual-Era Preview` failed and `Test, Build &
-Deploy` was skipped. No Worker deployment or D1 mutation occurred. The next
-release candidate must remain open while its exact head is deployed to the
-protected preview and audited, then merge only if `main` has not advanced so
-the receipt's source tree remains identical to the production merge tree.
+Deploy` was skipped. The final PR #151 head
+`2284a40a4a504f880576477975e5583bd5f63357` passed protected preview run
+`33441596793`; its source-bound receipt was then verified before protected
+production run `33443530427` deployed and passed all post-release audits. No D1
+binding, schema, or data mutation occurred.
 
 Implement this as a behavior-neutral infrastructure release:
 
@@ -212,19 +214,26 @@ Worker/D1 target, and records only sanitized hashes. C2 reconciled the
 successful dated rehearsal and current release identity in the permitted
 Markdown authority documents.
 
-The active production release is PR #145 source
-`e5c39c5e113454b264fa1eb1dceab6512899cb2e`, tree
-`e1e02c7280e7737b7a66d9ceed9a9cb6acfbb0de`, deployed as Cloudflare
-`8cefbaf9-1c0f-4565-b1a4-bd4be2ec86a7`, Worker
-`387953b4-a0b1-42b3-998c-67afef01e936` (#134), on
+The active production release is PR #151 source
+`50fcc5ea1d460a7869d5c0b5bf29aa26a37cbfc5`, tree
+`e73599eb50cd4a6beb6d756a587118407fc548e2`, deployed as Cloudflare
+`e44c5732-7203-4ac8-87db-f50cbd6761f0`, Worker
+`a04644c3-c49b-46e0-a42a-b8489e1f7a99` (#136), on
 `theologai-production-20260811-schema0009-a`
 (`9bc79346-338b-439e-a2a5-424f4418eb21`). The immediate same-D1 predecessor
-is PR #138 deployment `e8108f56-ae2e-4598-8324-f8b17a131f6a`, Worker
-`a481b2f7-ce75-4d55-8804-48dc7fccb4a3` (#132); preview remains deployment
-`4108d59a-4092-4389-824c-fa3820ab66f6`, Worker
-`70bbbecf-3fe6-4a04-8c34-babc3df09ad0` (#144), on
+is PR #145 deployment `8cefbaf9-1c0f-4565-b1a4-bd4be2ec86a7`, Worker
+`387953b4-a0b1-42b3-998c-67afef01e936` (#134); preview remains PR #151
+deployment `a430e3f5-d634-4c8a-a639-ea04794b7796`, Worker
+`38ecbb40-ded3-462e-b264-0a8786c8a4d5` (#150), on
 `theologai-preview-20260811-schema0009-a`
 (`74f456e2-6951-4003-bb6f-91951342bf8f`).
+
+Protected preview run `33441596793` and production run `33443530427` proved
+both MCP eras, the unchanged eleven-tool/six-prompt contract, D1 readiness,
+edge stability, original-language 11/11, historical-core 8/8,
+historical-spine 10/10, exact final routing, and production/preview isolation.
+The production run recorded GitHub deployment `6190302838`; preview recorded
+GitHub deployment `6190180665`.
 
 Repository/runtime reconciliation also records the pre-C2, then-`main` PR #146
 repository state used for the rehearsal:

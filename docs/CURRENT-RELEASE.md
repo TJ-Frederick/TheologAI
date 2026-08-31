@@ -5,84 +5,115 @@
 This dated, sanitized record is the repository's sole present-tense release
 identity authority. Other release documents provide operational guidance,
 plans, or historical evidence and point here for the active assignment. This
-snapshot records PR #145 as established by successful protected release run
-`33048777172`, completed `2026-08-27T12:59:01Z`. Its unchanged production and
-preview controls were later independently reverified by successful protected
-rehearsal run `33274529784`, completed `2026-08-29T21:06:51Z`; that is the latest
-observation in this snapshot. It remains a point-in-time record, not a
-guarantee against later authorized release activity.
+snapshot records the completed Phase 3B.1 dual-era release established by PR
+#151 and successful protected production run `33443530427`, completed
+`2026-08-31T22:18:10Z`. The same run proved the exact production assignment,
+the unchanged protected-preview control, and their distinct D1 bindings after
+all release audits. It remains a point-in-time record, not a guarantee against
+later authorized release activity.
 
 ## Active production assignment
 
-PR #145 merged as source `e5c39c5e113454b264fa1eb1dceab6512899cb2e`
-with parents `d869c0c4c621f4682194307c490f6837774dc391` and
-`e36f6877bc5a5afea3cd51a5b422634f078f5ecb`, and tree
-`e1e02c7280e7737b7a66d9ceed9a9cb6acfbb0de`. Protected run
-`33048777172` recorded GitHub deployment `6118233768` and the sole active
+PR #151 merged as source `50fcc5ea1d460a7869d5c0b5bf29aa26a37cbfc5`
+with parents `e7516c9e89f7735adcecac291e81b38ba93720a8` and
+`2284a40a4a504f880576477975e5583bd5f63357`, and tree
+`e73599eb50cd4a6beb6d756a587118407fc548e2`. Protected run
+`33443530427` recorded GitHub deployment `6190302838` and the sole active
 Cloudflare production assignment: deployment
-`8cefbaf9-1c0f-4565-b1a4-bd4be2ec86a7`, Worker
-`387953b4-a0b1-42b3-998c-67afef01e936` (version #134), and
+`e44c5732-7203-4ac8-87db-f50cbd6761f0`, Worker
+`a04644c3-c49b-46e0-a42a-b8489e1f7a99` (version #136), and
 `THEOLOGAI_DB` `theologai-production-20260811-schema0009-a`
 (`9bc79346-338b-439e-a2a5-424f4418eb21`).
 
-The immediate same-D1 predecessor is PR #138, retained only as predecessor
-evidence: deployment `e8108f56-ae2e-4598-8324-f8b17a131f6a`, Worker
-`a481b2f7-ce75-4d55-8804-48dc7fccb4a3` (version #132), on that same production
+The immediate same-D1 predecessor is PR #145, retained only as predecessor
+evidence: deployment `8cefbaf9-1c0f-4565-b1a4-bd4be2ec86a7`, Worker
+`387953b4-a0b1-42b3-998c-67afef01e936` (version #134), on that same production
 D1. It is not the active assignment.
 
 ## Preview control
 
 The preview control observed before deployment, after deployment, and after
-the production audits remained deployment
-`4108d59a-4092-4389-824c-fa3820ab66f6`, Worker
-`70bbbecf-3fe6-4a04-8c34-babc3df09ad0` (version #144), and D1
+the production audits remained PR #151 deployment
+`a430e3f5-d634-4c8a-a639-ea04794b7796`, Worker
+`38ecbb40-ded3-462e-b264-0a8786c8a4d5` (version #150), and D1
 `theologai-preview-20260811-schema0009-a`
 (`74f456e2-6951-4003-bb6f-91951342bf8f`). It is a read-only control identity,
-not production rollback authority.
+not production rollback authority. Protected preview run `33441596793`
+recorded GitHub deployment `6190180665` against exact reviewed source
+`2284a40a4a504f880576477975e5583bd5f63357` and the same tree
+`e73599eb50cd4a6beb6d756a587118407fc548e2` used by the production merge.
 
 ## Deployment gate and release evidence
 
-The unprivileged classifier in run `33048777172`, attempt `1`, emitted one
+The unprivileged classifier in run `33443530427`, attempt `1`, emitted one
 canonical deploy/non-documentation-path plan for base
-`d869c0c4c621f4682194307c490f6837774dc391` and exact head
-`e5c39c5e113454b264fa1eb1dceab6512899cb2e`, covering 15 records. The plan
+`e7516c9e89f7735adcecac291e81b38ba93720a8` and exact head
+`50fcc5ea1d460a7869d5c0b5bf29aa26a37cbfc5`, covering three records. The plan
 recorded `classification_succeeded=true`, `deploy_required=true`,
 `decision=deploy`, and `reason=non-documentation-path`. The canonical plan
-bytes hash to `e4cb1506611f727c8b83b2108ba5378164da64989fb42b5343aeb14f2cc4456d`.
-The one-day gate artifact was `9636701235`; its ZIP API digest was
-`2abc3435b0314be54a943472049f711866df2581942e942ce522b2df0ffbcda0`.
-That gate artifact expired on August 28 (`2026-08-28`). These values survive through verified
-logs and GitHub API metadata; this record does not imply a fresh artifact
-download.
+bytes hash to `bcb18ae5fccebf60244afbbd930bd477eba95033d1cf772360c21ebeac61f7ad`.
+The one-day gate artifact was `9777149938`; its ZIP API digest was
+`78e66cba5010265aae8d188a481133ac82f9b16b1195cff2ac940895ac4e4f3d`.
 
 The same run uploaded seven distinct post-deployment release-evidence
 artifacts. Their GitHub artifact IDs and ZIP SHA-256 values are:
 
 | Evidence | Artifact ID | ZIP SHA-256 |
 |---|---:|---|
-| D1 readiness | `9647166784` | `b9ed826bc126749298d2be4b329e1e7148daf7679f83f1e25fc1951f96299ba2` |
-| release predecessor | `9647169526` | `644e34ba284db8ea1e7c82f94fd1d0acec8146a34f076006857e0622519bc3ea` |
-| candidate cutover | `9647186636` | `85cbc86a7e0f5d3ce64a2f080c93f0f0d0a1526145af348203138e45ebafcea8` |
-| edge stabilization | `9647193785` | `4b96f8f984d4979a3b149ecc02d8e0e1f7f60c0fed9401f7a908c75db0592ca6` |
-| final routing | `9647224619` | `7e58d805cac8eb1342db7182ebdf5734141b4dc48b49805369ef049be9fb23be` |
-| release reconciliation | `9647227387` | `dc23f1566abbc21c6bea279b0c6b1a3df438db2596d3c996f01d400c7da6a2a0` |
-| release audit | `9647228043` | `f28e356eb5cddebd468442f29dcbbba41a24d101a5843b11dc3284b60916e5b0` |
+| D1 readiness | `9777830856` | `748333ef10d10ef775676ee87d6a03c6b02a697a648eed7a8c915dc260910242` |
+| release predecessor | `9777833021` | `6c3bbd2aa677b3459ceea9c2ded69440afc90d4a992125ddfd3fdf181f4f8e23` |
+| candidate cutover | `9777846323` | `c0ecd643c46213720adfc43cd8534650514b9b2bd4f0425da04329d72bfef5b7` |
+| edge stabilization | `9777851001` | `251b5ae91753c09783d472878929c16774297e31506b94291c35a915318f557d` |
+| final routing | `9777870204` | `bb264dfbd5028c95f47cc2b40a28b5ce702194879229313bf7940680c7fb1d87` |
+| release reconciliation | `9777872282` | `10b727da1af6a041c66c259563bb2b3c1a7582e92902d8f976d0a3bd9ac39ce8` |
+| release audit | `9777872720` | `e26b9ae55b9801cb4159a9f8c65874ebbc2c9625ad6c9016cc456ff62d30a9b6` |
 
 All seven ZIP digests matched GitHub's artifact metadata and expire on
-`2026-09-26`. Sanitized evidence
+`2026-09-30`. Sanitized evidence
 proved D1 readiness and authority, exact predecessor/candidate/final routing,
 stable edge registration, the original-language 11/11, historical-core 8/8,
 historical-spine 10/10 audits, and production/preview environment isolation.
-The run used exactly one protected-environment approval, one same-value masked
-`ESV_API_KEY` re-put, and one production Worker deployment. It made no preview
-mutation or D1/schema/data write. The gate artifact is not one of the seven
-release artifacts.
+The final routing JSON hashes to
+`736025402d589bd9c2fa49d0fb3a5360966caa1626d3278cbebc9d2f26399ced`;
+the final isolation receipt hashes to
+`8f5f1fab7912a1af540674c42da4f43ad13455deb92f2488ae5e3fa9c66a8d83`.
+The original-language, historical-core, and historical-spine audit JSON files
+hash respectively to
+`2e2e49d7cb12e7effb30a03a90f5702cdd77f20841c8efec186ddda422ea1603`,
+`25a1aea31a924ae4dfd4d127cc66ed1a62023bb7b332352163bdc09c46687473`,
+and `4b2f68474627b931ecc10063389af438b5edfcfaee18606e3d21f6cee799302e`.
+The run made one production Worker deployment and no preview mutation or
+D1/schema/data write. The gate artifact is not one of the seven release
+artifacts.
 
 ## Repository/runtime reconciliation
 
-The PR #146 repository state used for the corrective rehearsal, which advanced
-`main` before this C2 reconciliation, was a workflow/reconstruction merge, not
-a documentation-only merge: source
+PR #148 first merged the dual-era implementation as
+`c59ecbf278cd8ea473a9f524002ccc7968f51905`. Its merge-triggered run
+`33432068547` correctly failed closed before the production environment
+because no exact protected-preview receipt existed. PR #149 then opened the
+release candidate; its first preview audit exposed stale release-auditor
+expectations. PR #150 repaired those auditors. The refreshed PR #149 preview
+passed, but its documentation-only merge `e7516c9e89f7735adcecac291e81b38ba93720a8`
+correctly classified as no-deploy in run `33441001023`.
+
+The subsequent manual run `33441199613` failed closed before production when
+it exposed a preview-versus-production server-version mismatch in the receipt
+verifier. PR #151 repaired both verifier sites and added the missing regression
+coverage. Its exact head `2284a40a4a504f880576477975e5583bd5f63357`
+passed protected preview run `33441596793`; the preview audit and reconciliation
+artifact ZIP digests are
+`8b626c3509206449edaebca6dc42b1a60a772ffb70bfb470fd07b3973f359fbc`
+and `1cdff4e23c58e97a2c7080e0abbb616ea19f7b2dd68dbea108832f6c11ca4bec`.
+The source-bound receipt JSON hashes to
+`1180fd9b524a6322929a10109aff33ed478c0794fd27eab3569d67eb1e863fc9`.
+The merge tree remained identical to the audited preview tree, so production
+run `33443530427` retrieved and verified that exact receipt before entering
+the protected production environment.
+
+Earlier C2 evidence records that the PR #146 repository state used for the
+corrective rehearsal advanced `main` before the C2 reconciliation. It was a
+workflow/reconstruction merge, not a documentation-only merge: source
 `833c0b1902adb65a91929e1b2acc7ac7c0901a60`, parents
 `e5c39c5e113454b264fa1eb1dceab6512899cb2e` and
 `fe7ecfb75cc1aa9b032f59159d8b4d559cd970ae`, and tree
@@ -128,8 +159,8 @@ readiness, and complete matched-pair evidence.
 Release artifacts are time-limited GitHub evidence. On `2026-08-24`, the owner
 selected H1 Option A only for the finite PR #124–#138 cohort and accepted its
 natural expiry without a durable archive. That decision does not cover the PR
-#145 release artifacts or gate, the PR #146 gate, or the rehearsal artifact
-recorded above. C2 records their configured expirations and retained metadata
+#145 or PR #151 release artifacts or gates, the PR #146 gate, or the rehearsal
+artifact recorded above. This snapshot records their configured expirations and retained metadata
 and digests; it grants no new archive/download, deletion (including
 temporary-copy deletion), cleanup, credential, deployment, or rollback
 authority. Exact ZIP, content, file-roster, and privacy revalidation may become
@@ -140,4 +171,4 @@ The fresh rehearsal is satisfied only for the dated run recorded above. The
 30-day stability, no-active-binding, reconstruction, compatibility, and exact
 owner gates remain in force; no cleanup is authorized. The fixed PR #108
 source/tree and Worker/D1 target remain the rehearsal target regardless of the
-current PR #145 runtime assignment.
+current PR #151 runtime assignment.
