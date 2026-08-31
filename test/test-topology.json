@@ -10,8 +10,8 @@
     "conformance": 1
   },
   "current": {
-    "totalTestTypeScript": 284,
-    "activeVitest": 205,
+    "totalTestTypeScript": 286,
+    "activeVitest": 207,
     "support": 24,
     "manual": 4,
     "legacyOrphan": 50,
@@ -95,6 +95,7 @@
       "test/unit/kernel/transliteration.test.ts",
       "test/unit/kernel/ubsSemanticDomain.test.ts",
       "test/unit/kernel/ubsSemanticEvidenceBundle.test.ts",
+      "test/unit/mcp/errors.test.ts",
       "test/unit/mcp/originalLanguageStudyV2DraftSchema.test.ts",
       "test/unit/mcp/originalLanguageStudyV2Schema.test.ts",
       "test/unit/mcp/outputValidation.test.ts",
@@ -141,6 +142,7 @@
       "test/unit/scripts/d1WorkerdVerifierUtils.test.ts",
       "test/unit/scripts/dataIntegrity.test.ts",
       "test/unit/scripts/detectProductionCustomDomainChange.test.ts",
+      "test/unit/scripts/dualEraMcpPreviewAudit.test.ts",
       "test/unit/scripts/dualEraPreviewReleaseReceipt.test.ts",
       "test/unit/scripts/eeboTcpNorton1561.test.ts",
       "test/unit/scripts/finalizeBiblicalLanguageUnicodeManifest.test.ts",

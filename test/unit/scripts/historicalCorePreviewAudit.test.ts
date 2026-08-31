@@ -461,11 +461,11 @@ describe('historical core preview audit contract', () => {
     const invalidResourceUri = 'theologai://documents/does-not-exist#section-not-real';
     await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { invalidResourceError: 'Resource not found' })))
       .resolves.toMatchObject({ regressions: { invalidResourceRejected: true } });
-    await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { invalidResourceCode: -32001 })))
-      .rejects.toThrow('invalid resource regression must return exact resource-not-found code -32002');
-    await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { invalidResourceError: `MCP error -32002: Resource not found: ${invalidResourceUri}` })))
+    await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { invalidResourceCode: -32601 })))
+      .rejects.toThrow('invalid resource regression must return exact resource-not-found code -32602');
+    await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { invalidResourceError: `MCP error -32602: Resource not found: ${invalidResourceUri}` })))
       .rejects.toThrow('invalid resource regression must return an exact safe resource-not-found message');
-    await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { invalidResourceError: 'MCP error -32002: Resource not found: file:///private/tmp/internal' })))
+    await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { invalidResourceError: 'MCP error -32602: Resource not found: file:///private/tmp/internal' })))
       .rejects.toThrow('invalid resource regression must return an exact safe resource-not-found message');
     for (const invalidResourceExtra of [
       { stack: 'Error: not found' }, { debug: 'internal' }, { source: 'file:///private/tmp/internal' },
@@ -492,7 +492,7 @@ describe('historical core preview audit contract', () => {
     await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { invalidResourceError: 'https://private.invalid/secret' })))
       .rejects.toThrow('invalid resource regression must return an exact safe resource-not-found message');
     for (const sensitive of ['SQLite database failure', 'API Key leaked', 'SQL D1 traceback stack', 'Internal implementation detail']) {
-      await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { invalidResourceError: `MCP error -32002: Resource not found; ${sensitive}` })))
+      await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { invalidResourceError: `MCP error -32602: Resource not found; ${sensitive}` })))
         .rejects.toThrow('invalid resource regression must return an exact safe resource-not-found message');
     }
   });
@@ -701,8 +701,8 @@ function resourceResponse(body: RecordValue, fixtureValue: Audit, options: FakeO
     jsonrpc: '2.0', id: body.id,
     ...(options.invalidResourceResult === undefined ? {} : { result: options.invalidResourceResult }),
     error: {
-      code: options.invalidResourceCode ?? -32002,
-      message: options.invalidResourceError ?? 'MCP error -32002: Resource not found',
+      code: options.invalidResourceCode ?? -32602,
+      message: options.invalidResourceError ?? 'MCP error -32602: Resource not found',
       ...(options.omitInvalidResourceData ? {} : { data: options.invalidResourceData ?? { uri } }),
       ...(options.invalidResourceExtra ?? {}),
     },

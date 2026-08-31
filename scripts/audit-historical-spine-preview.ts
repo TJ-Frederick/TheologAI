@@ -264,7 +264,7 @@ function assertSectionRead(message: ObjectRecord, expectedUri: string, workId: s
 function assertInvalidResource(message: ObjectRecord): void {
   assert(message.result === undefined, 'historical-spine invalid resource returned a result');
   const error = object(message.error);
-  assert(error?.code === -32002 && (error.message === 'Resource not found' || error.message === 'MCP error -32002: Resource not found'),
+  assert(error?.code === -32602 && (error.message === 'Resource not found' || error.message === 'MCP error -32602: Resource not found'),
     'historical-spine invalid resource regression drifted');
 }
 

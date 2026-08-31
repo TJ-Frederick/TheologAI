@@ -13,6 +13,16 @@ const PROTOCOLS = ['2025-11-25', '2026-07-28'] as const;
 const DEFAULT_URL = 'https://preview-mcp.theologai.xyz/mcp';
 type ProtocolVersion = typeof PROTOCOLS[number];
 
+export function versionNegotiationFor(protocolVersion: ProtocolVersion) {
+  return protocolVersion === '2025-11-25'
+    ? { versionNegotiation: { mode: 'legacy' as const } }
+    : { versionNegotiation: { mode: { pin: protocolVersion } } };
+}
+
+export function expectedPreviewServerVersion(packageVersion: string): string {
+  return `${packageVersion}-preview`;
+}
+
 export interface DualEraMcpAudit {
   schemaVersion: 'theologai-dual-era-mcp-preview-audit.v1';
   capturedAt: string;
@@ -62,7 +72,7 @@ export async function auditDualEraMcpPreview(
   for (const protocolVersion of PROTOCOLS) {
     const client = new Client(
       { name: `theologai-protected-preview-${protocolVersion}`, version: '1.0.0' },
-      { versionNegotiation: { mode: { pin: protocolVersion } } },
+      versionNegotiationFor(protocolVersion),
     );
     try {
       await client.connect(new StreamableHTTPClientTransport(url));
@@ -113,7 +123,10 @@ async function main(): Promise<void> {
   if (typeof packageJson.version !== 'string') fail('package version is invalid');
   const output = option('--output');
   if (!output) fail('--output is required');
-  const audit = await auditDualEraMcpPreview(option('--url') ?? DEFAULT_URL, packageJson.version);
+  const audit = await auditDualEraMcpPreview(
+    option('--url') ?? DEFAULT_URL,
+    expectedPreviewServerVersion(packageJson.version),
+  );
   await mkdir(dirname(resolve(output)), { recursive: true });
   await writeFile(resolve(output), `${JSON.stringify(audit, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
   console.error(`[dual-era-preview] ${audit.eras.length} eras, 11 tools, 6 prompts; ${audit.crossEraContractSha256}`);
