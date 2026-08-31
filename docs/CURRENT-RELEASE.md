@@ -160,7 +160,8 @@ Release artifacts are time-limited GitHub evidence. On `2026-08-24`, the owner
 selected H1 Option A only for the finite PR #124–#138 cohort and accepted its
 natural expiry without a durable archive. That decision does not cover the PR
 #145 or PR #151 release artifacts or gates, the PR #146 gate, or the rehearsal
-artifact recorded above. This snapshot records their configured expirations and retained metadata
+artifact recorded above. This snapshot records their configured expirations
+and retained metadata
 and digests; it grants no new archive/download, deletion (including
 temporary-copy deletion), cleanup, credential, deployment, or rollback
 authority. Exact ZIP, content, file-roster, and privacy revalidation may become
