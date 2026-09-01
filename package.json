@@ -38,6 +38,7 @@
     "data:verify-db": "tsx scripts/verify-database.ts",
     "d1:seed:export": "tsx scripts/export-for-d1.ts",
     "d1:seed:verify": "tsx scripts/verify-d1-seed.ts",
+    "d1:seed:verify-readiness-seal": "tsx scripts/verify-d1-readiness-seal.ts",
     "d1:seed:verify-import": "tsx scripts/verify-d1-seed-import.ts",
     "d1:seed:verify-workerd": "tsx scripts/verify-d1-seed-workerd.ts",
     "d1:seed:apply-preview": "tsx scripts/apply-preview-d1-seed.ts",

@@ -555,6 +555,7 @@ jobs:
           npm run d1:seed:export -- --database "$RUNNER_TEMP/theologai.db" --clean
           cmp "$RUNNER_TEMP/d1-seed-manifest.json" scripts/d1-seed/seed-manifest.json
           npm run d1:seed:verify
+          npm run d1:seed:verify-readiness-seal
           npm run d1:seed:verify-import -- --database "$RUNNER_TEMP/theologai.db"
 
       - name: Verify historical section compatibility evidence against generated local artifacts
@@ -612,6 +613,7 @@ jobs:
         run: |
           candidate_d1_name="$(< "$RUNNER_TEMP/production-candidate-d1-name.txt")"
           npm run d1:remote:check -- --database "$candidate_d1_name" \
+            --sealed-release production \
             --output "$RUNNER_TEMP/production-d1-readiness-receipt.json"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

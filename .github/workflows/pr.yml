@@ -149,6 +149,7 @@ jobs:
           npm run d1:seed:export -- --database "$RUNNER_TEMP/theologai.db" --clean
           cmp "$RUNNER_TEMP/d1-seed-manifest.json" scripts/d1-seed/seed-manifest.json
           npm run d1:seed:verify
+          npm run d1:seed:verify-readiness-seal
           npm run d1:seed:verify-import -- --database "$RUNNER_TEMP/theologai.db"
 
       - name: Verify historical section compatibility evidence against generated local artifacts
@@ -320,10 +321,14 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
+      # Candidate preparation owns the one exhaustive remote corpus audit.
+      # Code-only releases bind that evidence to a small live identity/schema
+      # check with a hard rows-read budget, preserving D1 capacity for users.
       - name: Verify candidate preview D1 is compatible (read-only)
         run: |
           candidate_d1_name="$(< "$RUNNER_TEMP/preview-candidate-d1-name.txt")"
           npm run d1:remote:check -- --database "$candidate_d1_name" --env preview \
+            --sealed-release preview \
             --output "$RUNNER_TEMP/preview-d1-readiness-receipt.json"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
