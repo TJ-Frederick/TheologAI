@@ -38,8 +38,14 @@ export class PrimarySourceSearchService {
 
   async search(input: unknown): Promise<PrimarySourceSearchPlanResult> {
     const queries = validatePlan(input, this.options.contractVersion);
-    const queryResults = await Promise.all(queries.map(query => this.executeQuery(query)));
-    const aggregateTruncated = enforceAggregateHitBudget(queryResults);
+    let queryResults: PrimarySourcePlanQueryResult[];
+    let aggregateTruncated: boolean;
+    if (this.options.contractVersion === '8') {
+      ({ queryResults, aggregateTruncated } = await this.executeV8Plan(queries));
+    } else {
+      queryResults = await Promise.all(queries.map(query => this.executeQuery(query)));
+      aggregateTruncated = enforceAggregateHitBudget(queryResults);
+    }
     const providerResults = queryResults.flatMap(query => query.providers);
     const statuses = providerResults.map(provider => provider.status);
     const planStatus = aggregateTruncated
@@ -79,21 +85,35 @@ export class PrimarySourceSearchService {
     };
   }
 
-  private async executeQuery(query: NormalizedPlanQuery): Promise<PrimarySourcePlanQueryResult> {
-    if (this.options.contractVersion === '8') {
-      const local = await this.executeProvider(query, 'local');
-      const expansionDecision = decideExpansion(query, local);
-      const providers = expansionDecision.triggered
-        ? [local, await this.executeProvider(query, 'ccel')]
-        : [local];
+  private async executeV8Plan(
+    queries: NormalizedPlanQuery[],
+  ): Promise<{ queryResults: PrimarySourcePlanQueryResult[]; aggregateTruncated: boolean }> {
+    const localResults = await Promise.all(queries.map(query => this.executeProvider(query, 'local')));
+    const localBudget = enforceProviderHitBudget(localResults, MAX_TOTAL_HITS);
+    const queryResults = queries.map((query, index) => {
+      const local = localResults[index]!;
       return {
         id: query.id,
         normalizedMode: query.match,
         normalizedSelection: query.selection,
-        providers,
-        expansionDecision,
-      };
-    }
+        providers: [local],
+        expansionDecision: decideExpansion(query, local),
+      } satisfies PrimarySourcePlanQueryResult;
+    });
+    await Promise.all(queryResults.map(async (queryResult, index) => {
+      if (queryResult.expansionDecision?.triggered) {
+        queryResult.providers.push(await this.executeProvider(queries[index]!, 'ccel'));
+      }
+    }));
+    const externalResults = queryResults.flatMap(query => query.providers.filter(provider => provider.provider === 'ccel_live'));
+    const externalBudget = enforceProviderHitBudget(externalResults, localBudget.remaining);
+    return {
+      queryResults,
+      aggregateTruncated: localBudget.truncated || externalBudget.truncated,
+    };
+  }
+
+  private async executeQuery(query: NormalizedPlanQuery): Promise<PrimarySourcePlanQueryResult> {
     const providers: PrimarySourcePlanProviderResult[] = [];
     for (const provider of query.providers) providers.push(await this.executeProvider(query, provider));
     return { id: query.id, normalizedMode: query.match, normalizedSelection: query.selection, providers };
@@ -404,24 +424,32 @@ function normalizeLiteral(value: unknown, field: string, maximum: number): strin
 }
 
 function enforceAggregateHitBudget(queries: PrimarySourcePlanQueryResult[]): boolean {
-  let remaining = MAX_TOTAL_HITS;
+  return enforceProviderHitBudget(
+    queries.flatMap(query => query.providers),
+    MAX_TOTAL_HITS,
+  ).truncated;
+}
+
+function enforceProviderHitBudget(
+  providers: PrimarySourcePlanProviderResult[],
+  maximum: number,
+): { remaining: number; truncated: boolean } {
+  let remaining = maximum;
   let truncated = false;
-  for (const query of queries) {
-    for (const provider of query.providers) {
-      if (provider.hits.length > remaining) {
-        truncated = true;
-        provider.hits = provider.hits.slice(0, remaining);
-        provider.hitCount = provider.hits.length;
-        provider.resultWindow = {
-          returnedHitCount: provider.hits.length,
-          additionalMatchStatus: 'additional_match_observed',
-        };
-        provider.notices = [...provider.notices, 'The plan-wide 32-hit response budget truncated later provider results.'];
-      }
-      remaining -= provider.hits.length;
+  for (const provider of providers) {
+    if (provider.hits.length > remaining) {
+      truncated = true;
+      provider.hits = provider.hits.slice(0, remaining);
+      provider.hitCount = provider.hits.length;
+      provider.resultWindow = {
+        returnedHitCount: provider.hits.length,
+        additionalMatchStatus: 'additional_match_observed',
+      };
+      provider.notices = [...provider.notices, 'The plan-wide 32-hit response budget truncated later provider results.'];
     }
+    remaining -= provider.hits.length;
   }
-  return truncated;
+  return { remaining, truncated };
 }
 
 function aggregateStatus(results: PrimarySourcePlanProviderResult[]): PrimarySourceProviderStatus {

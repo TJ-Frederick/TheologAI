@@ -243,6 +243,51 @@ describe('PrimarySourceSearchService', () => {
     expect(ccel.search).toHaveBeenCalledTimes(1);
   });
 
+  it('budgets all four v8 local windows before expanded discovery', async () => {
+    const events: string[] = [];
+    let localIndex = 0;
+    const local = { search: vi.fn(async () => {
+      events.push('local');
+      const result = providerResult('local', 'ok', 8);
+      if (localIndex++ > 0) {
+        for (const [index, hit] of result.hits.entries()) {
+          if (hit.provider === 'local') hit.locator.documentId = `doc-${index + 1}`;
+        }
+        result.scope!.eligibleDocumentCount = 8;
+      }
+      return result;
+    }) };
+    const ccel = { search: vi.fn(async () => {
+      events.push('external');
+      return providerResult('ccel_live', 'ok', 5);
+    }) };
+    const queries = [0, 1, 2, 3].map(index => v7Query({
+      id: `q${index + 1}`, limit: 8,
+      ...(index === 0 ? {
+        searchDepth: 'expanded', selection: 'work_diversity',
+        expansionBasis: { reason: 'insufficient_diversity', minimumDistinctWorks: 3, observedDistinctWorks: 1 },
+      } : { searchDepth: 'standard' }),
+    }));
+
+    const result = await new PrimarySourceSearchService(local, ccel, v8Live, coordinator).search(plan(queries));
+
+    expect(events).toEqual(['local', 'local', 'local', 'local', 'external']);
+    expect(result.queries.map(queryResult => queryResult.id)).toEqual(['q1', 'q2', 'q3', 'q4']);
+    expect(result.queries.map(queryResult => queryResult.providers[0]!.hitCount)).toEqual([8, 8, 8, 8]);
+    expect(result.queries.map(queryResult => queryResult.expansionDecision?.localDistinctWorkCount)).toEqual([1, 8, 8, 8]);
+    expect(result.queries[0]!.providers).toMatchObject([
+      { provider: 'local', hitCount: 8 },
+      {
+        provider: 'ccel_live', hitCount: 0,
+        resultWindow: { returnedHitCount: 0, additionalMatchStatus: 'additional_match_observed' },
+      },
+    ]);
+    expect(result).toMatchObject({
+      planStatus: 'partial',
+      coverage: { localHitCount: 32, ccelAttempted: true, ccelHitCount: 0 },
+    });
+  });
+
   it.each([
     ['stale catalog miss', providerResult('local', 'ok', 1), { reason: 'catalog_miss' }, 'basis_not_confirmed'],
     ['metadata uncertainty', {
@@ -413,6 +458,8 @@ describe('PrimarySourceSearchService', () => {
     const result = await new PrimarySourceSearchService(local, ccel, live, coordinator).search(plan(queries));
     expect(result.planStatus).toBe('partial');
     expect(result.queries.flatMap(item => item.providers).flatMap(item => item.hits)).toHaveLength(32);
+    expect(result.queries.map(item => item.providers.map(provider => provider.hitCount)))
+      .toEqual([[8, 8], [8], [8], [0]]);
     expect(result.queries[0].providers[0].hits[0].rankWithinProvider).toBe(1);
     const truncated = result.queries.flatMap(item => item.providers).find(item => item.hits.length < 8);
     expect(truncated?.resultWindow.additionalMatchStatus).toBe('additional_match_observed');
