@@ -113,7 +113,11 @@ export function recommendedToolCallsForPrompt(
           queries: [{
             id: 'confession-topic',
             text: topic,
-            ...(descriptor.contractVersion === '7' ? { searchDepth: 'expanded', expandedLimit: 3 } : { providers: ['local'] }),
+            ...(descriptor.contractVersion === '8'
+              ? { searchDepth: 'standard' }
+              : descriptor.contractVersion === '7'
+                ? { searchDepth: 'expanded', expandedLimit: 3 }
+                : { providers: ['local'] }),
             match: 'all_terms',
             selection: 'work_diversity',
             limit: 5,
@@ -142,7 +146,7 @@ export function recommendedToolCallsForPrompt(
           queries: (authors.length ? authors : [undefined]).map((author, index) => ({
             id: author ? `creator-${index + 1}` : work ? 'exact-local-work' : 'topic-survey',
             text: topic,
-            ...(descriptor.contractVersion === '7' ? { searchDepth: 'standard' } : { providers: ['local'] }),
+            ...(descriptor.contractVersion !== '6' ? { searchDepth: 'standard' } : { providers: ['local'] }),
             match: 'all_terms',
             selection: work ? 'relevance' : 'work_diversity',
             ...scoped,
@@ -209,41 +213,43 @@ export function registerPromptHandlers(
       },
       {
         name: 'primary-source-research',
-        description: descriptor.contractVersion === '7'
+        description: descriptor.contractVersion !== '6'
           ? 'Find curated primary-source evidence and optionally broaden discovery without treating snippets as evidence'
           : 'Find and read bounded evidence from the locally indexed historical collection',
         arguments: [
           {
             name: 'topic',
-            description: descriptor.contractVersion === '7'
+            description: descriptor.contractVersion !== '6'
               ? 'Topic or terms for standard catalog research and optional expanded discovery.'
               : 'Topic or terms to find in the local historical collection',
             required: true,
           },
           {
             name: 'work',
-            description: descriptor.contractVersion === '7'
+            description: descriptor.contractVersion !== '6'
               ? 'Optional exact catalog work title/slug. Expanded discovery reuses the literal text as an unreviewed search restriction, not shared reviewed metadata or an author name.'
               : 'Optional exact local work title or slug; not an author name',
             required: false,
           },
           {
             name: 'authors',
-            description: descriptor.contractVersion === '7'
-              ? 'Optional comma-separated creators. Each becomes a separate exact catalog creator query; only the first scope is broadened immediately, while later scopes remain standard searches. Creator roles remain explicit.'
+            description: descriptor.contractVersion !== '6'
+              ? descriptor.contractVersion === '8'
+                ? 'Optional comma-separated creators. Each becomes a separate exact catalog creator query. The guided workflow may conditionally retry at most one proven local gap with expanded discovery.'
+                : 'Optional comma-separated creators. Each becomes a separate exact catalog creator query; only the first scope is broadened immediately, while later scopes remain standard searches. Creator roles remain explicit.'
               : 'Optional comma-separated canonical creator names. Each creator becomes a separate query; creator roles remain explicit.',
             required: false,
           },
           {
             name: 'startYear',
-            description: descriptor.contractVersion === '7'
+            description: descriptor.contractVersion !== '6'
               ? 'Optional inclusive catalog composition-year lower bound as an integer string. Expanded discovery deliberately omits this bound and warns that broader results are not date-filtered.'
               : 'Optional inclusive composition-year lower bound as an integer string.',
             required: false,
           },
           {
             name: 'endYear',
-            description: descriptor.contractVersion === '7'
+            description: descriptor.contractVersion !== '6'
               ? 'Optional inclusive catalog composition-year upper bound as an integer string. Expanded discovery deliberately omits this bound and warns that broader results are not date-filtered.'
               : 'Optional inclusive composition-year upper bound as an integer string.',
             required: false,
@@ -319,7 +325,17 @@ Use structured \`passages[]\` when available, compare by its \`translation\`, re
         const topic = args?.topic ?? '';
         const traditions = args?.traditions;
         const hint = traditions ? ` Focus on: ${traditions.split(',').map(item => item.trim()).join(', ')}.` : '';
-        text = descriptor.contractVersion === '7'
+        text = descriptor.contractVersion === '8'
+          ? `Cross-tradition doctrinal comparison on "${topic}".${hint}
+
+1. **Inspect the full local catalog** — Read \`theologai://primary-sources/catalog\` with MCP \`resources/read\`. All 35 local works, including the 17 legacy works, are ordinary usable local sources. Retain readiness metadata as quiet provenance context; never use it to block, demote, or split otherwise relevant local results.
+2. **Search local evidence first** — ${callText(calls[0])}. This initial \`searchDepth:"standard"\` plan is the authoritative local pass. Requested traditions are comparison interests, not creator filters or inferred metadata.
+3. **Conditionally broaden one proven gap** — Stop locally when the returned work-diverse evidence is useful. If the result proves \`catalog_miss\` or \`no_results\`, or a comparison/survey returns fewer than three distinct local \`documentId\` values, automatically rerun at most one affected query with \`searchDepth:"expanded"\`, \`expandedLimit:3\`, and an exact \`expansionBasis\`: \`{"reason":"catalog_miss"}\`, \`{"reason":"no_results"}\`, or \`{"reason":"insufficient_diversity","minimumDistinctWorks":3,"observedDistinctWorks":N}\`. Do not expand for metadata uncertainty, provider failure, or a merely subjective desire for more material.
+4. **Handle uncertainty honestly** — If local coverage is useful but its adequacy is genuinely uncertain, say that broader or more detailed sources can be requested. A v8 \`expansionDecision\` records only whether the supplied basis was revalidated; it does not claim any later page was read.
+5. **Read evidence before comparison** — Every snippet is discovery-only. Read at most five unique exact local resources; open a returned external URL independently before treating that page as evidence. Keep unreviewed external metadata separate from local evidence.
+6. **Close the coverage ledger** — Copy searched/not-searched execution facts from the tool. Record read only after an exact resource or page opens successfully, and deferred only when you intentionally leave a selected lead unread with a reason.
+7. **Compare cautiously** — Explain agreement, divergence, Scripture use, and historical context only from exact sections actually read. Missing hits are not historical silence. ${CCEL_DATE_CAPABILITY_NOTICE}`
+          : descriptor.contractVersion === '7'
           ? `Cross-tradition doctrinal comparison on "${topic}".${hint}
 
 1. **Inspect the curated catalog** — Read \`theologai://primary-sources/catalog\` with MCP \`resources/read\`. Use each work's returned readiness metadata; do not assume every edition has the same review state.
@@ -360,7 +376,17 @@ Use structured \`passages[]\` when available, compare by its \`translation\`, re
         const externalDateCallInstruction = startYear !== undefined || endYear !== undefined
           ? 'The service retains both year fields for catalog scope and omits them from expanded discovery; do not split or rewrite the plan.'
           : 'Do not add separate date assumptions to expanded results; the broader source cannot enforce reviewed composition years.';
-        text = descriptor.contractVersion === '7'
+        text = descriptor.contractVersion === '8'
+          ? `Research primary-source evidence about "${topic}"${work ? ` within the requested work "${work}"` : ''}${authors.length ? ` for the separately scoped creators ${authors.map(value => `"${value}"`).join(', ')}` : ''}.
+
+1. **Inspect catalog scope and choose the journey** — Read \`theologai://primary-sources/catalog\`. Treat this as a topical survey, exact-work location, or creator comparison. All 35 local works are ordinary usable sources; keep readiness metadata as provenance context, not an eligibility or ranking gate.
+2. **Run the standard local plan** — ${callText(calls[0])}. Broad historical-perspective questions with useful local coverage stop here. Exact-work location uses relevance; surveys and creator comparisons preserve deterministic work diversity and separate creator scopes. ${localDateScope}
+3. **Automatically retry one proven targeted gap** — For a targeted author, work, period, or comparison scope, rerun at most one affected query with \`searchDepth:"expanded"\`, \`expandedLimit:3\`, and an \`expansionBasis\` only after the standard result proves \`catalog_miss\` or \`no_results\`. For a survey/comparison diversity gap, count distinct returned local locator \`documentId\` values and use \`{"reason":"insufficient_diversity","minimumDistinctWorks":3,"observedDistinctWorks":N}\`. The other exact bases are \`{"reason":"catalog_miss"}\` and \`{"reason":"no_results"}\`. Copy every other query field unchanged. The server reruns local search and must revalidate that basis before any external provider can run.
+4. **Do not manufacture a trigger** — Metadata-incomplete or unavailable local scope is uncertainty, not a coverage miss. In that case, or when useful local results leave genuine doubt, tell the user that broader or more detailed sources can be requested. Do not build or imitate a natural-language intent classifier.
+5. **Interpret v8 routing and evidence truthfully** — Preserve \`expansionDecision\`, provider order, statuses, notices, result windows, and coverage facts. ${externalDateSafeguard} ${externalDateCallInstruction} External snippets remain unreviewed discovery leads and are never evidence until their direct pages are opened and verified.
+6. **Read selected exact evidence** — Follow at most ${args?.maxSections?.trim() || '3'} unique selected locators. Use MCP \`resources/read\` for local resources. Do not quote, compare, or synthesize from snippets alone.
+7. **Close the host ledger and synthesize** — Searched/not-searched come only from the tool; read and deferred are host-observed later. Distinguish exact text from interpretation, disclose unread external leads and unsearched scopes, and never treat a bounded miss as historical silence.`
+          : descriptor.contractVersion === '7'
           ? `Research primary-source evidence about "${topic}"${work ? ` within the requested work "${work}"` : ''}${authors.length ? ` for the separately scoped creators ${authors.map(value => `"${value}"`).join(', ')}` : ''}.
 
 1. **Inspect catalog scope** — Read \`theologai://primary-sources/catalog\` with MCP \`resources/read\`. Use its per-work and per-edition readiness metadata as returned; an absent creator is a catalog gap, not evidence that no other source exists.

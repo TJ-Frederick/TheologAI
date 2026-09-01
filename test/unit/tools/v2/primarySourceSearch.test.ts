@@ -4,6 +4,7 @@ import { createPrimarySourceSearchDescriptor } from '../../../../src/mcp/primary
 import { validatorFor } from '../../../../src/mcp/validation.js';
 import { AjvJsonSchemaValidator } from '@modelcontextprotocol/client/validators/ajv';
 import type { PrimarySourceSearchPlanResult } from '../../../../src/services/historical/primarySourceTypes.js';
+import { PrimarySourceSearchService } from '../../../../src/services/historical/PrimarySourceSearchService.js';
 
 function schemaTerms(value: unknown): string[] {
   if (typeof value === 'string') return [value];
@@ -691,5 +692,130 @@ describe('primary_source_search v7 discovery contract', () => {
       .filter((provider: any) => provider.provider === 'ccel_live')).toHaveLength(1);
     expect(structured).toMatchObject({ planStatus: 'partial', responseWindow: { truncated: true } });
     expect(validatorFor(handler.outputSchema!)(structured).valid).toBe(true);
+  });
+});
+
+describe('primary_source_search dormant v8 research foundation', () => {
+  const v8 = createPrimarySourceSearchDescriptor('8');
+
+  it('requires a closed evidence basis for expanded retries and emits routing truth', async () => {
+    const search = vi.fn().mockResolvedValue({
+      planStatus: 'complete',
+      queries: [{
+        id: 'q1', normalizedMode: 'all_terms', normalizedSelection: 'relevance',
+        expansionDecision: {
+          requested: true, triggered: false, reason: 'basis_not_confirmed', localDistinctWorkCount: 1,
+          basis: { reason: 'catalog_miss' },
+        },
+        providers: [{
+          provider: 'local', status: 'ok', searched: true, page: 1, hitCount: 1,
+          resultWindow: { returnedHitCount: 1, additionalMatchStatus: 'no_additional_match_observed' },
+          notices: [],
+          scope: {
+            status: 'matched', requested: {}, eligibleDocumentCount: 1,
+            eligibleDocuments: [{ id: 'doc', title: 'Document', metadataStatus: 'unknown' }],
+            eligibleDocumentsTruncated: false,
+          },
+          hits: [{
+            queryId: 'q1', provider: 'local', title: 'Local section', snippet: 'Local evidence lead',
+            rankWithinProvider: 1, page: 1, snippetOnly: true, attribution: 'Local', resourceSizeBytes: 42,
+            locator: { kind: 'local_section', url: 'theologai://documents/doc#section-1', documentId: 'doc', sectionKey: '1', sourceOrdinal: 1 },
+          }],
+        }],
+      }],
+      coverage: { localAttempted: true, localHitCount: 1, ccelAttempted: false, ccelHitCount: 0, notices: [] },
+    });
+    const handler = createPrimarySourceSearchHandler({ search } as never, v8);
+    const validateInput = validatorFor(handler.inputSchema);
+
+    expect(handler.outputSchema?.properties?.schemaVersion).toEqual({ const: '8' });
+    expect(validateInput({ queries: [{ id: 'q1', text: 'faith', searchDepth: 'standard' }] }).valid).toBe(true);
+    expect(validateInput({ queries: [{ id: 'q1', text: 'faith', searchDepth: 'expanded' }] }).valid).toBe(false);
+    expect(validateInput({ queries: [{
+      id: 'q1', text: 'faith', searchDepth: 'expanded', expansionBasis: { reason: 'catalog_miss' },
+    }] }).valid).toBe(true);
+    expect(validateInput({ queries: [{
+      id: 'q1', text: 'faith', searchDepth: 'expanded', selection: 'work_diversity',
+      expansionBasis: { reason: 'insufficient_diversity', minimumDistinctWorks: 3, observedDistinctWorks: 1 },
+    }] }).valid).toBe(true);
+    expect(validateInput({ queries: [{
+      id: 'q1', text: 'faith', searchDepth: 'standard', expansionBasis: { reason: 'catalog_miss' },
+    }] }).valid).toBe(false);
+
+    const result = await handler.handler({
+      queries: [{ id: 'q1', text: 'faith', searchDepth: 'expanded', expansionBasis: { reason: 'catalog_miss' } }],
+    });
+    expect(result.structuredContent).toMatchObject({
+      schemaVersion: '8', queries: [{ expansionDecision: { triggered: false, reason: 'basis_not_confirmed' } }],
+    });
+    expect(validatorFor(handler.outputSchema!)(result.structuredContent).valid).toBe(true);
+    expect(search).toHaveBeenCalledOnce();
+  });
+
+  it('delivers schema-valid output after reserving the four local windows ahead of expansion', async () => {
+    let localIndex = 0;
+    const local = { search: vi.fn(async () => {
+      const queryIndex = localIndex++;
+      const hits = Array.from({ length: 8 }, (_, index) => {
+        const documentId = queryIndex === 0 ? 'shared-work' : `work-${queryIndex}-${index + 1}`;
+        const sectionKey = `source-${String(index + 1).padStart(4, '0')}`;
+        return {
+          provider: 'local' as const,
+          title: `Local ${queryIndex + 1}.${index + 1}`,
+          snippet: 'Compact local discovery lead.',
+          locator: {
+            kind: 'local_section' as const, documentId, sectionKey, sourceOrdinal: index + 1,
+            url: `theologai://documents/${documentId}#section-${sectionKey}`,
+          },
+          resourceSizeBytes: 100,
+          rankWithinProvider: index + 1,
+          page: 1,
+          snippetOnly: true as const,
+          attribution: 'Local fixture',
+        };
+      });
+      return {
+        provider: 'local' as const, status: 'ok' as const, searched: true, page: 1,
+        hitCount: 8, hits, notices: [],
+        resultWindow: { returnedHitCount: 8, additionalMatchStatus: 'not_evaluated' as const },
+        scope: {
+          status: 'matched' as const, requested: {}, eligibleDocumentCount: queryIndex === 0 ? 1 : 8,
+          eligibleDocuments: [], eligibleDocumentsTruncated: false,
+        },
+      };
+    }) };
+    const ccel = { search: vi.fn(async () => ({
+      provider: 'ccel_live' as const, status: 'ok' as const, searched: true, page: 1,
+      hitCount: 5,
+      hits: Array.from({ length: 5 }, (_, index) => ({
+        provider: 'ccel_live' as const, title: `External ${index + 1}`, snippet: 'External lead.',
+        locator: { kind: 'ccel_section' as const, work: 'work', section: `${index + 1}`, url: `https://ccel.org/work/${index + 1}` },
+        rankWithinProvider: index + 1, page: 1, snippetOnly: true as const, attribution: 'External fixture',
+      })),
+      notices: [], resultWindow: { returnedHitCount: 5, additionalMatchStatus: 'not_evaluated' as const },
+    })) };
+    const service = new PrimarySourceSearchService(local, ccel, {
+      exposeCcelDiscovery: true, ccelLiveSearch: true, ccelCoordinator: true,
+      contractVersion: '8', liveCcelEnabled: true,
+    }, {} as never);
+    const handler = createPrimarySourceSearchHandler(service, v8);
+    const queries = [0, 1, 2, 3].map(index => ({
+      id: `q${index + 1}`, text: 'grace', limit: 8,
+      ...(index === 0 ? {
+        searchDepth: 'expanded', selection: 'work_diversity',
+        expansionBasis: { reason: 'insufficient_diversity', minimumDistinctWorks: 3, observedDistinctWorks: 1 },
+      } : { searchDepth: 'standard' }),
+    }));
+
+    const result = await handler.handler({ queries });
+    const structured = result.structuredContent as any;
+
+    expect(result).not.toHaveProperty('isError');
+    expect(structured.queries).toHaveLength(4);
+    expect(structured.queries.every((query: any) => query.providers[0].provider === 'local')).toBe(true);
+    expect(structured.queries.map((query: any) => query.expansionDecision.localDistinctWorkCount)).toEqual([1, 8, 8, 8]);
+    expect(structured.queries[0].providers[1]).toMatchObject({ provider: 'ccel_live', hitCount: 0 });
+    expect(validatorFor(handler.outputSchema!)(structured).valid).toBe(true);
+    expect(new AjvJsonSchemaValidator().getValidator(handler.outputSchema!)(structured).valid).toBe(true);
   });
 });

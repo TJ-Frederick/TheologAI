@@ -18,6 +18,8 @@ export type Env = Omit<Cloudflare.Env, 'THEOLOGAI_CCEL_COORDINATOR'> & {
   THEOLOGAI_EXPOSE_CCEL_DISCOVERY?: string;
   THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH?: string;
   THEOLOGAI_ENABLE_CCEL_COORDINATOR?: string;
+  /** Dormant Phase 3B.2 research-contract selector; absent from deployed config. */
+  THEOLOGAI_ENABLE_PRIMARY_SOURCE_RESEARCH_V8?: string;
   /** Optional HMAC key for the non-MCP operator route. Absent means 404/inert. */
   THEOLOGAI_CCEL_OPERATOR_TOKEN?: string;
   /** Exact deployed Worker version metadata supplied by Cloudflare. */

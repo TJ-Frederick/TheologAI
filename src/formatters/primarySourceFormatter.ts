@@ -3,6 +3,7 @@ import type {
   PresentedPrimarySourceSearchV4,
   PresentedPrimarySourceSearchV5,
 } from '../presenters/primarySourceSearchV4Structured.js';
+import type { PresentedPrimarySourceSearchV8 } from '../presenters/primarySourceSearchV8Structured.js';
 
 /** Reserve enough delivery budget for structured content and native links. */
 export const PRIMARY_SOURCE_FALLBACK_MAX_BYTES = 4_096;
@@ -75,7 +76,7 @@ export function formatPrimarySourceSearch(result: PresentedPrimarySourceSearch):
  * data or manufactures a second, divergent representation.
  */
 export function formatPrimarySourceSearchFallback(
-  result: PresentedPrimarySourceSearchV4 | PresentedPrimarySourceSearchV5,
+  result: PresentedPrimarySourceSearchV4 | PresentedPrimarySourceSearchV5 | PresentedPrimarySourceSearchV8,
 ): string {
   const lines = [
     '# Primary-source discovery',
@@ -84,6 +85,9 @@ export function formatPrimarySourceSearchFallback(
   ];
   for (const query of result.queries) {
     lines.push('', `## ${safe(query.id)}`);
+    if ('expansionDecision' in query) {
+      lines.push(`- Expanded retry: **${query.expansionDecision.triggered ? 'eligible' : 'not executed'}** (${query.expansionDecision.reason}); local distinct works: ${query.expansionDecision.localDistinctWorkCount}.`);
+    }
     for (const provider of query.providers) {
       const label = provider.provider === 'local' ? 'Curated catalog results' : 'Expanded discovery results';
       lines.push(`- ${label}: **${provider.status}**; ${provider.hitCount} returned.`);
