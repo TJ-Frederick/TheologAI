@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import type { ToolHandler } from '../../../src/kernel/types.js';
 import { recommendedToolCallsForPrompt, resolvePromptDepth } from '../../../src/mcp/prompts.js';
 import { validatorFor } from '../../../src/mcp/validation.js';
@@ -263,5 +264,34 @@ describe('prompt-recommended tool-call contracts', () => {
     }] });
     expect(recommendedToolCallsForPrompt('confession-study', { topic: 'justification' }, v7)[0]!.arguments)
       .toMatchObject({ queries: [{ searchDepth: 'expanded', expandedLimit: 3 }] });
+  });
+
+  it('materializes deterministic v8 standard-first plans for all three research journeys', () => {
+    const fixture = JSON.parse(readFileSync(
+      new URL('../../fixtures/primary-source-research-v8-journeys.json', import.meta.url),
+      'utf8',
+    )) as {
+      schemaVersion: number;
+      journeys: Array<{
+        id: string;
+        promptArguments: Record<string, string>;
+        expectedInitialQueries: Array<Record<string, unknown>>;
+      }>;
+    };
+    const v8 = createPrimarySourceSearchDescriptor('8');
+    const validateV8 = validatorFor(createPrimarySourceSearchHandler(unused, v8).inputSchema);
+
+    expect(fixture.schemaVersion).toBe(1);
+    expect(fixture.journeys.map(journey => journey.id)).toEqual([
+      'topical-survey', 'locate-in-work', 'compare-authors',
+    ]);
+    for (const journey of fixture.journeys) {
+      const calls = recommendedToolCallsForPrompt('primary-source-research', journey.promptArguments, v8);
+      expect(calls, journey.id).toEqual([{
+        tool: 'primary_source_search', arguments: { queries: journey.expectedInitialQueries },
+      }]);
+      expect(validateV8(calls[0]!.arguments), journey.id).toMatchObject({ valid: true });
+      expect(JSON.stringify(calls), journey.id).not.toContain('expansionBasis');
+    }
   });
 });

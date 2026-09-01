@@ -1122,6 +1122,42 @@ describe('shared MCP registration', () => {
     expect(confessionText).toContain('Name any disabled, unavailable, or unsupported provider');
   });
 
+  it('renders v8 standard-first routing with one evidence-bound retry and ordinary legacy results', async () => {
+    const root = makeMockRoot();
+    root.primarySourceContract = {
+      exposeCcelDiscovery: true, ccelLiveSearch: false, ccelCoordinator: false,
+      contractVersion: '8', liveCcelEnabled: false,
+    };
+    root.tools = root.tools.map(tool => tool.name === 'primary_source_search'
+      ? createPrimarySourceSearchHandler({ search: vi.fn() } as never, root.primarySourceContract)
+      : tool);
+    root.primarySourceSearch = {
+      descriptor: createPrimarySourceSearchDescriptor('8'),
+      tool: root.tools.find(tool => tool.name === 'primary_source_search')!,
+    };
+    const client = await connect(createTheologAiMcpServer(root, '1.0.0-v8-foundation-test').server);
+    expect((await client.listTools()).tools).toHaveLength(11);
+    expect((await client.listPrompts()).prompts).toHaveLength(6);
+
+    const primary = await client.getPrompt({
+      name: 'primary-source-research',
+      arguments: { topic: 'church government', authors: 'Richard Baxter,John Owen' },
+    });
+    const text = primary.messages[0]?.content.type === 'text' ? primary.messages[0].content.text : '';
+    expect(text).toContain('"searchDepth":"standard"');
+    expect(text).not.toContain('"searchDepth":"expanded"');
+    expect(text).toContain('Automatically retry one proven targeted gap');
+    expect(text).toContain('`expansionBasis`');
+    expect(text).toContain('Do not build or imitate a natural-language intent classifier');
+    expect(text).toContain('All 35 local works are ordinary usable sources');
+    expect(text).toContain('broader or more detailed sources can be requested');
+
+    const confession = await client.getPrompt({ name: 'confession-study', arguments: { topic: 'justification' } });
+    const confessionText = confession.messages[0]?.content.type === 'text' ? confession.messages[0].content.text : '';
+    expect(confessionText).toContain('including the 17 legacy works');
+    expect(confessionText).toContain('automatically rerun at most one affected query');
+  });
+
   it('requires the bound descriptor rather than probing mutable tool metadata', () => {
     const root = makeMockRoot();
     root.primarySourceContract = {

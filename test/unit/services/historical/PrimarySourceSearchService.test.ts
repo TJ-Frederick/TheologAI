@@ -20,11 +20,18 @@ function providerResult(provider: 'local' | 'ccel_live', status: PrimarySourcePr
       rankWithinProvider: index + 1, page: 1, snippetOnly: true as const, attribution: provider,
     });
   return {
-    provider, status, searched: status !== 'disabled', page: 1,
+    provider, status, searched: status !== 'disabled' && status !== 'catalog_miss', page: 1,
     hitCount: count,
     resultWindow: { returnedHitCount: count, additionalMatchStatus: 'not_evaluated' },
     hits,
     notices: [],
+    ...(provider === 'local' && (status === 'ok' || status === 'no_results' || status === 'catalog_miss') ? {
+      scope: {
+        status: status === 'catalog_miss' ? 'catalog_miss' as const : 'matched' as const,
+        requested: {}, eligibleDocumentCount: status === 'catalog_miss' ? 0 : 1,
+        eligibleDocuments: [], eligibleDocumentsTruncated: false,
+      },
+    } : {}),
   };
 }
 
@@ -33,6 +40,7 @@ const query = (overrides: Record<string, unknown> = {}) => ({ id: 'q1', text: 'u
 const v7Query = (overrides: Record<string, unknown> = {}) => ({ id: 'q1', text: 'union with Christ', ...overrides });
 const dormant = { exposeCcelDiscovery: false, ccelLiveSearch: false, ccelCoordinator: false, contractVersion: '6' as const, liveCcelEnabled: false };
 const live = { exposeCcelDiscovery: true, ccelLiveSearch: true, ccelCoordinator: true, contractVersion: '7' as const, liveCcelEnabled: true };
+const v8Live = { ...live, contractVersion: '8' as const };
 const coordinator = { admit: vi.fn(), recordOutcome: vi.fn(), snapshot: vi.fn() } satisfies CcelUpstreamCoordinator;
 
 describe('PrimarySourceSearchService', () => {
@@ -73,6 +81,31 @@ describe('PrimarySourceSearchService', () => {
     expect(rpcAdmit).toHaveBeenCalledTimes(fullyEnabled ? 1 : 0);
   });
 
+  it.each([
+    [false, false, false], [false, false, true], [false, true, false], [false, true, true],
+    [true, false, false], [true, false, true], [true, true, false], [true, true, true],
+  ])('keeps dormant v8 behind the same complete execution gates (%s,%s,%s)', async (exposure, liveSearch, coordinatorEnabled) => {
+    const adapterSearch = vi.fn().mockResolvedValue(providerResult('ccel_live', 'no_results', 0));
+    const config = readPrimarySourceContractConfig({
+      THEOLOGAI_EXPOSE_CCEL_DISCOVERY: String(exposure),
+      THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH: String(liveSearch),
+      THEOLOGAI_ENABLE_CCEL_COORDINATOR: String(coordinatorEnabled),
+      THEOLOGAI_ENABLE_PRIMARY_SOURCE_RESEARCH_V8: 'true',
+    });
+    const service = new PrimarySourceSearchService(
+      { search: vi.fn().mockResolvedValue(providerResult('local', 'no_results', 0)) },
+      { search: adapterSearch },
+      config,
+      coordinator,
+    );
+    await service.search(plan([exposure
+      ? v7Query({ searchDepth: 'expanded', expansionBasis: { reason: 'no_results' } })
+      : query()]));
+
+    expect(config.contractVersion).toBe(exposure ? '8' : '6');
+    expect(adapterSearch).toHaveBeenCalledTimes(exposure && liveSearch && coordinatorEnabled ? 1 : 0);
+  });
+
   it('validates the complete plan atomically before any provider call', async () => {
     const local = { search: vi.fn().mockResolvedValue(providerResult('local')) };
     const ccel = { search: vi.fn().mockResolvedValue(providerResult('ccel_live')) };
@@ -80,6 +113,45 @@ describe('PrimarySourceSearchService', () => {
     await expect(service.search(plan([v7Query(), v7Query({ id: 'q1' })]))).rejects.toThrow('Duplicate');
     await expect(service.search(plan([0, 1].map(index => v7Query({ id: `q${index}`, searchDepth: 'expanded' }))))).rejects.toThrow('At most 1');
     expect(local.search).not.toHaveBeenCalled();
+    expect(ccel.search).not.toHaveBeenCalled();
+  });
+
+  it('does not authorize expansion from a malformed local result', async () => {
+    const malformed = { ...providerResult('local', 'no_results', 0), scope: undefined };
+    const ccel = { search: vi.fn() };
+    const result = await new PrimarySourceSearchService(
+      { search: vi.fn().mockResolvedValue(malformed) }, ccel, v8Live, coordinator,
+    ).search(plan([v7Query({ searchDepth: 'expanded', expansionBasis: { reason: 'no_results' } })]));
+
+    expect(result.queries[0]!.expansionDecision).toMatchObject({
+      requested: true, triggered: false, reason: 'local_result_invalid',
+    });
+    expect(ccel.search).not.toHaveBeenCalled();
+  });
+
+  it('does not authorize expansion from a stale local scope or contradictory eligible-work count', async () => {
+    const staleScope = providerResult('local', 'no_results', 0);
+    staleScope.scope!.requested = { author: 'John Owen' };
+    const contradictoryCount = providerResult('local', 'ok', 1);
+    contradictoryCount.scope!.eligibleDocumentCount = 0;
+    const ccel = { search: vi.fn() };
+    const service = new PrimarySourceSearchService(
+      { search: vi.fn()
+        .mockResolvedValueOnce(staleScope)
+        .mockResolvedValueOnce(contradictoryCount) },
+      ccel, v8Live, coordinator,
+    );
+
+    const stale = await service.search(plan([v7Query({
+      author: 'Richard Baxter', searchDepth: 'expanded', expansionBasis: { reason: 'no_results' },
+    })]));
+    const contradictory = await service.search(plan([v7Query({
+      searchDepth: 'expanded', selection: 'work_diversity',
+      expansionBasis: { reason: 'insufficient_diversity', minimumDistinctWorks: 3, observedDistinctWorks: 1 },
+    })]));
+
+    expect(stale.queries[0]!.expansionDecision?.reason).toBe('local_result_invalid');
+    expect(contradictory.queries[0]!.expansionDecision?.reason).toBe('local_result_invalid');
     expect(ccel.search).not.toHaveBeenCalled();
   });
 
@@ -119,6 +191,138 @@ describe('PrimarySourceSearchService', () => {
     expect(ccel.search).not.toHaveBeenCalledWith(expect.objectContaining({ endYear: 1500 }), coordinator);
     expect(result.queries[0]!.providers[1]!.notices[0]).toBe(CCEL_COMPOSITION_DATE_NOTICE);
     expect(events).toEqual(['catalog', 'expanded']);
+  });
+
+  it('keeps a v8 standard pass local and records that no expansion was requested', async () => {
+    const local = { search: vi.fn().mockResolvedValue(providerResult('local')) };
+    const ccel = { search: vi.fn() };
+    const result = await new PrimarySourceSearchService(local, ccel, v8Live, coordinator)
+      .search(plan([v7Query({ searchDepth: 'standard' })]));
+
+    expect(result.queries[0]).toMatchObject({
+      providers: [{ provider: 'local' }],
+      expansionDecision: { requested: false, triggered: false, reason: 'not_requested', localDistinctWorkCount: 1 },
+    });
+    expect(ccel.search).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['catalog_miss', providerResult('local', 'catalog_miss', 0), { reason: 'catalog_miss' }],
+    ['no_results', providerResult('local', 'no_results', 0), { reason: 'no_results' }],
+  ] as const)('runs one v8 external retry only after revalidating %s', async (reason, localResult, expansionBasis) => {
+    const events: string[] = [];
+    const local = { search: vi.fn(async () => { events.push('local'); return localResult; }) };
+    const ccel = { search: vi.fn(async () => { events.push('external'); return providerResult('ccel_live', 'no_results', 0); }) };
+    const result = await new PrimarySourceSearchService(local, ccel, v8Live, coordinator).search(plan([v7Query({
+      searchDepth: 'expanded', expansionBasis,
+    })]));
+
+    expect(result.queries[0]).toMatchObject({
+      expansionDecision: { requested: true, triggered: true, reason, basis: expansionBasis },
+      providers: [{ provider: 'local' }, { provider: 'ccel_live' }],
+    });
+    expect(events).toEqual(['local', 'external']);
+  });
+
+  it('revalidates v8 diversity by distinct local document identity, not section count', async () => {
+    const localResult = providerResult('local', 'ok', 3);
+    for (const hit of localResult.hits) {
+      if (hit.provider === 'local') hit.locator.documentId = 'same-work';
+    }
+    const local = { search: vi.fn().mockResolvedValue(localResult) };
+    const ccel = { search: vi.fn().mockResolvedValue(providerResult('ccel_live', 'no_results', 0)) };
+    const basis = { reason: 'insufficient_diversity' as const, minimumDistinctWorks: 3, observedDistinctWorks: 1 };
+    const result = await new PrimarySourceSearchService(local, ccel, v8Live, coordinator).search(plan([v7Query({
+      searchDepth: 'expanded', selection: 'work_diversity', expansionBasis: basis,
+    })]));
+
+    expect(result.queries[0]!.expansionDecision).toEqual({
+      requested: true, triggered: true, reason: 'insufficient_diversity',
+      localDistinctWorkCount: 1, basis,
+    });
+    expect(ccel.search).toHaveBeenCalledTimes(1);
+  });
+
+  it('budgets all four v8 local windows before expanded discovery', async () => {
+    const events: string[] = [];
+    let localIndex = 0;
+    const local = { search: vi.fn(async () => {
+      events.push('local');
+      const result = providerResult('local', 'ok', 8);
+      if (localIndex++ > 0) {
+        for (const [index, hit] of result.hits.entries()) {
+          if (hit.provider === 'local') hit.locator.documentId = `doc-${index + 1}`;
+        }
+        result.scope!.eligibleDocumentCount = 8;
+      }
+      return result;
+    }) };
+    const ccel = { search: vi.fn(async () => {
+      events.push('external');
+      return providerResult('ccel_live', 'ok', 5);
+    }) };
+    const queries = [0, 1, 2, 3].map(index => v7Query({
+      id: `q${index + 1}`, limit: 8,
+      ...(index === 0 ? {
+        searchDepth: 'expanded', selection: 'work_diversity',
+        expansionBasis: { reason: 'insufficient_diversity', minimumDistinctWorks: 3, observedDistinctWorks: 1 },
+      } : { searchDepth: 'standard' }),
+    }));
+
+    const result = await new PrimarySourceSearchService(local, ccel, v8Live, coordinator).search(plan(queries));
+
+    expect(events).toEqual(['local', 'local', 'local', 'local', 'external']);
+    expect(result.queries.map(queryResult => queryResult.id)).toEqual(['q1', 'q2', 'q3', 'q4']);
+    expect(result.queries.map(queryResult => queryResult.providers[0]!.hitCount)).toEqual([8, 8, 8, 8]);
+    expect(result.queries.map(queryResult => queryResult.expansionDecision?.localDistinctWorkCount)).toEqual([1, 8, 8, 8]);
+    expect(result.queries[0]!.providers).toMatchObject([
+      { provider: 'local', hitCount: 8 },
+      {
+        provider: 'ccel_live', hitCount: 0,
+        resultWindow: { returnedHitCount: 0, additionalMatchStatus: 'additional_match_observed' },
+      },
+    ]);
+    expect(result).toMatchObject({
+      planStatus: 'partial',
+      coverage: { localHitCount: 32, ccelAttempted: true, ccelHitCount: 0 },
+    });
+  });
+
+  it.each([
+    ['stale catalog miss', providerResult('local', 'ok', 1), { reason: 'catalog_miss' }, 'basis_not_confirmed'],
+    ['metadata uncertainty', {
+      ...providerResult('local', 'no_results', 0),
+      scope: {
+        status: 'metadata_incomplete' as const, requested: {}, eligibleDocumentCount: 0,
+        eligibleDocuments: [], eligibleDocumentsTruncated: false,
+      },
+    }, { reason: 'no_results' }, 'local_coverage_uncertain'],
+    ['local failure', providerResult('local', 'unavailable', 0), { reason: 'no_results' }, 'local_search_unavailable'],
+  ] as const)('does not expand a v8 %s basis', async (_label, localResult, expansionBasis, reason) => {
+    const ccel = { search: vi.fn() };
+    const result = await new PrimarySourceSearchService(
+      { search: vi.fn().mockResolvedValue(localResult) }, ccel, v8Live, coordinator,
+    ).search(plan([v7Query({ searchDepth: 'expanded', expansionBasis })]));
+
+    expect(result.queries[0]).toMatchObject({
+      providers: [{ provider: 'local' }],
+      expansionDecision: { requested: true, triggered: false, reason, basis: expansionBasis },
+    });
+    expect(ccel.search).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { searchDepth: 'expanded' },
+    { searchDepth: 'standard', expansionBasis: { reason: 'no_results' } },
+    { searchDepth: 'expanded', expansionBasis: { reason: 'insufficient_diversity', minimumDistinctWorks: 3, observedDistinctWorks: 3 }, selection: 'work_diversity' },
+    { searchDepth: 'expanded', expansionBasis: { reason: 'insufficient_diversity', minimumDistinctWorks: 3, observedDistinctWorks: 1 }, selection: 'relevance' },
+  ])('rejects invalid v8 expansion evidence atomically %#', async invalid => {
+    const local = { search: vi.fn() };
+    const ccel = { search: vi.fn() };
+    await expect(new PrimarySourceSearchService(local, ccel, v8Live, coordinator)
+      .search(plan([v7Query(invalid)]))).rejects.toThrow('expansionBasis');
+    expect(local.search).not.toHaveBeenCalled();
+    expect(ccel.search).not.toHaveBeenCalled();
   });
 
   it.each([0, 6, 1.5])('rejects invalid v7 expandedLimit %s before provider work', async expandedLimit => {
@@ -254,6 +458,8 @@ describe('PrimarySourceSearchService', () => {
     const result = await new PrimarySourceSearchService(local, ccel, live, coordinator).search(plan(queries));
     expect(result.planStatus).toBe('partial');
     expect(result.queries.flatMap(item => item.providers).flatMap(item => item.hits)).toHaveLength(32);
+    expect(result.queries.map(item => item.providers.map(provider => provider.hitCount)))
+      .toEqual([[8, 8], [8], [8], [0]]);
     expect(result.queries[0].providers[0].hits[0].rankWithinProvider).toBe(1);
     const truncated = result.queries.flatMap(item => item.providers).find(item => item.hits.length < 8);
     expect(truncated?.resultWindow.additionalMatchStatus).toBe('additional_match_observed');

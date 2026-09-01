@@ -496,6 +496,15 @@ Production does not expose that preview-only discovery behavior. MCP clients sho
 reconnect and reinitialize after any endpoint/profile change because tool and
 prompt schemas may be cached for an existing connection.
 
+The repository also contains a dormant Phase 3B.2 v8 research foundation.
+It leaves the deployed v6/v7 profiles unchanged, starts guided research with a
+standard local plan, and permits one external-bearing retry only when the host
+supplies a prior `catalog_miss`, `no_results`, or explicit distinct-work
+diversity shortfall that the server revalidates against a fresh local result.
+All 17 legacy local works remain ordinary usable results; readiness metadata is
+retained as provenance context, not an eligibility or ranking gate. See
+[`docs/PRIMARY-SOURCE-RESEARCH-V8-FOUNDATION.md`](docs/PRIMARY-SOURCE-RESEARCH-V8-FOUNDATION.md).
+
 The retained `CcelSearchAdapter` remains in the codebase as bounded future
 provider architecture.
 The dormant adapter is restricted to page 1, one non-following/non-retried

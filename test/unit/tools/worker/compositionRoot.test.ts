@@ -214,6 +214,28 @@ describe('createWorkerCompositionRoot', () => {
       expect(getByName).not.toHaveBeenCalled();
     });
 
+    it('selects the dormant v8 contract identically in Worker composition without enabling CCEL', async () => {
+      const getByName = vi.fn();
+      const root = createWorkerCompositionRoot(makeEnv({
+        THEOLOGAI_EXPOSE_CCEL_DISCOVERY: 'true',
+        THEOLOGAI_ENABLE_PRIMARY_SOURCE_RESEARCH_V8: 'true',
+        THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH: 'false',
+        THEOLOGAI_ENABLE_CCEL_COORDINATOR: 'false',
+        THEOLOGAI_CCEL_COORDINATOR: { getByName } as any,
+      }));
+      expect(root.primarySourceContract).toMatchObject({ contractVersion: '8', liveCcelEnabled: false });
+      const tool = root.tools.find(candidate => candidate.name === 'primary_source_search')!;
+      expect(tool.outputSchema?.properties?.schemaVersion).toEqual({ const: '8' });
+      await tool.handler({
+        queries: [{
+          id: 'retry', text: 'grace', searchDepth: 'expanded',
+          expansionBasis: { reason: 'no_results' },
+        }],
+      });
+      expect(primarySourceMocks.search).not.toHaveBeenCalled();
+      expect(getByName).not.toHaveBeenCalled();
+    });
+
     it('does not expose the live adapter even when its future rollout flag is true', async () => {
       const root = createWorkerCompositionRoot(makeEnv({ THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH: 'true' }));
       const tool = root.tools.find(candidate => candidate.name === 'primary_source_search')!;

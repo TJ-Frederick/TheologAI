@@ -108,11 +108,18 @@ export interface PrimarySourceSearchQuery {
   page?: number;
   limit?: number;
   selection?: PrimarySourceSelection;
-  /** Candidate v7 only: reviewed catalog first, with optional bounded discovery expansion. */
+  /** Discovery contracts only: curated catalog first, with optional bounded expansion. */
   searchDepth?: 'standard' | 'expanded';
-  /** Candidate v7 only; valid only with searchDepth: expanded. */
+  /** Discovery contracts only; valid only with searchDepth: expanded. */
   expandedLimit?: number;
+  /** Candidate v8 only: host-observed basis for one conditional expanded retry. */
+  expansionBasis?: PrimarySourceExpansionBasis;
 }
+
+export type PrimarySourceExpansionBasis =
+  | { reason: 'catalog_miss' }
+  | { reason: 'no_results' }
+  | { reason: 'insufficient_diversity'; minimumDistinctWorks: number; observedDistinctWorks: number };
 
 export interface CcelSectionLocator {
   kind: 'ccel_section';
@@ -201,7 +208,45 @@ export interface PrimarySourcePlanQueryResult {
   normalizedMode: PrimarySourceSearchMatch;
   normalizedSelection: PrimarySourceSelection;
   providers: PrimarySourcePlanProviderResult[];
+  /** Candidate v8 only; omitted from the deployed v6/v7 contracts. */
+  expansionDecision?: PrimarySourceExpansionDecision;
 }
+
+export type PrimarySourceExpansionDecision =
+  | {
+      requested: false;
+      triggered: false;
+      reason: 'not_requested';
+      localDistinctWorkCount: number;
+    }
+  | {
+      requested: true;
+      triggered: false;
+      reason: 'basis_not_confirmed' | 'local_search_unavailable' | 'local_coverage_uncertain' | 'local_result_invalid';
+      localDistinctWorkCount: number;
+      basis: PrimarySourceExpansionBasis;
+    }
+  | {
+      requested: true;
+      triggered: true;
+      reason: 'catalog_miss';
+      localDistinctWorkCount: number;
+      basis: { reason: 'catalog_miss' };
+    }
+  | {
+      requested: true;
+      triggered: true;
+      reason: 'no_results';
+      localDistinctWorkCount: number;
+      basis: { reason: 'no_results' };
+    }
+  | {
+      requested: true;
+      triggered: true;
+      reason: 'insufficient_diversity';
+      localDistinctWorkCount: number;
+      basis: Extract<PrimarySourceExpansionBasis, { reason: 'insufficient_diversity' }>;
+    };
 
 export interface PrimarySourceResultWindow {
   returnedHitCount: number;

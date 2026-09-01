@@ -15,7 +15,11 @@ import { createDeterministicMcpFixture } from '../../fixtures/mcpCompositionRoot
 import { DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG } from '../../../src/kernel/featureFlags.js';
 import { classicTextsOutputSchema } from '../../../src/mcp/schemas/classicTexts.js';
 import { validateClassicTextsOutputSemantics } from '../../../src/presenters/classicTextsStructured.js';
-import { primarySourceSearchV6OutputSchema, primarySourceSearchV7OutputSchema } from '../../../src/mcp/schemas/primarySourceSearchV4.js';
+import {
+  primarySourceSearchV6OutputSchema,
+  primarySourceSearchV7OutputSchema,
+  primarySourceSearchV8OutputSchema,
+} from '../../../src/mcp/schemas/primarySourceSearchV4.js';
 import { validatorFor } from '../../../src/mcp/validation.js';
 import { createPrimarySourceSearchDescriptor } from '../../../src/mcp/primarySourceSearchDescriptor.js';
 
@@ -85,9 +89,10 @@ describe('MCP structured output validation', () => {
   it.each([
     ['v6', primarySourceSearchV6OutputSchema],
     ['v7', primarySourceSearchV7OutputSchema],
+    ['v8', primarySourceSearchV8OutputSchema],
   ] as const)('accepts 100 eligible works and rejects 101 at the %s output-schema boundary', async (version, outputSchema) => {
     const structuredContent = (eligibleDocumentCount: number) => ({
-      schemaVersion: version === 'v6' ? '6' : '7',
+      schemaVersion: version === 'v6' ? '6' : version === 'v7' ? '7' : '8',
       kind: 'primary_source_search',
       planStatus: 'complete',
       responseWindow: { unit: 'utf8_bytes', maximum: 32768, truncated: false },
@@ -102,14 +107,17 @@ describe('MCP structured output validation', () => {
             eligibleDocuments: [], eligibleDocumentsTruncated: true,
           },
         }],
+        ...(version === 'v8' ? {
+          expansionDecision: { requested: false, triggered: false, reason: 'not_requested', localDistinctWorkCount: 0 },
+        } : {}),
       }],
       coverage: {
         localAttempted: true, localStatus: 'no_results', localHitCount: 0,
-        ...(version === 'v7' ? { ccelAttempted: false, ccelHitCount: 0 } : {}),
+        ...(version !== 'v6' ? { ccelAttempted: false, ccelHitCount: 0 } : {}),
         notices: [],
         serverObserved: { searched: [{ queryId: 'q', provider: 'local', status: 'no_results', returnedHitCount: 0 }], notSearched: [] },
       },
-      evidencePolicy: version === 'v7'
+      evidencePolicy: version !== 'v6'
         ? {
           snippetUse: 'discovery_only', localSectionAccess: 'mcp_resource_read', externalSectionAccess: 'direct_url_only',
           coverageScope: 'bounded_non_exhaustive', externalRightsStatus: 'not_determined',
