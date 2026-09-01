@@ -281,7 +281,7 @@ stderr or privacy-safe telemetry instead.
 | `primary_source_search` | Execute bounded primary-source query plans. Production v6/local-only is deployed; preview runs the audited v7/discovery-only contract with CCEL execution disabled before adapter, coordinator, or fetch. The Transform-9 preview corpus release does not change that CCEL policy. Local locators use canonical section keys plus source ordinals; snippets remain discovery-only and research workflows maintain explicit searched/read/deferred/not-searched coverage ledgers. |
 | `original_language_lookup` | Look up or search Strong's entries, with opt-in rights-reviewed STEPBible metadata, exact corrected-corpus usage, and bounded occurrence pages for exact identities. The Online-Bible-derived TBESH Hebrew `Meaning` field is withheld. |
 | `bible_verse_morphology` | Return bounded word-by-word morphology for one exact verse, with raw codes, nullable expansions, and separate pinned STEPBible morphology/lemma provenance. |
-| `original_language_study` | Resolve and study one Greek or Hebrew token in one verse with contextual morphology and source-separated lexical evidence. Schema v2 preserves the complete prior study under `study` and adds bounded Hebrew semantic candidates with summary/detailed views and opaque continuation cursors. |
+| `original_language_study` | In this checked-out unreleased candidate, resolve and study one Greek or Hebrew token in one verse at `beginner`, `intermediate`, or `technical` depth (default `intermediate`). The closed schema-v3 contract keeps lexical range, English translation comparison, and contextual interpretation distinct; only technical depth returns bounded corpus occurrences. Schema-v2 cursors become stale after the hard cutover. See `docs/CURRENT-RELEASE.md` for active endpoint behavior. |
 | `donation_config` | Return versioned structured voluntary-donation configuration with the public web URL, recipient, and ordered native/token assets; donations do not unlock features. |
 | `verify_donation` | Return bounded, structured transaction evidence and verify only a successful receipt with a supported asset sent to the configured recipient; receipt observation does not claim confirmation depth or finality. |
 
@@ -401,12 +401,20 @@ reviewed normalized source packs, and mixed inventories.
 
 | Prompt | Workflow |
 |---|---|
-| `word-study` | Strong's lookup/search, morphology, context, and synthesis. |
-| `passage-exegesis` | Text, language, cross references, commentary, and historical theology. |
-| `compare-translations` | Compare translation choices against morphology and lexical data. |
+| `word-study` | Unreleased candidate: Strong's lookup/search, morphology, context, and depth-aware synthesis. |
+| `passage-exegesis` | Unreleased candidate: depth-aware text, language, cross references, commentary, and historical theology. |
+| `compare-translations` | Unreleased candidate: compare English translation choices against separate morphology and lexical evidence at the selected depth. |
 | `confession-study` | Inspect the hosted catalog, build a work-diverse doctrinal survey, then read selected exact sections. |
 | `primary-source-research` | Inspect the catalog; use work diversity for topic/creator surveys or relevance within one work; then read at most five unique exact sections as evidence. |
 | `donate` | Explain voluntary donation options. |
+
+In this checked-out unreleased candidate, `word-study`, `passage-exegesis`,
+and `compare-translations` accept optional
+`depth: beginner | intermediate | technical`. An explicit depth wins. Guided
+hosts map simple/beginner wording to `beginner`, raw-evidence/technical wording
+to `technical`, and otherwise use `intermediate`. Beginner contextual
+explanation is prompt-produced interpretation labeled with its evidence and
+limits; the deterministic tool does not choose a contextual meaning.
 
 ## Content scope and provenance
 
@@ -704,14 +712,16 @@ The kernel dependency boundary is inward-only: local imports resolved from
 adapters may depend on kernel contracts, but the kernel does not depend on
 application services, adapters, or composition roots.
 
-The original-language study v2 context is an application concern: the
+The original-language study context is an application concern: the
 service-owned `OriginalLanguageStudyV2ContextPort` and its authoritative
 context live under `src/services/languages/`. The kernel retains only the
-target-independent v2 request, result, cursor, and proof primitives used by
-that port; it does not own the application context provider.
+target-independent evidence-engine primitives used by that port; it does not
+own the application context provider. The public v3 coordinator wraps that
+internal evidence engine with the closed depth contract and the existing
+corrected-corpus occurrence service.
 
 The language-service presentation boundary is also zero-allowlist: language
-services return application results, and the public v2 packet and Markdown are
+services return application results, and the public v3 packet and Markdown are
 assembled by `src/presenters/` after the service call. This guard is scoped to
 the language-service edge and does not claim that every service is presentation
 free. `LocalPrimarySourceSearchProvider` retains its historical formatter call

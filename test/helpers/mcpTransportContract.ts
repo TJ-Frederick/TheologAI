@@ -69,15 +69,15 @@ const STATIC_RESOURCE_ORDER = [
 export const EXPECTED_MCP_CONTRACT_FINGERPRINTS: Record<'6' | '7', McpContractFingerprints> = {
   '6': {
     capabilities: '',
-    tools: '013cfd1b41e3ed8a30b0d7aa7dd6fa241d7481611af7c81c0805de478ab118b1',
-    prompts: 'a4b74048b785049c539bcc4868102e6143d4053a79e9da6cf0b41cc2fbf0fc60',
+    tools: '82acfbf776d2cd6580804c781902f9b533aa2ec60a97cc3caf13c4d6a0e168b5',
+    prompts: '1c47b7b40e158558f1892bef336e87c8ad9f5681faaeca02b0d6d35b1770143b',
     resourceTemplates: 'f67c92aa2f3f64ce0a55e0973b61346962edd1533c86024347b63483a04d6ca3',
     staticResources: '1a07ddfb5b7954de0f37d1bec03c0886e6235f63ef5611a557a8cde4424e201b',
   },
   '7': {
     capabilities: '',
-    tools: '21ad4813fa053e04065aca7028bbe97c288d58935c65e113ddc1d061ae9eded4',
-    prompts: 'a18ccf15c9a9bc3fd588aebe5ac8a5dc5cf9dec9ef67013c1494b5d2239b7a0f',
+    tools: '189f21954648fbe5c7a924ba8d5bf47700d45055b582a8fa6b0b4f37cf2afe67',
+    prompts: '5cdaaed864d234e0ac04fd66c7cb1bb44d3d7bb8ee601abcc4726e62c4406d63',
     resourceTemplates: 'f67c92aa2f3f64ce0a55e0973b61346962edd1533c86024347b63483a04d6ca3',
     staticResources: '1a07ddfb5b7954de0f37d1bec03c0886e6235f63ef5611a557a8cde4424e201b',
   },
@@ -195,7 +195,10 @@ export async function assertMcpTransportContract(
   const expected = expectedFingerprints;
   for (const key of Object.keys(expected) as Array<keyof McpContractFingerprints>) {
     if (!expected[key]) continue;
-    invariant(fingerprints[key] === expected[key], `${key} fingerprint drifted for v${profile.contractVersion}`);
+    invariant(
+      fingerprints[key] === expected[key],
+      `${key} fingerprint drifted for v${profile.contractVersion}: expected ${expected[key]}, received ${fingerprints[key]}`,
+    );
   }
 }
 

@@ -23,7 +23,7 @@ export default defineConfig({
       miniflare: {
         bindings: {
           TEST_MIGRATIONS: migrations,
-          THEOLOGAI_VERSION: '3.6.0-test',
+          THEOLOGAI_VERSION: '4.0.0-test',
           THEOLOGAI_REQUEST_LOGS: 'false',
           THEOLOGAI_ALLOWED_ORIGINS: 'https://allowed.example',
           THEOLOGAI_MAX_REQUEST_BYTES: '1024',

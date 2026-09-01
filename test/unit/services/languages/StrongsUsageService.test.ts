@@ -1,7 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { IMorphologyRepository, IStrongsRepository } from '../../../../src/kernel/repositories.js';
 import { StrongsService } from '../../../../src/services/languages/StrongsService.js';
-import { encodeMorphologyUsageCursor } from '../../../../src/kernel/morphologyUsageCursor.js';
+import { encodeMorphologyUsageCursor, MORPHOLOGY_USAGE_IDENTITY } from '../../../../src/kernel/morphologyUsageCursor.js';
+import {
+  ORIGINAL_LANGUAGE_STUDY_OCCURRENCE_CURSOR_OPERATION,
+  createOriginalLanguageStudyV3Cursor,
+  decodeOriginalLanguageStudyV3Cursor,
+  type OriginalLanguageStudyV3CursorBinding,
+} from '../../../../src/kernel/originalLanguageStudyV3Contract.js';
 
 const strongsRepo = {
   lookup: () => undefined,
@@ -107,6 +113,61 @@ describe('StrongsService corpus usage', () => {
     const getTokenOccurrences = vi.fn<IMorphologyRepository['getTokenOccurrences']>();
     const service = new StrongsService(strongsRepo, morphology({ getUsageStats, getTokenOccurrences }));
     await expect(service.getCorpusUsage('G25', level, limit, cursor)).rejects.toThrow(message);
+    expect(getUsageStats).not.toHaveBeenCalled();
+    expect(getTokenOccurrences).not.toHaveBeenCalled();
+  });
+});
+
+describe('StrongsService v3 occurrence-only projection', () => {
+  it('queries only totals and the bounded occurrence page', async () => {
+    const getBookUsage = vi.fn<IMorphologyRepository['getBookUsage']>();
+    const getFormUsage = vi.fn<IMorphologyRepository['getFormUsage']>();
+    const getTokenOccurrences = vi.fn<IMorphologyRepository['getTokenOccurrences']>().mockReturnValue({
+      occurrences: [{
+        book: 'John', book_order: 43, chapter: 1, verse: 1, position: 5,
+        word_text: 'λόγος', lemma: 'λόγος', strongs_number: 'G3056', morph_code: 'N-NSM', gloss: 'word',
+      }],
+    });
+    const service = new StrongsService(strongsRepo, morphology({
+      getUsageStats: () => ({ strongs_key: 'G3056', token_count: 330, verse_count: 300, book_count: 25, form_count: 8 }),
+      getBookUsage, getFormUsage, getTokenOccurrences,
+    }));
+    const result = await service.getCorpusOccurrencePage('G3056', 20);
+    expect(result).toMatchObject({
+      publicStrongs: 'G3056', exactMorphologyKey: 'G3056', attested: true,
+      occurrences: [{ sourceForm: 'λόγος', exactMorphologyKey: 'G3056' }],
+    });
+    expect(getTokenOccurrences).toHaveBeenCalledWith('G3056', undefined, 20);
+    expect(getBookUsage).not.toHaveBeenCalled();
+    expect(getFormUsage).not.toHaveBeenCalled();
+  });
+
+  it('rejects a forged continuation boundary before corpus reads', async () => {
+    const boundary = { book_order: 43, chapter: 1, verse: 1, position: 5 };
+    const innerCursor = encodeMorphologyUsageCursor('G3056', boundary);
+    const binding: OriginalLanguageStudyV3CursorBinding = {
+      requestReference: 'John 1:1', requestTarget: 'G3056', requestPosition: 5,
+      depth: 'technical', operation: ORIGINAL_LANGUAGE_STUDY_OCCURRENCE_CURSOR_OPERATION,
+      canonicalReference: 'John 1:1',
+      selectedToken: {
+        position: 5, text: 'Λόγος', lemma: 'λόγος', strongsNumber: 'G3056',
+        morphologyCode: 'N-NSM', gloss: 'word',
+      },
+      publicStrongs: 'G3056', morphologyKey: 'G3056',
+      semanticArtifactIdentity: null, semanticSourceIdentity: null,
+      semanticNormalizedReference: null, corpusIdentity: MORPHOLOGY_USAGE_IDENTITY,
+    };
+    const outerCursor = createOriginalLanguageStudyV3Cursor(innerCursor, binding);
+    const cursor = decodeOriginalLanguageStudyV3Cursor(outerCursor).repositoryCursor;
+    const getUsageStats = vi.fn<IMorphologyRepository['getUsageStats']>();
+    const getTokenOccurrences = vi.fn<IMorphologyRepository['getTokenOccurrences']>();
+    const hasTokenOccurrenceBoundary = vi.fn<NonNullable<IMorphologyRepository['hasTokenOccurrenceBoundary']>>()
+      .mockReturnValue(false);
+    const service = new StrongsService(strongsRepo, morphology({
+      getUsageStats, getTokenOccurrences, hasTokenOccurrenceBoundary,
+    }));
+    await expect(service.getCorpusOccurrencePage('G3056', 20, cursor)).rejects.toThrow(/genuine corpus page boundary/);
+    expect(hasTokenOccurrenceBoundary).toHaveBeenCalledWith('G3056', boundary, 20);
     expect(getUsageStats).not.toHaveBeenCalled();
     expect(getTokenOccurrences).not.toHaveBeenCalled();
   });

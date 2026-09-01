@@ -173,7 +173,10 @@ describe('MCP structured output validation', () => {
           oneOf: expect.arrayContaining([
             expect.objectContaining({
               type: 'object', additionalProperties: false,
-              properties: expect.objectContaining({ schemaVersion: { const: '2' } }),
+              properties: expect.objectContaining({
+                schemaVersion: { const: '3' },
+                depth: expect.objectContaining({ const: expect.stringMatching(/beginner|intermediate|technical/) }),
+              }),
             }),
           ]),
         });

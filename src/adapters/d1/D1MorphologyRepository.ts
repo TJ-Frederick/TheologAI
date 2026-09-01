@@ -141,4 +141,33 @@ export class D1MorphologyRepository implements IMorphologyRepository {
     const { results } = await statement.all<TokenOccurrence>();
     return tokenOccurrencePage(results, limit);
   }
+
+  async hasTokenOccurrenceBoundary(
+    strongsNumber: string,
+    boundary: CanonicalOccurrencePosition,
+    pageSize: number,
+  ): Promise<boolean> {
+    const identity = parseStrongsIdentity(strongsNumber);
+    if (!identity) return false;
+    assertOccurrencePosition(boundary);
+    if (!Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 25) return false;
+    const row = await this.db.prepare(
+      `WITH target(strongs_number, book_order, chapter, verse, position) AS (VALUES (?, ?, ?, ?, ?))
+       SELECT
+         (SELECT COUNT(*) FROM morphology m, target t
+          WHERE m.strongs_number = t.strongs_number
+            AND (m.book_order, m.chapter, m.verse, m.position) <= (t.book_order, t.chapter, t.verse, t.position)) AS row_count,
+         EXISTS(SELECT 1 FROM morphology m, target t
+          WHERE m.strongs_number = t.strongs_number
+            AND (m.book_order, m.chapter, m.verse, m.position) = (t.book_order, t.chapter, t.verse, t.position)) AS boundary_exists`
+    ).bind(
+      identity.morphologyKey,
+      boundary.book_order,
+      boundary.chapter,
+      boundary.verse,
+      boundary.position,
+    ).first<{ row_count: number; boundary_exists: number }>();
+    return row?.boundary_exists === 1
+      && Number.isSafeInteger(row.row_count) && row.row_count > 0 && row.row_count % pageSize === 0;
+  }
 }

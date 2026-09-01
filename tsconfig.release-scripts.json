@@ -15,6 +15,8 @@
     "scripts/dual-era-preview-release-receipt.ts",
     "scripts/audit-original-language-v2-preview.ts",
     "scripts/audit-original-language-v2-production.ts",
+    "scripts/audit-original-language-v3-preview.ts",
+    "scripts/audit-original-language-v3-production.ts",
     "scripts/audit-historical-core-preview.ts",
     "scripts/audit-historical-core-production.ts",
     "scripts/replay-historical-spine-source-packs.ts",

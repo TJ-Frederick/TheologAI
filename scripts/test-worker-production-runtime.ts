@@ -70,7 +70,7 @@ const miniflare = new Miniflare({
   compatibilityDate,
   compatibilityFlags: ['nodejs_compat'],
   bindings: {
-    THEOLOGAI_VERSION: '3.6.0-production-runtime-test',
+    THEOLOGAI_VERSION: '4.0.0-production-runtime-test',
     THEOLOGAI_ALLOWED_ORIGINS: 'https://allowed.example',
     THEOLOGAI_MAX_REQUEST_BYTES: '1048576',
     THEOLOGAI_REQUEST_LOGS: 'false',

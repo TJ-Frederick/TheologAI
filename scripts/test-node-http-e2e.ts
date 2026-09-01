@@ -338,7 +338,7 @@ function expectModernDiscovery(): Record<string, unknown> {
     _meta: {
       'io.modelcontextprotocol/serverInfo': {
         name: 'theologai-bible-server',
-        version: '3.6.0',
+        version: '4.0.0',
       },
     },
   };

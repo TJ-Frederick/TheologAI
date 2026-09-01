@@ -25,7 +25,7 @@
       { "name": "THEOLOGAI_RATE_LIMITER", "type": "ratelimit", "namespace_id": "361201", "simple": { "limit": 120, "period": 60 } },
       { "name": "THEOLOGAI_CCEL_OPERATOR_AUTH_LIMITER", "type": "ratelimit", "namespace_id": "361203", "simple": { "limit": 12, "period": 60 } },
       { "name": "CF_VERSION_METADATA", "type": "version_metadata" },
-      { "name": "THEOLOGAI_VERSION", "type": "plain_text", "text": "3.6.0" },
+      { "name": "THEOLOGAI_VERSION", "type": "plain_text", "text": "4.0.0" },
       { "name": "THEOLOGAI_ALLOWED_ORIGINS", "type": "plain_text", "text": "https://theologai.xyz,https://theologai.pages.dev" },
       { "name": "THEOLOGAI_MAX_REQUEST_BYTES", "type": "plain_text", "text": "1048576" },
       { "name": "THEOLOGAI_REQUEST_LOGS", "type": "plain_text", "text": "false" },

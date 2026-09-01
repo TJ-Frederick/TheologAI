@@ -96,7 +96,7 @@ function makeEnv(overrides: Record<string, unknown> = {}): Env {
     THEOLOGAI_RATE_LIMITER: {} as RateLimit,
     THEOLOGAI_CCEL_OPERATOR_AUTH_LIMITER: {} as RateLimit,
     CF_VERSION_METADATA: {} as WorkerVersionMetadata,
-    THEOLOGAI_VERSION: '3.6.0',
+    THEOLOGAI_VERSION: '4.0.0',
     THEOLOGAI_ALLOWED_ORIGINS: 'https://theologai.xyz,https://theologai.pages.dev',
     THEOLOGAI_MAX_REQUEST_BYTES: '1048576',
     THEOLOGAI_REQUEST_LOGS: 'false',
@@ -148,19 +148,19 @@ describe('createWorkerCompositionRoot', () => {
       }
     });
 
-    it('wires original_language_study to the active closed v2 schema', () => {
+    it('wires original_language_study to the active closed v3 depth schema', () => {
       const root = createWorkerCompositionRoot(makeEnv());
       const tool = root.tools.find(candidate => candidate.name === 'original_language_study');
       expect(tool?.inputSchema).toMatchObject({
         additionalProperties: false,
         properties: {
-          detail: { enum: ['summary', 'detailed'] },
-          cursor: { pattern: '^olsv2c1_(?:[0-9a-f]{2})+$' },
+          depth: { enum: ['beginner', 'intermediate', 'technical'] },
+          cursor: { maxLength: 12 * 1024 },
         },
       });
       expect(tool?.outputSchema).toMatchObject({
         oneOf: expect.arrayContaining([
-          expect.objectContaining({ properties: expect.objectContaining({ schemaVersion: { const: '2' } }) }),
+          expect.objectContaining({ properties: expect.objectContaining({ schemaVersion: { const: '3' } }) }),
         ]),
       });
     });

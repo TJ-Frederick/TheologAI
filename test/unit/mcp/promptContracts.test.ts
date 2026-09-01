@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ToolHandler } from '../../../src/kernel/types.js';
-import { recommendedToolCallsForPrompt } from '../../../src/mcp/prompts.js';
+import { recommendedToolCallsForPrompt, resolvePromptDepth } from '../../../src/mcp/prompts.js';
 import { validatorFor } from '../../../src/mcp/validation.js';
 import { createBibleLookupHandler } from '../../../src/tools/v2/bibleLookup.js';
 import { createClassicTextsHandler } from '../../../src/tools/v2/classicTexts.js';
@@ -40,11 +40,14 @@ describe('prompt-recommended tool-call contracts', () => {
     ['word-study', { word: 'G26' }],
     ['word-study', { word: 'love', testament: 'NT' }],
     ['word-study', { word: 'love', reference: 'John 3:16' }],
+    ['word-study', { word: 'love', reference: 'John 3:16', depth: 'beginner' }],
     ['passage-exegesis', { reference: 'John 3:16', translation: 'NET' }],
+    ['passage-exegesis', { reference: 'John 3:16', depth: 'technical' }],
     ['passage-exegesis', { reference: 'John 3:16', translation: 'unsupported' }],
     ['passage-exegesis', { reference: 'Romans 8:28-30', translation: 'ESV' }],
     ['compare-translations', { reference: 'Philippians 2:6-8', translations: 'ESV,KJV,NET,BSB' }],
     ['compare-translations', { reference: 'John 1:1', translations: 'unknown' }],
+    ['compare-translations', { reference: 'John 1:1', depth: 'intermediate' }],
     ['confession-study', { topic: 'justification', traditions: 'Reformed, Lutheran' }],
     ['primary-source-research', { topic: "Lord's Supper", work: 'westminster-confession', maxSections: '2' }],
     ['primary-source-research', { topic: "Lord's Supper", authors: 'Philip Melanchthon,Westminster Assembly', startYear: '1500', endYear: '1700', maxSections: '2' }],
@@ -60,6 +63,28 @@ describe('prompt-recommended tool-call contracts', () => {
       const result = validate(call.arguments);
       expect(result.valid, result.errorMessage).toBe(true);
     }
+  });
+
+  it('resolves the closed prompt depths with intermediate as the omission default', () => {
+    expect(resolvePromptDepth(undefined)).toBe('intermediate');
+    expect(resolvePromptDepth({})).toBe('intermediate');
+    expect(resolvePromptDepth({ depth: 'beginner' })).toBe('beginner');
+    expect(resolvePromptDepth({ depth: 'intermediate' })).toBe('intermediate');
+    expect(resolvePromptDepth({ depth: 'technical' })).toBe('technical');
+  });
+
+  it('uses technical corpus evidence only for a context-free technical word overview', () => {
+    expect(recommendedToolCallsForPrompt('word-study', { word: 'G26', depth: 'technical' })).toEqual([{
+      tool: 'original_language_lookup',
+      arguments: {
+        strongs_number: 'G26', include_extended: true, detail_level: 'detailed', usage_level: 'technical',
+      },
+    }]);
+    const contextual = recommendedToolCallsForPrompt('word-study', {
+      word: 'G26', reference: 'John 3:16', depth: 'technical',
+    });
+    expect(contextual.at(-1)?.arguments).toMatchObject({ usage_level: 'overview' });
+    expect(JSON.stringify(contextual)).not.toContain('"depth"');
   });
 
   it('never recommends a range to the single-verse morphology tool', () => {

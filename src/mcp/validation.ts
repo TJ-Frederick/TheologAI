@@ -109,9 +109,9 @@ function normalizeValidationMessage(message: string): string {
 }
 
 const PROMPT_ARGUMENTS = {
-  'word-study': { required: ['word'], allowed: ['word', 'testament', 'reference'] },
-  'passage-exegesis': { required: ['reference'], allowed: ['reference', 'translation'] },
-  'compare-translations': { required: ['reference'], allowed: ['reference', 'translations'] },
+  'word-study': { required: ['word'], allowed: ['word', 'testament', 'reference', 'depth'] },
+  'passage-exegesis': { required: ['reference'], allowed: ['reference', 'translation', 'depth'] },
+  'compare-translations': { required: ['reference'], allowed: ['reference', 'translations', 'depth'] },
   'confession-study': { required: ['topic'], allowed: ['topic', 'traditions'] },
   'primary-source-research': { required: ['topic'], allowed: ['topic', 'work', 'authors', 'startYear', 'endYear', 'maxSections'] },
   donate: { required: [], allowed: [] },
@@ -187,6 +187,15 @@ export function validatePromptArguments(
 
   if (['passage-exegesis', 'compare-translations'].includes(name) && (stringValues.reference?.length ?? 0) > 100) {
     throw new ProtocolError(ProtocolErrorCode.InvalidParams, `Argument "reference" for prompt "${name}" exceeds 100 characters`);
+  }
+
+  if (['word-study', 'passage-exegesis', 'compare-translations'].includes(name)
+    && stringValues.depth !== undefined
+    && !['beginner', 'intermediate', 'technical'].includes(stringValues.depth)) {
+    throw new ProtocolError(
+      ProtocolErrorCode.InvalidParams,
+      `Argument "depth" for prompt "${name}" must be beginner, intermediate, or technical`,
+    );
   }
 
   if (name === 'primary-source-research') {
