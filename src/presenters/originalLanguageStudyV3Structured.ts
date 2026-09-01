@@ -1,4 +1,3 @@
-import Ajv2020 from 'ajv/dist/2020.js';
 import { MORPHOLOGY_USAGE_IDENTITY, decodeMorphologyUsageCursor } from '../kernel/morphologyUsageCursor.js';
 import { parseStrongsIdentity } from '../kernel/strongs.js';
 import {
@@ -12,14 +11,12 @@ import {
 } from '../kernel/originalLanguageStudyV3Contract.js';
 import { parseOriginalLanguageStudyV2Cursor, type OriginalLanguageStudyV2Candidate } from '../kernel/originalLanguageStudyV2Contract.js';
 import { originalLanguageStudyV3OutputSchema } from '../mcp/schemas/originalLanguageStudyV3.js';
+import { validatorFor, type SchemaValidator } from '../mcp/validation.js';
 
-type SchemaValidator = ReturnType<Ajv2020['compile']>;
+let validateSchema: SchemaValidator<Record<string, unknown>> | undefined;
 
-let validateSchema: SchemaValidator | undefined;
-
-function getSchemaValidator(): SchemaValidator {
-  validateSchema ??= new Ajv2020({ strict: true, strictTypes: false, allErrors: true })
-    .compile(originalLanguageStudyV3OutputSchema);
+function getSchemaValidator(): SchemaValidator<Record<string, unknown>> {
+  validateSchema ??= validatorFor(originalLanguageStudyV3OutputSchema);
   return validateSchema;
 }
 
@@ -52,7 +49,8 @@ export function serializeValidatedOriginalLanguageStudyV3Output(output: unknown)
 
 function validateOriginalLanguageStudyV3Output(output: OriginalLanguageStudyV3Result): void {
   const validator = getSchemaValidator();
-  if (!validator(output)) throw new Error(`original_language_study v3 output violates its schema: ${JSON.stringify(validator.errors)}`);
+  const validation = validator(output as unknown as Record<string, unknown>);
+  if (!validation.valid) throw new Error(`original_language_study v3 output violates its schema: ${validation.errorMessage}`);
   const study = objectOf(output.study, 'study');
   const request = objectOf(study.request, 'study.request');
   const context = objectOf(study.context, 'study.context');
