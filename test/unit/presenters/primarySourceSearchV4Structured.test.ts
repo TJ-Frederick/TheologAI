@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { presentPrimarySourceSearchV7 } from '../../../src/presenters/primarySourceSearchV4Structured.js';
+import { presentPrimarySourceSearchV8 } from '../../../src/presenters/primarySourceSearchV8Structured.js';
 import type { PrimarySourcePlanProviderResult, PrimarySourceSearchPlanResult } from '../../../src/services/historical/primarySourceTypes.js';
 import { CCEL_COMPOSITION_DATE_NOTICE } from '../../../src/services/historical/primarySourceTypes.js';
 
@@ -285,5 +286,64 @@ describe('primary-source v7 structured presentation', () => {
     expect(presented.queries.map(query => query.id)).toEqual(['external-1']);
     expect(presented.coverage.ccelHitCount).toBe(5);
     expect(presented).toMatchObject({ planStatus: 'partial', responseWindow: { truncated: true } });
+  });
+});
+
+describe('primary-source v8 routing presentation', () => {
+  it('publishes a closed expansion decision and reserves it inside the structured budget', () => {
+    const plan = largePlan();
+    plan.queries = plan.queries.map((query, index) => ({
+      ...query,
+      providers: index === 0 ? [...query.providers, externalProvider(query.id, 1)] : query.providers,
+      expansionDecision: index === 0
+        ? {
+            requested: true as const, triggered: true as const, reason: 'insufficient_diversity' as const,
+            localDistinctWorkCount: 1,
+            basis: { reason: 'insufficient_diversity' as const, minimumDistinctWorks: 3, observedDistinctWorks: 1 },
+          }
+        : { requested: false as const, triggered: false as const, reason: 'not_requested' as const, localDistinctWorkCount: 1 },
+    }));
+
+    const presented = presentPrimarySourceSearchV8(plan);
+
+    expect(presented.schemaVersion).toBe('8');
+    expect(presented.queries[0]).toMatchObject({
+      expansionDecision: {
+        requested: true, triggered: true, reason: 'insufficient_diversity', localDistinctWorkCount: 1,
+        basis: { reason: 'insufficient_diversity', minimumDistinctWorks: 3, observedDistinctWorks: 1 },
+      },
+    });
+    expect(new TextEncoder().encode(JSON.stringify(presented)).byteLength).toBeLessThanOrEqual(20_480);
+  });
+
+  it('fails closed when service routing metadata is absent', () => {
+    const plan = largePlan();
+    plan.queries = [plan.queries[0]!];
+    expect(() => presentPrimarySourceSearchV8(plan)).toThrow('routing metadata');
+  });
+
+  it('fails closed when routing metadata contradicts provider execution', () => {
+    const plan = largePlan();
+    plan.queries = [{
+      ...plan.queries[0]!,
+      expansionDecision: {
+        requested: true, triggered: true, reason: 'no_results', localDistinctWorkCount: 0,
+        basis: { reason: 'no_results' },
+      },
+    }];
+    expect(() => presentPrimarySourceSearchV8(plan)).toThrow('contradicts provider execution');
+  });
+
+  it('fails closed when a triggered reason contradicts the local provider result', () => {
+    const plan = largePlan();
+    plan.queries = [{
+      ...plan.queries[0]!,
+      providers: [...plan.queries[0]!.providers, externalProvider('q1', 1)],
+      expansionDecision: {
+        requested: true, triggered: true, reason: 'no_results', localDistinctWorkCount: 1,
+        basis: { reason: 'no_results' },
+      },
+    }];
+    expect(() => presentPrimarySourceSearchV8(plan)).toThrow('contradicts the local trigger result');
   });
 });

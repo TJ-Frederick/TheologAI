@@ -250,6 +250,76 @@ const localServerObserved = {
   required: ['searched', 'notSearched'], additionalProperties: false,
 } as const;
 
+const expansionBasis = {
+  oneOf: [
+    {
+      type: 'object', properties: { reason: { type: 'string', enum: ['catalog_miss', 'no_results'] } },
+      required: ['reason'], additionalProperties: false,
+    },
+    {
+      type: 'object',
+      properties: {
+        reason: { const: 'insufficient_diversity' },
+        minimumDistinctWorks: { type: 'integer', minimum: 2, maximum: 5 },
+        observedDistinctWorks: { type: 'integer', minimum: 0, maximum: 4 },
+      },
+      required: ['reason', 'minimumDistinctWorks', 'observedDistinctWorks'], additionalProperties: false,
+    },
+  ],
+} as const;
+
+const expansionDecision = {
+  oneOf: [
+    {
+      type: 'object',
+      properties: {
+        requested: { const: false }, triggered: { const: false }, reason: { const: 'not_requested' },
+        localDistinctWorkCount: { type: 'integer', minimum: 0, maximum: 8 },
+      },
+      required: ['requested', 'triggered', 'reason', 'localDistinctWorkCount'], additionalProperties: false,
+    },
+    {
+      type: 'object',
+      properties: {
+        requested: { const: true }, triggered: { const: false },
+        reason: { type: 'string', enum: ['basis_not_confirmed', 'local_search_unavailable', 'local_coverage_uncertain', 'local_result_invalid'] },
+        localDistinctWorkCount: { type: 'integer', minimum: 0, maximum: 8 },
+        basis: expansionBasis,
+      },
+      required: ['requested', 'triggered', 'reason', 'localDistinctWorkCount', 'basis'], additionalProperties: false,
+    },
+    ...(['catalog_miss', 'no_results'] as const).map(reason => ({
+      type: 'object' as const,
+      properties: {
+        requested: { const: true }, triggered: { const: true }, reason: { const: reason },
+        localDistinctWorkCount: { type: 'integer' as const, minimum: 0, maximum: 8 },
+        basis: {
+          type: 'object' as const, properties: { reason: { const: reason } },
+          required: ['reason'], additionalProperties: false,
+        },
+      },
+      required: ['requested', 'triggered', 'reason', 'localDistinctWorkCount', 'basis'], additionalProperties: false,
+    })),
+    {
+      type: 'object',
+      properties: {
+        requested: { const: true }, triggered: { const: true }, reason: { const: 'insufficient_diversity' },
+        localDistinctWorkCount: { type: 'integer', minimum: 0, maximum: 8 },
+        basis: {
+          type: 'object',
+          properties: {
+            reason: { const: 'insufficient_diversity' },
+            minimumDistinctWorks: { type: 'integer', minimum: 2, maximum: 5 },
+            observedDistinctWorks: { type: 'integer', minimum: 0, maximum: 4 },
+          },
+          required: ['reason', 'minimumDistinctWorks', 'observedDistinctWorks'], additionalProperties: false,
+        },
+      },
+      required: ['requested', 'triggered', 'reason', 'localDistinctWorkCount', 'basis'], additionalProperties: false,
+    },
+  ],
+} as const;
+
 export const primarySourceSearchV5OutputSchema = {
   type: 'object',
   properties: {
@@ -304,6 +374,32 @@ export const primarySourceSearchV5OutputSchema = {
       },
       required: ['snippetUse', 'localSectionAccess', 'externalSectionAccess', 'coverageScope', 'externalRightsStatus', 'lookupAliasUse', 'coverageLedger'],
       additionalProperties: false,
+    },
+  },
+  required: ['schemaVersion', 'kind', 'planStatus', 'responseWindow', 'queries', 'coverage', 'evidencePolicy'],
+  additionalProperties: false,
+} as NonNullable<Tool['outputSchema']>;
+
+/** Dormant Phase 3B.2 foundation. It is not selected by deployed Wrangler configuration. */
+export const primarySourceSearchV8OutputSchema = {
+  type: 'object',
+  properties: {
+    ...(primarySourceSearchV5OutputSchema.properties as Record<string, unknown>),
+    schemaVersion: { const: '8' },
+    queries: {
+      type: 'array', minItems: 1, maxItems: 4,
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', minLength: 1, maxLength: 40 },
+          normalizedMode: { type: 'string', enum: ['all_terms', 'phrase'] },
+          normalizedSelection: { type: 'string', enum: ['relevance', 'work_diversity'] },
+          providers: { type: 'array', minItems: 1, maxItems: 2, items: { oneOf: [localProvider, externalProvider] } },
+          expansionDecision,
+        },
+        required: ['id', 'normalizedMode', 'normalizedSelection', 'providers', 'expansionDecision'],
+        additionalProperties: false,
+      },
     },
   },
   required: ['schemaVersion', 'kind', 'planStatus', 'responseWindow', 'queries', 'coverage', 'evidencePolicy'],

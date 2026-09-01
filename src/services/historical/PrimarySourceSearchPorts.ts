@@ -4,12 +4,13 @@ import type {
   PrimarySourceSearchQuery,
 } from './primarySourceTypes.js';
 
-/** Application-owned local primary-source search boundary. */
-export interface LocalPrimarySourceSearchPort {
-  search(query: PrimarySourceSearchQuery): Promise<PrimarySourceProviderResult>;
+/** Provider-neutral application boundary; adapters remain responsible for transport details. */
+export interface PrimarySourceSearchProviderPort<TContext extends unknown[] = []> {
+  search(query: PrimarySourceSearchQuery, ...context: TContext): Promise<PrimarySourceProviderResult>;
 }
 
+/** Application-owned local primary-source search boundary. */
+export type LocalPrimarySourceSearchPort = PrimarySourceSearchProviderPort;
+
 /** Application-owned dormant/live CCEL search boundary. */
-export interface CcelPrimarySourceSearchPort {
-  search(query: PrimarySourceSearchQuery, coordinator: CcelUpstreamCoordinator): Promise<PrimarySourceProviderResult>;
-}
+export type CcelPrimarySourceSearchPort = PrimarySourceSearchProviderPort<[CcelUpstreamCoordinator]>;

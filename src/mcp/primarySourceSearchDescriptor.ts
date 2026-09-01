@@ -1,7 +1,11 @@
-import { primarySourceSearchV6OutputSchema, primarySourceSearchV7OutputSchema } from './schemas/primarySourceSearchV4.js';
+import {
+  primarySourceSearchV6OutputSchema,
+  primarySourceSearchV7OutputSchema,
+  primarySourceSearchV8OutputSchema,
+} from './schemas/primarySourceSearchV4.js';
 import type { ToolHandler } from '../kernel/types.js';
 
-export type PrimarySourceSearchContractVersion = '6' | '7';
+export type PrimarySourceSearchContractVersion = '6' | '7' | '8';
 export interface PrimarySourceSearchDescriptor {
   readonly name: 'primary_source_search';
   readonly contractVersion: PrimarySourceSearchContractVersion;
@@ -12,19 +16,22 @@ export interface PrimarySourceSearchDescriptor {
 }
 
 export function createPrimarySourceSearchDescriptor(contractVersion: PrimarySourceSearchContractVersion = '6'): PrimarySourceSearchDescriptor {
-  const expanded = contractVersion === '7';
+  const expanded = contractVersion !== '6';
+  const conditionalRetry = contractVersion === '8';
   return {
     name: 'primary_source_search', contractVersion,
-    description: expanded
+    description: conditionalRetry
+      ? 'Search the curated 35-work historical catalog. Expanded depth is one evidence-bound retry after a prior catalog miss, no-results result, or explicit work-diversity shortfall; the server rechecks that basis before any external provider can run. All local works remain usable results, with edition readiness retained as provenance context.'
+      : expanded
       ? 'Search the curated 35-work historical catalog first. Use searchDepth expanded only when a bounded, separately labeled external-discovery set could help; its unreviewed direct-URL snippets are discovery leads, not evidence. Per-hit edition readiness states the available provenance.'
       : 'Execute an explicit, bounded query plan against the locally indexed historical-document collection. Supports exact catalog work aliases, exact reviewed creator names, and inclusive overlapping composition-year ranges. Returns catalog scope, snippets, and exact local section locators only; read selected exact resources before quotation or comparison.',
-    inputSchema: inputSchema(expanded),
-    outputSchema: expanded ? primarySourceSearchV7OutputSchema : primarySourceSearchV6OutputSchema,
+    inputSchema: inputSchema(expanded, conditionalRetry),
+    outputSchema: conditionalRetry ? primarySourceSearchV8OutputSchema : expanded ? primarySourceSearchV7OutputSchema : primarySourceSearchV6OutputSchema,
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: expanded },
   };
 }
 
-function inputSchema(expanded: boolean): ToolHandler['inputSchema'] {
+function inputSchema(expanded: boolean, conditionalRetry: boolean): ToolHandler['inputSchema'] {
   return {
     type: 'object',
     properties: {
@@ -36,8 +43,33 @@ function inputSchema(expanded: boolean): ToolHandler['inputSchema'] {
             id: { type: 'string', minLength: 1, maxLength: 40, pattern: '^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$' },
             text: { type: 'string', minLength: 1, maxLength: 200 },
             ...(expanded ? {
-              searchDepth: { type: 'string', enum: ['standard', 'expanded'], default: 'standard', description: 'standard searches the curated 35-work catalog. expanded keeps that search and adds one separately labeled bounded external-discovery group; at most one query per call may be expanded.' },
+              searchDepth: {
+                type: 'string', enum: ['standard', 'expanded'], default: 'standard',
+                description: conditionalRetry
+                  ? 'standard searches the curated 35-work catalog. expanded is one evidence-bound retry: local search reruns first, and a separately labeled external group is eligible only when expansionBasis still matches. At most one query per call may be expanded.'
+                  : 'standard searches the curated 35-work catalog. expanded keeps that search and adds one separately labeled bounded external-discovery group; at most one query per call may be expanded.',
+              },
               expandedLimit: { type: 'integer', minimum: 1, maximum: 5, default: 3, description: 'Expanded-discovery result cap. Valid only with searchDepth expanded.' },
+              ...(conditionalRetry ? {
+                expansionBasis: {
+                  description: 'Required only for expanded depth. This host-observed prior local result is rechecked against the current local retry before any external provider may run.',
+                  oneOf: [
+                    {
+                      type: 'object', properties: { reason: { type: 'string', enum: ['catalog_miss', 'no_results'] } },
+                      required: ['reason'], additionalProperties: false,
+                    },
+                    ...[2, 3, 4, 5].map(minimumDistinctWorks => ({
+                      type: 'object' as const,
+                      properties: {
+                        reason: { const: 'insufficient_diversity' },
+                        minimumDistinctWorks: { const: minimumDistinctWorks },
+                        observedDistinctWorks: { type: 'integer' as const, minimum: 0, maximum: minimumDistinctWorks - 1 },
+                      },
+                      required: ['reason', 'minimumDistinctWorks', 'observedDistinctWorks'], additionalProperties: false,
+                    })),
+                  ],
+                },
+              } : {}),
             } : {
               providers: { type: 'array', minItems: 1, maxItems: 1, uniqueItems: true, items: { type: 'string', enum: ['local'] }, description: 'Current public provider contract. Only the locally indexed collection is available.' },
             }),
@@ -84,6 +116,17 @@ function inputSchema(expanded: boolean): ToolHandler['inputSchema'] {
           ...(expanded ? { allOf: [
             { if: { required: ['expandedLimit'] }, then: { required: ['searchDepth'], properties: { searchDepth: { const: 'expanded' } } } },
             { if: { required: ['searchDepth'], properties: { searchDepth: { const: 'expanded' } } }, then: { properties: { page: { const: 1 } } } },
+            ...(conditionalRetry ? [
+              { if: { required: ['searchDepth'], properties: { searchDepth: { const: 'expanded' } } }, then: { required: ['expansionBasis'] } },
+              { if: { required: ['expansionBasis'] }, then: { required: ['searchDepth'], properties: { searchDepth: { const: 'expanded' } } } },
+              {
+                if: {
+                  required: ['expansionBasis'],
+                  properties: { expansionBasis: { properties: { reason: { const: 'insufficient_diversity' } }, required: ['reason'] } },
+                },
+                then: { required: ['selection'], properties: { selection: { const: 'work_diversity' } } },
+              },
+            ] : []),
           ] } : {}),
           additionalProperties: false,
         },

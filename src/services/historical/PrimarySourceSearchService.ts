@@ -5,6 +5,8 @@ import type { CcelUpstreamCoordinator } from './CcelUpstreamCoordinator.js';
 import {
   type PrimarySourcePlanProviderResult,
   type PrimarySourcePlanQueryResult,
+  type PrimarySourceExpansionDecision,
+  type PrimarySourceExpansionBasis,
   type PrimarySourceProviderResult,
   type PrimarySourceProviderStatus,
   type PrimarySourceRequestedProvider,
@@ -20,6 +22,7 @@ const MAX_TOTAL_HITS = 32;
 const QUERY_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$/;
 const V6_QUERY_KEYS = new Set(['id', 'text', 'providers', 'match', 'selection', 'author', 'work', 'startYear', 'endYear', 'page', 'limit']);
 const V7_QUERY_KEYS = new Set(['id', 'text', 'searchDepth', 'expandedLimit', 'match', 'selection', 'author', 'work', 'startYear', 'endYear', 'page', 'limit']);
+const V8_QUERY_KEYS = new Set([...V7_QUERY_KEYS, 'expansionBasis']);
 const COMPLETE_STATUSES = new Set<PrimarySourceProviderStatus>(['ok', 'no_results', 'catalog_miss']);
 const UNAVAILABLE_STATUSES = new Set<PrimarySourceProviderStatus>(['unavailable', 'disabled', 'rate_limited', 'interface_changed']);
 
@@ -77,6 +80,20 @@ export class PrimarySourceSearchService {
   }
 
   private async executeQuery(query: NormalizedPlanQuery): Promise<PrimarySourcePlanQueryResult> {
+    if (this.options.contractVersion === '8') {
+      const local = await this.executeProvider(query, 'local');
+      const expansionDecision = decideExpansion(query, local);
+      const providers = expansionDecision.triggered
+        ? [local, await this.executeProvider(query, 'ccel')]
+        : [local];
+      return {
+        id: query.id,
+        normalizedMode: query.match,
+        normalizedSelection: query.selection,
+        providers,
+        expansionDecision,
+      };
+    }
     const providers: PrimarySourcePlanProviderResult[] = [];
     for (const provider of query.providers) providers.push(await this.executeProvider(query, provider));
     return { id: query.id, normalizedMode: query.match, normalizedSelection: query.selection, providers };
@@ -130,7 +147,7 @@ export class PrimarySourceSearchService {
         };
       }
     }
-    if (provider === 'ccel' && result.status !== 'disabled' && (this.options.contractVersion === '7' || (query.page === 1
+    if (provider === 'ccel' && result.status !== 'disabled' && (this.options.contractVersion !== '6' || (query.page === 1
       && query.startYear === undefined && query.endYear === undefined))) {
       result = {
         ...result,
@@ -157,9 +174,11 @@ interface NormalizedPlanQuery extends Required<Pick<PrimarySourceSearchPlanQuery
   startYear?: number;
   endYear?: number;
   expandedLimit: number;
+  searchDepth: 'standard' | 'expanded';
+  expansionBasis?: PrimarySourceExpansionBasis;
 }
 
-function validatePlan(input: unknown, contractVersion: '6' | '7'): NormalizedPlanQuery[] {
+function validatePlan(input: unknown, contractVersion: '6' | '7' | '8'): NormalizedPlanQuery[] {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new ValidationError('queries', 'A primary-source query plan object is required.');
   const plan = input as Record<string, unknown>;
   if (Object.keys(plan).length !== 1 || !Object.hasOwn(plan, 'queries')) throw new ValidationError('queries', 'The plan must contain only queries.');
@@ -174,18 +193,19 @@ function validatePlan(input: unknown, contractVersion: '6' | '7'): NormalizedPla
   }
   if (normalized.filter(query => query.providers.includes('ccel')).length > MAX_CCEL_QUERIES) {
     throw new ValidationError(
-      contractVersion === '7' ? 'queries.searchDepth' : 'queries.providers',
-      `At most ${MAX_CCEL_QUERIES} queries may request ${contractVersion === '7' ? 'expanded discovery' : 'CCEL'}.`,
+      contractVersion === '6' ? 'queries.providers' : 'queries.searchDepth',
+      `At most ${MAX_CCEL_QUERIES} queries may request ${contractVersion === '6' ? 'CCEL' : 'expanded discovery'}.`,
     );
   }
   return normalized;
 }
 
-function validateQuery(input: unknown, index: number, contractVersion: '6' | '7'): NormalizedPlanQuery {
+function validateQuery(input: unknown, index: number, contractVersion: '6' | '7' | '8'): NormalizedPlanQuery {
   const path = `queries.${index}`;
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new ValidationError(path, 'Each query must be an object.');
   const query = input as Record<string, unknown>;
-  const unknown = Object.keys(query).find(key => !(contractVersion === '7' ? V7_QUERY_KEYS : V6_QUERY_KEYS).has(key));
+  const allowedKeys = contractVersion === '8' ? V8_QUERY_KEYS : contractVersion === '7' ? V7_QUERY_KEYS : V6_QUERY_KEYS;
+  const unknown = Object.keys(query).find(key => !allowedKeys.has(key));
   if (unknown) throw new ValidationError(`${path}.${unknown}`, 'Unknown query field.');
   if (typeof query.id !== 'string' || !QUERY_ID.test(query.id)) throw new ValidationError(`${path}.id`, 'id must be a 1 to 40 character plan identifier.');
   const text = normalizeLiteral(query.text, `${path}.text`, 200);
@@ -195,12 +215,12 @@ function validateQuery(input: unknown, index: number, contractVersion: '6' | '7'
   const selection = query.selection ?? 'relevance';
   if (selection !== 'relevance' && selection !== 'work_diversity') throw new ValidationError(`${path}.selection`, 'selection must be relevance or work_diversity.');
   const searchDepth = query.searchDepth ?? 'standard';
-  if (contractVersion === '7' && searchDepth !== 'standard' && searchDepth !== 'expanded') throw new ValidationError(`${path}.searchDepth`, 'searchDepth must be standard or expanded.');
+  if (contractVersion !== '6' && searchDepth !== 'standard' && searchDepth !== 'expanded') throw new ValidationError(`${path}.searchDepth`, 'searchDepth must be standard or expanded.');
   const expandedLimit = query.expandedLimit ?? 3;
-  if (contractVersion === '7' && (!Number.isSafeInteger(expandedLimit) || (expandedLimit as number) < 1 || (expandedLimit as number) > 5)) throw new ValidationError(`${path}.expandedLimit`, 'expandedLimit must be an integer from 1 to 5.');
-  if (contractVersion === '7' && query.expandedLimit !== undefined && searchDepth !== 'expanded') throw new ValidationError(`${path}.expandedLimit`, 'expandedLimit is valid only when searchDepth is expanded.');
+  if (contractVersion !== '6' && (!Number.isSafeInteger(expandedLimit) || (expandedLimit as number) < 1 || (expandedLimit as number) > 5)) throw new ValidationError(`${path}.expandedLimit`, 'expandedLimit must be an integer from 1 to 5.');
+  if (contractVersion !== '6' && query.expandedLimit !== undefined && searchDepth !== 'expanded') throw new ValidationError(`${path}.expandedLimit`, 'expandedLimit is valid only when searchDepth is expanded.');
   let providers: PrimarySourceRequestedProvider[];
-  if (contractVersion === '7') providers = searchDepth === 'expanded' ? ['local', 'ccel'] : ['local'];
+  if (contractVersion !== '6') providers = searchDepth === 'expanded' ? ['local', 'ccel'] : ['local'];
   else {
     if (!Array.isArray(query.providers) || query.providers.length < 1 || query.providers.length > 2) throw new ValidationError(`${path}.providers`, 'providers must contain local, ccel, or both.');
     const requested = query.providers as unknown[];
@@ -210,7 +230,7 @@ function validateQuery(input: unknown, index: number, contractVersion: '6' | '7'
   const page = query.page ?? 1;
   const limit = query.limit ?? 5;
   if (!Number.isSafeInteger(page) || (page as number) < 1 || (page as number) > 3) throw new ValidationError(`${path}.page`, 'page must be an integer from 1 to 3.');
-  if (contractVersion === '7' && page !== 1) throw new ValidationError(`${path}.page`, 'v7 primary-source search supports page 1 only.');
+  if (contractVersion !== '6' && page !== 1) throw new ValidationError(`${path}.page`, `${contractVersion} primary-source search supports page 1 only.`);
   if (!Number.isSafeInteger(limit) || (limit as number) < 1 || (limit as number) > 8) throw new ValidationError(`${path}.limit`, 'limit must be an integer from 1 to 8.');
   const author = query.author === undefined ? undefined : normalizeLiteral(query.author, `${path}.author`, 100);
   const work = query.work === undefined ? undefined : normalizeLiteral(query.work, `${path}.work`, 160);
@@ -218,6 +238,12 @@ function validateQuery(input: unknown, index: number, contractVersion: '6' | '7'
   const endYear = query.endYear === undefined ? undefined : normalizeYear(query.endYear, `${path}.endYear`);
   if (startYear !== undefined && endYear !== undefined && startYear > endYear) {
     throw new ValidationError(`${path}.startYear`, 'startYear must be less than or equal to endYear.');
+  }
+  const expansionBasis = contractVersion === '8'
+    ? validateExpansionBasis(query.expansionBasis, `${path}.expansionBasis`, searchDepth as 'standard' | 'expanded', selection)
+    : undefined;
+  if (contractVersion === '8' && searchDepth === 'expanded' && expansionBasis === undefined) {
+    throw new ValidationError(`${path}.expansionBasis`, 'expansionBasis is required when searchDepth is expanded.');
   }
   return {
     id: query.id,
@@ -227,12 +253,138 @@ function validateQuery(input: unknown, index: number, contractVersion: '6' | '7'
     selection,
     page: page as number,
     limit: limit as number,
-    expandedLimit: contractVersion === '7' ? expandedLimit as number : limit as number,
+    expandedLimit: contractVersion === '6' ? limit as number : expandedLimit as number,
+    searchDepth: contractVersion === '6' ? 'standard' : searchDepth as 'standard' | 'expanded',
+    ...(expansionBasis ? { expansionBasis } : {}),
     ...(author ? { author } : {}),
     ...(work ? { work } : {}),
     ...(startYear !== undefined ? { startYear } : {}),
     ...(endYear !== undefined ? { endYear } : {}),
   };
+}
+
+function validateExpansionBasis(
+  value: unknown,
+  path: string,
+  searchDepth: 'standard' | 'expanded',
+  selection: unknown,
+): PrimarySourceExpansionBasis | undefined {
+  if (value === undefined) return undefined;
+  if (searchDepth !== 'expanded') throw new ValidationError(path, 'expansionBasis is valid only when searchDepth is expanded.');
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new ValidationError(path, 'expansionBasis must be an object.');
+  const basis = value as Record<string, unknown>;
+  if (basis.reason === 'catalog_miss' || basis.reason === 'no_results') {
+    if (Object.keys(basis).length !== 1) throw new ValidationError(path, 'catalog_miss and no_results expansion bases contain only reason.');
+    return { reason: basis.reason };
+  }
+  if (basis.reason !== 'insufficient_diversity' || selection !== 'work_diversity'
+    || Object.keys(basis).some(key => !['reason', 'minimumDistinctWorks', 'observedDistinctWorks'].includes(key))
+    || Object.keys(basis).length !== 3
+    || !Number.isSafeInteger(basis.minimumDistinctWorks) || (basis.minimumDistinctWorks as number) < 2 || (basis.minimumDistinctWorks as number) > 5
+    || !Number.isSafeInteger(basis.observedDistinctWorks) || (basis.observedDistinctWorks as number) < 0 || (basis.observedDistinctWorks as number) > 4
+    || (basis.observedDistinctWorks as number) >= (basis.minimumDistinctWorks as number)) {
+    throw new ValidationError(path, 'expansionBasis insufficient_diversity requires work_diversity plus observedDistinctWorks below a 2 to 5 minimumDistinctWorks threshold.');
+  }
+  return {
+    reason: 'insufficient_diversity',
+    minimumDistinctWorks: basis.minimumDistinctWorks as number,
+    observedDistinctWorks: basis.observedDistinctWorks as number,
+  };
+}
+
+function decideExpansion(
+  query: NormalizedPlanQuery,
+  local: PrimarySourcePlanProviderResult,
+): PrimarySourceExpansionDecision {
+  const localDistinctWorkCount = new Set(local.hits.flatMap(hit => hit.provider === 'local'
+    ? [hit.locator.documentId]
+    : [])).size;
+  if (query.searchDepth !== 'expanded') {
+    return { requested: false, triggered: false, reason: 'not_requested', localDistinctWorkCount };
+  }
+  const basis = query.expansionBasis!;
+  if (local.scope?.status === 'metadata_incomplete') {
+    return { requested: true, triggered: false, reason: 'local_coverage_uncertain', localDistinctWorkCount, basis };
+  }
+  if (!COMPLETE_STATUSES.has(local.status)) {
+    return { requested: true, triggered: false, reason: 'local_search_unavailable', localDistinctWorkCount, basis };
+  }
+  if (!hasReliableLocalRoutingEvidence(local, query)) {
+    return { requested: true, triggered: false, reason: 'local_result_invalid', localDistinctWorkCount, basis };
+  }
+  let confirmed: boolean;
+  if (basis.reason === 'catalog_miss') {
+    confirmed = local.status === 'catalog_miss';
+  } else if (basis.reason === 'no_results') {
+    confirmed = local.status === 'no_results';
+  } else {
+    confirmed = local.status === 'ok'
+      && localDistinctWorkCount === basis.observedDistinctWorks
+      && localDistinctWorkCount < basis.minimumDistinctWorks;
+  }
+  if (!confirmed) {
+    return { requested: true, triggered: false, reason: 'basis_not_confirmed', localDistinctWorkCount, basis };
+  }
+  if (basis.reason === 'catalog_miss') {
+    return { requested: true, triggered: true, reason: 'catalog_miss', localDistinctWorkCount, basis };
+  }
+  if (basis.reason === 'no_results') {
+    return { requested: true, triggered: true, reason: 'no_results', localDistinctWorkCount, basis };
+  }
+  return { requested: true, triggered: true, reason: 'insufficient_diversity', localDistinctWorkCount, basis };
+}
+
+function hasReliableLocalRoutingEvidence(
+  local: PrimarySourcePlanProviderResult,
+  query: NormalizedPlanQuery,
+): boolean {
+  if (local.provider !== 'local' || local.page !== query.page
+    || !Number.isSafeInteger(local.hitCount) || local.hitCount !== local.hits.length
+    || !local.resultWindow || local.resultWindow.returnedHitCount !== local.hits.length
+    || !Number.isSafeInteger(local.resultWindow.returnedHitCount)
+    || !['additional_match_observed', 'no_additional_match_observed', 'not_evaluated']
+      .includes(local.resultWindow.additionalMatchStatus)
+    || !Array.isArray(local.notices) || local.notices.some(notice => typeof notice !== 'string')) {
+    return false;
+  }
+  const expectedScope = {
+    ...(query.work ? { work: query.work } : {}),
+    ...(query.author ? { author: query.author } : {}),
+    ...(query.startYear !== undefined ? { startYear: query.startYear } : {}),
+    ...(query.endYear !== undefined ? { endYear: query.endYear } : {}),
+  };
+  if (!local.scope || !['matched', 'catalog_miss', 'metadata_incomplete'].includes(local.scope.status)
+    || !Number.isSafeInteger(local.scope.eligibleDocumentCount)
+    || local.scope.eligibleDocumentCount < 0 || local.scope.eligibleDocumentCount > 100
+    || !Array.isArray(local.scope.eligibleDocuments)
+    || typeof local.scope.eligibleDocumentsTruncated !== 'boolean') {
+    return false;
+  }
+  const actualScope = local.scope.requested as Record<string, unknown> | undefined;
+  if (!actualScope || typeof actualScope !== 'object' || Array.isArray(actualScope)
+    || Object.keys(actualScope).length !== Object.keys(expectedScope).length
+    || Object.entries(expectedScope).some(([key, value]) => actualScope[key] !== value)) {
+    return false;
+  }
+  if (local.hits.some(hit => hit.provider !== 'local' || hit.locator.kind !== 'local_section'
+    || typeof hit.locator.documentId !== 'string' || hit.locator.documentId.length === 0)) {
+    return false;
+  }
+  const distinctHitWorkCount = new Set(local.hits.map(hit => hit.provider === 'local'
+    ? hit.locator.documentId
+    : '')).size;
+  if (local.scope.eligibleDocumentCount < distinctHitWorkCount) return false;
+  if (local.scope.status === 'metadata_incomplete') return local.hits.length === 0;
+  if (local.status === 'catalog_miss') {
+    return local.searched === false && local.scope.status === 'catalog_miss'
+      && local.scope.eligibleDocumentCount === 0 && local.hits.length === 0;
+  }
+  if (local.status === 'no_results') {
+    return local.searched === true && local.scope.status === 'matched'
+      && local.scope.eligibleDocumentCount > 0 && local.hits.length === 0;
+  }
+  return local.status === 'ok' && local.searched === true && local.scope.status === 'matched'
+    && local.scope.eligibleDocumentCount > 0 && local.hits.length > 0;
 }
 
 function normalizeYear(value: unknown, field: string): number {

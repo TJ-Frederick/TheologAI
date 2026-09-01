@@ -14,6 +14,10 @@ import {
   type PresentedPrimarySourceSearchV5,
   PRIMARY_SOURCE_V4_MAX_BYTES,
 } from '../../presenters/primarySourceSearchV4Structured.js';
+import {
+  presentPrimarySourceSearchV8,
+  type PresentedPrimarySourceSearchV8,
+} from '../../presenters/primarySourceSearchV8Structured.js';
 
 export interface PrimarySourceSearchBinding {
   readonly descriptor: PrimarySourceSearchDescriptor;
@@ -40,12 +44,16 @@ export function createPrimarySourceSearchHandler(
     outputSchema: descriptor.outputSchema, annotations: descriptor.annotations,
     handler: async params => {
       try {
-        const v7 = descriptor.contractVersion === '7';
-        const queries = !v7 && Array.isArray(params.queries)
+        const discoveryContract = descriptor.contractVersion !== '6';
+        const queries = !discoveryContract && Array.isArray(params.queries)
           ? params.queries.map(query => ({ ...(query as Record<string, unknown>), providers: ['local'] }))
           : params.queries;
         const result = await service.search({ ...params, queries });
-        const presented = v7 ? presentPrimarySourceSearchV7(result) : presentPrimarySourceSearchV6(result);
+        const presented = descriptor.contractVersion === '8'
+          ? presentPrimarySourceSearchV8(result)
+          : descriptor.contractVersion === '7'
+            ? presentPrimarySourceSearchV7(result)
+            : presentPrimarySourceSearchV6(result);
         const links = localSectionResourceLinks(presented);
         const fallback = formatPrimarySourceSearchFallback(presented);
         const unavailable = presented.planStatus === 'unavailable';
@@ -73,7 +81,9 @@ export function createPrimarySourceSearchHandler(
 }
 
 /** Build links only from validated presentation data, never directly from provider locators. */
-function localSectionResourceLinks(presented: PresentedPrimarySourceSearchV4 | PresentedPrimarySourceSearchV5): ResourceLink[] {
+function localSectionResourceLinks(
+  presented: PresentedPrimarySourceSearchV4 | PresentedPrimarySourceSearchV5 | PresentedPrimarySourceSearchV8,
+): ResourceLink[] {
   const links: ResourceLink[] = [];
   const seen = new Set<string>();
   for (const query of presented.queries) {
@@ -111,7 +121,7 @@ function localSectionResourceLinks(presented: PresentedPrimarySourceSearchV4 | P
 }
 
 function assertDeliveryBudget(
-  structuredContent: PresentedPrimarySourceSearchV4 | PresentedPrimarySourceSearchV5,
+  structuredContent: PresentedPrimarySourceSearchV4 | PresentedPrimarySourceSearchV5 | PresentedPrimarySourceSearchV8,
   fallback: string,
   links: ResourceLink[],
   isError: boolean,
@@ -124,7 +134,7 @@ function assertDeliveryBudget(
 }
 
 function deliveryBytes(
-  structuredContent: PresentedPrimarySourceSearchV4 | PresentedPrimarySourceSearchV5,
+  structuredContent: PresentedPrimarySourceSearchV4 | PresentedPrimarySourceSearchV5 | PresentedPrimarySourceSearchV8,
   fallback: string,
   links: ResourceLink[],
   isError: boolean,

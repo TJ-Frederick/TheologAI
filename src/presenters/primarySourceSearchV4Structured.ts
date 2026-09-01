@@ -144,7 +144,10 @@ type PresentedHitCandidate = {
 };
 
 /** Build the one sanitized presentation model used for JSON text and links. */
-export function presentPrimarySourceSearchV5(result: PrimarySourceSearchPlanResult): PresentedPrimarySourceSearchV5 {
+export function presentPrimarySourceSearchV5(
+  result: PrimarySourceSearchPlanResult,
+  reservedBytes = 0,
+): PresentedPrimarySourceSearchV5 {
   let ccelGroupSeen = false;
   const sourceQueryCount = result.queries.length;
   const queryDrafts = result.queries.slice(0, 4).flatMap(query => {
@@ -194,7 +197,7 @@ export function presentPrimarySourceSearchV5(result: PrimarySourceSearchPlanResu
           structuralOmission,
           queryDrafts.some(item => item.providers.some(provider => provider.invalidCandidates > 0)),
         );
-        if (utf8Bytes(conservative) > PRIMARY_SOURCE_STRUCTURED_MAX_BYTES) {
+        if (utf8Bytes(conservative) + reservedBytes > PRIMARY_SOURCE_STRUCTURED_MAX_BYTES) {
           selected[queryIndex]![providerIndex]!.pop();
           truncated = true;
           break outer;
@@ -214,7 +217,7 @@ export function presentPrimarySourceSearchV5(result: PrimarySourceSearchPlanResu
   // The bounded base envelope is intentionally small. This assertion converts
   // future schema growth into a fail-closed implementation defect, never an
   // oversized MCP payload.
-  if (utf8Bytes(presented) > PRIMARY_SOURCE_STRUCTURED_MAX_BYTES) {
+  if (utf8Bytes(presented) + reservedBytes > PRIMARY_SOURCE_STRUCTURED_MAX_BYTES) {
     throw new Error('Primary-source structured model exceeds its reserved delivery budget.');
   }
   return presented;

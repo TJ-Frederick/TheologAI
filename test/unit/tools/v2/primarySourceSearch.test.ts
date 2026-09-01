@@ -693,3 +693,61 @@ describe('primary_source_search v7 discovery contract', () => {
     expect(validatorFor(handler.outputSchema!)(structured).valid).toBe(true);
   });
 });
+
+describe('primary_source_search dormant v8 research foundation', () => {
+  const v8 = createPrimarySourceSearchDescriptor('8');
+
+  it('requires a closed evidence basis for expanded retries and emits routing truth', async () => {
+    const search = vi.fn().mockResolvedValue({
+      planStatus: 'complete',
+      queries: [{
+        id: 'q1', normalizedMode: 'all_terms', normalizedSelection: 'relevance',
+        expansionDecision: {
+          requested: true, triggered: false, reason: 'basis_not_confirmed', localDistinctWorkCount: 1,
+          basis: { reason: 'catalog_miss' },
+        },
+        providers: [{
+          provider: 'local', status: 'ok', searched: true, page: 1, hitCount: 1,
+          resultWindow: { returnedHitCount: 1, additionalMatchStatus: 'no_additional_match_observed' },
+          notices: [],
+          scope: {
+            status: 'matched', requested: {}, eligibleDocumentCount: 1,
+            eligibleDocuments: [{ id: 'doc', title: 'Document', metadataStatus: 'unknown' }],
+            eligibleDocumentsTruncated: false,
+          },
+          hits: [{
+            queryId: 'q1', provider: 'local', title: 'Local section', snippet: 'Local evidence lead',
+            rankWithinProvider: 1, page: 1, snippetOnly: true, attribution: 'Local', resourceSizeBytes: 42,
+            locator: { kind: 'local_section', url: 'theologai://documents/doc#section-1', documentId: 'doc', sectionKey: '1', sourceOrdinal: 1 },
+          }],
+        }],
+      }],
+      coverage: { localAttempted: true, localHitCount: 1, ccelAttempted: false, ccelHitCount: 0, notices: [] },
+    });
+    const handler = createPrimarySourceSearchHandler({ search } as never, v8);
+    const validateInput = validatorFor(handler.inputSchema);
+
+    expect(handler.outputSchema?.properties?.schemaVersion).toEqual({ const: '8' });
+    expect(validateInput({ queries: [{ id: 'q1', text: 'faith', searchDepth: 'standard' }] }).valid).toBe(true);
+    expect(validateInput({ queries: [{ id: 'q1', text: 'faith', searchDepth: 'expanded' }] }).valid).toBe(false);
+    expect(validateInput({ queries: [{
+      id: 'q1', text: 'faith', searchDepth: 'expanded', expansionBasis: { reason: 'catalog_miss' },
+    }] }).valid).toBe(true);
+    expect(validateInput({ queries: [{
+      id: 'q1', text: 'faith', searchDepth: 'expanded', selection: 'work_diversity',
+      expansionBasis: { reason: 'insufficient_diversity', minimumDistinctWorks: 3, observedDistinctWorks: 1 },
+    }] }).valid).toBe(true);
+    expect(validateInput({ queries: [{
+      id: 'q1', text: 'faith', searchDepth: 'standard', expansionBasis: { reason: 'catalog_miss' },
+    }] }).valid).toBe(false);
+
+    const result = await handler.handler({
+      queries: [{ id: 'q1', text: 'faith', searchDepth: 'expanded', expansionBasis: { reason: 'catalog_miss' } }],
+    });
+    expect(result.structuredContent).toMatchObject({
+      schemaVersion: '8', queries: [{ expansionDecision: { triggered: false, reason: 'basis_not_confirmed' } }],
+    });
+    expect(validatorFor(handler.outputSchema!)(result.structuredContent).valid).toBe(true);
+    expect(search).toHaveBeenCalledOnce();
+  });
+});

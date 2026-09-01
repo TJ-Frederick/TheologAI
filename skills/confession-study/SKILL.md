@@ -26,6 +26,12 @@ catalog, while one materially useful `searchDepth: "expanded"` query may add a
 separately grouped broader-discovery result. Preserve every returned group's
 state and unreviewed external metadata separately; a disabled or busy external
 group did not search or read an external page.
+Version 8 retains that provider-neutral shape but makes expansion a conditional
+retry. Start with `searchDepth: "standard"`; only a returned `catalog_miss`,
+`no_results`, or explicit shortfall in distinct local `documentId` values may
+be copied into one `expansionBasis` for one expanded retry. The server reruns
+local search and revalidates that basis before any external provider is
+eligible.
 
 ## Methodology
 
@@ -42,10 +48,14 @@ group did not search or read an external page.
 - Call `primary_source_search` with one bounded, version-appropriate query
   plan. For v6 use
   `{ "queries": [{ "id": "confession-topic", "text": "the doctrinal topic", "providers": ["local"], "match": "all_terms", "selection": "work_diversity", "limit": 5 }] }`.
-  For v7 use the same query with `searchDepth: "standard"` instead of
+  For v7 or v8 use the same query with `searchDepth: "standard"` instead of
   `providers`; change at most one query to `searchDepth: "expanded"` only when
-  broader discovery is materially useful.
-- Keep v7's ordered curated and external groups distinct. An expanded external
+  broader discovery is materially useful. Under v8, make that change only
+  after the standard result supplies an exact basis: `{ "reason":
+  "catalog_miss" }`, `{ "reason": "no_results" }`, or `{ "reason":
+  "insufficient_diversity", "minimumDistinctWorks": 3,
+  "observedDistinctWorks": N }`.
+- Keep v7/v8 ordered curated and external groups distinct. An expanded external
   group is never local catalog evidence. If composition-year bounds were
   requested, preserve the notice that expanded discovery omitted those bounds
   and cannot establish membership in the requested historical period.
@@ -63,10 +73,10 @@ group did not search or read an external page.
   confirm the returned URI matches the selected locator.
 - Do not quote, characterize a position, or compare documents from snippets.
   Base those claims only on exact resources actually read.
-- Treat local `editionReadiness` as authoritative per result: legacy entries
-  remain fail-closed, while reviewed source-pack entries establish the edition
-  and provenance status only for normalized public-domain text. Neither form
-  authorizes redistribution of source scan artifacts.
+- Treat all 35 local works, including all 17 legacy works, as ordinary usable
+  local results. Retain `editionReadiness` quietly as provenance context; do
+  not use it to block, demote, split, or rank a relevant result. Neither
+  readiness form authorizes redistribution of source scan artifacts.
 
 ### Step 3b: Close the Coverage Ledger
 

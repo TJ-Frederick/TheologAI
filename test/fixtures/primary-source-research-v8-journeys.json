@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "journeys": [
+    {
+      "id": "topical-survey",
+      "promptArguments": { "topic": "historical perspectives on church government", "maxSections": "3" },
+      "expectedInitialQueries": [
+        {
+          "id": "topic-survey",
+          "text": "historical perspectives on church government",
+          "searchDepth": "standard",
+          "match": "all_terms",
+          "selection": "work_diversity",
+          "limit": 3
+        }
+      ]
+    },
+    {
+      "id": "locate-in-work",
+      "promptArguments": { "topic": "sacraments", "work": "Institutes of the Christian Religion", "maxSections": "2" },
+      "expectedInitialQueries": [
+        {
+          "id": "exact-local-work",
+          "text": "sacraments",
+          "searchDepth": "standard",
+          "match": "all_terms",
+          "selection": "relevance",
+          "work": "Institutes of the Christian Religion",
+          "limit": 2
+        }
+      ]
+    },
+    {
+      "id": "compare-authors",
+      "promptArguments": { "topic": "church government", "authors": "Richard Baxter, John Owen", "maxSections": "3" },
+      "expectedInitialQueries": [
+        {
+          "id": "creator-1",
+          "text": "church government",
+          "searchDepth": "standard",
+          "match": "all_terms",
+          "selection": "work_diversity",
+          "author": "Richard Baxter",
+          "limit": 3
+        },
+        {
+          "id": "creator-2",
+          "text": "church government",
+          "searchDepth": "standard",
+          "match": "all_terms",
+          "selection": "work_diversity",
+          "author": "John Owen",
+          "limit": 3
+        }
+      ]
+    }
+  ]
+}
