@@ -16,8 +16,15 @@ import {
 } from '../kernel/originalLanguageStudyV2Contract.js';
 import { originalLanguageStudyV2OutputSchema } from '../mcp/schemas/originalLanguageStudyV2.js';
 
-const validateSchema = new Ajv2020({ strict: true, strictTypes: false, allErrors: true })
-  .compile(originalLanguageStudyV2OutputSchema);
+type SchemaValidator = ReturnType<Ajv2020['compile']>;
+
+let validateSchema: SchemaValidator | undefined;
+
+function getSchemaValidator(): SchemaValidator {
+  validateSchema ??= new Ajv2020({ strict: true, strictTypes: false, allErrors: true })
+    .compile(originalLanguageStudyV2OutputSchema);
+  return validateSchema;
+}
 
 export interface OriginalLanguageStudyV2StructuredPresentation {
   output: OriginalLanguageStudyV2Result;
@@ -59,8 +66,9 @@ export function serializeValidatedOriginalLanguageStudyV2Output(output: unknown)
 }
 
 function validateOutput(output: OriginalLanguageStudyV2Result): void {
-  if (!validateSchema(output)) {
-    throw new Error(`original_language_study v2 output violates its schema: ${JSON.stringify(validateSchema.errors)}`);
+  const validator = getSchemaValidator();
+  if (!validator(output)) {
+    throw new Error(`original_language_study v2 output violates its schema: ${JSON.stringify(validator.errors)}`);
   }
   validateRelationalContract(output);
 }

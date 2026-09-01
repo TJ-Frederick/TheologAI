@@ -35,6 +35,8 @@ describe('bounded UBS semantic aggregate bundle activation contract', () => {
     const guard = readFileSync(new URL('scripts/check-worker-bundle-excludes-ubs.ts', repo), 'utf8');
     expect(guard).toContain("endsWith('ubs-parallel-passages.generated.json')");
     expect(guard).toContain('3.125 * 1024 * 1024');
+    expect(guard).toContain("'check', 'startup'");
+    expect(guard).toContain('startupMs >= 1_000');
     expect(guard).toContain('active v2 semantic study adds bounded runtime code');
     expect(guard).toContain('narrow review margin');
     expect(guard).toContain('multi-megabyte compiled UBS JSON artifact');

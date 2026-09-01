@@ -13,8 +13,15 @@ import {
 import { parseOriginalLanguageStudyV2Cursor, type OriginalLanguageStudyV2Candidate } from '../kernel/originalLanguageStudyV2Contract.js';
 import { originalLanguageStudyV3OutputSchema } from '../mcp/schemas/originalLanguageStudyV3.js';
 
-const validateSchema = new Ajv2020({ strict: true, strictTypes: false, allErrors: true })
-  .compile(originalLanguageStudyV3OutputSchema);
+type SchemaValidator = ReturnType<Ajv2020['compile']>;
+
+let validateSchema: SchemaValidator | undefined;
+
+function getSchemaValidator(): SchemaValidator {
+  validateSchema ??= new Ajv2020({ strict: true, strictTypes: false, allErrors: true })
+    .compile(originalLanguageStudyV3OutputSchema);
+  return validateSchema;
+}
 
 export interface OriginalLanguageStudyV3StructuredPresentation {
   output: OriginalLanguageStudyV3Result;
@@ -44,7 +51,8 @@ export function serializeValidatedOriginalLanguageStudyV3Output(output: unknown)
 }
 
 function validateOriginalLanguageStudyV3Output(output: OriginalLanguageStudyV3Result): void {
-  if (!validateSchema(output)) throw new Error(`original_language_study v3 output violates its schema: ${JSON.stringify(validateSchema.errors)}`);
+  const validator = getSchemaValidator();
+  if (!validator(output)) throw new Error(`original_language_study v3 output violates its schema: ${JSON.stringify(validator.errors)}`);
   const study = objectOf(output.study, 'study');
   const request = objectOf(study.request, 'study.request');
   const context = objectOf(study.context, 'study.context');
