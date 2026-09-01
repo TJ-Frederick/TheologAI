@@ -26,7 +26,7 @@ import type { HistoricalDocumentService } from '../../../../src/services/histori
 import type { PrimarySourceSearchService } from '../../../../src/services/historical/PrimarySourceSearchService.js';
 import type { MorphologyService } from '../../../../src/services/languages/MorphologyService.js';
 import type { StrongsService } from '../../../../src/services/languages/StrongsService.js';
-import type { OriginalLanguageStudyV2Coordinator } from '../../../../src/services/languages/OriginalLanguageStudyV2Coordinator.js';
+import type { OriginalLanguageStudyV3Coordinator } from '../../../../src/services/languages/OriginalLanguageStudyV3Coordinator.js';
 import { StrongsService as StrongsServiceClass } from '../../../../src/services/languages/StrongsService.js';
 import { readFileSync } from 'node:fs';
 import type { ToolHandler, ToolResult } from '../../../../src/kernel/types.js';
@@ -58,7 +58,7 @@ describe('v2 tool handler schemas', () => {
       createPrimarySourceSearchHandler(serviceDouble<PrimarySourceSearchService>({})),
       createStrongsLookupHandler(serviceDouble<StrongsService>({})),
       createVerseMorphologyHandler(serviceDouble<MorphologyService>({})),
-      createOriginalLanguageStudyHandler(serviceDouble<OriginalLanguageStudyV2Coordinator>({})),
+      createOriginalLanguageStudyHandler(serviceDouble<OriginalLanguageStudyV3Coordinator>({})),
       createDonationConfigHandler(serviceDouble<DonationService>({})),
       createVerifyDonationHandler(serviceDouble<DonationService>({})),
     ];

@@ -147,6 +147,12 @@ export interface IMorphologyRepository {
     after?: CanonicalOccurrencePosition,
     limit?: number,
   ): RepositoryResult<TokenOccurrencePage>;
+  /** Proves that an opaque occurrence cursor points at a current page boundary. */
+  hasTokenOccurrenceBoundary?(
+    strongsNumber: string,
+    boundary: CanonicalOccurrencePosition,
+    pageSize: number,
+  ): RepositoryResult<boolean>;
 }
 
 // ── Historical document types & interface ──

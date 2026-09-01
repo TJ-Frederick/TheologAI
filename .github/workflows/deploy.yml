@@ -340,6 +340,7 @@ jobs:
           preview_server_version="$(node --input-type=module -e "import packageJson from './package.json' with { type: 'json' }; process.stdout.write(packageJson.version + '-preview')")"
           npx --no-install tsx scripts/dual-era-preview-release-receipt.ts verify \
             --receipt "$RUNNER_TEMP/protected-dual-era-preview/dual-era-preview-release-receipt.json" \
+            --original-language-audit "$RUNNER_TEMP/protected-dual-era-preview/original-language-v3-preview-audit.json" \
             --expected-repository "$GITHUB_REPOSITORY" \
             --expected-source-commit "$SOURCE_COMMIT" \
             --expected-source-tree "$source_tree" \
@@ -461,6 +462,7 @@ jobs:
           preview_server_version="$(node --input-type=module -e "import packageJson from './package.json' with { type: 'json' }; process.stdout.write(packageJson.version + '-preview')")"
           npx --no-install tsx scripts/dual-era-preview-release-receipt.ts verify \
             --receipt "$RUNNER_TEMP/protected-dual-era-preview/dual-era-preview-release-receipt.json" \
+            --original-language-audit "$RUNNER_TEMP/protected-dual-era-preview/original-language-v3-preview-audit.json" \
             --expected-repository "$GITHUB_REPOSITORY" \
             --expected-source-commit "$SOURCE_COMMIT" \
             --expected-source-tree "$source_tree" \
@@ -553,6 +555,7 @@ jobs:
           npm run d1:seed:export -- --database "$RUNNER_TEMP/theologai.db" --clean
           cmp "$RUNNER_TEMP/d1-seed-manifest.json" scripts/d1-seed/seed-manifest.json
           npm run d1:seed:verify
+          npm run d1:seed:verify-readiness-seal
           npm run d1:seed:verify-import -- --database "$RUNNER_TEMP/theologai.db"
 
       - name: Verify historical section compatibility evidence against generated local artifacts
@@ -610,6 +613,7 @@ jobs:
         run: |
           candidate_d1_name="$(< "$RUNNER_TEMP/production-candidate-d1-name.txt")"
           npm run d1:remote:check -- --database "$candidate_d1_name" \
+            --sealed-release production \
             --output "$RUNNER_TEMP/production-d1-readiness-receipt.json"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -826,17 +830,17 @@ jobs:
         if: ${{ always() && steps.production-worker-candidate-cutover.outcome == 'success' }}
         run: test "${{ steps.production-primary-source-edge-stabilization.outcome }}" = success
 
-      - name: Audit original-language v2 contract on production
-        id: production-original-language-v2-audit
+      - name: Audit original-language v3 depth contract on production
+        id: production-original-language-v3-audit
         if: ${{ steps.production-primary-source-edge-stabilization-gate.outcome == 'success' }}
         run: |
-          npm run audit:original-language-v2-production -- \
-            --output "$RUNNER_TEMP/original-language-v2-production-audit.json"
-          test -s "$RUNNER_TEMP/original-language-v2-production-audit.json"
+          npm run audit:original-language-v3-production -- \
+            --output "$RUNNER_TEMP/original-language-v3-production-audit.json"
+          test -s "$RUNNER_TEMP/original-language-v3-production-audit.json"
 
       - name: Audit Transform-9 historical core contract on production
         id: production-historical-core-audit
-        if: ${{ steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' }}
+        if: ${{ steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && steps.production-original-language-v3-audit.outcome == 'success' }}
         run: |
           npm run audit:historical-core-production -- \
             --output "$RUNNER_TEMP/historical-core-production-audit.json"
@@ -844,7 +848,7 @@ jobs:
 
       - name: Audit Transform-11 historical spine contract on production
         id: production-historical-spine-audit
-        if: ${{ steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' && steps.production-historical-core-audit.outcome == 'success' }}
+        if: ${{ steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && steps.production-original-language-v3-audit.outcome == 'success' && steps.production-historical-core-audit.outcome == 'success' }}
         run: |
           npm run audit:historical-spine-production -- \
             --output "$RUNNER_TEMP/historical-spine-production-audit.json"
@@ -852,7 +856,7 @@ jobs:
 
       - name: Verify production Worker remained active through audit (read-only)
         id: production-worker-audit-identity
-        if: ${{ steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' && steps.production-historical-core-audit.outcome == 'success' && steps.production-historical-spine-audit.outcome == 'success' }}
+        if: ${{ steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && steps.production-original-language-v3-audit.outcome == 'success' && steps.production-historical-core-audit.outcome == 'success' && steps.production-historical-spine-audit.outcome == 'success' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -971,10 +975,10 @@ jobs:
 
       - name: Hash sanitized production audit and reconciliation evidence
         id: production-audit-evidence
-        if: ${{ steps.production-worker-deploy.outcome == 'success' && steps.production-worker-candidate-cutover.outcome == 'success' && steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' && steps.production-historical-core-audit.outcome == 'success' && steps.production-historical-spine-audit.outcome == 'success' && steps.production-worker-audit-identity.outcome == 'success' && steps.preview-control-after-production-audits.outcome == 'success' && steps.final-environment-isolation.outcome == 'success' && steps.production-final-observation.outcome == 'success' && steps.production-final-post-audit-identity.outcome == 'success' }}
+        if: ${{ steps.production-worker-deploy.outcome == 'success' && steps.production-worker-candidate-cutover.outcome == 'success' && steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && steps.production-original-language-v3-audit.outcome == 'success' && steps.production-historical-core-audit.outcome == 'success' && steps.production-historical-spine-audit.outcome == 'success' && steps.production-worker-audit-identity.outcome == 'success' && steps.preview-control-after-production-audits.outcome == 'success' && steps.final-environment-isolation.outcome == 'success' && steps.production-final-observation.outcome == 'success' && steps.production-final-post-audit-identity.outcome == 'success' }}
         run: |
           edge_stabilization_sha256="$(sha256sum "$RUNNER_TEMP/production-primary-source-edge-stabilization.json" | awk '{print $1}')"
-          original_language_audit_sha256="$(sha256sum "$RUNNER_TEMP/original-language-v2-production-audit.json" | awk '{print $1}')"
+          original_language_audit_sha256="$(sha256sum "$RUNNER_TEMP/original-language-v3-production-audit.json" | awk '{print $1}')"
           historical_audit_sha256="$(sha256sum "$RUNNER_TEMP/historical-core-production-audit.json" | awk '{print $1}')"
           historical_spine_audit_sha256="$(sha256sum "$RUNNER_TEMP/historical-spine-production-audit.json" | awk '{print $1}')"
           identity_sha256="$(sha256sum "$RUNNER_TEMP/production-worker-deployment-identity.json" | awk '{print $1}')"
@@ -1021,7 +1025,7 @@ jobs:
           name: production-release-audit-${{ github.sha }}
           path: |
             ${{ runner.temp }}/production-primary-source-edge-stabilization.json
-            ${{ runner.temp }}/original-language-v2-production-audit.json
+            ${{ runner.temp }}/original-language-v3-production-audit.json
             ${{ runner.temp }}/historical-core-production-audit.json
             ${{ runner.temp }}/historical-spine-production-audit.json
             ${{ runner.temp }}/production-worker-deployment-identity.json

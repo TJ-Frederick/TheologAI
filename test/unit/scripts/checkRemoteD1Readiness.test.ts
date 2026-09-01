@@ -5,12 +5,16 @@ import Database from 'better-sqlite3';
 import { describe, expect, it, vi } from 'vitest';
 import {
   buildD1ReadinessDiagnosticSql,
+  buildD1ReleaseReadinessSql,
   buildD1ReadinessSql,
   buildMorphologyUnicodeReadinessContract,
   buildUbsSemanticStoredIntegrityPredicates,
   classicTextSectionReadinessPredicate,
   MAX_D1_READINESS_SQL_BYTES,
+  MAX_D1_RELEASE_ROWS_READ,
+  loadD1ReadinessSeal,
   runRemoteD1ReadinessCheck,
+  runRemoteD1ReleaseCheck,
 } from '../../../scripts/check-remote-d1-readiness.js';
 import type { BiblicalLanguageUnicodeCorrectionLedger } from '../../../scripts/biblical-language-unicode-correction.js';
 import { createUbsSemanticStorageContract } from '../../../scripts/ubs-semantics/storageContract.js';
@@ -96,8 +100,15 @@ function remoteAuthorityExecutor(): {
     calls,
     execute: (_file, args, options) => {
       calls.push([...args]);
-      if (options.stdio === 'inherit') return undefined;
       const sql = args[args.indexOf('--command') + 1]!;
+      if (sql.includes('readiness_checks(check_name, passed)')) {
+        return JSON.stringify([{
+          success: true,
+          results: [{ readiness: 'ready', failed_checks: '[]' }],
+          meta: { rows_read: 999 },
+        }]);
+      }
+      if (options.stdio === 'inherit') return undefined;
       return JSON.stringify([{ success: true, results: db.prepare(sql).all() }]);
     },
     close: () => db.close(),
@@ -180,10 +191,93 @@ describe('remote D1 readiness query', () => {
     expect(sql).not.toContain('FROM strongs_form_stats form WHERE form.token_count != (SELECT COUNT(*) FROM morphology');
     expect(sql).toContain('readiness_checks(check_name, passed) AS (VALUES');
     expect(sql).toContain('FROM readiness_checks WHERE passed IS 1');
+    expect(sql).toContain('json_group_array(check_name)');
     expect(sql).toContain("('integrity.quick_check', (");
     expect(sql).toContain("('data.genesis_1_1_lemma', (");
     expect(sql).not.toMatch(/\b(?:INSERT|UPDATE|DELETE|DROP|ALTER)\b/);
     expect(Buffer.byteLength(sql, 'utf8')).toBeLessThanOrEqual(MAX_D1_READINESS_SQL_BYTES);
+  });
+
+  it('builds a sealed live release check without corpus-sized scans', () => {
+    const sql = buildD1ReleaseReadinessSql();
+    expect(sql).toContain("key = 'schema_version'");
+    expect(sql).toContain("key = 'corpus_manifest_sha256'");
+    expect(sql).toContain("('seal.transform12', (");
+    expect(sql).toContain("('seal.ubs_parallel', (");
+    expect(sql).toContain("('seal.ubs_semantic', (");
+    expect(sql).toContain("('sentinel.john_1_1', (");
+    expect(sql).toContain("('sentinel.historical_edition_fts', (");
+    expect(sql).not.toContain('usage_expected');
+    expect(sql).not.toContain('pragma_quick_check');
+    expect(sql).not.toContain('pragma_foreign_key_check');
+    expect(sql).not.toContain('ubs_semantic_normalized_coordinates c');
+    expect(sql).not.toMatch(/COUNT\(\*\) FROM ["']?(?:morphology|cross_references|ubs_semantic_reference_evidence|ubs_semantic_normalized_coordinates)["']?/);
+    expect(Buffer.byteLength(sql, 'utf8')).toBeLessThan(20_000);
+  });
+
+  it('binds a sealed release to checked-in deep evidence and enforces rows_read', () => {
+    const seal = loadD1ReadinessSeal(
+      process.cwd(),
+      'preview',
+      'theologai-preview-20260811-schema0009-a',
+    );
+    expect(seal).toMatchObject({
+      databaseId: '74f456e2-6951-4003-bb6f-91951342bf8f',
+      deepReadinessReceiptSha256: '24e6cf53ac8de7d2e17903faf56a145d8dd7ef7c49b27e628878353484cfaee2',
+    });
+    expect(loadD1ReadinessSeal(
+      process.cwd(),
+      'production',
+      'theologai-production-20260811-schema0009-a',
+    )).toMatchObject({
+      databaseId: '9bc79346-338b-439e-a2a5-424f4418eb21',
+      deepReadinessReceiptSha256: 'f112b33785a6c1953625c395954bd952db6f0224ad389c52996881b76973d112',
+    });
+    expect(() => loadD1ReadinessSeal(process.cwd(), 'preview', 'wrong-database'))
+      .toThrow('does not match its reviewed readiness seal');
+
+    const execute = (_file: string, _args: readonly string[]) => JSON.stringify([{
+      success: true,
+      results: [{ readiness: 'ready', failed_checks: '[]' }],
+      meta: { rows_read: 999 },
+    }]);
+    const receipt = runRemoteD1ReleaseCheck({
+      database: 'theologai-preview-20260811-schema0009-a',
+      env: 'preview',
+      releaseEnvironment: 'preview',
+      cwd: process.cwd(),
+      wrangler: '/tmp/wrangler',
+    }, execute);
+    expect(receipt).toMatchObject({
+      mode: 'sealed-release',
+      rowsRead: 999,
+      rowsReadBudget: MAX_D1_RELEASE_ROWS_READ,
+      seal: { databaseId: '74f456e2-6951-4003-bb6f-91951342bf8f' },
+    });
+
+    expect(() => runRemoteD1ReleaseCheck({
+      database: 'theologai-preview-20260811-schema0009-a',
+      env: 'preview',
+      releaseEnvironment: 'preview',
+      cwd: process.cwd(),
+      wrangler: '/tmp/wrangler',
+    }, () => JSON.stringify([{
+      success: true,
+      results: [{ readiness: 'ready', failed_checks: '[]' }],
+      meta: { rows_read: MAX_D1_RELEASE_ROWS_READ + 1 },
+    }]))).toThrow(`budget is ${MAX_D1_RELEASE_ROWS_READ}`);
+
+    expect(() => runRemoteD1ReleaseCheck({
+      database: 'theologai-preview-20260811-schema0009-a',
+      env: 'preview',
+      releaseEnvironment: 'preview',
+      cwd: process.cwd(),
+      wrangler: '/tmp/wrangler',
+    }, () => JSON.stringify([{
+      success: true,
+      results: [{ readiness: 'ready', failed_checks: '[]' }],
+      meta: {},
+    }]))).toThrow('did not report rows_read');
   });
 
   it('rejects negative Psalm and out-of-canon chapter/verse coordinates in every shared D1 gate', () => {
@@ -322,7 +416,6 @@ describe('remote D1 readiness query', () => {
       remote.close();
     }
 
-    const primaryError = new Error('primary failed');
     const failedCalls: string[][] = [];
     const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     try {
@@ -330,14 +423,33 @@ describe('remote D1 readiness query', () => {
         { database: 'preview', wrangler: '/tmp/wrangler' },
         (_file, args) => {
           failedCalls.push([...args]);
-          if (failedCalls.length === 1) throw primaryError;
+          if (failedCalls.length === 1) {
+            return JSON.stringify([{
+              success: true,
+              results: [{ readiness: 'failed', failed_checks: '["identity.schema_version"]' }],
+              meta: { rows_read: 1 },
+            }]);
+          }
+          return JSON.stringify([{ success: true, results: [{ check_name: 'identity.schema_version', passed: 0 }] }]);
         },
-      )).toThrow(primaryError);
+      )).toThrow('D1 readiness failed checks: identity.schema_version');
     } finally {
       stderr.mockRestore();
     }
     expect(failedCalls).toHaveLength(2);
     expect(failedCalls[1].join('\n')).toContain('WHERE passed IS NOT 1 ORDER BY check_name');
+    expect(failedCalls[1].join('\n')).toContain("('identity.schema_version', (");
+    expect(failedCalls[1].join('\n')).not.toContain("('usage.summary_missing', (");
+
+    const quotaCalls: string[][] = [];
+    expect(() => runRemoteD1ReadinessCheck(
+      { database: 'preview', wrangler: '/tmp/wrangler' },
+      (_file, args) => {
+        quotaCalls.push([...args]);
+        throw new Error('D1_ERROR: exceeded daily row read limit [code: 7500]');
+      },
+    )).toThrow('exceeded daily row read limit');
+    expect(quotaCalls).toHaveLength(1);
   });
 
   it('rejects unsafe manifest identifiers', () => {
@@ -362,7 +474,7 @@ describe('remote D1 readiness query', () => {
     };
     const sql = buildD1ReadinessSql(manifest.expectedCounts);
     const db = new Database(databasePath);
-    const assertReady = () => expect(db.prepare(sql).get()).toEqual({ readiness: 'ready' });
+    const assertReady = () => expect(db.prepare(sql).get()).toMatchObject({ readiness: 'ready', failed_checks: '[]' });
     const assertFailedChecks = (checkNames: readonly string[]) => {
       const diagnostics = db.prepare(buildD1ReadinessDiagnosticSql(
         manifest.expectedCounts,

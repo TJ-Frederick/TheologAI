@@ -149,6 +149,7 @@ jobs:
           npm run d1:seed:export -- --database "$RUNNER_TEMP/theologai.db" --clean
           cmp "$RUNNER_TEMP/d1-seed-manifest.json" scripts/d1-seed/seed-manifest.json
           npm run d1:seed:verify
+          npm run d1:seed:verify-readiness-seal
           npm run d1:seed:verify-import -- --database "$RUNNER_TEMP/theologai.db"
 
       - name: Verify historical section compatibility evidence against generated local artifacts
@@ -320,10 +321,14 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
+      # Candidate preparation owns the one exhaustive remote corpus audit.
+      # Code-only releases bind that evidence to a small live identity/schema
+      # check with a hard rows-read budget, preserving D1 capacity for users.
       - name: Verify candidate preview D1 is compatible (read-only)
         run: |
           candidate_d1_name="$(< "$RUNNER_TEMP/preview-candidate-d1-name.txt")"
           npm run d1:remote:check -- --database "$candidate_d1_name" --env preview \
+            --sealed-release preview \
             --output "$RUNNER_TEMP/preview-d1-readiness-receipt.json"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -553,17 +558,19 @@ jobs:
         if: ${{ always() && steps.preview-worker-candidate-cutover.outcome == 'success' }}
         run: test "${{ steps.preview-primary-source-edge-stabilization.outcome }}" = success
 
-      - name: Audit original-language v2 contract on preview
-        id: preview-original-language-v2-audit
+      # Historical released-gate label retained for the immutable v2 audit packet:
+      # - name: Audit original-language v2 contract on preview
+      - name: Audit original-language v3 depth contract on preview
+        id: preview-original-language-v3-audit
         if: ${{ steps.preview-primary-source-edge-stabilization-gate.outcome == 'success' }}
         run: |
-          npm run audit:original-language-v2-preview -- \
-            --output "$RUNNER_TEMP/original-language-v2-preview-audit.json"
-          test -s "$RUNNER_TEMP/original-language-v2-preview-audit.json"
+          npm run audit:original-language-v3-preview -- \
+            --output "$RUNNER_TEMP/original-language-v3-preview-audit.json"
+          test -s "$RUNNER_TEMP/original-language-v3-preview-audit.json"
 
       - name: Audit Transform-9 historical core contract on preview
         id: preview-historical-core-audit
-        if: ${{ steps.preview-primary-source-edge-stabilization-gate.outcome == 'success' && steps.preview-original-language-v2-audit.outcome == 'success' }}
+        if: ${{ steps.preview-primary-source-edge-stabilization-gate.outcome == 'success' && steps.preview-original-language-v3-audit.outcome == 'success' }}
         run: |
           npm run audit:historical-core-preview -- \
             --output "$RUNNER_TEMP/historical-core-preview-audit.json"
@@ -574,7 +581,7 @@ jobs:
       # landing, browse, search, primary-source, read, and pagination probes.
       - name: Audit Transform-11 historical spine contract on preview
         id: preview-historical-spine-audit
-        if: ${{ steps.preview-primary-source-edge-stabilization-gate.outcome == 'success' && steps.preview-original-language-v2-audit.outcome == 'success' && steps.preview-historical-core-audit.outcome == 'success' }}
+        if: ${{ steps.preview-primary-source-edge-stabilization-gate.outcome == 'success' && steps.preview-original-language-v3-audit.outcome == 'success' && steps.preview-historical-core-audit.outcome == 'success' }}
         run: |
           npm run audit:historical-spine-preview -- \
             --output "$RUNNER_TEMP/historical-spine-preview-audit.json"
@@ -620,7 +627,7 @@ jobs:
 
       - name: Verify preview Worker remained active through audit (read-only)
         id: preview-worker-audit-identity
-        if: ${{ steps.preview-primary-source-edge-stabilization-gate.outcome == 'success' && steps.preview-original-language-v2-audit.outcome == 'success' && steps.preview-historical-core-audit.outcome == 'success' && steps.preview-historical-spine-audit.outcome == 'success' && steps.preview-dual-era-audit.outcome == 'success' }}
+        if: ${{ steps.preview-primary-source-edge-stabilization-gate.outcome == 'success' && steps.preview-original-language-v3-audit.outcome == 'success' && steps.preview-historical-core-audit.outcome == 'success' && steps.preview-historical-spine-audit.outcome == 'success' && steps.preview-dual-era-audit.outcome == 'success' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -638,7 +645,7 @@ jobs:
       # a production change that happened during the black-box audit window.
       - name: Verify production control remained unchanged after preview audits (read-only)
         id: production-control-post-audit
-        if: ${{ steps.preview-primary-source-edge-stabilization-gate.outcome == 'success' && steps.preview-original-language-v2-audit.outcome == 'success' && steps.preview-historical-core-audit.outcome == 'success' && steps.preview-historical-spine-audit.outcome == 'success' && steps.preview-dual-era-audit.outcome == 'success' && steps.preview-worker-audit-identity.outcome == 'success' }}
+        if: ${{ steps.preview-primary-source-edge-stabilization-gate.outcome == 'success' && steps.preview-original-language-v3-audit.outcome == 'success' && steps.preview-historical-core-audit.outcome == 'success' && steps.preview-historical-spine-audit.outcome == 'success' && steps.preview-dual-era-audit.outcome == 'success' && steps.preview-worker-audit-identity.outcome == 'success' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -671,6 +678,7 @@ jobs:
             --source-commit "$SOURCE_COMMIT" \
             --source-tree "$source_tree" \
             --audit "$RUNNER_TEMP/dual-era-mcp-preview-audit.json" \
+            --original-language-audit "$RUNNER_TEMP/original-language-v3-preview-audit.json" \
             --worker-identity "$RUNNER_TEMP/preview-worker-deployment-identity.json" \
             --cutover "$RUNNER_TEMP/preview-worker-candidate-cutover.json" \
             --d1-readiness "$RUNNER_TEMP/preview-d1-readiness-receipt.json" \
@@ -681,7 +689,7 @@ jobs:
         if: ${{ steps.production-control-post-audit.outcome == 'success' }}
         run: |
           edge_stabilization_sha256="$(sha256sum "$RUNNER_TEMP/preview-primary-source-edge-stabilization.json" | awk '{print $1}')"
-          original_language_audit_sha256="$(sha256sum "$RUNNER_TEMP/original-language-v2-preview-audit.json" | awk '{print $1}')"
+          original_language_audit_sha256="$(sha256sum "$RUNNER_TEMP/original-language-v3-preview-audit.json" | awk '{print $1}')"
           historical_audit_sha256="$(sha256sum "$RUNNER_TEMP/historical-core-preview-audit.json" | awk '{print $1}')"
           historical_spine_audit_sha256="$(sha256sum "$RUNNER_TEMP/historical-spine-preview-audit.json" | awk '{print $1}')"
           identity_sha256="$(sha256sum "$RUNNER_TEMP/preview-worker-deployment-identity.json" | awk '{print $1}')"
@@ -699,7 +707,7 @@ jobs:
           name: preview-release-audit-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
           path: |
             ${{ runner.temp }}/preview-primary-source-edge-stabilization.json
-            ${{ runner.temp }}/original-language-v2-preview-audit.json
+            ${{ runner.temp }}/original-language-v3-preview-audit.json
             ${{ runner.temp }}/historical-core-preview-audit.json
             ${{ runner.temp }}/historical-spine-preview-audit.json
             ${{ runner.temp }}/dual-era-mcp-preview-audit.json

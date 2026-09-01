@@ -1,4 +1,3 @@
-import Ajv2020 from 'ajv/dist/2020.js';
 import { formatReference, parseReference, referencesEqual } from '../kernel/reference.js';
 import { parseUbsPublicHebrewIdentity } from '../kernel/ubsSemanticDomain.js';
 import { parseUbsSemanticEvidenceBundleCursor } from '../kernel/ubsSemanticEvidenceBundle.js';
@@ -15,9 +14,14 @@ import {
   type ServerVerifiedHebrewSemanticAlignment,
 } from '../kernel/originalLanguageStudyV2Contract.js';
 import { originalLanguageStudyV2OutputSchema } from '../mcp/schemas/originalLanguageStudyV2.js';
+import { validatorFor, type SchemaValidator } from '../mcp/validation.js';
 
-const validateSchema = new Ajv2020({ strict: true, strictTypes: false, allErrors: true })
-  .compile(originalLanguageStudyV2OutputSchema);
+let validateSchema: SchemaValidator<Record<string, unknown>> | undefined;
+
+function getSchemaValidator(): SchemaValidator<Record<string, unknown>> {
+  validateSchema ??= validatorFor(originalLanguageStudyV2OutputSchema);
+  return validateSchema;
+}
 
 export interface OriginalLanguageStudyV2StructuredPresentation {
   output: OriginalLanguageStudyV2Result;
@@ -59,8 +63,10 @@ export function serializeValidatedOriginalLanguageStudyV2Output(output: unknown)
 }
 
 function validateOutput(output: OriginalLanguageStudyV2Result): void {
-  if (!validateSchema(output)) {
-    throw new Error(`original_language_study v2 output violates its schema: ${JSON.stringify(validateSchema.errors)}`);
+  const validator = getSchemaValidator();
+  const validation = validator(output as unknown as Record<string, unknown>);
+  if (!validation.valid) {
+    throw new Error(`original_language_study v2 output violates its schema: ${validation.errorMessage}`);
   }
   validateRelationalContract(output);
 }

@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 2,
+  "kind": "original-language-v3-depth-preview-audit-fixture",
+  "authorityAnchors": {
+    "semanticArtifactIdentity": "bd19fb99f7bbfd13ad68f2184aaded4a6e5587196ad76b68b0c22bf971fc90f6",
+    "morphologyUsageIdentity": "c3600bb55da75aa600f8c97885efa7d58a3e8c29c3fcc6445a553091011beabd",
+    "h0216SenseId": "ubs-sense-000206001001000",
+    "h3027SenseCount": 78
+  },
+  "promptCases": [
+    { "id": "word-study-beginner", "name": "word-study", "arguments": { "word": "G3056", "reference": "John 1:1", "depth": "beginner" }, "expectedDepth": "beginner" },
+    { "id": "passage-exegesis-technical", "name": "passage-exegesis", "arguments": { "reference": "Genesis 3:22", "depth": "technical" }, "expectedDepth": "technical" },
+    { "id": "compare-translations-default", "name": "compare-translations", "arguments": { "reference": "John 1:1" }, "expectedDepth": "intermediate" }
+  ],
+  "cases": [
+    { "id": "greek-beginner", "arguments": { "reference": "John 1:1", "target": "G3056", "position": 5, "depth": "beginner" }, "mode": "success", "cursorFrom": null, "cursorMutation": null },
+    { "id": "greek-default-intermediate", "arguments": { "reference": "John 1:1", "target": "G3056", "position": 5 }, "mode": "success", "cursorFrom": null, "cursorMutation": null },
+    { "id": "greek-technical", "arguments": { "reference": "John 1:1", "target": "G3056", "position": 5, "depth": "technical" }, "mode": "success", "cursorFrom": null, "cursorMutation": null },
+    { "id": "hebrew-position-required", "arguments": { "reference": "Genesis 1:3", "target": "H0216" }, "mode": "success", "cursorFrom": null, "cursorMutation": null },
+    { "id": "h0216-beginner", "arguments": { "reference": "Genesis 1:3", "target": "H0216", "position": 4, "depth": "beginner" }, "mode": "success", "cursorFrom": null, "cursorMutation": null },
+    { "id": "h3027-intermediate", "arguments": { "reference": "Genesis 3:22", "target": "H3027", "position": 15, "depth": "intermediate" }, "mode": "success", "cursorFrom": null, "cursorMutation": null },
+    { "id": "h3027-technical", "arguments": { "reference": "Genesis 3:22", "target": "H3027", "position": 15, "depth": "technical" }, "mode": "success", "cursorFrom": null, "cursorMutation": null },
+    { "id": "semantic-continuation", "arguments": { "reference": "Genesis 3:22", "target": "H3027", "position": 15, "depth": "intermediate" }, "mode": "success", "cursorFrom": "h3027-intermediate", "cursorMutation": null },
+    { "id": "occurrence-continuation", "arguments": { "reference": "John 1:1", "target": "G3056", "position": 5, "depth": "technical" }, "mode": "success", "cursorFrom": "greek-technical", "cursorMutation": null },
+    { "id": "h1961-unavailable", "arguments": { "reference": "Genesis 1:2", "target": "H1961", "position": 2 }, "mode": "success", "cursorFrom": null, "cursorMutation": null },
+    { "id": "stale-v2-cursor", "arguments": { "reference": "Genesis 3:22", "target": "H3027", "position": 15, "cursor": "olsv2c1_7b7d" }, "mode": "safe-error", "cursorFrom": null, "cursorMutation": null },
+    { "id": "removed-detail", "arguments": { "reference": "Genesis 3:22", "target": "H3027", "position": 15, "detail": "detailed" }, "mode": "input-error", "cursorFrom": null, "cursorMutation": null },
+    { "id": "cursor-wrong-depth", "arguments": { "reference": "Genesis 3:22", "target": "H3027", "position": 15, "depth": "technical" }, "mode": "safe-error", "cursorFrom": "h3027-intermediate", "cursorMutation": null },
+    { "id": "cursor-corrupt", "arguments": { "reference": "Genesis 3:22", "target": "H3027", "position": 15, "depth": "intermediate" }, "mode": "safe-error", "cursorFrom": "h3027-intermediate", "cursorMutation": "flip-final-base64url" },
+    { "id": "forbidden-artifact-identity", "arguments": { "reference": "Genesis 1:3", "target": "H0216", "position": 4, "artifactIdentity": "forged" }, "mode": "input-error", "cursorFrom": null, "cursorMutation": null }
+  ]
+}

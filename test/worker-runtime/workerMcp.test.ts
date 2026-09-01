@@ -258,7 +258,7 @@ describe('Worker MCP endpoint in workerd', () => {
     expect(initialized.message.error).toBeUndefined();
     expect(initialized.message.result).toMatchObject({
       protocolVersion: '2025-11-25',
-      serverInfo: { name: 'theologai-bible-server', version: '3.6.0-test' },
+      serverInfo: { name: 'theologai-bible-server', version: '4.0.0-test' },
     });
 
     const contractClient = {
@@ -368,7 +368,7 @@ describe('Worker MCP endpoint in workerd', () => {
       _meta: {
         'io.modelcontextprotocol/serverInfo': {
           name: 'theologai-bible-server',
-          version: '3.6.0-test',
+          version: '4.0.0-test',
         },
       },
     });
@@ -567,7 +567,8 @@ describe('Worker MCP endpoint in workerd', () => {
     expect(textContent(study.message)).toContain('TBESH Meaning field is withheld');
     expect(study.message.result).toMatchObject({
       structuredContent: {
-        schemaVersion: '2',
+        schemaVersion: '3',
+        depth: 'intermediate',
         study: {
           status: 'partial',
           lexiconEvidence: [{
@@ -591,8 +592,39 @@ describe('Worker MCP endpoint in workerd', () => {
             ],
           },
         },
+        lexicalRange: { status: 'available', scope: 'source_attested_non_exhaustive' },
+        englishTranslationComparison: { status: 'not_performed', responsibility: 'guided_prompt' },
+        contextualInterpretation: { status: 'not_performed', responsibility: 'guided_prompt' },
       },
     });
+
+    const technicalStudy = await rpc('tools/call', {
+      name: 'original_language_study',
+      arguments: { reference: 'John 3:16', target: 'G26', position: 2, depth: 'technical' },
+    }, 36);
+    expect(technicalStudy.message.error).toBeUndefined();
+    expect(technicalStudy.message.result).toMatchObject({
+      structuredContent: {
+        schemaVersion: '3', depth: 'technical',
+        semanticEvidence: { language: 'Greek', status: 'not_applicable' },
+        corpusOccurrences: {
+          status: 'available', publicStrongs: 'G26', exactMorphologyKey: 'G0026',
+          occurrences: [expect.objectContaining({ sourceForm: 'ἀγάπη·', exactMorphologyKey: 'G0026' })],
+          resultWindow: { returnedCount: 1, maximumReturned: 20, hasMore: false },
+        },
+      },
+    });
+
+    const staleCursor = await rpc('tools/call', {
+      name: 'original_language_study',
+      arguments: {
+        reference: 'John 3:16', target: 'G26', position: 2,
+        depth: 'technical', cursor: 'olsv2c1_7b7d',
+      },
+    }, 37);
+    expect(staleCursor.message.error).toBeUndefined();
+    expect(staleCursor.message.result).toMatchObject({ isError: true });
+    expect(textContent(staleCursor.message)).toMatch(/unsupported and stale/i);
   });
 
   it('lists the document fixture dynamically and reads its D1-backed resource', async () => {

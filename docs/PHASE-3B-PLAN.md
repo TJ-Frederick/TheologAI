@@ -66,7 +66,9 @@ The following boundaries remain deliberate:
 ## Phase 3B sequencing
 
 Status: **3B.0 complete (C1 + C2); 3B.1 complete in PR #151 after protected
-preview and production proof; 3B.2 is next**. This plan does not authorize any
+preview and production proof; 3B.2 planning is complete; the 3B.3 candidate is
+implemented on an unreleased branch and still requires review and protected
+preview proof**. This plan does not authorize any
 additional deployment, binding change, cleanup, or other operational mutation.
 
 ### 3B.0 — Rebaseline and simplify
@@ -177,18 +179,35 @@ has a defined scholarly purpose.
 
 ### 3B.3 — Original-language experience
 
-Preserve the existing evidence boundary while making one tool useful at
-multiple levels:
+The implementation candidate keeps the existing eleven-tool inventory and hard-cuts
+`original_language_study` from public schema v2 to v3. The request is closed to
+`reference`, `target`, optional `position`, optional `depth`, and optional v3
+continuation. `depth` is exactly `beginner | intermediate | technical` and
+defaults to `intermediate`; the removed `detail` control and every v2 cursor
+fail closed. The three levels are:
 
-- beginner: explain a likely nuance missed in English and the limits of the
-  evidence;
-- intermediate: lemma, morphology, translation range, and local context;
+- beginner: concise, plain-language source evidence and its limits; the guided
+  prompt, not the deterministic tool, produces any evidence-labeled
+  interpretation;
+- intermediate: lemma, expanded morphology, source-attributed lexical range,
+  and verse-local context;
 - technical: source identity, attested semantic candidates, ambiguity, and
-  bounded occurrence windows.
+  bounded exact corrected-corpus occurrence windows.
 
-Update guided prompts to choose an appropriate depth. Evaluate MACULA
-discourse/context data only after a separate source, license, and product-scope
-review.
+Lexical range remains source-attributed and is not presented as English
+translation comparison. English comparison is a separate guided-prompt step,
+and the deterministic tool never selects the contextual meaning. Only
+technical depth returns corpus occurrences; no schema, migration, D1 binding,
+or corpus-data change is part of this candidate. `word-study`,
+`passage-exegesis`, and `compare-translations` advertise the same depth policy;
+explicit depth wins, otherwise simple/beginner wording selects beginner,
+raw-evidence/technical wording selects technical, and all other requests use
+intermediate.
+
+MACULA remains entirely outside this lane. Its data, parser, repository,
+schema, prompt, test fixtures, and runtime composition must not be introduced
+by the v3 release. Any future evaluation requires a separate source, license,
+and product-scope review.
 
 ### 3B.4 — Public operations
 

@@ -847,6 +847,15 @@ Code readiness and operational readiness are deliberately separate:
   with explicit unavailable-evidence disclosure and no fabricated replacement.
   The separately CC BY 4.0 STEPBible morphology evidence remains usable on its
   own.
+- **Phase 3B.3 original-language depth candidate (unreleased):** advances the
+  existing tool to a closed schema-v3 `depth` contract, defaults omission to
+  intermediate, rejects removed `detail` and stale v2 cursors, keeps
+  source-attributed lexical range separate from English translation
+  comparison, reserves contextual interpretation for guided prompts, and
+  exposes bounded corrected-corpus occurrences only at technical depth. It
+  changes no migration, corpus data, D1 binding, or tool/prompt counts. MACULA
+  is explicitly excluded. This is repository candidate state, not a claim
+  about the active release recorded in `docs/CURRENT-RELEASE.md`.
 - Evaluate section-span commentary only where provider coverage can be stated
   honestly; never relabel a section anchor as an exact verse range.
 - Continue modern MCP output improvements tool by tool when a stable structured

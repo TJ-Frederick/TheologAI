@@ -17,6 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Prepared the unreleased breaking `original_language_study` schema-v3
+  cutover: `depth` replaces `detail`, omission defaults to `intermediate`, v2
+  cursors fail closed, lexical range is source-attributed and separate from
+  English translation comparison, contextual interpretation remains
+  prompt-produced, and only `technical` returns bounded corrected-corpus
+  occurrences. The tool/prompt inventory, migrations, D1 bindings, and corpus
+  data remain unchanged; MACULA is excluded.
+
 - Historically recorded the PR #96 production identity: source commit
   `ac4b5ed774302fbfc86bf846b6ee77a07beed456`, tree
   `adf08edbf6bfcb14b9613354b2b8fb9f62ec8c16`, canonical endpoint

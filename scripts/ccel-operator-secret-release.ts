@@ -31,7 +31,7 @@ const DO_CONFIG_BINDING = {
   script_name: DO_BINDING.script_name,
 };
 const PRODUCTION_VARS: Record<string, string> = {
-  THEOLOGAI_VERSION: '3.6.0',
+  THEOLOGAI_VERSION: '4.0.0',
   THEOLOGAI_ALLOWED_ORIGINS: ORIGINS,
   THEOLOGAI_MAX_REQUEST_BYTES: '1048576',
   THEOLOGAI_REQUEST_LOGS: 'false',
@@ -41,7 +41,7 @@ const PRODUCTION_VARS: Record<string, string> = {
 };
 const PREVIEW_VARS: Record<string, string> = {
   ...PRODUCTION_VARS,
-  THEOLOGAI_VERSION: '3.6.0-preview',
+  THEOLOGAI_VERSION: '4.0.0-preview',
   THEOLOGAI_REQUEST_LOGS: 'true',
   THEOLOGAI_EXPOSE_CCEL_DISCOVERY: 'true',
 };

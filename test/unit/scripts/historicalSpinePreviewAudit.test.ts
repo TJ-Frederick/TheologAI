@@ -26,7 +26,7 @@ function response(body: RecordValue, fixtureValue: HistoricalSpineAuditFixture, 
   const rpc = (result: RecordValue) => new Response(JSON.stringify({ jsonrpc: '2.0', id, result }), { headers: { 'content-type': 'application/json' } });
   const error = (errorValue: RecordValue) => new Response(JSON.stringify({ jsonrpc: '2.0', id, error: errorValue }), { headers: { 'content-type': 'application/json' } });
   if (body.method === 'initialize') return rpc({
-    protocolVersion: '2025-11-25', serverInfo: { name: 'theologai-bible-server', version: production ? '3.6.0' : '3.6.0-preview' },
+    protocolVersion: '2025-11-25', serverInfo: { name: 'theologai-bible-server', version: production ? '4.0.0' : '4.0.0-preview' },
     capabilities: { tools: {}, resources: {}, prompts: {} },
   });
   if (body.method === 'tools/list') return rpc({ tools: [

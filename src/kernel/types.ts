@@ -375,6 +375,16 @@ export interface CorpusUsageResult {
   cautions: string[];
 }
 
+/** Narrow technical occurrence projection used by original_language_study v3. */
+export type CorpusOccurrencePageResult = Pick<
+  CorpusUsageResult,
+  'exactMorphologyKey' | 'corpusIdentity' | 'attested' | 'totals' | 'cautions'
+> & {
+  publicStrongs: string;
+  occurrences: NonNullable<CorpusUsageResult['occurrences']>;
+  nextOccurrenceCursor?: string;
+};
+
 export interface StrongsResult {
   strongs_number: string;
   testament: 'OT' | 'NT' | null;

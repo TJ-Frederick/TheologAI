@@ -103,7 +103,7 @@ test/
 | `primary_source_search` | Run bounded local-only primary-source query plans with exact local section locators |
 | `original_language_lookup` | Strong's concordance plus opt-in exact corrected-corpus usage and bounded occurrence pages |
 | `bible_verse_morphology` | Word-by-word grammatical analysis for all 66 books |
-| `original_language_study` | Context-first study of one Greek or Hebrew token in one verse, with structured evidence and interpretive limits |
+| `original_language_study` | Checked-out unreleased schema-v3 candidate: context-first study at beginner, intermediate, or technical depth (default intermediate); only technical returns bounded corpus occurrences, and stale v2 cursors fail closed after cutover. `docs/CURRENT-RELEASE.md` remains active endpoint authority. |
 | `donation_config` | Structured voluntary-donation configuration: public web URL, recipient address, and ordered native/token assets; no feature unlocks or asset rankings |
 | `verify_donation` | Structured, fail-closed receipt classification across Ethereum, Base, and Radius; no confirmation-depth or finality claim |
 
@@ -136,6 +136,16 @@ These prompts provide structured research methodologies. **Auto-trigger**: when 
 | `confession-study` | `/mcp__theologai__confession-study` | Compare doctrines across creeds, confessions, and catechisms from different traditions |
 | `primary-source-research` | `/mcp__theologai__primary-source-research` | Survey a topic or search one exact local work, then read selected exact sections as evidence |
 | `donate` | `/mcp__theologai__donate` | Donate, support the project, contribute financially, or ask about donations |
+
+Only in this checked-out unreleased candidate do `word-study`,
+`passage-exegesis`, and `compare-translations` support the optional `depth`
+argument. An explicit `beginner`, `intermediate`, or
+`technical` value wins. When mapping user wording, choose `beginner` for
+simple/beginner requests, `technical` for raw-evidence/technical requests, and
+`intermediate` otherwise. Beginner contextual explanation is prompt-produced,
+evidence-labeled interpretation; `original_language_study` never chooses the
+contextual meaning. Keep its source-attributed lexical range separate from the
+English translation comparison performed by the guided workflow.
 
 When a user asks "what can you do?" or seems unsure how to proceed, mention these workflows as available research modes.
 

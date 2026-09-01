@@ -22,7 +22,7 @@ head_sampling_rate = 0.05
 binding = "CF_VERSION_METADATA"
 
 [vars]
-THEOLOGAI_VERSION = "3.6.0"
+THEOLOGAI_VERSION = "4.0.0"
 THEOLOGAI_ALLOWED_ORIGINS = "https://theologai.xyz,https://theologai.pages.dev"
 THEOLOGAI_MAX_REQUEST_BYTES = "1048576"
 THEOLOGAI_REQUEST_LOGS = "false"
@@ -90,7 +90,7 @@ routes = [
 binding = "CF_VERSION_METADATA"
 
 [env.preview.vars]
-THEOLOGAI_VERSION = "3.6.0-preview"
+THEOLOGAI_VERSION = "4.0.0-preview"
 THEOLOGAI_ALLOWED_ORIGINS = "https://theologai.xyz,https://theologai.pages.dev"
 THEOLOGAI_MAX_REQUEST_BYTES = "1048576"
 THEOLOGAI_REQUEST_LOGS = "true"

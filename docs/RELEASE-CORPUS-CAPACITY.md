@@ -73,6 +73,36 @@ evidence is retained before the generic verifier can issue its terse early
 size error. Operators should also run the same command manually when preparing
 release evidence; CI does not update the recorded baseline.
 
+## Remote readiness tiers
+
+Exhaustive corpus correctness remains mandatory, but it is not repeated for
+every code-only Worker deployment. Fresh checkout, deterministic seed import,
+local D1/Workerd, and new-candidate preparation execute the complete readiness
+and Transform authority inventories. Candidate preparation is the only remote
+phase that may create a new deep-readiness record.
+
+After that record is reviewed, `data/d1-readiness-seals.json` pins the exact D1
+name/UUID, corpus identity, deterministic seed-manifest SHA-256, deep-readiness
+receipt SHA-256, and historical evidence run for each environment. Fresh
+checkout regenerates the seed and requires
+`npm run d1:seed:verify-readiness-seal` to match that record byte-for-byte.
+Changing corpus inputs, migrations, seed output, a D1 binding, or the reviewed
+evidence therefore invalidates the seal and requires a newly prepared
+candidate; updating the JSON alone is not a readiness procedure.
+
+Protected preview and production deploys run the sealed live gate. It checks
+the current schema/corpus markers, every public table shape, runtime-critical
+indexes, terminal import seals, and representative indexed/FTS lookups. It
+does not execute corpus-sized counts, semantic reconstruction, aggregate
+parity, `quick_check`, foreign-key scans, or full authority pagination. The
+live statement must report D1 `rows_read` and fails above 10,000. Post-deploy
+Worker/D1 binding proof and fixed MCP black-box audits remain unchanged.
+
+When the deep gate reports a failed predicate, its first result names the
+failed checks and only those diagnostics may run. A SQL/platform/quota failure
+has no automatic diagnostic retry, preventing a failed full scan from being
+duplicated.
+
 ## Transform 10 release interpretation
 
 The normal release corpus intentionally excludes all Transform-10 hierarchy

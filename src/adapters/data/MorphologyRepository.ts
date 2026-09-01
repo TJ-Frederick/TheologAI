@@ -45,6 +45,7 @@ export class MorphologyRepository implements IMorphologyRepository {
   private stmtFormUsageLimited: Database.Statement;
   private stmtTokenOccurrences: Database.Statement;
   private stmtTokenOccurrencesAfter: Database.Statement;
+  private stmtTokenOccurrenceBoundary: Database.Statement;
 
   constructor(db?: Database.Database) {
     this.db = db ?? getDatabase();
@@ -93,6 +94,16 @@ export class MorphologyRepository implements IMorphologyRepository {
       `SELECT ${tokenColumns} FROM morphology
        WHERE strongs_number = ? AND (book_order, chapter, verse, position) > (?, ?, ?, ?)
        ORDER BY book_order, chapter, verse, position LIMIT ?`
+    );
+    this.stmtTokenOccurrenceBoundary = this.db.prepare(
+      `WITH target(strongs_number, book_order, chapter, verse, position) AS (VALUES (?, ?, ?, ?, ?))
+       SELECT
+         (SELECT COUNT(*) FROM morphology m, target t
+          WHERE m.strongs_number = t.strongs_number
+            AND (m.book_order, m.chapter, m.verse, m.position) <= (t.book_order, t.chapter, t.verse, t.position)) AS row_count,
+         EXISTS(SELECT 1 FROM morphology m, target t
+          WHERE m.strongs_number = t.strongs_number
+            AND (m.book_order, m.chapter, m.verse, m.position) = (t.book_order, t.chapter, t.verse, t.position)) AS boundary_exists`
     );
   }
 
@@ -174,5 +185,26 @@ export class MorphologyRepository implements IMorphologyRepository {
       )
       : this.stmtTokenOccurrences.all(identity.morphologyKey, limit + 1)) as TokenOccurrence[];
     return tokenOccurrencePage(rows, limit);
+  }
+
+  hasTokenOccurrenceBoundary(
+    strongsNumber: string,
+    boundary: CanonicalOccurrencePosition,
+    pageSize: number,
+  ): boolean {
+    const identity = parseStrongsIdentity(strongsNumber);
+    if (!identity) return false;
+    assertOccurrencePosition(boundary);
+    if (!Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 25) return false;
+    const row = this.stmtTokenOccurrenceBoundary.get(
+      identity.morphologyKey,
+      boundary.book_order,
+      boundary.chapter,
+      boundary.verse,
+      boundary.position,
+    ) as { row_count?: number; boundary_exists?: number } | undefined;
+    const count = row?.row_count;
+    return row?.boundary_exists === 1
+      && Number.isSafeInteger(count) && count! > 0 && count! % pageSize === 0;
   }
 }

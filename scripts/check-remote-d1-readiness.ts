@@ -3,9 +3,10 @@
 
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { parse as parseToml } from 'smol-toml';
 import { genesisOneOneLemmaReadinessPredicate, johnOneOneReadinessPredicate } from './data-integrity.js';
 import { computeD1CorpusIdentity, parseDataManifest, verifyD1Migrations } from './d1-corpus-identity.js';
 import { UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY, UBS_PARALLEL_PASSAGE_PROVENANCE } from '../src/kernel/ubsParallelSource.js';
@@ -61,6 +62,11 @@ const UBS_SEMANTIC_STORAGE = createUbsSemanticStorageContract(UBS_SEMANTIC_AUDIT
 
 /** D1's command interface is deliberately kept below its request-size ceiling. */
 export const MAX_D1_READINESS_SQL_BYTES = 100_000;
+
+/** A code-only release check must leave essentially all Free-plan capacity to the product. */
+export const MAX_D1_RELEASE_ROWS_READ = 10_000;
+
+export type D1ReleaseEnvironment = 'preview' | 'production';
 
 export const REQUIRED_COLUMNS: Readonly<Record<string, readonly string[]>> = {
   theologai_metadata: ['key', 'value'],
@@ -140,6 +146,26 @@ interface RemoteD1ReadinessOptions {
   configPath?: string;
 }
 
+interface RemoteD1ReleaseOptions extends RemoteD1ReadinessOptions {
+  releaseEnvironment: D1ReleaseEnvironment;
+}
+
+interface D1ReadinessSealRecord {
+  databaseName: string;
+  databaseId: string;
+  readinessIdentitySha256: string;
+  deepReadinessReceiptSha256: string;
+  evidencePath: string;
+  evidenceRunId: string;
+}
+
+interface D1ReadinessSealRegistry {
+  schemaVersion: 'theologai-d1-readiness-seals.v1';
+  seedManifestSha256: string;
+  corpusIdentity: string;
+  environments: Record<D1ReleaseEnvironment, D1ReadinessSealRecord>;
+}
+
 interface ReadinessReceiptComponent {
   identitySha256: string;
   result: 'passed';
@@ -156,6 +182,17 @@ export interface RemoteD1ReadinessReceipt {
   environment: string | null;
   readiness: ReadinessReceiptComponent;
   authority: ReadinessReceiptComponent;
+  mode?: 'deep-candidate' | 'sealed-release';
+  rowsRead?: number;
+  rowsReadBudget?: number;
+  seal?: {
+    databaseId: string;
+    seedManifestSha256: string;
+    corpusIdentity: string;
+    readinessIdentitySha256: string;
+    deepReadinessReceiptSha256: string;
+    evidenceRunId: string;
+  };
 }
 
 type ReadinessCommandExecutor = (
@@ -581,7 +618,8 @@ function buildD1ReadinessChecksCte(contract: D1ReadinessQueryContract): string {
   const values = contract.checks.map(check =>
     `(${sqlLiteral(check.id)}, (${check.predicate}))`
   ).join(',\n');
-  return `WITH ${contract.ctes.join(',\n')},\nreadiness_checks(check_name, passed) AS (VALUES\n${values}\n)`;
+  const prefix = contract.ctes.length > 0 ? `${contract.ctes.join(',\n')},\n` : '';
+  return `WITH ${prefix}readiness_checks(check_name, passed) AS (VALUES\n${values}\n)`;
 }
 
 /**
@@ -614,20 +652,96 @@ function selectD1ReadinessChecks(
   return { ...contract, checks: selected };
 }
 
+function buildReadinessResultSql(
+  kind: 'primary' | 'release',
+  contract: D1ReadinessQueryContract,
+): string {
+  const expectedCheckCount = contract.checks.length;
+  return assertD1ReadinessSqlByteBound(kind, [
+    buildD1ReadinessChecksCte(contract),
+    `SELECT CASE`,
+    `WHEN (SELECT COUNT(*) FROM readiness_checks) != ${expectedCheckCount} THEN 'failed'`,
+    `WHEN (SELECT COUNT(*) FROM readiness_checks WHERE passed IS 1) != ${expectedCheckCount} THEN 'failed'`,
+    `ELSE 'ready' END AS readiness,`,
+    `CASE WHEN (SELECT COUNT(*) FROM readiness_checks) != ${expectedCheckCount}`,
+    `THEN '["inventory.mismatch"]'`,
+    `ELSE (SELECT json_group_array(check_name) FROM readiness_checks WHERE passed IS NOT 1)`,
+    `END AS failed_checks;`,
+  ].join('\n'));
+}
+
 export function buildD1ReadinessSql(
   expectedCounts: Record<string, number>,
   schemaVersion = MANIFEST.schemaVersion,
   d1CorpusIdentity = D1_CORPUS_IDENTITY,
 ): string {
   const contract = buildD1ReadinessQueryContract(expectedCounts, schemaVersion, d1CorpusIdentity);
-  const expectedCheckCount = contract.checks.length;
-  return assertD1ReadinessSqlByteBound('primary', [
-    buildD1ReadinessChecksCte(contract),
-    `SELECT CASE`,
-    `WHEN (SELECT COUNT(*) FROM readiness_checks) != ${expectedCheckCount} THEN json_extract('D1 readiness check inventory mismatch', '$')`,
-    `WHEN (SELECT COUNT(*) FROM readiness_checks WHERE passed IS 1) != ${expectedCheckCount} THEN json_extract('D1 readiness check failed', '$')`,
-    `ELSE 'ready' END AS readiness;`,
-  ].join('\n'));
+  return buildReadinessResultSql('primary', contract);
+}
+
+/**
+ * Small live check for a D1 whose exhaustive, immutable-corpus readiness is
+ * already pinned by a reviewed seal. No corpus-sized COUNT, aggregation,
+ * parity reconstruction, quick_check, or foreign-key scan belongs here.
+ */
+export function buildD1ReleaseReadinessSql(
+  schemaVersion = MANIFEST.schemaVersion,
+  d1CorpusIdentity = D1_CORPUS_IDENTITY,
+): string {
+  if (!/^[a-z0-9_]+$/.test(schemaVersion) || !/^[a-f0-9]{64}$/.test(d1CorpusIdentity)) {
+    throw new Error('Invalid release schema or D1 corpus identity');
+  }
+  const releaseIndexes = [
+    'idx_morph_verse',
+    'idx_morph_strongs_canonical',
+    'idx_ubs_groups_source_order',
+    'idx_ubs_segments_lookup',
+    'idx_ubs_semantic_coordinate_lookup',
+    'idx_ubs_semantic_evidence_sense_order',
+    'idx_document_sections_id_document',
+    'idx_historical_edition_sections_order',
+  ];
+  const columnChecks = Object.entries(REQUIRED_COLUMNS).map(([table, columns]): D1ReadinessCheck => ({
+    id: `schema.columns.${table}`,
+    predicate: `(SELECT group_concat(name, ',') FROM (SELECT name FROM pragma_table_info('${table}') ORDER BY cid)) = '${columns.join(',')}'`,
+  }));
+  const semanticArtifact = UBS_SEMANTIC_STORAGE.artifact;
+  const checks: D1ReadinessCheck[] = [
+    { id: 'identity.schema_version', predicate: `(SELECT value FROM theologai_metadata WHERE key = 'schema_version') = '${schemaVersion}'` },
+    { id: 'identity.corpus_manifest_sha256', predicate: `(SELECT value FROM theologai_metadata WHERE key = 'corpus_manifest_sha256') = '${d1CorpusIdentity}'` },
+    ...columnChecks,
+    {
+      id: 'schema.release_indexes',
+      predicate: `(SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name IN (${releaseIndexes.map(sqlLiteral).join(',')})) = ${releaseIndexes.length}`,
+    },
+    {
+      id: 'seal.transform12',
+      predicate: `(SELECT COUNT(*) FROM historical_corpus_seal WHERE seal_id = 1 AND transform_version = 12 AND storage_contract = ${sqlLiteral(TRANSFORM12_STORAGE_CONTRACT)}) = 1`,
+    },
+    {
+      id: 'seal.ubs_parallel',
+      predicate: `(SELECT artifact_identity FROM ubs_parallel_sources WHERE source_id = 'ubs_paratext_parallel_passages') = ${sqlLiteral(UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY)}`,
+    },
+    {
+      id: 'seal.ubs_semantic',
+      predicate: `(SELECT artifact_identity FROM ubs_semantic_artifacts) = ${sqlLiteral(semanticArtifact.artifactIdentity)}`,
+    },
+    { id: 'sentinel.john_1_1', predicate: johnOneOneReadinessPredicate() },
+    { id: 'sentinel.genesis_1_1', predicate: genesisOneOneLemmaReadinessPredicate() },
+    {
+      id: 'sentinel.strongs_fts',
+      predicate: `(SELECT COUNT(*) FROM strongs_fts WHERE strongs_fts MATCH '"love"' AND strongs_number = 'G25') = 1`,
+    },
+    {
+      id: 'sentinel.sections_fts',
+      predicate: `(SELECT COUNT(*) FROM sections_fts WHERE sections_fts MATCH '"almighty"' AND rowid = 1962) = 1`,
+    },
+    {
+      id: 'sentinel.historical_edition_fts',
+      predicate: `(SELECT COUNT(*) FROM historical_edition_sections_fts WHERE historical_edition_sections_fts MATCH '"grace"') = 391`,
+    },
+  ];
+  return buildReadinessResultSql('release', { ctes: [], checks });
 }
 
 export function buildD1ReadinessDiagnosticSql(
@@ -646,7 +760,7 @@ export function buildD1ReadinessDiagnosticSql(
   ].join('\n'));
 }
 
-function assertD1ReadinessSqlByteBound(kind: 'primary' | 'diagnostic', sql: string): string {
+function assertD1ReadinessSqlByteBound(kind: 'primary' | 'diagnostic' | 'release', sql: string): string {
   const bytes = Buffer.byteLength(sql, 'utf8');
   if (bytes > MAX_D1_READINESS_SQL_BYTES) {
     throw new Error(`D1 readiness ${kind} SQL exceeds ${MAX_D1_READINESS_SQL_BYTES} bytes: ${bytes}`);
@@ -654,28 +768,198 @@ function assertD1ReadinessSqlByteBound(kind: 'primary' | 'diagnostic', sql: stri
   return sql;
 }
 
-function parseArguments(argv: string[]): { database: string; env?: string; output?: string; printOnly: boolean } {
+function parseArguments(argv: string[]): {
+  database: string;
+  env?: string;
+  output?: string;
+  printOnly: boolean;
+  releaseEnvironment?: D1ReleaseEnvironment;
+} {
   let database: string | undefined;
   let env: string | undefined;
   let output: string | undefined;
   let printOnly = false;
+  let releaseEnvironment: D1ReleaseEnvironment | undefined;
   for (let index = 0; index < argv.length; index++) {
     const argument = argv[index];
     if (argument === '--database') database = argv[++index];
     else if (argument === '--env') env = argv[++index];
     else if (argument === '--output') output = argv[++index];
     else if (argument === '--print') printOnly = true;
+    else if (argument === '--sealed-release') {
+      const value = argv[++index];
+      if (value !== 'preview' && value !== 'production') {
+        throw new Error('--sealed-release requires preview or production');
+      }
+      releaseEnvironment = value;
+    }
     else throw new Error(`Unknown argument: ${argument}`);
   }
   if (!database || database.startsWith('--')) throw new Error('--database is required');
   if (env?.startsWith('--')) throw new Error('--env requires a value');
   if (output?.startsWith('--')) throw new Error('--output requires a path');
   if (printOnly && output) throw new Error('--print and --output cannot be combined');
-  return { database, env, output, printOnly };
+  if (releaseEnvironment === 'preview' && env !== 'preview') {
+    throw new Error('A sealed preview release requires --env preview');
+  }
+  if (releaseEnvironment === 'production' && env !== undefined) {
+    throw new Error('A sealed production release uses the root Wrangler environment');
+  }
+  return { database, env, output, printOnly, releaseEnvironment };
 }
 
-function sha256(value: string): string {
+function sha256(value: string | Buffer): string {
   return createHash('sha256').update(value).digest('hex');
+}
+
+function record(value: unknown, label: string): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be an object`);
+  return value as Record<string, unknown>;
+}
+
+function canonicalUuid(value: unknown): value is string {
+  return typeof value === 'string'
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(value);
+}
+
+function configuredD1Binding(root: string, environment: D1ReleaseEnvironment): {
+  databaseName: string;
+  databaseId: string;
+} {
+  const config = record(parseToml(readFileSync(join(root, 'wrangler.toml'), 'utf8')), 'Wrangler config');
+  const scope = environment === 'preview'
+    ? record(record(config.env, 'Wrangler env').preview, 'Wrangler preview environment')
+    : config;
+  const bindings = scope.d1_databases;
+  if (!Array.isArray(bindings) || bindings.length !== 1) {
+    throw new Error(`Wrangler ${environment} must contain exactly one D1 binding`);
+  }
+  const binding = record(bindings[0], `Wrangler ${environment} D1 binding`);
+  if (binding.binding !== 'THEOLOGAI_DB' || typeof binding.database_name !== 'string'
+    || !canonicalUuid(binding.database_id)) {
+    throw new Error(`Wrangler ${environment} D1 binding is malformed`);
+  }
+  return { databaseName: binding.database_name, databaseId: binding.database_id };
+}
+
+/** Validate the reviewed, immutable deep-readiness evidence before any live D1 read. */
+export function loadD1ReadinessSeal(
+  root: string,
+  environment: D1ReleaseEnvironment,
+  database: string,
+): D1ReadinessSealRecord & { seedManifestSha256: string; corpusIdentity: string } {
+  const registryPath = join(root, 'data', 'd1-readiness-seals.json');
+  const registry = JSON.parse(readFileSync(registryPath, 'utf8')) as D1ReadinessSealRegistry;
+  if (registry.schemaVersion !== 'theologai-d1-readiness-seals.v1'
+    || !/^[a-f0-9]{64}$/.test(registry.seedManifestSha256)
+    || !/^[a-f0-9]{64}$/.test(registry.corpusIdentity)) {
+    throw new Error('D1 readiness seal registry is malformed');
+  }
+  if (registry.corpusIdentity !== D1_CORPUS_IDENTITY) {
+    throw new Error('D1 readiness seal does not match the checked-in seed and corpus identity');
+  }
+  const seedManifestPath = join(root, 'scripts', 'd1-seed', 'seed-manifest.json');
+  if (existsSync(seedManifestPath)) verifyD1ReadinessSealSeed(root);
+  const seal = record(
+    registry.environments?.[environment],
+    `${environment} D1 readiness seal`,
+  ) as unknown as D1ReadinessSealRecord;
+  if (seal.databaseName !== database || !canonicalUuid(seal.databaseId)
+    || seal.readinessIdentitySha256 !== receiptComponent({
+      kind: 'd1-readiness.v1',
+      schemaVersion: MANIFEST.schemaVersion,
+      corpusIdentity: D1_CORPUS_IDENTITY,
+      checkCount: buildD1ReadinessQueryContract(MANIFEST.expectedCounts).checks.length,
+    }).identitySha256
+    || !/^[a-f0-9]{64}$/.test(seal.deepReadinessReceiptSha256)
+    || !/^[0-9]+$/.test(seal.evidenceRunId)
+    || !/^docs\/[A-Z0-9._/-]+\.md$/i.test(seal.evidencePath)
+    || seal.evidencePath.includes('..')) {
+    throw new Error(`Checked-in ${environment} D1 does not match its reviewed readiness seal`);
+  }
+  const configured = configuredD1Binding(root, environment);
+  if (configured.databaseName !== seal.databaseName || configured.databaseId !== seal.databaseId) {
+    throw new Error(`Wrangler ${environment} D1 binding does not match its reviewed readiness seal`);
+  }
+  const evidence = readFileSync(join(root, seal.evidencePath), 'utf8');
+  for (const pinned of [seal.databaseName, seal.databaseId, seal.deepReadinessReceiptSha256, seal.evidenceRunId]) {
+    if (!evidence.includes(pinned)) {
+      throw new Error(`${environment} D1 readiness seal is not backed by its declared evidence`);
+    }
+  }
+  return { ...seal, seedManifestSha256: registry.seedManifestSha256, corpusIdentity: registry.corpusIdentity };
+}
+
+/**
+ * Fresh-checkout and candidate-preparation jobs call this after deterministic
+ * seed generation. Deploy jobs may then rely on the exact checked-in seal only
+ * because they require that successful fresh-checkout job for the same commit.
+ */
+export function verifyD1ReadinessSealSeed(root: string): void {
+  const registry = JSON.parse(
+    readFileSync(join(root, 'data', 'd1-readiness-seals.json'), 'utf8'),
+  ) as D1ReadinessSealRegistry;
+  const seedManifestPath = join(root, 'scripts', 'd1-seed', 'seed-manifest.json');
+  if (!existsSync(seedManifestPath)) throw new Error('Generated D1 seed manifest is unavailable');
+  const seedManifestBytes = readFileSync(seedManifestPath);
+  const seedManifest = record(JSON.parse(seedManifestBytes.toString('utf8')), 'D1 seed manifest');
+  const materialization = record(seedManifest.d1Materialization, 'D1 seed materialization');
+  if (sha256(seedManifestBytes) !== registry.seedManifestSha256
+    || materialization.sha256 !== registry.corpusIdentity
+    || registry.corpusIdentity !== D1_CORPUS_IDENTITY) {
+    throw new Error('Generated D1 seed manifest does not match the reviewed readiness seal');
+  }
+}
+
+interface ParsedD1StatementResult {
+  results: Array<Record<string, unknown>>;
+  rowsRead: number | null;
+}
+
+function parseD1StatementResult(value: unknown, requireRowsRead: boolean): ParsedD1StatementResult {
+  let parsed: unknown;
+  try {
+    parsed = typeof value === 'string' ? JSON.parse(value)
+      : Buffer.isBuffer(value) ? JSON.parse(value.toString('utf8')) : value;
+  } catch {
+    throw new Error('D1 readiness did not return JSON');
+  }
+  if (!Array.isArray(parsed) || parsed.length !== 1) {
+    throw new Error('D1 readiness must return exactly one statement result');
+  }
+  const statement = record(parsed[0], 'D1 readiness statement');
+  if (statement.success !== true || !Array.isArray(statement.results)) {
+    throw new Error('D1 readiness statement did not succeed');
+  }
+  const results = statement.results.map((row, index) => record(row, `D1 readiness result ${index}`));
+  const meta = statement.meta === undefined ? undefined : record(statement.meta, 'D1 readiness metadata');
+  const rowsRead = meta?.rows_read;
+  if (rowsRead !== undefined && (!Number.isSafeInteger(rowsRead) || (rowsRead as number) < 0)) {
+    throw new Error('D1 readiness rows_read metadata is invalid');
+  }
+  if (requireRowsRead && rowsRead === undefined) throw new Error('D1 release readiness did not report rows_read');
+  return { results, rowsRead: rowsRead === undefined ? null : rowsRead as number };
+}
+
+function parseReadinessResult(value: unknown, requireRowsRead: boolean): {
+  readiness: 'ready' | 'failed';
+  failedChecks: string[];
+  rowsRead: number | null;
+} {
+  const statement = parseD1StatementResult(value, requireRowsRead);
+  if (statement.results.length !== 1) throw new Error('D1 readiness must return exactly one result row');
+  const row = statement.results[0]!;
+  if (row.readiness !== 'ready' && row.readiness !== 'failed') throw new Error('D1 readiness result is malformed');
+  let failedChecks: unknown;
+  try { failedChecks = JSON.parse(String(row.failed_checks)); }
+  catch { throw new Error('D1 readiness failed-check inventory is malformed'); }
+  if (!Array.isArray(failedChecks) || !failedChecks.every(check => typeof check === 'string' && /^[a-z0-9._:-]+$/.test(check))) {
+    throw new Error('D1 readiness failed-check inventory is malformed');
+  }
+  if ((row.readiness === 'ready') !== (failedChecks.length === 0)) {
+    throw new Error('D1 readiness status and failed-check inventory disagree');
+  }
+  return { readiness: row.readiness, failedChecks, rowsRead: statement.rowsRead };
 }
 
 function receiptComponent(identity: unknown): ReadinessReceiptComponent {
@@ -694,6 +978,7 @@ export function createRemoteD1ReadinessReceipt(input: {
     schemaVersion: 'theologai-remote-d1-readiness-receipt.v1',
     database: input.database,
     environment: input.env ?? null,
+    mode: 'deep-candidate',
     readiness: receiptComponent({
       kind: 'd1-readiness.v1', schemaVersion: MANIFEST.schemaVersion,
       corpusIdentity: D1_CORPUS_IDENTITY,
@@ -730,45 +1015,115 @@ export function runRemoteD1ReadinessCheck(
     return execute(process.execPath, args, capture ? { cwd, stdio: 'pipe', encoding: 'utf8' } : { cwd, stdio: 'inherit' });
   };
 
-  try {
-    executeSql(buildD1ReadinessSql(MANIFEST.expectedCounts));
-    const audit = auditHistoricalTransform8Authority(ROOT, sql => {
-      const result = executeSql(sql, true);
-      return parseHistoricalTransform8D1Page(
-        typeof result === 'string' ? result : Buffer.isBuffer(result) ? result.toString('utf8') : String(result),
-      );
-    });
-    process.stderr.write(`Transform-8 D1 authority audit passed (${audit.pages.profiles}/${audit.pages.identities}/${audit.pages.aliases} pages).\n`);
-    const transform9Audit = auditHistoricalTransform9Authority(ROOT, sql => {
-      const result = executeSql(sql, true);
-      return parseHistoricalTransform9D1Page(
-        typeof result === 'string' ? result : Buffer.isBuffer(result) ? result.toString('utf8') : String(result),
-      );
-    });
-    process.stderr.write(`Transform-9 D1 authority audit passed (${transform9Audit.pages.packs}/${transform9Audit.pages.works}/${transform9Audit.pages.editions}/${transform9Audit.pages.artifacts}/${transform9Audit.pages.documents}/${transform9Audit.pages.profiles}/${transform9Audit.pages.sections}/${transform9Audit.pages.projections} pages).\n`);
-    return createRemoteD1ReadinessReceipt({
-      database: options.database, env: options.env, transform8: audit, transform9: transform9Audit,
-    });
-  } catch (primaryError) {
-    process.stderr.write('Primary D1 readiness gate failed; requesting failed-check diagnostics.\n');
-    try {
-      executeSql(buildD1ReadinessDiagnosticSql(MANIFEST.expectedCounts));
-    } catch {
-      process.stderr.write('D1 readiness diagnostics could not be retrieved.\n');
+  const primary = parseReadinessResult(
+    executeSql(buildD1ReadinessSql(MANIFEST.expectedCounts), true),
+    false,
+  );
+  if (primary.readiness !== 'ready') {
+    process.stderr.write(`Primary D1 readiness failed: ${primary.failedChecks.join(', ')}. Requesting only those diagnostics.\n`);
+    if (primary.failedChecks.includes('inventory.mismatch')) {
+      throw new Error('D1 readiness check inventory mismatch');
     }
-    throw primaryError;
+    executeSql(buildD1ReadinessDiagnosticSql(
+      MANIFEST.expectedCounts,
+      undefined,
+      undefined,
+      primary.failedChecks,
+    ), true);
+    throw new Error(`D1 readiness failed checks: ${primary.failedChecks.join(', ')}`);
   }
+  const audit = auditHistoricalTransform8Authority(ROOT, sql => {
+    const result = executeSql(sql, true);
+    return parseHistoricalTransform8D1Page(
+      typeof result === 'string' ? result : Buffer.isBuffer(result) ? result.toString('utf8') : String(result),
+    );
+  });
+  process.stderr.write(`Transform-8 D1 authority audit passed (${audit.pages.profiles}/${audit.pages.identities}/${audit.pages.aliases} pages).\n`);
+  const transform9Audit = auditHistoricalTransform9Authority(ROOT, sql => {
+    const result = executeSql(sql, true);
+    return parseHistoricalTransform9D1Page(
+      typeof result === 'string' ? result : Buffer.isBuffer(result) ? result.toString('utf8') : String(result),
+    );
+  });
+  process.stderr.write(`Transform-9 D1 authority audit passed (${transform9Audit.pages.packs}/${transform9Audit.pages.works}/${transform9Audit.pages.editions}/${transform9Audit.pages.artifacts}/${transform9Audit.pages.documents}/${transform9Audit.pages.profiles}/${transform9Audit.pages.sections}/${transform9Audit.pages.projections} pages).\n`);
+  return createRemoteD1ReadinessReceipt({
+    database: options.database, env: options.env, transform8: audit, transform9: transform9Audit,
+  });
+}
+
+/**
+ * Verify a code-only release against the exact reviewed candidate seal and a
+ * bounded live query. The exhaustive remote gate remains owned by candidate
+ * preparation and is never repeated here.
+ */
+export function runRemoteD1ReleaseCheck(
+  options: RemoteD1ReleaseOptions,
+  execute: ReadinessCommandExecutor = execFileSync,
+): RemoteD1ReadinessReceipt {
+  const root = options.cwd ?? ROOT;
+  const seal = loadD1ReadinessSeal(root, options.releaseEnvironment, options.database);
+  const wrangler = options.wrangler ?? join(root, 'node_modules', 'wrangler', 'bin', 'wrangler.js');
+  const args = [wrangler, 'd1', 'execute', options.database, '--remote', '--command',
+    buildD1ReleaseReadinessSql(), '--json'];
+  if (options.env) args.push('--env', options.env);
+  if (options.configPath) args.push('--config', options.configPath);
+  const result = execute(process.execPath, args, { cwd: root, stdio: 'pipe', encoding: 'utf8' });
+  const live = parseReadinessResult(result, true);
+  if (live.rowsRead === null || live.rowsRead > MAX_D1_RELEASE_ROWS_READ) {
+    throw new Error(
+      `D1 sealed release readiness read ${String(live.rowsRead)} rows; budget is ${MAX_D1_RELEASE_ROWS_READ}`,
+    );
+  }
+  if (live.readiness !== 'ready') {
+    throw new Error(`D1 sealed release readiness failed checks: ${live.failedChecks.join(', ')}`);
+  }
+  return {
+    schemaVersion: 'theologai-remote-d1-readiness-receipt.v1',
+    database: options.database,
+    environment: options.env ?? null,
+    mode: 'sealed-release',
+    rowsRead: live.rowsRead,
+    rowsReadBudget: MAX_D1_RELEASE_ROWS_READ,
+    readiness: receiptComponent({
+      kind: 'd1-sealed-release-live-readiness.v1',
+      schemaVersion: MANIFEST.schemaVersion,
+      corpusIdentity: D1_CORPUS_IDENTITY,
+      sqlSha256: sha256(buildD1ReleaseReadinessSql()),
+      rowsReadBudget: MAX_D1_RELEASE_ROWS_READ,
+    }),
+    authority: receiptComponent({
+      kind: 'd1-deep-readiness-seal.v1',
+      environment: options.releaseEnvironment,
+      databaseName: seal.databaseName,
+      databaseId: seal.databaseId,
+      readinessIdentitySha256: seal.readinessIdentitySha256,
+      deepReadinessReceiptSha256: seal.deepReadinessReceiptSha256,
+      evidenceRunId: seal.evidenceRunId,
+    }),
+    seal: {
+      databaseId: seal.databaseId,
+      seedManifestSha256: seal.seedManifestSha256,
+      corpusIdentity: seal.corpusIdentity,
+      readinessIdentitySha256: seal.readinessIdentitySha256,
+      deepReadinessReceiptSha256: seal.deepReadinessReceiptSha256,
+      evidenceRunId: seal.evidenceRunId,
+    },
+  };
 }
 
 function main(): void {
-  const { database, env, output, printOnly } = parseArguments(process.argv.slice(2));
-  const sql = buildD1ReadinessSql(MANIFEST.expectedCounts);
+  const { database, env, output, printOnly, releaseEnvironment } = parseArguments(process.argv.slice(2));
+  const sql = releaseEnvironment
+    ? buildD1ReleaseReadinessSql()
+    : buildD1ReadinessSql(MANIFEST.expectedCounts);
   if (printOnly) {
     process.stdout.write(`${sql}\n`);
     return;
   }
 
-  const receipt = runRemoteD1ReadinessCheck({ database, env });
+  const receipt = releaseEnvironment
+    ? runRemoteD1ReleaseCheck({ database, env, releaseEnvironment })
+    : runRemoteD1ReadinessCheck({ database, env });
   if (output) writeReadinessReceipt(output, receipt);
 }
 

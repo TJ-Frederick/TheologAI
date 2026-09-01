@@ -125,11 +125,11 @@ export type HistoricalCoreAuditProfile = {
 /** The shared transport needs only routing identity, not an audit's schema contract. */
 export type FixedAuditMcpProfile = Pick<HistoricalCoreAuditProfile, 'endpoint' | 'hostname' | 'label'>;
 export const PREVIEW_PROFILE: HistoricalCoreAuditProfile = {
-  endpoint: PREVIEW_ENDPOINT, hostname: 'preview-mcp.theologai.xyz', serverVersion: '3.6.0-preview',
+  endpoint: PREVIEW_ENDPOINT, hostname: 'preview-mcp.theologai.xyz', serverVersion: '4.0.0-preview',
   audit: 'historical-core-preview', endpointClass: 'preview-custom', label: 'preview', primarySource: PRIMARY_SOURCE_V7_AUDIT_CONTRACT,
 };
 export const PRODUCTION_PROFILE: HistoricalCoreAuditProfile = {
-  endpoint: PRODUCTION_ENDPOINT, hostname: 'mcp.theologai.xyz', serverVersion: '3.6.0',
+  endpoint: PRODUCTION_ENDPOINT, hostname: 'mcp.theologai.xyz', serverVersion: '4.0.0',
   audit: 'historical-core-production', endpointClass: 'production-custom', label: 'production', primarySource: PRIMARY_SOURCE_V6_AUDIT_CONTRACT,
 };
 const PROTOCOL_VERSION = '2025-11-25';

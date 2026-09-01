@@ -68,7 +68,7 @@ function bindings(mode: '100' | '111' | '000', includeOperatorSecret = false, d1
     { name: 'THEOLOGAI_RATE_LIMITER', type: 'ratelimit', namespace_id: productionMode ? '361201' : '361202', simple: { limit: 120, period: 60 } },
     { name: 'THEOLOGAI_CCEL_OPERATOR_AUTH_LIMITER', type: 'ratelimit', namespace_id: productionMode ? '361203' : '361204', simple: { limit: 12, period: 60 } },
     { name: 'CF_VERSION_METADATA', type: 'version_metadata' },
-    { name: 'THEOLOGAI_VERSION', type: 'plain_text', text: productionMode ? '3.6.0' : '3.6.0-preview' },
+    { name: 'THEOLOGAI_VERSION', type: 'plain_text', text: productionMode ? '4.0.0' : '4.0.0-preview' },
     { name: 'THEOLOGAI_ALLOWED_ORIGINS', type: 'plain_text', text: 'https://theologai.xyz,https://theologai.pages.dev' },
     { name: 'THEOLOGAI_MAX_REQUEST_BYTES', type: 'plain_text', text: '1048576' },
     { name: 'THEOLOGAI_REQUEST_LOGS', type: 'plain_text', text: productionMode ? 'false' : 'true' },

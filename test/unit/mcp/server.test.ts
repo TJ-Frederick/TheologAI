@@ -777,6 +777,21 @@ describe('shared MCP registration', () => {
       'primary-source-research',
       'donate',
     ]);
+    for (const name of ['word-study', 'passage-exegesis', 'compare-translations']) {
+      const prompt = prompts.prompts.find(candidate => candidate.name === name)!;
+      expect(prompt.arguments?.find(argument => argument.name === 'depth')).toMatchObject({
+        required: false,
+        description: expect.stringContaining('An explicit depth wins'),
+      });
+      const depthDescription = prompt.arguments?.find(argument => argument.name === 'depth')?.description ?? '';
+      expect(depthDescription).toContain('simple/beginner requests');
+      expect(depthDescription).toContain('raw-evidence/technical requests');
+      expect(depthDescription).toContain('Default: intermediate');
+    }
+    for (const name of ['confession-study', 'primary-source-research', 'donate']) {
+      expect(prompts.prompts.find(candidate => candidate.name === name)?.arguments)
+        .not.toEqual(expect.arrayContaining([expect.objectContaining({ name: 'depth' })]));
+    }
 
     const wordStudy = await client.getPrompt({ name: 'word-study', arguments: { word: 'G26' } });
     expect(wordStudy.messages[0].content).toEqual(expect.objectContaining({
@@ -797,20 +812,30 @@ describe('shared MCP registration', () => {
       name: 'word-study', arguments: { word: 'love', reference: 'John 3:16' },
     });
     const contextualWordStudyText = (contextualWordStudy.messages[0]!.content as { text: string }).text;
-    expect(contextualWordStudyText).toContain('`detail: "summary"`');
-    expect(contextualWordStudyText).toContain('complete prior study under `study`');
+    expect(contextualWordStudyText).toContain('at **intermediate** depth');
+    expect(contextualWordStudyText).toContain('`depth: "intermediate"`');
+    expect(contextualWordStudyText).not.toContain('`detail:');
     expect(contextualWordStudyText).toContain('semantic candidates as source evidence, not contextual adjudication');
-    expect(contextualWordStudyText).toContain('pass `semanticEvidence.resultWindow.continuation.cursor` unchanged');
+    expect(contextualWordStudyText).toContain('`semanticEvidence.resultWindow.continuation.cursor`');
+    expect(contextualWordStudyText).toContain('`lexicalRange` separate from the English renderings');
+    const beginnerWordStudy = await client.getPrompt({
+      name: 'word-study', arguments: { word: 'love', reference: 'John 3:16', depth: 'beginner' },
+    });
+    const beginnerWordStudyText = (beginnerWordStudy.messages[0]!.content as { text: string }).text;
+    expect(beginnerWordStudyText).toContain('`depth: "beginner"`');
+    expect(beginnerWordStudyText).toContain('prompt-produced interpretation supported by the cited evidence');
+    expect(beginnerWordStudyText).toContain('deterministic tool does not select contextual meaning');
 
     const passageExegesis = await client.getPrompt({
       name: 'passage-exegesis',
       arguments: { reference: 'John 3:16' },
     });
     const passageExegesisText = (passageExegesis.messages[0]!.content as { text: string }).text;
-    expect(passageExegesisText).toContain('`detail: "summary"`');
-    expect(passageExegesisText).toContain('Read the complete prior result from v2 `study`');
+    expect(passageExegesisText).toContain('at **intermediate** depth');
+    expect(passageExegesisText).toContain('`depth: "intermediate"`');
+    expect(passageExegesisText).not.toContain('`detail:');
     expect(passageExegesisText).toContain('semantic candidates as source evidence rather than contextual adjudication');
-    expect(passageExegesisText).toContain('pass `semanticEvidence.resultWindow.continuation.cursor` unchanged');
+    expect(passageExegesisText).toContain('`semanticEvidence.resultWindow.continuation.cursor`');
     const initialParallelCall = passageExegesisText.match(/`parallel_passages` with `([^`]+)`/);
     expect(initialParallelCall?.[1]).toBeDefined();
     expect(JSON.parse(initialParallelCall![1]!)).toEqual({
@@ -909,6 +934,21 @@ describe('shared MCP registration', () => {
     expect(compareTranslations.messages[0].content).toEqual(expect.objectContaining({
       text: expect.stringContaining('retain `provenanceIds` and `lemmaProvenanceIds`'),
     }));
+    const compareTranslationsText = (compareTranslations.messages[0]!.content as { text: string }).text;
+    expect(compareTranslationsText).toContain('at **intermediate** depth');
+    expect(compareTranslationsText).toContain('call `original_language_study`');
+    expect(compareTranslationsText).toContain('`depth: "intermediate"`');
+    expect(compareTranslationsText).toContain('`lexicalRange` as language evidence');
+    expect(compareTranslationsText).toContain('separate from the English renderings');
+    expect(compareTranslationsText).toContain('`englishTranslationComparison` and `contextualInterpretation` remain not performed');
+
+    const technicalTranslations = await client.getPrompt({
+      name: 'compare-translations', arguments: { reference: 'John 3:16', depth: 'technical' },
+    });
+    const technicalTranslationsText = (technicalTranslations.messages[0]!.content as { text: string }).text;
+    expect(technicalTranslationsText).toContain('`depth: "technical"`');
+    expect(technicalTranslationsText).toContain('bounded `corpusOccurrences`');
+    expect(technicalTranslationsText).toContain('raw distribution evidence, never as a contextual verdict');
 
     const compareTranslationRange = await client.getPrompt({
       name: 'compare-translations',
@@ -937,6 +977,13 @@ describe('shared MCP registration', () => {
       ? searchedWord.messages[0].content.text
       : '';
     expect(searchedWordText).not.toMatch(/"strongs_number":"[GH]\d+/);
+
+    const beginnerLexical = await client.getPrompt({
+      name: 'word-study', arguments: { word: 'love', depth: 'beginner' },
+    });
+    const beginnerLexicalText = (beginnerLexical.messages[0]!.content as { text: string }).text;
+    expect(beginnerLexicalText).toContain('Without one verse, do not produce a likely contextual nuance');
+    expect(beginnerLexicalText).not.toContain('explain one likely nuance in plain English');
 
     const exactWordText = wordStudy.messages[0].content.type === 'text'
       ? wordStudy.messages[0].content.text
@@ -1209,6 +1256,36 @@ describe('shared MCP registration', () => {
     })).rejects.toMatchObject({
       code: -32602,
       message: expect.stringContaining('Arguments for prompt "passage-exegesis" must be an object'),
+    });
+    for (const depth of ['expert', 'Beginner', ' beginner ']) {
+      await expect(client.getPrompt({
+        name: 'passage-exegesis',
+        arguments: { reference: 'John 3:16', depth },
+      })).rejects.toMatchObject({
+        code: -32602,
+        message: expect.stringContaining('must be beginner, intermediate, or technical'),
+      });
+    }
+    await expect(client.getPrompt({
+      name: 'compare-translations',
+      arguments: { reference: 'John 3:16', depth: 3 } as never,
+    })).rejects.toMatchObject({
+      code: -32602,
+      message: expect.stringContaining('Argument "depth" for prompt "compare-translations" must be a string'),
+    });
+    await expect(client.getPrompt({
+      name: 'word-study',
+      arguments: { word: 'love', detail: 'summary' },
+    })).rejects.toMatchObject({
+      code: -32602,
+      message: expect.stringContaining('Unknown argument "detail"'),
+    });
+    await expect(client.getPrompt({
+      name: 'confession-study',
+      arguments: { topic: 'justification', depth: 'beginner' },
+    })).rejects.toMatchObject({
+      code: -32602,
+      message: expect.stringContaining('Unknown argument "depth"'),
     });
   });
 

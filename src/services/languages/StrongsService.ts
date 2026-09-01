@@ -3,7 +3,7 @@
  */
 
 import type { IMorphologyRepository, IStrongsRepository, StrongsEntry } from '../../kernel/repositories.js';
-import type { StrongsResult, EnhancedStrongsResult, Citation, CorpusUsageLevel, CorpusUsageResult } from '../../kernel/types.js';
+import type { StrongsResult, EnhancedStrongsResult, Citation, CorpusUsageLevel, CorpusUsageResult, CorpusOccurrencePageResult } from '../../kernel/types.js';
 import { ValidationError, NotFoundError } from '../../kernel/errors.js';
 import { parseStrongsIdentity } from '../../kernel/strongs.js';
 import { normalizeLexiconText } from '../../kernel/lexiconText.js';
@@ -199,6 +199,70 @@ export class StrongsService {
         'Counts are exact tokens in the corrected STEPBible morphology corpus, not counts from the lexicon and not claims about meaning.',
         'Source surface variants are exact source text; punctuation, accents, breathing marks, and cantillation remain significant.',
         'Frequency and distribution do not establish a word’s meaning in any particular verse; use original_language_study for context.',
+      ],
+    };
+  }
+
+  /**
+   * Return only the bounded occurrence evidence needed by the v3 contextual
+   * study. Unlike getCorpusUsage, this deliberately does not query or expose
+   * book-distribution or source-form aggregates.
+   */
+  async getCorpusOccurrencePage(
+    strongsNumber: string,
+    occurrenceLimit = 20,
+    occurrenceCursor?: string,
+  ): Promise<CorpusOccurrencePageResult> {
+    const identity = parseStrongsIdentity(strongsNumber);
+    if (!identity) throw new ValidationError('strongs_number', `Invalid Strong's number format: ${strongsNumber}.`);
+    if (!this.morphologyRepo) throw new Error('Morphology usage repository is not configured');
+    if (!Number.isSafeInteger(occurrenceLimit) || occurrenceLimit < 1 || occurrenceLimit > 25) {
+      throw new ValidationError('occurrence_limit', 'occurrence_limit must be an integer between 1 and 25.');
+    }
+    let after;
+    if (occurrenceCursor) {
+      try { after = decodeMorphologyUsageCursor(occurrenceCursor, identity.morphologyKey); }
+      catch (error) { throw new ValidationError('occurrence_cursor', (error as Error).message); }
+      if (!this.morphologyRepo.hasTokenOccurrenceBoundary
+        || !(await this.morphologyRepo.hasTokenOccurrenceBoundary(identity.publicId, after, occurrenceLimit))) {
+        throw new ValidationError('occurrence_cursor', 'occurrence cursor is not a genuine corpus page boundary.');
+      }
+    }
+    const stats = await this.morphologyRepo.getUsageStats(identity.publicId);
+    const page = stats
+      ? await this.morphologyRepo.getTokenOccurrences(identity.publicId, after, occurrenceLimit)
+      : { occurrences: [] };
+    if (occurrenceCursor && page.occurrences.length === 0) {
+      throw new ValidationError('occurrence_cursor', 'occurrence cursor does not lead to a non-empty continuation page.');
+    }
+    return {
+      publicStrongs: identity.publicId,
+      exactMorphologyKey: identity.morphologyKey,
+      corpusIdentity: MORPHOLOGY_USAGE_IDENTITY,
+      attested: stats !== undefined,
+      totals: {
+        tokenCount: stats?.token_count ?? 0,
+        verseCount: stats?.verse_count ?? 0,
+        bookCount: stats?.book_count ?? 0,
+        sourceSurfaceVariantCount: stats?.form_count ?? 0,
+      },
+      occurrences: page.occurrences.map(occurrence => ({
+        book: occurrence.book,
+        canonicalOrder: occurrence.book_order,
+        chapter: occurrence.chapter,
+        verse: occurrence.verse,
+        position: occurrence.position,
+        sourceForm: occurrence.word_text,
+        lemma: occurrence.lemma,
+        exactMorphologyKey: occurrence.strongs_number,
+        morphologyCode: occurrence.morph_code,
+        gloss: occurrence.gloss,
+      })),
+      ...(page.next_after ? { nextOccurrenceCursor: encodeMorphologyUsageCursor(identity.morphologyKey, page.next_after) } : {}),
+      cautions: [
+        'Counts are exact tokens in the corrected STEPBible morphology corpus, not counts from the lexicon and not claims about meaning.',
+        'Source forms are exact source text; punctuation, accents, breathing marks, and cantillation remain significant.',
+        'Frequency and distribution do not establish a word’s meaning in any particular verse.',
       ],
     };
   }

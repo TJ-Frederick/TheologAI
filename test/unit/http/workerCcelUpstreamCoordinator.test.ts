@@ -56,7 +56,7 @@ function createFactoryHarness(
     THEOLOGAI_RATE_LIMITER: {} as RateLimit,
     THEOLOGAI_CCEL_OPERATOR_AUTH_LIMITER: {} as RateLimit,
     CF_VERSION_METADATA: {} as WorkerVersionMetadata,
-    THEOLOGAI_VERSION: '3.6.0',
+    THEOLOGAI_VERSION: '4.0.0',
     THEOLOGAI_ALLOWED_ORIGINS: 'https://theologai.xyz,https://theologai.pages.dev',
     THEOLOGAI_MAX_REQUEST_BYTES: '1048576',
     THEOLOGAI_REQUEST_LOGS: 'false',
