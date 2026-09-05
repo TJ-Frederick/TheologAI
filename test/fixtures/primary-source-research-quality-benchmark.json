@@ -1,0 +1,371 @@
+{
+  "schemaVersion": 1,
+  "fixtureRole": "checked-in exact-locator retrieval regression anchors, not human-reviewed scholarly relevance judgments",
+  "limits": {
+    "minimumCases": 30,
+    "maximumCases": 50,
+    "maximumAttemptsPerCase": 2,
+    "maximumResultsPerAttempt": 5
+  },
+  "cases": [
+    {
+      "id": "exact-salvation-faith",
+      "kind": "exact_term",
+      "humanQuestion": "Where do the sources connect salvation with faith?",
+      "attempts": [{ "text": "salvation by faith", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" }],
+      "regressionAnchors": [{ "documentId": "wesley-standard-sermons", "sectionKey": "sermon-01", "sourceOrdinal": 1 }]
+    },
+    {
+      "id": "exact-law-gospel-promises",
+      "kind": "exact_term",
+      "humanQuestion": "Where does Calvin reconcile the promises of law and gospel?",
+      "attempts": [{ "text": "promises law gospel reconciled", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" }],
+      "regressionAnchors": [{ "documentId": "calvin-institutes", "sectionKey": "book-3-chapter-17", "sourceOrdinal": 54 }]
+    },
+    {
+      "id": "exact-faith-understanding",
+      "kind": "exact_term",
+      "humanQuestion": "Where does faith seeking understanding appear?",
+      "attempts": [{ "text": "faith seeking understanding", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" }],
+      "regressionAnchors": [{ "documentId": "anselm-proslogion", "sectionKey": "preface", "sourceOrdinal": 1 }]
+    },
+    {
+      "id": "exact-original-sin",
+      "kind": "exact_term",
+      "humanQuestion": "Which confessions discuss original sin?",
+      "attempts": [{ "text": "original sin", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" }],
+      "regressionAnchors": [{ "documentId": "augsburg-confession", "sectionKey": "4", "sourceOrdinal": 4 }]
+    },
+    {
+      "id": "exact-predestination-election",
+      "kind": "exact_term",
+      "humanQuestion": "Where are predestination and election treated together?",
+      "attempts": [{ "text": "predestination election", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" }],
+      "regressionAnchors": [{ "documentId": "calvin-institutes", "sectionKey": "book-3-chapter-21", "sourceOrdinal": 59 }]
+    },
+    {
+      "id": "exact-lords-supper",
+      "kind": "exact_term",
+      "humanQuestion": "Which sources define the Lord's Supper?",
+      "attempts": [{ "text": "Lord supper", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" }],
+      "regressionAnchors": [{ "documentId": "39-articles", "sectionKey": "28", "sourceOrdinal": 28 }]
+    },
+    {
+      "id": "exact-two-natures",
+      "kind": "exact_term",
+      "humanQuestion": "Where is Christ's existence in two natures stated?",
+      "attempts": [{ "text": "Christ two natures", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" }],
+      "regressionAnchors": [{ "documentId": "chalcedonian-definition", "sectionKey": "2", "sourceOrdinal": 2 }]
+    },
+    {
+      "id": "exact-good-works",
+      "kind": "exact_term",
+      "humanQuestion": "How do confessions discuss good works?",
+      "attempts": [{ "text": "good works", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" }],
+      "regressionAnchors": [{ "documentId": "augsburg-confession", "sectionKey": "36", "sourceOrdinal": 36 }]
+    },
+    {
+      "id": "exact-sacraments-grace",
+      "kind": "exact_term",
+      "humanQuestion": "Where are sacraments related to grace?",
+      "attempts": [{ "text": "sacraments grace", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" }],
+      "regressionAnchors": [{ "documentId": "westminster-confession", "sectionKey": "28", "sourceOrdinal": 28 }]
+    },
+    {
+      "id": "exact-eternal-punishment",
+      "kind": "exact_term",
+      "humanQuestion": "Which early source explicitly discusses eternal punishment?",
+      "attempts": [{ "text": "eternal punishment", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" }],
+      "regressionAnchors": [{ "documentId": "justin-martyr-apologies", "sectionKey": "section-chapter-ix-eternal-punishment-not-a-mere-threat-080", "sourceOrdinal": 80 }]
+    },
+    {
+      "id": "exact-prayer-saints",
+      "kind": "exact_term",
+      "humanQuestion": "Where is the prayer of saints discussed?",
+      "attempts": [{ "text": "prayer saints", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" }],
+      "regressionAnchors": [{ "documentId": "philaret-catechism", "sectionKey": "265", "sourceOrdinal": 282 }]
+    },
+    {
+      "id": "exact-monastic-life",
+      "kind": "exact_term",
+      "humanQuestion": "Which documents discuss monastic life?",
+      "attempts": [{ "text": "monastic life", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" }],
+      "regressionAnchors": [{ "documentId": "augsburg-confession", "sectionKey": "95", "sourceOrdinal": 95 }]
+    },
+    {
+      "id": "exact-atonement-sacrifice",
+      "kind": "exact_term",
+      "humanQuestion": "Where do sources connect atonement and sacrifice?",
+      "attempts": [{ "text": "atonement sacrifice", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" }],
+      "regressionAnchors": [{ "documentId": "belgic-confession", "sectionKey": "21", "sourceOrdinal": 21 }]
+    },
+    {
+      "id": "exact-eucharist-sacrifice",
+      "kind": "exact_term",
+      "humanQuestion": "Where are Eucharist and sacrifice discussed together?",
+      "attempts": [{ "text": "eucharist sacrifice", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" }],
+      "regressionAnchors": [{ "documentId": "irenaeus-against-heresies", "sectionKey": "book-4-chapter-18", "sourceOrdinal": 113 }]
+    },
+    {
+      "id": "exact-papal-authority",
+      "kind": "exact_term",
+      "humanQuestion": "Where does Calvin criticize papal authority?",
+      "attempts": [{ "text": "papal authority", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" }],
+      "regressionAnchors": [{ "documentId": "calvin-institutes", "sectionKey": "book-4-chapter-08", "sourceOrdinal": 71 }]
+    },
+    {
+      "id": "paraphrase-church-government",
+      "kind": "paraphrase",
+      "humanQuestion": "Historical perspectives on church government?",
+      "attempts": [
+        { "text": "historical perspectives on church government", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "no_results" },
+        { "text": "church government", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" }
+      ],
+      "regressionAnchors": [{ "documentId": "belgic-confession", "sectionKey": "30", "sourceOrdinal": 30 }]
+    },
+    {
+      "id": "paraphrase-bodily-resurrection",
+      "kind": "paraphrase",
+      "humanQuestion": "How did early Christians describe bodily resurrection?",
+      "attempts": [
+        { "text": "How did early Christians describe bodily resurrection", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" },
+        { "text": "resurrection body", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" }
+      ],
+      "regressionAnchors": [{ "documentId": "origen-de-principiis", "sectionKey": "section-on-the-resurrection-and-the-judgment-the-fire-of-hel-020", "sourceOrdinal": 20 }]
+    },
+    {
+      "id": "paraphrase-incarnation-corruption",
+      "kind": "paraphrase",
+      "humanQuestion": "Where do sources explain the Son becoming human to cure corruption?",
+      "attempts": [
+        { "text": "Where do sources explain the Son becoming human to cure corruption", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "no_results" },
+        { "text": "incarnation corruption", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" }
+      ],
+      "regressionAnchors": [{ "documentId": "athanasius-on-incarnation", "sectionKey": "section-004", "sourceOrdinal": 4 }]
+    },
+    {
+      "id": "paraphrase-natural-law",
+      "kind": "paraphrase",
+      "humanQuestion": "How is natural law related to the order of creation?",
+      "attempts": [
+        { "text": "How is natural law related to the order of creation", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" },
+        { "text": "law nature", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" }
+      ],
+      "regressionAnchors": [{ "documentId": "hooker-laws-of-ecclesiastical-polity-book-1", "sectionKey": "section-003", "sourceOrdinal": 3 }]
+    },
+    {
+      "id": "paraphrase-infant-baptism",
+      "kind": "paraphrase",
+      "humanQuestion": "Did the church baptize babies?",
+      "attempts": [
+        { "text": "Did the church baptize babies", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "no_results" },
+        { "text": "baptism infants", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" }
+      ],
+      "regressionAnchors": [{ "documentId": "philaret-catechism", "sectionKey": "293", "sourceOrdinal": 317 }]
+    },
+    {
+      "id": "paraphrase-faith-reason",
+      "kind": "paraphrase",
+      "humanQuestion": "How do authors relate trust and rational inquiry?",
+      "attempts": [
+        { "text": "How do authors relate trust and rational inquiry", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" },
+        { "text": "faith reason", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" }
+      ],
+      "regressionAnchors": [{ "documentId": "pascal-pensees", "sectionKey": "section-004", "sourceOrdinal": 4 }]
+    },
+    {
+      "id": "paraphrase-scripture-interpretation",
+      "kind": "paraphrase",
+      "humanQuestion": "How should Scripture be understood?",
+      "attempts": [
+        { "text": "How should Scripture be understood", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" },
+        { "text": "Scripture interpretation", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" }
+      ],
+      "regressionAnchors": [{ "documentId": "augustine-on-christian-doctrine", "sectionKey": "section-that-interpretation-of-scripture-which-builds-us-up-037", "sourceOrdinal": 37 }]
+    },
+    {
+      "id": "paraphrase-grace-merit",
+      "kind": "paraphrase",
+      "humanQuestion": "What is the relation between merit and divine favor?",
+      "attempts": [
+        { "text": "What is the relation between merit and divine favor", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" },
+        { "text": "grace merit", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" }
+      ],
+      "regressionAnchors": [{ "documentId": "calvin-institutes", "sectionKey": "book-3-chapter-15", "sourceOrdinal": 52 }]
+    },
+    {
+      "id": "paraphrase-saintly-intercession",
+      "kind": "paraphrase",
+      "humanQuestion": "Can saints intercede for believers?",
+      "attempts": [
+        { "text": "Can saints intercede for believers", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" },
+        { "text": "prayer saints", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" }
+      ],
+      "regressionAnchors": [{ "documentId": "philaret-catechism", "sectionKey": "265", "sourceOrdinal": 282 }]
+    },
+    {
+      "id": "paraphrase-divine-simplicity",
+      "kind": "paraphrase",
+      "humanQuestion": "Is God made of parts?",
+      "attempts": [
+        { "text": "Is God made of parts", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" },
+        { "text": "divine simplicity", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" }
+      ],
+      "regressionAnchors": [{ "documentId": "john-damascene-exact-exposition", "sectionKey": "book-1-chapter-10", "sourceOrdinal": 10 }]
+    },
+    {
+      "id": "paraphrase-love-neighbor",
+      "kind": "paraphrase",
+      "humanQuestion": "How does love of neighbor include oneself?",
+      "attempts": [
+        { "text": "How does love of neighbor include oneself", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "no_results" },
+        { "text": "love neighbor", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" }
+      ],
+      "regressionAnchors": [{ "documentId": "augustine-on-christian-doctrine", "sectionKey": "section-the-command-to-love-god-and-our-neighbor-includes-a-027", "sourceOrdinal": 27 }]
+    },
+    {
+      "id": "paraphrase-creation-providence",
+      "kind": "paraphrase",
+      "humanQuestion": "How does creation depend on God's ongoing care?",
+      "attempts": [
+        { "text": "How does creation depend on Gods ongoing care", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "no_results" },
+        { "text": "creation providence", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" }
+      ],
+      "regressionAnchors": [{ "documentId": "westminster-shorter-catechism", "sectionKey": "8", "sourceOrdinal": 8 }]
+    },
+    {
+      "id": "paraphrase-holy-spirit-worship",
+      "kind": "paraphrase",
+      "humanQuestion": "Is the Holy Spirit worshiped with the Father and Son?",
+      "attempts": [{ "text": "Holy Spirit worship", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" }],
+      "regressionAnchors": [{ "documentId": "basil-on-the-holy-spirit", "sectionKey": "section-that-the-word-in-in-as-many-senses-as-it-bears-is-un-027", "sourceOrdinal": 27 }]
+    },
+    {
+      "id": "paraphrase-incarnation-image",
+      "kind": "paraphrase",
+      "humanQuestion": "How does the incarnation restore the image of God?",
+      "attempts": [{ "text": "image of God", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" }],
+      "regressionAnchors": [{ "documentId": "athanasius-on-incarnation", "sectionKey": "section-013", "sourceOrdinal": 13 }]
+    },
+    {
+      "id": "ambiguous-church-government",
+      "kind": "ambiguous",
+      "humanQuestion": "What is the historical Christian view of church government?",
+      "attempts": [{ "text": "church government", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" }],
+      "minimumDistinctWorks": 4,
+      "regressionAnchors": [
+        { "documentId": "augsburg-confession", "sectionKey": "99", "sourceOrdinal": 99 },
+        { "documentId": "belgic-confession", "sectionKey": "30", "sourceOrdinal": 30 }
+      ]
+    },
+    {
+      "id": "ambiguous-free-will",
+      "kind": "ambiguous",
+      "humanQuestion": "What is the historical Christian view of free will?",
+      "attempts": [{ "text": "free will", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" }],
+      "minimumDistinctWorks": 4,
+      "regressionAnchors": [
+        { "documentId": "london-baptist-1689", "sectionKey": "209", "sourceOrdinal": 209 },
+        { "documentId": "john-damascene-exact-exposition", "sectionKey": "book-2-chapter-27", "sourceOrdinal": 41 }
+      ]
+    },
+    {
+      "id": "ambiguous-justification",
+      "kind": "ambiguous",
+      "humanQuestion": "How did Christians understand justification by faith?",
+      "attempts": [{ "text": "justification faith", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" }],
+      "minimumDistinctWorks": 4,
+      "regressionAnchors": [
+        { "documentId": "westminster-confession", "sectionKey": "12", "sourceOrdinal": 12 },
+        { "documentId": "council-of-trent", "sectionKey": "17", "sourceOrdinal": 17 }
+      ]
+    },
+    {
+      "id": "ambiguous-communion-saints",
+      "kind": "ambiguous",
+      "humanQuestion": "What does communion of saints mean across sources?",
+      "attempts": [{ "text": "communion saints", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" }],
+      "minimumDistinctWorks": 4,
+      "regressionAnchors": [
+        { "documentId": "westminster-confession", "sectionKey": "27", "sourceOrdinal": 27 },
+        { "documentId": "london-baptist-1689", "sectionKey": "513", "sourceOrdinal": 513 }
+      ]
+    },
+    {
+      "id": "ambiguous-trinity-persons",
+      "kind": "ambiguous",
+      "humanQuestion": "How do historical sources describe the persons of the Trinity?",
+      "attempts": [{ "text": "Trinity persons", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" }],
+      "minimumDistinctWorks": 4,
+      "regressionAnchors": [
+        { "documentId": "philaret-catechism", "sectionKey": "95", "sourceOrdinal": 112 },
+        { "documentId": "athanasian-creed", "sectionKey": "2", "sourceOrdinal": 2 }
+      ]
+    },
+    {
+      "id": "ambiguous-scripture-authority",
+      "kind": "ambiguous",
+      "humanQuestion": "What gives Scripture authority?",
+      "attempts": [{ "text": "scripture authority", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" }],
+      "minimumDistinctWorks": 4,
+      "regressionAnchors": [
+        { "documentId": "39-articles", "sectionKey": "20", "sourceOrdinal": 20 },
+        { "documentId": "belgic-confession", "sectionKey": "5", "sourceOrdinal": 5 }
+      ]
+    },
+    {
+      "id": "catalog-miss-summa",
+      "kind": "catalog_miss",
+      "humanQuestion": "What does the Summa Theologiae say about divine simplicity?",
+      "attempts": [{ "text": "divine simplicity", "match": "all_terms", "selection": "relevance", "limit": 5, "work": "Summa Theologiae", "expectedStatus": "catalog_miss" }],
+      "regressionAnchors": []
+    },
+    {
+      "id": "catalog-miss-book-concord",
+      "kind": "catalog_miss",
+      "humanQuestion": "What does the Book of Concord say about justification?",
+      "attempts": [{ "text": "justification", "match": "all_terms", "selection": "relevance", "limit": 5, "work": "Book of Concord", "expectedStatus": "catalog_miss" }],
+      "regressionAnchors": []
+    },
+    {
+      "id": "catalog-miss-calvin-romans",
+      "kind": "catalog_miss",
+      "humanQuestion": "What does Calvin's commentary on Romans say about grace?",
+      "attempts": [{ "text": "Romans grace", "match": "all_terms", "selection": "relevance", "limit": 5, "work": "Calvin Commentary on Romans", "expectedStatus": "catalog_miss" }],
+      "regressionAnchors": []
+    },
+    {
+      "id": "no-results-open-theism",
+      "kind": "no_results",
+      "humanQuestion": "Does the local collection discuss open theism?",
+      "attempts": [{ "text": "open theism", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "no_results" }],
+      "regressionAnchors": []
+    },
+    {
+      "id": "no-results-digital-church",
+      "kind": "no_results",
+      "humanQuestion": "Does the local collection discuss digital church?",
+      "attempts": [{ "text": "digital church", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "no_results" }],
+      "regressionAnchors": []
+    },
+    {
+      "id": "no-results-nuclear-deterrence",
+      "kind": "no_results",
+      "humanQuestion": "Does the local collection discuss nuclear deterrence?",
+      "attempts": [{ "text": "nuclear deterrence", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "no_results" }],
+      "regressionAnchors": []
+    },
+    {
+      "id": "no-results-artificial-intelligence",
+      "kind": "no_results",
+      "humanQuestion": "Does the local collection discuss artificial intelligence in ministry?",
+      "attempts": [{ "text": "artificial intelligence ministry", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "no_results" }],
+      "regressionAnchors": []
+    }
+  ],
+  "limitations": [
+    "Regression anchors prove that pinned local sections remain discoverable and exactly readable; they are not comprehensive or human-reviewed scholarly relevance labels.",
+    "The benchmark does not evaluate synthesis, theological correctness, historical representativeness, user satisfaction, latency, token use, or monetary cost.",
+    "A no_results case reports only the behavior of this bounded local corpus and query; it is never evidence of historical silence."
+  ]
+}

@@ -186,6 +186,15 @@ describe('prompt-recommended tool-call contracts', () => {
     });
   });
 
+  it('keeps the human question separate from a narrowly de-framed first local query', () => {
+    const topic = 'Historical perspectives on church government?';
+    expect(recommendedToolCallsForPrompt('primary-source-research', { topic })[0]!.arguments)
+      .toMatchObject({ queries: [{ text: 'church government', match: 'all_terms' }] });
+    expect(recommendedToolCallsForPrompt('primary-source-research', {
+      topic: 'What did Calvin say about predestination?',
+    })[0]!.arguments).toMatchObject({ queries: [{ text: 'What did Calvin say about predestination' }] });
+  });
+
   it('uses bounded local primary-source discovery for confession study', () => {
     expect(recommendedToolCallsForPrompt('confession-study', {
       topic: 'justification', traditions: 'Reformed, Lutheran',
