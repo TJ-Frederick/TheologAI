@@ -988,6 +988,10 @@ describe('shared MCP registration', () => {
       ? primarySource.messages[0].content.text
       : '';
     expect(primarySourceText).not.toContain('CCEL search');
+    expect(primarySourceText).toContain('Keep the user\'s full question for synthesis');
+    expect(primarySourceText).toContain('one to three concise content terms');
+    expect(primarySourceText).toContain('Try one bounded local reformulation');
+    expect(primarySourceText).toContain('not historical silence');
 
     const donate = await client.getPrompt({ name: 'donate' });
     expect(donate.messages[0].content).toEqual(expect.objectContaining({

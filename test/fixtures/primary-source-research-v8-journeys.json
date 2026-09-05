@@ -7,7 +7,7 @@
       "expectedInitialQueries": [
         {
           "id": "topic-survey",
-          "text": "historical perspectives on church government",
+          "text": "church government",
           "searchDepth": "standard",
           "match": "all_terms",
           "selection": "work_diversity",
