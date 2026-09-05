@@ -112,15 +112,15 @@ export function registerToolHandlers(
 
       if (tool.outputSchema) {
         if (result.structuredContent === undefined) {
-        // Generic sanitized tool errors may omit structured output. Whenever a
-        // handler does provide it (including partial/unavailable isError
-        // results), it must validate against the advertised schema.
-        if (result.isError) {
-          return project(result as CallToolResult, tool.outputSchema, classifyToolResult(observedTool, result));
-        }
-        await reportOutputValidationFailure(server, logging, name);
-        emit({ outcome: 'error', failureCategory: 'output_contract' });
-        throw internalError();
+          // Generic sanitized tool errors may omit structured output. Whenever a
+          // handler does provide it (including partial/unavailable isError
+          // results), it must validate against the advertised schema.
+          if (result.isError) {
+            return project(result as CallToolResult, tool.outputSchema, classifyToolResult(observedTool, result));
+          }
+          await reportOutputValidationFailure(server, logging, name);
+          emit({ outcome: 'error', failureCategory: 'output_contract' });
+          throw internalError();
         }
         const validation = outputValidators.get(name)?.(result.structuredContent);
         const semanticValidation = validation?.valid && tool.validateStructuredOutput
