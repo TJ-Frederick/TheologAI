@@ -6,6 +6,89 @@ The [current release snapshot](CURRENT-RELEASE.md) is the designated current
 snapshot for this operations document. The dated records below retain release
 evidence and are not current identity authority.
 
+## Tool outcome observability
+
+Every dispatched `tools/call` emits one best-effort, content-free event at the
+shared MCP execution boundary. This covers MCP tool failures represented in a
+successful HTTP response as well as invalid arguments, unknown tool names,
+handler exceptions, and output-contract failures. It is not request logging.
+
+The fixed event shape is:
+
+```json
+{
+  "event": "theologai.tool.execution",
+  "tool": "bible_lookup",
+  "outcome": "success",
+  "durationMs": 12,
+  "releaseVersion": "3.6.0"
+}
+```
+
+`tool` is an allowlisted tool identifier (or `unknown`), `outcome` is one of
+`success`, `partial`, `unavailable`, `invalid`, or `error`, and an unsuccessful
+event can carry one low-cardinality `failureCategory`: `input_validation`,
+`unknown_tool`, `handler_exception`, `output_contract`, `tool_reported_error`,
+`execution_exception`, or `dependency_unavailable`. The event deliberately excludes arguments, response
+content, raw error text, URLs, IP addresses, user agents, sessions, user IDs,
+and authorization data. Delivery is nonawaited and not retried; exceptions from
+its sink are ignored, so telemetry cannot alter a tool response.
+
+`partial` and `unavailable` are determined only from explicit, versioned
+structured fields for the tools that publish those states: Bible comparison
+passage/failure counts, parallel-passage enrichment completion, primary-source
+plan status, nested original-language-study status, and donation coverage.
+`dependency_unavailable` deliberately does not identify a provider: a local
+D1 dependency and an external provider are operationally distinct. Other
+domain results such as a valid not-found or unsupported receipt remain
+successful tool executions; they must not be counted as provider outages.
+This event does not identify the local phase versus a provider phase, and it
+cannot distinguish an expected partial result (such as a budget omission or a
+disabled provider) from an unexpected degradation. Do not count every
+`partial` or `dependency_unavailable` event as a provider outage.
+
+The Worker writes these events as structured console records without request
+metadata. Node HTTP and stdio write the same records to stderr. Collection and
+sampling are platform operations, not application usage accounting: sampled
+logs can diagnose distributions but cannot establish exact totals. Until a
+durable metric sink is separately approved and provisioned, report rates only
+with the sample/window and do not infer request counts or user counts from
+them.
+
+Initial service indicators are separated by dependency boundary:
+
+| Indicator | Population | Initial target after baseline |
+| --- | --- | --- |
+| Local tool completion | Local-only tools and local portions of mixed tools; exclude `invalid` calls | ≥99.5% `success` or `partial` over 30 days |
+| External provider availability | Provider-dependent calls with `dependency_unavailable`; exclude valid absence, unsupported, and user-input errors | ≥99.0% over 30 days per provider-dependent tool |
+| Local tool latency | `durationMs` for local-only tools | p95 ≤1 s, p99 ≤3 s |
+| External tool latency | `durationMs` for provider-dependent tools | p95 ≤8 s, p99 ≤20 s |
+
+These are proposals, not accepted SLOs: the local portions and per-provider
+populations require later, separately approved bounded instrumentation before
+they can be measured from these events. Establish a representative baseline
+before setting enforcement thresholds. While events are sampled, alert on a
+sustained sampled increase in `error`/`unavailable` (for example, five minutes
+above three times the rolling baseline) and on absence of expected synthetic
+events. Page only when a corroborating platform signal or synthetic check also
+fails; otherwise open an investigation. Revisit thresholds after the first
+30-day baseline and any provider or deadline-policy change.
+
+Keep the telemetry budget bounded: one small event per executed tool call, no
+retry by the application, no event payload growth, and no per-user dimensions.
+Release version is bounded to a short allowlisted token. Retain and export only
+according to the approved platform retention policy; this repository does not
+create a telemetry binding, account, dashboard, or deployment configuration.
+
+For a no-network synthetic check, run
+`npx --no-install vitest run test/unit/mcp/toolExecutionObserver.test.ts`. It builds an
+in-process MCP server with an injected observer and proves success, invalid,
+reported-error, exception, partial, unavailable, unknown-tool, and failing-sink
+paths without a database or live provider. A future deployed synthetic must be
+explicitly authorized and should use one fixed harmless tool request, a bounded
+cadence, and the same release-version event; do not substitute ordinary traffic
+logs for that check.
+
 ## Production rollback rehearsal capability
 
 The protected `Production Rollback Rehearsal` workflow is manual, main-only,

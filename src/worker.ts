@@ -19,6 +19,7 @@ import { getLegacyEndpointResponse } from './http/worker/legacyEndpoint.js';
 import { getRateLimitResponse } from './http/worker/rateLimit.js';
 import {
   getWorkerRequestMetadata,
+  createWorkerToolExecutionObserver,
   logWorkerRuntimeError,
   logWorkerRequestEvent,
   safeErrorName,
@@ -109,7 +110,7 @@ export default {
       const root = createWorkerCompositionRoot(env);
       const version = env.THEOLOGAI_VERSION || '0.0.0';
       const result = await handleWorkerMcpRequest(
-        era => createWorkerMcpServer(root, version, era),
+        era => createWorkerMcpServer(root, version, era, createWorkerToolExecutionObserver()),
         boundedRequest,
       );
       const response = applyCors(result.response, origin);

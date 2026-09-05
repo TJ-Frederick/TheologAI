@@ -294,8 +294,20 @@ describe('Worker Entry Point', () => {
     expect(mockCreateRoot).toHaveBeenCalledWith(env);
     expect(mockHandleMcp).toHaveBeenCalledWith(expect.any(Function), request);
     const factory = mockHandleMcp.mock.calls[0]![0] as (era: 'legacy' | 'modern') => unknown;
-    expect(factory('modern')).toBe(mockServer);
-    expect(mockCreateServer).toHaveBeenCalledWith(mockRoot, '1.0.0-test', 'modern');
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    try {
+      expect(factory('modern')).toBe(mockServer);
+      expect(mockCreateServer).toHaveBeenCalledWith(mockRoot, '1.0.0-test', 'modern', expect.any(Function));
+      const observer = mockCreateServer.mock.calls[0]![3] as (event: unknown) => void;
+      observer({
+        event: 'theologai.tool.execution', tool: 'bible_lookup', outcome: 'success', durationMs: 12, releaseVersion: '1.0.0-test',
+      });
+      expect(infoSpy.mock.calls.map(call => JSON.parse(call[0] as string))).toEqual([{
+        event: 'theologai.tool.execution', tool: 'bible_lookup', outcome: 'success', durationMs: 12, releaseVersion: '1.0.0-test',
+      }]);
+    } finally {
+      infoSpy.mockRestore();
+    }
   });
 
   it('allows native clients without emitting an allow-origin header', async () => {
