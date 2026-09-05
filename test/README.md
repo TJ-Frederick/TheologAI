@@ -86,6 +86,14 @@ to the V2 service/presentation edge; the historical
 `LocalPrimarySourceSearchProvider` resource-sizing formatter exception remains
 outside this claim.
 
+The guard also rejects serving-source module dependencies on preparation
+scripts, tests, documentation, and root-level raw data. Compiled `src/data`
+modules remain permitted. Synthetic import/export, import-type, dynamic-import,
+and literal CommonJS cases prove this check without executing preparation code.
+It does not inspect nonliteral imports or runtime filesystem access. See
+[architecture and ownership](../docs/ARCHITECTURE.md) for responsibility and
+dormant-work review boundaries.
+
 ## Retired legacy commands
 
 The following former package commands have been removed. They are not runnable
