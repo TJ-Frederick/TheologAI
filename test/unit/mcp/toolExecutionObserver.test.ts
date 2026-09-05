@@ -3,6 +3,10 @@ import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import type { Server } from '@modelcontextprotocol/server';
 import type { ToolHandler, ToolResult } from '../../../src/kernel/types.js';
 import { createTheologAiMcpServer } from '../../../src/mcp/server.js';
+import { presentBibleLookupStructured } from '../../../src/presenters/bibleStructured.js';
+import { presentParallelPassagesStructured } from '../../../src/presenters/parallelPassagesStructured.js';
+import { presentPrimarySourceSearchV6 } from '../../../src/presenters/primarySourceSearchV4Structured.js';
+import { presentOriginalLanguageStudyV2 } from '../../../src/presenters/originalLanguageStudyV2Presentation.js';
 import {
   classifyToolResult,
   safeReleaseVersion,
@@ -10,6 +14,8 @@ import {
   type ToolExecutionEvent,
 } from '../../../src/mcp/toolExecutionObserver.js';
 import { createDeterministicMcpFixture } from '../../fixtures/mcpCompositionRoot.js';
+import { productionCandidate, productionContext, productionCoordinator, productionRequest } from '../../helpers/originalLanguageStudyV2ProductionFixtures.js';
+import type { PrimarySourceSearchPlanResult } from '../../../src/services/historical/primarySourceTypes.js';
 
 const connected: Array<{ client: Client; server: Server }> = [];
 
@@ -137,18 +143,87 @@ describe('tool execution observer', () => {
     expect(JSON.stringify(events)).not.toContain('private malformed output');
   });
 
-  it('uses explicit structured contracts for partial and unavailable outcomes', () => {
-    expect(classifyToolResult('bible_lookup', {
-      content: [{ type: 'text', text: 'ignored' }],
-      structuredContent: { passages: [{}], failures: [{}] },
-    })).toEqual({ outcome: 'partial' });
+  it('records a validator exception once with a generic category', async () => {
+    const events: ToolExecutionEvent[] = [];
+    const client = await connect([handler({
+      outputSchema: { type: 'object', additionalProperties: false },
+      handler: async () => ({
+        content: [{ type: 'text', text: 'safe fallback' }],
+        structuredContent: new Proxy({}, { ownKeys: () => { throw new Error('private validator failure'); } }),
+      }),
+    })], events);
+
+    await expect(client.callTool({ name: 'bible_lookup', arguments: { reference: 'John 3:16' } }))
+      .rejects.toMatchObject({ code: -32603 });
+    expect(events).toEqual([expect.objectContaining({
+      outcome: 'error', failureCategory: 'execution_exception',
+    })]);
+    expect(JSON.stringify(events)).not.toContain('private validator failure');
+  });
+
+  it('records a projection exception once with a generic category', async () => {
+    const events: ToolExecutionEvent[] = [];
+    const fixture = createDeterministicMcpFixture();
+    const server = createTheologAiMcpServer(
+      fixture.root,
+      '3.6.0-test',
+      undefined,
+      undefined,
+      event => events.push(event),
+    ).server;
+    vi.spyOn(server, 'projectCallToolResult').mockImplementationOnce(() => {
+      throw new Error('private projection failure');
+    });
+    const client = new Client({ name: 'tool-observer-projection-test', version: '1.0.0' }, { capabilities: {} });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+    connected.push({ client, server });
+
+    await expect(client.callTool({ name: 'bible_lookup', arguments: { reference: 'John 3:16' } }))
+      .rejects.toMatchObject({ code: -32603 });
+    expect(events).toEqual([expect.objectContaining({
+      outcome: 'error', failureCategory: 'execution_exception',
+    })]);
+    expect(JSON.stringify(events)).not.toContain('private projection failure');
+  });
+
+  it('uses presenter-produced structured contracts for partial and unavailable outcomes', async () => {
+    const bible = presentBibleLookupStructured({
+      reference: 'John 3:16',
+      results: [{ reference: 'John 3:16', translation: 'ESV', text: 'For God so loved the world.', citation: { source: 'Fixture' } }],
+      failures: [{ translation: 'NET', reason: 'intentionally unavailable fixture' }],
+    }, 'John 3:16', ['ESV', 'NET']);
+    expect(classifyToolResult('bible_lookup', { content: [{ type: 'text', text: 'ignored' }], structuredContent: bible }))
+      .toEqual({ outcome: 'partial' });
+
+    const parallel = presentParallelPassagesStructured({
+      requestedReference: 'John 3:16', corpora: [], sourceAttestedGroups: [],
+      sourceAttestedResultWindow: { requestedLimit: 1, returnedGroupCount: 0, additionalMatchStatus: 'not_evaluated' },
+      legacyParallels: [], openBibleCrossReferences: [], provenance: [],
+      textEnrichment: {
+        requested: true, translation: 'ESV', budget: { unit: 'unique_canonical_passage_lookups', maximum: 12 },
+        uniqueTargetCount: 2, scheduledLookupCount: 2, succeededLookupCount: 1, failedLookupCount: 1, omittedLookupCount: 0,
+        completionStatus: 'incomplete',
+      },
+    });
+    expect(classifyToolResult('parallel_passages', { content: [{ type: 'text', text: 'ignored' }], structuredContent: parallel }))
+      .toEqual({ outcome: 'partial' });
+
+    const primary = presentPrimarySourceSearchV6(primarySourcePartialPlan());
+    expect(classifyToolResult('primary_source_search', { content: [{ type: 'text', text: 'ignored' }], structuredContent: primary }))
+      .toEqual({ outcome: 'partial' });
+
+    const context = productionContext();
+    context.v1Result = { ...context.v1Result, status: 'partial' };
+    const language = presentOriginalLanguageStudyV2(await productionCoordinator([productionCandidate(1)], context).coordinator.study(productionRequest())).output;
+    expect(classifyToolResult('original_language_study', { content: [{ type: 'text', text: 'ignored' }], structuredContent: language }))
+      .toEqual({ outcome: 'partial' });
+
     expect(classifyToolResult('primary_source_search', {
       content: [{ type: 'text', text: 'ignored' }], isError: true,
-      structuredContent: { planStatus: 'unavailable' },
+      structuredContent: { ...primary, planStatus: 'unavailable' },
     })).toEqual({ outcome: 'unavailable', failureCategory: 'dependency_unavailable' });
-    expect(classifyToolResult('original_language_study', {
-      content: [{ type: 'text', text: 'ignored' }], structuredContent: { study: { status: 'partial' } },
-    })).toEqual({ outcome: 'partial' });
   });
 
   it('bounds potentially caller-controlled identifiers before observation', () => {
@@ -156,5 +231,21 @@ describe('tool execution observer', () => {
     expect(safeToolName('private_tool_name')).toBe('unknown');
     expect(safeReleaseVersion('3.6.0+abc')).toBe('3.6.0+abc');
     expect(safeReleaseVersion('private version with spaces')).toBe('unknown');
+    expect(safeReleaseVersion(`3.6.0+${'a'.repeat(60)}`)).toBe('unknown');
   });
 });
+
+function primarySourcePartialPlan(): PrimarySourceSearchPlanResult {
+  return {
+    planStatus: 'partial',
+    queries: [{
+      id: 'q', normalizedMode: 'all_terms', normalizedSelection: 'relevance', providers: [{
+        provider: 'local', status: 'no_results', searched: true, page: 1, hitCount: 0,
+        resultWindow: { returnedHitCount: 0, additionalMatchStatus: 'no_additional_match_observed' },
+        hits: [], notices: [],
+        scope: { status: 'matched', requested: {}, eligibleDocumentCount: 0, eligibleDocuments: [], eligibleDocumentsTruncated: false },
+      }],
+    }],
+    coverage: { localAttempted: true, localStatus: 'no_results', localHitCount: 0, ccelAttempted: false, ccelHitCount: 0, notices: [] },
+  };
+}

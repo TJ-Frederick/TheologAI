@@ -68,49 +68,50 @@ export function registerToolHandlers(
         emit(outcome);
         return projected;
       } catch {
-        emit({ outcome: 'error', failureCategory: 'output_contract' });
+        emit({ outcome: 'error', failureCategory: 'execution_exception' });
         throw internalError();
       }
     };
-    const tool = tools.find(candidate => candidate.name === name);
-    if (!tool) {
-      emit({ outcome: 'invalid', failureCategory: 'unknown_tool' });
-      throw new ProtocolError(ProtocolErrorCode.InvalidParams, `Unknown tool: ${name}`);
-    }
-
-    const validate = validators.get(name);
-    const toolArguments = args ?? {};
-    const validation = validate?.(toolArguments);
-    if (!validation?.valid) {
-      return project({
-        content: [{
-          type: 'text',
-          text: `Invalid arguments for ${name}: ${formatValidationError(validation?.errorMessage)}`,
-        }],
-        isError: true,
-      }, tool.outputSchema, { outcome: 'invalid', failureCategory: 'input_validation' });
-    }
-
-    if (logging) {
-      await server.sendLoggingMessage({
-        level: 'info',
-        logger: 'theologai.tools',
-        data: { event: 'tool_execution', tool: name },
-      }).catch(() => {
-        // Logging is observational and must not make an otherwise valid tool call fail.
-      });
-    }
-
-    let result;
     try {
-      result = await tool.handler(toolArguments);
-    } catch {
-      emit({ outcome: 'error', failureCategory: 'handler_exception' });
-      throw internalError();
-    }
+      const tool = tools.find(candidate => candidate.name === name);
+      if (!tool) {
+        emit({ outcome: 'invalid', failureCategory: 'unknown_tool' });
+        throw new ProtocolError(ProtocolErrorCode.InvalidParams, `Unknown tool: ${name}`);
+      }
 
-    if (tool.outputSchema) {
-      if (result.structuredContent === undefined) {
+      const validate = validators.get(name);
+      const toolArguments = args ?? {};
+      const validation = validate?.(toolArguments);
+      if (!validation?.valid) {
+        return project({
+          content: [{
+            type: 'text',
+            text: `Invalid arguments for ${name}: ${formatValidationError(validation?.errorMessage)}`,
+          }],
+          isError: true,
+        }, tool.outputSchema, { outcome: 'invalid', failureCategory: 'input_validation' });
+      }
+
+      if (logging) {
+        await server.sendLoggingMessage({
+          level: 'info',
+          logger: 'theologai.tools',
+          data: { event: 'tool_execution', tool: name },
+        }).catch(() => {
+          // Logging is observational and must not make an otherwise valid tool call fail.
+        });
+      }
+
+      let result;
+      try {
+        result = await tool.handler(toolArguments);
+      } catch {
+        emit({ outcome: 'error', failureCategory: 'handler_exception' });
+        throw internalError();
+      }
+
+      if (tool.outputSchema) {
+        if (result.structuredContent === undefined) {
         // Generic sanitized tool errors may omit structured output. Whenever a
         // handler does provide it (including partial/unavailable isError
         // results), it must validate against the advertised schema.
@@ -120,22 +121,29 @@ export function registerToolHandlers(
         await reportOutputValidationFailure(server, logging, name);
         emit({ outcome: 'error', failureCategory: 'output_contract' });
         throw internalError();
+        }
+        const validation = outputValidators.get(name)?.(result.structuredContent);
+        const semanticValidation = validation?.valid && tool.validateStructuredOutput
+          ? safelyValidateStructuredOutput(
+            tool.validateStructuredOutput,
+            result.structuredContent as Record<string, unknown>,
+          )
+          : true;
+        if (!validation?.valid || !semanticValidation) {
+          await reportOutputValidationFailure(server, logging, name);
+          emit({ outcome: 'error', failureCategory: 'output_contract' });
+          throw internalError();
+        }
       }
-      const validation = outputValidators.get(name)?.(result.structuredContent);
-      const semanticValidation = validation?.valid && tool.validateStructuredOutput
-        ? safelyValidateStructuredOutput(
-          tool.validateStructuredOutput,
-          result.structuredContent as Record<string, unknown>,
-        )
-        : true;
-      if (!validation?.valid || !semanticValidation) {
-        await reportOutputValidationFailure(server, logging, name);
-        emit({ outcome: 'error', failureCategory: 'output_contract' });
-        throw internalError();
-      }
-    }
 
-    return project(result as CallToolResult, tool.outputSchema, classifyToolResult(observedTool, result));
+      return project(result as CallToolResult, tool.outputSchema, classifyToolResult(observedTool, result));
+    } catch (error) {
+      // Do not expose an unexpected validator/projection error. The server's
+      // existing wrapper retains its established sanitized protocol behavior.
+      if (!emitted) emit({ outcome: 'error', failureCategory: 'execution_exception' });
+      if (error instanceof ProtocolError) throw error;
+      throw internalError();
+    }
   });
 }
 

@@ -29,10 +29,10 @@ The fixed event shape is:
 `success`, `partial`, `unavailable`, `invalid`, or `error`, and an unsuccessful
 event can carry one low-cardinality `failureCategory`: `input_validation`,
 `unknown_tool`, `handler_exception`, `output_contract`, `tool_reported_error`,
-or `dependency_unavailable`. The event deliberately excludes arguments, response
+`execution_exception`, or `dependency_unavailable`. The event deliberately excludes arguments, response
 content, raw error text, URLs, IP addresses, user agents, sessions, user IDs,
-and authorization data. The observer is synchronous and exceptions from its
-sink are ignored, so telemetry cannot delay or alter a tool response.
+and authorization data. Delivery is nonawaited and not retried; exceptions from
+its sink are ignored, so telemetry cannot alter a tool response.
 
 `partial` and `unavailable` are determined only from explicit, versioned
 structured fields for the tools that publish those states: Bible comparison
@@ -42,6 +42,10 @@ plan status, nested original-language-study status, and donation coverage.
 D1 dependency and an external provider are operationally distinct. Other
 domain results such as a valid not-found or unsupported receipt remain
 successful tool executions; they must not be counted as provider outages.
+This event does not identify the local phase versus a provider phase, and it
+cannot distinguish an expected partial result (such as a budget omission or a
+disabled provider) from an unexpected degradation. Do not count every
+`partial` or `dependency_unavailable` event as a provider outage.
 
 The Worker writes these events as structured console records without request
 metadata. Node HTTP and stdio write the same records to stderr. Collection and
@@ -60,7 +64,9 @@ Initial service indicators are separated by dependency boundary:
 | Local tool latency | `durationMs` for local-only tools | p95 ≤1 s, p99 ≤3 s |
 | External tool latency | `durationMs` for provider-dependent tools | p95 ≤8 s, p99 ≤20 s |
 
-These are proposals, not accepted SLOs: establish a representative baseline
+These are proposals, not accepted SLOs: the local portions and per-provider
+populations require later, separately approved bounded instrumentation before
+they can be measured from these events. Establish a representative baseline
 before setting enforcement thresholds. While events are sampled, alert on a
 sustained sampled increase in `error`/`unavailable` (for example, five minutes
 above three times the rolling baseline) and on absence of expected synthetic
@@ -75,7 +81,7 @@ according to the approved platform retention policy; this repository does not
 create a telemetry binding, account, dashboard, or deployment configuration.
 
 For a no-network synthetic check, run
-`npm test -- test/unit/mcp/toolExecutionObserver.test.ts`. It builds an
+`npx --no-install vitest run test/unit/mcp/toolExecutionObserver.test.ts`. It builds an
 in-process MCP server with an injected observer and proves success, invalid,
 reported-error, exception, partial, unavailable, unknown-tool, and failing-sink
 paths without a database or live provider. A future deployed synthetic must be

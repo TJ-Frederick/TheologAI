@@ -14,6 +14,7 @@ export type ToolExecutionFailureCategory =
   | 'unknown_tool'
   | 'handler_exception'
   | 'output_contract'
+  | 'execution_exception'
   | 'tool_reported_error'
   | 'dependency_unavailable';
 
@@ -50,7 +51,7 @@ export function safeToolName(value: unknown): string {
 }
 
 export function safeReleaseVersion(value: unknown): string {
-  return typeof value === 'string' && RELEASE_VERSION.test(value) ? value : 'unknown';
+  return typeof value === 'string' && value.length <= 64 && RELEASE_VERSION.test(value) ? value : 'unknown';
 }
 
 export function observeToolExecution(
