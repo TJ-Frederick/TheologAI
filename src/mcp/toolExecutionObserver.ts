@@ -30,7 +30,7 @@ export interface ToolExecutionEvent {
 export type ToolExecutionObserver = (event: ToolExecutionEvent) => void;
 
 export const UNKNOWN_TOOL_NAME = 'unknown';
-export const OBSERVABLE_TOOL_NAMES = new Set([
+const OBSERVABLE_TOOL_NAMES = [
   'bible_lookup',
   'bible_cross_references',
   'parallel_passages',
@@ -42,11 +42,11 @@ export const OBSERVABLE_TOOL_NAMES = new Set([
   'original_language_study',
   'donation_config',
   'verify_donation',
-] as const);
+] as const;
 const RELEASE_VERSION = /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]{1,32})?(?:\+[0-9A-Za-z.-]{1,32})?$/;
 
 export function safeToolName(value: unknown): string {
-  return typeof value === 'string' && OBSERVABLE_TOOL_NAMES.has(value as never) ? value : UNKNOWN_TOOL_NAME;
+  return typeof value === 'string' && OBSERVABLE_TOOL_NAMES.includes(value as never) ? value : UNKNOWN_TOOL_NAME;
 }
 
 export function safeReleaseVersion(value: unknown): string {
