@@ -7,11 +7,21 @@ import {
 import type { ToolHandler } from '../kernel/types.js';
 import { internalError } from './errors.js';
 import { formatValidationError, type SchemaValidator, validatorFor } from './validation.js';
+import {
+  classifyToolResult,
+  observeToolExecution,
+  safeReleaseVersion,
+  safeToolName,
+  type ToolExecutionEvent,
+  type ToolExecutionObserver,
+} from './toolExecutionObserver.js';
 
 export function registerToolHandlers(
   server: Server,
   tools: ToolHandler[],
   logging: boolean,
+  toolExecutionObserver?: ToolExecutionObserver,
+  releaseVersion?: string,
 ): void {
   const validators = new Map<string, SchemaValidator<Record<string, unknown>>>(
     tools.map(tool => [tool.name, validatorFor(tool.inputSchema)]),
@@ -34,8 +44,37 @@ export function registerToolHandlers(
 
   server.setRequestHandler('tools/call', async (request) => {
     const { name, arguments: args } = request.params;
+    const startedAt = Date.now();
+    const observedTool = safeToolName(name);
+    let emitted = false;
+    const emit = (event: Omit<ToolExecutionEvent, 'event' | 'tool' | 'durationMs' | 'releaseVersion'>) => {
+      if (emitted) return;
+      emitted = true;
+      observeToolExecution(toolExecutionObserver, {
+        event: 'theologai.tool.execution',
+        tool: observedTool,
+        durationMs: Math.max(0, Date.now() - startedAt),
+        releaseVersion: safeReleaseVersion(releaseVersion),
+        ...event,
+      });
+    };
+    const project = (
+      result: CallToolResult,
+      outputSchema: ToolHandler['outputSchema'],
+      outcome: Omit<ToolExecutionEvent, 'event' | 'tool' | 'durationMs' | 'releaseVersion'>,
+    ) => {
+      try {
+        const projected = server.projectCallToolResult(result, outputSchema);
+        emit(outcome);
+        return projected;
+      } catch {
+        emit({ outcome: 'error', failureCategory: 'output_contract' });
+        throw internalError();
+      }
+    };
     const tool = tools.find(candidate => candidate.name === name);
     if (!tool) {
+      emit({ outcome: 'invalid', failureCategory: 'unknown_tool' });
       throw new ProtocolError(ProtocolErrorCode.InvalidParams, `Unknown tool: ${name}`);
     }
 
@@ -43,13 +82,13 @@ export function registerToolHandlers(
     const toolArguments = args ?? {};
     const validation = validate?.(toolArguments);
     if (!validation?.valid) {
-      return server.projectCallToolResult({
+      return project({
         content: [{
           type: 'text',
           text: `Invalid arguments for ${name}: ${formatValidationError(validation?.errorMessage)}`,
         }],
         isError: true,
-      }, tool.outputSchema);
+      }, tool.outputSchema, { outcome: 'invalid', failureCategory: 'input_validation' });
     }
 
     if (logging) {
@@ -66,6 +105,7 @@ export function registerToolHandlers(
     try {
       result = await tool.handler(toolArguments);
     } catch {
+      emit({ outcome: 'error', failureCategory: 'handler_exception' });
       throw internalError();
     }
 
@@ -74,8 +114,11 @@ export function registerToolHandlers(
         // Generic sanitized tool errors may omit structured output. Whenever a
         // handler does provide it (including partial/unavailable isError
         // results), it must validate against the advertised schema.
-        if (result.isError) return server.projectCallToolResult(result as CallToolResult, tool.outputSchema);
+        if (result.isError) {
+          return project(result as CallToolResult, tool.outputSchema, classifyToolResult(observedTool, result));
+        }
         await reportOutputValidationFailure(server, logging, name);
+        emit({ outcome: 'error', failureCategory: 'output_contract' });
         throw internalError();
       }
       const validation = outputValidators.get(name)?.(result.structuredContent);
@@ -87,11 +130,12 @@ export function registerToolHandlers(
         : true;
       if (!validation?.valid || !semanticValidation) {
         await reportOutputValidationFailure(server, logging, name);
+        emit({ outcome: 'error', failureCategory: 'output_contract' });
         throw internalError();
       }
     }
 
-    return server.projectCallToolResult(result as CallToolResult, tool.outputSchema);
+    return project(result as CallToolResult, tool.outputSchema, classifyToolResult(observedTool, result));
   });
 }
 
