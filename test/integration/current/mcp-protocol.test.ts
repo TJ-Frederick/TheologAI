@@ -335,7 +335,10 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
             startVerse: 16,
           }),
           translation: 'ESV',
-          options: { includeFootnotes: undefined },
+          options: {
+            includeFootnotes: undefined,
+            signal: expect.any(AbortSignal),
+          },
         },
       ]);
       expect(result.content).toEqual([

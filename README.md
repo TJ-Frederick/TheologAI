@@ -319,6 +319,15 @@ attempts for the 12 scheduled lookups, preserving headroom below the
 50-subrequest Worker limit; this relationship is executable policy, not only
 documentation.
 
+Each `bible_lookup` call and the remote text-enrichment portion of
+`parallel_passages` share a 30-second deadline across provider fetches, body
+reads, and retry delays. MCP cancellation propagates through those operations.
+Bible comparisons run at most four translations concurrently, retain request
+order within successes and failures, and forward `includeFootnotes` for both
+single and multiple translations. When the budget expires, completed passages
+remain available and queued provider work does not start. This deadline does
+not preempt local database queries or synchronous formatting.
+
 For exact `original_language_lookup` calls, corpus usage is opt-in. `overview`
 returns totals plus the complete canonical-book distribution only. `study`
 adds the top 10 exact source variants and defaults to 8 raw occurrences (maximum

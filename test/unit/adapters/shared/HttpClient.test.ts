@@ -2,13 +2,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HttpClient } from '../../../../src/adapters/shared/HttpClient.js';
 import {
   DEFAULT_HTTP_MAX_RETRIES,
+  BIBLE_TOOL_CALL_DEADLINE_MS,
   BIBLE_TEXT_HTTP_MAX_RETRIES,
+  BIBLE_TRANSLATION_LOOKUP_CONCURRENCY,
   CLOUDFLARE_FREE_EXTERNAL_SUBREQUEST_LIMIT,
   PARALLEL_TEXT_LOOKUP_BUDGET,
   PARALLEL_TEXT_RESERVED_SUBREQUEST_HEADROOM,
 } from '../../../../src/kernel/requestLimits.js';
 import { createBibleHttpClient } from '../../../../src/adapters/bible/createBibleHttpClient.js';
 import { AdapterError } from '../../../../src/kernel/errors.js';
+import { RequestDeadlineExceededError } from '../../../../src/kernel/requestDeadline.js';
 
 describe('HttpClient timeouts', () => {
   let originalFetch: typeof globalThis.fetch;
@@ -93,6 +96,85 @@ describe('HttpClient timeouts', () => {
     expect(vi.getTimerCount()).toBe(0);
     client.dispose();
   });
+
+  it('propagates caller cancellation through fetch without retrying', async () => {
+    const controller = new AbortController();
+    globalThis.fetch = vi.fn().mockImplementation((_url, init) => new Promise((_resolve, reject) => {
+      const signal = init?.signal as AbortSignal;
+      signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+    }));
+    const client = new HttpClient({
+      source: 'Test', cacheTtlMs: 0, maxRetries: 2, timeoutMs: 15_000,
+    });
+
+    const request = client.getText('https://example.test/cancelled', { signal: controller.signal });
+    controller.abort(new DOMException('client cancelled', 'AbortError'));
+
+    await expect(request).rejects.toMatchObject({
+      name: 'AdapterError',
+      message: '[Test] Request was cancelled.',
+    });
+    expect(globalThis.fetch).toHaveBeenCalledOnce();
+    expect(vi.getTimerCount()).toBe(0);
+    client.dispose();
+  });
+
+  it('interrupts a stalled body read and starts best-effort stream cancellation', async () => {
+    const controller = new AbortController();
+    const reader = {
+      read: vi.fn(() => new Promise<ReadableStreamReadResult<Uint8Array>>(() => {})),
+      cancel: vi.fn().mockResolvedValue(undefined),
+      releaseLock: vi.fn(),
+    };
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      headers: new Headers(),
+      body: { getReader: () => reader },
+    } as unknown as Response);
+    const client = new HttpClient({
+      source: 'Test', cacheTtlMs: 0, maxRetries: 0, timeoutMs: 15_000,
+    });
+
+    const request = client.getText('https://example.test/stalled-body', { signal: controller.signal });
+    await Promise.resolve();
+    controller.abort(new DOMException('client cancelled', 'AbortError'));
+
+    await expect(request).rejects.toMatchObject({ message: '[Test] Request was cancelled.' });
+    expect(reader.cancel).toHaveBeenCalledOnce();
+    expect(reader.releaseLock).toHaveBeenCalledOnce();
+    expect(vi.getTimerCount()).toBe(0);
+    client.dispose();
+  });
+
+  it('interrupts retry backoff and prevents the next provider attempt', async () => {
+    const controller = new AbortController();
+    globalThis.fetch = vi.fn().mockRejectedValue(new Error('network failure'));
+    const client = new HttpClient({
+      source: 'Test', cacheTtlMs: 0, maxRetries: 2, timeoutMs: 15_000,
+    });
+
+    const request = client.getText('https://example.test/backoff', { signal: controller.signal });
+    await vi.advanceTimersByTimeAsync(0);
+    controller.abort(new DOMException('client cancelled', 'AbortError'));
+
+    await expect(request).rejects.toMatchObject({ message: '[Test] Request was cancelled.' });
+    expect(globalThis.fetch).toHaveBeenCalledOnce();
+    expect(vi.getTimerCount()).toBe(0);
+    client.dispose();
+  });
+
+  it('distinguishes the enclosing deadline from direct caller cancellation internally', async () => {
+    const controller = new AbortController();
+    controller.abort(new RequestDeadlineExceededError());
+    globalThis.fetch = vi.fn();
+    const client = new HttpClient({ source: 'Test', cacheTtlMs: 0 });
+
+    await expect(client.getText('https://example.test/deadline', { signal: controller.signal }))
+      .rejects.toMatchObject({ message: '[Test] Request deadline exceeded.' });
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+    client.dispose();
+  });
 });
 
 describe('HttpClient requests, caching, and errors', () => {
@@ -111,6 +193,8 @@ describe('HttpClient requests, caching, and errors', () => {
   it('keeps parallel text enrichment below the reviewed upstream-attempt headroom', () => {
     expect(DEFAULT_HTTP_MAX_RETRIES).toBe(2);
     expect(BIBLE_TEXT_HTTP_MAX_RETRIES).toBe(2);
+    expect(BIBLE_TOOL_CALL_DEADLINE_MS).toBe(30_000);
+    expect(BIBLE_TRANSLATION_LOOKUP_CONCURRENCY).toBe(4);
     expect((1 + BIBLE_TEXT_HTTP_MAX_RETRIES) * PARALLEL_TEXT_LOOKUP_BUDGET)
       .toBeLessThanOrEqual(
         CLOUDFLARE_FREE_EXTERNAL_SUBREQUEST_LIMIT - PARALLEL_TEXT_RESERVED_SUBREQUEST_HEADROOM,
@@ -170,6 +254,19 @@ describe('HttpClient requests, caching, and errors', () => {
       .resolves.toEqual({ kind: 'json' });
 
     expect(globalThis.fetch).toHaveBeenCalledTimes(3);
+    client.dispose();
+  });
+
+  it('does not serve a cache hit after its caller has been cancelled', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(new Response('cached'));
+    const client = new HttpClient({ source: 'Test', cacheTtlMs: 60_000 });
+    await client.getText('https://example.test/cached');
+    const controller = new AbortController();
+    controller.abort(new DOMException('client cancelled', 'AbortError'));
+
+    await expect(client.getText('https://example.test/cached', { signal: controller.signal }))
+      .rejects.toMatchObject({ message: '[Test] Request was cancelled.' });
+    expect(globalThis.fetch).toHaveBeenCalledOnce();
     client.dispose();
   });
 
@@ -243,6 +340,23 @@ describe('HttpClient requests, caching, and errors', () => {
       message: expect.stringContaining('HTTP 404: Not Found'),
     });
     expect(globalThis.fetch).toHaveBeenCalledOnce();
+    client.dispose();
+  });
+
+  it('does not wait for non-OK response-body cleanup before failing', async () => {
+    const cancel = vi.fn(() => new Promise<void>(() => {}));
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+      statusText: 'Not Found',
+      body: { cancel },
+    } as unknown as Response);
+    const client = new HttpClient({ source: 'Test', maxRetries: 0, cacheTtlMs: 0 });
+
+    await expect(client.getText('https://example.test/missing')).rejects.toMatchObject({
+      message: expect.stringContaining('HTTP 404: Not Found'),
+    });
+    expect(cancel).toHaveBeenCalledOnce();
     client.dispose();
   });
 

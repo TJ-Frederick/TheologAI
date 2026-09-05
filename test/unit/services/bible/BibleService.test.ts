@@ -100,7 +100,7 @@ describe('BibleService', () => {
       expect(esvAdapter.getPassage).toHaveBeenCalledWith(
         expect.anything(),
         'ESV',
-        { includeFootnotes: true }
+        { includeFootnotes: true, signal: undefined }
       );
     });
   });
@@ -137,6 +137,28 @@ describe('BibleService', () => {
       expect(kjvAdapter.getPassage).toHaveBeenCalled();
     });
 
+    it('forwards footnotes and one cancellation signal to every translation provider', async () => {
+      const controller = new AbortController();
+
+      await service.lookupMultiple(
+        'John 3:16',
+        ['ESV', 'KJV'],
+        { includeFootnotes: true },
+        { signal: controller.signal },
+      );
+
+      expect(esvAdapter.getPassage).toHaveBeenCalledWith(
+        expect.anything(),
+        'ESV',
+        { includeFootnotes: true, signal: controller.signal },
+      );
+      expect(kjvAdapter.getPassage).toHaveBeenCalledWith(
+        expect.anything(),
+        'KJV',
+        { includeFootnotes: true, signal: controller.signal },
+      );
+    });
+
     it('reports unconfigured adapters without discarding successful translations', async () => {
       (kjvAdapter.isConfigured as ReturnType<typeof vi.fn>).mockReturnValue(false);
       const response = await service.lookupMultiple('John 3:16', ['ESV', 'KJV']);
@@ -163,6 +185,62 @@ describe('BibleService', () => {
       const response = await service.lookupMultiple('John 3:16', ['ESV', 'KJV']);
       expect(response.results[0].translation).toBe('ESV');
       expect(response.results[1].translation).toBe('KJV');
+    });
+
+    it('bounds concurrency while preserving requested order across partial failures', async () => {
+      let active = 0;
+      let maximumActive = 0;
+      const translations = ['ESV', 'KJV', 'WEB', 'BSB', 'ASV'];
+      const adapter = makeAdapter({
+        supportedTranslations: translations,
+        getPassage: vi.fn().mockImplementation(async (_ref, translation) => {
+          active += 1;
+          maximumActive = Math.max(maximumActive, active);
+          await new Promise(resolve => setTimeout(resolve, translation === 'ESV' ? 10 : 1));
+          active -= 1;
+          if (translation === 'KJV') throw new Error('unavailable');
+          return {
+            reference: 'John 3:16', translation, text: `${translation} text`,
+            citation: { source: 'Fixture' },
+          };
+        }),
+      });
+
+      const response = await new BibleService([adapter]).lookupMultiple('John 3:16', translations);
+
+      expect(maximumActive).toBe(4);
+      expect(response.results.map(result => result.translation)).toEqual(['ESV', 'WEB', 'BSB', 'ASV']);
+      expect(response.failures).toEqual([{
+        translation: 'KJV',
+        reason: 'Translation could not be retrieved.',
+      }]);
+    });
+
+    it('stops starting provider calls after cancellation and fills stable failure outcomes', async () => {
+      const controller = new AbortController();
+      const translations = ['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8'];
+      const getPassage = vi.fn().mockImplementation(async (
+        _ref: unknown,
+        _translation: string,
+        options?: { signal?: AbortSignal },
+      ) => new Promise((_resolve, reject) => {
+        options?.signal?.addEventListener('abort', () => reject(options.signal?.reason), { once: true });
+      }));
+      const runtime = new BibleService([makeAdapter({ supportedTranslations: translations, getPassage })]);
+
+      const pending = runtime.lookupMultiple(
+        'John 3:16',
+        translations,
+        {},
+        { signal: controller.signal },
+      );
+      expect(getPassage).toHaveBeenCalledTimes(4);
+      controller.abort(new DOMException('cancelled', 'AbortError'));
+
+      const response = await pending;
+      expect(getPassage).toHaveBeenCalledTimes(4);
+      expect(response.results).toEqual([]);
+      expect(response.failures.map(failure => failure.translation)).toEqual(translations);
     });
 
     it('reports unknown translations instead of omitting them', async () => {

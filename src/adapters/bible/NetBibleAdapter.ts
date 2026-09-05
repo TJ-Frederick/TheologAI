@@ -25,7 +25,11 @@ export class NetBibleAdapter implements BibleProviderPort {
     });
   }
 
-  async getPassage(ref: BibleReference, _translation: string): Promise<BibleResult> {
+  async getPassage(
+    ref: BibleReference,
+    _translation: string,
+    options?: { includeFootnotes?: boolean; signal?: AbortSignal },
+  ): Promise<BibleResult> {
     const refStr = formatReference(ref);
     const params = new URLSearchParams({
       passage: refStr,
@@ -33,7 +37,7 @@ export class NetBibleAdapter implements BibleProviderPort {
       type: 'json',
     });
 
-    const data = await this.client.getJSON<any[]>(`?${params}`);
+    const data = await this.client.getJSON<any[]>(`?${params}`, { signal: options?.signal });
 
     if (!Array.isArray(data) || data.length === 0) {
       throw new APIError(404, `No passage found for: ${refStr}`);

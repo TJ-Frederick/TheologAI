@@ -2,6 +2,10 @@
 export const DEFAULT_HTTP_MAX_RETRIES = 2 as const;
 /** Remote Bible adapters are pinned so generic-client changes cannot consume enrichment headroom. */
 export const BIBLE_TEXT_HTTP_MAX_RETRIES = 2 as const;
+/** One MCP Bible-tool invocation, including all retries and text enrichment. */
+export const BIBLE_TOOL_CALL_DEADLINE_MS = 30_000 as const;
+/** Bound provider fan-out without serializing an eight-translation comparison. */
+export const BIBLE_TRANSLATION_LOOKUP_CONCURRENCY = 4 as const;
 export const PARALLEL_TEXT_LOOKUP_BUDGET = 12 as const;
 
 /**

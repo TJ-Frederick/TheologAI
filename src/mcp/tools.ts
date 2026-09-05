@@ -32,7 +32,7 @@ export function registerToolHandlers(
     })),
   }));
 
-  server.setRequestHandler('tools/call', async (request) => {
+  server.setRequestHandler('tools/call', async (request, context) => {
     const { name, arguments: args } = request.params;
     const tool = tools.find(candidate => candidate.name === name);
     if (!tool) {
@@ -64,7 +64,7 @@ export function registerToolHandlers(
 
     let result;
     try {
-      result = await tool.handler(toolArguments);
+      result = await tool.handler(toolArguments, { signal: context.mcpReq.signal });
     } catch {
       throw internalError();
     }
