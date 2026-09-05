@@ -1,9 +1,8 @@
 /**
  * SQLite connection manager.
  *
- * Singleton better-sqlite3 connection to data/theologai.db with:
- *   - WAL mode for concurrent reads
- *   - Prepared statement caching
+ * Read-only singleton connection to the database produced by the corpus build.
+ * Database creation and writable connections belong to preparation scripts.
  */
 
 import Database from 'better-sqlite3';
@@ -54,14 +53,4 @@ export function closeDatabase(): void {
     instance.close();
     instance = null;
   }
-}
-
-/**
- * Open a writable database connection (for build scripts only).
- */
-export function openWritableDatabase(dbPath: string): Database.Database {
-  const db = new Database(dbPath);
-  db.pragma('journal_mode = WAL');
-  db.pragma('synchronous = NORMAL');
-  return db;
 }
