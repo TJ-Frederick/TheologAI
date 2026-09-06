@@ -27,7 +27,11 @@ export class EsvAdapter implements BibleProviderPort {
     });
   }
 
-  async getPassage(ref: BibleReference, _translation: string, options?: { includeFootnotes?: boolean }): Promise<BibleResult> {
+  async getPassage(
+    ref: BibleReference,
+    _translation: string,
+    options?: { includeFootnotes?: boolean; signal?: AbortSignal },
+  ): Promise<BibleResult> {
     if (!this.apiKey) {
       throw new APIError(401, 'ESV API key not configured. Set ESV_API_KEY environment variable.');
     }
@@ -41,7 +45,7 @@ export class EsvAdapter implements BibleProviderPort {
       'include-short-copyright': 'false',
     });
 
-    const data = await this.client.getJSON<any>(`/text/?${params}`);
+    const data = await this.client.getJSON<any>(`/text/?${params}`, { signal: options?.signal });
 
     if (!data.passages || data.passages.length === 0) {
       throw new APIError(404, `No passages found for: ${refStr}`);

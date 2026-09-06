@@ -220,6 +220,7 @@ describe('MCP structured output validation', () => {
     await expect(client.callTool({ name: 'structured_test', arguments: {} }))
       .rejects.toMatchObject({ code: -32603, message: expect.stringContaining('Internal server error') });
     expect(handler).toHaveBeenCalledOnce();
+    expect(handler.mock.calls[0][1]).toEqual({ signal: expect.any(AbortSignal) });
   });
 
   it('rejects malformed successful structured results without disclosing payloads', async () => {

@@ -5,6 +5,10 @@
 TheologAI is an MCP server for Bible study and theological research. It runs
 locally over stdio or Streamable HTTP and on Cloudflare Workers with D1.
 
+For the current source layout and maintenance responsibilities, see
+[Architecture and ownership](docs/ARCHITECTURE.md). The earlier
+`docs/bible-mcp-architecture.md` remains historical design evidence.
+
 The checked-out local registry contains eleven tools, six guided prompts, eight
 English Bible translations, six commentary sources, 35 locally indexed
 historical works, Strong's dictionaries, and Greek/Hebrew morphology. The
@@ -318,6 +322,15 @@ The remote Bible-adapter ceiling of two HTTP retries therefore permits at most 3
 attempts for the 12 scheduled lookups, preserving headroom below the
 50-subrequest Worker limit; this relationship is executable policy, not only
 documentation.
+
+Each `bible_lookup` call and the remote text-enrichment portion of
+`parallel_passages` share a 30-second deadline across provider fetches, body
+reads, and retry delays. MCP cancellation propagates through those operations.
+Bible comparisons run at most four translations concurrently, retain request
+order within successes and failures, and forward `includeFootnotes` for both
+single and multiple translations. When the budget expires, completed passages
+remain available and queued provider work does not start. This deadline does
+not preempt local database queries or synchronous formatting.
 
 For exact `original_language_lookup` calls, corpus usage is opt-in. `overview`
 returns totals plus the complete canonical-book distribution only. `study`

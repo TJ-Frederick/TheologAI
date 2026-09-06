@@ -16,6 +16,7 @@ const compilerOptions: ts.CompilerOptions = {
   allowJs: false,
   module: ts.ModuleKind.ESNext,
   moduleResolution: ts.ModuleResolutionKind.Bundler,
+  resolveJsonModule: true,
 };
 const resolutionHost = ts.createCompilerHost(compilerOptions);
 
@@ -102,6 +103,34 @@ function resolvedReferences(fileName: string, forbiddenRoot: string): string[] {
 }
 
 describe('application-owned service boundaries', () => {
+  it('keeps serving source independent of preparation, tests, documentation and raw source modules', () => {
+    const forbiddenRoots = ['scripts', 'test', 'docs', 'data'].map(directory => join(repoRoot, directory));
+    const references = walk(srcRoot).flatMap(fileName => forbiddenRoots.flatMap(forbiddenRoot =>
+      resolvedReferences(fileName, forbiddenRoot).map(specifier => ({
+        file: relative(repoRoot, fileName).replaceAll('\\', '/'),
+        specifier,
+      }))));
+    expect(references).toEqual([]);
+  });
+
+  it('detects preparation and raw-source imports without executing their modules', () => {
+    const fileName = join(srcRoot, 'preparation-boundary-regression.ts');
+    const script = '../scripts/build-database.js';
+    const source = '../data/data-manifest.json';
+    for (const statement of [
+      `import '${script}';`,
+      `export * from '${script}';`,
+      `type Build = import('${script}');`,
+      `void import('${script}');`,
+      `import build = require('${script}');`,
+      `const build = require('${script}');`,
+    ]) {
+      expect(resolvedReferencesInSource(fileName, statement, join(repoRoot, 'scripts'))).toEqual([script]);
+    }
+    expect(resolvedReferencesInSource(fileName, `import manifest from '${source}';`, join(repoRoot, 'data'))).toEqual([source]);
+    expect(resolvedReferencesInSource(fileName, "import compiled from './data/parallel-passages.json';", join(repoRoot, 'data'))).toEqual([]);
+  });
+
   it('keeps service ports application-owned and retired adapter ports absent', () => {
     expect(existsSync(join(repoRoot, 'src/adapters/bible/BibleAdapter.ts'))).toBe(false);
     expect(existsSync(join(repoRoot, 'src/adapters/commentary/CommentaryAdapter.ts'))).toBe(false);

@@ -10,8 +10,8 @@
     "conformance": 1
   },
   "current": {
-    "totalTestTypeScript": 288,
-    "activeVitest": 209,
+    "totalTestTypeScript": 289,
+    "activeVitest": 210,
     "support": 24,
     "manual": 4,
     "legacyOrphan": 50,
@@ -105,6 +105,7 @@
       "test/unit/mcp/primarySourceSearchDescriptor.test.ts",
       "test/unit/mcp/promptContracts.test.ts",
       "test/unit/mcp/server.test.ts",
+      "test/unit/mcp/toolExecutionObserver.test.ts",
       "test/unit/mcp/validation.test.ts",
       "test/unit/presenters/bibleStructured.test.ts",
       "test/unit/presenters/classicTextsStructured.test.ts",

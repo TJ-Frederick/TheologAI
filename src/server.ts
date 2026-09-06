@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import type { Server, Transport } from '@modelcontextprotocol/server';
 import { createTheologAiMcpServer, STDIO_CAPABILITIES } from './mcp/server.js';
+import type { ToolExecutionObserver } from './mcp/toolExecutionObserver.js';
 import type { McpCapabilityProfile, McpCompositionRoot } from './mcp/server.js';
 import { createCompositionRoot } from './tools/v2/index.js';
 
@@ -22,8 +23,9 @@ export class BibleMCPServer {
     version: string = THEOLOGAI_VERSION,
     profile: McpCapabilityProfile = STDIO_CAPABILITIES,
     era: 'legacy' | 'modern' = 'legacy',
+    toolExecutionObserver?: ToolExecutionObserver,
   ) {
-    this.mcpServer = createTheologAiMcpServer(root, version, profile, era);
+    this.mcpServer = createTheologAiMcpServer(root, version, profile, era, toolExecutionObserver);
   }
 
   getServer(): Server {
