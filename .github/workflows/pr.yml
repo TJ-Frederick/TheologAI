@@ -132,6 +132,9 @@ jobs:
       - name: Verify generated SQLite database
         run: npm run data:verify-db -- --database "$RUNNER_TEMP/theologai.db"
 
+      - name: Run primary-source retrieval quality benchmark
+        run: npm run benchmark:primary-source-research -- --database "$RUNNER_TEMP/theologai.db"
+
       - name: Exercise D1 readiness checks against generated database
         run: |
           test -f "$THEOLOGAI_TEST_DATABASE_PATH"
