@@ -156,6 +156,19 @@ describe('ParallelPassageService fixed text-enrichment budget', () => {
     ]);
   });
 
+  it('shares one caller cancellation signal across the fixed enrichment budget', async () => {
+    const controller = new AbortController();
+    const lookup = successfulLookup();
+
+    await service(lookup).lookup({
+      reference: 'Matthew 1:1', corpora: ['ubs_source_attested', 'theologai_legacy'],
+      includeText: true, translation: 'WEB',
+    }, { signal: controller.signal });
+
+    expect(lookup).toHaveBeenCalledTimes(12);
+    expect(lookup.mock.calls.every((call) => call[1]?.signal === controller.signal)).toBe(true);
+  });
+
   it('does not backfill after failures and bounds deterministic failure examples', async () => {
     const lookup = vi.fn().mockImplementation(async ({ reference }) => {
       throw new Error(`Unavailable ${reference}`);

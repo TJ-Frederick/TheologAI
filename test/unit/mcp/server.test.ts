@@ -251,7 +251,10 @@ describe('shared MCP registration', () => {
       arguments: { reference: 'John 3:16' },
     });
     expect(result.content).toEqual([{ type: 'text', text: 'Result from bible_lookup' }]);
-    expect(root.tools[0].handler).toHaveBeenCalledWith({ reference: 'John 3:16' });
+    expect(root.tools[0].handler).toHaveBeenCalledWith(
+      { reference: 'John 3:16' },
+      { signal: expect.any(AbortSignal) },
+    );
   });
 
   it('preserves bounded UBS survey navigation in the parallel_passages tools/list contract', async () => {

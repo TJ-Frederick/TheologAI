@@ -17,7 +17,8 @@ import {
   DonationService as DonationServiceClass,
   type DonationService,
 } from '../../../../src/services/donation/DonationService.js';
-import type { BibleService } from '../../../../src/services/bible/BibleService.js';
+import { BibleService } from '../../../../src/services/bible/BibleService.js';
+import type { BibleProviderPort } from '../../../../src/services/bible/BibleProviderPort.js';
 import type { CrossReferenceService } from '../../../../src/services/bible/CrossReferenceService.js';
 import type { ParallelPassageService } from '../../../../src/services/bible/ParallelPassageService.js';
 import type { CommentaryService } from '../../../../src/services/commentary/CommentaryService.js';
@@ -135,11 +136,14 @@ describe('bible_lookup handler', () => {
 
     const result = await handler.handler({ reference: 'John 3:16', includeFootnotes: true });
 
-    expect(lookup).toHaveBeenCalledWith({
-      reference: 'John 3:16',
-      translation: 'ESV',
-      includeFootnotes: true,
-    });
+    expect(lookup).toHaveBeenCalledWith(
+      {
+        reference: 'John 3:16',
+        translation: 'ESV',
+        includeFootnotes: true,
+      },
+      { signal: expect.any(AbortSignal) },
+    );
     expect(lookupMultiple).not.toHaveBeenCalled();
     expect(textOf(result)).toContain('John 3:16 (ESV)');
     expect(textOf(result)).toContain('For God so loved the world.');
@@ -166,12 +170,57 @@ describe('bible_lookup handler', () => {
     const result = await handler.handler({
       reference: 'John 3:16',
       translation: ['ESV', 'KJV'],
+      includeFootnotes: true,
     });
 
-    expect(lookupMultiple).toHaveBeenCalledWith('John 3:16', ['ESV', 'KJV']);
+    expect(lookupMultiple).toHaveBeenCalledWith(
+      'John 3:16',
+      ['ESV', 'KJV'],
+      { includeFootnotes: true },
+      { signal: expect.any(AbortSignal) },
+    );
     expect(lookup).not.toHaveBeenCalled();
     expect(textOf(result)).toContain('(2 translations)');
     expect(textOf(result)).toContain('**KJV:**');
+  });
+
+  it('uses one overall deadline to stop queued translation work and cleans up its timer', async () => {
+    vi.useFakeTimers();
+    const translations = ['ESV', 'NET', 'KJV', 'WEB', 'BSB', 'ASV', 'YLT', 'DBY'];
+    const getPassage = vi.fn<BibleProviderPort['getPassage']>().mockImplementation(
+      async (_reference, _translation, options) => new Promise((_resolve, reject) => {
+        options?.signal?.addEventListener('abort', () => reject(options.signal?.reason), { once: true });
+      }),
+    );
+    const service = new BibleService([{
+      supportedTranslations: translations,
+      getPassage,
+      isConfigured: () => true,
+    }]);
+    const handler = createBibleLookupHandler(service);
+
+    try {
+      const pending = handler.handler({ reference: 'John 3:16', translation: translations });
+      expect(getPassage).toHaveBeenCalledTimes(4);
+      await vi.advanceTimersByTimeAsync(30_000);
+      const result = await pending;
+
+      expect(result.isError).not.toBe(true);
+      expect(getPassage).toHaveBeenCalledTimes(4);
+      expect(result.structuredContent).toMatchObject({
+        passages: [],
+        failures: translations.map(translation => ({
+          translation,
+          reason: 'Translation could not be retrieved.',
+        })),
+      });
+      const sharedSignal = getPassage.mock.calls[0][2]?.signal;
+      expect(sharedSignal?.aborted).toBe(true);
+      expect(sharedSignal?.reason).toMatchObject({ name: 'RequestDeadlineExceededError' });
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('accepts legacy JSON-encoded translation arrays and preserves partial results', async () => {
@@ -190,7 +239,12 @@ describe('bible_lookup handler', () => {
       translation: '["WEB","DBY"]',
     });
 
-    expect(lookupMultiple).toHaveBeenCalledWith('Psalm 23:1', ['WEB', 'DBY']);
+    expect(lookupMultiple).toHaveBeenCalledWith(
+      'Psalm 23:1',
+      ['WEB', 'DBY'],
+      { includeFootnotes: undefined },
+      { signal: expect.any(AbortSignal) },
+    );
     expect(textOf(result)).toContain('(2 translations requested; 1 available)');
     expect(textOf(result)).toContain('**WEB:**');
     expect(textOf(result)).toContain('**DBY:** unavailable');
@@ -237,7 +291,10 @@ describe('bible_lookup handler', () => {
 
     await handler.handler({ reference: 'John 3:16', translation: '[ESV' });
 
-    expect(lookup).toHaveBeenCalledWith(expect.objectContaining({ translation: '[ESV' }));
+    expect(lookup).toHaveBeenCalledWith(
+      expect.objectContaining({ translation: '[ESV' }),
+      { signal: expect.any(AbortSignal) },
+    );
   });
 
   it('returns a tool error when lookup fails', async () => {
@@ -427,10 +484,13 @@ describe('parallel_passages handler', () => {
     const result = await handler.handler({ reference: 'John 3:16', ...materialized });
 
     expect(result.isError).not.toBe(true);
-    expect(lookup).toHaveBeenCalledWith(expect.objectContaining({
-      corpora: ['ubs_source_attested'], maxGroups: 5, includeAlignment: false,
-      includeOpenBibleCrossReferences: undefined, mode: undefined, maxParallels: undefined, useCrossReferences: undefined,
-    }));
+    expect(lookup).toHaveBeenCalledWith(
+      expect.objectContaining({
+        corpora: ['ubs_source_attested'], maxGroups: 5, includeAlignment: false,
+        includeOpenBibleCrossReferences: undefined, mode: undefined, maxParallels: undefined, useCrossReferences: undefined,
+      }),
+      { signal: expect.any(AbortSignal) },
+    );
   });
   it('forwards all lookup controls and formats text-bearing parallels', async () => {
     const lookup = vi.fn<ParallelPassageService['lookup']>().mockResolvedValue({
@@ -474,18 +534,22 @@ describe('parallel_passages handler', () => {
       sourceAttestedResultWindow: { requestedLimit: 5, returnedGroupCount: 0, additionalMatchStatus: 'not_evaluated' },
     });
 
-    expect(lookup).toHaveBeenCalledWith({
-      reference: 'Matthew 26:26-28',
-      corpora: ['theologai_legacy'],
-      mode: 'synoptic',
-      includeText: true,
-      translation: 'KJV',
-      maxParallels: 4,
-      maxGroups: undefined,
-      includeAlignment: undefined,
-      includeOpenBibleCrossReferences: undefined,
-      useCrossReferences: false,
-    });
+    expect(lookup).toHaveBeenCalledWith(
+      {
+        reference: 'Matthew 26:26-28',
+        corpora: ['theologai_legacy'],
+        mode: 'synoptic',
+        includeText: true,
+        translation: 'KJV',
+        maxParallels: 4,
+        maxGroups: undefined,
+        groupCursor: undefined,
+        includeAlignment: undefined,
+        includeOpenBibleCrossReferences: undefined,
+        useCrossReferences: false,
+      },
+      { signal: expect.any(AbortSignal) },
+    );
     expect(textOf(result)).toContain('[synoptic] (95% confidence)');
     expect(textOf(result)).toContain('And as they were eating');
   });
