@@ -5,6 +5,10 @@
 > status. See [README.md](../README.md) and [docs/ROADMAP.md](ROADMAP.md) for
 > the current capabilities and sequence.
 
+For current source layout and maintenance responsibilities, use
+[Architecture and ownership](ARCHITECTURE.md). The addendum below preserves
+the boundary program's historical record; the new guide links its executable guards.
+
 ### Current compiler-boundary addendum
 
 The historical plan above is not a source-layout authority. Current test

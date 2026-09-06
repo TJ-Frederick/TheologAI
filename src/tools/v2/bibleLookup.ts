@@ -9,6 +9,8 @@ import { formatBibleResponse, formatMultiBibleResponse } from '../../formatters/
 import { handleToolError } from '../../kernel/errors.js';
 import { bibleLookupOutputSchema } from '../../mcp/schemas/bibleLookup.js';
 import { presentBibleLookupStructured } from '../../presenters/bibleStructured.js';
+import { BIBLE_TOOL_CALL_DEADLINE_MS } from '../../kernel/requestLimits.js';
+import { createRequestDeadline } from '../../kernel/requestDeadline.js';
 
 export function createBibleLookupHandler(bibleService: BibleService): ToolHandler {
   return {
@@ -34,7 +36,8 @@ export function createBibleLookupHandler(bibleService: BibleService): ToolHandle
     outputSchema: bibleLookupOutputSchema,
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
 
-    handler: async (params) => {
+    handler: async (params, context) => {
+      const deadline = createRequestDeadline(BIBLE_TOOL_CALL_DEADLINE_MS, context?.signal);
       try {
         const translations = resolveTranslations(params.translation);
 
@@ -43,7 +46,7 @@ export function createBibleLookupHandler(bibleService: BibleService): ToolHandle
             reference: params.reference as string,
             translation: translations[0],
             includeFootnotes: params.includeFootnotes as boolean,
-          });
+          }, { signal: deadline.signal });
           return {
             content: [{ type: 'text', text: formatBibleResponse(result) }],
             structuredContent: presentBibleLookupStructured(
@@ -54,7 +57,12 @@ export function createBibleLookupHandler(bibleService: BibleService): ToolHandle
           };
         }
 
-        const results = await bibleService.lookupMultiple(params.reference as string, translations);
+        const results = await bibleService.lookupMultiple(
+          params.reference as string,
+          translations,
+          { includeFootnotes: params.includeFootnotes as boolean },
+          { signal: deadline.signal },
+        );
         return {
           content: [{ type: 'text', text: formatMultiBibleResponse(results) }],
           structuredContent: presentBibleLookupStructured(
@@ -65,6 +73,8 @@ export function createBibleLookupHandler(bibleService: BibleService): ToolHandle
         };
       } catch (error) {
         return handleToolError(error as Error);
+      } finally {
+        deadline.dispose();
       }
     },
   };

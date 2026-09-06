@@ -42,7 +42,7 @@ export function registerToolHandlers(
     })),
   }));
 
-  server.setRequestHandler('tools/call', async (request) => {
+  server.setRequestHandler('tools/call', async (request, context) => {
     const { name, arguments: args } = request.params;
     const startedAt = Date.now();
     const observedTool = safeToolName(name);
@@ -104,7 +104,7 @@ export function registerToolHandlers(
 
       let result;
       try {
-        result = await tool.handler(toolArguments);
+        result = await tool.handler(toolArguments, { signal: context.mcpReq.signal });
       } catch {
         emit({ outcome: 'error', failureCategory: 'handler_exception' });
         throw internalError();

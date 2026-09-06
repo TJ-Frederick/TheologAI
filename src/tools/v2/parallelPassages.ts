@@ -9,6 +9,8 @@ import { handleToolError } from '../../kernel/errors.js';
 import { parallelPassagesOutputSchema } from '../../mcp/schemas/parallelPassages.js';
 import { presentParallelPassagesStructured } from '../../presenters/parallelPassagesStructured.js';
 import { validateParallelPassagesOutputSemantics } from '../../mcp/parallelPassagesOutputValidation.js';
+import { BIBLE_TOOL_CALL_DEADLINE_MS } from '../../kernel/requestLimits.js';
+import { createRequestDeadline } from '../../kernel/requestDeadline.js';
 
 export function createParallelPassagesHandler(service: ParallelPassageService): ToolHandler {
   return {
@@ -56,7 +58,8 @@ export function createParallelPassagesHandler(service: ParallelPassageService): 
     validateStructuredOutput: validateParallelPassagesOutputSemantics,
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
 
-    handler: async (params) => {
+    handler: async (params, context) => {
+      const deadline = createRequestDeadline(BIBLE_TOOL_CALL_DEADLINE_MS, context?.signal);
       try {
         const result = await service.lookup({
           reference: params.reference as string,
@@ -70,13 +73,15 @@ export function createParallelPassagesHandler(service: ParallelPassageService): 
           includeAlignment: params.includeAlignment as boolean,
           includeOpenBibleCrossReferences: params.includeOpenBibleCrossReferences as boolean,
           useCrossReferences: params.useCrossReferences as boolean,
-        });
+        }, { signal: deadline.signal });
         return {
           content: [{ type: 'text', text: formatParallelPassageResearch(result) }],
           structuredContent: presentParallelPassagesStructured(result),
         };
       } catch (error) {
         return handleToolError(error as Error);
+      } finally {
+        deadline.dispose();
       }
     },
   };

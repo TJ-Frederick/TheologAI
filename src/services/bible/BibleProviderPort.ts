@@ -7,7 +7,10 @@ export interface BibleProviderPort {
   getPassage(
     ref: BibleReference,
     translation: string,
-    options?: { readonly includeFootnotes?: boolean },
+    options?: {
+      readonly includeFootnotes?: boolean;
+      readonly signal?: AbortSignal;
+    },
   ): Promise<BibleResult>;
   isConfigured(): boolean;
 }

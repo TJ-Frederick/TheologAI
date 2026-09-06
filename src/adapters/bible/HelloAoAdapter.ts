@@ -44,7 +44,11 @@ export class HelloAoAdapter implements BibleProviderPort {
     });
   }
 
-  async getPassage(ref: BibleReference, translation: string, options?: { includeFootnotes?: boolean }): Promise<BibleResult> {
+  async getPassage(
+    ref: BibleReference,
+    translation: string,
+    options?: { includeFootnotes?: boolean; signal?: AbortSignal },
+  ): Promise<BibleResult> {
     const key = translation.toUpperCase();
     const meta = TRANSLATIONS[key];
     if (!meta) {
@@ -52,7 +56,10 @@ export class HelloAoAdapter implements BibleProviderPort {
     }
 
     const hao = toHelloAO(ref);
-    const data = await this.client.getJSON<any>(`/${meta.id}/${hao.bookCode}/${hao.chapter}.json`);
+    const data = await this.client.getJSON<any>(
+      `/${meta.id}/${hao.bookCode}/${hao.chapter}.json`,
+      { signal: options?.signal },
+    );
     this.assertResponseMatchesRequest(data, ref, hao.bookCode, meta.id);
 
     // Extract verses
