@@ -8,6 +8,7 @@ import {
 import { toNodeHandler } from '@modelcontextprotocol/node';
 import { STATELESS_HTTP_CAPABILITIES, type McpCompositionRoot } from '../mcp/server.js';
 import { createTheologAiMcpServer } from '../mcp/server.js';
+import type { ToolExecutionObserver } from '../mcp/toolExecutionObserver.js';
 import { THEOLOGAI_VERSION } from '../server.js';
 import { normalizeHostname, type NodeHttpConfig } from './config.js';
 import { INTERNAL_MCP_ERROR } from './mcpErrors.js';
@@ -30,6 +31,8 @@ export interface NodeHttpServerOptions {
   root: McpCompositionRoot;
   config: NodeHttpConfig;
   telemetry?: HttpTelemetry;
+  /** Content-free tool outcome telemetry; the caller owns its sink. */
+  toolExecutionObserver?: ToolExecutionObserver;
   createMcpHandler?: (root: McpCompositionRoot) => Pick<McpHttpHandler, 'fetch' | 'close'>;
 }
 
@@ -44,7 +47,7 @@ type BodyResult =
   | { ok: false; status: 400 | 413; message: string };
 
 export function createNodeHttpServer(options: NodeHttpServerOptions): NodeHttpRuntime {
-  const { root, config } = options;
+  const { root, config, toolExecutionObserver } = options;
   const telemetry = options.telemetry ?? defaultTelemetry;
   const createHandler = options.createMcpHandler ?? (sharedRoot => createSdkMcpHandler(
     ({ era }) => createTheologAiMcpServer(
@@ -52,6 +55,7 @@ export function createNodeHttpServer(options: NodeHttpServerOptions): NodeHttpRu
       THEOLOGAI_VERSION,
       STATELESS_HTTP_CAPABILITIES,
       era,
+      toolExecutionObserver,
     ),
     { legacy: 'stateless', responseMode: 'auto' },
   ));

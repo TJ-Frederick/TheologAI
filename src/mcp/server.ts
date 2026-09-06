@@ -26,6 +26,7 @@ import type { StrongsService } from '../services/languages/StrongsService.js';
 import { internalError, resourceNotFound } from './errors.js';
 import { registerPromptHandlers } from './prompts.js';
 import { registerToolHandlers } from './tools.js';
+import type { ToolExecutionObserver } from './toolExecutionObserver.js';
 import { jsonSchemaValidator } from './validation.js';
 import { buildPrimarySourceCatalog, PRIMARY_SOURCE_CATALOG_URI } from './primarySourceCatalog.js';
 import { COMMENTARY_CATALOG } from '../kernel/commentaryCatalog.js';
@@ -81,6 +82,7 @@ export function createTheologAiMcpServer(
   version: string,
   profile: McpCapabilityProfile = STDIO_CAPABILITIES,
   era: 'legacy' | 'modern' = 'legacy',
+  toolExecutionObserver?: ToolExecutionObserver,
 ): TheologAiMcpServer {
   assertPrimarySourceContractParity(root);
   const legacyLogging = profile.logging && era === 'legacy';
@@ -106,7 +108,7 @@ export function createTheologAiMcpServer(
   );
 
   const { tools, services } = root;
-  registerToolHandlers(server, tools, legacyLogging);
+  registerToolHandlers(server, tools, legacyLogging, toolExecutionObserver, version);
 
   // ── Resources ──
 
