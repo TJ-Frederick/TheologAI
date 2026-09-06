@@ -5,6 +5,10 @@
 TheologAI is an MCP server for Bible study and theological research. It runs
 locally over stdio or Streamable HTTP and on Cloudflare Workers with D1.
 
+For the current source layout and maintenance responsibilities, see
+[Architecture and ownership](docs/ARCHITECTURE.md). The earlier
+`docs/bible-mcp-architecture.md` remains historical design evidence.
+
 The checked-out local registry contains eleven tools, six guided prompts, eight
 English Bible translations, six commentary sources, 35 locally indexed
 historical works, Strong's dictionaries, and Greek/Hebrew morphology. The
