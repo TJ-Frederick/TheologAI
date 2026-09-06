@@ -14,6 +14,18 @@ const section = {
   id: 1, document_id: document.id, section_number: '1', title: 'Grace', content: 'Grace and faith.', topics: [],
 };
 
+interface MutableFixture {
+  fixtureRole: string;
+  cases: Array<{ id: string; kind: string; attempts: Array<{ expectedStatus: string }> }>;
+}
+
+function mutableFixture(): MutableFixture {
+  return JSON.parse(readFileSync(
+    new URL('../../fixtures/primary-source-research-quality-benchmark.json', import.meta.url),
+    'utf8',
+  )) as MutableFixture;
+}
+
 function repository(): IHistoricalDocumentRepository {
   return {
     listDocuments: () => [document],
@@ -77,12 +89,30 @@ describe('primary-source research quality benchmark', () => {
   });
 
   it('fails closed when a fixture relabels regression anchors as scholarly judgments', () => {
-    const fixture = JSON.parse(readFileSync(
-      new URL('../../fixtures/primary-source-research-quality-benchmark.json', import.meta.url),
-      'utf8',
-    )) as Record<string, unknown>;
+    const fixture = mutableFixture();
     fixture.fixtureRole = 'human-reviewed scholarly relevance judgments';
     expect(() => validatePrimarySourceBenchmarkFixture(fixture)).toThrow('must disclaim scholarly relevance judgment');
+  });
+
+  it.each([
+    ['catalog_miss', 'no_results'],
+    ['no_results', 'catalog_miss'],
+  ])('rejects a %s case whose attempt expects %s', (kind, expectedStatus) => {
+    const fixture = mutableFixture();
+    const benchmarkCase = fixture.cases.find(item => item.kind === kind)!;
+    benchmarkCase.attempts[0]!.expectedStatus = expectedStatus;
+    expect(() => validatePrimarySourceBenchmarkFixture(fixture)).toThrow(
+      `case ${benchmarkCase.id} ${kind} attempts must expect ${kind}`,
+    );
+  });
+
+  it('requires a positive retrieval case to finish with a successful status', () => {
+    const fixture = mutableFixture();
+    const benchmarkCase = fixture.cases.find(item => item.kind === 'paraphrase')!;
+    benchmarkCase.attempts.at(-1)!.expectedStatus = 'no_results';
+    expect(() => validatePrimarySourceBenchmarkFixture(fixture)).toThrow(
+      'positive retrieval attempts must not expect catalog_miss and must finish with ok',
+    );
   });
 
   it('reports an expected-status mutation instead of accepting the returned hit', async () => {

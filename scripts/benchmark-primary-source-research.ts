@@ -185,6 +185,14 @@ export function validatePrimarySourceBenchmarkFixture(value: unknown): PrimarySo
       };
     });
     const positive = kind === 'exact_term' || kind === 'paraphrase' || kind === 'ambiguous';
+    if (kind === 'catalog_miss' || kind === 'no_results') {
+      if (attempts.some(attempt => attempt.expectedStatus !== kind)) {
+        throw new Error(`case ${id} ${kind} attempts must expect ${kind}`);
+      }
+    } else if (attempts.some(attempt => attempt.expectedStatus === 'catalog_miss')
+      || attempts.at(-1)!.expectedStatus !== 'ok') {
+      throw new Error(`case ${id} positive retrieval attempts must not expect catalog_miss and must finish with ok`);
+    }
     if (positive !== (regressionAnchors.length > 0)) throw new Error(`case ${id} anchor policy does not match its kind`);
     if (kind === 'paraphrase') {
       const finalTerms = attempts.at(-1)!.text.trim().split(/\s+/u);
