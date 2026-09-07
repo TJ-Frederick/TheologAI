@@ -9,13 +9,15 @@ active assignment.
 
 The candidate starts from PR #160 merge
 `09892c8d39aed34074312f46c0c724b4212e25ee` and contains the merged improvements
-in PRs #155–#159: architecture ownership, dependency repairs, Bible footnotes
+in PRs #155–#160: architecture ownership, dependency repairs, Bible footnotes
 and remote-work budgets, content-free tool telemetry, and bounded local
-research query planning with its regression benchmark. See the
+research query planning with its regression benchmark, and roadmap
+reconciliation in PR #160. See the
 [roadmap](ROADMAP.md#september-review-improvements--merged-release-pending)
 for completed scope and limitations.
 
-This release transaction changes documentation only. Package version remains
+This candidate PR's delta is documentation-only; eventual promotion deploys
+the accumulated runtime changes as a new Worker version. Package version remains
 `3.6.0`. No schema, data, binding, secret, or Worker configuration change is
 included. PR #154's unmerged original-language depth implementation is outside
 this candidate.
