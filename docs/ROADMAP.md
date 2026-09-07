@@ -13,6 +13,30 @@ The successor program after PR #122 is defined in
 [Phase 3B](./PHASE-3B-PLAN.md); earlier uses of "Phase 3" below are historical
 names for already-shipped work.
 
+## September review improvements — merged, release pending
+
+As of 2026-09-07, the four repository-review improvements and their dependency
+prerequisite are merged through PR #159 (`77f25d3f45f50ab83e65bfb15ab465b3fce6859c`).
+Sol reviewed each final head and all five required checks passed before merge.
+These are source-complete milestones, not production-release claims: the
+post-merge deployment workflows stopped at the protected preview-evidence gate
+and skipped deployment. Active deployment identity remains in
+[CURRENT-RELEASE.md](CURRENT-RELEASE.md).
+
+| Improvement | Completed scope | Remaining work |
+| --- | --- | --- |
+| Research quality — [PR #159](https://github.com/TJ-Frederick/TheologAI/pull/159) | Bounded local prompt-query reformulation and a 42-case CI benchmark with 41 exact section anchors; a fixture-validation finding was fixed and re-reviewed. | Add human-reviewed relevance judgments and evaluate research synthesis separately; regression anchors do not establish scholarly quality. See [benchmark guide](PRIMARY-SOURCE-RESEARCH-QUALITY-BENCHMARK.md). |
+| Operational visibility — [PR #157](https://github.com/TJ-Frederick/TheologAI/pull/157) | Content-free, best-effort tool outcome/duration events across Node and Worker, with privacy and failure-isolation tests. | Establish a representative operational baseline, then choose durable metrics, dashboards, alerting, and service targets. No monitoring infrastructure or enforced SLO was provisioned. See [operations guide](worker-operations.md). |
+| Bible reliability — [PR #158](https://github.com/TJ-Frederick/TheologAI/pull/158) | Multi-translation footnotes, bounded concurrency, and a shared 30-second remote-work deadline with cancellation forwarding. | Verify integrated behavior in protected preview; the cooperative deadline does not preempt local database work or synchronous formatting. |
+| Architecture ownership — [PR #155](https://github.com/TJ-Frederick/TheologAI/pull/155) | Current ownership guide, compiler-enforced serving-code import boundaries, dormant-work register, and removal of an unused writable database helper. | Maintain the boundaries and review dormant work on 2026-10-05. See [architecture guide](ARCHITECTURE.md). |
+| Dependency prerequisite — [PR #156](https://github.com/TJ-Frederick/TheologAI/pull/156) | Targeted `fast-uri` and `qs` updates restored the dependency audit gate. | Continue routine dependency monitoring; the passing audit is dated verification. |
+
+Next, prepare a dedicated preview/release PR for the integrated changes and
+obtain the protected preview evidence required by the release gates below.
+Production promotion and its bounded post-release audit remain separate gated
+steps. These maintenance improvements do not mark any additional Phase 3B
+product phase complete or authorize corpus activation or deployment.
+
 ## Shipped baseline
 
 - **Phase 3B.1 dual-era MCP modernization / PRs #148–#151:** replaced the

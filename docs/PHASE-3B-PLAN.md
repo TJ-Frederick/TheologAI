@@ -65,6 +65,12 @@ The following boundaries remain deliberate:
 
 ## Phase 3B sequencing
 
+The September repository-review improvements (PRs #155–#159) are merged but
+await protected preview/release evidence. Their completed scope, limitations,
+and next steps are tracked in the
+[roadmap improvement status](ROADMAP.md#september-review-improvements--merged-release-pending).
+They do not change the phase completion claims below.
+
 Status: **3B.0 complete (C1 + C2); 3B.1 complete in PR #151 after protected
 preview and production proof; 3B.2 is next**. This plan does not authorize any
 additional deployment, binding change, cleanup, or other operational mutation.
