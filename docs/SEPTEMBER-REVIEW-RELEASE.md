@@ -24,13 +24,19 @@ this candidate.
 
 ## Shared preview coordination
 
-PR #154 still carries `deploy-preview`. Its protected run `33564178896`
+PR #154's protected run `33564178896`
 deployed its candidate on 2026-09-01, then failed the primary-source edge audit
 with `transport_failure`. Therefore a failed workflow is not evidence that
 preview remained at the PR #151 identity in the dated release snapshot.
 
-Before enabling this candidate's deployment, resolve the shared-preview
-handoff from PR #154. Use the existing protected workflow to capture the fresh
+The owner approved the shared-preview handoff. PR #154's `deploy-preview`
+label was removed at `2026-09-07T20:35:31Z`; GitHub recorded the unlabeled
+event. Its merge conflicts suppressed the `pull_request` revocation workflow,
+so no workflow acknowledgment exists. All its runs were completed and its
+live label was absent before PR #161 received preview authorization. PR #154
+remains open with its code unchanged.
+
+Use the existing protected workflow to capture the fresh
 preview predecessor and production control, verify the configured D1, and
 serialize the preview mutation. Do not infer rollback authority or modify
 PR #154's code as part of this release.
