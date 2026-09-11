@@ -168,6 +168,33 @@ describe('SourceAttestedParallelService', () => {
     expect(repository.findGroups).not.toHaveBeenCalled();
   });
 
+  it.each([
+    'Matthew 26:999',
+    'Matthew 26:75-999',
+    'Matthew 26:75,999',
+  ])('rejects an upper-bound violation before repository lookup: %s', async reference => {
+    const repository: ISourceAttestedParallelRepository = {
+      findGroups: vi.fn(),
+      hasValidGroupCursorBoundary: vi.fn().mockResolvedValue(true),
+      getProvenance: vi.fn(),
+    };
+
+    await expect(new SourceAttestedParallelService(repository).lookup({ reference }))
+      .rejects.toThrow('reference must identify one canonical or source-versification Bible passage');
+    expect(repository.findGroups).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['Psalms 18:51', 19, 18, 51],
+    ['1 Kings 5:32', 11, 5, 32],
+    ['Psalms 60:13-14', 19, 60, 13],
+    ['Isaiah 8:23', 23, 8, 23],
+    ['Hosea 2:25', 28, 2, 25],
+  ] as const)('preserves the bounded source-versification coordinate %s', (reference, bookNumber, chapter, startVerse) => {
+    const parsed = parseSourceAttestedLookupReference(reference);
+    expect(parsed.segments[0]).toMatchObject({ bookNumber, chapter, startVerse });
+  });
+
   it('rejects oversized and over-segmented references before repository lookup', async () => {
     const repository: ISourceAttestedParallelRepository = {
       findGroups: vi.fn(), hasValidGroupCursorBoundary: vi.fn().mockResolvedValue(true), getProvenance: vi.fn(),

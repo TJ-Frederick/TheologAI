@@ -37,6 +37,7 @@ import { validatorFor } from '../../../../src/mcp/validation.js';
 import { validateClassicTextsOutputSemantics } from '../../../../src/presenters/classicTextsStructured.js';
 import { encodeHistoricalSectionedOnlyCursor } from '../../../../src/kernel/historicalSectionedDelivery.js';
 import { Buffer } from 'node:buffer';
+import { parseReference } from '../../../../src/kernel/reference.js';
 
 function serviceDouble<T>(methods: Partial<{ [K in keyof T]: T[K] }>): T {
   return methods as unknown as T;
@@ -120,6 +121,35 @@ describe('v2 tool handler schemas', () => {
     expect(commentary.properties?.reference).toMatchObject({
       description: expect.stringContaining('verse ranges are not supported'),
     });
+  });
+});
+
+describe('shared malformed-reference guidance', () => {
+  const rejectMalformedReference = (reference: string): never => {
+    parseReference(reference);
+    throw new Error('expected malformed reference');
+  };
+  const handlers = [
+    createBibleLookupHandler(serviceDouble<BibleService>({
+      lookup: vi.fn(async params => rejectMalformedReference(params.reference)),
+      lookupMultiple: vi.fn(),
+    })),
+    createVerseMorphologyHandler(serviceDouble<MorphologyService>({
+      getVerseMorphology: vi.fn(async reference => rejectMalformedReference(reference)),
+    })),
+    createCommentaryHandler(serviceDouble<CommentaryService>({
+      lookup: vi.fn(async params => rejectMalformedReference(params.reference)),
+    })),
+    createParallelPassagesHandler(serviceDouble<ParallelPassageService>({
+      lookup: vi.fn(async params => rejectMalformedReference(params.reference)),
+    })),
+  ];
+
+  it.each(handlers)('returns actionable validation guidance from $name', async handler => {
+    const result = await handler.handler({ reference: 'not a reference' });
+    expect(result).toMatchObject({ isError: true });
+    expect(textOf(result)).toContain('Invalid input: Invalid Bible reference');
+    expect(textOf(result)).not.toContain('Please try again');
   });
 });
 
