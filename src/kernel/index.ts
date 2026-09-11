@@ -159,6 +159,7 @@ export type {
   Citation,
   Reference,
   Footnote,
+  FootnoteDelivery,
   BibleResult,
   BibleTranslationFailure,
   BibleLookupMultipleResult,

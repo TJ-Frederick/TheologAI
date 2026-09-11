@@ -28,7 +28,11 @@ export function createBibleLookupHandler(bibleService: BibleService): ToolHandle
           default: 'ESV',
           description: 'Translation(s). Single: "ESV". Compare: ["ESV","KJV","WEB"].',
         },
-        includeFootnotes: { type: 'boolean', default: false, description: 'Include footnotes and translation notes' },
+        includeFootnotes: {
+          type: 'boolean',
+          default: false,
+          description: 'Request available footnotes and translation notes. Each returned passage reports footnoteDelivery when enabled; provider support and delivery format vary.',
+        },
       },
       required: ['reference'],
       additionalProperties: false,

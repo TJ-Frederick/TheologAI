@@ -22,6 +22,8 @@ export function formatBibleResponse(data: BibleResult): string {
     }
   }
 
+  s += formatFootnoteDelivery(data, '\n');
+
   s += `\n*Source: ${data.citation.source}*`;
   if (data.citation.copyright) s += ` - ${data.citation.copyright}`;
   return s.trim();
@@ -49,6 +51,7 @@ export function formatMultiBibleResponse(data: BibleLookupMultipleResult | Bible
       }
       s += '\n';
     }
+    s += formatFootnoteDelivery(r, '', '\n\n');
   }
 
   if (failures.length > 0) {
@@ -64,6 +67,29 @@ export function formatMultiBibleResponse(data: BibleLookupMultipleResult | Bible
     s += `*Sources: ${sources.join(', ')}*`;
   }
   return s.trim();
+}
+
+function formatFootnoteDelivery(data: BibleResult, prefix: string, suffix = '\n'): string {
+  const delivery = data.footnoteDelivery;
+  if (!delivery || delivery.status === 'structured') return '';
+
+  let message: string;
+  switch (delivery.status) {
+    case 'inline':
+      message = delivery.reason ?? 'Available footnotes are embedded in the passage text.';
+      break;
+    case 'none':
+      message = 'No footnotes were returned for this passage.';
+      break;
+    case 'unavailable': {
+      const markers = delivery.markerCount == null
+        ? ''
+        : ` ${delivery.markerCount} note marker${delivery.markerCount === 1 ? '' : 's'} observed.`;
+      message = `Requested footnote text is unavailable.${markers}${delivery.reason ? ` ${delivery.reason}` : ''}`;
+      break;
+    }
+  }
+  return `${prefix}*Footnote status: ${message}*${suffix}`;
 }
 
 /** Format cross-reference results */

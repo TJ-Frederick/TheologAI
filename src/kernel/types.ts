@@ -64,12 +64,21 @@ export interface Footnote {
   };
 }
 
+/** How a provider fulfilled an explicit includeFootnotes request. */
+export interface FootnoteDelivery {
+  status: 'structured' | 'inline' | 'none' | 'unavailable';
+  noteCount?: number;
+  markerCount?: number;
+  reason?: string;
+}
+
 export interface BibleResult {
   reference: string;
   translation: string;
   text: string;
   crossReferences?: Reference[];
   footnotes?: Footnote[];
+  footnoteDelivery?: FootnoteDelivery;
   citation: Citation;
 }
 

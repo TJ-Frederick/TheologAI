@@ -60,6 +60,7 @@ describe('HelloAoAdapter', () => {
         text: 'Or uniquely gave',
         reference: { chapter: 3, verse: 16 },
       }],
+      footnoteDelivery: { status: 'structured', noteCount: 1 },
       citation: {
         source: 'World English Bible',
         copyright: 'Public Domain',
@@ -114,6 +115,30 @@ describe('HelloAoAdapter', () => {
 
     const result = await new HelloAoAdapter().getPassage(parseReference('Genesis 1'), 'BSB', { includeFootnotes: true });
     expect(result.footnotes).toHaveLength(1);
+    expect(result.footnoteDelivery).toEqual({ status: 'structured', noteCount: 1 });
+  });
+
+  it('distinguishes no matching notes from unavailable provider note data', async () => {
+    vi.mocked(globalThis.fetch)
+      .mockResolvedValueOnce(response({
+        chapter: {
+          content: [{ type: 'verse', number: 1, content: ['First.'] }],
+          footnotes: [],
+        },
+      }))
+      .mockResolvedValueOnce(response({
+        chapter: { content: [{ type: 'verse', number: 1, content: ['First.'] }] },
+      }));
+
+    const adapter = new HelloAoAdapter();
+    const none = await adapter.getPassage(parseReference('Genesis 1:1'), 'KJV', { includeFootnotes: true });
+    const unavailable = await adapter.getPassage(parseReference('Genesis 1:1'), 'WEB', { includeFootnotes: true });
+
+    expect(none.footnoteDelivery).toEqual({ status: 'none', noteCount: 0 });
+    expect(unavailable.footnoteDelivery).toEqual({
+      status: 'unavailable',
+      reason: 'The translation provider response did not include footnote data.',
+    });
   });
 
   it('rejects an unsupported translation before making a request', async () => {

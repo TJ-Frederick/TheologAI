@@ -185,6 +185,36 @@ describe('bible_lookup handler', () => {
     });
   });
 
+  it('returns NET note unavailability in both Markdown and structured content without a translation failure', async () => {
+    const lookup = vi.fn<BibleService['lookup']>().mockResolvedValue({
+      reference: 'John 1:1',
+      translation: 'NET',
+      text: 'In the beginning was the Word.',
+      footnoteDelivery: {
+        status: 'unavailable',
+        markerCount: 3,
+        reason: 'The configured provider returns markers but not note bodies.',
+      },
+      citation,
+    });
+    const handler = createBibleLookupHandler(serviceDouble<BibleService>({
+      lookup,
+      lookupMultiple: vi.fn<BibleService['lookupMultiple']>(),
+    }));
+
+    const result = await handler.handler({ reference: 'John 1:1', translation: 'NET', includeFootnotes: true });
+
+    expect(result.isError).not.toBe(true);
+    expect(textOf(result)).toContain('Requested footnote text is unavailable. 3 note markers observed.');
+    expect(result.structuredContent).toMatchObject({
+      passages: [{
+        translation: 'NET',
+        footnoteDelivery: { status: 'unavailable', markerCount: 3 },
+      }],
+      failures: [],
+    });
+  });
+
   it('dispatches an array to multi-translation lookup', async () => {
     const lookup = vi.fn<BibleService['lookup']>();
     const lookupMultiple = vi.fn<BibleService['lookupMultiple']>().mockResolvedValue({

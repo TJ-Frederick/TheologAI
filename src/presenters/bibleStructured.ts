@@ -36,6 +36,9 @@ export function presentBibleLookupStructured(
         verse: footnote.reference.verse,
       })),
     } : {}),
+    ...(result.footnoteDelivery ? {
+      footnoteDelivery: { ...result.footnoteDelivery },
+    } : {}),
     provenanceIds: [getProvenanceId(result, provenance, provenanceByKey)],
   }));
 
