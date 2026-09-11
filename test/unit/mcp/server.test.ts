@@ -1219,6 +1219,44 @@ describe('shared MCP registration', () => {
     });
   });
 
+  it.each([
+    ['Node', () => new BibleMCPServer(makeMockRoot(), 'comparison-validation-test').getServer()],
+    ['Worker', () => createWorkerMcpServer(makeMockRoot() as WorkerCompositionRoot, 'comparison-validation-test').server],
+  ])('rejects unsupported comparison translations with actionable errors on %s', async (_runtime, makeServer) => {
+    const client = await connect(makeServer());
+
+    await expect(client.getPrompt({
+      name: 'compare-translations',
+      arguments: { reference: 'John 3:16', translations: 'KJV,NIV,BOGUS' },
+    })).rejects.toMatchObject({
+      code: -32602,
+      message: expect.stringContaining('unsupported translations: NIV, BOGUS'),
+    });
+  });
+
+  it.each([
+    ['Node', () => new BibleMCPServer(makeMockRoot(), 'comparison-normalization-test').getServer()],
+    ['Worker', () => createWorkerMcpServer(makeMockRoot() as WorkerCompositionRoot, 'comparison-normalization-test').server],
+  ])('preserves defaults and supported normalization on %s', async (_runtime, makeServer) => {
+    const client = await connect(makeServer());
+    const defaults = await client.getPrompt({
+      name: 'compare-translations', arguments: { reference: 'John 3:16' },
+    });
+    const selected = await client.getPrompt({
+      name: 'compare-translations',
+      arguments: { reference: 'John 3:16', translations: 'kjv,web,KJV' },
+    });
+    const defaultText = textContent(defaults.messages[0]?.content);
+    const selectedText = textContent(selected.messages[0]?.content);
+
+    for (const translation of ['ESV', 'KJV', 'NET', 'BSB']) {
+      expect(defaultText).toContain(`"translation":"${translation}"`);
+    }
+    expect(selectedText.match(/`bible_lookup`/g)).toHaveLength(2);
+    expect(selectedText).toContain('"translation":"KJV"');
+    expect(selectedText).toContain('"translation":"WEB"');
+  });
+
   it('keeps tool/resource/prompt registrations identical while profiling logging by transport', async () => {
     const shared = await registrationSnapshot(
       createTheologAiMcpServer(makeMockRoot(), 'parity-test').server,

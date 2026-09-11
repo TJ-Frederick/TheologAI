@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatValidationError, validatePromptArguments, validatorFor } from '../../../src/mcp/validation.js';
+import { formatValidationError, resolveComparisonTranslations, validatePromptArguments, validatorFor } from '../../../src/mcp/validation.js';
 import { createBibleLookupHandler } from '../../../src/tools/v2/bibleLookup.js';
 import { createClassicTextsHandler } from '../../../src/tools/v2/classicTexts.js';
 import { createCommentaryHandler } from '../../../src/tools/v2/commentary.js';
@@ -69,6 +69,27 @@ describe('Worker-safe JSON Schema validation', () => {
       word: 'love', reference: 'John 3:16',
     })).not.toThrow();
   });
+
+  it('defaults, normalizes, and deduplicates comparison translations', () => {
+    expect(resolveComparisonTranslations(undefined)).toEqual(['ESV', 'KJV', 'NET', 'BSB']);
+    expect(resolveComparisonTranslations(' kjv,web,KJV ')).toEqual(['KJV', 'WEB']);
+  });
+
+  it.each([
+    ['', 'non-empty comma-separated translation codes'],
+    ['   ', 'non-empty comma-separated translation codes'],
+    ['KJV,,WEB', 'non-empty comma-separated translation codes'],
+    ['NIV', 'unsupported translation: NIV'],
+    ['KJV,NIV,BOGUS', 'unsupported translations: NIV, BOGUS'],
+  ])('rejects invalid explicitly supplied comparison translations (%j)', (translations, message) => {
+    expect(() => validatePromptArguments('compare-translations', {
+      reference: 'John 3:16', translations,
+    })).toThrow(expect.objectContaining({
+      code: -32602,
+      message: expect.stringContaining(message),
+    }));
+  });
+
   it('validates the two advertised output schemas with the same Worker-safe validator', () => {
     const bible = validatorFor(bibleLookupOutputSchema);
     const language = validatorFor(originalLanguageOutputSchema);
