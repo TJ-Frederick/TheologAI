@@ -19,6 +19,7 @@ describe('Bible structured presenter', () => {
         text: 'A translation note.',
         reference: { chapter: 3, verse: 16 },
       }],
+      footnoteDelivery: { status: 'structured', noteCount: 1 },
       citation,
     }, 'John 3:16', ['ESV']);
 
@@ -32,6 +33,7 @@ describe('Bible structured presenter', () => {
         translation: 'ESV',
         text: 'For God so loved the world.',
         footnotes: [{ caller: 'a', text: 'A translation note.', chapter: 3, verse: 16 }],
+        footnoteDelivery: { status: 'structured', noteCount: 1 },
         provenanceIds: ['src-1'],
       }],
     });
@@ -45,6 +47,27 @@ describe('Bible structured presenter', () => {
       status: 'provider_attributed',
     })]);
     expect(result.provenance[0]).not.toHaveProperty('license');
+  });
+
+  it('preserves an unavailable note-body disclosure for one translation without adding a failure', () => {
+    const result = presentBibleLookupStructured({
+      reference: 'John 1:1',
+      translation: 'NET',
+      text: 'In the beginning was the Word.',
+      footnoteDelivery: {
+        status: 'unavailable',
+        markerCount: 3,
+        reason: 'The configured NET Bible public API returns note markers but not note bodies.',
+      },
+      citation: { source: 'New English Translation' },
+    }, 'John 1:1', ['NET']);
+
+    expect(result.passages[0].footnoteDelivery).toEqual({
+      status: 'unavailable',
+      markerCount: 3,
+      reason: 'The configured NET Bible public API returns note markers but not note bodies.',
+    });
+    expect(result.failures).toEqual([]);
   });
 
   it('adds authoritative ESV and NET source metadata without inventing licenses', () => {

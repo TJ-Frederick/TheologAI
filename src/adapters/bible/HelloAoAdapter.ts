@@ -80,8 +80,19 @@ export class HelloAoAdapter implements BibleProviderPort {
     const text = verses.map(v => this.extractVerseText(v.content)).join(' ');
 
     let footnotes: Footnote[] | undefined;
-    if (options?.includeFootnotes && data.chapter.footnotes) {
-      footnotes = this.extractFootnotes(data.chapter.footnotes, hao.verse, hao.endVerse);
+    let footnoteDelivery: BibleResult['footnoteDelivery'];
+    if (options?.includeFootnotes) {
+      if (Array.isArray(data.chapter.footnotes)) {
+        footnotes = this.extractFootnotes(data.chapter.footnotes, hao.verse, hao.endVerse);
+        footnoteDelivery = footnotes.length > 0
+          ? { status: 'structured', noteCount: footnotes.length }
+          : { status: 'none', noteCount: 0 };
+      } else {
+        footnoteDelivery = {
+          status: 'unavailable',
+          reason: 'The translation provider response did not include footnote data.',
+        };
+      }
     }
 
     return {
@@ -89,6 +100,7 @@ export class HelloAoAdapter implements BibleProviderPort {
       translation: key,
       text,
       footnotes,
+      footnoteDelivery,
       citation: { source: meta.name, copyright: meta.copyright, url: meta.url },
     };
   }

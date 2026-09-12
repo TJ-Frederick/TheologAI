@@ -3,7 +3,7 @@ import { z } from 'zod/v4';
 import { parseReference } from '../kernel/reference.js';
 import { parseStrongsIdentity } from '../kernel/strongs.js';
 import { PUBLIC_DONATION_URL } from '../kernel/publicUrls.js';
-import { validatePromptArguments } from './validation.js';
+import { resolveComparisonTranslations, SUPPORTED_BIBLE_TRANSLATIONS, validatePromptArguments } from './validation.js';
 import { createPrimarySourceSearchDescriptor, type PrimarySourceSearchDescriptor } from './primarySourceSearchDescriptor.js';
 import { initialPrimarySourceLocalQuery } from './primarySourceQueryPlanning.js';
 
@@ -12,7 +12,7 @@ export interface RecommendedToolCall {
   arguments: Record<string, unknown>;
 }
 
-const TRANSLATIONS = new Set(['ESV', 'NET', 'KJV', 'WEB', 'BSB', 'ASV', 'YLT', 'DBY']);
+const TRANSLATIONS = new Set<string>(SUPPORTED_BIBLE_TRANSLATIONS);
 const CCEL_DATE_CAPABILITY_NOTICE = 'Expanded discovery does not provide reviewed composition-date filtering; any returned broader hit is not composition-date evidence.';
 const CCEL_DATED_FALLBACK_NOTICE = 'Expanded discovery deliberately omits the requested catalog composition-year bounds; any returned broader hit cannot establish membership in that requested range.';
 
@@ -95,12 +95,7 @@ export function recommendedToolCallsForPrompt(
     case 'compare-translations': {
       const reference = args?.reference ?? '';
       const singleVerse = isSingleVerseReference(reference);
-      const requested = (args?.translations || 'ESV,KJV,NET,BSB')
-        .split(',')
-        .map(item => item.trim().toUpperCase())
-        .filter(item => TRANSLATIONS.has(item));
-      const translations = [...new Set(requested)].slice(0, 8);
-      const selected = translations.length > 0 ? translations : ['ESV', 'KJV', 'NET', 'BSB'];
+      const selected = resolveComparisonTranslations(args?.translations);
       return [
         ...selected.map(item => ({ tool: 'bible_lookup', arguments: { reference, translation: item } })),
         ...(singleVerse ? [{ tool: 'bible_verse_morphology', arguments: { reference, expand_morphology: true } }] : []),
@@ -203,7 +198,7 @@ export function registerPromptHandlers(
         description: 'Compare a passage across multiple Bible translations to highlight differences in rendering',
         arguments: [
           { name: 'reference', description: 'Bible reference (e.g. "Philippians 2:6-8")', required: true },
-          { name: 'translations', description: 'Comma-separated list of translations. Default: ESV,KJV,NET,BSB.', required: false },
+          { name: 'translations', description: 'Comma-separated list using ESV, NET, KJV, WEB, BSB, ASV, YLT, or DBY. Default when omitted: ESV,KJV,NET,BSB.', required: false },
         ],
       },
       {

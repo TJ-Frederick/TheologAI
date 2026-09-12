@@ -120,7 +120,8 @@
     "postcss": {
       "nanoid": "3.3.18"
     },
-    "undici": "7.29.0"
+    "undici": "7.29.0",
+    "sharp": "0.35.4"
   },
   "dependencies": {
     "@cfworker/json-schema": "4.1.1",
@@ -148,7 +149,7 @@
     "happy-dom": "^20.0.4",
     "miniflare": "4.20260722.0",
     "nodemon": "^3.1.14",
-    "smol-toml": "^1.6.1",
+    "smol-toml": "^1.8.0",
     "tsx": "^4.20.6",
     "vite": "8.1.5",
     "vitest": "4.1.10",

@@ -37,6 +37,7 @@ import { validatorFor } from '../../../../src/mcp/validation.js';
 import { validateClassicTextsOutputSemantics } from '../../../../src/presenters/classicTextsStructured.js';
 import { encodeHistoricalSectionedOnlyCursor } from '../../../../src/kernel/historicalSectionedDelivery.js';
 import { Buffer } from 'node:buffer';
+import { parseReference } from '../../../../src/kernel/reference.js';
 
 function serviceDouble<T>(methods: Partial<{ [K in keyof T]: T[K] }>): T {
   return methods as unknown as T;
@@ -123,6 +124,35 @@ describe('v2 tool handler schemas', () => {
   });
 });
 
+describe('shared malformed-reference guidance', () => {
+  const rejectMalformedReference = (reference: string): never => {
+    parseReference(reference);
+    throw new Error('expected malformed reference');
+  };
+  const handlers = [
+    createBibleLookupHandler(serviceDouble<BibleService>({
+      lookup: vi.fn(async params => rejectMalformedReference(params.reference)),
+      lookupMultiple: vi.fn(),
+    })),
+    createVerseMorphologyHandler(serviceDouble<MorphologyService>({
+      getVerseMorphology: vi.fn(async reference => rejectMalformedReference(reference)),
+    })),
+    createCommentaryHandler(serviceDouble<CommentaryService>({
+      lookup: vi.fn(async params => rejectMalformedReference(params.reference)),
+    })),
+    createParallelPassagesHandler(serviceDouble<ParallelPassageService>({
+      lookup: vi.fn(async params => rejectMalformedReference(params.reference)),
+    })),
+  ];
+
+  it.each(handlers)('returns actionable validation guidance from $name', async handler => {
+    const result = await handler.handler({ reference: 'not a reference' });
+    expect(result).toMatchObject({ isError: true });
+    expect(textOf(result)).toContain('Invalid input: Invalid Bible reference');
+    expect(textOf(result)).not.toContain('Please try again');
+  });
+});
+
 describe('bible_lookup handler', () => {
   it('uses the ESV default and forwards the footnote option for one translation', async () => {
     const lookup = vi.fn<BibleService['lookup']>().mockResolvedValue({
@@ -151,6 +181,36 @@ describe('bible_lookup handler', () => {
       kind: 'bible_lookup',
       requestedTranslations: ['ESV'],
       passages: [{ translation: 'ESV', text: 'For God so loved the world.' }],
+      failures: [],
+    });
+  });
+
+  it('returns NET note unavailability in both Markdown and structured content without a translation failure', async () => {
+    const lookup = vi.fn<BibleService['lookup']>().mockResolvedValue({
+      reference: 'John 1:1',
+      translation: 'NET',
+      text: 'In the beginning was the Word.',
+      footnoteDelivery: {
+        status: 'unavailable',
+        markerCount: 3,
+        reason: 'The configured provider returns markers but not note bodies.',
+      },
+      citation,
+    });
+    const handler = createBibleLookupHandler(serviceDouble<BibleService>({
+      lookup,
+      lookupMultiple: vi.fn<BibleService['lookupMultiple']>(),
+    }));
+
+    const result = await handler.handler({ reference: 'John 1:1', translation: 'NET', includeFootnotes: true });
+
+    expect(result.isError).not.toBe(true);
+    expect(textOf(result)).toContain('Requested footnote text is unavailable. 3 note markers observed.');
+    expect(result.structuredContent).toMatchObject({
+      passages: [{
+        translation: 'NET',
+        footnoteDelivery: { status: 'unavailable', markerCount: 3 },
+      }],
       failures: [],
     });
   });

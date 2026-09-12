@@ -34,6 +34,19 @@ function legacyFixture() {
 
 describe('ParallelPassageService hard-cutover contract', () => {
   it.each([
+    'Matthew 26:999',
+    'Matthew 26:75-999',
+  ])('rejects an impossible canonical endpoint before UBS lookup: %s', async reference => {
+    const source = sourceService();
+    const service = new ParallelPassageService(
+      crossReferences(), undefined, undefined, legacyFixture(), source as any,
+    );
+
+    await expect(service.lookup({ reference })).rejects.toThrow(/out of range for Matthew 26/);
+    expect(source.lookup).not.toHaveBeenCalled();
+  });
+
+  it.each([
     { corpora: ['theologai_legacy'] as const },
     { corpora: ['ubs_source_attested', 'theologai_legacy'] as const },
     { mode: 'auto' as const },

@@ -23,6 +23,27 @@ function snapshot(version: '6' | '7', logging = false): McpTransportSnapshot {
     'bible_verse_morphology', 'original_language_study', 'donation_config', 'verify_donation',
   ];
   const tools = toolNames.map(name => descriptor(name, name === 'primary_source_search' ? version : '1'));
+  (tools[0] as any).outputSchema = {
+    type: 'object',
+    properties: {
+      schemaVersion: { const: '1' },
+      passages: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            footnoteDelivery: {
+              type: 'object',
+              properties: {
+                status: { type: 'string', enum: ['structured', 'inline', 'none', 'unavailable'] },
+              },
+            },
+          },
+        },
+      },
+    },
+    additionalProperties: false,
+  };
   tools[5]!.annotations.openWorldHint = version === '7';
   return {
     server: {
@@ -31,7 +52,16 @@ function snapshot(version: '6' | '7', logging = false): McpTransportSnapshot {
     },
     tools,
     prompts: ['word-study', 'passage-exegesis', 'compare-translations', 'confession-study', 'primary-source-research', 'donate']
-      .map(name => ({ name, description: `${name} prompt` })),
+      .map(name => ({
+        name,
+        description: `${name} prompt`,
+        ...(name === 'compare-translations' ? {
+          arguments: [{
+            name: 'translations',
+            description: 'Comma-separated list using ESV, NET, KJV, WEB, BSB, ASV, YLT, or DBY.',
+          }],
+        } : {}),
+      })),
     resourceTemplates: [
       { uriTemplate: 'theologai://documents/{slug}', name: 'Historical Document' },
       { uriTemplate: 'theologai://strongs/{number}', name: "Strong's Dictionary Entry" },
@@ -68,6 +98,13 @@ describe('MCP transport contract oracle', () => {
     ['template addition', (value: McpTransportSnapshot) => value.resourceTemplates.push({ uriTemplate: 'extra://{id}' })],
     ['primary v6/v7 drift', (value: McpTransportSnapshot) => {
       ((value.tools[5]!.outputSchema as any).properties.schemaVersion as any).const = '7';
+    }],
+    ['footnote-delivery status drift', (value: McpTransportSnapshot) => {
+      (((value.tools[0]!.outputSchema as any).properties.passages.items.properties.footnoteDelivery.properties.status as any).enum)
+        .pop();
+    }],
+    ['comparison-translation metadata drift', (value: McpTransportSnapshot) => {
+      (value.prompts[2]!.arguments as any)[0].description = 'Translations are silently filtered.';
     }],
   ])('rejects %s drift', async (_name, mutate) => {
     const actual = snapshot('6');

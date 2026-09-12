@@ -41,6 +41,7 @@ export class EsvAdapter implements BibleProviderPort {
       q: refStr,
       'include-headings': 'false',
       'include-footnotes': String(options?.includeFootnotes ?? false),
+      'include-footnote-body': String(options?.includeFootnotes ?? false),
       'include-verse-numbers': 'true',
       'include-short-copyright': 'false',
     });
@@ -67,6 +68,12 @@ export class EsvAdapter implements BibleProviderPort {
       reference: data.canonical || refStr,
       translation: 'ESV',
       text: data.passages[0].trim(),
+      ...(options?.includeFootnotes ? {
+        footnoteDelivery: {
+          status: 'inline' as const,
+          reason: 'The ESV passage-text API embeds available footnote callouts and bodies in the passage text.',
+        },
+      } : {}),
       citation: {
         source: 'English Standard Version',
         copyright: COPYRIGHT,

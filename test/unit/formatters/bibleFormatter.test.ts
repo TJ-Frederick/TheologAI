@@ -70,6 +70,30 @@ describe('formatBibleResponse', () => {
     expect(out).not.toContain('**Footnotes:**');
   });
 
+  it('discloses unavailable requested notes without presenting passage retrieval as a failure', () => {
+    const out = formatBibleResponse(makeBibleResult({
+      translation: 'NET',
+      footnoteDelivery: {
+        status: 'unavailable',
+        markerCount: 3,
+        reason: 'The configured provider returns markers but not note bodies.',
+      },
+    }));
+
+    expect(out).toContain('Requested footnote text is unavailable. 3 note markers observed.');
+    expect(out).toContain('The configured provider returns markers but not note bodies.');
+    expect(out).toContain('*Source: ESV API*');
+  });
+
+  it('discloses inline and empty provider note delivery', () => {
+    expect(formatBibleResponse(makeBibleResult({
+      footnoteDelivery: { status: 'inline' },
+    }))).toContain('Available footnotes are embedded in the passage text.');
+    expect(formatBibleResponse(makeBibleResult({
+      footnoteDelivery: { status: 'none', noteCount: 0 },
+    }))).toContain('No footnotes were returned for this passage.');
+  });
+
   it('returns trimmed output', () => {
     const out = formatBibleResponse(makeBibleResult());
     expect(out).toBe(out.trim());
@@ -227,6 +251,21 @@ describe('formatMultiBibleResponse', () => {
     ]);
     expect(out).toContain('*Footnotes:*');
     expect(out).toContain('[1] (v16): tn: note');
+  });
+
+  it('preserves per-translation footnote delivery status in comparisons', () => {
+    const out = formatMultiBibleResponse([
+      makeBibleResult({ translation: 'ESV', footnoteDelivery: { status: 'inline' } }),
+      makeBibleResult({
+        translation: 'NET',
+        footnoteDelivery: { status: 'unavailable', markerCount: 1, reason: 'Note bodies are unavailable.' },
+      }),
+    ]);
+
+    expect(out).toContain('**ESV:**');
+    expect(out).toContain('Available footnotes are embedded in the passage text.');
+    expect(out).toContain('**NET:**');
+    expect(out).toContain('Requested footnote text is unavailable. 1 note marker observed. Note bodies are unavailable.');
   });
 
   it('deduplicates source citations', () => {

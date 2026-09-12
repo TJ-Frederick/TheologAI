@@ -18,6 +18,12 @@ export interface BibleLookupOutputV1 {
       chapter: number;
       verse: number;
     }>;
+    footnoteDelivery?: {
+      status: 'structured' | 'inline' | 'none' | 'unavailable';
+      noteCount?: number;
+      markerCount?: number;
+      reason?: string;
+    };
     provenanceIds: string[];
   }>;
   failures: Array<{ translation: string; reason: string }>;
@@ -57,6 +63,17 @@ export const bibleLookupOutputSchema = {
               required: ['caller', 'text', 'chapter', 'verse'],
               additionalProperties: false,
             },
+          },
+          footnoteDelivery: {
+            type: 'object',
+            properties: {
+              status: { type: 'string', enum: ['structured', 'inline', 'none', 'unavailable'] },
+              noteCount: { type: 'integer', minimum: 0, maximum: 1000 },
+              markerCount: { type: 'integer', minimum: 0, maximum: 1000 },
+              reason: { type: 'string', minLength: 1, maxLength: 500 },
+            },
+            required: ['status'],
+            additionalProperties: false,
           },
           provenanceIds: {
             type: 'array', minItems: 1, maxItems: 16, uniqueItems: true,
