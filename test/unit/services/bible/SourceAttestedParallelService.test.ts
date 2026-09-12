@@ -4,7 +4,9 @@ import { UbsParallelPassageRepository } from '../../../../src/adapters/shared/Ub
 import { SourceAttestedParallelService } from '../../../../src/services/bible/SourceAttestedParallelService.js';
 import { encodeParallelGroupCursor } from '../../../../src/kernel/parallelGroupCursor.js';
 import { parseSourceAttestedLookupReference } from '../../../../src/kernel/sourceAttestedReference.js';
+import { findBookByNumber, getBibleBookBounds } from '../../../../src/kernel/books.js';
 import { ubsFixture } from '../../../fixtures/ubsParallelCorpus.js';
+import { readFileSync } from 'node:fs';
 
 describe('SourceAttestedParallelService', () => {
   const fixtureRepository = (): UbsParallelPassageRepository => {
@@ -190,9 +192,68 @@ describe('SourceAttestedParallelService', () => {
     ['Psalms 60:13-14', 19, 60, 13],
     ['Isaiah 8:23', 23, 8, 23],
     ['Hosea 2:25', 28, 2, 25],
+    ['Joel 4:1-21', 29, 4, 1],
   ] as const)('preserves the bounded source-versification coordinate %s', (reference, bookNumber, chapter, startVerse) => {
     const parsed = parseSourceAttestedLookupReference(reference);
     expect(parsed.segments[0]).toMatchObject({ bookNumber, chapter, startVerse });
+  });
+
+  it('supports an open-ended query for a source-only chapter', () => {
+    expect(parseSourceAttestedLookupReference('Joel 4')).toEqual({
+      normalizedReference: 'Joel 4',
+      segments: [{
+        bookNumber: 29,
+        chapter: 4,
+        startVerse: 1,
+        endVerse: Number.MAX_SAFE_INTEGER,
+      }],
+    });
+  });
+
+  it('accepts a complete Hebrew Psalm range and retrieves its stored UBS member', async () => {
+    const artifact = JSON.parse(readFileSync(
+      new URL('../../../../src/data/ubs-parallel-passages.generated.json', import.meta.url),
+      'utf8',
+    )) as { artifactIdentity: string };
+    const repository = new UbsParallelPassageRepository(artifact, artifact.artifactIdentity);
+
+    const result = await new SourceAttestedParallelService(repository).lookup({
+      reference: 'Psalms 51:1-21',
+      maxGroups: 10,
+    });
+
+    expect(result.groups.some(group => group.members.some(member => (
+      member.sourceReference === 'PSA 51:6'
+    )))).toBe(true);
+    await expect(new SourceAttestedParallelService(repository).lookup({
+      reference: 'Psalms 51:1-22',
+    })).rejects.toThrow('reference must identify one canonical or source-versification Bible passage');
+  });
+
+  it('covers every chapter maximum in the pinned TAHOT native-coordinate inventory', () => {
+    const bridge = JSON.parse(readFileSync(
+      new URL('../../../../data/biblical-languages/ubs-open-license/v0.9.2/NATIVE-TO-NORMALIZED-BRIDGE.json', import.meta.url),
+      'utf8',
+    )) as { nativeCoordinateKeys: string[] };
+    const sourceMaxima = new Map<string, number>();
+    for (const key of bridge.nativeCoordinateKeys) {
+      const [bookNumber, chapter, verse] = key.split(':').map(Number);
+      const chapterKey = `${bookNumber}:${chapter}`;
+      sourceMaxima.set(chapterKey, Math.max(sourceMaxima.get(chapterKey) ?? 0, verse));
+    }
+
+    for (const [chapterKey, sourceMaxVerse] of sourceMaxima) {
+      const [bookNumber, chapter] = chapterKey.split(':').map(Number);
+      const book = findBookByNumber(bookNumber)!;
+      const canonicalMaxVerse = getBibleBookBounds(book).maxVerseByChapter[chapter - 1] ?? 0;
+      const acceptedMaxVerse = Math.max(sourceMaxVerse, canonicalMaxVerse);
+      expect(() => parseSourceAttestedLookupReference(
+        `${book.name} ${chapter}:1-${acceptedMaxVerse}`,
+      ), chapterKey).not.toThrow();
+      expect(() => parseSourceAttestedLookupReference(
+        `${book.name} ${chapter}:1-${acceptedMaxVerse + 1}`,
+      ), chapterKey).toThrow();
+    }
   });
 
   it('rejects oversized and over-segmented references before repository lookup', async () => {
