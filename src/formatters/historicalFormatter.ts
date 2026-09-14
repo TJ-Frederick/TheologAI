@@ -7,7 +7,7 @@ import { buildLocalDocumentResourceUri } from '../kernel/documentResource.js';
 import { LOCAL_PRIMARY_SOURCE_ATTRIBUTION } from '../services/historical/primarySourceTypes.js';
 import { CLASSIC_TEXT_LIMITS } from '../kernel/classicTextContract.js';
 import { HISTORICAL_SECTIONED_ONLY_LANDING_MAX_BYTES } from '../kernel/historicalSectionedDelivery.js';
-import { escapeFrozenEditionSectionContentForMarkdown } from '../kernel/editionProvenanceFoundation.js';
+import { escapeFrozenEditionSectionContentForMarkdown } from '../kernel/editionText.js';
 
 /** Provenance label for documents bundled with the server. No edition is implied. */
 export const LOCAL_HISTORICAL_SOURCE = LOCAL_PRIMARY_SOURCE_ATTRIBUTION;

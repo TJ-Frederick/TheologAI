@@ -2,11 +2,13 @@ import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
 import {
   auditHistoricalTransform8Authority,
+  buildHistoricalTransform8AuthorityQueryPlan,
   HISTORICAL_TRANSFORM8_AUTHORITY_PAGE_MAX_BYTES,
   buildHistoricalTransform8ExpectedAuthority,
   HISTORICAL_TRANSFORM8_AUTHORITY_PAGE_SIZE,
   HISTORICAL_TRANSFORM8_D1_RESPONSE_MAX_BYTES,
   parseHistoricalTransform8D1Page,
+  parseHistoricalTransform8D1Pages,
   type HistoricalTransform8ExpectedAuthority,
 } from '../../../scripts/historical-transform8-authority-audit.js';
 import { verifyHistoricalSectionCompatibilityAttestationFromDisk } from '../../../scripts/historical-section-compatibility-compiler.js';
@@ -85,6 +87,7 @@ describe('Transform 8 ordered authority audit', () => {
       const result = audit(database, expected, sql);
       expect(result.pages).toEqual({ profiles: 1, identities: 12, aliases: 12 });
       expect(sql).toHaveLength(26); // 25 complete-sidecar pages plus the parity sample.
+      expect(buildHistoricalTransform8AuthorityQueryPlan(ROOT, expected)).toEqual(sql);
       expect(sql.every(query => /^\s*SELECT\b/i.test(query))).toBe(true);
       expect(sql.every(query => !/\bOFFSET\b/i.test(query))).toBe(true);
       expect(sql.filter(query => /FROM historical_document_delivery_profiles/.test(query))).toHaveLength(1);
@@ -177,6 +180,19 @@ describe('Transform 8 ordered authority audit', () => {
       rows: [{ documentId: 'doc' }],
       responseBytes: Buffer.byteLength(JSON.stringify([{ success: true, results: [{ documentId: 'doc' }] }]), 'utf8'),
     });
+    expect(parseHistoricalTransform8D1Pages(JSON.stringify([
+      { success: true, results: [{ first: 1 }] },
+      { success: true, results: [{ second: 2 }] },
+    ]), 2).map(page => page.rows)).toEqual([[{ first: 1 }], [{ second: 2 }]]);
+    expect(() => parseHistoricalTransform8D1Pages(JSON.stringify([
+      { success: true, results: [] },
+    ]), 2)).toThrow('exactly one successful statement result');
+    expect(() => parseHistoricalTransform8D1Pages(JSON.stringify([
+      { success: true, results: [] }, { success: true, results: [] }, { success: true, results: [] },
+    ]), 2)).toThrow('exactly one successful statement result');
+    expect(() => parseHistoricalTransform8D1Pages(JSON.stringify([
+      { success: true, results: [] }, { success: false, results: [] },
+    ]), 2)).toThrow('exactly one successful statement result');
     expect(() => parseHistoricalTransform8D1Page('{"success":true,"results":[]} {'))
       .toThrow('not valid JSON');
     expect(() => parseHistoricalTransform8D1Page(JSON.stringify([
@@ -196,5 +212,28 @@ describe('Transform 8 ordered authority audit', () => {
       rows: [],
       responseBytes: HISTORICAL_TRANSFORM8_AUTHORITY_PAGE_MAX_BYTES + 1,
     }), expected)).toThrow(`${HISTORICAL_TRANSFORM8_AUTHORITY_PAGE_MAX_BYTES}-byte response limit`);
+  });
+
+  it('rejects a changed actual continuation instead of accepting the precomputed batch plan', () => {
+    const expected = buildHistoricalTransform8ExpectedAuthority(ROOT);
+    const database = authorityDatabase(expected);
+    const plan = buildHistoricalTransform8AuthorityQueryPlan(ROOT, expected);
+    let cursor = 0;
+    try {
+      expect(() => auditHistoricalTransform8Authority(ROOT, sql => {
+        if (sql !== plan[cursor]) throw new Error('authority continuation diverged from its bounded query plan');
+        const rows = database.prepare(sql).all() as Array<Record<string, unknown>>;
+        // The second query is a full identities page. Altering its final key
+        // remains type-valid and ordered, but must alter the next keyset SQL.
+        if (cursor === 1) {
+          const last = rows.at(-1)!;
+          rows[rows.length - 1] = { ...last, sectionKey: `${last.sectionKey as string}~` };
+        }
+        cursor++;
+        return { rows, responseBytes: Buffer.byteLength(JSON.stringify(rows), 'utf8') };
+      }, expected)).toThrow('continuation diverged from its bounded query plan');
+    } finally {
+      database.close();
+    }
   });
 });

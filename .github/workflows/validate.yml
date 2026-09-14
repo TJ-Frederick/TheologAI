@@ -1,0 +1,144 @@
+name: Validate
+
+on:
+  workflow_call:
+    inputs:
+      data-lineage-before:
+        description: Verified previous production commit used for historical section-key lineage.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-build:
+    name: Test & Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - run: npm ci --no-audit
+
+      - uses: ./.github/actions/validate
+        with:
+          suite: core
+
+      - name: Audit production dependency scope
+        run: npm audit --omit=dev
+
+  fresh-checkout-data:
+    name: Fresh Checkout & Data
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - run: npm ci --no-audit
+
+      - name: Verify historical section-key lineage
+        shell: bash
+        env:
+          PREVIOUS_MAIN_SHA: ${{ inputs.data-lineage-before }}
+        run: |
+          if [ "$PREVIOUS_MAIN_SHA" = '0000000000000000000000000000000000000000' ]; then
+            npm run data:verify-section-keys -- --genesis
+          else
+            printf '%s' "$PREVIOUS_MAIN_SHA" | grep -Eq '^[0-9a-f]{40}$'
+            git cat-file -e "$PREVIOUS_MAIN_SHA^{commit}"
+            git merge-base --is-ancestor "$PREVIOUS_MAIN_SHA" HEAD
+            if git cat-file -e "$PREVIOUS_MAIN_SHA:data/historical-section-key-plan.json"; then
+              git show "$PREVIOUS_MAIN_SHA:data/historical-section-key-plan.json" > "$RUNNER_TEMP/historical-section-key-plan.previous.json"
+              npm run data:verify-section-keys -- --previous-plan "$RUNNER_TEMP/historical-section-key-plan.previous.json"
+            else
+              npm run data:verify-section-keys -- --genesis
+            fi
+          fi
+
+      - uses: ./.github/actions/validate
+        with:
+          suite: data
+
+  worker-runtime:
+    name: Worker Runtime & D1
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - run: npm ci --no-audit
+
+      - uses: ./.github/actions/validate
+        with:
+          suite: worker
+
+  node-http-e2e:
+    name: Node HTTP E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - run: npm ci --no-audit
+
+      - uses: ./.github/actions/validate
+        with:
+          suite: node
+
+  mcp-conformance:
+    name: Applicable MCP Conformance
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - run: npm ci --no-audit
+
+      - uses: ./.github/actions/validate
+        with:
+          suite: conformance
+
+      - name: Upload MCP conformance results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mcp-conformance-results
+          path: test-output/mcp-conformance/
+          if-no-files-found: error

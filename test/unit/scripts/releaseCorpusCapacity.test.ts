@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -168,32 +168,40 @@ describe('release-wide SQLite/D1 corpus capacity report', () => {
       { name: 'all_pages', kind: 'table', pages: overLimitBytes / 4_096, bytes: overLimitBytes },
     ]);
     const commands: Array<{ script: string; args: string[] }> = [];
-    const report = runReleaseCorpusCapacityReport(ROOT, {
-      commandRunner: (_root, script, args) => {
-        commands.push({ script, args: [...args] });
-        if (script === 'scripts/build-database.ts') fixtureDatabase(args[1]!, corpusIdentity);
-      },
-      measurePreVacuum: () => structuredClone(overLimitMeasurement),
-      measurePostVacuum: () => structuredClone(overLimitMeasurement),
-      baseline: baseline(measurement(4_096, [
-        { name: 'all_pages', kind: 'table', pages: 1, bytes: 4_096 },
-      ])),
-    });
-    expect(commands).toHaveLength(2);
-    expect(commands[0]).toMatchObject({ script: 'scripts/build-database.ts', args: ['--output', expect.any(String)] });
-    expect(commands[1]).toMatchObject({
-      script: 'scripts/verify-database.ts',
-      args: ['--database', expect.any(String), VERIFY_DATABASE_DEFER_CAPACITY_FLAG],
-    });
+    const outputDirectory = mkdtempSync(join(tmpdir(), 'theologai-release-capacity-over-limit-output-'));
+    const outputPath = join(outputDirectory, 'theologai.sqlite');
+    try {
+      const report = runReleaseCorpusCapacityReport(ROOT, {
+        commandRunner: (_root, script, args) => {
+          commands.push({ script, args: [...args] });
+          if (script === 'scripts/build-database.ts') fixtureDatabase(args[1]!, corpusIdentity);
+        },
+        measurePreVacuum: () => structuredClone(overLimitMeasurement),
+        measurePostVacuum: () => structuredClone(overLimitMeasurement),
+        baseline: baseline(measurement(4_096, [
+          { name: 'all_pages', kind: 'table', pages: 1, bytes: 4_096 },
+        ])),
+        outputDatabasePath: outputPath,
+      });
+      expect(commands).toHaveLength(2);
+      expect(commands[0]).toMatchObject({ script: 'scripts/build-database.ts', args: ['--output', expect.any(String)] });
+      expect(commands[1]).toMatchObject({
+        script: 'scripts/verify-database.ts',
+        args: ['--database', expect.any(String), VERIFY_DATABASE_DEFER_CAPACITY_FLAG],
+      });
 
-    let stdout = '';
-    const exitCode = emitReleaseCorpusCapacityReport(report, value => { stdout += value; });
-    expect(JSON.parse(stdout)).toMatchObject({
-      schemaVersion: 'theologai-release-corpus-capacity-report.v1',
-      capacity: { status: 'exceeds_350_mib', withinLimit: false },
-      growthSinceBaseline: { dbstat: [expect.objectContaining({ name: 'all_pages' })] },
-    });
-    expect(exitCode).toBe(1);
+      let stdout = '';
+      const exitCode = emitReleaseCorpusCapacityReport(report, value => { stdout += value; });
+      expect(JSON.parse(stdout)).toMatchObject({
+        schemaVersion: 'theologai-release-corpus-capacity-report.v1',
+        capacity: { status: 'exceeds_350_mib', withinLimit: false },
+        growthSinceBaseline: { dbstat: [expect.objectContaining({ name: 'all_pages' })] },
+      });
+      expect(exitCode).toBe(1);
+      expect(existsSync(outputPath)).toBe(false);
+    } finally {
+      rmSync(outputDirectory, { recursive: true, force: true });
+    }
   });
 
   it('reads the checked-in Transform 9 baseline and refuses public arguments', () => {
@@ -205,8 +213,12 @@ describe('release-wide SQLite/D1 corpus capacity report', () => {
     });
     expect(prior.measurement.fileBytes).toBe(315_211_776);
     expect(prior.measurement.dbstat).toHaveLength(117);
-    expect(() => parseReleaseCorpusCapacityArguments([])).not.toThrow();
-    expect(() => parseReleaseCorpusCapacityArguments(['--database', 'data/theologai.db'])).toThrow('accepts no arguments');
+    expect(parseReleaseCorpusCapacityArguments([])).toEqual({});
+    expect(parseReleaseCorpusCapacityArguments(['--output-database', 'tmp/verified.sqlite'], ROOT))
+      .toEqual({ outputDatabasePath: join(ROOT, 'tmp', 'verified.sqlite') });
+    expect(parseReleaseCorpusCapacityArguments(['--output-database=tmp/verified.sqlite'], ROOT))
+      .toEqual({ outputDatabasePath: join(ROOT, 'tmp', 'verified.sqlite') });
+    expect(() => parseReleaseCorpusCapacityArguments(['--database', 'data/theologai.db'])).toThrow('accepts only');
   });
 
   it('builds only a disposable fresh fixture when dependencies are injected for tests', () => {
@@ -218,5 +230,57 @@ describe('release-wide SQLite/D1 corpus capacity report', () => {
     expect(report.corpus).toMatchObject({ storage: 'sqlite_d1_materialized', freshBuildVerified: true });
     expect(report.current.preVacuum.fileBytes).toBeGreaterThan(0);
     expect(report.capacity.withinLimit).toBe(true);
+  });
+
+  it('publishes the exact fresh, semantically verified pre-VACUUM artifact to an explicit output path', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'theologai-release-capacity-output-'));
+    const outputPath = join(directory, 'verified.sqlite');
+    const corpusIdentity = computeD1CorpusIdentity(parseDataManifest(readFileSync(join(ROOT, 'data', 'data-manifest.json'))));
+    let verifiedBytes: Buffer | undefined;
+    let semanticVerificationRan = false;
+    try {
+      const report = runReleaseCorpusCapacityReport(ROOT, {
+        buildDatabase: ({ outputPath: freshPath }) => fixtureDatabase(freshPath, corpusIdentity),
+        verifyDatabase: ({ outputPath: freshPath }) => {
+          const database = new Database(freshPath, { readonly: true, fileMustExist: true });
+          try {
+            expect(database.prepare("SELECT value FROM theologai_metadata WHERE key = 'corpus_manifest_sha256'").get())
+              .toEqual({ value: corpusIdentity });
+            semanticVerificationRan = true;
+          } finally {
+            database.close();
+          }
+        },
+        measurePreVacuum: freshPath => {
+          const result = measurePreVacuumDatabase(freshPath);
+          verifiedBytes = readFileSync(freshPath);
+          return result;
+        },
+        baseline: baseline(measurement(4_096, [{ name: 'sqlite_schema', kind: 'internal', pages: 1, bytes: 4_096 }])),
+        outputDatabasePath: outputPath,
+      });
+      expect(report.capacity.withinLimit).toBe(true);
+      expect(semanticVerificationRan).toBe(true);
+      expect(readFileSync(outputPath)).toEqual(verifiedBytes);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses to overwrite an existing output artifact and leaves it unchanged', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'theologai-release-capacity-existing-output-'));
+    const outputPath = join(directory, 'verified.sqlite');
+    const corpusIdentity = computeD1CorpusIdentity(parseDataManifest(readFileSync(join(ROOT, 'data', 'data-manifest.json'))));
+    writeFileSync(outputPath, 'already-present');
+    try {
+      expect(() => runReleaseCorpusCapacityReport(ROOT, {
+        buildDatabase: ({ outputPath: freshPath }) => fixtureDatabase(freshPath, corpusIdentity),
+        baseline: baseline(measurement(4_096, [{ name: 'sqlite_schema', kind: 'internal', pages: 1, bytes: 4_096 }])),
+        outputDatabasePath: outputPath,
+      })).toThrow('refusing to overwrite existing verified database output');
+      expect(readFileSync(outputPath, 'utf8')).toBe('already-present');
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });

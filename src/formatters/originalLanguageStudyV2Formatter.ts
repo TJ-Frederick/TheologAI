@@ -1,4 +1,4 @@
-import { escapeEditionPlainTextForMarkdown } from '../kernel/editionProvenanceFoundation.js';
+import { escapeEditionPlainTextForMarkdown } from '../kernel/editionText.js';
 import {
   ORIGINAL_LANGUAGE_STUDY_V2_ADDED_SEMANTIC_MARKDOWN_BYTES,
   type OriginalLanguageStudyV2Candidate,

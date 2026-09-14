@@ -1,8 +1,6 @@
 name: Deploy Production
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       reason:
@@ -163,6 +161,7 @@ jobs:
     outputs:
       artifact_name: ${{ steps.verify.outputs.artifact_name }}
       plan_sha256: ${{ steps.verify.outputs.plan_sha256 }}
+      before: ${{ steps.verify.outputs.before }}
       deploy_required: ${{ steps.verify.outputs.deploy_required }}
       decision: ${{ steps.verify.outputs.decision }}
     steps:
@@ -221,6 +220,7 @@ jobs:
           ' "$verified"
           artifact_name="$(node --input-type=module -e 'const value=JSON.parse(process.argv[1]);process.stdout.write(value.artifactName)' "$verified")"
           plan_sha256="$(node --input-type=module -e 'const value=JSON.parse(process.argv[1]);process.stdout.write(value.planSha256)' "$verified")"
+          before="$(node --input-type=module -e 'const value=JSON.parse(process.argv[1]);process.stdout.write(value.base)' "$verified")"
           deploy_required="$(node --input-type=module -e 'const value=JSON.parse(process.argv[1]);process.stdout.write(String(value.deployRequired))' "$verified")"
           decision="$(node --input-type=module -e 'const value=JSON.parse(process.argv[1]);process.stdout.write(value.decision)' "$verified")"
           reason="$(node --input-type=module -e 'const value=JSON.parse(process.argv[1]);process.stdout.write(value.reason)' "$verified")"
@@ -228,6 +228,7 @@ jobs:
           {
             printf 'artifact_name=%s\n' "$artifact_name"
             printf 'plan_sha256=%s\n' "$plan_sha256"
+            printf 'before=%s\n' "$before"
             printf 'deploy_required=%s\n' "$deploy_required"
             printf 'decision=%s\n' "$decision"
           } >> "$GITHUB_OUTPUT"
@@ -240,6 +241,14 @@ jobs:
             echo "- Plan SHA-256: \`$plan_sha256\`"
             echo "- Changed-path evidence records: \`$evidence_count\`"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  validate:
+    name: Validate Release
+    needs: [verify-deployment-plan, verify-dual-era-preview]
+    if: ${{ github.ref == 'refs/heads/main' && needs.verify-deployment-plan.outputs.deploy_required == 'true' && needs.verify-deployment-plan.outputs.decision == 'deploy' }}
+    uses: ./.github/workflows/validate.yml
+    with:
+      data-lineage-before: ${{ needs.verify-deployment-plan.outputs.before }}
 
   verify-dual-era-preview:
     name: Verify Protected Dual-Era Preview
@@ -347,7 +356,7 @@ jobs:
 
   deploy:
     name: Test, Build & Deploy
-    needs: [verify-deployment-plan, verify-dual-era-preview]
+    needs: [verify-deployment-plan, validate, verify-dual-era-preview]
     if: ${{ github.ref == 'refs/heads/main' && needs.verify-deployment-plan.outputs.deploy_required == 'true' && needs.verify-deployment-plan.outputs.decision == 'deploy' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -481,116 +490,6 @@ jobs:
           if [ '${{ steps.production-release-context.outputs.custom_domain_required }}' = 'true' ]; then
             echo 'required=true' >> "$GITHUB_OUTPUT"
           fi
-
-      - name: Verify generated Worker binding types
-        run: |
-          npm run types:worker:check
-          npm run types:ccel-coordinator:check
-
-      - name: Validate production and preview Worker configuration
-        run: |
-          npm run validate:worker-config
-          npm run validate:ccel-coordinator-config
-          npm run validate:ccel-coordinator-test-config
-
-      - name: Typecheck Node.js target
-        run: |
-          npm run typecheck:node
-          npm run typecheck:test-node
-          npm run typecheck:test-scripts
-          npm run typecheck:test-frozen-context-capacity
-
-      - name: Typecheck release-critical scripts
-        run: npm run typecheck:release-scripts
-
-      - name: Typecheck Workers target
-        run: |
-          npm run typecheck:worker
-          npm run typecheck:ccel-coordinator
-
-      - name: Typecheck Worker runtime tests
-        run: |
-          npm run typecheck:worker-runtime
-          npm run typecheck:ccel-coordinator-test
-
-      - name: Verify canonical data sources
-        run: npm run data:verify-sources
-
-      - name: Verify historical section-key lineage
-        env:
-          PREVIOUS_MAIN_SHA: ${{ steps.production-release-context.outputs.before }}
-        run: |
-          if [ "$PREVIOUS_MAIN_SHA" = '0000000000000000000000000000000000000000' ]; then
-            npm run data:verify-section-keys -- --genesis
-          else
-            printf '%s' "$PREVIOUS_MAIN_SHA" | grep -Eq '^[0-9a-f]{40}$'
-            git cat-file -e "$PREVIOUS_MAIN_SHA^{commit}"
-            git merge-base --is-ancestor "$PREVIOUS_MAIN_SHA" HEAD
-            if git cat-file -e "$PREVIOUS_MAIN_SHA:data/historical-section-key-plan.json"; then
-              git show "$PREVIOUS_MAIN_SHA:data/historical-section-key-plan.json" > "$RUNNER_TEMP/historical-section-key-plan.previous.json"
-              npm run data:verify-section-keys -- --previous-plan "$RUNNER_TEMP/historical-section-key-plan.previous.json"
-            else
-              npm run data:verify-section-keys -- --genesis
-            fi
-          fi
-
-      - name: Confirm derived database is absent
-        run: test ! -e data/theologai.db
-
-      - name: Build SQLite database from tracked sources
-        run: npm run build:db -- --output "$RUNNER_TEMP/theologai.db"
-
-      - name: Verify generated SQLite database
-        run: npm run data:verify-db -- --database "$RUNNER_TEMP/theologai.db"
-
-      - name: Export deterministic local D1 seed
-        run: npm run d1:seed:export -- --database "$RUNNER_TEMP/theologai.db" --clean
-
-      - name: Verify and reproduce deterministic local D1 seed
-        run: |
-          npm run d1:seed:verify
-          cp scripts/d1-seed/seed-manifest.json "$RUNNER_TEMP/d1-seed-manifest.json"
-          npm run d1:seed:export -- --database "$RUNNER_TEMP/theologai.db" --clean
-          cmp "$RUNNER_TEMP/d1-seed-manifest.json" scripts/d1-seed/seed-manifest.json
-          npm run d1:seed:verify
-          npm run d1:seed:verify-import -- --database "$RUNNER_TEMP/theologai.db"
-
-      - name: Verify historical section compatibility evidence against generated local artifacts
-        run: >-
-          npx --no-install tsx scripts/historical-section-compatibility-evidence.ts
-          --database "$RUNNER_TEMP/theologai.db"
-          --seed-directory scripts/d1-seed
-
-      - name: Import generated seed through local D1
-        run: npm run d1:seed:verify-workerd
-
-      - name: Run unit tests with enforced coverage thresholds
-        run: npm run test:coverage
-
-      - name: Run current-architecture integration tests
-        run: npm run test:integration
-
-      - name: Exercise Worker MCP endpoint with isolated D1
-        run: |
-          npm run test:worker-runtime
-          npm run test:ccel-coordinator-runtime
-
-      - name: Exercise production-like Worker bundle without test-only globals
-        run: |
-          npm run test:worker-bundle-ubs
-          npm run test:worker-production-runtime
-
-      - name: Build Node.js target
-        run: npm run build
-
-      - name: Exercise compiled Node HTTP MCP server
-        run: npm run test:e2e:compiled
-
-      - name: Run applicable official MCP server scenarios
-        run: npm run test:conformance
-
-      - name: Audit production dependencies
-        run: npm audit --omit=dev
 
       # Resolve the checked-out production candidate by both name and UUID.
       # This is read-only; candidate creation/preparation is a separately

@@ -1,6 +1,8 @@
+import { releaseEligibility } from '../../../scripts/pr-release-eligibility.mjs';
+import { classifyCiChanges } from '../../../scripts/classify-ci-changes.mjs';
 import { createHash } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readdirSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readdirSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -313,5 +315,77 @@ describe('production deployment plan', () => {
     unlinkSync(join(directory, 'production-deployment-plan.sha256'));
     symlinkSync(join(directory, 'production-deployment-plan.json'), join(directory, 'production-deployment-plan.sha256'));
     expect(verify().status).not.toBe(0);
+  });
+});
+
+
+describe('CI change selection', () => {
+  it('keeps documentation checks while omitting unrelated serving and corpus work', () => {
+    expect(classifyCiChanges('M\0docs/ROADMAP.md\0M\0README.md\0')).toMatchObject({ mode: 'docs', data: false, serving: false });
+  });
+  it('checks both sides of moves and defaults unknown ownership to full verification', () => {
+    for (const path of ['src/kernel/cache.ts', 'src/adapters/d1/D1HistoricalDocumentRepository.ts', 'src/services/historical/LocalPrimarySourceSearchProvider.ts', 'scripts/build-database.ts', 'data/data-manifest.json', 'package-lock.json', '.github/workflows/pr.yml', 'new-area/file.ts']) {
+      expect(classifyCiChanges(`M\0${path}\0`)).toMatchObject({ mode: 'full', data: true, serving: true });
+      expect(classifyCiChanges(`R100\0${path}\0docs/old.md\0`)).toMatchObject({ mode: 'full' });
+    }
+    expect(classifyCiChanges('C100\0docs/plan.md\0src/kernel/plan.ts\0').data).toBe(true);
+  });
+  it('keeps all serving suites for positively identified serving changes', () => {
+    expect(classifyCiChanges('M\0src/mcp/tools.ts\0M\0docs/PLAN.md\0')).toMatchObject({ mode: 'serving', serving: true, data: false });
+    expect(classifyCiChanges('R100\0src/http/old.ts\0src/http/new.ts\0').serving).toBe(true);
+  });
+  it('binds CLI decisions to the actual merge checkout and PR head', () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'theologai-ci-selection-'));
+    const git = (...args: string[]) => execFileSync('git', ['-c', 'user.name=CI Test', '-c', 'user.email=ci@example.invalid', '-c', 'commit.gpgsign=false', ...args], { cwd, encoding: 'utf8' }).trim();
+    try {
+      git('init', '-q', '-b', 'base');
+      writeFileSync(join(cwd, 'README.md'), 'base');
+      git('add', '.'); git('commit', '-qm', 'base');
+      const base = git('rev-parse', 'HEAD');
+      git('checkout', '-qb', 'candidate');
+      writeFileSync(join(cwd, 'README.md'), 'candidate');
+      git('add', '.'); git('commit', '-qm', 'candidate');
+      const prHead = git('rev-parse', 'HEAD');
+      git('checkout', '-q', 'base');
+      git('merge', '--no-ff', '-qm', 'synthetic merge', 'candidate');
+      const head = git('rev-parse', 'HEAD');
+      const classifier = fileURLToPath(new URL('../../../scripts/classify-ci-changes.mjs', import.meta.url));
+      const eligibility = fileURLToPath(new URL('../../../scripts/pr-release-eligibility.mjs', import.meta.url));
+      const env = { ...process.env, CI_EXPECTED_HEAD: head, CI_PR_HEAD: prHead, CI_FORCE_FULL: 'false', CI_VALIDATION_RESULT: 'success', CI_PREVIEW_RESULT: 'skipped', GITHUB_OUTPUT: '', GITHUB_STEP_SUMMARY: '' };
+      const run = (script: string, overrides = {}) => spawnSync(process.execPath, [script], { cwd, env: { ...env, ...overrides }, encoding: 'utf8' });
+      const selected = run(classifier);
+      expect(selected.status, selected.stderr).toBe(0);
+      expect(JSON.parse(selected.stdout)).toMatchObject({ mode: 'docs', data: false });
+      expect(run(eligibility).stdout.trim()).toBe('no-deployment-required');
+      for (const script of [classifier, eligibility]) {
+        expect(run(script, { CI_EXPECTED_HEAD: base }).status).not.toBe(0);
+        expect(run(script, { CI_PR_HEAD: base }).status).not.toBe(0);
+      }
+      expect(JSON.parse(run(classifier, { CI_FORCE_FULL: 'true' }).stdout).mode).toBe('full');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+  it('never uses malformed or absent evidence to silently omit checks', () => {
+    for (const diff of ['M\0docs/PLAN.md', 'R100\0docs/a.md\0', 'X\0docs/a.md\0']) expect(() => classifyCiChanges(diff)).toThrow();
+    expect(classifyCiChanges('').mode).toBe('full');
+    expect(classifyCiChanges('M\0docs/PLAN.md\0', true).mode).toBe('full');
+    expect(classifyCiChanges('M\0docs/new\nname.md\0').mode).toBe('full');
+  });
+});
+
+
+describe('pre-merge release eligibility', () => {
+  const candidate = { classified: true, deployRequired: true, validation: 'success', preview: 'success', sameTree: true };
+  it('distinguishes no-release docs from candidates requiring preview proof', () => {
+    expect(releaseEligibility({ ...candidate, deployRequired: false, preview: 'skipped' })).toBe('no-deployment-required');
+    expect(releaseEligibility({ ...candidate, preview: 'skipped' })).toBe('protected-preview-required');
+    expect(releaseEligibility(candidate)).toBe('ready-for-protected-release-verification');
+  });
+  it('never treats a failure, missing result or different merge tree as ready', () => {
+    for (const validation of ['failure', 'cancelled', 'skipped', undefined]) expect(releaseEligibility({ ...candidate, validation })).toBe('validation-incomplete');
+    for (const preview of ['failure', 'cancelled', undefined]) expect(releaseEligibility({ ...candidate, preview })).toBe('protected-preview-incomplete');
+    expect(releaseEligibility({ ...candidate, classified: false })).toBe('validation-incomplete');
+    expect(releaseEligibility({ ...candidate, sameTree: false })).toBe('merge-tree-differs-from-preview');
   });
 });

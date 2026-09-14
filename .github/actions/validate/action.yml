@@ -1,0 +1,94 @@
+name: Validate
+description: Run one named local validation suite after checkout, Node setup, and dependency installation.
+
+inputs:
+  suite:
+    description: Validation suite to run.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Validate requested suite
+      shell: bash
+      env:
+        SUITE: ${{ inputs.suite }}
+      run: |
+        case "$SUITE" in
+          core|data|worker|node|conformance|docs) ;;
+          *)
+            printf 'Unknown validation suite: %s\n' "$SUITE" >&2
+            exit 1
+            ;;
+        esac
+
+    - name: Run core validation
+      if: inputs.suite == 'core'
+      shell: bash
+      run: |
+        npm run audit:dependencies:high
+        npm run types:worker:check
+        npm run types:ccel-coordinator:check
+        npm run validate:worker-config
+        npm run validate:ccel-coordinator-config
+        npm run validate:ccel-coordinator-test-config
+        npm run typecheck:node
+        npm run typecheck:release-scripts
+        npm run typecheck:test-node
+        npm run typecheck:test-scripts
+        npm run typecheck:test-frozen-context-capacity
+        npm run typecheck:worker
+        npm run typecheck:ccel-coordinator
+        npm run typecheck:worker-runtime
+        npm run typecheck:ccel-coordinator-test
+        npm run test:coverage
+        npm run test:integration
+        npm run build
+
+    - name: Run data validation
+      if: inputs.suite == 'data'
+      shell: bash
+      run: |
+        test ! -e data/theologai.db
+        npm run data:verify-sources
+        npm run audit:release-corpus-capacity -- --output-database "$RUNNER_TEMP/theologai.db"
+        npm run benchmark:primary-source-research -- --database "$RUNNER_TEMP/theologai.db"
+        test -f "$THEOLOGAI_TEST_DATABASE_PATH"
+        npm run test:d1-readiness-generated-db
+        npm run d1:seed:export -- --database "$RUNNER_TEMP/theologai.db" --clean
+        npm run d1:seed:verify
+        cp scripts/d1-seed/seed-manifest.json "$RUNNER_TEMP/d1-seed-manifest.json"
+        npm run d1:seed:export -- --database "$RUNNER_TEMP/theologai.db" --clean
+        cmp "$RUNNER_TEMP/d1-seed-manifest.json" scripts/d1-seed/seed-manifest.json
+        npm run d1:seed:verify
+        npm run d1:seed:verify-import -- --database "$RUNNER_TEMP/theologai.db"
+        npx --no-install tsx scripts/historical-section-compatibility-evidence.ts \
+          --database "$RUNNER_TEMP/theologai.db" \
+          --seed-directory scripts/d1-seed
+        npm run d1:seed:verify-workerd
+      env:
+        THEOLOGAI_TEST_DATABASE_PATH: ${{ runner.temp }}/theologai.db
+
+    - name: Run Worker validation
+      if: inputs.suite == 'worker'
+      shell: bash
+      run: |
+        npm run test:worker-runtime
+        npm run test:ccel-coordinator-runtime
+        npm run test:worker-bundle-ubs
+        npm run test:worker-production-runtime
+
+    - name: Run Node HTTP validation
+      if: inputs.suite == 'node'
+      shell: bash
+      run: npm run test:e2e
+
+    - name: Run MCP conformance validation
+      if: inputs.suite == 'conformance'
+      shell: bash
+      run: npm run test:conformance
+
+    - name: Run documentation validation
+      if: inputs.suite == 'docs'
+      shell: bash
+      run: npm run docs:check

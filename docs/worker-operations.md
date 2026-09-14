@@ -830,9 +830,11 @@ artifact is retained for one day and is API-visible independently of the
 protected job. A separate unprivileged job downloads that exact current-run
 artifact, checks its closed schema, digest, run identity, release context, Git
 identity, decision, and complete changed-path evidence, and independently
-reproduces the classifier result. A documentation-only push therefore completes
-verification and skips the protected job. A deploy-required push or main-only
-manual dispatch can queue the protected job only after verification succeeds;
+reproduces the release decision. Production promotion is manual: merging or
+pushing to main does not run this workflow. Run **Deploy Production** using
+**Run workflow** on `main` with a reason when ready to promote. The main-only
+manual dispatch can queue the protected job only after preview evidence and
+full unprivileged validation succeed;
 missing, malformed, stale, failed, or inconsistent evidence fails before the
 environment rather than falling through to deployment.
 

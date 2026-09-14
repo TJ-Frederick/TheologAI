@@ -1,12 +1,13 @@
 #!/usr/bin/env tsx
 /**
  * Release-wide capacity gate for the SQLite database that is also materialized
- * into D1. It always builds a disposable database from the current checkout;
- * it neither opens a remote D1 database nor writes a corpus artifact.
+ * into D1. It always builds a fresh database from the current checkout; an
+ * explicit output option may copy that verified pre-VACUUM artifact for a
+ * downstream local CI step. It never opens a remote D1 database.
  */
 
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { constants, copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -101,6 +102,11 @@ export interface ReleaseCorpusCapacityBuilderContext {
 }
 
 export interface ReleaseCorpusCapacityRunOptions {
+  /**
+   * An explicit destination for the freshly built, semantically verified,
+   * pre-VACUUM database. The command never accepts an input database.
+   */
+  outputDatabasePath?: string;
   /** Test-only injection. The public command always performs the normal build. */
   buildDatabase?: (context: ReleaseCorpusCapacityBuilderContext) => void;
   /** Test-only injection. The public command always performs normal verification. */
@@ -429,6 +435,24 @@ function assertStoredCorpusIdentity(path: string, expected: string): void {
   }
 }
 
+/**
+ * Publish only the database this command freshly built and verified. Refusing
+ * replacement keeps a downstream artifact handoff from silently reusing stale
+ * output, while COPYFILE_EXCL also closes the check/copy race.
+ */
+function publishVerifiedPreVacuumDatabase(sourcePath: string, outputPath: string): void {
+  if (existsSync(outputPath)) fail(`refusing to overwrite existing verified database output: ${outputPath}`);
+  try {
+    copyFileSync(sourcePath, outputPath, constants.COPYFILE_EXCL);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+      fail(`refusing to overwrite existing verified database output: ${outputPath}`);
+    }
+    const detail = error instanceof Error ? error.message : 'unknown copy failure';
+    fail(`could not publish verified database output ${outputPath}: ${detail}`);
+  }
+}
+
 /** Public runner: temporary fresh build, verified identity, pre-VACUUM gate, and baseline comparison. */
 export function runReleaseCorpusCapacityReport(root = ROOT, options: ReleaseCorpusCapacityRunOptions = {}): ReleaseCorpusCapacityReport {
   const temporaryDirectory = mkdtempSync(join(tmpdir(), 'theologai-release-corpus-capacity-'));
@@ -449,16 +473,37 @@ export function runReleaseCorpusCapacityReport(root = ROOT, options: ReleaseCorp
     copyFileSync(databasePath, vacuumDiagnosticPath);
     const postVacuumDiagnostic = (options.measurePostVacuum ?? measurePostVacuumDiagnostic)(vacuumDiagnosticPath);
     assertDatabaseCapacityMeasurement(postVacuumDiagnostic, 'current post-VACUUM diagnostic');
-    return buildReleaseCorpusCapacityReport(
+    const report = buildReleaseCorpusCapacityReport(
       corpusIdentity, preVacuum, postVacuumDiagnostic, options.baseline ?? readRecordedCapacityBaseline(root),
     );
+    if (options.outputDatabasePath !== undefined && report.capacity.withinLimit) {
+      publishVerifiedPreVacuumDatabase(databasePath, options.outputDatabasePath);
+    }
+    return report;
   } finally {
     rmSync(temporaryDirectory, { recursive: true, force: true });
   }
 }
 
-export function parseReleaseCorpusCapacityArguments(argv: readonly string[]): void {
-  if (argv.length !== 0) fail('this release-wide capacity command accepts no arguments and always uses a disposable fresh database');
+export interface ReleaseCorpusCapacityArguments {
+  outputDatabasePath?: string;
+}
+
+/** The sole public option is an output destination for this command's own fresh artifact. */
+export function parseReleaseCorpusCapacityArguments(
+  argv: readonly string[],
+  root = ROOT,
+): ReleaseCorpusCapacityArguments {
+  if (argv.length === 0) return {};
+  const equalsArgument = argv.find(argument => argument.startsWith('--output-database='));
+  const separateIndex = argv.indexOf('--output-database');
+  if ((equalsArgument !== undefined && (argv.length !== 1 || argv[0] !== equalsArgument))
+    || (equalsArgument === undefined && (argv.length !== 2 || separateIndex !== 0))) {
+    fail('accepts only --output-database PATH and always builds a disposable fresh database');
+  }
+  const outputValue = equalsArgument === undefined ? argv[1] : equalsArgument.slice('--output-database='.length);
+  if (!outputValue || outputValue.startsWith('--')) fail('--output-database requires a path');
+  return { outputDatabasePath: resolve(root, outputValue) };
 }
 
 export function releaseCorpusCapacityExitCode(report: ReleaseCorpusCapacityReport): 0 | 1 {
@@ -479,9 +524,9 @@ function assertNode22(): void {
 }
 
 function main(argv: readonly string[]): void {
-  parseReleaseCorpusCapacityArguments(argv);
+  const arguments_ = parseReleaseCorpusCapacityArguments(argv);
   assertNode22();
-  const report = runReleaseCorpusCapacityReport();
+  const report = runReleaseCorpusCapacityReport(ROOT, arguments_);
   process.exitCode = emitReleaseCorpusCapacityReport(report);
 }
 

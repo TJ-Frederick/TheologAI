@@ -1,3 +1,4 @@
+import { parse } from 'yaml';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -395,16 +396,15 @@ describe('migration-free historical section-key plan', () => {
   });
 
   it('keeps production ancestry and exact PR merge-ref lineage gates distinct', () => {
-    const lineageStart = prWorkflow.indexOf('      - name: Verify historical section-key lineage');
-    const lineageEnd = prWorkflow.indexOf('      - name: Build SQLite database from tracked sources');
-    const lineageStep = prWorkflow.slice(lineageStart, lineageEnd);
-
-    expect(lineageStart).toBeGreaterThanOrEqual(0);
-    expect(lineageEnd).toBeGreaterThan(lineageStart);
-    expect(deployWorkflow).toContain('fetch-depth: 0');
-    expect(deployWorkflow).toContain('git merge-base --is-ancestor "$PREVIOUS_MAIN_SHA" HEAD');
-    expect(deployWorkflow).toContain('git show "$PREVIOUS_MAIN_SHA:data/historical-section-key-plan.json"');
-    expect(deployWorkflow).not.toContain('git rev-parse HEAD^1)" = "$PREVIOUS_MAIN_SHA"');
+    const parsed = parse(prWorkflow) as { jobs: Record<string, { steps: Array<{ name?: string; run?: string; env?: Record<string, string> }> }> };
+    const lineage = parsed.jobs['fresh-checkout-data']!.steps.find(step => step.env?.EXPECTED_MERGE_SHA);
+    expect(lineage).toBeDefined();
+    const lineageStep = `${lineage!.run}\nEXPECTED_MERGE_SHA: ${lineage!.env!.EXPECTED_MERGE_SHA}\nEXPECTED_HEAD_SHA: ${lineage!.env!.EXPECTED_HEAD_SHA}`;
+    const validationWorkflow = readFileSync('.github/workflows/validate.yml', 'utf8');
+    expect(validationWorkflow).toContain('fetch-depth: 0');
+    expect(validationWorkflow).toContain('git merge-base --is-ancestor "$PREVIOUS_MAIN_SHA" HEAD');
+    expect(validationWorkflow).toContain('git show "$PREVIOUS_MAIN_SHA:data/historical-section-key-plan.json"');
+    expect(validationWorkflow).not.toContain('git rev-parse HEAD^1)" = "$PREVIOUS_MAIN_SHA"');
     expect(prWorkflow).toContain('fetch-depth: 2');
     expect(lineageStep).not.toContain('github.event.pull_request.base.sha');
     expect(lineageStep).toContain('EXPECTED_MERGE_SHA: ${{ github.sha }}');
