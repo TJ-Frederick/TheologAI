@@ -1,4 +1,4 @@
-import { escapeEditionPlainTextForMarkdown } from '../../../../src/kernel/editionText.js';
+import { escapeEditionPlainTextForMarkdown } from '../../../../src/kernel/editionProvenanceFoundation.js';
 import {
   ORIGINAL_LANGUAGE_STUDY_V2_DRAFT_MARKDOWN_BYTES,
   type OriginalLanguageStudyV2DraftCandidate,
