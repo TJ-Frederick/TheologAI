@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
 import {
   auditHistoricalTransform9Authority,
+  buildHistoricalTransform9AuthorityQueryPlan,
   buildHistoricalTransform9ExpectedAuthority,
   HISTORICAL_TRANSFORM9_AUTHORITY_PAGE_SIZE,
   HISTORICAL_TRANSFORM9_AUTHORITY_PAGE_MAX_BYTES,
@@ -69,6 +70,7 @@ describe('Transform 9 ordered authority audit', () => {
     try {
       const sql: string[] = [];
       const result = audit(database, expected, sql);
+      expect(buildHistoricalTransform9AuthorityQueryPlan(ROOT, expected)).toEqual(sql);
       expect(result.pages.sections).toBe(133); // 1,057 full bodies at 8 rows per bounded page.
       expect(result.pages.projections).toBe(17); // 1,057 compact rows at 64 rows per bounded page.
       expect(sql.every(query => /^\s*SELECT\b/i.test(query) && !/\bOFFSET\b/i.test(query))).toBe(true);

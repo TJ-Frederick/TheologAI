@@ -152,7 +152,9 @@ describe('inactive Augustine/Pusey strict edition package', () => {
       .filter(path => !ignored.test(path) && !/\.(?:png|jpg|jpeg|sqlite|db)$/i.test(path))
       .filter(path => identifiers.some(identifier => readFileSync(resolve(root, path), 'utf8').includes(identifier)));
     expect(references.length).toBeGreaterThan(0);
-    expect(references.every(path => allow.has(path))).toBe(true);
+    // Documentation can discuss a dormant packet without activating it.
+    // Runtime/configuration references remain forbidden below.
+    expect(references.filter(path => !allow.has(path) && !/^docs\/.*\.md$/.test(path))).toEqual([]);
 
     for (const forbiddenPath of ['migrations', 'src', '.github', 'wrangler.toml', 'package.json', 'data/data-manifest.json', 'data/historical-document-catalog.json']) {
       const absolute = resolve(root, forbiddenPath);

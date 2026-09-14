@@ -222,45 +222,9 @@ export function auditHistoricalTransform8Authority(
   expectedAuthority = buildHistoricalTransform8ExpectedAuthority(root),
 ): HistoricalTransform8AuthorityAuditResult {
   const expected = expectedAuthority;
-  const profiles = readPaged(readPage, {
-    name: 'profiles',
-    expected: expected.profiles,
-    sql: last => `SELECT document_id AS documentId, work_id AS workId, edition_id AS editionId,
-      immutable_corpus_identity AS immutableCorpusIdentity,
-      section_package_identity AS sectionPackageIdentity, delivery_mode AS deliveryMode,
-      section_count AS sectionCount, landing_max_bytes AS landingMaxBytes,
-      browse_page_size AS browsePageSize, cursor_version AS cursorVersion,
-      provenance_json AS provenanceJson, rights_json AS rightsJson
-      FROM historical_document_delivery_profiles WHERE delivery_mode = 'complete_document'${last ? ` AND document_id > ${sqlLiteral(last.documentId)}` : ''}
-      ORDER BY document_id LIMIT ${HISTORICAL_TRANSFORM8_AUTHORITY_PAGE_SIZE}`,
-    parse: parseProfile,
-    compare: compareProfiles,
-  });
-  const identities = readPaged(readPage, {
-    name: 'identities',
-    expected: expected.identities,
-    sql: last => `SELECT identity.document_id AS documentId, identity.section_key AS sectionKey, identity.source_ordinal AS sourceOrdinal,
-      identity.document_section_id AS documentSectionId
-      FROM historical_section_identities identity
-      JOIN historical_document_delivery_profiles profile
-        ON profile.document_id = identity.document_id AND profile.delivery_mode = 'complete_document'${last ? ` WHERE identity.document_id > ${sqlLiteral(last.documentId)}
-        OR (identity.document_id = ${sqlLiteral(last.documentId)} AND (identity.source_ordinal > ${last.sourceOrdinal}
-          OR (identity.source_ordinal = ${last.sourceOrdinal} AND identity.section_key > ${sqlLiteral(last.sectionKey)})))` : ''}
-      ORDER BY identity.document_id, identity.source_ordinal, identity.section_key LIMIT ${HISTORICAL_TRANSFORM8_AUTHORITY_PAGE_SIZE}`,
-    parse: parseIdentity,
-    compare: compareIdentities,
-  });
-  const aliases = readPaged(readPage, {
-    name: 'aliases',
-    expected: expected.aliases,
-    sql: last => `SELECT document_id AS documentId, legacy_section_id AS legacySectionId,
-      section_key AS sectionKey, source_ordinal AS sourceOrdinal
-      FROM historical_section_aliases${last ? ` WHERE document_id > ${sqlLiteral(last.documentId)}
-        OR (document_id = ${sqlLiteral(last.documentId)} AND legacy_section_id > ${sqlLiteral(last.legacySectionId)})` : ''}
-      ORDER BY document_id, legacy_section_id LIMIT ${HISTORICAL_TRANSFORM8_AUTHORITY_PAGE_SIZE}`,
-    parse: parseAlias,
-    compare: compareAliases,
-  });
+  const profiles = readPaged(readPage, profileSpec(expected.profiles));
+  const identities = readPaged(readPage, identitySpec(expected.identities));
+  const aliases = readPaged(readPage, aliasSpec(expected.aliases));
   const bodyFtsSample = readSample(readPage, expected.bodyFtsSample);
 
   assertProjectionHash('profiles', profiles.rows, expected.profiles);
@@ -279,14 +243,87 @@ export function auditHistoricalTransform8Authority(
 }
 
 /**
+ * Generate the exact clean-corpus keyset queries before running them in
+ * bounded local-Wrangler batches. The audit still replays these pages and
+ * rejects any changed continuation key, row count, ordering, or projection.
+ */
+export function buildHistoricalTransform8AuthorityQueryPlan(
+  root: string,
+  expectedAuthority = buildHistoricalTransform8ExpectedAuthority(root),
+): string[] {
+  const queries: string[] = [];
+  appendPagedQueryPlan(queries, profileSpec(expectedAuthority.profiles));
+  appendPagedQueryPlan(queries, identitySpec(expectedAuthority.identities));
+  appendPagedQueryPlan(queries, aliasSpec(expectedAuthority.aliases));
+  queries.push(bodyFtsSampleSql());
+  return queries;
+}
+
+function profileSpec(expected: readonly HistoricalTransform8ProfileProjection[]): PageSpec<HistoricalTransform8ProfileProjection> {
+  return {
+    name: 'profiles',
+    expected,
+    sql: last => `SELECT document_id AS documentId, work_id AS workId, edition_id AS editionId,
+      immutable_corpus_identity AS immutableCorpusIdentity,
+      section_package_identity AS sectionPackageIdentity, delivery_mode AS deliveryMode,
+      section_count AS sectionCount, landing_max_bytes AS landingMaxBytes,
+      browse_page_size AS browsePageSize, cursor_version AS cursorVersion,
+      provenance_json AS provenanceJson, rights_json AS rightsJson
+      FROM historical_document_delivery_profiles WHERE delivery_mode = 'complete_document'${last ? ` AND document_id > ${sqlLiteral(last.documentId)}` : ''}
+      ORDER BY document_id LIMIT ${HISTORICAL_TRANSFORM8_AUTHORITY_PAGE_SIZE}`,
+    parse: parseProfile,
+    compare: compareProfiles,
+  };
+}
+
+function identitySpec(expected: readonly HistoricalTransform8IdentityProjection[]): PageSpec<HistoricalTransform8IdentityProjection> {
+  return {
+    name: 'identities',
+    expected,
+    sql: last => `SELECT identity.document_id AS documentId, identity.section_key AS sectionKey, identity.source_ordinal AS sourceOrdinal,
+      identity.document_section_id AS documentSectionId
+      FROM historical_section_identities identity
+      JOIN historical_document_delivery_profiles profile
+        ON profile.document_id = identity.document_id AND profile.delivery_mode = 'complete_document'${last ? ` WHERE identity.document_id > ${sqlLiteral(last.documentId)}
+        OR (identity.document_id = ${sqlLiteral(last.documentId)} AND (identity.source_ordinal > ${last.sourceOrdinal}
+          OR (identity.source_ordinal = ${last.sourceOrdinal} AND identity.section_key > ${sqlLiteral(last.sectionKey)})))` : ''}
+      ORDER BY identity.document_id, identity.source_ordinal, identity.section_key LIMIT ${HISTORICAL_TRANSFORM8_AUTHORITY_PAGE_SIZE}`,
+    parse: parseIdentity,
+    compare: compareIdentities,
+  };
+}
+
+function aliasSpec(expected: readonly HistoricalTransform8AliasProjection[]): PageSpec<HistoricalTransform8AliasProjection> {
+  return {
+    name: 'aliases',
+    expected,
+    sql: last => `SELECT document_id AS documentId, legacy_section_id AS legacySectionId,
+      section_key AS sectionKey, source_ordinal AS sourceOrdinal
+      FROM historical_section_aliases${last ? ` WHERE document_id > ${sqlLiteral(last.documentId)}
+        OR (document_id = ${sqlLiteral(last.documentId)} AND legacy_section_id > ${sqlLiteral(last.legacySectionId)})` : ''}
+      ORDER BY document_id, legacy_section_id LIMIT ${HISTORICAL_TRANSFORM8_AUTHORITY_PAGE_SIZE}`,
+    parse: parseAlias,
+    compare: compareAliases,
+  };
+}
+
+/**
  * Decode the one-statement JSON envelope emitted by `wrangler d1 execute
  * --json`. The wrapper layout has changed across Wrangler releases, so locate
  * the successful statement result structurally instead of trusting a fixed
  * array offset. The page byte cap is checked before JSON parsing.
  */
 export function parseHistoricalTransform8D1Page(raw: string): HistoricalTransform8AuthorityPage {
+  return parseHistoricalTransform8D1Pages(raw, 1)[0]!;
+}
+
+/** Decode a bounded multi-statement Wrangler envelope into independently bounded pages. */
+export function parseHistoricalTransform8D1Pages(raw: string, expectedStatementCount: number): HistoricalTransform8AuthorityPage[] {
+  if (!Number.isSafeInteger(expectedStatementCount) || expectedStatementCount < 1) {
+    throw new Error('Transform 8 D1 authority batch must contain at least one statement');
+  }
   const responseBytes = Buffer.byteLength(raw, 'utf8');
-  if (responseBytes > HISTORICAL_TRANSFORM8_D1_RESPONSE_MAX_BYTES) {
+  if (responseBytes > HISTORICAL_TRANSFORM8_D1_RESPONSE_MAX_BYTES * expectedStatementCount) {
     throw new Error(`Transform 8 D1 authority response exceeds the ${HISTORICAL_TRANSFORM8_D1_RESPONSE_MAX_BYTES}-byte envelope limit`);
   }
   let parsed: unknown;
@@ -297,10 +334,13 @@ export function parseHistoricalTransform8D1Page(raw: string): HistoricalTransfor
   }
   const candidates: Array<{ results: unknown[]; success: unknown }> = [];
   collectD1StatementResults(parsed, candidates);
-  if (candidates.length !== 1 || candidates[0]!.success !== true) {
+  if (candidates.length !== expectedStatementCount || candidates.some(candidate => candidate.success !== true)) {
     throw new Error('Transform 8 D1 authority response must contain exactly one successful statement result');
   }
-  return { rows: candidates[0]!.results, responseBytes };
+  return candidates.map(candidate => ({
+    rows: candidate.results,
+    responseBytes: expectedStatementCount === 1 ? responseBytes : Buffer.byteLength(JSON.stringify(candidate), 'utf8'),
+  }));
 }
 
 function readPaged<Row>(
@@ -348,7 +388,15 @@ function readSample(
   readPage: HistoricalTransform8AuthorityReader,
   expected: readonly HistoricalTransform8BodyFtsParityProjection[],
 ): HistoricalTransform8BodyFtsParityProjection[] {
-  const page = readAndValidatePage(readPage, 'body/FTS sample', `SELECT
+  const page = readAndValidatePage(readPage, 'body/FTS sample', bodyFtsSampleSql());
+  if (page.rows.length !== expected.length) {
+    throw new Error(`Transform 8 body/FTS sample count mismatch: expected ${expected.length}, received ${page.rows.length}`);
+  }
+  return page.rows.map(parseBodyFtsParity);
+}
+
+function bodyFtsSampleSql(): string {
+  return `SELECT
     identity.document_id AS documentId, identity.section_key AS sectionKey,
     identity.source_ordinal AS sourceOrdinal, section.section_number AS legacySectionId,
     section.title AS title, section.content AS content, section.topics AS topics,
@@ -360,11 +408,15 @@ function readSample(
       ON profile.document_id = identity.document_id AND profile.delivery_mode = 'complete_document'
     LEFT JOIN sections_fts fts ON fts.rowid = section.id
     ORDER BY identity.document_id, identity.source_ordinal, identity.section_key
-    LIMIT ${HISTORICAL_TRANSFORM8_BODY_FTS_SAMPLE_SIZE}`);
-  if (page.rows.length !== expected.length) {
-    throw new Error(`Transform 8 body/FTS sample count mismatch: expected ${expected.length}, received ${page.rows.length}`);
+    LIMIT ${HISTORICAL_TRANSFORM8_BODY_FTS_SAMPLE_SIZE}`;
+}
+
+function appendPagedQueryPlan<Row>(queries: string[], spec: PageSpec<Row>): void {
+  const pageSize = HISTORICAL_TRANSFORM8_AUTHORITY_PAGE_SIZE;
+  for (let offset = 0; ; offset += pageSize) {
+    queries.push(spec.sql(offset === 0 ? undefined : spec.expected[offset - 1]));
+    if (offset + pageSize >= spec.expected.length) return;
   }
-  return page.rows.map(parseBodyFtsParity);
 }
 
 function readAndValidatePage(

@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { parse } from 'smol-toml';
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_ALLOWED_ORIGIN as NODE_DEFAULT_ALLOWED_ORIGIN } from '../../../src/http/config.js';
 import { DEFAULT_ALLOWED_ORIGIN as WORKER_DEFAULT_ALLOWED_ORIGIN } from '../../../src/http/worker/requestPolicy.js';
@@ -9,33 +10,55 @@ async function readProjectFile(path: string): Promise<string> {
 
 describe('custom-domain infrastructure contract', () => {
   it('keeps production and preview routes, D1, and rate limits isolated while retaining workers.dev', async () => {
-    const config = await readProjectFile('wrangler.toml');
-    const previewStart = config.indexOf('[env.preview]');
-    expect(previewStart).toBeGreaterThan(0);
+    const config = parse(await readProjectFile('wrangler.toml')) as {
+      workers_dev: boolean;
+      routes: Array<{ pattern: string; custom_domain: boolean }>;
+      vars: { THEOLOGAI_ALLOWED_ORIGINS: string };
+      d1_databases: Array<{ binding: string; database_name: string; database_id: string }>;
+      ratelimits: Array<{ name: string; namespace_id: string; simple: { limit: number; period: number } }>;
+      env: {
+        preview: {
+          workers_dev: boolean;
+          routes: Array<{ pattern: string; custom_domain: boolean }>;
+          vars: { THEOLOGAI_ALLOWED_ORIGINS: string };
+          d1_databases: Array<{ binding: string; database_name: string; database_id: string }>;
+          ratelimits: Array<{ name: string; namespace_id: string; simple: { limit: number; period: number } }>;
+        };
+      };
+    };
+    const production = config;
+    const preview = config.env.preview;
 
-    const production = config.slice(0, previewStart);
-    const preview = config.slice(previewStart);
+    expect(production.workers_dev).toBe(true);
+    expect(production.routes).toEqual([{ pattern: 'mcp.theologai.xyz', custom_domain: true }]);
+    expect(production.d1_databases).toContainEqual(expect.objectContaining({
+      binding: 'THEOLOGAI_DB',
+      database_name: 'theologai-production-20260811-schema0009-a',
+      database_id: '9bc79346-338b-439e-a2a5-424f4418eb21',
+    }));
+    expect(production.ratelimits).toContainEqual({
+      name: 'THEOLOGAI_RATE_LIMITER',
+      namespace_id: '361201',
+      simple: { limit: 120, period: 60 },
+    });
 
-    expect(production).toContain('workers_dev = true');
-    expect(production).toContain('{ pattern = "mcp.theologai.xyz", custom_domain = true }');
-    expect(production).not.toContain('preview-mcp.theologai.xyz');
-    expect(production).toContain('database_name = "theologai-production-20260811-schema0009-a"');
-    expect(production).toContain('database_id = "9bc79346-338b-439e-a2a5-424f4418eb21"');
-    expect(production).toContain('namespace_id = "361201"');
-
-    expect(preview).toContain('workers_dev = true');
-    expect(preview).toContain('{ pattern = "preview-mcp.theologai.xyz", custom_domain = true }');
-    expect(preview).not.toContain('{ pattern = "mcp.theologai.xyz", custom_domain = true }');
-    expect(preview).toContain('database_name = "theologai-preview-20260811-schema0009-a"');
-    expect(preview).toContain('database_id = "74f456e2-6951-4003-bb6f-91951342bf8f"');
-    expect(preview).toContain('namespace_id = "361202"');
+    expect(preview.workers_dev).toBe(true);
+    expect(preview.routes).toEqual([{ pattern: 'preview-mcp.theologai.xyz', custom_domain: true }]);
+    expect(preview.d1_databases).toContainEqual(expect.objectContaining({
+      binding: 'THEOLOGAI_DB',
+      database_name: 'theologai-preview-20260811-schema0009-a',
+      database_id: '74f456e2-6951-4003-bb6f-91951342bf8f',
+    }));
+    expect(preview.ratelimits).toContainEqual({
+      name: 'THEOLOGAI_RATE_LIMITER',
+      namespace_id: '361202',
+      simple: { limit: 120, period: 60 },
+    });
 
     for (const environment of [production, preview]) {
-      expect(environment).toContain(
-        'THEOLOGAI_ALLOWED_ORIGINS = "https://theologai.xyz,https://theologai.pages.dev"',
+      expect(environment.vars.THEOLOGAI_ALLOWED_ORIGINS).toBe(
+        'https://theologai.xyz,https://theologai.pages.dev',
       );
-      expect(environment).toContain('limit = 120');
-      expect(environment).toContain('period = 60');
     }
   });
 

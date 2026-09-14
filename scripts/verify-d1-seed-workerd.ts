@@ -4,16 +4,23 @@
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { performance } from 'node:perf_hooks';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadAndVerifyD1SeedManifest } from './d1-seed-manifest.js';
 import { parseDataManifest } from './d1-corpus-identity.js';
 import {
   auditHistoricalTransform8Authority,
+  buildHistoricalTransform8AuthorityQueryPlan,
+  buildHistoricalTransform8ExpectedAuthority,
   parseHistoricalTransform8D1Page,
+  parseHistoricalTransform8D1Pages,
+  type HistoricalTransform8AuthorityPage,
 } from './historical-transform8-authority-audit.js';
 import {
   auditHistoricalTransform9Authority,
+  buildHistoricalTransform9AuthorityQueryPlan,
+  buildHistoricalTransform9ExpectedAuthority,
   parseHistoricalTransform9D1Page,
 } from './historical-transform9-authority-audit.js';
 import {
@@ -34,6 +41,29 @@ const state = mkdtempSync(join(tmpdir(), 'theologai-wrangler-d1-'));
 const wrangler = join(ROOT, 'node_modules', 'wrangler', 'bin', 'wrangler.js');
 const wranglerLogDirectory = join(ROOT, 'test-output', 'wrangler', 'logs');
 ensureWranglerLogDirectory(wranglerLogDirectory);
+const AUTHORITY_BATCH_SIZE = 4;
+
+type AuthorityReadMode = 'batched' | 'serial';
+type Phase = 'migrations' | 'schema' | 'seedImport' | 'readiness' | 'transform8Authority' | 'transform9Authority';
+
+function parseAuthorityReadMode(argv: readonly string[]): AuthorityReadMode {
+  if (argv.length === 0) return 'batched';
+  if (argv.length === 1 && argv[0] === '--authority-read-mode=serial') return 'serial';
+  if (argv.length === 1 && argv[0] === '--authority-read-mode=batched') return 'batched';
+  throw new Error('Usage: verify-d1-seed-workerd.ts [--authority-read-mode=batched|serial]');
+}
+
+const authorityReadMode = parseAuthorityReadMode(process.argv.slice(2));
+const phaseMilliseconds = new Map<Phase, number>();
+
+function measure<T>(phase: Phase, action: () => T): T {
+  const started = performance.now();
+  try {
+    return action();
+  } finally {
+    phaseMilliseconds.set(phase, Math.round(performance.now() - started));
+  }
+}
 
 function run(args: string[]): string {
   try {
@@ -53,18 +83,53 @@ function run(args: string[]): string {
   }
 }
 
+function executeAuthorityBatch(common: readonly string[], queries: readonly string[]): HistoricalTransform8AuthorityPage[] {
+  if (queries.length === 0 || queries.length > AUTHORITY_BATCH_SIZE) {
+    throw new Error(`Authority batch must contain 1-${AUTHORITY_BATCH_SIZE} queries`);
+  }
+  const output = run(['d1', 'execute', ...common, '--command', queries.join('\n;\n'), '--json']);
+  return parseHistoricalTransform8D1Pages(output, queries.length);
+}
+
+function readPlannedAuthorityPages(
+  common: readonly string[],
+  queries: readonly string[],
+  label: string,
+): { readPage: (sql: string) => HistoricalTransform8AuthorityPage; commandCount: number; queryCount: number; assertFullyRead: () => void } {
+  const pages: HistoricalTransform8AuthorityPage[] = [];
+  for (let start = 0; start < queries.length; start += AUTHORITY_BATCH_SIZE) {
+    pages.push(...executeAuthorityBatch(common, queries.slice(start, start + AUTHORITY_BATCH_SIZE)));
+  }
+  let cursor = 0;
+  return {
+    readPage: sql => {
+      if (queries[cursor] !== sql) {
+        throw new Error(`${label} authority continuation diverged from its bounded query plan`);
+      }
+      const page = pages[cursor++];
+      if (!page) throw new Error(`${label} authority query plan exhausted unexpectedly`);
+      return page;
+    },
+    commandCount: Math.ceil(queries.length / AUTHORITY_BATCH_SIZE),
+    queryCount: queries.length,
+    assertFullyRead: () => {
+      if (cursor !== queries.length) throw new Error(`${label} authority audit did not consume its complete bounded query plan`);
+    },
+  };
+}
+
 try {
-  const common = ['THEOLOGAI_DB', '--local', '--persist-to', state, '--config', 'wrangler.toml'];
-  run(['d1', 'migrations', 'apply', ...common]);
+  const common = ['THEOLOGAI_DB', '--local', '--persist-to', state, '--config', 'wrangler.toml', '--env-file', '/dev/null'];
+  measure('migrations', () => run(['d1', 'migrations', 'apply', ...common]));
   const migrationNames = sourceManifest.materializations.d1.migrations.map(migration => basename(migration.path));
-  const schemaState = run([
+  const schemaState = measure('schema', () => run([
     'd1',
     'execute',
     ...common,
     '--command',
     buildWorkerdSchemaStateSql(migrationNames, REQUIRED_COLUMNS),
     '--json',
-  ]);
+  ]));
   if (!schemaState.includes('schema-ready')) throw new Error('Wrangler-applied migration state was not verified');
 
   // A sampled import would not prove relational integrity across Transform 7.
@@ -72,32 +137,73 @@ try {
   // deterministic corpus against the 350 MiB capacity ceiling. Workerd
   // intentionally blocks SQLite page-count PRAGMAs, so this phase proves that
   // every generated statement is accepted by its local D1 runtime instead.
-  for (const [index, file] of manifest.files.entries()) {
-    if (!/^[a-z0-9-]+-\d{3}\.sql$/.test(file.path)) {
-      throw new Error(`Unsafe generated seed path: ${file.path}`);
+  measure('seedImport', () => {
+    for (const [index, file] of manifest.files.entries()) {
+      if (!/^[a-z0-9-]+-\d{3}\.sql$/.test(file.path)) {
+        throw new Error(`Unsafe generated seed path: ${file.path}`);
+      }
+      console.error(`[verify-d1-seed-workerd] ${index + 1}/${manifest.files.length} ${file.path}`);
+      run(['d1', 'execute', ...common, '--file', join(SEED_ROOT, file.path)]);
     }
-    console.error(`[verify-d1-seed-workerd] ${index + 1}/${manifest.files.length} ${file.path}`);
-    run(['d1', 'execute', ...common, '--file', join(SEED_ROOT, file.path)]);
-  }
+  });
 
-  const readiness = parseHistoricalTransform8D1Page(run([
+  const readiness = measure('readiness', () => parseHistoricalTransform8D1Page(run([
     'd1',
     'execute',
     ...common,
     '--command',
     buildD1ReadinessSql(sourceManifest.expectedCounts),
     '--json',
-  ]));
+  ])));
   if (readiness.rows.length !== 1 || (readiness.rows[0] as { readiness?: unknown }).readiness !== 'ready') {
     throw new Error('Production local D1 readiness result was not ready');
   }
-  const authority = auditHistoricalTransform8Authority(ROOT, sql => parseHistoricalTransform8D1Page(run([
-    'd1', 'execute', ...common, '--command', sql, '--json',
-  ])));
-  const transform9Authority = auditHistoricalTransform9Authority(ROOT, sql => parseHistoricalTransform9D1Page(run([
-    'd1', 'execute', ...common, '--command', sql, '--json',
-  ])));
-  console.error(`[verify-d1-seed-workerd] Imported ${manifest.files.length} seed files through local D1; production readiness, Transform-8 (${authority.pages.profiles}/${authority.pages.identities}/${authority.pages.aliases} pages), and Transform-11 (${transform9Authority.pages.packs}/${transform9Authority.pages.works}/${transform9Authority.pages.editions}/${transform9Authority.pages.artifacts}/${transform9Authority.pages.documents}/${transform9Authority.pages.profiles}/${transform9Authority.pages.sections}/${transform9Authority.pages.projections} pages) authority audits passed.`);
+  const transform8Expected = buildHistoricalTransform8ExpectedAuthority(ROOT);
+  const transform9Expected = buildHistoricalTransform9ExpectedAuthority(ROOT);
+  let authorityCommandCount = 0;
+  let authorityQueryCount = 0;
+  const authority = measure('transform8Authority', () => {
+    if (authorityReadMode === 'serial') {
+      return auditHistoricalTransform8Authority(ROOT, sql => {
+        authorityCommandCount++;
+        authorityQueryCount++;
+        return parseHistoricalTransform8D1Page(run(['d1', 'execute', ...common, '--command', sql, '--json']));
+      }, transform8Expected);
+    }
+    const planned = readPlannedAuthorityPages(common, buildHistoricalTransform8AuthorityQueryPlan(ROOT, transform8Expected), 'Transform 8');
+    authorityCommandCount += planned.commandCount;
+    authorityQueryCount += planned.queryCount;
+    const result = auditHistoricalTransform8Authority(ROOT, planned.readPage, transform8Expected);
+    planned.assertFullyRead();
+    return result;
+  });
+  const transform9Authority = measure('transform9Authority', () => {
+    if (authorityReadMode === 'serial') {
+      return auditHistoricalTransform9Authority(ROOT, sql => {
+        authorityCommandCount++;
+        authorityQueryCount++;
+        return parseHistoricalTransform9D1Page(run(['d1', 'execute', ...common, '--command', sql, '--json']));
+      }, transform9Expected);
+    }
+    const planned = readPlannedAuthorityPages(common, buildHistoricalTransform9AuthorityQueryPlan(ROOT, transform9Expected), 'Transform 11');
+    authorityCommandCount += planned.commandCount;
+    authorityQueryCount += planned.queryCount;
+    const result = auditHistoricalTransform9Authority(ROOT, planned.readPage, transform9Expected);
+    planned.assertFullyRead();
+    return result;
+  });
+  const timingSummary = Object.fromEntries([...phaseMilliseconds.entries()].map(([phase, milliseconds]) => [phase, milliseconds]));
+  const authorityHashes = {
+    transform8: {
+      attestation: authority.attestationSha256,
+      profiles: authority.profilesSha256,
+      identities: authority.identitiesSha256,
+      aliases: authority.aliasesSha256,
+      bodyFtsSample: authority.bodyFtsSampleSha256,
+    },
+    transform11: transform9Authority.hashes,
+  };
+  console.error(`[verify-d1-seed-workerd] Imported ${manifest.files.length} seed files through local D1; production readiness, Transform-8 (${authority.pages.profiles}/${authority.pages.identities}/${authority.pages.aliases} pages), and Transform-11 (${transform9Authority.pages.packs}/${transform9Authority.pages.works}/${transform9Authority.pages.editions}/${transform9Authority.pages.artifacts}/${transform9Authority.pages.documents}/${transform9Authority.pages.profiles}/${transform9Authority.pages.sections}/${transform9Authority.pages.projections} pages) authority audits passed. Authority mode ${authorityReadMode}: ${authorityCommandCount} Wrangler commands for ${authorityQueryCount} bounded queries. Phase milliseconds: ${JSON.stringify(timingSummary)}. Authority hashes: ${JSON.stringify(authorityHashes)}.`);
 } finally {
   rmSync(state, { recursive: true, force: true });
 }

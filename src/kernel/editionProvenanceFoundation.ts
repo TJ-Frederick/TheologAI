@@ -1,7 +1,19 @@
 import { sha256Hex } from './sha256.js';
+import {
+  EditionProvenanceValidationError,
+  editionStringAt as stringAt,
+  safeEditionTextAt as safeTextAt,
+  splitFrozenEditionTextAt as splitFrozenSectionContentAt,
+} from './editionText.js';
+export {
+  EDITION_PROVENANCE_ALLOWED_CONTENT_FORMAT_CHARACTERS,
+  EditionProvenanceValidationError,
+  escapeEditionPlainTextForMarkdown,
+  escapeFrozenEditionSectionContentForMarkdown,
+} from './editionText.js';
 
 /**
- * Inactive foundation for a future, rights-reviewed local corpus pipeline.
+ * Preparation foundation for a future, rights-reviewed local corpus pipeline.
  *
  * This module is deliberately not exported from the kernel barrel or wired to
  * any service. A historical work and a particular edition/transcription are
@@ -23,15 +35,6 @@ export const EDITION_PROVENANCE_LIMITS = Object.freeze({
   longTextCharacters: 4_096,
 } as const);
 
-/**
- * The only invisible format characters retained in corpus bodies. ZWNJ and
- * ZWJ are required for faithful joining behavior in some scripts; metadata
- * identifiers and labels permit no Cf characters.
- */
-export const EDITION_PROVENANCE_ALLOWED_CONTENT_FORMAT_CHARACTERS = Object.freeze([
-  '\u200c', // ZERO WIDTH NON-JOINER
-  '\u200d', // ZERO WIDTH JOINER
-] as const);
 
 export type WorkCreatorRole =
   | 'author'
@@ -232,13 +235,6 @@ export interface CompiledEditionPackage {
   canonicalJson: string;
   utf8: Uint8Array;
   sha256: string;
-}
-
-export class EditionProvenanceValidationError extends Error {
-  constructor(public readonly path: string, message: string) {
-    super(`${path}: ${message}`);
-    this.name = 'EditionProvenanceValidationError';
-  }
 }
 
 /** Strictly validate unknown input and return a normalized, detached value. */
@@ -571,31 +567,6 @@ function validateSection(input: unknown, path: string): FrozenEditionSection {
   };
 }
 
-/**
- * Sole presentation-security boundary for emitting edition plain text inside
- * future CommonMark/GFM. It escapes every ASCII punctuation character, which
- * includes all link, image, autolink, HTML, entity, and destination delimiters.
- * Future Markdown renderers MUST call this function for trimmed plain text;
- * FrozenEditionSection.content uses its section-aware wrapper below. This
- * foundation is inactive; active formatters are intentionally unchanged.
- */
-export function escapeEditionPlainTextForMarkdown(content: string): string {
-  const value = safeTextAt(content, '$.content', Number.MAX_SAFE_INTEGER, true, true);
-  return value.replace(/[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/g, '\\$&');
-}
-
-/**
- * Presentation boundary for FrozenEditionSection.content only. It validates
- * and preserves the exact LF-only source boundaries, while routing the
- * trimmed interior through the strict generic Markdown escaper. This keeps
- * exact source segmentation reproducible without making the generic escaper
- * accept outer whitespace.
- */
-export function escapeFrozenEditionSectionContentForMarkdown(content: string): string {
-  const boundary = splitFrozenSectionContentAt(content, '$.content', Number.MAX_SAFE_INTEGER);
-  return `${boundary.leadingLineFeeds}${escapeEditionPlainTextForMarkdown(boundary.interior)}${boundary.trailingLineFeeds}`;
-}
-
 function validateContributorGroups(input: unknown): EditionContributorGroups {
   const path = '$.edition.contributorGroups';
   const record = objectAt(input, path, ['translation', 'editing', 'revision']);
@@ -677,84 +648,6 @@ function arrayAt(input: unknown, path: string, minimum: number, maximum: number)
   return detached;
 }
 
-function stringAt(input: unknown, path: string): string {
-  if (typeof input !== 'string') fail(path, 'must be a string');
-  return input;
-}
-
-function safeTextAt(
-  input: unknown,
-  path: string,
-  maxCharacters: number,
-  allowLineBreaks = false,
-  allowPlainTextSyntax = false,
-): string {
-  const raw = stringAt(input, path);
-  if (hasLoneSurrogate(raw)) fail(path, 'contains a lone UTF-16 surrogate');
-  const value = raw.normalize('NFC');
-  if (!value || value !== value.trim() || [...value].length > maxCharacters) {
-    fail(path, `must be non-empty, trimmed, and at most ${maxCharacters} Unicode characters`);
-  }
-  const forbiddenControls = allowLineBreaks
-    ? /[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069\ufeff]/u
-    : /[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069\ufeff]/u;
-  if (forbiddenControls.test(value)) fail(path, 'contains forbidden control or bidirectional-control characters');
-  if (/[\p{Zl}\p{Zp}]/u.test(value)) {
-    fail(path, 'contains a Unicode line or paragraph separator; use an explicit line feed in corpus text');
-  }
-  const allowedFormatCharacters = allowLineBreaks
-    ? new Set<string>(EDITION_PROVENANCE_ALLOWED_CONTENT_FORMAT_CHARACTERS)
-    : new Set<string>();
-  if ([...value].some(character => /\p{Cf}/u.test(character) && !allowedFormatCharacters.has(character))) {
-    fail(path, allowLineBreaks
-      ? 'contains an unapproved invisible format character; corpus text permits only ZWNJ and ZWJ'
-      : 'contains an invisible format character; single-line metadata permits none');
-  }
-  for (const character of value) {
-    const codePoint = character.codePointAt(0)!;
-    if ((codePoint >= 0xfdd0 && codePoint <= 0xfdef) || (codePoint & 0xffff) >= 0xfffe) {
-      fail(path, 'contains a forbidden Unicode noncharacter');
-    }
-  }
-  if (!allowPlainTextSyntax
-    && /<\/?[A-Za-z][^>]*>|<!DOCTYPE|<!--|<\?xml|javascript\s*:|\bon[A-Za-z]+\s*=/iu.test(value)) {
-    fail(path, 'contains markup or executable-content syntax');
-  }
-  return value;
-}
-
-interface FrozenSectionContentBoundary {
-  leadingLineFeeds: string;
-  interior: string;
-  trailingLineFeeds: string;
-}
-
-/**
- * Frozen source segmentation can carry LF-only separation with the preceding
- * or following source block. This is deliberately narrower than safeTextAt:
- * it applies only to stored section text and is never used by the Markdown
- * escaping boundary. Tabs, spaces, CR, and all other outer whitespace remain
- * invalid, so no renderer or generic metadata caller inherits this exception.
- */
-function splitFrozenSectionContentAt(input: unknown, path: string, maxCharacters: number): FrozenSectionContentBoundary {
-  const raw = stringAt(input, path);
-  if (hasLoneSurrogate(raw)) fail(path, 'contains a lone UTF-16 surrogate');
-  const value = raw.normalize('NFC');
-  if (!value || [...value].length > maxCharacters) {
-    fail(path, `must be non-empty, trimmed, and at most ${maxCharacters} Unicode characters`);
-  }
-  if (value.includes('\r')) fail(path, 'contains a carriage return; corpus text must use line feeds');
-  const interior = value.replace(/^\n+|\n+$/g, '');
-  if (!interior || interior !== interior.trim()) {
-    fail(path, 'must be trimmed except for LF-only frozen source boundaries');
-  }
-  // Validate the preserved interior with the ordinary multiline corpus rules.
-  safeTextAt(interior, path, maxCharacters, true, true);
-  const leadingLineFeeds = value.match(/^\n+/u)?.[0] ?? '';
-  const trailingLineFeeds = value.match(/\n+$/u)?.[0] ?? '';
-  return { leadingLineFeeds, interior, trailingLineFeeds };
-}
-
 function frozenSectionTextWithLfBoundariesAt(input: unknown, path: string, maxCharacters: number): string {
   const boundary = splitFrozenSectionContentAt(input, path, maxCharacters);
   // Rejoin rather than trim or relocate the evidence: canonical serialization
@@ -806,20 +699,6 @@ function httpsUrlAt(input: unknown, path: string): string {
   if (url.protocol !== 'https:' || !url.hostname) fail(path, 'must be an absolute HTTPS URL');
   if (url.username || url.password) fail(path, 'must not contain credentials');
   return url.toString();
-}
-
-function hasLoneSurrogate(value: string): boolean {
-  for (let index = 0; index < value.length; index++) {
-    const codeUnit = value.charCodeAt(index);
-    if (codeUnit >= 0xd800 && codeUnit <= 0xdbff) {
-      const next = value.charCodeAt(index + 1);
-      if (!(next >= 0xdc00 && next <= 0xdfff)) return true;
-      index++;
-    } else if (codeUnit >= 0xdc00 && codeUnit <= 0xdfff) {
-      return true;
-    }
-  }
-  return false;
 }
 
 function integerAt(input: unknown, path: string, minimum: number, maximum: number): number {
