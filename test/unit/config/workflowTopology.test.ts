@@ -137,7 +137,8 @@ describe('workflow topology', () => {
       const job = workflow.jobs[id]!;
       expect(job.name).toBe(name);
       expect(needs(job)).toContain('classify');
-      expect(job.if).toContain('always()');
+      expect(job.if).toContain('!cancelled()');
+      expect(job.if).not.toContain('always()');
       expect(job.environment).toBeUndefined();
       const guard = job.steps?.find(step => step.env?.CLASSIFIER_RESULT);
       expect(guard?.run).toBeDefined();

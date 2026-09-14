@@ -48,7 +48,7 @@ jobs:
   test-and-build:
     name: Test & Build
     needs: classify
-    if: always()
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -77,7 +77,7 @@ jobs:
   fresh-checkout-data:
     name: Fresh Checkout & Data
     needs: classify
-    if: always()
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -154,7 +154,7 @@ jobs:
   worker-runtime:
     name: Worker Runtime & D1
     needs: classify
-    if: always()
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -190,7 +190,7 @@ jobs:
   node-http-e2e:
     name: Node HTTP E2E
     needs: classify
-    if: always()
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -226,7 +226,7 @@ jobs:
   mcp-conformance:
     name: Applicable MCP Conformance
     needs: classify
-    if: always()
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
