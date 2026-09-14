@@ -198,5 +198,3 @@ Production is separately bound to schema-`0009` D1
 CCEL canary gate remains unrecorded and inert. The exact preparation identity,
 seed evidence, and release boundary are recorded in
 [docs/D1-DATA-WORKFLOW.md](D1-DATA-WORKFLOW.md).
-
-

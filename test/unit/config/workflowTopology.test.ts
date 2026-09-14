@@ -123,7 +123,10 @@ describe('workflow topology', () => {
     const workflow = parse(await readWorkflow('pr.yml')) as Workflow;
     expect(workflow.permissions).toEqual({ contents: 'read' });
     expect(workflow.on).toHaveProperty('schedule');
+    expect(JSON.stringify(workflow.on.pull_request)).toContain('labeled');
     expect(workflow.jobs.classify!.if).toBeUndefined();
+    const classifier = workflow.jobs.classify!.steps?.find(step => step.env?.CI_FORCE_FULL);
+    expect(classifier?.env?.CI_FORCE_FULL).toContain("github.event.action == 'labeled'");
     expect(workflow.concurrency.group).toContain("format('validation-{0}', github.run_id)");
     const expected = {
       'test-and-build': 'Test & Build', 'fresh-checkout-data': 'Fresh Checkout & Data',
