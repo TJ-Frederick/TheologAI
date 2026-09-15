@@ -71,10 +71,19 @@ assigns the responsible contributor when scheduling each review.
 |---|---|---|---|
 | CCEL discovery | Research serving + release operations | Adapter/coordinator code is present in the serving graph; execution remains gated. It is not dead code merely because live search is disabled. See [coordinator](CCEL-UPSTREAM-COORDINATOR.md) and [canary transaction](CCEL-LIVE-PREVIEW-CANARY-TRANSACTION.md). | Demonstrated gap after adequate local search, current interface/policy review, preserved discovery-only bounds, authorized canary and separate release decision |
 | Primary-source research v8 | Research serving | Implemented contract/prompt foundation selected by otherwise absent flag; see [v8 foundation](PRIMARY-SOURCE-RESEARCH-V8-FOUNDATION.md). | Useful local research outcomes, contract/parity tests, existing external execution gates, protected release evidence |
-| Partial Aquinas Transform 10 | Corpus preparation + research serving | Source packet, hierarchy contracts and disposable materializer remain; normal corpus excludes Aquinas lineage/publication. See [Transform 10](AQUINAS-HIERARCHY-TRANSFORM10.md). | Explicit complete-edition/coverage decision, edition-specific source evidence, conservation and search quality, capacity, reviewed activation transform |
+| Partial Aquinas Transform 10 | Corpus preparation + research serving | Source packet, hierarchy contracts and disposable materializer remain; normal corpus excludes Aquinas lineage/publication. See [Transform 10](AQUINAS-HIERARCHY-TRANSFORM10.md). | Accurate four-part coverage disclosure (Supplement absent), edition-specific source evidence, conservation and search quality, fresh capacity, activation transform |
 | Complete-edition Aquinas preparation | Corpus preparation | Collection/package foundations and Gutenberg acquisition/topology scripts remain preparation-only. Their presence does not replace the partial packet or activate a catalog work. | Verified acquisition/topology and completeness, source/rights review, deterministic compiler, integration and release decisions |
-| Norton | Corpus preparation + release operations | Generic Candidate-C schema is maintained, but Norton rows are confined to disposable proof. See [inactive Transform 12](NORTON-TRANSFORM12-INACTIVE.md). | Normalized-text rights decision, reviewed canonical activation, retrieval/section identity and capacity proof, separate release preparation |
+| Norton | Corpus preparation + release operations | Generic Candidate-C schema is maintained, but Norton rows are confined to disposable proof. See [inactive Transform 12](NORTON-TRANSFORM12-INACTIVE.md). | CC0-backed activation provenance, canonical source-pack admission, retrieval/section identity and fresh capacity, release preparation |
 | MACULA context | Corpus preparation + language research | Source contract and synthetic parser/capacity experiments; see [source contract](MACULA-SOURCE-CONTRACT.md) and [synthetic Gate 1](MACULA-GATE1-SYNTHETIC.md). | Product scope, real source/rights review and acquisition, alignment correctness, measured real-corpus capacity and research benefit |
+
+Current Aquinas/Norton direction (2026-09-15): assess activation rather than
+retirement. The Norton CC0 transcription has no identified remaining text-rights
+restriction; its old pending marker records a dormant proof. Aquinas covers the
+four authored parts through Tertia q90; the traditional Supplement is absent.
+Use the [Norton assessment](NORTON-ACTIVATION-ASSESSMENT-2026-09-15.md) and
+[Aquinas assessment](AQUINAS-ACTIVATION-ASSESSMENT-2026-09-15.md) for current
+integration work and evidence. The register's inactive state is not itself a
+licensing or quality finding.
 
 Keep new experiments outside the serving dependency graph until their use case,
 contract and source boundary are decided. Existing kernel foundations may be

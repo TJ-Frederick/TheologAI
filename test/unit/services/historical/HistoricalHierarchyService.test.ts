@@ -153,7 +153,7 @@ describe('HistoricalHierarchyService dormant delivery seam', () => {
     });
     expect(landing.profile.availability).toBe('local_only_inactive');
     expect(landing.publication.coverage.statement).toBe(
-      'Includes Prima (q1–119), Prima Secundae (q1–114), Secunda Secundae (q1–189), and Tertia through q90. Tertia q91+ and the traditional Supplement are excluded.',
+      'Includes Prima (q1–119), Prima Secundae (q1–114), Secunda Secundae (q1–189), and Tertia (q1–90, the end of the authored Tertia). The traditional Supplement is excluded.',
     );
   });
 

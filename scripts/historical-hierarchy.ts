@@ -178,8 +178,7 @@ function coverageDisclosure(): Record<string, unknown> {
       tertia: { firstQuestion: 1, lastQuestion: 90 },
     },
     exclusions: [
-      'Tertia questions 91 and later are not included.',
-      'The Supplement is not included.',
+      'The traditional Supplement is not included.',
       'Source wrappers, licenses, editorial interludes, structural metadata, and tables of contents are not authority bodies.',
     ],
     disclosure: 'This approved edition scope is not a complete traditional Summa Theologiae.',
