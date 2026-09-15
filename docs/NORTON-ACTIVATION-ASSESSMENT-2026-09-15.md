@@ -94,4 +94,3 @@ No additional product decision is needed merely to use the CC0 text with the
 existing 1,250 source-segment citations. The remaining work is implementing and
 verifying its manifest, catalog, and database projection. More scholarly
 book/chapter citation mapping would be an optional separate feature.
-
