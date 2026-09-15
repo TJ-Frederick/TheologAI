@@ -18,8 +18,13 @@ Tertia. The conventional *Supplementum Tertiae Partis* is a separately headed,
 posthumous compilation. The [New Advent Summa index](https://www.newadvent.org/summa/)
 lists *Tertia Pars* and *Supplementum Tertiae Partis* separately, and its
 [Tertia q90 page](https://www.newadvent.org/summa/4090.htm) is the final
-Tertia question. The current `q91+` wording in the hierarchy and publication
-metadata is therefore a correctness defect to fix as part of activation.
+Tertia question. The old `q91+` wording in the hierarchy and publication
+metadata was a correctness defect; this pass fixes the projected description.
+The hash-pinned `SOURCE_LOCK.json` still records that wording in its original
+`acquisitionScope.excluded` list. It is a historical acquisition assertion, not
+evidence of absent authored questions. Preserve the recorded lock identity;
+activation provenance must explicitly supersede this inaccurate assertion
+rather than copying it into the public coverage description.
 
 The existing material is sufficient for useful exact retrieval, bounded
 browsing, and bounded full-text discovery. It is not sufficient to claim a
