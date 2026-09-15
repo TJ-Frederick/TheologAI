@@ -41,7 +41,10 @@ const state = mkdtempSync(join(tmpdir(), 'theologai-wrangler-d1-'));
 const wrangler = join(ROOT, 'node_modules', 'wrangler', 'bin', 'wrangler.js');
 const wranglerLogDirectory = join(ROOT, 'test-output', 'wrangler', 'logs');
 ensureWranglerLogDirectory(wranglerLogDirectory);
-const AUTHORITY_BATCH_SIZE = 4;
+// Eight response envelopes at the existing 1,250,000-byte cap fit within the
+// unchanged 16 MiB stdout buffer. Page bounds remain independently enforced;
+// grouping eight queries reduces Wrangler startups without sampling the corpus.
+const AUTHORITY_BATCH_SIZE = 8;
 
 type AuthorityReadMode = 'batched' | 'serial';
 type Phase = 'migrations' | 'schema' | 'seedImport' | 'readiness' | 'transform8Authority' | 'transform9Authority';

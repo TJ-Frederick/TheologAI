@@ -56,6 +56,8 @@ interface Job {
   name?: string;
   needs?: string | string[];
   if?: string;
+  'runs-on'?: string;
+  'timeout-minutes'?: number;
   environment?: { name: string };
   concurrency?: Record<string, unknown>;
   permissions?: Record<string, string>;
@@ -69,6 +71,28 @@ interface Workflow {
   jobs: Record<string, Job>;
 }
 const needs = (job: Job): string[] => typeof job.needs === 'string' ? [job.needs] : job.needs ?? [];
+function expressionBody(value: string): string {
+  return normalized(value).replace(/^\$\{\{\s*/, '').replace(/\s*\}\}$/, '');
+}
+
+function assertPreviewRevocationBoundary(workflow: Workflow): void {
+  const trigger = workflow.on['pull_request'] as { types?: string[] };
+  expect(trigger).toEqual({ types: ['closed', 'unlabeled', 'converted_to_draft', 'edited'] });
+  expect(workflow.permissions).toEqual({});
+
+  const concurrency = workflow.concurrency;
+  const group = expressionBody(concurrency.group);
+  expect(group).toBe(`( ${REVOCATION_PREDICATE} ) && format('pr-{0}', github.event.pull_request.number) || format('preview-revocation-noop-{0}', github.run_id)`);
+  expect(expressionBody(String(concurrency['cancel-in-progress']))).toBe(REVOCATION_PREDICATE);
+
+  const job = workflow.jobs['acknowledge-revocation']!;
+  expect(expressionBody(job.if ?? '')).toBe(REVOCATION_PREDICATE);
+  expect(job).toMatchObject({ 'runs-on': 'ubuntu-latest', 'timeout-minutes': 1 });
+  expect(job.environment).toBeUndefined();
+  expect(JSON.stringify(job)).not.toMatch(/secrets\.|upload-artifact/i);
+  expect(job.steps?.filter(step => step.run?.includes('Preview authorization was revoked'))).toHaveLength(1);
+}
+
 function assertProductionBoundary(workflow: Workflow): void {
   const deploy = workflow.jobs.deploy!;
   expect(deploy.environment).toMatchObject({ name: 'production' });
@@ -195,28 +219,26 @@ describe('workflow topology', () => {
   });
 
   it('characterizes preview revocation without inventing a routing oracle', async () => {
-    const workflow = await readWorkflow('preview-revocation.yml');
-    const trigger = uniqueBlock(workflow, 'on:');
-    const permissions = uniqueBlock(workflow, 'permissions: {}');
-    const concurrency = uniqueBlock(workflow, 'concurrency:');
-    const job = uniqueBlock(workflow, '  acknowledge-revocation:');
+    const workflow = parse(await readWorkflow('preview-revocation.yml')) as Workflow;
+    assertPreviewRevocationBoundary(workflow);
 
-    expect(normalized(trigger)).toContain('pull_request: types: [closed, unlabeled, converted_to_draft, edited]');
-    expect(trigger).not.toContain('branches:');
-    expect(trigger).not.toContain('ready_for_review');
-    expect(normalized(permissions)).toBe('permissions: {}');
-    expect(normalized(concurrency)).toContain(REVOCATION_PREDICATE);
-    expect(normalized(concurrency)).toContain("format('pr-{0}', github.event.pull_request.number)");
-    expect(normalized(concurrency)).toContain("format('preview-revocation-noop-{0}', github.run_id)");
-    expect(normalized(concurrency)).toContain('cancel-in-progress: >- ${{ ' + REVOCATION_PREDICATE + ' }}');
+    // Display names and scalar wrapping are incidental; the policy expressions are not.
+    const reformatted = structuredClone(workflow);
+    reformatted.jobs['acknowledge-revocation']!.name = 'Record preview teardown';
+    reformatted.jobs['acknowledge-revocation']!.steps![0]!.name = 'Acknowledge teardown';
+    reformatted.jobs['acknowledge-revocation']!.steps![0]!.run =
+      'echo   "Preview authorization was revoked; matching in-flight PR Checks runs were canceled."';
+    assertPreviewRevocationBoundary(parse(stringify(reformatted, { lineWidth: 40 })) as Workflow);
 
-    expect(normalized(job)).toContain(`if: >- ${REVOCATION_PREDICATE}`);
-    expect(job).toContain('name: Record Preview Revocation');
-    expect(job).toContain('runs-on: ubuntu-latest');
-    expect(job).toContain('timeout-minutes: 1');
-    expect(job).not.toMatch(/environment:|secrets\.|upload-artifact/i);
-    expect(occurrences(job, '      - name: Confirm active preview cancellation')).toBe(1);
-    expect(job).toContain('run: echo "Preview authorization was revoked; matching in-flight PR Checks runs were canceled."');
+    const unsafe = structuredClone(workflow);
+    unsafe.jobs['acknowledge-revocation']!.if = unsafe.jobs['acknowledge-revocation']!.if!.replace(
+      "github.event.action == 'closed'",
+      "github.event.action == 'opened'",
+    );
+    expect(() => assertPreviewRevocationBoundary(unsafe)).toThrow();
+    const wrongGroup = structuredClone(workflow);
+    wrongGroup.concurrency.group = wrongGroup.concurrency.group.replace("format('pr-{0}'", "format('unrelated-{0}'");
+    expect(() => assertPreviewRevocationBoundary(wrongGroup)).toThrow();
   });
 
   it('keeps the production rollback rehearsal manual, protected, fixed-target, and read-only', async () => {

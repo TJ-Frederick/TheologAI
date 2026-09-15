@@ -62,16 +62,62 @@ function readCliInput(environment) {
   return Object.fromEntries(CLI_ENV.map(name => [name, environment[name]]));
 }
 
+function resolveManualWorkflowContext(environment) {
+  if (environment.PRODUCTION_RELEASE_EVENT_NAME !== 'workflow_dispatch') {
+    throw new Error('manual production workflow requires workflow_dispatch');
+  }
+  return {
+    context: resolveProductionReleaseContext({
+      eventName: environment.PRODUCTION_RELEASE_EVENT_NAME,
+      ref: environment.PRODUCTION_RELEASE_REF,
+      pushBefore: '',
+      firstParent: environment.PRODUCTION_RELEASE_FIRST_PARENT,
+    }),
+    head: requireSha(environment.PRODUCTION_RELEASE_HEAD, 'head'),
+  };
+}
+
+function manualContextOutput(context) {
+  const values = {
+    release_context_json: JSON.stringify(context),
+    before: context.before,
+    custom_domain_required: String(context.customDomainRequired),
+  };
+  return `${Object.entries(values).map(([key, value]) => `${key}=${value}`).join('\n')}\n`;
+}
+
+function manualClassificationOutput(environment) {
+  const { context, head } = resolveManualWorkflowContext(environment);
+  const values = {
+    classification_succeeded: 'true',
+    deploy_required: 'true',
+    decision: 'deploy',
+    reason: context.reason,
+    base: context.before,
+    head,
+    changed_path_evidence_json: '[]',
+  };
+  return `${manualContextOutput(context)}${Object.entries(values).map(([key, value]) => `${key}=${value}`).join('\n')}\n`;
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   try {
-    const input = readCliInput(process.env);
-    const resolved = resolveProductionReleaseContext({
-      eventName: input.PRODUCTION_RELEASE_EVENT_NAME,
-      ref: input.PRODUCTION_RELEASE_REF,
-      pushBefore: input.PRODUCTION_RELEASE_PUSH_BEFORE,
-      firstParent: input.PRODUCTION_RELEASE_FIRST_PARENT,
-    });
-    process.stdout.write(`${JSON.stringify(resolved)}\n`);
+    if (process.argv.length === 2) {
+      const input = readCliInput(process.env);
+      const resolved = resolveProductionReleaseContext({
+        eventName: input.PRODUCTION_RELEASE_EVENT_NAME,
+        ref: input.PRODUCTION_RELEASE_REF,
+        pushBefore: input.PRODUCTION_RELEASE_PUSH_BEFORE,
+        firstParent: input.PRODUCTION_RELEASE_FIRST_PARENT,
+      });
+      process.stdout.write(`${JSON.stringify(resolved)}\n`);
+    } else if (process.argv.length === 3 && process.argv[2] === 'manual-context-output') {
+      process.stdout.write(manualContextOutput(resolveManualWorkflowContext(process.env).context));
+    } else if (process.argv.length === 3 && process.argv[2] === 'manual-classification-output') {
+      process.stdout.write(manualClassificationOutput(process.env));
+    } else {
+      throw new Error('invalid-command');
+    }
   } catch (error) {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
     process.exitCode = 1;
