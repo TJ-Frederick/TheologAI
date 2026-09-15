@@ -267,10 +267,12 @@ describe('public-domain historical source preparation', () => {
     expect(first.artifacts[2].sections.slice(1).map(s => s.key)).toEqual(Array.from({ length: 13 }, (_, index) => `book-${index + 1}`));
   });
 
-  it('allows identifiers only in the offline preparation boundary and denies every operational/catalog/config surface', () => {
+  it('allows preparation and documentation references while denying operational/catalog/config registration', () => {
     const needles = ['gutenberg-pg45001-pg64392-john-allen-calvin', 'gutenberg-pg19950-aquinas-tertia-pars-q73-q83', 'gutenberg-pg3296-pusey-augustine-confessions', 'internet-archive-a566189200cypruoft-cyril-1839', 'public-domain-prep/'];
     const ignored = /^(?:\.git|node_modules|dist|test-output|coverage)\//;
-    const allow = (path: string) => path.startsWith('data/historical-sources/') || path === 'scripts/prepare-public-domain-historical-sources.ts' || path === 'test/unit/scripts/publicDomainHistoricalSources.test.ts';
+    // Discussing an inactive packet does not activate it. Keep the exclusion
+    // check on executable code, manifests, catalogs, migrations, and config.
+    const allow = (path: string) => /^docs\/.*\.md$/.test(path) || path.startsWith('data/historical-sources/') || path === 'scripts/prepare-public-domain-historical-sources.ts' || path === 'test/unit/scripts/publicDomainHistoricalSources.test.ts';
     const repositoryFiles = filesBelow(root)
       .map(path => relative(root, path))
       .filter(path => !ignored.test(path) && !/\.(?:png|jpg|jpeg|sqlite|db)$/.test(path));

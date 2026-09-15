@@ -45,7 +45,9 @@ dependency graph through formatting helpers.
 The implemented extraction uses `src/kernel/editionText.ts` for the shared
 text boundaries; active formatters now import that helper. The preparation
 foundation re-exports the prior names for compatibility. The design was: Move only the two escapers and their directly required boundary
-helpers, then update the two active formatters and test fixture. Keep all
+helpers, then update the two active formatters. The frozen draft fixture retains
+its original import through the compatibility export to preserve its reviewed
+Git object identity. Keep all
 provenance types, limits, validators, and compilation in the preparation
 foundation. Do not move compilation into formatters or expose the foundation
 through a kernel barrel.
@@ -94,3 +96,18 @@ and test topology references, confirm no current release identity or manifest
 depends on the target, and record the decision with an owner and date. Preserve
 hashes and sanitized evidence in an indexed historical location so future
 reviews can distinguish “not currently useful” from “never validated.”
+
+
+## Direction update — 2026-09-15
+
+The maintainer superseded the Aquinas/Norton retirement recommendations above:
+assess the shortest justified activation path for both. Inactive status and
+internal review/authorization markers are not evidence of a licensing or
+technical problem. Establish source permissions, exact content gaps and
+correctness, and useful labeled coverage; preserve provenance and checks that
+protect those properties. No retirement is planned.
+
+See the [Norton assessment](NORTON-ACTIVATION-ASSESSMENT-2026-09-15.md) and
+[Aquinas assessment](AQUINAS-ACTIVATION-ASSESSMENT-2026-09-15.md) for current
+evidence and implementation options. The dated recommendations above describe the earlier review, not
+the current disposition.

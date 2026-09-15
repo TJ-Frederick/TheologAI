@@ -27,9 +27,10 @@ The profile is the English Dominican / Project Gutenberg electronic packet
 | Secunda Secundae | 1–189 |
 | Tertia | 1–90 |
 
-This is not a complete traditional *Summa Theologiae*. Tertia questions 91 and
-later and the Supplement are excluded, as are source wrappers, licenses,
-tables of contents, editorial interludes, and structural metadata.
+This is not a complete traditional *Summa Theologiae*. Tertia is included
+through question 90, the end of the authored Tertia; the traditional Supplement
+is excluded, as are source wrappers, licenses, tables of contents, editorial
+interludes, and structural metadata.
 
 The immutable hierarchy is anchored by foreign keys to one source pack, work,
 and edition in the existing historical provenance tables. It records the exact

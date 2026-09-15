@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { parse } from 'smol-toml';
+import { parse as parseYaml } from 'yaml';
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_ALLOWED_ORIGIN as NODE_DEFAULT_ALLOWED_ORIGIN } from '../../../src/http/config.js';
 import { DEFAULT_ALLOWED_ORIGIN as WORKER_DEFAULT_ALLOWED_ORIGIN } from '../../../src/http/worker/requestPolicy.js';
@@ -81,21 +82,25 @@ describe('custom-domain infrastructure contract', () => {
     expect(prerequisiteStart).toBeGreaterThan(0);
     expect(deployStart).toBeGreaterThan(prerequisiteStart);
     expect(releaseContextEnd).toBeGreaterThan(releaseContextStart);
-    const releaseContext = productionWorkflow.slice(releaseContextStart, releaseContextEnd);
-    expect(releaseContext).toContain('PRODUCTION_RELEASE_EVENT_NAME: ${{ github.event_name }}');
-    expect(releaseContext).toContain('PRODUCTION_RELEASE_REF: ${{ github.ref }}');
-    expect(releaseContext).toContain('PRODUCTION_RELEASE_PUSH_BEFORE: ${{ github.event.before }}');
-    expect(releaseContext).toContain('PRODUCTION_RELEASE_FIRST_PARENT="$(git rev-parse HEAD^1)"');
-    expect(releaseContext).toContain('release_context="$(node scripts/resolve-production-release-context.mjs)"');
-    expect(releaseContext).toContain('Object.keys(value).length !== keys.length');
-    expect(releaseContext).toContain('process.stdout.write(value.before);');
-    expect(releaseContext).toContain('process.stdout.write(String(value.customDomainRequired));');
-    expect(releaseContext).toContain("grep -Eq '^[0-9a-f]{40}$'");
-    expect(releaseContext).toContain('git cat-file -e "${before}^{commit}"');
-    expect(releaseContext).toContain('git merge-base --is-ancestor "$before" HEAD');
-    expect(releaseContext).not.toMatch(/run:\s*\|[\s\S]*?\$\{\{\s*github\./);
-    expect(releaseContext).toContain('echo "before=$before"');
-    expect(releaseContext).toContain('echo "custom_domain_required=$custom_domain_required"');
+    const workflow = parseYaml(productionWorkflow) as {
+      jobs: { deploy: { steps: Array<{ name?: string; env?: Record<string, string>; run?: string }> } };
+    };
+    const releaseContext = workflow.jobs.deploy.steps.find(step => step.name === 'Resolve production release comparison context');
+    expect(releaseContext).toBeDefined();
+    expect(releaseContext!.env).toEqual({
+      PRODUCTION_RELEASE_EVENT_NAME: '${{ github.event_name }}',
+      PRODUCTION_RELEASE_REF: '${{ github.ref }}',
+      PRODUCTION_RELEASE_HEAD: '${{ github.sha }}',
+    });
+    expect(releaseContext!.run).toContain('actual_head="$(git rev-parse HEAD)"');
+    expect(releaseContext!.run).toContain('test "$actual_head" = "$PRODUCTION_RELEASE_HEAD"');
+    expect(releaseContext!.run).toContain('PRODUCTION_RELEASE_FIRST_PARENT="$(git rev-parse HEAD^1)"');
+    expect(releaseContext!.run).toContain('resolve-production-release-context.mjs manual-context-output >> "$GITHUB_OUTPUT"');
+    expect(releaseContext!.run).toContain("grep -Eq '^[0-9a-f]{40}$'");
+    expect(releaseContext!.run).toContain('git cat-file -e "${before}^{commit}"');
+    expect(releaseContext!.run).toContain('git merge-base --is-ancestor "$before" HEAD');
+    expect(releaseContext!.run).not.toContain('PRODUCTION_RELEASE_PUSH_BEFORE');
+    expect(releaseContext!.run).not.toContain('JSON.parse');
     const detector = productionWorkflow.slice(detectorStart, prerequisiteStart);
     expect(detector).toContain('before="${{ steps.production-release-context.outputs.before }}"');
     expect(detector).toContain('git cat-file -e "${before}^{commit}"');

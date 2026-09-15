@@ -34,11 +34,11 @@ EPUBs, Project Gutenberg wrappers, and CCEL content are not materialized.
 
 ## Aquinas exclusion
 
-The separately acquired English Dominican Aquinas packet is incomplete:
-Prima questions 1–119, Prima Secundae 1–114, Secunda Secundae 1–189, and
-Tertia 1–90 are present; Tertia 91 onward and the Supplement are absent. It
-must not be advertised as the *Summa Theologiae* catalog work without a
-separate coverage and product decision.
+The separately acquired English Dominican Aquinas packet contains the four
+authored parts: Prima questions 1–119, Prima Secundae 1–114, Secunda Secundae
+1–189, and Tertia 1–90, which is the end of Tertia. The traditional Supplement
+is absent, so it must not be advertised as a complete traditional *Summa
+Theologiae* catalog work without a separate coverage and product decision.
 
 Transform 11 therefore requires all hierarchy and publication tables to remain
 empty and gives Aquinas no document, catalog, search, resource, runtime, or D1

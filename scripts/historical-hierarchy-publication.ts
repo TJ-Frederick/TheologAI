@@ -37,13 +37,12 @@ export type HistoricalHierarchyPublicationMaterialization = HistoricalHierarchyP
 
 function coverageDisclosure(): HistoricalHierarchyPublicationCoverage {
   return {
-    statement: 'Includes Prima (q1–119), Prima Secundae (q1–114), Secunda Secundae (q1–189), and Tertia through q90. Tertia q91+ and the traditional Supplement are excluded.',
+    statement: 'Includes Prima (q1–119), Prima Secundae (q1–114), Secunda Secundae (q1–189), and Tertia (q1–90, the end of the authored Tertia). The traditional Supplement is excluded.',
     descriptors: [
       { relationship: 'included', label: 'Prima', address: { scheme: 'question', start: '1', end: '119' } },
       { relationship: 'included', label: 'Prima Secundae', address: { scheme: 'question', start: '1', end: '114' } },
       { relationship: 'included', label: 'Secunda Secundae', address: { scheme: 'question', start: '1', end: '189' } },
       { relationship: 'included', label: 'Tertia', address: { scheme: 'question', start: '1', end: '90' } },
-      { relationship: 'excluded', label: 'Tertia q91+', address: { scheme: 'question', start: '91', end: null } },
       { relationship: 'excluded', label: 'Traditional Supplement', address: { scheme: 'part', start: 'Supplement', end: null } },
     ],
     completeness: 'not_complete_traditional_summa_theologiae',
