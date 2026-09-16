@@ -22,6 +22,9 @@ import type { ToolHandler } from '../kernel/types.js';
 import type { BibleService } from '../services/bible/BibleService.js';
 import type { CommentaryService } from '../services/commentary/CommentaryService.js';
 import type { HistoricalDocumentService } from '../services/historical/HistoricalDocumentService.js';
+import type { HistoricalHierarchyService } from '../services/historical/HistoricalHierarchyService.js';
+import { parseHistoricalHierarchyResourceUri } from '../kernel/historicalHierarchyResource.js';
+import { formatHistoricalHierarchyLanding, formatHistoricalHierarchyNode } from '../formatters/historicalHierarchyFormatter.js';
 import type { StrongsService } from '../services/languages/StrongsService.js';
 import { internalError, resourceNotFound } from './errors.js';
 import { registerPromptHandlers } from './prompts.js';
@@ -59,6 +62,7 @@ export interface McpServerServices {
   bibleService: Pick<BibleService, 'getSupportedTranslations'>;
   commentaryService: Pick<CommentaryService, 'getAvailableCommentators'>;
   historicalService: Pick<HistoricalDocumentService, 'listDocuments' | 'getDocument' | 'getSections' | 'getDeliveryProfile' | 'resolveSection'>;
+  historicalHierarchyService: Pick<HistoricalHierarchyService, 'listPublications' | 'resolveCanonicalUri'>;
   strongsService: Pick<StrongsService, 'lookup'>;
 }
 
@@ -156,6 +160,14 @@ export function createTheologAiMcpServer(
           mimeType: 'text/markdown',
         });
       }
+      for (const { publication } of await services.historicalHierarchyService.listPublications()) {
+        resources.push({
+          uri: publication.canonicalUri,
+          name: publication.title,
+          description: 'Bounded hierarchy landing; browse parts, questions, and articles with historical_hierarchy_lookup. Exact node resources deliver direct text only.',
+          mimeType: 'text/markdown',
+        });
+      }
     } catch {
       if (legacyLogging) {
         await server.sendLoggingMessage({
@@ -178,7 +190,7 @@ export function createTheologAiMcpServer(
       {
         uriTemplate: 'theologai://documents/{slug}',
         name: 'Historical Document',
-        description: 'Historical document landing or complete work; canonical #section-{sectionKey} resources resolve one exact section',
+        description: 'Historical document or hierarchy landing; canonical #section-{sectionKey} or #node-{nodeKey} resources resolve one exact section or direct node',
         mimeType: 'text/markdown',
       },
       {
@@ -228,6 +240,27 @@ export function createTheologAiMcpServer(
         };
       } catch {
         throw internalError('Unable to read resource');
+      }
+    }
+
+    // Hierarchy landings share the document URI namespace, while exact nodes
+    // use a distinct fragment. A missing hierarchy landing may be a legacy work.
+    const hierarchyResource = parseHistoricalHierarchyResourceUri(uri);
+    if (hierarchyResource) {
+      try {
+        const delivery = await services.historicalHierarchyService.resolveCanonicalUri(uri);
+        return {
+          contents: [{
+            uri,
+            mimeType: 'text/markdown',
+            text: 'context' in delivery
+              ? formatHistoricalHierarchyNode(delivery)
+              : formatHistoricalHierarchyLanding(delivery),
+          }],
+        };
+      } catch (error) {
+        if (!(error instanceof NotFoundError)) throw internalError('Unable to read resource');
+        if (hierarchyResource.nodeKey !== undefined) throw resourceNotFound(uri, era);
       }
     }
 

@@ -7,9 +7,9 @@ production and preview-control snapshot, see
 [`docs/CURRENT-RELEASE.md`](docs/CURRENT-RELEASE.md); release identities below
 are dated historical evidence.
 
-Production MCP server for theological research. Eleven tools, six prompts, eight Bible translations, six commentaries, 36 historical documents and works, Greek/Hebrew language tools, and on-chain donation support. Tools, resources, and prompts are available on every transport; MCP Logging is stdio-only because HTTP is stateless.
+Production MCP server for theological research. Twelve tools, six prompts, eight Bible translations, six commentaries, 36 historical documents and works, Greek/Hebrew language tools, and on-chain donation support. Tools, resources, and prompts are available on every transport; MCP Logging is stdio-only because HTTP is stateless.
 
-<!-- theologai-public-contract tools=11 structured=bible_cross_references,bible_lookup,bible_verse_morphology,classic_text_lookup,commentary_lookup,donation_config,original_language_lookup,original_language_study,parallel_passages,primary_source_search,verify_donation -->
+<!-- theologai-public-contract tools=12 structured=bible_cross_references,bible_lookup,bible_verse_morphology,classic_text_lookup,commentary_lookup,donation_config,historical_hierarchy_lookup,original_language_lookup,original_language_study,parallel_passages,primary_source_search,verify_donation -->
 
 ## Quick Start
 
@@ -91,7 +91,7 @@ test/
 
 ## MCP Capabilities
 
-### Tools (11)
+### Tools (12)
 
 | Tool | Description |
 |------|-------------|
@@ -100,6 +100,7 @@ test/
 | `parallel_passages` | Complete UBS source-attested groups by default; explicit legacy curated edges and separate OpenBible.info rows |
 | `commentary_lookup` | 6 commentaries (Matthew Henry, JFB, Clarke, Gill, K-D, Tyndale) |
 | `classic_text_lookup` | Search and browse 36 local historical works; 19 reviewed source-pack editions are sectioned-only; no remote CCEL body retrieval |
+| `historical_hierarchy_lookup` | Browse and search Aquinas’s four authored Summa parts (English Dominican / Gutenberg); exact nodes deliver direct text, and the traditional Supplement is excluded. |
 | `primary_source_search` | Run bounded local-only primary-source query plans with exact local section locators |
 | `original_language_lookup` | Strong's concordance plus opt-in exact corrected-corpus usage and bounded occurrence pages |
 | `bible_verse_morphology` | Word-by-word grammatical analysis for all 66 books |
@@ -252,6 +253,8 @@ remains direct.
 Transform 11 supplied the 18 reviewed source-pack editions in both deployed 35-work catalogs.
 The checked-out corpus now adds the CC0 Norton 1561 transcription as a nineteenth
 source-pack edition (36 works total), with 1,250 unchanged source-segment citations.
-This code/corpus activation is not a deployment. Aquinas remains outside the
-normal build pending its separate activation change.
+This code/corpus activation is not a deployment. Transform 13 adds Aquinas
+as a separate active hierarchy: 3,184 direct bodies / 3,185 nodes, four authored
+parts through Tertia q90, with the traditional Supplement excluded. The flat
+classic-text catalog remains 36 works; hierarchy resources add a separate work.
 `package.json` is private: npm distribution is unsupported.

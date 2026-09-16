@@ -81,8 +81,8 @@ async function runScenario(
 
 async function main(): Promise<void> {
   const { root, biblePassageCalls } = createDeterministicMcpFixture();
-  if (root.tools.length !== 11) {
-    throw new Error(`Expected the complete eleven-tool registry, received ${root.tools.length}`);
+  if (root.tools.length !== 12) {
+    throw new Error(`Expected the complete twelve-tool registry, received ${root.tools.length}`);
   }
 
   // Bind an ephemeral loopback port, then add its exact Origin before the first

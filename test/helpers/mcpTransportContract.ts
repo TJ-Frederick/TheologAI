@@ -37,6 +37,7 @@ const TOOL_ORDER = [
   'parallel_passages',
   'commentary_lookup',
   'classic_text_lookup',
+  'historical_hierarchy_lookup',
   'primary_source_search',
   'original_language_lookup',
   'bible_verse_morphology',
@@ -69,16 +70,16 @@ const STATIC_RESOURCE_ORDER = [
 export const EXPECTED_MCP_CONTRACT_FINGERPRINTS: Record<'6' | '7', McpContractFingerprints> = {
   '6': {
     capabilities: '',
-    tools: '5a294c67a5faf01f8a91562f06ad55497a281fe52606ccb0f4c15abe7bf9b117',
+    tools: '0b4393f96fb48ee1634cadc5ff728c4ac3ed93b0c1bf02aa678863f9d19724c6',
     prompts: '7e6ab1c22d32a9f520a4a2e2cc917df17827610462ef524b791ad0c06ff3133d',
-    resourceTemplates: 'f67c92aa2f3f64ce0a55e0973b61346962edd1533c86024347b63483a04d6ca3',
+    resourceTemplates: '00f1610e183225227f78b36e6fb04fd72244e5dd042cb7205778703bf0d4accc',
     staticResources: '1a07ddfb5b7954de0f37d1bec03c0886e6235f63ef5611a557a8cde4424e201b',
   },
   '7': {
     capabilities: '',
-    tools: '3db01fdd22ed671ff16a4749768b04a099154a7485c83469184a9c21c2a4e982',
+    tools: 'a4b6d3444b9a461730d904559a0c0baea416d508d6c1b90afaef45305361c789',
     prompts: 'ce77959ede84ac3e4910e253282c831e7cfaa07976771cc02b88a57a21764df4',
-    resourceTemplates: 'f67c92aa2f3f64ce0a55e0973b61346962edd1533c86024347b63483a04d6ca3',
+    resourceTemplates: '00f1610e183225227f78b36e6fb04fd72244e5dd042cb7205778703bf0d4accc',
     staticResources: '1a07ddfb5b7954de0f37d1bec03c0886e6235f63ef5611a557a8cde4424e201b',
   },
 };

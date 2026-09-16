@@ -152,25 +152,21 @@ describe('Aquinas source-pack capacity comparison derivation', () => {
     }
   });
 
-  it('measures disposable full copies pre-VACUUM and keeps estimates non-gating', () => {
+  it('measures the active release baseline without duplicating its Aquinas authority', () => {
     const report = runAquinasSourcePackCapacityComparison(ROOT);
-    expect(report.status).toBe('normal_release_baseline_with_standalone_aquinas_rehearsal');
+    expect(report.status).toBe('active_release_baseline_with_aquinas_attestation');
     expect(report.temporaryStorage).toBe('os-temp-disposed');
-    expect(report.baseline.kind).toBe('normal_release_zero_hierarchy_baseline');
+    expect(report.baseline.kind).toBe('active_release_baseline_with_aquinas_hierarchy');
     expect(report.baseline.builtFreshFromCurrentCheckout).toBe(true);
     expect(report.baseline.preVacuum.freelistPages).toBe(0);
     expect(report.baseline.preVacuum.integrityCheck).toBe('ok');
     expect(report.baseline.postVacuumDiagnostic.fileBytes).toBeLessThanOrEqual(report.baseline.preVacuum.fileBytes);
-    expect(report.standaloneAquinasRehearsal.shape).toBe('generic edition-scoped hierarchy with external-content FTS');
-    expect(report.standaloneAquinasRehearsal.materialization).toEqual({ hierarchies: 1, artifacts: 4, bodies: 3184, nodes: 3185, ftsRows: 3184 });
-    expect(report.standaloneAquinasRehearsal.storedIntegrityVerified).toBe(true);
-    expect(report.standaloneAquinasRehearsal.preVacuumFullCopy.fileBytes).toBeGreaterThan(report.baseline.preVacuum.fileBytes);
-    expect(report.standaloneAquinasRehearsal.postVacuumDiagnostic.fileBytes)
-      .toBeLessThanOrEqual(report.standaloneAquinasRehearsal.preVacuumFullCopy.fileBytes);
-    expect(report.standaloneAquinasRehearsal.capacityGate.finalBytes)
-      .toBe(report.standaloneAquinasRehearsal.preVacuumFullCopy.fileBytes);
-    expect(report.standaloneAquinasRehearsal.capacityGate.basis).toBe('direct_pre_vacuum_full_copy_after_analyze');
-    expect(report.standaloneAquinasRehearsal.capacityGate.withinLimit).toBe(true);
+    expect(report.activeAquinasAttestation.shape).toBe('generic edition-scoped hierarchy with external-content FTS');
+    expect(report.activeAquinasAttestation.materialization).toEqual({ hierarchies: 1, artifacts: 4, bodies: 3184, nodes: 3185, ftsRows: 3184 });
+    expect(report.activeAquinasAttestation.storedIntegrityVerified).toBe(true);
+    expect(report.activeAquinasAttestation.capacityGate.finalBytes).toBe(report.baseline.preVacuum.fileBytes);
+    expect(report.activeAquinasAttestation.capacityGate.basis).toBe('direct_pre_vacuum_full_copy_after_analyze');
+    expect(report.activeAquinasAttestation.capacityGate.withinLimit).toBe(true);
 
     expect(JSON.stringify(report)).not.toContain('Whether Sacred Doctrine Is a Science');
     expect(report.capacityStatus).toBe('within_350_mib');

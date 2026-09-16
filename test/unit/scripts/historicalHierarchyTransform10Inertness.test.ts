@@ -4,32 +4,25 @@ import { describe, expect, it } from 'vitest';
 
 const ROOT = process.cwd();
 
-describe('Transform 10 hierarchy inertness', () => {
-  it('does not register hierarchy authority in active Node or Worker composition paths', () => {
-    const activePaths = [
-      'src/server.ts',
-      'src/worker-server.ts',
-      'src/tools/v2/index.ts',
-      'src/tools/worker/index.ts',
-      'src/mcp/primarySourceCatalog.ts',
-      'src/adapters/d1/index.ts',
-    ];
-    for (const path of activePaths) {
-      expect(readFileSync(join(ROOT, path), 'utf8'), path).not.toMatch(/HistoricalHierarchy|historical_(?:hierarchy|edition_hierarchy)/i);
+describe('Transform 13 active hierarchy boundaries', () => {
+  it('registers the hierarchy through the Node and Worker composition roots', () => {
+    for (const path of ['src/tools/v2/index.ts', 'src/tools/worker/index.ts']) {
+      const source = readFileSync(join(ROOT, path), 'utf8');
+      expect(source, path).toContain('HistoricalHierarchyRepository');
+      expect(source, path).toContain('HistoricalHierarchyService');
     }
   });
 
-  it('keeps Transform 10 out of normal materialization, document projections, and active runtime paths', () => {
+  it('materializes the active packet while retaining the legacy-document boundary', () => {
     const build = readFileSync(join(ROOT, 'scripts/build-database.ts'), 'utf8');
-    expect(build).toMatch(/dormant generic hierarchical authority foundation/);
-    const transform10 = build.slice(build.indexOf('// ── Transform 10'), build.indexOf('// ── Tier 3'));
-    expect(transform10).not.toMatch(/loadApprovedAquinasHierarchy|materializeHistoricalHierarchy|insertDocument|insertSection|insertProfile/);
-    expect(build).toMatch(/assertNormalAquinasHierarchyExclusion\(db\);/);
-    expect(build.indexOf('assertNormalAquinasHierarchyExclusion(db);')).toBeGreaterThan(build.indexOf('Unexpected table counts'));
+    expect(build).toContain('loadActiveAquinasHierarchy(sourceRegistry)');
+    expect(build).toContain('materializeHistoricalHierarchy(db, activeAquinasHierarchy)');
+    expect(build).toContain('loadActiveAquinasHierarchyPublication(activeAquinasHierarchy)');
+    expect(build).not.toContain('assertNormalAquinasHierarchyExclusion');
+    expect(build).not.toContain('loadApprovedAquinasHierarchy');
     const remoteReadiness = readFileSync(join(ROOT, 'scripts/check-remote-d1-readiness.ts'), 'utf8');
-    expect(remoteReadiness).toMatch(/normalAquinasHierarchyExclusionChecks/);
-    expect(remoteReadiness).toMatch(/normalTransform10ExclusionReadinessChecks/);
-    expect(remoteReadiness).not.toMatch(/historical\.transform10\.exact_profile_and_artifacts/);
-    expect(remoteReadiness).not.toMatch(/MCP tool|runtime composition/i);
+    expect(remoteReadiness).toContain('historical.aquinas.active_publication');
+    expect(remoteReadiness).toContain('historical.aquinas.no_legacy_projection');
+    expect(remoteReadiness).toContain('historical.aquinas.fts_parity');
   });
 });

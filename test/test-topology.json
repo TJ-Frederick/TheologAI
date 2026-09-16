@@ -10,8 +10,8 @@
     "conformance": 1
   },
   "current": {
-    "totalTestTypeScript": 289,
-    "activeVitest": 210,
+    "totalTestTypeScript": 290,
+    "activeVitest": 211,
     "support": 24,
     "manual": 4,
     "legacyOrphan": 50,
@@ -119,6 +119,7 @@
       "test/unit/presenters/verifyDonationStructured.test.ts",
       "test/unit/presenters/verseMorphologyStructured.test.ts",
       "test/unit/scripts/applyPreviewD1Seed.test.ts",
+      "test/unit/scripts/aquinasAuthorityAudit.test.ts",
       "test/unit/scripts/aquinasGutenbergAcquisition.test.ts",
       "test/unit/scripts/aquinasGutenbergDryCompilePathSafety.test.ts",
       "test/unit/scripts/aquinasGutenbergPackageFoundationInertness.test.ts",

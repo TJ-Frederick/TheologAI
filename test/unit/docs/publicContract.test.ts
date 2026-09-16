@@ -162,7 +162,7 @@ describe('published project contract', () => {
       client.listPrompts(),
     ]);
 
-    expect(tools).toHaveLength(11);
+    expect(tools).toHaveLength(12);
     expect(prompts).toHaveLength(6);
     for (const { name } of [...tools, ...prompts]) {
       expect(readme).toContain(`| \`${name}\` |`);
@@ -181,6 +181,9 @@ describe('published project contract', () => {
     nodeDatabase.exec(await readProjectFile('migrations/0003_original_language_usage.sql'));
     nodeDatabase.exec(await readProjectFile('migrations/0004_ubs_hebrew_semantics.sql'));
     nodeDatabase.exec(await readProjectFile('migrations/0005_historical_section_identity_delivery.sql'));
+    for (const migration of ['0006_historical_source_packs', '0007_historical_hierarchy', '0008_historical_hierarchy_publications', '0009_candidate_c_sectioned_publications', '0010_active_aquinas_hierarchy_publication']) {
+      nodeDatabase.exec(await readProjectFile(`migrations/${migration}.sql`));
+    }
     const nodeTools = createCompositionRoot({ database: nodeDatabase }).tools;
     nodeDatabase.close();
     const workerTools = createWorkerCompositionRoot({
@@ -197,7 +200,7 @@ describe('published project contract', () => {
 
     expect(workerContract).toEqual(nodeContract);
     expect(nodeContract).toEqual({
-      toolCount: 11,
+      toolCount: 12,
       structuredTools: [
         'bible_cross_references',
         'bible_lookup',
@@ -205,6 +208,7 @@ describe('published project contract', () => {
         'classic_text_lookup',
         'commentary_lookup',
         'donation_config',
+        'historical_hierarchy_lookup',
         'original_language_lookup',
         'original_language_study',
         'parallel_passages',
@@ -215,7 +219,7 @@ describe('published project contract', () => {
     for (const [index, document] of documents.entries()) {
       expect(parsePublicContractMarker(document, documentPaths[index])).toEqual(nodeContract);
     }
-    expect(documents[0]).toContain('All eleven tools\nadvertise versioned object-root `outputSchema` contracts');
+    expect(documents[0]).toContain('All twelve tools\nadvertise versioned object-root `outputSchema` contracts');
     expect(documents[0]).not.toMatch(/Ten tools also\s+advertise versioned object-root/);
     expect(documents[0]).toContain('work-inventory contract is intentionally bounded at 100 works');
   });
@@ -285,8 +289,8 @@ describe('published project contract', () => {
     expect(readme).toContain('current release snapshot records the active 35-work\nassignment');
     expect(readme).toContain('36 locally indexed');
     expect(readme).toContain('19 reviewed source-pack editions');
-    expect(readme).toContain('The integrated Transform 10 candidate is local-only and unpublished');
-    expect(readme).toContain('not wired into runtime or MCP surfaces');
+    expect(readme).toContain('historical_hierarchy_lookup');
+    expect(readme).toContain('traditional Supplement is excluded');
     expect(readme).toContain('before adapter');
     expect(readme).toContain('Durable Object lookup/RPC, or fetch');
     expect(readme).toContain('reconnect');

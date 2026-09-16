@@ -1,11 +1,11 @@
 {
   "manifestVersion": 2,
-  "schemaVersion": "0009_candidate_c_sectioned_publications",
+  "schemaVersion": "0010_active_aquinas_hierarchy_publication",
   "algorithm": "sha256",
   "materializations": {
     "d1": {
       "identityVersion": 1,
-      "transformVersion": 12,
+      "transformVersion": 13,
       "migrations": [
         {
           "path": "migrations/0001_initial_schema.sql",
@@ -42,6 +42,10 @@
         {
           "path": "migrations/0009_candidate_c_sectioned_publications.sql",
           "sha256": "989dd945ac633ecb1ba83cc80a1b88234cac31d78b3d905ae0242eb66c533eb3"
+        },
+        {
+          "path": "migrations/0010_active_aquinas_hierarchy_publication.sql",
+          "sha256": "601e95f14046c091fe14cc6d4b8df0f973959f4f7e3dd82474898cd2afbbfd8e"
         }
       ],
       "inputs": [
@@ -171,6 +175,16 @@
         "data/historical-source-packs/norton-1561/manifest.json",
         "data/historical-source-packs/norton-1561/manifest.sha256",
         "data/historical-sources/eebo-tcp/A17662/norton-1561.edition.json",
+        "data/historical-sources/project-gutenberg/aquinas-english-dominican/LOCAL_ACQUISITION_RECEIPT.json",
+        "data/historical-sources/project-gutenberg/aquinas-english-dominican/SOURCE_LOCK.json",
+        "data/historical-sources/project-gutenberg/aquinas-english-dominican/TOPOLOGY_DISCREPANCY_LEDGER.json",
+        "data/historical-sources/project-gutenberg/aquinas-english-dominican/TOPOLOGY_LOCK.json",
+        "data/historical-sources/project-gutenberg/aquinas-english-dominican/packages/aquinas-summa-pg-v1/aquinas-summa-pg-v1.prima-secundae.shard-0001.json",
+        "data/historical-sources/project-gutenberg/aquinas-english-dominican/packages/aquinas-summa-pg-v1/aquinas-summa-pg-v1.prima.shard-0001.json",
+        "data/historical-sources/project-gutenberg/aquinas-english-dominican/packages/aquinas-summa-pg-v1/aquinas-summa-pg-v1.secunda-secundae.shard-0001.json",
+        "data/historical-sources/project-gutenberg/aquinas-english-dominican/packages/aquinas-summa-pg-v1/aquinas-summa-pg-v1.secunda-secundae.shard-0002.json",
+        "data/historical-sources/project-gutenberg/aquinas-english-dominican/packages/aquinas-summa-pg-v1/aquinas-summa-pg-v1.tertia.shard-0001.json",
+        "data/historical-sources/project-gutenberg/aquinas-english-dominican/packages/aquinas-summa-pg-v1/manifest.json",
         "src/data/ubs-parallel-passages.generated.json"
       ]
     }
@@ -826,17 +840,17 @@
     "historical_document_delivery_profiles": 36,
     "historical_section_identities": 5361,
     "historical_section_aliases": 2821,
-    "historical_source_packs": 4,
-    "historical_works": 19,
-    "historical_editions": 19,
-    "historical_source_artifacts": 44,
+    "historical_source_packs": 5,
+    "historical_works": 20,
+    "historical_editions": 20,
+    "historical_source_artifacts": 48,
     "historical_edition_sections": 2307,
     "historical_edition_sections_fts": 2307,
-    "historical_edition_hierarchies": 0,
-    "historical_edition_hierarchy_bodies": 0,
-    "historical_edition_hierarchy_nodes": 0,
-    "historical_edition_hierarchy_bodies_fts": 0,
-    "historical_hierarchy_publications": 0,
+    "historical_edition_hierarchies": 1,
+    "historical_edition_hierarchy_bodies": 3184,
+    "historical_edition_hierarchy_nodes": 3185,
+    "historical_edition_hierarchy_bodies_fts": 3184,
+    "historical_hierarchy_publications": 1,
     "historical_sectioned_publications": 0,
     "sections_fts": 5361,
     "historical_corpus_seal": 1,

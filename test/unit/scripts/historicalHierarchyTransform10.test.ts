@@ -11,6 +11,11 @@ import {
   materializeHistoricalHierarchy,
 } from '../../../scripts/historical-hierarchy.js';
 import {
+  assertActiveAquinasHierarchyStoredIntegrity,
+  loadActiveAquinasHierarchy,
+} from '../../../scripts/active-aquinas-hierarchy.js';
+import {
+  loadActiveAquinasHierarchyPublication,
   loadApprovedAquinasHierarchyPublication,
   materializeHistoricalHierarchyPublication,
 } from '../../../scripts/historical-hierarchy-publication.js';
@@ -29,6 +34,12 @@ function database(): Database.Database {
   return db;
 }
 function packet() { return loadApprovedAquinasHierarchy({ read: path => readFileSync(join(ROOT, path)) }); }
+
+function activeDatabase(): Database.Database {
+  const db = database();
+  db.exec(readFileSync(join(ROOT, 'migrations/0010_active_aquinas_hierarchy_publication.sql'), 'utf8'));
+  return db;
+}
 
 function materializeHeadingSearchFixture(db: Database.Database): string {
   const hierarchyId = 'heading-search-fixture';
@@ -198,24 +209,12 @@ describe('Transform 10 generic edition hierarchy', () => {
     } finally { db.close(); }
   });
 
-  it('rejects the superseded core-eight-only release while excluding dormant Aquinas materialization', () => {
+  it('keeps the dormant packet proof isolated while rejecting a superseded core-eight-only release', () => {
     const db = database();
     try {
       materializeCoreEightAuthorityFixture(db);
       expect(readinessFailures(db, 'historical.transform9.source_pack_authority'))
         .toEqual(['historical.transform9.source_pack_authority']);
-      const normalTransform10Checks = [
-        'historical.transform10.normal.hierarchies_empty',
-        'historical.transform10.normal.bodies_empty',
-        'historical.transform10.normal.nodes_empty',
-        'historical.transform10.normal.fts_empty',
-        'historical.transform10.normal.publications_empty',
-        'historical.transform10.normal.pack_absent',
-        'historical.transform10.normal.work_absent',
-        'historical.transform10.normal.edition_absent',
-        'historical.transform10.normal.artifacts_absent',
-      ] as const;
-      for (const check of normalTransform10Checks) expect(readinessFailures(db, check)).toEqual([]);
       expect(() => assertNormalAquinasHierarchyExclusion(db)).not.toThrow();
 
       db.exec('SAVEPOINT core_eight_extra');
@@ -246,9 +245,53 @@ describe('Transform 10 generic edition hierarchy', () => {
         loadApprovedAquinasHierarchyPublication(materialization),
         materialization,
       );
-      for (const check of normalTransform10Checks) expect(readinessFailures(db, check)).toEqual([check]);
       expect(() => assertNormalAquinasHierarchyExclusion(db))
         .toThrow('Normal release database materialized excluded Transform 10 authority');
+    } finally { db.close(); }
+  });
+
+  it('activates the frozen four-part packet with q90 coverage while retaining its historical source lock', () => {
+    const db = activeDatabase();
+    try {
+      const sourceManifest = JSON.parse(readFileSync(join(ROOT, 'data/data-manifest.json'), 'utf8')) as {
+        materializations: { d1: { inputs: string[] } };
+      };
+      const requiredInputs = [
+        'data/historical-sources/project-gutenberg/aquinas-english-dominican/LOCAL_ACQUISITION_RECEIPT.json',
+        'data/historical-sources/project-gutenberg/aquinas-english-dominican/SOURCE_LOCK.json',
+        'data/historical-sources/project-gutenberg/aquinas-english-dominican/TOPOLOGY_DISCREPANCY_LEDGER.json',
+        'data/historical-sources/project-gutenberg/aquinas-english-dominican/TOPOLOGY_LOCK.json',
+        'data/historical-sources/project-gutenberg/aquinas-english-dominican/packages/aquinas-summa-pg-v1/aquinas-summa-pg-v1.prima-secundae.shard-0001.json',
+        'data/historical-sources/project-gutenberg/aquinas-english-dominican/packages/aquinas-summa-pg-v1/aquinas-summa-pg-v1.prima.shard-0001.json',
+        'data/historical-sources/project-gutenberg/aquinas-english-dominican/packages/aquinas-summa-pg-v1/aquinas-summa-pg-v1.secunda-secundae.shard-0001.json',
+        'data/historical-sources/project-gutenberg/aquinas-english-dominican/packages/aquinas-summa-pg-v1/aquinas-summa-pg-v1.secunda-secundae.shard-0002.json',
+        'data/historical-sources/project-gutenberg/aquinas-english-dominican/packages/aquinas-summa-pg-v1/aquinas-summa-pg-v1.tertia.shard-0001.json',
+        'data/historical-sources/project-gutenberg/aquinas-english-dominican/packages/aquinas-summa-pg-v1/manifest.json',
+      ];
+      expect(requiredInputs.every(path => sourceManifest.materializations.d1.inputs.includes(path))).toBe(true);
+      const hierarchy = loadActiveAquinasHierarchy({ read: path => readFileSync(join(ROOT, path)) });
+      expect(materializeHistoricalHierarchy(db, hierarchy)).toEqual({
+        hierarchies: 1, artifacts: 4, bodies: 3184, nodes: 3185, ftsRows: 3184,
+      });
+      const publication = loadActiveAquinasHierarchyPublication(hierarchy);
+      materializeHistoricalHierarchyPublication(db, publication, hierarchy);
+      expect(assertActiveAquinasHierarchyStoredIntegrity(db, hierarchy)).toEqual({
+        hierarchies: 1, artifacts: 4, bodies: 3184, nodes: 3185, ftsRows: 3184,
+      });
+      expect(publication).toMatchObject({ activationState: 'active', canonicalUri: 'theologai://documents/summa-theologiae' });
+      expect(publication.coverage.statement).toContain('Tertia (q1–90, the end of the authored Tertia)');
+      expect(publication.coverage.statement).toContain('traditional Supplement is excluded');
+      expect(publication.coverage.statement).not.toContain('q91');
+      for (const check of [
+        'historical.aquinas.active_publication',
+        'historical.aquinas.no_legacy_projection',
+        'historical.aquinas.body_lengths',
+        'historical.aquinas.fts_parity',
+      ]) expect(readinessFailures(db, check)).toEqual([]);
+      expect(readFileSync(join(ROOT, 'data/historical-sources/project-gutenberg/aquinas-english-dominican/SOURCE_LOCK.json'), 'utf8'))
+        .toContain('Tertia Pars questions 91 and later');
+      expect(db.prepare('SELECT COUNT(*) AS count FROM documents WHERE id = ?')
+        .get(hierarchy.work.workId)).toEqual({ count: 0 });
     } finally { db.close(); }
   });
 });

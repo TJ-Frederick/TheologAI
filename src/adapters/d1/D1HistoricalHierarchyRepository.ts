@@ -1,4 +1,4 @@
-/** D1 equivalent of the dormant generic edition-hierarchy repository. */
+/** D1 equivalent of the SQLite edition-hierarchy repository. */
 
 import type {
   HistoricalHierarchyArtifact,
@@ -40,9 +40,13 @@ function parseObject(value: string, label: string): Record<string, unknown> {
   return parsed as Record<string, unknown>;
 }
 function profile(row: Record<string, unknown>): HistoricalHierarchyProfile {
+  const availability = String(row.availability);
+  if (availability !== 'local_only_inactive' && availability !== 'local_only_active') {
+    throw new Error('Historical hierarchy availability is invalid');
+  }
   return {
     hierarchyId: String(row.hierarchyId), packId: String(row.packId), workId: String(row.workId), editionId: String(row.editionId),
-    availability: String(row.availability), hierarchySchemaVersion: String(row.hierarchySchemaVersion), levelSpec: parseObject(String(row.levelSpecJson), 'hierarchy level specification'),
+    availability, hierarchySchemaVersion: String(row.hierarchySchemaVersion), levelSpec: parseObject(String(row.levelSpecJson), 'hierarchy level specification'),
     sourceManifestSha256: String(row.sourceManifestSha256), aggregateSha256: String(row.aggregateSha256),
     orderedQuestionKeysSha256: String(row.orderedQuestionKeysSha256), orderedArticleKeysSha256: String(row.orderedArticleKeysSha256),
     sourceLockSha256: String(row.sourceLockSha256), localReceiptSha256: String(row.localReceiptSha256), topologyLockSha256: String(row.topologyLockSha256),
@@ -57,7 +61,7 @@ function publication(row: Record<string, unknown>): HistoricalHierarchyPublicati
   const activationState = String(row.activationState);
   if (deliveryKind !== 'hierarchy_nodes_v1'
     || cursorContract !== 'historical-hierarchy-browse-cursor-v1'
-    || activationState !== 'dormant') throw new Error('Historical hierarchy publication contract is invalid');
+    || (activationState !== 'dormant' && activationState !== 'active')) throw new Error('Historical hierarchy publication contract is invalid');
   return {
     publicationId: String(row.publicationId), hierarchyId: String(row.hierarchyId), publicSlug: String(row.publicSlug),
     title: String(row.title), metadata: parseObject(String(row.metadataJson), 'hierarchy publication metadata') as unknown as HistoricalHierarchyPublication['metadata'],
@@ -133,6 +137,12 @@ export class D1HistoricalHierarchyRepository implements IHistoricalHierarchyRepo
     const row = await this.db.prepare(`SELECT ${PUBLICATION_COLUMNS} FROM historical_hierarchy_publications WHERE public_slug = ?`)
       .bind(publicSlug).first<Record<string, unknown>>();
     return row ? publication(row) : undefined;
+  }
+
+  async listActiveHierarchyPublications(): Promise<HistoricalHierarchyPublication[]> {
+    const { results } = await this.db.prepare(`SELECT ${PUBLICATION_COLUMNS} FROM historical_hierarchy_publications
+      WHERE activation_state = 'active' ORDER BY public_slug`).bind().all<Record<string, unknown>>();
+    return results.map(publication);
   }
 
   async listHierarchyArtifacts(hierarchyId: string): Promise<HistoricalHierarchyArtifact[]> {

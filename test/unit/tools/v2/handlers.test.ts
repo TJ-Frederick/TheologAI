@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { createBibleLookupHandler } from '../../../../src/tools/v2/bibleLookup.js';
 import { createClassicTextsHandler } from '../../../../src/tools/v2/classicTexts.js';
+import { createHistoricalHierarchyHandler } from '../../../../src/tools/v2/historicalHierarchy.js';
 import { createCommentaryHandler } from '../../../../src/tools/v2/commentary.js';
 import { createCrossReferencesHandler } from '../../../../src/tools/v2/crossReferences.js';
 import { createDonationConfigHandler } from '../../../../src/tools/v2/donationConfig.js';
@@ -24,6 +25,7 @@ import type { ParallelPassageService } from '../../../../src/services/bible/Para
 import type { CommentaryService } from '../../../../src/services/commentary/CommentaryService.js';
 import { RECIPIENT_ADDRESS, type ChainTransactionEvidence } from '../../../../src/kernel/donation-types.js';
 import type { HistoricalDocumentService } from '../../../../src/services/historical/HistoricalDocumentService.js';
+import type { HistoricalHierarchyService } from '../../../../src/services/historical/HistoricalHierarchyService.js';
 import type { PrimarySourceSearchService } from '../../../../src/services/historical/PrimarySourceSearchService.js';
 import type { MorphologyService } from '../../../../src/services/languages/MorphologyService.js';
 import type { StrongsService } from '../../../../src/services/languages/StrongsService.js';
@@ -57,6 +59,7 @@ describe('v2 tool handler schemas', () => {
       createParallelPassagesHandler(serviceDouble<ParallelPassageService>({})),
       createCommentaryHandler(serviceDouble<CommentaryService>({})),
       createClassicTextsHandler(serviceDouble<HistoricalDocumentService>({})),
+      createHistoricalHierarchyHandler(serviceDouble<HistoricalHierarchyService>({})),
       createPrimarySourceSearchHandler(serviceDouble<PrimarySourceSearchService>({})),
       createStrongsLookupHandler(serviceDouble<StrongsService>({})),
       createVerseMorphologyHandler(serviceDouble<MorphologyService>({})),
@@ -65,7 +68,7 @@ describe('v2 tool handler schemas', () => {
       createVerifyDonationHandler(serviceDouble<DonationService>({})),
     ];
 
-    expect(handlers.map(handler => handler.name)).toHaveLength(11);
+    expect(handlers.map(handler => handler.name)).toHaveLength(12);
     for (const handler of handlers) {
       expect(handler.inputSchema.additionalProperties).toBe(false);
       expect(handler.annotations).toMatchObject({

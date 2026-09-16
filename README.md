@@ -9,19 +9,22 @@ For the current source layout and maintenance responsibilities, see
 [Architecture and ownership](docs/ARCHITECTURE.md). The earlier
 `docs/bible-mcp-architecture.md` remains historical design evidence.
 
-The checked-out local registry contains eleven tools, six guided prompts, eight
+The checked-out local registry contains twelve tools, six guided prompts, eight
 English Bible translations, six commentary sources, 36 locally indexed
 historical works, Strong's dictionaries, and Greek/Hebrew morphology. The
 checked-out corpus adds the Norton 1561 transcription to the prior
 35-work baseline. The current release snapshot records the active 35-work
 assignment; the separately protected PR #108 D1 cutover is historical evidence.
 
-The integrated Transform 10 candidate is local-only and unpublished. Its
-Aquinas packet, schema, and standalone materializer are retained for future
-work, while normal release builds prove its hierarchy and shared lineage are
-absent; it adds no document or catalog projection and is not wired into runtime or MCP surfaces.
+The checked-out corpus also activates Aquinas's four authored *Summa Theologiae*
+parts through `historical_hierarchy_lookup`: 3,185 navigation nodes and 3,184
+direct bodies, ending at Tertia q90. The traditional Supplement is excluded.
+Aquinas uses a separate hierarchy resource and search surface, so it is additional
+to the 36-work classic-text catalog. The English Dominican / Gutenberg provenance
+and U.S.-scoped public-domain statement remain visible. This is code and corpus
+activation; deployed identities remain recorded in the release snapshot.
 
-<!-- theologai-public-contract tools=11 structured=bible_cross_references,bible_lookup,bible_verse_morphology,classic_text_lookup,commentary_lookup,donation_config,original_language_lookup,original_language_study,parallel_passages,primary_source_search,verify_donation -->
+<!-- theologai-public-contract tools=12 structured=bible_cross_references,bible_lookup,bible_verse_morphology,classic_text_lookup,commentary_lookup,donation_config,historical_hierarchy_lookup,original_language_lookup,original_language_study,parallel_passages,primary_source_search,verify_donation -->
 
 ## Current release snapshot
 
@@ -96,6 +99,7 @@ stderr or privacy-safe telemetry instead.
 | `parallel_passages` | Return complete UBS source-attested parallel groups by default; legacy curated edges and OpenBible.info cross references require explicit selectors and remain separate. |
 | `commentary_lookup` | Retrieve Matthew Henry, JFB, Adam Clarke, John Gill, Keil-Delitzsch (OT), or Tyndale notes. |
 | `classic_text_lookup` | The checked-out catalog searches and browses 36 historical works with canonical source-first section keys; 19 reviewed source-pack editions use bounded sectioned delivery. Preview and production serve the 35-work Transform-11 catalog. Exact sections are the only body route, and remote CCEL document bodies are not retrieved or republished. |
+| `historical_hierarchy_lookup` | Browse and search Aquinas’s four authored Summa parts (English Dominican / Gutenberg); exact nodes deliver direct text, and the traditional Supplement is excluded. |
 | `primary_source_search` | Execute bounded primary-source query plans. Production v6/local-only is deployed; preview runs the audited v7/discovery-only contract with CCEL execution disabled before adapter, coordinator, or fetch. The Transform-9 preview corpus release does not change that CCEL policy. Local locators use canonical section keys plus source ordinals; snippets remain discovery-only and research workflows maintain explicit searched/read/deferred/not-searched coverage ledgers. |
 | `original_language_lookup` | Look up or search Strong's entries, with opt-in rights-reviewed STEPBible metadata, exact corrected-corpus usage, and bounded occurrence pages for exact identities. The Online-Bible-derived TBESH Hebrew `Meaning` field is withheld. |
 | `bible_verse_morphology` | Return bounded word-by-word morphology for one exact verse, with raw codes, nullable expansions, and separate pinned STEPBible morphology/lemma provenance. |
@@ -163,7 +167,7 @@ frequency, morphology, or other metadata. OpenScriptures definitions and Greek
 STEPBible evidence are unaffected.
 
 All tools are annotated as read-only, non-destructive, and idempotent. Tool
-inputs use closed, bounded JSON Schema 2020-12 contracts. All eleven tools
+inputs use closed, bounded JSON Schema 2020-12 contracts. All twelve tools
 advertise versioned object-root `outputSchema` contracts and return matching
 `structuredContent` beside the existing Markdown content: `bible_lookup`,
 `bible_cross_references`, `bible_verse_morphology`, `parallel_passages`,
@@ -222,6 +226,7 @@ reviewed normalized source packs, and mixed inventories.
 | `theologai://commentaries` | Available commentary sources. |
 | `theologai://primary-sources/catalog` | v2 JSON metadata inventory for the hosted primary-source collection; no document bodies, provenance URLs, source hashes, or rights instruments. Each work carries a fail-closed edition-readiness disclosure. |
 | `theologai://documents/{slug}` | One of 36 locally indexed historical works: 17 legacy creeds/confessions/catechisms and 19 reviewed source-pack editions. |
+| `theologai://documents/summa-theologiae` | Aquinas hierarchy landing; exact `#node-{nodeKey}` resources deliver one direct body with provenance. |
 | `theologai://strongs/{number}` | A Strong's dictionary entry such as `G26` or `H430`. |
 
 ### Guided prompts
@@ -284,9 +289,8 @@ enforced by `data/data-manifest.json`.
 Approved UBS Hebrew artifacts plus the separately acquired Norton and Aquinas
 public-domain packets are checked into the repository for deterministic
 verification and release work. Those acquisition packets remain outside the
-deployed catalog. Transform 10 retains an Aquinas packet, schema, and
-standalone materializer only; normal builds exclude its hierarchy and lineage,
-and it adds neither a document/catalog projection nor a runtime or MCP surface.
+deployed catalog. Transform 13 activates that Aquinas packet through its hierarchy reader; it is
+not duplicated into the flat classic-text catalog or primary-source search index.
 The reviewed PR95 core-eight remains part of both deployed baselines and the
 checked-out 36-work candidate described above. M4A's
 local/preview materialization and inactive-adapter statements are historical;
@@ -300,8 +304,8 @@ catalogs. Norton is now admitted through the ordinary source-pack projection,
 with 1,250 unchanged source-segment citations and an edition-qualified title.
 Its pinned EEBO-TCP transcription is CC0; images and facsimiles are excluded.
 The generic Candidate-C `sectioned_only` publication experiment remains dormant
-and separate from that active projection. Aquinas activation is next; its
-hierarchy remains excluded from this build. Cyril remains blocked
+and separate from that active projection. Aquinas is active through its separate hierarchy tool and canonical
+`theologai://documents/summa-theologiae` landing resource. Cyril remains blocked
 with zero output pending reliable translator attribution.
 
 Production v6/local-only and preview v7/discovery-only currently search and
@@ -577,7 +581,7 @@ per-request D1 repositories. Both targets share one MCP registry.
   license metadata before redistribution claims can be made.
 - Hosted MCP Logging would require a deliberate stateful-session design.
 - Authentication, saved workspaces, completions, and MCP tasks should be added
-  only when a concrete workflow requires them. All eleven tools provide
+  only when a concrete workflow requires them. All twelve tools provide
   versioned structured output beside compatible Markdown. Further contract
   revisions require separate compatibility review.
 - Remote D1 compatibility must be checked before any deployment; migration or

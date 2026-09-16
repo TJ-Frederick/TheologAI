@@ -22,6 +22,7 @@ import {
 } from '../../../src/mcp/schemas/primarySourceSearchV4.js';
 import { validatorFor } from '../../../src/mcp/validation.js';
 import { createPrimarySourceSearchDescriptor } from '../../../src/mcp/primarySourceSearchDescriptor.js';
+import { NotFoundError } from '../../../src/kernel/errors.js';
 
 const connected: Array<{ client: Client; server: Server }> = [];
 type LogMessage = { level: string; logger?: string; data: unknown };
@@ -53,6 +54,12 @@ async function connect(
           section: { id: 1, document_id: 'test', section_number: '1', title: 'Test', content: '', topics: [] },
           sectionKey: 'source-0001', sourceOrdinal: 1, requestedSectionId, resolution: 'canonical' as const,
         }),
+      },
+      historicalHierarchyService: {
+        listPublications: async () => [],
+        resolveCanonicalUri: async () => {
+          throw new NotFoundError('historical hierarchy', 'No active hierarchy publication matches this URI.');
+        },
       },
       strongsService: { lookup: async (strongsNumber: string) => ({
         strongs_number: strongsNumber, testament: 'NT' as const, lemma: 'fixture', definition: 'fixture', citation: { source: 'fixture' },
@@ -166,6 +173,7 @@ describe('MCP structured output validation', () => {
       'parallel_passages',
       'commentary_lookup',
       'classic_text_lookup',
+      'historical_hierarchy_lookup',
       'primary_source_search',
       'original_language_lookup',
       'bible_verse_morphology',
@@ -175,6 +183,19 @@ describe('MCP structured output validation', () => {
     ]);
     for (const toolName of withOutput) {
       const schema = listed.tools.find(tool => tool.name === toolName)?.outputSchema;
+      if (toolName === 'historical_hierarchy_lookup') {
+        expect(schema).toMatchObject({
+          type: 'object',
+          oneOf: expect.arrayContaining([
+            expect.objectContaining({
+              type: 'object', additionalProperties: false,
+              properties: expect.objectContaining({ schemaVersion: { const: '1' } }),
+            }),
+          ]),
+        });
+        expect(schema).not.toHaveProperty('$ref');
+        continue;
+      }
       if (toolName === 'original_language_study') {
         expect(schema).toMatchObject({
           type: 'object',
