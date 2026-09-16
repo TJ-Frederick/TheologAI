@@ -63,40 +63,42 @@ function remoteAuthorityExecutor(): {
     CREATE UNIQUE INDEX fixture_historical_editions_key ON historical_editions(edition_id);`);
   const insertProfile = db.prepare(`INSERT INTO historical_document_delivery_profiles VALUES
     (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-  for (const row of expected.profiles) {
-    insertProfile.run(row.documentId, row.workId, row.editionId, row.immutableCorpusIdentity,
-      row.sectionPackageIdentity, row.deliveryMode, row.sectionCount, row.landingMaxBytes,
-      row.browsePageSize, row.cursorVersion, row.provenanceJson, row.rightsJson);
-  }
   const insertIdentity = db.prepare('INSERT INTO historical_section_identities VALUES (?, ?, ?, ?)');
-  for (const row of expected.identities) {
-    insertIdentity.run(row.documentId, row.sectionKey, row.sourceOrdinal, row.documentSectionId);
-  }
   const insertAlias = db.prepare('INSERT INTO historical_section_aliases VALUES (?, ?, ?, ?)');
-  for (const row of expected.aliases) insertAlias.run(row.documentId, row.legacySectionId, row.sectionKey, row.sourceOrdinal);
   const insertSection = db.prepare('INSERT INTO document_sections VALUES (?, ?, ?, ?, ?, ?)');
   const insertFts = db.prepare('INSERT INTO sections_fts(rowid, title, content, topics) VALUES (?, ?, ?, ?)');
-  for (const row of expected.bodyFtsSample) {
-    const identity = expected.identities.find(candidate => candidate.documentId === row.documentId
-      && candidate.sectionKey === row.sectionKey && candidate.sourceOrdinal === row.sourceOrdinal)!;
-    insertSection.run(identity.documentSectionId, row.documentId, row.legacySectionId, row.title, row.content, row.topics);
-    insertFts.run(identity.documentSectionId, row.ftsTitle, row.ftsContent, row.ftsTopics);
-  }
   const insert = (sql: string, values: readonly unknown[]) => db.prepare(sql).run(...values);
-  for (const row of transform9.packs) insert('INSERT INTO historical_source_packs VALUES (?, ?, ?, ?, ?)', [row.packId, row.revision, row.schemaVersion, row.manifestSha256, row.sourcePath]);
-  for (const row of transform9.works) insert('INSERT INTO historical_works VALUES (?, ?, ?, ?)', [row.workId, row.title, row.creatorMetadataStatus, row.creatorsJson]);
-  for (const row of transform9.editions) insert('INSERT INTO historical_editions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [row.editionId, row.workId, row.packId, row.language, row.contributorGroupsJson, row.publication, row.version, row.provenanceStatus, row.provenanceUncertainty, row.provenanceReviewedAt, row.underlyingWorkRightsJson, row.exactArtifactRightsJson, row.normalizedTextRightsJson]);
-  for (const row of transform9.artifacts) insert('INSERT INTO historical_source_artifacts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [row.artifactId, row.editionId, row.role, row.locator, row.pinKind, row.pinValue, row.sha256, row.bytes, row.acquiredAt]);
-  for (const row of transform9.documents) insert('INSERT INTO documents VALUES (?, ?, ?, ?, ?)', [row.documentId, row.title, row.type, row.date, row.metadata]);
-  for (const row of transform9.profiles) insert('INSERT INTO historical_document_delivery_profiles VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [row.documentId, row.workId, row.editionId, row.immutableCorpusIdentity, row.sectionPackageIdentity, row.deliveryMode, row.sectionCount, row.landingMaxBytes, row.browsePageSize, row.cursorVersion, row.provenanceJson, row.rightsJson]);
-  for (const row of transform9.sections) insert('INSERT INTO historical_edition_sections VALUES (?, ?, ?, ?, ?, ?)', [row.editionId, row.sectionKey, row.sourceOrdinal, row.displayLabel, row.heading, row.content]);
-  for (const row of transform9.projections) {
-    const section = transform9.sections.find(candidate => candidate.editionId === row.editionId && candidate.sectionKey === row.sectionKey)!;
-    insert('INSERT INTO historical_section_identities VALUES (?, ?, ?, ?)', [row.documentId, row.sectionKey, row.sourceOrdinal, row.documentSectionId]);
-    insert('INSERT INTO document_sections VALUES (?, ?, ?, ?, ?, ?)', [row.documentSectionId, row.documentId, row.sectionKey, section.heading, section.content, '[]']);
-    insert('INSERT INTO historical_edition_sections_fts VALUES (?, ?, ?, ?)', [row.editionId, row.sectionKey, section.heading, section.content]);
-    insert('INSERT INTO sections_fts(rowid, title, content, topics) VALUES (?, ?, ?, ?)', [row.documentSectionId, section.heading, section.content, '[]']);
-  }
+  db.transaction(() => {
+    for (const row of expected.profiles) {
+      insertProfile.run(row.documentId, row.workId, row.editionId, row.immutableCorpusIdentity,
+        row.sectionPackageIdentity, row.deliveryMode, row.sectionCount, row.landingMaxBytes,
+        row.browsePageSize, row.cursorVersion, row.provenanceJson, row.rightsJson);
+    }
+    for (const row of expected.identities) {
+      insertIdentity.run(row.documentId, row.sectionKey, row.sourceOrdinal, row.documentSectionId);
+    }
+    for (const row of expected.aliases) insertAlias.run(row.documentId, row.legacySectionId, row.sectionKey, row.sourceOrdinal);
+    for (const row of expected.bodyFtsSample) {
+      const identity = expected.identities.find(candidate => candidate.documentId === row.documentId
+        && candidate.sectionKey === row.sectionKey && candidate.sourceOrdinal === row.sourceOrdinal)!;
+      insertSection.run(identity.documentSectionId, row.documentId, row.legacySectionId, row.title, row.content, row.topics);
+      insertFts.run(identity.documentSectionId, row.ftsTitle, row.ftsContent, row.ftsTopics);
+    }
+    for (const row of transform9.packs) insert('INSERT INTO historical_source_packs VALUES (?, ?, ?, ?, ?)', [row.packId, row.revision, row.schemaVersion, row.manifestSha256, row.sourcePath]);
+    for (const row of transform9.works) insert('INSERT INTO historical_works VALUES (?, ?, ?, ?)', [row.workId, row.title, row.creatorMetadataStatus, row.creatorsJson]);
+    for (const row of transform9.editions) insert('INSERT INTO historical_editions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [row.editionId, row.workId, row.packId, row.language, row.contributorGroupsJson, row.publication, row.version, row.provenanceStatus, row.provenanceUncertainty, row.provenanceReviewedAt, row.underlyingWorkRightsJson, row.exactArtifactRightsJson, row.normalizedTextRightsJson]);
+    for (const row of transform9.artifacts) insert('INSERT INTO historical_source_artifacts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [row.artifactId, row.editionId, row.role, row.locator, row.pinKind, row.pinValue, row.sha256, row.bytes, row.acquiredAt]);
+    for (const row of transform9.documents) insert('INSERT INTO documents VALUES (?, ?, ?, ?, ?)', [row.documentId, row.title, row.type, row.date, row.metadata]);
+    for (const row of transform9.profiles) insert('INSERT INTO historical_document_delivery_profiles VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [row.documentId, row.workId, row.editionId, row.immutableCorpusIdentity, row.sectionPackageIdentity, row.deliveryMode, row.sectionCount, row.landingMaxBytes, row.browsePageSize, row.cursorVersion, row.provenanceJson, row.rightsJson]);
+    for (const row of transform9.sections) insert('INSERT INTO historical_edition_sections VALUES (?, ?, ?, ?, ?, ?)', [row.editionId, row.sectionKey, row.sourceOrdinal, row.displayLabel, row.heading, row.content]);
+    for (const row of transform9.projections) {
+      const section = transform9.sections.find(candidate => candidate.editionId === row.editionId && candidate.sectionKey === row.sectionKey)!;
+      insert('INSERT INTO historical_section_identities VALUES (?, ?, ?, ?)', [row.documentId, row.sectionKey, row.sourceOrdinal, row.documentSectionId]);
+      insert('INSERT INTO document_sections VALUES (?, ?, ?, ?, ?, ?)', [row.documentSectionId, row.documentId, row.sectionKey, section.heading, section.content, '[]']);
+      insert('INSERT INTO historical_edition_sections_fts VALUES (?, ?, ?, ?)', [row.editionId, row.sectionKey, section.heading, section.content]);
+      insert('INSERT INTO sections_fts(rowid, title, content, topics) VALUES (?, ?, ?, ?)', [row.documentSectionId, section.heading, section.content, '[]']);
+    }
+  })();
   for (const migration of [
     '0007_historical_hierarchy.sql', '0008_historical_hierarchy_publications.sql',
     '0010_active_aquinas_hierarchy_publication.sql',
@@ -302,6 +304,9 @@ describe('remote D1 readiness query', () => {
     }
   });
 
+  // This replays all 813 bounded, source-derived authority queries in one
+  // local D1 surrogate. It is intentionally an integration-scale check and
+  // needs headroom when the core suite is sharing a constrained CI runner.
   it('runs primary readiness, then bounded authority pages, and requests diagnostics only after failure', () => {
     const remote = remoteAuthorityExecutor();
     try {
@@ -351,7 +356,7 @@ describe('remote D1 readiness query', () => {
     }
     expect(failedCalls).toHaveLength(2);
     expect(failedCalls[1].join('\n')).toContain('WHERE passed IS NOT 1 ORDER BY check_name');
-  });
+  }, 60_000);
 
   it('rejects unsafe manifest identifiers', () => {
     expect(() => buildD1ReadinessSql({ 'documents; DROP TABLE documents': 17 }))
