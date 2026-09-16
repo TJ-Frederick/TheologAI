@@ -12,7 +12,10 @@
       "id": "exact-salvation-faith",
       "kind": "exact_term",
       "humanQuestion": "Where do the sources connect salvation with faith?",
-      "attempts": [{ "text": "salvation by faith", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" }],
+      "attempts": [
+        { "text": "salvation by faith", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" },
+        { "text": "salvation by faith", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok", "work": "wesley-standard-sermons" }
+      ],
       "regressionAnchors": [{ "documentId": "wesley-standard-sermons", "sectionKey": "sermon-01", "sourceOrdinal": 1 }]
     },
     {
@@ -40,7 +43,10 @@
       "id": "exact-predestination-election",
       "kind": "exact_term",
       "humanQuestion": "Where are predestination and election treated together?",
-      "attempts": [{ "text": "predestination election", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" }],
+      "attempts": [
+        { "text": "predestination election", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" },
+        { "text": "predestination election", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok", "work": "calvin-institutes" }
+      ],
       "regressionAnchors": [{ "documentId": "calvin-institutes", "sectionKey": "book-3-chapter-21", "sourceOrdinal": 59 }]
     },
     {
@@ -129,7 +135,7 @@
       "humanQuestion": "How did early Christians describe bodily resurrection?",
       "attempts": [
         { "text": "How did early Christians describe bodily resurrection", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" },
-        { "text": "resurrection body", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok" }
+        { "text": "resurrection body", "match": "all_terms", "selection": "work_diversity", "limit": 5, "expectedStatus": "ok", "endYear": 500 }
       ],
       "regressionAnchors": [{ "documentId": "origen-de-principiis", "sectionKey": "section-on-the-resurrection-and-the-judgment-the-fire-of-hel-020", "sourceOrdinal": 20 }]
     },
