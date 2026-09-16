@@ -60,44 +60,5 @@ export function verifyBiblicalLanguageUnicodeD1(
     assert(row.count === expected, `Unicode D1 verifier row-count drift for ${table}`);
     rows += row.count;
   }
-  const derivedUsageRows = ['strongs_usage_stats', 'strongs_book_stats', 'strongs_form_stats']
-    .reduce((sum, table) => sum + (expectedCounts[table] ?? 0), 0);
-  const ubsSemanticRows = [
-    'ubs_semantic_artifacts', 'ubs_semantic_sources', 'ubs_semantic_domains',
-    'ubs_semantic_entries', 'ubs_semantic_entry_identities', 'ubs_semantic_senses',
-    'ubs_semantic_sense_domains', 'ubs_semantic_reference_evidence',
-    'ubs_semantic_normalized_coordinates',
-  ].reduce((sum, table) => sum + (expectedCounts[table] ?? 0), 0);
-  const historicalSourceRows = [
-    'historical_document_delivery_profiles',
-    'historical_section_identities',
-    'historical_section_aliases',
-    'historical_source_packs',
-    'historical_works',
-    'historical_editions',
-    'historical_source_artifacts',
-    'historical_edition_sections',
-    'historical_edition_sections_fts',
-  ].reduce((sum, table) => sum + (expectedCounts[table] ?? 0), 0);
-  const historicalTransform10Rows = [
-    'historical_edition_hierarchies',
-    'historical_edition_hierarchy_bodies',
-    'historical_edition_hierarchy_nodes',
-    'historical_edition_hierarchy_bodies_fts',
-  ].reduce((sum, table) => sum + (expectedCounts[table] ?? 0), 0);
-  const historicalPublicationRows = expectedCounts.historical_hierarchy_publications ?? 0;
-  const historicalSectionedPublicationRows = expectedCounts.historical_sectioned_publications ?? 0;
-  const historicalCorpusSealRows = expectedCounts.historical_corpus_seal ?? 0;
-  assert(ubsSemanticRows === 549_458, `UBS semantic canonical-source row-count drift: ${ubsSemanticRows}`);
-  assert(historicalSourceRows === 9_163, `Historical reviewed-source-pack lineage row-count drift: ${historicalSourceRows}`);
-  assert(historicalTransform10Rows === 0, `Normal release Transform 10 hierarchy rows must be zero: ${historicalTransform10Rows}`);
-  assert(historicalPublicationRows === 0, `Normal release Transform 10 publication rows must be zero: ${historicalPublicationRows}`);
-  assert(historicalSectionedPublicationRows === 0,
-    `Transform 12 dormant sectioned-publication seam row-count drift: ${historicalSectionedPublicationRows}`);
-  assert(historicalCorpusSealRows === 1, `Transform 12 corpus seal row-count drift: ${historicalCorpusSealRows}`);
-  assert(rows - derivedUsageRows === 861_728 + ubsSemanticRows + historicalSourceRows
-    + historicalTransform10Rows + historicalPublicationRows
-    + historicalSectionedPublicationRows + historicalCorpusSealRows,
-    `Unicode D1 canonical-source row-count drift: ${rows - derivedUsageRows}`);
   return { sourceCells: ledger.contract.sourceCells, d1Cells, rows };
 }

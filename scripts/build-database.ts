@@ -51,6 +51,7 @@ import {
   assertReviewedSourcePackRelease,
   loadHistoricalSourcePacks,
   materializeHistoricalSourcePacks,
+  REVIEWED_SOURCE_PACK_RELEASE,
 } from './historical-source-packs.js';
 import { assertNormalAquinasHierarchyExclusion } from './historical-hierarchy.js';
 import {
@@ -665,11 +666,8 @@ log('Materializing the exact reviewed historical source-pack release...');
 const historicalSourcePacks = loadHistoricalSourcePacks(manifest.materializations.d1.inputs, sourceRegistry);
 assertReviewedSourcePackRelease(historicalSourcePacks);
 const historicalSourcePackCounts = materializeHistoricalSourcePacks(db, historicalSourcePacks);
-if (JSON.stringify(historicalSourcePackCounts) !== JSON.stringify({
-  packs: 3, works: 18, editions: 18, artifacts: 43, sections: 1057,
-  deliveryProfiles: 18, identities: 1057, legacyAliases: 0,
-})) {
-  throw new Error('Transform 11 source-pack materialization did not retain the exact reviewed inventory');
+if (JSON.stringify(historicalSourcePackCounts) !== JSON.stringify(REVIEWED_SOURCE_PACK_RELEASE.counts)) {
+  throw new Error('Source-pack materialization did not retain the exact reviewed release inventory');
 }
 log(`  Inserted ${historicalSourcePackCounts.works} reviewed works with ${historicalSourcePackCounts.sections} canonical sections`);
 

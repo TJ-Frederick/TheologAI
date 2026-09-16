@@ -7,7 +7,7 @@ production and preview-control snapshot, see
 [`docs/CURRENT-RELEASE.md`](docs/CURRENT-RELEASE.md); release identities below
 are dated historical evidence.
 
-Production MCP server for theological research. Eleven tools, six prompts, eight Bible translations, six commentaries, 35 historical documents and works, Greek/Hebrew language tools, and on-chain donation support. Tools, resources, and prompts are available on every transport; MCP Logging is stdio-only because HTTP is stateless.
+Production MCP server for theological research. Eleven tools, six prompts, eight Bible translations, six commentaries, 36 historical documents and works, Greek/Hebrew language tools, and on-chain donation support. Tools, resources, and prompts are available on every transport; MCP Logging is stdio-only because HTTP is stateless.
 
 <!-- theologai-public-contract tools=11 structured=bible_cross_references,bible_lookup,bible_verse_morphology,classic_text_lookup,commentary_lookup,donation_config,original_language_lookup,original_language_study,parallel_passages,primary_source_search,verify_donation -->
 
@@ -67,7 +67,7 @@ data/                     # Source data files
 ├── biblical-languages/   # Strong's concordance, STEPBible morphology/lexicons
 ├── cross-references/     # OpenBible.info cross-reference TSV
 ├── historical-documents/ # 17 legacy creeds, confessions, catechisms (JSON)
-└── historical-source-packs/ # 18 reviewed, sectioned-only source-pack editions
+└── historical-source-packs/ # 19 reviewed, sectioned-only source-pack editions
 
 skills/                   # Agent skill workflows
 ├── word-study/           # Greek/Hebrew word study methodology
@@ -99,7 +99,7 @@ test/
 | `bible_cross_references` | OpenBible.info discovery leads with raw vote ranking, unspecified relationship semantics, bounded result windows, and pinned snapshot provenance |
 | `parallel_passages` | Complete UBS source-attested groups by default; explicit legacy curated edges and separate OpenBible.info rows |
 | `commentary_lookup` | 6 commentaries (Matthew Henry, JFB, Clarke, Gill, K-D, Tyndale) |
-| `classic_text_lookup` | Search and browse 35 local historical works; 18 reviewed source-pack editions are sectioned-only; no remote CCEL body retrieval |
+| `classic_text_lookup` | Search and browse 36 local historical works; 19 reviewed source-pack editions are sectioned-only; no remote CCEL body retrieval |
 | `primary_source_search` | Run bounded local-only primary-source query plans with exact local section locators |
 | `original_language_lookup` | Strong's concordance plus opt-in exact corrected-corpus usage and bounded occurrence pages |
 | `bible_verse_morphology` | Word-by-word grammatical analysis for all 66 books |
@@ -121,7 +121,7 @@ the legacy response.
 |-----|-------------|
 | `theologai://translations` | Available Bible translations |
 | `theologai://commentaries` | Available commentators with coverage info |
-| `theologai://documents/{slug}` | 35 historical works (17 legacy plus 18 reviewed source-pack editions; browseable) |
+| `theologai://documents/{slug}` | 36 historical works (17 legacy plus 19 reviewed source-pack editions; browseable) |
 | `theologai://strongs/{number}` | Strong's dictionary entries (G####, H####) |
 
 ### Prompts (Guided Workflows)
@@ -249,9 +249,9 @@ remains direct.
 > sole 100%; identity SHA-256
 > `a6959d24fb7f50a9848fe2d011f425894718471b8a0609e7833780a291721a44`.
 
-Transform 11 activates 18 reviewed sectioned-only source-pack editions in the
-checked-out local corpus and both deployed 35-work catalogs. Norton and Aquinas
-assets remain inactive; the incomplete
-Aquinas hierarchy has no document, catalog, search, resource, runtime, or D1
-projection.
+Transform 11 supplied the 18 reviewed source-pack editions in both deployed 35-work catalogs.
+The checked-out corpus now adds the CC0 Norton 1561 transcription as a nineteenth
+source-pack edition (36 works total), with 1,250 unchanged source-segment citations.
+This code/corpus activation is not a deployment. Aquinas remains outside the
+normal build pending its separate activation change.
 `package.json` is private: npm distribution is unsupported.

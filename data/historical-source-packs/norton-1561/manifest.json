@@ -1,0 +1,52 @@
+{
+  "schemaVersion": "historical-source-pack-manifest.v1",
+  "packId": "theologai-norton-1561",
+  "revision": 1,
+  "rightsScope": "normalized_public_domain_text_only",
+  "members": [
+    {
+      "id": "calvin-institutes-norton-1561-eebo-tcp-a17662",
+      "sourcePath": "data/historical-sources/eebo-tcp/A17662/norton-1561.edition.json",
+      "packageSha256": "3054f4446b2e92af87c1713ee1c44d6745bca42a32aed7c67890d25fedbdff33",
+      "normalizedTextRights": {
+        "status": "no_known_conflict",
+        "scope": "normalized_public_domain_text_only",
+        "basis": "The pinned EEBO-TCP Phase I A17662 README dedicates its keyboarded and encoded transcription/XML to CC0 1.0 Universal; the normalized text preserves that source's recorded limitations and excludes page images and facsimiles.",
+        "reviewedAt": "2026-09-15"
+      },
+      "artifacts": [
+        {
+          "artifactId": "eebo-tcp-a17662-norton-1561-transcription-xml",
+          "role": "authority",
+          "locator": "https://raw.githubusercontent.com/textcreationpartnership/A17662/32191150ad4a919dfd2c28c89b1dbc1c2396252a/A17662.xml",
+          "sha256": "90124aa3bf17f7dcb5cab40719ed362c91c0018194b7397884b58f6b10daf5a4",
+          "bytes": 4820278,
+          "acquiredAt": "2026-07-17T20:05:08.000Z"
+        }
+      ],
+      "catalog": {
+        "composition": {
+          "label": "first edition 1536; revised through definitive Latin edition 1559",
+          "startYear": 1536,
+          "endYear": 1559
+        },
+        "compositionProvenanceSources": [
+          {
+            "sourceId": "hist-meta-calvin-bnf",
+            "label": "Bibliothèque nationale de France: Institutes of the Christian Religion",
+            "url": "https://catalogue.bnf.fr/ark:/12148/cb11963198n"
+          }
+        ],
+        "presentation": {
+          "displayTitle": "Institutes of the Christian Religion (Norton, 1561)",
+          "lookupAliases": [
+            "calvin-institutes-of-the-christian-religion",
+            "Institutes of the Christian Religion (Norton, 1561)",
+            "Norton",
+            "Norton, 1561"
+          ]
+        }
+      }
+    }
+  ]
+}
