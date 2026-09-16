@@ -10,10 +10,10 @@ For the current source layout and maintenance responsibilities, see
 `docs/bible-mcp-architecture.md` remains historical design evidence.
 
 The checked-out local registry contains eleven tools, six guided prompts, eight
-English Bible translations, six commentary sources, 35 locally indexed
+English Bible translations, six commentary sources, 36 locally indexed
 historical works, Strong's dictionaries, and Greek/Hebrew morphology. The
-checked-out Transform 11 release adds ten reviewed editions to the former
-25-work baseline. The current release snapshot records the active 35-work
+checked-out corpus adds the Norton 1561 transcription to the prior
+35-work baseline. The current release snapshot records the active 35-work
 assignment; the separately protected PR #108 D1 cutover is historical evidence.
 
 The integrated Transform 10 candidate is local-only and unpublished. Its
@@ -95,7 +95,7 @@ stderr or privacy-safe telemetry instead.
 | `bible_cross_references` | Query locally indexed OpenBible.info cross references with raw vote ranking, explicit discovery-only semantics, threshold-scoped result windows, and pinned snapshot provenance. |
 | `parallel_passages` | Return complete UBS source-attested parallel groups by default; legacy curated edges and OpenBible.info cross references require explicit selectors and remain separate. |
 | `commentary_lookup` | Retrieve Matthew Henry, JFB, Adam Clarke, John Gill, Keil-Delitzsch (OT), or Tyndale notes. |
-| `classic_text_lookup` | The checked-out Transform 11 catalog searches and browses 35 historical works with canonical source-first section keys; 18 reviewed source-pack editions use bounded sectioned delivery. Preview and production serve the 35-work Transform-11 catalog. Exact sections are the only body route, and remote CCEL document bodies are not retrieved or republished. |
+| `classic_text_lookup` | The checked-out catalog searches and browses 36 historical works with canonical source-first section keys; 19 reviewed source-pack editions use bounded sectioned delivery. Preview and production serve the 35-work Transform-11 catalog. Exact sections are the only body route, and remote CCEL document bodies are not retrieved or republished. |
 | `primary_source_search` | Execute bounded primary-source query plans. Production v6/local-only is deployed; preview runs the audited v7/discovery-only contract with CCEL execution disabled before adapter, coordinator, or fetch. The Transform-9 preview corpus release does not change that CCEL policy. Local locators use canonical section keys plus source ordinals; snippets remain discovery-only and research workflows maintain explicit searched/read/deferred/not-searched coverage ledgers. |
 | `original_language_lookup` | Look up or search Strong's entries, with opt-in rights-reviewed STEPBible metadata, exact corrected-corpus usage, and bounded occurrence pages for exact identities. The Online-Bible-derived TBESH Hebrew `Meaning` field is withheld. |
 | `bible_verse_morphology` | Return bounded word-by-word morphology for one exact verse, with raw codes, nullable expansions, and separate pinned STEPBible morphology/lemma provenance. |
@@ -221,7 +221,7 @@ reviewed normalized source packs, and mixed inventories.
 | `theologai://translations` | Available Bible translations. |
 | `theologai://commentaries` | Available commentary sources. |
 | `theologai://primary-sources/catalog` | v2 JSON metadata inventory for the hosted primary-source collection; no document bodies, provenance URLs, source hashes, or rights instruments. Each work carries a fail-closed edition-readiness disclosure. |
-| `theologai://documents/{slug}` | One of 35 locally indexed historical works: 17 legacy creeds/confessions/catechisms and 18 reviewed source-pack editions. |
+| `theologai://documents/{slug}` | One of 36 locally indexed historical works: 17 legacy creeds/confessions/catechisms and 19 reviewed source-pack editions. |
 | `theologai://strongs/{number}` | A Strong's dictionary entry such as `G26` or `H430`. |
 
 ### Guided prompts
@@ -269,13 +269,13 @@ transcription uncertainty.
 
 ### Historical documents and external discovery
 
-The checked-out Transform 11 catalog contains 35 historical works: 17 tracked
-legacy creeds, confessions, and catechisms plus 18 reviewed, normalized
+The checked-out catalog contains 36 historical works: 17 tracked
+legacy creeds, confessions, and catechisms plus 19 reviewed, normalized
 public-domain source-pack editions. In addition to the core eight, the candidate
 adds Augustine's *On Christian Doctrine*, Basil, both Gregories, Justin Martyr,
 Origen, Hooker Book I, Julian of Norwich, *The Imitation of Christ*, and
-Pascal's *Pensées*. The three packs are sectioned-only, contribute 1,057
-canonical sections, and add no legacy aliases; exact resources disclose the
+Pascal's *Pensées*, and Calvin's *Institutes* in the Norton 1561 translation.
+The four packs are sectioned-only, contribute 2,307 canonical sections, and add no legacy aliases; exact resources disclose the
 reviewed edition and normalized-text rights boundary. Preview serves the
 35-work Transform-11 catalog, and production now serves the same corpus after
 the protected PR #108 cutover. The exact checked-out count is
@@ -288,7 +288,7 @@ deployed catalog. Transform 10 retains an Aquinas packet, schema, and
 standalone materializer only; normal builds exclude its hierarchy and lineage,
 and it adds neither a document/catalog projection nor a runtime or MCP surface.
 The reviewed PR95 core-eight remains part of both deployed baselines and the
-checked-out 35-work candidate described above. M4A's
+checked-out 36-work candidate described above. M4A's
 local/preview materialization and inactive-adapter statements are historical;
 PR #96 historically recorded a production D1 binding and bounded public
 `original_language_study` v2 audit. U3-T7 provides the in-memory semantic compiler,
@@ -296,12 +296,12 @@ native-to-normalized coordinate bridge, and content-free compilation audit;
 M4A provides capacity and seed verification. The PR #96 audit does not
 independently establish the runtime status of later transforms.
 PR95's Transform9 core-eight remains included in the checked-out and deployed
-catalogs. Norton and Aquinas assets remain inactive. Transform 12 adds the
-generic Candidate-C storage lifecycle, seal, and dormant `sectioned_only`
-schema seam, but the canonical build, generated D1 seed, and readiness contract
-contain zero Norton rows. A separate disposable local-only command proves the
-1,250-row Norton authority in copied SQLite and isolated Workerd databases; it
-cannot write the canonical seed or use a remote binding. Cyril remains blocked
+catalogs. Norton is now admitted through the ordinary source-pack projection,
+with 1,250 unchanged source-segment citations and an edition-qualified title.
+Its pinned EEBO-TCP transcription is CC0; images and facsimiles are excluded.
+The generic Candidate-C `sectioned_only` publication experiment remains dormant
+and separate from that active projection. Aquinas activation is next; its
+hierarchy remains excluded from this build. Cyril remains blocked
 with zero output pending reliable translator attribution.
 
 Production v6/local-only and preview v7/discovery-only currently search and

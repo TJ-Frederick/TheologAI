@@ -13,8 +13,8 @@ Use this workflow when the user asks about:
 
 ## Available Documents
 
-The checked-out TheologAI catalog includes 35 historical documents and works:
-17 legacy documents and 18 reviewed source-pack editions. Use the catalog and exact resources
+The checked-out TheologAI catalog includes 36 historical documents and works:
+17 legacy documents and 19 reviewed source-pack editions. Use the catalog and exact resources
 returned by the server to establish what is available and what each document
 says. The workflow must not assign a tradition or author from a title or from a
 prewritten grouping.
@@ -73,7 +73,7 @@ eligible.
   confirm the returned URI matches the selected locator.
 - Do not quote, characterize a position, or compare documents from snippets.
   Base those claims only on exact resources actually read.
-- Treat all 35 local works, including all 17 legacy works, as ordinary usable
+- Treat all 36 local works, including all 17 legacy works, as ordinary usable
   local results. Retain `editionReadiness` quietly as provenance context; do
   not use it to block, demote, split, or rank a relevant result. Neither
   readiness form authorizes redistribution of source scan artifacts.

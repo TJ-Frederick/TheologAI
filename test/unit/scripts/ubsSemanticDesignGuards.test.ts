@@ -54,10 +54,6 @@ describe('UBS semantic local materialization guards', () => {
     expect(migration).toContain('It is corpus-neutral');
     expect(migration).not.toMatch(/Norton|A17662|Calvin/i);
 
-    const manifest = JSON.parse(readFileSync(new URL('data/data-manifest.json', repo), 'utf8')) as {
-      materializations: { d1: { inputs: string[] } };
-    };
-    expect(manifest.materializations.d1.inputs.some(path => path.includes('/A17662/'))).toBe(false);
   });
 
   it('keeps the executable relational layer strict in an in-memory fixture', () => {

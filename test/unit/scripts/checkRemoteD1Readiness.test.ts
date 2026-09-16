@@ -311,7 +311,7 @@ describe('remote D1 readiness query', () => {
         expect(component.resultSha256).toMatch(/^[a-f0-9]{64}$/);
       }
       expect(JSON.stringify(receipt)).not.toMatch(/(?:sql|resources|diagnostic|content)/i);
-      expect(remote.calls).toHaveLength(183); // readiness plus Transform 8 and complete three-pack authority pages
+      expect(remote.calls).toHaveLength(359); // readiness plus Transform 8 and complete four-pack authority pages
       expect(remote.calls[0]).toContain('--json');
       expect(remote.calls[0]).toContain('--env');
       expect(remote.calls.every(call => call.includes('/tmp/generated-candidate/wrangler.candidate.toml'))).toBe(true);

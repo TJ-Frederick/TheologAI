@@ -145,7 +145,7 @@ export function assertCanonicalTransform12FtsMatchSentinels(db: Database.Databas
     (SELECT COUNT(*) FROM historical_edition_hierarchy_bodies_fts) AS hierarchyBacking
   `).get() as Record<string, number>;
   if (sentinels.strongsMatch !== 1 || sentinels.sectionMatch !== 1
-    || sentinels.historicalMatches !== 391 || sentinels.hierarchyBase !== 0
+    || sentinels.historicalMatches !== 703 || sentinels.hierarchyBase !== 0
     || sentinels.hierarchyBacking !== 0) {
     throw new Error(`Transform 12 canonical FTS MATCH sentinel drift: ${JSON.stringify(sentinels)}`);
   }

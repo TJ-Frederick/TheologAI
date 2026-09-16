@@ -426,7 +426,7 @@ function buildD1ReadinessQueryContract(
       id: 'historical.transform12.actual_fts_match_sentinels',
       predicate: `(SELECT COUNT(*) FROM strongs_fts WHERE strongs_fts MATCH '"love"' AND strongs_number = 'G25') = 1
         AND (SELECT COUNT(*) FROM sections_fts WHERE sections_fts MATCH '"almighty"' AND rowid = 1962) = 1
-        AND (SELECT COUNT(*) FROM historical_edition_sections_fts WHERE historical_edition_sections_fts MATCH '"grace"') = 391
+        AND (SELECT COUNT(*) FROM historical_edition_sections_fts WHERE historical_edition_sections_fts MATCH '"grace"') = 703
         AND (SELECT COUNT(*) FROM historical_edition_hierarchy_bodies) = 0
         AND (SELECT COUNT(*) FROM historical_edition_hierarchy_bodies_fts) = 0`,
     },
