@@ -24,6 +24,10 @@ import {
   parseHistoricalTransform9D1Page,
 } from './historical-transform9-authority-audit.js';
 import {
+  auditAquinasAuthority,
+  buildAquinasAuthorityQueryPlan,
+} from './aquinas-authority-audit.js';
+import {
   buildD1ReadinessSql,
   REQUIRED_COLUMNS,
 } from './check-remote-d1-readiness.js';
@@ -47,7 +51,7 @@ ensureWranglerLogDirectory(wranglerLogDirectory);
 const AUTHORITY_BATCH_SIZE = 8;
 
 type AuthorityReadMode = 'batched' | 'serial';
-type Phase = 'migrations' | 'schema' | 'seedImport' | 'readiness' | 'transform8Authority' | 'transform9Authority';
+type Phase = 'migrations' | 'schema' | 'seedImport' | 'readiness' | 'transform8Authority' | 'transform9Authority' | 'aquinasAuthority';
 
 function parseAuthorityReadMode(argv: readonly string[]): AuthorityReadMode {
   if (argv.length === 0) return 'batched';
@@ -195,6 +199,22 @@ try {
     planned.assertFullyRead();
     return result;
   });
+  const aquinasPlan = buildAquinasAuthorityQueryPlan(ROOT);
+  const aquinasAuthority = measure('aquinasAuthority', () => {
+    if (authorityReadMode === 'serial') {
+      return auditAquinasAuthority(sql => {
+        authorityCommandCount++;
+        authorityQueryCount++;
+        return parseHistoricalTransform8D1Page(run(['d1', 'execute', ...common, '--command', sql, '--json']));
+      }, aquinasPlan);
+    }
+    const planned = readPlannedAuthorityPages(common, aquinasPlan.map(page => page.sql), 'Aquinas');
+    authorityCommandCount += planned.commandCount;
+    authorityQueryCount += planned.queryCount;
+    const result = auditAquinasAuthority(planned.readPage, aquinasPlan);
+    planned.assertFullyRead();
+    return result;
+  });
   const timingSummary = Object.fromEntries([...phaseMilliseconds.entries()].map(([phase, milliseconds]) => [phase, milliseconds]));
   const authorityHashes = {
     transform8: {
@@ -205,8 +225,9 @@ try {
       bodyFtsSample: authority.bodyFtsSampleSha256,
     },
     transform11: transform9Authority.hashes,
+    aquinas: aquinasAuthority,
   };
-  console.error(`[verify-d1-seed-workerd] Imported ${manifest.files.length} seed files through local D1; production readiness, Transform-8 (${authority.pages.profiles}/${authority.pages.identities}/${authority.pages.aliases} pages), and Transform-11 (${transform9Authority.pages.packs}/${transform9Authority.pages.works}/${transform9Authority.pages.editions}/${transform9Authority.pages.artifacts}/${transform9Authority.pages.documents}/${transform9Authority.pages.profiles}/${transform9Authority.pages.sections}/${transform9Authority.pages.projections} pages) authority audits passed. Authority mode ${authorityReadMode}: ${authorityCommandCount} Wrangler commands for ${authorityQueryCount} bounded queries. Phase milliseconds: ${JSON.stringify(timingSummary)}. Authority hashes: ${JSON.stringify(authorityHashes)}.`);
+  console.error(`[verify-d1-seed-workerd] Imported ${manifest.files.length} seed files through local D1; production readiness, Transform-8 (${authority.pages.profiles}/${authority.pages.identities}/${authority.pages.aliases} pages), Transform-11 (${transform9Authority.pages.packs}/${transform9Authority.pages.works}/${transform9Authority.pages.editions}/${transform9Authority.pages.artifacts}/${transform9Authority.pages.documents}/${transform9Authority.pages.profiles}/${transform9Authority.pages.sections}/${transform9Authority.pages.projections} pages), and Aquinas (${aquinasAuthority.pages} pages / ${aquinasAuthority.rows} rows) authority audits passed. Authority mode ${authorityReadMode}: ${authorityCommandCount} Wrangler commands for ${authorityQueryCount} bounded queries. Phase milliseconds: ${JSON.stringify(timingSummary)}. Authority hashes: ${JSON.stringify(authorityHashes)}.`);
 } finally {
   rmSync(state, { recursive: true, force: true });
 }

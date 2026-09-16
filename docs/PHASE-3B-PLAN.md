@@ -47,9 +47,9 @@ runtime claim.
 
 ## Current product boundary
 
-TheologAI exposes eleven tools and six guided prompts across local stdio/HTTP
-and hosted Worker transports. It provides eight Bible translations, six
-commentary sources, 35 locally indexed historical works, UBS-attested parallel
+The checked-out TheologAI registry exposes twelve tools and six guided prompts.
+The deployed registry remains the one recorded in CURRENT-RELEASE.md. It provides eight Bible translations, six
+commentary sources, 36 classic-text works plus the Aquinas hierarchy, UBS-attested parallel
 passages, Strong's and morphology evidence, contextual original-language
 study, local primary-source research, and donation support.
 
@@ -59,7 +59,8 @@ The following boundaries remain deliberate:
 - preview exposes the discovery-aware contract but cannot execute CCEL before
   adapter, coordinator, or fetch;
 - CCEL bodies are never mirrored or durably stored;
-- the partial Aquinas packet and Norton packet are not public corpus members;
+- Norton and the four authored Aquinas parts are active in the checked-out corpus;
+  preview and production promotion remain separate;
 - npm distribution is unsupported; local execution and hosted Cloudflare
   deployment remain the supported forms.
 

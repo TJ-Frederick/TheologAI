@@ -386,6 +386,7 @@ describe('Worker MCP endpoint in workerd', () => {
       'parallel_passages',
       'commentary_lookup',
       'classic_text_lookup',
+      'historical_hierarchy_lookup',
       'primary_source_search',
       'original_language_lookup',
       'bible_verse_morphology',
@@ -393,6 +394,11 @@ describe('Worker MCP endpoint in workerd', () => {
       'donation_config',
       'verify_donation',
     ]);
+
+    const missingHierarchy = await modernRpc('tools/call', {
+      name: 'historical_hierarchy_lookup', arguments: { slug: 'missing-test-hierarchy' },
+    }, 'missing-hierarchy', 'historical_hierarchy_lookup');
+    expect(missingHierarchy.message.result?.isError).toBe(true);
 
     const mismatch = await modernRpc(
       'tools/call',

@@ -77,6 +77,14 @@ The converted historical indexes do not have body-bearing `*_fts_content`
 tables. A sealed database rejects later mutation of all four FTS base tables;
 an interrupted or partial import must be discarded and replayed from empty.
 
+Schema `0010_active_aquinas_hierarchy_publication` is a corpus successor.
+Its supported release path is a fresh SQLite rebuild followed by preparation
+and binding of a candidate D1 replacement. It does not define an in-place
+activation procedure for an experimental database already populated with the
+dormant Aquinas hierarchy: those immutable rows use the same source-pack,
+work, edition, hierarchy, and publication identities as the active projection.
+Discard that experimental database and rebuild the candidate corpus instead.
+
 ### Corpus revisions and deployed metadata
 
 When a canonical source changes, update its checksum in `data/data-manifest.json`

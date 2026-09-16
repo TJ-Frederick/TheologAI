@@ -13,9 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-<!-- theologai-public-contract tools=11 structured=bible_cross_references,bible_lookup,bible_verse_morphology,classic_text_lookup,commentary_lookup,donation_config,original_language_lookup,original_language_study,parallel_passages,primary_source_search,verify_donation -->
+<!-- theologai-public-contract tools=12 structured=bible_cross_references,bible_lookup,bible_verse_morphology,classic_text_lookup,commentary_lookup,donation_config,historical_hierarchy_lookup,original_language_lookup,original_language_study,parallel_passages,primary_source_search,verify_donation -->
 
 ### Changed
+
+- Activated the pinned Norton 1561 transcription in the 36-work local classic-text
+  catalog and the four authored Aquinas parts through the twelfth tool,
+  `historical_hierarchy_lookup`. The traditional Summa Supplement is excluded.
+  These are checked-out code/corpus changes; deployment remains a separate promotion.
 
 - Historically recorded the PR #96 production identity: source commit
   `ac4b5ed774302fbfc86bf846b6ee77a07beed456`, tree

@@ -53,7 +53,12 @@ import {
   materializeHistoricalSourcePacks,
   REVIEWED_SOURCE_PACK_RELEASE,
 } from './historical-source-packs.js';
-import { assertNormalAquinasHierarchyExclusion } from './historical-hierarchy.js';
+import { loadActiveAquinasHierarchy } from './active-aquinas-hierarchy.js';
+import { materializeHistoricalHierarchy } from './historical-hierarchy.js';
+import {
+  loadActiveAquinasHierarchyPublication,
+  materializeHistoricalHierarchyPublication,
+} from './historical-hierarchy-publication.js';
 import {
   assertTransform12CandidateCSchema,
   assertCanonicalTransform12FtsMatchSentinels,
@@ -671,18 +676,22 @@ if (JSON.stringify(historicalSourcePackCounts) !== JSON.stringify(REVIEWED_SOURC
 }
 log(`  Inserted ${historicalSourcePackCounts.works} reviewed works with ${historicalSourcePackCounts.sections} canonical sections`);
 
-// ── Transform 10: dormant generic hierarchical authority foundation ──
+// ── Transform 13: active, bounded Aquinas hierarchy ──
 //
-// The reviewed Aquinas packet, migration, and standalone materializer remain
-// local-only groundwork. A normal release build intentionally does not read or
-// materialize the packet: all four hierarchy tables and its shared source
-// lineage must remain empty. The capacity rehearsal is the only code path that
-// materializes the packet, into a disposable temporary database.
-
-// The PR-A delivery-projection schema and materializer are likewise dormant.
-// A normal build must not write a publication row: the reviewed projection is
-// exercised only in isolated in-memory authority tests until a separately
-// approved activation/release prepares it.
+// The checked-in four-part English Dominican/Project Gutenberg packet is
+// materialized directly from its locks. It has hierarchy-only delivery: no
+// legacy document or sectioned-delivery projection is created.
+log('Materializing the active Aquinas hierarchy...');
+const activeAquinasHierarchy = loadActiveAquinasHierarchy(sourceRegistry);
+const activeAquinasCounts = materializeHistoricalHierarchy(db, activeAquinasHierarchy);
+if (JSON.stringify(activeAquinasCounts) !== JSON.stringify({
+  hierarchies: 1, artifacts: 4, bodies: 3184, nodes: 3185, ftsRows: 3184,
+})) {
+  throw new Error('Active Aquinas hierarchy materialization did not retain its exact authority inventory');
+}
+const activeAquinasPublication = loadActiveAquinasHierarchyPublication(activeAquinasHierarchy);
+materializeHistoricalHierarchyPublication(db, activeAquinasPublication, activeAquinasHierarchy);
+log(`  Inserted ${activeAquinasCounts.bodies} authority bodies and ${activeAquinasCounts.nodes} hierarchy nodes`);
 
 // ── Tier 3: UBS source-attested parallel passages ──
 
@@ -772,11 +781,6 @@ for (const [table, expected] of Object.entries(manifest.expectedCounts)) {
 if (countMismatches.length > 0) {
   throw new Error(`Unexpected table counts: ${countMismatches.join('; ')}`);
 }
-
-// Count checks alone cannot prove that no Aquinas shared-lineage row leaked
-// into a similarly sized normal corpus. Enforce the exact exclusion boundary
-// immediately before this database becomes a releasable artifact.
-assertNormalAquinasHierarchyExclusion(db);
 
 db.close();
 db = undefined;

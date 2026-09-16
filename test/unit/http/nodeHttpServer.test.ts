@@ -21,6 +21,7 @@ import { BibleService } from '../../../src/services/bible/BibleService.js';
 import { createBibleLookupHandler } from '../../../src/tools/v2/bibleLookup.js';
 import { createPrimarySourceSearchHandler } from '../../../src/tools/v2/primarySourceSearch.js';
 import { createPrimarySourceSearchDescriptor } from '../../../src/mcp/primarySourceSearchDescriptor.js';
+import { NotFoundError } from '../../../src/kernel/errors.js';
 
 const TEST_MAX_BODY_BYTES = 1024;
 type NodeHttpTestEnvironment = Partial<Record<
@@ -374,6 +375,12 @@ function makeRoot(): McpCompositionRoot {
           section: { id: 1, document_id: 'test', section_number: '1', title: 'Test', content: '', topics: [] },
           sectionKey: 'source-0001', sourceOrdinal: 1, requestedSectionId: '1', resolution: 'canonical' as const,
         }),
+      },
+      historicalHierarchyService: {
+        listPublications: async () => [],
+        resolveCanonicalUri: async () => {
+          throw new NotFoundError('historical hierarchy', 'No active hierarchy publication matches this URI.');
+        },
       },
       strongsService: {
         lookup: async strongsNumber => ({

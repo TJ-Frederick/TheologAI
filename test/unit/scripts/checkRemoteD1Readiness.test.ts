@@ -20,13 +20,16 @@ import {
 } from '../../../scripts/ubs-semantics/storageReconstruction.js';
 import { buildHistoricalTransform8ExpectedAuthority } from '../../../scripts/historical-transform8-authority-audit.js';
 import { buildHistoricalTransform9ExpectedAuthority } from '../../../scripts/historical-transform9-authority-audit.js';
+import { loadActiveAquinasHierarchy } from '../../../scripts/active-aquinas-hierarchy.js';
+import { materializeHistoricalHierarchy } from '../../../scripts/historical-hierarchy.js';
+import { loadActiveAquinasHierarchyPublication, materializeHistoricalHierarchyPublication } from '../../../scripts/historical-hierarchy-publication.js';
 import { CLASSIC_TEXT_LIMITS } from '../../../src/kernel/classicTextContract.js';
 
 const generatedDbPath = process.env.THEOLOGAI_TEST_DATABASE_PATH?.trim();
 
 function remoteAuthorityExecutor(): {
   calls: string[][];
-  execute: (_file: string, args: readonly string[], options: { stdio: 'inherit' | 'pipe' }) => string | undefined;
+  execute: (_file: string, args: readonly string[], options: { stdio: 'inherit' | 'pipe'; maxBuffer?: number }) => string | undefined;
   close: () => void;
 } {
   const expected = buildHistoricalTransform8ExpectedAuthority(process.cwd());
@@ -54,43 +57,55 @@ function remoteAuthorityExecutor(): {
     CREATE TABLE historical_source_artifacts (artifact_id TEXT, edition_id TEXT, role TEXT, locator TEXT, pin_kind TEXT, pin_value TEXT, sha256 TEXT, bytes INTEGER, acquired_at TEXT);
     CREATE TABLE documents (id TEXT, title TEXT, type TEXT, date TEXT, metadata TEXT);
     CREATE TABLE historical_edition_sections (edition_id TEXT, section_key TEXT, source_ordinal INTEGER, display_label TEXT, heading TEXT, content TEXT);
-    CREATE TABLE historical_edition_sections_fts (edition_id TEXT, section_key TEXT, heading TEXT, content TEXT);`);
+    CREATE TABLE historical_edition_sections_fts (edition_id TEXT, section_key TEXT, heading TEXT, content TEXT);
+    CREATE UNIQUE INDEX fixture_historical_source_packs_key ON historical_source_packs(pack_id);
+    CREATE UNIQUE INDEX fixture_historical_works_key ON historical_works(work_id);
+    CREATE UNIQUE INDEX fixture_historical_editions_key ON historical_editions(edition_id);`);
   const insertProfile = db.prepare(`INSERT INTO historical_document_delivery_profiles VALUES
     (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-  for (const row of expected.profiles) {
-    insertProfile.run(row.documentId, row.workId, row.editionId, row.immutableCorpusIdentity,
-      row.sectionPackageIdentity, row.deliveryMode, row.sectionCount, row.landingMaxBytes,
-      row.browsePageSize, row.cursorVersion, row.provenanceJson, row.rightsJson);
-  }
   const insertIdentity = db.prepare('INSERT INTO historical_section_identities VALUES (?, ?, ?, ?)');
-  for (const row of expected.identities) {
-    insertIdentity.run(row.documentId, row.sectionKey, row.sourceOrdinal, row.documentSectionId);
-  }
   const insertAlias = db.prepare('INSERT INTO historical_section_aliases VALUES (?, ?, ?, ?)');
-  for (const row of expected.aliases) insertAlias.run(row.documentId, row.legacySectionId, row.sectionKey, row.sourceOrdinal);
   const insertSection = db.prepare('INSERT INTO document_sections VALUES (?, ?, ?, ?, ?, ?)');
   const insertFts = db.prepare('INSERT INTO sections_fts(rowid, title, content, topics) VALUES (?, ?, ?, ?)');
-  for (const row of expected.bodyFtsSample) {
-    const identity = expected.identities.find(candidate => candidate.documentId === row.documentId
-      && candidate.sectionKey === row.sectionKey && candidate.sourceOrdinal === row.sourceOrdinal)!;
-    insertSection.run(identity.documentSectionId, row.documentId, row.legacySectionId, row.title, row.content, row.topics);
-    insertFts.run(identity.documentSectionId, row.ftsTitle, row.ftsContent, row.ftsTopics);
-  }
   const insert = (sql: string, values: readonly unknown[]) => db.prepare(sql).run(...values);
-  for (const row of transform9.packs) insert('INSERT INTO historical_source_packs VALUES (?, ?, ?, ?, ?)', [row.packId, row.revision, row.schemaVersion, row.manifestSha256, row.sourcePath]);
-  for (const row of transform9.works) insert('INSERT INTO historical_works VALUES (?, ?, ?, ?)', [row.workId, row.title, row.creatorMetadataStatus, row.creatorsJson]);
-  for (const row of transform9.editions) insert('INSERT INTO historical_editions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [row.editionId, row.workId, row.packId, row.language, row.contributorGroupsJson, row.publication, row.version, row.provenanceStatus, row.provenanceUncertainty, row.provenanceReviewedAt, row.underlyingWorkRightsJson, row.exactArtifactRightsJson, row.normalizedTextRightsJson]);
-  for (const row of transform9.artifacts) insert('INSERT INTO historical_source_artifacts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [row.artifactId, row.editionId, row.role, row.locator, row.pinKind, row.pinValue, row.sha256, row.bytes, row.acquiredAt]);
-  for (const row of transform9.documents) insert('INSERT INTO documents VALUES (?, ?, ?, ?, ?)', [row.documentId, row.title, row.type, row.date, row.metadata]);
-  for (const row of transform9.profiles) insert('INSERT INTO historical_document_delivery_profiles VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [row.documentId, row.workId, row.editionId, row.immutableCorpusIdentity, row.sectionPackageIdentity, row.deliveryMode, row.sectionCount, row.landingMaxBytes, row.browsePageSize, row.cursorVersion, row.provenanceJson, row.rightsJson]);
-  for (const row of transform9.sections) insert('INSERT INTO historical_edition_sections VALUES (?, ?, ?, ?, ?, ?)', [row.editionId, row.sectionKey, row.sourceOrdinal, row.displayLabel, row.heading, row.content]);
-  for (const row of transform9.projections) {
-    const section = transform9.sections.find(candidate => candidate.editionId === row.editionId && candidate.sectionKey === row.sectionKey)!;
-    insert('INSERT INTO historical_section_identities VALUES (?, ?, ?, ?)', [row.documentId, row.sectionKey, row.sourceOrdinal, row.documentSectionId]);
-    insert('INSERT INTO document_sections VALUES (?, ?, ?, ?, ?, ?)', [row.documentSectionId, row.documentId, row.sectionKey, section.heading, section.content, '[]']);
-    insert('INSERT INTO historical_edition_sections_fts VALUES (?, ?, ?, ?)', [row.editionId, row.sectionKey, section.heading, section.content]);
-    insert('INSERT INTO sections_fts(rowid, title, content, topics) VALUES (?, ?, ?, ?)', [row.documentSectionId, section.heading, section.content, '[]']);
-  }
+  db.transaction(() => {
+    for (const row of expected.profiles) {
+      insertProfile.run(row.documentId, row.workId, row.editionId, row.immutableCorpusIdentity,
+        row.sectionPackageIdentity, row.deliveryMode, row.sectionCount, row.landingMaxBytes,
+        row.browsePageSize, row.cursorVersion, row.provenanceJson, row.rightsJson);
+    }
+    for (const row of expected.identities) {
+      insertIdentity.run(row.documentId, row.sectionKey, row.sourceOrdinal, row.documentSectionId);
+    }
+    for (const row of expected.aliases) insertAlias.run(row.documentId, row.legacySectionId, row.sectionKey, row.sourceOrdinal);
+    for (const row of expected.bodyFtsSample) {
+      const identity = expected.identities.find(candidate => candidate.documentId === row.documentId
+        && candidate.sectionKey === row.sectionKey && candidate.sourceOrdinal === row.sourceOrdinal)!;
+      insertSection.run(identity.documentSectionId, row.documentId, row.legacySectionId, row.title, row.content, row.topics);
+      insertFts.run(identity.documentSectionId, row.ftsTitle, row.ftsContent, row.ftsTopics);
+    }
+    for (const row of transform9.packs) insert('INSERT INTO historical_source_packs VALUES (?, ?, ?, ?, ?)', [row.packId, row.revision, row.schemaVersion, row.manifestSha256, row.sourcePath]);
+    for (const row of transform9.works) insert('INSERT INTO historical_works VALUES (?, ?, ?, ?)', [row.workId, row.title, row.creatorMetadataStatus, row.creatorsJson]);
+    for (const row of transform9.editions) insert('INSERT INTO historical_editions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [row.editionId, row.workId, row.packId, row.language, row.contributorGroupsJson, row.publication, row.version, row.provenanceStatus, row.provenanceUncertainty, row.provenanceReviewedAt, row.underlyingWorkRightsJson, row.exactArtifactRightsJson, row.normalizedTextRightsJson]);
+    for (const row of transform9.artifacts) insert('INSERT INTO historical_source_artifacts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [row.artifactId, row.editionId, row.role, row.locator, row.pinKind, row.pinValue, row.sha256, row.bytes, row.acquiredAt]);
+    for (const row of transform9.documents) insert('INSERT INTO documents VALUES (?, ?, ?, ?, ?)', [row.documentId, row.title, row.type, row.date, row.metadata]);
+    for (const row of transform9.profiles) insert('INSERT INTO historical_document_delivery_profiles VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [row.documentId, row.workId, row.editionId, row.immutableCorpusIdentity, row.sectionPackageIdentity, row.deliveryMode, row.sectionCount, row.landingMaxBytes, row.browsePageSize, row.cursorVersion, row.provenanceJson, row.rightsJson]);
+    for (const row of transform9.sections) insert('INSERT INTO historical_edition_sections VALUES (?, ?, ?, ?, ?, ?)', [row.editionId, row.sectionKey, row.sourceOrdinal, row.displayLabel, row.heading, row.content]);
+    for (const row of transform9.projections) {
+      const section = transform9.sections.find(candidate => candidate.editionId === row.editionId && candidate.sectionKey === row.sectionKey)!;
+      insert('INSERT INTO historical_section_identities VALUES (?, ?, ?, ?)', [row.documentId, row.sectionKey, row.sourceOrdinal, row.documentSectionId]);
+      insert('INSERT INTO document_sections VALUES (?, ?, ?, ?, ?, ?)', [row.documentSectionId, row.documentId, row.sectionKey, section.heading, section.content, '[]']);
+      insert('INSERT INTO historical_edition_sections_fts VALUES (?, ?, ?, ?)', [row.editionId, row.sectionKey, section.heading, section.content]);
+      insert('INSERT INTO sections_fts(rowid, title, content, topics) VALUES (?, ?, ?, ?)', [row.documentSectionId, section.heading, section.content, '[]']);
+    }
+  })();
+  for (const migration of [
+    '0007_historical_hierarchy.sql', '0008_historical_hierarchy_publications.sql',
+    '0010_active_aquinas_hierarchy_publication.sql',
+  ]) db.exec(readFileSync(join(process.cwd(), 'migrations', migration), 'utf8'));
+  const aquinas = loadActiveAquinasHierarchy({ read: path => readFileSync(join(process.cwd(), path)) });
+  materializeHistoricalHierarchy(db, aquinas);
+  materializeHistoricalHierarchyPublication(db, loadActiveAquinasHierarchyPublication(aquinas), aquinas);
   const calls: string[][] = [];
   return {
     calls,
@@ -98,7 +113,7 @@ function remoteAuthorityExecutor(): {
       calls.push([...args]);
       if (options.stdio === 'inherit') return undefined;
       const sql = args[args.indexOf('--command') + 1]!;
-      return JSON.stringify([{ success: true, results: db.prepare(sql).all() }]);
+      return JSON.stringify(sql.split('\n;\n').map(statement => ({ success: true, results: db.prepare(statement).all() })));
     },
     close: () => db.close(),
   };
@@ -141,15 +156,10 @@ describe('remote D1 readiness query', () => {
     expect(sql).toContain("('historical.transform8.collision_affected_sections', (");
     expect(sql).toContain("('historical.transform8.collision_newly_addressable_sections', (");
     expect(sql).toContain("('historical.transform8.full_fts_parity', (");
-    expect(sql).toContain("('historical.transform10.normal.hierarchies_empty', (");
-    expect(sql).toContain("('historical.transform10.normal.bodies_empty', (");
-    expect(sql).toContain("('historical.transform10.normal.nodes_empty', (");
-    expect(sql).toContain("('historical.transform10.normal.fts_empty', (");
-    expect(sql).toContain("('historical.transform10.normal.pack_absent', (");
-    expect(sql).toContain("('historical.transform10.normal.work_absent', (");
-    expect(sql).toContain("('historical.transform10.normal.edition_absent', (");
-    expect(sql).toContain("('historical.transform10.normal.artifacts_absent', (");
-    expect(sql).not.toContain("historical.transform10.exact_profile_and_artifacts");
+    expect(sql).toContain("('historical.aquinas.active_publication', (");
+    expect(sql).toContain("('historical.aquinas.no_legacy_projection', (");
+    expect(sql).toContain("('historical.aquinas.body_lengths', (");
+    expect(sql).toContain("('historical.aquinas.fts_parity', (");
     expect(sql).toContain('LEFT JOIN sections_fts fts ON fts.rowid = section.id');
     expect(sql).toContain(') = 23');
     expect(sql).toContain(') = 256');
@@ -294,6 +304,9 @@ describe('remote D1 readiness query', () => {
     }
   });
 
+  // This replays all 813 bounded, source-derived authority queries in one
+  // local D1 surrogate. It is intentionally an integration-scale check and
+  // needs headroom when the core suite is sharing a constrained CI runner.
   it('runs primary readiness, then bounded authority pages, and requests diagnostics only after failure', () => {
     const remote = remoteAuthorityExecutor();
     try {
@@ -311,13 +324,18 @@ describe('remote D1 readiness query', () => {
         expect(component.resultSha256).toMatch(/^[a-f0-9]{64}$/);
       }
       expect(JSON.stringify(receipt)).not.toMatch(/(?:sql|resources|diagnostic|content)/i);
-      expect(remote.calls).toHaveLength(359); // readiness plus Transform 8 and complete four-pack authority pages
+      expect(remote.calls).toHaveLength(104); // readiness plus 103 bounded authority batches
       expect(remote.calls[0]).toContain('--json');
       expect(remote.calls[0]).toContain('--env');
       expect(remote.calls.every(call => call.includes('/tmp/generated-candidate/wrangler.candidate.toml'))).toBe(true);
       expect(remote.calls[0].join('\n')).toContain('WHERE passed IS 1');
-      expect(remote.calls.slice(1).every(call => call.join('\n').includes('LIMIT 256') || call.join('\n').includes('LIMIT 64') || call.join('\n').includes('LIMIT 32') || call.join('\n').includes('LIMIT 8'))).toBe(true);
+      expect(remote.calls.slice(1).every(call => /\bLIMIT (?:1|4|8|32|64|256)\b/.test(call.join('\n')))).toBe(true);
       expect(remote.calls.slice(1).every(call => call.join('\n').includes('--remote'))).toBe(true);
+      const authorityQueries = remote.calls.slice(1).flatMap(call =>
+        call[call.indexOf('--command') + 1]!.split('\n;\n'));
+      expect(authorityQueries).toHaveLength(813);
+      expect(remote.calls.slice(1).every(call =>
+        call[call.indexOf('--command') + 1]!.split('\n;\n').length <= 8)).toBe(true);
     } finally {
       remote.close();
     }
@@ -338,7 +356,7 @@ describe('remote D1 readiness query', () => {
     }
     expect(failedCalls).toHaveLength(2);
     expect(failedCalls[1].join('\n')).toContain('WHERE passed IS NOT 1 ORDER BY check_name');
-  });
+  }, 60_000);
 
   it('rejects unsafe manifest identifiers', () => {
     expect(() => buildD1ReadinessSql({ 'documents; DROP TABLE documents': 17 }))

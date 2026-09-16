@@ -40,7 +40,7 @@ describe('D1 corpus identity', () => {
   it('pins the catalog-scope D1 identity and includes the generated UBS artifact', () => {
     const current = parseDataManifest(readFileSync('data/data-manifest.json'));
     expect(computeD1CorpusIdentity(current))
-      .toBe('874bc91e8068d6c70b7ead5e386b043a1b7569e5ef22a68926313b8efd8c3946');
+      .toBe('ef42dfff4fda29d708f2bd340bbd4463ab4a128408651cea887a97bc28199bb1');
     const changedUbs = structuredClone(current);
     const ubs = changedUbs.files.find(file => file.path === 'src/data/ubs-parallel-passages.generated.json');
     expect(ubs).toBeDefined();
@@ -50,19 +50,27 @@ describe('D1 corpus identity', () => {
     expect(current.materializations.d1.inputs).not.toContain('data/parallel-passages/ubs-paratext/ParallelPassages.xml');
   });
 
-  it('excludes every tracked Aquinas source hash from the current D1 identity', () => {
+  it('includes every active Aquinas source hash in the current D1 identity', () => {
     const current = parseDataManifest(readFileSync('data/data-manifest.json'));
     const identity = computeD1CorpusIdentity(current);
     const aquinasPrefix = 'data/historical-sources/project-gutenberg/aquinas-english-dominican/';
     const aquinasFiles = current.files.filter(file => file.path.startsWith(aquinasPrefix));
     expect(aquinasFiles.length).toBeGreaterThan(0);
-    expect(current.materializations.d1.inputs.some(path => path.startsWith(aquinasPrefix))).toBe(false);
+    expect(aquinasFiles).toHaveLength(10);
+    expect(current.materializations.d1.inputs.filter(path => path.startsWith(aquinasPrefix)))
+      .toEqual(aquinasFiles.map(file => file.path));
 
     const changedAquinas = structuredClone(current);
     const aquinasManifest = changedAquinas.files.find(file => file.path === `${aquinasPrefix}packages/aquinas-summa-pg-v1/manifest.json`);
     expect(aquinasManifest).toBeDefined();
     aquinasManifest!.sha256 = '0'.repeat(64);
-    expect(computeD1CorpusIdentity(changedAquinas)).toBe(identity);
+    expect(computeD1CorpusIdentity(changedAquinas)).not.toBe(identity);
+
+    const changedAquinasSourceLock = structuredClone(current);
+    const aquinasSourceLock = changedAquinasSourceLock.files.find(file => file.path === `${aquinasPrefix}SOURCE_LOCK.json`);
+    expect(aquinasSourceLock).toBeDefined();
+    aquinasSourceLock!.sha256 = '0'.repeat(64);
+    expect(computeD1CorpusIdentity(changedAquinasSourceLock)).not.toBe(identity);
 
     const changedD1Input = structuredClone(current);
     const coreEightManifest = changedD1Input.files.find(file => file.path === 'data/historical-source-packs/core-eight/manifest.json');

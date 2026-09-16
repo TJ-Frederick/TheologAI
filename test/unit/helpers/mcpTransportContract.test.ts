@@ -19,7 +19,7 @@ function descriptor(name: string, version = '1') {
 function snapshot(version: '6' | '7', logging = false): McpTransportSnapshot {
   const toolNames = [
     'bible_lookup', 'bible_cross_references', 'parallel_passages', 'commentary_lookup',
-    'classic_text_lookup', 'primary_source_search', 'original_language_lookup',
+    'classic_text_lookup', 'historical_hierarchy_lookup', 'primary_source_search', 'original_language_lookup',
     'bible_verse_morphology', 'original_language_study', 'donation_config', 'verify_donation',
   ];
   const tools = toolNames.map(name => descriptor(name, name === 'primary_source_search' ? version : '1'));
@@ -44,7 +44,7 @@ function snapshot(version: '6' | '7', logging = false): McpTransportSnapshot {
     },
     additionalProperties: false,
   };
-  tools[5]!.annotations.openWorldHint = version === '7';
+  tools[6]!.annotations.openWorldHint = version === '7';
   return {
     server: {
       name: 'theologai-bible-server', version: 'test',
@@ -97,7 +97,7 @@ describe('MCP transport contract oracle', () => {
     ['prompt removal', (value: McpTransportSnapshot) => value.prompts.pop()],
     ['template addition', (value: McpTransportSnapshot) => value.resourceTemplates.push({ uriTemplate: 'extra://{id}' })],
     ['primary v6/v7 drift', (value: McpTransportSnapshot) => {
-      ((value.tools[5]!.outputSchema as any).properties.schemaVersion as any).const = '7';
+      ((value.tools[6]!.outputSchema as any).properties.schemaVersion as any).const = '7';
     }],
     ['footnote-delivery status drift', (value: McpTransportSnapshot) => {
       (((value.tools[0]!.outputSchema as any).properties.passages.items.properties.footnoteDelivery.properties.status as any).enum)
@@ -120,7 +120,7 @@ describe('MCP transport contract oracle', () => {
     const second = cloneMcpTransportSnapshot(first);
     second.dynamicResourceUris.push('theologai://documents/another-runtime-only-document');
     expect(await fingerprintMcpTransportSnapshot(second)).toEqual(await fingerprintMcpTransportSnapshot(first));
-    (second.tools[5]!.description as string) += ' changed';
+    (second.tools[6]!.description as string) += ' changed';
     expect((await fingerprintMcpTransportSnapshot(second)).tools)
       .not.toBe((await fingerprintMcpTransportSnapshot(first)).tools);
   });

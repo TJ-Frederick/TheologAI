@@ -15,6 +15,7 @@ import type {
   HistoricalHierarchyPublicationMetadata,
 } from '../src/kernel/repositories.js';
 import {
+  assertActiveAquinasHierarchy,
   AQUINAS_HIERARCHY_EXPECTED,
   assertApprovedAquinasHierarchy,
   type HistoricalEditionHierarchyMaterialization,
@@ -31,6 +32,11 @@ export const AQUINAS_HIERARCHY_PUBLICATION_EXPECTED = Object.freeze({
   nodeMaxBytes: 65_536,
   searchMaxBytes: 16_384,
   activationState: 'dormant' as const,
+} as const);
+
+export const AQUINAS_ACTIVE_HIERARCHY_PUBLICATION_EXPECTED = Object.freeze({
+  ...AQUINAS_HIERARCHY_PUBLICATION_EXPECTED,
+  activationState: 'active' as const,
 } as const);
 
 export type HistoricalHierarchyPublicationMaterialization = HistoricalHierarchyPublication;
@@ -71,8 +77,9 @@ function cursorIdentity(publication: Omit<HistoricalHierarchyPublication, 'curso
   }));
 }
 
-function approvedUnsignedPublication(
+function aquinasUnsignedPublication(
   hierarchy: HistoricalEditionHierarchyMaterialization,
+  activationState: 'dormant' | 'active',
 ): Omit<HistoricalHierarchyPublication, 'cursorIdentity'> {
   const canonicalUri = buildHistoricalHierarchyResourceUri(AQUINAS_HIERARCHY_PUBLICATION_EXPECTED.publicSlug);
   if (!canonicalUri) throw new Error('Transform 10 publication canonical URI is invalid');
@@ -91,7 +98,7 @@ function approvedUnsignedPublication(
     nodeMaxBytes: AQUINAS_HIERARCHY_PUBLICATION_EXPECTED.nodeMaxBytes,
     searchMaxBytes: AQUINAS_HIERARCHY_PUBLICATION_EXPECTED.searchMaxBytes,
     canonicalUri,
-    activationState: AQUINAS_HIERARCHY_PUBLICATION_EXPECTED.activationState,
+    activationState,
   };
 }
 
@@ -116,9 +123,19 @@ function canonicalJson(value: unknown): string {
 export function loadApprovedAquinasHierarchyPublication(
   hierarchy: HistoricalEditionHierarchyMaterialization,
 ): HistoricalHierarchyPublicationMaterialization {
-  const unsigned = approvedUnsignedPublication(hierarchy);
+  const unsigned = aquinasUnsignedPublication(hierarchy, 'dormant');
   const publication = { ...unsigned, cursorIdentity: cursorIdentity(unsigned) };
   assertApprovedAquinasHierarchyPublication(publication, hierarchy);
+  return publication;
+}
+
+/** Transform-13 active publication over the same immutable four-part hierarchy. */
+export function loadActiveAquinasHierarchyPublication(
+  hierarchy: HistoricalEditionHierarchyMaterialization,
+): HistoricalHierarchyPublicationMaterialization {
+  const unsigned = aquinasUnsignedPublication(hierarchy, 'active');
+  const publication = { ...unsigned, cursorIdentity: cursorIdentity(unsigned) };
+  assertActiveAquinasHierarchyPublication(publication, hierarchy);
   return publication;
 }
 
@@ -128,7 +145,7 @@ export function assertApprovedAquinasHierarchyPublication(
 ): void {
   assertApprovedAquinasHierarchy(hierarchy);
   const { cursorIdentity: storedCursorIdentity, ...unsigned } = publication;
-  const expectedUnsigned = approvedUnsignedPublication(hierarchy);
+  const expectedUnsigned = aquinasUnsignedPublication(hierarchy, 'dormant');
   if (canonicalJson(unsigned) !== canonicalJson(expectedUnsigned)
     || storedCursorIdentity !== cursorIdentity(expectedUnsigned)) {
     throw new Error('Transform 10 dormant publication projection drifted from its approved hierarchy contract');
@@ -138,13 +155,37 @@ export function assertApprovedAquinasHierarchyPublication(
   }
 }
 
+export function assertActiveAquinasHierarchyPublication(
+  publication: HistoricalHierarchyPublication,
+  hierarchy: HistoricalEditionHierarchyMaterialization,
+): void {
+  assertActiveAquinasHierarchy(hierarchy);
+  const { cursorIdentity: storedCursorIdentity, ...unsigned } = publication;
+  const expectedUnsigned = aquinasUnsignedPublication(hierarchy, 'active');
+  if (canonicalJson(unsigned) !== canonicalJson(expectedUnsigned)
+    || storedCursorIdentity !== cursorIdentity(expectedUnsigned)) {
+    throw new Error('Transform 13 active publication projection drifted from its approved hierarchy contract');
+  }
+  if (hierarchy.bodies.some(body => body.contentUtf8Bytes > publication.nodeMaxBytes)) {
+    throw new Error('Transform 13 active publication node budget drifted');
+  }
+}
+
+function assertKnownAquinasHierarchyPublication(
+  publication: HistoricalHierarchyPublication,
+  hierarchy: HistoricalEditionHierarchyMaterialization,
+): void {
+  if (publication.activationState === 'active') assertActiveAquinasHierarchyPublication(publication, hierarchy);
+  else assertApprovedAquinasHierarchyPublication(publication, hierarchy);
+}
+
 /** Insert only a projection record; authority bodies and legacy documents are untouched. */
 export function materializeHistoricalHierarchyPublication(
   db: Database.Database,
   publication: HistoricalHierarchyPublicationMaterialization,
   hierarchy: HistoricalEditionHierarchyMaterialization,
 ): void {
-  assertApprovedAquinasHierarchyPublication(publication, hierarchy);
+  assertKnownAquinasHierarchyPublication(publication, hierarchy);
   db.prepare(`INSERT INTO historical_hierarchy_publications (
     publication_id, hierarchy_id, public_slug, title, metadata_json, delivery_kind,
     coverage_json, cursor_contract, cursor_identity, browse_page_size,
@@ -167,7 +208,7 @@ export function assertHistoricalHierarchyPublicationStoredIntegrity(
   expected: HistoricalHierarchyPublication,
   hierarchy: HistoricalEditionHierarchyMaterialization,
 ): void {
-  assertApprovedAquinasHierarchyPublication(expected, hierarchy);
+  assertKnownAquinasHierarchyPublication(expected, hierarchy);
   const row = db.prepare(`SELECT publication_id AS publicationId, hierarchy_id AS hierarchyId, public_slug AS publicSlug,
     title, metadata_json AS metadataJson, delivery_kind AS deliveryKind, coverage_json AS coverageJson,
     cursor_contract AS cursorContract, cursor_identity AS cursorIdentity, browse_page_size AS browsePageSize,
@@ -202,7 +243,7 @@ export function assertHistoricalHierarchyPublicationStoredIntegrity(
     activationState: expected.activationState,
   };
   if (JSON.stringify(stored) !== JSON.stringify(expectedStored)
-    || authority?.availability !== 'local_only_inactive'
+    || authority?.availability !== (expected.activationState === 'active' ? 'local_only_active' : 'local_only_inactive')
     || noDocumentProjection.count !== 0
     || bodyCount.count !== hierarchy.bodies.length
     || ftsCount.count !== hierarchy.bodies.length) {

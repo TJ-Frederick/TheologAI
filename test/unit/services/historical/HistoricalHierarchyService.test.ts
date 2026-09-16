@@ -18,15 +18,16 @@ import { parseHistoricalHierarchyResourceUri } from '../../../../src/kernel/hist
 import { historicalHierarchyOutputSchema } from '../../../../src/mcp/schemas/historicalHierarchy.js';
 import { validatorFor } from '../../../../src/mcp/validation.js';
 import { materializeHistoricalHierarchy } from '../../../../scripts/historical-hierarchy.js';
-import { loadApprovedAquinasHierarchy } from '../../../../scripts/aquinas-source-pack-capacity-comparison.js';
-import { loadApprovedAquinasHierarchyPublication, materializeHistoricalHierarchyPublication } from '../../../../scripts/historical-hierarchy-publication.js';
+import { loadActiveAquinasHierarchy } from '../../../../scripts/active-aquinas-hierarchy.js';
+import { loadActiveAquinasHierarchyPublication, materializeHistoricalHierarchyPublication } from '../../../../scripts/historical-hierarchy-publication.js';
+import { createHistoricalHierarchyHandler } from '../../../../src/tools/v2/historicalHierarchy.js';
 
 const ROOT = process.cwd();
 const internalValidate = validatorFor(historicalHierarchyOutputSchema);
 const sdkValidate = new AjvJsonSchemaValidator().getValidator(historicalHierarchyOutputSchema);
 let db: Database.Database;
 let service: HistoricalHierarchyService;
-let hierarchy: ReturnType<typeof loadApprovedAquinasHierarchy>;
+let hierarchy: ReturnType<typeof loadActiveAquinasHierarchy>;
 
 function expectValidSchema(value: unknown): void {
   expect(internalValidate(value).valid).toBe(true);
@@ -45,17 +46,18 @@ beforeAll(() => {
     '0001_initial_schema.sql', '0002_ubs_parallel_passages.sql', '0003_original_language_usage.sql',
     '0004_ubs_hebrew_semantics.sql', '0005_historical_section_identity_delivery.sql',
     '0006_historical_source_packs.sql', '0007_historical_hierarchy.sql', '0008_historical_hierarchy_publications.sql',
+    '0010_active_aquinas_hierarchy_publication.sql',
   ]) db.exec(readFileSync(join(ROOT, 'migrations', migration), 'utf8'));
-  hierarchy = loadApprovedAquinasHierarchy({ read: path => readFileSync(join(ROOT, path)) });
+  hierarchy = loadActiveAquinasHierarchy({ read: path => readFileSync(join(ROOT, path)) });
   materializeHistoricalHierarchy(db, hierarchy);
-  materializeHistoricalHierarchyPublication(db, loadApprovedAquinasHierarchyPublication(hierarchy), hierarchy);
+  materializeHistoricalHierarchyPublication(db, loadActiveAquinasHierarchyPublication(hierarchy), hierarchy);
   service = new HistoricalHierarchyService(new HistoricalHierarchyRepository(db));
 });
 
 afterAll(() => db.close());
 
-describe('HistoricalHierarchyService dormant delivery seam', () => {
-  it('publishes a strict, compilable, closed schema for every dormant presenter mode', async () => {
+describe('HistoricalHierarchyService active delivery', () => {
+  it('publishes a strict, compilable, closed schema for every active presenter mode', async () => {
     const ajv = new Ajv2020({ strict: true, strictTypes: false, allErrors: true });
     expect(ajv.validateSchema(historicalHierarchyOutputSchema), ajv.errorsText(ajv.errors)).toBe(true);
     expect(() => ajv.compile(historicalHierarchyOutputSchema)).not.toThrow();
@@ -116,7 +118,7 @@ describe('HistoricalHierarchyService dormant delivery seam', () => {
     ]) expectInvalidSchema(invalid);
   });
 
-  it('keeps the dormant envelope generic while retaining closed work-specific disclosures', async () => {
+  it('keeps the active envelope generic while retaining closed work-specific disclosures', async () => {
     const generic = structuredClone(presentHistoricalHierarchyLanding(await service.getLanding('summa-theologiae'))) as any;
     generic.publication = {
       ...generic.publication,
@@ -135,26 +137,29 @@ describe('HistoricalHierarchyService dormant delivery seam', () => {
       ...generic.authority,
       hierarchyId: 'generic-medieval-hierarchy-v1', editionId: 'generic-medieval-edition-v1',
       provenance: {
-        status: 'local_only_inactive', rightsStatus: 'public_domain', territoryCaveat: 'Verify jurisdiction before reuse.',
+        status: 'local_only_active', rightsStatus: 'public_domain', territoryCaveat: 'Verify jurisdiction before reuse.',
         catalogStatement: 'A reviewed local edition.', sourceLabel: 'University archive transcription',
         disclosures: [{ label: 'transcription_basis', values: ['Printed edition, 1890'] }],
-        activation: 'This is a dormant local authority.',
+        activation: 'This is an active local authority.',
       },
     };
     expectValidSchema(generic);
     expect(JSON.stringify(generic)).not.toMatch(/Summa|CCEL|question_range/);
   });
 
-  it('binds a dormant projection to exact authority metadata and explicit partial-Summa coverage', async () => {
+  it('binds an active projection to exact authority metadata and explicit partial-Summa coverage', async () => {
     const landing = await service.getLanding('summa-theologiae');
     expect(landing.publication).toMatchObject({
-      hierarchyId: hierarchy.hierarchy.hierarchyId, activationState: 'dormant', deliveryKind: 'hierarchy_nodes_v1',
+      hierarchyId: hierarchy.hierarchy.hierarchyId, activationState: 'active', deliveryKind: 'hierarchy_nodes_v1',
       canonicalUri: 'theologai://documents/summa-theologiae',
     });
-    expect(landing.profile.availability).toBe('local_only_inactive');
+    expect(landing.profile.availability).toBe('local_only_active');
     expect(landing.publication.coverage.statement).toBe(
       'Includes Prima (q1–119), Prima Secundae (q1–114), Secunda Secundae (q1–189), and Tertia (q1–90, the end of the authored Tertia). The traditional Supplement is excluded.',
     );
+    await expect(service.listPublications()).resolves.toMatchObject([
+      { publication: { publicSlug: 'summa-theologiae', activationState: 'active' } },
+    ]);
   });
 
   it('delivers an exact direct body with bounded ancestry and no descendant concatenation', async () => {
@@ -176,6 +181,7 @@ describe('HistoricalHierarchyService dormant delivery seam', () => {
       getHierarchyProfile: () => landing.profile,
       getHierarchyPublication: () => landing.publication,
       getHierarchyPublicationBySlug: () => landing.publication,
+      listActiveHierarchyPublications: () => [landing.publication],
       listHierarchyArtifacts: () => [],
       getHierarchyNodeContext: () => direct.context,
       listHierarchyChildren: () => children.page,
@@ -223,7 +229,7 @@ describe('HistoricalHierarchyService dormant delivery seam', () => {
     expect(presented.bodyDelivery).toBe('not_included');
   });
 
-  it('keeps internal FTS discovery metadata-only and bounds every dormant presenter output', async () => {
+  it('keeps internal FTS discovery metadata-only and bounds every active presenter output', async () => {
     const search = await service.search('summa-theologiae', 'Sacred Doctrine', 'phrase', 9);
     expect(search.results.length).toBeGreaterThan(0);
     expect(search.results.every(result => !('content' in result.body))).toBe(true);
@@ -241,5 +247,57 @@ describe('HistoricalHierarchyService dormant delivery seam', () => {
     });
     expect(() => presentHistoricalHierarchyNode({ ...node, publication: { ...node.publication, nodeMaxBytes: 1024 } }))
       .toThrow(OutputLimitError);
+  });
+
+  it('rejects dormant publication or authority bindings at the public service boundary', async () => {
+    const landing = await service.getLanding('summa-theologiae');
+    const repository = (overrides: Partial<IHistoricalHierarchyRepository>): IHistoricalHierarchyRepository => ({
+      getHierarchyProfile: () => landing.profile,
+      getHierarchyPublication: () => landing.publication,
+      getHierarchyPublicationBySlug: () => landing.publication,
+      listActiveHierarchyPublications: () => [landing.publication],
+      listHierarchyArtifacts: () => [],
+      getHierarchyNodeContext: () => undefined,
+      listHierarchyChildren: () => ({ nodes: [], hasMore: false, nextAfter: undefined }),
+      getHierarchyNeighbors: () => undefined,
+      searchHierarchyBodies: () => [],
+      ...overrides,
+    });
+    await expect(new HistoricalHierarchyService(repository({
+      getHierarchyPublicationBySlug: () => ({ ...landing.publication, activationState: 'dormant' }),
+    })).getLanding('summa-theologiae')).rejects.toThrow(/not active/);
+    await expect(new HistoricalHierarchyService(repository({
+      getHierarchyProfile: () => ({
+        ...landing.profile,
+        availability: 'local_only_inactive',
+        provenance: { ...landing.profile.provenance, status: 'local_only_inactive' },
+      }),
+    })).getLanding('summa-theologiae')).rejects.toThrow(/not active/);
+  });
+
+  it('routes each closed handler mode through active delivery and keeps bodies direct-node-only', async () => {
+    const handler = createHistoricalHierarchyHandler(service);
+    const landing = await handler.handler({ slug: 'summa-theologiae' });
+    expect(landing).not.toMatchObject({ isError: true });
+    expect(landing.content[0]?.text).toContain('# Summa Theologiae');
+    expect(landing.structuredContent).toMatchObject({ mode: 'landing', publication: { activationState: 'active' } });
+
+    const node = await handler.handler({ slug: 'summa-theologiae', nodeKey: 'question:prima.q001' });
+    expect(node.content[0]?.text).toContain('THE NATURE AND EXTENT OF SACRED DOCTRINE');
+    expect(node.structuredContent).toMatchObject({ mode: 'node', descendants: 'not_included' });
+
+    const children = await handler.handler({ slug: 'summa-theologiae', browseChildren: true, parentNodeKey: 'part:prima' });
+    expect(children.content[0]?.text).toContain('Children of part:prima');
+    expect(children.structuredContent).toMatchObject({ mode: 'children', bodyDelivery: 'not_included' });
+
+    const search = await handler.handler({ slug: 'summa-theologiae', query: 'Sacred Doctrine', match: 'phrase' });
+    expect(search.structuredContent).toMatchObject({ mode: 'search', bodyDelivery: 'not_included' });
+    expect((search.structuredContent as { hits: unknown[] }).hits).toHaveLength(9);
+    expect(JSON.stringify(search)).not.toContain('FIRST ARTICLE [I, Q. 1, Art. 1]');
+
+    await expect(handler.handler({ slug: 'summa-theologiae', nodeKey: 'question:prima.q001', query: 'doctrine' }))
+      .resolves.toMatchObject({ isError: true });
+    await expect(handler.handler({ slug: 'summa-theologiae', query: 'x'.repeat(501) }))
+      .resolves.toMatchObject({ isError: true });
   });
 });
