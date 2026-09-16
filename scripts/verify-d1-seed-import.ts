@@ -187,7 +187,7 @@ function assertRepresentativeFts(db: Database.Database): void {
     (SELECT COUNT(*) FROM historical_edition_hierarchy_bodies_fts) AS backingCount`).get() as {
       baseCount: number; backingCount: number;
     };
-  if (historical.count !== 391 || hierarchy.baseCount !== 0 || hierarchy.backingCount !== 0) {
+  if (historical.count !== 703 || hierarchy.baseCount !== 0 || hierarchy.backingCount !== 0) {
     throw new Error('Imported external-content FTS MATCH/empty-hierarchy sentinel drifted');
   }
 }
