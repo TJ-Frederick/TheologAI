@@ -162,7 +162,7 @@ const FIXTURE_PATH = new URL('../test/fixtures/historical-core-preview-audit.jso
 
 const TOOL_NAMES = [
   'bible_lookup', 'bible_cross_references', 'parallel_passages', 'commentary_lookup',
-  'classic_text_lookup', 'primary_source_search', 'original_language_lookup',
+  'classic_text_lookup', 'historical_hierarchy_lookup', 'primary_source_search', 'original_language_lookup',
   'bible_verse_morphology', 'original_language_study', 'donation_config', 'verify_donation',
 ] as const;
 const PROMPT_NAMES = [
@@ -186,6 +186,9 @@ const TRANSFORM11_WORK_IDS = [
   'kempis-imitation-of-christ',
   'pascal-pensees',
 ] as const;
+const NORTON_DOCUMENT_ID = 'calvin-institutes-of-the-christian-religion';
+const NORTON_EDITION_ID = 'calvin-institutes-norton-1561-eebo-tcp-a17662';
+const HIERARCHY_LANDING_URI = 'theologai://documents/summa-theologiae';
 const EXPECTED_CLASSIC_INPUT_SCHEMA_SHA256 = '45124e704b5e0009b5bc3672c52b0d7ed6e8193063b621a7ccf766d1d2ad00d4';
 const EXPECTED_CLASSIC_OUTPUT_SCHEMA_SHA256 = 'b8a6af9dff44cf8ad9d964661ca76cbe4ab9bcbdc97d9aca85df4edea73a9a7c';
 
@@ -195,7 +198,7 @@ const EXPECTED_FIXTURE = {
   baseline: {
     manifestSchemaVersion: '0006_historical_source_packs',
     d1TransformVersion: 9,
-    expectedCatalogIdentity: { workCount: 35, legacyWorkCount: 17, coreWorkCount: 8, coreSectionCount: 512 },
+    expectedCatalogIdentity: { workCount: 36, legacyWorkCount: 17, coreWorkCount: 8, coreSectionCount: 512 },
     sourcePackId: 'theologai-core-eight',
     expectedCoreEditionProvenanceStatus: 'verified_with_uncertainty',
   },
@@ -204,7 +207,7 @@ const EXPECTED_FIXTURE = {
     { workId: 'john-damascene-exact-exposition', editionId: 'john-damascene-exposition-salmond-npnf2-v9', query: 'two natures', sectionCount: 100, landingResourceUri: 'theologai://documents/john-damascene-exact-exposition', firstSection: { sectionKey: 'book-1-chapter-01', sourceOrdinal: 1, resourceUri: 'theologai://documents/john-damascene-exact-exposition#section-book-1-chapter-01' }, primarySearch: { sectionKey: 'book-3-chapter-16', sourceOrdinal: 60, resourceUri: 'theologai://documents/john-damascene-exact-exposition#section-book-3-chapter-16' } },
     { workId: 'calvin-institutes', editionId: 'calvin-institutes-beveridge-1845', query: 'promises law gospel reconciled', sectionCount: 84, landingResourceUri: 'theologai://documents/calvin-institutes', firstSection: { sectionKey: 'book-1-chapter-01', sourceOrdinal: 1, resourceUri: 'theologai://documents/calvin-institutes#section-book-1-chapter-01' }, primarySearch: { sectionKey: 'book-3-chapter-17', sourceOrdinal: 54, resourceUri: 'theologai://documents/calvin-institutes#section-book-3-chapter-17' } },
     { workId: 'wesley-standard-sermons', editionId: 'wesley-standard-sermons-1771', query: 'salvation by faith', sectionCount: 55, landingResourceUri: 'theologai://documents/wesley-standard-sermons', firstSection: { sectionKey: 'sermon-01', sourceOrdinal: 1, resourceUri: 'theologai://documents/wesley-standard-sermons#section-sermon-01' }, primarySearch: { sectionKey: 'sermon-01', sourceOrdinal: 1, resourceUri: 'theologai://documents/wesley-standard-sermons#section-sermon-01' } },
-    { workId: 'bunyan-pilgrims-progress-part-1', editionId: 'bunyan-pilgrims-progress-part-1', query: 'Christian', sectionCount: 3, landingResourceUri: 'theologai://documents/bunyan-pilgrims-progress-part-1', firstSection: { sectionKey: 'part-01-part-01', sourceOrdinal: 1, resourceUri: 'theologai://documents/bunyan-pilgrims-progress-part-1#section-part-01-part-01' }, primarySearch: { sectionKey: 'part-01-part-01', sourceOrdinal: 1, resourceUri: 'theologai://documents/bunyan-pilgrims-progress-part-1#section-part-01-part-01' } },
+    { workId: 'bunyan-pilgrims-progress-part-1', editionId: 'bunyan-pilgrims-progress-part-1', query: 'Slough Despond', sectionCount: 3, landingResourceUri: 'theologai://documents/bunyan-pilgrims-progress-part-1', firstSection: { sectionKey: 'part-01-part-01', sourceOrdinal: 1, resourceUri: 'theologai://documents/bunyan-pilgrims-progress-part-1#section-part-01-part-01' }, primarySearch: { sectionKey: 'part-01-part-01', sourceOrdinal: 1, resourceUri: 'theologai://documents/bunyan-pilgrims-progress-part-1#section-part-01-part-01' } },
     { workId: 'athanasius-on-incarnation', editionId: 'athanasius-on-incarnation-robertson-npnf2-v4', query: 'renewal creation', sectionCount: 57, landingResourceUri: 'theologai://documents/athanasius-on-incarnation', firstSection: { sectionKey: 'section-001', sourceOrdinal: 1, resourceUri: 'theologai://documents/athanasius-on-incarnation#section-section-001' }, primarySearch: { sectionKey: 'section-001', sourceOrdinal: 1, resourceUri: 'theologai://documents/athanasius-on-incarnation#section-section-001' } },
     { workId: 'irenaeus-against-heresies', editionId: 'irenaeus-against-heresies-anf1-1885', query: 'heresies', sectionCount: 173, landingResourceUri: 'theologai://documents/irenaeus-against-heresies', firstSection: { sectionKey: 'book-1-preface', sourceOrdinal: 1, resourceUri: 'theologai://documents/irenaeus-against-heresies#section-book-1-preface' }, primarySearch: { sectionKey: 'book-1-chapter-28', sourceOrdinal: 29, resourceUri: 'theologai://documents/irenaeus-against-heresies#section-book-1-chapter-28' } },
     { workId: 'anselm-proslogion', editionId: 'anselm-proslogion-deane-1903', query: 'that than which nothing greater', sectionCount: 27, landingResourceUri: 'theologai://documents/anselm-proslogion', firstSection: { sectionKey: 'preface', sourceOrdinal: 1, resourceUri: 'theologai://documents/anselm-proslogion#section-preface' }, primarySearch: { sectionKey: 'chapter-02', sourceOrdinal: 3, resourceUri: 'theologai://documents/anselm-proslogion#section-chapter-02' } },
@@ -457,11 +460,11 @@ function assertInitialize(message: ObjectRecord, profile: HistoricalCoreAuditPro
 
 function assertToolRegistration(message: ObjectRecord, profile: HistoricalCoreAuditProfile): ObjectRecord {
   const listed = array(result(message, 'tools/list').tools, 'tools/list.tools').map(object);
-  assert(listed.every(Boolean) && JSON.stringify(listed.map(tool => tool!.name)) === JSON.stringify(TOOL_NAMES), 'exact 11-tool registration/order drifted');
+  assert(listed.every(Boolean) && JSON.stringify(listed.map(tool => tool!.name)) === JSON.stringify(TOOL_NAMES), 'exact 12-tool registration/order drifted');
   for (const tool of listed) {
     const annotations = object(tool!.annotations);
     assert(annotations?.readOnlyHint === true && annotations.destructiveHint === false && annotations.idempotentHint === true, `${tool!.name} annotations drifted`);
-    const expectedOpenWorld = tool!.name === 'primary_source_search' ? profile.primarySource.openWorldHint : tool!.name === 'classic_text_lookup' ? false : undefined;
+    const expectedOpenWorld = tool!.name === 'primary_source_search' ? profile.primarySource.openWorldHint : ['classic_text_lookup', 'historical_hierarchy_lookup'].includes(String(tool!.name)) ? false : undefined;
     assert(annotations?.openWorldHint === expectedOpenWorld
       && (expectedOpenWorld === undefined ? !Object.hasOwn(annotations!, 'openWorldHint') : Object.hasOwn(annotations!, 'openWorldHint')),
     `${tool!.name} open-world annotation drifted`);
@@ -564,6 +567,7 @@ function expectedResourceUris(fixture: AuditFixture): string[] {
     ...LEGACY_WORK_IDS.map(id => `theologai://documents/${id}`),
     ...fixture.probes.map(probe => probe.landingResourceUri),
     ...TRANSFORM11_WORK_IDS.map(id => `theologai://documents/${id}`),
+    `theologai://documents/${NORTON_DOCUMENT_ID}`, HIERARCHY_LANDING_URI,
   ].sort();
 }
 
@@ -609,9 +613,14 @@ function assertCatalog(message: ObjectRecord, fixture: AuditFixture): ObjectReco
   assert(LEGACY_WORK_IDS.every(id => ids.includes(id)), 'catalog no longer contains the complete 17-work legacy identity');
   const core = fixture.probes.map(probe => works.find(work => work?.id === probe.workId));
   const transform11 = TRANSFORM11_WORK_IDS.map(id => works.find(work => work?.id === id));
-  assert(core.every(Boolean) && transform11.every(Boolean)
-    && works.length === LEGACY_WORK_IDS.length + core.length + transform11.length,
-  'catalog no longer has the exact 35=17+8+10 historical identity');
+  const norton = works.find(work => work?.id === NORTON_DOCUMENT_ID);
+  assert(core.every(Boolean) && transform11.every(Boolean) && norton !== undefined
+    && works.length === LEGACY_WORK_IDS.length + core.length + transform11.length + 1,
+  'catalog no longer has the exact 36=17+8+10+1 historical identity');
+  const nortonProvenance = object(norton.editionProvenance); const nortonReadiness = object(norton.editionReadiness);
+  assert(nortonProvenance?.sourcePackId === 'theologai-norton-1561' && nortonProvenance.editionId === NORTON_EDITION_ID
+    && nortonReadiness?.editionIdentity === 'established' && nortonReadiness.provenance === 'verified_with_uncertainty'
+    && nortonReadiness.normalizedTextRights === 'no_known_conflict', 'Norton edition provenance/readiness drifted');
   for (const [index, work] of core.entries()) {
     const probe = fixture.probes[index]!;
     const provenance = object(work!.editionProvenance); const readiness = object(work!.editionReadiness);
@@ -645,7 +654,7 @@ function assertClassicCatalog(raw: RawToolResult, fixture: AuditFixture): Object
     && catalog?.coverage === 'complete_local_work_inventory' && catalog.delivery === 'metadata_summary'
     && works.length === fixture.baseline.expectedCatalogIdentity.workCount && works.every(Boolean), 'classic-text reviewed registration inventory drifted');
   const ids = works.map(work => requireString(work!.id, 'classic-text catalog work ID'));
-  assert(JSON.stringify(ids.slice().sort()) === JSON.stringify(expectedResourceUris(fixture).filter(uri => uri.startsWith('theologai://documents/'))
+  assert(JSON.stringify(ids.slice().sort()) === JSON.stringify(expectedResourceUris(fixture).filter(uri => uri.startsWith('theologai://documents/') && uri !== HIERARCHY_LANDING_URI)
     .map(uri => uri.slice('theologai://documents/'.length)).sort()), 'classic-text catalog work identities drifted');
   const core = fixture.probes.map(probe => works.find(work => work?.id === probe.workId));
   assert(core.every(Boolean) && core.every(work => work!.deliveryMode === 'sectioned_only'), 'classic-text reviewed sectioned registrations drifted');

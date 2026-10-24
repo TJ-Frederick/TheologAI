@@ -35,7 +35,7 @@ const PAGE_SIZE = 32;
 const EXPECTED_FIXTURE = {
   schemaVersion: 1,
   kind: 'historical-spine-preview-audit-fixture',
-  baseline: { workCount: 10, sectionedOnlyWorkCount: 10, catalogWorkCount: 35 },
+  baseline: { workCount: 10, sectionedOnlyWorkCount: 10, catalogWorkCount: 36 },
   probes: [
     { workId: 'augustine-on-christian-doctrine', editionId: 'augustine-on-christian-doctrine-shaw-npnf1-v2-1887', sourcePackId: 'theologai-historical-spine-early', query: 'rules interpretation Scripture', sectionCount: 120, firstSection: { sectionKey: 'section-preface-001', sourceOrdinal: 1 }, requiresPagination: true },
     { workId: 'basil-on-the-holy-spirit', editionId: 'basil-on-the-holy-spirit-jackson-npnf2-v8-1895', sourcePackId: 'theologai-historical-spine-early', query: 'Holy Spirit Arius', sectionCount: 30, firstSection: { sectionKey: 'section-preface-001', sourceOrdinal: 1 }, requiresPagination: false },
@@ -108,7 +108,7 @@ function assertTools(message: ObjectRecord): void {
   const tools = array(result(message, 'tools/list').tools, 'tools/list.tools').map(object);
   const classic = tools.find(tool => tool?.name === 'classic_text_lookup');
   const primary = tools.find(tool => tool?.name === 'primary_source_search');
-  assert(tools.length === 11 && classic !== undefined && primary !== undefined, 'historical-spine tool registration drifted');
+  assert(tools.length === 12 && classic !== undefined && primary !== undefined, 'historical-spine tool registration drifted');
   for (const tool of [classic, primary]) {
     const annotations = object(tool!.annotations);
     assert(annotations?.readOnlyHint === true && annotations.destructiveHint === false && annotations.idempotentHint === true,

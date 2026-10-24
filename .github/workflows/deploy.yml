@@ -25,6 +25,7 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
@@ -120,6 +121,7 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
@@ -224,6 +226,7 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
@@ -311,9 +314,46 @@ jobs:
             --expected-source-tree "$source_tree" \
             --expected-server-version "$preview_server_version"
 
+  build-worker:
+    name: Build production Worker artifact (no cloud credentials)
+    needs: [verify-deployment-plan, validate]
+    if: ${{ github.ref == 'refs/heads/main' && needs.verify-deployment-plan.outputs.deploy_required == 'true' && needs.verify-deployment-plan.outputs.decision == 'deploy' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      worker_sha256: ${{ steps.worker-artifact.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - run: npm ci --ignore-scripts --no-audit
+
+      - name: Build Worker without cloud credentials
+        run: |
+          npx --no-install wrangler deploy --dry-run --env= --env-file /dev/null --outdir "$RUNNER_TEMP/worker-bundle"
+      - name: Bind Worker artifact to exact source
+        id: worker-artifact
+        run: |
+          digest="$(node scripts/worker-release-artifact.mjs create production "$RUNNER_TEMP/worker-bundle")"
+          printf 'sha256=%s\n' "$digest" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: worker-production-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/worker-bundle/
+          if-no-files-found: error
+          retention-days: 1
+          overwrite: false
+
   deploy:
     name: Test, Build & Deploy
-    needs: [verify-deployment-plan, validate, verify-dual-era-preview]
+    needs: [verify-deployment-plan, validate, verify-dual-era-preview, build-worker]
     if: ${{ github.ref == 'refs/heads/main' && needs.verify-deployment-plan.outputs.deploy_required == 'true' && needs.verify-deployment-plan.outputs.decision == 'deploy' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -332,12 +372,14 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          persist-credentials: false
           fetch-depth: 0
+
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version-file: '.nvmrc'
-          cache: 'npm'
+          package-manager-cache: false
 
       - name: Resolve production release comparison context
         id: production-release-context
@@ -386,7 +428,20 @@ jobs:
             ) throw new Error("protected production deployment plan revalidation failed");
           ' "$verified"
 
-      - run: npm ci --no-audit
+      - uses: ./.github/actions/release-toolchain
+
+      - name: Download source-bound Worker artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: worker-production-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/worker-bundle
+          merge-multiple: false
+          digest-mismatch: error
+      - name: Verify artifact and render upload-only configuration
+        env:
+          EXPECTED_MANIFEST_SHA256: ${{ needs.build-worker.outputs.worker_sha256 }}
+        run: |
+          node scripts/worker-release-artifact.mjs render production "$RUNNER_TEMP/worker-bundle" "$EXPECTED_MANIFEST_SHA256" "$RUNNER_TEMP/worker-release.json"
 
       - name: Download exact protected preview evidence with digest validation
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -444,7 +499,7 @@ jobs:
       - name: Verify candidate production D1 is compatible (read-only)
         run: |
           candidate_d1_name="$(< "$RUNNER_TEMP/production-candidate-d1-name.txt")"
-          npm run d1:remote:check -- --database "$candidate_d1_name" \
+          npx --no-install tsx scripts/check-remote-d1-readiness.ts --database "$candidate_d1_name" \
             --output "$RUNNER_TEMP/production-d1-readiness-receipt.json"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -519,7 +574,7 @@ jobs:
           grep -Eiq '^access-control-allow-methods:[[:space:]]*.*POST.*OPTIONS.*[[:space:]]*$' \
             "$RUNNER_TEMP/preview-mcp-options.headers"
 
-          npm run audit:parallel-preview -- \
+          npx --no-install tsx scripts/audit-parallel-passages-preview.ts \
             --url https://preview-mcp.theologai.xyz/mcp \
             --output "$RUNNER_TEMP/pre-production-preview-mcp-audit.json"
           test -s "$RUNNER_TEMP/pre-production-preview-mcp-audit.json"
@@ -548,16 +603,14 @@ jobs:
 
       - name: Deploy to Cloudflare Workers
         id: production-worker-deploy
-        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
-        with:
-          wranglerVersion: '4.114.0'
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          preCommands: |
-            printf '%s' "$ESV_API_KEY" | npx --no-install wrangler secret put ESV_API_KEY --env=
-          command: deploy --env=
         env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           ESV_API_KEY: ${{ secrets.ESV_API_KEY }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$ESV_API_KEY" | npx --no-install wrangler secret put ESV_API_KEY --env= --env-file /dev/null
+          npx --no-install wrangler deploy --config "$RUNNER_TEMP/worker-release.json" --no-bundle --env-file /dev/null | tee "$RUNNER_TEMP/production-worker-deploy.command-output.txt"
 
       - name: Verify exact active production Worker version (read-only)
         id: production-worker-pre-audit-identity
@@ -565,10 +618,8 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          DEPLOY_COMMAND_OUTPUT: ${{ steps.production-worker-deploy.outputs.command-output }}
           WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
         run: |
-          printf '%s' "$DEPLOY_COMMAND_OUTPUT" > "$RUNNER_TEMP/production-worker-deploy.command-output.txt"
           npx --no-install wrangler versions list --json > "$RUNNER_TEMP/production-worker-versions-after.json"
           npx --no-install wrangler deployments list --json > "$RUNNER_TEMP/production-worker-deployments-after.json"
           npx --no-install tsx scripts/verify-production-worker-deployment.ts verify-deploy \
@@ -644,7 +695,7 @@ jobs:
         if: ${{ steps.production-worker-candidate-cutover.outcome == 'success' }}
         continue-on-error: true
         run: |
-          npm run audit:primary-source-edge-stabilization-production -- \
+          npx --no-install tsx scripts/audit-primary-source-edge-stabilization-production.ts \
             --output "$RUNNER_TEMP/production-primary-source-edge-stabilization.json"
 
       - name: Upload production edge-stabilization evidence
@@ -665,7 +716,7 @@ jobs:
         id: production-original-language-v2-audit
         if: ${{ steps.production-primary-source-edge-stabilization-gate.outcome == 'success' }}
         run: |
-          npm run audit:original-language-v2-production -- \
+          npx --no-install tsx scripts/audit-original-language-v2-production.ts \
             --output "$RUNNER_TEMP/original-language-v2-production-audit.json"
           test -s "$RUNNER_TEMP/original-language-v2-production-audit.json"
 
@@ -673,15 +724,21 @@ jobs:
         id: production-historical-core-audit
         if: ${{ steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' }}
         run: |
-          npm run audit:historical-core-production -- \
+          npx --no-install tsx scripts/audit-historical-core-production.ts \
             --output "$RUNNER_TEMP/historical-core-production-audit.json"
           test -s "$RUNNER_TEMP/historical-core-production-audit.json"
+
+      - name: Respect the shared IP request budget before the spine audit
+        if: ${{ steps.production-historical-core-audit.outcome == 'success' }}
+        # SEC-03 makes all audit User-Agents share one IP allowance. Let the
+        # earlier bounded suites leave the 60-second window; audits never retry.
+        run: sleep 65
 
       - name: Audit Transform-11 historical spine contract on production
         id: production-historical-spine-audit
         if: ${{ steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' && steps.production-historical-core-audit.outcome == 'success' }}
         run: |
-          npm run audit:historical-spine-production -- \
+          npx --no-install tsx scripts/audit-historical-spine-production.ts \
             --output "$RUNNER_TEMP/historical-spine-production-audit.json"
           test -s "$RUNNER_TEMP/historical-spine-production-audit.json"
 

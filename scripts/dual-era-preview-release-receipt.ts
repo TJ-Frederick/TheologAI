@@ -20,7 +20,7 @@ export interface DualEraPreviewReleaseReceipt {
   productProfile: '7';
   protocols: ['2025-11-25', '2026-07-28'];
   server: { name: 'theologai-bible-server'; version: string };
-  counts: { tools: 11; prompts: 6; resourceTemplates: 2; staticResources: 3 };
+  counts: { tools: 12; prompts: 6; resourceTemplates: 2; staticResources: 3 };
   contractFingerprints: DualEraMcpAudit['eras'][number]['fingerprints'];
   auditSha256: string;
   worker: { deploymentId: string; versionId: string; versionNumber: number };
@@ -76,7 +76,7 @@ function parseAudit(text: string): DualEraMcpAudit {
     exactKeys(fingerprints, ['capabilities', 'tools', 'prompts', 'resourceTemplates', 'staticResources'], `dual-era audit ${protocol} fingerprints`);
     if (era.protocolVersion !== protocol || era.serverName !== 'theologai-bible-server'
       || typeof era.serverVersion !== 'string' || era.serverVersion.length === 0
-      || counts.tools !== 11 || counts.prompts !== 6 || counts.resourceTemplates !== 2 || counts.staticResources !== 3
+      || counts.tools !== 12 || counts.prompts !== 6 || counts.resourceTemplates !== 2 || counts.staticResources !== 3
       || !Object.values(fingerprints).every(value => typeof value === 'string' && /^[0-9a-f]{64}$/.test(value))) {
       fail(`dual-era audit ${protocol} contract is malformed`);
     }
@@ -170,7 +170,7 @@ export function verifyDualEraPreviewReleaseReceipt(receipt: unknown, expected: {
   exactKeys(d1, ['databaseName', 'databaseId'], 'receipt D1');
   if (server.name !== 'theologai-bible-server' || server.version !== expected.serverVersion
     || value.endpoint !== 'https://preview-mcp.theologai.xyz/mcp'
-    || counts.tools !== 11 || counts.prompts !== 6 || counts.resourceTemplates !== 2 || counts.staticResources !== 3
+    || counts.tools !== 12 || counts.prompts !== 6 || counts.resourceTemplates !== 2 || counts.staticResources !== 3
     || !Object.values(fingerprints).every(item => typeof item === 'string' && /^[0-9a-f]{64}$/.test(item))
     || !isSha256(value.auditSha256) || !isSha256(value.d1ReadinessSha256)
     || !isUuid(worker.deploymentId) || !isUuid(worker.versionId)

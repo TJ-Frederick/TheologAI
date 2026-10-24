@@ -1,5 +1,6 @@
 import type { Env } from '../../worker-env.js';
 import { responseWithCors, type GuardResponse } from './requestPolicy.js';
+import { hashRateLimitIp } from './rateLimitIdentity.js';
 import {
   logWorkerSecurityEvent,
   safeErrorName,
@@ -9,26 +10,6 @@ import {
 export const RATE_LIMIT_REQUESTS = 120;
 export const RATE_LIMIT_PERIOD_SECONDS = 60;
 
-interface ClientIdentity {
-  ip: string;
-  userAgent: string;
-}
-
-function getClientIdentity(request: Request): ClientIdentity {
-  return {
-    ip: request.headers.get('CF-Connecting-IP') ?? '',
-    userAgent: request.headers.get('User-Agent') ?? '',
-  };
-}
-
-async function hashClientIdentity(identity: ClientIdentity): Promise<string> {
-  const input = new TextEncoder().encode(
-    `theologai-rate-limit-v1\0${identity.ip}\0${identity.userAgent}`,
-  );
-  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', input));
-  return [...digest].map(byte => byte.toString(16).padStart(2, '0')).join('');
-}
-
 export async function getRateLimitResponse(
   env: Env,
   request: Request,
@@ -36,7 +17,9 @@ export async function getRateLimitResponse(
   origin: string | null,
 ): Promise<GuardResponse | null> {
   try {
-    const key = await hashClientIdentity(getClientIdentity(request));
+    // Missing trusted identity shares one conservative bucket. Never fall back
+    // to spoofable Forwarded/X-Forwarded-For or User-Agent values.
+    const key = await hashRateLimitIp(request.headers.get('CF-Connecting-IP') ?? '', 'theologai-rate-limit-v2');
     const { success } = await env.THEOLOGAI_RATE_LIMITER.limit({ key });
     if (success) return null;
 
@@ -45,7 +28,7 @@ export async function getRateLimitResponse(
       status: 429,
       limit: RATE_LIMIT_REQUESTS,
       periodSeconds: RATE_LIMIT_PERIOD_SECONDS,
-      scope: 'hashed_ip_user_agent_per_colo',
+      scope: 'hashed_ip_per_colo',
     });
 
     return {

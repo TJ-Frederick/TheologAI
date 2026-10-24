@@ -4,7 +4,7 @@
   "baseline": {
     "workCount": 10,
     "sectionedOnlyWorkCount": 10,
-    "catalogWorkCount": 35
+    "catalogWorkCount": 36
   },
   "probes": [
     { "workId": "augustine-on-christian-doctrine", "editionId": "augustine-on-christian-doctrine-shaw-npnf1-v2-1887", "sourcePackId": "theologai-historical-spine-early", "query": "rules interpretation Scripture", "sectionCount": 120, "firstSection": { "sectionKey": "section-preface-001", "sourceOrdinal": 1 }, "requiresPagination": true },

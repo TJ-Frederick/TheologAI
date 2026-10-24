@@ -57,6 +57,10 @@ different migration behavior:
 - Preview MCP: `https://theologai-preview.tjfrederick.workers.dev/mcp` remains
   a direct compatibility and rollback endpoint for the preview Worker.
 
+Configure clients with the canonical production URL directly. Current MCP
+TypeScript clients reject cross-origin redirects by default, including the
+legacy production host's redirect.
+
 Remote MCP client configuration:
 
 ```json
@@ -378,7 +382,7 @@ Source hashes and expected database counts live in
 
 Requirements:
 
-- Node.js 22 (the exact tested version is in `.nvmrc`).
+- Node.js 22.23.4 or later within Node 22 (the exact tested version is in `.nvmrc`).
 - npm.
 - `sqlite3` for the D1 seed export/import workflow.
 
@@ -433,11 +437,18 @@ HTTP configuration:
 | `HOST` | `127.0.0.1` | Listen address. |
 | `MCP_ALLOWED_HOSTS` | Loopback hosts | Additional accepted Host names. |
 | `MCP_ALLOWED_ORIGINS` | `https://theologai.pages.dev` | Comma-separated exact browser origins. Hosted Workers explicitly accept both `https://theologai.xyz` and this legacy website origin during migration. |
-| `MCP_MAX_BODY_BYTES` | `1048576` | Maximum request body size. |
+| `MCP_MAX_BODY_BYTES` | `65536` | Request body budget in bytes; may be lowered, with a hard ceiling of 64 KiB. |
 | `THEOLOGAI_DATABASE_PATH` | `data/theologai.db` | Explicit derived SQLite database path. |
 
 Native MCP clients without an `Origin` header are supported. Browser requests
 must supply an exact configured origin.
+
+Both HTTP transports reject input exceeding 64 KiB or the shared complexity
+budget before SDK validation: depth 16, 1,024 total entries, 128 entries per
+object/array, 16,384 characters per string, and 256 characters per object key.
+The Worker setting `THEOLOGAI_MAX_REQUEST_BYTES` can lower the byte budget.
+The shared server also enforces the complexity budget for stdio requests.
+These limits apply to requests; tool output retains its advertised schemas.
 
 ## Verification commands
 

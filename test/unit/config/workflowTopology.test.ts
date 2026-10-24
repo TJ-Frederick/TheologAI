@@ -1,6 +1,8 @@
 import { spawnSync } from 'node:child_process';
 import { parse, stringify } from 'yaml';
-import { readFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 async function readWorkflow(name: string): Promise<string> {
@@ -45,6 +47,7 @@ const REVOCATION_PREDICATE = normalized(`
 `);
 
 interface Step {
+  id?: string;
   name?: string;
   uses?: string;
   run?: string;
@@ -109,6 +112,171 @@ function assertProductionBoundary(workflow: Workflow): void {
 }
 
 describe('workflow topology', () => {
+  it('keeps root dependencies and builds out of every credential-bearing job', async () => {
+    for (const name of [
+      'deploy.yml', 'pr.yml', 'bootstrap-ccel-coordinator.yml',
+      'operate-ccel-coordinator.yml', 'stage-ccel-operator-secret.yml',
+      'promote-ccel-operator-secret.yml', 'rollback-ccel-operator-secret.yml',
+      'ccel-live-preview-canary.yml', 'restore-ccel-live-preview-canary.yml',
+      'production-rollback-rehearsal.yml',
+    ]) {
+      const workflow = parse(await readWorkflow(name)) as Workflow;
+      for (const job of Object.values(workflow.jobs)) {
+        if (!job.environment) {
+          expect(JSON.stringify(job), name).not.toContain('secrets.');
+          continue;
+        }
+        const source = JSON.stringify(job);
+        expect(source, name).not.toMatch(/npm ci|npm install|npm run|wrangler-action@/);
+        expect(source, name).toContain('/.github/actions/release-toolchain');
+        for (const step of job.steps ?? []) {
+          if (step.run?.includes('wrangler deploy --config') || step.run?.includes('wrangler versions upload')) {
+            expect(step.run, name).toContain('--no-bundle');
+          }
+          if (step.uses?.startsWith('actions/checkout@')) expect(step.with?.['persist-credentials'], name).toBe(false);
+        }
+      }
+    }
+    const action = await readFile(new URL('../../../.github/actions/release-toolchain/action.yml', import.meta.url), 'utf8');
+    expect(action).toContain('test ! -e node_modules');
+    expect(action).toContain('test ! -L node_modules');
+    expect(action).toContain('npm ci --prefix "$toolchain_dir" --ignore-scripts');
+    expect(action).toContain('npm rebuild --prefix "$toolchain_dir" better-sqlite3 --ignore-scripts=false');
+    expect(action).toContain('package-manager-cache: false');
+    expect(action).not.toMatch(/^\s+cache:/m);
+    const manifest = JSON.parse(await readFile(new URL('../../../.github/release-toolchain/package.json', import.meta.url), 'utf8'));
+    expect(Object.keys(manifest.dependencies).sort()).toEqual([
+      '@modelcontextprotocol/client', 'ajv', 'better-sqlite3', 'parse5', 'smol-toml', 'tsx', 'wrangler',
+    ]);
+    for (const version of Object.values(manifest.dependencies)) expect(version).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(manifest.scripts).toBeUndefined();
+  });
+
+  it('paces the long fixed audits within the shared per-IP request budget', async () => {
+    for (const [file, target, jobId] of [['pr.yml', 'preview', 'preview-deploy'], ['deploy.yml', 'production', 'deploy']] as const) {
+      const steps = (parse(await readWorkflow(file)) as Workflow).jobs[jobId]!.steps!;
+      const core = steps.findIndex(step => step.name === `Audit Transform-9 historical core contract on ${target}`);
+      const pause = steps.findIndex(step => step.name === 'Respect the shared IP request budget before the spine audit');
+      const spine = steps.findIndex(step => step.name === `Audit Transform-11 historical spine contract on ${target}`);
+      expect(pause).toBeGreaterThan(core);
+      expect(spine).toBeGreaterThan(pause);
+      const seconds = /^sleep (\d+)$/.exec(steps[pause]!.run ?? '');
+      expect(seconds).not.toBeNull();
+      expect(Number(seconds![1])).toBeGreaterThan(60);
+      expect(steps[pause]!.if).toBe(`\${{ steps.${target}-historical-core-audit.outcome == 'success' }}`);
+    }
+  });
+
+  it('captures final deploy stdout for strict identity proof and propagates upload failures', async () => {
+    for (const [file, target, jobId] of [['pr.yml', 'preview', 'preview-deploy'], ['deploy.yml', 'production', 'deploy']] as const) {
+      const workflow = parse(await readWorkflow(file)) as Workflow;
+      const steps = workflow.jobs[jobId]!.steps!;
+      const deploy = steps.find(step => step.id === `${target}-worker-deploy`)!;
+      const verify = steps.find(step => step.name === `Verify exact active ${target} Worker version (read-only)`)!;
+      const directory = await mkdtemp(join(tmpdir(), 'theologai-deploy-stdout-'));
+      try {
+        const bin = join(directory, 'bin');
+        await mkdir(bin);
+        await writeFile(join(bin, 'npx'), `#!/usr/bin/env node
+          if (process.argv.includes('put')) {
+            require('node:fs').readFileSync(0);
+            console.log('Secret update created an intermediate version');
+          } else {
+            console.log('Current Version ID: 223e4567-e89b-42d3-a456-426614174000');
+            process.exitCode = Number(process.env.DEPLOY_EXIT_STATUS || 0);
+          }
+        `, { mode: 0o755 });
+        for (const code of [0, 7]) {
+          const result = spawnSync('bash', ['-e', '-c', deploy.run!], {
+            cwd: directory,
+            env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, RUNNER_TEMP: directory,
+              ESV_API_KEY: 'offline-test-only', DEPLOY_EXIT_STATUS: String(code) },
+          });
+          expect(result.status).toBe(code);
+          expect(await readFile(join(directory, `${target}-worker-deploy.command-output.txt`), 'utf8'))
+            .toBe('Current Version ID: 223e4567-e89b-42d3-a456-426614174000\n');
+        }
+        expect(verify.run).toContain(`--command-output "$RUNNER_TEMP/${target}-worker-deploy.command-output.txt"`);
+        expect(JSON.stringify(verify)).not.toContain('outputs.command-output');
+        expect(verify.run).not.toContain('DEPLOY_COMMAND_OUTPUT');
+      } finally {
+        await rm(directory, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it('requires a credential-free build and verifies the artifact digest and source', async () => {
+    for (const [file, id] of [['deploy.yml', 'deploy'], ['pr.yml', 'preview-deploy']] as const) {
+      const workflow = parse(await readWorkflow(file)) as Workflow;
+      const build = workflow.jobs['build-worker']!;
+      expect(build.environment).toBeUndefined();
+      expect(JSON.stringify(build)).not.toContain('secrets.');
+      expect(JSON.stringify(build)).toContain('worker-release-artifact.mjs create');
+      const deploy = workflow.jobs[id]!;
+      expect(needs(deploy)).toContain('build-worker');
+      expect(JSON.stringify(deploy)).toContain('needs.build-worker.outputs.worker_sha256');
+      expect(JSON.stringify(deploy)).toContain('worker-release-artifact.mjs render');
+      const download = deploy.steps!.find(step => step.name === 'Download source-bound Worker artifact')!;
+      expect(download.with?.['digest-mismatch']).toBe('error');
+      expect(download.with?.name).toContain('github.run_attempt');
+    }
+    const preview = (parse(await readWorkflow('pr.yml')) as Workflow).jobs['preview-deploy']!;
+    expect(preview.steps?.find(step => step.with?.path === 'release-control')?.with?.ref).toBe('${{ github.event.pull_request.base.sha }}');
+    expect(preview.steps?.find(step => step.uses === './release-control/.github/actions/release-toolchain')?.if)
+      .toBe("steps.release-toolchain-source.outputs.source == 'base'");
+    expect(preview.steps?.find(step => step.uses === './.github/actions/release-toolchain')?.if)
+      .toBe("steps.release-toolchain-source.outputs.source == 'introduction'");
+  });
+
+  it('bootstraps only a wholly new release trust set and rejects a broken protected-base copy', async () => {
+    const preview = (parse(await readWorkflow('pr.yml')) as Workflow).jobs['preview-deploy']!;
+    const selection = preview.steps!.find(step => step.name === 'Select release toolchain source')!.run!;
+    const files = ['.github/actions/release-toolchain/action.yml', '.github/release-toolchain/package.json', '.github/release-toolchain/package-lock.json'];
+    for (const [baseCount, candidatePresent, symbolicBase, expected] of [
+      [0, true, false, 'introduction'], [3, true, false, 'base'],
+      [1, true, false, null], [2, true, false, null],
+      [0, false, false, null], [3, true, true, null],
+    ] as const) {
+      const directory = await mkdtemp(join(tmpdir(), 'theologai-release-selection-'));
+      try {
+        for (let index = 0; index < files.length; index++) {
+          const path = join(directory, files[index]!);
+          await mkdir(dirname(path), { recursive: true });
+          if (candidatePresent) await writeFile(path, 'reviewed release tooling');
+          if (index < baseCount) {
+            const base = join(directory, 'release-control', files[index]!);
+            await mkdir(dirname(base), { recursive: true });
+            if (symbolicBase && index === 0) await symlink(path, base);
+            else await writeFile(base, 'protected base release tooling');
+          }
+        }
+        const output = join(directory, 'output');
+        const result = spawnSync('bash', ['-e', '-c', selection], { cwd: directory, env: { ...process.env, GITHUB_OUTPUT: output } });
+        expect(result.status === 0).toBe(expected !== null);
+        if (expected !== null) expect(await readFile(output, 'utf8')).toBe(`source=${expected}\n`);
+      } finally {
+        await rm(directory, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it('preserves approved preview deployment and recovery without an SEC-06 migration gate', async () => {
+    for (const [file, id] of [
+      ['pr.yml', 'preview-deploy'], ['ccel-live-preview-canary.yml', 'canary'],
+      ['restore-ccel-live-preview-canary.yml', 'restore'],
+    ] as const) {
+      const job = (parse(await readWorkflow(file)) as Workflow).jobs[id]!;
+      const tools = job.steps!.findIndex(step => step.uses?.endsWith('/.github/actions/release-toolchain'));
+      const cloud = job.steps!.findIndex(step => JSON.stringify(step).includes('secrets.CLOUDFLARE') || JSON.stringify(step).includes('secrets.CCEL_CANARY'));
+      expect(JSON.stringify(job), file).not.toMatch(/require-preview-isolation|PREVIEW_DEPLOYMENT_ISOLATED|SEC-06/);
+      expect(job.environment, file).toBeDefined();
+      expect(tools, file).toBeGreaterThan(-1);
+      expect(cloud, file).toBeGreaterThan(tools);
+    }
+    const production = parse(await readWorkflow('deploy.yml')) as Workflow;
+    assertProductionBoundary(production);
+    expect(JSON.stringify(production.jobs.deploy)).toContain('scripts/dual-era-preview-release-receipt.ts verify');
+  });
   it('keeps local validation unprivileged and requires it before protected production', async () => {
     const workflow = parse(await readWorkflow('deploy.yml')) as Workflow;
     const validation = parse(await readWorkflow('validate.yml')) as Workflow;
@@ -254,7 +422,7 @@ describe('workflow topology', () => {
     expect(preflight).toContain('name: Validate dispatch inputs (unprotected)');
     expect(preflight).toContain("test \"$DISPATCH_REF\" = 'refs/heads/main'");
     expect(preflight).toContain('grep -Eiq');
-    expect(job).toContain('needs: preflight');
+    expect(job).toContain('needs: [preflight, historical-local-gates]');
     expect(job).toContain("if: ${{ needs.preflight.result == 'success' && github.ref == 'refs/heads/main' }}");
     expect(job).toContain('environment:\n      name: production\n      deployment: false');
     expect(job).not.toContain('url:');
@@ -281,7 +449,7 @@ describe('workflow topology', () => {
     expect(workflow).toContain('capture-bounded-command.mjs');
     expect(workflow).not.toContain('node_modules/.bin/tsx" "$GITHUB_WORKSPACE/scripts/capture-bounded-command');
     const installVerifier = uniqueBlock(job, '      - name: Install verifier dependencies');
-    expect(installVerifier).toContain('node "$GITHUB_WORKSPACE/scripts/capture-bounded-command.mjs"');
+    expect(installVerifier).toContain('uses: ./.github/actions/release-toolchain');
     expect(workflow).not.toContain('WRANGLER_LOG_PATH');
     expect(workflow).not.toMatch(/^\s*[^#\n]*>\s*["']?\$RUNNER_TEMP/m);
     for (const step of workflow.split('\n      - ')) {
@@ -317,7 +485,7 @@ describe('workflow topology', () => {
     }
     expect(localGate.match(/\$RUNNER_TEMP\/pr108-theologai\.db/g)).toHaveLength(3);
     expect(localGate).toContain('--clean');
-    expect(workflow.match(/^          persist-credentials: false$/gm)).toHaveLength(2);
+    expect(workflow.match(/^          persist-credentials: false$/gm)).toHaveLength(4);
     expect(workflow).not.toMatch(/wrangler\s+rollback|versions\s+upload|wrangler\s+deploy(?!ments)/i);
     expect(workflow).not.toMatch(/d1\s+(execute|migrations|delete|create|update)|secret\s+(put|delete)|triggers\s+deploy/i);
     expect(workflow).not.toContain('github-token:');

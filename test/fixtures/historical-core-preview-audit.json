@@ -5,7 +5,7 @@
     "manifestSchemaVersion": "0006_historical_source_packs",
     "d1TransformVersion": 9,
     "expectedCatalogIdentity": {
-      "workCount": 35,
+      "workCount": 36,
       "legacyWorkCount": 17,
       "coreWorkCount": 8,
       "coreSectionCount": 512
@@ -85,7 +85,7 @@
     {
       "workId": "bunyan-pilgrims-progress-part-1",
       "editionId": "bunyan-pilgrims-progress-part-1",
-      "query": "Christian",
+      "query": "Slough Despond",
       "sectionCount": 3,
       "landingResourceUri": "theologai://documents/bunyan-pilgrims-progress-part-1",
       "firstSection": {

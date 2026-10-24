@@ -235,7 +235,7 @@ function fakeTools(): Array<Record<string, unknown>> {
   const annotations = { readOnlyHint: true, destructiveHint: false, idempotentHint: true };
   return [
     'bible_lookup', 'bible_cross_references', 'parallel_passages', 'commentary_lookup',
-    'classic_text_lookup', 'primary_source_search', 'original_language_lookup',
+    'classic_text_lookup', 'historical_hierarchy_lookup', 'primary_source_search', 'original_language_lookup',
     'bible_verse_morphology', 'original_language_study', 'donation_config', 'verify_donation',
   ].map(name => name === 'original_language_study'
     ? { name, annotations, inputSchema: structuredClone(originalLanguageStudyV2InputSchema), outputSchema: structuredClone(originalLanguageStudyV2OutputSchema) }
