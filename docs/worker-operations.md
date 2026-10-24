@@ -684,9 +684,10 @@ The public Worker remains anonymous. It uses Cloudflare's Rate Limiting binding
 as an abuse-control boundary, not as authentication or exact usage accounting.
 
 - Limit: 120 accepted MCP requests per 60 seconds.
-- Key: SHA-256 of a versioned combination of `CF-Connecting-IP` and
-  `User-Agent`.
-- Scope: per fingerprint, per Cloudflare location. Cloudflare's counters are
+- Key: SHA-256 of a versioned `CF-Connecting-IP` identity. Changing or omitting
+  `User-Agent` does not create another allowance. Requests without a trusted
+  client IP share one bucket; forwarded headers are not identity fallbacks.
+- Scope: per IP, per Cloudflare location. Cloudflare's counters are
   permissive and eventually consistent, so brief bursts can exceed the nominal
   limit.
 - Exemptions: rejected origins, unknown paths, unsupported methods, and CORS
@@ -697,6 +698,21 @@ as an abuse-control boundary, not as authentication or exact usage accounting.
 Production and preview deliberately use different namespace IDs in
 `wrangler.toml`. Reusing a namespace ID would make equal keys share counters
 across Workers in the same Cloudflare account.
+
+The signed operator route likewise uses a distinct, hashed IP budget of 12
+authentication attempts per 60 seconds and fails closed without a trusted IP.
+Its limiter namespace and hash domain remain separate from public MCP traffic.
+
+### Request size and complexity
+
+Both HTTP transports enforce a 64 KiB request-body ceiling; configured byte
+budgets can lower it. Older configured values retained by release/rollback
+records are clamped to that runtime ceiling. Before SDK/schema validation, requests are limited to
+depth 16, 1,024 total entries, 128 entries per object/array, 16,384 characters
+per string, and 256 characters per object key. Oversized or excessive-complexity
+HTTP requests return 413. Invalid JSON retains the existing parse-error path.
+Shared stdio handlers also enforce the complexity limits. Validation diagnostics
+are bounded, and output schemas retain their existing result budgets.
 
 ### Failure policy and telemetry
 

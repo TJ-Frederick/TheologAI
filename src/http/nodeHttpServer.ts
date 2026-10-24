@@ -12,6 +12,7 @@ import type { ToolExecutionObserver } from '../mcp/toolExecutionObserver.js';
 import { THEOLOGAI_VERSION } from '../server.js';
 import { normalizeHostname, type NodeHttpConfig } from './config.js';
 import { INTERNAL_MCP_ERROR } from './mcpErrors.js';
+import { exceedsMcpInputLimits, MCP_INPUT_LIMIT_MESSAGE, MCP_MAX_REQUEST_BODY_BYTES } from '../mcp/inputLimits.js';
 
 export interface HttpTelemetryEvent {
   event: string;
@@ -228,6 +229,7 @@ export function createNodeHttpServer(options: NodeHttpServerOptions): NodeHttpRu
 }
 
 async function readJsonBody(req: IncomingMessage, maxBytes: number): Promise<BodyResult> {
+  maxBytes = Math.min(maxBytes, MCP_MAX_REQUEST_BODY_BYTES);
   const declaredLength = singleHeader(req.headers['content-length']);
   if (declaredLength !== undefined) {
     const length = Number(declaredLength);
@@ -275,7 +277,10 @@ async function readJsonBody(req: IncomingMessage, maxBytes: number): Promise<Bod
       settled = true;
       const text = Buffer.concat(chunks).toString('utf8');
       try {
-        resolve({ ok: true, body: text ? JSON.parse(text) : undefined });
+        const body: unknown = text ? JSON.parse(text) : undefined;
+        resolve(exceedsMcpInputLimits(body)
+          ? { ok: false, status: 413, message: MCP_INPUT_LIMIT_MESSAGE }
+          : { ok: true, body });
       } catch {
         resolve({ ok: false, status: 400, message: 'Invalid JSON body' });
       }

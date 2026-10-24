@@ -463,7 +463,7 @@ describe('CCEL live preview canary transaction', () => {
       commit: 'not-a-sha', predecessor, canary, productionControl: production,
       auditSha256: 'b'.repeat(64), auditOutcome: 'failure', restored: true,
     })).toThrow(/commit/);
-    expect(workflow.match(/npm run audit:ccel-preview/g)).toHaveLength(1);
+    expect(workflow.match(/npx --no-install tsx scripts\/audit-ccel-preview\.ts/g)).toHaveLength(1);
     expect(workflow).toContain('I AUTHORIZE TWO LIVE CCEL PREVIEW REQUESTS');
     expect(workflow).not.toMatch(/labels\.\*\.name.*deploy-preview/);
     expect(workflow).toMatch(/^on:\n  workflow_dispatch:/m);

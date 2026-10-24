@@ -1,6 +1,8 @@
+import { MCP_MAX_REQUEST_BODY_BYTES } from '../mcp/inputLimits.js';
+
 export const DEFAULT_HTTP_HOST = '127.0.0.1';
 export const DEFAULT_ALLOWED_ORIGIN = 'https://theologai.pages.dev';
-export const DEFAULT_MAX_BODY_BYTES = 1024 * 1024;
+export const DEFAULT_MAX_BODY_BYTES = MCP_MAX_REQUEST_BODY_BYTES;
 
 export interface NodeHttpConfig {
   host: string;
@@ -17,11 +19,11 @@ export function readNodeHttpConfig(
   const host = env.HOST?.trim() || DEFAULT_HTTP_HOST;
   const port = parsePort(env.PORT, options.allowEphemeralPort ?? false);
   const allowedOrigins = parseOrigins(env.MCP_ALLOWED_ORIGINS);
-  const maxBodyBytes = parsePositiveInteger(
+  const maxBodyBytes = Math.min(MCP_MAX_REQUEST_BODY_BYTES, parsePositiveInteger(
     env.MCP_MAX_BODY_BYTES,
     'MCP_MAX_BODY_BYTES',
     DEFAULT_MAX_BODY_BYTES,
-  );
+  ));
   const configuredHosts = parseList(env.MCP_ALLOWED_HOSTS).map(normalizeHostname);
   const allowedHosts = unique([
     normalizeHostname(host),

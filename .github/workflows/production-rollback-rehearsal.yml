@@ -60,9 +60,74 @@ jobs:
             printf '%s' "$value" | grep -Eiq '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
           done
 
+  historical-local-gates:
+    name: Historical PR108 local gates (no cloud credentials)
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: '.nvmrc'
+      - name: Check out exact historical PR108 source separately
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: 8da99fd0a161b90a4bd90ab29bde1abf796b3bf6
+          path: pr108-source
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify exact historical source identity
+        env:
+          PR108_COMMIT: 8da99fd0a161b90a4bd90ab29bde1abf796b3bf6
+          PR108_TREE: a59d9a062b2e6c7884de97fd97309878e1cbdc23
+        run: |
+          set -euo pipefail
+          test "$(git -C pr108-source rev-parse HEAD)" = "$PR108_COMMIT"
+          test "$(git -C pr108-source rev-parse HEAD^{tree})" = "$PR108_TREE"
+
+      - name: Run historical PR108 local gates without credentials
+        run: |
+          set -euo pipefail
+          capture() {
+            stdout="$1"; stderr="$2"; result="$3"; shift 3
+            node "$GITHUB_WORKSPACE/scripts/capture-bounded-command.mjs" \
+              --stdout "$stdout" --stderr "$stderr" --result "$result" --cwd "$GITHUB_WORKSPACE/pr108-source" \
+              --max-bytes 8388608 -- "$@"
+            jq -e '(.schemaVersion == "theologai-bounded-command.v1") and (.exitStatus == 0) and (.overflow == false)' "$result"
+          }
+          capture "$RUNNER_TEMP/pr108-npm-ci.out" "$RUNNER_TEMP/pr108-npm-ci.err" "$RUNNER_TEMP/pr108-npm-ci.result.json" npm ci --no-audit
+          capture "$RUNNER_TEMP/pr108-build-db.out" "$RUNNER_TEMP/pr108-build-db.err" "$RUNNER_TEMP/pr108-build-db.result.json" npm run build:db -- --output "$RUNNER_TEMP/pr108-theologai.db"
+          capture "$RUNNER_TEMP/pr108-verify-db.out" "$RUNNER_TEMP/pr108-verify-db.err" "$RUNNER_TEMP/pr108-verify-db.result.json" npm run data:verify-db -- --database "$RUNNER_TEMP/pr108-theologai.db"
+          capture "$RUNNER_TEMP/pr108-seed-export.out" "$RUNNER_TEMP/pr108-seed-export.err" "$RUNNER_TEMP/pr108-seed-export.result.json" npm run d1:seed:export -- --database "$RUNNER_TEMP/pr108-theologai.db" --clean
+          capture "$RUNNER_TEMP/pr108-seed-verify.out" "$RUNNER_TEMP/pr108-seed-verify.err" "$RUNNER_TEMP/pr108-seed-verify.result.json" npm run d1:seed:verify
+          capture "$RUNNER_TEMP/pr108-workerd.out" "$RUNNER_TEMP/pr108-workerd.err" "$RUNNER_TEMP/pr108-workerd.result.json" npm run d1:seed:verify-workerd
+          capture "$RUNNER_TEMP/pr108-runtime.out" "$RUNNER_TEMP/pr108-runtime.err" "$RUNNER_TEMP/pr108-runtime.result.json" npm run test:worker-production-runtime
+
+      - name: Retain bounded local gate evidence for protected verification
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pr108-local-gates-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/pr108-runtime.out
+            ${{ runner.temp }}/pr108-runtime.err
+            ${{ runner.temp }}/pr108-npm-ci.out
+            ${{ runner.temp }}/pr108-npm-ci.err
+            ${{ runner.temp }}/pr108-workerd.out
+            ${{ runner.temp }}/pr108-workerd.err
+          if-no-files-found: error
+          retention-days: 1
+          overwrite: false
+
   rehearse:
     name: Rehearse PR108 rollback without traffic
-    needs: preflight
+    needs: [preflight, historical-local-gates]
     if: ${{ needs.preflight.result == 'success' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -87,19 +152,8 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version-file: '.nvmrc'
-          cache: npm
-
       - name: Install verifier dependencies
-        run: |
-          set -euo pipefail
-          node "$GITHUB_WORKSPACE/scripts/capture-bounded-command.mjs" \
-            --stdout "$RUNNER_TEMP/verifier-npm-ci.out" --stderr "$RUNNER_TEMP/verifier-npm-ci.err" \
-            --result "$RUNNER_TEMP/verifier-npm-ci.result.json" --max-bytes 8388608 -- npm ci --no-audit
-          jq -e '(.schemaVersion == "theologai-bounded-command.v1") and (.exitStatus == 0) and (.overflow == false)' \
-            "$RUNNER_TEMP/verifier-npm-ci.result.json"
+        uses: ./.github/actions/release-toolchain
 
       - name: Verify pinned Wrangler version
         run: |
@@ -129,6 +183,16 @@ jobs:
           test "$(git -C pr108-source rev-parse HEAD)" = "$PR108_COMMIT"
           test "$(git -C pr108-source rev-parse HEAD^{tree})" = "$PR108_TREE"
 
+      - name: Download historical local gate evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: pr108-local-gates-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}
+          digest-mismatch: error
+          merge-multiple: false
+      - name: Use release toolchain for historical read-only readiness
+        run: ln -s "$GITHUB_WORKSPACE/node_modules" pr108-source/node_modules
+
       - name: Capture production and preview controls before rehearsal (read-only)
         env:
           CLOUDFLARE_READ_ONLY_API_TOKEN: ${{ secrets.CLOUDFLARE_READ_ONLY_API_TOKEN }}
@@ -150,24 +214,6 @@ jobs:
           bounded_json "$RUNNER_TEMP/production-version-before.json" "$RUNNER_TEMP/production-version-before.stderr" npx --no-install wrangler versions view "$EXPECTED_PRODUCTION_VERSION" --name theologai --json
           bounded_json "$RUNNER_TEMP/preview-before.json" "$RUNNER_TEMP/preview-before.stderr" npx --no-install wrangler deployments list --env preview --json
           bounded_json "$RUNNER_TEMP/preview-version-before.json" "$RUNNER_TEMP/preview-version-before.stderr" npx --no-install wrangler versions view "$EXPECTED_PREVIEW_VERSION" --name theologai-preview --env preview --json
-
-      - name: Run historical PR108 local gates without credentials
-        run: |
-          set -euo pipefail
-          capture() {
-            stdout="$1"; stderr="$2"; result="$3"; shift 3
-            node "$GITHUB_WORKSPACE/scripts/capture-bounded-command.mjs" \
-              --stdout "$stdout" --stderr "$stderr" --result "$result" --cwd "$GITHUB_WORKSPACE/pr108-source" \
-              --max-bytes 8388608 -- "$@"
-            jq -e '(.schemaVersion == "theologai-bounded-command.v1") and (.exitStatus == 0) and (.overflow == false)' "$result"
-          }
-          capture "$RUNNER_TEMP/pr108-npm-ci.out" "$RUNNER_TEMP/pr108-npm-ci.err" "$RUNNER_TEMP/pr108-npm-ci.result.json" npm ci --no-audit
-          capture "$RUNNER_TEMP/pr108-build-db.out" "$RUNNER_TEMP/pr108-build-db.err" "$RUNNER_TEMP/pr108-build-db.result.json" npm run build:db -- --output "$RUNNER_TEMP/pr108-theologai.db"
-          capture "$RUNNER_TEMP/pr108-verify-db.out" "$RUNNER_TEMP/pr108-verify-db.err" "$RUNNER_TEMP/pr108-verify-db.result.json" npm run data:verify-db -- --database "$RUNNER_TEMP/pr108-theologai.db"
-          capture "$RUNNER_TEMP/pr108-seed-export.out" "$RUNNER_TEMP/pr108-seed-export.err" "$RUNNER_TEMP/pr108-seed-export.result.json" npm run d1:seed:export -- --database "$RUNNER_TEMP/pr108-theologai.db" --clean
-          capture "$RUNNER_TEMP/pr108-seed-verify.out" "$RUNNER_TEMP/pr108-seed-verify.err" "$RUNNER_TEMP/pr108-seed-verify.result.json" npm run d1:seed:verify
-          capture "$RUNNER_TEMP/pr108-workerd.out" "$RUNNER_TEMP/pr108-workerd.err" "$RUNNER_TEMP/pr108-workerd.result.json" npm run d1:seed:verify-workerd
-          capture "$RUNNER_TEMP/pr108-runtime.out" "$RUNNER_TEMP/pr108-runtime.err" "$RUNNER_TEMP/pr108-runtime.result.json" npm run test:worker-production-runtime
 
       - name: Capture fixed PR108 Worker/version and deployment proof (read-only)
         env:
@@ -202,7 +248,7 @@ jobs:
           node "$GITHUB_WORKSPACE/scripts/capture-bounded-command.mjs" \
             --stdout "$RUNNER_TEMP/pr108-remote-d1.out" --stderr "$RUNNER_TEMP/pr108-remote-d1.err" \
             --result "$RUNNER_TEMP/pr108-remote-d1.result.json" --cwd "$GITHUB_WORKSPACE/pr108-source" \
-            --max-bytes 8388608 -- npm run d1:remote:check -- --database theologai-production-20260729-transform11-a
+            --max-bytes 8388608 -- npx --no-install tsx scripts/check-remote-d1-readiness.ts --database theologai-production-20260729-transform11-a
           jq -e '(.schemaVersion == "theologai-bounded-command.v1") and (.exitStatus == 0) and (.overflow == false)' \
             "$RUNNER_TEMP/pr108-remote-d1.result.json"
 

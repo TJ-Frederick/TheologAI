@@ -47,7 +47,7 @@
     "d1:remote:check": "tsx scripts/check-remote-d1-readiness.ts",
     "benchmark:ubs-runtime": "node --expose-gc --import tsx scripts/benchmark-ubs-runtime.ts",
     "benchmark:primary-source-research": "tsx scripts/benchmark-primary-source-research.ts",
-    "audit:dependencies:high": "npm audit --package-lock-only --include=dev --audit-level=high",
+    "audit:dependencies:high": "node scripts/audit-dependencies.mjs",
     "audit:parallel-preview": "tsx scripts/audit-parallel-passages-preview.ts",
     "audit:ccel-preview": "tsx scripts/audit-ccel-preview.ts",
     "audit:primary-source-edge-stabilization-preview": "tsx scripts/audit-primary-source-edge-stabilization.ts",
@@ -136,7 +136,7 @@
     "hono": "4.13.13",
     "parse5": "8.0.1",
     "typescript": "^5.9.2",
-    "zod": "4.3.6"
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20260722.1",
@@ -149,7 +149,7 @@
     "@types/xml2js": "^0.4.14",
     "@vitest/coverage-v8": "4.1.12",
     "@vitest/ui": "4.1.12",
-    "happy-dom": "^20.0.4",
+    "happy-dom": "21.0.4",
     "miniflare": "4.20260722.0",
     "smol-toml": "1.9.1",
     "tsx": "^4.20.6",

@@ -33,6 +33,7 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          persist-credentials: false
           fetch-depth: 2
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
@@ -62,6 +63,7 @@ jobs:
 
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          persist-credentials: false
           fetch-depth: 2
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
@@ -92,6 +94,7 @@ jobs:
       - if: needs.classify.outputs.data == 'true'
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          persist-credentials: false
           fetch-depth: 2
 
       - if: needs.classify.outputs.data == 'true'
@@ -169,6 +172,7 @@ jobs:
       - if: needs.classify.outputs.serving == 'true'
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          persist-credentials: false
           fetch-depth: 2
 
       - if: needs.classify.outputs.serving == 'true'
@@ -205,6 +209,7 @@ jobs:
       - if: needs.classify.outputs.serving == 'true'
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          persist-credentials: false
           fetch-depth: 2
 
       - if: needs.classify.outputs.serving == 'true'
@@ -241,6 +246,7 @@ jobs:
       - if: needs.classify.outputs.serving == 'true'
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          persist-credentials: false
           fetch-depth: 2
 
       - if: needs.classify.outputs.serving == 'true'
@@ -287,6 +293,7 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          persist-credentials: false
           fetch-depth: 2
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
@@ -299,9 +306,52 @@ jobs:
           CI_PREVIEW_RESULT: ${{ needs.preview-deploy.result }}
         run: node scripts/pr-release-eligibility.mjs
 
+  build-worker:
+    name: Build preview Worker artifact (no cloud credentials)
+    needs: validation-complete
+    if: >-
+      (github.event.action != 'labeled' || github.event.label.name == 'deploy-preview') &&
+      github.event.pull_request.state == 'open' &&
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.base.ref == 'main' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      contains(github.event.pull_request.labels.*.name, 'deploy-preview')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      worker_sha256: ${{ steps.worker-artifact.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - run: npm ci --ignore-scripts --no-audit
+
+      - name: Build Worker without cloud credentials
+        run: |
+          npx --no-install wrangler deploy --dry-run --env preview --env-file /dev/null --outdir "$RUNNER_TEMP/worker-bundle"
+      - name: Bind Worker artifact to exact source
+        id: worker-artifact
+        run: |
+          digest="$(node scripts/worker-release-artifact.mjs create preview "$RUNNER_TEMP/worker-bundle")"
+          printf 'sha256=%s\n' "$digest" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: worker-preview-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/worker-bundle/
+          if-no-files-found: error
+          retention-days: 1
+          overwrite: false
+
   preview-deploy:
     name: Deploy Preview
-    needs: validation-complete
+    needs: [validation-complete, build-worker]
     if: >-
       (github.event.action != 'labeled' || github.event.label.name == 'deploy-preview') &&
       github.event.pull_request.state == 'open' &&
@@ -352,6 +402,7 @@ jobs:
 
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          persist-credentials: false
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Verify preview checkout identity
@@ -368,12 +419,65 @@ jobs:
           printf 'commit=%s\n' "$checked_out_commit" >> "$GITHUB_OUTPUT"
           printf 'tree=%s\n' "$checked_out_tree" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+      # Prefer the protected base's release trust set. Its first introduction
+      # must pass the same validation, label, live-head and preview approval
+      # gates as every candidate; it never installs the root dependency graph.
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          node-version-file: '.nvmrc'
-          cache: 'npm'
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: release-control
+          persist-credentials: false
+      - name: Select release toolchain source
+        id: release-toolchain-source
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            .github/actions/release-toolchain/action.yml
+            .github/release-toolchain/package.json
+            .github/release-toolchain/package-lock.json
+          )
+          base_files=0
+          for file in "${files[@]}"; do
+            if test -e "release-control/$file" || test -L "release-control/$file"; then
+              test -f "release-control/$file"
+              test ! -L "release-control/$file"
+              base_files=$((base_files + 1))
+            fi
+          done
+          case "$base_files" in
+            3) printf 'source=base\n' >> "$GITHUB_OUTPUT" ;;
+            0)
+              # Bootstrap only an entirely absent trust set; missing individual
+              # files in an established base never permit a candidate fallback.
+              for file in "${files[@]}"; do
+                test -f "$file"
+                test ! -L "$file"
+              done
+              printf 'source=introduction\n' >> "$GITHUB_OUTPUT"
+              echo '::notice::Using the separately locked release toolchain introduced by this approved PR.'
+              ;;
+            *) echo '::error::The protected base has an incomplete release toolchain.'; exit 1 ;;
+          esac
 
-      - run: npm ci --no-audit
+      - if: steps.release-toolchain-source.outputs.source == 'base'
+        uses: ./release-control/.github/actions/release-toolchain
+
+      - if: steps.release-toolchain-source.outputs.source == 'introduction'
+        uses: ./.github/actions/release-toolchain
+
+      - name: Download source-bound Worker artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: worker-preview-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/worker-bundle
+          merge-multiple: false
+          digest-mismatch: error
+      - name: Verify artifact and render upload-only configuration
+        env:
+          EXPECTED_MANIFEST_SHA256: ${{ needs.build-worker.outputs.worker_sha256 }}
+        run: |
+          node scripts/worker-release-artifact.mjs render preview "$RUNNER_TEMP/worker-bundle" "$EXPECTED_MANIFEST_SHA256" "$RUNNER_TEMP/worker-release.json"
 
       # Resolve the checked-out candidate by ID and name before readiness.
       # The Worker remains bound to the predecessor until the later deploy.
@@ -391,7 +495,7 @@ jobs:
       - name: Verify candidate preview D1 is compatible (read-only)
         run: |
           candidate_d1_name="$(< "$RUNNER_TEMP/preview-candidate-d1-name.txt")"
-          npm run d1:remote:check -- --database "$candidate_d1_name" --env preview \
+          npx --no-install tsx scripts/check-remote-d1-readiness.ts --database "$candidate_d1_name" --env preview \
             --output "$RUNNER_TEMP/preview-d1-readiness-receipt.json"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -502,17 +606,13 @@ jobs:
 
       - name: Deploy to Cloudflare Workers (preview)
         id: preview-worker-deploy
-        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
-        with:
-          wranglerVersion: '4.114.0'
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          environment: preview
-          secrets: |
-            ESV_API_KEY
-          command: deploy --env preview
         env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           ESV_API_KEY: ${{ secrets.ESV_API_KEY }}
+        run: |
+          printf '%s' "$ESV_API_KEY" | npx --no-install wrangler secret put ESV_API_KEY --env preview --env-file /dev/null
+          npx --no-install wrangler deploy --config "$RUNNER_TEMP/worker-release.json" --no-bundle --env-file /dev/null
 
       - name: Verify exact active preview Worker version (read-only)
         id: preview-worker-pre-audit-identity
@@ -602,7 +702,7 @@ jobs:
         if: ${{ steps.preview-worker-candidate-cutover.outcome == 'success' }}
         continue-on-error: true
         run: |
-          npm run audit:primary-source-edge-stabilization-preview -- \
+          npx --no-install tsx scripts/audit-primary-source-edge-stabilization.ts \
             --output "$RUNNER_TEMP/preview-primary-source-edge-stabilization.json"
 
       - name: Upload preview edge-stabilization evidence
@@ -625,7 +725,7 @@ jobs:
         id: preview-original-language-v2-audit
         if: ${{ steps.preview-primary-source-edge-stabilization-gate.outcome == 'success' }}
         run: |
-          npm run audit:original-language-v2-preview -- \
+          npx --no-install tsx scripts/audit-original-language-v2-preview.ts \
             --output "$RUNNER_TEMP/original-language-v2-preview-audit.json"
           test -s "$RUNNER_TEMP/original-language-v2-preview-audit.json"
 
@@ -633,7 +733,7 @@ jobs:
         id: preview-historical-core-audit
         if: ${{ steps.preview-primary-source-edge-stabilization-gate.outcome == 'success' && steps.preview-original-language-v2-audit.outcome == 'success' }}
         run: |
-          npm run audit:historical-core-preview -- \
+          npx --no-install tsx scripts/audit-historical-core-preview.ts \
             --output "$RUNNER_TEMP/historical-core-preview-audit.json"
           test -s "$RUNNER_TEMP/historical-core-preview-audit.json"
 
@@ -644,7 +744,7 @@ jobs:
         id: preview-historical-spine-audit
         if: ${{ steps.preview-primary-source-edge-stabilization-gate.outcome == 'success' && steps.preview-original-language-v2-audit.outcome == 'success' && steps.preview-historical-core-audit.outcome == 'success' }}
         run: |
-          npm run audit:historical-spine-preview -- \
+          npx --no-install tsx scripts/audit-historical-spine-preview.ts \
             --output "$RUNNER_TEMP/historical-spine-preview-audit.json"
           test -s "$RUNNER_TEMP/historical-spine-preview-audit.json"
 
@@ -652,7 +752,7 @@ jobs:
         id: preview-dual-era-audit
         if: ${{ steps.preview-historical-spine-audit.outcome == 'success' }}
         run: |
-          npm run audit:dual-era-preview -- --output "$RUNNER_TEMP/dual-era-mcp-preview-audit.json"
+          npx --no-install tsx scripts/audit-dual-era-mcp-preview.ts --output "$RUNNER_TEMP/dual-era-mcp-preview-audit.json"
           test -s "$RUNNER_TEMP/dual-era-mcp-preview-audit.json"
 
       # Runs after any post-deploy result (including audit failure or a later
@@ -873,115 +973,4 @@ jobs:
                 issue_number: context.issue.number,
                 body,
               });
-            }
-
-  # Diagnostic-only; preserves existing preview approval and branch gates.
-  preview-credential-assessment:
-    name: Assess preview credential (read-only; no deployment)
-    needs: validation-complete
-    if: >-
-      github.event_name == 'pull_request' &&
-      github.event.action == 'labeled' &&
-      github.event.label.name == 'assess-preview-permissions' &&
-      github.event.pull_request.state == 'open' &&
-      github.event.pull_request.draft == false &&
-      github.event.pull_request.base.ref == 'main' &&
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      !contains(github.event.pull_request.labels.*.name, 'deploy-preview')
-    runs-on: ubuntu-latest
-    timeout-minutes: 3
-    permissions:
-      contents: read
-      pull-requests: read
-    environment: preview
-    concurrency:
-      group: theologai-shared-preview-mutation
-      cancel-in-progress: false
-    steps:
-      - name: Reconfirm live assessment authorization
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        with:
-          script: |
-            const {data: pr} = await github.rest.pulls.get({
-              owner: context.repo.owner, repo: context.repo.repo,
-              pull_number: context.issue.number,
-            });
-            const labels = pr.labels.map(label => label.name);
-            if (pr.state !== 'open' || pr.draft || pr.base.ref !== 'main'
-                || pr.head.repo.full_name !== `${context.repo.owner}/${context.repo.repo}`
-                || pr.head.sha !== context.payload.pull_request.head.sha
-                || !labels.includes('assess-preview-permissions')
-                || labels.includes('deploy-preview')) {
-              core.setFailed('Live preview assessment authorization changed.');
-            }
-      - name: Verify exact token and read fixed resource metadata
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        with:
-          script: |
-            // No checkout, packages, Wrangler, SQL, uploads, or cloud writes.
-            const account = process.env.CLOUDFLARE_ACCOUNT_ID;
-            const token = process.env.CLOUDFLARE_API_TOKEN;
-            const expectedTokenId = 'dac2ed85288c21310268159147e942dc';
-            const productionD1 = '9bc79346-338b-439e-a2a5-424f4418eb21';
-            const receipt = {schemaVersion: 1, observedAt: new Date().toISOString(),
-              runId: String(context.runId), headSha: context.payload.pull_request.head.sha,
-              cloudMethods: ['GET'], checks: []};
-            const uuid = value => typeof value === 'string'
-              && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(value);
-            async function get(path) {
-              const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${account}/${path}`, {
-                method: 'GET', redirect: 'error', signal: AbortSignal.timeout(10000),
-                headers: {Authorization: `Bearer ${token}`, Accept: 'application/json'},
-              });
-              const reader = response.body.getReader();
-              let size = 0;
-              const chunks = [];
-              try {
-                for (;;) {
-                  const {done, value} = await reader.read();
-                  if (done) break;
-                  size += value.byteLength;
-                  if (size > 262144) throw new Error('Response limit');
-                  chunks.push(Buffer.from(value));
-                }
-              } finally { await reader.cancel().catch(() => {}); }
-              const body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-              const entry = {path, httpStatus: response.status, success: body.success === true};
-              receipt.checks.push(entry);
-              return {body, entry};
-            }
-            try {
-              if (account !== '0594ed1e4c9fe35ab7d9f47991e99f3e'
-                  || typeof token !== 'string' || !token || token.length > 4096) {
-                throw new Error('Credential metadata mismatch');
-              }
-              const verified = await get('tokens/verify');
-              const id = verified.body.result?.id;
-              const status = verified.body.result?.status;
-              if (/^[0-9a-f]{32}$/i.test(id ?? '')) verified.entry.tokenId = id;
-              if (['active', 'disabled', 'expired'].includes(status)) verified.entry.tokenStatus = status;
-              if (!verified.entry.success || id !== expectedTokenId || status !== 'active') {
-                throw new Error('Token identity mismatch');
-              }
-              for (const worker of ['theologai-preview', 'theologai']) {
-                const {body, entry} = await get(`workers/scripts/${worker}/settings`);
-                if (entry.success && Array.isArray(body.result?.bindings)) {
-                  entry.d1Ids = body.result.bindings.filter(b => b.type === 'd1' && uuid(b.id)).map(b => b.id);
-                  entry.coordinatorNamespaceIds = body.result.bindings
-                    .filter(b => b.type === 'durable_object_namespace'
-                      && b.name === 'THEOLOGAI_CCEL_COORDINATOR'
-                      && /^[0-9a-f]{32}$/i.test(b.namespace_id ?? ''))
-                    .map(b => b.namespace_id);
-                }
-              }
-              const {body, entry} = await get(`d1/database/${productionD1}`);
-              entry.productionD1MetadataMatches = entry.success && body.result?.uuid === productionD1;
-            } catch {
-              // Never print response bodies, credentials, raw errors, or headers.
-              core.setFailed('Read-only assessment incomplete; inspect sanitized receipt.');
-            } finally {
-              core.info(`SEC06_READONLY_RECEIPT ${JSON.stringify(receipt)}`);
             }
