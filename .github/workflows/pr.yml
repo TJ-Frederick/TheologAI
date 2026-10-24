@@ -739,6 +739,12 @@ jobs:
       # Fixed Transform-11 coverage stays separate from the Transform-9 core
       # audit: each of the ten newly activated works must pass its own bounded
       # landing, browse, search, primary-source, read, and pagination probes.
+      - name: Respect the shared IP request budget before the spine audit
+        if: ${{ steps.preview-historical-core-audit.outcome == 'success' }}
+        # SEC-03 makes all audit User-Agents share one IP allowance. Let the
+        # earlier bounded suites leave the 60-second window; audits never retry.
+        run: sleep 65
+
       - name: Audit Transform-11 historical spine contract on preview
         id: preview-historical-spine-audit
         if: ${{ steps.preview-primary-source-edge-stabilization-gate.outcome == 'success' && steps.preview-original-language-v2-audit.outcome == 'success' && steps.preview-historical-core-audit.outcome == 'success' }}

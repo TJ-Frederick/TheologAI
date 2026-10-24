@@ -152,6 +152,21 @@ describe('workflow topology', () => {
     expect(manifest.scripts).toBeUndefined();
   });
 
+  it('paces the long fixed audits within the shared per-IP request budget', async () => {
+    for (const [file, target, jobId] of [['pr.yml', 'preview', 'preview-deploy'], ['deploy.yml', 'production', 'deploy']] as const) {
+      const steps = (parse(await readWorkflow(file)) as Workflow).jobs[jobId]!.steps!;
+      const core = steps.findIndex(step => step.name === `Audit Transform-9 historical core contract on ${target}`);
+      const pause = steps.findIndex(step => step.name === 'Respect the shared IP request budget before the spine audit');
+      const spine = steps.findIndex(step => step.name === `Audit Transform-11 historical spine contract on ${target}`);
+      expect(pause).toBeGreaterThan(core);
+      expect(spine).toBeGreaterThan(pause);
+      const seconds = /^sleep (\d+)$/.exec(steps[pause]!.run ?? '');
+      expect(seconds).not.toBeNull();
+      expect(Number(seconds![1])).toBeGreaterThan(60);
+      expect(steps[pause]!.if).toBe(`\${{ steps.${target}-historical-core-audit.outcome == 'success' }}`);
+    }
+  });
+
   it('captures final deploy stdout for strict identity proof and propagates upload failures', async () => {
     for (const [file, target, jobId] of [['pr.yml', 'preview', 'preview-deploy'], ['deploy.yml', 'production', 'deploy']] as const) {
       const workflow = parse(await readWorkflow(file)) as Workflow;

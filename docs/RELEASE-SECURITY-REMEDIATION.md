@@ -452,10 +452,16 @@ that work in the larger catalog. Dual-era receipts reject older eleven-tool
 evidence for this release; source/tree/Worker/D1 proof and freshness checks
 remain strict. No live-audit retry loop or relaxed identity check was added.
 
-All 74 focused workflow, identity, contract, and receipt regression tests pass.
+All 75 focused workflow, identity, contract, and receipt regression tests pass.
 The actual HTTP MCP handlers backed by a freshly rebuilt local corpus pass
 edge stabilization, the 11 original-language cases, eight historical-core
 works, ten spine works, and both preview protocol eras. The production-profile
 rehearsal also passes these fixed audits locally; it makes no hosted production
 request or deployment. Full CI must pass again for the exact amended candidate.
 SEC-06 remains open and paused, with account and token policies unchanged.
+
+The IP-only limiter also combines traffic across the fixed audit User-Agents.
+Preview and production therefore wait 65 seconds after the historical-core
+audit before the long spine audit. The bounded suites on each side remain
+below the 120-request allowance; no quota increase, User-Agent bypass, audit
+retry, permission change, or assertion relaxation is introduced.
