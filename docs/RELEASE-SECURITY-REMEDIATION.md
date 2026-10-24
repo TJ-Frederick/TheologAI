@@ -428,3 +428,34 @@ in parser tests. The gate rejected both. The final lock now selects body-parser
 parser tests are rechecked, and hosted CI validates the complete published
 candidate. Production and release-toolchain audits remain clean. SEC-06 scope
 and the existing Cloudflare permissions/deployment process remain unchanged.
+
+### Approved-preview release corrections, October 24
+
+The user approved PR #167's preview deployment and requested live tests followed
+by a stop at the production approval gate. The first approved job was canceled
+before any Cloudflare check or upload when review found that the SEC-05 CLI
+step did not pass deploy stdout to the unchanged strict identity verifier.
+Both preview and production now preserve only the final deploy command's stdout
+in the file consumed by that verifier. Shell `pipefail` preserves upload
+failures. An offline regression executes both workflow steps with a stub CLI,
+proving the final output handoff and failure propagation; it excludes the
+intermediate secret-update output from the identity evidence.
+
+Existing main's live auditors also retained the older 11-tool/35-work contract.
+They now require the reviewed 12-tool contract, all 36 flat works, and the
+separate Summa hierarchy landing. Norton remains a separate, exact edition
+with its public work locator and checked provenance/readiness; Summa remains
+outside the flat catalog. The eight core and ten spine probes remain bounded
+and mandatory. Bunyan's global discovery probe uses the source-attested
+`Slough Despond` terms because generic `Christian` no longer reliably ranks
+that work in the larger catalog. Dual-era receipts reject older eleven-tool
+evidence for this release; source/tree/Worker/D1 proof and freshness checks
+remain strict. No live-audit retry loop or relaxed identity check was added.
+
+All 74 focused workflow, identity, contract, and receipt regression tests pass.
+The actual HTTP MCP handlers backed by a freshly rebuilt local corpus pass
+edge stabilization, the 11 original-language cases, eight historical-core
+works, ten spine works, and both preview protocol eras. The production-profile
+rehearsal also passes these fixed audits locally; it makes no hosted production
+request or deployment. Full CI must pass again for the exact amended candidate.
+SEC-06 remains open and paused, with account and token policies unchanged.

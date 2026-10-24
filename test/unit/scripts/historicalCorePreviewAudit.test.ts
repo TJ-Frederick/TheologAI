@@ -32,6 +32,7 @@ const workflowUrl = new URL('.github/workflows/pr.yml', root);
 type RecordValue = Record<string, unknown>;
 type Audit = ReturnType<typeof validateFixture>;
 type FakeOptions = {
+  nortonEditionId?: string;
   mutate?: (body: RecordValue, response: RecordValue) => RecordValue;
   invalidResourceError?: string;
   invalidResourceCode?: number;
@@ -70,9 +71,25 @@ async function fixture(): Promise<RecordValue> {
 }
 
 describe('historical core preview audit contract', () => {
-  it('accepts the 35-work Transform-11 catalog while retaining deep core-eight probes', async () => {
+  it('rejects the old tool inventory, a missing hierarchy landing, and Norton edition drift', async () => {
     const parsed = validateFixture(await fixture());
-    expect(parsed.baseline.expectedCatalogIdentity).toEqual({ workCount: 35, legacyWorkCount: 17, coreWorkCount: 8, coreSectionCount: 512 });
+    for (const drift of ['old-tools', 'missing-hierarchy', 'norton-edition']) {
+      await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { nortonEditionId: drift === 'norton-edition' ? 'wrong-edition' : undefined, mutate: (body, response) => {
+        const result = response.result as RecordValue | undefined;
+        if (drift === 'old-tools' && body.method === 'tools/list') {
+          result!.tools = (result!.tools as RecordValue[]).filter(tool => tool.name !== 'historical_hierarchy_lookup');
+        }
+        if (drift === 'missing-hierarchy' && body.method === 'resources/list') {
+          result!.resources = (result!.resources as RecordValue[]).filter(resource => resource.uri !== 'theologai://documents/summa-theologiae');
+        }
+        return response;
+      } }))).rejects.toThrow(/12-tool|40 resources|Norton edition/);
+    }
+  });
+
+  it('accepts the 36-work catalog and hierarchy landing while retaining deep core-eight probes', async () => {
+    const parsed = validateFixture(await fixture());
+    expect(parsed.baseline.expectedCatalogIdentity).toEqual({ workCount: 36, legacyWorkCount: 17, coreWorkCount: 8, coreSectionCount: 512 });
     expect(parsed.baseline.expectedCoreEditionProvenanceStatus).toBe('verified_with_uncertainty');
     expect(parsed.probes).toHaveLength(8);
     expect(parsed.probes.map(probe => probe.sectionCount).reduce((sum, count) => sum + count, 0)).toBe(512);
@@ -363,7 +380,7 @@ describe('historical core preview audit contract', () => {
     await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { mutate: (body, response) => {
       if (body.method === 'resources/list') ((response.result as RecordValue).resources as RecordValue[]).pop();
       return response;
-    } }))).rejects.toThrow('resources/list must expose exactly 38 resources');
+    } }))).rejects.toThrow('resources/list must expose exactly 40 resources');
     await expect(runPreviewAudit(parsed, fakeFetchWith(parsed, { mutate: (body, response) => {
       if (body.method === 'resources/templates/list') ((response.result as RecordValue).resourceTemplates as RecordValue[])[0]!.name = 'changed';
       return response;
@@ -635,9 +652,10 @@ function fakeTools(profile: AuditProfile): RecordValue[] {
   const base = { readOnlyHint: true, destructiveHint: false, idempotentHint: true };
   return [
     'bible_lookup', 'bible_cross_references', 'parallel_passages', 'commentary_lookup',
-    'classic_text_lookup', 'primary_source_search', 'original_language_lookup',
+    'classic_text_lookup', 'historical_hierarchy_lookup', 'primary_source_search', 'original_language_lookup',
     'bible_verse_morphology', 'original_language_study', 'donation_config', 'verify_donation',
   ].map(name => {
+    if (name === 'historical_hierarchy_lookup') return { name, annotations: { ...base, openWorldHint: false } };
     if (name === 'classic_text_lookup') return { name, annotations: { ...base, openWorldHint: false }, inputSchema: classicInput(), outputSchema: structuredClone(classicTextsOutputSchema) };
     if (name === 'primary_source_search') return {
       name, annotations: { ...base, openWorldHint: profile.primarySource.openWorldHint },
@@ -684,6 +702,8 @@ function fakeResources(fixtureValue: Audit): RecordValue[] {
     { uri: 'theologai://primary-sources/catalog', mimeType: 'application/json' }, ...legacy,
     ...fixtureValue.probes.map(probe => ({ uri: probe.landingResourceUri, mimeType: 'text/markdown' })),
     ...transform11WorkIds.map(id => ({ uri: `theologai://documents/${id}`, mimeType: 'text/markdown' })),
+    { uri: 'theologai://documents/calvin-institutes-of-the-christian-religion', mimeType: 'text/markdown' },
+    { uri: 'theologai://documents/summa-theologiae', mimeType: 'text/markdown' },
   ];
 }
 
@@ -734,7 +754,7 @@ function fakeCatalog(fixtureValue: Audit, options: FakeOptions = {}): RecordValu
       normalizedTextRights: 'no_known_conflict',
     },
   }));
-  return { schemaVersion: '2', kind: 'local_primary_source_catalog', workCount: 35, works: [...legacy, ...core, ...transform11],
+  return { schemaVersion: '2', kind: 'local_primary_source_catalog', workCount: 36, works: [...legacy, ...core, ...transform11, { id: 'calvin-institutes-of-the-christian-religion', editionProvenance: { sourcePackId: 'theologai-norton-1561', editionId: options.nortonEditionId ?? 'calvin-institutes-norton-1561-eebo-tcp-a17662' }, editionReadiness: { editionIdentity: 'established', provenance: 'verified_with_uncertainty', normalizedTextRights: 'no_known_conflict' } }],
     policies: { scope: 'hosted_collection_only', editionProvenance: 'mixed_legacy_and_reviewed_source_packs', rightsStatus: 'mixed_not_established_and_no_known_conflict' } };
 }
 
@@ -763,7 +783,7 @@ function fakeClassicWorks(fixtureValue: Audit): RecordValue[] {
   const works = fakeCatalog(fixtureValue).works as RecordValue[];
   return works.map(work => ({
     id: work.id,
-    deliveryMode: fixtureValue.probes.some(probe => probe.workId === work.id)
+    deliveryMode: work.id === 'calvin-institutes-of-the-christian-religion' || fixtureValue.probes.some(probe => probe.workId === work.id)
       || transform11WorkIds.includes(work.id as typeof transform11WorkIds[number])
       ? 'sectioned_only'
       : 'complete_document',

@@ -611,18 +611,17 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           ESV_API_KEY: ${{ secrets.ESV_API_KEY }}
         run: |
+          set -euo pipefail
           printf '%s' "$ESV_API_KEY" | npx --no-install wrangler secret put ESV_API_KEY --env preview --env-file /dev/null
-          npx --no-install wrangler deploy --config "$RUNNER_TEMP/worker-release.json" --no-bundle --env-file /dev/null
+          npx --no-install wrangler deploy --config "$RUNNER_TEMP/worker-release.json" --no-bundle --env-file /dev/null | tee "$RUNNER_TEMP/preview-worker-deploy.command-output.txt"
 
       - name: Verify exact active preview Worker version (read-only)
         id: preview-worker-pre-audit-identity
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          DEPLOY_COMMAND_OUTPUT: ${{ steps.preview-worker-deploy.outputs.command-output }}
           WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
         run: |
-          printf '%s' "$DEPLOY_COMMAND_OUTPUT" > "$RUNNER_TEMP/preview-worker-deploy.command-output.txt"
           npx --no-install wrangler versions list --env preview --json > "$RUNNER_TEMP/preview-worker-versions-after.json"
           npx --no-install wrangler deployments list --env preview --json > "$RUNNER_TEMP/preview-worker-deployments-after.json"
           npx --no-install tsx scripts/verify-preview-worker-deployment.ts verify-deploy \

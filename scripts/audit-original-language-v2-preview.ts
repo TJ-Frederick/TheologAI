@@ -46,7 +46,7 @@ const CURSOR_MAXIMUM = 12 * 1024;
 const FIXTURE_PATH = new URL('../test/fixtures/original-language-v2-preview-audit.json', import.meta.url);
 const TOOL_NAMES = [
   'bible_lookup', 'bible_cross_references', 'parallel_passages', 'commentary_lookup',
-  'classic_text_lookup', 'primary_source_search', 'original_language_lookup',
+  'classic_text_lookup', 'historical_hierarchy_lookup', 'primary_source_search', 'original_language_lookup',
   'bible_verse_morphology', 'original_language_study', 'donation_config', 'verify_donation',
 ] as const;
 const ARTIFACT_IDENTITY = 'bd19fb99f7bbfd13ad68f2184aaded4a6e5587196ad76b68b0c22bf971fc90f6';
@@ -418,7 +418,7 @@ function assertInitialize(message: Record<string, unknown>, profile: OriginalLan
 
 function assertToolRegistration(message: Record<string, unknown>): SchemaHashes {
   const output = result(message, 'tools/list'); const listed = array(output.tools, 'tools/list.tools').map(object);
-  assert(listed.every(Boolean) && JSON.stringify(listed.map(tool => tool!.name)) === JSON.stringify(TOOL_NAMES), 'exact 11-tool registration/order drifted');
+  assert(listed.every(Boolean) && JSON.stringify(listed.map(tool => tool!.name)) === JSON.stringify(TOOL_NAMES), 'exact 12-tool registration/order drifted');
   for (const tool of listed) {
     const annotations = object(tool!.annotations);
     assert(annotations?.readOnlyHint === true && annotations.destructiveHint === false && annotations.idempotentHint === true,

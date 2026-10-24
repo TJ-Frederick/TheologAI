@@ -47,6 +47,7 @@ const REVOCATION_PREDICATE = normalized(`
 `);
 
 interface Step {
+  id?: string;
   name?: string;
   uses?: string;
   run?: string;
@@ -149,6 +150,44 @@ describe('workflow topology', () => {
     ]);
     for (const version of Object.values(manifest.dependencies)) expect(version).toMatch(/^\d+\.\d+\.\d+$/);
     expect(manifest.scripts).toBeUndefined();
+  });
+
+  it('captures final deploy stdout for strict identity proof and propagates upload failures', async () => {
+    for (const [file, target, jobId] of [['pr.yml', 'preview', 'preview-deploy'], ['deploy.yml', 'production', 'deploy']] as const) {
+      const workflow = parse(await readWorkflow(file)) as Workflow;
+      const steps = workflow.jobs[jobId]!.steps!;
+      const deploy = steps.find(step => step.id === `${target}-worker-deploy`)!;
+      const verify = steps.find(step => step.name === `Verify exact active ${target} Worker version (read-only)`)!;
+      const directory = await mkdtemp(join(tmpdir(), 'theologai-deploy-stdout-'));
+      try {
+        const bin = join(directory, 'bin');
+        await mkdir(bin);
+        await writeFile(join(bin, 'npx'), `#!/usr/bin/env node
+          if (process.argv.includes('put')) {
+            require('node:fs').readFileSync(0);
+            console.log('Secret update created an intermediate version');
+          } else {
+            console.log('Current Version ID: 223e4567-e89b-42d3-a456-426614174000');
+            process.exitCode = Number(process.env.DEPLOY_EXIT_STATUS || 0);
+          }
+        `, { mode: 0o755 });
+        for (const code of [0, 7]) {
+          const result = spawnSync('bash', ['-e', '-c', deploy.run!], {
+            cwd: directory,
+            env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, RUNNER_TEMP: directory,
+              ESV_API_KEY: 'offline-test-only', DEPLOY_EXIT_STATUS: String(code) },
+          });
+          expect(result.status).toBe(code);
+          expect(await readFile(join(directory, `${target}-worker-deploy.command-output.txt`), 'utf8'))
+            .toBe('Current Version ID: 223e4567-e89b-42d3-a456-426614174000\n');
+        }
+        expect(verify.run).toContain(`--command-output "$RUNNER_TEMP/${target}-worker-deploy.command-output.txt"`);
+        expect(JSON.stringify(verify)).not.toContain('outputs.command-output');
+        expect(verify.run).not.toContain('DEPLOY_COMMAND_OUTPUT');
+      } finally {
+        await rm(directory, { recursive: true, force: true });
+      }
+    }
   });
 
   it('requires a credential-free build and verifies the artifact digest and source', async () => {

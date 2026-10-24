@@ -9,7 +9,7 @@ const fingerprints = {
   capabilities: '1'.repeat(64), tools: '2'.repeat(64), prompts: '3'.repeat(64),
   resourceTemplates: '4'.repeat(64), staticResources: '5'.repeat(64),
 };
-const counts = { tools: 11, prompts: 6, resourceTemplates: 2, staticResources: 3 };
+const counts = { tools: 12, prompts: 6, resourceTemplates: 2, staticResources: 3 };
 const auditText = `${JSON.stringify({
   schemaVersion: 'theologai-dual-era-mcp-preview-audit.v1', capturedAt,
   endpoint: 'https://preview-mcp.theologai.xyz/mcp', productProfile: '7',
@@ -58,6 +58,20 @@ describe('dual-era protected preview receipt', () => {
       repository: 'owner/TheologAI', sourceCommit: 'a'.repeat(40), sourceTree: 'b'.repeat(40),
       serverVersion: '3.6.0', now: new Date(capturedAt),
     })).toThrow(/contract evidence/);
+  });
+
+  it('rejects an older eleven-tool receipt or audit for the current twelve-tool release', () => {
+    const value = receipt();
+    expect(() => verifyDualEraPreviewReleaseReceipt({ ...value, counts: { ...value.counts, tools: 11 } }, {
+      repository: 'owner/TheologAI', sourceCommit: 'a'.repeat(40), sourceTree: 'b'.repeat(40),
+      serverVersion: '3.6.0-preview', now: new Date(capturedAt),
+    })).toThrow(/contract evidence/);
+    const changedAudit = JSON.parse(auditText);
+    for (const era of changedAudit.eras) era.counts.tools = 11;
+    expect(() => createDualEraPreviewReleaseReceipt({
+      repository: 'owner/TheologAI', pullRequest: 150, sourceCommit: 'a'.repeat(40), sourceTree: 'b'.repeat(40),
+      auditText: JSON.stringify(changedAudit), workerIdentityText, cutoverText, d1ReadinessText: readinessText,
+    })).toThrow(/contract is malformed/);
   });
 
   it('fails closed when evidence is stale or belongs to another source tree', () => {
