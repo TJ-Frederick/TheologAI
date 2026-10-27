@@ -6,7 +6,7 @@ import {
 } from '@modelcontextprotocol/server';
 import type { ToolHandler } from '../kernel/types.js';
 import { internalError } from './errors.js';
-import { formatValidationError, type SchemaValidator, validatorFor } from './validation.js';
+import { formatValidationError, inputValidatorFor, type SchemaValidator, validatorFor } from './validation.js';
 
 export function registerToolHandlers(
   server: Server,
@@ -14,7 +14,7 @@ export function registerToolHandlers(
   logging: boolean,
 ): void {
   const validators = new Map<string, SchemaValidator<Record<string, unknown>>>(
-    tools.map(tool => [tool.name, validatorFor(tool.inputSchema)]),
+    tools.map(tool => [tool.name, inputValidatorFor(tool.inputSchema)]),
   );
   const outputValidators = new Map<string, SchemaValidator<Record<string, unknown>>>(
     tools

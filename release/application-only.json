@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "theologai-application-release-contract.v1",
+  "baseline": "8fbfccfc73628918cfbcf4ca22676f2f7a0b55ab",
+  "schema": "0009_candidate_c_sectioned_publications",
+  "corpusIdentity": "66c148a206b9b0eb1bf7552572570c42dabfd0ba591b63e0cf0d02adda35aa07",
+  "securityFiles": {
+    "src/http/config.ts": "c9f8274d283ff8d8db9927b3c7882765c90ff3b3",
+    "src/http/nodeHttpServer.ts": "94b42a5ba4117ae10bba461a0b2c0bc1090829f1",
+    "src/http/worker/ccelOperator.ts": "3c8bb87c91734671ed212c486f19c344ae57387d",
+    "src/http/worker/rateLimit.ts": "2b4ac985a0604b77120f63b91b21fd59410f882b",
+    "src/http/worker/rateLimitIdentity.ts": "455b1346fe13b2a8bcc8c396cf2f87278d9b5f8e",
+    "src/http/worker/requestBody.ts": "8dec64f1a60e98746195de6c80eb4c822264284b",
+    "src/http/worker/requestPolicy.ts": "418765ac26a3a4f2f3f928f29fd7f70fca65b672",
+    "src/http/worker/telemetry.ts": "c360a399023edcbf9e3a31087de0b840755bbb4d",
+    "src/mcp/inputLimits.ts": "19fb7380429fb81d9a0208d3e793ea2e6dc96f47",
+    "src/mcp/server.ts": "7f40afa349aedfdd7a5076c1945a2fc41d660e2c",
+    "src/mcp/tools.ts": "5f5b3e633993092bf59dab930f4078ea05bd2238",
+    "src/mcp/validation.ts": "c94e2787cc97cbed77597529df89091068726caf"
+  }
+}

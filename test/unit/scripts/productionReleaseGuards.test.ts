@@ -32,7 +32,7 @@ describe('production release guards', () => {
   it('requires exact checked-in candidate readiness and Worker/D1 proof before fixed audits', async () => {
     const workflow = await readFile(new URL('.github/workflows/deploy.yml', root), 'utf8');
     const mapping = workflow.indexOf('Capture checked-out candidate production D1 mapping (read-only)');
-    const readiness = workflow.indexOf('Verify candidate production D1 is compatible (read-only)');
+    const readiness = workflow.indexOf('Verify fresh corpus (up to 3.8M reads and four integrity commands)');
     const predecessor = workflow.indexOf('Capture production predecessor reconciliation anchor (read-only)');
     const versions = workflow.indexOf('Capture production Worker versions before deployment (read-only)');
     const deploy = workflow.indexOf('Deploy to Cloudflare Workers');
@@ -60,12 +60,12 @@ describe('production release guards', () => {
     expect(finalArtifact).toBeGreaterThan(finalObservation);
     expect(artifact).toBeGreaterThan(finalArtifact);
     expect(workflow).toContain('scripts/production-release-reconciliation.ts candidate-d1-name');
-    expect(workflow).toContain('npm run d1:remote:check -- --database "$candidate_d1_name"');
+    expect(workflow).toContain('npx --no-install tsx scripts/check-remote-d1-readiness.ts --database "$candidate_d1_name"');
     expect(workflow).toContain('scripts/verify-production-worker-deployment.ts verify-deploy');
     expect(workflow).toContain('scripts/verify-production-worker-deployment.ts verify-audit-stability');
-    expect(workflow).toContain('npm run audit:original-language-v2-production');
-    expect(workflow).toContain('npm run audit:historical-core-production');
-    expect(workflow).toContain('npm run audit:historical-spine-production');
+    expect(workflow).toContain('npx --no-install tsx scripts/audit-original-language-v2-production.ts');
+    expect(workflow).toContain('npx --no-install tsx scripts/audit-historical-core-production.ts');
+    expect(workflow).toContain('npx --no-install tsx scripts/audit-historical-spine-production.ts');
     expect(workflow).not.toContain('d1 create');
     expect(workflow).not.toContain('d1 delete');
   });
@@ -84,7 +84,7 @@ describe('production release guards', () => {
     const resolveContext = workflow.indexOf('Resolve production release comparison context', deployStart);
     const downloadPlan = workflow.indexOf('Download verified production deployment plan gate', deployStart);
     const revalidatePlan = workflow.indexOf('Revalidate production deployment plan after approval', deployStart);
-    const npmInstall = workflow.indexOf('- run: npm ci --no-audit', deployStart);
+    const npmInstall = workflow.indexOf('- uses: ./.github/actions/release-toolchain', deployStart);
     const customDomain = workflow.indexOf('Detect production custom-domain declaration change', deployStart);
     const firstCloudflareRead = workflow.indexOf('Capture checked-out candidate production D1 mapping (read-only)', deployStart);
     const deployMutation = workflow.indexOf('Deploy to Cloudflare Workers', deployStart);

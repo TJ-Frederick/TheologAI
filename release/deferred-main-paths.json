@@ -1,0 +1,1717 @@
+{
+  "schemaVersion": "theologai-deferred-main-review-manifest.v1",
+  "deployedBaseline": "8fbfccfc73628918cfbcf4ca22676f2f7a0b55ab",
+  "retainedMain": "f6026ab14128d4719b0ca8b120e8d5573837d8ec",
+  "retainedPublishedSecurityHead": "9edf8176a7c754f9bd6b5751fc4e1dcab8615f65",
+  "scope": "Restoration checklist, not automatic instructions to overwrite security fixes. All commits remain reachable through release parent. Review every path before restoration and separately approve corpus activation.",
+  "paths": [
+    {
+      "path": ".github/actions/validate/action.yml",
+      "deployed": null,
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "924da8acc9244ef057a30e4805f71f122822c682"
+      }
+    },
+    {
+      "path": ".github/workflows/deploy.yml",
+      "deployed": {
+        "mode": "100644",
+        "blob": "5babd1b2491470c13b007d42fcc1f4f1f07a9e31"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "da230e2f6be48c5c5e24ae70f4eeb7d8dd5f0318"
+      }
+    },
+    {
+      "path": ".github/workflows/pr.yml",
+      "deployed": {
+        "mode": "100644",
+        "blob": "1f639fb68e7e35a0ccfaebdd2a4210f28c0e2cf3"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "220edea07ae1ce495305cc52dc8488dbb379530c"
+      }
+    },
+    {
+      "path": ".github/workflows/validate.yml",
+      "deployed": null,
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "2c3466559ba4eb63652c9c81817fc1a0beb0da00"
+      }
+    },
+    {
+      "path": "CHANGELOG.md",
+      "deployed": {
+        "mode": "100644",
+        "blob": "a36ebe4f988d2f7c536f1e29caf02eabe493a854"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "689b6a72fb7ee4bc675e0aaf788547908b3c2c0d"
+      }
+    },
+    {
+      "path": "CLAUDE.md",
+      "deployed": {
+        "mode": "100644",
+        "blob": "e693ad997d9a7a559b1596effab4a45b3163426b"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "47d76ec2272994619f036bfc5be87884f746fb34"
+      }
+    },
+    {
+      "path": "README.md",
+      "deployed": {
+        "mode": "100644",
+        "blob": "cb967b1df573a9e360c1591990f9bc909a95f3f2"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "9213333f18f205e56a99f9192347ac2db31a55f8"
+      }
+    },
+    {
+      "path": "data/data-manifest.json",
+      "deployed": {
+        "mode": "100644",
+        "blob": "7ec58a7b62b2f142395010d5b1e573b49ac74205"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "439f5a237ac10f04f4670820aa51d3a26e42acd0"
+      }
+    },
+    {
+      "path": "data/historical-source-packs/norton-1561/manifest.json",
+      "deployed": null,
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "fd9b9aca1d377f556a46e8b72b4eb7e689325db8"
+      }
+    },
+    {
+      "path": "data/historical-source-packs/norton-1561/manifest.sha256",
+      "deployed": null,
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "d3de0308c5724569e7e938898dd7ddd255448af0"
+      }
+    },
+    {
+      "path": "docs/AQUINAS-ACTIVATION-ASSESSMENT-2026-09-15.md",
+      "deployed": null,
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "7407fc0ec605214fede1bf7f25cad1711352d644"
+      }
+    },
+    {
+      "path": "docs/AQUINAS-HIERARCHY-TRANSFORM10.md",
+      "deployed": {
+        "mode": "100644",
+        "blob": "43e7c709758d97231ea9d9a22a352465ce85f972"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "781dc93ad0bfce2d1078c9912f56b57cbdc2e7b0"
+      }
+    },
+    {
+      "path": "docs/AQUINAS-SOURCE-PACK-CAPACITY-COMPARISON.md",
+      "deployed": {
+        "mode": "100644",
+        "blob": "ce216315f91e5e5ae59505f1aab901025f64b157"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "1d453e0e54fa6ea99c7bb760917da3364c0a0dc8"
+      }
+    },
+    {
+      "path": "docs/ARCHITECTURE.md",
+      "deployed": null,
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "82724247fb199403d3a0c0c1e6318a7c08ead434"
+      }
+    },
+    {
+      "path": "docs/CI-EFFICIENCY-BASELINE-2026-09-14.md",
+      "deployed": null,
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "5a34b6e73f070220d9e25b60f50f7f6521462e9b"
+      }
+    },
+    {
+      "path": "docs/D1-DATA-WORKFLOW.md",
+      "deployed": {
+        "mode": "100644",
+        "blob": "5d7354e8332f81b776eb1c71100b62c8570953f7"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "090eea4f9b0df6fd66adfbfe562d072e1179023f"
+      }
+    },
+    {
+      "path": "docs/DORMANT-WORK-MAINTENANCE.md",
+      "deployed": null,
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "06ed3e1e84acc222d96b6f9891ebde6ead0b9dcc"
+      }
+    },
+    {
+      "path": "docs/EFFICIENCY-FOLLOWTHROUGH-2026-09-15.md",
+      "deployed": null,
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "c49c25575629a76589082e839c7238b398c0d91d"
+      }
+    },
+    {
+      "path": "docs/NORTON-ACTIVATION-ASSESSMENT-2026-09-15.md",
+      "deployed": null,
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "ed6d76874462c6e080486861e6f5010fe74c1f41"
+      }
+    },
+    {
+      "path": "docs/PHASE-3B-PLAN.md",
+      "deployed": {
+        "mode": "100644",
+        "blob": "9c789a4f194b4f0c0b083ae959c71135b2815ba5"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "ebf471ecda67b4fb44d63235454df2b59614b44c"
+      }
+    },
+    {
+      "path": "docs/PRIMARY-SOURCE-RESEARCH-QUALITY-BENCHMARK.md",
+      "deployed": null,
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "001139d6d4bbc0d7c43ab85154a0f6e9c05e82eb"
+      }
+    },
+    {
+      "path": "docs/RELEASE-HISTORY.md",
+      "deployed": null,
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "df158ca1a8b19ca41e826ba752d632fde498000e"
+      }
+    },
+    {
+      "path": "docs/REPO-EFFICIENCY-REVIEW-2026-09-14.md",
+      "deployed": null,
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "8970c0b5397bcafbcb5b24d0098a343277b29e0c"
+      }
+    },
+    {
+      "path": "docs/ROADMAP.md",
+      "deployed": {
+        "mode": "100644",
+        "blob": "9c98f9d794bd7714b412ae4d8f66e15d7290362f"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "69cad416c90294d7cb76947bb88029e5c6ac0b18"
+      }
+    },
+    {
+      "path": "docs/TRANSFORM11-HISTORICAL-SPINE-ACTIVATION.md",
+      "deployed": {
+        "mode": "100644",
+        "blob": "eed0fb1c82b674ebd3ed7bd8f2ee28a6a995b16c"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "360b356e29750f840f933ba097305aa8f3ce641f"
+      }
+    },
+    {
+      "path": "docs/bible-mcp-architecture.md",
+      "deployed": {
+        "mode": "100644",
+        "blob": "01d7e570beea70ca6097b45581e0c7f6a47507eb"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "0ad3a40dd872f2f4180b71318d7ad8c7dfc2b904"
+      }
+    },
+    {
+      "path": "docs/worker-operations.md",
+      "deployed": {
+        "mode": "100644",
+        "blob": "b53280f7817e04239c7a83865d7e764858612823"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "cc8036b15127ffbdf50227156fa60e04ea9c7e97"
+      }
+    },
+    {
+      "path": "migrations/0010_active_aquinas_hierarchy_publication.sql",
+      "deployed": null,
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "ba505475fc0f9162fcced37edee76ea69b77a03c"
+      }
+    },
+    {
+      "path": "package-lock.json",
+      "deployed": {
+        "mode": "100644",
+        "blob": "665e5f130167f3911167b11d8ca23a6faf1f9def"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "891611db80385ee6c3c20758914d9b92d430e37f"
+      }
+    },
+    {
+      "path": "package.json",
+      "deployed": {
+        "mode": "100644",
+        "blob": "858ab13d38ffa5fa3040802c47320f67ffd76bd2"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "adef691f30ea0ef283329111680c22588785dd38"
+      }
+    },
+    {
+      "path": "scripts/active-aquinas-hierarchy.ts",
+      "deployed": null,
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "84cb46c05e627a16728e4ce7c7994f397e4af950"
+      }
+    },
+    {
+      "path": "scripts/aquinas-authority-audit.ts",
+      "deployed": null,
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "dae6b5d3c8eddc403308387c762490f409cb8062"
+      }
+    },
+    {
+      "path": "scripts/aquinas-source-pack-capacity-comparison.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "8abdebf22d3c8e6147ca9919c1944abd288dfce0"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "f273bc261bf91c622de701e4abba2821db2a9505"
+      }
+    },
+    {
+      "path": "scripts/benchmark-primary-source-research.ts",
+      "deployed": null,
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "91ee4803e3a2bdb8cea842c09d053412f18ad67f"
+      }
+    },
+    {
+      "path": "scripts/build-database.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "438255941c3f8020dbbf8b55f9fd39f539e09224"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "353b847ea4293944d897d79ea5f933ab0bf3b17f"
+      }
+    },
+    {
+      "path": "scripts/check-remote-d1-readiness.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "96eb02928c016dd1470822326b7ef53ef3c41f42"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "c1e2a7076795e7f59aac8b5caf38f767f850e181"
+      }
+    },
+    {
+      "path": "scripts/classify-ci-changes.d.mts",
+      "deployed": null,
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "6bd08e6de6a3a5d12409478e655db1027c7b2dcd"
+      }
+    },
+    {
+      "path": "scripts/classify-ci-changes.mjs",
+      "deployed": null,
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "623dd7a1fb631c670089090e035715d12e760e5e"
+      }
+    },
+    {
+      "path": "scripts/finalize-biblical-language-unicode-manifest.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "b01202582a4ed37d403c19274cbfce4e5b333d36"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "5b850c11d7afd486ee9fea2a320c559f84916cd5"
+      }
+    },
+    {
+      "path": "scripts/historical-hierarchy-publication.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "0f20f053cd2b42ec5c3982411d654e8fb9a91a7b"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "207b075a14f8f22e6c60be3e4b3ad0e95003f888"
+      }
+    },
+    {
+      "path": "scripts/historical-hierarchy.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "d639efe860d70fc869f2e2cf7765f79ed7b1e272"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "f1627b67d9375b52454e9d167f61b591630ecdc3"
+      }
+    },
+    {
+      "path": "scripts/historical-source-packs.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "9a64756cc02e47cd86a487053fc937ec1d8d5f5f"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "183373dc0ba93c32cc895910baae6bfaa5eb5b89"
+      }
+    },
+    {
+      "path": "scripts/historical-transform8-authority-audit.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "1b93bb747d7331e2f54aef5d5095bf4749107002"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "de6b9aeb58a7dd8add5a1c4050e3f4b2de49c091"
+      }
+    },
+    {
+      "path": "scripts/historical-transform9-authority-audit.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "e9ae989bde4bef9f7ba69b28f5dcb8bbda1e832a"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "ed11bbbd3ab04b4187a8ecca98fac17aba3f8d0a"
+      }
+    },
+    {
+      "path": "scripts/pr-release-eligibility.d.mts",
+      "deployed": null,
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "2e7c232e2b1cae0dd75f10c94b153d636914274c"
+      }
+    },
+    {
+      "path": "scripts/pr-release-eligibility.mjs",
+      "deployed": null,
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "3d887d577d38c4c36640d6b32287de0c8648996e"
+      }
+    },
+    {
+      "path": "scripts/release-corpus-capacity.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "fe3de13d4ed05663e7da1aed6cdf59604a1861f2"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "38643fdd9f8d6d63eeea12d6faef06fbdabd0f01"
+      }
+    },
+    {
+      "path": "scripts/resolve-production-release-context.mjs",
+      "deployed": {
+        "mode": "100644",
+        "blob": "e032554810832ab998e8e030368ed07f44325b4d"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "04e6a06ce19be38abb55a9c160983d70ae2e546f"
+      }
+    },
+    {
+      "path": "scripts/transform12-candidate-c-storage.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "9626cb6b45ed90f3ad416173d5cb0f6a2a83cb3a"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "ba74f99d5711f5078104c3a4cf6ca398f2fe0576"
+      }
+    },
+    {
+      "path": "scripts/verify-biblical-language-unicode-d1.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "fb930df8e7e36387e6494638a198bf96b81d4d9e"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "cea0df31154c7161a930ae4c81224670d6989491"
+      }
+    },
+    {
+      "path": "scripts/verify-d1-seed-import.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "0730d78b53d34989491b8bfea2f45c6adfe341a4"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "4046bf3fdb4c386034a216c0f173132ab2ae3373"
+      }
+    },
+    {
+      "path": "scripts/verify-d1-seed-workerd.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "0646dd806996aeb1f7fe0732b859bc97799f75d3"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "e05c7f2ef71cc3f3c60f853bc8756326c9fe03aa"
+      }
+    },
+    {
+      "path": "scripts/verify-data-manifest.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "4719ded29a489ce109c18763eaf55507dbdecd8e"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "4ace7c8a7348c2e2b742e032a6ff2f5ee226c207"
+      }
+    },
+    {
+      "path": "scripts/verify-database.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "a060ec8b3b846f8a37fb18257b4b4dcc73f10763"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "c3a0b142f1688e5c496f900286b27bc416387c9c"
+      }
+    },
+    {
+      "path": "skills/confession-study/SKILL.md",
+      "deployed": {
+        "mode": "100644",
+        "blob": "024a78c5d19f30ba5881bd41e762b4cf1634d013"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "ffda2fd1588b1aea443f08c14ee64693de69cedf"
+      }
+    },
+    {
+      "path": "src/adapters/bible/EsvAdapter.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "ae0e5c6686c3974b5fef4c6900f72cf2fbe9aaec"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "5148fd5d651361e0e0eb412bf477e642e89c1a87"
+      }
+    },
+    {
+      "path": "src/adapters/bible/HelloAoAdapter.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "1d3ff86da40629af4f234b000fd09fa7292ea468"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "a0c19da66841a028acd88b37272b0164e60fdd1b"
+      }
+    },
+    {
+      "path": "src/adapters/bible/NetBibleAdapter.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "4c9c7ec2704a78c1bfe2e74351553c20767ebced"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "3ac287213581791d9ee34200673af6ff08f555f9"
+      }
+    },
+    {
+      "path": "src/adapters/d1/D1HistoricalHierarchyRepository.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "0ba8f1cf2beb18b0821df0de8eded1caff87a6a0"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "3584349e1518a6ae1f3472766b0004266ad617ff"
+      }
+    },
+    {
+      "path": "src/adapters/data/HistoricalHierarchyRepository.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "ddbbc87f871a1eb5f8f681173c4ff0e8685c0dc6"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "cea36190d6852a47b16f210317b8428fd2df8e83"
+      }
+    },
+    {
+      "path": "src/adapters/shared/Database.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "5d088ca8b5294ceec13685f0b9f04463aa59be39"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "67ecb006cfbfbdfe3b7a8c0c54a409c422c8b2e0"
+      }
+    },
+    {
+      "path": "src/adapters/shared/HttpClient.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "61c20c2c04e21d57886309ffb7c1131914570ef6"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "8d912169609cc1275cc167ce37d6f11510d1887e"
+      }
+    },
+    {
+      "path": "src/formatters/bibleFormatter.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "0244f3e1407ad8ed816a9909f8acf0db7c4757a1"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "cdfbab55079b7a421ddb07bd8483c2afc89b6e1d"
+      }
+    },
+    {
+      "path": "src/formatters/historicalFormatter.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "7aec7cd08ebaec61171acede3df426c13c13c49c"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "82383ae07c08143c13c828b1dbb273953d856831"
+      }
+    },
+    {
+      "path": "src/formatters/historicalHierarchyFormatter.ts",
+      "deployed": null,
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "a23b3e86c69d600b30fbbbce311dd188d715f0fc"
+      }
+    },
+    {
+      "path": "src/formatters/originalLanguageStudyV2Formatter.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "ca8cccadd3ec7db16fa1a0ed87fb9874d5044033"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "a90b383bcd46090aecd6588d1980072aef5cb673"
+      }
+    },
+    {
+      "path": "src/http/nodeHttpServer.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "6894a6eeb227962f3d750c4c737755630773c40e"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "36919fd40e9117c0cd3d8f2ce77e0aa96abff4eb"
+      }
+    },
+    {
+      "path": "src/http/worker/telemetry.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "25d954d44c547870063e65c55be73fbe48f64f0c"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "2c14d130726d4c853cbb75261f7778a466b44ac4"
+      }
+    },
+    {
+      "path": "src/index.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "257a83c06a74f1b805315f8d1fc671a348d8c9a2"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "4379b092cd93f9495a8fc810ebdce95733066a10"
+      }
+    },
+    {
+      "path": "src/kernel/editionProvenanceFoundation.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "1edc47dd1a4562a639c5f6e238b739d68fd7855a"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "a224abc95e47855ee7e06808bc4608f22c840599"
+      }
+    },
+    {
+      "path": "src/kernel/editionText.ts",
+      "deployed": null,
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "ce118a72d9289cd25ef8bd443048ad72eea76848"
+      }
+    },
+    {
+      "path": "src/kernel/historicalHierarchyResource.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "0020005b559b14f69f8f7429e2f010a5bc96212a"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "4e001a671d9361ae7281e5887c87906b4bee9974"
+      }
+    },
+    {
+      "path": "src/kernel/index.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "4913746c60269774a4144e65916e185849c0bd79"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "08e6499eb8d1a6806578bf5e32271b7e94c27933"
+      }
+    },
+    {
+      "path": "src/kernel/reference.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "5455896fcb13c8808ca73a5dd1055a42c0342a42"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "db270db6e5b54441e1b4d88aed2c53dd4709b026"
+      }
+    },
+    {
+      "path": "src/kernel/repositories.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "9e0728642d7e569b8a1ad170414dfad5a7c9b7ac"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "11a8bbc59f7029cf818f3bbe153cc77c88812145"
+      }
+    },
+    {
+      "path": "src/kernel/requestDeadline.ts",
+      "deployed": null,
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "87c3b0ea7752bf72cdcece5c9541751e62f4706d"
+      }
+    },
+    {
+      "path": "src/kernel/requestLimits.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "5cd2ae6fca510661482fdf6db9223887fafce940"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "f8fbc05deea92c5d1dca36cbe306c7ee936a6581"
+      }
+    },
+    {
+      "path": "src/kernel/sourceAttestedReference.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "939776c4a3c9b3fbfb5e1c47d0be6cb5c0bb3897"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "207bbaf6562519d8b3ac777b0e6cb268ad55f23e"
+      }
+    },
+    {
+      "path": "src/kernel/types.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "5932abefad64779bfbcd14349aa031907a4ccfa9"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "a852f7a1efa03fa5e927d040aac4915040fa7e09"
+      }
+    },
+    {
+      "path": "src/mcp/primarySourceQueryPlanning.ts",
+      "deployed": null,
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "b09960b4c2958cfcd5f4f86a674cf7b1b4fe16a7"
+      }
+    },
+    {
+      "path": "src/mcp/prompts.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "ca2a5c293b64c565c6c7f41b3656cf8cabe2f944"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "cc74b05d710c29c38d7be8fd73d59f1f8552940a"
+      }
+    },
+    {
+      "path": "src/mcp/schemas/bibleLookup.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "26526e30a95e7e0c4b703e2e3877390692f4d0fc"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "2059dbba6abe301fbbf3f091f485fd2057a954cf"
+      }
+    },
+    {
+      "path": "src/mcp/schemas/historicalHierarchy.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "a4113c0670cdb734416e55fa7b5c0b258aca4407"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "4a19ea16fb3757e1eabea83577167b99fa6d1245"
+      }
+    },
+    {
+      "path": "src/mcp/server.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "f709e9067d746e3655e6bf8adea0b8347f84b9e3"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "275b8d1b4e8367b31e647f54af25513d59deee95"
+      }
+    },
+    {
+      "path": "src/mcp/toolExecutionObserver.ts",
+      "deployed": null,
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "2251149fc33564eb733bad92f803543aed17e10a"
+      }
+    },
+    {
+      "path": "src/mcp/tools.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "79328c7836303d444194c4a8a9e93e8e7111ae55"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "97b07bef2d90f6811ab85a6d1d89643e85021860"
+      }
+    },
+    {
+      "path": "src/mcp/validation.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "4d9e2c056bd6aad44132bb418b4fc64fc7009b48"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "e69668c3b2f4b8908efbe8300767589271e94148"
+      }
+    },
+    {
+      "path": "src/presenters/bibleStructured.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "833123a7f3e8ab0e656fa09f7c057f03e52032fa"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "d20b908f2328c136ad3f1ce35d68ae94ec38c619"
+      }
+    },
+    {
+      "path": "src/presenters/historicalHierarchyStructured.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "1c37f0f88dc92d4106b9eb5d4c5a274ffaf8ad8c"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "a3ecdd6f9de155d9b9ef4e078d2f124f583cff8e"
+      }
+    },
+    {
+      "path": "src/server.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "4a6f8b659add8a8e90c500bb0237baacf927776b"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "0b6c5262b59a6aadff2a129632a1286c3f3359ad"
+      }
+    },
+    {
+      "path": "src/services/bible/BibleProviderPort.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "5edc0ccd35cee8c9fea833b46ce2c7021d339dd5"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "2ecd71d77f0d70eef82b62d0ec78692824909aa0"
+      }
+    },
+    {
+      "path": "src/services/bible/BibleService.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "80c46c502020cab4d5b5a30b4406adf8c53e0087"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "8850eda2cd452ef07555b0ca8520d60059d708ad"
+      }
+    },
+    {
+      "path": "src/services/bible/ParallelPassageService.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "d3c33ce77977af3355aab38bd5d2a4bdd6f01f50"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "891a0a40e6a785d1f5c0b062e1cb5dae0e165601"
+      }
+    },
+    {
+      "path": "src/services/historical/HistoricalHierarchyService.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "9a65f5c06b653073fd5ea5301ce09aa524dc807c"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "ed694df148092e48078e57e2e41390aab9df16bb"
+      }
+    },
+    {
+      "path": "src/tools/toolRegistry.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "c48fdacf7d4f04a90ab586dff874c10bf32e6b45"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "a1d8151d7220c705c092aa96ce9da868298940a5"
+      }
+    },
+    {
+      "path": "src/tools/v2/bibleLookup.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "7d6e8f6b67057996df6961191a20fdfe06a40c0d"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "f61b8c5c1e58dcd4208447a9a7a4580427b8ce4b"
+      }
+    },
+    {
+      "path": "src/tools/v2/historicalHierarchy.ts",
+      "deployed": null,
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "949cdcbf5bdc7147a59c84f9ed9650a87b8c37b2"
+      }
+    },
+    {
+      "path": "src/tools/v2/index.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "5a5f74422ac17efe45a6881bc6967d326cf3026a"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "a4176052637a7223ce4d5c89a3930702dfc61b0a"
+      }
+    },
+    {
+      "path": "src/tools/v2/parallelPassages.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "29e72aaba1d01a657f2c72ad34aa3dfaed53c4f1"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "eb6a2f9ed4beb3a3beeaeb84f4046ebb789fee40"
+      }
+    },
+    {
+      "path": "src/tools/worker/index.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "b7c676c092c5957ac027cf71950339156b74cf5e"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "8229958e19062571027ca53f031db2e768a13dcd"
+      }
+    },
+    {
+      "path": "src/worker-server.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "1e40dc0704efaae8a5a570bd73efe0290db5856a"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "92668eaed5dc6451afafb6eb7b2bb1d07c4d686f"
+      }
+    },
+    {
+      "path": "src/worker.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "6e32e6086480716cce3af44df8b9d21fef12173f"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "bc7419a1b41599e1029ed2bc528e97d1fd2113d4"
+      }
+    },
+    {
+      "path": "test/README.md",
+      "deployed": {
+        "mode": "100644",
+        "blob": "98a9b30e745e6587717b15e160625280d3e6f588"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "c65d674a6fb80ff81290e83b019d33661de13a6e"
+      }
+    },
+    {
+      "path": "test/conformance/run-server-conformance.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "18daeb5bd0540412f85b02452dc0e3cda09871c9"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "ee19138d1f024117269c748cd86733e8731cd731"
+      }
+    },
+    {
+      "path": "test/fixtures/mcpCompositionRoot.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "090ab8158278ad9f75d43a990c8b1d9ab4285f83"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "9e379ee341fa06c30f70c2e11496f2db2eefc431"
+      }
+    },
+    {
+      "path": "test/fixtures/primary-source-research-quality-benchmark.json",
+      "deployed": null,
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "131efd97dbabcaed1e15e31e96c9930b7a95390e"
+      }
+    },
+    {
+      "path": "test/fixtures/primary-source-research-v8-journeys.json",
+      "deployed": {
+        "mode": "100644",
+        "blob": "823d18bb60c22cc78ea36c3ceeba8527584dfae0"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "371ca0ed7b049705b4f89e7da5bd866fc94cde87"
+      }
+    },
+    {
+      "path": "test/helpers/mcpTransportContract.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "1e4f9d26a9fc477834d6d7987b5d2b0a7a3c00e3"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "fd8b0da34dea21feaf9c59dcb05a192a95a9335b"
+      }
+    },
+    {
+      "path": "test/integration/current/mcp-protocol.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "2bcca0e87b8aa19f8cf0aa158d8beb7098901b2e"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "6ef710589f44a290fd54aa5caad752ac9baf84fb"
+      }
+    },
+    {
+      "path": "test/test-topology.json",
+      "deployed": {
+        "mode": "100644",
+        "blob": "a3faad8eeaee764cb17d42594acf1fd1efae890d"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "6b938e7a363d9057754c0537a36add996d7c9922"
+      }
+    },
+    {
+      "path": "test/unit/adapters/bible/EsvAdapter.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "17168d9d54d8ea3aa0db1d8f4e6a577e9b94ba64"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "9a66d3714ff79ef796f5a55509569b02d3d9502b"
+      }
+    },
+    {
+      "path": "test/unit/adapters/bible/HelloAoAdapter.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "6c2a5717b7b9719299c41e84b4337a08e7172b10"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "4af5c17c53c5959e20220e83d9f6f00b61ff52ba"
+      }
+    },
+    {
+      "path": "test/unit/adapters/bible/NetBibleAdapter.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "a4f190aa1b93703bd39178c6cc3f1b0fce4f6596"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "fd0653a31b6f45fd0bd2461ebb24b43b490e707f"
+      }
+    },
+    {
+      "path": "test/unit/adapters/historicalHierarchyNodeD1Parity.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "296c945dc11ae33c510affe7fdea2721143791d7"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "bc0ee6fd1f9ce6a6e0bca6be73b53d6acd3c6336"
+      }
+    },
+    {
+      "path": "test/unit/adapters/shared/HttpClient.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "660b00c56861c73dac6f5bf947771576dee266e5"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "6f3a6181fc80cfd463244374b2296a2cdcf6bbd3"
+      }
+    },
+    {
+      "path": "test/unit/config/applicationBoundaries.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "ffe5293926a9db025b0599c05290594ba94f090c"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "ba749196a155f7c98a95a957d965a1b77ab4117c"
+      }
+    },
+    {
+      "path": "test/unit/config/customDomainConfig.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "1f09ae33caaa3ab4f948fd86784f46447f565669"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "4a56935355ef3971789f3c2aa2aed0d873a61900"
+      }
+    },
+    {
+      "path": "test/unit/config/testTopology.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "930905e022364c201470c1322740a557586e0640"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "88a47425506d225ebebb744ed914f0bbb509d323"
+      }
+    },
+    {
+      "path": "test/unit/config/workflowTopology.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "11c96bb4c2fe322c24fd9eb1aaeacc1cb8983a19"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "51428a1db9a5cf03af63e5509c357c1987e3c08f"
+      }
+    },
+    {
+      "path": "test/unit/docs/publicContract.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "3fcdfc7b756d1bab077892e10a14fe7dde96a7f9"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "6f94d3a3100b25695fcab1d80d738fac2d58b3ee"
+      }
+    },
+    {
+      "path": "test/unit/formatters/bibleFormatter.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "8277bfeec5915f0b971c2167d814b157d2985dd7"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "1f012e4e78ddfe4c93d84a68dc5463ce6bd74cb5"
+      }
+    },
+    {
+      "path": "test/unit/helpers/mcpTransportContract.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "704ff11f13d8ab37a903301e04708fd6b388d7c8"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "7f8700c3b598f1dd9e2a7024f212aea1d5b6625d"
+      }
+    },
+    {
+      "path": "test/unit/http/nodeHttpServer.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "d334a80d124b422696229cd687933692fed688e8"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "52813a6c16b520eb4f2edb9655d7ef95e633a3ec"
+      }
+    },
+    {
+      "path": "test/unit/kernel/reference.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "b483390116210e45759932d3984c83fa9c5063dc"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "d3efb9f1b00c55420c1a9863ad23b4ddbef37fa5"
+      }
+    },
+    {
+      "path": "test/unit/mcp/outputValidation.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "95fcf68173b7a6a4ae1147185b1593bb914b7511"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "5a76f2928fa5cb445f91a6c5f29c68b1b0993666"
+      }
+    },
+    {
+      "path": "test/unit/mcp/primarySourceQueryPlanning.test.ts",
+      "deployed": null,
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "41fa539dafee3e962df04f8eafa7bf2ff49707b1"
+      }
+    },
+    {
+      "path": "test/unit/mcp/promptContracts.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "c02dcb22c86a25c08d3fe586a71460db8f7f7f0b"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "13f9b2d5286aa85ca6002bf263ca9ea7eb335d28"
+      }
+    },
+    {
+      "path": "test/unit/mcp/server.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "39610932557b10fe076758366b82eabbc4dc7882"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "2afb012530ba595d251c3d8235eed8bc722ff4fb"
+      }
+    },
+    {
+      "path": "test/unit/mcp/toolExecutionObserver.test.ts",
+      "deployed": null,
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "5415b41ea16f59a7a073d69d874fda2f0c7c9021"
+      }
+    },
+    {
+      "path": "test/unit/mcp/validation.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "8c43e7745c5e8c4e0a2d86fbb3983f6601c89650"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "c5aec36441b0721e459f6cdc65521743b537e5c2"
+      }
+    },
+    {
+      "path": "test/unit/presenters/bibleStructured.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "16c9c328eca668e25142e27d9b70cd283ba1ab41"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "ee7df8e33dd1233248807c66d454bc9823bc1b6b"
+      }
+    },
+    {
+      "path": "test/unit/scripts/aquinasAuthorityAudit.test.ts",
+      "deployed": null,
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "9829a8f37cabf03eddad24c299fe05879f83e7e8"
+      }
+    },
+    {
+      "path": "test/unit/scripts/aquinasSourcePackCapacityComparison.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "950dd1f38c43ba16f9624e40055213d095153de7"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "fe3b0b31896805b67622c40fcdaed189cdd72f57"
+      }
+    },
+    {
+      "path": "test/unit/scripts/augustinePuseyStrictPackage.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "54e813609808ce143ee50cd1302642eb85043cf9"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "6806b5e26e728be45490093ebc703b2841f68557"
+      }
+    },
+    {
+      "path": "test/unit/scripts/biblicalLanguageSources.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "e0f44cc959349d04cefd4dc0e8c0a87774fe1624"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "5d431ec279fe666df2d27f45d3f1e9682f7882a5"
+      }
+    },
+    {
+      "path": "test/unit/scripts/checkRemoteD1Readiness.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "dfe4b722910f0b82149357e32db356e26f64af0b"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "c8af878887100ea60ff88db3b39fc8d095683f5e"
+      }
+    },
+    {
+      "path": "test/unit/scripts/classifyProductionDeployment.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "b3edc0b0c11e5f9bf43b826d38c9399b9c5ba6d8"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "d2418a1cdfb27abfa46865368b3249e66ec6ca1d"
+      }
+    },
+    {
+      "path": "test/unit/scripts/d1CorpusIdentity.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "53c0c4169fdbac3d2b7f5f0a86fc7ac1774fed42"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "853da670900f912e76dc943fac09ab67eca2d62b"
+      }
+    },
+    {
+      "path": "test/unit/scripts/finalizeBiblicalLanguageUnicodeManifest.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "99d266aaa187711a7d81b85aa1116ce7f71e353f"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "5f545e6db4171dd3936213b9e9d16a815714e7a1"
+      }
+    },
+    {
+      "path": "test/unit/scripts/historicalHierarchyPublication.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "c7c62f04ad8cc0b8272487db8939c3445c5ff9f9"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "cb5833f4e3d8a76e9b46c9d90a4cf63eecbefe0f"
+      }
+    },
+    {
+      "path": "test/unit/scripts/historicalHierarchyTransform10.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "4091d38aa18c87873e075f34073e50c61ca0f71c"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "e027b478bc30664ff5356322b339372346059797"
+      }
+    },
+    {
+      "path": "test/unit/scripts/historicalHierarchyTransform10Inertness.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "ce0a2129aef61dd93b5dfd5abcc4b606c30ac8e2"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "b046d1603b70477101d1448659ac5483451f8158"
+      }
+    },
+    {
+      "path": "test/unit/scripts/historicalSectionCompatibilityCompiler.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "dc3e84ec003e6bd89e067241d1cbe2f51537a847"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "5eef0e8e3e5df46303857248c497e7d11a6dbb45"
+      }
+    },
+    {
+      "path": "test/unit/scripts/historicalSectionKeyPlan.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "5b649a72bab2cc37a32f4502692f79479bf59717"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "efd586283783777730965884759596cf8ba4f0fb"
+      }
+    },
+    {
+      "path": "test/unit/scripts/historicalSourcePacks.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "0d17debbf9c0f7b519fce5c693d427997f4f38ab"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "c6a7b837a33efe48b239af9a756b8fbcb17a5be3"
+      }
+    },
+    {
+      "path": "test/unit/scripts/historicalTransform8AuthorityAudit.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "df9b355b701b5c9485f92425d234b21b9f776fcb"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "34f034ab002161c80b8798b13b3a37927fd6d020"
+      }
+    },
+    {
+      "path": "test/unit/scripts/historicalTransform9AuthorityAudit.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "450224baa406bd100e306b1672c06c4183682c85"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "f8404cc1d8a2ece029152671b00a17e0fd7c226e"
+      }
+    },
+    {
+      "path": "test/unit/scripts/primarySourceResearchBenchmark.test.ts",
+      "deployed": null,
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "1dcb143d060c1fe313aa8a762ddf04ce6b83f945"
+      }
+    },
+    {
+      "path": "test/unit/scripts/publicDomainHistoricalSources.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "e698c766b1d32f52e9dc47792cbb6a44a61294e9"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "98975ed78cdb48d2f8295945670b5d6741599d0a"
+      }
+    },
+    {
+      "path": "test/unit/scripts/releaseCorpusCapacity.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "42d3807ab3618f963c0c2f43a45dd64d51767409"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "cf2e58f530baf5c2bf9597b6cda18151111ba06c"
+      }
+    },
+    {
+      "path": "test/unit/scripts/resolveProductionReleaseContext.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "0b17a02685a3e8bc0e34c3629a4bf6c5c894497d"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "07f794db5ae0e5954f70c2469d7049c98792cd82"
+      }
+    },
+    {
+      "path": "test/unit/scripts/ubsHebrewV092AcquisitionInertness.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "1d3a7e2b322176839a280619ef55766d6b9e43a3"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "8fe39a1036987729543d77ba16e1cd044d103c69"
+      }
+    },
+    {
+      "path": "test/unit/scripts/ubsSemanticAggregateInertness.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "f122dae5f9af7cd41bad766b03eca3c64888ed4b"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "f7d5f10f2fa2c5e6bd9750691da0b8a1b15e7ffd"
+      }
+    },
+    {
+      "path": "test/unit/scripts/ubsSemanticDesignGuards.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "cf734848615cfd2cd3cc6bf2f2344a63c2b328e7"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "8c43f8103b3f56811d050320ae1b85a974a16225"
+      }
+    },
+    {
+      "path": "test/unit/scripts/ubsSemanticResolutionInertness.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "6d0637569a946c35d677428bddd483b776d3fba1"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "b3d87a8b3505f40d9826dcd90a40395f1fd44eb8"
+      }
+    },
+    {
+      "path": "test/unit/services/bible/BibleService.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "4aec33fd6783492c41af3a50298b0af9e526cd23"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "cccb3b0e5823cf21283f060d76358c2d4f52eb07"
+      }
+    },
+    {
+      "path": "test/unit/services/bible/ParallelPassageHardCutover.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "09f48c8d01c1cecf2515ce48c3ec893afd6043e7"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "5c1035a9e58b2bf71807f3fd6ed73e1c7a6f5f5d"
+      }
+    },
+    {
+      "path": "test/unit/services/bible/ParallelPassageTextBudget.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "3ca6ec69f863b91d7cd8259697711d573b84fc0f"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "0f05c50b5f4c0f03b904d764e1926cdb0bf45d59"
+      }
+    },
+    {
+      "path": "test/unit/services/bible/SourceAttestedParallelService.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "c8c775eb2720eeb9f203c19870ad9add0ef7a835"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "96ebea31ec79bb8d6580aa747048f75219037202"
+      }
+    },
+    {
+      "path": "test/unit/services/historical/HistoricalHierarchyService.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "0211b176a0f16adbc294b08cefa6932eef1bfa8a"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "9a93afc7ad550e189934c49ba4cb1adf53d11b8a"
+      }
+    },
+    {
+      "path": "test/unit/tools/v2/handlers.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "025a48b766c584041e7ca832c76561383533a0fa"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "57ff22c35a8b1f081e663e6138803a54da1dc33c"
+      }
+    },
+    {
+      "path": "test/unit/tools/worker/compositionRoot.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "0646464de7009c0591a98e8c578abb3d7a0c7502"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "e95322fac7b609c0bfa7453f384ed9c1d4bbeec7"
+      }
+    },
+    {
+      "path": "test/unit/worker/workerEntryPoint.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "79a505a21ba6391c24ed814d2b0e59be5aa1e6f1"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "32973de0ea36494279eb812a1697cb08df9f12fd"
+      }
+    },
+    {
+      "path": "test/worker-runtime/workerMcp.test.ts",
+      "deployed": {
+        "mode": "100644",
+        "blob": "83d56ba4ad111119b8b4561d7653180a863aca1c"
+      },
+      "retainedMain": {
+        "mode": "100644",
+        "blob": "0084fd428407a2c68ab4567f016a5572f4fec721"
+      }
+    }
+  ]
+}

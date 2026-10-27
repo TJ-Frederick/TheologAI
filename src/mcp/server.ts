@@ -9,6 +9,7 @@
 
 import {
   ProtocolError,
+  ProtocolErrorCode,
   Server,
   type JSONRPCRequest,
   type Result,
@@ -27,6 +28,7 @@ import { internalError, resourceNotFound } from './errors.js';
 import { registerPromptHandlers } from './prompts.js';
 import { registerToolHandlers } from './tools.js';
 import { jsonSchemaValidator } from './validation.js';
+import { exceedsMcpInputLimits, MCP_INPUT_LIMIT_MESSAGE } from './inputLimits.js';
 import { buildPrimarySourceCatalog, PRIMARY_SOURCE_CATALOG_URI } from './primarySourceCatalog.js';
 import { COMMENTARY_CATALOG } from '../kernel/commentaryCatalog.js';
 import type { PrimarySourceContractConfig } from '../kernel/featureFlags.js';
@@ -45,6 +47,9 @@ export class TheologAiMcpServer extends Server {
     const wrapped = super._wrapHandler(method, handler);
     return async (request, ctx) => {
       try {
+        if (exceedsMcpInputLimits(request)) {
+          throw new ProtocolError(ProtocolErrorCode.InvalidParams, MCP_INPUT_LIMIT_MESSAGE);
+        }
         return await wrapped(request, ctx);
       } catch (error) {
         if (error instanceof ProtocolError) throw error;

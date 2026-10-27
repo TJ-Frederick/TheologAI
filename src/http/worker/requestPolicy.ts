@@ -1,8 +1,9 @@
 import type { Env } from '../../worker-env.js';
 import type { WorkerRequestMetadata } from './telemetry.js';
+import { MCP_MAX_REQUEST_BODY_BYTES } from '../../mcp/inputLimits.js';
 
 export const DEFAULT_ALLOWED_ORIGIN = 'https://theologai.pages.dev';
-export const DEFAULT_MAX_REQUEST_BYTES = 1024 * 1024;
+export const DEFAULT_MAX_REQUEST_BYTES = MCP_MAX_REQUEST_BODY_BYTES;
 
 const ALLOWED_METHODS = new Set(['POST', 'OPTIONS']);
 const ALLOWED_PATHS = new Set(['/', '/mcp']);
@@ -21,7 +22,7 @@ export interface GuardResponse {
 export function getMaxRequestBytes(env: Env): number {
   const configured = Number(env.THEOLOGAI_MAX_REQUEST_BYTES);
   return Number.isSafeInteger(configured) && configured > 0
-    ? configured
+    ? Math.min(configured, MCP_MAX_REQUEST_BODY_BYTES)
     : DEFAULT_MAX_REQUEST_BYTES;
 }
 

@@ -6,6 +6,13 @@ import { resolveProductionReleaseContext } from '../../../scripts/resolve-produc
 const SHA = 'a'.repeat(40);
 const PARENT = 'b'.repeat(40);
 
+function outputRecord(stdout: string): Record<string, string> {
+  return Object.fromEntries(stdout.trim().split('\n').map(line => {
+    const separator = line.indexOf('=');
+    return [line.slice(0, separator), line.slice(separator + 1)];
+  }));
+}
+
 describe('resolveProductionReleaseContext', () => {
   it('selects the immutable push baseline without affecting deployment classification', () => {
     const result = resolveProductionReleaseContext({ eventName: 'push', ref: 'refs/heads/main', pushBefore: SHA, firstParent: PARENT });
@@ -84,6 +91,56 @@ describe('resolveProductionReleaseContext', () => {
     });
     expect(missing.status).toBe(1);
     expect(missing.stdout).toBe('');
+  });
+
+  it('emits the fixed manual workflow context and classifier outputs while rejecting stale event, ref, and identity inputs', () => {
+    const script = 'scripts/resolve-production-release-context.mjs';
+    const environment = {
+      PRODUCTION_RELEASE_EVENT_NAME: 'workflow_dispatch',
+      PRODUCTION_RELEASE_REF: 'refs/heads/main',
+      PRODUCTION_RELEASE_FIRST_PARENT: PARENT,
+      PRODUCTION_RELEASE_HEAD: SHA,
+      PATH: process.env.PATH,
+    };
+    const run = (command: string, overrides: Partial<Record<string, string>> = {}) => spawnSync(process.execPath, [script, command], {
+      cwd: new URL('../../..', import.meta.url), encoding: 'utf8', env: { ...environment, ...overrides },
+    });
+
+    const context = run('manual-context-output');
+    expect(context.status).toBe(0);
+    expect(context.stderr).toBe('');
+    expect(outputRecord(context.stdout)).toEqual({
+      release_context_json: JSON.stringify({ before: PARENT, mode: 'manual', forceDeploy: true, customDomainRequired: true, reason: 'manual-main-dispatch' }),
+      before: PARENT,
+      custom_domain_required: 'true',
+    });
+
+    const classification = run('manual-classification-output');
+    expect(classification.status).toBe(0);
+    expect(classification.stderr).toBe('');
+    expect(outputRecord(classification.stdout)).toMatchObject({
+      release_context_json: JSON.stringify({ before: PARENT, mode: 'manual', forceDeploy: true, customDomainRequired: true, reason: 'manual-main-dispatch' }),
+      before: PARENT,
+      custom_domain_required: 'true',
+      classification_succeeded: 'true',
+      deploy_required: 'true',
+      decision: 'deploy',
+      reason: 'manual-main-dispatch',
+      base: PARENT,
+      head: SHA,
+      changed_path_evidence_json: '[]',
+    });
+
+    for (const overrides of [
+      { PRODUCTION_RELEASE_EVENT_NAME: 'push' },
+      { PRODUCTION_RELEASE_REF: 'refs/heads/feature/unsafe' },
+      { PRODUCTION_RELEASE_HEAD: 'A'.repeat(40) },
+    ]) {
+      const result = run('manual-context-output', overrides);
+      expect(result.status).toBe(1);
+      expect(result.stdout).toBe('');
+      expect(result.stderr).not.toBe('');
+    }
   });
 
   it('keeps process, Git, filesystem, and network concerns outside the pure resolver', async () => {

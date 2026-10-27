@@ -24,6 +24,7 @@
     "scripts/macula-gate1.ts",
     "scripts/verify-database.ts",
     "scripts/ccel-live-preview-canary.ts",
-    "scripts/production-rollback-rehearsal.ts"
+    "scripts/production-rollback-rehearsal.ts",
+    "scripts/application-corpus-check.ts"
   ]
 }

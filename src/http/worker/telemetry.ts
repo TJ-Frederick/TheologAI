@@ -39,7 +39,7 @@ export type WorkerSecurityEvent =
       status: 429;
       limit: number;
       periodSeconds: number;
-      scope: 'hashed_ip_user_agent_per_colo';
+      scope: 'hashed_ip_per_colo';
     }
   | {
       event: 'theologai.worker.rate_limit.failure';

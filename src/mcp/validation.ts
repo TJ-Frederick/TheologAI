@@ -5,6 +5,10 @@ import {
   type JsonSchemaType,
 } from '@modelcontextprotocol/server';
 import { parseReference } from '../kernel/reference.js';
+import { exceedsMcpInputLimits, MCP_INPUT_LIMIT_MESSAGE } from './inputLimits.js';
+
+const MAX_VALIDATION_ERRORS = 8;
+const MAX_VALIDATION_DETAIL_CHARACTERS = 256;
 
 export type SchemaValidationResult<T> = {
   valid: true;
@@ -30,7 +34,9 @@ export const jsonSchemaValidator = {
         valid: false,
         data: undefined,
         errorMessage: result.errors
-          .map(error => `${error.instanceLocation}: ${error.error}`)
+          .slice(0, MAX_VALIDATION_ERRORS)
+          .map(({ instanceLocation, error }) =>
+            `${instanceLocation.slice(0, MAX_VALIDATION_DETAIL_CHARACTERS)}: ${error.slice(0, MAX_VALIDATION_DETAIL_CHARACTERS)}`)
           .join('; '),
       };
     };
@@ -50,6 +56,14 @@ export function validatorFor(
   );
   validatorCache.set(serializedSchema, validator);
   return validator;
+}
+
+/** Input preflight must run before the general validator allocates errors. */
+export function inputValidatorFor(schema: Record<string, unknown>): SchemaValidator<Record<string, unknown>> {
+  const validate = validatorFor(schema);
+  return input => exceedsMcpInputLimits(input)
+    ? { valid: false, data: undefined, errorMessage: MCP_INPUT_LIMIT_MESSAGE }
+    : validate(input);
 }
 
 export function formatValidationError(errorMessage: string | undefined): string {

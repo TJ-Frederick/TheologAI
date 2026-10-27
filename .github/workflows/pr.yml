@@ -4,77 +4,66 @@ on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, labeled, ready_for_review]
+  schedule:
+    - cron: '31 8 * * 1'
+  workflow_dispatch:
 
+# Unrelated labels cannot cancel active validation or preview transactions.
+# Required checks still execute: emitting skipped contexts on a label event
+# could otherwise supersede a failing required check for the same revision.
 concurrency:
-  group: pr-${{ github.event.pull_request.number }}
+  group: >-
+    ${{ github.event_name == 'pull_request' &&
+        (github.event.action != 'labeled' || github.event.label.name == 'deploy-preview') &&
+        format('pr-{0}', github.event.pull_request.number) || format('validation-{0}', github.run_id) }}
   cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
-  test-and-build:
-    name: Test & Build
+  classify:
+    name: Select Validation
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 3
+    outputs:
+      mode: ${{ steps.select.outputs.mode }}
+      data: ${{ steps.select.outputs.data }}
+      serving: ${{ steps.select.outputs.serving }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-
+        with:
+          persist-credentials: false
+          fetch-depth: 2
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version-file: '.nvmrc'
-          cache: 'npm'
+      - id: select
+        name: Classify exact checked-out change
+        env:
+          CI_EXPECTED_HEAD: ${{ github.sha }}
+          CI_PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          CI_FORCE_FULL: ${{ github.event_name != 'pull_request' || github.event.action == 'labeled' || contains(github.event.pull_request.labels.*.name, 'deploy-preview') }}
+        run: node scripts/classify-ci-changes.mjs
 
-      - run: npm ci --no-audit
-
-      - name: Audit full dependency lockfile for high-severity vulnerabilities
-        run: npm run audit:dependencies:high
-
-      - name: Verify generated Worker binding types
-        run: |
-          npm run types:worker:check
-          npm run types:ccel-coordinator:check
-
-      - name: Validate production and preview Worker configuration
-        run: |
-          npm run validate:worker-config
-          npm run validate:ccel-coordinator-config
-          npm run validate:ccel-coordinator-test-config
-
-      - name: Typecheck Node.js target
-        run: |
-          npm run typecheck:node
-          npm run typecheck:release-scripts
-          npm run typecheck:test-node
-          npm run typecheck:test-scripts
-          npm run typecheck:test-frozen-context-capacity
-
-      - name: Typecheck Workers target
-        run: |
-          npm run typecheck:worker
-          npm run typecheck:ccel-coordinator
-
-      - name: Typecheck Worker runtime tests
-        run: |
-          npm run typecheck:worker-runtime
-          npm run typecheck:ccel-coordinator-test
-
-      - name: Run unit tests with enforced coverage thresholds
-        run: npm run test:coverage
-
-      - name: Run current-architecture integration tests
-        run: npm run test:integration
-
-      - name: Build Node.js target
-        run: npm run build
-
-  fresh-checkout-data:
-    name: Fresh Checkout & Data
+  test-and-build:
+    name: Test & Build
+    needs: classify
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 15
     steps:
+      - name: Require explicit validation selection
+        env:
+          CLASSIFIER_RESULT: ${{ needs.classify.result }}
+          SELECTED: ${{ needs.classify.outputs.serving }}
+        run: |
+          test "$CLASSIFIER_RESULT" = success
+          case "$SELECTED" in true|false) ;; *) exit 1 ;; esac
+
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          persist-credentials: false
           fetch-depth: 2
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
@@ -83,14 +72,41 @@ jobs:
           cache: 'npm'
 
       - run: npm ci --no-audit
+      - uses: ./.github/actions/validate
+        with:
+          suite: ${{ needs.classify.outputs.mode == 'docs' && 'docs' || 'core' }}
 
-      - name: Confirm derived database is absent
-        run: test ! -e data/theologai.db
+  fresh-checkout-data:
+    name: Fresh Checkout & Data
+    needs: classify
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Require explicit validation selection
+        env:
+          CLASSIFIER_RESULT: ${{ needs.classify.result }}
+          SELECTED: ${{ needs.classify.outputs.data }}
+        run: |
+          test "$CLASSIFIER_RESULT" = success
+          case "$SELECTED" in true|false) ;; *) exit 1 ;; esac
 
-      - name: Verify canonical data sources
-        run: npm run data:verify-sources
+      - if: needs.classify.outputs.data == 'true'
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+          fetch-depth: 2
 
+      - if: needs.classify.outputs.data == 'true'
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - run: npm ci --no-audit
+        if: needs.classify.outputs.data == 'true'
       - name: Verify historical section-key lineage
+        if: needs.classify.outputs.data == 'true' && github.event_name == 'pull_request'
         env:
           EXPECTED_MERGE_SHA: ${{ github.sha }}
           EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
@@ -121,121 +137,243 @@ jobs:
             npm run data:verify-section-keys -- --genesis
           fi
 
-      - name: Build SQLite database from tracked sources
-        run: npm run build:db -- --output "$RUNNER_TEMP/theologai.db"
-
-      # Runs its own full semantic verifier with only the duplicate early size
-      # abort deferred, so an over-limit candidate prints structured evidence.
-      - name: Report release-wide SQLite/D1 corpus capacity
-        run: npm run audit:release-corpus-capacity
-
-      - name: Verify generated SQLite database
-        run: npm run data:verify-db -- --database "$RUNNER_TEMP/theologai.db"
-
-      - name: Exercise D1 readiness checks against generated database
+      - name: Verify scheduled historical section-key plan
+        if: needs.classify.outputs.data == 'true' && github.event_name != 'pull_request'
         run: |
-          test -f "$THEOLOGAI_TEST_DATABASE_PATH"
-          npm run test:d1-readiness-generated-db
-        env:
-          THEOLOGAI_TEST_DATABASE_PATH: ${{ runner.temp }}/theologai.db
-
-      - name: Export deterministic local D1 seed
-        run: npm run d1:seed:export -- --database "$RUNNER_TEMP/theologai.db" --clean
-
-      - name: Verify and reproduce deterministic local D1 seed
-        run: |
-          npm run d1:seed:verify
-          cp scripts/d1-seed/seed-manifest.json "$RUNNER_TEMP/d1-seed-manifest.json"
-          npm run d1:seed:export -- --database "$RUNNER_TEMP/theologai.db" --clean
-          cmp "$RUNNER_TEMP/d1-seed-manifest.json" scripts/d1-seed/seed-manifest.json
-          npm run d1:seed:verify
-          npm run d1:seed:verify-import -- --database "$RUNNER_TEMP/theologai.db"
-
-      - name: Verify historical section compatibility evidence against generated local artifacts
-        run: >-
-          npx --no-install tsx scripts/historical-section-compatibility-evidence.ts
-          --database "$RUNNER_TEMP/theologai.db"
-          --seed-directory scripts/d1-seed
-
-      - name: Import generated seed through local D1
-        run: npm run d1:seed:verify-workerd
-
-      - name: Build Node.js target
-        run: npm run build
+          if git cat-file -e 'HEAD^1:data/historical-section-key-plan.json'; then
+            git show 'HEAD^1:data/historical-section-key-plan.json' > "$RUNNER_TEMP/historical-section-key-plan.previous.json"
+            npm run data:verify-section-keys -- --previous-plan "$RUNNER_TEMP/historical-section-key-plan.previous.json"
+          else
+            npm run data:verify-section-keys -- --genesis
+          fi
+      - uses: ./.github/actions/validate
+        if: needs.classify.outputs.data == 'true'
+        with:
+          suite: data
+      - name: Record intentional omission
+        if: needs.classify.outputs.data == 'false'
+        run: echo 'This change does not affect this validation suite; the required check remains explicit.'
 
   worker-runtime:
     name: Worker Runtime & D1
+    needs: classify
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Require explicit validation selection
+        env:
+          CLASSIFIER_RESULT: ${{ needs.classify.result }}
+          SELECTED: ${{ needs.classify.outputs.serving }}
+        run: |
+          test "$CLASSIFIER_RESULT" = success
+          case "$SELECTED" in true|false) ;; *) exit 1 ;; esac
 
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+      - if: needs.classify.outputs.serving == 'true'
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+
+      - if: needs.classify.outputs.serving == 'true'
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
 
       - run: npm ci --no-audit
-
-      - name: Typecheck Worker runtime tests
-        run: npm run typecheck:worker-runtime
-
-      - name: Exercise Worker MCP endpoint with isolated D1
-        run: |
-          npm run test:worker-runtime
-          npm run test:ccel-coordinator-runtime
-
-      - name: Exercise production-like Worker bundle without test-only globals
-        run: |
-          npm run test:worker-bundle-ubs
-          npm run test:worker-production-runtime
+        if: needs.classify.outputs.serving == 'true'
+      - uses: ./.github/actions/validate
+        if: needs.classify.outputs.serving == 'true'
+        with:
+          suite: worker
+      - name: Record intentional omission
+        if: needs.classify.outputs.serving == 'false'
+        run: echo 'This change does not affect this validation suite; the required check remains explicit.'
 
   node-http-e2e:
     name: Node HTTP E2E
+    needs: classify
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Require explicit validation selection
+        env:
+          CLASSIFIER_RESULT: ${{ needs.classify.result }}
+          SELECTED: ${{ needs.classify.outputs.serving }}
+        run: |
+          test "$CLASSIFIER_RESULT" = success
+          case "$SELECTED" in true|false) ;; *) exit 1 ;; esac
 
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+      - if: needs.classify.outputs.serving == 'true'
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+
+      - if: needs.classify.outputs.serving == 'true'
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
 
       - run: npm ci --no-audit
-
-      - name: Exercise compiled Node HTTP MCP server
-        run: npm run test:e2e
+        if: needs.classify.outputs.serving == 'true'
+      - uses: ./.github/actions/validate
+        if: needs.classify.outputs.serving == 'true'
+        with:
+          suite: node
+      - name: Record intentional omission
+        if: needs.classify.outputs.serving == 'false'
+        run: echo 'This change does not affect this validation suite; the required check remains explicit.'
 
   mcp-conformance:
     name: Applicable MCP Conformance
+    needs: classify
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Require explicit validation selection
+        env:
+          CLASSIFIER_RESULT: ${{ needs.classify.result }}
+          SELECTED: ${{ needs.classify.outputs.serving }}
+        run: |
+          test "$CLASSIFIER_RESULT" = success
+          case "$SELECTED" in true|false) ;; *) exit 1 ;; esac
 
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+      - if: needs.classify.outputs.serving == 'true'
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+
+      - if: needs.classify.outputs.serving == 'true'
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
 
       - run: npm ci --no-audit
-
-      - name: Run applicable official MCP server scenarios
-        run: npm run test:conformance
-
+        if: needs.classify.outputs.serving == 'true'
+      - uses: ./.github/actions/validate
+        if: needs.classify.outputs.serving == 'true'
+        with:
+          suite: conformance
+      - name: Record intentional omission
+        if: needs.classify.outputs.serving == 'false'
+        run: echo 'This change does not affect this validation suite; the required check remains explicit.'
       - name: Upload MCP conformance results
-        if: always()
+        if: always() && needs.classify.outputs.serving == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: mcp-conformance-results
           path: test-output/mcp-conformance/
           if-no-files-found: error
 
+  validation-complete:
+    name: Validation Complete
+    needs: [test-and-build, fresh-checkout-data, worker-runtime, node-http-e2e, mcp-conformance]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Require every named check to succeed
+        env:
+          RESULTS: ${{ join(needs.*.result, ',') }}
+        run: test "$RESULTS" = 'success,success,success,success,success'
+
+  release-eligibility:
+    name: Release Eligibility
+    needs: [classify, validation-complete, preview-deploy]
+    if: ${{ always() && github.event_name == 'pull_request' && needs.classify.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: '.nvmrc'
+      - name: Explain exact candidate release eligibility
+        env:
+          CI_EXPECTED_HEAD: ${{ github.sha }}
+          CI_PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          CI_VALIDATION_RESULT: ${{ needs.validation-complete.result }}
+          CI_PREVIEW_RESULT: ${{ needs.preview-deploy.result }}
+        run: node scripts/pr-release-eligibility.mjs
+
+  build-worker:
+    name: Build preview Worker artifact (no cloud credentials)
+    needs: validation-complete
+    if: >-
+      (github.event.action != 'labeled' || github.event.label.name == 'deploy-preview') &&
+      github.event.pull_request.state == 'open' &&
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.base.ref == 'main' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      contains(github.event.pull_request.labels.*.name, 'deploy-preview')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      worker_sha256: ${{ steps.worker-artifact.outputs.sha256 }}
+      corpus_plan_sha256: ${{ steps.corpus-source.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - run: npm ci --ignore-scripts --no-audit
+
+      - name: Prepare complete corpus proof source without cloud credentials
+        if: hashFiles('release/application-only.json') != ''
+        id: corpus-source
+        run: |
+          npm rebuild better-sqlite3 --ignore-scripts=false
+          npm run build:db
+          digest="$(npx --no-install tsx scripts/application-corpus-check.ts prepare --database data/theologai.db --directory "$RUNNER_TEMP/corpus-source")"
+          printf 'sha256=%s\n' "$digest" >> "$GITHUB_OUTPUT"
+      - name: Upload source-bound corpus proof inputs
+        if: steps.corpus-source.outcome == 'success'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: corpus-preview-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/corpus-source/
+          if-no-files-found: error
+          retention-days: 1
+          overwrite: false
+
+      - name: Build Worker without cloud credentials
+        run: |
+          npx --no-install wrangler deploy --dry-run --env preview --env-file /dev/null --outdir "$RUNNER_TEMP/worker-bundle"
+      - name: Bind Worker artifact to exact source
+        id: worker-artifact
+        run: |
+          digest="$(node scripts/worker-release-artifact.mjs create preview "$RUNNER_TEMP/worker-bundle")"
+          printf 'sha256=%s\n' "$digest" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: worker-preview-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/worker-bundle/
+          if-no-files-found: error
+          retention-days: 1
+          overwrite: false
+
   preview-deploy:
     name: Deploy Preview
-    needs: [test-and-build, fresh-checkout-data, worker-runtime, node-http-e2e, mcp-conformance]
+    needs: [validation-complete, build-worker]
     if: >-
+      (github.event.action != 'labeled' || github.event.label.name == 'deploy-preview') &&
       github.event.pull_request.state == 'open' &&
       github.event.pull_request.draft == false &&
       github.event.pull_request.base.ref == 'main' &&
@@ -248,6 +386,7 @@ jobs:
       group: theologai-shared-preview-mutation
       cancel-in-progress: false
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     environment:
       name: preview
       url: https://preview-mcp.theologai.xyz/mcp
@@ -284,6 +423,8 @@ jobs:
 
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          persist-credentials: false
+          fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Verify preview checkout identity
@@ -300,12 +441,73 @@ jobs:
           printf 'commit=%s\n' "$checked_out_commit" >> "$GITHUB_OUTPUT"
           printf 'tree=%s\n' "$checked_out_tree" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+      # Prefer the protected base's release trust set. Its first introduction
+      # must pass the same validation, label, live-head and preview approval
+      # gates as every candidate; it never installs the root dependency graph.
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          node-version-file: '.nvmrc'
-          cache: 'npm'
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: release-control
+          persist-credentials: false
+      - name: Select release toolchain source
+        id: release-toolchain-source
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            .github/actions/release-toolchain/action.yml
+            .github/release-toolchain/package.json
+            .github/release-toolchain/package-lock.json
+          )
+          base_files=0
+          for file in "${files[@]}"; do
+            if test -e "release-control/$file" || test -L "release-control/$file"; then
+              test -f "release-control/$file"
+              test ! -L "release-control/$file"
+              base_files=$((base_files + 1))
+            fi
+          done
+          case "$base_files" in
+            3) printf 'source=base\n' >> "$GITHUB_OUTPUT" ;;
+            0)
+              # Bootstrap only an entirely absent trust set; missing individual
+              # files in an established base never permit a candidate fallback.
+              for file in "${files[@]}"; do
+                test -f "$file"
+                test ! -L "$file"
+              done
+              printf 'source=introduction\n' >> "$GITHUB_OUTPUT"
+              echo '::notice::Using the separately locked release toolchain introduced by this approved PR.'
+              ;;
+            *) echo '::error::The protected base has an incomplete release toolchain.'; exit 1 ;;
+          esac
 
-      - run: npm ci --no-audit
+      - if: steps.release-toolchain-source.outputs.source == 'base'
+        uses: ./release-control/.github/actions/release-toolchain
+
+      - if: steps.release-toolchain-source.outputs.source == 'introduction'
+        uses: ./.github/actions/release-toolchain
+
+      - name: Download source-bound Worker artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: worker-preview-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/worker-bundle
+          merge-multiple: false
+          digest-mismatch: error
+      - name: Download source-bound complete corpus proof inputs
+        if: hashFiles('release/application-only.json') != ''
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: corpus-preview-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/corpus-source
+          merge-multiple: false
+          digest-mismatch: error
+      - name: Verify artifact and render upload-only configuration
+        env:
+          EXPECTED_MANIFEST_SHA256: ${{ needs.build-worker.outputs.worker_sha256 }}
+        run: |
+          node scripts/worker-release-artifact.mjs render preview "$RUNNER_TEMP/worker-bundle" "$EXPECTED_MANIFEST_SHA256" "$RUNNER_TEMP/worker-release.json"
 
       # Resolve the checked-out candidate by ID and name before readiness.
       # The Worker remains bound to the predecessor until the later deploy.
@@ -320,20 +522,42 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      - name: Verify candidate preview D1 is compatible (read-only)
+      # The protected environment approval covers a complete fresh comparison
+      # and exactly four diagnostic FTS INSERT commands. They never rebuild data.
+      - name: Verify fresh corpus (up to 3.8M reads and four integrity commands)
+        id: corpus-proof
         run: |
           candidate_d1_name="$(< "$RUNNER_TEMP/preview-candidate-d1-name.txt")"
-          npm run d1:remote:check -- --database "$candidate_d1_name" --env preview \
-            --output "$RUNNER_TEMP/preview-d1-readiness-receipt.json"
+          if test -f release/application-only.json; then
+            APPLICATION_CORPUS_PROOF_APPROVAL_JSON="$(node --input-type=module - <<'JS'
+          import {execFileSync} from 'node:child_process';
+          import {ACCOUNT,TARGETS} from './scripts/application-release-policy.mjs';
+          const git=ref=>execFileSync('git',['rev-parse',ref],{encoding:'utf8'}).trim();
+          process.stdout.write(JSON.stringify({schemaVersion:'theologai-fresh-corpus-proof-approval.v1',role:'preview',accountId:ACCOUNT,databaseId:TARGETS.preview.databaseId,sourceCommit:git('HEAD'),sourceTree:git('HEAD^{tree}'),expiresAt:new Date(Date.now()+5400000).toISOString(),maxReads:3800000,integrityCommands:4,exclusiveDataWritesDuringProof:true}));
+          JS
+            )"
+            export APPLICATION_CORPUS_PROOF_APPROVAL_JSON
+            npx --no-install tsx scripts/application-corpus-check.ts verify \
+              --role preview --directory "$RUNNER_TEMP/corpus-source" \
+              --plan-sha256 "$CORPUS_PLAN_SHA256" --output "$RUNNER_TEMP/preview-d1-readiness-receipt.json"
+          else
+            npx --no-install tsx scripts/check-remote-d1-readiness.ts --database "$candidate_d1_name" --env preview \
+              --output "$RUNNER_TEMP/preview-d1-readiness-receipt.json"
+          fi
         env:
+          CORPUS_PLAN_SHA256: ${{ needs.build-worker.outputs.corpus_plan_sha256 }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Upload sanitized preview D1 readiness receipt
+        if: always() && steps.corpus-proof.outcome != 'skipped'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: preview-d1-readiness-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
-          path: ${{ runner.temp }}/preview-d1-readiness-receipt.json
+          path: |
+            ${{ runner.temp }}/preview-d1-readiness-receipt.json
+            ${{ runner.temp }}/preview-d1-readiness-receipt.json.events.jsonl
+            ${{ runner.temp }}/corpus-source/plan.json
           retention-days: 7
           if-no-files-found: error
 
@@ -434,27 +658,22 @@ jobs:
 
       - name: Deploy to Cloudflare Workers (preview)
         id: preview-worker-deploy
-        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
-        with:
-          wranglerVersion: '4.114.0'
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          environment: preview
-          secrets: |
-            ESV_API_KEY
-          command: deploy --env preview
         env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           ESV_API_KEY: ${{ secrets.ESV_API_KEY }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$ESV_API_KEY" | npx --no-install wrangler secret put ESV_API_KEY --env preview --env-file /dev/null
+          npx --no-install wrangler deploy --config "$RUNNER_TEMP/worker-release.json" --no-bundle --env-file /dev/null | tee "$RUNNER_TEMP/preview-worker-deploy.command-output.txt"
 
       - name: Verify exact active preview Worker version (read-only)
         id: preview-worker-pre-audit-identity
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          DEPLOY_COMMAND_OUTPUT: ${{ steps.preview-worker-deploy.outputs.command-output }}
           WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
         run: |
-          printf '%s' "$DEPLOY_COMMAND_OUTPUT" > "$RUNNER_TEMP/preview-worker-deploy.command-output.txt"
           npx --no-install wrangler versions list --env preview --json > "$RUNNER_TEMP/preview-worker-versions-after.json"
           npx --no-install wrangler deployments list --env preview --json > "$RUNNER_TEMP/preview-worker-deployments-after.json"
           npx --no-install tsx scripts/verify-preview-worker-deployment.ts verify-deploy \
@@ -534,7 +753,7 @@ jobs:
         if: ${{ steps.preview-worker-candidate-cutover.outcome == 'success' }}
         continue-on-error: true
         run: |
-          npm run audit:primary-source-edge-stabilization-preview -- \
+          npx --no-install tsx scripts/audit-primary-source-edge-stabilization.ts \
             --output "$RUNNER_TEMP/preview-primary-source-edge-stabilization.json"
 
       - name: Upload preview edge-stabilization evidence
@@ -557,7 +776,7 @@ jobs:
         id: preview-original-language-v2-audit
         if: ${{ steps.preview-primary-source-edge-stabilization-gate.outcome == 'success' }}
         run: |
-          npm run audit:original-language-v2-preview -- \
+          npx --no-install tsx scripts/audit-original-language-v2-preview.ts \
             --output "$RUNNER_TEMP/original-language-v2-preview-audit.json"
           test -s "$RUNNER_TEMP/original-language-v2-preview-audit.json"
 
@@ -565,18 +784,24 @@ jobs:
         id: preview-historical-core-audit
         if: ${{ steps.preview-primary-source-edge-stabilization-gate.outcome == 'success' && steps.preview-original-language-v2-audit.outcome == 'success' }}
         run: |
-          npm run audit:historical-core-preview -- \
+          npx --no-install tsx scripts/audit-historical-core-preview.ts \
             --output "$RUNNER_TEMP/historical-core-preview-audit.json"
           test -s "$RUNNER_TEMP/historical-core-preview-audit.json"
 
       # Fixed Transform-11 coverage stays separate from the Transform-9 core
       # audit: each of the ten newly activated works must pass its own bounded
       # landing, browse, search, primary-source, read, and pagination probes.
+      - name: Respect the shared IP request budget before the spine audit
+        if: ${{ steps.preview-historical-core-audit.outcome == 'success' }}
+        # SEC-03 makes all audit User-Agents share one IP allowance. Let the
+        # earlier bounded suites leave the 60-second window; audits never retry.
+        run: sleep 65
+
       - name: Audit Transform-11 historical spine contract on preview
         id: preview-historical-spine-audit
         if: ${{ steps.preview-primary-source-edge-stabilization-gate.outcome == 'success' && steps.preview-original-language-v2-audit.outcome == 'success' && steps.preview-historical-core-audit.outcome == 'success' }}
         run: |
-          npm run audit:historical-spine-preview -- \
+          npx --no-install tsx scripts/audit-historical-spine-preview.ts \
             --output "$RUNNER_TEMP/historical-spine-preview-audit.json"
           test -s "$RUNNER_TEMP/historical-spine-preview-audit.json"
 
@@ -584,7 +809,7 @@ jobs:
         id: preview-dual-era-audit
         if: ${{ steps.preview-historical-spine-audit.outcome == 'success' }}
         run: |
-          npm run audit:dual-era-preview -- --output "$RUNNER_TEMP/dual-era-mcp-preview-audit.json"
+          npx --no-install tsx scripts/audit-dual-era-mcp-preview.ts --output "$RUNNER_TEMP/dual-era-mcp-preview-audit.json"
           test -s "$RUNNER_TEMP/dual-era-mcp-preview-audit.json"
 
       # Runs after any post-deploy result (including audit failure or a later
@@ -674,6 +899,7 @@ jobs:
             --worker-identity "$RUNNER_TEMP/preview-worker-deployment-identity.json" \
             --cutover "$RUNNER_TEMP/preview-worker-candidate-cutover.json" \
             --d1-readiness "$RUNNER_TEMP/preview-d1-readiness-receipt.json" \
+            --d1-source-plan "$RUNNER_TEMP/corpus-source/plan.json" \
             --output "$RUNNER_TEMP/dual-era-preview-release-receipt.json"
 
       - name: Hash sanitized preview audit evidence

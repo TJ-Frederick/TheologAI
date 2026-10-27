@@ -1,8 +1,6 @@
 name: Deploy Production
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       reason:
@@ -27,6 +25,7 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
@@ -38,64 +37,17 @@ jobs:
         env:
           PRODUCTION_RELEASE_EVENT_NAME: ${{ github.event_name }}
           PRODUCTION_RELEASE_REF: ${{ github.ref }}
-          PRODUCTION_RELEASE_PUSH_BEFORE: ${{ github.event.before }}
           PRODUCTION_RELEASE_HEAD: ${{ github.sha }}
         run: |
-          PRODUCTION_RELEASE_FIRST_PARENT=''
-          if [ "$PRODUCTION_RELEASE_EVENT_NAME" = 'workflow_dispatch' ]; then
-            PRODUCTION_RELEASE_FIRST_PARENT="$(git rev-parse HEAD^1)"
-          fi
+          actual_head="$(git rev-parse HEAD)"
+          test "$actual_head" = "$PRODUCTION_RELEASE_HEAD"
+          PRODUCTION_RELEASE_FIRST_PARENT="$(git rev-parse HEAD^1)"
           export PRODUCTION_RELEASE_FIRST_PARENT
-          release_context="$(node scripts/resolve-production-release-context.mjs)"
-          node --input-type=module -e '
-            const value = JSON.parse(process.argv[1]);
-            const keys = ["before", "mode", "forceDeploy", "customDomainRequired", "reason"];
-            if (
-              typeof value !== "object" || value === null || Array.isArray(value) ||
-              Object.keys(value).length !== keys.length ||
-              keys.some(key => !Object.hasOwn(value, key)) ||
-              typeof value.before !== "string" ||
-              !["push", "manual"].includes(value.mode) ||
-              typeof value.forceDeploy !== "boolean" ||
-              typeof value.customDomainRequired !== "boolean" ||
-              typeof value.reason !== "string"
-            ) throw new Error("invalid production release context record");
-          ' "$release_context"
-          before="$(node --input-type=module -e 'const value = JSON.parse(process.argv[1]); process.stdout.write(value.before);' "$release_context")"
-          mode="$(node --input-type=module -e 'const value = JSON.parse(process.argv[1]); process.stdout.write(value.mode);' "$release_context")"
-          force_deploy="$(node --input-type=module -e 'const value = JSON.parse(process.argv[1]); process.stdout.write(String(value.forceDeploy));' "$release_context")"
-          custom_domain_required="$(node --input-type=module -e 'const value = JSON.parse(process.argv[1]); process.stdout.write(String(value.customDomainRequired));' "$release_context")"
-          selection_reason="$(node --input-type=module -e 'const value = JSON.parse(process.argv[1]); process.stdout.write(value.reason);' "$release_context")"
+          node scripts/resolve-production-release-context.mjs manual-classification-output >> "$GITHUB_OUTPUT"
+          before="$PRODUCTION_RELEASE_FIRST_PARENT"
           printf '%s' "$before" | grep -Eq '^[0-9a-f]{40}$'
           git cat-file -e "${before}^{commit}"
           git merge-base --is-ancestor "$before" HEAD
-          echo "release_context_json=$release_context" >> "$GITHUB_OUTPUT"
-          if [ "$mode" = 'manual' ]; then
-            test "$PRODUCTION_RELEASE_EVENT_NAME" = 'workflow_dispatch'
-            test "$force_deploy" = 'true'
-            test "$custom_domain_required" = 'true'
-            test "$selection_reason" = 'manual-main-dispatch'
-            head="$(git rev-parse HEAD)"
-            {
-              echo 'classification_succeeded=true'
-              echo 'deploy_required=true'
-              echo 'decision=deploy'
-              echo "reason=$selection_reason"
-              echo "base=$before"
-              echo "head=$head"
-              echo 'changed_path_evidence_json=[]'
-            } >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          test "$mode" = 'push'
-          test "$PRODUCTION_RELEASE_EVENT_NAME" = 'push'
-          test "$force_deploy" = 'false'
-          test "$custom_domain_required" = 'false'
-          test "$selection_reason" = 'push-before'
-          GITHUB_STEP_SUMMARY='' node scripts/classify-production-deployment.mjs \
-            --before "$before" \
-            --after "$PRODUCTION_RELEASE_HEAD" \
-            --head "$(git rev-parse HEAD)"
 
       - name: Create canonical production deployment plan
         id: production-deployment-plan
@@ -163,11 +115,13 @@ jobs:
     outputs:
       artifact_name: ${{ steps.verify.outputs.artifact_name }}
       plan_sha256: ${{ steps.verify.outputs.plan_sha256 }}
+      before: ${{ steps.verify.outputs.before }}
       deploy_required: ${{ steps.verify.outputs.deploy_required }}
       decision: ${{ steps.verify.outputs.decision }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
@@ -194,15 +148,19 @@ jobs:
           EXPECTED_HEAD: ${{ github.sha }}
           PRODUCTION_RELEASE_EVENT_NAME: ${{ github.event_name }}
           PRODUCTION_RELEASE_REF: ${{ github.ref }}
-          PRODUCTION_RELEASE_PUSH_BEFORE: ${{ github.event.before }}
+          PRODUCTION_RELEASE_HEAD: ${{ github.sha }}
         run: |
-          PRODUCTION_RELEASE_FIRST_PARENT=''
-          if [ "$PRODUCTION_RELEASE_EVENT_NAME" = 'workflow_dispatch' ]; then
-            PRODUCTION_RELEASE_FIRST_PARENT="$(git rev-parse HEAD^1)"
-          fi
+          actual_head="$(git rev-parse HEAD)"
+          test "$actual_head" = "$PRODUCTION_RELEASE_HEAD"
+          PRODUCTION_RELEASE_FIRST_PARENT="$(git rev-parse HEAD^1)"
           export PRODUCTION_RELEASE_FIRST_PARENT
           EXPECTED_RELEASE_CONTEXT_JSON="$(node scripts/resolve-production-release-context.mjs)"
           export EXPECTED_RELEASE_CONTEXT_JSON
+          node scripts/resolve-production-release-context.mjs manual-context-output >> "$GITHUB_OUTPUT"
+          before="$PRODUCTION_RELEASE_FIRST_PARENT"
+          printf '%s' "$before" | grep -Eq '^[0-9a-f]{40}$'
+          git cat-file -e "${before}^{commit}"
+          git merge-base --is-ancestor "$before" HEAD
           verified="$(node scripts/production-deployment-plan.mjs verify \
             --directory "$RUNNER_TEMP/production-deployment-plan-verifier")"
           node --input-type=module -e '
@@ -221,6 +179,7 @@ jobs:
           ' "$verified"
           artifact_name="$(node --input-type=module -e 'const value=JSON.parse(process.argv[1]);process.stdout.write(value.artifactName)' "$verified")"
           plan_sha256="$(node --input-type=module -e 'const value=JSON.parse(process.argv[1]);process.stdout.write(value.planSha256)' "$verified")"
+          before="$(node --input-type=module -e 'const value=JSON.parse(process.argv[1]);process.stdout.write(value.base)' "$verified")"
           deploy_required="$(node --input-type=module -e 'const value=JSON.parse(process.argv[1]);process.stdout.write(String(value.deployRequired))' "$verified")"
           decision="$(node --input-type=module -e 'const value=JSON.parse(process.argv[1]);process.stdout.write(value.decision)' "$verified")"
           reason="$(node --input-type=module -e 'const value=JSON.parse(process.argv[1]);process.stdout.write(value.reason)' "$verified")"
@@ -228,6 +187,7 @@ jobs:
           {
             printf 'artifact_name=%s\n' "$artifact_name"
             printf 'plan_sha256=%s\n' "$plan_sha256"
+            printf 'before=%s\n' "$before"
             printf 'deploy_required=%s\n' "$deploy_required"
             printf 'decision=%s\n' "$decision"
           } >> "$GITHUB_OUTPUT"
@@ -240,6 +200,14 @@ jobs:
             echo "- Plan SHA-256: \`$plan_sha256\`"
             echo "- Changed-path evidence records: \`$evidence_count\`"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  validate:
+    name: Validate Release
+    needs: [verify-deployment-plan, verify-dual-era-preview]
+    if: ${{ github.ref == 'refs/heads/main' && needs.verify-deployment-plan.outputs.deploy_required == 'true' && needs.verify-deployment-plan.outputs.decision == 'deploy' }}
+    uses: ./.github/workflows/validate.yml
+    with:
+      data-lineage-before: ${{ needs.verify-deployment-plan.outputs.before }}
 
   verify-dual-era-preview:
     name: Verify Protected Dual-Era Preview
@@ -258,6 +226,7 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
@@ -345,12 +314,69 @@ jobs:
             --expected-source-tree "$source_tree" \
             --expected-server-version "$preview_server_version"
 
-  deploy:
-    name: Test, Build & Deploy
-    needs: [verify-deployment-plan, verify-dual-era-preview]
+  build-worker:
+    name: Build production Worker artifact (no cloud credentials)
+    needs: [verify-deployment-plan, validate]
     if: ${{ github.ref == 'refs/heads/main' && needs.verify-deployment-plan.outputs.deploy_required == 'true' && needs.verify-deployment-plan.outputs.decision == 'deploy' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    permissions:
+      contents: read
+    outputs:
+      worker_sha256: ${{ steps.worker-artifact.outputs.sha256 }}
+      corpus_plan_sha256: ${{ steps.corpus-source.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - run: npm ci --ignore-scripts --no-audit
+
+      - name: Prepare complete corpus proof source without cloud credentials
+        if: hashFiles('release/application-only.json') != ''
+        id: corpus-source
+        run: |
+          npm rebuild better-sqlite3 --ignore-scripts=false
+          npm run build:db
+          digest="$(npx --no-install tsx scripts/application-corpus-check.ts prepare --database data/theologai.db --directory "$RUNNER_TEMP/corpus-source")"
+          printf 'sha256=%s\n' "$digest" >> "$GITHUB_OUTPUT"
+      - name: Upload source-bound corpus proof inputs
+        if: steps.corpus-source.outcome == 'success'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: corpus-production-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/corpus-source/
+          if-no-files-found: error
+          retention-days: 1
+          overwrite: false
+
+      - name: Build Worker without cloud credentials
+        run: |
+          npx --no-install wrangler deploy --dry-run --env= --env-file /dev/null --outdir "$RUNNER_TEMP/worker-bundle"
+      - name: Bind Worker artifact to exact source
+        id: worker-artifact
+        run: |
+          digest="$(node scripts/worker-release-artifact.mjs create production "$RUNNER_TEMP/worker-bundle")"
+          printf 'sha256=%s\n' "$digest" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: worker-production-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/worker-bundle/
+          if-no-files-found: error
+          retention-days: 1
+          overwrite: false
+
+  deploy:
+    name: Test, Build & Deploy
+    needs: [verify-deployment-plan, validate, verify-dual-era-preview, build-worker]
+    if: ${{ github.ref == 'refs/heads/main' && needs.verify-deployment-plan.outputs.deploy_required == 'true' && needs.verify-deployment-plan.outputs.decision == 'deploy' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
     environment:
       name: production
       url: https://mcp.theologai.xyz/mcp
@@ -366,50 +392,31 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          persist-credentials: false
           fetch-depth: 0
+
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version-file: '.nvmrc'
-          cache: 'npm'
+          package-manager-cache: false
 
       - name: Resolve production release comparison context
         id: production-release-context
         env:
           PRODUCTION_RELEASE_EVENT_NAME: ${{ github.event_name }}
           PRODUCTION_RELEASE_REF: ${{ github.ref }}
-          PRODUCTION_RELEASE_PUSH_BEFORE: ${{ github.event.before }}
+          PRODUCTION_RELEASE_HEAD: ${{ github.sha }}
         run: |
-          PRODUCTION_RELEASE_FIRST_PARENT=''
-          if [ "$PRODUCTION_RELEASE_EVENT_NAME" = 'workflow_dispatch' ]; then
-            PRODUCTION_RELEASE_FIRST_PARENT="$(git rev-parse HEAD^1)"
-          fi
+          actual_head="$(git rev-parse HEAD)"
+          test "$actual_head" = "$PRODUCTION_RELEASE_HEAD"
+          PRODUCTION_RELEASE_FIRST_PARENT="$(git rev-parse HEAD^1)"
           export PRODUCTION_RELEASE_FIRST_PARENT
-          release_context="$(node scripts/resolve-production-release-context.mjs)"
-          node --input-type=module -e '
-            const value = JSON.parse(process.argv[1]);
-            const keys = ["before", "mode", "forceDeploy", "customDomainRequired", "reason"];
-            if (
-              typeof value !== "object" || value === null || Array.isArray(value) ||
-              Object.keys(value).length !== keys.length ||
-              keys.some(key => !Object.hasOwn(value, key)) ||
-              typeof value.before !== "string" ||
-              !["push", "manual"].includes(value.mode) ||
-              typeof value.forceDeploy !== "boolean" ||
-              typeof value.customDomainRequired !== "boolean" ||
-              typeof value.reason !== "string"
-            ) throw new Error("invalid production release context record");
-          ' "$release_context"
-          before="$(node --input-type=module -e 'const value = JSON.parse(process.argv[1]); process.stdout.write(value.before);' "$release_context")"
-          custom_domain_required="$(node --input-type=module -e 'const value = JSON.parse(process.argv[1]); process.stdout.write(String(value.customDomainRequired));' "$release_context")"
+          node scripts/resolve-production-release-context.mjs manual-context-output >> "$GITHUB_OUTPUT"
+          before="$PRODUCTION_RELEASE_FIRST_PARENT"
           printf '%s' "$before" | grep -Eq '^[0-9a-f]{40}$'
           git cat-file -e "${before}^{commit}"
           git merge-base --is-ancestor "$before" HEAD
-          {
-            echo "before=$before"
-            echo "custom_domain_required=$custom_domain_required"
-            echo "release_context_json=$release_context"
-          } >> "$GITHUB_OUTPUT"
 
       - name: Download verified production deployment plan gate
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -441,7 +448,28 @@ jobs:
             ) throw new Error("protected production deployment plan revalidation failed");
           ' "$verified"
 
-      - run: npm ci --no-audit
+      - uses: ./.github/actions/release-toolchain
+
+      - name: Download source-bound Worker artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: worker-production-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/worker-bundle
+          merge-multiple: false
+          digest-mismatch: error
+      - name: Download source-bound complete corpus proof inputs
+        if: hashFiles('release/application-only.json') != ''
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: corpus-production-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/corpus-source
+          merge-multiple: false
+          digest-mismatch: error
+      - name: Verify artifact and render upload-only configuration
+        env:
+          EXPECTED_MANIFEST_SHA256: ${{ needs.build-worker.outputs.worker_sha256 }}
+        run: |
+          node scripts/worker-release-artifact.mjs render production "$RUNNER_TEMP/worker-bundle" "$EXPECTED_MANIFEST_SHA256" "$RUNNER_TEMP/worker-release.json"
 
       - name: Download exact protected preview evidence with digest validation
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -482,116 +510,6 @@ jobs:
             echo 'required=true' >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Verify generated Worker binding types
-        run: |
-          npm run types:worker:check
-          npm run types:ccel-coordinator:check
-
-      - name: Validate production and preview Worker configuration
-        run: |
-          npm run validate:worker-config
-          npm run validate:ccel-coordinator-config
-          npm run validate:ccel-coordinator-test-config
-
-      - name: Typecheck Node.js target
-        run: |
-          npm run typecheck:node
-          npm run typecheck:test-node
-          npm run typecheck:test-scripts
-          npm run typecheck:test-frozen-context-capacity
-
-      - name: Typecheck release-critical scripts
-        run: npm run typecheck:release-scripts
-
-      - name: Typecheck Workers target
-        run: |
-          npm run typecheck:worker
-          npm run typecheck:ccel-coordinator
-
-      - name: Typecheck Worker runtime tests
-        run: |
-          npm run typecheck:worker-runtime
-          npm run typecheck:ccel-coordinator-test
-
-      - name: Verify canonical data sources
-        run: npm run data:verify-sources
-
-      - name: Verify historical section-key lineage
-        env:
-          PREVIOUS_MAIN_SHA: ${{ steps.production-release-context.outputs.before }}
-        run: |
-          if [ "$PREVIOUS_MAIN_SHA" = '0000000000000000000000000000000000000000' ]; then
-            npm run data:verify-section-keys -- --genesis
-          else
-            printf '%s' "$PREVIOUS_MAIN_SHA" | grep -Eq '^[0-9a-f]{40}$'
-            git cat-file -e "$PREVIOUS_MAIN_SHA^{commit}"
-            git merge-base --is-ancestor "$PREVIOUS_MAIN_SHA" HEAD
-            if git cat-file -e "$PREVIOUS_MAIN_SHA:data/historical-section-key-plan.json"; then
-              git show "$PREVIOUS_MAIN_SHA:data/historical-section-key-plan.json" > "$RUNNER_TEMP/historical-section-key-plan.previous.json"
-              npm run data:verify-section-keys -- --previous-plan "$RUNNER_TEMP/historical-section-key-plan.previous.json"
-            else
-              npm run data:verify-section-keys -- --genesis
-            fi
-          fi
-
-      - name: Confirm derived database is absent
-        run: test ! -e data/theologai.db
-
-      - name: Build SQLite database from tracked sources
-        run: npm run build:db -- --output "$RUNNER_TEMP/theologai.db"
-
-      - name: Verify generated SQLite database
-        run: npm run data:verify-db -- --database "$RUNNER_TEMP/theologai.db"
-
-      - name: Export deterministic local D1 seed
-        run: npm run d1:seed:export -- --database "$RUNNER_TEMP/theologai.db" --clean
-
-      - name: Verify and reproduce deterministic local D1 seed
-        run: |
-          npm run d1:seed:verify
-          cp scripts/d1-seed/seed-manifest.json "$RUNNER_TEMP/d1-seed-manifest.json"
-          npm run d1:seed:export -- --database "$RUNNER_TEMP/theologai.db" --clean
-          cmp "$RUNNER_TEMP/d1-seed-manifest.json" scripts/d1-seed/seed-manifest.json
-          npm run d1:seed:verify
-          npm run d1:seed:verify-import -- --database "$RUNNER_TEMP/theologai.db"
-
-      - name: Verify historical section compatibility evidence against generated local artifacts
-        run: >-
-          npx --no-install tsx scripts/historical-section-compatibility-evidence.ts
-          --database "$RUNNER_TEMP/theologai.db"
-          --seed-directory scripts/d1-seed
-
-      - name: Import generated seed through local D1
-        run: npm run d1:seed:verify-workerd
-
-      - name: Run unit tests with enforced coverage thresholds
-        run: npm run test:coverage
-
-      - name: Run current-architecture integration tests
-        run: npm run test:integration
-
-      - name: Exercise Worker MCP endpoint with isolated D1
-        run: |
-          npm run test:worker-runtime
-          npm run test:ccel-coordinator-runtime
-
-      - name: Exercise production-like Worker bundle without test-only globals
-        run: |
-          npm run test:worker-bundle-ubs
-          npm run test:worker-production-runtime
-
-      - name: Build Node.js target
-        run: npm run build
-
-      - name: Exercise compiled Node HTTP MCP server
-        run: npm run test:e2e:compiled
-
-      - name: Run applicable official MCP server scenarios
-        run: npm run test:conformance
-
-      - name: Audit production dependencies
-        run: npm audit --omit=dev
-
       # Resolve the checked-out production candidate by both name and UUID.
       # This is read-only; candidate creation/preparation is a separately
       # authorized, fail-stop operation and this workflow cannot perform it.
@@ -606,20 +524,42 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      - name: Verify candidate production D1 is compatible (read-only)
+      # The protected environment approval covers a complete fresh comparison
+      # and exactly four diagnostic FTS INSERT commands. They never rebuild data.
+      - name: Verify fresh corpus (up to 3.8M reads and four integrity commands)
+        id: corpus-proof
         run: |
           candidate_d1_name="$(< "$RUNNER_TEMP/production-candidate-d1-name.txt")"
-          npm run d1:remote:check -- --database "$candidate_d1_name" \
-            --output "$RUNNER_TEMP/production-d1-readiness-receipt.json"
+          if test -f release/application-only.json; then
+            APPLICATION_CORPUS_PROOF_APPROVAL_JSON="$(node --input-type=module - <<'JS'
+          import {execFileSync} from 'node:child_process';
+          import {ACCOUNT,TARGETS} from './scripts/application-release-policy.mjs';
+          const git=ref=>execFileSync('git',['rev-parse',ref],{encoding:'utf8'}).trim();
+          process.stdout.write(JSON.stringify({schemaVersion:'theologai-fresh-corpus-proof-approval.v1',role:'production',accountId:ACCOUNT,databaseId:TARGETS.production.databaseId,sourceCommit:git('HEAD'),sourceTree:git('HEAD^{tree}'),expiresAt:new Date(Date.now()+5400000).toISOString(),maxReads:3800000,integrityCommands:4,exclusiveDataWritesDuringProof:true}));
+          JS
+            )"
+            export APPLICATION_CORPUS_PROOF_APPROVAL_JSON
+            npx --no-install tsx scripts/application-corpus-check.ts verify \
+              --role production --directory "$RUNNER_TEMP/corpus-source" \
+              --plan-sha256 "$CORPUS_PLAN_SHA256" --output "$RUNNER_TEMP/production-d1-readiness-receipt.json"
+          else
+            npx --no-install tsx scripts/check-remote-d1-readiness.ts --database "$candidate_d1_name" \
+              --output "$RUNNER_TEMP/production-d1-readiness-receipt.json"
+          fi
         env:
+          CORPUS_PLAN_SHA256: ${{ needs.build-worker.outputs.corpus_plan_sha256 }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Upload sanitized production D1 readiness receipt
+        if: always() && steps.corpus-proof.outcome != 'skipped'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: production-d1-readiness-${{ github.sha }}
-          path: ${{ runner.temp }}/production-d1-readiness-receipt.json
+          path: |
+            ${{ runner.temp }}/production-d1-readiness-receipt.json
+            ${{ runner.temp }}/production-d1-readiness-receipt.json.events.jsonl
+            ${{ runner.temp }}/corpus-source/plan.json
           retention-days: 30
           if-no-files-found: error
 
@@ -684,7 +624,7 @@ jobs:
           grep -Eiq '^access-control-allow-methods:[[:space:]]*.*POST.*OPTIONS.*[[:space:]]*$' \
             "$RUNNER_TEMP/preview-mcp-options.headers"
 
-          npm run audit:parallel-preview -- \
+          npx --no-install tsx scripts/audit-parallel-passages-preview.ts \
             --url https://preview-mcp.theologai.xyz/mcp \
             --output "$RUNNER_TEMP/pre-production-preview-mcp-audit.json"
           test -s "$RUNNER_TEMP/pre-production-preview-mcp-audit.json"
@@ -713,16 +653,14 @@ jobs:
 
       - name: Deploy to Cloudflare Workers
         id: production-worker-deploy
-        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
-        with:
-          wranglerVersion: '4.114.0'
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          preCommands: |
-            printf '%s' "$ESV_API_KEY" | npx --no-install wrangler secret put ESV_API_KEY --env=
-          command: deploy --env=
         env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           ESV_API_KEY: ${{ secrets.ESV_API_KEY }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$ESV_API_KEY" | npx --no-install wrangler secret put ESV_API_KEY --env= --env-file /dev/null
+          npx --no-install wrangler deploy --config "$RUNNER_TEMP/worker-release.json" --no-bundle --env-file /dev/null | tee "$RUNNER_TEMP/production-worker-deploy.command-output.txt"
 
       - name: Verify exact active production Worker version (read-only)
         id: production-worker-pre-audit-identity
@@ -730,10 +668,8 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          DEPLOY_COMMAND_OUTPUT: ${{ steps.production-worker-deploy.outputs.command-output }}
           WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
         run: |
-          printf '%s' "$DEPLOY_COMMAND_OUTPUT" > "$RUNNER_TEMP/production-worker-deploy.command-output.txt"
           npx --no-install wrangler versions list --json > "$RUNNER_TEMP/production-worker-versions-after.json"
           npx --no-install wrangler deployments list --json > "$RUNNER_TEMP/production-worker-deployments-after.json"
           npx --no-install tsx scripts/verify-production-worker-deployment.ts verify-deploy \
@@ -809,7 +745,7 @@ jobs:
         if: ${{ steps.production-worker-candidate-cutover.outcome == 'success' }}
         continue-on-error: true
         run: |
-          npm run audit:primary-source-edge-stabilization-production -- \
+          npx --no-install tsx scripts/audit-primary-source-edge-stabilization-production.ts \
             --output "$RUNNER_TEMP/production-primary-source-edge-stabilization.json"
 
       - name: Upload production edge-stabilization evidence
@@ -830,7 +766,7 @@ jobs:
         id: production-original-language-v2-audit
         if: ${{ steps.production-primary-source-edge-stabilization-gate.outcome == 'success' }}
         run: |
-          npm run audit:original-language-v2-production -- \
+          npx --no-install tsx scripts/audit-original-language-v2-production.ts \
             --output "$RUNNER_TEMP/original-language-v2-production-audit.json"
           test -s "$RUNNER_TEMP/original-language-v2-production-audit.json"
 
@@ -838,15 +774,21 @@ jobs:
         id: production-historical-core-audit
         if: ${{ steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' }}
         run: |
-          npm run audit:historical-core-production -- \
+          npx --no-install tsx scripts/audit-historical-core-production.ts \
             --output "$RUNNER_TEMP/historical-core-production-audit.json"
           test -s "$RUNNER_TEMP/historical-core-production-audit.json"
+
+      - name: Respect the shared IP request budget before the spine audit
+        if: ${{ steps.production-historical-core-audit.outcome == 'success' }}
+        # SEC-03 makes all audit User-Agents share one IP allowance. Let the
+        # earlier bounded suites leave the 60-second window; audits never retry.
+        run: sleep 65
 
       - name: Audit Transform-11 historical spine contract on production
         id: production-historical-spine-audit
         if: ${{ steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' && steps.production-historical-core-audit.outcome == 'success' }}
         run: |
-          npm run audit:historical-spine-production -- \
+          npx --no-install tsx scripts/audit-historical-spine-production.ts \
             --output "$RUNNER_TEMP/historical-spine-production-audit.json"
           test -s "$RUNNER_TEMP/historical-spine-production-audit.json"
 

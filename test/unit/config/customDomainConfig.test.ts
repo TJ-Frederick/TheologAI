@@ -1,4 +1,6 @@
 import { readFile } from 'node:fs/promises';
+import { parse } from 'smol-toml';
+import { parse as parseYaml } from 'yaml';
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_ALLOWED_ORIGIN as NODE_DEFAULT_ALLOWED_ORIGIN } from '../../../src/http/config.js';
 import { DEFAULT_ALLOWED_ORIGIN as WORKER_DEFAULT_ALLOWED_ORIGIN } from '../../../src/http/worker/requestPolicy.js';
@@ -9,33 +11,55 @@ async function readProjectFile(path: string): Promise<string> {
 
 describe('custom-domain infrastructure contract', () => {
   it('keeps production and preview routes, D1, and rate limits isolated while retaining workers.dev', async () => {
-    const config = await readProjectFile('wrangler.toml');
-    const previewStart = config.indexOf('[env.preview]');
-    expect(previewStart).toBeGreaterThan(0);
+    const config = parse(await readProjectFile('wrangler.toml')) as {
+      workers_dev: boolean;
+      routes: Array<{ pattern: string; custom_domain: boolean }>;
+      vars: { THEOLOGAI_ALLOWED_ORIGINS: string };
+      d1_databases: Array<{ binding: string; database_name: string; database_id: string }>;
+      ratelimits: Array<{ name: string; namespace_id: string; simple: { limit: number; period: number } }>;
+      env: {
+        preview: {
+          workers_dev: boolean;
+          routes: Array<{ pattern: string; custom_domain: boolean }>;
+          vars: { THEOLOGAI_ALLOWED_ORIGINS: string };
+          d1_databases: Array<{ binding: string; database_name: string; database_id: string }>;
+          ratelimits: Array<{ name: string; namespace_id: string; simple: { limit: number; period: number } }>;
+        };
+      };
+    };
+    const production = config;
+    const preview = config.env.preview;
 
-    const production = config.slice(0, previewStart);
-    const preview = config.slice(previewStart);
+    expect(production.workers_dev).toBe(true);
+    expect(production.routes).toEqual([{ pattern: 'mcp.theologai.xyz', custom_domain: true }]);
+    expect(production.d1_databases).toContainEqual(expect.objectContaining({
+      binding: 'THEOLOGAI_DB',
+      database_name: 'theologai-production-20260811-schema0009-a',
+      database_id: '9bc79346-338b-439e-a2a5-424f4418eb21',
+    }));
+    expect(production.ratelimits).toContainEqual({
+      name: 'THEOLOGAI_RATE_LIMITER',
+      namespace_id: '361201',
+      simple: { limit: 120, period: 60 },
+    });
 
-    expect(production).toContain('workers_dev = true');
-    expect(production).toContain('{ pattern = "mcp.theologai.xyz", custom_domain = true }');
-    expect(production).not.toContain('preview-mcp.theologai.xyz');
-    expect(production).toContain('database_name = "theologai-production-20260811-schema0009-a"');
-    expect(production).toContain('database_id = "9bc79346-338b-439e-a2a5-424f4418eb21"');
-    expect(production).toContain('namespace_id = "361201"');
-
-    expect(preview).toContain('workers_dev = true');
-    expect(preview).toContain('{ pattern = "preview-mcp.theologai.xyz", custom_domain = true }');
-    expect(preview).not.toContain('{ pattern = "mcp.theologai.xyz", custom_domain = true }');
-    expect(preview).toContain('database_name = "theologai-preview-20260811-schema0009-a"');
-    expect(preview).toContain('database_id = "74f456e2-6951-4003-bb6f-91951342bf8f"');
-    expect(preview).toContain('namespace_id = "361202"');
+    expect(preview.workers_dev).toBe(true);
+    expect(preview.routes).toEqual([{ pattern: 'preview-mcp.theologai.xyz', custom_domain: true }]);
+    expect(preview.d1_databases).toContainEqual(expect.objectContaining({
+      binding: 'THEOLOGAI_DB',
+      database_name: 'theologai-preview-20260811-schema0009-a',
+      database_id: '74f456e2-6951-4003-bb6f-91951342bf8f',
+    }));
+    expect(preview.ratelimits).toContainEqual({
+      name: 'THEOLOGAI_RATE_LIMITER',
+      namespace_id: '361202',
+      simple: { limit: 120, period: 60 },
+    });
 
     for (const environment of [production, preview]) {
-      expect(environment).toContain(
-        'THEOLOGAI_ALLOWED_ORIGINS = "https://theologai.xyz,https://theologai.pages.dev"',
+      expect(environment.vars.THEOLOGAI_ALLOWED_ORIGINS).toBe(
+        'https://theologai.xyz,https://theologai.pages.dev',
       );
-      expect(environment).toContain('limit = 120');
-      expect(environment).toContain('period = 60');
     }
   });
 
@@ -58,21 +82,25 @@ describe('custom-domain infrastructure contract', () => {
     expect(prerequisiteStart).toBeGreaterThan(0);
     expect(deployStart).toBeGreaterThan(prerequisiteStart);
     expect(releaseContextEnd).toBeGreaterThan(releaseContextStart);
-    const releaseContext = productionWorkflow.slice(releaseContextStart, releaseContextEnd);
-    expect(releaseContext).toContain('PRODUCTION_RELEASE_EVENT_NAME: ${{ github.event_name }}');
-    expect(releaseContext).toContain('PRODUCTION_RELEASE_REF: ${{ github.ref }}');
-    expect(releaseContext).toContain('PRODUCTION_RELEASE_PUSH_BEFORE: ${{ github.event.before }}');
-    expect(releaseContext).toContain('PRODUCTION_RELEASE_FIRST_PARENT="$(git rev-parse HEAD^1)"');
-    expect(releaseContext).toContain('release_context="$(node scripts/resolve-production-release-context.mjs)"');
-    expect(releaseContext).toContain('Object.keys(value).length !== keys.length');
-    expect(releaseContext).toContain('process.stdout.write(value.before);');
-    expect(releaseContext).toContain('process.stdout.write(String(value.customDomainRequired));');
-    expect(releaseContext).toContain("grep -Eq '^[0-9a-f]{40}$'");
-    expect(releaseContext).toContain('git cat-file -e "${before}^{commit}"');
-    expect(releaseContext).toContain('git merge-base --is-ancestor "$before" HEAD');
-    expect(releaseContext).not.toMatch(/run:\s*\|[\s\S]*?\$\{\{\s*github\./);
-    expect(releaseContext).toContain('echo "before=$before"');
-    expect(releaseContext).toContain('echo "custom_domain_required=$custom_domain_required"');
+    const workflow = parseYaml(productionWorkflow) as {
+      jobs: { deploy: { steps: Array<{ name?: string; env?: Record<string, string>; run?: string }> } };
+    };
+    const releaseContext = workflow.jobs.deploy.steps.find(step => step.name === 'Resolve production release comparison context');
+    expect(releaseContext).toBeDefined();
+    expect(releaseContext!.env).toEqual({
+      PRODUCTION_RELEASE_EVENT_NAME: '${{ github.event_name }}',
+      PRODUCTION_RELEASE_REF: '${{ github.ref }}',
+      PRODUCTION_RELEASE_HEAD: '${{ github.sha }}',
+    });
+    expect(releaseContext!.run).toContain('actual_head="$(git rev-parse HEAD)"');
+    expect(releaseContext!.run).toContain('test "$actual_head" = "$PRODUCTION_RELEASE_HEAD"');
+    expect(releaseContext!.run).toContain('PRODUCTION_RELEASE_FIRST_PARENT="$(git rev-parse HEAD^1)"');
+    expect(releaseContext!.run).toContain('resolve-production-release-context.mjs manual-context-output >> "$GITHUB_OUTPUT"');
+    expect(releaseContext!.run).toContain("grep -Eq '^[0-9a-f]{40}$'");
+    expect(releaseContext!.run).toContain('git cat-file -e "${before}^{commit}"');
+    expect(releaseContext!.run).toContain('git merge-base --is-ancestor "$before" HEAD');
+    expect(releaseContext!.run).not.toContain('PRODUCTION_RELEASE_PUSH_BEFORE');
+    expect(releaseContext!.run).not.toContain('JSON.parse');
     const detector = productionWorkflow.slice(detectorStart, prerequisiteStart);
     expect(detector).toContain('before="${{ steps.production-release-context.outputs.before }}"');
     expect(detector).toContain('git cat-file -e "${before}^{commit}"');
@@ -93,7 +121,7 @@ describe('custom-domain infrastructure contract', () => {
     expect(prerequisite).toContain('access-control-allow-origin:[[:space:]]*https://theologai\\.xyz');
     expect(prerequisite.match(/grep -Eiq/g)).toHaveLength(2);
     expect(prerequisite).not.toContain('rg --ignore-case');
-    expect(prerequisite).toContain('npm run audit:parallel-preview');
+    expect(prerequisite).toContain('npx --no-install tsx scripts/audit-parallel-passages-preview.ts');
     expect(prerequisite).toContain('$RUNNER_TEMP/pre-production-preview-mcp-audit.json');
     expect(prerequisite).toContain('test -s "$RUNNER_TEMP/pre-production-preview-mcp-audit.json"');
     expect(prerequisite).toContain('$RUNNER_TEMP/theologai-website.html');

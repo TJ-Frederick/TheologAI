@@ -35,7 +35,28 @@ afterEach(async () => {
 });
 
 describe('legacy-host redirect transport compatibility', () => {
-  it('lets the official TypeScript Streamable HTTP client follow a cross-origin 308 without changing its POST body', async () => {
+  it('rejects a cross-origin redirect by default before sending the body to the target', async () => {
+    const targetRequest = vi.fn();
+    const target = await listen((_request, response) => {
+      targetRequest();
+      response.end();
+    });
+    const legacy = await listen((_request, response) => {
+      response.writeHead(308, { Location: `${target.url}/mcp` });
+      response.end();
+    });
+    const transport = new StreamableHTTPClientTransport(new URL(`${legacy.url}/mcp`));
+    transport.onerror = () => {};
+    await transport.start();
+    try {
+      await expect(transport.send({ jsonrpc: '2.0', id: 1, method: 'ping' })).rejects.toThrow('not followed');
+      expect(targetRequest).not.toHaveBeenCalled();
+    } finally {
+      await transport.close();
+    }
+  });
+
+  it('preserves the POST body when a caller explicitly permits cross-origin redirects', async () => {
     const targetRequest = vi.fn<(
       method: string | undefined,
       url: string | undefined,
@@ -52,7 +73,9 @@ describe('legacy-host redirect transport compatibility', () => {
       response.end();
     });
 
-    const transport = new StreamableHTTPClientTransport(new URL(`${legacy.url}/mcp?source=legacy`));
+    const transport = new StreamableHTTPClientTransport(new URL(`${legacy.url}/mcp?source=legacy`), {
+      redirectPolicy: 'follow',
+    });
     const received = vi.fn();
     transport.onmessage = received;
     await transport.start();
