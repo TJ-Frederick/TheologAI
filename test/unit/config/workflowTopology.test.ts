@@ -403,8 +403,9 @@ describe('workflow topology', () => {
     const steps = action.runs.steps;
     const commands = (suite: string) => steps.filter(step => step.if === `inputs.suite == '${suite}'`).map(step => step.run).join('\n');
     const data = commands('data');
-    expect(data).toContain('audit:release-corpus-capacity -- --output-database');
-    expect(data).not.toContain('npm run build:db');
+    expect(data).toContain('npm run audit:release-corpus-capacity\n');
+    expect(data).not.toContain('--output-database');
+    expect(data).toContain('npm run build:db -- --output "$RUNNER_TEMP/theologai.db"');
     // This release retains the deployed application/corpus. The later research
     // benchmark and its implementation are outside this security backport.
     for (const command of ['d1:seed:verify-workerd', 'd1:seed:verify-import', 'test:d1-readiness-generated-db', 'historical-section-compatibility-evidence.ts']) expect(data).toContain(command);
