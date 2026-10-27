@@ -1,4 +1,4 @@
-# SEC-01–05 corpus-preserving security release — local review candidate
+# SEC-01–05 corpus-preserving security release — review candidate
 
 This candidate keeps the application/corpus contract of the deployed September 1
 source `8fbfccfc73628918cfbcf4ca22676f2f7a0b55ab`: 35 flat works, schema 0009,
@@ -62,7 +62,7 @@ older deployed application plus the five security fixes and fresh-proof gate.
 This is an explicit temporary deferral of newer application work, including
 Norton/Aquinas activation, research/formatting changes and other post-baseline
 behavior. It is a larger release diff than the security changes alone and needs
-review before publication. It must not be presented as an ordinary small patch
+review before merge or deployment. It must not be presented as an ordinary small patch
 that preserves all of current main's behavior.
 
 All newer work remains reachable through those parent commits and the original
@@ -82,8 +82,15 @@ October 26 baseline-backport validation passed 2,662 unit tests (five skipped),
 90.84% line / 81.17% branch coverage, three integration tests, 28 Worker and 17
 coordinator runtime tests, both Node transports/protocol eras, MCP conformance,
 all type checks, deterministic corpus build/verification and strict advisory audit.
-October 27 fresh-proof changes require the additional validation recorded with
-the final candidate. Local counters and synthetic transport tests are planning
+October 27 validation passed all 2,698 unit tests (five skipped), 90.84% line
+and 81.17% branch coverage, all type checks, three integration tests, 28 Worker
+and 17 coordinator runtime tests, production-profile local Workerd checks, both
+compiled Node transports/protocol eras, MCP conformance, corpus verification,
+the local complete counter and end-to-end source preparation. Failure tests
+cover invalid approval/plan/target, changed cells/schema/ledger/FTS postings,
+insufficient quota, sampled analytics, retries/replicas, unexpected writes,
+read overruns, redirects/network failure and control drift. The dependency
+audit passed its strict existing exception policy. Local counters and synthetic transport tests are planning
 and implementation evidence, not a remote database verification receipt.
 
 The only advisory exception is development-only GHSA-mrhx-c7xc-m3w5 beneath the
