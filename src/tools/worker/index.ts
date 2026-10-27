@@ -14,7 +14,6 @@ import { D1CrossReferenceRepository } from '../../adapters/d1/D1CrossReferenceRe
 import { D1StrongsRepository } from '../../adapters/d1/D1StrongsRepository.js';
 import { D1MorphologyRepository } from '../../adapters/d1/D1MorphologyRepository.js';
 import { D1HistoricalDocumentRepository } from '../../adapters/d1/D1HistoricalDocumentRepository.js';
-import { D1HistoricalHierarchyRepository } from '../../adapters/d1/D1HistoricalHierarchyRepository.js';
 import { D1UbsParallelPassageRepository } from '../../adapters/d1/D1UbsParallelPassageRepository.js';
 import { D1UbsSemanticEvidenceBundleRepository } from '../../adapters/d1/D1UbsSemanticEvidenceBundleRepository.js';
 
@@ -33,7 +32,6 @@ import { CrossReferenceService } from '../../services/bible/CrossReferenceServic
 import { ParallelPassageService } from '../../services/bible/ParallelPassageService.js';
 import { CommentaryService } from '../../services/commentary/CommentaryService.js';
 import { HistoricalDocumentService } from '../../services/historical/HistoricalDocumentService.js';
-import { HistoricalHierarchyService } from '../../services/historical/HistoricalHierarchyService.js';
 import { LocalPrimarySourceSearchProvider } from '../../services/historical/LocalPrimarySourceSearchProvider.js';
 import { PrimarySourceSearchService } from '../../services/historical/PrimarySourceSearchService.js';
 import { StrongsService } from '../../services/languages/StrongsService.js';
@@ -61,7 +59,6 @@ export interface WorkerServices {
   bibleService: BibleService;
   commentaryService: CommentaryService;
   historicalService: HistoricalDocumentService;
-  historicalHierarchyService: HistoricalHierarchyService;
   strongsService: StrongsService;
   sourceAttestedParallelService: SourceAttestedParallelService;
 }
@@ -128,7 +125,6 @@ export function createWorkerCompositionRoot(env: Env): WorkerCompositionRoot {
   const strongsRepo = new D1StrongsRepository(db);
   const morphRepo = new D1MorphologyRepository(db);
   const historicalRepo = new D1HistoricalDocumentRepository(db);
-  const historicalHierarchyRepo = new D1HistoricalHierarchyRepository(db);
   const sourceAttestedParallelRepo = new D1UbsParallelPassageRepository(db);
   const ubsSemanticEvidenceBundleRepo = new D1UbsSemanticEvidenceBundleRepository(db);
 
@@ -144,7 +140,6 @@ export function createWorkerCompositionRoot(env: Env): WorkerCompositionRoot {
     sourceAttestedParallelService,
   );
   const historicalService = new HistoricalDocumentService(historicalRepo);
-  const historicalHierarchyService = new HistoricalHierarchyService(historicalHierarchyRepo);
   const primarySourceContract = readPrimarySourceFeatureFlags(env);
   const primarySourceSearchService = new PrimarySourceSearchService(
     new LocalPrimarySourceSearchProvider(historicalRepo),
@@ -171,7 +166,6 @@ export function createWorkerCompositionRoot(env: Env): WorkerCompositionRoot {
     parallelPassageService: parallelService,
     commentaryService,
     historicalService,
-    historicalHierarchyService,
     primarySourceSearchTool: primarySourceSearch.tool,
     strongsService,
     morphologyService: morphService,
@@ -181,7 +175,7 @@ export function createWorkerCompositionRoot(env: Env): WorkerCompositionRoot {
 
   return {
     tools,
-    services: { bibleService, commentaryService, historicalService, historicalHierarchyService, strongsService, sourceAttestedParallelService },
+    services: { bibleService, commentaryService, historicalService, strongsService, sourceAttestedParallelService },
     primarySourceContract,
     primarySourceSearch,
   };

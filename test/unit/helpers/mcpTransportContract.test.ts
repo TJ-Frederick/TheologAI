@@ -19,32 +19,11 @@ function descriptor(name: string, version = '1') {
 function snapshot(version: '6' | '7', logging = false): McpTransportSnapshot {
   const toolNames = [
     'bible_lookup', 'bible_cross_references', 'parallel_passages', 'commentary_lookup',
-    'classic_text_lookup', 'historical_hierarchy_lookup', 'primary_source_search', 'original_language_lookup',
+    'classic_text_lookup', 'primary_source_search', 'original_language_lookup',
     'bible_verse_morphology', 'original_language_study', 'donation_config', 'verify_donation',
   ];
   const tools = toolNames.map(name => descriptor(name, name === 'primary_source_search' ? version : '1'));
-  (tools[0] as any).outputSchema = {
-    type: 'object',
-    properties: {
-      schemaVersion: { const: '1' },
-      passages: {
-        type: 'array',
-        items: {
-          type: 'object',
-          properties: {
-            footnoteDelivery: {
-              type: 'object',
-              properties: {
-                status: { type: 'string', enum: ['structured', 'inline', 'none', 'unavailable'] },
-              },
-            },
-          },
-        },
-      },
-    },
-    additionalProperties: false,
-  };
-  tools[6]!.annotations.openWorldHint = version === '7';
+  tools[5]!.annotations.openWorldHint = version === '7';
   return {
     server: {
       name: 'theologai-bible-server', version: 'test',
@@ -52,16 +31,7 @@ function snapshot(version: '6' | '7', logging = false): McpTransportSnapshot {
     },
     tools,
     prompts: ['word-study', 'passage-exegesis', 'compare-translations', 'confession-study', 'primary-source-research', 'donate']
-      .map(name => ({
-        name,
-        description: `${name} prompt`,
-        ...(name === 'compare-translations' ? {
-          arguments: [{
-            name: 'translations',
-            description: 'Comma-separated list using ESV, NET, KJV, WEB, BSB, ASV, YLT, or DBY.',
-          }],
-        } : {}),
-      })),
+      .map(name => ({ name, description: `${name} prompt` })),
     resourceTemplates: [
       { uriTemplate: 'theologai://documents/{slug}', name: 'Historical Document' },
       { uriTemplate: 'theologai://strongs/{number}', name: "Strong's Dictionary Entry" },
@@ -97,14 +67,7 @@ describe('MCP transport contract oracle', () => {
     ['prompt removal', (value: McpTransportSnapshot) => value.prompts.pop()],
     ['template addition', (value: McpTransportSnapshot) => value.resourceTemplates.push({ uriTemplate: 'extra://{id}' })],
     ['primary v6/v7 drift', (value: McpTransportSnapshot) => {
-      ((value.tools[6]!.outputSchema as any).properties.schemaVersion as any).const = '7';
-    }],
-    ['footnote-delivery status drift', (value: McpTransportSnapshot) => {
-      (((value.tools[0]!.outputSchema as any).properties.passages.items.properties.footnoteDelivery.properties.status as any).enum)
-        .pop();
-    }],
-    ['comparison-translation metadata drift', (value: McpTransportSnapshot) => {
-      (value.prompts[2]!.arguments as any)[0].description = 'Translations are silently filtered.';
+      ((value.tools[5]!.outputSchema as any).properties.schemaVersion as any).const = '7';
     }],
   ])('rejects %s drift', async (_name, mutate) => {
     const actual = snapshot('6');
@@ -120,7 +83,7 @@ describe('MCP transport contract oracle', () => {
     const second = cloneMcpTransportSnapshot(first);
     second.dynamicResourceUris.push('theologai://documents/another-runtime-only-document');
     expect(await fingerprintMcpTransportSnapshot(second)).toEqual(await fingerprintMcpTransportSnapshot(first));
-    (second.tools[6]!.description as string) += ' changed';
+    (second.tools[5]!.description as string) += ' changed';
     expect((await fingerprintMcpTransportSnapshot(second)).tools)
       .not.toBe((await fingerprintMcpTransportSnapshot(first)).tools);
   });

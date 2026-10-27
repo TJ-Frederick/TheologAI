@@ -13,11 +13,6 @@ import type { CallToolResult, ContentBlock, TextContent, Tool } from '@modelcont
 
 // ── Tool infrastructure ──
 
-export interface RequestContext {
-  /** Cancellation from the active request. */
-  signal?: AbortSignal;
-}
-
 export interface ToolHandler {
   name: string;
   description: string;
@@ -26,7 +21,7 @@ export interface ToolHandler {
   /** Optional cross-field validation that JSON Schema cannot fully express. */
   validateStructuredOutput?: (value: Record<string, unknown>) => boolean;
   annotations?: Tool['annotations'];
-  handler: (params: Record<string, unknown>, context?: RequestContext) => Promise<ToolResult>;
+  handler: (params: Record<string, unknown>) => Promise<ToolResult>;
 }
 
 export type ToolResult = Omit<CallToolResult, 'content' | 'structuredContent'> & {
@@ -64,21 +59,12 @@ export interface Footnote {
   };
 }
 
-/** How a provider fulfilled an explicit includeFootnotes request. */
-export interface FootnoteDelivery {
-  status: 'structured' | 'inline' | 'none' | 'unavailable';
-  noteCount?: number;
-  markerCount?: number;
-  reason?: string;
-}
-
 export interface BibleResult {
   reference: string;
   translation: string;
   text: string;
   crossReferences?: Reference[];
   footnotes?: Footnote[];
-  footnoteDelivery?: FootnoteDelivery;
   citation: Citation;
 }
 

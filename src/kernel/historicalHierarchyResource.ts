@@ -1,4 +1,4 @@
-/** Canonical active resource identities for hierarchy-node delivery. */
+/** Canonical dormant resource identities for hierarchy-node delivery. */
 
 export interface HistoricalHierarchyResource {
   publicSlug: string;

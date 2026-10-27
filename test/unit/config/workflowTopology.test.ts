@@ -228,6 +228,35 @@ describe('workflow topology', () => {
       .toBe("steps.release-toolchain-source.outputs.source == 'introduction'");
   });
 
+  it('binds complete fresh corpus verification to unprivileged source inputs and protected approval', async () => {
+    for (const [file, role, jobId] of [['pr.yml', 'preview', 'preview-deploy'], ['deploy.yml', 'production', 'deploy']] as const) {
+      const workflow = parse(await readWorkflow(file)) as Workflow;
+      const build = workflow.jobs['build-worker']!;
+      const prepare = build.steps!.find(step => step.id === 'corpus-source')!;
+      expect(build.environment).toBeUndefined();
+      expect(prepare.run).toContain('application-corpus-check.ts prepare');
+      expect(prepare.run).toContain('npm run build:db');
+      expect(JSON.stringify(prepare)).not.toContain('secrets.');
+      expect(prepare.run).toContain("printf 'sha256=%s\\n'");
+      const job = workflow.jobs[jobId]!;
+      expect(job.environment?.name).toBe(role);
+      expect(job['timeout-minutes']).toBe(120);
+      const proof = job.steps!.findIndex(step => step.name?.startsWith('Verify fresh corpus'));
+      const upload = job.steps!.findIndex(step => step.run?.includes('wrangler deploy --config'));
+      expect(proof).toBeGreaterThan(-1); expect(upload).toBeGreaterThan(proof);
+      const step = job.steps![proof]!;
+      expect(step.run).toContain('integrityCommands:4,exclusiveDataWritesDuringProof:true');
+      expect(step.run).toContain('maxReads:3800000');
+      expect(step.run).toContain(`--role ${role}`);
+      expect(step.run).toContain('application-corpus-check.ts verify');
+      expect(step.env?.CORPUS_PLAN_SHA256).toBe('${{ needs.build-worker.outputs.corpus_plan_sha256 }}');
+      const sourceDownload = job.steps!.find(s => s.name === 'Download source-bound complete corpus proof inputs')!;
+      expect(sourceDownload.with?.['digest-mismatch']).toBe('error');
+      expect(sourceDownload.with?.name).toContain('github.run_attempt');
+      expect(JSON.stringify(step)).not.toMatch(/npm ci|npm install|npm run/);
+    }
+  });
+
   it('bootstraps only a wholly new release trust set and rejects a broken protected-base copy', async () => {
     const preview = (parse(await readWorkflow('pr.yml')) as Workflow).jobs['preview-deploy']!;
     const selection = preview.steps!.find(step => step.name === 'Select release toolchain source')!.run!;
@@ -376,7 +405,15 @@ describe('workflow topology', () => {
     const data = commands('data');
     expect(data).toContain('audit:release-corpus-capacity -- --output-database');
     expect(data).not.toContain('npm run build:db');
-    for (const command of ['d1:seed:verify-workerd', 'd1:seed:verify-import', 'benchmark:primary-source-research', 'test:d1-readiness-generated-db', 'historical-section-compatibility-evidence.ts']) expect(data).toContain(command);
+    // This release retains the deployed application/corpus. The later research
+    // benchmark and its implementation are outside this security backport.
+    for (const command of ['d1:seed:verify-workerd', 'd1:seed:verify-import', 'test:d1-readiness-generated-db', 'historical-section-compatibility-evidence.ts']) expect(data).toContain(command);
+    const manifest = JSON.parse(await readFile(new URL('../../../package.json', import.meta.url), 'utf8'));
+    for (const step of steps) {
+      for (const match of (step.run ?? '').matchAll(/npm run ([a-zA-Z0-9:._-]+)/g)) {
+        expect(manifest.scripts, match[1]).toHaveProperty(match[1]!);
+      }
+    }
     expect(commands('core')).toContain('test:coverage');
     expect(commands('core')).toContain('typecheck:worker-runtime');
     expect(commands('worker')).not.toContain('typecheck:worker-runtime');

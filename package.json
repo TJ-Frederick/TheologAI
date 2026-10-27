@@ -46,7 +46,6 @@
     "d1:corpus:compare": "tsx scripts/compare-d1-corpora.ts",
     "d1:remote:check": "tsx scripts/check-remote-d1-readiness.ts",
     "benchmark:ubs-runtime": "node --expose-gc --import tsx scripts/benchmark-ubs-runtime.ts",
-    "benchmark:primary-source-research": "tsx scripts/benchmark-primary-source-research.ts",
     "audit:dependencies:high": "node scripts/audit-dependencies.mjs",
     "audit:parallel-preview": "tsx scripts/audit-parallel-passages-preview.ts",
     "audit:ccel-preview": "tsx scripts/audit-ccel-preview.ts",

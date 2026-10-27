@@ -321,17 +321,37 @@ jobs:
       contents: read
     outputs:
       worker_sha256: ${{ steps.worker-artifact.outputs.sha256 }}
+      corpus_plan_sha256: ${{ steps.corpus-source.outputs.sha256 }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
 
       - run: npm ci --ignore-scripts --no-audit
+
+      - name: Prepare complete corpus proof source without cloud credentials
+        if: hashFiles('release/application-only.json') != ''
+        id: corpus-source
+        run: |
+          npm rebuild better-sqlite3 --ignore-scripts=false
+          npm run build:db
+          digest="$(npx --no-install tsx scripts/application-corpus-check.ts prepare --database data/theologai.db --directory "$RUNNER_TEMP/corpus-source")"
+          printf 'sha256=%s\n' "$digest" >> "$GITHUB_OUTPUT"
+      - name: Upload source-bound corpus proof inputs
+        if: steps.corpus-source.outcome == 'success'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: corpus-preview-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/corpus-source/
+          if-no-files-found: error
+          retention-days: 1
+          overwrite: false
 
       - name: Build Worker without cloud credentials
         run: |
@@ -366,6 +386,7 @@ jobs:
       group: theologai-shared-preview-mutation
       cancel-in-progress: false
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     environment:
       name: preview
       url: https://preview-mcp.theologai.xyz/mcp
@@ -403,6 +424,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
+          fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Verify preview checkout identity
@@ -473,6 +495,14 @@ jobs:
           path: ${{ runner.temp }}/worker-bundle
           merge-multiple: false
           digest-mismatch: error
+      - name: Download source-bound complete corpus proof inputs
+        if: hashFiles('release/application-only.json') != ''
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: corpus-preview-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/corpus-source
+          merge-multiple: false
+          digest-mismatch: error
       - name: Verify artifact and render upload-only configuration
         env:
           EXPECTED_MANIFEST_SHA256: ${{ needs.build-worker.outputs.worker_sha256 }}
@@ -492,20 +522,42 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      - name: Verify candidate preview D1 is compatible (read-only)
+      # The protected environment approval covers a complete fresh comparison
+      # and exactly four diagnostic FTS INSERT commands. They never rebuild data.
+      - name: Verify fresh corpus (up to 3.8M reads and four integrity commands)
+        id: corpus-proof
         run: |
           candidate_d1_name="$(< "$RUNNER_TEMP/preview-candidate-d1-name.txt")"
-          npx --no-install tsx scripts/check-remote-d1-readiness.ts --database "$candidate_d1_name" --env preview \
-            --output "$RUNNER_TEMP/preview-d1-readiness-receipt.json"
+          if test -f release/application-only.json; then
+            APPLICATION_CORPUS_PROOF_APPROVAL_JSON="$(node --input-type=module - <<'JS'
+          import {execFileSync} from 'node:child_process';
+          import {ACCOUNT,TARGETS} from './scripts/application-release-policy.mjs';
+          const git=ref=>execFileSync('git',['rev-parse',ref],{encoding:'utf8'}).trim();
+          process.stdout.write(JSON.stringify({schemaVersion:'theologai-fresh-corpus-proof-approval.v1',role:'preview',accountId:ACCOUNT,databaseId:TARGETS.preview.databaseId,sourceCommit:git('HEAD'),sourceTree:git('HEAD^{tree}'),expiresAt:new Date(Date.now()+5400000).toISOString(),maxReads:3800000,integrityCommands:4,exclusiveDataWritesDuringProof:true}));
+          JS
+            )"
+            export APPLICATION_CORPUS_PROOF_APPROVAL_JSON
+            npx --no-install tsx scripts/application-corpus-check.ts verify \
+              --role preview --directory "$RUNNER_TEMP/corpus-source" \
+              --plan-sha256 "$CORPUS_PLAN_SHA256" --output "$RUNNER_TEMP/preview-d1-readiness-receipt.json"
+          else
+            npx --no-install tsx scripts/check-remote-d1-readiness.ts --database "$candidate_d1_name" --env preview \
+              --output "$RUNNER_TEMP/preview-d1-readiness-receipt.json"
+          fi
         env:
+          CORPUS_PLAN_SHA256: ${{ needs.build-worker.outputs.corpus_plan_sha256 }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Upload sanitized preview D1 readiness receipt
+        if: always() && steps.corpus-proof.outcome != 'skipped'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: preview-d1-readiness-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
-          path: ${{ runner.temp }}/preview-d1-readiness-receipt.json
+          path: |
+            ${{ runner.temp }}/preview-d1-readiness-receipt.json
+            ${{ runner.temp }}/preview-d1-readiness-receipt.json.events.jsonl
+            ${{ runner.temp }}/corpus-source/plan.json
           retention-days: 7
           if-no-files-found: error
 
@@ -847,6 +899,7 @@ jobs:
             --worker-identity "$RUNNER_TEMP/preview-worker-deployment-identity.json" \
             --cutover "$RUNNER_TEMP/preview-worker-candidate-cutover.json" \
             --d1-readiness "$RUNNER_TEMP/preview-d1-readiness-receipt.json" \
+            --d1-source-plan "$RUNNER_TEMP/corpus-source/plan.json" \
             --output "$RUNNER_TEMP/dual-era-preview-release-receipt.json"
 
       - name: Hash sanitized preview audit evidence

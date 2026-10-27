@@ -86,8 +86,7 @@ export function parseReference(input: string): BibleReference {
       validateReferenceBounds(ref);
       return ref;
     }
-    throw new ValidationError(
-      'reference',
+    throw new Error(
       `Invalid Bible reference: "${input}". Expected format like "John 3:16", "Genesis 1:1-5", or "Ps 23"`
     );
   }
@@ -122,8 +121,7 @@ function resolveBook(raw: string): BibleBook {
   const byAbbrev = findBookByAbbreviation(cleaned);
   if (byAbbrev) return byAbbrev;
 
-  throw new ValidationError(
-    'reference',
+  throw new Error(
     `Unknown Bible book: "${raw}". Try a full name (e.g. "Genesis") or common abbreviation (e.g. "Gen").`
   );
 }

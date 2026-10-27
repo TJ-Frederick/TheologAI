@@ -55,10 +55,6 @@ describe('EsvAdapter', () => {
         copyright: adapter.getCopyright(),
         url: 'https://www.esv.org/',
       },
-      footnoteDelivery: {
-        status: 'inline',
-        reason: 'The ESV passage-text API embeds available footnote callouts and bodies in the passage text.',
-      },
     });
 
     expect(adapter.isConfigured()).toBe(true);
@@ -67,7 +63,6 @@ describe('EsvAdapter', () => {
     expect(String(url)).toContain('https://api.esv.org/v3/passage/text/?');
     expect(String(url)).toContain('q=John+3%3A16-17');
     expect(String(url)).toContain('include-footnotes=true');
-    expect(String(url)).toContain('include-footnote-body=true');
     expect(init?.headers).toMatchObject({ Authorization: 'Token secret-key' });
   });
 
@@ -77,8 +72,6 @@ describe('EsvAdapter', () => {
 
     expect(result.reference).toBe('Psalms 23');
     expect(String(vi.mocked(globalThis.fetch).mock.calls[0][0])).toContain('include-footnotes=false');
-    expect(String(vi.mocked(globalThis.fetch).mock.calls[0][0])).toContain('include-footnote-body=false');
-    expect(result).not.toHaveProperty('footnoteDelivery');
   });
 
   it('accepts a common single-chapter canonical form from the provider', async () => {

@@ -32,7 +32,7 @@ export interface DualEraMcpAudit {
     protocolVersion: ProtocolVersion;
     serverName: 'theologai-bible-server';
     serverVersion: string;
-    counts: { tools: 12; prompts: 6; resourceTemplates: 2; staticResources: 3 };
+    counts: { tools: 11; prompts: 6; resourceTemplates: 2; staticResources: 3 };
     fingerprints: {
       capabilities: string;
       tools: string;
@@ -89,7 +89,7 @@ export async function auditDualEraMcpPreview(
         serverName: 'theologai-bible-server',
         serverVersion: snapshot.server.version,
         counts: {
-          tools: snapshot.tools.length as 12,
+          tools: snapshot.tools.length as 11,
           prompts: snapshot.prompts.length as 6,
           resourceTemplates: snapshot.resourceTemplates.length as 2,
           staticResources: snapshot.staticResources.length as 3,
@@ -129,7 +129,7 @@ async function main(): Promise<void> {
   );
   await mkdir(dirname(resolve(output)), { recursive: true });
   await writeFile(resolve(output), `${JSON.stringify(audit, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
-  console.error(`[dual-era-preview] ${audit.eras.length} eras, 12 tools, 6 prompts; ${audit.crossEraContractSha256}`);
+  console.error(`[dual-era-preview] ${audit.eras.length} eras, 11 tools, 6 prompts; ${audit.crossEraContractSha256}`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

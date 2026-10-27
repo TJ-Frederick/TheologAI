@@ -12,7 +12,6 @@ import type {
   ParallelTextEnrichment,
   ParallelTextEnrichmentStatus,
   ParallelTextTranslation,
-  RequestContext,
   ResearchLegacyParallel,
   SourceAttestedParallelGroupResult,
   SourceAttestedResultWindow,
@@ -80,10 +79,7 @@ export class ParallelPassageService {
     this.indexDatabase(raw);
   }
 
-  async lookup(
-    params: ParallelPassageLookupParams,
-    context: RequestContext = {},
-  ): Promise<ParallelPassageResearchResult> {
+  async lookup(params: ParallelPassageLookupParams): Promise<ParallelPassageResearchResult> {
     validateCursorIsolation(params);
     const corpora = normalizeCorpora(params);
     const primaryReference = normalizeResearchReference(params.reference);
@@ -121,7 +117,6 @@ export class ParallelPassageService {
         params.translation || 'ESV',
         warnings,
         provenance,
-        context,
       )
       : notRequestedTextEnrichment(
         orderedUniqueParallelTextTargets(sourceAttestedGroups, legacyParallels).length,
@@ -268,7 +263,6 @@ export class ParallelPassageService {
     translation: ParallelTextTranslation,
     warnings: string[],
     provenance: ProvenanceRecord[],
-    context: RequestContext,
   ): Promise<ParallelTextEnrichment> {
     const targets: Array<{
       reference: string;
@@ -316,10 +310,7 @@ export class ParallelPassageService {
         try {
           outcomes.set(plan.reference, {
             status: 'succeeded',
-            result: await this.bibleService!.lookup(
-              { reference: plan.reference, translation },
-              context,
-            ),
+            result: await this.bibleService!.lookup({ reference: plan.reference, translation }),
           });
         } catch {
           outcomes.set(plan.reference, { status: 'failed' });

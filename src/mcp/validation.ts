@@ -10,10 +10,6 @@ import { exceedsMcpInputLimits, MCP_INPUT_LIMIT_MESSAGE } from './inputLimits.js
 const MAX_VALIDATION_ERRORS = 8;
 const MAX_VALIDATION_DETAIL_CHARACTERS = 256;
 
-export const SUPPORTED_BIBLE_TRANSLATIONS = ['ESV', 'NET', 'KJV', 'WEB', 'BSB', 'ASV', 'YLT', 'DBY'] as const;
-const SUPPORTED_BIBLE_TRANSLATION_SET = new Set<string>(SUPPORTED_BIBLE_TRANSLATIONS);
-const DEFAULT_COMPARISON_TRANSLATIONS = ['ESV', 'KJV', 'NET', 'BSB'] as const;
-
 export type SchemaValidationResult<T> = {
   valid: true;
   data: T;
@@ -135,29 +131,6 @@ const PROMPT_ARGUMENTS = {
   donate: { required: [], allowed: [] },
 } as const;
 
-export function resolveComparisonTranslations(value: string | undefined): string[] {
-  if (value === undefined) return [...DEFAULT_COMPARISON_TRANSLATIONS];
-
-  const requested = value.split(',').map(item => item.trim().toUpperCase());
-  const supportedList = SUPPORTED_BIBLE_TRANSLATIONS.join(', ');
-  if (requested.some(item => item.length === 0)) {
-    throw new ProtocolError(
-      ProtocolErrorCode.InvalidParams,
-      `Argument "translations" for prompt "compare-translations" must contain only non-empty comma-separated translation codes. Supported translations: ${supportedList}`,
-    );
-  }
-
-  const unsupported = [...new Set(requested.filter(item => !SUPPORTED_BIBLE_TRANSLATION_SET.has(item)))];
-  if (unsupported.length > 0) {
-    throw new ProtocolError(
-      ProtocolErrorCode.InvalidParams,
-      `Argument "translations" for prompt "compare-translations" contains unsupported translation${unsupported.length === 1 ? '' : 's'}: ${unsupported.join(', ')}. Supported translations: ${supportedList}`,
-    );
-  }
-
-  return [...new Set(requested)];
-}
-
 export function validatePromptArguments(
   name: unknown,
   args: unknown,
@@ -228,10 +201,6 @@ export function validatePromptArguments(
 
   if (['passage-exegesis', 'compare-translations'].includes(name) && (stringValues.reference?.length ?? 0) > 100) {
     throw new ProtocolError(ProtocolErrorCode.InvalidParams, `Argument "reference" for prompt "${name}" exceeds 100 characters`);
-  }
-
-  if (name === 'compare-translations') {
-    resolveComparisonTranslations(stringValues.translations);
   }
 
   if (name === 'primary-source-research') {

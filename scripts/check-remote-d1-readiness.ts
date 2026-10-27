@@ -24,20 +24,18 @@ import {
 } from './ubs-semantics/storageContract.js';
 import {
   auditHistoricalTransform8Authority,
-  buildHistoricalTransform8AuthorityQueryPlan,
-  parseHistoricalTransform8D1Pages,
+  parseHistoricalTransform8D1Page,
   type HistoricalTransform8AuthorityAuditResult,
 } from './historical-transform8-authority-audit.js';
 import {
   auditHistoricalTransform9Authority,
-  buildHistoricalTransform9AuthorityQueryPlan,
+  parseHistoricalTransform9D1Page,
   type HistoricalTransform9AuthorityAuditResult,
 } from './historical-transform9-authority-audit.js';
 import {
-  AQUINAS_HIERARCHY_EXPECTED,
+  normalAquinasHierarchyExclusionChecks,
 } from './historical-hierarchy.js';
 import { REVIEWED_SOURCE_PACK_RELEASE } from './historical-source-packs.js';
-import { auditAquinasAuthority, buildAquinasAuthorityQueryPlan, type AquinasAuthorityAuditResult } from './aquinas-authority-audit.js';
 import { TRANSFORM12_STORAGE_CONTRACT } from './transform12-candidate-c-storage.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -63,8 +61,6 @@ const UBS_SEMANTIC_STORAGE = createUbsSemanticStorageContract(UBS_SEMANTIC_AUDIT
 
 /** D1's command interface is deliberately kept below its request-size ceiling. */
 export const MAX_D1_READINESS_SQL_BYTES = 100_000;
-const AUTHORITY_BATCH_SIZE = 8;
-const AUTHORITY_RESPONSE_MAX_BUFFER_BYTES = 16 * 1024 * 1024;
 
 export const REQUIRED_COLUMNS: Readonly<Record<string, readonly string[]>> = {
   theologai_metadata: ['key', 'value'],
@@ -165,22 +161,16 @@ export interface RemoteD1ReadinessReceipt {
 type ReadinessCommandExecutor = (
   file: string,
   args: readonly string[],
-  options: { cwd: string; stdio: 'inherit' | 'pipe'; encoding?: 'utf8'; maxBuffer?: number },
+  options: { cwd: string; stdio: 'inherit' | 'pipe'; encoding?: 'utf8' },
 ) => unknown;
 
 function sqlLiteral(value: string): string {
   return `'${value.replaceAll("'", "''")}'`;
 }
 
-/** Active hierarchy structure is checked here; bounded source replay verifies every stored field. */
-function activeAquinasReadinessChecks(): D1ReadinessCheck[] {
-  const id = sqlLiteral(AQUINAS_HIERARCHY_EXPECTED.hierarchyId);
-  return [
-    { id: 'historical.aquinas.active_publication', predicate: `(SELECT COUNT(*) FROM historical_hierarchy_publications p JOIN historical_edition_hierarchies h ON h.hierarchy_id = p.hierarchy_id WHERE h.hierarchy_id = ${id} AND h.availability = 'local_only_active' AND p.activation_state = 'active' AND h.body_count = 3184 AND h.node_count = 3185) = 1` },
-    { id: 'historical.aquinas.no_legacy_projection', predicate: `(SELECT COUNT(*) FROM documents WHERE id = ${sqlLiteral(AQUINAS_HIERARCHY_EXPECTED.workId)} OR id = 'summa-theologiae') = 0` },
-    { id: 'historical.aquinas.body_lengths', predicate: `(SELECT COUNT(*) FROM historical_edition_hierarchy_bodies WHERE hierarchy_id = ${id} AND length(CAST(content AS BLOB)) != content_utf8_bytes) = 0` },
-    { id: 'historical.aquinas.fts_parity', predicate: `(SELECT COUNT(*) FROM historical_edition_hierarchy_bodies b LEFT JOIN historical_edition_hierarchy_bodies_fts f ON f.rowid = b.rowid WHERE f.rowid IS NULL OR f.hierarchy_id IS NOT b.hierarchy_id OR f.body_key IS NOT b.body_key OR f.heading IS NOT b.heading OR f.content IS NOT b.content) = 0` },
-  ];
+/** The normal release contract fails closed if dormant Transform-10 rows leak in. */
+function normalTransform10ExclusionReadinessChecks(): D1ReadinessCheck[] {
+  return normalAquinasHierarchyExclusionChecks().map(check => ({ ...check }));
 }
 
 /**
@@ -436,10 +426,9 @@ function buildD1ReadinessQueryContract(
       id: 'historical.transform12.actual_fts_match_sentinels',
       predicate: `(SELECT COUNT(*) FROM strongs_fts WHERE strongs_fts MATCH '"love"' AND strongs_number = 'G25') = 1
         AND (SELECT COUNT(*) FROM sections_fts WHERE sections_fts MATCH '"almighty"' AND rowid = 1962) = 1
-        AND (SELECT COUNT(*) FROM historical_edition_sections_fts WHERE historical_edition_sections_fts MATCH '"grace"') = 703
-        AND (SELECT COUNT(*) FROM historical_edition_hierarchy_bodies) = 3184
-        AND (SELECT COUNT(*) FROM historical_edition_hierarchy_bodies_fts) = 3184
-        AND (SELECT COUNT(*) FROM historical_edition_hierarchy_bodies_fts WHERE historical_edition_hierarchy_bodies_fts MATCH '"God"') > 0`,
+        AND (SELECT COUNT(*) FROM historical_edition_sections_fts WHERE historical_edition_sections_fts MATCH '"grace"') = 391
+        AND (SELECT COUNT(*) FROM historical_edition_hierarchy_bodies) = 0
+        AND (SELECT COUNT(*) FROM historical_edition_hierarchy_bodies_fts) = 0`,
     },
     {
       id: 'historical.transform8.collision_groups',
@@ -559,7 +548,7 @@ function buildD1ReadinessQueryContract(
     ...identityChecks,
     ...historicalCatalogChecks,
     ...historicalOutputChecks,
-    ...activeAquinasReadinessChecks(),
+    ...normalTransform10ExclusionReadinessChecks(),
     ...columnChecks,
     ...countChecks,
     { id: 'schema.required_indexes', predicate: indexCheck },
@@ -700,7 +689,6 @@ export function createRemoteD1ReadinessReceipt(input: {
   env?: string;
   transform8: HistoricalTransform8AuthorityAuditResult;
   transform9: HistoricalTransform9AuthorityAuditResult;
-  aquinas: AquinasAuthorityAuditResult;
 }): RemoteD1ReadinessReceipt {
   return {
     schemaVersion: 'theologai-remote-d1-readiness-receipt.v1',
@@ -712,7 +700,7 @@ export function createRemoteD1ReadinessReceipt(input: {
       checkCount: buildD1ReadinessQueryContract(MANIFEST.expectedCounts).checks.length,
     }),
     authority: receiptComponent({
-      kind: 'historical-source-authority.v2',
+      kind: 'historical-transform8-9-authority.v1',
       transform8: {
         attestationSha256: input.transform8.attestationSha256,
         profilesSha256: input.transform8.profilesSha256,
@@ -721,7 +709,6 @@ export function createRemoteD1ReadinessReceipt(input: {
         bodyFtsSampleSha256: input.transform8.bodyFtsSampleSha256,
       },
       transform9: input.transform9.hashes,
-      aquinas: input.aquinas,
     }),
   };
 }
@@ -740,50 +727,27 @@ export function runRemoteD1ReadinessCheck(
     const args = [wrangler, 'd1', 'execute', options.database, '--remote', '--command', sql, '--json'];
     if (options.env) args.push('--env', options.env);
     if (options.configPath) args.push('--config', options.configPath);
-    return execute(process.execPath, args, capture
-      ? { cwd, stdio: 'pipe', encoding: 'utf8', maxBuffer: AUTHORITY_RESPONSE_MAX_BUFFER_BYTES }
-      : { cwd, stdio: 'inherit' });
-  };
-  const text = (result: unknown): string => typeof result === 'string'
-    ? result
-    : Buffer.isBuffer(result) ? result.toString('utf8') : String(result);
-  const readPlannedAuthorityPages = (queries: readonly string[], label: string) => {
-    const pages = [] as ReturnType<typeof parseHistoricalTransform8D1Pages>;
-    for (let start = 0; start < queries.length; start += AUTHORITY_BATCH_SIZE) {
-      const batch = queries.slice(start, start + AUTHORITY_BATCH_SIZE);
-      pages.push(...parseHistoricalTransform8D1Pages(text(executeSql(batch.join('\n;\n'), true)), batch.length));
-    }
-    let cursor = 0;
-    return {
-      readPage: (sql: string) => {
-        if (queries[cursor] !== sql) throw new Error(`${label} authority continuation diverged from its bounded query plan`);
-        const page = pages[cursor++];
-        if (!page) throw new Error(`${label} authority query plan exhausted unexpectedly`);
-        return page;
-      },
-      assertFullyRead: () => {
-        if (cursor !== queries.length) throw new Error(`${label} authority audit did not consume its complete bounded query plan`);
-      },
-    };
+    return execute(process.execPath, args, capture ? { cwd, stdio: 'pipe', encoding: 'utf8' } : { cwd, stdio: 'inherit' });
   };
 
   try {
     executeSql(buildD1ReadinessSql(MANIFEST.expectedCounts));
-    const transform8Planned = readPlannedAuthorityPages(buildHistoricalTransform8AuthorityQueryPlan(ROOT), 'Transform 8');
-    const audit = auditHistoricalTransform8Authority(ROOT, transform8Planned.readPage);
-    transform8Planned.assertFullyRead();
+    const audit = auditHistoricalTransform8Authority(ROOT, sql => {
+      const result = executeSql(sql, true);
+      return parseHistoricalTransform8D1Page(
+        typeof result === 'string' ? result : Buffer.isBuffer(result) ? result.toString('utf8') : String(result),
+      );
+    });
     process.stderr.write(`Transform-8 D1 authority audit passed (${audit.pages.profiles}/${audit.pages.identities}/${audit.pages.aliases} pages).\n`);
-    const transform9Planned = readPlannedAuthorityPages(buildHistoricalTransform9AuthorityQueryPlan(ROOT), 'Transform 11');
-    const transform9Audit = auditHistoricalTransform9Authority(ROOT, transform9Planned.readPage);
-    transform9Planned.assertFullyRead();
+    const transform9Audit = auditHistoricalTransform9Authority(ROOT, sql => {
+      const result = executeSql(sql, true);
+      return parseHistoricalTransform9D1Page(
+        typeof result === 'string' ? result : Buffer.isBuffer(result) ? result.toString('utf8') : String(result),
+      );
+    });
     process.stderr.write(`Transform-9 D1 authority audit passed (${transform9Audit.pages.packs}/${transform9Audit.pages.works}/${transform9Audit.pages.editions}/${transform9Audit.pages.artifacts}/${transform9Audit.pages.documents}/${transform9Audit.pages.profiles}/${transform9Audit.pages.sections}/${transform9Audit.pages.projections} pages).\n`);
-    const aquinasPlan = buildAquinasAuthorityQueryPlan(ROOT);
-    const aquinasPlanned = readPlannedAuthorityPages(aquinasPlan.map(page => page.sql), 'Aquinas');
-    const aquinas = auditAquinasAuthority(aquinasPlanned.readPage, aquinasPlan);
-    aquinasPlanned.assertFullyRead();
-    process.stderr.write(`Aquinas D1 authority audit passed (${aquinas.pages} bounded pages).\n`);
     return createRemoteD1ReadinessReceipt({
-      database: options.database, env: options.env, transform8: audit, transform9: transform9Audit, aquinas,
+      database: options.database, env: options.env, transform8: audit, transform9: transform9Audit,
     });
   } catch (primaryError) {
     process.stderr.write('Primary D1 readiness gate failed; requesting failed-check diagnostics.\n');

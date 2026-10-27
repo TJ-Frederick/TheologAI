@@ -1,5 +1,4 @@
 import type { Env } from '../../worker-env.js';
-import type { ToolExecutionEvent, ToolExecutionObserver } from '../../mcp/toolExecutionObserver.js';
 
 export interface WorkerRequestMetadata {
   method: string;
@@ -101,14 +100,4 @@ export function logWorkerRuntimeError(
     errorName,
     durationMs,
   }));
-}
-
-/**
- * Tool events intentionally use no request metadata. Unlike sampled request
- * diagnostics, their schema contains no caller-controlled identifiers.
- */
-export function createWorkerToolExecutionObserver(): ToolExecutionObserver {
-  return (event: ToolExecutionEvent) => {
-    console.info(JSON.stringify(event));
-  };
 }

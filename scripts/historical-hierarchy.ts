@@ -52,12 +52,6 @@ export const AQUINAS_HIERARCHY_EXPECTED = Object.freeze({
   ] as const,
 } as const);
 
-/** Active Transform-13 projection keeps the same immutable packet identity. */
-export const AQUINAS_ACTIVE_HIERARCHY_EXPECTED = Object.freeze({
-  ...AQUINAS_HIERARCHY_EXPECTED,
-  availability: 'local_only_active',
-} as const);
-
 export interface HistoricalEditionHierarchyRecord {
   hierarchyId: string;
   packId: string;
@@ -184,7 +178,8 @@ function coverageDisclosure(): Record<string, unknown> {
       tertia: { firstQuestion: 1, lastQuestion: 90 },
     },
     exclusions: [
-      'The traditional Supplement is not included.',
+      'Tertia questions 91 and later are not included.',
+      'The Supplement is not included.',
       'Source wrappers, licenses, editorial interludes, structural metadata, and tables of contents are not authority bodies.',
     ],
     disclosure: 'This approved edition scope is not a complete traditional Summa Theologiae.',
@@ -206,10 +201,7 @@ function sourceFacts(reader: HierarchySourceReader): {
   return { acquiredAt, sourceLock, receipt, manifest };
 }
 
-function provenance(
-  sourceLock: Record<string, unknown>,
-  availability: 'local_only_inactive' | 'local_only_active',
-): HistoricalHierarchyAuthorityProvenance {
+function provenance(sourceLock: Record<string, unknown>): HistoricalHierarchyAuthorityProvenance {
   const rights = object(sourceLock.rightsAndProvenance, 'Aquinas rights and provenance');
   const edition = object(rights.electronicEditionProvenance, 'Aquinas electronic edition provenance');
   const rightsStatus = string(rights.rightsStatus, 'Aquinas rights status');
@@ -222,7 +214,7 @@ function provenance(
     throw new Error('Aquinas disclosed editor actions must be non-empty text');
   }
   return {
-    status: availability,
+    status: 'local_only_inactive',
     rightsStatus,
     territoryCaveat,
     catalogStatement: string(rights.catalogStatement, 'Aquinas catalog statement'),
@@ -235,9 +227,7 @@ function provenance(
       { label: 'disclosed_editor_actions', values: disclosedEditorActions },
       { label: 'ccel_boundary', values: [string(edition.ccelBoundary, 'Aquinas CCEL boundary')] },
     ],
-    activation: availability === 'local_only_active'
-      ? 'This checked-in, four-part Project Gutenberg edition is active for bounded hierarchy retrieval; the traditional Supplement is excluded.'
-      : 'No document projection, catalogue registration, runtime composition, resource, or MCP tool is authorized by this materialization.',
+    activation: 'No document projection, catalogue registration, runtime composition, resource, or MCP tool is authorized by this materialization.',
   };
 }
 
@@ -302,14 +292,13 @@ function assertGenericPreorder(nodes: readonly HistoricalEditionHierarchyNodeRec
  * Keeping packet loading in the capacity module prevents a runtime ESM cycle:
  * this materializer consumes dependency-injected facts and exposes no loader.
  */
-function buildAquinasHierarchy(
+export function buildApprovedAquinasHierarchy(
   reader: HierarchySourceReader,
   input: AquinasCapacityInput,
   layout: { authorityBodies: readonly AquinasAuthorityBody[]; navigationNodes: readonly AquinasNavigationNode[] },
-  availability: 'local_only_inactive' | 'local_only_active',
 ): HistoricalEditionHierarchyMaterialization {
   const facts = sourceFacts(reader);
-  const hierarchyProvenance = provenance(facts.sourceLock, availability);
+  const hierarchyProvenance = provenance(facts.sourceLock);
   const bodies = layout.authorityBodies.map(bodyRecord);
   const bodyByKey = new Map(bodies.map(body => [body.bodyKey, body]));
   const nodes = layout.navigationNodes.map(node => nodeRecord(node, bodyByKey));
@@ -348,15 +337,10 @@ function buildAquinasHierarchy(
       catalogStatement: hierarchyProvenance.catalogStatement,
       sourceLockSha256: input.sourceHashes.sourceLockSha256,
     },
-    normalizedTextRights: availability === 'local_only_active'
-      ? {
-        status: 'public_domain_in_usa', scope: 'normalized_project_gutenberg_english_dominican_text_only',
-        basis: 'The pinned Project Gutenberg catalog notices support public-domain use in the United States only; this normalized four-part text excludes page images and makes no worldwide public-domain conclusion.', reviewedAt: facts.acquiredAt,
-      }
-      : {
-        status: 'not_projected', scope: 'local_only_inactive_authority_bodies',
-        basis: 'No public document or normalized-text projection is created by Transform 10.', reviewedAt: facts.acquiredAt,
-      },
+    normalizedTextRights: {
+      status: 'not_projected', scope: 'local_only_inactive_authority_bodies',
+      basis: 'No public document or normalized-text projection is created by Transform 10.', reviewedAt: facts.acquiredAt,
+    },
   };
   const artifacts = input.sourceArtifacts.map(artifact => ({
     artifactId: artifact.artifactId, editionId: edition.editionId, role: 'authority' as const,
@@ -367,7 +351,7 @@ function buildAquinasHierarchy(
     packId: sourcePack.packId,
     workId: work.workId,
     editionId: edition.editionId,
-    availability,
+    availability: AQUINAS_HIERARCHY_EXPECTED.availability,
     hierarchySchemaVersion: 'edition-hierarchy.v1',
     levelSpec: levelSpec(),
     sourceManifestSha256,
@@ -386,56 +370,23 @@ function buildAquinasHierarchy(
     provenance: hierarchyProvenance,
   };
   const materialization = { hierarchy, sourcePack, work, edition, artifacts, bodies, nodes };
-  assertAquinasHierarchy(materialization, availability);
+  assertApprovedAquinasHierarchy(materialization);
   return materialization;
-}
-
-/** Retained Transform-10 dormant builder for isolated capacity and history checks. */
-export function buildApprovedAquinasHierarchy(
-  reader: HierarchySourceReader,
-  input: AquinasCapacityInput,
-  layout: { authorityBodies: readonly AquinasAuthorityBody[]; navigationNodes: readonly AquinasNavigationNode[] },
-): HistoricalEditionHierarchyMaterialization {
-  return buildAquinasHierarchy(reader, input, layout, 'local_only_inactive');
-}
-
-/** Transform-13 active builder uses the same attested packet without altering it. */
-export function buildActiveAquinasHierarchy(
-  reader: HierarchySourceReader,
-  input: AquinasCapacityInput,
-  layout: { authorityBodies: readonly AquinasAuthorityBody[]; navigationNodes: readonly AquinasNavigationNode[] },
-): HistoricalEditionHierarchyMaterialization {
-  return buildAquinasHierarchy(reader, input, layout, 'local_only_active');
 }
 
 /** Independent audit of all reviewed profile, source, body, and navigation facts. */
 export function assertApprovedAquinasHierarchy(materialization: HistoricalEditionHierarchyMaterialization): void {
-  assertAquinasHierarchy(materialization, 'local_only_inactive');
-}
-
-/** Prove the active projection retains packet identity and US-scoped provenance. */
-export function assertActiveAquinasHierarchy(materialization: HistoricalEditionHierarchyMaterialization): void {
-  assertAquinasHierarchy(materialization, 'local_only_active');
-}
-
-function assertAquinasHierarchy(
-  materialization: HistoricalEditionHierarchyMaterialization,
-  availability: 'local_only_inactive' | 'local_only_active',
-): void {
-  const expected = availability === 'local_only_active'
-    ? AQUINAS_ACTIVE_HIERARCHY_EXPECTED
-    : AQUINAS_HIERARCHY_EXPECTED;
   const { hierarchy, sourcePack, work, edition, artifacts, bodies, nodes } = materialization;
-  if (hierarchy.hierarchyId !== expected.hierarchyId
-    || hierarchy.packId !== expected.packId
-    || hierarchy.workId !== expected.workId
-    || hierarchy.editionId !== expected.editionId
-    || hierarchy.availability !== expected.availability
-    || hierarchy.bodyCount !== expected.bodies
-    || hierarchy.nodeCount !== expected.nodes
-    || bodies.length !== expected.bodies
-    || nodes.length !== expected.nodes
-    || artifacts.length !== expected.artifacts
+  if (hierarchy.hierarchyId !== AQUINAS_HIERARCHY_EXPECTED.hierarchyId
+    || hierarchy.packId !== AQUINAS_HIERARCHY_EXPECTED.packId
+    || hierarchy.workId !== AQUINAS_HIERARCHY_EXPECTED.workId
+    || hierarchy.editionId !== AQUINAS_HIERARCHY_EXPECTED.editionId
+    || hierarchy.availability !== AQUINAS_HIERARCHY_EXPECTED.availability
+    || hierarchy.bodyCount !== AQUINAS_HIERARCHY_EXPECTED.bodies
+    || hierarchy.nodeCount !== AQUINAS_HIERARCHY_EXPECTED.nodes
+    || bodies.length !== AQUINAS_HIERARCHY_EXPECTED.bodies
+    || nodes.length !== AQUINAS_HIERARCHY_EXPECTED.nodes
+    || artifacts.length !== AQUINAS_HIERARCHY_EXPECTED.artifacts
     || sourcePack.packId !== hierarchy.packId || work.workId !== hierarchy.workId
     || edition.editionId !== hierarchy.editionId || edition.workId !== work.workId || edition.packId !== sourcePack.packId) {
     throw new Error('Transform 10 must retain the exact inactive Aquinas hierarchy identity and inventory');
@@ -447,27 +398,26 @@ function assertAquinasHierarchy(
     hierarchy.navigationPreorderSha256,
   ];
   if (fixedHashes.some(value => !/^[0-9a-f]{64}$/.test(value))
-    || hierarchy.sourceManifestSha256 !== expected.sourceManifestSha256
-    || hierarchy.aggregateSha256 !== expected.aggregateSha256
-    || hierarchy.orderedQuestionKeysSha256 !== expected.orderedQuestionKeysSha256
-    || hierarchy.orderedArticleKeysSha256 !== expected.orderedArticleKeysSha256
-    || hierarchy.sourceLockSha256 !== expected.sourceLockSha256
-    || hierarchy.localReceiptSha256 !== expected.localReceiptSha256
-    || hierarchy.topologyLockSha256 !== expected.topologyLockSha256
-    || hierarchy.discrepancyLedgerSha256 !== expected.discrepancyLedgerSha256) {
+    || hierarchy.sourceManifestSha256 !== AQUINAS_HIERARCHY_EXPECTED.sourceManifestSha256
+    || hierarchy.aggregateSha256 !== AQUINAS_HIERARCHY_EXPECTED.aggregateSha256
+    || hierarchy.orderedQuestionKeysSha256 !== AQUINAS_HIERARCHY_EXPECTED.orderedQuestionKeysSha256
+    || hierarchy.orderedArticleKeysSha256 !== AQUINAS_HIERARCHY_EXPECTED.orderedArticleKeysSha256
+    || hierarchy.sourceLockSha256 !== AQUINAS_HIERARCHY_EXPECTED.sourceLockSha256
+    || hierarchy.localReceiptSha256 !== AQUINAS_HIERARCHY_EXPECTED.localReceiptSha256
+    || hierarchy.topologyLockSha256 !== AQUINAS_HIERARCHY_EXPECTED.topologyLockSha256
+    || hierarchy.discrepancyLedgerSha256 !== AQUINAS_HIERARCHY_EXPECTED.discrepancyLedgerSha256) {
     throw new Error('Transform 10 fixed profile hashes drifted from the reviewed packet');
   }
-  const expectedArtifacts = expected.artifactPins;
+  const expectedArtifacts = AQUINAS_HIERARCHY_EXPECTED.artifactPins;
   if (JSON.stringify(artifacts.map(artifact => [artifact.artifactId, artifact.locator, artifact.sha256, artifact.bytes])) !== JSON.stringify(expectedArtifacts)
     || artifacts.some(artifact => artifact.editionId !== edition.editionId || artifact.role !== 'authority' || !/^\d{4}-\d{2}-\d{2}T/.test(artifact.acquiredAt))) {
     throw new Error('Transform 10 must preserve every exact reviewed Gutenberg artifact locator, hash, bytes, and acquisition time');
   }
   const hierarchyProvenance = hierarchy.provenance;
-  if (hierarchyProvenance.status !== availability
-    || hierarchyProvenance.rightsStatus !== expected.rightsStatus
-    || hierarchyProvenance.territoryCaveat !== expected.territoryCaveat
-    || edition.underlyingWorkRights.status !== expected.rightsStatus
-    || edition.exactArtifactRights.territoryCaveat !== expected.territoryCaveat
+  if (hierarchyProvenance.rightsStatus !== AQUINAS_HIERARCHY_EXPECTED.rightsStatus
+    || hierarchyProvenance.territoryCaveat !== AQUINAS_HIERARCHY_EXPECTED.territoryCaveat
+    || edition.underlyingWorkRights.status !== AQUINAS_HIERARCHY_EXPECTED.rightsStatus
+    || edition.exactArtifactRights.territoryCaveat !== AQUINAS_HIERARCHY_EXPECTED.territoryCaveat
     || edition.publication !== 'Benziger Brothers' || edition.language !== 'English') {
     throw new Error('Transform 10 edition provenance or territory caveat drifted');
   }
@@ -485,9 +435,9 @@ function assertAquinasHierarchy(
     || attachedBodyKeys.some(key => !bodyKeys.has(key))) throw new Error('Transform 10 must attach every authority body exactly once');
   const nodeCounts = new Map(nodes.map(node => [node.nodeKind, 0]));
   for (const node of nodes) nodeCounts.set(node.nodeKind, (nodeCounts.get(node.nodeKind) ?? 0) + 1);
-  if (nodeCounts.get('part') !== expected.parts
-    || nodeCounts.get('question') !== expected.questions
-    || nodeCounts.get('article') !== expected.articles
+  if (nodeCounts.get('part') !== AQUINAS_HIERARCHY_EXPECTED.parts
+    || nodeCounts.get('question') !== AQUINAS_HIERARCHY_EXPECTED.questions
+    || nodeCounts.get('article') !== AQUINAS_HIERARCHY_EXPECTED.articles
     || hierarchy.navigationPreorderSha256 !== hashRecords(nodes)) throw new Error('Transform 10 hierarchy topology hash drifted');
   assertGenericPreorder(nodes);
 }
@@ -497,8 +447,7 @@ export function materializeHistoricalHierarchy(
   db: Database.Database,
   materialization: HistoricalEditionHierarchyMaterialization,
 ): HistoricalHierarchyMaterializationCounts {
-  if (materialization.hierarchy.availability === 'local_only_active') assertActiveAquinasHierarchy(materialization);
-  else assertApprovedAquinasHierarchy(materialization);
+  assertApprovedAquinasHierarchy(materialization);
   const pack = db.prepare('INSERT INTO historical_source_packs (pack_id, revision, schema_version, manifest_sha256, source_path) VALUES (?, ?, ?, ?, ?)');
   const work = db.prepare('INSERT INTO historical_works (work_id, title, creator_metadata_status, creators_json) VALUES (?, ?, ?, ?)');
   const edition = db.prepare(`INSERT INTO historical_editions (

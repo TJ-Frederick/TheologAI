@@ -27,11 +27,7 @@ export class EsvAdapter implements BibleProviderPort {
     });
   }
 
-  async getPassage(
-    ref: BibleReference,
-    _translation: string,
-    options?: { includeFootnotes?: boolean; signal?: AbortSignal },
-  ): Promise<BibleResult> {
+  async getPassage(ref: BibleReference, _translation: string, options?: { includeFootnotes?: boolean }): Promise<BibleResult> {
     if (!this.apiKey) {
       throw new APIError(401, 'ESV API key not configured. Set ESV_API_KEY environment variable.');
     }
@@ -41,12 +37,11 @@ export class EsvAdapter implements BibleProviderPort {
       q: refStr,
       'include-headings': 'false',
       'include-footnotes': String(options?.includeFootnotes ?? false),
-      'include-footnote-body': String(options?.includeFootnotes ?? false),
       'include-verse-numbers': 'true',
       'include-short-copyright': 'false',
     });
 
-    const data = await this.client.getJSON<any>(`/text/?${params}`, { signal: options?.signal });
+    const data = await this.client.getJSON<any>(`/text/?${params}`);
 
     if (!data.passages || data.passages.length === 0) {
       throw new APIError(404, `No passages found for: ${refStr}`);
@@ -68,12 +63,6 @@ export class EsvAdapter implements BibleProviderPort {
       reference: data.canonical || refStr,
       translation: 'ESV',
       text: data.passages[0].trim(),
-      ...(options?.includeFootnotes ? {
-        footnoteDelivery: {
-          status: 'inline' as const,
-          reason: 'The ESV passage-text API embeds available footnote callouts and bodies in the passage text.',
-        },
-      } : {}),
       citation: {
         source: 'English Standard Version',
         copyright: COPYRIGHT,

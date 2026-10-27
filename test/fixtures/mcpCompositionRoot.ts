@@ -3,7 +3,6 @@ import type { CommentaryProviderPort } from '../../src/services/commentary/Comme
 import type { OnChainVerifier } from '../../src/adapters/donation/OnChainVerifier.js';
 import type {
   ICrossReferenceRepository,
-  IHistoricalHierarchyRepository,
   IHistoricalDocumentRepository,
   IMorphologyRepository,
   IStrongsRepository,
@@ -20,7 +19,6 @@ import { SourceAttestedParallelService } from '../../src/services/bible/SourceAt
 import { CommentaryService } from '../../src/services/commentary/CommentaryService.js';
 import { DonationService } from '../../src/services/donation/DonationService.js';
 import { HistoricalDocumentService } from '../../src/services/historical/HistoricalDocumentService.js';
-import { HistoricalHierarchyService } from '../../src/services/historical/HistoricalHierarchyService.js';
 import { LocalPrimarySourceSearchProvider } from '../../src/services/historical/LocalPrimarySourceSearchProvider.js';
 import { PrimarySourceSearchService } from '../../src/services/historical/PrimarySourceSearchService.js';
 import { MorphologyService } from '../../src/services/languages/MorphologyService.js';
@@ -50,7 +48,7 @@ export interface DeterministicMcpFixture {
  *
  * This fixture intentionally opens no database and performs no network calls.
  * It is shared by protocol integration tests and the official HTTP conformance
- * harness so both exercise the same twelve real tool definitions.
+ * harness so both exercise the same eleven real tool definitions.
  */
 export function createDeterministicMcpFixture(): DeterministicMcpFixture {
   const biblePassageCalls: BiblePassageCall[] = [];
@@ -157,18 +155,6 @@ export function createDeterministicMcpFixture(): DeterministicMcpFixture {
   );
   const commentaryService = new CommentaryService([commentaryAdapter]);
   const historicalService = new HistoricalDocumentService(historicalRepository);
-  const historicalHierarchyRepository: IHistoricalHierarchyRepository = {
-    getHierarchyProfile: () => undefined,
-    getHierarchyPublication: () => undefined,
-    getHierarchyPublicationBySlug: () => undefined,
-    listActiveHierarchyPublications: () => [],
-    listHierarchyArtifacts: () => [],
-    getHierarchyNodeContext: () => undefined,
-    listHierarchyChildren: () => ({ nodes: [], hasMore: false, nextAfter: undefined }),
-    getHierarchyNeighbors: () => undefined,
-    searchHierarchyBodies: () => [],
-  };
-  const historicalHierarchyService = new HistoricalHierarchyService(historicalHierarchyRepository);
   const primarySourceContract = DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG;
   const primarySourceSearchService = new PrimarySourceSearchService(
     new LocalPrimarySourceSearchProvider(historicalRepository),
@@ -200,14 +186,13 @@ export function createDeterministicMcpFixture(): DeterministicMcpFixture {
       parallelPassageService,
       commentaryService,
       historicalService,
-      historicalHierarchyService,
       primarySourceSearchTool: primarySourceSearch.tool,
       strongsService,
       morphologyService,
       originalLanguageStudyCoordinator,
       donationService,
     }),
-    services: { bibleService, commentaryService, historicalService, historicalHierarchyService, strongsService, sourceAttestedParallelService },
+    services: { bibleService, commentaryService, historicalService, strongsService, sourceAttestedParallelService },
     primarySourceContract,
     primarySourceSearch,
   } satisfies DeterministicMcpRoot;

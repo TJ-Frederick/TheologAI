@@ -6,89 +6,6 @@ The [current release snapshot](CURRENT-RELEASE.md) is the designated current
 snapshot for this operations document. The dated records below retain release
 evidence and are not current identity authority.
 
-## Tool outcome observability
-
-Every dispatched `tools/call` emits one best-effort, content-free event at the
-shared MCP execution boundary. This covers MCP tool failures represented in a
-successful HTTP response as well as invalid arguments, unknown tool names,
-handler exceptions, and output-contract failures. It is not request logging.
-
-The fixed event shape is:
-
-```json
-{
-  "event": "theologai.tool.execution",
-  "tool": "bible_lookup",
-  "outcome": "success",
-  "durationMs": 12,
-  "releaseVersion": "3.6.0"
-}
-```
-
-`tool` is an allowlisted tool identifier (or `unknown`), `outcome` is one of
-`success`, `partial`, `unavailable`, `invalid`, or `error`, and an unsuccessful
-event can carry one low-cardinality `failureCategory`: `input_validation`,
-`unknown_tool`, `handler_exception`, `output_contract`, `tool_reported_error`,
-`execution_exception`, or `dependency_unavailable`. The event deliberately excludes arguments, response
-content, raw error text, URLs, IP addresses, user agents, sessions, user IDs,
-and authorization data. Delivery is nonawaited and not retried; exceptions from
-its sink are ignored, so telemetry cannot alter a tool response.
-
-`partial` and `unavailable` are determined only from explicit, versioned
-structured fields for the tools that publish those states: Bible comparison
-passage/failure counts, parallel-passage enrichment completion, primary-source
-plan status, nested original-language-study status, and donation coverage.
-`dependency_unavailable` deliberately does not identify a provider: a local
-D1 dependency and an external provider are operationally distinct. Other
-domain results such as a valid not-found or unsupported receipt remain
-successful tool executions; they must not be counted as provider outages.
-This event does not identify the local phase versus a provider phase, and it
-cannot distinguish an expected partial result (such as a budget omission or a
-disabled provider) from an unexpected degradation. Do not count every
-`partial` or `dependency_unavailable` event as a provider outage.
-
-The Worker writes these events as structured console records without request
-metadata. Node HTTP and stdio write the same records to stderr. Collection and
-sampling are platform operations, not application usage accounting: sampled
-logs can diagnose distributions but cannot establish exact totals. Until a
-durable metric sink is separately approved and provisioned, report rates only
-with the sample/window and do not infer request counts or user counts from
-them.
-
-Initial service indicators are separated by dependency boundary:
-
-| Indicator | Population | Initial target after baseline |
-| --- | --- | --- |
-| Local tool completion | Local-only tools and local portions of mixed tools; exclude `invalid` calls | ≥99.5% `success` or `partial` over 30 days |
-| External provider availability | Provider-dependent calls with `dependency_unavailable`; exclude valid absence, unsupported, and user-input errors | ≥99.0% over 30 days per provider-dependent tool |
-| Local tool latency | `durationMs` for local-only tools | p95 ≤1 s, p99 ≤3 s |
-| External tool latency | `durationMs` for provider-dependent tools | p95 ≤8 s, p99 ≤20 s |
-
-These are proposals, not accepted SLOs: the local portions and per-provider
-populations require later, separately approved bounded instrumentation before
-they can be measured from these events. Establish a representative baseline
-before setting enforcement thresholds. While events are sampled, alert on a
-sustained sampled increase in `error`/`unavailable` (for example, five minutes
-above three times the rolling baseline) and on absence of expected synthetic
-events. Page only when a corroborating platform signal or synthetic check also
-fails; otherwise open an investigation. Revisit thresholds after the first
-30-day baseline and any provider or deadline-policy change.
-
-Keep the telemetry budget bounded: one small event per executed tool call, no
-retry by the application, no event payload growth, and no per-user dimensions.
-Release version is bounded to a short allowlisted token. Retain and export only
-according to the approved platform retention policy; this repository does not
-create a telemetry binding, account, dashboard, or deployment configuration.
-
-For a no-network synthetic check, run
-`npx --no-install vitest run test/unit/mcp/toolExecutionObserver.test.ts`. It builds an
-in-process MCP server with an injected observer and proves success, invalid,
-reported-error, exception, partial, unavailable, unknown-tool, and failing-sink
-paths without a database or live provider. A future deployed synthetic must be
-explicitly authorized and should use one fixed harmless tool request, a bounded
-cadence, and the same release-version event; do not substitute ordinary traffic
-logs for that check.
-
 ## Production rollback rehearsal capability
 
 The protected `Production Rollback Rehearsal` workflow is manual, main-only,
@@ -684,10 +601,9 @@ The public Worker remains anonymous. It uses Cloudflare's Rate Limiting binding
 as an abuse-control boundary, not as authentication or exact usage accounting.
 
 - Limit: 120 accepted MCP requests per 60 seconds.
-- Key: SHA-256 of a versioned `CF-Connecting-IP` identity. Changing or omitting
-  `User-Agent` does not create another allowance. Requests without a trusted
-  client IP share one bucket; forwarded headers are not identity fallbacks.
-- Scope: per IP, per Cloudflare location. Cloudflare's counters are
+- Key: SHA-256 of a versioned combination of `CF-Connecting-IP` and
+  `User-Agent`.
+- Scope: per fingerprint, per Cloudflare location. Cloudflare's counters are
   permissive and eventually consistent, so brief bursts can exceed the nominal
   limit.
 - Exemptions: rejected origins, unknown paths, unsupported methods, and CORS
@@ -698,21 +614,6 @@ as an abuse-control boundary, not as authentication or exact usage accounting.
 Production and preview deliberately use different namespace IDs in
 `wrangler.toml`. Reusing a namespace ID would make equal keys share counters
 across Workers in the same Cloudflare account.
-
-The signed operator route likewise uses a distinct, hashed IP budget of 12
-authentication attempts per 60 seconds and fails closed without a trusted IP.
-Its limiter namespace and hash domain remain separate from public MCP traffic.
-
-### Request size and complexity
-
-Both HTTP transports enforce a 64 KiB request-body ceiling; configured byte
-budgets can lower it. Older configured values retained by release/rollback
-records are clamped to that runtime ceiling. Before SDK/schema validation, requests are limited to
-depth 16, 1,024 total entries, 128 entries per object/array, 16,384 characters
-per string, and 256 characters per object key. Oversized or excessive-complexity
-HTTP requests return 413. Invalid JSON retains the existing parse-error path.
-Shared stdio handlers also enforce the complexity limits. Validation diagnostics
-are bounded, and output schemas retain their existing result budgets.
 
 ### Failure policy and telemetry
 
@@ -846,11 +747,9 @@ artifact is retained for one day and is API-visible independently of the
 protected job. A separate unprivileged job downloads that exact current-run
 artifact, checks its closed schema, digest, run identity, release context, Git
 identity, decision, and complete changed-path evidence, and independently
-reproduces the release decision. Production promotion is manual: merging or
-pushing to main does not run this workflow. Run **Deploy Production** using
-**Run workflow** on `main` with a reason when ready to promote. The main-only
-manual dispatch can queue the protected job only after preview evidence and
-full unprivileged validation succeed;
+reproduces the classifier result. A documentation-only push therefore completes
+verification and skips the protected job. A deploy-required push or main-only
+manual dispatch can queue the protected job only after verification succeeds;
 missing, malformed, stale, failed, or inconsistent evidence fails before the
 environment rather than falling through to deployment.
 

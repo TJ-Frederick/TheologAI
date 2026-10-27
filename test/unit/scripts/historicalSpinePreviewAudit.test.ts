@@ -30,7 +30,7 @@ function response(body: RecordValue, fixtureValue: HistoricalSpineAuditFixture, 
     capabilities: { tools: {}, resources: {}, prompts: {} },
   });
   if (body.method === 'tools/list') return rpc({ tools: [
-    'bible_lookup', 'bible_cross_references', 'parallel_passages', 'commentary_lookup', 'classic_text_lookup', 'historical_hierarchy_lookup', 'primary_source_search',
+    'bible_lookup', 'bible_cross_references', 'parallel_passages', 'commentary_lookup', 'classic_text_lookup', 'primary_source_search',
     'original_language_lookup', 'bible_verse_morphology', 'original_language_study', 'donation_config', 'verify_donation',
   ].map(name => ({ name, annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true } })) });
   if (body.method === 'resources/list') return rpc({ resources: HISTORICAL_CORE_EXPECTED_RESOURCE_URIS.map(uri => ({ uri })) });
@@ -47,8 +47,8 @@ function response(body: RecordValue, fixtureValue: HistoricalSpineAuditFixture, 
           normalizedTextRights: { status: 'no_known_conflict' },
         },
         editionReadiness: { editionIdentity: 'established', provenance: 'verified_with_uncertainty', normalizedTextRights: 'no_known_conflict' },
-      })), ...Array.from({ length: 26 }, (_, index) => ({ id: `legacy-${index}` }))];
-      return rpc({ contents: [{ uri, mimeType: 'application/json', text: JSON.stringify({ schemaVersion: '2', kind: 'local_primary_source_catalog', workCount: 36, works }) }] });
+      })), ...Array.from({ length: 25 }, (_, index) => ({ id: `legacy-${index}` }))];
+      return rpc({ contents: [{ uri, mimeType: 'application/json', text: JSON.stringify({ schemaVersion: '2', kind: 'local_primary_source_catalog', workCount: 35, works }) }] });
     }
     return rpc({ contents: [{ uri, mimeType: 'text/markdown', text: uri.includes('#section-') ? 'PRIVATE HISTORICAL BODY' : 'Bounded local metadata.' }] });
   }
@@ -57,7 +57,7 @@ function response(body: RecordValue, fixtureValue: HistoricalSpineAuditFixture, 
     const tool = (structuredContent: RecordValue, isError = false) => rpc({ isError, structuredContent, content: [] });
     if (name === 'classic_text_lookup' && args.listWorks === true) {
       const works = [...fixtureValue.probes.map(probe => ({ id: probe.workId, deliveryMode: 'sectioned_only', resource: { kind: 'mcp_resource', uri: `theologai://documents/${probe.workId}` } })),
-        ...Array.from({ length: 26 }, (_, index) => ({ id: `legacy-${index}`, deliveryMode: 'complete_document', resource: { kind: 'mcp_resource', uri: `theologai://documents/legacy-${index}` } }))];
+        ...Array.from({ length: 25 }, (_, index) => ({ id: `legacy-${index}`, deliveryMode: 'complete_document', resource: { kind: 'mcp_resource', uri: `theologai://documents/legacy-${index}` } }))];
       return tool({ schemaVersion: '2', kind: 'classic_text_lookup', mode: 'list_works', catalog: { coverage: 'complete_local_work_inventory', works } });
     }
     const workId = args.work as string | undefined; const probe = fixtureValue.probes.find(value => value.workId === workId);

@@ -86,7 +86,6 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
         'parallel_passages',
         'commentary_lookup',
         'classic_text_lookup',
-        'historical_hierarchy_lookup',
         'primary_source_search',
         'original_language_lookup',
         'bible_verse_morphology',
@@ -100,7 +99,6 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
         'parallel_passages',
         'commentary_lookup',
         'classic_text_lookup',
-        'historical_hierarchy_lookup',
         'primary_source_search',
         'original_language_lookup',
         'bible_verse_morphology',
@@ -337,10 +335,7 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
             startVerse: 16,
           }),
           translation: 'ESV',
-          options: {
-            includeFootnotes: undefined,
-            signal: expect.any(AbortSignal),
-          },
+          options: { includeFootnotes: undefined },
         },
       ]);
       expect(result.content).toEqual([

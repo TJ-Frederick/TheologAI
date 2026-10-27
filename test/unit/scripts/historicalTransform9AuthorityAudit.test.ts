@@ -2,7 +2,6 @@ import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
 import {
   auditHistoricalTransform9Authority,
-  buildHistoricalTransform9AuthorityQueryPlan,
   buildHistoricalTransform9ExpectedAuthority,
   HISTORICAL_TRANSFORM9_AUTHORITY_PAGE_SIZE,
   HISTORICAL_TRANSFORM9_AUTHORITY_PAGE_MAX_BYTES,
@@ -70,17 +69,16 @@ describe('Transform 9 ordered authority audit', () => {
     try {
       const sql: string[] = [];
       const result = audit(database, expected, sql);
-      expect(buildHistoricalTransform9AuthorityQueryPlan(ROOT, expected)).toEqual(sql);
-      expect(result.pages.sections).toBe(289); // 2,307 full bodies at 8 rows per bounded page.
-      expect(result.pages.projections).toBe(37); // 2,307 compact rows at 64 rows per bounded page.
+      expect(result.pages.sections).toBe(133); // 1,057 full bodies at 8 rows per bounded page.
+      expect(result.pages.projections).toBe(17); // 1,057 compact rows at 64 rows per bounded page.
       expect(sql.every(query => /^\s*SELECT\b/i.test(query) && !/\bOFFSET\b/i.test(query))).toBe(true);
       const authorityQueries = sql.filter(query => query.includes('FROM historical_edition_sections')
         && !query.includes('LEFT JOIN historical_editions'));
-      expect(authorityQueries).toHaveLength(289);
+      expect(authorityQueries).toHaveLength(133);
       expect(authorityQueries.every(query => query.includes(`LIMIT ${HISTORICAL_TRANSFORM9_SECTION_PAGE_SIZE}`))).toBe(true);
       expect(authorityQueries.every(query => !query.includes('historical_document_delivery_profiles'))).toBe(true);
       const projectionQueries = sql.filter(query => query.includes('profileSelectionValid'));
-      expect(projectionQueries).toHaveLength(37);
+      expect(projectionQueries).toHaveLength(17);
       expect(projectionQueries.every(query => query.includes(`LIMIT ${HISTORICAL_TRANSFORM9_AUTHORITY_PAGE_SIZE}`))).toBe(true);
       expect(projectionQueries.every(query => query.includes('LEFT JOIN sections_fts runtime_fts'))).toBe(true);
 

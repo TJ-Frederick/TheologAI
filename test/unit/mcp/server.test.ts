@@ -16,7 +16,6 @@ import { formatLocalDocumentResource, formatLocalDocumentSectionResourceWithIden
 import { DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG } from '../../../src/kernel/featureFlags.js';
 import { primarySourceSearchV6OutputSchema } from '../../../src/mcp/schemas/primarySourceSearchV4.js';
 import { createPrimarySourceSearchDescriptor } from '../../../src/mcp/primarySourceSearchDescriptor.js';
-import { NotFoundError } from '../../../src/kernel/errors.js';
 
 const TOOL_NAMES = [
   'bible_lookup',
@@ -24,7 +23,6 @@ const TOOL_NAMES = [
   'parallel_passages',
   'commentary_lookup',
   'classic_text_lookup',
-  'historical_hierarchy_lookup',
   'primary_source_search',
   'original_language_lookup',
   'bible_verse_morphology',
@@ -130,18 +128,9 @@ function makeMockRoot(): McpCompositionRoot {
           citation: { source: "Strong's Concordance" },
         }),
       },
-      historicalHierarchyService: {
-        listPublications: async () => [],
-        resolveCanonicalUri: async () => {
-          throw new NotFoundError('historical hierarchy', 'No active hierarchy publication matches this URI.');
-        },
-      },
     },
     primarySourceContract: DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG,
-    primarySourceSearch: {
-      descriptor: createPrimarySourceSearchDescriptor(),
-      tool: tools.find(tool => tool.name === 'primary_source_search')!,
-    },
+    primarySourceSearch: { descriptor: createPrimarySourceSearchDescriptor(), tool: tools[5]! },
   };
 }
 
@@ -239,7 +228,7 @@ describe('shared MCP registration', () => {
     });
   });
 
-  it('lists all 12 tools and dispatches calls through the shared registry', async () => {
+  it('lists all 11 tools and dispatches calls through the shared registry', async () => {
     const root = makeMockRoot();
     const client = await connect(createTheologAiMcpServer(root, '1.0.0-test').server);
     const listed = await client.listTools();
@@ -262,10 +251,7 @@ describe('shared MCP registration', () => {
       arguments: { reference: 'John 3:16' },
     });
     expect(result.content).toEqual([{ type: 'text', text: 'Result from bible_lookup' }]);
-    expect(root.tools[0].handler).toHaveBeenCalledWith(
-      { reference: 'John 3:16' },
-      { signal: expect.any(AbortSignal) },
-    );
+    expect(root.tools[0].handler).toHaveBeenCalledWith({ reference: 'John 3:16' });
   });
 
   it('preserves bounded UBS survey navigation in the parallel_passages tools/list contract', async () => {
@@ -1002,10 +988,6 @@ describe('shared MCP registration', () => {
       ? primarySource.messages[0].content.text
       : '';
     expect(primarySourceText).not.toContain('CCEL search');
-    expect(primarySourceText).toContain('Keep the user\'s full question for synthesis');
-    expect(primarySourceText).toContain('one to three concise content terms');
-    expect(primarySourceText).toContain('Try one bounded local reformulation');
-    expect(primarySourceText).toContain('not historical silence');
 
     const donate = await client.getPrompt({ name: 'donate' });
     expect(donate.messages[0].content).toEqual(expect.objectContaining({
@@ -1107,7 +1089,7 @@ describe('shared MCP registration', () => {
       tool: root.tools.find(tool => tool.name === 'primary_source_search')!,
     };
     const client = await connect(createTheologAiMcpServer(root, '1.0.0-v8-foundation-test').server);
-    expect((await client.listTools()).tools).toHaveLength(12);
+    expect((await client.listTools()).tools).toHaveLength(11);
     expect((await client.listPrompts()).prompts).toHaveLength(6);
 
     const primary = await client.getPrompt({
@@ -1228,44 +1210,6 @@ describe('shared MCP registration', () => {
       code: -32602,
       message: expect.stringContaining('Arguments for prompt "passage-exegesis" must be an object'),
     });
-  });
-
-  it.each([
-    ['Node', () => new BibleMCPServer(makeMockRoot(), 'comparison-validation-test').getServer()],
-    ['Worker', () => createWorkerMcpServer(makeMockRoot() as WorkerCompositionRoot, 'comparison-validation-test').server],
-  ])('rejects unsupported comparison translations with actionable errors on %s', async (_runtime, makeServer) => {
-    const client = await connect(makeServer());
-
-    await expect(client.getPrompt({
-      name: 'compare-translations',
-      arguments: { reference: 'John 3:16', translations: 'KJV,NIV,BOGUS' },
-    })).rejects.toMatchObject({
-      code: -32602,
-      message: expect.stringContaining('unsupported translations: NIV, BOGUS'),
-    });
-  });
-
-  it.each([
-    ['Node', () => new BibleMCPServer(makeMockRoot(), 'comparison-normalization-test').getServer()],
-    ['Worker', () => createWorkerMcpServer(makeMockRoot() as WorkerCompositionRoot, 'comparison-normalization-test').server],
-  ])('preserves defaults and supported normalization on %s', async (_runtime, makeServer) => {
-    const client = await connect(makeServer());
-    const defaults = await client.getPrompt({
-      name: 'compare-translations', arguments: { reference: 'John 3:16' },
-    });
-    const selected = await client.getPrompt({
-      name: 'compare-translations',
-      arguments: { reference: 'John 3:16', translations: 'kjv,web,KJV' },
-    });
-    const defaultText = textContent(defaults.messages[0]?.content);
-    const selectedText = textContent(selected.messages[0]?.content);
-
-    for (const translation of ['ESV', 'KJV', 'NET', 'BSB']) {
-      expect(defaultText).toContain(`"translation":"${translation}"`);
-    }
-    expect(selectedText.match(/`bible_lookup`/g)).toHaveLength(2);
-    expect(selectedText).toContain('"translation":"KJV"');
-    expect(selectedText).toContain('"translation":"WEB"');
   });
 
   it('keeps tool/resource/prompt registrations identical while profiling logging by transport', async () => {

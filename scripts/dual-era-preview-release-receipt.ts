@@ -3,6 +3,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { DualEraMcpAudit } from './audit-dual-era-mcp-preview.js';
+import { verifyFreshCorpusReceipt } from './application-release-policy.mjs';
 
 type JsonRecord = Record<string, unknown>;
 const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1_000;
@@ -10,7 +11,7 @@ const FUTURE_SKEW_MS = 5 * 60 * 1_000;
 const PROTOCOLS = ['2025-11-25', '2026-07-28'] as const;
 
 export interface DualEraPreviewReleaseReceipt {
-  schemaVersion: 'theologai-dual-era-preview-release-receipt.v1';
+  schemaVersion: 'theologai-dual-era-preview-release-receipt.v1' | 'theologai-dual-era-preview-release-receipt.v2';
   createdAt: string;
   repository: string;
   pullRequest: number;
@@ -20,12 +21,14 @@ export interface DualEraPreviewReleaseReceipt {
   productProfile: '7';
   protocols: ['2025-11-25', '2026-07-28'];
   server: { name: 'theologai-bible-server'; version: string };
-  counts: { tools: 12; prompts: 6; resourceTemplates: 2; staticResources: 3 };
+  counts: { tools: 11; prompts: 6; resourceTemplates: 2; staticResources: 3 };
   contractFingerprints: DualEraMcpAudit['eras'][number]['fingerprints'];
   auditSha256: string;
   worker: { deploymentId: string; versionId: string; versionNumber: number };
   d1: { databaseName: string; databaseId: string };
   d1ReadinessSha256: string;
+  d1ReadinessKind?: 'fresh-complete-corpus-proof';
+  d1SourcePlanSha256?: string;
 }
 
 function fail(message: string): never {
@@ -76,7 +79,7 @@ function parseAudit(text: string): DualEraMcpAudit {
     exactKeys(fingerprints, ['capabilities', 'tools', 'prompts', 'resourceTemplates', 'staticResources'], `dual-era audit ${protocol} fingerprints`);
     if (era.protocolVersion !== protocol || era.serverName !== 'theologai-bible-server'
       || typeof era.serverVersion !== 'string' || era.serverVersion.length === 0
-      || counts.tools !== 12 || counts.prompts !== 6 || counts.resourceTemplates !== 2 || counts.staticResources !== 3
+      || counts.tools !== 11 || counts.prompts !== 6 || counts.resourceTemplates !== 2 || counts.staticResources !== 3
       || !Object.values(fingerprints).every(value => typeof value === 'string' && /^[0-9a-f]{64}$/.test(value))) {
       fail(`dual-era audit ${protocol} contract is malformed`);
     }
@@ -96,6 +99,7 @@ export function createDualEraPreviewReleaseReceipt(input: {
   workerIdentityText: string;
   cutoverText: string;
   d1ReadinessText: string;
+  d1SourcePlanText?: string;
 }): DualEraPreviewReleaseReceipt {
   const audit = parseAudit(input.auditText);
   const identity = object(parseJson(input.workerIdentityText, 'Worker identity'), 'Worker identity');
@@ -115,11 +119,23 @@ export function createDualEraPreviewReleaseReceipt(input: {
     || candidateD1.binding !== 'THEOLOGAI_DB' || observedD1.binding !== 'THEOLOGAI_DB'
     || typeof candidateD1.databaseName !== 'string' || !isUuid(candidateD1.databaseId)
     || observedD1.databaseId !== candidateD1.databaseId) fail('cutover identity does not match the audited Worker and D1');
-  if (readiness.schemaVersion !== 'theologai-remote-d1-readiness-receipt.v1'
+  const fresh = readiness.schemaVersion === 'theologai-fresh-complete-corpus-proof.v1';
+  if (fresh) {
+    if (!input.d1SourcePlanText) fail('fresh proof source plan is required');
+    const plan = object(parseJson(input.d1SourcePlanText, 'D1 source plan'), 'D1 source plan');
+    const source = object(plan.classification, 'D1 source classification');
+    const expected = object(plan.expected, 'D1 source expectations');
+    if (plan.schemaVersion !== 'theologai-application-corpus-source-plan.v1'
+      || source.sourceCommit !== input.sourceCommit || source.sourceTree !== input.sourceTree
+      || readiness.databaseId !== candidateD1.databaseId || readiness.databaseName !== candidateD1.databaseName) fail('fresh proof source/candidate mismatch');
+    if (typeof readiness.completedAt !== 'string' || Date.parse(readiness.completedAt) > Date.parse(audit.capturedAt)) fail('fresh proof must precede the live audit');
+    verifyFreshCorpusReceipt(readiness, { role: 'preview', sourceCommit: input.sourceCommit, sourceTree: input.sourceTree,
+      sourcePlanSha256: sha256(input.d1SourcePlanText), tables: expected.digests });
+  } else if (readiness.schemaVersion !== 'theologai-remote-d1-readiness-receipt.v1'
     || readiness.environment !== 'preview' || readiness.database !== candidateD1.databaseName) fail('D1 readiness does not match the audited candidate');
   const first = audit.eras[0]!;
   return {
-    schemaVersion: 'theologai-dual-era-preview-release-receipt.v1',
+    schemaVersion: fresh ? 'theologai-dual-era-preview-release-receipt.v2' : 'theologai-dual-era-preview-release-receipt.v1',
     createdAt: audit.capturedAt,
     repository: input.repository,
     pullRequest: input.pullRequest,
@@ -139,6 +155,7 @@ export function createDualEraPreviewReleaseReceipt(input: {
     },
     d1: { databaseName: candidateD1.databaseName, databaseId: candidateD1.databaseId },
     d1ReadinessSha256: sha256(input.d1ReadinessText),
+    ...(fresh ? { d1ReadinessKind: 'fresh-complete-corpus-proof' as const, d1SourcePlanSha256: sha256(input.d1SourcePlanText!) } : {}),
   };
 }
 
@@ -149,15 +166,17 @@ export function verifyDualEraPreviewReleaseReceipt(receipt: unknown, expected: {
   exactKeys(value, [
     'schemaVersion', 'createdAt', 'repository', 'pullRequest', 'sourceCommit', 'sourceTree', 'endpoint',
     'productProfile', 'protocols', 'server', 'counts', 'contractFingerprints', 'auditSha256', 'worker', 'd1',
-    'd1ReadinessSha256',
+    'd1ReadinessSha256', ...(value.schemaVersion === 'theologai-dual-era-preview-release-receipt.v2' ? ['d1ReadinessKind', 'd1SourcePlanSha256'] : []),
   ], 'receipt');
   const created = typeof value.createdAt === 'string' ? Date.parse(value.createdAt) : Number.NaN;
   const now = (expected.now ?? new Date()).getTime();
-  if (value.schemaVersion !== 'theologai-dual-era-preview-release-receipt.v1'
+  if (!['theologai-dual-era-preview-release-receipt.v1', 'theologai-dual-era-preview-release-receipt.v2'].includes(String(value.schemaVersion))
     || value.repository !== expected.repository || value.sourceCommit !== expected.sourceCommit
     || value.sourceTree !== expected.sourceTree || value.productProfile !== '7'
     || JSON.stringify(value.protocols) !== JSON.stringify(PROTOCOLS)
     || !Number.isFinite(created) || created > now + FUTURE_SKEW_MS || now - created > MAX_AGE_MS) fail('receipt identity or seven-day freshness gate failed');
+  if (value.schemaVersion === 'theologai-dual-era-preview-release-receipt.v2'
+    && (value.d1ReadinessKind !== 'fresh-complete-corpus-proof' || !isSha256(value.d1SourcePlanSha256))) fail('fresh proof role or source plan is malformed');
   const server = object(value.server, 'receipt server');
   const counts = object(value.counts, 'receipt counts');
   const fingerprints = object(value.contractFingerprints, 'receipt fingerprints');
@@ -170,7 +189,7 @@ export function verifyDualEraPreviewReleaseReceipt(receipt: unknown, expected: {
   exactKeys(d1, ['databaseName', 'databaseId'], 'receipt D1');
   if (server.name !== 'theologai-bible-server' || server.version !== expected.serverVersion
     || value.endpoint !== 'https://preview-mcp.theologai.xyz/mcp'
-    || counts.tools !== 12 || counts.prompts !== 6 || counts.resourceTemplates !== 2 || counts.staticResources !== 3
+    || counts.tools !== 11 || counts.prompts !== 6 || counts.resourceTemplates !== 2 || counts.staticResources !== 3
     || !Object.values(fingerprints).every(item => typeof item === 'string' && /^[0-9a-f]{64}$/.test(item))
     || !isSha256(value.auditSha256) || !isSha256(value.d1ReadinessSha256)
     || !isUuid(worker.deploymentId) || !isUuid(worker.versionId)
@@ -199,11 +218,14 @@ async function main(): Promise<void> {
   const command = process.argv[2]; const options = args(process.argv.slice(3));
   if (command === 'create') {
     const output = options.get('--output'); if (!output) fail('--output is required');
+    const d1ReadinessText = await requiredFile(options, '--d1-readiness');
+    const fresh = object(parseJson(d1ReadinessText, 'D1 readiness receipt'), 'D1 readiness receipt').schemaVersion === 'theologai-fresh-complete-corpus-proof.v1';
     const receipt = createDualEraPreviewReleaseReceipt({
       repository: options.get('--repository') ?? '', pullRequest: Number(options.get('--pull-request')),
       sourceCommit: options.get('--source-commit') ?? '', sourceTree: options.get('--source-tree') ?? '',
       auditText: await requiredFile(options, '--audit'), workerIdentityText: await requiredFile(options, '--worker-identity'),
-      cutoverText: await requiredFile(options, '--cutover'), d1ReadinessText: await requiredFile(options, '--d1-readiness'),
+      cutoverText: await requiredFile(options, '--cutover'), d1ReadinessText,
+      ...(fresh ? { d1SourcePlanText: await requiredFile(options, '--d1-source-plan') } : {}),
     });
     await writeFile(resolve(output), `${JSON.stringify(receipt, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
     return;

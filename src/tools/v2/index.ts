@@ -22,7 +22,6 @@ import { CrossReferenceRepository } from '../../adapters/data/CrossReferenceRepo
 import { StrongsRepository } from '../../adapters/data/StrongsRepository.js';
 import { MorphologyRepository } from '../../adapters/data/MorphologyRepository.js';
 import { HistoricalDocumentRepository } from '../../adapters/data/HistoricalDocumentRepository.js';
-import { HistoricalHierarchyRepository } from '../../adapters/data/HistoricalHierarchyRepository.js';
 import { UbsSemanticEvidenceBundleRepository } from '../../adapters/data/UbsSemanticEvidenceBundleRepository.js';
 import { loadUbsParallelPassageRepository } from '../../adapters/data/loadUbsParallelPassages.js';
 
@@ -32,7 +31,6 @@ import { CrossReferenceService } from '../../services/bible/CrossReferenceServic
 import { ParallelPassageService } from '../../services/bible/ParallelPassageService.js';
 import { CommentaryService } from '../../services/commentary/CommentaryService.js';
 import { HistoricalDocumentService } from '../../services/historical/HistoricalDocumentService.js';
-import { HistoricalHierarchyService } from '../../services/historical/HistoricalHierarchyService.js';
 import { LocalPrimarySourceSearchProvider } from '../../services/historical/LocalPrimarySourceSearchProvider.js';
 import { PrimarySourceSearchService } from '../../services/historical/PrimarySourceSearchService.js';
 import { StrongsService } from '../../services/languages/StrongsService.js';
@@ -58,7 +56,6 @@ export interface ServerServices {
   bibleService: BibleService;
   commentaryService: CommentaryService;
   historicalService: HistoricalDocumentService;
-  historicalHierarchyService: HistoricalHierarchyService;
   strongsService: StrongsService;
   sourceAttestedParallelService: SourceAttestedParallelService;
 }
@@ -97,7 +94,6 @@ export function createCompositionRoot(options: CompositionRootOptions = {}): Com
   const strongsRepo = new StrongsRepository(db);
   const morphRepo = new MorphologyRepository(db);
   const historicalRepo = new HistoricalDocumentRepository(db);
-  const historicalHierarchyRepo = new HistoricalHierarchyRepository(db);
   const ubsSemanticEvidenceBundleRepo = new UbsSemanticEvidenceBundleRepository(db);
   const sourceAttestedParallelRepo = loadUbsParallelPassageRepository();
 
@@ -124,7 +120,6 @@ export function createCompositionRoot(options: CompositionRootOptions = {}): Com
   );
   const commentaryService = new CommentaryService([helloaoCommentary]);
   const historicalService = new HistoricalDocumentService(historicalRepo);
-  const historicalHierarchyService = new HistoricalHierarchyService(historicalHierarchyRepo);
   const primarySourceSearchService = new PrimarySourceSearchService(
     new LocalPrimarySourceSearchProvider(historicalRepo),
     nodeCcelSearchAdapter,
@@ -151,7 +146,6 @@ export function createCompositionRoot(options: CompositionRootOptions = {}): Com
     parallelPassageService: parallelService,
     commentaryService,
     historicalService,
-    historicalHierarchyService,
     primarySourceSearchTool: primarySourceSearch.tool,
     strongsService,
     morphologyService: morphService,
@@ -161,7 +155,7 @@ export function createCompositionRoot(options: CompositionRootOptions = {}): Com
 
   return {
     tools,
-    services: { bibleService, commentaryService, historicalService, historicalHierarchyService, strongsService, sourceAttestedParallelService },
+    services: { bibleService, commentaryService, historicalService, strongsService, sourceAttestedParallelService },
     primarySourceContract,
     primarySourceSearch,
   };
