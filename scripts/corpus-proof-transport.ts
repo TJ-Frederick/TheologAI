@@ -9,6 +9,10 @@ type ApiResult = { success?: boolean; errors?: unknown[]; result?: unknown; data
 function check(value: unknown, reason: string): asserts value { if (!value) throw Error(`Corpus transport refused: ${reason}`); }
 const sha = (v: string) => createHash('sha256').update(v).digest('hex');
 const count = (v: unknown): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v >= 0;
+function errorCodes(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 16).flatMap(error => error && typeof error === 'object' && 'code' in error && count(error.code) ? [error.code] : []);
+}
 function row(value: unknown): ProofRow { check(value !== null && typeof value === 'object' && !Array.isArray(value), 'object shape'); return value as ProofRow; }
 function list(value: unknown): ProofRow[] { check(Array.isArray(value), 'list shape'); return value.map(row); }
 
@@ -52,12 +56,24 @@ export class CorpusProofTransport {
     const response = await (this.options.fetch ?? fetch)(`https://api.cloudflare.com/client/v4${path}`, {
       method, redirect: 'error', signal: AbortSignal.timeout(30_000), headers: { authorization: `Bearer ${this.options.token}`, accept: 'application/json', 'content-type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}),
     });
-    check(response.status === 200 && !response.redirected && /^application\/json/.test(response.headers.get('content-type') ?? ''), 'HTTP/redirect/content type');
+    const jsonContentType = /^application\/json/.test(response.headers.get('content-type') ?? '');
+    const accepted = response.status === 200 && !response.redirected && jsonContentType;
+    if (!accepted || !response.body) this.event({ kind: 'rejected-response', method, path, httpStatus: response.status, redirected: response.redirected, jsonContentType, emptyBody: !response.body });
     check(response.body, 'empty response'); const reader = response.body.getReader(); const chunks: Uint8Array[] = []; let size = 0;
     try { for (;;) { const part = await reader.read(); if (part.done) break; size += part.value.byteLength; this.bytes += part.value.byteLength;
       check(size <= 1_250_000 && this.bytes <= 512 * 1024 * 1024, 'response bytes'); chunks.push(part.value); } }
     finally { await reader.cancel().catch(() => undefined); }
-    const text = Buffer.concat(chunks).toString('utf8'); const value = row(JSON.parse(text));
+    const text = Buffer.concat(chunks).toString('utf8'); let parsed: unknown;
+    try { parsed = JSON.parse(text); }
+    catch {
+      this.event({ kind: 'invalid-json', method, path, httpStatus: response.status, responseSha256: sha(text), bytes: size });
+      throw Error('Corpus transport refused: invalid JSON response');
+    }
+    const value = row(parsed);
+    if (!accepted || value.success === false || Array.isArray(value.errors) && value.errors.length) {
+      this.event({ kind: 'provider-error', method, path, httpStatus: response.status, errorCodes: errorCodes(value.errors), responseSha256: sha(text), bytes: size });
+    }
+    check(accepted, 'HTTP/redirect/content type');
     this.event({ kind: 'API', method, path, responseSha256: sha(text), bytes: size }); return value as ApiResult;
   }
   private async rest(path: string): Promise<unknown> {
@@ -112,9 +128,10 @@ export class CorpusProofTransport {
       check(meta.rows_read <= query.readCeiling && meta.rows_written <= query.writeCeiling && meta.changes <= query.writeCeiling, 'measured query budget');
       const rows = list(result.results); this.event({ kind: 'result', label: query.label, sqlSha256: sha(query.sql), rowsRead: meta.rows_read, rowsWritten: meta.rows_written, changes: meta.changes, rowCount: rows.length });
       this.current = null; return rows;
-    } catch {
+    } catch (error) {
       this.halted = true; this.metering.unknownAttempts++;
-      this.event({ kind: 'halted', label: query.label, reservedUnknownReads: query.readCeiling, reservedUnknownWrites: query.writeCeiling });
+      const failureKind = error instanceof Error && ['Error', 'AbortError', 'TimeoutError', 'TypeError', 'SyntaxError'].includes(error.name) ? error.name : 'unknown';
+      this.event({ kind: 'halted', label: query.label, failureKind, reservedUnknownReads: query.readCeiling, reservedUnknownWrites: query.writeCeiling });
       throw Error('Corpus transport refused: failed or ambiguous single attempt; no retry or cleanup');
     }
   }

@@ -129,7 +129,12 @@ function transportFixture(fault: string) {
     } else if (path.endsWith('/query')) {
       sqlCalls++;
       if (fault === 'network') throw Error('synthetic failed attempt');
+      if (fault === 'timeout') throw new DOMException('synthetic-test-token private SQL body', 'TimeoutError');
       if (fault === 'redirect') return new Response('{}', { status: 302 });
+      if (fault === 'http-403' || fault === 'http-400') return Response.json({ success: false, errors: [{ code: 7500, message: 'synthetic-test-token private SQL body' }, { code: 'unsafe-text' }] }, { status: fault === 'http-403' ? 403 : 400 });
+      if (fault === 'invalid-json') return new Response('synthetic-test-token private SQL body', { headers: { 'content-type': 'application/json' } });
+      if (fault === 'empty-json') return new Response(null, { headers: { 'content-type': 'application/json' } });
+      if (fault === 'oversized-http-error') return new Response('x'.repeat(1_250_001), { status: 400, headers: { 'content-type': 'application/json' } });
       value = { success: true, errors: [], result: [{ success: true, results: [{ n: 1 }], meta: {
         rows_read: fault === 'read-overrun' ? 200 : 1, rows_written: fault === 'unexpected-write' ? 1 : 0, changes: 0,
         total_attempts: fault === 'retry' ? 2 : 1, served_by_primary: fault !== 'replica',
@@ -147,7 +152,7 @@ function transportFixture(fault: string) {
   };
   const transport = new CorpusProofTransport({ role: 'preview', token: 'synthetic-test-token', readBudget: 3_510_997, eventFile: join(directory, 'events.jsonl'), fetch: fetcher });
   const query: ProofQuery = { kind: 'select', label: 'fixture', sql: 'SELECT 1 n', readCeiling: 100, writeCeiling: 0 };
-  return { transport, calls, query, close: () => { clock.mockRestore(); vi.useRealTimers(); rmSync(directory, { recursive: true, force: true }); } };
+  return { transport, calls, query, events: () => readFileSync(join(directory, 'events.jsonl'), 'utf8'), close: () => { clock.mockRestore(); vi.useRealTimers(); rmSync(directory, { recursive: true, force: true }); } };
 }
 
 describe('single-attempt corpus proof transport', () => {
@@ -168,6 +173,21 @@ describe('single-attempt corpus proof transport', () => {
       await f.transport.start(); await expect(f.transport.execute(f.query)).rejects.toThrow('no retry or cleanup');
       await expect(f.transport.execute(f.query)).rejects.toThrow('halted');
       expect(f.calls.filter(c => c.path.endsWith('/query'))).toHaveLength(1); expect(f.transport.metering.unknownAttempts).toBe(1);
+    } finally { f.close(); }
+  });
+  for (const fault of ['http-403', 'http-400', 'invalid-json', 'empty-json', 'network', 'timeout', 'oversized-http-error']) it('retains safe diagnostics without retry or response contents after ' + fault, async () => {
+    const f = transportFixture(fault); try {
+      await f.transport.start(); await expect(f.transport.execute(f.query)).rejects.toThrow('no retry or cleanup');
+      await expect(f.transport.execute(f.query)).rejects.toThrow('halted');
+      expect(f.calls.filter(c => c.path.endsWith('/query'))).toHaveLength(1);
+      const events = f.events(); expect(events).not.toContain('synthetic-test-token'); expect(events).not.toContain('private SQL body'); expect(events).not.toContain('unsafe-text');
+      const rows = events.trim().split('\n').map(line => JSON.parse(line) as Record<string, unknown>);
+      if (fault.startsWith('http-')) expect(rows).toContainEqual(expect.objectContaining({ kind: 'provider-error', httpStatus: fault === 'http-403' ? 403 : 400, errorCodes: [7500] }));
+      if (fault === 'invalid-json') expect(rows).toContainEqual(expect.objectContaining({ kind: 'invalid-json', httpStatus: 200 }));
+      if (fault === 'empty-json') expect(rows).toContainEqual(expect.objectContaining({ kind: 'rejected-response', httpStatus: 200, emptyBody: true }));
+      if (fault === 'timeout') expect(rows).toContainEqual(expect.objectContaining({ kind: 'halted', failureKind: 'TimeoutError' }));
+      if (fault === 'oversized-http-error') expect(rows.some(event => event.kind === 'provider-error')).toBe(false);
+      expect(f.transport.metering.unknownAttempts).toBe(1);
     } finally { f.close(); }
   });
   it('rejects control drift after the proof', async () => {
