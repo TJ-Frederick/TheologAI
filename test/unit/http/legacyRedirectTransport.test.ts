@@ -35,7 +35,7 @@ afterEach(async () => {
 });
 
 describe('legacy-host redirect transport compatibility', () => {
-  it('lets the official TypeScript Streamable HTTP client follow a cross-origin 308 without changing its POST body', async () => {
+  it('lets an explicitly configured official client follow the known cross-origin 308 without changing its POST body', async () => {
     const targetRequest = vi.fn<(
       method: string | undefined,
       url: string | undefined,
@@ -52,7 +52,7 @@ describe('legacy-host redirect transport compatibility', () => {
       response.end();
     });
 
-    const transport = new StreamableHTTPClientTransport(new URL(`${legacy.url}/mcp?source=legacy`));
+    const transport = new StreamableHTTPClientTransport(new URL(`${legacy.url}/mcp?source=legacy`), { redirectPolicy: 'follow' });
     const received = vi.fn();
     transport.onmessage = received;
     await transport.start();

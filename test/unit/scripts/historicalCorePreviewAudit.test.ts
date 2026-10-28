@@ -149,36 +149,28 @@ describe('historical core preview audit contract', () => {
     expect(readiness).toContain('auditHistoricalTransform9Authority');
     expect(reconciliation).toContain('does not automatically roll back, deploy, bind, delete, or mutate data');
 
-    const d1Mapping = workflow.indexOf('- name: Capture checked-out candidate preview D1 mapping (read-only)');
-    const d1 = workflow.indexOf('- name: Verify candidate preview D1 is compatible (read-only)');
-    const predecessor = workflow.indexOf('- name: Capture preview predecessor reconciliation anchor (read-only)');
-    const predecessorArtifact = workflow.indexOf('- name: Upload preview predecessor reconciliation anchor');
-    const deploy = workflow.indexOf('- name: Deploy to Cloudflare Workers (preview)');
-    const candidateCutover = workflow.indexOf('- name: Require deployed candidate preview D1 binding (read-only)');
-    const v2 = workflow.indexOf('- name: Audit original-language v2 contract on preview');
-    const historical = workflow.indexOf('- name: Audit Transform-9 historical core contract on preview');
-    const spine = workflow.indexOf('- name: Audit Transform-11 historical spine contract on preview');
-    const reconciliationStep = workflow.indexOf('- name: Capture preview post-mutation reconciliation record (read-only)');
-    const identity = workflow.indexOf('- name: Verify preview Worker remained active through audit (read-only)');
-    const artifact = workflow.indexOf('name: preview-release-audit-');
-    expect(d1Mapping).toBeGreaterThan(-1);
-    expect(d1).toBeGreaterThan(d1Mapping);
-    expect(predecessor).toBeGreaterThan(d1);
-    expect(predecessorArtifact).toBeGreaterThan(predecessor);
-    expect(deploy).toBeGreaterThan(predecessorArtifact);
-    expect(candidateCutover).toBeGreaterThan(deploy);
-    expect(v2).toBeGreaterThan(candidateCutover);
-    expect(historical).toBeGreaterThan(v2);
-    expect(spine).toBeGreaterThan(historical);
-    expect(reconciliationStep).toBeGreaterThan(spine);
-    expect(identity).toBeGreaterThan(spine);
-    expect(artifact).toBeGreaterThan(identity);
-    expect(workflow).toContain('historical-core-preview-audit.json');
-    expect(workflow).toContain('historical_audit_sha256');
-    expect(workflow).toContain('historical-spine-preview-audit.json');
-    expect(workflow).toContain('historical_spine_audit_sha256');
-    expect(workflow).toContain('wrangler versions view "$predecessor_version" --env preview --json');
-    expect(workflow).toContain('wrangler versions view "$observed_active_version" --env preview --json');
+    const ordered = [
+      'Capture checked-out candidate preview D1 mapping (read-only)',
+      'Prove the complete preview corpus before binding (four rank-1 integrity commands)',
+      'Capture preview predecessor reconciliation anchor (read-only)',
+      'Upload preview predecessor reconciliation anchor',
+      'Deploy to Cloudflare Workers (preview)',
+      'Require deployed candidate preview D1 binding (read-only)',
+      'Audit the corpus-only preview in both protocol eras',
+      'Verify preview Worker remained active through audit (read-only)',
+      'Create source-bound protected corpus preview receipt',
+      'Upload protected preview audit evidence',
+    ].map(name => workflow.indexOf('- name: '+name));
+    expect(ordered.every(index=>index>=0)).toBe(true);
+    expect(ordered).toEqual([...ordered].sort((a,b)=>a-b));
+    expect(workflow).toContain('corpus-live.json');
+    expect(workflow).toContain('corpus-preview-release.json');
+    expect(workflow).toContain('corpus_live_sha256');
+    expect(workflow).toContain('versions view "$predecessor_version" --env preview --json');
+    expect(workflow).toContain('versions view "$observed_active_version" --env preview --json');
+    const corpus=await readFile(new URL('scripts/audit-corpus-release.ts',root),'utf8');
+    expect(corpus).toContain('[...core.probes, ...spine.probes]');
+
   });
 
   it('runs the exact 55-exchange inventory through a representative fake transport without retaining bodies, locators, snippets, cursors, or error data', async () => {

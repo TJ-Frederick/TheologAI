@@ -1,5 +1,10 @@
 # Norton/Aquinas corpus release candidate
 
+This preparation-time record precedes execution. The owner subsequently authorized
+publication and protected preview in PR #168; live execution receipts, not the
+preparation-time statements below, determine what has actually run. Production
+preparation, deployment and merge remain outside that approval.
+
 Local candidate integrated into the existing protected PR and production workflows.
 The isolated source starts at `f6026ab14128d4719b0ca8b120e8d5573837d8ec`.
 The primary checkout's unpublished v9 work is preserved; its only focused edit is
@@ -409,3 +414,18 @@ all 53 original source-equivalence tests and eight existing readiness cases.
 Node, Worker, release-script and relevant test TypeScript checks pass. General CI
 passes without a prebuilt DB; protected preview explicitly builds it before full
 cases. The full unrelated unit suite and a remote protected run were not executed.
+
+## Publication dependency prerequisite
+
+The initial hosted core job stopped at the existing dependency audit. The focused
+repair updates dependency pins/lockfile and their compatibility tests, without
+copying the security application backport or changing the Node version. Wrangler
+4.114.0, measurement Miniflare 4.20260722.0 and better-sqlite3 12.6.2 remain fixed.
+The Worker test pool uses 0.20.0 with Zod 4.6.7; the required audit reports zero
+vulnerabilities. The SDK update uses an explicit redirect-follow option only in
+the known-public-redirect compatibility test. Production transport policy and
+bindings are unchanged. Existing guard tests now follow the single corpus profile.
+
+Post-repair validation passed all 40 corpus cases, all 63 repaired guard/compatibility
+cases, 26 Worker-runtime cases and relevant types. Exact preparation, verification
+and both-era live costs are unchanged; the original D1 reservations stand.
