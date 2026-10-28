@@ -17,7 +17,8 @@ function bytes(path: string, maximum = 400 * 1024 * 1024): Buffer {
 }
 function options(argv: string[]): Map<string, string> {
   check(argv.length % 2 === 0, 'argument pairs'); const result = new Map<string, string>();
-  for (let i = 0; i < argv.length; i += 2) { const key = argv[i]!, value = argv[i + 1]!; check(/^--[a-z-]+$/.test(key) && !result.has(key) && !value.startsWith('--'), 'argument'); result.set(key, value); }
+  const allowed = new Set(['--database', '--directory', '--role', '--plan-sha256', '--output']);
+  for (let i = 0; i < argv.length; i += 2) { const key = argv[i]!, value = argv[i + 1]!; check(allowed.has(key) && !result.has(key) && !value.startsWith('--'), 'argument'); result.set(key, value); }
   return result;
 }
 const required = (args: Map<string, string>, name: string) => { const value = args.get(name); check(value, name + ' required'); return value!; };

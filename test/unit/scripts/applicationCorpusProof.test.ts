@@ -1,11 +1,62 @@
 import Database from 'better-sqlite3';
 import { describe, expect, it, vi } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { parse } from 'yaml';
 import { ALL_FTS, CATALOG_SQL, canonicalTableDigest, proveCompleteCorpus, sourcePage, type CorpusProofSource, type ProofExecute, type ProofQuery, type ProofRow } from '../../../scripts/corpus-source-proof.js';
 import { CorpusProofTransport, assertProofQuery, admitCorpusBudget } from '../../../scripts/corpus-proof-transport.js';
 import { ACCOUNT, TARGETS, classifyEntries, requireProofApproval, verifyFreshCorpusReceipt } from '../../../scripts/application-release-policy.mjs';
+
+describe('fresh corpus verifier CLI boundary', () => {
+  const credentialFreeEnv = () => {
+    const env = { ...process.env };
+    delete env.APPLICATION_CORPUS_PROOF_APPROVAL_JSON;
+    delete env.CLOUDFLARE_API_TOKEN;
+    delete env.CLOUDFLARE_ACCOUNT_ID;
+    return env;
+  };
+  const invoke = (args: string[]) => {
+    return spawnSync(process.execPath, ['--import', 'tsx', 'scripts/application-corpus-check.ts', 'verify', ...args], {
+      cwd: new URL('../../../', import.meta.url), env: credentialFreeEnv(), encoding: 'utf8', timeout: 10_000,
+    });
+  };
+  const args = ['--role', 'preview', '--directory', '/unused-source', '--plan-sha256', 'a'.repeat(64), '--output', '/unused-receipt.json'];
+  it('accepts the exact workflow flags and reaches the approval guard before network or file access', () => {
+    const result = invoke(args);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('explicit protected proof approval missing');
+    expect(result.stderr).not.toContain('refused: argument');
+  });
+  it('rejects unknown flags', () => {
+    const result = invoke(args.map(v => v === '--plan-sha256' ? '--unreviewed-flag' : v));
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('refused: argument');
+  });
+  it('rejects duplicate flags', () => {
+    const result = invoke(args.map(v => v === '--plan-sha256' ? '--role' : v));
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('refused: argument');
+  });
+  for (const [workflow, job] of [['pr.yml', 'preview-deploy'], ['deploy.yml', 'deploy']] as const) {
+    it(`executes the exact ${workflow} verifier invocation up to its approval guard`, () => {
+      const source = parse(readFileSync(new URL(`../../../.github/workflows/${workflow}`, import.meta.url), 'utf8')) as {
+        jobs: Record<string, { steps: { id?: string; run?: string }[] }>;
+      };
+      const run = source.jobs[job]!.steps.find(step => step.id === 'corpus-proof')!.run!;
+      const command = run.match(/npx --no-install tsx scripts\/application-corpus-check\.ts verify \\\n[\s\S]*?(?=\n\s*else)/)?.[0];
+      expect(command).toBeDefined();
+      const result = spawnSync('bash', ['-e', '-c', command!], {
+        cwd: new URL('../../../', import.meta.url), encoding: 'utf8', timeout: 10_000,
+        env: { ...credentialFreeEnv(), RUNNER_TEMP: '/unused-runner', CORPUS_PLAN_SHA256: 'a'.repeat(64), npm_config_offline: 'true' },
+      });
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('explicit protected proof approval missing');
+      expect(result.stderr).not.toContain('refused: argument');
+    });
+  }
+});
 
 function fixture() {
   const source = new Database(':memory:');
