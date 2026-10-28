@@ -99,6 +99,7 @@ describe('test topology manifest', () => {
   it('gives every maintained test root exactly one strict noEmit owner', () => {
     const expectedProjects = [
       { owner: 'node-vitest', project: 'tsconfig.test-node.json', packageScript: 'typecheck:test-node' },
+      { owner: 'node-script-corpus-vitest', project: 'tsconfig.corpus-release-test.json', packageScript: 'typecheck:corpus-release' },
       { owner: 'node-script-vitest', project: 'tsconfig.test-scripts.json', packageScript: 'typecheck:test-scripts' },
       { owner: 'node-script-frozen-context-vitest', project: 'tsconfig.test-frozen-context-capacity.json', packageScript: 'typecheck:test-frozen-context-capacity' },
       { owner: 'worker-workerd', project: 'test/worker-runtime/tsconfig.json', packageScript: 'typecheck:worker-runtime' },
@@ -125,7 +126,7 @@ describe('test topology manifest', () => {
 
     const expectedRoots = new Set([...manifest.partitions.activeVitest, ...manifest.partitions.support]);
     const ownedRoots = rootsByProject.get('tsconfig.test-node.json')!
-      .concat(rootsByProject.get('tsconfig.test-scripts.json')!, rootsByProject.get('tsconfig.test-frozen-context-capacity.json')!, rootsByProject.get('test/worker-runtime/tsconfig.json')!, rootsByProject.get('tsconfig.ccel-coordinator-test.json')!);
+      .concat(rootsByProject.get('tsconfig.corpus-release-test.json')!, rootsByProject.get('tsconfig.test-scripts.json')!, rootsByProject.get('tsconfig.test-frozen-context-capacity.json')!, rootsByProject.get('test/worker-runtime/tsconfig.json')!, rootsByProject.get('tsconfig.ccel-coordinator-test.json')!);
     expect(new Set(ownedRoots).size).toBe(ownedRoots.length);
     expect(new Set(ownedRoots)).toEqual(expectedRoots);
     expect(ownedRoots.some(file => manifest.partitions.manual.includes(file))).toBe(false);

@@ -520,17 +520,17 @@ function buildD1ReadinessQueryContract(
     ];
   });
   const morphologyUnicodeContract = buildMorphologyUnicodeReadinessContract(UNICODE_CORRECTION.morphology);
-  const usageFoundationCtes = `usage_expected(strongs_key,token_count,verse_count,book_count) AS (
+  const usageFoundationCtes = `usage_expected(strongs_key,token_count,verse_count,book_count) AS MATERIALIZED (
     SELECT strongs_number, COUNT(*), COUNT(DISTINCT printf('%d:%d:%d', book_order, chapter, verse)), COUNT(DISTINCT book_order)
     FROM morphology WHERE strongs_number IS NOT NULL AND strongs_number != '' GROUP BY strongs_number
-  ), book_usage_expected(strongs_key,book,book_order,token_count,verse_count) AS (
+  ), book_usage_expected(strongs_key,book,book_order,token_count,verse_count) AS MATERIALIZED (
     SELECT strongs_number, book, book_order, COUNT(*), COUNT(DISTINCT printf('%d:%d:%d', book_order, chapter, verse))
     FROM morphology WHERE strongs_number IS NOT NULL AND strongs_number != '' GROUP BY strongs_number, book, book_order
-  ), form_usage_expected(strongs_key,form_text,token_count,verse_count,first_key) AS (
+  ), form_usage_expected(strongs_key,form_text,token_count,verse_count,first_key) AS MATERIALIZED (
     SELECT strongs_number, word_text, COUNT(*), COUNT(DISTINCT printf('%d:%d:%d', book_order, chapter, verse)),
            MIN(printf('%02d:%05d:%05d:%05d', book_order, chapter, verse, position))
     FROM morphology WHERE strongs_number IS NOT NULL AND strongs_number != '' GROUP BY strongs_number, word_text
-  ), form_counts_expected(strongs_key,form_count) AS (
+  ), form_counts_expected(strongs_key,form_count) AS MATERIALIZED (
     SELECT strongs_key, COUNT(*) FROM form_usage_expected GROUP BY strongs_key
   )`;
   const usageFoundationChecks: D1ReadinessCheck[] = [

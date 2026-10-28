@@ -381,37 +381,16 @@ describe('preview release reconciliation evidence', () => {
   });
 
   it('keeps exact-name candidate readiness and candidate-binding proof ahead of both black-box audits', async () => {
-    const workflow = await readFile(new URL('.github/workflows/pr.yml', root), 'utf8');
-    const mapping = workflow.indexOf('Capture checked-out candidate preview D1 mapping (read-only)');
-    const readiness = workflow.indexOf('Verify candidate preview D1 is compatible (read-only)');
-    const predecessor = workflow.indexOf('Capture preview predecessor reconciliation anchor (read-only)');
-    const candidateCutover = workflow.indexOf('Require deployed candidate preview D1 binding (read-only)');
-    const originalLanguageAudit = workflow.indexOf('Audit original-language v2 contract on preview');
-    const historicalAudit = workflow.indexOf('Audit Transform-9 historical core contract on preview');
-    const previewAuditIdentity = workflow.indexOf('Verify preview Worker remained active through audit (read-only)');
-    const postAuditProductionControl = workflow.indexOf('Verify production control remained unchanged after preview audits (read-only)');
-    const evidenceHash = workflow.indexOf('Hash sanitized preview audit evidence');
-    expect(mapping).toBeGreaterThan(-1);
-    expect(readiness).toBeGreaterThan(mapping);
-    expect(predecessor).toBeGreaterThan(readiness);
-    expect(candidateCutover).toBeGreaterThan(predecessor);
-    expect(originalLanguageAudit).toBeGreaterThan(candidateCutover);
-    expect(historicalAudit).toBeGreaterThan(candidateCutover);
-    expect(previewAuditIdentity).toBeGreaterThan(historicalAudit);
-    expect(postAuditProductionControl).toBeGreaterThan(previewAuditIdentity);
-    expect(evidenceHash).toBeGreaterThan(postAuditProductionControl);
-    expect(workflow).toContain('npx --no-install wrangler d1 list --json > "$RUNNER_TEMP/preview-d1-inventory.json"');
-    expect(workflow).toContain('--database "$candidate_d1_name" --env preview');
-    expect(workflow).toContain('observe-post-mutation');
-    expect(workflow).toContain('Upload preview candidate cutover observation');
-    expect(workflow).toContain('Hash sanitized preview reconciliation evidence');
-    expect(workflow).toContain('candidate_cutover_observation_sha256');
-    expect(workflow).toContain('post_mutation_reconciliation_sha256');
-    expect(workflow).toContain('production-control-d1-inventory-before.json');
-    expect(workflow).toContain('production-control-d1-inventory-after-deploy.json');
-    expect(workflow).toContain('production-control-d1-inventory-post-audit.json');
-    expect(workflow).toContain('--wrangler-config wrangler.toml');
-    expect(workflow).toContain('production_control_post_audit_sha256');
-    expect(workflow).toContain('production-control-post-audit.json');
+    const text=await readFile(new URL('.github/workflows/pr.yml',root),'utf8');
+    const terms=['candidate-d1-name','operator.ts verify --role preview','capture-predecessor','id: preview-worker-deploy','id: preview-worker-candidate-cutover','id: preview-corpus-live','create-preview-artifact'];const positions=terms.map(term=>text.indexOf(term));
+    expect(positions.every(p=>p>=0)).toBe(true);expect(positions).toEqual([...positions].sort((x,y)=>x-y));expect(text).not.toContain('npm run d1:remote:check');expect(text).toContain('environment:');expect(text).toContain('CORPUS_SOURCE_TREE');
+
   });
+});
+
+it('admits only the fixed corpus pair in corpus isolation mode',async()=>{
+ const {executionConfig}=await import('../../../scripts/corpus-release-operator.js');const config=executionConfig(await readFile(new URL('wrangler.toml',root),'utf8'),'production','/release');
+ const corpusPreview='62b871a6-5b4d-4d9b-8f52-301f6c878f48',corpusProduction='74f456e2-6951-4003-bb6f-91951342bf8f';
+ const input={productionDeploymentsText:deployments(predecessorDeployment,predecessorVersion),productionActiveVersionViewText:versionView(predecessorVersion,corpusProduction),productionAuditedIdentityText:auditedProductionIdentity(),previewDeploymentsText:deployments(candidateDeployment,candidateVersion),previewActiveVersionViewText:versionView(candidateVersion,corpusPreview),wranglerConfigText:config,d1InventoryText:JSON.stringify([{uuid:corpusProduction,name:'theologai-preview-20260811-schema0009-a'},{uuid:corpusPreview,name:'theologai-preview-20260728-transform11-a'}]),corpusRelease:true};
+ expect(captureEnvironmentIsolationReceipt(input).production.d1.databaseId).toBe(corpusProduction);expect(()=>captureEnvironmentIsolationReceipt({...input,corpusRelease:false})).toThrow();expect(()=>captureEnvironmentIsolationReceipt({...input,previewActiveVersionViewText:versionView(candidateVersion,corpusProduction)})).toThrow();
 });

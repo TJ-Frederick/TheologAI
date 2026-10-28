@@ -73,7 +73,7 @@
     "typecheck:test-node": "tsc --noEmit -p tsconfig.test-node.json",
     "typecheck:test-scripts": "tsc --noEmit -p tsconfig.test-scripts.json",
     "typecheck:test-frozen-context-capacity": "tsc --noEmit -p tsconfig.test-frozen-context-capacity.json",
-    "typecheck:tests": "npm run typecheck:test-node && npm run typecheck:test-scripts && npm run typecheck:test-frozen-context-capacity && npm run typecheck:worker-runtime && npm run typecheck:ccel-coordinator-test",
+    "typecheck:tests": "npm run typecheck:test-node && npm run typecheck:corpus-release && npm run typecheck:test-scripts && npm run typecheck:test-frozen-context-capacity && npm run typecheck:worker-runtime && npm run typecheck:ccel-coordinator-test",
     "types:worker": "WRANGLER_LOG_PATH=test-output/wrangler/logs wrangler types worker-configuration.d.ts --config wrangler.toml --env-file /dev/null",
     "types:worker:check": "WRANGLER_LOG_PATH=test-output/wrangler/logs wrangler types worker-configuration.d.ts --config wrangler.toml --env-file /dev/null --check",
     "types:ccel-coordinator": "WRANGLER_LOG_PATH=test-output/wrangler/logs wrangler types ccel-coordinator-configuration.d.ts --config wrangler.ccel-coordinator.toml --env-file /dev/null --include-runtime false",
@@ -99,7 +99,9 @@
     "test:e2e:compiled": "tsx scripts/test-node-http-e2e.ts",
     "test:e2e:stdio": "tsx scripts/test-node-stdio-e2e.ts",
     "test:coverage": "vitest run --coverage",
-    "test:ccel": "vitest run test/unit/adapters/commentary/CcelSearchAdapter.test.ts test/unit/services/historical/CcelUpstreamCoordinator.test.ts test/unit/presenters/primarySourceSearchV4Structured.test.ts test/unit/http/worker/ccelOperator.test.ts test/unit/scripts/ccelCoordinatorOperator.test.ts test/unit/scripts/ccelLivePreviewCanary.test.ts"
+    "test:ccel": "vitest run test/unit/adapters/commentary/CcelSearchAdapter.test.ts test/unit/services/historical/CcelUpstreamCoordinator.test.ts test/unit/presenters/primarySourceSearchV4Structured.test.ts test/unit/http/worker/ccelOperator.test.ts test/unit/scripts/ccelCoordinatorOperator.test.ts test/unit/scripts/ccelLivePreviewCanary.test.ts",
+    "test:corpus-release": "vitest run test/unit/scripts/corpusRelease*.test.ts --maxWorkers=1 --no-file-parallelism",
+    "typecheck:corpus-release": "tsc --noEmit -p tsconfig.corpus-release-test.json"
   },
   "keywords": [
     "bible",

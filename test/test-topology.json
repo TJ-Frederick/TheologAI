@@ -10,9 +10,9 @@
     "conformance": 1
   },
   "current": {
-    "totalTestTypeScript": 290,
-    "activeVitest": 211,
-    "support": 24,
+    "totalTestTypeScript": 299,
+    "activeVitest": 217,
+    "support": 27,
     "manual": 4,
     "legacyOrphan": 50,
     "conformance": 1
@@ -137,6 +137,12 @@
       "test/unit/scripts/ccelOperatorSecretRelease.test.ts",
       "test/unit/scripts/checkRemoteD1Readiness.test.ts",
       "test/unit/scripts/classifyProductionDeployment.test.ts",
+      "test/unit/scripts/corpusRelease.test.ts",
+      "test/unit/scripts/corpusReleaseArtifact.test.ts",
+      "test/unit/scripts/corpusReleaseCorruption.test.ts",
+      "test/unit/scripts/corpusReleaseIntegration.test.ts",
+      "test/unit/scripts/corpusReleaseLive.test.ts",
+      "test/unit/scripts/corpusReleaseTransport.test.ts",
       "test/unit/scripts/d1CorpusIdentity.test.ts",
       "test/unit/scripts/d1SeedHierarchyExport.test.ts",
       "test/unit/scripts/d1SeedManifest.test.ts",
@@ -245,16 +251,19 @@
       "test/fixtures/original-language-study-v2/support/originalLanguageStudyV2DraftSchema.ts",
       "test/fixtures/original-language-study-v2/support/originalLanguageStudyV2DraftStructured.ts",
       "test/fixtures/original-language-study-v2/support/syntheticOriginalLanguageStudyV2Fixtures.ts",
-    "test/fixtures/ubsParallelCorpus.ts",
-    "test/helpers/ccelRetiredContractGuards.ts",
-    "test/helpers/cloudflareWorkersShim.ts",
+      "test/fixtures/ubsParallelCorpus.ts",
+      "test/helpers/ccelRetiredContractGuards.ts",
+      "test/helpers/cloudflareWorkersShim.ts",
+      "test/helpers/corpusControlFixture.ts",
+      "test/helpers/corpusMcp.ts",
+      "test/helpers/corpusNative.ts",
       "test/helpers/mcpTransportContract.ts",
       "test/helpers/mockD1.ts",
-    "test/helpers/originalLanguageStudyV2ProductionFixtures.ts",
-    "test/helpers/testHelpers.ts",
-    "test/setup.ts",
-    "test/unit/adapters/data/fakeSqlite.ts",
-    "test/unit/scripts/originalLanguageContextCapacityRuntime.d.mts",
+      "test/helpers/originalLanguageStudyV2ProductionFixtures.ts",
+      "test/helpers/testHelpers.ts",
+      "test/setup.ts",
+      "test/unit/adapters/data/fakeSqlite.ts",
+      "test/unit/scripts/originalLanguageContextCapacityRuntime.d.mts",
       "test/worker-runtime/setup.ts"
     ],
     "manual": [
@@ -324,6 +333,11 @@
       "owner": "node-vitest",
       "project": "tsconfig.test-node.json",
       "packageScript": "typecheck:test-node"
+    },
+    {
+      "owner": "node-script-corpus-vitest",
+      "project": "tsconfig.corpus-release-test.json",
+      "packageScript": "typecheck:corpus-release"
     },
     {
       "owner": "node-script-vitest",

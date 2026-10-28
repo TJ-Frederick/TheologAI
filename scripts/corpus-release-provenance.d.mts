@@ -1,0 +1,1 @@
+export function trustedCorpusPreviewRun(artifact: Record<string, any>, run: Record<string, any>, jobs: Array<Record<string, any>>, pull: Record<string, any>, repository: string, now?: number): boolean;

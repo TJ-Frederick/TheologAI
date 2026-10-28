@@ -7,9 +7,15 @@
     "declaration": false,
     "sourceMap": false,
     "resolveJsonModule": true,
-    "types": ["node", "vitest", "vitest/globals"]
+    "types": [
+      "node",
+      "vitest",
+      "vitest/globals"
+    ]
   },
-  "include": ["test/unit/scripts/**/*.test.ts"],
+  "include": [
+    "test/unit/scripts/**/*.test.ts"
+  ],
   "exclude": [
     "node_modules",
     "dist",
@@ -19,6 +25,7 @@
     "test/manual/**/*",
     "test/conformance/**/*",
     "test/legacy-orphan/**/*",
-    "test/unit/scripts/originalLanguageContextCapacity.test.ts"
+    "test/unit/scripts/originalLanguageContextCapacity.test.ts",
+    "test/unit/scripts/corpusRelease*.test.ts"
   ]
 }

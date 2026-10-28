@@ -123,9 +123,10 @@ describe('workflow topology', () => {
     expect(validation.jobs['test-and-build']!.steps!.some(step => step.run === 'npm audit --omit=dev')).toBe(true);
     const deploy = workflow.jobs.deploy!;
     const commands = (deploy.steps ?? []).map(step => step.run ?? '').join('\n');
-    expect(commands).not.toMatch(/npm run (?:test:coverage|test:integration|d1:seed:verify-workerd|build:db)/);
+    expect(commands).not.toMatch(/npm run (?:test:coverage|test:integration|d1:seed:verify-workerd)/);
     expect(commands).toContain('scripts/production-deployment-plan.mjs verify');
-    expect(commands).toContain('scripts/dual-era-preview-release-receipt.ts verify');
+    expect(commands).toContain('scripts/corpus-release-operator.ts consume-preview');
+    expect(commands).toContain('scripts/corpus-release-operator.ts verify-preview-current');
     const downloads = (deploy.steps ?? []).filter(step => step.uses?.startsWith('actions/download-artifact@'));
     expect(downloads.length).toBeGreaterThanOrEqual(2);
     for (const step of downloads) expect(step.with?.['digest-mismatch']).toBe('error');

@@ -511,7 +511,7 @@ function assertSemanticIdentity(
   }) && value.normalizedReference === expected.normalizedReference, `${label} semantic identity/reference drifted`);
 }
 
-function assertSuccess(id: string, raw: RawToolResult, fixture: AuditFixture, cursorHistory: Map<string, string>, priorCandidates: Map<string, string[]>): Record<string, unknown> {
+export function assertSuccess(id: string, raw: RawToolResult, fixture: AuditFixture, cursorHistory: Map<string, string>, priorCandidates: Map<string, string[]>): Record<string, unknown> {
   const output = structured(raw, id); assert(output.schemaVersion === '2' && output.kind === 'original_language_study', `${id} v2 envelope drifted`); assertResponseWindow(output, id);
   const current = fixture.cases.find(item => item.id === id); assert(current !== undefined && typeof current.v1Baseline === 'string', `${id} v1 baseline missing`);
   const baseline = fixture.baseline.v1[current.v1Baseline]!; const v1 = assertV1Compatibility(raw, output, baseline, id);
@@ -564,14 +564,14 @@ function assertSuccess(id: string, raw: RawToolResult, fixture: AuditFixture, cu
 
 function combinedText(raw: RawToolResult): string { return [JSON.stringify(raw.raw), ...raw.text].join('\n'); }
 
-function assertSafeError(id: string, raw: RawToolResult, submittedCursor: string | undefined): void {
+export function assertSafeError(id: string, raw: RawToolResult, submittedCursor: string | undefined): void {
   assert(raw.isError && raw.structuredContent === undefined, `${id} must return a safe error without structured output`);
   const observed = combinedText(raw).toLowerCase();
   assert(!/(?:sqlite|\bsql\b|\bd1\b|secret|api[ _-]?key|authorization|bearer|stack|traceback)/.test(observed), `${id} error exposed internal detail`);
   if (submittedCursor !== undefined) assert(!combinedText(raw).includes(submittedCursor), `${id} error reflected the submitted cursor`);
 }
 
-function assertInputError(raw: RawToolResult): void {
+export function assertInputError(raw: RawToolResult): void {
   assertSafeError('forbidden-artifact-identity', raw, undefined);
   assert(/artifactidentity/i.test(combinedText(raw)), 'forbidden artifact identity was not rejected at the public input boundary');
 }
