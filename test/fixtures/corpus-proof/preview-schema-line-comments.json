@@ -1,0 +1,89 @@
+{
+  "description": "Six schema-metadata-only definition pairs captured by the bounded read-only diagnosis on 2026-10-28. Remote definitions omit SQL line comments; executable SQL is identical.",
+  "definitions": [
+    {
+      "source": {
+        "type": "table",
+        "name": "historical_document_delivery_profiles",
+        "tbl_name": "historical_document_delivery_profiles",
+        "sql": "CREATE TABLE historical_document_delivery_profiles (\n  document_id TEXT PRIMARY KEY\n    REFERENCES documents(id) ON DELETE RESTRICT,\n  work_id TEXT CHECK (\n    work_id = trim(work_id) AND length(work_id) BETWEEN 1 AND 160\n    AND work_id GLOB '[A-Za-z0-9]*' AND work_id NOT GLOB '*[^A-Za-z0-9._:-]*'\n    AND work_id NOT IN ('.', '..')\n  ),\n  edition_id TEXT CHECK (\n    edition_id = trim(edition_id) AND length(edition_id) BETWEEN 1 AND 160\n    AND edition_id GLOB '[A-Za-z0-9]*' AND edition_id NOT GLOB '*[^A-Za-z0-9._:-]*'\n    AND edition_id NOT IN ('.', '..')\n  ),\n  immutable_corpus_identity TEXT NOT NULL CHECK (\n    length(immutable_corpus_identity) = 64\n    AND immutable_corpus_identity NOT GLOB '*[^0-9a-f]*'\n  ),\n  section_package_identity TEXT CHECK (\n    length(section_package_identity) = 64\n    AND section_package_identity NOT GLOB '*[^0-9a-f]*'\n  ),\n  delivery_mode TEXT NOT NULL CHECK (delivery_mode IN ('complete_document', 'sectioned_only')),\n  section_count INTEGER NOT NULL CHECK (section_count > 0),\n  landing_max_bytes INTEGER NOT NULL CHECK (landing_max_bytes IN (0, 16384)),\n  browse_page_size INTEGER NOT NULL CHECK (browse_page_size IN (0, 32)),\n  cursor_version INTEGER NOT NULL CHECK (cursor_version IN (0, 1)),\n  provenance_json TEXT NOT NULL CHECK (json_valid(provenance_json) AND json_type(provenance_json) = 'object'),\n  rights_json TEXT NOT NULL CHECK (json_valid(rights_json) AND json_type(rights_json) = 'object'),\n  -- Complete documents retain their current whole-work behavior. A future\n  -- sectioned edition must opt into the exact bounded landing/browse contract.\n  CHECK (\n    (delivery_mode = 'complete_document'\n      AND work_id IS NULL AND edition_id IS NULL AND section_package_identity IS NULL\n      AND landing_max_bytes = 0 AND browse_page_size = 0 AND cursor_version = 0)\n    OR\n    (delivery_mode = 'sectioned_only'\n      AND work_id IS NOT NULL AND edition_id IS NOT NULL AND section_package_identity IS NOT NULL\n      AND landing_max_bytes = 16384 AND browse_page_size = 32 AND cursor_version = 1)\n  ),\n  UNIQUE (work_id, edition_id)\n)"
+      },
+      "remote": {
+        "type": "table",
+        "name": "historical_document_delivery_profiles",
+        "tbl_name": "historical_document_delivery_profiles",
+        "sql": "CREATE TABLE historical_document_delivery_profiles (\n  document_id TEXT PRIMARY KEY\n    REFERENCES documents(id) ON DELETE RESTRICT,\n  work_id TEXT CHECK (\n    work_id = trim(work_id) AND length(work_id) BETWEEN 1 AND 160\n    AND work_id GLOB '[A-Za-z0-9]*' AND work_id NOT GLOB '*[^A-Za-z0-9._:-]*'\n    AND work_id NOT IN ('.', '..')\n  ),\n  edition_id TEXT CHECK (\n    edition_id = trim(edition_id) AND length(edition_id) BETWEEN 1 AND 160\n    AND edition_id GLOB '[A-Za-z0-9]*' AND edition_id NOT GLOB '*[^A-Za-z0-9._:-]*'\n    AND edition_id NOT IN ('.', '..')\n  ),\n  immutable_corpus_identity TEXT NOT NULL CHECK (\n    length(immutable_corpus_identity) = 64\n    AND immutable_corpus_identity NOT GLOB '*[^0-9a-f]*'\n  ),\n  section_package_identity TEXT CHECK (\n    length(section_package_identity) = 64\n    AND section_package_identity NOT GLOB '*[^0-9a-f]*'\n  ),\n  delivery_mode TEXT NOT NULL CHECK (delivery_mode IN ('complete_document', 'sectioned_only')),\n  section_count INTEGER NOT NULL CHECK (section_count > 0),\n  landing_max_bytes INTEGER NOT NULL CHECK (landing_max_bytes IN (0, 16384)),\n  browse_page_size INTEGER NOT NULL CHECK (browse_page_size IN (0, 32)),\n  cursor_version INTEGER NOT NULL CHECK (cursor_version IN (0, 1)),\n  provenance_json TEXT NOT NULL CHECK (json_valid(provenance_json) AND json_type(provenance_json) = 'object'),\n  rights_json TEXT NOT NULL CHECK (json_valid(rights_json) AND json_type(rights_json) = 'object'),\n  \n  \n  CHECK (\n    (delivery_mode = 'complete_document'\n      AND work_id IS NULL AND edition_id IS NULL AND section_package_identity IS NULL\n      AND landing_max_bytes = 0 AND browse_page_size = 0 AND cursor_version = 0)\n    OR\n    (delivery_mode = 'sectioned_only'\n      AND work_id IS NOT NULL AND edition_id IS NOT NULL AND section_package_identity IS NOT NULL\n      AND landing_max_bytes = 16384 AND browse_page_size = 32 AND cursor_version = 1)\n  ),\n  UNIQUE (work_id, edition_id)\n)"
+      }
+    },
+    {
+      "source": {
+        "type": "table",
+        "name": "historical_section_identities",
+        "tbl_name": "historical_section_identities",
+        "sql": "CREATE TABLE historical_section_identities (\n  document_id TEXT NOT NULL\n    REFERENCES historical_document_delivery_profiles(document_id) ON DELETE RESTRICT,\n  section_key TEXT NOT NULL CHECK (\n    section_key = trim(section_key)\n    AND length(section_key) BETWEEN 1 AND 160\n    AND section_key GLOB '[A-Za-z0-9]*'\n    AND section_key NOT GLOB '*[^A-Za-z0-9._:-]*'\n    AND section_key NOT IN ('.', '..')\n  ),\n  source_ordinal INTEGER NOT NULL CHECK (source_ordinal > 0),\n  -- This is a storage link only. Public and semantic identity is document_id +\n  -- section_key / source_ordinal, never this legacy AUTOINCREMENT value.\n  document_section_id INTEGER NOT NULL UNIQUE,\n  PRIMARY KEY (document_id, section_key),\n  UNIQUE (document_id, source_ordinal),\n  UNIQUE (document_id, section_key, source_ordinal),\n  FOREIGN KEY (document_section_id, document_id)\n    REFERENCES document_sections(id, document_id) ON DELETE RESTRICT\n)"
+      },
+      "remote": {
+        "type": "table",
+        "name": "historical_section_identities",
+        "tbl_name": "historical_section_identities",
+        "sql": "CREATE TABLE historical_section_identities (\n  document_id TEXT NOT NULL\n    REFERENCES historical_document_delivery_profiles(document_id) ON DELETE RESTRICT,\n  section_key TEXT NOT NULL CHECK (\n    section_key = trim(section_key)\n    AND length(section_key) BETWEEN 1 AND 160\n    AND section_key GLOB '[A-Za-z0-9]*'\n    AND section_key NOT GLOB '*[^A-Za-z0-9._:-]*'\n    AND section_key NOT IN ('.', '..')\n  ),\n  source_ordinal INTEGER NOT NULL CHECK (source_ordinal > 0),\n  \n  \n  document_section_id INTEGER NOT NULL UNIQUE,\n  PRIMARY KEY (document_id, section_key),\n  UNIQUE (document_id, source_ordinal),\n  UNIQUE (document_id, section_key, source_ordinal),\n  FOREIGN KEY (document_section_id, document_id)\n    REFERENCES document_sections(id, document_id) ON DELETE RESTRICT\n)"
+      }
+    },
+    {
+      "source": {
+        "type": "table",
+        "name": "strongs_form_stats",
+        "tbl_name": "strongs_form_stats",
+        "sql": "CREATE TABLE strongs_form_stats (\n  strongs_key TEXT NOT NULL,\n  form_text TEXT NOT NULL,\n  token_count INTEGER NOT NULL CHECK (token_count > 0),\n  verse_count INTEGER NOT NULL CHECK (verse_count > 0),\n  first_book TEXT NOT NULL,\n  first_book_order INTEGER NOT NULL CHECK (first_book_order BETWEEN 1 AND 66),\n  first_chapter INTEGER NOT NULL CHECK (first_chapter > 0),\n  -- STEPBible represents Hebrew Psalm superscriptions as verse 0.\n  first_verse INTEGER NOT NULL CHECK (first_verse >= 0),\n  first_position INTEGER NOT NULL CHECK (first_position > 0),\n  PRIMARY KEY (strongs_key, form_text)\n)"
+      },
+      "remote": {
+        "type": "table",
+        "name": "strongs_form_stats",
+        "tbl_name": "strongs_form_stats",
+        "sql": "CREATE TABLE strongs_form_stats (\n  strongs_key TEXT NOT NULL,\n  form_text TEXT NOT NULL,\n  token_count INTEGER NOT NULL CHECK (token_count > 0),\n  verse_count INTEGER NOT NULL CHECK (verse_count > 0),\n  first_book TEXT NOT NULL,\n  first_book_order INTEGER NOT NULL CHECK (first_book_order BETWEEN 1 AND 66),\n  first_chapter INTEGER NOT NULL CHECK (first_chapter > 0),\n  \n  first_verse INTEGER NOT NULL CHECK (first_verse >= 0),\n  first_position INTEGER NOT NULL CHECK (first_position > 0),\n  PRIMARY KEY (strongs_key, form_text)\n)"
+      }
+    },
+    {
+      "source": {
+        "type": "table",
+        "name": "ubs_semantic_entries",
+        "tbl_name": "ubs_semantic_entries",
+        "sql": "CREATE TABLE ubs_semantic_entries (\n  artifact_identity TEXT NOT NULL,\n  source_id TEXT NOT NULL,\n  entry_id TEXT NOT NULL CHECK (entry_id = trim(entry_id) AND entry_id NOT GLOB '*[^a-z0-9._-]*'),\n  source_entry_id TEXT NOT NULL CHECK (source_entry_id = trim(source_entry_id) AND length(source_entry_id) > 0),\n  source_ordinal INTEGER NOT NULL CHECK (source_ordinal > 0),\n  lemma TEXT NOT NULL CHECK (lemma = trim(lemma) AND length(lemma) > 0),\n  part_of_speech_json TEXT NOT NULL CHECK (json_valid(part_of_speech_json) AND json_type(part_of_speech_json) = 'array'),\n  PRIMARY KEY (artifact_identity, entry_id),\n  UNIQUE (artifact_identity, source_id, source_ordinal),\n  -- A sense must retain the dictionary source that owns its entry.\n  UNIQUE (artifact_identity, source_id, entry_id),\n  FOREIGN KEY (artifact_identity, source_id) REFERENCES ubs_semantic_sources(artifact_identity, source_id)\n)"
+      },
+      "remote": {
+        "type": "table",
+        "name": "ubs_semantic_entries",
+        "tbl_name": "ubs_semantic_entries",
+        "sql": "CREATE TABLE ubs_semantic_entries (\n  artifact_identity TEXT NOT NULL,\n  source_id TEXT NOT NULL,\n  entry_id TEXT NOT NULL CHECK (entry_id = trim(entry_id) AND entry_id NOT GLOB '*[^a-z0-9._-]*'),\n  source_entry_id TEXT NOT NULL CHECK (source_entry_id = trim(source_entry_id) AND length(source_entry_id) > 0),\n  source_ordinal INTEGER NOT NULL CHECK (source_ordinal > 0),\n  lemma TEXT NOT NULL CHECK (lemma = trim(lemma) AND length(lemma) > 0),\n  part_of_speech_json TEXT NOT NULL CHECK (json_valid(part_of_speech_json) AND json_type(part_of_speech_json) = 'array'),\n  PRIMARY KEY (artifact_identity, entry_id),\n  UNIQUE (artifact_identity, source_id, source_ordinal),\n  \n  UNIQUE (artifact_identity, source_id, entry_id),\n  FOREIGN KEY (artifact_identity, source_id) REFERENCES ubs_semantic_sources(artifact_identity, source_id)\n)"
+      }
+    },
+    {
+      "source": {
+        "type": "table",
+        "name": "ubs_semantic_normalized_coordinates",
+        "tbl_name": "ubs_semantic_normalized_coordinates",
+        "sql": "CREATE TABLE ubs_semantic_normalized_coordinates (\n  coordinate_key INTEGER PRIMARY KEY,\n  evidence_key INTEGER NOT NULL,\n  target_ordinal INTEGER NOT NULL CHECK (target_ordinal > 0),\n  normalized_book_number INTEGER NOT NULL CHECK (normalized_book_number BETWEEN 1 AND 66),\n  normalized_book_code TEXT NOT NULL CHECK (normalized_book_code GLOB '[A-Z0-9][A-Z0-9][A-Z0-9]'),\n  normalized_chapter INTEGER NOT NULL CHECK (normalized_chapter > 0),\n  -- Verse zero represents a Psalm superscription only. The canonical display\n  -- string and book code are checked by the deterministic materializer and\n  -- stored-data readiness assertions below the schema boundary.\n  normalized_verse INTEGER NOT NULL CHECK (\n    normalized_verse >= 0 AND (normalized_verse != 0 OR normalized_book_number = 19)\n  ),\n  normalized_reference TEXT NOT NULL CHECK (normalized_reference = trim(normalized_reference) AND length(normalized_reference) > 0),\n  -- evidence_key is a global parent identity. Do not duplicate artifact or\n  -- evidence IDs here: the normalized child therefore cannot drift away from\n  -- its parent lineage, and the compact key remains D1/SQLite-compatible.\n  UNIQUE (evidence_key, target_ordinal),\n  FOREIGN KEY (evidence_key) REFERENCES ubs_semantic_reference_evidence(evidence_key)\n)"
+      },
+      "remote": {
+        "type": "table",
+        "name": "ubs_semantic_normalized_coordinates",
+        "tbl_name": "ubs_semantic_normalized_coordinates",
+        "sql": "CREATE TABLE ubs_semantic_normalized_coordinates (\n  coordinate_key INTEGER PRIMARY KEY,\n  evidence_key INTEGER NOT NULL,\n  target_ordinal INTEGER NOT NULL CHECK (target_ordinal > 0),\n  normalized_book_number INTEGER NOT NULL CHECK (normalized_book_number BETWEEN 1 AND 66),\n  normalized_book_code TEXT NOT NULL CHECK (normalized_book_code GLOB '[A-Z0-9][A-Z0-9][A-Z0-9]'),\n  normalized_chapter INTEGER NOT NULL CHECK (normalized_chapter > 0),\n  \n  \n  \n  normalized_verse INTEGER NOT NULL CHECK (\n    normalized_verse >= 0 AND (normalized_verse != 0 OR normalized_book_number = 19)\n  ),\n  normalized_reference TEXT NOT NULL CHECK (normalized_reference = trim(normalized_reference) AND length(normalized_reference) > 0),\n  \n  \n  \n  UNIQUE (evidence_key, target_ordinal),\n  FOREIGN KEY (evidence_key) REFERENCES ubs_semantic_reference_evidence(evidence_key)\n)"
+      }
+    },
+    {
+      "source": {
+        "type": "table",
+        "name": "ubs_semantic_reference_evidence",
+        "tbl_name": "ubs_semantic_reference_evidence",
+        "sql": "CREATE TABLE ubs_semantic_reference_evidence (\n  evidence_key INTEGER PRIMARY KEY,\n  artifact_identity TEXT NOT NULL,\n  source_id TEXT NOT NULL,\n  evidence_id TEXT NOT NULL CHECK (evidence_id = trim(evidence_id) AND evidence_id NOT GLOB '*[^a-z0-9._-]*'),\n  sense_id TEXT NOT NULL,\n  source_ordinal INTEGER NOT NULL CHECK (source_ordinal > 0),\n  source_reference TEXT NOT NULL CHECK (source_reference = trim(source_reference) AND length(source_reference) > 0),\n  raw_anchor TEXT NOT NULL CHECK (raw_anchor = trim(raw_anchor) AND length(raw_anchor) = 14 AND raw_anchor NOT GLOB '*[^0-9]*'),\n  footnote_suffix TEXT NOT NULL CHECK (footnote_suffix = trim(footnote_suffix)),\n  native_book_number INTEGER NOT NULL CHECK (native_book_number BETWEEN 1 AND 66),\n  native_book_code TEXT NOT NULL CHECK (native_book_code GLOB '[A-Z0-9][A-Z0-9][A-Z0-9]'),\n  native_chapter INTEGER NOT NULL CHECK (native_chapter > 0),\n  -- Psalm superscriptions retain the source's verse zero coordinate.\n  native_verse INTEGER NOT NULL CHECK (native_verse >= 0),\n  FOREIGN KEY (artifact_identity, source_id) REFERENCES ubs_semantic_sources(artifact_identity, source_id),\n  FOREIGN KEY (artifact_identity, sense_id) REFERENCES ubs_semantic_senses(artifact_identity, sense_id),\n  FOREIGN KEY (artifact_identity, source_id, sense_id)\n    REFERENCES ubs_semantic_senses(artifact_identity, source_id, sense_id)\n)"
+      },
+      "remote": {
+        "type": "table",
+        "name": "ubs_semantic_reference_evidence",
+        "tbl_name": "ubs_semantic_reference_evidence",
+        "sql": "CREATE TABLE ubs_semantic_reference_evidence (\n  evidence_key INTEGER PRIMARY KEY,\n  artifact_identity TEXT NOT NULL,\n  source_id TEXT NOT NULL,\n  evidence_id TEXT NOT NULL CHECK (evidence_id = trim(evidence_id) AND evidence_id NOT GLOB '*[^a-z0-9._-]*'),\n  sense_id TEXT NOT NULL,\n  source_ordinal INTEGER NOT NULL CHECK (source_ordinal > 0),\n  source_reference TEXT NOT NULL CHECK (source_reference = trim(source_reference) AND length(source_reference) > 0),\n  raw_anchor TEXT NOT NULL CHECK (raw_anchor = trim(raw_anchor) AND length(raw_anchor) = 14 AND raw_anchor NOT GLOB '*[^0-9]*'),\n  footnote_suffix TEXT NOT NULL CHECK (footnote_suffix = trim(footnote_suffix)),\n  native_book_number INTEGER NOT NULL CHECK (native_book_number BETWEEN 1 AND 66),\n  native_book_code TEXT NOT NULL CHECK (native_book_code GLOB '[A-Z0-9][A-Z0-9][A-Z0-9]'),\n  native_chapter INTEGER NOT NULL CHECK (native_chapter > 0),\n  \n  native_verse INTEGER NOT NULL CHECK (native_verse >= 0),\n  FOREIGN KEY (artifact_identity, source_id) REFERENCES ubs_semantic_sources(artifact_identity, source_id),\n  FOREIGN KEY (artifact_identity, sense_id) REFERENCES ubs_semantic_senses(artifact_identity, sense_id),\n  FOREIGN KEY (artifact_identity, source_id, sense_id)\n    REFERENCES ubs_semantic_senses(artifact_identity, source_id, sense_id)\n)"
+      }
+    }
+  ]
+}

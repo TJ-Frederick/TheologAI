@@ -18,8 +18,8 @@ On October 27 the owner could not attest to either bound database's write histor
 and required fresh verification. Historical validation, custody assumptions,
 matching markers and the preserved v9 preparation receipt cannot authorize this
 release. The application-only path therefore reconstructs and fully validates
-source locally, then compares every remote canonical cell, exact raw-migration
-schema and ledger, physical integrity, and every FTS index. FK correctness is
+source locally, then compares every remote canonical cell, raw-migration
+executable schema and exact ledger, physical integrity, and every FTS index. FK correctness is
 proved by the independently replayed schema, clean local FK check, and complete
 comparison of all child and parent cells. It is not described as a remote global
 FK scan. External-content FTS is checked against its proved base content; owned
@@ -50,8 +50,19 @@ Source artifacts are built without credentials. Only the existing protected
 preview environment can run preview verification and deploy. A fresh v2 preview
 receipt binds the data proof, plan, source/tree, active Worker/D1 and live audit.
 Production needs its own fresh proof inside its separate approval gate; a preview
-receipt is never production data authority. No remote proof or deployment has
-run for this candidate. Stop at production approval after approved preview/live tests.
+receipt is never production data authority. No successful remote proof or deployment
+exists for this candidate. Stop at production approval after approved preview/live tests.
+
+The October 28 protected attempt at `acf0a153e3195a573f03c6806b940366584f36cb`
+stopped at its first schema comparison after 324 reads and zero writes. A bounded
+read-only diagnosis found six table definitions with line comments omitted; all
+129 application schema objects and executable SQL matched. This repair ignores
+only SQL line-comment text outside quoted strings/identifiers in that initial
+comparison. Other whitespace and block comments remain exact, as does the raw
+before/after remote catalog check. Captured definitions and negative constraint,
+FK, trigger, quoted-content and catalog-drift regressions cover the boundary.
+All other data, physical, FK, FTS, quota, target and approval checks are unchanged.
+The new source requires fresh preview approval; no old approval is carried forward.
 
 ## Main reconciliation and restoration
 

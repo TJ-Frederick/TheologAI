@@ -104,6 +104,12 @@ describe('complete fresh application corpus verification',()=>{
   it('rejects a catalog change between the two observations',async()=>{
     const f=fixture();try{await expect(proveCompleteCorpus(f.source,f.expected,async q=>{if(q.label==='catalog-after')f.target.exec('CREATE INDEX changed ON documents(title)');return f.execute(q);})).rejects.toThrow('catalog changed');}finally{f.close();}
   });
+  it('still rejects a comment-only change between the raw catalog observations',async()=>{
+    const f=fixture();try{await expect(proveCompleteCorpus(f.source,f.expected,async q=>{
+      const rows=await f.execute(q);
+      return q.label==='catalog-before'?rows.map(r=>r.name==='documents'?{...r,sql:r.sql+'-- initial observation'}:r):rows;
+    })).rejects.toThrow('catalog changed during proof');}finally{f.close();}
+  });
   it('requires indexed, bounded keyset pages',()=>{const f=fixture();try{expect(()=>sourcePage(f.source,'documents',null,0)).toThrow();expect(()=>sourcePage(f.source,'documents;DROP TABLE documents',null)).toThrow();expect(sourcePage(f.source,'documents',null).expected).toHaveLength(1);}finally{f.close();}});
 });
 

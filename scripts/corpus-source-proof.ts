@@ -16,6 +16,35 @@ const MAX_PAGE_BYTES = 900_000;
 const sha = (s: string) => createHash('sha256').update(s).digest('hex');
 function check(value: unknown, message: string): asserts value { if (!value) throw new Error(`Corpus proof refused: ${message}`); }
 function same(a: unknown, b: unknown, message: string): void { check(JSON.stringify(a) === JSON.stringify(b), message); }
+function schemaWithoutLineComments(sql: string): string {
+  let result = ''; let quote: string | null = null;
+  for (let i = 0; i < sql.length; i++) {
+    const char = sql[i]!;
+    if (quote) {
+      result += char;
+      if (char === quote) {
+        if (quote !== ']' && sql[i + 1] === quote) result += sql[++i]!;
+        else quote = null;
+      }
+    } else if (char === "'" || char === '"' || char === '`' || char === '[') {
+      quote = char === '[' ? ']' : char; result += char;
+    } else if (char === '/' && sql[i + 1] === '*') {
+      // Preserve block comments exactly, including any quote/line markers inside.
+      const end = sql.indexOf('*/', i + 2); check(end >= 0, 'unterminated schema block comment');
+      result += sql.slice(i, end + 2); i = end + 1;
+    } else if (char === '-' && sql[i + 1] === '-') {
+      // D1's imported definitions omit line-comment text but retain the newline.
+      const end = sql.indexOf('\n', i + 2);
+      if (end < 0) break;
+      result += '\n'; i = end;
+    } else result += char;
+  }
+  check(quote === null, 'unterminated schema quote');
+  return result;
+}
+function comparableSchema(catalog: ProofRow[]): ProofRow[] {
+  return catalog.map(row => ({ ...row, sql: typeof row.sql === 'string' ? schemaWithoutLineComments(row.sql) : row.sql }));
+}
 function id(value: string): string { check(/^[a-z_][a-z0-9_]*$/.test(value), 'identifier'); return `"${value}"`; }
 function literal(value: unknown): string {
   if (typeof value === 'number' && Number.isSafeInteger(value)) return String(value);
@@ -130,7 +159,7 @@ async function compareTable(source: Database.Database, expected: CorpusProofSour
 export async function proveCompleteCorpus(source: Database.Database, expected: CorpusProofSource, execute: ProofExecute) {
   const catalogBefore = await execute({ kind: 'select', label: 'catalog-before', sql: CATALOG_SQL, readCeiling: 4096, writeCeiling: 0 });
   const application = catalogBefore.filter(r => r.name !== '_cf_KV' && r.name !== 'd1_migrations');
-  same(application, expected.catalog, 'remote schema differs from source');
+  same(comparableSchema(application), comparableSchema(expected.catalog), 'remote schema differs from source');
   const providers = catalogBefore.filter(r => r.name === '_cf_KV' || r.name === 'd1_migrations');
   check(providers.length === 2 && providers.every(r => r.type === 'table' && r.tbl_name === r.name && typeof r.sql === 'string'), 'provider schema unavailable');
   const ledger = await execute({ kind: 'select', label: 'ledger-before', sql: LEDGER_SQL, readCeiling: 128, writeCeiling: 0 });
