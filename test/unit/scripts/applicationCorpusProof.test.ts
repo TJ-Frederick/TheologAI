@@ -107,12 +107,12 @@ function transportFixture(fault: string, readBudget = 3_510_997, buffer = false)
   const directory = mkdtempSync(join(tmpdir(), 'theologai-transport-test-'));
   vi.useFakeTimers({ now: new Date(buffer ? '2026-10-29T12:00:00Z' : '2026-10-27T12:00:00Z') });
   let tick = Date.now(); const clock = vi.spyOn(Date, 'now').mockImplementation(() => tick += 1000);
-  const calls: { path: string; body: unknown; method: string }[] = [];
+  const calls: { path: string; body: unknown; method: string; rateLimitType: string | null }[] = [];
   let sqlCalls = 0;
   const fetcher: typeof fetch = async (url, options) => {
     const path = new URL(String(url)).pathname;
     const body = options?.body ? JSON.parse(String(options.body)) : undefined;
-    calls.push({ path, body, method: options?.method ?? 'GET' });
+    calls.push({ path, body, method: options?.method ?? 'GET', rateLimitType:new Headers(options?.headers).get('X-Rate-Limit-Type') });
     let value: unknown;
     if (path.endsWith('/graphql')) {
       value = { data: { viewer: { accounts: [{ accountTag: ACCOUNT, d1AnalyticsAdaptiveGroups: [{ sum: { rowsRead: fault === 'headroom' ? 4_000_000 : fault === 'daytime' ? 601_058 : 100, rowsWritten: 0 }, avg: { sampleInterval: fault === 'sampled' ? 2 : 1 } }] }] } } };
@@ -151,8 +151,10 @@ describe('single-attempt corpus proof transport', () => {
       await f.transport.start();await f.transport.execute(f.query);await f.transport.finish();
       expect(f.events()).toContain('"accountReadCeiling":5000000');expect(f.events()).toContain('"liveAuditReadReserve":500000');
       expect(f.events()).toContain('"previewQuotaBufferDay":"2026-10-29"');
+      expect(f.calls.filter(c=>c.path.endsWith('/graphql')).every(c=>c.rateLimitType==='account-based')).toBe(true);
+      expect(f.calls.filter(c=>!c.path.endsWith('/graphql')).every(c=>c.rateLimitType===null)).toBe(true);
     } finally {f.close();}
-    const standard=transportFixture('daytime');try {await expect(standard.transport.start()).rejects.toThrow('headroom');expect(standard.calls.some(c=>c.path.endsWith('/query'))).toBe(false);}finally{standard.close();}
+    const standard=transportFixture('daytime');try {await expect(standard.transport.start()).rejects.toThrow('headroom');expect(standard.calls.some(c=>c.path.endsWith('/query'))).toBe(false);expect(standard.calls.every(c=>c.rateLimitType===null)).toBe(true);}finally{standard.close();}
   });
   it('refuses the preview buffer on production and outside its authorized UTC day',()=>{
     const dir=mkdtempSync(join(tmpdir(),'theologai-buffer-boundary-'));try {

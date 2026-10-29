@@ -57,6 +57,12 @@ cap, four-command/write limit and all other checks are unchanged. The exception
 is rejected for production and outside that UTC date. Production queries may
 exhaust the shared allowance before the 00:00 UTC reset, a risk accepted by the
 owner. The duplicate evening follow-up is paused.
+The scoped quota observations use Cloudflare's documented
+[`X-Rate-Limit-Type: account-based`](https://developers.cloudflare.com/analytics/graphql-api/account-based-rate-limiting/)
+request header after preflight observed the default credential bucket returning
+`extensions.code: budget`. This changes only the analytics rate-limit bucket;
+the complete unsampled counter query, credentials, account and data allowances
+stay unchanged. It does not change account settings or retry SQL.
 
 Production uses the same full receipt consumer behind its existing separate
 environment and release gates. A preview receipt cannot authorize production.

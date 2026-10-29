@@ -72,7 +72,8 @@ export class CorpusProofTransport {
     const remaining = Math.max(0, this.lastDispatch + 300 - Date.now()); if (remaining) await new Promise(resolve => setTimeout(resolve, remaining));
     this.lastDispatch = Date.now();
     const response = await (this.options.fetch ?? fetch)(`https://api.cloudflare.com/client/v4${path}`, {
-      method, redirect: 'error', signal: AbortSignal.timeout(30_000), headers: { authorization: `Bearer ${this.options.token}`, accept: 'application/json', 'content-type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}),
+      method, redirect: 'error', signal: AbortSignal.timeout(30_000), headers: { authorization: `Bearer ${this.options.token}`, accept: 'application/json', 'content-type': 'application/json',
+        ...(path === '/graphql' && this.options.previewQuotaBuffer ? { 'X-Rate-Limit-Type': 'account-based' } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}),
     });
     const jsonContentType = /^application\/json/.test(response.headers.get('content-type') ?? '');
     const accepted = response.status === 200 && !response.redirected && jsonContentType;
