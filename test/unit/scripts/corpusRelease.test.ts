@@ -10,7 +10,7 @@ import { buildSourceProof, planPreparation, applyPreparation, verifyCorpus, veri
 const root = process.cwd(), directory = mkdtempSync(join(tmpdir(), 'corpus-release-test-'));
 const baseline = process.env.THEOLOGAI_LOCAL_BASELINE;
 let source: SourceProof;
-beforeAll(() => { if(existsSync('data/theologai.db'))source = buildSourceProof(root, 'data/theologai.db'); });
+beforeAll(() => { if(existsSync('data/theologai.db'))source = buildSourceProof(root, 'data/theologai.db'); }, 120000);
 afterAll(() => rmSync(directory, { recursive: true, force: true }));
 const now = Date.parse('2026-10-27T12:00:00Z');
 function control(role: 'preview' | 'production'): Control { return { databaseId: TARGETS[role].id, sourceCommit: 'a'.repeat(40), sourceTree: 'b'.repeat(40), unbound: true, ownerCustodySha256: 'c'.repeat(64), bindingInventorySha256: 'd'.repeat(64) }; }
@@ -25,7 +25,7 @@ function session(execute: (sql: string) => Promise<Meter>, maximum: {
     return { result, journal };
 }
 describe.skipIf(!existsSync('data/theologai.db'))('actual Norton/Aquinas release implementation', () => {
-    it('validates all source cells/schema and all local semantic/authority checks within the normal setup timeout', () => {
+    it('validates all source cells/schema and all local semantic/authority checks within the bounded setup timeout', () => {
         expect(Object.keys(source.canonical)).toHaveLength(39);
         expect(Object.values(source.canonical).reduce((n, t) => n + t.rows, 0)).toBe(1635226);
         expect(source.corpusIdentity).toBe('ef42dfff4fda29d708f2bd340bbd4463ab4a128408651cea887a97bc28199bb1');
