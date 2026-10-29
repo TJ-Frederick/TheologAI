@@ -13,6 +13,16 @@ function errorCodes(value: unknown): number[] {
   if (!Array.isArray(value)) return [];
   return value.slice(0, 16).flatMap(error => error && typeof error === 'object' && 'code' in error && count(error.code) ? [error.code] : []);
 }
+function errorKinds(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const kinds = new Set<string>();
+  for (const error of value.slice(0, 16)) {
+    if (!error || typeof error !== 'object' || !('message' in error) || typeof error.message !== 'string') continue;
+    for (const match of error.message.matchAll(/\bSQLITE_(AUTH|READONLY|CORRUPT|NOTADB|IOERR|BUSY|LOCKED|ERROR|CONSTRAINT|TOOBIG|FULL)(?:_[A-Z0-9]+)?\b/g)) kinds.add(`SQLITE_${match[1]}`);
+    if (/\b(?:not authorized|unauthorized|authorization|authentication|permissions?|read[- ]?only)\b/i.test(error.message)) kinds.add('authorization');
+  }
+  return [...kinds].sort();
+}
 function row(value: unknown): ProofRow { check(value !== null && typeof value === 'object' && !Array.isArray(value), 'object shape'); return value as ProofRow; }
 function list(value: unknown): ProofRow[] { check(Array.isArray(value), 'list shape'); return value.map(row); }
 
@@ -71,7 +81,7 @@ export class CorpusProofTransport {
     }
     const value = row(parsed);
     if (!accepted || value.success === false || Array.isArray(value.errors) && value.errors.length) {
-      this.event({ kind: 'provider-error', method, path, httpStatus: response.status, errorCodes: errorCodes(value.errors), responseSha256: sha(text), bytes: size });
+      this.event({ kind: 'provider-error', method, path, httpStatus: response.status, errorCodes: errorCodes(value.errors), errorKinds: errorKinds(value.errors), responseSha256: sha(text), bytes: size });
     }
     check(accepted, 'HTTP/redirect/content type');
     this.event({ kind: 'API', method, path, responseSha256: sha(text), bytes: size }); return value as ApiResult;

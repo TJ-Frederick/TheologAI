@@ -64,6 +64,28 @@ FK, trigger, quoted-content and catalog-drift regressions cover the boundary.
 All other data, physical, FK, FTS, quota, target and approval checks are unchanged.
 The new source requires fresh preview approval; no old approval is carried forward.
 
+## Authorized FTS-only diagnostic
+
+After the first FTS request failed without usable response details, the owner
+approved one FTS-only diagnostic through the existing preview environment.
+Manual `pr.yml` dispatch with `fts_diagnostic_only=true` and the passed exact-source
+PR Checks run ID verifies that source's normal CI/artifacts and runs the normal
+validation checks again. The protected diagnostic uses the existing preview
+secret and shared mutation lock, with live PR/source checks before cloud access.
+Its only SQL is the fixed rank-1 `strongs_fts` integrity command; it has no Worker
+upload, secret synchronization, seed, migration, rebuild or production path.
+
+The cumulative prior total remains 3,303,879 reads spent/reserved and one diagnostic
+command/write reserved. This one attempt reserves at most 4,096 additional reads
+and one additional command, even if rejected or ambiguous; a day, source or run
+change does not reset the totals. A separate zero-SQL observer checks controls
+after the attempt. Sanitized evidence includes status, numeric provider codes,
+allowlisted SQLite/authorization categories and hashes, without raw error text,
+response bodies, SQL data or credential values. The diagnostic receipt is not
+complete corpus verification and cannot satisfy a preview/production release
+receipt. No full-proof retry fits the remaining cumulative allowance. SEC-06
+stays paused, permissions are unchanged, and production remains unapproved.
+
 ## Main reconciliation and restoration
 
 The review commit is prepared as a descendant of PR #167 head

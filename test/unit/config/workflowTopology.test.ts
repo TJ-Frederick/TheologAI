@@ -112,6 +112,32 @@ function assertProductionBoundary(workflow: Workflow): void {
 }
 
 describe('workflow topology', () => {
+  it('keeps the FTS-only mode protected, source-validated and incapable of deployment', async () => {
+    const workflow = parse(await readWorkflow('pr.yml')) as Workflow;
+    const source = workflow.jobs['fts-diagnostic-source']!;
+    expect(source.environment).toBeUndefined(); expect(JSON.stringify(source)).not.toContain('secrets.');
+    expect(source.if).toContain("github.event_name == 'workflow_dispatch'");
+    expect(source.if).toContain('inputs.fts_diagnostic_only');
+    const job = workflow.jobs['preview-fts-diagnostic']!;
+    expect(needs(job)).toEqual(['fts-diagnostic-source', 'validation-complete']);
+    expect(job.environment).toMatchObject({ name: 'preview' });
+    expect(job.concurrency).toEqual({ group: 'theologai-shared-preview-mutation', 'cancel-in-progress': false });
+    expect(job['timeout-minutes']).toBe(10);
+    const serialized = JSON.stringify(job);
+    expect(serialized).not.toMatch(/wrangler |secret put|application-corpus-check|worker-release-artifact|rebuild|migrations|seed|ESV_API_KEY/);
+    expect(serialized).toContain('preview-fts-diagnostic.ts');
+    expect(serialized).toContain('priorReads:3303879,priorDiagnosticCommands:1,maxReads:4096,maxDiagnosticCommands:1');
+    expect(job.steps!.filter(s => s.with?.script?.includes('verify-fts-diagnostic-source.cjs'))).toHaveLength(2);
+    const cloud = job.steps!.findIndex(s => s.env?.CLOUDFLARE_API_TOKEN);
+    const reconfirm = job.steps!.findIndex(s => s.id === 'live-source');
+    expect(cloud).toBeGreaterThan(reconfirm);
+    expect(job.steps![cloud]!.env!.CLOUDFLARE_API_TOKEN).toBe('${{ secrets.CLOUDFLARE_API_TOKEN }}');
+    expect(job.steps!.find(s => s.with?.path === 'release-control')!.with!.ref).toBe('${{ needs.fts-diagnostic-source.outputs.base }}');
+    expect(job.steps!.at(-1)!.if).toContain('always()');
+    // Normal validation remains unchanged; diagnostic dispatch also runs it.
+    expect(workflow.jobs.classify!.if).toBeUndefined();
+    expect(workflow.jobs['preview-deploy']!.if).toContain("github.event.pull_request.state == 'open'");
+  });
   it('keeps root dependencies and builds out of every credential-bearing job', async () => {
     for (const name of [
       'deploy.yml', 'pr.yml', 'bootstrap-ccel-coordinator.yml',

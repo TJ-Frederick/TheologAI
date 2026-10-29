@@ -131,7 +131,7 @@ function transportFixture(fault: string) {
       if (fault === 'network') throw Error('synthetic failed attempt');
       if (fault === 'timeout') throw new DOMException('synthetic-test-token private SQL body', 'TimeoutError');
       if (fault === 'redirect') return new Response('{}', { status: 302 });
-      if (fault === 'http-403' || fault === 'http-400') return Response.json({ success: false, errors: [{ code: 7500, message: 'synthetic-test-token private SQL body' }, { code: 'unsafe-text' }] }, { status: fault === 'http-403' ? 403 : 400 });
+      if (fault === 'http-403' || fault === 'http-400') return Response.json({ success: false, errors: [{ code: 7500, message: `synthetic-test-token private SQL body ${fault === 'http-403' ? 'not authorized: SQLITE_AUTH' : 'SQLITE_CORRUPT_VTAB'}` }, { code: 'unsafe-text' }] }, { status: fault === 'http-403' ? 403 : 400 });
       if (fault === 'invalid-json') return new Response('synthetic-test-token private SQL body', { headers: { 'content-type': 'application/json' } });
       if (fault === 'empty-json') return new Response(null, { headers: { 'content-type': 'application/json' } });
       if (fault === 'oversized-http-error') return new Response('x'.repeat(1_250_001), { status: 400, headers: { 'content-type': 'application/json' } });
@@ -183,6 +183,7 @@ describe('single-attempt corpus proof transport', () => {
       const events = f.events(); expect(events).not.toContain('synthetic-test-token'); expect(events).not.toContain('private SQL body'); expect(events).not.toContain('unsafe-text');
       const rows = events.trim().split('\n').map(line => JSON.parse(line) as Record<string, unknown>);
       if (fault.startsWith('http-')) expect(rows).toContainEqual(expect.objectContaining({ kind: 'provider-error', httpStatus: fault === 'http-403' ? 403 : 400, errorCodes: [7500] }));
+      if (fault.startsWith('http-')) expect(rows).toContainEqual(expect.objectContaining({ kind: 'provider-error', errorKinds: fault === 'http-403' ? ['SQLITE_AUTH', 'authorization'] : ['SQLITE_CORRUPT'] }));
       if (fault === 'invalid-json') expect(rows).toContainEqual(expect.objectContaining({ kind: 'invalid-json', httpStatus: 200 }));
       if (fault === 'empty-json') expect(rows).toContainEqual(expect.objectContaining({ kind: 'rejected-response', httpStatus: 200, emptyBody: true }));
       if (fault === 'timeout') expect(rows).toContainEqual(expect.objectContaining({ kind: 'halted', failureKind: 'TimeoutError' }));

@@ -7,6 +7,15 @@ on:
   schedule:
     - cron: '31 8 * * 1'
   workflow_dispatch:
+    inputs:
+      fts_diagnostic_only:
+        description: Run only the approved one-command preview FTS diagnostic
+        type: boolean
+        default: false
+      fts_source_run:
+        description: Passed PR Checks run for this exact commit
+        type: string
+        default: ""
 
 # Unrelated labels cannot cancel active validation or preview transactions.
 # Required checks still execute: emitting skipped contexts on a label event
@@ -1032,3 +1041,144 @@ jobs:
                 body,
               });
             }
+
+  fts-diagnostic-source:
+    name: Verify FTS-only diagnostic source (no cloud credentials)
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.fts_diagnostic_only && github.ref == 'refs/heads/codex/sec06-preview-credential-assessment' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+    outputs:
+      source: ${{ steps.source.outputs.source }}
+      tree: ${{ steps.source.outputs.tree }}
+      base: ${{ steps.source.outputs.base }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify normal CI and live diagnostic authorization
+        id: source
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          FTS_SOURCE_RUN_ID: ${{ inputs.fts_source_run }}
+        with:
+          script: |
+            await require('./.github/scripts/verify-fts-diagnostic-source.cjs')({github, context, core});
+
+  preview-fts-diagnostic:
+    name: Preview FTS-only diagnostic
+    needs: [fts-diagnostic-source, validation-complete]
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.fts_diagnostic_only && needs.fts-diagnostic-source.result == 'success' && needs.validation-complete.result == 'success' }}
+    concurrency:
+      group: theologai-shared-preview-mutation
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: preview
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.fts-diagnostic-source.outputs.source }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Verify normal CI and live diagnostic authorization
+        id: source
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          FTS_SOURCE_RUN_ID: ${{ inputs.fts_source_run }}
+        with:
+          script: |
+            await require('./.github/scripts/verify-fts-diagnostic-source.cjs')({github, context, core});
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.fts-diagnostic-source.outputs.base }}
+          path: release-control
+          persist-credentials: false
+      - name: Select release toolchain source
+        id: release-toolchain-source
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            .github/actions/release-toolchain/action.yml
+            .github/release-toolchain/package.json
+            .github/release-toolchain/package-lock.json
+          )
+          base_files=0
+          for file in "${files[@]}"; do
+            if test -e "release-control/$file" || test -L "release-control/$file"; then
+              test -f "release-control/$file"
+              test ! -L "release-control/$file"
+              base_files=$((base_files + 1))
+            fi
+          done
+          case "$base_files" in
+            3) printf 'source=base\n' >> "$GITHUB_OUTPUT" ;;
+            0)
+              # Bootstrap only an entirely absent trust set; missing individual
+              # files in an established base never permit a candidate fallback.
+              for file in "${files[@]}"; do
+                test -f "$file"
+                test ! -L "$file"
+              done
+              printf 'source=introduction\n' >> "$GITHUB_OUTPUT"
+              echo '::notice::Using the separately locked release toolchain introduced by this approved PR.'
+              ;;
+            *) echo '::error::The protected base has an incomplete release toolchain.'; exit 1 ;;
+          esac
+
+      - if: steps.release-toolchain-source.outputs.source == 'base'
+        uses: ./release-control/.github/actions/release-toolchain
+
+      - if: steps.release-toolchain-source.outputs.source == 'introduction'
+        uses: ./.github/actions/release-toolchain
+
+      - name: Reconfirm authorization immediately before diagnostic
+        id: live-source
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          FTS_SOURCE_RUN_ID: ${{ inputs.fts_source_run }}
+        with:
+          script: |
+            await require('./.github/scripts/verify-fts-diagnostic-source.cjs')({github, context, core});
+
+      - name: Run one fixed preview FTS diagnostic (no deployment)
+        id: diagnostic
+        env:
+          FTS_SOURCE_RUN_ID: ${{ inputs.fts_source_run }}
+          EXPECTED_SOURCE: ${{ needs.fts-diagnostic-source.outputs.source }}
+          EXPECTED_TREE: ${{ needs.fts-diagnostic-source.outputs.tree }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE"
+          test "$(git rev-parse HEAD^{tree})" = "$EXPECTED_TREE"
+          APPLICATION_FTS_DIAGNOSTIC_APPROVAL_JSON="$(node --import tsx --input-type=module - <<'JS_APPROVAL'
+          import {FTS_DIAGNOSTIC} from './scripts/preview-fts-diagnostic.ts';
+          import {ACCOUNT,TARGETS} from './scripts/application-release-policy.mjs';
+          process.stdout.write(JSON.stringify({schemaVersion:'theologai-preview-fts-only-approval.v1',authorization:FTS_DIAGNOSTIC.authorization,role:'preview',accountId:ACCOUNT,databaseId:TARGETS.preview.databaseId,sourceCommit:process.env.EXPECTED_SOURCE,sourceTree:process.env.EXPECTED_TREE,runId:process.env.GITHUB_RUN_ID,sourceRunId:process.env.FTS_SOURCE_RUN_ID,priorReads:3303879,priorDiagnosticCommands:1,maxReads:4096,maxDiagnosticCommands:1,runAttempt:1,expiresAt:new Date(Date.now()+300000).toISOString()}));
+          JS_APPROVAL
+          )"
+          export APPLICATION_FTS_DIAGNOSTIC_APPROVAL_JSON
+          npx --no-install tsx scripts/preview-fts-diagnostic.ts "$RUNNER_TEMP/preview-fts-only-diagnostic.json"
+      - name: Upload sanitized diagnostic evidence (not release readiness)
+        if: always() && steps.diagnostic.outcome != 'skipped'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: preview-fts-only-pr167-20261029-01
+          path: |
+            ${{ runner.temp }}/preview-fts-only-diagnostic.json
+            ${{ runner.temp }}/preview-fts-only-diagnostic.json.events.jsonl
+            ${{ runner.temp }}/preview-fts-only-diagnostic.json.controls.jsonl
+          retention-days: 7
+          if-no-files-found: error
