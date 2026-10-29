@@ -31,6 +31,7 @@
     "scripts/corpus-release-artifact.ts",
     "scripts/corpus-release-control.ts",
     "scripts/corpus-release-api.ts",
-    "scripts/corpus-release-operator.ts"
+    "scripts/corpus-release-operator.ts",
+    "scripts/corpus-control-diagnostic.ts"
   ]
 }

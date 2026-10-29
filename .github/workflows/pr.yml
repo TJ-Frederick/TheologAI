@@ -381,6 +381,16 @@ jobs:
 
       - run: npm ci --no-audit
 
+      - name: Run the separately approved zero-SQL control diagnostic
+        if: ${{ fromJSON(env.CORPUS_EXECUTION_APPROVAL).status == 'control-diagnostic' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx --no-install tsx scripts/corpus-control-diagnostic.ts
+          # A diagnostic can never advance to readiness or deployment.
+          exit 1
+
       - name: Build the exact local corpus source
         run: npm run build:db
       - name: Test the integrated corpus release path locally
