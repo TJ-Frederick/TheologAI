@@ -138,7 +138,8 @@ describe('workflow topology', () => {
     expect(workflow.jobs.classify!.if).toBeUndefined();
     const action=parse(await readFile(new URL('../../../.github/actions/operator-corpus-proof/action.yml',import.meta.url),'utf8')) as {runs:{steps:Step[]}};
     const steps=action.runs.steps;expect(steps.find(s=>s.id==='evidence')!.with!.script).toContain('operator-proof-bridge.cjs');
-    expect(steps.find(s=>s.id==='accept')!.run).toContain('operator-corpus-proof.ts accept');
+    expect(steps.find(s=>s.id==='accept')!.run).toContain('operator-corpus-proof.ts complete');
+    expect(steps.find(s=>s.id==='accept')!.env).toMatchObject({GH_TOKEN:'${{ github.token }}'});
     expect(JSON.stringify(action)).not.toMatch(/auth token|wrangler login|application-corpus-check.ts verify/);
     const production=parse(await readWorkflow('deploy.yml')) as Workflow;
     expect(production.jobs.deploy!.environment).toMatchObject({name:'production'});
