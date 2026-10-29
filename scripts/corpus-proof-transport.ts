@@ -150,4 +150,8 @@ export class CorpusProofTransport {
     check(JSON.stringify(after) === JSON.stringify(this.controls), 'controls changed'); await this.usage();
     return { controls: this.controls, controlsUnchanged: true };
   }
+  async observeControls(): Promise<unknown> {
+    check(this.options.readBudget === 0 && this.metering.requests === 0, 'metadata-only observer');
+    const controls = await this.snapshot(); this.event({ kind: 'controls-observation', controls }); return controls;
+  }
 }

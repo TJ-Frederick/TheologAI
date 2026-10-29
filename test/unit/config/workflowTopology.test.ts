@@ -112,44 +112,38 @@ function assertProductionBoundary(workflow: Workflow): void {
 }
 
 describe('workflow topology', () => {
-  it('keeps the FTS-only mode protected, source-validated and incapable of deployment', async () => {
+  it('keeps operator verification protected and deployment permissions unchanged', async () => {
     const workflow = parse(await readWorkflow('pr.yml')) as Workflow;
-    const source = workflow.jobs['fts-diagnostic-source']!;
+    const source = workflow.jobs['operator-proof-source']!;
     expect(source.environment).toBeUndefined(); expect(JSON.stringify(source)).not.toContain('secrets.');
     expect(source.if).toContain("github.event_name == 'pull_request'");
     expect(source.if).toContain('github.event.pull_request.number == 167');
-    expect(source.if).toContain("'preview-fts-diagnostic'");
     expect(needs(source)).toEqual(['build-worker']);
-    expect(source.steps![0]!.with!.ref).toBe('${{ github.event.pull_request.head.sha }}');
-    const job = workflow.jobs['preview-fts-diagnostic']!;
-    expect(needs(job)).toEqual(['fts-diagnostic-source', 'validation-complete']);
-    expect(job.environment).toMatchObject({ name: 'preview' });
-    expect(job.concurrency).toEqual({ group: 'theologai-shared-preview-mutation', 'cancel-in-progress': false });
-    expect(job['timeout-minutes']).toBe(10);
-    const serialized = JSON.stringify(job);
-    expect(serialized).not.toMatch(/wrangler |secret put|application-corpus-check|worker-release-artifact|rebuild|migrations|seed|ESV_API_KEY/);
-    expect(serialized).toContain('preview-fts-diagnostic.ts');
-    expect(serialized).toContain('priorReads:3303879,priorDiagnosticCommands:1,maxReads:4096,maxDiagnosticCommands:1');
-    expect(job.steps!.filter(s => typeof s.with?.script === 'string' && s.with.script.includes('verify-fts-diagnostic-source.cjs'))).toHaveLength(2);
-    const cloud = job.steps!.findIndex(s => s.env?.CLOUDFLARE_API_TOKEN);
-    const reconfirm = job.steps!.findIndex(s => s.id === 'live-source');
-    expect(cloud).toBeGreaterThan(reconfirm);
-    expect(job.steps![cloud]!.env!.CLOUDFLARE_API_TOKEN).toBe('${{ secrets.CLOUDFLARE_API_TOKEN }}');
-    expect(job.steps!.find(s => s.with?.path === 'release-control')!.with!.ref).toBe('${{ needs.fts-diagnostic-source.outputs.base }}');
-    expect(job.steps!.at(-1)!.if).toContain('always()');
-    // Use the existing refs/pull/*/merge environment policy, never a feature
-    // branch manual dispatch or a relaxed branch policy. All normal CI/artifacts
-    // must finish first, and this diagnostic must not also start a full proof.
-    expect(job.if).toContain("github.event_name == 'pull_request'");
-    expect(job.if).not.toContain('workflow_dispatch');
-    for (const step of job.steps!.filter(s => s.env?.FTS_SOURCE_RUN_ID)) {
-      expect(step.env!.FTS_SOURCE_RUN_ID).toBe('${{ github.run_id }}');
-    }
+    const job = workflow.jobs['operator-corpus-proof']!;
+    expect(needs(job)).toEqual(['operator-proof-source', 'validation-complete', 'build-worker']);
+    expect(job.environment).toMatchObject({name:'preview'});
+    expect(job.permissions).toEqual({contents:'read',actions:'read','pull-requests':'read'});
+    expect(job.concurrency).toEqual({group:'theologai-shared-preview-mutation','cancel-in-progress':false});
+    expect(JSON.stringify(job)).not.toMatch(/wrangler |secret put|rebuild|migrations|seed|ESV_API_KEY|preview-fts-diagnostic.ts/);
+    expect(job.steps!.find(s=>s.id==='complete-proof')!.uses).toBe('./.github/actions/operator-corpus-proof');
+    const deploy=workflow.jobs['preview-deploy']!;
+    expect(deploy.permissions).toEqual({contents:'read','pull-requests':'write'});
+    expect(needs(deploy)).toContain('operator-corpus-proof');
+    expect(deploy.if).toContain("needs.operator-corpus-proof.result == 'success'");
+    expect(deploy.steps!.find(s=>s.id==='corpus-proof')!.run).toContain('EXPECTED_OPERATOR_ENVELOPE_SHA256');
+    expect(deploy.steps!.find(s=>s.id==='corpus-proof')!.run).not.toContain('application-corpus-check.ts verify');
+    const uploader=workflow.jobs['operator-proof-upload']!;
+    expect(uploader.environment).toBeUndefined();expect(uploader.permissions).toEqual({contents:'read'});
+    expect(uploader.if).toContain("github.actor_id == '40179660'");expect(JSON.stringify(uploader)).not.toContain('secrets.');
     expect(workflow.jobs.classify!.if).toBeUndefined();
-    expect(workflow.jobs['preview-deploy']!.if).toContain("github.event.pull_request.state == 'open'");
-    expect(workflow.jobs['preview-deploy']!.if).toContain("!(github.event.pull_request.number == 167 && contains(github.event.pull_request.labels.*.name, 'preview-fts-diagnostic'))");
-    expect(workflow.jobs['build-worker']!.if).toContain("github.event.label.name == 'preview-fts-diagnostic'");
-    expect(workflow.concurrency.group).toContain("github.event.label.name == 'preview-fts-diagnostic'");
+    const action=parse(await readFile(new URL('../../../.github/actions/operator-corpus-proof/action.yml',import.meta.url),'utf8')) as {runs:{steps:Step[]}};
+    const steps=action.runs.steps;expect(steps.find(s=>s.id==='evidence')!.with!.script).toContain('operator-proof-bridge.cjs');
+    expect(steps.find(s=>s.id==='accept')!.run).toContain('operator-corpus-proof.ts accept');
+    expect(JSON.stringify(action)).not.toMatch(/auth token|wrangler login|application-corpus-check.ts verify/);
+    const production=parse(await readWorkflow('deploy.yml')) as Workflow;
+    expect(production.jobs.deploy!.environment).toMatchObject({name:'production'});
+    expect(production.jobs.deploy!.permissions).toEqual({actions:'read',contents:'read'});
+    expect(production.jobs.deploy!.steps!.find(s=>s.id==='corpus-proof')!.uses).toBe('./.github/actions/operator-corpus-proof');
   });
   it('keeps root dependencies and builds out of every credential-bearing job', async () => {
     for (const name of [
@@ -284,11 +278,15 @@ describe('workflow topology', () => {
       const upload = job.steps!.findIndex(step => step.run?.includes('wrangler deploy --config'));
       expect(proof).toBeGreaterThan(-1); expect(upload).toBeGreaterThan(proof);
       const step = job.steps![proof]!;
-      expect(step.run).toContain('integrityCommands:4,exclusiveDataWritesDuringProof:true');
-      expect(step.run).toContain('maxReads:3800000');
-      expect(step.run).toContain(`--role ${role}`);
-      expect(step.run).toContain('application-corpus-check.ts verify');
-      expect(step.env?.CORPUS_PLAN_SHA256).toBe('${{ needs.build-worker.outputs.corpus_plan_sha256 }}');
+      if (role === 'preview') {
+        expect(step.run).toContain('operator-corpus-proof.ts accept');
+        expect(step.run).toContain('EXPECTED_OPERATOR_ENVELOPE_SHA256');
+        expect(step.env?.CORPUS_PLAN_SHA256).toBe('${{ needs.build-worker.outputs.corpus_plan_sha256 }}');
+      } else {
+        expect(step.uses).toBe('./.github/actions/operator-corpus-proof');
+        expect(step.with?.role).toBe('production');
+        expect(step.with?.['source-plan-sha256']).toBe('${{ needs.build-worker.outputs.corpus_plan_sha256 }}');
+      }
       const sourceDownload = job.steps!.find(s => s.name === 'Download source-bound complete corpus proof inputs')!;
       expect(sourceDownload.with?.['digest-mismatch']).toBe('error');
       expect(sourceDownload.with?.name).toContain('github.run_attempt');

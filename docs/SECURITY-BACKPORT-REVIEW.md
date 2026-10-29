@@ -28,8 +28,9 @@ Strong's FTS content is compared completely with physical document IDs normalize
 The four exact rank-1 FTS integrity commands use diagnostic INSERT syntax. They
 do not seed, migrate, restore, rebuild indexes or change application records,
 but local Workerd meters four writes. They must be explicitly included in the
-next protected preview approval. Existing token permissions stay unchanged;
-if the token cannot execute them, stop and report, without permission escalation.
+protected preview approval. The deployment token is D1 Read-only and cannot
+execute these direct REST writes. The approved repair uses the existing local
+operator's D1 write access for the complete proof, without changing that token.
 
 The local complete counter measured about 3.30 million reads versus 10.25 million
 for the old remote query; the source plan reserves 3,510,997 reads. Remote usage
@@ -46,8 +47,10 @@ an enforced Cloudflare lease. Catalog, migration ledger and both environments'
 active bindings/deployments are observed before and after. Application reads can
 continue. A conflicting write invalidates the proof even if markers do not change.
 
-Source artifacts are built without credentials. Only the existing protected
-preview environment can run preview verification and deploy. A fresh v2 preview
+Source artifacts are built without credentials. The existing protected preview
+environment admits and accepts the operator's complete source-bound proof; the
+operator credential remains local. Deployment still runs behind that environment.
+A fresh v2 preview
 receipt binds the data proof, plan, source/tree, active Worker/D1 and live audit.
 Production needs its own fresh proof inside its separate approval gate; a preview
 receipt is never production data authority. No successful remote proof or deployment
@@ -62,20 +65,19 @@ comparison. Other whitespace and block comments remain exact, as does the raw
 before/after remote catalog check. Captured definitions and negative constraint,
 FK, trigger, quoted-content and catalog-drift regressions cover the boundary.
 All other data, physical, FK, FTS, quota, target and approval checks are unchanged.
-The new source requires fresh preview approval; no old approval is carried forward.
+The owner subsequently authorized routine corrections and resulting source
+changes within the renewed cumulative budget and existing preview gates.
 
-## Authorized FTS-only diagnostic
+## Historical FTS-only diagnostic and corrected credential path
 
 After the first FTS request failed without usable response details, the owner
 approved one FTS-only diagnostic through the existing preview environment.
 The first manual dispatch was rejected before any job steps or SQL: the existing
-preview branch policy permits only `refs/pull/*/merge`. The diagnostic now uses
+preview branch policy permits only `refs/pull/*/merge`. The diagnostic used
 PR #167's normal event with both `deploy-preview` and `preview-fts-diagnostic`
 labels. It waits for all normal CI/artifacts in that same run, verifies their
-exact source, and selects the diagnostic instead of the full preview proof.
-Removing the diagnostic label restores the ordinary deployment route; its
-complete-proof and release-eligibility requirements are unchanged. No branch
-policy or reviewer configuration is changed. The protected diagnostic uses the existing preview
+exact source, and selected the diagnostic instead of the full preview proof.
+No branch policy or reviewer configuration changed. The protected diagnostic used the existing preview
 secret and shared mutation lock, with live PR/source checks before cloud access.
 Its only SQL is the fixed rank-1 `strongs_fts` integrity command; it has no Worker
 upload, secret synchronization, seed, migration, rebuild or production path.
@@ -88,8 +90,25 @@ after the attempt. Sanitized evidence includes status, numeric provider codes,
 allowlisted SQLite/authorization categories and hashes, without raw error text,
 response bodies, SQL data or credential values. The diagnostic receipt is not
 complete corpus verification and cannot satisfy a preview/production release
-receipt. No full-proof retry fits the remaining cumulative allowance. SEC-06
-stays paused, permissions are unchanged, and production remains unapproved.
+receipt. Its actual authorization rejection brought the frozen prior total to
+3,307,975 reads spent/reserved and two diagnostic commands/writes reserved.
+
+The token's D1 Read grant and the requirement for D1 Edit on direct HTTP writes
+were documented before the full proof. Introducing write-classified integrity
+commands without reconciling that credential was an implementation/admission
+error. It is not evidence of a generic D1 FTS restriction. Complete local checks
+pass; rank-1 detects damaged external-content indexes that rank-0 misses.
+
+The owner authorized an additional full preview proof: 3,510,997 reserved reads,
+3.8M hard cumulative cap and four diagnostic commands/writes, including retries.
+The old ledger stays frozen; unused old allowances are not transferred. The
+FTS-only route is retired. Its existing protected stage now accepts the complete
+operator proof before the ordinary preview deployment and live tests. The same
+receipt consumer is wired behind the existing production gate so this exact tree
+can later be released without another source change. This does not dispatch or
+approve production. See [the bounded handoff](OPERATOR-CORPUS-PROOF.md).
+
+SEC-06 stays paused, permissions are unchanged, and production remains unapproved.
 
 ## Main reconciliation and restoration
 

@@ -7,6 +7,11 @@ on:
   schedule:
     - cron: '31 8 * * 1'
   workflow_dispatch:
+    inputs:
+      operator_proof_json:
+        description: Sanitized complete proof submitted by the existing operator
+        type: string
+        default: ""
 
 # Unrelated labels cannot cancel active validation or preview transactions.
 # Required checks still execute: emitting skipped contexts on a label event
@@ -14,8 +19,7 @@ on:
 concurrency:
   group: >-
     ${{ github.event_name == 'pull_request' &&
-        (github.event.action != 'labeled' || github.event.label.name == 'deploy-preview' ||
-         (github.event.pull_request.number == 167 && github.event.label.name == 'preview-fts-diagnostic')) &&
+        (github.event.action != 'labeled' || github.event.label.name == 'deploy-preview') &&
         format('pr-{0}', github.event.pull_request.number) || format('validation-{0}', github.run_id) }}
   cancel-in-progress: true
 
@@ -311,8 +315,7 @@ jobs:
     name: Build preview Worker artifact (no cloud credentials)
     needs: validation-complete
     if: >-
-      (github.event.action != 'labeled' || github.event.label.name == 'deploy-preview' ||
-       (github.event.pull_request.number == 167 && github.event.label.name == 'preview-fts-diagnostic')) &&
+      (github.event.action != 'labeled' || github.event.label.name == 'deploy-preview') &&
       github.event.pull_request.state == 'open' &&
       github.event.pull_request.draft == false &&
       github.event.pull_request.base.ref == 'main' &&
@@ -373,15 +376,16 @@ jobs:
 
   preview-deploy:
     name: Deploy Preview
-    needs: [validation-complete, build-worker]
+    needs: [validation-complete, build-worker, operator-corpus-proof]
     if: >-
+      !cancelled() && needs.validation-complete.result == 'success' && needs.build-worker.result == 'success' &&
+      (github.event.pull_request.number != 167 || needs.operator-corpus-proof.result == 'success') &&
       (github.event.action != 'labeled' || github.event.label.name == 'deploy-preview') &&
       github.event.pull_request.state == 'open' &&
       github.event.pull_request.draft == false &&
       github.event.pull_request.base.ref == 'main' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
-      contains(github.event.pull_request.labels.*.name, 'deploy-preview') &&
-      !(github.event.pull_request.number == 167 && contains(github.event.pull_request.labels.*.name, 'preview-fts-diagnostic'))
+      contains(github.event.pull_request.labels.*.name, 'deploy-preview')
     # Repository-wide serialization: this exact group is also held by the
     # manual CCEL canary and emergency restore, so neither can observe or
     # overwrite an ordinary preview deployment mid-transaction.
@@ -525,29 +529,33 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      # The protected environment approval covers a complete fresh comparison
-      # and exactly four diagnostic FTS INSERT commands. They never rebuild data.
+      - name: Download protected operator proof for this preview run
+        if: github.event.pull_request.number == 167 && hashFiles('release/application-only.json') != ''
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: preview-operator-verified-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/operator-verified
+          merge-multiple: false
+          digest-mismatch: error
+
+      # The approved operator completes every check; this protected job revalidates
+      # its source-bound receipt and current controls without repeating its SQL.
       - name: Verify fresh corpus (up to 3.8M reads and four integrity commands)
         id: corpus-proof
         run: |
           candidate_d1_name="$(< "$RUNNER_TEMP/preview-candidate-d1-name.txt")"
           if test -f release/application-only.json; then
-            APPLICATION_CORPUS_PROOF_APPROVAL_JSON="$(node --input-type=module - <<'JS'
-          import {execFileSync} from 'node:child_process';
-          import {ACCOUNT,TARGETS} from './scripts/application-release-policy.mjs';
-          const git=ref=>execFileSync('git',['rev-parse',ref],{encoding:'utf8'}).trim();
-          process.stdout.write(JSON.stringify({schemaVersion:'theologai-fresh-corpus-proof-approval.v1',role:'preview',accountId:ACCOUNT,databaseId:TARGETS.preview.databaseId,sourceCommit:git('HEAD'),sourceTree:git('HEAD^{tree}'),expiresAt:new Date(Date.now()+5400000).toISOString(),maxReads:3800000,integrityCommands:4,exclusiveDataWritesDuringProof:true}));
-          JS
-            )"
-            export APPLICATION_CORPUS_PROOF_APPROVAL_JSON
-            npx --no-install tsx scripts/application-corpus-check.ts verify \
-              --role preview --directory "$RUNNER_TEMP/corpus-source" \
-              --plan-sha256 "$CORPUS_PLAN_SHA256" --output "$RUNNER_TEMP/preview-d1-readiness-receipt.json"
+            test "$(sha256sum "$RUNNER_TEMP/operator-verified/operator-proof-envelope.json" | cut -d' ' -f1)" = "$EXPECTED_OPERATOR_ENVELOPE_SHA256"
+            npx --no-install tsx scripts/operator-corpus-proof.ts accept \
+              "$RUNNER_TEMP/operator-verified/operator-corpus-challenge.json" \
+              "$RUNNER_TEMP/operator-verified/operator-proof-envelope.json" \
+              "$RUNNER_TEMP/corpus-source" "$CORPUS_PLAN_SHA256" "$RUNNER_TEMP/preview-d1-readiness-receipt.json"
           else
             npx --no-install tsx scripts/check-remote-d1-readiness.ts --database "$candidate_d1_name" --env preview \
               --output "$RUNNER_TEMP/preview-d1-readiness-receipt.json"
           fi
         env:
+          EXPECTED_OPERATOR_ENVELOPE_SHA256: ${{ needs.operator-corpus-proof.outputs.envelope_sha256 }}
           CORPUS_PLAN_SHA256: ${{ needs.build-worker.outputs.corpus_plan_sha256 }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -560,6 +568,9 @@ jobs:
           path: |
             ${{ runner.temp }}/preview-d1-readiness-receipt.json
             ${{ runner.temp }}/preview-d1-readiness-receipt.json.events.jsonl
+            ${{ runner.temp }}/preview-d1-readiness-receipt.json.controls.jsonl
+            ${{ runner.temp }}/operator-verified/operator-proof-envelope.json
+            ${{ runner.temp }}/operator-verified/operator-corpus-challenge.json
             ${{ runner.temp }}/corpus-source/plan.json
           retention-days: 7
           if-no-files-found: error
@@ -1036,10 +1047,10 @@ jobs:
               });
             }
 
-  fts-diagnostic-source:
-    name: Verify FTS-only diagnostic source (no cloud credentials)
+  operator-proof-source:
+    name: Verify operator proof source (no cloud credentials)
     needs: build-worker
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.number == 167 && github.event.pull_request.head.ref == 'codex/sec06-preview-credential-assessment' && contains(github.event.pull_request.labels.*.name, 'preview-fts-diagnostic') }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.number == 167 && github.event.pull_request.head.ref == 'codex/sec06-preview-credential-assessment' && contains(github.event.pull_request.labels.*.name, 'deploy-preview') }}
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:
@@ -1055,24 +1066,26 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
-      - name: Verify normal CI and live diagnostic authorization
+      - name: Verify normal CI and live operator-proof authorization
         id: source
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
-          FTS_SOURCE_RUN_ID: ${{ github.run_id }}
+          OPERATOR_SOURCE_RUN_ID: ${{ github.run_id }}
         with:
           script: |
-            await require('./.github/scripts/verify-fts-diagnostic-source.cjs')({github, context, core});
+            await require('./.github/scripts/verify-operator-proof-source.cjs')({github, context, core});
 
-  preview-fts-diagnostic:
-    name: Preview FTS-only diagnostic
-    needs: [fts-diagnostic-source, validation-complete]
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.number == 167 && contains(github.event.pull_request.labels.*.name, 'preview-fts-diagnostic') && needs.fts-diagnostic-source.result == 'success' && needs.validation-complete.result == 'success' }}
+  operator-corpus-proof:
+    name: Preview operator corpus verification
+    needs: [operator-proof-source, validation-complete, build-worker]
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.number == 167 && contains(github.event.pull_request.labels.*.name, 'deploy-preview') && needs.operator-proof-source.result == 'success' && needs.validation-complete.result == 'success' }}
     concurrency:
       group: theologai-shared-preview-mutation
       cancel-in-progress: false
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 110
+    outputs:
+      envelope_sha256: ${{ steps.complete-proof.outputs.envelope_sha256 }}
     environment:
       name: preview
     permissions:
@@ -1082,20 +1095,20 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: ${{ needs.fts-diagnostic-source.outputs.source }}
+          ref: ${{ needs.operator-proof-source.outputs.source }}
           persist-credentials: false
           fetch-depth: 0
-      - name: Verify normal CI and live diagnostic authorization
+      - name: Verify normal CI and live operator-proof authorization
         id: source
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
-          FTS_SOURCE_RUN_ID: ${{ github.run_id }}
+          OPERATOR_SOURCE_RUN_ID: ${{ github.run_id }}
         with:
           script: |
-            await require('./.github/scripts/verify-fts-diagnostic-source.cjs')({github, context, core});
+            await require('./.github/scripts/verify-operator-proof-source.cjs')({github, context, core});
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: ${{ needs.fts-diagnostic-source.outputs.base }}
+          ref: ${{ needs.operator-proof-source.outputs.base }}
           path: release-control
           persist-credentials: false
       - name: Select release toolchain source
@@ -1137,43 +1150,57 @@ jobs:
       - if: steps.release-toolchain-source.outputs.source == 'introduction'
         uses: ./.github/actions/release-toolchain
 
-      - name: Reconfirm authorization immediately before diagnostic
-        id: live-source
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          FTS_SOURCE_RUN_ID: ${{ github.run_id }}
+      - name: Download exact complete corpus proof source
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          script: |
-            await require('./.github/scripts/verify-fts-diagnostic-source.cjs')({github, context, core});
-
-      - name: Run one fixed preview FTS diagnostic (no deployment)
-        id: diagnostic
+          name: corpus-preview-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/corpus-source
+          merge-multiple: false
+          digest-mismatch: error
+      - name: Accept complete operator proof through the preview gate
+        id: complete-proof
+        uses: ./.github/actions/operator-corpus-proof
+        with:
+          role: preview
+          source-plan-sha256: ${{ needs.build-worker.outputs.corpus_plan_sha256 }}
+          base-commit: ${{ needs.operator-proof-source.outputs.base }}
+          output: ${{ runner.temp }}/preview-operator-readiness.json
         env:
-          FTS_SOURCE_RUN_ID: ${{ github.run_id }}
-          EXPECTED_SOURCE: ${{ needs.fts-diagnostic-source.outputs.source }}
-          EXPECTED_TREE: ${{ needs.fts-diagnostic-source.outputs.tree }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          set -euo pipefail
-          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE"
-          test "$(git rev-parse HEAD^{tree})" = "$EXPECTED_TREE"
-          APPLICATION_FTS_DIAGNOSTIC_APPROVAL_JSON="$(node --import tsx --input-type=module - <<'JS_APPROVAL'
-          import {FTS_DIAGNOSTIC} from './scripts/preview-fts-diagnostic.ts';
-          import {ACCOUNT,TARGETS} from './scripts/application-release-policy.mjs';
-          process.stdout.write(JSON.stringify({schemaVersion:'theologai-preview-fts-only-approval.v1',authorization:FTS_DIAGNOSTIC.authorization,role:'preview',accountId:ACCOUNT,databaseId:TARGETS.preview.databaseId,sourceCommit:process.env.EXPECTED_SOURCE,sourceTree:process.env.EXPECTED_TREE,runId:process.env.GITHUB_RUN_ID,sourceRunId:process.env.FTS_SOURCE_RUN_ID,priorReads:3303879,priorDiagnosticCommands:1,maxReads:4096,maxDiagnosticCommands:1,runAttempt:1,expiresAt:new Date(Date.now()+300000).toISOString()}));
-          JS_APPROVAL
-          )"
-          export APPLICATION_FTS_DIAGNOSTIC_APPROVAL_JSON
-          npx --no-install tsx scripts/preview-fts-diagnostic.ts "$RUNNER_TEMP/preview-fts-only-diagnostic.json"
-      - name: Upload sanitized diagnostic evidence (not release readiness)
-        if: always() && steps.diagnostic.outcome != 'skipped'
+      - name: Retain proof verified by this protected preview job
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: preview-fts-only-pr167-20261029-01
+          name: preview-operator-verified-${{ github.run_id }}-attempt-${{ github.run_attempt }}
           path: |
-            ${{ runner.temp }}/preview-fts-only-diagnostic.json
-            ${{ runner.temp }}/preview-fts-only-diagnostic.json.events.jsonl
-            ${{ runner.temp }}/preview-fts-only-diagnostic.json.controls.jsonl
+            ${{ runner.temp }}/operator-corpus-challenge.json
+            ${{ runner.temp }}/operator-proof/operator-proof-envelope.json
+            ${{ runner.temp }}/preview-operator-readiness.json
+            ${{ runner.temp }}/preview-operator-readiness.json.controls.jsonl
+          retention-days: 7
+          if-no-files-found: error
+
+  operator-proof-upload:
+    name: Retain operator corpus proof (no cloud credentials)
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.operator_proof_json != '' && github.actor_id == '40179660' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Retain bounded owner submission
+        id: envelope
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          OPERATOR_PROOF_JSON: ${{ inputs.operator_proof_json }}
+        with:
+          script: require('./.github/scripts/operator-proof-bridge.cjs').upload({context,core});
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.envelope.outputs.artifact_name }}
+          path: ${{ runner.temp }}/operator-proof-envelope.json
           retention-days: 7
           if-no-files-found: error

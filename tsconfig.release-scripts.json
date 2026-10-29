@@ -26,6 +26,7 @@
     "scripts/ccel-live-preview-canary.ts",
     "scripts/production-rollback-rehearsal.ts",
     "scripts/application-corpus-check.ts",
-    "scripts/preview-fts-diagnostic.ts"
+    "scripts/preview-fts-diagnostic.ts",
+    "scripts/operator-corpus-proof.ts"
   ]
 }

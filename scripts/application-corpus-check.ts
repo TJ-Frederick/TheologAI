@@ -48,7 +48,7 @@ function prepare(root: string, database: string, directory: string): void {
   } finally { if (source.open) source.close(); }
 }
 
-export async function runFreshApplicationCorpusCheck(input: { root: string; role: 'preview' | 'production'; directory: string; planSha256: string; output: string; approval: unknown; token: string }) {
+export async function runFreshApplicationCorpusCheck(input: { root: string; role: 'preview' | 'production'; directory: string; planSha256: string; output: string; approval: unknown; token: string; transport?: Pick<CorpusProofTransport, 'start' | 'execute' | 'finish' | 'metering'> }) {
   const classification = classifyApplicationRelease(input.root); const expectedIdentity = { role: input.role, sourceCommit: classification.sourceCommit, sourceTree: classification.sourceTree };
   const approval = requireProofApproval(input.approval, expectedIdentity);
   const planBytes = bytes(join(input.directory, 'plan.json'), 512 * 1024); check(sha(planBytes) === input.planSha256, 'source plan digest');
@@ -59,7 +59,7 @@ export async function runFreshApplicationCorpusCheck(input: { root: string; role
   check(/^[0-9a-f]{64}$/.test(input.planSha256) && Object.hasOwn(TARGETS, input.role), 'source plan or role');
   // Open only the hash-verified source produced by the unprivileged job.
   const source = new Database(sourcePath, { readonly: true });
-  const transport = new CorpusProofTransport({ role: input.role, token: input.token, readBudget: plan.readBudget, eventFile: input.output + '.events.jsonl' });
+  const transport = input.transport ?? new CorpusProofTransport({ role: input.role, token: input.token, readBudget: plan.readBudget, eventFile: input.output + '.events.jsonl' });
   const startedAt = new Date().toISOString();
   try {
     await transport.start();

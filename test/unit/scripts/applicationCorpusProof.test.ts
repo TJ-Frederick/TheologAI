@@ -39,23 +39,13 @@ describe('fresh corpus verifier CLI boundary', () => {
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('refused: argument');
   });
-  for (const [workflow, job] of [['pr.yml', 'preview-deploy'], ['deploy.yml', 'deploy']] as const) {
-    it(`executes the exact ${workflow} verifier invocation up to its approval guard`, () => {
-      const source = parse(readFileSync(new URL(`../../../.github/workflows/${workflow}`, import.meta.url), 'utf8')) as {
-        jobs: Record<string, { steps: { id?: string; run?: string }[] }>;
-      };
-      const run = source.jobs[job]!.steps.find(step => step.id === 'corpus-proof')!.run!;
-      const command = run.match(/npx --no-install tsx scripts\/application-corpus-check\.ts verify \\\n[\s\S]*?(?=\n\s*else)/)?.[0];
-      expect(command).toBeDefined();
-      const result = spawnSync('bash', ['-e', '-c', command!], {
-        cwd: new URL('../../../', import.meta.url), encoding: 'utf8', timeout: 10_000,
-        env: { ...credentialFreeEnv(), RUNNER_TEMP: '/unused-runner', CORPUS_PLAN_SHA256: 'a'.repeat(64), npm_config_offline: 'true' },
-      });
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain('explicit protected proof approval missing');
-      expect(result.stderr).not.toContain('refused: argument');
-    });
-  }
+  it('retains the complete producer for operator execution and protected receipt acceptance', () => {
+    const operator=readFileSync(new URL('../../../scripts/operator-corpus-proof.ts',import.meta.url),'utf8');
+    expect(operator).toContain('runFreshApplicationCorpusCheck({');
+    expect(operator).toContain('verifyFreshCorpusReceipt(receipt');
+    const action=parse(readFileSync(new URL('../../../.github/actions/operator-corpus-proof/action.yml',import.meta.url),'utf8')) as {runs:{steps:{id?:string;run?:string}[]}};
+    expect(action.runs.steps.find(s=>s.id==='accept')!.run).toContain('operator-corpus-proof.ts accept');
+  });
 });
 
 function fixture() {
@@ -113,7 +103,7 @@ describe('complete fresh application corpus verification',()=>{
   it('requires indexed, bounded keyset pages',()=>{const f=fixture();try{expect(()=>sourcePage(f.source,'documents',null,0)).toThrow();expect(()=>sourcePage(f.source,'documents;DROP TABLE documents',null)).toThrow();expect(sourcePage(f.source,'documents',null).expected).toHaveLength(1);}finally{f.close();}});
 });
 
-function transportFixture(fault: string) {
+function transportFixture(fault: string, readBudget = 3_510_997) {
   const directory = mkdtempSync(join(tmpdir(), 'theologai-transport-test-'));
   vi.useFakeTimers({ now: new Date('2026-10-27T12:00:00Z') });
   let tick = Date.now(); const clock = vi.spyOn(Date, 'now').mockImplementation(() => tick += 1000);
@@ -150,12 +140,21 @@ function transportFixture(fault: string) {
     }
     return Response.json(value);
   };
-  const transport = new CorpusProofTransport({ role: 'preview', token: 'synthetic-test-token', readBudget: 3_510_997, eventFile: join(directory, 'events.jsonl'), fetch: fetcher });
+  const transport = new CorpusProofTransport({ role: 'preview', token: 'synthetic-test-token', readBudget, eventFile: join(directory, 'events.jsonl'), fetch: fetcher });
   const query: ProofQuery = { kind: 'select', label: 'fixture', sql: 'SELECT 1 n', readCeiling: 100, writeCeiling: 0 };
   return { transport, calls, query, events: () => readFileSync(join(directory, 'events.jsonl'), 'utf8'), close: () => { clock.mockRestore(); vi.useRealTimers(); rmSync(directory, { recursive: true, force: true }); } };
 }
 
 describe('single-attempt corpus proof transport', () => {
+  it('rechecks both active/configured bindings with six GETs and zero SQL or analytics', async () => {
+    const f=transportFixture('',0); try {
+      expect(await f.transport.observeControls()).toHaveLength(2);
+      expect(f.calls).toHaveLength(6); expect(f.calls.every(c=>c.method==='GET')).toBe(true);
+      expect(f.transport.metering).toEqual({rowsRead:0,rowsWritten:0,requests:0,retries:0,unknownAttempts:0,integrityCommands:0});
+    } finally {f.close();}
+    const wrong=transportFixture('binding',0); try {await expect(wrong.transport.observeControls()).rejects.toThrow('configured D1 binding');} finally {wrong.close();}
+    const producer=transportFixture(''); try {await expect(producer.transport.observeControls()).rejects.toThrow('metadata-only observer');expect(producer.calls).toHaveLength(0);} finally {producer.close();}
+  });
   it('meters one primary attempt and proves both bindings unchanged', async () => {
     const f = transportFixture(''); try {
       await f.transport.start(); await expect(f.transport.execute(f.query)).resolves.toEqual([{ n: 1 }]);

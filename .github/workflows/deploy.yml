@@ -414,6 +414,7 @@ jobs:
           export PRODUCTION_RELEASE_FIRST_PARENT
           node scripts/resolve-production-release-context.mjs manual-context-output >> "$GITHUB_OUTPUT"
           before="$PRODUCTION_RELEASE_FIRST_PARENT"
+          printf 'operator_base=%s\n' "$before" >> "$GITHUB_OUTPUT"
           printf '%s' "$before" | grep -Eq '^[0-9a-f]{40}$'
           git cat-file -e "${before}^{commit}"
           git merge-base --is-ancestor "$before" HEAD
@@ -524,41 +525,40 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      # The protected environment approval covers a complete fresh comparison
-      # and exactly four diagnostic FTS INSERT commands. They never rebuild data.
+      # Production still requires its independent source-bound proof and its
+      # separate protected approval. No production operation is authorized here.
       - name: Verify fresh corpus (up to 3.8M reads and four integrity commands)
+        if: hashFiles('release/application-only.json') != ''
         id: corpus-proof
-        run: |
-          candidate_d1_name="$(< "$RUNNER_TEMP/production-candidate-d1-name.txt")"
-          if test -f release/application-only.json; then
-            APPLICATION_CORPUS_PROOF_APPROVAL_JSON="$(node --input-type=module - <<'JS'
-          import {execFileSync} from 'node:child_process';
-          import {ACCOUNT,TARGETS} from './scripts/application-release-policy.mjs';
-          const git=ref=>execFileSync('git',['rev-parse',ref],{encoding:'utf8'}).trim();
-          process.stdout.write(JSON.stringify({schemaVersion:'theologai-fresh-corpus-proof-approval.v1',role:'production',accountId:ACCOUNT,databaseId:TARGETS.production.databaseId,sourceCommit:git('HEAD'),sourceTree:git('HEAD^{tree}'),expiresAt:new Date(Date.now()+5400000).toISOString(),maxReads:3800000,integrityCommands:4,exclusiveDataWritesDuringProof:true}));
-          JS
-            )"
-            export APPLICATION_CORPUS_PROOF_APPROVAL_JSON
-            npx --no-install tsx scripts/application-corpus-check.ts verify \
-              --role production --directory "$RUNNER_TEMP/corpus-source" \
-              --plan-sha256 "$CORPUS_PLAN_SHA256" --output "$RUNNER_TEMP/production-d1-readiness-receipt.json"
-          else
-            npx --no-install tsx scripts/check-remote-d1-readiness.ts --database "$candidate_d1_name" \
-              --output "$RUNNER_TEMP/production-d1-readiness-receipt.json"
-          fi
+        uses: ./.github/actions/operator-corpus-proof
+        with:
+          role: production
+          source-plan-sha256: ${{ needs.build-worker.outputs.corpus_plan_sha256 }}
+          base-commit: ${{ steps.production-release-context.outputs.operator_base }}
+          output: ${{ runner.temp }}/production-d1-readiness-receipt.json
         env:
-          CORPUS_PLAN_SHA256: ${{ needs.build-worker.outputs.corpus_plan_sha256 }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-
+      - name: Verify legacy production D1 readiness
+        if: hashFiles('release/application-only.json') == ''
+        id: legacy-corpus-proof
+        run: |
+          candidate_d1_name="$(< "$RUNNER_TEMP/production-candidate-d1-name.txt")"
+          npx --no-install tsx scripts/check-remote-d1-readiness.ts --database "$candidate_d1_name" --output "$RUNNER_TEMP/production-d1-readiness-receipt.json"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       - name: Upload sanitized production D1 readiness receipt
-        if: always() && steps.corpus-proof.outcome != 'skipped'
+        if: always() && (steps.corpus-proof.outcome != 'skipped' || steps.legacy-corpus-proof.outcome != 'skipped')
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: production-d1-readiness-${{ github.sha }}
           path: |
             ${{ runner.temp }}/production-d1-readiness-receipt.json
             ${{ runner.temp }}/production-d1-readiness-receipt.json.events.jsonl
+            ${{ runner.temp }}/production-d1-readiness-receipt.json.controls.jsonl
+            ${{ runner.temp }}/operator-corpus-challenge.json
+            ${{ runner.temp }}/operator-proof/operator-proof-envelope.json
             ${{ runner.temp }}/corpus-source/plan.json
           retention-days: 30
           if-no-files-found: error

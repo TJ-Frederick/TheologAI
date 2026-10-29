@@ -73,15 +73,10 @@ describe('one-command preview FTS diagnostic', () => {
     const result = spawnSync(process.execPath, ['--import', 'tsx', 'scripts/preview-fts-diagnostic.ts', '/unused/receipt.json'], { encoding: 'utf8', env, timeout: 10_000 });
     expect(result.status).toBe(1); expect(result.stderr).toContain('FTS-only diagnostic refused');
   });
-  it('executes the exact workflow approval generator without credentials', () => {
-    const workflow = parse(readFileSync('.github/workflows/pr.yml', 'utf8')) as { jobs: Record<string, { steps: { id?: string; run?: string }[] }> };
-    const command = workflow.jobs['preview-fts-diagnostic']!.steps.find(s => s.id === 'diagnostic')!.run!;
-    const generator = command.match(/<<'JS_APPROVAL'\n([\s\S]*?)\nJS_APPROVAL/)![1]!;
-    const env: NodeJS.ProcessEnv = { ...process.env, EXPECTED_SOURCE: identity.sourceCommit, EXPECTED_TREE: identity.sourceTree, GITHUB_RUN_ID: identity.runId, FTS_SOURCE_RUN_ID: identity.sourceRunId };
-    delete env.CLOUDFLARE_API_TOKEN;
-    const result = spawnSync(process.execPath, ['--import', 'tsx', '--input-type=module', '-'], { input: generator, encoding: 'utf8', env, timeout: 10_000 });
-    expect(result.status, result.stderr).toBe(0);
-    expect(() => requireFtsDiagnosticApproval(JSON.parse(result.stdout), identity)).not.toThrow();
+  it('does not retain a diagnostic-only writer in the active workflow', () => {
+    const workflow = parse(readFileSync('.github/workflows/pr.yml','utf8')) as {jobs:Record<string,unknown>};
+    expect(workflow.jobs['preview-fts-diagnostic']).toBeUndefined();
+    expect(workflow.jobs['operator-corpus-proof']).toBeDefined();
   });
 });
 

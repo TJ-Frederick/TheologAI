@@ -10,8 +10,8 @@
     "conformance": 1
   },
   "current": {
-    "totalTestTypeScript": 292,
-    "activeVitest": 213,
+    "totalTestTypeScript": 293,
+    "activeVitest": 214,
     "support": 24,
     "manual": 4,
     "legacyOrphan": 50,
@@ -173,6 +173,7 @@
       "test/unit/scripts/morphologyLemma.test.ts",
       "test/unit/scripts/morphologyUsageIdentity.test.ts",
       "test/unit/scripts/nortonCapacityDecisionEvidence.test.ts",
+      "test/unit/scripts/operatorCorpusProof.test.ts",
       "test/unit/scripts/originalLanguageContextCapacity.test.ts",
       "test/unit/scripts/originalLanguageStudyV2DraftInertness.test.ts",
       "test/unit/scripts/originalLanguageStudyV2Inertness.test.ts",
