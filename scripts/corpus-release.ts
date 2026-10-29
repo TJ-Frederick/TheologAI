@@ -222,6 +222,7 @@ export interface JournalEntry {
 export type CorpusExecutor = ((sql: string) => Promise<Meter>) & { databaseId?: string };
 export interface SessionDependencies {
     databaseId: string;
+    productionReadReserve?: number;
     execute: CorpusExecutor;
     usage(): Promise<Usage>;
     guard(): Promise<void>;
@@ -250,6 +251,9 @@ export class CorpusSession implements ProofReader {
     } = { reads: LIMITS.proofReads, writes: LIMITS.proofWrites }, readonly now = () => Date.now()) {
         check([TARGETS.preview.id, TARGETS.production.id].includes(dependencies.databaseId), 'unknown session target');
         check(dependencies.execute.databaseId === undefined || dependencies.execute.databaseId === dependencies.databaseId, 'executor/session target mismatch');
+        const reserve = dependencies.productionReadReserve ?? LIMITS.productionReserve;
+        check(Number.isSafeInteger(reserve) && reserve >= 0 && reserve <= LIMITS.productionReserve, 'invalid production read reserve');
+        check(reserve === LIMITS.productionReserve || (dependencies.databaseId === TARGETS.preview.id && new Date(now()).toISOString().slice(0, 10) === '2026-10-29'), 'reduced reserve is only authorized for the October 29 preview');
     }
     async query(sql: string, readCeiling: number, writeCeiling = 0): Promise<Meter> {
         check(!this.busy, 'concurrent operation');
@@ -274,7 +278,7 @@ export class CorpusSession implements ProofReader {
             this.windowWrites = 0;
         }
         const effectiveReads = Math.max(usage.rowsRead, this.anchor.rowsRead + this.windowReads), effectiveWrites = Math.max(usage.rowsWritten, this.anchor.rowsWritten + this.windowWrites);
-        if (effectiveReads + readCeiling + LIMITS.productionReserve + LIMITS.lagReserve > LIMITS.dailyReads || effectiveWrites + writeCeiling > LIMITS.dailyWrites || this.reads + readCeiling > this.maximum.reads || this.writes + writeCeiling > this.maximum.writes)
+        if (effectiveReads + readCeiling + (this.dependencies.productionReadReserve ?? LIMITS.productionReserve) + LIMITS.lagReserve > LIMITS.dailyReads || effectiveWrites + writeCeiling > LIMITS.dailyWrites || this.reads + readCeiling > this.maximum.reads || this.writes + writeCeiling > this.maximum.writes)
             throw new AllowancePause('Operation not admitted; pause before dispatch');
         const index = this.requests;
         const sqlSha256 = sha(sql);

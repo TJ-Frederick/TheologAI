@@ -14,7 +14,7 @@ import { auditCorpusRelease } from './audit-corpus-release.js';
 import { createCorpusPreviewArtifact, verifyCorpusPreviewArtifact, type CorpusLiveAudit } from './corpus-release-artifact.js';
 const digest = z.string().regex(/^[0-9a-f]{64}$/), count = z.number().int().nonnegative();
 export const executionApprovalSchema = z.object({ schemaVersion: z.literal('norton-aquinas-execution-approval.v1'), status: z.literal('approved'), role: z.enum(['preview', 'production']), databaseId: z.string().uuid(),
-    exclusiveCandidateSql: z.literal(true), candidateJobsPaused: z.literal(true), ownerCustodySha256: digest, windowStart: z.string().datetime(), expiresAt: z.string().datetime(), knownRowsRead: count, knownRowsWritten: count, expectedLedgerSha256: digest, previewCustodyUnbroken: z.boolean().optional(), previewCustodyEvidenceSha256: digest.optional() }).strict();
+    exclusiveCandidateSql: z.literal(true), candidateJobsPaused: z.literal(true), ownerCustodySha256: digest, windowStart: z.string().datetime(), expiresAt: z.string().datetime(), knownRowsRead: count, knownRowsWritten: count, expectedLedgerSha256: digest, useRemainingProductionReserve: z.literal(true).optional(), previewCustodyUnbroken: z.boolean().optional(), previewCustodyEvidenceSha256: digest.optional() }).strict();
 export type ExecutionApproval = z.infer<typeof executionApprovalSchema>;
 export function parseExecutionApproval(value: unknown, role: 'preview' | 'production', now = Date.now()): ExecutionApproval {
     const a = executionApprovalSchema.parse(value);
@@ -22,7 +22,19 @@ export function parseExecutionApproval(value: unknown, role: 'preview' | 'produc
         check(a.previewCustodyUnbroken === true && a.previewCustodyEvidenceSha256, 'production requires an unbroken sealed-preview custody witness');
     check(a.role === role && a.databaseId === TARGETS[role].id, 'approval target differs');
     check(a.windowStart === new Date(now).toISOString().slice(0, 10) + 'T00:00:00.000Z' && Date.parse(a.expiresAt) > now && Date.parse(a.expiresAt) <= now + 3 * 60 * 60000, 'approval window expired or unsupported');
+    check(!a.useRemainingProductionReserve || (role === 'preview' && a.windowStart === '2026-10-29T00:00:00.000Z'), 'reduced reserve is only authorized for the October 29 preview');
     return a;
+}
+/** Owner-authorized one-day exception; fix the remaining reserve before any candidate SQL. */
+export function executionBudget(approval: ExecutionApproval, observedRowsRead: number) {
+    check(Number.isSafeInteger(observedRowsRead) && observedRowsRead >= 0, 'invalid observed account reads');
+    const effectiveAccountReads = Math.max(observedRowsRead, approval.knownRowsRead);
+    const previewReads = LIMITS.proofReads + LIMITS.liveReads + LIMITS.controlsReads;
+    const productionReadReserve = approval.useRemainingProductionReserve
+        ? Math.min(LIMITS.productionReserve, LIMITS.dailyReads - effectiveAccountReads - previewReads - LIMITS.lagReserve)
+        : LIMITS.productionReserve;
+    check(productionReadReserve >= 0 && effectiveAccountReads + previewReads + productionReadReserve + LIMITS.lagReserve <= LIMITS.dailyReads, 'complete proof/live window not admitted');
+    return { schemaVersion: 'norton-aquinas-budget-admission.v1', windowStart: approval.windowStart, ownerCustodySha256: approval.ownerCustodySha256, effectiveAccountReads, previewReads, productionReadReserve, analyticsMargin: LIMITS.lagReserve };
 }
 export function executionConfig(text: string, role: 'preview' | 'production', root: string): string {
     const config = parseToml(text) as any;
@@ -86,7 +98,8 @@ export async function executeVerification(input: {
     mkdirSync(directory, { recursive: true });
     const before = await captureUnboundCorpusControl({ role, api, now });
     write(join(directory, 'corpus-control-before.json'), before);
-    check(Math.max(before.accountUsage.rowsRead, approval.knownRowsRead) + 3660000 + LIMITS.productionReserve + LIMITS.lagReserve <= LIMITS.dailyReads, 'complete proof/live window not admitted');
+    const budget = executionBudget(approval, before.accountUsage.rowsRead);
+    write(join(directory, 'corpus-budget-admission.json'), budget);
     check(Math.max(before.accountUsage.rowsWritten, approval.knownRowsWritten) + LIMITS.proofWrites <= LIMITS.dailyWrites, 'complete proof write reservation not admitted');
     const activeProduction = before.inventory.workers.find(worker => worker.name === 'theologai');
     check(activeProduction && hash(activeProduction.configuredD1) === hash([TARGETS.rollback.id]) && activeProduction.versions.length === 1 && activeProduction.versions[0].percentage === 100 && hash(activeProduction.versions[0].databases) === hash([TARGETS.rollback.id]), 'production rollback assignment changed');
@@ -102,14 +115,14 @@ export async function executeVerification(input: {
     } return { ...usage, rowsRead: Math.max(usage.rowsRead, knownReads), rowsWritten: Math.max(usage.rowsWritten, knownWrites) }; };
     const guard = async () => { parseExecutionApproval(approval, role, now()); check(Date.parse(approval.expiresAt) - now() > 30000, 'custody too near expiry for another operation'); check(now() - started <= LIMITS.durationMs, 'proof duration exceeded'); };
     const execute = createCorpusD1Executor(role, api.authorizedFetch);
-    const preflight = new CorpusSession({ databaseId: TARGETS[role].id, execute, usage: getUsage, guard, append: journal(join(directory, 'corpus-preflight-journal.jsonl')) }, { reads: 10000, writes: 0 }, now);
+    const preflight = new CorpusSession({ databaseId: TARGETS[role].id, productionReadReserve: budget.productionReadReserve, execute, usage: getUsage, guard, append: journal(join(directory, 'corpus-preflight-journal.jsonl')) }, { reads: 10000, writes: 0 }, now);
     const ledger = (await preflight.query(LEDGER_SQL, 128)).rows;
     const original = ledger.slice(0, role === 'preview' ? 10 : 9);
     check(sha(JSON.stringify(original)) === approval.expectedLedgerSha256, 'reviewed provider ledger differs');
     knownReads += preflight.reads;
     const control = (capture: typeof before): Control => ({ databaseId: TARGETS[role].id, sourceCommit: context.sourceCommit, sourceTree: context.sourceTree, unbound: true, ownerCustodySha256: approval.ownerCustodySha256, bindingInventorySha256: capture.inventorySha256 });
     let captures = 0;
-    const session = new CorpusSession({ databaseId: TARGETS[role].id, execute, usage: getUsage, guard, append: journal(join(directory, 'corpus-verification-journal.jsonl')) }, undefined, now);
+    const session = new CorpusSession({ databaseId: TARGETS[role].id, productionReadReserve: budget.productionReadReserve, execute, usage: getUsage, guard, append: journal(join(directory, 'corpus-verification-journal.jsonl')) }, undefined, now);
     const db = new Database(input.databasePath, { readonly: true, fileMustExist: true });
     let receipt;
     try {
@@ -177,8 +190,10 @@ export async function runCorpusOperator(argv: string[], dependencies: {
         verifyReceipt(receipt, source, { role, sourceCommit: context.sourceCommit, sourceTree: context.sourceTree, control: receipt.observed.control, ledger });
         const api = createCorpusApi(role, dependencies.readToken ?? (async () => { check(process.env.CLOUDFLARE_API_TOKEN, 'protected credential unavailable'); return process.env.CLOUDFLARE_API_TOKEN; }), dependencies.fetch);
         const usage = await captureCorpusUsage({ role, api });
+        const budget = executionBudget(approval, read(join(directory, 'corpus-control-before.json')).accountUsage.rowsRead);
+        check(hash(budget) === hash(read(join(directory, 'corpus-budget-admission.json'))), 'admitted production reserve changed');
         const effective = Math.max(usage.candidate.rowsRead + usage.otherDatabases.rowsRead, approval.knownRowsRead + receipt.metering.rowsRead + 128);
-        check(effective + LIMITS.liveReads + LIMITS.productionReserve + LIMITS.lagReserve <= LIMITS.dailyReads, 'live profile read admission failed');
+        check(effective + LIMITS.liveReads + budget.productionReadReserve + LIMITS.lagReserve <= LIMITS.dailyReads, 'live profile read admission failed');
         const live = await auditCorpusRelease({ role, root, databasePath, endpoint: role === 'preview' ? 'https://preview-mcp.theologai.xyz/mcp' : 'https://mcp.theologai.xyz/mcp', serverVersion: role === 'preview' ? '3.6.0-preview' : '3.6.0', fetch: dependencies.fetch ?? fetch });
         parseExecutionApproval(approval, role);
         write(output, live);

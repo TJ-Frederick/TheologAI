@@ -134,15 +134,20 @@ it.skipIf(!existsSync('data/theologai.db'))('runs the protected verification dri
         db.prepare('INSERT INTO d1_migrations(id,name,applied_at) VALUES(?,?,?)').run(row.id, row.name, row.applied_at);
     db.close();
     const native = new Native(join(directory, 'native')), fixture = corpusControlFixture();
+    const proofNow = Date.parse('2026-10-29T12:00:00Z');
+    const proofApproval = parseExecutionApproval({ ...approval, windowStart: '2026-10-29T00:00:00.000Z', expiresAt: '2026-10-29T14:30:00.000Z', knownRowsRead: 571753, useRemainingProductionReserve: true, expectedLedgerSha256: sha(JSON.stringify(ledger)) }, 'preview', proofNow);
+    const originalUsage = fixture.api.graphql;
+    fixture.api.graphql = async () => { const value: any = await (await originalUsage()).json(); value.data.viewer.accounts[0].databases[0].sum.rowsRead = 571753; return Response.json(value); };
     let calls = 0;
     try {
         await native.load(path);
         const api = { ...fixture.api, authorizedFetch: (async (url: any, init: any) => { expect(String(url)).toContain(TARGETS.preview.id); const sql = JSON.parse(init.body).sql; const measured = await native.exec(sql); calls++; return Response.json({ success: true, result: [{ success: true, results: measured.rows, meta: { rows_read: measured.rowsRead, rows_written: measured.rowsWritten } }] }); }) as typeof fetch };
-        const receipt = await executeVerification({ role: 'preview', approval: parseExecutionApproval({ ...approval, expectedLedgerSha256: sha(JSON.stringify(ledger)) }, 'preview', NOW), context: { sourceCommit: 'a'.repeat(40), sourceTree: 'b'.repeat(40), repository: 'owner/repo', pullRequest: 1, workflowRunId: 2 }, root: process.cwd(), databasePath: 'data/theologai.db', output: join(directory, 'corpus-verification.json'), api, now: () => NOW });
-        const inputs = { role: 'preview' as const, approval: parseExecutionApproval({ ...approval, expectedLedgerSha256: sha(JSON.stringify(ledger)) }, 'preview', NOW), context: { sourceCommit: 'a'.repeat(40), sourceTree: 'b'.repeat(40), repository: 'owner/repo', pullRequest: 1, workflowRunId: 2 }, source: JSON.parse(readFileSync(join(directory, 'corpus-source-proof.json'), 'utf8')), receipt, ledger };
-        expect(admitActivation(inputs, NOW).target.id).toBe(TARGETS.preview.id);
-        expect(() => admitActivation({ ...inputs, approval: { ...inputs.approval, ownerCustodySha256: 'f'.repeat(64) } }, NOW)).toThrow('custody');
-        expect(() => admitActivation(inputs, NOW + 140 * 60000)).toThrow('custody');
+        const receipt = await executeVerification({ role: 'preview', approval: proofApproval, context: { sourceCommit: 'a'.repeat(40), sourceTree: 'b'.repeat(40), repository: 'owner/repo', pullRequest: 1, workflowRunId: 2 }, root: process.cwd(), databasePath: 'data/theologai.db', output: join(directory, 'corpus-verification.json'), api, now: () => proofNow });
+        const inputs = { role: 'preview' as const, approval: proofApproval, context: { sourceCommit: 'a'.repeat(40), sourceTree: 'b'.repeat(40), repository: 'owner/repo', pullRequest: 1, workflowRunId: 2 }, source: JSON.parse(readFileSync(join(directory, 'corpus-source-proof.json'), 'utf8')), receipt, ledger };
+        expect(admitActivation(inputs, proofNow).target.id).toBe(TARGETS.preview.id);
+        expect(() => admitActivation({ ...inputs, approval: { ...inputs.approval, ownerCustodySha256: 'f'.repeat(64) } }, proofNow)).toThrow('custody');
+        expect(() => admitActivation(inputs, proofNow + 140 * 60000)).toThrow('custody');
+        expect(JSON.parse(readFileSync(join(directory, 'corpus-budget-admission.json'), 'utf8')).productionReadReserve).toBe(568247);
         expect(receipt.metering.requests).toBe(3336);
         expect(calls).toBe(3337);
         expect(receipt.metering.rowsRead).toBe(3346717);

@@ -202,6 +202,16 @@ Each proof/live/control window reserves 3,660,000 reads plus 1,000,000 productio
 headroom and 200,000 analytics lag reserve: 4,860,000 total. Start only if effective
 account usage is at most 140,000 reads. Every individual operation rechecks
 admission; a table page does not receive permission from the headline total alone.
+For the owner-authorized **2026-10-29 UTC preview only**, protected input may set
+`useRemainingProductionReserve:true`. At proof start the operator reserves all
+3,660,000 preview reads and the unchanged 200,000 analytics margin, then fixes
+production headroom at the remaining reads (at most the normal 1,000,000). It
+refuses if those reservations do not fit, records the exact amount in
+`corpus-budget-admission.json`, and retains that same reserve for every SQL
+operation and the live profile. The owner accepts possible shared-allowance
+exhaustion and production-query interruption until reset. Other UTC days and
+production retain the normal reserve; verification, write ceilings, custody,
+unknown-outcome controls and separate production approval are unchanged.
 Preparation has its own allowance window(s); do not add its 250,000 reservation to
 a full proof window. Never exceed the project operating ceiling of 80,000 writes
 per UTC day. The 115,000 lifetime preparation reservation allows two write windows
@@ -310,7 +320,8 @@ security reconciliation requires renewed source binding and appropriate reruns.
    UTC-day allowance start, known same-window usage, expiry two to three hours
    ahead, `exclusiveCandidateSql:true` and `candidateJobsPaused:true`.
    Start with at least two hours left in the UTC day, no more than 140,000
-   effective account reads, and admission for the full 4,100-write reservation.
+   effective account reads (except the explicit October 29 preview headroom
+   authorization above), and admission for the full 4,100-write reservation.
    Existing label/head/revocation checks, shared preview concurrency and protected
    environment approval remain intact. No new locking or permissions system exists.
 4. **Execute the existing protected PR job once.** It builds the source DB, runs
