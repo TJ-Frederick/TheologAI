@@ -103,9 +103,9 @@ describe('complete fresh application corpus verification',()=>{
   it('requires indexed, bounded keyset pages',()=>{const f=fixture();try{expect(()=>sourcePage(f.source,'documents',null,0)).toThrow();expect(()=>sourcePage(f.source,'documents;DROP TABLE documents',null)).toThrow();expect(sourcePage(f.source,'documents',null).expected).toHaveLength(1);}finally{f.close();}});
 });
 
-function transportFixture(fault: string, readBudget = 3_510_997) {
+function transportFixture(fault: string, readBudget = 3_510_997, buffer = false) {
   const directory = mkdtempSync(join(tmpdir(), 'theologai-transport-test-'));
-  vi.useFakeTimers({ now: new Date('2026-10-27T12:00:00Z') });
+  vi.useFakeTimers({ now: new Date(buffer ? '2026-10-29T12:00:00Z' : '2026-10-27T12:00:00Z') });
   let tick = Date.now(); const clock = vi.spyOn(Date, 'now').mockImplementation(() => tick += 1000);
   const calls: { path: string; body: unknown; method: string }[] = [];
   let sqlCalls = 0;
@@ -115,7 +115,7 @@ function transportFixture(fault: string, readBudget = 3_510_997) {
     calls.push({ path, body, method: options?.method ?? 'GET' });
     let value: unknown;
     if (path.endsWith('/graphql')) {
-      value = { data: { viewer: { accounts: [{ accountTag: ACCOUNT, d1AnalyticsAdaptiveGroups: [{ sum: { rowsRead: fault === 'headroom' ? 4_000_000 : 100, rowsWritten: 0 }, avg: { sampleInterval: fault === 'sampled' ? 2 : 1 } }] }] } } };
+      value = { data: { viewer: { accounts: [{ accountTag: ACCOUNT, d1AnalyticsAdaptiveGroups: [{ sum: { rowsRead: fault === 'headroom' ? 4_000_000 : fault === 'daytime' ? 601_058 : 100, rowsWritten: 0 }, avg: { sampleInterval: fault === 'sampled' ? 2 : 1 } }] }] } } };
     } else if (path.endsWith('/query')) {
       sqlCalls++;
       if (fault === 'network') throw Error('synthetic failed attempt');
@@ -140,12 +140,28 @@ function transportFixture(fault: string, readBudget = 3_510_997) {
     }
     return Response.json(value);
   };
-  const transport = new CorpusProofTransport({ role: 'preview', token: 'synthetic-test-token', readBudget, eventFile: join(directory, 'events.jsonl'), fetch: fetcher });
+  const transport = new CorpusProofTransport({ role: 'preview', token: 'synthetic-test-token', readBudget, eventFile: join(directory, 'events.jsonl'), fetch: fetcher, previewQuotaBuffer:buffer });
   const query: ProofQuery = { kind: 'select', label: 'fixture', sql: 'SELECT 1 n', readCeiling: 100, writeCeiling: 0 };
   return { transport, calls, query, events: () => readFileSync(join(directory, 'events.jsonl'), 'utf8'), close: () => { clock.mockRestore(); vi.useRealTimers(); rmSync(directory, { recursive: true, force: true }); } };
 }
 
 describe('single-attempt corpus proof transport', () => {
+  it('uses the approved daytime preview buffer with live-audit and uncertainty reserves',async()=>{
+    const f=transportFixture('daytime',3_510_997,true);try {
+      await f.transport.start();await f.transport.execute(f.query);await f.transport.finish();
+      expect(f.events()).toContain('"accountReadCeiling":5000000');expect(f.events()).toContain('"liveAuditReadReserve":500000');
+      expect(f.events()).toContain('"previewQuotaBufferDay":"2026-10-29"');
+    } finally {f.close();}
+    const standard=transportFixture('daytime');try {await expect(standard.transport.start()).rejects.toThrow('headroom');expect(standard.calls.some(c=>c.path.endsWith('/query'))).toBe(false);}finally{standard.close();}
+  });
+  it('refuses the preview buffer on production and outside its authorized UTC day',()=>{
+    const dir=mkdtempSync(join(tmpdir(),'theologai-buffer-boundary-'));try {
+      for(const [role,day] of [['production','2026-10-29'],['preview','2026-10-30']] as const){
+        vi.useFakeTimers({now:new Date(day+'T12:00:00Z')});
+        expect(()=>new CorpusProofTransport({role,token:'synthetic-token',readBudget:3510997,eventFile:join(dir,'unused.jsonl'),previewQuotaBuffer:true})).toThrow('preview quota buffer date/role');
+      }
+    }finally{vi.useRealTimers();rmSync(dir,{recursive:true,force:true});}
+  });
   it('rechecks both active/configured bindings with six GETs and zero SQL or analytics', async () => {
     const f=transportFixture('',0); try {
       expect(await f.transport.observeControls()).toHaveLength(2);
@@ -210,6 +226,10 @@ describe('source, approval and metering boundaries',()=>{
     expect(()=>admitCorpusBudget(100000,3600000,100000,0)).not.toThrow();
     expect(()=>admitCorpusBudget(100001,3700000,0,0)).toThrow();
     expect(()=>admitCorpusBudget(0,0,3799999,2)).toThrow();
+    expect(()=>admitCorpusBudget(789003,3510997,0,0,5000000,500000)).not.toThrow();
+    expect(()=>admitCorpusBudget(789004,3510997,0,0,5000000,500000)).toThrow();
+    expect(()=>admitCorpusBudget(0,3510997,0,0,5000000,0)).toThrow('policy');
+    expect(()=>admitCorpusBudget(0,3510997,0,0,6000000,500000)).toThrow('policy');
   });
   it('refuses missing, expired, wrong-role or broader verification approval',()=>{
     const now=Date.parse('2026-10-27T12:00:00Z');const expected={role:'preview' as const,sourceCommit:'a'.repeat(40),sourceTree:'b'.repeat(40)};

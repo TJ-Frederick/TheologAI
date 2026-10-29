@@ -7,7 +7,7 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ACCOUNT, TARGETS, classifyApplicationRelease, verifyFreshCorpusReceipt } from './application-release-policy.mjs';
 import { runFreshApplicationCorpusCheck } from './application-corpus-check.js';
-import { CorpusProofTransport } from './corpus-proof-transport.js';
+import { CorpusProofTransport, PREVIEW_QUOTA_BUFFER_DAY } from './corpus-proof-transport.js';
 
 const check = (v: unknown, reason: string): void => { if (!v) throw Error('Operator corpus proof refused: ' + reason); };
 const sha = (v: string | Buffer) => createHash('sha256').update(v).digest('hex');
@@ -157,7 +157,8 @@ export async function runOperatorProof(input: { challenge:OperatorChallenge; dir
     ledger.attempts.push(attempt); save();
     let lastGuard = Date.now();
     try {
-      transport = new CorpusProofTransport({role:c.role,token:input.token,readBudget:plan.readBudget,eventFile:input.output+'.receipt.json.events.jsonl'});
+      transport = new CorpusProofTransport({role:c.role,token:input.token,readBudget:plan.readBudget,eventFile:input.output+'.receipt.json.events.jsonl',
+        previewQuotaBuffer:c.role==='preview' && c.authorizationId===OPERATOR_PROOF.previewAuthorization && c.createdAt.startsWith(PREVIEW_QUOTA_BUFFER_DAY+'T')});
       const receipt = await runFreshApplicationCorpusCheck({root:process.cwd(),role:c.role,directory:input.directory,planSha256:input.planSha256,
         output:input.output+'.receipt.json',approval:operatorApproval(c),token:input.token,transport:{metering:transport.metering,
           start:()=>transport!.start(), finish:()=>finishOperatorMetadata(()=>transport!.finish(),async()=>{

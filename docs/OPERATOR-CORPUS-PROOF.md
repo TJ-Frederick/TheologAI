@@ -47,6 +47,17 @@ ceiling; account writes plus four must fit 80,000. Start only when the entire
 for that window; application reads may continue. This is an owner reservation,
 not a provider-enforced lease.
 
+For **October 29, 2026 UTC only**, the owner waived the usual production read
+buffer for this preview. The existing operator authorization may therefore use
+the 5,000,000-read Free allowance, retaining the 200,000-read analytics margin
+and reserving 500,000 reads for the unchanged fixed live audits. Full-proof
+admission requires usage + 3,510,997 + 200,000 + 500,000 ≤ 5,000,000; periodic
+checks preserve that live-audit reserve. The complete proof's 3.8M cumulative
+cap, four-command/write limit and all other checks are unchanged. The exception
+is rejected for production and outside that UTC date. Production queries may
+exhaust the shared allowance before the 00:00 UTC reset, a risk accepted by the
+owner. The duplicate evening follow-up is paused.
+
 Production uses the same full receipt consumer behind its existing separate
 environment and release gates. A preview receipt cannot authorize production.
 Production needs its own source-matched fresh proof, budget, timing and rollback
