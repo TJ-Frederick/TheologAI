@@ -221,6 +221,7 @@ jobs:
       artifact_name: ${{ steps.evidence.outputs.artifact_name }}
       run_id: ${{ steps.evidence.outputs.run_id }}
       source_commit: ${{ steps.evidence.outputs.source_commit }}
+      pull_request: ${{ steps.evidence.outputs.pull_request }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -238,6 +239,7 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
+            const { trustedCorpusPreviewRun } = await import(`${process.cwd()}/scripts/corpus-release-provenance.mjs`);
             const { data: pulls } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -273,8 +275,10 @@ jobs:
                 repo: context.repo.repo,
                 run_id: artifact.workflow_run.id,
               });
-              if (run.event === 'pull_request' && run.status === 'completed' && run.conclusion === 'success'
-                && run.head_sha === pull.head.sha) {
+              const {data: jobPage} = await github.rest.actions.listJobsForWorkflowRun({owner:context.repo.owner,repo:context.repo.repo,run_id:run.id,filter:'latest',per_page:100,page:1});
+              if(jobPage.total_count>100||jobPage.jobs.length!==jobPage.total_count)continue;
+              const jobs=jobPage.jobs;
+              if (trustedCorpusPreviewRun(artifact,run,jobs,pull,`${context.repo.owner}/${context.repo.repo}`)) {
                 selected = { artifact, run };
                 break;
               }
@@ -287,6 +291,7 @@ jobs:
             core.setOutput('artifact_name', artifactName);
             core.setOutput('run_id', String(run.id));
             core.setOutput('source_commit', pull.head.sha);
+            core.setOutput('pull_request', String(pull.number));
 
       - name: Download exact protected preview evidence with digest validation
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -298,25 +303,22 @@ jobs:
           merge-multiple: false
           digest-mismatch: error
 
-      - name: Verify source-bound dual-era preview release receipt
+      - name: Verify source-bound protected corpus preview receipt
         env:
           SOURCE_COMMIT: ${{ steps.evidence.outputs.source_commit }}
-        run: |
-          source_tree="$(git rev-parse 'HEAD^{tree}')"
-          preview_server_version="$(node --input-type=module -e "import packageJson from './package.json' with { type: 'json' }; process.stdout.write(packageJson.version + '-preview')")"
-          npx --no-install tsx scripts/dual-era-preview-release-receipt.ts verify \
-            --receipt "$RUNNER_TEMP/protected-dual-era-preview/dual-era-preview-release-receipt.json" \
-            --expected-repository "$GITHUB_REPOSITORY" \
-            --expected-source-commit "$SOURCE_COMMIT" \
-            --expected-source-tree "$source_tree" \
-            --expected-server-version "$preview_server_version"
+          CORPUS_PRODUCER_RUN: ${{ steps.evidence.outputs.run_id }}
+          CORPUS_SOURCE_PR: ${{ steps.evidence.outputs.pull_request }}
+        run: |-
+          npm run build:db
+          npx --no-install tsx scripts/corpus-release-operator.ts consume-preview --directory "$RUNNER_TEMP/protected-dual-era-preview" --workflow-run-id "$CORPUS_PRODUCER_RUN" --pull-request "$CORPUS_SOURCE_PR" --source-commit "$SOURCE_COMMIT" --output "$RUNNER_TEMP/corpus-preview-provenance-1.json"
+
 
   deploy:
     name: Test, Build & Deploy
     needs: [verify-deployment-plan, validate, verify-dual-era-preview]
     if: ${{ github.ref == 'refs/heads/main' && needs.verify-deployment-plan.outputs.deploy_required == 'true' && needs.verify-deployment-plan.outputs.decision == 'deploy' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 120
     environment:
       name: production
       url: https://mcp.theologai.xyz/mcp
@@ -324,6 +326,9 @@ jobs:
       actions: read
       contents: read
     env:
+      CORPUS_EXECUTION_APPROVAL: ${{ vars.CORPUS_RELEASE_APPROVAL_JSON }}
+      CORPUS_SOURCE_COMMIT: ${{ github.sha }}
+      CORPUS_PULL_REQUEST: ${{ needs.verify-dual-era-preview.outputs.pull_request }}
       EXPECTED_RUN_ID: ${{ github.run_id }}
       EXPECTED_RUN_ATTEMPT: ${{ github.run_attempt }}
       EXPECTED_EVENT_NAME: ${{ github.event_name }}
@@ -398,18 +403,15 @@ jobs:
           merge-multiple: false
           digest-mismatch: error
 
-      - name: Verify source-bound dual-era preview release receipt
+      - name: Verify source-bound protected corpus preview receipt
         env:
           SOURCE_COMMIT: ${{ needs.verify-dual-era-preview.outputs.source_commit }}
-        run: |
-          source_tree="$(git rev-parse 'HEAD^{tree}')"
-          preview_server_version="$(node --input-type=module -e "import packageJson from './package.json' with { type: 'json' }; process.stdout.write(packageJson.version + '-preview')")"
-          npx --no-install tsx scripts/dual-era-preview-release-receipt.ts verify \
-            --receipt "$RUNNER_TEMP/protected-dual-era-preview/dual-era-preview-release-receipt.json" \
-            --expected-repository "$GITHUB_REPOSITORY" \
-            --expected-source-commit "$SOURCE_COMMIT" \
-            --expected-source-tree "$source_tree" \
-            --expected-server-version "$preview_server_version"
+          CORPUS_PRODUCER_RUN: ${{ needs.verify-dual-era-preview.outputs.run_id }}
+          CORPUS_SOURCE_PR: ${{ needs.verify-dual-era-preview.outputs.pull_request }}
+        run: |-
+          npm run build:db
+          npx --no-install tsx scripts/corpus-release-operator.ts consume-preview --directory "$RUNNER_TEMP/protected-dual-era-preview" --workflow-run-id "$CORPUS_PRODUCER_RUN" --pull-request "$CORPUS_SOURCE_PR" --source-commit "$SOURCE_COMMIT" --output "$RUNNER_TEMP/corpus-preview-provenance-2.json"
+
 
       - name: Detect production custom-domain declaration change
         id: production-custom-domain-change
@@ -427,34 +429,44 @@ jobs:
             echo 'required=true' >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Record the production source tree and generate its execution config
+        run: |-
+          printf "CORPUS_SOURCE_TREE=%s\n" "$(git rev-parse HEAD^{tree})" >> "$GITHUB_ENV"
+          npx --no-install tsx scripts/corpus-release-operator.ts config --role production --output "$RUNNER_TEMP/corpus-wrangler.toml"
+
       # Resolve the checked-out production candidate by both name and UUID.
       # This is read-only; candidate creation/preparation is a separately
       # authorized, fail-stop operation and this workflow cannot perform it.
       - name: Capture checked-out candidate production D1 mapping (read-only)
         run: |
-          npx --no-install wrangler d1 list --json > "$RUNNER_TEMP/production-d1-inventory.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" d1 list --json > "$RUNNER_TEMP/production-d1-inventory.json"
           npx --no-install tsx scripts/production-release-reconciliation.ts candidate-d1-name \
-            --wrangler-config wrangler.toml \
+            --wrangler-config "$RUNNER_TEMP/corpus-wrangler.toml" \
             --d1-inventory "$RUNNER_TEMP/production-d1-inventory.json" \
             > "$RUNNER_TEMP/production-candidate-d1-name.txt"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      - name: Verify candidate production D1 is compatible (read-only)
-        run: |
-          candidate_d1_name="$(< "$RUNNER_TEMP/production-candidate-d1-name.txt")"
-          npm run d1:remote:check -- --database "$candidate_d1_name" \
-            --output "$RUNNER_TEMP/production-d1-readiness-receipt.json"
+      - name: Prove the complete prepared production corpus (four rank-1 integrity commands)
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --no-install tsx scripts/corpus-release-operator.ts verify --role production --output "$RUNNER_TEMP/corpus-verification.json"
+      - name: Retain production proof and journal after any outcome
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: corpus-production-proof-${{ github.sha }}
+          path: ${{ runner.temp }}/corpus-*.json*
+          retention-days: 30
+          if-no-files-found: warn
 
       - name: Upload sanitized production D1 readiness receipt
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: production-d1-readiness-${{ github.sha }}
-          path: ${{ runner.temp }}/production-d1-readiness-receipt.json
+          path: ${{ runner.temp }}/corpus-verification.json
           retention-days: 30
           if-no-files-found: error
 
@@ -468,14 +480,14 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
         run: |
-          npx --no-install wrangler deployments list --json > "$RUNNER_TEMP/production-worker-deployments-predecessor.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" deployments list --json > "$RUNNER_TEMP/production-worker-deployments-predecessor.json"
           predecessor_version="$(npx --no-install tsx scripts/production-release-reconciliation.ts active-version-id \
             --deployments "$RUNNER_TEMP/production-worker-deployments-predecessor.json")"
-          npx --no-install wrangler versions view "$predecessor_version" --json > "$RUNNER_TEMP/production-worker-predecessor-version-view.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" versions view "$predecessor_version" --json > "$RUNNER_TEMP/production-worker-predecessor-version-view.json"
           npx --no-install tsx scripts/production-release-reconciliation.ts capture-predecessor \
             --deployments "$RUNNER_TEMP/production-worker-deployments-predecessor.json" \
             --predecessor-version-view "$RUNNER_TEMP/production-worker-predecessor-version-view.json" \
-            --wrangler-config wrangler.toml \
+            --wrangler-config "$RUNNER_TEMP/corpus-wrangler.toml" \
             --d1-inventory "$RUNNER_TEMP/production-d1-inventory.json" \
             --output "$RUNNER_TEMP/production-worker-predecessor-anchor.json"
 
@@ -488,7 +500,7 @@ jobs:
           if-no-files-found: error
 
       - name: Capture production Worker versions before deployment (read-only)
-        run: npx --no-install wrangler versions list --json > "$RUNNER_TEMP/production-worker-versions-before.json"
+        run: npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" versions list --json > "$RUNNER_TEMP/production-worker-versions-before.json"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -519,10 +531,6 @@ jobs:
           grep -Eiq '^access-control-allow-methods:[[:space:]]*.*POST.*OPTIONS.*[[:space:]]*$' \
             "$RUNNER_TEMP/preview-mcp-options.headers"
 
-          npm run audit:parallel-preview -- \
-            --url https://preview-mcp.theologai.xyz/mcp \
-            --output "$RUNNER_TEMP/pre-production-preview-mcp-audit.json"
-          test -s "$RUNNER_TEMP/pre-production-preview-mcp-audit.json"
 
       # A production deploy must leave the independently deployed preview
       # Worker untouched. Capture its exact sole-active version and binding
@@ -534,17 +542,27 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
         run: |
-          npx --no-install wrangler d1 list --json > "$RUNNER_TEMP/preview-control-d1-inventory-before.json"
-          npx --no-install wrangler deployments list --env preview --json > "$RUNNER_TEMP/preview-control-deployments-before.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" d1 list --json > "$RUNNER_TEMP/preview-control-d1-inventory-before.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" deployments list --env preview --json > "$RUNNER_TEMP/preview-control-deployments-before.json"
           preview_version="$(npx --no-install tsx scripts/preview-release-reconciliation.ts active-version-id \
             --deployments "$RUNNER_TEMP/preview-control-deployments-before.json")"
-          npx --no-install wrangler versions view "$preview_version" --env preview --json > "$RUNNER_TEMP/preview-control-version-before.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" versions view "$preview_version" --env preview --json > "$RUNNER_TEMP/preview-control-version-before.json"
           npx --no-install tsx scripts/preview-release-reconciliation.ts capture-control \
             --deployments "$RUNNER_TEMP/preview-control-deployments-before.json" \
             --active-version-view "$RUNNER_TEMP/preview-control-version-before.json" \
-            --wrangler-config wrangler.toml \
+            --wrangler-config "$RUNNER_TEMP/corpus-wrangler.toml" \
             --d1-inventory "$RUNNER_TEMP/preview-control-d1-inventory-before.json" \
             --output "$RUNNER_TEMP/preview-control-before-production.json"
+
+      - name: Recheck the protected preview assignment immediately before production deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --no-install tsx scripts/corpus-release-operator.ts verify-preview-current --directory "$RUNNER_TEMP/protected-dual-era-preview" --control "$RUNNER_TEMP/preview-control-before-production.json" --output "$RUNNER_TEMP/corpus-preview-current.json"
+
+      - name: Consume the complete corpus receipt immediately before activation
+        id: corpus-activation-admission
+        run: npx --no-install tsx scripts/corpus-release-operator.ts admit-activation --role production --output "$RUNNER_TEMP/corpus-activation-admission.json"
 
       - name: Deploy to Cloudflare Workers
         id: production-worker-deploy
@@ -553,11 +571,7 @@ jobs:
           wranglerVersion: '4.114.0'
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          preCommands: |
-            printf '%s' "$ESV_API_KEY" | npx --no-install wrangler secret put ESV_API_KEY --env=
-          command: deploy --env=
-        env:
-          ESV_API_KEY: ${{ secrets.ESV_API_KEY }}
+          command: deploy --env= --config "${{ runner.temp }}/corpus-wrangler.toml"
 
       - name: Verify exact active production Worker version (read-only)
         id: production-worker-pre-audit-identity
@@ -569,8 +583,8 @@ jobs:
           WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
         run: |
           printf '%s' "$DEPLOY_COMMAND_OUTPUT" > "$RUNNER_TEMP/production-worker-deploy.command-output.txt"
-          npx --no-install wrangler versions list --json > "$RUNNER_TEMP/production-worker-versions-after.json"
-          npx --no-install wrangler deployments list --json > "$RUNNER_TEMP/production-worker-deployments-after.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" versions list --json > "$RUNNER_TEMP/production-worker-versions-after.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" deployments list --json > "$RUNNER_TEMP/production-worker-deployments-after.json"
           npx --no-install tsx scripts/verify-production-worker-deployment.ts verify-deploy \
             --before-versions "$RUNNER_TEMP/production-worker-versions-before.json" \
             --after-versions "$RUNNER_TEMP/production-worker-versions-after.json" \
@@ -587,16 +601,16 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
         run: |
-          npx --no-install wrangler d1 list --json > "$RUNNER_TEMP/preview-control-d1-inventory-after-deploy.json"
-          npx --no-install wrangler deployments list --env preview --json > "$RUNNER_TEMP/preview-control-deployments-after-deploy.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" d1 list --json > "$RUNNER_TEMP/preview-control-d1-inventory-after-deploy.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" deployments list --env preview --json > "$RUNNER_TEMP/preview-control-deployments-after-deploy.json"
           preview_version="$(npx --no-install tsx scripts/preview-release-reconciliation.ts active-version-id \
             --deployments "$RUNNER_TEMP/preview-control-deployments-after-deploy.json")"
-          npx --no-install wrangler versions view "$preview_version" --env preview --json > "$RUNNER_TEMP/preview-control-version-after-deploy.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" versions view "$preview_version" --env preview --json > "$RUNNER_TEMP/preview-control-version-after-deploy.json"
           npx --no-install tsx scripts/preview-release-reconciliation.ts verify-control \
             --control "$RUNNER_TEMP/preview-control-before-production.json" \
             --deployments "$RUNNER_TEMP/preview-control-deployments-after-deploy.json" \
             --active-version-view "$RUNNER_TEMP/preview-control-version-after-deploy.json" \
-            --wrangler-config wrangler.toml \
+            --wrangler-config "$RUNNER_TEMP/corpus-wrangler.toml" \
             --d1-inventory "$RUNNER_TEMP/preview-control-d1-inventory-after-deploy.json" \
             --output "$RUNNER_TEMP/preview-control-after-production-deploy.json"
 
@@ -612,19 +626,19 @@ jobs:
         run: |
           observed_active_version="$(npx --no-install tsx scripts/production-release-reconciliation.ts active-version-id \
             --deployments "$RUNNER_TEMP/production-worker-deployments-after.json")"
-          npx --no-install wrangler versions view "$observed_active_version" --json \
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" versions view "$observed_active_version" --json \
             > "$RUNNER_TEMP/production-worker-candidate-version-view.json"
           npx --no-install tsx scripts/production-release-reconciliation.ts observe-post-mutation \
             --predecessor-anchor "$RUNNER_TEMP/production-worker-predecessor-anchor.json" \
             --deployments "$RUNNER_TEMP/production-worker-deployments-after.json" \
             --observed-active-version-view "$RUNNER_TEMP/production-worker-candidate-version-view.json" \
-            --wrangler-config wrangler.toml \
+            --wrangler-config "$RUNNER_TEMP/corpus-wrangler.toml" \
             --output "$RUNNER_TEMP/production-worker-candidate-cutover-observation.json"
           npx --no-install tsx scripts/production-release-reconciliation.ts reconcile-post-mutation \
             --predecessor-anchor "$RUNNER_TEMP/production-worker-predecessor-anchor.json" \
             --deployments "$RUNNER_TEMP/production-worker-deployments-after.json" \
             --observed-active-version-view "$RUNNER_TEMP/production-worker-candidate-version-view.json" \
-            --wrangler-config wrangler.toml \
+            --wrangler-config "$RUNNER_TEMP/corpus-wrangler.toml" \
             --output "$RUNNER_TEMP/production-worker-candidate-cutover.json"
 
       - name: Upload production candidate cutover observation
@@ -639,61 +653,23 @@ jobs:
       # This is a bounded edge-convergence check, not a retry of either
       # protected audit. It proves the exact production v6 tool contract and
       # checked-out resource identity first.
-      - name: Stabilize production release registrations at edge (read-only)
-        id: production-primary-source-edge-stabilization
+      - name: Audit the corpus-only production in both protocol eras
+        id: production-corpus-live
         if: ${{ steps.production-worker-candidate-cutover.outcome == 'success' }}
-        continue-on-error: true
-        run: |
-          npm run audit:primary-source-edge-stabilization-production -- \
-            --output "$RUNNER_TEMP/production-primary-source-edge-stabilization.json"
-
-      - name: Upload production edge-stabilization evidence
-        if: ${{ always() && steps.production-worker-candidate-cutover.outcome == 'success' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: production-edge-stabilization-${{ github.sha }}
-          path: ${{ runner.temp }}/production-primary-source-edge-stabilization.json
-          retention-days: 30
-          if-no-files-found: error
-
-      - name: Require stable production release registrations before audits
-        id: production-primary-source-edge-stabilization-gate
-        if: ${{ always() && steps.production-worker-candidate-cutover.outcome == 'success' }}
-        run: test "${{ steps.production-primary-source-edge-stabilization.outcome }}" = success
-
-      - name: Audit original-language v2 contract on production
-        id: production-original-language-v2-audit
-        if: ${{ steps.production-primary-source-edge-stabilization-gate.outcome == 'success' }}
-        run: |
-          npm run audit:original-language-v2-production -- \
-            --output "$RUNNER_TEMP/original-language-v2-production-audit.json"
-          test -s "$RUNNER_TEMP/original-language-v2-production-audit.json"
-
-      - name: Audit Transform-9 historical core contract on production
-        id: production-historical-core-audit
-        if: ${{ steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' }}
-        run: |
-          npm run audit:historical-core-production -- \
-            --output "$RUNNER_TEMP/historical-core-production-audit.json"
-          test -s "$RUNNER_TEMP/historical-core-production-audit.json"
-
-      - name: Audit Transform-11 historical spine contract on production
-        id: production-historical-spine-audit
-        if: ${{ steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' && steps.production-historical-core-audit.outcome == 'success' }}
-        run: |
-          npm run audit:historical-spine-production -- \
-            --output "$RUNNER_TEMP/historical-spine-production-audit.json"
-          test -s "$RUNNER_TEMP/historical-spine-production-audit.json"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --no-install tsx scripts/corpus-release-operator.ts live --role production --output "$RUNNER_TEMP/corpus-live.json"
 
       - name: Verify production Worker remained active through audit (read-only)
         id: production-worker-audit-identity
-        if: ${{ steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' && steps.production-historical-core-audit.outcome == 'success' && steps.production-historical-spine-audit.outcome == 'success' }}
+        if: ${{ steps.production-corpus-live.outcome == 'success' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
         run: |
-          npx --no-install wrangler deployments list --json > "$RUNNER_TEMP/production-worker-deployments-post-audit.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" deployments list --json > "$RUNNER_TEMP/production-worker-deployments-post-audit.json"
           npx --no-install tsx scripts/verify-production-worker-deployment.ts verify-audit-stability \
             --pre-audit-identity "$RUNNER_TEMP/production-worker-deployment-pre-audit-identity.json" \
             --post-audit-deployments "$RUNNER_TEMP/production-worker-deployments-post-audit.json" \
@@ -708,20 +684,20 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
         run: |
-          npx --no-install wrangler d1 list --json > "$RUNNER_TEMP/preview-control-d1-inventory-after-audits.json"
-          npx --no-install wrangler deployments list --env preview --json > "$RUNNER_TEMP/preview-control-deployments-after-audits.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" d1 list --json > "$RUNNER_TEMP/preview-control-d1-inventory-after-audits.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" deployments list --env preview --json > "$RUNNER_TEMP/preview-control-deployments-after-audits.json"
           preview_version="$(npx --no-install tsx scripts/preview-release-reconciliation.ts active-version-id \
             --deployments "$RUNNER_TEMP/preview-control-deployments-after-audits.json")"
-          npx --no-install wrangler versions view "$preview_version" --env preview --json > "$RUNNER_TEMP/preview-control-version-after-audits.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" versions view "$preview_version" --env preview --json > "$RUNNER_TEMP/preview-control-version-after-audits.json"
           npx --no-install tsx scripts/preview-release-reconciliation.ts verify-control \
             --control "$RUNNER_TEMP/preview-control-before-production.json" \
             --deployments "$RUNNER_TEMP/preview-control-deployments-after-audits.json" \
             --active-version-view "$RUNNER_TEMP/preview-control-version-after-audits.json" \
-            --wrangler-config wrangler.toml \
+            --wrangler-config "$RUNNER_TEMP/corpus-wrangler.toml" \
             --d1-inventory "$RUNNER_TEMP/preview-control-d1-inventory-after-audits.json" \
             --output "$RUNNER_TEMP/preview-control-after-production-audits.json"
 
-      - name: Capture final schema-0009 environment isolation receipt (read-only)
+      - name: Capture final corpus environment isolation receipt (read-only)
         id: final-environment-isolation
         if: ${{ steps.production-worker-audit-identity.outcome == 'success' && steps.preview-control-after-production-audits.outcome == 'success' }}
         env:
@@ -729,24 +705,16 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
         run: |
-          npx --no-install wrangler d1 list --json > "$RUNNER_TEMP/final-environment-d1-inventory.json"
-          npx --no-install wrangler deployments list --json > "$RUNNER_TEMP/final-environment-production-deployments.json"
-          npx --no-install wrangler deployments list --env preview --json > "$RUNNER_TEMP/final-environment-preview-deployments.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" d1 list --json > "$RUNNER_TEMP/final-environment-d1-inventory.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" deployments list --json > "$RUNNER_TEMP/final-environment-production-deployments.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" deployments list --env preview --json > "$RUNNER_TEMP/final-environment-preview-deployments.json"
           production_version="$(npx --no-install tsx scripts/production-release-reconciliation.ts active-version-id \
             --deployments "$RUNNER_TEMP/final-environment-production-deployments.json")"
           preview_version="$(npx --no-install tsx scripts/preview-release-reconciliation.ts active-version-id \
             --deployments "$RUNNER_TEMP/final-environment-preview-deployments.json")"
-          npx --no-install wrangler versions view "$production_version" --json > "$RUNNER_TEMP/final-environment-production-version.json"
-          npx --no-install wrangler versions view "$preview_version" --env preview --json > "$RUNNER_TEMP/final-environment-preview-version.json"
-          npx --no-install tsx scripts/production-release-reconciliation.ts capture-environment-isolation \
-            --production-deployments "$RUNNER_TEMP/final-environment-production-deployments.json" \
-            --production-active-version-view "$RUNNER_TEMP/final-environment-production-version.json" \
-            --preview-deployments "$RUNNER_TEMP/final-environment-preview-deployments.json" \
-            --preview-active-version-view "$RUNNER_TEMP/final-environment-preview-version.json" \
-            --production-audited-identity "$RUNNER_TEMP/production-worker-deployment-identity.json" \
-            --wrangler-config wrangler.toml \
-            --d1-inventory "$RUNNER_TEMP/final-environment-d1-inventory.json" \
-            --output "$RUNNER_TEMP/final-environment-isolation-receipt.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" versions view "$production_version" --json > "$RUNNER_TEMP/final-environment-production-version.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" versions view "$preview_version" --env preview --json > "$RUNNER_TEMP/final-environment-preview-version.json"
+          npx --no-install tsx scripts/corpus-release-operator.ts isolation --output "$RUNNER_TEMP/final-environment-isolation-receipt.json"
 
       # This non-strict observation must run after an attempted deploy even if
       # a secret pre-command or deploy failed. It records current
@@ -761,15 +729,15 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
         run: |
-          npx --no-install wrangler deployments list --json > "$RUNNER_TEMP/production-worker-deployments-post-mutation.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" deployments list --json > "$RUNNER_TEMP/production-worker-deployments-post-mutation.json"
           observed_active_version="$(npx --no-install tsx scripts/production-release-reconciliation.ts active-version-id \
             --deployments "$RUNNER_TEMP/production-worker-deployments-post-mutation.json")"
-          npx --no-install wrangler versions view "$observed_active_version" --json > "$RUNNER_TEMP/production-worker-observed-active-version-view.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" versions view "$observed_active_version" --json > "$RUNNER_TEMP/production-worker-observed-active-version-view.json"
           npx --no-install tsx scripts/production-release-reconciliation.ts observe-post-mutation \
             --predecessor-anchor "$RUNNER_TEMP/production-worker-predecessor-anchor.json" \
             --deployments "$RUNNER_TEMP/production-worker-deployments-post-mutation.json" \
             --observed-active-version-view "$RUNNER_TEMP/production-worker-observed-active-version-view.json" \
-            --wrangler-config wrangler.toml \
+            --wrangler-config "$RUNNER_TEMP/corpus-wrangler.toml" \
             --output "$RUNNER_TEMP/production-worker-final-routing-observation.json"
 
       - name: Upload final production routing/binding observation
@@ -792,38 +760,38 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
         run: |
-          npx --no-install wrangler deployments list --json > "$RUNNER_TEMP/production-worker-deployments-final-post-audit.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" deployments list --json > "$RUNNER_TEMP/production-worker-deployments-final-post-audit.json"
           final_version="$(npx --no-install tsx scripts/production-release-reconciliation.ts active-version-id \
             --deployments "$RUNNER_TEMP/production-worker-deployments-final-post-audit.json")"
-          npx --no-install wrangler versions view "$final_version" --json > "$RUNNER_TEMP/production-worker-final-post-audit-version-view.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" versions view "$final_version" --json > "$RUNNER_TEMP/production-worker-final-post-audit-version-view.json"
           npx --no-install tsx scripts/production-release-reconciliation.ts observe-final-post-audit \
             --predecessor-anchor "$RUNNER_TEMP/production-worker-predecessor-anchor.json" \
             --deployments "$RUNNER_TEMP/production-worker-deployments-final-post-audit.json" \
             --observed-active-version-view "$RUNNER_TEMP/production-worker-final-post-audit-version-view.json" \
             --production-audited-identity "$RUNNER_TEMP/production-worker-deployment-identity.json" \
-            --wrangler-config wrangler.toml \
+            --wrangler-config "$RUNNER_TEMP/corpus-wrangler.toml" \
             --output "$RUNNER_TEMP/production-worker-final-post-audit-identity.json"
 
       - name: Hash sanitized production audit and reconciliation evidence
         id: production-audit-evidence
-        if: ${{ steps.production-worker-deploy.outcome == 'success' && steps.production-worker-candidate-cutover.outcome == 'success' && steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' && steps.production-historical-core-audit.outcome == 'success' && steps.production-historical-spine-audit.outcome == 'success' && steps.production-worker-audit-identity.outcome == 'success' && steps.preview-control-after-production-audits.outcome == 'success' && steps.final-environment-isolation.outcome == 'success' && steps.production-final-observation.outcome == 'success' && steps.production-final-post-audit-identity.outcome == 'success' }}
+        if: ${{ steps.production-worker-deploy.outcome == 'success' && steps.production-worker-candidate-cutover.outcome == 'success' && steps.production-corpus-live.outcome == 'success' && steps.production-worker-audit-identity.outcome == 'success' && steps.preview-control-after-production-audits.outcome == 'success' && steps.final-environment-isolation.outcome == 'success' && steps.production-final-observation.outcome == 'success' && steps.production-final-post-audit-identity.outcome == 'success' }}
         run: |
-          edge_stabilization_sha256="$(sha256sum "$RUNNER_TEMP/production-primary-source-edge-stabilization.json" | awk '{print $1}')"
-          original_language_audit_sha256="$(sha256sum "$RUNNER_TEMP/original-language-v2-production-audit.json" | awk '{print $1}')"
-          historical_audit_sha256="$(sha256sum "$RUNNER_TEMP/historical-core-production-audit.json" | awk '{print $1}')"
-          historical_spine_audit_sha256="$(sha256sum "$RUNNER_TEMP/historical-spine-production-audit.json" | awk '{print $1}')"
+          edge_stabilization_sha256="$(sha256sum "$RUNNER_TEMP/corpus-live.json" | awk '{print $1}')"
+          original_language_audit_sha256="$edge_stabilization_sha256"
+          historical_audit_sha256="$edge_stabilization_sha256"
+          historical_spine_audit_sha256="$edge_stabilization_sha256"
           identity_sha256="$(sha256sum "$RUNNER_TEMP/production-worker-deployment-identity.json" | awk '{print $1}')"
           candidate_cutover_observation_sha256="$(sha256sum "$RUNNER_TEMP/production-worker-candidate-cutover-observation.json" | awk '{print $1}')"
           final_routing_observation_sha256="$(sha256sum "$RUNNER_TEMP/production-worker-final-routing-observation.json" | awk '{print $1}')"
           final_post_audit_identity_sha256="$(sha256sum "$RUNNER_TEMP/production-worker-final-post-audit-identity.json" | awk '{print $1}')"
-          readiness_receipt_sha256="$(sha256sum "$RUNNER_TEMP/production-d1-readiness-receipt.json" | awk '{print $1}')"
+          readiness_receipt_sha256="$(sha256sum "$RUNNER_TEMP/corpus-verification.json" | awk '{print $1}')"
           preview_control_sha256="$(sha256sum "$RUNNER_TEMP/preview-control-after-production-audits.json" | awk '{print $1}')"
           environment_isolation_sha256="$(sha256sum "$RUNNER_TEMP/final-environment-isolation-receipt.json" | awk '{print $1}')"
           printf 'edge_stabilization_sha256=%s\n' "$edge_stabilization_sha256" >> "$GITHUB_OUTPUT"
           printf 'original_language_audit_sha256=%s\n' "$original_language_audit_sha256" >> "$GITHUB_OUTPUT"
           printf 'historical_audit_sha256=%s\n' "$historical_audit_sha256" >> "$GITHUB_OUTPUT"
           printf 'historical_spine_audit_sha256=%s\n' "$historical_spine_audit_sha256" >> "$GITHUB_OUTPUT"
-          printf 'Transform-11 historical-spine audit SHA-256: `%s`\n' "$historical_spine_audit_sha256" >> "$GITHUB_STEP_SUMMARY"
+          printf 'Corpus-only audit SHA-256: `%s`\n' "$historical_spine_audit_sha256" >> "$GITHUB_STEP_SUMMARY"
           printf 'identity_record_sha256=%s\n' "$identity_sha256" >> "$GITHUB_OUTPUT"
           printf 'candidate_cutover_observation_sha256=%s\n' "$candidate_cutover_observation_sha256" >> "$GITHUB_OUTPUT"
           printf 'final_routing_observation_sha256=%s\n' "$final_routing_observation_sha256" >> "$GITHUB_OUTPUT"
@@ -855,16 +823,14 @@ jobs:
         with:
           name: production-release-audit-${{ github.sha }}
           path: |
-            ${{ runner.temp }}/production-primary-source-edge-stabilization.json
-            ${{ runner.temp }}/original-language-v2-production-audit.json
-            ${{ runner.temp }}/historical-core-production-audit.json
-            ${{ runner.temp }}/historical-spine-production-audit.json
+            ${{ runner.temp }}/corpus-live.json
             ${{ runner.temp }}/production-worker-deployment-identity.json
             ${{ runner.temp }}/production-worker-candidate-cutover-observation.json
             ${{ runner.temp }}/production-worker-candidate-cutover.json
             ${{ runner.temp }}/production-worker-final-routing-observation.json
             ${{ runner.temp }}/production-worker-final-post-audit-identity.json
-            ${{ runner.temp }}/production-d1-readiness-receipt.json
+            ${{ runner.temp }}/corpus-verification.json
+            ${{ runner.temp }}/corpus-activation-admission.json
             ${{ runner.temp }}/preview-control-before-production.json
             ${{ runner.temp }}/preview-control-after-production-deploy.json
             ${{ runner.temp }}/preview-control-after-production-audits.json

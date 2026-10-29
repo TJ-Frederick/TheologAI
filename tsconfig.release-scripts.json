@@ -24,6 +24,14 @@
     "scripts/macula-gate1.ts",
     "scripts/verify-database.ts",
     "scripts/ccel-live-preview-canary.ts",
-    "scripts/production-rollback-rehearsal.ts"
+    "scripts/production-rollback-rehearsal.ts",
+    "scripts/corpus-release.ts",
+    "scripts/corpus-release-data.ts",
+    "scripts/audit-corpus-release.ts",
+    "scripts/corpus-release-artifact.ts",
+    "scripts/corpus-release-control.ts",
+    "scripts/corpus-release-api.ts",
+    "scripts/corpus-release-operator.ts",
+    "scripts/corpus-control-diagnostic.ts"
   ]
 }

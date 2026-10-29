@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.test-node.json",
+  "include": [
+    "test/unit/scripts/corpusRelease*.test.ts",
+    "worker-configuration.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+}

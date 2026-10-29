@@ -499,14 +499,16 @@ export function captureEnvironmentIsolationReceipt(input: {
   previewActiveVersionViewText: string;
   wranglerConfigText: string;
   d1InventoryText: string;
+  corpusRelease?: boolean;
 }): EnvironmentIsolationReceipt {
   const auditedProduction = parseAuditedProductionWorkerIdentity(
     parseJson(input.productionAuditedIdentityText, 'audited production Worker identity'),
   );
   const productionD1 = checkedOutProductionCandidateD1(input.wranglerConfigText);
   const previewD1 = checkedOutCandidateD1(input.wranglerConfigText);
-  assertCurrentSchema0009D1(productionD1, 'production');
-  assertCurrentSchema0009D1(previewD1, 'preview');
+  if(input.corpusRelease){
+    assert(productionD1.databaseId==='74f456e2-6951-4003-bb6f-91951342bf8f'&&productionD1.databaseName==='theologai-preview-20260811-schema0009-a'&&previewD1.databaseId==='62b871a6-5b4d-4d9b-8f52-301f6c878f48'&&previewD1.databaseName==='theologai-preview-20260728-transform11-a','corpus release target pair differs');
+  }else{assertCurrentSchema0009D1(productionD1,'production');assertCurrentSchema0009D1(previewD1,'preview');}
   assert(productionD1.databaseId !== previewD1.databaseId && productionD1.databaseName !== previewD1.databaseName,
     'production and preview D1 identities must be distinct');
   assertCandidateD1Inventory(productionD1, input.d1InventoryText, 'production');

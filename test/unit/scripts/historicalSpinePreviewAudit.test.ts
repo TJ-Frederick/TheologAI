@@ -187,22 +187,22 @@ describe('Transform-11 historical-spine fixed audit', () => {
     }
   });
 
-  it('places both fixed audits after registration stabilization and before identity reconciliation, retaining their hash and evidence', async () => {
+  it('retains all spine probes in the single corpus profile before identity reconciliation', async () => {
     const [preview, production] = await Promise.all([
       readFile(new URL('.github/workflows/pr.yml', root), 'utf8'),
       readFile(new URL('.github/workflows/deploy.yml', root), 'utf8'),
     ]);
-    const previewAudit = preview.indexOf('Audit Transform-11 historical spine contract on preview');
-    expect(previewAudit).toBeGreaterThan(preview.indexOf('Stabilize preview release registrations at edge (read-only)'));
-    expect(previewAudit).toBeLessThan(preview.indexOf('Verify preview Worker remained active through audit (read-only)'));
-    expect(preview).toContain('historical-spine-preview-audit.json');
-    expect(preview).toContain('historical_spine_audit_sha256');
-    expect(preview).toContain('Transform-11 historical-spine audit SHA-256');
-    const productionAudit = production.indexOf('Audit Transform-11 historical spine contract on production');
-    expect(productionAudit).toBeGreaterThan(production.indexOf('Stabilize production release registrations at edge (read-only)'));
-    expect(productionAudit).toBeLessThan(production.indexOf('Verify production Worker remained active through audit (read-only)'));
-    expect(production).toContain('historical-spine-production-audit.json');
-    expect(production).toContain('historical_spine_audit_sha256');
-    expect(production).toContain('Transform-11 historical-spine audit SHA-256');
+    for(const [workflow,role] of [[preview,'preview'],[production,'production']] as const){
+      const cutover=workflow.indexOf('Require deployed candidate '+role+' D1 binding (read-only)');
+      const audit=workflow.indexOf('Audit the corpus-only '+role+' in both protocol eras');
+      const identity=workflow.indexOf('Verify '+role+' Worker remained active through audit (read-only)');
+      expect(cutover).toBeGreaterThan(-1);expect(audit).toBeGreaterThan(cutover);expect(identity).toBeGreaterThan(audit);
+      expect(workflow).toContain('corpus-live.json');
+      expect(workflow).toContain('sha256sum "$RUNNER_TEMP/corpus-live.json"');
+    }
+    const corpus=await readFile(new URL('scripts/audit-corpus-release.ts',root),'utf8');
+    expect(corpus).toContain('historical-spine-preview-audit.json');
+    expect(corpus).toContain('[...core.probes, ...spine.probes]');
+
   });
 });

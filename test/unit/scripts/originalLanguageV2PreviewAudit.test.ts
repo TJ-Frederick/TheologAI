@@ -79,7 +79,7 @@ describe('original-language v2 preview audit contract', () => {
 
     const deploy = workflow.indexOf('- name: Deploy to Cloudflare Workers (preview)');
     const preAuditIdentity = workflow.indexOf('- name: Verify exact active preview Worker version (read-only)');
-    const audit = workflow.indexOf('- name: Audit original-language v2 contract on preview');
+    const audit = workflow.indexOf('- name: Audit the corpus-only preview in both protocol eras');
     const postAuditIdentity = workflow.indexOf('- name: Verify preview Worker remained active through audit (read-only)');
     const comment = workflow.indexOf('- name: Comment preview URL on PR');
     expect(deploy).toBeGreaterThan(-1);
@@ -89,8 +89,11 @@ describe('original-language v2 preview audit contract', () => {
     expect(comment).toBeGreaterThan(postAuditIdentity);
     expect(workflow).toContain('group: theologai-shared-preview-mutation');
     expect(workflow).toContain('Verify exact active preview Worker version (read-only)');
-    expect(workflow).toContain('wrangler deployments list --env preview --json > "$RUNNER_TEMP/preview-worker-deployments-post-audit.json"');
+    expect(workflow).toContain('deployments list --env preview --json > "$RUNNER_TEMP/preview-worker-deployments-post-audit.json"');
     expect(workflow).toContain('Upload protected preview audit evidence');
+    const corpus=await readFile(new URL('scripts/audit-corpus-release.ts',root),'utf8');
+    expect(corpus).toContain('for (const c of language.cases)');
+    expect(corpus).toContain('original-language-v2-preview-audit.json');
   });
 
   it('runs the fixed 14-exchange protocol through a representative fake transport without retaining private bodies or cursors', async () => {

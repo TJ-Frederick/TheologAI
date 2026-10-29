@@ -222,21 +222,18 @@ describe('primary-source edge-stabilization gate', () => {
     expect(evidence.attempts).toEqual([expect.objectContaining({ outcome: 'transport_failure', requestCount: 1, responseBytes: 0 })]);
   });
 
-  it('wires explicit preview evidence and a strict gate before either protected preview audit', async () => {
+  it('requires strict registration comparison before the fixed corpus probes and retains protected evidence', async () => {
     const workflow = await readFile(new URL('.github/workflows/pr.yml', root), 'utf8');
-    const stabilize = workflow.indexOf('Stabilize preview release registrations at edge (read-only)');
-    const upload = workflow.indexOf('Upload preview edge-stabilization evidence');
-    const gate = workflow.indexOf('Require stable preview release registrations before audits');
-    const language = workflow.indexOf('Audit original-language v2 contract on preview');
-    const historical = workflow.indexOf('Audit Transform-9 historical core contract on preview');
-    expect(stabilize).toBeGreaterThan(-1);
-    expect(upload).toBeGreaterThan(stabilize);
-    expect(gate).toBeGreaterThan(upload);
-    expect(language).toBeGreaterThan(gate);
-    expect(historical).toBeGreaterThan(language);
-    expect(workflow).toContain('continue-on-error: true');
-    expect(workflow).toContain("if: ${{ steps.preview-worker-candidate-cutover.outcome == 'success' }}");
-    expect(workflow).toContain('edge_stabilization_sha256');
-    expect(workflow).toContain('preview-primary-source-edge-stabilization.json');
+    const corpus = await readFile(new URL('scripts/audit-corpus-release.ts', root), 'utf8');
+    const cutover=workflow.indexOf('Require deployed candidate preview D1 binding (read-only)');
+    const audit=workflow.indexOf('Audit the corpus-only preview in both protocol eras');
+    const artifact=workflow.indexOf('Create source-bound protected corpus preview receipt');
+    expect(cutover).toBeGreaterThan(-1);expect(audit).toBeGreaterThan(cutover);expect(artifact).toBeGreaterThan(audit);
+    expect(corpus.indexOf('assertMcpTransportContract(snapshot')).toBeLessThan(corpus.indexOf("probe('catalog'"));
+    expect(workflow).toContain('corpus_live_sha256');
+    expect(workflow).toContain('corpus-live.json');
+    expect(workflow).toContain('corpus-preview-release.json');
+    expect(workflow).not.toContain('npm run audit:primary-source-edge-stabilization-preview');
+
   });
 });

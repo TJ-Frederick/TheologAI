@@ -717,7 +717,7 @@ describe('published project contract', () => {
     expect(dataWorkflow).toContain('60 tables, 307,617,792 bytes, 35 documents, 4,111');
     expect(dataWorkflow).toContain('zero `historical_sectioned_publications` rows, and one corpus seal');
     expect(canaryScript).toContain("state: 'unrecorded'");
-    expect(workflow).toContain('preview-d1-readiness-receipt.json');
+    expect(workflow).toContain('corpus-verification.json');
     expect(workflow).toContain('Capture production control before preview deployment (read-only)');
     expect(workflow).toContain('Verify production control remained unchanged (read-only)');
     expect(workflow).toContain('Verify production control remained unchanged after preview audits (read-only)');

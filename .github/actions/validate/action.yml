@@ -35,6 +35,7 @@ runs:
         npm run typecheck:node
         npm run typecheck:release-scripts
         npm run typecheck:test-node
+        npm run typecheck:corpus-release
         npm run typecheck:test-scripts
         npm run typecheck:test-frozen-context-capacity
         npm run typecheck:worker
