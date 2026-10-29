@@ -10,8 +10,8 @@
     "conformance": 1
   },
   "current": {
-    "totalTestTypeScript": 299,
-    "activeVitest": 217,
+    "totalTestTypeScript": 300,
+    "activeVitest": 218,
     "support": 27,
     "manual": 4,
     "legacyOrphan": 50,
@@ -139,6 +139,7 @@
       "test/unit/scripts/classifyProductionDeployment.test.ts",
       "test/unit/scripts/corpusRelease.test.ts",
       "test/unit/scripts/corpusReleaseArtifact.test.ts",
+      "test/unit/scripts/corpusReleaseBudget.test.ts",
       "test/unit/scripts/corpusReleaseCorruption.test.ts",
       "test/unit/scripts/corpusReleaseIntegration.test.ts",
       "test/unit/scripts/corpusReleaseLive.test.ts",
