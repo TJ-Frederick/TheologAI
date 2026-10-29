@@ -9,21 +9,22 @@ import { parseExecutionApproval } from './corpus-release-operator.js';
 import { check, hash, sha, TARGETS } from './corpus-release.js';
 
 type Entry = Record<string, unknown>;
-export function diagnosticFetch(fetchImpl: typeof fetch, append: (entry: Entry) => Promise<void>, now = Date.now): typeof fetch {
+export function diagnosticFetch(fetchImpl: typeof fetch, append: (entry: Entry) => Promise<void>, now = Date.now, tokenIdentityOnly = false): typeof fetch {
     const started = now(), prefix = `https://api.cloudflare.com/client/v4/accounts/${CORPUS_ACCOUNT_ID}`;
     let requests = 0, aggregateBytes = 0, graphql = 0;
     return (async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input), method = init?.method ?? 'GET';
         const isGraphql = method === 'POST' && url === 'https://api.cloudflare.com/client/v4/graphql';
-        check((method === 'GET' && url.startsWith(prefix + '/')) || isGraphql, 'diagnostic forbids SQL and unrelated routes');
+        const isTokenVerify = method === 'GET' && [prefix + '/tokens/verify', 'https://api.cloudflare.com/client/v4/user/tokens/verify'].includes(url);
+        check(tokenIdentityOnly ? isTokenVerify : ((method === 'GET' && url.startsWith(prefix + '/')) || isGraphql), 'diagnostic forbids SQL and unrelated routes');
         if (url.includes('/d1/'))
             check(method === 'GET' && url === prefix + '/d1/database/' + TARGETS.preview.id, 'diagnostic permits only fixed candidate metadata');
         if (isGraphql) {
             const body = JSON.parse(String(init?.body)), day = new Date(now()).toISOString().slice(0, 10);
             check(body.query === CORPUS_USAGE_QUERY && body.variables?.accountTag === CORPUS_ACCOUNT_ID && body.variables.start === day && body.variables.end === day && ++graphql <= 2, 'diagnostic analytics scope differs');
         }
-        check(++requests <= CORPUS_CONTROL_LIMITS.exchanges && now() - started < CORPUS_CONTROL_LIMITS.durationMs, 'diagnostic request/time limit');
-        const index = requests - 1, route = isGraphql ? '/graphql' : url.slice(prefix.length);
+        check(++requests <= (tokenIdentityOnly ? 2 : CORPUS_CONTROL_LIMITS.exchanges) && now() - started < CORPUS_CONTROL_LIMITS.durationMs, 'diagnostic request/time limit');
+        const index = requests - 1, route = isGraphql ? '/graphql' : url.startsWith(prefix) ? url.slice(prefix.length) : '/user/tokens/verify';
         await append({ state: 'intent', index, method, route });
         try {
             const response = await fetchImpl(input, init), chunks: Uint8Array[] = [];
@@ -60,7 +61,9 @@ export function diagnosticFetch(fetchImpl: typeof fetch, append: (entry: Entry) 
 export async function runControlDiagnostic(input: { approval: unknown; output: string; readToken(): Promise<string>; fetch: typeof fetch; now?: () => number }) {
     const now = input.now ?? Date.now, value = input.approval as Record<string, unknown> | null;
     check(value && value.status === 'control-diagnostic', 'explicit control-diagnostic approval required');
-    const approval = parseExecutionApproval({ ...value, status: 'approved' }, 'preview', now());
+    const { identifyPreviewTokenOnly, ...execution } = value;
+    check(identifyPreviewTokenOnly === undefined || identifyPreviewTokenOnly === true, 'unsupported token identity mode');
+    const approval = parseExecutionApproval({ ...execution, status: 'approved' }, 'preview', now());
     check(Date.parse(approval.expiresAt) - now() >= 150000, 'insufficient diagnostic custody time');
     mkdirSync(dirname(input.output), { recursive: true });
     const journal = input.output + '.events.jsonl';
@@ -71,9 +74,26 @@ export async function runControlDiagnostic(input: { approval: unknown; output: s
         try { appendFileSync(handle, JSON.stringify({ ...entry, at: new Date(now()).toISOString() }) + '\n'); fsyncSync(handle); }
         finally { closeSync(handle); }
     };
-    const api = createCorpusApi('preview', async () => { parseExecutionApproval({ ...value, status: 'approved' }, 'preview', now()); return input.readToken(); }, diagnosticFetch(input.fetch, append, now));
+    const readToken = async () => { parseExecutionApproval({ ...execution, status: 'approved' }, 'preview', now()); return input.readToken(); };
+    if (identifyPreviewTokenOnly) {
+        const token = await readToken();
+        check(token.length > 0 && token.length <= 8192 && !/[\r\n]/.test(token), 'protected credential unavailable');
+        const audited = diagnosticFetch(input.fetch, append, now, true);
+        for (const owner of ['user', 'account'] as const) {
+            const url = owner === 'user' ? 'https://api.cloudflare.com/client/v4/user/tokens/verify' : `https://api.cloudflare.com/client/v4/accounts/${CORPUS_ACCOUNT_ID}/tokens/verify`;
+            const response = await audited(url, { method: 'GET', headers: { authorization: `Bearer ${token}`, accept: 'application/json' }, redirect: 'error', signal: AbortSignal.timeout(30000) });
+            if (owner === 'user' && [401, 403].includes(response.status)) continue;
+            check(response.status === 200, 'preview token identity could not be verified');
+            const result = await response.json() as { success?: boolean; result?: { id?: string; status?: string } };
+            check(result.success === true && /^[0-9a-f]{32}$/.test(result.result?.id ?? '') && result.result?.status === 'active' && result.result.id !== token, 'invalid preview token identity');
+            writeFileSync(input.output, JSON.stringify({ schemaVersion: 'norton-aquinas-preview-token-identity.v1', tokenId: result.result!.id, tokenOwner: owner, status: 'active', environment: 'preview', secretName: 'CLOUDFLARE_API_TOKEN', sourceCommit: process.env.CORPUS_SOURCE_COMMIT, sourceTree: process.env.CORPUS_SOURCE_TREE, capturedAt: new Date(now()).toISOString(), sqlCalls: 0, writes: 0, readinessReceipt: false, deployment: false }, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
+            return;
+        }
+        throw Error('Preview token identity unavailable; no other credential was inspected.');
+    }
+    const api = createCorpusApi('preview', readToken, diagnosticFetch(input.fetch, append, now));
     const control = await captureUnboundCorpusControl({ role: 'preview', api, now });
-    parseExecutionApproval({ ...value, status: 'approved' }, 'preview', now());
+    parseExecutionApproval({ ...execution, status: 'approved' }, 'preview', now());
     writeFileSync(input.output, JSON.stringify({ schemaVersion: 'norton-aquinas-control-diagnostic.v1', result: 'CONTROL_CAPTURE_COMPLETE_ONLY', databaseId: TARGETS.preview.id, capturedAt: control.capturedAt, inventorySha256: control.inventorySha256, controlSha256: hash(control), sqlCalls: 0, writes: 0, readinessReceipt: false, deployment: false }, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
 }
 
