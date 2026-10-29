@@ -116,8 +116,11 @@ describe('workflow topology', () => {
     const workflow = parse(await readWorkflow('pr.yml')) as Workflow;
     const source = workflow.jobs['fts-diagnostic-source']!;
     expect(source.environment).toBeUndefined(); expect(JSON.stringify(source)).not.toContain('secrets.');
-    expect(source.if).toContain("github.event_name == 'workflow_dispatch'");
-    expect(source.if).toContain('inputs.fts_diagnostic_only');
+    expect(source.if).toContain("github.event_name == 'pull_request'");
+    expect(source.if).toContain('github.event.pull_request.number == 167');
+    expect(source.if).toContain("'preview-fts-diagnostic'");
+    expect(needs(source)).toEqual(['build-worker']);
+    expect(source.steps![0]!.with!.ref).toBe('${{ github.event.pull_request.head.sha }}');
     const job = workflow.jobs['preview-fts-diagnostic']!;
     expect(needs(job)).toEqual(['fts-diagnostic-source', 'validation-complete']);
     expect(job.environment).toMatchObject({ name: 'preview' });
@@ -134,9 +137,19 @@ describe('workflow topology', () => {
     expect(job.steps![cloud]!.env!.CLOUDFLARE_API_TOKEN).toBe('${{ secrets.CLOUDFLARE_API_TOKEN }}');
     expect(job.steps!.find(s => s.with?.path === 'release-control')!.with!.ref).toBe('${{ needs.fts-diagnostic-source.outputs.base }}');
     expect(job.steps!.at(-1)!.if).toContain('always()');
-    // Normal validation remains unchanged; diagnostic dispatch also runs it.
+    // Use the existing refs/pull/*/merge environment policy, never a feature
+    // branch manual dispatch or a relaxed branch policy. All normal CI/artifacts
+    // must finish first, and this diagnostic must not also start a full proof.
+    expect(job.if).toContain("github.event_name == 'pull_request'");
+    expect(job.if).not.toContain('workflow_dispatch');
+    for (const step of job.steps!.filter(s => s.env?.FTS_SOURCE_RUN_ID)) {
+      expect(step.env!.FTS_SOURCE_RUN_ID).toBe('${{ github.run_id }}');
+    }
     expect(workflow.jobs.classify!.if).toBeUndefined();
     expect(workflow.jobs['preview-deploy']!.if).toContain("github.event.pull_request.state == 'open'");
+    expect(workflow.jobs['preview-deploy']!.if).toContain("!(github.event.pull_request.number == 167 && contains(github.event.pull_request.labels.*.name, 'preview-fts-diagnostic'))");
+    expect(workflow.jobs['build-worker']!.if).toContain("github.event.label.name == 'preview-fts-diagnostic'");
+    expect(workflow.concurrency.group).toContain("github.event.label.name == 'preview-fts-diagnostic'");
   });
   it('keeps root dependencies and builds out of every credential-bearing job', async () => {
     for (const name of [

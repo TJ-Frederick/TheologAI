@@ -8,7 +8,7 @@ import { parse } from 'yaml';
 import { ACCOUNT, TARGETS, verifyFreshCorpusReceipt } from '../../../scripts/application-release-policy.mjs';
 import { FTS_DIAGNOSTIC, requireFtsDiagnosticApproval, runFtsOnlyDiagnostic } from '../../../scripts/preview-fts-diagnostic.js';
 
-const identity = { sourceCommit: 'a'.repeat(40), sourceTree: 'b'.repeat(40), runId: '123', sourceRunId: '122' };
+const identity = { sourceCommit: 'a'.repeat(40), sourceTree: 'b'.repeat(40), runId: '123', sourceRunId: '123' };
 const approval = () => ({ schemaVersion: 'theologai-preview-fts-only-approval.v1', authorization: FTS_DIAGNOSTIC.authorization,
   role: 'preview', accountId: ACCOUNT, databaseId: TARGETS.preview.databaseId, ...identity,
   priorReads: 3_303_879, priorDiagnosticCommands: 1, maxReads: 4096, maxDiagnosticCommands: 1, runAttempt: 1,
@@ -88,19 +88,21 @@ describe('one-command preview FTS diagnostic', () => {
 describe('diagnostic exact-source normal CI admission', () => {
   const verify = createRequire(import.meta.url)('../../../.github/scripts/verify-fts-diagnostic-source.cjs') as (input: Record<string, unknown>) => Promise<void>;
   function setup() {
-    const pr = { state: 'open', draft: false, base: { ref: 'main', sha: 'c'.repeat(40) }, head: { sha: identity.sourceCommit, ref: 'candidate', repo: { full_name: 'TJ-Frederick/TheologAI' } }, labels: [{ name: 'deploy-preview' }] };
+    const pr = { state: 'open', draft: false, base: { ref: 'main', sha: 'c'.repeat(40) }, head: { sha: identity.sourceCommit, ref: 'codex/sec06-preview-credential-assessment', repo: { full_name: 'TJ-Frederick/TheologAI' } }, labels: [{ name: 'deploy-preview' }, { name: 'preview-fts-diagnostic' }] };
     const run = { head_sha: identity.sourceCommit, path: '.github/workflows/pr.yml', event: 'pull_request', run_attempt: 1, pull_requests: [{ number: 167, head: { sha: identity.sourceCommit }, base: { sha: 'c'.repeat(40) } }] };
     const jobs = ['Select Validation', 'Test & Build', 'Fresh Checkout & Data', 'Node HTTP E2E', 'Worker Runtime & D1', 'Applicable MCP Conformance', 'Validation Complete', 'Build preview Worker artifact (no cloud credentials)'].map(name => ({ name, status: 'completed', conclusion: 'success' }));
-    const artifacts = ['corpus', 'worker'].map(kind => ({ name: `${kind}-preview-122-attempt-1`, expired: false, expires_at: new Date(Date.now() + 3600_000).toISOString(), workflow_run: { head_sha: identity.sourceCommit, id: 122 }, digest: 'sha256:' + 'd'.repeat(64) }));
+    const artifacts = ['corpus', 'worker'].map(kind => ({ name: `${kind}-preview-123-attempt-1`, expired: false, expires_at: new Date(Date.now() + 3600_000).toISOString(), workflow_run: { head_sha: identity.sourceCommit, id: 123 }, digest: 'sha256:' + 'd'.repeat(64) }));
     const outputs: Record<string, string> = {};
     const priorArtifacts: { id: number }[] = [];
-    const input = { context: { repo: { owner: 'TJ-Frederick', repo: 'TheologAI' }, sha: identity.sourceCommit }, environment: { GITHUB_RUN_ATTEMPT: '1', FTS_SOURCE_RUN_ID: '122', GITHUB_REF: 'refs/heads/candidate' }, core: { setOutput: (key: string, value: string) => { outputs[key] = value; } }, github: { rest: { pulls: { get: async () => ({ data: pr }) }, actions: { listArtifactsForRepo: async () => ({ data: { artifacts: priorArtifacts } }), getWorkflowRun: async () => ({ data: run }), listJobsForWorkflowRun: async () => ({ data: { jobs } }), listWorkflowRunArtifacts: async () => ({ data: { artifacts } }) }, git: { getCommit: async () => ({ data: { tree: { sha: identity.sourceTree } } }) } } } };
+    // GitHub's protected PR ref has a merge SHA distinct from the head source.
+    // Bind the artifact and checkout to the verified live head, never that SHA.
+    const input = { context: { repo: { owner: 'TJ-Frederick', repo: 'TheologAI' }, sha: 'e'.repeat(40), eventName: 'pull_request', payload: { pull_request: { number: 167, head: { sha: identity.sourceCommit } } } }, environment: { GITHUB_RUN_ATTEMPT: '1', GITHUB_RUN_ID: '123', FTS_SOURCE_RUN_ID: '123', GITHUB_REF: 'refs/pull/167/merge' }, core: { setOutput: (key: string, value: string) => { outputs[key] = value; } }, github: { rest: { pulls: { get: async () => ({ data: pr }) }, actions: { listArtifactsForRepo: async () => ({ data: { artifacts: priorArtifacts } }), getWorkflowRun: async () => ({ data: run }), listJobsForWorkflowRun: async () => ({ data: { jobs } }), listWorkflowRunArtifacts: async () => ({ data: { artifacts } }) }, git: { getCommit: async () => ({ data: { tree: { sha: identity.sourceTree } } }) } } } };
     return { pr, run, jobs, artifacts, outputs, input, priorArtifacts };
   }
   it('accepts all normal CI and current source-bound artifacts for the exact live PR', async () => {
     const f = setup(); await verify(f.input); expect(f.outputs).toEqual({ source: identity.sourceCommit, tree: identity.sourceTree, base: 'c'.repeat(40) });
   });
-  for (const fault of ['head', 'fork', 'closed', 'draft', 'base', 'label', 'ref', 'rerun', 'failed-CI', 'skipped-CI', 'duplicate-CI', 'expired-artifact', 'wrong-artifact-source', 'wrong-workflow', 'wrong-event', 'stale-base-CI', 'wrong-artifact-run', 'source-rerun', 'replay']) it('rejects ' + fault, async () => {
+  for (const fault of ['head', 'fork', 'closed', 'draft', 'base', 'label', 'diagnostic-label', 'ref', 'manual-event', 'other-PR', 'feature-ref', 'other-source-run', 'payload-head', 'branch', 'rerun', 'failed-CI', 'skipped-CI', 'duplicate-CI', 'expired-artifact', 'wrong-artifact-source', 'wrong-workflow', 'wrong-event', 'stale-base-CI', 'wrong-artifact-run', 'source-rerun', 'replay']) it('rejects ' + fault, async () => {
     const f = setup();
     if (fault === 'head') f.pr.head.sha = 'f'.repeat(40);
     if (fault === 'fork') f.pr.head.repo.full_name = 'other/repo';
@@ -108,7 +110,14 @@ describe('diagnostic exact-source normal CI admission', () => {
     if (fault === 'draft') f.pr.draft = true;
     if (fault === 'base') f.pr.base.ref = 'other';
     if (fault === 'label') f.pr.labels = [];
+    if (fault === 'diagnostic-label') f.pr.labels = [{ name: 'deploy-preview' }];
     if (fault === 'ref') f.input.environment.GITHUB_REF = 'refs/heads/main';
+    if (fault === 'feature-ref') f.input.environment.GITHUB_REF = 'refs/heads/codex/sec06-preview-credential-assessment';
+    if (fault === 'manual-event') f.input.context.eventName = 'workflow_dispatch';
+    if (fault === 'other-PR') f.input.context.payload.pull_request.number = 168;
+    if (fault === 'other-source-run') f.input.environment.FTS_SOURCE_RUN_ID = '122';
+    if (fault === 'payload-head') f.input.context.payload.pull_request.head.sha = 'e'.repeat(40);
+    if (fault === 'branch') f.pr.head.ref = 'other';
     if (fault === 'rerun') f.input.environment.GITHUB_RUN_ATTEMPT = '2';
     if (fault === 'failed-CI') f.jobs[0]!.conclusion = 'failure';
     if (fault === 'skipped-CI') f.jobs[0]!.conclusion = 'skipped';

@@ -68,9 +68,14 @@ The new source requires fresh preview approval; no old approval is carried forwa
 
 After the first FTS request failed without usable response details, the owner
 approved one FTS-only diagnostic through the existing preview environment.
-Manual `pr.yml` dispatch with `fts_diagnostic_only=true` and the passed exact-source
-PR Checks run ID verifies that source's normal CI/artifacts and runs the normal
-validation checks again. The protected diagnostic uses the existing preview
+The first manual dispatch was rejected before any job steps or SQL: the existing
+preview branch policy permits only `refs/pull/*/merge`. The diagnostic now uses
+PR #167's normal event with both `deploy-preview` and `preview-fts-diagnostic`
+labels. It waits for all normal CI/artifacts in that same run, verifies their
+exact source, and selects the diagnostic instead of the full preview proof.
+Removing the diagnostic label restores the ordinary deployment route; its
+complete-proof and release-eligibility requirements are unchanged. No branch
+policy or reviewer configuration is changed. The protected diagnostic uses the existing preview
 secret and shared mutation lock, with live PR/source checks before cloud access.
 Its only SQL is the fixed rank-1 `strongs_fts` integrity command; it has no Worker
 upload, secret synchronization, seed, migration, rebuild or production path.

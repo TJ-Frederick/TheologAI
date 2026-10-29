@@ -7,15 +7,6 @@ on:
   schedule:
     - cron: '31 8 * * 1'
   workflow_dispatch:
-    inputs:
-      fts_diagnostic_only:
-        description: Run only the approved one-command preview FTS diagnostic
-        type: boolean
-        default: false
-      fts_source_run:
-        description: Passed PR Checks run for this exact commit
-        type: string
-        default: ""
 
 # Unrelated labels cannot cancel active validation or preview transactions.
 # Required checks still execute: emitting skipped contexts on a label event
@@ -23,7 +14,8 @@ on:
 concurrency:
   group: >-
     ${{ github.event_name == 'pull_request' &&
-        (github.event.action != 'labeled' || github.event.label.name == 'deploy-preview') &&
+        (github.event.action != 'labeled' || github.event.label.name == 'deploy-preview' ||
+         (github.event.pull_request.number == 167 && github.event.label.name == 'preview-fts-diagnostic')) &&
         format('pr-{0}', github.event.pull_request.number) || format('validation-{0}', github.run_id) }}
   cancel-in-progress: true
 
@@ -319,7 +311,8 @@ jobs:
     name: Build preview Worker artifact (no cloud credentials)
     needs: validation-complete
     if: >-
-      (github.event.action != 'labeled' || github.event.label.name == 'deploy-preview') &&
+      (github.event.action != 'labeled' || github.event.label.name == 'deploy-preview' ||
+       (github.event.pull_request.number == 167 && github.event.label.name == 'preview-fts-diagnostic')) &&
       github.event.pull_request.state == 'open' &&
       github.event.pull_request.draft == false &&
       github.event.pull_request.base.ref == 'main' &&
@@ -387,7 +380,8 @@ jobs:
       github.event.pull_request.draft == false &&
       github.event.pull_request.base.ref == 'main' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
-      contains(github.event.pull_request.labels.*.name, 'deploy-preview')
+      contains(github.event.pull_request.labels.*.name, 'deploy-preview') &&
+      !(github.event.pull_request.number == 167 && contains(github.event.pull_request.labels.*.name, 'preview-fts-diagnostic'))
     # Repository-wide serialization: this exact group is also held by the
     # manual CCEL canary and emergency restore, so neither can observe or
     # overwrite an ordinary preview deployment mid-transaction.
@@ -1044,7 +1038,8 @@ jobs:
 
   fts-diagnostic-source:
     name: Verify FTS-only diagnostic source (no cloud credentials)
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.fts_diagnostic_only && github.ref == 'refs/heads/codex/sec06-preview-credential-assessment' }}
+    needs: build-worker
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.number == 167 && github.event.pull_request.head.ref == 'codex/sec06-preview-credential-assessment' && contains(github.event.pull_request.labels.*.name, 'preview-fts-diagnostic') }}
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:
@@ -1058,13 +1053,13 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
       - name: Verify normal CI and live diagnostic authorization
         id: source
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
-          FTS_SOURCE_RUN_ID: ${{ inputs.fts_source_run }}
+          FTS_SOURCE_RUN_ID: ${{ github.run_id }}
         with:
           script: |
             await require('./.github/scripts/verify-fts-diagnostic-source.cjs')({github, context, core});
@@ -1072,7 +1067,7 @@ jobs:
   preview-fts-diagnostic:
     name: Preview FTS-only diagnostic
     needs: [fts-diagnostic-source, validation-complete]
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.fts_diagnostic_only && needs.fts-diagnostic-source.result == 'success' && needs.validation-complete.result == 'success' }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.number == 167 && contains(github.event.pull_request.labels.*.name, 'preview-fts-diagnostic') && needs.fts-diagnostic-source.result == 'success' && needs.validation-complete.result == 'success' }}
     concurrency:
       group: theologai-shared-preview-mutation
       cancel-in-progress: false
@@ -1094,7 +1089,7 @@ jobs:
         id: source
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
-          FTS_SOURCE_RUN_ID: ${{ inputs.fts_source_run }}
+          FTS_SOURCE_RUN_ID: ${{ github.run_id }}
         with:
           script: |
             await require('./.github/scripts/verify-fts-diagnostic-source.cjs')({github, context, core});
@@ -1146,7 +1141,7 @@ jobs:
         id: live-source
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
-          FTS_SOURCE_RUN_ID: ${{ inputs.fts_source_run }}
+          FTS_SOURCE_RUN_ID: ${{ github.run_id }}
         with:
           script: |
             await require('./.github/scripts/verify-fts-diagnostic-source.cjs')({github, context, core});
@@ -1154,7 +1149,7 @@ jobs:
       - name: Run one fixed preview FTS diagnostic (no deployment)
         id: diagnostic
         env:
-          FTS_SOURCE_RUN_ID: ${{ inputs.fts_source_run }}
+          FTS_SOURCE_RUN_ID: ${{ github.run_id }}
           EXPECTED_SOURCE: ${{ needs.fts-diagnostic-source.outputs.source }}
           EXPECTED_TREE: ${{ needs.fts-diagnostic-source.outputs.tree }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

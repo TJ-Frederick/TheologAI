@@ -29,7 +29,7 @@ export function requireFtsDiagnosticApproval(value: unknown, expected: Identity,
   check(Object.keys(a).sort().join(',') === [...Object.keys(required), 'expiresAt'].sort().join(','), 'approval shape');
   for (const [key, value] of Object.entries(required)) check(a[key] === value, `approval ${key}`);
   check(/^[0-9a-f]{40}$/.test(expected.sourceCommit) && /^[0-9a-f]{40}$/.test(expected.sourceTree)
-    && /^[1-9][0-9]*$/.test(expected.runId) && /^[1-9][0-9]*$/.test(expected.sourceRunId), 'identity');
+    && /^[1-9][0-9]*$/.test(expected.runId) && expected.runId === expected.sourceRunId, 'identity');
   const expiry = Date.parse(String(a.expiresAt));
   check(Number.isFinite(expiry) && expiry > now && expiry - now <= 300_000, 'five-minute expiry');
   check(FTS_DIAGNOSTIC.priorReads + 4096 <= FTS_DIAGNOSTIC.readReservation
@@ -85,7 +85,8 @@ async function main(): Promise<void> {
   check(process.argv.length === 3, 'only output path is accepted');
   const text = process.env.APPLICATION_FTS_DIAGNOSTIC_APPROVAL_JSON;
   check(text && Buffer.byteLength(text) <= 4096, 'explicit approval missing');
-  check(process.env.GITHUB_RUN_ATTEMPT === '1' && process.env.GITHUB_EVENT_NAME === 'workflow_dispatch', 'single manual attempt');
+  check(process.env.GITHUB_RUN_ATTEMPT === '1' && process.env.GITHUB_EVENT_NAME === 'pull_request'
+    && process.env.GITHUB_REF === 'refs/pull/167/merge', 'single protected PR attempt');
   check(process.env.CLOUDFLARE_ACCOUNT_ID === ACCOUNT && process.env.CLOUDFLARE_API_TOKEN, 'existing account/credential');
   const c = classifyApplicationRelease(process.cwd());
   const receipt = await runFtsOnlyDiagnostic({ sourceCommit: c.sourceCommit, sourceTree: c.sourceTree,
