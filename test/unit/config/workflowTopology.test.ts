@@ -127,7 +127,7 @@ describe('workflow topology', () => {
     expect(serialized).not.toMatch(/wrangler |secret put|application-corpus-check|worker-release-artifact|rebuild|migrations|seed|ESV_API_KEY/);
     expect(serialized).toContain('preview-fts-diagnostic.ts');
     expect(serialized).toContain('priorReads:3303879,priorDiagnosticCommands:1,maxReads:4096,maxDiagnosticCommands:1');
-    expect(job.steps!.filter(s => s.with?.script?.includes('verify-fts-diagnostic-source.cjs'))).toHaveLength(2);
+    expect(job.steps!.filter(s => typeof s.with?.script === 'string' && s.with.script.includes('verify-fts-diagnostic-source.cjs'))).toHaveLength(2);
     const cloud = job.steps!.findIndex(s => s.env?.CLOUDFLARE_API_TOKEN);
     const reconfirm = job.steps!.findIndex(s => s.id === 'live-source');
     expect(cloud).toBeGreaterThan(reconfirm);
