@@ -1171,12 +1171,17 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       - name: Retain proof verified by this protected preview job
+        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: preview-operator-verified-${{ github.run_id }}-attempt-${{ github.run_attempt }}
           path: |
             ${{ runner.temp }}/operator-corpus-challenge.json
+            ${{ runner.temp }}/operator-proof-envelope.json
             ${{ runner.temp }}/operator-proof/operator-proof-envelope.json
+            ${{ runner.temp }}/operator-corpus-challenge.json.admission.jsonl
+            ${{ runner.temp }}/preview-operator-readiness.json.events.jsonl
+            ${{ runner.temp }}/preview-operator-readiness.json.budget.json
             ${{ runner.temp }}/preview-operator-readiness.json
             ${{ runner.temp }}/preview-operator-readiness.json.controls.jsonl
           retention-days: 7

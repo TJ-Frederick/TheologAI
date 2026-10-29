@@ -558,7 +558,10 @@ jobs:
             ${{ runner.temp }}/production-d1-readiness-receipt.json.events.jsonl
             ${{ runner.temp }}/production-d1-readiness-receipt.json.controls.jsonl
             ${{ runner.temp }}/operator-corpus-challenge.json
+            ${{ runner.temp }}/operator-proof-envelope.json
             ${{ runner.temp }}/operator-proof/operator-proof-envelope.json
+            ${{ runner.temp }}/operator-corpus-challenge.json.admission.jsonl
+            ${{ runner.temp }}/production-d1-readiness-receipt.json.budget.json
             ${{ runner.temp }}/corpus-source/plan.json
           retention-days: 30
           if-no-files-found: error

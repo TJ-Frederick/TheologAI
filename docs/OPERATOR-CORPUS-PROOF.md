@@ -2,8 +2,8 @@
 
 The deployment credential has D1 Read; direct HTTP FTS integrity INSERTs require
 D1 Edit. Keep its permissions unchanged. Use the existing operator OAuth grant
-locally for the existing complete proof, including exactly four rank-1 integrity
-commands. No seed, migration, rebuild, binding, account or billing change occurs.
+locally for exactly four rank-1 integrity commands. The protected job uses its
+existing D1 Read token for the complete read proof and account-quota observations. No seed, migration, rebuild, binding, account or billing change occurs.
 
 The protected preview stage reuses the former diagnostic stage's environment,
 GitHub permissions and shared preview mutation lock. It admits only PR #167's
@@ -17,19 +17,26 @@ source, using the separately locked release toolchain. Obtain the existing
 Wrangler OAuth credential only after installation; keep it in process memory.
 Supply the exact `operatorApproval(challenge)` and the **same persistent local
 ledger** for every attempt. Never create a replacement ledger to reset limits.
-The producer uses all existing complete-cell, raw schema/ledger, local FK witness,
-physical integrity, rank-1 FTS, primary/single-attempt, quota and response limits.
-It rechecks live protected-job/PR authority periodically and before each FTS write.
-Only a transient read-only analytics error at the final metadata observation may
-be retried once; SQL is never retried. Preserve journals and unknown-cost reserves.
+The protected challenge includes a fresh unsampled quota observation and unchanged
+controls. The operator accepts it only within 50 seconds and completes the four
+allowlisted integrity commands within that admission interval, with live authority
+checked before each command. The operator never calls GraphQL or scans data.
+The protected job then executes every complete-cell, raw schema/ledger, local FK
+witness and physical-integrity read. Its proof producer consumes the four exact
+operator-attested results without sending any INSERT to the read token. The
+reservation excludes other data writes across both phases; unchanged controls
+are checked throughout. SQL is never retried. Preserve both journals, cumulative
+metering and unknown-cost reserves. The full receipt includes both phases' reads,
+writes and requests and binds the operator envelope hash.
 
-Submit only the sanitized complete envelope using the existing `pr.yml` manual
+Submit only the sanitized integrity envelope using the existing `pr.yml` manual
 dispatch's `operator_proof_json` input at the exact PR source branch. The upload
 job has no cloud credential or environment, and accepts only owner actor ID
 40179660 on attempt 1. No OAuth credential is sent to GitHub. The protected stage
 checks the server-authored dispatch actor/source/attempt, immutable artifact
-digest, nonce, expiry and complete receipt. It rechecks both actual Worker/D1
-controls using the existing deployment token, without SQL. Partial proofs,
+digest, nonce, expiry and integrity receipt before its complete read verification. It
+retains a separate full receipt at the flat downstream artifact path, together
+with the nested operator evidence and failure-cost journal. Partial proofs,
 ambiguous results, altered sources and multiple submissions fail closed.
 
 The normal Deploy Preview job consumes the protected stage's same-run envelope
@@ -57,12 +64,11 @@ cap, four-command/write limit and all other checks are unchanged. The exception
 is rejected for production and outside that UTC date. Production queries may
 exhaust the shared allowance before the 00:00 UTC reset, a risk accepted by the
 owner. The duplicate evening follow-up is paused.
-The scoped quota observations use Cloudflare's documented
-[`X-Rate-Limit-Type: account-based`](https://developers.cloudflare.com/analytics/graphql-api/account-based-rate-limiting/)
-request header after preflight observed the default credential bucket returning
-`extensions.code: budget`. This changes only the analytics rate-limit bucket;
-the complete unsampled counter query, credentials, account and data allowances
-stay unchanged. It does not change account settings or retry SQL.
+The operator OAuth analytics endpoint returned a provider rate-budget error even
+with the documented account-based header. That header did not resolve admission
+and is not retained. Routing quota/read verification through the existing protected
+read token avoids granting additional access or transferring that token locally.
+An integrity-only receipt cannot pass the deployment receipt consumer.
 
 Production uses the same full receipt consumer behind its existing separate
 environment and release gates. A preview receipt cannot authorize production.

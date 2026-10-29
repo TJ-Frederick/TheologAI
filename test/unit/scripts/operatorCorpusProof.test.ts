@@ -5,7 +5,7 @@ import {mkdtempSync,writeFileSync,readFileSync,copyFileSync,existsSync,rmSync,mk
 import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
 import {spawnSync,execFileSync} from 'node:child_process';
-import {createOperatorChallenge,requireOperatorChallenge,operatorApproval,verifyOperatorEnvelope,finishOperatorMetadata,admitOperatorBudget,spentOperatorBudget,OPERATOR_PROOF} from '../../../scripts/operator-corpus-proof.js';
+import {createOperatorChallenge,requireOperatorChallenge,operatorApproval,verifyOperatorEnvelope,verifyOperatorIntegrity,composeReadProof,finishOperatorMetadata,admitOperatorBudget,spentOperatorBudget,OPERATOR_PROOF} from '../../../scripts/operator-corpus-proof.js';
 import {ACCOUNT,CORPUS,SCHEMA,TARGETS,classifyApplicationRelease} from '../../../scripts/application-release-policy.mjs';
 import {ALL_FTS} from '../../../scripts/corpus-source-proof.js';
 const sha=(v:string)=>createHash('sha256').update(v).digest('hex');
@@ -13,7 +13,8 @@ const start=Date.parse('2026-10-30T00:05:00Z');
 function fixture() {
   const classification={sourceCommit:'a'.repeat(40),sourceTree:'b'.repeat(40)};
   const env={GITHUB_ACTIONS:'true',GITHUB_REPOSITORY:OPERATOR_PROOF.repository,GITHUB_RUN_ATTEMPT:'1',GITHUB_RUN_ID:'123',GITHUB_EVENT_NAME:'pull_request',GITHUB_REF:'refs/pull/167/merge',OPERATOR_BASE_COMMIT:'c'.repeat(40)};
-  const c=createOperatorChallenge('preview',classification,'d'.repeat(64),env,start);
+  const admission={accountId:ACCOUNT,role:'preview' as const,day:'2026-10-30',observedAt:new Date(start).toISOString(),rowsRead:100,rowsWritten:0,sampleInterval:1 as const,readBudget:3510997,controls:[{role:'preview',databaseId:TARGETS.preview.databaseId}]};
+  const c=createOperatorChallenge('preview',classification,'d'.repeat(64),env,start,admission);
   const tables=Object.fromEntries(Array.from({length:39},(_,i)=>['table'+i,{rows:1,sha256:'e'.repeat(64)}]));
   const plan={schemaVersion:'theologai-application-corpus-source-plan.v1',classification,readBudget:3510997,integrityCommands:4,expected:{digests:tables}};
   const receipt={schemaVersion:'theologai-fresh-complete-corpus-proof.v1',role:'preview',accountId:ACCOUNT,...TARGETS.preview,
@@ -202,5 +203,31 @@ describe('operator protected source admission',()=>{
     if(fault==='required-check')f.jobs[0]!.conclusion='skipped';if(fault==='missing-artifact')f.artifacts.pop();
     if(fault==='expired-artifact')f.artifacts[0]!.expired=true;if(fault==='artifact-source')f.artifacts[0]!.workflow_run.head_sha='e'.repeat(40);if(fault==='digest')f.artifacts[0]!.digest='unsafe';
     await expect(verify(f)).rejects.toThrow();expect(f.outputs).not.toHaveBeenCalled();
+  });
+});
+
+describe('operator writes and protected read proof composition',()=>{
+  function setup(){const f=fixture();const results=ALL_FTS.map(table=>({label:'fts:'+table,sqlSha256:sha(`INSERT INTO "${table}"("${table}",rank) VALUES('integrity-check',1)`),rowsRead:2,rowsWritten:1}));
+    const e:any=structuredClone(f.envelope);e.receipt={schemaVersion:'theologai-operator-fts-proof.v1',role:'preview',accountId:ACCOUNT,databaseId:TARGETS.preview.databaseId,sourceCommit:f.c.sourceCommit,sourceTree:f.c.sourceTree,sourcePlanSha256:f.c.sourcePlanSha256,startedAt:new Date(start+1000).toISOString(),completedAt:new Date(start+20000).toISOString(),controlsUnchanged:true,controls:f.c.admission.controls,results,metering:{rowsRead:8,rowsWritten:4,requests:4,integrityCommands:4,retries:0,unknownAttempts:0}};e.budget.cumulativeReadsSpentOrReserved=8;return {...f,e};}
+  it('keeps an integrity-only receipt insufficient to deploy',()=>{const f=setup();expect(()=>verifyOperatorIntegrity(f.e,f.c,f.now)).not.toThrow();expect(()=>verifyOperatorEnvelope(f.e,f.c,f.plan,f.now)).toThrow();});
+  for(const fault of ['wrong-sql','missing','reads','writes','attempt','stale-admission','control-drift','budget-reset'])it('rejects operator '+fault,()=>{const f=setup();if(fault==='wrong-sql')f.e.receipt.results[0].sqlSha256='f'.repeat(64);if(fault==='missing')f.e.receipt.results.pop();if(fault==='reads')f.e.receipt.results[0].rowsRead=4097;if(fault==='writes')f.e.receipt.results[0].rowsWritten=2;if(fault==='attempt')f.e.receipt.metering.unknownAttempts=1;if(fault==='stale-admission')f.e.receipt.completedAt=new Date(start+51000).toISOString();if(fault==='control-drift')f.e.receipt.controls=[];if(fault==='budget-reset')f.e.budget.cumulativeReadsSpentOrReserved=0;expect(()=>verifyOperatorIntegrity(f.e,f.c,f.now)).toThrow();});
+  it('runs every read with read credentials and consumes each attested write exactly once',async()=>{const f=setup();const meter={rowsRead:0,rowsWritten:0,requests:0,integrityCommands:0,retries:0,unknownAttempts:0};const calls:string[]=[];
+    const reader={metering:meter,start:async()=>{},execute:async(q:any)=>{if(q.kind==='fts-integrity')throw Error('read token must never write');calls.push(q.sql);meter.rowsRead+=10;meter.requests++;return [{n:1}];},finish:async()=>({controls:f.c.admission.controls,controlsUnchanged:true as const})};
+    const t=composeReadProof(reader,f.e,()=>{});await t.start();await expect(t.finish()).rejects.toThrow('complete integrity');
+    await expect(t.execute({kind:'select',sql:'SELECT 1 n',label:'read',readCeiling:100,writeCeiling:0})).resolves.toEqual([{n:1}]);
+    for(const table of ALL_FTS)expect(await t.execute({kind:'fts-integrity',label:'fts:'+table,sql:`INSERT INTO "${table}"("${table}",rank) VALUES('integrity-check',1)`,readCeiling:4096,writeCeiling:1})).toEqual([]);
+    expect(calls).toEqual(['SELECT 1 n']);expect(t.metering).toEqual({...meter,rowsRead:18,rowsWritten:4,requests:5,integrityCommands:4});await expect(t.finish()).resolves.toMatchObject({controlsUnchanged:true});
+    await expect(t.execute({kind:'fts-integrity',label:'extra',sql:'INSERT extra',readCeiling:4096,writeCeiling:1})).rejects.toThrow('integrity consumption');
+  });
+  it('retains failed-read costs alongside the four writes',async()=>{const f=setup();const reader={metering:{rowsRead:100,rowsWritten:0,requests:1,integrityCommands:0,retries:0,unknownAttempts:1},start:async()=>{},execute:async()=>{throw Error('failed read');},finish:async()=>({controls:[],controlsUnchanged:true as const})};const t=composeReadProof(reader,f.e,()=>{});await expect(t.execute({kind:'select',sql:'SELECT 1',label:'fail',readCeiling:100,writeCeiling:0})).rejects.toThrow();expect(t.metering).toMatchObject({rowsRead:108,rowsWritten:4,requests:5,unknownAttempts:1});});
+  it('archives the complete receipt at the flat downstream path while preserving operator evidence',()=>{
+    const workflow=readFileSync(resolve('.github/workflows/pr.yml'),'utf8');const block=workflow.split('name: Retain proof verified by this protected preview job')[1]!.split('  operator-proof-upload:')[0]!;
+    const paths=block.split('path: |')[1]!.split('retention-days:')[0]!.trim().split('\n').map(p=>p.trim().replace('${{ runner.temp }}/',''));
+    expect(paths).toContain('operator-proof-envelope.json');expect(paths).toContain('operator-proof/operator-proof-envelope.json');expect(block).toContain('if: always()');
+    // upload-artifact preserves paths from the common RUNNER_TEMP ancestor.
+    const directory=mkdtempSync(join(tmpdir(),'proof-artifact-layout-'));try{for(const path of paths){mkdirSync(join(directory,path,'..'),{recursive:true});writeFileSync(join(directory,path),path==='operator-proof-envelope.json'?'complete':'operator');}
+      const zip=join(directory,'artifact.zip');execFileSync(process.platform==='darwin'?'/opt/homebrew/bin/python3':'python3',['-c',"import sys,zipfile,pathlib; root=pathlib.Path(sys.argv[1]); z=zipfile.ZipFile(sys.argv[2],'w'); [z.write(root/p,p) for p in sys.argv[3:]]",directory,zip,...paths]);
+      const output=execFileSync(process.platform==='darwin'?'/opt/homebrew/bin/python3':'python3',['-c',"import sys,zipfile; z=zipfile.ZipFile(sys.argv[1]); assert z.read('operator-proof-envelope.json')==b'complete'; assert z.read('operator-proof/operator-proof-envelope.json')==b'operator'; print('flat complete receipt and nested integrity receipt retained')",zip],{encoding:'utf8'});expect(output).toContain('flat complete');
+    }finally{rmSync(directory,{recursive:true,force:true});}
   });
 });

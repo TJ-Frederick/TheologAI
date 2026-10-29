@@ -1,5 +1,5 @@
 name: Accept complete operator corpus proof
-description: Keep the approved operator credential local; validate owner-submitted proof inside the protected gate.
+description: Keep the operator credential local for four integrity commands; execute complete reads with the protected read token.
 inputs:
   role:
     required: true
@@ -34,7 +34,7 @@ runs:
         path: ${{ runner.temp }}/operator-corpus-challenge.json
         retention-days: 7
         if-no-files-found: error
-    - name: Wait for owner-submitted complete proof
+    - name: Wait for owner-submitted integrity proof
       id: evidence
       uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
       with:
@@ -48,10 +48,11 @@ runs:
         path: ${{ runner.temp }}/operator-proof
         merge-multiple: false
         digest-mismatch: error
-    - name: Validate full proof and unchanged controls without SQL
+    - name: Complete all read verification with the existing read-only token
       id: accept
       shell: bash
       env:
+        GH_TOKEN: ${{ github.token }}
         SOURCE_PLAN_SHA256: ${{ inputs.source-plan-sha256 }}
         PROOF_OUTPUT: ${{ inputs.output }}
-      run: npx --no-install tsx scripts/operator-corpus-proof.ts accept "$RUNNER_TEMP/operator-corpus-challenge.json" "$RUNNER_TEMP/operator-proof/operator-proof-envelope.json" "$RUNNER_TEMP/corpus-source" "$SOURCE_PLAN_SHA256" "$PROOF_OUTPUT"
+      run: npx --no-install tsx scripts/operator-corpus-proof.ts complete "$RUNNER_TEMP/operator-corpus-challenge.json" "$RUNNER_TEMP/operator-proof/operator-proof-envelope.json" "$RUNNER_TEMP/corpus-source" "$SOURCE_PLAN_SHA256" "$PROOF_OUTPUT"

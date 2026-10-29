@@ -6,6 +6,7 @@ import { ALL_FTS, type ProofQuery, type ProofRow } from './corpus-source-proof.j
 
 type Role = keyof typeof TARGETS;
 type ApiResult = { success?: boolean; errors?: unknown[]; result?: unknown; data?: unknown };
+export type ProtectedCorpusAdmission = { accountId: string; role: Role; day: string; observedAt: string; rowsRead: number; rowsWritten: number; sampleInterval: 1; readBudget: number; controls: unknown };
 // Owner's October 29 preview-only waiver of the production traffic reserve.
 export const PREVIEW_QUOTA_BUFFER_DAY = '2026-10-29';
 function check(value: unknown, reason: string): asserts value { if (!value) throw Error(`Corpus transport refused: ${reason}`); }
@@ -46,6 +47,8 @@ export class CorpusProofTransport {
   private lastUsageAt = 0;
   private latestUsage = 0;
   private baselineUsage = 0;
+  private latestWrites = 0;
+  private integrityOnly = false;
   private controls: unknown;
   private halted = false;
   private current: ProofQuery | null = null;
@@ -72,8 +75,7 @@ export class CorpusProofTransport {
     const remaining = Math.max(0, this.lastDispatch + 300 - Date.now()); if (remaining) await new Promise(resolve => setTimeout(resolve, remaining));
     this.lastDispatch = Date.now();
     const response = await (this.options.fetch ?? fetch)(`https://api.cloudflare.com/client/v4${path}`, {
-      method, redirect: 'error', signal: AbortSignal.timeout(30_000), headers: { authorization: `Bearer ${this.options.token}`, accept: 'application/json', 'content-type': 'application/json',
-        ...(path === '/graphql' && this.options.previewQuotaBuffer ? { 'X-Rate-Limit-Type': 'account-based' } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}),
+      method, redirect: 'error', signal: AbortSignal.timeout(30_000), headers: { authorization: `Bearer ${this.options.token}`, accept: 'application/json', 'content-type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}),
     });
     const jsonContentType = /^application\/json/.test(response.headers.get('content-type') ?? '');
     const accepted = response.status === 200 && !response.redirected && jsonContentType;
@@ -107,7 +109,7 @@ export class CorpusProofTransport {
     const groups = list(accounts[0]!.d1AnalyticsAdaptiveGroups); check(groups.length === 1 && row(groups[0]!.avg).sampleInterval === 1, 'analytics incomplete or sampled');
     const sum = row(groups[0]!.sum); check(count(sum.rowsRead) && count(sum.rowsWritten), 'analytics counters');
     check(sum.rowsWritten + 4 <= 80_000, 'insufficient account write headroom');
-    this.latestUsage = Math.max(this.latestUsage, sum.rowsRead); this.lastUsageAt = Date.now();
+    this.latestUsage = Math.max(this.latestUsage, sum.rowsRead); this.latestWrites = Math.max(this.latestWrites, sum.rowsWritten); this.lastUsageAt = Date.now();
     this.event({ kind: 'usage', rowsRead: sum.rowsRead, rowsWritten: sum.rowsWritten, ingestionWatermarkUnavailable: true });
   }
   private async snapshot(): Promise<unknown> {
@@ -131,9 +133,24 @@ export class CorpusProofTransport {
     this.event({ kind: 'admitted', readBudget: this.options.readBudget, maxIntegrityCommands: 4, accountReadCeiling: this.accountCeiling, liveAuditReadReserve: this.liveAuditReserve,
       ...(this.options.previewQuotaBuffer ? {previewQuotaBufferDay:PREVIEW_QUOTA_BUFFER_DAY} : {}), controls: this.controls });
   }
+  protectedAdmission(): ProtectedCorpusAdmission {
+    check(this.controls && this.lastUsageAt > 0 && Date.now()-this.lastUsageAt <= 50_000 && this.metering.requests===0, 'fresh admission before SQL');
+    return {accountId:ACCOUNT,role:this.options.role,day:this.day,observedAt:new Date(this.lastUsageAt).toISOString(),rowsRead:this.latestUsage,rowsWritten:this.latestWrites,sampleInterval:1,readBudget:this.options.readBudget,controls:this.controls};
+  }
+  async startIntegrity(admission: ProtectedCorpusAdmission): Promise<void> {
+    check(this.options.readBudget===16_384 && admission.accountId===ACCOUNT && admission.role===this.options.role && admission.day===this.day
+      && admission.sampleInterval===1 && count(admission.rowsRead) && count(admission.rowsWritten) && count(admission.readBudget)
+      && admission.readBudget<=3_800_000 && Date.parse(admission.observedAt)<=Date.now() && Date.now()-Date.parse(admission.observedAt)<=50_000, 'protected integrity admission');
+    check(admission.rowsWritten+4<=80_000,'insufficient account write headroom');
+    admitCorpusBudget(admission.rowsRead,admission.readBudget,admission.rowsRead,0,this.accountCeiling,this.liveAuditReserve);
+    this.controls=await this.snapshot();check(JSON.stringify(this.controls)===JSON.stringify(admission.controls),'protected admission controls changed');
+    this.latestUsage=this.baselineUsage=admission.rowsRead;this.latestWrites=admission.rowsWritten;this.lastUsageAt=Date.parse(admission.observedAt);this.integrityOnly=true;
+    this.event({kind:'integrity-admitted',admission});
+  }
   async execute(query: ProofQuery): Promise<ProofRow[]> {
     check(!this.halted && this.current === null, 'concurrent or halted execution'); assertProofQuery(query);
-    if (Date.now() - this.lastUsageAt > 50_000) await this.usage();
+    if(this.integrityOnly) check(query.kind==='fts-integrity' && Date.now()-this.lastUsageAt<=50_000,'fresh integrity-only execution');
+    else if (Date.now() - this.lastUsageAt > 50_000) await this.usage();
     admitCorpusBudget(this.latestUsage, 0, this.baselineUsage + this.metering.rowsRead, query.readCeiling, this.accountCeiling, this.liveAuditReserve);
     check(this.metering.requests < 5000 && this.metering.rowsRead + query.readCeiling <= this.options.readBudget && this.metering.rowsWritten + query.writeCeiling <= 4, 'run budget');
     this.current = query; this.event({ kind: 'intent', label: query.label, sqlSha256: sha(query.sql), readCeiling: query.readCeiling, writeCeiling: query.writeCeiling });
@@ -157,7 +174,7 @@ export class CorpusProofTransport {
   }
   async finish(): Promise<{ controls: unknown; controlsUnchanged: true }> {
     check(!this.halted && this.current === null, 'incomplete session'); const after = await this.snapshot();
-    check(JSON.stringify(after) === JSON.stringify(this.controls), 'controls changed'); await this.usage();
+    check(JSON.stringify(after) === JSON.stringify(this.controls), 'controls changed'); if(!this.integrityOnly) await this.usage();
     return { controls: this.controls, controlsUnchanged: true };
   }
   async observeControls(): Promise<unknown> {

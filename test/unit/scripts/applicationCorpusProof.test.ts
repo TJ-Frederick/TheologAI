@@ -44,7 +44,7 @@ describe('fresh corpus verifier CLI boundary', () => {
     expect(operator).toContain('runFreshApplicationCorpusCheck({');
     expect(operator).toContain('verifyFreshCorpusReceipt(receipt');
     const action=parse(readFileSync(new URL('../../../.github/actions/operator-corpus-proof/action.yml',import.meta.url),'utf8')) as {runs:{steps:{id?:string;run?:string}[]}};
-    expect(action.runs.steps.find(s=>s.id==='accept')!.run).toContain('operator-corpus-proof.ts accept');
+    expect(action.runs.steps.find(s=>s.id==='accept')!.run).toContain('operator-corpus-proof.ts complete');
   });
 });
 
@@ -151,7 +151,7 @@ describe('single-attempt corpus proof transport', () => {
       await f.transport.start();await f.transport.execute(f.query);await f.transport.finish();
       expect(f.events()).toContain('"accountReadCeiling":5000000');expect(f.events()).toContain('"liveAuditReadReserve":500000');
       expect(f.events()).toContain('"previewQuotaBufferDay":"2026-10-29"');
-      expect(f.calls.filter(c=>c.path.endsWith('/graphql')).every(c=>c.rateLimitType==='account-based')).toBe(true);
+      expect(f.calls.filter(c=>c.path.endsWith('/graphql')).every(c=>c.rateLimitType===null)).toBe(true);
       expect(f.calls.filter(c=>!c.path.endsWith('/graphql')).every(c=>c.rateLimitType===null)).toBe(true);
     } finally {f.close();}
     const standard=transportFixture('daytime');try {await expect(standard.transport.start()).rejects.toThrow('headroom');expect(standard.calls.some(c=>c.path.endsWith('/query'))).toBe(false);expect(standard.calls.every(c=>c.rateLimitType===null)).toBe(true);}finally{standard.close();}
@@ -244,4 +244,14 @@ describe('source, approval and metering boundaries',()=>{
     const expected={role:'preview' as const,sourceCommit:'a'.repeat(40),sourceTree:'b'.repeat(40)};
     for(const schemaVersion of ['theologai-composite-preparation-verification.v1','theologai-remote-d1-readiness-receipt.v1','markers-only'])expect(()=>verifyFreshCorpusReceipt({schemaVersion},expected)).toThrow('fresh complete proof required');
   });
+});
+
+describe('operator integrity-only transport',()=>{
+  it('uses fresh protected admission without any operator analytics or SELECT calls',async()=>{const f=transportFixture('',16384);try{
+    // Obtain the same controls via the zero-SQL observer, then start a separate writer.
+    const controls=['production','preview'].map(role=>({role,deploymentId:role,versionId:role==='preview'?'11111111-1111-4111-8111-111111111111':'22222222-2222-4222-8222-222222222222',databaseId:TARGETS[role as 'preview'|'production'].databaseId}));
+    const at=Date.now();await f.transport.startIntegrity({accountId:ACCOUNT,role:'preview',day:'2026-10-27',observedAt:new Date(at).toISOString(),rowsRead:100,rowsWritten:0,sampleInterval:1,readBudget:3510997,controls});
+    await expect(f.transport.execute(f.query)).rejects.toThrow('integrity-only');expect(f.calls.every(c=>!c.path.endsWith('/graphql')&&!c.path.endsWith('/query'))).toBe(true);
+  }finally{f.close();}});
+  for(const fault of ['stale','scope','sampled','headroom','writes'])it('refuses '+fault+' protected admission before SQL',async()=>{const f=transportFixture('',16384);try{const a:any={accountId:ACCOUNT,role:'preview',day:'2026-10-27',observedAt:new Date(Date.now()).toISOString(),rowsRead:100,rowsWritten:0,sampleInterval:1,readBudget:3510997,controls:[]};if(fault==='stale')a.observedAt='2026-10-27T11:59:00Z';if(fault==='scope')a.role='production';if(fault==='sampled')a.sampleInterval=2;if(fault==='headroom')a.rowsRead=4000000;if(fault==='writes')a.rowsWritten=80000;await expect(f.transport.startIntegrity(a)).rejects.toThrow();expect(f.calls).toHaveLength(0);}finally{f.close();}});
 });

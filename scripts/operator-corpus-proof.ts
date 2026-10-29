@@ -7,7 +7,9 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ACCOUNT, TARGETS, classifyApplicationRelease, verifyFreshCorpusReceipt } from './application-release-policy.mjs';
 import { runFreshApplicationCorpusCheck } from './application-corpus-check.js';
-import { CorpusProofTransport, PREVIEW_QUOTA_BUFFER_DAY } from './corpus-proof-transport.js';
+import { CorpusProofTransport, PREVIEW_QUOTA_BUFFER_DAY, type ProtectedCorpusAdmission } from './corpus-proof-transport.js';
+
+import { ALL_FTS, type ProofQuery } from './corpus-source-proof.js';
 
 const check = (v: unknown, reason: string): void => { if (!v) throw Error('Operator corpus proof refused: ' + reason); };
 const sha = (v: string | Buffer) => createHash('sha256').update(v).digest('hex');
@@ -20,7 +22,7 @@ export type OperatorChallenge = {
   schemaVersion: 'theologai-operator-corpus-challenge.v1'; role: 'preview' | 'production'; authorizationId: string;
   repository: string; ownerActorId: number; sourceCommit: string; sourceTree: string; sourcePlanSha256: string;
   runId: string; runAttempt: 1; workflowPath: string; eventName: string; ref: string; baseCommit: string;
-  nonce: string; createdAt: string; expiresAt: string; reservedReads: number; hardReadCap: number; diagnosticCommands: number;
+  nonce: string; createdAt: string; expiresAt: string; reservedReads: number; hardReadCap: number; diagnosticCommands: number; admission: ProtectedCorpusAdmission;
 };
 function readJson(path: string, maximum = 60_000): any {
   const stat = lstatSync(path); check(stat.isFile() && !stat.isSymbolicLink() && stat.size <= maximum, 'file type/size');
@@ -35,7 +37,7 @@ function readPlan(directory: string, digest: string) {
   return plan;
 }
 export function requireOperatorChallenge(input: unknown, now = Date.now()): OperatorChallenge {
-  const c = object(input); const keys = ['schemaVersion','role','authorizationId','repository','ownerActorId','sourceCommit','sourceTree','sourcePlanSha256','runId','runAttempt','workflowPath','eventName','ref','baseCommit','nonce','createdAt','expiresAt','reservedReads','hardReadCap','diagnosticCommands'];
+  const c = object(input); const keys = ['schemaVersion','role','authorizationId','repository','ownerActorId','sourceCommit','sourceTree','sourcePlanSha256','runId','runAttempt','workflowPath','eventName','ref','baseCommit','nonce','createdAt','expiresAt','reservedReads','hardReadCap','diagnosticCommands','admission'];
   check(Object.keys(c).sort().join(',') === keys.sort().join(','), 'challenge shape');
   check(c.schemaVersion === 'theologai-operator-corpus-challenge.v1' && ['preview','production'].includes(c.role), 'challenge version/role');
   const preview = c.role === 'preview';
@@ -50,9 +52,13 @@ export function requireOperatorChallenge(input: unknown, now = Date.now()): Oper
   const start = Date.parse(c.createdAt), end = Date.parse(c.expiresAt);
   check(Number.isFinite(start) && Number.isFinite(end) && start <= now + 30_000 && end > now && end - start === 5_400_000
     && end < Date.parse(new Date(start).toISOString().slice(0,10) + 'T00:00:00Z') + 86_400_000, 'fresh single-UTC-day window');
+  const a=object(c.admission);
+  check(a.accountId===ACCOUNT && a.role===c.role && a.day===c.createdAt.slice(0,10) && a.sampleInterval===1
+    && integer(a.rowsRead) && integer(a.rowsWritten) && a.readBudget===c.reservedReads
+    && Number.isFinite(Date.parse(a.observedAt)) && Math.abs(Date.parse(a.observedAt)-start)<=50_000 && Array.isArray(a.controls), 'protected quota admission');
   return c as OperatorChallenge;
 }
-export function createOperatorChallenge(role: 'preview' | 'production', classification: {sourceCommit:string;sourceTree:string}, planSha256: string, env = process.env, now = Date.now()): OperatorChallenge {
+export function createOperatorChallenge(role: 'preview' | 'production', classification: {sourceCommit:string;sourceTree:string}, planSha256: string, env = process.env, now = Date.now(), admission?: ProtectedCorpusAdmission): OperatorChallenge {
   check(env.GITHUB_ACTIONS === 'true' && env.GITHUB_REPOSITORY === OPERATOR_PROOF.repository && env.GITHUB_RUN_ATTEMPT === '1', 'protected CI context');
   const c = { schemaVersion: 'theologai-operator-corpus-challenge.v1', role,
     authorizationId: role === 'preview' ? OPERATOR_PROOF.previewAuthorization : 'production-operator-' + classification.sourceCommit,
@@ -61,7 +67,7 @@ export function createOperatorChallenge(role: 'preview' | 'production', classifi
     workflowPath: role === 'preview' ? '.github/workflows/pr.yml' : '.github/workflows/deploy.yml',
     eventName: env.GITHUB_EVENT_NAME, ref: env.GITHUB_REF, baseCommit: env.OPERATOR_BASE_COMMIT,
     nonce: randomBytes(32).toString('hex'), createdAt: new Date(now).toISOString(), expiresAt: new Date(now + 5_400_000).toISOString(),
-    reservedReads: OPERATOR_PROOF.reservedReads, hardReadCap: OPERATOR_PROOF.hardReadCap, diagnosticCommands: 4 };
+    reservedReads: OPERATOR_PROOF.reservedReads, hardReadCap: OPERATOR_PROOF.hardReadCap, diagnosticCommands: 4, admission };
   return requireOperatorChallenge(c, now);
 }
 export function operatorApproval(c: OperatorChallenge) {
@@ -94,6 +100,41 @@ export function verifyOperatorEnvelope(input: unknown, expectedChallenge: unknow
     && b.cumulativeDiagnosticCommands === b.previousDiagnosticCommands + receipt.metering.integrityCommands
     && b.cumulativeDiagnosticCommands <= c.diagnosticCommands, 'cumulative authorization');
   return e;
+}
+
+function integrityQueries(): ProofQuery[] {
+  return ALL_FTS.map(table=>({kind:'fts-integrity',label:`fts:${table}`,sql:`INSERT INTO "${table}"("${table}",rank) VALUES('integrity-check',1)`,readCeiling:4096,writeCeiling:1}));
+}
+export function verifyOperatorIntegrity(input: unknown, c: OperatorChallenge, now=Date.now()) {
+  requireOperatorChallenge(c,now); const e=object(input), r=object(e.receipt), m=object(r.metering), b=object(e.budget);
+  check(e.schemaVersion==='theologai-operator-corpus-envelope.v1' && JSON.stringify(e.challenge)===JSON.stringify(c) && hex(e.journalSha256,64), 'integrity envelope binding');
+  check(r.schemaVersion==='theologai-operator-fts-proof.v1' && r.role===c.role && r.accountId===ACCOUNT && r.databaseId===TARGETS[c.role].databaseId
+    && r.sourceCommit===c.sourceCommit && r.sourceTree===c.sourceTree && r.sourcePlanSha256===c.sourcePlanSha256, 'integrity source target');
+  check(Date.parse(r.startedAt)>=Date.parse(c.createdAt) && Date.parse(r.completedAt)>=Date.parse(r.startedAt)
+    && Date.parse(r.completedAt)<=now+30_000 && Date.parse(r.completedAt)<=Date.parse(c.admission.observedAt)+50_000
+    && r.controlsUnchanged===true && JSON.stringify(r.controls)===JSON.stringify(c.admission.controls), 'integrity window controls');
+  check(Array.isArray(r.results) && r.results.length===4, 'four integrity results');
+  for(const [i,q] of integrityQueries().entries()) { const result=object(r.results[i]);
+    check(result.label===q.label && result.sqlSha256===sha(q.sql) && integer(result.rowsRead) && result.rowsRead<=4096
+      && integer(result.rowsWritten) && result.rowsWritten<=1, 'exact integrity command result'); }
+  check(m.requests===4 && m.integrityCommands===4 && m.retries===0 && m.unknownAttempts===0
+    && m.rowsRead===r.results.reduce((n:number,v:any)=>n+v.rowsRead,0) && m.rowsWritten===r.results.reduce((n:number,v:any)=>n+v.rowsWritten,0), 'integrity metering');
+  check(b.authorizationId===c.authorizationId && [b.previousReadsSpentOrReserved,b.previousWritesSpentOrReserved,b.previousDiagnosticCommands].every(integer)
+    && b.previousReadsSpentOrReserved+c.reservedReads<=c.hardReadCap && b.previousWritesSpentOrReserved===0 && b.previousDiagnosticCommands===0
+    && b.cumulativeReadsSpentOrReserved===b.previousReadsSpentOrReserved+m.rowsRead
+    && b.cumulativeWritesSpentOrReserved===m.rowsWritten && b.cumulativeDiagnosticCommands===4, 'integrity cumulative budget');
+  return e;
+}
+/** Existing read token executes every read; only four owner-authenticated results replace writes. */
+export function composeReadProof(reader: Pick<CorpusProofTransport,'start'|'execute'|'finish'|'metering'>, integrity: any, guard:()=>void) {
+  const meter={...integrity.receipt.metering}; let consumed=0;
+  const update=()=>{for(const key of Object.keys(meter)) meter[key]=reader.metering[key as keyof typeof reader.metering]+integrity.receipt.metering[key];};
+  return {metering:meter,start:async()=>{guard();await reader.start();},execute:async(q:ProofQuery)=>{
+    guard();
+    if(q.kind==='fts-integrity') { const expected=integrityQueries()[consumed++]; check(expected && JSON.stringify(q)===JSON.stringify(expected),'integrity consumption'); return []; }
+    try {return await reader.execute(q);} finally {update();}
+  },finish:async()=>{check(consumed===4,'complete integrity consumption'); const result=await reader.finish();
+    check(JSON.stringify(result.controls)===JSON.stringify(integrity.receipt.controls),'integrity read controls changed');return result;}};
 }
 
 /** Only the read-only metadata tail may be retried, once; never a SQL command. */
@@ -155,26 +196,25 @@ export async function runOperatorProof(input: { challenge:OperatorChallenge; dir
     const previousReads = ledger.readsSpentOrReserved, previousWrites=ledger.writesSpentOrReserved, previousCommands = ledger.diagnosticCommands;
     const attempt = {nonce:c.nonce,sourceCommit:c.sourceCommit,runId:c.runId,startedAt:new Date().toISOString(),status:'RUNNING',readsSpentOrReserved:0,writesSpentOrReserved:0,diagnosticCommands:0};
     ledger.attempts.push(attempt); save();
-    let lastGuard = Date.now();
     try {
-      transport = new CorpusProofTransport({role:c.role,token:input.token,readBudget:plan.readBudget,eventFile:input.output+'.receipt.json.events.jsonl',
-        previewQuotaBuffer:c.role==='preview' && c.authorizationId===OPERATOR_PROOF.previewAuthorization && c.createdAt.startsWith(PREVIEW_QUOTA_BUFFER_DAY+'T')});
-      const receipt = await runFreshApplicationCorpusCheck({root:process.cwd(),role:c.role,directory:input.directory,planSha256:input.planSha256,
-        output:input.output+'.receipt.json',approval:operatorApproval(c),token:input.token,transport:{metering:transport.metering,
-          start:()=>transport!.start(), finish:()=>finishOperatorMetadata(()=>transport!.finish(),async()=>{
-            appendFileSync(input.output+'.receipt.json.events.jsonl',JSON.stringify({at:new Date().toISOString(),kind:'metadata-tail-retry',sqlRetries:0})+'\n');
-            await new Promise(resolve=>setTimeout(resolve,5000)); requireOperatorChallenge(c); requireLiveOperatorGate(c);
-          }), execute:async query => {
-            if (query.kind === 'fts-integrity' || Date.now()-lastGuard > 30_000) { requireLiveOperatorGate(c); lastGuard=Date.now(); }
-            requireOperatorChallenge(c); return transport!.execute(query);
-          }}});
-      requireLiveOperatorGate(c);
-      const envelope = {schemaVersion:'theologai-operator-corpus-envelope.v1',challenge:c,receipt,
+      transport = new CorpusProofTransport({role:c.role,token:input.token,readBudget:16_384,eventFile:input.output+'.receipt.json.events.jsonl',
+        previewQuotaBuffer:c.role==='preview' && c.createdAt.startsWith(PREVIEW_QUOTA_BUFFER_DAY+'T')});
+      const startedAt=new Date().toISOString(); await transport.startIntegrity(c.admission);
+      const results=[];
+      for(const q of integrityQueries()) {
+        requireOperatorChallenge(c); requireLiveOperatorGate(c);
+        const before={...transport.metering}; const rows=await transport.execute(q);check(rows.length===0,'integrity response');
+        results.push({label:q.label,sqlSha256:sha(q.sql),rowsRead:transport.metering.rowsRead-before.rowsRead,rowsWritten:transport.metering.rowsWritten-before.rowsWritten});
+      }
+      const controls=await transport.finish(); requireLiveOperatorGate(c);
+      const receipt={schemaVersion:'theologai-operator-fts-proof.v1',role:c.role,accountId:ACCOUNT,databaseId:TARGETS[c.role].databaseId,
+        sourceCommit:c.sourceCommit,sourceTree:c.sourceTree,sourcePlanSha256:c.sourcePlanSha256,startedAt,completedAt:new Date().toISOString(),...controls,results,metering:{...transport.metering}};
+      const envelope={schemaVersion:'theologai-operator-corpus-envelope.v1',challenge:c,receipt,
         journalSha256:sha(readFileSync(input.output+'.receipt.json.events.jsonl')),budget:{authorizationId:c.authorizationId,
           previousReadsSpentOrReserved:previousReads,previousWritesSpentOrReserved:previousWrites,previousDiagnosticCommands:previousCommands,
           cumulativeReadsSpentOrReserved:previousReads+receipt.metering.rowsRead,cumulativeWritesSpentOrReserved:previousWrites+receipt.metering.rowsWritten,cumulativeDiagnosticCommands:previousCommands+receipt.metering.integrityCommands}};
-      verifyOperatorEnvelope(envelope,c,plan);
-      writeFileSync(input.output,JSON.stringify(envelope,null,2)+'\n',{flag:'wx',mode:0o600}); attempt.status='PASSED';
+      verifyOperatorIntegrity(envelope,c);
+      writeFileSync(input.output,JSON.stringify(envelope,null,2)+'\n',{flag:'wx',mode:0o600}); attempt.status='INTEGRITY_PASSED_AWAITING_CI';
       return envelope;
     } finally {
       if (transport) {
@@ -192,8 +232,39 @@ async function main() {
   if (command==='challenge') {
     check(args.length===4 && ['preview','production'].includes(args[0]!), 'challenge arguments');
     const [role,directory,digest,output]=args; const p=readPlan(directory!,digest!);
-    const c=createOperatorChallenge(role as 'preview'|'production',{sourceCommit:p.classification.sourceCommit,sourceTree:p.classification.sourceTree},digest!);
+    check(process.env.CLOUDFLARE_ACCOUNT_ID===ACCOUNT && process.env.CLOUDFLARE_API_TOKEN,'existing read-only deployment credential');
+    const transport=new CorpusProofTransport({role:role as 'preview'|'production',token:process.env.CLOUDFLARE_API_TOKEN!,readBudget:p.readBudget,eventFile:output!+'.admission.jsonl',
+      previewQuotaBuffer:role==='preview' && new Date().toISOString().startsWith(PREVIEW_QUOTA_BUFFER_DAY+'T')});
+    await transport.start();
+    const c=createOperatorChallenge(role as 'preview'|'production',{sourceCommit:p.classification.sourceCommit,sourceTree:p.classification.sourceTree},digest!,process.env,Date.now(),transport.protectedAdmission());
     writeFileSync(output!,JSON.stringify(c,null,2)+'\n',{flag:'wx',mode:0o600}); return;
+  }
+  if(command==='complete') {
+    check(args.length===5,'complete arguments'); const [challengeFile,integrityFile,directory,digest,output]=args;
+    const c=requireOperatorChallenge(readJson(challengeFile!)); const p=readPlan(directory!,digest!);
+    check(p.classification.sourceCommit===c.sourceCommit && p.classification.sourceTree===c.sourceTree && digest===c.sourcePlanSha256
+      && process.env.GITHUB_ACTIONS==='true' && process.env.GITHUB_RUN_ID===c.runId && process.env.GITHUB_RUN_ATTEMPT==='1','complete protected source');
+    const integrity=verifyOperatorIntegrity(readJson(integrityFile!),c);
+    check(process.env.CLOUDFLARE_ACCOUNT_ID===ACCOUNT && process.env.CLOUDFLARE_API_TOKEN,'existing read-only deployment credential');
+    const reader=new CorpusProofTransport({role:c.role,token:process.env.CLOUDFLARE_API_TOKEN!,readBudget:p.readBudget-integrity.receipt.metering.rowsRead,eventFile:output!+'.events.jsonl',
+      previewQuotaBuffer:c.role==='preview' && c.createdAt.startsWith(PREVIEW_QUOTA_BUFFER_DAY+'T')});
+    let lastGuard=0; const transport=composeReadProof(reader,integrity,()=>{requireOperatorChallenge(c);if(Date.now()-lastGuard>30_000){requireLiveOperatorGate(c);lastGuard=Date.now();}});
+    try {
+      const receipt=await runFreshApplicationCorpusCheck({root:process.cwd(),role:c.role,directory:directory!,planSha256:digest!,output:output!,approval:operatorApproval(c),token:process.env.CLOUDFLARE_API_TOKEN!,transport});
+      Object.assign(receipt,{startedAt:integrity.receipt.startedAt,operatorIntegritySha256:sha(readFileSync(integrityFile!))});
+      const b=integrity.budget;
+      const envelope={schemaVersion:'theologai-operator-corpus-envelope.v1',challenge:c,receipt,journalSha256:sha(readFileSync(output!+'.events.jsonl')),
+        budget:{...b,cumulativeReadsSpentOrReserved:b.previousReadsSpentOrReserved+receipt.metering.rowsRead,cumulativeWritesSpentOrReserved:b.previousWritesSpentOrReserved+receipt.metering.rowsWritten,cumulativeDiagnosticCommands:b.previousDiagnosticCommands+receipt.metering.integrityCommands}};
+      verifyOperatorEnvelope(envelope,c,p);requireLiveOperatorGate(c);
+      writeFileSync(output!,JSON.stringify(receipt,null,2)+'\n',{mode:0o600});
+      const envelopeFile=resolve(output!,'../operator-proof-envelope.json');
+      writeFileSync(envelopeFile,JSON.stringify(envelope,null,2)+'\n',{flag:'wx',mode:0o600});
+      if(process.env.GITHUB_OUTPUT)appendFileSync(process.env.GITHUB_OUTPUT,`envelope_sha256=${sha(readFileSync(envelopeFile))}\n`);
+    } finally {
+      const events=readFileSync(output!+'.events.jsonl','utf8').trim().split('\n').filter(Boolean).map(line=>JSON.parse(line));
+      writeFileSync(output!+'.budget.json',JSON.stringify({operatorIntegritySha256:sha(readFileSync(integrityFile!)),reader:spentOperatorBudget(reader.metering,events),integrity:integrity.budget},null,2)+'\n',{mode:0o600});
+    }
+    return;
   }
   if (command==='accept') {
     check(args.length===5, 'accept arguments'); const [challengeFile,envelopeFile,directory,digest,output]=args;
