@@ -70,6 +70,8 @@ eight total diagnostic commands/at most eight writes**. Its existing measured
 1,072,690 reads and four commands/writes remain spent. This leaves exactly the
 3,510,997 full reservation and four new diagnostics/writes for one fresh proof;
 the prior failed attempt and native evidence must remain in the ledger.
+The producer and both receipt consumers reject counters below those known
+spent totals; a missing/recreated zero ledger cannot activate this extension.
 These expanded cumulative bounds apply only to preview challenges created at
 or after that approved time. Each proof still has the original 3.8M hard cap,
 exactly four diagnostics/at most four writes and the complete source-bound

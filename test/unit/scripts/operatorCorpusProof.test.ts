@@ -27,7 +27,7 @@ function fixture() {
       catalogSha256:'f'.repeat(64),ledgerSha256:'1'.repeat(64),foreignKeys:{method:'local_clean_raw_schema_plus_all_child_parent_cells',witnessSha256:'2'.repeat(64)}},
     metering:{rowsRead:1000,rowsWritten:4,requests:50,integrityCommands:4,retries:0,unknownAttempts:0}};
   const envelope={schemaVersion:'theologai-operator-corpus-envelope.v1',challenge:c,receipt,journalSha256:'3'.repeat(64),
-    budget:{authorizationId:c.authorizationId,previousReadsSpentOrReserved:0,previousWritesSpentOrReserved:0,previousDiagnosticCommands:0,cumulativeReadsSpentOrReserved:1000,cumulativeWritesSpentOrReserved:4,cumulativeDiagnosticCommands:4}};
+    budget:{authorizationId:c.authorizationId,previousReadsSpentOrReserved:1072690,previousWritesSpentOrReserved:4,previousDiagnosticCommands:4,cumulativeReadsSpentOrReserved:1073690,cumulativeWritesSpentOrReserved:8,cumulativeDiagnosticCommands:8}};
   return {env,c,plan,envelope,now:start+180_000};
 }
 describe('complete operator proof contract',()=>{
@@ -75,7 +75,7 @@ describe('complete operator proof contract',()=>{
     if(fault==='extra-field')e.unreviewed=true;
     expect(()=>verifyOperatorEnvelope(e,f.c,f.plan,f.now)).toThrow();
   });
-  it('preserves earlier small failures within the same cumulative authorization',()=>{const f=fixture();f.envelope.budget.previousReadsSpentOrReserved=100;f.envelope.budget.cumulativeReadsSpentOrReserved=1100;expect(()=>verifyOperatorEnvelope(f.envelope,f.c,f.plan,f.now)).not.toThrow();});
+  it('rejects a receipt that replaces the known prior reads with a smaller failure',()=>{const f=fixture();f.envelope.budget.previousReadsSpentOrReserved=100;f.envelope.budget.cumulativeReadsSpentOrReserved=1100;expect(()=>verifyOperatorEnvelope(f.envelope,f.c,f.plan,f.now)).toThrow();});
   for(const fault of ['expired','UTC-crossing','manual-preview','main-preview','owner','broader-budget','attempt','extra','non-CI'])it('rejects challenge '+fault,()=>{
     const f=fixture();const c:any={...f.c};
     if(fault==='expired')c.expiresAt=new Date(start-1).toISOString();
@@ -98,8 +98,8 @@ describe('complete operator proof contract',()=>{
 });
 
 describe('operator cumulative budget',()=>{
-  const ledger=()=>({schemaVersion:'theologai-operator-proof-budget.v1',authorizationId:String(OPERATOR_PROOF.previewAuthorization),readsSpentOrReserved:100,writesSpentOrReserved:0,diagnosticCommands:0,attempts:[{status:'FAILED_OR_AMBIGUOUS'}]});
-  it('can fund a complete fresh retry after an early failure without resetting prior reads',()=>{const f=fixture();expect(()=>admitOperatorBudget(ledger(),f.c,3510997)).not.toThrow();});
+  const ledger=()=>({schemaVersion:'theologai-operator-proof-budget.v1',authorizationId:String(OPERATOR_PROOF.previewAuthorization),readsSpentOrReserved:1072690,writesSpentOrReserved:4,diagnosticCommands:4,attempts:[{status:'FAILED_OR_AMBIGUOUS'}]});
+  it('funds the approved complete retry without resetting the measured prior attempt',()=>{const f=fixture();expect(()=>admitOperatorBudget(ledger(),f.c,3510997)).not.toThrow();});
   for(const fault of ['reads','writes','commands','running','passed','identity','negative'])it('stops before SQL for '+fault,()=>{const f=fixture();const l=ledger();if(fault==='reads')l.readsSpentOrReserved=1072691;if(fault==='writes')l.writesSpentOrReserved=5;if(fault==='commands')l.diagnosticCommands=5;if(fault==='running')l.attempts[0]!.status='RUNNING';if(fault==='passed')l.attempts[0]!.status='PASSED';if(fault==='identity')l.authorizationId='different';if(fault==='negative')l.readsSpentOrReserved=-1;expect(()=>admitOperatorBudget(l,f.c,3510997)).toThrow();});
   it('carries the exact measured reads and four writes into the approved additive allowance',()=>{
     const f=fixture(),l={...ledger(),readsSpentOrReserved:1072690,writesSpentOrReserved:4,diagnosticCommands:4};
@@ -113,9 +113,16 @@ describe('operator cumulative budget',()=>{
     expect(()=>admitOperatorBudget(l,{...f.c,createdAt:'2026-10-31T00:04:59Z'},3510997)).toThrow();
     expect(()=>admitOperatorBudget(l,{...f.c,role:'production'},3510997)).toThrow();
   });
+  for(const field of ['readsSpentOrReserved','writesSpentOrReserved','diagnosticCommands'] as const)it('rejects a ledger that forgets prior '+field,()=>{
+    const f=fixture();expect(()=>admitOperatorBudget({...ledger(),[field]:0},f.c,3510997)).toThrow();
+  });
+  it('rejects a preview challenge created before the approved post-reset start',()=>{
+    const f=fixture(),before=Date.parse(OPERATOR_PROOF.previewExtensionNotBefore)-1;
+    expect(()=>createOperatorChallenge('preview',f.plan.classification,f.c.sourcePlanSha256,f.env,before,{...f.c.admission,observedAt:new Date(before).toISOString()})).toThrow('preview continuation start');
+  });
   it('retains production admission at its original 3.8M and four-write cumulative limits',()=>{
     const f=fixture(),c=createOperatorChallenge('production',f.plan.classification,f.c.sourcePlanSha256,{...f.env,GITHUB_EVENT_NAME:'workflow_dispatch',GITHUB_REF:'refs/heads/main'},start,{...f.c.admission,role:'production'});
-    const l={...ledger(),authorizationId:c.authorizationId};expect(()=>admitOperatorBudget(l,c,3510997)).not.toThrow();
+    const l={...ledger(),authorizationId:c.authorizationId,readsSpentOrReserved:100,writesSpentOrReserved:0,diagnosticCommands:0};expect(()=>admitOperatorBudget(l,c,3510997)).not.toThrow();
     expect(()=>admitOperatorBudget({...l,readsSpentOrReserved:289004},c,3510997)).toThrow();expect(()=>admitOperatorBudget({...l,writesSpentOrReserved:1},c,3510997)).toThrow();
   });
   it('reserves unmatched requests and records metered overruns instead of hiding them',()=>{
@@ -244,7 +251,7 @@ describe('operator protected source admission',()=>{
 
 describe('operator writes and protected read proof composition',()=>{
   function setup(){const f=fixture();const results=ALL_FTS.map(table=>({label:'fts:'+table,sqlSha256:sha(`INSERT INTO "${table}"("${table}",rank) VALUES('integrity-check',1)`),rowsRead:2,rowsWritten:1}));
-    const e:any=structuredClone(f.envelope);e.receipt={schemaVersion:'theologai-operator-fts-proof.v1',role:'preview',accountId:ACCOUNT,databaseId:TARGETS.preview.databaseId,sourceCommit:f.c.sourceCommit,sourceTree:f.c.sourceTree,sourcePlanSha256:f.c.sourcePlanSha256,startedAt:new Date(start+1000).toISOString(),completedAt:new Date(start+20000).toISOString(),controlsUnchanged:true,controls:f.c.admission.controls,results,metering:{rowsRead:8,rowsWritten:4,requests:4,integrityCommands:4,retries:0,unknownAttempts:0}};e.budget.cumulativeReadsSpentOrReserved=8;return {...f,e};}
+    const e:any=structuredClone(f.envelope);e.receipt={schemaVersion:'theologai-operator-fts-proof.v1',role:'preview',accountId:ACCOUNT,databaseId:TARGETS.preview.databaseId,sourceCommit:f.c.sourceCommit,sourceTree:f.c.sourceTree,sourcePlanSha256:f.c.sourcePlanSha256,startedAt:new Date(start+1000).toISOString(),completedAt:new Date(start+20000).toISOString(),controlsUnchanged:true,controls:f.c.admission.controls,results,metering:{rowsRead:8,rowsWritten:4,requests:4,integrityCommands:4,retries:0,unknownAttempts:0}};e.budget.cumulativeReadsSpentOrReserved=e.budget.previousReadsSpentOrReserved+8;return {...f,e};}
   it('keeps an integrity-only receipt insufficient to deploy',()=>{const f=setup();expect(()=>verifyOperatorIntegrity(f.e,f.c,f.now)).not.toThrow();expect(()=>verifyOperatorEnvelope(f.e,f.c,f.plan,f.now)).toThrow();});
   it('preserves the first four commands and measured reads when attesting the second four',()=>{
     const f=setup();Object.assign(f.e.budget,{previousReadsSpentOrReserved:1072690,previousWritesSpentOrReserved:4,previousDiagnosticCommands:4,cumulativeReadsSpentOrReserved:1072698,cumulativeWritesSpentOrReserved:8,cumulativeDiagnosticCommands:8});

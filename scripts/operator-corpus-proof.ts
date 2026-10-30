@@ -18,7 +18,8 @@ const integer = (v: unknown): v is number => Number.isSafeInteger(v) && Number(v
 const hex = (v: unknown, length: number) => typeof v === 'string' && new RegExp(`^[0-9a-f]{${length}}$`).test(v);
 export const OPERATOR_PROOF = Object.freeze({ repository: 'TJ-Frederick/TheologAI', ownerActorId: 40179660,
   previewAuthorization: 'pr170-preview-checkout-review-20261030-01', reservedReads: 3_510_997, hardReadCap: 3_800_000, diagnosticCommands: 4,
-  previewExtensionNotBefore: '2026-10-31T00:05:00Z', previewCumulativeReadCap: 4_583_687, previewCumulativeDiagnostics: 8 });
+  previewExtensionNotBefore: '2026-10-31T00:05:00Z', previewCumulativeReadCap: 4_583_687, previewCumulativeDiagnostics: 8,
+  previewPriorReads: 1_072_690, previewPriorWrites: 4, previewPriorDiagnostics: 4 });
 export type OperatorChallenge = {
   schemaVersion: 'theologai-operator-corpus-challenge.v1'; role: 'preview' | 'production'; authorizationId: string;
   repository: string; ownerActorId: number; sourceCommit: string; sourceTree: string; sourcePlanSha256: string;
@@ -27,8 +28,9 @@ export type OperatorChallenge = {
 };
 function cumulativeAllowance(c: OperatorChallenge) {
   return c.role === 'preview' && Date.parse(c.createdAt) >= Date.parse(OPERATOR_PROOF.previewExtensionNotBefore)
-    ? { reads: OPERATOR_PROOF.previewCumulativeReadCap, diagnostics: OPERATOR_PROOF.previewCumulativeDiagnostics }
-    : { reads: c.hardReadCap, diagnostics: c.diagnosticCommands };
+    ? { reads: OPERATOR_PROOF.previewCumulativeReadCap, diagnostics: OPERATOR_PROOF.previewCumulativeDiagnostics,
+        priorReads: OPERATOR_PROOF.previewPriorReads, priorWrites: OPERATOR_PROOF.previewPriorWrites, priorDiagnostics: OPERATOR_PROOF.previewPriorDiagnostics }
+    : { reads: c.hardReadCap, diagnostics: c.diagnosticCommands, priorReads: 0, priorWrites: 0, priorDiagnostics: 0 };
 }
 function readJson(path: string, maximum = 60_000): any {
   const stat = lstatSync(path); check(stat.isFile() && !stat.isSymbolicLink() && stat.size <= maximum, 'file type/size');
@@ -58,6 +60,7 @@ export function requireOperatorChallenge(input: unknown, now = Date.now()): Oper
   const start = Date.parse(c.createdAt), end = Date.parse(c.expiresAt);
   check(Number.isFinite(start) && Number.isFinite(end) && start <= now + 30_000 && end > now && end - start === 5_400_000
     && end < Date.parse(new Date(start).toISOString().slice(0,10) + 'T00:00:00Z') + 86_400_000, 'fresh single-UTC-day window');
+  check(!preview || start>=Date.parse(OPERATOR_PROOF.previewExtensionNotBefore),'preview continuation start');
   const a=object(c.admission);
   check(a.accountId===ACCOUNT && a.role===c.role && a.day===c.createdAt.slice(0,10) && a.sampleInterval===1
     && integer(a.rowsRead) && integer(a.rowsWritten) && a.readBudget===c.reservedReads
@@ -99,6 +102,8 @@ export function verifyOperatorEnvelope(input: unknown, expectedChallenge: unknow
     && b.authorizationId === c.authorizationId, 'budget identity');
   check([b.previousReadsSpentOrReserved,b.previousWritesSpentOrReserved,b.previousDiagnosticCommands,b.cumulativeReadsSpentOrReserved,b.cumulativeWritesSpentOrReserved,b.cumulativeDiagnosticCommands].every(integer), 'budget counters');
   check(b.cumulativeReadsSpentOrReserved === b.previousReadsSpentOrReserved + receipt.metering.rowsRead
+    && b.previousReadsSpentOrReserved >= cumulative.priorReads && b.previousWritesSpentOrReserved >= cumulative.priorWrites
+    && b.previousDiagnosticCommands >= cumulative.priorDiagnostics
     && b.previousReadsSpentOrReserved + plan.readBudget <= cumulative.reads
     && b.cumulativeReadsSpentOrReserved <= cumulative.reads
     && b.previousWritesSpentOrReserved + 4 <= cumulative.diagnostics
@@ -128,6 +133,7 @@ export function verifyOperatorIntegrity(input: unknown, c: OperatorChallenge, no
   check(m.requests===4 && m.integrityCommands===4 && m.retries===0 && m.unknownAttempts===0
     && m.rowsRead===r.results.reduce((n:number,v:any)=>n+v.rowsRead,0) && m.rowsWritten===r.results.reduce((n:number,v:any)=>n+v.rowsWritten,0), 'integrity metering');
   check(b.authorizationId===c.authorizationId && [b.previousReadsSpentOrReserved,b.previousWritesSpentOrReserved,b.previousDiagnosticCommands].every(integer)
+    && b.previousReadsSpentOrReserved>=cumulative.priorReads && b.previousWritesSpentOrReserved>=cumulative.priorWrites && b.previousDiagnosticCommands>=cumulative.priorDiagnostics
     && b.previousReadsSpentOrReserved+c.reservedReads<=cumulative.reads
     && b.previousWritesSpentOrReserved+4<=cumulative.diagnostics && b.previousDiagnosticCommands+4<=cumulative.diagnostics
     && b.cumulativeReadsSpentOrReserved===b.previousReadsSpentOrReserved+m.rowsRead
@@ -163,6 +169,7 @@ export function admitOperatorBudget(ledger: any, c: OperatorChallenge, plannedRe
     && integer(ledger.readsSpentOrReserved) && integer(ledger.writesSpentOrReserved) && integer(ledger.diagnosticCommands) && Array.isArray(ledger.attempts)
     && !ledger.attempts.some((a:any) => a.status === 'RUNNING' || a.status === 'PASSED'), 'ledger identity/replay/incomplete attempt');
   check(integer(plannedReads) && plannedReads<=c.reservedReads && plannedReads<=c.hardReadCap
+    && ledger.readsSpentOrReserved>=cumulative.priorReads && ledger.writesSpentOrReserved>=cumulative.priorWrites && ledger.diagnosticCommands>=cumulative.priorDiagnostics
     && ledger.readsSpentOrReserved + plannedReads <= cumulative.reads && ledger.diagnosticCommands + 4 <= cumulative.diagnostics
     && ledger.writesSpentOrReserved + 4 <= cumulative.diagnostics, 'remaining cumulative budget');
 }
