@@ -112,6 +112,13 @@ function assertProductionBoundary(workflow: Workflow): void {
 }
 
 describe('workflow topology', () => {
+  it('provides immutable baseline history to both core validation routes', async () => {
+    for (const name of ['pr.yml', 'validate.yml']) {
+      const workflow = parse(await readWorkflow(name)) as Workflow;
+      const checkout = workflow.jobs['test-and-build']!.steps!.find(step => step.uses?.startsWith('actions/checkout@'))!;
+      expect(checkout.with?.['fetch-depth'], name).toBe(0);
+    }
+  });
   it('keeps operator verification protected and deployment permissions unchanged', async () => {
     const workflow = parse(await readWorkflow('pr.yml')) as Workflow;
     const source = workflow.jobs['operator-proof-source']!;
