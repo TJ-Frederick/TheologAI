@@ -64,6 +64,20 @@ ceiling; account writes plus four must fit 80,000. Start only when the entire
 for that window; application reads may continue. This is an owner reservation,
 not a provider-enforced lease.
 
+The owner approved an additive continuation after **October 31 00:05 UTC**:
+the same preview authorization/ledger has a **4,583,687 cumulative read cap and
+eight total diagnostic commands/at most eight writes**. Its existing measured
+1,072,690 reads and four commands/writes remain spent. This leaves exactly the
+3,510,997 full reservation and four new diagnostics/writes for one fresh proof;
+the prior failed attempt and native evidence must remain in the ledger.
+These expanded cumulative bounds apply only to preview challenges created at
+or after that approved time. Each proof still has the original 3.8M hard cap,
+exactly four diagnostics/at most four writes and the complete source-bound
+verification. Production retains its original cumulative 3.8M/four allowance.
+The continuation renews the prospective ≤90-minute preview data-write
+reservation. Normal 200K uncertainty and the 4M operating ceiling apply after
+the reset; no October 30 margin waiver carries into October 31.
+
 For **October 30, 2026 UTC preview only**, the owner explicitly waived the
 200,000-read analytics uncertainty margin to complete this security release.
 Admission requires usage + the full 3,510,997 reservation ≤4,000,000. The source

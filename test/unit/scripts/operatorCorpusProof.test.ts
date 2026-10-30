@@ -69,8 +69,8 @@ describe('complete operator proof contract',()=>{
     if(fault==='stale')e.receipt.completedAt=new Date(start-3600001).toISOString();
     if(fault==='pre-challenge')e.receipt.startedAt=new Date(start-1).toISOString();
     if(fault==='approval')e.receipt.approvalSha256='f'.repeat(64);
-    if(fault==='budget-overrun'){e.budget.previousReadsSpentOrReserved=290000;e.budget.cumulativeReadsSpentOrReserved=291000;}
-    if(fault==='write-overrun'){e.budget.previousDiagnosticCommands=1;e.budget.cumulativeDiagnosticCommands=5;}
+    if(fault==='budget-overrun'){e.budget.previousReadsSpentOrReserved=1072691;e.budget.cumulativeReadsSpentOrReserved=1073691;}
+    if(fault==='write-overrun'){e.budget.previousDiagnosticCommands=5;e.budget.cumulativeDiagnosticCommands=9;}
     if(fault==='budget-reset')e.budget.cumulativeReadsSpentOrReserved=0;
     if(fault==='extra-field')e.unreviewed=true;
     expect(()=>verifyOperatorEnvelope(e,f.c,f.plan,f.now)).toThrow();
@@ -100,7 +100,24 @@ describe('complete operator proof contract',()=>{
 describe('operator cumulative budget',()=>{
   const ledger=()=>({schemaVersion:'theologai-operator-proof-budget.v1',authorizationId:String(OPERATOR_PROOF.previewAuthorization),readsSpentOrReserved:100,writesSpentOrReserved:0,diagnosticCommands:0,attempts:[{status:'FAILED_OR_AMBIGUOUS'}]});
   it('can fund a complete fresh retry after an early failure without resetting prior reads',()=>{const f=fixture();expect(()=>admitOperatorBudget(ledger(),f.c,3510997)).not.toThrow();});
-  for(const fault of ['reads','writes','commands','running','passed','identity','negative'])it('stops before SQL for '+fault,()=>{const f=fixture();const l=ledger();if(fault==='reads')l.readsSpentOrReserved=289004;if(fault==='writes')l.writesSpentOrReserved=1;if(fault==='commands')l.diagnosticCommands=1;if(fault==='running')l.attempts[0]!.status='RUNNING';if(fault==='passed')l.attempts[0]!.status='PASSED';if(fault==='identity')l.authorizationId='different';if(fault==='negative')l.readsSpentOrReserved=-1;expect(()=>admitOperatorBudget(l,f.c,3510997)).toThrow();});
+  for(const fault of ['reads','writes','commands','running','passed','identity','negative'])it('stops before SQL for '+fault,()=>{const f=fixture();const l=ledger();if(fault==='reads')l.readsSpentOrReserved=1072691;if(fault==='writes')l.writesSpentOrReserved=5;if(fault==='commands')l.diagnosticCommands=5;if(fault==='running')l.attempts[0]!.status='RUNNING';if(fault==='passed')l.attempts[0]!.status='PASSED';if(fault==='identity')l.authorizationId='different';if(fault==='negative')l.readsSpentOrReserved=-1;expect(()=>admitOperatorBudget(l,f.c,3510997)).toThrow();});
+  it('carries the exact measured reads and four writes into the approved additive allowance',()=>{
+    const f=fixture(),l={...ledger(),readsSpentOrReserved:1072690,writesSpentOrReserved:4,diagnosticCommands:4};
+    expect(()=>admitOperatorBudget(l,f.c,3510997)).not.toThrow();expect(l.readsSpentOrReserved).toBe(1072690);expect(l.writesSpentOrReserved).toBe(4);
+    expect(()=>admitOperatorBudget(l,f.c,3510998)).toThrow();
+    const e=structuredClone(f.envelope);Object.assign(e.budget,{previousReadsSpentOrReserved:1072690,previousWritesSpentOrReserved:4,previousDiagnosticCommands:4,cumulativeReadsSpentOrReserved:1073690,cumulativeWritesSpentOrReserved:8,cumulativeDiagnosticCommands:8});
+    expect(()=>verifyOperatorEnvelope(e,f.c,f.plan,f.now)).not.toThrow();expect(operatorApproval(f.c).maxReads).toBe(3800000);expect(operatorApproval(f.c).integrityCommands).toBe(4);
+  });
+  it('keeps the expanded allowance inactive before its approved reset and unchanged for production',()=>{
+    const f=fixture(),l={...ledger(),readsSpentOrReserved:1072690,writesSpentOrReserved:4,diagnosticCommands:4};
+    expect(()=>admitOperatorBudget(l,{...f.c,createdAt:'2026-10-31T00:04:59Z'},3510997)).toThrow();
+    expect(()=>admitOperatorBudget(l,{...f.c,role:'production'},3510997)).toThrow();
+  });
+  it('retains production admission at its original 3.8M and four-write cumulative limits',()=>{
+    const f=fixture(),c=createOperatorChallenge('production',f.plan.classification,f.c.sourcePlanSha256,{...f.env,GITHUB_EVENT_NAME:'workflow_dispatch',GITHUB_REF:'refs/heads/main'},start,{...f.c.admission,role:'production'});
+    const l={...ledger(),authorizationId:c.authorizationId};expect(()=>admitOperatorBudget(l,c,3510997)).not.toThrow();
+    expect(()=>admitOperatorBudget({...l,readsSpentOrReserved:289004},c,3510997)).toThrow();expect(()=>admitOperatorBudget({...l,writesSpentOrReserved:1},c,3510997)).toThrow();
+  });
   it('reserves unmatched requests and records metered overruns instead of hiding them',()=>{
     const meter={rowsRead:100,rowsWritten:0,requests:2,retries:0,unknownAttempts:1,integrityCommands:1};
     const events=[{kind:'intent',readCeiling:100,writeCeiling:0},{kind:'result',rowsRead:100,rowsWritten:0},{kind:'intent',readCeiling:4096,writeCeiling:1}];
@@ -229,6 +246,10 @@ describe('operator writes and protected read proof composition',()=>{
   function setup(){const f=fixture();const results=ALL_FTS.map(table=>({label:'fts:'+table,sqlSha256:sha(`INSERT INTO "${table}"("${table}",rank) VALUES('integrity-check',1)`),rowsRead:2,rowsWritten:1}));
     const e:any=structuredClone(f.envelope);e.receipt={schemaVersion:'theologai-operator-fts-proof.v1',role:'preview',accountId:ACCOUNT,databaseId:TARGETS.preview.databaseId,sourceCommit:f.c.sourceCommit,sourceTree:f.c.sourceTree,sourcePlanSha256:f.c.sourcePlanSha256,startedAt:new Date(start+1000).toISOString(),completedAt:new Date(start+20000).toISOString(),controlsUnchanged:true,controls:f.c.admission.controls,results,metering:{rowsRead:8,rowsWritten:4,requests:4,integrityCommands:4,retries:0,unknownAttempts:0}};e.budget.cumulativeReadsSpentOrReserved=8;return {...f,e};}
   it('keeps an integrity-only receipt insufficient to deploy',()=>{const f=setup();expect(()=>verifyOperatorIntegrity(f.e,f.c,f.now)).not.toThrow();expect(()=>verifyOperatorEnvelope(f.e,f.c,f.plan,f.now)).toThrow();});
+  it('preserves the first four commands and measured reads when attesting the second four',()=>{
+    const f=setup();Object.assign(f.e.budget,{previousReadsSpentOrReserved:1072690,previousWritesSpentOrReserved:4,previousDiagnosticCommands:4,cumulativeReadsSpentOrReserved:1072698,cumulativeWritesSpentOrReserved:8,cumulativeDiagnosticCommands:8});
+    expect(()=>verifyOperatorIntegrity(f.e,f.c,f.now)).not.toThrow();f.e.budget.cumulativeWritesSpentOrReserved=4;expect(()=>verifyOperatorIntegrity(f.e,f.c,f.now)).toThrow();
+  });
   for(const fault of ['wrong-sql','missing','reads','writes','attempt','stale-admission','control-drift','budget-reset'])it('rejects operator '+fault,()=>{const f=setup();if(fault==='wrong-sql')f.e.receipt.results[0].sqlSha256='f'.repeat(64);if(fault==='missing')f.e.receipt.results.pop();if(fault==='reads')f.e.receipt.results[0].rowsRead=4097;if(fault==='writes')f.e.receipt.results[0].rowsWritten=2;if(fault==='attempt')f.e.receipt.metering.unknownAttempts=1;if(fault==='stale-admission')f.e.receipt.completedAt=new Date(start+51000).toISOString();if(fault==='control-drift')f.e.receipt.controls=[];if(fault==='budget-reset')f.e.budget.cumulativeReadsSpentOrReserved=0;expect(()=>verifyOperatorIntegrity(f.e,f.c,f.now)).toThrow();});
   it('runs every read with read credentials and consumes each attested write exactly once',async()=>{const f=setup();const meter={rowsRead:0,rowsWritten:0,requests:0,integrityCommands:0,retries:0,unknownAttempts:0};const calls:string[]=[];
     const reader={metering:meter,start:async()=>{},execute:async(q:any)=>{if(q.kind==='fts-integrity')throw Error('read token must never write');calls.push(q.sql);meter.rowsRead+=10;meter.requests++;return [{n:1}];},finish:async()=>({controls:f.c.admission.controls,controlsUnchanged:true as const})};
