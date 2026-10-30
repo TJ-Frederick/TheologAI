@@ -45,7 +45,7 @@ uses the unchanged custom-domain deployment command and all existing live tests.
 The operator stage and Deploy Preview retain the existing separate approvals.
 No new token, secret, account, permission, environment or approval policy is added.
 
-Proposed preview authorization (pending new owner budget approval) `pr170-preview-checkout-review-20261030-01` reserves
+The owner-approved preview authorization `pr170-preview-checkout-review-20261030-01` reserves
 3,510,997 reads, hard cap 3,800,000 across retries, and four total diagnostics and
 at most four writes. Admission also requires unsampled account usage plus the
 whole proof and 200,000 uncertainty reads to fit the existing 4,000,000 operating
@@ -53,6 +53,21 @@ ceiling; account writes plus four must fit 80,000. Start only when the entire
 90-minute window fits the UTC quota day. Other preview data writes are reserved
 for that window; application reads may continue. This is an owner reservation,
 not a provider-enforced lease.
+
+For **October 30, 2026 UTC preview only**, the owner explicitly waived the
+200,000-read analytics uncertainty margin to complete this security release.
+Admission requires usage + the full 3,510,997 reservation ≤4,000,000. The source
+derives this exception from the actual preview role and UTC day; production
+and every other day retain the 200,000-read margin. The protected admission
+journal records the waived margin and date, and the operator's four-command
+phase applies the same policy. Periodic unsampled usage, local/in-flight cost
+accounting, unknown-cost reserves, the 4M operating ceiling, 3.8M cumulative
+proof cap, four-command/write limit, single-UTC-day window and all complete
+verification/source/approval checks remain. The owner accepts the reduced
+allowance for analytics ingestion delay; no account, token, binding or billing
+change is involved. The earlier quota-refused run issued no SQL and remains
+recorded at zero cost in the same persistent ledger; this source correction
+does not reset the allowance.
 
 For **October 29, 2026 UTC only**, the owner waived the usual production read
 buffer for this preview. The existing operator authorization may therefore use
@@ -63,7 +78,7 @@ checks preserve that live-audit reserve. The complete proof's 3.8M cumulative
 cap, four-command/write limit and all other checks are unchanged. The exception
 is rejected for production and outside that UTC date. Production queries may
 exhaust the shared allowance before the 00:00 UTC reset, a risk accepted by the
-owner. The duplicate evening follow-up is paused.
+owner. That historical follow-up has ended.
 The operator OAuth analytics endpoint returned a provider rate-budget error even
 with the documented account-based header. That header did not resolve admission
 and is not retained. Routing quota/read verification through the existing protected
