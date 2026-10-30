@@ -11,6 +11,18 @@ Production MCP server for theological research. Eleven tools, six prompts, eight
 
 <!-- theologai-public-contract tools=11 structured=bible_cross_references,bible_lookup,bible_verse_morphology,classic_text_lookup,commentary_lookup,donation_config,original_language_lookup,original_language_study,parallel_passages,primary_source_search,verify_donation -->
 
+## Working Agreements
+
+- Read the root `README.md` and the architecture sections relevant to the task. For release work, read `docs/CURRENT-RELEASE.md` and the applicable release runbook; dated identities below do not establish current state.
+- Tyler owns product behavior/design, spending, publishing, and production decisions. The current task owner handles technical implementation and verification within the authorized scope, including routine corrections.
+- Infer the quality bar from the task; ask one focused question when an unresolved tradeoff would materially change the work.
+- Trace persistent failures to their first incorrect step and revisit assumptions before adding more tuning, release machinery, or safeguards. Explain what each diagnostic or experiment establishes.
+- Justify new infrastructure against an observed problem and reuse existing tools. Keep application-only releases, corpus preparation/activation, and broader workflow redesign separate unless the approved scope joins them.
+- Match verification to changed behavior and release risk. Preserve required correctness, provenance, and release checks; identify the need before rebuilding the corpus or repeating expensive remote verification.
+- Remote reads can consume shared quota. Honor approved cumulative read/write/spending limits, target identities, custody requirements, recovery rules, and separate preview/production gates. Do not blindly retry an operation with an unknown mutation outcome.
+- Existing authorization carries through narrow corrections only within its terms; an explicit fixed revision, window, or operation limit remains binding. No publishing, deployment, binding/permission change, or credential access is implied by local implementation.
+- Keep the current task summary in an existing brief or status record, link detailed receipts, and report the user-visible result, meaningful limitations, and required decisions in plain English.
+
 ## Quick Start
 
 ```bash
