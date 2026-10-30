@@ -1,4 +1,4 @@
-# PR #167: existing operator access for complete corpus verification
+# PR #170: existing operator access for complete corpus verification
 
 The deployment credential has D1 Read; direct HTTP FTS integrity INSERTs require
 D1 Edit. Keep its permissions unchanged. Use the existing operator OAuth grant
@@ -6,7 +6,7 @@ locally for exactly four rank-1 integrity commands. The protected job uses its
 existing D1 Read token for the complete read proof and account-quota observations. No seed, migration, rebuild, binding, account or billing change occurs.
 
 The protected preview stage reuses the former diagnostic stage's environment,
-GitHub permissions and shared preview mutation lock. It admits only PR #167's
+GitHub permissions and shared preview mutation lock. It admits only PR #170's
 current source after every normal CI job and source artifact passes. After
 approval it issues a random challenge bound to the source, tree, plan, base,
 run/attempt, target, cumulative authorization and 90-minute same-UTC-day window.
@@ -45,7 +45,7 @@ uses the unchanged custom-domain deployment command and all existing live tests.
 The operator stage and Deploy Preview retain the existing separate approvals.
 No new token, secret, account, permission, environment or approval policy is added.
 
-New preview authorization `pr167-preview-operator-full-20261029-01` reserves
+Proposed preview authorization (pending new owner budget approval) `pr170-preview-checkout-review-20261030-01` reserves
 3,510,997 reads, hard cap 3,800,000 across retries, and four total diagnostics and
 at most four writes. Admission also requires unsampled account usage plus the
 whole proof and 200,000 uncertainty reads to fit the existing 4,000,000 operating
@@ -75,3 +75,5 @@ environment and release gates. A preview receipt cannot authorize production.
 Production needs its own source-matched fresh proof, budget, timing and rollback
 approval. No merge or production dispatch is authorized in this preview task.
 SEC-06 remains open and paused; corpus activation and broader process work wait.
+
+The PR #170 source-admission gate additionally requires the unprivileged shared production-validation rehearsal. Historical PR #167 preview budgets/receipts remain frozen and cannot authorize this changed source/tree. No PR #170 proof or production continuation is approved by publishing this correction.

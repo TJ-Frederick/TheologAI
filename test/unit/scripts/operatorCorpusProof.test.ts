@@ -9,11 +9,12 @@ import {createOperatorChallenge,requireOperatorChallenge,operatorApproval,verify
 import {ACCOUNT,CORPUS,SCHEMA,TARGETS,classifyApplicationRelease} from '../../../scripts/application-release-policy.mjs';
 import {ALL_FTS} from '../../../scripts/corpus-source-proof.js';
 const sha=(v:string)=>createHash('sha256').update(v).digest('hex');
-const start=Date.parse('2026-10-30T00:05:00Z');
+const today=new Date();
+const start=Date.UTC(today.getUTCFullYear(),today.getUTCMonth(),today.getUTCDate()+1,0,5);
 function fixture() {
   const classification={sourceCommit:'a'.repeat(40),sourceTree:'b'.repeat(40)};
-  const env={GITHUB_ACTIONS:'true',GITHUB_REPOSITORY:OPERATOR_PROOF.repository,GITHUB_RUN_ATTEMPT:'1',GITHUB_RUN_ID:'123',GITHUB_EVENT_NAME:'pull_request',GITHUB_REF:'refs/pull/167/merge',OPERATOR_BASE_COMMIT:'c'.repeat(40)};
-  const admission={accountId:ACCOUNT,role:'preview' as const,day:'2026-10-30',observedAt:new Date(start).toISOString(),rowsRead:100,rowsWritten:0,sampleInterval:1 as const,readBudget:3510997,controls:[{role:'preview',databaseId:TARGETS.preview.databaseId}]};
+  const env={GITHUB_ACTIONS:'true',GITHUB_REPOSITORY:OPERATOR_PROOF.repository,GITHUB_RUN_ATTEMPT:'1',GITHUB_RUN_ID:'123',GITHUB_EVENT_NAME:'pull_request',GITHUB_REF:'refs/pull/170/merge',OPERATOR_BASE_COMMIT:'c'.repeat(40)};
+  const admission={accountId:ACCOUNT,role:'preview' as const,day:new Date(start).toISOString().slice(0,10),observedAt:new Date(start).toISOString(),rowsRead:100,rowsWritten:0,sampleInterval:1 as const,readBudget:3510997,controls:[{role:'preview',databaseId:TARGETS.preview.databaseId}]};
   const c=createOperatorChallenge('preview',classification,'d'.repeat(64),env,start,admission);
   const tables=Object.fromEntries(Array.from({length:39},(_,i)=>['table'+i,{rows:1,sha256:'e'.repeat(64)}]));
   const plan={schemaVersion:'theologai-application-corpus-source-plan.v1',classification,readBudget:3510997,integrityCommands:4,expected:{digests:tables}};
@@ -93,7 +94,7 @@ describe('operator cumulative budget',()=>{
 describe('GitHub owner artifact provenance',()=>{
   const bridge=createRequire(import.meta.url)('../../../.github/scripts/operator-proof-bridge.cjs');
   function setup() {
-    const f=fixture();const run={id:456,head_sha:f.c.sourceCommit,created_at:new Date(start+130000).toISOString(),actor:{id:40179660},triggering_actor:{id:40179660},run_attempt:1,path:'.github/workflows/pr.yml',event:'workflow_dispatch',head_branch:'codex/sec06-preview-credential-assessment'};
+    const f=fixture();const run={id:456,head_sha:f.c.sourceCommit,created_at:new Date(start+130000).toISOString(),actor:{id:40179660},triggering_actor:{id:40179660},run_attempt:1,path:'.github/workflows/pr.yml',event:'workflow_dispatch',head_branch:'codex/security-checkout-continuation'};
     const artifact={id:789,name:bridge.artifactName(f.c),expired:false,expires_at:new Date(start+86400000).toISOString(),workflow_run:{head_sha:f.c.sourceCommit,id:456},digest:'sha256:'+'f'.repeat(64)};
     const job={name:'Retain operator corpus proof (no cloud credentials)',status:'completed',conclusion:'success'};
     const pr={state:'open',draft:false,head:{repo:{full_name:f.c.repository},sha:f.c.sourceCommit},base:{sha:f.c.baseCommit},labels:[{name:'deploy-preview'}]};
@@ -122,7 +123,7 @@ describe('GitHub owner artifact provenance',()=>{
       f.run.head_sha=source.sourceCommit;f.artifact.workflow_run.head_sha=source.sourceCommit;f.pr.head.sha=source.sourceCommit;
       const uploadDir=join(directory,'upload');mkdirSync(uploadDir);
       const output=vi.fn(); const uploadContext={repo:{owner:'TJ-Frederick',repo:'TheologAI'},eventName:'workflow_dispatch',sha:source.sourceCommit};
-      const uploadEnv={GITHUB_ACTOR_ID:'40179660',GITHUB_RUN_ATTEMPT:'1',GITHUB_REF:'refs/heads/codex/sec06-preview-credential-assessment',RUNNER_TEMP:uploadDir,OPERATOR_PROOF_JSON:JSON.stringify(f.envelope)};
+      const uploadEnv={GITHUB_ACTOR_ID:'40179660',GITHUB_RUN_ATTEMPT:'1',GITHUB_REF:'refs/heads/codex/security-checkout-continuation',RUNNER_TEMP:uploadDir,OPERATOR_PROOF_JSON:JSON.stringify(f.envelope)};
       expect(()=>bridge.upload({context:uploadContext,core:{setOutput:output},environment:{...uploadEnv,GITHUB_ACTOR_ID:'1'}})).toThrow('owner manual dispatch');
       expect(existsSync(join(uploadDir,'operator-proof-envelope.json'))).toBe(false);
       bridge.upload({context:uploadContext,core:{setOutput:output},environment:uploadEnv});
@@ -185,11 +186,11 @@ describe('operator protected source admission',()=>{
   const verify=createRequire(import.meta.url)('../../../.github/scripts/verify-operator-proof-source.cjs');
   function setup(){
     const source='a'.repeat(40),base='b'.repeat(40),tree='c'.repeat(40);
-    const pr={state:'open',draft:false,base:{ref:'main',sha:base},head:{sha:source,ref:'codex/sec06-preview-credential-assessment',repo:{full_name:OPERATOR_PROOF.repository}},labels:[{name:'deploy-preview'}]};
-    const context={repo:{owner:'TJ-Frederick',repo:'TheologAI'},eventName:'pull_request',payload:{pull_request:{number:167,head:{sha:source}}}};
-    const environment={GITHUB_REF:'refs/pull/167/merge',GITHUB_RUN_ATTEMPT:'1',GITHUB_RUN_ID:'123',OPERATOR_SOURCE_RUN_ID:'123'};
-    const run={head_sha:source,path:'.github/workflows/pr.yml',event:'pull_request',run_attempt:1,pull_requests:[{number:167,head:{sha:source},base:{sha:base}}]};
-    const jobs=['Select Validation','Test & Build','Fresh Checkout & Data','Node HTTP E2E','Worker Runtime & D1','Applicable MCP Conformance','Validation Complete','Build preview Worker artifact (no cloud credentials)'].map(name=>({name,status:'completed',conclusion:'success'}));
+    const pr={state:'open',draft:false,base:{ref:'main',sha:base},head:{sha:source,ref:'codex/security-checkout-continuation',repo:{full_name:OPERATOR_PROOF.repository}},labels:[{name:'deploy-preview'}]};
+    const context={repo:{owner:'TJ-Frederick',repo:'TheologAI'},eventName:'pull_request',payload:{pull_request:{number:170,head:{sha:source}}}};
+    const environment={GITHUB_REF:'refs/pull/170/merge',GITHUB_RUN_ATTEMPT:'1',GITHUB_RUN_ID:'123',OPERATOR_SOURCE_RUN_ID:'123'};
+    const run={head_sha:source,path:'.github/workflows/pr.yml',event:'pull_request',run_attempt:1,pull_requests:[{number:170,head:{sha:source},base:{sha:base}}]};
+    const jobs=['Select Validation','Test & Build','Fresh Checkout & Data','Node HTTP E2E','Worker Runtime & D1','Applicable MCP Conformance','Validation Complete','Build preview Worker artifact (no cloud credentials)',...['Test & Build','Fresh Checkout & Data','Node HTTP E2E','Worker Runtime & D1','Applicable MCP Conformance'].map(name=>'Shared production validation rehearsal / '+name)].map(name=>({name,status:'completed',conclusion:'success'}));
     const artifacts=['worker','corpus'].map(kind=>({name:`${kind}-preview-123-attempt-1`,expired:false,expires_at:new Date(Date.now()+86400000).toISOString(),workflow_run:{head_sha:source,id:123},digest:'sha256:'+'d'.repeat(64)}));
     const github={rest:{pulls:{get:async()=>({data:pr})},actions:{getWorkflowRun:async()=>({data:run}),listJobsForWorkflowRun:async()=>({data:{jobs}}),listWorkflowRunArtifacts:async()=>({data:{artifacts}})},git:{getCommit:async()=>({data:{tree:{sha:tree}}})}}};
     const outputs=vi.fn();return {source,base,tree,pr,context,environment,run,jobs,artifacts,github,core:{setOutput:outputs},outputs};
@@ -230,4 +231,36 @@ describe('operator writes and protected read proof composition',()=>{
       const output=execFileSync(process.platform==='darwin'?'/opt/homebrew/bin/python3':'python3',['-c',"import sys,zipfile; z=zipfile.ZipFile(sys.argv[1]); assert z.read('operator-proof-envelope.json')==b'complete'; assert z.read('operator-proof/operator-proof-envelope.json')==b'operator'; print('flat complete receipt and nested integrity receipt retained')",zip],{encoding:'utf8'});expect(output).toContain('flat complete');
     }finally{rmSync(directory,{recursive:true,force:true});}
   });
+});
+
+describe('merged correction PR production handoff',()=>{
+  const bridge=createRequire(import.meta.url)('../../../.github/scripts/operator-proof-bridge.cjs');
+  function setup(){const f=fixture();const c=createOperatorChallenge('production',{sourceCommit:'a'.repeat(40),sourceTree:'b'.repeat(40)},'d'.repeat(64),{...f.env,GITHUB_EVENT_NAME:'workflow_dispatch',GITHUB_REF:'refs/heads/main'},start,{...f.c.admission,role:'production'});
+    const run={id:456,head_sha:c.sourceCommit,created_at:new Date(start+130000).toISOString(),actor:{id:40179660},triggering_actor:{id:40179660},run_attempt:1,path:'.github/workflows/pr.yml',event:'workflow_dispatch',head_branch:'main'};
+    const artifact={id:789,name:bridge.artifactName(c),expired:false,expires_at:new Date(start+86400000).toISOString(),workflow_run:{head_sha:c.sourceCommit,id:456},digest:'sha256:'+'f'.repeat(64)};const main={object:{sha:c.sourceCommit}};
+    const github={rest:{git:{getRef:async()=>({data:main})},pulls:{get:async()=>{throw Error('production must not require the merged PR to be open');}},actions:{listWorkflowRuns:async()=>({data:{workflow_runs:[run]}}),listWorkflowRunArtifacts:async()=>({data:{artifacts:[artifact]}}),listJobsForWorkflowRun:async()=>({data:{jobs:[{name:'Retain operator corpus proof (no cloud credentials)',status:'completed',conclusion:'success'}]}})}}};return {...f,c,run,artifact,main,github};}
+  it('accepts an owner upload at the exact merged main commit without open-PR assumptions',async()=>{const f=setup();await expect(bridge.find({github:f.github,challenge:f.c,now:f.now})).resolves.toMatchObject({runId:456,artifactId:789});const dir=mkdtempSync(join(tmpdir(),'merged-operator-'));try{bridge.upload({context:{repo:{owner:'TJ-Frederick',repo:'TheologAI'},eventName:'workflow_dispatch',sha:f.c.sourceCommit},core:{setOutput:vi.fn()},environment:{GITHUB_ACTOR_ID:'40179660',GITHUB_RUN_ATTEMPT:'1',GITHUB_REF:'refs/heads/main',RUNNER_TEMP:dir,OPERATOR_PROOF_JSON:JSON.stringify({schemaVersion:'theologai-operator-corpus-envelope.v1',challenge:f.c,receipt:{sourceCommit:f.c.sourceCommit}})}});expect(existsSync(join(dir,'operator-proof-envelope.json'))).toBe(true);}finally{rmSync(dir,{recursive:true,force:true});}});
+  for(const fault of ['moved-main','unmerged-head','preview-branch','other-actor','rerun'])it('rejects '+fault,async()=>{const f=setup();if(fault==='moved-main')f.main.object.sha='f'.repeat(40);if(fault==='unmerged-head')f.run.head_sha='e'.repeat(40);if(fault==='preview-branch')f.run.head_branch='codex/security-checkout-continuation';if(fault==='other-actor')f.run.triggering_actor.id=1;if(fault==='rerun')f.run.run_attempt=2;if(fault==='moved-main')await expect(bridge.find({github:f.github,challenge:f.c,now:f.now})).rejects.toThrow('live main');else await expect(bridge.find({github:f.github,challenge:f.c,now:f.now})).resolves.toBeNull();});
+  it('rejects the completed PR167 route and its exhausted preview ledger for the correction',()=>{const f=fixture();expect(()=>requireOperatorChallenge({...f.c,ref:'refs/pull/167/merge'},f.now)).toThrow('protected route');expect(()=>admitOperatorBudget({schemaVersion:'theologai-operator-proof-budget.v1',authorizationId:'pr167-preview-operator-full-20261029-01',readsSpentOrReserved:3299468,writesSpentOrReserved:4,diagnosticCommands:4,attempts:[]},f.c,3510997)).toThrow('ledger identity');});
+});
+
+describe('production selection of revised-source preview evidence',()=>{
+  const yaml=createRequire(import.meta.url)('yaml');
+  async function run(fault=''){
+    const workflow=yaml.parse(readFileSync(resolve('.github/workflows/deploy.yml'),'utf8'));
+    const script=workflow.jobs['verify-dual-era-preview'].steps.find((s:any)=>s.name==='Resolve fresh protected dual-era preview evidence').with.script;
+    const head='a'.repeat(40),merge='b'.repeat(40),name='preview-release-audit-170-'+head;
+    const pull={number:170,merged_at:new Date().toISOString(),base:{ref:'main'},merge_commit_sha:merge,head:{sha:head}};
+    const artifact={name,expired:false,created_at:new Date().toISOString(),workflow_run:{head_sha:head,id:456}};
+    const run={event:'pull_request',status:'completed',conclusion:'success',head_sha:head};
+    if(fault==='old-receipt')artifact.name='preview-release-audit-167-'+head;
+    if(fault==='wrong-source')artifact.workflow_run.head_sha='e'.repeat(40);
+    if(fault==='expired')artifact.expired=true;
+    if(fault==='failed-preview')run.conclusion='failure';
+    if(fault==='wrong-merge')pull.merge_commit_sha='e'.repeat(40);
+    const github={rest:{repos:{listPullRequestsAssociatedWithCommit:async()=>({data:[pull]})},actions:{listArtifactsForRepo:async()=>({data:{artifacts:[artifact]}}),getWorkflowRun:async()=>({data:run})}}};
+    const core={setOutput:vi.fn(),setFailed:vi.fn()};await new Function('github','context','core','return (async()=>{'+script+'})()')(github,{repo:{owner:'TJ-Frederick',repo:'TheologAI'},sha:merge},core);return {core,name,head};
+  }
+  it('uses the replacement merged PR and its own successful protected preview artifact',async()=>{const f=await run();expect(f.core.setFailed).not.toHaveBeenCalled();expect(f.core.setOutput).toHaveBeenCalledWith('artifact_name',f.name);expect(f.core.setOutput).toHaveBeenCalledWith('source_commit',f.head);});
+  for(const fault of ['old-receipt','wrong-source','expired','failed-preview','wrong-merge'])it('fails closed for '+fault,async()=>{const f=await run(fault);expect(f.core.setFailed).toHaveBeenCalledOnce();expect(f.core.setOutput).not.toHaveBeenCalled();});
 });

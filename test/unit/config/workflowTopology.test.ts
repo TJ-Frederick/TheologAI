@@ -124,8 +124,11 @@ describe('workflow topology', () => {
     const source = workflow.jobs['operator-proof-source']!;
     expect(source.environment).toBeUndefined(); expect(JSON.stringify(source)).not.toContain('secrets.');
     expect(source.if).toContain("github.event_name == 'pull_request'");
-    expect(source.if).toContain('github.event.pull_request.number == 167');
-    expect(needs(source)).toEqual(['build-worker']);
+    expect(source.if).toContain('github.event.pull_request.number == 170');
+    expect(needs(source)).toEqual(['build-worker', 'shared-release-validation']);
+    expect(workflow.jobs['shared-release-validation']!.uses).toBe('./.github/workflows/validate.yml');
+    expect(workflow.jobs['shared-release-validation']!.environment).toBeUndefined();
+    expect(JSON.stringify(workflow.jobs['shared-release-validation'])).not.toContain('secrets');
     const job = workflow.jobs['operator-corpus-proof']!;
     expect(needs(job)).toEqual(['operator-proof-source', 'validation-complete', 'build-worker']);
     expect(job.environment).toMatchObject({name:'preview'});

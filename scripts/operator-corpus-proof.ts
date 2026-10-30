@@ -17,7 +17,7 @@ const object = (v: unknown): Record<string, any> => { check(v && typeof v === 'o
 const integer = (v: unknown): v is number => Number.isSafeInteger(v) && Number(v) >= 0;
 const hex = (v: unknown, length: number) => typeof v === 'string' && new RegExp(`^[0-9a-f]{${length}}$`).test(v);
 export const OPERATOR_PROOF = Object.freeze({ repository: 'TJ-Frederick/TheologAI', ownerActorId: 40179660,
-  previewAuthorization: 'pr167-preview-operator-full-20261029-01', reservedReads: 3_510_997, hardReadCap: 3_800_000, diagnosticCommands: 4 });
+  previewAuthorization: 'pr170-preview-checkout-review-20261030-01', reservedReads: 3_510_997, hardReadCap: 3_800_000, diagnosticCommands: 4 });
 export type OperatorChallenge = {
   schemaVersion: 'theologai-operator-corpus-challenge.v1'; role: 'preview' | 'production'; authorizationId: string;
   repository: string; ownerActorId: number; sourceCommit: string; sourceTree: string; sourcePlanSha256: string;
@@ -47,7 +47,7 @@ export function requireOperatorChallenge(input: unknown, now = Date.now()): Oper
   check(c.authorizationId === (preview ? OPERATOR_PROOF.previewAuthorization : 'production-operator-' + c.sourceCommit), 'authorization identity');
   check(c.workflowPath === (preview ? '.github/workflows/pr.yml' : '.github/workflows/deploy.yml')
     && c.eventName === (preview ? 'pull_request' : 'workflow_dispatch')
-    && c.ref === (preview ? 'refs/pull/167/merge' : 'refs/heads/main'), 'existing protected route');
+    && c.ref === (preview ? 'refs/pull/170/merge' : 'refs/heads/main'), 'existing protected route');
   check(c.reservedReads === OPERATOR_PROOF.reservedReads && c.hardReadCap === OPERATOR_PROOF.hardReadCap && c.diagnosticCommands === 4, 'authorization budget');
   const start = Date.parse(c.createdAt), end = Date.parse(c.expiresAt);
   check(Number.isFinite(start) && Number.isFinite(end) && start <= now + 30_000 && end > now && end - start === 5_400_000
@@ -171,7 +171,7 @@ export function requireLiveOperatorGate(c: OperatorChallenge): void {
   const jobs = get('/actions/runs/' + c.runId + '/jobs?per_page=100').jobs.filter((j: any) => j.name === name);
   check(jobs.length === 1 && jobs[0].status === 'in_progress', 'live approved protected job');
   if (c.role === 'preview') {
-    const pr = get('/pulls/167');
+    const pr = get('/pulls/170');
     check(pr.state === 'open' && !pr.draft && pr.head.sha === c.sourceCommit && pr.base.sha === c.baseCommit
       && pr.head.repo.full_name === c.repository && pr.labels.some((l:any) => l.name === 'deploy-preview'), 'live PR authorization');
   } else check(get('/git/ref/heads/main').object.sha === c.sourceCommit, 'live production main');
