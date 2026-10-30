@@ -99,6 +99,27 @@ describe('CCEL operator route', () => {
     stub.resetAfterOperatorReview.mockResolvedValueOnce({ applied: false, reason: 'epoch_mismatch', snapshot: { ...baseSnapshot, state: 'closed', operatorEpoch: 4 } });
     expect((await handleCcelOperatorRequest(signed(body), value))?.status).toBe(409);
   });
+
+  it('shares the pre-auth IP budget across user agents and fails closed without an IP', async () => {
+    const body = JSON.stringify({ action: 'snapshot', workerVersionId: versionId });
+    const counts = new Map<string, number>();
+    const limit = vi.fn(async ({ key }: { key: string }) => {
+      const count = (counts.get(key) ?? 0) + 1;
+      counts.set(key, count);
+      return { success: count <= 12 };
+    });
+    const { value, stub } = env({ THEOLOGAI_CCEL_OPERATOR_AUTH_LIMITER: { limit } });
+    for (let i = 0; i < 13; i++) {
+      expect((await handleCcelOperatorRequest(signed(body, { 'User-Agent': `operator/${i}` }), value))?.status)
+        .toBe(i < 12 ? 200 : 404);
+    }
+    expect(counts.size).toBe(1);
+    expect(stub.snapshot).toHaveBeenCalledTimes(12);
+    const missingIp = signed(body);
+    missingIp.headers.delete('CF-Connecting-IP');
+    expect((await handleCcelOperatorRequest(missingIp, value))?.status).toBe(404);
+    expect(limit).toHaveBeenCalledTimes(13);
+  });
 });
 
 async function responseShape(response: Response) {

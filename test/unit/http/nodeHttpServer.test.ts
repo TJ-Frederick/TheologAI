@@ -21,7 +21,7 @@ import { BibleService } from '../../../src/services/bible/BibleService.js';
 import { createBibleLookupHandler } from '../../../src/tools/v2/bibleLookup.js';
 import { createPrimarySourceSearchHandler } from '../../../src/tools/v2/primarySourceSearch.js';
 import { createPrimarySourceSearchDescriptor } from '../../../src/mcp/primarySourceSearchDescriptor.js';
-import { NotFoundError } from '../../../src/kernel/errors.js';
+import { MCP_INPUT_LIMIT_MESSAGE, MCP_MAX_REQUEST_BODY_BYTES } from '../../../src/mcp/inputLimits.js';
 
 const TEST_MAX_BODY_BYTES = 1024;
 type NodeHttpTestEnvironment = Partial<Record<
@@ -68,6 +68,12 @@ describe('readNodeHttpConfig', () => {
     expect(config.allowedHosts).toEqual(['127.0.0.1', 'localhost', '::1']);
     expect(config.allowedOrigins).toEqual([DEFAULT_ALLOWED_ORIGIN]);
     expect(config.maxBodyBytes).toBe(DEFAULT_MAX_BODY_BYTES);
+  });
+
+  it('allows a lower body budget but cannot configure past the security ceiling', () => {
+    expect(readNodeHttpConfig(withProcessEnv({ PORT: '3000', MCP_MAX_BODY_BYTES: '1048576' })).maxBodyBytes)
+      .toBe(MCP_MAX_REQUEST_BODY_BYTES);
+    expect(DEFAULT_MAX_BODY_BYTES).toBe(65536);
   });
 
   it('rejects invalid ports and non-origin URLs', () => {
@@ -257,6 +263,32 @@ describe('Node stateless HTTP MCP server', () => {
     expect(createdServers).toHaveLength(0);
   });
 
+  it.each([
+    ['many keys', Object.fromEntries(Array.from({ length: 129 }, (_, i) => [`${i}`, 0]))],
+    ['deep metadata', JSON.parse('{"child":'.repeat(20) + 'null' + '}'.repeat(20))],
+    ['large array', Array(129).fill(0)],
+  ])('rejects %s below the byte limit before MCP dispatch', async (_name, input) => {
+    const body = JSON.stringify(input);
+    expect(Buffer.byteLength(body)).toBeLessThan(TEST_MAX_BODY_BYTES);
+    const response = await sendHttp(port, { body });
+    expect(response.status).toBe(413);
+    expect(response.json).toEqual({ error: MCP_INPUT_LIMIT_MESSAGE });
+    expect(createdServers).toHaveLength(0);
+  });
+
+  it.each(['2025-11-25', '2026-07-28'])('preflights %s request metadata before SDK validation', async version => {
+    const response = await sendHttp(port, {
+      headers: { 'Mcp-Protocol-Version': version, 'Mcp-Method': 'tools/call', 'Mcp-Name': 'bible_lookup' },
+      body: JSON.stringify({
+        jsonrpc: '2.0', id: 1, method: 'tools/call',
+        params: { name: 'bible_lookup', arguments: { reference: 'John 3:16' }, _meta: { extra: Array(129).fill(0) } },
+      }),
+    });
+    expect(response.status).toBe(413);
+    expect(response.json).toEqual({ error: MCP_INPUT_LIMIT_MESSAGE });
+    expect(createdServers).toHaveLength(0);
+  });
+
   it('answers allowed preflight requests without MCP dispatch', async () => {
     const response = await sendHttp(port, {
       method: 'OPTIONS',
@@ -375,12 +407,6 @@ function makeRoot(): McpCompositionRoot {
           section: { id: 1, document_id: 'test', section_number: '1', title: 'Test', content: '', topics: [] },
           sectionKey: 'source-0001', sourceOrdinal: 1, requestedSectionId: '1', resolution: 'canonical' as const,
         }),
-      },
-      historicalHierarchyService: {
-        listPublications: async () => [],
-        resolveCanonicalUri: async () => {
-          throw new NotFoundError('historical hierarchy', 'No active hierarchy publication matches this URI.');
-        },
       },
       strongsService: {
         lookup: async strongsNumber => ({

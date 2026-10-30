@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { createBibleLookupHandler } from '../../../../src/tools/v2/bibleLookup.js';
 import { createClassicTextsHandler } from '../../../../src/tools/v2/classicTexts.js';
-import { createHistoricalHierarchyHandler } from '../../../../src/tools/v2/historicalHierarchy.js';
 import { createCommentaryHandler } from '../../../../src/tools/v2/commentary.js';
 import { createCrossReferencesHandler } from '../../../../src/tools/v2/crossReferences.js';
 import { createDonationConfigHandler } from '../../../../src/tools/v2/donationConfig.js';
@@ -18,14 +17,12 @@ import {
   DonationService as DonationServiceClass,
   type DonationService,
 } from '../../../../src/services/donation/DonationService.js';
-import { BibleService } from '../../../../src/services/bible/BibleService.js';
-import type { BibleProviderPort } from '../../../../src/services/bible/BibleProviderPort.js';
+import type { BibleService } from '../../../../src/services/bible/BibleService.js';
 import type { CrossReferenceService } from '../../../../src/services/bible/CrossReferenceService.js';
 import type { ParallelPassageService } from '../../../../src/services/bible/ParallelPassageService.js';
 import type { CommentaryService } from '../../../../src/services/commentary/CommentaryService.js';
 import { RECIPIENT_ADDRESS, type ChainTransactionEvidence } from '../../../../src/kernel/donation-types.js';
 import type { HistoricalDocumentService } from '../../../../src/services/historical/HistoricalDocumentService.js';
-import type { HistoricalHierarchyService } from '../../../../src/services/historical/HistoricalHierarchyService.js';
 import type { PrimarySourceSearchService } from '../../../../src/services/historical/PrimarySourceSearchService.js';
 import type { MorphologyService } from '../../../../src/services/languages/MorphologyService.js';
 import type { StrongsService } from '../../../../src/services/languages/StrongsService.js';
@@ -39,7 +36,6 @@ import { validatorFor } from '../../../../src/mcp/validation.js';
 import { validateClassicTextsOutputSemantics } from '../../../../src/presenters/classicTextsStructured.js';
 import { encodeHistoricalSectionedOnlyCursor } from '../../../../src/kernel/historicalSectionedDelivery.js';
 import { Buffer } from 'node:buffer';
-import { parseReference } from '../../../../src/kernel/reference.js';
 
 function serviceDouble<T>(methods: Partial<{ [K in keyof T]: T[K] }>): T {
   return methods as unknown as T;
@@ -59,7 +55,6 @@ describe('v2 tool handler schemas', () => {
       createParallelPassagesHandler(serviceDouble<ParallelPassageService>({})),
       createCommentaryHandler(serviceDouble<CommentaryService>({})),
       createClassicTextsHandler(serviceDouble<HistoricalDocumentService>({})),
-      createHistoricalHierarchyHandler(serviceDouble<HistoricalHierarchyService>({})),
       createPrimarySourceSearchHandler(serviceDouble<PrimarySourceSearchService>({})),
       createStrongsLookupHandler(serviceDouble<StrongsService>({})),
       createVerseMorphologyHandler(serviceDouble<MorphologyService>({})),
@@ -68,7 +63,7 @@ describe('v2 tool handler schemas', () => {
       createVerifyDonationHandler(serviceDouble<DonationService>({})),
     ];
 
-    expect(handlers.map(handler => handler.name)).toHaveLength(12);
+    expect(handlers.map(handler => handler.name)).toHaveLength(11);
     for (const handler of handlers) {
       expect(handler.inputSchema.additionalProperties).toBe(false);
       expect(handler.annotations).toMatchObject({
@@ -127,35 +122,6 @@ describe('v2 tool handler schemas', () => {
   });
 });
 
-describe('shared malformed-reference guidance', () => {
-  const rejectMalformedReference = (reference: string): never => {
-    parseReference(reference);
-    throw new Error('expected malformed reference');
-  };
-  const handlers = [
-    createBibleLookupHandler(serviceDouble<BibleService>({
-      lookup: vi.fn(async params => rejectMalformedReference(params.reference)),
-      lookupMultiple: vi.fn(),
-    })),
-    createVerseMorphologyHandler(serviceDouble<MorphologyService>({
-      getVerseMorphology: vi.fn(async reference => rejectMalformedReference(reference)),
-    })),
-    createCommentaryHandler(serviceDouble<CommentaryService>({
-      lookup: vi.fn(async params => rejectMalformedReference(params.reference)),
-    })),
-    createParallelPassagesHandler(serviceDouble<ParallelPassageService>({
-      lookup: vi.fn(async params => rejectMalformedReference(params.reference)),
-    })),
-  ];
-
-  it.each(handlers)('returns actionable validation guidance from $name', async handler => {
-    const result = await handler.handler({ reference: 'not a reference' });
-    expect(result).toMatchObject({ isError: true });
-    expect(textOf(result)).toContain('Invalid input: Invalid Bible reference');
-    expect(textOf(result)).not.toContain('Please try again');
-  });
-});
-
 describe('bible_lookup handler', () => {
   it('uses the ESV default and forwards the footnote option for one translation', async () => {
     const lookup = vi.fn<BibleService['lookup']>().mockResolvedValue({
@@ -169,14 +135,11 @@ describe('bible_lookup handler', () => {
 
     const result = await handler.handler({ reference: 'John 3:16', includeFootnotes: true });
 
-    expect(lookup).toHaveBeenCalledWith(
-      {
-        reference: 'John 3:16',
-        translation: 'ESV',
-        includeFootnotes: true,
-      },
-      { signal: expect.any(AbortSignal) },
-    );
+    expect(lookup).toHaveBeenCalledWith({
+      reference: 'John 3:16',
+      translation: 'ESV',
+      includeFootnotes: true,
+    });
     expect(lookupMultiple).not.toHaveBeenCalled();
     expect(textOf(result)).toContain('John 3:16 (ESV)');
     expect(textOf(result)).toContain('For God so loved the world.');
@@ -184,36 +147,6 @@ describe('bible_lookup handler', () => {
       kind: 'bible_lookup',
       requestedTranslations: ['ESV'],
       passages: [{ translation: 'ESV', text: 'For God so loved the world.' }],
-      failures: [],
-    });
-  });
-
-  it('returns NET note unavailability in both Markdown and structured content without a translation failure', async () => {
-    const lookup = vi.fn<BibleService['lookup']>().mockResolvedValue({
-      reference: 'John 1:1',
-      translation: 'NET',
-      text: 'In the beginning was the Word.',
-      footnoteDelivery: {
-        status: 'unavailable',
-        markerCount: 3,
-        reason: 'The configured provider returns markers but not note bodies.',
-      },
-      citation,
-    });
-    const handler = createBibleLookupHandler(serviceDouble<BibleService>({
-      lookup,
-      lookupMultiple: vi.fn<BibleService['lookupMultiple']>(),
-    }));
-
-    const result = await handler.handler({ reference: 'John 1:1', translation: 'NET', includeFootnotes: true });
-
-    expect(result.isError).not.toBe(true);
-    expect(textOf(result)).toContain('Requested footnote text is unavailable. 3 note markers observed.');
-    expect(result.structuredContent).toMatchObject({
-      passages: [{
-        translation: 'NET',
-        footnoteDelivery: { status: 'unavailable', markerCount: 3 },
-      }],
       failures: [],
     });
   });
@@ -233,57 +166,12 @@ describe('bible_lookup handler', () => {
     const result = await handler.handler({
       reference: 'John 3:16',
       translation: ['ESV', 'KJV'],
-      includeFootnotes: true,
     });
 
-    expect(lookupMultiple).toHaveBeenCalledWith(
-      'John 3:16',
-      ['ESV', 'KJV'],
-      { includeFootnotes: true },
-      { signal: expect.any(AbortSignal) },
-    );
+    expect(lookupMultiple).toHaveBeenCalledWith('John 3:16', ['ESV', 'KJV']);
     expect(lookup).not.toHaveBeenCalled();
     expect(textOf(result)).toContain('(2 translations)');
     expect(textOf(result)).toContain('**KJV:**');
-  });
-
-  it('uses one overall deadline to stop queued translation work and cleans up its timer', async () => {
-    vi.useFakeTimers();
-    const translations = ['ESV', 'NET', 'KJV', 'WEB', 'BSB', 'ASV', 'YLT', 'DBY'];
-    const getPassage = vi.fn<BibleProviderPort['getPassage']>().mockImplementation(
-      async (_reference, _translation, options) => new Promise((_resolve, reject) => {
-        options?.signal?.addEventListener('abort', () => reject(options.signal?.reason), { once: true });
-      }),
-    );
-    const service = new BibleService([{
-      supportedTranslations: translations,
-      getPassage,
-      isConfigured: () => true,
-    }]);
-    const handler = createBibleLookupHandler(service);
-
-    try {
-      const pending = handler.handler({ reference: 'John 3:16', translation: translations });
-      expect(getPassage).toHaveBeenCalledTimes(4);
-      await vi.advanceTimersByTimeAsync(30_000);
-      const result = await pending;
-
-      expect(result.isError).not.toBe(true);
-      expect(getPassage).toHaveBeenCalledTimes(4);
-      expect(result.structuredContent).toMatchObject({
-        passages: [],
-        failures: translations.map(translation => ({
-          translation,
-          reason: 'Translation could not be retrieved.',
-        })),
-      });
-      const sharedSignal = getPassage.mock.calls[0][2]?.signal;
-      expect(sharedSignal?.aborted).toBe(true);
-      expect(sharedSignal?.reason).toMatchObject({ name: 'RequestDeadlineExceededError' });
-      expect(vi.getTimerCount()).toBe(0);
-    } finally {
-      vi.useRealTimers();
-    }
   });
 
   it('accepts legacy JSON-encoded translation arrays and preserves partial results', async () => {
@@ -302,12 +190,7 @@ describe('bible_lookup handler', () => {
       translation: '["WEB","DBY"]',
     });
 
-    expect(lookupMultiple).toHaveBeenCalledWith(
-      'Psalm 23:1',
-      ['WEB', 'DBY'],
-      { includeFootnotes: undefined },
-      { signal: expect.any(AbortSignal) },
-    );
+    expect(lookupMultiple).toHaveBeenCalledWith('Psalm 23:1', ['WEB', 'DBY']);
     expect(textOf(result)).toContain('(2 translations requested; 1 available)');
     expect(textOf(result)).toContain('**WEB:**');
     expect(textOf(result)).toContain('**DBY:** unavailable');
@@ -354,10 +237,7 @@ describe('bible_lookup handler', () => {
 
     await handler.handler({ reference: 'John 3:16', translation: '[ESV' });
 
-    expect(lookup).toHaveBeenCalledWith(
-      expect.objectContaining({ translation: '[ESV' }),
-      { signal: expect.any(AbortSignal) },
-    );
+    expect(lookup).toHaveBeenCalledWith(expect.objectContaining({ translation: '[ESV' }));
   });
 
   it('returns a tool error when lookup fails', async () => {
@@ -547,13 +427,10 @@ describe('parallel_passages handler', () => {
     const result = await handler.handler({ reference: 'John 3:16', ...materialized });
 
     expect(result.isError).not.toBe(true);
-    expect(lookup).toHaveBeenCalledWith(
-      expect.objectContaining({
-        corpora: ['ubs_source_attested'], maxGroups: 5, includeAlignment: false,
-        includeOpenBibleCrossReferences: undefined, mode: undefined, maxParallels: undefined, useCrossReferences: undefined,
-      }),
-      { signal: expect.any(AbortSignal) },
-    );
+    expect(lookup).toHaveBeenCalledWith(expect.objectContaining({
+      corpora: ['ubs_source_attested'], maxGroups: 5, includeAlignment: false,
+      includeOpenBibleCrossReferences: undefined, mode: undefined, maxParallels: undefined, useCrossReferences: undefined,
+    }));
   });
   it('forwards all lookup controls and formats text-bearing parallels', async () => {
     const lookup = vi.fn<ParallelPassageService['lookup']>().mockResolvedValue({
@@ -597,22 +474,18 @@ describe('parallel_passages handler', () => {
       sourceAttestedResultWindow: { requestedLimit: 5, returnedGroupCount: 0, additionalMatchStatus: 'not_evaluated' },
     });
 
-    expect(lookup).toHaveBeenCalledWith(
-      {
-        reference: 'Matthew 26:26-28',
-        corpora: ['theologai_legacy'],
-        mode: 'synoptic',
-        includeText: true,
-        translation: 'KJV',
-        maxParallels: 4,
-        maxGroups: undefined,
-        groupCursor: undefined,
-        includeAlignment: undefined,
-        includeOpenBibleCrossReferences: undefined,
-        useCrossReferences: false,
-      },
-      { signal: expect.any(AbortSignal) },
-    );
+    expect(lookup).toHaveBeenCalledWith({
+      reference: 'Matthew 26:26-28',
+      corpora: ['theologai_legacy'],
+      mode: 'synoptic',
+      includeText: true,
+      translation: 'KJV',
+      maxParallels: 4,
+      maxGroups: undefined,
+      includeAlignment: undefined,
+      includeOpenBibleCrossReferences: undefined,
+      useCrossReferences: false,
+    });
     expect(textOf(result)).toContain('[synoptic] (95% confidence)');
     expect(textOf(result)).toContain('And as they were eating');
   });

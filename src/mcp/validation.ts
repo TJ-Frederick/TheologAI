@@ -5,10 +5,10 @@ import {
   type JsonSchemaType,
 } from '@modelcontextprotocol/server';
 import { parseReference } from '../kernel/reference.js';
+import { exceedsMcpInputLimits, MCP_INPUT_LIMIT_MESSAGE } from './inputLimits.js';
 
-export const SUPPORTED_BIBLE_TRANSLATIONS = ['ESV', 'NET', 'KJV', 'WEB', 'BSB', 'ASV', 'YLT', 'DBY'] as const;
-const SUPPORTED_BIBLE_TRANSLATION_SET = new Set<string>(SUPPORTED_BIBLE_TRANSLATIONS);
-const DEFAULT_COMPARISON_TRANSLATIONS = ['ESV', 'KJV', 'NET', 'BSB'] as const;
+const MAX_VALIDATION_ERRORS = 8;
+const MAX_VALIDATION_DETAIL_CHARACTERS = 256;
 
 export type SchemaValidationResult<T> = {
   valid: true;
@@ -34,7 +34,9 @@ export const jsonSchemaValidator = {
         valid: false,
         data: undefined,
         errorMessage: result.errors
-          .map(error => `${error.instanceLocation}: ${error.error}`)
+          .slice(0, MAX_VALIDATION_ERRORS)
+          .map(({ instanceLocation, error }) =>
+            `${instanceLocation.slice(0, MAX_VALIDATION_DETAIL_CHARACTERS)}: ${error.slice(0, MAX_VALIDATION_DETAIL_CHARACTERS)}`)
           .join('; '),
       };
     };
@@ -54,6 +56,14 @@ export function validatorFor(
   );
   validatorCache.set(serializedSchema, validator);
   return validator;
+}
+
+/** Input preflight must run before the general validator allocates errors. */
+export function inputValidatorFor(schema: Record<string, unknown>): SchemaValidator<Record<string, unknown>> {
+  const validate = validatorFor(schema);
+  return input => exceedsMcpInputLimits(input)
+    ? { valid: false, data: undefined, errorMessage: MCP_INPUT_LIMIT_MESSAGE }
+    : validate(input);
 }
 
 export function formatValidationError(errorMessage: string | undefined): string {
@@ -120,29 +130,6 @@ const PROMPT_ARGUMENTS = {
   'primary-source-research': { required: ['topic'], allowed: ['topic', 'work', 'authors', 'startYear', 'endYear', 'maxSections'] },
   donate: { required: [], allowed: [] },
 } as const;
-
-export function resolveComparisonTranslations(value: string | undefined): string[] {
-  if (value === undefined) return [...DEFAULT_COMPARISON_TRANSLATIONS];
-
-  const requested = value.split(',').map(item => item.trim().toUpperCase());
-  const supportedList = SUPPORTED_BIBLE_TRANSLATIONS.join(', ');
-  if (requested.some(item => item.length === 0)) {
-    throw new ProtocolError(
-      ProtocolErrorCode.InvalidParams,
-      `Argument "translations" for prompt "compare-translations" must contain only non-empty comma-separated translation codes. Supported translations: ${supportedList}`,
-    );
-  }
-
-  const unsupported = [...new Set(requested.filter(item => !SUPPORTED_BIBLE_TRANSLATION_SET.has(item)))];
-  if (unsupported.length > 0) {
-    throw new ProtocolError(
-      ProtocolErrorCode.InvalidParams,
-      `Argument "translations" for prompt "compare-translations" contains unsupported translation${unsupported.length === 1 ? '' : 's'}: ${unsupported.join(', ')}. Supported translations: ${supportedList}`,
-    );
-  }
-
-  return [...new Set(requested)];
-}
 
 export function validatePromptArguments(
   name: unknown,
@@ -214,10 +201,6 @@ export function validatePromptArguments(
 
   if (['passage-exegesis', 'compare-translations'].includes(name) && (stringValues.reference?.length ?? 0) > 100) {
     throw new ProtocolError(ProtocolErrorCode.InvalidParams, `Argument "reference" for prompt "${name}" exceeds 100 characters`);
-  }
-
-  if (name === 'compare-translations') {
-    resolveComparisonTranslations(stringValues.translations);
   }
 
   if (name === 'primary-source-research') {

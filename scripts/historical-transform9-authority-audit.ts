@@ -15,7 +15,6 @@ import {
   REVIEWED_SOURCE_PACK_RELEASE,
   assertReviewedSourcePackRelease,
   buildHistoricalSourcePackDocumentMetadata,
-  historicalSourcePackDocumentTitle,
   loadHistoricalSourcePacks,
 } from './historical-source-packs.js';
 import { readHistoricalSectionSources, sha256Canonical } from './historical-section-key-plan.js';
@@ -143,7 +142,7 @@ export function buildHistoricalTransform9ExpectedAuthority(root: string): Histor
     const metadata = JSON.stringify(buildHistoricalSourcePackDocumentMetadata(
       record.packId, record.compiled, record.normalizedTextRights, record.catalog, record.artifacts,
     ));
-    documents.push({ documentId: work.workId, title: historicalSourcePackDocumentTitle(record.compiled, record.catalog), type: 'historical_work', date: null, metadata });
+    documents.push({ documentId: work.workId, title: work.title, type: 'historical_work', date: null, metadata });
     profiles.push({
       documentId: work.workId, workId: work.workId, editionId: edition.editionId,
       immutableCorpusIdentity: record.compiled.sha256, sectionPackageIdentity: record.compiled.sha256,
@@ -190,7 +189,7 @@ export function buildHistoricalTransform9ExpectedAuthority(root: string): Histor
     || expected.profiles.length !== REVIEWED_SOURCE_PACK_RELEASE.counts.deliveryProfiles
     || expected.sections.length !== REVIEWED_SOURCE_PACK_RELEASE.counts.sections
     || expected.projections.length !== REVIEWED_SOURCE_PACK_RELEASE.counts.sections) {
-    throw new Error('Active reviewed source-pack release no longer matches its 4/19/19/44/2307 inventory');
+    throw new Error('Transform 11 regenerated authority no longer matches the reviewed 3/18/18/43/1057 inventory');
   }
   return expected;
 }
@@ -227,27 +226,6 @@ export function auditHistoricalTransform9Authority(
     pages[name] = results[name].pages;
   }
   return { hashes, pages };
-}
-
-/**
- * Generate the clean-corpus keyset sequence for bounded local-Wrangler
- * batching. The regular audit still consumes each result in order, so any
- * changed continuation key or result shape fails before acceptance.
- */
-export function buildHistoricalTransform9AuthorityQueryPlan(
-  root: string,
-  expected = buildHistoricalTransform9ExpectedAuthority(root),
-): string[] {
-  const queries: string[] = [];
-  appendPagedQueryPlan(queries, packSpec(expected.packs));
-  appendPagedQueryPlan(queries, workSpec(expected.works));
-  appendPagedQueryPlan(queries, editionSpec(expected.editions));
-  appendPagedQueryPlan(queries, artifactSpec(expected.artifacts));
-  appendPagedQueryPlan(queries, documentSpec(expected.documents));
-  appendPagedQueryPlan(queries, profileSpec(expected.profiles));
-  appendPagedQueryPlan(queries, sectionSpec(expected.sections));
-  appendPagedQueryPlan(queries, projectionSpec(expected.projections));
-  return queries;
 }
 
 /** The Transform-8 envelope decoder is transport-generic and bounds JSON before parsing. */
@@ -395,14 +373,6 @@ function readPaged<Row>(reader: HistoricalTransform9AuthorityReader, spec: PageS
     }
     pages++;
     if (page.rows.length < pageSize) return { rows, pages };
-  }
-}
-
-function appendPagedQueryPlan<Row>(queries: string[], spec: PageSpec<Row>): void {
-  const pageSize = spec.pageSize ?? HISTORICAL_TRANSFORM9_AUTHORITY_PAGE_SIZE;
-  for (let offset = 0; ; offset += pageSize) {
-    queries.push(spec.sql(offset === 0 ? undefined : spec.expected[offset - 1]));
-    if (offset + pageSize >= spec.expected.length) return;
   }
 }
 

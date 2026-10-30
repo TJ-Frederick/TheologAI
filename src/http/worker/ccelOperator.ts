@@ -1,4 +1,5 @@
 import type { Env } from '../../worker-env.js';
+import { hashRateLimitIp } from './rateLimitIdentity.js';
 import type {
   CcelCoordinatorCircuitState,
   CcelCoordinatorSnapshot,
@@ -87,11 +88,9 @@ export async function handleCcelOperatorRequest(request: Request, env: Env): Pro
 
 async function allowOperatorAuthAttempt(request: Request, env: Env): Promise<boolean> {
   const ip = request.headers.get('CF-Connecting-IP');
-  const userAgent = request.headers.get('User-Agent');
-  if (!ip || ip.length > 64 || !userAgent || userAgent.length > 256) return false;
+  if (!ip?.trim() || ip.length > 64) return false;
   try {
-    const digest = await crypto.subtle.digest('SHA-256', encoder.encode(`${ip}\n${userAgent}`));
-    const key = [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+    const key = await hashRateLimitIp(ip, 'theologai-operator-rate-limit-v2');
     const decision = await env.THEOLOGAI_CCEL_OPERATOR_AUTH_LIMITER.limit({ key });
     return decision.success === true;
   } catch {

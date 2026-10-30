@@ -25,11 +25,7 @@ export class NetBibleAdapter implements BibleProviderPort {
     });
   }
 
-  async getPassage(
-    ref: BibleReference,
-    _translation: string,
-    options?: { includeFootnotes?: boolean; signal?: AbortSignal },
-  ): Promise<BibleResult> {
+  async getPassage(ref: BibleReference, _translation: string): Promise<BibleResult> {
     const refStr = formatReference(ref);
     const params = new URLSearchParams({
       passage: refStr,
@@ -37,7 +33,7 @@ export class NetBibleAdapter implements BibleProviderPort {
       type: 'json',
     });
 
-    const data = await this.client.getJSON<any[]>(`?${params}`, { signal: options?.signal });
+    const data = await this.client.getJSON<any[]>(`?${params}`);
 
     if (!Array.isArray(data) || data.length === 0) {
       throw new APIError(404, `No passage found for: ${refStr}`);
@@ -48,23 +44,11 @@ export class NetBibleAdapter implements BibleProviderPort {
     // Combine verses
     const html = data.map((v: any) => v.text || '').join(' ');
     const text = stripHtml(html);
-    const markerCount = options?.includeFootnotes
-      ? [...html.matchAll(/<n\b[^>]*\bid=["']\d+["'][^>]*\/?\s*>/gi)].length
-      : 0;
 
     return {
       reference: refStr,
       translation: 'NET',
       text,
-      ...(options?.includeFootnotes ? {
-        footnoteDelivery: markerCount > 0
-          ? {
-            status: 'unavailable' as const,
-            markerCount,
-            reason: 'The configured NET Bible public API returns note markers but not translator or study note bodies.',
-          }
-          : { status: 'none' as const, noteCount: 0, markerCount: 0 },
-      } : {}),
       citation: {
         source: 'New English Translation',
         copyright: COPYRIGHT,

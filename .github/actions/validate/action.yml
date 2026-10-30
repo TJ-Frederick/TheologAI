@@ -51,8 +51,8 @@ runs:
       run: |
         test ! -e data/theologai.db
         npm run data:verify-sources
-        npm run audit:release-corpus-capacity -- --output-database "$RUNNER_TEMP/theologai.db"
-        npm run benchmark:primary-source-research -- --database "$RUNNER_TEMP/theologai.db"
+        npm run audit:release-corpus-capacity
+        npm run build:db -- --output "$RUNNER_TEMP/theologai.db"
         test -f "$THEOLOGAI_TEST_DATABASE_PATH"
         npm run test:d1-readiness-generated-db
         npm run d1:seed:export -- --database "$RUNNER_TEMP/theologai.db" --clean

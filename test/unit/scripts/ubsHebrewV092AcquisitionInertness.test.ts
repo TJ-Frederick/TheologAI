@@ -110,8 +110,8 @@ describe('UBS Hebrew v0.9.2 acquisition remains globally inactive', () => {
       materializations: { d1: { transformVersion: number; inputs: string[] } };
     };
     expect(manifest).toMatchObject({
-      schemaVersion: '0010_active_aquinas_hierarchy_publication',
-      materializations: { d1: { transformVersion: 13 } },
+      schemaVersion: '0009_candidate_c_sectioned_publications',
+      materializations: { d1: { transformVersion: 12 } },
     });
     expect(manifest.materializations.d1.inputs.filter(path => path.startsWith(sourceRoot))).toEqual([
       `${sourceRoot}/NATIVE-TO-NORMALIZED-BRIDGE.json`,
@@ -130,9 +130,7 @@ describe('UBS Hebrew v0.9.2 acquisition remains globally inactive', () => {
 
     const packlist = npmPacklist();
     expect(packlist.filter(isPacketCandidate).sort()).toEqual(packetPaths);
-    // Local build output may be present. Runtime packet exclusion is proved by
-    // the isolated build test above; npm distribution remains prohibited.
-    expect(packageJson.private).toBe(true);
+    expect(packlist).not.toContain('dist/index.js');
   });
 });
 

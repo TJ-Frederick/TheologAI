@@ -5,32 +5,25 @@
 TheologAI is an MCP server for Bible study and theological research. It runs
 locally over stdio or Streamable HTTP and on Cloudflare Workers with D1.
 
-For the current source layout and maintenance responsibilities, see
-[Architecture and ownership](docs/ARCHITECTURE.md). The earlier
-`docs/bible-mcp-architecture.md` remains historical design evidence.
-
-The checked-out local registry contains twelve tools, six guided prompts, eight
-English Bible translations, six commentary sources, 36 locally indexed
+The checked-out local registry contains eleven tools, six guided prompts, eight
+English Bible translations, six commentary sources, 35 locally indexed
 historical works, Strong's dictionaries, and Greek/Hebrew morphology. The
-checked-out corpus adds the Norton 1561 transcription to the prior
-35-work baseline. The current release snapshot records the active 35-work
+checked-out Transform 11 release adds ten reviewed editions to the former
+25-work baseline. The current release snapshot records the active 35-work
 assignment; the separately protected PR #108 D1 cutover is historical evidence.
 
-The checked-out corpus also activates Aquinas's four authored *Summa Theologiae*
-parts through `historical_hierarchy_lookup`: 3,185 navigation nodes and 3,184
-direct bodies, ending at Tertia q90. The traditional Supplement is excluded.
-Aquinas uses a separate hierarchy resource and search surface, so it is additional
-to the 36-work classic-text catalog. The English Dominican / Gutenberg provenance
-and U.S.-scoped public-domain statement remain visible. This is code and corpus
-activation; deployed identities remain recorded in the release snapshot.
+The integrated Transform 10 candidate is local-only and unpublished. Its
+Aquinas packet, schema, and standalone materializer are retained for future
+work, while normal release builds prove its hierarchy and shared lineage are
+absent; it adds no document or catalog projection and is not wired into runtime or MCP surfaces.
 
-<!-- theologai-public-contract tools=12 structured=bible_cross_references,bible_lookup,bible_verse_morphology,classic_text_lookup,commentary_lookup,donation_config,historical_hierarchy_lookup,original_language_lookup,original_language_study,parallel_passages,primary_source_search,verify_donation -->
+<!-- theologai-public-contract tools=11 structured=bible_cross_references,bible_lookup,bible_verse_morphology,classic_text_lookup,commentary_lookup,donation_config,original_language_lookup,original_language_study,parallel_passages,primary_source_search,verify_donation -->
 
 ## Current release snapshot
 
 The [current release snapshot](docs/CURRENT-RELEASE.md) is the designated
 current snapshot for this entry document and the named reconciliation documents.
-The linked historical release records preserve point-in-time evidence; they are
+The historical release records below preserve point-in-time evidence; they are
 not current identity authority.
 
 ## Public website and remote endpoints
@@ -69,11 +62,197 @@ Remote MCP client configuration:
 }
 ```
 
-Use the preview URL only for explicitly authorized release testing. Dated
-release identities, audit outcomes, and rollback evidence are preserved in the
-[release history](docs/RELEASE-HISTORY.md); they are not current identity
-authority. The [current release snapshot](docs/CURRENT-RELEASE.md) is the sole
-source for present-tense production and preview assignments.
+Use the preview URL only for explicitly authorized release testing. The
+following is the historical PR #122 production baseline, not current today:
+`86475ecf8288cb0ebcb6467c77c0fd0998a8f1c2` (tree
+`8150aa29e7e4a22141edbfc9ab568df933f9c9b3`). Protected workflow
+`31631924636` deployed Cloudflare deployment
+`e62698f3-f6b0-4145-97bf-28abdeae0e3a`, serving Worker
+`02174f95-abe2-480b-84bf-3e8c1a3a0320` (#100) as the sole active assignment,
+bound to schema-`0009` D1 `theologai-production-20260811-schema0009-a`
+(`9bc79346-338b-439e-a2a5-424f4418eb21`). Remote readiness and authority,
+historical core, Transform-11 spine, original-language, edge stabilization,
+final Worker identity, preview-control, and environment-isolation checks all
+passed. CCEL execution remains disabled.
+
+The exact captured PR #108 Worker/D1 pair is the immediately preceding primary
+rollback unit in that dated release record; it is not current today: deployment
+`3d7489d9-7b48-4ad0-bdc6-95ffbda53bd8`, Worker
+`291f3292-3fa9-44fc-bf6f-b68fd2f4cef6`, and D1
+`theologai-production-20260729-transform11-a`
+(`53211f50-a893-4b4c-be1e-bc625a595dc7`). PR #101 is older retained rollback
+history, not the immediate rollback claim.
+
+The successor delivery program is tracked in
+[Phase 3B](docs/PHASE-3B-PLAN.md). The 3B.1 dual-era implementation is locally
+release-ready and awaits its separately authorized protected preview proof;
+it makes no claim about the currently deployed runtime.
+
+The historical PR #96 `original_language_study` schema-v2 audit passed 11/11
+cases.
+It made 14 stateless HTTP exchanges (initialization, initialized notification,
+`tools/list`, and 11 tool calls), with a 180-second end-to-end cap, 30-second
+per-request cap, 256 KiB per-response cap, and 1 MiB aggregate cap. The
+audited v2 fixture SHA-256 is
+`dabe124580904c411f11484d2c25fbd30452201f6c6f8927c94c0f3f294204a7`; retained
+evidence is sanitized metadata and hashes, not live tool output or source text.
+
+PR #72 is retained only as the matched rollback record: merge
+`72a8ee5eef9b909a373b085d1a4f193484ddfe8a`, deployment
+`a4697fd1-deda-4dae-a16c-635454218bc8`, Worker
+`762485da-9e02-46a0-9777-e0d8743b9dbf`, and D1
+`theologai-production-20260715-a`
+(`c6535a4a-1953-4279-b277-7368445fc61a`). It is not the active production
+binding.
+
+> **PR96 broad MCP smoke — PASS:** Completed in 8.834 seconds. Sanitized
+> `production-mcp-smoke-audit.json` evidence SHA-256:
+> `f33680b7f9f0f2dfbc0df427bcf43d62fb07254d899a9b59a22d483d776a2e26`.
+> It verified 26 MCP operations across 27 HTTP exchanges and 293,466 aggregate
+> MCP response bytes, stateless with no retries or redirects. Pre/post identity
+> was unchanged: deployment `2d10d693-958e-47a6-ae24-81647679c2f6`, Worker
+> `7a3f5078-37bc-453e-bac7-a0743afd508a` (#88), and D1
+> `theologai-production-20260723-a` (`3f7faa0e-689f-47aa-a601-dc662db9a6cf`).
+
+> **PR96 deployment/audit tail — PASS_WITH_OBSERVATION_LIMITATIONS:** Two
+> post-smoke unfiltered JSON Wrangler 4.107.0 tails were pinned to Worker
+> `7a3f5078-37bc-453e-bac7-a0743afd508a` (#88) at requested sampling `0.999999`.
+> Attempt 1: `2026-07-24T13:03:40Z`–`13:34:06Z`, raw 0600 5,634,265 bytes,
+> SHA-256 `819ab5dbbca47719edb5a9292e41c54cd6c15d21488640023ad7e148a609617b`,
+> 1,324 events. Attempt 2: `13:36:32Z`–`13:56:16Z`, raw 0600 3,603,881 bytes,
+> SHA-256 `a56d25424fdeca4207e9039d0efeec5ee0d272d04fd924f0caa1d8bebd3f83f8`,
+> 848 events. Combined command time was 50m10s; observed event-span 49m29.544s.
+> Two automatic reconnect warnings and a maximum uninterrupted segment of about
+> 19m12s mean this is neither a continuous 30-minute observation nor an
+> exhaustive/global request count. Wrangler tail authoritatively cannot provide
+> a request total: 2,172 observed events = 2,167 ok + 5 separately classified
+> client cancellations; 0 observed 5xx, 0 429, 0 exceptions, 0 error logs, 0
+> truncated events, and 0 unexpected release errors. Raw captures are private
+> and unpublished because they contain request metadata. Final authoritative
+> identity after each: source `ac4b5ed774302fbfc86bf846b6ee77a07beed456`, tree
+> `adf08edbf6bfcb14b9613354b2b8fb9f62ec8c16`, deployment
+> `2d10d693-958e-47a6-ae24-81647679c2f6`, Worker #88 above, D1
+> `theologai-production-20260723-a` (`3f7faa0e-689f-47aa-a601-dc662db9a6cf`),
+> sole 100%; identity SHA-256
+> `a6959d24fb7f50a9848fe2d011f425894718471b8a0609e7833780a291721a44`.
+
+PR95's Transform9 source-pack release is historical preview evidence:
+Cloudflare deployment `3467d062-9097-4ffe-9ff1-db900838f538` served Worker
+`8d516c26-6cfe-451c-889a-7dd580b1f4ca` at 100% with
+`theologai-preview-20260727-normal-a`
+(`776944d4-60d1-457f-b13e-b4e7898971ca`). The reviewed core-eight made that
+historical checked-out catalog 25 works. The integrated Transform-10 Aquinas work
+remains local-only and unpublished: it has no document/catalog projection or
+runtime activation.
+
+The protected PR #101 preview release deployed Cloudflare deployment
+`070b292b-0bae-400a-b983-3d72157b5a96`, serving Worker
+`bd722b69-2e2c-4d8d-b42b-617e8caba13d` (#130), bound to
+`theologai-preview-20260728-hierarchy-a`
+(`51890e12-1c3f-421f-b661-9a5ea9637e43`). It was unbound when prepared from the
+reviewed 49-file, 1,627,474-row deterministic seed for schema `0008`; remote
+readiness passed, Transform-8/9 authority audits passed, and Transform-10
+normal-corpus exclusion predicates proved hierarchy, publication, and
+Aquinas-lineage rows empty. The protected release subsequently proved this
+exact binding; it is the retained compatible preview predecessor and makes no
+production claim.
+
+PR #107's preview candidate `theologai-preview-20260728-transform11-a`
+(`62b871a6-5b4d-4d9b-8f52-301f6c878f48`). Its one-use schema-`0008` import
+applied the exact reviewed 49-file, 1,630,259-row seed with corpus identity
+`29a4a7faec2a960f06bfc026a319df8c08b495bb7ad82831fb62d3a3586643a4`.
+Primary readiness, Transform-8 authority (`1/12/12` pages), and the complete
+Transform-11 source-pack authority audit (`1/1/1/1/1/1/133/17` pages) passed.
+Protected preview deployment `5e812152-355b-4a5f-a123-2485e89f1550`
+historically served Worker `06b9a603-8339-42b6-a246-ef9238563043` (#140) with
+that exact D1 and is the immediate predecessor to PR #122. Production was
+unchanged by that preview release. Transform-10 hierarchy,
+publication, and Aquinas material remain excluded.
+
+That historical PR #107 preview Worker predates PR #115's repository-only,
+unpublished pin to `https://www.ccel.org/home3/search`. It is not a valid
+code/resource-equivalent `100` predecessor for a `111` canary built from
+current `main`. PR #122 has since completed the schema-`0009` preview
+bind/deploy/audit stage. The separately prepared schema-`0009` production
+candidate remains unbound; production bind/deploy/audit and read-only
+environment-isolation verification remain separately gated. Completion of the
+preview stage does not authorize credential work or the canary; see the
+[CCEL canary transaction](docs/CCEL-LIVE-PREVIEW-CANARY-TRANSACTION.md).
+
+PR #101's former production assignment is older retained rollback history:
+deployment `71b76d24-bf5f-490e-adc4-31cf63fb046e`, Worker
+`bae58cd3-cad7-4663-879d-408accf061b0` (#96), and D1
+`theologai-production-20260728-hierarchy-a`
+(`f93c3b02-a0bd-4ca1-9697-8ecb4bcf9395`). It was unbound when its reviewed
+49-file, 1,627,474-row schema-`0008` preparation completed: remote readiness
+passed, Transform-8/9 authority audits passed, and Transform-10 normal-corpus
+exclusion predicates proved hierarchy, publication, and Aquinas-lineage rows
+empty. The protected production workflow subsequently proved the exact binding
+before and after its black-box audits. Production primary-source stabilization
+matched on attempt 1, `original_language_study` v2 passed 11/11 cases, and all
+eight reviewed Transform-9 core works passed. This release activates no
+Transform-10 hierarchy or publication rows.
+
+The protected PR #108 production release activated the separately prepared
+Transform-11 candidate `theologai-production-20260729-transform11-a`
+(`53211f50-a893-4b4c-be1e-bc625a595dc7`). It was created once in ENAM from
+merge `501ae7840a71ceb589dc3b1ae9863aef83e3586f`, exact tree
+`dec0f2d66779e6126b3ddb02e74304b97293c67f`, and the reviewed 49-file,
+1,630,259-row seed with corpus identity
+`29a4a7faec2a960f06bfc026a319df8c08b495bb7ad82831fb62d3a3586643a4`.
+Primary readiness, Transform-8 authority (`1/12/12` pages), and complete
+Transform-11 source-pack authority (`1/1/1/1/1/1/133/17` pages) passed.
+Protected workflow `30496350408` then deployed
+`3d7489d9-7b48-4ad0-bdc6-95ffbda53bd8`, Worker
+`291f3292-3fa9-44fc-bf6f-b68fd2f4cef6` (#98), from merge
+`8da99fd0a161b90a4bd90ab29bde1abf796b3bf6` and bound it to that exact D1.
+Historical core passed 8/8, Transform-11 spine passed 10/10,
+`original_language_study` passed 11/11, primary-source edge stabilization
+matched on attempt 4 and remained stable, and independent post-release review
+returned `SHIP`. The exact PR #108 Worker/D1 pair above is the primary
+immediate rollback unit for this schema-`0009` cutover; PR #101 remains older
+retained rollback history only.
+For a preview-client rollback without changing server state, use the direct preview
+`workers.dev` address above; the production `workers.dev` address intentionally
+redirects rather than serving a separate legacy Worker.
+
+In the historical PR #122 record, production and preview used their distinct
+audited schema-`0009` Candidate-C D1 databases. Earlier local-only and preview-only activation
+statements are historical. The historical PR #96 public
+`original_language_study` v2 audit does not independently establish the runtime
+path for every later historical transform. The pinned packet's `SOURCE.json`
+remains a historical acquisition-gate snapshot, not deployment evidence.
+Production v6/local-only and preview v7/discovery-only remain deployed with
+CCEL execution disabled before adapter, coordinator, or fetch.
+
+### Schema-0009 preview release state
+
+The protected release targeted the prepared preview D1
+`theologai-preview-20260811-schema0009-a`
+(`74f456e2-6951-4003-bb6f-91951342bf8f`). The workflow re-checked the
+candidate, deployed it, proved the active preview binding, and completed its
+audit. It validated the fixed production control against the checked-in
+production D1 name/UUID and fresh inventory before deployment, immediately
+afterward, and again after the final preview audit.
+PR #123 subsequently deployed exact source
+`7fb3ec5113a16ed86bfc4a403a3ec3678d4d4dd0` (tree
+`28e555808ad3840d145a7ddd7e57934dc30e45c2`) as preview Worker
+`70bbbecf-3fe6-4a04-8c34-babc3df09ad0` (#144) through deployment
+`4108d59a-4092-4389-824c-fa3820ab66f6`, retaining the same schema-`0009` D1.
+All fixed audits and three production-control observations passed. The
+authorization label was removed and revocation run `31645546905` succeeded.
+PR #122 deployment `13393917-fa91-4afc-aeaf-2809db6701a2` and Worker
+`b2c62527-5759-4c1d-a9a3-8c1d43dddabe` (#142) are the immediate retained
+same-D1 predecessor. The detailed sanitized evidence is in
+[docs/PREVIEW-RELEASE-RECONCILIATION.md](docs/PREVIEW-RELEASE-RECONCILIATION.md).
+This post-release evidence commit postdates the deployed source and makes no new
+runtime claim.
+Production is separately bound to schema-`0009` D1
+`theologai-production-20260811-schema0009-a`
+(`9bc79346-338b-439e-a2a5-424f4418eb21`) by the protected PR #122 release. The
+CCEL canary gate remains unrecorded and inert. The exact preparation identity,
+seed evidence, and release boundary are recorded in
+[docs/D1-DATA-WORKFLOW.md](docs/D1-DATA-WORKFLOW.md).
 
 ## MCP capabilities
 
@@ -98,8 +277,7 @@ stderr or privacy-safe telemetry instead.
 | `bible_cross_references` | Query locally indexed OpenBible.info cross references with raw vote ranking, explicit discovery-only semantics, threshold-scoped result windows, and pinned snapshot provenance. |
 | `parallel_passages` | Return complete UBS source-attested parallel groups by default; legacy curated edges and OpenBible.info cross references require explicit selectors and remain separate. |
 | `commentary_lookup` | Retrieve Matthew Henry, JFB, Adam Clarke, John Gill, Keil-Delitzsch (OT), or Tyndale notes. |
-| `classic_text_lookup` | The checked-out catalog searches and browses 36 historical works with canonical source-first section keys; 19 reviewed source-pack editions use bounded sectioned delivery. Preview and production serve the 35-work Transform-11 catalog. Exact sections are the only body route, and remote CCEL document bodies are not retrieved or republished. |
-| `historical_hierarchy_lookup` | Browse and search Aquinas’s four authored Summa parts (English Dominican / Gutenberg); exact nodes deliver direct text, and the traditional Supplement is excluded. |
+| `classic_text_lookup` | The checked-out Transform 11 catalog searches and browses 35 historical works with canonical source-first section keys; 18 reviewed source-pack editions use bounded sectioned delivery. Preview and production serve the 35-work Transform-11 catalog. Exact sections are the only body route, and remote CCEL document bodies are not retrieved or republished. |
 | `primary_source_search` | Execute bounded primary-source query plans. Production v6/local-only is deployed; preview runs the audited v7/discovery-only contract with CCEL execution disabled before adapter, coordinator, or fetch. The Transform-9 preview corpus release does not change that CCEL policy. Local locators use canonical section keys plus source ordinals; snippets remain discovery-only and research workflows maintain explicit searched/read/deferred/not-searched coverage ledgers. |
 | `original_language_lookup` | Look up or search Strong's entries, with opt-in rights-reviewed STEPBible metadata, exact corrected-corpus usage, and bounded occurrence pages for exact identities. The Online-Bible-derived TBESH Hebrew `Meaning` field is withheld. |
 | `bible_verse_morphology` | Return bounded word-by-word morphology for one exact verse, with raw codes, nullable expansions, and separate pinned STEPBible morphology/lemma provenance. |
@@ -141,15 +319,6 @@ attempts for the 12 scheduled lookups, preserving headroom below the
 50-subrequest Worker limit; this relationship is executable policy, not only
 documentation.
 
-Each `bible_lookup` call and the remote text-enrichment portion of
-`parallel_passages` share a 30-second deadline across provider fetches, body
-reads, and retry delays. MCP cancellation propagates through those operations.
-Bible comparisons run at most four translations concurrently, retain request
-order within successes and failures, and forward `includeFootnotes` for both
-single and multiple translations. When the budget expires, completed passages
-remain available and queued provider work does not start. This deadline does
-not preempt local database queries or synchronous formatting.
-
 For exact `original_language_lookup` calls, corpus usage is opt-in. `overview`
 returns totals plus the complete canonical-book distribution only. `study`
 adds the top 10 exact source variants and defaults to 8 raw occurrences (maximum
@@ -167,7 +336,7 @@ frequency, morphology, or other metadata. OpenScriptures definitions and Greek
 STEPBible evidence are unaffected.
 
 All tools are annotated as read-only, non-destructive, and idempotent. Tool
-inputs use closed, bounded JSON Schema 2020-12 contracts. All twelve tools
+inputs use closed, bounded JSON Schema 2020-12 contracts. All eleven tools
 advertise versioned object-root `outputSchema` contracts and return matching
 `structuredContent` beside the existing Markdown content: `bible_lookup`,
 `bible_cross_references`, `bible_verse_morphology`, `parallel_passages`,
@@ -225,8 +394,7 @@ reviewed normalized source packs, and mixed inventories.
 | `theologai://translations` | Available Bible translations. |
 | `theologai://commentaries` | Available commentary sources. |
 | `theologai://primary-sources/catalog` | v2 JSON metadata inventory for the hosted primary-source collection; no document bodies, provenance URLs, source hashes, or rights instruments. Each work carries a fail-closed edition-readiness disclosure. |
-| `theologai://documents/{slug}` | One of 36 locally indexed historical works: 17 legacy creeds/confessions/catechisms and 19 reviewed source-pack editions. |
-| `theologai://documents/summa-theologiae` | Aquinas hierarchy landing; exact `#node-{nodeKey}` resources deliver one direct body with provenance. |
+| `theologai://documents/{slug}` | One of 35 locally indexed historical works: 17 legacy creeds/confessions/catechisms and 18 reviewed source-pack editions. |
 | `theologai://strongs/{number}` | A Strong's dictionary entry such as `G26` or `H430`. |
 
 ### Guided prompts
@@ -274,13 +442,13 @@ transcription uncertainty.
 
 ### Historical documents and external discovery
 
-The checked-out catalog contains 36 historical works: 17 tracked
-legacy creeds, confessions, and catechisms plus 19 reviewed, normalized
+The checked-out Transform 11 catalog contains 35 historical works: 17 tracked
+legacy creeds, confessions, and catechisms plus 18 reviewed, normalized
 public-domain source-pack editions. In addition to the core eight, the candidate
 adds Augustine's *On Christian Doctrine*, Basil, both Gregories, Justin Martyr,
 Origen, Hooker Book I, Julian of Norwich, *The Imitation of Christ*, and
-Pascal's *Pensées*, and Calvin's *Institutes* in the Norton 1561 translation.
-The four packs are sectioned-only, contribute 2,307 canonical sections, and add no legacy aliases; exact resources disclose the
+Pascal's *Pensées*. The three packs are sectioned-only, contribute 1,057
+canonical sections, and add no legacy aliases; exact resources disclose the
 reviewed edition and normalized-text rights boundary. Preview serves the
 35-work Transform-11 catalog, and production now serves the same corpus after
 the protected PR #108 cutover. The exact checked-out count is
@@ -289,10 +457,11 @@ enforced by `data/data-manifest.json`.
 Approved UBS Hebrew artifacts plus the separately acquired Norton and Aquinas
 public-domain packets are checked into the repository for deterministic
 verification and release work. Those acquisition packets remain outside the
-deployed catalog. Transform 13 activates that Aquinas packet through its hierarchy reader; it is
-not duplicated into the flat classic-text catalog or primary-source search index.
+deployed catalog. Transform 10 retains an Aquinas packet, schema, and
+standalone materializer only; normal builds exclude its hierarchy and lineage,
+and it adds neither a document/catalog projection nor a runtime or MCP surface.
 The reviewed PR95 core-eight remains part of both deployed baselines and the
-checked-out 36-work candidate described above. M4A's
+checked-out 35-work candidate described above. M4A's
 local/preview materialization and inactive-adapter statements are historical;
 PR #96 historically recorded a production D1 binding and bounded public
 `original_language_study` v2 audit. U3-T7 provides the in-memory semantic compiler,
@@ -300,12 +469,12 @@ native-to-normalized coordinate bridge, and content-free compilation audit;
 M4A provides capacity and seed verification. The PR #96 audit does not
 independently establish the runtime status of later transforms.
 PR95's Transform9 core-eight remains included in the checked-out and deployed
-catalogs. Norton is now admitted through the ordinary source-pack projection,
-with 1,250 unchanged source-segment citations and an edition-qualified title.
-Its pinned EEBO-TCP transcription is CC0; images and facsimiles are excluded.
-The generic Candidate-C `sectioned_only` publication experiment remains dormant
-and separate from that active projection. Aquinas is active through its separate hierarchy tool and canonical
-`theologai://documents/summa-theologiae` landing resource. Cyril remains blocked
+catalogs. Norton and Aquinas assets remain inactive. Transform 12 adds the
+generic Candidate-C storage lifecycle, seal, and dormant `sectioned_only`
+schema seam, but the canonical build, generated D1 seed, and readiness contract
+contain zero Norton rows. A separate disposable local-only command proves the
+1,250-row Norton authority in copied SQLite and isolated Workerd databases; it
+cannot write the canonical seed or use a remote binding. Cyril remains blocked
 with zero output pending reliable translator attribution.
 
 Production v6/local-only and preview v7/discovery-only currently search and
@@ -500,10 +669,7 @@ caller can rotate user agents, and users behind the same NAT may share a bucket.
 
 See [docs/worker-operations.md](docs/worker-operations.md). Normal pull requests
 perform verification only; preview and production deployment require explicit
-approval. Merging to main does not deploy production. Promote main explicitly
-using the **Deploy Production** workflow's **Run workflow** action, supplying a
-reason; preview evidence, full validation, and production approval still apply.
-Deployment does not automatically migrate or seed remote D1.
+approval. Deployment does not automatically migrate or seed remote D1.
 
 ## Architecture
 
@@ -581,7 +747,7 @@ per-request D1 repositories. Both targets share one MCP registry.
   license metadata before redistribution claims can be made.
 - Hosted MCP Logging would require a deliberate stateful-session design.
 - Authentication, saved workspaces, completions, and MCP tasks should be added
-  only when a concrete workflow requires them. All twelve tools provide
+  only when a concrete workflow requires them. All eleven tools provide
   versioned structured output beside compatible Markdown. Further contract
   revisions require separate compatibility review.
 - Remote D1 compatibility must be checked before any deployment; migration or

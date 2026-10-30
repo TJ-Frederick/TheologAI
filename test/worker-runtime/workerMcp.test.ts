@@ -119,13 +119,29 @@ async function modernRpc(
   return { response, message: await parseMcpResponse(response) };
 }
 
-async function rateLimitKey(ip: string, userAgent: string): Promise<string> {
-  const input = new TextEncoder().encode(`theologai-rate-limit-v1\0${ip}\0${userAgent}`);
+async function rateLimitKey(ip: string): Promise<string> {
+  const input = new TextEncoder().encode(`theologai-rate-limit-v2\0${ip}`);
   const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', input));
   return [...digest].map(byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
 describe('Worker MCP endpoint in workerd', () => {
+  it.each(['2025-11-25', '2026-07-28'])('rejects excessive %s metadata before SDK validation', async version => {
+    const response = await SELF.fetch(MCP_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json', Accept: 'application/json, text/event-stream',
+        'Mcp-Protocol-Version': version, 'Mcp-Method': 'tools/call', 'Mcp-Name': 'donation_config',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0', id: 1, method: 'tools/call',
+        params: { name: 'donation_config', arguments: {}, _meta: { extra: Array(129).fill(0) } },
+      }),
+    });
+    expect(response.status).toBe(413);
+    expect((await response.text()).length).toBeLessThan(100);
+  });
+
   it('keeps the legacy production migration browser-safe and scopes the poller guard to production hosts', async () => {
     const browserPreflight = await SELF.fetch(LEGACY_PRODUCTION_MCP_URL, {
       method: 'OPTIONS',
@@ -218,10 +234,10 @@ describe('Worker MCP endpoint in workerd', () => {
     })).resolves.toEqual({ success: true });
   });
 
-  it('returns the configured 429 response after the client fingerprint exhausts its binding limit', async () => {
+  it('returns 429 for a different user agent after the IP exhausts its binding limit', async () => {
     const ip = '203.0.113.42';
     const userAgent = 'theologai-worker-runtime-rate-limit-test';
-    const key = await rateLimitKey(ip, userAgent);
+    const key = await rateLimitKey(ip);
 
     for (let requestNumber = 0; requestNumber < 120; requestNumber += 1) {
       const result = await env.THEOLOGAI_RATE_LIMITER.limit({ key });
@@ -386,7 +402,6 @@ describe('Worker MCP endpoint in workerd', () => {
       'parallel_passages',
       'commentary_lookup',
       'classic_text_lookup',
-      'historical_hierarchy_lookup',
       'primary_source_search',
       'original_language_lookup',
       'bible_verse_morphology',
@@ -394,11 +409,6 @@ describe('Worker MCP endpoint in workerd', () => {
       'donation_config',
       'verify_donation',
     ]);
-
-    const missingHierarchy = await modernRpc('tools/call', {
-      name: 'historical_hierarchy_lookup', arguments: { slug: 'missing-test-hierarchy' },
-    }, 'missing-hierarchy', 'historical_hierarchy_lookup');
-    expect(missingHierarchy.message.result?.isError).toBe(true);
 
     const mismatch = await modernRpc(
       'tools/call',

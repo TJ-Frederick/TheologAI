@@ -6,7 +6,6 @@
 
 import { AdapterError } from '../../kernel/errors.js';
 import { DEFAULT_HTTP_MAX_RETRIES } from '../../kernel/requestLimits.js';
-import { RequestDeadlineExceededError } from '../../kernel/requestDeadline.js';
 
 const DEFAULT_MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 const DEFAULT_MAX_CACHE_BYTES = 8 * 1024 * 1024;
@@ -30,11 +29,6 @@ export interface HttpClientOptions {
   maxResponseBytes?: number;
   /** Maximum aggregate UTF-8 cache weight. Default: 8 MiB. */
   maxCacheBytes?: number;
-}
-
-export interface HttpRequestOptions {
-  headers?: Record<string, string>;
-  signal?: AbortSignal;
 }
 
 export class HttpClient {
@@ -68,17 +62,16 @@ export class HttpClient {
   }
 
   /** GET request, returning parsed JSON */
-  async getJSON<T = unknown>(path: string, options: HttpRequestOptions = {}): Promise<T> {
+  async getJSON<T = unknown>(path: string, options?: { headers?: Record<string, string> }): Promise<T> {
     const url = this.baseUrl + path;
     const cacheKey = url;
-    this.throwIfCallerCancelled(options.signal);
 
     if (this.cache) {
       const cached = this.cache.get(cacheKey);
       if (cached !== undefined) return JSON.parse(cached) as T;
     }
 
-    const body = await this.fetchWithRetry(url, options);
+    const body = await this.fetchWithRetry(url, options?.headers);
 
     if (this.cache) {
       this.cache.set(cacheKey, body);
@@ -88,17 +81,16 @@ export class HttpClient {
   }
 
   /** GET request, returning raw text */
-  async getText(path: string, options: HttpRequestOptions = {}): Promise<string> {
+  async getText(path: string, options?: { headers?: Record<string, string> }): Promise<string> {
     const url = this.baseUrl + path;
     const cacheKey = `text:${url}`;
-    this.throwIfCallerCancelled(options.signal);
 
     if (this.cache) {
       const cached = this.cache.get(cacheKey);
       if (cached !== undefined) return cached;
     }
 
-    const body = await this.fetchWithRetry(url, options);
+    const body = await this.fetchWithRetry(url, options?.headers);
 
     if (this.cache) {
       this.cache.set(cacheKey, body);
@@ -115,28 +107,21 @@ export class HttpClient {
     this.cache?.dispose();
   }
 
-  private async fetchWithRetry(url: string, options: HttpRequestOptions): Promise<string> {
+  private async fetchWithRetry(url: string, extraHeaders?: Record<string, string>): Promise<string> {
     let lastError: Error | undefined;
 
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
-      this.throwIfCallerCancelled(options.signal);
       const controller = new AbortController();
-      const abortFromCaller = () => controller.abort(options.signal?.reason);
-      options.signal?.addEventListener('abort', abortFromCaller, { once: true });
-      if (options.signal?.aborted) abortFromCaller();
-      const timeout = setTimeout(() => {
-        controller.abort(new DOMException('Upstream request timed out.', 'TimeoutError'));
-      }, this.timeoutMs);
+      const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
       let shouldRetry = false;
 
       try {
         const response = await fetch(url, {
-          headers: { ...this.headers, ...options.headers },
+          headers: { ...this.headers, ...extraHeaders },
           signal: controller.signal,
         });
 
         if (!response.ok) {
-          cancelResponseBody(response, `HTTP ${response.status}`);
           if (response.status >= 500 && attempt < this.maxRetries) {
             shouldRetry = true;
           } else {
@@ -146,34 +131,21 @@ export class HttpClient {
             );
           }
         } else {
-          return await readBoundedResponseText(
-            response,
-            this.maxResponseBytes,
-            this.source,
-            controller.signal,
-          );
+          return await readBoundedResponseText(response, this.maxResponseBytes, this.source);
         }
       } catch (error) {
-        if (options.signal?.aborted) {
-          throw this.callerCancellationError(options.signal, error);
-        }
         if (error instanceof AdapterError) throw error;
 
-        lastError = error instanceof Error ? error : new Error(String(error));
+        lastError = error as Error;
         if (attempt < this.maxRetries) {
           shouldRetry = true;
         }
       } finally {
         clearTimeout(timeout);
-        options.signal?.removeEventListener('abort', abortFromCaller);
       }
 
       if (shouldRetry) {
-        try {
-          await this.backoff(attempt, options.signal);
-        } catch (error) {
-          throw this.callerCancellationError(options.signal, error);
-        }
+        await this.backoff(attempt);
       }
     }
 
@@ -184,26 +156,9 @@ export class HttpClient {
     );
   }
 
-  private backoff(attempt: number, signal?: AbortSignal): Promise<void> {
+  private backoff(attempt: number): Promise<void> {
     const delay = Math.min(1000 * 2 ** attempt, 10000);
-    return waitForDelay(delay, signal);
-  }
-
-  private throwIfCallerCancelled(signal?: AbortSignal): void {
-    if (signal?.aborted) throw this.callerCancellationError(signal);
-  }
-
-  private callerCancellationError(signal?: AbortSignal, cause?: unknown): AdapterError {
-    const reason = signal?.reason;
-    const message = reason instanceof RequestDeadlineExceededError
-      ? 'Request deadline exceeded.'
-      : 'Request was cancelled.';
-    const errorCause = cause instanceof Error
-      ? cause
-      : reason instanceof Error
-        ? reason
-        : undefined;
-    return new AdapterError(this.source, message, errorCause);
+    return new Promise(resolve => setTimeout(resolve, delay));
   }
 }
 
@@ -212,40 +167,30 @@ export async function readBoundedResponseText(
   response: Response,
   maxBytes: number,
   source: string,
-  signal?: AbortSignal,
 ): Promise<string> {
   const declared = response.headers?.get('Content-Length');
   if (declared && /^\d+$/.test(declared) && Number(declared) > maxBytes) {
-    cancelResponseBody(response, 'Upstream response exceeds configured limit');
+    await response.body?.cancel();
     throw new AdapterError(source, `Upstream response exceeds ${maxBytes} bytes`);
   }
-  if (!response.body) return awaitWithAbort(response.text(), signal);
+  if (!response.body) return response.text();
 
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
   try {
     while (true) {
-      const { done, value } = await awaitWithAbort(reader.read(), signal);
+      const { done, value } = await reader.read();
       if (done) break;
       total += value.byteLength;
       if (total > maxBytes) {
-        cancelReader(reader, 'Upstream response exceeds configured limit');
+        await reader.cancel('Upstream response exceeds configured limit');
         throw new AdapterError(source, `Upstream response exceeds ${maxBytes} bytes`);
       }
       chunks.push(value);
     }
-  } catch (error) {
-    if (signal?.aborted) {
-      cancelReader(reader, signal.reason);
-    }
-    throw error;
   } finally {
-    try {
-      reader.releaseLock();
-    } catch {
-      // A hostile or detached stream must not replace the bounded read failure.
-    }
+    reader.releaseLock();
   }
 
   const body = new Uint8Array(total);
@@ -255,78 +200,6 @@ export async function readBoundedResponseText(
     offset += chunk.byteLength;
   }
   return new TextDecoder().decode(body);
-}
-
-function waitForDelay(delayMs: number, signal?: AbortSignal): Promise<void> {
-  if (signal?.aborted) return Promise.reject(abortReason(signal));
-  return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      cleanup();
-      resolve();
-    }, delayMs);
-    const onAbort = () => {
-      cleanup();
-      reject(abortReason(signal));
-    };
-    const cleanup = () => {
-      clearTimeout(timeout);
-      signal?.removeEventListener('abort', onAbort);
-    };
-    signal?.addEventListener('abort', onAbort, { once: true });
-    if (signal?.aborted) onAbort();
-  });
-}
-
-function awaitWithAbort<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
-  if (!signal) return promise;
-  return new Promise((resolve, reject) => {
-    const onAbort = () => {
-      cleanup();
-      reject(abortReason(signal));
-    };
-    const cleanup = () => signal.removeEventListener('abort', onAbort);
-    signal.addEventListener('abort', onAbort, { once: true });
-    if (signal.aborted) onAbort();
-    promise.then(
-      value => {
-        cleanup();
-        resolve(value);
-      },
-      error => {
-        cleanup();
-        reject(error);
-      },
-    );
-  });
-}
-
-function cancelResponseBody(response: Response, reason: string): void {
-  try {
-    void response.body?.cancel(reason).catch(() => {
-      // Body cleanup must never replace or delay the request failure.
-    });
-  } catch {
-    // Preserve the request failure when a nonconforming stream throws synchronously.
-  }
-}
-
-function cancelReader(
-  reader: ReadableStreamDefaultReader<Uint8Array>,
-  reason: unknown,
-): void {
-  try {
-    void reader.cancel(reason).catch(() => {
-      // Preserve the bounded read or cancellation failure.
-    });
-  } catch {
-    // Preserve the bounded read or cancellation failure.
-  }
-}
-
-function abortReason(signal?: AbortSignal): Error {
-  return signal?.reason instanceof Error
-    ? signal.reason
-    : new DOMException('The request was aborted.', 'AbortError');
 }
 
 class ResponseCache {

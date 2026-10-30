@@ -44,11 +44,7 @@ export class HelloAoAdapter implements BibleProviderPort {
     });
   }
 
-  async getPassage(
-    ref: BibleReference,
-    translation: string,
-    options?: { includeFootnotes?: boolean; signal?: AbortSignal },
-  ): Promise<BibleResult> {
+  async getPassage(ref: BibleReference, translation: string, options?: { includeFootnotes?: boolean }): Promise<BibleResult> {
     const key = translation.toUpperCase();
     const meta = TRANSLATIONS[key];
     if (!meta) {
@@ -56,10 +52,7 @@ export class HelloAoAdapter implements BibleProviderPort {
     }
 
     const hao = toHelloAO(ref);
-    const data = await this.client.getJSON<any>(
-      `/${meta.id}/${hao.bookCode}/${hao.chapter}.json`,
-      { signal: options?.signal },
-    );
+    const data = await this.client.getJSON<any>(`/${meta.id}/${hao.bookCode}/${hao.chapter}.json`);
     this.assertResponseMatchesRequest(data, ref, hao.bookCode, meta.id);
 
     // Extract verses
@@ -80,19 +73,8 @@ export class HelloAoAdapter implements BibleProviderPort {
     const text = verses.map(v => this.extractVerseText(v.content)).join(' ');
 
     let footnotes: Footnote[] | undefined;
-    let footnoteDelivery: BibleResult['footnoteDelivery'];
-    if (options?.includeFootnotes) {
-      if (Array.isArray(data.chapter.footnotes)) {
-        footnotes = this.extractFootnotes(data.chapter.footnotes, hao.verse, hao.endVerse);
-        footnoteDelivery = footnotes.length > 0
-          ? { status: 'structured', noteCount: footnotes.length }
-          : { status: 'none', noteCount: 0 };
-      } else {
-        footnoteDelivery = {
-          status: 'unavailable',
-          reason: 'The translation provider response did not include footnote data.',
-        };
-      }
+    if (options?.includeFootnotes && data.chapter.footnotes) {
+      footnotes = this.extractFootnotes(data.chapter.footnotes, hao.verse, hao.endVerse);
     }
 
     return {
@@ -100,7 +82,6 @@ export class HelloAoAdapter implements BibleProviderPort {
       translation: key,
       text,
       footnotes,
-      footnoteDelivery,
       citation: { source: meta.name, copyright: meta.copyright, url: meta.url },
     };
   }

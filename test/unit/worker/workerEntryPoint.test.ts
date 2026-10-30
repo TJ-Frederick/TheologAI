@@ -294,20 +294,8 @@ describe('Worker Entry Point', () => {
     expect(mockCreateRoot).toHaveBeenCalledWith(env);
     expect(mockHandleMcp).toHaveBeenCalledWith(expect.any(Function), request);
     const factory = mockHandleMcp.mock.calls[0]![0] as (era: 'legacy' | 'modern') => unknown;
-    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined);
-    try {
-      expect(factory('modern')).toBe(mockServer);
-      expect(mockCreateServer).toHaveBeenCalledWith(mockRoot, '1.0.0-test', 'modern', expect.any(Function));
-      const observer = mockCreateServer.mock.calls[0]![3] as (event: unknown) => void;
-      observer({
-        event: 'theologai.tool.execution', tool: 'bible_lookup', outcome: 'success', durationMs: 12, releaseVersion: '1.0.0-test',
-      });
-      expect(infoSpy.mock.calls.map(call => JSON.parse(call[0] as string))).toEqual([{
-        event: 'theologai.tool.execution', tool: 'bible_lookup', outcome: 'success', durationMs: 12, releaseVersion: '1.0.0-test',
-      }]);
-    } finally {
-      infoSpy.mockRestore();
-    }
+    expect(factory('modern')).toBe(mockServer);
+    expect(mockCreateServer).toHaveBeenCalledWith(mockRoot, '1.0.0-test', 'modern');
   });
 
   it('allows native clients without emitting an allow-origin header', async () => {
@@ -425,7 +413,7 @@ describe('Worker Entry Point', () => {
     }
   });
 
-  it('uses a stable hashed IP and user-agent fingerprint', async () => {
+  it('uses a stable hashed IP fingerprint', async () => {
     const headers = { 'CF-Connecting-IP': '203.0.113.10', 'User-Agent': 'test-client/1.0' };
     await worker.fetch(makeRequest('/mcp', 'POST', headers), env as never, ctx);
     await worker.fetch(makeRequest('/mcp', 'POST', headers), env as never, ctx);
@@ -436,7 +424,7 @@ describe('Worker Entry Point', () => {
     expect(first).not.toContain('test-client/1.0');
   });
 
-  it('changes the fingerprint when either component changes', async () => {
+  it('changes the fingerprint only when the IP changes', async () => {
     for (const headers of [
       { 'CF-Connecting-IP': '203.0.113.10', 'User-Agent': 'client/1' },
       { 'CF-Connecting-IP': '203.0.113.11', 'User-Agent': 'client/1' },
@@ -445,7 +433,42 @@ describe('Worker Entry Point', () => {
       await worker.fetch(makeRequest('/mcp', 'POST', headers), env as never, ctx);
     }
     const keys = env.THEOLOGAI_RATE_LIMITER.limit.mock.calls.map(call => call[0].key);
-    expect(new Set(keys).size).toBe(3);
+    expect(new Set(keys).size).toBe(2);
+    expect(keys[0]).toBe(keys[2]);
+  });
+
+  it('enforces the same IP budget across rotating user agents', async () => {
+    const counts = new Map<string, number>();
+    env.THEOLOGAI_RATE_LIMITER.limit.mockImplementation(async ({ key }: { key: string }) => {
+      const count = (counts.get(key) ?? 0) + 1;
+      counts.set(key, count);
+      return { success: count <= 120 };
+    });
+    for (let i = 0; i < 120; i++) {
+      const response = await worker.fetch(makeRequest('/mcp', 'POST', {
+        'CF-Connecting-IP': '203.0.113.10', 'User-Agent': `client/${i}`,
+      }), env as never, ctx);
+      expect(response.status).toBe(200);
+    }
+    const warningSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      const response = await worker.fetch(makeRequest('/mcp', 'POST', {
+        'CF-Connecting-IP': '203.0.113.10', 'User-Agent': 'new-agent',
+      }), env as never, ctx);
+      expect(response.status).toBe(429);
+      expect(counts.size).toBe(1);
+    } finally {
+      warningSpy.mockRestore();
+    }
+  });
+
+  it('shares a missing-IP bucket instead of trusting spoofable identity headers', async () => {
+    for (const headers of [
+      { 'User-Agent': 'one', 'X-Forwarded-For': '203.0.113.10' },
+      { 'User-Agent': 'two', 'X-Forwarded-For': '203.0.113.11' },
+    ]) await worker.fetch(makeRequest('/mcp', 'POST', headers), env as never, ctx);
+    const keys = env.THEOLOGAI_RATE_LIMITER.limit.mock.calls.map(call => call[0].key);
+    expect(keys[0]).toBe(keys[1]);
   });
 
   it('returns a CORS-safe, non-cacheable 429 before reading the body', async () => {
@@ -486,7 +509,7 @@ describe('Worker Entry Point', () => {
         status: 429,
         limit: 120,
         periodSeconds: 60,
-        scope: 'hashed_ip_user_agent_per_colo',
+        scope: 'hashed_ip_per_colo',
       });
       const serialized = warningSpy.mock.calls.join('\n');
       expect(serialized).not.toContain(clientIp);
@@ -550,6 +573,24 @@ describe('Worker Entry Point', () => {
     await worker.fetch(makeRequest('/mcp', 'POST', undefined, body), env as never, ctx);
     const forwarded = mockHandleMcp.mock.calls[0][1] as Request;
     await expect(forwarded.text()).resolves.toBe('{"ok":true}');
+  });
+
+  it.each([
+    ['many keys', Object.fromEntries(Array.from({ length: 129 }, (_, i) => [`k${i}`, 0]))],
+    ['deep metadata', JSON.parse('{"child":'.repeat(20) + 'null' + '}'.repeat(20))],
+    ['large array', Array(129).fill(0)],
+  ])('rejects %s before constructing MCP dependencies', async (_name, input) => {
+    const response = await worker.fetch(makeRequest('/mcp', 'POST', undefined, JSON.stringify(input)), env as never, ctx);
+    expect(response.status).toBe(413);
+    expect(mockCreateRoot).not.toHaveBeenCalled();
+    expect(mockHandleMcp).not.toHaveBeenCalled();
+  });
+
+  it('caps an oversized configured byte budget at 64 KiB', async () => {
+    env.THEOLOGAI_MAX_REQUEST_BYTES = '1048576';
+    const response = await worker.fetch(makeRequest('/mcp', 'POST', undefined, 'x'.repeat(65537)), env as never, ctx);
+    expect(response.status).toBe(413);
+    expect(mockCreateRoot).not.toHaveBeenCalled();
   });
 
   it('logs only allowlisted request metadata when enabled', async () => {

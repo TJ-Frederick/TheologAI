@@ -121,7 +121,7 @@ describe('custom-domain infrastructure contract', () => {
     expect(prerequisite).toContain('access-control-allow-origin:[[:space:]]*https://theologai\\.xyz');
     expect(prerequisite.match(/grep -Eiq/g)).toHaveLength(2);
     expect(prerequisite).not.toContain('rg --ignore-case');
-    expect(prerequisite).toContain('npm run audit:parallel-preview');
+    expect(prerequisite).toContain('npx --no-install tsx scripts/audit-parallel-passages-preview.ts');
     expect(prerequisite).toContain('$RUNNER_TEMP/pre-production-preview-mcp-audit.json');
     expect(prerequisite).toContain('test -s "$RUNNER_TEMP/pre-production-preview-mcp-audit.json"');
     expect(prerequisite).toContain('$RUNNER_TEMP/theologai-website.html');

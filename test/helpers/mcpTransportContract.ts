@@ -37,7 +37,6 @@ const TOOL_ORDER = [
   'parallel_passages',
   'commentary_lookup',
   'classic_text_lookup',
-  'historical_hierarchy_lookup',
   'primary_source_search',
   'original_language_lookup',
   'bible_verse_morphology',
@@ -70,16 +69,16 @@ const STATIC_RESOURCE_ORDER = [
 export const EXPECTED_MCP_CONTRACT_FINGERPRINTS: Record<'6' | '7', McpContractFingerprints> = {
   '6': {
     capabilities: '',
-    tools: '0b4393f96fb48ee1634cadc5ff728c4ac3ed93b0c1bf02aa678863f9d19724c6',
-    prompts: '7e6ab1c22d32a9f520a4a2e2cc917df17827610462ef524b791ad0c06ff3133d',
-    resourceTemplates: '00f1610e183225227f78b36e6fb04fd72244e5dd042cb7205778703bf0d4accc',
+    tools: '013cfd1b41e3ed8a30b0d7aa7dd6fa241d7481611af7c81c0805de478ab118b1',
+    prompts: 'a4b74048b785049c539bcc4868102e6143d4053a79e9da6cf0b41cc2fbf0fc60',
+    resourceTemplates: 'f67c92aa2f3f64ce0a55e0973b61346962edd1533c86024347b63483a04d6ca3',
     staticResources: '1a07ddfb5b7954de0f37d1bec03c0886e6235f63ef5611a557a8cde4424e201b',
   },
   '7': {
     capabilities: '',
-    tools: 'a4b6d3444b9a461730d904559a0c0baea416d508d6c1b90afaef45305361c789',
-    prompts: 'ce77959ede84ac3e4910e253282c831e7cfaa07976771cc02b88a57a21764df4',
-    resourceTemplates: '00f1610e183225227f78b36e6fb04fd72244e5dd042cb7205778703bf0d4accc',
+    tools: '21ad4813fa053e04065aca7028bbe97c288d58935c65e113ddc1d061ae9eded4',
+    prompts: 'a18ccf15c9a9bc3fd588aebe5ac8a5dc5cf9dec9ef67013c1494b5d2239b7a0f',
+    resourceTemplates: 'f67c92aa2f3f64ce0a55e0973b61346962edd1533c86024347b63483a04d6ca3',
     staticResources: '1a07ddfb5b7954de0f37d1bec03c0886e6235f63ef5611a557a8cde4424e201b',
   },
 };
@@ -190,29 +189,6 @@ export async function assertMcpTransportContract(
   invariant(
     (primary.annotations as JsonRecord | undefined)?.openWorldHint === (profile.contractVersion === '7'),
     `primary_source_search openWorldHint drifted for v${profile.contractVersion}`,
-  );
-
-  const bibleLookup = snapshot.tools.find(tool => tool.name === 'bible_lookup');
-  invariant(bibleLookup, 'bible_lookup is missing');
-  const bibleOutputProperties = (bibleLookup.outputSchema as JsonRecord | undefined)?.properties as JsonRecord | undefined;
-  const passages = bibleOutputProperties?.passages as JsonRecord | undefined;
-  const passageProperties = (passages?.items as JsonRecord | undefined)?.properties as JsonRecord | undefined;
-  const footnoteDelivery = passageProperties?.footnoteDelivery as JsonRecord | undefined;
-  const deliveryProperties = footnoteDelivery?.properties as JsonRecord | undefined;
-  invariant(
-    canonicalize((deliveryProperties?.status as JsonRecord | undefined)?.enum)
-      === canonicalize(['structured', 'inline', 'none', 'unavailable']),
-    'bible_lookup footnoteDelivery status contract drifted',
-  );
-
-  const comparePrompt = snapshot.prompts.find(prompt => prompt.name === 'compare-translations');
-  invariant(comparePrompt, 'compare-translations is missing');
-  const comparisonArguments = comparePrompt.arguments as JsonRecord[] | undefined;
-  const translationsArgument = comparisonArguments?.find(argument => argument.name === 'translations');
-  invariant(
-    typeof translationsArgument?.description === 'string'
-      && translationsArgument.description.includes('ESV, NET, KJV, WEB, BSB, ASV, YLT, or DBY'),
-    'compare-translations supported-translation contract drifted',
   );
 
   const fingerprints = await fingerprintMcpTransportSnapshot(snapshot);

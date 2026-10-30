@@ -45,7 +45,7 @@ describe('prompt-recommended tool-call contracts', () => {
     ['passage-exegesis', { reference: 'John 3:16', translation: 'unsupported' }],
     ['passage-exegesis', { reference: 'Romans 8:28-30', translation: 'ESV' }],
     ['compare-translations', { reference: 'Philippians 2:6-8', translations: 'ESV,KJV,NET,BSB' }],
-    ['compare-translations', { reference: 'John 1:1', translations: 'kjv,web,KJV' }],
+    ['compare-translations', { reference: 'John 1:1', translations: 'unknown' }],
     ['confession-study', { topic: 'justification', traditions: 'Reformed, Lutheran' }],
     ['primary-source-research', { topic: "Lord's Supper", work: 'westminster-confession', maxSections: '2' }],
     ['primary-source-research', { topic: "Lord's Supper", authors: 'Philip Melanchthon,Westminster Assembly', startYear: '1500', endYear: '1700', maxSections: '2' }],
@@ -96,15 +96,6 @@ describe('prompt-recommended tool-call contracts', () => {
       tool: 'bible_verse_morphology',
       arguments: { reference: 'John 1:1', expand_morphology: true },
     });
-  });
-
-  it('normalizes and deduplicates explicitly selected comparison translations', () => {
-    expect(recommendedToolCallsForPrompt('compare-translations', {
-      reference: 'John 3:16', translations: ' kjv,web,KJV ',
-    }).filter(call => call.tool === 'bible_lookup')).toEqual([
-      { tool: 'bible_lookup', arguments: { reference: 'John 3:16', translation: 'KJV' } },
-      { tool: 'bible_lookup', arguments: { reference: 'John 3:16', translation: 'WEB' } },
-    ]);
   });
 
   it('never recommends a chapter to verse-only morphology or cross-reference tools', () => {
@@ -193,15 +184,6 @@ describe('prompt-recommended tool-call contracts', () => {
         selection: 'work_diversity', author: 'Martin Luther', startYear: 1500, endYear: 1600, limit: 3,
       }],
     });
-  });
-
-  it('keeps the human question separate from a narrowly de-framed first local query', () => {
-    const topic = 'Historical perspectives on church government?';
-    expect(recommendedToolCallsForPrompt('primary-source-research', { topic })[0]!.arguments)
-      .toMatchObject({ queries: [{ text: 'church government', match: 'all_terms' }] });
-    expect(recommendedToolCallsForPrompt('primary-source-research', {
-      topic: 'What did Calvin say about predestination?',
-    })[0]!.arguments).toMatchObject({ queries: [{ text: 'What did Calvin say about predestination' }] });
   });
 
   it('uses bounded local primary-source discovery for confession study', () => {

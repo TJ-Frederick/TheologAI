@@ -150,7 +150,7 @@ describe('historical core preview audit contract', () => {
     expect(reconciliation).toContain('does not automatically roll back, deploy, bind, delete, or mutate data');
 
     const d1Mapping = workflow.indexOf('- name: Capture checked-out candidate preview D1 mapping (read-only)');
-    const d1 = workflow.indexOf('- name: Verify candidate preview D1 is compatible (read-only)');
+    const d1 = workflow.indexOf('- name: Verify fresh corpus (up to 3.8M reads and four integrity commands)');
     const predecessor = workflow.indexOf('- name: Capture preview predecessor reconciliation anchor (read-only)');
     const predecessorArtifact = workflow.indexOf('- name: Upload preview predecessor reconciliation anchor');
     const deploy = workflow.indexOf('- name: Deploy to Cloudflare Workers (preview)');

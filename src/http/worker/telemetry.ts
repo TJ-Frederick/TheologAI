@@ -1,5 +1,4 @@
 import type { Env } from '../../worker-env.js';
-import type { ToolExecutionEvent, ToolExecutionObserver } from '../../mcp/toolExecutionObserver.js';
 
 export interface WorkerRequestMetadata {
   method: string;
@@ -40,7 +39,7 @@ export type WorkerSecurityEvent =
       status: 429;
       limit: number;
       periodSeconds: number;
-      scope: 'hashed_ip_user_agent_per_colo';
+      scope: 'hashed_ip_per_colo';
     }
   | {
       event: 'theologai.worker.rate_limit.failure';
@@ -101,14 +100,4 @@ export function logWorkerRuntimeError(
     errorName,
     durationMs,
   }));
-}
-
-/**
- * Tool events intentionally use no request metadata. Unlike sampled request
- * diagnostics, their schema contains no caller-controlled identifiers.
- */
-export function createWorkerToolExecutionObserver(): ToolExecutionObserver {
-  return (event: ToolExecutionEvent) => {
-    console.info(JSON.stringify(event));
-  };
 }

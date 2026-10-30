@@ -3,15 +3,10 @@
 import 'dotenv/config';
 import { serveStdio } from '@modelcontextprotocol/server/stdio';
 import { createTheologAiMcpServer, STDIO_CAPABILITIES } from './mcp/server.js';
-import type { ToolExecutionObserver } from './mcp/toolExecutionObserver.js';
 import { THEOLOGAI_VERSION } from './server.js';
 import { createCompositionRoot } from './tools/v2/index.js';
 import { readNodeHttpConfig } from './http/config.js';
 import { createNodeHttpServer } from './http/nodeHttpServer.js';
-
-const stderrToolExecutionObserver: ToolExecutionObserver = event => {
-  console.error(JSON.stringify(event));
-};
 
 async function main() {
   // The composition root owns the long-lived local database and caches. HTTP
@@ -21,7 +16,7 @@ async function main() {
 
   if (port) {
     const config = readNodeHttpConfig(process.env);
-    const runtime = createNodeHttpServer({ root, config, toolExecutionObserver: stderrToolExecutionObserver });
+    const runtime = createNodeHttpServer({ root, config });
     const address = await runtime.listen();
 
     console.error(`TheologAI Bible MCP Server running at http://${config.host}:${address.port}/mcp`);
@@ -60,7 +55,6 @@ async function main() {
           THEOLOGAI_VERSION,
           STDIO_CAPABILITIES,
           era,
-          stderrToolExecutionObserver,
         ),
         {
           onerror(error) {

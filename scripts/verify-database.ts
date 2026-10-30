@@ -22,7 +22,9 @@ import {
   assertReviewedSourcePackRelease,
   loadHistoricalSourcePacks,
 } from './historical-source-packs.js';
-import { auditAquinasAuthority, buildAquinasAuthorityQueryPlan } from './aquinas-authority-audit.js';
+import {
+  assertNormalAquinasHierarchyExclusion,
+} from './historical-hierarchy.js';
 import { HistoricalDocumentRepository } from '../src/adapters/data/HistoricalDocumentRepository.js';
 import { buildD1ReadinessSql } from './check-remote-d1-readiness.js';
 import { VERIFY_DATABASE_DEFER_CAPACITY_FLAG } from './release-corpus-capacity-policy.js';
@@ -393,10 +395,7 @@ try {
   verifyBiblicalLanguageUnicodeD1(ROOT, db, manifest.expectedCounts);
   assertHistoricalTransform8Materialization(db);
   assertHistoricalTransform11SourcePackMaterialization(db);
-  auditAquinasAuthority(sql => {
-    const rows = db.prepare(sql).all();
-    return { rows, responseBytes: Buffer.byteLength(JSON.stringify(rows), 'utf8') };
-  }, buildAquinasAuthorityQueryPlan(ROOT));
+  assertNormalAquinasHierarchyExclusion(db);
   auditHistoricalTransform8Authority(ROOT, sql => {
     const rows = db.prepare(sql).all();
     return { rows, responseBytes: Buffer.byteLength(JSON.stringify(rows), 'utf8') };
