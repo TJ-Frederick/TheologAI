@@ -161,9 +161,30 @@ export function spentOperatorBudget(metering: CorpusProofTransport['metering'], 
     diagnosticCommands:metering.integrityCommands};
 }
 
-/** This checks server-authored GitHub state, not a local assertion of approval. */
+/** Retry only transient read-only GitHub responses; never repeat SQL or a mutation. */
+export function readLiveOperatorMetadata(repository: string, path: string,
+  invoke: (args: string[]) => string = args => execFileSync('gh',args,{encoding:'utf8',maxBuffer:2*1024*1024,timeout:15_000,stdio:['ignore','pipe','pipe']}),
+  pause: (milliseconds: number) => void = milliseconds => { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,milliseconds); }) {
+  check(repository===OPERATOR_PROOF.repository && /^\/(?:actions\/runs\/[1-9][0-9]{0,15}(?:\/jobs\?per_page=100)?|pulls\/170|git\/ref\/heads\/main)$/.test(path),'live metadata GET route');
+  for(let attempt=0;attempt<2;attempt++) {
+    let text: string;
+    try { text=invoke(['api',`repos/${repository}${path}`,'--method','GET']); }
+    catch(error) {
+      const stderr=error && typeof error==='object' && 'stderr' in error ? String(error.stderr) : '';
+      const status=Number(stderr.match(/\(HTTP ([0-9]{3})\)/)?.[1]);
+      if(attempt===0 && [502,503,504].includes(status)) { process.stderr.write(`Operator metadata GET transient HTTP ${status}; retrying once before SQL.\n`);pause(250);continue; }
+      if(Number.isInteger(status)&&status>=100&&status<=599)throw Error('Operator corpus proof refused: live GitHub metadata HTTP '+status);
+      throw error;
+    }
+    return JSON.parse(text);
+  }
+  throw Error('Operator corpus proof refused: live GitHub metadata unavailable');
+}
+
+/** This checks fresh server-authored GitHub state, including after a transient GET retry. */
 export function requireLiveOperatorGate(c: OperatorChallenge): void {
-  const get = (path: string) => JSON.parse(execFileSync('gh', ['api', `repos/${c.repository}${path}`], { encoding:'utf8', maxBuffer:2*1024*1024 }));
+  requireOperatorChallenge(c);
+  const get = (path: string) => readLiveOperatorMetadata(c.repository,path);
   const run = get('/actions/runs/' + c.runId);
   check(run.head_sha === c.sourceCommit && run.run_attempt === 1 && run.path === c.workflowPath && run.event === c.eventName
     && run.status !== 'completed', 'live protected run');
@@ -175,6 +196,7 @@ export function requireLiveOperatorGate(c: OperatorChallenge): void {
     check(pr.state === 'open' && !pr.draft && pr.head.sha === c.sourceCommit && pr.base.sha === c.baseCommit
       && pr.head.repo.full_name === c.repository && pr.labels.some((l:any) => l.name === 'deploy-preview'), 'live PR authorization');
   } else check(get('/git/ref/heads/main').object.sha === c.sourceCommit, 'live production main');
+  requireOperatorChallenge(c);
 }
 
 export async function runOperatorProof(input: { challenge:OperatorChallenge; directory:string; planSha256:string; output:string; ledger:string; token:string }) {

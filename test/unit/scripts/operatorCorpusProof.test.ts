@@ -5,7 +5,7 @@ import {mkdtempSync,writeFileSync,readFileSync,copyFileSync,existsSync,rmSync,mk
 import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
 import {spawnSync,execFileSync} from 'node:child_process';
-import {createOperatorChallenge,requireOperatorChallenge,operatorApproval,verifyOperatorEnvelope,verifyOperatorIntegrity,composeReadProof,finishOperatorMetadata,admitOperatorBudget,spentOperatorBudget,OPERATOR_PROOF} from '../../../scripts/operator-corpus-proof.js';
+import {createOperatorChallenge,requireOperatorChallenge,operatorApproval,verifyOperatorEnvelope,verifyOperatorIntegrity,composeReadProof,finishOperatorMetadata,readLiveOperatorMetadata,admitOperatorBudget,spentOperatorBudget,OPERATOR_PROOF} from '../../../scripts/operator-corpus-proof.js';
 import {ACCOUNT,CORPUS,SCHEMA,TARGETS,classifyApplicationRelease} from '../../../scripts/application-release-policy.mjs';
 import {ALL_FTS} from '../../../scripts/corpus-source-proof.js';
 const sha=(v:string)=>createHash('sha256').update(v).digest('hex');
@@ -31,6 +31,24 @@ function fixture() {
   return {env,c,plan,envelope,now:start+180_000};
 }
 describe('complete operator proof contract',()=>{
+  for(const status of [502,503,504])it('retries read-only GitHub HTTP '+status+' once before returning fresh metadata',()=>{
+    const invoke=vi.fn().mockImplementationOnce(()=>{throw {stderr:Buffer.from(`gh: Server Error (HTTP ${status})`)};}).mockReturnValue('{"status":"in_progress"}');const pause=vi.fn();
+    expect(readLiveOperatorMetadata(OPERATOR_PROOF.repository,'/actions/runs/123',invoke,pause)).toEqual({status:'in_progress'});
+    expect(invoke.mock.calls).toEqual(Array.from({length:2},()=>[['api','repos/TJ-Frederick/TheologAI/actions/runs/123','--method','GET']]));expect(pause).toHaveBeenCalledExactlyOnceWith(250);
+  });
+  it('stops after a persistent metadata outage without returning cached authorization',()=>{
+    const invoke=vi.fn().mockImplementation(()=>{throw {stderr:'gh: Server Error (HTTP 502)'};});const pause=vi.fn();
+    expect(()=>readLiveOperatorMetadata(OPERATOR_PROOF.repository,'/pulls/170',invoke,pause)).toThrow('HTTP 502');expect(invoke).toHaveBeenCalledTimes(2);expect(pause).toHaveBeenCalledOnce();
+  });
+  for(const status of [401,403,404,429])it('does not retry non-transient metadata HTTP '+status,()=>{
+    const invoke=vi.fn().mockImplementation(()=>{throw {stderr:`gh: rejected (HTTP ${status})`};});const pause=vi.fn();
+    expect(()=>readLiveOperatorMetadata(OPERATOR_PROOF.repository,'/actions/runs/123/jobs?per_page=100',invoke,pause)).toThrow('HTTP '+status);expect(invoke).toHaveBeenCalledOnce();expect(pause).not.toHaveBeenCalled();
+  });
+  it('does not retry malformed metadata, timeout ambiguity or non-GET routes',()=>{
+    const pause=vi.fn(),invalid=vi.fn().mockReturnValue('invalid');expect(()=>readLiveOperatorMetadata(OPERATOR_PROOF.repository,'/pulls/170',invalid,pause)).toThrow();expect(invalid).toHaveBeenCalledOnce();
+    const timeout=vi.fn().mockImplementation(()=>{throw Error('timeout');});expect(()=>readLiveOperatorMetadata(OPERATOR_PROOF.repository,'/pulls/170',timeout,pause)).toThrow('timeout');expect(timeout).toHaveBeenCalledOnce();
+    for(const path of ['/actions/workflows/pr.yml/dispatches','/actions/runs/123/pending_deployments','/d1/query'])expect(()=>readLiveOperatorMetadata(OPERATOR_PROOF.repository,path,invalid,pause)).toThrow('GET route');expect(invalid).toHaveBeenCalledOnce();expect(pause).not.toHaveBeenCalled();
+  });
   it('keeps the approved complete proof/read/write reservation unchanged',()=>{const f=fixture();expect(operatorApproval(f.c)).toEqual({schemaVersion:'theologai-fresh-corpus-proof-approval.v1',role:'preview',accountId:ACCOUNT,databaseId:TARGETS.preview.databaseId,sourceCommit:f.c.sourceCommit,sourceTree:f.c.sourceTree,expiresAt:f.c.expiresAt,maxReads:3800000,integrityCommands:4,exclusiveDataWritesDuringProof:true});});
   it('accepts a current full proof for the exact protected source and target',()=>{const f=fixture();expect(verifyOperatorEnvelope(f.envelope,f.c,f.plan,f.now)).toBe(f.envelope);});
   for(const fault of ['source','tree','plan','nonce','target','role','partial','fts','physical','fk','controls','retries','ambiguous','stale','pre-challenge','approval','budget-overrun','write-overrun','budget-reset','extra-field'])it('rejects '+fault,()=>{

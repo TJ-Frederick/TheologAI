@@ -45,6 +45,16 @@ uses the unchanged custom-domain deployment command and all existing live tests.
 The operator stage and Deploy Preview retain the existing separate approvals.
 No new token, secret, account, permission, environment or approval policy is added.
 
+Live GitHub authorization observations use only allowlisted metadata GET routes.
+For HTTP 502/503/504, retry that GET once after 250 ms; each CLI call has a
+15-second timeout. Require the recovered fresh response to pass every existing
+run/job/source/label/main check and recheck challenge expiry after observation.
+Persistent outages, other HTTP errors, malformed metadata, timeout ambiguity or
+revoked/changed authorization stop the proof. This does not retry SQL, owner
+dispatches, diagnostic writes, deployments or any other mutation. A stopped
+proof retains its measured/unknown costs in the same ledger and needs enough
+remaining authorized reads and diagnostics before any new complete proof.
+
 The owner-approved preview authorization `pr170-preview-checkout-review-20261030-01` reserves
 3,510,997 reads, hard cap 3,800,000 across retries, and four total diagnostics and
 at most four writes. Admission also requires unsampled account usage plus the
