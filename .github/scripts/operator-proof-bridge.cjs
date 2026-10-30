@@ -15,7 +15,7 @@ function upload({context,core,environment=process.env}) {
     && c.repository==='TJ-Frederick/TheologAI' && c.ownerActorId===ownerId && /^[1-9][0-9]{0,15}$/.test(c.runId)
     && c.runAttempt===1 && /^[0-9a-f]{64}$/.test(c.nonce), 'proof/challenge shape');
   check(c.sourceCommit===context.sha && e.receipt?.sourceCommit===context.sha && Date.parse(c.expiresAt)>Date.now(), 'exact fresh source');
-  check(environment.GITHUB_REF===(c.role==='preview'?'refs/heads/codex/sec06-preview-credential-assessment':'refs/heads/main')
+  check(environment.GITHUB_REF===(c.role==='preview'?'refs/heads/codex/security-checkout-continuation':'refs/heads/main')
     && ['preview','production'].includes(c.role), 'source branch/role');
   fs.writeFileSync(environment.RUNNER_TEMP+'/operator-proof-envelope.json',JSON.stringify(e,null,2)+'\n',{flag:'wx',mode:0o600});
   core.setOutput('artifact_name',artifactName(c));
@@ -24,7 +24,7 @@ function upload({context,core,environment=process.env}) {
 async function find({github,challenge:c,now=Date.now()}) {
   check(c.repository==='TJ-Frederick/TheologAI' && c.ownerActorId===ownerId && Date.parse(c.expiresAt)>now, 'live challenge');
   if(c.role==='preview') {
-    const {data:pr}=await github.rest.pulls.get({...repo,pull_number:167});
+    const {data:pr}=await github.rest.pulls.get({...repo,pull_number:170});
     check(pr.state==='open' && !pr.draft && pr.head.repo.full_name===c.repository && pr.head.sha===c.sourceCommit
       && pr.base.sha===c.baseCommit && pr.labels.some(l=>l.name==='deploy-preview'), 'live preview authority');
   } else {
@@ -36,7 +36,7 @@ async function find({github,challenge:c,now=Date.now()}) {
   for(const r of runs.workflow_runs) {
     if(r.head_sha!==c.sourceCommit || Date.parse(r.created_at)<Date.parse(c.createdAt) || r.actor?.id!==ownerId
       || r.triggering_actor?.id!==ownerId || r.run_attempt!==1 || r.path!=='.github/workflows/pr.yml'
-      || r.event!=='workflow_dispatch' || r.head_branch!==(c.role==='preview'?'codex/sec06-preview-credential-assessment':'main')) continue;
+      || r.event!=='workflow_dispatch' || r.head_branch!==(c.role==='preview'?'codex/security-checkout-continuation':'main')) continue;
     const {data:files}=await github.rest.actions.listWorkflowRunArtifacts({...repo,run_id:r.id,per_page:100});
     const artifacts=files.artifacts.filter(a=>a.name===artifactName(c));
     check(artifacts.length<=1,'duplicate proof artifact');

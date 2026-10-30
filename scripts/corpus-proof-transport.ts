@@ -9,6 +9,10 @@ type ApiResult = { success?: boolean; errors?: unknown[]; result?: unknown; data
 export type ProtectedCorpusAdmission = { accountId: string; role: Role; day: string; observedAt: string; rowsRead: number; rowsWritten: number; sampleInterval: 1; readBudget: number; controls: unknown };
 // Owner's October 29 preview-only waiver of the production traffic reserve.
 export const PREVIEW_QUOTA_BUFFER_DAY = '2026-10-29';
+// Owner waived only the analytics uncertainty margin for today's preview.
+export const PREVIEW_UNCERTAINTY_WAIVER_DAY = '2026-10-30';
+type BudgetScope = { role: Role; day: string };
+const uncertaintyReadMargin = (scope?: BudgetScope): number => scope?.role === 'preview' && scope.day === PREVIEW_UNCERTAINTY_WAIVER_DAY ? 0 : 200_000;
 function check(value: unknown, reason: string): asserts value { if (!value) throw Error(`Corpus transport refused: ${reason}`); }
 const sha = (v: string) => createHash('sha256').update(v).digest('hex');
 const count = (v: unknown): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v >= 0;
@@ -35,9 +39,9 @@ export function assertProofQuery(query: ProofQuery): void {
   else if (query.kind === 'quick-check') check(query.sql === 'PRAGMA quick_check' && query.writeCeiling === 0, 'physical check allowlist');
   else check(query.kind === 'fts-integrity' && query.writeCeiling === 1 && ALL_FTS.some(t => query.sql === `INSERT INTO "${t}"("${t}",rank) VALUES('integrity-check',1)`), 'integrity command allowlist');
 }
-export function admitCorpusBudget(usage: number, reserved: number, localKnownReads: number, next: number, accountCeiling = 4_000_000, liveAuditReserve = 0): void {
+export function admitCorpusBudget(usage: number, reserved: number, localKnownReads: number, next: number, accountCeiling = 4_000_000, liveAuditReserve = 0, scope?: BudgetScope): void {
   check(accountCeiling === 4_000_000 && liveAuditReserve === 0 || accountCeiling === 5_000_000 && liveAuditReserve === 500_000, 'account budget policy');
-  check([usage, reserved, localKnownReads, next].every(count) && Math.max(usage, localKnownReads) + 200_000 + reserved + next + liveAuditReserve <= accountCeiling, 'insufficient account headroom');
+  check([usage, reserved, localKnownReads, next].every(count) && Math.max(usage, localKnownReads) + uncertaintyReadMargin(scope) + reserved + next + liveAuditReserve <= accountCeiling, 'insufficient account headroom');
 }
 
 export class CorpusProofTransport {
@@ -55,6 +59,7 @@ export class CorpusProofTransport {
   private bytes = 0;
   private readonly accountCeiling: number;
   private readonly liveAuditReserve: number;
+  private readonly budgetScope: BudgetScope;
   readonly metering = { rowsRead: 0, rowsWritten: 0, requests: 0, retries: 0, unknownAttempts: 0, integrityCommands: 0 };
   constructor(private readonly options: { role: Role; token: string; readBudget: number; eventFile: string; fetch?: typeof fetch; previewQuotaBuffer?: boolean }) {
     check(Object.hasOwn(TARGETS, options.role) && options.token.length > 0 && options.token.length <= 8192 && !/[\r\n]/.test(options.token), 'target or credential');
@@ -62,6 +67,7 @@ export class CorpusProofTransport {
     check(!options.previewQuotaBuffer || options.role === 'preview' && this.day === PREVIEW_QUOTA_BUFFER_DAY, 'preview quota buffer date/role');
     this.accountCeiling = options.previewQuotaBuffer ? 5_000_000 : 4_000_000;
     this.liveAuditReserve = options.previewQuotaBuffer ? 500_000 : 0;
+    this.budgetScope = { role: options.role, day: this.day };
     check(this.started + 5_400_000 < Date.parse(this.day + 'T00:00:00Z') + 86_400_000, 'insufficient UTC window');
     writeFileSync(options.eventFile, '', { flag: 'wx', mode: 0o600 });
   }
@@ -129,9 +135,11 @@ export class CorpusProofTransport {
   }
   async start(): Promise<void> {
     this.controls = await this.snapshot(); await this.usage(); this.baselineUsage = this.latestUsage;
-    admitCorpusBudget(this.latestUsage, this.options.readBudget, this.baselineUsage, 0, this.accountCeiling, this.liveAuditReserve);
+    admitCorpusBudget(this.latestUsage, this.options.readBudget, this.baselineUsage, 0, this.accountCeiling, this.liveAuditReserve, this.budgetScope);
     this.event({ kind: 'admitted', readBudget: this.options.readBudget, maxIntegrityCommands: 4, accountReadCeiling: this.accountCeiling, liveAuditReadReserve: this.liveAuditReserve,
-      ...(this.options.previewQuotaBuffer ? {previewQuotaBufferDay:PREVIEW_QUOTA_BUFFER_DAY} : {}), controls: this.controls });
+      ...(this.options.previewQuotaBuffer ? {previewQuotaBufferDay:PREVIEW_QUOTA_BUFFER_DAY} : {}),
+      uncertaintyReadMargin: uncertaintyReadMargin(this.budgetScope),
+      ...(uncertaintyReadMargin(this.budgetScope) === 0 ? {previewUncertaintyWaiverDay:PREVIEW_UNCERTAINTY_WAIVER_DAY} : {}), controls: this.controls });
   }
   protectedAdmission(): ProtectedCorpusAdmission {
     check(this.controls && this.lastUsageAt > 0 && Date.now()-this.lastUsageAt <= 50_000 && this.metering.requests===0, 'fresh admission before SQL');
@@ -142,16 +150,16 @@ export class CorpusProofTransport {
       && admission.sampleInterval===1 && count(admission.rowsRead) && count(admission.rowsWritten) && count(admission.readBudget)
       && admission.readBudget<=3_800_000 && Date.parse(admission.observedAt)<=Date.now() && Date.now()-Date.parse(admission.observedAt)<=50_000, 'protected integrity admission');
     check(admission.rowsWritten+4<=80_000,'insufficient account write headroom');
-    admitCorpusBudget(admission.rowsRead,admission.readBudget,admission.rowsRead,0,this.accountCeiling,this.liveAuditReserve);
+    admitCorpusBudget(admission.rowsRead,admission.readBudget,admission.rowsRead,0,this.accountCeiling,this.liveAuditReserve,this.budgetScope);
     this.controls=await this.snapshot();check(JSON.stringify(this.controls)===JSON.stringify(admission.controls),'protected admission controls changed');
     this.latestUsage=this.baselineUsage=admission.rowsRead;this.latestWrites=admission.rowsWritten;this.lastUsageAt=Date.parse(admission.observedAt);this.integrityOnly=true;
-    this.event({kind:'integrity-admitted',admission});
+    this.event({kind:'integrity-admitted',admission,uncertaintyReadMargin:uncertaintyReadMargin(this.budgetScope)});
   }
   async execute(query: ProofQuery): Promise<ProofRow[]> {
     check(!this.halted && this.current === null, 'concurrent or halted execution'); assertProofQuery(query);
     if(this.integrityOnly) check(query.kind==='fts-integrity' && Date.now()-this.lastUsageAt<=50_000,'fresh integrity-only execution');
     else if (Date.now() - this.lastUsageAt > 50_000) await this.usage();
-    admitCorpusBudget(this.latestUsage, 0, this.baselineUsage + this.metering.rowsRead, query.readCeiling, this.accountCeiling, this.liveAuditReserve);
+    admitCorpusBudget(this.latestUsage, 0, this.baselineUsage + this.metering.rowsRead, query.readCeiling, this.accountCeiling, this.liveAuditReserve, this.budgetScope);
     check(this.metering.requests < 5000 && this.metering.rowsRead + query.readCeiling <= this.options.readBudget && this.metering.rowsWritten + query.writeCeiling <= 4, 'run budget');
     this.current = query; this.event({ kind: 'intent', label: query.label, sqlSha256: sha(query.sql), readCeiling: query.readCeiling, writeCeiling: query.writeCeiling });
     this.metering.requests++;

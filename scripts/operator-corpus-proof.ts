@@ -17,13 +17,21 @@ const object = (v: unknown): Record<string, any> => { check(v && typeof v === 'o
 const integer = (v: unknown): v is number => Number.isSafeInteger(v) && Number(v) >= 0;
 const hex = (v: unknown, length: number) => typeof v === 'string' && new RegExp(`^[0-9a-f]{${length}}$`).test(v);
 export const OPERATOR_PROOF = Object.freeze({ repository: 'TJ-Frederick/TheologAI', ownerActorId: 40179660,
-  previewAuthorization: 'pr167-preview-operator-full-20261029-01', reservedReads: 3_510_997, hardReadCap: 3_800_000, diagnosticCommands: 4 });
+  previewAuthorization: 'pr170-preview-checkout-review-20261030-01', reservedReads: 3_510_997, hardReadCap: 3_800_000, diagnosticCommands: 4,
+  previewExtensionNotBefore: '2026-10-31T00:05:00Z', previewCumulativeReadCap: 4_583_687, previewCumulativeDiagnostics: 8,
+  previewPriorReads: 1_072_690, previewPriorWrites: 4, previewPriorDiagnostics: 4 });
 export type OperatorChallenge = {
   schemaVersion: 'theologai-operator-corpus-challenge.v1'; role: 'preview' | 'production'; authorizationId: string;
   repository: string; ownerActorId: number; sourceCommit: string; sourceTree: string; sourcePlanSha256: string;
   runId: string; runAttempt: 1; workflowPath: string; eventName: string; ref: string; baseCommit: string;
   nonce: string; createdAt: string; expiresAt: string; reservedReads: number; hardReadCap: number; diagnosticCommands: number; admission: ProtectedCorpusAdmission;
 };
+function cumulativeAllowance(c: OperatorChallenge) {
+  return c.role === 'preview' && Date.parse(c.createdAt) >= Date.parse(OPERATOR_PROOF.previewExtensionNotBefore)
+    ? { reads: OPERATOR_PROOF.previewCumulativeReadCap, diagnostics: OPERATOR_PROOF.previewCumulativeDiagnostics,
+        priorReads: OPERATOR_PROOF.previewPriorReads, priorWrites: OPERATOR_PROOF.previewPriorWrites, priorDiagnostics: OPERATOR_PROOF.previewPriorDiagnostics }
+    : { reads: c.hardReadCap, diagnostics: c.diagnosticCommands, priorReads: 0, priorWrites: 0, priorDiagnostics: 0 };
+}
 function readJson(path: string, maximum = 60_000): any {
   const stat = lstatSync(path); check(stat.isFile() && !stat.isSymbolicLink() && stat.size <= maximum, 'file type/size');
   return JSON.parse(readFileSync(path, 'utf8'));
@@ -47,11 +55,12 @@ export function requireOperatorChallenge(input: unknown, now = Date.now()): Oper
   check(c.authorizationId === (preview ? OPERATOR_PROOF.previewAuthorization : 'production-operator-' + c.sourceCommit), 'authorization identity');
   check(c.workflowPath === (preview ? '.github/workflows/pr.yml' : '.github/workflows/deploy.yml')
     && c.eventName === (preview ? 'pull_request' : 'workflow_dispatch')
-    && c.ref === (preview ? 'refs/pull/167/merge' : 'refs/heads/main'), 'existing protected route');
+    && c.ref === (preview ? 'refs/pull/170/merge' : 'refs/heads/main'), 'existing protected route');
   check(c.reservedReads === OPERATOR_PROOF.reservedReads && c.hardReadCap === OPERATOR_PROOF.hardReadCap && c.diagnosticCommands === 4, 'authorization budget');
   const start = Date.parse(c.createdAt), end = Date.parse(c.expiresAt);
   check(Number.isFinite(start) && Number.isFinite(end) && start <= now + 30_000 && end > now && end - start === 5_400_000
     && end < Date.parse(new Date(start).toISOString().slice(0,10) + 'T00:00:00Z') + 86_400_000, 'fresh single-UTC-day window');
+  check(!preview || start>=Date.parse(OPERATOR_PROOF.previewExtensionNotBefore),'preview continuation start');
   const a=object(c.admission);
   check(a.accountId===ACCOUNT && a.role===c.role && a.day===c.createdAt.slice(0,10) && a.sampleInterval===1
     && integer(a.rowsRead) && integer(a.rowsWritten) && a.readBudget===c.reservedReads
@@ -88,17 +97,20 @@ export function verifyOperatorEnvelope(input: unknown, expectedChallenge: unknow
   check(Date.parse(receipt.startedAt) >= Date.parse(c.createdAt) && Date.parse(receipt.completedAt) <= Date.parse(c.expiresAt)
     && receipt.approvalSha256 === sha(JSON.stringify(operatorApproval(c))) && receipt.readBudget === plan.readBudget, 'approval/window/plan');
   const b = object(e.budget);
+  const cumulative = cumulativeAllowance(c);
   check(Object.keys(b).sort().join(',') === ['authorizationId','previousReadsSpentOrReserved','previousWritesSpentOrReserved','previousDiagnosticCommands','cumulativeReadsSpentOrReserved','cumulativeWritesSpentOrReserved','cumulativeDiagnosticCommands'].sort().join(',')
     && b.authorizationId === c.authorizationId, 'budget identity');
   check([b.previousReadsSpentOrReserved,b.previousWritesSpentOrReserved,b.previousDiagnosticCommands,b.cumulativeReadsSpentOrReserved,b.cumulativeWritesSpentOrReserved,b.cumulativeDiagnosticCommands].every(integer), 'budget counters');
   check(b.cumulativeReadsSpentOrReserved === b.previousReadsSpentOrReserved + receipt.metering.rowsRead
-    && b.previousReadsSpentOrReserved + plan.readBudget <= c.hardReadCap
-    && b.cumulativeReadsSpentOrReserved <= c.hardReadCap
-    && b.previousWritesSpentOrReserved + 4 <= c.diagnosticCommands
+    && b.previousReadsSpentOrReserved >= cumulative.priorReads && b.previousWritesSpentOrReserved >= cumulative.priorWrites
+    && b.previousDiagnosticCommands >= cumulative.priorDiagnostics
+    && b.previousReadsSpentOrReserved + plan.readBudget <= cumulative.reads
+    && b.cumulativeReadsSpentOrReserved <= cumulative.reads
+    && b.previousWritesSpentOrReserved + 4 <= cumulative.diagnostics
     && b.cumulativeWritesSpentOrReserved === b.previousWritesSpentOrReserved + receipt.metering.rowsWritten
-    && b.cumulativeWritesSpentOrReserved <= c.diagnosticCommands
+    && b.cumulativeWritesSpentOrReserved <= cumulative.diagnostics
     && b.cumulativeDiagnosticCommands === b.previousDiagnosticCommands + receipt.metering.integrityCommands
-    && b.cumulativeDiagnosticCommands <= c.diagnosticCommands, 'cumulative authorization');
+    && b.cumulativeDiagnosticCommands <= cumulative.diagnostics, 'cumulative authorization');
   return e;
 }
 
@@ -107,6 +119,7 @@ function integrityQueries(): ProofQuery[] {
 }
 export function verifyOperatorIntegrity(input: unknown, c: OperatorChallenge, now=Date.now()) {
   requireOperatorChallenge(c,now); const e=object(input), r=object(e.receipt), m=object(r.metering), b=object(e.budget);
+  const cumulative=cumulativeAllowance(c);
   check(e.schemaVersion==='theologai-operator-corpus-envelope.v1' && JSON.stringify(e.challenge)===JSON.stringify(c) && hex(e.journalSha256,64), 'integrity envelope binding');
   check(r.schemaVersion==='theologai-operator-fts-proof.v1' && r.role===c.role && r.accountId===ACCOUNT && r.databaseId===TARGETS[c.role].databaseId
     && r.sourceCommit===c.sourceCommit && r.sourceTree===c.sourceTree && r.sourcePlanSha256===c.sourcePlanSha256, 'integrity source target');
@@ -120,9 +133,13 @@ export function verifyOperatorIntegrity(input: unknown, c: OperatorChallenge, no
   check(m.requests===4 && m.integrityCommands===4 && m.retries===0 && m.unknownAttempts===0
     && m.rowsRead===r.results.reduce((n:number,v:any)=>n+v.rowsRead,0) && m.rowsWritten===r.results.reduce((n:number,v:any)=>n+v.rowsWritten,0), 'integrity metering');
   check(b.authorizationId===c.authorizationId && [b.previousReadsSpentOrReserved,b.previousWritesSpentOrReserved,b.previousDiagnosticCommands].every(integer)
-    && b.previousReadsSpentOrReserved+c.reservedReads<=c.hardReadCap && b.previousWritesSpentOrReserved===0 && b.previousDiagnosticCommands===0
+    && b.previousReadsSpentOrReserved>=cumulative.priorReads && b.previousWritesSpentOrReserved>=cumulative.priorWrites && b.previousDiagnosticCommands>=cumulative.priorDiagnostics
+    && b.previousReadsSpentOrReserved+c.reservedReads<=cumulative.reads
+    && b.previousWritesSpentOrReserved+4<=cumulative.diagnostics && b.previousDiagnosticCommands+4<=cumulative.diagnostics
     && b.cumulativeReadsSpentOrReserved===b.previousReadsSpentOrReserved+m.rowsRead
-    && b.cumulativeWritesSpentOrReserved===m.rowsWritten && b.cumulativeDiagnosticCommands===4, 'integrity cumulative budget');
+    && b.cumulativeReadsSpentOrReserved<=cumulative.reads
+    && b.cumulativeWritesSpentOrReserved===b.previousWritesSpentOrReserved+m.rowsWritten && b.cumulativeWritesSpentOrReserved<=cumulative.diagnostics
+    && b.cumulativeDiagnosticCommands===b.previousDiagnosticCommands+4 && b.cumulativeDiagnosticCommands<=cumulative.diagnostics, 'integrity cumulative budget');
   return e;
 }
 /** Existing read token executes every read; only four owner-authenticated results replace writes. */
@@ -147,11 +164,14 @@ export async function finishOperatorMetadata<T>(finish: () => Promise<T>, onRetr
 }
 
 export function admitOperatorBudget(ledger: any, c: OperatorChallenge, plannedReads: number): void {
+  const cumulative=cumulativeAllowance(c);
   check(ledger.schemaVersion === 'theologai-operator-proof-budget.v1' && ledger.authorizationId === c.authorizationId
     && integer(ledger.readsSpentOrReserved) && integer(ledger.writesSpentOrReserved) && integer(ledger.diagnosticCommands) && Array.isArray(ledger.attempts)
     && !ledger.attempts.some((a:any) => a.status === 'RUNNING' || a.status === 'PASSED'), 'ledger identity/replay/incomplete attempt');
-  check(ledger.readsSpentOrReserved + plannedReads <= c.hardReadCap && ledger.diagnosticCommands + 4 <= c.diagnosticCommands
-    && ledger.writesSpentOrReserved + 4 <= c.diagnosticCommands, 'remaining cumulative budget');
+  check(integer(plannedReads) && plannedReads<=c.reservedReads && plannedReads<=c.hardReadCap
+    && ledger.readsSpentOrReserved>=cumulative.priorReads && ledger.writesSpentOrReserved>=cumulative.priorWrites && ledger.diagnosticCommands>=cumulative.priorDiagnostics
+    && ledger.readsSpentOrReserved + plannedReads <= cumulative.reads && ledger.diagnosticCommands + 4 <= cumulative.diagnostics
+    && ledger.writesSpentOrReserved + 4 <= cumulative.diagnostics, 'remaining cumulative budget');
 }
 export function spentOperatorBudget(metering: CorpusProofTransport['metering'], events: Record<string,any>[]) {
   const results=events.filter(e=>e.kind==='result'); const intents=events.filter(e=>e.kind==='intent');
@@ -161,9 +181,30 @@ export function spentOperatorBudget(metering: CorpusProofTransport['metering'], 
     diagnosticCommands:metering.integrityCommands};
 }
 
-/** This checks server-authored GitHub state, not a local assertion of approval. */
+/** Retry only transient read-only GitHub responses; never repeat SQL or a mutation. */
+export function readLiveOperatorMetadata(repository: string, path: string,
+  invoke: (args: string[]) => string = args => execFileSync('gh',args,{encoding:'utf8',maxBuffer:2*1024*1024,timeout:15_000,stdio:['ignore','pipe','pipe']}),
+  pause: (milliseconds: number) => void = milliseconds => { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,milliseconds); }) {
+  check(repository===OPERATOR_PROOF.repository && /^\/(?:actions\/runs\/[1-9][0-9]{0,15}(?:\/jobs\?per_page=100)?|pulls\/170|git\/ref\/heads\/main)$/.test(path),'live metadata GET route');
+  for(let attempt=0;attempt<2;attempt++) {
+    let text: string;
+    try { text=invoke(['api',`repos/${repository}${path}`,'--method','GET']); }
+    catch(error) {
+      const stderr=error && typeof error==='object' && 'stderr' in error ? String(error.stderr) : '';
+      const status=Number(stderr.match(/\(HTTP ([0-9]{3})\)/)?.[1]);
+      if(attempt===0 && [502,503,504].includes(status)) { process.stderr.write(`Operator metadata GET transient HTTP ${status}; retrying once before SQL.\n`);pause(250);continue; }
+      if(Number.isInteger(status)&&status>=100&&status<=599)throw Error('Operator corpus proof refused: live GitHub metadata HTTP '+status);
+      throw error;
+    }
+    return JSON.parse(text);
+  }
+  throw Error('Operator corpus proof refused: live GitHub metadata unavailable');
+}
+
+/** This checks fresh server-authored GitHub state, including after a transient GET retry. */
 export function requireLiveOperatorGate(c: OperatorChallenge): void {
-  const get = (path: string) => JSON.parse(execFileSync('gh', ['api', `repos/${c.repository}${path}`], { encoding:'utf8', maxBuffer:2*1024*1024 }));
+  requireOperatorChallenge(c);
+  const get = (path: string) => readLiveOperatorMetadata(c.repository,path);
   const run = get('/actions/runs/' + c.runId);
   check(run.head_sha === c.sourceCommit && run.run_attempt === 1 && run.path === c.workflowPath && run.event === c.eventName
     && run.status !== 'completed', 'live protected run');
@@ -171,10 +212,11 @@ export function requireLiveOperatorGate(c: OperatorChallenge): void {
   const jobs = get('/actions/runs/' + c.runId + '/jobs?per_page=100').jobs.filter((j: any) => j.name === name);
   check(jobs.length === 1 && jobs[0].status === 'in_progress', 'live approved protected job');
   if (c.role === 'preview') {
-    const pr = get('/pulls/167');
+    const pr = get('/pulls/170');
     check(pr.state === 'open' && !pr.draft && pr.head.sha === c.sourceCommit && pr.base.sha === c.baseCommit
       && pr.head.repo.full_name === c.repository && pr.labels.some((l:any) => l.name === 'deploy-preview'), 'live PR authorization');
   } else check(get('/git/ref/heads/main').object.sha === c.sourceCommit, 'live production main');
+  requireOperatorChallenge(c);
 }
 
 export async function runOperatorProof(input: { challenge:OperatorChallenge; directory:string; planSha256:string; output:string; ledger:string; token:string }) {

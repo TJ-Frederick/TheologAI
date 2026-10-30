@@ -103,9 +103,9 @@ describe('complete fresh application corpus verification',()=>{
   it('requires indexed, bounded keyset pages',()=>{const f=fixture();try{expect(()=>sourcePage(f.source,'documents',null,0)).toThrow();expect(()=>sourcePage(f.source,'documents;DROP TABLE documents',null)).toThrow();expect(sourcePage(f.source,'documents',null).expected).toHaveLength(1);}finally{f.close();}});
 });
 
-function transportFixture(fault: string, readBudget = 3_510_997, buffer = false) {
+function transportFixture(fault: string, readBudget = 3_510_997, buffer = false, scope?: {role:'preview'|'production';day:string}) {
   const directory = mkdtempSync(join(tmpdir(), 'theologai-transport-test-'));
-  vi.useFakeTimers({ now: new Date(buffer ? '2026-10-29T12:00:00Z' : '2026-10-27T12:00:00Z') });
+  vi.useFakeTimers({ now: new Date(scope ? scope.day+'T12:00:00Z' : buffer ? '2026-10-29T12:00:00Z' : '2026-10-27T12:00:00Z') });
   let tick = Date.now(); const clock = vi.spyOn(Date, 'now').mockImplementation(() => tick += 1000);
   const calls: { path: string; body: unknown; method: string; rateLimitType: string | null }[] = [];
   let sqlCalls = 0;
@@ -115,7 +115,7 @@ function transportFixture(fault: string, readBudget = 3_510_997, buffer = false)
     calls.push({ path, body, method: options?.method ?? 'GET', rateLimitType:new Headers(options?.headers).get('X-Rate-Limit-Type') });
     let value: unknown;
     if (path.endsWith('/graphql')) {
-      value = { data: { viewer: { accounts: [{ accountTag: ACCOUNT, d1AnalyticsAdaptiveGroups: [{ sum: { rowsRead: fault === 'headroom' ? 4_000_000 : fault === 'daytime' ? 601_058 : 100, rowsWritten: 0 }, avg: { sampleInterval: fault === 'sampled' ? 2 : 1 } }] }] } } };
+      value = { data: { viewer: { accounts: [{ accountTag: ACCOUNT, d1AnalyticsAdaptiveGroups: [{ sum: { rowsRead: fault === 'headroom' ? 4_000_000 : fault === 'daytime' ? 601_058 : fault === 'waived-margin' ? 415_369 : fault === 'waived-overrun' ? 489_004 : 100, rowsWritten: 0 }, avg: { sampleInterval: fault === 'sampled' ? 2 : 1 } }] }] } } };
     } else if (path.endsWith('/query')) {
       sqlCalls++;
       if (fault === 'network') throw Error('synthetic failed attempt');
@@ -140,12 +140,24 @@ function transportFixture(fault: string, readBudget = 3_510_997, buffer = false)
     }
     return Response.json(value);
   };
-  const transport = new CorpusProofTransport({ role: 'preview', token: 'synthetic-test-token', readBudget, eventFile: join(directory, 'events.jsonl'), fetch: fetcher, previewQuotaBuffer:buffer });
+  const transport = new CorpusProofTransport({ role: scope?.role ?? 'preview', token: 'synthetic-test-token', readBudget, eventFile: join(directory, 'events.jsonl'), fetch: fetcher, previewQuotaBuffer:buffer });
   const query: ProofQuery = { kind: 'select', label: 'fixture', sql: 'SELECT 1 n', readCeiling: 100, writeCeiling: 0 };
   return { transport, calls, query, events: () => readFileSync(join(directory, 'events.jsonl'), 'utf8'), close: () => { clock.mockRestore(); vi.useRealTimers(); rmSync(directory, { recursive: true, force: true }); } };
 }
 
 describe('single-attempt corpus proof transport', () => {
+  for(const [role,day,accepted] of [['preview','2026-10-30',true],['production','2026-10-30',false],['preview','2026-10-31',false]] as const)it(`scopes the uncertainty waiver to ${role} on ${day}`,async()=>{
+    const f=transportFixture('waived-margin',3510997,false,{role,day});try {
+      if(accepted){await f.transport.start();expect(f.events()).toContain('"uncertaintyReadMargin":0');expect(f.events()).toContain('"previewUncertaintyWaiverDay":"2026-10-30"');}
+      else await expect(f.transport.start()).rejects.toThrow('headroom');
+      expect(f.calls.some(c=>c.path.endsWith('/query'))).toBe(false);
+    }finally{f.close();}
+  });
+  it('retains the 4M ceiling when the preview uncertainty margin is waived',async()=>{
+    const f=transportFixture('waived-overrun',3510997,false,{role:'preview',day:'2026-10-30'});try {
+      await expect(f.transport.start()).rejects.toThrow('headroom');expect(f.calls.some(c=>c.path.endsWith('/query'))).toBe(false);
+    }finally{f.close();}
+  });
   it('uses the approved daytime preview buffer with live-audit and uncertainty reserves',async()=>{
     const f=transportFixture('daytime',3_510_997,true);try {
       await f.transport.start();await f.transport.execute(f.query);await f.transport.finish();
@@ -247,6 +259,13 @@ describe('source, approval and metering boundaries',()=>{
 });
 
 describe('operator integrity-only transport',()=>{
+  it('applies the same scoped margin waiver to fresh operator admission without analytics or SQL',async()=>{
+    const f=transportFixture('',16384,false,{role:'preview',day:'2026-10-30'});try {
+      const controls=['production','preview'].map(role=>({role,deploymentId:role,versionId:role==='preview'?'11111111-1111-4111-8111-111111111111':'22222222-2222-4222-8222-222222222222',databaseId:TARGETS[role as 'preview'|'production'].databaseId}));const at=Date.now();
+      await f.transport.startIntegrity({accountId:ACCOUNT,role:'preview',day:'2026-10-30',observedAt:new Date(at).toISOString(),rowsRead:415369,rowsWritten:0,sampleInterval:1,readBudget:3510997,controls});
+      expect(f.events()).toContain('"uncertaintyReadMargin":0');expect(f.calls.every(c=>!c.path.endsWith('/graphql')&&!c.path.endsWith('/query'))).toBe(true);
+    }finally{f.close();}
+  });
   it('uses fresh protected admission without any operator analytics or SELECT calls',async()=>{const f=transportFixture('',16384);try{
     // Obtain the same controls via the zero-SQL observer, then start a separate writer.
     const controls=['production','preview'].map(role=>({role,deploymentId:role,versionId:role==='preview'?'11111111-1111-4111-8111-111111111111':'22222222-2222-4222-8222-222222222222',databaseId:TARGETS[role as 'preview'|'production'].databaseId}));
