@@ -1,5 +1,7 @@
 # TheologAI Testing Report
 
+Current security-release evidence is in the [production completion](docs/security/SEC01-05-PRODUCTION-COMPLETE-2026-11-01.md) and [findings register](docs/SECURITY-REVIEW-2026-10-22.md). This report remains historical.
+
 > **Historical test report:** This file records an earlier intended feature
 > state and is not the current product contract or implementation status. Full
 > CCEL catalog discovery, catalog-wide search, and Calvin auto-routing are not

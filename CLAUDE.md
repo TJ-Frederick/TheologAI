@@ -11,6 +11,12 @@ Production MCP server for theological research. Eleven tools, six prompts, eight
 
 <!-- theologai-public-contract tools=11 structured=bible_cross_references,bible_lookup,bible_verse_morphology,classic_text_lookup,commentary_lookup,donation_config,original_language_lookup,original_language_study,parallel_passages,primary_source_search,verify_donation -->
 
+## Security release and remaining scope
+
+SEC-01–05 are resolved in production through PR #170 / run 41256928054. [Findings and remaining risks](docs/SECURITY-REVIEW-2026-10-22.md), [remediation](docs/RELEASE-SECURITY-REMEDIATION.md) and [completed evidence](docs/security/SEC01-05-PRODUCTION-COMPLETE-2026-11-01.md) record the exact closure. Keep SEC-06 open and paused; preserve the existing Cloudflare account, permissions, bindings and approval process. Corpus activation and broader process work remain deferred. The release retains 11 tools, 35 flat works and schema 0009; newer corpus/features remain deferred.
+
+The public rate-limit key is domain-separated IP only, independent of User-Agent; public limiter failures remain fail-open and counts remain location-local. Keep the strict audit gate and its exact dev-only Zod exception/November 22 UTC expiry. Verify complete private Git history, required baseline objects and the exact approved merge/tree before dispatching a release. Preserve cumulative proof budgets and original workspaces; use [CURRENT-RELEASE](docs/CURRENT-RELEASE.md) for assignment identity and require a separate owner decision for rollback.
+
 ## Quick Start
 
 ```bash

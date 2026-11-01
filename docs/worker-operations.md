@@ -6,6 +6,12 @@ The [current release snapshot](CURRENT-RELEASE.md) is the designated current
 snapshot for this operations document. The dated records below retain release
 evidence and are not current identity authority.
 
+## Released security posture
+
+SEC-01–05 are resolved in production through PR #170 / [run 41256928054](https://github.com/TJ-Frederick/TheologAI/actions/runs/41256928054). Input/diagnostic bounds, patched Node/dependencies, stable-IP limits and separated build/deployment trust are released. [Findings and residual risks](SECURITY-REVIEW-2026-10-22.md) are the security status register; [completed evidence](security/SEC01-05-PRODUCTION-COMPLETE-2026-11-01.md) records verification. SEC-06 remains **open and paused**: existing account/permissions/bindings and normal preview → test → production gates stay in place. No new credential check, permission change, account migration or unconditional preview block is approved.
+
+Complete data verification uses existing local operator access only for four integrity commands and the protected read token for all complete reads/quota observation. Keep cumulative budgets, source/run/owner evidence, native artifact checks and approval gates; see the [operator-proof runbook](OPERATOR-CORPUS-PROOF.md). Live-audit D1 rows are not separately measured by the proof meter. Fresh full-history private checkouts must pass Git connectivity/baseline/merged-tree checks and local prerequisites before dispatch; preserve original workspaces. Rollback still requires a separate owner decision and a fresh matched Worker/same-D1 proof.
+
 ## Production rollback rehearsal capability
 
 The protected `Production Rollback Rehearsal` workflow is manual, main-only,

@@ -12,6 +12,10 @@ files for imports or exports that target it. The guard does not execute or
 typecheck quarantined files, and changing their ownership remains a separate
 reviewed decision.
 
+## Released security verification
+
+SEC-01–05 passed the production release gates in [run 41256928054](https://github.com/TJ-Frederick/TheologAI/actions/runs/41256928054). The repaired full-history checkout passed 190 focused tests, release/test script types, app/release audits and local proof/Worker preparation before dispatch. Full production-data verification and all hosted audits passed afterward; see [completion/evidence](../docs/security/SEC01-05-PRODUCTION-COMPLETE-2026-11-01.md). Test counts in older dated reports remain historical. The exact dev-only Zod exception and expiry remain enforced; see [residual risks](../docs/RELEASE-SECURITY-REMEDIATION.md#remaining-risks-and-explicit-limits). No live tests or quota-consuming checks are required for this documentation update.
+
 ## Static typecheck ownership
 
 The manifest's `maintainedTestTypecheckProjects` is the compiler ownership

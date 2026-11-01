@@ -1,5 +1,7 @@
 # SEC-01–05 corpus-preserving security release — review candidate
 
+**Completed release:** SEC-01–05 resolved in production in PR #170 / run 41256928054. SEC-06 stays open/paused; corpus activation and broader process work remain deferred. See [findings](SECURITY-REVIEW-2026-10-22.md), [completion](security/SEC01-05-PRODUCTION-COMPLETE-2026-11-01.md) and [current assignment](CURRENT-RELEASE.md). Dated failure/approval text below is historical and authorizes no new run.
+
 This candidate keeps the application/corpus contract of the deployed September 1
 source `8fbfccfc73628918cfbcf4ca22676f2f7a0b55ab`: 35 flat works, schema 0009,
 corpus `66c148a206b9b0eb1bf7552572570c42dabfd0ba591b63e0cf0d02adda35aa07`.
