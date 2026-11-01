@@ -14,6 +14,9 @@ successful normal CI job and source artifact, then waits up to 60 minutes withou
 credentials or a protected environment. It exposes the candidate identity and target run
 in its summary. Missing authorization times out before protected approval or cloud inventory.
 Prepare the clean exact-source checkout and isolated release toolchain before approval.
+Run the credential-free [offline readiness command](ci-reliability/READINESS-AND-REUSE.md)
+from an independent operator clone before dispatch/approval. It verifies local history and
+runtime readiness only; a successful summary grants no operation and replaces no live check.
 
 A real successor requires a separate explicit owner grant for ONE new operation. Its strict
 `theologai-operator-authorization.v1` manifest binds role, repository, owner 40179660, PR number,

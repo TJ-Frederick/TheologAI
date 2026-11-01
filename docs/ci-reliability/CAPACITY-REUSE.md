@@ -57,8 +57,18 @@ release setting, permission, binding, runtime application or corpus file changed
 Retained local artifacts are in
 [capacity-reuse](../../test-output/ci-reliability-remediation/capacity-reuse/verification.log),
 including baseline/candidate reports, databases, timings and per-step logs. The prior ordinary
-hosted Data baseline on commit `080a85c`, run `41315535953`, was 13m24s. A hosted comparison
-will follow independent local diff review. No additional rehearsal dispatch is needed.
+hosted Data baseline on commit `080a85c`, run `41315535953`, was 13m24s. The exact-head
+[capacity run 41318753879](https://github.com/TJ-Frederick/TheologAI/actions/runs/41318753879)
+on `ef26d39` passed attempt 1 and independent hosted review. Each required context appeared
+once; all protected/source/proof/deployment paths were skipped. Core passed 3,039 tests and
+three integrations with the same five existing conditional skips and unchanged coverage.
+Data passed the complete generated-DB/import/authority checks.
+
+Hosted preparation from the capacity command to generated-DB testing was 78.741960 s before
+and 52.633213 s after. The whole Data job was 753 seconds (12m33s), versus 804 seconds
+(13m24s) before. These are one consecutive pair on different runners, not a guaranteed gain.
+[Retained hosted evidence](../../test-output/ci-reliability-remediation/capacity-reuse/hosted-41318753879/summary.json)
+records exact metadata, timestamps and logs. No additional rehearsal dispatch is needed.
 
 ## Remaining boundaries
 

@@ -2,9 +2,12 @@
 
 Local implementation from main `8a0ad10c53d81b1e575dfd6b4b3df876d77ed5dc`.
 Tyler authorized continued audit remediation with overseer review. The disjoint zero-authority handoff rehearsal passed all three planned hosted dispatches
-and independent review. The current local slice reuses the capacity verifier's own fresh
-pre-VACUUM output in the Data suite. Its diff and equivalence evidence passed independent
-review; ordinary exact-head hosted CI is next. No cloud/proof SQL allowance is granted or renewed.
+and independent review. Capacity output reuse passed local and hosted verification plus
+independent review. The current local slice verifies an independent operator checkout and
+isolated release toolchain before dispatch/approval. Local evidence and independent review
+passed; final committed-source evidence is retained with the
+[readiness records](../../test-output/ci-reliability-remediation/readiness/summary.json).
+No cloud/proof SQL allowance is granted or renewed.
 Production deployment and material product/assurance decisions remain owner-gated. No
 credential values, permission/binding change, SEC06 or corpus activation is in scope.
 
