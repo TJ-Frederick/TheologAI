@@ -38,16 +38,18 @@ function requirePackage(p, expected = {}, now = Date.now()) {
     && /^sha256:[0-9a-f]{64}$/.test(v.digest) && v.contentSha256 === hash(JSON.stringify(p.authorization)), 'native provenance');
   return p;
 }
-function readArchive(bytes, digest) {
+function readArchiveFile(bytes, digest, expectedFile) {
   check(Buffer.isBuffer(bytes) && bytes.length <= 128*1024 && 'sha256:' + hash(bytes) === digest, 'native archive digest');
   const directory = fs.mkdtempSync(join(tmpdir(),'operator-auth-'));
   try {
     const archive = join(directory,'authorization.zip'); fs.writeFileSync(archive,bytes,{mode:0o600});
     const files = execFileSync('unzip',['-Z1',archive],{encoding:'utf8',maxBuffer:60000}).trim().split('\n');
-    check(files.length === 1 && files[0] === 'operator-authorization.json', 'archive roster');
-    const content = execFileSync('unzip',['-p',archive,'operator-authorization.json'],{encoding:'utf8',maxBuffer:60000});
-    return JSON.parse(content);
+    check(files.length === 1 && files[0] === expectedFile, 'archive roster');
+    return execFileSync('unzip',['-p',archive,expectedFile],{maxBuffer:60000});
   } finally { fs.rmSync(directory,{recursive:true,force:true}); }
+}
+function readArchive(bytes, digest) {
+  return JSON.parse(readArchiveFile(bytes,digest,'operator-authorization.json').toString('utf8'));
 }
 function requireProvenance(p, run, artifact, now = Date.now()) {
   requirePackage(p,{},now); const a = p.authorization, v = p.provenance;
@@ -137,4 +139,4 @@ async function requireLiveSource({github,authorization:a}) {
   const {data:commit}=await github.rest.git.getCommit({...repo,commit_sha:a.sourceCommit});
   check(commit.tree.sha===a.sourceTree && (a.role!=='production' || commit.parents?.[0]?.sha===a.baseCommit),'live source tree and base');
 }
-module.exports={requireAuthorization,requirePackage,requireProvenance,findAuthorization,waitForAuthorization,uploadAuthorization,requireLiveCandidate,requireLiveSource,requireLedgerMarker,readArchive,hash};
+module.exports={requireAuthorization,requirePackage,requireProvenance,findAuthorization,waitForAuthorization,uploadAuthorization,requireLiveCandidate,requireLiveSource,requireLedgerMarker,readArchive,readArchiveFile,hash};

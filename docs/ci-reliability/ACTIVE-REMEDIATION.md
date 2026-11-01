@@ -1,9 +1,11 @@
 # Active CI/release reliability slice
 
 Local implementation from main `8a0ad10c53d81b1e575dfd6b4b3df876d77ed5dc`.
-Tyler subsequently authorized a branch commit, push, draft PR and ordinary hosted PR CI.
-No preview label, manual dispatch/handoff rehearsal, merge, remote SQL, secrets access,
-permission/binding change, operation budget or deployment is authorized.
+Tyler authorized continued audit remediation with overseer review. The current follow-up is
+a disjoint zero-authority handoff rehearsal, independently reviewed and approved for
+publication. Full ordinary CI must pass on its exact head before the three bounded dispatches. No cloud/proof SQL allowance is granted or renewed.
+Production deployment and material product/assurance decisions remain owner-gated. No
+credential values, permission/binding change, SEC06 or corpus activation is in scope.
 
 - A implemented: five exact PR contexts preserved; one shared setup/preflight/lineage/suite
   implementation; duplicate PR170 rehearsal removed; early source/history/audit failure.
@@ -15,9 +17,10 @@ permission/binding change, operation budget or deployment is authorized.
 - [Verification](VERIFICATION.md): all five shared local suites, final 285 targeted tests,
   strict types, documentation and static checks pass. Overseer final local acceptance: **APPROVED**,
   no remaining blocking findings. The reviewed changes are proceeding through a draft PR.
-- Ordinary hosted PR CI is authorized; [its evidence](../../test-output/ci-reliability-remediation/hosted-ci.json)
-  is retained locally. Metadata dispatch, protected approval timing and release artifact
-  behavior remain unverified and require separate authorization.
+- Ordinary hosted PR CI passed and was independently accepted; [its evidence](../../test-output/ci-reliability-remediation/hosted-ci.json)
+  is retained locally. [Rehearsal plan](HANDOFF-REHEARSAL.md) and
+  [remaining audit checklist](REMAINING-AUDIT-SCOPE.md) record the current work. Metadata
+  dispatch and protected behavior remain unverified; the bounded zero-authority test is authorized.
 
 Retained incident evidence remains read-only in
 `/Users/tyler/.codex/worktrees/c5ce/TheologAI/docs/security` and its test-output tree.

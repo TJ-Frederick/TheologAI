@@ -1135,24 +1135,69 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
+      - name: Route strictly disjoint owner metadata input
+        id: request
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          OPERATOR_AUTHORIZATION_JSON: ${{ inputs.operator_authorization_json }}
+        with:
+          script: core.setOutput('kind',require('./.github/scripts/operator-handoff-rehearsal.cjs').kind(process.env.OPERATOR_AUTHORIZATION_JSON));
       - name: Retain explicit one-operation owner authorization
         id: authorization
+        if: steps.request.outputs.kind == 'operation'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           OPERATOR_AUTHORIZATION_JSON: ${{ inputs.operator_authorization_json }}
         with:
           script: await require('./.github/scripts/operator-authorization.cjs').uploadAuthorization({github,context,core});
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - if: steps.request.outputs.kind == 'operation'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ steps.authorization.outputs.artifact_name }}
           path: ${{ runner.temp }}/operator-authorization.json
           retention-days: 7
           if-no-files-found: error
           overwrite: false
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - if: steps.request.outputs.kind == 'operation'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: operator-ledger-${{ fromJSON(inputs.operator_authorization_json).ledgerId }}
           path: ${{ runner.temp }}/operator-authorization.json
           retention-days: 7
           if-no-files-found: error
           overwrite: false
+      - name: Prepare zero-authority native handoff rehearsal
+        id: rehearsal
+        if: steps.request.outputs.kind == 'rehearsal'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          OPERATOR_AUTHORIZATION_JSON: ${{ inputs.operator_authorization_json }}
+        with:
+          script: await require('./.github/scripts/operator-handoff-rehearsal.cjs').prepare({github,context,core});
+      - name: Retain rehearsal metadata only
+        if: steps.rehearsal.outputs.rehearsal_mode == 'publish'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.rehearsal.outputs.rehearsal_artifact_name }}
+          path: ${{ runner.temp }}/operator-handoff-rehearsal.json
+          retention-days: 1
+          if-no-files-found: error
+          overwrite: false
+      - name: Download authenticated rehearsal artifact with the pinned action
+        if: steps.rehearsal.outputs.rehearsal_mode == 'consume'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ steps.rehearsal.outputs.rehearsal_artifact_id }}
+          run-id: ${{ steps.rehearsal.outputs.rehearsal_producer_run_id }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/operator-handoff-rehearsal-download
+          merge-multiple: true
+          digest-mismatch: error
+      - name: Compare pinned download with authenticated native bytes
+        if: steps.rehearsal.outputs.rehearsal_mode == 'consume'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          OPERATOR_AUTHORIZATION_JSON: ${{ inputs.operator_authorization_json }}
+          EXPECTED_REHEARSAL_PAYLOAD_SHA256: ${{ steps.rehearsal.outputs.rehearsal_payload_sha256 }}
+        with:
+          script: await require('./.github/scripts/operator-handoff-rehearsal.cjs').compareDownload({github,context,core});
