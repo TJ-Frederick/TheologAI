@@ -230,6 +230,15 @@ describe('single-attempt corpus proof transport', () => {
 });
 
 describe('source, approval and metering boundaries',()=>{
+  it('allows only the exact reviewed capacity tooling path and preserves corpus rejection',()=>{
+    const before=new Map([['scripts/release-corpus-capacity.ts',{mode:'100644',blob:'a'}]]);
+    const after=new Map([['scripts/release-corpus-capacity.ts',{mode:'100644',blob:'b'}]]);
+    expect(classifyEntries(before,after,{}).applicationOnly).toBe(true);
+    for(const path of ['scripts/release-corpus-capacity-copy.ts','scripts/nested/release-corpus-capacity.ts','scripts/build-database.ts','data/data-manifest.json','src/kernel/query.ts','migrations/0010.sql']){
+      const changed=new Map(after);changed.set(path,{mode:'100644',blob:'c'});
+      expect(classifyEntries(before,changed,{})).toMatchObject({applicationOnly:false,unreviewedDataOrApplicationPaths:[path]});
+    }
+  });
   it('rejects data/query changes, including renames or extra source paths',()=>{
     const b=new Map([['data/manifest.json',{mode:'100644',blob:'a'}],['src/kernel/query.ts',{mode:'100644',blob:'a'}]]);
     expect(classifyEntries(b,b,{}).applicationOnly).toBe(true);

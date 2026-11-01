@@ -43,8 +43,10 @@ Rehearsal artifacts use `operator-handoff-rehearsal-<producer-run>-attempt-1` an
    Do not change the published expiry or silently extend its lifetime to accommodate latency.
 
 At most three planned metadata dispatches, each with the existing three-minute uploader cap.
-Metadata dispatch must skip all full suites under distinct `Operator metadata / ...` names,
-leaving the five substantive PR contexts intact. Preserve native IDs, digests, logs, before/after
+Metadata dispatch must skip all full suites under names distinct from the five substantive
+PR contexts. Hosted GitHub renders the skipped name expressions literally rather than resolving
+the intended `Operator metadata / ...` labels; check-run inspection confirmed the required
+contexts remain intact. Preserve native IDs, digests, logs, before/after
 check records and time windows. No unrelated artifact deletion, mutation retry or cleanup.
 Unexpected real-role output, source/main movement, labels/draft change, required-context
 supersession, ambiguous provenance, environment/cloud execution or new paid-service need
@@ -71,4 +73,25 @@ The combined rehearsal/operator/full-CLI/topology regression run passed five fil
 Strict test-script types, public documentation (14 tests), CJS syntax, Actionlint and diff
 whitespace passed. Independent review passed all 48 rehearsal-specific tests and found no
 blocking issue. Operational schemas and permissions remain unchanged; the shared archive
-reader's existing default filename/JSON contract is retained. Hosted outcomes are pending.
+reader's existing default filename/JSON contract is retained. Hosted outcomes passed and were independently accepted. Full ordinary CI on commit
+`080a85ced92cd38fc85574496cc31b713ee2fc2e` passed in run
+[41315535953](https://github.com/TJ-Frederick/TheologAI/actions/runs/41315535953).
+The exact three dispatches are complete:
+
+| Step | Run / observed result |
+|---|---|
+| Publish | [41316767859](https://github.com/TJ-Frederick/TheologAI/actions/runs/41316767859): native artifact `13087802457`, SHA-256 `c138427a01a5a992eb9e08d9c7c13e5354e9cfd14baa1b3fa138f88ce287fa3f`; payload lifetime 14:33:28.669Z–14:38:28.669Z on November 1. |
+| Consume | [41317002397](https://github.com/TJ-Frederick/TheologAI/actions/runs/41317002397): pinned action digest and independent extracted-byte comparison passed at 14:36:18.773Z. |
+| Reject expired | [41317230666](https://github.com/TJ-Frederick/TheologAI/actions/runs/41317230666): all other authentication passed before the specific original expiry rejection at 14:39:09.916Z. |
+
+Only the existing unprivileged uploader executed in each dispatch. All validation, source,
+proof, protected and deploy jobs were skipped. After all three, each of the five required
+contexts still had exactly one successful ordinary-run check. The PR stayed draft and
+unlabeled; deployment API results for this source were empty. No real grant, ledger or cloud
+request was created. Native one-day retention expiry and protected operational admission
+remain untested. No more rehearsal dispatches are part of this plan.
+
+[Retained local evidence](../../test-output/ci-reliability-remediation/rehearsal-followup/handoff-rehearsal.json)
+links native metadata, the ZIP, exact requests, check records and logs. Independent review
+verified all seven then-retained log hashes; the ordinary core/data logs were subsequently
+retained as additional evidence. This is a transport result, not authority for another operation.

@@ -1,9 +1,10 @@
 # Active CI/release reliability slice
 
 Local implementation from main `8a0ad10c53d81b1e575dfd6b4b3df876d77ed5dc`.
-Tyler authorized continued audit remediation with overseer review. The current follow-up is
-a disjoint zero-authority handoff rehearsal, independently reviewed and approved for
-publication. Full ordinary CI must pass on its exact head before the three bounded dispatches. No cloud/proof SQL allowance is granted or renewed.
+Tyler authorized continued audit remediation with overseer review. The disjoint zero-authority handoff rehearsal passed all three planned hosted dispatches
+and independent review. The current local slice reuses the capacity verifier's own fresh
+pre-VACUUM output in the Data suite. Its diff and equivalence evidence passed independent
+review; ordinary exact-head hosted CI is next. No cloud/proof SQL allowance is granted or renewed.
 Production deployment and material product/assurance decisions remain owner-gated. No
 credential values, permission/binding change, SEC06 or corpus activation is in scope.
 
@@ -20,7 +21,9 @@ credential values, permission/binding change, SEC06 or corpus activation is in s
 - Ordinary hosted PR CI passed and was independently accepted; [its evidence](../../test-output/ci-reliability-remediation/hosted-ci.json)
   is retained locally. [Rehearsal plan](HANDOFF-REHEARSAL.md) and
   [remaining audit checklist](REMAINING-AUDIT-SCOPE.md) record the current work. Metadata
-  dispatch and protected behavior remain unverified; the bounded zero-authority test is authorized.
+  transport, exact downloaded bytes and actual-clock payload expiry passed. Protected operational
+  admission remains untested. The three-dispatch plan is complete; no further rehearsal dispatch
+  is authorized. [Capacity reuse evidence](CAPACITY-REUSE.md) records the next local slice.
 
 Retained incident evidence remains read-only in
 `/Users/tyler/.codex/worktrees/c5ce/TheologAI/docs/security` and its test-output tree.

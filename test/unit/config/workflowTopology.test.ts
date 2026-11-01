@@ -470,11 +470,11 @@ describe('workflow topology', () => {
     const steps = action.runs.steps;
     const commands = (suite: string) => steps.filter(step => step.if === `inputs.selected == 'true' && inputs.suite == '${suite}'`).map(step => step.run).join('\n');
     const data = commands('data');
-    expect(data).toContain('npm run audit:release-corpus-capacity\n');
-    expect(data).not.toContain('--output-database');
-    expect(data).toContain('npm run build:db -- --output "$RUNNER_TEMP/theologai.db"');
-    // This release retains the deployed application/corpus. The later research
-    // benchmark and its implementation are outside this security backport.
+    expect(data).toContain('npm run audit:release-corpus-capacity -- --output-database "$RUNNER_TEMP/theologai.db"');
+    expect(data).not.toContain('npm run build:db');
+    expect(data.match(/npm run d1:seed:export /g)).toHaveLength(2);
+    expect(data.match(/npm run d1:seed:verify\n/g)).toHaveLength(2);
+    expect(data).toContain('cmp "$RUNNER_TEMP/d1-seed-manifest.json" scripts/d1-seed/seed-manifest.json');
     for (const command of ['d1:seed:verify-workerd', 'd1:seed:verify-import', 'test:d1-readiness-generated-db', 'historical-section-compatibility-evidence.ts']) expect(data).toContain(command);
     const manifest = JSON.parse(await readFile(new URL('../../../package.json', import.meta.url), 'utf8'));
     for (const step of steps) {

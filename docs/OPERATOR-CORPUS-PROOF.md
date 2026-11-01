@@ -29,8 +29,9 @@ After an actual separate owner decision, the existing pr.yml manual input
 main). Owner and triggering-owner metadata, attempt1, live source/run, native ZIP SHA-256,
 strict JSON, unique authorization artifact and matching ledger-marker artifact authenticate
 it. Candidate JSON alone grants nothing. Metadata-only submissions use distinct skipped
-validation names so they cannot supersede the five substantive PR check contexts. Hosted
-routing/artifact behavior still needs separately authorized CI verification.
+validation names so they cannot supersede the five substantive PR check contexts. The separate
+[zero-authority hosted rehearsal](ci-reliability/HANDOFF-REHEARSAL.md) passed transport,
+downloaded-byte and payload-expiry checks; protected operational admission remains untested.
 
 After source admission, the existing protected operator job asks for its normal approval,
 revalidates native authority and issues one v2 challenge for that exact run. The full
