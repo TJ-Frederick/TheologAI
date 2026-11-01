@@ -20,9 +20,26 @@ outputs:
 runs:
   using: composite
   steps:
+    - name: Recheck owner authority and refuse a repeated challenge before cloud admission
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      with:
+        script: |
+          const fs = require('node:fs');
+          const authority = require('./.github/scripts/operator-authorization.cjs');
+          const p = authority.requirePackage(JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+'/operator-authorization.json','utf8')),
+            {targetRunId:String(context.runId),targetRunAttempt:1});
+          await authority.requireLiveCandidate({github,authorization:p.authorization});
+          const {data:run}=await github.rest.actions.getWorkflowRun({...context.repo,run_id:Number(p.provenance.runId)});
+          const {data:artifact}=await github.rest.actions.getArtifact({...context.repo,artifact_id:Number(p.provenance.artifactId)});
+          authority.requireProvenance(p,run,artifact);
+          await authority.requireLedgerMarker({github,package:p});
+          const {data:files}=await github.rest.actions.listWorkflowRunArtifacts({...context.repo,run_id:context.runId,per_page:100});
+          if(files.artifacts.some(a=>a.name===`operator-corpus-challenge-${context.runId}-attempt-1`)) throw Error('Operator authorization refused: challenge already issued');
+          authority.requirePackage(p);
     - name: Create source-bound operator challenge after protected approval
       shell: bash
       env:
+        GH_TOKEN: ${{ github.token }}
         OPERATOR_BASE_COMMIT: ${{ inputs.base-commit }}
         PROOF_ROLE: ${{ inputs.role }}
         SOURCE_PLAN_SHA256: ${{ inputs.source-plan-sha256 }}

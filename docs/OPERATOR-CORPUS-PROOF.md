@@ -1,4 +1,85 @@
-# PR #170: existing operator access for complete corpus verification
+# Complete operator corpus proof
+
+The reviewed successor admission implementation is authorized for branch publication,
+a draft PR and ordinary hosted PR CI. This document and its fixtures authorize no real
+operation, quota spend, preview label, manual workflow dispatch or deployment.
+The [CI/release task](ci-reliability/ACTIVE-REMEDIATION.md) and
+[reviewed design](ci-reliability/DESIGN.md) record the implementation scope.
+
+## Successor operation sequence
+
+Normal PR validation tests the exact synthetic merge; the independent Worker/corpus source
+artifacts describe the exact source head. The operator source gate verifies every unique,
+successful normal CI job and source artifact, then waits up to 60 minutes without cloud
+credentials or a protected environment. It exposes the candidate identity and target run
+in its summary. Missing authorization times out before protected approval or cloud inventory.
+Prepare the clean exact-source checkout and isolated release toolchain before approval.
+
+A real successor requires a separate explicit owner grant for ONE new operation. Its strict
+`theologai-operator-authorization.v1` manifest binds role, repository, owner 40179660, PR number,
+same-repository branch/head, base, tree, source-plan digest, target run/attempt, unique
+`operation-...` authorization/ledger identity, not-before/expiry and fixed bounds. Preview
+requires `refs/pull/<number>/merge`; production requires the actual main dispatch and first
+parent. The normal complete proof reserves 3,510,997 reads, caps at 3.8M reads and four total
+rank-1 FTS diagnostics/at most four writes. The normal 200K uncertainty margin and 4M account
+operating ceiling apply. No historical PR170 date exception activates for successors.
+
+After an actual separate owner decision, the existing pr.yml manual input
+`operator_authorization_json` receives that grant at the exact source branch (production:
+main). Owner and triggering-owner metadata, attempt1, live source/run, native ZIP SHA-256,
+strict JSON, unique authorization artifact and matching ledger-marker artifact authenticate
+it. Candidate JSON alone grants nothing. Metadata-only submissions use distinct skipped
+validation names so they cannot supersede the five substantive PR check contexts. Hosted
+routing/artifact behavior still needs separately authorized CI verification.
+
+After source admission, the existing protected operator job asks for its normal approval,
+revalidates native authority and issues one v2 challenge for that exact run. The full
+90-minute window must fit the same UTC day and the owner's authorization window. No SQL
+is retried. Local challenge admission and every diagnostic gate verify both native archives'
+bytes/content, live source/run/approval and marker uniqueness before cloud work.
+
+Initialize the persistent per-operation ledger deliberately from the authenticated challenge:
+
+```bash
+npx --no-install tsx scripts/operator-corpus-proof.ts init-ledger CHALLENGE LEDGER
+```
+
+Then use the existing `run CHALLENGE SOURCE_DIRECTORY PLAN_SHA256 OUTPUT LEDGER` command
+with the exact `operatorApproval(challenge)`, existing local OAuth grant held only in memory,
+and the SAME ledger. Never recreate it to recover allowance. A missing ledger is rejected.
+The ledger is consumed and retains the WHOLE both-phase reservation before the first
+command; replay, existing attempts, inherited counters and mismatched authorization fail.
+Only the four exact FTS diagnostics use operator access. The existing protected read token
+then performs every complete-cell/schema/FK/physical read, with no permission expansion.
+The owner submits only the sanitized integrity envelope in `operator_proof_json` at the exact
+branch. The two manual inputs are mutually exclusive.
+
+Keep the local ledger, operator journal, protected read journal, metering and native artifacts.
+An incomplete/cancelled protected phase or missing/ambiguous terminal evidence leaves the
+FULL operation reservation outstanding, including both operator and reader costs and unmatched
+intents. Zero inherited counters in a new operation do not erase older costs. This slice
+supports NO automatic continuation, cross-run recovery, reconstructed lower counters or
+remote-proof reuse. Another operation needs an explicit additional owner scope that accepts
+all unresolved prior reservations. Production has its OWN authorization/ledger and fresh proof;
+a successful matching preview receipt remains an independent prerequisite.
+
+Deploy Preview receives the admitted package only from the exact same-run protected artifact,
+checks its hash against original source admission and the full envelope hash against the
+protected producer, and rechecks expiry/source/live PR/main/tree before cloud inventory.
+It retains its existing contents:read / pull-requests:write permissions and separate approval.
+The isolated protected-base release toolchain and unchanged deployment/live-audit gates remain.
+
+This is not a globally append-only ledger: retained native artifacts provide finite replay
+checks; expired/missing evidence stops recovery, and deliberate local ledger reconstruction
+cannot be cryptographically distinguished from a fresh file. Preserve original evidence.
+No account, token, secret, permission, binding, billing or corpus change is authorized here.
+
+## Historical PR #170 authorization and completed evidence
+
+Everything below is dated historical evidence. Its completed allowance, continuations and
+waivers cannot authorize successor challenges or provide new budget.
+
+### PR #170: existing operator access for complete corpus verification
 
 **Completed release:** SEC-01–05 resolved in production in PR #170 / run 41256928054. SEC-06 stays open/paused; corpus activation and broader process work remain deferred. See [findings](SECURITY-REVIEW-2026-10-22.md), [completion](security/SEC01-05-PRODUCTION-COMPLETE-2026-11-01.md) and [current assignment](CURRENT-RELEASE.md). Dated failure/approval text below is historical and authorizes no new run.
 

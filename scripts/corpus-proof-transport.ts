@@ -11,8 +11,8 @@ export type ProtectedCorpusAdmission = { accountId: string; role: Role; day: str
 export const PREVIEW_QUOTA_BUFFER_DAY = '2026-10-29';
 // Owner waived only the analytics uncertainty margin for today's preview.
 export const PREVIEW_UNCERTAINTY_WAIVER_DAY = '2026-10-30';
-type BudgetScope = { role: Role; day: string };
-const uncertaintyReadMargin = (scope?: BudgetScope): number => scope?.role === 'preview' && scope.day === PREVIEW_UNCERTAINTY_WAIVER_DAY ? 0 : 200_000;
+type BudgetScope = { role: Role; day: string; historicalExceptions?: boolean };
+const uncertaintyReadMargin = (scope?: BudgetScope): number => scope?.historicalExceptions !== false && scope?.role === 'preview' && scope.day === PREVIEW_UNCERTAINTY_WAIVER_DAY ? 0 : 200_000;
 function check(value: unknown, reason: string): asserts value { if (!value) throw Error(`Corpus transport refused: ${reason}`); }
 const sha = (v: string) => createHash('sha256').update(v).digest('hex');
 const count = (v: unknown): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v >= 0;
@@ -61,13 +61,13 @@ export class CorpusProofTransport {
   private readonly liveAuditReserve: number;
   private readonly budgetScope: BudgetScope;
   readonly metering = { rowsRead: 0, rowsWritten: 0, requests: 0, retries: 0, unknownAttempts: 0, integrityCommands: 0 };
-  constructor(private readonly options: { role: Role; token: string; readBudget: number; eventFile: string; fetch?: typeof fetch; previewQuotaBuffer?: boolean }) {
+  constructor(private readonly options: { role: Role; token: string; readBudget: number; eventFile: string; fetch?: typeof fetch; previewQuotaBuffer?: boolean; historicalExceptions?: boolean }) {
     check(Object.hasOwn(TARGETS, options.role) && options.token.length > 0 && options.token.length <= 8192 && !/[\r\n]/.test(options.token), 'target or credential');
     check(count(options.readBudget) && options.readBudget <= 3_800_000, 'whole-run budget');
     check(!options.previewQuotaBuffer || options.role === 'preview' && this.day === PREVIEW_QUOTA_BUFFER_DAY, 'preview quota buffer date/role');
     this.accountCeiling = options.previewQuotaBuffer ? 5_000_000 : 4_000_000;
     this.liveAuditReserve = options.previewQuotaBuffer ? 500_000 : 0;
-    this.budgetScope = { role: options.role, day: this.day };
+    this.budgetScope = { role: options.role, day: this.day, historicalExceptions: options.historicalExceptions };
     check(this.started + 5_400_000 < Date.parse(this.day + 'T00:00:00Z') + 86_400_000, 'insufficient UTC window');
     writeFileSync(options.eventFile, '', { flag: 'wx', mode: 0o600 });
   }
