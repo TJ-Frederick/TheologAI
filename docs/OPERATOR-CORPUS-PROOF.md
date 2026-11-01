@@ -1,5 +1,7 @@
 # PR #170: existing operator access for complete corpus verification
 
+**Completed release:** SEC-01–05 resolved in production in PR #170 / run 41256928054. SEC-06 stays open/paused; corpus activation and broader process work remain deferred. See [findings](SECURITY-REVIEW-2026-10-22.md), [completion](security/SEC01-05-PRODUCTION-COMPLETE-2026-11-01.md) and [current assignment](CURRENT-RELEASE.md). Dated failure/approval text below is historical and authorizes no new run.
+
 The deployment credential has D1 Read; direct HTTP FTS integrity INSERTs require
 D1 Edit. Keep its permissions unchanged. Use the existing operator OAuth grant
 locally for exactly four rank-1 integrity commands. The protected job uses its

@@ -6,12 +6,14 @@ This roadmap owns delivery status and sequencing, not active deployment
 identity. See the [current release snapshot](CURRENT-RELEASE.md); deployment
 identities below are time-scoped milestone evidence.
 
-This is the tracked source of truth for delivery status and sequencing. The
-ignored [dated architecture and roadmap assessment](../test-output/ARCHITECTURE_AND_ROADMAP_ASSESSMENT.md)
-is local source context only and does not define the current product contract.
+This is the tracked source of truth for delivery status and sequencing. The earlier `test-output/ARCHITECTURE_AND_ROADMAP_ASSESSMENT.md` is historical local-only context and may be absent; it does not define the current product contract.
 The successor program after PR #122 is defined in
 [Phase 3B](./PHASE-3B-PLAN.md); earlier uses of "Phase 3" below are historical
 names for already-shipped work.
+
+## Security maintenance — resolved in production
+
+SEC-01–05 shipped in PR #170, actual merge `a1b684b`, after protected preview, full independent production-data verification and all live audits passed. [Findings/status and remaining risks](SECURITY-REVIEW-2026-10-22.md); [completion evidence](security/SEC01-05-PRODUCTION-COMPLETE-2026-11-01.md). SEC-06 stays open and paused. Its credential-scope/custom-domain assessment gaps, shared-account access risk and dev-only audit-exception deadline remain explicit; no further permission-hardening work is scheduled. Corpus activation and broader incremental-data/release-process proposals remain deferred. This release does not promote the prepared Norton/Aquinas or twelve-tool source features.
 
 ## Shipped baseline
 

@@ -3,16 +3,71 @@
 <!-- theologai-release-authority v1 role=current-snapshot current=self -->
 
 This dated, sanitized record is the repository's sole present-tense release
-identity authority. Other release documents provide operational guidance,
-plans, or historical evidence and point here for the active assignment. This
-snapshot records the completed Phase 3B.1 dual-era release established by PR
-#151 and successful protected production run `33443530427`, completed
-`2026-08-31T22:18:10Z`. The same run proved the exact production assignment,
-the unchanged protected-preview control, and their distinct D1 bindings after
-all release audits. It remains a point-in-time record, not a guarantee against
-later authorized release activity.
+identity authority. The latest November 1 observation below supersedes the older assignment identities for current-state purposes. The August 31 release provenance and custody record is retained afterward as dated historical evidence. These are point-in-time observations, not a guarantee against later authorized activity.
+
+## Latest completed production release — November 1, 2026 UTC
+
+SEC-01–05 are released through PR #170 merge `a1b684bd45cc116d92c1ec7a4d5300c0017d82f2`, tree `5de9bb6facd64a217b44ecd6a08647e7e1e51675`. Protected production run `41256928054`, attempt 1, passed every CI, source-bound preview handoff, complete fresh production verification, custom-domain/ESV deployment, live audit and final reconciliation/isolation check. Independent read-only controls at `2026-11-01T01:03:53.500Z` matched the final assignments below. This supersedes the older observations retained afterward.
 
 ## Active production assignment
+
+| Environment | Deployment | Worker | D1 |
+| --- | --- | --- | --- |
+| Production — sole 100% assignment | `225b1d85-6a66-44df-b3e9-7581b9f9e4bb` | `862e4a1c-7dd2-4002-9f63-3c6c47551e4c` (#140) | `theologai-production-20260811-schema0009-a` / `9bc79346-338b-439e-a2a5-424f4418eb21` |
+
+## Preview control
+
+| Environment | Deployment | Worker | D1 |
+| --- | --- | --- | --- |
+| Preview — observed unchanged | `c81e3a6c-d3c2-426c-9b8b-5925d294c2da` | `95eda346-80fd-42e1-b233-de978107c16b` (#163) | `theologai-preview-20260811-schema0009-a` / `74f456e2-6951-4003-bb6f-91951342bf8f` |
+
+## Deployment gate and release evidence
+
+Production fresh proof passed all 39 tables / 1,625,092 rows and every required integrity check: 3,299,468 reads / four diagnostic writes, no retries or unknown attempts, read token zero writes. Original-language 11/11, historical core 8/8, historical spine 10/10 and edge stabilization passed. Both phase costs, complete journals, native provenance/digests and matched predecessor evidence were retained. Existing live-audit D1 rows are not separately measured by the proof total.
+
+Native audit artifact `13065050178` ZIP digest `sha256:e6732de29845ee971dc0e80fd1f1b42cd36584b0c1a5df628984c0e4e16bb809`, expiry `2026-12-01T01:03:29Z`; complete-proof artifact `13063489901` ZIP digest `sha256:2dae7467fa1a0d20889fe8502f600194976e98e9499a2cf084141ed81d0cb212`. Final identity SHA-256 `d0e26ab4a71ce30d30966df42066dc913b08de83d811091db7ed795fd984dfe0`; isolation SHA-256 `58d5290f7c9e50021ed7bd0111582e56f47182b17cd55f4164e834830a837bee`. [Completed release and evidence](security/SEC01-05-PRODUCTION-COMPLETE-2026-11-01.md).
+
+The immediate matched predecessor is deployment `244914a5-4c40-4a4e-a71e-c9a1e57038f6`, Worker `8f75b4c3-fb6e-42c2-91a3-df9c1469caed`, with the **same** production D1. It is evidence only; rollback remains separately owner-gated with fresh matched compatibility/readiness checks. Permissions, bindings/account/billing and custom domains remain unchanged. SEC-06 stays open/paused; corpus activation remains deferred. These local release notes do not alter the deployed source tree. [Security findings/status](SECURITY-REVIEW-2026-10-22.md) and [remaining risks](RELEASE-SECURITY-REMEDIATION.md#remaining-risks-and-explicit-limits) record SEC-01–05 closure and the paused SEC-06 boundary.
+
+## Historical stopped attempt — November 1, 2026
+
+PR #170 merged as `a1b684bd45cc116d92c1ec7a4d5300c0017d82f2` with the exact reviewed tree. Production run `41255280880` was cancelled after local private Git object loss blocked exact-merge/operator preparation. No production gate approval, proof SQL/diagnostic write, ESV synchronization, deployment or rollback occurred. The same production ledger is unspent. Read-only controls at `2026-11-01T00:08:06.665Z` confirmed production deployment `244914a5-4c40-4a4e-a71e-c9a1e57038f6`, Worker `8f75b4c3-fb6e-42c2-91a3-df9c1469caed`, D1 `9bc79346-338b-439e-a2a5-424f4418eb21`, and preview deployment `c81e3a6c-d3c2-426c-9b8b-5925d294c2da`, Worker `95eda346-80fd-42e1-b233-de978107c16b`, D1 `74f456e2-6951-4003-bb6f-91951342bf8f`, unchanged. The one-time follow-up was deleted; no retry is scheduled. Stop diagnosis and boundary (retained local record: `security/SEC01-05-PR170-PRODUCTION-STOP-2026-11-01.md`). SEC-06 remains open/paused; corpus work deferred. No new production source-lineage/data-integrity claim follows from this control observation.
+
+## Historical control observation — October 31, 2026
+
+PR #170 protected run `41148281112`, attempt 1, completed the approved security preview for source `d72d2927c97a30fcc50f06be585fa2bf133c6387`, tree `5de9bb6facd64a217b44ecd6a08647e7e1e51675`. All fresh verification, custom-domain deployment, live audits and final source/eligibility checks passed. Receipt created `2026-10-31T00:43:46.359Z`; independent read-only controls/domain observation at `2026-10-31T00:45:00.781Z` matched the following assignments.
+
+| Environment | Deployment | Worker | D1 |
+| --- | --- | --- | --- |
+| Production — observed unchanged; no PR #170 production deployment | `244914a5-4c40-4a4e-a71e-c9a1e57038f6` | `8f75b4c3-fb6e-42c2-91a3-df9c1469caed` | `theologai-production-20260811-schema0009-a` / `9bc79346-338b-439e-a2a5-424f4418eb21` |
+| Preview — new sole 100% assignment | `c81e3a6c-d3c2-426c-9b8b-5925d294c2da` | `95eda346-80fd-42e1-b233-de978107c16b` (#163) | `theologai-preview-20260811-schema0009-a` / `74f456e2-6951-4003-bb6f-91951342bf8f` |
+
+The existing preview custom domain `https://preview-mcp.theologai.xyz/mcp`, account, permissions and bindings are preserved. Fresh proof measured 3,299,468 reads / four diagnostic writes, no retries or unknown attempts; every required check across 39 tables / 1,625,092 rows passed. Cumulative preview spend is 4,372,158 reads / eight diagnostics and writes, retaining prior attempts. All live cases passed: edge stabilization, original-language 11/11, historical core 8/8, historical spine 10/10 and both MCP eras. Live-audit D1 rows are not separately measured by the proof meter.
+
+Native protected audit artifact `13022793506` ZIP SHA-256 `1008ebd2824422567dd3c125bf105677fe1609f7a7a7718949a164d7c2d5c1c1` expires `2026-11-07T00:44:03Z`; v2 receipt SHA-256 `6f75f54d36433989b0b6633a0ce991047ec1bacf2c3acce673c17d7684634ca9`. Native complete proof and owner evidence were independently verified and retained locally. Completion (local-only retained evidence: `../test-output/security-review-2026-10-23/operator-preview-pr170-2026-10-30/preview-completion-summary-d72d292.json`). Final read-only control confirmation (local-only retained evidence: `../test-output/security-review-2026-10-23/operator-preview-pr170-2026-10-30/post-live-control-confirmation-d72d292.json`).
+
+Production source lineage/data integrity was not established by these control observations; its recorded Worker/deployment/D1 tuple is authoritative only for this dated observation. Production requires its own fresh proof and separate approval. Main remains `e45a88c5e063ac6f74b5ef892889318b78f12489`; PR #170 remains unmerged. Tyler subsequently approved its exact production plan for after November 1 00:05 UTC / October 31 8:05 p.m. New York; the one-time production continuation is scheduled, with no merge, production dispatch or mutation yet. The completed preview follow-up was deleted. Production approval plan (retained local record: `security/SEC01-05-PR170-PRODUCTION-PLAN-2026-10-31.md`). SEC-06 remains open/paused; corpus activation remains deferred. This local snapshot update does not alter the preview-verified source tree.
+
+## October 30 production attempt — stopped before deployment
+
+After the authorized reset, PR #167 merged as `e45a88c5e063ac6f74b5ef892889318b78f12489` with the exact reviewed tree. Production workflow `40977856303`, attempt 1, failed required shared Test & Build because a shallow checkout omitted the immutable baseline needed by its handoff regression. The remaining workflow was cancelled; no production environment approval, verification SQL/FTS writes, ESV synchronization, deployment or rollback occurred. Read-only controls at `2026-10-30T00:17:29.314Z` re-proved both assignments below unchanged. The one-time follow-up was deleted. SEC-06 and corpus work stay deferred. Diagnosis and current boundary (retained local record: `security/SEC01-05-PRODUCTION-STOP-2026-10-30.md`).
+
+## Historical control observation — October 29, 2026
+
+**October 30 preview verification observation:** PR #170 source `87dffce` was admitted under the explicit preview-only uncertainty waiver; four FTS diagnostics/writes passed and the full read phase measured 1,072,690 reads before a read-only GitHub live-authorization GET failed with HTTP 502. The full proof did not complete; deployment and live tests were skipped. Native evidence and the same ledger show zero unknown SQL costs. Read-only controls at `2026-10-30T17:25:48.481Z` re-proved both assignment tuples below unchanged. Metadata retry repair is under review, with no additional proof, merge or production dispatch authorized. Current diagnosis and budget boundary (retained local record: `security/SEC01-05-GITHUB-GUARD-STOP-2026-10-30.md`). This is an updated observation, not a new assignment or production source-lineage claim.
+
+Protected PR #167 run `40918123483`, attempt 1, successfully deployed and tested exact preview source `0d754e0dc3d202a6fc31b7ac7757d29968cacc93`, tree `a4137ea6f2d6803964db5448a4f27b8b1ab83b57`, with the final source-bound receipt created `2026-10-29T17:47:44.856Z`.
+
+| Environment | Deployment | Worker | D1 |
+| --- | --- | --- | --- |
+| Production — observed unchanged, no production release in this task | `244914a5-4c40-4a4e-a71e-c9a1e57038f6` | `8f75b4c3-fb6e-42c2-91a3-df9c1469caed` | `theologai-production-20260811-schema0009-a` / `9bc79346-338b-439e-a2a5-424f4418eb21` |
+| Preview — newly deployed sole 100% assignment | `1c5da8ef-992e-4b32-a5e8-6a0c57336797` | `31330d66-e24d-4e8a-b33d-7279171ed280` (#161) | `theologai-preview-20260811-schema0009-a` / `74f456e2-6951-4003-bb6f-91951342bf8f` |
+
+The existing preview custom domain, account, credential permissions and bindings are preserved. Complete verification passed all 39 tables and integrity checks; original-language 11/11, historical core 8/8, historical spine 10/10, both MCP eras, stable routing and pre/post production controls passed. Native audit artifact `12920700077` ZIP SHA-256 is `4dcae64ee3b45fa03084c1e8cbee5430c0481e2ae0b82ae0b8aba8ab371926f8`; final v2 receipt SHA-256 is `ec45851b49f16d4475325d285ceccb2b696ed1336187c40c444521b129c68eb2`. Its November 5 expiry is not new long-term custody authority. Detailed evidence and the production decision are linked from the active task (retained local record: `security/ACTIVE-SECURITY-RELEASE.md`).
+
+Production source lineage was not re-established by these control checks; the observed Worker/deployment/D1 tuple is authoritative for this dated observation. Tyler subsequently approved the exact PR #167 production plan for after 00:05 UTC October 30 under its existing gates and limits; the authorized merge and one production dispatch later occurred, but required CI failed before any Cloudflare production mutation. Work stopped as instructed; rollback remains separately unapproved. SEC-06 and corpus activation remain deferred. This local snapshot update is not a change to the published, preview-verified release tree.
+
+## Historical August 31 production assignment
 
 PR #151 merged as source `50fcc5ea1d460a7869d5c0b5bf29aa26a37cbfc5`
 with parents `e7516c9e89f7735adcecac291e81b38ba93720a8` and
@@ -30,7 +85,7 @@ evidence: deployment `8cefbaf9-1c0f-4565-b1a4-bd4be2ec86a7`, Worker
 `387953b4-a0b1-42b3-998c-67afef01e936` (version #134), on that same production
 D1. It is not the active assignment.
 
-## Preview control
+## Historical August 31 preview control
 
 The preview control observed before deployment, after deployment, and after
 the production audits remained PR #151 deployment
@@ -43,7 +98,7 @@ recorded GitHub deployment `6190180665` against exact reviewed source
 `2284a40a4a504f880576477975e5583bd5f63357` and the same tree
 `e73599eb50cd4a6beb6d756a587118407fc548e2` used by the production merge.
 
-## Deployment gate and release evidence
+## Historical August 31 deployment gate and release evidence
 
 The unprivileged classifier in run `33443530427`, attempt `1`, emitted one
 canonical deploy/non-documentation-path plan for base

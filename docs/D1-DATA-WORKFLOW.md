@@ -17,6 +17,10 @@ TheologAI treats database structure and corpus data as separate artifacts:
 Do not put the corpus into a migration. Migrations version structure; the seed
 loads a complete corpus into a new, empty database.
 
+## Security-release data boundary
+
+The completed SEC-01–05 release preserved both existing D1 bindings and independently verified the full production corpus before deployment. No seed, migration, import, rebuild or corpus activation was performed. [Completion evidence](security/SEC01-05-PRODUCTION-COMPLETE-2026-11-01.md) and the [operator-proof runbook](OPERATOR-CORPUS-PROOF.md) document the exact read/diagnostic split, cumulative allowance and prospective write reservation. Future corpus/incremental-verification process proposals remain deferred and require review; this release does not replace complete validation for changed data.
+
 ## Build and verify locally
 
 Requirements are Node 22, the project dependencies, and the `sqlite3` command.

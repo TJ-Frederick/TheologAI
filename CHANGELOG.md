@@ -11,6 +11,12 @@ All notable changes to TheologAI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Security maintenance release — 2026-10-31 (New York)
+
+- Resolved SEC-01–05 in production through PR #170 merge `a1b684b` and protected run `41256928054`: bounded input/diagnostics, Node 22.23.4 floor, stable-IP limits, supported dependency fixes and separated build/release trust.
+- Complete production verification and all bounded live audits passed; existing account, token permissions, D1 bindings and deployment gates were preserved. This application/security backport retains the deployed schema 0009 / 35-work / 11-tool corpus contract; prepared corpus activation remains deferred.
+- SEC-06 remains open and paused. The bounded dev-only Zod audit exception expires November 22 UTC; all remaining risk is recorded in the [security findings](docs/SECURITY-REVIEW-2026-10-22.md). See [release completion](docs/security/SEC01-05-PRODUCTION-COMPLETE-2026-11-01.md) and the sole [current assignment](docs/CURRENT-RELEASE.md).
+
 ## [Unreleased]
 
 <!-- theologai-public-contract tools=11 structured=bible_cross_references,bible_lookup,bible_verse_morphology,classic_text_lookup,commentary_lookup,donation_config,original_language_lookup,original_language_study,parallel_passages,primary_source_search,verify_donation -->

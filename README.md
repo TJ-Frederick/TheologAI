@@ -254,6 +254,8 @@ CCEL canary gate remains unrecorded and inert. The exact preparation identity,
 seed evidence, and release boundary are recorded in
 [docs/D1-DATA-WORKFLOW.md](docs/D1-DATA-WORKFLOW.md).
 
+**Security release:** SEC-01–05 are resolved in production through PR #170 / run 41256928054. SEC-06 remains open and paused. See [findings and remaining risks](docs/SECURITY-REVIEW-2026-10-22.md) and [release evidence](docs/security/SEC01-05-PRODUCTION-COMPLETE-2026-11-01.md). The eleven-tool / 35-work schema-0009 contract is preserved; corpus activation remains deferred.
+
 ## MCP capabilities
 
 | Transport | Tools | Resources | Prompts | MCP Logging |
