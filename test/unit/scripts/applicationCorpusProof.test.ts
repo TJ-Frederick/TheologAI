@@ -103,7 +103,7 @@ describe('complete fresh application corpus verification',()=>{
   it('requires indexed, bounded keyset pages',()=>{const f=fixture();try{expect(()=>sourcePage(f.source,'documents',null,0)).toThrow();expect(()=>sourcePage(f.source,'documents;DROP TABLE documents',null)).toThrow();expect(sourcePage(f.source,'documents',null).expected).toHaveLength(1);}finally{f.close();}});
 });
 
-function transportFixture(fault: string, readBudget = 3_510_997, buffer = false, scope?: {role:'preview'|'production';day:string}) {
+function transportFixture(fault: string, readBudget = 3_510_997, buffer = false, scope?: {role:'preview'|'production';day:string}, successor=false) {
   const directory = mkdtempSync(join(tmpdir(), 'theologai-transport-test-'));
   vi.useFakeTimers({ now: new Date(scope ? scope.day+'T12:00:00Z' : buffer ? '2026-10-29T12:00:00Z' : '2026-10-27T12:00:00Z') });
   let tick = Date.now(); const clock = vi.spyOn(Date, 'now').mockImplementation(() => tick += 1000);
@@ -140,7 +140,7 @@ function transportFixture(fault: string, readBudget = 3_510_997, buffer = false,
     }
     return Response.json(value);
   };
-  const transport = new CorpusProofTransport({ role: scope?.role ?? 'preview', token: 'synthetic-test-token', readBudget, eventFile: join(directory, 'events.jsonl'), fetch: fetcher, previewQuotaBuffer:buffer });
+  const transport = new CorpusProofTransport({ role: scope?.role ?? 'preview', token: 'synthetic-test-token', readBudget, eventFile: join(directory, 'events.jsonl'), fetch: fetcher, previewQuotaBuffer:buffer,historicalExceptions:!successor });
   const query: ProofQuery = { kind: 'select', label: 'fixture', sql: 'SELECT 1 n', readCeiling: 100, writeCeiling: 0 };
   return { transport, calls, query, events: () => readFileSync(join(directory, 'events.jsonl'), 'utf8'), close: () => { clock.mockRestore(); vi.useRealTimers(); rmSync(directory, { recursive: true, force: true }); } };
 }
@@ -152,6 +152,10 @@ describe('single-attempt corpus proof transport', () => {
       else await expect(f.transport.start()).rejects.toThrow('headroom');
       expect(f.calls.some(c=>c.path.endsWith('/query'))).toBe(false);
     }finally{f.close();}
+  });
+  it('never activates the historical uncertainty waiver for a successor operation',async()=>{
+    const f=transportFixture('waived-margin',3510997,false,{role:'preview',day:'2026-10-30'},true);
+    try{await expect(f.transport.start()).rejects.toThrow('headroom');expect(f.calls.some(c=>c.path.endsWith('/query'))).toBe(false);}finally{f.close();}
   });
   it('retains the 4M ceiling when the preview uncertainty margin is waived',async()=>{
     const f=transportFixture('waived-overrun',3510997,false,{role:'preview',day:'2026-10-30'});try {
@@ -226,6 +230,15 @@ describe('single-attempt corpus proof transport', () => {
 });
 
 describe('source, approval and metering boundaries',()=>{
+  it('allows only the exact reviewed capacity tooling path and preserves corpus rejection',()=>{
+    const before=new Map([['scripts/release-corpus-capacity.ts',{mode:'100644',blob:'a'}]]);
+    const after=new Map([['scripts/release-corpus-capacity.ts',{mode:'100644',blob:'b'}]]);
+    expect(classifyEntries(before,after,{}).applicationOnly).toBe(true);
+    for(const path of ['scripts/release-corpus-capacity-copy.ts','scripts/nested/release-corpus-capacity.ts','scripts/build-database.ts','data/data-manifest.json','src/kernel/query.ts','migrations/0010.sql']){
+      const changed=new Map(after);changed.set(path,{mode:'100644',blob:'c'});
+      expect(classifyEntries(before,changed,{})).toMatchObject({applicationOnly:false,unreviewedDataOrApplicationPaths:[path]});
+    }
+  });
   it('rejects data/query changes, including renames or extra source paths',()=>{
     const b=new Map([['data/manifest.json',{mode:'100644',blob:'a'}],['src/kernel/query.ts',{mode:'100644',blob:'a'}]]);
     expect(classifyEntries(b,b,{}).applicationOnly).toBe(true);

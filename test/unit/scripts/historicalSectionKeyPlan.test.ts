@@ -395,31 +395,14 @@ describe('migration-free historical section-key plan', () => {
     expect(exactSuccessor.status, exactSuccessor.stderr).toBe(0);
   });
 
-  it('keeps production ancestry and exact PR merge-ref lineage gates distinct', () => {
-    const parsed = parse(prWorkflow) as { jobs: Record<string, { steps: Array<{ name?: string; run?: string; env?: Record<string, string> }> }> };
-    const lineage = parsed.jobs['fresh-checkout-data']!.steps.find(step => step.env?.EXPECTED_MERGE_SHA);
-    expect(lineage).toBeDefined();
-    const lineageStep = `${lineage!.run}\nEXPECTED_MERGE_SHA: ${lineage!.env!.EXPECTED_MERGE_SHA}\nEXPECTED_HEAD_SHA: ${lineage!.env!.EXPECTED_HEAD_SHA}`;
+  it('uses the verified checkout baseline for shared historical lineage', () => {
+    const action = parse(readFileSync('.github/actions/validate/action.yml', 'utf8')) as { runs: { steps: Array<{ name?: string; run?: string; env?: Record<string, string> }> } };
+    const lineage = action.runs.steps.find(step => step.name === 'Verify historical section-key lineage')!;
+    expect(lineage.env?.PREVIOUS_MAIN_SHA).toBe('${{ steps.context.outputs.baseline }}');
+    expect(lineage.run).toContain('git show "$PREVIOUS_MAIN_SHA:data/historical-section-key-plan.json"');
     const validationWorkflow = readFileSync('.github/workflows/validate.yml', 'utf8');
-    expect(validationWorkflow).toContain('fetch-depth: 0');
-    expect(validationWorkflow).toContain('git merge-base --is-ancestor "$PREVIOUS_MAIN_SHA" HEAD');
-    expect(validationWorkflow).toContain('git show "$PREVIOUS_MAIN_SHA:data/historical-section-key-plan.json"');
-    expect(validationWorkflow).not.toContain('git rev-parse HEAD^1)" = "$PREVIOUS_MAIN_SHA"');
-    expect(prWorkflow).toContain('fetch-depth: 2');
-    expect(lineageStep).not.toContain('github.event.pull_request.base.sha');
-    expect(lineageStep).toContain('EXPECTED_MERGE_SHA: ${{ github.sha }}');
-    expect(lineageStep).toContain('EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}');
-    expect(lineageStep).not.toMatch(/run:\s*\|[\s\S]*github\.(?:sha|event\.pull_request\.head\.sha)/);
-    expect(lineageStep).toContain('for sha in "$EXPECTED_MERGE_SHA" "$EXPECTED_HEAD_SHA"; do');
-    expect(lineageStep).toContain('git cat-file -e "$sha^{commit}"');
-    expect(lineageStep).toContain('checked_out_sha="$(git rev-parse HEAD)"');
-    expect(lineageStep).toContain('test "$checked_out_sha" = "$EXPECTED_MERGE_SHA"');
-    expect(lineageStep).toContain('set -- $(git rev-list --parents -n 1 HEAD)');
-    expect(lineageStep).toContain('test "$#" -eq 3');
-    expect(lineageStep).toContain('BASE_SHA="$2"');
-    expect(lineageStep).toContain('CANDIDATE_HEAD_SHA="$3"');
-    expect(lineageStep).toContain('for sha in "$BASE_SHA" "$CANDIDATE_HEAD_SHA"; do');
-    expect(lineageStep).toContain('test "$CANDIDATE_HEAD_SHA" = "$EXPECTED_HEAD_SHA"');
-    expect(lineageStep).toContain('git show "$BASE_SHA:data/historical-section-key-plan.json"');
+    expect(validationWorkflow).toContain('data-lineage-before: ${{ inputs.data-lineage-before }}');
+    expect(prWorkflow).toContain('fetch-depth: 0');
+    expect(prWorkflow).toContain('ref: ${{ github.sha }}');
   });
 });

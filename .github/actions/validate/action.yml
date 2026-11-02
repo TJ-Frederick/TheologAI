@@ -1,10 +1,23 @@
 name: Validate
-description: Run one named local validation suite after checkout, Node setup, and dependency installation.
+description: Set up and run one named local validation suite after an exact, nonpersisted checkout.
 
 inputs:
   suite:
     description: Validation suite to run.
     required: true
+
+  selected:
+    description: Explicit classifier selection; false records an intentional omission.
+    default: 'true'
+  classifier-result:
+    description: Classifier conclusion; anything other than success fails closed.
+    default: success
+  selection-mode:
+    description: Exact docs, serving or full classifier decision.
+    default: full
+  data-lineage-before:
+    description: Canonical production plan first-parent baseline; empty for PR and scheduled validation.
+    default: ''
 
 runs:
   using: composite
@@ -13,7 +26,13 @@ runs:
       shell: bash
       env:
         SUITE: ${{ inputs.suite }}
+        SELECTED: ${{ inputs.selected }}
+        CLASSIFIER_RESULT: ${{ inputs.classifier-result }}
+        MODE: ${{ inputs.selection-mode }}
       run: |
+        test "$CLASSIFIER_RESULT" = success
+        case "$SELECTED" in true|false) ;; *) exit 1 ;; esac
+        case "$MODE" in docs|serving|full) ;; *) exit 1 ;; esac
         case "$SUITE" in
           core|data|worker|node|conformance|docs) ;;
           *)
@@ -21,12 +40,58 @@ runs:
             exit 1
             ;;
         esac
+        case "$SUITE:$MODE:$SELECTED" in
+          docs:docs:true|core:serving:true|core:full:true|data:full:true|data:docs:false|data:serving:false|worker:docs:false|node:docs:false|conformance:docs:false|worker:serving:true|node:serving:true|conformance:serving:true|worker:full:true|node:full:true|conformance:full:true) ;;
+          *) echo 'Inconsistent validation selection' >&2; exit 1 ;;
+        esac
+
+    - name: Verify exact checkout and required history before installation
+      id: context
+      if: inputs.selected == 'true'
+      shell: bash
+      env:
+        CI_SUITE: ${{ inputs.suite }}
+        CI_EXPECTED_HEAD: ${{ github.sha }}
+        CI_EVENT_NAME: ${{ github.event_name }}
+        CI_REF: ${{ github.ref }}
+        CI_PR_HEAD: ${{ github.event.pull_request.head.sha }}
+        CI_LINEAGE_BEFORE: ${{ inputs.data-lineage-before }}
+      run: node .github/scripts/validation-context.cjs
+
+    - if: inputs.selected == 'true'
+      uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+      with:
+        node-version-file: '.nvmrc'
+        cache: 'npm'
+
+    - if: inputs.selected == 'true'
+      shell: bash
+      run: npm ci --no-audit
+
+    - name: Verify historical section-key lineage
+      if: inputs.selected == 'true' && inputs.suite == 'data'
+      shell: bash
+      env:
+        PREVIOUS_MAIN_SHA: ${{ steps.context.outputs.baseline }}
+      run: |
+        if git cat-file -e "$PREVIOUS_MAIN_SHA:data/historical-section-key-plan.json"; then
+          git show "$PREVIOUS_MAIN_SHA:data/historical-section-key-plan.json" > "$RUNNER_TEMP/historical-section-key-plan.previous.json"
+          npm run data:verify-section-keys -- --previous-plan "$RUNNER_TEMP/historical-section-key-plan.previous.json"
+        else
+          npm run data:verify-section-keys -- --genesis
+        fi
+
+    - name: Record intentional omission
+      if: inputs.selected == 'false'
+      shell: bash
+      run: echo 'This change does not affect this validation suite; the required check remains explicit.'
 
     - name: Run core validation
-      if: inputs.suite == 'core'
+      if: inputs.selected == 'true' && inputs.suite == 'core'
       shell: bash
       run: |
         npm run audit:dependencies:high
+        npm audit --omit=dev
         npm run types:worker:check
         npm run types:ccel-coordinator:check
         npm run validate:worker-config
@@ -46,13 +111,12 @@ runs:
         npm run build
 
     - name: Run data validation
-      if: inputs.suite == 'data'
+      if: inputs.selected == 'true' && inputs.suite == 'data'
       shell: bash
       run: |
         test ! -e data/theologai.db
         npm run data:verify-sources
-        npm run audit:release-corpus-capacity
-        npm run build:db -- --output "$RUNNER_TEMP/theologai.db"
+        npm run audit:release-corpus-capacity -- --output-database "$RUNNER_TEMP/theologai.db"
         test -f "$THEOLOGAI_TEST_DATABASE_PATH"
         npm run test:d1-readiness-generated-db
         npm run d1:seed:export -- --database "$RUNNER_TEMP/theologai.db" --clean
@@ -70,7 +134,7 @@ runs:
         THEOLOGAI_TEST_DATABASE_PATH: ${{ runner.temp }}/theologai.db
 
     - name: Run Worker validation
-      if: inputs.suite == 'worker'
+      if: inputs.selected == 'true' && inputs.suite == 'worker'
       shell: bash
       run: |
         npm run test:worker-runtime
@@ -79,16 +143,16 @@ runs:
         npm run test:worker-production-runtime
 
     - name: Run Node HTTP validation
-      if: inputs.suite == 'node'
+      if: inputs.selected == 'true' && inputs.suite == 'node'
       shell: bash
       run: npm run test:e2e
 
     - name: Run MCP conformance validation
-      if: inputs.suite == 'conformance'
+      if: inputs.selected == 'true' && inputs.suite == 'conformance'
       shell: bash
       run: npm run test:conformance
 
     - name: Run documentation validation
-      if: inputs.suite == 'docs'
+      if: inputs.selected == 'true' && inputs.suite == 'docs'
       shell: bash
       run: npm run docs:check

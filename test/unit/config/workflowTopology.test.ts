@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 import { parse, stringify } from 'yaml';
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
@@ -78,6 +79,10 @@ function expressionBody(value: string): string {
   return normalized(value).replace(/^\$\{\{\s*/, '').replace(/\s*\}\}$/, '');
 }
 
+function routedName(name: string | undefined, event = 'pull_request', proof = '', authorization = ''): string {
+  if (!name?.startsWith('${{')) return name ?? '';
+  return new Function('github','inputs','return ('+name.slice(3,-2)+')')({event_name:event},{operator_proof_json:proof,operator_authorization_json:authorization});
+}
 function assertPreviewRevocationBoundary(workflow: Workflow): void {
   const trigger = workflow.on['pull_request'] as { types?: string[] };
   expect(trigger).toEqual({ types: ['closed', 'unlabeled', 'converted_to_draft', 'edited'] });
@@ -124,11 +129,9 @@ describe('workflow topology', () => {
     const source = workflow.jobs['operator-proof-source']!;
     expect(source.environment).toBeUndefined(); expect(JSON.stringify(source)).not.toContain('secrets.');
     expect(source.if).toContain("github.event_name == 'pull_request'");
-    expect(source.if).toContain('github.event.pull_request.number == 170');
-    expect(needs(source)).toEqual(['build-worker', 'shared-release-validation']);
-    expect(workflow.jobs['shared-release-validation']!.uses).toBe('./.github/workflows/validate.yml');
-    expect(workflow.jobs['shared-release-validation']!.environment).toBeUndefined();
-    expect(JSON.stringify(workflow.jobs['shared-release-validation'])).not.toContain('secrets');
+    expect(source.if).not.toContain('170');
+    expect(needs(source)).toEqual(['build-worker', 'validation-complete']);
+    expect(workflow.jobs['shared-release-validation']).toBeUndefined();
     const job = workflow.jobs['operator-corpus-proof']!;
     expect(needs(job)).toEqual(['operator-proof-source', 'validation-complete', 'build-worker']);
     expect(job.environment).toMatchObject({name:'preview'});
@@ -145,7 +148,7 @@ describe('workflow topology', () => {
     const uploader=workflow.jobs['operator-proof-upload']!;
     expect(uploader.environment).toBeUndefined();expect(uploader.permissions).toEqual({contents:'read'});
     expect(uploader.if).toContain("github.actor_id == '40179660'");expect(JSON.stringify(uploader)).not.toContain('secrets.');
-    expect(workflow.jobs.classify!.if).toBeUndefined();
+    expect(workflow.jobs.classify!.if).toContain('operator_authorization_json');
     const action=parse(await readFile(new URL('../../../.github/actions/operator-corpus-proof/action.yml',import.meta.url),'utf8')) as {runs:{steps:Step[]}};
     const steps=action.runs.steps;expect(steps.find(s=>s.id==='evidence')!.with!.script).toContain('operator-proof-bridge.cjs');
     expect(steps.find(s=>s.id==='accept')!.run).toContain('operator-corpus-proof.ts complete');
@@ -365,7 +368,10 @@ describe('workflow topology', () => {
       expect(job.environment).toBeUndefined();
       expect(JSON.stringify(job)).not.toMatch(/secrets\.|--remote\b|d1:remote/);
     }
-    expect(validation.jobs['test-and-build']!.steps!.some(step => step.run === 'npm audit --omit=dev')).toBe(true);
+    const shared = parse(await readFile(new URL('../../../.github/actions/validate/action.yml', import.meta.url), 'utf8'));
+    const core = shared.runs.steps.find((step: Step) => step.name === 'Run core validation').run;
+    expect(core.indexOf('npm audit --omit=dev')).toBeGreaterThan(core.indexOf('npm run audit:dependencies:high'));
+    expect(core.indexOf('npm audit --omit=dev')).toBeLessThan(core.indexOf('npm run test:coverage'));
     const deploy = workflow.jobs.deploy!;
     const commands = (deploy.steps ?? []).map(step => step.run ?? '').join('\n');
     expect(commands).not.toMatch(/npm run (?:test:coverage|test:integration|d1:seed:verify-workerd|build:db)/);
@@ -393,7 +399,7 @@ describe('workflow topology', () => {
     expect(workflow.permissions).toEqual({ contents: 'read' });
     expect(workflow.on).toHaveProperty('schedule');
     expect(JSON.stringify(workflow.on.pull_request)).toContain('labeled');
-    expect(workflow.jobs.classify!.if).toBeUndefined();
+    expect(workflow.jobs.classify!.if).toContain('operator_authorization_json');
     const classifier = workflow.jobs.classify!.steps?.find(step => step.env?.CI_FORCE_FULL);
     expect(classifier?.env?.CI_FORCE_FULL).toContain("github.event.action == 'labeled'");
     expect(workflow.concurrency.group).toContain("format('validation-{0}', github.run_id)");
@@ -402,14 +408,19 @@ describe('workflow topology', () => {
       'worker-runtime': 'Worker Runtime & D1', 'node-http-e2e': 'Node HTTP E2E',
       'mcp-conformance': 'Applicable MCP Conformance',
     };
+    const action = parse(await readFile(new URL('../../../.github/actions/validate/action.yml', import.meta.url), 'utf8')) as { runs: { steps: Step[] } };
+    const guard = action.runs.steps.find(step => step.env?.CLASSIFIER_RESULT);
     for (const [id, name] of Object.entries(expected)) {
       const job = workflow.jobs[id]!;
-      expect(job.name).toBe(name);
+      expect(routedName(job.name)).toBe(name);
       expect(needs(job)).toContain('classify');
       expect(job.if).toContain('!cancelled()');
       expect(job.if).not.toContain('always()');
       expect(job.environment).toBeUndefined();
-      const guard = job.steps?.find(step => step.env?.CLASSIFIER_RESULT);
+      const invocation = job.steps!.find(step => step.uses === './.github/actions/validate')!;
+      expect(invocation.with?.['classifier-result']).toBe('${{ needs.classify.result }}');
+      expect(job.steps!.filter(step => step.uses === './.github/actions/validate')).toHaveLength(1);
+      expect(Object.values(workflow.jobs).filter(value => routedName(value.name) === name)).toHaveLength(1);
       expect(guard?.run).toBeDefined();
       for (const [result, selected, passes] of [
         ['success', 'true', true], ['success', 'false', true],
@@ -417,10 +428,18 @@ describe('workflow topology', () => {
         ['skipped', 'false', false], ['success', '', false], ['success', 'unexpected', false],
       ] as const) {
         const run = spawnSync('bash', ['-e', '-c', guard!.run!], {
-          env: { ...process.env, CLASSIFIER_RESULT: result, SELECTED: selected },
+          env: { ...process.env, CLASSIFIER_RESULT: result, SELECTED: selected, SUITE: 'data', MODE: selected === 'false' ? 'serving' : 'full' },
         });
         expect(run.status === 0, `${id}: ${result}/${selected}`).toBe(passes);
       }
+    }
+    for(const job of Object.values(expected).map(name=>Object.values(workflow.jobs).find(value=>routedName(value.name)===name)!)) {
+      const name=routedName(job.name);
+      for(const event of ['pull_request','schedule','workflow_dispatch'])expect(routedName(job.name,event)).toBe(name);
+      expect(routedName(job.name,'workflow_dispatch','proof')).toBe('Operator metadata / '+name);
+      expect(routedName(job.name,'workflow_dispatch','','authorization')).toBe('Operator metadata / '+name);
+      const evaluate=(event:string,proof:string,authorization:string)=>new Function('github','inputs','cancelled','return ('+expressionBody(job.if!)+')')({event_name:event},{operator_proof_json:proof,operator_authorization_json:authorization},()=>false);
+      expect(evaluate('pull_request','','')).toBe(true);expect(evaluate('workflow_dispatch','proof','')).toBe(false);expect(evaluate('workflow_dispatch','','authorization')).toBe(false);
     }
     const aggregate = workflow.jobs['validation-complete']!;
     expect(new Set(needs(aggregate))).toEqual(new Set(Object.keys(expected)));
@@ -449,13 +468,13 @@ describe('workflow topology', () => {
   it('shares named validation suites without dropping data or transport proof', async () => {
     const action = parse(await readFile(new URL('../../../.github/actions/validate/action.yml', import.meta.url), 'utf8')) as { runs: { steps: Step[] } };
     const steps = action.runs.steps;
-    const commands = (suite: string) => steps.filter(step => step.if === `inputs.suite == '${suite}'`).map(step => step.run).join('\n');
+    const commands = (suite: string) => steps.filter(step => step.if === `inputs.selected == 'true' && inputs.suite == '${suite}'`).map(step => step.run).join('\n');
     const data = commands('data');
-    expect(data).toContain('npm run audit:release-corpus-capacity\n');
-    expect(data).not.toContain('--output-database');
-    expect(data).toContain('npm run build:db -- --output "$RUNNER_TEMP/theologai.db"');
-    // This release retains the deployed application/corpus. The later research
-    // benchmark and its implementation are outside this security backport.
+    expect(data).toContain('npm run audit:release-corpus-capacity -- --output-database "$RUNNER_TEMP/theologai.db"');
+    expect(data).not.toContain('npm run build:db');
+    expect(data.match(/npm run d1:seed:export /g)).toHaveLength(2);
+    expect(data.match(/npm run d1:seed:verify\n/g)).toHaveLength(2);
+    expect(data).toContain('cmp "$RUNNER_TEMP/d1-seed-manifest.json" scripts/d1-seed/seed-manifest.json');
     for (const command of ['d1:seed:verify-workerd', 'd1:seed:verify-import', 'test:d1-readiness-generated-db', 'historical-section-compatibility-evidence.ts']) expect(data).toContain(command);
     const manifest = JSON.parse(await readFile(new URL('../../../package.json', import.meta.url), 'utf8'));
     for (const step of steps) {
@@ -585,5 +604,38 @@ describe('workflow topology', () => {
     expect(runbook).toContain('schema-`0009` is active');
     expect(runbook).toContain('PR #108 Transform-11');
     expect(runbook).toContain('PR #101 hierarchy');
+  });
+});
+
+
+describe('downstream preview authorization before cloud inventory',()=>{
+  for(const fault of ['', 'substituted-package','stale-package','wrong-source-hash','wrong-producer-hash','moved-main'])it(fault || 'accepts exact same-run protected authority',async()=>{
+    const directory=await mkdtemp(join(tmpdir(),'preview-admission-'));
+    try {
+      const require=createRequire(import.meta.url),authority=require('../../../.github/scripts/operator-authorization.cjs');
+      const workflow=parse(await readWorkflow('pr.yml')) as Workflow,steps=workflow.jobs['preview-deploy']!.steps!;
+      const proof=steps.find(s=>s.name==='Require exact protected proof before cloud inventory')!;
+      const source=steps.find(s=>s.name==='Recheck source and admitted authorization before preview cloud inventory')!;
+      const cloud=steps.findIndex(s=>s.name==='Capture checked-out candidate preview D1 mapping (read-only)');
+      expect(steps.indexOf(proof)).toBeLessThan(cloud);expect(steps.indexOf(source)).toBeLessThan(cloud);
+      expect(workflow.jobs['preview-deploy']!.permissions).toEqual({contents:'read','pull-requests':'write'});
+      const now=Date.now(),head='a'.repeat(40),base='b'.repeat(40),tree='c'.repeat(40),plan='d'.repeat(64);
+      const a={schemaVersion:'theologai-operator-authorization.v1',scope:'new-additional-operation',repository:'TJ-Frederick/TheologAI',ownerActorId:40179660,role:'preview',pullRequestNumber:172,headBranch:'ci/another-successor',sourceCommit:head,sourceTree:tree,baseCommit:base,sourcePlanSha256:plan,targetRunId:'123',targetRunAttempt:1,authorizationId:'operation-downstream-fixture',ledgerId:'operation-downstream-fixture',notBefore:new Date(now-1000).toISOString(),expiresAt:new Date(now+86400000-1000).toISOString(),reservedReads:3510997,hardReadCap:3800000,diagnosticCommands:4,maxWrites:4,previousReadsSpentOrReserved:0,previousWritesSpentOrReserved:0,previousDiagnosticCommands:0,outstandingPriorReservationsAccepted:true};
+      const p={authorization:a,provenance:{runId:'321',artifactId:'654',digest:'sha256:'+'e'.repeat(64),contentSha256:authority.hash(JSON.stringify(a))}};
+      let text=JSON.stringify(p),expectedHash=authority.hash(text);
+      if(fault==='substituted-package'){p.authorization.headBranch='substituted';p.provenance.contentSha256=authority.hash(JSON.stringify(p.authorization));text=JSON.stringify(p);}
+      if(fault==='stale-package'){p.authorization.expiresAt=new Date(now-1).toISOString();p.provenance.contentSha256=authority.hash(JSON.stringify(p.authorization));text=JSON.stringify(p);expectedHash=authority.hash(text);}
+      if(fault==='wrong-source-hash')expectedHash='f'.repeat(64);
+      await mkdir(join(directory,'operator-verified'));
+      await writeFile(join(directory,'operator-verified/operator-authorization.json'),text);
+      await writeFile(join(directory,'operator-verified/operator-corpus-challenge.json'),'{}');
+      const envelope='exact protected producer envelope';await writeFile(join(directory,'operator-verified/operator-proof-envelope.json'),envelope);
+      const shell=spawnSync('bash',['-e','-c',proof.run!],{env:{...process.env,RUNNER_TEMP:directory,EXPECTED_OPERATOR_ENVELOPE_SHA256:fault==='wrong-producer-hash'?'f'.repeat(64):authority.hash(envelope)}});
+      if(fault==='wrong-producer-hash'){expect(shell.status).toBe(1);return;}expect(shell.status,shell.stderr?.toString()).toBe(0);
+      const github={rest:{pulls:{get:async()=>({data:{state:'open',draft:false,base:{ref:'main',sha:base},head:{ref:a.headBranch,sha:head,repo:{full_name:a.repository}},labels:[{name:'deploy-preview'}]}})},git:{getRef:async()=>({data:{object:{sha:fault==='moved-main'?'f'.repeat(40):base}}}),getCommit:async()=>({data:{tree:{sha:tree}}})}}};
+      const execute=()=>new Function('require','github','context','process','return (async()=>{'+source.with!.script+'})()')(createRequire(new URL('../../../package.json',import.meta.url)),github,{runId:123,payload:{pull_request:{head:{sha:head}}}},{env:{RUNNER_TEMP:directory,EXPECTED_AUTHORIZATION_SHA256:expectedHash,SOURCE_PLAN_SHA256:plan}});
+      if(fault){await expect(execute()).rejects.toThrow(fault==='stale-package'?'authorization window':fault==='moved-main'?'live preview':'admitted package hash');expect(await readFile(join(directory,'operator-verified/operator-authorization.json'),'utf8')).toBe(text);}
+      else{await execute();expect(await readFile(join(directory,'operator-authorization.json'),'utf8')).toBe(text);}
+    }finally{await rm(directory,{recursive:true,force:true});}
   });
 });

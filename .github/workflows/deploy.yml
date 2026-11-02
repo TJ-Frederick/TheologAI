@@ -371,9 +371,36 @@ jobs:
           retention-days: 1
           overwrite: false
 
+  operator-authorization:
+    name: Admit production operator authorization (no cloud credentials)
+    needs: [verify-deployment-plan, validate, verify-dual-era-preview, build-worker]
+    if: ${{ github.ref == 'refs/heads/main' && needs.verify-deployment-plan.outputs.decision == 'deploy' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    outputs:
+      authorization_sha256: ${{ steps.authorization.outputs.authorization_sha256 }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Wait for separate explicit production operation authorization
+        id: authorization
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          OPERATOR_WAIT_AUTHORIZATION: 'true'
+          OPERATOR_BASE_COMMIT: ${{ needs.verify-deployment-plan.outputs.before }}
+          OPERATOR_SOURCE_PLAN_SHA256: ${{ needs.build-worker.outputs.corpus_plan_sha256 }}
+        with:
+          script: await require('./.github/scripts/verify-production-operator-authorization.cjs')({github,context,core});
+
   deploy:
     name: Test, Build & Deploy
-    needs: [verify-deployment-plan, validate, verify-dual-era-preview, build-worker]
+    needs: [verify-deployment-plan, validate, verify-dual-era-preview, build-worker, operator-authorization]
     if: ${{ github.ref == 'refs/heads/main' && needs.verify-deployment-plan.outputs.deploy_required == 'true' && needs.verify-deployment-plan.outputs.decision == 'deploy' }}
     runs-on: ubuntu-latest
     timeout-minutes: 120
@@ -395,6 +422,15 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
+
+      - name: Recheck separate production authorization after protected approval
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          OPERATOR_BASE_COMMIT: ${{ needs.verify-deployment-plan.outputs.before }}
+          OPERATOR_SOURCE_PLAN_SHA256: ${{ needs.build-worker.outputs.corpus_plan_sha256 }}
+          OPERATOR_EXPECTED_AUTHORIZATION_SHA256: ${{ needs.operator-authorization.outputs.authorization_sha256 }}
+        with:
+          script: await require('./.github/scripts/verify-production-operator-authorization.cjs')({github,context,core});
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
@@ -557,6 +593,7 @@ jobs:
             ${{ runner.temp }}/production-d1-readiness-receipt.json
             ${{ runner.temp }}/production-d1-readiness-receipt.json.events.jsonl
             ${{ runner.temp }}/production-d1-readiness-receipt.json.controls.jsonl
+            ${{ runner.temp }}/operator-authorization.json
             ${{ runner.temp }}/operator-corpus-challenge.json
             ${{ runner.temp }}/operator-proof-envelope.json
             ${{ runner.temp }}/operator-proof/operator-proof-envelope.json

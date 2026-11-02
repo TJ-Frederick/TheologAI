@@ -31,10 +31,10 @@ export function main() {
   if (!/^[0-9a-f]{40}$/.test(head ?? '') || git('rev-parse', 'HEAD') !== head) throw new Error('Unexpected checkout identity');
   let diff = '';
   const forceFull = process.env.CI_FORCE_FULL === 'true';
-  if (!forceFull) {
+  if (process.env.CI_EVENT_NAME === 'pull_request' || process.env.CI_PR_HEAD || !forceFull) {
     const parents = git('rev-list', '--parents', '-n', '1', 'HEAD').split(' ');
     if (parents.length !== 3 || parents[2] !== process.env.CI_PR_HEAD) throw new Error('Expected exact PR merge checkout');
-    diff = execFileSync('git', ['diff', '--name-status', '-z', '--find-renames', '--find-copies', parents[1], head], { encoding: 'utf8' });
+    if (!forceFull) diff = execFileSync('git', ['diff', '--name-status', '-z', '--find-renames', '--find-copies', parents[1], head], { encoding: 'utf8' });
   }
   const result = classifyCiChanges(diff, forceFull);
   if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT,

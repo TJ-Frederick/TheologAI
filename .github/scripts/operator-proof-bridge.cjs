@@ -1,21 +1,23 @@
 // Artifact provenance is the owner's authenticated dispatch, never PR-controlled metadata.
 const fs = require('node:fs');
+const authority = require('./operator-authorization.cjs');
 const repo = {owner:'TJ-Frederick',repo:'TheologAI'};
 const ownerId = 40179660;
 const check = (v, reason) => { if (!v) throw Error('Operator evidence refused: '+reason); };
 const artifactName = c => `operator-corpus-proof-${c.runId}-attempt-1`;
 
-function upload({context,core,environment=process.env}) {
+function upload({context,core,environment=process.env,now=Date.now()}) {
   check(context.repo.owner===repo.owner && context.repo.repo===repo.repo && context.eventName==='workflow_dispatch'
     && environment.GITHUB_ACTOR_ID===String(ownerId) && environment.GITHUB_RUN_ATTEMPT==='1', 'owner manual dispatch');
   const text=environment.OPERATOR_PROOF_JSON;
   check(typeof text==='string' && Buffer.byteLength(text)<=60_000, 'bounded proof input');
   const e=JSON.parse(text); const c=e.challenge;
-  check(e.schemaVersion==='theologai-operator-corpus-envelope.v1' && c?.schemaVersion==='theologai-operator-corpus-challenge.v1'
+  check(e.schemaVersion==='theologai-operator-corpus-envelope.v1' && c?.schemaVersion==='theologai-operator-corpus-challenge.v2'
     && c.repository==='TJ-Frederick/TheologAI' && c.ownerActorId===ownerId && /^[1-9][0-9]{0,15}$/.test(c.runId)
     && c.runAttempt===1 && /^[0-9a-f]{64}$/.test(c.nonce), 'proof/challenge shape');
-  check(c.sourceCommit===context.sha && e.receipt?.sourceCommit===context.sha && Date.parse(c.expiresAt)>Date.now(), 'exact fresh source');
-  check(environment.GITHUB_REF===(c.role==='preview'?'refs/heads/codex/security-checkout-continuation':'refs/heads/main')
+  authority.requirePackage(c.authorization,{role:c.role,sourceCommit:c.sourceCommit,sourceTree:c.sourceTree,baseCommit:c.baseCommit,sourcePlanSha256:c.sourcePlanSha256,targetRunId:c.runId,targetRunAttempt:1},now);
+  check(c.sourceCommit===context.sha && e.receipt?.sourceCommit===context.sha && Date.parse(c.expiresAt)>now, 'exact fresh source');
+  check(environment.GITHUB_REF===(c.role==='preview'?'refs/heads/'+c.authorization.authorization.headBranch:'refs/heads/main')
     && ['preview','production'].includes(c.role), 'source branch/role');
   fs.writeFileSync(environment.RUNNER_TEMP+'/operator-proof-envelope.json',JSON.stringify(e,null,2)+'\n',{flag:'wx',mode:0o600});
   core.setOutput('artifact_name',artifactName(c));
@@ -23,10 +25,16 @@ function upload({context,core,environment=process.env}) {
 
 async function find({github,challenge:c,now=Date.now()}) {
   check(c.repository==='TJ-Frederick/TheologAI' && c.ownerActorId===ownerId && Date.parse(c.expiresAt)>now, 'live challenge');
+  authority.requirePackage(c.authorization,{role:c.role,sourceCommit:c.sourceCommit,targetRunId:c.runId},now);
+  await authority.requireLiveCandidate({github,authorization:c.authorization.authorization});
+  const {data:authorizationRun}=await github.rest.actions.getWorkflowRun({...repo,run_id:Number(c.authorization.provenance.runId)});
+  const {data:authorizationArtifact}=await github.rest.actions.getArtifact({...repo,artifact_id:Number(c.authorization.provenance.artifactId)});
+  authority.requireProvenance(c.authorization,authorizationRun,authorizationArtifact,now);
+  await authority.requireLedgerMarker({github,package:c.authorization,now});
   if(c.role==='preview') {
-    const {data:pr}=await github.rest.pulls.get({...repo,pull_number:170});
+    const {data:pr}=await github.rest.pulls.get({...repo,pull_number:c.authorization.authorization.pullRequestNumber});
     check(pr.state==='open' && !pr.draft && pr.head.repo.full_name===c.repository && pr.head.sha===c.sourceCommit
-      && pr.base.sha===c.baseCommit && pr.labels.some(l=>l.name==='deploy-preview'), 'live preview authority');
+      && pr.base.ref==='main' && pr.head.ref===c.authorization.authorization.headBranch && pr.base.sha===c.baseCommit && pr.labels.some(l=>l.name==='deploy-preview'), 'live preview authority');
   } else {
     const {data:ref}=await github.rest.git.getRef({...repo,ref:'heads/main'});
     check(c.role==='production' && ref.object.sha===c.sourceCommit, 'live main');
@@ -36,7 +44,7 @@ async function find({github,challenge:c,now=Date.now()}) {
   for(const r of runs.workflow_runs) {
     if(r.head_sha!==c.sourceCommit || Date.parse(r.created_at)<Date.parse(c.createdAt) || r.actor?.id!==ownerId
       || r.triggering_actor?.id!==ownerId || r.run_attempt!==1 || r.path!=='.github/workflows/pr.yml'
-      || r.event!=='workflow_dispatch' || r.head_branch!==(c.role==='preview'?'codex/security-checkout-continuation':'main')) continue;
+      || r.event!=='workflow_dispatch' || r.head_branch!==(c.role==='preview'?c.authorization.authorization.headBranch:'main')) continue;
     const {data:files}=await github.rest.actions.listWorkflowRunArtifacts({...repo,run_id:r.id,per_page:100});
     const artifacts=files.artifacts.filter(a=>a.name===artifactName(c));
     check(artifacts.length<=1,'duplicate proof artifact');

@@ -4,26 +4,27 @@ module.exports = async ({ github, context, core, environment = process.env }) =>
   const repo = { owner: 'TJ-Frederick', repo: 'TheologAI' };
   check(context.repo.owner === repo.owner && context.repo.repo === repo.repo, 'repository');
   const source = context.payload?.pull_request?.head?.sha;
-  check(context.eventName === 'pull_request' && context.payload.pull_request.number === 170
-    && environment.GITHUB_REF === 'refs/pull/170/merge', 'existing protected PR ref');
+  const number = context.payload?.pull_request?.number;
+  const branch = context.payload?.pull_request?.head?.ref;
+  check(context.eventName === 'pull_request' && Number.isSafeInteger(number) && number > 170
+    && environment.GITHUB_REF === `refs/pull/${number}/merge`, 'existing protected PR ref');
   check(environment.GITHUB_RUN_ATTEMPT === '1', 'single attempt');
   check(/^[1-9][0-9]{0,15}$/.test(environment.OPERATOR_SOURCE_RUN_ID || ''), 'source run');
   const runId = Number(environment.OPERATOR_SOURCE_RUN_ID);
   check(Number.isSafeInteger(runId) && environment.OPERATOR_SOURCE_RUN_ID === environment.GITHUB_RUN_ID
     && /^[0-9a-f]{40}$/.test(source || ''), 'identity');
-  const { data: pr } = await github.rest.pulls.get({ ...repo, pull_number: 170 });
+  const { data: pr } = await github.rest.pulls.get({ ...repo, pull_number: number });
   check(pr.state === 'open' && !pr.draft && pr.base.ref === 'main' && pr.head.repo.full_name === 'TJ-Frederick/TheologAI', 'live PR');
   check(pr.labels.some(l => l.name === 'deploy-preview'), 'preview/diagnostic labels');
-  check(pr.head.sha === source && pr.head.ref === 'codex/security-checkout-continuation', 'live source/ref');
+  check(pr.head.sha === source && pr.head.ref === branch, 'live source/ref');
   const { data: run } = await github.rest.actions.getWorkflowRun({ ...repo, run_id: runId });
-  const linked = run.pull_requests.filter(p => p.number === 170);
+  const linked = run.pull_requests.filter(p => p.number === number);
   check(run.head_sha === source && run.path === '.github/workflows/pr.yml' && run.event === 'pull_request'
     && run.run_attempt === 1 && linked.length === 1 && linked[0].head.sha === source
     && linked[0].base.sha === pr.base.sha && /^[0-9a-f]{40}$/.test(pr.base.sha), 'normal PR run identity');
   const { data: result } = await github.rest.actions.listJobsForWorkflowRun({ ...repo, run_id: runId, filter: 'latest', per_page: 100 });
   for (const name of ['Select Validation', 'Test & Build', 'Fresh Checkout & Data', 'Node HTTP E2E',
-    'Worker Runtime & D1', 'Applicable MCP Conformance', 'Validation Complete', 'Build preview Worker artifact (no cloud credentials)',
-    ...['Test & Build','Fresh Checkout & Data','Node HTTP E2E','Worker Runtime & D1','Applicable MCP Conformance'].map(name => 'Shared production validation rehearsal / ' + name)]) {
+    'Worker Runtime & D1', 'Applicable MCP Conformance', 'Validation Complete', 'Build preview Worker artifact (no cloud credentials)']) {
     const jobs = result.jobs.filter(j => j.name === name);
     check(jobs.length === 1 && jobs[0].status === 'completed' && jobs[0].conclusion === 'success', 'required CI: ' + name);
   }
@@ -37,5 +38,11 @@ module.exports = async ({ github, context, core, environment = process.env }) =>
   }
   const { data: commit } = await github.rest.git.getCommit({ ...repo, commit_sha: source });
   check(/^[0-9a-f]{40}$/.test(commit.tree.sha), 'source tree');
+  const authority = require('./operator-authorization.cjs');
+  const expected = {role:'preview',pullRequestNumber:number,headBranch:branch,sourceCommit:source,sourceTree:commit.tree.sha,
+    baseCommit:pr.base.sha,sourcePlanSha256:environment.OPERATOR_SOURCE_PLAN_SHA256,targetRunId:String(runId),targetRunAttempt:1};
+  await authority.waitForAuthorization({github,expected,core,environment,
+    revalidate:async()=>authority.requireLiveCandidate({github,authorization:{...expected,repository:'TJ-Frederick/TheologAI'}})});
+  if(environment.OPERATOR_EXPECTED_AUTHORIZATION_SHA256) check(authority.hash(require('node:fs').readFileSync(environment.RUNNER_TEMP+'/operator-authorization.json'))===environment.OPERATOR_EXPECTED_AUTHORIZATION_SHA256,'same admitted owner authorization');
   core.setOutput('source', source); core.setOutput('tree', commit.tree.sha); core.setOutput('base', pr.base.sha);
 };
