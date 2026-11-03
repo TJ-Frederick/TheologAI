@@ -1,17 +1,11 @@
 # Test maintenance — active task
 
-2026-11-03: slice 1 accepted and committed locally as `c8c1b118b027d2086b712ee4bcfe1fa93b9f19fb`.
-Slice 2 independently reviewed and accepted. Investigation baseline
-`0a9df1d31407a2918f521c4482efd821dfaeb6e4`; local branch
-`test/retained-language-sql-coverage` in audit checkout `12bf/TheologAI`.
-Reviewer chat `01a1a30d-56d7-7260-9321-3b6b724ba515` accepted the five test
-diffs, mapping and fault evidence with no blocking findings; local commit authorized.
-No PR, merge, preview or production operation performed.
-
-Scope: slice 1 strengthened retained tests; slice 2 retires the frozen language-v2
-draft packet. Production behavior, workflows, dependencies, corpus, release code
-and documentation contracts remain unchanged. Slice 3 (cosmetic documentation
-locks/IP-only prose) remains gated by review.
+2026-11-03: local implementation, independent review and validation are
+complete for all three slices. Publication is pending explicit approval.
+Branch: `test/retained-language-sql-coverage`, audit checkout `12bf/TheologAI`.
+No PR, push, merge or deployment performed. Production behavior, release gates,
+workflows, dependencies and corpus are unchanged. Norton/Aquinas remains
+preserved; its historical evidence and resume boundary are linked below.
 
 ## Coverage mapping
 
@@ -41,6 +35,9 @@ Do not alter or activate that candidate. Resume its separate workstream in
 [the original chat](codex://threads/01a179a9-6b6e-7973-92de-f7b13d617aad).
 
 ## Slice 1 validation and controlled faults
+
+Accepted by reviewer chat `01a1a30d-56d7-7260-9321-3b6b724ba515` with no blocking
+findings; committed as `c8c1b118b027d2086b712ee4bcfe1fa93b9f19fb`.
 
 Node 22.23.4, existing matched dependencies from checkout `19d3`; no install.
 All five slice 1 affected files: **61/61 pass** (Vitest 4.1.12, 1.14 s reported duration).
@@ -130,4 +127,83 @@ for the reviewed slice 3 patch. Aquinas/Norton and other design packets remain
 untouched. Independent reviewer accepted the exact deletions, topology, retained
 boundaries and validation evidence; no code blocker. The Git-index reproduction
 clarification above completes the requested correction. Local slice 2 commit
-authorized; slice 3 remains separately reviewable.
+authorized and completed as `8d383acfb02018816f9eb29716518cbcb53434de`; slice 3
+remains separately reviewable.
+
+
+## Slice 3 documentation assertion decisions
+
+Independent reviewer accepted the README change, retained contract safeguards,
+assertion dispositions, controlled faults, focused checks and full coverage
+evidence with no blocking finding. The generated-dist prerequisite diagnosis
+was accepted; local slice 3 commit authorized.
+
+Scope is exactly README, `test/unit/docs/publicContract.test.ts`, and this
+record. README now describes the existing domain-separated IP-only rate limit,
+User-Agent independence, shared NAT buckets and fail-open limiter behavior.
+The separate abusive-poller IP/User-Agent rejection tuple is unchanged.
+No historical document or current release snapshot was edited.
+
+| Assertion group | Retained protection | Removed obligation and reason |
+| --- | --- | --- |
+| Release authority | Exact closed marker role/target graph for all 18 existing documents, sole present-tense authority, separate rollback decision, gate versus release-artifact distinction | Snapshot headings, historical seven-row evidence-table count and thirteen literal stale-release phrases. Headings/table layout are presentation; dated artifact enumeration and old phrase blacklists are not current identity authority |
+| Roadmap/history | README roadmap link and six historical artifact banners stating non-current product authority | Exact roadmap heading, prior commit and completed phase label; repeated historical banner/title checks elsewhere |
+| Public registry and corpus | README tool/prompt registry against actual MCP; tool count/structured-output markers against both real runtime registries; corpus counts against manifest; bounded work inventory and skill evidence/attribution instructions | Duplicate eleven-tool prose, obsolete ten-tool wording blacklist, duplicate primary-source row description and hardcoded repeated corpus prose. Runtime/manifest checks own those relationships |
+| Current transport/discovery/corpus | v6 local-only/v7 discovery-only status, CCEL execution disabled before adapter/coordinator/fetch, actual exposure/live/coordinator flags, year-bound limits, reconnect/reinitialize instructions, inactive Aquinas/local-only unpublished candidate | Exact historical PR #108 narrative wording and mixed Transform-11 cutover/rollback/predecessor assertions; the closed authority graph and current operational boundaries remain |
+| Historical release identity and reconciliation | Historical records themselves preserved; authority markers direct readers to CURRENT-RELEASE | Literal deployment/Worker/D1/run/commit/tree/digest values, cancelled-PR enumeration, completed preview/production chronology and old exact rollback-unit descriptions. Historical fidelity stays in reviewed Git documents; tests no longer duplicate the ledgers |
+| Operator admission and proof limits | Separate stage authorization, fresh unbound preparation/readiness, preview then production then credential/canary order, schema isolation, fresh control-plane identity, hard inert unrecorded gate before cloud access, staging/promotion mutation disclosures, preflight and evidence limitations | Historical stage-completion PR labels, prior endpoint-bearing Worker IDs, repository-only PR narratives and historical endpoint-deployment claims. Admission, readiness, secret release and canary executable rejection suites remain unchanged |
+| Production control | Capture/verify commands, success condition and post-audit control hash; documented initial inventory and checks after final audit/identity | Workflow display labels and repeated artifact filenames already owned by workflow/reconciliation suites; no workflow selector or executable gate changed |
+| Whitespace/presentation | Prose-only helper removes quote prefixes and collapses whitespace; markers, tables, SQL/config/workflow code remain raw | Exact prose line wrapping and cosmetic headings; no replacement regex list for retired identities |
+
+Public-contract suite is 14 → 10 tests and 745 → 360 lines. This is a
+maintenance reduction, not a CI wall-clock claim. Escaping and current product
+contracts remain obligations; no accepted behavior was changed to pass tests.
+
+Slice 3 focused verification: **119/119 pass** across public contract, topology,
+workflow, Worker rate limits, production guards, preview reconciliation, canary
+and operator-secret release; complete `npm run typecheck` **pass**. Exact
+commands/results/logs and the single-file macOS checksum wrapper are local at
+`/var/folders/rl/yfww2gx95ysd4z9qpxyxt2bm0000gn/T/theologai-test-slice3-z8vffbhd/`.
+`/private/tmp/verify-test-slice3.py` is the focused runner.
+
+Disposable-copy negative/neutral controls: baseline **10/10 pass**; rename
+README/current-snapshot/roadmap headings **10/10 pass**; reflow README, snapshot
+and canary prose **10/10 pass**; change one retired historical deployment ID
+**10/10 pass**. Removing the README `bible_lookup` row, changing its public tool
+count marker, and pointing its release-authority marker at ROADMAP each cause
+**exactly the intended one test failure**. Restored control **10/10 pass**.
+The exact mutation runner and per-case JSON/logs are at
+`/var/folders/rl/yfww2gx95ysd4z9qpxyxt2bm0000gn/T/theologai-test-slice3-faults-5achhwxc/`.
+No working implementation was mutated.
+
+Full combined-candidate coverage validation: **210/210 files pass; 3,043 tests
+pass, five conditionally skipped**. Statements **86.72%**, branches **81.25%**,
+functions **91.95%**, lines **90.87%**; all existing thresholds pass. Corrected
+run elapsed 56.757 seconds (Vitest-reported duration 56.28 seconds); this is a
+local observation, not a baseline-relative or hosted CI saving. The five skips
+are two generated-database readiness cases and three cases requiring the
+separate authoritative Macula audit packet; those optional local inputs were
+not created here, and their skip conditions/tests are unchanged.
+
+The initial full run (54.390 seconds) had 3,042 passes, five skips and one
+failure: the unchanged UBS acquisition packaging test rejects `dist/index.js`
+in npm's diagnostic packlist. The successful slice 2 build had left exactly
+that generated file. Preserved the build output at `slice2-node-build-dist/`
+under the evidence directory, then the unchanged packaging suite passed 5/5.
+Only after that independent prerequisite check, repeated coverage to obtain
+its otherwise-suppressed threshold report. No assertion or package policy was
+weakened. `coverage-summary.json`/`coverage-tests.json`/`coverage.log` retain
+the failed first run; `coverage-retry-summary.json`/`coverage-retry-tests.json`/
+`coverage-retry.log` retain the passing run, alongside both exact runners.
+The temporary PATH checksum wrapper and isolated HOME/environment were used
+in both runs. Temporary dependency symlink removed after validation.
+
+Slice 2 Node build and 3/3 shared/Node/Worker MCP integration results are reused
+because slice 3 changes only docs and their test; no production build input
+changed. No manual corpus rebuild, live provider, remote operation or deployment
+proof is requested or implied. Hosted required checks still apply. No production
+source, workflow, dependency, corpus, other design packet or preserved candidate
+file changed. All three slices are independently reviewed and accepted; local
+implementation and validation are complete. Publication remains pending explicit
+approval in the originating reviewer chat; no push, PR, merge or deployment is
+authorized by this local completion.
