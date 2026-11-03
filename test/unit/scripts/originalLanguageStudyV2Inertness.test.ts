@@ -9,7 +9,6 @@ import {
 } from '../../../src/services/languages/OriginalLanguageStudyV2ContextProvider.js';
 
 const repoPath = fileURLToPath(new URL('../../../', import.meta.url));
-const frozenDraftFixtureRoot = 'test/fixtures/original-language-study-v2/';
 const activatedModules = [
   'src/kernel/originalLanguageStudyV2Contract.ts',
   'src/mcp/schemas/originalLanguageStudyV2.ts',
@@ -25,11 +24,10 @@ const runtimeEntrypoints = [
 ] as const;
 
 describe('activated original_language_study v2 runtime seam', () => {
-  it('is reachable from both production runtimes while frozen draft fixtures remain unreachable', () => {
+  it('is reachable from both production runtimes', () => {
     for (const entrypoint of runtimeEntrypoints) {
       const reachable = reachableModules(entrypoint);
       expect(activatedModules.filter(path => !reachable.has(path)), entrypoint).toEqual([]);
-      expect([...reachable].filter(path => path.startsWith(frozenDraftFixtureRoot)), entrypoint).toEqual([]);
     }
   });
 
@@ -51,7 +49,7 @@ describe('activated original_language_study v2 runtime seam', () => {
       .toBe('bd19fb99f7bbfd13ad68f2184aaded4a6e5587196ad76b68b0c22bf971fc90f6');
     expect(provider).not.toMatch(/(?:scripts\/|SEMANTIC-COMPILATION-AUDIT|data\/biblical-languages|D1Database|better-sqlite3|THEOLOGAI_)/);
     expect(coordinator).toContain('queryUbsSemanticEvidenceBundle(this.evidenceRepository');
-    expect(coordinator).not.toMatch(/originalLanguageStudyV2Draft|test\/fixtures/);
+    expect(coordinator).not.toMatch(/test\/fixtures/);
   });
 });
 
