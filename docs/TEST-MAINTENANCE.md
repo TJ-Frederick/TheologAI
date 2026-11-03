@@ -1,11 +1,17 @@
-# Test maintenance — active task
+# Test maintenance — completed
 
-2026-11-03: local implementation, independent review and validation are
-complete for all three slices. Publication is pending explicit approval.
-Branch: `test/retained-language-sql-coverage`, audit checkout `12bf/TheologAI`.
-No PR, push, merge or deployment performed. Production behavior, release gates,
-workflows, dependencies and corpus are unchanged. Norton/Aquinas remains
-preserved; its historical evidence and resume boundary are linked below.
+2026-11-03: [PR #174](https://github.com/TJ-Frederick/TheologAI/pull/174)
+merged as `4ef5d42e3a04c3b425586a4c39498a3ae8c05a6b` after independent final
+review of head `d9333bc31e7d071580b0f782ac03fadb1cd03c86`. All five required
+checks passed in [PR Checks run 41722831261](https://github.com/TJ-Frederick/TheologAI/actions/runs/41722831261),
+attempt 1. No deployment occurred. Production behavior, release gates, workflows,
+dependencies and corpus are unchanged. Norton/Aquinas remains preserved.
+
+The slice records below retain dated local implementation and approval states,
+including their then-pending publication language. This completion notice
+supersedes those states; the validation evidence and candidate resume boundary
+remain intact. Original branch: `test/retained-language-sql-coverage`; audit
+checkout: `12bf/TheologAI`.
 
 ## Coverage mapping
 
