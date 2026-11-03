@@ -11,6 +11,31 @@ The successor program after PR #122 is defined in
 [Phase 3B](./PHASE-3B-PLAN.md); earlier uses of "Phase 3" below are historical
 names for already-shipped work.
 
+## Current delivery status — November 3, 2026
+
+- **Production reliability complete:** [PR #172](https://github.com/TJ-Frederick/TheologAI/pull/172), merged as `701ab6295f033105ec306f7878a85e294cba0f6d`, passed the separately approved production release. [Completion and accounting](ci-reliability/PRODUCTION-COMPLETE-2026-11-03.md) records the proof and live audits. [CURRENT-RELEASE](CURRENT-RELEASE.md) alone owns the dated assignment.
+- **Security complete within scope:** SEC-01–05 shipped through PR #170; SEC-06 remains open and paused. The section below preserves the remaining risks and approval boundaries.
+- **Test maintenance merged:** [PR #174](https://github.com/TJ-Frederick/TheologAI/pull/174), merged as `4ef5d42e3a04c3b425586a4c39498a3ae8c05a6b`, strengthened retained coverage and retired obsolete draft tests. All five required checks passed; this test/docs change did not deploy. [Validation record](TEST-MAINTENANCE.md).
+- **September improvements are deferred, not a pending integrated release:** the corpus-preserving security reconciliation `527d33d596b6f8ee5dcacb2e76771f18b19f47da` restored the deployed September 1 application baseline and recorded newer work in [the deferred-path inventory](../release/deferred-main-paths.json). Earlier merge ancestry does not establish that those improvements remain implemented. See the [open-PR assessment](#open-pr-assessment).
+
+## Next work
+
+- Resume the preserved Norton/Aquinas candidate in [its existing chat](codex://threads/01a179a9-6b6e-7973-92de-f7b13d617aad). Keep that candidate and its evidence separate from this documentation work; production promotion requires Tyler's approval. PR #154's language-depth candidate also remains preserved and unmerged.
+- Review restoration of the September Bible reliability, tool telemetry, research-query benchmark and architecture-maintenance work against current security fixes. Establish current scope and acceptance evidence before implementation; do not reuse PR #161's expired preview transaction as release authority.
+- Maintain the strict dependency audit and its existing dev-only exception/November 22 UTC expiry. SEC-06 remains paused; broader evidence reuse, remote batching and assurance choices remain deferred as recorded in [remaining audit scope](ci-reliability/REMAINING-AUDIT-SCOPE.md).
+- Keep live CCEL discovery gated, section-span commentary dependent on honest provider coverage, and further structured-output revisions subject to compatibility review. The historical planning record below preserves their detailed constraints; it does not schedule or authorize operations.
+
+## Open-PR assessment
+
+Assessment against main `4ef5d42e3a04c3b425586a4c39498a3ae8c05a6b`; dispositions require coordinating review. Neither PR is closed by this record.
+
+| PR | Evidence | Proposed disposition |
+| --- | --- | --- |
+| [#161 — September release candidate](https://github.com/TJ-Frederick/TheologAI/pull/161) | Its sole delta is `docs/SEPTEMBER-REVIEW-RELEASE.md`; head `88a87df4d872a2c95b4063a12b3ad141757b8d4f` records September preview proof and awaits production approval. Its base `09892c8d39aed34074312f46c0c724b4212e25ee` is an ancestor of current main, but reconciliation `527d33d` removed `src/mcp/toolExecutionObserver.ts`, `src/kernel/requestDeadline.ts`, the research benchmark and architecture guide. Current Bible service and primary-source query planner match the September 1 baseline. [Security backport review](SECURITY-BACKPORT-REVIEW.md) explains the baseline decision. | Close the obsolete release transaction after review, retaining its branch and preview history. Its improvement backlog remains deferred; it was not wholly superseded by a later release. Any restoration needs a fresh candidate and evidence. |
+| [#169 — agent guidance](https://github.com/TJ-Frederick/TheologAI/pull/169) | Head `89868155f3013ed7bd42a5f6c136a8c30a8bf6d3` adds nine working agreements missing from main. Its full instruction files also describe the newer twelve-tool/36-work candidate, whereas current main retains the security-backport contract. | Reconcile only the nine agreements into the current matching AGENTS/CLAUDE pair, preserving current security guidance and public-contract markers. After this replacement is reviewed and merged, close #169 as replaced; retain its branch. |
+
+Housekeeping task: documentation reconciliation and PR assessment are under review. Targeted documentation, instruction-pair and diff checks apply; merge is held for independent review and required CI. No deployment, PR closure or candidate modification is part of this patch.
+
 ## Security maintenance — resolved in production
 
 SEC-01–05 shipped in PR #170, actual merge `a1b684b`, after protected preview, full independent production-data verification and all live audits passed. [Findings/status and remaining risks](SECURITY-REVIEW-2026-10-22.md); [completion evidence](security/SEC01-05-PRODUCTION-COMPLETE-2026-11-01.md). SEC-06 stays open and paused. Its credential-scope/custom-domain assessment gaps, shared-account access risk and dev-only audit-exception deadline remain explicit; no further permission-hardening work is scheduled. Corpus activation and broader incremental-data/release-process proposals remain deferred. This release does not promote the prepared Norton/Aquinas or twelve-tool source features.
@@ -691,7 +716,12 @@ Code readiness and operational readiness are deliberately separate:
    green required checks, successful preview audit, and protected production
    approval. Production then receives the same bounded smoke audit.
 
-## Next work
+## Historical planning and completed milestones
+
+The following planning snapshot is retained as dated evidence. Its present-tense
+candidate descriptions and sequencing reflect earlier milestones; use the
+current delivery status and next-work sections above for today's backlog.
+Historical rollback records do not authorize a rollback.
 
 - The migration-free catalog-capacity prerequisite shipped in PR #56; retain
   its centralized 100-work and 2,000-section ceilings and single D1-safe
