@@ -3,25 +3,49 @@
 <!-- theologai-release-authority v1 role=current-snapshot current=self -->
 
 This dated, sanitized record is the repository's sole present-tense release
-identity authority. The latest November 1 observation below supersedes the older assignment identities for current-state purposes. The August 31 release provenance and custody record is retained afterward as dated historical evidence. These are point-in-time observations, not a guarantee against later authorized activity.
+identity authority. The latest November 3 observation below supersedes the older assignment identities for current-state purposes. The August 31 release provenance and custody record is retained afterward as dated historical evidence. These are point-in-time observations, not a guarantee against later authorized activity.
 
-## Latest completed production release — November 1, 2026 UTC
+## Latest completed production release — November 3, 2026 UTC
 
-SEC-01–05 are released through PR #170 merge `a1b684bd45cc116d92c1ec7a4d5300c0017d82f2`, tree `5de9bb6facd64a217b44ecd6a08647e7e1e51675`. Protected production run `41256928054`, attempt 1, passed every CI, source-bound preview handoff, complete fresh production verification, custom-domain/ESV deployment, live audit and final reconciliation/isolation check. Independent read-only controls at `2026-11-01T01:03:53.500Z` matched the final assignments below. This supersedes the older observations retained afterward.
+PR #172 merged as `701ab6295f033105ec306f7878a85e294cba0f6d`, preserving preview-tested tree `6251804e5463ef279a29e9134971bac5166de57a` and exact parents `8a0ad10c53d81b1e575dfd6b4b3df876d77ed5dc` / `e705f8d9d123fa6503745abd9ad7fb5cb4c108ca`. [Protected production run 41645812927](https://github.com/TJ-Frederick/TheologAI/actions/runs/41645812927), attempt 1, passed the canonical plan, source-bound preview prerequisite, all five validation suites, separate owner-authenticated production admission, complete fresh proof, deployment, live audits and final routing/isolation checks. Independent final review accepted all 56 retained evidence hashes and reconciled both phase costs.
 
 ## Active production assignment
 
 | Environment | Deployment | Worker | D1 |
 | --- | --- | --- | --- |
-| Production — sole 100% assignment | `225b1d85-6a66-44df-b3e9-7581b9f9e4bb` | `862e4a1c-7dd2-4002-9f63-3c6c47551e4c` (#140) | `theologai-production-20260811-schema0009-a` / `9bc79346-338b-439e-a2a5-424f4418eb21` |
+| Production — sole 100% assignment | `f6c9a995-0940-4758-a9a9-14f1389a9ab3` | `d2e2bd87-1213-4ba5-891d-e0f9b3293cb9` (#142) | `theologai-production-20260811-schema0009-a` / `9bc79346-338b-439e-a2a5-424f4418eb21` |
 
 ## Preview control
 
 | Environment | Deployment | Worker | D1 |
 | --- | --- | --- | --- |
-| Preview — observed unchanged | `c81e3a6c-d3c2-426c-9b8b-5925d294c2da` | `95eda346-80fd-42e1-b233-de978107c16b` (#163) | `theologai-preview-20260811-schema0009-a` / `74f456e2-6951-4003-bb6f-91951342bf8f` |
+| Preview — unchanged across production deployment/audits | `52a5387c-9367-457a-8a85-14b23d5dd629` | `3312716e-d347-4f47-8753-787e4aa1808f` (#165) | `theologai-preview-20260811-schema0009-a` / `74f456e2-6951-4003-bb6f-91951342bf8f` |
 
 ## Deployment gate and release evidence
+
+The final workflow observations are point-in-time evidence, not a later live inventory. Both existing D1 assignments, account, permissions and custom domains were preserved. Full proof matched 39 tables / 1,625,092 canonical rows: **3,299,468 reads / four diagnostic writes / 3,293 requests**, zero SQL retries or unknown attempts. The protected reader wrote zero rows. Original-language 11/11, historical core 8/8, historical spine 10/10 and two consecutive edge probes passed; preview controls before/after/post-audit were identical. Live-audit D1 reads are outside the proof meter.
+
+Native audit artifact `13236913963` ZIP digest `sha256:a10b9e6c4bf4864387ccd5c6f913a45ed944a3694c51092b677076e3c0e02491`, expiry `2026-12-03T14:14:06Z`; complete-proof artifact `13238310194` ZIP digest `sha256:a030b2fe2baa6cb3cb4e0b38fb546755e73e6f671faf562b937839f6e26423a5`, expiry `2026-12-03T14:11:29Z`. Final identity SHA-256 `ad49840598849b69b8b706ee68ae7f00f1a41aed133fa0b00d2caa84a925e550`; isolation SHA-256 `bd477c954a4799dc94180aefff1226d0cec8169becfd7f33d01deb211db17953`. [Completed reliability release and accounting](ci-reliability/PRODUCTION-COMPLETE-2026-11-03.md).
+
+The fresh matched predecessor is deployment `225b1d85-6a66-44df-b3e9-7581b9f9e4bb`, Worker `862e4a1c-7dd2-4002-9f63-3c6c47551e4c` (#140), on the same production D1. It is evidence only: rollback needs a separate owner decision and fresh matched compatibility/readiness checks. Original consumed ledgers and prior unknown-cost reserves remain unchanged; terminal acceptance does not grant reusable allowance. No retry or rollback occurred. SEC-01–05 remain resolved through PR #170; SEC-06 stays open/paused and corpus activation remains deferred. This documentation reconciliation does not change the deployed source/tree or dispatch production.
+
+## Historical production release — November 1, 2026 UTC
+
+SEC-01–05 are released through PR #170 merge `a1b684bd45cc116d92c1ec7a4d5300c0017d82f2`, tree `5de9bb6facd64a217b44ecd6a08647e7e1e51675`. Protected production run `41256928054`, attempt 1, passed every CI, source-bound preview handoff, complete fresh production verification, custom-domain/ESV deployment, live audit and final reconciliation/isolation check. Independent read-only controls at `2026-11-01T01:03:53.500Z` matched the final assignments below. This supersedes the older observations retained afterward.
+
+## November 1 production assignment (historical)
+
+| Environment | Deployment | Worker | D1 |
+| --- | --- | --- | --- |
+| Production — sole 100% assignment | `225b1d85-6a66-44df-b3e9-7581b9f9e4bb` | `862e4a1c-7dd2-4002-9f63-3c6c47551e4c` (#140) | `theologai-production-20260811-schema0009-a` / `9bc79346-338b-439e-a2a5-424f4418eb21` |
+
+## November 1 preview control (historical)
+
+| Environment | Deployment | Worker | D1 |
+| --- | --- | --- | --- |
+| Preview — observed unchanged | `c81e3a6c-d3c2-426c-9b8b-5925d294c2da` | `95eda346-80fd-42e1-b233-de978107c16b` (#163) | `theologai-preview-20260811-schema0009-a` / `74f456e2-6951-4003-bb6f-91951342bf8f` |
+
+## November 1 deployment gate and release evidence (historical)
 
 Production fresh proof passed all 39 tables / 1,625,092 rows and every required integrity check: 3,299,468 reads / four diagnostic writes, no retries or unknown attempts, read token zero writes. Original-language 11/11, historical core 8/8, historical spine 10/10 and edge stabilization passed. Both phase costs, complete journals, native provenance/digests and matched predecessor evidence were retained. Existing live-audit D1 rows are not separately measured by the proof total.
 

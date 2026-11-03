@@ -34,7 +34,7 @@ strict JSON, unique authorization artifact and matching ledger-marker artifact a
 it. Candidate JSON alone grants nothing. Metadata-only submissions use distinct skipped
 validation names so they cannot supersede the five substantive PR check contexts. The separate
 [zero-authority hosted rehearsal](ci-reliability/HANDOFF-REHEARSAL.md) passed transport,
-downloaded-byte and payload-expiry checks; protected operational admission remains untested.
+downloaded-byte and payload-expiry checks; protected preview and production admission subsequently passed in PR #172; see the [dated completion](ci-reliability/PRODUCTION-COMPLETE-2026-11-03.md).
 
 After source admission, the existing protected operator job asks for its normal approval,
 revalidates native authority and issues one v2 challenge for that exact run. The full
