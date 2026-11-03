@@ -50,6 +50,12 @@ describe('production original_language_study v2 schema', () => {
     if (invalid.semanticEvidence.status !== 'lexical_candidates') throw new Error('expected candidate evidence');
     invalid.semanticEvidence.reason = 'no_lexical_entry' as never;
     expect(validateOutput(invalid)).toBe(false);
+
+    const invalidDetail = structuredClone(output);
+    if (invalidDetail.semanticEvidence.status !== 'lexical_candidates') throw new Error('expected candidate evidence');
+    // Summary candidates lack the required detailed fields; keep the status/reason valid.
+    invalidDetail.semanticEvidence.candidates[0]!.detailStatus = 'detailed' as never;
+    expect(validateOutput(invalidDetail)).toBe(false);
   });
 });
 

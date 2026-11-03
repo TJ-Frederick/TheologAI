@@ -1,10 +1,9 @@
 /**
  * Minimal fixtures for the active production v2 modules.
  *
- * The historic `original-language-study-v2` draft packet remains frozen for
- * provenance review.  These fixtures intentionally live elsewhere so the
- * production implementation is tested without editing or importing its
- * coordinator/support implementation.
+ * Exercises the production modules without a duplicate coordinator or support
+ * implementation. The retired design packet is reproducible from Git history;
+ * see docs/TEST-MAINTENANCE.md for its baseline and coverage mapping.
  */
 import {
   type IUbsSemanticEvidenceBundleRepository,

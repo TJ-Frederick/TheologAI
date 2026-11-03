@@ -46,6 +46,25 @@ describe('production original_language_study v2 coordinator', () => {
     expect(second.semanticEvidence.resultWindow).toMatchObject({ priorCount: 8, returnedCount: 2, hasMore: false });
   });
 
+  it.each(['target', 'position', 'selected token', 'artifact'] as const)(
+    'rejects continuation after changing %s before querying evidence', async field => {
+      const values = Array.from({ length: 10 }, (_, index) => productionCandidate(index + 1));
+      const first = await productionCoordinator(values).coordinator.study(productionRequest());
+      if (!('resultWindow' in first.semanticEvidence) || !first.semanticEvidence.resultWindow.continuation) {
+        throw new Error('expected continuation');
+      }
+      const context = productionContext();
+      const request = productionRequest(first.semanticEvidence.resultWindow.continuation.cursor);
+      if (field === 'target') { context.v1Result.target = 'OTHER'; request.target = 'OTHER'; }
+      if (field === 'position') { context.v1Result.selectedToken!.position = 2; request.position = 2; }
+      if (field === 'selected token') context.v1Result.selectedToken!.text = 'OTHER TOKEN';
+      if (field === 'artifact') context.semanticArtifactIdentity = 'b'.repeat(64);
+      const current = productionCoordinator(values, context);
+      await expect(current.coordinator.study(request)).rejects.toThrow('full selected-token request context');
+      expect(current.repository.queryCount).toBe(0);
+    },
+  );
+
   it('rejects an authoritative result that is semantically different or noncanonical before querying evidence', async () => {
     const different = productionContext();
     different.v1Result.reference = 'Genesis 1:2';
@@ -128,6 +147,38 @@ describe('production original_language_study v2 coordinator', () => {
       alignmentEvidence: { normalizedReference: 'Genesis 1:1', evidenceId: 'production-reference-01' },
     });
     expect(aligned.semanticEvidence.plainLanguage).toContain('not an adjudicated contextual meaning');
+
+    const mismatches: readonly [string, (context: ReturnType<typeof productionContext>) => void, RegExp][] = [
+      ['stale aggregate artifact', context => { context.serverVerifiedAlignment!.artifactIdentity = 'b'.repeat(64); },
+        /does not match one complete exact aggregate candidate/],
+      ['stale artifact version', context => { (context.serverVerifiedAlignment! as unknown as { artifactVersion: string }).artifactVersion = '0.9.1'; },
+        /pinned UBS artifact version/],
+      ['stale dictionary source hash', context => {
+        context.serverVerifiedAlignment!.artifactSources.dictionary.sourceSha256 = 'b'.repeat(64);
+      }, /does not match one complete exact aggregate candidate/],
+      ['different normalized reference', context => { context.serverVerifiedAlignment!.normalizedReference = 'Genesis 1:2'; },
+        /does not match one complete exact aggregate candidate/],
+      ['arbitrary morphology token identity', context => {
+        context.serverVerifiedAlignment!.morphologyTokenIdentity = 'attacker-chosen-token';
+      }, /does not match one complete exact aggregate candidate/],
+      ['different selected morphology token', context => {
+        context.v1Result.selectedToken!.text = 'OTHER SYNTHETIC TOKEN';
+      }, /does not match one complete exact aggregate candidate/],
+      ['source mismatch', context => { context.serverVerifiedAlignment!.sourceId = 'other-source'; },
+        /does not match one complete exact aggregate candidate/],
+      ['entry mismatch', context => { context.serverVerifiedAlignment!.entryId = 'production-entry-02'; },
+        /does not match one complete exact aggregate candidate/],
+      ['sense mismatch', context => { context.serverVerifiedAlignment!.senseId = 'production-sense-02'; },
+        /does not match one complete exact aggregate candidate/],
+      ['evidence mismatch', context => { context.serverVerifiedAlignment!.evidenceId = 'production-reference-02'; },
+        /does not match one complete exact aggregate candidate/],
+    ];
+    for (const [name, mutate, expected] of mismatches) {
+      const bad = productionContext('Hebrew', true);
+      mutate(bad);
+      await expect(productionCoordinator([productionCandidate(1)], bad).coordinator.study(productionRequest()), name)
+        .rejects.toThrow(expected);
+    }
 
     const mismatched = productionContext('Hebrew', true);
     mismatched.serverVerifiedAlignment!.morphologyTokenCoordinates.normalizedReference = 'Genesis 1:2';

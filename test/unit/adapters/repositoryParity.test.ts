@@ -122,7 +122,10 @@ describe('SQLite and D1 repository parity with identical real data', () => {
         ('John.4.1', 'Gen.4.25-Gen.5.32', 31),
         ('John.4.1', 'Acts.28.17-Rom.1.1', 30),
         ('Gen.2.1', 'Rom.5.8', 30),
-        ('Gen.2.1', '1John.4.9', 30);
+        ('Gen.2.1', '1John.4.9', 30),
+        ('Gen.3.1', 'Rom.5.8', 31),
+        ('Gen.3.1', '1John.4.9', 30),
+        ('Gen.3.1', 'Rom.8.1', 29);
 
       INSERT INTO strongs VALUES
         ('G0025', 'NT', 'ἀγαπάω', 'agapaō', 'ag-ap-ah-o', 'to love', 'perhaps from agan'),
@@ -207,6 +210,20 @@ describe('SQLite and D1 repository parity with identical real data', () => {
     d1Strongs = new D1StrongsRepository(d1);
     nodeUbs = new UbsParallelPassageRepository(artifact, artifact.artifactIdentity);
     d1Ubs = new D1UbsParallelPassageRepository(d1);
+  });
+
+  it.each(['SQLite', 'D1'] as const)('includes minVotes itself in %s real SQL rows and totals', async backend => {
+    const repository = backend === 'SQLite' ? sqliteCrossReferences : d1CrossReferences;
+    const expectedReferences = [
+      { reference: 'Romans 5:8', votes: 31 },
+      { reference: '1 John 4:9', votes: 30 },
+    ];
+    expect(await repository.getCrossReferences('Genesis 3:1', { minVotes: 30 })).toEqual({
+      references: expectedReferences, total: 2, showing: 2, hasMore: false,
+    });
+    expect(await repository.getCrossReferences('Genesis 3:1', { minVotes: 30, maxResults: 1 })).toEqual({
+      references: expectedReferences.slice(0, 1), total: 2, showing: 1, hasMore: true,
+    });
   });
 
   afterAll(() => db.close());

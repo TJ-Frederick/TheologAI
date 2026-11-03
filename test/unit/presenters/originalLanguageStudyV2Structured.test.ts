@@ -105,6 +105,27 @@ describe('production original_language_study v2 structured presenter', () => {
     await assertCase('candidate-omission', productionCoordinator([productionCandidate(1, 14_000), productionCandidate(2, 14_000)]), productionRequest(undefined, 'detailed'));
   });
 
+  it.each(['request', 'context'] as const)('rejects an independently mismatched v1 %s reference', async field => {
+    const output = presentOriginalLanguageStudyV2(await productionCoordinator([productionCandidate(1)]).coordinator
+      .study(productionRequest(undefined, 'detailed'))).output;
+    const study = output.study as { request: { reference: string }; context: { reference: string } };
+    study[field].reference = 'Genesis 1:2';
+    accountForSerializedBytes(output);
+    expect(() => serializeValidatedOriginalLanguageStudyV2Output(output)).toThrow('semantically matching');
+  });
+
+  it('rejects a nested domain attributed to the dictionary source', async () => {
+    const output = presentOriginalLanguageStudyV2(await productionCoordinator([productionCandidate(1)]).coordinator
+      .study(productionRequest(undefined, 'detailed'))).output;
+    if (!('candidates' in output.semanticEvidence)) throw new Error('expected candidate evidence');
+    const candidate = output.semanticEvidence.candidates[0]!;
+    if (candidate.detailStatus !== 'detailed') throw new Error('expected detailed evidence');
+    expect(candidate.domains).toHaveLength(1);
+    candidate.domains[0]!.sourceId = output.semanticEvidence.provenance.sources[0].sourceId;
+    accountForSerializedBytes(output);
+    expect(() => serializeValidatedOriginalLanguageStudyV2Output(output)).toThrow('nested evidence');
+  });
+
   it('rejects false-terminal arithmetic, provenance swaps, and dishonest byte accounting', async () => {
     const baseline = presentOriginalLanguageStudyV2(await productionCoordinator([productionCandidate(1)]).coordinator.study(productionRequest())).output;
     const terminal = structuredClone(baseline);
@@ -146,4 +167,14 @@ describe('production original_language_study v2 structured presenter', () => {
 
 function hash(value: string): string {
   return createHash('sha256').update(value).digest('hex');
+}
+
+// Keep these negative controls independent of the separate truthful-byte validator.
+function accountForSerializedBytes(output: { responseWindow: { used: number } }): void {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const actual = new TextEncoder().encode(JSON.stringify(output)).byteLength;
+    if (actual === output.responseWindow.used) return;
+    output.responseWindow.used = actual;
+  }
+  throw new Error('test byte accounting did not stabilize');
 }

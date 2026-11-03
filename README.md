@@ -659,15 +659,15 @@ The Worker uses:
 
 - exact browser-origin validation and native no-Origin support;
 - bounded streamed request bodies;
-- anonymous per-location rate limiting at 120 requests/minute per SHA-256
-  IP + user-agent fingerprint;
+- anonymous per-location rate limiting at 120 requests/minute per
+  domain-separated SHA-256 hash of IP only, independent of User-Agent;
 - separate production and preview rate-limit namespaces;
 - structured telemetry that omits raw identities, authorization values,
   session identifiers, query strings, arguments, and exception messages;
 - D1 bindings and generated Wrangler types.
 
-The fingerprint limit is abuse friction, not authenticated user accounting: a
-caller can rotate user agents, and users behind the same NAT may share a bucket.
+The IP limit is abuse friction, not authenticated user accounting. Users behind
+the same NAT may share a bucket; limiter failures remain fail-open.
 
 See [docs/worker-operations.md](docs/worker-operations.md). Normal pull requests
 perform verification only; preview and production deployment require explicit

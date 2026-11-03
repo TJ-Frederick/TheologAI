@@ -51,6 +51,29 @@ describe('production original_language_study v2 Markdown formatter', () => {
     expect(presentation.markdown).not.toContain('[link](https://evil.invalid)');
   });
 
+  it('preserves excluded definitions, clean glosses, and zero-domain evidence', async () => {
+    const value = productionCandidate(1);
+    value.sense.definitionStatus = 'excluded_unresolved_markup';
+    delete value.sense.definition;
+    value.sense.definitionExclusionReasons = ['malformed_or_unknown_markup'];
+    value.sense.domainRefs = [];
+    value.domains = [];
+    value.domainTotal = 0;
+    const presentation = presentOriginalLanguageStudyV2(await productionCoordinator([value]).coordinator
+      .study(productionRequest(undefined, 'detailed')));
+    if (!('candidates' in presentation.output.semanticEvidence)) throw new Error('expected candidate evidence');
+    expect(presentation.output.semanticEvidence.candidates[0]).toMatchObject({
+      detailStatus: 'detailed', definitionStatus: 'excluded_unresolved_markup',
+      definitionExclusionReasons: ['malformed_or_unknown_markup'], glosses: ['PRODUCTION GLOSS 01'],
+      domains: [], domainTotal: 0,
+    });
+    expect(presentation.output.semanticEvidence.candidates[0]).not.toHaveProperty('definition');
+    expect(presentation.markdown).toContain('Definition: unavailable');
+    expect(presentation.markdown).toContain('excluded\\_unresolved\\_markup');
+    expect(presentation.markdown).toContain('Definition exclusion: malformed\\_or\\_unknown\\_markup');
+    expect(presentation.markdown).not.toContain('Definition: undefined');
+  });
+
   it('fails closed if a caller tries to render v2 with a different v1 result', async () => {
     const presentation = presentOriginalLanguageStudyV2(await productionCoordinator([productionCandidate(1)]).coordinator.study(productionRequest()));
     const different = productionContext().v1Result;
