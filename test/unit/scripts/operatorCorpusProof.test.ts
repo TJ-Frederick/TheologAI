@@ -165,6 +165,7 @@ describe('GitHub owner artifact provenance',()=>{
       for(const name of ['operator-authorization.cjs'])copyFileSync(resolve('.github/scripts',name),join(sourceRoot,'.github/scripts',name));
       git(['add','scripts','.github']);git(['-c','user.name=Operator proof test','-c','user.email=test@example.invalid','commit','--allow-empty','-m','Test exact operator proof source']);
       symlinkSync(resolve('node_modules'),join(sourceRoot,'node_modules'),'dir');
+      writeFileSync(join(sourceRoot,'.git/info/exclude'),'\n/node_modules\n',{flag:'a'});
       const source=classifyApplicationRelease(sourceRoot);
       f.plan.classification=source;
       f.c.sourceCommit=source.sourceCommit;f.c.sourceTree=source.sourceTree;

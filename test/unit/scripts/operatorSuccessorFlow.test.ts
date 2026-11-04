@@ -28,7 +28,7 @@ describe('successor operation flow with real CLIs and bounded local SQLite trans
       for(const name of ['operator-authorization.cjs'])copyFileSync(resolve('.github/scripts',name),join(root,'.github/scripts',name));
       git('add','scripts','.github');git('-c','user.name=Flow fixture','-c','user.email=fixture@example.invalid','commit','--allow-empty','-m','Reviewed successor fixture');
       const previewSource=git('rev-parse','HEAD'),tree=git('rev-parse','HEAD^{tree}');
-      symlinkSync(resolve('node_modules'),join(root,'node_modules'),'dir');symlinkSync(resolve('node_modules'),join(directory,'node_modules'),'dir');
+      symlinkSync(resolve('node_modules'),join(root,'node_modules'),'dir');writeFileSync(join(root,'.git/info/exclude'),'\n/node_modules\n',{flag:'a'});symlinkSync(resolve('node_modules'),join(directory,'node_modules'),'dir');
       const db=new Database(join(directory,'source.db'));
       db.exec(`CREATE TABLE documents(id INTEGER PRIMARY KEY,title TEXT);
         CREATE TABLE document_sections(id INTEGER PRIMARY KEY,document_id INTEGER REFERENCES documents(id),content TEXT);

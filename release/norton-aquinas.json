@@ -34,7 +34,7 @@
     "scripts/norton-aquinas-preparation.ts": "7138fc4faccc6d3290023090469f4ec9c31da3aa",
     "scripts/operator-corpus-proof.ts": "d65c2d6c876b757c03900ca0f3988473cb45032d",
     "scripts/transform12-candidate-c-storage.ts": "ba74f99d5711f5078104c3a4cf6ca398f2fe0576",
-    "scripts/verify-biblical-language-unicode-d1.ts": "0bfb4e97cc807236921b9734106d7b41abc7bd81",
+    "scripts/verify-biblical-language-unicode-d1.ts": "b91088b1113d8a5fbd885bfdffaa6ab48ed0e2cb",
     "scripts/verify-d1-seed-workerd.ts": "1294ea9e8af06977e8f163c0cedf8a735b9ce5f3",
     "scripts/verify-data-manifest.ts": "4ace7c8a7348c2e2b742e032a6ff2f5ee226c207",
     "scripts/verify-database.ts": "c3a0b142f1688e5c496f900286b27bc416387c9c",

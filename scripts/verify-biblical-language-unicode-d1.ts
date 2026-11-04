@@ -95,7 +95,7 @@ export function verifyBiblicalLanguageUnicodeD1(
   assert(historicalSectionedPublicationRows === 0,
     `Transform 12 dormant sectioned-publication seam row-count drift: ${historicalSectionedPublicationRows}`);
   assert(historicalCorpusSealRows === 1, `Transform 12 corpus seal row-count drift: ${historicalCorpusSealRows}`);
-  assert(rows - derivedUsageRows === 862_979 + ubsSemanticRows + historicalSourceRows
+  assert(rows - derivedUsageRows === 864_229 + ubsSemanticRows + historicalSourceRows
     + historicalTransform10Rows + historicalPublicationRows
     + historicalSectionedPublicationRows + historicalCorpusSealRows,
     `Unicode D1 canonical-source row-count drift: ${rows - derivedUsageRows}`);
