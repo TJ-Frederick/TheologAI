@@ -32,7 +32,11 @@ function prepare(root: string, database: string, directory: string): void {
     // locally. This is never represented as remote verification.
     const legacy = runRemoteD1ReadinessCheck({ database: 'LOCAL_SOURCE_ONLY', cwd: root }, (_file, argv) => {
       const sql = argv[argv.indexOf('--command') + 1]!;
-      const rows=source.prepare(sql).all() as Record<string,unknown>[];
+      let rows:Record<string,unknown>[];
+      try{rows=source.prepare(sql).all() as Record<string,unknown>[];}catch(error){
+        if(sql.includes('AS readiness'))check(false,'local complete semantic readiness failed');
+        throw error;
+      }
       if(sql.includes('AS readiness'))check(rows.length===1 && rows[0]?.readiness==='ready','local complete semantic readiness failed');
       return JSON.stringify([{ results: rows, success: true }]);
     });
