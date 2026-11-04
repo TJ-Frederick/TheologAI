@@ -3,6 +3,7 @@ import {mkdtempSync,copyFileSync,readFileSync,writeFileSync,appendFileSync,rmSyn
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {createHash} from 'node:crypto';
+import {execFileSync} from 'node:child_process';
 import Database from 'better-sqlite3';
 import {Native,split} from '../../helpers/corpusNative.js';
 import {planPreparation,prepareAndReadBackCandidate,PreparedCorpusSession,createPreparationExecutor,assertDefinitiveJournal,type JournalEntry,type PreparationSession} from '../../../scripts/norton-aquinas-preparation.js';
@@ -55,6 +56,6 @@ it.skipIf(!enabled)('executes all complete source reads through the actual opera
  const now=Date.now(),receipt={schemaVersion:'theologai-fresh-complete-corpus-proof.v1',releasePolicy:POLICY.policy,liveControlReserve:100000,role:'preview',accountId:POLICY.account,...TARGETS.preview,sourceCommit:'a'.repeat(40),sourceTree:'b'.repeat(40),corpusIdentity:POLICY.corpus,schema:POLICY.schema,startedAt:new Date(now-1000).toISOString(),completedAt:new Date(now).toISOString(),sourcePlanSha256:'c'.repeat(64),approvalSha256:'d'.repeat(64),operationalAssumption:'owner_reserves_target_data_writes_during_proof_not_an_enforced_provider_lease',proof,...checked,readBudget:3560000,metering:transport.metering};
  verifyFreshCorpusReceipt(receipt,{role:'preview',sourceCommit:receipt.sourceCommit,sourceTree:receipt.sourceTree,sourcePlanSha256:receipt.sourcePlanSha256,tables:expected.digests,foreignKeyWitnessSha256:expected.foreignKeyWitnessSha256});
  expect(Object.keys(proof.tables)).toHaveLength(39);expect(proof.sourceRows).toBe(1635226);expect(transport.metering.integrityCommands).toBe(4);expect(transport.metering.rowsWritten).toBe(4);
- const record={localOnly:true,preparation,proof:transport.metering,operations:plan.operations.length,readbacks:plan.readbacks.length,baselineWitnessSha256:plan.baselineWitnessSha256};
+ const record={localOnly:true,hostedProvenance:'none',implementationSourceCommit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),implementationSourceTree:execFileSync('git',['rev-parse','HEAD^{tree}'],{encoding:'utf8'}).trim(),sourceDatabaseSha256:sha(readFileSync(sourcePath)),completeLocalFixtureReceipt:receipt,preparation,proof:transport.metering,operations:plan.operations.length,readbacks:plan.readbacks.length,baselineWitnessSha256:plan.baselineWitnessSha256};
  if(process.env.THEOLOGAI_CORPUS_LOCAL_RESULT)writeFileSync(process.env.THEOLOGAI_CORPUS_LOCAL_RESULT,JSON.stringify(record,null,2)+'\n',{mode:0o600});
 },180000);
