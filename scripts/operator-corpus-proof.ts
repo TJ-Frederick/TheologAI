@@ -43,6 +43,7 @@ function readPlan(directory: string, digest: string) {
   const path = resolve(directory, 'plan.json'); const stat = lstatSync(path);
   check(stat.isFile() && !stat.isSymbolicLink() && stat.size <= 512 * 1024 && sha(readFileSync(path)) === digest, 'source plan digest');
   const plan = readJson(path, 512 * 1024), selected=selectReleaseProofPolicy(process.cwd()), actual=selected.classification;
+  requireSameReleasePolicy(selected,plan.releasePolicy);
   check(plan.schemaVersion === 'theologai-application-corpus-source-plan.v1' && JSON.stringify(plan.classification) === JSON.stringify(actual), 'source plan identity');
   check(plan.integrityCommands === 4 && integer(plan.readBudget) && (selected.id==='norton-aquinas.v1'?plan.readBudget===selected.reservedReads:plan.readBudget<=selected.reservedReads), 'complete planned budget');
   return plan;
@@ -100,7 +101,7 @@ export function verifyOperatorEnvelope(input: unknown, expectedChallenge: unknow
     && e.schemaVersion === 'theologai-operator-corpus-envelope.v1', 'envelope shape');
   check(JSON.stringify(e.challenge) === JSON.stringify(c) && hex(e.journalSha256,64), 'challenge/nonce binding');
   const receipt = object(e.receipt);
-  const selected=policyForIdentity(c.releasePolicy);requireSameReleasePolicy(selected,plan.classification?.releasePolicy);requireSameReleasePolicy(selected,receipt.releasePolicy);
+  const selected=policyForIdentity(c.releasePolicy);requireSameReleasePolicy(selected,plan.classification?.releasePolicy);requireSameReleasePolicy(selected,plan.releasePolicy);requireSameReleasePolicy(selected,receipt.releasePolicy);
   selected.module.verifyFreshCorpusReceipt(receipt, { role:c.role, sourceCommit:c.sourceCommit, sourceTree:c.sourceTree,
     sourcePlanSha256:c.sourcePlanSha256, tables:plan.expected.digests,foreignKeyWitnessSha256:plan.expected.foreignKeyWitnessSha256 }, now);
   if(c.releasePolicy==='norton-aquinas.v1')check(JSON.stringify(receipt.controls)===JSON.stringify(c.admission.controls),'complete proof controls differ from challenge');
@@ -256,7 +257,7 @@ export function requireLiveOperatorGate(c: OperatorChallenge): void {
 }
 
 export async function runOperatorProof(input: { challenge:OperatorChallenge; directory:string; planSha256:string; output:string; ledger:string; token:string }) {
-  const c = requireOperatorChallenge(input.challenge); const plan = readPlan(input.directory,input.planSha256);
+  const c = requireOperatorChallenge(input.challenge); const plan = readPlan(input.directory,input.planSha256);requireSameReleasePolicy(policyForClassification(plan.classification),c.releasePolicy);
   check(plan.classification.sourceCommit === c.sourceCommit && plan.classification.sourceTree === c.sourceTree && input.planSha256 === c.sourcePlanSha256, 'operator source');
   // A local approval file is required in addition to the live protected gate.
   check(process.env.APPLICATION_CORPUS_PROOF_APPROVAL_JSON && JSON.stringify(JSON.parse(process.env.APPLICATION_CORPUS_PROOF_APPROVAL_JSON)) === JSON.stringify(operatorApproval(c)), 'explicit operator approval');
@@ -337,7 +338,7 @@ async function main() {
   }
   if(command==='complete') {
     check(args.length===5,'complete arguments'); const [challengeFile,integrityFile,directory,digest,output]=args;
-    const c=requireOperatorChallenge(readJson(challengeFile!)); const p=readPlan(directory!,digest!);
+    const c=requireOperatorChallenge(readJson(challengeFile!)); const p=readPlan(directory!,digest!);requireSameReleasePolicy(policyForClassification(p.classification),c.releasePolicy);
     const admitted=authority.requirePackage(readJson(resolve(process.env.RUNNER_TEMP!,'operator-authorization.json')));
     check(JSON.stringify(admitted)===JSON.stringify(c.authorization),'independently admitted authorization');
     check(p.classification.sourceCommit===c.sourceCommit && p.classification.sourceTree===c.sourceTree && digest===c.sourcePlanSha256

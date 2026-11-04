@@ -39,8 +39,8 @@ function fixture() {
   const admission={accountId:ACCOUNT,role:'preview' as const,day:new Date(start).toISOString().slice(0,10),inventoryObservedAt:new Date(start).toISOString(),liveControlReserve:100000,observedAt:new Date(start).toISOString(),rowsRead:100,rowsWritten:0,sampleInterval:1 as const,readBudget:3560000,controls:[{role:'preview',databaseId:TARGETS.preview.databaseId}]};
   const c=createOperatorChallenge('preview',classification,'d'.repeat(64),env,start,admission,authorization());
   const tables=Object.fromEntries(Array.from({length:39},(_,i)=>['table'+i,{rows:1,sha256:'e'.repeat(64)}]));
-  const plan={schemaVersion:'theologai-application-corpus-source-plan.v1',classification,readBudget:3560000,integrityCommands:4,expected:{digests:tables,foreignKeyWitnessSha256:'2'.repeat(64)}};
-  const receipt={releasePolicy:'norton-aquinas.v1',liveControlReserve:100000,schemaVersion:'theologai-fresh-complete-corpus-proof.v1',role:'preview',accountId:ACCOUNT,...TARGETS.preview,
+  const plan={schemaVersion:'theologai-application-corpus-source-plan.v1',releasePolicy:'norton-aquinas.v1',classification,readBudget:3560000,integrityCommands:4,expected:{digests:tables,foreignKeyWitnessSha256:'2'.repeat(64)}};
+  const receipt={liveControlReserve:100000,schemaVersion:'theologai-fresh-complete-corpus-proof.v1',role:'preview',accountId:ACCOUNT,...TARGETS.preview,
     ...classification,corpusIdentity:CORPUS,schema:SCHEMA,startedAt:new Date(start+1000).toISOString(),completedAt:new Date(start+120_000).toISOString(),
     sourcePlanSha256:c.sourcePlanSha256,approvalSha256:sha(JSON.stringify(operatorApproval(c))),readBudget:3560000,controlsUnchanged:true,
     operationalAssumption:'owner_reserves_target_data_writes_during_proof_not_an_enforced_provider_lease',
@@ -292,7 +292,7 @@ describe('operator writes and protected read proof composition',()=>{
 
 describe('merged correction PR production handoff',()=>{
   const bridge=createRequire(import.meta.url)('../../../.github/scripts/operator-proof-bridge.cjs');
-  function setup(){const f=fixture();const c=createOperatorChallenge('production',{sourceCommit:'a'.repeat(40),sourceTree:'b'.repeat(40)},'d'.repeat(64),{...f.env,GITHUB_EVENT_NAME:'workflow_dispatch',GITHUB_REF:'refs/heads/main'},start,{...f.c.admission,role:'production'},authorization('production'));
+  function setup(){const f=fixture();const c=createOperatorChallenge('production',{releasePolicy:'norton-aquinas.v1',applicationOnly:false,sourceCommit:'a'.repeat(40),sourceTree:'b'.repeat(40)},'d'.repeat(64),{...f.env,GITHUB_EVENT_NAME:'workflow_dispatch',GITHUB_REF:'refs/heads/main'},start,{...f.c.admission,role:'production'},authorization('production'));
     const main={object:{sha:c.sourceCommit}},run={id:456,head_sha:c.sourceCommit,created_at:new Date(start+130000).toISOString(),actor:{id:40179660},triggering_actor:{id:40179660},run_attempt:1,path:'.github/workflows/pr.yml',event:'workflow_dispatch',head_branch:'main'};
     const artifact={id:789,name:bridge.artifactName(c),expired:false,expires_at:new Date(start+86400000).toISOString(),workflow_run:{head_sha:c.sourceCommit,id:456},digest:'sha256:'+'f'.repeat(64)};
     const bytes=archiveAuthorization(c.authorization),native=nativeAuthorization(c.authorization);
@@ -350,7 +350,7 @@ describe('explicit successor operation authorization',()=>{
       expect(outputs).toHaveBeenCalledWith('artifact_name','operator-authorization-123-attempt-1');
       f.state.submitted=true;await expect(authority.findAuthorization({github:f.github,expected:f.expected,now:f.now})).resolves.toEqual(f.p);
       const environment={...fixture().env,GITHUB_EVENT_NAME:role==='preview'?'pull_request':'workflow_dispatch',GITHUB_REF:role==='preview'?'refs/pull/172/merge':'refs/heads/main'};
-      const c=createOperatorChallenge(role as 'preview'|'production',{sourceCommit:f.a.sourceCommit,sourceTree:f.a.sourceTree},f.a.sourcePlanSha256,environment,start,{...fixture().c.admission,role:role as 'preview'|'production'},f.p);
+      const c=createOperatorChallenge(role as 'preview'|'production',{releasePolicy:'norton-aquinas.v1',applicationOnly:false,sourceCommit:f.a.sourceCommit,sourceTree:f.a.sourceTree},f.a.sourcePlanSha256,environment,start,{...fixture().c.admission,role:role as 'preview'|'production'},f.p);
       expect(c.authorization.authorization.authorizationId).toBe(f.a.authorizationId);
     }finally{rmSync(directory,{recursive:true,force:true});}
   });
@@ -385,7 +385,7 @@ it('rejects cross-policy owner packages and receipts before any transport can st
  for(const key of ['exclusiveDataWritesDuringWindow','candidateWriteJobsPaused','liveControlReserve','expectedLedgerSha256','releasePolicy'])delete app.authorization[key];
  app.authorization.reservedReads=3510997;app.authorization.hardReadCap=3800000;app.provenance.contentSha256=sha(JSON.stringify(app.authorization));
  expect(()=>requireOperatorChallenge({...f.c,authorization:app},f.now)).toThrow('cross-policy');
- const swapped=structuredClone(f.envelope);delete swapped.receipt.releasePolicy;
+ const swapped:any=structuredClone(f.envelope);delete swapped.receipt.releasePolicy;
  expect(()=>verifyOperatorEnvelope(swapped,f.c,f.plan,f.now)).toThrow('cross-policy');
  const missing=structuredClone(f.c);delete missing.releasePolicy;delete missing.liveControlReserve;
  expect(()=>requireOperatorChallenge(missing,f.now)).toThrow('cross-policy');

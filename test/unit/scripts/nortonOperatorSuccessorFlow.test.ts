@@ -55,7 +55,7 @@ describe('successor operation flow with real CLIs and bounded local SQLite trans
           git('checkout','--detach',merge);expect(git('rev-parse','HEAD^{tree}')).toBe(priorPreview.sourceTree);
         }
         const source=classifyApplicationRelease(root);
-        const plan={schemaVersion:'theologai-application-corpus-source-plan.v1',classification:source,sourceSha256:sourceHash,expected,readBudget:3560000,integrityCommands:4};
+        const plan={schemaVersion:'theologai-application-corpus-source-plan.v1',releasePolicy:'norton-aquinas.v1',classification:source,sourceSha256:sourceHash,expected,readBudget:3560000,integrityCommands:4};
         const planText=JSON.stringify(plan),digest=sha(planText);writeFileSync(join(work,'plan.json'),planText);copyFileSync(join(directory,'source.db'),join(work,'source.db'));
         const target=join(work,'target.db');copyFileSync(join(directory,'source.db'),target);const remote=new Database(target);remote.exec("CREATE TABLE _cf_KV(key TEXT PRIMARY KEY,value BLOB);CREATE TABLE d1_migrations(id INTEGER PRIMARY KEY,name TEXT,applied_at TEXT);INSERT INTO d1_migrations VALUES(1,'0001.sql','fixture')");remote.close();
         const day=new Date(Date.now()+86400000).toISOString().slice(0,10),now=Date.parse(day+'T00:05:00Z');

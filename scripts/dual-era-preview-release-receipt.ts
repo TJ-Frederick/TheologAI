@@ -130,7 +130,7 @@ export function createDualEraPreviewReleaseReceipt(input: {
       || source.sourceCommit !== input.sourceCommit || source.sourceTree !== input.sourceTree
       || readiness.databaseId !== candidateD1.databaseId || readiness.databaseName !== candidateD1.databaseName) fail('fresh proof source/candidate mismatch');
     if (typeof readiness.completedAt !== 'string' || Date.parse(readiness.completedAt) > Date.parse(audit.capturedAt)) fail('fresh proof must precede the live audit');
-    const selected=policyForClassification(source);requireSameReleasePolicy(selected,readiness.releasePolicy);
+    const selected=policyForClassification(source);requireSameReleasePolicy(selected,plan.releasePolicy);requireSameReleasePolicy(selected,readiness.releasePolicy);
     if(audit.eras.some(era=>era.counts.tools!==(selected.id==='norton-aquinas.v1'?12:11)))fail('source policy/audit tool count mismatch');
     selected.module.verifyFreshCorpusReceipt(readiness, { role: 'preview', sourceCommit: input.sourceCommit, sourceTree: input.sourceTree,
       sourcePlanSha256: sha256(input.d1SourcePlanText), tables: expected.digests,foreignKeyWitnessSha256:expected.foreignKeyWitnessSha256 });

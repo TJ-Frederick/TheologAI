@@ -445,6 +445,14 @@ jobs:
 
       # Resolve the checked-out candidate by ID and name before readiness.
       # The Worker remains bound to the predecessor until the later deploy.
+      - name: Verify closed release policy before provider access
+        env:
+          CORPUS_PLAN_SHA256: ${{ needs.build-worker.outputs.corpus_plan_sha256 }}
+          EXPECTED_RELEASE_POLICY: ${{ needs.build-worker.outputs.release_policy }}
+        run: |
+          policy="$(npx --no-install tsx .github/scripts/verify-release-operation.ts complete "$RUNNER_TEMP/corpus-source" "$CORPUS_PLAN_SHA256" "$RUNNER_TEMP/operator-authorization.json" "$RUNNER_TEMP/operator-verified/operator-corpus-challenge.json" "$RUNNER_TEMP/operator-verified/operator-proof-envelope.json")"
+          test "$policy" = "$EXPECTED_RELEASE_POLICY"
+
       - name: Capture checked-out candidate preview D1 mapping (read-only)
         run: |
           npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" d1 list --json > "$RUNNER_TEMP/preview-d1-inventory.json"

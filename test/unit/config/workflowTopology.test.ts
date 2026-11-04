@@ -206,11 +206,36 @@ describe('workflow topology', () => {
       expect(live).toHaveLength(1);
       expect(live[0]!.run).toContain('scripts/norton-aquinas-live.ts '+target);
       expect(live[0]!.if).toContain('steps.'+target+"-primary-source-edge-stabilization-gate.outcome == 'success'");
-      expect(steps.some(step=>step.name?.includes('Audit Transform-'))).toBe(false);
+      expect(live[0]!.if).toContain("needs.build-worker.outputs.release_policy == 'norton-aquinas.v1'");
+      const core=steps.findIndex(step=>step.id===target+'-historical-core-audit'),spine=steps.findIndex(step=>step.id===target+'-historical-spine-audit');
+      const pause=steps.findIndex(step=>step.name==='Respect the shared IP request budget before the spine audit');
+      expect(core).toBeGreaterThan(-1);expect(pause).toBeGreaterThan(core);expect(spine).toBeGreaterThan(pause);
+      expect(steps[pause]!.run).toBe('sleep 65');
+      for(const step of [steps[core]!,steps[spine]!])expect(step.if).toContain("needs.build-worker.outputs.release_policy == 'application-only'");
+      const evaluate=(step:Step,policy:string)=>{
+        const ids=['primary-source-edge-stabilization-gate','original-language-v2-audit','historical-core-audit','historical-spine-audit'].map(id=>target+'-'+id);
+        let expression=expressionBody(step.if!).replaceAll('needs.build-worker','needs["build-worker"]');
+        for(const id of ids)expression=expression.replaceAll('steps.'+id,'steps['+JSON.stringify(id)+']');
+        return new Function('needs','steps','return ('+expression+')')({'build-worker':{outputs:{release_policy:policy}}},Object.fromEntries(ids.map(id=>[id,{outcome:'success'}])));
+      };
+      expect(evaluate(live[0]!,'norton-aquinas.v1')).toBe(true);expect(evaluate(live[0]!,'application-only')).toBe(false);expect(evaluate(steps[core]!,'application-only')).toBe(true);expect(evaluate(steps[core]!,'norton-aquinas.v1')).toBe(false);expect(evaluate(live[0]!,'unknown')).toBe(false);
       const audit = await readFile(new URL('../../../scripts/audit-corpus-release.ts', import.meta.url), 'utf8');
       expect(audit).toContain('650');
       expect(audit).toContain('++exchanges <= 200');
       expect(audit).toContain('guard');
+    }
+  });
+
+  it('binds config, owner and workflow policy before any provider credential is exposed',async()=>{
+    for(const [file,jobId]of [['pr.yml','preview-deploy'],['deploy.yml','deploy']]as const){
+      const workflow=parse(await readWorkflow(file))as Workflow,steps=workflow.jobs[jobId]!.steps!;
+      const source=steps.findIndex(step=>step.run?.includes('verify-source-plan'));
+      const owner=steps.findIndex(step=>step.name==='Verify closed release policy before provider access');
+      const credential=steps.findIndex(step=>step.env?.CLOUDFLARE_API_TOKEN);
+      expect(source).toBeGreaterThan(-1);expect(owner).toBeGreaterThan(source);expect(credential).toBeGreaterThan(owner);
+      expect(steps[source]!.run).toContain('test "$policy" = "$EXPECTED_RELEASE_POLICY"');
+      expect(steps[owner]!.run).toContain('verify-release-operation.ts '+(file==='pr.yml'?'complete':'owner'));
+      expect(steps[owner]!.env?.EXPECTED_RELEASE_POLICY).toContain('needs.build-worker.outputs.release_policy');
     }
   });
 

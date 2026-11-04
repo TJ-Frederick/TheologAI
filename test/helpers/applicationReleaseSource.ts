@@ -7,6 +7,6 @@ export function prepareApplicationReleaseSource(root:string){
  for(const path of [
   'scripts/application-release-policy.mjs','scripts/application-release-policy.d.mts','scripts/application-corpus-check.ts','scripts/operator-corpus-proof.ts','scripts/corpus-proof-transport.ts','scripts/corpus-source-proof.ts',
   'scripts/norton-aquinas-release-policy.mjs','scripts/norton-aquinas-release-policy.d.mts','scripts/corpus-release-api.ts','scripts/corpus-release-control.ts','scripts/corpus-token-identity.ts',
-  '.github/scripts/release-proof-policy.mjs','.github/scripts/release-proof-policy.d.mts','.github/scripts/norton-aquinas-policy.cjs','.github/scripts/operator-authorization.cjs','.github/scripts/operator-readiness.cjs',
+  '.github/scripts/release-proof-policy.mjs','.github/scripts/release-proof-policy.d.mts','.github/scripts/norton-aquinas-policy.cjs','.github/scripts/operator-authorization.cjs','.github/scripts/operator-readiness.cjs','.github/scripts/verify-release-operation.ts',
  ])copyFileSync(resolve(path),join(root,path));
 }

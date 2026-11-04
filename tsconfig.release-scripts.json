@@ -27,6 +27,7 @@
     "scripts/production-rollback-rehearsal.ts",
     "scripts/application-corpus-check.ts",
     "scripts/preview-fts-diagnostic.ts",
-    "scripts/operator-corpus-proof.ts"
+    "scripts/operator-corpus-proof.ts",
+    ".github/scripts/verify-release-operation.ts"
   ]
 }

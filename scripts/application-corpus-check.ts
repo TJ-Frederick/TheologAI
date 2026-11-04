@@ -61,7 +61,8 @@ export async function runFreshApplicationCorpusCheck(input: { root: string; role
   const expectedIdentity = { role: input.role, sourceCommit: classification.sourceCommit, sourceTree: classification.sourceTree };
   const approval = requireProofApproval(input.approval, expectedIdentity);
   const planBytes = bytes(join(input.directory, 'plan.json'), 512 * 1024); check(sha(planBytes) === input.planSha256, 'source plan digest');
-  const plan = JSON.parse(planBytes.toString()) as { schemaVersion: string; classification: unknown; sourceSha256: string; expected: ReturnType<typeof buildCorpusProofSource>; readBudget: number; integrityCommands: number };
+  const plan = JSON.parse(planBytes.toString()) as { schemaVersion: string; releasePolicy?:string; classification: unknown; sourceSha256: string; expected: ReturnType<typeof buildCorpusProofSource>; readBudget: number; integrityCommands: number };
+  requireSameReleasePolicy(selected,plan.releasePolicy);
   check(plan.schemaVersion === 'theologai-application-corpus-source-plan.v1' && JSON.stringify(plan.classification) === JSON.stringify(classification), 'source plan identity');
   check(plan.integrityCommands === 4 && Number.isSafeInteger(plan.readBudget) && (selected.id==='norton-aquinas.v1'?plan.readBudget===selected.reservedReads && plan.readBudget===approval.maxReads:plan.readBudget>0&&plan.readBudget<=approval.maxReads), 'approved read/integrity budget');
   const sourcePath = join(input.directory, 'source.db'); check(sha(bytes(sourcePath)) === plan.sourceSha256, 'source database digest');

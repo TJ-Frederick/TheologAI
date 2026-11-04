@@ -51,7 +51,7 @@ describe('dual-era protected preview receipt', () => {
   it('keeps a complete fresh proof distinct and binds it to its source plan and preview UUID', () => {
     const now = new Date().toISOString();
     const tables = Object.fromEntries(Array.from({ length: 39 }, (_, i) => [`table_${i}`, { rows: 1, sha256: 'a'.repeat(64) }]));
-    const planText = JSON.stringify({ schemaVersion: 'theologai-application-corpus-source-plan.v1', classification: { releasePolicy:'norton-aquinas.v1',applicationOnly:false,sourceCommit: 'a'.repeat(40), sourceTree: 'b'.repeat(40) }, expected: { digests: tables,foreignKeyWitnessSha256:'b'.repeat(64) } });
+    const planText = JSON.stringify({ schemaVersion: 'theologai-application-corpus-source-plan.v1',releasePolicy:'norton-aquinas.v1', classification: { releasePolicy:'norton-aquinas.v1',applicationOnly:false,sourceCommit: 'a'.repeat(40), sourceTree: 'b'.repeat(40) }, expected: { digests: tables,foreignKeyWitnessSha256:'b'.repeat(64) } });
     const proof = { releasePolicy:'norton-aquinas.v1',liveControlReserve:100000,schemaVersion: 'theologai-fresh-complete-corpus-proof.v1', role: 'preview', accountId: ACCOUNT, ...TARGETS.preview,
       sourceCommit: 'a'.repeat(40), sourceTree: 'b'.repeat(40), corpusIdentity: CORPUS, schema: SCHEMA,
       startedAt: now, completedAt: now, sourcePlanSha256: createHash('sha256').update(planText).digest('hex'), approvalSha256: 'a'.repeat(64),
