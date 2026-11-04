@@ -68,3 +68,16 @@ it('accepts the existing separately locked release link while rejecting source d
   writeFileSync(join(toolchain,'package-lock.json'),'{}');expect(()=>classifyApplicationRelease(root)).toThrow('dirty');
  }finally{rmSync(dir,{recursive:true,force:true});}
 });
+
+import Database from 'better-sqlite3';
+import {copyFileSync,existsSync} from 'node:fs';
+import {spawnSync} from 'node:child_process';
+it.skipIf(!existsSync(process.env.THEOLOGAI_TEST_DATABASE_PATH||'data/theologai.db'))('refuses a source plan when real local aggregate readiness fails with unchanged row counts',()=>{
+ const dir=mkdtempSync(join(tmpdir(),'corpus-bad-source-')),path=join(dir,'source.db'),output=join(dir,'plan');
+ try{
+  copyFileSync(process.env.THEOLOGAI_TEST_DATABASE_PATH||'data/theologai.db',path);const db=new Database(path);
+  db.exec('UPDATE strongs_usage_stats SET token_count=token_count+1 WHERE strongs_key=(SELECT strongs_key FROM strongs_usage_stats ORDER BY strongs_key LIMIT 1)');db.close();
+  const result=spawnSync(process.execPath,['--import','tsx','scripts/application-corpus-check.ts','prepare','--database',path,'--directory',output],{cwd:process.cwd(),encoding:'utf8',timeout:60000});
+  expect(result.status,result.stderr).toBe(1);expect(result.stderr).toContain('local complete semantic readiness failed');expect(existsSync(join(output,'plan.json'))).toBe(false);
+ }finally{rmSync(dir,{recursive:true,force:true});}
+},65000);

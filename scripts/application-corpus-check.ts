@@ -32,7 +32,9 @@ function prepare(root: string, database: string, directory: string): void {
     // locally. This is never represented as remote verification.
     const legacy = runRemoteD1ReadinessCheck({ database: 'LOCAL_SOURCE_ONLY', cwd: root }, (_file, argv) => {
       const sql = argv[argv.indexOf('--command') + 1]!;
-      return JSON.stringify([{ results: source.prepare(sql).all(), success: true }]);
+      const rows=source.prepare(sql).all() as Record<string,unknown>[];
+      if(sql.includes('AS readiness'))check(rows.length===1 && rows[0]?.readiness==='ready','local complete semantic readiness failed');
+      return JSON.stringify([{ results: rows, success: true }]);
     });
     const expected = buildCorpusProofSource(root, source);
     const planningReads = Object.values(expected.digests).reduce((n, t) => n + t.rows, 0) + expected.quickCheckReadCeiling + 60_000;
