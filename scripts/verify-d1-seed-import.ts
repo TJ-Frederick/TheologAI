@@ -25,7 +25,7 @@ import {
   type UbsSemanticStorageAudit,
 } from './ubs-semantics/storageContract.js';
 import { assertUbsSemanticStoredArtifactIdentity } from './ubs-semantics/storageReconstruction.js';
-import { assertTransform12CandidateCSchema, assertTransform12CorpusSealed } from './transform12-candidate-c-storage.js';
+import { assertCanonicalTransform12FtsMatchSentinels, assertTransform12CandidateCSchema, assertTransform12CorpusSealed } from './transform12-candidate-c-storage.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SEED_DIRECTORY = join(ROOT, 'scripts', 'd1-seed');
@@ -165,32 +165,6 @@ function assertDatabaseHealth(db: Database.Database, expectedCounts: Record<stri
   }
 }
 
-function assertRepresentativeFts(db: Database.Database): void {
-  const strongs = db.prepare(
-    `SELECT strongs_number FROM strongs_fts
-     WHERE strongs_fts MATCH '"love"*'
-     ORDER BY strongs_number LIMIT 1`,
-  ).get();
-  if (!strongs) throw new Error("Imported Strong's FTS has no representative 'love' result");
-
-  const sections = db.prepare(
-    `SELECT rowid FROM sections_fts
-     WHERE sections_fts MATCH '"almighty"*'
-     ORDER BY rowid LIMIT 1`,
-  ).get();
-  if (!sections) throw new Error("Imported historical FTS has no representative 'almighty' result");
-
-  const historical = db.prepare(`SELECT COUNT(*) AS count FROM historical_edition_sections_fts
-    WHERE historical_edition_sections_fts MATCH '"grace"'`).get() as { count: number };
-  const hierarchy = db.prepare(`SELECT
-    (SELECT COUNT(*) FROM historical_edition_hierarchy_bodies) AS baseCount,
-    (SELECT COUNT(*) FROM historical_edition_hierarchy_bodies_fts) AS backingCount`).get() as {
-      baseCount: number; backingCount: number;
-    };
-  if (historical.count !== 391 || hierarchy.baseCount !== 0 || hierarchy.backingCount !== 0) {
-    throw new Error('Imported external-content FTS MATCH/empty-hierarchy sentinel drifted');
-  }
-}
 
 function assertUbsReconstruction(db: Database.Database, expectedCounts: Record<string, number>): void {
   const incompleteGroups = db.prepare(`SELECT COUNT(*) AS count FROM ubs_parallel_groups g
@@ -392,7 +366,7 @@ try {
   assertGenesisOneOneDatabase(target, 'Imported D1 morphology');
   assertHebrewLemmaCoverageDatabase(source, 'Source SQLite morphology');
   assertHebrewLemmaCoverageDatabase(target, 'Imported D1 morphology');
-  assertRepresentativeFts(target);
+  assertCanonicalTransform12FtsMatchSentinels(target);
   assertUbsReconstruction(source, manifest.expectedCounts);
   assertUbsReconstruction(target, manifest.expectedCounts);
   assertUbsSemanticReconstruction(source, manifest.expectedCounts);

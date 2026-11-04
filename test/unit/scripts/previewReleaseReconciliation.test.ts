@@ -401,7 +401,8 @@ describe('preview release reconciliation evidence', () => {
     expect(postAuditProductionControl).toBeGreaterThan(previewAuditIdentity);
     expect(evidenceHash).toBeGreaterThan(postAuditProductionControl);
     expect(workflow).toContain('npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" d1 list --json > "$RUNNER_TEMP/preview-d1-inventory.json"');
-    expect(workflow).toContain('--database "$candidate_d1_name" --env preview');
+    expect(workflow).not.toContain('scripts/check-remote-d1-readiness.ts');
+    expect(workflow).toContain('scripts/operator-corpus-proof.ts accept');
     expect(workflow).toContain('observe-post-mutation');
     expect(workflow).toContain('Upload preview candidate cutover observation');
     expect(workflow).toContain('Hash sanitized preview reconciliation evidence');

@@ -6,6 +6,14 @@ import { PRODUCTION_PROFILE as languageProfile } from '../../../scripts/audit-or
 
 const root = new URL('../../../', import.meta.url);
 
+
+const validatedPolicy="(steps.release-operation.outputs.release_policy == 'application-only' || steps.release-operation.outputs.release_policy == 'norton-aquinas.v1')";
+// The truth table in workflowTopology tests the common guard on the actual YAML.
+// Keep these assertions focused on the original required gates inside it.
+const originalGates=(value:string)=>value.split('\n').map(line=>{
+ const prefix='        if: ${{ '+validatedPolicy+' && (';
+ return line.startsWith(prefix)&&line.endsWith(') }}')?'        if: ${{ '+line.slice(prefix.length,-4)+' }}':line;
+}).join('\n');
 describe('production release guards', () => {
   it('keeps both post-deploy audit profiles fixed to the production custom domain and 3.6.0', () => {
     expect(languageProfile).toEqual({
@@ -30,7 +38,7 @@ describe('production release guards', () => {
   });
 
   it('requires exact checked-in candidate readiness and Worker/D1 proof before fixed audits', async () => {
-    const workflow = await readFile(new URL('.github/workflows/deploy.yml', root), 'utf8');
+    const workflow = originalGates(await readFile(new URL('.github/workflows/deploy.yml', root), 'utf8'));
     const mapping = workflow.indexOf('Capture checked-out candidate production D1 mapping (read-only)');
     const readiness = workflow.indexOf('Verify fresh corpus (up to 3.8M reads and four integrity commands)');
     const predecessor = workflow.indexOf('Capture production predecessor reconciliation anchor (read-only)');
@@ -60,7 +68,9 @@ describe('production release guards', () => {
     expect(finalArtifact).toBeGreaterThan(finalObservation);
     expect(artifact).toBeGreaterThan(finalArtifact);
     expect(workflow).toContain('scripts/production-release-reconciliation.ts candidate-d1-name');
-    expect(workflow).toContain('npx --no-install tsx scripts/check-remote-d1-readiness.ts --database "$candidate_d1_name"');
+    expect(workflow).not.toContain('scripts/check-remote-d1-readiness.ts');
+    expect(workflow).not.toContain('legacy-corpus-proof');
+    expect(workflow).toContain('uses: ./.github/actions/operator-corpus-proof');
     expect(workflow).toContain('scripts/verify-production-worker-deployment.ts verify-deploy');
     expect(workflow).toContain('scripts/verify-production-worker-deployment.ts verify-audit-stability');
     expect(workflow).toContain('npx --no-install tsx scripts/norton-aquinas-live.ts production');
@@ -71,7 +81,7 @@ describe('production release guards', () => {
   });
 
   it('verifies the protected receipt against the preview-suffixed server identity', async () => {
-    const workflow = await readFile(new URL('.github/workflows/deploy.yml', root), 'utf8');
+    const workflow = originalGates(await readFile(new URL('.github/workflows/deploy.yml', root), 'utf8'));
     expect((workflow.match(/process\.stdout\.write\(packageJson\.version \+ '-preview'\)/g) ?? [])).toHaveLength(2);
     expect((workflow.match(/--expected-server-version "\$preview_server_version"/g) ?? [])).toHaveLength(2);
     expect(workflow).not.toContain('process.stdout.write(packageJson.version)');
@@ -79,7 +89,7 @@ describe('production release guards', () => {
   });
 
   it('revalidates the exact gate artifact before dependencies, secrets, Cloudflare, or D1 and retains seven release artifacts', async () => {
-    const workflow = await readFile(new URL('.github/workflows/deploy.yml', root), 'utf8');
+    const workflow = originalGates(await readFile(new URL('.github/workflows/deploy.yml', root), 'utf8'));
     const deployStart = workflow.indexOf('  deploy:');
     const resolveContext = workflow.indexOf('Resolve production release comparison context', deployStart);
     const downloadPlan = workflow.indexOf('Download verified production deployment plan gate', deployStart);
@@ -117,7 +127,7 @@ describe('production release guards', () => {
   });
 
   it('retains a non-strict final routing observation after every attempted deploy, while requiring it for a successful release', async () => {
-    const workflow = await readFile(new URL('.github/workflows/deploy.yml', root), 'utf8');
+    const workflow = originalGates(await readFile(new URL('.github/workflows/deploy.yml', root), 'utf8'));
     const historicalAuditScript = await readFile(new URL('../../../scripts/audit-historical-core-preview.ts', import.meta.url), 'utf8');
     const finalObservation = workflow.indexOf('Capture final production routing/binding observation (read-only)');
     const finalArtifact = workflow.indexOf('Upload final production routing/binding observation');

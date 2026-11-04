@@ -213,10 +213,10 @@ describe('workflow topology', () => {
       expect(steps[pause]!.run).toBe('sleep 65');
       for(const step of [steps[core]!,steps[spine]!])expect(step.if).toContain("needs.build-worker.outputs.release_policy == 'application-only'");
       const evaluate=(step:Step,policy:string)=>{
-        const ids=['primary-source-edge-stabilization-gate','original-language-v2-audit','historical-core-audit','historical-spine-audit'].map(id=>target+'-'+id);
+        const ids=['primary-source-edge-stabilization-gate','original-language-v2-audit','historical-core-audit','historical-spine-audit'].map(id=>target+'-'+id).concat('release-operation');
         let expression=expressionBody(step.if!).replaceAll('needs.build-worker','needs["build-worker"]');
         for(const id of ids)expression=expression.replaceAll('steps.'+id,'steps['+JSON.stringify(id)+']');
-        return new Function('needs','steps','return ('+expression+')')({'build-worker':{outputs:{release_policy:policy}}},Object.fromEntries(ids.map(id=>[id,{outcome:'success'}])));
+        return new Function('needs','steps','return ('+expression+')')({'build-worker':{outputs:{release_policy:policy}}},Object.fromEntries(ids.map(id=>[id,{outcome:'success',outputs:{release_policy:policy}}])));
       };
       expect(evaluate(live[0]!,'norton-aquinas.v1')).toBe(true);expect(evaluate(live[0]!,'application-only')).toBe(false);expect(evaluate(steps[core]!,'application-only')).toBe(true);expect(evaluate(steps[core]!,'norton-aquinas.v1')).toBe(false);expect(evaluate(live[0]!,'unknown')).toBe(false);
       const audit = await readFile(new URL('../../../scripts/audit-corpus-release.ts', import.meta.url), 'utf8');
@@ -663,4 +663,23 @@ describe('downstream preview authorization before cloud inventory',()=>{
       else{await execute();expect(await readFile(join(directory,'operator-authorization.json'),'utf8')).toBe(text);}
     }finally{await rm(directory,{recursive:true,force:true});}
   });
+});
+
+it('runs exactly one bounded readiness path per validated policy and no provider path for missing or unknown identity',async()=>{
+ for(const[file,jobId]of [['pr.yml','preview-deploy'],['deploy.yml','deploy']]as const){
+  const raw=await readWorkflow(file),workflow=parse(raw)as Workflow,steps=workflow.jobs[jobId]!.steps!;
+  const readiness=steps.filter(step=>step.id==='corpus-proof'||step.id==='legacy-corpus-proof');expect(readiness).toHaveLength(1);
+  expect(raw).not.toContain('legacy-corpus-proof');expect(raw).not.toContain('scripts/check-remote-d1-readiness.ts');
+  const provider=steps.filter(step=>step.env?.CLOUDFLARE_API_TOKEN||step.run?.includes('/audit-')||step.run?.includes('scripts/norton-aquinas-live.ts'));expect(provider.length).toBeGreaterThan(5);
+  const evaluate=(step:Step,policy:string|undefined)=>{
+   let expression=expressionBody(step.if!);const ids=steps.map(step=>step.id).filter((id):id is string=>Boolean(id)).sort((a,b)=>b.length-a.length);
+   for(const id of ids)expression=expression.replaceAll('steps.'+id,'steps['+JSON.stringify(id)+']');
+   expression=expression.replaceAll('needs.build-worker','needs["build-worker"]');
+   const context=Object.fromEntries(ids.map(id=>[id,{outcome:'success',outputs:{release_policy:policy}}]));
+   return new Function('steps','needs','always','success','cancelled','return ('+expression+')')(context,{'build-worker':{outputs:{release_policy:'norton-aquinas.v1'}}},()=>true,()=>true,()=>false);
+  };
+  for(const policy of ['application-only','norton-aquinas.v1'])expect(readiness.filter(step=>evaluate(step,policy))).toHaveLength(1);
+  for(const policy of [undefined,'','unknown']){expect(readiness.filter(step=>evaluate(step,policy))).toHaveLength(0);for(const step of provider)expect(evaluate(step,policy),step.name).toBe(false);}
+  const local=steps.find(step=>step.id==='release-operation')!;expect(local.run).toContain('verify-release-operation.ts');expect(local.run).toContain('release_policy=%s');
+ }
 });

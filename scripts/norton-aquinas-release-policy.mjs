@@ -46,6 +46,7 @@ const ACTIVATION_PATHS=Object.freeze([
   "scripts/operator-corpus-proof.ts",
   "scripts/transform12-candidate-c-storage.ts",
   "scripts/verify-biblical-language-unicode-d1.ts",
+  "scripts/verify-d1-seed-import.ts",
   "scripts/verify-d1-seed-workerd.ts",
   "scripts/verify-data-manifest.ts",
   "scripts/verify-database.ts",

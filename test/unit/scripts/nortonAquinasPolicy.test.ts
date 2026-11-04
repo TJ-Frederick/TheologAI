@@ -32,7 +32,7 @@ describe('closed Norton/Aquinas release policy',()=>{
  });
  it('allows only reviewed activation blobs and leaves application-only classification strict',()=>{
   const declaration=JSON.parse(readFileSync('release/norton-aquinas.json','utf8'));
-  const raw=execFileSync('/opt/homebrew/bin/git',['ls-tree','-r','-z',declaration.baseline]).toString();
+  const raw=execFileSync('git',['ls-tree','-r','-z',declaration.baseline]).toString();
   const before=new Map<string,{mode:string;blob:string}>(raw.split('\0').filter(Boolean).map(entry=>{const [metadata,path]=entry.split('\t');const [mode,,blob]=metadata!.split(' ');return [path!,{mode:mode!,blob:blob!}];}));
   const after=new Map(before);for(const [path,blob]of Object.entries(declaration.files))after.set(path,{mode:'100644',blob:blob as string});
   expect(()=>assertReviewedActivationEntries(declaration,before,after)).not.toThrow();
