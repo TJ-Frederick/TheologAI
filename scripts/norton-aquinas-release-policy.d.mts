@@ -1,4 +1,4 @@
-export const POLICY: {policy:'norton-aquinas.v1';account:string;corpus:string;schema:string;reservedReads:number;hardReadCap:number;liveReads:number;controlReads:number;targets:Readonly<Record<'preview'|'production',{databaseName:string;databaseId:string}>>;rollback:{databaseName:string;databaseId:string}};
+export const POLICY: {policy:'norton-aquinas.v1';baseline:string;account:string;corpus:string;schema:string;reservedReads:number;hardReadCap:number;liveReads:number;controlReads:number;targets:Readonly<Record<'preview'|'production',{databaseName:string;databaseId:string}>>;rollback:{databaseName:string;databaseId:string}};
 export const BASELINE: string;
 export const ACCOUNT: string;
 export const CORPUS: string;
