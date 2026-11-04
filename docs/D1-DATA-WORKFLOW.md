@@ -46,7 +46,10 @@ For a separately built database, pass exactly one explicit `.db` path:
 
 ```bash
 npm run d1:seed:export -- --database /absolute/path/to/corpus.db --clean
+THEOLOGAI_TEST_DATABASE_PATH=/absolute/path/to/corpus.db npm run d1:seed:verify-workerd
 ```
+
+The Workerd verifier uses that generated database only to enumerate authority queries. It still imports every seed file through local Wrangler and checks the actual D1 results in one owned Workerd runtime. A missing generated source is an error; it does not rebuild or substitute another database.
 
 The exporter is read-only with respect to its source database. It verifies the
 canonical source checksums and database row counts, derives columns and primary

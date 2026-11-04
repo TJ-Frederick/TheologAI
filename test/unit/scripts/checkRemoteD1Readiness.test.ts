@@ -236,7 +236,7 @@ describe('remote D1 readiness query', () => {
       const workerd = readFileSync('scripts/verify-d1-seed-workerd.ts', 'utf8');
       expect(seedImport).toContain('buildUbsSemanticStoredIntegrityPredicates().join');
       expect(workerd).toContain('buildD1ReadinessSql(sourceManifest.expectedCounts)');
-      expect(workerd).toContain('auditHistoricalTransform8Authority(ROOT');
+      expect(workerd).toContain('auditHistoricalTransform8Authority(root, readPage)');
     } finally {
       db.close();
     }
