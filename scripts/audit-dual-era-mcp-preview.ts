@@ -32,7 +32,7 @@ export interface DualEraMcpAudit {
     protocolVersion: ProtocolVersion;
     serverName: 'theologai-bible-server';
     serverVersion: string;
-    counts: { tools: 12; prompts: 6; resourceTemplates: 2; staticResources: 3 };
+    counts: { tools: 11|12; prompts: 6; resourceTemplates: 2; staticResources: 3 };
     fingerprints: {
       capabilities: string;
       tools: string;
@@ -89,7 +89,7 @@ export async function auditDualEraMcpPreview(
         serverName: 'theologai-bible-server',
         serverVersion: snapshot.server.version,
         counts: {
-          tools: snapshot.tools.length as 12,
+          tools: snapshot.tools.length as 11|12,
           prompts: snapshot.prompts.length as 6,
           resourceTemplates: snapshot.resourceTemplates.length as 2,
           staticResources: snapshot.staticResources.length as 3,

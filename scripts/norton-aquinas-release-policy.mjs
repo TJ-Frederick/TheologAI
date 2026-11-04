@@ -19,6 +19,7 @@ const ACTIVATION_PATHS=Object.freeze([
   "migrations/0010_active_aquinas_hierarchy_publication.sql",
   "scripts/active-aquinas-hierarchy.ts",
   "scripts/application-corpus-check.ts",
+  "scripts/application-release-policy.mjs",
   "scripts/aquinas-authority-audit.ts",
   "scripts/aquinas-source-pack-capacity-comparison.ts",
   "scripts/audit-corpus-release.ts",
@@ -92,7 +93,7 @@ export function assertReviewedActivationEntries(declaration,before,after){
  for(const path of expectedPaths)check(after.get(path)?.mode==='100644' && /^[a-f0-9]{40}$/.test(declaration.files[path]) && after.get(path)?.blob===declaration.files[path],'reviewed activation blob');
  const changed=[...new Set([...before.keys(),...after.keys()])].filter(path=>/^(?:src|data|scripts|migrations)\//.test(path) && JSON.stringify(before.get(path))!==JSON.stringify(after.get(path)));
  check(changed.every(path=>expectedPaths.includes(path) || path.startsWith('scripts/') && RELEASE_SCRIPTS.has(path.slice(8))),'unreviewed corpus/application path');
- for(const path of ['scripts/application-release-policy.mjs','scripts/application-release-policy.d.mts','wrangler.toml','wrangler.ccel-coordinator.toml','package.json','package-lock.json','.nvmrc','.github/release-toolchain/package.json','.github/release-toolchain/package-lock.json'])check(JSON.stringify(before.get(path))===JSON.stringify(after.get(path)),'binding/dependency/runtime baseline changed');
+ for(const path of ['release/application-only.json','wrangler.toml','wrangler.ccel-coordinator.toml','package.json','package-lock.json','.nvmrc','.github/release-toolchain/package.json','.github/release-toolchain/package-lock.json'])check(JSON.stringify(before.get(path))===JSON.stringify(after.get(path)),'binding/dependency/runtime baseline changed');
 }
 export function requireProofApproval(value,expected,now=Date.now()){
  check(value&&Object.keys(value).sort().join(',')===['liveControlReserve','expectedLedgerSha256','releasePolicy','schemaVersion','role','accountId','databaseId','sourceCommit','sourceTree','expiresAt','maxReads','integrityCommands','exclusiveDataWritesDuringProof'].sort().join(','),'verification approval shape');

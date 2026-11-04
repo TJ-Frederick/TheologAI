@@ -209,6 +209,7 @@ jobs:
     outputs:
       worker_sha256: ${{ steps.worker-artifact.outputs.sha256 }}
       corpus_plan_sha256: ${{ steps.corpus-source.outputs.sha256 }}
+      release_policy: ${{ steps.corpus-source.outputs.release_policy }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -223,7 +224,7 @@ jobs:
       - run: npm ci --ignore-scripts --no-audit
 
       - name: Prepare complete corpus proof source without cloud credentials
-        if: hashFiles('release/norton-aquinas.json') != ''
+        if: hashFiles('release/norton-aquinas.json') != '' || hashFiles('release/application-only.json') != ''
         id: corpus-source
         run: |
           npm rebuild better-sqlite3 --ignore-scripts=false
@@ -385,7 +386,7 @@ jobs:
           merge-multiple: false
           digest-mismatch: error
       - name: Download source-bound complete corpus proof inputs
-        if: hashFiles('release/norton-aquinas.json') != ''
+        if: hashFiles('release/norton-aquinas.json') != '' || hashFiles('release/application-only.json') != ''
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: corpus-preview-${{ github.run_id }}-attempt-${{ github.run_attempt }}
@@ -393,14 +394,24 @@ jobs:
           merge-multiple: false
           digest-mismatch: error
       - name: Verify artifact and render upload-only configuration
+        id: release-policy
         env:
+          CORPUS_PLAN_SHA256: ${{ needs.build-worker.outputs.corpus_plan_sha256 }}
+          EXPECTED_RELEASE_POLICY: ${{ needs.build-worker.outputs.release_policy }}
           EXPECTED_MANIFEST_SHA256: ${{ needs.build-worker.outputs.worker_sha256 }}
         run: |
+          policy="$(node .github/scripts/release-proof-policy.mjs verify-source-plan "$RUNNER_TEMP/corpus-source" "$CORPUS_PLAN_SHA256")"
+          test "$policy" = "$EXPECTED_RELEASE_POLICY"
+          printf 'release_policy=%s\n' "$policy" >> "$GITHUB_OUTPUT"
           node scripts/worker-release-artifact.mjs render preview "$RUNNER_TEMP/worker-bundle" "$EXPECTED_MANIFEST_SHA256" "$RUNNER_TEMP/worker-release.json"
-          npx --no-install tsx scripts/corpus-execution-config.ts preview "$RUNNER_TEMP/corpus-wrangler.toml"
+          if test "$policy" = norton-aquinas.v1; then
+            npx --no-install tsx scripts/corpus-execution-config.ts preview "$RUNNER_TEMP/corpus-wrangler.toml"
+          else
+            cp wrangler.toml "$RUNNER_TEMP/corpus-wrangler.toml"
+          fi
 
       - name: Download protected operator proof for this preview run
-        if: hashFiles('release/norton-aquinas.json') != ''
+        if: hashFiles('release/norton-aquinas.json') != '' || hashFiles('release/application-only.json') != ''
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: preview-operator-verified-${{ github.run_id }}-attempt-${{ github.run_attempt }}
@@ -451,7 +462,7 @@ jobs:
         id: corpus-proof
         run: |
           candidate_d1_name="$(< "$RUNNER_TEMP/preview-candidate-d1-name.txt")"
-          if test -f release/norton-aquinas.json; then
+          if test '${{ needs.build-worker.outputs.release_policy }}' = norton-aquinas.v1 || test '${{ needs.build-worker.outputs.release_policy }}' = application-only; then
             test "$(sha256sum "$RUNNER_TEMP/operator-verified/operator-proof-envelope.json" | cut -d' ' -f1)" = "$EXPECTED_OPERATOR_ENVELOPE_SHA256"
             npx --no-install tsx scripts/operator-corpus-proof.ts accept \
               "$RUNNER_TEMP/operator-verified/operator-corpus-challenge.json" \
@@ -674,8 +685,10 @@ jobs:
         if: ${{ steps.preview-worker-candidate-cutover.outcome == 'success' }}
         continue-on-error: true
         run: |
+          corpus_flag=()
+          if test '${{ needs.build-worker.outputs.release_policy }}' = norton-aquinas.v1; then corpus_flag+=(--corpus-release); fi
           npx --no-install tsx scripts/audit-primary-source-edge-stabilization.ts \
-            --output "$RUNNER_TEMP/preview-primary-source-edge-stabilization.json" --corpus-release
+            --output "$RUNNER_TEMP/preview-primary-source-edge-stabilization.json" "${corpus_flag[@]}"
 
       - name: Upload preview edge-stabilization evidence
         if: ${{ always() && steps.preview-worker-candidate-cutover.outcome == 'success' }}
@@ -693,9 +706,49 @@ jobs:
         if: ${{ always() && steps.preview-worker-candidate-cutover.outcome == 'success' }}
         run: test "${{ steps.preview-primary-source-edge-stabilization.outcome }}" = success
 
+      - name: Audit original-language v2 contract on preview
+        id: preview-original-language-v2-audit
+        if: ${{ needs.build-worker.outputs.release_policy == 'application-only' && steps.preview-primary-source-edge-stabilization-gate.outcome == 'success' }}
+        run: |
+          npx --no-install tsx scripts/audit-original-language-v2-preview.ts \
+            --output "$RUNNER_TEMP/original-language-v2-preview-audit.json"
+          test -s "$RUNNER_TEMP/original-language-v2-preview-audit.json"
+
+      - name: Audit Transform-9 historical core contract on preview
+        id: preview-historical-core-audit
+        if: ${{ needs.build-worker.outputs.release_policy == 'application-only' && steps.preview-primary-source-edge-stabilization-gate.outcome == 'success' && steps.preview-original-language-v2-audit.outcome == 'success' }}
+        run: |
+          npx --no-install tsx scripts/audit-historical-core-preview.ts \
+            --output "$RUNNER_TEMP/historical-core-preview-audit.json"
+          test -s "$RUNNER_TEMP/historical-core-preview-audit.json"
+
+      # Fixed Transform-11 coverage stays separate from the Transform-9 core
+      # audit: each of the ten newly activated works must pass its own bounded
+      # landing, browse, search, primary-source, read, and pagination probes.
+      - name: Respect the shared IP request budget before the spine audit
+        if: ${{ needs.build-worker.outputs.release_policy == 'application-only' && steps.preview-historical-core-audit.outcome == 'success' }}
+        # SEC-03 makes all audit User-Agents share one IP allowance. Let the
+        # earlier bounded suites leave the 60-second window; audits never retry.
+        run: sleep 65
+
+      - name: Audit Transform-11 historical spine contract on preview
+        id: preview-historical-spine-audit
+        if: ${{ needs.build-worker.outputs.release_policy == 'application-only' && steps.preview-primary-source-edge-stabilization-gate.outcome == 'success' && steps.preview-original-language-v2-audit.outcome == 'success' && steps.preview-historical-core-audit.outcome == 'success' }}
+        run: |
+          npx --no-install tsx scripts/audit-historical-spine-preview.ts \
+            --output "$RUNNER_TEMP/historical-spine-preview-audit.json"
+          test -s "$RUNNER_TEMP/historical-spine-preview-audit.json"
+
+      - name: Prove legacy and modern MCP eras on the protected preview
+        id: preview-dual-era-audit
+        if: ${{ needs.build-worker.outputs.release_policy == 'application-only' && steps.preview-historical-spine-audit.outcome == 'success' }}
+        run: |
+          npx --no-install tsx scripts/audit-dual-era-mcp-preview.ts --output "$RUNNER_TEMP/dual-era-mcp-preview-audit.json"
+          test -s "$RUNNER_TEMP/dual-era-mcp-preview-audit.json"
+
       - name: Audit the corpus release in both protocol eras
         id: preview-corpus-live
-        if: ${{ steps.preview-primary-source-edge-stabilization-gate.outcome == 'success' }}
+        if: ${{ needs.build-worker.outputs.release_policy == 'norton-aquinas.v1' && steps.preview-primary-source-edge-stabilization-gate.outcome == 'success' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -739,7 +792,7 @@ jobs:
 
       - name: Verify preview Worker remained active through audit (read-only)
         id: preview-worker-audit-identity
-        if: ${{ steps.preview-primary-source-edge-stabilization-gate.outcome == 'success' && steps.preview-corpus-live.outcome == 'success' }}
+        if: ${{ steps.preview-primary-source-edge-stabilization-gate.outcome == 'success' && (steps.preview-corpus-live.outcome == 'success' || (steps.preview-original-language-v2-audit.outcome == 'success' && steps.preview-historical-core-audit.outcome == 'success' && steps.preview-historical-spine-audit.outcome == 'success' && steps.preview-dual-era-audit.outcome == 'success')) }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -757,7 +810,7 @@ jobs:
       # a production change that happened during the black-box audit window.
       - name: Verify production control remained unchanged after preview audits (read-only)
         id: production-control-post-audit
-        if: ${{ steps.preview-primary-source-edge-stabilization-gate.outcome == 'success' && steps.preview-corpus-live.outcome == 'success' && steps.preview-worker-audit-identity.outcome == 'success' }}
+        if: ${{ steps.preview-primary-source-edge-stabilization-gate.outcome == 'success' && (steps.preview-corpus-live.outcome == 'success' || (steps.preview-original-language-v2-audit.outcome == 'success' && steps.preview-historical-core-audit.outcome == 'success' && steps.preview-historical-spine-audit.outcome == 'success' && steps.preview-dual-era-audit.outcome == 'success')) && steps.preview-worker-audit-identity.outcome == 'success' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

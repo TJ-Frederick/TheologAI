@@ -1,5 +1,4 @@
-import {captureUnboundCorpusControl} from '../../../scripts/corpus-release-control.js';
-import {corpusTransportFixture} from '../../helpers/corpusTransportFixture.js';
+import{prepareApplicationReleaseSource}from '../../helpers/applicationReleaseSource.js';
 import {describe,expect,it,vi} from 'vitest';
 import {createHash} from 'node:crypto';
 import {createRequire} from 'node:module';
@@ -8,16 +7,16 @@ import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
 import {spawnSync,execFileSync} from 'node:child_process';
 import {createOperatorChallenge,requireOperatorChallenge,operatorApproval,verifyOperatorEnvelope,verifyOperatorIntegrity,composeReadProof,finishOperatorMetadata,readLiveOperatorMetadata,admitOperatorBudget,spentOperatorBudget,OPERATOR_PROOF} from '../../../scripts/operator-corpus-proof.js';
-import {POLICY,ACCOUNT,CORPUS,SCHEMA,TARGETS,classifyApplicationRelease} from '../../../scripts/norton-aquinas-release-policy.mjs';
+import {ACCOUNT,CORPUS,SCHEMA,TARGETS,classifyApplicationRelease} from '../../../scripts/application-release-policy.mjs';
 import {ALL_FTS} from '../../../scripts/corpus-source-proof.js';
 const sha=(v:string)=>createHash('sha256').update(v).digest('hex');
 const today=new Date();
 const start=Date.UTC(today.getUTCFullYear(),today.getUTCMonth(),today.getUTCDate()+1,0,5);
 const authority=createRequire(import.meta.url)('../../../.github/scripts/operator-authorization.cjs');
 function authorization(role='preview', now=start, identity:any={}) {
-  const a={schemaVersion:'theologai-operator-authorization.v1',scope:'new-additional-operation',exclusiveDataWritesDuringWindow:true,candidateWriteJobsPaused:true,releasePolicy:'norton-aquinas.v1',liveControlReserve:100000,expectedLedgerSha256:'1'.repeat(64),repository:OPERATOR_PROOF.repository,ownerActorId:40179660,
+  const a={schemaVersion:'theologai-operator-authorization.v1',scope:'new-additional-operation',repository:OPERATOR_PROOF.repository,ownerActorId:40179660,
     role,pullRequestNumber:172,headBranch:role==='preview'?'ci/different-successor':'main',sourceCommit:'a'.repeat(40),sourceTree:'b'.repeat(40),baseCommit:'c'.repeat(40),sourcePlanSha256:'d'.repeat(64),targetRunId:'123',targetRunAttempt:1,
-    authorizationId:'operation-successor-fixture',ledgerId:'operation-successor-fixture',notBefore:new Date(now-1000).toISOString(),expiresAt:new Date(now+86400000-1000).toISOString(),reservedReads:3560000,hardReadCap:3560000,diagnosticCommands:4,maxWrites:4,
+    authorizationId:'operation-successor-fixture',ledgerId:'operation-successor-fixture',notBefore:new Date(now-1000).toISOString(),expiresAt:new Date(now+86400000-1000).toISOString(),reservedReads:3510997,hardReadCap:3800000,diagnosticCommands:4,maxWrites:4,
     previousReadsSpentOrReserved:0,previousWritesSpentOrReserved:0,previousDiagnosticCommands:0,outstandingPriorReservationsAccepted:true,...identity};
   return {authorization:a,provenance:{runId:'321',artifactId:'654',digest:'sha256:'+'9'.repeat(64),contentSha256:sha(JSON.stringify(a))}};
 }
@@ -35,13 +34,13 @@ function archiveAuthorization(p:any) {
 function fixture() {
   const classification={sourceCommit:'a'.repeat(40),sourceTree:'b'.repeat(40)};
   const env={GITHUB_ACTIONS:'true',GITHUB_REPOSITORY:OPERATOR_PROOF.repository,GITHUB_RUN_ATTEMPT:'1',GITHUB_RUN_ID:'123',GITHUB_EVENT_NAME:'pull_request',GITHUB_REF:'refs/pull/172/merge',OPERATOR_BASE_COMMIT:'c'.repeat(40)};
-  const admission={accountId:ACCOUNT,role:'preview' as const,day:new Date(start).toISOString().slice(0,10),inventoryObservedAt:new Date(start).toISOString(),liveControlReserve:100000,observedAt:new Date(start).toISOString(),rowsRead:100,rowsWritten:0,sampleInterval:1 as const,readBudget:3560000,controls:[{role:'preview',databaseId:TARGETS.preview.databaseId}]};
+  const admission={accountId:ACCOUNT,role:'preview' as const,day:new Date(start).toISOString().slice(0,10),observedAt:new Date(start).toISOString(),rowsRead:100,rowsWritten:0,sampleInterval:1 as const,readBudget:3510997,controls:[{role:'preview',databaseId:TARGETS.preview.databaseId}]};
   const c=createOperatorChallenge('preview',classification,'d'.repeat(64),env,start,admission,authorization());
   const tables=Object.fromEntries(Array.from({length:39},(_,i)=>['table'+i,{rows:1,sha256:'e'.repeat(64)}]));
-  const plan={schemaVersion:'theologai-application-corpus-source-plan.v1',classification,readBudget:3560000,integrityCommands:4,expected:{digests:tables,foreignKeyWitnessSha256:'2'.repeat(64)}};
-  const receipt={releasePolicy:'norton-aquinas.v1',liveControlReserve:100000,schemaVersion:'theologai-fresh-complete-corpus-proof.v1',role:'preview',accountId:ACCOUNT,...TARGETS.preview,
+  const plan={schemaVersion:'theologai-application-corpus-source-plan.v1',classification,readBudget:3510997,integrityCommands:4,expected:{digests:tables}};
+  const receipt={schemaVersion:'theologai-fresh-complete-corpus-proof.v1',role:'preview',accountId:ACCOUNT,...TARGETS.preview,
     ...classification,corpusIdentity:CORPUS,schema:SCHEMA,startedAt:new Date(start+1000).toISOString(),completedAt:new Date(start+120_000).toISOString(),
-    sourcePlanSha256:c.sourcePlanSha256,approvalSha256:sha(JSON.stringify(operatorApproval(c))),readBudget:3560000,controlsUnchanged:true,
+    sourcePlanSha256:c.sourcePlanSha256,approvalSha256:sha(JSON.stringify(operatorApproval(c))),readBudget:3510997,controlsUnchanged:true,
     operationalAssumption:'owner_reserves_target_data_writes_during_proof_not_an_enforced_provider_lease',
     controls:[{role:'preview',databaseId:TARGETS.preview.databaseId}],
     proof:{method:'fresh_complete_cells_physical_and_rank1_fts.v1',quickCheck:'ok',ftsIntegrity:[...ALL_FTS],tables,sourceRows:39,
@@ -70,7 +69,7 @@ describe('complete operator proof contract',()=>{
     const timeout=vi.fn().mockImplementation(()=>{throw Error('timeout');});expect(()=>readLiveOperatorMetadata(OPERATOR_PROOF.repository,'/pulls/170',timeout,pause)).toThrow('timeout');expect(timeout).toHaveBeenCalledOnce();
     for(const path of ['/actions/workflows/pr.yml/dispatches','/actions/runs/123/pending_deployments','/d1/query'])expect(()=>readLiveOperatorMetadata(OPERATOR_PROOF.repository,path,invalid,pause)).toThrow('GET route');expect(invalid).toHaveBeenCalledOnce();expect(pause).not.toHaveBeenCalled();
   });
-  it('keeps the approved complete proof/read/write reservation unchanged',()=>{const f=fixture();expect(operatorApproval(f.c)).toEqual({releasePolicy:'norton-aquinas.v1',liveControlReserve:100000,expectedLedgerSha256:'1'.repeat(64),schemaVersion:'theologai-fresh-corpus-proof-approval.v1',role:'preview',accountId:ACCOUNT,databaseId:TARGETS.preview.databaseId,sourceCommit:f.c.sourceCommit,sourceTree:f.c.sourceTree,expiresAt:f.c.expiresAt,maxReads:3560000,integrityCommands:4,exclusiveDataWritesDuringProof:true});});
+  it('keeps the approved complete proof/read/write reservation unchanged',()=>{const f=fixture();expect(operatorApproval(f.c)).toEqual({schemaVersion:'theologai-fresh-corpus-proof-approval.v1',role:'preview',accountId:ACCOUNT,databaseId:TARGETS.preview.databaseId,sourceCommit:f.c.sourceCommit,sourceTree:f.c.sourceTree,expiresAt:f.c.expiresAt,maxReads:3800000,integrityCommands:4,exclusiveDataWritesDuringProof:true});});
   it('accepts a current full proof for the exact protected source and target',()=>{const f=fixture();expect(verifyOperatorEnvelope(f.envelope,f.c,f.plan,f.now)).toBe(f.envelope);});
   for(const fault of ['source','tree','plan','nonce','target','role','partial','fts','physical','fk','controls','retries','ambiguous','stale','pre-challenge','approval','budget-overrun','write-overrun','budget-reset','extra-field'])it('rejects '+fault,()=>{
     const f=fixture(); const e:any=structuredClone(f.envelope);
@@ -121,7 +120,7 @@ describe('complete operator proof contract',()=>{
 describe('operator cumulative budget',()=>{
   const ledger=(c:any)=>({schemaVersion:'theologai-operator-proof-budget.v1',authorizationId:c.authorizationId,
     ledgerId:c.authorization.authorization.ledgerId,authorizationSha256:sha(JSON.stringify(c.authorization)),consumed:false,readsSpentOrReserved:0,writesSpentOrReserved:0,diagnosticCommands:0,attempts:[] as any[]});
-  it('admits only a deliberately initialized new-operation ledger',()=>{const f=fixture();expect(()=>admitOperatorBudget(ledger(f.c),f.c,3560000)).not.toThrow();});
+  it('admits only a deliberately initialized new-operation ledger',()=>{const f=fixture();expect(()=>admitOperatorBudget(ledger(f.c),f.c,3510997)).not.toThrow();});
   for(const fault of ['reads','writes','commands','consumed','running','passed','awaiting','identity','missing-ledger','negative','old-pr170','authorization'])it('stops before SQL for '+fault,()=>{
     const f=fixture();const l=ledger(f.c);
     if(fault==='reads')l.readsSpentOrReserved=1;if(fault==='writes')l.writesSpentOrReserved=1;if(fault==='commands')l.diagnosticCommands=1;
@@ -160,7 +159,7 @@ describe('GitHub owner artifact provenance',()=>{
       const sourceRoot=join(directory,'source');
       execFileSync('git',['clone','--shared','--no-checkout',process.cwd(),sourceRoot],{stdio:'pipe'});
       const git=(args:string[])=>execFileSync('git',args,{cwd:sourceRoot,stdio:'pipe'});
-      git(['sparse-checkout','init','--cone']);git(['sparse-checkout','set','scripts','release','src','data','migrations','.github']);git(['checkout','--detach','HEAD']);
+      git(['sparse-checkout','init','--cone']);git(['sparse-checkout','set','scripts','release','src','data','migrations','.github']);git(['checkout','--detach','HEAD']);prepareApplicationReleaseSource(sourceRoot);
       for(const name of ['operator-corpus-proof.ts','application-corpus-check.ts','application-release-policy.mjs','corpus-proof-transport.ts'])copyFileSync(resolve('scripts',name),join(sourceRoot,'scripts',name));
       for(const name of ['operator-authorization.cjs'])copyFileSync(resolve('.github/scripts',name),join(sourceRoot,'.github/scripts',name));
       git(['add','scripts','.github']);git(['-c','user.name=Operator proof test','-c','user.email=test@example.invalid','commit','--allow-empty','-m','Test exact operator proof source']);
@@ -173,11 +172,7 @@ describe('GitHub owner artifact provenance',()=>{
       f.c.authorization=authorization('preview',start,{sourceCommit:source.sourceCommit,sourceTree:source.sourceTree,sourcePlanSha256:f.c.sourcePlanSha256});
       writeFileSync(join(directory,'operator-authorization.json'),JSON.stringify(f.c.authorization));
       Object.assign(f.envelope.receipt,{sourceCommit:source.sourceCommit,sourceTree:source.sourceTree,sourcePlanSha256:f.c.sourcePlanSha256,approvalSha256:sha(JSON.stringify(operatorApproval(f.c)))});
-      const mock=corpusTransportFixture({role:'preview'});
-      const control=await captureUnboundCorpusControl({role:'preview',now:()=>start,api:{get:path=>mock.fetch('https://api.cloudflare.com/client/v4/accounts/'+ACCOUNT+path),graphql:body=>mock.fetch('https://api.cloudflare.com/client/v4/graphql',{method:'POST',body:JSON.stringify(body)})}});
-      const controls:any[]=['production','preview'].map(role=>({role,deploymentId:mock.deployments[role as 'production'|'preview'],versionId:mock.versions[role as 'production'|'preview'],databaseId:role==='production'?POLICY.rollback.databaseId:TARGETS.production.databaseId}));
-      controls.push({kind:'unbound-corpus',databaseId:TARGETS.preview.databaseId,inventorySha256:control.inventorySha256});
-      f.c.admission.controls=controls;
+      const controls=['production','preview'].map(role=>({role,deploymentId:role,versionId:role==='preview'?'11111111-1111-4111-8111-111111111111':'22222222-2222-4222-8222-222222222222',databaseId:TARGETS[role as 'preview'|'production'].databaseId}));
       f.envelope.receipt.controls=controls as typeof f.envelope.receipt.controls;
       f.run.head_sha=source.sourceCommit;f.artifact.workflow_run.head_sha=source.sourceCommit;f.pr.head.sha=source.sourceCommit;
       const uploadDir=join(directory,'upload');mkdirSync(uploadDir);
@@ -192,9 +187,17 @@ describe('GitHub owner artifact provenance',()=>{
       const envelopeDigest=sha(readFileSync(envelopeFile,'utf8'));
       const challengeFile=join(directory,'challenge.json');writeFileSync(challengeFile,JSON.stringify(f.c));writeFileSync(join(directory,'plan.json'),planText);
       const preload=join(directory,'metadata-only.mjs');const calls=join(directory,'calls.jsonl');
-      writeFileSync(preload,`import {appendFileSync} from 'node:fs';import {corpusTransportFixture} from ${JSON.stringify(resolve('test/helpers/corpusTransportFixture.ts'))};
-        const N=Date;globalThis.Date=class extends N{constructor(...args){super(...(args.length?args:[${f.now}]));}static now(){return ${f.now};}};const timeout=setTimeout;globalThis.setTimeout=(fn,ms,...args)=>timeout(fn,ms<=650?0:ms,...args);
-        const fixture=corpusTransportFixture({role:'preview',drift:!!process.env.SYNTHETIC_CONTROL_DRIFT,record:(path,method)=>appendFileSync(${JSON.stringify(calls)},JSON.stringify({path,method})+'\\n')});globalThis.fetch=fixture.fetch;`);
+      writeFileSync(preload,`import {appendFileSync} from 'node:fs';
+        const NativeDate=Date;globalThis.Date=class extends NativeDate {constructor(...args){super(...(args.length?args:[${f.now}]));}static now(){return ${f.now};}};
+        const controls=${JSON.stringify(controls)};
+        globalThis.fetch=async(url,options)=>{
+          if(options.method!=='GET')throw Error('SQL/analytics forbidden in acceptance');
+          const path=new URL(url).pathname;appendFileSync(${JSON.stringify(calls)},JSON.stringify({path,method:options.method})+'\\n');
+          const role=path.includes('/theologai-preview/')?'preview':'production';const c=controls.find(c=>c.role===role);
+          const binding={type:'d1',name:'THEOLOGAI_DB',id:process.env.SYNTHETIC_CONTROL_DRIFT?'wrong':c.databaseId};
+          const result=path.endsWith('/settings')?{bindings:[binding]}:path.endsWith('/deployments')?{deployments:[{id:c.deploymentId,versions:[{version_id:c.versionId,percentage:100}]}]}:{id:c.versionId,resources:{bindings:[binding]}};
+          return Response.json({success:true,errors:[],result});
+        };`);
       const invoke=(receipt:string,drift=false)=>spawnSync(process.execPath,['--import','tsx','--import',preload,'scripts/operator-corpus-proof.ts','accept',challengeFile,envelopeFile,directory,f.c.sourcePlanSha256,receipt],{
         cwd:sourceRoot,encoding:'utf8',timeout:15000,env:{...process.env,RUNNER_TEMP:directory,CLOUDFLARE_ACCOUNT_ID:ACCOUNT,CLOUDFLARE_API_TOKEN:'synthetic-acceptance-token',GITHUB_OUTPUT:join(directory,'outputs.txt'),...(drift?{SYNTHETIC_CONTROL_DRIFT:'true'}:{})},
       });
@@ -204,7 +207,7 @@ describe('GitHub owner artifact provenance',()=>{
       expect(sha(readFileSync(envelopeFile,'utf8'))).toBe(envelopeDigest);
       const downstream=join(directory,'preview-readiness.json');const next=invoke(downstream);
       expect(next.status,next.stderr).toBe(0);expect(JSON.parse(readFileSync(downstream,'utf8'))).toEqual(f.envelope.receipt);
-      expect(readFileSync(calls,'utf8').trim().split('\n')).toHaveLength(48);
+      expect(readFileSync(calls,'utf8').trim().split('\n')).toHaveLength(12);
       const drift=join(directory,'drift.json');expect(invoke(drift,true).status).toBe(1);expect(existsSync(drift)).toBe(false);
       const altered=structuredClone(f.envelope);altered.receipt.proof.ftsIntegrity.pop();writeFileSync(envelopeFile,JSON.stringify(altered));
       expect(sha(readFileSync(envelopeFile,'utf8'))).not.toBe(envelopeDigest);

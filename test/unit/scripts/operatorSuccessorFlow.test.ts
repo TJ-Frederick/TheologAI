@@ -1,3 +1,4 @@
+import{prepareApplicationReleaseSource}from '../../helpers/applicationReleaseSource.js';
 import Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
@@ -7,7 +8,7 @@ import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, expect, it, vi } from 'vitest';
 import { ALL_FTS, CATALOG_SQL, canonicalTableDigest } from '../../../scripts/corpus-source-proof.js';
-import { ACCOUNT, TARGETS, classifyApplicationRelease } from '../../../scripts/norton-aquinas-release-policy.mjs';
+import { ACCOUNT, TARGETS, classifyApplicationRelease } from '../../../scripts/application-release-policy.mjs';
 import { operatorApproval } from '../../../scripts/operator-corpus-proof.js';
 const require=createRequire(import.meta.url);
 const authority=require('../../../.github/scripts/operator-authorization.cjs');
@@ -22,7 +23,7 @@ describe('successor operation flow with real CLIs and bounded local SQLite trans
     try {
       const root=join(directory,'source');execFileSync('git',['clone','--shared','--no-checkout',process.cwd(),root],{stdio:'pipe'});
       const git=(...args:string[])=>execFileSync('git',args,{cwd:root,encoding:'utf8',stdio:'pipe'}).trim();
-      git('sparse-checkout','init','--cone');git('sparse-checkout','set','scripts','release','src','data','migrations','.github');git('checkout','--detach','HEAD');
+      git('sparse-checkout','init','--cone');git('sparse-checkout','set','scripts','release','src','data','migrations','.github');git('checkout','--detach','HEAD');prepareApplicationReleaseSource(root);
       const base=git('rev-parse','HEAD');
       for(const name of ['operator-corpus-proof.ts','application-corpus-check.ts','application-release-policy.mjs','corpus-proof-transport.ts'])copyFileSync(resolve('scripts',name),join(root,'scripts',name));
       for(const name of ['operator-authorization.cjs'])copyFileSync(resolve('.github/scripts',name),join(root,'.github/scripts',name));
@@ -55,12 +56,12 @@ describe('successor operation flow with real CLIs and bounded local SQLite trans
           git('checkout','--detach',merge);expect(git('rev-parse','HEAD^{tree}')).toBe(priorPreview.sourceTree);
         }
         const source=classifyApplicationRelease(root);
-        const plan={schemaVersion:'theologai-application-corpus-source-plan.v1',classification:source,sourceSha256:sourceHash,expected,readBudget:3560000,integrityCommands:4};
+        const plan={schemaVersion:'theologai-application-corpus-source-plan.v1',classification:source,sourceSha256:sourceHash,expected,readBudget:3510997,integrityCommands:4};
         const planText=JSON.stringify(plan),digest=sha(planText);writeFileSync(join(work,'plan.json'),planText);copyFileSync(join(directory,'source.db'),join(work,'source.db'));
         const target=join(work,'target.db');copyFileSync(join(directory,'source.db'),target);const remote=new Database(target);remote.exec("CREATE TABLE _cf_KV(key TEXT PRIMARY KEY,value BLOB);CREATE TABLE d1_migrations(id INTEGER PRIMARY KEY,name TEXT,applied_at TEXT);INSERT INTO d1_migrations VALUES(1,'0001.sql','fixture')");remote.close();
         const day=new Date(Date.now()+86400000).toISOString().slice(0,10),now=Date.parse(day+'T00:05:00Z');
         const runId=role==='production'?'124':phase==='failed-read'?'125':'123',branch=role==='production'?'main':'ci/different-successor-flow';
-        const a={schemaVersion:'theologai-operator-authorization.v1',scope:'new-additional-operation',exclusiveDataWritesDuringWindow:true,candidateWriteJobsPaused:true,releasePolicy:'norton-aquinas.v1',liveControlReserve:100000,expectedLedgerSha256:sha(JSON.stringify([{id:1,name:'0001.sql',applied_at:'fixture'}])),repository:'TJ-Frederick/TheologAI',ownerActorId:40179660,role,pullRequestNumber:172,headBranch:branch,sourceCommit:source.sourceCommit,sourceTree:source.sourceTree,baseCommit:base,sourcePlanSha256:digest,targetRunId:runId,targetRunAttempt:1,authorizationId:'operation-flow-'+phase,ledgerId:'operation-flow-'+phase,notBefore:new Date(now-1000).toISOString(),expiresAt:new Date(now+86400000-1000).toISOString(),reservedReads:3560000,hardReadCap:3560000,diagnosticCommands:4,maxWrites:4,previousReadsSpentOrReserved:0,previousWritesSpentOrReserved:0,previousDiagnosticCommands:0,outstandingPriorReservationsAccepted:true};
+        const a={schemaVersion:'theologai-operator-authorization.v1',scope:'new-additional-operation',repository:'TJ-Frederick/TheologAI',ownerActorId:40179660,role,pullRequestNumber:172,headBranch:branch,sourceCommit:source.sourceCommit,sourceTree:source.sourceTree,baseCommit:base,sourcePlanSha256:digest,targetRunId:runId,targetRunAttempt:1,authorizationId:'operation-flow-'+phase,ledgerId:'operation-flow-'+phase,notBefore:new Date(now-1000).toISOString(),expiresAt:new Date(now+86400000-1000).toISOString(),reservedReads:3510997,hardReadCap:3800000,diagnosticCommands:4,maxWrites:4,previousReadsSpentOrReserved:0,previousWritesSpentOrReserved:0,previousDiagnosticCommands:0,outstandingPriorReservationsAccepted:true};
         writeFileSync(join(work,'operator-authorization.json'),JSON.stringify(a));execFileSync('zip',['-q','authorization.zip','operator-authorization.json'],{cwd:work});let zip=readFileSync(join(work,'authorization.zip'));let retained=false;
         const owner={id:321,head_sha:source.sourceCommit,head_branch:branch,created_at:new Date(now).toISOString(),actor:{id:40179660},triggering_actor:{id:40179660},run_attempt:1,event:'workflow_dispatch',path:'.github/workflows/pr.yml'};
         const artifact={id:654,name:`operator-authorization-${runId}-attempt-1`,digest:'sha256:'+sha(zip),expired:false,expires_at:a.expiresAt,workflow_run:{id:321,head_sha:source.sourceCommit}},marker={...artifact,id:655,name:'operator-ledger-'+a.ledgerId};
@@ -86,10 +87,11 @@ describe('successor operation flow with real CLIs and bounded local SQLite trans
         writeFileSync(join(work,'bin/gh'),`#!${process.execPath}\nconst fs=require('node:fs');const path=process.argv[3];if(path.endsWith('/zip'))process.stdout.write(fs.readFileSync(${JSON.stringify(join(work,'authorization.zip'))}));else{const data=JSON.parse(fs.readFileSync(${JSON.stringify(join(work,'github.json'))},'utf8'));if(!data[path])process.exit(1);process.stdout.write(JSON.stringify(data[path]));}`,{mode:0o755});
         const network=join(work,'network.jsonl'),log=join(work,'transport.jsonl'),preload=join(work,'transport.mjs');
         writeFileSync(preload,`import Database from ${JSON.stringify(resolve('node_modules/better-sqlite3/lib/index.js'))};import{appendFileSync}from'node:fs';
-          import{corpusTransportFixture}from ${JSON.stringify(resolve('test/helpers/corpusTransportFixture.ts'))};
-          const N=Date;const now=Number(process.env.FIXTURE_NOW);globalThis.Date=class extends N{constructor(...args){super(...(args.length?args:[now]));}static now(){return now;}};const timeout=globalThis.setTimeout;globalThis.setTimeout=(fn,ms,...args)=>timeout(fn,ms<1000?0:ms,...args);
-          const db=new Database(${JSON.stringify(target)});globalThis.fetch=corpusTransportFixture({role:${JSON.stringify(role)},record:()=>appendFileSync(${JSON.stringify(network)},'request\\n'),query:(sql,token)=>{
-          const write=sql.startsWith('INSERT');appendFileSync(${JSON.stringify(log)},JSON.stringify({kind:write?'diagnostic':'read',credential:token.includes('integrity')?'operator':'reader'})+'\\n');if(write&&!token.includes('integrity'))throw Error('reader attempted write');if(process.env.FAIL_READ==='true'&&!write)throw Error('ambiguous read fixture');const rows=write?(db.prepare(sql).run(),[]):db.prepare(sql).all();return{rows,rowsRead:Math.max(rows.length,1),rowsWritten:write?1:0};}}).fetch;`);
+          const N=Date;const now=Number(process.env.FIXTURE_NOW);globalThis.Date=class extends N{constructor(...args){super(...(args.length?args:[now]));}static now(){return now;}};const timeout=globalThis.setTimeout;globalThis.setTimeout=(fn,ms,...args)=>timeout(fn,0,...args);
+          const db=new Database(${JSON.stringify(target)});globalThis.fetch=async(url,options)=>{appendFileSync(${JSON.stringify(network)},'request\\n');const path=new URL(url).pathname;const body=options.body?JSON.parse(options.body):null;let value;
+          if(path.endsWith('/query')){const sql=body.sql;const write=sql.startsWith('INSERT');const token=options.headers.authorization;appendFileSync(${JSON.stringify(log)},JSON.stringify({kind:write?'diagnostic':'read',credential:token.includes('integrity')?'operator':'reader'})+'\\n');if(write&&!token.includes('integrity'))throw Error('reader attempted write');if(process.env.FAIL_READ==='true'&&!write)throw Error('ambiguous read fixture');const rows=write?(db.prepare(sql).run(),[]):db.prepare(sql).all();value={success:true,errors:[],result:[{success:true,results:rows,meta:{rows_read:Math.max(rows.length,1),rows_written:write?1:0,changes:write?1:0,total_attempts:1,served_by_primary:true}}]};}
+          else if(path.endsWith('/graphql'))value={data:{viewer:{accounts:[{accountTag:${JSON.stringify(ACCOUNT)},d1AnalyticsAdaptiveGroups:[{sum:{rowsRead:100,rowsWritten:0},avg:{sampleInterval:1}}]}]}}};
+          else{const role=path.includes('/theologai-preview/')?'preview':'production';const binding={type:'d1',name:'THEOLOGAI_DB',id:${JSON.stringify(TARGETS)}[role].databaseId};const version=role==='preview'?'11111111-1111-4111-8111-111111111111':'22222222-2222-4222-8222-222222222222';const result=path.endsWith('/settings')?{bindings:[binding]}:path.endsWith('/deployments')?{deployments:[{id:role,versions:[{version_id:version,percentage:100}]}]}:{id:version,resources:{bindings:[binding]}};value={success:true,errors:[],result};}return Response.json(value);};`);
         const invoke=(args:string[],extra:Record<string,string>={})=>spawnSync(process.execPath,['--import','tsx','--import',preload,'scripts/operator-corpus-proof.ts',...args],{cwd:root,encoding:'utf8',timeout:45000,env:{...env,PATH:join(work,'bin')+':'+process.env.PATH,FIXTURE_NOW:String(now+1000),CLOUDFLARE_ACCOUNT_ID:ACCOUNT,CLOUDFLARE_API_TOKEN:'synthetic-reader',...extra}});
         const challenge=join(work,'challenge.json');let result=invoke(['challenge',role,work,digest,challenge]);expect(result.status,result.stderr).toBe(0);
         const c=JSON.parse(readFileSync(challenge,'utf8')),ledger=join(work,'ledger.json'),integrity=join(work,'integrity.json');
@@ -104,7 +106,7 @@ describe('successor operation flow with real CLIs and bounded local SQLite trans
         result=invoke(['init-ledger',challenge,ledger]);expect(result.status,result.stderr).toBe(0);
         const runArgs=['run',challenge,work,digest,integrity,ledger],operatorEnv={CLOUDFLARE_API_TOKEN:'synthetic-integrity',THEOLOGAI_OPERATOR_AUTH_CONFIRMED:'existing-wrangler-oauth',APPLICATION_CORPUS_PROOF_APPROVAL_JSON:JSON.stringify(operatorApproval(c)),FIXTURE_NOW:String(now+2000)};
         result=invoke(runArgs,operatorEnv);expect(result.status,result.stderr).toBe(0);
-        const budget=JSON.parse(readFileSync(ledger,'utf8'));expect(budget.consumed).toBe(true);expect(budget.outstandingReservation).toEqual({reads:3560000,writes:4,diagnosticCommands:4,liveControlReads:100000,includesProtectedReader:true});expect(budget.diagnosticCommands).toBe(4);
+        const budget=JSON.parse(readFileSync(ledger,'utf8'));expect(budget.consumed).toBe(true);expect(budget.outstandingReservation).toEqual({reads:3510997,writes:4,diagnosticCommands:4,includesProtectedReader:true});expect(budget.diagnosticCommands).toBe(4);
         const localEnvelope=JSON.parse(readFileSync(integrity,'utf8'));const proofUpload=join(work,'upload');mkdirSync(proofUpload);
         bridge.upload({context:{...context,eventName:'workflow_dispatch'},core:{setOutput:vi.fn()},environment:{GITHUB_ACTOR_ID:'40179660',GITHUB_RUN_ATTEMPT:'1',GITHUB_REF:'refs/heads/'+branch,RUNNER_TEMP:proofUpload,OPERATOR_PROOF_JSON:JSON.stringify(localEnvelope)},now:now+2000});
         execFileSync('zip',['-q','proof.zip','operator-proof-envelope.json'],{cwd:proofUpload});const proofZip=readFileSync(join(proofUpload,'proof.zip'));
@@ -118,10 +120,10 @@ describe('successor operation flow with real CLIs and bounded local SQLite trans
         expect('sha256:'+sha(proofZip)).toBe(found.digest);expect(execFileSync('unzip',['-Z1',join(proofUpload,'proof.zip')],{encoding:'utf8'}).trim()).toBe('operator-proof-envelope.json');
         expect(invoke(['run',challenge,work,digest,join(work,'replay.json'),ledger],operatorEnv).status).toBe(1);expect(readFileSync(log,'utf8').trim().split('\n')).toHaveLength(4);
         // A cancelled/missing protected phase leaves the whole reservation outstanding.
-        expect(existsSync(join(work,'complete.json'))).toBe(false);expect(JSON.parse(readFileSync(ledger,'utf8')).outstandingReservation.reads).toBe(3560000);
+        expect(existsSync(join(work,'complete.json'))).toBe(false);expect(JSON.parse(readFileSync(ledger,'utf8')).outstandingReservation.reads).toBe(3510997);
         const complete=join(work,'complete.json');result=invoke(['complete',challenge,join(proofUpload,'operator-proof-envelope.json'),work,digest,complete],{FIXTURE_NOW:String(now+3000),...(phase==='failed-read'?{FAIL_READ:'true'}:{})});
         if(phase==='failed-read') {
-          expect(result.status).toBe(1);const costs=JSON.parse(readFileSync(complete+'.budget.json','utf8'));expect(costs.reader.readsSpentOrReserved).toBeGreaterThanOrEqual(4096);expect(costs.integrity.cumulativeDiagnosticCommands).toBe(4);expect(JSON.parse(readFileSync(ledger,'utf8')).outstandingReservation.reads).toBe(3560000);continue;
+          expect(result.status).toBe(1);const costs=JSON.parse(readFileSync(complete+'.budget.json','utf8'));expect(costs.reader.readsSpentOrReserved).toBeGreaterThanOrEqual(4096);expect(costs.integrity.cumulativeDiagnosticCommands).toBe(4);expect(JSON.parse(readFileSync(ledger,'utf8')).outstandingReservation.reads).toBe(3510997);continue;
         }
         expect(result.status,result.stderr).toBe(0);const receipt=JSON.parse(readFileSync(complete,'utf8'));expect(Object.keys(receipt.proof.tables)).toHaveLength(39);expect(receipt.metering.integrityCommands).toBe(4);expect(receipt.metering.rowsWritten).toBe(4);
         const accepted=join(work,'accepted.json');result=invoke(['accept',challenge,join(work,'operator-proof-envelope.json'),work,digest,accepted],{FIXTURE_NOW:String(now+4000)});expect(result.status,result.stderr).toBe(0);expect(JSON.parse(readFileSync(accepted,'utf8'))).toEqual(receipt);

@@ -3,7 +3,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { DualEraMcpAudit } from './audit-dual-era-mcp-preview.js';
-import { verifyFreshCorpusReceipt } from './norton-aquinas-release-policy.mjs';
+import {policyForClassification,policyForIdentity,requireSameReleasePolicy,selectReleaseProofPolicy} from '../.github/scripts/release-proof-policy.mjs';
 
 type JsonRecord = Record<string, unknown>;
 const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1_000;
@@ -21,7 +21,8 @@ export interface DualEraPreviewReleaseReceipt {
   productProfile: '7';
   protocols: ['2025-11-25', '2026-07-28'];
   server: { name: 'theologai-bible-server'; version: string };
-  counts: { tools: 12; prompts: 6; resourceTemplates: 2; staticResources: 3 };
+  releasePolicy?: 'norton-aquinas.v1';
+  counts: { tools: 11|12; prompts: 6; resourceTemplates: 2; staticResources: 3 };
   contractFingerprints: DualEraMcpAudit['eras'][number]['fingerprints'];
   auditSha256: string;
   worker: { deploymentId: string; versionId: string; versionNumber: number };
@@ -79,7 +80,7 @@ function parseAudit(text: string): DualEraMcpAudit {
     exactKeys(fingerprints, ['capabilities', 'tools', 'prompts', 'resourceTemplates', 'staticResources'], `dual-era audit ${protocol} fingerprints`);
     if (era.protocolVersion !== protocol || era.serverName !== 'theologai-bible-server'
       || typeof era.serverVersion !== 'string' || era.serverVersion.length === 0
-      || counts.tools !== 12 || counts.prompts !== 6 || counts.resourceTemplates !== 2 || counts.staticResources !== 3
+      || ![11,12].includes(Number(counts.tools)) || counts.prompts !== 6 || counts.resourceTemplates !== 2 || counts.staticResources !== 3
       || !Object.values(fingerprints).every(value => typeof value === 'string' && /^[0-9a-f]{64}$/.test(value))) {
       fail(`dual-era audit ${protocol} contract is malformed`);
     }
@@ -129,12 +130,16 @@ export function createDualEraPreviewReleaseReceipt(input: {
       || source.sourceCommit !== input.sourceCommit || source.sourceTree !== input.sourceTree
       || readiness.databaseId !== candidateD1.databaseId || readiness.databaseName !== candidateD1.databaseName) fail('fresh proof source/candidate mismatch');
     if (typeof readiness.completedAt !== 'string' || Date.parse(readiness.completedAt) > Date.parse(audit.capturedAt)) fail('fresh proof must precede the live audit');
-    verifyFreshCorpusReceipt(readiness, { role: 'preview', sourceCommit: input.sourceCommit, sourceTree: input.sourceTree,
+    const selected=policyForClassification(source);requireSameReleasePolicy(selected,readiness.releasePolicy);
+    if(audit.eras.some(era=>era.counts.tools!==(selected.id==='norton-aquinas.v1'?12:11)))fail('source policy/audit tool count mismatch');
+    selected.module.verifyFreshCorpusReceipt(readiness, { role: 'preview', sourceCommit: input.sourceCommit, sourceTree: input.sourceTree,
       sourcePlanSha256: sha256(input.d1SourcePlanText), tables: expected.digests,foreignKeyWitnessSha256:expected.foreignKeyWitnessSha256 });
   } else if (readiness.schemaVersion !== 'theologai-remote-d1-readiness-receipt.v1'
     || readiness.environment !== 'preview' || readiness.database !== candidateD1.databaseName) fail('D1 readiness does not match the audited candidate');
+  if(!fresh&&audit.eras.some(era=>era.counts.tools!==11))fail('legacy application audit tool count mismatch');
   const first = audit.eras[0]!;
   return {
+    ...(readiness.releasePolicy==='norton-aquinas.v1'?{releasePolicy:'norton-aquinas.v1' as const}:{}),
     schemaVersion: fresh ? 'theologai-dual-era-preview-release-receipt.v2' : 'theologai-dual-era-preview-release-receipt.v1',
     createdAt: audit.capturedAt,
     repository: input.repository,
@@ -160,11 +165,12 @@ export function createDualEraPreviewReleaseReceipt(input: {
 }
 
 export function verifyDualEraPreviewReleaseReceipt(receipt: unknown, expected: {
-  repository: string; sourceCommit: string; sourceTree: string; serverVersion: string; now?: Date;
+  repository: string; sourceCommit: string; sourceTree: string; serverVersion: string; now?: Date; releasePolicy?:'application-only'|'norton-aquinas.v1';
 }): DualEraPreviewReleaseReceipt {
   const value = object(receipt, 'receipt');
+  const selected=policyForIdentity(expected.releasePolicy);requireSameReleasePolicy(selected,value.releasePolicy);
   exactKeys(value, [
-    'schemaVersion', 'createdAt', 'repository', 'pullRequest', 'sourceCommit', 'sourceTree', 'endpoint',
+    ...(selected.id==='norton-aquinas.v1'?['releasePolicy']:[]),'schemaVersion', 'createdAt', 'repository', 'pullRequest', 'sourceCommit', 'sourceTree', 'endpoint',
     'productProfile', 'protocols', 'server', 'counts', 'contractFingerprints', 'auditSha256', 'worker', 'd1',
     'd1ReadinessSha256', ...(value.schemaVersion === 'theologai-dual-era-preview-release-receipt.v2' ? ['d1ReadinessKind', 'd1SourcePlanSha256'] : []),
   ], 'receipt');
@@ -189,7 +195,7 @@ export function verifyDualEraPreviewReleaseReceipt(receipt: unknown, expected: {
   exactKeys(d1, ['databaseName', 'databaseId'], 'receipt D1');
   if (server.name !== 'theologai-bible-server' || server.version !== expected.serverVersion
     || value.endpoint !== 'https://preview-mcp.theologai.xyz/mcp'
-    || counts.tools !== 12 || counts.prompts !== 6 || counts.resourceTemplates !== 2 || counts.staticResources !== 3
+    || counts.tools !== (selected.id==='norton-aquinas.v1'?12:11) || counts.prompts !== 6 || counts.resourceTemplates !== 2 || counts.staticResources !== 3
     || !Object.values(fingerprints).every(item => typeof item === 'string' && /^[0-9a-f]{64}$/.test(item))
     || !isSha256(value.auditSha256) || !isSha256(value.d1ReadinessSha256)
     || !isUuid(worker.deploymentId) || !isUuid(worker.versionId)
@@ -234,7 +240,7 @@ async function main(): Promise<void> {
     const receipt = parseJson(await requiredFile(options, '--receipt'), 'receipt');
     const verified = verifyDualEraPreviewReleaseReceipt(receipt, {
       repository: options.get('--expected-repository') ?? '', sourceCommit: options.get('--expected-source-commit') ?? '',
-      sourceTree: options.get('--expected-source-tree') ?? '', serverVersion: options.get('--expected-server-version') ?? '',
+      sourceTree: options.get('--expected-source-tree') ?? '', serverVersion: options.get('--expected-server-version') ?? '',releasePolicy:selectReleaseProofPolicy(process.cwd()).id,
     });
     process.stdout.write(`${JSON.stringify({ pullRequest: verified.pullRequest, worker: verified.worker, d1: verified.d1 })}\n`);
     return;

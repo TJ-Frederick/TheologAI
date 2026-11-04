@@ -16,7 +16,7 @@ export async function runCorpusLive(input:{role:'preview'|'production';sourceDir
  const classification=classifyApplicationRelease(process.cwd());
  const planText=readFileSync(join(input.sourceDirectory,'plan.json'));check(sha(planText)===input.planSha256,'source plan hash');
  const plan=JSON.parse(planText.toString()),challenge=requireOperatorChallenge(json(input.challengeFile));
- check(JSON.stringify(plan.classification)===JSON.stringify(classification)&&challenge.role===input.role&&challenge.sourceCommit===classification.sourceCommit&&challenge.sourceTree===classification.sourceTree&&challenge.sourcePlanSha256===input.planSha256,'source policy/role');
+ check(JSON.stringify(plan.classification)===JSON.stringify(classification)&&challenge.releasePolicy===POLICY.policy&&challenge.liveControlReserve===100000&&challenge.role===input.role&&challenge.sourceCommit===classification.sourceCommit&&challenge.sourceTree===classification.sourceTree&&challenge.sourcePlanSha256===input.planSha256,'source policy/role');
  check(sha(readFileSync(join(input.sourceDirectory,'source.db')))===plan.sourceSha256,'source database hash');
  const receipt=json(input.receiptFile);verifyFreshCorpusReceipt(receipt,{role:input.role,sourceCommit:classification.sourceCommit,sourceTree:classification.sourceTree,sourcePlanSha256:input.planSha256,tables:plan.expected.digests,foreignKeyWitnessSha256:plan.expected.foreignKeyWitnessSha256});
  check(receipt.proof.ledgerSha256===challenge.authorization.authorization.expectedLedgerSha256,'approved original ledger witness');
@@ -24,7 +24,6 @@ export async function runCorpusLive(input:{role:'preview'|'production';sourceDir
  const output=join(input.outputDirectory,'corpus-live.json'),events=output+'.events.jsonl';
  const event=(value:unknown)=>appendFileSync(events,JSON.stringify(value)+'\n',{mode:0o600,flush:true});
  // A partial/failed live attempt retains the whole reservation; output paths are create-only.
- writeFileSync(events,'',{flag:'wx',mode:0o600});
  const observer=new CorpusProofTransport({policy:POLICY.policy,role:input.role,token:input.token,readBudget:0,eventFile:events,activated:true,fetch:input.fetch,historicalExceptions:false});
  const before=await observer.observeControls() as any[];
  const active=before.find(v=>v.role===input.role);check(active?.deploymentId===cutover.observedActiveDeploymentId&&active?.versionId===cutover.observedActiveVersionId,'cutover assignment changed');
