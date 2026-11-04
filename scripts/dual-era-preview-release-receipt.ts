@@ -3,7 +3,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { DualEraMcpAudit } from './audit-dual-era-mcp-preview.js';
-import { verifyFreshCorpusReceipt } from './application-release-policy.mjs';
+import { verifyFreshCorpusReceipt } from './norton-aquinas-release-policy.mjs';
 
 type JsonRecord = Record<string, unknown>;
 const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1_000;
@@ -21,7 +21,7 @@ export interface DualEraPreviewReleaseReceipt {
   productProfile: '7';
   protocols: ['2025-11-25', '2026-07-28'];
   server: { name: 'theologai-bible-server'; version: string };
-  counts: { tools: 11; prompts: 6; resourceTemplates: 2; staticResources: 3 };
+  counts: { tools: 12; prompts: 6; resourceTemplates: 2; staticResources: 3 };
   contractFingerprints: DualEraMcpAudit['eras'][number]['fingerprints'];
   auditSha256: string;
   worker: { deploymentId: string; versionId: string; versionNumber: number };
@@ -79,7 +79,7 @@ function parseAudit(text: string): DualEraMcpAudit {
     exactKeys(fingerprints, ['capabilities', 'tools', 'prompts', 'resourceTemplates', 'staticResources'], `dual-era audit ${protocol} fingerprints`);
     if (era.protocolVersion !== protocol || era.serverName !== 'theologai-bible-server'
       || typeof era.serverVersion !== 'string' || era.serverVersion.length === 0
-      || counts.tools !== 11 || counts.prompts !== 6 || counts.resourceTemplates !== 2 || counts.staticResources !== 3
+      || counts.tools !== 12 || counts.prompts !== 6 || counts.resourceTemplates !== 2 || counts.staticResources !== 3
       || !Object.values(fingerprints).every(value => typeof value === 'string' && /^[0-9a-f]{64}$/.test(value))) {
       fail(`dual-era audit ${protocol} contract is malformed`);
     }
@@ -130,7 +130,7 @@ export function createDualEraPreviewReleaseReceipt(input: {
       || readiness.databaseId !== candidateD1.databaseId || readiness.databaseName !== candidateD1.databaseName) fail('fresh proof source/candidate mismatch');
     if (typeof readiness.completedAt !== 'string' || Date.parse(readiness.completedAt) > Date.parse(audit.capturedAt)) fail('fresh proof must precede the live audit');
     verifyFreshCorpusReceipt(readiness, { role: 'preview', sourceCommit: input.sourceCommit, sourceTree: input.sourceTree,
-      sourcePlanSha256: sha256(input.d1SourcePlanText), tables: expected.digests });
+      sourcePlanSha256: sha256(input.d1SourcePlanText), tables: expected.digests,foreignKeyWitnessSha256:expected.foreignKeyWitnessSha256 });
   } else if (readiness.schemaVersion !== 'theologai-remote-d1-readiness-receipt.v1'
     || readiness.environment !== 'preview' || readiness.database !== candidateD1.databaseName) fail('D1 readiness does not match the audited candidate');
   const first = audit.eras[0]!;
@@ -189,7 +189,7 @@ export function verifyDualEraPreviewReleaseReceipt(receipt: unknown, expected: {
   exactKeys(d1, ['databaseName', 'databaseId'], 'receipt D1');
   if (server.name !== 'theologai-bible-server' || server.version !== expected.serverVersion
     || value.endpoint !== 'https://preview-mcp.theologai.xyz/mcp'
-    || counts.tools !== 11 || counts.prompts !== 6 || counts.resourceTemplates !== 2 || counts.staticResources !== 3
+    || counts.tools !== 12 || counts.prompts !== 6 || counts.resourceTemplates !== 2 || counts.staticResources !== 3
     || !Object.values(fingerprints).every(item => typeof item === 'string' && /^[0-9a-f]{64}$/.test(item))
     || !isSha256(value.auditSha256) || !isSha256(value.d1ReadinessSha256)
     || !isUuid(worker.deploymentId) || !isUuid(worker.versionId)

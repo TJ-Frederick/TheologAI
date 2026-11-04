@@ -37,7 +37,8 @@ type FetchLike = typeof fetch;
 type Now = () => number;
 type Sleep = (milliseconds: number) => Promise<void>;
 
-export type StabilizationProfile = HistoricalCoreAuditProfile;
+export type StabilizationProfile = HistoricalCoreAuditProfile & {corpusRelease?:true};
+export function expectedStabilizationResources(profile:StabilizationProfile):readonly string[]{return profile.corpusRelease ? [...HISTORICAL_CORE_EXPECTED_RESOURCE_URIS,'theologai://documents/calvin-institutes-of-the-christian-religion','theologai://documents/summa-theologiae'].sort() : HISTORICAL_CORE_EXPECTED_RESOURCE_URIS;}
 export type StabilizationAttempt = Readonly<{
   attempt: number;
   elapsedMs: number;
@@ -294,8 +295,8 @@ async function probeContract(
       return resource.uri;
     }).sort();
     const resourceUrisSha256 = sha256(canonicalJson(resourceUris));
-    const expectedResourceUrisSha256 = sha256(canonicalJson(HISTORICAL_CORE_EXPECTED_RESOURCE_URIS));
-    const resourcesMatch = resourceUris.length === HISTORICAL_CORE_EXPECTED_RESOURCE_URIS.length
+    const expectedResourceUrisSha256 = sha256(canonicalJson(expectedStabilizationResources(profile)));
+    const resourcesMatch = resourceUris.length === expectedStabilizationResources(profile).length
       && new Set(resourceUris).size === resourceUris.length
       && canonicalJson(resourceUris) === canonicalJson(HISTORICAL_CORE_EXPECTED_RESOURCE_URIS)
       && resourceUrisSha256 === expectedResourceUrisSha256;
@@ -414,11 +415,12 @@ export async function runPrimarySourceEdgeStabilizationCli(
   profile: StabilizationProfile,
   dependencies: StabilizationDependencies = {},
 ): Promise<{ output: string; evidence: StabilizationEvidence }> {
-  assert(args.length === 2 && args[0] === '--output' && typeof args[1] === 'string' && args[1].length > 0,
+  const corpusRelease=args.length===3&&args[2]==='--corpus-release';
+  assert((args.length === 2 || corpusRelease) && args[0] === '--output' && typeof args[1] === 'string' && args[1].length > 0,
     `usage: audit:primary-source-edge-stabilization-${profile.label} --output path`);
   const output = resolve(args[1]!);
   await assertOutputAbsent(output);
-  const evidence = await runPrimarySourceEdgeStabilization(profile, dependencies);
+  const evidence = await runPrimarySourceEdgeStabilization(corpusRelease?{...profile,corpusRelease:true}:profile, dependencies);
   await mkdir(dirname(output), { recursive: true });
   await writeFile(output, `${JSON.stringify(evidence, null, 2)}\n`, { encoding: 'utf8', flag: 'wx', mode: 0o600 });
   assert(evidence.passed,

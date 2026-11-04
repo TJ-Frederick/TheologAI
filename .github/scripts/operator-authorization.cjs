@@ -1,5 +1,6 @@
 // Authenticated owner handoff for one new operation. No cloud API or budget renewal.
 const fs = require('node:fs');
+const policy = require('./norton-aquinas-policy.cjs');
 const { join } = require('node:path');
 const { tmpdir } = require('node:os');
 const { execFileSync } = require('node:child_process');
@@ -10,10 +11,10 @@ const hash = value => createHash('sha256').update(value).digest('hex');
 const check = (v, reason) => { if (!v) throw Error('Operator authorization refused: ' + reason); };
 const hex = (v, n) => typeof v === 'string' && new RegExp(`^[0-9a-f]{${n}}$`).test(v);
 const id = v => typeof v === 'string' && /^[1-9][0-9]{0,15}$/.test(v) && Number.isSafeInteger(Number(v));
-const keys = ['schemaVersion','scope','repository','ownerActorId','role','pullRequestNumber','headBranch','sourceCommit','sourceTree','baseCommit','sourcePlanSha256','targetRunId','targetRunAttempt','authorizationId','ledgerId','notBefore','expiresAt','reservedReads','hardReadCap','diagnosticCommands','maxWrites','previousReadsSpentOrReserved','previousWritesSpentOrReserved','previousDiagnosticCommands','outstandingPriorReservationsAccepted'];
+const keys = ['exclusiveDataWritesDuringWindow','candidateWriteJobsPaused','liveControlReserve','expectedLedgerSha256','releasePolicy','schemaVersion','scope','repository','ownerActorId','role','pullRequestNumber','headBranch','sourceCommit','sourceTree','baseCommit','sourcePlanSha256','targetRunId','targetRunAttempt','authorizationId','ledgerId','notBefore','expiresAt','reservedReads','hardReadCap','diagnosticCommands','maxWrites','previousReadsSpentOrReserved','previousWritesSpentOrReserved','previousDiagnosticCommands','outstandingPriorReservationsAccepted'];
 function requireAuthorization(a, expected = {}, now = Date.now()) {
   check(a && Object.keys(a).sort().join(',') === [...keys].sort().join(','), 'shape');
-  check(a.schemaVersion === 'theologai-operator-authorization.v1' && a.scope === 'new-additional-operation'
+  check(a.schemaVersion === 'theologai-operator-authorization.v1' && a.scope === 'new-additional-operation' && a.exclusiveDataWritesDuringWindow===true && a.candidateWriteJobsPaused===true && a.releasePolicy === policy.policy && hex(a.expectedLedgerSha256,64)
     && a.repository === repository && a.ownerActorId === ownerActorId, 'explicit new owner scope');
   check(['preview','production'].includes(a.role) && Number.isSafeInteger(a.pullRequestNumber) && a.pullRequestNumber > 170,
     'successor role and PR');
@@ -22,7 +23,7 @@ function requireAuthorization(a, expected = {}, now = Date.now()) {
   check(['sourceCommit','sourceTree','baseCommit'].every(k => hex(a[k],40)) && hex(a.sourcePlanSha256,64)
     && id(a.targetRunId) && a.targetRunAttempt === 1, 'source and run');
   check(/^operation-[a-z0-9-]{8,80}$/.test(a.authorizationId || '') && a.ledgerId === a.authorizationId, 'single operation ledger');
-  check(a.reservedReads === 3510997 && a.hardReadCap === 3800000 && a.diagnosticCommands === 4 && a.maxWrites === 4
+  check(a.reservedReads === policy.reservedReads && a.hardReadCap === policy.hardReadCap && a.diagnosticCommands === 4 && a.maxWrites === 4 && a.liveControlReserve === policy.liveReads + policy.controlReads
     && a.previousReadsSpentOrReserved === 0 && a.previousWritesSpentOrReserved === 0 && a.previousDiagnosticCommands === 0
     && a.outstandingPriorReservationsAccepted === true, 'new allowance and retained prior reservations');
   const start = Date.parse(a.notBefore), end = Date.parse(a.expiresAt);

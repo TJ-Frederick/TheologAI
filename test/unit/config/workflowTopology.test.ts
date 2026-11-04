@@ -202,15 +202,15 @@ describe('workflow topology', () => {
   it('paces the long fixed audits within the shared per-IP request budget', async () => {
     for (const [file, target, jobId] of [['pr.yml', 'preview', 'preview-deploy'], ['deploy.yml', 'production', 'deploy']] as const) {
       const steps = (parse(await readWorkflow(file)) as Workflow).jobs[jobId]!.steps!;
-      const core = steps.findIndex(step => step.name === `Audit Transform-9 historical core contract on ${target}`);
-      const pause = steps.findIndex(step => step.name === 'Respect the shared IP request budget before the spine audit');
-      const spine = steps.findIndex(step => step.name === `Audit Transform-11 historical spine contract on ${target}`);
-      expect(pause).toBeGreaterThan(core);
-      expect(spine).toBeGreaterThan(pause);
-      const seconds = /^sleep (\d+)$/.exec(steps[pause]!.run ?? '');
-      expect(seconds).not.toBeNull();
-      expect(Number(seconds![1])).toBeGreaterThan(60);
-      expect(steps[pause]!.if).toBe(`\${{ steps.${target}-historical-core-audit.outcome == 'success' }}`);
+      const live = steps.filter(step => step.id === target+'-corpus-live');
+      expect(live).toHaveLength(1);
+      expect(live[0]!.run).toContain('scripts/norton-aquinas-live.ts '+target);
+      expect(live[0]!.if).toContain('steps.'+target+"-primary-source-edge-stabilization-gate.outcome == 'success'");
+      expect(steps.some(step=>step.name?.includes('Audit Transform-'))).toBe(false);
+      const audit = await readFile(new URL('../../../scripts/audit-corpus-release.ts', import.meta.url), 'utf8');
+      expect(audit).toContain('650');
+      expect(audit).toContain('++exchanges <= 200');
+      expect(audit).toContain('guard');
     }
   });
 
@@ -620,7 +620,7 @@ describe('downstream preview authorization before cloud inventory',()=>{
       expect(steps.indexOf(proof)).toBeLessThan(cloud);expect(steps.indexOf(source)).toBeLessThan(cloud);
       expect(workflow.jobs['preview-deploy']!.permissions).toEqual({contents:'read','pull-requests':'write'});
       const now=Date.now(),head='a'.repeat(40),base='b'.repeat(40),tree='c'.repeat(40),plan='d'.repeat(64);
-      const a={schemaVersion:'theologai-operator-authorization.v1',scope:'new-additional-operation',repository:'TJ-Frederick/TheologAI',ownerActorId:40179660,role:'preview',pullRequestNumber:172,headBranch:'ci/another-successor',sourceCommit:head,sourceTree:tree,baseCommit:base,sourcePlanSha256:plan,targetRunId:'123',targetRunAttempt:1,authorizationId:'operation-downstream-fixture',ledgerId:'operation-downstream-fixture',notBefore:new Date(now-1000).toISOString(),expiresAt:new Date(now+86400000-1000).toISOString(),reservedReads:3510997,hardReadCap:3800000,diagnosticCommands:4,maxWrites:4,previousReadsSpentOrReserved:0,previousWritesSpentOrReserved:0,previousDiagnosticCommands:0,outstandingPriorReservationsAccepted:true};
+      const a={schemaVersion:'theologai-operator-authorization.v1',scope:'new-additional-operation',exclusiveDataWritesDuringWindow:true,candidateWriteJobsPaused:true,releasePolicy:'norton-aquinas.v1',liveControlReserve:100000,expectedLedgerSha256:'1'.repeat(64),repository:'TJ-Frederick/TheologAI',ownerActorId:40179660,role:'preview',pullRequestNumber:172,headBranch:'ci/another-successor',sourceCommit:head,sourceTree:tree,baseCommit:base,sourcePlanSha256:plan,targetRunId:'123',targetRunAttempt:1,authorizationId:'operation-downstream-fixture',ledgerId:'operation-downstream-fixture',notBefore:new Date(now-1000).toISOString(),expiresAt:new Date(now+86400000-1000).toISOString(),reservedReads:3560000,hardReadCap:3560000,diagnosticCommands:4,maxWrites:4,previousReadsSpentOrReserved:0,previousWritesSpentOrReserved:0,previousDiagnosticCommands:0,outstandingPriorReservationsAccepted:true};
       const p={authorization:a,provenance:{runId:'321',artifactId:'654',digest:'sha256:'+'e'.repeat(64),contentSha256:authority.hash(JSON.stringify(a))}};
       let text=JSON.stringify(p),expectedHash=authority.hash(text);
       if(fault==='substituted-package'){p.authorization.headBranch='substituted';p.provenance.contentSha256=authority.hash(JSON.stringify(p.authorization));text=JSON.stringify(p);}

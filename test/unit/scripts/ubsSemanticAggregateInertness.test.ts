@@ -24,8 +24,8 @@ describe('bounded UBS semantic aggregate bundle activation contract', () => {
       materializations: { d1: { transformVersion: number } };
     };
     expect(manifest).toMatchObject({
-      schemaVersion: '0009_candidate_c_sectioned_publications',
-      materializations: { d1: { transformVersion: 12 } },
+      schemaVersion: '0010_active_aquinas_hierarchy_publication',
+      materializations: { d1: { transformVersion: 13 } },
     });
     const adapter = readFileSync(new URL('src/adapters/d1/D1UbsSemanticEvidenceBundleRepository.ts', repo), 'utf8');
     expect(adapter).toContain('exactly five statements');

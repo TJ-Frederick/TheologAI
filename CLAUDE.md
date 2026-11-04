@@ -7,9 +7,9 @@ production and preview-control snapshot, see
 [`docs/CURRENT-RELEASE.md`](docs/CURRENT-RELEASE.md); release identities below
 are dated historical evidence.
 
-Production MCP server for theological research. Eleven tools, six prompts, eight Bible translations, six commentaries, 35 historical documents and works, Greek/Hebrew language tools, and on-chain donation support. Tools, resources, and prompts are available on every transport; MCP Logging is stdio-only because HTTP is stateless.
+The checked-out local release candidate provides twelve tools, six prompts, eight Bible translations, six commentaries, 36 historical documents and works, Greek/Hebrew language tools, and on-chain donation support. Tools, resources, and prompts are available on every transport; MCP Logging is stdio-only because HTTP is stateless.
 
-<!-- theologai-public-contract tools=11 structured=bible_cross_references,bible_lookup,bible_verse_morphology,classic_text_lookup,commentary_lookup,donation_config,original_language_lookup,original_language_study,parallel_passages,primary_source_search,verify_donation -->
+<!-- theologai-public-contract tools=12 structured=bible_cross_references,bible_lookup,bible_verse_morphology,classic_text_lookup,commentary_lookup,donation_config,historical_hierarchy_lookup,original_language_lookup,original_language_study,parallel_passages,primary_source_search,verify_donation -->
 
 ## Working Agreements
 
@@ -25,7 +25,7 @@ Production MCP server for theological research. Eleven tools, six prompts, eight
 
 ## Security release and remaining scope
 
-SEC-01–05 are resolved in production through PR #170 / run 41256928054. [Findings and remaining risks](docs/SECURITY-REVIEW-2026-10-22.md), [remediation](docs/RELEASE-SECURITY-REMEDIATION.md) and [completed evidence](docs/security/SEC01-05-PRODUCTION-COMPLETE-2026-11-01.md) record the exact closure. Keep SEC-06 open and paused; preserve the existing Cloudflare account, permissions, bindings and approval process. Corpus activation and broader process work remain deferred. The release retains 11 tools, 35 flat works and schema 0009; newer corpus/features remain deferred.
+SEC-01–05 are resolved in production through PR #170 / run 41256928054. [Findings and remaining risks](docs/SECURITY-REVIEW-2026-10-22.md), [remediation](docs/RELEASE-SECURITY-REMEDIATION.md) and [completed evidence](docs/security/SEC01-05-PRODUCTION-COMPLETE-2026-11-01.md) record the exact closure. Keep SEC-06 open and paused; preserve the existing Cloudflare account, permissions, bindings and approval process. The deployed release retains 11 tools, 35 flat works and schema 0009. This local Norton/Aquinas candidate restores 12 tools, 36 flat works plus a separate hierarchy and schema 0010; preview execution and production preparation/deployment remain separately gated. Broader v9/CCEL work remains deferred.
 
 The public rate-limit key is domain-separated IP only, independent of User-Agent; public limiter failures remain fail-open and counts remain location-local. Keep the strict audit gate and its exact dev-only Zod exception/November 22 UTC expiry. Verify complete private Git history, required baseline objects and the exact approved merge/tree before dispatching a release. Preserve cumulative proof budgets and original workspaces; use [CURRENT-RELEASE](docs/CURRENT-RELEASE.md) for assignment identity and require a separate owner decision for rollback.
 
@@ -85,7 +85,7 @@ data/                     # Source data files
 ├── biblical-languages/   # Strong's concordance, STEPBible morphology/lexicons
 ├── cross-references/     # OpenBible.info cross-reference TSV
 ├── historical-documents/ # 17 legacy creeds, confessions, catechisms (JSON)
-└── historical-source-packs/ # 18 reviewed, sectioned-only source-pack editions
+└── historical-source-packs/ # 19 reviewed, sectioned-only source-pack editions
 
 skills/                   # Agent skill workflows
 ├── word-study/           # Greek/Hebrew word study methodology
@@ -109,7 +109,7 @@ test/
 
 ## MCP Capabilities
 
-### Tools (11)
+### Tools (12)
 
 | Tool | Description |
 |------|-------------|
@@ -117,7 +117,8 @@ test/
 | `bible_cross_references` | OpenBible.info discovery leads with raw vote ranking, unspecified relationship semantics, bounded result windows, and pinned snapshot provenance |
 | `parallel_passages` | Complete UBS source-attested groups by default; explicit legacy curated edges and separate OpenBible.info rows |
 | `commentary_lookup` | 6 commentaries (Matthew Henry, JFB, Clarke, Gill, K-D, Tyndale) |
-| `classic_text_lookup` | Search and browse 35 local historical works; 18 reviewed source-pack editions are sectioned-only; no remote CCEL body retrieval |
+| `classic_text_lookup` | Search and browse 36 local historical works; 19 reviewed source-pack editions are sectioned-only; no remote CCEL body retrieval |
+| `historical_hierarchy_lookup` | Browse Aquinas’s four authored Summa parts through Tertia Q90; exact nodes return direct text and the traditional Supplement is excluded. |
 | `primary_source_search` | Run bounded local-only primary-source query plans with exact local section locators |
 | `original_language_lookup` | Strong's concordance plus opt-in exact corrected-corpus usage and bounded occurrence pages |
 | `bible_verse_morphology` | Word-by-word grammatical analysis for all 66 books |
@@ -139,7 +140,7 @@ the legacy response.
 |-----|-------------|
 | `theologai://translations` | Available Bible translations |
 | `theologai://commentaries` | Available commentators with coverage info |
-| `theologai://documents/{slug}` | 35 historical works (17 legacy plus 18 reviewed source-pack editions; browseable) |
+| `theologai://documents/{slug}` | 36 historical works (17 legacy plus 19 reviewed source-pack editions; browseable) |
 | `theologai://strongs/{number}` | Strong's dictionary entries (G####, H####) |
 
 ### Prompts (Guided Workflows)
@@ -267,9 +268,5 @@ remains direct.
 > sole 100%; identity SHA-256
 > `a6959d24fb7f50a9848fe2d011f425894718471b8a0609e7833780a291721a44`.
 
-Transform 11 activates 18 reviewed sectioned-only source-pack editions in the
-checked-out local corpus and both deployed 35-work catalogs. Norton and Aquinas
-assets remain inactive; the incomplete
-Aquinas hierarchy has no document, catalog, search, resource, runtime, or D1
-projection.
+The checked-out candidate adds Norton’s CC0 1561 transcription with 1,250 unchanged source-segment citations to the 36-work flat catalog. Aquinas is a separate active hierarchy with 3,184 direct bodies and 3,185 nodes in four authored parts through Tertia Q90, excluding the traditional Supplement. Local activation is not a deployment; CURRENT-RELEASE remains the authority for the deployed assignment.
 `package.json` is private: npm distribution is unsupported.

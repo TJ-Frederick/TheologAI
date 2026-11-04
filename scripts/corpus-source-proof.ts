@@ -12,6 +12,11 @@ const EXTERNAL_FTS = ['sections_fts', 'historical_edition_sections_fts', 'histor
 export const ALL_FTS = ['strongs_fts', ...EXTERNAL_FTS] as const;
 export const CATALOG_SQL = "SELECT type,name,tbl_name,sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY type,name";
 export const LEDGER_SQL = 'SELECT id,name,applied_at FROM d1_migrations ORDER BY id LIMIT 11';
+export const PROVIDER_CATALOG: ProofRow[] = [
+    { type: 'table', name: '_cf_KV', tbl_name: '_cf_KV', sql: 'CREATE TABLE _cf_KV (\n        key TEXT PRIMARY KEY,\n        value BLOB\n      ) WITHOUT ROWID' },
+    { type: 'table', name: 'd1_migrations', tbl_name: 'd1_migrations', sql: 'CREATE TABLE "d1_migrations"(\n\t\tid         INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\tname       TEXT UNIQUE,\n\t\tapplied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL\n)' }
+];
+
 const MAX_PAGE_BYTES = 900_000;
 const sha = (s: string) => createHash('sha256').update(s).digest('hex');
 function check(value: unknown, message: string): asserts value { if (!value) throw new Error(`Corpus proof refused: ${message}`); }
@@ -156,14 +161,20 @@ async function compareTable(source: Database.Database, expected: CorpusProofSour
   } finally { captured?.close(); }
 }
 
-export async function proveCompleteCorpus(source: Database.Database, expected: CorpusProofSource, execute: ProofExecute) {
+export async function proveCompleteCorpus(source: Database.Database, expected: CorpusProofSource, execute: ProofExecute, expectedLedgerSha256?: string) {
   const catalogBefore = await execute({ kind: 'select', label: 'catalog-before', sql: CATALOG_SQL, readCeiling: 4096, writeCeiling: 0 });
   const application = catalogBefore.filter(r => r.name !== '_cf_KV' && r.name !== 'd1_migrations');
   same(comparableSchema(application), comparableSchema(expected.catalog), 'remote schema differs from source');
   const providers = catalogBefore.filter(r => r.name === '_cf_KV' || r.name === 'd1_migrations');
+  if(expected.schemaVersion==='0010_active_aquinas_hierarchy_publication') same(providers,PROVIDER_CATALOG,'exact reviewed provider schema differs');
   check(providers.length === 2 && providers.every(r => r.type === 'table' && r.tbl_name === r.name && typeof r.sql === 'string'), 'provider schema unavailable');
   const ledger = await execute({ kind: 'select', label: 'ledger-before', sql: LEDGER_SQL, readCeiling: 128, writeCeiling: 0 });
   same(ledger.map(r => r.name), expected.migrationNames, 'migration ledger source mismatch');
+  if(expected.schemaVersion==='0010_active_aquinas_hierarchy_publication'){
+    check(typeof expectedLedgerSha256==='string' && /^[a-f0-9]{64}$/.test(expectedLedgerSha256),'reviewed original ledger witness required');
+    same(sha(JSON.stringify(ledger)),expectedLedgerSha256,'reviewed original provider ledger changed');
+    check(ledger.length===10 && ledger.every((r,i)=>r.id===i+1 && typeof r.applied_at==='string' && /^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/.test(r.applied_at)),'original provider ledger shape');
+  }
   check(ledger.every((r, i) => Number.isSafeInteger(r.id) && (r.id as number) > 0 && (!i || (r.id as number) > (ledger[i - 1]!.id as number)) && typeof r.applied_at === 'string'), 'migration ledger shape');
   // Fail a wrong corpus identity before scanning content, even on the same schema.
   if (expected.tables.includes('theologai_metadata')) {

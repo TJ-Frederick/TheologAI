@@ -75,6 +75,8 @@ function discoverCanonicalFiles(): string[] {
     ...relativeDataFiles('data/historical-source-packs/historical-spine-later/editions', '.json'),
     'data/historical-source-packs/historical-spine-later/manifest.json',
     'data/historical-source-packs/historical-spine-later/manifest.sha256',
+    'data/historical-source-packs/norton-1561/manifest.json',
+    'data/historical-source-packs/norton-1561/manifest.sha256',
     'data/historical-sources/eebo-tcp/A17662/A17662.xml',
     'data/historical-sources/eebo-tcp/A17662/NORMALIZATION_REPORT.json',
     'data/historical-sources/eebo-tcp/A17662/README.md',

@@ -89,13 +89,13 @@ export function verifyBiblicalLanguageUnicodeD1(
   const historicalSectionedPublicationRows = expectedCounts.historical_sectioned_publications ?? 0;
   const historicalCorpusSealRows = expectedCounts.historical_corpus_seal ?? 0;
   assert(ubsSemanticRows === 549_458, `UBS semantic canonical-source row-count drift: ${ubsSemanticRows}`);
-  assert(historicalSourceRows === 9_163, `Historical reviewed-source-pack lineage row-count drift: ${historicalSourceRows}`);
-  assert(historicalTransform10Rows === 0, `Normal release Transform 10 hierarchy rows must be zero: ${historicalTransform10Rows}`);
-  assert(historicalPublicationRows === 0, `Normal release Transform 10 publication rows must be zero: ${historicalPublicationRows}`);
+  assert(historicalSourceRows === 12_925, `Historical reviewed-source-pack lineage row-count drift: ${historicalSourceRows}`);
+  assert(historicalTransform10Rows === 9_554, `Active four-part Aquinas hierarchy row-count drift: ${historicalTransform10Rows}`);
+  assert(historicalPublicationRows === 1, `Active Aquinas publication row-count drift: ${historicalPublicationRows}`);
   assert(historicalSectionedPublicationRows === 0,
     `Transform 12 dormant sectioned-publication seam row-count drift: ${historicalSectionedPublicationRows}`);
   assert(historicalCorpusSealRows === 1, `Transform 12 corpus seal row-count drift: ${historicalCorpusSealRows}`);
-  assert(rows - derivedUsageRows === 861_728 + ubsSemanticRows + historicalSourceRows
+  assert(rows - derivedUsageRows === 862_979 + ubsSemanticRows + historicalSourceRows
     + historicalTransform10Rows + historicalPublicationRows
     + historicalSectionedPublicationRows + historicalCorpusSealRows,
     `Unicode D1 canonical-source row-count drift: ${rows - derivedUsageRows}`);

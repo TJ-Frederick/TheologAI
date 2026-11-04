@@ -137,7 +137,7 @@ describe('published project contract', () => {
       client.listPrompts(),
     ]);
 
-    expect(tools).toHaveLength(11);
+    expect(tools).toHaveLength(12);
     expect(prompts).toHaveLength(6);
     for (const { name } of [...tools, ...prompts]) {
       expect(readme).toContain(`| \`${name}\` |`);
@@ -172,7 +172,7 @@ describe('published project contract', () => {
 
     expect(workerContract).toEqual(nodeContract);
     expect(nodeContract).toEqual({
-      toolCount: 11,
+      toolCount: 12,
       structuredTools: [
         'bible_cross_references',
         'bible_lookup',
@@ -180,6 +180,7 @@ describe('published project contract', () => {
         'classic_text_lookup',
         'commentary_lookup',
         'donation_config',
+        'historical_hierarchy_lookup',
         'original_language_lookup',
         'original_language_study',
         'parallel_passages',
@@ -238,8 +239,8 @@ describe('published project contract', () => {
     expect(readme).toContain('Production v6/local-only is deployed');
     expect(readme).toContain('preview runs the audited v7/discovery-only contract with CCEL execution disabled');
     expect(readme).toContain('current release snapshot records the active 35-work assignment');
-    expect(readme).toContain('The integrated Transform 10 candidate is local-only and unpublished');
-    expect(readme).toContain('not wired into runtime or MCP surfaces');
+    expect(readme).toContain('local Norton/Aquinas release candidate');
+    expect(readme).toContain('wired into local runtime and MCP surfaces');
     expect(readme).toContain('before adapter');
     expect(readme).toContain('Durable Object lookup/RPC, or fetch');
     expect(readme).toContain('reconnect');

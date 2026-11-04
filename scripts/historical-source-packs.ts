@@ -10,6 +10,12 @@ import type { D1SourceConsumptionRegistry } from './d1-corpus-identity.js';
 import { isExternalContentFts } from './transform12-candidate-c-storage.js';
 
 export const HISTORICAL_SOURCE_PACK_PREFIX = 'data/historical-source-packs/';
+/**
+ * Norton is an immutable EEBO-TCP package whose source identity remains in the
+ * source lock.  The active manifest may reference this one reviewed package
+ * directly so release materialization does not create a second, mutable copy.
+ */
+export const NORTON_EEBO_TCP_EDITION_PACKAGE_PATH = 'data/historical-sources/eebo-tcp/A17662/norton-1561.edition.json';
 export const CORE_EIGHT_SOURCE_PACK_ID = 'theologai-core-eight';
 export const CORE_EIGHT_SOURCE_PACK_COUNTS = Object.freeze({
   packs: 1,
@@ -38,6 +44,7 @@ export const REVIEWED_SOURCE_PACK_RELEASE = Object.freeze({
     'theologai-core-eight',
     'theologai-historical-spine-early',
     'theologai-historical-spine-later',
+    'theologai-norton-1561',
   ].sort(),
   editionIds: [
     ...CORE_EIGHT_EDITION_IDS,
@@ -51,15 +58,16 @@ export const REVIEWED_SOURCE_PACK_RELEASE = Object.freeze({
     'julian-revelations-of-divine-love-warrack-1901-gutenberg',
     'kempis-imitation-of-christ-benham-gutenberg',
     'pascal-pensees-trotter-1910',
+    'calvin-institutes-norton-1561-eebo-tcp-a17662',
   ].sort(),
   counts: {
-    packs: 3,
-    works: 18,
-    editions: 18,
-    artifacts: 43,
-    sections: 1057,
-    deliveryProfiles: 18,
-    identities: 1057,
+    packs: 4,
+    works: 19,
+    editions: 19,
+    artifacts: 44,
+    sections: 2307,
+    deliveryProfiles: 19,
+    identities: 2307,
     legacyAliases: 0,
   },
 });
@@ -88,6 +96,10 @@ export interface HistoricalSourcePackCatalog {
     label: string;
     url: string;
   }>;
+  presentation?: {
+    displayTitle: string;
+    lookupAliases: string[];
+  };
 }
 
 export interface NormalizedTextRights {
@@ -127,7 +139,7 @@ export function loadHistoricalSourcePacks(
   for (const manifestPath of manifestPaths) {
     const sidecarPath = posix.join(dirname(manifestPath), 'manifest.sha256');
     if (!paths.includes(sidecarPath)) throw new Error(`${manifestPath} is missing required manifest.sha256 sidecar`);
-    const loaded = loadManifestPack(manifestPath, sidecarPath, sources);
+    const loaded = loadManifestPack(manifestPath, sidecarPath, inputs, sources);
     for (const memberPath of loaded.memberPaths) {
       if (declaredMembers.has(memberPath)) throw new Error(`Historical source-pack edition is declared by multiple manifests: ${memberPath}`);
       declaredMembers.add(memberPath);
@@ -193,7 +205,7 @@ export function assertReviewedSourcePackRelease(
     })
     || JSON.stringify(records.map(record => record.compiled.package.edition.editionId).sort())
       !== JSON.stringify(REVIEWED_SOURCE_PACK_RELEASE.editionIds)) {
-    throw new Error('Transform 11 source-pack release must retain the reviewed 3/18/18/43/1057 inventory');
+    throw new Error('Active source-pack release no longer matches its reviewed 4/19/19/44/2307 inventory');
   }
 }
 
@@ -225,6 +237,7 @@ export function assertCoreEightSourcePackRelease(
 function loadManifestPack(
   path: string,
   sidecarPath: string,
+  inputs: readonly string[],
   sources: Pick<D1SourceConsumptionRegistry, 'read'>,
 ): { records: HistoricalSourcePackRecord[]; memberPaths: string[] } {
   const rawBytes = sources.read(path, 'utf8');
@@ -234,7 +247,7 @@ function loadManifestPack(
     throw new Error(`${sidecarPath} does not match ${path}`);
   }
   const raw = JSON.parse(rawBytes) as unknown;
-  const manifest = parseManifest(raw, path);
+  const manifest = parseManifest(raw, path, new Set(inputs));
   const works = new Map<string, string>();
   const editions = new Set<string>();
   const records = manifest.members.map(member => {
@@ -271,7 +284,7 @@ interface ParsedManifest {
   members: Array<{ id: string; sourcePath: string; packageSha256: string; normalizedTextRights: NormalizedTextRights; catalog: HistoricalSourcePackCatalog; artifacts: HistoricalSourcePackArtifact[] }>;
 }
 
-function parseManifest(value: unknown, path: string): ParsedManifest {
+function parseManifest(value: unknown, path: string, declaredInputs: ReadonlySet<string>): ParsedManifest {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${path} must be an object`);
   const root = value as Record<string, unknown>;
   assertKeys(root, ['schemaVersion', 'packId', 'revision', 'rightsScope', 'members'], path);
@@ -290,7 +303,7 @@ function parseManifest(value: unknown, path: string): ParsedManifest {
       if (!entry || typeof entry !== 'object' || Array.isArray(entry)) throw new Error(`${path}.members[${index}] must be an object`);
       const member = entry as Record<string, unknown>;
       assertKeys(member, ['id', 'sourcePath', 'packageSha256', 'normalizedTextRights', 'catalog', 'artifacts'], `${path}.members[${index}]`);
-      if (!isId(member.id) || typeof member.sourcePath !== 'string' || !/^editions\/[a-z][a-z0-9._-]*\.json$/.test(member.sourcePath) || member.sourcePath <= previous) {
+      if (!isId(member.id) || typeof member.sourcePath !== 'string' || member.sourcePath <= previous) {
         throw new Error(`${path}.members must be strictly sourcePath-sorted packages`);
       }
       previous = member.sourcePath;
@@ -306,7 +319,11 @@ function parseManifest(value: unknown, path: string): ParsedManifest {
       });
       if (!artifacts.some(artifact => artifact.role === 'authority')) throw new Error(`${path}.members[${index}] requires an authority artifact`);
       const catalog = parseCatalog(member.catalog, artifacts, `${path}.members[${index}].catalog`);
-      return { id: member.id, sourcePath: posix.join(dirname(path), member.sourcePath), packageSha256: member.packageSha256, normalizedTextRights, catalog, artifacts };
+      const sourcePath = resolveMemberSourcePath(path, member.sourcePath);
+      if (!declaredInputs.has(sourcePath)) {
+        throw new Error(`${path}.members[${index}].sourcePath must be a declared D1 materialization input`);
+      }
+      return { id: member.id, sourcePath, packageSha256: member.packageSha256, normalizedTextRights, catalog, artifacts };
     }),
   };
 }
@@ -314,7 +331,7 @@ function parseManifest(value: unknown, path: string): ParsedManifest {
 function parseCatalog(value: unknown, _artifacts: readonly HistoricalSourcePackArtifact[], path: string): HistoricalSourcePackCatalog {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${path} must be an object`);
   const catalog = value as Record<string, unknown>;
-  assertKeys(catalog, ['composition', 'compositionProvenanceSources'], path);
+  assertKeys(catalog, ['composition', 'compositionProvenanceSources', ...(catalog.presentation === undefined ? [] : ['presentation'])], path);
   if (!catalog.composition || typeof catalog.composition !== 'object' || Array.isArray(catalog.composition)) {
     throw new Error(`${path}.composition must be an object`);
   }
@@ -347,13 +364,37 @@ function parseCatalog(value: unknown, _artifacts: readonly HistoricalSourcePackA
     || sources.some((source, index) => index > 0 && sources[index - 1]!.sourceId >= source.sourceId)) {
     throw new Error(`${path}.compositionProvenanceSources must use sorted unique source IDs`);
   }
+  const presentation = parsePresentation(catalog.presentation, `${path}.presentation`);
   return {
     composition: {
       label: composition.label,
       ...(composition.startYear === undefined ? {} : { startYear: composition.startYear as number, endYear: composition.endYear as number }),
     },
     compositionProvenanceSources: sources,
+    ...(presentation === undefined ? {} : { presentation }),
   };
+}
+
+function parsePresentation(value: unknown, path: string): HistoricalSourcePackCatalog['presentation'] {
+  if (value === undefined) return undefined;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${path} must be an object`);
+  const presentation = value as Record<string, unknown>;
+  assertKeys(presentation, ['displayTitle', 'lookupAliases'], path);
+  if (typeof presentation.displayTitle !== 'string' || !presentation.displayTitle.trim()
+    || !Array.isArray(presentation.lookupAliases) || presentation.lookupAliases.length < 1
+    || !presentation.lookupAliases.every(alias => typeof alias === 'string' && alias.trim())
+    || new Set(presentation.lookupAliases).size !== presentation.lookupAliases.length) {
+    throw new Error(`${path} must use a display title and unique non-empty aliases`);
+  }
+  return { displayTitle: presentation.displayTitle, lookupAliases: [...presentation.lookupAliases] };
+}
+
+function resolveMemberSourcePath(manifestPath: string, memberSourcePath: string): string {
+  if (/^editions\/[a-z][a-z0-9._-]*\.json$/.test(memberSourcePath)) {
+    return posix.join(dirname(manifestPath), memberSourcePath);
+  }
+  if (memberSourcePath === NORTON_EEBO_TCP_EDITION_PACKAGE_PATH) return memberSourcePath;
+  throw new Error(`${manifestPath}.members sourcePath is unsupported: ${memberSourcePath}`);
 }
 
 function parseNormalizedTextRights(value: unknown, path: string): NormalizedTextRights {
@@ -468,11 +509,12 @@ export function materializeHistoricalSourcePacks(
         artifactCount++;
       }
 
+      const documentTitle = historicalSourcePackDocumentTitle(compiled, catalog);
       const metadata = buildHistoricalSourcePackDocumentMetadata(packId, compiled, normalizedTextRights, catalog, artifacts);
       assertClassicTextDocumentMetadata({
-        id: work.workId, title: work.title, type: 'historical_work', date: null, topics: [],
+        id: work.workId, title: documentTitle, type: 'historical_work', date: null, topics: [],
       }, `Historical source-pack work ${work.workId}`);
-      insertDocument.run(work.workId, work.title, 'historical_work', null, JSON.stringify(metadata));
+      insertDocument.run(work.workId, documentTitle, 'historical_work', null, JSON.stringify(metadata));
       const identityRows: Array<{ sectionKey: string; sourceOrdinal: number; documentSectionId: number }> = [];
       for (const section of editionSections) {
         assertClassicTextSectionMetadata({
@@ -550,7 +592,7 @@ export function buildHistoricalSourcePackDocumentMetadata(
   return {
     topics: [],
     catalog: {
-      lookupAliases: [work.workId, work.title],
+      lookupAliases: catalog.presentation?.lookupAliases ?? [work.workId, work.title],
       composition: catalog.composition,
       creators: work.creators,
       metadataStatus: work.creatorMetadataStatus,
@@ -569,4 +611,12 @@ export function buildHistoricalSourcePackDocumentMetadata(
       provenance: edition.provenance,
     },
   };
+}
+
+/** The immutable work title can be qualified by a reviewed edition presentation. */
+export function historicalSourcePackDocumentTitle(
+  compiled: CompiledEditionPackage,
+  catalog: HistoricalSourcePackCatalog,
+): string {
+  return catalog.presentation?.displayTitle ?? compiled.package.work.title;
 }

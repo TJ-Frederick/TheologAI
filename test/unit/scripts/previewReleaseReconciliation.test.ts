@@ -386,8 +386,8 @@ describe('preview release reconciliation evidence', () => {
     const readiness = workflow.indexOf('Verify fresh corpus (up to 3.8M reads and four integrity commands)');
     const predecessor = workflow.indexOf('Capture preview predecessor reconciliation anchor (read-only)');
     const candidateCutover = workflow.indexOf('Require deployed candidate preview D1 binding (read-only)');
-    const originalLanguageAudit = workflow.indexOf('Audit original-language v2 contract on preview');
-    const historicalAudit = workflow.indexOf('Audit Transform-9 historical core contract on preview');
+    const originalLanguageAudit = workflow.indexOf('Audit the corpus release in both protocol eras');
+    const historicalAudit = workflow.indexOf('Audit the corpus release in both protocol eras');
     const previewAuditIdentity = workflow.indexOf('Verify preview Worker remained active through audit (read-only)');
     const postAuditProductionControl = workflow.indexOf('Verify production control remained unchanged after preview audits (read-only)');
     const evidenceHash = workflow.indexOf('Hash sanitized preview audit evidence');
@@ -400,7 +400,7 @@ describe('preview release reconciliation evidence', () => {
     expect(previewAuditIdentity).toBeGreaterThan(historicalAudit);
     expect(postAuditProductionControl).toBeGreaterThan(previewAuditIdentity);
     expect(evidenceHash).toBeGreaterThan(postAuditProductionControl);
-    expect(workflow).toContain('npx --no-install wrangler d1 list --json > "$RUNNER_TEMP/preview-d1-inventory.json"');
+    expect(workflow).toContain('npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" d1 list --json > "$RUNNER_TEMP/preview-d1-inventory.json"');
     expect(workflow).toContain('--database "$candidate_d1_name" --env preview');
     expect(workflow).toContain('observe-post-mutation');
     expect(workflow).toContain('Upload preview candidate cutover observation');
@@ -410,7 +410,7 @@ describe('preview release reconciliation evidence', () => {
     expect(workflow).toContain('production-control-d1-inventory-before.json');
     expect(workflow).toContain('production-control-d1-inventory-after-deploy.json');
     expect(workflow).toContain('production-control-d1-inventory-post-audit.json');
-    expect(workflow).toContain('--wrangler-config wrangler.toml');
+    expect(workflow).toContain('--wrangler-config "$RUNNER_TEMP/corpus-wrangler.toml"');
     expect(workflow).toContain('production_control_post_audit_sha256');
     expect(workflow).toContain('production-control-post-audit.json');
   });

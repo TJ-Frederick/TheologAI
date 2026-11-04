@@ -1,9 +1,5 @@
 /**
- * Dormant service seam for future hierarchy-node delivery.
- *
- * Nothing constructs this service in the Node or Worker composition roots.
- * Its presence establishes one identical service contract over the Node and
- * D1 repositories without registering any public MCP behavior.
+ * Public hierarchy-node delivery over the shared Node and D1 repositories.
  */
 
 import {
@@ -48,15 +44,24 @@ export interface HistoricalHierarchySearchDelivery extends HistoricalHierarchyLa
   results: HistoricalHierarchySearchResult[];
 }
 
-/** Dormant neighbor seam; it is deliberately not registered or presented by MCP. */
 export interface HistoricalHierarchyNeighborDelivery extends HistoricalHierarchyLanding {
   node: HistoricalHierarchyNode;
   neighbors: HistoricalHierarchyNeighbors;
 }
 
-/** Generic, deliberately uncomposed future-delivery boundary. */
 export class HistoricalHierarchyService {
   constructor(private readonly repository: IHistoricalHierarchyRepository) {}
+
+  /** Active publications only; safe for public resource inventory. */
+  async listPublications(): Promise<HistoricalHierarchyLanding[]> {
+    const publications = await this.repository.listActiveHierarchyPublications();
+    return await Promise.all(publications.map(async publication => {
+      const profile = await this.repository.getHierarchyProfile(publication.hierarchyId);
+      if (!profile) throw new NotFoundError('hierarchy', `Hierarchy authority not found: "${publication.hierarchyId}"`);
+      assertPublicBinding(publication, profile);
+      return { publication, profile };
+    }));
+  }
 
   async getLanding(publicSlug: string): Promise<HistoricalHierarchyLanding> {
     return await this.landing(publicSlug);
@@ -117,7 +122,7 @@ export class HistoricalHierarchyService {
     return { ...landing, results };
   }
 
-  /** Verify sibling navigation against the same immutable hierarchy before any future exposure. */
+  /** Verify sibling navigation against the same immutable hierarchy. */
   async getNeighbors(publicSlug: string, nodeKey: string): Promise<HistoricalHierarchyNeighborDelivery> {
     if (!isHistoricalHierarchyNodeKey(nodeKey)) throw new ValidationError('node_key', 'node_key must be a canonical hierarchy node key.');
     const landing = await this.landing(publicSlug);
@@ -136,7 +141,7 @@ export class HistoricalHierarchyService {
     return { ...landing, node: context.node, neighbors };
   }
 
-  /** Parse a canonical dormant URI, but do not register it with MCP. */
+  /** Parse a canonical active hierarchy landing or node URI. */
   async resolveCanonicalUri(uri: string): Promise<HistoricalHierarchyLanding | HistoricalHierarchyNodeDelivery> {
     const resource = parseHistoricalHierarchyResourceUri(uri);
     if (!resource) throw new ValidationError('uri', 'uri must be a canonical hierarchy landing or node resource URI.');
@@ -149,16 +154,23 @@ export class HistoricalHierarchyService {
     if (!isHistoricalHierarchyPublicSlug(publicSlug)) throw new ValidationError('slug', 'slug must be a canonical hierarchy publication slug.');
     const publication = await this.repository.getHierarchyPublicationBySlug(publicSlug);
     if (!publication) throw new NotFoundError('hierarchy_publication', `Hierarchy publication not found: "${publicSlug}"`);
-    if (publication.activationState !== 'dormant' || publication.publicSlug !== publicSlug
+    if (publication.publicSlug !== publicSlug
       || publication.canonicalUri !== buildHistoricalHierarchyResourceUri(publicSlug)) {
       throw new Error('Historical hierarchy publication contract is invalid');
     }
     const profile = await this.repository.getHierarchyProfile(publication.hierarchyId);
     if (!profile) throw new NotFoundError('hierarchy', `Hierarchy authority not found: "${publication.hierarchyId}"`);
-    if (profile.hierarchyId !== publication.hierarchyId || profile.availability !== 'local_only_inactive') {
-      throw new Error('Historical hierarchy publication must retain local_only_inactive authority');
-    }
+    assertPublicBinding(publication, profile);
     return { publication, profile };
+  }
+}
+
+function assertPublicBinding(publication: HistoricalHierarchyPublication, profile: HistoricalHierarchyProfile): void {
+  if (publication.activationState !== 'active'
+    || profile.hierarchyId !== publication.hierarchyId
+    || profile.availability !== 'local_only_active'
+    || profile.provenance.status !== 'local_only_active') {
+    throw new Error('Historical hierarchy publication is not active for public delivery');
   }
 }
 

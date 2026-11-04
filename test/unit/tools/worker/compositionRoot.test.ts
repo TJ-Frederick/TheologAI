@@ -74,6 +74,7 @@ const EXPECTED_TOOL_NAMES = [
   'parallel_passages',
   'commentary_lookup',
   'classic_text_lookup',
+  'historical_hierarchy_lookup',
   'primary_source_search',
   'original_language_lookup',
   'bible_verse_morphology',
@@ -120,9 +121,9 @@ describe('createWorkerCompositionRoot', () => {
   });
 
   describe('tool creation', () => {
-    it('creates exactly 11 tools', () => {
+    it('creates exactly 12 tools', () => {
       const root = createWorkerCompositionRoot(makeEnv());
-      expect(root.tools).toHaveLength(11);
+      expect(root.tools).toHaveLength(12);
     });
 
     it('creates tools with correct names', () => {
@@ -337,10 +338,10 @@ describe('createWorkerCompositionRoot', () => {
       expect(root.services.strongsService).toBeDefined();
     });
 
-    it('exposes the internal D1-backed source-attested parallel service with the eleven-tool registry', () => {
+    it('exposes the internal D1-backed source-attested parallel service with the twelve-tool registry', () => {
       const root = createWorkerCompositionRoot(makeEnv());
       expect(root.services.sourceAttestedParallelService).toBeDefined();
-      expect(root.tools).toHaveLength(11);
+      expect(root.tools).toHaveLength(12);
     });
   });
 

@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { copyFileSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { ACCOUNT, CORPUS, SCHEMA, TARGETS, classifyApplicationRelease, requireProofApproval, verifyFreshCorpusReceipt } from './application-release-policy.mjs';
+import { POLICY, ACCOUNT, CORPUS, SCHEMA, TARGETS, classifyApplicationRelease, requireProofApproval, verifyFreshCorpusReceipt } from './norton-aquinas-release-policy.mjs';
 import { buildCorpusProofSource, proveCompleteCorpus } from './corpus-source-proof.js';
 import { CorpusProofTransport } from './corpus-proof-transport.js';
 import { runRemoteD1ReadinessCheck } from './check-remote-d1-readiness.js';
@@ -36,12 +36,12 @@ function prepare(root: string, database: string, directory: string): void {
     });
     const expected = buildCorpusProofSource(root, source);
     const planningReads = Object.values(expected.digests).reduce((n, t) => n + t.rows, 0) + expected.quickCheckReadCeiling + 60_000;
-    check(planningReads <= 3_800_000, 'complete proof exceeds approved operating budget');
+    check(planningReads <= POLICY.reservedReads, 'complete proof exceeds approved operating budget');
     const metadata = Object.fromEntries((source.prepare('SELECT key,value FROM theologai_metadata').all() as { key: string; value: string }[]).map(r => [r.key, r.value]));
     check(metadata.schema_version === SCHEMA && metadata.corpus_manifest_sha256 === CORPUS, 'source corpus');
     source.close();
     const plan = { schemaVersion: 'theologai-application-corpus-source-plan.v1', classification, sourceSha256: sha(bytes(destination)),
-      expected, localLegacyValidationSha256: sha(JSON.stringify(legacy)), readBudget: planningReads, integrityCommands: 4,
+      expected, localLegacyValidationSha256: sha(JSON.stringify(legacy)), readBudget: POLICY.reservedReads, planningReadCeiling: planningReads, releasePolicy: POLICY.policy, integrityCommands: 4,
       semantics: 'all local legacy assertions; all remote canonical cells, physical check, raw-migration FK equivalence, four complete rank-1 FTS checks' };
     const text = JSON.stringify(plan, null, 2) + '\n'; writeFileSync(join(directory, 'plan.json'), text, { flag: 'wx' });
     process.stdout.write(sha(text) + '\n');
@@ -59,18 +59,18 @@ export async function runFreshApplicationCorpusCheck(input: { root: string; role
   check(/^[0-9a-f]{64}$/.test(input.planSha256) && Object.hasOwn(TARGETS, input.role), 'source plan or role');
   // Open only the hash-verified source produced by the unprivileged job.
   const source = new Database(sourcePath, { readonly: true });
-  const transport = input.transport ?? new CorpusProofTransport({ role: input.role, token: input.token, readBudget: plan.readBudget, eventFile: input.output + '.events.jsonl' });
+  const transport = input.transport ?? new CorpusProofTransport({policy:POLICY.policy, role: input.role, token: input.token, readBudget: plan.readBudget, eventFile: input.output + '.events.jsonl' });
   const startedAt = new Date().toISOString();
   try {
     await transport.start();
-    const proof = await proveCompleteCorpus(source, plan.expected, query => transport.execute(query));
+    const proof = await proveCompleteCorpus(source, plan.expected, query => transport.execute(query), approval.expectedLedgerSha256);
     const controls = await transport.finish();
-    const receipt = { schemaVersion: 'theologai-fresh-complete-corpus-proof.v1', role: input.role, accountId: ACCOUNT, ...TARGETS[input.role],
+    const receipt = { liveControlReserve: POLICY.liveReads + POLICY.controlReads, releasePolicy: POLICY.policy, schemaVersion: 'theologai-fresh-complete-corpus-proof.v1', role: input.role, accountId: ACCOUNT, ...TARGETS[input.role],
       sourceCommit: classification.sourceCommit, sourceTree: classification.sourceTree, corpusIdentity: CORPUS, schema: SCHEMA,
       startedAt, completedAt: new Date().toISOString(), sourcePlanSha256: input.planSha256, approvalSha256: sha(JSON.stringify(approval)),
       operationalAssumption: 'owner_reserves_target_data_writes_during_proof_not_an_enforced_provider_lease',
       proof, ...controls, readBudget: plan.readBudget, metering: { ...transport.metering } };
-    verifyFreshCorpusReceipt(receipt, { ...expectedIdentity, sourcePlanSha256: input.planSha256, tables: plan.expected.digests });
+    verifyFreshCorpusReceipt(receipt, { ...expectedIdentity, sourcePlanSha256: input.planSha256, tables: plan.expected.digests,foreignKeyWitnessSha256:plan.expected.foreignKeyWitnessSha256 });
     writeFileSync(input.output, JSON.stringify(receipt, null, 2) + '\n', { flag: 'wx', mode: 0o600 }); return receipt;
   } finally { source.close(); }
 }

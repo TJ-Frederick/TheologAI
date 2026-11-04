@@ -9,6 +9,7 @@
 import type { ToolHandler } from '../kernel/types.js';
 import { createBibleLookupHandler } from './v2/bibleLookup.js';
 import { createClassicTextsHandler } from './v2/classicTexts.js';
+import { createHistoricalHierarchyHandler } from './v2/historicalHierarchy.js';
 import { createCommentaryHandler } from './v2/commentary.js';
 import { createCrossReferencesHandler } from './v2/crossReferences.js';
 import { createDonationConfigHandler } from './v2/donationConfig.js';
@@ -24,6 +25,7 @@ export interface ToolRegistryDependencies {
   parallelPassageService: Parameters<typeof createParallelPassagesHandler>[0];
   commentaryService: Parameters<typeof createCommentaryHandler>[0];
   historicalService: Parameters<typeof createClassicTextsHandler>[0];
+  historicalHierarchyService: Parameters<typeof createHistoricalHierarchyHandler>[0];
   primarySourceSearchTool: ToolHandler;
   strongsService: Parameters<typeof createStrongsLookupHandler>[0];
   morphologyService: Parameters<typeof createVerseMorphologyHandler>[0];
@@ -38,6 +40,7 @@ export function createToolRegistry(dependencies: ToolRegistryDependencies): Tool
     createParallelPassagesHandler(dependencies.parallelPassageService),
     createCommentaryHandler(dependencies.commentaryService),
     createClassicTextsHandler(dependencies.historicalService),
+    createHistoricalHierarchyHandler(dependencies.historicalHierarchyService),
     dependencies.primarySourceSearchTool,
     createStrongsLookupHandler(dependencies.strongsService),
     createVerseMorphologyHandler(dependencies.morphologyService),

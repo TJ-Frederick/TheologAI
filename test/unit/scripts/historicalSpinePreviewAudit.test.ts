@@ -192,13 +192,13 @@ describe('Transform-11 historical-spine fixed audit', () => {
       readFile(new URL('.github/workflows/pr.yml', root), 'utf8'),
       readFile(new URL('.github/workflows/deploy.yml', root), 'utf8'),
     ]);
-    const previewAudit = preview.indexOf('Audit Transform-11 historical spine contract on preview');
+    const previewAudit = preview.indexOf('Audit the corpus release in both protocol eras');
     expect(previewAudit).toBeGreaterThan(preview.indexOf('Stabilize preview release registrations at edge (read-only)'));
     expect(previewAudit).toBeLessThan(preview.indexOf('Verify preview Worker remained active through audit (read-only)'));
     expect(preview).toContain('historical-spine-preview-audit.json');
     expect(preview).toContain('historical_spine_audit_sha256');
     expect(preview).toContain('Transform-11 historical-spine audit SHA-256');
-    const productionAudit = production.indexOf('Audit Transform-11 historical spine contract on production');
+    const productionAudit = production.indexOf('Audit the corpus release in both protocol eras');
     expect(productionAudit).toBeGreaterThan(production.indexOf('Stabilize production release registrations at edge (read-only)'));
     expect(productionAudit).toBeLessThan(production.indexOf('Verify production Worker remained active through audit (read-only)'));
     expect(production).toContain('historical-spine-production-audit.json');

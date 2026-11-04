@@ -227,13 +227,13 @@ describe('primary-source edge-stabilization gate', () => {
     const stabilize = workflow.indexOf('Stabilize preview release registrations at edge (read-only)');
     const upload = workflow.indexOf('Upload preview edge-stabilization evidence');
     const gate = workflow.indexOf('Require stable preview release registrations before audits');
-    const language = workflow.indexOf('Audit original-language v2 contract on preview');
-    const historical = workflow.indexOf('Audit Transform-9 historical core contract on preview');
+    const language = workflow.indexOf('Audit the corpus release in both protocol eras');
+    const historical = workflow.indexOf('Audit the corpus release in both protocol eras');
     expect(stabilize).toBeGreaterThan(-1);
     expect(upload).toBeGreaterThan(stabilize);
     expect(gate).toBeGreaterThan(upload);
     expect(language).toBeGreaterThan(gate);
-    expect(historical).toBeGreaterThan(language);
+    expect(historical).toBe(language);
     expect(workflow).toContain('continue-on-error: true');
     expect(workflow).toContain("if: ${{ steps.preview-worker-candidate-cutover.outcome == 'success' }}");
     expect(workflow).toContain('edge_stabilization_sha256');
