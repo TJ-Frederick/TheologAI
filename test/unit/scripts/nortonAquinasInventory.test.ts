@@ -48,6 +48,7 @@ import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {vi} from 'vitest';
 import {CorpusProofTransport} from '../../../scripts/corpus-proof-transport.js';
+import { LEDGER_SQL } from '../../../scripts/corpus-source-proof.js';
 import {corpusTransportFixture} from '../../helpers/corpusTransportFixture.js';
 it.each(['pages403','wrong-assignment','failed-pages-page'])('stops the actual protected transport before SQL for %s',async fault=>{
  const dir=mkdtempSync(join(tmpdir(),'corpus-inventory-refusal-')),file=join(dir,'events.jsonl');let time=NOW,calls=0,sql=0,verify=0;
@@ -65,3 +66,43 @@ it.each(['pages403','wrong-assignment','failed-pages-page'])('stops the actual p
   expect(readFileSync(file,'utf8')).not.toMatch(/private-token-sentinel|private-provider-message/);
  }finally{clock.mockRestore();rmSync(dir,{recursive:true,force:true});}
 });
+
+it.each([['norton-aquinas.v1', 500, 3_560_000], ['application-only', 300, 3_510_997]] as const)(
+  'spaces immediate direct SQL responses for %s without changing the existing application pace',
+  async (policy, minimum, readBudget) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-04T12:00:00Z'));
+    const directory = mkdtempSync(join(tmpdir(), 'corpus-sql-spacing-'));
+    const starts: number[] = [];
+    try {
+      const fixture = corpusTransportFixture({ role: 'preview' });
+      const immediateFetch = (async (input: any, init: any = {}) => {
+        if (new URL(String(input)).pathname.endsWith('/query')) {
+          starts.push(Date.now());
+          return Response.json({ success: true, errors: [], result: [{ success: true, results: [], meta: {
+            rows_read: 1, rows_written: 0, changes: 0, total_attempts: 1, served_by_primary: true,
+          } }] });
+        }
+        return fixture.fetch(input, init);
+      }) as typeof fetch;
+      const transport = new CorpusProofTransport({
+        policy, role: 'preview', token: 'synthetic-token', readBudget,
+        eventFile: join(directory, 'events.jsonl'), fetch: immediateFetch, historicalExceptions: false,
+      });
+      const admission = transport.start();
+      await vi.runAllTimersAsync();
+      await admission;
+      for (const phase of ['before', 'after']) {
+        const result = transport.execute({ kind: 'select', label: 'ledger-' + phase, sql: LEDGER_SQL, readCeiling: 128, writeCeiling: 0 });
+        await vi.runAllTimersAsync();
+        await result;
+      }
+      expect(starts).toHaveLength(2);
+      expect(starts[1]! - starts[0]!).toBe(minimum);
+      expect(transport.metering).toMatchObject({ requests: 2, rowsRead: 2, rowsWritten: 0, integrityCommands: 0, retries: 0 });
+    } finally {
+      vi.useRealTimers();
+      rmSync(directory, { recursive: true, force: true });
+    }
+  },
+);

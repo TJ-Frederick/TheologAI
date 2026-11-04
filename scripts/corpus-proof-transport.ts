@@ -91,7 +91,7 @@ export class CorpusProofTransport {
     const databasePath = `${prefix}/d1/database/${this.targets[this.options.role].databaseId}`;
     check(path === '/graphql' && method === 'POST' || path === databasePath + '/query' && method === 'POST'
       || method === 'GET' && new RegExp(`^${prefix}/workers/scripts/(?:theologai|theologai-preview)/(?:settings|deployments\\?page=1&per_page=1|versions/[0-9a-f-]{36})$`).test(path), 'network route');
-    const remaining = Math.max(0, this.lastDispatch + 300 - Date.now()); if (remaining) await new Promise(resolve => setTimeout(resolve, remaining));
+    const remaining = Math.max(0, this.lastDispatch + (this.corpus ? 500 : 300) - Date.now()); if (remaining) await new Promise(resolve => setTimeout(resolve, remaining));
     this.lastDispatch = Date.now();
     const response = await (this.options.fetch ?? fetch)(`https://api.cloudflare.com/client/v4${path}`, {
       method, redirect: 'error', signal: AbortSignal.timeout(30_000), headers: { authorization: `Bearer ${this.options.token}`, accept: 'application/json', 'content-type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}),
