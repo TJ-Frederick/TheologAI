@@ -10,8 +10,8 @@
     "conformance": 1
   },
   "current": {
-    "totalTestTypeScript": 304,
-    "activeVitest": 225,
+    "totalTestTypeScript": 305,
+    "activeVitest": 226,
     "support": 24,
     "manual": 4,
     "legacyOrphan": 50,
@@ -212,6 +212,7 @@
       "test/unit/scripts/ubsSemanticDesignGuards.test.ts",
       "test/unit/scripts/ubsSemanticResolutionInertness.test.ts",
       "test/unit/scripts/validationContext.test.ts",
+      "test/unit/scripts/verifyD1SeedWorkerd.test.ts",
       "test/unit/scripts/verifyPreviewWorkerDeployment.test.ts",
       "test/unit/scripts/verifyUbsHebrewV092Acquisition.test.ts",
       "test/unit/scripts/workerReleaseArtifact.test.ts",
