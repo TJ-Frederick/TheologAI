@@ -235,7 +235,7 @@ describe('primary-source edge-stabilization gate', () => {
     expect(language).toBeGreaterThan(gate);
     expect(historical).toBe(language);
     expect(workflow).toContain('continue-on-error: true');
-    expect(workflow).toContain("if: ${{ steps.preview-worker-candidate-cutover.outcome == 'success' }}");
+    expect(workflow).toContain("if: ${{ (steps.release-operation.outputs.release_policy == 'application-only' || steps.release-operation.outputs.release_policy == 'norton-aquinas.v1') && (steps.preview-worker-candidate-cutover.outcome == 'success') }}");
     expect(workflow).toContain('edge_stabilization_sha256');
     expect(workflow).toContain('preview-primary-source-edge-stabilization.json');
   });
