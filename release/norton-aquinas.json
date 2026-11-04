@@ -8,7 +8,7 @@
     "data/historical-source-packs/norton-1561/manifest.sha256": "d3de0308c5724569e7e938898dd7ddd255448af0",
     "migrations/0010_active_aquinas_hierarchy_publication.sql": "ba505475fc0f9162fcced37edee76ea69b77a03c",
     "scripts/active-aquinas-hierarchy.ts": "84cb46c05e627a16728e4ce7c7994f397e4af950",
-    "scripts/application-corpus-check.ts": "5962837dfbf7bbaa3a5a2c7069f78eb64f0ac3ff",
+    "scripts/application-corpus-check.ts": "480404734005bb1c83ae97568a25f782eeb8ea9a",
     "scripts/aquinas-authority-audit.ts": "dae6b5d3c8eddc403308387c762490f409cb8062",
     "scripts/aquinas-source-pack-capacity-comparison.ts": "f273bc261bf91c622de701e4abba2821db2a9505",
     "scripts/audit-corpus-release.ts": "51144fd54692d5433e8d2e02cb35b0ecfa80c750",

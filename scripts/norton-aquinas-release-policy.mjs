@@ -1,8 +1,8 @@
 /** Explicit Norton/Aquinas activation policy. The separate application-only policy stays unchanged. */
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
-import {readFileSync} from 'node:fs';
-import {join} from 'node:path';
+import {readFileSync,lstatSync,realpathSync} from 'node:fs';
+import {join,dirname} from 'node:path';
 
 import POLICY from '../.github/scripts/norton-aquinas-policy.cjs';
 export { POLICY };
@@ -73,7 +73,15 @@ export function classifyApplicationRelease(root){
  check(Object.keys(declaration).sort().join(',')==='baseline,files,policy,schemaVersion' && declaration.schemaVersion==='theologai-norton-aquinas-declaration.v1' && declaration.policy===POLICY.policy && declaration.baseline===BASELINE,'closed corpus declaration');
  const expectedPaths=ACTIVATION_PATHS;
  check(declaration.files && JSON.stringify(Object.keys(declaration.files).sort())===JSON.stringify(expectedPaths),'exact activation path inventory');
- check(git(root,['status','--porcelain','--untracked-files=all']).length===0,'dirty or untracked exact release source');
+ // The existing protected action and independent operator use this one generated symlink.
+ // Permit only the separately locked release trust set; every source/test edit still fails.
+ const preparedReleaseLink=()=>{try{
+  const link=join(root,'node_modules');if(!lstatSync(link).isSymbolicLink())return false;
+  const toolchain=dirname(realpathSync(link));
+  return ['package.json','package-lock.json'].every(name=>readFileSync(join(toolchain,name)).equals(git(root,['show',BASELINE+':.github/release-toolchain/'+name])));
+ }catch{return false;}};
+ const changes=git(root,['status','--porcelain','--untracked-files=all']).toString().split('\n').filter(Boolean);
+ check(changes.every(line=>line==='?? node_modules'&&preparedReleaseLink()),'dirty or untracked exact release source');
  assertReviewedActivationEntries(declaration,tree(root,BASELINE),tree(root,'HEAD'));
  const sourceCommit=git(root,['rev-parse','HEAD']).toString().trim(),sourceTree=git(root,['rev-parse','HEAD^{tree}']).toString().trim();
  return {schemaVersion:'theologai-norton-aquinas-classification.v1',releasePolicy:POLICY.policy,sourceCommit,sourceTree,baseline:BASELINE,corpusIdentity:CORPUS,schema:SCHEMA,applicationOnly:false,declarationSha256:sha(readFileSync(join(root,'release/norton-aquinas.json')))};

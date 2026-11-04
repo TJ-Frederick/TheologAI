@@ -42,3 +42,26 @@ it.each(['old-version-d1', 'settings-d1', 'missing-interval-witness', 'overlap',
 it('refuses any Worker binding to the candidate',async()=>{const f=corpusControlFixture();f.setBound(true);await expect(captureUnboundCorpusControl({role:'preview',api:f.api,now:()=>NOW})).rejects.toThrow('candidate_database_is_bound');});
 it.each(['failed-workers','missing-pages-pagination','short-worker-page','duplicate-worker','unknown-target'])('refuses incomplete inventory%s',async fault=>{const f=corpusControlFixture();const api={...f.api,get:async(path:string)=>{const r=await f.api.get(path),v=await r.json() as any;if(fault==='failed-workers'&&path==='/workers/scripts')v.success=false;if(fault==='missing-pages-pagination'&&path.startsWith('/pages/projects?'))delete v.result_info;if(fault==='short-worker-page'&&path==='/workers/scripts')v.result_info={page:1,per_page:100,count:1,total_count:101,total_pages:2};if(fault==='duplicate-worker'&&path==='/workers/scripts')v.result.push({...v.result[0]});if(fault==='unknown-target'&&path.startsWith('/d1/database/'))v.result.uuid=targets.production.databaseId;return Response.json(v);}};await expect(captureUnboundCorpusControl({role:'preview',api,now:()=>NOW})).rejects.toThrow();});
 it('rejects a capture exceeding its bounded freshness interval',async()=>{let n=0;const f=corpusControlFixture();await expect(captureUnboundCorpusControl({role:'preview',api:f.api,now:()=>NOW+(n++>4?121000:0)})).rejects.toThrow();});
+
+import {mkdtempSync,readFileSync,rmSync} from 'node:fs';
+import {join} from 'node:path';
+import {tmpdir} from 'node:os';
+import {vi} from 'vitest';
+import {CorpusProofTransport} from '../../../scripts/corpus-proof-transport.js';
+import {corpusTransportFixture} from '../../helpers/corpusTransportFixture.js';
+it.each(['pages403','wrong-assignment','failed-pages-page'])('stops the actual protected transport before SQL for %s',async fault=>{
+ const dir=mkdtempSync(join(tmpdir(),'corpus-inventory-refusal-')),file=join(dir,'events.jsonl');let time=NOW,calls=0,sql=0,verify=0;
+ const clock=vi.spyOn(Date,'now').mockImplementation(()=>time);
+ try{
+  const f=corpusTransportFixture({role:'preview',drift:fault==='wrong-assignment',advance:()=>{time+=1000;},query:()=>{sql++;throw Error('SQL forbidden');}});
+  const fetchImpl=(async(input:any,init:any)=>{
+   calls++;const url=String(input);
+   if(url.includes('/tokens/verify')){verify++;time+=1000;return new Response('',{status:403});}
+   if(url.includes('/pages/projects?')){time+=1000;if(fault==='pages403')return Response.json({success:false,errors:[{code:10000,message:'private-provider-message'}]},{status:403});if(fault==='failed-pages-page')return Response.json({success:false,errors:[{code:10000}]});}
+   return f.fetch(input,init);
+  }) as typeof fetch;
+  const transport=new CorpusProofTransport({policy:'norton-aquinas.v1',role:'preview',token:'private-token-sentinel',readBudget:3560000,eventFile:file,fetch:fetchImpl,historicalExceptions:false});
+  await expect(transport.start()).rejects.toThrow();expect(sql).toBe(0);expect(calls).toBeLessThanOrEqual(256);expect(verify).toBeLessThanOrEqual(2);
+  expect(readFileSync(file,'utf8')).not.toMatch(/private-token-sentinel|private-provider-message/);
+ }finally{clock.mockRestore();rmSync(dir,{recursive:true,force:true});}
+});

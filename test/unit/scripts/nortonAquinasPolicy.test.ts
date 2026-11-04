@@ -48,3 +48,23 @@ describe('closed Norton/Aquinas release policy',()=>{
   for(const change of [{schema:'0009_candidate_c_sectioned_publications'},{databaseId:TARGETS.production.databaseId},{releasePolicy:'application-only'},{liveControlReserve:0},{readBudget:3800000},{proof:{...receipt.proof,ftsIntegrity:receipt.proof.ftsIntegrity.slice(1)}},{metering:{...receipt.metering,unknownAttempts:1}}])expect(()=>verifyFreshCorpusReceipt({...receipt,...change},expected,now)).toThrow();
  });
 });
+
+import {mkdtempSync,mkdirSync,writeFileSync,symlinkSync,rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {classifyApplicationRelease} from '../../../scripts/norton-aquinas-release-policy.mjs';
+it('accepts the existing separately locked release link while rejecting source dirt and substituted trust sets',()=>{
+ const dir=mkdtempSync(join(tmpdir(),'corpus-source-link-')),root=join(dir,'source'),toolchain=join(dir,'toolchain');
+ try{
+  execFileSync('git',['clone','--shared','--no-checkout',process.cwd(),root],{stdio:'pipe'});
+  const git=(...args:string[])=>execFileSync('git',args,{cwd:root,stdio:'pipe'});
+  git('sparse-checkout','init','--cone');git('sparse-checkout','set','scripts','release','src','data','migrations','.github');git('checkout','--detach','HEAD');
+  mkdirSync(join(toolchain,'node_modules'),{recursive:true});
+  for(const name of ['package.json','package-lock.json'])writeFileSync(join(toolchain,name),git('show',POLICY.baseline+':.github/release-toolchain/'+name));
+  symlinkSync(join(toolchain,'node_modules'),join(root,'node_modules'),'dir');
+  expect(()=>classifyApplicationRelease(root)).not.toThrow();
+  writeFileSync(join(root,'README.md'),'unreviewed');expect(()=>classifyApplicationRelease(root)).toThrow('dirty');git('restore','README.md');
+  writeFileSync(join(root,'untracked-source.ts'),'unreviewed');expect(()=>classifyApplicationRelease(root)).toThrow('dirty');rmSync(join(root,'untracked-source.ts'));
+  writeFileSync(join(toolchain,'package-lock.json'),'{}');expect(()=>classifyApplicationRelease(root)).toThrow('dirty');
+ }finally{rmSync(dir,{recursive:true,force:true});}
+});

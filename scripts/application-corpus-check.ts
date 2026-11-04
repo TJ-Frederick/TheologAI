@@ -54,7 +54,7 @@ export async function runFreshApplicationCorpusCheck(input: { root: string; role
   const planBytes = bytes(join(input.directory, 'plan.json'), 512 * 1024); check(sha(planBytes) === input.planSha256, 'source plan digest');
   const plan = JSON.parse(planBytes.toString()) as { schemaVersion: string; classification: unknown; sourceSha256: string; expected: ReturnType<typeof buildCorpusProofSource>; readBudget: number; integrityCommands: number };
   check(plan.schemaVersion === 'theologai-application-corpus-source-plan.v1' && JSON.stringify(plan.classification) === JSON.stringify(classification), 'source plan identity');
-  check(plan.integrityCommands === 4 && Number.isSafeInteger(plan.readBudget) && plan.readBudget <= approval.maxReads, 'approved read/integrity budget');
+  check(plan.integrityCommands === 4 && plan.readBudget === POLICY.reservedReads && plan.readBudget === approval.maxReads, 'approved read/integrity budget');
   const sourcePath = join(input.directory, 'source.db'); check(sha(bytes(sourcePath)) === plan.sourceSha256, 'source database digest');
   check(/^[0-9a-f]{64}$/.test(input.planSha256) && Object.hasOwn(TARGETS, input.role), 'source plan or role');
   // Open only the hash-verified source produced by the unprivileged job.
