@@ -1,10 +1,11 @@
 import { createRequire } from 'node:module';
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { parse, stringify } from 'yaml';
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rename, rm, symlink, unlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { classifyApplicationRelease, POLICY as CORPUS_POLICY } from '../../../scripts/norton-aquinas-release-policy.mjs';
 
 async function readWorkflow(name: string): Promise<string> {
   return readFile(new URL(`../../../.github/workflows/${name}`, import.meta.url), 'utf8');
@@ -293,8 +294,8 @@ describe('workflow topology', () => {
       expect(download.with?.name).toContain('github.run_attempt');
     }
     const preview = (parse(await readWorkflow('pr.yml')) as Workflow).jobs['preview-deploy']!;
-    expect(preview.steps?.find(step => step.with?.path === 'release-control')?.with?.ref).toBe('${{ github.event.pull_request.base.sha }}');
-    expect(preview.steps?.find(step => step.uses === './release-control/.github/actions/release-toolchain')?.if)
+    expect(preview.steps?.find(step => step.with?.path === 'test-output/release-control')?.with?.ref).toBe('${{ github.event.pull_request.base.sha }}');
+    expect(preview.steps?.find(step => step.uses === './test-output/release-control/.github/actions/release-toolchain')?.if)
       .toBe("steps.release-toolchain-source.outputs.source == 'base'");
     expect(preview.steps?.find(step => step.uses === './.github/actions/release-toolchain')?.if)
       .toBe("steps.release-toolchain-source.outputs.source == 'introduction'");
@@ -349,7 +350,7 @@ describe('workflow topology', () => {
           await mkdir(dirname(path), { recursive: true });
           if (candidatePresent) await writeFile(path, 'reviewed release tooling');
           if (index < baseCount) {
-            const base = join(directory, 'release-control', files[index]!);
+            const base = join(directory, 'test-output/release-control', files[index]!);
             await mkdir(dirname(base), { recursive: true });
             if (symbolicBase && index === 0) await symlink(path, base);
             else await writeFile(base, 'protected base release tooling');
@@ -364,6 +365,57 @@ describe('workflow topology', () => {
       }
     }
   });
+
+  it('keeps both protected preview control checkouts clean under the real corpus classifier', async () => {
+    const workflow = parse(await readWorkflow('pr.yml')) as Workflow;
+    const jobs = ['operator-corpus-proof', 'preview-deploy'].map(id => workflow.jobs[id]!);
+    const directory = await mkdtemp(join(tmpdir(), 'theologai-hosted-corpus-layout-'));
+    const root = join(directory, 'candidate');
+    const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: 'pipe' });
+    try {
+      git(directory, 'clone', '--shared', '--no-checkout', process.cwd(), root);
+      git(root, 'sparse-checkout', 'init', '--cone');
+      git(root, 'sparse-checkout', 'set', 'scripts', 'release', 'src', 'data', 'migrations', '.github');
+      git(root, 'checkout', '--detach', 'HEAD');
+      const oldControl = join(root, 'release-control');
+      git(root, 'clone', '--shared', '--no-checkout', process.cwd(), oldControl);
+      git(oldControl, 'sparse-checkout', 'init', '--cone');
+      git(oldControl, 'sparse-checkout', 'set', '.github');
+      git(oldControl, 'checkout', '--detach', CORPUS_POLICY.baseline);
+      // The cleanliness check needs the action's real link and pinned manifests;
+      // no package installation or authentication is needed to exercise it.
+      await mkdir(join(oldControl, '.github/release-toolchain/node_modules'));
+      await symlink(join(oldControl, '.github/release-toolchain/node_modules'), join(root, 'node_modules'), 'dir');
+      expect(git(root, 'status', '--porcelain', '--untracked-files=all')).toContain('?? release-control/');
+      expect(() => classifyApplicationRelease(root)).toThrow('dirty or untracked exact release source');
+
+      const controlPath = 'test-output/release-control';
+      const control = join(root, controlPath);
+      await mkdir(dirname(control), { recursive: true });
+      await rename(oldControl, control);
+      await unlink(join(root, 'node_modules'));
+      await symlink(join(control, '.github/release-toolchain/node_modules'), join(root, 'node_modules'), 'dir');
+      expect(git(control, 'rev-parse', 'HEAD').trim()).toBe(CORPUS_POLICY.baseline);
+      for (const [index, job] of jobs.entries()) {
+        const checkout = job.steps!.find(step => step.with?.path === controlPath)!;
+        expect(checkout.with?.ref).toBe(index === 0
+          ? '${{ needs.operator-proof-source.outputs.base }}' : '${{ github.event.pull_request.base.sha }}');
+        expect(checkout.with?.['persist-credentials']).toBe(false);
+        expect(job.steps!.find(step => step.uses === './' + controlPath + '/.github/actions/release-toolchain')?.if)
+          .toBe("steps.release-toolchain-source.outputs.source == 'base'");
+        const selection = job.steps!.find(step => step.name === 'Select release toolchain source')!.run!;
+        const output = join(directory, 'selection-' + index);
+        const selected = spawnSync('bash', ['-e', '-c', selection], { cwd: root, env: { ...process.env, GITHUB_OUTPUT: output } });
+        expect(selected.status, selected.stderr?.toString()).toBe(0);
+        expect(await readFile(output, 'utf8')).toBe('source=base\n');
+      }
+      expect(classifyApplicationRelease(root).sourceCommit).toBe(git(root, 'rev-parse', 'HEAD').trim());
+      await writeFile(join(root, 'untracked-candidate.ts'), 'unreviewed');
+      expect(() => classifyApplicationRelease(root)).toThrow('dirty or untracked exact release source');
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  }, 60_000);
 
   it('preserves approved preview deployment and recovery without an SEC-06 migration gate', async () => {
     for (const [file, id] of [
