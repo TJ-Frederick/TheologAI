@@ -12,7 +12,17 @@ import {captureUnboundCorpusControl,captureCorpusUsage} from '../../scripts/corp
 import {createCorpusApi} from '../../scripts/corpus-release-api.js';
 const authority=createRequire(import.meta.url)('./operator-authorization.cjs');
 const sha=(v:string|Buffer)=>createHash('sha256').update(v).digest('hex');
-const check=(v:unknown,s:string):void=>{if(!v)throw Error('Norton production preparation refused: '+s);};
+class PreparationRefusal extends Error {constructor(readonly reason:string){super('Norton production preparation refused: '+reason);}}
+const check=(v:unknown,s:string):void=>{if(!v)throw new PreparationRefusal(s.replaceAll(/[^a-z0-9]+/gi,'_').toLowerCase());};
+function stopReason(cause:unknown,stage:string,halted:boolean){
+ if(cause instanceof PreparationRefusal)return cause.reason;
+ if(cause instanceof Error&&cause.message==='Corpus preparation refused: preparation operation not admitted')return 'quota_admission';
+ if(cause instanceof Error&&cause.message==='Corpus preparation refused: actual preparation exceeds reserved operation ceiling')return 'operation_budget_exceeded';
+ if(halted)return 'sql_outcome_unresolved';
+ if(stage==='owner_source')return 'source_authority_refused';
+ if(stage.startsWith('unbound_'))return 'control_inventory_refused';
+ return 'preparation_verification_refused';
+}
 export const PREPARATION_CONFIRMATION='PREPARE ONLY THE UNBOUND 74F NORTON AQUINAS CANDIDATE';
 export type PreparationApproval={schemaVersion:string;confirmation:string;operationId:string;repository:string;ownerActorId:number;role:'production';pullRequestNumber:number;headBranch:string;sourceCommit:string;sourceTree:string;baseCommit:string;targetRunId:string;targetRunAttempt:number;databaseId:string;baselineSha256:string;sourceSha256:string;sourcePlanSha256:string;preparationPlanSha256:string;originalLedgerSha256:string;notBefore:string;expiresAt:string;budgetDay:string;maxReads:number;maxLifetimeWrites:number;maxDailyWrites:number;previousPreparationWrites:number;exclusiveDataWritesDuringWindow:boolean;candidateWriteJobsPaused:boolean;noDeployment:boolean};
 export function requirePreparationApproval(a:PreparationApproval,source:{sourceCommit:string;sourceTree:string},now=Date.now()){
@@ -50,7 +60,7 @@ export async function runNortonPreparation(input:{root:string;approval:Preparati
   stage='unbound_after';const after=await captureUnboundCorpusControl({role:'production',api});check(after.inventorySha256===before.inventorySha256,'unchanged unbound assignments');await guard();
   const receipt={schemaVersion:'norton-production-preparation-receipt.v1',purpose:'unbound-candidate-preparation-only',operationId:a.operationId,source:classification,target:plan.target,planSha256:plan.sha256,baselineWitnessSha256:plan.baselineWitnessSha256,originalLedgerSha256:a.originalLedgerSha256,postPreparationLedgerSha256:sha(JSON.stringify(ledger.rows)),postPreparationLedgerRows:10,readbacksSha256:result.readbacksSha256,completedAt:new Date(now()).toISOString(),metering:{rowsRead:session.reads,rowsWritten:session.writes,sqlRequests:session.requests,providerExchanges:providerCalls,githubReads:githubCalls,retries:0,unknownOutcomes:0},controlInventorySha256:after.inventorySha256,authority:a,freshCompleteProof:false,deploymentAuthorized:false};
   record({kind:'preparation-complete',receiptSha256:sha(JSON.stringify(receipt))});writeFileSync(join(input.output,'preparation-receipt.json'),JSON.stringify(receipt,null,2)+'\n',{flag:'wx',mode:0o600});return receipt;
- }catch{try{record({kind:'STOP',stage,reads:session?.reads??0,writes:session?.writes??0,sqlRequests:session?.requests??0,providerExchanges:providerCalls,githubReads:githubCalls,unknownOutcome:session?.halted??false,retry:false,noAutomaticResume:true});}catch{}throw Error('Norton production preparation stopped; preserve the original journal, no retry or automatic recovery');}finally{baseline.close();source.close();}
+ }catch(cause){try{record({kind:'STOP',stage,reason:stopReason(cause,stage,session?.halted??false),reads:session?.reads??0,writes:session?.writes??0,sqlRequests:session?.requests??0,providerExchanges:providerCalls,githubReads:githubCalls,unknownOutcome:session?.halted??false,retry:false,noAutomaticResume:true});}catch{}throw Error('Norton production preparation stopped; preserve the original journal, no retry or automatic recovery');}finally{baseline.close();source.close();}
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
  const [approvalPath,baselinePath,sourcePath,sourcePlanPath,output,...extra]=process.argv.slice(2);check(approvalPath&&baselinePath&&sourcePath&&sourcePlanPath&&output&&!extra.length,'exact approval/baseline/source/source-plan/output arguments');
