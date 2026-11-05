@@ -117,17 +117,14 @@ export async function auditCorpusRelease(options: {
                     }
                 };
                 const client = new Client({ name: 'local-corpus-feasibility', version: '1' }, versionNegotiationFor(protocol));
-                const probe = async (id: string, action: () => Promise<any>, allowError = false) => { current = id;stage='probe';transportFailure=undefined;lastHttpStatus=null; try {
+                const probe = async (id: string, action: () => Promise<any>, allowError = false) => { current = id;stage='probe';transportFailure=undefined;lastHttpStatus=null;
                     const value = await action();stage='assertion';
                     if (value?.isError && !allowError)
                         throw new AuditFault('tool_error');
                     validateResource(value);
                     checks.push({ role, era, id, passed: true, responseSha256: sha(JSON.stringify(value)) });
                     return value;
-                }
-                catch (e) {
-                    throw e;
-                } };
+                };
                 let eraFailed=false;
                 try {
                     current = 'initialize';stage='initialize';transportFailure=undefined;lastHttpStatus=null;
@@ -168,6 +165,7 @@ export async function auditCorpusRelease(options: {
                     const disabled = await probe('external-disabled', () => client.callTool({ name: 'primary_source_search', arguments: { queries: [{ id: 'external', text: 'Lord Supper', ...(preview ? { searchDepth: 'expanded', expandedLimit: 1 } : { providers: ['ccel'] }), match: 'all_terms', selection: 'relevance', limit: 1 }] } }), !preview);
                     const badCursor = await probe('invalid-classic-cursor', () => client.callTool({ name: 'classic_text_lookup', arguments: { work: core.probes[0].workId, browseSections: true, cursor: 'not-a-valid-cursor' } }), true);
                     check(badCursor.isError === true, 'invalid cursor succeeded');
+                    current='external-disabled';stage='assertion';
                     check(preview ? !JSON.stringify(disabled).includes('external_discovery_executed') : disabled.isError === true, 'disabled external contract drift');
                     await probe('norton-browse', () => client.callTool({ name: 'classic_text_lookup', arguments: { work: norton.document_id, browseSections: true } }));
                     await probe('norton-body', () => client.readResource({ uri: 'theologai://documents/' + norton.document_id + '#section-' + norton.section_key }));
@@ -180,6 +178,7 @@ export async function auditCorpusRelease(options: {
                     await probe('aquinas-search', () => client.callTool({ name: 'historical_hierarchy_lookup', arguments: { slug: aquinas.public_slug, query: 'grace', match: 'all_terms' } }));
                     const cursorHistory = new Map<string, string>(), priorCandidates = new Map<string, string[]>();
                     for (const c of language.cases) {
+                        current='language:'+c.id;stage='assertion';
                         const args = { ...c.arguments };
                         if (c.cursorFrom) {
                             const cursor = cursorHistory.get(c.cursorFrom);
@@ -206,10 +205,10 @@ export async function auditCorpusRelease(options: {
         }
         current='dual-era-parity';stage='parity';sameFingerprints();
     }
-    catch(error){failure=error instanceof AuditFault?error.category:transportFailure??(lastHttpStatus!==null&&lastHttpStatus>=400?'http_status':categoryForStage(stage));}
+    catch(error){if((stage as FailureStage)==='assertion'){const failed=[...checks].reverse().find(c=>c.id===current&&c.era===era);if(failed)failed.passed=false;}failure=error instanceof AuditFault?error.category:transportFailure??(lastHttpStatus!==null&&lastHttpStatus>=400?'http_status':categoryForStage(stage));}
     finally {
         try{db.close();}catch{cleanupFailed=true;if(!failure){failure='cleanup';stage='cleanup';}}
     }
-    return { schemaVersion: 'norton-aquinas-live.v1', role: options.role, endpoint: options.endpoint, serverVersion: options.serverVersion, productProfile: options.role === 'preview' ? '7' : '6', protocols: ['2025-11-25', '2026-07-28'], summaries, fixtureSha256: hash([core, spine, language]), fingerprints, checks, databaseSha256, manifestSha256, sourceBodyOutput: false, broaderV9Features: false, aggregateResponseBytes: aggregateBytes, durationMs: Date.now() - started,...(failure?{failure:{schemaVersion:'norton-aquinas-live-failure.v1' as const,category:failure,stage,role:options.role,era:era||null,probeId:trustedId(current),lastCompletedProbe:checks.length?trustedId(checks.at(-1)!.id):null,completedChecks:checks.length,httpExchanges:totalExchanges,eraHttpExchanges:eraExchanges,lastHttpStatus,aggregateResponseBytes:aggregateBytes,cleanupFailed}}:{}) };
+    return { schemaVersion: 'norton-aquinas-live.v1', role: options.role, endpoint: options.endpoint, serverVersion: options.serverVersion, productProfile: options.role === 'preview' ? '7' : '6', protocols: ['2025-11-25', '2026-07-28'], summaries, fixtureSha256: hash([core, spine, language]), fingerprints, checks, databaseSha256, manifestSha256, sourceBodyOutput: false, broaderV9Features: false, aggregateResponseBytes: aggregateBytes, durationMs: Date.now() - started,...(failure?{failure:{schemaVersion:'norton-aquinas-live-failure.v1' as const,category:failure,stage,role:options.role,era:era||null,probeId:trustedId(current),lastCompletedProbe:checks.some(c=>c.passed)?trustedId([...checks].reverse().find(c=>c.passed)!.id):null,lastCompletedEra:[...checks].reverse().find(c=>c.passed)?.era??null,completedChecks:checks.filter(c=>c.passed).length,httpExchanges:totalExchanges,eraHttpExchanges:eraExchanges,lastHttpStatus,aggregateResponseBytes:aggregateBytes,cleanupFailed}}:{}) };
     function sameFingerprints() { check(hash(fingerprints[0]) === hash(fingerprints[1]), 'dual-era contract differs'); }
 }
