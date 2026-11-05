@@ -80,9 +80,9 @@ function expressionBody(value: string): string {
   return normalized(value).replace(/^\$\{\{\s*/, '').replace(/\s*\}\}$/, '');
 }
 
-function routedName(name: string | undefined, event = 'pull_request', proof = '', authorization = ''): string {
+function routedName(name: string | undefined, event = 'pull_request', proof = '', authorization = '', restoration = ''): string {
   if (!name?.startsWith('${{')) return name ?? '';
-  return new Function('github','inputs','return ('+name.slice(3,-2)+')')({event_name:event},{operator_proof_json:proof,operator_authorization_json:authorization});
+  return new Function('github','inputs','return ('+name.slice(3,-2)+')')({event_name:event},{operator_proof_json:proof,operator_authorization_json:authorization,preview_restore_json:restoration});
 }
 function assertPreviewRevocationBoundary(workflow: Workflow): void {
   const trigger = workflow.on['pull_request'] as { types?: string[] };
@@ -515,8 +515,9 @@ describe('workflow topology', () => {
       for(const event of ['pull_request','schedule','workflow_dispatch'])expect(routedName(job.name,event)).toBe(name);
       expect(routedName(job.name,'workflow_dispatch','proof')).toBe('Operator metadata / '+name);
       expect(routedName(job.name,'workflow_dispatch','','authorization')).toBe('Operator metadata / '+name);
-      const evaluate=(event:string,proof:string,authorization:string)=>new Function('github','inputs','cancelled','return ('+expressionBody(job.if!)+')')({event_name:event},{operator_proof_json:proof,operator_authorization_json:authorization},()=>false);
-      expect(evaluate('pull_request','','')).toBe(true);expect(evaluate('workflow_dispatch','proof','')).toBe(false);expect(evaluate('workflow_dispatch','','authorization')).toBe(false);
+      expect(routedName(job.name,'workflow_dispatch','','','restoration')).toBe('Operator metadata / '+name);
+      const evaluate=(event:string,proof:string,authorization:string,restoration='')=>new Function('github','inputs','cancelled','return ('+expressionBody(job.if!)+')')({event_name:event},{operator_proof_json:proof,operator_authorization_json:authorization,preview_restore_json:restoration},()=>false);
+      expect(evaluate('pull_request','','')).toBe(true);expect(evaluate('workflow_dispatch','','')).toBe(true);expect(evaluate('workflow_dispatch','','','restoration')).toBe(false);expect(evaluate('workflow_dispatch','proof','')).toBe(false);expect(evaluate('workflow_dispatch','','authorization')).toBe(false);
     }
     const aggregate = workflow.jobs['validation-complete']!;
     expect(new Set(needs(aggregate))).toEqual(new Set(Object.keys(expected)));
