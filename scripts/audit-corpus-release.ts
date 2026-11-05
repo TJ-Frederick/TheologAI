@@ -10,7 +10,13 @@ import { escapeFrozenEditionSectionContentForMarkdown } from '../src/kernel/edit
 import {createHash} from 'node:crypto';
 const sha=(v:string|Buffer)=>createHash('sha256').update(v).digest('hex');
 const hash=(v:unknown)=>sha(JSON.stringify(v));
-function check(v:unknown,message:string):asserts v {if(!v)throw Error('Corpus live refused: '+message);}
+export const CORPUS_LIVE_FAILURE_CATEGORIES=['timeout','aborted','guard','network','http_status','response_size','response_read','transport_budget','protocol','tool_error','assertion','cleanup','unknown'] as const;
+type FailureCategory=typeof CORPUS_LIVE_FAILURE_CATEGORIES[number];
+type FailureStage='initialize'|'contract'|'probe'|'assertion'|'parity'|'cleanup';
+class AuditFault extends Error {constructor(readonly category:FailureCategory){super('Corpus live audit failed');}}
+function check(v:unknown,message:string):asserts v {if(!v)throw new AuditFault(message==='live HTTP/time budget exceeded'?'transport_budget':'assertion');}
+const categoryForStage=(stage:FailureStage):FailureCategory=>stage==='initialize'||stage==='probe'?'protocol':stage==='assertion'||stage==='contract'||stage==='parity'?'assertion':'unknown';
+const trustedId=(id:string)=>/^[A-Za-z0-9:._-]{1,200}$/.test(id)?id:'unavailable';
 export async function auditCorpusRelease(options: {
     role: 'preview' | 'production';
     endpoint: string;
@@ -33,7 +39,9 @@ export async function auditCorpusRelease(options: {
         passed: boolean;
         responseSha256: string;
     }[] = [], summaries: unknown[] = [], fingerprints: unknown[] = [];
-    let current = '', role = '', era = '';
+    let current = 'initialize', role = '', era = '';
+    let stage:FailureStage='initialize',failure:FailureCategory|undefined,transportFailure:FailureCategory|undefined,cleanupFailed=false,totalExchanges=0,eraExchanges=0,lastHttpStatus:number|null=null;
+    const databaseSha256=sha(readFileSync(options.databasePath)),manifestSha256=sha(readFileSync(join(root,'data/data-manifest.json')));
     const core = JSON.parse(readFileSync(join(root, 'test/fixtures/historical-core-preview-audit.json'), 'utf8'));
     const spine = JSON.parse(readFileSync(join(root, 'test/fixtures/historical-spine-preview-audit.json'), 'utf8'));
     const language = JSON.parse(readFileSync(join(root, 'test/fixtures/original-language-v2-preview-audit.json'), 'utf8'));
@@ -73,30 +81,32 @@ export async function auditCorpusRelease(options: {
             const fetchImpl = options.fetch;
             for (const protocol of ['2025-11-25', '2026-07-28'] as const) {
                 era = protocol;
-                let exchanges = 0;
+                let exchanges = 0;eraExchanges=0;
                 const localFetch = async (input: any, init?: any) => {
-                    options.guard?.();
+                    try{options.guard?.();}catch{throw new AuditFault('guard');}
                     check(++exchanges <= 200 && Date.now() - started <= 600000, 'live HTTP/time budget exceeded');
+                    totalExchanges++;eraExchanges=exchanges;
                     const url = String(input instanceof Request ? input.url : input);
                     check(url === options.endpoint, 'unexpected audit URL');
                     const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 30000);
                     try {
                         if(options.fetch===fetch){const delay=Math.max(0,nextNetworkStart-Date.now());if(delay)await new Promise(r=>setTimeout(r,delay));nextNetworkStart=Date.now()+650;}
-                        const response = await fetchImpl(input, { ...init, headers:{...Object.fromEntries(new Headers(init?.headers)),'user-agent':`TheologAI-Corpus-${role}-Audit/1.0`}, redirect: 'error', signal: init?.signal ? AbortSignal.any([init.signal, controller.signal]) : controller.signal });
-                        check(!response.redirected && response.status < 500, 'live transport failed');
+                        let response:Response;try{response = await fetchImpl(input, { ...init, headers:{...Object.fromEntries(new Headers(init?.headers)),'user-agent':`TheologAI-Corpus-${role}-Audit/1.0`}, redirect: 'error', signal: init?.signal ? AbortSignal.any([init.signal, controller.signal]) : controller.signal });}catch{transportFailure=controller.signal.aborted?'timeout':init?.signal?.aborted?'aborted':'network';throw new AuditFault(transportFailure);}
+                        lastHttpStatus=response.status;
+                        if(response.redirected||response.status>=500){transportFailure='http_status';throw new AuditFault(transportFailure);}
                         if (!response.body)
                             return response;
                         const reader = response.body.getReader(), chunks: Uint8Array[] = [];
                         let bytes = 0;
                         for (;;) {
-                            const next = await reader.read();
+                            let next:ReadableStreamReadResult<Uint8Array>;try{next=await reader.read();}catch{transportFailure=controller.signal.aborted?'timeout':init?.signal?.aborted?'aborted':'response_read';throw new AuditFault(transportFailure);}
                             if (next.done)
                                 break;
                             bytes += next.value.byteLength;
                             aggregateBytes += next.value.byteLength;
                             if (bytes > 256 * 1024 || aggregateBytes > 16 * 1024 * 1024) {
-                                await reader.cancel();
-                                throw Error('live response budget exceeded');
+                                transportFailure='response_size';try{await reader.cancel();}catch{}
+                                throw new AuditFault(transportFailure);
                             }
                             chunks.push(next.value);
                         }
@@ -107,21 +117,23 @@ export async function auditCorpusRelease(options: {
                     }
                 };
                 const client = new Client({ name: 'local-corpus-feasibility', version: '1' }, versionNegotiationFor(protocol));
-                const probe = async (id: string, action: () => Promise<any>, allowError = false) => { current = id; try {
-                    const value = await action();
+                const probe = async (id: string, action: () => Promise<any>, allowError = false) => { current = id;stage='probe';transportFailure=undefined;lastHttpStatus=null; try {
+                    const value = await action();stage='assertion';
                     if (value?.isError && !allowError)
-                        throw Error('Unexpected tool error ' + JSON.stringify(value).slice(0, 500));
+                        throw new AuditFault('tool_error');
                     validateResource(value);
                     checks.push({ role, era, id, passed: true, responseSha256: sha(JSON.stringify(value)) });
                     return value;
                 }
                 catch (e) {
-                    throw Error(role + '/' + era + '/' + id + ': ' + String(e));
+                    throw e;
                 } };
+                let eraFailed=false;
                 try {
-                    current = 'initialize';
+                    current = 'initialize';stage='initialize';transportFailure=undefined;lastHttpStatus=null;
                     await client.connect(new StreamableHTTPClientTransport(new URL(options.endpoint), { fetch: localFetch as any }));
                     const snapshot = await captureMcpTransportSnapshot(client);
+                    current='contract';stage='contract';
                     await assertMcpTransportContract(snapshot, { contractVersion: preview ? '7' : '6', logging: false });
                     check(client.getNegotiatedProtocolVersion() === protocol, 'protocol drift');
                     check(snapshot.server.version === options.serverVersion, 'server version drift');
@@ -186,16 +198,18 @@ export async function auditCorpusRelease(options: {
                     }
                     summaries.push({ role, era, httpExchanges: exchanges, checks: checks.filter(x => x.role === role && x.era === era).length });
                 }
+                catch(error){eraFailed=true;throw error;}
                 finally {
-                    await client.close();
+                    try{await client.close();}catch{cleanupFailed=true;if(!eraFailed){stage='cleanup';throw new AuditFault('cleanup');}}
                 }
             }
         }
-        sameFingerprints();
-        return { schemaVersion: 'norton-aquinas-live.v1', role: options.role, endpoint: options.endpoint, serverVersion: options.serverVersion, productProfile: options.role === 'preview' ? '7' : '6', protocols: ['2025-11-25', '2026-07-28'], summaries, fixtureSha256: hash([core, spine, language]), fingerprints, checks, databaseSha256: sha(readFileSync(options.databasePath)), manifestSha256: sha(readFileSync(join(root, 'data/data-manifest.json'))), sourceBodyOutput: false, broaderV9Features: false, aggregateResponseBytes: aggregateBytes, durationMs: Date.now() - started };
+        current='dual-era-parity';stage='parity';sameFingerprints();
     }
+    catch(error){failure=error instanceof AuditFault?error.category:transportFailure??(lastHttpStatus!==null&&lastHttpStatus>=400?'http_status':categoryForStage(stage));}
     finally {
-        db.close();
+        try{db.close();}catch{cleanupFailed=true;if(!failure){failure='cleanup';stage='cleanup';}}
     }
+    return { schemaVersion: 'norton-aquinas-live.v1', role: options.role, endpoint: options.endpoint, serverVersion: options.serverVersion, productProfile: options.role === 'preview' ? '7' : '6', protocols: ['2025-11-25', '2026-07-28'], summaries, fixtureSha256: hash([core, spine, language]), fingerprints, checks, databaseSha256, manifestSha256, sourceBodyOutput: false, broaderV9Features: false, aggregateResponseBytes: aggregateBytes, durationMs: Date.now() - started,...(failure?{failure:{schemaVersion:'norton-aquinas-live-failure.v1' as const,category:failure,stage,role:options.role,era:era||null,probeId:trustedId(current),lastCompletedProbe:checks.length?trustedId(checks.at(-1)!.id):null,completedChecks:checks.length,httpExchanges:totalExchanges,eraHttpExchanges:eraExchanges,lastHttpStatus,aggregateResponseBytes:aggregateBytes,cleanupFailed}}:{}) };
     function sameFingerprints() { check(hash(fingerprints[0]) === hash(fingerprints[1]), 'dual-era contract differs'); }
 }

@@ -34,6 +34,12 @@ export async function runCorpusLive(input:{role:'preview'|'production';sourceDir
  event({kind:'live-admitted',releasePolicy:POLICY.policy,liveReads:POLICY.liveReads,controlReads:POLICY.controlReads,effectiveAccountReads:effective,uncertaintyMargin:200000,challengeNonce:challenge.nonce});
  event({kind:'live-intent',reservedReads:POLICY.liveReads,stopOnUnknown:true});
  const live=await auditCorpusRelease({role:input.role,root:process.cwd(),databasePath:join(input.sourceDirectory,'source.db'),endpoint:input.role==='preview'?'https://preview-mcp.theologai.xyz/mcp':'https://mcp.theologai.xyz/mcp',serverVersion:JSON.parse(readFileSync('package.json','utf8')).version+(input.role==='preview'?'-preview':''),fetch:input.fetch??fetch,guard:()=>{requireOperatorChallenge(challenge);}});
+ if(Object.hasOwn(live,'failure')){
+  const text=JSON.stringify(live,null,2)+'\n';let retained=false;
+  try{check(Buffer.byteLength(text)<=512*1024,'bounded sanitized failure report');writeFileSync(output,text,{flag:'wx',mode:0o600});retained=true;}catch{}
+  try{event({kind:'live-failed',reportSha256:sha(text),reportRetained:retained,reservedReadsRetained:POLICY.liveReads,retry:false});}catch{try{process.stderr.write('Corpus live audit failed; report or journal retention unavailable. No retry.\n');}catch{}}
+  check(false,'live audit failure');
+ }
  const after=await observer.observeControls();check(JSON.stringify(after)===JSON.stringify(before),'live assignments changed');
  const finalUsage=await captureCorpusUsage({role:input.role,api});
  // Adaptive analytics has no ingestion watermark: a delta can include the earlier full proof.
