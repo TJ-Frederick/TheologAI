@@ -26,7 +26,7 @@ export const OPERATOR_PROOF = Object.freeze({ repository: 'TJ-Frederick/TheologA
   previewExtensionNotBefore: '2026-10-31T00:05:00Z', previewCumulativeReadCap: 4_583_687, previewCumulativeDiagnostics: 8,
   previewPriorReads: 1_072_690, previewPriorWrites: 4, previewPriorDiagnostics: 4 });
 export type OperatorChallenge = {
-  schemaVersion: 'theologai-operator-corpus-challenge.v2'; releasePolicy?: string; liveControlReserve?: number; authorization: {authorization: Record<string,any>;provenance: Record<string,any>}; role: 'preview' | 'production'; authorizationId: string;
+  schemaVersion: 'theologai-operator-corpus-challenge.v2'; releasePolicy?: string; liveControlReserve?: number;accountReadCeiling?:number;accountReadCeilingDay?:string; authorization: {authorization: Record<string,any>;provenance: Record<string,any>}; role: 'preview' | 'production'; authorizationId: string;
   repository: string; ownerActorId: number; sourceCommit: string; sourceTree: string; sourcePlanSha256: string;
   runId: string; runAttempt: 1; workflowPath: string; eventName: string; ref: string; baseCommit: string;
   nonce: string; createdAt: string; expiresAt: string; reservedReads: number; hardReadCap: number; diagnosticCommands: number; admission: ProtectedCorpusAdmission;
@@ -50,7 +50,7 @@ function readPlan(directory: string, digest: string) {
   return plan;
 }
 export function requireOperatorChallenge(input: unknown, now = Date.now()): OperatorChallenge {
-  const c = object(input), selected=policyForIdentity(c.releasePolicy), corpus=selected.id==='norton-aquinas.v1'; const keys = [...(corpus?['liveControlReserve','releasePolicy']:[]),'schemaVersion','authorization','role','authorizationId','repository','ownerActorId','sourceCommit','sourceTree','sourcePlanSha256','runId','runAttempt','workflowPath','eventName','ref','baseCommit','nonce','createdAt','expiresAt','reservedReads','hardReadCap','diagnosticCommands','admission'];
+  const c = object(input), selected=policyForIdentity(c.releasePolicy), corpus=selected.id==='norton-aquinas.v1'; const keys = [...(Object.hasOwn(c,'accountReadCeiling')||Object.hasOwn(c,'accountReadCeilingDay')?['accountReadCeiling','accountReadCeilingDay']:[]),...(corpus?['liveControlReserve','releasePolicy']:[]),'schemaVersion','authorization','role','authorizationId','repository','ownerActorId','sourceCommit','sourceTree','sourcePlanSha256','runId','runAttempt','workflowPath','eventName','ref','baseCommit','nonce','createdAt','expiresAt','reservedReads','hardReadCap','diagnosticCommands','admission'];
   check(Object.keys(c).sort().join(',') === keys.sort().join(','), 'challenge shape');
   check(c.schemaVersion === 'theologai-operator-corpus-challenge.v2' && ['preview','production'].includes(c.role), 'challenge version/role');
   const preview = c.role === 'preview';
@@ -59,6 +59,7 @@ export function requireOperatorChallenge(input: unknown, now = Date.now()): Oper
   check(typeof c.runId === 'string' && /^[1-9][0-9]{0,15}$/.test(c.runId) && c.runAttempt === 1, 'single run attempt');
   const authorization=authority.requirePackage(c.authorization,{role:c.role,sourceCommit:c.sourceCommit,sourceTree:c.sourceTree,baseCommit:c.baseCommit,sourcePlanSha256:c.sourcePlanSha256,targetRunId:c.runId,targetRunAttempt:1},now).authorization;
   requireSameReleasePolicy(selected,authorization.releasePolicy);
+  check(c.accountReadCeiling===authorization.accountReadCeiling&&c.accountReadCeilingDay===authorization.accountReadCeilingDay,'owner-bound account ceiling');
   check(c.authorizationId === authorization.authorizationId, 'authorization identity');
   check(c.workflowPath === (preview ? '.github/workflows/pr.yml' : '.github/workflows/deploy.yml')
     && c.eventName === (preview ? 'pull_request' : 'workflow_dispatch')
@@ -71,6 +72,7 @@ export function requireOperatorChallenge(input: unknown, now = Date.now()): Oper
   const a=object(c.admission);
   check(a.accountId===ACCOUNT && a.role===c.role && a.day===c.createdAt.slice(0,10) && a.sampleInterval===1
     && integer(a.rowsRead) && integer(a.rowsWritten) && a.readBudget===c.reservedReads && (!corpus || a.liveControlReserve===c.liveControlReserve)
+    && a.accountReadCeiling===c.accountReadCeiling&&a.accountReadCeilingDay===c.accountReadCeilingDay
     && Number.isFinite(Date.parse(a.observedAt)) && Math.abs(Date.parse(a.observedAt)-start)<=50_000 && (!corpus || Math.abs(Date.parse(a.inventoryObservedAt)-start)<=50_000) && Array.isArray(a.controls), 'protected quota admission');
   return c as OperatorChallenge;
 }
@@ -78,7 +80,8 @@ export function createOperatorChallenge(role: 'preview' | 'production', classifi
   check(env.GITHUB_ACTIONS === 'true' && env.GITHUB_REPOSITORY === OPERATOR_PROOF.repository && env.GITHUB_RUN_ATTEMPT === '1', 'protected CI context');
   const selected=policyForClassification(classification);
   requireSameReleasePolicy(selected,authorization?.authorization?.releasePolicy);
-  const c = { ...(selected.id==='norton-aquinas.v1'?{liveControlReserve:100000,releasePolicy:selected.id}:{}), schemaVersion: 'theologai-operator-corpus-challenge.v2', authorization, role,
+  const grant=authority.requirePackage(authorization,{},now).authorization;
+  const c = { ...(grant.accountReadCeiling?{accountReadCeiling:grant.accountReadCeiling,accountReadCeilingDay:grant.accountReadCeilingDay}:{}),...(selected.id==='norton-aquinas.v1'?{liveControlReserve:100000,releasePolicy:selected.id}:{}), schemaVersion: 'theologai-operator-corpus-challenge.v2', authorization, role,
     authorizationId: authority.requirePackage(authorization,{},now).authorization.authorizationId,
     repository: OPERATOR_PROOF.repository, ownerActorId: OPERATOR_PROOF.ownerActorId, sourceCommit:classification.sourceCommit,sourceTree:classification.sourceTree,
     sourcePlanSha256: planSha256, runId: env.GITHUB_RUN_ID, runAttempt: 1,
@@ -88,6 +91,7 @@ export function createOperatorChallenge(role: 'preview' | 'production', classifi
     reservedReads: selected.reservedReads, hardReadCap: selected.hardReadCap, diagnosticCommands: 4, admission };
   return requireOperatorChallenge(c, now);
 }
+export function productionBudgetForChallenge(c:OperatorChallenge){requireOperatorChallenge(c);return c.accountReadCeiling?{package:c.authorization,sourceCommit:c.sourceCommit,sourceTree:c.sourceTree,runId:c.runId}:undefined;}
 export function operatorApproval(c: OperatorChallenge) {
   const selected=policyForIdentity(c.releasePolicy);
   return { ...(selected.id==='norton-aquinas.v1'?{liveControlReserve:100000,expectedLedgerSha256:c.authorization.authorization.expectedLedgerSha256,releasePolicy:selected.id}:{}), schemaVersion: 'theologai-fresh-corpus-proof-approval.v1', role: c.role, accountId: ACCOUNT,
@@ -338,7 +342,7 @@ export async function runOperatorProof(input: { challenge:OperatorChallenge; dir
     ledger.attempts.push(attempt); save();
     try {
       transport = new CorpusProofTransport({policy:policyForIdentity(c.releasePolicy).id,role:c.role,token:input.token,readBudget:16_384,eventFile:input.output+'.receipt.json.events.jsonl',
-        previewQuotaBuffer:false,historicalExceptions:false});
+        previewQuotaBuffer:false,historicalExceptions:false,productionAuthorization:productionBudgetForChallenge(c)});
       const startedAt=new Date().toISOString(); await transport.startIntegrity(c.admission);
       const results=[];
       for(const q of integrityQueries()) {
@@ -390,7 +394,7 @@ async function main() {
     authenticateLiveOperatorPackage(authorization);
     check(process.env.CLOUDFLARE_ACCOUNT_ID===ACCOUNT && process.env.CLOUDFLARE_API_TOKEN,'existing read-only deployment credential');
     const transport=new CorpusProofTransport({policy:policyForClassification(p.classification).id,role:role as 'preview'|'production',token:process.env.CLOUDFLARE_API_TOKEN!,readBudget:p.readBudget,eventFile:output!+'.admission.jsonl',
-      previewQuotaBuffer:false,historicalExceptions:false});
+      previewQuotaBuffer:false,historicalExceptions:false,productionAuthorization:auth.accountReadCeiling?{package:authorization,sourceCommit:p.classification.sourceCommit,sourceTree:p.classification.sourceTree,runId:process.env.GITHUB_RUN_ID!}:undefined});
     await transport.start();
     const c=createOperatorChallenge(role as 'preview'|'production',{sourceCommit:p.classification.sourceCommit,sourceTree:p.classification.sourceTree,...(p.classification.releasePolicy?{releasePolicy:p.classification.releasePolicy,applicationOnly:false}:{})},digest!,process.env,Date.now(),transport.protectedAdmission(),authorization);
     writeFileSync(output!,JSON.stringify(c,null,2)+'\n',{flag:'wx',mode:0o600}); return;
@@ -405,7 +409,7 @@ async function main() {
     const integrity=verifyOperatorIntegrity(readJson(integrityFile!),c);
     check(process.env.CLOUDFLARE_ACCOUNT_ID===ACCOUNT && process.env.CLOUDFLARE_API_TOKEN,'existing read-only deployment credential');
     const reader=new CorpusProofTransport({policy:policyForIdentity(c.releasePolicy).id,role:c.role,token:process.env.CLOUDFLARE_API_TOKEN!,readBudget:p.readBudget-integrity.receipt.metering.rowsRead,knownRowsRead:c.admission.rowsRead+integrity.receipt.metering.rowsRead,eventFile:output!+'.events.jsonl',
-      previewQuotaBuffer:false,historicalExceptions:false});
+      previewQuotaBuffer:false,historicalExceptions:false,productionAuthorization:productionBudgetForChallenge(c)});
     let lastGuard=0; const transport=composeReadProof(reader,integrity,()=>{requireOperatorChallenge(c);if(Date.now()-lastGuard>30_000){requireLiveOperatorGate(c);lastGuard=Date.now();}},c.admission.controls);
     try {
       const receipt=await runFreshApplicationCorpusCheck({root:process.cwd(),role:c.role,directory:directory!,planSha256:digest!,output:output!,approval:operatorApproval(c),token:process.env.CLOUDFLARE_API_TOKEN!,transport});
@@ -432,7 +436,7 @@ async function main() {
     check(c.sourceCommit===p.classification.sourceCommit && c.sourceTree===p.classification.sourceTree && c.sourcePlanSha256===digest, 'gate source');
     const envelope=verifyOperatorEnvelope(readJson(envelopeFile!),c,p);
     check(process.env.CLOUDFLARE_ACCOUNT_ID===ACCOUNT && process.env.CLOUDFLARE_API_TOKEN, 'existing read-only deployment credential');
-    const observer=new CorpusProofTransport({policy:policyForIdentity(c.releasePolicy).id,role:c.role,token:process.env.CLOUDFLARE_API_TOKEN!,readBudget:0,eventFile:output!+'.controls.jsonl'});
+    const observer=new CorpusProofTransport({policy:policyForIdentity(c.releasePolicy).id,role:c.role,token:process.env.CLOUDFLARE_API_TOKEN!,readBudget:0,eventFile:output!+'.controls.jsonl',productionAuthorization:productionBudgetForChallenge(c)});
     const controls=await observer.observeControls();
     check(JSON.stringify(controls)===JSON.stringify(envelope.receipt.controls), 'operator/gate controls changed');
     check(Date.parse(c.expiresAt)-Date.now()>=15*60000,'activation needs full live/control time reserve');

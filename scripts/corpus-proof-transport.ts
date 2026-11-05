@@ -1,4 +1,7 @@
 /** Fixed-account, single-attempt Cloudflare transport for a complete corpus proof. */
+import {createRequire} from 'node:module';
+const operatorAuthority=createRequire(import.meta.url)('../.github/scripts/operator-authorization.cjs');
+export type ProductionBudgetAuthorization={package:unknown;sourceCommit:string;sourceTree:string;runId:string};
 import { createHash } from 'node:crypto';
 import { appendFileSync, writeFileSync } from 'node:fs';
 import {TARGETS as APPLICATION_TARGETS} from './application-release-policy.mjs';
@@ -10,12 +13,12 @@ import { ALL_FTS, type ProofQuery, type ProofRow } from './corpus-source-proof.j
 
 type Role = keyof typeof TARGETS;
 type ApiResult = { success?: boolean; errors?: unknown[]; result?: unknown; data?: unknown };
-export type ProtectedCorpusAdmission = { accountId: string; role: Role; day: string; observedAt: string; rowsRead: number; rowsWritten: number; sampleInterval: 1; readBudget: number; liveControlReserve?:number; inventoryObservedAt?:string; controls: unknown };
+export type ProtectedCorpusAdmission = { accountId: string; role: Role; day: string; observedAt: string; rowsRead: number; rowsWritten: number; sampleInterval: 1; readBudget: number; liveControlReserve?:number; inventoryObservedAt?:string; controls: unknown;accountReadCeiling?:number;accountReadCeilingDay?:string };
 // Owner's October 29 preview-only waiver of the production traffic reserve.
 export const PREVIEW_QUOTA_BUFFER_DAY = '2026-10-29';
 // Owner waived only the analytics uncertainty margin for today's preview.
 export const PREVIEW_UNCERTAINTY_WAIVER_DAY = '2026-10-30';
-type BudgetScope = { role: Role; day: string; historicalExceptions?: boolean };
+type BudgetScope = { role: Role; day: string; historicalExceptions?: boolean;productionAuthorization?:ProductionBudgetAuthorization };
 const uncertaintyReadMargin = (scope?: BudgetScope): number => scope?.historicalExceptions !== false && scope?.role === 'preview' && scope.day === PREVIEW_UNCERTAINTY_WAIVER_DAY ? 0 : 200_000;
 function check(value: unknown, reason: string): asserts value { if (!value) throw Error(`Corpus transport refused: ${reason}`); }
 const sha = (v: string) => createHash('sha256').update(v).digest('hex');
@@ -44,7 +47,7 @@ export function assertProofQuery(query: ProofQuery): void {
   else check(query.kind === 'fts-integrity' && query.writeCeiling === 1 && ALL_FTS.some(t => query.sql === `INSERT INTO "${t}"("${t}",rank) VALUES('integrity-check',1)`), 'integrity command allowlist');
 }
 export function admitCorpusBudget(usage: number, reserved: number, localKnownReads: number, next: number, accountCeiling = 4_000_000, liveAuditReserve = 0, scope?: BudgetScope): void {
-  check(accountCeiling === 4_000_000 && (liveAuditReserve === 0 || liveAuditReserve === POLICY.liveReads + POLICY.controlReads) || accountCeiling === 5_000_000 && liveAuditReserve === 500_000, 'account budget policy');
+  check(accountCeiling === 4_000_000 && (liveAuditReserve === 0 || liveAuditReserve === POLICY.liveReads + POLICY.controlReads) || accountCeiling === 5_000_000 && liveAuditReserve === 500_000 || accountCeiling===4400000&&scope?.role==='production'&&scope.day==='2026-11-06'&&scope.productionAuthorization&&operatorAuthority.productionAccountCeiling(scope.productionAuthorization.package,scope.productionAuthorization)===accountCeiling&&liveAuditReserve===100000, 'account budget policy');
   check([usage, reserved, localKnownReads, next].every(count) && Math.max(usage, localKnownReads) + uncertaintyReadMargin(scope) + reserved + next + liveAuditReserve <= accountCeiling, 'insufficient account headroom');
 }
 
@@ -69,7 +72,7 @@ export class CorpusProofTransport {
   private readonly liveAuditReserve: number;
   private readonly budgetScope: BudgetScope;
   readonly metering = { rowsRead: 0, rowsWritten: 0, requests: 0, retries: 0, unknownAttempts: 0, integrityCommands: 0 };
-  constructor(private readonly options: { role: Role; token: string; readBudget: number; eventFile: string; fetch?: typeof fetch; previewQuotaBuffer?: boolean; historicalExceptions?: boolean; activated?: boolean; policy?: 'application-only'|'norton-aquinas.v1'; knownRowsRead?:number }) {
+  constructor(private readonly options: { role: Role; token: string; readBudget: number; eventFile: string; fetch?: typeof fetch; previewQuotaBuffer?: boolean; historicalExceptions?: boolean; activated?: boolean; policy?: 'application-only'|'norton-aquinas.v1'; knownRowsRead?:number;productionAuthorization?:ProductionBudgetAuthorization }) {
     check(options.knownRowsRead===undefined || count(options.knownRowsRead),'known read floor');
     this.corpus=options.policy===POLICY.policy; this.targets=this.corpus?TARGETS:APPLICATION_TARGETS;
     check(!options.policy || options.policy==='application-only' || this.corpus,'closed transport policy');
@@ -78,9 +81,10 @@ export class CorpusProofTransport {
     if(this.corpus)check(!options.previewQuotaBuffer && options.historicalExceptions !== true,'corpus policy forbids historical quota exceptions');
     else check(!options.previewQuotaBuffer || options.role==='preview' && this.day===PREVIEW_QUOTA_BUFFER_DAY,'preview quota buffer date/role');
     check(!options.activated || this.corpus && options.readBudget===0,'activated observer is metadata only');
-    this.accountCeiling = options.previewQuotaBuffer ? 5_000_000 : 4_000_000;
+    if(options.productionAuthorization)check(this.corpus&&options.role==='production','production-only account authority');
+    this.accountCeiling = options.productionAuthorization?operatorAuthority.productionAccountCeiling(options.productionAuthorization.package,options.productionAuthorization):options.previewQuotaBuffer ? 5_000_000 : 4_000_000;
     this.liveAuditReserve = options.previewQuotaBuffer ? 500_000 : this.corpus ? POLICY.liveReads + POLICY.controlReads : 0;
-    this.budgetScope = { role: options.role, day: this.day, historicalExceptions: this.corpus ? false : options.historicalExceptions };
+    this.budgetScope = { role: options.role, day: this.day, historicalExceptions: this.corpus ? false : options.historicalExceptions,productionAuthorization:options.productionAuthorization };
     check(this.started + 5_400_000 < Date.parse(this.day + 'T00:00:00Z') + 86_400_000, 'insufficient UTC window');
     writeFileSync(options.eventFile, '', { flag: 'wx', mode: 0o600 });
   }
@@ -179,12 +183,13 @@ export class CorpusProofTransport {
   }
   protectedAdmission(): ProtectedCorpusAdmission {
     check(this.controls && this.lastUsageAt > 0 && Date.now()-this.lastUsageAt <= 50_000 && this.metering.requests===0, 'fresh admission before SQL');
-    return {accountId:ACCOUNT,role:this.options.role,day:this.day,observedAt:new Date(this.lastUsageAt).toISOString(),rowsRead:this.latestUsage,rowsWritten:this.latestWrites,sampleInterval:1,readBudget:this.options.readBudget,liveControlReserve:this.liveAuditReserve,inventoryObservedAt:new Date(this.inventoryObservedAt || this.lastUsageAt).toISOString(),controls:this.controls};
+    return {...(this.options.productionAuthorization?{accountReadCeiling:this.accountCeiling,accountReadCeilingDay:this.day}:{}),accountId:ACCOUNT,role:this.options.role,day:this.day,observedAt:new Date(this.lastUsageAt).toISOString(),rowsRead:this.latestUsage,rowsWritten:this.latestWrites,sampleInterval:1,readBudget:this.options.readBudget,liveControlReserve:this.liveAuditReserve,inventoryObservedAt:new Date(this.inventoryObservedAt || this.lastUsageAt).toISOString(),controls:this.controls};
   }
   async startIntegrity(admission: ProtectedCorpusAdmission): Promise<void> {
     check(this.options.readBudget===16_384 && admission.accountId===ACCOUNT && admission.role===this.options.role && admission.day===this.day
       && admission.sampleInterval===1 && count(admission.rowsRead) && count(admission.rowsWritten) && count(admission.readBudget)
       && admission.readBudget<=(this.corpus?POLICY.hardReadCap:3_800_000) && Date.parse(admission.observedAt)<=Date.now() && Date.now()-Date.parse(admission.observedAt)<=50_000, 'protected integrity admission');
+    check((admission.accountReadCeiling??4000000)===this.accountCeiling&&(admission.accountReadCeilingDay??this.day)===this.day,'matching protected account ceiling');
     if(this.corpus)check(admission.liveControlReserve===POLICY.liveReads+POLICY.controlReads && Date.now()-Date.parse(admission.inventoryObservedAt ?? '')<=50_000 && Date.parse(admission.inventoryObservedAt ?? '')<=Date.now(),'fresh complete inventory and live/control reserve');
     check(admission.rowsWritten+4<=80_000,'insufficient account write headroom');
     admitCorpusBudget(admission.rowsRead,admission.readBudget,admission.rowsRead,0,this.accountCeiling,this.liveAuditReserve,this.budgetScope);

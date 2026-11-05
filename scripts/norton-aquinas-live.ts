@@ -4,7 +4,7 @@ import {readFileSync,writeFileSync,appendFileSync} from 'node:fs';
 import {join,resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {POLICY,TARGETS,classifyApplicationRelease,verifyFreshCorpusReceipt} from './norton-aquinas-release-policy.mjs';
-import {requireOperatorChallenge} from './operator-corpus-proof.js';
+import {requireOperatorChallenge,productionBudgetForChallenge} from './operator-corpus-proof.js';
 import {CorpusProofTransport} from './corpus-proof-transport.js';
 import {captureCorpusUsage} from './corpus-release-control.js';
 import {createCorpusApi} from './corpus-release-api.js';
@@ -18,20 +18,22 @@ export async function runCorpusLive(input:{role:'preview'|'production';sourceDir
  const plan=JSON.parse(planText.toString()),challenge=requireOperatorChallenge(json(input.challengeFile));
  check(JSON.stringify(plan.classification)===JSON.stringify(classification)&&challenge.releasePolicy===POLICY.policy&&challenge.liveControlReserve===100000&&challenge.role===input.role&&challenge.sourceCommit===classification.sourceCommit&&challenge.sourceTree===classification.sourceTree&&challenge.sourcePlanSha256===input.planSha256,'source policy/role');
  check(sha(readFileSync(join(input.sourceDirectory,'source.db')))===plan.sourceSha256,'source database hash');
+ const accountReadCeiling=challenge.accountReadCeiling??4000000;
+ if(challenge.accountReadCeiling)check(input.role==='production'&&process.env.GITHUB_RUN_ID===challenge.runId&&process.env.GITHUB_RUN_ATTEMPT==='1'&&process.env.GITHUB_EVENT_NAME==='workflow_dispatch'&&process.env.GITHUB_REF==='refs/heads/main','current protected production budget context');
  const receipt=json(input.receiptFile);verifyFreshCorpusReceipt(receipt,{role:input.role,sourceCommit:classification.sourceCommit,sourceTree:classification.sourceTree,sourcePlanSha256:input.planSha256,tables:plan.expected.digests,foreignKeyWitnessSha256:plan.expected.foreignKeyWitnessSha256});
  check(receipt.proof.ledgerSha256===challenge.authorization.authorization.expectedLedgerSha256,'approved original ledger witness');
  const cutover=json(input.cutoverFile);check(cutover.candidateBindingMatches===true&&cutover.candidateD1.databaseId===TARGETS[input.role].databaseId,'audited cutover target');
  const output=join(input.outputDirectory,'corpus-live.json'),events=output+'.events.jsonl';
  const event=(value:unknown)=>appendFileSync(events,JSON.stringify(value)+'\n',{mode:0o600,flush:true});
  // A partial/failed live attempt retains the whole reservation; output paths are create-only.
- const observer=new CorpusProofTransport({policy:POLICY.policy,role:input.role,token:input.token,readBudget:0,eventFile:events,activated:true,fetch:input.fetch,historicalExceptions:false});
+ const observer=new CorpusProofTransport({policy:POLICY.policy,role:input.role,token:input.token,readBudget:0,eventFile:events,activated:true,fetch:input.fetch,historicalExceptions:false,productionAuthorization:productionBudgetForChallenge(challenge)});
  const before=await observer.observeControls() as any[];
  const active=before.find(v=>v.role===input.role);check(active?.deploymentId===cutover.observedActiveDeploymentId&&active?.versionId===cutover.observedActiveVersionId,'cutover assignment changed');
  const api=createCorpusApi(input.role,async()=>input.token,input.fetch,event);
  const usage=await captureCorpusUsage({role:input.role,api});
  const effective=Math.max(usage.candidate.rowsRead+usage.otherDatabases.rowsRead,challenge.admission.rowsRead+receipt.metering.rowsRead);
- check(effective+POLICY.liveReads+POLICY.controlReads+200000<=4000000,'whole live/control reservation and uncertainty margin');
- event({kind:'live-admitted',releasePolicy:POLICY.policy,liveReads:POLICY.liveReads,controlReads:POLICY.controlReads,effectiveAccountReads:effective,uncertaintyMargin:200000,challengeNonce:challenge.nonce});
+ check(effective+POLICY.liveReads+POLICY.controlReads+200000<=accountReadCeiling,'whole live/control reservation and uncertainty margin');
+ event({kind:'live-admitted',releasePolicy:POLICY.policy,liveReads:POLICY.liveReads,controlReads:POLICY.controlReads,effectiveAccountReads:effective,uncertaintyMargin:200000,accountReadCeiling,challengeNonce:challenge.nonce});
  event({kind:'live-intent',reservedReads:POLICY.liveReads,stopOnUnknown:true});
  const live=await auditCorpusRelease({role:input.role,root:process.cwd(),databasePath:join(input.sourceDirectory,'source.db'),endpoint:input.role==='preview'?'https://preview-mcp.theologai.xyz/mcp':'https://mcp.theologai.xyz/mcp',serverVersion:JSON.parse(readFileSync('package.json','utf8')).version+(input.role==='preview'?'-preview':''),fetch:input.fetch??fetch,guard:()=>{requireOperatorChallenge(challenge);}});
  if(Object.hasOwn(live,'failure')){
@@ -45,7 +47,7 @@ export async function runCorpusLive(input:{role:'preview'|'production';sourceDir
  // Adaptive analytics has no ingestion watermark: a delta can include the earlier full proof.
  // Retain the whole live charge; never present a delayed counter delta as precise per-suite metering.
  const finalAccountReads=Math.max(finalUsage.candidate.rowsRead+finalUsage.otherDatabases.rowsRead,effective+POLICY.liveReads);
- check(finalAccountReads+POLICY.controlReads+200000<=4000000,'final account headroom exceeded');
+ check(finalAccountReads+POLICY.controlReads+200000<=accountReadCeiling,'final account headroom exceeded');
  check(finalUsage.candidate.rowsWritten+finalUsage.otherDatabases.rowsWritten<=80000,'final account write ceiling exceeded');
  requireOperatorChallenge(challenge);
  event({kind:'live-complete',sha256:sha(JSON.stringify(live)),reservedReadsRetained:POLICY.liveReads,precisePerSuiteMeteringUnavailable:true,usageBefore:usage,usageObservation:finalUsage,ingestionWatermarkUnavailable:true});
