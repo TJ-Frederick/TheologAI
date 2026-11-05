@@ -80,9 +80,9 @@ function expressionBody(value: string): string {
   return normalized(value).replace(/^\$\{\{\s*/, '').replace(/\s*\}\}$/, '');
 }
 
-function routedName(name: string | undefined, event = 'pull_request', proof = '', authorization = '', restoration = ''): string {
+function routedName(name: string | undefined, event = 'pull_request', proof = '', authorization = '', restoration = '', existingValidation = ''): string {
   if (!name?.startsWith('${{')) return name ?? '';
-  return new Function('github','inputs','return ('+name.slice(3,-2)+')')({event_name:event},{operator_proof_json:proof,operator_authorization_json:authorization,preview_restore_json:restoration});
+  return new Function('github','inputs','return ('+name.slice(3,-2)+')')({event_name:event},{operator_proof_json:proof,operator_authorization_json:authorization,preview_restore_json:restoration,preview_validate_existing_json:existingValidation});
 }
 function assertPreviewRevocationBoundary(workflow: Workflow): void {
   const trigger = workflow.on['pull_request'] as { types?: string[] };
@@ -516,8 +516,9 @@ describe('workflow topology', () => {
       expect(routedName(job.name,'workflow_dispatch','proof')).toBe('Operator metadata / '+name);
       expect(routedName(job.name,'workflow_dispatch','','authorization')).toBe('Operator metadata / '+name);
       expect(routedName(job.name,'workflow_dispatch','','','restoration')).toBe('Operator metadata / '+name);
-      const evaluate=(event:string,proof:string,authorization:string,restoration='')=>new Function('github','inputs','cancelled','return ('+expressionBody(job.if!)+')')({event_name:event},{operator_proof_json:proof,operator_authorization_json:authorization,preview_restore_json:restoration},()=>false);
-      expect(evaluate('pull_request','','')).toBe(true);expect(evaluate('workflow_dispatch','','')).toBe(true);expect(evaluate('workflow_dispatch','','','restoration')).toBe(false);expect(evaluate('workflow_dispatch','proof','')).toBe(false);expect(evaluate('workflow_dispatch','','authorization')).toBe(false);
+      expect(routedName(job.name,'workflow_dispatch','','','','validation')).toBe('Operator metadata / '+name);
+      const evaluate=(event:string,proof:string,authorization:string,restoration='',existingValidation='')=>new Function('github','inputs','cancelled','return ('+expressionBody(job.if!)+')')({event_name:event},{operator_proof_json:proof,operator_authorization_json:authorization,preview_restore_json:restoration,preview_validate_existing_json:existingValidation},()=>false);
+      expect(evaluate('pull_request','','')).toBe(true);expect(evaluate('workflow_dispatch','','')).toBe(true);expect(evaluate('workflow_dispatch','','','restoration')).toBe(false);expect(evaluate('workflow_dispatch','','','','validation')).toBe(false);expect(evaluate('workflow_dispatch','proof','')).toBe(false);expect(evaluate('workflow_dispatch','','authorization')).toBe(false);
     }
     const aggregate = workflow.jobs['validation-complete']!;
     expect(new Set(needs(aggregate))).toEqual(new Set(Object.keys(expected)));
@@ -735,4 +736,17 @@ it('runs exactly one bounded readiness path per validated policy and no provider
   for(const policy of [undefined,'','unknown']){expect(readiness.filter(step=>evaluate(step,policy))).toHaveLength(0);for(const step of provider)expect(evaluate(step,policy),step.name).toBe(false);}
   const local=steps.find(step=>step.id==='release-operation')!;expect(local.run).toContain('verify-release-operation.ts');expect(local.run).toContain('release_policy=%s');
  }
+});
+
+it('keeps in-place corpus validation protected, read-only and distinct from deployment/proof routes',async()=>{
+ const workflow=parse(await readWorkflow('pr.yml')) as Workflow;
+ const source=workflow.jobs['existing-preview-source']!,job=workflow.jobs['validate-existing-preview']!;
+ expect(source.environment).toBeUndefined();expect(JSON.stringify(source)).not.toContain('secrets.');
+ expect(source.if).toContain("inputs.preview_restore_json == ''");expect(source.if).toContain("github.actor_id == '40179660'");expect(source.if).toContain('github.run_attempt == 1');
+ expect(job.environment).toBe('preview');expect(needs(job)).toEqual(['existing-preview-source']);expect(job.concurrency).toEqual({group:'theologai-shared-preview-mutation','cancel-in-progress':false});
+ expect(job.permissions).toEqual({contents:'read',actions:'read','pull-requests':'read'});
+ const run=job.steps!.find(s=>s.name==='Complete the existing candidate validation without any deployment')!;
+ expect(run.env).toMatchObject({CLOUDFLARE_API_TOKEN:'${{ secrets.CLOUDFLARE_API_TOKEN }}'});
+ expect(run.run).toContain('validate-existing-norton-preview.ts validate');expect(run.run).not.toMatch(/wrangler|operator-corpus-proof|migrations|seed|rollback/);
+ expect(JSON.stringify(job)).not.toContain('PRODUCTION');
 });
