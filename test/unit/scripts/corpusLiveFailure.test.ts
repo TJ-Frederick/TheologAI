@@ -1,5 +1,5 @@
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
-import {mkdtempSync,mkdirSync,writeFileSync,rmSync} from 'node:fs';
+import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync} from 'node:fs';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import Database from 'better-sqlite3';
@@ -23,7 +23,7 @@ vi.mock('../../helpers/mcpTransportContract.js',()=>({
  assertMcpTransportContract:async()=>{if(state.fault==='contract-assertion')throw Error('SECRET_CONTRACT');},
  fingerprintMcpTransportSnapshot:async()=>({tools:state.fault==='parity'&&++state.fingerprints===2?'b':'a'})
 }));
-vi.mock('../../../scripts/audit-original-language-v2-preview.js',()=>({assertSuccess:()=>{},assertSafeError:()=>{},assertInputError:()=>{},corruptCursor:(v:string)=>v}));
+vi.mock('../../../scripts/audit-original-language-v2-preview.js',()=>({assertSuccess:()=>{if(state.fault==='language-success')throw Error('SECRET_LANGUAGE');},assertSafeError:()=>{if(state.fault==='language-safe-error')throw Error('SECRET_LANGUAGE');},assertInputError:()=>{if(state.fault==='language-input-error')throw Error('SECRET_LANGUAGE');},corruptCursor:(v:string)=>v}));
 import {auditCorpusRelease} from '../../../scripts/audit-corpus-release.js';
 let root:string,path:string;
 beforeEach(()=>{
@@ -41,7 +41,7 @@ const transport=(async(_input:any,init:any)=>{
  if(n===state.at){
   if(state.fault==='network'||state.fault==='network-and-cleanup')throw Error('SECRET_NETWORK');
   if(state.fault==='timeout')return new Promise((_resolve,reject)=>init.signal.addEventListener('abort',()=>reject(Error('SECRET_TIMEOUT'))));
-  if(state.fault==='status')return new Response('SECRET_STATUS',{status:503});
+  if(state.fault==='status'||state.fault==='status-malicious')return new Response('SECRET_STATUS',{status:503,headers:state.fault==='status'?{'cf-ray':'0123456789abcdef-LHR','server':'cloudflare','content-type':'text/html; charset=utf-8','retry-after':'12','set-cookie':'SECRET_COOKIE'}:{'cf-ray':'SECRET_RAY','server':'SECRET_SERVER','content-type':'text/SECRET_TYPE','retry-after':'999999','x-secret':'SECRET_HEADER'}});
   if(state.fault==='size')return new Response('SECRET_'.repeat(50000));
   if(state.fault==='read')return new Response(new ReadableStream({start(c){c.error(Error('SECRET_READ'));}}));
   if(state.fault==='protocol')return new Response('SECRET_INVALID_JSON');
@@ -53,9 +53,13 @@ const transport=(async(_input:any,init:any)=>{
  if(method==='tools/call'){
   const a=params.arguments??{};if(params.name==='classic_text_lookup'&&a.browseSections&&!a.cursor&&a.work.startsWith('work'))result.structuredContent={directory:{pagination:{nextCursor:'next'}}};if(params.name==='classic_text_lookup'&&a.query){const work='work'+a.query.slice(1);result.structuredContent={uri:'theologai://documents/'+work+'#section-s'};}
   if(params.name==='primary_source_search'&&a.queries?.[0]?.work)result.structuredContent={uri:'theologai://documents/'+a.queries[0].work+'#section-s'};
-  if(a.cursor==='not-a-valid-cursor'||params.name==='original_language_study')result.isError=true;
+  if(a.cursor==='not-a-valid-cursor'||params.name==='original_language_study'&&state.fault!=='language-success')result.isError=true;
+  if(state.fault==='external-assertion'&&a.queries?.[0]?.id==='external')result.structuredContent={status:'external_discovery_executed'};
+  if(state.fault==='scoped-locator'&&a.queries?.[0]?.work)result.structuredContent={};
+  if(state.fault==='global-locator'&&a.query)result.structuredContent={};
   if(state.fault==='tool-error'&&a.listWorks)result={isError:true,content:[{type:'text',text:'SECRET_TOOL_BODY'}]};
  }
+ if(state.fault==='resource-shape'&&method==='resources/read')result={contents:[{uri:12,text:'SECRET_BODY'}]};
  return Response.json({jsonrpc:'2.0',result,...(state.fault==='aggregate-size'?{padding:'x'.repeat(240000)}:{})});
 }) as typeof fetch;
 const run=()=>auditCorpusRelease({role:'preview',endpoint:'https://local.test/mcp',serverVersion:'3.6.0-preview',databasePath:path,root,fetch:transport});
@@ -67,4 +71,11 @@ describe('actual corpus auditor exception-path report',()=>{
  it.each(['parity','cleanup'])('reports failure after370 operations for %s, never a success-shaped fallback',async fault=>{state.fault=fault;state.at=2;const result=await run();expect(result.checks).toHaveLength(370);expect(result.failure?.category).toBe(fault==='cleanup'?'cleanup':'assertion');expect(result.failure?.completedChecks).toBe(370);expect(result.failure?.stage).toBe(fault==='cleanup'?'cleanup':'parity');expect(JSON.stringify(result)).not.toContain('SECRET_');});
  it('does not mask the original network failure when cleanup also fails',async()=>{state.fault='network-and-cleanup';const result=await run();expect(result.failure).toMatchObject({category:'network',cleanupFailed:true,httpExchanges:1});});
  it('preserves650ms native-fetch pacing and all370 checks',async()=>{vi.useFakeTimers();vi.stubGlobal('fetch',transport);const pending=run();await vi.runAllTimersAsync();const result=await pending;expect(Object.hasOwn(result,'failure')).toBe(false);expect(state.requests).toBe(382);expect(state.dispatchTimes.slice(1).every((t,i)=>t-state.dispatchTimes[i]>=650)).toBe(true);});
+ it.each([[3,'contract:tools-list'],[4,'contract:prompts-list'],[5,'contract:resources-list'],[6,'contract:resource-templates-list']])('identifies contract request%s without adding a check or retry',async(at,id)=>{state.fault='status';state.at=at as number;const result=await run();expect(result.failure).toMatchObject({category:'http_status',probeId:id,httpObservationProbe:id,lastHttpStatus:503,httpExchanges:at,completedChecks:0});expect(state.requests).toBe(at);});
+ it('retains only bounded correlation metadata for a failing scoped search',async()=>{state.fault='status';state.at=18;const result=await run();expect(result.failure).toMatchObject({category:'http_status',reason:'http_status',probeId:'search:work0',httpObservationProbe:'search:work0',lastHttpStatus:503,httpEvidence:{cfRay:'0123456789abcdef-LHR',cloudflareServer:true,contentType:'text/html',retryAfterSeconds:12}});expect(state.requests).toBe(18);expect(JSON.stringify(result)).not.toContain('SECRET_');});
+ it('omits malformed and arbitrary response headers',async()=>{state.fault='status-malicious';const result=await run();expect(result.failure?.httpEvidence).toEqual({cfRay:null,cloudflareServer:false,contentType:null,retryAfterSeconds:null});expect(JSON.stringify(result)).not.toContain('SECRET_');});
+ it.each([['outside-assertion','catalog_count_mismatch'],['resource-assertion','resource_body_mismatch'],['resource-shape','resource_shape'],['scoped-locator','scoped_search_locator_missing'],['contract-assertion','mcp_contract_mismatch']])('retains a fixed known assertion reason for%s',async(fault,reason)=>{state.fault=fault;const result=await run();expect(result.failure).toMatchObject({category:'assertion',reason});expect(JSON.stringify(result)).not.toContain('SECRET_');});
+ it('does not associate the invalid-cursor HTTP status with the earlier external-disabled assertion',async()=>{state.fault='external-assertion';const result=await run();expect(result.failure).toMatchObject({category:'assertion',reason:'external_disabled_contract',probeId:'external-disabled',lastHttpStatus:null,httpObservationProbe:null,httpEvidence:null});});
+ it.each([['language-success','success','language_success_contract'],['language-safe-error','safe-error','language_safe_error_contract'],['language-input-error','input-error','language_input_error_contract']])('retains the exact language probe and%s mode without helper messages',async(fault,mode,reason)=>{state.fault=fault;const file=join(root,'test/fixtures/original-language-v2-preview-audit.json'),fixture=JSON.parse(readFileSync(file,'utf8'));fixture.cases[0].mode=mode;writeFileSync(file,JSON.stringify(fixture));const result=await run();expect(result.failure).toMatchObject({category:'assertion',reason,probeId:'language:input0'});expect(result.checks.find(c=>c.id==='language:input0')?.passed).toBe(false);expect(JSON.stringify(result)).not.toContain('SECRET_');});
+
 });

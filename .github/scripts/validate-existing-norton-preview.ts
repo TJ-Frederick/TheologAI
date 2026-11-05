@@ -22,7 +22,7 @@ export const EXISTING=Object.freeze({repository:'TJ-Frederick/TheologAI',owner:4
  proofSha256:'74842d254f0c6312f02d3b9908d3dcf8a5b24752f2eb6a93e4490856cb78f724',planSha256:'2d8221f3af48f5865e4fd737253f72a831fa78f289ac3ba504a6043d346607c2',
  databaseSha256:'3f8a53c37a585b5c42b2410d7f3167645f738bbf90b51d43b2c0378efb4f898c',workerSha256:'9d9cff3b7d252a9c47a5316d643e4a91e3309989909f648041dcbcc7a70e659b',workerManifestSha256:'4911c593dc6383a6026250489eac9d094cb6c79e2506aeeb3e917ad22d59c1ff',
  cutoverSha256:'0253060587ca9a7e6940127f518dabea0ae39ac59bf9ee48864c35544abc162f',
- proofDay:'2026-11-05',previousReadReservation:3760000,knownPriorReads:3331098,actualPriorWrites:7,heldPriorWrites:8,reads:100000,liveReads:90000,controlReads:10000,
+ proofDay:'2026-11-05',previousReadReservation:3860000,knownPriorReads:3331435,actualPriorWrites:7,heldPriorWrites:8,reads:100000,liveReads:90000,controlReads:10000,
  confirmation:'VALIDATE THE DEPLOYED NORTON PREVIEW IN PLACE'});
 export const NATIVE_ARTIFACTS=[
  {id:13380979536,name:'corpus-preview-41951638734-attempt-1',digest:'sha256:c557e3624aacebf405c6c603eb015e9d782cb59daf53278e38bd8732aab9a01c'},
@@ -42,7 +42,7 @@ export function requireExistingApproval(a:ExistingApproval,source:{commit:string
  check(/^[a-f0-9]{40}$/.test(a.auditorCommit)&&/^[a-f0-9]{40}$/.test(a.auditorTree)&&a.auditorCommit===source.commit&&a.auditorTree===source.tree,'distinct reviewed auditor source');
  check(a.historicalProofSha256===EXISTING.proofSha256&&a.acceptHistoricalProofForValidationOnly===true&&a.uninterruptedDataCustody===true,'historical proof exception and custody');
  check(a.previousReadReservation===EXISTING.previousReadReservation,'explicit cumulative prior read reservation');
- check(a.accountReadCeiling===4100000,'approved one-operation account ceiling');
+ check(a.accountReadCeiling===4200000,'approved one-operation account ceiling');
  check(a.maxReads===100000&&a.maxWrites===0&&a.noDeployment===true,'read-only operation allowance');
  check(new Date(now).toISOString().slice(0,10)===EXISTING.proofDay&&Date.parse(a.expiresAt)>now&&Date.parse(a.expiresAt)-now<=1800000&&a.expiresAt.slice(0,10)===EXISTING.proofDay,'new short same-day window');return a;
 }
