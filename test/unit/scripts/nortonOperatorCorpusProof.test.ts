@@ -7,9 +7,10 @@ import {mkdtempSync,writeFileSync,readFileSync,copyFileSync,existsSync,rmSync,mk
 import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
 import {spawnSync,execFileSync} from 'node:child_process';
-import {createOperatorChallenge,requireOperatorChallenge,operatorApproval,verifyOperatorEnvelope,verifyOperatorIntegrity,composeReadProof,finishOperatorMetadata,readLiveOperatorMetadata,admitOperatorBudget,spentOperatorBudget,OPERATOR_PROOF as APPLICATION_OPERATOR_PROOF} from '../../../scripts/operator-corpus-proof.js';
+import {createOperatorChallenge,requireOperatorChallenge,operatorApproval,verifyOperatorEnvelope,verifyOperatorIntegrity,composeReadProof,finishOperatorMetadata,readLiveOperatorMetadata,readLiveOperatorMetadataAsync,requireLiveOperatorGate,requireLiveOperatorGateParallel,admitOperatorBudget,spentOperatorBudget,OPERATOR_PROOF as APPLICATION_OPERATOR_PROOF} from '../../../scripts/operator-corpus-proof.js';
 import {POLICY,ACCOUNT,CORPUS,SCHEMA,TARGETS,classifyApplicationRelease} from '../../../scripts/norton-aquinas-release-policy.mjs';
 import {ALL_FTS} from '../../../scripts/corpus-source-proof.js';
+import {CorpusProofTransport} from '../../../scripts/corpus-proof-transport.js';
 const sha=(v:string)=>createHash('sha256').update(v).digest('hex');
 const OPERATOR_PROOF={...APPLICATION_OPERATOR_PROOF,reservedReads:3560000,hardReadCap:3560000};
 const today=new Date();
@@ -389,4 +390,130 @@ it('rejects cross-policy owner packages and receipts before any transport can st
  expect(()=>verifyOperatorEnvelope(swapped,f.c,f.plan,f.now)).toThrow('cross-policy');
  const missing=structuredClone(f.c);delete missing.releasePolicy;delete missing.liveControlReserve;
  expect(()=>requireOperatorChallenge(missing,f.now)).toThrow('cross-policy');
+});
+
+
+describe('fresh parallel operator gate',()=>{
+  function gateFixture(){
+    const f=fixture(),bytes=archiveAuthorization(f.c.authorization),native=nativeAuthorization(f.c.authorization),a=f.c.authorization.authorization;
+    const marker={...native.artifact,id:655,name:'operator-ledger-'+a.ledgerId};
+    const metadata:Record<string,any>={
+      '/actions/runs/321':native.run,'/actions/artifacts/654':native.artifact,
+      ['/actions/artifacts?name=operator-ledger-'+a.ledgerId+'&per_page=100']:{artifacts:[marker]},
+      '/actions/runs/123':{head_sha:a.sourceCommit,run_attempt:1,path:'.github/workflows/pr.yml',event:'pull_request',status:'in_progress'},
+      '/actions/runs/123/jobs?per_page=100':{jobs:[{name:'Preview operator corpus verification',status:'in_progress'}]},
+      '/pulls/172':{state:'open',draft:false,head:{sha:a.sourceCommit,ref:a.headBranch,repo:{full_name:a.repository}},base:{sha:a.baseCommit,ref:'main'},labels:[{name:'deploy-preview'}]},
+      '/git/ref/heads/main':{object:{sha:a.baseCommit}},
+    };
+    return {...f,bytes,metadata,marker,archives:new Map([['654',bytes],['655',bytes]])};
+  }
+  it('uses the identical nine GETs and validators, with no reuse between commands',async()=>{
+    vi.useFakeTimers();vi.setSystemTime(start);
+    try{
+      const f=gateFixture(),serial:string[]=[],parallel:string[]=[];
+      requireLiveOperatorGate(f.c,path=>{serial.push(path);return f.metadata[path];},id=>{serial.push('zip:'+id);return f.archives.get(id)!;});
+      for(let command=0;command<4;command++){
+        const archives=vi.fn(async(id:string)=>{parallel.push('zip:'+id);return f.archives.get(id)!;});
+        await requireLiveOperatorGateParallel(f.c,async path=>{parallel.push(path);return f.metadata[path];},archives);
+        expect(parallel.slice(command*9).sort()).toEqual([...serial].sort());expect(archives).toHaveBeenCalledTimes(2);
+      }
+      expect(parallel).toHaveLength(36);
+    }finally{vi.useRealTimers();}
+  });
+  for(const fault of ['owner','expired-artifact','marker-source','duplicate-marker','run-completed','source','job-waiting','label','main','authorization-bytes','marker-bytes','expiry'])it('retains serial rejection for '+fault,async()=>{
+    vi.useFakeTimers();vi.setSystemTime(start);
+    try{
+      const f=gateFixture();
+      if(fault==='owner')f.metadata['/actions/runs/321'].actor.id=1;
+      if(fault==='expired-artifact')f.metadata['/actions/artifacts/654'].expired=true;
+      if(fault==='marker-source')f.marker.workflow_run={...f.marker.workflow_run,head_sha:'f'.repeat(40)};
+      if(fault==='duplicate-marker')f.metadata['/actions/artifacts?name=operator-ledger-'+f.c.authorization.authorization.ledgerId+'&per_page=100'].artifacts.push(f.marker);
+      if(fault==='run-completed')f.metadata['/actions/runs/123'].status='completed';
+      if(fault==='source')f.metadata['/actions/runs/123'].head_sha='f'.repeat(40);
+      if(fault==='job-waiting')f.metadata['/actions/runs/123/jobs?per_page=100'].jobs[0].status='waiting';
+      if(fault==='label')f.metadata['/pulls/172'].labels=[];
+      if(fault==='main')f.metadata['/git/ref/heads/main'].object.sha='f'.repeat(40);
+      if(fault==='authorization-bytes')f.archives.set('654',Buffer.from('invalid'));
+      if(fault==='marker-bytes')f.archives.set('655',Buffer.from('invalid'));
+      if(fault==='expiry')vi.setSystemTime(start+5_400_001);
+      expect(()=>requireLiveOperatorGate(f.c,path=>f.metadata[path],id=>f.archives.get(id)!)).toThrow();
+      const sql=vi.fn();await expect(requireLiveOperatorGateParallel(f.c,async path=>f.metadata[path],async id=>f.archives.get(id)!).then(sql)).rejects.toThrow();expect(sql).not.toHaveBeenCalled();
+    }finally{vi.useRealTimers();}
+  });
+  it('settles all independent failures and never fetches archives or permits SQL on partial evidence',async()=>{
+    vi.useFakeTimers();vi.setSystemTime(start);
+    try{
+      const f=gateFixture(),settled:string[]=[],archive=vi.fn(async()=>f.bytes),sql=vi.fn();
+      const gate=requireLiveOperatorGateParallel(f.c,async path=>{await new Promise(resolve=>setTimeout(resolve,path.includes('jobs?')?20:10));settled.push(path);if(path==='/pulls/172')throw Error('synthetic metadata failure');return f.metadata[path];},archive).then(sql);
+      const rejected=expect(gate).rejects.toThrow('synthetic metadata failure');await vi.advanceTimersByTimeAsync(20);await rejected;
+      expect(settled).toHaveLength(7);expect(archive).not.toHaveBeenCalled();expect(sql).not.toHaveBeenCalled();
+    }finally{vi.useRealTimers();}
+  });
+  it('never downloads archive bytes for unvalidated artifact or marker provenance',async()=>{
+    vi.useFakeTimers();vi.setSystemTime(start);
+    try{for(const member of ['artifact','marker']){const f=gateFixture();if(member==='artifact')f.metadata['/actions/artifacts/654'].workflow_run.head_sha='f'.repeat(40);else (f.marker as any).id='unvalidated';const archive=vi.fn(async()=>f.bytes);await expect(requireLiveOperatorGateParallel(f.c,async path=>f.metadata[path],archive)).rejects.toThrow();expect(archive).not.toHaveBeenCalled();}}
+    finally{vi.useRealTimers();}
+  });
+  it('reproduces the recorded three-results-then-stale path with the actual transport and no fourth SQL intent',async()=>{
+    const directory=mkdtempSync(join(tmpdir(),'operator-freshness-replay-'));vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(start);
+    try{
+      let latency=500;const mock=corpusTransportFixture({role:'preview',record:path=>{latency=path.endsWith('/query')?300:500;},advance:()=>vi.setSystemTime(Date.now()+latency),query:()=>({rows:[],rowsRead:0,rowsWritten:1})});
+      const observer=new CorpusProofTransport({policy:'norton-aquinas.v1',role:'preview',token:'synthetic',readBudget:3560000,eventFile:join(directory,'observe.jsonl'),fetch:mock.fetch,historicalExceptions:false});
+      await observer.start();const admission=observer.protectedAdmission();admission.inventoryObservedAt=new Date(start).toISOString();admission.observedAt=new Date(start+3280).toISOString();
+      vi.setSystemTime(start+33597);
+      const transport=new CorpusProofTransport({policy:'norton-aquinas.v1',role:'preview',token:'synthetic',readBudget:16384,eventFile:join(directory,'writer.jsonl'),fetch:mock.fetch,historicalExceptions:false});
+      await transport.startIntegrity(admission);
+      for(const [index,elapsed] of [40233,44449,48896,53520].entries()){
+        vi.setSystemTime(start+elapsed);const table=ALL_FTS[index]!;const q={kind:'fts-integrity' as const,label:'fts:'+table,sql:`INSERT INTO "${table}"("${table}",rank) VALUES('integrity-check',1)`,readCeiling:4096,writeCeiling:1};
+        if(index<3)await expect(transport.execute(q)).resolves.toEqual([]);else await expect(transport.execute(q)).rejects.toThrow('fresh integrity-only execution');
+      }
+      const events=readFileSync(join(directory,'writer.jsonl'),'utf8').trim().split('\n').map(s=>JSON.parse(s));expect(events.filter(e=>e.kind==='intent')).toHaveLength(3);expect(events.filter(e=>e.kind==='result')).toHaveLength(3);expect(transport.metering).toMatchObject({requests:3,rowsRead:0,rowsWritten:3,unknownAttempts:0,integrityCommands:3});
+    }finally{vi.useRealTimers();rmSync(directory,{recursive:true,force:true});}
+  });
+  it('replays the whole init/run/four-command/finish handoff with identical gate evidence and fixed non-GitHub overhead',async()=>{
+    vi.useFakeTimers({toFake:['Date']});
+    const execute=async(parallel:boolean)=>{
+      vi.setSystemTime(start);const f=gateFixture(),directory=mkdtempSync(join(tmpdir(),'operator-handoff-replay-')),requests:string[]=[],sql:string[]=[];
+      try{
+        let latency=500;const mock=corpusTransportFixture({role:'preview',record:path=>{latency=path.endsWith('/query')?300:500;},advance:()=>vi.setSystemTime(Date.now()+latency),query:statement=>{sql.push(statement);return {rows:[],rowsRead:0,rowsWritten:1};}});
+        const observer=new CorpusProofTransport({policy:'norton-aquinas.v1',role:'preview',token:'synthetic',readBudget:3560000,eventFile:join(directory,'observe.jsonl'),fetch:mock.fetch,historicalExceptions:false});await observer.start();
+        f.c.admission=observer.protectedAdmission();f.c.admission.inventoryObservedAt=new Date(start).toISOString();f.c.admission.observedAt=new Date(start+3280).toISOString();
+        // Controlled GH450ms, CF metadata500ms and SQL300ms. Fixed25.083s
+        // other handoff work calibrates the recorded first intent40.233s; not remote latency.
+        vi.setSystemTime(start+25083);
+        const gate=async()=>{
+          if(!parallel){requireLiveOperatorGate(f.c,path=>{requests.push(path);vi.setSystemTime(Date.now()+450);return f.metadata[path];},id=>{requests.push('zip:'+id);vi.setSystemTime(Date.now()+450);return f.archives.get(id)!;});return;}
+          const reads:Array<{path:string;resolve:(value:any)=>void}>=[],zips:Array<{id:string;resolve:(value:Buffer)=>void}>=[];
+          const pending=requireLiveOperatorGateParallel(f.c,path=>new Promise(resolve=>{requests.push(path);reads.push({path,resolve});}),id=>new Promise(resolve=>{requests.push('zip:'+id);zips.push({id,resolve});}));
+          expect(reads).toHaveLength(7);vi.setSystemTime(Date.now()+450);for(const read of reads)read.resolve(f.metadata[read.path]);
+          await new Promise<void>(resolve=>setImmediate(resolve));expect(zips).toHaveLength(2);vi.setSystemTime(Date.now()+450);for(const zip of zips)zip.resolve(f.archives.get(zip.id)!);await pending;
+        };
+        await gate();await gate(); // Native init-ledger and run preflight both retained.
+        const transport=new CorpusProofTransport({policy:'norton-aquinas.v1',role:'preview',token:'synthetic',readBudget:16384,eventFile:join(directory,'writer.jsonl'),fetch:mock.fetch,historicalExceptions:false});await transport.startIntegrity(f.c.admission);
+        let failure:string|null=null;
+        for(const table of ALL_FTS){await gate();try{await transport.execute({kind:'fts-integrity',label:'fts:'+table,sql:`INSERT INTO "${table}"("${table}",rank) VALUES('integrity-check',1)`,readCeiling:4096,writeCeiling:1});}catch(error){failure=(error as Error).message;break;}}
+        if(!failure){vi.setSystemTime(Date.now()+200);await transport.finish();await gate();}
+        return {elapsed:Date.now()-start,requests,sql,failure,metering:{...transport.metering}};
+      }finally{rmSync(directory,{recursive:true,force:true});}
+    };
+    try{
+      const serial=await execute(false),parallel=await execute(true);
+      expect(serial).toMatchObject({elapsed:53283,failure:'Corpus transport refused: fresh integrity-only execution',metering:{requests:3,rowsWritten:3,unknownAttempts:0}});
+      expect(parallel).toMatchObject({elapsed:38783,failure:null,metering:{requests:4,rowsWritten:4,unknownAttempts:0}});
+      expect(serial.requests).toHaveLength(54);expect(parallel.requests).toHaveLength(63);
+      for(let gate=0;gate<7;gate++)expect(parallel.requests.slice(gate*9,(gate+1)*9).sort()).toEqual(serial.requests.slice(0,9).sort());
+      expect(parallel.sql.slice(0,3)).toEqual(serial.sql);expect(parallel.sql).toHaveLength(4);
+      if(process.env.HANDOFF_REPLAY_REPORT)writeFileSync(process.env.HANDOFF_REPLAY_REPORT,JSON.stringify({semantics:'controlled whole handoff replay; controlled fixed25.083s other overhead, GH450ms per response, CFmetadata500ms/SQL300ms and native pacing; not remote measurement',serial,parallel},null,2)+'\n');
+    }finally{vi.useRealTimers();}
+  });
+  for(const status of [401,403,404,429,502,503,504])it('preserves metadata HTTP policy asynchronously for '+status,async()=>{
+    const invoke=vi.fn().mockRejectedValueOnce({stderr:`gh: rejected (HTTP ${status})`}).mockResolvedValue('{"ok":true}'),pause=vi.fn(async()=>{});
+    if(status>=500){await expect(readLiveOperatorMetadataAsync(OPERATOR_PROOF.repository,'/actions/runs/123',invoke,pause)).resolves.toEqual({ok:true});expect(invoke).toHaveBeenCalledTimes(2);expect(pause).toHaveBeenCalledExactlyOnceWith(250);}
+    else{await expect(readLiveOperatorMetadataAsync(OPERATOR_PROOF.repository,'/actions/runs/123',invoke,pause)).rejects.toThrow('HTTP '+status);expect(invoke).toHaveBeenCalledOnce();expect(pause).not.toHaveBeenCalled();}
+  });
+  it('does not retry malformed/unknown errors and refuses routes outside the original GET allowlist',async()=>{
+    const malformed=vi.fn(async()=>'{'),pause=vi.fn(async()=>{});await expect(readLiveOperatorMetadataAsync(OPERATOR_PROOF.repository,'/actions/runs/123',malformed,pause)).rejects.toThrow();expect(malformed).toHaveBeenCalledOnce();
+    const unknown=vi.fn(async()=>{throw Error('synthetic timeout');});await expect(readLiveOperatorMetadataAsync(OPERATOR_PROOF.repository,'/actions/runs/123',unknown,pause)).rejects.toThrow('synthetic timeout');expect(unknown).toHaveBeenCalledOnce();
+    for(const path of ['/d1/query','/actions/workflows/pr.yml/dispatches'])await expect(readLiveOperatorMetadataAsync(OPERATOR_PROOF.repository,path,malformed,pause)).rejects.toThrow('GET route');expect(malformed).toHaveBeenCalledOnce();expect(pause).not.toHaveBeenCalled();
+  });
 });

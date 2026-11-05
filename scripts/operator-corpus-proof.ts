@@ -1,7 +1,8 @@
 #!/usr/bin/env tsx
 /** Complete operator proof, accepted only inside the unchanged protected gate. */
 import { createHash, randomBytes } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
+import { promisify } from 'node:util';
 import { appendFileSync, closeSync, existsSync, lstatSync, openSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
@@ -195,16 +196,23 @@ export function spentOperatorBudget(metering: CorpusProofTransport['metering'], 
 }
 
 /** Retry only transient read-only GitHub responses; never repeat SQL or a mutation. */
+function liveMetadataArguments(repository:string,path:string):string[] {
+  check(repository===OPERATOR_PROOF.repository && /^\/(?:actions\/runs\/[1-9][0-9]{0,15}(?:\/jobs\?per_page=100)?|pulls\/[1-9][0-9]{0,15}|actions\/artifacts(?:\/[1-9][0-9]{0,15}|\?name=operator-ledger-operation-[a-z0-9-]{8,80}&per_page=100)|git\/ref\/heads\/main)$/.test(path),'live metadata GET route');
+  return ['api',`repos/${repository}${path}`,'--method','GET'];
+}
+function metadataStatus(error:unknown):number {
+  const stderr=error && typeof error==='object' && 'stderr' in error ? String(error.stderr) : '';
+  return Number(stderr.match(/\(HTTP ([0-9]{3})\)/)?.[1]);
+}
 export function readLiveOperatorMetadata(repository: string, path: string,
   invoke: (args: string[]) => string = args => execFileSync('gh',args,{encoding:'utf8',maxBuffer:2*1024*1024,timeout:15_000,stdio:['ignore','pipe','pipe']}),
   pause: (milliseconds: number) => void = milliseconds => { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,milliseconds); }) {
-  check(repository===OPERATOR_PROOF.repository && /^\/(?:actions\/runs\/[1-9][0-9]{0,15}(?:\/jobs\?per_page=100)?|pulls\/[1-9][0-9]{0,15}|actions\/artifacts(?:\/[1-9][0-9]{0,15}|\?name=operator-ledger-operation-[a-z0-9-]{8,80}&per_page=100)|git\/ref\/heads\/main)$/.test(path),'live metadata GET route');
+  const args=liveMetadataArguments(repository,path);
   for(let attempt=0;attempt<2;attempt++) {
     let text: string;
-    try { text=invoke(['api',`repos/${repository}${path}`,'--method','GET']); }
+    try { text=invoke(args); }
     catch(error) {
-      const stderr=error && typeof error==='object' && 'stderr' in error ? String(error.stderr) : '';
-      const status=Number(stderr.match(/\(HTTP ([0-9]{3})\)/)?.[1]);
+      const status=metadataStatus(error);
       if(attempt===0 && [502,503,504].includes(status)) { process.stderr.write(`Operator metadata GET transient HTTP ${status}; retrying once before SQL.\n`);pause(250);continue; }
       if(Number.isInteger(status)&&status>=100&&status<=599)throw Error('Operator corpus proof refused: live GitHub metadata HTTP '+status);
       throw error;
@@ -212,6 +220,35 @@ export function readLiveOperatorMetadata(repository: string, path: string,
     return JSON.parse(text);
   }
   throw Error('Operator corpus proof refused: live GitHub metadata unavailable');
+}
+
+const execFileAsync=promisify(execFile);
+export async function readLiveOperatorMetadataAsync(repository:string,path:string,
+  invoke:(args:string[])=>Promise<string>=async args=>(await execFileAsync('gh',args,{encoding:'utf8',maxBuffer:2*1024*1024,timeout:15_000})).stdout,
+  pause:(milliseconds:number)=>Promise<void>=milliseconds=>new Promise(resolve=>setTimeout(resolve,milliseconds))) {
+  const args=liveMetadataArguments(repository,path);
+  for(let attempt=0;attempt<2;attempt++) {
+    let text:string;
+    try{text=await invoke(args);}catch(error){
+      const status=metadataStatus(error);
+      if(attempt===0 && [502,503,504].includes(status)){
+        process.stderr.write(`Operator metadata GET transient HTTP ${status}; retrying once before SQL.\n`);await pause(250);continue;
+      }
+      if(Number.isInteger(status)&&status>=100&&status<=599)throw Error('Operator corpus proof refused: live GitHub metadata HTTP '+status);
+      throw error;
+    }
+    return JSON.parse(text);
+  }
+  throw Error('Operator corpus proof refused: live GitHub metadata unavailable');
+}
+
+function requireAuthenticatedLedgerMarker(p:OperatorChallenge['authorization'],markers:any) {
+  check(Array.isArray(markers) && markers.length===1,'unique authenticated ledger marker');
+  const marker=markers[0],v=p.provenance;
+  check(!marker.expired && Date.parse(marker.expires_at)>Date.now()+60000 && marker.workflow_run?.id===Number(v.runId)
+    && marker.workflow_run.head_sha===p.authorization.sourceCommit && /^[1-9][0-9]{0,15}$/.test(String(marker.id))
+    && /^sha256:[0-9a-f]{64}$/.test(marker.digest),'authenticated ledger marker provenance');
+  return marker;
 }
 
 /** Bind supplied authorization to native archive bytes BEFORE any local diagnostic. */
@@ -224,11 +261,7 @@ export function authenticateLiveOperatorPackage(p: OperatorChallenge['authorizat
   authority.requireProvenance(p,get('/actions/runs/'+v.runId),get('/actions/artifacts/'+v.artifactId));
   check(JSON.stringify(authority.readArchive(archive(v.artifactId),v.digest))===JSON.stringify(p.authorization),'authenticated authorization archive content');
   const markers=get('/actions/artifacts?name=operator-ledger-'+p.authorization.ledgerId+'&per_page=100').artifacts;
-  check(Array.isArray(markers) && markers.length===1,'unique authenticated ledger marker');
-  const marker=markers[0];
-  check(!marker.expired && Date.parse(marker.expires_at)>Date.now()+60000 && marker.workflow_run?.id===Number(v.runId)
-    && marker.workflow_run.head_sha===p.authorization.sourceCommit && /^[1-9][0-9]{0,15}$/.test(String(marker.id))
-    && /^sha256:[0-9a-f]{64}$/.test(marker.digest),'authenticated ledger marker provenance');
+  const marker=requireAuthenticatedLedgerMarker(p,markers);
   check(JSON.stringify(authority.readArchive(archive(String(marker.id)),marker.digest))===JSON.stringify(p.authorization),'authenticated ledger marker content');
   authority.requirePackage(p);
 }
@@ -237,10 +270,11 @@ export function authenticateLiveOperatorAuthorization(c: OperatorChallenge,get?:
 }
 
 /** This checks fresh server-authored GitHub state, including after a transient GET retry. */
-export function requireLiveOperatorGate(c: OperatorChallenge): void {
+export function requireLiveOperatorGate(c: OperatorChallenge,
+  get:(path:string)=>any=path=>readLiveOperatorMetadata(c.repository,path),
+  archive?:(artifactId:string)=>Buffer): void {
   requireOperatorChallenge(c);
-  const get = (path: string) => readLiveOperatorMetadata(c.repository,path);
-  authenticateLiveOperatorAuthorization(c,get);
+  authenticateLiveOperatorAuthorization(c,get,archive);
   const run = get('/actions/runs/' + c.runId);
   check(run.head_sha === c.sourceCommit && run.run_attempt === 1 && run.path === c.workflowPath && run.event === c.eventName
     && run.status !== 'completed', 'live protected run');
@@ -256,6 +290,31 @@ export function requireLiveOperatorGate(c: OperatorChallenge): void {
   requireOperatorChallenge(c);
 }
 
+/** Fresh evidence for this gate only: independent metadata, then validated archive IDs. */
+export async function requireLiveOperatorGateParallel(c:OperatorChallenge,
+  get:(path:string)=>Promise<any>=path=>readLiveOperatorMetadataAsync(c.repository,path),
+  archive:(id:string)=>Promise<Buffer>=async id=>(await execFileAsync('gh',['api',`repos/${c.repository}/actions/artifacts/${id}/zip`,'--method','GET'],
+    {encoding:'buffer',maxBuffer:128*1024,timeout:15_000})).stdout) {
+  requireOperatorChallenge(c);
+  const p=c.authorization,v=p.provenance;
+  const markerPath='/actions/artifacts?name=operator-ledger-'+p.authorization.ledgerId+'&per_page=100';
+  const paths=['/actions/runs/'+v.runId,'/actions/artifacts/'+v.artifactId,markerPath,
+    '/actions/runs/'+c.runId,'/actions/runs/'+c.runId+'/jobs?per_page=100',
+    ...(c.role==='preview'?['/pulls/'+p.authorization.pullRequestNumber]:[]),'/git/ref/heads/main'];
+  const settled=await Promise.allSettled(paths.map(path=>get(path)));
+  for(const result of settled)if(result.status==='rejected')throw result.reason;
+  const metadata=new Map(paths.map((path,index)=>[path,(settled[index] as PromiseFulfilledResult<any>).value]));
+  authority.requireProvenance(p,metadata.get(paths[0]!),metadata.get(paths[1]!));
+  const marker=requireAuthenticatedLedgerMarker(p,metadata.get(markerPath)?.artifacts);
+  // Neither archive is fetched until its server-authored identity/provenance is checked.
+  const ids=[v.artifactId,String(marker.id)];
+  const archives=await Promise.allSettled(ids.map(id=>archive(id)));
+  for(const result of archives)if(result.status==='rejected')throw result.reason;
+  const bytes=new Map(ids.map((id,index)=>[id,(archives[index] as PromiseFulfilledResult<Buffer>).value]));
+  requireLiveOperatorGate(c,path=>{check(metadata.has(path),'complete live gate metadata');return metadata.get(path);},
+    id=>{check(bytes.has(id),'complete live gate archives');return bytes.get(id)!;});
+}
+
 export async function runOperatorProof(input: { challenge:OperatorChallenge; directory:string; planSha256:string; output:string; ledger:string; token:string }) {
   const c = requireOperatorChallenge(input.challenge); const plan = readPlan(input.directory,input.planSha256);requireSameReleasePolicy(policyForClassification(plan.classification),c.releasePolicy);
   check(plan.classification.sourceCommit === c.sourceCommit && plan.classification.sourceTree === c.sourceTree && input.planSha256 === c.sourcePlanSha256, 'operator source');
@@ -264,7 +323,7 @@ export async function runOperatorProof(input: { challenge:OperatorChallenge; dir
   for (const path of [input.output,input.output+'.receipt.json',input.output+'.receipt.json.events.jsonl']) {
     check(!existsSync(path), 'fresh output paths required');
   }
-  requireLiveOperatorGate(c);
+  await requireLiveOperatorGateParallel(c);
   const lock = openSync(input.ledger + '.lock','wx',0o600);
   let ledger:any;
   const save = () => { const temp = input.ledger + '.pending'; writeFileSync(temp,JSON.stringify(ledger,null,2)+'\n',{mode:0o600,flush:true}); renameSync(temp,input.ledger); };
@@ -283,11 +342,11 @@ export async function runOperatorProof(input: { challenge:OperatorChallenge; dir
       const startedAt=new Date().toISOString(); await transport.startIntegrity(c.admission);
       const results=[];
       for(const q of integrityQueries()) {
-        requireOperatorChallenge(c); requireLiveOperatorGate(c);
+        requireOperatorChallenge(c); await requireLiveOperatorGateParallel(c);
         const before={...transport.metering}; const rows=await transport.execute(q);check(rows.length===0,'integrity response');
         results.push({label:q.label,sqlSha256:sha(q.sql),rowsRead:transport.metering.rowsRead-before.rowsRead,rowsWritten:transport.metering.rowsWritten-before.rowsWritten});
       }
-      const controls=await transport.finish(); requireLiveOperatorGate(c);
+      const controls=await transport.finish(); await requireLiveOperatorGateParallel(c);
       const receipt={schemaVersion:'theologai-operator-fts-proof.v1',role:c.role,accountId:ACCOUNT,databaseId:policyForIdentity(c.releasePolicy).module.TARGETS[c.role].databaseId,
         sourceCommit:c.sourceCommit,sourceTree:c.sourceTree,sourcePlanSha256:c.sourcePlanSha256,startedAt,completedAt:new Date().toISOString(),...controls,results,metering:{...transport.metering}};
       const envelope={schemaVersion:'theologai-operator-corpus-envelope.v1',challenge:c,receipt,
@@ -312,7 +371,7 @@ async function main() {
   const [command,...args] = process.argv.slice(2);
   if(command==='init-ledger') {
     check(args.length===2,'ledger initialization arguments');
-    const c=requireOperatorChallenge(readJson(args[0]!));requireLiveOperatorGate(c);
+    const c=requireOperatorChallenge(readJson(args[0]!));await requireLiveOperatorGateParallel(c);
     writeFileSync(args[1]!,JSON.stringify({schemaVersion:'theologai-operator-proof-budget.v1',authorizationId:c.authorizationId,
       ledgerId:c.authorization.authorization.ledgerId,authorizationSha256:sha(JSON.stringify(c.authorization)),consumed:false,
       readsSpentOrReserved:0,writesSpentOrReserved:0,diagnosticCommands:0,attempts:[]},null,2)+'\n',{flag:'wx',mode:0o600});return;
