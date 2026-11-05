@@ -449,6 +449,14 @@ describe('fresh parallel operator gate',()=>{
       expect(settled).toHaveLength(7);expect(archive).not.toHaveBeenCalled();expect(sql).not.toHaveBeenCalled();
     }finally{vi.useRealTimers();}
   });
+  it('settles both archive reads and permits no SQL after a partial archive failure',async()=>{
+    vi.useFakeTimers();vi.setSystemTime(start);
+    try{
+      const f=gateFixture(),settled:string[]=[],sql=vi.fn();
+      const gate=requireLiveOperatorGateParallel(f.c,async path=>f.metadata[path],async id=>{await new Promise(resolve=>setTimeout(resolve,id==='654'?10:20));settled.push(id);if(id==='654')throw Error('synthetic archive failure');return f.bytes;}).then(sql);
+      const rejected=expect(gate).rejects.toThrow('synthetic archive failure');await vi.advanceTimersByTimeAsync(20);await rejected;expect(settled.sort()).toEqual(['654','655']);expect(sql).not.toHaveBeenCalled();
+    }finally{vi.useRealTimers();}
+  });
   it('never downloads archive bytes for unvalidated artifact or marker provenance',async()=>{
     vi.useFakeTimers();vi.setSystemTime(start);
     try{for(const member of ['artifact','marker']){const f=gateFixture();if(member==='artifact')f.metadata['/actions/artifacts/654'].workflow_run.head_sha='f'.repeat(40);else (f.marker as any).id='unvalidated';const archive=vi.fn(async()=>f.bytes);await expect(requireLiveOperatorGateParallel(f.c,async path=>f.metadata[path],archive)).rejects.toThrow();expect(archive).not.toHaveBeenCalled();}}
