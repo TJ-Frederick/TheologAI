@@ -295,10 +295,11 @@ async function probeContract(
       return resource.uri;
     }).sort();
     const resourceUrisSha256 = sha256(canonicalJson(resourceUris));
-    const expectedResourceUrisSha256 = sha256(canonicalJson(expectedStabilizationResources(profile)));
-    const resourcesMatch = resourceUris.length === expectedStabilizationResources(profile).length
+    const expectedResourceUris = expectedStabilizationResources(profile);
+    const expectedResourceUrisSha256 = sha256(canonicalJson(expectedResourceUris));
+    const resourcesMatch = resourceUris.length === expectedResourceUris.length
       && new Set(resourceUris).size === resourceUris.length
-      && canonicalJson(resourceUris) === canonicalJson(HISTORICAL_CORE_EXPECTED_RESOURCE_URIS)
+      && canonicalJson(resourceUris) === canonicalJson(expectedResourceUris)
       && resourceUrisSha256 === expectedResourceUrisSha256;
     const matched = initializeIdentityMatch
       && canonicalJson(inputSchema) === canonicalJson(profile.primarySource.inputSchema)
@@ -386,7 +387,7 @@ function evidence(
     contract: {
       version: profile.primarySource.contractVersion, inputSchemaSha256: profile.primarySource.inputSchemaSha256,
       outputSchemaSha256: profile.primarySource.outputSchemaSha256, openWorldHint: profile.primarySource.openWorldHint,
-      resourceUrisSha256: sha256(canonicalJson(HISTORICAL_CORE_EXPECTED_RESOURCE_URIS)),
+      resourceUrisSha256: sha256(canonicalJson(expectedStabilizationResources(profile))),
     },
     bounds: {
       maximumAttempts: MAX_ATTEMPTS, maximumDurationMs: MAX_DURATION_MS, retryDelayMs: RETRY_DELAY_MS,

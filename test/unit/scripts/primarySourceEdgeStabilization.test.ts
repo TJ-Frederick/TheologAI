@@ -33,6 +33,7 @@ function fetchFor(
   profile: HistoricalCoreAuditProfile,
   staleAttempts: number | readonly number[] = 0,
   paddingBytes = 0,
+  resourceUris: readonly string[] = HISTORICAL_CORE_EXPECTED_RESOURCE_URIS,
 ): typeof fetch {
   let toolsLists = 0;
   const staleAttemptLimit = typeof staleAttempts === 'number' ? staleAttempts : undefined;
@@ -60,7 +61,7 @@ function fetchFor(
     if (request.method === 'resources/list') {
       const uris = stale()
         ? HISTORICAL_CORE_EXPECTED_RESOURCE_URIS.slice(0, -1)
-        : HISTORICAL_CORE_EXPECTED_RESOURCE_URIS;
+        : resourceUris;
       return json({ jsonrpc: '2.0', id: request.id, result: {
         resources: uris.map(uri => ({ uri })),
       } }, 200, paddingBytes);
@@ -70,6 +71,40 @@ function fetchFor(
 }
 
 describe('primary-source edge-stabilization gate', () => {
+  const corpusUris = [...HISTORICAL_CORE_EXPECTED_RESOURCE_URIS,
+    'theologai://documents/calvin-institutes-of-the-christian-religion',
+    'theologai://documents/summa-theologiae'].sort();
+
+  it.each([PREVIEW_PROFILE, PRODUCTION_PROFILE])('accepts the complete corpus roster for $label and records its matching hash', async base => {
+    const profile = {...base, corpusRelease: true as const};
+    let clock = 0;
+    const evidence = await runPrimarySourceEdgeStabilization(profile, {
+      fetchImpl: fetchFor(profile, 0, 0, corpusUris), now: () => clock,
+      sleep: async ms => { clock += ms; },
+    });
+    expect(evidence).toMatchObject({passed: true, matchedAttempt: 2,
+      contract: {resourceUrisSha256: '30329e5a68efea087c0f5449efbf9c792d09c2e7d79aa595157a37734f7a90da'}});
+    expect(evidence.attempts.every(a => a.observed?.resourcesMatch === true)).toBe(true);
+    expect(evidence.attempts.every(a => a.observed?.resourceUrisSha256 === evidence.contract.resourceUrisSha256)).toBe(true);
+  });
+
+  it.each([
+    ['legacy roster', HISTORICAL_CORE_EXPECTED_RESOURCE_URIS],
+    ['missing resource', corpusUris.slice(0, -1)],
+    ['extra resource', [...corpusUris, 'theologai://documents/extra']],
+    ['unexpected resource', [...corpusUris.slice(0, -1), 'theologai://documents/unexpected']],
+    ['duplicate resource', [...corpusUris.slice(0, -1), corpusUris[0]!]],
+  ] as const)('rejects a corpus %s without weakening exact roster checks', async (_label, uris) => {
+    const profile = {...PREVIEW_PROFILE, corpusRelease: true as const};
+    let clock = 0;
+    const evidence = await runPrimarySourceEdgeStabilization(profile, {
+      fetchImpl: fetchFor(profile, 0, 0, uris), now: () => clock,
+      sleep: async ms => { clock += ms; },
+    });
+    expect(evidence.passed).toBe(false);
+    expect(evidence.attempts.every(a => a.observed?.resourcesMatch === false)).toBe(true);
+  });
+
   it('uses fixed preview-v7 and production-v6 profiles with a bounded explicit convergence window', () => {
     expect(PREVIEW_PROFILE.primarySource.contractVersion).toBe('7');
     expect(PRODUCTION_PROFILE.primarySource.contractVersion).toBe('6');

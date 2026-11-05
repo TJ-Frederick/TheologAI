@@ -15,7 +15,7 @@
     "scripts/audit-corpus-release.ts": "51144fd54692d5433e8d2e02cb35b0ecfa80c750",
     "scripts/audit-dual-era-mcp-preview.ts": "83fac50a1981cad35d43b9c14c0d1b40e911968e",
     "scripts/audit-original-language-v2-preview.ts": "e2f6266f460de8828af79e3b2b8b9db4abf4de55",
-    "scripts/audit-primary-source-edge-stabilization.ts": "2992028d207c761f3b15426e1281cfc718c240cb",
+    "scripts/audit-primary-source-edge-stabilization.ts": "18257ec7f8d0717d54a8b342a57e7a7f9fd5a045",
     "scripts/build-database.ts": "353b847ea4293944d897d79ea5f933ab0bf3b17f",
     "scripts/check-remote-d1-readiness.ts": "dfffac20e684ad916519c12357761e76f8f0f8b9",
     "scripts/corpus-execution-config.ts": "4ee19a8caf9a2e05bd52ebd82f72c74e79da8c9a",
