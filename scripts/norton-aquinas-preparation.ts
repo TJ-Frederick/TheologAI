@@ -171,7 +171,8 @@ export type PreparationExecutor=((sql:string)=>Promise<PreparationMeter>) & {dat
 /** Existing single-operation admission/journal model, fixed to the unbound production candidate. */
 export class PreparedCorpusSession implements PreparationSession {
  halted=false;reads=0;writes=0;requests=0;private busy=false;private anchor:PreparationUsage|null=null;
- constructor(readonly dependencies:{databaseId:string;execute:PreparationExecutor;usage:()=>Promise<PreparationUsage>;guard:()=>Promise<void>;append:(entry:JournalEntry)=>Promise<void>},readonly now=()=>Date.now()){
+ constructor(readonly dependencies:{priorReadsReserved?:number;databaseId:string;execute:PreparationExecutor;usage:()=>Promise<PreparationUsage>;guard:()=>Promise<void>;append:(entry:JournalEntry)=>Promise<void>},readonly now=()=>Date.now()){
+  check(Number.isSafeInteger(dependencies.priorReadsReserved??0)&&(dependencies.priorReadsReserved??0)>=0&&(dependencies.priorReadsReserved??0)<=250000,'prior preparation reservation');
   check(dependencies.databaseId===TARGETS.production.id && (dependencies.execute.databaseId===undefined || dependencies.execute.databaseId===dependencies.databaseId),'preparation executor/session target');
  }
  async query(sql:string,readCeiling:number,writeCeiling=0):Promise<PreparationMeter>{
@@ -180,7 +181,7 @@ export class PreparedCorpusSession implements PreparationSession {
    check([readCeiling,writeCeiling].every(n=>Number.isSafeInteger(n)&&n>=0),'operation ceiling');await this.dependencies.guard();const usage=await this.dependencies.usage();
    check(usage.windowStart===new Date(this.now()).toISOString().slice(0,10)+'T00:00:00.000Z' && Date.parse(usage.observedAt)<=this.now() && this.now()-Date.parse(usage.observedAt)<=50000 && [usage.rowsRead,usage.rowsWritten].every(n=>Number.isSafeInteger(n)&&n>=0),'fresh unsampled usage required');
    if(!this.anchor)this.anchor={...usage};check(this.anchor.windowStart===usage.windowStart,'new UTC day needs separately reviewed recovery');
-   check(Math.max(usage.rowsRead,this.anchor.rowsRead+this.reads)+readCeiling+200000<=4000000 && Math.max(usage.rowsWritten,this.anchor.rowsWritten+this.writes)+writeCeiling<=80000 && this.reads+readCeiling<=250000 && this.writes+writeCeiling<=115000,'preparation operation not admitted');
+   check(Math.max(usage.rowsRead,this.anchor.rowsRead+this.reads)+readCeiling+200000<=4000000 && Math.max(usage.rowsWritten,this.anchor.rowsWritten+this.writes)+writeCeiling<=80000 && (this.dependencies.priorReadsReserved??0)+this.reads+readCeiling<=250000 && this.writes+writeCeiling<=115000,'preparation operation not admitted');
    const index=this.requests,sqlSha256=sha(sql);this.halted=true;
    await this.dependencies.append({index,sqlSha256,state:'intent',readCeiling,writeCeiling} as JournalEntry);
    const result=await this.dependencies.execute(sql);check(result&&Array.isArray(result.rows)&&[result.rowsRead,result.rowsWritten].every(n=>Number.isSafeInteger(n)&&n>=0),'unknown preparation outcome');

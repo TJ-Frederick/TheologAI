@@ -44,3 +44,9 @@ it.each(['partial','retry','secondary'])('halts without retry for %s batch metad
  const f=session({execute});await expect(f.s.query('SELECT 1',8)).rejects.toThrow('unknown');await expect(f.s.query('SELECT 1',8)).rejects.toThrow('halted');expect(calls).toBe(1);expect(f.entries).toHaveLength(1);
 });
 it('retains already metered preflight reads for cumulative admission',async()=>{const f=session({execute:async()=>({rows:[],rowsRead:249999,rowsWritten:0})});await f.s.query('SELECT 1',249999);await expect(f.s.query('SELECT 2',2)).rejects.toThrow('not admitted');expect(f.s.reads).toBe(249999);expect(f.entries).toHaveLength(2);});
+
+it('retains the separately reserved discovery reads in the same preparation role',async()=>{
+ const entries:any[]=[];let calls=0;const s=new PreparedCorpusSession({priorReadsReserved:32,databaseId:TARGETS.production.id,guard:async()=>{},usage:async()=>({windowStart:'2026-11-03T00:00:00.000Z',observedAt:new Date(now).toISOString(),rowsRead:32,rowsWritten:0}),append:async e=>{entries.push(e);},execute:async()=>{calls++;return{rows:[],rowsRead:249968,rowsWritten:0};}},()=>now);
+ await s.query('SELECT 1',249968);await expect(s.query('SELECT 2',1)).rejects.toThrow('not admitted');expect(calls).toBe(1);expect(s.reads).toBe(249968);expect(entries).toHaveLength(2);
+ expect(()=>new PreparedCorpusSession({...s.dependencies,priorReadsReserved:-1})).toThrow('prior preparation reservation');
+});

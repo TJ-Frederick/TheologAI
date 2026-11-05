@@ -32,7 +32,7 @@
     "scripts/historical-source-packs.ts": "183373dc0ba93c32cc895910baae6bfaa5eb5b89",
     "scripts/historical-transform9-authority-audit.ts": "08b5c29ad1aff0127b9af73927afc00e3db81567",
     "scripts/norton-aquinas-live.ts": "5c29c28819084a4368a7d495b30891c1acf954e4",
-    "scripts/norton-aquinas-preparation.ts": "7138fc4faccc6d3290023090469f4ec9c31da3aa",
+    "scripts/norton-aquinas-preparation.ts": "2d759a1703c0abac6fbc20dab414ce5c4dc6cd0c",
     "scripts/operator-corpus-proof.ts": "fe2f1f80092d5761bbbc299045f1761a59be693f",
     "scripts/transform12-candidate-c-storage.ts": "ba74f99d5711f5078104c3a4cf6ca398f2fe0576",
     "scripts/verify-biblical-language-unicode-d1.ts": "b91088b1113d8a5fbd885bfdffaa6ab48ed0e2cb",
