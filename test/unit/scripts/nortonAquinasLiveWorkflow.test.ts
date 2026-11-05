@@ -1,4 +1,4 @@
-import{it,expect,vi}from'vitest';
+import{it,expect,vi,afterEach}from'vitest';
 import{mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync,existsSync,appendFileSync,chmodSync}from'node:fs';
 import{join}from'node:path';
 import{execFileSync}from'node:child_process';
@@ -12,7 +12,10 @@ const audit=vi.hoisted(()=>vi.fn());
 vi.mock('../../../scripts/audit-corpus-release.js',()=>({auditCorpusRelease:audit}));
 import{runCorpusLive}from'../../../scripts/norton-aquinas-live.js';
 const sha=(v:string|Buffer)=>createHash('sha256').update(v).digest('hex');
+afterEach(()=>vi.useRealTimers());
 function fixture(){
+ // A synthetic grant must use its valid fixture window, independent of host UTC time.
+ vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-11-05T05:00:00Z'));
  const directory=mkdtempSync(join(tmpdir(),'corpus-live-wrapper-')),sourceDirectory=join(directory,'source');mkdirSync(sourceDirectory);
  const {classification}=selectReleaseProofPolicy(process.cwd()),now=Date.now(),hash='a'.repeat(64);
  const tables=Object.fromEntries(Array.from({length:39},(_,i)=>['table'+i,{rows:1,sha256:hash}]));
