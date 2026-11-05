@@ -21,7 +21,7 @@ vi.mock('@modelcontextprotocol/client',()=>({
   callTool(params:any){return this.request('tools/call',params);}
   readResource(params:any){return this.request('resources/read',params);}
   getPrompt(params:any){return this.request('prompts/get',params);}
-  async close(){state.closes++;if((state.fault==='cleanup'||state.fault==='network-and-cleanup')&&state.closes===state.at)throw Error('SECRET_CLEANUP');}
+  async close(){state.closes++;if(['protocol-then-network','network-then-status'].includes(state.fault))await new Promise(resolve=>setTimeout(resolve,15));if((state.fault==='cleanup'||state.fault==='network-and-cleanup')&&state.closes===state.at)throw Error('SECRET_CLEANUP');}
  }
 }));
 vi.mock('../../helpers/mcpTransportContract.js',()=>({
@@ -45,13 +45,15 @@ afterEach(()=>{vi.useRealTimers();vi.unstubAllGlobals();rmSync(root,{recursive:t
 const transport=(async(_input:any,init:any)=>{
  const n=++state.requests;state.dispatchTimes.push(Date.now());
  if(state.parallel&&n>=3&&n<=6){await new Promise(resolve=>setTimeout(resolve,n===state.at?1:5));}
+ if(state.fault==='protocol-then-network'&&n===state.at+1)throw Error('SECRET_LATE_NETWORK');
+ if(state.fault==='network-then-status'&&n===state.at+1)return new Response('SECRET_LATE_STATUS',{status:503});
  if(n===state.at){
-  if(state.fault==='network'||state.fault==='network-and-cleanup')throw Error('SECRET_NETWORK');
+  if(state.fault==='network'||state.fault==='network-and-cleanup'||state.fault==='network-then-status')throw Error('SECRET_NETWORK');
   if(state.fault==='timeout')return new Promise((_resolve,reject)=>init.signal.addEventListener('abort',()=>reject(Error('SECRET_TIMEOUT'))));
   if(state.fault==='status'||state.fault==='status-malicious')return new Response('SECRET_STATUS',{status:503,headers:state.fault==='status'?{'cf-ray':'0123456789abcdef-LHR','server':'cloudflare','content-type':'text/html; charset=utf-8','retry-after':'12','set-cookie':'SECRET_COOKIE'}:{'cf-ray':'SECRET_RAY','server':'SECRET_SERVER','content-type':'text/SECRET_TYPE','retry-after':'999999','x-secret':'SECRET_HEADER'}});
   if(state.fault==='size')return new Response('SECRET_'.repeat(50000));
   if(state.fault==='read')return new Response(new ReadableStream({start(c){c.error(Error('SECRET_READ'));}}));
-  if(state.fault==='protocol')return new Response('SECRET_INVALID_JSON');
+  if(state.fault==='protocol'||state.fault==='protocol-then-network')return new Response('SECRET_INVALID_JSON');
  }
  const {method,params}=JSON.parse(String(init.body));let result:any={content:[],structuredContent:{}};
  if(method==='resources/read'){
@@ -88,5 +90,7 @@ describe('actual corpus auditor exception-path report',()=>{
  it('clears the prior response when a language cursor prerequisite fails before request',async()=>{const file=join(root,'test/fixtures/original-language-v2-preview-audit.json'),fixture=JSON.parse(readFileSync(file,'utf8'));fixture.cases[0].cursorFrom='missing';writeFileSync(file,JSON.stringify(fixture));const result=await run();expect(result.failure).toMatchObject({category:'assertion',reason:'language_cursor_missing',probeId:'language:input0',lastHttpStatus:null,httpObservationProbe:null,httpEvidence:null});});
 
  it.each([[3,'contract:tools-list'],[4,'contract:prompts-list'],[5,'contract:resource-templates-list'],[6,'contract:resources-list']])('pins concurrent SDK decoding failure%s despite later successful responses',async(at,id)=>{state.parallel=true;state.fault='protocol';state.at=at as number;const result=await run();expect(result.failure).toMatchObject({category:'protocol',reason:'protocol',probeId:id,httpObservationProbe:id,lastHttpStatus:200,completedChecks:0,httpExchanges:6});expect(state.requests).toBe(6);expect(JSON.stringify(result)).not.toContain('SECRET_');await new Promise(resolve=>setTimeout(resolve,10));expect(result.failure?.probeId).toBe(id);expect(state.requests).toBe(6);});
+
+ it.each([['protocol-then-network','protocol',200],['network-then-status','network',null]])('keeps the first concurrent operation and cause when%s completes during cleanup',async(fault,category,status)=>{state.parallel=true;state.fault=fault as string;state.at=3;const result=await run();expect(result.failure).toMatchObject({category,reason:category,probeId:'contract:tools-list',lastHttpStatus:status,completedChecks:0,httpExchanges:6});expect(result.failure?.httpObservationProbe).toBe(status===null?null:'contract:tools-list');expect(state.requests).toBe(6);expect(state.closes).toBe(1);expect(JSON.stringify(result)).not.toContain('SECRET_');});
 
 });

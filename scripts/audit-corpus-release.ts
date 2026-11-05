@@ -47,8 +47,8 @@ export async function auditCorpusRelease(options: {
         responseSha256: string;
     }[] = [], summaries: unknown[] = [], fingerprints: unknown[] = [];
     let current = 'initialize', role = '', era = '';
-    let failedRequest:{probeId:string;status:number|null;evidence:ReturnType<typeof httpEvidence>|null}|undefined;
-    let stage:FailureStage='initialize',failureReason:string|undefined,lastHttpEvidence:ReturnType<typeof httpEvidence>|null=null,httpObservationProbe:string|null=null,failure:FailureCategory|undefined,transportFailure:FailureCategory|undefined,cleanupFailed=false,totalExchanges=0,eraExchanges=0,lastHttpStatus:number|null=null;
+    let failedRequest:{probeId:string;status:number|null;evidence:ReturnType<typeof httpEvidence>|null;category:FailureCategory;reason:string}|undefined;
+    let stage:FailureStage='initialize',failureReason:string|undefined,lastHttpEvidence:ReturnType<typeof httpEvidence>|null=null,httpObservationProbe:string|null=null,failure:FailureCategory|undefined,cleanupFailed=false,totalExchanges=0,eraExchanges=0,lastHttpStatus:number|null=null;
     const databaseSha256=sha(readFileSync(options.databasePath)),manifestSha256=sha(readFileSync(join(root,'data/data-manifest.json')));
     const core = JSON.parse(readFileSync(join(root, 'test/fixtures/historical-core-preview-audit.json'), 'utf8'));
     const spine = JSON.parse(readFileSync(join(root, 'test/fixtures/historical-spine-preview-audit.json'), 'utf8'));
@@ -103,22 +103,22 @@ export async function auditCorpusRelease(options: {
                     const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 30000);
                     try {
                         if(options.fetch===fetch){const delay=Math.max(0,nextNetworkStart-Date.now());if(delay)await new Promise(r=>setTimeout(r,delay));nextNetworkStart=Date.now()+650;}
-                        let response:Response;try{response = await fetchImpl(input, { ...init, headers:{...Object.fromEntries(new Headers(init?.headers)),'user-agent':`TheologAI-Corpus-${role}-Audit/1.0`}, redirect: 'error', signal: init?.signal ? AbortSignal.any([init.signal, controller.signal]) : controller.signal });}catch{transportFailure=controller.signal.aborted?'timeout':init?.signal?.aborted?'aborted':'network';throw new AuditFault(transportFailure);}
+                        let response:Response;try{response = await fetchImpl(input, { ...init, headers:{...Object.fromEntries(new Headers(init?.headers)),'user-agent':`TheologAI-Corpus-${role}-Audit/1.0`}, redirect: 'error', signal: init?.signal ? AbortSignal.any([init.signal, controller.signal]) : controller.signal });}catch{throw new AuditFault(controller.signal.aborted?'timeout':init?.signal?.aborted?'aborted':'network');}
                         requestStatus=response.status;requestEvidence=httpEvidence(response);if(requestProbe.startsWith('contract:'))contractResponses.set(requestProbe,{status:requestStatus,evidence:requestEvidence});lastHttpStatus=requestStatus;lastHttpEvidence=requestEvidence;httpObservationProbe=requestProbe;
-                        if(response.redirected||response.status>=500){transportFailure='http_status';throw new AuditFault(transportFailure);}
+                        if(response.redirected||response.status>=500){throw new AuditFault('http_status');}
                         if (!response.body)
                             return response;
                         const reader = response.body.getReader(), chunks: Uint8Array[] = [];
                         let bytes = 0;
                         for (;;) {
-                            let next:ReadableStreamReadResult<Uint8Array>;try{next=await reader.read();}catch{transportFailure=controller.signal.aborted?'timeout':init?.signal?.aborted?'aborted':'response_read';throw new AuditFault(transportFailure);}
+                            let next:ReadableStreamReadResult<Uint8Array>;try{next=await reader.read();}catch{throw new AuditFault(controller.signal.aborted?'timeout':init?.signal?.aborted?'aborted':'response_read');}
                             if (next.done)
                                 break;
                             bytes += next.value.byteLength;
                             aggregateBytes += next.value.byteLength;
                             if (bytes > 256 * 1024 || aggregateBytes > 16 * 1024 * 1024) {
-                                transportFailure='response_size';try{await reader.cancel();}catch{}
-                                throw new AuditFault(transportFailure);
+                                try{await reader.cancel();}catch{}
+                                throw new AuditFault('response_size');
                             }
                             chunks.push(next.value);
                         }
@@ -127,14 +127,14 @@ export async function auditCorpusRelease(options: {
                     finally {
                         clearTimeout(timer);
                     }
-                    }catch(error){failedRequest??={probeId:requestProbe,status:requestStatus,evidence:requestEvidence};throw error;}
+                    }catch(error){failedRequest??={probeId:requestProbe,status:requestStatus,evidence:requestEvidence,category:error instanceof AuditFault?error.category:'protocol',reason:error instanceof AuditFault?error.reason:'protocol'};throw error;}
                 };
                 const client = new Client({ name: 'local-corpus-feasibility', version: '1' }, versionNegotiationFor(protocol));
                 async function contractOperation<T>(id:string,action:()=>Promise<T>):Promise<T>{
-                    try{return await action();}catch(error){const response=contractResponses.get(id);failedRequest??={probeId:id,status:response?.status??null,evidence:response?.evidence??null};throw error;}
+                    try{return await action();}catch(error){const response=contractResponses.get(id);const category=error instanceof AuditFault?error.category:response&&response.status>=400?'http_status':'protocol';failedRequest??={probeId:id,status:response?.status??null,evidence:response?.evidence??null,category,reason:error instanceof AuditFault?error.reason:category};throw error;}
                 }
                 const contractClient={getServerVersion:()=>client.getServerVersion(),getServerCapabilities:()=>client.getServerCapabilities(),listTools:()=>contractOperation('contract:tools-list',()=>client.listTools()),listPrompts:()=>contractOperation('contract:prompts-list',()=>client.listPrompts()),listResourceTemplates:()=>contractOperation('contract:resource-templates-list',()=>client.listResourceTemplates()),listResources:()=>contractOperation('contract:resources-list',()=>client.listResources())};
-                const probe = async (id: string, action: () => Promise<any>, allowError = false) => { current = id;stage='probe';failedRequest=undefined;transportFailure=undefined;lastHttpStatus=null;lastHttpEvidence=null;httpObservationProbe=null;
+                const probe = async (id: string, action: () => Promise<any>, allowError = false) => { current = id;stage='probe';failedRequest=undefined;lastHttpStatus=null;lastHttpEvidence=null;httpObservationProbe=null;
                     const value = await action();stage='assertion';
                     if (value?.isError && !allowError)
                         throw new AuditFault('tool_error','unexpected_tool_error');
@@ -144,7 +144,7 @@ export async function auditCorpusRelease(options: {
                 };
                 let eraFailed=false;
                 try {
-                    current = 'initialize';stage='initialize';failedRequest=undefined;transportFailure=undefined;lastHttpStatus=null;lastHttpEvidence=null;httpObservationProbe=null;
+                    current = 'initialize';stage='initialize';failedRequest=undefined;lastHttpStatus=null;lastHttpEvidence=null;httpObservationProbe=null;
                     await client.connect(new StreamableHTTPClientTransport(new URL(options.endpoint), { fetch: localFetch as any }));
                     current='contract';stage='contract';
                     const snapshot = await captureMcpTransportSnapshot(contractClient);
@@ -183,7 +183,7 @@ export async function auditCorpusRelease(options: {
                     const disabled = await probe('external-disabled', () => client.callTool({ name: 'primary_source_search', arguments: { queries: [{ id: 'external', text: 'Lord Supper', ...(preview ? { searchDepth: 'expanded', expandedLimit: 1 } : { providers: ['ccel'] }), match: 'all_terms', selection: 'relevance', limit: 1 }] } }), !preview);
                     const badCursor = await probe('invalid-classic-cursor', () => client.callTool({ name: 'classic_text_lookup', arguments: { work: core.probes[0].workId, browseSections: true, cursor: 'not-a-valid-cursor' } }), true);
                     check(badCursor.isError === true, 'invalid_cursor_accepted');
-                    current='external-disabled';stage='assertion';lastHttpStatus=null;lastHttpEvidence=null;httpObservationProbe=null;transportFailure=undefined;
+                    current='external-disabled';stage='assertion';lastHttpStatus=null;lastHttpEvidence=null;httpObservationProbe=null;
                     check(preview ? !JSON.stringify(disabled).includes('external_discovery_executed') : disabled.isError === true, 'external_disabled_contract');
                     await probe('norton-browse', () => client.callTool({ name: 'classic_text_lookup', arguments: { work: norton.document_id, browseSections: true } }));
                     await probe('norton-body', () => client.readResource({ uri: 'theologai://documents/' + norton.document_id + '#section-' + norton.section_key }));
@@ -196,7 +196,7 @@ export async function auditCorpusRelease(options: {
                     await probe('aquinas-search', () => client.callTool({ name: 'historical_hierarchy_lookup', arguments: { slug: aquinas.public_slug, query: 'grace', match: 'all_terms' } }));
                     const cursorHistory = new Map<string, string>(), priorCandidates = new Map<string, string[]>();
                     for (const c of language.cases) {
-                        current='language:'+c.id;stage='assertion';lastHttpStatus=null;lastHttpEvidence=null;httpObservationProbe=null;transportFailure=undefined;failedRequest=undefined;
+                        current='language:'+c.id;stage='assertion';lastHttpStatus=null;lastHttpEvidence=null;httpObservationProbe=null;failedRequest=undefined;
                         const args = { ...c.arguments };
                         if (c.cursorFrom) {
                             const cursor = cursorHistory.get(c.cursorFrom);
@@ -225,7 +225,7 @@ export async function auditCorpusRelease(options: {
         }
         current='dual-era-parity';stage='parity';lastHttpStatus=null;lastHttpEvidence=null;httpObservationProbe=null;sameFingerprints();
     }
-    catch(error){if(failedRequest){current=failedRequest.probeId;lastHttpStatus=failedRequest.status;lastHttpEvidence=failedRequest.evidence;httpObservationProbe=failedRequest.status===null?null:failedRequest.probeId;}if((stage as FailureStage)==='assertion'){const failed=[...checks].reverse().find(c=>c.id===current&&c.era===era);if(failed)failed.passed=false;}failureReason=error instanceof AuditFault?error.reason:transportFailure??categoryForStage(stage);failure=error instanceof AuditFault?error.category:transportFailure??(lastHttpStatus!==null&&lastHttpStatus>=400?'http_status':categoryForStage(stage));}
+    catch(error){if(failedRequest){current=failedRequest.probeId;lastHttpStatus=failedRequest.status;lastHttpEvidence=failedRequest.evidence;httpObservationProbe=failedRequest.status===null?null:failedRequest.probeId;}if((stage as FailureStage)==='assertion'){const failed=[...checks].reverse().find(c=>c.id===current&&c.era===era);if(failed)failed.passed=false;}failureReason=failedRequest?.reason??(error instanceof AuditFault?error.reason:categoryForStage(stage));failure=failedRequest?.category??(error instanceof AuditFault?error.category:lastHttpStatus!==null&&lastHttpStatus>=400?'http_status':categoryForStage(stage));}
     finally {
         try{db.close();}catch{cleanupFailed=true;if(!failure){failure='cleanup';failureReason='database_close';current='database-close';stage='cleanup';lastHttpStatus=null;lastHttpEvidence=null;httpObservationProbe=null;}}
     }
