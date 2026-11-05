@@ -12,7 +12,7 @@
     "scripts/application-release-policy.mjs": "443eab6e738e14766f3cb19bcbc229d8f5477275",
     "scripts/aquinas-authority-audit.ts": "dae6b5d3c8eddc403308387c762490f409cb8062",
     "scripts/aquinas-source-pack-capacity-comparison.ts": "f273bc261bf91c622de701e4abba2821db2a9505",
-    "scripts/audit-corpus-release.ts": "1718390e162aac9d801d1d8f51c503df83aa7210",
+    "scripts/audit-corpus-release.ts": "dac110b4b2162eb76c357eb20ffc7721bbdbdeaf",
     "scripts/audit-dual-era-mcp-preview.ts": "83fac50a1981cad35d43b9c14c0d1b40e911968e",
     "scripts/audit-original-language-v2-preview.ts": "e2f6266f460de8828af79e3b2b8b9db4abf4de55",
     "scripts/audit-primary-source-edge-stabilization.ts": "18257ec7f8d0717d54a8b342a57e7a7f9fd5a045",

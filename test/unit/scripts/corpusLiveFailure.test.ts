@@ -3,7 +3,7 @@ import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync} from 'node:fs';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import Database from 'better-sqlite3';
-const state=vi.hoisted(()=>({clients:0,requests:0,closes:0,fingerprints:0,fault:'',at:1,dispatchTimes:[] as number[]}));
+const state=vi.hoisted(()=>({clients:0,requests:0,closes:0,fingerprints:0,parallel:false,fault:'',at:1,dispatchTimes:[] as number[]}));
 vi.mock('@modelcontextprotocol/client',()=>({
  StreamableHTTPClientTransport:class{constructor(readonly url:URL,readonly options:any){}},
  Client:class{
@@ -12,6 +12,12 @@ vi.mock('@modelcontextprotocol/client',()=>({
   async request(method:string,params:any={}){const response=await this.transport.options.fetch(String(this.transport.url),{method:'POST',body:JSON.stringify({jsonrpc:'2.0',id:state.requests+1,method,params})});if(response.status>=400)throw Error('SECRET_HTTP_BODY');return(await response.json()).result;}
   async connect(transport:any){this.transport=transport;for(let i=0;i<(state.fault==='exchange-budget'?201:2);i++)await this.request(i?'notifications/initialized':'initialize');}
   getNegotiatedProtocolVersion(){return this.era;}
+  getServerVersion(){return{name:'theologai',version:'3.6.0-preview'};}
+  getServerCapabilities(){return{};}
+  listTools(){return this.request('tools/list');}
+  listPrompts(){return this.request('prompts/list');}
+  listResourceTemplates(){return this.request('resources/templates/list');}
+  listResources(){return this.request('resources/list');}
   callTool(params:any){return this.request('tools/call',params);}
   readResource(params:any){return this.request('resources/read',params);}
   getPrompt(params:any){return this.request('prompts/get',params);}
@@ -19,7 +25,7 @@ vi.mock('@modelcontextprotocol/client',()=>({
  }
 }));
 vi.mock('../../helpers/mcpTransportContract.js',()=>({
- captureMcpTransportSnapshot:async(client:any)=>{for(const method of ['tools/list','prompts/list','resources/list','resources/templates/list'])await client.request(method);return{server:{version:'3.6.0-preview'}};},
+ captureMcpTransportSnapshot:async(client:any)=>{const methods=['listTools','listPrompts','listResourceTemplates','listResources'];if(state.parallel)await Promise.all(methods.map(method=>client[method]()));else for(const method of methods)await client[method]();return{server:{version:'3.6.0-preview'}};},
  assertMcpTransportContract:async()=>{if(state.fault==='contract-assertion')throw Error('SECRET_CONTRACT');},
  fingerprintMcpTransportSnapshot:async()=>({tools:state.fault==='parity'&&++state.fingerprints===2?'b':'a'})
 }));
@@ -27,7 +33,7 @@ vi.mock('../../../scripts/audit-original-language-v2-preview.js',()=>({assertSuc
 import {auditCorpusRelease} from '../../../scripts/audit-corpus-release.js';
 let root:string,path:string;
 beforeEach(()=>{
- Object.assign(state,{clients:0,requests:0,closes:0,fingerprints:0,fault:'',at:1,dispatchTimes:[]});root=mkdtempSync(join(tmpdir(),'live-failure-'));path=join(root,'source.db');mkdirSync(join(root,'test/fixtures'),{recursive:true});mkdirSync(join(root,'data'));
+ Object.assign(state,{clients:0,requests:0,closes:0,fingerprints:0,parallel:false,fault:'',at:1,dispatchTimes:[]});root=mkdtempSync(join(tmpdir(),'live-failure-'));path=join(root,'source.db');mkdirSync(join(root,'test/fixtures'),{recursive:true});mkdirSync(join(root,'data'));
  const core={probes:Array.from({length:18},(_,i)=>({workId:'work'+i,query:'q'+i,firstSection:{sectionKey:'s'}})),legacyRegression:{workId:'legacy'}};
  for(const [name,value] of [['historical-core-preview-audit',core],['historical-spine-preview-audit',{probes:[]}],['original-language-v2-preview-audit',{cases:Array.from({length:3},(_,i)=>({id:'input'+i,arguments:{},mode:'input-error'}))}]])writeFileSync(join(root,'test/fixtures/'+name+'.json'),JSON.stringify(value));
  writeFileSync(join(root,'data/data-manifest.json'),'{}');const db=new Database(path);
@@ -38,6 +44,7 @@ beforeEach(()=>{
 afterEach(()=>{vi.useRealTimers();vi.unstubAllGlobals();rmSync(root,{recursive:true,force:true});});
 const transport=(async(_input:any,init:any)=>{
  const n=++state.requests;state.dispatchTimes.push(Date.now());
+ if(state.parallel&&n>=3&&n<=6){await new Promise(resolve=>setTimeout(resolve,n===state.at?1:5));}
  if(n===state.at){
   if(state.fault==='network'||state.fault==='network-and-cleanup')throw Error('SECRET_NETWORK');
   if(state.fault==='timeout')return new Promise((_resolve,reject)=>init.signal.addEventListener('abort',()=>reject(Error('SECRET_TIMEOUT'))));
@@ -71,11 +78,15 @@ describe('actual corpus auditor exception-path report',()=>{
  it.each(['parity','cleanup'])('reports failure after370 operations for %s, never a success-shaped fallback',async fault=>{state.fault=fault;state.at=2;const result=await run();expect(result.checks).toHaveLength(370);expect(result.failure?.category).toBe(fault==='cleanup'?'cleanup':'assertion');expect(result.failure?.completedChecks).toBe(370);expect(result.failure?.stage).toBe(fault==='cleanup'?'cleanup':'parity');expect(JSON.stringify(result)).not.toContain('SECRET_');});
  it('does not mask the original network failure when cleanup also fails',async()=>{state.fault='network-and-cleanup';const result=await run();expect(result.failure).toMatchObject({category:'network',cleanupFailed:true,httpExchanges:1});});
  it('preserves650ms native-fetch pacing and all370 checks',async()=>{vi.useFakeTimers();vi.stubGlobal('fetch',transport);const pending=run();await vi.runAllTimersAsync();const result=await pending;expect(Object.hasOwn(result,'failure')).toBe(false);expect(state.requests).toBe(382);expect(state.dispatchTimes.slice(1).every((t,i)=>t-state.dispatchTimes[i]>=650)).toBe(true);});
- it.each([[3,'contract:tools-list'],[4,'contract:prompts-list'],[5,'contract:resources-list'],[6,'contract:resource-templates-list']])('identifies contract request%s without adding a check or retry',async(at,id)=>{state.fault='status';state.at=at as number;const result=await run();expect(result.failure).toMatchObject({category:'http_status',probeId:id,httpObservationProbe:id,lastHttpStatus:503,httpExchanges:at,completedChecks:0});expect(state.requests).toBe(at);});
+ it.each([[3,'contract:tools-list'],[4,'contract:prompts-list'],[5,'contract:resource-templates-list'],[6,'contract:resources-list']])('identifies concurrent contract request%s without adding a check or retry',async(at,id)=>{state.parallel=true;state.fault='status';state.at=at as number;const result=await run();expect(result.failure).toMatchObject({category:'http_status',probeId:id,httpObservationProbe:id,lastHttpStatus:503,completedChecks:0});expect(state.requests).toBe(6);expect(result.failure?.httpExchanges).toBe(6);});
  it('retains only bounded correlation metadata for a failing scoped search',async()=>{state.fault='status';state.at=18;const result=await run();expect(result.failure).toMatchObject({category:'http_status',reason:'http_status',probeId:'search:work0',httpObservationProbe:'search:work0',lastHttpStatus:503,httpEvidence:{cfRay:'0123456789abcdef-LHR',cloudflareServer:true,contentType:'text/html',retryAfterSeconds:12}});expect(state.requests).toBe(18);expect(JSON.stringify(result)).not.toContain('SECRET_');});
  it('omits malformed and arbitrary response headers',async()=>{state.fault='status-malicious';const result=await run();expect(result.failure?.httpEvidence).toEqual({cfRay:null,cloudflareServer:false,contentType:null,retryAfterSeconds:null});expect(JSON.stringify(result)).not.toContain('SECRET_');});
  it.each([['outside-assertion','catalog_count_mismatch'],['resource-assertion','resource_body_mismatch'],['resource-shape','resource_shape'],['scoped-locator','scoped_search_locator_missing'],['contract-assertion','mcp_contract_mismatch']])('retains a fixed known assertion reason for%s',async(fault,reason)=>{state.fault=fault;const result=await run();expect(result.failure).toMatchObject({category:'assertion',reason});expect(JSON.stringify(result)).not.toContain('SECRET_');});
  it('does not associate the invalid-cursor HTTP status with the earlier external-disabled assertion',async()=>{state.fault='external-assertion';const result=await run();expect(result.failure).toMatchObject({category:'assertion',reason:'external_disabled_contract',probeId:'external-disabled',lastHttpStatus:null,httpObservationProbe:null,httpEvidence:null});});
  it.each([['language-success','success','language_success_contract'],['language-safe-error','safe-error','language_safe_error_contract'],['language-input-error','input-error','language_input_error_contract']])('retains the exact language probe and%s mode without helper messages',async(fault,mode,reason)=>{state.fault=fault;const file=join(root,'test/fixtures/original-language-v2-preview-audit.json'),fixture=JSON.parse(readFileSync(file,'utf8'));fixture.cases[0].mode=mode;writeFileSync(file,JSON.stringify(fixture));const result=await run();expect(result.failure).toMatchObject({category:'assertion',reason,probeId:'language:input0'});expect(result.checks.find(c=>c.id==='language:input0')?.passed).toBe(false);expect(JSON.stringify(result)).not.toContain('SECRET_');});
+
+ it('clears the prior response when a language cursor prerequisite fails before request',async()=>{const file=join(root,'test/fixtures/original-language-v2-preview-audit.json'),fixture=JSON.parse(readFileSync(file,'utf8'));fixture.cases[0].cursorFrom='missing';writeFileSync(file,JSON.stringify(fixture));const result=await run();expect(result.failure).toMatchObject({category:'assertion',reason:'language_cursor_missing',probeId:'language:input0',lastHttpStatus:null,httpObservationProbe:null,httpEvidence:null});});
+
+ it.each([[3,'contract:tools-list'],[4,'contract:prompts-list'],[5,'contract:resource-templates-list'],[6,'contract:resources-list']])('pins concurrent SDK decoding failure%s despite later successful responses',async(at,id)=>{state.parallel=true;state.fault='protocol';state.at=at as number;const result=await run();expect(result.failure).toMatchObject({category:'protocol',reason:'protocol',probeId:id,httpObservationProbe:id,lastHttpStatus:200,completedChecks:0,httpExchanges:6});expect(state.requests).toBe(6);expect(JSON.stringify(result)).not.toContain('SECRET_');await new Promise(resolve=>setTimeout(resolve,10));expect(result.failure?.probeId).toBe(id);expect(state.requests).toBe(6);});
 
 });
