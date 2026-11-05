@@ -157,7 +157,7 @@ describe('workflow topology', () => {
     expect(JSON.stringify(action)).not.toMatch(/auth token|wrangler login|application-corpus-check.ts verify/);
     const production=parse(await readWorkflow('deploy.yml')) as Workflow;
     expect(production.jobs.deploy!.environment).toMatchObject({name:'production'});
-    expect(production.jobs.deploy!.permissions).toEqual({actions:'read',contents:'read'});
+    expect(production.jobs.deploy!.permissions).toEqual({actions:'read',contents:'read','pull-requests':'read'});
     expect(production.jobs.deploy!.steps!.find(s=>s.id==='corpus-proof')!.uses).toBe('./.github/actions/operator-corpus-proof');
   });
   it('keeps root dependencies and builds out of every credential-bearing job', async () => {
