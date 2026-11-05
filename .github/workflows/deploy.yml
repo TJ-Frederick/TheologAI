@@ -245,10 +245,6 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
-            const { pathToFileURL } = require('node:url');
-            const { selectReleaseProofPolicy } = await import(pathToFileURL(require('node:path').resolve('.github/scripts/release-proof-policy.mjs')).href);
-            core.setOutput('evidence_kind', 'legacy');
-            const existingNortonAllowed = selectReleaseProofPolicy(process.cwd()).id === 'norton-aquinas.v1';
             const { data: pulls } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -291,6 +287,12 @@ jobs:
               }
             }
             if (!selected) {
+              let existingNortonAllowed = false;
+              if (pull.number === 176) {
+                const { pathToFileURL } = require('node:url');
+                const { selectReleaseProofPolicy } = await import(pathToFileURL(require('node:path').resolve('.github/scripts/release-proof-policy.mjs')).href);
+                existingNortonAllowed = selectReleaseProofPolicy(process.cwd()).id === 'norton-aquinas.v1';
+              }
               if (existingNortonAllowed) {
                 const binding = await require('./.github/scripts/resolve-existing-norton-preview.cjs').resolveExistingNortonPreview({github,context});
                 core.setOutput('evidence_kind', binding.kind);
@@ -306,6 +308,7 @@ jobs:
               return;
             }
             const { artifact, run } = selected;
+            core.setOutput('evidence_kind', 'legacy');
             core.setOutput('artifact_name', artifactName);
             core.setOutput('run_id', String(run.id));
             core.setOutput('source_commit', pull.head.sha);
