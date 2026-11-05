@@ -750,3 +750,6 @@ it('keeps in-place corpus validation protected, read-only and distinct from depl
  expect(run.run).toContain('validate-existing-norton-preview.ts validate');expect(run.run).not.toMatch(/wrangler|operator-corpus-proof|migrations|seed|rollback/);
  expect(JSON.stringify(job)).not.toContain('PRODUCTION');
 });
+
+
+it('binds Norton manual preview evidence at both production checks with only necessary GitHub reads',async()=>{const w=parse(await readWorkflow('deploy.yml'))as Workflow;expect(w.jobs.deploy!.permissions).toEqual({actions:'read',contents:'read','pull-requests':'read'});for(const name of ['verify-dual-era-preview','deploy']){const job=w.jobs[name]!;const actions=job.steps!.filter(s=>s.name?.startsWith('Download Norton'));expect(actions).toHaveLength(2);for(const action of actions){expect(action.with?.['artifact-ids']).toBeTruthy();expect(action.with?.['digest-mismatch']).toBe('error');}expect(job.steps!.find(s=>s.name==='Verify source-bound dual-era preview release receipt')!.run).toContain('verify-existing');}const recheck=w.jobs.deploy!.steps!.find(s=>s.id==='recheck-existing-preview');expect(JSON.stringify(recheck)).toContain('resolveExistingNortonPreview');expect(JSON.stringify(recheck)).toContain('pin');});

@@ -248,17 +248,7 @@ jobs:
             const { pathToFileURL } = require('node:url');
             const { selectReleaseProofPolicy } = await import(pathToFileURL(require('node:path').resolve('.github/scripts/release-proof-policy.mjs')).href);
             core.setOutput('evidence_kind', 'legacy');
-            if (selectReleaseProofPolicy(process.cwd()).id === 'norton-aquinas.v1') {
-              const binding = await require('./.github/scripts/resolve-existing-norton-preview.cjs').resolveExistingNortonPreview({github,context});
-              core.setOutput('evidence_kind', binding.kind);
-              core.setOutput('native_binding_json', JSON.stringify(binding));
-              core.setOutput('artifact_name', binding.validationArtifact.name);
-              core.setOutput('artifact_id', String(binding.validationArtifact.id));
-              core.setOutput('inputs_artifact_id', String(binding.inputsArtifact.id));
-              core.setOutput('run_id', String(binding.run.id));
-              core.setOutput('source_commit', binding.auditorCommit);
-              return;
-            }
+            const existingNortonAllowed = selectReleaseProofPolicy(process.cwd()).id === 'norton-aquinas.v1';
             const { data: pulls } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -301,6 +291,17 @@ jobs:
               }
             }
             if (!selected) {
+              if (existingNortonAllowed) {
+                const binding = await require('./.github/scripts/resolve-existing-norton-preview.cjs').resolveExistingNortonPreview({github,context});
+                core.setOutput('evidence_kind', binding.kind);
+                core.setOutput('native_binding_json', JSON.stringify(binding));
+                core.setOutput('artifact_name', binding.validationArtifact.name);
+                core.setOutput('artifact_id', String(binding.validationArtifact.id));
+                core.setOutput('inputs_artifact_id', String(binding.inputsArtifact.id));
+                core.setOutput('run_id', String(binding.run.id));
+                core.setOutput('source_commit', binding.auditorCommit);
+                return;
+              }
               core.setFailed(`No fresh successful protected preview artifact named ${artifactName} matched the merged source.`);
               return;
             }
@@ -461,6 +462,7 @@ jobs:
     permissions:
       actions: read
       contents: read
+      pull-requests: read
     env:
       EXPECTED_RUN_ID: ${{ github.run_id }}
       EXPECTED_RUN_ATTEMPT: ${{ github.run_attempt }}
