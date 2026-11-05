@@ -42,7 +42,7 @@ it('refuses a pre-existing journal before any provider or audit call',async()=>{
 const continuationEdge=vi.hoisted(()=>vi.fn());
 vi.mock('../../../scripts/audit-primary-source-edge-stabilization.js',()=>({runPrimarySourceEdgeStabilization:continuationEdge}));
 import Database from 'better-sqlite3';
-import {EXISTING,NATIVE_ARTIFACTS,CONTINUITY_QUERIES,requireExistingApproval,requireExistingDispatch,requireRuntimeEquivalence,validateExistingPreview,type ExistingApproval} from '../../../.github/scripts/validate-existing-norton-preview.js';
+import {EXISTING,NATIVE_ARTIFACTS,CONTINUITY_QUERIES,requireExistingApproval,requireExistingDispatch,requireRuntimeEquivalence,validateExistingPreview,summarizeUsageResponse,safeContinuationFailure,type ExistingApproval} from '../../../.github/scripts/validate-existing-norton-preview.js';
 import {describe} from 'vitest';
 
 function existingFixture(fault=''){
@@ -69,7 +69,15 @@ function existingFixture(fault=''){
   const response=await provider.fetch(input,init);let body=JSON.stringify(await response.json());
   for(const [a,b] of [[provider.versions.preview,EXISTING.worker],[provider.versions.production,EXISTING.productionWorker],[provider.deployments.preview,EXISTING.deployment],[provider.deployments.production,EXISTING.productionDeployment]])body=body.replaceAll(a,b);
   const value=JSON.parse(body),path=new URL(String(input)).pathname;
-  if(path.endsWith('/graphql')){const g=value.data.viewer.accounts[0].databases[0];if(fault==='quota')g.sum.rowsRead=3700001;if(fault==='sampled')g.avg.sampleInterval=2;if(fault==='extra-writer')g.sum.rowsWritten=8;}
+  if(path.endsWith('/graphql')){const groups=value.data.viewer.accounts[0].databases,g=groups[0];if(fault==='quota')g.sum.rowsRead=3700001;if(fault==='sampled')g.avg.sampleInterval=2;if(fault==='extra-writer')g.sum.rowsWritten=8;
+   if(fault==='graphql-error')value.errors=[{message:'SECRET_PROVIDER_MESSAGE',code:'SECRET_PROVIDER_CODE'}];
+   if(fault==='extensions')value.extensions={secret:'SECRET_PROVIDER_MESSAGE'};
+   if(fault==='empty-accounts')value.data.viewer.accounts=[];
+   if(fault==='malformed-groups')value.data.viewer.accounts[0].databases={secret:'SECRET_PROVIDER_MESSAGE'};
+   if(fault==='empty-groups')groups.length=0;
+   if(fault==='account-writes')groups.push({dimensions:{databaseId:'00000000-0000-4000-8000-000000000001'},sum:{rowsRead:0,rowsWritten:80001},avg:{sampleInterval:1}});
+   if(fault==='invalid-json')return new Response('SECRET_PROVIDER_MESSAGE',{headers:{'content-type':'application/json'}});
+  }
   if(fault==='wrong-assignment'&&path.endsWith('/settings'))value.result.bindings[0].id='74f456e2-6951-4003-bb6f-91951342bf8f';
   if(fault==='unknown'&&path.endsWith('/query'))value.result[0].meta.total_attempts=2;
   return Response.json(value);
@@ -136,3 +144,21 @@ it('rejects a changed runtime, data, fixture or lock even if an auditor claims e
   }
  }finally{rmSync(directory,{recursive:true,force:true});}
 },30000);
+
+
+describe('continuation admission diagnostics',()=>{
+ it.each([
+  ['quota','quota_initial','quota_read_reservation'],['extra-writer','quota_initial','quota_candidate_writes'],['account-writes','quota_initial','quota_account_writes'],
+  ['sampled','usage_capture_initial','sampled_or_unknown_account_usage'],['graphql-error','usage_capture_initial','graphql_partial_or_error_response'],['extensions','usage_capture_initial','graphql_partial_or_error_response'],
+  ['empty-accounts','usage_capture_initial','account_usage_scope_changed'],['malformed-groups','usage_capture_initial','malformed_list'],['invalid-json','usage_capture_initial','bounded_request_failed'],
+ ])('retains bounded %s evidence and a constant reason before any SQL',async(fault,stage,reason)=>{
+  const f=existingFixture(fault);try{await expect(f.run()).rejects.toThrow('preserve full reservation');const text=readFileSync(join(f.output,'continuation.events.jsonl'),'utf8'),events=text.trim().split('\n').map(s=>JSON.parse(s));expect(events.at(-1)).toMatchObject({kind:'STOP',stage,reason,retainWholeReadReservation:100000,retry:false});expect(events.some(e=>e.kind==='usage-response-observation')).toBe(true);expect(text).not.toContain('SECRET_PROVIDER');expect(f.queries()).toBe(0);expect(audit).not.toHaveBeenCalled();if(stage==='quota_initial')expect(events.find(e=>e.kind==='usage-observation')).toMatchObject({phase:'initial',completeDatabaseGroups:true,watermarkUnavailable:true});if(fault==='quota')expect(events.find(e=>e.kind==='usage-observation')).toMatchObject({accountReads:3700001,headroomAfterReservationAndMargin:-1});expect(existsSync(join(f.output,'continuation-receipt.json'))).toBe(false);}finally{f.cleanup();}
+ });
+ it('retains zero-observation limitations and the full reservation without treating empty groups as a billing proof',async()=>{
+  const f=existingFixture('empty-groups');try{const receipt=await f.run();expect(receipt.initialUsage).toMatchObject({watermarkUnavailable:true,candidate:{rowsRead:0,rowsWritten:0}});expect(receipt.metering).toMatchObject({newTotalReadsReserved:100000,liveReadsReserved:90000,preciseLiveBillingUnavailable:true});const events=readFileSync(join(f.output,'continuation.events.jsonl'),'utf8').trim().split('\n').map(s=>JSON.parse(s));expect(events.filter(e=>e.kind==='usage-response-observation').map(e=>e.groupsCount)).toEqual([0,0]);expect(events.filter(e=>e.kind==='usage-observation').map(e=>e.headroomAfterReservationAndMargin)).toEqual([40000,40000]);}finally{f.cleanup();}
+ });
+ it('records only fixed shape/counters/hash values and allowlisted errors, never provider messages',()=>{
+  const bytes=Buffer.from(JSON.stringify({errors:[{message:'SECRET_PROVIDER_MESSAGE',code:'SECRET_PROVIDER_CODE'}],extensions:{token:'SECRET_PROVIDER_TOKEN'},data:{viewer:{accounts:[{accountTag:'SECRET_WRONG_ACCOUNT',databases:[{dimensions:{databaseId:'SECRET_WRONG_ID'},sum:{rowsRead:'SECRET_COUNTER',rowsWritten:-1},avg:{sampleInterval:'SECRET_SAMPLE'}}]}]}}}));
+  const summary=summarizeUsageResponse(bytes);expect(summary).toMatchObject({json:true,errors:'nonempty',extensionsPresent:true,accountsCount:1,accountMatches:false,groupsCount:1,invalidCounters:1,nonUnitSamples:1,counters:null});expect(JSON.stringify(summary)).not.toContain('SECRET_');expect(summarizeUsageResponse(Buffer.from('SECRET_NON_JSON'))).toMatchObject({json:false,bounded:true});expect(summarizeUsageResponse(Buffer.alloc(1250001))).toMatchObject({bounded:false,json:false});expect(safeContinuationFailure(new Error('Corpus control capture refused: SECRET_PROVIDER'))).toBe('unclassified');expect(safeContinuationFailure(new Error('SECRET_PROVIDER'))).toBe('unclassified');expect(safeContinuationFailure({message:'Corpus control capture refused: invalid_account_usage'})).toBe('unclassified');
+ });
+});
