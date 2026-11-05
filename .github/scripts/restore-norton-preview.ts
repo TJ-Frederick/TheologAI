@@ -14,6 +14,7 @@ export const RESTORE=Object.freeze({repo:'TJ-Frederick/TheologAI',actor:40179660
  production:'d2e2bd87-1213-4ba5-891d-e0f9b3293cb9',productionDeployment:'f6c9a995-0940-4758-a9a9-14f1389a9ab3',productionDatabase:'9bc79346-338b-439e-a2a5-424f4418eb21',
  artifact:13383258018,artifactDigest:'sha256:678e2a8f6aa6af73ea9f5f9474bd6aa5133a048ee614278556c7c2eb23bc51a7',
  account:'0594ed1e4c9fe35ab7d9f47991e99f3e',confirmation:'RESTORE THE REVIEWED NORTON PREVIEW PREDECESSOR'});
+const ROUTING_CONFIG=`name = "theologai"\naccount_id = "${RESTORE.account}"\nsend_metrics = false\n[env.preview]\nname = "theologai-preview"\n`;
 const sha=(v:string|Buffer)=>createHash('sha256').update(v).digest('hex');
 function check(v:unknown,s:string):asserts v{if(!v)throw Error('Preview restoration refused: '+s);}
 export type Request={sourceCommit:string;sourceTree:string;expiresAt:string;confirmation:string};
@@ -51,13 +52,13 @@ export async function restore(request:Request,d:Dependencies){
 export async function restoreMatchedPreview(request:Request,d:Dependencies,anchorText:string,revalidate:()=>Promise<void>){
  const anchor=JSON.parse(anchorText);
  d.record({kind:'restoration-budget',expectedCloudflareExchangesUnderFixedAssignment:17,maximumMutationCommands:1,maximumD1Reads:0,maximumD1Writes:0,retries:0});
- const config=`name = "theologai"\naccount_id = "${RESTORE.account}"\nsend_metrics = false\n[env.preview]\nname = "theologai-preview"\n`;
+
  const read=async(args:string[])=>{const text=await d.run(args);d.record({kind:'metadata',command:args[0],sha256:sha(text)});return text;};
  const preview=()=>read(['deployments','list','--env','preview','--json']);
  const version=(id:string,preview=true)=>read(['versions','view',id,...(preview?['--env','preview']:[]),'--json']);
  const production=async()=>{const list=await read(['deployments','list','--json']);check(activeProductionVersionId(list)===RESTORE.production,'production version');deployment(list,RESTORE.productionDeployment);const view=await version(RESTORE.production,false);binding(view,RESTORE.production,RESTORE.productionDatabase);return {list,view};};
  // Write only routing config: no observability, logpush or tail-consumer fields that versions deploy would PATCH.
- d.record({kind:'routing-config',sha256:sha(config)});
+ d.record({kind:'routing-config',sha256:sha(ROUTING_CONFIG)});
  const before=await preview();check(activePreviewVersionId(before)===RESTORE.current,'current preview');deployment(before,RESTORE.currentDeployment);
  const current=await version(RESTORE.current);binding(current,RESTORE.current,RESTORE.candidate);
  const target=await version(RESTORE.target);binding(target,RESTORE.target,RESTORE.targetDatabase);check(sha(target)===anchor.predecessorVersionViewSha256,'immutable predecessor payload');
@@ -112,6 +113,6 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).hr
  check(env.GITHUB_TOKEN,'existing GitHub token');
  check(!env.CLOUDFLARE_API_BASE_URL&&JSON.parse(readFileSync('node_modules/wrangler/package.json','utf8')).version==='4.114.0','pinned provider routing and CLI');
  writeFileSync(output+'.events.jsonl','',{flag:'wx',mode:0o600});
- if(mode==='restore'){check(env.CLOUDFLARE_API_TOKEN&&env.CLOUDFLARE_ACCOUNT_ID===RESTORE.account,'existing preview credential');writeFileSync(output+'.toml',`name="theologai"\naccount_id="${RESTORE.account}"\nsend_metrics=false\n[env.preview]\nname="theologai-preview"\n`,{flag:'wx',mode:0o600});}
+ if(mode==='restore'){check(env.CLOUDFLARE_API_TOKEN&&env.CLOUDFLARE_ACCOUNT_ID===RESTORE.account,'existing preview credential');writeFileSync(output+'.toml',ROUTING_CONFIG,{flag:'wx',mode:0o600});}
  (mode==='restore'?restore(request,d):admit(request,d).then(()=>({admitted:true,sourceCommit:d.sourceCommit}))).then(result=>writeFileSync(output,JSON.stringify(result,null,2)+'\n',{flag:'wx',mode:0o600})).catch(()=>{try{d.record({kind:'STOP',holdReservations:true,retry:false});}catch{}process.stderr.write('Preview restoration stopped; preserve intent and sanitized evidence. No retry.\n');process.exitCode=1;});
 }

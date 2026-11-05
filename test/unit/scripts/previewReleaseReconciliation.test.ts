@@ -1,7 +1,10 @@
 import {parse as parseYaml} from 'yaml';
 import {createHash} from 'node:crypto';
 import {RESTORE,admit,restoreMatchedPreview,type Dependencies,type Request} from '../../../.github/scripts/restore-norton-preview.js';
-import { readFile } from 'node:fs/promises';
+import { readFile,writeFile,mkdtemp,rm } from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join,resolve} from 'node:path';
+import {execFileSync,spawnSync} from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 import {
   activeProductionVersionId,
@@ -454,6 +457,20 @@ describe('fixed Norton preview restoration', () => {
     const f=fixture(),r=await f.run();expect(r).toMatchObject({d1Reads:0,d1Writes:0,mutationCommands:1,observation:{observedActiveVersionId:RESTORE.target,observedActiveD1:{databaseId:RESTORE.targetDatabase},candidateBindingMatches:false}});
     expect(f.commands.filter(c=>c[1]==='deploy')).toEqual([['versions','deploy',RESTORE.target+'@100','--env','preview','--yes']]);
     expect(f.commands.every(c=>c[0]!=='d1')).toBe(true);
+  });
+  it('records the hash of the actual routing-config bytes written by the CLI',async()=>{
+    const dir=await mkdtemp(join(tmpdir(),'norton-restore-config-'));
+    try{
+      const request=join(dir,'request.json'),output=join(dir,'result.json'),preload=join(dir,'deny-network.mjs');
+      const commit=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),tree=execFileSync('git',['rev-parse','HEAD^{tree}'],{encoding:'utf8'}).trim();
+      await writeFile(request,JSON.stringify({sourceCommit:commit,sourceTree:tree,expiresAt:new Date(Date.now()+600000).toISOString(),confirmation:RESTORE.confirmation}));
+      // Fail authenticated owner admission before any Cloudflare command. All fetches stay in this local fixture.
+      await writeFile(preload,"globalThis.fetch=async()=>new Response(JSON.stringify({actor:{id:2}}),{status:200});");
+      const child=spawnSync(process.execPath,['--import',resolve('node_modules/tsx/dist/loader.mjs'),'--import',preload,'.github/scripts/restore-norton-preview.ts','restore',request,output],{encoding:'utf8',timeout:15000,env:{PATH:process.env.PATH,GITHUB_TOKEN:'offline-only',CLOUDFLARE_API_TOKEN:'offline-only',CLOUDFLARE_ACCOUNT_ID:RESTORE.account,GITHUB_REPOSITORY:RESTORE.repo,GITHUB_EVENT_NAME:'workflow_dispatch',GITHUB_RUN_ATTEMPT:'1',GITHUB_ACTOR_ID:String(RESTORE.actor),GITHUB_RUN_ID:'9',GITHUB_REF:'refs/heads/offline'}});
+      expect(child.status).toBe(1);expect(child.stderr).toContain('Preview restoration stopped');
+      const f=fixture();await f.run();
+      expect(f.events.find(e=>e.kind==='routing-config').sha256).toBe(createHash('sha256').update(await readFile(output+'.toml')).digest('hex'));
+    }finally{await rm(dir,{recursive:true,force:true});}
   });
   it.each(['wrong current','wrong D1','changed target','production','race','revoked','intent journal'])('refuses %s before a mutation',async fault=>{
     const f=fixture(fault);await expect(f.run()).rejects.toThrow();expect(f.commands.filter(c=>c[1]==='deploy')).toHaveLength(0);
