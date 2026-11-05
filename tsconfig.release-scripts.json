@@ -28,6 +28,7 @@
     "scripts/application-corpus-check.ts",
     "scripts/preview-fts-diagnostic.ts",
     "scripts/operator-corpus-proof.ts",
-    ".github/scripts/verify-release-operation.ts"
+    ".github/scripts/verify-release-operation.ts",
+    ".github/scripts/restore-norton-preview.ts"
   ]
 }

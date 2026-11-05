@@ -17,6 +17,11 @@ on:
         type: string
         default: ""
 
+      preview_restore_json:
+        description: Exact owner-approved fixed Norton preview restoration; no SQL or new proof
+        type: string
+        default: ""
+
 # Unrelated labels cannot cancel active validation or preview transactions.
 # Required checks still execute: emitting skipped contexts on a label event
 # could otherwise supersede a failing required check for the same revision.
@@ -32,8 +37,8 @@ permissions:
 
 jobs:
   classify:
-    name: ${{ github.event_name == 'workflow_dispatch' && (inputs.operator_proof_json != '' || inputs.operator_authorization_json != '') && 'Operator metadata / Select Validation' || 'Select Validation' }}
-    if: ${{ !(github.event_name == 'workflow_dispatch' && (inputs.operator_proof_json != '' || inputs.operator_authorization_json != '')) }}
+    name: ${{ github.event_name == 'workflow_dispatch' && (inputs.operator_proof_json != '' || inputs.operator_authorization_json != '' || inputs.preview_restore_json != '') && 'Operator metadata / Select Validation' || 'Select Validation' }}
+    if: ${{ !(github.event_name == 'workflow_dispatch' && (inputs.operator_proof_json != '' || inputs.operator_authorization_json != '' || inputs.preview_restore_json != '')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 3
     outputs:
@@ -58,9 +63,9 @@ jobs:
         run: node scripts/classify-ci-changes.mjs
 
   test-and-build:
-    name: ${{ github.event_name == 'workflow_dispatch' && (inputs.operator_proof_json != '' || inputs.operator_authorization_json != '') && 'Operator metadata / Test & Build' || 'Test & Build' }}
+    name: ${{ github.event_name == 'workflow_dispatch' && (inputs.operator_proof_json != '' || inputs.operator_authorization_json != '' || inputs.preview_restore_json != '') && 'Operator metadata / Test & Build' || 'Test & Build' }}
     needs: classify
-    if: ${{ !cancelled() && !(github.event_name == 'workflow_dispatch' && (inputs.operator_proof_json != '' || inputs.operator_authorization_json != '')) }}
+    if: ${{ !cancelled() && !(github.event_name == 'workflow_dispatch' && (inputs.operator_proof_json != '' || inputs.operator_authorization_json != '' || inputs.preview_restore_json != '')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -77,9 +82,9 @@ jobs:
           selection-mode: ${{ needs.classify.outputs.mode }}
 
   fresh-checkout-data:
-    name: ${{ github.event_name == 'workflow_dispatch' && (inputs.operator_proof_json != '' || inputs.operator_authorization_json != '') && 'Operator metadata / Fresh Checkout & Data' || 'Fresh Checkout & Data' }}
+    name: ${{ github.event_name == 'workflow_dispatch' && (inputs.operator_proof_json != '' || inputs.operator_authorization_json != '' || inputs.preview_restore_json != '') && 'Operator metadata / Fresh Checkout & Data' || 'Fresh Checkout & Data' }}
     needs: classify
-    if: ${{ !cancelled() && !(github.event_name == 'workflow_dispatch' && (inputs.operator_proof_json != '' || inputs.operator_authorization_json != '')) }}
+    if: ${{ !cancelled() && !(github.event_name == 'workflow_dispatch' && (inputs.operator_proof_json != '' || inputs.operator_authorization_json != '' || inputs.preview_restore_json != '')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -96,9 +101,9 @@ jobs:
           selection-mode: ${{ needs.classify.outputs.mode }}
 
   worker-runtime:
-    name: ${{ github.event_name == 'workflow_dispatch' && (inputs.operator_proof_json != '' || inputs.operator_authorization_json != '') && 'Operator metadata / Worker Runtime & D1' || 'Worker Runtime & D1' }}
+    name: ${{ github.event_name == 'workflow_dispatch' && (inputs.operator_proof_json != '' || inputs.operator_authorization_json != '' || inputs.preview_restore_json != '') && 'Operator metadata / Worker Runtime & D1' || 'Worker Runtime & D1' }}
     needs: classify
-    if: ${{ !cancelled() && !(github.event_name == 'workflow_dispatch' && (inputs.operator_proof_json != '' || inputs.operator_authorization_json != '')) }}
+    if: ${{ !cancelled() && !(github.event_name == 'workflow_dispatch' && (inputs.operator_proof_json != '' || inputs.operator_authorization_json != '' || inputs.preview_restore_json != '')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -115,9 +120,9 @@ jobs:
           selection-mode: ${{ needs.classify.outputs.mode }}
 
   node-http-e2e:
-    name: ${{ github.event_name == 'workflow_dispatch' && (inputs.operator_proof_json != '' || inputs.operator_authorization_json != '') && 'Operator metadata / Node HTTP E2E' || 'Node HTTP E2E' }}
+    name: ${{ github.event_name == 'workflow_dispatch' && (inputs.operator_proof_json != '' || inputs.operator_authorization_json != '' || inputs.preview_restore_json != '') && 'Operator metadata / Node HTTP E2E' || 'Node HTTP E2E' }}
     needs: classify
-    if: ${{ !cancelled() && !(github.event_name == 'workflow_dispatch' && (inputs.operator_proof_json != '' || inputs.operator_authorization_json != '')) }}
+    if: ${{ !cancelled() && !(github.event_name == 'workflow_dispatch' && (inputs.operator_proof_json != '' || inputs.operator_authorization_json != '' || inputs.preview_restore_json != '')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -134,9 +139,9 @@ jobs:
           selection-mode: ${{ needs.classify.outputs.mode }}
 
   mcp-conformance:
-    name: ${{ github.event_name == 'workflow_dispatch' && (inputs.operator_proof_json != '' || inputs.operator_authorization_json != '') && 'Operator metadata / Applicable MCP Conformance' || 'Applicable MCP Conformance' }}
+    name: ${{ github.event_name == 'workflow_dispatch' && (inputs.operator_proof_json != '' || inputs.operator_authorization_json != '' || inputs.preview_restore_json != '') && 'Operator metadata / Applicable MCP Conformance' || 'Applicable MCP Conformance' }}
     needs: classify
-    if: ${{ !cancelled() && !(github.event_name == 'workflow_dispatch' && (inputs.operator_proof_json != '' || inputs.operator_authorization_json != '')) }}
+    if: ${{ !cancelled() && !(github.event_name == 'workflow_dispatch' && (inputs.operator_proof_json != '' || inputs.operator_authorization_json != '' || inputs.preview_restore_json != '')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -160,9 +165,9 @@ jobs:
           if-no-files-found: error
 
   validation-complete:
-    name: ${{ github.event_name == 'workflow_dispatch' && (inputs.operator_proof_json != '' || inputs.operator_authorization_json != '') && 'Operator metadata / Validation Complete' || 'Validation Complete' }}
+    name: ${{ github.event_name == 'workflow_dispatch' && (inputs.operator_proof_json != '' || inputs.operator_authorization_json != '' || inputs.preview_restore_json != '') && 'Operator metadata / Validation Complete' || 'Validation Complete' }}
     needs: [test-and-build, fresh-checkout-data, worker-runtime, node-http-e2e, mcp-conformance]
-    if: ${{ always() && !(github.event_name == 'workflow_dispatch' && (inputs.operator_proof_json != '' || inputs.operator_authorization_json != '')) }}
+    if: ${{ always() && !(github.event_name == 'workflow_dispatch' && (inputs.operator_proof_json != '' || inputs.operator_authorization_json != '' || inputs.preview_restore_json != '')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 1
     steps:
@@ -1145,7 +1150,7 @@ jobs:
 
   operator-proof-upload:
     name: Retain operator corpus proof (no cloud credentials)
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.operator_proof_json != '' && inputs.operator_authorization_json == '' && github.actor_id == '40179660' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.operator_proof_json != '' && inputs.operator_authorization_json == '' && inputs.preview_restore_json == '' && github.actor_id == '40179660' }}
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:
@@ -1170,7 +1175,7 @@ jobs:
 
   operator-authorization-upload:
     name: Retain operator operation authorization (no cloud credentials)
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.operator_authorization_json != '' && inputs.operator_proof_json == '' && github.actor_id == '40179660' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.operator_authorization_json != '' && inputs.operator_proof_json == '' && inputs.preview_restore_json == '' && github.actor_id == '40179660' }}
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:
@@ -1247,3 +1252,56 @@ jobs:
           EXPECTED_REHEARSAL_PAYLOAD_SHA256: ${{ steps.rehearsal.outputs.rehearsal_payload_sha256 }}
         with:
           script: await require('./.github/scripts/operator-handoff-rehearsal.cjs').compareDownload({github,context,core});
+
+  restore-norton-preview:
+    name: Restore exact Norton preview predecessor
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.preview_restore_json != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: theologai-shared-preview-mutation
+      cancel-in-progress: false
+    environment: preview
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/release-toolchain
+      - name: Admit exact owner restoration without Cloudflare credentials
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PREVIEW_RESTORE_JSON: ${{ inputs.preview_restore_json }}
+          OTHER_AUTHORIZATION: ${{ inputs.operator_authorization_json }}
+          OTHER_PROOF: ${{ inputs.operator_proof_json }}
+        run: |
+          set -euo pipefail
+          test -z "$OTHER_AUTHORIZATION"
+          test -z "$OTHER_PROOF"
+          printf '%s\n' "$PREVIEW_RESTORE_JSON" > "$RUNNER_TEMP/preview-restore-request.json"
+          npx --no-install tsx .github/scripts/restore-norton-preview.ts admit \
+            "$RUNNER_TEMP/preview-restore-request.json" "$RUNNER_TEMP/preview-restore-admission.json"
+      - name: Restore once and reconcile the fixed preview assignment
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx --no-install tsx .github/scripts/restore-norton-preview.ts restore \
+            "$RUNNER_TEMP/preview-restore-request.json" "$RUNNER_TEMP/preview-restore-result.json"
+      - name: Retain restoration evidence even after a stop
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: norton-preview-restoration-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/preview-restore-admission.json
+            ${{ runner.temp }}/preview-restore-admission.json.events.jsonl
+            ${{ runner.temp }}/preview-restore-result.json
+            ${{ runner.temp }}/preview-restore-result.json.events.jsonl
+          retention-days: 7
+          if-no-files-found: warn
