@@ -25,7 +25,7 @@
     "scripts/corpus-release-data.ts": "3904a9af9a0c768345fe22461e8c1c9620b50116",
     "scripts/corpus-source-proof.ts": "67637786e48356035b4d46c535d8e2abf04b9971",
     "scripts/corpus-token-identity.ts": "d8a68e5741d8383e72cfd942748c26b37a36961b",
-    "scripts/dual-era-preview-release-receipt.ts": "9fc7594587bd6ccd45d2306b7dd832b15f3fbf2f",
+    "scripts/dual-era-preview-release-receipt.ts": "8e6781171266a41e99f36f1849ce6675f5bd8316",
     "scripts/finalize-biblical-language-unicode-manifest.ts": "5b850c11d7afd486ee9fea2a320c559f84916cd5",
     "scripts/historical-hierarchy-publication.ts": "207b075a14f8f22e6c60be3e4b3ad0e95003f888",
     "scripts/historical-hierarchy.ts": "f1627b67d9375b52454e9d167f61b591630ecdc3",

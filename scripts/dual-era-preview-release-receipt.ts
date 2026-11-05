@@ -222,6 +222,15 @@ async function requiredFile(options: Map<string, string>, name: string): Promise
 
 async function main(): Promise<void> {
   const command = process.argv[2]; const options = args(process.argv.slice(3));
+  if(command==='verify-existing'){
+    exactKeys(Object.fromEntries(options),['--native-binding','--directory','--candidate-root'],'existing verification arguments');
+    if(selectReleaseProofPolicy(process.cwd()).id!=='norton-aquinas.v1')fail('existing evidence is Norton-only');
+    const binding=parseJson(await requiredFile(options,'--native-binding'),'native binding');
+    const {verifyExistingNortonHandoff}=await import('../.github/scripts/verify-existing-norton-handoff.js');
+    const directory=options.get('--directory'),candidateRoot=options.get('--candidate-root');if(!directory||!candidateRoot)fail('existing evidence directories required');
+    const verified=verifyExistingNortonHandoff({root:process.cwd(),directory:resolve(directory),candidateRoot:resolve(candidateRoot),binding});
+    process.stdout.write(JSON.stringify(verified)+'\n');return;
+  }
   if (command === 'create') {
     const output = options.get('--output'); if (!output) fail('--output is required');
     const d1ReadinessText = await requiredFile(options, '--d1-readiness');
@@ -245,7 +254,7 @@ async function main(): Promise<void> {
     process.stdout.write(`${JSON.stringify({ pullRequest: verified.pullRequest, worker: verified.worker, d1: verified.d1 })}\n`);
     return;
   }
-  fail('command must be create or verify');
+  fail('command must be create, verify or verify-existing');
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) await main();

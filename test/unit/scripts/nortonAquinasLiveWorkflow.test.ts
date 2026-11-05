@@ -49,7 +49,7 @@ import {EXISTING,CARRY_FORWARD,NATIVE_ARTIFACTS,CONTINUITY_QUERIES,requireExisti
 import {describe} from 'vitest';
 
 function existingFixture(fault=''){
- vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-11-05T05:00:00Z'));
+ vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-11-06T00:00:00Z'));
  const directory=mkdtempSync(join(tmpdir(),'existing-preview-local-')),sourceDirectory=join(directory,'source'),output=join(directory,'output');mkdirSync(sourceDirectory);mkdirSync(output);
  const database=new Database(join(sourceDirectory,'source.db'));
  database.exec("CREATE TABLE theologai_metadata(key TEXT PRIMARY KEY,value TEXT);INSERT INTO theologai_metadata VALUES('corpus','fixture'),('schema','0010');CREATE TABLE historical_corpus_seal(seal_id INTEGER PRIMARY KEY,value TEXT);INSERT INTO historical_corpus_seal VALUES(1,'sealed');CREATE TABLE d1_migrations(id INTEGER,name TEXT,applied_at TEXT);");
@@ -57,7 +57,7 @@ function existingFixture(fault=''){
  const expected=(sql:string)=>database.prepare(sql).all();
  const view={id:EXISTING.worker,number:1,resources:{bindings:[{type:'d1',name:'THEOLOGAI_DB',id:EXISTING.database}]}};
  const source={commit:'a'.repeat(40),tree:'b'.repeat(40)};
- const approval:ExistingApproval={schemaVersion:'norton-existing-preview-validation-approval.v1',operationId:'operation-existing-fixture',auditorCommit:source.commit,auditorTree:source.tree,expiresAt:new Date(Date.now()+1800000).toISOString(),confirmation:EXISTING.confirmation,historicalProofSha256:EXISTING.proofSha256,acceptHistoricalProofForValidationOnly:true,uninterruptedDataCustody:true,maxReads:100000,maxWrites:0,noDeployment:true,accountReadCeiling:4400000,previousReadReservation:3860000,carryForwardFromOperationId:CARRY_FORWARD.operationId,acceptUnusedRoleCarryForward:true};
+ const approval:ExistingApproval={schemaVersion:'norton-existing-preview-validation-approval.v1',operationId:'operation-existing-fixture',auditorCommit:source.commit,auditorTree:source.tree,expiresAt:new Date(Date.now()+1800000).toISOString(),confirmation:EXISTING.confirmation,historicalProofSha256:EXISTING.proofSha256,acceptHistoricalProofForValidationOnly:true,uninterruptedDataCustody:true,maxReads:100000,maxWrites:0,noDeployment:true,accountReadCeiling:4400000,previousReadReservation:3860000,carryForwardFromOperationId:CARRY_FORWARD.operationId,acceptUnusedRoleCarryForward:true,validationDay:EXISTING.validationDay,acceptPriorDayHistoricalProof:true,maximumHistoricalProofAgeMs:EXISTING.maximumHistoricalProofAgeMs};
  const evidence:any={historicalVerificationAt:'2026-11-05T02:45:14.748Z',freshProof:false,cutover:{observedActiveVersionViewSha256:sha(JSON.stringify(view,null,2)+'\n')},envelope:{receipt:{proof:{catalogSha256:sha(JSON.stringify(expected(CONTINUITY_QUERIES[0].sql))),ledgerSha256:sha(JSON.stringify(expected(CONTINUITY_QUERIES[1].sql)))}}}};
  let calls=0,queries=0,authorizations=0,usageCaptures=0;
  const provider=corpusTransportFixture({role:'preview',activated:true,advance:()=>vi.setSystemTime(Date.now()+1000),record:()=>{calls++;},query:sql=>{
@@ -75,7 +75,7 @@ function existingFixture(fault=''){
   if(path.endsWith('/graphql')){const groups=value.data.viewer.accounts[0].databases,g=groups[0];usageCaptures++;if(fault==='quota')g.sum.rowsRead=4100001;
    if(fault==='initial-boundary'||fault==='initial-over')g.sum.rowsRead=fault==='initial-over'?4100001:4100000;
    if(fault==='final-boundary'||fault==='final-over')g.sum.rowsRead=usageCaptures===1?3700000:fault==='final-over'?4200001:4200000;
-   if(fault==='last-quota-usage'){g.sum.rowsRead=3591252;g.sum.rowsWritten=7;groups.push({dimensions:{databaseId:'00000000-0000-4000-8000-000000000001'},sum:{rowsRead:407006,rowsWritten:0},avg:{sampleInterval:1}});}if(fault==='retained-usage'){g.sum.rowsRead=3704638;g.sum.rowsWritten=7;}if(fault==='sampled')g.avg.sampleInterval=2;if(fault==='extra-writer')g.sum.rowsWritten=8;
+   if(fault==='last-quota-usage'){g.sum.rowsRead=3591252;g.sum.rowsWritten=0;groups.push({dimensions:{databaseId:'00000000-0000-4000-8000-000000000001'},sum:{rowsRead:407006,rowsWritten:0},avg:{sampleInterval:1}});}if(fault==='retained-usage'){g.sum.rowsRead=3704638;g.sum.rowsWritten=0;}if(fault==='sampled')g.avg.sampleInterval=2;if(fault==='extra-writer')g.sum.rowsWritten=1;
    if(fault==='graphql-error')value.errors=[{message:'SECRET_PROVIDER_MESSAGE',code:'SECRET_PROVIDER_CODE'}];
    if(fault==='extensions')value.extensions={secret:'SECRET_PROVIDER_MESSAGE'};
    if(fault==='empty-accounts')value.data.viewer.accounts=[];
@@ -116,8 +116,8 @@ describe('existing-candidate continuation',()=>{
 
 describe('existing-candidate native authority',()=>{
  function dispatchFixture(fault=''){
-  const source={commit:'a'.repeat(40),tree:'b'.repeat(40)},now=Date.parse('2026-11-05T05:00:00Z');
-  const a:ExistingApproval={schemaVersion:'norton-existing-preview-validation-approval.v1',operationId:'operation-existing-native-fixture',auditorCommit:source.commit,auditorTree:source.tree,expiresAt:'2026-11-05T05:30:00.000Z',confirmation:EXISTING.confirmation,historicalProofSha256:EXISTING.proofSha256,acceptHistoricalProofForValidationOnly:true,uninterruptedDataCustody:true,maxReads:100000,maxWrites:0,noDeployment:true,accountReadCeiling:4400000,previousReadReservation:3860000,carryForwardFromOperationId:CARRY_FORWARD.operationId,acceptUnusedRoleCarryForward:true};
+  const source={commit:'a'.repeat(40),tree:'b'.repeat(40)},now=Date.parse('2026-11-06T00:00:00Z');
+  const a:ExistingApproval={schemaVersion:'norton-existing-preview-validation-approval.v1',operationId:'operation-existing-native-fixture',auditorCommit:source.commit,auditorTree:source.tree,expiresAt:'2026-11-06T00:30:00.000Z',confirmation:EXISTING.confirmation,historicalProofSha256:EXISTING.proofSha256,acceptHistoricalProofForValidationOnly:true,uninterruptedDataCustody:true,maxReads:100000,maxWrites:0,noDeployment:true,accountReadCeiling:4400000,previousReadReservation:3860000,carryForwardFromOperationId:CARRY_FORWARD.operationId,acceptUnusedRoleCarryForward:true,validationDay:EXISTING.validationDay,acceptPriorDayHistoricalProof:true,maximumHistoricalProofAgeMs:EXISTING.maximumHistoricalProofAgeMs};
   const calls:string[]=[];
   const github=async(route:string)=>{calls.push(route);
    if(route==='/actions/runs/9')return {id:9,actor:{id:EXISTING.owner},triggering_actor:{id:fault==='trigger'?2:EXISTING.owner},event:'workflow_dispatch',path:'.github/workflows/pr.yml',head_sha:source.commit,head_branch:'codex/norton-aquinas-successor',run_attempt:fault==='attempt'?2:1};
@@ -127,7 +127,7 @@ describe('existing-candidate native authority',()=>{
    if(route==='/actions/runs/'+EXISTING.run)return {id:EXISTING.run,status:'completed',conclusion:'failure',head_sha:fault==='candidate-source'?'c'.repeat(40):EXISTING.sourceCommit,run_attempt:1,path:'.github/workflows/pr.yml'};
    if(route.includes('/jobs?'))return {jobs:[{name:'Preview operator corpus verification',conclusion:fault==='proof-job'?'failure':'success'},{name:'Deploy Preview',conclusion:'failure',steps:[{name:'Require stable preview release registrations before audits',conclusion:'failure'}]}]};
    if(route.includes('/workflows/'))return {workflow_runs:fault==='CI'?[]:[{head_sha:source.commit,path:'.github/workflows/pr.yml',event:'pull_request',conclusion:'success'}]};
-   const artifact=NATIVE_ARTIFACTS.find(a=>route==='/actions/artifacts/'+a.id);if(artifact)return {...artifact,expired:fault==='expired-artifact',expires_at:'2026-11-06T00:00:00Z',size_in_bytes:fault==='oversized-artifact'?129*1024*1024:1000,workflow_run:{id:EXISTING.run,head_sha:EXISTING.sourceCommit},digest:fault==='artifact-digest'?'sha256:'+'0'.repeat(64):artifact.digest};
+   const artifact=NATIVE_ARTIFACTS.find(a=>route==='/actions/artifacts/'+a.id);if(artifact)return {...artifact,expired:fault==='expired-artifact',expires_at:'2026-11-06T02:02:46Z',size_in_bytes:fault==='oversized-artifact'?129*1024*1024:1000,workflow_run:{id:EXISTING.run,head_sha:EXISTING.sourceCommit},digest:fault==='artifact-digest'?'sha256:'+'0'.repeat(64):artifact.digest};
    throw Error('Unexpected native fixture route');
   };
   const environment={GITHUB_REPOSITORY:EXISTING.repository,GITHUB_EVENT_NAME:'workflow_dispatch',GITHUB_RUN_ATTEMPT:'1',GITHUB_ACTOR_ID:String(EXISTING.owner),GITHUB_RUN_ID:'9',GITHUB_REF:'refs/heads/codex/norton-aquinas-successor'};
@@ -208,4 +208,9 @@ it.each([undefined,3760000,3860001,4000000,'3860000',null])('requires the explic
 describe('explicit one-role carry-forward authority',()=>{
  it.each(['missing-grant','false-grant','missing-operation','wrong-operation','same-operation'])('rejects%s before provider use rather than inferring unused budget',async fault=>{const f=existingFixture();try{const a=f.approval as unknown as Record<string,unknown>;if(fault==='missing-grant')delete a.acceptUnusedRoleCarryForward;if(fault==='false-grant')a.acceptUnusedRoleCarryForward=false;if(fault==='missing-operation')delete a.carryForwardFromOperationId;if(fault==='wrong-operation')a.carryForwardFromOperationId='operation-other-unused-role';if(fault==='same-operation')a.operationId=CARRY_FORWARD.operationId;await expect(f.run()).rejects.toThrow();expect(f.calls()).toBe(0);expect(f.queries()).toBe(0);expect(audit).not.toHaveBeenCalled();}finally{f.cleanup();}});
  it('preserves the full held history and native refusal pointer without adding another100K',async()=>{const f=existingFixture('last-quota-usage');try{const receipt=await f.run();expect(receipt.quotaPolicy).toEqual({accountReadCeiling:4400000,analyticsMargin:200000,previousReadReservation:3860000,finalHeldReadReservation:3960000,carriedForwardRole:CARRY_FORWARD});expect(receipt.authority.acceptUnusedRoleCarryForward).toBe(true);expect(receipt.metering.newTotalReadsReserved).toBe(100000);expect(CARRY_FORWARD).toMatchObject({runId:42114178613,artifactId:13453494842,sqlRequests:0,mcpRequests:0,readsHeld:100000,additionalCumulativeReads:0});expect(f.queries()).toBe(8);}finally{f.cleanup();}});
+});
+
+
+describe('closed proposed next-day validation window',()=>{
+ it.each(['missing-date','wrong-date','missing-age-grant','false-age-grant','wrong-age-cap','before-window','at-end','expiry-after-window'])('refuses%s before provider access',async fault=>{const f=existingFixture();try{const a=f.approval as unknown as Record<string,unknown>;if(fault==='missing-date')delete a.validationDay;if(fault==='wrong-date')a.validationDay='2026-11-07';if(fault==='missing-age-grant')delete a.acceptPriorDayHistoricalProof;if(fault==='false-age-grant')a.acceptPriorDayHistoricalProof=false;if(fault==='wrong-age-cap')a.maximumHistoricalProofAgeMs=86400000;if(fault==='before-window')vi.setSystemTime(new Date('2026-11-05T23:59:59Z'));if(fault==='at-end')vi.setSystemTime(new Date(EXISTING.validationEnd));if(fault==='expiry-after-window')a.expiresAt='2026-11-06T01:00:00.001Z';await expect(f.run()).rejects.toThrow();expect(f.calls()).toBe(0);expect(f.queries()).toBe(0);}finally{f.cleanup();}});
 });
