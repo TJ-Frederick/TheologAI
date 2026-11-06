@@ -1313,7 +1313,7 @@ jobs:
 
   existing-preview-source:
     outputs:
-      operation_kind: ${{ steps.existing-inputs.outputs.operation_kind }}
+      operation_kind: ${{ steps['existing-inputs'].outputs.operation_kind }}
     name: Verify deployed Norton candidate and distinct auditor (no cloud credentials)
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.preview_validate_existing_json != '' && inputs.preview_restore_json == '' && inputs.operator_authorization_json == '' && inputs.operator_proof_json == '' && github.actor_id == '40179660' && github.run_attempt == 1 }}
     runs-on: ubuntu-latest
@@ -1378,7 +1378,7 @@ jobs:
           overwrite: false
 
   validate-existing-preview:
-    name: ${{ needs.existing-preview-source.outputs.operation_kind == 'diagnostic' && 'Diagnose fixed Norton scoped response (read-only)' || 'Validate already deployed Norton preview (read-only)' }}
+    name: ${{ needs['existing-preview-source'].outputs.operation_kind == 'diagnostic' && 'Diagnose fixed Norton scoped response (read-only)' || 'Validate already deployed Norton preview (read-only)' }}
     needs: existing-preview-source
     if: ${{ github.event_name == 'workflow_dispatch' && needs.existing-preview-source.result == 'success' }}
     runs-on: ubuntu-latest
@@ -1421,7 +1421,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: ${{ needs.existing-preview-source.outputs.operation_kind == 'diagnostic' && format('norton-scoped-diagnostic-{0}-attempt-{1}', github.run_id, github.run_attempt) || format('existing-preview-validation-{0}-attempt-{1}', github.run_id, github.run_attempt) }}
+          name: ${{ needs['existing-preview-source'].outputs.operation_kind == 'diagnostic' && format('norton-scoped-diagnostic-{0}-attempt-{1}', github.run_id, github.run_attempt) || format('existing-preview-validation-{0}-attempt-{1}', github.run_id, github.run_attempt) }}
           path: ${{ runner.temp }}/continuation-results/
           retention-days: 7
           if-no-files-found: warn
