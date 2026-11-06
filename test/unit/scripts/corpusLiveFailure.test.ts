@@ -4,7 +4,7 @@ import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import Database from 'better-sqlite3';
 const state=vi.hoisted(()=>({clients:0,requests:0,closes:0,fingerprints:0,parallel:false,fault:'',at:1,dispatchTimes:[] as number[]}));
-vi.mock('@modelcontextprotocol/client',()=>({
+vi.mock('@modelcontextprotocol/client',async original=>({...await original<any>(),
  StreamableHTTPClientTransport:class{constructor(readonly url:URL,readonly options:any){}},
  Client:class{
   era:string;transport:any;

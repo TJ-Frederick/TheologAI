@@ -10,8 +10,8 @@
     "conformance": 1
   },
   "current": {
-    "totalTestTypeScript": 308,
-    "activeVitest": 229,
+    "totalTestTypeScript": 309,
+    "activeVitest": 230,
     "support": 24,
     "manual": 4,
     "legacyOrphan": 50,
@@ -136,6 +136,7 @@
       "test/unit/scripts/checkRemoteD1Readiness.test.ts",
       "test/unit/scripts/classifyProductionDeployment.test.ts",
       "test/unit/scripts/corpusLiveFailure.test.ts",
+      "test/unit/scripts/corpusLiveSdkFailure.test.ts",
       "test/unit/scripts/corpusSchemaComments.test.ts",
       "test/unit/scripts/corpusTokenIdentity.test.ts",
       "test/unit/scripts/d1CorpusIdentity.test.ts",

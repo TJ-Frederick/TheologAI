@@ -2,7 +2,7 @@
 import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
+import { Client, StreamableHTTPClientTransport, SdkError, SdkErrorCode } from '@modelcontextprotocol/client';
 import { versionNegotiationFor } from './audit-dual-era-mcp-preview.js';
 import { assertSuccess, assertSafeError, assertInputError, corruptCursor } from './audit-original-language-v2-preview.js';
 import { captureMcpTransportSnapshot, assertMcpTransportContract, fingerprintMcpTransportSnapshot } from '../test/helpers/mcpTransportContract.js';
@@ -47,7 +47,10 @@ export async function auditCorpusRelease(options: {
         responseSha256: string;
     }[] = [], summaries: unknown[] = [], fingerprints: unknown[] = [];
     let current = 'initialize', role = '', era = '';
-    let failedRequest:{probeId:string;status:number|null;evidence:ReturnType<typeof httpEvidence>|null;category:FailureCategory;reason:string}|undefined;
+    type HttpObservation={era:string;probeId:string;httpMethod:string;rpcMethod:string|null;requestId:string|number|null;status:number|null;evidence:ReturnType<typeof httpEvidence>|null};
+    type RequestFailure=HttpObservation&{category:FailureCategory;reason:string};
+    let failedRequest:RequestFailure|undefined,secondaryHttpFailure:RequestFailure|undefined;
+    let originatingFailure:(RequestFailure&{sdkErrorCode:string|null;stage:FailureStage})|undefined;
     let stage:FailureStage='initialize',failureReason:string|undefined,lastHttpEvidence:ReturnType<typeof httpEvidence>|null=null,httpObservationProbe:string|null=null,failure:FailureCategory|undefined,cleanupFailed=false,totalExchanges=0,eraExchanges=0,lastHttpStatus:number|null=null;
     const databaseSha256=sha(readFileSync(options.databasePath)),manifestSha256=sha(readFileSync(join(root,'data/data-manifest.json')));
     const core = JSON.parse(readFileSync(join(root, 'test/fixtures/historical-core-preview-audit.json'), 'utf8'));
@@ -91,9 +94,15 @@ export async function auditCorpusRelease(options: {
                 era = protocol;
                 let exchanges = 0;eraExchanges=0;
                 const contractResponses=new Map<string,{status:number;evidence:ReturnType<typeof httpEvidence>}>();
+                const requestObservations=new Map<string,HttpObservation>();
                 const localFetch = async (input: any, init?: any) => {
                     let requestProbe=current,requestStatus:number|null=null,requestEvidence:ReturnType<typeof httpEvidence>|null=null;
-                    if(stage==='contract'&&typeof init?.body==='string'){try{const method=JSON.parse(init.body).method;const id=({'tools/list':'contract:tools-list','prompts/list':'contract:prompts-list','resources/list':'contract:resources-list','resources/templates/list':'contract:resource-templates-list'} as Record<string,string>)[method];if(id)requestProbe=id;}catch{}}
+                    const httpMethod=init?.method===undefined?'GET':['GET','POST','DELETE'].includes(init.method)?init.method:'other';let rpcMethod:string|null=null,requestId:string|number|null=null;
+                    if(typeof init?.body==='string'){try{const rpc=JSON.parse(init.body);rpcMethod=typeof rpc.method==='string'&&/^[A-Za-z][A-Za-z0-9/_-]{0,80}$/.test(rpc.method)?rpc.method:null;requestId=typeof rpc.id==='number'&&Number.isSafeInteger(rpc.id)||typeof rpc.id==='string'&&/^[A-Za-z0-9._:-]{1,80}$/.test(rpc.id)?rpc.id:null;if(stage==='contract'){const id=({'tools/list':'contract:tools-list','prompts/list':'contract:prompts-list','resources/list':'contract:resources-list','resources/templates/list':'contract:resource-templates-list'} as Record<string,string>)[rpc.method];if(id)requestProbe=id;}}catch{}}
+                    // Initialized notifications are awaited by connect(); cancellation and GET streams are not the active RPC.
+                    const awaited=httpMethod!=='GET'&&rpcMethod!=='notifications/cancelled';
+                    const observation:HttpObservation={era:protocol,probeId:requestProbe,httpMethod,rpcMethod,requestId,status:null,evidence:null};
+                    if(awaited)requestObservations.set(requestProbe,observation);
                     try{
                     try{options.guard?.();}catch{throw new AuditFault('guard');}
                     check(++exchanges <= 200 && Date.now() - started <= 600000, 'live_http_time_budget');
@@ -104,7 +113,7 @@ export async function auditCorpusRelease(options: {
                     try {
                         if(options.fetch===fetch){const delay=Math.max(0,nextNetworkStart-Date.now());if(delay)await new Promise(r=>setTimeout(r,delay));nextNetworkStart=Date.now()+650;}
                         let response:Response;try{response = await fetchImpl(input, { ...init, headers:{...Object.fromEntries(new Headers(init?.headers)),'user-agent':`TheologAI-Corpus-${role}-Audit/1.0`}, redirect: 'error', signal: init?.signal ? AbortSignal.any([init.signal, controller.signal]) : controller.signal });}catch{throw new AuditFault(controller.signal.aborted?'timeout':init?.signal?.aborted?'aborted':'network');}
-                        requestStatus=response.status;requestEvidence=httpEvidence(response);if(requestProbe.startsWith('contract:'))contractResponses.set(requestProbe,{status:requestStatus,evidence:requestEvidence});lastHttpStatus=requestStatus;lastHttpEvidence=requestEvidence;httpObservationProbe=requestProbe;
+                        requestStatus=response.status;requestEvidence=httpEvidence(response);observation.status=requestStatus;observation.evidence=requestEvidence;if(awaited){if(requestProbe.startsWith('contract:'))contractResponses.set(requestProbe,{status:requestStatus,evidence:requestEvidence});lastHttpStatus=requestStatus;lastHttpEvidence=requestEvidence;httpObservationProbe=requestProbe;}
                         if(response.redirected||response.status>=500){throw new AuditFault('http_status');}
                         if (!response.body)
                             return response;
@@ -127,11 +136,11 @@ export async function auditCorpusRelease(options: {
                     finally {
                         clearTimeout(timer);
                     }
-                    }catch(error){failedRequest??={probeId:requestProbe,status:requestStatus,evidence:requestEvidence,category:error instanceof AuditFault?error.category:'protocol',reason:error instanceof AuditFault?error.reason:'protocol'};throw error;}
+                    }catch(error){const failure={...observation,status:requestStatus,evidence:requestEvidence,category:error instanceof AuditFault?error.category:'protocol' as const,reason:error instanceof AuditFault?error.reason:'protocol'};if(awaited)failedRequest??=failure;else secondaryHttpFailure??=failure;throw error;}
                 };
                 const client = new Client({ name: 'local-corpus-feasibility', version: '1' }, versionNegotiationFor(protocol));
                 async function contractOperation<T>(id:string,action:()=>Promise<T>):Promise<T>{
-                    try{return await action();}catch(error){const response=contractResponses.get(id);const category=error instanceof AuditFault?error.category:response&&response.status>=400?'http_status':'protocol';failedRequest??={probeId:id,status:response?.status??null,evidence:response?.evidence??null,category,reason:error instanceof AuditFault?error.reason:category};throw error;}
+                    try{return await action();}catch(error){const response=contractResponses.get(id);const category=error instanceof AuditFault?error.category:response&&response.status>=400?'http_status':'protocol';failedRequest??={...(requestObservations.get(id)??{era:protocol,probeId:id,httpMethod:'POST',rpcMethod:null,requestId:null}),status:response?.status??null,evidence:response?.evidence??null,category,reason:error instanceof AuditFault?error.reason:category};throw error;}
                 }
                 const contractClient={getServerVersion:()=>client.getServerVersion(),getServerCapabilities:()=>client.getServerCapabilities(),listTools:()=>contractOperation('contract:tools-list',()=>client.listTools()),listPrompts:()=>contractOperation('contract:prompts-list',()=>client.listPrompts()),listResourceTemplates:()=>contractOperation('contract:resource-templates-list',()=>client.listResourceTemplates()),listResources:()=>contractOperation('contract:resources-list',()=>client.listResources())};
                 const probe = async (id: string, action: () => Promise<any>, allowError = false) => { current = id;stage='probe';failedRequest=undefined;lastHttpStatus=null;lastHttpEvidence=null;httpObservationProbe=null;
@@ -217,7 +226,16 @@ export async function auditCorpusRelease(options: {
                     }
                     summaries.push({ role, era, httpExchanges: exchanges, checks: checks.filter(x => x.role === role && x.era === era).length });
                 }
-                catch(error){eraFailed=true;throw error;}
+                catch(error){
+                    eraFailed=true;
+                    const sdkErrorCode=error instanceof SdkError?Object.entries(SdkErrorCode).find(([name,value])=>value===error.code&&/^[A-Za-z][A-Za-z0-9]{0,80}$/.test(name))?.[0]??null:null;
+                    const category=failedRequest?.category??(error instanceof AuditFault?error.category:sdkErrorCode==='RequestTimeout'?'timeout':lastHttpStatus!==null&&lastHttpStatus>=400?'http_status':categoryForStage(stage));
+                    const observed=requestObservations.get(failedRequest?.probeId??current);
+                    // Freeze the awaited operation before close() aborts shared transport/cancellation traffic.
+                    originatingFailure={...(failedRequest??observed??{era,probeId:current,httpMethod:'POST',rpcMethod:null,requestId:null,status:lastHttpStatus,evidence:lastHttpEvidence}),category,reason:failedRequest?.reason??(error instanceof AuditFault?error.reason:sdkErrorCode==='RequestTimeout'?'sdk_request_timeout':category),sdkErrorCode,stage};
+                    if(!failedRequest&&httpObservationProbe!==current){originatingFailure.status=null;originatingFailure.evidence=null;}
+                    throw error;
+                }
                 finally {
                     try{await client.close();}catch{cleanupFailed=true;if(!eraFailed){current='client-close';stage='cleanup';lastHttpStatus=null;lastHttpEvidence=null;httpObservationProbe=null;throw new AuditFault('cleanup','client_close');}}
                 }
@@ -225,10 +243,10 @@ export async function auditCorpusRelease(options: {
         }
         current='dual-era-parity';stage='parity';lastHttpStatus=null;lastHttpEvidence=null;httpObservationProbe=null;sameFingerprints();
     }
-    catch(error){if(failedRequest){current=failedRequest.probeId;lastHttpStatus=failedRequest.status;lastHttpEvidence=failedRequest.evidence;httpObservationProbe=failedRequest.status===null?null:failedRequest.probeId;}if((stage as FailureStage)==='assertion'){const failed=[...checks].reverse().find(c=>c.id===current&&c.era===era);if(failed)failed.passed=false;}failureReason=failedRequest?.reason??(error instanceof AuditFault?error.reason:categoryForStage(stage));failure=failedRequest?.category??(error instanceof AuditFault?error.category:lastHttpStatus!==null&&lastHttpStatus>=400?'http_status':categoryForStage(stage));}
+    catch(error){const origin=originatingFailure??failedRequest;if(origin){current=origin.probeId;lastHttpStatus=origin.status;lastHttpEvidence=origin.evidence;httpObservationProbe=origin.status===null?null:origin.probeId;}if(originatingFailure)stage=originatingFailure.stage;if((stage as FailureStage)==='assertion'){const failed=[...checks].reverse().find(c=>c.id===current&&c.era===era);if(failed)failed.passed=false;}failureReason=origin?.reason??(error instanceof AuditFault?error.reason:categoryForStage(stage));failure=origin?.category??(error instanceof AuditFault?error.category:lastHttpStatus!==null&&lastHttpStatus>=400?'http_status':categoryForStage(stage));}
     finally {
         try{db.close();}catch{cleanupFailed=true;if(!failure){failure='cleanup';failureReason='database_close';current='database-close';stage='cleanup';lastHttpStatus=null;lastHttpEvidence=null;httpObservationProbe=null;}}
     }
-    return { schemaVersion: 'norton-aquinas-live.v1', role: options.role, endpoint: options.endpoint, serverVersion: options.serverVersion, productProfile: options.role === 'preview' ? '7' : '6', protocols: ['2025-11-25', '2026-07-28'], summaries, fixtureSha256: hash([core, spine, language]), fingerprints, checks, databaseSha256, manifestSha256, sourceBodyOutput: false, broaderV9Features: false, aggregateResponseBytes: aggregateBytes, durationMs: Date.now() - started,...(failure?{failure:{schemaVersion:'norton-aquinas-live-failure.v1' as const,category:failure,reason:failureReason,stage,role:options.role,era:era||null,probeId:trustedId(current),lastCompletedProbe:checks.some(c=>c.passed)?trustedId([...checks].reverse().find(c=>c.passed)!.id):null,lastCompletedEra:[...checks].reverse().find(c=>c.passed)?.era??null,completedChecks:checks.filter(c=>c.passed).length,httpExchanges:totalExchanges,eraHttpExchanges:eraExchanges,lastHttpStatus,httpObservationProbe:httpObservationProbe?trustedId(httpObservationProbe):null,httpEvidence:lastHttpEvidence,aggregateResponseBytes:aggregateBytes,cleanupFailed}}:{}) };
+    return { schemaVersion: 'norton-aquinas-live.v1', role: options.role, endpoint: options.endpoint, serverVersion: options.serverVersion, productProfile: options.role === 'preview' ? '7' : '6', protocols: ['2025-11-25', '2026-07-28'], summaries, fixtureSha256: hash([core, spine, language]), fingerprints, checks, databaseSha256, manifestSha256, sourceBodyOutput: false, broaderV9Features: false, aggregateResponseBytes: aggregateBytes, durationMs: Date.now() - started,...(failure?{failure:{schemaVersion:'norton-aquinas-live-failure.v1' as const,category:failure,reason:failureReason,stage,role:options.role,era:era||null,probeId:trustedId(current),lastCompletedProbe:checks.some(c=>c.passed)?trustedId([...checks].reverse().find(c=>c.passed)!.id):null,lastCompletedEra:[...checks].reverse().find(c=>c.passed)?.era??null,completedChecks:checks.filter(c=>c.passed).length,httpExchanges:totalExchanges,eraHttpExchanges:eraExchanges,lastHttpStatus,httpObservationProbe:httpObservationProbe?trustedId(httpObservationProbe):null,httpEvidence:lastHttpEvidence,aggregateResponseBytes:aggregateBytes,cleanupFailed,httpMethod:originatingFailure?.httpMethod??null,rpcMethod:originatingFailure?.rpcMethod??null,requestId:originatingFailure?.requestId??null,sdkErrorCode:originatingFailure?.sdkErrorCode??null,secondaryHttpFailure:secondaryHttpFailure?{...secondaryHttpFailure,probeId:trustedId(secondaryHttpFailure.probeId)}:null}}:{}) };
     function sameFingerprints() { check(hash(fingerprints[0]) === hash(fingerprints[1]), 'dual_era_contract_mismatch'); }
 }
