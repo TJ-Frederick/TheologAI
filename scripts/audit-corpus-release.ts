@@ -16,6 +16,7 @@ type FailureStage='initialize'|'contract'|'probe'|'assertion'|'parity'|'cleanup'
 class AuditFault extends Error {constructor(readonly category:FailureCategory,readonly reason:string=category){super('Corpus live audit failed');}}
 function check(v:unknown,message:string):asserts v {if(!v)throw new AuditFault(message==='live_http_time_budget'?'transport_budget':'assertion',message);}
 const categoryForStage=(stage:FailureStage):FailureCategory=>stage==='initialize'||stage==='probe'||stage==='contract'?'protocol':stage==='assertion'||stage==='parity'?'assertion':'unknown';
+const sdkErrorCodeFor=(error:unknown):string|null=>error instanceof SdkError?Object.entries(SdkErrorCode).find(([name,value])=>value===error.code&&/^[A-Za-z][A-Za-z0-9]{0,80}$/.test(name))?.[0]??null:null;
 const trustedId=(id:string)=>/^[A-Za-z0-9:._-]{1,200}$/.test(id)?id:'unavailable';
 
 /** Correlation only: these headers do not establish which component generated a response. */
@@ -48,7 +49,7 @@ export async function auditCorpusRelease(options: {
     }[] = [], summaries: unknown[] = [], fingerprints: unknown[] = [];
     let current = 'initialize', role = '', era = '';
     type HttpObservation={era:string;probeId:string;httpMethod:string;rpcMethod:string|null;requestId:string|number|null;status:number|null;evidence:ReturnType<typeof httpEvidence>|null};
-    type RequestFailure=HttpObservation&{category:FailureCategory;reason:string};
+    type RequestFailure=HttpObservation&{category:FailureCategory;reason:string;sdkErrorCode?:string|null};
     let failedRequest:RequestFailure|undefined,secondaryHttpFailure:RequestFailure|undefined;
     let originatingFailure:(RequestFailure&{sdkErrorCode:string|null;stage:FailureStage})|undefined;
     let stage:FailureStage='initialize',failureReason:string|undefined,lastHttpEvidence:ReturnType<typeof httpEvidence>|null=null,httpObservationProbe:string|null=null,failure:FailureCategory|undefined,cleanupFailed=false,totalExchanges=0,eraExchanges=0,lastHttpStatus:number|null=null;
@@ -136,11 +137,11 @@ export async function auditCorpusRelease(options: {
                     finally {
                         clearTimeout(timer);
                     }
-                    }catch(error){const failure={...observation,status:requestStatus,evidence:requestEvidence,category:error instanceof AuditFault?error.category:'protocol' as const,reason:error instanceof AuditFault?error.reason:'protocol'};if(awaited)failedRequest??=failure;else secondaryHttpFailure??=failure;throw error;}
+                    }catch(error){const failure={...observation,status:requestStatus,evidence:requestEvidence,sdkErrorCode:null,category:error instanceof AuditFault?error.category:'protocol' as const,reason:error instanceof AuditFault?error.reason:'protocol'};if(awaited)failedRequest??=failure;else secondaryHttpFailure??=failure;throw error;}
                 };
                 const client = new Client({ name: 'local-corpus-feasibility', version: '1' }, versionNegotiationFor(protocol));
                 async function contractOperation<T>(id:string,action:()=>Promise<T>):Promise<T>{
-                    try{return await action();}catch(error){const response=contractResponses.get(id);const category=error instanceof AuditFault?error.category:response&&response.status>=400?'http_status':'protocol';failedRequest??={...(requestObservations.get(id)??{era:protocol,probeId:id,httpMethod:'POST',rpcMethod:null,requestId:null}),status:response?.status??null,evidence:response?.evidence??null,category,reason:error instanceof AuditFault?error.reason:category};throw error;}
+                    try{return await action();}catch(error){const response=contractResponses.get(id);const sdkErrorCode=sdkErrorCodeFor(error);const category=error instanceof AuditFault?error.category:sdkErrorCode==='RequestTimeout'?'timeout':response&&response.status>=400?'http_status':'protocol';failedRequest??={...(requestObservations.get(id)??{era:protocol,probeId:id,httpMethod:'POST',rpcMethod:null,requestId:null}),status:response?.status??null,evidence:response?.evidence??null,category,reason:error instanceof AuditFault?error.reason:sdkErrorCode==='RequestTimeout'?'sdk_request_timeout':category,sdkErrorCode};throw error;}
                 }
                 const contractClient={getServerVersion:()=>client.getServerVersion(),getServerCapabilities:()=>client.getServerCapabilities(),listTools:()=>contractOperation('contract:tools-list',()=>client.listTools()),listPrompts:()=>contractOperation('contract:prompts-list',()=>client.listPrompts()),listResourceTemplates:()=>contractOperation('contract:resource-templates-list',()=>client.listResourceTemplates()),listResources:()=>contractOperation('contract:resources-list',()=>client.listResources())};
                 const probe = async (id: string, action: () => Promise<any>, allowError = false) => { current = id;stage='probe';failedRequest=undefined;lastHttpStatus=null;lastHttpEvidence=null;httpObservationProbe=null;
@@ -228,7 +229,7 @@ export async function auditCorpusRelease(options: {
                 }
                 catch(error){
                     eraFailed=true;
-                    const sdkErrorCode=error instanceof SdkError?Object.entries(SdkErrorCode).find(([name,value])=>value===error.code&&/^[A-Za-z][A-Za-z0-9]{0,80}$/.test(name))?.[0]??null:null;
+                    const sdkErrorCode=failedRequest?(failedRequest.sdkErrorCode??null):sdkErrorCodeFor(error);
                     const category=failedRequest?.category??(error instanceof AuditFault?error.category:sdkErrorCode==='RequestTimeout'?'timeout':lastHttpStatus!==null&&lastHttpStatus>=400?'http_status':categoryForStage(stage));
                     const observed=requestObservations.get(failedRequest?.probeId??current);
                     // Freeze the awaited operation before close() aborts shared transport/cancellation traffic.
