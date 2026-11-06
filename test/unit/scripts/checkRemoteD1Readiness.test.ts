@@ -22,6 +22,11 @@ import { buildHistoricalTransform8ExpectedAuthority } from '../../../scripts/his
 import { buildHistoricalTransform9ExpectedAuthority } from '../../../scripts/historical-transform9-authority-audit.js';
 import { CLASSIC_TEXT_LIMITS } from '../../../src/kernel/classicTextContract.js';
 
+import {loadActiveAquinasHierarchy} from '../../../scripts/active-aquinas-hierarchy.js';
+import {materializeHistoricalHierarchy} from '../../../scripts/historical-hierarchy.js';
+import {loadActiveAquinasHierarchyPublication,materializeHistoricalHierarchyPublication} from '../../../scripts/historical-hierarchy-publication.js';
+import {buildAquinasAuthorityQueryPlan} from '../../../scripts/aquinas-authority-audit.js';
+
 const generatedDbPath = process.env.THEOLOGAI_TEST_DATABASE_PATH?.trim();
 
 function remoteAuthorityExecutor(): {
@@ -91,6 +96,17 @@ function remoteAuthorityExecutor(): {
     insert('INSERT INTO historical_edition_sections_fts VALUES (?, ?, ?, ?)', [row.editionId, row.sectionKey, section.heading, section.content]);
     insert('INSERT INTO sections_fts(rowid, title, content, topics) VALUES (?, ?, ?, ?)', [row.documentSectionId, section.heading, section.content, '[]']);
   }
+  db.exec('CREATE UNIQUE INDEX pack_key ON historical_source_packs(pack_id); CREATE UNIQUE INDEX work_key ON historical_works(work_id); CREATE UNIQUE INDEX edition_key ON historical_editions(edition_id);');
+  const hierarchy=loadActiveAquinasHierarchy({read:path=>readFileSync(join(process.cwd(),path))});
+  // Replay the real hierarchy/publication schema without replacing the serial page parser.
+  const manifest=JSON.parse(readFileSync('data/data-manifest.json','utf8'));
+  const schema=new Database(':memory:');
+  for(const migration of manifest.materializations.d1.migrations)schema.exec(readFileSync(migration.path,'utf8'));
+  for(const name of ['historical_edition_hierarchies','historical_edition_hierarchy_bodies','historical_edition_hierarchy_nodes','historical_hierarchy_publications'])db.exec((schema.prepare('SELECT sql FROM sqlite_master WHERE name=?').get(name) as {sql:string}).sql);
+  db.exec((schema.prepare("SELECT sql FROM sqlite_master WHERE name='historical_edition_hierarchy_bodies_fts'").get() as {sql:string}).sql);
+  schema.close();
+  materializeHistoricalHierarchy(db,hierarchy);
+  materializeHistoricalHierarchyPublication(db,loadActiveAquinasHierarchyPublication(hierarchy),hierarchy);
   const calls: string[][] = [];
   return {
     calls,
@@ -141,15 +157,9 @@ describe('remote D1 readiness query', () => {
     expect(sql).toContain("('historical.transform8.collision_affected_sections', (");
     expect(sql).toContain("('historical.transform8.collision_newly_addressable_sections', (");
     expect(sql).toContain("('historical.transform8.full_fts_parity', (");
-    expect(sql).toContain("('historical.transform10.normal.hierarchies_empty', (");
-    expect(sql).toContain("('historical.transform10.normal.bodies_empty', (");
-    expect(sql).toContain("('historical.transform10.normal.nodes_empty', (");
-    expect(sql).toContain("('historical.transform10.normal.fts_empty', (");
-    expect(sql).toContain("('historical.transform10.normal.pack_absent', (");
-    expect(sql).toContain("('historical.transform10.normal.work_absent', (");
-    expect(sql).toContain("('historical.transform10.normal.edition_absent', (");
-    expect(sql).toContain("('historical.transform10.normal.artifacts_absent', (");
-    expect(sql).not.toContain("historical.transform10.exact_profile_and_artifacts");
+    expect(sql).toContain("historical.aquinas.active_publication");
+    expect(sql).toContain("historical.aquinas.no_legacy_projection");
+    expect(sql).toContain("historical.aquinas.fts_parity");
     expect(sql).toContain('LEFT JOIN sections_fts fts ON fts.rowid = section.id');
     expect(sql).toContain(') = 23');
     expect(sql).toContain(') = 256');
@@ -226,7 +236,7 @@ describe('remote D1 readiness query', () => {
       const workerd = readFileSync('scripts/verify-d1-seed-workerd.ts', 'utf8');
       expect(seedImport).toContain('buildUbsSemanticStoredIntegrityPredicates().join');
       expect(workerd).toContain('buildD1ReadinessSql(sourceManifest.expectedCounts)');
-      expect(workerd).toContain('auditHistoricalTransform8Authority(ROOT');
+      expect(workerd).toContain('auditHistoricalTransform8Authority(root, readPage)');
     } finally {
       db.close();
     }
@@ -311,12 +321,12 @@ describe('remote D1 readiness query', () => {
         expect(component.resultSha256).toMatch(/^[a-f0-9]{64}$/);
       }
       expect(JSON.stringify(receipt)).not.toMatch(/(?:sql|resources|diagnostic|content)/i);
-      expect(remote.calls).toHaveLength(183); // readiness plus Transform 8 and complete three-pack authority pages
+      expect(remote.calls).toHaveLength(359+buildAquinasAuthorityQueryPlan(process.cwd()).length); // all serial source-authority pages
       expect(remote.calls[0]).toContain('--json');
       expect(remote.calls[0]).toContain('--env');
       expect(remote.calls.every(call => call.includes('/tmp/generated-candidate/wrangler.candidate.toml'))).toBe(true);
       expect(remote.calls[0].join('\n')).toContain('WHERE passed IS 1');
-      expect(remote.calls.slice(1).every(call => call.join('\n').includes('LIMIT 256') || call.join('\n').includes('LIMIT 64') || call.join('\n').includes('LIMIT 32') || call.join('\n').includes('LIMIT 8'))).toBe(true);
+      expect(remote.calls.slice(1).every(call => call.join('\n').includes('LIMIT 256') || call.join('\n').includes('LIMIT 64') || call.join('\n').includes('LIMIT 32') || call.join('\n').includes('LIMIT 8') || /LIMIT (1|4)$/.test(call[call.indexOf('--command')+1]!))).toBe(true);
       expect(remote.calls.slice(1).every(call => call.join('\n').includes('--remote'))).toBe(true);
     } finally {
       remote.close();

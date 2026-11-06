@@ -1,0 +1,943 @@
+{
+  "schemaVersion": "norton-aquinas-schema0009-baseline-witness.v1",
+  "originalPhysicalSha256": "6ec5e7d77c65c4df9910b4e21f603fc61f39498b87a6556ed5d1ca2284d48b16",
+  "replacementPhysicalSha256": "0712d1a61f84a979019d471f0da1447100dab512b5385dcf52cc1738ca447c7c",
+  "nativePlanSha256": "dd42daacdc18740a6fcf77d045f0aa80395fd331e29ba22b4d08d12b587375f9",
+  "sourceCommit": "701ab6295f033105ec306f7878a85e294cba0f6d",
+  "corpusIdentity": "66c148a206b9b0eb1bf7552572570c42dabfd0ba591b63e0cf0d02adda35aa07",
+  "schema": "0009_candidate_c_sectioned_publications",
+  "catalog": [
+    {
+      "type": "index",
+      "name": "idx_document_sections_id_document",
+      "tbl_name": "document_sections",
+      "sql": "CREATE UNIQUE INDEX idx_document_sections_id_document\n  ON document_sections(id, document_id)"
+    },
+    {
+      "type": "index",
+      "name": "idx_historical_edition_hierarchy_bodies_order",
+      "tbl_name": "historical_edition_hierarchy_bodies",
+      "sql": "CREATE INDEX idx_historical_edition_hierarchy_bodies_order\n  ON historical_edition_hierarchy_bodies(hierarchy_id, source_ordinal, body_key)"
+    },
+    {
+      "type": "index",
+      "name": "idx_historical_edition_hierarchy_child_siblings",
+      "tbl_name": "historical_edition_hierarchy_nodes",
+      "sql": "CREATE UNIQUE INDEX idx_historical_edition_hierarchy_child_siblings\n  ON historical_edition_hierarchy_nodes(hierarchy_id, parent_node_key, sibling_ordinal) WHERE parent_node_key IS NOT NULL"
+    },
+    {
+      "type": "index",
+      "name": "idx_historical_edition_hierarchy_nodes_flat",
+      "tbl_name": "historical_edition_hierarchy_nodes",
+      "sql": "CREATE INDEX idx_historical_edition_hierarchy_nodes_flat\n  ON historical_edition_hierarchy_nodes(hierarchy_id, flat_ordinal, node_key)"
+    },
+    {
+      "type": "index",
+      "name": "idx_historical_edition_hierarchy_nodes_parent",
+      "tbl_name": "historical_edition_hierarchy_nodes",
+      "sql": "CREATE INDEX idx_historical_edition_hierarchy_nodes_parent\n  ON historical_edition_hierarchy_nodes(hierarchy_id, parent_node_key, sibling_ordinal, node_key)"
+    },
+    {
+      "type": "index",
+      "name": "idx_historical_edition_hierarchy_root_siblings",
+      "tbl_name": "historical_edition_hierarchy_nodes",
+      "sql": "CREATE UNIQUE INDEX idx_historical_edition_hierarchy_root_siblings\n  ON historical_edition_hierarchy_nodes(hierarchy_id, sibling_ordinal) WHERE parent_node_key IS NULL"
+    },
+    {
+      "type": "index",
+      "name": "idx_historical_edition_sections_order",
+      "tbl_name": "historical_edition_sections",
+      "sql": "CREATE INDEX idx_historical_edition_sections_order\n  ON historical_edition_sections(edition_id, source_ordinal)"
+    },
+    {
+      "type": "index",
+      "name": "idx_historical_editions_pack",
+      "tbl_name": "historical_editions",
+      "sql": "CREATE INDEX idx_historical_editions_pack\n  ON historical_editions(pack_id, work_id)"
+    },
+    {
+      "type": "index",
+      "name": "idx_historical_editions_work",
+      "tbl_name": "historical_editions",
+      "sql": "CREATE INDEX idx_historical_editions_work\n  ON historical_editions(work_id, edition_id)"
+    },
+    {
+      "type": "index",
+      "name": "idx_historical_section_aliases_target",
+      "tbl_name": "historical_section_aliases",
+      "sql": "CREATE INDEX idx_historical_section_aliases_target\n  ON historical_section_aliases(document_id, section_key, source_ordinal)"
+    },
+    {
+      "type": "index",
+      "name": "idx_historical_section_identities_browse",
+      "tbl_name": "historical_section_identities",
+      "sql": "CREATE INDEX idx_historical_section_identities_browse\n  ON historical_section_identities(document_id, source_ordinal, section_key)"
+    },
+    {
+      "type": "index",
+      "name": "idx_historical_source_artifacts_edition",
+      "tbl_name": "historical_source_artifacts",
+      "sql": "CREATE INDEX idx_historical_source_artifacts_edition\n  ON historical_source_artifacts(edition_id, artifact_id)"
+    },
+    {
+      "type": "index",
+      "name": "idx_morph_strongs",
+      "tbl_name": "morphology",
+      "sql": "CREATE INDEX idx_morph_strongs\n  ON morphology(strongs_number)"
+    },
+    {
+      "type": "index",
+      "name": "idx_morph_strongs_canonical",
+      "tbl_name": "morphology",
+      "sql": "CREATE INDEX idx_morph_strongs_canonical\n  ON morphology(strongs_number, book_order, chapter, verse, position)"
+    },
+    {
+      "type": "index",
+      "name": "idx_morph_verse",
+      "tbl_name": "morphology",
+      "sql": "CREATE INDEX idx_morph_verse\n  ON morphology(book, chapter, verse)"
+    },
+    {
+      "type": "index",
+      "name": "idx_strongs_book_stats_order",
+      "tbl_name": "strongs_book_stats",
+      "sql": "CREATE INDEX idx_strongs_book_stats_order\n  ON strongs_book_stats(strongs_key, book_order)"
+    },
+    {
+      "type": "index",
+      "name": "idx_strongs_form_stats_rank",
+      "tbl_name": "strongs_form_stats",
+      "sql": "CREATE INDEX idx_strongs_form_stats_rank\n  ON strongs_form_stats(\n    strongs_key,\n    token_count DESC,\n    verse_count DESC,\n    form_text\n  )"
+    },
+    {
+      "type": "index",
+      "name": "idx_ubs_groups_source_order",
+      "tbl_name": "ubs_parallel_groups",
+      "sql": "CREATE INDEX idx_ubs_groups_source_order\n  ON ubs_parallel_groups(source_id, source_ordinal, group_id)"
+    },
+    {
+      "type": "index",
+      "name": "idx_ubs_segments_lookup",
+      "tbl_name": "ubs_parallel_segments",
+      "sql": "CREATE INDEX idx_ubs_segments_lookup\n  ON ubs_parallel_segments(book_number, chapter, start_verse, end_verse, group_id)"
+    },
+    {
+      "type": "index",
+      "name": "idx_ubs_semantic_coordinate_lookup",
+      "tbl_name": "ubs_semantic_normalized_coordinates",
+      "sql": "CREATE INDEX idx_ubs_semantic_coordinate_lookup\n  ON ubs_semantic_normalized_coordinates(normalized_reference, evidence_key)"
+    },
+    {
+      "type": "index",
+      "name": "idx_ubs_semantic_evidence_sense_order",
+      "tbl_name": "ubs_semantic_reference_evidence",
+      "sql": "CREATE INDEX idx_ubs_semantic_evidence_sense_order\n  ON ubs_semantic_reference_evidence(sense_id, source_ordinal, evidence_key)"
+    },
+    {
+      "type": "index",
+      "name": "idx_ubs_semantic_identity_candidate",
+      "tbl_name": "ubs_semantic_entry_identities",
+      "sql": "CREATE INDEX idx_ubs_semantic_identity_candidate\n  ON ubs_semantic_entry_identities(artifact_identity, lexical_identity, entry_id)"
+    },
+    {
+      "type": "index",
+      "name": "idx_ubs_semantic_sense_candidate_order",
+      "tbl_name": "ubs_semantic_senses",
+      "sql": "CREATE INDEX idx_ubs_semantic_sense_candidate_order\n  ON ubs_semantic_senses(artifact_identity, entry_id, source_ordinal, sense_id)"
+    },
+    {
+      "type": "index",
+      "name": "idx_ubs_semantic_sense_domain_order",
+      "tbl_name": "ubs_semantic_sense_domains",
+      "sql": "CREATE INDEX idx_ubs_semantic_sense_domain_order\n  ON ubs_semantic_sense_domains(artifact_identity, sense_id, domain_ordinal, domain_id)"
+    },
+    {
+      "type": "index",
+      "name": "idx_xref_from",
+      "tbl_name": "cross_references",
+      "sql": "CREATE INDEX idx_xref_from\n  ON cross_references(from_verse)"
+    },
+    {
+      "type": "index",
+      "name": "idx_xref_votes",
+      "tbl_name": "cross_references",
+      "sql": "CREATE INDEX idx_xref_votes\n  ON cross_references(votes DESC)"
+    },
+    {
+      "type": "table",
+      "name": "cross_references",
+      "tbl_name": "cross_references",
+      "sql": "CREATE TABLE cross_references (\n  from_verse TEXT NOT NULL,\n  to_verse TEXT NOT NULL,\n  votes INTEGER NOT NULL,\n  PRIMARY KEY (from_verse, to_verse)\n)"
+    },
+    {
+      "type": "table",
+      "name": "document_sections",
+      "tbl_name": "document_sections",
+      "sql": "CREATE TABLE document_sections (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  document_id TEXT NOT NULL REFERENCES documents(id),\n  section_number TEXT,\n  title TEXT,\n  content TEXT NOT NULL,\n  topics TEXT\n)"
+    },
+    {
+      "type": "table",
+      "name": "documents",
+      "tbl_name": "documents",
+      "sql": "CREATE TABLE documents (\n  id TEXT PRIMARY KEY,\n  title TEXT NOT NULL,\n  type TEXT NOT NULL,\n  date TEXT,\n  metadata TEXT\n)"
+    },
+    {
+      "type": "table",
+      "name": "historical_corpus_seal",
+      "tbl_name": "historical_corpus_seal",
+      "sql": "CREATE TABLE historical_corpus_seal (\n  seal_id INTEGER PRIMARY KEY CHECK (seal_id = 1),\n  transform_version INTEGER NOT NULL CHECK (transform_version = 12),\n  storage_contract TEXT NOT NULL CHECK (\n    storage_contract = 'candidate_c_seed_base_rebuild_all_fts_integrity_check_then_seal_v1'\n  )\n)"
+    },
+    {
+      "type": "table",
+      "name": "historical_document_delivery_profiles",
+      "tbl_name": "historical_document_delivery_profiles",
+      "sql": "CREATE TABLE historical_document_delivery_profiles (\n  document_id TEXT PRIMARY KEY\n    REFERENCES documents(id) ON DELETE RESTRICT,\n  work_id TEXT CHECK (\n    work_id = trim(work_id) AND length(work_id) BETWEEN 1 AND 160\n    AND work_id GLOB '[A-Za-z0-9]*' AND work_id NOT GLOB '*[^A-Za-z0-9._:-]*'\n    AND work_id NOT IN ('.', '..')\n  ),\n  edition_id TEXT CHECK (\n    edition_id = trim(edition_id) AND length(edition_id) BETWEEN 1 AND 160\n    AND edition_id GLOB '[A-Za-z0-9]*' AND edition_id NOT GLOB '*[^A-Za-z0-9._:-]*'\n    AND edition_id NOT IN ('.', '..')\n  ),\n  immutable_corpus_identity TEXT NOT NULL CHECK (\n    length(immutable_corpus_identity) = 64\n    AND immutable_corpus_identity NOT GLOB '*[^0-9a-f]*'\n  ),\n  section_package_identity TEXT CHECK (\n    length(section_package_identity) = 64\n    AND section_package_identity NOT GLOB '*[^0-9a-f]*'\n  ),\n  delivery_mode TEXT NOT NULL CHECK (delivery_mode IN ('complete_document', 'sectioned_only')),\n  section_count INTEGER NOT NULL CHECK (section_count > 0),\n  landing_max_bytes INTEGER NOT NULL CHECK (landing_max_bytes IN (0, 16384)),\n  browse_page_size INTEGER NOT NULL CHECK (browse_page_size IN (0, 32)),\n  cursor_version INTEGER NOT NULL CHECK (cursor_version IN (0, 1)),\n  provenance_json TEXT NOT NULL CHECK (json_valid(provenance_json) AND json_type(provenance_json) = 'object'),\n  rights_json TEXT NOT NULL CHECK (json_valid(rights_json) AND json_type(rights_json) = 'object'),\n  -- Complete documents retain their current whole-work behavior. A future\n  -- sectioned edition must opt into the exact bounded landing/browse contract.\n  CHECK (\n    (delivery_mode = 'complete_document'\n      AND work_id IS NULL AND edition_id IS NULL AND section_package_identity IS NULL\n      AND landing_max_bytes = 0 AND browse_page_size = 0 AND cursor_version = 0)\n    OR\n    (delivery_mode = 'sectioned_only'\n      AND work_id IS NOT NULL AND edition_id IS NOT NULL AND section_package_identity IS NOT NULL\n      AND landing_max_bytes = 16384 AND browse_page_size = 32 AND cursor_version = 1)\n  ),\n  UNIQUE (work_id, edition_id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "historical_edition_hierarchies",
+      "tbl_name": "historical_edition_hierarchies",
+      "sql": "CREATE TABLE historical_edition_hierarchies (\n  hierarchy_id TEXT PRIMARY KEY CHECK (\n    hierarchy_id = trim(hierarchy_id) AND length(hierarchy_id) BETWEEN 1 AND 160\n    AND hierarchy_id GLOB '[A-Za-z0-9]*' AND hierarchy_id NOT GLOB '*[^A-Za-z0-9._:-]*'\n    AND hierarchy_id NOT IN ('.', '..')\n  ),\n  pack_id TEXT NOT NULL REFERENCES historical_source_packs(pack_id) ON DELETE RESTRICT,\n  work_id TEXT NOT NULL REFERENCES historical_works(work_id) ON DELETE RESTRICT,\n  edition_id TEXT NOT NULL UNIQUE REFERENCES historical_editions(edition_id) ON DELETE RESTRICT,\n  availability TEXT NOT NULL CHECK (\n    availability = trim(availability) AND length(availability) BETWEEN 1 AND 80\n    AND availability GLOB '[A-Za-z0-9]*' AND availability NOT GLOB '*[^A-Za-z0-9._:-]*'\n  ),\n  hierarchy_schema_version TEXT NOT NULL CHECK (\n    hierarchy_schema_version = trim(hierarchy_schema_version) AND length(hierarchy_schema_version) BETWEEN 1 AND 80\n    AND hierarchy_schema_version GLOB '[A-Za-z0-9]*' AND hierarchy_schema_version NOT GLOB '*[^A-Za-z0-9._:-]*'\n  ),\n  level_spec_json TEXT NOT NULL CHECK (json_valid(level_spec_json) AND json_type(level_spec_json) = 'object'),\n  source_manifest_sha256 TEXT NOT NULL CHECK (length(source_manifest_sha256) = 64 AND source_manifest_sha256 NOT GLOB '*[^0-9a-f]*'),\n  aggregate_sha256 TEXT NOT NULL CHECK (length(aggregate_sha256) = 64 AND aggregate_sha256 NOT GLOB '*[^0-9a-f]*'),\n  ordered_question_keys_sha256 TEXT NOT NULL CHECK (length(ordered_question_keys_sha256) = 64 AND ordered_question_keys_sha256 NOT GLOB '*[^0-9a-f]*'),\n  ordered_article_keys_sha256 TEXT NOT NULL CHECK (length(ordered_article_keys_sha256) = 64 AND ordered_article_keys_sha256 NOT GLOB '*[^0-9a-f]*'),\n  source_lock_sha256 TEXT NOT NULL CHECK (length(source_lock_sha256) = 64 AND source_lock_sha256 NOT GLOB '*[^0-9a-f]*'),\n  local_receipt_sha256 TEXT NOT NULL CHECK (length(local_receipt_sha256) = 64 AND local_receipt_sha256 NOT GLOB '*[^0-9a-f]*'),\n  topology_lock_sha256 TEXT NOT NULL CHECK (length(topology_lock_sha256) = 64 AND topology_lock_sha256 NOT GLOB '*[^0-9a-f]*'),\n  discrepancy_ledger_sha256 TEXT NOT NULL CHECK (length(discrepancy_ledger_sha256) = 64 AND discrepancy_ledger_sha256 NOT GLOB '*[^0-9a-f]*'),\n  authority_bodies_sha256 TEXT NOT NULL CHECK (length(authority_bodies_sha256) = 64 AND authority_bodies_sha256 NOT GLOB '*[^0-9a-f]*'),\n  navigation_preorder_sha256 TEXT NOT NULL CHECK (length(navigation_preorder_sha256) = 64 AND navigation_preorder_sha256 NOT GLOB '*[^0-9a-f]*'),\n  body_count INTEGER NOT NULL CHECK (body_count > 0),\n  node_count INTEGER NOT NULL CHECK (node_count > 0),\n  coverage_json TEXT NOT NULL CHECK (json_valid(coverage_json) AND json_type(coverage_json) = 'object'),\n  provenance_json TEXT NOT NULL CHECK (json_valid(provenance_json) AND json_type(provenance_json) = 'object')\n)"
+    },
+    {
+      "type": "table",
+      "name": "historical_edition_hierarchy_bodies",
+      "tbl_name": "historical_edition_hierarchy_bodies",
+      "sql": "CREATE TABLE historical_edition_hierarchy_bodies (\n  hierarchy_id TEXT NOT NULL REFERENCES historical_edition_hierarchies(hierarchy_id) ON DELETE RESTRICT,\n  body_key TEXT NOT NULL CHECK (\n    body_key = trim(body_key) AND length(body_key) BETWEEN 1 AND 160\n    AND body_key NOT GLOB '*[^A-Za-z0-9._:-]*'\n  ),\n  body_kind TEXT NOT NULL CHECK (\n    body_kind = trim(body_kind) AND length(body_kind) BETWEEN 1 AND 80\n    AND body_kind GLOB '[A-Za-z0-9]*' AND body_kind NOT GLOB '*[^A-Za-z0-9._:-]*'\n  ),\n  source_ordinal INTEGER NOT NULL CHECK (source_ordinal > 0),\n  heading TEXT NOT NULL CHECK (length(trim(heading)) > 0),\n  content_sha256 TEXT NOT NULL CHECK (length(content_sha256) = 64 AND content_sha256 NOT GLOB '*[^0-9a-f]*'),\n  content_utf8_bytes INTEGER NOT NULL CHECK (content_utf8_bytes > 0),\n  content TEXT NOT NULL CHECK (length(content) > 0),\n  PRIMARY KEY (hierarchy_id, body_key),\n  UNIQUE (hierarchy_id, source_ordinal)\n)"
+    },
+    {
+      "type": "table",
+      "name": "historical_edition_hierarchy_bodies_fts",
+      "tbl_name": "historical_edition_hierarchy_bodies_fts",
+      "sql": "CREATE VIRTUAL TABLE historical_edition_hierarchy_bodies_fts USING fts5(\n  hierarchy_id UNINDEXED,\n  body_key UNINDEXED,\n  heading,\n  content,\n  content='historical_edition_hierarchy_bodies',\n  content_rowid='rowid'\n)"
+    },
+    {
+      "type": "table",
+      "name": "historical_edition_hierarchy_bodies_fts_config",
+      "tbl_name": "historical_edition_hierarchy_bodies_fts_config",
+      "sql": "CREATE TABLE 'historical_edition_hierarchy_bodies_fts_config'(k PRIMARY KEY, v) WITHOUT ROWID"
+    },
+    {
+      "type": "table",
+      "name": "historical_edition_hierarchy_bodies_fts_data",
+      "tbl_name": "historical_edition_hierarchy_bodies_fts_data",
+      "sql": "CREATE TABLE 'historical_edition_hierarchy_bodies_fts_data'(id INTEGER PRIMARY KEY, block BLOB)"
+    },
+    {
+      "type": "table",
+      "name": "historical_edition_hierarchy_bodies_fts_docsize",
+      "tbl_name": "historical_edition_hierarchy_bodies_fts_docsize",
+      "sql": "CREATE TABLE 'historical_edition_hierarchy_bodies_fts_docsize'(id INTEGER PRIMARY KEY, sz BLOB)"
+    },
+    {
+      "type": "table",
+      "name": "historical_edition_hierarchy_bodies_fts_idx",
+      "tbl_name": "historical_edition_hierarchy_bodies_fts_idx",
+      "sql": "CREATE TABLE 'historical_edition_hierarchy_bodies_fts_idx'(segid, term, pgno, PRIMARY KEY(segid, term)) WITHOUT ROWID"
+    },
+    {
+      "type": "table",
+      "name": "historical_edition_hierarchy_nodes",
+      "tbl_name": "historical_edition_hierarchy_nodes",
+      "sql": "CREATE TABLE historical_edition_hierarchy_nodes (\n  hierarchy_id TEXT NOT NULL REFERENCES historical_edition_hierarchies(hierarchy_id) ON DELETE RESTRICT,\n  node_key TEXT NOT NULL CHECK (\n    node_key = trim(node_key) AND length(node_key) BETWEEN 1 AND 160\n    AND node_key NOT GLOB '*[^A-Za-z0-9._:-]*'\n  ),\n  parent_node_key TEXT,\n  node_kind TEXT NOT NULL CHECK (\n    node_kind = trim(node_kind) AND length(node_kind) BETWEEN 1 AND 80\n    AND node_kind GLOB '[A-Za-z0-9]*' AND node_kind NOT GLOB '*[^A-Za-z0-9._:-]*'\n  ),\n  body_key TEXT,\n  depth INTEGER NOT NULL CHECK (depth > 0),\n  flat_ordinal INTEGER NOT NULL CHECK (flat_ordinal > 0),\n  sibling_ordinal INTEGER NOT NULL CHECK (sibling_ordinal > 0),\n  label TEXT NOT NULL CHECK (length(trim(label)) > 0),\n  heading TEXT NOT NULL CHECK (length(trim(heading)) > 0),\n  PRIMARY KEY (hierarchy_id, node_key),\n  UNIQUE (hierarchy_id, flat_ordinal),\n  UNIQUE (hierarchy_id, body_key),\n  FOREIGN KEY (hierarchy_id, parent_node_key)\n    REFERENCES historical_edition_hierarchy_nodes(hierarchy_id, node_key) ON DELETE RESTRICT,\n  FOREIGN KEY (hierarchy_id, body_key)\n    REFERENCES historical_edition_hierarchy_bodies(hierarchy_id, body_key) ON DELETE RESTRICT\n)"
+    },
+    {
+      "type": "table",
+      "name": "historical_edition_sections",
+      "tbl_name": "historical_edition_sections",
+      "sql": "CREATE TABLE historical_edition_sections (\n  edition_id TEXT NOT NULL REFERENCES historical_editions(edition_id) ON DELETE RESTRICT,\n  section_key TEXT NOT NULL,\n  source_ordinal INTEGER NOT NULL CHECK (source_ordinal > 0),\n  display_label TEXT NOT NULL,\n  heading TEXT NOT NULL,\n  content TEXT NOT NULL,\n  PRIMARY KEY (edition_id, section_key),\n  UNIQUE (edition_id, source_ordinal)\n)"
+    },
+    {
+      "type": "table",
+      "name": "historical_edition_sections_fts",
+      "tbl_name": "historical_edition_sections_fts",
+      "sql": "CREATE VIRTUAL TABLE historical_edition_sections_fts USING fts5(\n  edition_id UNINDEXED,\n  section_key UNINDEXED,\n  heading,\n  content,\n  content='historical_edition_sections',\n  content_rowid='rowid'\n)"
+    },
+    {
+      "type": "table",
+      "name": "historical_edition_sections_fts_config",
+      "tbl_name": "historical_edition_sections_fts_config",
+      "sql": "CREATE TABLE 'historical_edition_sections_fts_config'(k PRIMARY KEY, v) WITHOUT ROWID"
+    },
+    {
+      "type": "table",
+      "name": "historical_edition_sections_fts_data",
+      "tbl_name": "historical_edition_sections_fts_data",
+      "sql": "CREATE TABLE 'historical_edition_sections_fts_data'(id INTEGER PRIMARY KEY, block BLOB)"
+    },
+    {
+      "type": "table",
+      "name": "historical_edition_sections_fts_docsize",
+      "tbl_name": "historical_edition_sections_fts_docsize",
+      "sql": "CREATE TABLE 'historical_edition_sections_fts_docsize'(id INTEGER PRIMARY KEY, sz BLOB)"
+    },
+    {
+      "type": "table",
+      "name": "historical_edition_sections_fts_idx",
+      "tbl_name": "historical_edition_sections_fts_idx",
+      "sql": "CREATE TABLE 'historical_edition_sections_fts_idx'(segid, term, pgno, PRIMARY KEY(segid, term)) WITHOUT ROWID"
+    },
+    {
+      "type": "table",
+      "name": "historical_editions",
+      "tbl_name": "historical_editions",
+      "sql": "CREATE TABLE historical_editions (\n  edition_id TEXT PRIMARY KEY,\n  work_id TEXT NOT NULL REFERENCES historical_works(work_id) ON DELETE RESTRICT,\n  pack_id TEXT NOT NULL REFERENCES historical_source_packs(pack_id) ON DELETE RESTRICT,\n  language TEXT NOT NULL,\n  contributor_groups_json TEXT NOT NULL CHECK (json_valid(contributor_groups_json) AND json_type(contributor_groups_json) = 'object'),\n  publication TEXT NOT NULL,\n  version TEXT NOT NULL,\n  provenance_status TEXT NOT NULL CHECK (provenance_status IN ('verified', 'verified_with_uncertainty')),\n  provenance_uncertainty TEXT,\n  provenance_reviewed_at TEXT NOT NULL,\n  underlying_work_rights_json TEXT NOT NULL CHECK (json_valid(underlying_work_rights_json) AND json_type(underlying_work_rights_json) = 'object'),\n  exact_artifact_rights_json TEXT NOT NULL CHECK (json_valid(exact_artifact_rights_json) AND json_type(exact_artifact_rights_json) = 'object'),\n  normalized_text_rights_json TEXT NOT NULL CHECK (json_valid(normalized_text_rights_json) AND json_type(normalized_text_rights_json) = 'object')\n)"
+    },
+    {
+      "type": "table",
+      "name": "historical_hierarchy_publications",
+      "tbl_name": "historical_hierarchy_publications",
+      "sql": "CREATE TABLE historical_hierarchy_publications (\n  publication_id TEXT PRIMARY KEY CHECK (\n    publication_id = trim(publication_id) AND length(publication_id) BETWEEN 1 AND 160\n    AND publication_id GLOB '[A-Za-z0-9]*' AND publication_id NOT GLOB '*[^A-Za-z0-9._:-]*'\n    AND publication_id NOT IN ('.', '..')\n  ),\n  hierarchy_id TEXT NOT NULL UNIQUE\n    REFERENCES historical_edition_hierarchies(hierarchy_id) ON DELETE RESTRICT,\n  public_slug TEXT NOT NULL UNIQUE CHECK (\n    public_slug = trim(public_slug) AND length(public_slug) BETWEEN 1 AND 160\n    AND public_slug GLOB '[A-Za-z0-9]*' AND public_slug NOT GLOB '*[^A-Za-z0-9._-]*'\n    AND public_slug NOT IN ('.', '..')\n  ),\n  title TEXT NOT NULL CHECK (length(trim(title)) BETWEEN 1 AND 500),\n  metadata_json TEXT NOT NULL CHECK (json_valid(metadata_json) AND json_type(metadata_json) = 'object'),\n  delivery_kind TEXT NOT NULL CHECK (delivery_kind = 'hierarchy_nodes_v1'),\n  coverage_json TEXT NOT NULL CHECK (json_valid(coverage_json) AND json_type(coverage_json) = 'object'),\n  cursor_contract TEXT NOT NULL CHECK (cursor_contract = 'historical-hierarchy-browse-cursor-v1'),\n  cursor_identity TEXT NOT NULL CHECK (length(cursor_identity) = 64 AND cursor_identity NOT GLOB '*[^0-9a-f]*'),\n  browse_page_size INTEGER NOT NULL CHECK (browse_page_size BETWEEN 1 AND 32),\n  landing_max_bytes INTEGER NOT NULL CHECK (landing_max_bytes BETWEEN 1024 AND 65536),\n  directory_max_bytes INTEGER NOT NULL CHECK (directory_max_bytes BETWEEN 1024 AND 65536),\n  node_max_bytes INTEGER NOT NULL CHECK (node_max_bytes BETWEEN 1024 AND 131072),\n  search_max_bytes INTEGER NOT NULL CHECK (search_max_bytes BETWEEN 1024 AND 65536),\n  canonical_uri TEXT NOT NULL UNIQUE CHECK (\n    canonical_uri = 'theologai://documents/' || public_slug\n    AND length(canonical_uri) <= 384\n  ),\n  activation_state TEXT NOT NULL CHECK (activation_state = 'dormant')\n)"
+    },
+    {
+      "type": "table",
+      "name": "historical_section_aliases",
+      "tbl_name": "historical_section_aliases",
+      "sql": "CREATE TABLE historical_section_aliases (\n  document_id TEXT NOT NULL,\n  legacy_section_id TEXT NOT NULL CHECK (\n    legacy_section_id = trim(legacy_section_id)\n    AND length(legacy_section_id) BETWEEN 1 AND 160\n    AND legacy_section_id GLOB '[A-Za-z0-9]*'\n    AND legacy_section_id NOT GLOB '*[^A-Za-z0-9._:-]*'\n    AND legacy_section_id NOT IN ('.', '..')\n  ),\n  section_key TEXT NOT NULL,\n  source_ordinal INTEGER NOT NULL CHECK (source_ordinal > 0),\n  PRIMARY KEY (document_id, legacy_section_id),\n  FOREIGN KEY (document_id, section_key, source_ordinal)\n    REFERENCES historical_section_identities(document_id, section_key, source_ordinal)\n    ON DELETE RESTRICT\n)"
+    },
+    {
+      "type": "table",
+      "name": "historical_section_identities",
+      "tbl_name": "historical_section_identities",
+      "sql": "CREATE TABLE historical_section_identities (\n  document_id TEXT NOT NULL\n    REFERENCES historical_document_delivery_profiles(document_id) ON DELETE RESTRICT,\n  section_key TEXT NOT NULL CHECK (\n    section_key = trim(section_key)\n    AND length(section_key) BETWEEN 1 AND 160\n    AND section_key GLOB '[A-Za-z0-9]*'\n    AND section_key NOT GLOB '*[^A-Za-z0-9._:-]*'\n    AND section_key NOT IN ('.', '..')\n  ),\n  source_ordinal INTEGER NOT NULL CHECK (source_ordinal > 0),\n  -- This is a storage link only. Public and semantic identity is document_id +\n  -- section_key / source_ordinal, never this legacy AUTOINCREMENT value.\n  document_section_id INTEGER NOT NULL UNIQUE,\n  PRIMARY KEY (document_id, section_key),\n  UNIQUE (document_id, source_ordinal),\n  UNIQUE (document_id, section_key, source_ordinal),\n  FOREIGN KEY (document_section_id, document_id)\n    REFERENCES document_sections(id, document_id) ON DELETE RESTRICT\n)"
+    },
+    {
+      "type": "table",
+      "name": "historical_sectioned_publications",
+      "tbl_name": "historical_sectioned_publications",
+      "sql": "CREATE TABLE historical_sectioned_publications (\n  publication_id TEXT PRIMARY KEY CHECK (\n    publication_id = trim(publication_id) AND length(publication_id) BETWEEN 1 AND 160\n    AND publication_id GLOB '[A-Za-z0-9]*'\n    AND publication_id NOT GLOB '*[^A-Za-z0-9._:-]*'\n  ),\n  document_id TEXT NOT NULL UNIQUE CHECK (\n    document_id = trim(document_id) AND length(document_id) BETWEEN 1 AND 160\n    AND document_id GLOB '[A-Za-z0-9]*'\n    AND document_id NOT GLOB '*[^A-Za-z0-9._:-]*'\n  ),\n  pack_id TEXT NOT NULL REFERENCES historical_source_packs(pack_id) ON DELETE RESTRICT,\n  work_id TEXT NOT NULL REFERENCES historical_works(work_id) ON DELETE RESTRICT,\n  edition_id TEXT NOT NULL UNIQUE REFERENCES historical_editions(edition_id) ON DELETE RESTRICT,\n  title TEXT NOT NULL CHECK (length(trim(title)) BETWEEN 1 AND 500),\n  metadata_json TEXT NOT NULL CHECK (json_valid(metadata_json) AND json_type(metadata_json) = 'object'),\n  immutable_corpus_identity TEXT NOT NULL CHECK (\n    length(immutable_corpus_identity) = 64\n    AND immutable_corpus_identity NOT GLOB '*[^0-9a-f]*'\n  ),\n  section_package_identity TEXT NOT NULL CHECK (\n    length(section_package_identity) = 64\n    AND section_package_identity NOT GLOB '*[^0-9a-f]*'\n  ),\n  delivery_kind TEXT NOT NULL CHECK (delivery_kind = 'sectioned_only_v1'),\n  section_count INTEGER NOT NULL CHECK (section_count > 0),\n  landing_max_bytes INTEGER NOT NULL CHECK (landing_max_bytes = 16384),\n  browse_page_size INTEGER NOT NULL CHECK (browse_page_size = 32),\n  cursor_contract TEXT NOT NULL CHECK (cursor_contract = 'historical-sectioned-only-cursor-v1'),\n  cursor_version INTEGER NOT NULL CHECK (cursor_version = 1),\n  cursor_identity TEXT NOT NULL CHECK (\n    length(cursor_identity) = 64 AND cursor_identity NOT GLOB '*[^0-9a-f]*'\n  ),\n  body_delivery TEXT NOT NULL CHECK (body_delivery = 'exact_section_only'),\n  canonical_uri TEXT NOT NULL UNIQUE CHECK (\n    canonical_uri = 'theologai://documents/' || document_id AND length(canonical_uri) <= 384\n  ),\n  activation_state TEXT NOT NULL CHECK (activation_state = 'dormant')\n)"
+    },
+    {
+      "type": "table",
+      "name": "historical_source_artifacts",
+      "tbl_name": "historical_source_artifacts",
+      "sql": "CREATE TABLE historical_source_artifacts (\n  artifact_id TEXT PRIMARY KEY,\n  edition_id TEXT NOT NULL REFERENCES historical_editions(edition_id) ON DELETE RESTRICT,\n  role TEXT NOT NULL CHECK (role IN ('authority', 'comparator')),\n  locator TEXT NOT NULL,\n  pin_kind TEXT NOT NULL CHECK (pin_kind = 'sha256'),\n  pin_value TEXT NOT NULL CHECK (length(pin_value) = 64 AND pin_value NOT GLOB '*[^0-9a-f]*'),\n  sha256 TEXT NOT NULL CHECK (length(sha256) = 64 AND sha256 NOT GLOB '*[^0-9a-f]*'),\n  bytes INTEGER NOT NULL CHECK (bytes > 0),\n  acquired_at TEXT NOT NULL,\n  CHECK (pin_value = sha256)\n)"
+    },
+    {
+      "type": "table",
+      "name": "historical_source_packs",
+      "tbl_name": "historical_source_packs",
+      "sql": "CREATE TABLE historical_source_packs (\n  pack_id TEXT PRIMARY KEY,\n  revision TEXT NOT NULL,\n  schema_version TEXT NOT NULL,\n  manifest_sha256 TEXT NOT NULL CHECK (\n    length(manifest_sha256) = 64 AND manifest_sha256 NOT GLOB '*[^0-9a-f]*'\n  ),\n  source_path TEXT NOT NULL UNIQUE\n)"
+    },
+    {
+      "type": "table",
+      "name": "historical_works",
+      "tbl_name": "historical_works",
+      "sql": "CREATE TABLE historical_works (\n  work_id TEXT PRIMARY KEY,\n  title TEXT NOT NULL,\n  creator_metadata_status TEXT NOT NULL,\n  creators_json TEXT NOT NULL CHECK (json_valid(creators_json) AND json_type(creators_json) = 'array')\n)"
+    },
+    {
+      "type": "table",
+      "name": "morph_codes",
+      "tbl_name": "morph_codes",
+      "sql": "CREATE TABLE morph_codes (\n  code TEXT PRIMARY KEY,\n  expansion TEXT NOT NULL\n)"
+    },
+    {
+      "type": "table",
+      "name": "morphology",
+      "tbl_name": "morphology",
+      "sql": "CREATE TABLE morphology (\n  book TEXT NOT NULL,\n  chapter INTEGER NOT NULL,\n  verse INTEGER NOT NULL,\n  position INTEGER NOT NULL,\n  word_text TEXT NOT NULL,\n  lemma TEXT NOT NULL,\n  strongs_number TEXT,\n  morph_code TEXT,\n  gloss TEXT, book_order INTEGER NOT NULL\n  CHECK (book_order BETWEEN 1 AND 66),\n  PRIMARY KEY (book, chapter, verse, position)\n)"
+    },
+    {
+      "type": "table",
+      "name": "sections_fts",
+      "tbl_name": "sections_fts",
+      "sql": "CREATE VIRTUAL TABLE sections_fts USING fts5(\n  title,\n  content,\n  topics,\n  content='document_sections',\n  content_rowid='id'\n)"
+    },
+    {
+      "type": "table",
+      "name": "sections_fts_config",
+      "tbl_name": "sections_fts_config",
+      "sql": "CREATE TABLE 'sections_fts_config'(k PRIMARY KEY, v) WITHOUT ROWID"
+    },
+    {
+      "type": "table",
+      "name": "sections_fts_data",
+      "tbl_name": "sections_fts_data",
+      "sql": "CREATE TABLE 'sections_fts_data'(id INTEGER PRIMARY KEY, block BLOB)"
+    },
+    {
+      "type": "table",
+      "name": "sections_fts_docsize",
+      "tbl_name": "sections_fts_docsize",
+      "sql": "CREATE TABLE 'sections_fts_docsize'(id INTEGER PRIMARY KEY, sz BLOB)"
+    },
+    {
+      "type": "table",
+      "name": "sections_fts_idx",
+      "tbl_name": "sections_fts_idx",
+      "sql": "CREATE TABLE 'sections_fts_idx'(segid, term, pgno, PRIMARY KEY(segid, term)) WITHOUT ROWID"
+    },
+    {
+      "type": "table",
+      "name": "stepbible_lexicons",
+      "tbl_name": "stepbible_lexicons",
+      "sql": "CREATE TABLE stepbible_lexicons (\n  strongs_number TEXT PRIMARY KEY,\n  source TEXT NOT NULL,\n  extended_data TEXT NOT NULL\n)"
+    },
+    {
+      "type": "table",
+      "name": "strongs",
+      "tbl_name": "strongs",
+      "sql": "CREATE TABLE strongs (\n  strongs_number TEXT PRIMARY KEY,\n  testament TEXT NOT NULL,\n  lemma TEXT NOT NULL,\n  transliteration TEXT,\n  pronunciation TEXT,\n  definition TEXT NOT NULL,\n  derivation TEXT\n)"
+    },
+    {
+      "type": "table",
+      "name": "strongs_book_stats",
+      "tbl_name": "strongs_book_stats",
+      "sql": "CREATE TABLE strongs_book_stats (\n  strongs_key TEXT NOT NULL,\n  book TEXT NOT NULL,\n  book_order INTEGER NOT NULL CHECK (book_order BETWEEN 1 AND 66),\n  token_count INTEGER NOT NULL CHECK (token_count > 0),\n  verse_count INTEGER NOT NULL CHECK (verse_count > 0),\n  PRIMARY KEY (strongs_key, book)\n)"
+    },
+    {
+      "type": "table",
+      "name": "strongs_form_stats",
+      "tbl_name": "strongs_form_stats",
+      "sql": "CREATE TABLE strongs_form_stats (\n  strongs_key TEXT NOT NULL,\n  form_text TEXT NOT NULL,\n  token_count INTEGER NOT NULL CHECK (token_count > 0),\n  verse_count INTEGER NOT NULL CHECK (verse_count > 0),\n  first_book TEXT NOT NULL,\n  first_book_order INTEGER NOT NULL CHECK (first_book_order BETWEEN 1 AND 66),\n  first_chapter INTEGER NOT NULL CHECK (first_chapter > 0),\n  -- STEPBible represents Hebrew Psalm superscriptions as verse 0.\n  first_verse INTEGER NOT NULL CHECK (first_verse >= 0),\n  first_position INTEGER NOT NULL CHECK (first_position > 0),\n  PRIMARY KEY (strongs_key, form_text)\n)"
+    },
+    {
+      "type": "table",
+      "name": "strongs_fts",
+      "tbl_name": "strongs_fts",
+      "sql": "CREATE VIRTUAL TABLE strongs_fts USING fts5(\n  strongs_number UNINDEXED,\n  lemma,\n  transliteration,\n  definition\n)"
+    },
+    {
+      "type": "table",
+      "name": "strongs_fts_config",
+      "tbl_name": "strongs_fts_config",
+      "sql": "CREATE TABLE 'strongs_fts_config'(k PRIMARY KEY, v) WITHOUT ROWID"
+    },
+    {
+      "type": "table",
+      "name": "strongs_fts_content",
+      "tbl_name": "strongs_fts_content",
+      "sql": "CREATE TABLE 'strongs_fts_content'(id INTEGER PRIMARY KEY, c0, c1, c2, c3)"
+    },
+    {
+      "type": "table",
+      "name": "strongs_fts_data",
+      "tbl_name": "strongs_fts_data",
+      "sql": "CREATE TABLE 'strongs_fts_data'(id INTEGER PRIMARY KEY, block BLOB)"
+    },
+    {
+      "type": "table",
+      "name": "strongs_fts_docsize",
+      "tbl_name": "strongs_fts_docsize",
+      "sql": "CREATE TABLE 'strongs_fts_docsize'(id INTEGER PRIMARY KEY, sz BLOB)"
+    },
+    {
+      "type": "table",
+      "name": "strongs_fts_idx",
+      "tbl_name": "strongs_fts_idx",
+      "sql": "CREATE TABLE 'strongs_fts_idx'(segid, term, pgno, PRIMARY KEY(segid, term)) WITHOUT ROWID"
+    },
+    {
+      "type": "table",
+      "name": "strongs_usage_stats",
+      "tbl_name": "strongs_usage_stats",
+      "sql": "CREATE TABLE strongs_usage_stats (\n  strongs_key TEXT PRIMARY KEY,\n  token_count INTEGER NOT NULL CHECK (token_count > 0),\n  verse_count INTEGER NOT NULL CHECK (verse_count > 0),\n  book_count INTEGER NOT NULL CHECK (book_count > 0),\n  form_count INTEGER NOT NULL CHECK (form_count > 0)\n)"
+    },
+    {
+      "type": "table",
+      "name": "theologai_metadata",
+      "tbl_name": "theologai_metadata",
+      "sql": "CREATE TABLE theologai_metadata (\n  key TEXT PRIMARY KEY,\n  value TEXT NOT NULL\n)"
+    },
+    {
+      "type": "table",
+      "name": "ubs_parallel_groups",
+      "tbl_name": "ubs_parallel_groups",
+      "sql": "CREATE TABLE ubs_parallel_groups (\n  group_id TEXT PRIMARY KEY,\n  source_id TEXT NOT NULL REFERENCES ubs_parallel_sources(source_id),\n  source_ordinal INTEGER NOT NULL CHECK (source_ordinal > 0),\n  label TEXT NOT NULL CHECK (label = 'source_attested_parallel'),\n  directionality TEXT NOT NULL CHECK (directionality = 'unspecified'),\n  UNIQUE (source_id, source_ordinal)\n)"
+    },
+    {
+      "type": "table",
+      "name": "ubs_parallel_members",
+      "tbl_name": "ubs_parallel_members",
+      "sql": "CREATE TABLE ubs_parallel_members (\n  group_id TEXT NOT NULL REFERENCES ubs_parallel_groups(group_id),\n  source_order INTEGER NOT NULL CHECK (source_order > 0),\n  source_reference TEXT NOT NULL,\n  normalized_reference TEXT NOT NULL,\n  language_marker TEXT NOT NULL CHECK (language_marker IN ('HEB', 'GRK')),\n  alignment_basis TEXT NOT NULL CHECK (alignment_basis IN ('BHS', 'LXX', 'UBSGNT5')),\n  alignment_raw TEXT NOT NULL,\n  PRIMARY KEY (group_id, source_order)\n)"
+    },
+    {
+      "type": "table",
+      "name": "ubs_parallel_segments",
+      "tbl_name": "ubs_parallel_segments",
+      "sql": "CREATE TABLE ubs_parallel_segments (\n  group_id TEXT NOT NULL,\n  member_order INTEGER NOT NULL,\n  segment_order INTEGER NOT NULL CHECK (segment_order > 0),\n  book_number INTEGER NOT NULL CHECK (book_number BETWEEN 1 AND 66),\n  chapter INTEGER NOT NULL CHECK (chapter > 0),\n  start_verse INTEGER NOT NULL CHECK (start_verse > 0),\n  end_verse INTEGER NOT NULL CHECK (end_verse >= start_verse),\n  PRIMARY KEY (group_id, member_order, segment_order),\n  FOREIGN KEY (group_id, member_order)\n    REFERENCES ubs_parallel_members(group_id, source_order)\n)"
+    },
+    {
+      "type": "table",
+      "name": "ubs_parallel_sources",
+      "tbl_name": "ubs_parallel_sources",
+      "sql": "CREATE TABLE ubs_parallel_sources (\n  source_id TEXT PRIMARY KEY,\n  schema_version TEXT NOT NULL,\n  transform_version INTEGER NOT NULL,\n  artifact_identity TEXT NOT NULL UNIQUE,\n  title TEXT NOT NULL,\n  publisher TEXT NOT NULL,\n  copyright TEXT NOT NULL,\n  license TEXT NOT NULL,\n  license_url TEXT NOT NULL,\n  source_url TEXT NOT NULL,\n  source_path TEXT NOT NULL,\n  source_commit TEXT NOT NULL,\n  source_commit_date TEXT NOT NULL,\n  source_blob TEXT NOT NULL,\n  source_bytes INTEGER NOT NULL,\n  source_sha256 TEXT NOT NULL,\n  modified INTEGER NOT NULL CHECK (modified = 1),\n  modification_note TEXT NOT NULL,\n  label TEXT NOT NULL CHECK (label = 'source_attested_parallel'),\n  directionality TEXT NOT NULL CHECK (directionality = 'unspecified')\n)"
+    },
+    {
+      "type": "table",
+      "name": "ubs_semantic_artifacts",
+      "tbl_name": "ubs_semantic_artifacts",
+      "sql": "CREATE TABLE ubs_semantic_artifacts (\n  artifact_identity TEXT PRIMARY KEY CHECK (length(artifact_identity) = 64 AND artifact_identity NOT GLOB '*[^0-9a-f]*'),\n  schema_version TEXT NOT NULL CHECK (schema_version = 'theologai-ubs-hebrew-semantic-compiled.v1'),\n  compiler_version INTEGER NOT NULL CHECK (compiler_version = 1),\n  transform_version INTEGER NOT NULL CHECK (transform_version = 7),\n  rights_notice_json TEXT NOT NULL CHECK (json_valid(rights_notice_json) AND json_type(rights_notice_json) = 'object'),\n  provenance_notice_json TEXT NOT NULL CHECK (json_valid(provenance_notice_json) AND json_type(provenance_notice_json) = 'object'),\n  transformation_witness_json TEXT NOT NULL CHECK (json_valid(transformation_witness_json) AND json_type(transformation_witness_json) = 'object')\n)"
+    },
+    {
+      "type": "table",
+      "name": "ubs_semantic_domains",
+      "tbl_name": "ubs_semantic_domains",
+      "sql": "CREATE TABLE ubs_semantic_domains (\n  artifact_identity TEXT NOT NULL,\n  source_id TEXT NOT NULL,\n  domain_id TEXT NOT NULL CHECK (domain_id = trim(domain_id) AND domain_id NOT GLOB '*[^a-z0-9._-]*'),\n  source_ordinal INTEGER NOT NULL CHECK (source_ordinal > 0),\n  parent_domain_id TEXT,\n  label TEXT NOT NULL CHECK (label = trim(label) AND length(label) > 0),\n  description TEXT CHECK (description = trim(description) AND length(description) > 0),\n  PRIMARY KEY (artifact_identity, domain_id),\n  UNIQUE (artifact_identity, source_id, source_ordinal),\n  FOREIGN KEY (artifact_identity, source_id) REFERENCES ubs_semantic_sources(artifact_identity, source_id),\n  FOREIGN KEY (artifact_identity, parent_domain_id) REFERENCES ubs_semantic_domains(artifact_identity, domain_id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "ubs_semantic_entries",
+      "tbl_name": "ubs_semantic_entries",
+      "sql": "CREATE TABLE ubs_semantic_entries (\n  artifact_identity TEXT NOT NULL,\n  source_id TEXT NOT NULL,\n  entry_id TEXT NOT NULL CHECK (entry_id = trim(entry_id) AND entry_id NOT GLOB '*[^a-z0-9._-]*'),\n  source_entry_id TEXT NOT NULL CHECK (source_entry_id = trim(source_entry_id) AND length(source_entry_id) > 0),\n  source_ordinal INTEGER NOT NULL CHECK (source_ordinal > 0),\n  lemma TEXT NOT NULL CHECK (lemma = trim(lemma) AND length(lemma) > 0),\n  part_of_speech_json TEXT NOT NULL CHECK (json_valid(part_of_speech_json) AND json_type(part_of_speech_json) = 'array'),\n  PRIMARY KEY (artifact_identity, entry_id),\n  UNIQUE (artifact_identity, source_id, source_ordinal),\n  -- A sense must retain the dictionary source that owns its entry.\n  UNIQUE (artifact_identity, source_id, entry_id),\n  FOREIGN KEY (artifact_identity, source_id) REFERENCES ubs_semantic_sources(artifact_identity, source_id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "ubs_semantic_entry_identities",
+      "tbl_name": "ubs_semantic_entry_identities",
+      "sql": "CREATE TABLE ubs_semantic_entry_identities (\n  artifact_identity TEXT NOT NULL,\n  entry_id TEXT NOT NULL,\n  lexical_identity TEXT NOT NULL CHECK (\n    length(lexical_identity) = 5 AND substr(lexical_identity, 1, 1) IN ('H', 'A')\n    AND substr(lexical_identity, 2) NOT GLOB '*[^0-9]*' AND CAST(substr(lexical_identity, 2) AS INTEGER) > 0\n  ),\n  PRIMARY KEY (artifact_identity, entry_id, lexical_identity),\n  FOREIGN KEY (artifact_identity, entry_id) REFERENCES ubs_semantic_entries(artifact_identity, entry_id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "ubs_semantic_normalized_coordinates",
+      "tbl_name": "ubs_semantic_normalized_coordinates",
+      "sql": "CREATE TABLE ubs_semantic_normalized_coordinates (\n  coordinate_key INTEGER PRIMARY KEY,\n  evidence_key INTEGER NOT NULL,\n  target_ordinal INTEGER NOT NULL CHECK (target_ordinal > 0),\n  normalized_book_number INTEGER NOT NULL CHECK (normalized_book_number BETWEEN 1 AND 66),\n  normalized_book_code TEXT NOT NULL CHECK (normalized_book_code GLOB '[A-Z0-9][A-Z0-9][A-Z0-9]'),\n  normalized_chapter INTEGER NOT NULL CHECK (normalized_chapter > 0),\n  -- Verse zero represents a Psalm superscription only. The canonical display\n  -- string and book code are checked by the deterministic materializer and\n  -- stored-data readiness assertions below the schema boundary.\n  normalized_verse INTEGER NOT NULL CHECK (\n    normalized_verse >= 0 AND (normalized_verse != 0 OR normalized_book_number = 19)\n  ),\n  normalized_reference TEXT NOT NULL CHECK (normalized_reference = trim(normalized_reference) AND length(normalized_reference) > 0),\n  -- evidence_key is a global parent identity. Do not duplicate artifact or\n  -- evidence IDs here: the normalized child therefore cannot drift away from\n  -- its parent lineage, and the compact key remains D1/SQLite-compatible.\n  UNIQUE (evidence_key, target_ordinal),\n  FOREIGN KEY (evidence_key) REFERENCES ubs_semantic_reference_evidence(evidence_key)\n)"
+    },
+    {
+      "type": "table",
+      "name": "ubs_semantic_reference_evidence",
+      "tbl_name": "ubs_semantic_reference_evidence",
+      "sql": "CREATE TABLE ubs_semantic_reference_evidence (\n  evidence_key INTEGER PRIMARY KEY,\n  artifact_identity TEXT NOT NULL,\n  source_id TEXT NOT NULL,\n  evidence_id TEXT NOT NULL CHECK (evidence_id = trim(evidence_id) AND evidence_id NOT GLOB '*[^a-z0-9._-]*'),\n  sense_id TEXT NOT NULL,\n  source_ordinal INTEGER NOT NULL CHECK (source_ordinal > 0),\n  source_reference TEXT NOT NULL CHECK (source_reference = trim(source_reference) AND length(source_reference) > 0),\n  raw_anchor TEXT NOT NULL CHECK (raw_anchor = trim(raw_anchor) AND length(raw_anchor) = 14 AND raw_anchor NOT GLOB '*[^0-9]*'),\n  footnote_suffix TEXT NOT NULL CHECK (footnote_suffix = trim(footnote_suffix)),\n  native_book_number INTEGER NOT NULL CHECK (native_book_number BETWEEN 1 AND 66),\n  native_book_code TEXT NOT NULL CHECK (native_book_code GLOB '[A-Z0-9][A-Z0-9][A-Z0-9]'),\n  native_chapter INTEGER NOT NULL CHECK (native_chapter > 0),\n  -- Psalm superscriptions retain the source's verse zero coordinate.\n  native_verse INTEGER NOT NULL CHECK (native_verse >= 0),\n  FOREIGN KEY (artifact_identity, source_id) REFERENCES ubs_semantic_sources(artifact_identity, source_id),\n  FOREIGN KEY (artifact_identity, sense_id) REFERENCES ubs_semantic_senses(artifact_identity, sense_id),\n  FOREIGN KEY (artifact_identity, source_id, sense_id)\n    REFERENCES ubs_semantic_senses(artifact_identity, source_id, sense_id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "ubs_semantic_sense_domains",
+      "tbl_name": "ubs_semantic_sense_domains",
+      "sql": "CREATE TABLE ubs_semantic_sense_domains (\n  artifact_identity TEXT NOT NULL,\n  sense_id TEXT NOT NULL,\n  domain_id TEXT NOT NULL,\n  domain_ordinal INTEGER NOT NULL CHECK (domain_ordinal > 0),\n  PRIMARY KEY (artifact_identity, sense_id, domain_id),\n  UNIQUE (artifact_identity, sense_id, domain_ordinal),\n  FOREIGN KEY (artifact_identity, sense_id) REFERENCES ubs_semantic_senses(artifact_identity, sense_id),\n  FOREIGN KEY (artifact_identity, domain_id) REFERENCES ubs_semantic_domains(artifact_identity, domain_id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "ubs_semantic_senses",
+      "tbl_name": "ubs_semantic_senses",
+      "sql": "CREATE TABLE ubs_semantic_senses (\n  artifact_identity TEXT NOT NULL,\n  source_id TEXT NOT NULL,\n  sense_id TEXT NOT NULL CHECK (sense_id = trim(sense_id) AND sense_id NOT GLOB '*[^a-z0-9._-]*'),\n  source_sense_id TEXT NOT NULL CHECK (source_sense_id = trim(source_sense_id) AND length(source_sense_id) > 0),\n  entry_id TEXT NOT NULL,\n  source_ordinal INTEGER NOT NULL CHECK (source_ordinal > 0),\n  definition_status TEXT NOT NULL CHECK (definition_status IN ('published', 'absent_in_source', 'excluded_unresolved_markup')),\n  definition TEXT,\n  definition_exclusion_reasons_json TEXT NOT NULL CHECK (json_valid(definition_exclusion_reasons_json) AND json_type(definition_exclusion_reasons_json) = 'array'),\n  glosses_json TEXT NOT NULL CHECK (json_valid(glosses_json) AND json_type(glosses_json) = 'array' AND json_array_length(glosses_json) > 0),\n  PRIMARY KEY (artifact_identity, sense_id),\n  UNIQUE (artifact_identity, source_id, entry_id, source_ordinal),\n  UNIQUE (artifact_identity, source_id, sense_id),\n  CHECK ((definition_status = 'published') = (definition IS NOT NULL)),\n  FOREIGN KEY (artifact_identity, source_id) REFERENCES ubs_semantic_sources(artifact_identity, source_id),\n  FOREIGN KEY (artifact_identity, entry_id) REFERENCES ubs_semantic_entries(artifact_identity, entry_id),\n  FOREIGN KEY (artifact_identity, source_id, entry_id)\n    REFERENCES ubs_semantic_entries(artifact_identity, source_id, entry_id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "ubs_semantic_sources",
+      "tbl_name": "ubs_semantic_sources",
+      "sql": "CREATE TABLE ubs_semantic_sources (\n  artifact_identity TEXT NOT NULL,\n  source_id TEXT NOT NULL CHECK (source_id = trim(source_id) AND source_id NOT GLOB '*[^a-z0-9._-]*'),\n  source_role TEXT NOT NULL CHECK (source_role IN ('dictionary', 'lexical_domains')),\n  schema_version TEXT NOT NULL CHECK (schema_version = 'ubs-semantics.v1'),\n  transform_version INTEGER NOT NULL CHECK (transform_version = 7),\n  title TEXT NOT NULL CHECK (title = trim(title) AND length(title) > 0),\n  artifact_name TEXT NOT NULL CHECK (\n    (source_role = 'dictionary' AND artifact_name = 'UBSHebrewDic-v0.9.2-en.JSON')\n    OR (source_role = 'lexical_domains' AND artifact_name = 'UBSHebrewDicLexicalDomains-v0.9.2-en.JSON')\n  ),\n  artifact_version TEXT NOT NULL CHECK (artifact_version = '0.9.2'),\n  language TEXT NOT NULL CHECK (language = 'Hebrew'),\n  source_url TEXT NOT NULL CHECK (source_url LIKE 'https://%' AND source_url = trim(source_url)),\n  source_commit TEXT NOT NULL CHECK (length(source_commit) = 40 AND source_commit NOT GLOB '*[^0-9a-f]*'),\n  source_blob TEXT NOT NULL CHECK (length(source_blob) = 40 AND source_blob NOT GLOB '*[^0-9a-f]*'),\n  source_sha256 TEXT NOT NULL CHECK (length(source_sha256) = 64 AND source_sha256 NOT GLOB '*[^0-9a-f]*'),\n  license TEXT NOT NULL CHECK (license = 'CC BY-SA 4.0'),\n  license_url TEXT NOT NULL CHECK (license_url = 'https://creativecommons.org/licenses/by-sa/4.0/'),\n  publisher TEXT NOT NULL CHECK (publisher = 'United Bible Societies'),\n  modified INTEGER NOT NULL CHECK (modified = 1),\n  modification_description TEXT NOT NULL CHECK (modification_description = trim(modification_description) AND length(modification_description) > 0),\n  PRIMARY KEY (artifact_identity, source_id),\n  UNIQUE (artifact_identity, source_role),\n  FOREIGN KEY (artifact_identity) REFERENCES ubs_semantic_artifacts(artifact_identity)\n)"
+    },
+    {
+      "type": "trigger",
+      "name": "historical_document_delivery_profile_immutable_delete",
+      "tbl_name": "historical_document_delivery_profiles",
+      "sql": "CREATE TRIGGER historical_document_delivery_profile_immutable_delete\nBEFORE DELETE ON historical_document_delivery_profiles\nFOR EACH ROW\nBEGIN\n  SELECT RAISE(ABORT, 'historical delivery profiles cannot be deleted');\nEND"
+    },
+    {
+      "type": "trigger",
+      "name": "historical_document_delivery_profile_immutable_update",
+      "tbl_name": "historical_document_delivery_profiles",
+      "sql": "CREATE TRIGGER historical_document_delivery_profile_immutable_update\nBEFORE UPDATE ON historical_document_delivery_profiles\nFOR EACH ROW\nBEGIN\n  SELECT RAISE(ABORT, 'historical delivery profiles are immutable');\nEND"
+    },
+    {
+      "type": "trigger",
+      "name": "historical_edition_hierarchies_immutable_delete",
+      "tbl_name": "historical_edition_hierarchies",
+      "sql": "CREATE TRIGGER historical_edition_hierarchies_immutable_delete BEFORE DELETE ON historical_edition_hierarchies\nBEGIN SELECT RAISE(ABORT, 'historical edition hierarchies cannot be deleted'); END"
+    },
+    {
+      "type": "trigger",
+      "name": "historical_edition_hierarchies_immutable_update",
+      "tbl_name": "historical_edition_hierarchies",
+      "sql": "CREATE TRIGGER historical_edition_hierarchies_immutable_update BEFORE UPDATE ON historical_edition_hierarchies\nBEGIN SELECT RAISE(ABORT, 'historical edition hierarchies are immutable'); END"
+    },
+    {
+      "type": "trigger",
+      "name": "historical_edition_hierarchy_anchor_insert",
+      "tbl_name": "historical_edition_hierarchies",
+      "sql": "CREATE TRIGGER historical_edition_hierarchy_anchor_insert\nBEFORE INSERT ON historical_edition_hierarchies\nFOR EACH ROW\nWHEN NOT EXISTS (\n  SELECT 1 FROM historical_editions edition\n  WHERE edition.edition_id = NEW.edition_id\n    AND edition.work_id = NEW.work_id\n    AND edition.pack_id = NEW.pack_id\n)\nBEGIN\n  SELECT RAISE(ABORT, 'historical edition hierarchy anchor does not match its edition lineage');\nEND"
+    },
+    {
+      "type": "trigger",
+      "name": "historical_edition_hierarchy_bodies_immutable_delete",
+      "tbl_name": "historical_edition_hierarchy_bodies",
+      "sql": "CREATE TRIGGER historical_edition_hierarchy_bodies_immutable_delete BEFORE DELETE ON historical_edition_hierarchy_bodies\nBEGIN SELECT RAISE(ABORT, 'historical edition hierarchy bodies cannot be deleted'); END"
+    },
+    {
+      "type": "trigger",
+      "name": "historical_edition_hierarchy_bodies_immutable_update",
+      "tbl_name": "historical_edition_hierarchy_bodies",
+      "sql": "CREATE TRIGGER historical_edition_hierarchy_bodies_immutable_update BEFORE UPDATE ON historical_edition_hierarchy_bodies\nBEGIN SELECT RAISE(ABORT, 'historical edition hierarchy bodies are immutable'); END"
+    },
+    {
+      "type": "trigger",
+      "name": "historical_edition_hierarchy_node_body_insert",
+      "tbl_name": "historical_edition_hierarchy_nodes",
+      "sql": "CREATE TRIGGER historical_edition_hierarchy_node_body_insert\nBEFORE INSERT ON historical_edition_hierarchy_nodes\nFOR EACH ROW\nWHEN NOT EXISTS (\n  SELECT 1\n  FROM historical_edition_hierarchies hierarchy,\n       json_each(hierarchy.level_spec_json, '$.levels') level\n  WHERE hierarchy.hierarchy_id = NEW.hierarchy_id\n    AND CAST(json_extract(level.value, '$.depth') AS INTEGER) = NEW.depth\n    AND json_extract(level.value, '$.nodeKind') = NEW.node_kind\n    AND (\n      (NEW.body_key IS NULL AND COALESCE(CAST(json_extract(level.value, '$.bodyRequired') AS INTEGER), 0) = 0)\n      OR\n      (NEW.body_key IS NOT NULL AND EXISTS (\n        SELECT 1\n        FROM historical_edition_hierarchy_bodies body,\n             json_each(level.value, '$.bodyKinds') allowed_body\n        WHERE body.hierarchy_id = NEW.hierarchy_id\n          AND body.body_key = NEW.body_key\n          AND body.body_kind = allowed_body.value\n      ))\n    )\n)\nBEGIN\n  SELECT RAISE(ABORT, 'historical edition hierarchy node body violates its generic level specification');\nEND"
+    },
+    {
+      "type": "trigger",
+      "name": "historical_edition_hierarchy_node_flat_ordinal_insert",
+      "tbl_name": "historical_edition_hierarchy_nodes",
+      "sql": "CREATE TRIGGER historical_edition_hierarchy_node_flat_ordinal_insert\nBEFORE INSERT ON historical_edition_hierarchy_nodes\nFOR EACH ROW\nWHEN NEW.flat_ordinal != (\n  SELECT COALESCE(MAX(node.flat_ordinal), 0) + 1\n  FROM historical_edition_hierarchy_nodes node\n  WHERE node.hierarchy_id = NEW.hierarchy_id\n)\nBEGIN\n  SELECT RAISE(ABORT, 'historical edition hierarchy flat ordinals must be contiguous');\nEND"
+    },
+    {
+      "type": "trigger",
+      "name": "historical_edition_hierarchy_node_level_insert",
+      "tbl_name": "historical_edition_hierarchy_nodes",
+      "sql": "CREATE TRIGGER historical_edition_hierarchy_node_level_insert\nBEFORE INSERT ON historical_edition_hierarchy_nodes\nFOR EACH ROW\nWHEN NOT EXISTS (\n  SELECT 1\n  FROM historical_edition_hierarchies hierarchy,\n       json_each(hierarchy.level_spec_json, '$.levels') level\n  WHERE hierarchy.hierarchy_id = NEW.hierarchy_id\n    AND NEW.depth <= CAST(json_extract(hierarchy.level_spec_json, '$.maxDepth') AS INTEGER)\n    AND CAST(json_extract(level.value, '$.depth') AS INTEGER) = NEW.depth\n    AND json_extract(level.value, '$.nodeKind') = NEW.node_kind\n    AND (\n      (NEW.parent_node_key IS NULL\n        AND json_array_length(json_extract(level.value, '$.parentNodeKinds')) = 0)\n      OR\n      (NEW.parent_node_key IS NOT NULL AND EXISTS (\n        SELECT 1\n        FROM historical_edition_hierarchy_nodes parent,\n             json_each(level.value, '$.parentNodeKinds') allowed_parent\n        WHERE parent.hierarchy_id = NEW.hierarchy_id\n          AND parent.node_key = NEW.parent_node_key\n          AND parent.depth = NEW.depth - 1\n          AND parent.node_kind = allowed_parent.value\n      ))\n    )\n)\nBEGIN\n  SELECT RAISE(ABORT, 'historical edition hierarchy node violates its generic level specification');\nEND"
+    },
+    {
+      "type": "trigger",
+      "name": "historical_edition_hierarchy_node_preorder_insert",
+      "tbl_name": "historical_edition_hierarchy_nodes",
+      "sql": "CREATE TRIGGER historical_edition_hierarchy_node_preorder_insert\nAFTER INSERT ON historical_edition_hierarchy_nodes\nFOR EACH ROW\nWHEN NEW.flat_ordinal = (\n  SELECT hierarchy.node_count FROM historical_edition_hierarchies hierarchy\n  WHERE hierarchy.hierarchy_id = NEW.hierarchy_id\n)\nBEGIN\n  SELECT RAISE(ABORT, 'historical edition hierarchy flat ordinals are not preorder')\n  WHERE EXISTS (\n    WITH RECURSIVE traversal(node_key, path) AS (\n      SELECT root.node_key, printf('%08d', root.sibling_ordinal)\n      FROM historical_edition_hierarchy_nodes root\n      WHERE root.hierarchy_id = NEW.hierarchy_id AND root.parent_node_key IS NULL\n      UNION ALL\n      SELECT child.node_key, traversal.path || '.' || printf('%08d', child.sibling_ordinal)\n      FROM historical_edition_hierarchy_nodes child\n      JOIN traversal ON traversal.node_key = child.parent_node_key\n      WHERE child.hierarchy_id = NEW.hierarchy_id\n    ), ordered AS (\n      SELECT node_key, ROW_NUMBER() OVER (ORDER BY path) AS expected_flat_ordinal\n      FROM traversal\n    )\n    SELECT 1\n    FROM historical_edition_hierarchy_nodes node\n    LEFT JOIN ordered ON ordered.node_key = node.node_key\n    WHERE node.hierarchy_id = NEW.hierarchy_id\n      AND (ordered.expected_flat_ordinal IS NULL OR node.flat_ordinal != ordered.expected_flat_ordinal)\n  );\nEND"
+    },
+    {
+      "type": "trigger",
+      "name": "historical_edition_hierarchy_node_sibling_ordinal_insert",
+      "tbl_name": "historical_edition_hierarchy_nodes",
+      "sql": "CREATE TRIGGER historical_edition_hierarchy_node_sibling_ordinal_insert\nBEFORE INSERT ON historical_edition_hierarchy_nodes\nFOR EACH ROW\nWHEN NEW.sibling_ordinal != (\n  SELECT COUNT(*) + 1 FROM historical_edition_hierarchy_nodes sibling\n  WHERE sibling.hierarchy_id = NEW.hierarchy_id\n    AND sibling.parent_node_key IS NEW.parent_node_key\n)\nBEGIN\n  SELECT RAISE(ABORT, 'historical edition hierarchy sibling ordinals must be locally contiguous');\nEND"
+    },
+    {
+      "type": "trigger",
+      "name": "historical_edition_hierarchy_nodes_immutable_delete",
+      "tbl_name": "historical_edition_hierarchy_nodes",
+      "sql": "CREATE TRIGGER historical_edition_hierarchy_nodes_immutable_delete BEFORE DELETE ON historical_edition_hierarchy_nodes\nBEGIN SELECT RAISE(ABORT, 'historical edition hierarchy nodes cannot be deleted'); END"
+    },
+    {
+      "type": "trigger",
+      "name": "historical_edition_hierarchy_nodes_immutable_update",
+      "tbl_name": "historical_edition_hierarchy_nodes",
+      "sql": "CREATE TRIGGER historical_edition_hierarchy_nodes_immutable_update BEFORE UPDATE ON historical_edition_hierarchy_nodes\nBEGIN SELECT RAISE(ABORT, 'historical edition hierarchy nodes are immutable'); END"
+    },
+    {
+      "type": "trigger",
+      "name": "historical_hierarchy_publication_requires_inactive_authority_insert",
+      "tbl_name": "historical_hierarchy_publications",
+      "sql": "CREATE TRIGGER historical_hierarchy_publication_requires_inactive_authority_insert\nBEFORE INSERT ON historical_hierarchy_publications\nFOR EACH ROW\nWHEN NOT EXISTS (\n  SELECT 1 FROM historical_edition_hierarchies hierarchy\n  WHERE hierarchy.hierarchy_id = NEW.hierarchy_id\n    AND hierarchy.availability = 'local_only_inactive'\n)\nBEGIN\n  SELECT RAISE(ABORT, 'historical hierarchy publication must bind local_only_inactive authority');\nEND"
+    },
+    {
+      "type": "trigger",
+      "name": "historical_hierarchy_publications_immutable_delete",
+      "tbl_name": "historical_hierarchy_publications",
+      "sql": "CREATE TRIGGER historical_hierarchy_publications_immutable_delete\nBEFORE DELETE ON historical_hierarchy_publications\nFOR EACH ROW\nBEGIN\n  SELECT RAISE(ABORT, 'historical hierarchy publications cannot be deleted');\nEND"
+    },
+    {
+      "type": "trigger",
+      "name": "historical_hierarchy_publications_immutable_update",
+      "tbl_name": "historical_hierarchy_publications",
+      "sql": "CREATE TRIGGER historical_hierarchy_publications_immutable_update\nBEFORE UPDATE ON historical_hierarchy_publications\nFOR EACH ROW\nBEGIN\n  SELECT RAISE(ABORT, 'historical hierarchy publications are immutable');\nEND"
+    },
+    {
+      "type": "trigger",
+      "name": "historical_section_alias_immutable_delete",
+      "tbl_name": "historical_section_aliases",
+      "sql": "CREATE TRIGGER historical_section_alias_immutable_delete\nBEFORE DELETE ON historical_section_aliases\nFOR EACH ROW\nBEGIN\n  SELECT RAISE(ABORT, 'historical section aliases cannot be deleted');\nEND"
+    },
+    {
+      "type": "trigger",
+      "name": "historical_section_alias_immutable_update",
+      "tbl_name": "historical_section_aliases",
+      "sql": "CREATE TRIGGER historical_section_alias_immutable_update\nBEFORE UPDATE ON historical_section_aliases\nFOR EACH ROW\nBEGIN\n  SELECT RAISE(ABORT, 'historical section aliases are immutable');\nEND"
+    },
+    {
+      "type": "trigger",
+      "name": "historical_section_alias_non_shadowing_insert",
+      "tbl_name": "historical_section_aliases",
+      "sql": "CREATE TRIGGER historical_section_alias_non_shadowing_insert\nBEFORE INSERT ON historical_section_aliases\nFOR EACH ROW\nWHEN EXISTS (\n  SELECT 1 FROM historical_section_identities\n  WHERE document_id = NEW.document_id\n    AND section_key = NEW.legacy_section_id\n    AND section_key != NEW.section_key\n)\nBEGIN\n  SELECT RAISE(ABORT, 'legacy alias may not shadow a different canonical section key');\nEND"
+    },
+    {
+      "type": "trigger",
+      "name": "historical_section_identity_immutable_delete",
+      "tbl_name": "historical_section_identities",
+      "sql": "CREATE TRIGGER historical_section_identity_immutable_delete\nBEFORE DELETE ON historical_section_identities\nFOR EACH ROW\nBEGIN\n  SELECT RAISE(ABORT, 'historical section identities cannot be deleted');\nEND"
+    },
+    {
+      "type": "trigger",
+      "name": "historical_section_identity_immutable_update",
+      "tbl_name": "historical_section_identities",
+      "sql": "CREATE TRIGGER historical_section_identity_immutable_update\nBEFORE UPDATE ON historical_section_identities\nFOR EACH ROW\nBEGIN\n  SELECT RAISE(ABORT, 'historical section identities are immutable');\nEND"
+    },
+    {
+      "type": "trigger",
+      "name": "historical_section_identity_same_document_insert",
+      "tbl_name": "historical_section_identities",
+      "sql": "CREATE TRIGGER historical_section_identity_same_document_insert\nBEFORE INSERT ON historical_section_identities\nFOR EACH ROW\nWHEN NOT EXISTS (\n  SELECT 1 FROM document_sections\n  WHERE id = NEW.document_section_id AND document_id = NEW.document_id\n)\nBEGIN\n  SELECT RAISE(ABORT, 'document section identity must retain its source document');\nEND"
+    },
+    {
+      "type": "trigger",
+      "name": "historical_sectioned_profile_requires_matching_edition",
+      "tbl_name": "historical_document_delivery_profiles",
+      "sql": "CREATE TRIGGER historical_sectioned_profile_requires_matching_edition\nBEFORE INSERT ON historical_document_delivery_profiles\nWHEN NEW.delivery_mode = 'sectioned_only'\n AND (\n   NEW.document_id != NEW.work_id\n   OR NEW.work_id IS NULL\n   OR NEW.edition_id IS NULL\n   OR NOT EXISTS (\n     SELECT 1 FROM historical_editions\n     WHERE edition_id = NEW.edition_id AND work_id = NEW.work_id\n   )\n )\nBEGIN\n  SELECT RAISE(ABORT, 'sectioned delivery profile must select one matching edition for its work');\nEND"
+    },
+    {
+      "type": "trigger",
+      "name": "historical_sectioned_profile_update_requires_matching_edition",
+      "tbl_name": "historical_document_delivery_profiles",
+      "sql": "CREATE TRIGGER historical_sectioned_profile_update_requires_matching_edition\nBEFORE UPDATE OF document_id, work_id, edition_id, delivery_mode\nON historical_document_delivery_profiles\nWHEN NEW.delivery_mode = 'sectioned_only'\n AND (\n   NEW.document_id != NEW.work_id\n   OR NEW.work_id IS NULL\n   OR NEW.edition_id IS NULL\n   OR NOT EXISTS (\n     SELECT 1 FROM historical_editions\n     WHERE edition_id = NEW.edition_id AND work_id = NEW.work_id\n   )\n )\nBEGIN\n  SELECT RAISE(ABORT, 'sectioned delivery profile must select one matching edition for its work');\nEND"
+    },
+    {
+      "type": "trigger",
+      "name": "historical_sectioned_publication_blocks_document_insert",
+      "tbl_name": "documents",
+      "sql": "CREATE TRIGGER historical_sectioned_publication_blocks_document_insert\nBEFORE INSERT ON documents\nWHEN EXISTS (SELECT 1 FROM historical_sectioned_publications WHERE document_id = NEW.id)\nBEGIN SELECT RAISE(ABORT, 'dormant sectioned publication cannot become a runtime document'); END"
+    },
+    {
+      "type": "trigger",
+      "name": "historical_sectioned_publication_blocks_document_update",
+      "tbl_name": "documents",
+      "sql": "CREATE TRIGGER historical_sectioned_publication_blocks_document_update\nBEFORE UPDATE OF id ON documents\nWHEN EXISTS (SELECT 1 FROM historical_sectioned_publications WHERE document_id = NEW.id)\nBEGIN SELECT RAISE(ABORT, 'dormant sectioned publication cannot become a runtime document'); END"
+    },
+    {
+      "type": "trigger",
+      "name": "historical_sectioned_publication_blocks_profile_insert",
+      "tbl_name": "historical_document_delivery_profiles",
+      "sql": "CREATE TRIGGER historical_sectioned_publication_blocks_profile_insert\nBEFORE INSERT ON historical_document_delivery_profiles\nWHEN EXISTS (\n  SELECT 1 FROM historical_sectioned_publications\n  WHERE document_id = NEW.document_id OR edition_id = NEW.edition_id\n)\nBEGIN SELECT RAISE(ABORT, 'dormant sectioned publication cannot become a delivery profile'); END"
+    },
+    {
+      "type": "trigger",
+      "name": "historical_sectioned_publication_blocks_profile_update",
+      "tbl_name": "historical_document_delivery_profiles",
+      "sql": "CREATE TRIGGER historical_sectioned_publication_blocks_profile_update\nBEFORE UPDATE OF document_id, edition_id ON historical_document_delivery_profiles\nWHEN EXISTS (\n  SELECT 1 FROM historical_sectioned_publications\n  WHERE document_id = NEW.document_id OR edition_id = NEW.edition_id\n)\nBEGIN SELECT RAISE(ABORT, 'dormant sectioned publication cannot become a delivery profile'); END"
+    },
+    {
+      "type": "trigger",
+      "name": "historical_sectioned_publication_requires_inactive_lineage",
+      "tbl_name": "historical_sectioned_publications",
+      "sql": "CREATE TRIGGER historical_sectioned_publication_requires_inactive_lineage\nBEFORE INSERT ON historical_sectioned_publications\nFOR EACH ROW\nWHEN NEW.document_id != NEW.edition_id\n  OR NOT EXISTS (\n    SELECT 1 FROM historical_editions edition\n    WHERE edition.edition_id = NEW.edition_id\n      AND edition.work_id = NEW.work_id\n      AND edition.pack_id = NEW.pack_id\n  )\n  OR EXISTS (SELECT 1 FROM documents WHERE id = NEW.document_id)\n  OR EXISTS (\n    SELECT 1 FROM historical_document_delivery_profiles\n    WHERE document_id = NEW.document_id OR edition_id = NEW.edition_id\n  )\nBEGIN\n  SELECT RAISE(ABORT, 'dormant sectioned publication must bind inactive edition lineage');\nEND"
+    },
+    {
+      "type": "trigger",
+      "name": "historical_sectioned_publications_immutable_delete",
+      "tbl_name": "historical_sectioned_publications",
+      "sql": "CREATE TRIGGER historical_sectioned_publications_immutable_delete\nBEFORE DELETE ON historical_sectioned_publications\nBEGIN SELECT RAISE(ABORT, 'historical sectioned publications cannot be deleted'); END"
+    },
+    {
+      "type": "trigger",
+      "name": "historical_sectioned_publications_immutable_update",
+      "tbl_name": "historical_sectioned_publications",
+      "sql": "CREATE TRIGGER historical_sectioned_publications_immutable_update\nBEFORE UPDATE ON historical_sectioned_publications\nBEGIN SELECT RAISE(ABORT, 'historical sectioned publications are immutable'); END"
+    },
+    {
+      "type": "trigger",
+      "name": "transform12_document_sections_sealed_delete",
+      "tbl_name": "document_sections",
+      "sql": "CREATE TRIGGER transform12_document_sections_sealed_delete BEFORE DELETE ON document_sections\nWHEN EXISTS (SELECT 1 FROM historical_corpus_seal WHERE seal_id = 1)\nBEGIN SELECT RAISE(ABORT, 'Transform 12 corpus is sealed'); END"
+    },
+    {
+      "type": "trigger",
+      "name": "transform12_document_sections_sealed_insert",
+      "tbl_name": "document_sections",
+      "sql": "CREATE TRIGGER transform12_document_sections_sealed_insert BEFORE INSERT ON document_sections\nWHEN EXISTS (SELECT 1 FROM historical_corpus_seal WHERE seal_id = 1)\nBEGIN SELECT RAISE(ABORT, 'Transform 12 corpus is sealed'); END"
+    },
+    {
+      "type": "trigger",
+      "name": "transform12_document_sections_sealed_update",
+      "tbl_name": "document_sections",
+      "sql": "CREATE TRIGGER transform12_document_sections_sealed_update BEFORE UPDATE ON document_sections\nWHEN EXISTS (SELECT 1 FROM historical_corpus_seal WHERE seal_id = 1)\nBEGIN SELECT RAISE(ABORT, 'Transform 12 corpus is sealed'); END"
+    },
+    {
+      "type": "trigger",
+      "name": "transform12_edition_sections_sealed_delete",
+      "tbl_name": "historical_edition_sections",
+      "sql": "CREATE TRIGGER transform12_edition_sections_sealed_delete BEFORE DELETE ON historical_edition_sections\nWHEN EXISTS (SELECT 1 FROM historical_corpus_seal WHERE seal_id = 1)\nBEGIN SELECT RAISE(ABORT, 'Transform 12 corpus is sealed'); END"
+    },
+    {
+      "type": "trigger",
+      "name": "transform12_edition_sections_sealed_insert",
+      "tbl_name": "historical_edition_sections",
+      "sql": "CREATE TRIGGER transform12_edition_sections_sealed_insert BEFORE INSERT ON historical_edition_sections\nWHEN EXISTS (SELECT 1 FROM historical_corpus_seal WHERE seal_id = 1)\nBEGIN SELECT RAISE(ABORT, 'Transform 12 corpus is sealed'); END"
+    },
+    {
+      "type": "trigger",
+      "name": "transform12_edition_sections_sealed_update",
+      "tbl_name": "historical_edition_sections",
+      "sql": "CREATE TRIGGER transform12_edition_sections_sealed_update BEFORE UPDATE ON historical_edition_sections\nWHEN EXISTS (SELECT 1 FROM historical_corpus_seal WHERE seal_id = 1)\nBEGIN SELECT RAISE(ABORT, 'Transform 12 corpus is sealed'); END"
+    },
+    {
+      "type": "trigger",
+      "name": "transform12_hierarchy_bodies_sealed_delete",
+      "tbl_name": "historical_edition_hierarchy_bodies",
+      "sql": "CREATE TRIGGER transform12_hierarchy_bodies_sealed_delete BEFORE DELETE ON historical_edition_hierarchy_bodies\nWHEN EXISTS (SELECT 1 FROM historical_corpus_seal WHERE seal_id = 1)\nBEGIN SELECT RAISE(ABORT, 'Transform 12 corpus is sealed'); END"
+    },
+    {
+      "type": "trigger",
+      "name": "transform12_hierarchy_bodies_sealed_insert",
+      "tbl_name": "historical_edition_hierarchy_bodies",
+      "sql": "CREATE TRIGGER transform12_hierarchy_bodies_sealed_insert BEFORE INSERT ON historical_edition_hierarchy_bodies\nWHEN EXISTS (SELECT 1 FROM historical_corpus_seal WHERE seal_id = 1)\nBEGIN SELECT RAISE(ABORT, 'Transform 12 corpus is sealed'); END"
+    },
+    {
+      "type": "trigger",
+      "name": "transform12_hierarchy_bodies_sealed_update",
+      "tbl_name": "historical_edition_hierarchy_bodies",
+      "sql": "CREATE TRIGGER transform12_hierarchy_bodies_sealed_update BEFORE UPDATE ON historical_edition_hierarchy_bodies\nWHEN EXISTS (SELECT 1 FROM historical_corpus_seal WHERE seal_id = 1)\nBEGIN SELECT RAISE(ABORT, 'Transform 12 corpus is sealed'); END"
+    },
+    {
+      "type": "trigger",
+      "name": "transform12_strongs_sealed_delete",
+      "tbl_name": "strongs",
+      "sql": "CREATE TRIGGER transform12_strongs_sealed_delete BEFORE DELETE ON strongs\nWHEN EXISTS (SELECT 1 FROM historical_corpus_seal WHERE seal_id = 1)\nBEGIN SELECT RAISE(ABORT, 'Transform 12 corpus is sealed'); END"
+    },
+    {
+      "type": "trigger",
+      "name": "transform12_strongs_sealed_insert",
+      "tbl_name": "strongs",
+      "sql": "CREATE TRIGGER transform12_strongs_sealed_insert BEFORE INSERT ON strongs\nWHEN EXISTS (SELECT 1 FROM historical_corpus_seal WHERE seal_id = 1)\nBEGIN SELECT RAISE(ABORT, 'Transform 12 corpus is sealed'); END"
+    },
+    {
+      "type": "trigger",
+      "name": "transform12_strongs_sealed_update",
+      "tbl_name": "strongs",
+      "sql": "CREATE TRIGGER transform12_strongs_sealed_update BEFORE UPDATE ON strongs\nWHEN EXISTS (SELECT 1 FROM historical_corpus_seal WHERE seal_id = 1)\nBEGIN SELECT RAISE(ABORT, 'Transform 12 corpus is sealed'); END"
+    }
+  ],
+  "tables": {
+    "cross_references": {
+      "rows": 344799,
+      "sha256": "27251a2b645757d89975fa69af5bb163a9a7fba51d0ddedabd9af712e83b9766"
+    },
+    "document_sections": {
+      "rows": 4111,
+      "sha256": "96234d341d15fa0defd615740dfb00cc6b277fe35f6ae893e1ecc38a6b14e1d0"
+    },
+    "documents": {
+      "rows": 35,
+      "sha256": "4e2bb40a6ff5683b83241bd7e52f4ca4d478f4c09cb361b557035da7a877babb"
+    },
+    "historical_corpus_seal": {
+      "rows": 1,
+      "sha256": "044db2054455b04e8f4ff2c564106118bfbba8e55c30dd8a87dda5f78de9ed4b"
+    },
+    "historical_document_delivery_profiles": {
+      "rows": 35,
+      "sha256": "d74ccf31e56fca8cf8e07de00f4a9910996853c95c072f2425ef1766a182a5d3"
+    },
+    "historical_edition_hierarchies": {
+      "rows": 0,
+      "sha256": "bb8b5311fec088574ed1e4cce37fbea4ff948db1f936f97741757bb630f31f79"
+    },
+    "historical_edition_hierarchy_bodies": {
+      "rows": 0,
+      "sha256": "0c92b2636a1db26f385fbbe18d3f198be38aac242766f2ba32af78092b30d8e7"
+    },
+    "historical_edition_hierarchy_nodes": {
+      "rows": 0,
+      "sha256": "983445fa6f87989ad159abcd50e44822e59949850ad64054d28398a74f2b21d6"
+    },
+    "historical_edition_sections": {
+      "rows": 1057,
+      "sha256": "1e330866e9c44057d8084652ef424aea8edc9fab254015483750d4f99019b6da"
+    },
+    "historical_editions": {
+      "rows": 18,
+      "sha256": "c7e417372363b3d5d2521db1a85dbc9679874fc37f205b459bff9443e4b15478"
+    },
+    "historical_hierarchy_publications": {
+      "rows": 0,
+      "sha256": "ad63ef473efd5489ce4884e00c41adac975476a0826269de6c23d96220b88da8"
+    },
+    "historical_section_aliases": {
+      "rows": 2821,
+      "sha256": "51586ee04ad48eb811567f5351086c13ad44a6170b745448dfc7cffcd29c8d01"
+    },
+    "historical_section_identities": {
+      "rows": 4111,
+      "sha256": "c78b6c68b6e2388d0077ec1fa14780446334a646b68ee251b3ed0bec54d88492"
+    },
+    "historical_sectioned_publications": {
+      "rows": 0,
+      "sha256": "eb3e63a656becc8f2b8331c8757306b2f120d88b3b9a2896d518607322501393"
+    },
+    "historical_source_artifacts": {
+      "rows": 43,
+      "sha256": "3bd2228999234f39249711c1780a31436c3a55c92a535e4bc992eb3da2808349"
+    },
+    "historical_source_packs": {
+      "rows": 3,
+      "sha256": "735a82efa8587855fdc4a0e60616b060361f70d5b50bdbadff3fed14ae8d0ff4"
+    },
+    "historical_works": {
+      "rows": 18,
+      "sha256": "e01447f1f7fc174cc54e54bd66dbe272c1056c006198685bc1fc97271d0cb557"
+    },
+    "morph_codes": {
+      "rows": 20,
+      "sha256": "2ed77174eff55db93486c7513320292f1b693b242ecb2fe4799f3647f7e709ab"
+    },
+    "morphology": {
+      "rows": 447748,
+      "sha256": "71520c27fc722c2a0f5397139a1fb2bd8872a1e3d016156bbf500be7388bbb72"
+    },
+    "stepbible_lexicons": {
+      "rows": 19570,
+      "sha256": "f8936515ec99c5804b15a76777566bf4f53becb2cab936f00e7a390dcc44727e"
+    },
+    "strongs": {
+      "rows": 14298,
+      "sha256": "cbc8c382b248403e7b660141f17b62c66a733087127dfdc2509505aab0ef1fe1"
+    },
+    "strongs_book_stats": {
+      "rows": 57781,
+      "sha256": "14603215e51fd53ff5a193e7e7cf181f1d0ce72fa9ac014d17ebc0c99db0fe87"
+    },
+    "strongs_form_stats": {
+      "rows": 138293,
+      "sha256": "07413ba6712a6488762a9146fe04ff9a205bb698c4b78857f407887b11b7278f"
+    },
+    "strongs_fts": {
+      "rows": 14298,
+      "sha256": "1df5dc89ed089cc5f0c9f664df67db0a180881795bb19aeeb2403aae58dd899d"
+    },
+    "strongs_usage_stats": {
+      "rows": 13836,
+      "sha256": "8d57e10374cf5e8cd2f1431cc1bf287dc11885322e9b1c6c2963b7e96889f8bb"
+    },
+    "theologai_metadata": {
+      "rows": 2,
+      "sha256": "1e87ea9bf90461d21381e58e3ae81cfcd846d4159d91db0216882826ee5c32cc"
+    },
+    "ubs_parallel_groups": {
+      "rows": 2193,
+      "sha256": "39bee8902f787d4c8d689042cc1fcb8be1ac9ca12c0cc86658b48ccff2bd9f39"
+    },
+    "ubs_parallel_members": {
+      "rows": 5266,
+      "sha256": "54ec2ac9342551865fa234e07b7153013d7638d3085ead59b5cc41d6f277a8c3"
+    },
+    "ubs_parallel_segments": {
+      "rows": 5276,
+      "sha256": "598341e7f8aa6ec713bb20b314594c1829570b1a93d2e7c6b098005ab2040b84"
+    },
+    "ubs_parallel_sources": {
+      "rows": 1,
+      "sha256": "1975421c9eaac9a1c8ea858705661a1c4eea2f3c0457feffea24bbdcf933040f"
+    },
+    "ubs_semantic_artifacts": {
+      "rows": 1,
+      "sha256": "2f3d2159f3846b2d9498d9bbe75ea4d6bb5888be3393fdd6bce98489aeaaae86"
+    },
+    "ubs_semantic_domains": {
+      "rows": 411,
+      "sha256": "976fc098da06e15db83bf0716e5c1f9af02290099e6480721fc47ec56b034ffd"
+    },
+    "ubs_semantic_entries": {
+      "rows": 8285,
+      "sha256": "fef33cea7f94ab065259a6148c98292da0b6e5ff6d966ef8f99da087341f1acc"
+    },
+    "ubs_semantic_entry_identities": {
+      "rows": 9981,
+      "sha256": "263ce95728a5cb45ead62bd8e5155817d0c3a228f0a2f0277bee5a05a65d1823"
+    },
+    "ubs_semantic_normalized_coordinates": {
+      "rows": 250393,
+      "sha256": "39fd973d1181f8827970a51c2c7f32e653c121aff421a8aa1376874e56f804ab"
+    },
+    "ubs_semantic_reference_evidence": {
+      "rows": 249901,
+      "sha256": "df1ad5d0f4cdde1bba8983981ab8e63d04f1144104b26133667413098cd67ceb"
+    },
+    "ubs_semantic_sense_domains": {
+      "rows": 15361,
+      "sha256": "bce82646d825e3d02fa34e355e1a5aa87d57d4d2be681a361f2da46a9603b345"
+    },
+    "ubs_semantic_senses": {
+      "rows": 15123,
+      "sha256": "f88fe2a340bfa4ef3e011eb41d23f0cd4b60af6048da555f1c1c8f8e69b0d779"
+    },
+    "ubs_semantic_sources": {
+      "rows": 2,
+      "sha256": "2013d8e0de5eea13b7449318efdf8c5da02b125388f7d67e96c9d2217504d98e"
+    }
+  }
+}

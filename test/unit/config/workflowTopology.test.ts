@@ -1,10 +1,11 @@
 import { createRequire } from 'node:module';
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { parse, stringify } from 'yaml';
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rename, rm, symlink, unlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { classifyApplicationRelease, POLICY as CORPUS_POLICY } from '../../../scripts/norton-aquinas-release-policy.mjs';
 
 async function readWorkflow(name: string): Promise<string> {
   return readFile(new URL(`../../../.github/workflows/${name}`, import.meta.url), 'utf8');
@@ -79,9 +80,9 @@ function expressionBody(value: string): string {
   return normalized(value).replace(/^\$\{\{\s*/, '').replace(/\s*\}\}$/, '');
 }
 
-function routedName(name: string | undefined, event = 'pull_request', proof = '', authorization = ''): string {
+function routedName(name: string | undefined, event = 'pull_request', proof = '', authorization = '', restoration = '', existingValidation = '', operationKind = 'validation'): string {
   if (!name?.startsWith('${{')) return name ?? '';
-  return new Function('github','inputs','return ('+name.slice(3,-2)+')')({event_name:event},{operator_proof_json:proof,operator_authorization_json:authorization});
+  return new Function('github','inputs','needs','return ('+name.slice(3,-2)+')')({event_name:event},{operator_proof_json:proof,operator_authorization_json:authorization,preview_restore_json:restoration,preview_validate_existing_json:existingValidation},{'existing-preview-source':{outputs:{operation_kind:operationKind}}});
 }
 function assertPreviewRevocationBoundary(workflow: Workflow): void {
   const trigger = workflow.on['pull_request'] as { types?: string[] };
@@ -156,7 +157,7 @@ describe('workflow topology', () => {
     expect(JSON.stringify(action)).not.toMatch(/auth token|wrangler login|application-corpus-check.ts verify/);
     const production=parse(await readWorkflow('deploy.yml')) as Workflow;
     expect(production.jobs.deploy!.environment).toMatchObject({name:'production'});
-    expect(production.jobs.deploy!.permissions).toEqual({actions:'read',contents:'read'});
+    expect(production.jobs.deploy!.permissions).toEqual({actions:'read',contents:'read','pull-requests':'read'});
     expect(production.jobs.deploy!.steps!.find(s=>s.id==='corpus-proof')!.uses).toBe('./.github/actions/operator-corpus-proof');
   });
   it('keeps root dependencies and builds out of every credential-bearing job', async () => {
@@ -202,15 +203,40 @@ describe('workflow topology', () => {
   it('paces the long fixed audits within the shared per-IP request budget', async () => {
     for (const [file, target, jobId] of [['pr.yml', 'preview', 'preview-deploy'], ['deploy.yml', 'production', 'deploy']] as const) {
       const steps = (parse(await readWorkflow(file)) as Workflow).jobs[jobId]!.steps!;
-      const core = steps.findIndex(step => step.name === `Audit Transform-9 historical core contract on ${target}`);
-      const pause = steps.findIndex(step => step.name === 'Respect the shared IP request budget before the spine audit');
-      const spine = steps.findIndex(step => step.name === `Audit Transform-11 historical spine contract on ${target}`);
-      expect(pause).toBeGreaterThan(core);
-      expect(spine).toBeGreaterThan(pause);
-      const seconds = /^sleep (\d+)$/.exec(steps[pause]!.run ?? '');
-      expect(seconds).not.toBeNull();
-      expect(Number(seconds![1])).toBeGreaterThan(60);
-      expect(steps[pause]!.if).toBe(`\${{ steps.${target}-historical-core-audit.outcome == 'success' }}`);
+      const live = steps.filter(step => step.id === target+'-corpus-live');
+      expect(live).toHaveLength(1);
+      expect(live[0]!.run).toContain('scripts/norton-aquinas-live.ts '+target);
+      expect(live[0]!.if).toContain('steps.'+target+"-primary-source-edge-stabilization-gate.outcome == 'success'");
+      expect(live[0]!.if).toContain("needs.build-worker.outputs.release_policy == 'norton-aquinas.v1'");
+      const core=steps.findIndex(step=>step.id===target+'-historical-core-audit'),spine=steps.findIndex(step=>step.id===target+'-historical-spine-audit');
+      const pause=steps.findIndex(step=>step.name==='Respect the shared IP request budget before the spine audit');
+      expect(core).toBeGreaterThan(-1);expect(pause).toBeGreaterThan(core);expect(spine).toBeGreaterThan(pause);
+      expect(steps[pause]!.run).toBe('sleep 65');
+      for(const step of [steps[core]!,steps[spine]!])expect(step.if).toContain("needs.build-worker.outputs.release_policy == 'application-only'");
+      const evaluate=(step:Step,policy:string)=>{
+        const ids=['primary-source-edge-stabilization-gate','original-language-v2-audit','historical-core-audit','historical-spine-audit'].map(id=>target+'-'+id).concat('release-operation');
+        let expression=expressionBody(step.if!).replaceAll('needs.build-worker','needs["build-worker"]');
+        for(const id of ids)expression=expression.replaceAll('steps.'+id,'steps['+JSON.stringify(id)+']');
+        return new Function('needs','steps','return ('+expression+')')({'build-worker':{outputs:{release_policy:policy}}},Object.fromEntries(ids.map(id=>[id,{outcome:'success',outputs:{release_policy:policy}}])));
+      };
+      expect(evaluate(live[0]!,'norton-aquinas.v1')).toBe(true);expect(evaluate(live[0]!,'application-only')).toBe(false);expect(evaluate(steps[core]!,'application-only')).toBe(true);expect(evaluate(steps[core]!,'norton-aquinas.v1')).toBe(false);expect(evaluate(live[0]!,'unknown')).toBe(false);
+      const audit = await readFile(new URL('../../../scripts/audit-corpus-release.ts', import.meta.url), 'utf8');
+      expect(audit).toContain('650');
+      expect(audit).toContain('++exchanges <= 200');
+      expect(audit).toContain('guard');
+    }
+  });
+
+  it('binds config, owner and workflow policy before any provider credential is exposed',async()=>{
+    for(const [file,jobId]of [['pr.yml','preview-deploy'],['deploy.yml','deploy']]as const){
+      const workflow=parse(await readWorkflow(file))as Workflow,steps=workflow.jobs[jobId]!.steps!;
+      const source=steps.findIndex(step=>step.run?.includes('verify-source-plan'));
+      const owner=steps.findIndex(step=>step.name==='Verify closed release policy before provider access');
+      const credential=steps.findIndex(step=>step.env?.CLOUDFLARE_API_TOKEN);
+      expect(source).toBeGreaterThan(-1);expect(owner).toBeGreaterThan(source);expect(credential).toBeGreaterThan(owner);
+      expect(steps[source]!.run).toContain('test "$policy" = "$EXPECTED_RELEASE_POLICY"');
+      expect(steps[owner]!.run).toContain('verify-release-operation.ts '+(file==='pr.yml'?'complete':'owner'));
+      expect(steps[owner]!.env?.EXPECTED_RELEASE_POLICY).toContain('needs.build-worker.outputs.release_policy');
     }
   });
 
@@ -268,8 +294,8 @@ describe('workflow topology', () => {
       expect(download.with?.name).toContain('github.run_attempt');
     }
     const preview = (parse(await readWorkflow('pr.yml')) as Workflow).jobs['preview-deploy']!;
-    expect(preview.steps?.find(step => step.with?.path === 'release-control')?.with?.ref).toBe('${{ github.event.pull_request.base.sha }}');
-    expect(preview.steps?.find(step => step.uses === './release-control/.github/actions/release-toolchain')?.if)
+    expect(preview.steps?.find(step => step.with?.path === 'test-output/release-control')?.with?.ref).toBe('${{ github.event.pull_request.base.sha }}');
+    expect(preview.steps?.find(step => step.uses === './test-output/release-control/.github/actions/release-toolchain')?.if)
       .toBe("steps.release-toolchain-source.outputs.source == 'base'");
     expect(preview.steps?.find(step => step.uses === './.github/actions/release-toolchain')?.if)
       .toBe("steps.release-toolchain-source.outputs.source == 'introduction'");
@@ -324,7 +350,7 @@ describe('workflow topology', () => {
           await mkdir(dirname(path), { recursive: true });
           if (candidatePresent) await writeFile(path, 'reviewed release tooling');
           if (index < baseCount) {
-            const base = join(directory, 'release-control', files[index]!);
+            const base = join(directory, 'test-output/release-control', files[index]!);
             await mkdir(dirname(base), { recursive: true });
             if (symbolicBase && index === 0) await symlink(path, base);
             else await writeFile(base, 'protected base release tooling');
@@ -339,6 +365,57 @@ describe('workflow topology', () => {
       }
     }
   });
+
+  it('keeps both protected preview control checkouts clean under the real corpus classifier', async () => {
+    const workflow = parse(await readWorkflow('pr.yml')) as Workflow;
+    const jobs = ['operator-corpus-proof', 'preview-deploy'].map(id => workflow.jobs[id]!);
+    const directory = await mkdtemp(join(tmpdir(), 'theologai-hosted-corpus-layout-'));
+    const root = join(directory, 'candidate');
+    const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: 'pipe' });
+    try {
+      git(directory, 'clone', '--shared', '--no-checkout', process.cwd(), root);
+      git(root, 'sparse-checkout', 'init', '--cone');
+      git(root, 'sparse-checkout', 'set', 'scripts', 'release', 'src', 'data', 'migrations', '.github');
+      git(root, 'checkout', '--detach', 'HEAD');
+      const oldControl = join(root, 'release-control');
+      git(root, 'clone', '--shared', '--no-checkout', process.cwd(), oldControl);
+      git(oldControl, 'sparse-checkout', 'init', '--cone');
+      git(oldControl, 'sparse-checkout', 'set', '.github');
+      git(oldControl, 'checkout', '--detach', CORPUS_POLICY.baseline);
+      // The cleanliness check needs the action's real link and pinned manifests;
+      // no package installation or authentication is needed to exercise it.
+      await mkdir(join(oldControl, '.github/release-toolchain/node_modules'));
+      await symlink(join(oldControl, '.github/release-toolchain/node_modules'), join(root, 'node_modules'), 'dir');
+      expect(git(root, 'status', '--porcelain', '--untracked-files=all')).toContain('?? release-control/');
+      expect(() => classifyApplicationRelease(root)).toThrow('dirty or untracked exact release source');
+
+      const controlPath = 'test-output/release-control';
+      const control = join(root, controlPath);
+      await mkdir(dirname(control), { recursive: true });
+      await rename(oldControl, control);
+      await unlink(join(root, 'node_modules'));
+      await symlink(join(control, '.github/release-toolchain/node_modules'), join(root, 'node_modules'), 'dir');
+      expect(git(control, 'rev-parse', 'HEAD').trim()).toBe(CORPUS_POLICY.baseline);
+      for (const [index, job] of jobs.entries()) {
+        const checkout = job.steps!.find(step => step.with?.path === controlPath)!;
+        expect(checkout.with?.ref).toBe(index === 0
+          ? '${{ needs.operator-proof-source.outputs.base }}' : '${{ github.event.pull_request.base.sha }}');
+        expect(checkout.with?.['persist-credentials']).toBe(false);
+        expect(job.steps!.find(step => step.uses === './' + controlPath + '/.github/actions/release-toolchain')?.if)
+          .toBe("steps.release-toolchain-source.outputs.source == 'base'");
+        const selection = job.steps!.find(step => step.name === 'Select release toolchain source')!.run!;
+        const output = join(directory, 'selection-' + index);
+        const selected = spawnSync('bash', ['-e', '-c', selection], { cwd: root, env: { ...process.env, GITHUB_OUTPUT: output } });
+        expect(selected.status, selected.stderr?.toString()).toBe(0);
+        expect(await readFile(output, 'utf8')).toBe('source=base\n');
+      }
+      expect(classifyApplicationRelease(root).sourceCommit).toBe(git(root, 'rev-parse', 'HEAD').trim());
+      await writeFile(join(root, 'untracked-candidate.ts'), 'unreviewed');
+      expect(() => classifyApplicationRelease(root)).toThrow('dirty or untracked exact release source');
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  }, 60_000);
 
   it('preserves approved preview deployment and recovery without an SEC-06 migration gate', async () => {
     for (const [file, id] of [
@@ -438,8 +515,10 @@ describe('workflow topology', () => {
       for(const event of ['pull_request','schedule','workflow_dispatch'])expect(routedName(job.name,event)).toBe(name);
       expect(routedName(job.name,'workflow_dispatch','proof')).toBe('Operator metadata / '+name);
       expect(routedName(job.name,'workflow_dispatch','','authorization')).toBe('Operator metadata / '+name);
-      const evaluate=(event:string,proof:string,authorization:string)=>new Function('github','inputs','cancelled','return ('+expressionBody(job.if!)+')')({event_name:event},{operator_proof_json:proof,operator_authorization_json:authorization},()=>false);
-      expect(evaluate('pull_request','','')).toBe(true);expect(evaluate('workflow_dispatch','proof','')).toBe(false);expect(evaluate('workflow_dispatch','','authorization')).toBe(false);
+      expect(routedName(job.name,'workflow_dispatch','','','restoration')).toBe('Operator metadata / '+name);
+      expect(routedName(job.name,'workflow_dispatch','','','','validation')).toBe('Operator metadata / '+name);
+      const evaluate=(event:string,proof:string,authorization:string,restoration='',existingValidation='')=>new Function('github','inputs','cancelled','return ('+expressionBody(job.if!)+')')({event_name:event},{operator_proof_json:proof,operator_authorization_json:authorization,preview_restore_json:restoration,preview_validate_existing_json:existingValidation},()=>false);
+      expect(evaluate('pull_request','','')).toBe(true);expect(evaluate('workflow_dispatch','','')).toBe(true);expect(evaluate('workflow_dispatch','','','restoration')).toBe(false);expect(evaluate('workflow_dispatch','','','','validation')).toBe(false);expect(evaluate('workflow_dispatch','proof','')).toBe(false);expect(evaluate('workflow_dispatch','','authorization')).toBe(false);
     }
     const aggregate = workflow.jobs['validation-complete']!;
     expect(new Set(needs(aggregate))).toEqual(new Set(Object.keys(expected)));
@@ -620,7 +699,7 @@ describe('downstream preview authorization before cloud inventory',()=>{
       expect(steps.indexOf(proof)).toBeLessThan(cloud);expect(steps.indexOf(source)).toBeLessThan(cloud);
       expect(workflow.jobs['preview-deploy']!.permissions).toEqual({contents:'read','pull-requests':'write'});
       const now=Date.now(),head='a'.repeat(40),base='b'.repeat(40),tree='c'.repeat(40),plan='d'.repeat(64);
-      const a={schemaVersion:'theologai-operator-authorization.v1',scope:'new-additional-operation',repository:'TJ-Frederick/TheologAI',ownerActorId:40179660,role:'preview',pullRequestNumber:172,headBranch:'ci/another-successor',sourceCommit:head,sourceTree:tree,baseCommit:base,sourcePlanSha256:plan,targetRunId:'123',targetRunAttempt:1,authorizationId:'operation-downstream-fixture',ledgerId:'operation-downstream-fixture',notBefore:new Date(now-1000).toISOString(),expiresAt:new Date(now+86400000-1000).toISOString(),reservedReads:3510997,hardReadCap:3800000,diagnosticCommands:4,maxWrites:4,previousReadsSpentOrReserved:0,previousWritesSpentOrReserved:0,previousDiagnosticCommands:0,outstandingPriorReservationsAccepted:true};
+      const a={schemaVersion:'theologai-operator-authorization.v1',scope:'new-additional-operation',exclusiveDataWritesDuringWindow:true,candidateWriteJobsPaused:true,releasePolicy:'norton-aquinas.v1',liveControlReserve:100000,expectedLedgerSha256:'1'.repeat(64),repository:'TJ-Frederick/TheologAI',ownerActorId:40179660,role:'preview',pullRequestNumber:172,headBranch:'ci/another-successor',sourceCommit:head,sourceTree:tree,baseCommit:base,sourcePlanSha256:plan,targetRunId:'123',targetRunAttempt:1,authorizationId:'operation-downstream-fixture',ledgerId:'operation-downstream-fixture',notBefore:new Date(now-1000).toISOString(),expiresAt:new Date(now+86400000-1000).toISOString(),reservedReads:3560000,hardReadCap:3560000,diagnosticCommands:4,maxWrites:4,previousReadsSpentOrReserved:0,previousWritesSpentOrReserved:0,previousDiagnosticCommands:0,outstandingPriorReservationsAccepted:true};
       const p={authorization:a,provenance:{runId:'321',artifactId:'654',digest:'sha256:'+'e'.repeat(64),contentSha256:authority.hash(JSON.stringify(a))}};
       let text=JSON.stringify(p),expectedHash=authority.hash(text);
       if(fault==='substituted-package'){p.authorization.headBranch='substituted';p.provenance.contentSha256=authority.hash(JSON.stringify(p.authorization));text=JSON.stringify(p);}
@@ -639,3 +718,41 @@ describe('downstream preview authorization before cloud inventory',()=>{
     }finally{await rm(directory,{recursive:true,force:true});}
   });
 });
+
+it('runs exactly one bounded readiness path per validated policy and no provider path for missing or unknown identity',async()=>{
+ for(const[file,jobId]of [['pr.yml','preview-deploy'],['deploy.yml','deploy']]as const){
+  const raw=await readWorkflow(file),workflow=parse(raw)as Workflow,steps=workflow.jobs[jobId]!.steps!;
+  const readiness=steps.filter(step=>step.id==='corpus-proof'||step.id==='legacy-corpus-proof');expect(readiness).toHaveLength(1);
+  expect(raw).not.toContain('legacy-corpus-proof');expect(raw).not.toContain('scripts/check-remote-d1-readiness.ts');
+  const provider=steps.filter(step=>step.env?.CLOUDFLARE_API_TOKEN||step.run?.includes('/audit-')||step.run?.includes('scripts/norton-aquinas-live.ts'));expect(provider.length).toBeGreaterThan(5);
+  const evaluate=(step:Step,policy:string|undefined)=>{
+   let expression=expressionBody(step.if!);const ids=steps.map(step=>step.id).filter((id):id is string=>Boolean(id)).sort((a,b)=>b.length-a.length);
+   for(const id of ids)expression=expression.replaceAll('steps.'+id,'steps['+JSON.stringify(id)+']');
+   expression=expression.replaceAll('needs.build-worker','needs["build-worker"]');
+   const context=Object.fromEntries(ids.map(id=>[id,{outcome:'success',outputs:{release_policy:policy}}]));
+   return new Function('steps','needs','always','success','cancelled','return ('+expression+')')(context,{'build-worker':{outputs:{release_policy:'norton-aquinas.v1'}}},()=>true,()=>true,()=>false);
+  };
+  for(const policy of ['application-only','norton-aquinas.v1'])expect(readiness.filter(step=>evaluate(step,policy))).toHaveLength(1);
+  for(const policy of [undefined,'','unknown']){expect(readiness.filter(step=>evaluate(step,policy))).toHaveLength(0);for(const step of provider)expect(evaluate(step,policy),step.name).toBe(false);}
+  const local=steps.find(step=>step.id==='release-operation')!;expect(local.run).toContain('verify-release-operation.ts');expect(local.run).toContain('release_policy=%s');
+ }
+});
+
+it('keeps in-place corpus validation protected, read-only and distinct from deployment/proof routes',async()=>{
+ const workflow=parse(await readWorkflow('pr.yml')) as Workflow;
+ const source=workflow.jobs['existing-preview-source']!,job=workflow.jobs['validate-existing-preview']!;
+ expect(source.environment).toBeUndefined();expect(JSON.stringify(source)).not.toContain('secrets.');
+ expect(source.if).toContain("inputs.preview_restore_json == ''");expect(source.if).toContain("github.actor_id == '40179660'");expect(source.if).toContain('github.run_attempt == 1');
+ expect(job.environment).toBe('preview');expect(needs(job)).toEqual(['existing-preview-source']);expect(job.concurrency).toEqual({group:'theologai-shared-preview-mutation','cancel-in-progress':false});
+ expect(job.permissions).toEqual({contents:'read',actions:'read','pull-requests':'read'});
+ const run=job.steps!.find(s=>s.name==='Complete the existing candidate validation without any deployment')!;
+ expect(run.env).toMatchObject({CLOUDFLARE_API_TOKEN:'${{ secrets.CLOUDFLARE_API_TOKEN }}'});
+ expect(run.run).toContain('validate-existing-norton-preview.ts validate');expect(run.run).not.toMatch(/wrangler|operator-corpus-proof|migrations|seed|rollback/);
+ expect(JSON.stringify(job)).not.toContain('PRODUCTION');
+});
+
+
+it('binds Norton manual preview evidence at both production checks with only necessary GitHub reads',async()=>{const w=parse(await readWorkflow('deploy.yml'))as Workflow;expect(w.jobs.deploy!.permissions).toEqual({actions:'read',contents:'read','pull-requests':'read'});for(const name of ['verify-dual-era-preview','deploy']){const job=w.jobs[name]!;const actions=job.steps!.filter(s=>s.name?.startsWith('Download Norton'));expect(actions).toHaveLength(2);for(const action of actions){expect(action.with?.['artifact-ids']).toBeTruthy();expect(action.with?.['digest-mismatch']).toBe('error');}expect(job.steps!.find(s=>s.name==='Verify source-bound dual-era preview release receipt')!.run).toContain('verify-existing');}const recheck=w.jobs.deploy!.steps!.find(s=>s.id==='recheck-existing-preview');expect(JSON.stringify(recheck)).toContain('resolveExistingNortonPreview');expect(JSON.stringify(recheck)).toContain('pin');});
+
+
+it('keeps the fixed scoped diagnostic inside the same protected source and concurrency path with distinct evidence',async()=>{const w=parse(await readWorkflow('pr.yml'))as Workflow,source=w.jobs['existing-preview-source']!,job=w.jobs['validate-existing-preview']!;expect(JSON.stringify(source)).toContain('operation_kind');const marker=source.steps!.find(s=>s.name==='Reserve the fixed diagnostic operation in native artifact history')!;expect(marker.if).toContain("operation_kind == 'diagnostic'");expect(marker.with).toMatchObject({name:"norton-scoped-diagnostic-ledger-${{ steps['existing-inputs'].outputs.operation_id }}",path:'${{ runner.temp }}/continuation-request.json','retention-days':7,'if-no-files-found':'error',overwrite:false});expect(source.steps!.find(s=>s.name==='Verify immutable candidate inputs and compile-equivalent auditor runtime')!.id).toBe('existing-inputs');expect(job.name).toContain("operation_kind == 'diagnostic'");expect(job.name).toContain('Diagnose fixed Norton scoped response (read-only)');expect(routedName(job.name,'workflow_dispatch','','','','','diagnostic')).toBe('Diagnose fixed Norton scoped response (read-only)');expect(job.environment).toBe('preview');expect(job.concurrency).toEqual({group:'theologai-shared-preview-mutation','cancel-in-progress':false});const upload=job.steps!.find(s=>s.name==='Retain in-place validation evidence after success or stop')!;expect(upload.with?.name).toContain('norton-scoped-diagnostic-');expect(job.permissions).toEqual({contents:'read',actions:'read','pull-requests':'read'});});

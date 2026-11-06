@@ -3,6 +3,10 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import Database from 'better-sqlite3';
+import { HistoricalDocumentRepository } from '../../../src/adapters/data/HistoricalDocumentRepository.js';
+import { HistoricalDocumentService } from '../../../src/services/historical/HistoricalDocumentService.js';
+import { LocalPrimarySourceSearchProvider } from '../../../src/services/historical/LocalPrimarySourceSearchProvider.js';
+import { createClassicTextsHandler } from '../../../src/tools/v2/classicTexts.js';
 import { compileEditionPackage } from '../../../src/kernel/editionProvenanceFoundation.js';
 import { inventedEditionPackageFixture } from '../../fixtures/editionProvenanceFoundation.js';
 import {
@@ -48,6 +52,57 @@ function sourcePackEditionFixture(id = 'invented-clockwork-treatise') {
 }
 
 describe('historical exact-edition source packs', () => {
+  it('delivers the pinned Norton transcription through bounded public browsing and exact citations alongside Beveridge', async () => {
+    const manifest = JSON.parse(readFileSync('data/data-manifest.json', 'utf8'));
+    const packs = loadHistoricalSourcePacks(manifest.materializations.d1.inputs, {
+      read: (path: string) => readFileSync(path, 'utf8'),
+    } as never);
+    const norton = packs.find(pack => pack.compiled.package.edition.editionId === 'calvin-institutes-norton-1561-eebo-tcp-a17662')!;
+    expect(norton).toBeDefined();
+    expect(norton.compiled.package.sections).toHaveLength(1250);
+    expect(norton.compiled.sha256).toBe('3054f4446b2e92af87c1713ee1c44d6745bca42a32aed7c67890d25fedbdff33');
+    const db = new Database(':memory:');
+    try {
+      for (const migration of ['0001_initial_schema', '0005_historical_section_identity_delivery', '0006_historical_source_packs']) {
+        db.exec(readFileSync(`migrations/${migration}.sql`, 'utf8'));
+      }
+      materializeHistoricalSourcePacks(db, packs);
+      const repository = new HistoricalDocumentRepository(db);
+      const service = new HistoricalDocumentService(repository);
+      const handler = createClassicTextsHandler(service);
+      const documentId = norton.compiled.package.work.workId;
+      expect((await service.getDocument('Norton')).id).toBe(documentId);
+      expect((await service.getDocument('Norton, 1561')).id).toBe(documentId);
+      expect((await service.getDocument('calvin-institutes')).id).toBe('calvin-institutes');
+      expect((await service.getDocument('Institutes of the Christian Religion')).id).toBe('calvin-institutes');
+      const landing = await handler.handler({ work: documentId });
+      expect(landing.isError).not.toBe(true);
+      expect(JSON.stringify(landing)).toContain('Norton, 1561');
+      expect(JSON.stringify(landing)).not.toContain(norton.compiled.package.sections[0].content);
+      const directory = await handler.handler({ work: documentId, browseSections: true });
+      expect(directory.isError).not.toBe(true);
+      expect(directory.content.filter(item => item.type === 'resource_link')).toHaveLength(32);
+      for (const ordinal of [1, 157, 778, 1250]) {
+        const expected = norton.compiled.package.sections[ordinal - 1];
+        const actual = await service.resolveSection(documentId, expected.sectionKey);
+        expect(actual.section.content).toBe(expected.content);
+        expect(actual.sourceOrdinal).toBe(ordinal);
+      }
+      const results = await service.searchResolvedSections('Quenes maiesties iniunctions', 10);
+      expect(results.some(row => row.document.id === documentId)).toBe(true);
+      expect(results.filter(row => row.document.id === documentId).every(row => row.sectionKey.startsWith('a17662-source-ordinal-'))).toBe(true);
+      const provider = new LocalPrimarySourceSearchProvider(repository);
+      const scoped = await provider.search({ text: 'grace', work: 'Norton, 1561' });
+      expect(scoped.hits.length).toBeGreaterThan(0);
+      expect(scoped.hits.every(hit => hit.locator.kind === 'local_section' && hit.locator.documentId === documentId)).toBe(true);
+      const existing = await provider.search({ text: 'grace', work: 'Institutes of the Christian Religion' });
+      expect(existing.hits.length).toBeGreaterThan(0);
+      expect(existing.hits.every(hit => hit.locator.kind === 'local_section' && hit.locator.documentId === 'calvin-institutes')).toBe(true);
+    } finally {
+      db.close();
+    }
+  });
+
   it('preserves canonical Book and Chapter identities for Damascene and Irenaeus', () => {
     const load = (id: string) => JSON.parse(readFileSync(resolve(process.cwd(), `data/historical-source-packs/core-eight/editions/${id}.json`), 'utf8')) as { edition: { provenance: { uncertainty: string } }; sections: Array<{ sectionKey: string; sourceOrdinal: number }> };
     const damascene = load('john-damascene-exposition-salmond-npnf2-v9');
@@ -276,5 +331,57 @@ describe('historical exact-edition source packs', () => {
     } finally {
       db.close();
     }
+  });
+
+  it('allows the Norton external package only when it is explicitly declared as a D1 input', () => {
+    const manifest = JSON.parse(readFileSync('data/data-manifest.json', 'utf8')) as {
+      materializations: { d1: { inputs: string[] } };
+    };
+    const omitted = manifest.materializations.d1.inputs.filter(path => path
+      !== 'data/historical-sources/eebo-tcp/A17662/norton-1561.edition.json');
+    expect(() => loadHistoricalSourcePacks(omitted, {
+      read: (path: string) => readFileSync(path, 'utf8'),
+    } as never)).toThrow('must be a declared D1 materialization input');
+  });
+
+  it('rejects arbitrary or traversing external member paths', () => {
+    const dataManifest = JSON.parse(readFileSync('data/data-manifest.json', 'utf8')) as {
+      materializations: { d1: { inputs: string[] } };
+    };
+    const manifestPath = 'data/historical-source-packs/norton-1561/manifest.json';
+    const sidecarPath = 'data/historical-source-packs/norton-1561/manifest.sha256';
+    const original = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
+      members: Array<{ sourcePath: string }>;
+    };
+    const loadWithSourcePath = (sourcePath: string) => {
+      const changed = structuredClone(original);
+      changed.members[0]!.sourcePath = sourcePath;
+      const bytes = JSON.stringify(changed);
+      return () => loadHistoricalSourcePacks(dataManifest.materializations.d1.inputs, {
+        read: (path: string) => {
+          if (path === manifestPath) return bytes;
+          if (path === sidecarPath) return `${sha256(bytes)}  manifest.json\n`;
+          return readFileSync(path, 'utf8');
+        },
+      } as never);
+    };
+    expect(loadWithSourcePath('data/historical-sources/eebo-tcp/A17662/arbitrary.edition.json'))
+      .toThrow('sourcePath is unsupported');
+    expect(loadWithSourcePath('editions/../../eebo-tcp/A17662/norton-1561.edition.json'))
+      .toThrow('sourcePath is unsupported');
+  });
+
+  it('keeps the immutable Norton work title distinct from its public edition presentation', () => {
+    const manifest = JSON.parse(readFileSync('data/data-manifest.json', 'utf8')) as {
+      materializations: { d1: { inputs: string[] } };
+    };
+    const norton = loadHistoricalSourcePacks(manifest.materializations.d1.inputs, {
+      read: (path: string) => readFileSync(path, 'utf8'),
+    } as never).find(pack => pack.packId === 'theologai-norton-1561')!;
+    expect(norton.compiled.package.work.title).toBe('Institutes of the Christian Religion');
+    expect(norton.catalog.presentation).toMatchObject({
+      displayTitle: 'Institutes of the Christian Religion (Norton, 1561)',
+      lookupAliases: ['calvin-institutes-of-the-christian-religion', 'Institutes of the Christian Religion (Norton, 1561)', 'Norton', 'Norton, 1561'],
+    });
   });
 });

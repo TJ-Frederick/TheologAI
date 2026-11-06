@@ -105,8 +105,8 @@ const PROBE = `
   const sqliteVersion=memory.prepare('SELECT sqlite_version() AS version').get().version;
   if(memory.prepare('SELECT 1 AS ready').get().ready!==1)throw Error('native runtime');
   memory.close();
-  const policy=await import(pathToFileURL(join(root,'scripts/application-release-policy.mjs')));
-  const classification=policy.classifyApplicationRelease(root);
+  const selector=await import(pathToFileURL(join(root,'.github/scripts/release-proof-policy.mjs')));
+  const selected=selector.selectReleaseProofPolicy(root),policy=selected.module,classification=selected.classification;
   await import(pathToFileURL(join(root,'scripts/operator-corpus-proof.ts')));
   let artifact={status:'not_performed',hostedProvenance:'not_verified'};
   if(artifactDirectory){
@@ -114,9 +114,9 @@ const PROBE = `
     const bytes=(name,max)=>{const file=join(artifactDirectory,name),s=lstatSync(file);if(!s.isFile()||s.isSymbolicLink()||s.size>max)throw Error('artifact file');return readFileSync(file);};
     const hash=b=>createHash('sha256').update(b).digest('hex');
     const planBytes=bytes('plan.json',512*1024);if(hash(planBytes)!==digest)throw Error('plan digest');
-    const plan=JSON.parse(planBytes);
+    const plan=JSON.parse(planBytes);selector.requireSameReleasePolicy(selected,plan.releasePolicy);
     if(plan.schemaVersion!=='theologai-application-corpus-source-plan.v1'||JSON.stringify(plan.classification)!==JSON.stringify(classification)
-      ||plan.integrityCommands!==4||!Number.isSafeInteger(plan.readBudget)||plan.readBudget<1||plan.readBudget>3510997)throw Error('plan identity');
+      ||plan.integrityCommands!==4||!Number.isSafeInteger(plan.readBudget)||plan.readBudget<1||(selected.id==='norton-aquinas.v1'?plan.readBudget!==selected.reservedReads:plan.readBudget>3510997))throw Error('plan identity');
     const sourceSha256=hash(bytes('source.db',400*1024*1024));if(sourceSha256!==plan.sourceSha256)throw Error('database digest');
     const database=new Database(join(artifactDirectory,'source.db'),{readonly:true,fileMustExist:true});
     try{const metadata=Object.fromEntries(database.prepare('SELECT key,value FROM theologai_metadata').all().map(r=>[r.key,r.value]));

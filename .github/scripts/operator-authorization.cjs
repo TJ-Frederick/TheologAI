@@ -1,5 +1,6 @@
 // Authenticated owner handoff for one new operation. No cloud API or budget renewal.
 const fs = require('node:fs');
+const policy = require('./norton-aquinas-policy.cjs');
 const { join } = require('node:path');
 const { tmpdir } = require('node:os');
 const { execFileSync } = require('node:child_process');
@@ -10,10 +11,14 @@ const hash = value => createHash('sha256').update(value).digest('hex');
 const check = (v, reason) => { if (!v) throw Error('Operator authorization refused: ' + reason); };
 const hex = (v, n) => typeof v === 'string' && new RegExp(`^[0-9a-f]{${n}}$`).test(v);
 const id = v => typeof v === 'string' && /^[1-9][0-9]{0,15}$/.test(v) && Number.isSafeInteger(Number(v));
-const keys = ['schemaVersion','scope','repository','ownerActorId','role','pullRequestNumber','headBranch','sourceCommit','sourceTree','baseCommit','sourcePlanSha256','targetRunId','targetRunAttempt','authorizationId','ledgerId','notBefore','expiresAt','reservedReads','hardReadCap','diagnosticCommands','maxWrites','previousReadsSpentOrReserved','previousWritesSpentOrReserved','previousDiagnosticCommands','outstandingPriorReservationsAccepted'];
+const applicationKeys = ['schemaVersion','scope','repository','ownerActorId','role','pullRequestNumber','headBranch','sourceCommit','sourceTree','baseCommit','sourcePlanSha256','targetRunId','targetRunAttempt','authorizationId','ledgerId','notBefore','expiresAt','reservedReads','hardReadCap','diagnosticCommands','maxWrites','previousReadsSpentOrReserved','previousWritesSpentOrReserved','previousDiagnosticCommands','outstandingPriorReservationsAccepted'];
+const corpusKeys=[...applicationKeys,'exclusiveDataWritesDuringWindow','candidateWriteJobsPaused','liveControlReserve','expectedLedgerSha256','releasePolicy'];
 function requireAuthorization(a, expected = {}, now = Date.now()) {
+  const corpus=a?.releasePolicy===policy.policy;
+  const extended=a&&('accountReadCeiling'in a||'accountReadCeilingDay'in a);
+  const keys=[...(corpus?corpusKeys:applicationKeys),...(extended?['accountReadCeiling','accountReadCeilingDay']:[])];
   check(a && Object.keys(a).sort().join(',') === [...keys].sort().join(','), 'shape');
-  check(a.schemaVersion === 'theologai-operator-authorization.v1' && a.scope === 'new-additional-operation'
+  check(a.schemaVersion === 'theologai-operator-authorization.v1' && a.scope === 'new-additional-operation' && (!corpus || a.exclusiveDataWritesDuringWindow===true && a.candidateWriteJobsPaused===true && hex(a.expectedLedgerSha256,64))
     && a.repository === repository && a.ownerActorId === ownerActorId, 'explicit new owner scope');
   check(['preview','production'].includes(a.role) && Number.isSafeInteger(a.pullRequestNumber) && a.pullRequestNumber > 170,
     'successor role and PR');
@@ -22,9 +27,10 @@ function requireAuthorization(a, expected = {}, now = Date.now()) {
   check(['sourceCommit','sourceTree','baseCommit'].every(k => hex(a[k],40)) && hex(a.sourcePlanSha256,64)
     && id(a.targetRunId) && a.targetRunAttempt === 1, 'source and run');
   check(/^operation-[a-z0-9-]{8,80}$/.test(a.authorizationId || '') && a.ledgerId === a.authorizationId, 'single operation ledger');
-  check(a.reservedReads === 3510997 && a.hardReadCap === 3800000 && a.diagnosticCommands === 4 && a.maxWrites === 4
+  check(a.reservedReads === (corpus?policy.reservedReads:3510997) && a.hardReadCap === (corpus?policy.hardReadCap:3800000) && a.diagnosticCommands === 4 && a.maxWrites === 4 && (!corpus || a.liveControlReserve === policy.liveReads + policy.controlReads)
     && a.previousReadsSpentOrReserved === 0 && a.previousWritesSpentOrReserved === 0 && a.previousDiagnosticCommands === 0
     && a.outstandingPriorReservationsAccepted === true, 'new allowance and retained prior reservations');
+  if(extended)check(corpus&&a.role==='production'&&a.accountReadCeiling===4400000&&a.accountReadCeilingDay==='2026-11-06'&&new Date(now).toISOString().slice(0,10)===a.accountReadCeilingDay&&typeof a.notBefore==='string'&&a.notBefore.slice(0,10)===a.accountReadCeilingDay&&Date.parse(a.expiresAt)<=Date.parse(a.accountReadCeilingDay+'T00:00:00Z')+86400000,'explicit dated production account ceiling');
   const start = Date.parse(a.notBefore), end = Date.parse(a.expiresAt);
   check(Number.isFinite(start) && Number.isFinite(end) && start <= now && end > now && end - start <= 86400000, 'authorization window');
   for (const [k,v] of Object.entries(expected)) check(a[k] === v, 'expected ' + k);
@@ -139,4 +145,5 @@ async function requireLiveSource({github,authorization:a}) {
   const {data:commit}=await github.rest.git.getCommit({...repo,commit_sha:a.sourceCommit});
   check(commit.tree.sha===a.sourceTree && (a.role!=='production' || commit.parents?.[0]?.sha===a.baseCommit),'live source tree and base');
 }
-module.exports={requireAuthorization,requirePackage,requireProvenance,findAuthorization,waitForAuthorization,uploadAuthorization,requireLiveCandidate,requireLiveSource,requireLedgerMarker,readArchive,readArchiveFile,hash};
+function productionAccountCeiling(p,context,now=Date.now()){const a=requirePackage(p,{role:'production',releasePolicy:policy.policy,sourceCommit:context.sourceCommit,sourceTree:context.sourceTree,targetRunId:context.runId,targetRunAttempt:1},now).authorization;check(a.accountReadCeiling===4400000&&a.accountReadCeilingDay===new Date(now).toISOString().slice(0,10),'approved production ceiling context');return a.accountReadCeiling;}
+module.exports={productionAccountCeiling,requireAuthorization,requirePackage,requireProvenance,findAuthorization,waitForAuthorization,uploadAuthorization,requireLiveCandidate,requireLiveSource,requireLedgerMarker,readArchive,readArchiveFile,hash};

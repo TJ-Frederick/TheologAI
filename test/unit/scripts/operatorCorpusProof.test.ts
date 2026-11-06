@@ -1,3 +1,4 @@
+import{prepareApplicationReleaseSource}from '../../helpers/applicationReleaseSource.js';
 import {describe,expect,it,vi} from 'vitest';
 import {createHash} from 'node:crypto';
 import {createRequire} from 'node:module';
@@ -158,11 +159,12 @@ describe('GitHub owner artifact provenance',()=>{
       const sourceRoot=join(directory,'source');
       execFileSync('git',['clone','--shared','--no-checkout',process.cwd(),sourceRoot],{stdio:'pipe'});
       const git=(args:string[])=>execFileSync('git',args,{cwd:sourceRoot,stdio:'pipe'});
-      git(['sparse-checkout','init','--cone']);git(['sparse-checkout','set','scripts','release','src','data','migrations','.github']);git(['checkout','--detach','HEAD']);
+      git(['sparse-checkout','init','--cone']);git(['sparse-checkout','set','scripts','release','src','data','migrations','.github']);git(['checkout','--detach','HEAD']);prepareApplicationReleaseSource(sourceRoot);
       for(const name of ['operator-corpus-proof.ts','application-corpus-check.ts','application-release-policy.mjs','corpus-proof-transport.ts'])copyFileSync(resolve('scripts',name),join(sourceRoot,'scripts',name));
       for(const name of ['operator-authorization.cjs'])copyFileSync(resolve('.github/scripts',name),join(sourceRoot,'.github/scripts',name));
       git(['add','scripts','.github']);git(['-c','user.name=Operator proof test','-c','user.email=test@example.invalid','commit','--allow-empty','-m','Test exact operator proof source']);
       symlinkSync(resolve('node_modules'),join(sourceRoot,'node_modules'),'dir');
+      writeFileSync(join(sourceRoot,'.git/info/exclude'),'\n/node_modules\n',{flag:'a'});
       const source=classifyApplicationRelease(sourceRoot);
       f.plan.classification=source;
       f.c.sourceCommit=source.sourceCommit;f.c.sourceTree=source.sourceTree;

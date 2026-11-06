@@ -54,6 +54,7 @@ describe('Transform 12 actual FTS corruption gates', () => {
     expect(`${verify.stderr}${verify.stdout}`).toMatch(/MATCH sentinel|malformed JSON|Unexpected strongs_fts count/);
     expect(readFileSync(join(ROOT, 'scripts/export-for-d1.ts'), 'utf8'))
       .toContain('assertCanonicalTransform12FtsMatchSentinels(sentinelDatabase)');
+    expect(readFileSync(join(ROOT,'scripts/verify-d1-seed-import.ts'),'utf8')).toContain('assertCanonicalTransform12FtsMatchSentinels(target)');
   }, 30_000);
 
   it('proves delete-all corruption for a non-empty hierarchy external index', () => {

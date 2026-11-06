@@ -1,4 +1,5 @@
 /** Source-bound prebuilt Worker handoff. Never imports or executes the bundle. */
+import {TARGETS as CORPUS_TARGETS,classifyApplicationRelease as classifyCorpusRelease} from './norton-aquinas-release-policy.mjs';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { lstatSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
@@ -75,6 +76,12 @@ export async function renderDeploymentConfig(root, directory, target, expectedHa
   }
   delete selected.env;
   delete selected.$schema;
+  if((target==='preview'||target==='production')&&execFileSync('git',['ls-tree','--name-only','HEAD','--','release/norton-aquinas.json'],{cwd:root,encoding:'utf8'}).trim()==='release/norton-aquinas.json'){
+    classifyCorpusRelease(root);
+    const candidate=CORPUS_TARGETS[target];
+    if(selected.d1_databases?.length!==1||selected.d1_databases[0].binding!=='THEOLOGAI_DB')throw Error('Corpus release requires exact D1 binding');
+    selected.d1_databases[0]={...selected.d1_databases[0],database_name:candidate.databaseName,database_id:candidate.databaseId};
+  }
   selected.main = resolve(directory, entry);
   selected.no_bundle = true;
   selected.find_additional_modules = false;

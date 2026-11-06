@@ -5,8 +5,8 @@ import { describe, expect, it } from 'vitest';
 import { HistoricalHierarchyRepository } from '../../../src/adapters/data/HistoricalHierarchyRepository.js';
 import { D1HistoricalHierarchyRepository } from '../../../src/adapters/d1/D1HistoricalHierarchyRepository.js';
 import { materializeHistoricalHierarchy } from '../../../scripts/historical-hierarchy.js';
-import { loadApprovedAquinasHierarchy } from '../../../scripts/aquinas-source-pack-capacity-comparison.js';
-import { loadApprovedAquinasHierarchyPublication, materializeHistoricalHierarchyPublication } from '../../../scripts/historical-hierarchy-publication.js';
+import { loadActiveAquinasHierarchy } from '../../../scripts/active-aquinas-hierarchy.js';
+import { loadActiveAquinasHierarchyPublication, materializeHistoricalHierarchyPublication } from '../../../scripts/historical-hierarchy-publication.js';
 
 const ROOT = process.cwd();
 
@@ -35,16 +35,18 @@ describe('historical hierarchy Node/D1 repository parity', () => {
         '0001_initial_schema.sql', '0002_ubs_parallel_passages.sql', '0003_original_language_usage.sql',
         '0004_ubs_hebrew_semantics.sql', '0005_historical_section_identity_delivery.sql',
         '0006_historical_source_packs.sql', '0007_historical_hierarchy.sql', '0008_historical_hierarchy_publications.sql',
+        '0010_active_aquinas_hierarchy_publication.sql',
       ]) db.exec(readFileSync(join(ROOT, 'migrations', migration), 'utf8'));
-      const hierarchy = loadApprovedAquinasHierarchy({ read: path => readFileSync(join(ROOT, path)) });
+      const hierarchy = loadActiveAquinasHierarchy({ read: path => readFileSync(join(ROOT, path)) });
       materializeHistoricalHierarchy(db, hierarchy);
-      materializeHistoricalHierarchyPublication(db, loadApprovedAquinasHierarchyPublication(hierarchy), hierarchy);
+      materializeHistoricalHierarchyPublication(db, loadActiveAquinasHierarchyPublication(hierarchy), hierarchy);
       const statements: string[] = [];
       const node = new HistoricalHierarchyRepository(db);
       const d1 = new D1HistoricalHierarchyRepository(sqliteD1(db, statements));
       const id = hierarchy.hierarchy.hierarchyId;
 
       expect(await d1.getHierarchyPublicationBySlug('summa-theologiae')).toEqual(node.getHierarchyPublicationBySlug('summa-theologiae'));
+      expect(await d1.listActiveHierarchyPublications()).toEqual(node.listActiveHierarchyPublications());
       expect(await d1.getHierarchyNodeContext(id, 'article:prima.q001.a001')).toEqual(node.getHierarchyNodeContext(id, 'article:prima.q001.a001'));
       expect(await d1.listHierarchyChildren(id, 'part:secunda-secundae', undefined, 32))
         .toEqual(node.listHierarchyChildren(id, 'part:secunda-secundae', undefined, 32));

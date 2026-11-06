@@ -16,6 +16,7 @@ import { formatLocalDocumentResource, formatLocalDocumentSectionResourceWithIden
 import { DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG } from '../../../src/kernel/featureFlags.js';
 import { primarySourceSearchV6OutputSchema } from '../../../src/mcp/schemas/primarySourceSearchV4.js';
 import { createPrimarySourceSearchDescriptor } from '../../../src/mcp/primarySourceSearchDescriptor.js';
+import { NotFoundError } from '../../../src/kernel/errors.js';
 
 const TOOL_NAMES = [
   'bible_lookup',
@@ -23,6 +24,7 @@ const TOOL_NAMES = [
   'parallel_passages',
   'commentary_lookup',
   'classic_text_lookup',
+  'historical_hierarchy_lookup',
   'primary_source_search',
   'original_language_lookup',
   'bible_verse_morphology',
@@ -128,9 +130,18 @@ function makeMockRoot(): McpCompositionRoot {
           citation: { source: "Strong's Concordance" },
         }),
       },
+      historicalHierarchyService: {
+        listPublications: async () => [],
+        resolveCanonicalUri: async () => {
+          throw new NotFoundError('historical hierarchy', 'No active hierarchy publication matches this URI.');
+        },
+      },
     },
     primarySourceContract: DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG,
-    primarySourceSearch: { descriptor: createPrimarySourceSearchDescriptor(), tool: tools[5]! },
+    primarySourceSearch: {
+      descriptor: createPrimarySourceSearchDescriptor(),
+      tool: tools.find(tool => tool.name === 'primary_source_search')!,
+    },
   };
 }
 
@@ -228,7 +239,7 @@ describe('shared MCP registration', () => {
     });
   });
 
-  it('lists all 11 tools and dispatches calls through the shared registry', async () => {
+  it('lists all 12 tools and dispatches calls through the shared registry', async () => {
     const root = makeMockRoot();
     const client = await connect(createTheologAiMcpServer(root, '1.0.0-test').server);
     const listed = await client.listTools();
@@ -1089,7 +1100,7 @@ describe('shared MCP registration', () => {
       tool: root.tools.find(tool => tool.name === 'primary_source_search')!,
     };
     const client = await connect(createTheologAiMcpServer(root, '1.0.0-v8-foundation-test').server);
-    expect((await client.listTools()).tools).toHaveLength(11);
+    expect((await client.listTools()).tools).toHaveLength(12);
     expect((await client.listPrompts()).prompts).toHaveLength(6);
 
     const primary = await client.getPrompt({
@@ -1102,7 +1113,7 @@ describe('shared MCP registration', () => {
     expect(text).toContain('Automatically retry one proven targeted gap');
     expect(text).toContain('`expansionBasis`');
     expect(text).toContain('Do not build or imitate a natural-language intent classifier');
-    expect(text).toContain('All 35 local works are ordinary usable sources');
+    expect(text).toContain('All 36 local works are ordinary usable sources');
     expect(text).toContain('broader or more detailed sources can be requested');
 
     const confession = await client.getPrompt({ name: 'confession-study', arguments: { topic: 'justification' } });

@@ -11,6 +11,10 @@ All notable changes to TheologAI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Norton/Aquinas candidate — local preparation
+
+The successor candidate activates a 36-work flat catalog and a separate Aquinas hierarchy, with twelve tools. This is local implementation; the deployed schema0009/security release remains the dated record below. Protected preview and production require their own execution evidence.
+
 ## Security maintenance release — 2026-10-31 (New York)
 
 - Resolved SEC-01–05 in production through PR #170 merge `a1b684b` and protected run `41256928054`: bounded input/diagnostics, Node 22.23.4 floor, stable-IP limits, supported dependency fixes and separated build/release trust.
@@ -19,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-<!-- theologai-public-contract tools=11 structured=bible_cross_references,bible_lookup,bible_verse_morphology,classic_text_lookup,commentary_lookup,donation_config,original_language_lookup,original_language_study,parallel_passages,primary_source_search,verify_donation -->
+<!-- theologai-public-contract tools=12 structured=bible_cross_references,bible_lookup,bible_verse_morphology,classic_text_lookup,commentary_lookup,donation_config,historical_hierarchy_lookup,original_language_lookup,original_language_study,parallel_passages,primary_source_search,verify_donation -->
 
 ### Changed
 

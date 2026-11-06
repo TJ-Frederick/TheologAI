@@ -1,3 +1,4 @@
+import{prepareApplicationReleaseSource}from '../../helpers/applicationReleaseSource.js';
 import Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
@@ -22,13 +23,13 @@ describe('successor operation flow with real CLIs and bounded local SQLite trans
     try {
       const root=join(directory,'source');execFileSync('git',['clone','--shared','--no-checkout',process.cwd(),root],{stdio:'pipe'});
       const git=(...args:string[])=>execFileSync('git',args,{cwd:root,encoding:'utf8',stdio:'pipe'}).trim();
-      git('sparse-checkout','init','--cone');git('sparse-checkout','set','scripts','release','src','data','migrations','.github');git('checkout','--detach','HEAD');
+      git('sparse-checkout','init','--cone');git('sparse-checkout','set','scripts','release','src','data','migrations','.github');git('checkout','--detach','HEAD');prepareApplicationReleaseSource(root);
       const base=git('rev-parse','HEAD');
       for(const name of ['operator-corpus-proof.ts','application-corpus-check.ts','application-release-policy.mjs','corpus-proof-transport.ts'])copyFileSync(resolve('scripts',name),join(root,'scripts',name));
       for(const name of ['operator-authorization.cjs'])copyFileSync(resolve('.github/scripts',name),join(root,'.github/scripts',name));
       git('add','scripts','.github');git('-c','user.name=Flow fixture','-c','user.email=fixture@example.invalid','commit','--allow-empty','-m','Reviewed successor fixture');
       const previewSource=git('rev-parse','HEAD'),tree=git('rev-parse','HEAD^{tree}');
-      symlinkSync(resolve('node_modules'),join(root,'node_modules'),'dir');symlinkSync(resolve('node_modules'),join(directory,'node_modules'),'dir');
+      symlinkSync(resolve('node_modules'),join(root,'node_modules'),'dir');writeFileSync(join(root,'.git/info/exclude'),'\n/node_modules\n',{flag:'a'});symlinkSync(resolve('node_modules'),join(directory,'node_modules'),'dir');
       const db=new Database(join(directory,'source.db'));
       db.exec(`CREATE TABLE documents(id INTEGER PRIMARY KEY,title TEXT);
         CREATE TABLE document_sections(id INTEGER PRIMARY KEY,document_id INTEGER REFERENCES documents(id),content TEXT);

@@ -18,14 +18,14 @@ const digestOf = (path: string) => createHash('sha256').update(readFileSync(path
 afterEach(() => directories.splice(0).forEach(directory => rmSync(directory, { recursive: true, force: true })));
 
 describe('source-bound prebuilt Worker handoff', () => {
-  it('verifies code as data and renders an upload-only config preserving production bindings', async () => {
+  it('verifies code as data and renders an upload-only config selecting the reviewed corpus candidate without editing checked-in bindings', async () => {
     const { directory, digest } = fixture();
     const output = join(directory, 'upload.json');
     await renderDeploymentConfig(root, directory, 'production', digest, output);
     const config = JSON.parse(readFileSync(output, 'utf8'));
     expect(config).toMatchObject({
       name: 'theologai', main: join(directory, 'worker.js'), no_bundle: true, find_additional_modules: false,
-      d1_databases: [{ binding: 'THEOLOGAI_DB', database_id: '9bc79346-338b-439e-a2a5-424f4418eb21' }],
+      d1_databases: [{ binding: 'THEOLOGAI_DB', database_id: '74f456e2-6951-4003-bb6f-91951342bf8f' }],
     });
     expect(config.env).toBeUndefined();
     expect(config.build).toBeUndefined();

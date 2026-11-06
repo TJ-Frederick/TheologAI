@@ -1,6 +1,5 @@
 /**
- * Dormant output schema for a future hierarchy-node delivery surface.
- * It is intentionally not registered by src/mcp/server.ts in Transform-10 PR A.
+ * Structured output schema for public hierarchy-node delivery.
  *
  * Every object is closed. This schema is the exact serialized contract emitted
  * by historicalHierarchyStructured.ts, not an open-ended metadata envelope.
@@ -135,7 +134,7 @@ const publication = {
       pattern: LANDING_URI,
     },
     deliveryKind: { const: 'hierarchy_nodes_v1' },
-    activationState: { const: 'dormant' },
+    activationState: { const: 'active' },
     metadata: publicationMetadata,
     coverage: publicationCoverage,
   },
@@ -161,7 +160,7 @@ const provenanceDisclosure = {
 const authorityProvenance = {
   type: 'object',
   properties: {
-    status: { const: 'local_only_inactive' },
+    status: { const: 'local_only_active' },
     rightsStatus: { type: 'string', minLength: 1, maxLength: 80 },
     territoryCaveat: { type: 'string', minLength: 1, maxLength: 2_000 },
     catalogStatement: { type: 'string', minLength: 1, maxLength: 2_000 },
@@ -178,7 +177,7 @@ const authority = {
   properties: {
     hierarchyId: safeKey,
     editionId: safeKey,
-    availability: { const: 'local_only_inactive' },
+    availability: { const: 'local_only_active' },
     provenance: authorityProvenance,
   },
   required: ['hierarchyId', 'editionId', 'availability', 'provenance'],
