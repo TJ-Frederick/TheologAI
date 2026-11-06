@@ -31,6 +31,7 @@
     ".github/scripts/verify-release-operation.ts",
     ".github/scripts/restore-norton-preview.ts",
     ".github/scripts/validate-existing-norton-preview.ts",
-    ".github/scripts/prepare-norton-production.ts"
+    ".github/scripts/prepare-norton-production.ts",
+    ".github/scripts/retained-norton-inputs.ts"
   ]
 }

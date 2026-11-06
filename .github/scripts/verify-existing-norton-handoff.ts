@@ -1,4 +1,5 @@
 /** Preview acceptance evidence, never a fresh proof or production deployment grant. */
+import {verifyRetainedInputEvidence} from './retained-norton-inputs.js';
 import {readFileSync,lstatSync} from 'node:fs';
 import {join} from 'node:path';
 import {execFileSync} from 'node:child_process';
@@ -27,9 +28,9 @@ export function verifyExistingNortonHandoff(input:{root:string;directory:string;
  check(equivalence.schemaVersion==='norton-fixed-runtime-equivalence.v1'&&equivalence.candidateSourceCommit===EXISTING.sourceCommit&&equivalence.auditorCommit===b.auditorCommit&&equivalence.auditorTree===b.auditorTree&&equivalence.admission?.runId===String(b.run.id)&&equivalence.admission.operationId===r.operationId,'same-run input/source attestation');
  same(r.runtimeEquivalence,equivalence,'native runtime attestation bytes');
  const runtime=requireRuntimeEquivalence(input.root,join(inputs,'auditor-bundle'));same(runtime.inputs,equivalence.inputs,'merged runtime/data/fixture equivalence');check(runtime.workerSha256===EXISTING.workerSha256&&equivalence.workerSha256===EXISTING.workerSha256,'compiled Worker identity');
- // Original ZIPs need not still exist at production time: immutable files and the
- // source job's dated original-native metadata survive in this SUCCESS run's inputs.
- for(const captured of [equivalence.admission.nativeArtifacts,r.ownerDispatch.nativeArtifacts]){check(Array.isArray(captured)&&captured.length===4,'original native chain retained');for(const expected of NATIVE_ARTIFACTS){const a=captured.find((x:any)=>x.id===expected.id);check(a?.name===expected.name&&a.digest===expected.digest&&a.originalRunId===EXISTING.run&&a.originalSourceCommit===EXISTING.sourceCommit&&Date.parse(a.expiresAt)>completed,'original inputs nonexpired at validation');}}
+ // The prior native source job captured originals before expiry; current native inputs retain that exact chain.
+ same(equivalence.admission.retainedInputs,r.ownerDispatch.retainedInputs,'same retained custody source');
+ verifyRetainedInputEvidence(inputs,r.ownerDispatch.retainedInputs,NATIVE_ARTIFACTS,EXISTING.run,EXISTING.sourceCommit,completed);
  const historical=verifyHistoricalCandidate(inputs,input.candidateRoot);
  check(r.historicalProof?.sha256===EXISTING.proofSha256&&r.historicalProof.completedAt===historical.historicalVerificationAt&&r.historicalProof.historicalValidationClock===historical.historicalVerificationAt&&r.historicalProof.freshProof===false&&r.historicalProof.structurallyReverifiedAsHistorical===true&&r.historicalProof.validationDay===EXISTING.validationDay&&r.historicalProof.maximumAgeMsApproved===EXISTING.maximumHistoricalProofAgeMs&&r.historicalProof.ageAtValidationMs===completed-Date.parse(EXISTING.proofCompletedAt),'explicit historical proof age, never fresh');
  same(r.quotaPolicy,{accountReadCeiling:4400000,analyticsMargin:200000,previousReadReservation:3860000,finalHeldReadReservation:3960000,carriedForwardRole:CARRY_FORWARD},'held role and approved ceiling');
