@@ -23,7 +23,7 @@ on:
         default: ""
 
       preview_validate_existing_json:
-        description: Owner-scoped read-only validation of the deployed cc14 Norton candidate
+        description: Owner-scoped validation or fixed response diagnostic of the deployed Norton candidate
         type: string
         default: ""
 
@@ -1312,6 +1312,8 @@ jobs:
           if-no-files-found: warn
 
   existing-preview-source:
+    outputs:
+      operation_kind: ${{ steps.existing-inputs.outputs.operation_kind }}
     name: Verify deployed Norton candidate and distinct auditor (no cloud credentials)
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.preview_validate_existing_json != '' && inputs.preview_restore_json == '' && inputs.operator_authorization_json == '' && inputs.operator_proof_json == '' && github.actor_id == '40179660' && github.run_attempt == 1 }}
     runs-on: ubuntu-latest
@@ -1355,6 +1357,7 @@ jobs:
           npx --no-install tsx .github/scripts/retained-norton-inputs.ts \
             "$RUNNER_TEMP/retained-norton-inputs" "$RUNNER_TEMP/retained-norton-stop" "$RUNNER_TEMP/existing-preview"
       - name: Verify immutable candidate inputs and compile-equivalent auditor runtime
+        id: existing-inputs
         env:
           GITHUB_TOKEN: ${{ github.token }}
           APPROVAL_JSON: ${{ inputs.preview_validate_existing_json }}
@@ -1375,7 +1378,7 @@ jobs:
           overwrite: false
 
   validate-existing-preview:
-    name: Validate already deployed Norton preview (read-only)
+    name: ${{ needs.existing-preview-source.outputs.operation_kind == 'diagnostic' && 'Diagnose fixed Norton scoped response (read-only)' || 'Validate already deployed Norton preview (read-only)' }}
     needs: existing-preview-source
     if: ${{ github.event_name == 'workflow_dispatch' && needs.existing-preview-source.result == 'success' }}
     runs-on: ubuntu-latest
@@ -1418,7 +1421,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: existing-preview-validation-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          name: ${{ needs.existing-preview-source.outputs.operation_kind == 'diagnostic' && format('norton-scoped-diagnostic-{0}-attempt-{1}', github.run_id, github.run_attempt) || format('existing-preview-validation-{0}-attempt-{1}', github.run_id, github.run_attempt) }}
           path: ${{ runner.temp }}/continuation-results/
           retention-days: 7
           if-no-files-found: warn

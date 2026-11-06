@@ -45,6 +45,7 @@ it('refuses a pre-existing journal before any provider or audit call',async()=>{
 const continuationEdge=vi.hoisted(()=>vi.fn());
 vi.mock('../../../scripts/audit-primary-source-edge-stabilization.js',()=>({runPrimarySourceEdgeStabilization:continuationEdge}));
 import Database from 'better-sqlite3';
+import {SCOPED_DIAGNOSTIC,diagnosticRequestsSha256} from '../../../.github/scripts/norton-scoped-response-diagnostic.js';
 import {RETAINED_INPUTS} from '../../../.github/scripts/retained-norton-inputs.js';
 import {EXISTING,CARRY_FORWARD,NATIVE_ARTIFACTS,CONTINUITY_QUERIES,requireExistingApproval,requireExistingDispatch,requireRuntimeEquivalence,validateExistingPreview,summarizeUsageResponse,safeContinuationFailure,type ExistingApproval} from '../../../.github/scripts/validate-existing-norton-preview.js';
 import {describe} from 'vitest';
@@ -60,16 +61,25 @@ function existingFixture(fault=''){
  const source={commit:'a'.repeat(40),tree:'b'.repeat(40)};
  const approval:ExistingApproval={schemaVersion:'norton-existing-preview-validation-approval.v1',operationId:'operation-existing-fixture',auditorCommit:source.commit,auditorTree:source.tree,expiresAt:new Date(Date.now()+1800000).toISOString(),confirmation:EXISTING.confirmation,historicalProofSha256:EXISTING.proofSha256,acceptHistoricalProofForValidationOnly:true,uninterruptedDataCustody:true,maxReads:100000,maxWrites:0,noDeployment:true,accountReadCeiling:4400000,previousReadReservation:3860000,carryForwardFromOperationId:CARRY_FORWARD.operationId,acceptUnusedRoleCarryForward:true,validationDay:EXISTING.validationDay,acceptPriorDayHistoricalProof:true,maximumHistoricalProofAgeMs:EXISTING.maximumHistoricalProofAgeMs,acceptRetainedNativeInputs:true,retainedInputArtifactId:RETAINED_INPUTS.inputArtifact.id};
  const evidence:any={historicalVerificationAt:'2026-11-05T02:45:14.748Z',freshProof:false,cutover:{observedActiveVersionViewSha256:sha(JSON.stringify(view,null,2)+'\n')},envelope:{receipt:{proof:{catalogSha256:sha(JSON.stringify(expected(CONTINUITY_QUERIES[0].sql))),ledgerSha256:sha(JSON.stringify(expected(CONTINUITY_QUERIES[1].sql)))}}}};
- let calls=0,queries=0,authorizations=0,usageCaptures=0;
+ if(fault.startsWith('diagnostic-')){const a=approval as any;delete a.acceptHistoricalProofForValidationOnly;delete a.carryForwardFromOperationId;delete a.acceptUnusedRoleCarryForward;Object.assign(a,{schemaVersion:SCOPED_DIAGNOSTIC.schema,confirmation:SCOPED_DIAGNOSTIC.confirmation,maxReads:10000,previousReadReservation:3960000,acceptHistoricalProofForDiagnosticOnly:true,newReadAllowance:true,priorFailedOperationId:SCOPED_DIAGNOSTIC.failedOperation,requestPlanSha256:diagnosticRequestsSha256});}
+ let calls=0,queries=0,authorizations=0,usageCaptures=0,mcpRequests=0;
  const provider=corpusTransportFixture({role:'preview',activated:true,advance:()=>vi.setSystemTime(Date.now()+1000),record:()=>{calls++;},query:sql=>{
   queries++;const rows=expected(sql) as any[];
   if(fault==='schema'&&sql===CONTINUITY_QUERIES[0].sql)rows.pop();
-  if((fault==='ledger'||fault==='post-ledger'&&queries>4)&&sql===CONTINUITY_QUERIES[1].sql)rows[0].applied_at='changed';
+  if((fault==='ledger'||['post-ledger','diagnostic-post-ledger'].includes(fault)&&queries>4)&&sql===CONTINUITY_QUERIES[1].sql)rows[0].applied_at='changed';
   if(fault==='seal'&&sql===CONTINUITY_QUERIES[3].sql)rows[0].value='unsealed';
   if(fault==='identity'&&sql===CONTINUITY_QUERIES[2].sql)rows[0].value='wrong';
   return {rows,rowsRead:fault==='read-overrun'?4097:rows.length,rowsWritten:fault==='write'?1:0};
  }});
  const fetchImpl=(async(input:any,init:any)=>{
+  if(String(input)==='https://preview-mcp.theologai.xyz/mcp'){
+   mcpRequests++;const rpc=JSON.parse(init.body);if(fault==='diagnostic-http-failure'&&rpc.id===1)return new Response('SECRET_PROVIDER_BODY',{status:503});
+   if(rpc.method==='notifications/initialized')return new Response(null,{status:202});
+   const result=rpc.method==='initialize'?{protocolVersion:'2025-11-25',serverInfo:{version:'3.6.0-preview'}}:{content:[{type:'text',text:'SECRET_SOURCE_BODY'}]};
+   if(fault==='diagnostic-delayed-eof'&&rpc.id===1)return new Response(new ReadableStream({start(c){c.enqueue(new TextEncoder().encode('data: '+JSON.stringify({jsonrpc:'2.0',id:1,result})+'\n\n'));}}),{headers:{'content-type':'text/event-stream'}});
+   return Response.json({jsonrpc:'2.0',id:rpc.id,result});
+  }
+  if(fault==='diagnostic-control-stall')return new Promise<Response>(()=>{});
   const response=await provider.fetch(input,init);let body=JSON.stringify(await response.json());
   for(const [a,b] of [[provider.versions.preview,EXISTING.worker],[provider.versions.production,EXISTING.productionWorker],[provider.deployments.preview,EXISTING.deployment],[provider.deployments.production,EXISTING.productionDeployment]])body=body.replaceAll(a,b);
   const value=JSON.parse(body),path=new URL(String(input)).pathname;
@@ -89,10 +99,10 @@ function existingFixture(fault=''){
   if(fault==='unknown'&&path.endsWith('/query'))value.result[0].meta.total_attempts=2;
   return Response.json(value);
  }) as typeof fetch;
- const revalidate=async()=>{authorizations++;if(fault==='revoked'&&authorizations===2)throw Error('revoked');return {runId:'9',operationId:approval.operationId};};
+ const revalidate=async()=>{authorizations++;if(fault==='diagnostic-owner-stall')return new Promise(()=>{});if(fault==='revoked'&&authorizations===2)throw Error('revoked');return {runId:'9',operationId:approval.operationId};};
  const live=()=>({protocols:['2025-11-25','2026-07-28'],checks:Array.from({length:fault==='missing-check'?369:370},(_,i)=>({id:'check'+i,passed:!(fault==='failed-check'&&i===0)})),fingerprints:[],summaries:[],fixtureSha256:'f'.repeat(64)});
  continuationEdge.mockResolvedValue({passed:fault!=='edge'});audit.mockImplementationOnce(async(options:any)=>{options.guard();if(fault==='audit')throw Error('audit failed');return live();});
- return {approval,source,output,calls:()=>calls,queries:()=>queries,run:()=>validateExistingPreview({approval,source,equivalence:{candidateSourceCommit:EXISTING.sourceCommit,auditorCommit:source.commit,auditorTree:source.tree,workerSha256:EXISTING.workerSha256},evidence,directory,output,token:'synthetic-only',revalidate,fetch:fetchImpl}),cleanup:()=>{database.close();rmSync(directory,{recursive:true,force:true});vi.useRealTimers();audit.mockReset();continuationEdge.mockReset();}};
+ return {approval,source,output,calls:()=>calls,queries:()=>queries,mcpRequests:()=>mcpRequests,run:()=>validateExistingPreview({approval,source,equivalence:{candidateSourceCommit:EXISTING.sourceCommit,auditorCommit:source.commit,auditorTree:source.tree,workerSha256:EXISTING.workerSha256},evidence,directory,output,token:'synthetic-only',revalidate,fetch:fetchImpl}),cleanup:()=>{database.close();rmSync(directory,{recursive:true,force:true});vi.useRealTimers();audit.mockReset();continuationEdge.mockReset();}};
 }
 
 describe('existing-candidate continuation',()=>{
@@ -216,4 +226,13 @@ describe('explicit one-role carry-forward authority',()=>{
 
 describe('closed proposed next-day validation window',()=>{
  it.each(['missing-date','wrong-date','missing-age-grant','false-age-grant','wrong-age-cap','before-window','at-end','expiry-after-window','missing-retained-grant','wrong-retained-id','over-age'])('refuses%s before provider access',async fault=>{const f=existingFixture();try{const a=f.approval as unknown as Record<string,unknown>;if(fault==='missing-retained-grant')delete a.acceptRetainedNativeInputs;if(fault==='wrong-retained-id')a.retainedInputArtifactId=1;if(fault==='over-age')vi.setSystemTime(Date.parse(EXISTING.proofCompletedAt)+EXISTING.maximumHistoricalProofAgeMs+1);if(fault==='missing-date')delete a.validationDay;if(fault==='wrong-date')a.validationDay='2026-11-07';if(fault==='missing-age-grant')delete a.acceptPriorDayHistoricalProof;if(fault==='false-age-grant')a.acceptPriorDayHistoricalProof=false;if(fault==='wrong-age-cap')a.maximumHistoricalProofAgeMs=86400000;if(fault==='before-window')vi.setSystemTime(new Date('2026-11-05T23:59:59Z'));if(fault==='at-end')vi.setSystemTime(new Date(EXISTING.validationEnd));if(fault==='expiry-after-window')a.expiresAt='2026-11-06T18:00:00.001Z';await expect(f.run()).rejects.toThrow();expect(f.calls()).toBe(0);expect(f.queries()).toBe(0);}finally{f.cleanup();}});
+});
+
+
+describe('fixed scoped diagnostic through the existing protected controller',()=>{
+ it('uses its separate10k role, matching headroom and both continuity passes without release acceptance',async()=>{const f=existingFixture('diagnostic-normal');try{const r=await f.run();expect(r).toMatchObject({schemaVersion:'norton-scoped-diagnostic-receipt.v1',purpose:'response_observation_only',releaseAcceptance:false,productionAuthorized:false,metering:{newTotalReadsReserved:10000,mcpReadsReserved:1000,totalHeldPreviewReads:3970000,rowsWritten:0,controlRequests:24,mcpRequests:3}});expect(f.queries()).toBe(8);expect(f.mcpRequests()).toBe(3);expect(audit).not.toHaveBeenCalled();expect(continuationEdge).not.toHaveBeenCalled();expect(existsSync(join(f.output,'continuation-receipt.json'))).toBe(false);expect(existsSync(join(f.output,'corpus-live.json'))).toBe(false);const journal=readFileSync(join(f.output,'scoped-diagnostic.events.jsonl'),'utf8').trim().split('\n').map(l=>JSON.parse(l));const usage=journal.filter(e=>e.kind==='usage-observation');expect(usage).toHaveLength(2);expect(usage.every(e=>e.headroomAfterReservationAndMargin===230000)).toBe(true);expect(journal.at(-1).kind).toBe('scoped-diagnostic-complete');expect(JSON.stringify(r)).not.toContain('SECRET_');}finally{f.cleanup();}});
+ it.each(['http-failure','post-ledger'])('stops diagnostic%s with10k held and no validation receipt',async fault=>{const f=existingFixture('diagnostic-'+fault);try{await expect(f.run()).rejects.toThrow();expect(f.mcpRequests()).toBe(3);expect(existsSync(join(f.output,'scoped-diagnostic-receipt.json'))).toBe(false);expect(existsSync(join(f.output,'continuation-receipt.json'))).toBe(false);const journal=readFileSync(join(f.output,'scoped-diagnostic.events.jsonl'),'utf8');expect(journal).toContain('"retainWholeReadReservation":10000');expect(journal).not.toContain('SECRET_');expect(audit).not.toHaveBeenCalled();}finally{f.cleanup();}});
+ it('retains the first matching frame and stops on delayed EOF',async()=>{const f=existingFixture('diagnostic-delayed-eof');try{vi.useFakeTimers();const pending=f.run();const rejected=expect(pending).rejects.toThrow();await vi.advanceTimersByTimeAsync(31000);await rejected;const report=JSON.parse(readFileSync(join(f.output,'scoped-diagnostic.json'),'utf8'));expect(report.observations[2]).toMatchObject({outcome:'timeout_after_matching_frame',eofMs:null});expect(report.observations[2].matchingFrameMs).not.toBeNull();expect(f.queries()).toBe(4);expect(f.mcpRequests()).toBe(3);}finally{f.cleanup();}});
+ it.each(['control-stall','owner-stall'])('hard-bounds the entire diagnostic when%s ignores abort',async fault=>{const f=existingFixture('diagnostic-'+fault);try{vi.useFakeTimers();const pending=f.run();const rejected=expect(pending).rejects.toThrow();await vi.advanceTimersByTimeAsync(120001);await rejected;expect(f.mcpRequests()).toBe(0);expect(f.queries()).toBe(0);const last=JSON.parse(readFileSync(join(f.output,'scoped-diagnostic.events.jsonl'),'utf8').trim().split('\n').at(-1)!);expect(last).toMatchObject({kind:'STOP',reason:'diagnostic_operation_deadline',retainWholeReadReservation:10000,retry:false});}finally{f.cleanup();}});
+ it.each(['old-role','old-history','not-new','query','unknown-field'])('refuses diagnostic%s before any live fetch',async fault=>{const f=existingFixture('diagnostic-normal');try{const a=f.approval as any;if(fault==='old-role')a.maxReads=100000;if(fault==='old-history')a.previousReadReservation=3860000;if(fault==='not-new')a.newReadAllowance=false;if(fault==='query')a.requestPlanSha256='f'.repeat(64);if(fault==='unknown-field')a.secret='SECRET_FIELD';await expect(f.run()).rejects.toThrow();expect(f.calls()).toBe(0);expect(f.mcpRequests()).toBe(0);}finally{f.cleanup();}});
 });

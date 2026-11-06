@@ -16,8 +16,13 @@ async function resolveExistingNortonPreview({github,context,pin,now=Date.now()})
  else{const {data}=await github.rest.actions.listWorkflowRuns({...repo,workflow_id:'pr.yml',head_sha:pull.head.sha,event:'workflow_dispatch',status:'success',per_page:10});runs=data.workflow_runs;}
  const eligible=runs.filter(r=>r.path==='.github/workflows/pr.yml'&&r.event==='workflow_dispatch'&&r.status==='completed'&&r.conclusion==='success'&&r.run_attempt===1&&r.head_sha===pull.head.sha&&r.actor?.id===40179660&&r.triggering_actor?.id===40179660&&Date.parse(r.updated_at)<=now+300000&&Date.parse(r.updated_at)>=now-7*86400000);
  check(eligible.length>0,'successful owner-dispatched auditor');
- const run=eligible.sort((a,b)=>Date.parse(b.updated_at)-Date.parse(a.updated_at))[0];
- const {data:jobs}=await github.rest.actions.listJobsForWorkflowRun({...repo,run_id:run.id,per_page:100});check(jobs.total_count<=100,'complete job roster');
+ let run,jobs;
+ for(const candidate of eligible.sort((a,b)=>Date.parse(b.updated_at)-Date.parse(a.updated_at))){
+  const {data:roster}=await github.rest.actions.listJobsForWorkflowRun({...repo,run_id:candidate.id,per_page:100});check(roster.total_count<=100,'complete job roster');
+  if(roster.jobs.some(j=>j.name==='Diagnose fixed Norton scoped response (read-only)')){check(!pin,'diagnostic run is not pinned preview acceptance');continue;}
+  run=candidate;jobs=roster;break;
+ }
+ check(run&&jobs,'full protected validation, not diagnostic-only evidence');
  for(const name of ['Verify deployed Norton candidate and distinct auditor (no cloud credentials)','Validate already deployed Norton preview (read-only)']){const matches=jobs.jobs.filter(j=>j.name===name);check(matches.length===1&&matches[0].conclusion==='success','successful source and protected validation jobs');}
  check(jobs.jobs.filter(j=>j.name==='Deploy Preview').every(j=>j.conclusion==='skipped'),'no deployment in validation run');
  const {data:artifacts}=await github.rest.actions.listWorkflowRunArtifacts({...repo,run_id:run.id,per_page:100});check(artifacts.total_count<=100,'complete artifact roster');

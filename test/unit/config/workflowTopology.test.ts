@@ -80,9 +80,9 @@ function expressionBody(value: string): string {
   return normalized(value).replace(/^\$\{\{\s*/, '').replace(/\s*\}\}$/, '');
 }
 
-function routedName(name: string | undefined, event = 'pull_request', proof = '', authorization = '', restoration = '', existingValidation = ''): string {
+function routedName(name: string | undefined, event = 'pull_request', proof = '', authorization = '', restoration = '', existingValidation = '', operationKind = 'validation'): string {
   if (!name?.startsWith('${{')) return name ?? '';
-  return new Function('github','inputs','return ('+name.slice(3,-2)+')')({event_name:event},{operator_proof_json:proof,operator_authorization_json:authorization,preview_restore_json:restoration,preview_validate_existing_json:existingValidation});
+  return new Function('github','inputs','needs','return ('+name.slice(3,-2)+')')({event_name:event},{operator_proof_json:proof,operator_authorization_json:authorization,preview_restore_json:restoration,preview_validate_existing_json:existingValidation},{'existing-preview-source':{outputs:{operation_kind:operationKind}}});
 }
 function assertPreviewRevocationBoundary(workflow: Workflow): void {
   const trigger = workflow.on['pull_request'] as { types?: string[] };
@@ -753,3 +753,6 @@ it('keeps in-place corpus validation protected, read-only and distinct from depl
 
 
 it('binds Norton manual preview evidence at both production checks with only necessary GitHub reads',async()=>{const w=parse(await readWorkflow('deploy.yml'))as Workflow;expect(w.jobs.deploy!.permissions).toEqual({actions:'read',contents:'read','pull-requests':'read'});for(const name of ['verify-dual-era-preview','deploy']){const job=w.jobs[name]!;const actions=job.steps!.filter(s=>s.name?.startsWith('Download Norton'));expect(actions).toHaveLength(2);for(const action of actions){expect(action.with?.['artifact-ids']).toBeTruthy();expect(action.with?.['digest-mismatch']).toBe('error');}expect(job.steps!.find(s=>s.name==='Verify source-bound dual-era preview release receipt')!.run).toContain('verify-existing');}const recheck=w.jobs.deploy!.steps!.find(s=>s.id==='recheck-existing-preview');expect(JSON.stringify(recheck)).toContain('resolveExistingNortonPreview');expect(JSON.stringify(recheck)).toContain('pin');});
+
+
+it('keeps the fixed scoped diagnostic inside the same protected source and concurrency path with distinct evidence',async()=>{const w=parse(await readWorkflow('pr.yml'))as Workflow,source=w.jobs['existing-preview-source']!,job=w.jobs['validate-existing-preview']!;expect(JSON.stringify(source)).toContain('operation_kind');expect(source.steps!.find(s=>s.name==='Verify immutable candidate inputs and compile-equivalent auditor runtime')!.id).toBe('existing-inputs');expect(job.name).toContain("operation_kind == 'diagnostic'");expect(job.name).toContain('Diagnose fixed Norton scoped response (read-only)');expect(routedName(job.name,'workflow_dispatch','','','','','diagnostic')).toBe('Diagnose fixed Norton scoped response (read-only)');expect(job.environment).toBe('preview');expect(job.concurrency).toEqual({group:'theologai-shared-preview-mutation','cancel-in-progress':false});const upload=job.steps!.find(s=>s.name==='Retain in-place validation evidence after success or stop')!;expect(upload.with?.name).toContain('norton-scoped-diagnostic-');expect(job.permissions).toEqual({contents:'read',actions:'read','pull-requests':'read'});});
