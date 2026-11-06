@@ -126,11 +126,16 @@ describe('existing-candidate continuation',()=>{
 });
 
 describe('existing-candidate native authority',()=>{
- function dispatchFixture(fault=''){
+ function dispatchFixture(fault='',diagnostic=false,phase:'prepare'|'validate'='validate'){
   const source={commit:'a'.repeat(40),tree:'b'.repeat(40)},now=Date.parse('2026-11-06T12:00:00Z');
   const a:ExistingApproval={schemaVersion:'norton-existing-preview-validation-approval.v1',operationId:'operation-existing-native-fixture',auditorCommit:source.commit,auditorTree:source.tree,expiresAt:'2026-11-06T12:30:00.000Z',confirmation:EXISTING.confirmation,historicalProofSha256:EXISTING.proofSha256,acceptHistoricalProofForValidationOnly:true,uninterruptedDataCustody:true,maxReads:100000,maxWrites:0,noDeployment:true,accountReadCeiling:4400000,previousReadReservation:3860000,carryForwardFromOperationId:CARRY_FORWARD.operationId,acceptUnusedRoleCarryForward:true,validationDay:EXISTING.validationDay,acceptPriorDayHistoricalProof:true,maximumHistoricalProofAgeMs:EXISTING.maximumHistoricalProofAgeMs,acceptRetainedNativeInputs:true,retainedInputArtifactId:RETAINED_INPUTS.inputArtifact.id};
+  if(diagnostic){const d=a as any;delete d.acceptHistoricalProofForValidationOnly;delete d.carryForwardFromOperationId;delete d.acceptUnusedRoleCarryForward;Object.assign(d,{schemaVersion:SCOPED_DIAGNOSTIC.schema,confirmation:SCOPED_DIAGNOSTIC.confirmation,maxReads:10000,previousReadReservation:3960000,acceptHistoricalProofForDiagnosticOnly:true,newReadAllowance:true,priorFailedOperationId:SCOPED_DIAGNOSTIC.failedOperation,requestPlanSha256:diagnosticRequestsSha256});}
   const calls:string[]=[];
   const github=async(route:string)=>{calls.push(route);
+   if(route.startsWith('/actions/artifacts?name=')){const marker={id:88,name:'norton-scoped-diagnostic-ledger-'+a.operationId,digest:'sha256:'+'a'.repeat(64),expired:false,expires_at:'2026-11-07T12:00:00Z',size_in_bytes:2000,workflow_run:{id:9,head_sha:source.commit}};
+    if(fault==='foreign-marker')marker.workflow_run.id=10;if(fault==='marker-head')marker.workflow_run.head_sha='c'.repeat(40);if(fault==='marker-digest')marker.digest='unknown';if(fault==='marker-expired')marker.expired=true;
+    const artifacts=fault==='empty-marker'?[]:fault==='multiple-markers'?[marker,{...marker,id:89}]:[marker];return {total_count:artifacts.length,artifacts};}
+
    if(route==='/actions/runs/9')return {id:9,actor:{id:EXISTING.owner},triggering_actor:{id:fault==='trigger'?2:EXISTING.owner},event:'workflow_dispatch',path:'.github/workflows/pr.yml',head_sha:source.commit,head_branch:'codex/norton-aquinas-successor',run_attempt:fault==='attempt'?2:1};
    if(route==='/pulls/176')return {state:'open',draft:false,base:{ref:'main',sha:EXISTING.base},head:{sha:fault==='head'?'c'.repeat(40):source.commit,ref:'codex/norton-aquinas-successor',repo:{full_name:EXISTING.repository}},labels:fault==='label'?[{name:'deploy-preview'}]:[]};
    if(route.startsWith('/git/commits/'))return {tree:{sha:source.tree}};
@@ -144,8 +149,10 @@ describe('existing-candidate native authority',()=>{
    throw Error('Unexpected native fixture route');
   };
   const environment={GITHUB_REPOSITORY:EXISTING.repository,GITHUB_EVENT_NAME:'workflow_dispatch',GITHUB_RUN_ATTEMPT:'1',GITHUB_ACTOR_ID:String(EXISTING.owner),GITHUB_RUN_ID:'9',GITHUB_REF:'refs/heads/codex/norton-aquinas-successor'};
-  return {a,source,calls,run:()=>requireExistingDispatch(a,source,github,environment,now)};
+  return {a,source,calls,run:()=>requireExistingDispatch(a,source,github,environment,now,phase)};
  }
+ it('admits preparation only with no diagnostic marker and validation only with one same-run marker',async()=>{await expect(dispatchFixture('empty-marker',true,'prepare').run()).resolves.toMatchObject({runId:'9'});await expect(dispatchFixture('',true).run()).resolves.toMatchObject({runId:'9'});await expect(dispatchFixture('',true,'prepare').run()).rejects.toThrow('unused diagnostic operation');});
+ it.each(['empty-marker','multiple-markers','foreign-marker','marker-head','marker-digest','marker-expired'])('refuses diagnostic replay/invalid %s before any provider operation',async fault=>{await expect(dispatchFixture(fault,true).run()).rejects.toThrow();});
  it('authenticates separate auditor dispatch and all original immutable artifacts without renewing the old proof',async()=>{const f=dispatchFixture();const result=await f.run();expect(result).toMatchObject({runId:'9',auditorCommit:f.source.commit,operationId:f.a.operationId,ownerActorId:EXISTING.owner});expect(result.retainedInputs.inputArtifact.id).toBe(RETAINED_INPUTS.inputArtifact.id);expect(f.calls).toHaveLength(11);expect(f.source.commit).not.toBe(EXISTING.sourceCommit);});
  it.each(['trigger','attempt','head','label','candidate-source','proof-job','CI','expired-artifact','oversized-artifact','artifact-digest'])('rejects %s before Cloudflare use',async fault=>{const f=dispatchFixture(fault);await expect(f.run()).rejects.toThrow();});
 });

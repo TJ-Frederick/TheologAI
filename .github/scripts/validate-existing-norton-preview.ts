@@ -107,7 +107,7 @@ export function verifyHistoricalCandidate(directory:string,candidateRoot:string)
  check(cutover.candidateBindingMatches===true&&cutover.observedActiveVersionId===EXISTING.worker&&cutover.observedActiveDeploymentId===EXISTING.deployment&&cutover.observedActiveD1.databaseId===EXISTING.database,'known candidate cutover');
  return {plan,envelope,challenge,cutover,historicalVerificationAt:envelope.receipt.completedAt,freshProof:false};
 }
-export async function requireExistingDispatch(a:PreviewApproval,source:{commit:string;tree:string},github:(route:string)=>Promise<any>,environment:NodeJS.ProcessEnv,now=Date.now()){
+export async function requireExistingDispatch(a:PreviewApproval,source:{commit:string;tree:string},github:(route:string)=>Promise<any>,environment:NodeJS.ProcessEnv,now=Date.now(),phase:'prepare'|'validate'='validate'){
  requirePreviewApproval(a,source,now);check(environment.GITHUB_REPOSITORY===EXISTING.repository&&environment.GITHUB_EVENT_NAME==='workflow_dispatch'&&environment.GITHUB_RUN_ATTEMPT==='1'&&environment.GITHUB_ACTOR_ID===String(EXISTING.owner),'owner dispatch environment');
  const run=await github('/actions/runs/'+environment.GITHUB_RUN_ID);check(run.actor?.id===EXISTING.owner&&run.triggering_actor?.id===EXISTING.owner&&run.run_attempt===1&&run.event==='workflow_dispatch'&&run.path==='.github/workflows/pr.yml'&&String(run.id)===environment.GITHUB_RUN_ID&&run.head_sha===source.commit&&environment.GITHUB_REF==='refs/heads/'+run.head_branch,'authenticated owner/auditor run');
  const pr=await github('/pulls/176'),commit=await github('/git/commits/'+source.commit),main=await github('/git/ref/heads/main');
@@ -117,8 +117,17 @@ export async function requireExistingDispatch(a:PreviewApproval,source:{commit:s
  check(jobs.jobs.some((j:any)=>j.name==='Preview operator corpus verification'&&j.conclusion==='success')&&jobs.jobs.some((j:any)=>j.name==='Deploy Preview'&&j.conclusion==='failure'),'original proof passed before deployment gate failure');
  const proofJobs=jobs.jobs.filter((j:any)=>j.name==='Preview operator corpus verification'),deployJobs=jobs.jobs.filter((j:any)=>j.name==='Deploy Preview');check(proofJobs.length===1&&deployJobs.length===1&&deployJobs[0].steps.some((s:any)=>s.name==='Require stable preview release registrations before audits'&&s.conclusion==='failure'),'exact original failed gate');
  const ci=await github('/actions/workflows/pr.yml/runs?head_sha='+source.commit+'&event=pull_request&status=success&per_page=10');check(ci.workflow_runs.some((r:any)=>r.head_sha===source.commit&&r.path==='.github/workflows/pr.yml'&&r.event==='pull_request'&&r.conclusion==='success'),'ordinary auditor CI');
- const retainedInputs=await requireRetainedNativeMetadata(github,now);
- return {runId:String(run.id),auditorCommit:source.commit,auditorTree:source.tree,operationId:a.operationId,ownerActorId:run.actor.id,triggeringActorId:run.triggering_actor.id,retainedInputs};
+ const retainedInputs=await requireRetainedNativeMetadata(github,now);let diagnosticMarker:unknown;
+ if(isScopedDiagnostic(a)){
+  const name='norton-scoped-diagnostic-ledger-'+a.operationId,markers=await github('/actions/artifacts?name='+name+'&per_page=100');
+  check(Number.isSafeInteger(markers.total_count)&&Array.isArray(markers.artifacts)&&markers.total_count===markers.artifacts.length,'complete diagnostic operation ledger');
+  if(phase==='prepare')check(markers.total_count===0,'unused diagnostic operation');
+  else{
+   check(markers.total_count===1,'one diagnostic operation marker');const marker=markers.artifacts[0];
+   check(marker.name===name&&Number.isSafeInteger(marker.id)&&marker.id>0&&/^sha256:[a-f0-9]{64}$/.test(marker.digest)&&marker.expired===false&&Date.parse(marker.expires_at)>now+60000&&Number.isSafeInteger(marker.size_in_bytes)&&marker.size_in_bytes>0&&marker.size_in_bytes<=60000&&marker.workflow_run?.id===run.id&&marker.workflow_run?.head_sha===source.commit,'same-run diagnostic operation marker');diagnosticMarker=marker;
+  }
+ }
+ return {runId:String(run.id),auditorCommit:source.commit,auditorTree:source.tree,operationId:a.operationId,ownerActorId:run.actor.id,triggeringActorId:run.triggering_actor.id,retainedInputs,...(diagnosticMarker?{diagnosticMarker}:{})};
 }
 // Evidence only: never admit usage from this summary or retain provider strings.
 export function summarizeUsageResponse(bytes:Buffer){
@@ -215,7 +224,7 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).hr
  const run=async()=>{
   check(environment.GITHUB_TOKEN,'existing GitHub token');requirePreviewApproval(a,source);
   const classification=classifyApplicationRelease(process.cwd());check(classification.sourceCommit===source.commit&&classification.sourceTree===source.tree,'clean exact auditor checkout');
-  const admission=mode==='prepare'?await requireExistingDispatch(a,source,github,environment):undefined;
+  const admission=mode==='prepare'?await requireExistingDispatch(a,source,github,environment,Date.now(),'prepare'):undefined;
   const evidence=verifyHistoricalCandidate(directory!,candidateRoot!);
   const priorCustody=mode==='prepare'?admission!.retainedInputs:json(join(directory!,'equivalence.json')).admission.retainedInputs;
   verifyRetainedInputEvidence(directory!,priorCustody,NATIVE_ARTIFACTS,EXISTING.run,EXISTING.sourceCommit);
@@ -227,7 +236,7 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).hr
    check(JSON.stringify(strip(oldMap))===JSON.stringify(strip(newMap)),'debug map source contents or mappings changed');
    const oldPaths=oldMap.sources.map((s:string)=>posix.relative('/home/runner/work/TheologAI/TheologAI',posix.resolve(oldMap.sourceRoot,s))),newPaths=newMap.sources.map((s:string)=>posix.relative(process.cwd(),posix.resolve(newMap.sourceRoot,s)));
    check(JSON.stringify(oldPaths)===JSON.stringify(newPaths),'debug map repository source paths changed');
-   if(environment.GITHUB_OUTPUT)appendFileSync(environment.GITHUB_OUTPUT,'operation_kind='+(isScopedDiagnostic(a)?'diagnostic':'validation')+'\n');
+   if(environment.GITHUB_OUTPUT)appendFileSync(environment.GITHUB_OUTPUT,'operation_kind='+(isScopedDiagnostic(a)?'diagnostic':'validation')+'\noperation_id='+a.operationId+'\n');
    writeFileSync(join(directory!,'equivalence.json'),JSON.stringify({schemaVersion:'norton-fixed-runtime-equivalence.v1',...equivalence,auditorTree:source.tree,admission,historicalVerificationAt:evidence.historicalVerificationAt,freshProof:false},null,2)+'\n',{flag:'wx',mode:0o600});return;
   }
   const witness=json(join(directory!,'equivalence.json'));

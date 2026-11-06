@@ -1314,6 +1314,7 @@ jobs:
   existing-preview-source:
     outputs:
       operation_kind: ${{ steps['existing-inputs'].outputs.operation_kind }}
+      operation_id: ${{ steps['existing-inputs'].outputs.operation_id }}
     name: Verify deployed Norton candidate and distinct auditor (no cloud credentials)
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.preview_validate_existing_json != '' && inputs.preview_restore_json == '' && inputs.operator_authorization_json == '' && inputs.operator_proof_json == '' && github.actor_id == '40179660' && github.run_attempt == 1 }}
     runs-on: ubuntu-latest
@@ -1369,6 +1370,15 @@ jobs:
           npx --no-install tsx .github/scripts/validate-existing-norton-preview.ts prepare \
             "$RUNNER_TEMP/continuation-request.json" "$RUNNER_TEMP/existing-preview" \
             "$RUNNER_TEMP/candidate-cc14" "$RUNNER_TEMP/existing-preview/auditor-bundle"
+      - name: Reserve the fixed diagnostic operation in native artifact history
+        if: ${{ steps['existing-inputs'].outputs.operation_kind == 'diagnostic' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: norton-scoped-diagnostic-ledger-${{ steps['existing-inputs'].outputs.operation_id }}
+          path: ${{ runner.temp }}/continuation-request.json
+          retention-days: 7
+          if-no-files-found: error
+          overwrite: false
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: existing-preview-inputs-${{ github.run_id }}-attempt-${{ github.run_attempt }}
