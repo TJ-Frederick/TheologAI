@@ -6,8 +6,10 @@ import { execFileSync } from 'node:child_process';
 import Database from 'better-sqlite3';
 export const SOURCE_RECOVERY = Object.freeze({ directory: 'release/norton-aquinas-recovery', statisticsBytes: 307777, statisticsSha256: '379d676e70f30f94fc87e9e462bbb06c2b92a895aa3022b0f2345165dbb1d496', metadataBytes: 1526086, metadataSha256: 'c04fd2ba6e98ce14d48a8114527f372716f5a2a897f600eb4ce23c476742f4ee', manifestSha256: 'c54cc9443a10d0d4ed6c0b182831518e7a800752e12c1752fce448c071782f97', databaseBytes: 348463104, databaseSha256: '3f8a53c37a585b5c42b2410d7f3167645f738bbf90b51d43b2c0378efb4f898c', workerSha256: '9d9cff3b7d252a9c47a5316d643e4a91e3309989909f648041dcbcc7a70e659b', originalRun: 42226589902, originalSource: '91a458ba77abd05191f855b3cb80fc811dd2552b', originalJob: 127921535696, capturedAt: '2026-11-06T13:35:14Z', originalArtifact: 13505817745, originalArchiveBytes: 102846532, originalArchiveSha256: '5e7694da3a0d7bc6d656e8d19a84637bffe536f58b3a6948a400e5cc89542600', sqlite: '3.51.2', node: 'v22.23.4' });
 const sha = (b: Buffer | string) => createHash('sha256').update(b).digest('hex');
-const check = (v: unknown, s: string): void => { if (!v)
-    throw Error('Original Norton source recovery refused: ' + s); };
+const check = (v: unknown, s: string): void => {
+    if (!v)
+        throw Error('Original Norton source recovery refused: ' + s);
+};
 function bytes(p: string, max: number) { const s = lstatSync(p); check(s.isFile() && !s.isSymbolicLink() && s.size > 0 && s.size <= max, 'bounded regular file'); return readFileSync(p); }
 function pinned(root: string, name: string, hash: string, size?: number) { const b = bytes(join(root, SOURCE_RECOVERY.directory, name), 16 * 1024 * 1024); check(sha(b) === hash && (!size || b.length === size), 'pinned recovery payload'); return b; }
 function manifest(root: string): Record<string, {
@@ -15,20 +17,26 @@ function manifest(root: string): Record<string, {
     sha256: string;
 }> { return JSON.parse(pinned(root, 'original-metadata-files.json', SOURCE_RECOVERY.manifestSha256).toString()); }
 function ownedDirectory(p: string) { const s = lstatSync(p); check(s.isDirectory() && !s.isSymbolicLink(), 'regular recovery directory'); }
-function freelist(b: Buffer) { let page = b.readUInt32BE(32); const found = new Set<number>(), trunks = new Set<number>(), limit = b.length / 4096; while (page) {
-    check(page > 1 && page <= limit && !trunks.has(page), 'freelist trunk bounds');
-    trunks.add(page);
-    check(!found.has(page), 'disjoint freelist trunk');
-    found.add(page);
-    const offset = (page - 1) * 4096, count = b.readUInt32BE(offset + 4);
-    check(count <= 1022, 'freelist leaf count');
-    for (let i = 0; i < count; i++) {
-        const leaf = b.readUInt32BE(offset + 8 + 4 * i);
-        check(leaf > 1 && leaf <= limit && !found.has(leaf), 'disjoint bounded freelist leaf');
-        found.add(leaf);
+function freelist(b: Buffer) {
+    let page = b.readUInt32BE(32);
+    const found = new Set<number>(), trunks = new Set<number>(), limit = b.length / 4096;
+    while (page) {
+        check(page > 1 && page <= limit && !trunks.has(page), 'freelist trunk bounds');
+        trunks.add(page);
+        check(!found.has(page), 'disjoint freelist trunk');
+        found.add(page);
+        const offset = (page - 1) * 4096, count = b.readUInt32BE(offset + 4);
+        check(count <= 1022, 'freelist leaf count');
+        for (let i = 0; i < count; i++) {
+            const leaf = b.readUInt32BE(offset + 8 + 4 * i);
+            check(leaf > 1 && leaf <= limit && !found.has(leaf), 'disjoint bounded freelist leaf');
+            found.add(leaf);
+        }
+        page = b.readUInt32BE(offset);
     }
-    page = b.readUInt32BE(offset);
-} check(found.size === b.readUInt32BE(36), 'complete freelist'); return found; }
+    check(found.size === b.readUInt32BE(36), 'complete freelist');
+    return found;
+}
 /** Only the owned fresh build is replaced, after the complete original byte hash matches. */
 export function reconstructNortonSource(root: string, directory: string, bundle: string) {
     ownedDirectory(directory);
@@ -147,4 +155,29 @@ export async function requireRecoveredNativeMetadata(github: (route: string) => 
     const source = jobs.jobs.filter((j: any) => j.id === p.originalJob && j.name === 'Verify deployed Norton candidate and distinct auditor (no cloud credentials)' && j.status === 'completed' && j.conclusion === 'success' && j.completed_at === p.capturedAt);
     check(source.length === 1, 'authenticated original source capture');
     return { runId: p.originalRun, sourceCommit: p.originalSource, sourceJobId: p.originalJob, capturedAt: p.capturedAt, originalNativeArtifactId: p.originalArtifact, originalArchiveSha256: p.originalArchiveSha256, freshRemoteProof: false };
+}
+/** Bind the already verified Ubuntu bytes; never repeat a stochastic source build after approval. */
+export async function requireRehearsalNativeInputs(github: (route: string) => Promise<any>, pin: {
+    rehearsalRunId: number;
+    rehearsalArtifactId: number;
+    rehearsalArtifactDigest: string;
+}, source: {
+    commit: string;
+    tree: string;
+}, now = Date.now()) {
+    const run = await github('/actions/runs/' + pin.rehearsalRunId), jobs = await github('/actions/runs/' + pin.rehearsalRunId + '/jobs?per_page=100'), a = await github('/actions/artifacts/' + pin.rehearsalArtifactId);
+    check(run.id === pin.rehearsalRunId && run.path === '.github/workflows/pr.yml' && run.event === 'pull_request' && Array.isArray(run.pull_requests) && run.pull_requests.some((p: any) => p.number === 176) && run.head_sha === source.commit && run.run_attempt === 1 && run.status === 'completed' && run.conclusion === 'success', 'successful exact-head Ubuntu CI rehearsal');
+    check(jobs.total_count === jobs.jobs.length && jobs.total_count <= 100, 'complete rehearsal job roster');
+    const data = jobs.jobs.filter((j: any) => j.name === 'Fresh Checkout & Data' && j.status === 'completed' && j.conclusion === 'success');
+    check(data.length === 1 && Number.isSafeInteger(data[0].id) && data[0].id>0 && ['Rehearse complete original Norton source recovery without cloud credentials', 'Retain original source recovery rehearsal result', 'Retain original source recovery rehearsal inputs'].every(name => data[0].steps.filter((s: any) => s.name === name && s.conclusion === 'success').length === 1), 'actual Ubuntu reconstruction and native retention passed');
+    check(a.id === pin.rehearsalArtifactId && a.name === 'norton-original-source-inputs-' + pin.rehearsalRunId + '-attempt-1' && a.digest === pin.rehearsalArtifactDigest && /^sha256:[a-f0-9]{64}$/.test(a.digest) && a.expired === false && Number.isSafeInteger(a.size_in_bytes) && a.size_in_bytes > 0 && a.size_in_bytes <= 128 * 1024 * 1024 && Number.isFinite(Date.parse(a.created_at)) && Date.parse(a.created_at)<=now && Date.parse(a.expires_at) > now + 60000 && a.workflow_run?.id === run.id && a.workflow_run.head_sha === source.commit, 'owner-pinned unexpired CI input artifact');
+    return { runId: run.id, sourceCommit: source.commit, sourceTree: source.tree, jobId: data[0].id, artifact: { id: a.id, name: a.name, digest: a.digest, bytes: a.size_in_bytes, createdAt: a.created_at, expiresAt: a.expires_at }, freshRemoteProof: false };
+}
+export function verifyRehearsalInputWitness(directory: string, source: {
+    commit: string;
+    tree: string;
+}) {
+    const r = JSON.parse(bytes(join(directory, 'original-source-rehearsal.json'), 60000).toString()), record = JSON.parse(bytes(join(directory, 'source-recovery.json'), 60000).toString());
+    check(Object.keys(r).sort().join(',') === 'allOriginalProofAndFourIntegrityReceiptsVerified,auditorCommit,auditorTree,candidateSourceCommit,freshRemoteProof,originalDatabaseSha256,originalNativeArchiveSha256,originalNativeArtifact,originalNativeRun,originalProofSha256,originalVerificationAt,reconstruction,releaseAcceptance,remoteOperations,schemaVersion,workerSha256' && r.schemaVersion === 'norton-original-source-rehearsal.v1' && /^[a-f0-9]{40}$/.test(r.auditorCommit) && r.auditorTree === source.tree && r.candidateSourceCommit === 'cc14e062d772e957a24a64bfc15a679ebaca8109' && r.originalDatabaseSha256 === SOURCE_RECOVERY.databaseSha256 && r.workerSha256 === SOURCE_RECOVERY.workerSha256 && r.originalProofSha256 === '74842d254f0c6312f02d3b9908d3dcf8a5b24752f2eb6a93e4490856cb78f724' && r.originalVerificationAt === '2026-11-05T02:45:14.748Z' && r.originalNativeRun === SOURCE_RECOVERY.originalRun && r.originalNativeArtifact === SOURCE_RECOVERY.originalArtifact && r.originalNativeArchiveSha256 === SOURCE_RECOVERY.originalArchiveSha256 && r.allOriginalProofAndFourIntegrityReceiptsVerified === true && r.freshRemoteProof === false && r.releaseAcceptance === false && r.remoteOperations === 0 && JSON.stringify(r.reconstruction) === JSON.stringify(record), 'same-tree complete Ubuntu source rehearsal, never release acceptance');
+    return r;
 }

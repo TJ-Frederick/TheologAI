@@ -107,7 +107,7 @@ jobs:
 
       - name: Rehearse complete original Norton source recovery without cloud credentials
         id: original-source-rehearsal
-        if: ${{ github.event_name == 'pull_request' && needs.classify.outputs.data == 'true' }}
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.number == 176 && needs.classify.outputs.data == 'true' }}
         env:
           RECOVERY_BASE: ${{ github.event.pull_request.base.sha }}
           RECOVERY_HEAD: ${{ github.event.pull_request.head.sha }}
@@ -138,12 +138,24 @@ jobs:
             "$RUNNER_TEMP/norton-recovery-rehearsal" "$RUNNER_TEMP/norton-recovery-cc14" \
             "$RUNNER_TEMP/norton-recovery-rehearsal/auditor-bundle" | tee "$RUNNER_TEMP/norton-original-source-rehearsal.json"
           test -s "$RUNNER_TEMP/norton-original-source-rehearsal.json"
+          cp "$RUNNER_TEMP/norton-original-source-rehearsal.json" "$RUNNER_TEMP/norton-recovery-rehearsal/original-source-rehearsal.json"
       - name: Retain original source recovery rehearsal result
         if: ${{ steps['original-source-rehearsal'].outputs.selected == 'true' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: norton-original-source-rehearsal-${{ github.run_id }}-attempt-${{ github.run_attempt }}
           path: ${{ runner.temp }}/norton-original-source-rehearsal.json
+          retention-days: 7
+          if-no-files-found: error
+          overwrite: false
+
+
+      - name: Retain original source recovery rehearsal inputs
+        if: ${{ steps['original-source-rehearsal'].outputs.selected == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: norton-original-source-inputs-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/norton-recovery-rehearsal/
           retention-days: 7
           if-no-files-found: error
           overwrite: false
@@ -1403,11 +1415,23 @@ jobs:
         run: |
           npx --no-install tsx .github/scripts/retained-norton-inputs.ts \
             "$RUNNER_TEMP/retained-norton-inputs" "$RUNNER_TEMP/retained-norton-stop" "$RUNNER_TEMP/existing-preview"
-      - name: Build the exact original source recovery input without cloud credentials
+      - name: Download the owner-pinned successful Ubuntu source inputs
         if: ${{ fromJSON(inputs.preview_validate_existing_json).schemaVersion == 'norton-existing-preview-validation-approval.v2' }}
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ fromJSON(inputs.preview_validate_existing_json).rehearsalArtifactId }}
+          run-id: ${{ fromJSON(inputs.preview_validate_existing_json).rehearsalRunId }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/existing-preview
+          merge-multiple: true
+          digest-mismatch: error
+      - name: Compile the auditor when no verified Ubuntu input pack is selected
+        if: ${{ fromJSON(inputs.preview_validate_existing_json).schemaVersion != 'norton-existing-preview-validation-approval.v2' }}
+        env:
+          WRANGLER_SEND_METRICS: 'false'
         run: |
-          mkdir -p "$RUNNER_TEMP/existing-preview/source"
-          npx --no-install tsx scripts/build-database.ts --output "$RUNNER_TEMP/existing-preview/source/source.db"
+          mkdir -p "$RUNNER_TEMP/existing-preview"
+          npx --no-install wrangler deploy --dry-run --env preview --env-file /dev/null --outdir "$RUNNER_TEMP/existing-preview/auditor-bundle"
       - name: Verify immutable candidate inputs and compile-equivalent auditor runtime
         id: existing-inputs
         env:
@@ -1418,7 +1442,6 @@ jobs:
           printf '%s\n' "$APPROVAL_JSON" > "$RUNNER_TEMP/continuation-request.json"
           mkdir -p "$RUNNER_TEMP/existing-preview"
           git worktree add --detach "$RUNNER_TEMP/candidate-cc14" cc14e062d772e957a24a64bfc15a679ebaca8109
-          npx --no-install wrangler deploy --dry-run --env preview --env-file /dev/null --outdir "$RUNNER_TEMP/existing-preview/auditor-bundle"
           npx --no-install tsx .github/scripts/validate-existing-norton-preview.ts prepare \
             "$RUNNER_TEMP/continuation-request.json" "$RUNNER_TEMP/existing-preview" \
             "$RUNNER_TEMP/candidate-cc14" "$RUNNER_TEMP/existing-preview/auditor-bundle"
