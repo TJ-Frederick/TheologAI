@@ -48,7 +48,10 @@ export async function auditCorpusRelease(options: {
         responseSha256: string;
     }[] = [], summaries: unknown[] = [], fingerprints: unknown[] = [];
     let current = 'initialize', role = '', era = '';
-    type HttpObservation={era:string;probeId:string;httpMethod:string;rpcMethod:string|null;requestId:string|number|null;status:number|null;evidence:ReturnType<typeof httpEvidence>|null};
+    // EOF records an actual reader EOF; a null body has finishedMs with eof=false.
+    // Timings share the existing HTTP deadline start, including admission spacing.
+    type ResponseBodyObservation={bytes:number;eof:boolean;readError:boolean;deadlineFired:boolean;headersMs:number|null;firstByteMs:number|null;finishedMs:number|null};
+    type HttpObservation={era:string;probeId:string;httpMethod:string;rpcMethod:string|null;requestId:string|number|null;status:number|null;evidence:ReturnType<typeof httpEvidence>|null;responseBody:ResponseBodyObservation};
     type RequestFailure=HttpObservation&{category:FailureCategory;reason:string;sdkErrorCode?:string|null};
     let failedRequest:RequestFailure|undefined,secondaryHttpFailure:RequestFailure|undefined;
     let originatingFailure:(RequestFailure&{sdkErrorCode:string|null;stage:FailureStage})|undefined;
@@ -102,7 +105,7 @@ export async function auditCorpusRelease(options: {
                     if(typeof init?.body==='string'){try{const rpc=JSON.parse(init.body);rpcMethod=typeof rpc.method==='string'&&/^[A-Za-z][A-Za-z0-9/_-]{0,80}$/.test(rpc.method)?rpc.method:null;requestId=typeof rpc.id==='number'&&Number.isSafeInteger(rpc.id)||typeof rpc.id==='string'&&/^[A-Za-z0-9._:-]{1,80}$/.test(rpc.id)?rpc.id:null;if(stage==='contract'){const id=({'tools/list':'contract:tools-list','prompts/list':'contract:prompts-list','resources/list':'contract:resources-list','resources/templates/list':'contract:resource-templates-list'} as Record<string,string>)[rpc.method];if(id)requestProbe=id;}}catch{}}
                     // Initialized notifications are awaited by connect(); cancellation and GET streams are not the active RPC.
                     const awaited=httpMethod!=='GET'&&rpcMethod!=='notifications/cancelled';
-                    const observation:HttpObservation={era:protocol,probeId:requestProbe,httpMethod,rpcMethod,requestId,status:null,evidence:null};
+                    const observation:HttpObservation={era:protocol,probeId:requestProbe,httpMethod,rpcMethod,requestId,status:null,evidence:null,responseBody:{bytes:0,eof:false,readError:false,deadlineFired:false,headersMs:null,firstByteMs:null,finishedMs:null}};
                     if(awaited)requestObservations.set(requestProbe,observation);
                     try{
                     try{options.guard?.();}catch{throw new AuditFault('guard');}
@@ -110,20 +113,20 @@ export async function auditCorpusRelease(options: {
                     totalExchanges++;eraExchanges=exchanges;
                     const url = String(input instanceof Request ? input.url : input);
                     check(url === options.endpoint, 'unexpected_endpoint');
-                    const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 30000);
+                    const requestStarted=Date.now();const controller = new AbortController(), timer = setTimeout(() => {observation.responseBody.deadlineFired=true;controller.abort();}, 30000);
                     try {
                         if(options.fetch===fetch){const delay=Math.max(0,nextNetworkStart-Date.now());if(delay)await new Promise(r=>setTimeout(r,delay));nextNetworkStart=Date.now()+650;}
                         let response:Response;try{response = await fetchImpl(input, { ...init, headers:{...Object.fromEntries(new Headers(init?.headers)),'user-agent':`TheologAI-Corpus-${role}-Audit/1.0`}, redirect: 'error', signal: init?.signal ? AbortSignal.any([init.signal, controller.signal]) : controller.signal });}catch{throw new AuditFault(controller.signal.aborted?'timeout':init?.signal?.aborted?'aborted':'network');}
-                        requestStatus=response.status;requestEvidence=httpEvidence(response);observation.status=requestStatus;observation.evidence=requestEvidence;if(awaited){if(requestProbe.startsWith('contract:'))contractResponses.set(requestProbe,{status:requestStatus,evidence:requestEvidence});lastHttpStatus=requestStatus;lastHttpEvidence=requestEvidence;httpObservationProbe=requestProbe;}
+                        observation.responseBody.headersMs=Date.now()-requestStarted;requestStatus=response.status;requestEvidence=httpEvidence(response);observation.status=requestStatus;observation.evidence=requestEvidence;if(awaited){if(requestProbe.startsWith('contract:'))contractResponses.set(requestProbe,{status:requestStatus,evidence:requestEvidence});lastHttpStatus=requestStatus;lastHttpEvidence=requestEvidence;httpObservationProbe=requestProbe;}
                         if(response.redirected||response.status>=500){throw new AuditFault('http_status');}
                         if (!response.body)
                             return response;
                         const reader = response.body.getReader(), chunks: Uint8Array[] = [];
                         let bytes = 0;
                         for (;;) {
-                            let next:ReadableStreamReadResult<Uint8Array>;try{next=await reader.read();}catch{throw new AuditFault(controller.signal.aborted?'timeout':init?.signal?.aborted?'aborted':'response_read');}
-                            if (next.done)
-                                break;
+                            let next:ReadableStreamReadResult<Uint8Array>;try{next=await reader.read();}catch{observation.responseBody.readError=true;throw new AuditFault(controller.signal.aborted?'timeout':init?.signal?.aborted?'aborted':'response_read');}
+                            if (next.done){observation.responseBody.eof=true;break;}
+                            if(observation.responseBody.firstByteMs===null)observation.responseBody.firstByteMs=Date.now()-requestStarted;observation.responseBody.bytes+=next.value.byteLength;
                             bytes += next.value.byteLength;
                             aggregateBytes += next.value.byteLength;
                             if (bytes > 256 * 1024 || aggregateBytes > 16 * 1024 * 1024) {
@@ -135,13 +138,13 @@ export async function auditCorpusRelease(options: {
                         return new Response(Buffer.concat(chunks), { status: response.status, headers: response.headers });
                     }
                     finally {
-                        clearTimeout(timer);
+                        observation.responseBody.finishedMs=Date.now()-requestStarted;clearTimeout(timer);
                     }
                     }catch(error){const failure={...observation,status:requestStatus,evidence:requestEvidence,sdkErrorCode:null,category:error instanceof AuditFault?error.category:'protocol' as const,reason:error instanceof AuditFault?error.reason:'protocol'};if(awaited)failedRequest??=failure;else secondaryHttpFailure??=failure;throw error;}
                 };
                 const client = new Client({ name: 'local-corpus-feasibility', version: '1' }, versionNegotiationFor(protocol));
                 async function contractOperation<T>(id:string,action:()=>Promise<T>):Promise<T>{
-                    try{return await action();}catch(error){const response=contractResponses.get(id);const sdkErrorCode=sdkErrorCodeFor(error);const category=error instanceof AuditFault?error.category:sdkErrorCode==='RequestTimeout'?'timeout':response&&response.status>=400?'http_status':'protocol';failedRequest??={...(requestObservations.get(id)??{era:protocol,probeId:id,httpMethod:'POST',rpcMethod:null,requestId:null}),status:response?.status??null,evidence:response?.evidence??null,category,reason:error instanceof AuditFault?error.reason:sdkErrorCode==='RequestTimeout'?'sdk_request_timeout':category,sdkErrorCode};throw error;}
+                    try{return await action();}catch(error){const response=contractResponses.get(id);const sdkErrorCode=sdkErrorCodeFor(error);const category=error instanceof AuditFault?error.category:sdkErrorCode==='RequestTimeout'?'timeout':response&&response.status>=400?'http_status':'protocol';failedRequest??={...(requestObservations.get(id)??{era:protocol,probeId:id,httpMethod:'POST',rpcMethod:null,requestId:null,responseBody:{bytes:0,eof:false,readError:false,deadlineFired:false,headersMs:null,firstByteMs:null,finishedMs:null}}),status:response?.status??null,evidence:response?.evidence??null,category,reason:error instanceof AuditFault?error.reason:sdkErrorCode==='RequestTimeout'?'sdk_request_timeout':category,sdkErrorCode};throw error;}
                 }
                 const contractClient={getServerVersion:()=>client.getServerVersion(),getServerCapabilities:()=>client.getServerCapabilities(),listTools:()=>contractOperation('contract:tools-list',()=>client.listTools()),listPrompts:()=>contractOperation('contract:prompts-list',()=>client.listPrompts()),listResourceTemplates:()=>contractOperation('contract:resource-templates-list',()=>client.listResourceTemplates()),listResources:()=>contractOperation('contract:resources-list',()=>client.listResources())};
                 const probe = async (id: string, action: () => Promise<any>, allowError = false) => { current = id;stage='probe';failedRequest=undefined;lastHttpStatus=null;lastHttpEvidence=null;httpObservationProbe=null;
@@ -233,7 +236,8 @@ export async function auditCorpusRelease(options: {
                     const category=failedRequest?.category??(error instanceof AuditFault?error.category:sdkErrorCode==='RequestTimeout'?'timeout':lastHttpStatus!==null&&lastHttpStatus>=400?'http_status':categoryForStage(stage));
                     const observed=requestObservations.get(failedRequest?.probeId??current);
                     // Freeze the awaited operation before close() aborts shared transport/cancellation traffic.
-                    originatingFailure={...(failedRequest??observed??{era,probeId:current,httpMethod:'POST',rpcMethod:null,requestId:null,status:lastHttpStatus,evidence:lastHttpEvidence}),category,reason:failedRequest?.reason??(error instanceof AuditFault?error.reason:sdkErrorCode==='RequestTimeout'?'sdk_request_timeout':category),sdkErrorCode,stage};
+                    originatingFailure={...(failedRequest??observed??{era,probeId:current,httpMethod:'POST',rpcMethod:null,requestId:null,status:lastHttpStatus,evidence:lastHttpEvidence,responseBody:{bytes:0,eof:false,readError:false,deadlineFired:false,headersMs:null,firstByteMs:null,finishedMs:null}}),category,reason:failedRequest?.reason??(error instanceof AuditFault?error.reason:sdkErrorCode==='RequestTimeout'?'sdk_request_timeout':category),sdkErrorCode,stage};
+                    originatingFailure.responseBody={...originatingFailure.responseBody};
                     if(!failedRequest&&httpObservationProbe!==current){originatingFailure.status=null;originatingFailure.evidence=null;}
                     throw error;
                 }
@@ -248,6 +252,6 @@ export async function auditCorpusRelease(options: {
     finally {
         try{db.close();}catch{cleanupFailed=true;if(!failure){failure='cleanup';failureReason='database_close';current='database-close';stage='cleanup';lastHttpStatus=null;lastHttpEvidence=null;httpObservationProbe=null;}}
     }
-    return { schemaVersion: 'norton-aquinas-live.v1', role: options.role, endpoint: options.endpoint, serverVersion: options.serverVersion, productProfile: options.role === 'preview' ? '7' : '6', protocols: ['2025-11-25', '2026-07-28'], summaries, fixtureSha256: hash([core, spine, language]), fingerprints, checks, databaseSha256, manifestSha256, sourceBodyOutput: false, broaderV9Features: false, aggregateResponseBytes: aggregateBytes, durationMs: Date.now() - started,...(failure?{failure:{schemaVersion:'norton-aquinas-live-failure.v1' as const,category:failure,reason:failureReason,stage,role:options.role,era:era||null,probeId:trustedId(current),lastCompletedProbe:checks.some(c=>c.passed)?trustedId([...checks].reverse().find(c=>c.passed)!.id):null,lastCompletedEra:[...checks].reverse().find(c=>c.passed)?.era??null,completedChecks:checks.filter(c=>c.passed).length,httpExchanges:totalExchanges,eraHttpExchanges:eraExchanges,lastHttpStatus,httpObservationProbe:httpObservationProbe?trustedId(httpObservationProbe):null,httpEvidence:lastHttpEvidence,aggregateResponseBytes:aggregateBytes,cleanupFailed,httpMethod:originatingFailure?.httpMethod??null,rpcMethod:originatingFailure?.rpcMethod??null,requestId:originatingFailure?.requestId??null,sdkErrorCode:originatingFailure?.sdkErrorCode??null,secondaryHttpFailure:secondaryHttpFailure?{...secondaryHttpFailure,probeId:trustedId(secondaryHttpFailure.probeId)}:null}}:{}) };
+    return { schemaVersion: 'norton-aquinas-live.v1', role: options.role, endpoint: options.endpoint, serverVersion: options.serverVersion, productProfile: options.role === 'preview' ? '7' : '6', protocols: ['2025-11-25', '2026-07-28'], summaries, fixtureSha256: hash([core, spine, language]), fingerprints, checks, databaseSha256, manifestSha256, sourceBodyOutput: false, broaderV9Features: false, aggregateResponseBytes: aggregateBytes, durationMs: Date.now() - started,...(failure?{failure:{schemaVersion:'norton-aquinas-live-failure.v1' as const,category:failure,reason:failureReason,stage,role:options.role,era:era||null,probeId:trustedId(current),lastCompletedProbe:checks.some(c=>c.passed)?trustedId([...checks].reverse().find(c=>c.passed)!.id):null,lastCompletedEra:[...checks].reverse().find(c=>c.passed)?.era??null,completedChecks:checks.filter(c=>c.passed).length,httpExchanges:totalExchanges,eraHttpExchanges:eraExchanges,lastHttpStatus,httpObservationProbe:httpObservationProbe?trustedId(httpObservationProbe):null,httpEvidence:lastHttpEvidence,aggregateResponseBytes:aggregateBytes,cleanupFailed,httpMethod:originatingFailure?.httpMethod??null,rpcMethod:originatingFailure?.rpcMethod??null,requestId:originatingFailure?.requestId??null,sdkErrorCode:originatingFailure?.sdkErrorCode??null,responseBody:originatingFailure?.responseBody??null,secondaryHttpFailure:secondaryHttpFailure?{...secondaryHttpFailure,probeId:trustedId(secondaryHttpFailure.probeId)}:null}}:{}) };
     function sameFingerprints() { check(hash(fingerprints[0]) === hash(fingerprints[1]), 'dual_era_contract_mismatch'); }
 }
