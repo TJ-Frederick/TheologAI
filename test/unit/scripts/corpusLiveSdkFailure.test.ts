@@ -48,7 +48,7 @@ function fixture(mode:string){
   if(rpc.params?.arguments?.cursor==='not-a-valid-cursor')result.isError=true;
   row.status=200;return Response.json({jsonrpc:'2.0',id:scoped&&mode==='uncorrelated-200'?999999:rpc.id,result});
  })as typeof fetch;
- return{trace,run:()=>auditCorpusRelease({role:'preview',endpoint:'https://local.invalid/mcp',serverVersion:'3.6.0-preview',databasePath:path,root,fetch:fetchImpl})};
+ return{trace,run:(diagnosticStopAfterProbe?:'search:calvin-institutes')=>auditCorpusRelease({diagnosticStopAfterProbe,role:'preview',endpoint:'https://local.invalid/mcp',serverVersion:'3.6.0-preview',databasePath:path,root,fetch:fetchImpl})};
 }
 it.each([['ack-202',202],['uncorrelated-200',200]])('keeps the real SDK timeout and original%s response when cancellation aborts during close',async(mode,status)=>{
  const f=fixture(mode as string),report=await f.run();expect(report.failure).toMatchObject({category:'timeout',reason:'sdk_request_timeout',probeId:'search:calvin-institutes',httpMethod:'POST',rpcMethod:'tools/call',lastHttpStatus:status,sdkErrorCode:'RequestTimeout',secondaryHttpFailure:{rpcMethod:'notifications/cancelled',category:'aborted',status:null}});
@@ -65,3 +65,5 @@ it('distinguishes empty SSE EOF from a pending response without retaining conten
 it('captures the original body deadline and read error before close aborts other requests',async()=>{const f=fixture('body-stalled'),report=await f.run();expect(report.failure).toMatchObject({category:'timeout',reason:'timeout',lastHttpStatus:200,responseBody:{bytes:0,eof:false,readError:true,deadlineFired:true,headersMs:expect.any(Number),firstByteMs:null,finishedMs:expect.any(Number)}});expect(JSON.stringify(report)).not.toContain('SECRET_');});
 
 it('freezes pending primary body metrics before cleanup changes the reader state',async()=>{const f=fixture('body-close'),report=await f.run();expect(report.failure).toMatchObject({reason:'sdk_request_timeout',lastHttpStatus:200,responseBody:{bytes:0,eof:false,readError:false,deadlineFired:false,headersMs:expect.any(Number),firstByteMs:null,finishedMs:null}});expect(JSON.stringify(report)).not.toContain('SECRET_');});
+
+it('stops the explicit diagnostic prefix after the successful target without reading its next body',async()=>{const f=fixture('prefix-success'),report=await f.run('search:calvin-institutes');expect(report.failure).toMatchObject({category:'diagnostic_boundary',reason:'fixed_prefix_boundary',probeId:'search:calvin-institutes',lastCompletedProbe:'search:calvin-institutes',rpcMethod:'tools/call',responseBody:{eof:true,readError:false,bytes:expect.any(Number)}});const id=report.failure!.requestId as number;expect(f.trace.filter(r=>r.rpc==='tools/call'&&r.id===id)).toHaveLength(1);expect(f.trace.some(r=>r.id!==null&&r.id>id)).toBe(false);expect(report.failure!.responseBody!.bytes).toBeGreaterThan(0);});

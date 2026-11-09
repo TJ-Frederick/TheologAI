@@ -10,7 +10,7 @@ import { escapeFrozenEditionSectionContentForMarkdown } from '../src/kernel/edit
 import {createHash} from 'node:crypto';
 const sha=(v:string|Buffer)=>createHash('sha256').update(v).digest('hex');
 const hash=(v:unknown)=>sha(JSON.stringify(v));
-export const CORPUS_LIVE_FAILURE_CATEGORIES=['timeout','aborted','guard','network','http_status','response_size','response_read','transport_budget','protocol','tool_error','assertion','cleanup','unknown'] as const;
+export const CORPUS_LIVE_FAILURE_CATEGORIES=['timeout','aborted','guard','network','http_status','response_size','response_read','transport_budget','protocol','tool_error','assertion','cleanup','unknown','diagnostic_boundary'] as const;
 type FailureCategory=typeof CORPUS_LIVE_FAILURE_CATEGORIES[number];
 type FailureStage='initialize'|'contract'|'probe'|'assertion'|'parity'|'cleanup';
 class AuditFault extends Error {constructor(readonly category:FailureCategory,readonly reason:string=category){super('Corpus live audit failed');}}
@@ -33,6 +33,7 @@ export async function auditCorpusRelease(options: {
     root: string;
     fetch: typeof fetch;
     guard?:()=>void;
+    diagnosticStopAfterProbe?:'search:calvin-institutes';
 }) {
     const root = options.root;
     const parsed = new URL(options.endpoint);
@@ -153,6 +154,7 @@ export async function auditCorpusRelease(options: {
                         throw new AuditFault('tool_error','unexpected_tool_error');
                     validateResource(value);
                     checks.push({ role, era, id, passed: true, responseSha256: sha(JSON.stringify(value)) });
+                    if(options.diagnosticStopAfterProbe===id){stage='probe';throw new AuditFault('diagnostic_boundary','fixed_prefix_boundary');}
                     return value;
                 };
                 let eraFailed=false;

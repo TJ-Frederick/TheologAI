@@ -19,7 +19,7 @@ async function resolveExistingNortonPreview({github,context,pin,now=Date.now()})
  let run,jobs;
  for(const candidate of eligible.sort((a,b)=>Date.parse(b.updated_at)-Date.parse(a.updated_at))){
   const {data:roster}=await github.rest.actions.listJobsForWorkflowRun({...repo,run_id:candidate.id,per_page:100});check(roster.total_count<=100,'complete job roster');
-  if(roster.jobs.some(j=>j.name==='Diagnose fixed Norton scoped response (read-only)')){check(!pin,'diagnostic run is not pinned preview acceptance');continue;}
+  if(roster.jobs.some(j=>j.name==='Diagnose fixed Norton scoped response (read-only)'||j.name==='Diagnose Norton SDK prefix (read-only)')){check(!pin,'diagnostic run is not pinned preview acceptance');continue;}
   run=candidate;jobs=roster;break;
  }
  check(run&&jobs,'full protected validation, not diagnostic-only evidence');
