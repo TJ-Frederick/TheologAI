@@ -2,7 +2,7 @@
 import {createHash} from 'node:crypto';
 
 export const SCOPED_DIAGNOSTIC = Object.freeze({
-    schema: 'norton-scoped-response-diagnostic-approval.v1',
+    schema: 'norton-scoped-response-diagnostic-approval.v2',
     confirmation: 'DIAGNOSE ONLY THE FIXED NORTON SCOPED SEARCH RESPONSE',
     failedOperation: 'operation-retained-carry-20261106-9305cbfb17',
     reads: 10000,

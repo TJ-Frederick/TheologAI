@@ -1336,6 +1336,7 @@ jobs:
       - run: npm ci --ignore-scripts --no-audit
       - run: npm rebuild better-sqlite3 --ignore-scripts=false
       - name: Download exact retained native inputs
+        if: ${{ fromJSON(inputs.preview_validate_existing_json).schemaVersion != 'norton-scoped-response-diagnostic-approval.v2' }}
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           artifact-ids: '13454129353'
@@ -1345,6 +1346,7 @@ jobs:
           merge-multiple: true
           digest-mismatch: error
       - name: Download the exact prior quota-stop evidence
+        if: ${{ fromJSON(inputs.preview_validate_existing_json).schemaVersion != 'norton-scoped-response-diagnostic-approval.v2' }}
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           artifact-ids: '13453494842'
@@ -1354,6 +1356,7 @@ jobs:
           merge-multiple: true
           digest-mismatch: error
       - name: Stage pinned historical inputs without renewing proof age
+        if: ${{ fromJSON(inputs.preview_validate_existing_json).schemaVersion != 'norton-scoped-response-diagnostic-approval.v2' }}
         run: |
           npx --no-install tsx .github/scripts/retained-norton-inputs.ts \
             "$RUNNER_TEMP/retained-norton-inputs" "$RUNNER_TEMP/retained-norton-stop" "$RUNNER_TEMP/existing-preview"
@@ -1365,6 +1368,7 @@ jobs:
         run: |
           set -euo pipefail
           printf '%s\n' "$APPROVAL_JSON" > "$RUNNER_TEMP/continuation-request.json"
+          mkdir -p "$RUNNER_TEMP/existing-preview"
           git worktree add --detach "$RUNNER_TEMP/candidate-cc14" cc14e062d772e957a24a64bfc15a679ebaca8109
           npx --no-install wrangler deploy --dry-run --env preview --env-file /dev/null --outdir "$RUNNER_TEMP/existing-preview/auditor-bundle"
           npx --no-install tsx .github/scripts/validate-existing-norton-preview.ts prepare \
@@ -1423,6 +1427,7 @@ jobs:
         run: |
           set -euo pipefail
           printf '%s\n' "$APPROVAL_JSON" > "$RUNNER_TEMP/continuation-request.json"
+          mkdir -p "$RUNNER_TEMP/existing-preview"
           git worktree add --detach "$RUNNER_TEMP/candidate-cc14" cc14e062d772e957a24a64bfc15a679ebaca8109
           npx --no-install tsx .github/scripts/validate-existing-norton-preview.ts validate \
             "$RUNNER_TEMP/continuation-request.json" "$RUNNER_TEMP/existing-preview" \
