@@ -16,7 +16,9 @@ export type CorpusControlApi = {
         variables: Record<string, unknown>;
     }): Promise<Response>;
 };
+export type BoundPreview = { mode: 'already-bound-preview.v1'; databaseId: string; previewDeploymentId: string; previewVersionId: string; productionDatabaseId: string; productionDeploymentId: string; productionVersionId: string };
 type Dependencies = {
+    boundPreview?: BoundPreview;
     api: CorpusControlApi;
     role: 'preview' | 'production';
     now?: () => number;
@@ -327,7 +329,7 @@ async function pagesFunctionAuthority(api: ReadOnlyApi, account: string, project
     }
     return { databaseCreated, databaseCreatedAt: database.created_at, deployments: completed.sort((a, b) => a.id.localeCompare(b.id)), histories };
 }
-async function inventory(api: ReadOnlyApi) {
+async function inventory(api: ReadOnlyApi, boundPreview?: BoundPreview) {
     const account = `/accounts/${CORPUS_ACCOUNT_ID}`;
     const scripts = await api.list(`${account}/workers/scripts`, array, true);
     const names = scripts.map(script => name(script.id)).sort();
@@ -393,7 +395,21 @@ async function inventory(api: ReadOnlyApi) {
     const result = { workers, pages };
     const bindingCount = workers.reduce((sum, worker) => sum + [...worker.configuredD1, ...worker.versions.flatMap(version => version.databases)].filter(id => id === api.target.databaseId).length, 0)
         + pages.reduce((sum, project) => sum + [...project.production, ...project.preview].filter(id => id === api.target.databaseId).length, 0);
-    check(bindingCount === 0, 'candidate_database_is_bound');
+    if (boundPreview) {
+        check(api.target.databaseId === TARGETS.preview.databaseId && boundPreview.databaseId === api.target.databaseId, 'bound_preview_target');
+        const preview = workers.find(worker => worker.name === 'theologai-preview');
+        const production = workers.find(worker => worker.name === 'theologai');
+        check(bindingCount === 2 && preview?.deploymentId === boundPreview.previewDeploymentId
+            && JSON.stringify(preview.configuredD1) === JSON.stringify([api.target.databaseId])
+            && preview.versions.length === 1 && preview.versions[0]?.versionId === boundPreview.previewVersionId
+            && preview.versions[0]?.percentage === 100
+            && JSON.stringify(preview.versions[0]?.databases) === JSON.stringify([api.target.databaseId]), 'bound_preview_assignment_changed');
+        check(production?.deploymentId === boundPreview.productionDeploymentId
+            && JSON.stringify(production.configuredD1) === JSON.stringify([boundPreview.productionDatabaseId])
+            && production.versions.length === 1 && production.versions[0]?.versionId === boundPreview.productionVersionId
+            && production.versions[0]?.percentage === 100
+            && JSON.stringify(production.versions[0]?.databases) === JSON.stringify([boundPreview.productionDatabaseId]), 'bound_production_assignment_changed');
+    } else check(bindingCount === 0, 'candidate_database_is_bound');
     return result;
 }
 export const CORPUS_USAGE_QUERY = `query CorpusReleaseUsage($accountTag: string!, $start: Date!, $end: Date!) {
@@ -443,12 +459,12 @@ async function observeExclusiveUsage(api: ReadOnlyApi) {
 }
 export async function captureUnboundCorpusControl(dependencies: Dependencies) {
     const api = new ReadOnlyApi(dependencies);
-    const before = await inventory(api);
+    const before = await inventory(api, dependencies.boundPreview);
     const metadata = row((await api.rest('/accounts/' + CORPUS_ACCOUNT_ID + '/d1/database/' + api.target.databaseId)).result);
     check(metadata.uuid === api.target.databaseId && metadata.name === api.target.databaseName, 'candidate_database_identity_changed');
     check(count(metadata.file_size) && metadata.file_size <= 367001600, 'candidate_size_unknown_or_over_budget');
     const exclusiveUsage = await observeExclusiveUsage(api);
-    const after = await inventory(api);
+    const after = await inventory(api, dependencies.boundPreview);
     check(hash(before) === hash(after), 'bindings_or_deployments_changed_during_capture');
     const capturedAt = new Date(api.now()).toISOString();
     check(api.now() - api.started <= CORPUS_CONTROL_LIMITS.durationMs && capturedAt.slice(0, 10) === new Date(api.started).toISOString().slice(0, 10), 'utc_rollover_or_stale_capture');

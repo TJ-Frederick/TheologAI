@@ -61,6 +61,7 @@ const ACTIVATION_PATHS=Object.freeze([
   "src/mcp/server.ts",
   "src/presenters/historicalHierarchyStructured.ts",
   "src/services/historical/HistoricalHierarchyService.ts",
+  "src/services/historical/LocalPrimarySourceSearchProvider.ts",
   "src/tools/toolRegistry.ts",
   "src/tools/v2/historicalHierarchy.ts",
   "src/tools/v2/index.ts",

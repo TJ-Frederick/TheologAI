@@ -1,12 +1,15 @@
 /** Complete synthetic control plane for local operator/read transport tests. Never performs network IO. */
+import {boundPreview} from './boundPreviewFixture.js';
 import {ACCOUNT,POLICY,TARGETS} from '../../scripts/norton-aquinas-release-policy.mjs';
 import {CORPUS_USAGE_QUERY} from '../../scripts/corpus-release-control.js';
 type Result={rows:Record<string,unknown>[];rowsRead:number;rowsWritten:number};
-export function corpusTransportFixture(options:{role:'preview'|'production';activated?:boolean;drift?:boolean;query?:(sql:string,credential:string)=>Promise<Result>|Result;record?:(path:string,method:string)=>void;advance?:()=>void}){
+export function corpusTransportFixture(options:{role:'preview'|'production';activated?:boolean;boundPreview?:boolean;drift?:boolean;query?:(sql:string,credential:string)=>Promise<Result>|Result;record?:(path:string,method:string)=>void;advance?:()=>void}){
  let reads=100,writes=0;
  const versions={preview:'11111111-1111-4111-8111-111111111111',production:'22222222-2222-4222-8222-222222222222'};
+ if(options.boundPreview){versions.preview=boundPreview.previewVersionId;versions.production=boundPreview.productionVersionId;}
  const deployments={preview:'33333333-3333-4333-8333-333333333333',production:'44444444-4444-4444-8444-444444444444'};
- const binding=(role:'preview'|'production')=>role==='production'?(options.role==='production'&&options.activated?TARGETS.production.databaseId:POLICY.rollback.databaseId):(options.role==='preview'&&!options.activated?TARGETS.production.databaseId:TARGETS.preview.databaseId);
+ if(options.boundPreview){deployments.preview=boundPreview.previewDeploymentId;deployments.production=boundPreview.productionDeploymentId;}
+ const binding=(role:'preview'|'production')=>role==='production'?(options.role==='production'&&options.activated?TARGETS.production.databaseId:POLICY.rollback.databaseId):(options.role==='preview'&&!options.activated&&!options.boundPreview?TARGETS.production.databaseId:TARGETS.preview.databaseId);
  const envelope=(result:unknown,info?:unknown)=>Response.json({success:true,errors:[],messages:[],result,...(info?{result_info:info}:{})});
  const fetchImpl=(async(input:any,init:any={})=>{
   const url=new URL(String(input)),path=url.pathname,method=init.method??'GET';options.record?.(path,method);

@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto';
 import { appendFileSync, writeFileSync } from 'node:fs';
 import {TARGETS as APPLICATION_TARGETS} from './application-release-policy.mjs';
 import { POLICY, ACCOUNT, TARGETS } from './norton-aquinas-release-policy.mjs';
-import { captureUnboundCorpusControl } from './corpus-release-control.js';
+import { type BoundPreview, captureUnboundCorpusControl } from './corpus-release-control.js';
 import {identifyProtectedPreviewToken} from './corpus-token-identity.js';
 import { createCorpusApi } from './corpus-release-api.js';
 import { ALL_FTS, type ProofQuery, type ProofRow } from './corpus-source-proof.js';
@@ -64,7 +64,8 @@ export class CorpusProofTransport {
   private latestWrites = 0;
   private integrityOnly = false;
   private controls: unknown;
-  private candidateWitness: {kind:'unbound-corpus';databaseId:string;inventorySha256:string} | undefined;
+  private candidateWitness: {kind:'unbound-corpus'|'bound-preview-corpus';databaseId:string;inventorySha256:string} | undefined;
+  private readonly boundPreview: BoundPreview | undefined;
   private halted = false;
   private current: ProofQuery | null = null;
   private bytes = 0;
@@ -72,7 +73,7 @@ export class CorpusProofTransport {
   private readonly liveAuditReserve: number;
   private readonly budgetScope: BudgetScope;
   readonly metering = { rowsRead: 0, rowsWritten: 0, requests: 0, retries: 0, unknownAttempts: 0, integrityCommands: 0 };
-  constructor(private readonly options: { role: Role; token: string; readBudget: number; eventFile: string; fetch?: typeof fetch; previewQuotaBuffer?: boolean; historicalExceptions?: boolean; activated?: boolean; policy?: 'application-only'|'norton-aquinas.v1'; knownRowsRead?:number;productionAuthorization?:ProductionBudgetAuthorization }) {
+  constructor(private readonly options: { role: Role; token: string; readBudget: number; eventFile: string; fetch?: typeof fetch; previewQuotaBuffer?: boolean; historicalExceptions?: boolean; activated?: boolean; policy?: 'application-only'|'norton-aquinas.v1'; knownRowsRead?:number;boundPreviewAuthorization?:ProductionBudgetAuthorization;productionAuthorization?:ProductionBudgetAuthorization }) {
     check(options.knownRowsRead===undefined || count(options.knownRowsRead),'known read floor');
     this.corpus=options.policy===POLICY.policy; this.targets=this.corpus?TARGETS:APPLICATION_TARGETS;
     check(!options.policy || options.policy==='application-only' || this.corpus,'closed transport policy');
@@ -81,6 +82,11 @@ export class CorpusProofTransport {
     if(this.corpus)check(!options.previewQuotaBuffer && options.historicalExceptions !== true,'corpus policy forbids historical quota exceptions');
     else check(!options.previewQuotaBuffer || options.role==='preview' && this.day===PREVIEW_QUOTA_BUFFER_DAY,'preview quota buffer date/role');
     check(!options.activated || this.corpus && options.readBudget===0,'activated observer is metadata only');
+    if(options.boundPreviewAuthorization){
+      check(this.corpus && options.role==='preview' && !options.activated && !options.productionAuthorization,'bound preview mode');
+      const context=options.boundPreviewAuthorization;
+      this.boundPreview=operatorAuthority.boundPreviewForPackage(context.package,context);
+    }
     if(options.productionAuthorization)check(this.corpus&&options.role==='production','production-only account authority');
     this.accountCeiling = options.productionAuthorization?operatorAuthority.productionAccountCeiling(options.productionAuthorization.package,options.productionAuthorization):options.previewQuotaBuffer ? 5_000_000 : 4_000_000;
     this.liveAuditReserve = options.previewQuotaBuffer ? 500_000 : this.corpus ? POLICY.liveReads + POLICY.controlReads : 0;
@@ -91,6 +97,7 @@ export class CorpusProofTransport {
   private event(value: unknown): void { appendFileSync(this.options.eventFile, JSON.stringify({ at: new Date().toISOString(), ...row(value) }) + '\n', { mode: 0o600, flush: true }); }
   private async request(path: string, method: 'GET' | 'POST', body?: unknown): Promise<ApiResult> {
     check(!this.halted && Date.now() - this.started < 5_400_000 && new Date().toISOString().slice(0, 10) === this.day, 'halted, expired or UTC crossing');
+    if(this.options.boundPreviewAuthorization){const context=this.options.boundPreviewAuthorization;operatorAuthority.boundPreviewForPackage(context.package,context);}
     const prefix = `/accounts/${ACCOUNT}`;
     const databasePath = `${prefix}/d1/database/${this.targets[this.options.role].databaseId}`;
     check(path === '/graphql' && method === 'POST' || path === databasePath + '/query' && method === 'POST'
@@ -138,7 +145,7 @@ export class CorpusProofTransport {
   private expectedBinding(role:Role):string {
     if(!this.corpus)return this.targets[role].databaseId;
     if(role==='production')return this.options.role==='production'&&this.options.activated?TARGETS.production.databaseId:POLICY.rollback.databaseId;
-    return this.options.role==='preview'&&!this.options.activated?TARGETS.production.databaseId:TARGETS.preview.databaseId;
+    return this.options.role==='preview'&&!this.options.activated&&!this.boundPreview?TARGETS.production.databaseId:TARGETS.preview.databaseId;
   }
   private async snapshot(): Promise<unknown> {
     const result = [];
@@ -162,13 +169,13 @@ export class CorpusProofTransport {
     const started=Date.now();let failedAccess=false;
     const api=createCorpusApi(this.options.role,async()=>this.options.token,this.options.fetch??fetch,event=>{this.event(event);const e=event as any;if(e.kind==='corpus-control-http'&&(e.httpStatus===401||e.httpStatus===403))failedAccess=true;});
     let capture:Awaited<ReturnType<typeof captureUnboundCorpusControl>>;
-    try{capture=await captureUnboundCorpusControl({role:this.options.role,api});}
+    try{capture=await captureUnboundCorpusControl({role:this.options.role,api,boundPreview:this.boundPreview});}
     catch(error){
       if(this.options.role==='preview'&&failedAccess){try{this.event({kind:'preview-token-identity',...await identifyProtectedPreviewToken(this.options.token,this.options.fetch??fetch,Math.min(started+120000,Date.now()+30000))});}catch{this.event({kind:'preview-token-identity-unavailable',sqlCalls:0,writes:0});}}
       throw error;
     }
     check(Date.now()-Date.parse(capture.capturedAt)<=50_000,'stale complete candidate inventory');
-    const witness={kind:'unbound-corpus' as const,databaseId:capture.databaseId,inventorySha256:capture.inventorySha256};
+    const witness={kind:this.boundPreview?'bound-preview-corpus' as const:'unbound-corpus' as const,databaseId:capture.databaseId,inventorySha256:capture.inventorySha256};
     if(this.candidateWitness) check(JSON.stringify(witness)===JSON.stringify(this.candidateWitness),'candidate inventory changed');
     this.candidateWitness=witness; this.inventoryObservedAt=Date.parse(capture.capturedAt);
     this.event({kind:'complete-unbound-inventory',capture});
@@ -196,7 +203,7 @@ export class CorpusProofTransport {
     if(this.corpus){
     check(Array.isArray(admission.controls),'complete inventory witness missing');
     const witness=admission.controls.at(-1) as any;
-    check(witness?.kind==='unbound-corpus' && witness.databaseId===this.targets[this.options.role].databaseId && /^[a-f0-9]{64}$/.test(witness.inventorySha256),'complete inventory witness target');
+    check(witness?.kind===(this.boundPreview?'bound-preview-corpus':'unbound-corpus') && witness.databaseId===this.targets[this.options.role].databaseId && /^[a-f0-9]{64}$/.test(witness.inventorySha256),'complete inventory witness target');
     this.candidateWitness=witness; this.inventoryObservedAt=Date.parse(admission.inventoryObservedAt ?? '');
     }
     this.controls=await this.snapshot();check(JSON.stringify(this.controls)===JSON.stringify(admission.controls),'protected admission controls changed');

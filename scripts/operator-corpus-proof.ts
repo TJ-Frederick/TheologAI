@@ -91,6 +91,7 @@ export function createOperatorChallenge(role: 'preview' | 'production', classifi
     reservedReads: selected.reservedReads, hardReadCap: selected.hardReadCap, diagnosticCommands: 4, admission };
   return requireOperatorChallenge(c, now);
 }
+export function boundPreviewBudgetForChallenge(c:OperatorChallenge){requireOperatorChallenge(c);return c.authorization.authorization.boundPreview?{package:c.authorization,sourceCommit:c.sourceCommit,sourceTree:c.sourceTree,runId:c.runId}:undefined;}
 export function productionBudgetForChallenge(c:OperatorChallenge){requireOperatorChallenge(c);return c.accountReadCeiling?{package:c.authorization,sourceCommit:c.sourceCommit,sourceTree:c.sourceTree,runId:c.runId}:undefined;}
 export function operatorApproval(c: OperatorChallenge) {
   const selected=policyForIdentity(c.releasePolicy);
@@ -182,6 +183,7 @@ export async function finishOperatorMetadata<T>(finish: () => Promise<T>, onRetr
 
 export function admitOperatorBudget(ledger: any, c: OperatorChallenge, plannedReads: number): void {
   const cumulative=cumulativeAllowance(c);
+  if(c.authorization.authorization.boundPreview)check(JSON.stringify(ledger.cumulativeTask)===JSON.stringify(c.authorization.authorization.cumulativeTask),'retained cumulative task reservations');
   check(ledger.schemaVersion === 'theologai-operator-proof-budget.v1' && ledger.authorizationId === c.authorizationId
     && integer(ledger.readsSpentOrReserved) && integer(ledger.writesSpentOrReserved) && integer(ledger.diagnosticCommands) && Array.isArray(ledger.attempts)
     && ledger.ledgerId === c.authorization.authorization.ledgerId && ledger.authorizationSha256 === sha(JSON.stringify(c.authorization))
@@ -342,7 +344,7 @@ export async function runOperatorProof(input: { challenge:OperatorChallenge; dir
     ledger.attempts.push(attempt); save();
     try {
       transport = new CorpusProofTransport({policy:policyForIdentity(c.releasePolicy).id,role:c.role,token:input.token,readBudget:16_384,eventFile:input.output+'.receipt.json.events.jsonl',
-        previewQuotaBuffer:false,historicalExceptions:false,productionAuthorization:productionBudgetForChallenge(c)});
+        previewQuotaBuffer:false,historicalExceptions:false,boundPreviewAuthorization:boundPreviewBudgetForChallenge(c),productionAuthorization:productionBudgetForChallenge(c)});
       const startedAt=new Date().toISOString(); await transport.startIntegrity(c.admission);
       const results=[];
       for(const q of integrityQueries()) {
@@ -377,7 +379,7 @@ async function main() {
     check(args.length===2,'ledger initialization arguments');
     const c=requireOperatorChallenge(readJson(args[0]!));await requireLiveOperatorGateParallel(c);
     writeFileSync(args[1]!,JSON.stringify({schemaVersion:'theologai-operator-proof-budget.v1',authorizationId:c.authorizationId,
-      ledgerId:c.authorization.authorization.ledgerId,authorizationSha256:sha(JSON.stringify(c.authorization)),consumed:false,
+      ...(c.authorization.authorization.boundPreview?{cumulativeTask:c.authorization.authorization.cumulativeTask}:{}),ledgerId:c.authorization.authorization.ledgerId,authorizationSha256:sha(JSON.stringify(c.authorization)),consumed:false,
       readsSpentOrReserved:0,writesSpentOrReserved:0,diagnosticCommands:0,attempts:[]},null,2)+'\n',{flag:'wx',mode:0o600});return;
   }
   if (command==='challenge') {
@@ -394,7 +396,7 @@ async function main() {
     authenticateLiveOperatorPackage(authorization);
     check(process.env.CLOUDFLARE_ACCOUNT_ID===ACCOUNT && process.env.CLOUDFLARE_API_TOKEN,'existing read-only deployment credential');
     const transport=new CorpusProofTransport({policy:policyForClassification(p.classification).id,role:role as 'preview'|'production',token:process.env.CLOUDFLARE_API_TOKEN!,readBudget:p.readBudget,eventFile:output!+'.admission.jsonl',
-      previewQuotaBuffer:false,historicalExceptions:false,productionAuthorization:auth.accountReadCeiling?{package:authorization,sourceCommit:p.classification.sourceCommit,sourceTree:p.classification.sourceTree,runId:process.env.GITHUB_RUN_ID!}:undefined});
+      previewQuotaBuffer:false,historicalExceptions:false,boundPreviewAuthorization:auth.boundPreview?{package:authorization,sourceCommit:p.classification.sourceCommit,sourceTree:p.classification.sourceTree,runId:process.env.GITHUB_RUN_ID!}:undefined,productionAuthorization:auth.accountReadCeiling?{package:authorization,sourceCommit:p.classification.sourceCommit,sourceTree:p.classification.sourceTree,runId:process.env.GITHUB_RUN_ID!}:undefined});
     await transport.start();
     const c=createOperatorChallenge(role as 'preview'|'production',{sourceCommit:p.classification.sourceCommit,sourceTree:p.classification.sourceTree,...(p.classification.releasePolicy?{releasePolicy:p.classification.releasePolicy,applicationOnly:false}:{})},digest!,process.env,Date.now(),transport.protectedAdmission(),authorization);
     writeFileSync(output!,JSON.stringify(c,null,2)+'\n',{flag:'wx',mode:0o600}); return;
@@ -409,7 +411,7 @@ async function main() {
     const integrity=verifyOperatorIntegrity(readJson(integrityFile!),c);
     check(process.env.CLOUDFLARE_ACCOUNT_ID===ACCOUNT && process.env.CLOUDFLARE_API_TOKEN,'existing read-only deployment credential');
     const reader=new CorpusProofTransport({policy:policyForIdentity(c.releasePolicy).id,role:c.role,token:process.env.CLOUDFLARE_API_TOKEN!,readBudget:p.readBudget-integrity.receipt.metering.rowsRead,knownRowsRead:c.admission.rowsRead+integrity.receipt.metering.rowsRead,eventFile:output!+'.events.jsonl',
-      previewQuotaBuffer:false,historicalExceptions:false,productionAuthorization:productionBudgetForChallenge(c)});
+      previewQuotaBuffer:false,historicalExceptions:false,boundPreviewAuthorization:boundPreviewBudgetForChallenge(c),productionAuthorization:productionBudgetForChallenge(c)});
     let lastGuard=0; const transport=composeReadProof(reader,integrity,()=>{requireOperatorChallenge(c);if(Date.now()-lastGuard>30_000){requireLiveOperatorGate(c);lastGuard=Date.now();}},c.admission.controls);
     try {
       const receipt=await runFreshApplicationCorpusCheck({root:process.cwd(),role:c.role,directory:directory!,planSha256:digest!,output:output!,approval:operatorApproval(c),token:process.env.CLOUDFLARE_API_TOKEN!,transport});
@@ -436,7 +438,7 @@ async function main() {
     check(c.sourceCommit===p.classification.sourceCommit && c.sourceTree===p.classification.sourceTree && c.sourcePlanSha256===digest, 'gate source');
     const envelope=verifyOperatorEnvelope(readJson(envelopeFile!),c,p);
     check(process.env.CLOUDFLARE_ACCOUNT_ID===ACCOUNT && process.env.CLOUDFLARE_API_TOKEN, 'existing read-only deployment credential');
-    const observer=new CorpusProofTransport({policy:policyForIdentity(c.releasePolicy).id,role:c.role,token:process.env.CLOUDFLARE_API_TOKEN!,readBudget:0,eventFile:output!+'.controls.jsonl',productionAuthorization:productionBudgetForChallenge(c)});
+    const observer=new CorpusProofTransport({policy:policyForIdentity(c.releasePolicy).id,role:c.role,token:process.env.CLOUDFLARE_API_TOKEN!,readBudget:0,eventFile:output!+'.controls.jsonl',boundPreviewAuthorization:boundPreviewBudgetForChallenge(c),productionAuthorization:productionBudgetForChallenge(c)});
     const controls=await observer.observeControls();
     check(JSON.stringify(controls)===JSON.stringify(envelope.receipt.controls), 'operator/gate controls changed');
     check(Date.parse(c.expiresAt)-Date.now()>=15*60000,'activation needs full live/control time reserve');

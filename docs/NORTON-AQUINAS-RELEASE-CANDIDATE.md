@@ -1,5 +1,23 @@
 # Norton/Aquinas successor candidate
 
+## Active local optimization — November 9
+
+The two scan-local lowercase calls are optimized with per-code-point indexing
+preserved. The existing full-proof/operator path gains an explicitly owner/source-
+bound already-active preview mode; historical original-runtime recovery remains
+pinned to `7fe92b0`, and initial unbound/production activation semantics remain.
+Local validation and independent review are in progress; no live attempt or
+production action is authorized. Review evidence: retained local
+`test-output/cpu-review-20261109/REVIEW.txt`; implementation results will be retained
+under `test-output/optimization-20261109/`.
+
+A future preview needs a separate exact-source approval for 3.66M additional
+reads and four integrity writes, preserving 4.20M old read holds, seven actual /
+eight held prior diagnostic writes, the 200K margin, 8.06M cumulative ceiling and
+12 held diagnostic writes. The daily operating ceiling remains 4M (effective
+admission usage at most 140K); stay Free. No historical proof expiry is extended.
+
+
 Local implementation from reviewed main `328168d5b817e9eaa0e702de382adc2c46c858ef`. This succeeds frozen PR #168 without changing its source or evidence. The existing security release and current dependencies, runtime floor, input limits, protected environments, shared preview concurrency and native operator-artifact bridge remain intact. Broader v9/CCEL execution and SEC-06 stay deferred. `CURRENT-RELEASE.md` remains assignment authority; this document grants no remote authority.
 
 The local candidate has twelve tools, 36 flat historical works, Norton’s 1,250 preserved source segments and a separate Aquinas hierarchy: 3,184 direct bodies / 3,185 nodes, four authored parts through Tertia Q90, excluding the Supplement. The current deployed corpus is schema0009 with 35 flat works / eleven tools. No deployed assignment is changed by this candidate.
