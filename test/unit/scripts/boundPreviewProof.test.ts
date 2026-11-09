@@ -51,7 +51,8 @@ it.each(['valid', 'unbound-mode', 'wrong-version', 'wrong-deployment', 'wrong-bi
       if (path.includes('/theologai-preview/')) {
         if (path.endsWith('/settings') && fault === 'wrong-binding') v.result.bindings[0].id = boundPreview.productionDatabaseId;
         if (path.endsWith('/deployments') && (fault === 'wrong-deployment' || fault === 'second-scan-drift' && scans > 1)) v.result.deployments[0].id = boundPreview.productionDeploymentId;
-        if (path.endsWith('/deployments') && (fault === 'wrong-version' || fault === 'post-inventory-race' && scans === 2 && new URL(String(input)).searchParams.get('per_page') === '1')) v.result.deployments[0].versions[0].version_id = boundPreview.productionVersionId;
+        if (path.endsWith('/deployments') && fault === 'post-inventory-race' && scans === 2 && new URL(String(input)).searchParams.get('per_page') === '1') v.result.deployments[0].id = boundPreview.productionDeploymentId;
+        if (path.endsWith('/deployments') && fault === 'wrong-version') v.result.deployments[0].versions[0].version_id = boundPreview.productionVersionId;
       }
       if (path.includes('/theologai/deployments') && fault === 'production-drift') v.result.deployments[0].id = boundPreview.previewDeploymentId;
       return Response.json(v);
@@ -62,7 +63,7 @@ it.each(['valid', 'unbound-mode', 'wrong-version', 'wrong-deployment', 'wrong-bi
     if (fault === 'valid') {
       await transport.start(); expect(transport.protectedAdmission().controls).toContainEqual(expect.objectContaining({ kind: 'bound-preview-corpus' }));
       await transport.finish();
-    } else await expect(transport.start()).rejects.toThrow();
+    } else await expect(transport.start()).rejects.toThrow(fault === 'post-inventory-race' ? 'owner-pinned bound assignment changed' : undefined);
     expect(sql).toBe(0);
   } finally { clock.mockRestore(); rmSync(directory, { recursive: true, force: true }); }
 });
