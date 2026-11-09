@@ -6,8 +6,13 @@ The two scan-local lowercase calls are optimized with per-code-point indexing
 preserved. The existing full-proof/operator path gains an explicitly owner/source-
 bound already-active preview mode; historical original-runtime recovery remains
 pinned to `7fe92b0`, and initial unbound/production activation semantics remain.
-Local validation and independent review are in progress; no live attempt or
-production action is authorized. Review evidence: retained local
+Independent review has cleared the implementation. Local compiled Workerd
+acceptance passed 370 checks plus eight edge exchanges (390 total), with zero
+external attempts. Full native proof passed 39 tables / 1,635,226 rows, global
+quick_check, FK equivalence and all four rank-1 checks; the fresh source plan
+requires at most 3,544,615 reads. Language reproduction passed 72 artifacts.
+Final coverage, historical rehearsal and ordinary exact-head CI are finishing;
+no live attempt or production action is authorized. Review evidence: retained local
 `test-output/cpu-review-20261109/REVIEW.txt`; implementation results will be retained
 under `test-output/optimization-20261109/`.
 
