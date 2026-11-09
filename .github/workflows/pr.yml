@@ -130,7 +130,7 @@ jobs:
           # it cannot recover the exact original bytes using statistics pages only.
           npx --no-install tsx scripts/build-database.ts --output "$RUNNER_TEMP/norton-recovery-rehearsal/source/source.db"
           git worktree add --detach "$RUNNER_TEMP/norton-recovery-runtime" 7fe92b0c0398c09b0f07c27e98a39b42194bac49
-          ln -s "$GITHUB_WORKSPACE/node_modules" "$RUNNER_TEMP/norton-recovery-runtime/node_modules"
+          cp -a "$GITHUB_WORKSPACE/node_modules" "$RUNNER_TEMP/norton-recovery-runtime/node_modules"
           (cd "$RUNNER_TEMP/norton-recovery-runtime" && npx --no-install wrangler deploy --dry-run --env preview --env-file /dev/null --outdir "$RUNNER_TEMP/norton-recovery-rehearsal/auditor-bundle")
           THEOLOGAI_NORTON_RECOVERY_ROOT="$RUNNER_TEMP/norton-recovery-runtime" \
           THEOLOGAI_NORTON_RECOVERY_DATABASE="$RUNNER_TEMP/norton-recovery-rehearsal/source/source.db" \
